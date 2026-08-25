@@ -11,3 +11,15 @@ alter table public.chat_turns
   foreign key (committed_attempt_id, id, subject_id)
   references public.chat_turn_attempts(id, turn_id, subject_id)
   deferrable initially immediate;
+
+alter table public.reading_sessions
+  add constraint reading_sessions_current_reading_fk
+  foreign key (current_reading_id, id, subject_id)
+  references public.readings(id, reading_session_id, subject_id)
+  deferrable initially deferred;
+
+alter table public.readings
+  add constraint readings_committed_execution_attempt_fk
+  foreign key (committed_execution_attempt_id, id, subject_id)
+  references public.reading_execution_attempts(id, reading_id, subject_id)
+  deferrable initially deferred;
