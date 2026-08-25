@@ -227,7 +227,7 @@ select pg_temp.assert_fails(
 select pg_temp.assert_fails(
   'message turn cannot cross thread or owner',
   $$insert into public.conversation_messages(id, thread_id, subject_id, turn_id, sequence_no, sender_type, body_text, content_hash, created_at)
-    values ('34000000-0000-0000-0000-000000000003', '30000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000002', '32000000-0000-0000-0000-000000000001', 1, 'user', 'cross thread', 'hmac:v1:message-3', now())$$,
+    values ('34000000-0000-0000-0000-000000000003', '30000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000002', '32000000-0000-0000-0000-000000000001', 1, 'system', 'cross thread', 'hmac:v1:message-3', now())$$,
   'conversation_messages_turn_thread_subject_fk'
 );
 
