@@ -1,0 +1,302 @@
+# 명하 Verification / E2E Test Plan v0.3 — Full Audit
+
+> Product: **명하 (Myeongha)**  
+> Pack Version: **v0.3**  
+> Date: **2026-08-25**  
+> Source Authority: `Usecase_re_reviewed_v2(1).md`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`, `Myeonghwa_Personalized_Interpretation_Architecture_v1.3_THIRD_REVIEW(1).md`  
+> Rule: source가 결정하지 않은 implementation-critical 사항은 `OPEN-P0`, 비차단 선택은 `CANDIDATE`, source 간 충돌은 `SOURCE_AUTHORITY_GAPS.md`에 기록한다.
+
+---
+
+## 1. 완료 Evidence Rule
+
+```text
+Implementation
++ Automated Tests
++ Contract/Schema Evidence
++ Security Negative Tests
++ Concurrency/Idempotency Tests
++ Failure Recovery
++ E2E Vertical Slice
++ Source/P0 Gate Evidence for enabled features
+```
+
+화면 노출 또는 LLM 한 번 성공은 완료 근거가 아니다.
+
+## 2. Test Layers
+
+```text
+L0 Spec traceability / static registry
+L1 Unit / policy
+L2 DB schema / constraint / trigger / RLS
+L3 API command contract
+L4 Saju integration contract
+L5 AI runtime / content contract
+L6 Web/Mobile client integration
+L7 E2E vertical slice
+L8 failure/concurrency/security
+L9 release/regression
+```
+
+## 3. Spec Traceability Gate
+
+`SPEC_TRACEABILITY_MATRIX.md`의 모든 launch-relevant UC는 최소:
+
+```text
+behavior spec
++ API/command owner
++ persistence/state owner if applicable
++ test gate
+```
+
+를 가져야 한다. `UNMAPPED` 0.
+
+## 4. DB Gate
+
+- 59-table ERD catalog coverage
+- actual catalog diff(table/column/FK/UNIQUE/CHECK/trigger) = 0
+- phantom FK/column = 0
+- same-owner composite FK deny
+- append-only/immutable mutation deny
+- partial unique behavior
+- deferrable finalization
+- allocator/concurrency
+- migration replay/catalog hash
+- `SRC-01`, `SRC-05`, `SRC-06` schema impacts resolved before relevant final migration baseline
+
+## 5. Auth / RLS / Privacy Gate
+
+`P0-AUTH-01` DECIDED 이후 selected execution model로 실제 RLS test.
+
+- A→B birth/thread/memory/reading/target/device deny
+- forged DB subject context/JWT claim deny
+- guest direct DB deny
+- merged history current endpoint deny
+- dedicated merged history read-only allow
+- merged history write deny
+- revoked/future-character grant context exclusion
+- public share → private reading deny
+- deletion_pending subject → new AI/Saju/purchase deny
+
+## 6. API Workflow Gate
+
+기존 core 외 반드시:
+
+- guest bootstrap
+- new-signup promotion
+- existing-member merge/conflict resolution
+- profile nickname update
+- target-person CRUD/isolation
+- chat retry + abandon
+- reading clarification + transient retry
+- conversation delete scope semantics
+- memory session-only / private / explicit grants / forget
+- device installation register/revoke
+- account deletion job
+- admin content release authorization
+
+## 7. Chat Gate
+
+- same clientTurnId same request → same turn
+- same ID different request → conflict
+- one in-flight thread concurrency
+- retryable → new attempt same turn
+- abandon retryable → next turn possible
+- committed response-loss retry → no duplicate user/assistant/events/memory
+- participant/bundle mismatch deny
+- output guard fail → no commit/reveal
+
+## 8. Saju Gate
+
+Saju repo semantic tests는 별도 authority. 명하에서는:
+
+- immutable birth snapshots
+- domain/character capability
+- exact Saju public response contract state preservation
+- clarification vs transport retry
+- reading version/revision provenance
+- stale detection
+- grounding no semantic invention
+- prohibited inference preservation
+- current Saju exported `ProductReadingResponse` fixture exact-deserialize
+- current public host input shape vs adapter contract checked (`SRC-08`)
+- material public ambiguity reaches `CharacterSajuContextEnvelopeV2`
+- public response에 없는 semanticClaims/prohibited metadata를 fabricate하지 않음
+- protected-block 밖 free-form Saju generation denied in production baseline
+- protected narrative block ref/hash integrity
+
+## 9. AI / Character Gate
+
+Deterministic fixtures:
+
+- unknown planner action/fact/event key → no execution
+- renderer context excludes non-granted/private data
+- unknown cue/action → reject/fallback
+- absent canon relation → official-history assertion not accepted
+- material ambiguity → no single-outcome certainty
+- protected Saju semantic segment not paraphrased/mutated
+- proposal alone → no authority mutation
+
+Provider model quality/eval matrix = `OPEN-P0: P0-AI-01`.
+
+## 10. Relationship / Memory Gate
+
+- proposal explicit approval only
+- session-only → no durable record
+- private durable record → no character context
+- duplicate proposal/event once
+- unknown relationship event no mutation
+- concurrent revision one wins
+- anti-farming
+- inactivity-only degradation absent
+- Life Fact no branch/cycle/type mismatch
+
+## 11. Episode / Content Gate
+
+- bundle pin exact
+- content hash/artifact integrity
+- invalid episode graph/node/choice deny
+- episode advance retry once
+- world/relationship side effects atomic
+- client capability incompatible content graceful handling
+- existing thread not silently moved by default release change
+- `SRC-01` resolved behavior test: chosen per-character/per-episode operational disable policy or explicit non-requirement
+
+## 12. Commerce Gate
+
+- guest purchase deny
+- unverified/forged receipt no grant
+- duplicate receipt/provider event once
+- unresolved provider event no effect
+- cross-user provider source deny
+- offer verified but fulfillment definition missing → deny
+- purchase fulfillment snapshot hash/version immutable
+- resource-scoped product cannot unlock another subject resource
+- overlapping grant recompute
+- expiry immediate deny
+- out-of-order lifecycle event no rollback
+- restore idempotent reconciliation
+
+## 13. Notification Gate
+
+- device cross-user deny
+- active installation uniqueness
+- logical delivery dedupe
+- retry allocator
+- quiet hours/opt-out/frequency cap
+- revoked installation no send
+- default privacy preview no sensitive content
+- deep link unauthorized private resource deny
+
+## 13A. Cost / Quota / Abuse Gate
+
+- subject/guest rate limit owner resolved server-side
+- client supplied rate-limit owner ignored
+- AI context/token budget bounded
+- budget reduction never drops mandatory qualifier/prohibited inference/material ambiguity
+- Saju transport retry bounded
+- multi-character maxTurns/call cap enforced
+- entitlement-required quota deny without effective entitlement
+- relationship/episode farming cannot bypass domain idempotency
+
+## 13B. Analytics / Experiment Gate
+
+- analytics schema registry/version required
+- raw Birth/chat/Memory/receipt detector PASS
+- client optimistic success not counted as authoritative conversion
+- outbox retry dedupes server conversion event
+- stable experiment assignment for same identity/version
+- experiment cannot mutate Saju semantic authority or privacy/entitlement gates
+
+## 14. Deletion / Lifecycle Gate
+
+- conversation delete does not silently delete confirmed Life Fact
+- character forget does not delete unrelated Life Fact
+- target-person delete scope exact
+- account delete revokes shares/devices/scheduled notifications before erase
+- direct merged guest lineage included
+- legal commerce retention remains separated
+- backup/raw AI trace behavior follows `P0-PR-01` when DECIDED
+- conversation delete redacts/removes source text without destroying retained Life Fact/Memory authority
+- `SRC-05`: session-only/reject proposal staging payload no shadow durable record
+- `SRC-06`: target/self Birth standalone privacy deletion dependency policy verified
+- `SRC-07`: manual commerce resolution disabled unless audited source resolution exists
+- `SRC-08`: real compatibility/domain adapter only enabled against an actual consumable Saju public contract
+- `SRC-09`: explicit guard-metadata invariant not marked CLOSED until source public export exists or source requirement changes
+
+## 15. Engineering Vertical Slice
+
+```text
+Guest bootstrap
+→ character choose
+→ nickname
+→ birth revision
+→ Mock Saju governed narrative
+→ protected grounded response + character framing
+→ current-life question
+→ memory proposal
+→ session-only/private/character grant branch test
+→ relationship event
+→ Hall state change
+→ signup promotion
+→ Web/Mobile continuation
+```
+
+## 16. Real Saju Slice
+
+```text
+real Saju adapter
+→ versioned ProductResponse
+→ ambiguity preserved
+→ grounding/context envelope
+→ protected semantic segment
+→ controlled reveal
+```
+
+## 17. Failure Injection
+
+- Saju timeout/invalid contract
+- planner timeout/invalid schema
+- renderer invalid schema
+- output guard block
+- DB commit then client response loss
+- outbox worker crash/lease expiry
+- push provider failure
+- duplicate/out-of-order commerce webhook
+- content artifact hash mismatch
+- deletion worker partial failure
+
+중복 charge/event/message/memory 또는 cross-user leakage 0.
+
+## 18. Evidence Artifact
+
+CI/release evidence:
+
+- commit SHA
+- migration version/catalog hash
+- API contract version
+- content release/bundle/hash
+- Saju engine/reading contract/grounding versions
+- AI runtime/prompt versions
+- relationship policy version
+- fulfillment definition version when applicable
+- test matrix summary + failed invariant IDs
+- source gap/P0 status snapshot
+
+## 19. Promotion Criteria
+
+### Engineering baseline
+
+```text
+relevant source blockers closed or feature explicitly disabled
++ DB schema gate PASS
++ API contract PASS
++ security/RLS model testable and PASS for selected environment
++ AI/Saju protected semantic boundary PASS
++ E2E slice PASS
++ failure recovery PASS
+```
+
+### Production
+
+추가로 enabled feature가 참조하는 P0 decision이 DECIDED이고 store/privacy/age/release runbook이 준비되어야 한다.
