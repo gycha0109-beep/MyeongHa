@@ -1,12 +1,12 @@
-import type { CharacterContentBundle } from '../../character-content/src/index.js';
+import type { CharacterContentBundle, CharacterSpeechProfile } from '../../character-content/src/index.js';
 import type { WorldContentBundle } from '../../world-content/src/index.js';
 
-const placeholderSpeech = {
+const placeholderSpeech: CharacterSpeechProfile = {
   register: 'placeholder',
   sentenceRhythm: 'placeholder',
-  directness: 'medium' as const,
-  warmth: 'medium' as const,
-  profanity: 'none' as const,
+  directness: 'medium',
+  warmth: 'medium',
+  profanity: 'none',
   forbiddenBehaviors: ['alter_saju_semantics'],
 };
 
