@@ -37,10 +37,12 @@ export function validateWorldContentBundle(world: WorldContentBundle, characters
   for (const episode of world.episodes) {
     nonEmpty(episode.episodeId, 'episode.episodeId');
     nonEmpty(episode.title, `${episode.episodeId}.title`);
+    nonEmpty(episode.synopsis, `${episode.episodeId}.synopsis`);
     nonEmpty(episode.unlockRuleId, `${episode.episodeId}.unlockRuleId`);
     if (episode.contentVersion !== world.contentVersion) {
       throw new WorldContentValidationError(`${episode.episodeId}.contentVersion must match world contentVersion`);
     }
+    if (episode.participants.length === 0) throw new WorldContentValidationError(`${episode.episodeId}.participants must not be empty`);
     unique(episode.participants.map((participant) => participant.characterId), `${episode.episodeId}.participants`);
     for (const participant of episode.participants) {
       if (!characterIds.has(participant.characterId)) throw new WorldContentValidationError(`${episode.episodeId} references character outside bundle`);
