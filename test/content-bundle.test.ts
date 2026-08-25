@@ -14,86 +14,32 @@ describe('immutable content bundle validation', () => {
     const characterManifestB = buildCharacterContentManifest(DEV_CHARACTER_CONTENT_BUNDLE);
     const worldManifestA = buildWorldContentManifest(DEV_WORLD_CONTENT_BUNDLE, DEV_CHARACTER_CONTENT_BUNDLE);
     const worldManifestB = buildWorldContentManifest(DEV_WORLD_CONTENT_BUNDLE, DEV_CHARACTER_CONTENT_BUNDLE);
-
     expect(characterManifestA).toEqual(characterManifestB);
     expect(worldManifestA).toEqual(worldManifestB);
-    expect(characterManifestA.characterIds).toEqual([
-      'john-doe-01',
-      'john-doe-02',
-      'john-doe-03',
-      'john-doe-04',
-      'john-doe-05',
-    ]);
+    expect(characterManifestA.characterIds).toEqual(['john-doe-01','john-doe-02','john-doe-03','john-doe-04','john-doe-05']);
     expect(characterManifestA.contentHash).toMatch(/^sha256:[a-f0-9]{64}$/u);
-    expect(worldManifestA).toMatchObject({
-      bundleId: 'dev-content-bundle-0001',
-      contentVersion: '0.0.1-dev',
-      episodeIds: ['dev-first-contact'],
-      relationCount: 1,
-    });
+    expect(worldManifestA).toMatchObject({ bundleId: 'dev-content-bundle-0001', contentVersion: '0.0.1-dev', episodeIds: ['dev-first-contact'], relationCount: 1 });
     expect(worldManifestA.contentHash).toMatch(/^sha256:[a-f0-9]{64}$/u);
   });
 
   it('rejects a world relation that points outside the same character bundle', () => {
-    expect(() =>
-      validateWorldContentBundle(
-        {
-          ...DEV_WORLD_CONTENT_BUNDLE,
-          characterRelations: [
-            {
-              fromCharacterId: 'john-doe-01',
-              toCharacterId: 'future-character',
-              relationType: 'invalid',
-              summary: 'must fail',
-            },
-          ],
-        },
-        DEV_CHARACTER_CONTENT_BUNDLE,
-      ),
-    ).toThrow(/outside bundle/u);
+    expect(() => validateWorldContentBundle({ ...DEV_WORLD_CONTENT_BUNDLE, characterRelations: [{ fromCharacterId: 'john-doe-01', toCharacterId: 'future-character', relationType: 'unknown', summary: 'must fail' }] }, DEV_CHARACTER_CONTENT_BUNDLE)).toThrow(/outside bundle/u);
   });
 
   it('rejects duplicate character ids', () => {
-    expect(() =>
-      validateCharacterContentBundle({
-        ...DEV_CHARACTER_CONTENT_BUNDLE,
-        characters: [
-          DEV_CHARACTER_CONTENT_BUNDLE.characters[0]!,
-          DEV_CHARACTER_CONTENT_BUNDLE.characters[0]!,
-        ],
-      }),
-    ).toThrow(/duplicate/u);
+    expect(() => validateCharacterContentBundle({ ...DEV_CHARACTER_CONTENT_BUNDLE, characters: [DEV_CHARACTER_CONTENT_BUNDLE.characters[0]!, DEV_CHARACTER_CONTENT_BUNDLE.characters[0]!] })).toThrow(/duplicate/u);
   });
 
   it('rejects incoherent world and character bundle versions', () => {
-    expect(() =>
-      validateWorldContentBundle(
-        { ...DEV_WORLD_CONTENT_BUNDLE, contentVersion: '0.0.2-dev' },
-        DEV_CHARACTER_CONTENT_BUNDLE,
-      ),
-    ).toThrow(/contentVersion must match/u);
+    expect(() => validateWorldContentBundle({ ...DEV_WORLD_CONTENT_BUNDLE, contentVersion: '0.0.2-dev' }, DEV_CHARACTER_CONTENT_BUNDLE)).toThrow(/contentVersion must match/u);
   });
 
   it('rejects a character or episode version that drifts from its bundle', () => {
-    expect(() =>
-      validateCharacterContentBundle({
-        ...DEV_CHARACTER_CONTENT_BUNDLE,
-        characters: [
-          { ...DEV_CHARACTER_CONTENT_BUNDLE.characters[0]!, contentVersion: '0.0.2-dev' },
-        ],
-      }),
-    ).toThrow(/must match bundle contentVersion/u);
+    expect(() => validateCharacterContentBundle({ ...DEV_CHARACTER_CONTENT_BUNDLE, characters: [{ ...DEV_CHARACTER_CONTENT_BUNDLE.characters[0]!, contentVersion: '0.0.2-dev' }] })).toThrow(/must match bundle contentVersion/u);
+    expect(() => validateWorldContentBundle({ ...DEV_WORLD_CONTENT_BUNDLE, episodes: [{ ...DEV_WORLD_CONTENT_BUNDLE.episodes[0]!, contentVersion: '0.0.2-dev' }] }, DEV_CHARACTER_CONTENT_BUNDLE)).toThrow(/must match world contentVersion/u);
+  });
 
-    expect(() =>
-      validateWorldContentBundle(
-        {
-          ...DEV_WORLD_CONTENT_BUNDLE,
-          episodes: [
-            { ...DEV_WORLD_CONTENT_BUNDLE.episodes[0]!, contentVersion: '0.0.2-dev' },
-          ],
-        },
-        DEV_CHARACTER_CONTENT_BUNDLE,
-      ),
-    ).toThrow(/must match world contentVersion/u);
+  it('rejects empty episode participants', () => {
+    expect(() => validateWorldContentBundle({ ...DEV_WORLD_CONTENT_BUNDLE, episodes: [{ ...DEV_WORLD_CONTENT_BUNDLE.episodes[0]!, participants: [] }] }, DEV_CHARACTER_CONTENT_BUNDLE)).toThrow(/participants must not be empty/u);
   });
 });
