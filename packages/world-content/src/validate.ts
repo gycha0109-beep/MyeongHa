@@ -28,9 +28,7 @@ export function validateWorldContentBundle(world: WorldContentBundle, characters
   for (const relation of world.characterRelations) {
     nonEmpty(relation.relationType, 'relation.relationType');
     nonEmpty(relation.summary, 'relation.summary');
-    if (!characterIds.has(relation.fromCharacterId) || !characterIds.has(relation.toCharacterId)) {
-      throw new WorldContentValidationError('character relation references character outside bundle');
-    }
+    if (!characterIds.has(relation.fromCharacterId) || !characterIds.has(relation.toCharacterId)) throw new WorldContentValidationError('character relation references character outside bundle');
     if (relation.fromCharacterId === relation.toCharacterId) throw new WorldContentValidationError('self relation is not allowed');
   }
 
@@ -39,11 +37,11 @@ export function validateWorldContentBundle(world: WorldContentBundle, characters
     nonEmpty(episode.title, `${episode.episodeId}.title`);
     nonEmpty(episode.synopsis, `${episode.episodeId}.synopsis`);
     nonEmpty(episode.unlockRuleId, `${episode.episodeId}.unlockRuleId`);
-    if (episode.contentVersion !== world.contentVersion) {
-      throw new WorldContentValidationError(`${episode.episodeId}.contentVersion must match world contentVersion`);
-    }
+    if (episode.contentVersion !== world.contentVersion) throw new WorldContentValidationError(`${episode.episodeId}.contentVersion must match world contentVersion`);
     if (episode.participants.length === 0) throw new WorldContentValidationError(`${episode.episodeId}.participants must not be empty`);
     unique(episode.participants.map((participant) => participant.characterId), `${episode.episodeId}.participants`);
+    const leadCount = episode.participants.filter((participant) => participant.role === 'lead').length;
+    if (leadCount !== 1) throw new WorldContentValidationError(`${episode.episodeId} must have exactly one lead participant`);
     for (const participant of episode.participants) {
       if (!characterIds.has(participant.characterId)) throw new WorldContentValidationError(`${episode.episodeId} references character outside bundle`);
     }
