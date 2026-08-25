@@ -63,3 +63,68 @@ create table public.guest_sessions (
 );
 
 create index guest_sessions_expires_at_idx on public.guest_sessions(expires_at);
+
+create table public.subject_merge_jobs (
+  id uuid primary key,
+  guest_subject_id uuid not null,
+  member_subject_id uuid not null,
+  guest_session_id uuid not null,
+  policy_version text not null,
+  status text not null,
+  conflicts_jsonb jsonb not null,
+  resolution_jsonb jsonb null,
+  idempotency_key text not null,
+  created_at timestamptz not null,
+  completed_at timestamptz null,
+  constraint subject_merge_jobs_guest_session_unique unique (guest_session_id),
+  constraint subject_merge_jobs_retry_unique
+    unique (guest_subject_id, member_subject_id, idempotency_key),
+  constraint subject_merge_jobs_provenance_unique
+    unique (id, guest_subject_id, member_subject_id),
+  constraint subject_merge_jobs_guest_subject_fk
+    foreign key (guest_subject_id) references public.subjects(id),
+  constraint subject_merge_jobs_member_subject_fk
+    foreign key (member_subject_id) references public.subjects(id),
+  constraint subject_merge_jobs_session_guest_fk
+    foreign key (guest_session_id, guest_subject_id)
+    references public.guest_sessions(id, subject_id),
+  constraint subject_merge_jobs_distinct_subjects_check
+    check (guest_subject_id <> member_subject_id),
+  constraint subject_merge_jobs_status_check
+    check (status in ('detected', 'awaiting_resolution', 'running', 'completed', 'failed')),
+  constraint subject_merge_jobs_completed_timestamp_check
+    check (status <> 'completed' or completed_at is not null)
+);
+
+create table public.subject_merge_actions (
+  id uuid primary key,
+  merge_job_id uuid not null,
+  action_dedupe_key text not null,
+  domain_key text not null,
+  resource_type text not null,
+  source_resource_id text not null,
+  action_type text not null,
+  target_resource_id text null,
+  status text not null,
+  created_at timestamptz not null,
+  completed_at timestamptz null,
+  constraint subject_merge_actions_dedupe_unique
+    unique (merge_job_id, action_dedupe_key),
+  constraint subject_merge_actions_merge_job_fk
+    foreign key (merge_job_id) references public.subject_merge_jobs(id),
+  constraint subject_merge_actions_type_check
+    check (action_type in ('retain_readonly', 'import_new', 'merge_projection', 'discard')),
+  constraint subject_merge_actions_status_check
+    check (status in ('planned', 'applied', 'skipped', 'failed')),
+  constraint subject_merge_actions_applied_target_check
+    check (
+      status <> 'applied'
+      or action_type not in ('import_new', 'merge_projection')
+      or target_resource_id is not null
+    )
+);
+
+create index subject_merge_jobs_status_created_idx
+  on public.subject_merge_jobs(status, created_at);
+create index subject_merge_actions_job_status_idx
+  on public.subject_merge_actions(merge_job_id, status);
