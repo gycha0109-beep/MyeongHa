@@ -59,10 +59,10 @@ begin
       message = 'chat receive requires an exact resolved content release and bundle';
   end if;
 
-  select subject_id, status, active_content_release_id, active_content_bundle_id, next_sequence_no
+  select ct.subject_id, ct.status, ct.active_content_release_id, ct.active_content_bundle_id, ct.next_sequence_no
     into v_thread_subject_id, v_thread_status, v_thread_release_id, v_thread_bundle_id, v_sequence_no
-  from public.conversation_threads
-  where id = p_thread_id
+  from public.conversation_threads ct
+  where ct.id = p_thread_id
   for update;
 
   if not found or v_thread_subject_id is distinct from p_subject_id then
@@ -87,11 +87,11 @@ begin
       message = 'resolved content does not match the thread content authority';
   end if;
 
-  select id, request_hash
+  select cturn.id, cturn.request_hash
     into v_existing_turn_id, v_existing_request_hash
-  from public.chat_turns
-  where thread_id = p_thread_id
-    and client_turn_id = p_client_turn_id;
+  from public.chat_turns cturn
+  where cturn.thread_id = p_thread_id
+    and cturn.client_turn_id = p_client_turn_id;
 
   if v_existing_turn_id is not null then
     if v_existing_request_hash is distinct from p_request_hash then
@@ -101,12 +101,12 @@ begin
         message = 'clientTurnId already exists with a different canonical request hash';
     end if;
 
-    select id, sequence_no
+    select msg.id, msg.sequence_no
       into v_existing_message_id, v_existing_sequence_no
-    from public.conversation_messages
-    where turn_id = v_existing_turn_id
-      and subject_id = p_subject_id
-      and sender_type = 'user';
+    from public.conversation_messages msg
+    where msg.turn_id = v_existing_turn_id
+      and msg.subject_id = p_subject_id
+      and msg.sender_type = 'user';
 
     if v_existing_message_id is null then
       raise exception using
@@ -120,11 +120,11 @@ begin
     return;
   end if;
 
-  select id into v_in_flight_turn_id
-  from public.chat_turns
-  where thread_id = p_thread_id
-    and state in ('received', 'planned', 'context_ready', 'generated', 'validated', 'failed_retryable')
-  order by created_at, id
+  select cturn.id into v_in_flight_turn_id
+  from public.chat_turns cturn
+  where cturn.thread_id = p_thread_id
+    and cturn.state in ('received', 'planned', 'context_ready', 'generated', 'validated', 'failed_retryable')
+  order by cturn.created_at, cturn.id
   limit 1;
 
   if v_in_flight_turn_id is not null then
@@ -134,10 +134,10 @@ begin
       message = 'another logical turn is still in flight for this thread';
   end if;
 
-  update public.conversation_threads
+  update public.conversation_threads ct
   set next_sequence_no = v_sequence_no + 1,
       updated_at = v_now
-  where id = p_thread_id;
+  where ct.id = p_thread_id;
 
   insert into public.chat_turns(
     id,
