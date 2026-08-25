@@ -10,23 +10,28 @@ describe('immutable content bundle validation', () => {
   });
 
   it('creates deterministic manifests for the coherent bundle', () => {
-    const characterManifest = buildCharacterContentManifest(DEV_CHARACTER_CONTENT_BUNDLE);
-    const worldManifest = buildWorldContentManifest(DEV_WORLD_CONTENT_BUNDLE, DEV_CHARACTER_CONTENT_BUNDLE);
-    expect(characterManifest.characterIds).toEqual([
+    const characterManifestA = buildCharacterContentManifest(DEV_CHARACTER_CONTENT_BUNDLE);
+    const characterManifestB = buildCharacterContentManifest(DEV_CHARACTER_CONTENT_BUNDLE);
+    const worldManifestA = buildWorldContentManifest(DEV_WORLD_CONTENT_BUNDLE, DEV_CHARACTER_CONTENT_BUNDLE);
+    const worldManifestB = buildWorldContentManifest(DEV_WORLD_CONTENT_BUNDLE, DEV_CHARACTER_CONTENT_BUNDLE);
+
+    expect(characterManifestA).toEqual(characterManifestB);
+    expect(worldManifestA).toEqual(worldManifestB);
+    expect(characterManifestA.characterIds).toEqual([
       'john-doe-01',
       'john-doe-02',
       'john-doe-03',
       'john-doe-04',
       'john-doe-05',
     ]);
-    expect(characterManifest.contentHash).toMatch(/^sha256:[a-f0-9]{64}$/u);
-    expect(worldManifest).toMatchObject({
+    expect(characterManifestA.contentHash).toMatch(/^sha256:[a-f0-9]{64}$/u);
+    expect(worldManifestA).toMatchObject({
       bundleId: 'dev-content-bundle-0001',
       contentVersion: '0.0.1-dev',
       episodeIds: ['dev-first-contact'],
       relationCount: 1,
     });
-    expect(worldManifest.contentHash).toMatch(/^sha256:[a-f0-9]{64}$/u);
+    expect(worldManifestA.contentHash).toMatch(/^sha256:[a-f0-9]{64}$/u);
   });
 
   it('rejects a world relation that points outside the same character bundle', () => {
@@ -58,5 +63,14 @@ describe('immutable content bundle validation', () => {
         ],
       }),
     ).toThrow(/duplicate/u);
+  });
+
+  it('rejects incoherent world and character bundle versions', () => {
+    expect(() =>
+      validateWorldContentBundle(
+        { ...DEV_WORLD_CONTENT_BUNDLE, contentVersion: '0.0.2-dev' },
+        DEV_CHARACTER_CONTENT_BUNDLE,
+      ),
+    ).toThrow(/contentVersion must match/u);
   });
 });
