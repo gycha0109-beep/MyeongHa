@@ -75,9 +75,7 @@ describe('memory resolution', () => {
     current.push('future-character');
 
     expect(plan.grants.map((grant) => grant.granteeCharacterId)).toEqual([
-      'dev-eop',
-      'dev-myeong',
-      'dev-yeon',
+      ...DEV_CHARACTER_IDS,
     ]);
   });
 });
@@ -110,6 +108,7 @@ describe('relationship policy authority', () => {
 describe('mock first-reading vertical core', () => {
   it('commits only a synthetic non-semantic Saju segment and explicit record plan', () => {
     const aggregate = relationshipAggregate();
+    const selectedCharacterId = DEV_CHARACTER_IDS[1] ?? DEV_CHARACTER_IDS[0]!;
     const result = runMockFirstReadingTurn(
       {
         requestId: 'req-1',
@@ -118,7 +117,7 @@ describe('mock first-reading vertical core', () => {
         capability: allowedCapability,
         proposalKind: 'life_fact',
         memoryResolution: 'accept_long_term',
-        grantChoice: { mode: 'character_only', characterId: 'dev-eop' },
+        grantChoice: { mode: 'character_only', characterId: selectedCharacterId },
         currentEligibleCharacterIds: DEV_CHARACTER_IDS,
         relationshipEvent: 'COMPLETED_READING',
         relationshipEventDedupeKey: 'reading:1',
@@ -134,7 +133,7 @@ describe('mock first-reading vertical core', () => {
       'none_dev_fixture_only',
     );
     expect(result.memory.grants).toEqual([
-      { granteeCharacterId: 'dev-eop' },
+      { granteeCharacterId: selectedCharacterId },
     ]);
     expect(result.relationship.event?.policyContentHash).toMatch(/^sha256:v1:/u);
   });
