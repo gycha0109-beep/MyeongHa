@@ -37,6 +37,7 @@ export function validateCharacterContentBundle(bundle: CharacterContentBundle): 
     if (!character.developmentPlaceholder) {
       if (character.personalityTraits.length === 0) throw new CharacterContentValidationError(`${character.characterId}.personalityTraits must not be empty`);
       if (character.values.length === 0) throw new CharacterContentValidationError(`${character.characterId}.values must not be empty`);
+      if (character.deityProxyLabel === 'placeholder') throw new CharacterContentValidationError(`${character.characterId}.deityProxyLabel must be authored`);
     }
     for (const capability of character.capabilities) nonEmpty(capability.capabilityVersion, `${character.characterId}.capabilityVersion`);
   }
