@@ -41,11 +41,12 @@ export function buildCoherentContentRelease(
   characters: CharacterContentManifest,
   world: WorldContentManifest,
 ): CoherentContentRelease {
-  if (releaseId.trim().length === 0) throw new Error('releaseId must not be empty');
+  const normalizedReleaseId = releaseId.trim();
+  if (normalizedReleaseId.length === 0) throw new Error('releaseId must not be empty');
   if (characters.bundleId !== world.bundleId) throw new Error('release manifests must share bundleId');
   if (characters.contentVersion !== world.contentVersion) throw new Error('release manifests must share contentVersion');
   return Object.freeze({
-    releaseId,
+    releaseId: normalizedReleaseId,
     bundleId: characters.bundleId,
     contentVersion: characters.contentVersion,
     characterContentHash: characters.contentHash,
