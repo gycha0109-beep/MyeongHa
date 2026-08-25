@@ -1,4 +1,7 @@
-import type { RelationshipPolicyV1 } from '../../domain/src/index.js';
+import {
+  createImmutableArtifact,
+  type RelationshipPolicyV1,
+} from '../../domain/src/index.js';
 
 export const DEV_CHARACTER_IDS: readonly string[] = [
   'john-doe-01',
@@ -8,15 +11,23 @@ export const DEV_CHARACTER_IDS: readonly string[] = [
   'john-doe-05',
 ];
 
-export const DEV_RELATIONSHIP_POLICY: RelationshipPolicyV1 = {
-  policyVersion: 'dev-v1',
-  policyContentHash: 'sha256:v1:dev-placeholder-policy',
-  rules: {
-    COMPLETED_READING: {
-      closeness: 2,
-      trust: 1,
-      friction: 0,
-      nextStage: 'familiar_visitor',
-    },
+const DEV_RELATIONSHIP_POLICY_PAYLOAD: RelationshipPolicyV1 = {
+  bounds: {
+    closeness: [0, 100],
+    trust: [0, 100],
+    friction: [0, 100],
   },
+  events: [
+    {
+      event: 'COMPLETED_READING',
+      delta: { closeness: 2, trust: 1, friction: 0 },
+      transitionTo: 'familiar_visitor',
+    },
+  ],
 };
+
+export const DEV_RELATIONSHIP_POLICY = createImmutableArtifact(
+  'relationship-policy',
+  'dev-v1',
+  DEV_RELATIONSHIP_POLICY_PAYLOAD,
+);
