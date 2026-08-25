@@ -31,6 +31,7 @@ export interface CharacterContentDefinition {
   readonly capabilities: readonly CharacterCapabilityContent[];
   readonly assetRefs: readonly string[];
   readonly animationCueIds: readonly string[];
+  readonly developmentPlaceholder?: true;
 }
 
 export interface CharacterContentBundle {
