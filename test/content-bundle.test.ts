@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildCharacterContentManifest, validateCharacterContentBundle } from '../packages/character-content/src/index.js';
-import { buildWorldContentManifest, validateWorldContentBundle } from '../packages/world-content/src/index.js';
+import { buildCoherentContentRelease, buildWorldContentManifest, validateWorldContentBundle } from '../packages/world-content/src/index.js';
 import { DEV_CHARACTER_CONTENT_BUNDLE, DEV_WORLD_CONTENT_BUNDLE } from '../packages/test-fixtures/src/index.js';
 
 describe('immutable content bundle validation', () => {
@@ -9,7 +9,7 @@ describe('immutable content bundle validation', () => {
     expect(validateWorldContentBundle(DEV_WORLD_CONTENT_BUNDLE, DEV_CHARACTER_CONTENT_BUNDLE)).toBe(DEV_WORLD_CONTENT_BUNDLE);
   });
 
-  it('creates deterministic manifests for the coherent bundle', () => {
+  it('creates deterministic manifests and a coherent release', () => {
     const characterManifestA = buildCharacterContentManifest(DEV_CHARACTER_CONTENT_BUNDLE);
     const characterManifestB = buildCharacterContentManifest(DEV_CHARACTER_CONTENT_BUNDLE);
     const worldManifestA = buildWorldContentManifest(DEV_WORLD_CONTENT_BUNDLE, DEV_CHARACTER_CONTENT_BUNDLE);
@@ -20,6 +20,11 @@ describe('immutable content bundle validation', () => {
     expect(characterManifestA.contentHash).toMatch(/^sha256:[a-f0-9]{64}$/u);
     expect(worldManifestA).toMatchObject({ bundleId: 'dev-content-bundle-0001', contentVersion: '0.0.1-dev', episodeIds: ['dev-first-contact'], relationCount: 1 });
     expect(worldManifestA.contentHash).toMatch(/^sha256:[a-f0-9]{64}$/u);
+    expect(buildCoherentContentRelease('dev-release-0001', characterManifestA, worldManifestA)).toMatchObject({
+      releaseId: 'dev-release-0001',
+      bundleId: 'dev-content-bundle-0001',
+      contentVersion: '0.0.1-dev',
+    });
   });
 
   it('rejects a world relation that points outside the same character bundle', () => {
@@ -45,12 +50,12 @@ describe('immutable content bundle validation', () => {
   });
 
   it('rejects character speech content that can alter Saju semantics', () => {
-    expect(() => validateCharacterContentBundle({
-      ...DEV_CHARACTER_CONTENT_BUNDLE,
-      characters: [{
-        ...DEV_CHARACTER_CONTENT_BUNDLE.characters[0]!,
-        speech: { ...DEV_CHARACTER_CONTENT_BUNDLE.characters[0]!.speech, forbiddenBehaviors: [] },
-      }],
-    })).toThrow(/must forbid alter_saju_semantics/u);
+    expect(() => validateCharacterContentBundle({ ...DEV_CHARACTER_CONTENT_BUNDLE, characters: [{ ...DEV_CHARACTER_CONTENT_BUNDLE.characters[0]!, speech: { ...DEV_CHARACTER_CONTENT_BUNDLE.characters[0]!.speech, forbiddenBehaviors: [] } }] })).toThrow(/must forbid alter_saju_semantics/u);
+  });
+
+  it('rejects incoherent release manifests', () => {
+    const characters = buildCharacterContentManifest(DEV_CHARACTER_CONTENT_BUNDLE);
+    const world = buildWorldContentManifest(DEV_WORLD_CONTENT_BUNDLE, DEV_CHARACTER_CONTENT_BUNDLE);
+    expect(() => buildCoherentContentRelease('dev-release-invalid', characters, { ...world, bundleId: 'other-bundle' })).toThrow(/share bundleId/u);
   });
 });
