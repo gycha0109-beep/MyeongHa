@@ -19,6 +19,7 @@ export interface EpisodeDefinition {
   readonly synopsis: string;
   readonly participants: readonly EpisodeParticipantDefinition[];
   readonly unlockRuleId: string;
+  readonly developmentPlaceholder?: true;
 }
 
 export interface WorldContentBundle {
