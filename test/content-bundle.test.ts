@@ -73,4 +73,27 @@ describe('immutable content bundle validation', () => {
       ),
     ).toThrow(/contentVersion must match/u);
   });
+
+  it('rejects a character or episode version that drifts from its bundle', () => {
+    expect(() =>
+      validateCharacterContentBundle({
+        ...DEV_CHARACTER_CONTENT_BUNDLE,
+        characters: [
+          { ...DEV_CHARACTER_CONTENT_BUNDLE.characters[0]!, contentVersion: '0.0.2-dev' },
+        ],
+      }),
+    ).toThrow(/must match bundle contentVersion/u);
+
+    expect(() =>
+      validateWorldContentBundle(
+        {
+          ...DEV_WORLD_CONTENT_BUNDLE,
+          episodes: [
+            { ...DEV_WORLD_CONTENT_BUNDLE.episodes[0]!, contentVersion: '0.0.2-dev' },
+          ],
+        },
+        DEV_CHARACTER_CONTENT_BUNDLE,
+      ),
+    ).toThrow(/must match world contentVersion/u);
+  });
 });
