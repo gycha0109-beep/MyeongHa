@@ -56,9 +56,10 @@ describe('immutable content bundle validation', () => {
   });
 
   it('allows placeholder metadata but requires authored personality once placeholder flag is removed', () => {
-    expect(() => validateCharacterContentBundle({
-      ...DEV_CHARACTER_CONTENT_BUNDLE,
-      characters: [{ ...DEV_CHARACTER_CONTENT_BUNDLE.characters[0]!, developmentPlaceholder: undefined, personalityTraits: [] }],
-    })).toThrow(/personalityTraits must not be empty/u);
+    expect(() => validateCharacterContentBundle({ ...DEV_CHARACTER_CONTENT_BUNDLE, characters: [{ ...DEV_CHARACTER_CONTENT_BUNDLE.characters[0]!, developmentPlaceholder: undefined, personalityTraits: [] }] })).toThrow(/personalityTraits must not be empty/u);
+  });
+
+  it('requires exactly one lead per episode', () => {
+    expect(() => validateWorldContentBundle({ ...DEV_WORLD_CONTENT_BUNDLE, episodes: [{ ...DEV_WORLD_CONTENT_BUNDLE.episodes[0]!, participants: DEV_WORLD_CONTENT_BUNDLE.episodes[0]!.participants.map((participant) => ({ ...participant, role: 'support' as const })) }] }, DEV_CHARACTER_CONTENT_BUNDLE)).toThrow(/exactly one lead/u);
   });
 });
