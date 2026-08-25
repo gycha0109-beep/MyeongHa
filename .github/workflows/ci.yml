@@ -66,3 +66,5 @@ jobs:
         run: psql -1 -v ON_ERROR_STOP=1 -f test/db/record_world_negative.sql
       - name: Run reading and operations negative tests
         run: psql -1 -v ON_ERROR_STOP=1 -f test/db/reading_ops_negative.sql
+      - name: Run story and share negative tests
+        run: psql -1 -v ON_ERROR_STOP=1 -f test/db/story_share_negative.sql
