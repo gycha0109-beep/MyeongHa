@@ -32,6 +32,10 @@ export function validateCharacterContentBundle(bundle: CharacterContentBundle): 
     if (character.capabilities.length === 0) throw new CharacterContentValidationError(`${character.characterId}.capabilities must not be empty`);
     unique(character.capabilities.map((capability) => `${capability.domain}:${capability.role}`), `${character.characterId}.capabilities`);
     unique(character.animationCueIds, `${character.characterId}.animationCueIds`);
+    unique(character.speech.forbiddenBehaviors, `${character.characterId}.speech.forbiddenBehaviors`);
+    if (!character.speech.forbiddenBehaviors.includes('alter_saju_semantics')) {
+      throw new CharacterContentValidationError(`${character.characterId}.speech must forbid alter_saju_semantics`);
+    }
     for (const capability of character.capabilities) nonEmpty(capability.capabilityVersion, `${character.characterId}.capabilityVersion`);
   }
 
