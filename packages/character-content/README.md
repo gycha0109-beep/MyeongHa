@@ -1,3 +1,3 @@
 # @myeongha/character-content
 
-Versioned character canon authoring package placeholder. Canon changes must flow through source review and immutable bundle publication.
+Immutable, versioned character content authority for Myeongha. Runtime DBs may project release metadata, but character canon must originate from versioned content bundles.
