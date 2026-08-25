@@ -26,12 +26,12 @@ export function buildCharacterContentManifest(bundle: CharacterContentBundle): C
   validateCharacterContentBundle(bundle);
   const characterIds = bundle.characters.map((character) => character.characterId).sort();
   const contentHash = `sha256:${createHash('sha256').update(stableJson(bundle)).digest('hex')}`;
-  return {
+  return Object.freeze({
     bundleId: bundle.bundleId,
     contentVersion: bundle.contentVersion,
     minClientCapability: bundle.minClientCapability,
     cueSchemaVersion: bundle.cueSchemaVersion,
-    characterIds,
+    characterIds: Object.freeze(characterIds),
     contentHash,
-  };
+  });
 }
