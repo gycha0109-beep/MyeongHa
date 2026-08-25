@@ -1,4 +1,4 @@
-import type { RelationshipPolicy } from '../../domain/src/index.js';
+import type { RelationshipPolicyV1 } from '../../domain/src/index.js';
 
 export const DEV_CHARACTER_IDS: readonly string[] = [
   'john-doe-01',
@@ -8,7 +8,7 @@ export const DEV_CHARACTER_IDS: readonly string[] = [
   'john-doe-05',
 ];
 
-export const DEV_RELATIONSHIP_POLICY: RelationshipPolicy = {
+export const DEV_RELATIONSHIP_POLICY: RelationshipPolicyV1 = {
   policyVersion: 'dev-v1',
   policyContentHash: 'sha256:v1:dev-placeholder-policy',
   rules: {
