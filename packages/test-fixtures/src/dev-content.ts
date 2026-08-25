@@ -41,6 +41,7 @@ export const DEV_WORLD_CONTENT_BUNDLE = {
         { characterId: 'john-doe-02', role: 'support' },
       ],
       unlockRuleId: 'dev-first-contact-unlock',
+      developmentPlaceholder: true,
     },
   ],
 } satisfies WorldContentBundle;
