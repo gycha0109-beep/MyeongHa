@@ -27,13 +27,13 @@ export function buildWorldContentManifest(
   characters: CharacterContentBundle,
 ): WorldContentManifest {
   validateWorldContentBundle(world, characters);
-  return {
+  return Object.freeze({
     bundleId: world.bundleId,
     contentVersion: world.contentVersion,
-    episodeIds: world.episodes.map((episode) => episode.episodeId).sort(),
+    episodeIds: Object.freeze(world.episodes.map((episode) => episode.episodeId).sort()),
     relationCount: world.characterRelations.length,
     contentHash: `sha256:${createHash('sha256').update(stableJson(world)).digest('hex')}`,
-  };
+  });
 }
 
 export function buildCoherentContentRelease(
