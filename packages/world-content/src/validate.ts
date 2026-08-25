@@ -42,6 +42,7 @@ export function validateWorldContentBundle(world: WorldContentBundle, characters
     unique(episode.participants.map((participant) => participant.characterId), `${episode.episodeId}.participants`);
     const leadCount = episode.participants.filter((participant) => participant.role === 'lead').length;
     if (leadCount !== 1) throw new WorldContentValidationError(`${episode.episodeId} must have exactly one lead participant`);
+    if (!episode.developmentPlaceholder && episode.title === 'Placeholder Episode') throw new WorldContentValidationError(`${episode.episodeId}.title must be authored`);
     for (const participant of episode.participants) {
       if (!characterIds.has(participant.characterId)) throw new WorldContentValidationError(`${episode.episodeId} references character outside bundle`);
     }
