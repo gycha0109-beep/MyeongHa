@@ -1,7 +1,9 @@
+export type WorldRelationType = 'placeholder_relation' | 'ally' | 'rival' | 'mentor' | 'ward' | 'debt' | 'unknown';
+
 export interface CharacterRelationDefinition {
   readonly fromCharacterId: string;
   readonly toCharacterId: string;
-  readonly relationType: string;
+  readonly relationType: WorldRelationType;
   readonly summary: string;
 }
 
