@@ -39,7 +39,8 @@ describe('immutable content bundle validation', () => {
     expect(() => validateWorldContentBundle({ ...DEV_WORLD_CONTENT_BUNDLE, episodes: [{ ...DEV_WORLD_CONTENT_BUNDLE.episodes[0]!, contentVersion: '0.0.2-dev' }] }, DEV_CHARACTER_CONTENT_BUNDLE)).toThrow(/must match world contentVersion/u);
   });
 
-  it('rejects empty episode participants', () => {
+  it('rejects empty episode participants or character capabilities', () => {
     expect(() => validateWorldContentBundle({ ...DEV_WORLD_CONTENT_BUNDLE, episodes: [{ ...DEV_WORLD_CONTENT_BUNDLE.episodes[0]!, participants: [] }] }, DEV_CHARACTER_CONTENT_BUNDLE)).toThrow(/participants must not be empty/u);
+    expect(() => validateCharacterContentBundle({ ...DEV_CHARACTER_CONTENT_BUNDLE, characters: [{ ...DEV_CHARACTER_CONTENT_BUNDLE.characters[0]!, capabilities: [] }] })).toThrow(/capabilities must not be empty/u);
   });
 });
