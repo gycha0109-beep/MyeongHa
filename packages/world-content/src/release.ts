@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
-import type { WorldContentBundle } from './schema.js';
+import type { CharacterContentBundle, CharacterContentManifest } from '../../character-content/src/index.js';
+import type { CoherentContentRelease, WorldContentBundle } from './schema.js';
 import { validateWorldContentBundle } from './validate.js';
-import type { CharacterContentBundle } from '../../character-content/src/index.js';
 
 export interface WorldContentManifest {
   readonly bundleId: string;
@@ -34,4 +34,22 @@ export function buildWorldContentManifest(
     relationCount: world.characterRelations.length,
     contentHash: `sha256:${createHash('sha256').update(stableJson(world)).digest('hex')}`,
   };
+}
+
+export function buildCoherentContentRelease(
+  releaseId: string,
+  characters: CharacterContentManifest,
+  world: WorldContentManifest,
+): CoherentContentRelease {
+  if (releaseId.trim().length === 0) throw new Error('releaseId must not be empty');
+  if (characters.bundleId !== world.bundleId) throw new Error('release manifests must share bundleId');
+  if (characters.contentVersion !== world.contentVersion) throw new Error('release manifests must share contentVersion');
+  return Object.freeze({
+    releaseId,
+    bundleId: characters.bundleId,
+    contentVersion: characters.contentVersion,
+    characterContentHash: characters.contentHash,
+    worldContentHash: world.contentHash,
+    minClientCapability: characters.minClientCapability,
+  });
 }

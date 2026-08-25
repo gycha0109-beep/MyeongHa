@@ -28,3 +28,12 @@ export interface WorldContentBundle {
   readonly characterRelations: readonly CharacterRelationDefinition[];
   readonly episodes: readonly EpisodeDefinition[];
 }
+
+export interface CoherentContentRelease {
+  readonly releaseId: string;
+  readonly bundleId: string;
+  readonly contentVersion: string;
+  readonly characterContentHash: string;
+  readonly worldContentHash: string;
+  readonly minClientCapability: string;
+}
