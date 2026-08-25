@@ -169,7 +169,7 @@ select pg_temp.assert_fails('grant must reference exactly one record kind',
   $$insert into public.record_access_grants(id,subject_id,life_fact_id,memory_item_id,grantee_character_id,grant_reason,granted_at) values ('47300000-0000-0000-0000-000000000003','40000000-0000-0000-0000-000000000001','47000000-0000-0000-0000-000000000003','47100000-0000-0000-0000-000000000001','record-char-01','user_choice',now())$$,
   'record_access_grants_exactly_one_record_check');
 select pg_temp.assert_fails('grant owner must equal record owner',
-  $$insert into public.record_access_grants(id,subject_id,life_fact_id,grantee_character_id,grant_reason,granted_at) values ('47300000-0000-0000-0000-000000000004','40000000-0000-0000-0000-000000000002','47000000-0000-0000-0000-000000000003','record-char-01','user_choice',now())$$,
+  $$insert into public.record_access_grants(id,subject_id,life_fact_id,grantee_character_id,grant_reason,granted_at) values ('47300000-0000-0000-0000-000000000004','40000000-0000-0000-0000-000000000002','47000000-0000-0000-0000-000000000003','record-char-02','user_choice',now())$$,
   'record_access_grants_life_fact_subject_fk');
 
 insert into public.user_character_states(id,subject_id,character_id,closeness,trust,friction,relationship_stage,policy_version,revision,created_at,updated_at)
