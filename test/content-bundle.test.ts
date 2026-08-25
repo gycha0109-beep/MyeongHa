@@ -56,9 +56,12 @@ describe('immutable content bundle validation', () => {
   });
 
   it('allows placeholder metadata but requires authored fields after promotion', () => {
-    expect(() => validateCharacterContentBundle({ ...DEV_CHARACTER_CONTENT_BUNDLE, characters: [{ ...DEV_CHARACTER_CONTENT_BUNDLE.characters[0]!, developmentPlaceholder: undefined, personalityTraits: [] }] })).toThrow(/personalityTraits must not be empty/u);
-    expect(() => validateCharacterContentBundle({ ...DEV_CHARACTER_CONTENT_BUNDLE, characters: [{ ...DEV_CHARACTER_CONTENT_BUNDLE.characters[0]!, developmentPlaceholder: undefined, deityProxyLabel: 'placeholder' }] })).toThrow(/deityProxyLabel must be authored/u);
-    expect(() => validateWorldContentBundle({ ...DEV_WORLD_CONTENT_BUNDLE, episodes: [{ ...DEV_WORLD_CONTENT_BUNDLE.episodes[0]!, developmentPlaceholder: undefined, title: 'Placeholder Episode' }] }, DEV_CHARACTER_CONTENT_BUNDLE)).toThrow(/title must be authored/u);
+    const { developmentPlaceholder: _characterPlaceholder, ...authoredCharacter } = DEV_CHARACTER_CONTENT_BUNDLE.characters[0]!;
+    const { developmentPlaceholder: _episodePlaceholder, ...authoredEpisode } = DEV_WORLD_CONTENT_BUNDLE.episodes[0]!;
+
+    expect(() => validateCharacterContentBundle({ ...DEV_CHARACTER_CONTENT_BUNDLE, characters: [{ ...authoredCharacter, personalityTraits: [] }] })).toThrow(/personalityTraits must not be empty/u);
+    expect(() => validateCharacterContentBundle({ ...DEV_CHARACTER_CONTENT_BUNDLE, characters: [{ ...authoredCharacter, deityProxyLabel: 'placeholder' }] })).toThrow(/deityProxyLabel must be authored/u);
+    expect(() => validateWorldContentBundle({ ...DEV_WORLD_CONTENT_BUNDLE, episodes: [{ ...authoredEpisode, title: 'Placeholder Episode' }] }, DEV_CHARACTER_CONTENT_BUNDLE)).toThrow(/title must be authored/u);
   });
 
   it('requires exactly one lead per episode', () => {
