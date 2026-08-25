@@ -63,4 +63,4 @@ jobs:
       - name: Run authority core negative tests
         run: psql -v ON_ERROR_STOP=1 -f test/db/authority_core_negative.sql
       - name: Run record and relationship negative tests
-        run: psql -v ON_ERROR_STOP=1 -f test/db/record_world_negative.sql
+        run: psql -1 -v ON_ERROR_STOP=1 -f test/db/record_world_negative.sql
