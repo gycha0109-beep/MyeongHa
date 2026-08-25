@@ -1,0 +1,223 @@
+# 명하 Auth / RLS / Privacy Specification v0.3 — Full Audit
+
+> Product: **명하 (Myeongha)**  
+> Pack Version: **v0.3**  
+> Date: **2026-08-25**  
+> Source Authority: `Usecase_re_reviewed_v2(1).md`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`, `Myeonghwa_Personalized_Interpretation_Architecture_v1.3_THIRD_REVIEW(1).md`  
+> Rule: source가 결정하지 않은 implementation-critical 사항은 `OPEN-P0`, 비차단 선택은 `CANDIDATE`, source 간 충돌은 `SOURCE_AUTHORITY_GAPS.md`에 기록한다.
+
+---
+
+## 1. 목적
+
+Guest/Member/merged history/public share/service write의 identity와 authorization 경계를 정의한다.
+
+## 2. Identity Authorities
+
+```text
+auth.users
+→ authenticated account identity
+
+subjects
+→ Myeongha owner identity
+```
+
+모든 user-owned row는 `subject_id`로 소유한다. `auth_user_id`는 owner key가 아니라 authentication mapping이다.
+
+## 3. Guest
+
+```text
+raw guest token
+→ API verifier
+→ guest_session fingerprint check
+→ guest subject resolve
+→ object authorization
+```
+
+Supabase anon direct row CRUD를 guest persistence mechanism으로 사용하지 않는다. Guest TTL은 `OPEN-P0: P0-PR-01`.
+
+## 4. New Signup Promotion
+
+```text
+guest subject
+→ same subject kind=member
+→ auth_user_id attach
+→ guest_session consumed
+```
+
+owner FK 이동 없음. promotion command는 auth identity proof + active guest proof를 같은 transaction 경계에서 검증한다.
+
+## 5. Existing Member Merge
+
+- guest raw ledger reparent 금지
+- exactly one merge job per guest session
+- conflict detection / explicit resolution
+- canonical member에 필요한 current projection만 import/merge
+- guest subject = merged read-only lineage
+- 새 writes = canonical member only
+- merge command target member는 **active**여야 한다. ERD가 FK/trigger 차원에서 deletion_pending target을 표현 가능하더라도 deletion lifecycle 중인 계정으로 새 guest merge를 허용하는 권한으로 해석하지 않는다.
+
+## 6. Database Execution Identity — OPEN P0
+
+`OPEN-P0: P0-AUTH-01`.
+
+RLS를 실제 security control로 주장하려면 API가 DB에서 어떤 identity로 실행되는지 확정해야 한다. 허용 후보:
+
+```text
+A. User JWT를 PostgREST/Supabase RLS context로 위임
+   + service-only commands는 별도 restricted role
+
+B. Fastify API가 non-BYPASSRLS DB role 사용
+   + verified auth/guest identity를 transaction-scoped trusted context로 설정
+   + RLS policy가 그 context로 current subject를 resolve
+```
+
+금지 baseline:
+
+```text
+service_role/BYPASSRLS 하나로 모든 user-owned CRUD
++ application WHERE subject_id만 믿음
+```
+
+이 방식은 application authorization은 될 수 있어도 본 spec의 `RLS negative test`를 충족했다고 부르지 않는다.
+
+## 7. Subject Resolution Function Contract
+
+P0-AUTH-01 결정 후 하나의 trusted resolver를 둔다. conceptual contract:
+
+```text
+current_authenticated_subject()
+→ exactly one active/deletion_pending member subject mapped to verified auth identity
+
+current_guest_subject()
+→ API-only verified guest context; direct public DB invocation 불가
+```
+
+Resolver는 client-supplied subject_id를 신뢰하지 않는다.
+
+## 7.1 Web / Mobile Session Transport Security
+
+구체 token transport는 client implementation에 따라 달라질 수 있지만 다음은 필수다.
+
+- browser cookie로 credential을 보내는 mutating route는 CSRF/Origin/SameSite 전략을 명시하고 검증
+- browser-readable token을 사용할 경우 XSS 노출 위험을 security model에 포함
+- mobile credential은 OS secure storage 사용
+- logout/revocation 이후 old credential reuse 차단
+- CORS는 허용 origin을 명시하며 wildcard credential origin 금지
+- auth/guest bearer token을 URL/query/log/analytics에 기록 금지
+
+Client가 보낸 `subject_id` header/body는 identity proof가 아니다.
+
+## 8. RLS Baseline
+
+- user-owned table: RLS/default deny
+- normal current path: `row.subject_id = trusted current subject`
+- merged guest history: generic current policy에 union하지 않음
+- merged lineage read: dedicated view/command with direct one-hop lineage validation
+- merged lineage write: deny except controlled security/lifecycle service command
+- service-only ledger/projection tables: client policy 없음
+
+## 9. Object-Level Authorization
+
+ID를 아는 것은 권한이 아니다.
+
+```text
+A → B thread/birth/memory/reading/target-person/device
+→ DENY
+```
+
+Authorization은 route lookup 이전/이후 모두 resource ownership을 검증하며 error surface가 다른 user 존재를 불필요하게 드러내지 않는다.
+
+## 10. Service-Only Writes
+
+client direct write 금지:
+
+- relationship/world/unlock/progress ledger/projection
+- reading/ref/grounding provenance
+- commerce receipt/provider/grant/event/entitlement
+- AI logs/outbox
+- deletion execution
+- content release activation
+
+## 11. Memory / Life Fact Privacy
+
+캐릭터 context read는 `record_access_grants` active explicit grant만 허용.
+
+`현재 대리자들에게 공유` = 승인 당시 eligible character set snapshot. future character auto grant 금지.
+
+`private` = durable record는 존재할 수 있으나 character grant 0.
+
+`session-only` = durable Life Fact/Memory row 생성 없음.
+
+## 12. Public Share
+
+```text
+raw public token
+→ API fingerprint verify
+→ active/unexpired artifact
+→ minimized immutable share snapshot
+```
+
+Public token은 private Reading endpoint credential이 아니다. 기본 share에 full birth/chat/memory/target internal ID 금지.
+
+## 13. Notification Privacy
+
+default preview는 sensitive content를 포함하지 않는 mode. full preview도 server policy와 user opt-in 범위 안에서만 생성.
+
+## 14. Logging / Analytics
+
+일반 analytics/log 금지:
+
+- raw birth date/time
+- full transcript
+- auth/service token
+- raw receipt/provider account ID
+
+Stable ref/versioned HMAC fingerprint 우선. hash는 anonymization 주장이 아니다.
+
+## 15. Deletion Lifecycle
+
+Account deletion 시작 즉시:
+
+```text
+block new AI/Saju/product commands
+revoke share artifacts
+revoke device installations
+cancel scheduled notifications
+terminate/limit active sessions
+```
+
+Deletion graph:
+
+- canonical subject
+- direct merged guest lineage
+- birth/target/life fact/memory/conversation/reading personalization artifacts
+- AI raw trace가 별도 restricted store에 있으면 동일 deletion/retention policy 대상
+
+법적 commerce retention은 product personalization과 분리. 실제 기간 `OPEN-P0: P0-PR-01`.
+
+Standalone Birth/Target privacy deletion과 historical Reading provenance 충돌은 `SRC-06`이 authority다.
+
+Final account erase 순서는 `subjects` CHECK와 충돌하지 않게 canonical/merged-lineage destructive phase를 완료한 뒤 member subject를 `deleted` 상태로 전환하고 auth mapping 제거를 수행한다. `deletion_pending` 상태에서 `auth_user_id`를 먼저 NULL로 만들지 않는다. Account delete는 전체 dependency graph를 함께 지울 수 있지만, 개별 Birth/Target delete를 단순 archive로 가장하지 않는다.
+
+Conversation-only delete는 confirmed Life Fact/Memory를 보존해야 하므로, 해당 source FK가 필요한 동안 message/turn identity tombstone을 보존하고 원문을 redaction하는 방식이 baseline이다. 삭제된 원문은 UI/AI context에서 재노출 금지.
+
+## 16. Admin / Content Security
+
+`ADMIN_CONTENT`는 일반 member auth와 별도 authorization scope. Content bundle register/release activation은 actor/audit provenance 필수. Canon authoring은 Git review가 authority.
+
+## 17. Negative Test Matrix
+
+- own current row → allow expected operation
+- different subject → deny
+- forged subject context/GUC/JWT claim → deny
+- guest direct DB access → deny
+- merged guest generic endpoint → deny
+- merged history dedicated endpoint → read-only allow
+- merged history write → deny
+- service-only client write → deny
+- revoked grant → context exclusion
+- future character → old grant deny
+- share token → minimized share only
+- deletion_pending subject → new AI/Saju/purchase deny
+- P0-AUTH-01 selected model RLS negative tests PASS before production baseline
