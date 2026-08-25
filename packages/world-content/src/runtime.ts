@@ -123,6 +123,36 @@ export class ContentReleaseRuntime {
     }
   }
 
+  #validateReleaseOrder(orderedReleaseIds: readonly string[]): readonly string[] {
+    if (orderedReleaseIds.length === 0) {
+      throw new ContentReleaseRuntimeError(
+        'INVALID_RELEASE_ORDER',
+        'Operational release order must not be empty.',
+      );
+    }
+
+    const seen = new Set<string>();
+    const normalized: string[] = [];
+    for (const rawReleaseId of orderedReleaseIds) {
+      const releaseId = rawReleaseId.trim();
+      if (releaseId.length === 0 || seen.has(releaseId)) {
+        throw new ContentReleaseRuntimeError(
+          'INVALID_RELEASE_ORDER',
+          'Operational release order contains an empty or duplicate release id.',
+        );
+      }
+      if (!this.#entriesByReleaseId.has(releaseId)) {
+        throw new ContentReleaseRuntimeError(
+          'INVALID_RELEASE_ORDER',
+          `Operational release order references unknown release: ${releaseId}`,
+        );
+      }
+      seen.add(releaseId);
+      normalized.push(releaseId);
+    }
+    return normalized;
+  }
+
   resolveForNewThread(input: ResolveNewThreadInput): ContentReleaseRuntimeEntry {
     const clientCapability = input.clientCapability.trim();
     if (clientCapability.length === 0) {
@@ -131,24 +161,9 @@ export class ContentReleaseRuntime {
         'Client capability must not be empty.',
       );
     }
-    if (input.orderedReleaseIds.length === 0) {
-      throw new ContentReleaseRuntimeError(
-        'INVALID_RELEASE_ORDER',
-        'Operational release order must not be empty.',
-      );
-    }
 
-    const seen = new Set<string>();
-    for (const rawReleaseId of input.orderedReleaseIds) {
-      const releaseId = rawReleaseId.trim();
-      if (releaseId.length === 0 || seen.has(releaseId)) {
-        throw new ContentReleaseRuntimeError(
-          'INVALID_RELEASE_ORDER',
-          'Operational release order contains an empty or duplicate release id.',
-        );
-      }
-      seen.add(releaseId);
-
+    const orderedReleaseIds = this.#validateReleaseOrder(input.orderedReleaseIds);
+    for (const releaseId of orderedReleaseIds) {
       const entry = this.#entriesByReleaseId.get(releaseId);
       if (entry === undefined) {
         throw new ContentReleaseRuntimeError(
