@@ -15,7 +15,7 @@ export interface CharacterSpeechProfile {
   readonly directness: 'low' | 'medium' | 'high';
   readonly warmth: 'low' | 'medium' | 'high';
   readonly profanity: 'none' | 'light' | 'moderate';
-  readonly forbiddenBehaviors: readonly string[];
+  readonly forbiddenBehaviors: readonly ('alter_saju_semantics' | 'invent_current_life_fact' | 'mutate_relationship_directly' | 'invent_world_canon')[];
 }
 
 export interface CharacterContentDefinition {
