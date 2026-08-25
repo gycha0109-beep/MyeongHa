@@ -1,3 +1,3 @@
 # @myeongha/test-fixtures
 
-Synthetic, non-user-derived fixtures only. Personal birth inputs must not become repository fixtures.
+Development-only fixtures. Character/world fixtures intentionally use John Doe placeholders and carry no product canon or Saju semantic authority.
