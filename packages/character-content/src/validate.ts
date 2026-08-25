@@ -25,10 +25,11 @@ export function validateCharacterContentBundle(bundle: CharacterContentBundle): 
   for (const character of bundle.characters) {
     nonEmpty(character.characterId, 'character.characterId');
     nonEmpty(character.contentVersion, `${character.characterId}.contentVersion`);
-    if (character.contentVersion !== bundle.contentVersion) {
-      throw new CharacterContentValidationError(`${character.characterId}.contentVersion must match bundle contentVersion`);
-    }
+    if (character.contentVersion !== bundle.contentVersion) throw new CharacterContentValidationError(`${character.characterId}.contentVersion must match bundle contentVersion`);
     nonEmpty(character.displayName, `${character.characterId}.displayName`);
+    nonEmpty(character.deityProxyLabel, `${character.characterId}.deityProxyLabel`);
+    nonEmpty(character.shortDescriptor, `${character.characterId}.shortDescriptor`);
+    if (character.capabilities.length === 0) throw new CharacterContentValidationError(`${character.characterId}.capabilities must not be empty`);
     unique(character.capabilities.map((capability) => `${capability.domain}:${capability.role}`), `${character.characterId}.capabilities`);
     unique(character.animationCueIds, `${character.characterId}.animationCueIds`);
     for (const capability of character.capabilities) nonEmpty(capability.capabilityVersion, `${character.characterId}.capabilityVersion`);
