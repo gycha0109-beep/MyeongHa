@@ -65,7 +65,7 @@ describe('memory resolution', () => {
   });
 
   it('snapshots only approval-time current characters', () => {
-    const current = [...DEV_CHARACTER_IDS];
+    const current: string[] = [...DEV_CHARACTER_IDS];
     const plan = resolveMemoryProposal({
       proposalKind: 'memory',
       resolution: 'accept_long_term',
