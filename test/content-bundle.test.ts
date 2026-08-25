@@ -20,11 +20,7 @@ describe('immutable content bundle validation', () => {
     expect(characterManifestA.contentHash).toMatch(/^sha256:[a-f0-9]{64}$/u);
     expect(worldManifestA).toMatchObject({ bundleId: 'dev-content-bundle-0001', contentVersion: '0.0.1-dev', episodeIds: ['dev-first-contact'], relationCount: 1 });
     expect(worldManifestA.contentHash).toMatch(/^sha256:[a-f0-9]{64}$/u);
-    expect(buildCoherentContentRelease('dev-release-0001', characterManifestA, worldManifestA)).toMatchObject({
-      releaseId: 'dev-release-0001',
-      bundleId: 'dev-content-bundle-0001',
-      contentVersion: '0.0.1-dev',
-    });
+    expect(buildCoherentContentRelease('dev-release-0001', characterManifestA, worldManifestA)).toMatchObject({ releaseId: 'dev-release-0001', bundleId: 'dev-content-bundle-0001', contentVersion: '0.0.1-dev' });
   });
 
   it('rejects a world relation that points outside the same character bundle', () => {
@@ -57,5 +53,12 @@ describe('immutable content bundle validation', () => {
     const characters = buildCharacterContentManifest(DEV_CHARACTER_CONTENT_BUNDLE);
     const world = buildWorldContentManifest(DEV_WORLD_CONTENT_BUNDLE, DEV_CHARACTER_CONTENT_BUNDLE);
     expect(() => buildCoherentContentRelease('dev-release-invalid', characters, { ...world, bundleId: 'other-bundle' })).toThrow(/share bundleId/u);
+  });
+
+  it('allows placeholder metadata but requires authored personality once placeholder flag is removed', () => {
+    expect(() => validateCharacterContentBundle({
+      ...DEV_CHARACTER_CONTENT_BUNDLE,
+      characters: [{ ...DEV_CHARACTER_CONTENT_BUNDLE.characters[0]!, developmentPlaceholder: undefined, personalityTraits: [] }],
+    })).toThrow(/personalityTraits must not be empty/u);
   });
 });
