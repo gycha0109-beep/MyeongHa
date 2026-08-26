@@ -51,15 +51,9 @@ begin
       message = 'terminal chat turn cannot be abandoned';
   end if;
 
-  -- The governed baseline does not silently normalize partially progressed states.
-  -- A turn with an active attempt must first reach its own terminal failure/commit path.
-  if v_turn_state not in ('received', 'failed_retryable') then
-    raise exception using
-      errcode = '23514',
-      constraint = 'cmd_chat_abandon_turn_not_eligible',
-      message = 'chat turn is not eligible for abandon';
-  end if;
-
+  -- Never orphan a nonterminal attempt. This check intentionally runs before the
+  -- turn-state eligibility check so RUNNING/GENERATED/VALIDATED are rejected by the
+  -- exact attempt authority rather than normalized into ABANDONED.
   select a.id
     into v_active_attempt_id
   from public.chat_turn_attempts a
@@ -74,6 +68,16 @@ begin
       errcode = '23514',
       constraint = 'cmd_chat_abandon_attempt_in_flight',
       message = 'chat turn with a nonterminal attempt cannot be abandoned';
+  end if;
+
+  -- The governed baseline does not silently repair impossible partially progressed
+  -- states. Only a never-started RECEIVED turn or an already-terminal retryable
+  -- failure can be abandoned without mutating attempt provenance.
+  if v_turn_state not in ('received', 'failed_retryable') then
+    raise exception using
+      errcode = '23514',
+      constraint = 'cmd_chat_abandon_turn_not_eligible',
+      message = 'chat turn is not eligible for abandon';
   end if;
 
   update public.chat_turns t
