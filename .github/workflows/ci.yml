@@ -94,5 +94,7 @@ jobs:
         run: bash test/db/notification_delivery_attempt_concurrency.sh
       - name: Run account deletion start persistence/concurrency tests
         run: bash test/db/account_deletion_start_concurrency.sh
+      - name: Run guest promotion persistence/concurrency tests
+        run: bash test/db/guest_promotion_concurrency.sh
       - name: Verify deterministic schema catalog snapshot
         run: bash test/db/catalog_snapshot.sh
