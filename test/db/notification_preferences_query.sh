@@ -29,14 +29,15 @@ expect_fail() {
 "${psql_base[@]}" <<'SQL'
 insert into auth.users(id) values
   ('5a100000-0000-0000-0000-000000000001'),
-  ('5a100000-0000-0000-0000-000000000002');
+  ('5a100000-0000-0000-0000-000000000002'),
+  ('5a100000-0000-0000-0000-000000000005');
 
 insert into public.subjects(id,kind,auth_user_id,status,merged_into_subject_id,created_at,updated_at) values
   ('5a200000-0000-0000-0000-000000000001','member','5a100000-0000-0000-0000-000000000001','active',null,timestamptz '2026-08-01 00:00:00+00',timestamptz '2026-08-01 00:00:00+00'),
   ('5a200000-0000-0000-0000-000000000002','member','5a100000-0000-0000-0000-000000000002','active',null,timestamptz '2026-08-01 00:00:00+00',timestamptz '2026-08-01 00:00:00+00'),
   ('5a200000-0000-0000-0000-000000000003','guest',null,'active',null,timestamptz '2026-08-01 00:00:00+00',timestamptz '2026-08-01 00:00:00+00'),
   ('5a200000-0000-0000-0000-000000000004','guest',null,'merged','5a200000-0000-0000-0000-000000000001',timestamptz '2026-08-01 00:00:00+00',timestamptz '2026-08-02 00:00:00+00'),
-  ('5a200000-0000-0000-0000-000000000005','member',null,'deletion_pending',null,timestamptz '2026-08-01 00:00:00+00',timestamptz '2026-08-03 00:00:00+00'),
+  ('5a200000-0000-0000-0000-000000000005','member','5a100000-0000-0000-0000-000000000005','deletion_pending',null,timestamptz '2026-08-01 00:00:00+00',timestamptz '2026-08-03 00:00:00+00'),
   ('5a200000-0000-0000-0000-000000000006','member',null,'deleted',null,timestamptz '2026-08-01 00:00:00+00',timestamptz '2026-08-04 00:00:00+00');
 
 insert into public.notification_settings(subject_id,timezone_override,quiet_start,quiet_end,preview_mode,global_enabled,updated_at) values
