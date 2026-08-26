@@ -86,5 +86,7 @@ jobs:
           set -euo pipefail
           psql -v ON_ERROR_STOP=1 -c "delete from public.saju_domain_runtime where saju_domain in ('general','compatibility','career')"
           bash test/db/reading_session_create_concurrency.sh
+      - name: Run reading transport prepare/finalize persistence/concurrency tests
+        run: bash test/db/reading_transport_finalize_concurrency.sh
       - name: Verify deterministic schema catalog snapshot
         run: bash test/db/catalog_snapshot.sh
