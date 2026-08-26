@@ -78,5 +78,7 @@ jobs:
         run: bash test/db/chat_attempt_commit_concurrency.sh
       - name: Run chat retry/abandon persistence/concurrency tests
         run: bash test/db/chat_retry_abandon_concurrency.sh
+      - name: Run birth revision append persistence/concurrency tests
+        run: bash test/db/birth_revision_append_concurrency.sh
       - name: Verify deterministic schema catalog snapshot
         run: bash test/db/catalog_snapshot.sh
