@@ -78,8 +78,8 @@ result=$("${psql_base[@]}" -Atc "select character_id||'|'||revoked_grant_count||
 active_alpha=$("${psql_base[@]}" -Atc "select count(*) from public.record_access_grants where subject_id='e2000000-0000-0000-0000-000000000001' and grantee_character_id='forget-alpha' and revoked_at is null;")
 [[ "$active_alpha" == "0" ]] || fail "forgotten character still has active grants: $active_alpha"
 
-preserved=$("${psql_base[@]}" -Atc "select (select count(*) from public.life_facts where subject_id='e2000000-0000-0000-0000-000000000001' and revoked_at is null)||(select count(*) from public.memory_items where subject_id='e2000000-0000-0000-0000-000000000001' and revoked_at is null)||(select count(*) from public.record_access_grants where subject_id='e2000000-0000-0000-0000-000000000001' and grantee_character_id='forget-beta' and revoked_at is null)||(select count(*) from public.record_access_grants where subject_id='e2000000-0000-0000-0000-000000000002' and grantee_character_id='forget-alpha' and revoked_at is null); ")
-[[ "$preserved" == "2211" ]] || fail "forget modified record/other-character/other-subject authority: $preserved"
+preserved=$("${psql_base[@]}" -Atc "select (select count(*) from public.life_facts where subject_id='e2000000-0000-0000-0000-000000000001' and revoked_at is null)::text||'|'||(select count(*) from public.memory_items where subject_id='e2000000-0000-0000-0000-000000000001' and revoked_at is null)::text||'|'||(select count(*) from public.record_access_grants where subject_id='e2000000-0000-0000-0000-000000000001' and grantee_character_id='forget-beta' and revoked_at is null)::text||'|'||(select count(*) from public.record_access_grants where subject_id='e2000000-0000-0000-0000-000000000002' and grantee_character_id='forget-alpha' and revoked_at is null)::text;")
+[[ "$preserved" == "2|2|1|1" ]] || fail "forget modified record/other-character/other-subject authority: $preserved"
 
 prior_revoked=$("${psql_base[@]}" -Atc "select revoked_at from public.record_access_grants where id='e5000000-0000-0000-0000-000000000004';")
 [[ "$prior_revoked" == "2026-01-01 00:00:00+00" ]] || fail "forget rewrote prior revoked grant timestamp: $prior_revoked"
@@ -96,7 +96,7 @@ pass "retired character remains forgettable so historical grants can be revoked"
 expect_fail "unknown character forget is denied" "character was not found" "select * from public.cmd_forget_character_records_v1('e2000000-0000-0000-0000-000000000001','forget-missing');"
 expect_fail "unknown subject forget is denied" "subject was not found" "select * from public.cmd_forget_character_records_v1('e2000000-0000-0000-0000-000000000099','forget-alpha');"
 expect_fail "deletion-pending subject cannot start character forget command" "character forget requires an active canonical subject" "select * from public.cmd_forget_character_records_v1('e2000000-0000-0000-0000-000000000003','forget-alpha');"
-[[ "$("${psql_base[@]}" -Atc "select count(*) from public.record_access_grants where subject_id='e2000000-0000-0000-0000-000000000003' and grantee_character_id='forget-alpha' and revoked_at is null;")" == "1" ]] || fail "denied forget mutated deletion-pending subject grant"
+[[ "$("${psql_base[@]}" -Atc "select count(*) from public.record_access_grants where subject_id='e2000000-0000-0000-000000000003' and grantee_character_id='forget-alpha' and revoked_at is null;")" == "1" ]] || fail "denied forget mutated deletion-pending subject grant"
 
 # Re-grant two records, then race duplicate forget calls. Subject row lock must linearize them.
 "${psql_base[@]}" <<'SQL'
