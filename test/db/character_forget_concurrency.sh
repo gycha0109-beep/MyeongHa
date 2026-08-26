@@ -96,9 +96,8 @@ pass "retired character remains forgettable so historical grants can be revoked"
 expect_fail "unknown character forget is denied" "character was not found" "select * from public.cmd_forget_character_records_v1('e2000000-0000-0000-0000-000000000001','forget-missing');"
 expect_fail "unknown subject forget is denied" "subject was not found" "select * from public.cmd_forget_character_records_v1('e2000000-0000-0000-0000-000000000099','forget-alpha');"
 expect_fail "deletion-pending subject cannot start character forget command" "character forget requires an active canonical subject" "select * from public.cmd_forget_character_records_v1('e2000000-0000-0000-0000-000000000003','forget-alpha');"
-[[ "$("${psql_base[@]}" -Atc "select count(*) from public.record_access_grants where subject_id='e2000000-0000-0000-000000000003' and grantee_character_id='forget-alpha' and revoked_at is null;")" == "1" ]] || fail "denied forget mutated deletion-pending subject grant"
+[[ "$("${psql_base[@]}" -Atc "select count(*) from public.record_access_grants where subject_id='e2000000-0000-0000-0000-000000000003' and grantee_character_id='forget-alpha' and revoked_at is null;")" == "1" ]] || fail "denied forget mutated deletion-pending subject grant"
 
-# Re-grant two records, then race duplicate forget calls. Subject row lock must linearize them.
 "${psql_base[@]}" <<'SQL'
 insert into public.record_access_grants(
   id,subject_id,life_fact_id,memory_item_id,grantee_character_id,grant_reason,granted_at,revoked_at
