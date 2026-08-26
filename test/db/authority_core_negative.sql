@@ -245,22 +245,97 @@ select pg_temp.assert_fails(
   'conversation_messages_thread_sequence_unique'
 );
 
--- Positive circular provenance path: attempt exists before committed pointer is set.
-insert into public.chat_turn_attempts(
-  id, turn_id, subject_id, attempt_no, state, started_at, finished_at
-) values (
-  '33000000-0000-0000-0000-000000000002',
-  '32000000-0000-0000-0000-000000000001',
+-- Positive committed provenance path now uses the same transaction authority as runtime.
+-- The direct bare committed-attempt fixture is intentionally removed because a committed
+-- attempt must pin exact generated/validated AI provenance and its authoritative message.
+update public.conversation_threads
+set next_sequence_no = 2,
+    updated_at = now()
+where id = '30000000-0000-0000-0000-000000000001';
+
+select * from public.cmd_allocate_chat_turn_attempt_v1(
   '10000000-0000-0000-0000-000000000001',
-  1, 'committed', now(), now()
+  '32000000-0000-0000-0000-000000000001',
+  '33000000-0000-0000-0000-000000000002',
+  'planner-v1'
 );
 
-update public.chat_turns
-set state = 'committed',
-    committed_attempt_id = '33000000-0000-0000-0000-000000000002',
-    committed_at = now(),
-    updated_at = now()
-where id = '32000000-0000-0000-0000-000000000001';
+select public.cmd_mark_chat_turn_context_ready_v1(
+  '10000000-0000-0000-0000-000000000001',
+  '32000000-0000-0000-0000-000000000001',
+  '33000000-0000-0000-0000-000000000002'
+);
+
+insert into public.ai_execution_logs(
+  id, subject_id, turn_id, turn_attempt_id, stage, provider, model,
+  prompt_version, content_release_id, content_bundle_id, character_id,
+  output_ref_jsonb, status, created_at
+) values (
+  '35000000-0000-0000-0000-000000000001',
+  '10000000-0000-0000-0000-000000000001',
+  '32000000-0000-0000-0000-000000000001',
+  '33000000-0000-0000-0000-000000000002',
+  'renderer', 'test-provider', 'test-model', 'renderer-prompt-v1',
+  '21000000-0000-0000-0000-000000000001',
+  '20000000-0000-0000-0000-000000000001',
+  'john-doe-01',
+  jsonb_build_object('generatedContentHash','sha256:v1:authority-core-answer'),
+  'success', now()
+);
+
+select public.cmd_mark_chat_turn_generated_v1(
+  '10000000-0000-0000-0000-000000000001',
+  '32000000-0000-0000-0000-000000000001',
+  '33000000-0000-0000-0000-000000000002',
+  '35000000-0000-0000-0000-000000000001',
+  'renderer-v1',
+  '31000000-0000-0000-0000-000000000001',
+  'authoritative answer',
+  null,
+  'character-dialogue-v1',
+  'sha256:v1:authority-core-answer',
+  '[]'::jsonb
+);
+
+insert into public.ai_execution_logs(
+  id, subject_id, turn_id, turn_attempt_id, stage, provider, model,
+  prompt_version, content_release_id, content_bundle_id, character_id,
+  output_ref_jsonb, status, created_at
+) values (
+  '35000000-0000-0000-0000-000000000002',
+  '10000000-0000-0000-0000-000000000001',
+  '32000000-0000-0000-0000-000000000001',
+  '33000000-0000-0000-0000-000000000002',
+  'output_guard', 'test-provider', 'test-guard', 'guard-prompt-v1',
+  '21000000-0000-0000-0000-000000000001',
+  '20000000-0000-0000-0000-000000000001',
+  'john-doe-01',
+  jsonb_build_object('generatedContentHash','sha256:v1:authority-core-answer'),
+  'success', now()
+);
+
+select public.cmd_validate_chat_turn_attempt_v1(
+  '10000000-0000-0000-0000-000000000001',
+  '32000000-0000-0000-0000-000000000001',
+  '33000000-0000-0000-0000-000000000002',
+  '35000000-0000-0000-0000-000000000002',
+  'output-guard-v1',
+  '{"passed":true}'::jsonb,
+  true,
+  'failed_final'
+);
+
+select * from public.cmd_commit_chat_turn_v1(
+  '10000000-0000-0000-0000-000000000001',
+  '30000000-0000-0000-0000-000000000001',
+  '32000000-0000-0000-0000-000000000001',
+  '33000000-0000-0000-0000-000000000002',
+  '34000000-0000-0000-0000-000000000006',
+  '36000000-0000-0000-0000-000000000001',
+  null,
+  null,
+  null
+);
 
 -- The DDL draft currently covers M01 + M02 core + M04 core only.
 do $$
