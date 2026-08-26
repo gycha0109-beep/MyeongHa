@@ -80,5 +80,11 @@ jobs:
         run: bash test/db/chat_retry_abandon_concurrency.sh
       - name: Run birth revision append persistence/concurrency tests
         run: bash test/db/birth_revision_append_concurrency.sh
+      - name: Run reading session create persistence/concurrency tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 -c "delete from public.saju_domain_runtime where saju_domain in ('general','compatibility','career')"
+          bash test/db/reading_session_create_concurrency.sh
       - name: Verify deterministic schema catalog snapshot
         run: bash test/db/catalog_snapshot.sh
