@@ -88,5 +88,7 @@ jobs:
           bash test/db/reading_session_create_concurrency.sh
       - name: Run reading transport prepare/finalize persistence/concurrency tests
         run: bash test/db/reading_transport_finalize_concurrency.sh
+      - name: Run reading clarification append persistence/concurrency tests
+        run: bash test/db/reading_clarification_concurrency.sh
       - name: Verify deterministic schema catalog snapshot
         run: bash test/db/catalog_snapshot.sh
