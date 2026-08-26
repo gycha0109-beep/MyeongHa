@@ -100,5 +100,7 @@ jobs:
         run: bash test/db/user_resource_revocation_concurrency.sh
       - name: Run character forget grant revocation persistence/concurrency tests
         run: bash test/db/character_forget_concurrency.sh
+      - name: Run individual Memory grant revoke persistence/concurrency tests
+        run: bash test/db/memory_grant_revoke_concurrency.sh
       - name: Verify deterministic schema catalog snapshot
         run: bash test/db/catalog_snapshot.sh
