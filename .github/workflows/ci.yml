@@ -106,5 +106,7 @@ jobs:
         run: bash test/db/guest_bootstrap_concurrency.sh
       - name: Run Life Fact revoke persistence/concurrency tests
         run: bash test/db/life_fact_revoke_concurrency.sh
+      - name: Run Memory Item revoke persistence/concurrency tests
+        run: bash test/db/memory_item_revoke_concurrency.sh
       - name: Verify deterministic schema catalog snapshot
         run: bash test/db/catalog_snapshot.sh
