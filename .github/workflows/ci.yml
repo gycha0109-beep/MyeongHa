@@ -110,5 +110,7 @@ jobs:
         run: bash test/db/memory_item_revoke_concurrency.sh
       - name: Run character record context filtering tests
         run: bash test/db/character_record_context_query.sh
+      - name: Run notification read persistence/concurrency tests
+        run: bash test/db/notification_read_concurrency.sh
       - name: Verify deterministic schema catalog snapshot
         run: bash test/db/catalog_snapshot.sh
