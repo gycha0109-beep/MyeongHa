@@ -118,5 +118,7 @@ jobs:
         run: bash test/db/entitlements_current_query.sh
       - name: Run data deletion job status read tests
         run: bash test/db/data_deletion_job_query.sh
+      - name: Run notification preference projection read tests
+        run: bash test/db/notification_preferences_query.sh
       - name: Verify deterministic schema catalog snapshot
         run: bash test/db/catalog_snapshot.sh
