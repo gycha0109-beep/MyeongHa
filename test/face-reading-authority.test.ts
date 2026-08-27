@@ -17,6 +17,18 @@ import {
   type SharedFaceObservationBundleV3,
 } from '../packages/face-reading/src/index.js';
 
+function withScanCheckedPassages(registry: FaceAuthorityRegistry, passageIds: readonly string[]): FaceAuthorityRegistry {
+  const selected = new Set(passageIds);
+  return {
+    ...registry,
+    passages: registry.passages.map((passage) =>
+      selected.has(passage.passageId)
+        ? { ...passage, verificationStatus: 'scan_checked' as const }
+        : passage,
+    ),
+  };
+}
+
 describe('face source and methodology authority', () => {
   it('accepts the research-only seed registry', () => {
     expect(() => validateFaceAuthorityRegistry(FACE_AUTHORITY_RESEARCH_REGISTRY_V0)).not.toThrow();
@@ -38,7 +50,7 @@ describe('face source and methodology authority', () => {
     expect(() => validateFaceAuthorityRegistry(invalid)).toThrow(FaceAuthorityValidationError);
   });
 
-  it('rejects an unresolved methodology ref instead of accepting a stringly-typed authority', () => {
+  it('rejects an unresolved methodology ref instead of accepting stringly-typed authority', () => {
     const invalid: FaceAuthorityRegistry = {
       ...FACE_AUTHORITY_RESEARCH_REGISTRY_V0,
       rules: [
@@ -77,17 +89,49 @@ describe('face source and methodology authority', () => {
     expect(() => validateFaceAuthorityRegistry(invalid)).toThrow(/scan_checked/u);
   });
 
+  it('does not allow a production rule to outrun a research methodology', () => {
+    const base = withScanCheckedPassages(FACE_AUTHORITY_RESEARCH_REGISTRY_V0, [
+      'passage.shenxiang.face_three_divisions',
+    ]);
+    const invalid: FaceAuthorityRegistry = {
+      ...base,
+      rules: [
+        {
+          ruleId: 'rule.invalid.method_status',
+          version: '1.0.0',
+          methodologyRef: FACE_METHOD_REFS_V0.shenxiangThreeDivisions,
+          sourceRefs: ['passage.shenxiang.face_three_divisions'],
+          tier: 'F1',
+          inputs: [],
+          condition: { op: 'exists', input: 'threeDivisions' },
+          output: {
+            claimType: 'FACE_MORPHOLOGY_CLASSIFICATION',
+            semanticKey: 'face.three_divisions.invalid_method_status',
+          },
+          rationale: 'test only',
+          limitations: [],
+          promotionStatus: 'production_authorized',
+        },
+      ],
+    };
+    expect(() => validateFaceAuthorityRegistry(invalid)).toThrow(/methodology .* status=research/u);
+  });
+
   it('blocks F6 promotion while the period-direction source conflict is unresolved', () => {
-    const passages = FACE_AUTHORITY_RESEARCH_REGISTRY_V0.passages.map((passage) =>
-      passage.passageId === 'passage.shenxiang.sancai_three_divisions'
-        ? { ...passage, verificationStatus: 'scan_checked' as const }
-        : passage,
+    const base = withScanCheckedPassages(FACE_AUTHORITY_RESEARCH_REGISTRY_V0, [
+      'passage.shenxiang.face_three_divisions',
+      'passage.shenxiang.sancai_three_divisions',
+    ]);
+    const methodologies = base.methodologies.map((method) =>
+      `${method.methodologyId}@${method.version}` === FACE_METHOD_REFS_V0.shenxiangThreeDivisions
+        ? { ...method, reviewStatus: 'production_authorized' as const }
+        : method,
     );
     const invalid: FaceAuthorityRegistry = {
-      ...FACE_AUTHORITY_RESEARCH_REGISTRY_V0,
-      passages,
+      ...base,
+      methodologies,
       rules: [
-        ...FACE_AUTHORITY_RESEARCH_REGISTRY_V0.rules,
+        ...base.rules,
         {
           ruleId: 'rule.invalid.f6.period',
           version: '1.0.0',
