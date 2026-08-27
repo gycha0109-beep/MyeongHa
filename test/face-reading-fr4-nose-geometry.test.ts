@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   FR4_NOSE_NEUTRAL_METRICS_V0,
   MEDIAPIPE_FACE_LANDMARKER_FR4_CANDIDATE_V0,
+  NOSE_TIP_TRADITIONAL_BINDING_V0,
   FaceAuthorityValidationError,
-  assertNoseCriterionCalibrationReady,
+  assertNoseBridgeCalibrationReady,
   computeNoseBridgeCenterlineDeviation,
   computeNoseTipContourCircularity,
   type NeutralFaceGeometryProvenance,
@@ -107,7 +108,7 @@ describe('FR-4 neutral nose-tip contour geometry', () => {
     expect(first.classificationApplied).toBe(false);
   });
 
-  it('rejects insufficient or degenerate contours', () => {
+  it('rejects insufficient, degenerate, and duplicate-closure contours', () => {
     expect(() =>
       computeNoseTipContourCircularity({
         provenance,
@@ -133,6 +134,14 @@ describe('FR-4 neutral nose-tip contour geometry', () => {
         ],
       }),
     ).toThrow(/positive polygon area/u);
+
+    const contour = regularPolygon(6, 1);
+    expect(() =>
+      computeNoseTipContourCircularity({
+        provenance,
+        contourPoints: [...contour, contour[0]!],
+      }),
+    ).toThrow(/must not repeat vertices/u);
   });
 });
 
@@ -143,19 +152,31 @@ describe('FR-4 calibration and provider binding gates', () => {
     expect(FR4_NOSE_NEUTRAL_METRICS_V0.some((metric) => metric.interpretationBoundary.includes('does not classify'))).toBe(true);
   });
 
-  it('blocks criterion classification until an explicit production calibration exists', () => {
-    expect(() => assertNoseCriterionCalibrationReady(undefined)).toThrow(/explicit calibration/u);
+  it('blocks bridge criterion classification until an explicit production calibration exists', () => {
+    expect(() => assertNoseBridgeCalibrationReady(undefined)).toThrow(/explicit calibration/u);
     expect(() =>
-      assertNoseCriterionCalibrationReady({
+      assertNoseBridgeCalibrationReady({
         calibrationId: 'calibration.nose.bridge.research_v0',
         metricRef: 'neutral.nose.bridge.centerline_rms_deviation@0.1.0',
         criterionId: 'criterion.discernment.bridge_straight',
         evidenceRefs: ['fixture-set.synthetic-nose-v0'],
         calibrationDatasetVersion: 'synthetic-nose-v0',
-        thresholdPolicy: { maxDeviation: 0.02 },
+        thresholdPolicy: { kind: 'max_inclusive', maxRmsDeviation: 0.02 },
         status: 'research',
       }),
     ).toThrow(/status=research/u);
+  });
+
+  it('refuses to calibrate 準圓庫起 from 2D circularity alone', () => {
+    expect(NOSE_TIP_TRADITIONAL_BINDING_V0).toMatchObject({
+      criterionId: 'criterion.discernment.tip_round_full',
+      bindingStatus: 'blocked_under_observed',
+      calibrationAllowed: false,
+    });
+    expect(NOSE_TIP_TRADITIONAL_BINDING_V0.missingEvidenceDimensions).toEqual([
+      'tip_fullness',
+      'tip_projection_or_depth',
+    ]);
   });
 
   it('keeps the current MediaPipe provider-index binding unresolved', () => {
