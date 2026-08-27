@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest';
 import {
   FACE_AUTHORITY_RESEARCH_REGISTRY_V0,
   FACE_COMPARISON_POLICY_V0,
+  FACELAB_COMPATIBILITY_REPORT_V0,
   FaceAuthorityValidationError,
   adaptMyeongHaStaticFaceObservation,
   assertClaimsComparable,
+  assertFaceLabProductionBridgeReady,
   projectCharacterFaceGrounding,
   validateFaceAuthorityRegistry,
   type FaceAuthorityRegistry,
@@ -81,6 +83,21 @@ describe('shared observation core boundary', () => {
     expect(adapted.observationState).toBe('usable');
     expect(adapted.unavailableRegions).toEqual(['left_ear']);
     expect('colorAppearance' in adapted.observations).toBe(false);
+  });
+
+  it('blocks production FaceLab coupling while only evaluation tooling contract is available', () => {
+    expect(FACELAB_COMPATIBILITY_REPORT_V0.state).toBe('evaluation_contract_only');
+    expect(() => assertFaceLabProductionBridgeReady()).toThrow(/evaluation_contract_only/u);
+  });
+
+  it('permits a future stable neutral FaceLab contract without changing Face Reading semantics', () => {
+    expect(() =>
+      assertFaceLabProductionBridgeReady({
+        ...FACELAB_COMPATIBILITY_REPORT_V0,
+        state: 'production_neutral_contract_available',
+        missingProductionCapabilities: [],
+      }),
+    ).not.toThrow();
   });
 });
 
