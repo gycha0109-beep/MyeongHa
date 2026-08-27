@@ -10,6 +10,8 @@ export * from './five-officers-six-fus-research-v0.js';
 export * from './nose-geometry.js';
 export * from './research-diagnosis-runtime.js';
 export * from './research-pack-v0.js';
+export * from './semantic-anchor-authority-fr13.js';
+export * from './semantic-anchor-registry-fr13.js';
 export * from './semantic-projection.js';
 export * from './source-corroboration.js';
 export * from './three-divisions.js';
