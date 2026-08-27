@@ -76,9 +76,11 @@ export {
 export {
   CharacterFacePresentationError,
   presentResearchFaceDiagnosisForCharacter,
+  validateCharacterFacePresentationProfileForCharacterV1,
   validateCharacterFacePresentationProfileV1,
   type CharacterFaceFollowUpStrategyV1,
   type CharacterFacePresentationBlockV1,
+  type CharacterFacePresentationContentIdentityV1,
   type CharacterFacePresentationFocusV1,
   type CharacterFacePresentationModeV1,
   type CharacterFacePresentationProfileV1,
