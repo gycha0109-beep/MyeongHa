@@ -1,8 +1,27 @@
 import { describe, expect, it } from 'vitest';
 import type { CharacterRuntimeContextV1 } from '../packages/domain/src/index.js';
-import { guardCharacterRendererOutput } from '../packages/domain/src/index.js';
+import {
+  guardCharacterRendererOutput,
+  hashProtectedSajuTextV1,
+} from '../packages/domain/src/index.js';
+
+function protectedText(
+  readingRef: string,
+  segmentId: string,
+  sourceRef: string,
+  text: string,
+) {
+  return {
+    segmentId,
+    sourceReadingRef: readingRef,
+    sourceRef,
+    contentHash: hashProtectedSajuTextV1(text),
+    text,
+  };
+}
 
 function runtimeContext(withSaju = true): CharacterRuntimeContextV1 {
+  const readingRef = 'reading-output-test-1';
   return {
     schemaVersion: 'v1',
     characterId: 'char-output-test',
@@ -131,17 +150,26 @@ function runtimeContext(withSaju = true): CharacterRuntimeContextV1 {
     recentMessages: ['요즘 회사를 그만둘까 고민 중이야.'],
     saju: withSaju
       ? {
-          readingRef: 'reading-output-test-1',
+          readingRef,
           domain: 'career',
           coverageState: 'complete',
           protectedSegments: [
-            {
-              segmentId: 'protected-career-1',
-              text: '서버가 검증한 사주 원문은 이 문장 그대로 유지되어야 합니다.',
-            },
+            protectedText(
+              readingRef,
+              'protected-career-1',
+              'product-block:career:0',
+              '서버가 검증한 사주 원문은 이 문장 그대로 유지되어야 합니다.',
+            ),
           ],
-          disclosures: ['현재 현실과의 연결은 사용자 확인이 필요합니다.'],
-          ambiguity: [],
+          disclosures: [
+            protectedText(
+              readingRef,
+              'disclosure-career-1',
+              'product-disclosure:career:0',
+              '현재 현실과의 연결은 사용자 확인이 필요합니다.',
+            ),
+          ],
+          ambiguity: ['birth_time_window'],
           capability: {
             domain: 'career',
             role: 'secondary',
@@ -175,7 +203,7 @@ function validDraft(): Record<string, unknown> {
 }
 
 describe('Character Output Guard', () => {
-  it('injects the exact protected Saju segment from server context', () => {
+  it('injects exact protected Saju material and ambiguity from server context', () => {
     const context = runtimeContext();
     const envelope = guardCharacterRendererOutput({
       rawOutput: validDraft(),
@@ -184,8 +212,13 @@ describe('Character Output Guard', () => {
     });
 
     expect(envelope.protectedSajuSegments).toEqual(context.saju?.protectedSegments);
-    expect(envelope.protectedSajuSegments[0]?.text).toBe(
-      '서버가 검증한 사주 원문은 이 문장 그대로 유지되어야 합니다.',
+    expect(envelope.protectedSajuDisclosures).toEqual(context.saju?.disclosures);
+    expect(envelope.calculationAmbiguity).toEqual(['birth_time_window']);
+    expect(envelope.protectedSajuSegments[0]?.sourceRef).toBe('product-block:career:0');
+    expect(envelope.protectedSajuSegments[0]?.contentHash).toBe(
+      hashProtectedSajuTextV1(
+        '서버가 검증한 사주 원문은 이 문장 그대로 유지되어야 합니다.',
+      ),
     );
     expect(envelope.framingBefore).toBe('기록부터 보겠습니다.');
     expect(envelope.framingAfter).toContain('지금 현실');
@@ -204,6 +237,71 @@ describe('Character Output Guard', () => {
         allowedSuggestedActionKeys: ['open_records'],
       }),
     ).toThrow(/unexpected field: protectedSajuSegments/u);
+  });
+
+  it('rejects any provider attempt to author disclosures or ambiguity', () => {
+    expect(() =>
+      guardCharacterRendererOutput({
+        rawOutput: {
+          ...validDraft(),
+          calculationAmbiguity: [],
+        },
+        context: runtimeContext(),
+        allowedSuggestedActionKeys: ['open_records'],
+      }),
+    ).toThrow(/unexpected field: calculationAmbiguity/u);
+  });
+
+  it('rejects framing that duplicates a protected Saju block', () => {
+    const context = runtimeContext();
+    expect(() =>
+      guardCharacterRendererOutput({
+        rawOutput: {
+          ...validDraft(),
+          framingAfter: `제가 정리하면, ${context.saju?.protectedSegments[0]?.text}`,
+        },
+        context,
+        allowedSuggestedActionKeys: ['open_records'],
+      }),
+    ).toThrow(/must not duplicate protected Saju content/u);
+  });
+
+  it('rejects framing that duplicates a protected disclosure', () => {
+    const context = runtimeContext();
+    expect(() =>
+      guardCharacterRendererOutput({
+        rawOutput: {
+          ...validDraft(),
+          framingBefore: `${context.saju?.disclosures[0]?.text} 그러니 기록을 보죠.`,
+        },
+        context,
+        allowedSuggestedActionKeys: ['open_records'],
+      }),
+    ).toThrow(/must not duplicate protected Saju content/u);
+  });
+
+  it('rejects a protected server context whose content hash has drifted', () => {
+    const context = runtimeContext();
+    const saju = context.saju!;
+    const drifted: CharacterRuntimeContextV1 = {
+      ...context,
+      saju: {
+        ...saju,
+        protectedSegments: [
+          {
+            ...saju.protectedSegments[0]!,
+            contentHash: 'sha256:v1:deadbeef',
+          },
+        ],
+      },
+    };
+    expect(() =>
+      guardCharacterRendererOutput({
+        rawOutput: validDraft(),
+        context: drifted,
+        allowedSuggestedActionKeys: ['open_records'],
+      }),
+    ).toThrow(/contentHash does not match protected text/u);
   });
 
   it('rejects an emotion outside the content-pinned allowlist', () => {
@@ -273,7 +371,7 @@ describe('Character Output Guard', () => {
     ).toThrow(/must be JSON-compatible/u);
   });
 
-  it('produces no protected Saju segment when the runtime context has no reading', () => {
+  it('produces no protected Saju material when the runtime context has no reading', () => {
     const envelope = guardCharacterRendererOutput({
       rawOutput: validDraft(),
       context: runtimeContext(false),
@@ -281,5 +379,7 @@ describe('Character Output Guard', () => {
     });
 
     expect(envelope.protectedSajuSegments).toEqual([]);
+    expect(envelope.protectedSajuDisclosures).toEqual([]);
+    expect(envelope.calculationAmbiguity).toEqual([]);
   });
 });
