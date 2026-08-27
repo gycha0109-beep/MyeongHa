@@ -1,8 +1,8 @@
-# 명하 Source Authority Gap Register v0.3
+# 명하 Source Authority Gap Register v0.4
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.3**  
-> Date: **2026-08-25**  
+> Pack Version: **v0.4**  
+> Date: **2026-08-27**  
 > Rule: source 문서끼리 충돌하거나 source가 implementation-critical authority를 제공하지 못하는 경우 Pack이 임의로 덮지 않는다.
 > Saju Public Contract Audit Pin: `gycha0109-beep/Saju@7102dc8fe8483c0875f6a093a4fd585b0df51f8b`
 
@@ -177,3 +177,144 @@ Character LLM semantic paraphrase/new Saju claim = DENY
 ```
 
 이 방식은 semantic drift를 fail-closed로 줄이지만 **explicit prohibitedInferences transport가 구현됐다는 뜻은 아니다.** source가 public guard metadata를 export하거나 Use Case contract를 현재 public ProductResponse 경계에 맞게 수정해야 해당 invariant를 완전히 CLOSED로 판정할 수 있다.
+
+## SRC-10 — Record Access Grant Create / Regrant Authority
+
+**Status: BLOCKING BEFORE `POST /api/memories/:id/grants` WRITE FINALIZATION**
+
+Use Case는 durable Memory/Life Fact visibility를 explicit `record_access_grants`로 표현하고, `current_characters` 선택을 **승인 시점의 현재 eligible character 집합 snapshot**으로 확장하라고 요구한다. 그러나 source는 여기서 `eligible`의 authoritative predicate를 끝까지 정의하지 않는다.
+
+현재 source만으로는 다음을 확정할 수 없다.
+
+```text
+character row 존재
+vs character unlock 상태
+vs current content release/runtime availability
+vs retired/disabled character 처리
+vs subject가 실제 접근 가능한 캐릭터 집합
+```
+
+또한 ERD는 active grant에만 partial unique를 두므로 revoked history 뒤 같은 `(record, character)` 조합의 새 row를 구조적으로 허용하지만, API `POST .../grants`가 다음 중 어느 command semantics를 가져야 하는지는 source가 정하지 않는다.
+
+```text
+A. revoked grant를 다시 활성화
+B. 새 grant row를 append하여 과거 revoke history를 보존
+C. 별도 grant lineage/regrant event를 기록
+```
+
+단순 DB 가능성을 product command authority로 승격하지 않는다. Source는 최소 다음을 정해야 한다.
+
+```text
+1. current_characters snapshot의 exact eligibility predicate
+2. explicit one-character grant의 eligibility predicate
+3. revoke 후 regrant의 lineage/history semantics
+4. retry/idempotency 시 동일 logical grant create의 dedupe authority
+```
+
+해결 전에는 current grant read와 revoke/forget 경계는 유지할 수 있으나, **새 grant create command를 final production authority로 확정하지 않는다.**
+
+## SRC-11 — Episode Progress Query Bundle Selection Authority
+
+**Status: BLOCKING BEFORE `GET /api/episodes/:id/progress` PROJECTION FINALIZATION**
+
+ERD v0.6의 `user_episode_progress` authority는 다음 키로 version-pinned current projection을 보존한다.
+
+```text
+(subject_id, episode_id, content_bundle_id)
+```
+
+따라서 한 사용자가 동일 stable `episode_id`에 대해 서로 다른 content bundle의 progress row를 역사적으로 둘 이상 가질 수 있다. `CHARACTER_WORLD_CONTENT_SPEC`도 retired bundle을 기존 pinned progress가 참조하는 동안 유지하도록 요구한다.
+
+반면 Shared API는:
+
+```text
+GET /api/episodes/:id/progress
+```
+
+만 정의하고 bundle/version selector를 받지 않는다. Source는 여러 pinned progress가 공존할 때 어떤 row가 이 endpoint의 authoritative response인지 결정하지 않는다.
+
+임의로 다음을 선택하면 안 된다.
+
+```text
+latest updated row
+highest revision row
+active/completed 우선순위
+latest content release의 bundle
+현재 default release와 동일한 bundle
+```
+
+Source에서 다음 중 하나 또는 동등한 contract가 필요하다.
+
+```text
+A. endpoint에 contentBundleId/progressId selector 추가
+B. current/continuable progress를 고르는 deterministic authority 정의
+C. episode별 모든 pinned progress summary를 반환하고 client가 explicit 선택
+```
+
+해결 전 episode start/advance write authority와 historical pinned rows는 유지할 수 있으나, bundle을 숨긴 단수형 current projection을 임의 구현하지 않는다.
+
+## SRC-12 — Notification Preference Default / Materialization Authority
+
+**Status: BLOCKING BEFORE NOTIFICATION PREFERENCE MUTATION FINALIZATION**
+
+Use Case는 카테고리별 opt-in/out, quiet hours, timezone, preview privacy를 요구하고 ERD는 `notification_settings` 1-row projection과 `notification_preferences(subject_id, category)` rows를 둔다. 그러나 source는 **row가 아직 없을 때의 effective value와 materialization rule**을 정의하지 않는다.
+
+현재 source가 확정하지 않은 항목:
+
+```text
+notification_settings 미존재 시 global_enabled 기본값
+notification_preferences(category) 미존재 시 enabled 기본값
+초기 5개 category row를 bootstrap 시 모두 생성하는지 여부
+PATCH가 insert-or-update인지 existing-row-only update인지 여부
+새 category가 registry에 추가될 때 기존 사용자에게 어떤 default를 적용하는지
+preview 기본값이 discreet인지 character_only인지 — source는 "민감 내용을 노출하지 않는 mode"까지만 요구
+```
+
+이 값들은 단순 UI default가 아니라 scheduler eligibility와 개인정보 노출을 직접 바꾸므로 Pack이 임의 선택하지 않는다.
+
+Source는 최소 다음을 명시해야 한다.
+
+```text
+1. missing-row effective default authority
+2. subject bootstrap/materialization policy
+3. PATCH create/update semantics와 idempotency
+4. category registry 확장 시 existing-user default/migration policy
+5. exact default preview mode
+```
+
+해결 전 current stored-row projection은 읽을 수 있지만, absence를 임의 default로 합성하거나 PATCH를 암묵 upsert로 확정하지 않는다.
+
+## SRC-13 — Notification Inbox Status Membership Authority
+
+**Status: BLOCKING BEFORE `GET /api/notifications` INBOX PROJECTION FINALIZATION**
+
+ERD v0.6의 logical notification 상태는 다음과 같다.
+
+```text
+queued | ready | read | cancelled | expired
+```
+
+`NOTIFICATION_RETURN_LOOP_SPEC`는 `notifications.status='read'`를 사용자가 inbox item을 읽은 상태로 정의하지만, Shared API `GET /api/notifications`가 위 status 중 **어떤 항목을 사용자 inbox에 노출해야 하는지**는 source가 정하지 않는다.
+
+특히 다음은 의미가 서로 다르다.
+
+```text
+queued     → 미래 scheduled item일 수 있음
+ready      → 현재 노출 가능한 item일 수 있음
+read       → 읽은 history
+cancelled  → 생성됐지만 더 이상 유효하지 않은 item
+expired    → 과거 유효기간 종료 item
+```
+
+Source authority 없이 `WHERE status IN (...)`를 임의 작성하면 future notification 선노출, 취소된 world event 노출, 또는 읽은 history의 비의도적 소실이 발생할 수 있다.
+
+Source는 최소 다음을 결정해야 한다.
+
+```text
+1. inbox visible status membership
+2. read history 포함 여부
+3. cancelled/expired history의 사용자 노출 여부
+4. queued item의 scheduled-before-ready visibility 여부
+```
+
+해결 전 `POST /api/notifications/:id/read`처럼 explicit 대상의 read command는 유지할 수 있으나, 전체 inbox projection은 source-backed status membership이 생기기 전까지 final authority로 구현하지 않는다.
