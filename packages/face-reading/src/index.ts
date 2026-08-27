@@ -8,6 +8,7 @@ export * from './facelab-compat.js';
 export * from './facelab-fr3-requirements.js';
 export * from './five-officers-six-fus-research-v0.js';
 export * from './nose-geometry.js';
+export * from './research-diagnosis-runtime.js';
 export * from './research-pack-v0.js';
 export * from './semantic-projection.js';
 export * from './source-corroboration.js';
