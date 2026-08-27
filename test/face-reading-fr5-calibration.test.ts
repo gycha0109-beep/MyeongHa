@@ -15,6 +15,12 @@ import {
 const metricRef = 'neutral.nose.bridge.centerline_rms_deviation@0.1.0';
 const criterionId = 'criterion.discernment.bridge_straight';
 const sourceRef = 'passage.shenxiang.five_officers.discernment';
+const syntheticEvidenceRef = 'evidence.nose_bridge.synthetic_discriminating@0.1.0';
+const repeatEvidenceRef = 'evidence.nose_bridge.repeat_capture@1.0.0';
+const expertEvidenceRef = 'evidence.nose_bridge.blinded_expert@1.0.0';
+const selectionEvidenceRef = 'evidence.nose_bridge.threshold_selection@1.0.0';
+const selectionMethodRef = 'method.threshold-selection.test-only-blinded-consensus-v1';
+const calibrationDatasetVersion = 'test-only-nose-bridge-calibration-v1';
 
 function context(input?: {
   faceAuthorityRegistry?: FaceAuthorityRegistry;
@@ -28,7 +34,7 @@ function context(input?: {
   };
 }
 
-function productionCalibration(): FaceCalibrationDefinition {
+function productionCalibration(threshold = 0.02): FaceCalibrationDefinition {
   return {
     calibrationId: 'calibration.nose.bridge.straight',
     version: '1.0.0-test-fixture',
@@ -36,10 +42,10 @@ function productionCalibration(): FaceCalibrationDefinition {
     criterionId,
     methodologyRef: FACE_FR3_METHOD_REFS_V0.shenxiangFiveOfficers,
     traditionalSourceRefs: [sourceRef],
-    calibrationEvidenceRefs: ['evidence.nose_bridge.synthetic_discriminating@0.1.0'],
-    calibrationDatasetVersion: 'test-only-nose-bridge-calibration-v1',
-    selectionMethodRef: 'method.threshold-selection.test-only-blinded-consensus-v1',
-    decisionRule: { kind: 'max_inclusive', threshold: 0.02 },
+    calibrationEvidenceRefs: [syntheticEvidenceRef],
+    calibrationDatasetVersion,
+    selectionMethodRef,
+    decisionRule: { kind: 'max_inclusive', threshold },
     status: 'production_authorized',
   };
 }
@@ -60,7 +66,7 @@ function promoteTraditionalAuthority(): FaceAuthorityRegistry {
   };
 }
 
-function withHumanEvidence(classes: readonly ('repeat_capture_stability' | 'blinded_expert_operationalization')[]): FaceCalibrationEvidenceRegistry {
+function empiricalEvidence(classes: readonly ('repeat_capture_stability' | 'blinded_expert_operationalization')[]): FaceCalibrationEvidenceRegistry {
   return {
     ...FACE_CALIBRATION_EVIDENCE_RESEARCH_V0,
     evidence: [
@@ -82,6 +88,49 @@ function withHumanEvidence(classes: readonly ('repeat_capture_stability' | 'blin
           : {}),
         status: 'reviewed' as const,
       })),
+    ],
+  };
+}
+
+function completeEvidence(selectionThreshold = 0.02): FaceCalibrationEvidenceRegistry {
+  const empirical = empiricalEvidence([
+    'repeat_capture_stability',
+    'blinded_expert_operationalization',
+  ]);
+  return {
+    ...empirical,
+    evidence: [
+      ...empirical.evidence,
+      {
+        evidenceId: 'evidence.nose_bridge.threshold_selection',
+        version: '1.0.0',
+        evidenceClass: 'threshold_selection_result',
+        metricRefs: [metricRef],
+        criterionRefs: [criterionId],
+        datasetVersion: calibrationDatasetVersion,
+        provenanceRefs: ['artifact:test-only-threshold-selection-v1'],
+        participantPolicy: 'consented_deidentified',
+        selectionResult: {
+          selectionMethodRef,
+          calibrationDatasetVersion,
+          decisionRule: { kind: 'max_inclusive', threshold: selectionThreshold },
+          inputEvidenceRefs: [repeatEvidenceRef, expertEvidenceRef],
+          evaluationProtocolRef: 'protocol.test-only-threshold-evaluation-v1',
+        },
+        status: 'reviewed',
+      },
+    ],
+  };
+}
+
+function fullCalibration(threshold = 0.02): FaceCalibrationDefinition {
+  return {
+    ...productionCalibration(threshold),
+    calibrationEvidenceRefs: [
+      syntheticEvidenceRef,
+      repeatEvidenceRef,
+      expertEvidenceRef,
+      selectionEvidenceRef,
     ],
   };
 }
@@ -135,6 +184,36 @@ describe('FR-5 calibration evidence authority', () => {
     expect(() => validateFaceCalibrationEvidenceRegistry(invalid)).toThrow(/duplicate ref/u);
   });
 
+  it('requires threshold-selection evidence to resolve to both repeat-capture and expert inputs', () => {
+    const empirical = empiricalEvidence(['repeat_capture_stability']);
+    const invalid: FaceCalibrationEvidenceRegistry = {
+      ...empirical,
+      evidence: [
+        ...empirical.evidence,
+        {
+          evidenceId: 'evidence.nose_bridge.threshold_selection',
+          version: '1.0.0',
+          evidenceClass: 'threshold_selection_result',
+          metricRefs: [metricRef],
+          criterionRefs: [criterionId],
+          datasetVersion: calibrationDatasetVersion,
+          provenanceRefs: ['artifact:invalid-selection-v1'],
+          participantPolicy: 'consented_deidentified',
+          selectionResult: {
+            selectionMethodRef,
+            calibrationDatasetVersion,
+            decisionRule: { kind: 'max_inclusive', threshold: 0.02 },
+            inputEvidenceRefs: [repeatEvidenceRef],
+            evaluationProtocolRef: 'protocol.invalid-selection-v1',
+          },
+          status: 'reviewed',
+        },
+      ],
+    };
+
+    expect(() => validateFaceCalibrationEvidenceRegistry(invalid)).toThrow(/blinded_expert_operationalization/u);
+  });
+
   it('rejects unknown neutral metrics before calibration logic runs', () => {
     const calibration = { ...productionCalibration(), metricRef: 'neutral.nose.magic_score@1.0.0' };
     expect(() => validateFaceCalibrationDefinition(calibration, context())).toThrow(/metricRef references unknown key/u);
@@ -149,10 +228,7 @@ describe('FR-5 calibration evidence authority', () => {
 
     const duplicateEvidence: FaceCalibrationDefinition = {
       ...productionCalibration(),
-      calibrationEvidenceRefs: [
-        'evidence.nose_bridge.synthetic_discriminating@0.1.0',
-        'evidence.nose_bridge.synthetic_discriminating@0.1.0',
-      ],
+      calibrationEvidenceRefs: [syntheticEvidenceRef, syntheticEvidenceRef],
     };
     expect(() => validateFaceCalibrationDefinition(duplicateEvidence, context())).toThrow(/calibrationEvidenceRefs contains duplicate ref/u);
   });
@@ -178,23 +254,19 @@ describe('FR-5 calibration evidence authority', () => {
   });
 
   it('does not allow a reviewed synthetic fixture to substitute for repeat-capture evidence', () => {
-    const calibration = productionCalibration();
     expect(() =>
       validateFaceCalibrationDefinition(
-        calibration,
+        productionCalibration(),
         context({ faceAuthorityRegistry: promoteTraditionalAuthority() }),
       ),
     ).toThrow(/repeat_capture_stability/u);
   });
 
   it('still requires blinded expert operationalization after repeat-capture stability is present', () => {
-    const evidenceRegistry = withHumanEvidence(['repeat_capture_stability']);
+    const evidenceRegistry = empiricalEvidence(['repeat_capture_stability']);
     const calibration = {
       ...productionCalibration(),
-      calibrationEvidenceRefs: [
-        'evidence.nose_bridge.synthetic_discriminating@0.1.0',
-        'evidence.nose_bridge.repeat_capture@1.0.0',
-      ],
+      calibrationEvidenceRefs: [syntheticEvidenceRef, repeatEvidenceRef],
     };
 
     expect(() =>
@@ -208,18 +280,14 @@ describe('FR-5 calibration evidence authority', () => {
     ).toThrow(/blinded_expert_operationalization/u);
   });
 
-  it('accepts a structurally complete production calibration only after both empirical evidence classes exist', () => {
-    const evidenceRegistry = withHumanEvidence([
+  it('requires a threshold-selection result even when both empirical evidence classes exist', () => {
+    const evidenceRegistry = empiricalEvidence([
       'repeat_capture_stability',
       'blinded_expert_operationalization',
     ]);
     const calibration = {
       ...productionCalibration(),
-      calibrationEvidenceRefs: [
-        'evidence.nose_bridge.synthetic_discriminating@0.1.0',
-        'evidence.nose_bridge.repeat_capture@1.0.0',
-        'evidence.nose_bridge.blinded_expert@1.0.0',
-      ],
+      calibrationEvidenceRefs: [syntheticEvidenceRef, repeatEvidenceRef, expertEvidenceRef],
     };
 
     expect(() =>
@@ -230,21 +298,37 @@ describe('FR-5 calibration evidence authority', () => {
           calibrationEvidenceRegistry: evidenceRegistry,
         }),
       ),
+    ).toThrow(/threshold_selection_result/u);
+  });
+
+  it('rejects a calibration threshold that does not match the reviewed selection result', () => {
+    expect(() =>
+      validateFaceCalibrationDefinition(
+        fullCalibration(0.03),
+        context({
+          faceAuthorityRegistry: promoteTraditionalAuthority(),
+          calibrationEvidenceRegistry: completeEvidence(0.02),
+        }),
+      ),
+    ).toThrow(/decisionRule does not match threshold selection evidence/u);
+  });
+
+  it('accepts a structurally complete production calibration only when the selection artifact matches exactly', () => {
+    expect(() =>
+      validateFaceCalibrationDefinition(
+        fullCalibration(0.02),
+        context({
+          faceAuthorityRegistry: promoteTraditionalAuthority(),
+          calibrationEvidenceRegistry: completeEvidence(0.02),
+        }),
+      ),
     ).not.toThrow();
   });
 
-  it('requires a decision rule for production but does not provide a threshold in the seed registry', () => {
-    const evidenceRegistry = withHumanEvidence([
-      'repeat_capture_stability',
-      'blinded_expert_operationalization',
-    ]);
+  it('requires a decision rule for production and still ships no threshold authority seed', () => {
     const calibration = {
-      ...productionCalibration(),
+      ...fullCalibration(),
       decisionRule: null,
-      calibrationEvidenceRefs: [
-        'evidence.nose_bridge.repeat_capture@1.0.0',
-        'evidence.nose_bridge.blinded_expert@1.0.0',
-      ],
     };
 
     expect(() =>
@@ -252,7 +336,7 @@ describe('FR-5 calibration evidence authority', () => {
         calibration,
         context({
           faceAuthorityRegistry: promoteTraditionalAuthority(),
-          calibrationEvidenceRegistry: evidenceRegistry,
+          calibrationEvidenceRegistry: completeEvidence(),
         }),
       ),
     ).toThrow(/requires decisionRule/u);
