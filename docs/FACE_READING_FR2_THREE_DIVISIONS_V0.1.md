@@ -42,7 +42,7 @@ Operational reading used only for the research region map:
 下停 = nose tip / 準頭 → chin / 頦·地閣
 ```
 
-Verification status remains `unverified_ocr` until the NLC scan page itself is checked.
+Verification status remains `unverified_ocr` until the 576-page NLC `神相全編` scan page itself is visually checked.
 
 ### 2.2 《神相全編》 — 三才三停論
 
@@ -52,7 +52,41 @@ The same electronic witness separately contains:
 
 This supports the same three-span morphology boundary, but the surrounding passage also contains period-direction wording that is not consistent with other transmitted formulations.
 
-### 2.3 《柳莊相法》 — 永樂百問
+### 2.3 《麻衣相法》 — 1925 NLC 第1卷 scan
+
+Witness:
+
+- 文明書局 民國十四年本
+- National Library of China
+- 第1卷
+
+The scan was visually checked around PDF pp. 35–36 / printed pp. 31–33.
+
+Registered scan-checked passages:
+
+```text
+passage.mayi.sancai_three_divisions.boundaries
+passage.mayi.sancai_three_divisions.period
+```
+
+The scan confirms the transmitted 三才三停 material and, critically, the period verse:
+
+> 上停長老吉昌，中停長近君王，下停長少吉祥，三停平等富貴榮顯……
+
+These passages are `scan_checked`, not merely electronic transcription candidates.
+
+This matters because the `上停長老吉昌` formulation materially conflicts with another transmitted `神相全編` formulation (`上停長少年忙`). The conflict therefore cannot be dismissed as a trivial OCR error.
+
+The Mayi witness is registered as its own methodology authority:
+
+```text
+method.mayi.face_three_divisions@0.1.0
+reviewStatus = reviewed
+```
+
+`reviewed` here means the cited witness passage has been visually scan-checked. It does **not** mean its traditional claims are scientifically validated or that production fortune interpretation is authorized.
+
+### 2.4 《柳莊相法》 — 永樂百問
 
 Electronic witness:
 
@@ -69,14 +103,15 @@ This is **not normalized into the 神相全編 region map**. The boundary semant
 
 A single global `ThreeDivisionsMap` would erase source disagreement.
 
-Current authority therefore distinguishes:
+Current authority distinguishes:
 
 ```text
 method.shenxiang.face_three_divisions@0.1.0
+method.mayi.face_three_divisions@0.1.0
 method.liuzhuang.face_three_divisions@0.1.0
 ```
 
-The first has an executable research region map. The second is preserved as a separate research methodology and is not force-fit into the first coordinate system.
+The Shenxiang methodology currently has the executable research region map. The Mayi scan is a checked comparative witness. The Liuzhuang formulation remains separate and is not force-fit into the Shenxiang coordinate system.
 
 ## 4. No invented `平等` threshold
 
@@ -153,11 +188,12 @@ The current corpus contains materially different period-direction formulations a
 
 Examples include:
 
-- `上停長少年忙，中停長福祿昌，下停長老吉祥`
-- `上停長老吉昌，中停長近君王，下停長少吉祥`
-- 柳莊系統의 `上停 ... 初限` wording
+- `神相全編 / 十觀`: `上停長少年忙，中停長福祿昌，下停長老吉祥`
+- `神相全編 / 三才三停論`: `上停長老吉昌，中停長近君王，下停長少吉祥`
+- `麻衣相法 / 1925 NLC scan`: `上停長老吉昌，中停長近君王，下停長少吉祥`
+- `柳莊相法`: `上停 ... 初限` wording
 
-Until scan-level checking and textual-lineage reconciliation are complete, the registry contains:
+The registry therefore contains:
 
 ```text
 conflict.three_divisions.period_direction_v0
@@ -165,7 +201,7 @@ status = open
 affectedTiers = [F6]
 ```
 
-Any attempt to mark an F6 rule from the affected methodologies as `production_authorized` fails validation even if a passage is later marked `scan_checked`.
+Any attempt to mark an F6 rule from the affected methodologies as `production_authorized` fails validation even when its selected passage has reached `scan_checked`.
 
 This makes source conflict an executable authority constraint rather than a documentation warning.
 
@@ -176,8 +212,10 @@ Current state:
 | Layer | State |
 |---|---|
 | Source work/witness inventory | research established |
-| Electronic passages | `unverified_ocr` |
-| 神相全編 region map | `research` |
+| `麻衣相法` 1925 三停 passages | `scan_checked` |
+| `神相全編` electronic passages | `unverified_ocr` |
+| `柳莊相法` electronic passage | `unverified_ocr` |
+| `神相全編` region map | `research` |
 | Metrics | research contract |
 | Relative-order evaluator | executable |
 | F1 morphology rules | `research` |
@@ -187,8 +225,9 @@ Current state:
 
 ## 9. Next evidence work
 
-1. Locate exact NLC scan pages for the registered `面三停` and `三才三停論` passages.
-2. Mark passage `scan_checked` only after visual page comparison.
-3. Compare the same passage across 麻衣相法 / 神相全編 witnesses to identify inheritance vs independent attestation.
-4. Resolve whether a stable, source-defensible F6 period mapping exists.
+1. Locate and visually scan-check the exact NLC `神相全編` pages for `面三停`, `三才三停論`, and the `十觀` variant.
+2. Compare `麻衣相法` and `神相全編` wording at passage level to determine inheritance/compilation relationships rather than counting them as independent corroboration.
+3. Obtain a scan-level `柳莊相法` witness for the conflicting boundary/period formulation.
+4. Resolve whether any stable, source-defensible F6 period mapping exists; until then keep F6 closed.
 5. Separately calibrate image measurement tolerance for `平等`; calibration evidence must remain distinct from traditional source evidence.
+6. Only after the neutral FaceLab anchor contract exists, bind semantic anchors (`hairline_midpoint`, `brow_midline`, `nose_tip`, `chin_bottom`) to extractor-specific landmarks.
