@@ -26,7 +26,7 @@ expect_fail() {
   pass "$label -> $needle"
 }
 
-"${psql_base[@]}" <<'SQL'
+"${psql_base[@]}" >/dev/null <<'SQL'
 insert into auth.users(id) values
   ('52000000-0000-0000-0000-000000000001'),
   ('52000000-0000-0000-0000-000000000002'),
@@ -73,7 +73,7 @@ insert into public.conversation_threads(
   id,subject_id,thread_type,status,title,active_content_release_id,active_content_bundle_id,
   content_revision,next_sequence_no,created_at,updated_at,deleted_at
 ) values
-  ('52400000-0000-0000-0000-000000000001','52100000-0000-0000-0000-000000000001','single_character','active','active owner thread','52300000-0000-0000-0000-000000000001','52200000-0000-0000-0000-000000000001',0,4,timestamptz '2026-08-22 05:00:00+00',timestamptz '2026-08-22 05:30:00+00',null),
+  ('52400000-0000-0000-0000-000000000001','52100000-0000-0000-0000-000000000001','single_character','active','active owner thread','52300000-0000-0000-0000-000000000001','52200000-0000-0000-0000-000000000001',0,1,timestamptz '2026-08-22 05:00:00+00',timestamptz '2026-08-22 05:30:00+00',null),
   ('52400000-0000-0000-0000-000000000002','52100000-0000-0000-0000-000000000001','system','archived','archived owner thread',null,null,0,2,timestamptz '2026-08-22 06:00:00+00',timestamptz '2026-08-22 06:30:00+00',null),
   ('52400000-0000-0000-0000-000000000003','52100000-0000-0000-0000-000000000001','system','deleted','deleted owner thread',null,null,0,2,timestamptz '2026-08-22 07:00:00+00',timestamptz '2026-08-22 07:30:00+00',timestamptz '2026-08-22 07:30:00+00'),
   ('52400000-0000-0000-0000-000000000004','52100000-0000-0000-0000-000000000002','system','active','other owner thread',null,null,0,2,timestamptz '2026-08-22 08:00:00+00',timestamptz '2026-08-22 08:30:00+00',null),
@@ -88,25 +88,106 @@ insert into public.conversation_thread_characters(
   timestamptz '2026-08-22 05:00:00+00',null
 );
 
-insert into public.chat_turns(
-  id,thread_id,subject_id,client_turn_id,request_hash,request_contract_version,request_snapshot_jsonb,
-  resolved_content_release_id,resolved_content_bundle_id,state,revision,next_attempt_no,committed_attempt_id,
-  error_code,created_at,committed_at,delivered_at,updated_at
-) values (
-  '52600000-0000-0000-0000-000000000001','52400000-0000-0000-0000-000000000001',
-  '52100000-0000-0000-0000-000000000001','chat-stream-turn-v52',
-  'sha256:v1:5200000000000000000000000000000000000000000000000000000000000003','v1',
-  '{"text":"hello"}'::jsonb,'52300000-0000-0000-0000-000000000001','52200000-0000-0000-0000-000000000001',
-  'received',0,2,null,null,timestamptz '2026-08-22 05:10:00+00',null,null,timestamptz '2026-08-22 05:10:00+00'
+-- Build the visible user/character history through the existing authoritative
+-- receive -> attempt -> context -> generate -> validate -> commit command path.
+-- The stream query is therefore tested against a real committed message shape,
+-- not a fixture-only illegal state jump.
+select * from public.cmd_receive_chat_turn_v1(
+  '52100000-0000-0000-0000-000000000001',
+  '52400000-0000-0000-0000-000000000001',
+  'chat-stream-turn-v52',
+  'sha256:v1:5200000000000000000000000000000000000000000000000000000000000003',
+  'v1',
+  '{"text":"hello"}'::jsonb,
+  '52300000-0000-0000-0000-000000000001',
+  '52200000-0000-0000-0000-000000000001',
+  '52600000-0000-0000-0000-000000000001',
+  '52800000-0000-0000-0000-000000000001',
+  'hello',
+  null,
+  'sha256:v1:5200000000000000000000000000000000000000000000000000000000000011'
 );
 
-insert into public.chat_turn_attempts(
-  id,turn_id,subject_id,attempt_no,state,planner_version,renderer_version,output_guard_version,
-  started_at,finished_at,error_code
+select * from public.cmd_allocate_chat_turn_attempt_v1(
+  '52100000-0000-0000-0000-000000000001',
+  '52600000-0000-0000-0000-000000000001',
+  '52700000-0000-0000-0000-000000000001',
+  'planner-v1'
+);
+
+select public.cmd_mark_chat_turn_context_ready_v1(
+  '52100000-0000-0000-0000-000000000001',
+  '52600000-0000-0000-0000-000000000001',
+  '52700000-0000-0000-0000-000000000001'
+);
+
+insert into public.ai_execution_logs(
+  id,subject_id,turn_id,turn_attempt_id,stage,provider,model,prompt_version,
+  content_release_id,content_bundle_id,character_id,input_ref_jsonb,output_ref_jsonb,status,created_at
 ) values (
-  '52700000-0000-0000-0000-000000000001','52600000-0000-0000-0000-000000000001',
-  '52100000-0000-0000-0000-000000000001',1,'running','planner-v1','renderer-v1','guard-v1',
-  timestamptz '2026-08-22 05:11:00+00',null,null
+  '52a00000-0000-0000-0000-000000000001',
+  '52100000-0000-0000-0000-000000000001',
+  '52600000-0000-0000-0000-000000000001',
+  '52700000-0000-0000-0000-000000000001',
+  'renderer','test-provider','test-model','renderer-prompt-v1',
+  '52300000-0000-0000-0000-000000000001','52200000-0000-0000-0000-000000000001',
+  'char-chat-stream-52',
+  '{"source":"chat-stream-test"}'::jsonb,
+  '{"generatedContentHash":"sha256:v1:5200000000000000000000000000000000000000000000000000000000000012"}'::jsonb,
+  'success',clock_timestamp()
+);
+
+select public.cmd_mark_chat_turn_generated_v1(
+  '52100000-0000-0000-0000-000000000001',
+  '52600000-0000-0000-0000-000000000001',
+  '52700000-0000-0000-0000-000000000001',
+  '52a00000-0000-0000-0000-000000000001',
+  'renderer-v1',
+  '52500000-0000-0000-0000-000000000001',
+  'answer',
+  '{"emotion":"neutral"}'::jsonb,
+  'character-message/v1',
+  'sha256:v1:5200000000000000000000000000000000000000000000000000000000000012',
+  '[]'::jsonb
+);
+
+insert into public.ai_execution_logs(
+  id,subject_id,turn_id,turn_attempt_id,stage,provider,model,prompt_version,
+  content_release_id,content_bundle_id,character_id,input_ref_jsonb,output_ref_jsonb,status,created_at
+) values (
+  '52b00000-0000-0000-0000-000000000001',
+  '52100000-0000-0000-0000-000000000001',
+  '52600000-0000-0000-0000-000000000001',
+  '52700000-0000-0000-0000-000000000001',
+  'output_guard','test-provider','test-guard','guard-prompt-v1',
+  '52300000-0000-0000-0000-000000000001','52200000-0000-0000-0000-000000000001',
+  'char-chat-stream-52',
+  '{"source":"chat-stream-test"}'::jsonb,
+  '{"generatedContentHash":"sha256:v1:5200000000000000000000000000000000000000000000000000000000000012"}'::jsonb,
+  'success',clock_timestamp()
+);
+
+select public.cmd_validate_chat_turn_attempt_v1(
+  '52100000-0000-0000-0000-000000000001',
+  '52600000-0000-0000-0000-000000000001',
+  '52700000-0000-0000-0000-000000000001',
+  '52b00000-0000-0000-0000-000000000001',
+  'output-guard-v1',
+  '{"passed":true}'::jsonb,
+  true,
+  'failed_final'
+);
+
+select * from public.cmd_commit_chat_turn_v1(
+  '52100000-0000-0000-0000-000000000001',
+  '52400000-0000-0000-0000-000000000001',
+  '52600000-0000-0000-0000-000000000001',
+  '52700000-0000-0000-0000-000000000001',
+  '52800000-0000-0000-0000-000000000002',
+  '52900000-0000-0000-0000-000000000001',
+  null,
+  null,
+  null
 );
 
 insert into public.conversation_messages(
@@ -114,8 +195,6 @@ insert into public.conversation_messages(
   character_content_bundle_id,body_text,message_payload_jsonb,message_schema_version,
   content_hash,created_at,redacted_at,redaction_reason
 ) values
-  ('52800000-0000-0000-0000-000000000001','52400000-0000-0000-0000-000000000001','52100000-0000-0000-0000-000000000001','52600000-0000-0000-0000-000000000001',1,'user',null,null,'hello',null,null,'sha256:v1:5200000000000000000000000000000000000000000000000000000000000011',timestamptz '2026-08-22 05:10:00+00',null,null),
-  ('52800000-0000-0000-0000-000000000002','52400000-0000-0000-0000-000000000001','52100000-0000-0000-0000-000000000001','52600000-0000-0000-0000-000000000001',2,'character','52500000-0000-0000-0000-000000000001','52200000-0000-0000-0000-000000000001','answer','{"emotion":"neutral"}'::jsonb,'character-message/v1','sha256:v1:5200000000000000000000000000000000000000000000000000000000000012',timestamptz '2026-08-22 05:12:00+00',null,null),
   ('52800000-0000-0000-0000-000000000003','52400000-0000-0000-0000-000000000001','52100000-0000-0000-0000-000000000001',null,3,'system',null,null,'REDACTED_SECRET_TEXT','{"secret":"REDACTED_SECRET_PAYLOAD"}'::jsonb,'system-message/v1','sha256:v1:5200000000000000000000000000000000000000000000000000000000000013',timestamptz '2026-08-22 05:13:00+00',timestamptz '2026-08-22 05:20:00+00','conversation_delete'),
   ('52800000-0000-0000-0000-000000000004','52400000-0000-0000-0000-000000000002','52100000-0000-0000-0000-000000000001',null,1,'system',null,null,'archived visible',null,null,'sha256:v1:5200000000000000000000000000000000000000000000000000000000000014',timestamptz '2026-08-22 06:10:00+00',null,null),
   ('52800000-0000-0000-0000-000000000005','52400000-0000-0000-0000-000000000003','52100000-0000-0000-0000-000000000001',null,1,'system',null,null,'deleted thread secret',null,null,'sha256:v1:5200000000000000000000000000000000000000000000000000000000000015',timestamptz '2026-08-22 07:10:00+00',null,null),
@@ -123,18 +202,17 @@ insert into public.conversation_messages(
   ('52800000-0000-0000-0000-000000000007','52400000-0000-0000-0000-000000000005','52100000-0000-0000-0000-000000000003',null,1,'system',null,null,'guest visible',null,null,'sha256:v1:5200000000000000000000000000000000000000000000000000000000000017',timestamptz '2026-08-22 09:10:00+00',null,null),
   ('52800000-0000-0000-0000-000000000008','52400000-0000-0000-0000-000000000006','52100000-0000-0000-0000-000000000004',null,1,'system',null,null,'deletion-pending history',null,null,'sha256:v1:5200000000000000000000000000000000000000000000000000000000000018',timestamptz '2026-08-22 10:10:00+00',null,null);
 
-update public.chat_turn_attempts
-set state='committed', finished_at=timestamptz '2026-08-22 05:14:00+00'
-where id='52700000-0000-0000-0000-000000000001';
-
-update public.chat_turns
-set state='delivered',
-    committed_attempt_id='52700000-0000-0000-0000-000000000001',
-    committed_at=timestamptz '2026-08-22 05:14:00+00',
-    delivered_at=timestamptz '2026-08-22 05:15:00+00',
-    updated_at=timestamptz '2026-08-22 05:15:00+00'
-where id='52600000-0000-0000-0000-000000000001';
+update public.conversation_threads
+set next_sequence_no=4
+where id='52400000-0000-0000-0000-000000000001';
 SQL
+
+lifecycle_shape=$("${psql_base[@]}" -At -F '|' -c "select
+  (select state from public.chat_turns where id='52600000-0000-0000-0000-000000000001'),
+  (select state from public.chat_turn_attempts where id='52700000-0000-0000-0000-000000000001'),
+  (select committed_message_id::text from public.chat_turn_attempts where id='52700000-0000-0000-0000-000000000001');")
+[[ "$lifecycle_shape" == 'committed|committed|52800000-0000-0000-0000-000000000002' ]] || fail "authoritative chat fixture did not reach committed state: $lifecycle_shape"
+pass "chat stream fixture uses committed chat command lifecycle"
 
 before_state=$("${psql_base[@]}" -At -F '|' -c "select
   (select status||'|'||next_sequence_no::text||'|'||updated_at::text from public.conversation_threads where id='52400000-0000-0000-0000-000000000001'),
