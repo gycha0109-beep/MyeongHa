@@ -1,5 +1,6 @@
 export * from './contracts.js';
 export * from './facelab-compat.js';
+export * from './five-officers-six-fus-research-v0.js';
 export * from './research-pack-v0.js';
 export * from './semantic-projection.js';
 export * from './three-divisions.js';
