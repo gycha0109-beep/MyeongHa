@@ -56,24 +56,38 @@ function passageStatusRank(status: SourcePassage['verificationStatus']): number 
   }
 }
 
-function validateProductionSourceGate(
+function validateReviewedSourceGate(
   authorityKey: string,
   status: ReviewStatus,
   sourceRefs: readonly string[],
   passages: ReadonlyMap<string, SourcePassage>,
 ): void {
-  if (status !== 'production_authorized') return;
+  if (status === 'research') return;
   if (sourceRefs.length === 0) {
-    throw new FaceAuthorityValidationError(`${authorityKey} production authority requires sourceRefs.`);
+    throw new FaceAuthorityValidationError(`${authorityKey} reviewed authority requires sourceRefs.`);
   }
   for (const ref of sourceRefs) {
     const passage = passages.get(ref);
     if (passage === undefined) {
-      throw new FaceAuthorityValidationError(`${authorityKey} production sourceRef must resolve to a passage: ${ref}`);
+      throw new FaceAuthorityValidationError(`${authorityKey} sourceRef must resolve to a passage: ${ref}`);
     }
     if (passageStatusRank(passage.verificationStatus) < passageStatusRank('scan_checked')) {
-      throw new FaceAuthorityValidationError(`${authorityKey} production authority requires scan_checked source passage: ${ref}`);
+      throw new FaceAuthorityValidationError(`${authorityKey} ${status} authority requires scan_checked source passage: ${ref}`);
     }
+  }
+}
+
+function assertProductionDependency(
+  authorityKey: string,
+  status: ReviewStatus,
+  dependencyLabel: string,
+  dependencyStatus: ReviewStatus | undefined,
+): void {
+  if (status !== 'production_authorized') return;
+  if (dependencyStatus !== 'production_authorized') {
+    throw new FaceAuthorityValidationError(
+      `${authorityKey} cannot be production_authorized while ${dependencyLabel} status=${dependencyStatus ?? 'missing'}.`,
+    );
   }
 }
 
@@ -81,9 +95,38 @@ function validateRulePromotion(
   rule: FaceRuleDefinition,
   passages: ReadonlyMap<string, SourcePassage>,
   conflicts: readonly FaceAuthorityConflictDefinition[],
+  methodologyStatuses: ReadonlyMap<string, ReviewStatus>,
+  metricStatuses: ReadonlyMap<string, ReviewStatus>,
+  operationalizationStatuses: ReadonlyMap<string, ReviewStatus>,
 ): void {
-  validateProductionSourceGate(rule.ruleId, rule.promotionStatus, rule.sourceRefs, passages);
+  validateReviewedSourceGate(rule.ruleId, rule.promotionStatus, rule.sourceRefs, passages);
   if (rule.promotionStatus !== 'production_authorized') return;
+
+  assertProductionDependency(
+    rule.ruleId,
+    rule.promotionStatus,
+    `methodology ${rule.methodologyRef}`,
+    methodologyStatuses.get(rule.methodologyRef),
+  );
+
+  for (const input of rule.inputs) {
+    if (input.sourceType === 'metric') {
+      assertProductionDependency(
+        rule.ruleId,
+        rule.promotionStatus,
+        `metric ${input.ref}`,
+        metricStatuses.get(input.ref),
+      );
+    }
+    if (input.sourceType === 'operationalization') {
+      assertProductionDependency(
+        rule.ruleId,
+        rule.promotionStatus,
+        `operationalization ${input.ref}`,
+        operationalizationStatuses.get(input.ref),
+      );
+    }
+  }
 
   const blockingConflict = conflicts.find(
     (conflict) =>
@@ -137,11 +180,23 @@ export function validateFaceAuthorityRegistry(registry: FaceAuthorityRegistry): 
   const passageMap = new Map(registry.passages.map((passage) => [passage.passageId, passage] as const));
   const passageIds = new Set(passageMap.keys());
   const methodologyIds = new Set(registry.methodologies.map((method) => `${method.methodologyId}@${method.version}`));
+  const methodologyStatuses = new Map(
+    registry.methodologies.map((method) => [`${method.methodologyId}@${method.version}`, method.reviewStatus] as const),
+  );
+  const regionMapIds = new Set(registry.regionMaps.map((map) => `${map.regionMapId}@${map.version}`));
+  const regionMapStatuses = new Map(
+    registry.regionMaps.map((map) => [`${map.regionMapId}@${map.version}`, map.mappingStatus] as const),
+  );
   const metricIds = new Set(registry.metrics.map((metric) => `${metric.metricKey}@${metric.version}`));
+  const metricStatuses = new Map(
+    registry.metrics.map((metric) => [`${metric.metricKey}@${metric.version}`, metric.reviewStatus] as const),
+  );
   const operationalizationIds = new Set(registry.operationalizations.map((entry) => entry.operationalizationId));
+  const operationalizationStatuses = new Map(
+    registry.operationalizations.map((entry) => [entry.operationalizationId, entry.reviewStatus] as const),
+  );
   const claimTypes = new Map(registry.claimTypes.map((entry) => [entry.claimType, entry] as const));
   const comparisonPolicyIds = new Set(registry.comparisonPolicies.map((policy) => `${policy.policyId}@${policy.version}`));
-  const regionMapIds = new Set(registry.regionMaps.map((map) => `${map.regionMapId}@${map.version}`));
 
   for (const work of registry.works) {
     stableKey(work.workId, 'work.workId');
@@ -172,6 +227,7 @@ export function validateFaceAuthorityRegistry(registry: FaceAuthorityRegistry): 
   }
 
   for (const method of registry.methodologies) {
+    const methodologyRef = `${method.methodologyId}@${method.version}`;
     stableKey(method.methodologyId, 'methodology.methodologyId');
     nonEmpty(method.version, `${method.methodologyId}.version`);
     nonEmpty(method.traditionalTerm, `${method.methodologyId}.traditionalTerm`);
@@ -181,12 +237,7 @@ export function validateFaceAuthorityRegistry(registry: FaceAuthorityRegistry): 
     for (const sourceRef of method.sourceRefs) {
       assertRef(passageIds, sourceRef, `${method.methodologyId}.sourceRefs`);
     }
-    validateProductionSourceGate(
-      `${method.methodologyId}@${method.version}`,
-      method.reviewStatus,
-      method.sourceRefs,
-      passageMap,
-    );
+    validateReviewedSourceGate(methodologyRef, method.reviewStatus, method.sourceRefs, passageMap);
   }
 
   for (const conflict of registry.conflicts) {
@@ -206,6 +257,7 @@ export function validateFaceAuthorityRegistry(registry: FaceAuthorityRegistry): 
   }
 
   for (const map of registry.regionMaps) {
+    const mapRef = `${map.regionMapId}@${map.version}`;
     stableKey(map.regionMapId, 'regionMap.regionMapId');
     assertRef(methodologyIds, map.methodologyRef, `${map.regionMapId}.methodologyRef`);
     if (map.sourceRefs.length === 0) {
@@ -223,12 +275,24 @@ export function validateFaceAuthorityRegistry(registry: FaceAuthorityRegistry): 
         assertRef(passageIds, sourceRef, `${map.regionMapId}.${region.regionKey}.sourceRefs`);
       }
     }
-    validateProductionSourceGate(`${map.regionMapId}@${map.version}`, map.mappingStatus, map.sourceRefs, passageMap);
+    validateReviewedSourceGate(mapRef, map.mappingStatus, map.sourceRefs, passageMap);
+    assertProductionDependency(mapRef, map.mappingStatus, `methodology ${map.methodologyRef}`, methodologyStatuses.get(map.methodologyRef));
   }
 
   for (const metric of registry.metrics) {
+    const metricRef = `${metric.metricKey}@${metric.version}`;
     stableKey(metric.metricKey, 'metric.metricKey');
     nonEmpty(metric.version, `${metric.metricKey}.version`);
+    assertRef(methodologyIds, metric.methodologyRef, `${metric.metricKey}.methodologyRef`);
+    if (metric.regionMapRef !== undefined) {
+      assertRef(regionMapIds, metric.regionMapRef, `${metric.metricKey}.regionMapRef`);
+    }
+    if (metric.sourceRefs.length === 0) {
+      throw new FaceAuthorityValidationError(`${metric.metricKey} requires sourceRefs.`);
+    }
+    for (const sourceRef of metric.sourceRefs) {
+      assertRef(passageIds, sourceRef, `${metric.metricKey}.sourceRefs`);
+    }
     nonEmpty(metric.formula, `${metric.metricKey}.formula`);
     if (metric.requiredAnchorRefs.length === 0) {
       throw new FaceAuthorityValidationError(`${metric.metricKey} requires semantic anchor refs.`);
@@ -236,6 +300,11 @@ export function validateFaceAuthorityRegistry(registry: FaceAuthorityRegistry): 
     unique(metric.requiredAnchorRefs, `${metric.metricKey}.requiredAnchorRefs`);
     if (metric.stabilityRequirements.length === 0) {
       throw new FaceAuthorityValidationError(`${metric.metricKey} requires stabilityRequirements.`);
+    }
+    validateReviewedSourceGate(metricRef, metric.reviewStatus, metric.sourceRefs, passageMap);
+    assertProductionDependency(metricRef, metric.reviewStatus, `methodology ${metric.methodologyRef}`, methodologyStatuses.get(metric.methodologyRef));
+    if (metric.regionMapRef !== undefined) {
+      assertProductionDependency(metricRef, metric.reviewStatus, `region map ${metric.regionMapRef}`, regionMapStatuses.get(metric.regionMapRef));
     }
   }
 
@@ -251,12 +320,26 @@ export function validateFaceAuthorityRegistry(registry: FaceAuthorityRegistry): 
     for (const metricRef of operationalization.inputMetricRefs) {
       assertRef(metricIds, metricRef, `${operationalization.operationalizationId}.inputMetricRefs`);
     }
-    validateProductionSourceGate(
+    validateReviewedSourceGate(
       operationalization.operationalizationId,
       operationalization.reviewStatus,
       operationalization.sourceRefs,
       passageMap,
     );
+    assertProductionDependency(
+      operationalization.operationalizationId,
+      operationalization.reviewStatus,
+      `methodology ${operationalization.methodologyRef}`,
+      methodologyStatuses.get(operationalization.methodologyRef),
+    );
+    for (const metricRef of operationalization.inputMetricRefs) {
+      assertProductionDependency(
+        operationalization.operationalizationId,
+        operationalization.reviewStatus,
+        `metric ${metricRef}`,
+        metricStatuses.get(metricRef),
+      );
+    }
   }
 
   for (const rule of registry.rules) {
@@ -279,7 +362,14 @@ export function validateFaceAuthorityRegistry(registry: FaceAuthorityRegistry): 
         throw new FaceAuthorityValidationError(`${rule.ruleId}.inputs references unknown claim type: ${input.ref}`);
       }
     }
-    validateRulePromotion(rule, passageMap, registry.conflicts);
+    validateRulePromotion(
+      rule,
+      passageMap,
+      registry.conflicts,
+      methodologyStatuses,
+      metricStatuses,
+      operationalizationStatuses,
+    );
   }
 
   for (const policy of registry.comparisonPolicies) {
