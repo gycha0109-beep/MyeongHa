@@ -132,5 +132,7 @@ jobs:
         run: bash test/db/birth_profile_current_revision_query.sh
       - name: Run Target Person current projection read tests
         run: bash test/db/target_person_current_queries.sh
+      - name: Run public Share Artifact read tests
+        run: bash test/db/public_share_query.sh
       - name: Verify deterministic schema catalog snapshot
         run: bash test/db/catalog_snapshot.sh
