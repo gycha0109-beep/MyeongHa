@@ -2,9 +2,12 @@ import {
   RELATIONSHIP_EVENT_CANDIDATES,
   type RelationshipEventCandidate,
 } from '../../contracts/src/index.js';
-import type {
-  CharacterRuntimeContextV1,
-  ProtectedSajuSegmentV1,
+import {
+  hashProtectedSajuTextV1,
+  type CharacterRuntimeContextV1,
+  type ProtectedSajuDisclosureV1,
+  type ProtectedSajuSegmentV1,
+  type ProtectedSajuTextRefV1,
 } from './character-runtime-context.js';
 
 export type CharacterMemoryProposalKindV1 = 'life_fact' | 'memory';
@@ -22,8 +25,8 @@ export interface CharacterSuggestedActionV1 {
 }
 
 /**
- * Provider-owned draft. Protected Saju segments are intentionally absent: the model cannot
- * author, reorder, summarize, or replace them.
+ * Provider-owned draft. Protected Saju blocks/disclosures/ambiguity are intentionally absent:
+ * the model cannot author, reorder, summarize, or replace them.
  */
 export interface CharacterRendererDraftV1 {
   readonly schemaVersion: 'v1';
@@ -36,11 +39,13 @@ export interface CharacterRendererDraftV1 {
   readonly suggestedActions: readonly CharacterSuggestedActionV1[];
 }
 
-/** Final validated message material. Protected Saju content is server-injected from context. */
+/** Final validated message material. Protected Saju material is server-injected from context. */
 export interface CharacterDialogueEnvelopeV1 {
   readonly schemaVersion: 'v1';
   readonly framingBefore: string | null;
   readonly protectedSajuSegments: readonly ProtectedSajuSegmentV1[];
+  readonly protectedSajuDisclosures: readonly ProtectedSajuDisclosureV1[];
+  readonly calculationAmbiguity: readonly string[];
   readonly framingAfter: string | null;
   readonly emotion: string;
   readonly animationCue: string | null;
@@ -184,6 +189,36 @@ function uniqueStrings(values: readonly string[], path: string): void {
   }
 }
 
+function verifyProtectedTextRef(
+  value: ProtectedSajuTextRefV1,
+  readingRef: string,
+  path: string,
+): void {
+  if (value.sourceReadingRef !== readingRef) {
+    throw new CharacterOutputGuardError(`${path}.sourceReadingRef does not match readingRef.`);
+  }
+  if (value.sourceRef.trim().length === 0) {
+    throw new CharacterOutputGuardError(`${path}.sourceRef is required.`);
+  }
+  if (value.contentHash !== hashProtectedSajuTextV1(value.text)) {
+    throw new CharacterOutputGuardError(`${path}.contentHash does not match protected text.`);
+  }
+}
+
+function assertNoProtectedEcho(
+  framing: string | null,
+  protectedValues: readonly ProtectedSajuTextRefV1[],
+  path: string,
+): void {
+  if (framing === null) return;
+  const echoed = protectedValues.find((value) => framing.includes(value.text));
+  if (echoed !== undefined) {
+    throw new CharacterOutputGuardError(
+      `${path} must not duplicate protected Saju content; the server injects it separately.`,
+    );
+  }
+}
+
 export function guardCharacterRendererOutput(input: {
   readonly rawOutput: unknown;
   readonly context: CharacterRuntimeContextV1;
@@ -264,16 +299,40 @@ export function guardCharacterRendererOutput(input: {
   });
   uniqueStrings(suggestedActions.map((action) => action.actionKey), 'suggestedActions');
 
+  const readingRef = input.context.saju?.readingRef ?? null;
   const protectedSajuSegments = Object.freeze(
-    (input.context.saju?.protectedSegments ?? []).map((segment) =>
-      Object.freeze({ segmentId: segment.segmentId, text: segment.text }),
-    ),
+    (input.context.saju?.protectedSegments ?? []).map((segment, index) => {
+      if (readingRef === null) throw new CharacterOutputGuardError('Protected Saju segment without readingRef.');
+      verifyProtectedTextRef(segment, readingRef, `protectedSajuSegments[${index}]`);
+      return Object.freeze({ ...segment });
+    }),
+  );
+  const protectedSajuDisclosures = Object.freeze(
+    (input.context.saju?.disclosures ?? []).map((disclosure, index) => {
+      if (readingRef === null) throw new CharacterOutputGuardError('Protected Saju disclosure without readingRef.');
+      verifyProtectedTextRef(disclosure, readingRef, `protectedSajuDisclosures[${index}]`);
+      return Object.freeze({ ...disclosure });
+    }),
+  );
+  const calculationAmbiguity = Object.freeze([...(input.context.saju?.ambiguity ?? [])]);
+
+  assertNoProtectedEcho(
+    framingBefore,
+    [...protectedSajuSegments, ...protectedSajuDisclosures],
+    'framingBefore',
+  );
+  assertNoProtectedEcho(
+    framingAfter,
+    [...protectedSajuSegments, ...protectedSajuDisclosures],
+    'framingAfter',
   );
 
   return Object.freeze({
     schemaVersion: 'v1',
     framingBefore,
     protectedSajuSegments,
+    protectedSajuDisclosures,
+    calculationAmbiguity,
     framingAfter,
     emotion,
     animationCue,
