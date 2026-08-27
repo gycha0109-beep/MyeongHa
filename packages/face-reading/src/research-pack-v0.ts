@@ -1,0 +1,305 @@
+import type {
+  FaceAuthorityRegistry,
+  FaceClaimTypeDefinition,
+  FaceComparisonPolicy,
+  FaceMethodologyPackDefinition,
+  SourceLineageRelation,
+  SourcePassage,
+  SourceWitness,
+  SourceWork,
+} from './contracts.js';
+
+export const FACE_RESEARCH_WORKS_V0 = [
+  {
+    workId: 'work.shenxiang_quanbian',
+    canonicalTitle: '神相全編',
+    alternateTitles: ['Shenxiang Quanbian'],
+    attributedAuthors: ['陳摶（傳）', '袁忠徹（訂正）'],
+    sourceClass: 'primary_manual',
+  },
+  {
+    workId: 'work.renlun_datongfu',
+    canonicalTitle: '人倫大統賦',
+    alternateTitles: ['Renlun Datongfu'],
+    attributedAuthors: ['張行簡'],
+    estimatedPeriod: '金代',
+    sourceClass: 'primary_manual',
+  },
+  {
+    workId: 'work.mayi_xiangfa',
+    canonicalTitle: '麻衣相法',
+    alternateTitles: ['Mayi Xiangfa'],
+    attributedAuthors: ['傳統題署 불확정', '秦慎安（校勘，1925 witness）'],
+    sourceClass: 'primary_manual',
+  },
+  {
+    workId: 'work.liuzhuang_xiangfa',
+    canonicalTitle: '柳莊相法',
+    alternateTitles: ['Liuzhuang Xiangfa'],
+    attributedAuthors: ['袁柳莊（傳）'],
+    sourceClass: 'primary_manual',
+  },
+  {
+    workId: 'work.kohn_1986',
+    canonicalTitle: 'A Textbook of Physiognomy: The Tradition of the Shenxiang quanbian',
+    alternateTitles: [],
+    attributedAuthors: ['Livia Kohn'],
+    estimatedPeriod: '1986',
+    sourceClass: 'scholarly_lineage',
+  },
+] as const satisfies readonly SourceWork[];
+
+export const FACE_RESEARCH_WITNESSES_V0 = [
+  {
+    witnessId: 'witness.shenxiang_quanbian.nlc_1925',
+    workId: 'work.shenxiang_quanbian',
+    editionLabel: '文明書局 民國十四年本 — NLC scan',
+    publicationYear: 1925,
+    holdingInstitution: 'National Library of China',
+    digitalSourceUrl: 'https://commons.wikimedia.org/wiki/File:NLC416-13jh001662-59167_神相全編.pdf',
+    witnessStatus: 'verified',
+  },
+  {
+    witnessId: 'witness.shenxiang_quanbian.ctext',
+    workId: 'work.shenxiang_quanbian',
+    editionLabel: 'Chinese Text Project electronic transcription',
+    digitalSourceUrl: 'https://ctext.org/wiki.pl?chapter=905153&if=gb',
+    witnessStatus: 'candidate',
+  },
+  {
+    witnessId: 'witness.mayi_xiangfa.nlc_1925_v1',
+    workId: 'work.mayi_xiangfa',
+    editionLabel: '文明書局 民國十四年 第1卷 — NLC scan',
+    publicationYear: 1925,
+    holdingInstitution: 'National Library of China',
+    digitalSourceUrl: 'https://commons.wikimedia.org/wiki/File:NLC416-12jh002690-44091_麻衣相法_第1卷.pdf',
+    witnessStatus: 'verified',
+  },
+  {
+    witnessId: 'witness.mayi_xiangfa.nlc_1925_v2',
+    workId: 'work.mayi_xiangfa',
+    editionLabel: '文明書局 民國十四年 第2卷 — NLC scan',
+    publicationYear: 1925,
+    holdingInstitution: 'National Library of China',
+    digitalSourceUrl: 'https://commons.wikimedia.org/wiki/File:NLC416-12jh002690-44092_麻衣相法_第2卷.pdf',
+    witnessStatus: 'verified',
+  },
+  {
+    witnessId: 'witness.liuzhuang_xiangfa.nlc_1925',
+    workId: 'work.liuzhuang_xiangfa',
+    editionLabel: '民國十四年本 — NLC scan',
+    publicationYear: 1925,
+    holdingInstitution: 'National Library of China',
+    digitalSourceUrl: 'https://commons.wikimedia.org/wiki/File:NLC416-13jh001257-42702_柳莊相法.pdf',
+    witnessStatus: 'verified',
+  },
+  {
+    witnessId: 'witness.liuzhuang_xiangfa.ctext',
+    workId: 'work.liuzhuang_xiangfa',
+    editionLabel: 'Chinese Text Project electronic transcription',
+    digitalSourceUrl: 'https://ctext.org/wiki.pl?chapter=90958&if=gb',
+    witnessStatus: 'candidate',
+  },
+  {
+    witnessId: 'witness.renlun_datongfu.wikisource',
+    workId: 'work.renlun_datongfu',
+    editionLabel: 'Wikisource transcription, 卷上',
+    digitalSourceUrl: 'https://zh.wikisource.org/zh/人倫大統賦/卷上',
+    witnessStatus: 'candidate',
+  },
+  {
+    witnessId: 'witness.kohn_1986.jstor',
+    workId: 'work.kohn_1986',
+    editionLabel: 'Asian Folklore Studies 45(2), pp. 227–258',
+    publicationYear: 1986,
+    holdingInstitution: 'Nanzan University / JSTOR',
+    digitalSourceUrl: 'https://www.jstor.org/stable/1178619',
+    witnessStatus: 'verified',
+  },
+] as const satisfies readonly SourceWitness[];
+
+export const FACE_RESEARCH_PASSAGES_V0 = [
+  {
+    passageId: 'passage.shenxiang.intro.scope',
+    witnessId: 'witness.shenxiang_quanbian.ctext',
+    chapter: '卷首 / 十觀前總論',
+    originalText: '大凡觀人之相貌，先觀骨格，次看五行；量三停之長短，察面部之盈虧，觀眉目之清秀……取五官之有成，看六府之有就，取五岳之歸朝……俱依部位流年而推；骨格形局而斷。',
+    verificationStatus: 'unverified_ocr',
+  },
+  {
+    passageId: 'passage.shenxiang.three_divisions',
+    witnessId: 'witness.shenxiang_quanbian.ctext',
+    chapter: '十觀 / 五看五岳及三停',
+    originalText: '三停者，額門，准頭，地角，此面部三停也……俱要平等。上停長少年忙，中停長福祿昌，下停長老吉祥，三停平等，一生衣祿無虧。',
+    verificationStatus: 'unverified_ocr',
+  },
+  {
+    passageId: 'passage.renlun.five_officers_six_fus',
+    witnessId: 'witness.renlun_datongfu.wikisource',
+    volume: '卷上',
+    originalText: '四瀆須宜深且闊，五嶽必要穹與隆。五官欲其明而正，六府欲其實而充。一官成十年貴顯，一府就十載富豐。',
+    verificationStatus: 'unverified_ocr',
+  },
+  {
+    passageId: 'passage.liuzhuang.twelve_palaces.wealth',
+    witnessId: 'witness.liuzhuang_xiangfa.ctext',
+    chapter: '十二宮 / 二財帛宮',
+    originalText: '鼻乃財星，位居土宿。截筒懸膽，千倉萬箱。聳直興隆，一生富貴。中正不偏，須知福祿滔滔。',
+    verificationStatus: 'unverified_ocr',
+  },
+  {
+    passageId: 'passage.liuzhuang.configuration_caution',
+    witnessId: 'witness.liuzhuang_xiangfa.ctext',
+    chapter: '相法總論',
+    originalText: '不可以美而言好，莫以惡而言害，其中還有異處，不可定一理而推，更宜細審聲音，再察五官六府。',
+    verificationStatus: 'unverified_ocr',
+  },
+] as const satisfies readonly SourcePassage[];
+
+export const FACE_RESEARCH_LINEAGE_V0 = [
+  {
+    fromWorkId: 'work.shenxiang_quanbian',
+    toWorkId: 'work.renlun_datongfu',
+    relation: 'quotes',
+    evidenceRefs: ['evidence.shenxiang_contents.renlun_datongfu'],
+    confidence: 'high',
+  },
+  {
+    fromWorkId: 'work.kohn_1986',
+    toWorkId: 'work.shenxiang_quanbian',
+    relation: 'same_tradition',
+    evidenceRefs: ['doi:10.2307/1178619'],
+    confidence: 'high',
+  },
+  {
+    fromWorkId: 'work.liuzhuang_xiangfa',
+    toWorkId: 'work.shenxiang_quanbian',
+    relation: 'same_tradition',
+    evidenceRefs: ['evidence.shared_systems.three_divisions_five_officers_twelve_palaces'],
+    confidence: 'medium',
+  },
+] as const satisfies readonly SourceLineageRelation[];
+
+export const FACE_CLAIM_TYPES_V0 = [
+  {
+    claimType: 'FACE_MORPHOLOGY_CLASSIFICATION',
+    valueSchemaRef: 'face-claim/morphology/v1',
+    allowedTiers: ['F1'],
+    materialForNarrative: true,
+    dynamicAppearance: false,
+    requiresMethodAttribution: true,
+    comparisonGroups: ['morphology.salience'],
+  },
+  {
+    claimType: 'FACE_LOCAL_INTERPRETATION',
+    valueSchemaRef: 'face-claim/local/v1',
+    allowedTiers: ['F2'],
+    materialForNarrative: true,
+    dynamicAppearance: false,
+    requiresMethodAttribution: true,
+    comparisonGroups: ['local.salience'],
+  },
+  {
+    claimType: 'FACE_CONFIGURATION_INTERPRETATION',
+    valueSchemaRef: 'face-claim/configuration/v1',
+    allowedTiers: ['F3'],
+    materialForNarrative: true,
+    dynamicAppearance: false,
+    requiresMethodAttribution: true,
+  },
+  {
+    claimType: 'FACE_TENSION_INTERPRETATION',
+    valueSchemaRef: 'face-claim/tension/v1',
+    allowedTiers: ['F3', 'F7'],
+    materialForNarrative: true,
+    dynamicAppearance: false,
+    requiresMethodAttribution: true,
+  },
+  {
+    claimType: 'FACE_POSITION_PERIOD_INTERPRETATION',
+    valueSchemaRef: 'face-claim/position-period/v1',
+    allowedTiers: ['F6'],
+    materialForNarrative: true,
+    dynamicAppearance: false,
+    requiresMethodAttribution: true,
+    comparisonGroups: ['three_divisions.salience'],
+  },
+  {
+    claimType: 'FACE_PALACE_STATUS',
+    valueSchemaRef: 'face-claim/palace/v1',
+    allowedTiers: ['F2', 'F3', 'F7'],
+    materialForNarrative: true,
+    dynamicAppearance: false,
+    requiresMethodAttribution: true,
+    comparisonGroups: ['twelve_palaces.salience'],
+  },
+  {
+    claimType: 'FACE_DOMAIN_PATTERN',
+    valueSchemaRef: 'face-claim/domain/v1',
+    allowedTiers: ['F7'],
+    materialForNarrative: true,
+    dynamicAppearance: false,
+    requiresMethodAttribution: true,
+  },
+] as const satisfies readonly FaceClaimTypeDefinition[];
+
+export const FACE_COMPARISON_POLICY_V0: FaceComparisonPolicy = {
+  policyId: 'comparison.face.research_v0',
+  version: '0.1.0',
+  groups: [
+    {
+      groupKey: 'morphology.salience',
+      eligibleClaimTypes: ['FACE_MORPHOLOGY_CLASSIFICATION'],
+      comparisonMode: 'diagnostic_salience',
+    },
+    {
+      groupKey: 'local.salience',
+      eligibleClaimTypes: ['FACE_LOCAL_INTERPRETATION'],
+      comparisonMode: 'diagnostic_salience',
+    },
+    {
+      groupKey: 'three_divisions.salience',
+      eligibleClaimTypes: ['FACE_POSITION_PERIOD_INTERPRETATION'],
+      comparisonMode: 'diagnostic_salience',
+      sourceRefs: ['passage.shenxiang.three_divisions'],
+    },
+    {
+      groupKey: 'twelve_palaces.salience',
+      eligibleClaimTypes: ['FACE_PALACE_STATUS'],
+      comparisonMode: 'diagnostic_salience',
+    },
+  ],
+};
+
+export const FACE_RESEARCH_PACK_V0: FaceMethodologyPackDefinition = {
+  packId: 'pack.face.research_v0',
+  version: '0.1.0',
+  sourceWitnessSetRef: 'witness-set.face.research_v0',
+  methodologyDefinitionRefs: [
+    'method.three_divisions.research_v0',
+    'method.five_officers.research_v0',
+    'method.twelve_palaces.research_v0',
+  ],
+  regionMapRefs: [],
+  metricRegistryRef: 'metrics.face.research_v0',
+  operationalizationRegistryRef: 'operationalizations.face.research_v0',
+  claimTypeRegistryRef: 'claim-types.face.research_v0',
+  ruleRegistryRef: 'rules.face.research_v0',
+  comparisonPolicyRef: `${FACE_COMPARISON_POLICY_V0.policyId}@${FACE_COMPARISON_POLICY_V0.version}`,
+  enabledTiers: ['F0', 'F1', 'F2', 'F3', 'F6', 'F7'],
+  forbiddenObservationInputs: ['observations.colorAppearance'],
+};
+
+export const FACE_AUTHORITY_RESEARCH_REGISTRY_V0: FaceAuthorityRegistry = {
+  works: FACE_RESEARCH_WORKS_V0,
+  witnesses: FACE_RESEARCH_WITNESSES_V0,
+  passages: FACE_RESEARCH_PASSAGES_V0,
+  lineage: FACE_RESEARCH_LINEAGE_V0,
+  regionMaps: [],
+  metrics: [],
+  operationalizations: [],
+  claimTypes: FACE_CLAIM_TYPES_V0,
+  rules: [],
+  comparisonPolicies: [FACE_COMPARISON_POLICY_V0],
+  methodologyPacks: [FACE_RESEARCH_PACK_V0],
+};
