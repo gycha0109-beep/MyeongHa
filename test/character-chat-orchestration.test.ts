@@ -130,6 +130,24 @@ function authoredCharacter(): CharacterContentDefinition {
         maySuggestAnotherCharacter: false,
         conditions: [],
       },
+      safeFraming: {
+        schemaVersion: 'v1',
+        catalogVersion: 'orchestration-safe-framing-v1',
+        before: [
+          {
+            key: 'record_first',
+            text: '기록부터 보겠습니다.',
+            purpose: 'record_transition',
+          },
+        ],
+        after: [
+          {
+            key: 'ask_current_context',
+            text: '지금 현실에서는 어떤 부분이 가장 걸립니까?',
+            purpose: 'current_life_question',
+          },
+        ],
+      },
     },
     relationshipBehavior: {
       behaviorVersion: 'relationship-behavior-v1',
@@ -242,8 +260,8 @@ function contextInput(): CharacterRuntimeContextAssemblyInputV1 {
 function validDraft() {
   return {
     schemaVersion: 'v1',
-    framingBefore: '기록부터 보겠습니다.',
-    framingAfter: '지금 현실에서는 어떤 부분이 가장 걸립니까?',
+    framingBeforeKey: 'record_first',
+    framingAfterKey: 'ask_current_context',
     emotion: 'serious',
     animationCue: 'look_aside',
     memoryProposals: [],
@@ -253,7 +271,7 @@ function validDraft() {
 }
 
 describe('mock Character Chat Turn orchestration', () => {
-  it('runs gate -> context -> renderer -> guard -> commit -> delivery in order', () => {
+  it('runs gate -> context -> keyed safe renderer -> guard -> commit -> delivery in order', () => {
     const renderer = new StaticMockCharacterRendererProviderV1(validDraft());
     const commitPort = new InMemoryCharacterChatCommitPortV1();
 
@@ -278,6 +296,10 @@ describe('mock Character Chat Turn orchestration', () => {
       'committed',
       'delivered',
     ]);
+    expect(result.envelope.framingBefore).toBe('기록부터 보겠습니다.');
+    expect(result.envelope.framingAfter).toBe(
+      '지금 현실에서는 어떤 부분이 가장 걸립니까?',
+    );
     expect(result.replayedCommittedTurn).toBe(false);
     expect(renderer.callCount).toBe(1);
     expect(commitPort.committedCount).toBe(1);
@@ -411,7 +433,28 @@ describe('mock Character Chat Turn orchestration', () => {
     expect(commitPort.committedCount).toBe(0);
   });
 
-  it('never commits or reveals provider output that fails the Output Guard', () => {
+  it('rejects provider-authored free framing on a Saju-bearing turn', () => {
+    const renderer = new StaticMockCharacterRendererProviderV1({
+      ...validDraft(),
+      framingBefore: '제가 이 사주를 다시 해석해보겠습니다.',
+    });
+    const commitPort = new InMemoryCharacterChatCommitPortV1();
+
+    expect(() =>
+      runMockCharacterChatTurn({
+        turnId: 'turn-free-saju-framing',
+        attemptId: 'attempt-1',
+        capability: allowedCapability,
+        contextInput: contextInput(),
+        allowedSuggestedActionKeys: ['open_records'],
+        renderer,
+        commitPort,
+      }),
+    ).toThrow(/unexpected field: framingBefore/u);
+    expect(commitPort.committedCount).toBe(0);
+  });
+
+  it('never commits or reveals provider output that injects protected Saju material', () => {
     const renderer = new StaticMockCharacterRendererProviderV1({
       ...validDraft(),
       protectedSajuSegments: [{ segmentId: 'fake', text: '모델이 만든 사주 문장' }],
