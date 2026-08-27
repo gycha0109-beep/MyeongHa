@@ -1,11 +1,12 @@
 import { createHash } from 'node:crypto';
-import type { CapabilityDenialReason, ChatTurnState } from '../../../packages/contracts/src/index.js';
+import type { ChatTurnState } from '../../../packages/contracts/src/index.js';
 import {
   assembleCharacterRuntimeContext,
   canonicalJson,
   evaluateCapabilityGate,
   guardCharacterRendererOutput,
   transitionChatTurn,
+  type CapabilityDenialReason,
   type CharacterDialogueEnvelopeV1,
   type CharacterRuntimeContextV1,
   type CapabilityGateInput,
@@ -61,6 +62,10 @@ function hashEnvelope(envelope: CharacterDialogueEnvelopeV1): string {
   return `sha256:v1:${createHash('sha256')
     .update(canonicalJson(envelope), 'utf8')
     .digest('hex')}`;
+}
+
+function freezeStateTrace(states: ChatTurnState[]): readonly ChatTurnState[] {
+  return Object.freeze(states);
 }
 
 export class InMemoryCharacterChatCommitPortV1 implements CharacterChatCommitPortV1 {
@@ -144,7 +149,7 @@ export type CharacterChatOrchestrationStageV1 =
   | 'deliver';
 
 export class CharacterChatTurnOrchestrationError extends Error {
-  readonly cause: unknown | undefined;
+  override readonly cause: unknown | undefined;
 
   constructor(
     readonly stage: CharacterChatOrchestrationStageV1,
@@ -250,7 +255,10 @@ export function runMockCharacterChatTurn(
       replayedCommittedTurn: true,
       providerKey: alreadyCommitted.receipt.providerKey,
       modelKey: alreadyCommitted.receipt.modelKey,
-      stateTrace: Object.freeze(['committed', transitionChatTurn('committed', 'delivered')]),
+      stateTrace: freezeStateTrace([
+        'committed',
+        transitionChatTurn('committed', 'delivered'),
+      ]),
       envelope: alreadyCommitted.envelope,
       commitReceipt: alreadyCommitted.receipt,
     });
@@ -270,7 +278,7 @@ export function runMockCharacterChatTurn(
       status: 'denied',
       reason: capability.reason,
       lastState: 'planned',
-      stateTrace: Object.freeze(['received', 'planned']),
+      stateTrace: freezeStateTrace(['received', 'planned']),
     });
   }
 
@@ -354,7 +362,7 @@ export function runMockCharacterChatTurn(
     replayedCommittedTurn: false,
     providerKey: committed.receipt.providerKey,
     modelKey: committed.receipt.modelKey,
-    stateTrace: Object.freeze([...stateTrace]),
+    stateTrace: freezeStateTrace([...stateTrace]),
     envelope: committed.envelope,
     commitReceipt: committed.receipt,
   });
