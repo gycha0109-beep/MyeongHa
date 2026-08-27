@@ -114,6 +114,8 @@ jobs:
         run: bash test/db/notification_read_concurrency.sh
       - name: Run current relationship projection read tests
         run: bash test/db/relationship_current_query.sh
+      - name: Run current Character Unlock projection read tests
+        run: bash test/db/character_unlocks_current_query.sh
       - name: Run current entitlement projection read tests
         run: bash test/db/entitlements_current_query.sh
       - name: Run data deletion job status read tests
