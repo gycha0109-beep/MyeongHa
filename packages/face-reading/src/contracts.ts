@@ -52,6 +52,27 @@ export interface SourceLineageRelation {
   readonly confidence: 'high' | 'medium' | 'low';
 }
 
+export interface FaceMethodologyDefinition {
+  readonly methodologyId: string;
+  readonly version: string;
+  readonly traditionalTerm: string;
+  readonly scope: 'static_face' | 'dynamic_face' | 'body' | 'mixed';
+  readonly sourceRefs: readonly string[];
+  readonly description: string;
+  readonly limitations: readonly string[];
+  readonly reviewStatus: ReviewStatus;
+}
+
+export interface FaceAuthorityConflictDefinition {
+  readonly conflictId: string;
+  readonly methodologyRefs: readonly string[];
+  readonly sourceRefs: readonly string[];
+  readonly affectedTiers: readonly FaceTier[];
+  readonly status: 'open' | 'resolved';
+  readonly reason: string;
+  readonly resolutionNote?: string;
+}
+
 export interface FaceRegionDefinition {
   readonly regionKey: string;
   readonly label: string;
@@ -73,7 +94,8 @@ export interface FaceMetricDefinition {
   readonly metricKey: string;
   readonly version: string;
   readonly formula: string;
-  readonly requiredLandmarkRefs: readonly number[];
+  readonly requiredAnchorRefs: readonly string[];
+  readonly extractorLandmarkRefs?: readonly number[];
   readonly unit: FaceMetricUnit;
   readonly stabilityRequirements: readonly string[];
 }
@@ -295,6 +317,8 @@ export interface FaceAuthorityRegistry {
   readonly witnesses: readonly SourceWitness[];
   readonly passages: readonly SourcePassage[];
   readonly lineage: readonly SourceLineageRelation[];
+  readonly methodologies: readonly FaceMethodologyDefinition[];
+  readonly conflicts: readonly FaceAuthorityConflictDefinition[];
   readonly regionMaps: readonly FaceRegionMapDefinition[];
   readonly metrics: readonly FaceMetricDefinition[];
   readonly operationalizations: readonly FaceOperationalizationDefinition[];
