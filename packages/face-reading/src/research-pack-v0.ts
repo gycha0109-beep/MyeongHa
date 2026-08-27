@@ -127,10 +127,32 @@ export const FACE_RESEARCH_PASSAGES_V0 = [
     verificationStatus: 'unverified_ocr',
   },
   {
-    passageId: 'passage.shenxiang.three_divisions',
+    passageId: 'passage.shenxiang.three_divisions.ten_observations',
     witnessId: 'witness.shenxiang_quanbian.ctext',
     chapter: '十觀 / 五看五岳及三停',
     originalText: '三停者，額門，准頭，地角，此面部三停也……俱要平等。上停長少年忙，中停長福祿昌，下停長老吉祥，三停平等，一生衣祿無虧。',
+    verificationStatus: 'unverified_ocr',
+  },
+  {
+    passageId: 'passage.shenxiang.face_three_divisions',
+    witnessId: 'witness.shenxiang_quanbian.ctext',
+    chapter: '面三停',
+    originalText: '面之三停者，自發際下至眉間為上停，自眉間下至鼻為中停，自准下人中至頦為下停。夫三停者，以象三才也。',
+    normalizedText: '上停=髮際至眉；中停=眉至準頭；下停=準頭至頦/地閣。',
+    verificationStatus: 'unverified_ocr',
+  },
+  {
+    passageId: 'passage.shenxiang.sancai_three_divisions',
+    witnessId: 'witness.shenxiang_quanbian.ctext',
+    chapter: '三才三停論',
+    originalText: '三停者，髮際至印堂為上輔，是初主。自山根至准頭為中府，是中主。自人中至地閣為下輔，末至。自發際至眉為上停，眉至准頭為中停，准頭至地閣為下停。訣曰：上停長老吉昌，中停長近君王，下停長少吉祥。三停平等，富貴榮顯。',
+    verificationStatus: 'unverified_ocr',
+  },
+  {
+    passageId: 'passage.liuzhuang.three_divisions',
+    witnessId: 'witness.liuzhuang_xiangfa.ctext',
+    chapter: '永樂百問 / 二十九、三停有面有身何說',
+    originalText: '面上三停，髮際到山根為上停，為初限。准頭為中限，人中到地閣為下限，主未年。如上停短削，少年不利，中停低陷，一世不榮，下停若長，一生憂滯。大概上停中停俱長，下停宜短。',
     verificationStatus: 'unverified_ocr',
   },
   {
@@ -179,6 +201,158 @@ export const FACE_RESEARCH_LINEAGE_V0 = [
     confidence: 'medium',
   },
 ] as const satisfies readonly SourceLineageRelation[];
+
+export const FACE_METHOD_REFS_V0 = Object.freeze({
+  shenxiangThreeDivisions: 'method.shenxiang.face_three_divisions@0.1.0',
+  liuzhuangThreeDivisions: 'method.liuzhuang.face_three_divisions@0.1.0',
+  fiveOfficers: 'method.five_officers.research_v0@0.1.0',
+  twelvePalaces: 'method.twelve_palaces.research_v0@0.1.0',
+});
+
+export const FACE_RESEARCH_METHODOLOGIES_V0 = [
+  {
+    methodologyId: 'method.shenxiang.face_three_divisions',
+    version: '0.1.0',
+    traditionalTerm: '面三停',
+    scope: 'static_face',
+    sourceRefs: ['passage.shenxiang.face_three_divisions', 'passage.shenxiang.sancai_three_divisions'],
+    description: '神相全編 계열의 상·중·하 삼정 경계를 별도 방법론으로 보존한다.',
+    limitations: ['전자본문 대조 단계이며 scan_checked 이전이다.', '平等의 수치 허용오차는 원전이 제공하지 않는다.'],
+    reviewStatus: 'research',
+  },
+  {
+    methodologyId: 'method.liuzhuang.face_three_divisions',
+    version: '0.1.0',
+    traditionalTerm: '面上三停',
+    scope: 'static_face',
+    sourceRefs: ['passage.liuzhuang.three_divisions'],
+    description: '柳莊相法의 삼정 서술을 神相全編 좌표계와 합치지 않고 별도 계통으로 보존한다.',
+    limitations: ['현재 전자본문 문장은 중정 경계가 완전히 operationalizable하지 않다.', 'scan_checked 이전이다.'],
+    reviewStatus: 'research',
+  },
+  {
+    methodologyId: 'method.five_officers.research_v0',
+    version: '0.1.0',
+    traditionalTerm: '五官六府',
+    scope: 'static_face',
+    sourceRefs: ['passage.renlun.five_officers_six_fus'],
+    description: '오관·육부 연구 단위의 placeholder authority.',
+    limitations: ['세부 부위 map은 아직 미구축이다.'],
+    reviewStatus: 'research',
+  },
+  {
+    methodologyId: 'method.twelve_palaces.research_v0',
+    version: '0.1.0',
+    traditionalTerm: '十二宮',
+    scope: 'static_face',
+    sourceRefs: ['passage.liuzhuang.twelve_palaces.wealth'],
+    description: '십이궁 연구 단위의 placeholder authority.',
+    limitations: ['최종 十二宮 region map은 아직 미구축이다.'],
+    reviewStatus: 'research',
+  },
+] as const;
+
+export const FACE_RESEARCH_CONFLICTS_V0 = [
+  {
+    conflictId: 'conflict.three_divisions.period_direction_v0',
+    methodologyRefs: [FACE_METHOD_REFS_V0.shenxiangThreeDivisions, FACE_METHOD_REFS_V0.liuzhuangThreeDivisions],
+    sourceRefs: [
+      'passage.shenxiang.three_divisions.ten_observations',
+      'passage.shenxiang.sancai_three_divisions',
+      'passage.liuzhuang.three_divisions',
+    ],
+    affectedTiers: ['F6'],
+    status: 'open',
+    reason: '삼정의 長과 초·중·말년을 연결하는 문구가 전승/문맥별로 일관되지 않아 F6 시기 해석을 하나의 규칙으로 승격할 수 없다.',
+  },
+] as const;
+
+export const FACE_THREE_DIVISION_REGION_MAPS_V0 = [
+  {
+    regionMapId: 'regionmap.shenxiang.face_three_divisions',
+    version: '0.1.0',
+    methodologyRef: FACE_METHOD_REFS_V0.shenxiangThreeDivisions,
+    sourceRefs: ['passage.shenxiang.face_three_divisions', 'passage.shenxiang.sancai_three_divisions'],
+    coordinateFrame: 'normalized_face_landmark_frame',
+    regions: [
+      {
+        regionKey: 'upper',
+        label: '上停',
+        geometryDefinition: { kind: 'vertical_span', fromAnchor: 'hairline_midpoint', toAnchor: 'brow_midline' },
+        sourceRefs: ['passage.shenxiang.face_three_divisions', 'passage.shenxiang.sancai_three_divisions'],
+      },
+      {
+        regionKey: 'middle',
+        label: '中停',
+        geometryDefinition: { kind: 'vertical_span', fromAnchor: 'brow_midline', toAnchor: 'nose_tip' },
+        sourceRefs: ['passage.shenxiang.face_three_divisions', 'passage.shenxiang.sancai_three_divisions'],
+      },
+      {
+        regionKey: 'lower',
+        label: '下停',
+        geometryDefinition: { kind: 'vertical_span', fromAnchor: 'nose_tip', toAnchor: 'chin_bottom' },
+        sourceRefs: ['passage.shenxiang.face_three_divisions', 'passage.shenxiang.sancai_three_divisions'],
+      },
+    ],
+    mappingStatus: 'research',
+  },
+] as const;
+
+export const FACE_THREE_DIVISION_METRICS_V0 = [
+  {
+    metricKey: 'metric.shenxiang.three_divisions.upper_length',
+    version: '0.1.0',
+    formula: 'abs(y(brow_midline)-y(hairline_midpoint))/normalized_face_height',
+    requiredAnchorRefs: ['hairline_midpoint', 'brow_midline'],
+    unit: 'normalized_distance',
+    stabilityRequirements: ['frontal_static_view', 'hairline_visible', 'brow_midline_visible'],
+  },
+  {
+    metricKey: 'metric.shenxiang.three_divisions.middle_length',
+    version: '0.1.0',
+    formula: 'abs(y(nose_tip)-y(brow_midline))/normalized_face_height',
+    requiredAnchorRefs: ['brow_midline', 'nose_tip'],
+    unit: 'normalized_distance',
+    stabilityRequirements: ['frontal_static_view', 'brow_midline_visible', 'nose_tip_visible'],
+  },
+  {
+    metricKey: 'metric.shenxiang.three_divisions.lower_length',
+    version: '0.1.0',
+    formula: 'abs(y(chin_bottom)-y(nose_tip))/normalized_face_height',
+    requiredAnchorRefs: ['nose_tip', 'chin_bottom'],
+    unit: 'normalized_distance',
+    stabilityRequirements: ['frontal_static_view', 'nose_tip_visible', 'chin_visible'],
+  },
+] as const;
+
+export const FACE_THREE_DIVISION_OPERATIONALIZATIONS_V0 = [
+  {
+    operationalizationId: 'op.shenxiang.three_divisions.relative_order_v0',
+    methodologyRef: FACE_METHOD_REFS_V0.shenxiangThreeDivisions,
+    sourceRefs: ['passage.shenxiang.face_three_divisions', 'passage.shenxiang.sancai_three_divisions'],
+    traditionalTerm: '三停長短 / 三停平等',
+    inputMetricRefs: [
+      'metric.shenxiang.three_divisions.upper_length@0.1.0',
+      'metric.shenxiang.three_divisions.middle_length@0.1.0',
+      'metric.shenxiang.three_divisions.lower_length@0.1.0',
+    ],
+    classificationBands: {
+      kind: 'strict_relative_order',
+      classes: [
+        'upper_longest',
+        'middle_longest',
+        'lower_longest',
+        'upper_middle_tie_longest',
+        'upper_lower_tie_longest',
+        'middle_lower_tie_longest',
+        'all_equal_exact',
+      ],
+      numericTolerance: null,
+      nearEqualClassification: 'blocked_until_calibrated',
+    },
+    reviewStatus: 'research',
+  },
+] as const;
 
 export const FACE_CLAIM_TYPES_V0 = [
   {
@@ -243,6 +417,74 @@ export const FACE_CLAIM_TYPES_V0 = [
   },
 ] as const satisfies readonly FaceClaimTypeDefinition[];
 
+export const FACE_THREE_DIVISION_RULES_V0 = [
+  {
+    ruleId: 'rule.shenxiang.three_divisions.upper_longest',
+    version: '0.1.0',
+    methodologyRef: FACE_METHOD_REFS_V0.shenxiangThreeDivisions,
+    sourceRefs: ['passage.shenxiang.face_three_divisions'],
+    tier: 'F1',
+    inputs: [{ inputKey: 'threeDivisionRelation', sourceType: 'operationalization', ref: 'op.shenxiang.three_divisions.relative_order_v0', required: true }],
+    condition: { op: 'eq', input: 'threeDivisionRelation', value: 'upper_longest' },
+    output: { claimType: 'FACE_MORPHOLOGY_CLASSIFICATION', semanticKey: 'face.three_divisions.upper_longest', pattern: 'upper_longest' },
+    rationale: '원전이 삼정의 長短을 구분하므로, 수치 임계값 없이 유일 최장 구간만 형태 분류로 보존한다.',
+    limitations: ['운세·성격·수명 해석을 포함하지 않는다.', 'near-equal은 calibration 전까지 별도 판정하지 않는다.'],
+    promotionStatus: 'research',
+  },
+  {
+    ruleId: 'rule.shenxiang.three_divisions.middle_longest',
+    version: '0.1.0',
+    methodologyRef: FACE_METHOD_REFS_V0.shenxiangThreeDivisions,
+    sourceRefs: ['passage.shenxiang.face_three_divisions'],
+    tier: 'F1',
+    inputs: [{ inputKey: 'threeDivisionRelation', sourceType: 'operationalization', ref: 'op.shenxiang.three_divisions.relative_order_v0', required: true }],
+    condition: { op: 'eq', input: 'threeDivisionRelation', value: 'middle_longest' },
+    output: { claimType: 'FACE_MORPHOLOGY_CLASSIFICATION', semanticKey: 'face.three_divisions.middle_longest', pattern: 'middle_longest' },
+    rationale: '원전이 삼정의 長短을 구분하므로, 수치 임계값 없이 유일 최장 구간만 형태 분류로 보존한다.',
+    limitations: ['운세·성격·수명 해석을 포함하지 않는다.', 'near-equal은 calibration 전까지 별도 판정하지 않는다.'],
+    promotionStatus: 'research',
+  },
+  {
+    ruleId: 'rule.shenxiang.three_divisions.lower_longest',
+    version: '0.1.0',
+    methodologyRef: FACE_METHOD_REFS_V0.shenxiangThreeDivisions,
+    sourceRefs: ['passage.shenxiang.face_three_divisions'],
+    tier: 'F1',
+    inputs: [{ inputKey: 'threeDivisionRelation', sourceType: 'operationalization', ref: 'op.shenxiang.three_divisions.relative_order_v0', required: true }],
+    condition: { op: 'eq', input: 'threeDivisionRelation', value: 'lower_longest' },
+    output: { claimType: 'FACE_MORPHOLOGY_CLASSIFICATION', semanticKey: 'face.three_divisions.lower_longest', pattern: 'lower_longest' },
+    rationale: '원전이 삼정의 長短을 구분하므로, 수치 임계값 없이 유일 최장 구간만 형태 분류로 보존한다.',
+    limitations: ['운세·성격·수명 해석을 포함하지 않는다.', 'near-equal은 calibration 전까지 별도 판정하지 않는다.'],
+    promotionStatus: 'research',
+  },
+  {
+    ruleId: 'rule.shenxiang.three_divisions.exact_equal',
+    version: '0.1.0',
+    methodologyRef: FACE_METHOD_REFS_V0.shenxiangThreeDivisions,
+    sourceRefs: ['passage.shenxiang.face_three_divisions', 'passage.shenxiang.sancai_three_divisions'],
+    tier: 'F1',
+    inputs: [{ inputKey: 'threeDivisionRelation', sourceType: 'operationalization', ref: 'op.shenxiang.three_divisions.relative_order_v0', required: true }],
+    condition: { op: 'eq', input: 'threeDivisionRelation', value: 'all_equal_exact' },
+    output: { claimType: 'FACE_MORPHOLOGY_CLASSIFICATION', semanticKey: 'face.three_divisions.exact_equal_measurement', pattern: 'exact_equal_measurement' },
+    rationale: '平等이라는 원전 표현을 임의의 허용오차로 바꾸지 않고 정확한 측정 동률만 별도 표식한다.',
+    limitations: ['전통적 平等의 실무 허용오차와 동일하다는 뜻이 아니다.', 'production balance classification은 calibration authority가 필요하다.'],
+    promotionStatus: 'research',
+  },
+  {
+    ruleId: 'rule.shenxiang.three_divisions.no_unique_longest',
+    version: '0.1.0',
+    methodologyRef: FACE_METHOD_REFS_V0.shenxiangThreeDivisions,
+    sourceRefs: ['passage.shenxiang.face_three_divisions'],
+    tier: 'F1',
+    inputs: [{ inputKey: 'threeDivisionRelation', sourceType: 'operationalization', ref: 'op.shenxiang.three_divisions.relative_order_v0', required: true }],
+    condition: { op: 'in', input: 'threeDivisionRelation', values: ['upper_middle_tie_longest', 'upper_lower_tie_longest', 'middle_lower_tie_longest'] },
+    output: { claimType: 'FACE_MORPHOLOGY_CLASSIFICATION', semanticKey: 'face.three_divisions.no_unique_longest', pattern: 'no_unique_longest' },
+    rationale: '동률일 때 임의로 하나의 중심 구간을 선택하지 않는다.',
+    limitations: ['near-equal을 동률로 간주하지 않는다.'],
+    promotionStatus: 'research',
+  },
+] as const;
+
 export const FACE_COMPARISON_POLICY_V0: FaceComparisonPolicy = {
   policyId: 'comparison.face.research_v0',
   version: '0.1.0',
@@ -261,7 +503,7 @@ export const FACE_COMPARISON_POLICY_V0: FaceComparisonPolicy = {
       groupKey: 'three_divisions.salience',
       eligibleClaimTypes: ['FACE_POSITION_PERIOD_INTERPRETATION'],
       comparisonMode: 'diagnostic_salience',
-      sourceRefs: ['passage.shenxiang.three_divisions'],
+      sourceRefs: ['passage.shenxiang.three_divisions.ten_observations'],
     },
     {
       groupKey: 'twelve_palaces.salience',
@@ -273,14 +515,15 @@ export const FACE_COMPARISON_POLICY_V0: FaceComparisonPolicy = {
 
 export const FACE_RESEARCH_PACK_V0: FaceMethodologyPackDefinition = {
   packId: 'pack.face.research_v0',
-  version: '0.1.0',
+  version: '0.2.0',
   sourceWitnessSetRef: 'witness-set.face.research_v0',
   methodologyDefinitionRefs: [
-    'method.three_divisions.research_v0',
-    'method.five_officers.research_v0',
-    'method.twelve_palaces.research_v0',
+    FACE_METHOD_REFS_V0.shenxiangThreeDivisions,
+    FACE_METHOD_REFS_V0.liuzhuangThreeDivisions,
+    FACE_METHOD_REFS_V0.fiveOfficers,
+    FACE_METHOD_REFS_V0.twelvePalaces,
   ],
-  regionMapRefs: [],
+  regionMapRefs: ['regionmap.shenxiang.face_three_divisions@0.1.0'],
   metricRegistryRef: 'metrics.face.research_v0',
   operationalizationRegistryRef: 'operationalizations.face.research_v0',
   claimTypeRegistryRef: 'claim-types.face.research_v0',
@@ -295,11 +538,13 @@ export const FACE_AUTHORITY_RESEARCH_REGISTRY_V0: FaceAuthorityRegistry = {
   witnesses: FACE_RESEARCH_WITNESSES_V0,
   passages: FACE_RESEARCH_PASSAGES_V0,
   lineage: FACE_RESEARCH_LINEAGE_V0,
-  regionMaps: [],
-  metrics: [],
-  operationalizations: [],
+  methodologies: FACE_RESEARCH_METHODOLOGIES_V0,
+  conflicts: FACE_RESEARCH_CONFLICTS_V0,
+  regionMaps: FACE_THREE_DIVISION_REGION_MAPS_V0,
+  metrics: FACE_THREE_DIVISION_METRICS_V0,
+  operationalizations: FACE_THREE_DIVISION_OPERATIONALIZATIONS_V0,
   claimTypes: FACE_CLAIM_TYPES_V0,
-  rules: [],
+  rules: FACE_THREE_DIVISION_RULES_V0,
   comparisonPolicies: [FACE_COMPARISON_POLICY_V0],
   methodologyPacks: [FACE_RESEARCH_PACK_V0],
 };
