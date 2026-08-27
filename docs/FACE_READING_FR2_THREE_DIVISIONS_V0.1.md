@@ -91,13 +91,27 @@ reviewStatus = reviewed
 Electronic witness:
 
 - Chinese Text Project
-- https://ctext.org/wiki.pl?chapter=90958&if=gb
+- https://ctext.org/wiki.pl?chapter=570484&if=en
 
-Relevant text:
+The fuller electronic passage states:
 
-> 面上三停，髮際到山根為上停，為初限。准頭為中限，人中到地閣為下限……
+> 面上三停，髮際到山根為上停，為初限。山根到准頭，為中停，為中限。人中到地閣，為下停，主末限。
 
-This is **not normalized into the 神相全編 region map**. The boundary semantics differ and the middle division is not fully operationalizable from the current electronic sentence alone. It therefore remains a separate methodology candidate.
+This is operationally different from the `神相全編` face-three-divisions map:
+
+```text
+柳莊 上停 = hairline → shangen
+柳莊 中停 = shangen → nose tip / 準頭
+柳莊 下停 = renzhong → dige
+```
+
+FR-2 therefore registers a separate research map:
+
+```text
+regionmap.liuzhuang.face_three_divisions@0.1.0
+```
+
+It is **not** normalized into the Shenxiang map and is not yet used by executable metrics. The 1925 NLC `柳莊相法` scan metadata is verified, but this exact passage has not yet been visually scan-checked, so the passage and map remain `research` / `unverified_ocr` authority.
 
 ## 3. Why 三停 is methodology-versioned
 
@@ -111,7 +125,14 @@ method.mayi.face_three_divisions@0.1.0
 method.liuzhuang.face_three_divisions@0.1.0
 ```
 
-The Shenxiang methodology currently has the executable research region map. The Mayi scan is a checked comparative witness. The Liuzhuang formulation remains separate and is not force-fit into the Shenxiang coordinate system.
+Current maps:
+
+```text
+regionmap.shenxiang.face_three_divisions@0.1.0
+regionmap.liuzhuang.face_three_divisions@0.1.0
+```
+
+The Mayi scan is preserved as a checked comparative witness and methodology rather than silently counted as an independent modern coordinate system. No composition policy currently authorizes mixing these maps in one reading.
 
 ## 4. No invented `平等` threshold
 
@@ -149,12 +170,21 @@ Example:
 
 ## 5. Metric model
 
-Research metric keys:
+Current executable research metric keys are Shenxiang-specific:
 
 ```text
 metric.shenxiang.three_divisions.upper_length@0.1.0
 metric.shenxiang.three_divisions.middle_length@0.1.0
 metric.shenxiang.three_divisions.lower_length@0.1.0
+```
+
+Each metric now carries explicit:
+
+```text
+methodologyRef
+regionMapRef
+sourceRefs
+reviewStatus
 ```
 
 Semantic anchors are used instead of hard-coded extractor landmark indices:
@@ -167,6 +197,8 @@ chin_bottom
 ```
 
 This is deliberate. The current FaceLab repository does not yet expose a production-neutral MyeongHa-compatible anchor contract. MediaPipe/provider-specific indices must not become traditional-method authority.
+
+No Liuzhuang metric is executable yet; only its distinct research region map is recorded pending scan checking and measurement review.
 
 ## 6. F1 rule scope
 
@@ -182,7 +214,26 @@ face.three_divisions.no_unique_longest
 
 These claims say only what the measured geometry supports. They do not create fortune, personality, morality, health, lifespan, wealth, or career claims.
 
-## 7. F6 conflict gate
+## 7. Full promotion chain
+
+Authority status cannot be upgraded independently at the last rule layer.
+
+A production rule must have a fully promoted dependency chain:
+
+```text
+scan_checked source passages
+→ production_authorized methodology
+→ production_authorized region map
+→ production_authorized metric
+→ production_authorized operationalization
+→ production_authorized rule
+```
+
+A rule depending directly on a methodology still requires that methodology itself to be `production_authorized`.
+
+`reviewed` and `production_authorized` source-backed authority objects require at least `scan_checked` passages. Research objects may cite `unverified_ocr` passages but cannot outrun them into production.
+
+## 8. F6 conflict gate
 
 The current corpus contains materially different period-direction formulations around 三停.
 
@@ -191,7 +242,7 @@ Examples include:
 - `神相全編 / 十觀`: `上停長少年忙，中停長福祿昌，下停長老吉祥`
 - `神相全編 / 三才三停論`: `上停長老吉昌，中停長近君王，下停長少吉祥`
 - `麻衣相法 / 1925 NLC scan`: `上停長老吉昌，中停長近君王，下停長少吉祥`
-- `柳莊相法`: `上停 ... 初限` wording
+- `柳莊相法`: `上停 ... 初限`, `中停 ... 中限`, `下停 ... 末限`
 
 The registry therefore contains:
 
@@ -201,11 +252,11 @@ status = open
 affectedTiers = [F6]
 ```
 
-Any attempt to mark an F6 rule from the affected methodologies as `production_authorized` fails validation even when its selected passage has reached `scan_checked`.
+Any attempt to mark an F6 rule from the affected methodologies as `production_authorized` fails validation even when its selected passage has reached `scan_checked` and its methodology status has been promoted.
 
 This makes source conflict an executable authority constraint rather than a documentation warning.
 
-## 8. Promotion state
+## 9. Promotion state
 
 Current state:
 
@@ -213,21 +264,23 @@ Current state:
 |---|---|
 | Source work/witness inventory | research established |
 | `麻衣相法` 1925 三停 passages | `scan_checked` |
+| `麻衣相法` 三停 methodology | `reviewed` |
 | `神相全編` electronic passages | `unverified_ocr` |
 | `柳莊相法` electronic passage | `unverified_ocr` |
-| `神相全編` region map | `research` |
-| Metrics | research contract |
-| Relative-order evaluator | executable |
+| Shenxiang region map | `research` |
+| Liuzhuang region map | `research` |
+| Shenxiang metrics | `research` |
+| Relative-order evaluator | executable research utility |
 | F1 morphology rules | `research` |
 | Near-equal / 平等 threshold | blocked |
 | F6 period interpretation | blocked by open conflict |
 | Production rules | none |
 
-## 9. Next evidence work
+## 10. Next evidence work
 
 1. Locate and visually scan-check the exact NLC `神相全編` pages for `面三停`, `三才三停論`, and the `十觀` variant.
-2. Compare `麻衣相法` and `神相全編` wording at passage level to determine inheritance/compilation relationships rather than counting them as independent corroboration.
-3. Obtain a scan-level `柳莊相法` witness for the conflicting boundary/period formulation.
+2. Visually scan-check the 1925 NLC `柳莊相法` `永樂百問` 三停 passage.
+3. Compare `麻衣相法` and `神相全編` wording at passage level to determine inheritance/compilation relationships rather than counting them as independent corroboration.
 4. Resolve whether any stable, source-defensible F6 period mapping exists; until then keep F6 closed.
 5. Separately calibrate image measurement tolerance for `平等`; calibration evidence must remain distinct from traditional source evidence.
-6. Only after the neutral FaceLab anchor contract exists, bind semantic anchors (`hairline_midpoint`, `brow_midline`, `nose_tip`, `chin_bottom`) to extractor-specific landmarks.
+6. Only after the neutral FaceLab anchor contract exists, bind semantic anchors to extractor-specific landmarks.
