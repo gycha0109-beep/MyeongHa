@@ -144,6 +144,7 @@ const authoredCharacter: CharacterContentDefinition = {
     rules: [
       {
         ruleKey: 'trusted_return_visit',
+        priority: 100,
         when: {
           trustBands: ['high'],
           recentEventKeys: ['RETURN_VISIT'],
@@ -239,5 +240,27 @@ describe('C1 character architecture contracts', () => {
         }),
       ),
     ).toThrow(/when must contain a condition/u);
+  });
+
+  it('rejects ambiguous relationship behavior priorities', () => {
+    const existing = authoredCharacter.relationshipBehavior!.rules[0]!;
+    expect(() =>
+      validateCharacterContentBundle(
+        bundleWith({
+          ...authoredCharacter,
+          relationshipBehavior: {
+            ...authoredCharacter.relationshipBehavior!,
+            rules: [
+              existing,
+              {
+                ...existing,
+                ruleKey: 'same_priority_conflict',
+                when: { frictionBands: ['high'] },
+              },
+            ],
+          },
+        }),
+      ),
+    ).toThrow(/priorities contains duplicate/u);
   });
 });
