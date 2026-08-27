@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
   FACE_AUTHORITY_FR3_RESEARCH_REGISTRY_V0,
+  FACE_EVIDENCE_ACCEPTANCE_POLICY_RESEARCH_V0,
   FACE_EVIDENCE_REPORT_RESEARCH_DIRECTION_V0,
   FACE_SOURCE_CORROBORATION_RESEARCH_V0,
+  validateFaceEvidenceAcceptancePolicyRegistry,
   validateFaceHoldoutEvaluationReport,
   validateFaceRepeatabilityReport,
   validateFaceReviewerReliabilityReport,
   validateSourceCorroborationRegistry,
+  type FaceEvidenceAcceptancePolicy,
   type FaceHoldoutEvaluationReport,
   type FaceRepeatabilityReport,
   type FaceReportAuthorityContext,
@@ -19,13 +22,17 @@ const metricRef = 'neutral.nose.bridge.centerline_rms_deviation@0.1.0';
 const labelingProtocolRef = 'label.shenxiang.discernment.bridge_straight@0.3.0';
 const calibrationRef = 'calibration.nose.bridge.straight@1.0.0-test-only';
 
-function context(reviewedAcceptancePolicyRefs: readonly string[] = []): FaceReportAuthorityContext {
+function context(policies: readonly FaceEvidenceAcceptancePolicy[] = []): FaceReportAuthorityContext {
   return {
     knownStudyRefs: new Set([studyRef]),
     knownMetricRefs: new Set([metricRef]),
     knownLabelingProtocolRefs: new Set([labelingProtocolRef]),
     knownCalibrationRefs: new Set([calibrationRef]),
-    reviewedAcceptancePolicyRefs: new Set(reviewedAcceptancePolicyRefs),
+    acceptancePolicyRegistry: {
+      registryId: 'evidence-acceptance.test',
+      version: '1.0.0-test-only',
+      policies,
+    },
   };
 }
 
@@ -95,17 +102,8 @@ function holdout(): FaceHoldoutEvaluationReport {
     participantCount: 10,
     evaluatedItemCount: 20,
     excludedNoConsensusCount: 2,
-    confusion: {
-      truePositive: 8,
-      trueNegative: 8,
-      falsePositive: 2,
-      falseNegative: 2,
-    },
-    metrics: {
-      sensitivity: 0.8,
-      specificity: 0.8,
-      balancedAccuracy: 0.8,
-    },
+    confusion: { truePositive: 8, trueNegative: 8, falsePositive: 2, falseNegative: 2 },
+    metrics: { sensitivity: 0.8, specificity: 0.8, balancedAccuracy: 0.8 },
     thresholdValueExposed: false,
     selectionLabelsConsumed: false,
     provenanceRefs: ['artifact:holdout-test-v1'],
@@ -147,6 +145,8 @@ describe('FR-7 source transmission corroboration', () => {
 
 describe('FR-7 repeatability and reviewer reliability reports', () => {
   it('validates research/reviewed reports without inventing acceptance cutoffs', () => {
+    expect(() => validateFaceEvidenceAcceptancePolicyRegistry(FACE_EVIDENCE_ACCEPTANCE_POLICY_RESEARCH_V0)).not.toThrow();
+    expect(FACE_EVIDENCE_ACCEPTANCE_POLICY_RESEARCH_V0.policies).toHaveLength(0);
     expect(() => validateFaceRepeatabilityReport(repeatability(), context())).not.toThrow();
     expect(() => validateFaceReviewerReliabilityReport(reviewerReliability(), context())).not.toThrow();
     expect(FACE_EVIDENCE_REPORT_RESEARCH_DIRECTION_V0.repeatability.acceptanceCutoff).toBeNull();
@@ -166,18 +166,34 @@ describe('FR-7 repeatability and reviewer reliability reports', () => {
     expect(() => validateFaceReviewerReliabilityReport(invalid, context())).toThrow(/ciLower <= estimate/u);
   });
 
-  it('cannot attach a pass/fail decision without a separately reviewed policy', () => {
+  it('cannot attach a pass/fail decision without a reviewed typed policy', () => {
     const invalid: FaceRepeatabilityReport = {
       ...repeatability(),
-      acceptanceDecision: { policyRef: 'policy.repeatability.magic-v1', state: 'met' },
+      acceptanceDecision: { policyRef: 'policy.repeatability.magic@1.0.0', state: 'met' },
     };
     expect(() => validateFaceRepeatabilityReport(invalid, context())).toThrow(/unreviewed\/unknown policy/u);
+  });
 
+  it('recomputes acceptance state from the reviewed policy rather than trusting caller state', () => {
+    const policy: FaceEvidenceAcceptancePolicy = {
+      policyId: 'policy.repeatability.test',
+      version: '1.0.0',
+      reportKind: 'repeatability',
+      rule: { kind: 'min_ci_lower', minValue: 0.7 },
+      status: 'reviewed',
+    };
     const valid: FaceRepeatabilityReport = {
       ...repeatability(),
-      acceptanceDecision: { policyRef: 'policy.repeatability.reviewed-v1', state: 'met' },
+      acceptanceDecision: { policyRef: 'policy.repeatability.test@1.0.0', state: 'met' },
     };
-    expect(() => validateFaceRepeatabilityReport(valid, context(['policy.repeatability.reviewed-v1']))).not.toThrow();
+    expect(() => validateFaceRepeatabilityReport(valid, context([policy]))).not.toThrow();
+
+    const forged: FaceRepeatabilityReport = {
+      ...repeatability(),
+      statistic: { ...repeatability().statistic, ciLower: 0.6 },
+      acceptanceDecision: { policyRef: 'policy.repeatability.test@1.0.0', state: 'met' },
+    };
+    expect(() => validateFaceRepeatabilityReport(forged, context([policy]))).toThrow(/expected not_met/u);
   });
 });
 
@@ -189,22 +205,47 @@ describe('FR-7 holdout evaluation report', () => {
   it('rejects raw threshold exposure or selection-label reuse', () => {
     const thresholdLeaked = { ...holdout(), thresholdValueExposed: true } as unknown as FaceHoldoutEvaluationReport;
     expect(() => validateFaceHoldoutEvaluationReport(thresholdLeaked, context())).toThrow(/must not expose raw threshold/u);
-
     const selectionLeak = { ...holdout(), selectionLabelsConsumed: true } as unknown as FaceHoldoutEvaluationReport;
     expect(() => validateFaceHoldoutEvaluationReport(selectionLeak, context())).toThrow(/must not consume selection labels/u);
   });
 
-  it('requires confusion counts and balanced accuracy to be internally consistent', () => {
+  it('requires confusion counts and all derived metrics to be internally consistent', () => {
     const badCount: FaceHoldoutEvaluationReport = {
       ...holdout(),
       confusion: { ...holdout().confusion, falsePositive: 3 },
     };
     expect(() => validateFaceHoldoutEvaluationReport(badCount, context())).toThrow(/confusion counts/u);
 
+    const badSensitivity: FaceHoldoutEvaluationReport = {
+      ...holdout(),
+      metrics: { ...holdout().metrics, sensitivity: 0.9 },
+    };
+    expect(() => validateFaceHoldoutEvaluationReport(badSensitivity, context())).toThrow(/sensitivity must match confusion/u);
+
     const badBalanced: FaceHoldoutEvaluationReport = {
       ...holdout(),
       metrics: { ...holdout().metrics, balancedAccuracy: 0.9 },
     };
     expect(() => validateFaceHoldoutEvaluationReport(badBalanced, context())).toThrow(/must equal mean/u);
+  });
+
+  it('evaluates a reviewed holdout acceptance policy deterministically', () => {
+    const policy: FaceEvidenceAcceptancePolicy = {
+      policyId: 'policy.holdout.test',
+      version: '1.0.0',
+      reportKind: 'holdout_evaluation',
+      rule: {
+        kind: 'minimum_holdout_metrics',
+        minSensitivity: 0.75,
+        minSpecificity: 0.75,
+        minBalancedAccuracy: 0.75,
+      },
+      status: 'reviewed',
+    };
+    const report: FaceHoldoutEvaluationReport = {
+      ...holdout(),
+      acceptanceDecision: { policyRef: 'policy.holdout.test@1.0.0', state: 'met' },
+    };
+    expect(() => validateFaceHoldoutEvaluationReport(report, context([policy]))).not.toThrow();
   });
 });
