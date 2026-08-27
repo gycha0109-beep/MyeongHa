@@ -37,6 +37,8 @@ describe('FR-9 decisive research diagnosis', () => {
     const output = buildResearchFaceDiagnosis(baseInput());
 
     expect(output.status).toBe('research_only');
+    expect(output.assertionAuthority).toBe('research_fixture');
+    expect(output.evidenceRefs).toEqual(['fixture:fr9-test-v1']);
     expect(output.reading.verdict.semanticKey).toBe('face.research.verdict.discernment.complete');
     expect(output.narrative.verdict).toBe(
       '審辨官이 중심을 잡는 관상입니다. 코 쪽 정적 조건이 이번 판독에서 가장 선명하게 모였습니다.',
@@ -49,7 +51,10 @@ describe('FR-9 decisive research diagnosis', () => {
     expect(output.claims.some((claim) => claim.semanticKey.includes('formed'))).toBe(false);
     expect(output.claims.some((claim) => claim.semanticKey.includes('bright_color'))).toBe(false);
     expect(output.reading.modules.tensions?.claimRefs).toHaveLength(1);
+    expect(output.reading.modules.fiveOfficers?.comparisonPolicyGroup).toBeUndefined();
     expect(output.reading.lenses.map((lens) => lens.lensKey)).toContain('contrast');
+    expect(Object.isFrozen(output)).toBe(true);
+    expect(Object.isFrozen(output.evidenceRefs)).toBe(true);
   });
 
   it('keeps diagnosed prose free of hedging language', () => {
@@ -87,17 +92,20 @@ describe('FR-9 decisive research diagnosis', () => {
     expect(dynamic.narrative).toEqual(baseline.narrative);
   });
 
-  it('keeps provenance/read identity out of the semantic signature', () => {
+  it('keeps provenance/read identity out of the semantic signature while preserving provenance in output', () => {
     const first = buildResearchFaceDiagnosis(baseInput());
     const second = buildResearchFaceDiagnosis({
       ...baseInput(),
       readingRef: 'reading:fr9:other',
       sourceSnapshotRef: 'source-snapshot:other',
-      evidenceRefs: ['fixture:other'],
+      assertionAuthority: 'human_label_assertion',
+      evidenceRefs: ['label-dataset:other'],
     });
 
     expect(second.semanticSignature).toBe(first.semanticSignature);
     expect(second.narrative.verdict).toBe(first.narrative.verdict);
+    expect(second.assertionAuthority).toBe('human_label_assertion');
+    expect(second.evidenceRefs).toEqual(['label-dataset:other']);
   });
 
   it('changes semantic signature and tension when a criterion state materially changes', () => {
@@ -167,6 +175,14 @@ describe('FR-9 partial and invalid inputs', () => {
 
   it('requires explicit evidence provenance even in research mode', () => {
     expect(() => buildResearchFaceDiagnosis({ ...baseInput(), evidenceRefs: [] })).toThrow(/evidenceRefs must be non-empty/u);
+  });
+
+  it('rejects an assertion-authority value that is not part of the research contract', () => {
+    const invalid = {
+      ...baseInput(),
+      assertionAuthority: 'production_photo_classifier',
+    } as unknown as FaceResearchDiagnosisInput;
+    expect(() => buildResearchFaceDiagnosis(invalid)).toThrow(/Unsupported research assertion authority/u);
   });
 });
 
