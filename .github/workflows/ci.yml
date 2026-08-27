@@ -126,5 +126,7 @@ jobs:
         run: bash test/db/memory_active_grants_query.sh
       - name: Run Reading provenance and stale projection read tests
         run: bash test/db/reading_provenance_stale_query.sh
+      - name: Run Reading Session provenance and stale projection read tests
+        run: bash test/db/reading_session_provenance_stale_query.sh
       - name: Verify deterministic schema catalog snapshot
         run: bash test/db/catalog_snapshot.sh
