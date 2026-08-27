@@ -221,7 +221,7 @@ describe('FR-16 provider adapter evidence contract', () => {
     const readiness = assessProviderAdapterEvidenceReadinessFR16();
     expect(readiness.productionReady).toBe(false);
     expect(readiness.authorityState).toBe('research_only');
-    expect(readiness.researchCandidateSlots.sort()).toEqual([
+    expect([...readiness.researchCandidateSlots].sort()).toEqual([
       'neutral.face.left_eye_region',
       'neutral.face.right_eye_region',
     ]);
