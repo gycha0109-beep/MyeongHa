@@ -4,16 +4,28 @@ import type {
   FaceAuthorityRegistry,
   FaceClaim,
   FaceComparisonPolicy,
+  FaceDefinitionLateralityContractV1,
+  FaceLateralityInputSensitivityV1,
   FaceMethodologyPackDefinition,
   FaceObservationState,
+  FacePairSwapInvariantOperationDefinitionV1,
+  FacePairSwapInvariantTransformV1,
   FaceRuleDefinition,
   MyeongHaStaticFaceObservation,
   ReviewStatus,
   SharedFaceObservationBundleV3,
   SourcePassage,
 } from './contracts.js';
+import { LATERALITY_CONSUMPTION_POLICY_FR20 } from './laterality-consumption-policy-fr20.js';
 
 const STABLE_KEY = /^[a-z0-9][a-z0-9._:-]{0,191}$/u;
+const FR21A_CONTRACT_KEYS = new Set(['schemaVersion', 'outputRequirement', 'inputs', 'pairOperationRef']);
+const FR21A_INPUT_KEYS = new Set(['inputRef', 'sensitivity', 'consumerSlotRefs']);
+const FR21A_PAIR_OPERATION_KEYS = new Set(['operationRef', 'pairGroupRef', 'reviewState', 'transform', 'formulaSpec', 'evidenceRefs']);
+const FR21A_PAIR_TRANSFORM_KEYS = new Set(['kind', 'inputRefs']);
+const FR21A_OUTPUT_REQUIREMENTS = new Set(['side_invariant', 'pair_swap_invariant', 'anatomical_side']);
+const FR21A_INPUT_SENSITIVITIES = new Set(['side_invariant', 'image_side_only', 'pair_swap_invariant', 'anatomical_side']);
+const FR21A_PAIR_TRANSFORMS = new Set(['absolute_difference', 'unordered_mean', 'unordered_min_max_span']);
 
 export class FaceAuthorityValidationError extends Error {
   override readonly name = 'FaceAuthorityValidationError';
@@ -36,8 +48,31 @@ function unique(values: readonly string[], path: string): void {
   }
 }
 
+function exactKeys(value: object, allowed: ReadonlySet<string>, path: string): void {
+  const unexpected = Object.keys(value).find((key) => !allowed.has(key));
+  if (unexpected !== undefined) throw new FaceAuthorityValidationError(`${path} contains unauthorized field: ${unexpected}`);
+}
+
 function assertRef(set: ReadonlySet<string>, value: string, path: string): void {
   if (!set.has(value)) throw new FaceAuthorityValidationError(`${path} references unknown key: ${value}`);
+}
+
+function sameStringSet(actual: readonly string[], expected: readonly string[]): boolean {
+  if (actual.length !== expected.length) return false;
+  return [...actual].sort().join('|') === [...expected].sort().join('|');
+}
+
+function normalizeFormula(value: string): string {
+  return value.replace(/\s+/gu, '');
+}
+
+function canonicalPairFormula(transform: FacePairSwapInvariantTransformV1): string {
+  const [left, right] = transform.inputRefs;
+  switch (transform.kind) {
+    case 'absolute_difference': return `abs(${left}-${right})`;
+    case 'unordered_mean': return `mean_unordered(${left},${right})`;
+    case 'unordered_min_max_span': return `span_unordered(${left},${right})`;
+  }
 }
 
 function passageStatusRank(status: SourcePassage['verificationStatus']): number {
@@ -144,6 +179,213 @@ function validateMethodologyPack(
   }
 }
 
+export function validateFacePairSwapInvariantOperationFR21A(
+  operation: FacePairSwapInvariantOperationDefinitionV1,
+): FacePairSwapInvariantOperationDefinitionV1 {
+  exactKeys(operation, FR21A_PAIR_OPERATION_KEYS, `FR-21A pair operation ${operation.operationRef}`);
+  stableKey(operation.operationRef, 'fr21a.operationRef');
+  stableKey(operation.pairGroupRef, `fr21a.${operation.operationRef}.pairGroupRef`);
+  if (operation.reviewState !== 'research_candidate' && operation.reviewState !== 'reviewed') {
+    throw new FaceAuthorityValidationError(`FR-21A pair operation has unknown reviewState: ${String(operation.reviewState)}`);
+  }
+  exactKeys(operation.transform, FR21A_PAIR_TRANSFORM_KEYS, `FR-21A pair operation ${operation.operationRef}.transform`);
+  if (!FR21A_PAIR_TRANSFORMS.has(operation.transform.kind)) {
+    throw new FaceAuthorityValidationError(`FR-21A pair operation has unauthorized transform kind: ${String(operation.transform.kind)}`);
+  }
+  if (!Array.isArray(operation.transform.inputRefs) || operation.transform.inputRefs.length !== 2) {
+    throw new FaceAuthorityValidationError(`FR-21A pair operation requires exactly two transform inputs: ${operation.operationRef}`);
+  }
+  const [first, second] = operation.transform.inputRefs;
+  nonEmpty(first, `fr21a.${operation.operationRef}.transform.inputRefs[0]`);
+  nonEmpty(second, `fr21a.${operation.operationRef}.transform.inputRefs[1]`);
+  if (first === second) throw new FaceAuthorityValidationError(`FR-21A pair operation inputs must be distinct: ${operation.operationRef}`);
+
+  const pairGroup = LATERALITY_CONSUMPTION_POLICY_FR20.pairGroups.find((group) => group.pairGroupRef === operation.pairGroupRef);
+  if (pairGroup === undefined) {
+    throw new FaceAuthorityValidationError(`FR-21A pair operation references unknown FR-20 pair group: ${operation.pairGroupRef}`);
+  }
+
+  nonEmpty(operation.formulaSpec, `fr21a.${operation.operationRef}.formulaSpec`);
+  const canonical = canonicalPairFormula(operation.transform);
+  if (normalizeFormula(operation.formulaSpec) !== normalizeFormula(canonical)) {
+    throw new FaceAuthorityValidationError(
+      `FR-21A pair operation formula does not match its structurally swap-invariant transform: ${operation.operationRef}`,
+    );
+  }
+  if (operation.evidenceRefs.length === 0) {
+    throw new FaceAuthorityValidationError(`FR-21A pair operation requires evidenceRefs: ${operation.operationRef}`);
+  }
+  unique(operation.evidenceRefs, `fr21a.${operation.operationRef}.evidenceRefs`);
+  return operation;
+}
+
+export function validateFaceDefinitionLateralityContractFR21A(input: {
+  readonly authorityKey: string;
+  readonly status: ReviewStatus;
+  readonly expectedInputRefs: readonly string[];
+  readonly contract?: FaceDefinitionLateralityContractV1 | undefined;
+  readonly pairOperations?: readonly FacePairSwapInvariantOperationDefinitionV1[] | undefined;
+  readonly expectedInputSensitivities?: ReadonlyMap<string, FaceLateralityInputSensitivityV1> | undefined;
+  readonly extractorLandmarkRefs?: readonly number[] | undefined;
+  readonly formula?: string | undefined;
+}): void {
+  const { authorityKey, status, expectedInputRefs, contract } = input;
+  if (contract === undefined) {
+    if (status === 'production_authorized') {
+      throw new FaceAuthorityValidationError(`${authorityKey} production authority requires an explicit FR-21A laterality contract.`);
+    }
+    return;
+  }
+
+  exactKeys(contract, FR21A_CONTRACT_KEYS, `${authorityKey}.laterality`);
+  if (contract.schemaVersion !== 'fr21a-v1') {
+    throw new FaceAuthorityValidationError(`${authorityKey}.laterality has unknown schemaVersion: ${String(contract.schemaVersion)}`);
+  }
+  if (!FR21A_OUTPUT_REQUIREMENTS.has(contract.outputRequirement)) {
+    throw new FaceAuthorityValidationError(`${authorityKey}.laterality has unknown outputRequirement: ${String(contract.outputRequirement)}`);
+  }
+
+  unique(expectedInputRefs, `${authorityKey}.expectedInputRefs`);
+  unique(contract.inputs.map((binding) => binding.inputRef), `${authorityKey}.laterality.inputs`);
+  if (!sameStringSet(contract.inputs.map((binding) => binding.inputRef), expectedInputRefs)) {
+    throw new FaceAuthorityValidationError(`${authorityKey}.laterality must declare every direct definition input exactly once.`);
+  }
+
+  const classificationBySlot = new Map(
+    LATERALITY_CONSUMPTION_POLICY_FR20.classifications.map((entry) => [entry.consumerSlot, entry] as const),
+  );
+  const pairGroups = LATERALITY_CONSUMPTION_POLICY_FR20.pairGroups;
+
+  for (const binding of contract.inputs) {
+    exactKeys(binding, FR21A_INPUT_KEYS, `${authorityKey}.laterality.input.${binding.inputRef}`);
+    nonEmpty(binding.inputRef, `${authorityKey}.laterality.inputRef`);
+    if (!FR21A_INPUT_SENSITIVITIES.has(binding.sensitivity)) {
+      throw new FaceAuthorityValidationError(
+        `${authorityKey}.laterality input ${binding.inputRef} has unknown sensitivity: ${String(binding.sensitivity)}`,
+      );
+    }
+    const expectedSensitivity = input.expectedInputSensitivities?.get(binding.inputRef);
+    if (expectedSensitivity !== undefined && expectedSensitivity !== binding.sensitivity) {
+      throw new FaceAuthorityValidationError(
+        `${authorityKey}.laterality input ${binding.inputRef} sensitivity=${binding.sensitivity} does not match upstream output=${expectedSensitivity}.`,
+      );
+    }
+
+    const consumerSlots = binding.consumerSlotRefs ?? [];
+    unique(consumerSlots, `${authorityKey}.laterality.input.${binding.inputRef}.consumerSlotRefs`);
+    for (const slot of consumerSlots) {
+      if (!classificationBySlot.has(slot as never)) {
+        throw new FaceAuthorityValidationError(`${authorityKey}.laterality references unknown FR-20 consumer slot: ${slot}`);
+      }
+    }
+
+    if (binding.sensitivity === 'side_invariant') {
+      const invalid = consumerSlots.find((slot) => classificationBySlot.get(slot as never)?.individualSemanticClass !== 'side_invariant');
+      if (invalid !== undefined) {
+        throw new FaceAuthorityValidationError(`${authorityKey}.laterality cannot declare image-side slot ${invalid} as side_invariant.`);
+      }
+    }
+    if (binding.sensitivity === 'image_side_only') {
+      if (consumerSlots.length !== 1) {
+        throw new FaceAuthorityValidationError(`${authorityKey}.laterality image_side_only input ${binding.inputRef} requires exactly one FR-20 slot.`);
+      }
+      const classification = classificationBySlot.get(consumerSlots[0] as never);
+      if (classification?.individualSemanticClass !== 'image_side_only') {
+        throw new FaceAuthorityValidationError(`${authorityKey}.laterality input ${binding.inputRef} is not an FR-20 image-side-only slot.`);
+      }
+    }
+    if (binding.sensitivity === 'pair_swap_invariant' && consumerSlots.length > 0) {
+      const matchingPair = pairGroups.find((group) => sameStringSet(group.memberSlots, consumerSlots));
+      if (matchingPair === undefined) {
+        throw new FaceAuthorityValidationError(`${authorityKey}.laterality pair_swap_invariant input ${binding.inputRef} has no matching FR-20 pair group.`);
+      }
+    }
+    if (binding.sensitivity === 'anatomical_side' && status === 'production_authorized') {
+      throw new FaceAuthorityValidationError(`${authorityKey} anatomical-side input is blocked while capture laterality authority is unresolved.`);
+    }
+  }
+
+  if (status === 'production_authorized' && (input.extractorLandmarkRefs?.length ?? 0) > 0) {
+    throw new FaceAuthorityValidationError(
+      `${authorityKey} production metric cannot use provider-specific extractor landmark indices as semantic authority.`,
+    );
+  }
+
+  if (contract.outputRequirement === 'anatomical_side' && status === 'production_authorized') {
+    throw new FaceAuthorityValidationError(
+      `${authorityKey} anatomical-side output is blocked while FR-19/FR-20 capture laterality authority is unresolved.`,
+    );
+  }
+
+  const imageSideInputs = contract.inputs.filter((binding) => binding.sensitivity === 'image_side_only');
+  const pairInputs = contract.inputs.filter((binding) => binding.sensitivity === 'pair_swap_invariant');
+  const anatomicalInputs = contract.inputs.filter((binding) => binding.sensitivity === 'anatomical_side');
+
+  if (contract.outputRequirement === 'side_invariant') {
+    const nonInvariant = contract.inputs.find((binding) => binding.sensitivity !== 'side_invariant');
+    if (nonInvariant !== undefined) {
+      throw new FaceAuthorityValidationError(
+        `${authorityKey} side_invariant output cannot silently collapse direct ${nonInvariant.sensitivity} input ${nonInvariant.inputRef}.`,
+      );
+    }
+    if (contract.pairOperationRef !== undefined) {
+      throw new FaceAuthorityValidationError(`${authorityKey} side_invariant output cannot carry a pairOperationRef.`);
+    }
+    return;
+  }
+
+  if (contract.outputRequirement === 'pair_swap_invariant') {
+    if (anatomicalInputs.length > 0 && status === 'production_authorized') {
+      throw new FaceAuthorityValidationError(`${authorityKey} cannot consume anatomical-side input before trusted capture laterality exists.`);
+    }
+    if (imageSideInputs.length === 0 && pairInputs.length === 0) {
+      throw new FaceAuthorityValidationError(`${authorityKey} pair_swap_invariant output requires an actual pair-sensitive input.`);
+    }
+
+    if (imageSideInputs.length === 0) {
+      if (contract.pairOperationRef !== undefined) {
+        throw new FaceAuthorityValidationError(`${authorityKey} pairOperationRef is only valid when directly transforming image-side inputs.`);
+      }
+      return;
+    }
+
+    if (imageSideInputs.length !== 2 || contract.pairOperationRef === undefined) {
+      throw new FaceAuthorityValidationError(
+        `${authorityKey} direct image-side consumption requires exactly two pair members and a reviewed pair operation.`,
+      );
+    }
+    const operations = input.pairOperations ?? [];
+    const operation = operations.find((candidate) => candidate.operationRef === contract.pairOperationRef);
+    if (operation === undefined) {
+      throw new FaceAuthorityValidationError(`${authorityKey} references unknown FR-21A pair operation: ${contract.pairOperationRef}`);
+    }
+    validateFacePairSwapInvariantOperationFR21A(operation);
+    if (status === 'production_authorized' && operation.reviewState !== 'reviewed') {
+      throw new FaceAuthorityValidationError(`${authorityKey} production pair operation must be reviewed: ${operation.operationRef}`);
+    }
+    if (!sameStringSet(operation.transform.inputRefs, imageSideInputs.map((binding) => binding.inputRef))) {
+      throw new FaceAuthorityValidationError(`${authorityKey} pair operation inputs do not match the direct image-side inputs.`);
+    }
+
+    const consumerSlots = imageSideInputs.flatMap((binding) => binding.consumerSlotRefs ?? []);
+    const group = pairGroups.find((candidate) => candidate.pairGroupRef === operation.pairGroupRef);
+    if (group === undefined || !sameStringSet(group.memberSlots, consumerSlots)) {
+      throw new FaceAuthorityValidationError(`${authorityKey} pair operation group does not match the declared FR-20 pair members.`);
+    }
+
+    if (input.formula !== undefined && normalizeFormula(input.formula) !== normalizeFormula(operation.formulaSpec)) {
+      throw new FaceAuthorityValidationError(
+        `${authorityKey} formula uses ordered/different side semantics than the reviewed pair operation.`,
+      );
+    }
+    return;
+  }
+
+  if (contract.pairOperationRef !== undefined) {
+    throw new FaceAuthorityValidationError(`${authorityKey} anatomical_side output cannot use pairOperationRef as a laterality shortcut.`);
+  }
+}
+
 export function validateFaceAuthorityRegistry(registry: FaceAuthorityRegistry): void {
   unique(registry.works.map((work) => work.workId), 'works');
   unique(registry.witnesses.map((witness) => witness.witnessId), 'witnesses');
@@ -157,6 +399,9 @@ export function validateFaceAuthorityRegistry(registry: FaceAuthorityRegistry): 
   unique(registry.rules.map((rule) => `${rule.ruleId}@${rule.version}`), 'rules');
   unique(registry.comparisonPolicies.map((policy) => `${policy.policyId}@${policy.version}`), 'comparisonPolicies');
   unique(registry.methodologyPacks.map((pack) => `${pack.packId}@${pack.version}`), 'methodologyPacks');
+  const lateralityPairOperations = registry.lateralityPairOperations ?? [];
+  unique(lateralityPairOperations.map((operation) => operation.operationRef), 'lateralityPairOperations');
+  for (const operation of lateralityPairOperations) validateFacePairSwapInvariantOperationFR21A(operation);
 
   const workIds: ReadonlySet<string> = new Set<string>(registry.works.map((work) => work.workId));
   const witnessIds: ReadonlySet<string> = new Set<string>(registry.witnesses.map((witness) => witness.witnessId));
@@ -182,11 +427,17 @@ export function validateFaceAuthorityRegistry(registry: FaceAuthorityRegistry): 
   const metricStatuses: ReadonlyMap<string, ReviewStatus> = new Map<string, ReviewStatus>(
     registry.metrics.map((metric) => [`${metric.metricKey}@${metric.version}`, metric.reviewStatus]),
   );
+  const metricDefinitions = new Map<string, FaceAuthorityRegistry['metrics'][number]>(
+    registry.metrics.map((metric) => [`${metric.metricKey}@${metric.version}`, metric]),
+  );
   const operationalizationIds: ReadonlySet<string> = new Set<string>(
     registry.operationalizations.map((entry) => entry.operationalizationId),
   );
   const operationalizationStatuses: ReadonlyMap<string, ReviewStatus> = new Map<string, ReviewStatus>(
     registry.operationalizations.map((entry) => [entry.operationalizationId, entry.reviewStatus]),
+  );
+  const operationalizationDefinitions = new Map<string, FaceAuthorityRegistry['operationalizations'][number]>(
+    registry.operationalizations.map((entry) => [entry.operationalizationId, entry]),
   );
   const claimTypes = new Map(registry.claimTypes.map((entry) => [entry.claimType, entry] as const));
   const comparisonPolicyIds: ReadonlySet<string> = new Set<string>(
@@ -273,6 +524,15 @@ export function validateFaceAuthorityRegistry(registry: FaceAuthorityRegistry): 
     if (metric.regionMapRef !== undefined) {
       assertProductionDependency(metricRef, metric.reviewStatus, `region map ${metric.regionMapRef}`, regionMapStatuses.get(metric.regionMapRef));
     }
+    validateFaceDefinitionLateralityContractFR21A({
+      authorityKey: metricRef,
+      status: metric.reviewStatus,
+      expectedInputRefs: metric.requiredAnchorRefs,
+      contract: metric.laterality,
+      pairOperations: lateralityPairOperations,
+      extractorLandmarkRefs: metric.extractorLandmarkRefs,
+      formula: metric.formula,
+    });
   }
 
   for (const operationalization of registry.operationalizations) {
@@ -302,6 +562,19 @@ export function validateFaceAuthorityRegistry(registry: FaceAuthorityRegistry): 
         metricStatuses.get(metricRef),
       );
     }
+    const expectedInputSensitivities = new Map<string, FaceLateralityInputSensitivityV1>();
+    for (const metricRef of operationalization.inputMetricRefs) {
+      const upstream = metricDefinitions.get(metricRef)?.laterality?.outputRequirement;
+      if (upstream !== undefined) expectedInputSensitivities.set(metricRef, upstream);
+    }
+    validateFaceDefinitionLateralityContractFR21A({
+      authorityKey: operationalization.operationalizationId,
+      status: operationalization.reviewStatus,
+      expectedInputRefs: operationalization.inputMetricRefs,
+      contract: operationalization.laterality,
+      pairOperations: lateralityPairOperations,
+      expectedInputSensitivities,
+    });
   }
 
   for (const rule of registry.rules) {
@@ -313,14 +586,45 @@ export function validateFaceAuthorityRegistry(registry: FaceAuthorityRegistry): 
       throw new FaceAuthorityValidationError(`${rule.ruleId} tier ${rule.tier} is not allowed for ${rule.output.claimType}.`);
     }
     for (const sourceRef of rule.sourceRefs) assertRef(passageIds, sourceRef, `${rule.ruleId}.sourceRefs`);
-    for (const input of rule.inputs) {
-      if (input.sourceType === 'metric') assertRef(metricIds, input.ref, `${rule.ruleId}.inputs`);
-      if (input.sourceType === 'operationalization') assertRef(operationalizationIds, input.ref, `${rule.ruleId}.inputs`);
-      if (input.sourceType === 'claim' && !claimTypes.has(input.ref)) {
-        throw new FaceAuthorityValidationError(`${rule.ruleId}.inputs references unknown claim type: ${input.ref}`);
+    for (const inputRequirement of rule.inputs) {
+      if (inputRequirement.sourceType === 'metric') assertRef(metricIds, inputRequirement.ref, `${rule.ruleId}.inputs`);
+      if (inputRequirement.sourceType === 'operationalization') assertRef(operationalizationIds, inputRequirement.ref, `${rule.ruleId}.inputs`);
+      if (inputRequirement.sourceType === 'claim' && !claimTypes.has(inputRequirement.ref)) {
+        throw new FaceAuthorityValidationError(`${rule.ruleId}.inputs references unknown claim type: ${inputRequirement.ref}`);
       }
     }
     validateRulePromotion(rule, passageMap, registry.conflicts, methodologyStatuses, metricStatuses, operationalizationStatuses);
+
+    const expectedInputSensitivities = new Map<string, FaceLateralityInputSensitivityV1>();
+    for (const inputRequirement of rule.inputs) {
+      if (inputRequirement.sourceType === 'metric') {
+        const upstream = metricDefinitions.get(inputRequirement.ref)?.laterality?.outputRequirement;
+        if (upstream !== undefined) expectedInputSensitivities.set(inputRequirement.inputKey, upstream);
+      } else if (inputRequirement.sourceType === 'operationalization') {
+        const upstream = operationalizationDefinitions.get(inputRequirement.ref)?.laterality?.outputRequirement;
+        if (upstream !== undefined) expectedInputSensitivities.set(inputRequirement.inputKey, upstream);
+      } else {
+        const producerRequirements = registry.rules
+          .filter((candidate) => candidate.output.claimType === inputRequirement.ref && candidate.promotionStatus === 'production_authorized')
+          .map((candidate) => candidate.laterality?.outputRequirement)
+          .filter((requirement): requirement is NonNullable<typeof requirement> => requirement !== undefined);
+        const distinct = [...new Set(producerRequirements)];
+        if (distinct.length > 1) {
+          throw new FaceAuthorityValidationError(
+            `${rule.ruleId} claim input ${inputRequirement.ref} has mixed production laterality outputs and cannot be consumed without a narrower contract.`,
+          );
+        }
+        if (distinct.length === 1) expectedInputSensitivities.set(inputRequirement.inputKey, distinct[0]!);
+      }
+    }
+    validateFaceDefinitionLateralityContractFR21A({
+      authorityKey: rule.ruleId,
+      status: rule.promotionStatus,
+      expectedInputRefs: rule.inputs.map((entry) => entry.inputKey),
+      contract: rule.laterality,
+      pairOperations: lateralityPairOperations,
+      expectedInputSensitivities,
+    });
   }
 
   for (const policy of registry.comparisonPolicies) {

@@ -10,6 +10,48 @@ export type DiagnosticSalience = 'primary' | 'strong' | 'supporting' | 'secondar
 export type TraditionalDisposition = 'favorable' | 'mixed' | 'challenging' | 'neutral';
 export type FaceMetricUnit = 'ratio' | 'degree' | 'normalized_distance';
 export type ComparisonMode = 'methodology_ordinal' | 'diagnostic_salience' | 'unordered';
+export type FaceLateralitySemanticRequirementV1 = 'side_invariant' | 'pair_swap_invariant' | 'anatomical_side';
+export type FaceLateralityInputSensitivityV1 =
+  | 'side_invariant'
+  | 'image_side_only'
+  | 'pair_swap_invariant'
+  | 'anatomical_side';
+
+export interface FaceLateralityInputBindingV1 {
+  readonly inputRef: string;
+  readonly sensitivity: FaceLateralityInputSensitivityV1;
+  readonly consumerSlotRefs?: readonly string[];
+}
+
+export type FacePairSwapInvariantTransformV1 =
+  | {
+      readonly kind: 'absolute_difference';
+      readonly inputRefs: readonly [string, string];
+    }
+  | {
+      readonly kind: 'unordered_mean';
+      readonly inputRefs: readonly [string, string];
+    }
+  | {
+      readonly kind: 'unordered_min_max_span';
+      readonly inputRefs: readonly [string, string];
+    };
+
+export interface FacePairSwapInvariantOperationDefinitionV1 {
+  readonly operationRef: string;
+  readonly pairGroupRef: string;
+  readonly reviewState: 'research_candidate' | 'reviewed';
+  readonly transform: FacePairSwapInvariantTransformV1;
+  readonly formulaSpec: string;
+  readonly evidenceRefs: readonly string[];
+}
+
+export interface FaceDefinitionLateralityContractV1 {
+  readonly schemaVersion: 'fr21a-v1';
+  readonly outputRequirement: FaceLateralitySemanticRequirementV1;
+  readonly inputs: readonly FaceLateralityInputBindingV1[];
+  readonly pairOperationRef?: string;
+}
 
 export interface SourceWork {
   readonly workId: string;
@@ -102,6 +144,7 @@ export interface FaceMetricDefinition {
   readonly unit: FaceMetricUnit;
   readonly stabilityRequirements: readonly string[];
   readonly reviewStatus: ReviewStatus;
+  readonly laterality?: FaceDefinitionLateralityContractV1;
 }
 
 export interface FaceOperationalizationDefinition {
@@ -112,6 +155,7 @@ export interface FaceOperationalizationDefinition {
   readonly inputMetricRefs: readonly string[];
   readonly classificationBands: unknown;
   readonly reviewStatus: ReviewStatus;
+  readonly laterality?: FaceDefinitionLateralityContractV1;
 }
 
 export type FaceRuleExpression =
@@ -151,6 +195,7 @@ export interface FaceRuleDefinition {
   readonly rationale: string;
   readonly limitations: readonly string[];
   readonly promotionStatus: ReviewStatus;
+  readonly laterality?: FaceDefinitionLateralityContractV1;
 }
 
 export interface FaceClaimTypeDefinition {
@@ -330,4 +375,5 @@ export interface FaceAuthorityRegistry {
   readonly rules: readonly FaceRuleDefinition[];
   readonly comparisonPolicies: readonly FaceComparisonPolicy[];
   readonly methodologyPacks: readonly FaceMethodologyPackDefinition[];
+  readonly lateralityPairOperations?: readonly FacePairSwapInvariantOperationDefinitionV1[];
 }
