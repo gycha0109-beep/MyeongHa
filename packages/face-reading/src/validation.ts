@@ -1,5 +1,6 @@
 import type {
   ComparisonMode,
+  FaceAuthorityConflictDefinition,
   FaceAuthorityRegistry,
   FaceClaim,
   FaceComparisonPolicy,
@@ -7,6 +8,7 @@ import type {
   FaceObservationState,
   FaceRuleDefinition,
   MyeongHaStaticFaceObservation,
+  ReviewStatus,
   SharedFaceObservationBundleV3,
   SourcePassage,
 } from './contracts.js';
@@ -54,19 +56,45 @@ function passageStatusRank(status: SourcePassage['verificationStatus']): number 
   }
 }
 
-function validateRulePromotion(rule: FaceRuleDefinition, passages: ReadonlyMap<string, SourcePassage>): void {
-  if (rule.promotionStatus !== 'production_authorized') return;
-  if (rule.sourceRefs.length === 0) {
-    throw new FaceAuthorityValidationError(`${rule.ruleId} production rule requires sourceRefs.`);
+function validateProductionSourceGate(
+  authorityKey: string,
+  status: ReviewStatus,
+  sourceRefs: readonly string[],
+  passages: ReadonlyMap<string, SourcePassage>,
+): void {
+  if (status !== 'production_authorized') return;
+  if (sourceRefs.length === 0) {
+    throw new FaceAuthorityValidationError(`${authorityKey} production authority requires sourceRefs.`);
   }
-  for (const ref of rule.sourceRefs) {
+  for (const ref of sourceRefs) {
     const passage = passages.get(ref);
     if (passage === undefined) {
-      throw new FaceAuthorityValidationError(`${rule.ruleId} production sourceRef must resolve to a passage: ${ref}`);
+      throw new FaceAuthorityValidationError(`${authorityKey} production sourceRef must resolve to a passage: ${ref}`);
     }
     if (passageStatusRank(passage.verificationStatus) < passageStatusRank('scan_checked')) {
-      throw new FaceAuthorityValidationError(`${rule.ruleId} production rule requires scan_checked source passage: ${ref}`);
+      throw new FaceAuthorityValidationError(`${authorityKey} production authority requires scan_checked source passage: ${ref}`);
     }
+  }
+}
+
+function validateRulePromotion(
+  rule: FaceRuleDefinition,
+  passages: ReadonlyMap<string, SourcePassage>,
+  conflicts: readonly FaceAuthorityConflictDefinition[],
+): void {
+  validateProductionSourceGate(rule.ruleId, rule.promotionStatus, rule.sourceRefs, passages);
+  if (rule.promotionStatus !== 'production_authorized') return;
+
+  const blockingConflict = conflicts.find(
+    (conflict) =>
+      conflict.status === 'open' &&
+      conflict.methodologyRefs.includes(rule.methodologyRef) &&
+      conflict.affectedTiers.includes(rule.tier),
+  );
+  if (blockingConflict !== undefined) {
+    throw new FaceAuthorityValidationError(
+      `${rule.ruleId} production promotion blocked by unresolved authority conflict: ${blockingConflict.conflictId}`,
+    );
   }
 }
 
@@ -74,10 +102,14 @@ function validateMethodologyPack(
   pack: FaceMethodologyPackDefinition,
   comparisonPolicyIds: ReadonlySet<string>,
   regionMapIds: ReadonlySet<string>,
+  methodologyIds: ReadonlySet<string>,
 ): void {
   stableKey(pack.packId, 'methodologyPack.packId');
   nonEmpty(pack.version, `${pack.packId}.version`);
   assertRef(comparisonPolicyIds, pack.comparisonPolicyRef, `${pack.packId}.comparisonPolicyRef`);
+  for (const ref of pack.methodologyDefinitionRefs) {
+    assertRef(methodologyIds, ref, `${pack.packId}.methodologyDefinitionRefs`);
+  }
   for (const ref of pack.regionMapRefs) {
     assertRef(regionMapIds, ref, `${pack.packId}.regionMapRefs`);
   }
@@ -90,6 +122,8 @@ export function validateFaceAuthorityRegistry(registry: FaceAuthorityRegistry): 
   unique(registry.works.map((work) => work.workId), 'works');
   unique(registry.witnesses.map((witness) => witness.witnessId), 'witnesses');
   unique(registry.passages.map((passage) => passage.passageId), 'passages');
+  unique(registry.methodologies.map((method) => `${method.methodologyId}@${method.version}`), 'methodologies');
+  unique(registry.conflicts.map((conflict) => conflict.conflictId), 'conflicts');
   unique(registry.regionMaps.map((map) => `${map.regionMapId}@${map.version}`), 'regionMaps');
   unique(registry.metrics.map((metric) => `${metric.metricKey}@${metric.version}`), 'metrics');
   unique(registry.operationalizations.map((entry) => entry.operationalizationId), 'operationalizations');
@@ -102,6 +136,7 @@ export function validateFaceAuthorityRegistry(registry: FaceAuthorityRegistry): 
   const witnessIds = new Set(registry.witnesses.map((witness) => witness.witnessId));
   const passageMap = new Map(registry.passages.map((passage) => [passage.passageId, passage] as const));
   const passageIds = new Set(passageMap.keys());
+  const methodologyIds = new Set(registry.methodologies.map((method) => `${method.methodologyId}@${method.version}`));
   const metricIds = new Set(registry.metrics.map((metric) => `${metric.metricKey}@${metric.version}`));
   const operationalizationIds = new Set(registry.operationalizations.map((entry) => entry.operationalizationId));
   const claimTypes = new Map(registry.claimTypes.map((entry) => [entry.claimType, entry] as const));
@@ -136,8 +171,43 @@ export function validateFaceAuthorityRegistry(registry: FaceAuthorityRegistry): 
     }
   }
 
+  for (const method of registry.methodologies) {
+    stableKey(method.methodologyId, 'methodology.methodologyId');
+    nonEmpty(method.version, `${method.methodologyId}.version`);
+    nonEmpty(method.traditionalTerm, `${method.methodologyId}.traditionalTerm`);
+    if (method.sourceRefs.length === 0) {
+      throw new FaceAuthorityValidationError(`${method.methodologyId} requires sourceRefs.`);
+    }
+    for (const sourceRef of method.sourceRefs) {
+      assertRef(passageIds, sourceRef, `${method.methodologyId}.sourceRefs`);
+    }
+    validateProductionSourceGate(
+      `${method.methodologyId}@${method.version}`,
+      method.reviewStatus,
+      method.sourceRefs,
+      passageMap,
+    );
+  }
+
+  for (const conflict of registry.conflicts) {
+    stableKey(conflict.conflictId, 'conflict.conflictId');
+    if (conflict.methodologyRefs.length === 0 || conflict.sourceRefs.length === 0 || conflict.affectedTiers.length === 0) {
+      throw new FaceAuthorityValidationError(`${conflict.conflictId} requires methodologyRefs, sourceRefs, and affectedTiers.`);
+    }
+    for (const methodologyRef of conflict.methodologyRefs) {
+      assertRef(methodologyIds, methodologyRef, `${conflict.conflictId}.methodologyRefs`);
+    }
+    for (const sourceRef of conflict.sourceRefs) {
+      assertRef(passageIds, sourceRef, `${conflict.conflictId}.sourceRefs`);
+    }
+    if (conflict.status === 'resolved' && (conflict.resolutionNote === undefined || conflict.resolutionNote.trim().length === 0)) {
+      throw new FaceAuthorityValidationError(`${conflict.conflictId} resolved conflict requires resolutionNote.`);
+    }
+  }
+
   for (const map of registry.regionMaps) {
     stableKey(map.regionMapId, 'regionMap.regionMapId');
+    assertRef(methodologyIds, map.methodologyRef, `${map.regionMapId}.methodologyRef`);
     if (map.sourceRefs.length === 0) {
       throw new FaceAuthorityValidationError(`${map.regionMapId} requires sourceRefs.`);
     }
@@ -145,20 +215,53 @@ export function validateFaceAuthorityRegistry(registry: FaceAuthorityRegistry): 
       assertRef(passageIds, sourceRef, `${map.regionMapId}.sourceRefs`);
     }
     unique(map.regions.map((region) => region.regionKey), `${map.regionMapId}.regions`);
+    for (const region of map.regions) {
+      if (region.sourceRefs.length === 0) {
+        throw new FaceAuthorityValidationError(`${map.regionMapId}.${region.regionKey} requires sourceRefs.`);
+      }
+      for (const sourceRef of region.sourceRefs) {
+        assertRef(passageIds, sourceRef, `${map.regionMapId}.${region.regionKey}.sourceRefs`);
+      }
+    }
+    validateProductionSourceGate(`${map.regionMapId}@${map.version}`, map.mappingStatus, map.sourceRefs, passageMap);
+  }
+
+  for (const metric of registry.metrics) {
+    stableKey(metric.metricKey, 'metric.metricKey');
+    nonEmpty(metric.version, `${metric.metricKey}.version`);
+    nonEmpty(metric.formula, `${metric.metricKey}.formula`);
+    if (metric.requiredAnchorRefs.length === 0) {
+      throw new FaceAuthorityValidationError(`${metric.metricKey} requires semantic anchor refs.`);
+    }
+    unique(metric.requiredAnchorRefs, `${metric.metricKey}.requiredAnchorRefs`);
+    if (metric.stabilityRequirements.length === 0) {
+      throw new FaceAuthorityValidationError(`${metric.metricKey} requires stabilityRequirements.`);
+    }
   }
 
   for (const operationalization of registry.operationalizations) {
     stableKey(operationalization.operationalizationId, 'operationalization.operationalizationId');
+    assertRef(methodologyIds, operationalization.methodologyRef, `${operationalization.operationalizationId}.methodologyRef`);
+    if (operationalization.sourceRefs.length === 0) {
+      throw new FaceAuthorityValidationError(`${operationalization.operationalizationId} requires sourceRefs.`);
+    }
     for (const sourceRef of operationalization.sourceRefs) {
       assertRef(passageIds, sourceRef, `${operationalization.operationalizationId}.sourceRefs`);
     }
     for (const metricRef of operationalization.inputMetricRefs) {
       assertRef(metricIds, metricRef, `${operationalization.operationalizationId}.inputMetricRefs`);
     }
+    validateProductionSourceGate(
+      operationalization.operationalizationId,
+      operationalization.reviewStatus,
+      operationalization.sourceRefs,
+      passageMap,
+    );
   }
 
   for (const rule of registry.rules) {
     stableKey(rule.ruleId, 'rule.ruleId');
+    assertRef(methodologyIds, rule.methodologyRef, `${rule.ruleId}.methodologyRef`);
     const claimType = claimTypes.get(rule.output.claimType);
     if (claimType === undefined) {
       throw new FaceAuthorityValidationError(`${rule.ruleId} references unknown claimType: ${rule.output.claimType}`);
@@ -176,7 +279,7 @@ export function validateFaceAuthorityRegistry(registry: FaceAuthorityRegistry): 
         throw new FaceAuthorityValidationError(`${rule.ruleId}.inputs references unknown claim type: ${input.ref}`);
       }
     }
-    validateRulePromotion(rule, passageMap);
+    validateRulePromotion(rule, passageMap, registry.conflicts);
   }
 
   for (const policy of registry.comparisonPolicies) {
@@ -184,7 +287,7 @@ export function validateFaceAuthorityRegistry(registry: FaceAuthorityRegistry): 
   }
 
   for (const pack of registry.methodologyPacks) {
-    validateMethodologyPack(pack, comparisonPolicyIds, regionMapIds);
+    validateMethodologyPack(pack, comparisonPolicyIds, regionMapIds, methodologyIds);
   }
 }
 
