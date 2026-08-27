@@ -16,8 +16,7 @@ separate evidence path:
 neutral geometry metric
 → repeat-capture stability evidence
 → blinded expert operationalization evidence
-→ threshold-selection method
-→ calibration definition
+→ reviewed threshold-selection result
 → issued calibration authorization
 → criterion classifier
 ```
@@ -27,6 +26,7 @@ The invariant is:
 ```text
 traditional text != numeric threshold
 synthetic metric fixture != threshold ground truth
+empirical evidence != arbitrary threshold
 raw calibration object != runtime authorization
 ```
 
@@ -46,9 +46,7 @@ Neither statement supplies a justified numeric boundary such as:
 RMS <= 0.02 → 梁柱端直
 ```
 
-Without FR-5, a developer could silently invent that threshold and turn implementation intuition into semantic authority.
-
-FR-5 makes that impossible in the supported path.
+Even if repeat-capture and human-label datasets exist, a developer must not be able to type an arbitrary threshold beside those evidence references and call it calibrated. FR-5 therefore binds the final decision rule to a reviewed `threshold_selection_result` artifact.
 
 ## 3. Evidence classes
 
@@ -109,6 +107,34 @@ reviewProtocolRef
 
 No production evidence is seeded in FR-5.
 
+### 3.4 threshold_selection_result
+
+Purpose:
+
+- record the actual reviewed output of threshold selection
+- bind a numeric decision rule to the exact metric, criterion, input evidence, dataset version, selection method, and evaluation protocol
+
+Required fields include:
+
+```text
+selectionMethodRef
+calibrationDatasetVersion
+decisionRule
+inputEvidenceRefs
+evaluationProtocolRef
+```
+
+Its `inputEvidenceRefs` must resolve to evidence for the same metric/criterion and must include at least:
+
+```text
+repeat_capture_stability
+blinded_expert_operationalization
+```
+
+A threshold-selection artifact cannot self-reference and cannot refer to unknown evidence.
+
+No threshold-selection result is seeded in FR-5 production/research exports.
+
 ## 4. Production calibration requirements
 
 A calibration with `status=production_authorized` must satisfy all of the following:
@@ -125,10 +151,26 @@ explicit threshold-selection method
 explicit decision rule
 repeat_capture_stability evidence
 blinded_expert_operationalization evidence
+exactly one threshold_selection_result evidence
 all consumed calibration evidence >= reviewed
 ```
 
-Synthetic metric evidence may be included, but it cannot substitute for either empirical evidence class.
+The calibration must also match the selected threshold artifact exactly:
+
+```text
+calibration.selectionMethodRef
+  == selectionResult.selectionMethodRef
+
+calibration.calibrationDatasetVersion
+  == selectionResult.calibrationDatasetVersion
+
+calibration.decisionRule
+  == selectionResult.decisionRule
+```
+
+Every evidence input named by the threshold-selection artifact must also be explicitly present in the calibration's evidence refs.
+
+This closes the gap where legitimate evidence could be attached to an arbitrary developer-authored threshold.
 
 ## 5. Duplicate-reference hardening
 
@@ -137,6 +179,7 @@ FR-5 rejects duplicate references in:
 - evidence metric refs
 - evidence criterion refs
 - evidence provenance refs
+- threshold-selection input evidence refs
 - calibration traditional source refs
 - calibration evidence refs
 
@@ -196,7 +239,17 @@ const forged = { ...issuedAuthorization }
 → rejected
 ```
 
-This prevents a parallel raw-threshold authority from reappearing at the runtime seam.
+Issued authorization is also a detached immutable snapshot:
+
+```text
+decisionRule = copied + frozen
+calibrationEvidenceRefs = copied + frozen
+authorization envelope = frozen
+```
+
+Mutating the source calibration object after issuance cannot change the threshold used by an already-issued authorization.
+
+The current issuance object is process/module-instance local by design. Serialization/deserialization does not preserve authorization authority and therefore fails closed.
 
 ## 8. Test-only calibration fixtures are not authority seeds
 
@@ -207,9 +260,9 @@ threshold = 0.02
 status = production_authorized
 ```
 
-These objects exist only inside test files to exercise the full validation/authorization/classification path.
+These objects exist only inside test files to exercise the complete source → evidence → selection → authorization → classification chain.
 
-They are deliberately named with `test-only` / `test-fixture` version and dataset identifiers.
+They are deliberately named with `test-only` / `test-fixture` identifiers.
 
 The exported production package contains:
 
@@ -218,6 +271,7 @@ no production FaceCalibrationDefinition
 no production numeric threshold
 no production repeat-capture evidence
 no production expert-label evidence
+no production threshold-selection result
 ```
 
 The only exported calibration evidence seed is the reviewed synthetic metric fixture, which cannot authorize a production calibration by itself.
@@ -238,11 +292,13 @@ A strong traditional source does not justify a numeric threshold.
 
 A strong calibration dataset does not create traditional meaning that is absent from the source corpus.
 
-Production requires both chains to meet.
+A threshold-selection artifact does not override either chain; it binds the decision rule produced from them.
+
+Production requires all three layers to meet.
 
 ## 10. Privacy boundary
 
-Human calibration evidence requires:
+Human-derived calibration evidence requires:
 
 ```text
 participantPolicy = consented_deidentified
@@ -265,6 +321,7 @@ Calibration dataset storage/retention policy remains a separate implementation r
 | synthetic bridge metric evidence | reviewed |
 | repeat-capture evidence | absent |
 | blinded expert operationalization evidence | absent |
+| threshold-selection result | absent |
 | traditional 審辨官 source | research / production gate not closed |
 | production calibration definition | absent |
 | production numeric threshold | absent |
@@ -280,27 +337,31 @@ FR-5 tests verify:
 2. human evidence without `consented_deidentified` is rejected
 3. blinded expert evidence requires a review protocol
 4. duplicate evidence/source refs are rejected
-5. unknown neutral metrics are rejected
-6. metric-incompatible bridge threshold rules are rejected
-7. research-only methodology cannot support production calibration
-8. unverified traditional source cannot support production calibration
-9. synthetic fixture cannot replace repeat-capture evidence
-10. repeat-capture alone cannot replace blinded expert evidence
-11. complete structural evidence can validate only in an explicit test fixture
-12. raw forged runtime authorization is rejected
-13. research calibration cannot issue runtime authorization
-14. no threshold is seeded in the exported research registry
+5. threshold selection must resolve repeat-capture and expert input evidence
+6. unknown neutral metrics are rejected
+7. metric-incompatible bridge threshold rules are rejected
+8. research-only methodology cannot support production calibration
+9. unverified traditional source cannot support production calibration
+10. synthetic fixture cannot replace repeat-capture evidence
+11. repeat-capture alone cannot replace blinded expert evidence
+12. both empirical classes still cannot replace threshold-selection evidence
+13. calibration threshold must exactly match the reviewed selection artifact
+14. raw forged runtime authorization is rejected
+15. authorization snapshots/freeze the selected threshold and evidence refs
+16. research calibration cannot issue runtime authorization
+17. no threshold is seeded in the exported research registry
 
 ## 13. Next
 
-FR-6 should not invent a production threshold.
+FR-6 should still not invent a production threshold.
 
 The next implementation/research work should be:
 
 1. define a real calibration dataset protocol
 2. define repeat-capture acceptance conditions and stability statistics
 3. define blinded morphology-labeling instructions tied to scan-checked source language
-4. decide how many independent reviewers and what agreement rule are required
-5. define threshold-selection/evaluation split to avoid fitting and evaluating on the same subjects
-6. only then collect consented data and estimate a candidate bridge threshold
-7. keep `準圓庫起` blocked until depth/fullness evidence exists
+4. decide independent reviewer count and agreement policy
+5. define subject-level train/selection/holdout separation
+6. define threshold-selection and evaluation artifact schemas in more statistical detail if required
+7. only then collect consented data and estimate a candidate bridge threshold
+8. keep `準圓庫起` blocked until depth/fullness evidence exists
