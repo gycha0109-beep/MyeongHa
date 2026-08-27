@@ -26,10 +26,6 @@ export interface CharacterSpeechProfile {
   )[];
 }
 
-/**
- * Stable canon: who the representative is in the world.
- * Saju domain ownership intentionally does not live here.
- */
 export interface CharacterCanonProfile {
   readonly worldRole: string;
   readonly origin: string;
@@ -56,7 +52,6 @@ export interface CharacterCanonProfile {
   };
 }
 
-/** Rich authoring persona. CharacterSpeechProfile remains the compact runtime/UI projection. */
 export interface CharacterPersonaProfile {
   readonly communication: {
     readonly register: string;
@@ -106,10 +101,6 @@ export interface CharacterBehaviorRule {
   readonly fallback?: string;
 }
 
-/**
- * Bounded behavior preferences. These rules select priorities and boundaries;
- * they are not exact dialogue templates and cannot mutate authority state.
- */
 export interface CharacterBehaviorPolicyContent {
   readonly policyVersion: string;
   readonly questionPriorities: readonly string[];
@@ -117,10 +108,6 @@ export interface CharacterBehaviorPolicyContent {
   readonly rules: readonly CharacterBehaviorRule[];
 }
 
-/**
- * Character-specific handling around a governed Saju reading.
- * Domain access/initiative remains in CharacterCapabilityContent.
- */
 export interface CharacterSajuProfileContent {
   readonly profileVersion: string;
   readonly attentionAxes: readonly string[];
@@ -136,31 +123,35 @@ export interface CharacterSajuProfileContent {
 
 export type RelationshipStateBand = 'low' | 'medium' | 'high';
 
+export interface CharacterRelationshipMode {
+  readonly distance: string;
+  readonly questionDepth: string;
+  readonly selfDisclosure: string;
+  readonly humorIntensity: string;
+  readonly directness: string;
+  readonly memoryReferenceFrequency: string;
+  readonly nicknameBehavior: string;
+  readonly conflictSensitivity: string;
+}
+
 export interface CharacterRelationshipBehaviorRule {
   readonly ruleKey: string;
+  readonly priority: number;
   readonly when: {
     readonly stageKeys?: readonly string[];
     readonly trustBands?: readonly RelationshipStateBand[];
     readonly closenessBands?: readonly RelationshipStateBand[];
     readonly frictionBands?: readonly RelationshipStateBand[];
+    /** Any listed event is sufficient once the other supplied conditions match. */
     readonly recentEventKeys?: readonly RelationshipEventCandidate[];
   };
-  readonly mode: {
-    readonly distance: string;
-    readonly questionDepth: string;
-    readonly selfDisclosure: string;
-    readonly humorIntensity: string;
-    readonly directness: string;
-    readonly memoryReferenceFrequency: string;
-    readonly nicknameBehavior: string;
-    readonly conflictSensitivity: string;
-  };
+  readonly mode: CharacterRelationshipMode;
 }
 
 /** Rendering projection only. Relationship mutations remain server-policy authority. */
 export interface CharacterRelationshipBehaviorContent {
   readonly behaviorVersion: string;
-  readonly defaultMode: CharacterRelationshipBehaviorRule['mode'];
+  readonly defaultMode: CharacterRelationshipMode;
   readonly rules: readonly CharacterRelationshipBehaviorRule[];
 }
 
@@ -178,7 +169,6 @@ export interface CharacterContentDefinition {
   readonly assetRefs: readonly string[];
   readonly animationCueIds: readonly string[];
 
-  /** C1 authored contracts. Required before developmentPlaceholder promotion. */
   readonly canon?: CharacterCanonProfile;
   readonly persona?: CharacterPersonaProfile;
   readonly behavior?: CharacterBehaviorPolicyContent;
