@@ -88,6 +88,14 @@ export {
 } from './character-face-presentation.js';
 
 export {
+  CharacterFaceRuntimeError,
+  renderResearchFaceCharacterRuntimeTurn,
+  type CharacterFaceRuntimeProjectionV1,
+  type CharacterFaceRuntimeTurnV1,
+  type CharacterFaceSafeFollowUpSelectionV1,
+} from './character-face-runtime.js';
+
+export {
   MockSajuAdapter,
   type MockSajuRequest,
   type MockSajuResult,
