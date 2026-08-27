@@ -111,6 +111,17 @@ export const FACELAB_NEUTRAL_BINDING_PROFILE_FR14: NeutralProviderBindingProfile
   bindings: NEUTRAL_ANCHOR_BINDING_REQUIREMENTS_FR14,
 });
 
+const ALLOWED_PROFILE_KEYS = new Set([
+  'schemaVersion',
+  'profileVersion',
+  'providerKey',
+  'semanticAnchorRegistryRef',
+  'consumerContractVersion',
+  'providerContractVersion',
+  'activationState',
+  'bindings',
+]);
+
 const ALLOWED_BINDING_KEYS = new Set([
   'anchorRef',
   'consumerSlot',
@@ -135,7 +146,17 @@ function unique(values: readonly string[], path: string): void {
 export function validateNeutralProviderBindingProfileFR14(
   profile: NeutralProviderBindingProfileV1,
 ): NeutralProviderBindingProfileV1 {
+  const unexpectedProfileField = Object.keys(profile).find((key) => !ALLOWED_PROFILE_KEYS.has(key));
+  if (unexpectedProfileField !== undefined) {
+    throw new FaceAuthorityValidationError(
+      `FR-14 profile contains unauthorized provider-specific field: ${unexpectedProfileField}`,
+    );
+  }
   if (profile.schemaVersion !== 'v1') throw new FaceAuthorityValidationError('FR-14 binding profile schemaVersion must be v1.');
+  if (profile.providerKey !== 'visually_facelab') throw new FaceAuthorityValidationError('FR-14 providerKey must be visually_facelab.');
+  if (profile.activationState !== 'blocked' && profile.activationState !== 'candidate') {
+    throw new FaceAuthorityValidationError(`FR-14 unsupported activationState: ${String(profile.activationState)}`);
+  }
   nonEmpty(profile.profileVersion, 'fr14.profileVersion');
   nonEmpty(profile.consumerContractVersion, 'fr14.consumerContractVersion');
   const expectedAnchorRegistryRef = `${FACE_SEMANTIC_ANCHOR_REGISTRY_FR13.registryId}@${FACE_SEMANTIC_ANCHOR_REGISTRY_FR13.version}`;
@@ -154,10 +175,6 @@ export function validateNeutralProviderBindingProfileFR14(
 
   unique(profile.bindings.map((binding) => binding.anchorRef), 'fr14.anchorRefs');
   unique(profile.bindings.map((binding) => binding.consumerSlot), 'fr14.consumerSlots');
-  const actualRefs = new Set(profile.bindings.map((binding) => binding.anchorRef));
-  for (const required of REQUIRED_ANCHORS) {
-    if (!actualRefs.has(required)) throw new FaceAuthorityValidationError(`FR-14 missing required neutral anchor: ${required}`);
-  }
 
   for (const binding of profile.bindings) {
     const unexpected = Object.keys(binding).find((key) => !ALLOWED_BINDING_KEYS.has(key));
@@ -178,6 +195,11 @@ export function validateNeutralProviderBindingProfileFR14(
       throw new FaceAuthorityValidationError(`FR-14 binding requires capabilities: ${binding.anchorRef}`);
     }
     unique(binding.requiredCapabilities, `fr14.${binding.anchorRef}.requiredCapabilities`);
+  }
+
+  const actualRefs = new Set(profile.bindings.map((binding) => binding.anchorRef));
+  for (const required of REQUIRED_ANCHORS) {
+    if (!actualRefs.has(required)) throw new FaceAuthorityValidationError(`FR-14 missing required neutral anchor: ${required}`);
   }
 
   return profile;
