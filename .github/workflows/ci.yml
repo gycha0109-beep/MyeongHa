@@ -60,8 +60,6 @@ jobs:
             echo "Applying ${migration}"
             psql -v ON_ERROR_STOP=1 -f "${migration}"
           done
-      - name: Diagnose catalog immediately after migrations
-        run: bash test/db/catalog_diagnostics.sh post-migration
       - name: Run authority core negative tests
         run: psql -v ON_ERROR_STOP=1 -f test/db/authority_core_negative.sql
       - name: Run record and relationship negative tests
@@ -130,7 +128,5 @@ jobs:
         run: bash test/db/reading_provenance_stale_query.sh
       - name: Run Reading Session provenance and stale projection read tests
         run: bash test/db/reading_session_provenance_stale_query.sh
-      - name: Diagnose catalog after all tests
-        run: bash test/db/catalog_diagnostics.sh post-tests
       - name: Verify deterministic schema catalog snapshot
         run: bash test/db/catalog_snapshot.sh
