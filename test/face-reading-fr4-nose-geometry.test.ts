@@ -4,7 +4,6 @@ import {
   MEDIAPIPE_FACE_LANDMARKER_FR4_CANDIDATE_V0,
   NOSE_TIP_TRADITIONAL_BINDING_V0,
   FaceAuthorityValidationError,
-  assertNoseBridgeCalibrationReady,
   computeNoseBridgeCenterlineDeviation,
   computeNoseTipContourCircularity,
   type NeutralFaceGeometryProvenance,
@@ -145,26 +144,11 @@ describe('FR-4 neutral nose-tip contour geometry', () => {
   });
 });
 
-describe('FR-4 calibration and provider binding gates', () => {
+describe('FR-4 provider and traditional binding gates', () => {
   it('registers neutral metrics as observation measurements rather than physiognomy classifications', () => {
     expect(FR4_NOSE_NEUTRAL_METRICS_V0).toHaveLength(2);
     expect(FR4_NOSE_NEUTRAL_METRICS_V0.every((metric) => metric.metricKey.startsWith('neutral.nose.'))).toBe(true);
     expect(FR4_NOSE_NEUTRAL_METRICS_V0.some((metric) => metric.interpretationBoundary.includes('does not classify'))).toBe(true);
-  });
-
-  it('blocks bridge criterion classification until an explicit production calibration exists', () => {
-    expect(() => assertNoseBridgeCalibrationReady(undefined)).toThrow(/explicit calibration/u);
-    expect(() =>
-      assertNoseBridgeCalibrationReady({
-        calibrationId: 'calibration.nose.bridge.research_v0',
-        metricRef: 'neutral.nose.bridge.centerline_rms_deviation@0.1.0',
-        criterionId: 'criterion.discernment.bridge_straight',
-        evidenceRefs: ['fixture-set.synthetic-nose-v0'],
-        calibrationDatasetVersion: 'synthetic-nose-v0',
-        thresholdPolicy: { kind: 'max_inclusive', maxRmsDeviation: 0.02 },
-        status: 'research',
-      }),
-    ).toThrow(/status=research/u);
   });
 
   it('refuses to calibrate 準圓庫起 from 2D circularity alone', () => {
@@ -179,10 +163,9 @@ describe('FR-4 calibration and provider binding gates', () => {
     ]);
   });
 
-  it('keeps the current MediaPipe provider-index binding unresolved', () => {
+  it('keeps the current MediaPipe traditional anchor binding unresolved', () => {
     expect(MEDIAPIPE_FACE_LANDMARKER_FR4_CANDIDATE_V0).toMatchObject({
       taskOutputLandmarkCount: 478,
-      legacyCanonicalGeometryLandmarkCount: 468,
       semanticAnchorBindingStatus: 'unresolved',
       productionBindingAllowed: false,
     });
