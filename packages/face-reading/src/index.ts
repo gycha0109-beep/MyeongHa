@@ -2,6 +2,7 @@ export * from './calibration-authority.js';
 export * from './calibration-authorization.js';
 export * from './calibration-protocol.js';
 export * from './contracts.js';
+export * from './direct-source-verification.js';
 export * from './evidence-reports.js';
 export * from './facelab-compat.js';
 export * from './facelab-fr3-requirements.js';
