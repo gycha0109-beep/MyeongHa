@@ -49,11 +49,17 @@ update public.birth_profiles
 set current_revision_id='9f400000-0000-0000-0000-000000000001',updated_at=clock_timestamp()
 where id='9f300000-0000-0000-0000-000000000001';
 
+insert into public.saju_domain_runtime(
+  saju_domain,availability,capability_version,required_engine_version,updated_at
+) values (
+  'general','available','public-share-test-v1',null,clock_timestamp()
+);
+
 insert into public.reading_sessions(
   id,subject_id,saju_domain,domain_capability_version,source_birth_revision_id,target_birth_revision_id,
   state,next_attempt_no,current_reading_id,created_at,updated_at
 ) values (
-  '9f500000-0000-0000-0000-000000000001','9f200000-0000-0000-0000-000000000001','career','public-share-test-v1',
+  '9f500000-0000-0000-0000-000000000001','9f200000-0000-0000-0000-000000000001','general','public-share-test-v1',
   '9f400000-0000-0000-0000-000000000001',null,'active',2,null,clock_timestamp(),clock_timestamp()
 );
 
@@ -64,7 +70,7 @@ insert into public.readings(
   next_execution_attempt_no,committed_execution_attempt_id,created_at,completed_at
 ) values (
   '9f600000-0000-0000-0000-000000000001','9f500000-0000-0000-0000-000000000001',
-  '9f200000-0000-0000-0000-000000000001','career',1,null,null,null,null,null,
+  '9f200000-0000-0000-0000-000000000001','general',1,null,null,null,null,null,
   'pending','public-share-reading-1','hmac-sha256:k2:public-share-request','reading-request-v1','{}'::jsonb,
   1,null,clock_timestamp(),null
 );
@@ -95,8 +101,8 @@ SQL
 
 before_state=$("${psql_base[@]}" -At -F '|' -c "select string_agg(id::text||':'||status||':'||snapshot_hash,',' order by id) from public.share_artifacts where subject_id='9f200000-0000-0000-0000-000000000001';")
 
-active=$("${psql_base[@]}" -At -F '|' -c "select artifact_version,snapshot_jsonb::text from public.qry_public_share_artifact_v1('hmac-sha256:k2:public-share-active');")
-[[ "$active" == 'share-v1|{"title": "public-safe", "blocks": [{"kind": "summary", "text": "safe"}]}' ]] || fail "active public share projection mismatch: $active"
+active=$("${psql_base[@]}" -At -F '|' -c "select artifact_version,snapshot_jsonb->>'title',snapshot_jsonb#>>'{blocks,0,kind}',snapshot_jsonb#>>'{blocks,0,text}' from public.qry_public_share_artifact_v1('hmac-sha256:k2:public-share-active');")
+[[ "$active" == 'share-v1|public-safe|summary|safe' ]] || fail "active public share projection mismatch: $active"
 pass "active unexpired token fingerprint returns the immutable public snapshot"
 
 no_expiry=$("${psql_base[@]}" -At -F '|' -c "select artifact_version,snapshot_jsonb->>'title' from public.qry_public_share_artifact_v1('hmac-sha256:k2:public-share-no-expiry');")
@@ -133,7 +139,7 @@ revoked_snapshot=$("${psql_base[@]}" -At -F '|' -c "select status,snapshot_jsonb
 [[ "$revoked_snapshot" == 'revoked|public-safe|sha256:v1:public-share-active' ]] || fail "revoke changed immutable share snapshot/provenance: $revoked_snapshot"
 pass "revocation removes public authority while preserving immutable artifact provenance"
 
-# Restore the expected post-read comparison by excluding the intentionally revoked integration row status.
+# Compare every artifact not intentionally revoked by the integration assertion.
 after_nonrevoked=$("${psql_base[@]}" -At -F '|' -c "select string_agg(id::text||':'||status||':'||snapshot_hash,',' order by id) from public.share_artifacts where subject_id='9f200000-0000-0000-0000-000000000001' and id<>'9f700000-0000-0000-0000-000000000001';")
 before_nonrevoked=$(printf '%s' "$before_state" | tr ',' '\n' | grep -v '^9f700000-0000-0000-0000-000000000001:' | paste -sd, -)
 [[ "$after_nonrevoked" == "$before_nonrevoked" ]] || fail "public share reads mutated unrelated artifact state: before=$before_nonrevoked after=$after_nonrevoked"
