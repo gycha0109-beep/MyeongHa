@@ -1,3 +1,7 @@
+import {
+  assertIssuedFaceCalibrationAuthorization,
+  type FaceCalibrationAuthorization,
+} from './calibration-authorization.js';
 import { FaceAuthorityValidationError } from './validation.js';
 
 export type NeutralFaceCoordinateFrame = 'pose_normalized_face_2d';
@@ -235,40 +239,46 @@ export function computeNoseTipContourCircularity(
   };
 }
 
-export interface NoseBridgeStraightCalibrationDefinition {
-  readonly calibrationId: string;
-  readonly metricRef: 'neutral.nose.bridge.centerline_rms_deviation@0.1.0';
+export interface CalibratedNoseBridgeCriterionResult {
   readonly criterionId: 'criterion.discernment.bridge_straight';
-  readonly evidenceRefs: readonly string[];
-  readonly calibrationDatasetVersion: string;
-  readonly thresholdPolicy: {
-    readonly kind: 'max_inclusive';
-    readonly maxRmsDeviation: number;
-  };
-  readonly status: 'research' | 'reviewed' | 'production_authorized';
+  readonly state: 'met' | 'not_met';
+  readonly metricRef: 'neutral.nose.bridge.centerline_rms_deviation@0.1.0';
+  readonly metricValue: number;
+  readonly calibrationRef: string;
+  readonly methodologyRef: string;
+  readonly calibrationApplied: true;
 }
 
-export function assertNoseBridgeCalibrationReady(
-  calibration: NoseBridgeStraightCalibrationDefinition | undefined,
-): asserts calibration is NoseBridgeStraightCalibrationDefinition & { readonly status: 'production_authorized' } {
-  if (calibration === undefined) {
-    throw new FaceAuthorityValidationError('Nose bridge classification is blocked until an explicit calibration definition exists.');
-  }
-  if (calibration.status !== 'production_authorized') {
+export function classifyNoseBridgeStraightness(
+  metric: NeutralGeometryMetricResult,
+  authorization: FaceCalibrationAuthorization,
+): CalibratedNoseBridgeCriterionResult {
+  assertIssuedFaceCalibrationAuthorization(authorization);
+  const expectedMetricRef = 'neutral.nose.bridge.centerline_rms_deviation@0.1.0';
+  const actualMetricRef = `${metric.metricKey}@${metric.metricVersion}`;
+  if (actualMetricRef !== expectedMetricRef || authorization.metricRef !== expectedMetricRef) {
     throw new FaceAuthorityValidationError(
-      `Nose bridge classification is blocked: calibration ${calibration.calibrationId} status=${calibration.status}.`,
+      `Nose bridge classifier requires ${expectedMetricRef}; got metric=${actualMetricRef}, authorization=${authorization.metricRef}.`,
     );
   }
-  if (calibration.evidenceRefs.length === 0 || calibration.calibrationDatasetVersion.trim().length === 0) {
-    throw new FaceAuthorityValidationError('Production nose bridge calibration requires evidenceRefs and calibrationDatasetVersion.');
+  if (authorization.criterionId !== 'criterion.discernment.bridge_straight') {
+    throw new FaceAuthorityValidationError(
+      `Nose bridge classifier received authorization for ${authorization.criterionId}.`,
+    );
   }
-  if (
-    calibration.thresholdPolicy.kind !== 'max_inclusive' ||
-    !Number.isFinite(calibration.thresholdPolicy.maxRmsDeviation) ||
-    calibration.thresholdPolicy.maxRmsDeviation < 0
-  ) {
-    throw new FaceAuthorityValidationError('Production nose bridge calibration requires a finite non-negative maxRmsDeviation.');
+  if (authorization.decisionRule.kind !== 'max_inclusive') {
+    throw new FaceAuthorityValidationError('Nose bridge classifier requires max_inclusive decisionRule.');
   }
+
+  return {
+    criterionId: 'criterion.discernment.bridge_straight',
+    state: metric.value <= authorization.decisionRule.threshold ? 'met' : 'not_met',
+    metricRef: expectedMetricRef,
+    metricValue: metric.value,
+    calibrationRef: authorization.calibrationRef,
+    methodologyRef: authorization.methodologyRef,
+    calibrationApplied: true,
+  };
 }
 
 export const NOSE_TIP_TRADITIONAL_BINDING_V0 = Object.freeze({
@@ -289,5 +299,5 @@ export const MEDIAPIPE_FACE_LANDMARKER_FR4_CANDIDATE_V0 = Object.freeze({
   semanticAnchorBindingStatus: 'unresolved' as const,
   productionBindingAllowed: false,
   reason:
-    'Current Face Landmarker output and legacy canonical geometry documentation use different published landmark counts; provider landmark indices are not promoted to MyeongHa semantic nose anchors without a versioned adapter review.',
+    'Provider nose topology is a viable observation candidate, but no version-pinned provider index is authorized as the traditional anchors 山根/年壽/準頭.',
 });
