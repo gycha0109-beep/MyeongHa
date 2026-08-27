@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { CapabilityDenialReason, ChatTurnState } from '../../../packages/contracts/src/index.js';
 import {
   assembleCharacterRuntimeContext,
@@ -35,6 +36,8 @@ export interface CharacterChatCommitReceiptV1 {
   readonly attemptId: string;
   readonly receiptId: string;
   readonly envelopeHash: string;
+  readonly providerKey: string;
+  readonly modelKey: string;
 }
 
 export interface CharacterCommittedTurnV1 {
@@ -48,18 +51,16 @@ export interface CharacterChatCommitPortV1 {
   commit(input: {
     readonly turnId: string;
     readonly attemptId: string;
+    readonly providerKey: string;
+    readonly modelKey: string;
     readonly envelope: CharacterDialogueEnvelopeV1;
   }): CharacterCommittedTurnV1;
 }
 
 function hashEnvelope(envelope: CharacterDialogueEnvelopeV1): string {
-  let hash = 2166136261;
-  const canonical = canonicalJson(envelope);
-  for (let index = 0; index < canonical.length; index += 1) {
-    hash ^= canonical.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-  return `fnv1a32:v1:${(hash >>> 0).toString(16).padStart(8, '0')}`;
+  return `sha256:v1:${createHash('sha256')
+    .update(canonicalJson(envelope), 'utf8')
+    .digest('hex')}`;
 }
 
 export class InMemoryCharacterChatCommitPortV1 implements CharacterChatCommitPortV1 {
@@ -73,6 +74,8 @@ export class InMemoryCharacterChatCommitPortV1 implements CharacterChatCommitPor
   commit(input: {
     readonly turnId: string;
     readonly attemptId: string;
+    readonly providerKey: string;
+    readonly modelKey: string;
     readonly envelope: CharacterDialogueEnvelopeV1;
   }): CharacterCommittedTurnV1 {
     const existing = this.#byTurnId.get(input.turnId);
@@ -94,6 +97,8 @@ export class InMemoryCharacterChatCommitPortV1 implements CharacterChatCommitPor
         attemptId: input.attemptId,
         receiptId: `mock-character-commit:${this.#sequence}`,
         envelopeHash: hashEnvelope(input.envelope),
+        providerKey: input.providerKey,
+        modelKey: input.modelKey,
       }),
       envelope: input.envelope,
     });
@@ -119,7 +124,9 @@ export class StaticMockCharacterRendererProviderV1 implements CharacterRendererP
 
   render(input: CharacterRendererProviderInputV1): unknown {
     this.#calls += 1;
-    return typeof this.output === 'function' ? this.output(input) : this.output;
+    return typeof this.output === 'function'
+      ? (this.output as (providerInput: CharacterRendererProviderInputV1) => unknown)(input)
+      : this.output;
   }
 
   get callCount(): number {
@@ -137,14 +144,17 @@ export type CharacterChatOrchestrationStageV1 =
   | 'deliver';
 
 export class CharacterChatTurnOrchestrationError extends Error {
+  readonly cause: unknown | undefined;
+
   constructor(
     readonly stage: CharacterChatOrchestrationStageV1,
     readonly lastState: ChatTurnState,
     message: string,
-    readonly cause?: unknown,
+    cause?: unknown,
   ) {
     super(message);
     this.name = 'CharacterChatTurnOrchestrationError';
+    this.cause = cause;
   }
 }
 
@@ -163,7 +173,7 @@ export type MockCharacterChatTurnResultV1 =
       readonly status: 'denied';
       readonly reason: CapabilityDenialReason;
       readonly lastState: 'planned';
-      readonly stateTrace: readonly ['received', 'planned'];
+      readonly stateTrace: readonly ChatTurnState[];
     }
   | {
       readonly status: 'delivered';
@@ -238,14 +248,16 @@ export function runMockCharacterChatTurn(
     return Object.freeze({
       status: 'delivered',
       replayedCommittedTurn: true,
-      providerKey: input.renderer.providerKey,
-      modelKey: input.renderer.modelKey,
+      providerKey: alreadyCommitted.receipt.providerKey,
+      modelKey: alreadyCommitted.receipt.modelKey,
       stateTrace: Object.freeze(['committed', transitionChatTurn('committed', 'delivered')]),
       envelope: alreadyCommitted.envelope,
       commitReceipt: alreadyCommitted.receipt,
     });
   }
 
+  const providerKey = requiredIdentifier(input.renderer.providerKey, 'renderer.providerKey');
+  const modelKey = requiredIdentifier(input.renderer.modelKey, 'renderer.modelKey');
   const stateTrace: ChatTurnState[] = ['received'];
   let state: ChatTurnState = 'received';
 
@@ -315,7 +327,13 @@ export function runMockCharacterChatTurn(
 
   let committed: CharacterCommittedTurnV1;
   try {
-    committed = input.commitPort.commit({ turnId, attemptId, envelope });
+    committed = input.commitPort.commit({
+      turnId,
+      attemptId,
+      providerKey,
+      modelKey,
+      envelope,
+    });
   } catch (error) {
     if (error instanceof CharacterChatTurnOrchestrationError) throw error;
     throw new CharacterChatTurnOrchestrationError(
@@ -334,8 +352,8 @@ export function runMockCharacterChatTurn(
   return Object.freeze({
     status: 'delivered',
     replayedCommittedTurn: false,
-    providerKey: input.renderer.providerKey,
-    modelKey: input.renderer.modelKey,
+    providerKey: committed.receipt.providerKey,
+    modelKey: committed.receipt.modelKey,
     stateTrace: Object.freeze([...stateTrace]),
     envelope: committed.envelope,
     commitReceipt: committed.receipt,
