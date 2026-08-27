@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type {
   RelationshipEventCandidate,
   SajuDomain,
@@ -153,9 +154,35 @@ export interface GrantedMemoryContextV1 {
   readonly granteeCharacterId: string;
 }
 
-export interface ProtectedSajuSegmentV1 {
+export interface ProtectedSajuTextRefV1 {
   readonly segmentId: string;
+  readonly sourceReadingRef: string;
+  readonly sourceRef: string;
+  readonly contentHash: string;
   readonly text: string;
+}
+
+export type ProtectedSajuSegmentV1 = ProtectedSajuTextRefV1;
+export type ProtectedSajuDisclosureV1 = ProtectedSajuTextRefV1;
+
+export function hashProtectedSajuTextV1(text: string): string {
+  return `sha256:v1:${createHash('sha256').update(text, 'utf8').digest('hex')}`;
+}
+
+function validateProtectedSajuTextRef(
+  value: ProtectedSajuTextRefV1,
+  readingRef: string,
+  path: string,
+): void {
+  if (value.segmentId.trim().length === 0) throw new TypeError(`${path}.segmentId is required.`);
+  if (value.sourceReadingRef !== readingRef) {
+    throw new TypeError(`${path}.sourceReadingRef must match the Saju readingRef.`);
+  }
+  if (value.sourceRef.trim().length === 0) throw new TypeError(`${path}.sourceRef is required.`);
+  if (value.text.trim().length === 0) throw new TypeError(`${path}.text is required.`);
+  if (value.contentHash !== hashProtectedSajuTextV1(value.text)) {
+    throw new TypeError(`${path}.contentHash does not match protected text.`);
+  }
 }
 
 export interface CharacterSajuRuntimeContextV1 {
@@ -163,7 +190,7 @@ export interface CharacterSajuRuntimeContextV1 {
   readonly domain: SajuDomain;
   readonly coverageState: 'complete' | 'partial' | 'insufficient';
   readonly protectedSegments: readonly ProtectedSajuSegmentV1[];
-  readonly disclosures: readonly string[];
+  readonly disclosures: readonly ProtectedSajuDisclosureV1[];
   readonly ambiguity: readonly string[];
   readonly capability: CharacterCapabilityContent;
 }
@@ -260,19 +287,36 @@ export function assembleCharacterRuntimeContext(input: {
 
   let saju: CharacterSajuRuntimeContextV1 | null = null;
   if (input.saju !== undefined) {
+    const readingRef = input.saju.readingRef.trim();
+    if (readingRef.length === 0) throw new TypeError('Saju readingRef is required.');
     const capability = input.character.capabilities.find(
       (candidate) => candidate.domain === input.saju!.domain,
     );
     if (capability === undefined) {
       throw new TypeError('Character has no capability for the requested Saju domain.');
     }
-    if (input.saju.coverageState === 'insufficient' && input.saju.protectedSegments.length > 0) {
-      throw new TypeError('Insufficient Saju coverage cannot expose protected semantic segments.');
+    if (
+      input.saju.coverageState === 'insufficient' &&
+      (input.saju.protectedSegments.length > 0 || input.saju.disclosures.length > 0)
+    ) {
+      throw new TypeError('Insufficient Saju coverage cannot expose protected semantic content.');
     }
+    input.saju.protectedSegments.forEach((segment, index) =>
+      validateProtectedSajuTextRef(segment, readingRef, `protectedSegments[${index}]`),
+    );
+    input.saju.disclosures.forEach((disclosure, index) =>
+      validateProtectedSajuTextRef(disclosure, readingRef, `disclosures[${index}]`),
+    );
+
     saju = Object.freeze({
       ...input.saju,
-      protectedSegments: Object.freeze(input.saju.protectedSegments.map((segment) => Object.freeze({ ...segment }))),
-      disclosures: Object.freeze([...input.saju.disclosures]),
+      readingRef,
+      protectedSegments: Object.freeze(
+        input.saju.protectedSegments.map((segment) => Object.freeze({ ...segment })),
+      ),
+      disclosures: Object.freeze(
+        input.saju.disclosures.map((disclosure) => Object.freeze({ ...disclosure })),
+      ),
       ambiguity: Object.freeze([...input.saju.ambiguity]),
       capability: Object.freeze({ ...capability }),
     });
