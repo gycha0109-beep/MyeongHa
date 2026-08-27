@@ -53,7 +53,12 @@ insert into public.saju_domain_runtime(
   saju_domain,availability,capability_version,required_engine_version,updated_at
 ) values (
   'general','available','public-share-test-v1',null,clock_timestamp()
-);
+)
+on conflict (saju_domain) do update
+set availability = excluded.availability,
+    capability_version = excluded.capability_version,
+    required_engine_version = excluded.required_engine_version,
+    updated_at = excluded.updated_at;
 
 insert into public.reading_sessions(
   id,subject_id,saju_domain,domain_capability_version,source_birth_revision_id,target_birth_revision_id,
