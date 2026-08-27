@@ -20,6 +20,16 @@ export interface FaceCalibrationAuthorization {
   readonly status: 'production_authorized';
 }
 
+function snapshotDecisionRule(rule: FaceCalibrationDecisionRule): FaceCalibrationDecisionRule {
+  switch (rule.kind) {
+    case 'max_inclusive':
+    case 'min_inclusive':
+      return Object.freeze({ kind: rule.kind, threshold: rule.threshold });
+    case 'between_inclusive':
+      return Object.freeze({ kind: rule.kind, min: rule.min, max: rule.max });
+  }
+}
+
 export function authorizeFaceCalibration(
   calibration: FaceCalibrationDefinition,
   context: FaceCalibrationValidationContext,
@@ -41,10 +51,10 @@ export function authorizeFaceCalibration(
     metricRef: calibration.metricRef,
     criterionId: calibration.criterionId,
     methodologyRef: calibration.methodologyRef,
-    decisionRule: calibration.decisionRule,
+    decisionRule: snapshotDecisionRule(calibration.decisionRule),
     calibrationDatasetVersion: calibration.calibrationDatasetVersion,
     selectionMethodRef: calibration.selectionMethodRef,
-    calibrationEvidenceRefs: calibration.calibrationEvidenceRefs,
+    calibrationEvidenceRefs: Object.freeze([...calibration.calibrationEvidenceRefs]),
     status: 'production_authorized',
   });
   ISSUED_CALIBRATION_AUTHORIZATIONS.add(authorization);
