@@ -7,6 +7,7 @@ export * from './evidence-reports.js';
 export * from './facelab-compat.js';
 export * from './facelab-fr3-requirements.js';
 export * from './five-officers-six-fus-research-v0.js';
+export * from './neutral-observation-schema-fr15.js';
 export * from './neutral-provider-bindings-fr14.js';
 export * from './nose-geometry.js';
 export * from './research-diagnosis-runtime.js';
