@@ -128,6 +128,24 @@ const authoredCharacter: CharacterContentDefinition = {
       maySuggestAnotherCharacter: true,
       conditions: ['meaningful_second_perspective'],
     },
+    safeFraming: {
+      schemaVersion: 'v1',
+      catalogVersion: 'architecture-safe-framing-v1',
+      before: [
+        {
+          key: 'record_first',
+          text: '먼저 기록을 그대로 보겠습니다.',
+          purpose: 'record_transition',
+        },
+      ],
+      after: [
+        {
+          key: 'ask_current_context',
+          text: '지금의 상황에서는 어떤 부분이 가장 걸립니까?',
+          purpose: 'current_life_question',
+        },
+      ],
+    },
   },
   relationshipBehavior: {
     behaviorVersion: 'c1-v1',
@@ -262,5 +280,51 @@ describe('C1 character architecture contracts', () => {
         }),
       ),
     ).toThrow(/priorities contains duplicate/u);
+  });
+
+  it('rejects dynamic interpolation tokens in Saju-safe framing text', () => {
+    const safeFraming = authoredCharacter.sajuProfile!.safeFraming!;
+    expect(() =>
+      validateCharacterContentBundle(
+        bundleWith({
+          ...authoredCharacter,
+          sajuProfile: {
+            ...authoredCharacter.sajuProfile!,
+            safeFraming: {
+              ...safeFraming,
+              before: [
+                {
+                  ...safeFraming.before[0]!,
+                  text: '이 기록의 {dayMaster}를 먼저 보겠습니다.',
+                },
+              ],
+            },
+          },
+        }),
+      ),
+    ).toThrow(/dynamic interpolation tokens/u);
+  });
+
+  it('rejects ambiguous Saju-safe framing keys across placements', () => {
+    const safeFraming = authoredCharacter.sajuProfile!.safeFraming!;
+    expect(() =>
+      validateCharacterContentBundle(
+        bundleWith({
+          ...authoredCharacter,
+          sajuProfile: {
+            ...authoredCharacter.sajuProfile!,
+            safeFraming: {
+              ...safeFraming,
+              after: [
+                {
+                  ...safeFraming.after[0]!,
+                  key: safeFraming.before[0]!.key,
+                },
+              ],
+            },
+          },
+        }),
+      ),
+    ).toThrow(/keys contains duplicate/u);
   });
 });

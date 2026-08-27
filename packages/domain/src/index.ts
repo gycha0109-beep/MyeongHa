@@ -69,6 +69,11 @@ export {
 } from './character-output-guard.js';
 
 export {
+  guardCharacterSajuSafeRendererOutput,
+  type CharacterSajuSafeRendererDraftV1,
+} from './character-saju-safe-renderer.js';
+
+export {
   MockSajuAdapter,
   type MockSajuRequest,
   type MockSajuResult,

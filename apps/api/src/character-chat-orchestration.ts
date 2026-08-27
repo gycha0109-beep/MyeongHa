@@ -5,6 +5,7 @@ import {
   canonicalJson,
   evaluateCapabilityGate,
   guardCharacterRendererOutput,
+  guardCharacterSajuSafeRendererOutput,
   transitionChatTurn,
   type CapabilityDenialReason,
   type CharacterDialogueEnvelopeV1,
@@ -46,7 +47,6 @@ export interface CharacterCommittedTurnV1 {
   readonly envelope: CharacterDialogueEnvelopeV1;
 }
 
-/** Commit is the atomic boundary. Orchestration never returns/reveals the envelope before this. */
 export interface CharacterChatCommitPortV1 {
   findCommitted(turnId: string): CharacterCommittedTurnV1 | null;
   commit(input: {
@@ -235,13 +235,6 @@ function assertCoverageConsistency(
   }
 }
 
-/**
- * Development orchestration harness for the C1 Character Runtime seam.
- *
- * It deliberately does not decide production retry/final-failure classification. If context,
- * renderer, or guard work throws, the error reports the last valid state and the caller owns
- * persistence/retry policy. The only returned dialogue envelope is one that was already committed.
- */
 export function runMockCharacterChatTurn(
   input: RunMockCharacterChatTurnInputV1,
 ): MockCharacterChatTurnResultV1 {
@@ -316,11 +309,17 @@ export function runMockCharacterChatTurn(
 
   let envelope: CharacterDialogueEnvelopeV1;
   try {
-    envelope = guardCharacterRendererOutput({
-      rawOutput,
-      context,
-      allowedSuggestedActionKeys: input.allowedSuggestedActionKeys,
-    });
+    envelope = context.saju === null
+      ? guardCharacterRendererOutput({
+          rawOutput,
+          context,
+          allowedSuggestedActionKeys: input.allowedSuggestedActionKeys,
+        })
+      : guardCharacterSajuSafeRendererOutput({
+          rawOutput,
+          context,
+          allowedSuggestedActionKeys: input.allowedSuggestedActionKeys,
+        });
   } catch (error) {
     throw new CharacterChatTurnOrchestrationError(
       'validate',
