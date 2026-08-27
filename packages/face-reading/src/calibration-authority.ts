@@ -24,7 +24,7 @@ export type FaceCalibrationEvidenceClass =
 
 export type FaceCalibrationParticipantPolicy =
   | 'no_human_subjects'
-  | 'consented_deidentified';
+  | 'consented_pseudonymous';
 
 export interface FaceThresholdSelectionResult {
   readonly selectionMethodRef: string;
@@ -182,8 +182,8 @@ export function validateFaceCalibrationEvidenceRegistry(registry: FaceCalibratio
       if (evidence.participantPolicy !== 'no_human_subjects') {
         throw new FaceAuthorityValidationError(`${ref} synthetic evidence must use no_human_subjects.`);
       }
-    } else if (evidence.participantPolicy !== 'consented_deidentified') {
-      throw new FaceAuthorityValidationError(`${ref} human-derived calibration evidence must be consented_deidentified.`);
+    } else if (evidence.participantPolicy !== 'consented_pseudonymous') {
+      throw new FaceAuthorityValidationError(`${ref} human-derived calibration evidence must be consented_pseudonymous.`);
     }
 
     if (
