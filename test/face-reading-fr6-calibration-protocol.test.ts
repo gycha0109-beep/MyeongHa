@@ -214,7 +214,7 @@ describe('FR-6 participant-level split and repeat capture manifest', () => {
     expect(() => validateFaceCalibrationDatasetManifest(invalid, study, captureProtocol)).toThrow(/Participant leakage/u);
   });
 
-  it('rejects capture-family reuse across participants', () => {
+  it('rejects capture-family leakage across selection and holdout', () => {
     const manifest = validManifest();
     const target = manifest.records.find((record) => record.participantKey === 'p-holdout')!;
     const invalid: FaceCalibrationDatasetManifest = {
@@ -224,6 +224,26 @@ describe('FR-6 participant-level split and repeat capture manifest', () => {
           ? { ...record, captureFamilyKey: 'family:p-selection' }
           : record,
       ),
+    };
+    expect(() => validateFaceCalibrationDatasetManifest(invalid, study, captureProtocol)).toThrow(/Capture-family leakage across selection\/holdout/u);
+  });
+
+  it('rejects capture-family ownership by multiple participants inside one partition', () => {
+    const manifest = validManifest();
+    const template = manifest.records.find((record) => record.participantKey === 'p-holdout')!;
+    const invalid: FaceCalibrationDatasetManifest = {
+      ...manifest,
+      records: [
+        ...manifest.records,
+        {
+          ...template,
+          observationRef: 'obs:p-holdout-2:s1:1',
+          reviewItemRef: 'review:p-holdout-2:s1:1',
+          participantKey: 'p-holdout-2',
+          captureSessionKey: 'p-holdout-2:s1',
+          captureOrdinal: 1,
+        },
+      ],
     };
     expect(() => validateFaceCalibrationDatasetManifest(invalid, study, captureProtocol)).toThrow(/Capture family belongs to multiple participants/u);
   });
