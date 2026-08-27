@@ -42,6 +42,19 @@ export {
 } from './relationship-engine.js';
 
 export {
+  assembleCharacterRuntimeContext,
+  projectCharacterRelationshipBehavior,
+  type CharacterRelationshipProjectionV1,
+  type CharacterRuntimeContextV1,
+  type CharacterSajuRuntimeContextV1,
+  type GrantedLifeFactContextV1,
+  type GrantedMemoryContextV1,
+  type ProtectedSajuSegmentV1,
+  type RelationshipBandThresholds,
+  type RelationshipRenderingProjectionPolicyV1,
+} from './character-runtime-context.js';
+
+export {
   MockSajuAdapter,
   type MockSajuRequest,
   type MockSajuResult,
