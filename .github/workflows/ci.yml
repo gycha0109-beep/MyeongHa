@@ -130,5 +130,7 @@ jobs:
         run: bash test/db/reading_session_provenance_stale_query.sh
       - name: Run Birth Profile current/revision summary read tests
         run: bash test/db/birth_profile_current_revision_query.sh
+      - name: Run Target Person current projection read tests
+        run: bash test/db/target_person_current_queries.sh
       - name: Verify deterministic schema catalog snapshot
         run: bash test/db/catalog_snapshot.sh
