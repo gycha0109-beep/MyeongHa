@@ -1,6 +1,8 @@
 import { createHash } from 'node:crypto';
 import {
+  validateCharacterFacePresentationProfileForCharacterV1,
   validateCharacterFacePresentationProfileV1,
+  type CharacterFacePresentationContentIdentityV1,
   type CharacterFacePresentationModeV1,
   type CharacterFacePresentationProfileV1,
 } from '../../character-content/src/face-presentation.js';
@@ -11,9 +13,11 @@ import {
 } from '../../face-reading/src/index.js';
 
 export {
+  validateCharacterFacePresentationProfileForCharacterV1,
   validateCharacterFacePresentationProfileV1,
 };
 export type {
+  CharacterFacePresentationContentIdentityV1,
   CharacterFacePresentationModeV1,
   CharacterFacePresentationProfileV1,
 };
@@ -238,9 +242,10 @@ function presentationPlan(
 export function presentResearchFaceDiagnosisForCharacter(input: {
   readonly diagnosis: FaceResearchDiagnosisOutput;
   readonly groundingVersion: string;
+  readonly character: CharacterFacePresentationContentIdentityV1;
   readonly profile: CharacterFacePresentationProfileV1;
 }): CharacterFacePresentationV1 {
-  validateCharacterFacePresentationProfileV1(input.profile);
+  validateCharacterFacePresentationProfileForCharacterV1(input.profile, input.character);
 
   // This call also rejects a structurally forged research diagnosis object.
   const grounding = projectResearchFaceDiagnosisGrounding(input.diagnosis, input.groundingVersion);
@@ -250,8 +255,8 @@ export function presentResearchFaceDiagnosisForCharacter(input: {
 
   return deepFreeze({
     schemaVersion: 'v1' as const,
-    characterId: input.profile.characterId,
-    characterContentVersion: input.profile.characterContentVersion,
+    characterId: input.character.characterId,
+    characterContentVersion: input.character.contentVersion,
     profileVersion: input.profile.profileVersion,
     requestedMode: input.profile.mode,
     effectiveMode: plan.effectiveMode,
