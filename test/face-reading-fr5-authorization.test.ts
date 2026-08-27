@@ -62,7 +62,7 @@ function completeEvidence(threshold = 0.02): FaceCalibrationEvidenceRegistry {
         criterionRefs: [criterionId],
         datasetVersion: 'repeat-capture-v1',
         provenanceRefs: ['dataset:repeat-capture-v1'],
-        participantPolicy: 'consented_deidentified',
+        participantPolicy: 'consented_pseudonymous',
         status: 'reviewed',
       },
       {
@@ -73,7 +73,7 @@ function completeEvidence(threshold = 0.02): FaceCalibrationEvidenceRegistry {
         criterionRefs: [criterionId],
         datasetVersion: 'expert-label-v1',
         provenanceRefs: ['dataset:expert-label-v1'],
-        participantPolicy: 'consented_deidentified',
+        participantPolicy: 'consented_pseudonymous',
         reviewProtocolRef: 'protocol.blinded-bridge-straight-v1',
         status: 'reviewed',
       },
@@ -85,7 +85,7 @@ function completeEvidence(threshold = 0.02): FaceCalibrationEvidenceRegistry {
         criterionRefs: [criterionId],
         datasetVersion: calibrationDatasetVersion,
         provenanceRefs: ['artifact:test-only-threshold-selection-v1'],
-        participantPolicy: 'consented_deidentified',
+        participantPolicy: 'consented_pseudonymous',
         selectionResult: {
           selectionMethodRef,
           calibrationDatasetVersion,
