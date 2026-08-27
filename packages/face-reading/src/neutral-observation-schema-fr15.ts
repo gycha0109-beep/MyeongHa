@@ -80,6 +80,7 @@ export interface NeutralObservationBundleReadinessV1 {
   readonly neutralIngestionReady: boolean;
   readonly semanticPromotionState: 'blocked_traditional_operationalization_required';
   readonly unavailableAnchorRefs: readonly string[];
+  readonly limitedAnchorRefs: readonly string[];
   readonly blockers: readonly string[];
 }
 
@@ -197,6 +198,9 @@ function validateQuality(quality: NeutralObservationQualityV1, availability: Neu
     if (quality.confidence === null) throw new FaceAuthorityValidationError(`${path}.confidence is required for observed geometry.`);
     normalized(quality.confidence, `${path}.confidence`);
     if (quality.visibility === 'not_visible') throw new FaceAuthorityValidationError(`${path}.visibility cannot be not_visible for observed geometry.`);
+    if (quality.visibility === 'partial' && quality.reasons.length === 0) {
+      throw new FaceAuthorityValidationError(`${path}.reasons are required for partial visibility.`);
+    }
     return;
   }
   if (quality.confidence !== null) throw new FaceAuthorityValidationError(`${path}.confidence must be null when unavailable.`);
@@ -244,6 +248,32 @@ function validateProvenance(bundle: NeutralObservationBundleV1): void {
   if (provenance.biometricEmbeddingPersisted !== false) {
     throw new FaceAuthorityValidationError('FR-15 biometric embedding persistence must remain false.');
   }
+}
+
+function validateDerivationGraph(observations: readonly NeutralObservationItemV1[]): void {
+  const byRef = new Map(observations.map((entry) => [entry.observationRef, entry] as const));
+  for (const entry of observations) {
+    for (const ref of entry.derivedFromObservationRefs ?? []) {
+      const dependency = byRef.get(ref);
+      if (dependency === undefined) throw new FaceAuthorityValidationError(`FR-15 derivation references unknown observation: ${ref}`);
+      if (dependency.availability !== 'observed') {
+        throw new FaceAuthorityValidationError(`FR-15 derivation cannot depend on unavailable observation: ${ref}`);
+      }
+    }
+  }
+
+  const visiting = new Set<string>();
+  const visited = new Set<string>();
+  const visit = (ref: string): void => {
+    if (visiting.has(ref)) throw new FaceAuthorityValidationError(`FR-15 derivation cycle detected at: ${ref}`);
+    if (visited.has(ref)) return;
+    visiting.add(ref);
+    const entry = byRef.get(ref);
+    for (const dependencyRef of entry?.derivedFromObservationRefs ?? []) visit(dependencyRef);
+    visiting.delete(ref);
+    visited.add(ref);
+  };
+  observations.forEach((entry) => visit(entry.observationRef));
 }
 
 function immutableClone<T>(value: T): T {
@@ -326,6 +356,7 @@ export function validateNeutralObservationBundleFR15(
     }
   }
 
+  validateDerivationGraph(bundle.observations);
   validateProvenance(bundle);
   return bundle;
 }
@@ -346,9 +377,10 @@ export function assessNeutralObservationBundleReadinessFR15(input: {
   const blockers = [...providerReadiness.blockers];
   if (input.bundle.pose.qualityState === 'unusable') blockers.push('neutral observation pose is unusable');
   const unavailableAnchorRefs = input.bundle.observations.filter((entry) => entry.availability === 'unavailable').map((entry) => entry.anchorRef);
+  const limitedAnchorRefs = input.bundle.observations.filter((entry) => entry.availability === 'observed' && entry.quality.visibility === 'partial').map((entry) => entry.anchorRef);
   const state = blockers.length > 0
     ? 'blocked' as const
-    : input.bundle.pose.qualityState === 'limited' || unavailableAnchorRefs.length > 0
+    : input.bundle.pose.qualityState === 'limited' || unavailableAnchorRefs.length > 0 || limitedAnchorRefs.length > 0
       ? 'section_limited' as const
       : 'usable' as const;
 
@@ -357,6 +389,7 @@ export function assessNeutralObservationBundleReadinessFR15(input: {
     neutralIngestionReady: state !== 'blocked',
     semanticPromotionState: 'blocked_traditional_operationalization_required' as const,
     unavailableAnchorRefs: Object.freeze(unavailableAnchorRefs),
+    limitedAnchorRefs: Object.freeze(limitedAnchorRefs),
     blockers: Object.freeze(blockers),
   });
 }
