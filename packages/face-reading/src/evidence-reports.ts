@@ -254,6 +254,9 @@ export function validateFaceHoldoutEvaluationReport(
   nonEmpty(report.labelDatasetRef, `${report.reportId}.labelDatasetRef`);
   positiveInteger(report.participantCount, `${report.reportId}.participantCount`);
   positiveInteger(report.evaluatedItemCount, `${report.reportId}.evaluatedItemCount`);
+  if (report.participantCount > report.evaluatedItemCount) {
+    throw new FaceAuthorityValidationError(`${report.reportId}.participantCount cannot exceed evaluatedItemCount.`);
+  }
   nonNegativeInteger(report.excludedNoConsensusCount, `${report.reportId}.excludedNoConsensusCount`);
   for (const [key, value] of Object.entries(report.confusion)) nonNegativeInteger(value, `${report.reportId}.confusion.${key}`);
   const confusionCount = report.confusion.truePositive + report.confusion.trueNegative + report.confusion.falsePositive + report.confusion.falseNegative;
@@ -263,7 +266,21 @@ export function validateFaceHoldoutEvaluationReport(
   unitInterval(report.metrics.sensitivity, `${report.reportId}.metrics.sensitivity`);
   unitInterval(report.metrics.specificity, `${report.reportId}.metrics.specificity`);
   unitInterval(report.metrics.balancedAccuracy, `${report.reportId}.metrics.balancedAccuracy`);
-  const expectedBalanced = (report.metrics.sensitivity + report.metrics.specificity) / 2;
+
+  const actualPositive = report.confusion.truePositive + report.confusion.falseNegative;
+  const actualNegative = report.confusion.trueNegative + report.confusion.falsePositive;
+  if (actualPositive === 0 || actualNegative === 0) {
+    throw new FaceAuthorityValidationError(`${report.reportId} holdout evaluation requires both positive and negative reference items.`);
+  }
+  const expectedSensitivity = report.confusion.truePositive / actualPositive;
+  const expectedSpecificity = report.confusion.trueNegative / actualNegative;
+  if (Math.abs(report.metrics.sensitivity - expectedSensitivity) > 1e-12) {
+    throw new FaceAuthorityValidationError(`${report.reportId}.metrics.sensitivity must match confusion counts.`);
+  }
+  if (Math.abs(report.metrics.specificity - expectedSpecificity) > 1e-12) {
+    throw new FaceAuthorityValidationError(`${report.reportId}.metrics.specificity must match confusion counts.`);
+  }
+  const expectedBalanced = (expectedSensitivity + expectedSpecificity) / 2;
   if (Math.abs(report.metrics.balancedAccuracy - expectedBalanced) > 1e-12) {
     throw new FaceAuthorityValidationError(`${report.reportId}.metrics.balancedAccuracy must equal mean(sensitivity,specificity).`);
   }
