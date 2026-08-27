@@ -139,6 +139,20 @@ describe('FR-5 issued calibration authorization', () => {
     expect(() => classifyNoseBridgeStraightness(bridgeMetric(0.01), forged)).toThrow(/was not issued/u);
   });
 
+  it('snapshots and freezes threshold authority so post-issuance mutation cannot change classification', () => {
+    const calibration = productionCalibration(0.02);
+    const authorization = authorizeFaceCalibration(calibration, validationContext());
+    const mutableRule = calibration.decisionRule as { kind: 'max_inclusive'; threshold: number };
+    mutableRule.threshold = 0.5;
+    (calibration.calibrationEvidenceRefs as string[]).push('evidence.forged-after-issuance@1.0.0');
+
+    expect(authorization.decisionRule).toEqual({ kind: 'max_inclusive', threshold: 0.02 });
+    expect(authorization.calibrationEvidenceRefs).not.toContain('evidence.forged-after-issuance@1.0.0');
+    expect(Object.isFrozen(authorization.decisionRule)).toBe(true);
+    expect(Object.isFrozen(authorization.calibrationEvidenceRefs)).toBe(true);
+    expect(classifyNoseBridgeStraightness(bridgeMetric(0.03), authorization).state).toBe('not_met');
+  });
+
   it('refuses to issue authorization for research-only calibration', () => {
     const researchCalibration: FaceCalibrationDefinition = {
       ...productionCalibration(),
