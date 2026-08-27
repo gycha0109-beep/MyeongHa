@@ -18,18 +18,9 @@ export interface NormalizedPoint2DV1 {
 }
 
 export type NeutralObservationGeometryV1 =
-  | {
-      readonly kind: 'point';
-      readonly point: NormalizedPoint2DV1;
-    }
-  | {
-      readonly kind: 'curve';
-      readonly points: readonly NormalizedPoint2DV1[];
-    }
-  | {
-      readonly kind: 'region';
-      readonly boundary: readonly NormalizedPoint2DV1[];
-    };
+  | { readonly kind: 'point'; readonly point: NormalizedPoint2DV1 }
+  | { readonly kind: 'curve'; readonly points: readonly NormalizedPoint2DV1[] }
+  | { readonly kind: 'region'; readonly boundary: readonly NormalizedPoint2DV1[] };
 
 export type NeutralObservationAvailabilityV1 = 'observed' | 'unavailable';
 
@@ -113,40 +104,31 @@ const REQUIRED_GEOMETRY_KIND_BY_SLOT: Readonly<Record<NeutralAnchorConsumerSlotV
   'neutral.face.right_eye_region': 'region',
 });
 
+const ALLOWED_CAPABILITIES = new Set<NeutralProviderCapabilityV1>([
+  'neutral_pose_quality',
+  'neutral_brow_regions',
+  'neutral_brow_midline_derivation',
+  'neutral_eye_regions',
+  'neutral_nose_region',
+]);
+
 const ALLOWED_BUNDLE_KEYS = new Set([
-  'schemaVersion',
-  'contractVersion',
-  'bindingProfileVersion',
-  'providerKey',
-  'providerContractVersion',
-  'coordinateFrame',
-  'pose',
-  'availableCapabilities',
-  'observations',
-  'provenance',
+  'schemaVersion', 'contractVersion', 'bindingProfileVersion', 'providerKey', 'providerContractVersion',
+  'coordinateFrame', 'pose', 'availableCapabilities', 'observations', 'provenance',
 ]);
-
 const ALLOWED_OBSERVATION_KEYS = new Set([
-  'observationRef',
-  'anchorRef',
-  'consumerSlot',
-  'availability',
-  'geometry',
-  'quality',
-  'producedByCapabilities',
-  'derivedFromObservationRefs',
+  'observationRef', 'anchorRef', 'consumerSlot', 'availability', 'geometry', 'quality',
+  'producedByCapabilities', 'derivedFromObservationRefs',
 ]);
-
+const ALLOWED_POSE_KEYS = new Set(['yawDegrees', 'pitchDegrees', 'rollDegrees', 'qualityState', 'reasons']);
+const ALLOWED_QUALITY_KEYS = new Set(['visibility', 'confidence', 'reasons']);
+const ALLOWED_POINT_KEYS = new Set(['x', 'y']);
+const ALLOWED_POINT_GEOMETRY_KEYS = new Set(['kind', 'point']);
+const ALLOWED_CURVE_GEOMETRY_KEYS = new Set(['kind', 'points']);
+const ALLOWED_REGION_GEOMETRY_KEYS = new Set(['kind', 'boundary']);
 const ALLOWED_PROVENANCE_KEYS = new Set([
-  'providerKey',
-  'providerContractVersion',
-  'adapterVersion',
-  'providerModelRef',
-  'providerRunRef',
-  'canonicalAssetDigest',
-  'evidenceRefs',
-  'rawSourcePersisted',
-  'rawProviderResponsePersisted',
+  'providerKey', 'providerContractVersion', 'adapterVersion', 'providerModelRef', 'providerRunRef',
+  'canonicalAssetDigest', 'evidenceRefs', 'rawSourcePersisted', 'rawProviderResponsePersisted',
   'biometricEmbeddingPersisted',
 ]);
 
@@ -165,6 +147,11 @@ function unique(values: readonly string[], path: string): void {
   }
 }
 
+function exactKeys(value: object, allowed: ReadonlySet<string>, path: string): void {
+  const unexpected = Object.keys(value).find((key) => !allowed.has(key));
+  if (unexpected !== undefined) throw new FaceAuthorityValidationError(`${path} contains unauthorized field: ${unexpected}`);
+}
+
 function finite(value: number, path: string): void {
   if (!Number.isFinite(value)) throw new FaceAuthorityValidationError(`${path} must be finite.`);
 }
@@ -175,41 +162,50 @@ function normalized(value: number, path: string): void {
 }
 
 function validatePoint(point: NormalizedPoint2DV1, path: string): void {
+  exactKeys(point, ALLOWED_POINT_KEYS, path);
   normalized(point.x, `${path}.x`);
   normalized(point.y, `${path}.y`);
 }
 
 function validateGeometry(geometry: NeutralObservationGeometryV1, path: string): void {
+  const runtimeKind = (geometry as { readonly kind?: unknown }).kind;
+  if (runtimeKind !== 'point' && runtimeKind !== 'curve' && runtimeKind !== 'region') {
+    throw new FaceAuthorityValidationError(`${path}.kind is invalid: ${String(runtimeKind)}`);
+  }
   if (geometry.kind === 'point') {
+    exactKeys(geometry, ALLOWED_POINT_GEOMETRY_KEYS, path);
     validatePoint(geometry.point, `${path}.point`);
     return;
   }
   if (geometry.kind === 'curve') {
+    exactKeys(geometry, ALLOWED_CURVE_GEOMETRY_KEYS, path);
     if (geometry.points.length < 2) throw new FaceAuthorityValidationError(`${path}.curve requires at least 2 points.`);
     geometry.points.forEach((point, index) => validatePoint(point, `${path}.points[${index}]`));
     return;
   }
+  exactKeys(geometry, ALLOWED_REGION_GEOMETRY_KEYS, path);
   if (geometry.boundary.length < 3) throw new FaceAuthorityValidationError(`${path}.region requires at least 3 boundary points.`);
   geometry.boundary.forEach((point, index) => validatePoint(point, `${path}.boundary[${index}]`));
 }
 
 function validateQuality(quality: NeutralObservationQualityV1, availability: NeutralObservationAvailabilityV1, path: string): void {
+  exactKeys(quality, ALLOWED_QUALITY_KEYS, path);
+  if (!['clear', 'partial', 'not_visible'].includes(quality.visibility)) {
+    throw new FaceAuthorityValidationError(`${path}.visibility is invalid: ${String(quality.visibility)}`);
+  }
   if (availability === 'observed') {
     if (quality.confidence === null) throw new FaceAuthorityValidationError(`${path}.confidence is required for observed geometry.`);
     normalized(quality.confidence, `${path}.confidence`);
-    if (quality.visibility === 'not_visible') {
-      throw new FaceAuthorityValidationError(`${path}.visibility cannot be not_visible for observed geometry.`);
-    }
+    if (quality.visibility === 'not_visible') throw new FaceAuthorityValidationError(`${path}.visibility cannot be not_visible for observed geometry.`);
     return;
   }
   if (quality.confidence !== null) throw new FaceAuthorityValidationError(`${path}.confidence must be null when unavailable.`);
-  if (quality.visibility !== 'not_visible') {
-    throw new FaceAuthorityValidationError(`${path}.visibility must be not_visible when unavailable.`);
-  }
+  if (quality.visibility !== 'not_visible') throw new FaceAuthorityValidationError(`${path}.visibility must be not_visible when unavailable.`);
   if (quality.reasons.length === 0) throw new FaceAuthorityValidationError(`${path}.reasons are required when unavailable.`);
 }
 
 function validatePose(pose: NeutralObservationPoseV1): void {
+  exactKeys(pose, ALLOWED_POSE_KEYS, 'fr15.pose');
   finite(pose.yawDegrees, 'fr15.pose.yawDegrees');
   finite(pose.pitchDegrees, 'fr15.pose.pitchDegrees');
   finite(pose.rollDegrees, 'fr15.pose.rollDegrees');
@@ -221,15 +217,16 @@ function validatePose(pose: NeutralObservationPoseV1): void {
   }
 }
 
+function validateCapability(capability: NeutralProviderCapabilityV1, path: string): void {
+  if (!ALLOWED_CAPABILITIES.has(capability)) {
+    throw new FaceAuthorityValidationError(`${path} contains unknown neutral provider capability: ${String(capability)}`);
+  }
+}
+
 function validateProvenance(bundle: NeutralObservationBundleV1): void {
   const provenance = bundle.provenance;
-  const unexpected = Object.keys(provenance).find((key) => !ALLOWED_PROVENANCE_KEYS.has(key));
-  if (unexpected !== undefined) {
-    throw new FaceAuthorityValidationError(`FR-15 provenance contains unauthorized field: ${unexpected}`);
-  }
-  if (provenance.providerKey !== bundle.providerKey) {
-    throw new FaceAuthorityValidationError('FR-15 provenance providerKey must match bundle providerKey.');
-  }
+  exactKeys(provenance, ALLOWED_PROVENANCE_KEYS, 'FR-15 provenance');
+  if (provenance.providerKey !== bundle.providerKey) throw new FaceAuthorityValidationError('FR-15 provenance providerKey must match bundle providerKey.');
   if (provenance.providerContractVersion !== bundle.providerContractVersion) {
     throw new FaceAuthorityValidationError('FR-15 provenance providerContractVersion must match bundle providerContractVersion.');
   }
@@ -249,23 +246,27 @@ function validateProvenance(bundle: NeutralObservationBundleV1): void {
   }
 }
 
+function immutableClone<T>(value: T): T {
+  if (Array.isArray(value)) return Object.freeze(value.map((item) => immutableClone(item))) as T;
+  if (value !== null && typeof value === 'object') {
+    const clone: Record<string, unknown> = {};
+    for (const [key, child] of Object.entries(value as Record<string, unknown>)) clone[key] = immutableClone(child);
+    return Object.freeze(clone) as T;
+  }
+  return value;
+}
+
 export function validateNeutralObservationBundleFR15(
   bundle: NeutralObservationBundleV1,
   profile: NeutralProviderBindingProfileV1 = FACELAB_NEUTRAL_BINDING_PROFILE_FR14,
 ): NeutralObservationBundleV1 {
   validateNeutralProviderBindingProfileFR14(profile);
-  const unexpectedBundleKey = Object.keys(bundle).find((key) => !ALLOWED_BUNDLE_KEYS.has(key));
-  if (unexpectedBundleKey !== undefined) {
-    throw new FaceAuthorityValidationError(`FR-15 bundle contains unauthorized field: ${unexpectedBundleKey}`);
-  }
+  exactKeys(bundle, ALLOWED_BUNDLE_KEYS, 'FR-15 bundle');
   if (bundle.schemaVersion !== 'v1') throw new FaceAuthorityValidationError('FR-15 schemaVersion must be v1.');
-  if (bundle.contractVersion !== 'myeongha-neutral-observation-v1') {
-    throw new FaceAuthorityValidationError('FR-15 contractVersion mismatch.');
-  }
-  if (bundle.bindingProfileVersion !== profile.profileVersion) {
-    throw new FaceAuthorityValidationError('FR-15 bindingProfileVersion must match the supplied FR-14 profile.');
-  }
+  if (bundle.contractVersion !== 'myeongha-neutral-observation-v1') throw new FaceAuthorityValidationError('FR-15 contractVersion mismatch.');
+  if (bundle.bindingProfileVersion !== profile.profileVersion) throw new FaceAuthorityValidationError('FR-15 bindingProfileVersion must match the supplied FR-14 profile.');
   if (bundle.providerKey !== profile.providerKey) throw new FaceAuthorityValidationError('FR-15 providerKey mismatch.');
+  nonEmpty(bundle.providerContractVersion, 'fr15.providerContractVersion');
   if (profile.providerContractVersion === null || bundle.providerContractVersion !== profile.providerContractVersion) {
     throw new FaceAuthorityValidationError('FR-15 bundle requires the exact pinned providerContractVersion from FR-14.');
   }
@@ -274,6 +275,7 @@ export function validateNeutralObservationBundleFR15(
   }
   validatePose(bundle.pose);
   unique(bundle.availableCapabilities, 'fr15.availableCapabilities');
+  bundle.availableCapabilities.forEach((capability) => validateCapability(capability, 'fr15.availableCapabilities'));
   unique(bundle.observations.map((entry) => entry.observationRef), 'fr15.observationRefs');
   unique(bundle.observations.map((entry) => entry.anchorRef), 'fr15.anchorRefs');
   unique(bundle.observations.map((entry) => entry.consumerSlot), 'fr15.consumerSlots');
@@ -286,15 +288,14 @@ export function validateNeutralObservationBundleFR15(
   for (const binding of profile.bindings) {
     const observation = bundle.observations.find((entry) => entry.anchorRef === binding.anchorRef);
     if (observation === undefined) throw new FaceAuthorityValidationError(`FR-15 missing neutral observation: ${binding.anchorRef}`);
-    const unexpected = Object.keys(observation).find((key) => !ALLOWED_OBSERVATION_KEYS.has(key));
-    if (unexpected !== undefined) {
-      throw new FaceAuthorityValidationError(`FR-15 observation contains unauthorized field: ${unexpected}`);
-    }
+    exactKeys(observation, ALLOWED_OBSERVATION_KEYS, `FR-15 observation ${binding.anchorRef}`);
     nonEmpty(observation.observationRef, `fr15.${binding.anchorRef}.observationRef`);
-    if (observation.consumerSlot !== binding.consumerSlot) {
-      throw new FaceAuthorityValidationError(`FR-15 consumerSlot mismatch for ${binding.anchorRef}.`);
+    if (observation.consumerSlot !== binding.consumerSlot) throw new FaceAuthorityValidationError(`FR-15 consumerSlot mismatch for ${binding.anchorRef}.`);
+    if (observation.availability !== 'observed' && observation.availability !== 'unavailable') {
+      throw new FaceAuthorityValidationError(`FR-15 availability is invalid for ${binding.anchorRef}: ${String(observation.availability)}`);
     }
     unique(observation.producedByCapabilities, `fr15.${binding.anchorRef}.producedByCapabilities`);
+    observation.producedByCapabilities.forEach((capability) => validateCapability(capability, `fr15.${binding.anchorRef}.producedByCapabilities`));
     for (const capability of binding.requiredCapabilities) {
       if (!observation.producedByCapabilities.includes(capability)) {
         throw new FaceAuthorityValidationError(`FR-15 ${binding.anchorRef} missing required production capability: ${capability}`);
@@ -308,20 +309,17 @@ export function validateNeutralObservationBundleFR15(
     validateQuality(observation.quality, observation.availability, `fr15.${binding.anchorRef}.quality`);
 
     if (observation.availability === 'observed') {
-      if (observation.geometry === undefined) {
-        throw new FaceAuthorityValidationError(`FR-15 observed item requires geometry: ${binding.anchorRef}`);
-      }
+      if (observation.geometry === undefined) throw new FaceAuthorityValidationError(`FR-15 observed item requires geometry: ${binding.anchorRef}`);
       const expectedKind = REQUIRED_GEOMETRY_KIND_BY_SLOT[binding.consumerSlot];
       if (observation.geometry.kind !== expectedKind) {
-        throw new FaceAuthorityValidationError(
-          `FR-15 geometry kind mismatch for ${binding.anchorRef}: expected ${expectedKind}, got ${observation.geometry.kind}.`,
-        );
+        throw new FaceAuthorityValidationError(`FR-15 geometry kind mismatch for ${binding.anchorRef}: expected ${expectedKind}, got ${observation.geometry.kind}.`);
       }
       validateGeometry(observation.geometry, `fr15.${binding.anchorRef}.geometry`);
     } else if (observation.geometry !== undefined) {
       throw new FaceAuthorityValidationError(`FR-15 unavailable item must not carry geometry: ${binding.anchorRef}`);
     }
 
+    unique(observation.derivedFromObservationRefs ?? [], `fr15.${binding.anchorRef}.derivedFromObservationRefs`);
     for (const ref of observation.derivedFromObservationRefs ?? []) {
       if (ref === observation.observationRef) throw new FaceAuthorityValidationError(`FR-15 derivation cannot self-reference: ${ref}`);
       if (!observationRefs.has(ref)) throw new FaceAuthorityValidationError(`FR-15 derivation references unknown observation: ${ref}`);
@@ -347,10 +345,7 @@ export function assessNeutralObservationBundleReadinessFR15(input: {
   });
   const blockers = [...providerReadiness.blockers];
   if (input.bundle.pose.qualityState === 'unusable') blockers.push('neutral observation pose is unusable');
-  const unavailableAnchorRefs = input.bundle.observations
-    .filter((entry) => entry.availability === 'unavailable')
-    .map((entry) => entry.anchorRef);
-
+  const unavailableAnchorRefs = input.bundle.observations.filter((entry) => entry.availability === 'unavailable').map((entry) => entry.anchorRef);
   const state = blockers.length > 0
     ? 'blocked' as const
     : input.bundle.pose.qualityState === 'limited' || unavailableAnchorRefs.length > 0
@@ -375,10 +370,11 @@ export function issueNeutralObservationArtifactFR15(input: {
   if (!readiness.neutralIngestionReady) {
     throw new FaceAuthorityValidationError(`FR-15 neutral observation ingestion is blocked: ${readiness.blockers.join('; ')}`);
   }
-  const artifact = Object.freeze({
+  const detachedBundle = immutableClone(input.bundle);
+  const artifact: IssuedNeutralObservationArtifactV1 = Object.freeze({
     authorityState: 'neutral_observation_only' as const,
     schemaVersion: 'v1' as const,
-    bundle: input.bundle,
+    bundle: detachedBundle,
     prohibitedSemanticUses: Object.freeze([
       'traditional_anchor_equivalence',
       'physiognomy_claim_generation',
@@ -390,9 +386,7 @@ export function issueNeutralObservationArtifactFR15(input: {
   return artifact;
 }
 
-export function assertIssuedNeutralObservationArtifactFR15(
-  artifact: IssuedNeutralObservationArtifactV1,
-): void {
+export function assertIssuedNeutralObservationArtifactFR15(artifact: IssuedNeutralObservationArtifactV1): void {
   if (!ISSUED_NEUTRAL_ARTIFACTS.has(artifact)) {
     throw new FaceAuthorityValidationError('FR-15 neutral observation artifact was not issued by the FR-15 runtime gate.');
   }
