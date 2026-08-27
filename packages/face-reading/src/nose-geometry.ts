@@ -64,10 +64,10 @@ export const FR4_NOSE_NEUTRAL_METRICS_V0: readonly NeutralFaceGeometryMetricDefi
     version: '0.1.0',
     region: 'nose',
     coordinateFrame: 'pose_normalized_face_2d',
-    requiredSemanticInputs: ['ordered_closed_nose_tip_contour_points'],
+    requiredSemanticInputs: ['ordered_nose_tip_contour_vertices_without_duplicate_closure'],
     formula: '4*pi*polygon_area/(polygon_perimeter^2)',
     unit: 'ratio',
-    interpretationBoundary: 'Continuous contour metric only. It does not classify 準圓庫起, fullness, wealth, or 官成.',
+    interpretationBoundary: 'Continuous contour metric only. It cannot by itself operationalize 準圓庫起 because fullness/projection is unobserved.',
   },
 ];
 
@@ -176,16 +176,23 @@ function segmentsIntersect(
   return o1 * o2 < 0 && o3 * o4 < 0;
 }
 
+function assertUniqueContourVertices(points: readonly NeutralFacePoint2D[]): void {
+  const keys = new Set<string>();
+  for (const point of points) {
+    const key = `${point.x}:${point.y}`;
+    if (keys.has(key)) {
+      throw new FaceAuthorityValidationError('Nose-tip contour must not repeat vertices, including a duplicated closing vertex.');
+    }
+    keys.add(key);
+  }
+}
+
 function assertSimplePolygon(points: readonly NeutralFacePoint2D[]): void {
   for (let first = 0; first < points.length; first += 1) {
     const firstNext = (first + 1) % points.length;
     for (let second = first + 1; second < points.length; second += 1) {
       const secondNext = (second + 1) % points.length;
-      const adjacent =
-        first === second ||
-        firstNext === second ||
-        secondNext === first ||
-        (first === 0 && secondNext === 0);
+      const adjacent = firstNext === second || secondNext === first;
       if (adjacent) continue;
       if (segmentsIntersect(points[first]!, points[firstNext]!, points[second]!, points[secondNext]!)) {
         throw new FaceAuthorityValidationError('Nose-tip contour must be an ordered non-self-intersecting polygon.');
@@ -202,6 +209,7 @@ export function computeNoseTipContourCircularity(
     throw new FaceAuthorityValidationError('Nose-tip contour requires at least 6 ordered points.');
   }
   input.contourPoints.forEach((point, index) => finitePoint(point, `contourPoints[${index}]`));
+  assertUniqueContourVertices(input.contourPoints);
   assertSimplePolygon(input.contourPoints);
 
   const area = polygonArea(input.contourPoints);
@@ -227,31 +235,50 @@ export function computeNoseTipContourCircularity(
   };
 }
 
-export interface NoseCriterionCalibrationDefinition {
+export interface NoseBridgeStraightCalibrationDefinition {
   readonly calibrationId: string;
-  readonly metricRef: string;
-  readonly criterionId: 'criterion.discernment.bridge_straight' | 'criterion.discernment.tip_round_full';
+  readonly metricRef: 'neutral.nose.bridge.centerline_rms_deviation@0.1.0';
+  readonly criterionId: 'criterion.discernment.bridge_straight';
   readonly evidenceRefs: readonly string[];
   readonly calibrationDatasetVersion: string;
-  readonly thresholdPolicy: unknown;
+  readonly thresholdPolicy: {
+    readonly kind: 'max_inclusive';
+    readonly maxRmsDeviation: number;
+  };
   readonly status: 'research' | 'reviewed' | 'production_authorized';
 }
 
-export function assertNoseCriterionCalibrationReady(
-  calibration: NoseCriterionCalibrationDefinition | undefined,
-): asserts calibration is NoseCriterionCalibrationDefinition & { readonly status: 'production_authorized' } {
+export function assertNoseBridgeCalibrationReady(
+  calibration: NoseBridgeStraightCalibrationDefinition | undefined,
+): asserts calibration is NoseBridgeStraightCalibrationDefinition & { readonly status: 'production_authorized' } {
   if (calibration === undefined) {
-    throw new FaceAuthorityValidationError('Nose criterion classification is blocked until an explicit calibration definition exists.');
+    throw new FaceAuthorityValidationError('Nose bridge classification is blocked until an explicit calibration definition exists.');
   }
   if (calibration.status !== 'production_authorized') {
     throw new FaceAuthorityValidationError(
-      `Nose criterion classification is blocked: calibration ${calibration.calibrationId} status=${calibration.status}.`,
+      `Nose bridge classification is blocked: calibration ${calibration.calibrationId} status=${calibration.status}.`,
     );
   }
   if (calibration.evidenceRefs.length === 0 || calibration.calibrationDatasetVersion.trim().length === 0) {
-    throw new FaceAuthorityValidationError('Production nose calibration requires evidenceRefs and calibrationDatasetVersion.');
+    throw new FaceAuthorityValidationError('Production nose bridge calibration requires evidenceRefs and calibrationDatasetVersion.');
+  }
+  if (
+    calibration.thresholdPolicy.kind !== 'max_inclusive' ||
+    !Number.isFinite(calibration.thresholdPolicy.maxRmsDeviation) ||
+    calibration.thresholdPolicy.maxRmsDeviation < 0
+  ) {
+    throw new FaceAuthorityValidationError('Production nose bridge calibration requires a finite non-negative maxRmsDeviation.');
   }
 }
+
+export const NOSE_TIP_TRADITIONAL_BINDING_V0 = Object.freeze({
+  criterionId: 'criterion.discernment.tip_round_full',
+  candidateMetricRef: 'neutral.nose.tip.contour_circularity@0.1.0',
+  bindingStatus: 'blocked_under_observed' as const,
+  missingEvidenceDimensions: ['tip_fullness', 'tip_projection_or_depth'],
+  calibrationAllowed: false,
+  reason: '2D contour circularity observes roundness only; it cannot represent the fullness/projection component of 準圓庫起.',
+});
 
 export const MEDIAPIPE_FACE_LANDMARKER_FR4_CANDIDATE_V0 = Object.freeze({
   provider: 'google_mediapipe_face_landmarker',
