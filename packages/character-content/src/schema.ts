@@ -1,4 +1,7 @@
-import type { SajuDomain } from '../../contracts/src/index.js';
+import type {
+  RelationshipEventCandidate,
+  SajuDomain,
+} from '../../contracts/src/index.js';
 
 export type CharacterContentRole = 'primary' | 'secondary' | 'commentary';
 
@@ -140,7 +143,7 @@ export interface CharacterRelationshipBehaviorRule {
     readonly trustBands?: readonly RelationshipStateBand[];
     readonly closenessBands?: readonly RelationshipStateBand[];
     readonly frictionBands?: readonly RelationshipStateBand[];
-    readonly recentEventKeys?: readonly string[];
+    readonly recentEventKeys?: readonly RelationshipEventCandidate[];
   };
   readonly mode: {
     readonly distance: string;
