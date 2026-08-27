@@ -18,6 +18,11 @@ import {
 const metricRef = 'neutral.nose.bridge.centerline_rms_deviation@0.1.0';
 const criterionId = 'criterion.discernment.bridge_straight';
 const sourceRef = 'passage.shenxiang.five_officers.discernment';
+const repeatEvidenceRef = 'evidence.nose_bridge.repeat_capture@1.0.0';
+const expertEvidenceRef = 'evidence.nose_bridge.blinded_expert@1.0.0';
+const selectionEvidenceRef = 'evidence.nose_bridge.threshold_selection@1.0.0';
+const selectionMethodRef = 'method.threshold-selection.test-only-v1';
+const calibrationDatasetVersion = 'test-only-complete-calibration-v1';
 
 const provenance: NeutralFaceGeometryProvenance = {
   observationContractVersion: 'neutral-face-observation-v0',
@@ -44,7 +49,7 @@ function promotedAuthority(): FaceAuthorityRegistry {
   };
 }
 
-function completeEvidence(): FaceCalibrationEvidenceRegistry {
+function completeEvidence(threshold = 0.02): FaceCalibrationEvidenceRegistry {
   return {
     ...FACE_CALIBRATION_EVIDENCE_RESEARCH_V0,
     evidence: [
@@ -72,14 +77,32 @@ function completeEvidence(): FaceCalibrationEvidenceRegistry {
         reviewProtocolRef: 'protocol.blinded-bridge-straight-v1',
         status: 'reviewed',
       },
+      {
+        evidenceId: 'evidence.nose_bridge.threshold_selection',
+        version: '1.0.0',
+        evidenceClass: 'threshold_selection_result',
+        metricRefs: [metricRef],
+        criterionRefs: [criterionId],
+        datasetVersion: calibrationDatasetVersion,
+        provenanceRefs: ['artifact:test-only-threshold-selection-v1'],
+        participantPolicy: 'consented_deidentified',
+        selectionResult: {
+          selectionMethodRef,
+          calibrationDatasetVersion,
+          decisionRule: { kind: 'max_inclusive', threshold },
+          inputEvidenceRefs: [repeatEvidenceRef, expertEvidenceRef],
+          evaluationProtocolRef: 'protocol.test-only-threshold-evaluation-v1',
+        },
+        status: 'reviewed',
+      },
     ],
   };
 }
 
-function validationContext(): FaceCalibrationValidationContext {
+function validationContext(threshold = 0.02): FaceCalibrationValidationContext {
   return {
     faceAuthorityRegistry: promotedAuthority(),
-    calibrationEvidenceRegistry: completeEvidence(),
+    calibrationEvidenceRegistry: completeEvidence(threshold),
     knownNeutralMetricRefs: new Set([metricRef]),
     knownCriterionIds: new Set([criterionId]),
   };
@@ -95,11 +118,12 @@ function productionCalibration(threshold = 0.02): FaceCalibrationDefinition {
     traditionalSourceRefs: [sourceRef],
     calibrationEvidenceRefs: [
       'evidence.nose_bridge.synthetic_discriminating@0.1.0',
-      'evidence.nose_bridge.repeat_capture@1.0.0',
-      'evidence.nose_bridge.blinded_expert@1.0.0',
+      repeatEvidenceRef,
+      expertEvidenceRef,
+      selectionEvidenceRef,
     ],
-    calibrationDatasetVersion: 'test-only-complete-calibration-v1',
-    selectionMethodRef: 'method.threshold-selection.test-only-v1',
+    calibrationDatasetVersion,
+    selectionMethodRef,
     decisionRule: { kind: 'max_inclusive', threshold },
     status: 'production_authorized',
   };
@@ -118,7 +142,7 @@ function bridgeMetric(offset: number) {
 
 describe('FR-5 issued calibration authorization', () => {
   it('classifies only after the full calibration authority issues an authorization', () => {
-    const authorization = authorizeFaceCalibration(productionCalibration(0.02), validationContext());
+    const authorization = authorizeFaceCalibration(productionCalibration(0.02), validationContext(0.02));
 
     expect(classifyNoseBridgeStraightness(bridgeMetric(0.01), authorization)).toMatchObject({
       criterionId,
@@ -141,7 +165,7 @@ describe('FR-5 issued calibration authorization', () => {
 
   it('snapshots and freezes threshold authority so post-issuance mutation cannot change classification', () => {
     const calibration = productionCalibration(0.02);
-    const authorization = authorizeFaceCalibration(calibration, validationContext());
+    const authorization = authorizeFaceCalibration(calibration, validationContext(0.02));
     const mutableRule = calibration.decisionRule as { kind: 'max_inclusive'; threshold: number };
     mutableRule.threshold = 0.5;
     (calibration.calibrationEvidenceRefs as string[]).push('evidence.forged-after-issuance@1.0.0');
@@ -151,6 +175,12 @@ describe('FR-5 issued calibration authorization', () => {
     expect(Object.isFrozen(authorization.decisionRule)).toBe(true);
     expect(Object.isFrozen(authorization.calibrationEvidenceRefs)).toBe(true);
     expect(classifyNoseBridgeStraightness(bridgeMetric(0.03), authorization).state).toBe('not_met');
+  });
+
+  it('refuses authorization when the calibration threshold does not match selection evidence', () => {
+    expect(() => authorizeFaceCalibration(productionCalibration(0.03), validationContext(0.02))).toThrow(
+      /decisionRule does not match threshold selection evidence/u,
+    );
   });
 
   it('refuses to issue authorization for research-only calibration', () => {
