@@ -82,7 +82,7 @@ function empiricalEvidence(classes: readonly ('repeat_capture_stability' | 'blin
         criterionRefs: [criterionId],
         datasetVersion: `${evidenceClass}-v1`,
         provenanceRefs: [`dataset:${evidenceClass}-v1`],
-        participantPolicy: 'consented_deidentified' as const,
+        participantPolicy: 'consented_pseudonymous' as const,
         ...(evidenceClass === 'blinded_expert_operationalization'
           ? { reviewProtocolRef: 'protocol.blinded-bridge-straight-v1' }
           : {}),
@@ -109,7 +109,7 @@ function completeEvidence(selectionThreshold = 0.02): FaceCalibrationEvidenceReg
         criterionRefs: [criterionId],
         datasetVersion: calibrationDatasetVersion,
         provenanceRefs: ['artifact:test-only-threshold-selection-v1'],
-        participantPolicy: 'consented_deidentified',
+        participantPolicy: 'consented_pseudonymous',
         selectionResult: {
           selectionMethodRef,
           calibrationDatasetVersion,
@@ -140,7 +140,7 @@ describe('FR-5 calibration evidence authority', () => {
     expect(() => validateFaceCalibrationEvidenceRegistry(FACE_CALIBRATION_EVIDENCE_RESEARCH_V0)).not.toThrow();
   });
 
-  it('rejects human calibration evidence without consented/deidentified policy', () => {
+  it('rejects human calibration evidence without consented/pseudonymous policy', () => {
     const invalid: FaceCalibrationEvidenceRegistry = {
       registryId: 'calibration-evidence.invalid',
       version: '1.0.0',
@@ -159,7 +159,7 @@ describe('FR-5 calibration evidence authority', () => {
       ],
     };
 
-    expect(() => validateFaceCalibrationEvidenceRegistry(invalid)).toThrow(/consented_deidentified/u);
+    expect(() => validateFaceCalibrationEvidenceRegistry(invalid)).toThrow(/consented_pseudonymous/u);
   });
 
   it('rejects duplicate refs inside evidence definitions', () => {
@@ -198,7 +198,7 @@ describe('FR-5 calibration evidence authority', () => {
           criterionRefs: [criterionId],
           datasetVersion: calibrationDatasetVersion,
           provenanceRefs: ['artifact:invalid-selection-v1'],
-          participantPolicy: 'consented_deidentified',
+          participantPolicy: 'consented_pseudonymous',
           selectionResult: {
             selectionMethodRef,
             calibrationDatasetVersion,
