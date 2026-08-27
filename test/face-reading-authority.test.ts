@@ -55,7 +55,7 @@ describe('face source and methodology authority', () => {
       ...FACE_AUTHORITY_RESEARCH_REGISTRY_V0,
       rules: [
         {
-          ...FACE_AUTHORITY_RESEARCH_REGISTRY_V0.rules[0],
+          ...FACE_AUTHORITY_RESEARCH_REGISTRY_V0.rules[0]!,
           ruleId: 'rule.invalid.methodology',
           methodologyRef: 'method.does_not_exist@1.0.0',
         },
