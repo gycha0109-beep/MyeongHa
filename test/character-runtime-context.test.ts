@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { CharacterContentDefinition } from '../packages/character-content/src/index.js';
 import {
   assembleCharacterRuntimeContext,
+  hashProtectedSajuTextV1,
   projectCharacterRelationshipBehavior,
   type RelationshipRenderingProjectionPolicyV1,
 } from '../packages/domain/src/index.js';
@@ -24,6 +25,8 @@ function authoredCharacter(): CharacterContentDefinition {
     personalityTraits: ['observant'],
     flaws: ['overchecks continuity'],
     values: ['truth'],
+    emotionIds: ['neutral', 'serious'],
+    animationCueIds: ['idle'],
     canon: {
       worldRole: 'record witness',
       origin: 'record hall',
@@ -210,6 +213,16 @@ function runtimeInput(character = authoredCharacter()) {
   };
 }
 
+function protectedText(readingRef: string, segmentId: string, sourceRef: string, text: string) {
+  return {
+    segmentId,
+    sourceReadingRef: readingRef,
+    sourceRef,
+    contentHash: hashProtectedSajuTextV1(text),
+    text,
+  };
+}
+
 describe('character relationship rendering projection', () => {
   it('uses explicit priority when multiple behavior rules match', () => {
     const character = authoredCharacter();
@@ -242,28 +255,42 @@ describe('character relationship rendering projection', () => {
 });
 
 describe('CharacterRuntimeContext assembly', () => {
-  it('assembles only explicitly scoped records and exact protected Saju text', () => {
+  it('assembles only explicitly scoped records and provenance-pinned protected Saju text', () => {
     const input = runtimeInput();
+    const readingRef = 'reading-1';
+    const segment = protectedText(
+      readingRef,
+      'segment-1',
+      'product-block:career:0',
+      '검증된 사주 블록 원문',
+    );
+    const disclosure = protectedText(
+      readingRef,
+      'disclosure-1',
+      'product-disclosure:career:0',
+      '이 블록의 범위를 넘겨 해석하지 않는다.',
+    );
     const context = assembleCharacterRuntimeContext({
       ...input,
       saju: {
-        readingRef: 'reading-1',
+        readingRef,
         domain: 'career',
         coverageState: 'complete',
-        protectedSegments: [
-          { segmentId: 'segment-1', text: '검증된 사주 블록 원문' },
-        ],
-        disclosures: ['이 블록의 범위를 넘겨 해석하지 않는다.'],
-        ambiguity: [],
+        protectedSegments: [segment],
+        disclosures: [disclosure],
+        ambiguity: ['birth_time_window'],
       },
     });
 
     expect(context.characterId).toBe(input.character.characterId);
     expect(context.lifeFacts).toHaveLength(1);
     expect(context.memories).toHaveLength(1);
-    expect(context.saju?.protectedSegments[0]?.text).toBe('검증된 사주 블록 원문');
+    expect(context.saju?.protectedSegments[0]).toEqual(segment);
+    expect(context.saju?.disclosures[0]).toEqual(disclosure);
+    expect(context.saju?.ambiguity).toEqual(['birth_time_window']);
     expect(context.saju?.capability.role).toBe('secondary');
     expect(context.relationship.matchedBehaviorRuleKey).toBe('trusted_return');
+    expect(context.rendererPolicy.allowedEmotionIds).toEqual(['neutral', 'serious']);
   });
 
   it('rejects a record grant belonging to another character', () => {
@@ -283,14 +310,17 @@ describe('CharacterRuntimeContext assembly', () => {
 
   it('rejects Saju context for a domain the character cannot consume', () => {
     const input = runtimeInput();
+    const readingRef = 'reading-2';
     expect(() =>
       assembleCharacterRuntimeContext({
         ...input,
         saju: {
-          readingRef: 'reading-2',
+          readingRef,
           domain: 'wealth',
           coverageState: 'complete',
-          protectedSegments: [{ segmentId: 'segment-2', text: 'test' }],
+          protectedSegments: [
+            protectedText(readingRef, 'segment-2', 'product-block:wealth:0', 'test'),
+          ],
           disclosures: [],
           ambiguity: [],
         },
@@ -298,21 +328,71 @@ describe('CharacterRuntimeContext assembly', () => {
     ).toThrow(/no capability/u);
   });
 
-  it('fails closed when insufficient coverage carries a protected semantic segment', () => {
+  it('fails closed when insufficient coverage carries protected semantic content', () => {
     const input = runtimeInput();
+    const readingRef = 'reading-3';
     expect(() =>
       assembleCharacterRuntimeContext({
         ...input,
         saju: {
-          readingRef: 'reading-3',
+          readingRef,
           domain: 'career',
           coverageState: 'insufficient',
-          protectedSegments: [{ segmentId: 'segment-3', text: 'must not reveal' }],
+          protectedSegments: [
+            protectedText(readingRef, 'segment-3', 'product-block:career:0', 'must not reveal'),
+          ],
           disclosures: [],
           ambiguity: [],
         },
       }),
     ).toThrow(/Insufficient Saju coverage/u);
+  });
+
+  it('rejects protected text with a mismatched reading provenance ref', () => {
+    const input = runtimeInput();
+    const readingRef = 'reading-4';
+    const segment = protectedText(
+      'different-reading',
+      'segment-4',
+      'product-block:career:0',
+      'governed text',
+    );
+    expect(() =>
+      assembleCharacterRuntimeContext({
+        ...input,
+        saju: {
+          readingRef,
+          domain: 'career',
+          coverageState: 'complete',
+          protectedSegments: [segment],
+          disclosures: [],
+          ambiguity: [],
+        },
+      }),
+    ).toThrow(/sourceReadingRef must match/u);
+  });
+
+  it('rejects protected text whose content hash does not match', () => {
+    const input = runtimeInput();
+    const readingRef = 'reading-5';
+    expect(() =>
+      assembleCharacterRuntimeContext({
+        ...input,
+        saju: {
+          readingRef,
+          domain: 'career',
+          coverageState: 'complete',
+          protectedSegments: [
+            {
+              ...protectedText(readingRef, 'segment-5', 'product-block:career:0', 'governed text'),
+              contentHash: 'sha256:v1:deadbeef',
+            },
+          ],
+          disclosures: [],
+          ambiguity: [],
+        },
+      }),
+    ).toThrow(/contentHash does not match/u);
   });
 
   it('rejects development placeholders from the authored runtime', () => {
