@@ -176,6 +176,7 @@ function validateAuthoredCharacter(character: CharacterContentDefinition): void 
   if (character.flaws.length === 0) throw new CharacterContentValidationError(`${id}.flaws must not be empty`);
   if (character.values.length === 0) throw new CharacterContentValidationError(`${id}.values must not be empty`);
   if (character.deityProxyLabel === 'placeholder') throw new CharacterContentValidationError(`${id}.deityProxyLabel must be authored`);
+  if (character.emotionIds === undefined || character.emotionIds.length === 0) throw new CharacterContentValidationError(`${id}.emotionIds must not be empty`);
   if (!character.canon) throw new CharacterContentValidationError(`${id}.canon is required`);
   if (!character.persona) throw new CharacterContentValidationError(`${id}.persona is required`);
   if (!character.behavior) throw new CharacterContentValidationError(`${id}.behavior is required`);
@@ -205,7 +206,8 @@ export function validateCharacterContentBundle(bundle: CharacterContentBundle): 
     nonEmpty(character.shortDescriptor, `${character.characterId}.shortDescriptor`);
     if (character.capabilities.length === 0) throw new CharacterContentValidationError(`${character.characterId}.capabilities must not be empty`);
     unique(character.capabilities.map((capability) => capability.domain), `${character.characterId}.capabilities.domain`);
-    unique(character.animationCueIds, `${character.characterId}.animationCueIds`);
+    if (character.emotionIds !== undefined) validateStringList(character.emotionIds, `${character.characterId}.emotionIds`, { stableKeys: true });
+    validateStringList(character.animationCueIds, `${character.characterId}.animationCueIds`, { stableKeys: true });
     unique(character.speech.forbiddenBehaviors, `${character.characterId}.speech.forbiddenBehaviors`);
     if (!character.speech.forbiddenBehaviors.includes('alter_saju_semantics')) throw new CharacterContentValidationError(`${character.characterId}.speech must forbid alter_saju_semantics`);
     for (const capability of character.capabilities) nonEmpty(capability.capabilityVersion, `${character.characterId}.capabilityVersion`);
