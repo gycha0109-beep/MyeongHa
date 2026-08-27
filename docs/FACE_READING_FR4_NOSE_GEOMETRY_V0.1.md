@@ -11,12 +11,12 @@ image / FaceLab
 → provider landmarks / contour
 → pose-normalized semantic nose geometry
 → neutral continuous metrics
-→ calibration authority (future)
-→ traditional criterion operationalization (future)
+→ calibration authority (where sufficiently observed)
+→ traditional criterion operationalization
 → F2/F3 claim
 ```
 
-The core boundary is:
+Core boundary:
 
 ```text
 measurement != physiognomy classification
@@ -24,18 +24,18 @@ measurement != physiognomy classification
 
 A CV provider may measure a nose. It does not decide `梁柱端直`, `準圓庫起`, `審辨官成`, wealth, career, or fortune.
 
-## 2. Why a neutral metric layer is separate
+## 2. Neutral metric layer
 
-The existing `FaceMetricDefinition` is methodology-bound. That is appropriate after a traditional concept has been operationalized, but it is too high-level for FaceLab/provider output.
+The existing `FaceMetricDefinition` is methodology-bound. That is appropriate after a traditional concept has been operationalized, but too high-level for FaceLab/provider output.
 
-FR-4 therefore introduces neutral geometry definitions first:
+FR-4 therefore introduces source-neutral geometry first:
 
 ```text
 neutral.nose.bridge.centerline_rms_deviation@0.1.0
 neutral.nose.tip.contour_circularity@0.1.0
 ```
 
-These are observation measurements. They are not registered as traditional semantic metrics yet.
+Neither is registered as a traditional semantic metric yet.
 
 ## 3. Nose bridge metric
 
@@ -76,7 +76,8 @@ until a separate calibration policy is reviewed.
 Input:
 
 - pose-normalized 2D frame
-- ordered non-self-intersecting nose-tip contour polygon
+- ordered, non-self-intersecting contour vertices
+- no duplicated closing vertex
 - provider provenance
 
 Formula:
@@ -85,8 +86,6 @@ Formula:
 circularity = 4πA / P²
 ```
 
-where `A` is polygon area and `P` is perimeter.
-
 Properties:
 
 - scale invariant
@@ -94,82 +93,89 @@ Properties:
 - approaches 1 for a circular contour
 - no traditional interpretation applied
 
-It is only one geometric signal. `準圓庫起` contains more meaning than 2D contour circularity, including fullness/projection that may require depth or side-view evidence.
-
-Therefore:
+Crucially:
 
 ```text
 nose-tip circularity != 準圓庫起
 ```
 
+`準圓庫起` contains more than planar roundness. `庫起` implies fullness/projection that 2D contour circularity does not observe. FR-4 therefore records the traditional binding as:
+
+```text
+bindingStatus = blocked_under_observed
+missing = [tip_fullness, tip_projection_or_depth]
+calibrationAllowed = false
+```
+
+This is stronger than merely saying “threshold not decided”: **the current signal set is structurally insufficient for that criterion.**
+
 ## 5. Quality/provenance gate
 
 FR-4 rejects geometry when:
 
-- coordinate values are non-finite
+- coordinates are non-finite
 - bridge has fewer than 3 ordered points
 - bridge endpoint axis has zero length
-- nose-tip contour has fewer than 6 ordered points
+- nose-tip contour has fewer than 6 vertices
+- a contour vertex is duplicated, including duplicated closure
 - contour area/perimeter is degenerate
 - contour self-intersects
 - pose compensation is not declared
 - source landmark refs are absent
 
-This prevents arbitrary provider output from becoming evidence.
+Missing or invalid provider data cannot become traditional evidence.
 
 ## 6. Calibration authority
 
-FR-4 defines a calibration contract but ships **no calibration**.
-
-A future criterion calibration must pin:
-
-```text
-calibrationId
-metricRef
-criterionId
-calibrationDatasetVersion
-evidenceRefs
-thresholdPolicy
-status
-```
-
-Current target criteria:
+FR-4 currently permits a calibration contract only for:
 
 ```text
 criterion.discernment.bridge_straight
-criterion.discernment.tip_round_full
+← neutral.nose.bridge.centerline_rms_deviation@0.1.0
 ```
 
-Production criterion classification is blocked unless calibration status is explicitly `production_authorized` and calibration evidence/version are present.
-
-This prevents a developer from silently writing:
+A future bridge calibration must pin:
 
 ```text
-bridge deviation < 0.02 = straight
-circularity > 0.8 = round
+calibrationId
+exact metricRef
+exact criterionId
+calibrationDatasetVersion
+evidenceRefs
+thresholdPolicy = max_inclusive(maxRmsDeviation)
+status
 ```
 
-without calibration evidence.
+Production classification remains blocked unless:
+
+- status = `production_authorized`
+- evidence refs exist
+- calibration dataset version exists
+- `maxRmsDeviation` is finite and non-negative
+
+FR-4 ships **no threshold value**.
+
+`criterion.discernment.tip_round_full` is not accepted by this calibration contract at all. It first needs additional depth/fullness observation dimensions.
 
 ## 7. MediaPipe current candidate
 
-Current official Google Face Landmarker documentation (checked 2026-08-27) describes:
+Current official Google Face Landmarker documentation checked on 2026-08-27 describes:
 
 - FaceMesh-V2 output: 478 estimated 3D face landmarks
 - 52 blendshape scores
 - optional facial transformation matrices
-- official page last updated 2026-08-17 UTC
+- page last updated 2026-08-17 UTC
 
-The older public Face Geometry / Canonical Face Model documentation describes a canonical 468-landmark topology and a metric 3D geometry pipeline.
+The older public Face Geometry / Canonical Face Model documentation describes a canonical 468-landmark topology and metric 3D geometry pipeline.
 
-This creates an important adapter boundary:
+Therefore:
 
 ```text
 current task output = 478 landmarks
-legacy canonical geometry documentation = 468 topology
+legacy canonical geometry docs = 468 topology
 ```
 
-FR-4 therefore records:
+FR-4 records:
 
 ```text
 semanticAnchorBindingStatus = unresolved
@@ -178,7 +184,7 @@ productionBindingAllowed = false
 
 No provider index is currently declared to be MyeongHa's `nose_bridge`, `山根`, `年壽`, or `準頭` authority.
 
-A future adapter must explicitly pin:
+A future adapter must pin:
 
 ```text
 provider
@@ -189,22 +195,23 @@ pose normalization method
 metric implementation version
 ```
 
-## 8. Relation to FaceLab
+## 8. FaceLab relation
 
-FaceLab should eventually provide a production-neutral contract such as:
+FaceLab should eventually expose a production-neutral observation contract such as:
 
 ```text
 NoseGeometryObservation
 - coordinate frame
 - semantic bridge centerline points
-- nose-tip contour/depth evidence
+- nose-tip contour
+- depth/profile evidence where available
 - pose quality
 - occlusion
 - source landmark provenance
 - extractor/model versions
 ```
 
-MyeongHa then owns:
+MyeongHa owns:
 
 ```text
 neutral metric calculation
@@ -213,7 +220,7 @@ neutral metric calculation
 → 五官 synthesis
 ```
 
-FaceLab still must not emit:
+FaceLab must not emit:
 
 ```text
 審辨官
@@ -226,57 +233,57 @@ FaceLab still must not emit:
 
 ## 9. Verification strategy
 
-FR-4 tests use synthetic geometry only.
+Synthetic geometry only:
 
-Required invariants:
-
-1. exactly straight bridge → deviation 0
-2. displaced interior bridge point → positive continuous deviation
+1. straight bridge → deviation 0
+2. displaced centerline → positive continuous deviation
 3. uniform scaling → same normalized deviation
-4. regular high-resolution circular polygon → circularity near 1
-5. uniform scaling → same circularity
+4. regular circular polygon → circularity near 1
+5. circularity is scale invariant
 6. pose-uncompensated input rejected
 7. missing provenance rejected
 8. degenerate geometry rejected
-9. non-finite provider values rejected
-10. no metric result contains a physiognomy classification
-11. no criterion classification without explicit calibration
-12. current MediaPipe semantic index binding remains unresolved
+9. duplicate contour closure rejected
+10. non-finite provider values rejected
+11. no metric result carries classification
+12. bridge criterion requires explicit production calibration
+13. `準圓庫起` remains blocked as under-observed
+14. MediaPipe semantic index binding remains unresolved
 
-## 10. Consumer/product implication
+## 10. Consumer implication
 
-This layer enables a strong visual experience later without fake certainty:
+This layer enables a strong visual experience later without fake scoring:
 
 ```text
-코 중심축 visual overlay
-코끝 contour overlay
+코 중심축 overlay
+실제 편차 visual
 측정 근거 highlight
 ↓
-calibrated traditional criterion
+reviewed calibration
 ↓
-"코의 중심축이 審辨官의 직선 조건을 강하게 충족합니다."
+"코의 중심축은 審辨官의 직선 조건을 분명하게 충족합니다."
 ```
 
-The confidence in the sentence comes from a resolved calibrated criterion, not from adding vague wording or inventing a fortune score.
+For the tip, the UI may show contour geometry as an observation, but may not yet state `準圓庫起` until fullness/depth evidence is added.
 
 ## 11. Current promotion state
 
 | Layer | State |
 |---|---|
-| neutral bridge metric | executable |
-| neutral tip circularity | executable |
+| neutral bridge deviation | executable |
+| neutral tip circularity | executable observation only |
 | synthetic geometry verification | executable |
 | provider semantic anchor binding | unresolved |
 | FaceLab production-neutral geometry contract | unavailable |
-| 梁柱端直 calibration | absent / blocked |
-| 準圓庫起 calibration | absent / blocked |
+| 梁柱端直 calibration | absent / allowed only through explicit calibration contract |
+| 準圓庫起 calibration | **structurally blocked: under-observed** |
 | F2 nose criterion production claim | blocked |
 | 審辨官 full formation | blocked |
 
 ## 12. Next
 
-1. Build synthetic discriminating-pair fixture catalog for bridge deviation and tip contour.
-2. Define a calibration-evidence registry separate from traditional source evidence.
-3. Prototype a provider adapter only after semantic anchor mapping is version-pinned.
-4. Add depth/profile metric candidate for `年壽高隆` / fullness without forcing it into single-view 2D.
+1. Build synthetic discriminating-pair fixture catalog for bridge deviation.
+2. Define calibration-evidence registry separate from traditional textual evidence.
+3. Add depth/profile observation candidate for `年壽高隆` and `準圓庫起` fullness/projection.
+4. Prototype provider adapter only after semantic anchor mapping is version-pinned.
 5. Continue scan-level source verification for 審辨官 passages.
