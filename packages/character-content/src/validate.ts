@@ -1,3 +1,4 @@
+import { RELATIONSHIP_EVENT_CANDIDATES } from '../../contracts/src/index.js';
 import type {
   CharacterCanonProfile,
   CharacterContentBundle,
@@ -185,6 +186,7 @@ function validateSajuProfile(
 }
 
 const RELATIONSHIP_BANDS = new Set<RelationshipStateBand>(['low', 'medium', 'high']);
+const RELATIONSHIP_EVENTS = new Set<string>(RELATIONSHIP_EVENT_CANDIDATES);
 
 function validateRelationshipBehavior(
   characterId: string,
@@ -221,9 +223,14 @@ function validateRelationshipBehavior(
       });
     }
     if (rule.when.recentEventKeys) {
-      validateStringList(rule.when.recentEventKeys, `${rulePath}.when.recentEventKeys`, {
-        stableKeys: true,
-      });
+      unique(rule.when.recentEventKeys, `${rulePath}.when.recentEventKeys`);
+      for (const eventKey of rule.when.recentEventKeys) {
+        if (!RELATIONSHIP_EVENTS.has(eventKey)) {
+          throw new CharacterContentValidationError(
+            `${rulePath}.when.recentEventKeys contains unknown relationship event`,
+          );
+        }
+      }
     }
 
     for (const [bandPath, bands] of [
