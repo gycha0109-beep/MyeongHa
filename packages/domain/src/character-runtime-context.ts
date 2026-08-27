@@ -17,10 +17,6 @@ export interface RelationshipBandThresholds {
   readonly mediumMax: number;
 }
 
-/**
- * Versioned rendering projection policy. It does not mutate RelationshipState and it is
- * deliberately separate from the relationship event/delta policy.
- */
 export interface RelationshipRenderingProjectionPolicyV1 {
   readonly version: string;
   readonly closeness: RelationshipBandThresholds;
@@ -172,6 +168,11 @@ export interface CharacterSajuRuntimeContextV1 {
   readonly capability: CharacterCapabilityContent;
 }
 
+export interface CharacterRendererPolicyV1 {
+  readonly allowedEmotionIds: readonly string[];
+  readonly allowedAnimationCueIds: readonly string[];
+}
+
 export interface CharacterRuntimeContextV1 {
   readonly schemaVersion: 'v1';
   readonly characterId: string;
@@ -182,6 +183,7 @@ export interface CharacterRuntimeContextV1 {
   readonly behavior: NonNullable<CharacterContentDefinition['behavior']>;
   readonly sajuProfile: NonNullable<CharacterContentDefinition['sajuProfile']>;
   readonly relationship: CharacterRelationshipProjectionV1;
+  readonly rendererPolicy: CharacterRendererPolicyV1;
   readonly worldRelations: readonly CharacterRelationDefinition[];
   readonly lifeFacts: readonly GrantedLifeFactContextV1[];
   readonly memories: readonly GrantedMemoryContextV1[];
@@ -192,6 +194,7 @@ export interface CharacterRuntimeContextV1 {
 function requireAuthoredCharacter(
   character: CharacterContentDefinition,
 ): asserts character is CharacterContentDefinition & {
+  readonly emotionIds: readonly string[];
   readonly canon: NonNullable<CharacterContentDefinition['canon']>;
   readonly persona: NonNullable<CharacterContentDefinition['persona']>;
   readonly behavior: NonNullable<CharacterContentDefinition['behavior']>;
@@ -209,6 +212,9 @@ function requireAuthoredCharacter(
     !character.relationshipBehavior
   ) {
     throw new TypeError('Authored Character Runtime requires all C1 character profiles.');
+  }
+  if (character.emotionIds === undefined || character.emotionIds.length === 0) {
+    throw new TypeError('Authored Character Runtime requires a content-pinned emotion allowlist.');
   }
 }
 
@@ -282,6 +288,10 @@ export function assembleCharacterRuntimeContext(input: {
     behavior: input.character.behavior,
     sajuProfile: input.character.sajuProfile,
     relationship,
+    rendererPolicy: Object.freeze({
+      allowedEmotionIds: Object.freeze([...input.character.emotionIds]),
+      allowedAnimationCueIds: Object.freeze([...input.character.animationCueIds]),
+    }),
     worldRelations: Object.freeze(input.worldRelations.map((relation) => Object.freeze({ ...relation }))),
     lifeFacts: Object.freeze(input.grantedLifeFacts.map((fact) => Object.freeze({ ...fact }))),
     memories: Object.freeze(input.grantedMemories.map((memory) => Object.freeze({ ...memory }))),
