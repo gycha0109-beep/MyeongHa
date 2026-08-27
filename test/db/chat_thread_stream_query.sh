@@ -29,14 +29,15 @@ expect_fail() {
 "${psql_base[@]}" <<'SQL'
 insert into auth.users(id) values
   ('52000000-0000-0000-0000-000000000001'),
-  ('52000000-0000-0000-0000-000000000002')
+  ('52000000-0000-0000-0000-000000000002'),
+  ('52000000-0000-0000-0000-000000000003')
 on conflict do nothing;
 
 insert into public.subjects(id,kind,auth_user_id,status,merged_into_subject_id,created_at,updated_at) values
   ('52100000-0000-0000-0000-000000000001','member','52000000-0000-0000-0000-000000000001','active',null,timestamptz '2026-08-22 01:00:00+00',timestamptz '2026-08-22 01:00:00+00'),
   ('52100000-0000-0000-0000-000000000002','member','52000000-0000-0000-0000-000000000002','active',null,timestamptz '2026-08-22 02:00:00+00',timestamptz '2026-08-22 02:00:00+00'),
   ('52100000-0000-0000-0000-000000000003','guest',null,'active',null,timestamptz '2026-08-22 03:00:00+00',timestamptz '2026-08-22 03:00:00+00'),
-  ('52100000-0000-0000-0000-000000000004','guest',null,'merged','52100000-0000-0000-0000-000000000001',timestamptz '2026-08-22 04:00:00+00',timestamptz '2026-08-22 04:00:00+00');
+  ('52100000-0000-0000-0000-000000000004','member','52000000-0000-0000-0000-000000000003','deletion_pending',null,timestamptz '2026-08-22 04:00:00+00',timestamptz '2026-08-22 04:00:00+00');
 
 insert into public.content_bundles(
   id,content_version,content_hash,artifact_ref,artifact_schema_version,min_client_capability,
@@ -77,7 +78,7 @@ insert into public.conversation_threads(
   ('52400000-0000-0000-0000-000000000003','52100000-0000-0000-0000-000000000001','system','deleted','deleted owner thread',null,null,0,2,timestamptz '2026-08-22 07:00:00+00',timestamptz '2026-08-22 07:30:00+00',timestamptz '2026-08-22 07:30:00+00'),
   ('52400000-0000-0000-0000-000000000004','52100000-0000-0000-0000-000000000002','system','active','other owner thread',null,null,0,2,timestamptz '2026-08-22 08:00:00+00',timestamptz '2026-08-22 08:30:00+00',null),
   ('52400000-0000-0000-0000-000000000005','52100000-0000-0000-0000-000000000003','system','active','guest thread',null,null,0,2,timestamptz '2026-08-22 09:00:00+00',timestamptz '2026-08-22 09:30:00+00',null),
-  ('52400000-0000-0000-0000-000000000006','52100000-0000-0000-0000-000000000004','system','archived','merged lineage thread',null,null,0,2,timestamptz '2026-08-22 10:00:00+00',timestamptz '2026-08-22 10:30:00+00',null);
+  ('52400000-0000-0000-0000-000000000006','52100000-0000-0000-0000-000000000004','system','archived','deletion-pending owner thread',null,null,0,2,timestamptz '2026-08-22 10:00:00+00',timestamptz '2026-08-22 10:30:00+00',null);
 
 insert into public.conversation_thread_characters(
   id,thread_id,character_id,content_bundle_id,role,joined_at,left_at
@@ -120,7 +121,7 @@ insert into public.conversation_messages(
   ('52800000-0000-0000-0000-000000000005','52400000-0000-0000-0000-000000000003','52100000-0000-0000-0000-000000000001',null,1,'system',null,null,'deleted thread secret',null,null,'sha256:v1:5200000000000000000000000000000000000000000000000000000000000015',timestamptz '2026-08-22 07:10:00+00',null,null),
   ('52800000-0000-0000-0000-000000000006','52400000-0000-0000-0000-000000000004','52100000-0000-0000-0000-000000000002',null,1,'system',null,null,'other owner secret',null,null,'sha256:v1:5200000000000000000000000000000000000000000000000000000000000016',timestamptz '2026-08-22 08:10:00+00',null,null),
   ('52800000-0000-0000-0000-000000000007','52400000-0000-0000-0000-000000000005','52100000-0000-0000-0000-000000000003',null,1,'system',null,null,'guest visible',null,null,'sha256:v1:5200000000000000000000000000000000000000000000000000000000000017',timestamptz '2026-08-22 09:10:00+00',null,null),
-  ('52800000-0000-0000-0000-000000000008','52400000-0000-0000-0000-000000000006','52100000-0000-0000-0000-000000000004',null,1,'system',null,null,'merged history',null,null,'sha256:v1:5200000000000000000000000000000000000000000000000000000000000018',timestamptz '2026-08-22 10:10:00+00',null,null);
+  ('52800000-0000-0000-0000-000000000008','52400000-0000-0000-0000-000000000006','52100000-0000-0000-0000-000000000004',null,1,'system',null,null,'deletion-pending history',null,null,'sha256:v1:5200000000000000000000000000000000000000000000000000000000000018',timestamptz '2026-08-22 10:10:00+00',null,null);
 
 update public.chat_turn_attempts
 set state='committed', finished_at=timestamptz '2026-08-22 05:14:00+00'
@@ -191,7 +192,7 @@ expect_fail "cross-subject thread probe is unavailable" "chat thread is unavaila
   "select * from public.qry_chat_thread_stream_v1('52100000-0000-0000-0000-000000000001','52400000-0000-0000-0000-000000000004',0);"
 expect_fail "unknown thread is unavailable" "chat thread is unavailable for this subject" \
   "select * from public.qry_chat_thread_stream_v1('52100000-0000-0000-0000-000000000001','52400000-0000-0000-0000-000000000099',0);"
-expect_fail "merged guest generic current stream is denied" "chat stream read requires an active canonical subject" \
+expect_fail "deletion-pending subject generic current stream is denied" "chat stream read requires an active canonical subject" \
   "select * from public.qry_chat_thread_stream_v1('52100000-0000-0000-0000-000000000004','52400000-0000-0000-0000-000000000006',0);"
 expect_fail "chat stream subject is required" "chat stream subject is required" \
   "select * from public.qry_chat_thread_stream_v1(null,'52400000-0000-0000-0000-000000000001',0);"
