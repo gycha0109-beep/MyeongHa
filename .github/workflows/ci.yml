@@ -140,9 +140,6 @@ jobs:
         run: bash test/db/subject_profile_current_query.sh
       - name: Run chat thread sequence stream read tests
         run: bash test/db/chat_thread_stream_query.sh
-      - name: Diagnose Subject trigger catalog before merge-job fixture
-        run: |
-          psql -P pager=off -c "select t.tgname, n.nspname as function_schema, p.proname as function_name, p.oid as function_oid from pg_trigger t join pg_class c on c.oid=t.tgrelid join pg_proc p on p.oid=t.tgfoid join pg_namespace n on n.oid=p.pronamespace where c.oid='public.subjects'::regclass and not t.tgisinternal order by t.tgname"
       - name: Run current Subject Merge Job projection read tests
         run: bash test/db/subject_merge_job_query.sh
       - name: Verify deterministic schema catalog snapshot
