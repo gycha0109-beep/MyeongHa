@@ -4,30 +4,27 @@ Status: **executable research protocol / human collection blocked / no threshold
 
 ## 1. Goal
 
-FR-6 defines how a future real calibration study may be conducted without allowing data leakage, reviewer leakage, privacy ambiguity, or premature source promotion.
-
-The pipeline is now:
+FR-6 defines how a future real face-calibration study may be conducted without source drift, participant leakage, reviewer leakage, threshold leakage, or ambiguous face-data handling.
 
 ```text
 scan-checked traditional criterion
-→ reviewed morphology-label instruction
-→ reviewed capture/quality/retention protocol
+→ reviewed labeling instruction
+→ reviewed capture quality policy
+→ reviewed review-artifact retention policy
 → consented pseudonymous participants
 → independent repeat captures
 → participant-level selection/holdout split
-→ reviewers blind to metric + peer labels
-→ deterministic label consensus
+→ blinded independent labels
+→ deterministic consensus
 → repeat-capture evidence
 → blinded expert evidence
-→ threshold-selection artifact
+→ threshold-selection result
 → FR-5 calibration authorization
 ```
 
-FR-6 does **not** estimate a threshold.
+FR-6 does **not** estimate or seed a production threshold.
 
-## 2. Current research target
-
-Initial vertical:
+## 2. Current vertical
 
 ```text
 methodology:
@@ -43,116 +40,179 @@ neutral metric:
 neutral.nose.bridge.centerline_rms_deviation@0.1.0
 ```
 
-Current direct source authority remains:
+The current direct MyeongHa source passage remains:
 
 ```text
 passage.shenxiang.five_officers.discernment
 verificationStatus = unverified_ocr
 ```
 
-The 1925 NLC/Wikimedia PDF is indexed with the 五官/審辨官 text, and later transmission witnesses reproduce the passage, but the current environment could not fetch the approximately 19 MB PDF body for direct page screenshot verification.
+The 1925 NLC/Wikimedia scan is search-indexed with the relevant 五官/審辨官 content, but direct PDF-page verification remains blocked by the current large-file fetch limit. Later transmission material also corroborates the wording, but it does not convert the NLC witness to `scan_checked`.
 
-Therefore:
+Therefore the real calibration study remains blocked.
 
-```text
-indexed scan text != scan_checked source passage
-```
+## 3. Protocol registry
 
-The calibration study remains blocked.
-
-## 3. Research capture proposal
-
-Current research protocol candidate:
+Current registry:
 
 ```text
-capture mode: frontal
-sessions per participant: 2
-accepted captures per session: 2
-independent recapture: required
+calibration-protocol.face.nose_bridge.research_v0@0.3.0
 ```
 
-These numbers are **research defaults**, not production truth.
+It contains four authority groups:
 
-Their role is to make repeatability measurable before a production protocol is approved.
+```text
+support artifacts
+capture protocol
+labeling protocol
+split policy
+study protocol
+```
 
-Production collection still requires explicit review of:
+The study cannot become `authorized_to_collect` merely by changing its own status.
 
-- capture quality policy
-- device/camera variance policy
-- session separation definition
-- pose normalization acceptance
-- review-artifact retention
-- participant consent language
+Every linked authority must pass its own gate.
 
-## 4. Face data terminology and privacy
+## 4. Support-artifact authority
 
-FR-6 does not describe face imagery as truly deidentified.
+FR-6 removes string-only quality/retention/instruction placeholders as sufficient authority.
 
-A face remains potentially identifying even when:
+The registry contains typed support artifacts:
 
-- account identity is removed
-- EXIF is stripped
-- a pseudonymous participant key is used
+### 4.1 Capture quality policy
 
-Therefore FR-6 uses:
+```text
+quality.face.calibration.frontal@0.1.0
+```
+
+Research checks include:
+
+- one face
+- frontal pose
+- sharpness
+- nose-bridge visibility
+- major occlusion
+
+The exact acceptance policy is still research-only and must be reviewed before collection.
+
+### 4.2 Review-artifact retention policy
+
+```text
+retention.face.calibration.review_artifact@0.1.0
+```
+
+It declares:
+
+```text
+containsPotentiallyIdentifyingFace = true
+deleteTrigger = labeling_and_audit_complete
+accessScope = assigned_reviewers_and_auditors
+trainingReuseAllowed = false
+identityMatchingAllowed = false
+```
+
+A reviewed retention artifact must also define a positive `maxRetentionDays`.
+
+The current research artifact intentionally has:
+
+```text
+maxRetentionDays = null
+```
+
+so it cannot be promoted accidentally.
+
+### 4.3 Labeling instruction
+
+```text
+instructions.face.bridge_straight@0.1.0
+```
+
+It is pinned to:
+
+```text
+method.shenxiang.five_officers@0.1.0
+criterion.discernment.bridge_straight
+passage.shenxiang.five_officers.discernment
+```
+
+Reviewers must not see:
+
+```text
+metric values
+candidate threshold
+peer labels
+fortune output
+```
+
+The instruction itself is still research-only because the direct source passage is not scan-checked.
+
+## 5. Face-data terminology
+
+FR-6 does not call face imagery truly deidentified.
+
+Removing account identity and EXIF does not remove the possibility of identifying a person from their face.
+
+FR-6 therefore uses:
 
 ```text
 consented_pseudonymous
 ```
 
-The capture policy requires:
+for human calibration participants and review artifacts.
+
+The original source image policy requires:
 
 ```text
 EXIF stripped before processing
-original source image deleted after review-artifact creation
+original deleted after review-artifact creation
 training reuse = false
 identity embedding = false
-identity matching = false
 ```
 
-The temporary review artifact explicitly declares:
+The review artifact remains explicitly potentially identifying and is governed by its retention policy.
+
+The older FR-5 `consented_deidentified` label is legacy terminology. No real human evidence exists under that label; evidence-contract terminology should be migrated before FR-6 outputs are converted into FR-5 human evidence artifacts.
+
+## 6. Research capture proposal
+
+Current research candidate:
 
 ```text
-containsPotentiallyIdentifyingFace = true
+capture mode = single frontal
+sessions per participant = 2
+accepted captures per session = 2
+independent recapture required = true
 ```
 
-It requires its own retention-policy authority before human collection is authorized.
+These are research protocol defaults, not universal production truths.
 
-FR-5's earlier `consented_deidentified` name should be treated as legacy terminology until the evidence-contract migration is completed; no real human calibration evidence currently exists under that value.
+They exist to make repeatability measurable and are versioned so they can be changed after protocol review.
 
-## 5. Review protocol
+## 7. Labeling protocol
 
-Current research labeling candidate:
+Current research candidate:
 
 ```text
 reviewers per item = 3
 labels = met | not_met | abstain
 blind to metric values = true
 blind to peer labels = true
-independent first labels = true
-abstain = allowed
+independent initial labels = true
+abstain allowed = true
 ```
 
-Reviewers judge the traditional morphology criterion, not the numeric metric.
+Reviewer records structurally contain no metric or threshold fields.
 
-They must not see:
+The human task is to judge the morphology criterion, not reverse-engineer the numerical classifier.
 
-- bridge RMS value
-- proposed threshold
-- other reviewers' labels
-- predicted face-reading result
-- wealth/career/fortune output
+## 8. Research consensus rule
 
-The label record schema contains no metric field.
-
-## 6. Research consensus candidate
-
-Current research candidate:
+Current candidate:
 
 ```text
 kind = supermajority_non_abstain
-min agreement fraction = 2/3
-min non-abstain labels = 2
+minAgreementFraction = 2/3
+minNonAbstainLabels = 2
 ```
 
 Examples:
@@ -168,52 +228,34 @@ met / not_met / abstain
 → no_consensus
 ```
 
-`no_consensus` is retained as data. It is not silently forced into either class.
+`no_consensus` remains explicit evidence and is never force-labeled.
 
-These agreement values are protocol candidates and may be changed only through a versioned protocol revision, not by runtime code.
+This is a research consensus rule. It is not a magical correctness threshold.
 
-## 7. Participant-level split
+## 9. Participant-level split
 
-FR-6 makes subject leakage a hard failure.
+The dataset is split by participant, never by image.
 
 ```text
 partition = selection | holdout
-split unit = participant
+splitUnit = participant
+participantLeakageAllowed = false
+captureFamilyLeakageAllowed = false
 ```
 
 Forbidden:
 
 ```text
-same participant
-  capture A → selection
-  capture B → holdout
+same participant:
+photo A → selection
+photo B → holdout
 ```
 
-Also forbidden:
+Repeated measurements from the same person are correlated; image-level random splitting would inflate apparent generalization.
 
-```text
-same capture family → multiple participants
-same capture family → multiple partitions
-```
+This design is consistent with repeated-measures validation literature warning that subject overlap between development and evaluation can produce optimistic performance estimates.
 
-The manifest validator requires accepted observations in both partitions.
-
-## 8. Why capture-level random split is invalid
-
-Repeated captures from one face are strongly correlated.
-
-If one photograph of a participant is used to select the threshold and another photograph of the same participant appears in holdout evaluation, the apparent generalization is inflated.
-
-Therefore:
-
-```text
-all observations from a participant
-→ exactly one partition
-```
-
-This is enforced by code, not by convention.
-
-## 9. Threshold-selection blindness
+## 10. Holdout isolation
 
 The split policy fixes:
 
@@ -222,28 +264,28 @@ thresholdSelectionMayReadHoldout = false
 finalEvaluationMayReadSelectionLabels = false
 ```
 
-The intended flow is:
+Intended flow:
 
 ```text
 selection participants
-→ repeatability analysis
-→ blinded morphology labels
+→ repeatability
+→ labels
 → threshold selection
+→ freeze threshold
 
 holdout participants
-→ frozen threshold only
-→ final evaluation
+→ final evaluation only
 ```
 
-A threshold cannot be tuned after inspecting holdout outcomes without creating a new study/version.
+If holdout outcomes are used to retune the threshold, that requires a new study/version.
 
-## 10. Calibration manifest contract
+## 11. Calibration manifest
 
-Each observation records only pseudonymous study metadata:
+Accepted records carry pseudonymous study references:
 
 ```text
 observationRef
-reviewItemRef (accepted captures only)
+reviewItemRef
 participantKey
 captureFamilyKey
 captureSessionKey
@@ -252,27 +294,29 @@ partition
 metricRef
 protocolRef
 accepted
-rejectionReason
 ```
 
-The manifest validator rejects:
+Rejected records carry a rejection reason and do not expose a review item.
+
+The validator rejects:
 
 - duplicate observation refs
-- duplicate review-item refs
+- duplicate review item refs
 - duplicate ordinal within participant/session
 - participant leakage
 - capture-family leakage
-- capture family shared by different participants
-- accepted item without review artifact
-- rejected item with review artifact
-- rejected item without reason
-- insufficient independent sessions
+- one capture family attached to multiple participants
+- accepted capture without review artifact
+- rejected capture with review artifact
+- rejected capture without reason
+- insufficient sessions
 - insufficient accepted captures per session
-- missing accepted selection or holdout data
+- no accepted selection partition
+- no accepted holdout partition
 
-## 11. Label dataset contract
+## 12. Label dataset
 
-A label record contains:
+A label record contains only:
 
 ```text
 itemRef
@@ -281,36 +325,20 @@ label
 labelingProtocolRef
 ```
 
-It deliberately does not contain:
+The validator rejects:
+
+- item not present as accepted review artifact
+- duplicate label by the same reviewer for the same item
+- unsupported label
+- wrong labeling protocol
+- any accepted review item without required reviewer coverage
+
+## 13. Deterministic consensus
+
+`evaluateFaceCalibrationLabelConsensus()` returns:
 
 ```text
-metricValue
-threshold
-peerLabels
-fortuneResult
-```
-
-Validation requires:
-
-- every label item resolves to an accepted review artifact
-- no duplicate reviewer label per item
-- all accepted review items receive the protocol-required reviewer coverage
-- exact protocol reference
-- bounded label vocabulary
-
-## 12. Deterministic consensus
-
-`evaluateFaceCalibrationLabelConsensus()` converts the independent labels into:
-
-```text
-met
-not_met
-no_consensus
-```
-
-and records:
-
-```text
+state = met | not_met | no_consensus
 metCount
 notMetCount
 abstainCount
@@ -318,57 +346,86 @@ nonAbstainCount
 agreementFraction
 ```
 
-No LLM adjudication is involved.
+No LLM adjudication is used.
 
-## 13. Human collection promotion gate
+## 14. Human collection gate
 
-A study may use:
+`executionState = authorized_to_collect` is valid only when all of the following are true:
 
-```text
-executionState = authorized_to_collect
-```
+1. all traditional source passages used by the study are at least `scan_checked`
+2. methodology is at least reviewed
+3. capture protocol is at least reviewed
+4. labeling protocol is at least reviewed
+5. split policy is at least reviewed
+6. linked capture-quality artifact is at least reviewed
+7. linked review-retention artifact is at least reviewed and has a positive retention limit
+8. linked labeling instruction is at least reviewed
+9. blocking reasons are empty
+10. study itself is no longer research-only
 
-only when:
+Thus changing the study enum alone cannot authorize human face collection.
 
-1. every traditional source used by the labeling protocol is at least `scan_checked`
-2. the methodology is no longer research-only
-3. capture protocol is no longer research-only
-4. labeling protocol is no longer research-only
-5. blocking reasons are empty
-6. study status is no longer research
+## 15. Current state
 
-Current study fails these conditions by design.
-
-## 14. Current research registry
-
-```text
-calibration-protocol.face.nose_bridge.research_v0@0.2.0
-```
-
-Contains:
+Current research refs:
 
 ```text
-capture.nose_bridge.repeat_frontal@0.2.0
-label.shenxiang.discernment.bridge_straight@0.2.0
-split.face.calibration.participant_holdout@0.2.0
-study.face.nose_bridge.straight@0.2.0
+quality.face.calibration.frontal@0.1.0
+retention.face.calibration.review_artifact@0.1.0
+instructions.face.bridge_straight@0.1.0
+capture.nose_bridge.repeat_frontal@0.3.0
+label.shenxiang.discernment.bridge_straight@0.3.0
+split.face.calibration.participant_holdout@0.3.0
+study.face.nose_bridge.straight@0.3.0
 ```
 
-Current state:
+Current study:
 
 ```text
 executionState = blocked
 ```
 
-Blocking reasons include:
+Principal blockers:
 
-- direct 審辨官 source passage not yet scan-checked
-- capture/labeling protocol still research-only
-- quality/retention/instruction artifacts still research refs
+- direct 審辨官 source not scan-checked
+- quality/retention/instruction/capture/label/split authorities remain research-only
 
-## 15. Relation to FR-5
+## 16. Statistical research direction
 
-FR-6 generates the empirical evidence that FR-5 requires.
+FR-6 does not hard-code a repeatability cutoff yet.
+
+Current literature review supports the following **research candidates**:
+
+### Repeated metric reliability
+
+For test-retest numeric measurements, an intraclass correlation coefficient should explicitly state:
+
+```text
+model
+type
+definition
+confidence interval
+```
+
+Absolute agreement is the relevant definition for repeated measurements if the same value is expected across sessions.
+
+Candidate future specification:
+
+```text
+model = two-way mixed-effects
+type = single measurement
+definition = absolute agreement
+```
+
+This still needs a protocol-specific acceptance rule rather than importing a generic rule-of-thumb cutoff blindly.
+
+### Reviewer reliability
+
+Because the labeling task is nominal and permits `abstain`, Krippendorff's alpha with bootstrap confidence intervals is a research candidate for inter-rater reliability reporting.
+
+Again, FR-6 does not seed a pass/fail alpha threshold.
+
+## 17. Relation to FR-5
 
 ```text
 FR-6 study
@@ -377,55 +434,51 @@ FR-6 study
 → threshold_selection_result
 
 FR-5
-→ validate exact evidence chain
-→ authorize calibration
-→ immutable runtime authorization
+→ exact evidence validation
+→ exact selected threshold binding
+→ immutable authorization
+→ criterion classifier
 ```
 
-FR-6 does not bypass FR-5.
+FR-6 governs collection and evaluation design.
 
-FR-5 does not dictate how human data are collected.
+FR-5 governs calibration promotion and runtime authorization.
 
-## 16. Product effect
+Neither layer may bypass the other.
 
-This infrastructure exists so that, once calibrated, MyeongHa can say something decisive such as:
+## 18. Product consequence
+
+Once this chain is genuinely closed, a consumer-facing result can be decisive:
 
 ```text
 코 중심축은 審辨官의 직선 조건을 분명하게 충족합니다.
 ```
 
-without the sentence being based on:
+That confidence comes from reproducible evidence, not vague prose or an LLM's visual intuition.
 
-- arbitrary developer threshold
-- one photograph
-- a model's visual intuition
-- reviewers who saw the metric
-- leakage from the same participant into evaluation
-
-The consumer sentence may be confident because the evidence chain is explicit and reproducible.
-
-## 17. Not authorized yet
+## 19. Not authorized
 
 FR-6 does not authorize:
 
-- human participant recruitment
-- real face calibration collection
-- any production threshold
+- recruiting real participants
+- collecting real calibration faces
+- production bridge threshold
 - `梁柱端直` production claim
 - `審辨官成`
-- health/intelligence/morality/criminality inference
 - identity recognition
-- training reuse of participant faces
+- training reuse of calibration faces
+- health/intelligence/morality/criminality inference
 
-## 18. Next
+## 20. Next
 
-FR-7 should close the remaining prerequisites in this order:
+FR-7 should close prerequisites in this order:
 
-1. obtain direct scan-page verification for the 審辨官 source passage
-2. define a versioned morphology-label instruction artifact from that verified wording
-3. define concrete frontal quality acceptance criteria and their provenance
-4. define review-artifact retention/deletion procedure
-5. define subject recruitment/consent protocol
-6. define repeat-capture stability statistic and acceptance criterion
-7. define threshold-selection evaluation artifact over participant-disjoint selection/holdout data
-8. only then consider a real calibration pilot
+1. direct scan-page verification of the 審辨官 passage
+2. migrate FR-5 human evidence terminology to `consented_pseudonymous`
+3. turn the labeling instruction into a reviewed artifact based on scan-checked wording
+4. define concrete frontal capture acceptance policy
+5. approve a bounded review-artifact retention duration
+6. define repeatability statistic/report schema
+7. define reviewer-reliability statistic/report schema
+8. define selection/holdout evaluation artifact schemas
+9. only after those gates, consider a consented pilot
