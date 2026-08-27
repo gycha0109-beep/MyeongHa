@@ -27,7 +27,7 @@ export const FR17_NEUTRAL_DERIVATION_EVIDENCE: readonly NeutralDerivationEvidenc
   Object.freeze({
     evidenceRef: 'evidence.fr17.kbeauty.face_observation_contract',
     sourceClass: 'kbeauty_runtime_inspection' as const,
-    sourceRef: 'gycha0109-beep/K_beauty@81c3b4139efdffc785439da005557dc38a6b4873:lib/face-lab-observation-contract.js#blob=4d0956b96daa57c0e0bb3a0f6de15b69775a22ed',
+    sourceRef: 'gycha0109-beep/K_beauty@81c3b4139efdffc785439da005557dc38a6b4873:lib/face-lab-observation-contract.js#blob=94315afc85f35e6bee3a5ea149895c875ed9d25a',
     observedValue: 'Current FaceLab observation contract exposes bounded qualitative enums for outline, vertical balance, eyes, feature layout, visual language, and color appearance; it does not expose landmark coordinates or neutral brow/nose geometry derivations.',
     authorityState: 'research_only' as const,
     limitations: Object.freeze([
@@ -49,12 +49,7 @@ export const FR17_NEUTRAL_DERIVATION_EVIDENCE: readonly NeutralDerivationEvidenc
 ] as const);
 
 const ALLOWED_RECORD_KEYS = new Set([
-  'evidenceRef',
-  'sourceClass',
-  'sourceRef',
-  'observedValue',
-  'authorityState',
-  'limitations',
+  'evidenceRef', 'sourceClass', 'sourceRef', 'observedValue', 'authorityState', 'limitations',
 ]);
 
 function exactKeys(value: object, allowed: ReadonlySet<string>, path: string): void {
