@@ -108,6 +108,27 @@ export interface CharacterBehaviorPolicyContent {
   readonly rules: readonly CharacterBehaviorRule[];
 }
 
+/**
+ * Human-authored, versioned non-semantic wrapper text for the strict Saju-bearing baseline.
+ * No dynamic interpolation is supported: provider selection chooses keys only.
+ */
+export interface CharacterSajuSafeFramingEntryV1 {
+  readonly key: string;
+  readonly text: string;
+  readonly purpose:
+    | 'record_transition'
+    | 'current_life_question'
+    | 'uncertainty_transition'
+    | 'relationship_transition';
+}
+
+export interface CharacterSajuSafeFramingCatalogV1 {
+  readonly schemaVersion: 'v1';
+  readonly catalogVersion: string;
+  readonly before: readonly CharacterSajuSafeFramingEntryV1[];
+  readonly after: readonly CharacterSajuSafeFramingEntryV1[];
+}
+
 export interface CharacterSajuProfileContent {
   readonly profileVersion: string;
   readonly attentionAxes: readonly string[];
@@ -119,6 +140,8 @@ export interface CharacterSajuProfileContent {
     readonly maySuggestAnotherCharacter: boolean;
     readonly conditions: readonly string[];
   };
+  /** Optional until real roster authoring; required by the strict Saju-bearing renderer. */
+  readonly safeFraming?: CharacterSajuSafeFramingCatalogV1;
 }
 
 export type RelationshipStateBand = 'low' | 'medium' | 'high';
