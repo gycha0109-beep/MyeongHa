@@ -78,6 +78,8 @@ jobs:
         run: bash test/db/chat_attempt_commit_concurrency.sh
       - name: Run chat retry/abandon persistence/concurrency tests
         run: bash test/db/chat_retry_abandon_concurrency.sh
+      - name: Run Birth Profile create persistence/concurrency tests
+        run: bash test/db/birth_profile_create_concurrency.sh
       - name: Run birth revision append persistence/concurrency tests
         run: bash test/db/birth_revision_append_concurrency.sh
       - name: Run reading session create persistence/concurrency tests
