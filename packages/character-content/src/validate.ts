@@ -114,6 +114,54 @@ function validateBehavior(characterId: string, behavior: CharacterBehaviorPolicy
   }
 }
 
+const SAFE_FRAMING_PURPOSES = new Set([
+  'record_transition',
+  'current_life_question',
+  'uncertainty_transition',
+  'relationship_transition',
+]);
+
+function validateSafeFraming(
+  characterId: string,
+  profile: CharacterSajuProfileContent,
+): void {
+  const catalog = profile.safeFraming;
+  if (catalog === undefined) return;
+  const path = `${characterId}.sajuProfile.safeFraming`;
+  if (catalog.schemaVersion !== 'v1') {
+    throw new CharacterContentValidationError(`${path}.schemaVersion must be v1`);
+  }
+  nonEmpty(catalog.catalogVersion, `${path}.catalogVersion`);
+  nonEmptyArray(catalog.before, `${path}.before`);
+  nonEmptyArray(catalog.after, `${path}.after`);
+  unique(
+    [...catalog.before, ...catalog.after].map((entry) => entry.key),
+    `${path}.keys`,
+  );
+
+  for (const [placement, entries] of [
+    ['before', catalog.before],
+    ['after', catalog.after],
+  ] as const) {
+    for (const [index, entry] of entries.entries()) {
+      const entryPath = `${path}.${placement}[${index}]`;
+      stableKey(entry.key, `${entryPath}.key`);
+      nonEmpty(entry.text, `${entryPath}.text`);
+      if (entry.text.length > 500) {
+        throw new CharacterContentValidationError(`${entryPath}.text exceeds 500 characters`);
+      }
+      if (/[{}]/u.test(entry.text)) {
+        throw new CharacterContentValidationError(
+          `${entryPath}.text must not contain dynamic interpolation tokens`,
+        );
+      }
+      if (!SAFE_FRAMING_PURPOSES.has(entry.purpose)) {
+        throw new CharacterContentValidationError(`${entryPath}.purpose is unknown`);
+      }
+    }
+  }
+}
+
 function validateSajuProfile(characterId: string, profile: CharacterSajuProfileContent): void {
   const path = `${characterId}.sajuProfile`;
   nonEmpty(profile.profileVersion, `${path}.profileVersion`);
@@ -126,6 +174,7 @@ function validateSajuProfile(characterId: string, profile: CharacterSajuProfileC
   if (!profile.referralBehavior.maySuggestAnotherCharacter && profile.referralBehavior.conditions.length > 0) {
     throw new CharacterContentValidationError(`${path}.referralBehavior.conditions requires maySuggestAnotherCharacter=true`);
   }
+  validateSafeFraming(characterId, profile);
 }
 
 const RELATIONSHIP_BANDS = new Set<RelationshipStateBand>(['low', 'medium', 'high']);
