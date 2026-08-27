@@ -80,6 +80,19 @@ jobs:
         run: bash test/db/chat_retry_abandon_concurrency.sh
       - name: Run Birth Profile create persistence/concurrency tests
         run: bash test/db/birth_profile_create_concurrency.sh
+      - name: Run Target Person create persistence/concurrency tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          target_db=myeongha_target_person_test
+          createdb "$target_db"
+          trap 'dropdb --if-exists "$target_db"' EXIT
+          PGDATABASE="$target_db" psql -v ON_ERROR_STOP=1 -f test/db/bootstrap_supabase_auth_stub.sql
+          for migration in supabase/migrations/*.sql; do
+            echo "Applying ${migration} to isolated Target Person test DB"
+            PGDATABASE="$target_db" psql -v ON_ERROR_STOP=1 -f "$migration" >/dev/null
+          done
+          PGDATABASE="$target_db" bash test/db/target_person_create_concurrency.sh
       - name: Run birth revision append persistence/concurrency tests
         run: bash test/db/birth_revision_append_concurrency.sh
       - name: Run reading session create persistence/concurrency tests
