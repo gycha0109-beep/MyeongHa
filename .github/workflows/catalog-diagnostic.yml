@@ -1,0 +1,48 @@
+name: Catalog Diagnostic
+
+on:
+  push:
+    branches:
+      - feat/birth-profile-current-revision-read-v0.1
+
+permissions:
+  contents: read
+
+jobs:
+  catalog:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: myeongha_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d myeongha_test"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: myeongha_test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: sudo apt-get update -qq >/dev/null && sudo apt-get install -y -qq postgresql-client >/dev/null
+      - name: Apply migrations
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 -f test/db/bootstrap_supabase_auth_stub.sql >/dev/null
+          for migration in supabase/migrations/*.sql; do
+            psql -v ON_ERROR_STOP=1 -f "${migration}" >/dev/null
+          done
+      - name: Print catalog hash
+        run: bash test/db/catalog_snapshot.sh
