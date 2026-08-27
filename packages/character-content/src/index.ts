@@ -2,3 +2,4 @@ export * from './schema.js';
 export * from './validate.js';
 export * from './release.js';
 export * from './face-presentation.js';
+export * from './face-followup.js';

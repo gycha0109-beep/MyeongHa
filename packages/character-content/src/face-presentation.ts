@@ -5,6 +5,11 @@ export type CharacterFacePresentationModeV1 =
   | 'contrast_first'
   | 'detail_first';
 
+export type CharacterFaceFollowUpStrategyV1 =
+  | 'inspect_dominant_feature'
+  | 'explore_contrast_axis'
+  | 'inspect_local_detail';
+
 export interface CharacterFacePresentationProfileV1 {
   readonly schemaVersion: 'v1';
   readonly profileVersion: string;
