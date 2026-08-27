@@ -1,14 +1,22 @@
 import { createHash } from 'node:crypto';
 import {
+  validateCharacterFacePresentationProfileV1,
+  type CharacterFacePresentationModeV1,
+  type CharacterFacePresentationProfileV1,
+} from '../../character-content/src/face-presentation.js';
+import {
   projectResearchFaceDiagnosisGrounding,
   type FaceResearchCharacterGrounding,
   type FaceResearchDiagnosisOutput,
 } from '../../face-reading/src/index.js';
 
-export type CharacterFacePresentationModeV1 =
-  | 'strongest_first'
-  | 'contrast_first'
-  | 'detail_first';
+export {
+  validateCharacterFacePresentationProfileV1,
+};
+export type {
+  CharacterFacePresentationModeV1,
+  CharacterFacePresentationProfileV1,
+};
 
 export type CharacterFacePresentationFocusV1 =
   | 'dominant_feature'
@@ -20,12 +28,6 @@ export type CharacterFaceFollowUpStrategyV1 =
   | 'explore_contrast_axis'
   | 'inspect_local_detail';
 
-export interface CharacterFacePresentationProfileV1 {
-  readonly schemaVersion: 'v1';
-  readonly profileVersion: string;
-  readonly mode: CharacterFacePresentationModeV1;
-}
-
 export interface CharacterFacePresentationBlockV1 {
   readonly key: string;
   readonly text: string;
@@ -34,6 +36,7 @@ export interface CharacterFacePresentationBlockV1 {
 export interface CharacterFacePresentationV1 {
   readonly schemaVersion: 'v1';
   readonly characterId: string;
+  readonly characterContentVersion: string;
   readonly profileVersion: string;
   readonly requestedMode: CharacterFacePresentationModeV1;
   readonly effectiveMode: CharacterFacePresentationModeV1;
@@ -55,12 +58,6 @@ interface ClassifiedBlocks {
   readonly tension: CharacterFacePresentationBlockV1 | null;
 }
 
-const PRESENTATION_MODES = new Set<CharacterFacePresentationModeV1>([
-  'strongest_first',
-  'contrast_first',
-  'detail_first',
-]);
-
 function nonEmpty(value: string, path: string): void {
   if (value.trim().length === 0) {
     throw new CharacterFacePresentationError(`${path} must be non-empty.`);
@@ -73,19 +70,6 @@ function deepFreeze<T>(value: T): T {
     Object.freeze(value);
   }
   return value;
-}
-
-export function validateCharacterFacePresentationProfileV1(
-  profile: CharacterFacePresentationProfileV1,
-): CharacterFacePresentationProfileV1 {
-  if (profile.schemaVersion !== 'v1') {
-    throw new CharacterFacePresentationError('face presentation profile schemaVersion must be v1.');
-  }
-  nonEmpty(profile.profileVersion, 'facePresentation.profileVersion');
-  if (!PRESENTATION_MODES.has(profile.mode)) {
-    throw new CharacterFacePresentationError(`Unsupported face presentation mode: ${String(profile.mode)}`);
-  }
-  return profile;
 }
 
 function classifyApprovedBlocks(grounding: FaceResearchCharacterGrounding): ClassifiedBlocks {
@@ -254,10 +238,8 @@ function presentationPlan(
 export function presentResearchFaceDiagnosisForCharacter(input: {
   readonly diagnosis: FaceResearchDiagnosisOutput;
   readonly groundingVersion: string;
-  readonly characterId: string;
   readonly profile: CharacterFacePresentationProfileV1;
 }): CharacterFacePresentationV1 {
-  nonEmpty(input.characterId, 'characterId');
   validateCharacterFacePresentationProfileV1(input.profile);
 
   // This call also rejects a structurally forged research diagnosis object.
@@ -268,7 +250,8 @@ export function presentResearchFaceDiagnosisForCharacter(input: {
 
   return deepFreeze({
     schemaVersion: 'v1' as const,
-    characterId: input.characterId,
+    characterId: input.profile.characterId,
+    characterContentVersion: input.profile.characterContentVersion,
     profileVersion: input.profile.profileVersion,
     requestedMode: input.profile.mode,
     effectiveMode: plan.effectiveMode,
