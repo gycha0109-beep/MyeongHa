@@ -14,7 +14,10 @@ import {
   type FiveOfficerCriterionDefinition,
   type FiveOfficerKey,
 } from './five-officers-six-fus-research-v0.js';
-import { projectCharacterFaceGrounding } from './semantic-projection.js';
+import {
+  assertNoConsumerProseInSemanticReading,
+  projectCharacterFaceGrounding,
+} from './semantic-projection.js';
 import { FaceAuthorityValidationError } from './validation.js';
 
 export type FaceResearchAssertionAuthority = 'research_fixture' | 'human_label_assertion';
@@ -58,6 +61,13 @@ export interface FaceResearchDiagnosisOutput {
   readonly reading: ProductFaceReadingSemanticV3;
   readonly claims: readonly FaceClaim[];
   readonly narrative: FaceResearchConsumerNarrative;
+}
+
+export interface FaceResearchCharacterGrounding extends CharacterFaceGrounding {
+  readonly authorityState: 'research_only';
+  readonly assertionAuthority: FaceResearchAssertionAuthority;
+  readonly evidenceRefs: readonly string[];
+  readonly semanticSignature: string;
 }
 
 interface OfficerRuntimeEntry {
@@ -382,6 +392,7 @@ export function buildResearchFaceDiagnosis(input: FaceResearchDiagnosisInput): F
     unavailableSections,
     prohibitedInferences: PROHIBITED_INFERENCES,
   };
+  assertNoConsumerProseInSemanticReading(reading);
 
   const framing = '전통 관상 체계의 오관 정적 조건을 기준으로 읽은 연구 판독입니다.';
   const verdict = verdictText(lead);
@@ -435,7 +446,7 @@ export function buildResearchFaceDiagnosis(input: FaceResearchDiagnosisInput): F
 export function projectResearchFaceDiagnosisGrounding(
   output: FaceResearchDiagnosisOutput,
   groundingVersion: string,
-): CharacterFaceGrounding {
+): FaceResearchCharacterGrounding {
   if (!issuedResearchDiagnoses.has(output)) {
     throw new FaceAuthorityValidationError('Research face diagnosis was not issued by this runtime instance.');
   }
@@ -447,6 +458,10 @@ export function projectResearchFaceDiagnosisGrounding(
   });
   return deepFreeze({
     ...semanticGrounding,
+    authorityState: 'research_only' as const,
+    assertionAuthority: output.assertionAuthority,
+    evidenceRefs: [...output.evidenceRefs],
+    semanticSignature: output.semanticSignature,
     approvedNarrativeBlocks: output.narrative.blocks.map((block) => ({ key: block.blockKey, text: block.text })),
   });
 }
