@@ -55,11 +55,11 @@ insert into public.subject_merge_jobs(
   ('53400000-0000-0000-0000-000000000003','53200000-0000-0000-0000-000000000013','53200000-0000-0000-0000-000000000003','53300000-0000-0000-0000-000000000013','merge-policy-v1','completed','{}'::jsonb,jsonb_build_object('result','applied'),'internal-merge-dedupe-3',timestamptz '2026-08-22 03:00:00+00',timestamptz '2026-08-22 03:00:05+00');
 SQL
 
-active_row=$("${psql_base[@]}" -Atc "select merge_job_id||'|'||policy_version||'|'||status||'|'||conflicts_jsonb->'birthProfile'->>'kind'||'|'||coalesce(resolution_jsonb::text,'NULL') from public.qry_subject_merge_job_v1('53200000-0000-0000-0000-000000000001','53400000-0000-0000-0000-000000000001');")
+active_row=$("${psql_base[@]}" -Atc "select merge_job_id||'|'||policy_version||'|'||status||'|'||(conflicts_jsonb->'birthProfile'->>'kind')||'|'||coalesce(resolution_jsonb::text,'NULL') from public.qry_subject_merge_job_v1('53200000-0000-0000-0000-000000000001','53400000-0000-0000-0000-000000000001');")
 [[ "$active_row" == "53400000-0000-0000-0000-000000000001|merge-policy-v1|awaiting_resolution|current_conflict|NULL" ]] || fail "active member merge job projection mismatch: $active_row"
 pass "canonical member reads stored merge progress/conflict projection"
 
-pending_row=$("${psql_base[@]}" -Atc "select merge_job_id||'|'||status||'|'||resolution_jsonb->>'result'||'|'||to_char(completed_at at time zone 'UTC','YYYY-MM-DD HH24:MI:SS') from public.qry_subject_merge_job_v1('53200000-0000-0000-0000-000000000003','53400000-0000-0000-0000-000000000003');")
+pending_row=$("${psql_base[@]}" -Atc "select merge_job_id||'|'||status||'|'||(resolution_jsonb->>'result')||'|'||to_char(completed_at at time zone 'UTC','YYYY-MM-DD HH24:MI:SS') from public.qry_subject_merge_job_v1('53200000-0000-0000-0000-000000000003','53400000-0000-0000-0000-000000000003');")
 [[ "$pending_row" == "53400000-0000-0000-0000-000000000003|completed|applied|2026-08-22 03:00:05" ]] || fail "deletion-pending member merge job polling mismatch: $pending_row"
 pass "deletion-pending canonical member can poll an existing merge job without gaining merge-write authority"
 
