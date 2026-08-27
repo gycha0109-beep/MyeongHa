@@ -136,5 +136,7 @@ jobs:
         run: bash test/db/public_share_query.sh
       - name: Run Saju domain runtime projection read tests
         run: bash test/db/saju_domain_runtime_query.sh
+      - name: Run current Subject/Profile projection read tests
+        run: bash test/db/subject_profile_current_query.sh
       - name: Verify deterministic schema catalog snapshot
         run: bash test/db/catalog_snapshot.sh
