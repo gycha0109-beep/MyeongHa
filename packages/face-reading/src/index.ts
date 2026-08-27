@@ -8,6 +8,7 @@ export * from './evidence-reports.js';
 export * from './facelab-compat.js';
 export * from './facelab-fr3-requirements.js';
 export * from './five-officers-six-fus-research-v0.js';
+export * from './laterality-consumption-policy-fr20.js';
 export * from './neutral-derivation-algorithms-fr17.js';
 export * from './neutral-derivation-evidence-fr17.js';
 export * from './neutral-derivation-registry-fr17.js';
