@@ -64,6 +64,30 @@ export function validateFaceSemanticAnchorAuthorityFR13(): void {
   if (FACE_SEMANTIC_ANCHOR_REGISTRY_FR13.version.trim().length === 0) {
     throw new FaceAuthorityValidationError('FR-13 semantic anchor registry version is required.');
   }
+
+  const passageRefs = new Set(
+    FACE_AUTHORITY_RESEARCH_REGISTRY_FR13.passages.map((passage) => passage.passageId),
+  );
+  const conflictRefs = new Set(
+    FACE_AUTHORITY_RESEARCH_REGISTRY_FR13.conflicts.map((conflict) => conflict.conflictId),
+  );
+  for (const anchor of FACE_SEMANTIC_ANCHOR_REGISTRY_FR13.definitions) {
+    for (const sourceRef of anchor.sourceRefs) {
+      if (!passageRefs.has(sourceRef)) {
+        throw new FaceAuthorityValidationError(
+          `${anchor.anchorRef} semantic anchor sourceRef is unresolved: ${sourceRef}`,
+        );
+      }
+    }
+    for (const conflictRef of anchor.blockingConflictRefs ?? []) {
+      if (!conflictRefs.has(conflictRef)) {
+        throw new FaceAuthorityValidationError(
+          `${anchor.anchorRef} semantic anchor blockingConflictRef is unresolved: ${conflictRef}`,
+        );
+      }
+    }
+  }
+
   const expectedRef = `${FACE_SEMANTIC_ANCHOR_REGISTRY_FR13.registryId}@${FACE_SEMANTIC_ANCHOR_REGISTRY_FR13.version}`;
   if (FACE_RESEARCH_PACK_FR13.semanticAnchorRegistryRef !== expectedRef) {
     throw new FaceAuthorityValidationError('FR-13 methodology pack must pin the exact semantic anchor registry version.');
