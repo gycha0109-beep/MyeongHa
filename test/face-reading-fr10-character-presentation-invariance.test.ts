@@ -35,6 +35,10 @@ function diagnosisInput(): FaceResearchDiagnosisInput {
   };
 }
 
+function character(characterId: string, contentVersion = 'character-content-fr10-v1') {
+  return { characterId, contentVersion };
+}
+
 function profile(mode: CharacterFacePresentationModeV1, characterId: string) {
   return {
     schemaVersion: 'v1' as const,
@@ -50,6 +54,7 @@ function presentation(mode: CharacterFacePresentationModeV1, characterId: string
   return presentResearchFaceDiagnosisForCharacter({
     diagnosis,
     groundingVersion: 'face-grounding-fr10-v1',
+    character: character(characterId),
     profile: profile(mode, characterId),
   });
 }
@@ -108,7 +113,7 @@ describe('FR-10 character Face presentation invariance', () => {
     expect(detail.followUpStrategy).toBe('inspect_local_detail');
   });
 
-  it('pins each presentation to character identity and content version without changing diagnosis digest', () => {
+  it('pins each presentation to active character identity and content version without changing diagnosis digest', () => {
     const alpha = presentation('strongest_first', 'character.alpha');
     const beta = presentation('strongest_first', 'character.beta');
 
@@ -117,6 +122,28 @@ describe('FR-10 character Face presentation invariance', () => {
     expect(alpha.characterContentVersion).toBe('character-content-fr10-v1');
     expect(beta.characterContentVersion).toBe('character-content-fr10-v1');
     expect(alpha.protectedDiagnosisDigest).toBe(beta.protectedDiagnosisDigest);
+  });
+
+  it('rejects a profile whose character or content version does not match the active character', () => {
+    const diagnosis = buildResearchFaceDiagnosis(diagnosisInput());
+
+    expect(() =>
+      presentResearchFaceDiagnosisForCharacter({
+        diagnosis,
+        groundingVersion: 'face-grounding-fr10-v1',
+        character: character('character.alpha'),
+        profile: profile('strongest_first', 'character.beta'),
+      }),
+    ).toThrow(/characterId mismatch/u);
+
+    expect(() =>
+      presentResearchFaceDiagnosisForCharacter({
+        diagnosis,
+        groundingVersion: 'face-grounding-fr10-v1',
+        character: character('character.alpha', 'character-content-other-v1'),
+        profile: profile('strongest_first', 'character.alpha'),
+      }),
+    ).toThrow(/contentVersion mismatch/u);
   });
 
   it('preserves research authority and evidence provenance in every mode', () => {
@@ -167,6 +194,7 @@ describe('FR-10 character Face presentation invariance', () => {
     const value = presentResearchFaceDiagnosisForCharacter({
       diagnosis,
       groundingVersion: 'face-grounding-fr10-v1',
+      character: character('character.beta'),
       profile: profile('contrast_first', 'character.beta'),
     });
 
@@ -185,6 +213,7 @@ describe('FR-10 character Face presentation invariance', () => {
       presentResearchFaceDiagnosisForCharacter({
         diagnosis: forged,
         groundingVersion: 'face-grounding-fr10-v1',
+        character: character('character.fake'),
         profile: profile('strongest_first', 'character.fake'),
       }),
     ).toThrow(/was not issued/u);
