@@ -4,7 +4,6 @@ import {
   type FaceResearchDiagnosisInput,
 } from '../packages/face-reading/src/index.js';
 import {
-  CharacterFacePresentationError,
   presentResearchFaceDiagnosisForCharacter,
   validateCharacterFacePresentationProfileV1,
   type CharacterFacePresentationModeV1,
@@ -36,17 +35,22 @@ function diagnosisInput(): FaceResearchDiagnosisInput {
   };
 }
 
+function profile(mode: CharacterFacePresentationModeV1, characterId: string) {
+  return {
+    schemaVersion: 'v1' as const,
+    profileVersion: `face-presentation-${mode}-v1`,
+    characterId,
+    characterContentVersion: 'character-content-fr10-v1',
+    mode,
+  };
+}
+
 function presentation(mode: CharacterFacePresentationModeV1, characterId: string) {
   const diagnosis = buildResearchFaceDiagnosis(diagnosisInput());
   return presentResearchFaceDiagnosisForCharacter({
     diagnosis,
     groundingVersion: 'face-grounding-fr10-v1',
-    characterId,
-    profile: {
-      schemaVersion: 'v1',
-      profileVersion: `face-presentation-${mode}-v1`,
-      mode,
-    },
+    profile: profile(mode, characterId),
   });
 }
 
@@ -104,6 +108,17 @@ describe('FR-10 character Face presentation invariance', () => {
     expect(detail.followUpStrategy).toBe('inspect_local_detail');
   });
 
+  it('pins each presentation to character identity and content version without changing diagnosis digest', () => {
+    const alpha = presentation('strongest_first', 'character.alpha');
+    const beta = presentation('strongest_first', 'character.beta');
+
+    expect(alpha.characterId).toBe('character.alpha');
+    expect(beta.characterId).toBe('character.beta');
+    expect(alpha.characterContentVersion).toBe('character-content-fr10-v1');
+    expect(beta.characterContentVersion).toBe('character-content-fr10-v1');
+    expect(alpha.protectedDiagnosisDigest).toBe(beta.protectedDiagnosisDigest);
+  });
+
   it('preserves research authority and evidence provenance in every mode', () => {
     for (const mode of ['strongest_first', 'contrast_first', 'detail_first'] as const) {
       const value = presentation(mode, `character.${mode}`);
@@ -152,12 +167,7 @@ describe('FR-10 character Face presentation invariance', () => {
     const value = presentResearchFaceDiagnosisForCharacter({
       diagnosis,
       groundingVersion: 'face-grounding-fr10-v1',
-      characterId: 'character.beta',
-      profile: {
-        schemaVersion: 'v1',
-        profileVersion: 'face-presentation-contrast-v1',
-        mode: 'contrast_first',
-      },
+      profile: profile('contrast_first', 'character.beta'),
     });
 
     expect(value.requestedMode).toBe('contrast_first');
@@ -175,12 +185,7 @@ describe('FR-10 character Face presentation invariance', () => {
       presentResearchFaceDiagnosisForCharacter({
         diagnosis: forged,
         groundingVersion: 'face-grounding-fr10-v1',
-        characterId: 'character.fake',
-        profile: {
-          schemaVersion: 'v1',
-          profileVersion: 'face-presentation-fake-v1',
-          mode: 'strongest_first',
-        },
+        profile: profile('strongest_first', 'character.fake'),
       }),
     ).toThrow(/was not issued/u);
   });
@@ -190,8 +195,10 @@ describe('FR-10 character Face presentation invariance', () => {
       validateCharacterFacePresentationProfileV1({
         schemaVersion: 'v1',
         profileVersion: 'face-presentation-invalid-v1',
+        characterId: 'character.invalid',
+        characterContentVersion: 'character-content-fr10-v1',
         mode: 'fortune_rewrite' as CharacterFacePresentationModeV1,
       }),
-    ).toThrow(CharacterFacePresentationError);
+    ).toThrow(/Unsupported face presentation mode/u);
   });
 });
