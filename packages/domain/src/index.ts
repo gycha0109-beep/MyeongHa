@@ -45,6 +45,7 @@ export {
   assembleCharacterRuntimeContext,
   projectCharacterRelationshipBehavior,
   type CharacterRelationshipProjectionV1,
+  type CharacterRendererPolicyV1,
   type CharacterRuntimeContextV1,
   type CharacterSajuRuntimeContextV1,
   type GrantedLifeFactContextV1,
@@ -53,6 +54,16 @@ export {
   type RelationshipBandThresholds,
   type RelationshipRenderingProjectionPolicyV1,
 } from './character-runtime-context.js';
+
+export {
+  CharacterOutputGuardError,
+  guardCharacterRendererOutput,
+  type CharacterDialogueEnvelopeV1,
+  type CharacterMemoryProposalDraftV1,
+  type CharacterMemoryProposalKindV1,
+  type CharacterRendererDraftV1,
+  type CharacterSuggestedActionV1,
+} from './character-output-guard.js';
 
 export {
   MockSajuAdapter,
