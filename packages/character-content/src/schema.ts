@@ -148,7 +148,6 @@ export interface CharacterRelationshipBehaviorRule {
   readonly mode: CharacterRelationshipMode;
 }
 
-/** Rendering projection only. Relationship mutations remain server-policy authority. */
 export interface CharacterRelationshipBehaviorContent {
   readonly behaviorVersion: string;
   readonly defaultMode: CharacterRelationshipMode;
@@ -167,6 +166,8 @@ export interface CharacterContentDefinition {
   readonly speech: CharacterSpeechProfile;
   readonly capabilities: readonly CharacterCapabilityContent[];
   readonly assetRefs: readonly string[];
+  /** Character-content-pinned renderer allowlist. Required for authored runtime characters. */
+  readonly emotionIds?: readonly string[];
   readonly animationCueIds: readonly string[];
 
   readonly canon?: CharacterCanonProfile;
