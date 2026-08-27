@@ -18,9 +18,19 @@ export interface FaceCaptureProtocolDefinition {
     readonly independentRecaptureRequired: boolean;
   };
   readonly qualityPolicyRef: string;
-  readonly rawImageRetention: 'ephemeral_delete_after_observation';
-  readonly identityEmbeddingAllowed: false;
-  readonly participantPolicy: 'consented_deidentified';
+  readonly sourceImagePolicy: {
+    readonly exifStrippedBeforeProcessing: true;
+    readonly originalDeletedAfterReviewArtifactCreation: true;
+    readonly trainingReuseAllowed: false;
+    readonly identityEmbeddingAllowed: false;
+  };
+  readonly reviewArtifactPolicy: {
+    readonly containsPotentiallyIdentifyingFace: true;
+    readonly participantPolicy: 'consented_pseudonymous';
+    readonly retentionPolicyRef: string;
+    readonly identityMatchingAllowed: false;
+    readonly trainingReuseAllowed: false;
+  };
   readonly status: FaceCalibrationProtocolStatus;
 }
 
@@ -37,10 +47,14 @@ export interface FaceLabelingProtocolDefinition {
     readonly blindToPeerLabels: true;
     readonly independentInitialLabels: true;
     readonly allowAbstain: true;
-    readonly agreementRuleRef: string;
+    readonly agreementRule: {
+      readonly kind: 'supermajority_non_abstain';
+      readonly minAgreementFraction: number;
+      readonly minNonAbstainLabels: number;
+    };
   };
   readonly instructionArtifactRef: string;
-  readonly participantPolicy: 'consented_deidentified';
+  readonly participantPolicy: 'consented_pseudonymous';
   readonly status: FaceCalibrationProtocolStatus;
 }
 
@@ -87,6 +101,7 @@ export interface FaceCalibrationProtocolRegistry {
 
 export interface FaceCalibrationManifestRecord {
   readonly observationRef: string;
+  readonly reviewItemRef?: string;
   readonly participantKey: string;
   readonly captureFamilyKey: string;
   readonly captureSessionKey: string;
@@ -117,6 +132,16 @@ export interface FaceCalibrationLabelDataset {
   readonly version: string;
   readonly studyRef: string;
   readonly records: readonly FaceCalibrationLabelRecord[];
+}
+
+export interface FaceCalibrationLabelConsensus {
+  readonly itemRef: string;
+  readonly state: 'met' | 'not_met' | 'no_consensus';
+  readonly metCount: number;
+  readonly notMetCount: number;
+  readonly abstainCount: number;
+  readonly nonAbstainCount: number;
+  readonly agreementFraction: number | null;
 }
 
 export interface FaceCalibrationProtocolValidationContext {
@@ -226,6 +251,7 @@ export function validateFaceCalibrationProtocolRegistry(
       throw new FaceAuthorityValidationError(`${ref} must require independent recapture.`);
     }
     nonEmpty(protocol.qualityPolicyRef, `${ref}.qualityPolicyRef`);
+    nonEmpty(protocol.reviewArtifactPolicy.retentionPolicyRef, `${ref}.reviewArtifactPolicy.retentionPolicyRef`);
   }
 
   const methods = new Map(context.faceAuthorityRegistry.methodologies.map((method) => [methodologyRef(method), method] as const));
@@ -257,7 +283,13 @@ export function validateFaceCalibrationProtocolRegistry(
     if (!Number.isInteger(protocol.reviewerPlan.reviewersPerItem) || protocol.reviewerPlan.reviewersPerItem < 3) {
       throw new FaceAuthorityValidationError(`${ref} requires at least 3 independent reviewers per item.`);
     }
-    nonEmpty(protocol.reviewerPlan.agreementRuleRef, `${ref}.reviewerPlan.agreementRuleRef`);
+    const agreement = protocol.reviewerPlan.agreementRule;
+    if (!(agreement.minAgreementFraction > 0.5 && agreement.minAgreementFraction <= 1)) {
+      throw new FaceAuthorityValidationError(`${ref} agreement fraction must be > 0.5 and <= 1.`);
+    }
+    if (!Number.isInteger(agreement.minNonAbstainLabels) || agreement.minNonAbstainLabels < 2 || agreement.minNonAbstainLabels > protocol.reviewerPlan.reviewersPerItem) {
+      throw new FaceAuthorityValidationError(`${ref} minNonAbstainLabels must be between 2 and reviewersPerItem.`);
+    }
     nonEmpty(protocol.instructionArtifactRef, `${ref}.instructionArtifactRef`);
   }
 
@@ -334,9 +366,12 @@ export function validateFaceCalibrationDatasetManifest(
   if (manifest.records.length === 0) throw new FaceAuthorityValidationError(`${manifest.manifestId} requires records.`);
 
   const observationRefs = new Set<string>();
+  const reviewItemRefs = new Set<string>();
   const participantPartition = new Map<string, FaceCalibrationPartition>();
   const captureFamilyPartition = new Map<string, FaceCalibrationPartition>();
+  const captureFamilyParticipant = new Map<string, string>();
   const sessionOrdinals = new Set<string>();
+  const acceptedPartitions = new Set<FaceCalibrationPartition>();
 
   for (const record of manifest.records) {
     nonEmpty(record.observationRef, 'manifest.record.observationRef');
@@ -348,14 +383,25 @@ export function validateFaceCalibrationDatasetManifest(
     if (record.metricRef !== study.metricRef) throw new FaceAuthorityValidationError(`${record.observationRef} metricRef does not match study.`);
     if (record.protocolRef !== captureProtocolRef(captureProtocol)) throw new FaceAuthorityValidationError(`${record.observationRef} protocolRef does not match capture protocol.`);
     if (!Number.isInteger(record.captureOrdinal) || record.captureOrdinal < 1) throw new FaceAuthorityValidationError(`${record.observationRef} captureOrdinal must be a positive integer.`);
-    const ordinalKey = `${record.captureSessionKey}:${record.captureOrdinal}`;
-    if (sessionOrdinals.has(ordinalKey)) throw new FaceAuthorityValidationError(`Duplicate capture ordinal within session: ${ordinalKey}`);
+    const ordinalKey = `${record.participantKey}:${record.captureSessionKey}:${record.captureOrdinal}`;
+    if (sessionOrdinals.has(ordinalKey)) throw new FaceAuthorityValidationError(`Duplicate capture ordinal within participant/session: ${ordinalKey}`);
     sessionOrdinals.add(ordinalKey);
-    if (!record.accepted && (record.rejectionReason === undefined || record.rejectionReason.trim().length === 0)) {
-      throw new FaceAuthorityValidationError(`${record.observationRef} rejected capture requires rejectionReason.`);
-    }
-    if (record.accepted && record.rejectionReason !== undefined) {
-      throw new FaceAuthorityValidationError(`${record.observationRef} accepted capture must not carry rejectionReason.`);
+
+    if (!record.accepted) {
+      if (record.rejectionReason === undefined || record.rejectionReason.trim().length === 0) {
+        throw new FaceAuthorityValidationError(`${record.observationRef} rejected capture requires rejectionReason.`);
+      }
+      if (record.reviewItemRef !== undefined) {
+        throw new FaceAuthorityValidationError(`${record.observationRef} rejected capture must not expose reviewItemRef.`);
+      }
+    } else {
+      if (record.rejectionReason !== undefined) throw new FaceAuthorityValidationError(`${record.observationRef} accepted capture must not carry rejectionReason.`);
+      if (record.reviewItemRef === undefined || record.reviewItemRef.trim().length === 0) {
+        throw new FaceAuthorityValidationError(`${record.observationRef} accepted capture requires reviewItemRef.`);
+      }
+      if (reviewItemRefs.has(record.reviewItemRef)) throw new FaceAuthorityValidationError(`Duplicate reviewItemRef: ${record.reviewItemRef}`);
+      reviewItemRefs.add(record.reviewItemRef);
+      acceptedPartitions.add(record.partition);
     }
 
     const participantExisting = participantPartition.get(record.participantKey);
@@ -369,6 +415,15 @@ export function validateFaceCalibrationDatasetManifest(
       throw new FaceAuthorityValidationError(`Capture-family leakage across selection/holdout: ${record.captureFamilyKey}`);
     }
     captureFamilyPartition.set(record.captureFamilyKey, record.partition);
+    const familyParticipant = captureFamilyParticipant.get(record.captureFamilyKey);
+    if (familyParticipant !== undefined && familyParticipant !== record.participantKey) {
+      throw new FaceAuthorityValidationError(`Capture family belongs to multiple participants: ${record.captureFamilyKey}`);
+    }
+    captureFamilyParticipant.set(record.captureFamilyKey, record.participantKey);
+  }
+
+  if (!acceptedPartitions.has('selection') || !acceptedPartitions.has('holdout')) {
+    throw new FaceAuthorityValidationError(`${manifest.manifestId} requires accepted observations in both selection and holdout partitions.`);
   }
 
   const acceptedByParticipantSession = new Map<string, number>();
@@ -396,18 +451,26 @@ export function validateFaceCalibrationDatasetManifest(
 
 export function validateFaceCalibrationLabelDataset(
   dataset: FaceCalibrationLabelDataset,
+  manifest: FaceCalibrationDatasetManifest,
   study: FaceCalibrationStudyProtocolDefinition,
   labelingProtocol: FaceLabelingProtocolDefinition,
 ): void {
   stableKey(dataset.datasetId, 'calibrationLabelDataset.datasetId');
   nonEmpty(dataset.version, `${dataset.datasetId}.version`);
   if (dataset.studyRef !== studyRef(study)) throw new FaceAuthorityValidationError(`${dataset.datasetId} studyRef does not match supplied study.`);
+  if (dataset.studyRef !== manifest.studyRef) throw new FaceAuthorityValidationError(`${dataset.datasetId} and manifest must reference the same study.`);
   if (dataset.records.length === 0) throw new FaceAuthorityValidationError(`${dataset.datasetId} requires label records.`);
 
+  const acceptedReviewItems = new Set(
+    manifest.records.filter((record) => record.accepted).map((record) => record.reviewItemRef!),
+  );
   const reviewerPerItem = new Map<string, Set<string>>();
   for (const record of dataset.records) {
     nonEmpty(record.itemRef, 'labelRecord.itemRef');
     nonEmpty(record.reviewerKey, 'labelRecord.reviewerKey');
+    if (!acceptedReviewItems.has(record.itemRef)) {
+      throw new FaceAuthorityValidationError(`${record.itemRef} is not an accepted review item in the calibration manifest.`);
+    }
     if (record.labelingProtocolRef !== labelingProtocolRef(labelingProtocol)) {
       throw new FaceAuthorityValidationError(`${record.itemRef} uses wrong labeling protocol.`);
     }
@@ -422,20 +485,58 @@ export function validateFaceCalibrationLabelDataset(
     reviewerPerItem.set(record.itemRef, reviewers);
   }
 
-  for (const [itemRef, reviewers] of reviewerPerItem) {
-    if (reviewers.size < labelingProtocol.reviewerPlan.reviewersPerItem) {
+  for (const itemRef of acceptedReviewItems) {
+    const reviewers = reviewerPerItem.get(itemRef);
+    if (reviewers === undefined || reviewers.size < labelingProtocol.reviewerPlan.reviewersPerItem) {
       throw new FaceAuthorityValidationError(`${itemRef} has insufficient independent reviewer labels.`);
     }
   }
 }
 
+export function evaluateFaceCalibrationLabelConsensus(
+  dataset: FaceCalibrationLabelDataset,
+  labelingProtocol: FaceLabelingProtocolDefinition,
+): readonly FaceCalibrationLabelConsensus[] {
+  const labelsByItem = new Map<string, FaceMorphologyLabel[]>();
+  for (const record of dataset.records) {
+    const labels = labelsByItem.get(record.itemRef) ?? [];
+    labels.push(record.label);
+    labelsByItem.set(record.itemRef, labels);
+  }
+
+  return [...labelsByItem.entries()].sort(([left], [right]) => left.localeCompare(right)).map(([itemRef, labels]) => {
+    const metCount = labels.filter((label) => label === 'met').length;
+    const notMetCount = labels.filter((label) => label === 'not_met').length;
+    const abstainCount = labels.filter((label) => label === 'abstain').length;
+    const nonAbstainCount = metCount + notMetCount;
+    const winningCount = Math.max(metCount, notMetCount);
+    const agreementFraction = nonAbstainCount === 0 ? null : winningCount / nonAbstainCount;
+    const rule = labelingProtocol.reviewerPlan.agreementRule;
+    const hasConsensus =
+      nonAbstainCount >= rule.minNonAbstainLabels &&
+      agreementFraction !== null &&
+      agreementFraction >= rule.minAgreementFraction &&
+      metCount !== notMetCount;
+
+    return {
+      itemRef,
+      state: hasConsensus ? (metCount > notMetCount ? 'met' : 'not_met') : 'no_consensus',
+      metCount,
+      notMetCount,
+      abstainCount,
+      nonAbstainCount,
+      agreementFraction,
+    };
+  });
+}
+
 export const FACE_NOSE_BRIDGE_CALIBRATION_PROTOCOL_RESEARCH_V0: FaceCalibrationProtocolRegistry = {
   registryId: 'calibration-protocol.face.nose_bridge.research_v0',
-  version: '0.1.0',
+  version: '0.2.0',
   captureProtocols: [
     {
       protocolId: 'capture.nose_bridge.repeat_frontal',
-      version: '0.1.0',
+      version: '0.2.0',
       metricRefs: ['neutral.nose.bridge.centerline_rms_deviation@0.1.0'],
       captureMode: 'single_frontal',
       requiredViewKeys: ['frontal'],
@@ -445,16 +546,26 @@ export const FACE_NOSE_BRIDGE_CALIBRATION_PROTOCOL_RESEARCH_V0: FaceCalibrationP
         independentRecaptureRequired: true,
       },
       qualityPolicyRef: 'quality.face.calibration.frontal.research_v0',
-      rawImageRetention: 'ephemeral_delete_after_observation',
-      identityEmbeddingAllowed: false,
-      participantPolicy: 'consented_deidentified',
+      sourceImagePolicy: {
+        exifStrippedBeforeProcessing: true,
+        originalDeletedAfterReviewArtifactCreation: true,
+        trainingReuseAllowed: false,
+        identityEmbeddingAllowed: false,
+      },
+      reviewArtifactPolicy: {
+        containsPotentiallyIdentifyingFace: true,
+        participantPolicy: 'consented_pseudonymous',
+        retentionPolicyRef: 'retention.face.calibration.review_artifact.research_v0',
+        identityMatchingAllowed: false,
+        trainingReuseAllowed: false,
+      },
       status: 'research',
     },
   ],
   labelingProtocols: [
     {
       protocolId: 'label.shenxiang.discernment.bridge_straight',
-      version: '0.1.0',
+      version: '0.2.0',
       methodologyRef: FACE_FR3_METHOD_REFS_V0.shenxiangFiveOfficers,
       criterionId: 'criterion.discernment.bridge_straight',
       traditionalSourceRefs: ['passage.shenxiang.five_officers.discernment'],
@@ -465,17 +576,21 @@ export const FACE_NOSE_BRIDGE_CALIBRATION_PROTOCOL_RESEARCH_V0: FaceCalibrationP
         blindToPeerLabels: true,
         independentInitialLabels: true,
         allowAbstain: true,
-        agreementRuleRef: 'agreement.face.calibration.bridge_straight.research_v0',
+        agreementRule: {
+          kind: 'supermajority_non_abstain',
+          minAgreementFraction: 2 / 3,
+          minNonAbstainLabels: 2,
+        },
       },
       instructionArtifactRef: 'instructions.face.bridge_straight.research_v0',
-      participantPolicy: 'consented_deidentified',
+      participantPolicy: 'consented_pseudonymous',
       status: 'research',
     },
   ],
   splitPolicies: [
     {
       policyId: 'split.face.calibration.participant_holdout',
-      version: '0.1.0',
+      version: '0.2.0',
       splitUnit: 'participant',
       partitions: ['selection', 'holdout'],
       participantLeakageAllowed: false,
@@ -488,14 +603,14 @@ export const FACE_NOSE_BRIDGE_CALIBRATION_PROTOCOL_RESEARCH_V0: FaceCalibrationP
   studies: [
     {
       studyId: 'study.face.nose_bridge.straight',
-      version: '0.1.0',
+      version: '0.2.0',
       metricRef: 'neutral.nose.bridge.centerline_rms_deviation@0.1.0',
       criterionId: 'criterion.discernment.bridge_straight',
       methodologyRef: FACE_FR3_METHOD_REFS_V0.shenxiangFiveOfficers,
       traditionalSourceRefs: ['passage.shenxiang.five_officers.discernment'],
-      captureProtocolRef: 'capture.nose_bridge.repeat_frontal@0.1.0',
-      labelingProtocolRef: 'label.shenxiang.discernment.bridge_straight@0.1.0',
-      splitPolicyRef: 'split.face.calibration.participant_holdout@0.1.0',
+      captureProtocolRef: 'capture.nose_bridge.repeat_frontal@0.2.0',
+      labelingProtocolRef: 'label.shenxiang.discernment.bridge_straight@0.2.0',
+      splitPolicyRef: 'split.face.calibration.participant_holdout@0.2.0',
       requiredEvidenceClasses: [
         'repeat_capture_stability',
         'blinded_expert_operationalization',
@@ -505,7 +620,7 @@ export const FACE_NOSE_BRIDGE_CALIBRATION_PROTOCOL_RESEARCH_V0: FaceCalibrationP
       blockingReasons: [
         'passage.shenxiang.five_officers.discernment is not scan_checked in the current authority registry',
         'capture and labeling protocols are research-only',
-        'real consent/retention operational procedure is not yet approved',
+        'quality/retention/instruction artifacts are research refs and not reviewed authorities',
       ],
       status: 'research',
     },
