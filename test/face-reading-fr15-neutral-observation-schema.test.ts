@@ -157,6 +157,27 @@ describe('FR-15 neutral observation schema', () => {
     expect(readiness.unavailableAnchorRefs).toEqual(['left_eye']);
   });
 
+  it('treats partial visibility as section-limited and requires a reason', () => {
+    const base = fixtureBundle();
+    const partial: NeutralObservationBundleV1 = {
+      ...base,
+      observations: base.observations.map((entry) => entry.anchorRef === 'right_brow'
+        ? { ...entry, quality: { visibility: 'partial' as const, confidence: 0.8, reasons: ['edge_occlusion'] } }
+        : entry),
+    };
+    const readiness = assessNeutralObservationBundleReadinessFR15({ bundle: partial, profile: candidateProfile, compatibilityReport: productionCompatibility });
+    expect(readiness.state).toBe('section_limited');
+    expect(readiness.limitedAnchorRefs).toEqual(['right_brow']);
+
+    const noReason = {
+      ...partial,
+      observations: partial.observations.map((entry) => entry.anchorRef === 'right_brow'
+        ? { ...entry, quality: { visibility: 'partial' as const, confidence: 0.8, reasons: [] } }
+        : entry),
+    };
+    expect(() => validateNeutralObservationBundleFR15(noReason, candidateProfile)).toThrow(/reasons are required for partial visibility/u);
+  });
+
   it('rejects observed geometry outside the canonical normalized image frame', () => {
     const base = fixtureBundle();
     const forged = {
@@ -177,6 +198,17 @@ describe('FR-15 neutral observation schema', () => {
         : entry),
     };
     expect(() => validateNeutralObservationBundleFR15(forged, candidateProfile)).toThrow(/must not carry geometry/u);
+  });
+
+  it('rejects derivation cycles', () => {
+    const base = fixtureBundle();
+    const cyclic: NeutralObservationBundleV1 = {
+      ...base,
+      observations: base.observations.map((entry) => entry.anchorRef === 'left_brow'
+        ? { ...entry, derivedFromObservationRefs: ['obs.brow_midline'] }
+        : entry),
+    };
+    expect(() => validateNeutralObservationBundleFR15(cyclic, candidateProfile)).toThrow(/derivation cycle/u);
   });
 
   it('rejects provider-specific geometry fields and top-level identity payloads', () => {
