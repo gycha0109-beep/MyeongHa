@@ -149,6 +149,27 @@ export const FACE_RESEARCH_PASSAGES_V0 = [
     verificationStatus: 'unverified_ocr',
   },
   {
+    passageId: 'passage.mayi.sancai_three_divisions.boundaries',
+    witnessId: 'witness.mayi_xiangfa.nlc_1925_v1',
+    volume: '卷一',
+    chapter: '三才三停',
+    printedPage: '31',
+    scanPage: 35,
+    originalText: '三停者髮際至印堂為上停……自山根至準頭為中停……自人中至地閣為下停……自髮際至眉為上停。',
+    normalizedText: '1925 NLC scan confirms a transmitted 三停 boundary formulation; ellipses mark omitted intervening print, not OCR uncertainty.',
+    verificationStatus: 'scan_checked',
+  },
+  {
+    passageId: 'passage.mayi.sancai_three_divisions.period',
+    witnessId: 'witness.mayi_xiangfa.nlc_1925_v1',
+    volume: '卷一',
+    chapter: '三才三停',
+    printedPage: '33',
+    scanPage: 36,
+    originalText: '上停長老吉昌，中停長近君王，下停長少吉祥，三停平等富貴榮顯，三停不均孤夭貧賤。',
+    verificationStatus: 'scan_checked',
+  },
+  {
     passageId: 'passage.liuzhuang.three_divisions',
     witnessId: 'witness.liuzhuang_xiangfa.ctext',
     chapter: '永樂百問 / 二十九、三停有面有身何說',
@@ -194,6 +215,13 @@ export const FACE_RESEARCH_LINEAGE_V0 = [
     confidence: 'high',
   },
   {
+    fromWorkId: 'work.mayi_xiangfa',
+    toWorkId: 'work.shenxiang_quanbian',
+    relation: 'same_tradition',
+    evidenceRefs: ['passage.mayi.sancai_three_divisions.boundaries', 'passage.shenxiang.sancai_three_divisions'],
+    confidence: 'medium',
+  },
+  {
     fromWorkId: 'work.liuzhuang_xiangfa',
     toWorkId: 'work.shenxiang_quanbian',
     relation: 'same_tradition',
@@ -204,6 +232,7 @@ export const FACE_RESEARCH_LINEAGE_V0 = [
 
 export const FACE_METHOD_REFS_V0 = Object.freeze({
   shenxiangThreeDivisions: 'method.shenxiang.face_three_divisions@0.1.0',
+  mayiThreeDivisions: 'method.mayi.face_three_divisions@0.1.0',
   liuzhuangThreeDivisions: 'method.liuzhuang.face_three_divisions@0.1.0',
   fiveOfficers: 'method.five_officers.research_v0@0.1.0',
   twelvePalaces: 'method.twelve_palaces.research_v0@0.1.0',
@@ -219,6 +248,16 @@ export const FACE_RESEARCH_METHODOLOGIES_V0 = [
     description: '神相全編 계열의 상·중·하 삼정 경계를 별도 방법론으로 보존한다.',
     limitations: ['전자본문 대조 단계이며 scan_checked 이전이다.', '平等의 수치 허용오차는 원전이 제공하지 않는다.'],
     reviewStatus: 'research',
+  },
+  {
+    methodologyId: 'method.mayi.face_three_divisions',
+    version: '0.1.0',
+    traditionalTerm: '三才三停',
+    scope: 'static_face',
+    sourceRefs: ['passage.mayi.sancai_three_divisions.boundaries', 'passage.mayi.sancai_three_divisions.period'],
+    description: '1925 NLC scan에서 직접 확인한 麻衣相法 삼정 전승을 독립 witness methodology로 보존한다.',
+    limitations: ['scan은 확인했지만 현대 landmark operationalization과 平等 tolerance는 별도 calibration이 필요하다.'],
+    reviewStatus: 'reviewed',
   },
   {
     methodologyId: 'method.liuzhuang.face_three_divisions',
@@ -255,15 +294,20 @@ export const FACE_RESEARCH_METHODOLOGIES_V0 = [
 export const FACE_RESEARCH_CONFLICTS_V0 = [
   {
     conflictId: 'conflict.three_divisions.period_direction_v0',
-    methodologyRefs: [FACE_METHOD_REFS_V0.shenxiangThreeDivisions, FACE_METHOD_REFS_V0.liuzhuangThreeDivisions],
+    methodologyRefs: [
+      FACE_METHOD_REFS_V0.shenxiangThreeDivisions,
+      FACE_METHOD_REFS_V0.mayiThreeDivisions,
+      FACE_METHOD_REFS_V0.liuzhuangThreeDivisions,
+    ],
     sourceRefs: [
       'passage.shenxiang.three_divisions.ten_observations',
       'passage.shenxiang.sancai_three_divisions',
+      'passage.mayi.sancai_three_divisions.period',
       'passage.liuzhuang.three_divisions',
     ],
     affectedTiers: ['F6'],
     status: 'open',
-    reason: '삼정의 長과 초·중·말년을 연결하는 문구가 전승/문맥별로 일관되지 않아 F6 시기 해석을 하나의 규칙으로 승격할 수 없다.',
+    reason: '삼정의 長과 초·중·말년을 연결하는 문구가 전승/문맥별로 일관되지 않는다. 1925 麻衣相法 scan은 上停長老吉昌 계열을 실제로 확인하므로 단순 OCR 오류로 치부할 수 없다.',
   },
 ] as const;
 
@@ -519,6 +563,7 @@ export const FACE_RESEARCH_PACK_V0: FaceMethodologyPackDefinition = {
   sourceWitnessSetRef: 'witness-set.face.research_v0',
   methodologyDefinitionRefs: [
     FACE_METHOD_REFS_V0.shenxiangThreeDivisions,
+    FACE_METHOD_REFS_V0.mayiThreeDivisions,
     FACE_METHOD_REFS_V0.liuzhuangThreeDivisions,
     FACE_METHOD_REFS_V0.fiveOfficers,
     FACE_METHOD_REFS_V0.twelvePalaces,
