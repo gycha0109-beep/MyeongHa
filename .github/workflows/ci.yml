@@ -124,6 +124,8 @@ jobs:
         run: bash test/db/life_record_ledger_query.sh
       - name: Run current Memory grant projection read tests
         run: bash test/db/memory_active_grants_query.sh
+      - name: Run current Memory Item projection read tests
+        run: bash test/db/memory_items_current_query.sh
       - name: Run Reading provenance and stale projection read tests
         run: bash test/db/reading_provenance_stale_query.sh
       - name: Run Reading Session provenance and stale projection read tests
