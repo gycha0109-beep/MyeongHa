@@ -10,6 +10,7 @@ import {
   type FaceAuthorityRegistry,
   type FaceCalibrationDatasetManifest,
   type FaceCalibrationLabelDataset,
+  type FaceCalibrationManifestRecord,
   type FaceCalibrationProtocolRegistry,
 } from '../packages/face-reading/src/index.js';
 
@@ -44,6 +45,14 @@ function recordsForParticipant(participantKey: string, partition: 'selection' | 
     }
   }
   return records;
+}
+
+function rejectedRecord(
+  record: FaceCalibrationManifestRecord,
+  reason: string,
+): FaceCalibrationManifestRecord {
+  const { reviewItemRef: _reviewItemRef, ...rest } = record;
+  return { ...rest, accepted: false, rejectionReason: reason };
 }
 
 function validManifest(): FaceCalibrationDatasetManifest {
@@ -225,7 +234,7 @@ describe('FR-6 participant-level split and repeat capture manifest', () => {
       ...manifest,
       records: manifest.records.map((record) =>
         record.partition === 'holdout'
-          ? { ...record, accepted: false, reviewItemRef: undefined, rejectionReason: 'test-only rejection' }
+          ? rejectedRecord(record, 'test-only rejection')
           : record,
       ),
     };
@@ -238,7 +247,7 @@ describe('FR-6 participant-level split and repeat capture manifest', () => {
       ...manifest,
       records: manifest.records.map((record) =>
         record.participantKey === 'p-selection' && record.captureSessionKey.endsWith(':s2')
-          ? { ...record, accepted: false, reviewItemRef: undefined, rejectionReason: 'test-only rejection' }
+          ? rejectedRecord(record, 'test-only rejection')
           : record,
       ),
     };
