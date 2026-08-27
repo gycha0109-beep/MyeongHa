@@ -193,7 +193,7 @@ describe('FR-9 character grounding boundary', () => {
 
     expect(grounding.faceReadingRef).toBe(output.reading.readingRef);
     expect(grounding.semanticClaims.map((claim) => claim.claimRef)).toEqual(
-      expect.arrayContaining(output.reading.verdict.claimRefs),
+      expect.arrayContaining([...output.reading.verdict.claimRefs]),
     );
     expect(grounding.approvedNarrativeBlocks?.map((block) => block.text)).toContain(output.narrative.verdict);
     expect(grounding.approvedNarrativeBlocks?.map((block) => block.text)).toContain(output.narrative.hiddenTension);
