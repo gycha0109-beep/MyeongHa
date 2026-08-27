@@ -6,6 +6,10 @@ import {
   FACELAB_PROVIDER_ADAPTER_EVIDENCE_FR16,
   type ProviderTopologyClassV1,
 } from './provider-adapter-evidence-fr16.js';
+import {
+  assertNeutralDerivationEvidenceRefsFR17,
+  validateNeutralDerivationEvidenceFR17,
+} from './neutral-derivation-evidence-fr17.js';
 import type { NeutralObservationGeometryV1 } from './neutral-observation-schema-fr15.js';
 import { FaceAuthorityValidationError } from './validation.js';
 
@@ -140,8 +144,9 @@ const DEFINITIONS_FR17: readonly NeutralDerivationDefinitionV1[] = Object.freeze
     reviewState: 'blocked_unresolved' as const,
     algorithmRef: null,
     evidenceRefs: Object.freeze([
-      'evidence.fr16.mediapipe.face_landmark_connections.current_upstream',
-      'evidence.fr17.kbeauty.current_runtime.qualitative_vlm_only',
+      'evidence.fr17.fr16.topology_structure',
+      'evidence.fr17.kbeauty.face_observation_contract',
+      'evidence.fr17.kbeauty.unified_runtime_provider',
     ]),
     calibrationRefs: Object.freeze([]),
     qualityPrerequisites: Object.freeze(['neutral_pose_quality', 'neutral_nose_region']),
@@ -166,8 +171,9 @@ const DEFINITIONS_FR17: readonly NeutralDerivationDefinitionV1[] = Object.freeze
     reviewState: 'blocked_unresolved' as const,
     algorithmRef: null,
     evidenceRefs: Object.freeze([
-      'evidence.fr16.mediapipe.face_landmark_connections.current_upstream',
-      'evidence.fr17.kbeauty.current_runtime.qualitative_vlm_only',
+      'evidence.fr17.fr16.topology_structure',
+      'evidence.fr17.kbeauty.face_observation_contract',
+      'evidence.fr17.kbeauty.unified_runtime_provider',
     ]),
     calibrationRefs: Object.freeze([]),
     qualityPrerequisites: Object.freeze(['neutral_pose_quality', 'neutral_brow_regions']),
@@ -193,8 +199,9 @@ const DEFINITIONS_FR17: readonly NeutralDerivationDefinitionV1[] = Object.freeze
     reviewState: 'blocked_unresolved' as const,
     algorithmRef: null,
     evidenceRefs: Object.freeze([
-      'evidence.fr16.mediapipe.face_landmark_connections.current_upstream',
-      'evidence.fr17.kbeauty.current_runtime.qualitative_vlm_only',
+      'evidence.fr17.fr16.topology_structure',
+      'evidence.fr17.kbeauty.face_observation_contract',
+      'evidence.fr17.kbeauty.unified_runtime_provider',
     ]),
     calibrationRefs: Object.freeze([]),
     qualityPrerequisites: Object.freeze(['neutral_pose_quality', 'neutral_brow_regions']),
@@ -223,7 +230,8 @@ const DEFINITIONS_FR17: readonly NeutralDerivationDefinitionV1[] = Object.freeze
     reviewState: 'blocked_dependency' as const,
     algorithmRef: null,
     evidenceRefs: Object.freeze([
-      'evidence.fr17.kbeauty.current_runtime.qualitative_vlm_only',
+      'evidence.fr17.kbeauty.face_observation_contract',
+      'evidence.fr17.kbeauty.unified_runtime_provider',
     ]),
     calibrationRefs: Object.freeze([]),
     qualityPrerequisites: Object.freeze([
@@ -284,6 +292,7 @@ export function isNeutralDerivationExecutableFR17(
 export function validateNeutralDerivationRegistryFR17(
   registry: NeutralDerivationRegistryV1 = NEUTRAL_DERIVATION_REGISTRY_FR17,
 ): NeutralDerivationRegistryV1 {
+  validateNeutralDerivationEvidenceFR17();
   exactKeys(registry, ALLOWED_REGISTRY_KEYS, 'FR-17 registry');
   if (registry.registryId !== 'registry.face.neutral_derivations.fr17') {
     throw new FaceAuthorityValidationError('FR-17 registryId mismatch.');
@@ -345,6 +354,7 @@ export function validateNeutralDerivationRegistryFR17(
     if (definition.evidenceRefs.length === 0) {
       throw new FaceAuthorityValidationError(`FR-17 derivation requires evidenceRefs: ${definition.derivationId}`);
     }
+    assertNeutralDerivationEvidenceRefsFR17(definition.evidenceRefs);
     if (definition.qualityPrerequisites.length === 0) {
       throw new FaceAuthorityValidationError(`FR-17 derivation requires quality prerequisites: ${definition.derivationId}`);
     }
@@ -397,20 +407,6 @@ export function validateNeutralDerivationRegistryFR17(
   for (const requiredRef of requiredRefs) {
     if (!registryRefs.has(requiredRef)) {
       throw new FaceAuthorityValidationError(`FR-17 missing FR-16 required derivation: ${requiredRef}`);
-    }
-  }
-
-  for (const definition of registry.definitions) {
-    if (definition.reviewState === 'blocked_dependency') {
-      for (const dependencyRef of definition.dependencyDerivationRefs) {
-        const dependency = registry.definitions.find((entry) => entry.derivationId === dependencyRef);
-        if (dependency === undefined) {
-          throw new FaceAuthorityValidationError(`FR-17 missing dependency definition: ${dependencyRef}`);
-        }
-        if (dependency.reviewState === 'reviewed' && definition.algorithmRef === null) {
-          continue;
-        }
-      }
     }
   }
 
