@@ -3,7 +3,6 @@ import {
   FACE_AUTHORITY_FR3_RESEARCH_REGISTRY_V0,
   FACE_FR3_METHOD_REFS_V0,
   FACE_NOSE_BRIDGE_CALIBRATION_PROTOCOL_RESEARCH_V0,
-  FaceAuthorityValidationError,
   evaluateFaceCalibrationLabelConsensus,
   validateFaceCalibrationDatasetManifest,
   validateFaceCalibrationLabelDataset,
@@ -39,7 +38,7 @@ function recordsForParticipant(participantKey: string, partition: 'selection' | 
         captureOrdinal: ordinal,
         partition,
         metricRef,
-        protocolRef: 'capture.nose_bridge.repeat_frontal@0.2.0',
+        protocolRef: 'capture.nose_bridge.repeat_frontal@0.3.0',
         accepted: true,
       } as const);
     }
@@ -51,7 +50,7 @@ function validManifest(): FaceCalibrationDatasetManifest {
   return {
     manifestId: 'manifest.nose_bridge.test',
     version: '1.0.0',
-    studyRef: 'study.face.nose_bridge.straight@0.2.0',
+    studyRef: 'study.face.nose_bridge.straight@0.3.0',
     records: [
       ...recordsForParticipant('p-selection', 'selection'),
       ...recordsForParticipant('p-holdout', 'holdout'),
@@ -67,18 +66,24 @@ function labelsForManifest(manifest: FaceCalibrationDatasetManifest): FaceCalibr
     records: manifest.records.flatMap((record) => {
       if (!record.accepted || record.reviewItemRef === undefined) return [];
       return [
-        { itemRef: record.reviewItemRef, reviewerKey: 'r1', label: 'met' as const, labelingProtocolRef: 'label.shenxiang.discernment.bridge_straight@0.2.0' },
-        { itemRef: record.reviewItemRef, reviewerKey: 'r2', label: 'met' as const, labelingProtocolRef: 'label.shenxiang.discernment.bridge_straight@0.2.0' },
-        { itemRef: record.reviewItemRef, reviewerKey: 'r3', label: 'abstain' as const, labelingProtocolRef: 'label.shenxiang.discernment.bridge_straight@0.2.0' },
+        { itemRef: record.reviewItemRef, reviewerKey: 'r1', label: 'met' as const, labelingProtocolRef: 'label.shenxiang.discernment.bridge_straight@0.3.0' },
+        { itemRef: record.reviewItemRef, reviewerKey: 'r2', label: 'met' as const, labelingProtocolRef: 'label.shenxiang.discernment.bridge_straight@0.3.0' },
+        { itemRef: record.reviewItemRef, reviewerKey: 'r3', label: 'abstain' as const, labelingProtocolRef: 'label.shenxiang.discernment.bridge_straight@0.3.0' },
       ];
     }),
   };
 }
 
-function promoteProtocolForCollection(sourceChecked: boolean): FaceCalibrationProtocolRegistry {
+function promoteProtocolForCollection(): FaceCalibrationProtocolRegistry {
   const registry = FACE_NOSE_BRIDGE_CALIBRATION_PROTOCOL_RESEARCH_V0;
   return {
     ...registry,
+    supportArtifacts: registry.supportArtifacts.map((artifact) => {
+      if (artifact.kind === 'review_artifact_retention_policy') {
+        return { ...artifact, maxRetentionDays: 30, status: 'reviewed' as const };
+      }
+      return { ...artifact, status: 'reviewed' as const };
+    }),
     captureProtocols: registry.captureProtocols.map((protocol) => ({ ...protocol, status: 'reviewed' as const })),
     labelingProtocols: registry.labelingProtocols.map((protocol) => ({ ...protocol, status: 'reviewed' as const })),
     splitPolicies: registry.splitPolicies.map((policy) => ({ ...policy, status: 'reviewed' as const })),
@@ -131,19 +136,44 @@ describe('FR-6 protocol authority', () => {
     expect(study.executionState).toBe('blocked');
   });
 
+  it('requires quality, retention, and labeling instruction refs to resolve to typed support artifacts', () => {
+    const registry = FACE_NOSE_BRIDGE_CALIBRATION_PROTOCOL_RESEARCH_V0;
+    const invalid: FaceCalibrationProtocolRegistry = {
+      ...registry,
+      captureProtocols: registry.captureProtocols.map((protocol) => ({
+        ...protocol,
+        qualityPolicyRef: 'quality.does.not.exist@1.0.0',
+      })),
+    };
+    expect(() => validateFaceCalibrationProtocolRegistry(invalid, validationContext())).toThrow(/qualityPolicyRef must resolve/u);
+  });
+
   it('blocks human collection while the traditional source remains unverified electronic text', () => {
     expect(() =>
       validateFaceCalibrationProtocolRegistry(
-        promoteProtocolForCollection(false),
+        promoteProtocolForCollection(),
         validationContext(promoteFaceAuthority(false)),
       ),
     ).toThrow(/before all traditional sources are scan_checked/u);
   });
 
-  it('can structurally authorize collection only in a test fixture after source and methodology gates are raised', () => {
+  it('blocks collection if a linked support artifact remains research-only', () => {
+    const promoted = promoteProtocolForCollection();
+    const invalid: FaceCalibrationProtocolRegistry = {
+      ...promoted,
+      supportArtifacts: promoted.supportArtifacts.map((artifact, index) =>
+        index === 0 ? { ...artifact, status: 'research' as const } : artifact,
+      ),
+    };
+    expect(() =>
+      validateFaceCalibrationProtocolRegistry(invalid, validationContext(promoteFaceAuthority(true))),
+    ).toThrow(/support artifact is research-only/u);
+  });
+
+  it('can structurally authorize collection only in a test fixture after every source/protocol/support gate is raised', () => {
     expect(() =>
       validateFaceCalibrationProtocolRegistry(
-        promoteProtocolForCollection(true),
+        promoteProtocolForCollection(),
         validationContext(promoteFaceAuthority(true)),
       ),
     ).not.toThrow();
@@ -249,18 +279,18 @@ describe('FR-6 blinded label dataset and consensus', () => {
         itemRef: 'review:not-in-manifest',
         reviewerKey: 'r1',
         label: 'met',
-        labelingProtocolRef: 'label.shenxiang.discernment.bridge_straight@0.2.0',
+        labelingProtocolRef: 'label.shenxiang.discernment.bridge_straight@0.3.0',
       }],
     };
     expect(() => validateFaceCalibrationLabelDataset(invalid, manifest, study, labelingProtocol)).toThrow(/not an accepted review item/u);
   });
 
   it('computes deterministic met/not-met/no-consensus without exposing metric values to reviewers', () => {
-    const protocolRef = 'label.shenxiang.discernment.bridge_straight@0.2.0';
+    const protocolRef = 'label.shenxiang.discernment.bridge_straight@0.3.0';
     const dataset: FaceCalibrationLabelDataset = {
       datasetId: 'labels.consensus.test',
       version: '1.0.0',
-      studyRef: 'study.face.nose_bridge.straight@0.2.0',
+      studyRef: 'study.face.nose_bridge.straight@0.3.0',
       records: [
         { itemRef: 'a', reviewerKey: 'r1', label: 'met', labelingProtocolRef: protocolRef },
         { itemRef: 'a', reviewerKey: 'r2', label: 'met', labelingProtocolRef: protocolRef },
@@ -275,33 +305,9 @@ describe('FR-6 blinded label dataset and consensus', () => {
     };
 
     expect(evaluateFaceCalibrationLabelConsensus(dataset, labelingProtocol)).toEqual([
-      {
-        itemRef: 'a',
-        state: 'met',
-        metCount: 2,
-        notMetCount: 0,
-        abstainCount: 1,
-        nonAbstainCount: 2,
-        agreementFraction: 1,
-      },
-      {
-        itemRef: 'b',
-        state: 'not_met',
-        metCount: 1,
-        notMetCount: 2,
-        abstainCount: 0,
-        nonAbstainCount: 3,
-        agreementFraction: 2 / 3,
-      },
-      {
-        itemRef: 'c',
-        state: 'no_consensus',
-        metCount: 1,
-        notMetCount: 1,
-        abstainCount: 1,
-        nonAbstainCount: 2,
-        agreementFraction: 0.5,
-      },
+      { itemRef: 'a', state: 'met', metCount: 2, notMetCount: 0, abstainCount: 1, nonAbstainCount: 2, agreementFraction: 1 },
+      { itemRef: 'b', state: 'not_met', metCount: 1, notMetCount: 2, abstainCount: 0, nonAbstainCount: 3, agreementFraction: 2 / 3 },
+      { itemRef: 'c', state: 'no_consensus', metCount: 1, notMetCount: 1, abstainCount: 1, nonAbstainCount: 2, agreementFraction: 0.5 },
     ]);
   });
 
