@@ -17,7 +17,7 @@ import {
 import { projectCharacterFaceGrounding } from './semantic-projection.js';
 import { FaceAuthorityValidationError } from './validation.js';
 
-export type FaceResearchAssertionAuthority = 'research_fixture' | 'reviewed_human_label';
+export type FaceResearchAssertionAuthority = 'research_fixture' | 'human_label_assertion';
 
 export interface FaceResearchDiagnosisInput {
   readonly readingRef: string;
@@ -52,6 +52,8 @@ export interface FaceResearchConsumerNarrative {
 
 export interface FaceResearchDiagnosisOutput {
   readonly status: 'research_only';
+  readonly assertionAuthority: FaceResearchAssertionAuthority;
+  readonly evidenceRefs: readonly string[];
   readonly semanticSignature: string;
   readonly reading: ProductFaceReadingSemanticV3;
   readonly claims: readonly FaceClaim[];
@@ -183,8 +185,8 @@ function canonicalSemanticSignature(entries: readonly OfficerRuntimeEntry[]): st
   for (const officerKey of OFFICER_ORDER) {
     const entry = byOfficer.get(officerKey);
     if (entry === undefined) continue;
-    const staticCriteria = criteriaForOfficer(officerKey).filter((criterion) => criterion.staticV1Eligible);
-    const states = staticCriteria
+    const states = criteriaForOfficer(officerKey)
+      .filter((criterion) => criterion.staticV1Eligible)
       .map((criterion) => `${criterion.criterionId}=${entry.input.criterionStates[criterion.criterionId] ?? 'not_evaluated'}`)
       .sort();
     sections.push(`${officerKey}[${states.join(',')}]`);
@@ -196,10 +198,7 @@ function uniqueSourceRefs(entries: readonly OfficerRuntimeEntry[]): readonly str
   return [...new Set(entries.flatMap((entry) => officerDefinition(entry.input.officerKey).sourceRefs))].sort();
 }
 
-function buildTensionClaim(
-  strong: OfficerRuntimeEntry | undefined,
-  weak: OfficerRuntimeEntry | undefined,
-): FaceClaim | null {
+function buildTensionClaim(strong: OfficerRuntimeEntry | undefined, weak: OfficerRuntimeEntry | undefined): FaceClaim | null {
   if (strong === undefined || weak === undefined) return null;
   if (strong.assessment.staticSupportState !== 'complete' || weak.assessment.staticSupportState !== 'contradicted') return null;
   return {
@@ -217,8 +216,8 @@ function buildTensionClaim(
 
 function localCriterionForClaim(claim: FaceClaim): FiveOfficerCriterionDefinition | undefined {
   if (claim.claimType !== 'FACE_LOCAL_INTERPRETATION') return undefined;
-  return FIVE_OFFICER_CRITERIA_V0.find((criterion) =>
-    claim.claimRef === `claim.research.${criterion.criterionId}.${claim.pattern}`,
+  return FIVE_OFFICER_CRITERIA_V0.find(
+    (criterion) => claim.claimRef === `claim.research.${criterion.criterionId}.${claim.pattern}`,
   );
 }
 
@@ -232,9 +231,8 @@ function summaryText(entry: OfficerRuntimeEntry): string {
 function localText(claim: FaceClaim): string {
   const criterion = localCriterionForClaim(claim);
   if (criterion === undefined) throw new FaceAuthorityValidationError(`Cannot render local claim: ${claim.claimRef}`);
-  const name = criterion.traditionalOfficerName;
-  if (claim.pattern === 'met') return `${name}에서 ‘${criterion.sourceConcept}’ 조건이 분명하게 잡힙니다.`;
-  if (claim.pattern === 'not_met') return `${name}에서 ‘${criterion.sourceConcept}’ 조건은 분명히 깨집니다.`;
+  if (claim.pattern === 'met') return `${criterion.traditionalOfficerName}에서 ‘${criterion.sourceConcept}’ 조건이 분명하게 잡힙니다.`;
+  if (claim.pattern === 'not_met') return `${criterion.traditionalOfficerName}에서 ‘${criterion.sourceConcept}’ 조건은 분명히 깨집니다.`;
   throw new FaceAuthorityValidationError(`Unsupported local-claim pattern: ${claim.pattern ?? 'missing'}`);
 }
 
@@ -251,20 +249,10 @@ function verdictText(lead: OfficerRuntimeEntry): string {
 }
 
 function tensionText(strong: OfficerRuntimeEntry, weak: OfficerRuntimeEntry): string {
-  const strongName = strong.assessment.traditionalOfficerName;
-  const weakName = weak.assessment.traditionalOfficerName;
-  return `${strongName}은 서고 ${weakName}은 꺾입니다. 이번 판독의 핵심 대비는 ${TARGET_LABELS[strong.input.officerKey]}와 ${TARGET_LABELS[weak.input.officerKey]} 사이입니다.`;
+  return `${strong.assessment.traditionalOfficerName}은 서고 ${weak.assessment.traditionalOfficerName}은 꺾입니다. 이번 판독의 핵심 대비는 ${TARGET_LABELS[strong.input.officerKey]}와 ${TARGET_LABELS[weak.input.officerKey]} 사이입니다.`;
 }
 
-function claimNarrativeText(claim: FaceClaim, entries: readonly OfficerRuntimeEntry[], tension: FaceClaim | null): string {
-  if (tension !== null && claim.claimRef === tension.claimRef) {
-    const [strongKey, weakKey] = tension.pattern?.split('_complete__') ?? [];
-    const strong = entries.find((entry) => entry.input.officerKey === strongKey);
-    const weakToken = weakKey?.replace('_contradicted', '');
-    const weak = entries.find((entry) => entry.input.officerKey === weakToken);
-    if (strong === undefined || weak === undefined) throw new FaceAuthorityValidationError(`Cannot resolve tension claim: ${claim.claimRef}`);
-    return tensionText(strong, weak);
-  }
+function claimNarrativeText(claim: FaceClaim, entries: readonly OfficerRuntimeEntry[]): string {
   const entry = entries.find((candidate) => candidate.summaryClaim.claimRef === claim.claimRef);
   if (entry !== undefined) return summaryText(entry);
   return localText(claim);
@@ -276,29 +264,30 @@ function topFeatureClaims(
   entries: readonly OfficerRuntimeEntry[],
 ): readonly FaceClaim[] {
   const candidates: FaceClaim[] = [lead.summaryClaim];
-  const leadLocal = lead.claims
+  candidates.push(...lead.claims
     .filter((claim) => claim.claimType === 'FACE_LOCAL_INTERPRETATION')
     .sort((left, right) => {
       if (left.pattern === right.pattern) return left.claimRef.localeCompare(right.claimRef);
       if (left.pattern === 'met') return -1;
       if (right.pattern === 'met') return 1;
       return left.claimRef.localeCompare(right.claimRef);
-    });
-  candidates.push(...leadLocal);
+    }));
   if (weak !== undefined && weak.input.officerKey !== lead.input.officerKey) {
     candidates.push(weak.summaryClaim);
     candidates.push(...weak.claims.filter((claim) => claim.claimType === 'FACE_LOCAL_INTERPRETATION' && claim.pattern === 'not_met'));
   }
-  for (const entry of sortLeadEntries(entries)) candidates.push(entry.summaryClaim, ...entry.claims.filter((claim) => claim.claimType === 'FACE_LOCAL_INTERPRETATION'));
-  const unique: FaceClaim[] = [];
+  for (const entry of sortLeadEntries(entries)) {
+    candidates.push(entry.summaryClaim, ...entry.claims.filter((claim) => claim.claimType === 'FACE_LOCAL_INTERPRETATION'));
+  }
+  const result: FaceClaim[] = [];
   const seen = new Set<string>();
   for (const claim of candidates) {
     if (seen.has(claim.claimRef)) continue;
     seen.add(claim.claimRef);
-    unique.push(claim);
-    if (unique.length === 3) break;
+    result.push(claim);
+    if (result.length === 3) break;
   }
-  return unique;
+  return result;
 }
 
 function assertDecisiveNarrative(narrative: FaceResearchConsumerNarrative): void {
@@ -319,6 +308,9 @@ function validateInput(input: FaceResearchDiagnosisInput): void {
   nonEmpty(input.readingRef, 'researchDiagnosis.readingRef');
   nonEmpty(input.engineVersion, 'researchDiagnosis.engineVersion');
   nonEmpty(input.sourceSnapshotRef, 'researchDiagnosis.sourceSnapshotRef');
+  if (input.assertionAuthority !== 'research_fixture' && input.assertionAuthority !== 'human_label_assertion') {
+    throw new FaceAuthorityValidationError(`Unsupported research assertion authority: ${String(input.assertionAuthority)}`);
+  }
   uniqueNonEmpty(input.evidenceRefs, 'researchDiagnosis.evidenceRefs');
   if (input.fiveOfficers.length === 0) throw new FaceAuthorityValidationError('researchDiagnosis.fiveOfficers must be non-empty.');
   const seen = new Set<FiveOfficerKey>();
@@ -331,8 +323,7 @@ function validateInput(input: FaceResearchDiagnosisInput): void {
 export function buildResearchFaceDiagnosis(input: FaceResearchDiagnosisInput): FaceResearchDiagnosisOutput {
   validateInput(input);
   const entries = input.fiveOfficers.map(buildEntry);
-  const ordered = sortLeadEntries(entries);
-  const lead = ordered[0]!;
+  const lead = sortLeadEntries(entries)[0]!;
   const weak = sortContradictedEntries(entries)[0];
   const tensionClaim = buildTensionClaim(
     lead.assessment.staticSupportState === 'complete' ? lead : undefined,
@@ -355,6 +346,7 @@ export function buildResearchFaceDiagnosis(input: FaceResearchDiagnosisInput): F
   });
   const hasLimited = unavailableSections.length > 0;
   const hasContradiction = entries.some((entry) => entry.assessment.staticSupportState === 'contradicted');
+
   const reading: ProductFaceReadingSemanticV3 = {
     readingRef: input.readingRef,
     engineVersion: input.engineVersion,
@@ -369,18 +361,16 @@ export function buildResearchFaceDiagnosis(input: FaceResearchDiagnosisInput): F
     modules: {
       fiveOfficers: {
         moduleKey: 'five_officers',
-        claimRefs: claims.filter((claim) => claim.claimType === 'FACE_LOCAL_INTERPRETATION' || claim.claimType === 'FACE_CONFIGURATION_INTERPRETATION').map((claim) => claim.claimRef),
-        comparisonPolicyGroup: 'local.salience',
+        claimRefs: claims
+          .filter((claim) => claim.claimType === 'FACE_LOCAL_INTERPRETATION' || claim.claimType === 'FACE_CONFIGURATION_INTERPRETATION')
+          .map((claim) => claim.claimRef),
       },
       dominantFeatures: {
         moduleKey: 'dominant_features',
         claimRefs: featureClaims.map((claim) => claim.claimRef),
       },
       ...(tensionClaim === null ? {} : {
-        tensions: {
-          moduleKey: 'tensions',
-          claimRefs: [tensionClaim.claimRef],
-        },
+        tensions: { moduleKey: 'tensions', claimRefs: [tensionClaim.claimRef] },
       }),
     },
     lenses: [
@@ -399,7 +389,7 @@ export function buildResearchFaceDiagnosis(input: FaceResearchDiagnosisInput): F
     rank: index + 1,
     claimRef: claim.claimRef,
     semanticKey: claim.semanticKey,
-    text: claimNarrativeText(claim, entries, tensionClaim),
+    text: claimNarrativeText(claim, entries),
   }));
   const hiddenTension = tensionClaim === null || weak === undefined ? null : tensionText(lead, weak);
   const blocks: FaceResearchNarrativeBlock[] = [
@@ -427,16 +417,12 @@ export function buildResearchFaceDiagnosis(input: FaceResearchDiagnosisInput): F
     }
   }
 
-  const narrative: FaceResearchConsumerNarrative = {
-    framing,
-    verdict,
-    topFeatures,
-    hiddenTension,
-    blocks,
-  };
+  const narrative: FaceResearchConsumerNarrative = { framing, verdict, topFeatures, hiddenTension, blocks };
   assertDecisiveNarrative(narrative);
   const output: FaceResearchDiagnosisOutput = deepFreeze({
     status: 'research_only' as const,
+    assertionAuthority: input.assertionAuthority,
+    evidenceRefs: [...input.evidenceRefs],
     semanticSignature: canonicalSemanticSignature(entries),
     reading,
     claims,
@@ -461,9 +447,6 @@ export function projectResearchFaceDiagnosisGrounding(
   });
   return deepFreeze({
     ...semanticGrounding,
-    approvedNarrativeBlocks: output.narrative.blocks.map((block) => ({
-      key: block.blockKey,
-      text: block.text,
-    })),
+    approvedNarrativeBlocks: output.narrative.blocks.map((block) => ({ key: block.blockKey, text: block.text })),
   });
 }
