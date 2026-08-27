@@ -2,9 +2,9 @@
 
 > Product: **명하 (Myeongha)**  
 > Pack Version: **v0.3**  
-> Date: **2026-08-25**  
-> Source Authority: `Usecase_re_reviewed_v2(1).md`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`, `Myeonghwa_Personalized_Interpretation_Architecture_v1.3_THIRD_REVIEW(1).md`  
-> Rule: 본 문서는 위 source authority를 구현 수준으로 구체화한다. source가 결정하지 않은 사항은 임의 확정하지 않고 `OPEN-P0` 또는 `CANDIDATE`로 표시한다.
+> Date: **2026-08-27**  
+> Source Authority: `Usecase_re_reviewed_v2(1).md`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`, `Myeonghwa_Personalized_Interpretation_Architecture_v1.3_THIRD_REVIEW(1).md`, Face Reading FR-0 source/methodology authority  
+> Rule: 본 문서는 source authority를 구현 수준으로 구체화한다. source가 결정하지 않은 사항은 임의 확정하지 않고 `OPEN-P0` 또는 `CANDIDATE`로 표시한다.
 
 ---
 
@@ -12,20 +12,23 @@
 
 이 Pack은 명하의 구현을 여러 문서로 나누되 **authority가 다시 분열되지 않게 하는 구현 명세 묶음**이다.
 
-현재 source authority가 이미 고정한 핵심은 다음이다.
+현재 source authority가 고정한 핵심은 다음이다.
 
 ```text
 Saju Engine
-→ 무엇을 해석할 수 있는가
+→ 명리적으로 무엇을 해석할 수 있는가
+
+Face Reading Engine
+→ 얼굴의 중립 observation을 전통 관상 방법론으로 무엇이라 해석할 수 있는가
 
 Myeongha Product
 → 누구의 어떤 입력/대화/관계/권한/결과인가
 
 Character Runtime
-→ 허용된 의미를 어떤 캐릭터 화법으로 전달하는가
+→ 이미 허용된 의미를 어떤 캐릭터 화법으로 전달하는가
 ```
 
-새 명세는 이 세 경계를 침범하지 않는다.
+`Shared Face Observation Core`는 사진에서 관찰 가능한 중립 구조만 소유한다. Visually FaceLab과 MyeongHa Face Reading Engine은 이 중립 observation을 공유할 수 있지만 서로의 style/archetype semantic result와 관상 semantic result를 authority 입력으로 사용할 수 없다.
 
 ## 2. Authority Resolution Matrix
 
@@ -34,6 +37,7 @@ Character Runtime
 | Authority Domain | Primary Source | Pack Implementation Owner |
 |---|---|---|
 | Saju semantic meaning / methodology / T0~T11 / narrative truth | `Myeonghwa_Personalized_Interpretation_Architecture_v1.3_THIRD_REVIEW(1).md` + Saju public product contract | `SAJU_INTEGRATION_SPEC.md`, `AI_CHARACTER_RUNTIME_SPEC.md` |
+| Face Reading semantic meaning / source lineage / F0~F8 / comparison authority | Face Reading v0.3 architecture + `FACE_READING_SOURCE_METHOD_INVENTORY_V0.md` | `packages/face-reading`, `FACE_READING_IMPLEMENTATION_BASELINE_V0.md` |
 | Product UX / user journey / character-world behavior | `Usecase_re_reviewed_v2(1).md` | API / AI / Content / Client specs |
 | Persistence / PK-FK-UNIQUE / relational provenance | `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md` | `DB_DDL_MIGRATION_SPEC.md` |
 | Authentication / privacy / authorization implementation | Use Case privacy boundary + ERD ownership | `AUTH_RLS_PRIVACY_SPEC.md` |
@@ -47,10 +51,16 @@ Character Runtime
 3. source끼리 직접 충돌하면 Pack이 임의 선택하지 않고 `SOURCE_AUTHORITY_GAPS.md`에 blocker로 등록한다.
 4. Pack 내부 provisional 문구보다 `P0_DECISION_REGISTER.md`의 `DECIDED` 항목이 우선한다.
 5. 구현이 source authority를 만족할 수 없는 경우 source 수정 없이 우회 구현하지 않는다.
+6. 관상 source의 전자 transcription과 NLC witness가 다르면 scan-checked witness가 우선하며, 전자 transcription만으로 production rule을 승격하지 않는다.
+7. 동일 문구가 계통상 인용/전승 관계에 있으면 독립 근거 여러 개로 계산하지 않는다.
 
 ### Current Saju integration audit pin
 
 Pack v0.3의 current public-contract compatibility 검수는 `gycha0109-beep/Saju@7102dc8fe8483c0875f6a093a4fd585b0df51f8b`를 기준으로 했다. 이후 Saju main이 바뀌면 `SAJU_INTEGRATION_SPEC`의 exact-contract fixture를 다시 실행해야 하며 단순 branch 이름만으로 호환을 가정하지 않는다.
+
+### Current Face Reading research pin
+
+Face Reading FR-0는 2026-08-27 연구 snapshot을 기준으로 한다. `神相全編 / 人倫大統賦 / 麻衣相法 / 柳莊相法` witness와 Kohn 1986 lineage record를 registry에 등록했지만, 최초 production rule은 아직 존재하지 않는다. Production promotion은 exact scan passage + metric/region operationalization + deterministic test를 모두 요구한다.
 
 ## 3. 문서 목록
 
@@ -67,6 +77,8 @@ Pack v0.3의 current public-contract compatibility 검수는 `gycha0109-beep/Saj
 | 03 | `AI_CHARACTER_RUNTIME_SPEC.md` | Planner/Context/Renderer/Guard/Scene runtime |
 | 04 | `CHARACTER_WORLD_CONTENT_SPEC.md` | 캐릭터·신·canon·episode content bundle contract |
 | 05 | `SAJU_INTEGRATION_SPEC.md` | Product ↔ Saju boundary / retry / grounding |
+| 05A | `FACE_READING_SOURCE_METHOD_INVENTORY_V0.md` | 관상 source witness / passage / lineage / methodology inventory |
+| 05B | `FACE_READING_IMPLEMENTATION_BASELINE_V0.md` | Face Reading FR-0 executable authority boundary |
 | 06 | `AUTH_RLS_PRIVACY_SPEC.md` | Guest/Member ownership, RLS, deletion, privacy |
 | 07 | `RELATIONSHIP_MEMORY_POLICY_SPEC.md` | 관계 ledger, Life Fact, Memory, grants |
 | 08 | `COMMERCE_ENTITLEMENT_SPEC.md` | purchase/provider/grant/entitlement authority |
@@ -84,31 +96,37 @@ Pack v0.3의 current public-contract compatibility 검수는 `gycha0109-beep/Saj
 ```text
 P0 Decision Register
         │
-        ├────────────┐
-        ▼            ▼
-DB DDL/RLS        Content Canon
-        │            │
-        ├──────┬─────┘
-        ▼      ▼
-      API   Character Runtime
-        │      │
-        └──┬───┘
-           ▼
-      Saju Adapter
-           │
-   ┌───────┼────────┐
-   ▼       ▼        ▼
+        ├─────────────────────────────┐
+        ▼                             ▼
+DB DDL/RLS                        Content Canon
+        │                             │
+        ├──────────────┬──────────────┘
+        ▼              ▼
+      API        Character Runtime
+        │              │
+        ├───────┬──────┘
+        ▼       ▼
+ Saju Adapter   Face Grounding Adapter
+        │       ▲
+        │       │
+        │   Face Reading Engine
+        │       ▲
+        │       │
+        │ Shared Face Observation Core
+        │
+   ┌────┼────────┐
+   ▼    ▼        ▼
 Relation Commerce Notification
-   │       │        │
-   └── Cost/Quota ──┤
-           │        │
-      Analytics ────┘
-           ▼
-      Web / Mobile
-           ▼
-       E2E Gates
-           ▼
-   Release / Observability
+   │    │        │
+   └─ Cost/Quota ┤
+        │        │
+   Analytics ────┘
+        ▼
+   Web / Mobile
+        ▼
+    E2E Gates
+        ▼
+Release / Observability
 ```
 
 ## 5. 공통 불변식
@@ -116,7 +134,14 @@ Relation Commerce Notification
 모든 구현은 다음을 MUST 만족한다.
 
 - Saju 의미는 Saju Engine 밖에서 생성하지 않는다.
-- 캐릭터는 Saju 의미를 표현하지만 새 semantic authority가 아니다.
+- Face Reading 의미는 Face Reading Engine 밖에서 생성하지 않는다.
+- Shared Face Observation Core는 중립 observation만 제공하며 FaceLab style/archetype 결과나 관상 diagnosis를 생성하지 않는다.
+- MyeongHa static Face Reading v1은 `observations.colorAppearance`를 소비하지 않는다.
+- 관상 production rule은 `scan_checked` 이상 source passage 없이는 승격하지 않는다.
+- 관상 source genealogy의 인용/파생 문헌을 독립 evidence count로 중복 계산하지 않는다.
+- `strongest/weakest` 같은 ordinal wording은 methodology-defined ordering authority 없이는 사용하지 않는다. 그 경우 `most salient` 계열만 허용한다.
+- 관상 semantic reading과 consumer prose를 같은 contract에 섞지 않는다.
+- 캐릭터는 Saju/Face Reading 의미를 표현하지만 새 semantic authority가 아니다.
 - 사용자 장기 기억은 사용자 승인 없이 확정 저장하지 않는다.
 - 관계 점수/해금/entitlement는 client/LLM이 직접 쓰지 않는다.
 - Web/Mobile은 서버 authority의 client다.
@@ -130,7 +155,7 @@ Relation Commerce Notification
 - scenario/ambiguity가 material하면 Character context까지 구조적으로 보존한다.
 - verified commerce source가 어떤 entitlement를 부여하는지는 versioned fulfillment definition으로 결정한다.
 - Saju public Product contract를 raw JSON 구조 추정으로 재정의하지 않는다. 실제 exported `ProductReadingResponse` / host input contract와 adapter spec이 다르면 `SOURCE_AUTHORITY_GAPS.md`에서 닫기 전 real integration을 production-ready로 부르지 않는다.
-- versioned policy/fulfillment registry의 같은 version key는 immutable content를 가리켜야 하며, runtime에서 조용히 의미를 바꾸지 않는다.
+- versioned policy/fulfillment/face-methodology registry의 같은 version key는 immutable content를 가리켜야 하며, runtime에서 조용히 의미를 바꾸지 않는다.
 
 ## 6. 미결정 사항 취급
 
@@ -144,6 +169,8 @@ OPEN-P0: P0-SA-01
 
 이 표기가 있는 분기는 interface/adapter를 유지하고 특정 provider/rail에 hard-code하지 않는다.
 
+Face Reading에서 source passage는 확보됐지만 modern geometry threshold나 region map이 검증되지 않은 경우에도 같은 원칙을 적용한다. 그 dimension은 research-only로 남기고 결과 다양성을 위해 threshold를 임의 생성하지 않는다.
+
 ## 7. 최초 구현 순서
 
 ```text
@@ -156,6 +183,11 @@ OPEN-P0: P0-SA-01
 6. Mock Saju Adapter
 7. Birth / Life Fact / Memory / Relationship vertical slice
 8. Real Saju Adapter with deterministic Saju-bearing rendering boundary
+8A. Face Reading FR-0 source/claim/comparison authority foundation
+8B. Shared Face Observation compatibility + FaceLab-neutral adapter contract
+8C. scan-checked 三停 / 五官 / 十二宮 source passages + metric/region operationalization
+8D. first F1/F2 rules → F3 configuration/tension → F7 bounded domain synthesis
+8E. deterministic decisive Face Narrative + Character Face Grounding
 9. Web + Mobile + UX screen-state vertical slice
 10. Commerce / Notification + Cost/Quota
 11. Analytics/Experiment contract wiring
