@@ -93,11 +93,15 @@ export interface FaceRegionMapDefinition {
 export interface FaceMetricDefinition {
   readonly metricKey: string;
   readonly version: string;
+  readonly methodologyRef: string;
+  readonly regionMapRef?: string;
+  readonly sourceRefs: readonly string[];
   readonly formula: string;
   readonly requiredAnchorRefs: readonly string[];
   readonly extractorLandmarkRefs?: readonly number[];
   readonly unit: FaceMetricUnit;
   readonly stabilityRequirements: readonly string[];
+  readonly reviewStatus: ReviewStatus;
 }
 
 export interface FaceOperationalizationDefinition {
