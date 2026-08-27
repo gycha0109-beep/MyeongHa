@@ -180,9 +180,10 @@ describe('C1 character architecture contracts', () => {
   });
 
   it('requires C1 canon/persona/behavior profiles before placeholder promotion', () => {
-    expect(() =>
-      validateCharacterContentBundle(bundleWith({ ...authoredCharacter, canon: undefined })),
-    ).toThrow(/canon is required/u);
+    const { canon: _canon, ...withoutCanon } = authoredCharacter;
+    expect(() => validateCharacterContentBundle(bundleWith(withoutCanon))).toThrow(
+      /canon is required/u,
+    );
   });
 
   it('rejects duplicate capability rows for the same Saju domain', () => {
