@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import {
   validateCharacterFacePresentationProfileForCharacterV1,
   validateCharacterFacePresentationProfileV1,
+  type CharacterFaceFollowUpStrategyV1,
   type CharacterFacePresentationContentIdentityV1,
   type CharacterFacePresentationModeV1,
   type CharacterFacePresentationProfileV1,
@@ -17,6 +18,7 @@ export {
   validateCharacterFacePresentationProfileV1,
 };
 export type {
+  CharacterFaceFollowUpStrategyV1,
   CharacterFacePresentationContentIdentityV1,
   CharacterFacePresentationModeV1,
   CharacterFacePresentationProfileV1,
@@ -26,11 +28,6 @@ export type CharacterFacePresentationFocusV1 =
   | 'dominant_feature'
   | 'contrast_axis'
   | 'local_detail';
-
-export type CharacterFaceFollowUpStrategyV1 =
-  | 'inspect_dominant_feature'
-  | 'explore_contrast_axis'
-  | 'inspect_local_detail';
 
 export interface CharacterFacePresentationBlockV1 {
   readonly key: string;
@@ -247,7 +244,6 @@ export function presentResearchFaceDiagnosisForCharacter(input: {
 }): CharacterFacePresentationV1 {
   validateCharacterFacePresentationProfileForCharacterV1(input.profile, input.character);
 
-  // This call also rejects a structurally forged research diagnosis object.
   const grounding = projectResearchFaceDiagnosisGrounding(input.diagnosis, input.groundingVersion);
   const blocks = classifyApprovedBlocks(grounding);
   const plan = presentationPlan(input.profile.mode, blocks);
