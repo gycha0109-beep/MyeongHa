@@ -74,6 +74,18 @@ export {
 } from './character-saju-safe-renderer.js';
 
 export {
+  CharacterFacePresentationError,
+  presentResearchFaceDiagnosisForCharacter,
+  validateCharacterFacePresentationProfileV1,
+  type CharacterFaceFollowUpStrategyV1,
+  type CharacterFacePresentationBlockV1,
+  type CharacterFacePresentationFocusV1,
+  type CharacterFacePresentationModeV1,
+  type CharacterFacePresentationProfileV1,
+  type CharacterFacePresentationV1,
+} from './character-face-presentation.js';
+
+export {
   MockSajuAdapter,
   type MockSajuRequest,
   type MockSajuResult,
