@@ -3,10 +3,12 @@ import {
   FACE_AUTHORITY_RESEARCH_REGISTRY_V0,
   FACE_COMPARISON_POLICY_V0,
   FACELAB_COMPATIBILITY_REPORT_V0,
+  FACE_METHOD_REFS_V0,
   FaceAuthorityValidationError,
   adaptMyeongHaStaticFaceObservation,
   assertClaimsComparable,
   assertFaceLabProductionBridgeReady,
+  evaluateThreeDivisionRelativeOrder,
   projectCharacterFaceGrounding,
   validateFaceAuthorityRegistry,
   type FaceAuthorityRegistry,
@@ -36,6 +38,20 @@ describe('face source and methodology authority', () => {
     expect(() => validateFaceAuthorityRegistry(invalid)).toThrow(FaceAuthorityValidationError);
   });
 
+  it('rejects an unresolved methodology ref instead of accepting a stringly-typed authority', () => {
+    const invalid: FaceAuthorityRegistry = {
+      ...FACE_AUTHORITY_RESEARCH_REGISTRY_V0,
+      rules: [
+        {
+          ...FACE_AUTHORITY_RESEARCH_REGISTRY_V0.rules[0],
+          ruleId: 'rule.invalid.methodology',
+          methodologyRef: 'method.does_not_exist@1.0.0',
+        },
+      ],
+    };
+    expect(() => validateFaceAuthorityRegistry(invalid)).toThrow(/methodologyRef references unknown key/u);
+  });
+
   it('does not promote unverified electronic text directly into a production rule', () => {
     const invalid: FaceAuthorityRegistry = {
       ...FACE_AUTHORITY_RESEARCH_REGISTRY_V0,
@@ -43,13 +59,13 @@ describe('face source and methodology authority', () => {
         {
           ruleId: 'rule.invalid.production',
           version: '1.0.0',
-          methodologyRef: 'method.three_divisions.research_v0',
-          sourceRefs: ['passage.shenxiang.three_divisions'],
-          tier: 'F6',
+          methodologyRef: FACE_METHOD_REFS_V0.shenxiangThreeDivisions,
+          sourceRefs: ['passage.shenxiang.face_three_divisions'],
+          tier: 'F1',
           inputs: [],
           condition: { op: 'exists', input: 'threeDivisions' },
           output: {
-            claimType: 'FACE_POSITION_PERIOD_INTERPRETATION',
+            claimType: 'FACE_MORPHOLOGY_CLASSIFICATION',
             semanticKey: 'face.three_divisions.invalid',
           },
           rationale: 'test only',
@@ -59,6 +75,67 @@ describe('face source and methodology authority', () => {
       ],
     };
     expect(() => validateFaceAuthorityRegistry(invalid)).toThrow(/scan_checked/u);
+  });
+
+  it('blocks F6 promotion while the period-direction source conflict is unresolved', () => {
+    const passages = FACE_AUTHORITY_RESEARCH_REGISTRY_V0.passages.map((passage) =>
+      passage.passageId === 'passage.shenxiang.sancai_three_divisions'
+        ? { ...passage, verificationStatus: 'scan_checked' as const }
+        : passage,
+    );
+    const invalid: FaceAuthorityRegistry = {
+      ...FACE_AUTHORITY_RESEARCH_REGISTRY_V0,
+      passages,
+      rules: [
+        ...FACE_AUTHORITY_RESEARCH_REGISTRY_V0.rules,
+        {
+          ruleId: 'rule.invalid.f6.period',
+          version: '1.0.0',
+          methodologyRef: FACE_METHOD_REFS_V0.shenxiangThreeDivisions,
+          sourceRefs: ['passage.shenxiang.sancai_three_divisions'],
+          tier: 'F6',
+          inputs: [],
+          condition: { op: 'exists', input: 'threeDivisionRelation' },
+          output: {
+            claimType: 'FACE_POSITION_PERIOD_INTERPRETATION',
+            semanticKey: 'face.three_divisions.period.invalid',
+          },
+          rationale: 'test only',
+          limitations: [],
+          promotionStatus: 'production_authorized',
+        },
+      ],
+    };
+    expect(() => validateFaceAuthorityRegistry(invalid)).toThrow(/unresolved authority conflict/u);
+  });
+});
+
+describe('three divisions FR-2 operationalization', () => {
+  it('computes only strict relative order without an invented near-equal tolerance', () => {
+    expect(evaluateThreeDivisionRelativeOrder({ upper: 1, middle: 1, lower: 1 })).toMatchObject({
+      relation: 'all_equal_exact',
+      calibrationApplied: false,
+      nearEqualClassificationAvailable: false,
+    });
+
+    expect(evaluateThreeDivisionRelativeOrder({ upper: 1, middle: 1.00001, lower: 1 })).toMatchObject({
+      relation: 'middle_longest',
+      calibrationApplied: false,
+      nearEqualClassificationAvailable: false,
+    });
+  });
+
+  it('normalizes shares without changing the source-level relation', () => {
+    const result = evaluateThreeDivisionRelativeOrder({ upper: 2, middle: 3, lower: 5 });
+    expect(result.relation).toBe('lower_longest');
+    expect(result.normalizedShares).toEqual({ upper: 0.2, middle: 0.3, lower: 0.5 });
+    expect(result.totalLength).toBe(10);
+  });
+
+  it('rejects zero, negative, and non-finite measurements', () => {
+    expect(() => evaluateThreeDivisionRelativeOrder({ upper: 0, middle: 1, lower: 1 })).toThrow(/upper/u);
+    expect(() => evaluateThreeDivisionRelativeOrder({ upper: 1, middle: -1, lower: 1 })).toThrow(/middle/u);
+    expect(() => evaluateThreeDivisionRelativeOrder({ upper: 1, middle: 1, lower: Number.NaN })).toThrow(/lower/u);
   });
 });
 
@@ -107,7 +184,7 @@ describe('comparison policy', () => {
       claimRef: 'claim-1',
       claimType: 'FACE_PALACE_STATUS',
       tier: 'F2',
-      methodologyRef: 'method.twelve_palaces.research_v0',
+      methodologyRef: FACE_METHOD_REFS_V0.twelvePalaces,
       sourceRefs: [],
       semanticKey: 'palace.wealth.prominent',
       salience: 'primary',
@@ -144,7 +221,7 @@ describe('MyeongHa grounding projection', () => {
         claimRef: 'claim-career-1',
         claimType: 'FACE_DOMAIN_PATTERN',
         tier: 'F7',
-        methodologyRef: 'method.career.research_v0',
+        methodologyRef: 'method.career.research_v0@0.1.0',
         sourceRefs: [],
         semanticKey: 'face.career.responsibility_axis',
         axis: 'career',
@@ -154,7 +231,7 @@ describe('MyeongHa grounding projection', () => {
     const reading: ProductFaceReadingSemanticV3 = {
       readingRef: 'face-reading-1',
       engineVersion: '0.1.0',
-      methodologyPackRef: 'pack.face.research_v0@0.1.0',
+      methodologyPackRef: 'pack.face.research_v0@0.2.0',
       sourceSnapshotRef: 'observation-1',
       observationState: 'usable',
       diagnosisResolution: 'resolved',
@@ -172,7 +249,7 @@ describe('MyeongHa grounding projection', () => {
       groundingVersion: 'v1',
       faceReadingRef: 'face-reading-1',
       faceEngineVersion: '0.1.0',
-      methodologyPackRef: 'pack.face.research_v0@0.1.0',
+      methodologyPackRef: 'pack.face.research_v0@0.2.0',
       semanticClaims: [
         {
           key: 'face.career.responsibility_axis',
