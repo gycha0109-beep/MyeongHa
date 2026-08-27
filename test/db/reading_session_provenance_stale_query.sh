@@ -180,14 +180,14 @@ guest_shape=$("${psql_base[@]}" -At -F '|' -c "select reading_session_id,stored_
 pass "active canonical guest/member can read owned Reading Session provenance"
 
 before=$("${psql_base[@]}" -At -F '|' -c "select
-  (select count(*) from public.reading_sessions where id like '8c5%'::text),
-  (select count(*) from public.readings where id like '8c6%'::text),
+  (select count(*) from public.reading_sessions where id::text like '8c5%'),
+  (select count(*) from public.readings where id::text like '8c6%'),
   (select current_reading_id from public.reading_sessions where id='8c500000-0000-0000-0000-000000000001'),
   (select current_revision_id from public.birth_profiles where id='8c300000-0000-0000-0000-000000000001');")
 "${psql_base[@]}" -q -c "select * from public.qry_reading_session_provenance_stale_v1('8c200000-0000-0000-0000-000000000001','8c500000-0000-0000-0000-000000000001');" >/dev/null
 after=$("${psql_base[@]}" -At -F '|' -c "select
-  (select count(*) from public.reading_sessions where id like '8c5%'::text),
-  (select count(*) from public.readings where id like '8c6%'::text),
+  (select count(*) from public.reading_sessions where id::text like '8c5%'),
+  (select count(*) from public.readings where id::text like '8c6%'),
   (select current_reading_id from public.reading_sessions where id='8c500000-0000-0000-0000-000000000001'),
   (select current_revision_id from public.birth_profiles where id='8c300000-0000-0000-0000-000000000001');")
 [[ "$before" == "$after" ]] || fail "Reading Session provenance query mutated authority: before=$before after=$after"
