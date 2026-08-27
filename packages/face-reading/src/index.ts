@@ -1,6 +1,7 @@
 export * from './calibration-authority.js';
 export * from './calibration-authorization.js';
 export * from './calibration-protocol.js';
+export * from './capture-orientation-authority-fr19.js';
 export * from './contracts.js';
 export * from './direct-source-verification.js';
 export * from './evidence-reports.js';
