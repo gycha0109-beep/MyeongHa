@@ -172,8 +172,8 @@ export const FACE_RESEARCH_PASSAGES_V0 = [
   {
     passageId: 'passage.liuzhuang.three_divisions',
     witnessId: 'witness.liuzhuang_xiangfa.ctext',
-    chapter: '永樂百問 / 二十九、三停有面有身何說',
-    originalText: '面上三停，髮際到山根為上停，為初限。准頭為中限，人中到地閣為下限，主未年。如上停短削，少年不利，中停低陷，一世不榮，下停若長，一生憂滯。大概上停中停俱長，下停宜短。',
+    chapter: '永樂百問 / 三停有面有身何說',
+    originalText: '面上三停，髮際到山根為上停，為初限。山根到准頭，為中停，為中限。人中到地閣，為下停，主末限。如上停短削，少年不利。中停低陷，一世不榮。下停若長，一生憂滯。大概上停中停俱長，下停宜短。',
     verificationStatus: 'unverified_ocr',
   },
   {
@@ -265,8 +265,8 @@ export const FACE_RESEARCH_METHODOLOGIES_V0 = [
     traditionalTerm: '面上三停',
     scope: 'static_face',
     sourceRefs: ['passage.liuzhuang.three_divisions'],
-    description: '柳莊相法의 삼정 서술을 神相全編 좌표계와 합치지 않고 별도 계통으로 보존한다.',
-    limitations: ['현재 전자본문 문장은 중정 경계가 완전히 operationalizable하지 않다.', 'scan_checked 이전이다.'],
+    description: '柳莊相法의 삼정 좌표계를 神相全編 좌표계와 합치지 않고 별도 방법론으로 보존한다.',
+    limitations: ['전자본문은 상정=髮際→山根, 중정=山根→準頭, 하정=人中→地閣을 제시하지만 NLC scan은 아직 직접 대조하지 않았다.'],
     reviewStatus: 'research',
   },
   {
@@ -340,32 +340,72 @@ export const FACE_THREE_DIVISION_REGION_MAPS_V0 = [
     ],
     mappingStatus: 'research',
   },
+  {
+    regionMapId: 'regionmap.liuzhuang.face_three_divisions',
+    version: '0.1.0',
+    methodologyRef: FACE_METHOD_REFS_V0.liuzhuangThreeDivisions,
+    sourceRefs: ['passage.liuzhuang.three_divisions'],
+    coordinateFrame: 'normalized_face_landmark_frame',
+    regions: [
+      {
+        regionKey: 'upper',
+        label: '上停',
+        geometryDefinition: { kind: 'vertical_span', fromAnchor: 'hairline_midpoint', toAnchor: 'shangen' },
+        sourceRefs: ['passage.liuzhuang.three_divisions'],
+      },
+      {
+        regionKey: 'middle',
+        label: '中停',
+        geometryDefinition: { kind: 'vertical_span', fromAnchor: 'shangen', toAnchor: 'nose_tip' },
+        sourceRefs: ['passage.liuzhuang.three_divisions'],
+      },
+      {
+        regionKey: 'lower',
+        label: '下停',
+        geometryDefinition: { kind: 'vertical_span', fromAnchor: 'renzhong', toAnchor: 'dige' },
+        sourceRefs: ['passage.liuzhuang.three_divisions'],
+      },
+    ],
+    mappingStatus: 'research',
+  },
 ] as const;
 
 export const FACE_THREE_DIVISION_METRICS_V0 = [
   {
     metricKey: 'metric.shenxiang.three_divisions.upper_length',
     version: '0.1.0',
+    methodologyRef: FACE_METHOD_REFS_V0.shenxiangThreeDivisions,
+    regionMapRef: 'regionmap.shenxiang.face_three_divisions@0.1.0',
+    sourceRefs: ['passage.shenxiang.face_three_divisions', 'passage.shenxiang.sancai_three_divisions'],
     formula: 'abs(y(brow_midline)-y(hairline_midpoint))/normalized_face_height',
     requiredAnchorRefs: ['hairline_midpoint', 'brow_midline'],
     unit: 'normalized_distance',
     stabilityRequirements: ['frontal_static_view', 'hairline_visible', 'brow_midline_visible'],
+    reviewStatus: 'research',
   },
   {
     metricKey: 'metric.shenxiang.three_divisions.middle_length',
     version: '0.1.0',
+    methodologyRef: FACE_METHOD_REFS_V0.shenxiangThreeDivisions,
+    regionMapRef: 'regionmap.shenxiang.face_three_divisions@0.1.0',
+    sourceRefs: ['passage.shenxiang.face_three_divisions', 'passage.shenxiang.sancai_three_divisions'],
     formula: 'abs(y(nose_tip)-y(brow_midline))/normalized_face_height',
     requiredAnchorRefs: ['brow_midline', 'nose_tip'],
     unit: 'normalized_distance',
     stabilityRequirements: ['frontal_static_view', 'brow_midline_visible', 'nose_tip_visible'],
+    reviewStatus: 'research',
   },
   {
     metricKey: 'metric.shenxiang.three_divisions.lower_length',
     version: '0.1.0',
+    methodologyRef: FACE_METHOD_REFS_V0.shenxiangThreeDivisions,
+    regionMapRef: 'regionmap.shenxiang.face_three_divisions@0.1.0',
+    sourceRefs: ['passage.shenxiang.face_three_divisions', 'passage.shenxiang.sancai_three_divisions'],
     formula: 'abs(y(chin_bottom)-y(nose_tip))/normalized_face_height',
     requiredAnchorRefs: ['nose_tip', 'chin_bottom'],
     unit: 'normalized_distance',
     stabilityRequirements: ['frontal_static_view', 'nose_tip_visible', 'chin_visible'],
+    reviewStatus: 'research',
   },
 ] as const;
 
@@ -568,7 +608,10 @@ export const FACE_RESEARCH_PACK_V0: FaceMethodologyPackDefinition = {
     FACE_METHOD_REFS_V0.fiveOfficers,
     FACE_METHOD_REFS_V0.twelvePalaces,
   ],
-  regionMapRefs: ['regionmap.shenxiang.face_three_divisions@0.1.0'],
+  regionMapRefs: [
+    'regionmap.shenxiang.face_three_divisions@0.1.0',
+    'regionmap.liuzhuang.face_three_divisions@0.1.0',
+  ],
   metricRegistryRef: 'metrics.face.research_v0',
   operationalizationRegistryRef: 'operationalizations.face.research_v0',
   claimTypeRegistryRef: 'claim-types.face.research_v0',
