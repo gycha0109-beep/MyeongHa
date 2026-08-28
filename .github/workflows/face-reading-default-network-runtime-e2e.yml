@@ -31,7 +31,20 @@ jobs:
       - name: Build MyeongHa runtime
         run: npm run build
       - name: Execute FR-26 default network factory in headless Chrome
-        run: node scripts/face-reading-fr28-default-network-runtime-e2e.mjs
+        shell: bash
+        run: |
+          set +e
+          output="$(node scripts/face-reading-fr28-default-network-runtime-e2e.mjs 2>&1)"
+          status=$?
+          printf '%s\n' "$output"
+          if [ "$status" -eq 0 ]; then
+            exit 0
+          fi
+          if ! printf '%s\n' "$output" | grep -Fq 'FR-28 could not discover Chrome DevTools page target'; then
+            exit "$status"
+          fi
+          echo 'FR-28 Chrome DevTools discovery timed out; retrying once with a fresh Chrome process.'
+          exec node scripts/face-reading-fr28-default-network-runtime-e2e.mjs
       - name: Upload FR-28 execution evidence
         if: always()
         uses: actions/upload-artifact@v4
