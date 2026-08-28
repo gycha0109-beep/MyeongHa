@@ -1,7 +1,7 @@
-# 명하 Spec Pack — Source Authority Validation Report v0.7
+# 명하 Spec Pack — Source Authority Validation Report v0.8
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.7 Source Alignment**  
+> Pack Version: **v0.8 Source Alignment**  
 > Date: **2026-08-28**  
 > Source Authority: `Usecase_re_reviewed_v2(1).md`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`, `Myeonghwa_Personalized_Interpretation_Architecture_v1.3_THIRD_REVIEW(1).md`  
 > Saju Public Contract Audit Pin: `gycha0109-beep/Saju@7102dc8fe8483c0875f6a093a4fd585b0df51f8b`
@@ -46,6 +46,7 @@ Source끼리 직접 충돌하거나 source가 구현 필수 authority를 제공�
 - Existing source-safe Share public-read/revoke and Device Installation revoke boundaries remain valid even though their inverse create/register workflows are source-blocked.
 - Existing `entitlements` projection/read schema remains valid as a storage/read envelope even though source does not yet define the complete event→grant→aggregate recompute algorithm.
 - Existing relationship state/event schema remains valid as a current-projection/append-only-ledger envelope even though source does not yet define the executable score/stage policy evaluator.
+- Existing `world_events` and `character_unlocks` schema remain valid as append-only world provenance/current unlock projection envelopes even though source does not yet define the executable Character Unlock condition/effect evaluator.
 
 Machine validation values recorded in older reports are historical snapshots; this report does not silently reuse stale counts as evidence for the current repository state. Current CI/action runs are the execution evidence.
 
@@ -315,6 +316,71 @@ relationship anti-farming evaluator           = BLOCKED by SRC-22
 
 A DB command that accepts caller-calculated `delta_*`/next stage is not a valid workaround; it would move rather than resolve the missing authority.
 
+### 4.7 Character Unlock condition/effect overreach separated — `SRC-23`
+
+UC-14 defines the product flow:
+
+```text
+Unlock condition satisfied
+→ World Event
+→ Hall silhouette state change
+→ first appearance scene
+→ CHARACTER_UNLOCKED event
+```
+
+The listed triggers are explicitly **examples**:
+
+```text
+specific relationship stage
+first Reading in a domain
+episode completion
+season event
+operator reveal
+```
+
+UC-24 requires character content to contain an `unlock condition`; UC-25 says an episode may contain an `unlock reward`. ERD v0.6 defines `world_events` and the current `character_unlocks` projection with same-subject causal World Event FK.
+
+But source does **not** define the executable bridge between those concepts:
+
+```text
+positive versioned unlock condition schema/DSL
+World Event registry/payload schemas used for unlock causality
+condition/content bundle → target character mapping
+condition composition/comparison operators
+first-appearance/reward effect mapping
+already-unlocked/replay/concurrency behavior
+condition migration across content releases
+season/operator reveal authority/scope
+unlock-specific downstream event/outbox contract
+```
+
+The previous `CHARACTER_WORLD_CONTENT_SPEC.md` overreached by listing `unlock condition schema 적합` as if a source-backed executable schema already existed. Primary source requires the authoring concept but does not supply that schema.
+
+A second ambiguity is that UC-14 says both `World Event 생성` and later ``CHARACTER_UNLOCKED` 이벤트 기록`; source does not explicitly establish that `CHARACTER_UNLOCKED` is the exact `world_events.event_type` rather than another domain/analytics event. Pack must not collapse those event families by naming assumption.
+
+Current baseline:
+
+```text
+world_events relational append-only envelope       = SOURCE-COMPLETE
+character_unlocks current projection/shape/read     = SOURCE-COMPLETE
+same-subject causal World Event FK                   = SOURCE-COMPLETE structural provenance
+client direct unlock authority deny                 = SOURCE-COMPLETE
+content has an unlock-condition concept              = SOURCE-COMPLETE authoring requirement
+condition/event → concrete character unlock mutation = BLOCKED by SRC-23
+```
+
+A command that accepts `character_id` + arbitrary same-owner `source_world_event_id` or caller-computed condition result is not a valid workaround; the FK proves ownership/provenance shape, not eligibility.
+
+Blocker composition matters:
+
+```text
+relationship-stage-driven character unlock
+→ SRC-22 + SRC-23
+
+episode-completion-driven character unlock
+→ applicable SRC-17 + SRC-23
+```
+
 ## 5. Current Saju Public Contract Boundary
 
 Pinned public contract:
@@ -329,6 +395,31 @@ Current public boundary supports one Birth input plus reading text/optional targ
 The Pack does not fabricate second-Birth compatibility input or semantic guard fields absent from the exported public contract. `SRC-08` and `SRC-09` remain the applicable blockers.
 
 ## 6. Source-Complete Validation Boundaries
+
+### Character Unlock with `SRC-23` open
+
+Source-complete verification may assert:
+
+- `world_events` owner/dedupe/append-only relational behavior;
+- same-owner source-turn/content-bundle provenance where populated;
+- one current `character_unlocks` row per user-character;
+- locked/unlocked timestamp shape;
+- nonnegative unlock revision;
+- same-subject `source_world_event_id` FK;
+- current unlock projection read/isolation;
+- client direct unlock-state authority denied;
+- UI can render stored locked/unlocked state.
+
+It must **not** claim the following as source-complete:
+
+- final unlock condition schema/DSL;
+- World Event unlock registry/payload schema;
+- event/condition→character target correctness;
+- replay/already-unlocked/concurrency result semantics;
+- cross-release condition migration;
+- first-appearance/reward effect transaction;
+- season/operator reveal execution policy;
+- `CHARACTER_UNLOCKED` exact domain/outbox event identity.
 
 ### Relationship with `SRC-22` open
 
@@ -409,7 +500,15 @@ SRC-18    = what entitlement/grant target a purchased product maps to
 SRC-21    = how an authoritative event mutates a grant and recomputes logical entitlement
 ```
 
-Source-gap decisions `SRC-19`, `SRC-20`, and `SRC-22` are likewise independent of infrastructure/provider P0 choices.
+World/relationship blockers compose independently:
+
+```text
+SRC-17 = how Episode graph/condition/choice progression is evaluated
+SRC-22 = how Relationship Event computes authoritative score/stage
+SRC-23 = how authoritative conditions/events map to concrete Character Unlock effects
+```
+
+Source-gap decisions `SRC-19`, `SRC-20`, `SRC-22`, and `SRC-23` are likewise independent of infrastructure/provider P0 choices.
 
 ## 8. Promotion Gate
 
@@ -445,8 +544,14 @@ Share Artifact create
 Relationship Event score/stage apply
 → SRC-22 resolution + event-schema/delta/stage/anti-farming/concurrency evidence
 
-relationship-stage-driven downstream unlock
-→ SRC-22 + applicable World/Content unlock-condition authority
+Character Unlock condition/effect apply
+→ SRC-23 resolution + condition/event/target/replay/concurrency evidence
+
+relationship-stage-driven Character Unlock
+→ SRC-22 + SRC-23
+
+episode-driven Character Unlock
+→ applicable SRC-17 + SRC-23
 ```
 
 ## 9. Final Classification
@@ -461,4 +566,4 @@ FINAL PRODUCTION BASELINE = BLOCKED WHERE SOURCE/P0 REMAINS OPEN
 
 ### Final statement
 
-> Pack은 source authority를 구현 가능하게 구체화하는 문서이지 source에 없는 product semantics를 발명하는 authority가 아니다. 현재 commerce는 `SRC-18` Product→grant mapping과 `SRC-21` event→grant→logical-entitlement aggregation을 독립적으로 fail-closed 처리한다. `SRC-19`는 Device Installation registration lifecycle, `SRC-20`은 Share Artifact create/public projection lifecycle, `SRC-22`는 Relationship Event의 event→score/stage/anti-farming policy evaluator를 각각 차단한다. 이미 source-complete한 Purchase Intent, current stored Entitlement read, Device revoke, Share public-read/revoke, Relationship ledger/current-read 경계는 이 blocker들과 독립적으로 유지한다.
+> Pack은 source authority를 구현 가능하게 구체화하는 문서이지 source에 없는 product semantics를 발명하는 authority가 아니다. 현재 commerce는 `SRC-18` Product→grant mapping과 `SRC-21` event→grant→logical-entitlement aggregation을 독립적으로 fail-closed 처리한다. `SRC-19`는 Device Installation registration lifecycle, `SRC-20`은 Share Artifact create/public projection lifecycle, `SRC-22`는 Relationship Event의 event→score/stage/anti-farming policy evaluator, `SRC-23`은 Character Unlock의 condition/World Event→target/effect evaluator를 각각 차단한다. 이미 source-complete한 Purchase Intent, current stored Entitlement read, Device revoke, Share public-read/revoke, Relationship ledger/current-read, World Event/Character Unlock relational current-read 경계는 이 blocker들과 독립적으로 유지한다.

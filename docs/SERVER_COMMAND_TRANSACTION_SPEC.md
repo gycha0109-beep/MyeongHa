@@ -1,7 +1,7 @@
-# 명하 Server Command / Transaction Specification v0.6
+# 명하 Server Command / Transaction Specification v0.7
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.6**  
+> Pack Version: **v0.7**  
 > Date: **2026-08-28**  
 > Persistence Authority: `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`  
 > API Authority: `API_CONTRACT.md`
@@ -34,6 +34,7 @@ validate identity/capability
    - conversation_thread
    - reading_session
    - user_character_state
+   - character_unlock
    - user_episode_progress
    - entitlement_grant
    - notification_delivery
@@ -45,6 +46,8 @@ validate identity/capability
 같은 class 여러 row는 stable primary key 정렬 순으로 lock한다.
 
 문서별 command가 이 순서를 뒤집어 deadlock을 만들면 안 된다. 예외 lock order가 필요하면 command별로 명시하고 concurrency test를 추가한다.
+
+`character_unlock` lock class는 relational projection write가 source-resolved 된 이후의 ordering placeholder다. `SRC-23` 해결 전 실제 unlock eligibility/effect command가 source-complete하다는 뜻이 아니다.
 
 ## 4. External Call Pattern
 
@@ -97,6 +100,8 @@ verify both identities
 Historical immutable ledger `subject_id` UPDATE 금지.
 
 Relationship score/stage merge semantics require the source-approved relationship policy. `SRC-22` 해결 전 merge command가 relationship scores/stage를 임의 합산/재계산하지 않는다.
+
+Character Unlock merge/import semantics are not defined by UC-32 or ERD beyond historical ownership boundaries. `SRC-23` 해결 전 merge command가 guest/member unlock projections를 임의 OR/overwrite/re-evaluate하지 않는다 unless a separate source authority explicitly defines that merge action.
 
 ## 7. Birth Revision Append
 
@@ -169,7 +174,11 @@ lock thread → turn → attempt
 → commit
 ```
 
-Relationship Event candidate가 존재하더라도 authoritative score/stage mutation은 `SRC-22` 해결 전 이 transaction 안에서 임의 실행하지 않는다. 안전하게 compose할 수 없는 domain side effect는 validated proposal/outbox command candidate로 분리하되, 그 candidate가 source-gap을 우회해 authority mutation을 수행해서는 안 된다.
+Relationship Event candidate가 존재하더라도 authoritative score/stage mutation은 `SRC-22` 해결 전 이 transaction 안에서 임의 실행하지 않는다.
+
+Character Unlock candidate/condition이 존재하더라도 authoritative unlock mutation은 `SRC-23` 해결 전 임의 실행하지 않는다. LLM/caller가 `character_id`, `unlock=true`, arbitrary condition result 또는 same-owner `source_world_event_id`를 보냈다는 사실은 eligibility proof가 아니다.
+
+안전하게 compose할 수 없는 domain side effect는 validated proposal/outbox command candidate로 분리할 수 있으나, 그 candidate가 source-gap을 우회해 authority mutation을 수행해서는 안 된다.
 
 ## 11. Chat Retry / Abandon
 
@@ -249,7 +258,63 @@ Caller/LLM-supplied `delta_*` or next-stage values are not an acceptable replace
 
 Relationship-specific outbox publication is also not automatically inserted by this skeleton; where downstream publication is required, its event schema/dedupe contract must come from an independently source-approved outbox/domain contract.
 
-## 14. Episode Advance
+## 14. Character Unlock Apply — relational projection exists; evaluator blocked by `SRC-23`
+
+UC-14 gives a high-level product flow:
+
+```text
+Unlock condition satisfied
+→ World Event
+→ Hall silhouette state change
+→ first appearance scene
+→ CHARACTER_UNLOCKED event
+```
+
+ERD gives `world_events` and `character_unlocks` storage envelopes, but source does not provide the condition/effect function connecting them.
+
+Therefore the following is only a **future transaction skeleton**, not a currently source-complete command:
+
+```text
+validate authoritative trigger/condition against pinned content semantics
+→ lock character_unlocks(subject, character)
+→ resolve duplicate/already-unlocked state under source-approved rule
+→ validate/create causal World Event under source-approved event schema
+→ update locked→unlocked projection + revision + unlocked_at + source_world_event_id
+→ emit required first-appearance/reward/outbox effects under source-approved contract
+→ commit
+```
+
+`SRC-23` must resolve at least:
+
+```text
+unlock condition positive schema/DSL
+World Event registry/payload schema for unlock causality
+condition → target character mapping
+bundle/version pinning and migration
+already-unlocked/replay/concurrency semantics
+projection revision/no-op behavior
+first-appearance/reward effect mapping
+season/operator reveal authority
+unlock-specific outbox/domain event contract
+```
+
+Until then:
+
+- `cmd_unlock_character...` is not production-authoritative;
+- same-subject `source_world_event_id` FK validity is insufficient eligibility proof;
+- caller/LLM-supplied target/effect is not authority;
+- stored current unlock projection may be read/rendered without enabling mutation.
+
+Composition:
+
+```text
+relationship-stage trigger → SRC-22 + SRC-23
+episode completion trigger → SRC-17 where completion evaluator is needed + SRC-23
+Reading completion trigger  → authoritative Reading completion provenance + SRC-23
+season/operator trigger     → source-approved operational authority + SRC-23
+```
+
+## 15. Episode Advance
 
 ```text
 lock user_episode_progress
@@ -257,15 +322,15 @@ lock user_episode_progress
 → validate pinned bundle/node/choice
 → append progress event
 → update current projection
-→ governed world/unlock side effects
+→ governed world/unlock side effects only when their independent source authorities are resolved
 → governed relationship side effects only when `SRC-22` relationship evaluator is resolved
 → outbox when applicable
 → commit
 ```
 
-`SRC-17` 해결 전 scene graph/condition/choice evaluator가 필요한 실제 start/advance write authority는 final production command로 승격하지 않는다. Episode가 relationship state를 바꾸는 경우 그 side effect는 추가로 `SRC-22`가 필요하다.
+`SRC-17` 해결 전 scene graph/condition/choice evaluator가 필요한 실제 start/advance write authority는 final production command로 승격하지 않는다. Episode가 relationship state를 바꾸는 경우 그 side effect는 추가로 `SRC-22`가 필요하다. Episode reward가 concrete Character Unlock을 발생시키는 경우 추가로 `SRC-23`이 필요하다.
 
-## 15. Reading Session / Clarification
+## 16. Reading Session / Clarification
 
 Create session:
 
@@ -290,7 +355,9 @@ lock reading_session
 → commit
 ```
 
-## 16. Saju Transport Retry / Finalize
+A completed Reading may become a future Character Unlock trigger according to UC-14 examples, but Reading completion provenance alone does not authorize a specific character unlock before `SRC-23` defines the mapping/condition.
+
+## 17. Saju Transport Retry / Finalize
 
 Prepare transport attempt under `readings` lock. External Saju call outside transaction.
 
@@ -309,7 +376,7 @@ lock reading + execution attempt
 
 Clarification response가 transport success라도 consumer semantic completion과 동일하지 않다.
 
-## 17. Grounding Finalize
+## 18. Grounding Finalize
 
 ```text
 lock/read succeeded reading_ref
@@ -321,9 +388,9 @@ lock/read succeeded reading_ref
 
 LLM semantic creation 없음.
 
-## 18. Commerce Commands
+## 19. Commerce Commands
 
-### 18.1 Purchase Intent Create — source-complete baseline
+### 19.1 Purchase Intent Create — source-complete baseline
 
 ```text
 resolve active member subject
@@ -337,11 +404,11 @@ resolve active member subject
 
 Purchase Intent create does **not** call a provider and does not create receipt/provider-event/entitlement rows.
 
-### 18.2 Provider Source Provenance
+### 19.2 Provider Source Provenance
 
 Provider verification happens outside the DB transaction or at a dedicated provider boundary. Verified results may be persisted as source-defined receipt/provider-event provenance with dedupe and ownership constraints.
 
-### 18.3 Purchase Source → Grant Target — blocked by `SRC-18`
+### 19.3 Purchase Source → Grant Target — blocked by `SRC-18`
 
 Primary source does not define purchased `product_id` → `entitlement_key` / scope / grant-key semantics.
 
@@ -352,7 +419,7 @@ verified purchase provenance
 
 Pack must not insert an invented `ProductFulfillmentDefinition` or client-supplied scope authority.
 
-### 18.4 Entitlement Event Apply / Aggregate Recompute — skeleton only; executable command blocked by `SRC-21`
+### 19.4 Entitlement Event Apply / Aggregate Recompute — skeleton only; executable command blocked by `SRC-21`
 
 ERD fixes this transaction skeleton:
 
@@ -395,7 +462,7 @@ may be promoted as production-authoritative merely because the relational schema
 
 The existing commerce negative test that manually changes a grant and then manually writes `active_grant_count/effective_valid_until` is a schema representability test, not executable transition authority.
 
-### 18.5 Blocker composition
+### 19.5 Blocker composition
 
 Full purchase→access mutation requires all applicable layers:
 
@@ -407,7 +474,7 @@ SRC-21    → event → grant transition + grant aggregate projection
 
 `SRC-07` 해결 전 manual provider-event resolution도 production deny다.
 
-## 19. Notification Delivery Attempt
+## 20. Notification Delivery Attempt
 
 ```text
 lock delivery
@@ -427,7 +494,7 @@ lock delivery + attempt
 
 Ambiguous provider-send crash/retry semantics는 `NOTIFICATION_RETURN_LOOP_SPEC.md`의 transport rule을 따른다. Provider send는 DB exactly-once라고 주장하지 않는다.
 
-## 20. Deletion Workflow
+## 21. Deletion Workflow
 
 Account deletion first transaction:
 
@@ -443,22 +510,26 @@ lock subject
 
 Destructive phases는 idempotent하고 dependency order를 따른다. Direct merged guest lineage를 canonical subject보다 먼저 또는 같은 governed deletion graph에서 처리한다. Finalization은 member subject를 `deleted`로 전환한 뒤 auth mapping 제거/`auth.users` deletion이 일어나도록 하여 `deletion_pending -> auth_user_id NULL` CHECK 위반을 만들지 않는다. Conversation-only deletion은 provenance tombstone/redaction baseline. Birth/Target standalone delete는 `SRC-06` resolution 필요.
 
-## 21. Outbox Rule
+## 22. Outbox Rule
 
 Domain state와 downstream event 생성이 둘 다 필요한 source-approved command는 **같은 DB transaction에서 outbox row를 insert**한다.
 
 Publisher는 at-least-once로 동작할 수 있으므로 consumer가 event dedupe를 구현한다.
 
-## 22. Verification
+Source가 Character Unlock 관련 downstream event/outbox schema를 아직 정의하지 않았으므로 `SRC-23` 해결 전 `CHARACTER_UNLOCKED` 명칭을 특정 outbox event contract로 임의 고정하지 않는다.
+
+## 23. Verification
 
 - reverse lock-order concurrency stress → no deadlock regression
-- same idempotency key concurrency → one logical command
+- same idempotency key concurrency → one logical command where source defines command identity
 - external timeout → no transaction held open
-- DB commit after external response loss → retry returns existing state
+- DB commit after external response loss → retry returns existing state where retry contract is source-defined
 - chat commit + relationship score/stage mutation → blocked until `SRC-22`; after resolution both-or-neither atomicity required
 - relationship event ledger/revision structural invariants → testable now
 - relationship event→delta/stage/anti-farming correctness → blocked until `SRC-22`
-- episode advance with unlock → both or neither after `SRC-17` resolution and any applicable unlock/relationship authorities
+- `character_unlocks` relational status/timestamp/owner/source-FK/current-read invariants → testable now
+- Character Unlock condition→target/effect/replay/concurrency correctness → blocked until `SRC-23`
+- episode advance with unlock → requires `SRC-17` + `SRC-23` and any other applicable authority before both-or-neither atomicity can be asserted
 - Purchase Intent same-key concurrency → one logical intent
 - Purchase Intent replay does not depend on later offer availability
 - purchase provenance → grant target remains blocked until `SRC-18`
