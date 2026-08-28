@@ -63,6 +63,7 @@ behavior spec
 - allocator/concurrency
 - migration replay/catalog hash
 - `SRC-01`, `SRC-05`, `SRC-06` schema impacts resolved before relevant final migration baseline
+- `SRC-14` resolved before conversation-delete mutation can be promoted: all durable transcript-bearing columns need governed redaction/tombstone semantics compatible with provenance/immutability constraints
 
 ## 5. Auth / RLS / Privacy Gate
 
@@ -89,7 +90,7 @@ behavior spec
 - target-person CRUD/isolation
 - chat retry + abandon
 - reading clarification + transient retry
-- conversation delete scope semantics
+- conversation delete scope semantics (`SRC-14` resolution required before final write authority)
 - memory session-only / private / explicit grants / forget
 - device installation register/revoke
 - account deletion job
@@ -217,12 +218,16 @@ Provider model quality/eval matrix = `OPEN-P0: P0-AI-01`.
 - direct merged guest lineage included
 - legal commerce retention remains separated
 - backup/raw AI trace behavior follows `P0-PR-01` when DECIDED
-- conversation delete redacts/removes source text without destroying retained Life Fact/Memory authority
+- conversation delete preserves provenance identity but removes/redacts raw transcript from **every durable duplicate**: `conversation_messages.body_text/message_payload_jsonb`, `chat_turns.request_snapshot_jsonb`, and transcript-bearing `chat_turn_attempts.generated_*`
+- message-row redaction alone is not a conversation-delete PASS
+- deletion must not make terminal attempt provenance mutable in an ad-hoc way; source-approved tombstone/redaction semantics must define the exception boundary first
+- delete/commit race must serialize so either commit precedes deletion and is redacted, or deletion wins and later assistant commit is denied
 - `SRC-05`: session-only/reject proposal staging payload no shadow durable record
 - `SRC-06`: target/self Birth standalone privacy deletion dependency policy verified
 - `SRC-07`: manual commerce resolution disabled unless audited source resolution exists
 - `SRC-08`: real compatibility/domain adapter only enabled against an actual consumable Saju public contract
 - `SRC-09`: explicit guard-metadata invariant not marked CLOSED until source public export exists or source requirement changes
+- `SRC-14`: conversation-delete write remains blocked until duplicate transcript retention/redaction and terminal-attempt immutability semantics are source-resolved
 
 ## 15. Engineering Vertical Slice
 
