@@ -1,10 +1,10 @@
-# 명하 Release / Observability Specification v0.3 — Full Audit
+# 명하 Release / Observability Specification v0.4 — Source Aligned
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.3**  
-> Date: **2026-08-25**  
+> Pack Version: **v0.4**  
+> Date: **2026-08-28**  
 > Source Authority: `Usecase_re_reviewed_v2(1).md`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`, `Myeonghwa_Personalized_Interpretation_Architecture_v1.3_THIRD_REVIEW(1).md`  
-> Rule: source가 결정하지 않은 implementation-critical 사항은 `OPEN-P0`, 비차단 선택은 `CANDIDATE`, source 간 충돌은 `SOURCE_AUTHORITY_GAPS.md`에 기록한다.
+> Rule: source가 결정하지 않은 implementation-critical 사항은 `OPEN-P0` 또는 numbered source-authority gap으로 남기며 Pack이 새 authority를 만들지 않는다.
 
 ---
 
@@ -12,9 +12,9 @@
 
 DB/API/AI/content/mobile이 서로 다른 속도로 배포되어도 provenance, compatibility, rollback/disable 경계를 유지한다.
 
-## 2. Version Set
+## 2. Version / Provenance Set
 
-실행/리포트에서 가능한 범위로 기록:
+실행/리포트에서 source-backed 범위로 기록:
 
 ```text
 apiContractVersion
@@ -27,8 +27,12 @@ relationshipPolicyVersion
 sajuEngineVersion
 readingContractVersion
 groundingVersion
-fulfillmentDefinitionVersion where commerce applies
+commerce product / offer identity where applicable
+Purchase Intent immutable minimal offer mapping snapshot/hash where applicable
+source-gap/P0 status for blocked commerce transitions
 ```
+
+Source에 없는 commerce fulfillment-definition version/hash를 release provenance로 요구하지 않는다.
 
 ## 3. Release Units
 
@@ -41,20 +45,24 @@ fulfillmentDefinitionVersion where commerce applies
 - Saju Engine/package/service
 - AI runtime/prompt policy
 - relationship policy
-- commerce fulfillment registry
-- relationship/usage/notification/experiment policy registries
+- commerce product/offer/provider-provenance components
+- relationship/usage/notification/experiment policy registries that have source authority
 
 한 release unit 변경이 과거 provenance를 rewrite하지 않는다. 동일 `(policyKey,version)` artifact content도 immutable하다.
+
+Commerce의 Product→grant mapping은 `SRC-18`, entitlement event→grant→logical-entitlement transition/aggregation은 `SRC-21` 해결 전 source-backed release unit/registry가 존재한다고 가정하지 않는다.
 
 ## 4. Content Rollout
 
 `content_bundles` immutable, `content_releases` deterministic rollout.
 
 - existing thread binding 유지
-- new thread/session은 resolver result pin
+- new thread/session은 governed resolver result pin
 - explicit content transition만 existing thread bundle 변경
 - forced safety upgrade는 transition reason/provenance 기록
 - retired release의 bundle artifact는 existing pinned thread/progress가 continuable한 동안 삭제하지 않음
+
+Subject-specific rollout resolver semantics는 `SRC-16` boundary를 따른다.
 
 ## 5. Character / Episode Operational Disable Gap
 
@@ -99,9 +107,12 @@ SRC-01 해결 후 별도 operational override 또는 mutable runtime authority�
 - outbox backlog/lease/retry
 - push delivery/attempt failure
 - commerce receipt/provider event lag
-- fulfillment snapshot/version mismatch
-- entitlement recompute failure/overgrant prevention
+- Purchase Intent offer mapping snapshot/provenance mismatch
+- current entitlement projection inconsistency / overgrant-prevention signal
+- source-authoritative entitlement recompute failure **only after `SRC-21` is resolved and that mutation is enabled**
 - deletion job age/failure
+
+Do not emit telemetry that assumes an invented fulfillment registry/version or an unimplemented entitlement recompute policy.
 
 ## 9. Privacy in Telemetry
 
@@ -173,6 +184,7 @@ Kill switch는 과거 ledger/provenance 삭제가 아니다.
 - disable/rollback action
 - repair necessity
 - regression test ID added
+- relevant source-gap/P0 status when an affected path is blocked or partially enabled
 
 ## 14. Release Gate
 
@@ -187,11 +199,33 @@ client capability = confirmed
 content hash/manifest = valid
 Saju protected narrative boundary = PASS
 AI runtime contract/eval = PASS
-commerce fulfillment snapshot gate = PASS if commerce enabled
 rollback/disable path = known and actually supported
 ```
 
-## 15. P0 Dependencies
+Commerce gate는 enabled slice별로 분리한다.
+
+```text
+Purchase Intent create
+→ immutable minimal offer mapping snapshot + idempotency/concurrency evidence
+
+provider-specific payment/receipt/restore rail
+→ P0-CM-01 DECIDED + provider evidence
+
+purchased Product → concrete entitlement/grant target
+→ SRC-18 resolved
+
+authoritative entitlement event → grant mutation → logical entitlement recompute
+→ SRC-21 resolved + transition/aggregation/concurrency evidence
+
+full purchase → effective access
+→ all applicable gates above PASS
+```
+
+Source에 없는 `fulfillmentDefinitionVersion`, `commerce fulfillment registry`, fulfillment snapshot/hash를 PASS condition으로 사용하지 않는다.
+
+## 15. P0 / Source Dependencies
+
+P0:
 
 - `P0-SA-01`: Saju deploy/retry/runbook
 - `P0-CM-01`: rail/webhook/restore/refund runbook
@@ -199,3 +233,12 @@ rollback/disable path = known and actually supported
 - `P0-AGE-01`: content/marketing gate
 - `P0-PR-01`: logs/backup/deletion retention
 - `P0-AUTH-01`: DB execution identity/RLS runbook
+
+Relevant source gaps include:
+
+- `SRC-18`: purchased Product → entitlement/grant mapping
+- `SRC-19`: Device Installation registration lifecycle
+- `SRC-20`: Share Artifact create/public projection lifecycle
+- `SRC-21`: entitlement event apply / logical aggregation
+
+P0 결정은 별도 source gap을 자동으로 닫지 않는다.
