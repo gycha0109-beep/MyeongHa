@@ -12,7 +12,8 @@ describe('FR-18 provider release and laterality attestation', () => {
   it('validates the attestation and bounded evidence registry', () => {
     expect(validateProviderReleaseEvidenceFR18()).toBe(PROVIDER_RELEASE_EVIDENCE_FR18);
     expect(validateProviderReleaseAttestationFR18()).toBe(PROVIDER_RELEASE_ATTESTATION_FR18);
-    expect(PROVIDER_RELEASE_EVIDENCE_FR18).toHaveLength(4);
+    expect(PROVIDER_RELEASE_EVIDENCE_FR18).toHaveLength(5);
+    expect(PROVIDER_RELEASE_ATTESTATION_FR18.attestationVersion).toBe('0.2.0');
   });
 
   it('pins exactly the FR-16 K_beauty dependency evidence', () => {
@@ -23,6 +24,21 @@ describe('FR-18 provider release and laterality attestation', () => {
     expect(fr18.packageManifestBlobSha).toBe(fr16.packageManifestBlobSha);
     expect(fr18.packageName).toBe(fr16.packageName);
     expect(fr18.packageVersion).toBe(fr16.packageVersion);
+  });
+
+  it('pins the exact K_beauty lockfile tarball resolution and sha512 SRI without claiming a rehash', () => {
+    const artifact = PROVIDER_RELEASE_ATTESTATION_FR18.consumerArtifactLock;
+    expect(artifact.repositoryCommit).toBe('81c3b4139efdffc785439da005557dc38a6b4873');
+    expect(artifact.lockfileBlobSha).toBe('2fdca4f4498617f383b9579191415efe0c8e743b');
+    expect(artifact.resolvedTarballUrl).toBe(
+      'https://registry.npmjs.org/@mediapipe/tasks-vision/-/tasks-vision-0.10.35.tgz',
+    );
+    expect(artifact.integrity).toBe(
+      'sha512-HOvadwVRE6JC+45nyYhmnywnr5h/J8KZvOeUNVOG9q/0875pZgItznFB9bRTvLc264YSJqiZ1NsIpCStJw/egg==',
+    );
+    expect(artifact.artifactIdentityState).toBe('consumer_lockfile_attested');
+    expect(artifact.tarballBytesIndependentlyRehashed).toBe(false);
+    expect(artifact.sourceEquivalenceEstablished).toBe(false);
   });
 
   it('keeps public package metadata separate from topology-byte attestation', () => {
@@ -65,6 +81,50 @@ describe('FR-18 provider release and laterality attestation', () => {
       },
     } as never;
     expect(() => validateProviderReleaseAttestationFR18(forged)).toThrow(/exactly match the merged FR-16 dependency evidence/u);
+  });
+
+  it('rejects lockfile blob drift from the inspected K_beauty consumer artifact lock', () => {
+    const forged = {
+      ...PROVIDER_RELEASE_ATTESTATION_FR18,
+      consumerArtifactLock: {
+        ...PROVIDER_RELEASE_ATTESTATION_FR18.consumerArtifactLock,
+        lockfileBlobSha: '1111111111111111111111111111111111111111',
+      },
+    } as never;
+    expect(() => validateProviderReleaseAttestationFR18(forged)).toThrow(/pin the inspected K_beauty package-lock exactly/u);
+  });
+
+  it('rejects SRI drift even when package name and version are unchanged', () => {
+    const forged = {
+      ...PROVIDER_RELEASE_ATTESTATION_FR18,
+      consumerArtifactLock: {
+        ...PROVIDER_RELEASE_ATTESTATION_FR18.consumerArtifactLock,
+        integrity: 'sha512-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==',
+      },
+    } as never;
+    expect(() => validateProviderReleaseAttestationFR18(forged)).toThrow(/integrity must match the inspected package-lock sha512 SRI exactly/u);
+  });
+
+  it('rejects promotion of lockfile integrity into source equivalence', () => {
+    const forged = {
+      ...PROVIDER_RELEASE_ATTESTATION_FR18,
+      consumerArtifactLock: {
+        ...PROVIDER_RELEASE_ATTESTATION_FR18.consumerArtifactLock,
+        sourceEquivalenceEstablished: true,
+      },
+    } as never;
+    expect(() => validateProviderReleaseAttestationFR18(forged)).toThrow(/without independent rehash\/source equivalence/u);
+  });
+
+  it('rejects pretending the published tarball bytes were independently rehashed', () => {
+    const forged = {
+      ...PROVIDER_RELEASE_ATTESTATION_FR18,
+      consumerArtifactLock: {
+        ...PROVIDER_RELEASE_ATTESTATION_FR18.consumerArtifactLock,
+        tarballBytesIndependentlyRehashed: true,
+      },
+    } as never;
+    expect(() => validateProviderReleaseAttestationFR18(forged)).toThrow(/without independent rehash\/source equivalence/u);
   });
 
   it('rejects promotion of package metadata to topology-byte authority', () => {
@@ -132,12 +192,14 @@ describe('FR-18 provider release and laterality attestation', () => {
     expect(() => validateProviderReleaseAttestationFR18(forged)).toThrow(/provider activation must remain blocked/u);
   });
 
-  it('reports explicit release and laterality blockers', () => {
+  it('reports artifact identity as attested while keeping release/build provenance unresolved', () => {
     const readiness = assessProviderReleaseAttestationReadinessFR18();
     expect(readiness.productionReady).toBe(false);
+    expect(readiness.artifactIdentityState).toBe('consumer_lockfile_attested');
     expect(readiness.releaseExactState).toBe('unresolved');
     expect(readiness.lateralityState).toBe('unresolved');
-    expect(readiness.blockers.join(' ')).toMatch(/published npm 0\.10\.35 bundle topology bytes/u);
+    expect(readiness.blockers.join(' ')).toMatch(/tarball URL and sha512 SRI/u);
+    expect(readiness.blockers.join(' ')).toMatch(/source\/build provenance/u);
     expect(readiness.blockers.join(' ')).toMatch(/development source snapshot/u);
     expect(readiness.blockers.join(' ')).toMatch(/mirroring/u);
     expect(readiness.blockers.join(' ')).toMatch(/image-space x ordering/u);
