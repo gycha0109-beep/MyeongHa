@@ -145,6 +145,19 @@ jobs:
             PGDATABASE="$relation_db" psql -v ON_ERROR_STOP=1 -f "$migration" >/dev/null
           done
           PGDATABASE="$relation_db" bash test/db/character_bundle_relations_query.sh
+      - name: Run Content bundle manifest projection tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest_db=myeongha_content_bundle_manifest_query_test
+          createdb "$manifest_db"
+          trap 'dropdb --if-exists "$manifest_db"' EXIT
+          PGDATABASE="$manifest_db" psql -v ON_ERROR_STOP=1 -f test/db/bootstrap_supabase_auth_stub.sql
+          for migration in supabase/migrations/*.sql; do
+            echo "Applying ${migration} to isolated Content bundle manifest query DB"
+            PGDATABASE="$manifest_db" psql -v ON_ERROR_STOP=1 -f "$migration" >/dev/null
+          done
+          PGDATABASE="$manifest_db" bash test/db/content_bundle_manifest_query.sh
       - name: Run Episode bundle catalog/participant projection tests
         shell: bash
         run: |
