@@ -1,7 +1,7 @@
-# 명하 Spec Pack — Source Authority Validation Report v0.6
+# 명하 Spec Pack — Source Authority Validation Report v0.7
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.6 Source Alignment**  
+> Pack Version: **v0.7 Source Alignment**  
 > Date: **2026-08-28**  
 > Source Authority: `Usecase_re_reviewed_v2(1).md`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`, `Myeonghwa_Personalized_Interpretation_Architecture_v1.3_THIRD_REVIEW(1).md`  
 > Saju Public Contract Audit Pin: `gycha0109-beep/Saju@7102dc8fe8483c0875f6a093a4fd585b0df51f8b`
@@ -45,6 +45,7 @@ Source끼리 직접 충돌하거나 source가 구현 필수 authority를 제공�
 - Content/canon projections remain explicit bundle-pinned where source does not authorize hidden current selection.
 - Existing source-safe Share public-read/revoke and Device Installation revoke boundaries remain valid even though their inverse create/register workflows are source-blocked.
 - Existing `entitlements` projection/read schema remains valid as a storage/read envelope even though source does not yet define the complete event→grant→aggregate recompute algorithm.
+- Existing relationship state/event schema remains valid as a current-projection/append-only-ledger envelope even though source does not yet define the executable score/stage policy evaluator.
 
 Machine validation values recorded in older reports are historical snapshots; this report does not silently reuse stale counts as evidence for the current repository state. Current CI/action runs are the execution evidence.
 
@@ -237,6 +238,83 @@ purchase-derived event-apply additionally               = BLOCKED by SRC-18
 
 The Pack must not infer `max(valid_until)`, treat NULL expiry as unbounded without source approval, ignore future `valid_from`, compare opaque provider ordering keys lexically, or invent event payload transition semantics.
 
+### 4.6 Relationship policy/evaluator overreach removed — `SRC-22`
+
+Primary source defines a strong Relationship **envelope**:
+
+```text
+User Character State
+- closeness / trust / friction
+- relationship_stage
+- policy_version
+- revision
+- last_interaction_at
+
+Relationship Event
+- event_type / event_schema_version / event_dedupe_key
+- source provenance
+- delta_closeness / delta_trust / delta_friction
+- policy_version
+- state_revision_before / state_revision_after
+- validated payload
+```
+
+It also requires:
+
+```text
+LLM/client cannot directly choose relationship scores
+Relationship Engine applies events deterministically
+same event/action retry must not repeatedly increase state
+message spam cannot farm stage indefinitely
+transition rule is versioned
+historical event provenance is preserved
+inactivity alone does not automatically degrade baseline relationship state
+state row is locked and event + projection revision update atomically
+```
+
+However source does **not** define the executable policy content needed to calculate the projection:
+
+```text
+final normative Relationship Event allowlist
+event payload schemas
+score bounds
+event → delta mapping
+internal stage keys / thresholds / transition graph
+anti-farming windows/caps/cooldowns
+last_interaction_at mutation rule
+active policy-version selection/migration
+no-op/blocked-event ledger semantics
+```
+
+The previous Pack went beyond source by introducing a concrete `RelationshipPolicyDefinitionV1` with:
+
+```text
+policyVersion
+contentHash
+scoreBounds
+stages[].entryConditions
+events[].delta
+antiFarmingRuleKey
+```
+
+That artifact is not present in the three primary source documents. The persistence mismatch is material: ERD v0.6 stores `policy_version` on relationship state/event rows but defines **no relationship-policy content-hash column and no relationship-policy artifact table**.
+
+Therefore the Pack cannot require `policy_version + contentHash` as current durable relationship provenance without an explicit source/ERD decision.
+
+Current baseline:
+
+```text
+relationship state/event relational envelope = SOURCE-COMPLETE
+append-only + dedupe + applied-revision chain = SOURCE-COMPLETE
+current relationship projection read          = SOURCE-COMPLETE
+LLM/client direct score authority deny        = SOURCE-COMPLETE
+atomic apply order                            = SOURCE-COMPLETE skeleton
+production event→score/stage policy mutation  = BLOCKED by SRC-22
+relationship anti-farming evaluator           = BLOCKED by SRC-22
+```
+
+A DB command that accepts caller-calculated `delta_*`/next stage is not a valid workaround; it would move rather than resolve the missing authority.
+
 ## 5. Current Saju Public Contract Boundary
 
 Pinned public contract:
@@ -251,6 +329,31 @@ Current public boundary supports one Birth input plus reading text/optional targ
 The Pack does not fabricate second-Birth compatibility input or semantic guard fields absent from the exported public contract. `SRC-08` and `SRC-09` remain the applicable blockers.
 
 ## 6. Source-Complete Validation Boundaries
+
+### Relationship with `SRC-22` open
+
+Source-complete verification may assert:
+
+- one current relationship state per user-character;
+- relationship event append-only behavior;
+- same-owner source provenance constraints;
+- same event dedupe key does not create multiple ledger effects;
+- one event per applied revision;
+- `state_revision_after = state_revision_before + 1`;
+- current relationship projection read/isolation;
+- client/LLM direct score mutation denied;
+- inactivity-only automatic degradation absent.
+
+It must **not** claim the following as source-complete:
+
+- final event allowlist/schema;
+- event→delta correctness;
+- score bound behavior;
+- stage threshold/transition correctness;
+- anti-farming window/cap behavior;
+- policy version selection/migration;
+- relationship policy content-hash provenance;
+- authoritative concurrent score/stage apply.
 
 ### Commerce with `SRC-18` and `SRC-21` open
 
@@ -306,7 +409,7 @@ SRC-18    = what entitlement/grant target a purchased product maps to
 SRC-21    = how an authoritative event mutates a grant and recomputes logical entitlement
 ```
 
-Source-gap decisions `SRC-19` and `SRC-20` are likewise independent of infrastructure/provider P0 choices.
+Source-gap decisions `SRC-19`, `SRC-20`, and `SRC-22` are likewise independent of infrastructure/provider P0 choices.
 
 ## 8. Promotion Gate
 
@@ -338,6 +441,12 @@ Device Installation register/re-register
 
 Share Artifact create
 → SRC-20 resolution + positive snapshot/privacy + retry/token evidence
+
+Relationship Event score/stage apply
+→ SRC-22 resolution + event-schema/delta/stage/anti-farming/concurrency evidence
+
+relationship-stage-driven downstream unlock
+→ SRC-22 + applicable World/Content unlock-condition authority
 ```
 
 ## 9. Final Classification
@@ -352,4 +461,4 @@ FINAL PRODUCTION BASELINE = BLOCKED WHERE SOURCE/P0 REMAINS OPEN
 
 ### Final statement
 
-> Pack은 source authority를 구현 가능하게 구체화하는 문서이지 source에 없는 product semantics를 발명하는 authority가 아니다. 현재 commerce는 `SRC-18` Product→grant mapping과 `SRC-21` event→grant→logical-entitlement aggregation을 독립적으로 fail-closed 처리한다. `SRC-19`는 Device Installation registration lifecycle, `SRC-20`은 Share Artifact create/public projection lifecycle을 각각 차단한다. 이미 source-complete한 Purchase Intent, current stored Entitlement read, Device revoke, Share public-read/revoke 경계는 이 blocker들과 독립적으로 유지한다.
+> Pack은 source authority를 구현 가능하게 구체화하는 문서이지 source에 없는 product semantics를 발명하는 authority가 아니다. 현재 commerce는 `SRC-18` Product→grant mapping과 `SRC-21` event→grant→logical-entitlement aggregation을 독립적으로 fail-closed 처리한다. `SRC-19`는 Device Installation registration lifecycle, `SRC-20`은 Share Artifact create/public projection lifecycle, `SRC-22`는 Relationship Event의 event→score/stage/anti-farming policy evaluator를 각각 차단한다. 이미 source-complete한 Purchase Intent, current stored Entitlement read, Device revoke, Share public-read/revoke, Relationship ledger/current-read 경계는 이 blocker들과 독립적으로 유지한다.

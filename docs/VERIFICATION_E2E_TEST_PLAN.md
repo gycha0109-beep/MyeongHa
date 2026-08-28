@@ -1,7 +1,7 @@
-# 명하 Verification / E2E Test Plan v0.6 — Source Aligned
+# 명하 Verification / E2E Test Plan v0.7 — Source Aligned
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.6**  
+> Pack Version: **v0.7**  
 > Date: **2026-08-28**  
 > Source Authority: `Usecase_re_reviewed_v2(1).md`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`, `Myeonghwa_Personalized_Interpretation_Architecture_v1.3_THIRD_REVIEW(1).md`  
 > Rule: source가 결정하지 않은 implementation-critical 사항은 `OPEN-P0`, 비차단 선택은 `CANDIDATE`, source 간 충돌/공백은 `SOURCE_AUTHORITY_GAPS.md` 또는 numbered source-gap 문서에 기록한다.
@@ -68,6 +68,7 @@ behavior spec
 - no invented entitlement event transition/aggregation function before `SRC-21` resolution
 - no invented Device Installation register/upsert lifecycle before `SRC-19` resolution
 - no invented Share create positive snapshot/token replay schema before `SRC-20` resolution
+- relationship ledger structural constraints remain testable, but no invented relationship policy registry/content-hash column/score-stage evaluator before `SRC-22` resolution
 
 ## 5. Auth / RLS / Privacy Gate
 
@@ -100,6 +101,8 @@ behavior spec
 - Device Installation register/re-register/token rotation은 `SRC-19` 해결 전 production API PASS 대상에서 제외
 - public Share active/unexpired read + owner revoke
 - Share create는 `SRC-20` 해결 전 production API PASS 대상에서 제외
+- Relationship current projection read
+- authoritative Relationship Event score/stage apply는 `SRC-22` 해결 전 production API/command PASS 대상에서 제외
 - account deletion job
 - admin content release authorization
 
@@ -113,6 +116,7 @@ behavior spec
 - committed response-loss retry → no duplicate user/assistant/events/memory
 - participant/bundle mismatch deny
 - output guard fail → no commit/reveal
+- Relationship Event proposal/candidate가 있더라도 `SRC-22` 해결 전 caller/LLM delta 또는 next-stage를 authoritative mutation으로 commit하지 않음
 
 ## 8. Saju Gate
 
@@ -137,27 +141,68 @@ Saju repo semantic tests는 별도 authority. 명하에서는:
 
 Deterministic fixtures:
 
-- unknown planner action/fact/event key → no execution
+- unknown planner action/fact/event key → no execution authority
 - renderer context excludes non-granted/private data
 - unknown cue/action → reject/fallback
 - absent canon relation → official-history assertion not accepted
 - material ambiguity → no single-outcome certainty
 - protected Saju semantic segment not paraphrased/mutated
 - proposal alone → no authority mutation
+- LLM-proposed relationship delta/stage → never treated as authority
 
 Provider model quality/eval matrix = `OPEN-P0: P0-AI-01`.
 
 ## 10. Relationship / Memory Gate
 
+### Source-complete now
+
 - proposal explicit approval only
 - session-only → no durable record
 - private durable record → no character context
-- duplicate proposal/event once
-- unknown relationship event no mutation
-- concurrent revision one wins
-- anti-farming
-- inactivity-only degradation absent
+- duplicate proposal once
+- revoked grant/memory excluded from context
 - Life Fact no branch/cycle/type mismatch
+- relationship current projection ownership/read isolation
+- `relationship_events` append-only
+- same `(subject, character, event_dedupe_key)` cannot create multiple ledger effects
+- one `state_revision_after` per user-character
+- `state_revision_after = state_revision_before + 1`
+- relationship state/event same-owner provenance integrity
+- client/LLM direct score mutation authority denied
+- inactivity-only automatic relationship degradation absent
+
+These prove the relational envelope, not the missing score/stage policy.
+
+### Blocked by `SRC-22`
+
+Do not promote authoritative Relationship Event apply until source resolves:
+
+- final normative Relationship Event allowlist
+- event payload schema per event type/schema version
+- closeness/trust/friction numeric bounds
+- deterministic event→delta mapping
+- internal stage keys / entry/exit thresholds / transition graph
+- anti-farming windows/caps/cooldowns and repeatability rules
+- `last_interaction_at` update semantics
+- policy-version selection/change/migration semantics
+- no-op/blocked-event ledger semantics
+- historical relationship-policy provenance beyond existing `policy_version`, if required
+
+After resolution, required tests include:
+
+- same event retry → one policy application
+- conflicting same-key shape → source-approved conflict/no-op behavior
+- unknown event/schema → no mutation
+- each event computes exact approved deltas
+- score boundary behavior exact
+- concurrent web/mobile events serialize to one linear revision chain
+- stage transitions deterministic and reproducible
+- message/action spam cannot farm beyond policy
+- explicit conflict/reconciliation degradation/recovery follows approved rules
+- event ledger + current projection mutation commit atomically
+- historical policy provenance remains resolvable under the approved model
+
+A Pack-invented `RelationshipPolicyDefinitionV1`, caller-supplied delta, or intuitive stage threshold is not a PASS condition.
 
 ## 11. Episode / Content Gate
 
@@ -165,7 +210,9 @@ Provider model quality/eval matrix = `OPEN-P0: P0-AI-01`.
 - content hash/artifact integrity
 - invalid episode graph/node/choice deny after `SRC-17` evaluator contract resolution
 - episode advance retry once after `SRC-17` resolution
-- world/relationship side effects atomic after `SRC-17` resolution
+- world/unlock side effects atomic after applicable source authorities are resolved
+- episode-derived relationship score/stage side effects additionally require `SRC-22`
+- relationship-stage-driven unlock evaluation requires `SRC-22` plus any independently missing World/Content unlock-condition authority
 - client capability incompatible content graceful handling
 - existing thread not silently moved by default release change
 - `SRC-01` resolved behavior test: chosen per-character/per-episode operational disable policy or explicit non-requirement
@@ -290,7 +337,7 @@ A blacklist-only serializer, Pack-invented `ShareArtifactV1`, or plaintext raw-t
 - Saju transport retry bounded
 - multi-character maxTurns/call cap enforced
 - entitlement-required quota deny without effective entitlement
-- relationship/episode farming cannot bypass domain idempotency
+- relationship/episode farming cannot bypass source-approved domain idempotency/policy; exact relationship anti-farming expectations remain `SRC-22`
 
 ## 13C. Analytics / Experiment Gate
 
@@ -324,8 +371,11 @@ A blacklist-only serializer, Pack-invented `ShareArtifactV1`, or plaintext raw-t
 - `SRC-19`: Device Installation register/re-register remains blocked; standalone revoke remains valid
 - `SRC-20`: Share Artifact create remains blocked; existing public read/revoke remains valid
 - `SRC-21`: Entitlement grant-event transition/aggregate recompute remains blocked; current stored projection read remains valid
+- `SRC-22`: Relationship Event score/stage policy apply remains blocked; relationship relational ledger/current-read envelope remains valid
 
 ## 15. Engineering Vertical Slice
+
+Source-complete vertical slice may include the current relationship projection read and a non-authoritative Relationship Event proposal/candidate, but must not claim real score/stage progression until `SRC-22` resolves.
 
 ```text
 Guest bootstrap
@@ -337,8 +387,8 @@ Guest bootstrap
 → current-life question
 → memory proposal
 → session-only/private/character grant branch test
-→ relationship event
-→ Hall state change
+→ relationship candidate / current-state read (`SRC-22` blocks authoritative score-stage apply)
+→ Hall state change only from source-approved state
 → signup promotion
 → Web/Mobile continuation
 ```
@@ -369,7 +419,7 @@ real Saju adapter
 
 중복 charge/event/message/memory 또는 cross-user leakage 0.
 
-Share create response-loss retry는 `SRC-20` 해결 전 기대 결과를 임의 정의하지 않는다. Device register transport/retry도 `SRC-19` 해결 전 기대 lineage를 임의 정의하지 않는다. Commerce out-of-order source application과 aggregate recompute의 exact result는 `SRC-21` 해결 전 임의 정의하지 않는다.
+Share create response-loss retry는 `SRC-20` 해결 전 기대 결과를 임의 정의하지 않는다. Device register transport/retry도 `SRC-19` 해결 전 기대 lineage를 임의 정의하지 않는다. Commerce out-of-order source application과 aggregate recompute의 exact result는 `SRC-21` 해결 전 임의 정의하지 않는다. Relationship apply retry/concurrent result 중 policy output(delta/stage/anti-farming)은 `SRC-22` 해결 전 임의 정의하지 않으며, 현재는 relational dedupe/revision invariants만 검증한다.
 
 ## 18. Evidence Artifact
 
@@ -381,7 +431,8 @@ CI/release evidence:
 - content release/bundle/hash
 - Saju engine/reading contract/grounding versions
 - AI runtime/prompt versions
-- relationship policy version
+- relationship `policy_version` provenance available in current ERD
+- `SRC-22` status for any authoritative relationship score/stage mutation evidence
 - commerce product/offer/Purchase Intent snapshot provenance for implemented commerce slices
 - `SRC-18` status for product→grant-target evidence
 - `SRC-21` status for grant-event apply/aggregate recompute evidence
@@ -389,6 +440,8 @@ CI/release evidence:
 - `SRC-20` status for any Share Artifact create evidence
 - test matrix summary + failed invariant IDs
 - source gap/P0 status snapshot
+
+Do not require a relationship policy `contentHash` as current source evidence: ERD v0.6 does not define that persistence field/table. If source later requires stronger policy artifact provenance, `SRC-22` resolution must define it explicitly.
 
 ## 19. Promotion Criteria
 
@@ -412,4 +465,6 @@ relevant source blockers closed or feature explicitly disabled
 Commerce purchase→access enabled → SRC-18 + SRC-21 source-resolved + P0-CM-01 decided
 Device Installation register enabled → SRC-19 source-resolved
 Share Artifact create enabled → SRC-20 source-resolved
+Relationship Event score/stage apply enabled → SRC-22 source-resolved
+relationship-stage-driven unlock enabled → SRC-22 + applicable World/Content unlock-condition authority
 ```

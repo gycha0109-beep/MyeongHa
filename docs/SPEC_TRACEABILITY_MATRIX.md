@@ -1,7 +1,7 @@
-# 명하 Specification Traceability Matrix v0.7
+# 명하 Specification Traceability Matrix v0.8
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.7**  
+> Pack Version: **v0.8**  
 > Date: **2026-08-28**  
 > Authority: `Usecase_re_reviewed_v2(1).md`의 UC-01~UC-34(UC-16A 포함)  
 > Rule: Use Case가 implementation spec과 verification gate에 연결되지 않으면 구현 완료로 간주하지 않는다.
@@ -28,7 +28,7 @@ COVERED-SOURCE-GAP
 | UC | 핵심 요구 | Primary Implementation Specs | Verification Gate | Status |
 |---|---|---|---|---|
 | UC-01 | Guest 진입/세션 bootstrap | `API_CONTRACT`, `AUTH_RLS_PRIVACY`, `WEB_MOBILE_CLIENT_ARCHITECTURE`, `DB_DDL_MIGRATION` | §6 API, §15 Vertical Slice | COVERED |
-| UC-02 | 첫 캐릭터 선택/첫 만남 | `API_CONTRACT`, `CHARACTER_WORLD_CONTENT`, `AI_CHARACTER_RUNTIME`, `RELATIONSHIP_MEMORY_POLICY` | §7 Chat, §9 AI, §11 Content | COVERED |
+| UC-02 | 첫 캐릭터 선택/첫 만남 | `API_CONTRACT`, `CHARACTER_WORLD_CONTENT`, `AI_CHARACTER_RUNTIME`, `RELATIONSHIP_MEMORY_POLICY` | §7 Chat, §9 AI, §11 Content | COVERED-SOURCE-GAP (`SRC-22` if first-meeting candidate is intended to mutate relationship score/stage) |
 | UC-03 | 호칭/닉네임 저장 | `API_CONTRACT`, `AUTH_RLS_PRIVACY`, `WEB_MOBILE_CLIENT_ARCHITECTURE` | §6 API, §15 Vertical Slice | COVERED |
 | UC-04 | 명식록 입력/계산 요청 | `API_CONTRACT`, `SAJU_INTEGRATION`, `DB_DDL_MIGRATION` | §6 API, §8 Saju, §15 Vertical Slice | COVERED |
 | UC-05 | 첫 Grounded Reading | `SAJU_INTEGRATION`, `AI_CHARACTER_RUNTIME`, `SHARED_DOMAIN_CONTRACTS`, `UX_SCREEN_STATE` | §8 Saju, §9 AI | COVERED-SOURCE-GAP (`SRC-09` explicit guard metadata; protected-block baseline available) |
@@ -39,8 +39,8 @@ COVERED-SOURCE-GAP
 | UC-10 | 과거 대화 기억 | `RELATIONSHIP_MEMORY_POLICY`, `AI_CHARACTER_RUNTIME`, `AUTH_RLS_PRIVACY` | §5 Auth, §10 Relationship/Memory | COVERED |
 | UC-11 | 다른 캐릭터 canon 참조 | `CHARACTER_WORLD_CONTENT`, `AI_CHARACTER_RUNTIME` | §9 AI, §11 Content | COVERED |
 | UC-12 | Multi-character scene | `AI_CHARACTER_RUNTIME`, `CHARACTER_WORLD_CONTENT`, `SHARED_DOMAIN_CONTRACTS` | §9 AI, §11 Content, §17 Failure | COVERED |
-| UC-13 | 관계 progression | `RELATIONSHIP_MEMORY_POLICY`, `DB_DDL_MIGRATION` | §4 DB, §10 Relationship/Memory | COVERED |
-| UC-14 | 캐릭터 unlock/reveal | `CHARACTER_WORLD_CONTENT`, `RELATIONSHIP_MEMORY_POLICY`, `API_CONTRACT` | §11 Content, §15 Vertical Slice | COVERED |
+| UC-13 | 관계 progression | `RELATIONSHIP_MEMORY_POLICY`, `DB_DDL_MIGRATION`, `SERVER_COMMAND_TRANSACTION_SPEC`, `SOURCE_AUTHORITY_GAPS` | §4 DB, §10 Relationship/Memory | COVERED-SOURCE-GAP (`SRC-22` event registry/payload → score delta/stage/anti-farming policy evaluator) |
+| UC-14 | 캐릭터 unlock/reveal | `CHARACTER_WORLD_CONTENT`, `RELATIONSHIP_MEMORY_POLICY`, `API_CONTRACT` | §11 Content, §15 Vertical Slice | COVERED-SOURCE-GAP (`SRC-22` blocks relationship-stage-derived trigger evaluation; other unlock-condition authority remains independently source-bounded) |
 | UC-15 | 상세 Reading report | `SAJU_INTEGRATION`, `API_CONTRACT`, `WEB_MOBILE_CLIENT_ARCHITECTURE` | §8 Saju, §16 Real Saju | COVERED |
 | UC-16 | 궁합/상대 Birth Profile | `API_CONTRACT`, `SAJU_INTEGRATION`, `AUTH_RLS_PRIVACY`, `UX_SCREEN_STATE` | §5 Auth, §6 API, §8 Saju, §14 Deletion | COVERED-SOURCE-GAP (`SRC-06` deletion + `SRC-08` real compatibility adapter) |
 | UC-16A | revocable share artifact | `API_CONTRACT`, `AUTH_RLS_PRIVACY`, `DB_DDL_MIGRATION`, `SOURCE_AUTHORITY_GAPS` | §5 Auth, §6 API | COVERED-SOURCE-GAP (`SRC-20` positive public snapshot + create/retry/raw-token/expiry authority; public read + owner revoke baseline available) |
@@ -59,7 +59,7 @@ COVERED-SOURCE-GAP
 | UC-29 | unsupported Saju fail-closed | `SAJU_INTEGRATION`, `AI_CHARACTER_RUNTIME`, `API_CONTRACT` | §8 Saju, §9 AI | COVERED |
 | UC-30 | Birth 수정/revision/stale | `API_CONTRACT`, `SAJU_INTEGRATION`, `DB_DDL_MIGRATION` | §4 DB, §6 API, §8 Saju | COVERED |
 | UC-31 | 대화 삭제/캐릭터 forget/Life Fact revoke 분리 | `API_CONTRACT`, `AUTH_RLS_PRIVACY`, `RELATIONSHIP_MEMORY_POLICY`, `SOURCE_AUTHORITY_GAPS` | §5 Auth, §10 Relationship/Memory, §14 Deletion | COVERED-SOURCE-GAP (`SRC-14` duplicate transcript redaction authority; `P0-PR-01` retention also open) |
-| UC-32 | Guest → 기존 Member merge | `API_CONTRACT`, `AUTH_RLS_PRIVACY`, `DB_DDL_MIGRATION` | §4 DB, §5 Auth, §6 API, §14 Deletion | COVERED |
+| UC-32 | Guest → 기존 Member merge | `API_CONTRACT`, `AUTH_RLS_PRIVACY`, `DB_DDL_MIGRATION`, `RELATIONSHIP_MEMORY_POLICY` | §4 DB, §5 Auth, §6 API, §14 Deletion | COVERED-SOURCE-GAP (`SRC-22` if merge imports/recomputes relationship score/stage; historical ledger raw reparent remains forbidden) |
 | UC-33 | AI/Saju partial failure/retry | `API_CONTRACT`, `AI_CHARACTER_RUNTIME`, `SAJU_INTEGRATION`, `DB_DDL_MIGRATION`, `SERVER_COMMAND_TRANSACTION_SPEC.md` | §7 Chat, §8 Saju, §17 Failure | COVERED-P0 (`P0-AI-01`, `P0-SA-01`); Saju guard metadata also `SRC-09` |
 | UC-34 | account data deletion | `AUTH_RLS_PRIVACY`, `API_CONTRACT`, `DB_DDL_MIGRATION`, `RELEASE_OBSERVABILITY` | §14 Deletion, §19 Promotion | COVERED-P0 (`P0-PR-01`) |
 
@@ -76,6 +76,7 @@ COVERED-SOURCE-GAP
 | deterministic baseline Saju-bearing narrative | `SAJU_INTEGRATION`, `AI_CHARACTER_RUNTIME` | Saju/AI gates |
 | explicit record grants | `RELATIONSHIP_MEMORY_POLICY` | cross-character privacy tests |
 | record grant create/regrant authority | `RELATIONSHIP_MEMORY_POLICY`, `API_CONTRACT`, `SOURCE_AUTHORITY_GAPS.md` (`SRC-10`) | create/regrant/idempotency gate blocked pending source resolution |
+| relationship event apply policy authority | `RELATIONSHIP_MEMORY_POLICY`, `SHARED_DOMAIN_CONTRACTS`, `SERVER_COMMAND_TRANSACTION_SPEC`, `SOURCE_AUTHORITY_GAPS` (`SRC-22`) | event registry/payload, score bounds/delta, stage transition, anti-farming, concurrency apply gate blocked pending source resolution; ledger/revision structure remains testable |
 | episode progress single-projection bundle selection | `CHARACTER_WORLD_CONTENT`, `API_CONTRACT`, `SOURCE_AUTHORITY_GAPS.md` (`SRC-11`) | `GET /api/episodes/:id/progress` projection gate blocked pending source resolution |
 | notification preference missing-row/default/materialization | `NOTIFICATION_RETURN_LOOP`, `API_CONTRACT`, `SOURCE_AUTHORITY_GAPS.md` (`SRC-12`) | preference mutation/default gate blocked pending source resolution |
 | notification inbox status membership | `NOTIFICATION_RETURN_LOOP`, `API_CONTRACT`, `SOURCE_AUTHORITY_GAPS.md` (`SRC-13`) | inbox projection gate blocked pending source resolution |

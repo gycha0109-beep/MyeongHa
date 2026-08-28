@@ -1,10 +1,10 @@
-# 명하 Relationship / Life Record / Memory Policy v0.3 — Full Audit
+# 명하 Relationship / Life Record / Memory Policy v0.4 — Source Aligned
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.3**  
-> Date: **2026-08-25**  
+> Pack Version: **v0.4**  
+> Date: **2026-08-28**  
 > Source Authority: `Usecase_re_reviewed_v2(1).md`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`, `Myeonghwa_Personalized_Interpretation_Architecture_v1.3_THIRD_REVIEW(1).md`  
-> Rule: source가 결정하지 않은 implementation-critical 사항은 `OPEN-P0`, 비차단 선택은 `CANDIDATE`, source 간 충돌은 `SOURCE_AUTHORITY_GAPS.md`에 기록한다.
+> Rule: source가 결정하지 않은 implementation-critical 사항은 `OPEN-P0`, 비차단 선택은 `CANDIDATE`, source 간 충돌/공백은 `SOURCE_AUTHORITY_GAPS.md` 또는 numbered source-gap 문서에 기록한다.
 
 ---
 
@@ -95,58 +95,105 @@ session_only        → durable record 자체 없음
 
 새 캐릭터가 과거 `current_characters` 선택을 자동 상속하지 않는다.
 
-## 8. Relationship State
+## 8. Relationship State — source-complete envelope
+
+Primary source defines the current projection as:
 
 ```text
 closeness
 trust
 friction
 relationship_stage
-last_interaction_at
-revision
 policy_version
+revision
+last_interaction_at
 ```
 
-숫자 bounds와 stage transition은 `SHARED_DOMAIN_CONTRACTS_SPEC.md`의 immutable `RelationshipPolicyDefinition` authority가 소유한다. `policy_version` 문자열만 같고 실제 rule content가 바뀌는 구현은 금지한다.
+Source-backed rules:
 
-## 9. Relationship Event Registry
+- one current projection per user-character;
+- scores are server-controlled;
+- LLM/client cannot directly choose scores;
+- relationship is multi-dimensional rather than one scalar;
+- transition rule is versioned;
+- revision is linear and server-controlled.
 
-LLM/free-form string이 event authority가 아니다.
+Numeric bounds and exact stage transition semantics are **not defined by source**. The previous Pack statement that `SHARED_DOMAIN_CONTRACTS_SPEC.md` already owns a complete immutable `RelationshipPolicyDefinition` was overreach. Executable policy authority is `SRC-22` OPEN.
+
+## 9. Relationship Event Ledger — source-complete envelope
+
+`relationship_events` is append-only and records:
 
 ```text
-FIRST_MEETING
-RETURN_VISIT
-SHARED_PERSONAL_FACT
-COMPLETED_READING
-FINISHED_EPISODE
-CONFLICT_EVENT
-RECONCILIATION_EVENT
-...
+event_type / event_schema_version / event_dedupe_key
+source turn / world event / merge action provenance
+delta_closeness / delta_trust / delta_friction
+policy_version
+state_revision_before / state_revision_after
+validated payload
+applied_at
 ```
 
-실제 allowed event set은 `policy_version + event_schema_version` registry로 고정한다. unknown candidate → no mutation.
+Structural rules:
 
-## 10. Atomic Apply
+- same `(subject, character, event_dedupe_key)` applies at most once;
+- one event owns one `state_revision_after`;
+- `after = before + 1`;
+- state-row lock serializes apply;
+- event append and current projection revision update commit atomically;
+- historical event rows are not rewritten when policy changes.
+
+Use Case supplies example event names, not a final normative registry. Final event allowlist, event payload schemas, score deltas, stage rules and anti-farming evaluator remain `SRC-22`.
+
+## 10. Atomic Apply — skeleton only; executable evaluator blocked by `SRC-22`
+
+Source fixes this order:
 
 ```text
 lock user_character_state
-→ validate candidate/source/dedupe/policy
-→ calculate deterministic delta/stage
+→ dedupe event
+→ evaluate source-approved versioned relationship policy
 → append relationship_event(before r, after r+1)
-→ update projection revision
-→ outbox
+→ update current projection revision
 → commit
 ```
 
-LLM이 delta를 직접 정하지 않는다.
+This is an algorithmic/transactional skeleton, not enough information to compute authoritative outputs today.
 
-## 11. Anti-Farming
+Until `SRC-22` is resolved:
 
-- same event retry once
-- same source action repeated beyond policy window no farming
-- message spam만으로 무한 상승 금지
-- distinct events same revision DB deny
-- inactivity alone automatic degradation 금지
+- do not trust LLM/client/caller supplied `delta_*` values;
+- do not trust caller supplied next `relationship_stage`;
+- do not invent score bounds;
+- do not convert Use Case event examples into a closed production registry;
+- do not invent stage thresholds/condition DSL;
+- do not invent anti-farming windows/caps;
+- do not promote `cmd_apply_relationship_event...` as source-authoritative.
+
+A procedure that merely persists already-calculated caller deltas does not satisfy Relationship Engine authority.
+
+## 11. Anti-Farming — requirement known, algorithm unresolved
+
+Source requires:
+
+- same event retry once;
+- same user action retry does not repeatedly increase state;
+- message spam cannot farm relationship stage indefinitely;
+- inactivity alone does not automatically degrade baseline relationship state;
+- relationship degradation requires explicit story event or actual interaction basis.
+
+Source does not define:
+
+```text
+cooldown/window duration
+per-event caps
+source aggregate uniqueness rules beyond event_dedupe_key
+which candidate events are repeatable
+how equivalent actions across distinct turns are detected
+additional persisted/derived anti-farming state
+```
+
+Therefore exact anti-farming implementation is blocked by `SRC-22`; implementation must fail closed rather than invent these rules.
 
 ## 12. Character-to-Character Awareness
 
@@ -182,23 +229,47 @@ Account delete
 
 ## 14. Guest Merge
 
-Historical relationship ledger raw reparent 금지. canonical member current projection이 필요하면 explicit merge action + policy version으로 import/merge하고 provenance를 남긴다.
+Historical relationship ledger raw reparent 금지. canonical member current projection이 필요하면 explicit merge action + source-approved relationship policy semantics로 import/merge하고 provenance를 남긴다.
 
-## 15. Policy Versioning
+`SRC-22` 해결 전 merge 과정에서 relationship score/stage를 임의 합산/재계산하는 production policy를 만들지 않는다.
 
-과거 event는 당시 `policy_version + policy content hash`의 의미를 보존한다. 정책 변경으로 ledger rewrite 금지. 동일 version key의 policy content mutation도 금지한다.
+## 15. Policy Versioning — source boundary
+
+Source requires relationship transition rules to be versioned and historical event provenance to remain preserved when policies change.
+
+Source currently stores `policy_version` on both current state and event rows. It does **not** define:
+
+- a `RelationshipPolicyDefinitionV1` artifact;
+- a relationship policy `contentHash` column/table;
+- policy version selection/migration rules;
+- historical policy artifact storage/replay mechanism.
+
+Therefore Pack은 동일 version 의미를 운영 중 임의 변경하지 않는 일반 원칙을 유지하되, `policy_version + contentHash` persistence를 source-backed requirement라고 주장하지 않는다. 추가 provenance가 필요하면 `SRC-22` resolution에서 ERD-compatible contract 또는 explicit ERD change가 먼저 정의되어야 한다.
 
 ## 16. Verification
+
+Source-complete now:
 
 - future character old grant → deny
 - revoked memory context retrieval → deny
 - session-only resolution → durable record count unchanged
 - private record → character context excluded
 - duplicate proposal resolution → once
-- unknown relationship event → no mutation
-- duplicate relationship event → once
-- concurrent same revision → one wins
-- spam farming → blocked by policy
-- source message/turn mismatch → DB deny
 - Life Fact type mismatch supersede → deny
 - double supersede race → one wins
+- relationship event ledger append-only / revision invariants
+- duplicate relationship event key cannot occupy multiple applied revisions
+- client/LLM direct score authority denied
+- inactivity-only automatic degradation absent
+
+Blocked until `SRC-22` resolution:
+
+- final unknown/known Relationship Event registry mutation test
+- event→delta correctness
+- numeric bound behavior
+- stage transition correctness
+- anti-farming window/cap behavior
+- concurrent authoritative relationship policy application
+- relationship-stage-driven unlock reproducibility
+
+After `SRC-22` resolution, the relationship apply gate must prove same-event retry once, linear concurrent revisions, source-approved delta/stage evaluation, anti-farming, and historical policy provenance according to the resolved contract.
