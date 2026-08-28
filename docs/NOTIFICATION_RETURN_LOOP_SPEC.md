@@ -1,8 +1,8 @@
-# 명하 Notification / Return-Loop Specification v0.3 — Full Audit
+# 명하 Notification / Return-Loop Specification v0.4 — Source Aligned
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.3**  
-> Date: **2026-08-25**  
+> Pack Version: **v0.4**  
+> Date: **2026-08-28**  
 > Source Authority: `Usecase_re_reviewed_v2(1).md`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`  
 > Shared Contracts: `SHARED_DOMAIN_CONTRACTS_SPEC.md`
 
@@ -71,12 +71,28 @@ full
 
 ## 5. Device Installation
 
+Source-backed invariants:
+
 - active `(platform, installation_key)` global unique
 - active push token fingerprint unique
 - raw push token은 암호화 저장
-- logout/account switch 시 이전 installation revoke 후 재등록
+- logout/account switch 시 이전 installation revoke 후 같은 install/token을 다른 subject에 attach
 - revoked installation은 새 delivery 대상에서 제외
 - client가 `subject_id`를 직접 지정해 다른 사용자 installation을 등록하지 못한다
+
+다만 source는 **same-subject register retry / re-registration / push-token rotation lifecycle**을 정의하지 않는다. 특히 active row를 in-place update할지, revoke+new generation으로 만들지, revoked row를 재활성화할지, app/client capability/last_seen을 어떤 transition에서 갱신할지가 없다.
+
+따라서:
+
+```text
+POST /api/device-installations/:id/revoke
+→ source-complete
+
+POST /api/device-installations/register
+→ SRC-19 OPEN
+```
+
+`SRC-19` 해결 전 단순 UPSERT나 token-steal/rebind를 production registration authority로 승격하지 않는다.
 
 ## 6. Preference Model
 
@@ -217,3 +233,4 @@ Account deletion 시작 시:
 - deletion_pending → scheduler deny
 - private deep link unauthorized → DENY
 - push retry → no duplicate character/world event
+- registration lifecycle tests remain blocked until `SRC-19` defines retry/re-registration/token-rotation semantics
