@@ -1,7 +1,7 @@
-# 명하 Relationship / Life Record / Memory Policy v0.4 — Source Aligned
+# 명하 Relationship / Life Record / Memory Policy v0.5 — Source Aligned
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.4**  
+> Pack Version: **v0.5**  
 > Date: **2026-08-28**  
 > Source Authority: `Usecase_re_reviewed_v2(1).md`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`, `Myeonghwa_Personalized_Interpretation_Architecture_v1.3_THIRD_REVIEW(1).md`  
 > Rule: source가 결정하지 않은 implementation-critical 사항은 `OPEN-P0`, 비차단 선택은 `CANDIDATE`, source 간 충돌/공백은 `SOURCE_AUTHORITY_GAPS.md` 또는 numbered source-gap 문서에 기록한다.
@@ -23,7 +23,7 @@ Relationship Event     → 관계 변화 source ledger
 User Character State   → 관계 current projection
 ```
 
-## 3. Life Fact
+## 3. Life Fact — relational/history authority source-complete; positive schema registry `SRC-25` OPEN
 
 Current overwrite 금지. 변경은 same-type supersession append.
 
@@ -35,13 +35,49 @@ Current overwrite 금지. 변경은 same-type supersession append.
 - supersedes_fact_id
 - confirmed_at / revoked_at
 
-Fact type는 `SHARED_DOMAIN_CONTRACTS_SPEC.md`의 versioned registry를 통과한다.
+Primary source requires each durable Life Fact value to pass a **fact-type-specific versioned schema** and explicitly forbids long-term storage of an unknown fact type/schema version.
 
-## 4. Character Memory
+However source examples such as:
+
+```text
+employment_status/v1
+relationship_status/v1
+planned_event/v1
+```
+
+are examples, not a complete normative `LifeFactType` registry or positive value schemas. Therefore the Pack cannot claim that `SHARED_DOMAIN_CONTRACTS_SPEC.md` already contains a complete usable registry. Exact type inventory/schema authority is `SRC-25`.
+
+Source-complete now:
+
+- already-authoritative Life Fact history storage/read;
+- revoke/current-context exclusion;
+- same-type no-branch/no-cycle supersession structure and concurrency;
+- source provenance envelope.
+
+Blocked by `SRC-25`:
+
+- arbitrary new durable Life Fact value creation without a source-approved type+schema;
+- treating example keys as a closed registry;
+- LLM/planner-created type keys;
+- generic `fact_type + schema_version + arbitrary JSON` persistence.
+
+## 4. Character Memory — relational/approval authority source-complete; positive schema registry `SRC-25` OPEN
 
 구조화된 회상용 durable record. Birth input 또는 confirmed Life Fact 전체를 무조건 복사하지 않는다.
 
-Memory type/schema도 versioned registry를 사용한다.
+ERD requires:
+
+```text
+memory_type = versioned contract key
+schema_version = required
+content_jsonb = validated structured memory
+```
+
+but primary source does not define the final `MemoryType` allowlist or positive structured schema per type/version. Therefore durable Character Memory value creation is also gated by `SRC-25`.
+
+Natural-language examples of remembered experiences describe product intent, not a normative `content_jsonb` schema.
+
+Existing already-valid Memory Item reads/revokes/provenance checks remain independently source-complete.
 
 ## 5. Session-only Context
 
@@ -81,6 +117,20 @@ pending
 동일 turn retry는 proposal_dedupe_key로 중복 생성 금지. terminal resolution은 1회만.
 
 `SRC-05` 해결 전에는 `session_only/reject` 후 `memory_proposals.proposed_value_jsonb`의 장기 보존을 privacy baseline으로 승인하지 않는다. proposal staging payload retention은 Memory authority를 우회하는 shadow record가 되어서는 안 된다.
+
+Long-term accept additionally requires a source-approved personal-record schema:
+
+```text
+proposal_kind=life_fact
+→ record_type/schema_version/value must validate under resolved LifeFact registry
+
+proposal_kind=memory
+→ record_type/schema_version/value must validate under resolved Memory registry
+```
+
+That positive registry is `SRC-25`. A proposal having `record_type`, `schema_version`, and JSON does not make the payload authoritative by itself.
+
+If accept creates explicit grants, `SRC-10` grant create/regrant authority remains an independent blocker where applicable.
 
 ## 7. Access Grants
 
@@ -233,6 +283,8 @@ Historical relationship ledger raw reparent 금지. canonical member current pro
 
 `SRC-22` 해결 전 merge 과정에서 relationship score/stage를 임의 합산/재계산하는 production policy를 만들지 않는다.
 
+Durable Life Fact/Memory `merge_import`가 새 record value를 생성하는 경우 merge action semantics는 `SRC-24`, record type/schema validation은 추가로 `SRC-25`가 필요하다.
+
 ## 15. Policy Versioning — source boundary
 
 Source requires relationship transition rules to be versioned and historical event provenance to remain preserved when policies change.
@@ -253,14 +305,22 @@ Source-complete now:
 - future character old grant → deny
 - revoked memory context retrieval → deny
 - session-only resolution → durable record count unchanged
-- private record → character context excluded
-- duplicate proposal resolution → once
+- private **already-valid** record → character context excluded
+- duplicate proposal resolution envelope → once
 - Life Fact type mismatch supersede → deny
 - double supersede race → one wins
+- already-valid Life Fact/Memory current reads/revokes
 - relationship event ledger append-only / revision invariants
 - duplicate relationship event key cannot occupy multiple applied revisions
 - client/LLM direct score authority denied
 - inactivity-only automatic degradation absent
+
+Blocked until `SRC-25` resolution:
+
+- direct new Life Fact create with positive type/value validation
+- Memory proposal long-term accept creating Life Fact/Memory value
+- unknown/legacy/new personal-record schema write behavior
+- planner requestable Life Fact type registry behavior
 
 Blocked until `SRC-22` resolution:
 

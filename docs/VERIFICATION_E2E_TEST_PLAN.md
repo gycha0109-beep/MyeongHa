@@ -1,7 +1,7 @@
-# 명하 Verification / E2E Test Plan v0.9 — Source Aligned
+# 명하 Verification / E2E Test Plan v0.10 — Source Aligned
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.9**  
+> Pack Version: **v0.10**  
 > Date: **2026-08-28**  
 > Source Authority: `Usecase_re_reviewed_v2(1).md`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`, `Myeonghwa_Personalized_Interpretation_Architecture_v1.3_THIRD_REVIEW(1).md`  
 > Rule: source가 결정하지 않은 implementation-critical 사항은 `OPEN-P0`, 비차단 선택은 `CANDIDATE`, source 간 충돌/공백은 `SOURCE_AUTHORITY_GAPS.md` 또는 numbered source-gap 문서에 기록한다.
@@ -71,6 +71,7 @@ behavior spec
 - relationship ledger structural constraints remain testable, but no invented relationship policy registry/content-hash column/score-stage evaluator before `SRC-22` resolution
 - World Event/Character Unlock structural constraints remain testable, but no invented unlock condition DSL, World Event→character evaluator, unlock-policy provenance field/table, or reward-effect function before `SRC-23` resolution
 - merge-job/action relational constraints remain testable, but no invented merge conflict/resolution schema registry, merge policy artifact/table, domain action planner, projection merge formula, or retry/resume state machine before `SRC-24` resolution
+- Life Fact/Memory relational storage, provenance, revoke/read and Life Fact lineage constraints remain testable, but no Pack-invented personal-record type/schema registry, schema artifact table, generic arbitrary-JSON validator, or example-key seed registry before `SRC-25` resolution
 
 ## 5. Auth / RLS / Privacy Gate
 
@@ -102,7 +103,11 @@ behavior spec
 - chat retry + abandon
 - reading clarification + transient retry
 - conversation delete scope semantics (`SRC-14` resolution required before final write authority)
-- memory session-only / private / explicit grants / forget
+- Life Record current read / revoke / source-complete supersession lineage
+- direct `POST /api/life-record` durable value create는 `SRC-25` 해결 전 production API PASS 대상에서 제외
+- Life Fact supersede에서 새 value/type/schema의 positive validation은 `SRC-25` 해결 전 PASS로 주장하지 않음
+- memory session-only / private / explicit grants / forget의 relational/privacy boundary
+- Memory Proposal long-term accept가 새 Life Fact/Memory value를 만드는 positive schema validation은 `SRC-25` 해결 전 production PASS 대상에서 제외
 - Device Installation standalone owner revoke
 - Device Installation register/re-register/token rotation은 `SRC-19` 해결 전 production API PASS 대상에서 제외
 - public Share active/unexpired read + owner revoke
@@ -124,6 +129,7 @@ behavior spec
 - committed response-loss retry → no duplicate user/assistant/events/memory
 - participant/bundle mismatch deny
 - output guard fail → no commit/reveal
+- unresolved/unknown personal-record type proposed by planner/LLM → no durable Life Fact/Memory write before `SRC-25`
 - Relationship Event proposal/candidate가 있더라도 `SRC-22` 해결 전 caller/LLM delta 또는 next-stage를 authoritative mutation으로 commit하지 않음
 - Character Unlock candidate/condition가 있더라도 `SRC-23` 해결 전 caller/LLM target, unlock flag, arbitrary condition result 또는 unrelated same-owner World Event를 authoritative unlock proof로 commit하지 않음
 
@@ -153,12 +159,14 @@ A completed Reading may be represented as an authoritative source fact, but Read
 Deterministic fixtures:
 
 - unknown planner action/fact/event key → no execution authority
+- planner-requested Life Fact type absent from approved source registry → no durable create/request authority before `SRC-25`
 - renderer context excludes non-granted/private data
 - unknown cue/action → reject/fallback
 - absent canon relation → official-history assertion not accepted
 - material ambiguity → no single-outcome certainty
 - protected Saju semantic segment not paraphrased/mutated
 - proposal alone → no authority mutation
+- LLM-proposed personal-record type/schema/value → never treated as durable authority without `SRC-25` validator
 - LLM-proposed relationship delta/stage → never treated as authority
 - LLM-proposed Character Unlock target/result → never treated as authority
 
@@ -168,12 +176,14 @@ Provider model quality/eval matrix = `OPEN-P0: P0-AI-01`.
 
 ### Source-complete now
 
-- proposal explicit approval only
-- session-only → no durable record
-- private durable record → no character context
-- duplicate proposal once
+- proposal explicit approval principle
+- session-only → no durable Life Fact/Memory row
+- existing private durable record → no character context
+- proposal dedupe/terminal-resolution relational envelope
 - revoked grant/memory excluded from context
-- Life Fact no branch/cycle/type mismatch
+- Life Fact no branch/cycle/type mismatch structural invariant
+- Life Fact double-supersede concurrency → one lineage branch
+- already-valid Life Fact/Memory current read/revoke/provenance behavior
 - relationship current projection ownership/read isolation
 - `relationship_events` append-only
 - same `(subject, character, event_dedupe_key)` cannot create multiple ledger effects
@@ -183,7 +193,36 @@ Provider model quality/eval matrix = `OPEN-P0: P0-AI-01`.
 - client/LLM direct score mutation authority denied
 - inactivity-only automatic relationship degradation absent
 
-These prove the relational envelope, not the missing score/stage policy.
+These prove relational/privacy/history envelopes. They do not prove either the missing personal-record positive schemas (`SRC-25`) or the missing relationship score/stage policy (`SRC-22`).
+
+### Blocked by `SRC-25`
+
+Do not promote new durable Life Fact/Memory value creation until source resolves:
+
+- final normative LifeFactType allowlist
+- positive value schema per LifeFactType/schemaVersion
+- final normative MemoryType allowlist
+- positive content schema per MemoryType/schemaVersion
+- schema canonicalization/normalization rules
+- writable-current vs legacy-read version policy
+- schema evolution/backward compatibility
+- requestable Life Fact type exposure to Planner/Capability Gate
+- type-specific source constraints if required
+
+After resolution, required tests include:
+
+- known writable type/version + valid value → accepted
+- known type/version + invalid value → no durable record
+- unknown type → no durable record
+- unknown schema version → no durable record
+- legacy read-only schema → readable but new write denied according to approved policy
+- unknown/extra fields follow approved strictness contract
+- planner cannot request an unregistered Life Fact type
+- LLM proposal cannot create an unregistered type/schema
+- accepted memory remains distinct from Life Fact/Birth/episode authority
+- historical stored schema identity remains deterministically interpretable
+
+A Pack-invented `VersionedRecordTypeDefinition`, example-key allowlist, or arbitrary JSON with a `schema_version` string is not a PASS condition.
 
 ### Blocked by `SRC-22`
 
@@ -443,10 +482,11 @@ A blacklist-only serializer, Pack-invented `ShareArtifactV1`, or plaintext raw-t
 - `SRC-22`: Relationship Event score/stage policy apply remains blocked; relationship relational ledger/current-read envelope remains valid
 - `SRC-23`: Character Unlock condition/effect apply remains blocked; World Event/Character Unlock relational envelope and stored current read remain valid
 - `SRC-24`: existing-Member Guest merge conflict/resolution/domain-action execution remains blocked; merge-job current read + direct merged guest history remain valid
+- `SRC-25`: new durable Life Fact/Character Memory positive type-schema validation remains blocked; already-valid stored record read/revoke and Life Fact lineage constraints remain valid
 
 ## 16. Engineering Vertical Slice
 
-Source-complete vertical slice may include current relationship/unlock projections and non-authoritative candidates, but must not claim real score/stage progression or Character Unlock eligibility/effect evaluation until the relevant gaps resolve.
+Source-complete vertical slice may include current relationship/unlock projections and non-authoritative candidates, but must not claim real score/stage progression, Character Unlock eligibility/effect evaluation, or new durable personal-record schema validation until the relevant gaps resolve.
 
 ```text
 Guest bootstrap
@@ -457,7 +497,9 @@ Guest bootstrap
 → protected grounded response + character framing
 → current-life question
 → memory proposal
-→ session-only/private/character grant branch test
+→ session-only branch test
+→ stored already-valid personal-record read/privacy branch
+→ long-term Life Fact/Memory accept remains disabled until `SRC-25` (+ grant/proposal blockers as applicable)
 → relationship candidate / current-state read (`SRC-22` blocks authoritative score-stage apply)
 → stored Character Unlock state read/render (`SRC-23` blocks eligibility/effect mutation)
 → Hall state from stored/source-approved state only
@@ -465,7 +507,7 @@ Guest bootstrap
 → Web/Mobile continuation
 ```
 
-Existing-Member Guest merge may contribute only its source-complete stored job/history-read envelope to this baseline until `SRC-24` resolves the actual conflict/action workflow.
+Existing-Member Guest merge may contribute only its source-complete stored job/history-read envelope to this baseline until `SRC-24` resolves the actual conflict/action workflow. Any merge-import of new Life Fact/Memory values additionally requires `SRC-25`.
 
 ## 17. Real Saju Slice
 
@@ -493,7 +535,7 @@ real Saju adapter
 
 중복 charge/event/message/memory 또는 cross-user leakage 0.
 
-Share create response-loss retry는 `SRC-20` 해결 전 기대 결과를 임의 정의하지 않는다. Device register transport/retry도 `SRC-19` 해결 전 기대 lineage를 임의 정의하지 않는다. Commerce out-of-order source application과 aggregate recompute의 exact result는 `SRC-21` 해결 전 임의 정의하지 않는다. Relationship apply retry/concurrent result 중 policy output(delta/stage/anti-farming)은 `SRC-22` 해결 전 임의 정의하지 않으며, 현재는 relational dedupe/revision invariants만 검증한다. Character Unlock response-loss/replay/concurrent trigger의 exact projection/effect result는 `SRC-23` 해결 전 임의 정의하지 않으며, 현재는 stored projection/relational invariants만 검증한다. Existing-Member merge response-loss/stale-resolution/partial-action-failure의 exact resume/result semantics는 `SRC-24` 해결 전 임의 정의하지 않으며, 현재는 relational uniqueness, ownership, direct-lineage history, no-raw-reparent invariants만 검증한다.
+Personal-record unknown/invalid type-schema writes fail closed with no durable value before `SRC-25`; exact valid/legacy schema acceptance behavior is not invented until source resolution. Share create response-loss retry는 `SRC-20` 해결 전 기대 결과를 임의 정의하지 않는다. Device register transport/retry도 `SRC-19` 해결 전 기대 lineage를 임의 정의하지 않는다. Commerce out-of-order source application과 aggregate recompute의 exact result는 `SRC-21` 해결 전 임의 정의하지 않는다. Relationship apply retry/concurrent result 중 policy output(delta/stage/anti-farming)은 `SRC-22` 해결 전 임의 정의하지 않으며, 현재는 relational dedupe/revision invariants만 검증한다. Character Unlock response-loss/replay/concurrent trigger의 exact projection/effect result는 `SRC-23` 해결 전 임의 정의하지 않으며, 현재는 stored projection/relational invariants만 검증한다. Existing-Member merge response-loss/stale-resolution/partial-action-failure의 exact resume/result semantics는 `SRC-24` 해결 전 임의 정의하지 않으며, 현재는 relational uniqueness, ownership, direct-lineage history, no-raw-reparent invariants만 검증한다.
 
 ## 19. Evidence Artifact
 
@@ -505,6 +547,8 @@ CI/release evidence:
 - content release/bundle/hash
 - Saju engine/reading contract/grounding versions
 - AI runtime/prompt versions
+- personal-record type/schema registry/version evidence only after `SRC-25` source resolution
+- `SRC-25` status for any new durable Life Fact/Memory value evidence
 - relationship `policy_version` provenance available in current ERD
 - `SRC-22` status for any authoritative relationship score/stage mutation evidence
 - Character Unlock stored projection/source-world-event provenance available in current ERD
@@ -524,6 +568,8 @@ Do not require a relationship policy `contentHash` as current source evidence: E
 Do not invent Character Unlock condition hash/version/bundle provenance fields as current source evidence: ERD v0.6 does not define them. If they are required for deterministic unlock replay/migration, `SRC-23` resolution must define an ERD-compatible contract or explicit ERD revision.
 
 Do not invent merge policy hash/artifact, conflict schema version, request hash, or domain-action transformation evidence absent from ERD. If required, `SRC-24` resolution must define an ERD-compatible contract or explicit ERD revision.
+
+Do not treat the Pack's previous `VersionedRecordTypeDefinition` shape as source evidence. `SRC-25` must define the actual positive personal-record type/schema registry and any required artifact identity/provenance.
 
 ## 20. Promotion Criteria
 
@@ -551,5 +597,6 @@ Relationship Event score/stage apply enabled → SRC-22 source-resolved
 Character Unlock eligibility/effect apply enabled → SRC-23 source-resolved
 relationship-stage-driven Character Unlock enabled → SRC-22 + SRC-23
 episode-driven Character Unlock enabled → applicable SRC-17 + SRC-23
-Existing-Member Guest full merge execution enabled → SRC-24 source-resolved + applicable domain gaps (`SRC-22`/`SRC-23`/`SRC-17`) resolved for transformed projections
+Existing-Member Guest full merge execution enabled → SRC-24 source-resolved + applicable domain gaps (`SRC-22`/`SRC-23`/`SRC-17`/`SRC-25`) resolved for transformed projections/records
+new durable Life Fact/Character Memory creation enabled → SRC-25 source-resolved + applicable proposal/grant authority resolved
 ```
