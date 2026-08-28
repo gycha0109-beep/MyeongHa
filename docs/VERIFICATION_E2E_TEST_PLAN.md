@@ -1,10 +1,10 @@
-# 명하 Verification / E2E Test Plan v0.4 — Source Aligned
+# 명하 Verification / E2E Test Plan v0.5 — Source Aligned
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.4**  
+> Pack Version: **v0.5**  
 > Date: **2026-08-28**  
 > Source Authority: `Usecase_re_reviewed_v2(1).md`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`, `Myeonghwa_Personalized_Interpretation_Architecture_v1.3_THIRD_REVIEW(1).md`  
-> Rule: source가 결정하지 않은 implementation-critical 사항은 `OPEN-P0`, 비차단 선택은 `CANDIDATE`, source 간 충돌/공백은 `SOURCE_AUTHORITY_GAPS.md`에 기록한다.
+> Rule: source가 결정하지 않은 implementation-critical 사항은 `OPEN-P0`, 비차단 선택은 `CANDIDATE`, source 간 충돌/공백은 `SOURCE_AUTHORITY_GAPS.md` 또는 numbered source-gap 문서에 기록한다.
 
 ---
 
@@ -65,6 +65,8 @@ behavior spec
 - `SRC-01`, `SRC-05`, `SRC-06` schema impacts resolved before relevant final migration baseline
 - `SRC-14` resolved before conversation-delete mutation can be promoted: all durable transcript-bearing columns need governed redaction/tombstone semantics compatible with provenance/immutability constraints
 - no invented commerce product→entitlement mapping schema/registry before `SRC-18` resolution
+- no invented Device Installation register/upsert lifecycle before `SRC-19` resolution
+- no invented Share create positive snapshot/token replay schema before `SRC-20` resolution
 
 ## 5. Auth / RLS / Privacy Gate
 
@@ -93,7 +95,10 @@ behavior spec
 - reading clarification + transient retry
 - conversation delete scope semantics (`SRC-14` resolution required before final write authority)
 - memory session-only / private / explicit grants / forget
-- device installation register/revoke
+- Device Installation standalone owner revoke
+- Device Installation register/re-register/token rotation은 `SRC-19` 해결 전 production API PASS 대상에서 제외
+- public Share active/unexpired read + owner revoke
+- Share create는 `SRC-20` 해결 전 production API PASS 대상에서 제외
 - account deletion job
 - admin content release authorization
 
@@ -199,16 +204,61 @@ Do not require or fabricate `ProductFulfillmentDefinition`, `fulfillmentDefiniti
 
 ## 13. Notification Gate
 
+### Source-complete now
+
 - device cross-user deny
-- active installation uniqueness
+- active installation identity/token uniqueness constraints
+- owner-scoped revoke
+- revoked installation no new send
 - logical delivery dedupe
 - retry allocator
-- quiet hours/opt-out/frequency cap
-- revoked installation no send
-- default privacy preview no sensitive content
+- quiet hours/opt-out/frequency cap where stored policy authority exists
+- default privacy preview no sensitive content only after `SRC-12` default authority is resolved; stored explicit preview mode remains testable
 - deep link unauthorized private resource deny
 
-## 13A. Cost / Quota / Abuse Gate
+### Blocked by `SRC-19`
+
+Do not promote a Device Installation register endpoint until source resolves:
+
+- same-subject exact retry behavior
+- token rotation behavior
+- revoked-row re-registration/reactivation vs new generation
+- installation row identity/lineage
+- same-token/different-installation same-subject conflict behavior
+- `app_version` / `client_capability` / `last_seen_at` refresh authority
+- concurrent register logical identity/idempotency
+
+Database uniqueness violations alone are not a registration lifecycle PASS.
+
+## 13A. Share Gate
+
+### Source-complete now
+
+- `share_artifacts` relational envelope and immutable stored identity
+- public raw token is converted at API boundary to protected keyed fingerprint/hash representation
+- public lookup returns only stored public snapshot projection fields, not owner/Reading/hash provenance
+- inactive/revoked/clock-expired artifact public lookup deny
+- public share capability cannot authorize private Reading API
+- owner-scoped active Share revoke
+- revoked Share cannot be reactivated through normal lifecycle
+- account deletion revokes active Share artifacts before later destructive phases
+
+### Blocked by `SRC-20`
+
+Do not promote `POST /api/share-artifacts` until source resolves:
+
+- positive versioned allowlist for `snapshot_jsonb`
+- exact source Reading lifecycle state(s) eligible for share
+- whether one Reading may intentionally have multiple active artifacts
+- create logical identity and retry/idempotency behavior
+- raw opaque public-token generation + replay/recovery behavior after commit/response loss
+- create-time expiry policy and allowed caller control
+- explicit user-controlled inclusion of fields described only as hidden **by default**
+- compatibility/Target Person public representation without internal identifiers
+
+A blacklist-only serializer, Pack-invented `ShareArtifactV1`, or plaintext raw-token storage is not a PASS condition.
+
+## 13B. Cost / Quota / Abuse Gate
 
 - subject/guest rate limit owner resolved server-side
 - client supplied rate-limit owner ignored
@@ -219,7 +269,7 @@ Do not require or fabricate `ProductFulfillmentDefinition`, `fulfillmentDefiniti
 - entitlement-required quota deny without effective entitlement
 - relationship/episode farming cannot bypass domain idempotency
 
-## 13B. Analytics / Experiment Gate
+## 13C. Analytics / Experiment Gate
 
 - analytics schema registry/version required
 - raw Birth/chat/Memory/receipt detector PASS
@@ -248,6 +298,8 @@ Do not require or fabricate `ProductFulfillmentDefinition`, `fulfillmentDefiniti
 - `SRC-09`: explicit guard-metadata invariant not marked CLOSED until source public export exists or source requirement changes
 - `SRC-14`: conversation-delete write remains blocked until duplicate transcript retention/redaction and terminal-attempt immutability semantics are source-resolved
 - `SRC-18`: purchase-derived entitlement mutation remains blocked until product→entitlement mapping authority is source-resolved
+- `SRC-19`: Device Installation register/re-register remains blocked; standalone revoke remains valid
+- `SRC-20`: Share Artifact create remains blocked; existing public read/revoke remains valid
 
 ## 15. Engineering Vertical Slice
 
@@ -293,6 +345,8 @@ real Saju adapter
 
 중복 charge/event/message/memory 또는 cross-user leakage 0.
 
+Share create response-loss retry는 `SRC-20` 해결 전 기대 결과를 임의 정의하지 않는다. Device register transport/retry도 `SRC-19` 해결 전 기대 lineage를 임의 정의하지 않는다.
+
 ## 18. Evidence Artifact
 
 CI/release evidence:
@@ -306,6 +360,8 @@ CI/release evidence:
 - relationship policy version
 - commerce product/offer/Purchase Intent snapshot provenance for implemented commerce slices
 - `SRC-18` status for any purchase→grant/restore evidence
+- `SRC-19` status for any Device Installation register/re-register evidence
+- `SRC-20` status for any Share Artifact create evidence
 - test matrix summary + failed invariant IDs
 - source gap/P0 status snapshot
 
@@ -325,4 +381,10 @@ relevant source blockers closed or feature explicitly disabled
 
 ### Production
 
-추가로 enabled feature가 참조하는 P0 decision이 DECIDED이고 store/privacy/age/release runbook이 준비되어야 한다. Commerce purchase→grant path는 추가로 `SRC-18`이 source-resolved여야 한다.
+추가로 enabled feature가 참조하는 P0 decision이 DECIDED이고 store/privacy/age/release runbook이 준비되어야 한다.
+
+```text
+Commerce purchase→grant enabled → SRC-18 source-resolved + P0-CM-01 decided
+Device Installation register enabled → SRC-19 source-resolved
+Share Artifact create enabled → SRC-20 source-resolved
+```

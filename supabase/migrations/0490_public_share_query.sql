@@ -7,7 +7,8 @@
 --
 -- This query intentionally exposes neither subject/Reading identity nor token/snapshot
 -- provenance hashes. It does not create Share Artifacts, does not mutate clock-expired rows
--- into the expired state, and does not resolve the still-blocked Share Create idempotency gap.
+-- into the expired state, and does not resolve SRC-20 Share Artifact positive projection,
+-- create retry/idempotency, raw-token replay, Reading-eligibility, or expiry authority.
 --
 -- P0-AUTH-01 remains unresolved. The HTTP route may be public, but direct database execution
 -- is not: SECURITY INVOKER is retained and PUBLIC EXECUTE is revoked so token fingerprinting

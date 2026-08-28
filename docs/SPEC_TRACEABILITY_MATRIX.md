@@ -1,7 +1,7 @@
-# 명하 Specification Traceability Matrix v0.5
+# 명하 Specification Traceability Matrix v0.6
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.5**  
+> Pack Version: **v0.6**  
 > Date: **2026-08-28**  
 > Authority: `Usecase_re_reviewed_v2(1).md`의 UC-01~UC-34(UC-16A 포함)  
 > Rule: Use Case가 implementation spec과 verification gate에 연결되지 않으면 구현 완료로 간주하지 않는다.
@@ -43,14 +43,14 @@ COVERED-SOURCE-GAP
 | UC-14 | 캐릭터 unlock/reveal | `CHARACTER_WORLD_CONTENT`, `RELATIONSHIP_MEMORY_POLICY`, `API_CONTRACT` | §11 Content, §15 Vertical Slice | COVERED |
 | UC-15 | 상세 Reading report | `SAJU_INTEGRATION`, `API_CONTRACT`, `WEB_MOBILE_CLIENT_ARCHITECTURE` | §8 Saju, §16 Real Saju | COVERED |
 | UC-16 | 궁합/상대 Birth Profile | `API_CONTRACT`, `SAJU_INTEGRATION`, `AUTH_RLS_PRIVACY`, `UX_SCREEN_STATE` | §5 Auth, §6 API, §8 Saju, §14 Deletion | COVERED-SOURCE-GAP (`SRC-06` deletion + `SRC-08` real compatibility adapter) |
-| UC-16A | revocable share artifact | `API_CONTRACT`, `AUTH_RLS_PRIVACY`, `DB_DDL_MIGRATION` | §5 Auth, §6 API | COVERED |
+| UC-16A | revocable share artifact | `API_CONTRACT`, `AUTH_RLS_PRIVACY`, `DB_DDL_MIGRATION`, `SOURCE_AUTHORITY_GAPS` | §5 Auth, §6 API | COVERED-SOURCE-GAP (`SRC-20` positive public snapshot + create/retry/raw-token/expiry authority; public read + owner revoke baseline available) |
 | UC-17 | 속마음 질문 경계 | `SAJU_INTEGRATION`, `AI_CHARACTER_RUNTIME` | §8 Saju, §9 AI | COVERED |
 | UC-18 | Guest → 신규 계정 보관 | `API_CONTRACT`, `AUTH_RLS_PRIVACY`, `DB_DDL_MIGRATION` | §5 Auth, §6 API, §15 Vertical Slice | COVERED |
 | UC-19 | 개인 기록 조회/수정/삭제 | `API_CONTRACT`, `AUTH_RLS_PRIVACY`, `RELATIONSHIP_MEMORY_POLICY`, `WEB_MOBILE_CLIENT_ARCHITECTURE`, `UX_SCREEN_STATE` | §5 Auth, §6 API, §14 Deletion | COVERED-SOURCE-GAP (`SRC-06`) |
 | UC-20 | 일/월/연 return loop | `NOTIFICATION_RETURN_LOOP`, `SAJU_INTEGRATION`, `COST_QUOTA_ABUSE`, `WEB_MOBILE_CLIENT_ARCHITECTURE` | §13 Notification, §16 Real Saju | COVERED |
 | UC-21 | 캐릭터 return message | `NOTIFICATION_RETURN_LOOP`, `AI_CHARACTER_RUNTIME`, `CHARACTER_WORLD_CONTENT`, `COST_QUOTA_ABUSE` | §9 AI, §13 Notification | COVERED |
 | UC-22 | Web↔App deep link | `WEB_MOBILE_CLIENT_ARCHITECTURE`, `API_CONTRACT`, `AUTH_RLS_PRIVACY` | §5 Auth, §6 API, §13 Notification | COVERED |
-| UC-23 | 기기 전환/동일 세계 | `WEB_MOBILE_CLIENT_ARCHITECTURE`, `API_CONTRACT`, `AUTH_RLS_PRIVACY` | §6 API, §15 Vertical Slice | COVERED |
+| UC-23 | 기기 전환/동일 세계 | `WEB_MOBILE_CLIENT_ARCHITECTURE`, `API_CONTRACT`, `AUTH_RLS_PRIVACY`, `NOTIFICATION_RETURN_LOOP` | §6 API, §13 Notification, §15 Vertical Slice | COVERED-SOURCE-GAP (`SRC-19` blocks authoritative device register/re-register/token-rotation lifecycle; revoke baseline available) |
 | UC-24 | Admin 신규 캐릭터 publish | `CHARACTER_WORLD_CONTENT`, `API_CONTRACT`, `RELEASE_OBSERVABILITY` | §11 Content, §19 Promotion | COVERED-SOURCE-GAP (`SRC-01` affects per-character operational override only) |
 | UC-25 | Admin episode release | `CHARACTER_WORLD_CONTENT`, `API_CONTRACT`, `RELEASE_OBSERVABILITY` | §11 Content, §19 Promotion | COVERED-SOURCE-GAP (`SRC-01` affects per-episode operational override only) |
 | UC-26 | 유료 Reading/content 구매 | `COMMERCE_ENTITLEMENT`, `API_CONTRACT`, `SHARED_DOMAIN_CONTRACTS`, `COST_QUOTA_ABUSE` | §12 Commerce | COVERED-SOURCE-GAP (`SRC-18` product→entitlement mapping; provider rail additionally `P0-CM-01`) |
@@ -82,6 +82,8 @@ COVERED-SOURCE-GAP
 | conversation delete duplicate transcript redaction | `API_CONTRACT`, `AUTH_RLS_PRIVACY_SPEC.md`, `SOURCE_AUTHORITY_GAPS.md` (`SRC-14`) | message + turn request snapshot + attempt generated payload redaction/tombstone gate blocked pending source resolution |
 | commerce Purchase Intent minimal offer mapping snapshot | `API_CONTRACT`, `COMMERCE_ENTITLEMENT`, ERD v0.6 | Purchase Intent create/idempotency/concurrency gate |
 | purchased product → entitlement mapping authority | `SOURCE_AUTHORITY_GAPS` (`SRC-18`), `COMMERCE_ENTITLEMENT` | purchase/restore grant-apply gate blocked pending source resolution |
+| device installation register/re-register lifecycle | `NOTIFICATION_RETURN_LOOP`, `API_CONTRACT`, `SOURCE_AUTHORITY_GAPS` (`SRC-19`) | register/re-register/token-rotation/row-lineage gate blocked; standalone owner revoke remains testable |
+| Share Artifact create/public projection authority | `API_CONTRACT`, `AUTH_RLS_PRIVACY`, `SOURCE_AUTHORITY_GAPS` (`SRC-20`) | positive snapshot allowlist + Reading eligibility + retry/raw-token/expiry create gate blocked; public read + revoke remain testable |
 | transactional outbox | `DB_DDL_MIGRATION`, `RELEASE_OBSERVABILITY` | failure/recovery tests |
 | content/client compatibility | `CHARACTER_WORLD_CONTENT`, `WEB_MOBILE_CLIENT_ARCHITECTURE`, `UX_SCREEN_STATE_SPEC.md` | content/client compatibility + screen-state tests |
 | rate-limit/quota/context budget | `COST_QUOTA_ABUSE_SPEC.md` | cost/quota/abuse gate |
