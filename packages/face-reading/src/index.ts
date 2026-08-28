@@ -6,6 +6,7 @@ export * from './contracts.js';
 export * from './controlled-capture-attestation-fr21b.js';
 export * from './direct-source-verification.js';
 export * from './evidence-reports.js';
+export * from './face-observation-provider-contract-fr22.js';
 export * from './facelab-compat.js';
 export * from './facelab-fr3-requirements.js';
 export * from './five-officers-six-fus-research-v0.js';
