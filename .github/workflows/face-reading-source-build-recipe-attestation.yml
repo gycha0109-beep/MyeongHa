@@ -1,0 +1,43 @@
+name: Face Reading Source Build Recipe Attestation
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'packages/face-reading/**'
+      - 'scripts/face-reading-fr31-source-build-recipe-attestation.mjs'
+      - '.github/workflows/face-reading-source-build-recipe-attestation.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'packages/face-reading/**'
+      - 'scripts/face-reading-fr31-source-build-recipe-attestation.mjs'
+      - '.github/workflows/face-reading-source-build-recipe-attestation.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  fr31-source-build-recipe-attestation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install exact workspace dependencies
+        run: npm install --ignore-scripts
+      - name: Build MyeongHa runtime and validate FR-31 contract
+        run: npm run build
+      - name: Independently verify upstream v0.10.35 build recipe identity
+        run: node scripts/face-reading-fr31-source-build-recipe-attestation.mjs
+      - name: Upload FR-31 source recipe evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fr31-source-build-recipe-attestation
+          path: artifacts/face-reading/fr31-source-build-recipe-attestation.json
+          if-no-files-found: error
+          retention-days: 14
