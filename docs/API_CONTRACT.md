@@ -176,7 +176,9 @@ sequence cursor authoritative stream.
 ### `DELETE /api/chat/:threadId`
 Conversation deletion workflow를 생성한다. Life Fact/Memory authority는 자동 삭제하지 않는다.
 
-Baseline deletion semantics는 provenance FK를 깨지 않도록 thread를 deleted 상태로 전환하고 message body/payload를 redaction/tombstone 처리할 수 있다. persistent Life Fact/Memory가 source message를 참조하더라도 삭제된 대화 원문이 다시 Renderer context/UI에 노출되어서는 안 된다. Account-level destructive erase는 별도 deletion graph가 처리한다.
+Baseline deletion semantics는 provenance FK를 깨지 않도록 thread identity를 tombstone으로 유지하고 삭제된 대화 원문이 Renderer context/UI에 다시 노출되지 않게 해야 한다. 그러나 현재 persistence model은 raw transcript-equivalent data를 `conversation_messages.body_text/message_payload_jsonb`뿐 아니라 `chat_turns.request_snapshot_jsonb`와 `chat_turn_attempts.generated_*`에도 보존하며, terminal attempt immutability가 lifecycle redaction exception을 정의하지 않는다.
+
+따라서 `SRC-14` 해결 전에는 message row만 redaction하고 conversation deletion을 완료로 처리하는 구현을 금지한다. Source는 모든 durable duplicate의 redaction/tombstone 범위와 terminal attempt provenance를 보존하는 허용 mutation boundary를 정의해야 한다. Account-level destructive erase는 별도 deletion graph가 처리한다.
 
 ## 10. Birth / Target Person
 
@@ -389,6 +391,7 @@ POST /api/admin/threads/:id/content-transition   # governed migration only
 - session-only memory no long-term row
 - grant revoke context exclusion
 - device installation ownership
+- conversation delete duplicate transcript redaction (`SRC-14` resolved before write contract promotion)
 - account deletion command
 - admin release authorization
 - old client capability fallback
