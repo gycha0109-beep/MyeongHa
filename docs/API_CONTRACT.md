@@ -1,10 +1,10 @@
-# 명하 Shared API Contract v0.3 — Full Audit
+# 명하 Shared API Contract v0.4 — Source Aligned
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.3**  
-> Date: **2026-08-25**  
+> Pack Version: **v0.4**  
+> Date: **2026-08-28**  
 > Source Authority: `Usecase_re_reviewed_v2(1).md`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`, `Myeonghwa_Personalized_Interpretation_Architecture_v1.3_THIRD_REVIEW(1).md`  
-> Rule: source가 결정하지 않은 implementation-critical 사항은 `OPEN-P0`, 비차단 선택은 `CANDIDATE`, source 간 충돌은 `SOURCE_AUTHORITY_GAPS.md`에 기록한다.
+> Rule: source가 결정하지 않은 implementation-critical 사항은 `OPEN-P0`, 비차단 선택은 `CANDIDATE`, source 간 충돌/공백은 `SOURCE_AUTHORITY_GAPS.md` 또는 numbered source-gap 문서에 기록한다.
 
 ---
 
@@ -62,7 +62,7 @@ Guest raw token은 API에서 fingerprint 검증 후 subject resolve. DB direct a
 
 ## 5. Idempotency Model
 
-Idempotency identifier는 endpoint의 logical command identity다.
+Source-backed command identity가 정의된 endpoint만 아래 normative list에 둔다.
 
 ```text
 chat              → clientTurnId
@@ -72,12 +72,13 @@ memory resolution → idempotencyKey
 episode action    → idempotencyKey + expectedRevision
 purchase intent   → idempotencyKey
 receipt/restore   → idempotencyKey or provider source dedupe
-share create      → idempotencyKey
 guest merge       → idempotencyKey + guestSession proof
 deletion request  → requestDedupeKey
 ```
 
 동일 key + 동일 canonical request → 기존 logical result. 동일 key + 다른 hash → `409 IDEMPOTENCY_CONFLICT`.
+
+Share Artifact create는 Use Case §21.1의 explicit idempotency-required write 목록에 포함되지 않는다. 그렇다고 non-idempotent semantics가 source-backed인 것도 아니므로 create/retry/raw-token lifecycle은 `SRC-20` 해결 전 normative idempotency model에 넣지 않는다.
 
 ## 6. Error Code Baseline
 
@@ -247,11 +248,16 @@ DB의 raw `reading_refs.response_snapshot_jsonb`를 그대로 client에 serializ
 ## 12. Share
 
 ### `POST /api/share-artifacts`
-Idempotent minimized snapshot create.
+
+Use Case가 요구하는 route이지만 production create contract는 `SRC-20` 해결 전 승격하지 않는다. Source는 공개 projection의 **금지 필드**와 relational envelope는 정의하지만, positive versioned snapshot allowlist, shareable Reading lifecycle state, create retry/idempotency identity, raw opaque token replay/recovery, expiry create policy를 끝까지 정의하지 않는다.
+
+따라서 `SRC-20` 해결 전에는 임의 `ShareArtifactV1`, blacklist-only Reading JSON copy, `idempotencyKey`, plaintext/raw token durable storage, 또는 default expiry를 product authority로 만들지 않는다.
+
 ### `DELETE /api/share-artifacts/:id`
-revoke.
+Owner-scoped revoke. 기존 source-safe revoke command boundary는 유지한다.
+
 ### `GET /s/:publicToken`
-public-safe snapshot only; private Reading authorization이 아니다.
+public-safe stored snapshot only; active + unexpired artifact만 허용하며 private Reading authorization이 아니다. Raw token은 API에서 source-approved keyed fingerprint/hash representation으로 변환한 뒤 lookup한다.
 
 ## 13. Life Record / Memory / Grants
 
@@ -317,9 +323,11 @@ write는 `idempotencyKey + expectedRevision` 필요.
 
 ## 15. Notifications / Installations
 
+Use Case의 공식 API 목록은 notification preference/inbox를 정의하지만 Device Installation register/revoke HTTP route 이름 자체는 명시하지 않는다. 아래 두 route는 Pack의 supporting surface 후보이며, source-backed DB/lifecycle 의미와 분리해 본다.
+
 ```text
-POST   /api/device-installations/register
-POST   /api/device-installations/:id/revoke
+POST   /api/device-installations/register      # SRC-19 BLOCKED
+POST   /api/device-installations/:id/revoke    # supporting route candidate; revoke behavior source-safe
 GET    /api/notifications
 POST   /api/notifications/:id/read
 GET    /api/notification-preferences
@@ -327,7 +335,9 @@ PATCH  /api/notification-preferences
 PATCH  /api/notification-preferences/preview
 ```
 
-Push token registration은 subject ownership + installation uniqueness를 server가 검증한다.
+`SRC-19` 해결 전 register endpoint를 production-authoritative contract로 승격하지 않는다. Source는 active identity/token uniqueness와 cross-subject revoke-before-rebind는 정의하지만 same-subject retry, token rotation, revoked-row re-registration, row lineage, observation-field refresh, concurrent registration identity를 정의하지 않는다.
+
+Standalone owner-scoped revoke DB command는 이 gap과 독립적으로 유지할 수 있다. Push token registration이 향후 승격될 때도 subject ownership + installation/token uniqueness는 server가 검증해야 한다.
 
 ## 16. Commerce
 
@@ -390,7 +400,11 @@ POST /api/admin/threads/:id/content-transition   # governed migration only
 - target-person CRUD isolation
 - session-only memory no long-term row
 - grant revoke context exclusion
-- device installation ownership
+- Device Installation standalone revoke ownership/lifecycle
+- Device Installation register/re-register/token-rotation contract remains blocked until `SRC-19`
+- public Share active/unexpired read cannot authorize private Reading
+- Share owner revoke immediately blocks public access
+- Share create positive snapshot/retry/raw-token/expiry contract remains blocked until `SRC-20`
 - conversation delete duplicate transcript redaction (`SRC-14` resolved before write contract promotion)
 - account deletion command
 - admin release authorization
