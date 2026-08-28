@@ -1,9 +1,9 @@
-# 명하 Shared Domain Contracts Specification v0.3
+# 명하 Shared Domain Contracts Specification v0.4
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.3**  
-> Date: **2026-08-25**  
-> Purpose: 여러 spec에 흩어진 free-form string/JSON을 bounded versioned contract로 묶는다.
+> Pack Version: **v0.4**  
+> Date: **2026-08-28**  
+> Purpose: 여러 spec에 흩어진 free-form string/JSON을 bounded versioned contract로 묶는다. Source가 contract shape를 정의하지 않은 영역은 registry를 임의 생성하지 않는다.
 
 ---
 
@@ -28,11 +28,11 @@ API Error Detail schema
 Outbox EventType
 ```
 
-각 key family는 `registryVersion` 또는 schema version을 가진다. unknown value는 실행하지 않고 reject/fallback한다.
+각 source-backed key family는 `registryVersion` 또는 schema version을 가진다. unknown value는 실행하지 않고 reject/fallback한다.
 
 ### 1.1 Immutable Registry Authority
 
-다음 registry/policy는 **source-controlled immutable artifact**로 관리한다. DB free-form JSON이나 admin UI가 같은 version key의 의미를 덮어쓰면 안 된다.
+다음 registry/policy는 **source-controlled immutable artifact로 source authority가 실제로 정의한 범위에서만** 관리한다. DB free-form JSON이나 admin UI가 같은 version key의 의미를 덮어쓰면 안 된다.
 
 ```text
 RelationshipPolicyDefinition
@@ -40,11 +40,12 @@ UsagePolicyDefinition
 NotificationPolicyDefinition
 AnalyticsEventSchemaRegistry
 ExperimentAssignmentPolicy
-ProductFulfillmentDefinition
 ContentPolicyTagRegistry
 ```
 
-각 artifact는 최소 `id/key + version + contentHash`를 가지며, 동일 `(key,version)`은 동일 normalized content를 뜻해야 한다. 정책 내용이 바뀌면 version 또는 content hash가 바뀐다. 실행 provenance에는 해당 version/hash를 가능한 범위에서 pin한다.
+각 source-backed artifact는 최소 `id/key + version + contentHash` 또는 해당 source가 정의한 동등한 provenance를 가진다. 정책 내용이 바뀌면 version/content identity도 바뀐다.
+
+Commerce의 purchased product → entitlement mapping은 현재 source-backed registry contract가 없으며 `SRC-18`로 분리한다. 기존 Pack의 `ProductFulfillmentDefinition`은 source authority로 취급하지 않는다.
 
 ## 2. Chat Structured Action Registry
 
@@ -133,24 +134,40 @@ Emotion/Cue는 content bundle의 cue schema와 캐릭터 allowlist의 교집합�
 
 unknown cue는 asset path로 resolve하지 않는다.
 
-## 7. Commerce Fulfillment Definition
+## 7. Commerce Product → Entitlement Mapping
 
-Provider-independent commerce authority:
+`SRC-18`이 source authority gap이다.
 
-```ts
-interface ProductFulfillmentDefinition {
-  productKey: string;
-  version: string;
-  grants: readonly {
-    entitlementKey: string;
-    scopeResolver: 'GLOBAL' | 'REQUEST_RESOURCE' | 'FIXED';
-    fixedScopeKey?: string;
-    grantClass: 'one_off' | 'subscription' | 'promo_compatible';
-  }[];
-}
+현재 source-backed Purchase Intent contract는 selected `product_offer`의 immutable minimal mapping snapshot을 pin한다.
+
+```text
+productOfferId
+productId
+platform
+provider
+externalProductId
 ```
 
-Purchase Intent 생성 시 resolved fulfillment definition의 `version + normalized grants + hash`를 `offer_snapshot_jsonb`에 pin한다. Provider verification 후 grant 생성은 **그 snapshot**만 사용한다. 현재 product config를 다시 읽어 과거 purchase의 권리를 바꾸지 않는다.
+Primary source는 다음을 정의하지 않는다.
+
+```text
+product → entitlementKey
+scope resolver
+purchase-derived grantKey
+one product → multiple grants
+historical mapping version/hash
+```
+
+따라서 Pack은 다음 schema를 source type처럼 만들지 않는다.
+
+```text
+ProductFulfillmentDefinition
+fulfillmentDefinitionVersion
+GLOBAL | REQUEST_RESOURCE | FIXED
+one_off | subscription | promo_compatible
+```
+
+`SRC-18` 해결 전 verified receipt/provider event가 있더라도 unknown product→entitlement mapping에서는 entitlement mutation을 실행하지 않는다.
 
 ## 8. API Error Details
 
@@ -191,5 +208,6 @@ interface NotificationPolicyDefinitionV1 {
 - unknown LifeFact schema → no persistence
 - unknown Relationship event → no state mutation
 - unknown cue → no arbitrary asset resolution
-- purchase fulfillment snapshot mutation → hash mismatch deny
+- Purchase Intent minimal offer mapping snapshot mutation → hash mismatch/deny
+- unresolved product→entitlement mapping (`SRC-18`) → no entitlement mutation
 - unknown outbox schema → no silent consume
