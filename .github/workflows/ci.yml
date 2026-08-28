@@ -72,6 +72,8 @@ jobs:
         run: psql -1 -v ON_ERROR_STOP=1 -f test/db/notification_deletion_negative.sql
       - name: Run commerce negative tests
         run: psql -1 -v ON_ERROR_STOP=1 -f test/db/commerce_negative.sql
+      - name: Run Outbox claim/reclaim persistence/concurrency tests
+        run: bash test/db/outbox_claim_concurrency.sh
       - name: Run chat receive persistence/concurrency tests
         run: bash test/db/chat_receive_concurrency.sh
       - name: Run chat attempt/commit persistence/concurrency tests
