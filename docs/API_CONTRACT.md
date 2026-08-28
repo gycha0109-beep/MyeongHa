@@ -1,7 +1,7 @@
-# 명하 Shared API Contract v0.4 — Source Aligned
+# 명하 Shared API Contract v0.5 — Source Aligned
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.4**  
+> Pack Version: **v0.5**  
 > Date: **2026-08-28**  
 > Source Authority: `Usecase_re_reviewed_v2(1).md`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`, `Myeonghwa_Personalized_Interpretation_Architecture_v1.3_THIRD_REVIEW(1).md`  
 > Rule: source가 결정하지 않은 implementation-critical 사항은 `OPEN-P0`, 비차단 선택은 `CANDIDATE`, source 간 충돌/공백은 `SOURCE_AUTHORITY_GAPS.md` 또는 numbered source-gap 문서에 기록한다.
@@ -348,7 +348,39 @@ POST /api/commerce/receipts/verify
 POST /api/commerce/restore
 ```
 
-Purchase Intent는 ERD source가 정의한 immutable minimal offer mapping snapshot과 version-prefixed digest를 pin한다. Provider/platform 결제 rail은 `OPEN-P0: P0-CM-01`이다. Verified product/receipt를 어떤 `entitlement_key`/scope/grant로 변환하는지는 source가 정의하지 않아 `SRC-18`이 OPEN이다. 따라서 receipt verification/restore endpoint의 provenance ingest는 설계할 수 있지만 **purchase → entitlement grant apply** 단계를 source-backed production authority로 확정하지 않는다.
+### Source-complete boundaries
+
+- Purchase Intent는 ERD source가 정의한 immutable minimal offer mapping snapshot과 version-prefixed digest를 pin한다.
+- Verified receipt/provider-event provenance는 source ownership/dedupe constraints를 따른다.
+- `GET /api/entitlements`는 이미 저장된 provider-independent logical projection을 읽고, access gate는 expired `effective_valid_until`을 wall-clock에서 fail-closed 해야 한다.
+
+### Independent blockers
+
+```text
+P0-CM-01
+→ provider/platform payment/receipt/restore rail
+
+SRC-18
+→ verified purchased product → entitlement_key/scope/grant_key target mapping
+
+SRC-21
+→ entitlement event payload/transition, stale provider ordering, grant validity predicate,
+   active_grant_count/effective_valid_until aggregation, projection revision/outbox semantics
+```
+
+ERD §17.11의:
+
+```text
+lock/upsert grant
+→ append event
+→ update grant
+→ recompute logical entitlement
+→ outbox
+```
+
+는 transaction **skeleton authority**다. `SRC-21` 해결 전 이를 완전한 executable transition formula로 해석하지 않는다.
+
+따라서 receipt verification/restore의 provenance ingest가 가능하더라도 **purchase→grant target→event apply→effective access mutation**은 필요한 `SRC-18`, `SRC-21`, `P0-CM-01` authority가 해결된 범위에서만 production-enable한다.
 
 ## 17. Account / Deletion
 
@@ -410,4 +442,6 @@ POST /api/admin/threads/:id/content-transition   # governed migration only
 - admin release authorization
 - old client capability fallback
 - purchase intent minimal offer mapping snapshot + idempotency
-- purchase→entitlement grant apply remains blocked until `SRC-18` resolution
+- purchased product→grant target remains blocked until `SRC-18`
+- entitlement event apply/aggregate recompute remains blocked until `SRC-21`
+- expired stored entitlement projection cannot authorize access after `effective_valid_until`

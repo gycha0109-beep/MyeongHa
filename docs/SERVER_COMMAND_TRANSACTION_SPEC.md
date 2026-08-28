@@ -1,7 +1,7 @@
-# 명하 Server Command / Transaction Specification v0.4
+# 명하 Server Command / Transaction Specification v0.5
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.4**  
+> Pack Version: **v0.5**  
 > Date: **2026-08-28**  
 > Persistence Authority: `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`  
 > API Authority: `API_CONTRACT.md`
@@ -307,32 +307,71 @@ Purchase Intent create does **not** call a provider and does not create receipt/
 
 Provider verification happens outside the DB transaction or at a dedicated provider boundary. Verified results may be persisted as source-defined receipt/provider-event provenance with dedupe and ownership constraints.
 
-### 18.3 Purchase Source → Entitlement Apply — blocked by `SRC-18`
+### 18.3 Purchase Source → Grant Target — blocked by `SRC-18`
 
-ERD defines the transaction skeleton after a grant target is known:
+Primary source does not define purchased `product_id` → `entitlement_key` / scope / grant-key semantics.
 
 ```text
-verified receipt/provider event
-→ resolve subject + grant_key
-→ lock grant(s) deterministic order
+verified purchase provenance
+→ concrete purchase-derived grant target resolution = SRC-18
+```
+
+Pack must not insert an invented `ProductFulfillmentDefinition` or client-supplied scope authority.
+
+### 18.4 Entitlement Event Apply / Aggregate Recompute — skeleton only; executable command blocked by `SRC-21`
+
+ERD fixes this transaction skeleton:
+
+```text
+already-authoritative subject + grant target + source event
+→ lock/upsert grant
 → reject stale provider order
-→ append entitlement event
+→ append entitlement_event
 → update grant projection
-→ recompute logical entitlement
+→ recompute logical entitlement from ALL valid grants
 → outbox
 → commit
 ```
 
-However, source does not define purchased `product_id` → `entitlement_key` / scope / grant-key semantics. Therefore Pack must not insert an invented `ProductFulfillmentDefinition` step.
+This fixes **atomic ordering**, not every field transition.
 
-Until `SRC-18` is resolved:
+`SRC-21` remains open because source does not define:
 
 ```text
-verified purchase provenance
-→ concrete purchase-derived entitlement grant mutation = BLOCKED
+versioned payload schema per entitlement event type
+granted/renewed/expired/revoked/restored/adjusted → grant field transition
+provider_ordering_key/effective_at stale comparator
+exact "valid grant" predicate using status/valid_from/valid_until
+active_grant_count formula
+effective_valid_until aggregation including unbounded grants
+future valid_from behavior
+aggregation as_of time
+projection create/id/revision/no-op semantics
+entitlement outbox event/dedupe contract
 ```
 
-`SRC-07` 해결 전 manual provider-event resolution도 production deny이며, provider rail 자체는 `P0-CM-01` 결정이 필요하다.
+Therefore neither:
+
+```text
+cmd_apply_entitlement_event...
+cmd_recompute_entitlement_projection...
+```
+
+may be promoted as production-authoritative merely because the relational schema can represent their outputs.
+
+The existing commerce negative test that manually changes a grant and then manually writes `active_grant_count/effective_valid_until` is a schema representability test, not executable transition authority.
+
+### 18.5 Blocker composition
+
+Full purchase→access mutation requires all applicable layers:
+
+```text
+P0-CM-01 → provider/store rail semantics
+SRC-18    → product → grant target mapping
+SRC-21    → event → grant transition + grant aggregate projection
+```
+
+`SRC-07` 해결 전 manual provider-event resolution도 production deny다.
 
 ## 19. Notification Delivery Attempt
 
@@ -386,6 +425,7 @@ Publisher는 at-least-once로 동작할 수 있으므로 consumer가 event dedup
 - episode advance with unlock → both or neither after `SRC-17` resolution
 - Purchase Intent same-key concurrency → one logical intent
 - Purchase Intent replay does not depend on later offer availability
-- purchase provenance → grant apply remains blocked until `SRC-18`
-- commerce grant recompute → ledger/projection atomic after mapping authority exists
+- purchase provenance → grant target remains blocked until `SRC-18`
+- grant event apply / logical entitlement recompute remains blocked until `SRC-21`
+- expired `effective_valid_until` current projection cannot authorize access after wall-clock expiry
 - outbox publisher retry → domain state not duplicated

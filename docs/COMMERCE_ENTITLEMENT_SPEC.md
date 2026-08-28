@@ -1,10 +1,10 @@
-# 명하 Commerce / Entitlement Specification v0.4 — Source Aligned
+# 명하 Commerce / Entitlement Specification v0.5 — Source Aligned
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.4**  
+> Pack Version: **v0.5**  
 > Date: **2026-08-28**  
 > Source Authority: `Usecase_re_reviewed_v2(1).md`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`, `Myeonghwa_Personalized_Interpretation_Architecture_v1.3_THIRD_REVIEW(1).md`  
-> Rule: source가 결정하지 않은 implementation-critical 사항은 `OPEN-P0` 또는 `SOURCE_AUTHORITY_GAPS.md`에 남기며 Pack이 새 authority를 만들지 않는다.
+> Rule: source가 결정하지 않은 implementation-critical 사항은 `OPEN-P0` 또는 numbered source-gap 문서에 남기며 Pack이 새 authority를 만들지 않는다.
 
 ---
 
@@ -12,14 +12,17 @@
 
 Web/iOS/Android 결제가 달라도 entitlement는 명하 서버가 최종 authority가 되도록 한다.
 
-두 개의 독립 blocker를 구분한다.
+세 개의 독립 blocker를 구분한다.
 
 ```text
 P0-CM-01
 → Web / Apple / Google provider rail 및 product-type matrix
 
 SRC-18
-→ verified purchased product를 entitlement_key/scope/grant로 변환하는 source authority
+→ verified purchased product를 entitlement_key/scope/grant_key target으로 변환하는 source authority
+
+SRC-21
+→ 이미 authoritative한 grant target/event를 grant projection에 적용하고 여러 grant를 logical entitlement로 합성하는 transition/aggregation authority
 ```
 
 ## 2. Source-Backed Authority Flow
@@ -30,13 +33,13 @@ Product stable identity
 → Purchase Intent immutable minimal offer mapping snapshot
 → Provider verification
 → Receipt / Provider Event provenance
-→ [SRC-18: governed Product → Entitlement mapping]
-→ Entitlement Grant lifecycle
+→ [SRC-18: governed Product → Grant target mapping]
+→ [SRC-21: Entitlement event apply + grant transition + aggregate recompute]
 → Logical Entitlement projection
 → Access Gate
 ```
 
-`SRC-18` 해결 전 마지막 네 단계 중 **purchase provenance를 concrete entitlement grant로 변환하는 mutation**은 production authority로 승격하지 않는다.
+ERD는 grant/event/projection 구조와 transaction **skeleton**을 고정한다. Source가 끝까지 정의하지 않은 target mapping 또는 transition/aggregation 식을 Pack이 채우지 않는다.
 
 ## 3. Product / Offer Authority
 
@@ -91,7 +94,7 @@ provider
 externalProductId
 ```
 
-같은 idempotency key + 같은 canonical request → 기존 intent replay.
+같은 idempotency key + 같은 canonical request → 기존 intent replay.  
 같은 idempotency key + 다른 request hash → conflict.
 
 표시 가격/통화 cache를 historical entitlement semantics로 pin했다고 주장하지 않는다.
@@ -120,7 +123,14 @@ Client success UI는 authority가 아니다.
 
 Verified receipt만 이후 authoritative commerce source 후보가 될 수 있다.
 
-단, **verified receipt가 어떤 entitlement를 발급해야 하는지는 SRC-18 해결 전 확정하지 않는다.**
+단, verified receipt에서 실제 entitlement mutation까지 가려면:
+
+```text
+SRC-18 → grant target resolution
+SRC-21 → event/grant/projection transition
+```
+
+이 모두 필요하다.
 
 ## 8. Provider Events
 
@@ -129,9 +139,9 @@ Verified receipt만 이후 authoritative commerce source 후보가 될 수 있�
 - unresolved event → no entitlement effect
 - `SRC-07` 해결 전 `resolution_source_type='manual'` production 사용 금지
 - occurrence/order metadata preserve
-- stale/out-of-order lifecycle event가 최신 grant를 rollback하지 못하도록 source-defined ordering provenance를 보존
+- source는 stale/out-of-order provider event가 최신 grant를 rollback하면 안 된다고 요구한다.
 
-Provider event가 실제 entitlement effect를 만들기 위해서는 추가로 `SRC-18` product→grant authority가 필요하다.
+하지만 **provider-specific stale-order comparator 자체는 source가 정의하지 않는다.** `provider_ordering_key`, `effective_at`, provider occurred time의 비교 우선순위를 Pack이 lexical/timestamp 규칙으로 발명하지 않는다. 이 apply-time transition 문제는 `SRC-21`; provider rail semantics는 추가로 `P0-CM-01`이다.
 
 ## 9. Grants
 
@@ -145,6 +155,8 @@ grant_source_type
 status
 valid_from / valid_until
 revision
+last_effective_at
+last_provider_ordering_key
 ```
 
 하나의 logical entitlement에 여러 independent source instance가 동시에 기여할 수 있다.
@@ -155,11 +167,18 @@ promo grant B
 subscription grant C
 ```
 
-한 grant revoke가 다른 valid grant를 제거하지 않는다.
+한 grant revoke가 다른 grant row를 제거하지 않는다.
 
-이 구조는 source-backed이지만, purchased product에서 이 필드들을 **어떻게 산출하는지**는 SRC-18이다.
+이 **구조와 독립성**은 source-backed이다. 그러나:
 
-## 10. Entitlement Event Apply
+```text
+purchased product → 이 grant identity 산출 = SRC-18
+event → grant field transition            = SRC-21
+```
+
+이다.
+
+## 10. Entitlement Event Apply — skeleton source-backed, executable semantics `SRC-21`
 
 ERD가 고정한 transaction skeleton:
 
@@ -175,21 +194,71 @@ verified receipt/provider event
 → commit
 ```
 
-이 skeleton을 구현할 수 있다는 것과 product→grant semantic resolver가 정의됐다는 것은 별개다.
+Source가 **정한 것**:
 
-`SRC-18` 해결 전 purchase/provider source에 대한 concrete grant apply command는 production-authoritative가 아니다.
+- event ledger는 append-only;
+- event가 grant owner/key/scope와 일치해야 함;
+- receipt/provider-event source provenance가 verified여야 함;
+- one grant의 변경이 다른 independent grant를 삭제하지 않음;
+- logical entitlement는 grants에서 파생됨;
+- 위 mutation 순서는 atomic해야 함.
 
-## 11. Effective Entitlement
+Source가 **정하지 않은 것**은 `SRC-21`이다.
 
-Source-backed current-access rule:
+### 10.1 Event transition gap
+
+`granted | renewed | expired | revoked | restored | adjusted` 각각이 다음을 어떻게 바꾸는지 완전한 transition table이 없다.
+
+```text
+status
+valid_from
+valid_until
+revision
+last_effective_at
+last_provider_ordering_key
+```
+
+`payload_jsonb`의 event-type별 versioned schema도 없다.
+
+### 10.2 Provider ordering gap
+
+Stale provider order를 reject하라고만 되어 있고 comparator/precedence가 없다. 따라서 `provider_ordering_key` 문자열 비교나 `effective_at` 우선순위를 DB에서 임의 결정하지 않는다.
+
+## 11. Logical Entitlement Aggregation — `SRC-21`
+
+ERD projection shape:
+
+```text
+status                  # active | inactive
+active_grant_count
+effective_valid_until
+revision
+```
+
+Source-backed access check:
 
 ```text
 status='active'
-AND active_grant_count > 0
 AND (effective_valid_until IS NULL OR effective_valid_until > now())
 ```
 
-Sweeper 지연이 접근 기간을 연장하면 안 된다.
+이 clock-expiry fail-closed rule은 그대로 유지한다.
+
+그러나 `ALL valid grants`가 executable predicate/aggregation formula로 정의되어 있지 않다.
+
+### Missing
+
+- contributing grant predicate: `status`, `valid_from`, `valid_until`의 정확한 조합;
+- future `valid_from` 처리;
+- `active_grant_count`가 status-active row인지 wall-clock-valid active grant인지;
+- 여러 finite `valid_until`의 집계식;
+- finite + unbounded(`valid_until NULL`) 혼합 시 `effective_valid_until`;
+- aggregation `as_of` 시간 authority;
+- first projection row 생성/ID authority;
+- revision/no-op update semantics;
+- entitlement-change outbox schema/dedupe.
+
+직관적인 `MAX(valid_until)` 또는 NULL-wins 규칙도 source 문장이 아니므로 임의 승격하지 않는다.
 
 ## 12. Resource-Scoped Paid Reading / Content
 
@@ -203,13 +272,19 @@ client-supplied arbitrary scope acceptance
 product type별 fixed/global/resource mapping
 ```
 
-Cross-subject resource unlock은 항상 deny해야 하며, exact scope mapping authority는 SRC-18 resolution에 포함되어야 한다.
+Cross-subject resource unlock은 항상 deny해야 하며, exact scope mapping authority는 `SRC-18` resolution에 포함되어야 한다.
 
 ## 13. Restore
 
 Restore는 provider ownership + transaction/subscription lineage reconciliation + missing verified provenance ingest를 의미한다. 임의 grant 생성 기능이 아니다.
 
-Provider rail/restore mechanics는 `P0-CM-01`; verified historical source를 어떤 grant로 복원하는지는 `SRC-18`이다.
+```text
+provider rail/restore mechanics             = P0-CM-01
+verified historical product → grant target = SRC-18
+grant restore event/aggregate transition    = SRC-21
+```
+
+모두 필요한 범위가 해결되어야 concrete access mutation이 가능하다.
 
 ## 14. Guest
 
@@ -234,34 +309,64 @@ Guest purchase 금지. 구매 전 Member identity 필요.
 
 - raw receipt/token/provider secret 최소화/금지
 - client entitlement write 금지
-- forged/unverified receipt → no grant
+- forged/unverified receipt → no grant/event
 - cross-user receipt/account link → deny
 - unknown/unresolved product→entitlement mapping → no grant
+- unresolved grant-event transition/aggregation → no authoritative access mutation
 - client supplied scope만으로 paid resource unlock 금지
 - current mutable offer/cache state로 historical purchase entitlement를 재해석하지 않음
+- stale projection의 expired `effective_valid_until`이 access를 연장하지 않음
 
 ## 17. Verification
 
-Source-complete now:
+### Source-complete now
 
 - guest purchase deny
 - Purchase Intent same key/same request replay
 - same key/different request conflict
 - immutable minimal offer mapping snapshot validation
 - provider account link owner/provider/status validation
-- duplicate receipt/provider event dedupe
-- unresolved provider event → no effect
-- overlapping already-authoritative grants read/recompute invariants
-- expiry immediate deny
-- out-of-order source cannot rollback newer grant state
+- duplicate receipt/provider event relational dedupe
+- unresolved provider event → entitlement event source deny
+- forged/unverified receipt → entitlement event source deny
+- entitlement event append-only / grant owner-key-scope FK
+- multiple independent grant rows coexist structurally
+- one logical entitlement projection row per owner/key/scope
+- projection shape active↔count constraints
+- current entitlement read
+- expired `effective_valid_until` must be denied by access check even if sweeper lags
 
-Blocked pending `SRC-18`:
+The existing commerce negative test manually simulates an overlapping-grant projection update; it demonstrates representability, **not an authoritative recompute algorithm**.
 
-- purchased product → exact entitlement key/scope/grant mapping
+### Blocked pending `SRC-18`
+
+- purchased product → exact entitlement key/scope/grant target
 - resource-scoped product grant resolution
-- historical mapping-version replay after mapping changes
-- restore → concrete missing grant reconstruction
+- historical product→grant mapping version replay
 
-Blocked/additionally gated by `P0-CM-01`:
+### Blocked pending `SRC-21`
+
+- event-type payload/transition apply
+- stale provider-order comparator
+- future `valid_from` behavior
+- exact contributing-grant predicate
+- `active_grant_count` recompute formula
+- `effective_valid_until` aggregation
+- projection revision/no-op semantics
+- entitlement-change outbox contract
+
+### Additionally gated by `P0-CM-01`
 
 - provider-specific payment/receipt/restore production rail.
+
+## 18. Full Purchase→Access Completion
+
+```text
+Purchase Intent create                      = implemented source-complete baseline
+verified source provenance constraints      = source-complete structural baseline
+product → grant target                      = SRC-18
+entitlement event transition + aggregation  = SRC-21
+provider/store lifecycle                    = P0-CM-01
+```
+
+`SRC-18`만 해결되었다고 full commerce path를 완료로 판정하지 않는다.
