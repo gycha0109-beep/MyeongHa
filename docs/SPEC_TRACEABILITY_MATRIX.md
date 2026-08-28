@@ -56,7 +56,7 @@ COVERED-SOURCE-GAP
 | UC-28 | notification controls/privacy | `NOTIFICATION_RETURN_LOOP`, `API_CONTRACT`, `WEB_MOBILE_CLIENT_ARCHITECTURE` | §13 Notification | COVERED-SOURCE-GAP (`SRC-12` missing-row/default/materialization authority) |
 | UC-29 | unsupported Saju fail-closed | `SAJU_INTEGRATION`, `AI_CHARACTER_RUNTIME`, `API_CONTRACT` | §8 Saju, §9 AI | COVERED |
 | UC-30 | Birth 수정/revision/stale | `API_CONTRACT`, `SAJU_INTEGRATION`, `DB_DDL_MIGRATION` | §4 DB, §6 API, §8 Saju | COVERED |
-| UC-31 | 대화 삭제/캐릭터 forget/Life Fact revoke 분리 | `API_CONTRACT`, `AUTH_RLS_PRIVACY`, `RELATIONSHIP_MEMORY_POLICY` | §5 Auth, §10 Relationship/Memory, §14 Deletion | COVERED-P0 (`P0-PR-01` retention) |
+| UC-31 | 대화 삭제/캐릭터 forget/Life Fact revoke 분리 | `API_CONTRACT`, `AUTH_RLS_PRIVACY`, `RELATIONSHIP_MEMORY_POLICY`, `SOURCE_AUTHORITY_GAPS` | §5 Auth, §10 Relationship/Memory, §14 Deletion | COVERED-SOURCE-GAP (`SRC-14` duplicate transcript redaction authority; `P0-PR-01` retention also open) |
 | UC-32 | Guest → 기존 Member merge | `API_CONTRACT`, `AUTH_RLS_PRIVACY`, `DB_DDL_MIGRATION` | §4 DB, §5 Auth, §6 API, §14 Deletion | COVERED |
 | UC-33 | AI/Saju partial failure/retry | `API_CONTRACT`, `AI_CHARACTER_RUNTIME`, `SAJU_INTEGRATION`, `DB_DDL_MIGRATION`, `SERVER_COMMAND_TRANSACTION` | §7 Chat, §8 Saju, §17 Failure | COVERED-P0 (`P0-AI-01`, `P0-SA-01`); Saju guard metadata also `SRC-09` |
 | UC-34 | account data deletion | `AUTH_RLS_PRIVACY`, `API_CONTRACT`, `DB_DDL_MIGRATION`, `RELEASE_OBSERVABILITY` | §14 Deletion, §19 Promotion | COVERED-P0 (`P0-PR-01`) |
@@ -77,6 +77,7 @@ COVERED-SOURCE-GAP
 | episode progress single-projection bundle selection | `CHARACTER_WORLD_CONTENT`, `API_CONTRACT`, `SOURCE_AUTHORITY_GAPS.md` (`SRC-11`) | `GET /api/episodes/:id/progress` projection gate blocked pending source resolution |
 | notification preference missing-row/default/materialization | `NOTIFICATION_RETURN_LOOP`, `API_CONTRACT`, `SOURCE_AUTHORITY_GAPS.md` (`SRC-12`) | preference mutation/default gate blocked pending source resolution |
 | notification inbox status membership | `NOTIFICATION_RETURN_LOOP`, `API_CONTRACT`, `SOURCE_AUTHORITY_GAPS.md` (`SRC-13`) | inbox projection gate blocked pending source resolution |
+| conversation delete duplicate transcript redaction | `API_CONTRACT`, `AUTH_RLS_PRIVACY_SPEC.md`, `SOURCE_AUTHORITY_GAPS.md` (`SRC-14`) | message + turn request snapshot + attempt generated payload redaction/tombstone gate blocked pending source resolution |
 | provider-independent fulfillment | `SHARED_DOMAIN_CONTRACTS`, `COMMERCE_ENTITLEMENT` | Commerce tests |
 | transactional outbox | `DB_DDL_MIGRATION`, `RELEASE_OBSERVABILITY` | failure/recovery tests |
 | content/client compatibility | `CHARACTER_WORLD_CONTENT`, `WEB_MOBILE_CLIENT_ARCHITECTURE`, `UX_SCREEN_STATE_SPEC.md` | content/client compatibility + screen-state tests |

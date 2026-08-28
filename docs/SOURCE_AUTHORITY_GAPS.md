@@ -318,3 +318,44 @@ Source는 최소 다음을 결정해야 한다.
 ```
 
 해결 전 `POST /api/notifications/:id/read`처럼 explicit 대상의 read command는 유지할 수 있으나, 전체 inbox projection은 source-backed status membership이 생기기 전까지 final authority로 구현하지 않는다.
+
+## SRC-14 — Conversation Delete Redaction vs Turn / Attempt Duplicate Payload Authority
+
+**Status: BLOCKING BEFORE `DELETE /api/chat/:threadId` MUTATION FINALIZATION**
+
+Use Case와 Auth/Privacy spec은 conversation-only delete가 confirmed Life Fact/Memory authority와 provenance identity는 보존하면서, 삭제된 대화의 원문은 UI/Renderer/AI context에서 다시 노출되지 않도록 redaction/tombstone 처리해야 한다고 요구한다.
+
+현재 persistence model은 같은 대화 원문을 한 곳에만 저장하지 않는다.
+
+```text
+conversation_messages.body_text / message_payload_jsonb
+chat_turns.request_snapshot_jsonb
+chat_turn_attempts.generated_body_text / generated_message_payload_jsonb
+```
+
+따라서 `conversation_messages`만 redaction하고 thread를 `deleted`로 바꾸는 구현은 raw transcript의 다른 durable copy를 남기며, conversation deletion을 완료했다고 볼 수 없다.
+
+특히 `chat_turn_attempts`는 generated/validated/committed shape CHECK와 terminal immutability guard를 가지므로 deletion lifecycle이 raw generated payload를 제거하려고 해도 현재 schema authority와 충돌한다. 또한 delete와 동시에 provider/renderer 작업 중인 attempt를 어떤 terminal state로 정리할지 source가 정하지 않는다.
+
+Source에서 최소 다음 중 하나 또는 동등한 구조를 결정해야 한다.
+
+```text
+A. message/turn/attempt의 raw transcript field를 모두 lifecycle-redact할 수 있는
+   명시적 redaction state/columns + terminal immutability 예외를 정의하고,
+   identity/hash/minimal provenance만 보존
+
+B. immutable attempt provenance와 redactable sensitive transcript payload store를 분리
+
+C. 다른 deletion graph로 모든 raw/derivative transcript copy의 처리와
+   in-flight attempt cancellation/terminalization semantics를 명시
+```
+
+해결 전에도 다음 fail-closed 경계는 유지할 수 있다.
+
+```text
+deleted thread → current chat stream에서 unreadable
+new chat receive → deleted thread deny
+assistant final commit → thread status lock/recheck로 delete 이후 deny
+```
+
+하지만 이 경계만으로 **Conversation Delete가 privacy-complete하다고 주장하지 않는다.** `conversation_messages`만 지우는 command도 production authority로 확정하지 않는다.
