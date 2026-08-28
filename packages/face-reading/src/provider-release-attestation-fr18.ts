@@ -3,6 +3,7 @@ import { FaceAuthorityValidationError } from './validation.js';
 
 export type ProviderReleaseEvidenceClassV1 =
   | 'consumer_dependency_pin'
+  | 'consumer_lockfile_resolution'
   | 'public_package_metadata'
   | 'upstream_version_bump'
   | 'upstream_topology_snapshot';
@@ -48,6 +49,22 @@ export interface ProviderReleaseAttestationFR18V1 {
     readonly evidenceRef: string;
   };
 
+  readonly consumerArtifactLock: {
+    readonly repository: 'gycha0109-beep/K_beauty';
+    readonly repositoryCommit: string;
+    readonly lockfilePath: 'package-lock.json';
+    readonly lockfileBlobSha: string;
+    readonly packageName: '@mediapipe/tasks-vision';
+    readonly packageVersion: '0.10.35';
+    readonly resolvedTarballUrl: 'https://registry.npmjs.org/@mediapipe/tasks-vision/-/tasks-vision-0.10.35.tgz';
+    readonly integrityAlgorithm: 'sha512';
+    readonly integrity: 'sha512-HOvadwVRE6JC+45nyYhmnywnr5h/J8KZvOeUNVOG9q/0875pZgItznFB9bRTvLc264YSJqiZ1NsIpCStJw/egg==';
+    readonly evidenceRef: string;
+    readonly artifactIdentityState: 'consumer_lockfile_attested';
+    readonly tarballBytesIndependentlyRehashed: false;
+    readonly sourceEquivalenceEstablished: false;
+  };
+
   readonly publishedPackageMetadata: {
     readonly packageName: '@mediapipe/tasks-vision';
     readonly packageVersion: '0.10.35';
@@ -82,6 +99,7 @@ export interface ProviderReleaseAttestationFR18V1 {
   readonly providerActivationAllowed: false;
   readonly prohibitedPromotions: readonly [
     'development_version_snapshot_to_release_exact',
+    'consumer_lockfile_integrity_to_source_equivalence',
     'provider_left_right_symbol_to_image_x_order',
     'selfie_preview_orientation_to_canonical_orientation',
     'package_dependency_presence_to_runtime_geometry_authority',
@@ -90,23 +108,30 @@ export interface ProviderReleaseAttestationFR18V1 {
 
 export interface ProviderReleaseAttestationReadinessFR18V1 {
   readonly productionReady: false;
+  readonly artifactIdentityState: 'consumer_lockfile_attested';
   readonly releaseExactState: 'unresolved';
   readonly lateralityState: 'unresolved';
   readonly blockers: readonly string[];
 }
 
 const HEX40 = /^[0-9a-f]{40}$/u;
+const SHA512_SRI = /^sha512-[A-Za-z0-9+/]+={0,2}$/u;
 
 const ALLOWED_EVIDENCE_KEYS = new Set([
   'evidenceRef', 'evidenceClass', 'sourceRef', 'observedValue', 'verificationState', 'authorityState', 'limitations',
 ]);
 const ALLOWED_ATTESTATION_KEYS = new Set([
   'schemaVersion', 'attestationVersion', 'authorityState', 'providerKey', 'consumerDependency',
-  'publishedPackageMetadata', 'upstreamVersionSnapshot', 'laterality', 'publishedBundleTopologyEvidenceRef',
-  'releaseExactState', 'providerActivationAllowed', 'prohibitedPromotions',
+  'consumerArtifactLock', 'publishedPackageMetadata', 'upstreamVersionSnapshot', 'laterality',
+  'publishedBundleTopologyEvidenceRef', 'releaseExactState', 'providerActivationAllowed', 'prohibitedPromotions',
 ]);
 const ALLOWED_DEPENDENCY_KEYS = new Set([
   'repository', 'repositoryCommit', 'packageManifestPath', 'packageManifestBlobSha', 'packageName', 'packageVersion', 'evidenceRef',
+]);
+const ALLOWED_ARTIFACT_LOCK_KEYS = new Set([
+  'repository', 'repositoryCommit', 'lockfilePath', 'lockfileBlobSha', 'packageName', 'packageVersion',
+  'resolvedTarballUrl', 'integrityAlgorithm', 'integrity', 'evidenceRef', 'artifactIdentityState',
+  'tarballBytesIndependentlyRehashed', 'sourceEquivalenceEstablished',
 ]);
 const ALLOWED_PACKAGE_METADATA_KEYS = new Set([
   'packageName', 'packageVersion', 'browserEntry', 'typeEntry', 'evidenceRef', 'topologyBytesAttested',
@@ -156,7 +181,20 @@ export const PROVIDER_RELEASE_EVIDENCE_FR18: readonly ProviderReleaseEvidenceRec
     authorityState: 'research_only' as const,
     limitations: Object.freeze([
       'dependency presence does not establish that the current FaceLab runtime executes MediaPipe geometry extraction',
-      'dependency presence does not attest the bytes or topology exported by the published npm artifact',
+      'dependency presence alone does not attest the bytes or topology exported by the published npm artifact',
+    ]),
+  }),
+  Object.freeze({
+    evidenceRef: 'evidence.fr18.kbeauty.tasks_vision_lock_resolution',
+    evidenceClass: 'consumer_lockfile_resolution' as const,
+    sourceRef: 'github:gycha0109-beep/K_beauty@81c3b4139efdffc785439da005557dc38a6b4873:package-lock.json#blob-2fdca4f4498617f383b9579191415efe0c8e743b',
+    observedValue: 'K_beauty package-lock resolves @mediapipe/tasks-vision 0.10.35 to the npm tasks-vision-0.10.35.tgz tarball with sha512-HOvadwVRE6JC+45nyYhmnywnr5h/J8KZvOeUNVOG9q/0875pZgItznFB9bRTvLc264YSJqiZ1NsIpCStJw/egg==',
+    verificationState: 'repository_exact' as const,
+    authorityState: 'research_only' as const,
+    limitations: Object.freeze([
+      'the lockfile cryptographically identifies the consumer-resolved tarball expectation but FR-18 did not independently fetch and rehash those registry bytes',
+      'tarball integrity does not establish which upstream git source/build invocation produced the published artifact',
+      'tarball integrity does not by itself attest the topology exported by vision_bundle.mjs',
     ]),
   }),
   Object.freeze({
@@ -168,7 +206,7 @@ export const PROVIDER_RELEASE_EVIDENCE_FR18: readonly ProviderReleaseEvidenceRec
     authorityState: 'research_only' as const,
     limitations: Object.freeze([
       'package metadata proves package identity and entry points only',
-      'FR-18 has not captured a cryptographic digest or source-map provenance linking published bundle topology bytes to an upstream source commit',
+      'FR-18 has not captured source-map/build provenance linking published bundle topology bytes to an upstream source commit',
     ]),
   }),
   Object.freeze({
@@ -191,7 +229,7 @@ export const PROVIDER_RELEASE_EVIDENCE_FR18: readonly ProviderReleaseEvidenceRec
     authorityState: 'research_only' as const,
     limitations: Object.freeze([
       'named source symbols do not define the capture pipeline mirror transform',
-      'this source snapshot is not yet proven byte-exact to the published npm 0.10.35 bundle',
+      'this source snapshot is not yet proven source/build-equivalent to the published npm 0.10.35 tarball or bundle',
     ]),
   }),
 ]);
@@ -225,7 +263,7 @@ const LATERALITY_SYMBOLS_FR18: readonly ProviderLateralitySymbolV1[] = Object.fr
 
 export const PROVIDER_RELEASE_ATTESTATION_FR18: ProviderReleaseAttestationFR18V1 = Object.freeze({
   schemaVersion: 'v1' as const,
-  attestationVersion: '0.1.0',
+  attestationVersion: '0.2.0',
   authorityState: 'research_only' as const,
   providerKey: 'mediapipe_tasks_vision' as const,
   consumerDependency: Object.freeze({
@@ -236,6 +274,21 @@ export const PROVIDER_RELEASE_ATTESTATION_FR18: ProviderReleaseAttestationFR18V1
     packageName: '@mediapipe/tasks-vision' as const,
     packageVersion: '0.10.35' as const,
     evidenceRef: 'evidence.fr18.kbeauty.tasks_vision_dependency',
+  }),
+  consumerArtifactLock: Object.freeze({
+    repository: 'gycha0109-beep/K_beauty' as const,
+    repositoryCommit: '81c3b4139efdffc785439da005557dc38a6b4873',
+    lockfilePath: 'package-lock.json' as const,
+    lockfileBlobSha: '2fdca4f4498617f383b9579191415efe0c8e743b',
+    packageName: '@mediapipe/tasks-vision' as const,
+    packageVersion: '0.10.35' as const,
+    resolvedTarballUrl: 'https://registry.npmjs.org/@mediapipe/tasks-vision/-/tasks-vision-0.10.35.tgz' as const,
+    integrityAlgorithm: 'sha512' as const,
+    integrity: 'sha512-HOvadwVRE6JC+45nyYhmnywnr5h/J8KZvOeUNVOG9q/0875pZgItznFB9bRTvLc264YSJqiZ1NsIpCStJw/egg==' as const,
+    evidenceRef: 'evidence.fr18.kbeauty.tasks_vision_lock_resolution',
+    artifactIdentityState: 'consumer_lockfile_attested' as const,
+    tarballBytesIndependentlyRehashed: false as const,
+    sourceEquivalenceEstablished: false as const,
   }),
   publishedPackageMetadata: Object.freeze({
     packageName: '@mediapipe/tasks-vision' as const,
@@ -271,6 +324,7 @@ export const PROVIDER_RELEASE_ATTESTATION_FR18: ProviderReleaseAttestationFR18V1
   providerActivationAllowed: false as const,
   prohibitedPromotions: Object.freeze([
     'development_version_snapshot_to_release_exact',
+    'consumer_lockfile_integrity_to_source_equivalence',
     'provider_left_right_symbol_to_image_x_order',
     'selfie_preview_orientation_to_canonical_orientation',
     'package_dependency_presence_to_runtime_geometry_authority',
@@ -323,13 +377,44 @@ export function validateProviderReleaseAttestationFR18(
     throw new FaceAuthorityValidationError('FR-18 consumer dependency evidenceRef is unresolved.');
   }
 
+  exactKeys(attestation.consumerArtifactLock, ALLOWED_ARTIFACT_LOCK_KEYS, 'FR-18 consumerArtifactLock');
+  commitSha(attestation.consumerArtifactLock.repositoryCommit, 'fr18.consumerArtifactLock.repositoryCommit');
+  commitSha(attestation.consumerArtifactLock.lockfileBlobSha, 'fr18.consumerArtifactLock.lockfileBlobSha');
+  if (attestation.consumerArtifactLock.repository !== attestation.consumerDependency.repository ||
+      attestation.consumerArtifactLock.repositoryCommit !== attestation.consumerDependency.repositoryCommit ||
+      attestation.consumerArtifactLock.packageName !== attestation.consumerDependency.packageName ||
+      attestation.consumerArtifactLock.packageVersion !== attestation.consumerDependency.packageVersion) {
+    throw new FaceAuthorityValidationError('FR-18 consumer artifact lock must match the exact pinned consumer dependency.');
+  }
+  if (attestation.consumerArtifactLock.lockfilePath !== 'package-lock.json' ||
+      attestation.consumerArtifactLock.lockfileBlobSha !== '2fdca4f4498617f383b9579191415efe0c8e743b') {
+    throw new FaceAuthorityValidationError('FR-18 consumer artifact lock must pin the inspected K_beauty package-lock exactly.');
+  }
+  if (attestation.consumerArtifactLock.resolvedTarballUrl !== 'https://registry.npmjs.org/@mediapipe/tasks-vision/-/tasks-vision-0.10.35.tgz') {
+    throw new FaceAuthorityValidationError('FR-18 consumer artifact lock tarball URL mismatch.');
+  }
+  if (attestation.consumerArtifactLock.integrityAlgorithm !== 'sha512' ||
+      !SHA512_SRI.test(attestation.consumerArtifactLock.integrity) ||
+      attestation.consumerArtifactLock.integrity !== 'sha512-HOvadwVRE6JC+45nyYhmnywnr5h/J8KZvOeUNVOG9q/0875pZgItznFB9bRTvLc264YSJqiZ1NsIpCStJw/egg==') {
+    throw new FaceAuthorityValidationError('FR-18 consumer artifact lock integrity must match the inspected package-lock sha512 SRI exactly.');
+  }
+  if (attestation.consumerArtifactLock.artifactIdentityState !== 'consumer_lockfile_attested' ||
+      attestation.consumerArtifactLock.tarballBytesIndependentlyRehashed !== false ||
+      attestation.consumerArtifactLock.sourceEquivalenceEstablished !== false) {
+    throw new FaceAuthorityValidationError('FR-18 consumer artifact identity must remain lockfile-attested without independent rehash/source equivalence.');
+  }
+  const artifactEvidence = evidenceByRef(attestation.consumerArtifactLock.evidenceRef);
+  if (artifactEvidence?.evidenceClass !== 'consumer_lockfile_resolution' || artifactEvidence.verificationState !== 'repository_exact') {
+    throw new FaceAuthorityValidationError('FR-18 consumer artifact lock evidenceRef must resolve to repository-exact lockfile evidence.');
+  }
+
   exactKeys(attestation.publishedPackageMetadata, ALLOWED_PACKAGE_METADATA_KEYS, 'FR-18 publishedPackageMetadata');
   if (attestation.publishedPackageMetadata.packageName !== attestation.consumerDependency.packageName ||
       attestation.publishedPackageMetadata.packageVersion !== attestation.consumerDependency.packageVersion) {
     throw new FaceAuthorityValidationError('FR-18 published package metadata must match the pinned consumer dependency.');
   }
   if (attestation.publishedPackageMetadata.topologyBytesAttested !== false) {
-    throw new FaceAuthorityValidationError('FR-18 v0.1 has no published bundle topology-byte attestation.');
+    throw new FaceAuthorityValidationError('FR-18 has no published bundle topology-byte attestation.');
   }
   if (evidenceByRef(attestation.publishedPackageMetadata.evidenceRef) === null) {
     throw new FaceAuthorityValidationError('FR-18 package metadata evidenceRef is unresolved.');
@@ -375,12 +460,15 @@ export function validateProviderReleaseAttestationFR18(
   }
 
   if (attestation.publishedBundleTopologyEvidenceRef !== null || attestation.releaseExactState !== 'unresolved') {
-    throw new FaceAuthorityValidationError('FR-18 v0.1 release-exact topology provenance remains unresolved.');
+    throw new FaceAuthorityValidationError('FR-18 release-exact topology provenance remains unresolved despite the consumer lockfile artifact identity.');
   }
   if (attestation.providerActivationAllowed !== false) {
     throw new FaceAuthorityValidationError('FR-18 provider activation must remain blocked while release exactness/laterality are unresolved.');
   }
-  if (attestation.prohibitedPromotions.length !== 4) throw new FaceAuthorityValidationError('FR-18 prohibited promotion set is incomplete.');
+  if (attestation.prohibitedPromotions.length !== 5 ||
+      !attestation.prohibitedPromotions.includes('consumer_lockfile_integrity_to_source_equivalence')) {
+    throw new FaceAuthorityValidationError('FR-18 prohibited promotion set is incomplete.');
+  }
   return attestation;
 }
 
@@ -390,12 +478,14 @@ export function assessProviderReleaseAttestationReadinessFR18(
   validateProviderReleaseAttestationFR18(attestation);
   return Object.freeze({
     productionReady: false,
+    artifactIdentityState: 'consumer_lockfile_attested' as const,
     releaseExactState: 'unresolved' as const,
     lateralityState: 'unresolved' as const,
     blockers: Object.freeze([
-      'published npm 0.10.35 bundle topology bytes are not cryptographically/provenance-attested to the inspected upstream source snapshot',
+      'K_beauty now pins the npm 0.10.35 tarball URL and sha512 SRI, but FR-18 did not independently fetch/re-hash the published tarball bytes',
+      'published npm 0.10.35 bundle topology bytes remain unlinked to an authoritative source/build provenance chain',
       'the upstream 0.10.35 version-bump commit is a development source snapshot rather than sufficient npm publication provenance',
-      'capture/selfie mirroring and canonical orientation contract is unresolved',
+      'capture/selfie mirroring and canonical orientation contract is unresolved for ordinary file upload',
       'image-space x ordering cannot be used as anatomical left/right authority',
       'current K_beauty FaceLab runtime still does not establish MediaPipe neutral geometry as its canonical observation authority',
     ]),
