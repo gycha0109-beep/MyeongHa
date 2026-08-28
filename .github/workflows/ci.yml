@@ -106,6 +106,19 @@ jobs:
             PGDATABASE="$device_db" psql -v ON_ERROR_STOP=1 -f "$migration" >/dev/null
           done
           PGDATABASE="$device_db" bash test/db/device_installation_revoke_concurrency.sh
+      - name: Run Profile patch persistence/concurrency tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          profile_db=myeongha_profile_patch_test
+          createdb "$profile_db"
+          trap 'dropdb --if-exists "$profile_db"' EXIT
+          PGDATABASE="$profile_db" psql -v ON_ERROR_STOP=1 -f test/db/bootstrap_supabase_auth_stub.sql
+          for migration in supabase/migrations/*.sql; do
+            echo "Applying ${migration} to isolated Profile patch test DB"
+            PGDATABASE="$profile_db" psql -v ON_ERROR_STOP=1 -f "$migration" >/dev/null
+          done
+          PGDATABASE="$profile_db" bash test/db/profile_patch_concurrency.sh
       - name: Run birth revision append persistence/concurrency tests
         run: bash test/db/birth_revision_append_concurrency.sh
       - name: Run reading session create persistence/concurrency tests
