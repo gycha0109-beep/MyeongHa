@@ -1,10 +1,10 @@
-# 명하 DB DDL / Migration Specification v0.3 — Full Audit
+# 명하 DB DDL / Migration Specification v0.4 — Source Aligned
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.3**  
-> Date: **2026-08-25**  
+> Pack Version: **v0.4**  
+> Date: **2026-08-28**  
 > Source Authority: `Usecase_re_reviewed_v2(1).md`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`, `Myeonghwa_Personalized_Interpretation_Architecture_v1.3_THIRD_REVIEW(1).md`  
-> Rule: source가 결정하지 않은 implementation-critical 사항은 `OPEN-P0`, 비차단 선택은 `CANDIDATE`, source 간 충돌은 `SOURCE_AUTHORITY_GAPS.md`에 기록한다.
+> Rule: source가 결정하지 않은 implementation-critical 사항은 `OPEN-P0` 또는 `SOURCE_AUTHORITY_GAPS.md`에 남긴다.
 
 ---
 
@@ -21,6 +21,7 @@ ERD v0.6의 59-table schema catalog를 PostgreSQL migration으로 옮길 때 필
 - `SRC-06` standalone Birth/Target deletion vs Reading provenance가 해결되기 전 deletion DDL을 complete로 승격하지 않는다.
 - `SRC-07` manual commerce resolution은 source 해결 전 DDL이 존재하더라도 production-disabled로 유지한다.
 - `SRC-09`가 해결되기 전 `reading_groundings.qualifiers/prohibited_inferences`를 실제 Saju public contract에서 온 authoritative metadata라고 간주하지 않는다. table DDL draft는 가능하지만 grounding semantic baseline은 승격 금지다.
+- `SRC-18`이 해결되기 전 purchased product를 concrete entitlement grant로 변환하는 mapping schema/registry/table을 Pack이 임의로 추가하지 않는다. Existing commerce provenance/grant tables의 DDL은 가능하지만 purchase→grant semantic pipeline을 complete로 승격하지 않는다.
 - `P0-AUTH-01` RLS execution identity가 결정되기 전에는 RLS policy SQL을 **candidate**로만 작성하고 production security baseline으로 승격하지 않는다.
 
 ## 3. Migration Layout
@@ -159,6 +160,8 @@ data deletion lifecycle
 content release activation/retirement
 ```
 
+Source gap이 있는 command는 shell/table existence만으로 production-complete로 취급하지 않는다. 특히 episode transition evaluator는 `SRC-17`, purchase-derived entitlement apply는 `SRC-18`을 따른다.
+
 ## 10. Append-only / Immutable Policy
 
 Append-only semantics:
@@ -202,6 +205,8 @@ hmac-sha256:k2:<hex>
 
 low-entropy personal/token/receipt/account identifiers는 keyed/versioned HMAC 우선. Hash는 anonymization이 아니다.
 
+Purchase Intent `offer_snapshot_hash`는 source-defined version-prefixed digest field이지만 source가 canonical JSON serialization/hash algorithm을 PostgreSQL contract로 정의하지 않는다. Service boundary가 canonicalization을 소유하며 DB command는 supplied immutable snapshot/hash consistency contract를 검증한다.
+
 ## 13. JSON Contract Validation
 
 JSONB column이 `validated`라고 적혀 있으면 실제 validator source가 있어야 한다.
@@ -219,7 +224,9 @@ JSONB column이 `validated`라고 적혀 있으면 실제 validator source가 �
 - development constants
 - explicitly approved product stable identities
 
-캐릭터 persona/canon authoring은 seed SQL이 아니라 content publish pipeline. Product fulfillment definitions는 versioned contract registry authority이며 display metadata seed와 혼합하지 않는다.
+캐릭터 persona/canon authoring은 seed SQL이 아니라 content publish pipeline.
+
+Product→entitlement mapping은 `SRC-18` 미해결이므로 invented `ProductFulfillmentDefinition` registry나 equivalent mapping seed를 source authority라고 추가하지 않는다. Source가 mapping model을 정한 뒤에만 해당 artifact/table/seed policy를 DDL spec에 추가한다.
 
 ## 15. Schema Catalog Diff
 
@@ -265,11 +272,12 @@ ERD v0.6 section 23 + v0.2 추가 findings를 최소 gate로 사용.
 - standalone target/birth privacy deletion dependency graph (`SRC-06` resolution)
 - manual commerce provider resolution has audited proof or remains disabled (`SRC-07`)
 - reading_groundings guard metadata is source-backed rather than fabricated (`SRC-09`)
+- no invented product→entitlement mapping schema/registry before `SRC-18` resolution
 
 ## 18. Promotion Gate
 
 ```text
-source blocker relevant to schema = CLOSED
+source blocker relevant to schema/command = CLOSED or affected feature explicitly disabled
 → DDL clean apply
 → migration replay/catalog hash PASS
 → schema catalog diff = 0

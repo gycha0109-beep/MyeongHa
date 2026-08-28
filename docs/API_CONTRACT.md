@@ -338,7 +338,7 @@ POST /api/commerce/receipts/verify
 POST /api/commerce/restore
 ```
 
-`OPEN-P0: P0-CM-01`. Purchase Intent snapshot은 provider offer뿐 아니라 provider-independent fulfillment definition version/hash도 pin한다.
+Purchase Intent는 ERD source가 정의한 immutable minimal offer mapping snapshot과 version-prefixed digest를 pin한다. Provider/platform 결제 rail은 `OPEN-P0: P0-CM-01`이다. Verified product/receipt를 어떤 `entitlement_key`/scope/grant로 변환하는지는 source가 정의하지 않아 `SRC-18`이 OPEN이다. 따라서 receipt verification/restore endpoint의 provenance ingest는 설계할 수 있지만 **purchase → entitlement grant apply** 단계를 source-backed production authority로 확정하지 않는다.
 
 ## 17. Account / Deletion
 
@@ -395,3 +395,5 @@ POST /api/admin/threads/:id/content-transition   # governed migration only
 - account deletion command
 - admin release authorization
 - old client capability fallback
+- purchase intent minimal offer mapping snapshot + idempotency
+- purchase→entitlement grant apply remains blocked until `SRC-18` resolution

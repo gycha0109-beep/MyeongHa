@@ -1,8 +1,8 @@
-# 명하 Server Command / Transaction Specification v0.3
+# 명하 Server Command / Transaction Specification v0.4
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.3**  
-> Date: **2026-08-25**  
+> Pack Version: **v0.4**  
+> Date: **2026-08-28**  
 > Persistence Authority: `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`  
 > API Authority: `API_CONTRACT.md`
 
@@ -229,6 +229,8 @@ lock user_episode_progress
 → commit
 ```
 
+`SRC-17` 해결 전 scene graph/condition/choice evaluator가 필요한 실제 start/advance write authority는 final production command로 승격하지 않는다.
+
 ## 15. Reading Session / Clarification
 
 Create session:
@@ -285,13 +287,35 @@ lock/read succeeded reading_ref
 
 LLM semantic creation 없음.
 
-## 18. Commerce Source Apply
+## 18. Commerce Commands
+
+### 18.1 Purchase Intent Create — source-complete baseline
 
 ```text
-verify external source outside/at provider boundary
-→ resolve canonical subject + pinned purchase fulfillment
+resolve active member subject
+→ replay existing subject + idempotency key before current availability checks
+→ validate selected product + offer availability for new intent
+→ validate optional provider account link owner/provider/status
+→ validate exact immutable minimal offer mapping snapshot
+→ insert purchase_intent
+→ commit
+```
+
+Purchase Intent create does **not** call a provider and does not create receipt/provider event/entitlement rows.
+
+### 18.2 Provider Source Provenance
+
+Provider verification happens outside the DB transaction or at a dedicated provider boundary. Verified results may be persisted as source-defined receipt/provider-event provenance with dedupe and ownership constraints.
+
+### 18.3 Purchase Source → Entitlement Apply — blocked by `SRC-18`
+
+ERD defines the transaction skeleton after a grant target is known:
+
+```text
+verified receipt/provider event
+→ resolve subject + grant_key
 → lock grant(s) deterministic order
-→ dedupe receipt/provider event
+→ reject stale provider order
 → append entitlement event
 → update grant projection
 → recompute logical entitlement
@@ -299,7 +323,16 @@ verify external source outside/at provider boundary
 → commit
 ```
 
-`SRC-07` 해결 전 manual provider-event resolution은 command entry 자체를 production deny.
+However, source does not define purchased `product_id` → `entitlement_key` / scope / grant-key semantics. Therefore Pack must not insert an invented `ProductFulfillmentDefinition` step.
+
+Until `SRC-18` is resolved:
+
+```text
+verified purchase provenance
+→ concrete purchase-derived entitlement grant mutation = BLOCKED
+```
+
+`SRC-07` 해결 전 manual provider-event resolution도 production deny이며, provider rail 자체는 `P0-CM-01` 결정이 필요하다.
 
 ## 19. Notification Delivery Attempt
 
@@ -350,6 +383,9 @@ Publisher는 at-least-once로 동작할 수 있으므로 consumer가 event dedup
 - external timeout → no transaction held open
 - DB commit after external response loss → retry returns existing state
 - chat commit with relationship event → both or neither
-- episode advance with unlock → both or neither
-- commerce grant recompute → ledger/projection atomic
+- episode advance with unlock → both or neither after `SRC-17` resolution
+- Purchase Intent same-key concurrency → one logical intent
+- Purchase Intent replay does not depend on later offer availability
+- purchase provenance → grant apply remains blocked until `SRC-18`
+- commerce grant recompute → ledger/projection atomic after mapping authority exists
 - outbox publisher retry → domain state not duplicated

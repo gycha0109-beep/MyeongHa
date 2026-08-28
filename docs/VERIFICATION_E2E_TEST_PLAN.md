@@ -1,10 +1,10 @@
-# 명하 Verification / E2E Test Plan v0.3 — Full Audit
+# 명하 Verification / E2E Test Plan v0.4 — Source Aligned
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.3**  
-> Date: **2026-08-25**  
+> Pack Version: **v0.4**  
+> Date: **2026-08-28**  
 > Source Authority: `Usecase_re_reviewed_v2(1).md`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`, `Myeonghwa_Personalized_Interpretation_Architecture_v1.3_THIRD_REVIEW(1).md`  
-> Rule: source가 결정하지 않은 implementation-critical 사항은 `OPEN-P0`, 비차단 선택은 `CANDIDATE`, source 간 충돌은 `SOURCE_AUTHORITY_GAPS.md`에 기록한다.
+> Rule: source가 결정하지 않은 implementation-critical 사항은 `OPEN-P0`, 비차단 선택은 `CANDIDATE`, source 간 충돌/공백은 `SOURCE_AUTHORITY_GAPS.md`에 기록한다.
 
 ---
 
@@ -64,6 +64,7 @@ behavior spec
 - migration replay/catalog hash
 - `SRC-01`, `SRC-05`, `SRC-06` schema impacts resolved before relevant final migration baseline
 - `SRC-14` resolved before conversation-delete mutation can be promoted: all durable transcript-bearing columns need governed redaction/tombstone semantics compatible with provenance/immutability constraints
+- no invented commerce product→entitlement mapping schema/registry before `SRC-18` resolution
 
 ## 5. Auth / RLS / Privacy Gate
 
@@ -156,27 +157,45 @@ Provider model quality/eval matrix = `OPEN-P0: P0-AI-01`.
 
 - bundle pin exact
 - content hash/artifact integrity
-- invalid episode graph/node/choice deny
-- episode advance retry once
-- world/relationship side effects atomic
+- invalid episode graph/node/choice deny after `SRC-17` evaluator contract resolution
+- episode advance retry once after `SRC-17` resolution
+- world/relationship side effects atomic after `SRC-17` resolution
 - client capability incompatible content graceful handling
 - existing thread not silently moved by default release change
 - `SRC-01` resolved behavior test: chosen per-character/per-episode operational disable policy or explicit non-requirement
 
 ## 12. Commerce Gate
 
+### Source-complete now
+
 - guest purchase deny
-- unverified/forged receipt no grant
+- active member Purchase Intent create only
+- same idempotency key + same canonical request → one logical intent / replay
+- same key + different request → conflict
+- concurrent Purchase Intent retries converge
+- immutable minimal offer mapping snapshot exact
+- product/offer current availability checked only for new intent, not historical replay
+- provider account link owner/provider/status validation
+- Purchase Intent create produces no receipt/provider-event/entitlement side effects
+- unverified/forged receipt → no grant
 - duplicate receipt/provider event once
 - unresolved provider event no effect
 - cross-user provider source deny
-- offer verified but fulfillment definition missing → deny
-- purchase fulfillment snapshot hash/version immutable
-- resource-scoped product cannot unlock another subject resource
-- overlapping grant recompute
-- expiry immediate deny
-- out-of-order lifecycle event no rollback
-- restore idempotent reconciliation
+- current entitlement projection respects valid grant aggregation/expiry
+
+### Blocked by `SRC-18`
+
+- verified purchased product → exact `entitlement_key` / scope / grant mapping
+- resource-scoped purchase grant resolution
+- historical product→grant mapping replay after mapping changes
+- restore → concrete missing purchase-derived grant reconstruction
+- purchase/provider source → entitlement grant/apply/recompute E2E
+
+Do not require or fabricate `ProductFulfillmentDefinition`, `fulfillmentDefinitionVersion`, normalized grant-definition snapshot, or fulfillment hash as a source-backed PASS condition.
+
+### Additionally gated by `P0-CM-01`
+
+- provider-specific Web / Apple / Google payment, receipt, restore, refund/revoke rail behavior.
 
 ## 13. Notification Gate
 
@@ -228,6 +247,7 @@ Provider model quality/eval matrix = `OPEN-P0: P0-AI-01`.
 - `SRC-08`: real compatibility/domain adapter only enabled against an actual consumable Saju public contract
 - `SRC-09`: explicit guard-metadata invariant not marked CLOSED until source public export exists or source requirement changes
 - `SRC-14`: conversation-delete write remains blocked until duplicate transcript retention/redaction and terminal-attempt immutability semantics are source-resolved
+- `SRC-18`: purchase-derived entitlement mutation remains blocked until product→entitlement mapping authority is source-resolved
 
 ## 15. Engineering Vertical Slice
 
@@ -284,7 +304,8 @@ CI/release evidence:
 - Saju engine/reading contract/grounding versions
 - AI runtime/prompt versions
 - relationship policy version
-- fulfillment definition version when applicable
+- commerce product/offer/Purchase Intent snapshot provenance for implemented commerce slices
+- `SRC-18` status for any purchase→grant/restore evidence
 - test matrix summary + failed invariant IDs
 - source gap/P0 status snapshot
 
@@ -304,4 +325,4 @@ relevant source blockers closed or feature explicitly disabled
 
 ### Production
 
-추가로 enabled feature가 참조하는 P0 decision이 DECIDED이고 store/privacy/age/release runbook이 준비되어야 한다.
+추가로 enabled feature가 참조하는 P0 decision이 DECIDED이고 store/privacy/age/release runbook이 준비되어야 한다. Commerce purchase→grant path는 추가로 `SRC-18`이 source-resolved여야 한다.
