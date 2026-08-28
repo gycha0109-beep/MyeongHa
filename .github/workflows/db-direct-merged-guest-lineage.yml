@@ -1,0 +1,61 @@
+name: DB Direct Merged Guest Lineage
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/migrations/**'
+      - 'test/db/**'
+      - '.github/workflows/db-direct-merged-guest-lineage.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'supabase/migrations/**'
+      - 'test/db/**'
+      - '.github/workflows/db-direct-merged-guest-lineage.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  direct-merged-guest-lineage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: myeongha_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d myeongha_test"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: myeongha_test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Bootstrap Supabase auth test fixture
+        run: psql -v ON_ERROR_STOP=1 -f test/db/bootstrap_supabase_auth_stub.sql
+      - name: Apply clean migrations
+        shell: bash
+        run: |
+          set -euo pipefail
+          for migration in supabase/migrations/*.sql; do
+            echo "Applying ${migration}"
+            psql -v ON_ERROR_STOP=1 -f "$migration" >/dev/null
+          done
+      - name: Run direct merged guest lineage projection tests
+        run: bash test/db/direct_merged_guest_lineage_query.sh
+      - name: Verify deterministic schema catalog snapshot
+        run: bash test/db/catalog_snapshot.sh
