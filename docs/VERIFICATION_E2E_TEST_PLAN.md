@@ -1,7 +1,7 @@
-# 명하 Verification / E2E Test Plan v0.7 — Source Aligned
+# 명하 Verification / E2E Test Plan v0.8 — Source Aligned
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.7**  
+> Pack Version: **v0.8**  
 > Date: **2026-08-28**  
 > Source Authority: `Usecase_re_reviewed_v2(1).md`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`, `Myeonghwa_Personalized_Interpretation_Architecture_v1.3_THIRD_REVIEW(1).md`  
 > Rule: source가 결정하지 않은 implementation-critical 사항은 `OPEN-P0`, 비차단 선택은 `CANDIDATE`, source 간 충돌/공백은 `SOURCE_AUTHORITY_GAPS.md` 또는 numbered source-gap 문서에 기록한다.
@@ -69,12 +69,14 @@ behavior spec
 - no invented Device Installation register/upsert lifecycle before `SRC-19` resolution
 - no invented Share create positive snapshot/token replay schema before `SRC-20` resolution
 - relationship ledger structural constraints remain testable, but no invented relationship policy registry/content-hash column/score-stage evaluator before `SRC-22` resolution
+- World Event/Character Unlock structural constraints remain testable, but no invented unlock condition DSL, World Event→character evaluator, unlock-policy provenance field/table, or reward-effect function before `SRC-23` resolution
 
 ## 5. Auth / RLS / Privacy Gate
 
 `P0-AUTH-01` DECIDED 이후 selected execution model로 실제 RLS test.
 
 - A→B birth/thread/memory/reading/target/device deny
+- A cannot mutate B's relationship/unlock state
 - forged DB subject context/JWT claim deny
 - guest direct DB deny
 - merged history current endpoint deny
@@ -103,6 +105,8 @@ behavior spec
 - Share create는 `SRC-20` 해결 전 production API PASS 대상에서 제외
 - Relationship current projection read
 - authoritative Relationship Event score/stage apply는 `SRC-22` 해결 전 production API/command PASS 대상에서 제외
+- Character Unlock current projection read
+- authoritative Character Unlock eligibility/effect apply는 `SRC-23` 해결 전 production API/command PASS 대상에서 제외
 - account deletion job
 - admin content release authorization
 
@@ -117,6 +121,7 @@ behavior spec
 - participant/bundle mismatch deny
 - output guard fail → no commit/reveal
 - Relationship Event proposal/candidate가 있더라도 `SRC-22` 해결 전 caller/LLM delta 또는 next-stage를 authoritative mutation으로 commit하지 않음
+- Character Unlock candidate/condition가 있더라도 `SRC-23` 해결 전 caller/LLM target, unlock flag, arbitrary condition result 또는 unrelated same-owner World Event를 authoritative unlock proof로 commit하지 않음
 
 ## 8. Saju Gate
 
@@ -137,6 +142,8 @@ Saju repo semantic tests는 별도 authority. 명하에서는:
 - protected-block 밖 free-form Saju generation denied in production baseline
 - protected narrative block ref/hash integrity
 
+A completed Reading may be represented as an authoritative source fact, but Reading completion → concrete Character Unlock mapping is not a PASS condition until `SRC-23` resolves that trigger/effect contract.
+
 ## 9. AI / Character Gate
 
 Deterministic fixtures:
@@ -149,6 +156,7 @@ Deterministic fixtures:
 - protected Saju semantic segment not paraphrased/mutated
 - proposal alone → no authority mutation
 - LLM-proposed relationship delta/stage → never treated as authority
+- LLM-proposed Character Unlock target/result → never treated as authority
 
 Provider model quality/eval matrix = `OPEN-P0: P0-AI-01`.
 
@@ -204,7 +212,59 @@ After resolution, required tests include:
 
 A Pack-invented `RelationshipPolicyDefinitionV1`, caller-supplied delta, or intuitive stage threshold is not a PASS condition.
 
-## 11. Episode / Content Gate
+## 11. Character Unlock / World Event Gate
+
+### Source-complete now
+
+- `world_events` subject ownership and append-only envelope
+- `world_events(subject_id,event_dedupe_key)` uniqueness
+- optional source-turn/content-bundle relational provenance
+- one `character_unlocks` current row per subject-character
+- `status IN ('locked','unlocked')`
+- unlocked → `unlocked_at` present
+- locked → `unlocked_at` absent
+- `revision >= 0`
+- `source_world_event_id` same-subject FK integrity
+- current Character Unlock projection owner-isolated read
+- client direct unlock-state authority denied
+- stored locked/unlocked state can drive Hall silhouette/presentation without re-evaluating an invented condition
+
+These prove representability/current state, not unlock eligibility.
+
+### Blocked by `SRC-23`
+
+Do not promote authoritative Character Unlock mutation until source resolves:
+
+- positive versioned unlock-condition schema/DSL or deterministic equivalent
+- World Event registry/payload schemas used for unlock causality
+- condition/content-bundle → target character mapping
+- condition composition/comparison semantics
+- first-appearance/reward effect mapping
+- already-unlocked/replay behavior
+- concurrent multiple valid trigger behavior and projection revision semantics
+- content-release/bundle migration semantics for locked/unlocked subjects
+- season/operator reveal authority and scope
+- unlock-specific downstream/outbox event contract where required
+
+After resolution, required tests include:
+
+- unknown condition operator/schema → no unlock
+- unknown World Event/schema → no unlock
+- forged same-owner but unrelated World Event → no unlock
+- wrong target character → deny
+- unsatisfied condition → projection unchanged
+- satisfied condition → exactly one logical unlock
+- duplicate trigger → approved replay/no-op result
+- concurrent valid triggers → deterministic one-way projection/revision result
+- relationship-stage trigger uses authoritative `SRC-22` stage rather than caller supplied stage
+- episode-completion trigger uses authoritative episode result and applicable `SRC-17` evaluator
+- Reading trigger validates authoritative completion provenance
+- season/operator trigger validates approved authority/scope
+- unlock projection + required causal/domain/outbox effects commit atomically
+
+The existence of `source_world_event_id` or a content authoring `unlock 조건` field is not by itself a PASS for eligibility/effect evaluation.
+
+## 12. Episode / Content Gate
 
 - bundle pin exact
 - content hash/artifact integrity
@@ -212,12 +272,14 @@ A Pack-invented `RelationshipPolicyDefinitionV1`, caller-supplied delta, or intu
 - episode advance retry once after `SRC-17` resolution
 - world/unlock side effects atomic after applicable source authorities are resolved
 - episode-derived relationship score/stage side effects additionally require `SRC-22`
-- relationship-stage-driven unlock evaluation requires `SRC-22` plus any independently missing World/Content unlock-condition authority
+- concrete Character Unlock reward/effect additionally requires `SRC-23`
+- relationship-stage-driven Character Unlock requires `SRC-22 + SRC-23`
 - client capability incompatible content graceful handling
 - existing thread not silently moved by default release change
+- existing `character_unlocks` projection not silently re-evaluated/re-written merely because default content release changes before `SRC-23` defines migration semantics
 - `SRC-01` resolved behavior test: chosen per-character/per-episode operational disable policy or explicit non-requirement
 
-## 12. Commerce Gate
+## 13. Commerce Gate
 
 ### Source-complete now
 
@@ -272,7 +334,7 @@ A lexical provider-order comparator or intuitive `MAX(valid_until)`/NULL-wins ag
 
 - provider-specific Web / Apple / Google payment, receipt, restore, refund/revoke rail behavior.
 
-## 13. Notification Gate
+## 14. Notification Gate
 
 ### Source-complete now
 
@@ -300,7 +362,7 @@ Do not promote a Device Installation register endpoint until source resolves:
 
 Database uniqueness violations alone are not a registration lifecycle PASS.
 
-## 13A. Share Gate
+## 14A. Share Gate
 
 ### Source-complete now
 
@@ -328,7 +390,7 @@ Do not promote `POST /api/share-artifacts` until source resolves:
 
 A blacklist-only serializer, Pack-invented `ShareArtifactV1`, or plaintext raw-token storage is not a PASS condition.
 
-## 13B. Cost / Quota / Abuse Gate
+## 14B. Cost / Quota / Abuse Gate
 
 - subject/guest rate limit owner resolved server-side
 - client supplied rate-limit owner ignored
@@ -338,8 +400,9 @@ A blacklist-only serializer, Pack-invented `ShareArtifactV1`, or plaintext raw-t
 - multi-character maxTurns/call cap enforced
 - entitlement-required quota deny without effective entitlement
 - relationship/episode farming cannot bypass source-approved domain idempotency/policy; exact relationship anti-farming expectations remain `SRC-22`
+- Character Unlock cannot be farmed or forged through arbitrary World Event/condition input; exact trigger replay/concurrency semantics remain `SRC-23`
 
-## 13C. Analytics / Experiment Gate
+## 14C. Analytics / Experiment Gate
 
 - analytics schema registry/version required
 - raw Birth/chat/Memory/receipt detector PASS
@@ -347,8 +410,9 @@ A blacklist-only serializer, Pack-invented `ShareArtifactV1`, or plaintext raw-t
 - outbox retry dedupes server conversion event
 - stable experiment assignment for same identity/version
 - experiment cannot mutate Saju semantic authority or privacy/entitlement gates
+- `CHARACTER_UNLOCKED` analytics naming must not be silently treated as the authoritative World Event/command contract before `SRC-23` resolves domain event semantics
 
-## 14. Deletion / Lifecycle Gate
+## 15. Deletion / Lifecycle Gate
 
 - conversation delete does not silently delete confirmed Life Fact
 - character forget does not delete unrelated Life Fact
@@ -372,10 +436,11 @@ A blacklist-only serializer, Pack-invented `ShareArtifactV1`, or plaintext raw-t
 - `SRC-20`: Share Artifact create remains blocked; existing public read/revoke remains valid
 - `SRC-21`: Entitlement grant-event transition/aggregate recompute remains blocked; current stored projection read remains valid
 - `SRC-22`: Relationship Event score/stage policy apply remains blocked; relationship relational ledger/current-read envelope remains valid
+- `SRC-23`: Character Unlock condition/effect apply remains blocked; World Event/Character Unlock relational envelope and stored current read remain valid
 
-## 15. Engineering Vertical Slice
+## 16. Engineering Vertical Slice
 
-Source-complete vertical slice may include the current relationship projection read and a non-authoritative Relationship Event proposal/candidate, but must not claim real score/stage progression until `SRC-22` resolves.
+Source-complete vertical slice may include current relationship/unlock projections and non-authoritative candidates, but must not claim real score/stage progression or Character Unlock eligibility/effect evaluation until the relevant gaps resolve.
 
 ```text
 Guest bootstrap
@@ -388,12 +453,13 @@ Guest bootstrap
 → memory proposal
 → session-only/private/character grant branch test
 → relationship candidate / current-state read (`SRC-22` blocks authoritative score-stage apply)
-→ Hall state change only from source-approved state
+→ stored Character Unlock state read/render (`SRC-23` blocks eligibility/effect mutation)
+→ Hall state from stored/source-approved state only
 → signup promotion
 → Web/Mobile continuation
 ```
 
-## 16. Real Saju Slice
+## 17. Real Saju Slice
 
 ```text
 real Saju adapter
@@ -404,7 +470,7 @@ real Saju adapter
 → controlled reveal
 ```
 
-## 17. Failure Injection
+## 18. Failure Injection
 
 - Saju timeout/invalid contract
 - planner timeout/invalid schema
@@ -419,9 +485,9 @@ real Saju adapter
 
 중복 charge/event/message/memory 또는 cross-user leakage 0.
 
-Share create response-loss retry는 `SRC-20` 해결 전 기대 결과를 임의 정의하지 않는다. Device register transport/retry도 `SRC-19` 해결 전 기대 lineage를 임의 정의하지 않는다. Commerce out-of-order source application과 aggregate recompute의 exact result는 `SRC-21` 해결 전 임의 정의하지 않는다. Relationship apply retry/concurrent result 중 policy output(delta/stage/anti-farming)은 `SRC-22` 해결 전 임의 정의하지 않으며, 현재는 relational dedupe/revision invariants만 검증한다.
+Share create response-loss retry는 `SRC-20` 해결 전 기대 결과를 임의 정의하지 않는다. Device register transport/retry도 `SRC-19` 해결 전 기대 lineage를 임의 정의하지 않는다. Commerce out-of-order source application과 aggregate recompute의 exact result는 `SRC-21` 해결 전 임의 정의하지 않는다. Relationship apply retry/concurrent result 중 policy output(delta/stage/anti-farming)은 `SRC-22` 해결 전 임의 정의하지 않으며, 현재는 relational dedupe/revision invariants만 검증한다. Character Unlock response-loss/replay/concurrent trigger의 exact projection/effect result는 `SRC-23` 해결 전 임의 정의하지 않으며, 현재는 stored projection/relational invariants만 검증한다.
 
-## 18. Evidence Artifact
+## 19. Evidence Artifact
 
 CI/release evidence:
 
@@ -433,6 +499,8 @@ CI/release evidence:
 - AI runtime/prompt versions
 - relationship `policy_version` provenance available in current ERD
 - `SRC-22` status for any authoritative relationship score/stage mutation evidence
+- Character Unlock stored projection/source-world-event provenance available in current ERD
+- `SRC-23` status for any authoritative Character Unlock eligibility/effect mutation evidence
 - commerce product/offer/Purchase Intent snapshot provenance for implemented commerce slices
 - `SRC-18` status for product→grant-target evidence
 - `SRC-21` status for grant-event apply/aggregate recompute evidence
@@ -443,7 +511,9 @@ CI/release evidence:
 
 Do not require a relationship policy `contentHash` as current source evidence: ERD v0.6 does not define that persistence field/table. If source later requires stronger policy artifact provenance, `SRC-22` resolution must define it explicitly.
 
-## 19. Promotion Criteria
+Do not invent Character Unlock condition hash/version/bundle provenance fields as current source evidence: ERD v0.6 does not define them. If they are required for deterministic unlock replay/migration, `SRC-23` resolution must define an ERD-compatible contract or explicit ERD revision.
+
+## 20. Promotion Criteria
 
 ### Engineering baseline
 
@@ -466,5 +536,7 @@ Commerce purchase→access enabled → SRC-18 + SRC-21 source-resolved + P0-CM-0
 Device Installation register enabled → SRC-19 source-resolved
 Share Artifact create enabled → SRC-20 source-resolved
 Relationship Event score/stage apply enabled → SRC-22 source-resolved
-relationship-stage-driven unlock enabled → SRC-22 + applicable World/Content unlock-condition authority
+Character Unlock eligibility/effect apply enabled → SRC-23 source-resolved
+relationship-stage-driven Character Unlock enabled → SRC-22 + SRC-23
+episode-driven Character Unlock enabled → applicable SRC-17 + SRC-23
 ```
