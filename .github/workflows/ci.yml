@@ -132,6 +132,19 @@ jobs:
             PGDATABASE="$character_db" psql -v ON_ERROR_STOP=1 -f "$migration" >/dev/null
           done
           PGDATABASE="$character_db" bash test/db/character_bundle_projection_queries.sh
+      - name: Run Character bundle relation projection tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          relation_db=myeongha_character_relation_query_test
+          createdb "$relation_db"
+          trap 'dropdb --if-exists "$relation_db"' EXIT
+          PGDATABASE="$relation_db" psql -v ON_ERROR_STOP=1 -f test/db/bootstrap_supabase_auth_stub.sql
+          for migration in supabase/migrations/*.sql; do
+            echo "Applying ${migration} to isolated Character relation query DB"
+            PGDATABASE="$relation_db" psql -v ON_ERROR_STOP=1 -f "$migration" >/dev/null
+          done
+          PGDATABASE="$relation_db" bash test/db/character_bundle_relations_query.sh
       - name: Run Episode bundle catalog/participant projection tests
         shell: bash
         run: |
