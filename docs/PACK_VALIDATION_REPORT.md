@@ -1,7 +1,7 @@
-# 명하 Spec Pack — Source Authority Validation Report v0.5
+# 명하 Spec Pack — Source Authority Validation Report v0.6
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.5 Source Alignment**  
+> Pack Version: **v0.6 Source Alignment**  
 > Date: **2026-08-28**  
 > Source Authority: `Usecase_re_reviewed_v2(1).md`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`, `Myeonghwa_Personalized_Interpretation_Architecture_v1.3_THIRD_REVIEW(1).md`  
 > Saju Public Contract Audit Pin: `gycha0109-beep/Saju@7102dc8fe8483c0875f6a093a4fd585b0df51f8b`
@@ -44,6 +44,7 @@ Source끼리 직접 충돌하거나 source가 구현 필수 authority를 제공�
 - P0-AUTH-01 unresolved 동안 DB functions use `SECURITY INVOKER` and PUBLIC EXECUTE remains revoked for newly exposed command/query surfaces.
 - Content/canon projections remain explicit bundle-pinned where source does not authorize hidden current selection.
 - Existing source-safe Share public-read/revoke and Device Installation revoke boundaries remain valid even though their inverse create/register workflows are source-blocked.
+- Existing `entitlements` projection/read schema remains valid as a storage/read envelope even though source does not yet define the complete event→grant→aggregate recompute algorithm.
 
 Machine validation values recorded in older reports are historical snapshots; this report does not silently reuse stale counts as evidence for the current repository state. Current CI/action runs are the execution evidence.
 
@@ -66,7 +67,7 @@ The Pack continues to preserve explicit blockers rather than converting ambiguit
 - subject-specific content rollout resolver → `SRC-16`
 - Episode transition evaluator → `SRC-17`
 
-### 4.2 Commerce fulfillment overreach removed — `SRC-18`
+### 4.2 Commerce product→grant mapping overreach removed — `SRC-18`
 
 An earlier Pack revision introduced a `ProductFulfillmentDefinition` contract that does not exist in any of the three primary source-authority documents.
 
@@ -89,21 +90,19 @@ Product Offer immutable provider/platform/external-product/product mapping
 Purchase Intent immutable minimal mapping snapshot + digest
 Receipt/provider-event provenance
 Entitlement grant/event/projection structures
-Entitlement apply transaction skeleton after a grant target is known
+Entitlement transaction skeleton after a grant target is known
 ```
 
 Primary source does **not** define the mapping from a purchased product to the concrete entitlement key/scope/grant semantics. This is `SRC-18`.
 
-Therefore current Pack baseline is:
+Current baseline:
 
 ```text
 Purchase Intent minimal offer mapping snapshot = IMPLEMENTABLE
 verified provider provenance persistence        = schema/provenance boundary implementable
-purchase/provider source → concrete grant       = BLOCKED by SRC-18
+purchased product → concrete grant target       = BLOCKED by SRC-18
 provider-specific commerce rail                 = additionally OPEN-P0 P0-CM-01
 ```
-
-The previous claim that a source-controlled `ProductFulfillmentDefinition` is already authoritative is superseded and must not be used for implementation.
 
 ### 4.3 Device Installation register lifecycle separated — `SRC-19`
 
@@ -148,7 +147,7 @@ explicit opt-in semantics for fields hidden by default
 compatibility/Target Person public representation
 ```
 
-Earlier Pack text added `share create → idempotencyKey` even though Use Case §21.1's explicit idempotency-required write list does not include Share create. Removing that invented requirement does **not** make Share create non-idempotent; the create/retry model itself is unresolved and is now `SRC-20`.
+Earlier Pack text added `share create → idempotencyKey` even though Use Case §21.1's explicit idempotency-required write list does not include Share create. Removing that invented requirement does **not** make Share create non-idempotent; the create/retry model itself is unresolved and is `SRC-20`.
 
 Current baseline:
 
@@ -160,7 +159,83 @@ owner-scoped revoke                          = SOURCE-COMPLETE
 POST /api/share-artifacts create workflow    = BLOCKED by SRC-20
 ```
 
-The Pack must not close SRC-20 with a blacklist-only serializer, invented `ShareArtifactV1`, plaintext raw-token storage, or arbitrary default expiry.
+### 4.5 Entitlement event-apply / aggregate recompute overreach separated — `SRC-21`
+
+A follow-up audit found a second commerce source gap independent of `SRC-18`.
+
+ERD v0.6 defines:
+
+```text
+entitlement_grants
+- status
+- valid_from / valid_until
+- revision
+- last_effective_at
+- last_provider_ordering_key
+
+entitlement_events
+- event_type = granted | renewed | expired | revoked | restored | adjusted
+- effective_at
+- provider_ordering_key
+- payload_jsonb
+
+entitlements
+- status
+- active_grant_count
+- effective_valid_until
+- revision
+```
+
+It also defines the transaction skeleton:
+
+```text
+verified source
+→ resolve subject + grant_key
+→ lock/upsert grant
+→ reject stale provider order
+→ append entitlement_event
+→ update grant projection
+→ recompute logical entitlement from ALL valid grants
+→ outbox
+```
+
+But source does **not** define the executable semantics required to implement that skeleton:
+
+```text
+event_type → exact grant status/validity transition
+payload_jsonb schema per event type
+provider_ordering_key comparison semantics
+exact definition of a currently valid grant
+future valid_from behavior
+effective_valid_until aggregation across multiple finite grants
+finite + unbounded grant aggregation
+recompute evaluation timestamp/no-op policy
+logical entitlement create/update/revision rules
+outbox event contract for the recompute
+```
+
+The existing commerce negative test does not prove these semantics. It directly updates `entitlement_grants` and `entitlements` to simulate one overlapping-grant outcome, so it verifies relational representability rather than a source-authoritative recompute command.
+
+Therefore:
+
+```text
+SRC-18 = purchased Product → entitlement/grant target mapping
+SRC-21 = already-targeted event → grant transition → logical entitlement aggregation
+```
+
+One does not close the other.
+
+Current baseline:
+
+```text
+entitlement grant/event/projection relational envelope = SOURCE-COMPLETE
+verified-source relational provenance constraints       = SOURCE-COMPLETE
+current stored entitlement read                         = SOURCE-COMPLETE
+production event-apply/recompute mutation               = BLOCKED by SRC-21
+purchase-derived event-apply additionally               = BLOCKED by SRC-18
+```
+
+The Pack must not infer `max(valid_until)`, treat NULL expiry as unbounded without source approval, ignore future `valid_from`, compare opaque provider ordering keys lexically, or invent event payload transition semantics.
 
 ## 5. Current Saju Public Contract Boundary
 
@@ -177,7 +252,7 @@ The Pack does not fabricate second-Birth compatibility input or semantic guard f
 
 ## 6. Source-Complete Validation Boundaries
 
-### Commerce after `SRC-18`
+### Commerce with `SRC-18` and `SRC-21` open
 
 Source-complete verification may assert:
 
@@ -190,15 +265,23 @@ Source-complete verification may assert:
 - provider account link owner/provider/status checks;
 - no receipt/provider-event/entitlement side effects from Purchase Intent create;
 - receipt/provider event relational provenance/dedupe constraints;
-- current entitlement projection from already-authoritative grants.
+- grant/event/projection relational ownership and immutability constraints;
+- current stored entitlement projection read;
+- overlapping-grant relational shape can be represented.
 
-It must **not** claim exact purchased product → entitlement key/scope/grant mapping or restore grant reconstruction is source-complete before `SRC-18` resolution.
+It must **not** claim the following as source-complete:
 
-### Device after `SRC-19`
+- purchased product → entitlement key/scope/grant mapping before `SRC-18`;
+- event type → exact grant mutation before `SRC-21`;
+- provider-order stale comparison before `SRC-21`;
+- `active_grant_count` / `effective_valid_until` recompute before `SRC-21`;
+- restore → concrete missing grant reconstruction before both applicable gaps are resolved.
+
+### Device with `SRC-19` open
 
 Current verification may assert schema uniqueness, ownership denial, standalone revoke idempotency, and revoked-delivery exclusion. It must not claim registration retry/token-rotation/re-registration lineage is source-complete before `SRC-19` resolution.
 
-### Share after `SRC-20`
+### Share with `SRC-20` open
 
 Current verification may assert public token fingerprint lookup, active/unexpired stored-snapshot read, private Reading denial, owner revoke, immutable stored snapshot/token identity, and account-deletion revocation. It must not claim Share create serialization/retry/token-response/expiry semantics are source-complete before `SRC-20` resolution.
 
@@ -215,11 +298,12 @@ Current production decisions include:
 | `P0-PR-01` | retention / backup / legal retention |
 | `P0-AUTH-01` | API→PostgreSQL execution identity / RLS enforcement model |
 
-`P0-CM-01` and `SRC-18` are independent:
+Commerce blockers are independent layers:
 
 ```text
 P0-CM-01 = which provider/platform rail is used
-SRC-18    = what entitlement a verified purchased product authoritatively grants
+SRC-18    = what entitlement/grant target a purchased product maps to
+SRC-21    = how an authoritative event mutates a grant and recomputes logical entitlement
 ```
 
 Source-gap decisions `SRC-19` and `SRC-20` are likewise independent of infrastructure/provider P0 choices.
@@ -243,8 +327,11 @@ relevant source gap closed or affected behavior explicitly disabled
 Specific promotion boundaries:
 
 ```text
+provider-independent entitlement event apply/recompute
+→ SRC-21 resolution + transition/aggregation/concurrency evidence
+
 full purchase→entitlement path
-→ P0-CM-01 + SRC-18 resolution + provider/restore evidence
+→ P0-CM-01 + SRC-18 + SRC-21 resolution + provider/restore evidence
 
 Device Installation register/re-register
 → SRC-19 resolution + concurrency/rotation evidence
@@ -265,4 +352,4 @@ FINAL PRODUCTION BASELINE = BLOCKED WHERE SOURCE/P0 REMAINS OPEN
 
 ### Final statement
 
-> Pack은 source authority를 구현 가능하게 구체화하는 문서이지 source에 없는 product semantics를 발명하는 authority가 아니다. 현재 `SRC-18`은 purchase→entitlement mapping, `SRC-19`는 Device Installation registration lifecycle, `SRC-20`은 Share Artifact create/public projection lifecycle을 각각 fail-closed로 분리한다. 이미 source-complete한 Purchase Intent, Device revoke, Share public-read/revoke 경계는 이 blocker들과 독립적으로 유지한다.
+> Pack은 source authority를 구현 가능하게 구체화하는 문서이지 source에 없는 product semantics를 발명하는 authority가 아니다. 현재 commerce는 `SRC-18` Product→grant mapping과 `SRC-21` event→grant→logical-entitlement aggregation을 독립적으로 fail-closed 처리한다. `SRC-19`는 Device Installation registration lifecycle, `SRC-20`은 Share Artifact create/public projection lifecycle을 각각 차단한다. 이미 source-complete한 Purchase Intent, current stored Entitlement read, Device revoke, Share public-read/revoke 경계는 이 blocker들과 독립적으로 유지한다.

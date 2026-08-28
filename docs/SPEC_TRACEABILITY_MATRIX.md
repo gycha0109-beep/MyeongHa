@@ -1,7 +1,7 @@
-# 명하 Specification Traceability Matrix v0.6
+# 명하 Specification Traceability Matrix v0.7
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.6**  
+> Pack Version: **v0.7**  
 > Date: **2026-08-28**  
 > Authority: `Usecase_re_reviewed_v2(1).md`의 UC-01~UC-34(UC-16A 포함)  
 > Rule: Use Case가 implementation spec과 verification gate에 연결되지 않으면 구현 완료로 간주하지 않는다.
@@ -53,8 +53,8 @@ COVERED-SOURCE-GAP
 | UC-23 | 기기 전환/동일 세계 | `WEB_MOBILE_CLIENT_ARCHITECTURE`, `API_CONTRACT`, `AUTH_RLS_PRIVACY`, `NOTIFICATION_RETURN_LOOP` | §6 API, §13 Notification, §15 Vertical Slice | COVERED-SOURCE-GAP (`SRC-19` blocks authoritative device register/re-register/token-rotation lifecycle; revoke baseline available) |
 | UC-24 | Admin 신규 캐릭터 publish | `CHARACTER_WORLD_CONTENT`, `API_CONTRACT`, `RELEASE_OBSERVABILITY` | §11 Content, §19 Promotion | COVERED-SOURCE-GAP (`SRC-01` affects per-character operational override only) |
 | UC-25 | Admin episode release | `CHARACTER_WORLD_CONTENT`, `API_CONTRACT`, `RELEASE_OBSERVABILITY` | §11 Content, §19 Promotion | COVERED-SOURCE-GAP (`SRC-01` affects per-episode operational override only) |
-| UC-26 | 유료 Reading/content 구매 | `COMMERCE_ENTITLEMENT`, `API_CONTRACT`, `SHARED_DOMAIN_CONTRACTS`, `COST_QUOTA_ABUSE` | §12 Commerce | COVERED-SOURCE-GAP (`SRC-18` product→entitlement mapping; provider rail additionally `P0-CM-01`) |
-| UC-27 | entitlement restore | `COMMERCE_ENTITLEMENT`, `API_CONTRACT` | §12 Commerce | COVERED-SOURCE-GAP (`SRC-18` grant reconstruction semantics; provider rail additionally `P0-CM-01`) |
+| UC-26 | 유료 Reading/content 구매 | `COMMERCE_ENTITLEMENT`, `API_CONTRACT`, `SHARED_DOMAIN_CONTRACTS`, `COST_QUOTA_ABUSE` | §12 Commerce | COVERED-SOURCE-GAP (`SRC-18` product→grant target + `SRC-21` event apply/aggregate projection; provider rail additionally `P0-CM-01`) |
+| UC-27 | entitlement restore | `COMMERCE_ENTITLEMENT`, `API_CONTRACT` | §12 Commerce | COVERED-SOURCE-GAP (`SRC-18` historical source→grant target + `SRC-21` restore event/aggregate transition; provider rail additionally `P0-CM-01`) |
 | UC-28 | notification controls/privacy | `NOTIFICATION_RETURN_LOOP`, `API_CONTRACT`, `WEB_MOBILE_CLIENT_ARCHITECTURE` | §13 Notification | COVERED-SOURCE-GAP (`SRC-12` missing-row/default/materialization authority) |
 | UC-29 | unsupported Saju fail-closed | `SAJU_INTEGRATION`, `AI_CHARACTER_RUNTIME`, `API_CONTRACT` | §8 Saju, §9 AI | COVERED |
 | UC-30 | Birth 수정/revision/stale | `API_CONTRACT`, `SAJU_INTEGRATION`, `DB_DDL_MIGRATION` | §4 DB, §6 API, §8 Saju | COVERED |
@@ -81,7 +81,8 @@ COVERED-SOURCE-GAP
 | notification inbox status membership | `NOTIFICATION_RETURN_LOOP`, `API_CONTRACT`, `SOURCE_AUTHORITY_GAPS.md` (`SRC-13`) | inbox projection gate blocked pending source resolution |
 | conversation delete duplicate transcript redaction | `API_CONTRACT`, `AUTH_RLS_PRIVACY_SPEC.md`, `SOURCE_AUTHORITY_GAPS.md` (`SRC-14`) | message + turn request snapshot + attempt generated payload redaction/tombstone gate blocked pending source resolution |
 | commerce Purchase Intent minimal offer mapping snapshot | `API_CONTRACT`, `COMMERCE_ENTITLEMENT`, ERD v0.6 | Purchase Intent create/idempotency/concurrency gate |
-| purchased product → entitlement mapping authority | `SOURCE_AUTHORITY_GAPS` (`SRC-18`), `COMMERCE_ENTITLEMENT` | purchase/restore grant-apply gate blocked pending source resolution |
+| purchased product → grant target authority | `SOURCE_AUTHORITY_GAPS` (`SRC-18`), `COMMERCE_ENTITLEMENT` | purchase/restore grant-target resolution gate blocked pending source resolution |
+| entitlement grant event transition + logical aggregate authority | `SOURCE_AUTHORITY_GAPS` (`SRC-21`), `COMMERCE_ENTITLEMENT`, `SERVER_COMMAND_TRANSACTION_SPEC` | event-type transition/stale-order/valid-grant predicate/active-count/effective-expiry/revision/outbox gate blocked pending source resolution |
 | device installation register/re-register lifecycle | `NOTIFICATION_RETURN_LOOP`, `API_CONTRACT`, `SOURCE_AUTHORITY_GAPS` (`SRC-19`) | register/re-register/token-rotation/row-lineage gate blocked; standalone owner revoke remains testable |
 | Share Artifact create/public projection authority | `API_CONTRACT`, `AUTH_RLS_PRIVACY`, `SOURCE_AUTHORITY_GAPS` (`SRC-20`) | positive snapshot allowlist + Reading eligibility + retry/raw-token/expiry create gate blocked; public read + revoke remain testable |
 | transactional outbox | `DB_DDL_MIGRATION`, `RELEASE_OBSERVABILITY` | failure/recovery tests |

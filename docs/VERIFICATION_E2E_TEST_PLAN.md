@@ -1,7 +1,7 @@
-# 명하 Verification / E2E Test Plan v0.5 — Source Aligned
+# 명하 Verification / E2E Test Plan v0.6 — Source Aligned
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.5**  
+> Pack Version: **v0.6**  
 > Date: **2026-08-28**  
 > Source Authority: `Usecase_re_reviewed_v2(1).md`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`, `Myeonghwa_Personalized_Interpretation_Architecture_v1.3_THIRD_REVIEW(1).md`  
 > Rule: source가 결정하지 않은 implementation-critical 사항은 `OPEN-P0`, 비차단 선택은 `CANDIDATE`, source 간 충돌/공백은 `SOURCE_AUTHORITY_GAPS.md` 또는 numbered source-gap 문서에 기록한다.
@@ -64,7 +64,8 @@ behavior spec
 - migration replay/catalog hash
 - `SRC-01`, `SRC-05`, `SRC-06` schema impacts resolved before relevant final migration baseline
 - `SRC-14` resolved before conversation-delete mutation can be promoted: all durable transcript-bearing columns need governed redaction/tombstone semantics compatible with provenance/immutability constraints
-- no invented commerce product→entitlement mapping schema/registry before `SRC-18` resolution
+- no invented commerce product→grant mapping schema/registry before `SRC-18` resolution
+- no invented entitlement event transition/aggregation function before `SRC-21` resolution
 - no invented Device Installation register/upsert lifecycle before `SRC-19` resolution
 - no invented Share create positive snapshot/token replay schema before `SRC-20` resolution
 
@@ -182,21 +183,43 @@ Provider model quality/eval matrix = `OPEN-P0: P0-AI-01`.
 - product/offer current availability checked only for new intent, not historical replay
 - provider account link owner/provider/status validation
 - Purchase Intent create produces no receipt/provider-event/entitlement side effects
-- unverified/forged receipt → no grant
-- duplicate receipt/provider event once
-- unresolved provider event no effect
-- cross-user provider source deny
-- current entitlement projection respects valid grant aggregation/expiry
+- receipt/provider-event relational dedupe and owner/source constraints
+- unresolved provider event → entitlement event source deny
+- forged/unverified receipt → entitlement event source deny
+- entitlement event append-only
+- entitlement event grant owner/key/scope FK integrity
+- multiple independent grant rows can coexist structurally
+- one logical entitlement projection row per subject/key/scope
+- logical projection active/inactive ↔ active_grant_count shape constraints
+- current entitlement projection read
+- expired `effective_valid_until` cannot authorize access even if sweeper is delayed
+
+The current commerce negative test manually changes a grant and then manually writes the logical projection to demonstrate that overlapping grants are representable. It is **not** evidence of an executable recompute algorithm.
 
 ### Blocked by `SRC-18`
 
-- verified purchased product → exact `entitlement_key` / scope / grant mapping
-- resource-scoped purchase grant resolution
-- historical product→grant mapping replay after mapping changes
-- restore → concrete missing purchase-derived grant reconstruction
-- purchase/provider source → entitlement grant/apply/recompute E2E
+- verified purchased product → exact `entitlement_key` / scope / grant-key target
+- resource-scoped product target resolution
+- historical product→grant mapping version replay
+- restore source → concrete grant target reconstruction
 
-Do not require or fabricate `ProductFulfillmentDefinition`, `fulfillmentDefinitionVersion`, normalized grant-definition snapshot, or fulfillment hash as a source-backed PASS condition.
+### Blocked by `SRC-21`
+
+Do not promote grant-event apply or aggregate recompute until source resolves:
+
+- versioned payload schema for `granted|renewed|expired|revoked|restored|adjusted`
+- event type → grant status/validity/revision transition
+- stale provider-order comparator/precedence
+- exact contributing-grant predicate including `valid_from`/`valid_until`
+- future `valid_from` behavior
+- exact `active_grant_count` formula
+- exact `effective_valid_until` aggregation including finite + unbounded grants
+- recompute as-of time authority
+- first projection row/id behavior
+- projection revision/no-op update semantics
+- entitlement-change outbox schema/dedupe
+
+A lexical provider-order comparator or intuitive `MAX(valid_until)`/NULL-wins aggregation is not a source-backed PASS condition.
 
 ### Additionally gated by `P0-CM-01`
 
@@ -297,9 +320,10 @@ A blacklist-only serializer, Pack-invented `ShareArtifactV1`, or plaintext raw-t
 - `SRC-08`: real compatibility/domain adapter only enabled against an actual consumable Saju public contract
 - `SRC-09`: explicit guard-metadata invariant not marked CLOSED until source public export exists or source requirement changes
 - `SRC-14`: conversation-delete write remains blocked until duplicate transcript retention/redaction and terminal-attempt immutability semantics are source-resolved
-- `SRC-18`: purchase-derived entitlement mutation remains blocked until product→entitlement mapping authority is source-resolved
+- `SRC-18`: purchase-derived grant-target resolution remains blocked until product→grant mapping authority is source-resolved
 - `SRC-19`: Device Installation register/re-register remains blocked; standalone revoke remains valid
 - `SRC-20`: Share Artifact create remains blocked; existing public read/revoke remains valid
+- `SRC-21`: Entitlement grant-event transition/aggregate recompute remains blocked; current stored projection read remains valid
 
 ## 15. Engineering Vertical Slice
 
@@ -345,7 +369,7 @@ real Saju adapter
 
 중복 charge/event/message/memory 또는 cross-user leakage 0.
 
-Share create response-loss retry는 `SRC-20` 해결 전 기대 결과를 임의 정의하지 않는다. Device register transport/retry도 `SRC-19` 해결 전 기대 lineage를 임의 정의하지 않는다.
+Share create response-loss retry는 `SRC-20` 해결 전 기대 결과를 임의 정의하지 않는다. Device register transport/retry도 `SRC-19` 해결 전 기대 lineage를 임의 정의하지 않는다. Commerce out-of-order source application과 aggregate recompute의 exact result는 `SRC-21` 해결 전 임의 정의하지 않는다.
 
 ## 18. Evidence Artifact
 
@@ -359,7 +383,8 @@ CI/release evidence:
 - AI runtime/prompt versions
 - relationship policy version
 - commerce product/offer/Purchase Intent snapshot provenance for implemented commerce slices
-- `SRC-18` status for any purchase→grant/restore evidence
+- `SRC-18` status for product→grant-target evidence
+- `SRC-21` status for grant-event apply/aggregate recompute evidence
 - `SRC-19` status for any Device Installation register/re-register evidence
 - `SRC-20` status for any Share Artifact create evidence
 - test matrix summary + failed invariant IDs
@@ -384,7 +409,7 @@ relevant source blockers closed or feature explicitly disabled
 추가로 enabled feature가 참조하는 P0 decision이 DECIDED이고 store/privacy/age/release runbook이 준비되어야 한다.
 
 ```text
-Commerce purchase→grant enabled → SRC-18 source-resolved + P0-CM-01 decided
+Commerce purchase→access enabled → SRC-18 + SRC-21 source-resolved + P0-CM-01 decided
 Device Installation register enabled → SRC-19 source-resolved
 Share Artifact create enabled → SRC-20 source-resolved
 ```
