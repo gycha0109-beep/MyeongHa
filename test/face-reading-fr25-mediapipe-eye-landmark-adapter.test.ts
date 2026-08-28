@@ -40,6 +40,10 @@ describe('FR-25 MediaPipe raw landmark research adapter', () => {
     expect(evidence.sourceWitness.normalizedLandmarkBlobSha).toBe('bb6104d89c8f9917cc173b5bfe2b347bab71b71c');
     expect(evidence.sourceWitness.faceLandmarkerResultBlobSha).toBe('4af483ab3c1c61b268b9d92a28bab6160c60b47f');
     expect(evidence.sourceWitness.releaseExactForInstalledPackage).toBe(false);
+    expect(evidence.runtimeShapeObservation.sourceDeclarationSupplementalFields).toEqual([]);
+    expect(evidence.runtimeShapeObservation.observedSupplementalLandmarkFields).toEqual(['faceLandmarks[].visibility']);
+    expect(evidence.runtimeShapeObservation.treatment).toBe('finite_validate_then_discard');
+    expect(evidence.runtimeShapeObservation.authorityState).toBe('runtime_shape_only');
     expect(evidence.authorityState).toBe('research_adapter_only');
   });
 
@@ -51,6 +55,21 @@ describe('FR-25 MediaPipe raw landmark research adapter', () => {
       for (const point of Object.values(points)) {
         expect(Object.keys(point).sort()).toEqual(['x', 'y']);
         expect(point).not.toHaveProperty('z');
+      }
+    }
+  });
+
+  it('accepts runtime-observed visibility only as finite validated-and-discarded provider shape', () => {
+    const result = fixtureResult();
+    const face = result.faceLandmarks[0]!.map((landmark, index) => ({
+      ...landmark,
+      visibility: 0.5 + (index % 10) / 100,
+    }));
+    const adapted = adaptMediaPipeFaceLandmarkerResultToFR24InputFR25({ ...result, faceLandmarks: [face] }, CONTEXT);
+    for (const symbol of ['FACE_LANDMARKS_LEFT_EYE', 'FACE_LANDMARKS_RIGHT_EYE'] as const) {
+      for (const point of Object.values(adapted.topologyInputs[symbol].pointsByProviderVertex)) {
+        expect(Object.keys(point).sort()).toEqual(['x', 'y']);
+        expect(point).not.toHaveProperty('visibility');
       }
     }
   });
@@ -88,7 +107,7 @@ describe('FR-25 MediaPipe raw landmark research adapter', () => {
     expect(() => issueMediaPipeEyePairResearchArtifactFR25({ ...result, faceLandmarks: [face] }, CONTEXT)).toThrow(/missing required provider vertex: 466/u);
   });
 
-  it('rejects malformed x/y and non-finite z on consumed eye vertices', () => {
+  it('rejects malformed x/y and non-finite discarded z/visibility on consumed eye vertices', () => {
     const xResult = fixtureResult();
     const xFace = [...xResult.faceLandmarks[0]!];
     xFace[33] = { ...xFace[33]!, x: 1.1 };
@@ -103,13 +122,18 @@ describe('FR-25 MediaPipe raw landmark research adapter', () => {
     const zFace = [...zResult.faceLandmarks[0]!];
     zFace[249] = { ...zFace[249]!, z: Number.POSITIVE_INFINITY };
     expect(() => issueMediaPipeEyePairResearchArtifactFR25({ ...zResult, faceLandmarks: [zFace] }, CONTEXT)).toThrow(/faceLandmarks\[249\]\.z must be finite before it is discarded/u);
+
+    const visibilityResult = fixtureResult();
+    const visibilityFace = [...visibilityResult.faceLandmarks[0]!];
+    visibilityFace[249] = { ...visibilityFace[249]!, visibility: Number.NaN };
+    expect(() => issueMediaPipeEyePairResearchArtifactFR25({ ...visibilityResult, faceLandmarks: [visibilityFace] }, CONTEXT)).toThrow(/faceLandmarks\[249\]\.visibility must be finite before it is discarded/u);
   });
 
-  it('rejects unwitnessed provider fields on consumed landmarks rather than silently consuming them', () => {
+  it('still rejects unobserved supplemental provider fields on consumed landmarks', () => {
     const result = fixtureResult();
     const face = [...result.faceLandmarks[0]!];
-    face[33] = { ...face[33]!, visibility: 0.9 } as never;
-    expect(() => issueMediaPipeEyePairResearchArtifactFR25({ ...result, faceLandmarks: [face] }, CONTEXT)).toThrow(/unauthorized field: visibility/u);
+    face[33] = { ...face[33]!, presence: 0.9 } as never;
+    expect(() => issueMediaPipeEyePairResearchArtifactFR25({ ...result, faceLandmarks: [face] }, CONTEXT)).toThrow(/unauthorized field: presence/u);
   });
 
   it('requires the exact witnessed FaceLandmarkerResult root field set', () => {
@@ -143,6 +167,7 @@ describe('FR-25 MediaPipe raw landmark research adapter', () => {
     expect(readiness.anatomicalLateralityReady).toBe(false);
     expect(readiness.traditionalSemanticAuthorityGranted).toBe(false);
     expect(readiness.blockers.join(' ')).toMatch(/release-exact/u);
+    expect(readiness.blockers.join(' ')).toMatch(/supplemental landmark visibility/u);
     expect(readiness.blockers.join(' ')).toMatch(/verified FR-22 provider implementation/u);
   });
 });

@@ -159,10 +159,10 @@ describe('FR-26 MediaPipe FaceLandmarker research runtime', () => {
     const hiddenLandmark = fakeFactory(() => {
       const result = fixtureResult();
       const face = [...result.faceLandmarks[0]!];
-      face[33] = { ...face[33]!, visibility: 0.99 } as never;
+      face[33] = { ...face[33]!, presence: 0.99 } as never;
       return { ...result, faceLandmarks: [face] };
     });
-    await expect(runMediaPipeEyePairResearchFR26(request(), hiddenLandmark.factory)).rejects.toThrow(/unauthorized field: visibility/u);
+    await expect(runMediaPipeEyePairResearchFR26(request(), hiddenLandmark.factory)).rejects.toThrow(/unauthorized field: presence/u);
     expect(hiddenLandmark.state.closeCalls).toBe(1);
   });
 

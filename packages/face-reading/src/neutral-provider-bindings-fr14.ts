@@ -8,15 +8,14 @@ import {
 import {
   getTraditionalFaceAnchorFR13,
 } from './semantic-anchor-registry-fr13.js';
+import {
+  FR14_NEUTRAL_BINDING_PROFILE_VERSION,
+  FR14_NEUTRAL_CONSUMER_SLOTS,
+  type NeutralAnchorConsumerSlotV1,
+} from './neutral-provider-binding-contract-fr14.js';
 import { FaceAuthorityValidationError } from './validation.js';
 
-export type NeutralAnchorConsumerSlotV1 =
-  | 'neutral.face.brow_midline'
-  | 'neutral.face.nose_region'
-  | 'neutral.face.left_brow_region'
-  | 'neutral.face.right_brow_region'
-  | 'neutral.face.left_eye_region'
-  | 'neutral.face.right_eye_region';
+export type { NeutralAnchorConsumerSlotV1 } from './neutral-provider-binding-contract-fr14.js';
 
 export type NeutralProviderCapabilityV1 =
   | 'neutral_pose_quality'
@@ -102,7 +101,7 @@ export const NEUTRAL_ANCHOR_BINDING_REQUIREMENTS_FR14: readonly NeutralAnchorBin
 
 export const FACELAB_NEUTRAL_BINDING_PROFILE_FR14: NeutralProviderBindingProfileV1 = Object.freeze({
   schemaVersion: 'v1' as const,
-  profileVersion: '0.1.0',
+  profileVersion: FR14_NEUTRAL_BINDING_PROFILE_VERSION,
   providerKey: 'visually_facelab' as const,
   semanticAnchorRegistryRef: `${FACE_SEMANTIC_ANCHOR_REGISTRY_FR13.registryId}@${FACE_SEMANTIC_ANCHOR_REGISTRY_FR13.version}`,
   consumerContractVersion: 'myeongha-neutral-anchor-consumer-v1',
@@ -175,6 +174,12 @@ export function validateNeutralProviderBindingProfileFR14(
 
   unique(profile.bindings.map((binding) => binding.anchorRef), 'fr14.anchorRefs');
   unique(profile.bindings.map((binding) => binding.consumerSlot), 'fr14.consumerSlots');
+  const actualConsumerSlots = new Set(profile.bindings.map((binding) => binding.consumerSlot));
+  for (const slot of FR14_NEUTRAL_CONSUMER_SLOTS) {
+    if (!actualConsumerSlots.has(slot)) {
+      throw new FaceAuthorityValidationError(`FR-14 missing neutral consumer slot: ${slot}`);
+    }
+  }
 
   for (const binding of profile.bindings) {
     const unexpected = Object.keys(binding).find((key) => !ALLOWED_BINDING_KEYS.has(key));
