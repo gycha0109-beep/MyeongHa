@@ -16,6 +16,7 @@ export * from './mediapipe-default-network-runtime-evidence-fr28.js';
 export * from './mediapipe-eye-landmark-adapter-fr25.js';
 export * from './mediapipe-face-landmarker-runtime-fr26.js';
 export * from './mediapipe-real-runtime-evidence-fr27.js';
+export * from './mediapipe-release-tag-provenance-fr29.js';
 export * from './neutral-derivation-algorithms-fr17.js';
 export * from './neutral-derivation-evidence-fr17.js';
 export * from './neutral-derivation-registry-fr17.js';
