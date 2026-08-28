@@ -1,7 +1,7 @@
-# 명하 Shared Domain Contracts Specification v0.4
+# 명하 Shared Domain Contracts Specification v0.5
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.4**  
+> Pack Version: **v0.5**  
 > Date: **2026-08-28**  
 > Purpose: 여러 spec에 흩어진 free-form string/JSON을 bounded versioned contract로 묶는다. Source가 contract shape를 정의하지 않은 영역은 registry를 임의 생성하지 않는다.
 
@@ -28,14 +28,13 @@ API Error Detail schema
 Outbox EventType
 ```
 
-각 source-backed key family는 `registryVersion` 또는 schema version을 가진다. unknown value는 실행하지 않고 reject/fallback한다.
+각 source-backed key family는 source가 실제 정의한 범위에서 `registryVersion` 또는 schema version을 가진다. unknown/unresolved value는 실행 authority로 승격하지 않고 reject/fallback한다.
 
 ### 1.1 Immutable Registry Authority
 
 다음 registry/policy는 **source-controlled immutable artifact로 source authority가 실제로 정의한 범위에서만** 관리한다. DB free-form JSON이나 admin UI가 같은 version key의 의미를 덮어쓰면 안 된다.
 
 ```text
-RelationshipPolicyDefinition
 UsagePolicyDefinition
 NotificationPolicyDefinition
 AnalyticsEventSchemaRegistry
@@ -43,7 +42,9 @@ ExperimentAssignmentPolicy
 ContentPolicyTagRegistry
 ```
 
-각 source-backed artifact는 최소 `id/key + version + contentHash` 또는 해당 source가 정의한 동등한 provenance를 가진다. 정책 내용이 바뀌면 version/content identity도 바뀐다.
+각 source-backed artifact는 해당 source가 실제 정의한 provenance identity를 따른다. Pack이 source에 없는 `contentHash`, condition DSL, registry table을 공통 요구사항으로 추가하지 않는다.
+
+Relationship transition rule은 source가 versioned policy로 관리하라고 요구하지만, 구체적인 policy artifact/schema/hash/score bounds/delta/stage/anti-farming contract는 정의하지 않는다. 해당 executable authority는 `SRC-22`가 OPEN이다.
 
 Commerce의 purchased product → entitlement mapping은 현재 source-backed registry contract가 없으며 `SRC-18`로 분리한다. 기존 Pack의 `ProductFulfillmentDefinition`은 source authority로 취급하지 않는다.
 
@@ -75,9 +76,9 @@ AI가 UI에 제안하는 `SuggestedActionV1`도 bounded union이며, navigation 
 
 ## 3. Planner References
 
-Planner output의 `intent`, `sceneIntent`, `requiredLifeFactTypes`, `requestedActions`는 registry key만 허용한다.
+Planner output의 `intent`, `sceneIntent`, `requiredLifeFactTypes`, `requestedActions`는 source-backed registry key만 허용한다.
 
-Planner가 unknown key를 제안하면 Capability Gate는 실행하지 않는다.
+Planner가 unknown/unresolved key를 제안하면 Capability Gate는 실행하지 않는다.
 
 ## 4. Life Fact / Memory Schemas
 
@@ -93,30 +94,64 @@ interface VersionedRecordTypeDefinition {
 
 `value_jsonb` / `content_jsonb`는 해당 schema validation 통과 후만 저장한다.
 
-## 5. Relationship / World Event Registry
+## 5. Relationship / World Event Boundary
 
-LLM은 event candidate key만 제안한다. 실제 event 생성은 versioned policy가 candidate를 allowlist에 매핑한 경우만 가능하다.
+LLM은 Relationship/World event **candidate**만 제안할 수 있고 score/stage/delta를 직접 결정하지 않는다.
 
-동일 문자열이라도 policy version이 다르면 의미를 암묵적으로 재해석하지 않는다.
+Primary source는 Relationship Event가 idempotent identity를 갖고, server Relationship Engine이 versioned transition rule로 결정론적으로 상태를 갱신해야 한다고 요구한다. 그러나 Use Case의 event 이름은 example list이며, 최종 normative event allowlist와 event payload schema, score bounds, delta table, stage transition rule, anti-farming evaluator는 source에 없다.
 
-## 5A. Relationship Policy Definition
+따라서 `SRC-22` 해결 전에는 Pack이 example event names를 닫힌 registry로 승격하거나 caller-supplied `delta_*`/next stage를 authority로 받아서는 안 된다. Unknown 또는 아직 source-approved evaluator가 없는 relationship candidate는 authoritative state mutation으로 실행하지 않는다.
 
-```ts
-interface RelationshipPolicyDefinitionV1 {
-  policyVersion: string;
-  contentHash: string;
-  scoreBounds: { closeness:[number,number]; trust:[number,number]; friction:[number,number] };
-  stages: readonly { stageKey:string; entryConditions: readonly PolicyConditionV1[] }[];
-  events: readonly {
-    eventType: RelationshipEventType;
-    eventSchemaVersion: string;
-    delta?: { closeness?:number; trust?:number; friction?:number };
-    antiFarmingRuleKey?: string;
-  }[];
-}
+World Event 역시 source-backed schema/condition authority가 존재하는 범위에서만 실행한다.
+
+## 5A. Relationship Policy — `SRC-22` OPEN
+
+Source-backed contract는 다음 **원칙/relational envelope**까지다.
+
+```text
+state dimensions = closeness / trust / friction
+current stage + policy_version + revision
+relationship_event append-only ledger
+unique event dedupe per subject/character
+one event per applied revision
+state_revision_after = state_revision_before + 1
+state row lock + event append + projection revision update atomically
+LLM/client cannot choose scores
+transition rule is versioned
+historical event provenance is preserved
+message spam cannot farm indefinitely
+inactivity alone does not auto-degrade baseline state
 ```
 
-LLM/client는 delta/stage를 보내지 않는다. Runtime은 pinned policy version/hash의 deterministic rule만 적용한다.
+Source가 아직 정의하지 않은 executable policy:
+
+```text
+final RelationshipEventType allowlist
+event payload schemas
+score bounds
+event → delta mapping
+internal stage keys / thresholds / transition graph
+anti-farming windows/caps/cooldowns
+last_interaction_at update semantics
+active policy-version selection/migration
+no-op/blocked-event ledger semantics
+policy content-hash persistence
+```
+
+이전 Pack의 다음 형태는 **source-backed interface가 아니므로 normative contract에서 제거**한다.
+
+```text
+RelationshipPolicyDefinitionV1
+policyVersion + contentHash
+scoreBounds
+stages[].entryConditions
+ events[].delta
+antiFarmingRuleKey
+```
+
+특히 ERD v0.6의 relationship state/event row는 `policy_version`만 저장하고 relationship-policy `contentHash` 컬럼이나 policy artifact table을 정의하지 않는다. 추가 hash provenance가 필요하면 source/ERD가 먼저 그 persistence authority를 결정해야 한다.
+
+`SRC-22` 해결 전 `cmd_apply_relationship_event...`, score/stage transition evaluator, anti-farming evaluator를 production-authoritative로 승격하지 않는다.
 
 ## 5B. Content Policy Tags
 
@@ -206,7 +241,8 @@ interface NotificationPolicyDefinitionV1 {
 
 - unknown PlannedAction → no command execution
 - unknown LifeFact schema → no persistence
-- unknown Relationship event → no state mutation
+- unresolved/unknown Relationship event candidate → no authoritative relationship mutation before `SRC-22` resolution
+- relationship delta/stage/anti-farming evaluator → blocked until `SRC-22`
 - unknown cue → no arbitrary asset resolution
 - Purchase Intent minimal offer mapping snapshot mutation → hash mismatch/deny
 - unresolved product→entitlement mapping (`SRC-18`) → no entitlement mutation

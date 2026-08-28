@@ -1,7 +1,7 @@
-# 명하 Server Command / Transaction Specification v0.5
+# 명하 Server Command / Transaction Specification v0.6
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.5**  
+> Pack Version: **v0.6**  
 > Date: **2026-08-28**  
 > Persistence Authority: `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`  
 > API Authority: `API_CONTRACT.md`
@@ -18,7 +18,7 @@ API command가 여러 table/ledger/projection을 갱신할 때 atomicity, lock o
 validate identity/capability
 → lock aggregate root/current projection
 → validate expected revision/idempotency
-→ DB mutations + outbox
+→ DB mutations + outbox when source/domain requires downstream publication
 → commit
 ```
 
@@ -96,6 +96,8 @@ verify both identities
 
 Historical immutable ledger `subject_id` UPDATE 금지.
 
+Relationship score/stage merge semantics require the source-approved relationship policy. `SRC-22` 해결 전 merge command가 relationship scores/stage를 임의 합산/재계산하지 않는다.
+
 ## 7. Birth Revision Append
 
 ```text
@@ -161,13 +163,13 @@ lock thread → turn → attempt
 → validate Output Guard result
 → allocate assistant/system message sequence(s)
 → insert committed message(s)
-→ apply approved relationship/world/memory side effects through their governed command semantics in deterministic order
+→ apply only source-approved governed side effects in deterministic order
 → set attempt committed + turn committed pointer/state
-→ outbox
+→ outbox when applicable
 → commit
 ```
 
-If domain side effect cannot be safely composed in one transaction, store a validated proposal/outbox command rather than partially commit hidden state.
+Relationship Event candidate가 존재하더라도 authoritative score/stage mutation은 `SRC-22` 해결 전 이 transaction 안에서 임의 실행하지 않는다. 안전하게 compose할 수 없는 domain side effect는 validated proposal/outbox command candidate로 분리하되, 그 candidate가 source-gap을 우회해 authority mutation을 수행해서는 안 된다.
 
 ## 11. Chat Retry / Abandon
 
@@ -203,18 +205,49 @@ lock proposal
 → commit
 ```
 
-## 13. Relationship Event Apply
+## 13. Relationship Event Apply — skeleton only; executable command blocked by `SRC-22`
+
+ERD/Use Case fixes this structural order:
 
 ```text
 lock user_character_state
-→ dedupe existing event
-→ validate event registry/source/policy
-→ deterministic delta/stage
-→ append event(before r, after r+1)
-→ update projection revision
-→ outbox
+→ dedupe event
+→ calculate source-approved versioned policy
+→ append relationship_event(before=r, after=r+1)
+→ update projection r+1
 → commit
 ```
+
+This fixes **atomic ordering and revision lineage**, not the missing policy function.
+
+`SRC-22` remains OPEN because source does not define:
+
+```text
+final Relationship Event allowlist
+event payload schemas
+score bounds
+event → closeness/trust/friction delta mapping
+internal stage keys / thresholds / transition graph
+anti-farming windows/caps/cooldowns
+last_interaction_at mutation semantics
+active policy-version selection/migration
+no-op/blocked-event ledger behavior
+relationship policy content-hash/artifact persistence
+```
+
+Therefore neither:
+
+```text
+cmd_apply_relationship_event...
+relationship policy transition evaluator
+relationship anti-farming evaluator
+```
+
+may be promoted as production-authoritative merely because `relationship_events.delta_*` and `user_character_states` can represent the outputs.
+
+Caller/LLM-supplied `delta_*` or next-stage values are not an acceptable replacement for the missing Relationship Engine policy authority.
+
+Relationship-specific outbox publication is also not automatically inserted by this skeleton; where downstream publication is required, its event schema/dedupe contract must come from an independently source-approved outbox/domain contract.
 
 ## 14. Episode Advance
 
@@ -224,12 +257,13 @@ lock user_episode_progress
 → validate pinned bundle/node/choice
 → append progress event
 → update current projection
-→ governed relationship/world/unlock side effects
-→ outbox
+→ governed world/unlock side effects
+→ governed relationship side effects only when `SRC-22` relationship evaluator is resolved
+→ outbox when applicable
 → commit
 ```
 
-`SRC-17` 해결 전 scene graph/condition/choice evaluator가 필요한 실제 start/advance write authority는 final production command로 승격하지 않는다.
+`SRC-17` 해결 전 scene graph/condition/choice evaluator가 필요한 실제 start/advance write authority는 final production command로 승격하지 않는다. Episode가 relationship state를 바꾸는 경우 그 side effect는 추가로 `SRC-22`가 필요하다.
 
 ## 15. Reading Session / Clarification
 
@@ -301,7 +335,7 @@ resolve active member subject
 → commit
 ```
 
-Purchase Intent create does **not** call a provider and does not create receipt/provider event/entitlement rows.
+Purchase Intent create does **not** call a provider and does not create receipt/provider-event/entitlement rows.
 
 ### 18.2 Provider Source Provenance
 
@@ -411,7 +445,7 @@ Destructive phases는 idempotent하고 dependency order를 따른다. Direct mer
 
 ## 21. Outbox Rule
 
-Domain state와 downstream event 생성이 둘 다 필요한 command는 **같은 DB transaction에서 outbox row를 insert**한다.
+Domain state와 downstream event 생성이 둘 다 필요한 source-approved command는 **같은 DB transaction에서 outbox row를 insert**한다.
 
 Publisher는 at-least-once로 동작할 수 있으므로 consumer가 event dedupe를 구현한다.
 
@@ -421,8 +455,10 @@ Publisher는 at-least-once로 동작할 수 있으므로 consumer가 event dedup
 - same idempotency key concurrency → one logical command
 - external timeout → no transaction held open
 - DB commit after external response loss → retry returns existing state
-- chat commit with relationship event → both or neither
-- episode advance with unlock → both or neither after `SRC-17` resolution
+- chat commit + relationship score/stage mutation → blocked until `SRC-22`; after resolution both-or-neither atomicity required
+- relationship event ledger/revision structural invariants → testable now
+- relationship event→delta/stage/anti-farming correctness → blocked until `SRC-22`
+- episode advance with unlock → both or neither after `SRC-17` resolution and any applicable unlock/relationship authorities
 - Purchase Intent same-key concurrency → one logical intent
 - Purchase Intent replay does not depend on later offer availability
 - purchase provenance → grant target remains blocked until `SRC-18`
