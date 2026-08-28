@@ -1,7 +1,7 @@
-# 명하 Spec Pack — Source Authority Validation Report v0.8
+# 명하 Spec Pack — Source Authority Validation Report v0.9
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.8 Source Alignment**  
+> Pack Version: **v0.9 Source Alignment**  
 > Date: **2026-08-28**  
 > Source Authority: `Usecase_re_reviewed_v2(1).md`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`, `Myeonghwa_Personalized_Interpretation_Architecture_v1.3_THIRD_REVIEW(1).md`  
 > Saju Public Contract Audit Pin: `gycha0109-beep/Saju@7102dc8fe8483c0875f6a093a4fd585b0df51f8b`
@@ -47,6 +47,7 @@ Source끼리 직접 충돌하거나 source가 구현 필수 authority를 제공�
 - Existing `entitlements` projection/read schema remains valid as a storage/read envelope even though source does not yet define the complete event→grant→aggregate recompute algorithm.
 - Existing relationship state/event schema remains valid as a current-projection/append-only-ledger envelope even though source does not yet define the executable score/stage policy evaluator.
 - Existing `world_events` and `character_unlocks` schema remain valid as append-only world provenance/current unlock projection envelopes even though source does not yet define the executable Character Unlock condition/effect evaluator.
+- Existing `subject_merge_jobs` / `subject_merge_actions`, merge-job current read, and direct merged guest lineage remain valid relational/read envelopes even though source does not yet define the executable conflict/resolution/domain-action merge policy.
 
 Machine validation values recorded in older reports are historical snapshots; this report does not silently reuse stale counts as evidence for the current repository state. Current CI/action runs are the execution evidence.
 
@@ -381,6 +382,56 @@ episode-completion-driven character unlock
 → applicable SRC-17 + SRC-23
 ```
 
+### 4.8 Existing-Member Guest merge execution overreach removed — `SRC-24`
+
+UC-32 and ERD v0.6 define a strong **merge envelope**:
+
+```text
+Guest ownership/session proof
+→ one Guest Session → one canonical Member destination
+→ duplicate/conflict detection principle
+→ automatic merge only where mergeable
+→ explicit resolution for conflicts such as Birth Profile
+→ subject_merge_jobs / subject_merge_actions audit envelope
+→ immutable guest ledgers remain guest-owned
+→ completed merge creates direct guest→Member lineage
+→ future writes use canonical Member
+```
+
+They do not define the executable policy that fills that envelope:
+
+```text
+participating domain/resource inventory
+duplicate/conflict classification rules
+conflicts_jsonb / resolution_jsonb positive schemas
+legal user choices per domain
+merge policy_version artifact/selection/retention
+resource → action_type planning
+per-domain import_new / merge_projection transformations
+stale resolution behavior
+partial action failure/retry/resume semantics
+same idempotency key + changed request/resolution behavior
+completed response-loss replay reconstruction
+deletion_pending Member start/resume eligibility
+```
+
+The Pack previously presented `detect conflicts → apply domain merge actions deterministically` and a generic `MERGE_CONFLICT` detail schema/replay model as if those executable semantics already existed. They do not.
+
+The lifecycle mismatch is also explicit: ERD relational command notes accept an `active/deletion_pending` Member target, while Pack text narrowed merge execution to active-only. The stricter choice may be a safe operational fail-close, but it is not source-authoritative until `SRC-24` resolves start/resume/finish behavior for deletion-pending targets.
+
+Current baseline:
+
+```text
+subject_merge_jobs/actions relational envelope       = SOURCE-COMPLETE
+guest-session one-destination uniqueness              = SOURCE-COMPLETE
+no raw immutable-ledger reparent                      = SOURCE-COMPLETE
+direct merged guest read-only history lineage         = SOURCE-COMPLETE
+member-owned current merge-job read                   = SOURCE-COMPLETE
+full conflict/resolution/domain-action merge execution = BLOCKED by SRC-24
+```
+
+A command that invents conflict schemas, request hashes, action planning, or domain projection merge formulas is not a valid workaround. Relationship/Unlock/Episode transformations remain independently gated by `SRC-22`/`SRC-23`/`SRC-17` where applicable.
+
 ## 5. Current Saju Public Contract Boundary
 
 Pinned public contract:
@@ -395,6 +446,32 @@ Current public boundary supports one Birth input plus reading text/optional targ
 The Pack does not fabricate second-Birth compatibility input or semantic guard fields absent from the exported public contract. `SRC-08` and `SRC-09` remain the applicable blockers.
 
 ## 6. Source-Complete Validation Boundaries
+
+### Existing-Member Guest merge with `SRC-24` open
+
+Source-complete verification may assert:
+
+- Guest Session/member ownership and relational FK integrity;
+- one Guest Session cannot resolve to two canonical Members;
+- guest/member self-merge and merge-chain/cycle constraints deny invalid lineage;
+- historical immutable ledger ownership is not rewritten;
+- canonical Member can read direct merged guest history only through dedicated history authority;
+- generic product writes to merged guest are denied;
+- guest-owned Birth cannot be used directly for a new canonical-Member Reading;
+- stored member-owned merge-job current projection can be read;
+- stored merge action envelope/action enum is representable.
+
+It must **not** claim the following as source-complete:
+
+- domain conflict detector;
+- `MERGE_CONFLICT` positive detail schema;
+- resolution schema/allowed choices;
+- active merge-policy artifact semantics;
+- domain action planner;
+- per-domain import/merge transformations;
+- failed-action retry/resume workflow;
+- same-key/different-request conflict semantics absent a source request-hash contract;
+- deletion-pending target start/resume policy.
 
 ### Character Unlock with `SRC-23` open
 
@@ -508,7 +585,16 @@ SRC-22 = how Relationship Event computes authoritative score/stage
 SRC-23 = how authoritative conditions/events map to concrete Character Unlock effects
 ```
 
-Source-gap decisions `SRC-19`, `SRC-20`, `SRC-22`, and `SRC-23` are likewise independent of infrastructure/provider P0 choices.
+Merge blocker composition:
+
+```text
+SRC-24 = how existing-Member Guest conflicts/resolutions/domain actions are decided/applied
+SRC-22 = additionally required if relationship projection is transformed
+SRC-23 = additionally required if Character Unlock projection is transformed
+SRC-17 = additionally required where Episode transition/effect semantics are transformed
+```
+
+Source-gap decisions `SRC-19`, `SRC-20`, `SRC-22`, `SRC-23`, and `SRC-24` are independent of infrastructure/provider P0 choices.
 
 ## 8. Promotion Gate
 
@@ -552,6 +638,10 @@ relationship-stage-driven Character Unlock
 
 episode-driven Character Unlock
 → applicable SRC-17 + SRC-23
+
+Existing-Member Guest full merge execution
+→ SRC-24 resolution + conflict/resolution/domain-action/retry-resume evidence
+→ plus applicable SRC-22/SRC-23/SRC-17 authority for transformed projections
 ```
 
 ## 9. Final Classification
@@ -566,4 +656,4 @@ FINAL PRODUCTION BASELINE = BLOCKED WHERE SOURCE/P0 REMAINS OPEN
 
 ### Final statement
 
-> Pack은 source authority를 구현 가능하게 구체화하는 문서이지 source에 없는 product semantics를 발명하는 authority가 아니다. 현재 commerce는 `SRC-18` Product→grant mapping과 `SRC-21` event→grant→logical-entitlement aggregation을 독립적으로 fail-closed 처리한다. `SRC-19`는 Device Installation registration lifecycle, `SRC-20`은 Share Artifact create/public projection lifecycle, `SRC-22`는 Relationship Event의 event→score/stage/anti-farming policy evaluator, `SRC-23`은 Character Unlock의 condition/World Event→target/effect evaluator를 각각 차단한다. 이미 source-complete한 Purchase Intent, current stored Entitlement read, Device revoke, Share public-read/revoke, Relationship ledger/current-read, World Event/Character Unlock relational current-read 경계는 이 blocker들과 독립적으로 유지한다.
+> Pack은 source authority를 구현 가능하게 구체화하는 문서이지 source에 없는 product semantics를 발명하는 authority가 아니다. 현재 commerce는 `SRC-18` Product→grant mapping과 `SRC-21` event→grant→logical-entitlement aggregation을 독립적으로 fail-closed 처리한다. `SRC-19`는 Device Installation registration lifecycle, `SRC-20`은 Share Artifact create/public projection lifecycle, `SRC-22`는 Relationship Event의 event→score/stage/anti-farming policy evaluator, `SRC-23`은 Character Unlock의 condition/World Event→target/effect evaluator, `SRC-24`는 existing-Member Guest merge의 conflict/resolution/domain-action/retry-resume policy를 각각 차단한다. 이미 source-complete한 Purchase Intent, current stored Entitlement read, Device revoke, Share public-read/revoke, Relationship ledger/current-read, World Event/Character Unlock relational current-read, merge-job current read 및 direct merged guest history 경계는 이 blocker들과 독립적으로 유지한다.

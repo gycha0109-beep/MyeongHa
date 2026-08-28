@@ -1,7 +1,7 @@
-# 명하 Verification / E2E Test Plan v0.8 — Source Aligned
+# 명하 Verification / E2E Test Plan v0.9 — Source Aligned
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.8**  
+> Pack Version: **v0.9**  
 > Date: **2026-08-28**  
 > Source Authority: `Usecase_re_reviewed_v2(1).md`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`, `Myeonghwa_Personalized_Interpretation_Architecture_v1.3_THIRD_REVIEW(1).md`  
 > Rule: source가 결정하지 않은 implementation-critical 사항은 `OPEN-P0`, 비차단 선택은 `CANDIDATE`, source 간 충돌/공백은 `SOURCE_AUTHORITY_GAPS.md` 또는 numbered source-gap 문서에 기록한다.
@@ -70,6 +70,7 @@ behavior spec
 - no invented Share create positive snapshot/token replay schema before `SRC-20` resolution
 - relationship ledger structural constraints remain testable, but no invented relationship policy registry/content-hash column/score-stage evaluator before `SRC-22` resolution
 - World Event/Character Unlock structural constraints remain testable, but no invented unlock condition DSL, World Event→character evaluator, unlock-policy provenance field/table, or reward-effect function before `SRC-23` resolution
+- merge-job/action relational constraints remain testable, but no invented merge conflict/resolution schema registry, merge policy artifact/table, domain action planner, projection merge formula, or retry/resume state machine before `SRC-24` resolution
 
 ## 5. Auth / RLS / Privacy Gate
 
@@ -82,6 +83,7 @@ behavior spec
 - merged history current endpoint deny
 - dedicated merged history read-only allow
 - merged history write deny
+- other user's Guest Session/merge job cannot be claimed or observed
 - revoked/future-character grant context exclusion
 - public share → private reading deny
 - deletion_pending subject → new AI/Saju/purchase deny
@@ -92,7 +94,9 @@ behavior spec
 
 - guest bootstrap
 - new-signup promotion
-- existing-member merge/conflict resolution
+- existing-member merge-job current read
+- direct merged guest history authorization/read-only projection
+- full existing-member merge conflict detection/resolution/domain action execution은 `SRC-24` 해결 전 production API PASS 대상에서 제외
 - profile nickname update
 - target-person CRUD/isolation
 - chat retry + abandon
@@ -425,6 +429,7 @@ A blacklist-only serializer, Pack-invented `ShareArtifactV1`, or plaintext raw-t
 - message-row redaction alone is not a conversation-delete PASS
 - deletion must not make terminal attempt provenance mutable in an ad-hoc way; source-approved tombstone/redaction semantics must define the exception boundary first
 - delete/commit race must serialize so either commit precedes deletion and is redacted, or deletion wins and later assistant commit is denied
+- merged Guest historical ledgers remain guest-owned/read-only; full existing-Member merge domain transformation remains `SRC-24`
 - `SRC-05`: session-only/reject proposal staging payload no shadow durable record
 - `SRC-06`: target/self Birth standalone privacy deletion dependency policy verified
 - `SRC-07`: manual commerce resolution disabled unless audited source resolution exists
@@ -437,6 +442,7 @@ A blacklist-only serializer, Pack-invented `ShareArtifactV1`, or plaintext raw-t
 - `SRC-21`: Entitlement grant-event transition/aggregate recompute remains blocked; current stored projection read remains valid
 - `SRC-22`: Relationship Event score/stage policy apply remains blocked; relationship relational ledger/current-read envelope remains valid
 - `SRC-23`: Character Unlock condition/effect apply remains blocked; World Event/Character Unlock relational envelope and stored current read remain valid
+- `SRC-24`: existing-Member Guest merge conflict/resolution/domain-action execution remains blocked; merge-job current read + direct merged guest history remain valid
 
 ## 16. Engineering Vertical Slice
 
@@ -458,6 +464,8 @@ Guest bootstrap
 → signup promotion
 → Web/Mobile continuation
 ```
+
+Existing-Member Guest merge may contribute only its source-complete stored job/history-read envelope to this baseline until `SRC-24` resolves the actual conflict/action workflow.
 
 ## 17. Real Saju Slice
 
@@ -485,7 +493,7 @@ real Saju adapter
 
 중복 charge/event/message/memory 또는 cross-user leakage 0.
 
-Share create response-loss retry는 `SRC-20` 해결 전 기대 결과를 임의 정의하지 않는다. Device register transport/retry도 `SRC-19` 해결 전 기대 lineage를 임의 정의하지 않는다. Commerce out-of-order source application과 aggregate recompute의 exact result는 `SRC-21` 해결 전 임의 정의하지 않는다. Relationship apply retry/concurrent result 중 policy output(delta/stage/anti-farming)은 `SRC-22` 해결 전 임의 정의하지 않으며, 현재는 relational dedupe/revision invariants만 검증한다. Character Unlock response-loss/replay/concurrent trigger의 exact projection/effect result는 `SRC-23` 해결 전 임의 정의하지 않으며, 현재는 stored projection/relational invariants만 검증한다.
+Share create response-loss retry는 `SRC-20` 해결 전 기대 결과를 임의 정의하지 않는다. Device register transport/retry도 `SRC-19` 해결 전 기대 lineage를 임의 정의하지 않는다. Commerce out-of-order source application과 aggregate recompute의 exact result는 `SRC-21` 해결 전 임의 정의하지 않는다. Relationship apply retry/concurrent result 중 policy output(delta/stage/anti-farming)은 `SRC-22` 해결 전 임의 정의하지 않으며, 현재는 relational dedupe/revision invariants만 검증한다. Character Unlock response-loss/replay/concurrent trigger의 exact projection/effect result는 `SRC-23` 해결 전 임의 정의하지 않으며, 현재는 stored projection/relational invariants만 검증한다. Existing-Member merge response-loss/stale-resolution/partial-action-failure의 exact resume/result semantics는 `SRC-24` 해결 전 임의 정의하지 않으며, 현재는 relational uniqueness, ownership, direct-lineage history, no-raw-reparent invariants만 검증한다.
 
 ## 19. Evidence Artifact
 
@@ -501,6 +509,8 @@ CI/release evidence:
 - `SRC-22` status for any authoritative relationship score/stage mutation evidence
 - Character Unlock stored projection/source-world-event provenance available in current ERD
 - `SRC-23` status for any authoritative Character Unlock eligibility/effect mutation evidence
+- merge-job/action relational provenance + direct merged guest lineage for implemented read/safety slices
+- `SRC-24` status for any full existing-Member Guest merge conflict/resolution/domain-action evidence
 - commerce product/offer/Purchase Intent snapshot provenance for implemented commerce slices
 - `SRC-18` status for product→grant-target evidence
 - `SRC-21` status for grant-event apply/aggregate recompute evidence
@@ -512,6 +522,8 @@ CI/release evidence:
 Do not require a relationship policy `contentHash` as current source evidence: ERD v0.6 does not define that persistence field/table. If source later requires stronger policy artifact provenance, `SRC-22` resolution must define it explicitly.
 
 Do not invent Character Unlock condition hash/version/bundle provenance fields as current source evidence: ERD v0.6 does not define them. If they are required for deterministic unlock replay/migration, `SRC-23` resolution must define an ERD-compatible contract or explicit ERD revision.
+
+Do not invent merge policy hash/artifact, conflict schema version, request hash, or domain-action transformation evidence absent from ERD. If required, `SRC-24` resolution must define an ERD-compatible contract or explicit ERD revision.
 
 ## 20. Promotion Criteria
 
@@ -539,4 +551,5 @@ Relationship Event score/stage apply enabled → SRC-22 source-resolved
 Character Unlock eligibility/effect apply enabled → SRC-23 source-resolved
 relationship-stage-driven Character Unlock enabled → SRC-22 + SRC-23
 episode-driven Character Unlock enabled → applicable SRC-17 + SRC-23
+Existing-Member Guest full merge execution enabled → SRC-24 source-resolved + applicable domain gaps (`SRC-22`/`SRC-23`/`SRC-17`) resolved for transformed projections
 ```

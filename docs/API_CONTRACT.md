@@ -1,7 +1,7 @@
-# 명하 Shared API Contract v0.5 — Source Aligned
+# 명하 Shared API Contract v0.6 — Source Aligned
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.5**  
+> Pack Version: **v0.6**  
 > Date: **2026-08-28**  
 > Source Authority: `Usecase_re_reviewed_v2(1).md`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`, `Myeonghwa_Personalized_Interpretation_Architecture_v1.3_THIRD_REVIEW(1).md`  
 > Rule: source가 결정하지 않은 implementation-critical 사항은 `OPEN-P0`, 비차단 선택은 `CANDIDATE`, source 간 충돌/공백은 `SOURCE_AUTHORITY_GAPS.md` 또는 numbered source-gap 문서에 기록한다.
@@ -72,11 +72,13 @@ memory resolution → idempotencyKey
 episode action    → idempotencyKey + expectedRevision
 purchase intent   → idempotencyKey
 receipt/restore   → idempotencyKey or provider source dedupe
-guest merge       → idempotencyKey + guestSession proof
+guest merge       → idempotencyKey + guestSession proof (logical uniqueness envelope only; SRC-24)
 deletion request  → requestDedupeKey
 ```
 
-동일 key + 동일 canonical request → 기존 logical result. 동일 key + 다른 hash → `409 IDEMPOTENCY_CONFLICT`.
+동일 key + 동일 canonical request → 기존 logical result, 동일 key + 다른 hash → `409 IDEMPOTENCY_CONFLICT` 규칙은 source가 canonical request/hash identity를 실제로 정의한 command에만 적용한다.
+
+Guest merge는 ERD가 `(guest_subject_id, member_subject_id, idempotency_key)` uniqueness를 정의하지만 request hash/canonicalization, resolution 포함 request-shape 충돌, completed response-loss replay reconstruction을 정의하지 않는다. 따라서 `SRC-24` 해결 전 guest merge에 일반적인 same-key/same-hash replay 규칙을 임의 적용하지 않는다.
 
 Share Artifact create는 Use Case §21.1의 explicit idempotency-required write 목록에 포함되지 않는다. 그렇다고 non-idempotent semantics가 source-backed인 것도 아니므로 create/retry/raw-token lifecycle은 `SRC-20` 해결 전 normative idempotency model에 넣지 않는다.
 
@@ -102,6 +104,8 @@ Share Artifact create는 Use Case §21.1의 explicit idempotency-required write 
 503 AI_TEMPORARILY_UNAVAILABLE
 ```
 
+`MERGE_CONFLICT` code 이름을 유지할 수는 있지만, 해당 `details`의 positive schema/allowed resolution choices는 `SRC-24` 해결 전 source-backed contract로 승격하지 않는다.
+
 Cross-user object probing의 403/404 외부 표현은 implementation security policy로 일관되게 고정하며 raw ownership 여부를 노출하지 않는다.
 
 ## 7. Bootstrap / Identity / Guest
@@ -123,10 +127,28 @@ Auth: PUBLIC 또는 existing guest/member token.
 신규 가입 후 same guest subject를 member로 승격. auth identity proof 필수.
 
 ### `POST /api/auth/merge-guest`
-기존 Member 로그인 시 guest ownership proof + idempotency key로 merge job 생성/재개. Birth conflict 등 자동 병합 불가 항목은 `MERGE_CONFLICT` detail schema로 반환.
+UC-32가 요구하는 existing-Member Guest claim route다. Guest ownership proof, one Guest Session→one canonical destination, no raw immutable-ledger reparent, explicit conflict resolution principle, merge-job/action audit envelope는 source-backed다.
+
+그러나 production-authoritative full execution contract는 `SRC-24` 해결 전 승격하지 않는다. Source는 다음을 정의하지 않는다.
+
+```text
+participating domain/resource inventory
+duplicate/conflict classification algorithm
+conflicts_jsonb / resolution_jsonb positive schemas
+legal user resolution choices
+merge policy_version artifact/selection/retention
+domain resource → retain_readonly|import_new|merge_projection|discard planning
+per-domain import/merge transformation
+stale resolution + partial failure/resume semantics
+same idempotency key + different request/resolution behavior
+completed response-loss replay reconstruction
+deletion_pending member start/resume eligibility
+```
+
+따라서 `SRC-24` 해결 전 임의 `MERGE_CONFLICT` detail schema, generic request-hash conflict model, Birth/Memory/Relationship/Unlock/Episode merge formula를 product authority로 만들지 않는다. Relationship projection 변환은 추가로 `SRC-22`, Character Unlock 변환은 `SRC-23`, Episode transition/effect 의미는 적용 범위에서 `SRC-17`이 필요하다.
 
 ### `GET /api/auth/merge-jobs/:id`
-merge progress/read-only result.
+member-owned stored merge progress/conflict/result read-only projection. Existing `qry_subject_merge_job_v1` boundary는 `SRC-24`와 독립적으로 source-safe하다. 이 read는 merge start/resume 권한을 부여하지 않는다.
 
 ## 8. Home / Capability / Character
 
@@ -426,7 +448,9 @@ POST /api/admin/threads/:id/content-transition   # governed migration only
 - 모든 endpoint unknown field policy
 - Web/Mobile same fixture same schema
 - cross-user resource probe denial
-- guest bootstrap/promote/merge
+- guest bootstrap/promote
+- existing-Member merge-job current read + direct merged guest history authorization
+- full guest→existing-Member conflict/resolution/domain-action execution remains blocked until `SRC-24`
 - chat retry + abandon
 - reading clarification + transient retry 구분
 - target-person CRUD isolation
