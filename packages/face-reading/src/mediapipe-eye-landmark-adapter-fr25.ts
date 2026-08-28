@@ -14,6 +14,7 @@ export interface MediaPipeNormalizedLandmarkFR25V1 {
   readonly x: number;
   readonly y: number;
   readonly z: number;
+  readonly visibility?: number;
 }
 
 export interface MediaPipeFaceLandmarkerResultFR25V1 {
@@ -44,9 +45,16 @@ export interface MediaPipeEyeLandmarkAdapterEvidenceFR25V1 {
     readonly faceLandmarkerResultPath: 'mediapipe/tasks/web/vision/face_landmarker/face_landmarker_result.d.ts';
     readonly faceLandmarkerResultBlobSha: string;
   };
+  readonly runtimeShapeObservation: {
+    readonly packageVersion: '0.10.35';
+    readonly sourceDeclarationSupplementalFields: readonly [];
+    readonly observedSupplementalLandmarkFields: readonly ['faceLandmarks[].visibility'];
+    readonly treatment: 'finite_validate_then_discard';
+    readonly authorityState: 'runtime_shape_only';
+  };
   readonly faceSelectionPolicy: 'exactly_one_face';
   readonly consumedProviderFields: readonly ['faceLandmarks[].x', 'faceLandmarks[].y'];
-  readonly validatedButDiscardedProviderFields: readonly ['faceLandmarks[].z'];
+  readonly validatedButDiscardedProviderFields: readonly ['faceLandmarks[].z', 'faceLandmarks[].visibility'];
   readonly ignoredProviderResultFields: readonly ['faceBlendshapes', 'facialTransformationMatrixes'];
   readonly rawProviderResponsePersisted: false;
   readonly providerDepthPersisted: false;
@@ -81,9 +89,16 @@ export const MEDIAPIPE_EYE_LANDMARK_ADAPTER_EVIDENCE_FR25: MediaPipeEyeLandmarkA
     faceLandmarkerResultPath: 'mediapipe/tasks/web/vision/face_landmarker/face_landmarker_result.d.ts' as const,
     faceLandmarkerResultBlobSha: '4af483ab3c1c61b268b9d92a28bab6160c60b47f',
   }),
+  runtimeShapeObservation: Object.freeze({
+    packageVersion: '0.10.35' as const,
+    sourceDeclarationSupplementalFields: Object.freeze([] as const),
+    observedSupplementalLandmarkFields: Object.freeze(['faceLandmarks[].visibility'] as const),
+    treatment: 'finite_validate_then_discard' as const,
+    authorityState: 'runtime_shape_only' as const,
+  }),
   faceSelectionPolicy: 'exactly_one_face' as const,
   consumedProviderFields: Object.freeze(['faceLandmarks[].x', 'faceLandmarks[].y'] as const),
-  validatedButDiscardedProviderFields: Object.freeze(['faceLandmarks[].z'] as const),
+  validatedButDiscardedProviderFields: Object.freeze(['faceLandmarks[].z', 'faceLandmarks[].visibility'] as const),
   ignoredProviderResultFields: Object.freeze(['faceBlendshapes', 'facialTransformationMatrixes'] as const),
   rawProviderResponsePersisted: false as const,
   providerDepthPersisted: false as const,
@@ -103,7 +118,7 @@ export const FR25_REQUIRED_EYE_PROVIDER_VERTICES: Readonly<Record<ProviderEyeTop
 
 const ROOT_RESULT_KEYS = new Set(['faceLandmarks', 'faceBlendshapes', 'facialTransformationMatrixes']);
 const CONTEXT_KEYS = new Set(['providerRunRef', 'canonicalAssetDigest']);
-const RAW_LANDMARK_KEYS = new Set(['x', 'y', 'z']);
+const RAW_LANDMARK_KEYS = new Set(['x', 'y', 'z', 'visibility']);
 const HEX40 = /^[0-9a-f]{40}$/u;
 
 function exactKeys(value: object, allowed: ReadonlySet<string>, path: string): void {
@@ -128,8 +143,15 @@ function validateAdapterEvidenceFR25(): void {
     throw new FaceAuthorityValidationError('FR-25 raw landmark type evidence must remain aligned to the FR-16 upstream structure witness without release-exact promotion.');
   }
   if (evidence.runtimePackageName !== FACELAB_PROVIDER_ADAPTER_EVIDENCE_FR16.dependencyEvidence.packageName ||
-      evidence.runtimePackageVersion !== FACELAB_PROVIDER_ADAPTER_EVIDENCE_FR16.dependencyEvidence.packageVersion) {
-    throw new FaceAuthorityValidationError('FR-25 runtime package pin must match FR-16 dependency evidence.');
+      evidence.runtimePackageVersion !== FACELAB_PROVIDER_ADAPTER_EVIDENCE_FR16.dependencyEvidence.packageVersion ||
+      evidence.runtimeShapeObservation.packageVersion !== evidence.runtimePackageVersion) {
+    throw new FaceAuthorityValidationError('FR-25 runtime package pin and runtime-shape observation must match FR-16 dependency evidence.');
+  }
+  if (evidence.runtimeShapeObservation.sourceDeclarationSupplementalFields.length !== 0 ||
+      evidence.runtimeShapeObservation.observedSupplementalLandmarkFields.join('|') !== 'faceLandmarks[].visibility' ||
+      evidence.runtimeShapeObservation.treatment !== 'finite_validate_then_discard' ||
+      evidence.runtimeShapeObservation.authorityState !== 'runtime_shape_only') {
+    throw new FaceAuthorityValidationError('FR-25 supplemental runtime landmark fields must remain explicit runtime-shape-only evidence and must be discarded.');
   }
   if (evidence.authorityState !== 'research_adapter_only' ||
       evidence.productionProviderActivationAllowed !== false ||
@@ -157,6 +179,9 @@ function validateRawLandmarkFR25(
   }
   if (!Number.isFinite(landmark.z)) {
     throw new FaceAuthorityValidationError(`${path}.z must be finite before it is discarded.`);
+  }
+  if (landmark.visibility !== undefined && !Number.isFinite(landmark.visibility)) {
+    throw new FaceAuthorityValidationError(`${path}.visibility must be finite before it is discarded.`);
   }
   return Object.freeze({ x: landmark.x, y: landmark.y });
 }
@@ -227,6 +252,7 @@ export function assessMediaPipeEyeLandmarkAdapterFR25(): MediaPipeEyeAdapterRead
     traditionalSemanticAuthorityGranted: false as const,
     blockers: Object.freeze([
       'FR-25 raw Web type evidence is an upstream master structure witness, not release-exact source evidence for @mediapipe/tasks-vision@0.10.35',
+      'FR-25 real @mediapipe/tasks-vision@0.10.35 execution exposed supplemental landmark visibility not declared by the pinned upstream type witness; it is finite-validated and discarded as runtime-shape-only data',
       'K_beauty currently provides no inspected FaceLandmarker runtime implementation to attest as a verified FR-22 provider implementation',
       'FR-22 verified implementation registry and FR-23 reviewed conformance evidence registry remain empty',
       'provider LEFT/RIGHT topology labels remain provider-label provenance only and do not resolve anatomical laterality',

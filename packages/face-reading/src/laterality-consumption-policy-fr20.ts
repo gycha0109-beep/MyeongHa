@@ -1,8 +1,9 @@
 import { CAPTURE_ORIENTATION_AUTHORITY_FR19 } from './capture-orientation-authority-fr19.js';
 import {
-  FACELAB_NEUTRAL_BINDING_PROFILE_FR14,
+  FR14_NEUTRAL_BINDING_PROFILE_VERSION,
+  FR14_NEUTRAL_CONSUMER_SLOTS,
   type NeutralAnchorConsumerSlotV1,
-} from './neutral-provider-bindings-fr14.js';
+} from './neutral-provider-binding-contract-fr14.js';
 import { FaceAuthorityValidationError } from './validation.js';
 
 export type LateralitySemanticRequirementV1 =
@@ -100,57 +101,27 @@ export const LATERALITY_CONSUMPTION_POLICY_FR20: LateralityConsumptionPolicyFR20
   policyVersion: '0.1.0',
   authorityState: 'research_only' as const,
   captureOrientationAuthorityVersion: CAPTURE_ORIENTATION_AUTHORITY_FR19.authorityVersion,
-  neutralBindingProfileVersion: FACELAB_NEUTRAL_BINDING_PROFILE_FR14.profileVersion,
+  neutralBindingProfileVersion: FR14_NEUTRAL_BINDING_PROFILE_VERSION,
   currentCaptureState: 'file_upload_unknown_source_mirror' as const,
   classifications: Object.freeze([
-    Object.freeze({
-      consumerSlot: 'neutral.face.brow_midline' as const,
-      individualSemanticClass: 'side_invariant' as const,
-      pairGroupRef: null,
-    }),
-    Object.freeze({
-      consumerSlot: 'neutral.face.nose_region' as const,
-      individualSemanticClass: 'side_invariant' as const,
-      pairGroupRef: null,
-    }),
-    Object.freeze({
-      consumerSlot: 'neutral.face.left_brow_region' as const,
-      individualSemanticClass: 'image_side_only' as const,
-      pairGroupRef: 'pair.neutral.brows',
-    }),
-    Object.freeze({
-      consumerSlot: 'neutral.face.right_brow_region' as const,
-      individualSemanticClass: 'image_side_only' as const,
-      pairGroupRef: 'pair.neutral.brows',
-    }),
-    Object.freeze({
-      consumerSlot: 'neutral.face.left_eye_region' as const,
-      individualSemanticClass: 'image_side_only' as const,
-      pairGroupRef: 'pair.neutral.eyes',
-    }),
-    Object.freeze({
-      consumerSlot: 'neutral.face.right_eye_region' as const,
-      individualSemanticClass: 'image_side_only' as const,
-      pairGroupRef: 'pair.neutral.eyes',
-    }),
+    Object.freeze({ consumerSlot: 'neutral.face.brow_midline' as const, individualSemanticClass: 'side_invariant' as const, pairGroupRef: null }),
+    Object.freeze({ consumerSlot: 'neutral.face.nose_region' as const, individualSemanticClass: 'side_invariant' as const, pairGroupRef: null }),
+    Object.freeze({ consumerSlot: 'neutral.face.left_brow_region' as const, individualSemanticClass: 'image_side_only' as const, pairGroupRef: 'pair.neutral.brows' }),
+    Object.freeze({ consumerSlot: 'neutral.face.right_brow_region' as const, individualSemanticClass: 'image_side_only' as const, pairGroupRef: 'pair.neutral.brows' }),
+    Object.freeze({ consumerSlot: 'neutral.face.left_eye_region' as const, individualSemanticClass: 'image_side_only' as const, pairGroupRef: 'pair.neutral.eyes' }),
+    Object.freeze({ consumerSlot: 'neutral.face.right_eye_region' as const, individualSemanticClass: 'image_side_only' as const, pairGroupRef: 'pair.neutral.eyes' }),
   ]),
   pairGroups: Object.freeze([
     Object.freeze({
       pairGroupRef: 'pair.neutral.brows',
-      memberSlots: Object.freeze([
-        'neutral.face.left_brow_region',
-        'neutral.face.right_brow_region',
-      ] as const),
+      memberSlots: Object.freeze(['neutral.face.left_brow_region', 'neutral.face.right_brow_region'] as const),
       allowedRequirement: 'pair_swap_invariant' as const,
       requiresReviewedSwapInvariantOperation: true as const,
       anatomicalSideMeaningAllowed: false as const,
     }),
     Object.freeze({
       pairGroupRef: 'pair.neutral.eyes',
-      memberSlots: Object.freeze([
-        'neutral.face.left_eye_region',
-        'neutral.face.right_eye_region',
-      ] as const),
+      memberSlots: Object.freeze(['neutral.face.left_eye_region', 'neutral.face.right_eye_region'] as const),
       allowedRequirement: 'pair_swap_invariant' as const,
       requiresReviewedSwapInvariantOperation: true as const,
       anatomicalSideMeaningAllowed: false as const,
@@ -175,7 +146,7 @@ export function validateLateralityConsumptionPolicyFR20(
   if (policy.captureOrientationAuthorityVersion !== CAPTURE_ORIENTATION_AUTHORITY_FR19.authorityVersion) {
     throw new FaceAuthorityValidationError('FR-20 must pin the merged FR-19 capture orientation authority version.');
   }
-  if (policy.neutralBindingProfileVersion !== FACELAB_NEUTRAL_BINDING_PROFILE_FR14.profileVersion) {
+  if (policy.neutralBindingProfileVersion !== FR14_NEUTRAL_BINDING_PROFILE_VERSION) {
     throw new FaceAuthorityValidationError('FR-20 must pin the FR-14 neutral binding profile version.');
   }
   if (policy.currentCaptureState !== 'file_upload_unknown_source_mirror') {
@@ -185,7 +156,7 @@ export function validateLateralityConsumptionPolicyFR20(
     throw new FaceAuthorityValidationError('FR-20 anatomical-side semantic consumption must remain blocked.');
   }
 
-  const expectedSlots = FACELAB_NEUTRAL_BINDING_PROFILE_FR14.bindings.map((entry) => entry.consumerSlot);
+  const expectedSlots = FR14_NEUTRAL_CONSUMER_SLOTS;
   unique(policy.classifications.map((entry) => entry.consumerSlot), 'fr20.classificationSlots');
   if (policy.classifications.length !== expectedSlots.length) {
     throw new FaceAuthorityValidationError('FR-20 must classify exactly every FR-14 neutral consumer slot.');
@@ -212,9 +183,7 @@ export function validateLateralityConsumptionPolicyFR20(
     if (group.memberSlots.length !== 2 || group.memberSlots[0] === group.memberSlots[1]) {
       throw new FaceAuthorityValidationError(`FR-20 pair group requires two distinct members: ${group.pairGroupRef}`);
     }
-    if (group.allowedRequirement !== 'pair_swap_invariant' ||
-        group.requiresReviewedSwapInvariantOperation !== true ||
-        group.anatomicalSideMeaningAllowed !== false) {
+    if (group.allowedRequirement !== 'pair_swap_invariant' || group.requiresReviewedSwapInvariantOperation !== true || group.anatomicalSideMeaningAllowed !== false) {
       throw new FaceAuthorityValidationError(`FR-20 pair group contract mismatch: ${group.pairGroupRef}`);
     }
     for (const slot of group.memberSlots) {
