@@ -1,0 +1,42 @@
+name: Face Reading Default Network Runtime E2E
+
+on:
+  pull_request:
+    paths:
+      - 'packages/face-reading/**'
+      - 'scripts/face-reading-fr28-default-network-runtime-e2e.mjs'
+      - '.github/workflows/face-reading-default-network-runtime-e2e.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'packages/face-reading/**'
+      - 'scripts/face-reading-fr28-default-network-runtime-e2e.mjs'
+      - '.github/workflows/face-reading-default-network-runtime-e2e.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  fr28-default-network-runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install exact workspace dependencies
+        run: npm install --ignore-scripts
+      - name: Build MyeongHa runtime
+        run: npm run build
+      - name: Execute FR-26 default network factory in headless Chrome
+        run: node scripts/face-reading-fr28-default-network-runtime-e2e.mjs
+      - name: Upload FR-28 execution evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fr28-default-network-runtime-e2e
+          path: artifacts/face-reading/fr28-default-network-runtime-e2e.json
+          if-no-files-found: warn
+          retention-days: 14
