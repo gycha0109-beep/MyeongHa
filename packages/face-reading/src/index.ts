@@ -18,6 +18,7 @@ export * from './neutral-observation-schema-fr15.js';
 export * from './neutral-provider-bindings-fr14.js';
 export * from './nose-geometry.js';
 export * from './provider-adapter-evidence-fr16.js';
+export * from './provider-conformance-evidence-fr23.js';
 export * from './provider-release-attestation-fr18.js';
 export * from './research-diagnosis-runtime.js';
 export * from './research-pack-v0.js';
