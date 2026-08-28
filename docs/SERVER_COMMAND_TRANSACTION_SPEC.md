@@ -1,7 +1,7 @@
-# 명하 Server Command / Transaction Specification v0.7
+# 명하 Server Command / Transaction Specification v0.8
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.7**  
+> Pack Version: **v0.8**  
 > Date: **2026-08-28**  
 > Persistence Authority: `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`  
 > API Authority: `API_CONTRACT.md`
@@ -82,26 +82,60 @@ verify auth identity + guest token
 
 owner FK bulk move 없음.
 
-## 6. Existing-Member Guest Merge
+## 6. Existing-Member Guest Merge — relational skeleton only; executable workflow blocked by `SRC-24`
+
+UC-32/ERD가 고정한 구조적 순서는 다음과 같다.
 
 ```text
-verify both identities
-→ require canonical member target status=active (deletion_pending target deny)
-→ lock guest_session
-→ get/create one merge_job by idempotency
-→ detect conflicts
-→ if resolution required: stop awaiting_resolution
-→ for resolved command, apply domain merge actions deterministically
-→ mark guest subject merged→direct member
-→ consume session
-→ commit
+verify Guest ownership/session proof + Member identity
+→ serialize one Guest Session → one canonical merge job/destination
+→ inspect source-approved conflict set
+→ if source-approved resolution is required: await explicit user resolution
+→ plan/apply only source-approved domain merge actions
+→ keep immutable historical ledgers guest-owned
+→ on approved completion consume Guest Session
+→ guest subject status=merged, merged_into_subject_id=Member
+→ future normal writes use canonical Member
 ```
 
-Historical immutable ledger `subject_id` UPDATE 금지.
+이 순서는 **merge envelope와 safety invariant**를 고정할 뿐, conflict detector나 domain merge algorithm을 정의하지 않는다.
+
+`SRC-24` remains OPEN because primary source does not define:
+
+```text
+participating domain/resource inventory
+duplicate/conflict classification algorithm
+conflicts_jsonb / resolution_jsonb positive schemas
+legal resolution choices per domain
+merge policy_version artifact/selection/retention
+resource → retain_readonly|import_new|merge_projection|discard planning
+per-domain import_new / merge_projection transformation
+stale resolution handling
+failed action retry/resume/status transition semantics
+same idempotency key + different request/resolution behavior
+completed response-loss replay reconstruction
+member deletion_pending start/resume eligibility
+```
+
+ERD는 merge target relational validation을 `active/deletion_pending` member로 기술하지만, Pack이 `active` only로 좁혀 production rule로 확정할 source authority는 없다. `SRC-24` 해결 전 `deletion_pending` 대상에 대해 start/resume/finish 중 무엇을 허용하는지 임의 확정하지 않는다. 안전상 production mutation을 fail-close하는 것은 가능하지만 그것을 source-defined semantics라고 기록하지 않는다.
+
+Historical immutable ledger `subject_id` UPDATE는 금지다. Existing `qry_subject_merge_job_v1` current read와 direct merged guest lineage history projection은 stored authority를 읽기만 하므로 `SRC-24`와 독립적으로 유지할 수 있다.
 
 Relationship score/stage merge semantics require the source-approved relationship policy. `SRC-22` 해결 전 merge command가 relationship scores/stage를 임의 합산/재계산하지 않는다.
 
-Character Unlock merge/import semantics are not defined by UC-32 or ERD beyond historical ownership boundaries. `SRC-23` 해결 전 merge command가 guest/member unlock projections를 임의 OR/overwrite/re-evaluate하지 않는다 unless a separate source authority explicitly defines that merge action.
+Character Unlock merge/import semantics are not defined by UC-32 or ERD beyond historical ownership boundaries. `SRC-23` 해결 전 guest/member unlock projections를 임의 OR/overwrite/re-evaluate하지 않는다.
+
+Episode progress/state transformation이 필요한 merge action은 적용 범위에서 `SRC-17`의 transition/effect authority를 우회하지 않는다.
+
+따라서 다음은 `SRC-24` 해결 전 production-authoritative command로 승격하지 않는다.
+
+```text
+cmd_merge_guest_into_existing_member...
+merge conflict detector
+merge resolution validator
+merge action planner
+per-domain merge executor
+```
 
 ## 7. Birth Revision Append
 
@@ -524,6 +558,8 @@ Source가 Character Unlock 관련 downstream event/outbox schema를 아직 정�
 - same idempotency key concurrency → one logical command where source defines command identity
 - external timeout → no transaction held open
 - DB commit after external response loss → retry returns existing state where retry contract is source-defined
+- existing-Member Guest merge relational uniqueness/lineage/history-read invariants → testable now
+- existing-Member merge conflict classification/resolution/domain action/retry-resume semantics → blocked until `SRC-24`
 - chat commit + relationship score/stage mutation → blocked until `SRC-22`; after resolution both-or-neither atomicity required
 - relationship event ledger/revision structural invariants → testable now
 - relationship event→delta/stage/anti-farming correctness → blocked until `SRC-22`

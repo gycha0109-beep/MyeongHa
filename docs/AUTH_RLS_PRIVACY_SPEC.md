@@ -1,10 +1,10 @@
-# 명하 Auth / RLS / Privacy Specification v0.3 — Full Audit
+# 명하 Auth / RLS / Privacy Specification v0.4 — Source Aligned
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.3**  
-> Date: **2026-08-25**  
+> Pack Version: **v0.4**  
+> Date: **2026-08-28**  
 > Source Authority: `Usecase_re_reviewed_v2(1).md`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`, `Myeonghwa_Personalized_Interpretation_Architecture_v1.3_THIRD_REVIEW(1).md`  
-> Rule: source가 결정하지 않은 implementation-critical 사항은 `OPEN-P0`, 비차단 선택은 `CANDIDATE`, source 간 충돌은 `SOURCE_AUTHORITY_GAPS.md`에 기록한다.
+> Rule: source가 결정하지 않은 implementation-critical 사항은 `OPEN-P0`, 비차단 선택은 `CANDIDATE`, source 간 충돌/공백은 `SOURCE_AUTHORITY_GAPS.md` 또는 numbered source-gap 문서에 기록한다.
 
 ---
 
@@ -49,13 +49,46 @@ owner FK 이동 없음. promotion command는 auth identity proof + active guest 
 
 ## 5. Existing Member Merge
 
-- guest raw ledger reparent 금지
-- exactly one merge job per guest session
-- conflict detection / explicit resolution
-- canonical member에 필요한 current projection만 import/merge
-- guest subject = merged read-only lineage
-- 새 writes = canonical member only
-- merge command target member는 **active**여야 한다. ERD가 FK/trigger 차원에서 deletion_pending target을 표현 가능하더라도 deletion lifecycle 중인 계정으로 새 guest merge를 허용하는 권한으로 해석하지 않는다.
+Primary source가 고정하는 merge security/lifecycle envelope:
+
+- guest raw immutable ledger `subject_id` reparent 금지
+- one Guest Session → at most one canonical Member merge lineage
+- conflict detection과 필요한 explicit user resolution 원칙
+- source-approved 범위에서만 canonical member current projection import/merge
+- completed guest subject는 merged read-only lineage로 유지
+- merge 완료 뒤 새 writes는 canonical member만 수행
+- generic current endpoint에 merged guest history를 자동 union하지 않음
+- dedicated direct-lineage read는 canonical member authorization을 통해서만 허용
+
+그러나 source는 full existing-member merge executor에 필요한 다음 authority를 정의하지 않는다.
+
+```text
+domain/resource별 conflict taxonomy
+conflicts_jsonb positive schema
+resolution_jsonb schema / allowed choices
+policy_version content/selection/migration
+resource → retain_readonly | import_new | merge_projection | discard mapping
+domain별 import/merge algorithm
+stale resolution handling
+partial failure / retry / resume semantics
+same-key different-request semantics beyond the relational one-job envelope
+response-loss replay semantics
+canonical member status=deletion_pending에서 start/resume/finish 허용 범위
+```
+
+따라서 이 실행 policy는 `SRC-24`가 OPEN이다. 특히 ERD가 merge target을 `active/deletion_pending` relational envelope로 표현할 수 있다는 사실도, 반대로 Pack이 `active only`를 production product rule로 좁히는 것도 source resolution 없이 확정하지 않는다.
+
+현재 source-safe하게 유지 가능한 것은:
+
+```text
+subject_merge_jobs / subject_merge_actions relational envelope
+one-job/direct-lineage integrity
+merge-job current read
+completed direct merged guest lineage read-only projection
+raw historical ledger reparent deny
+```
+
+Full conflict detection → resolution → domain action apply → merge completion command는 `SRC-24` 해결 전 production-authoritative로 승격하지 않는다. Relationship/Character Unlock/Episode semantics가 merge action에 포함되면 각각 `SRC-22`/`SRC-23`/`SRC-17` 등 해당 domain authority도 추가로 필요하다.
 
 ## 6. Database Execution Identity — OPEN P0
 
@@ -114,8 +147,10 @@ Client가 보낸 `subject_id` header/body는 identity proof가 아니다.
 - normal current path: `row.subject_id = trusted current subject`
 - merged guest history: generic current policy에 union하지 않음
 - merged lineage read: dedicated view/command with direct one-hop lineage validation
-- merged lineage write: deny except controlled security/lifecycle service command
+- merged lineage write: deny except controlled security/lifecycle service command whose semantics are independently source-approved
 - service-only ledger/projection tables: client policy 없음
+
+`SRC-24` 해결 전 merge executor를 privileged lifecycle path라는 이유만으로 허용하지 않는다. Privilege boundary와 merge policy authority는 별개다.
 
 ## 9. Object-Level Authorization
 
@@ -138,6 +173,9 @@ client direct write 금지:
 - AI logs/outbox
 - deletion execution
 - content release activation
+- existing-member merge execution state/action mutation
+
+Service-only라고 해서 source gap이 해소되는 것은 아니다. Existing-member merge action mutation은 `SRC-24` 해결 범위에서만 가능하다.
 
 ## 11. Memory / Life Fact Privacy
 
@@ -202,6 +240,8 @@ Final account erase 순서는 `subjects` CHECK와 충돌하지 않게 canonical/
 
 Conversation-only delete는 confirmed Life Fact/Memory를 보존해야 하므로, 해당 source FK가 필요한 동안 message/turn identity tombstone을 보존하고 원문을 redaction하는 방식이 baseline이다. 삭제된 원문은 UI/AI context에서 재노출 금지.
 
+Canonical member가 deletion lifecycle에 들어간 동안 새로운 Guest merge를 시작/재개/완료할 수 있는 exact rule은 `SRC-24` 해결 전 임의 확정하지 않는다.
+
 ## 16. Admin / Content Security
 
 `ADMIN_CONTENT`는 일반 member auth와 별도 authorization scope. Content bundle register/release activation은 actor/audit provenance 필수. Canon authoring은 Git review가 authority.
@@ -215,9 +255,13 @@ Conversation-only delete는 confirmed Life Fact/Memory를 보존해야 하므로
 - merged guest generic endpoint → deny
 - merged history dedicated endpoint → read-only allow
 - merged history write → deny
+- merge-job current read → canonical member owner only
+- raw historical ledger reparent → deny
+- full existing-member conflict/resolution/action executor → excluded from production PASS until `SRC-24`
 - service-only client write → deny
 - revoked grant → context exclusion
 - future character → old grant deny
 - share token → minimized share only
 - deletion_pending subject → new AI/Saju/purchase deny
+- deletion_pending member merge lifecycle → no source-invented allow/deny claim before `SRC-24`
 - P0-AUTH-01 selected model RLS negative tests PASS before production baseline

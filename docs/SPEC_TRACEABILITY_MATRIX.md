@@ -1,7 +1,7 @@
-# 명하 Specification Traceability Matrix v0.9
+# 명하 Specification Traceability Matrix v0.10
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.9**  
+> Pack Version: **v0.10**  
 > Date: **2026-08-28**  
 > Authority: `Usecase_re_reviewed_v2(1).md`의 UC-01~UC-34(UC-16A 포함)  
 > Rule: Use Case가 implementation spec과 verification gate에 연결되지 않으면 구현 완료로 간주하지 않는다.
@@ -59,7 +59,7 @@ COVERED-SOURCE-GAP
 | UC-29 | unsupported Saju fail-closed | `SAJU_INTEGRATION`, `AI_CHARACTER_RUNTIME`, `API_CONTRACT` | §8 Saju, §9 AI | COVERED |
 | UC-30 | Birth 수정/revision/stale | `API_CONTRACT`, `SAJU_INTEGRATION`, `DB_DDL_MIGRATION` | §4 DB, §6 API, §8 Saju | COVERED |
 | UC-31 | 대화 삭제/캐릭터 forget/Life Fact revoke 분리 | `API_CONTRACT`, `AUTH_RLS_PRIVACY`, `RELATIONSHIP_MEMORY_POLICY`, `SOURCE_AUTHORITY_GAPS` | §5 Auth, §10 Relationship/Memory, §14 Deletion | COVERED-SOURCE-GAP (`SRC-14` duplicate transcript redaction authority; `P0-PR-01` retention also open) |
-| UC-32 | Guest → 기존 Member merge | `API_CONTRACT`, `AUTH_RLS_PRIVACY`, `DB_DDL_MIGRATION`, `RELATIONSHIP_MEMORY_POLICY` | §4 DB, §5 Auth, §6 API, §14 Deletion | COVERED-SOURCE-GAP (`SRC-22` if merge imports/recomputes relationship score/stage; historical ledger raw reparent remains forbidden) |
+| UC-32 | Guest → 기존 Member merge | `API_CONTRACT`, `AUTH_RLS_PRIVACY`, `DB_DDL_MIGRATION`, `SERVER_COMMAND_TRANSACTION_SPEC`, `SOURCE_AUTHORITY_GAPS` | §4 DB, §5 Auth, §6 API, §14 Deletion | COVERED-SOURCE-GAP (`SRC-24` conflict classification + conflicts/resolution schemas + domain action planning/apply + retry/resume/member-lifecycle authority; `SRC-22` additionally for relationship projection transformation, `SRC-23` for Character Unlock transformation, `SRC-17` where Episode transition/effect semantics are involved; stored merge-job read + direct merged-history lineage remain available) |
 | UC-33 | AI/Saju partial failure/retry | `API_CONTRACT`, `AI_CHARACTER_RUNTIME`, `SAJU_INTEGRATION`, `DB_DDL_MIGRATION`, `SERVER_COMMAND_TRANSACTION_SPEC.md` | §7 Chat, §8 Saju, §17 Failure | COVERED-P0 (`P0-AI-01`, `P0-SA-01`); Saju guard metadata also `SRC-09` |
 | UC-34 | account data deletion | `AUTH_RLS_PRIVACY`, `API_CONTRACT`, `DB_DDL_MIGRATION`, `RELEASE_OBSERVABILITY` | §14 Deletion, §19 Promotion | COVERED-P0 (`P0-PR-01`) |
 
@@ -78,6 +78,7 @@ COVERED-SOURCE-GAP
 | record grant create/regrant authority | `RELATIONSHIP_MEMORY_POLICY`, `API_CONTRACT`, `SOURCE_AUTHORITY_GAPS.md` (`SRC-10`) | create/regrant/idempotency gate blocked pending source resolution |
 | relationship event apply policy authority | `RELATIONSHIP_MEMORY_POLICY`, `SHARED_DOMAIN_CONTRACTS`, `SERVER_COMMAND_TRANSACTION_SPEC`, `SOURCE_AUTHORITY_GAPS` (`SRC-22`) | event registry/payload, score bounds/delta, stage transition, anti-farming, concurrency apply gate blocked pending source resolution; ledger/revision structure remains testable |
 | Character Unlock condition/effect authority | `CHARACTER_WORLD_CONTENT`, `SERVER_COMMAND_TRANSACTION_SPEC`, `SOURCE_AUTHORITY_GAPS` (`SRC-23`) | unlock condition schema, World Event payload/causality, condition→target/effect, replay/concurrency and bundle-migration gate blocked; stored projection/current-read remains testable |
+| existing-Member Guest merge policy authority | `API_CONTRACT`, `AUTH_RLS_PRIVACY`, `SERVER_COMMAND_TRANSACTION_SPEC`, `SOURCE_AUTHORITY_GAPS` (`SRC-24`) | conflict classification, conflicts/resolution schema, domain action planning/apply, stale-resolution, retry/resume and member-lifecycle gate blocked; merge-job current read + direct merged-history projection remain testable |
 | episode progress single-projection bundle selection | `CHARACTER_WORLD_CONTENT`, `API_CONTRACT`, `SOURCE_AUTHORITY_GAPS.md` (`SRC-11`) | `GET /api/episodes/:id/progress` projection gate blocked pending source resolution |
 | notification preference missing-row/default/materialization | `NOTIFICATION_RETURN_LOOP`, `API_CONTRACT`, `SOURCE_AUTHORITY_GAPS.md` (`SRC-12`) | preference mutation/default gate blocked pending source resolution |
 | notification inbox status membership | `NOTIFICATION_RETURN_LOOP`, `API_CONTRACT`, `SOURCE_AUTHORITY_GAPS.md` (`SRC-13`) | inbox projection gate blocked pending source resolution |

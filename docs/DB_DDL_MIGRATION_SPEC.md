@@ -1,7 +1,7 @@
-# 명하 DB DDL / Migration Specification v0.6 — Source Aligned
+# 명하 DB DDL / Migration Specification v0.7 — Source Aligned
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.6**  
+> Pack Version: **v0.7**  
 > Date: **2026-08-28**  
 > Source Authority: `Usecase_re_reviewed_v2(1).md`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`, `Myeonghwa_Personalized_Interpretation_Architecture_v1.3_THIRD_REVIEW(1).md`  
 > Rule: source가 결정하지 않은 implementation-critical 사항은 `OPEN-P0` 또는 `SOURCE_AUTHORITY_GAPS.md`/numbered source-gap 문서에 남긴다.
@@ -25,6 +25,7 @@ ERD v0.6의 59-table schema catalog를 PostgreSQL migration으로 옮길 때 필
 - `SRC-21`이 해결되기 전 entitlement event→grant transition/aggregate recompute function을 source-authoritative command로 추가하지 않는다.
 - `SRC-22`가 해결되기 전 Relationship Event의 score bounds, event→delta, stage transition, anti-farming을 계산하는 registry/table/function/condition DSL을 Pack이 임의로 추가하지 않는다. Existing relationship state/event relational DDL은 유지 가능하다.
 - `SRC-23`이 해결되기 전 Character Unlock의 condition DSL/schema, World Event→target mapping, unlock evaluator/reward registry/table/function을 Pack이 임의로 추가하지 않는다. Existing `world_events`/`character_unlocks` relational DDL은 유지 가능하다.
+- `SRC-24`가 해결되기 전 existing-member Guest merge의 conflict taxonomy/schema, resolution schema, policy-version semantics, domain action mapping/evaluator, retry/resume state machine 또는 `deletion_pending` target lifecycle rule을 Pack이 임의로 추가하지 않는다. Existing `subject_merge_jobs`/`subject_merge_actions` relational DDL과 source-safe current/direct-lineage reads는 유지 가능하다.
 - `P0-AUTH-01` RLS execution identity가 결정되기 전에는 RLS policy SQL을 **candidate**로만 작성하고 production security baseline으로 승격하지 않는다.
 
 ## 3. Migration Layout
@@ -131,6 +132,8 @@ source_world_event_id same-subject FK
 
 이 FK/shape는 causal provenance의 **구조**만 보장한다. 해당 World Event가 그 `character_id`를 unlock할 자격이 있는지는 `SRC-23` condition/effect authority 없이는 DB CHECK로 임의 추론하지 않는다.
 
+Existing-member Guest merge의 source-complete DDL-native 범위도 relational envelope까지다. `subject_merge_jobs`/`subject_merge_actions`의 PK/FK/UNIQUE/CHECK/one-job/direct-lineage constraints를 enforce할 수 있지만, constraint가 존재한다는 사실을 domain conflict/action evaluator로 해석하지 않는다.
+
 ## 8. Constraint Trigger Catalog
 
 최소 family:
@@ -148,6 +151,8 @@ ct_memory_proposal_source_character
 tr_content_projection_immutable
 tr_append_only_ledgers
 ```
+
+`ct_subject_merge_target_valid`는 ERD의 relational target/lineage integrity를 enforce하는 trigger다. `SRC-24` 해결 전 이를 `active only`, conflict taxonomy, resolution correctness, domain action eligibility 같은 production merge policy evaluator로 확장하지 않는다.
 
 Relationship/episode/commerce/world-unlock처럼 allocator + row lock + multiple mutations가 핵심인 transition은 무리하게 trigger에 숨기지 않고 server command/procedure transaction으로 유지한다. 단, 해당 command가 source gap으로 막혀 있으면 relational constraints만 구현하고 policy/evaluator function은 만들지 않는다.
 
@@ -184,16 +189,19 @@ Source gap이 있는 command는 shell/table existence만으로 production-comple
 특히:
 
 ```text
-episode transition evaluator               → SRC-17
-purchase-derived entitlement target         → SRC-18
-entitlement event apply/aggregate            → SRC-21
-relationship event score/stage policy apply  → SRC-22
-character unlock condition/effect apply      → SRC-23
+episode transition evaluator                → SRC-17
+purchase-derived entitlement target          → SRC-18
+entitlement event apply/aggregate             → SRC-21
+relationship event score/stage policy apply   → SRC-22
+character unlock condition/effect apply       → SRC-23
+existing-member Guest merge policy/executor   → SRC-24
 ```
 
 `SRC-22` 해결 전 Relationship apply command가 caller-supplied `delta_*` 또는 next stage를 trusted input으로 받아 persistence하는 방식도 금지한다. 그것은 source-required Relationship Engine authority를 구현한 것이 아니다.
 
 `SRC-23` 해결 전 Character Unlock command가 caller-supplied `character_id`, `unlock=true`, arbitrary condition result, 또는 same-owner `source_world_event_id`를 자격 증명처럼 신뢰하는 방식도 금지한다.
+
+`SRC-24` 해결 전 merge command가 caller/service-supplied `conflicts_jsonb`, `resolution_jsonb`, `action_type`, domain result 또는 Pack-invented `policy_version` semantics를 trusted authority로 받아 completed merge를 만드는 방식도 금지한다. ERD의 one-job/action ledger는 결과를 **표현**할 수 있다는 뜻이지 어떤 결과가 옳은지를 정의하지 않는다.
 
 ## 10. Append-only / Immutable Policy
 
@@ -218,6 +226,8 @@ Published immutable projection:
 
 `character_unlocks`는 current projection이며 append-only ledger가 아니다. 하지만 current projection write가 허용된다는 사실은 unlock eligibility/effect authority가 해결됐다는 뜻이 아니다.
 
+Merged guest의 historical user-owned ledger는 full merge가 source-resolved되더라도 raw `subject_id` UPDATE로 canonical member에 reparent하지 않는다. Source-approved merge는 current projection import/merge와 direct read-only lineage를 통해 구성되어야 한다.
+
 ## 11. RLS Integration
 
 Authority: `AUTH_RLS_PRIVACY_SPEC.md`, `OPEN-P0: P0-AUTH-01`.
@@ -230,6 +240,8 @@ DDL draft 단계:
 - guest direct DB access 없음
 
 P0-AUTH-01 미결정 상태에서 service-role bypass를 RLS PASS로 기록 금지.
+
+Merged guest history는 generic current subject policy에 union하지 않고 dedicated direct-lineage read를 사용한다. `SRC-24`는 merge **write policy** blocker이며 이미 source-safe한 direct-lineage read authority를 막지 않는다.
 
 ## 12. Hash / Fingerprint
 
@@ -246,6 +258,8 @@ Relationship state/event ERD에는 `policy_version`만 있고 relationship polic
 
 Character Unlock ERD에는 condition version/hash/bundle pin 컬럼이 없다. `SRC-23` 해결 전 Pack이 unlock evaluator provenance를 위해 임의 condition hash/version 컬럼이나 registry table을 추가하지 않는다. Source가 추가 provenance를 요구하면 ERD-compatible contract 또는 explicit ERD revision이 먼저 필요하다.
 
+Subject merge ERD에는 `policy_version`, `conflicts_jsonb`, `resolution_jsonb`, action rows가 존재하지만 source가 이 값들의 executable content semantics를 정의하지 않는다. `SRC-24` 해결 전 Pack이 특정 policy hash/registry, conflict schema registry 또는 action-policy table을 source authority처럼 추가하지 않는다.
+
 ## 13. JSON Contract Validation
 
 JSONB column이 `validated`라고 적혀 있으면 실제 validator source가 있어야 한다.
@@ -258,6 +272,8 @@ JSONB column이 `validated`라고 적혀 있으면 실제 validator source가 �
 Relationship Event `payload_jsonb`는 source가 exact event schema를 정의하지 않았으므로 `SRC-22` 해결 전 production Relationship apply payload validator를 임의 schema로 확정하지 않는다.
 
 World Event `payload_jsonb`도 Character Unlock causality에 필요한 exact event/payload schema가 source에 없으므로 `SRC-23` 해결 전 unlock evaluator용 arbitrary JSON schema를 authority로 확정하지 않는다.
+
+`subject_merge_jobs.conflicts_jsonb`와 `resolution_jsonb`는 storage envelope가 존재해도 positive executable schema가 source에 없다. `SRC-24` 해결 전 blacklist-only 또는 Pack-invented JSON shape를 production merge validator로 확정하지 않는다.
 
 ## 14. Seed Data
 
@@ -274,6 +290,8 @@ Product→entitlement mapping은 `SRC-18` 미해결이므로 invented `ProductFu
 Relationship event→delta/stage policy seed/registry도 `SRC-22` 미해결 상태에서는 source authority라고 추가하지 않는다.
 
 Character unlock condition/effect registry나 World Event→character mapping seed도 `SRC-23` 미해결 상태에서는 source authority라고 추가하지 않는다.
+
+Existing-member merge conflict/action policy registry나 default policy seed도 `SRC-24` 미해결 상태에서는 source authority라고 추가하지 않는다.
 
 ## 15. Schema Catalog Diff
 
@@ -314,7 +332,7 @@ ERD v0.6 section 23 + v0.2 추가 findings를 최소 gate로 사용.
 - material ambiguity source preserved in reading_ref path
 - unknown JSON contract key cannot execute server command
 - RLS forged subject context deny after P0-AUTH-01
-- deletion_pending subject command gate deny
+- deletion_pending subject command gate deny where source defines the command denial
 - session-only/reject proposal derivative payload does not persist indefinitely (`SRC-05` resolution)
 - standalone target/birth privacy deletion dependency graph (`SRC-06` resolution)
 - manual commerce provider resolution has audited proof or remains disabled (`SRC-07`)
@@ -325,6 +343,8 @@ ERD v0.6 section 23 + v0.2 추가 findings를 최소 gate로 사용.
 - no invented relationship policy registry/content-hash column/evaluator before `SRC-22` resolution
 - Character Unlock status/timestamp/revision/owner/source-FK relational invariants remain enforced
 - no invented unlock condition DSL/World Event→target evaluator/unlock-policy provenance column before `SRC-23` resolution
+- subject merge one-job/direct-lineage/raw-reparent relational invariants remain enforced
+- no invented merge conflict/resolution schema, domain action evaluator, retry/resume state machine, or deletion_pending merge lifecycle policy before `SRC-24` resolution
 
 ## 18. Promotion Gate
 
@@ -335,7 +355,7 @@ source blocker relevant to schema/command = CLOSED or affected feature explicitl
 → schema catalog diff = 0
 → constraint/trigger negative PASS
 → RLS negative PASS (P0-AUTH-01 DECIDED)
-→ concurrency/idempotency PASS
+→ concurrency/idempotency PASS where source defines that behavior
 → Engineering Slice E2E PASS
 → migration baseline candidate
 ```
@@ -343,3 +363,5 @@ source blocker relevant to schema/command = CLOSED or affected feature explicitl
 Relationship relational schema may remain in the baseline while authoritative score/stage mutation is disabled pending `SRC-22`.
 
 World Event / Character Unlock relational schema and stored current-read projection may remain in the baseline while authoritative unlock eligibility/effect mutation is disabled pending `SRC-23`.
+
+AUTH/OWNER merge tables, merge-job current read, and direct merged guest lineage read may remain in the baseline while full existing-member merge conflict/resolution/action execution is disabled pending `SRC-24`.
