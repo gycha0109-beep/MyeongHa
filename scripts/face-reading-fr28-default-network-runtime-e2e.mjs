@@ -289,8 +289,11 @@ async function main() {
   };
 })()`;
       const evaluationPromise = cdp.command('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true, timeout: 90000 });
-      const timeoutPromise = new Promise((_, rejectPromise) => setTimeout(() => rejectPromise(new Error(`FR-28 CDP evaluation timeout. console=${JSON.stringify(cdp.consoleEvents)} exceptions=${JSON.stringify(cdp.exceptionEvents)} chrome=${chromeStderr}`)), 95000));
-      const evaluation = await Promise.race([evaluationPromise, timeoutPromise]);
+      let evaluationTimer;
+      const timeoutPromise = new Promise((_, rejectPromise) => {
+        evaluationTimer = setTimeout(() => rejectPromise(new Error(`FR-28 CDP evaluation timeout. console=${JSON.stringify(cdp.consoleEvents)} exceptions=${JSON.stringify(cdp.exceptionEvents)} chrome=${chromeStderr}`)), 95000);
+      });
+      const evaluation = await Promise.race([evaluationPromise, timeoutPromise]).finally(() => clearTimeout(evaluationTimer));
       if (evaluation.exceptionDetails) throw new Error(`FR-28 browser exception: ${JSON.stringify(evaluation.exceptionDetails)}`);
       const result = evaluation.result?.value;
       console.log(`FR28_RUNTIME ${JSON.stringify(result)}`);
