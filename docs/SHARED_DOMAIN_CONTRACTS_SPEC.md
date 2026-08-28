@@ -1,7 +1,7 @@
-# 명하 Shared Domain Contracts Specification v0.5
+# 명하 Shared Domain Contracts Specification v0.6 — Source Aligned
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.5**  
+> Pack Version: **v0.6**  
 > Date: **2026-08-28**  
 > Purpose: 여러 spec에 흩어진 free-form string/JSON을 bounded versioned contract로 묶는다. Source가 contract shape를 정의하지 않은 영역은 registry를 임의 생성하지 않는다.
 
@@ -48,6 +48,8 @@ Relationship transition rule은 source가 versioned policy로 관리하라고 �
 
 Commerce의 purchased product → entitlement mapping은 현재 source-backed registry contract가 없으며 `SRC-18`로 분리한다. 기존 Pack의 `ProductFulfillmentDefinition`은 source authority로 취급하지 않는다.
 
+Life Fact/Character Memory는 versioned type/schema validation이 **필수**라는 authority까지 source-complete지만, final positive type inventory와 schema content가 없다. Personal-record registry authority는 `SRC-25`가 OPEN이다.
+
 ## 2. Chat Structured Action Registry
 
 `POST /api/chat`의 structured action은 **대화 intent 입력**만 표현한다. 다른 aggregate를 직접 변경하는 command를 chat action으로 중복 노출하지 않는다.
@@ -80,7 +82,36 @@ Planner output의 `intent`, `sceneIntent`, `requiredLifeFactTypes`, `requestedAc
 
 Planner가 unknown/unresolved key를 제안하면 Capability Gate는 실행하지 않는다.
 
-## 4. Life Fact / Memory Schemas
+`requiredLifeFactTypes`의 실제 requestable key set은 `SRC-25` 해결 전 Pack example/LLM string으로 확정하지 않는다. Source의 `employment_status` 예시는 final registry라는 뜻이 아니다.
+
+## 4. Life Fact / Memory Schemas — `SRC-25` OPEN
+
+Primary source fixes the following boundary:
+
+```text
+Life Fact
+→ fact_type + schema_version
+→ value_jsonb must be validated against a type-specific versioned schema
+→ unknown type/version is not stored long-term
+
+Character Memory
+→ memory_type = versioned contract key
+→ schema_version required
+→ content_jsonb = validated structured memory
+```
+
+But source does **not** define the complete positive registry needed to execute that validation:
+
+```text
+final LifeFactType allowlist
+positive value schema per LifeFactType/version
+final MemoryType allowlist
+positive content schema per MemoryType/version
+schema canonicalization / evolution / legacy-write rules
+planner/capability exposure of requestable Life Fact types
+```
+
+An earlier Pack shape:
 
 ```ts
 interface VersionedRecordTypeDefinition {
@@ -92,7 +123,17 @@ interface VersionedRecordTypeDefinition {
 }
 ```
 
-`value_jsonb` / `content_jsonb`는 해당 schema validation 통과 후만 저장한다.
+is **not a primary-source-defined interface**. The source requires versioned validation, but does not define `valueSchemaRef`, `allowedSources`, or `retentionClass` as this registry object's normative fields.
+
+Therefore until `SRC-25` resolves the registry:
+
+- do not treat `employment_status`, `relationship_status`, `planned_event` examples as a closed production allowlist;
+- do not accept arbitrary `type:string + value:unknown`;
+- do not let LLM/planner invent record type keys;
+- do not promote durable Life Fact/Memory creation as source-complete merely because relational columns exist;
+- unknown/unresolved type+schema pairs fail closed with no durable value.
+
+Already-valid stored record reads, revoke behavior, Life Fact supersession lineage constraints, and grant/context filtering remain independently testable.
 
 ## 5. Relationship / World Event Boundary
 
@@ -240,7 +281,9 @@ interface NotificationPolicyDefinitionV1 {
 ## 10. Verification
 
 - unknown PlannedAction → no command execution
-- unknown LifeFact schema → no persistence
+- unresolved/unknown LifeFact type/schema → no durable persistence before `SRC-25` resolution
+- unresolved/unknown Memory type/schema → no durable persistence before `SRC-25` resolution
+- already-valid stored personal-record read/revoke/supersession lineage remains testable
 - unresolved/unknown Relationship event candidate → no authoritative relationship mutation before `SRC-22` resolution
 - relationship delta/stage/anti-farming evaluator → blocked until `SRC-22`
 - unknown cue → no arbitrary asset resolution

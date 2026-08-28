@@ -1,7 +1,7 @@
-# 명하 Shared API Contract v0.6 — Source Aligned
+# 명하 Shared API Contract v0.7 — Source Aligned
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.6**  
+> Pack Version: **v0.7**  
 > Date: **2026-08-28**  
 > Source Authority: `Usecase_re_reviewed_v2(1).md`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`, `Myeonghwa_Personalized_Interpretation_Architecture_v1.3_THIRD_REVIEW(1).md`  
 > Rule: source가 결정하지 않은 implementation-critical 사항은 `OPEN-P0`, 비차단 선택은 `CANDIDATE`, source 간 충돌/공백은 `SOURCE_AUTHORITY_GAPS.md` 또는 numbered source-gap 문서에 기록한다.
@@ -57,8 +57,9 @@ Guest raw token은 API에서 fingerprint 검증 후 subject resolve. DB direct a
 ## 4. Input Strictness
 
 - JSON object는 endpoint contract의 unknown top-level fields를 기본 reject한다.
-- `structuredAction`, Life Fact, Memory, event payload는 versioned discriminated schema를 사용한다.
-- arbitrary `type:string + payload:unknown`을 command dispatch에 직접 사용하지 않는다.
+- `structuredAction`, Life Fact, Memory, event payload는 source-approved versioned discriminated schema가 존재하는 범위에서만 실행 authority로 사용한다.
+- arbitrary `type:string + payload:unknown`을 command dispatch 또는 durable personal-record persistence에 직접 사용하지 않는다.
+- Life Fact/Memory positive type-schema registry는 `SRC-25` 해결 전 Pack example/interface로 대체하지 않는다.
 
 ## 5. Idempotency Model
 
@@ -145,7 +146,7 @@ completed response-loss replay reconstruction
 deletion_pending member start/resume eligibility
 ```
 
-따라서 `SRC-24` 해결 전 임의 `MERGE_CONFLICT` detail schema, generic request-hash conflict model, Birth/Memory/Relationship/Unlock/Episode merge formula를 product authority로 만들지 않는다. Relationship projection 변환은 추가로 `SRC-22`, Character Unlock 변환은 `SRC-23`, Episode transition/effect 의미는 적용 범위에서 `SRC-17`이 필요하다.
+따라서 `SRC-24` 해결 전 임의 `MERGE_CONFLICT` detail schema, generic request-hash conflict model, Birth/Memory/Relationship/Unlock/Episode merge formula를 product authority로 만들지 않는다. Relationship projection 변환은 추가로 `SRC-22`, Character Unlock 변환은 `SRC-23`, Episode transition/effect 의미는 적용 범위에서 `SRC-17`이 필요하다. 새 durable Life Fact/Memory import를 만드는 merge action은 추가로 `SRC-25` positive record schema authority가 필요하다.
 
 ### `GET /api/auth/merge-jobs/:id`
 member-owned stored merge progress/conflict/result read-only projection. Existing `qry_subject_merge_job_v1` boundary는 `SRC-24`와 독립적으로 source-safe하다. 이 read는 merge start/resume 권한을 부여하지 않는다.
@@ -186,6 +187,8 @@ turn RECEIVED + authoritative user message
 → atomic commit
 → controlled reveal
 ```
+
+Planner/LLM이 `requiredLifeFactTypes`, record type, schema version 또는 proposed JSON을 출력해도 source-approved personal-record registry가 없으면 durable Life Fact/Memory authority로 승격하지 않는다. `SRC-25` 해결 전 example key나 free-form key를 저장 authority로 사용하지 않는다.
 
 ### `GET /api/chat/:threadId`
 sequence cursor authoritative stream.
@@ -287,12 +290,23 @@ public-safe stored snapshot only; active + unexpired artifact만 허용하며 pr
 
 ```text
 GET    /api/life-record
-POST   /api/life-record
-PATCH  /api/life-record/:id     # superseding fact append, not raw overwrite
-DELETE /api/life-record/:id     # revoke/deletion workflow semantics
+POST   /api/life-record            # route required by Use Case; durable value create SRC-25 BLOCKED
+PATCH  /api/life-record/:id        # supersession lineage source-safe; new value validation SRC-25 BLOCKED
+DELETE /api/life-record/:id        # revoke/deletion workflow semantics
 ```
 
-Mutation은 fact schema version + expected current lineage state를 요구한다.
+Source fixes the Life Fact history/provenance model and requires a fact-type-specific versioned validator. It explicitly says unknown fact type/schema version must not be stored long-term.
+
+However source does not define the final normative `LifeFactType` allowlist or positive value schema. `employment_status/v1`, `relationship_status/v1`, and `planned_event/v1` are examples, not a production registry.
+
+Therefore:
+
+- existing Life Record read remains valid;
+- owner-scoped revoke remains valid;
+- same-type no-branch/no-cycle supersession lineage and concurrency remain valid;
+- `POST /api/life-record` cannot production-authoritatively create an arbitrary new durable value before `SRC-25`;
+- `PATCH /api/life-record/:id` cannot treat an unapproved type/schema/value as valid merely because the lineage transition is correct;
+- generic `factType:string + schemaVersion:string + value:unknown` is not a production contract.
 
 ### Memory
 
@@ -307,6 +321,8 @@ POST   /api/characters/:id/forget
 
 `forget`은 해당 캐릭터가 접근하는 active memory/Life Fact grants를 revoke하는 command다. shared memory item/Life Fact 원본이나 다른 캐릭터의 grants를 삭제하지 않는다.
 
+ERD requires `memory_type` to be a versioned contract key and `content_jsonb` to be validated structured memory, but source does not define the final MemoryType/positive schema registry. Existing valid Memory reads/revokes remain source-safe; new durable Memory value creation is `SRC-25` gated.
+
 ### Memory Proposal
 
 ```text
@@ -315,11 +331,11 @@ POST /api/memory/proposals/:id/reject
 POST /api/memory/proposals/:id/session-only
 ```
 
-- `accept`: long-term Life Fact/Memory + explicit grants.
 - `reject`: 장기 저장 없음.
 - `session-only`: 장기 Life Fact/Memory로 승격하지 않고 active thread ephemeral context에만 사용. `SRC-05` 해결 전 proposal staging payload를 장기 shadow record로 유지하는 구현도 금지.
+- `accept`: source principle requires exactly one long-term Life Fact OR Memory plus the approved visibility/grant result, but production-authoritative record creation requires `SRC-25` positive type/schema validation and applicable `SRC-10` grant authority.
 
-`accept` grant choice:
+`accept` grant choice envelope:
 
 ```ts
 type GrantChoice =
@@ -327,6 +343,8 @@ type GrantChoice =
  | { mode:'current_characters' } // approval-time currently accessible character snapshot
  | { mode:'private' };
 ```
+
+This grant-choice shape does not authorize an unregistered personal-record payload. `record_type/schema_version/proposed_value_jsonb` from a proposal is candidate input until validated by the source-approved registry.
 
 ## 14. Relationship / Episodes
 
@@ -436,6 +454,8 @@ POST /api/admin/threads/:id/content-transition   # governed migration only
 - remote content requires minClientCapability
 - version negotiation 결과는 response meta에 기록
 
+For personal records, old/new schema compatibility cannot be inferred from the generic API version. Writable vs legacy-read behavior for Life Fact/Memory types is `SRC-25` authority.
+
 ## 20. Pagination / Ordering
 
 - messages: `(thread_id, sequence_no)` cursor
@@ -454,6 +474,10 @@ POST /api/admin/threads/:id/content-transition   # governed migration only
 - chat retry + abandon
 - reading clarification + transient retry 구분
 - target-person CRUD isolation
+- Life Record existing stored read/revoke + Life Fact supersession lineage
+- direct new durable Life Fact create positive type/value validation remains blocked until `SRC-25`
+- Memory Proposal long-term accept positive Life Fact/Memory schema validation remains blocked until `SRC-25`
+- unresolved/unknown personal-record type/schema → no durable persistence
 - session-only memory no long-term row
 - grant revoke context exclusion
 - Device Installation standalone revoke ownership/lifecycle
