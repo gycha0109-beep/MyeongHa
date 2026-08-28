@@ -119,6 +119,19 @@ jobs:
             PGDATABASE="$profile_db" psql -v ON_ERROR_STOP=1 -f "$migration" >/dev/null
           done
           PGDATABASE="$profile_db" bash test/db/profile_patch_concurrency.sh
+      - name: Run Character bundle catalog/capability projection tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          character_db=myeongha_character_bundle_query_test
+          createdb "$character_db"
+          trap 'dropdb --if-exists "$character_db"' EXIT
+          PGDATABASE="$character_db" psql -v ON_ERROR_STOP=1 -f test/db/bootstrap_supabase_auth_stub.sql
+          for migration in supabase/migrations/*.sql; do
+            echo "Applying ${migration} to isolated Character bundle query DB"
+            PGDATABASE="$character_db" psql -v ON_ERROR_STOP=1 -f "$migration" >/dev/null
+          done
+          PGDATABASE="$character_db" bash test/db/character_bundle_projection_queries.sh
       - name: Run birth revision append persistence/concurrency tests
         run: bash test/db/birth_revision_append_concurrency.sh
       - name: Run reading session create persistence/concurrency tests
