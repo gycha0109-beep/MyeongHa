@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { once } from 'node:events';
 import { createServer } from 'node:http';
 import { mkdtemp, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -91,6 +92,13 @@ function mime(path) {
 
 function delay(ms) {
   return new Promise((resolvePromise) => setTimeout(resolvePromise, ms));
+}
+
+async function stopChrome(child) {
+  if (!child || child.exitCode !== null) return;
+  const exitPromise = once(child, 'exit').catch(() => []);
+  child.kill('SIGKILL');
+  await Promise.race([exitPromise, delay(3000)]);
 }
 
 async function waitForPageTarget(pageUrl) {
@@ -364,12 +372,18 @@ async function main() {
         returnByValue: true,
         timeout: 60000,
       });
+      let timeoutHandle;
       const timeoutPromise = new Promise((_, rejectPromise) => {
-        setTimeout(() => rejectPromise(new Error(
+        timeoutHandle = setTimeout(() => rejectPromise(new Error(
           `FR-27 CDP evaluation timeout. console=${JSON.stringify(cdp.consoleEvents)} exceptions=${JSON.stringify(cdp.exceptionEvents)} chrome=${chromeStderr}`,
         )), 65000);
       });
-      const evaluation = await Promise.race([evaluationPromise, timeoutPromise]);
+      let evaluation;
+      try {
+        evaluation = await Promise.race([evaluationPromise, timeoutPromise]);
+      } finally {
+        if (timeoutHandle !== undefined) clearTimeout(timeoutHandle);
+      }
       if (evaluation.exceptionDetails) {
         throw new Error(`FR-27 browser exception: ${JSON.stringify(evaluation.exceptionDetails)}`);
       }
@@ -415,11 +429,11 @@ async function main() {
       );
     } finally {
       if (cdp) cdp.ws.close();
-      if (child && child.exitCode === null) child.kill('SIGKILL');
+      await stopChrome(child);
       await new Promise((resolvePromise) => server.close(resolvePromise));
     }
   } finally {
-    await rm(scratch, { recursive: true, force: true });
+    await rm(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   }
 }
 
