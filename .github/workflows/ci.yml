@@ -211,6 +211,8 @@ jobs:
         run: bash test/db/notification_read_concurrency.sh
       - name: Run notification stored ledger projection read tests
         run: bash test/db/notification_stored_ledger_query.sh
+      - name: Run notification delivery authority projection read tests
+        run: bash test/db/notification_delivery_authority_queries.sh
       - name: Run current relationship projection read tests
         run: bash test/db/relationship_current_query.sh
       - name: Run current Character Unlock projection read tests
