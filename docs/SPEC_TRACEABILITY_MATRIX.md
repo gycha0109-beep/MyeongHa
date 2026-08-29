@@ -1,8 +1,8 @@
-# 명하 Specification Traceability Matrix v0.11
+# 명하 Specification Traceability Matrix v0.12
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.11**  
-> Date: **2026-08-28**  
+> Pack Version: **v0.12**  
+> Date: **2026-08-29**  
 > Authority: `Usecase_re_reviewed_v2(1).md`의 UC-01~UC-34(UC-16A 포함)  
 > Rule: Use Case가 implementation spec과 verification gate에 연결되지 않으면 구현 완료로 간주하지 않는다.
 
@@ -42,7 +42,7 @@ COVERED-SOURCE-GAP
 | UC-13 | 관계 progression | `RELATIONSHIP_MEMORY_POLICY`, `DB_DDL_MIGRATION`, `SERVER_COMMAND_TRANSACTION_SPEC`, `SOURCE_AUTHORITY_GAPS` | §4 DB, §10 Relationship/Memory | COVERED-SOURCE-GAP (`SRC-22` event registry/payload → score delta/stage/anti-farming policy evaluator; concrete Character Unlock reward additionally `SRC-23`) |
 | UC-14 | 잠긴 캐릭터 reveal/unlock | `CHARACTER_WORLD_CONTENT`, `DB_DDL_MIGRATION`, `SERVER_COMMAND_TRANSACTION_SPEC`, `SOURCE_AUTHORITY_GAPS` | §4 DB, §11 Content, §15 Vertical Slice | COVERED-SOURCE-GAP (`SRC-23` unlock condition schema + World Event/condition→character effect authority; relationship-stage trigger additionally `SRC-22`, episode-completion trigger additionally `SRC-17` where applicable) |
 | UC-15 | 상세 Reading report | `SAJU_INTEGRATION`, `API_CONTRACT`, `WEB_MOBILE_CLIENT_ARCHITECTURE` | §8 Saju, §16 Real Saju | COVERED |
-| UC-16 | 궁합/상대 Birth Profile | `API_CONTRACT`, `SAJU_INTEGRATION`, `AUTH_RLS_PRIVACY`, `UX_SCREEN_STATE` | §5 Auth, §6 API, §8 Saju, §14 Deletion | COVERED-SOURCE-GAP (`SRC-06` deletion + `SRC-08` real compatibility adapter) |
+| UC-16 | 궁합/상대 Birth Profile | `API_CONTRACT`, `SAJU_INTEGRATION`, `AUTH_RLS_PRIVACY`, `UX_SCREEN_STATE` | §5 Auth, §6 API, §8 Saju, §14 Deletion | COVERED-SOURCE-GAP (`SRC-06` deletion + `SRC-08` real compatibility adapter; supporting post-create Target Person metadata edit additionally `SRC-28`, while Target Birth revision append remains available) |
 | UC-16A | revocable share artifact | `API_CONTRACT`, `AUTH_RLS_PRIVACY`, `DB_DDL_MIGRATION`, `SOURCE_AUTHORITY_GAPS` | §5 Auth, §6 API | COVERED-SOURCE-GAP (`SRC-20` positive public snapshot + create/retry/raw-token/expiry authority; public read + owner revoke baseline available) |
 | UC-17 | 속마음 질문 경계 | `SAJU_INTEGRATION`, `AI_CHARACTER_RUNTIME` | §8 Saju, §9 AI | COVERED |
 | UC-18 | Guest → 신규 계정 보관 | `API_CONTRACT`, `AUTH_RLS_PRIVACY`, `DB_DDL_MIGRATION` | §5 Auth, §6 API, §15 Vertical Slice | COVERED |
@@ -51,17 +51,17 @@ COVERED-SOURCE-GAP
 | UC-21 | 캐릭터 return message | `NOTIFICATION_RETURN_LOOP`, `AI_CHARACTER_RUNTIME`, `CHARACTER_WORLD_CONTENT`, `COST_QUOTA_ABUSE` | §9 AI, §13 Notification | COVERED |
 | UC-22 | Web↔App deep link | `WEB_MOBILE_CLIENT_ARCHITECTURE`, `API_CONTRACT`, `AUTH_RLS_PRIVACY` | §5 Auth, §6 API, §13 Notification | COVERED |
 | UC-23 | 기기 전환/동일 세계 | `WEB_MOBILE_CLIENT_ARCHITECTURE`, `API_CONTRACT`, `AUTH_RLS_PRIVACY`, `NOTIFICATION_RETURN_LOOP` | §6 API, §13 Notification, §15 Vertical Slice | COVERED-SOURCE-GAP (`SRC-19` blocks authoritative device register/re-register/token-rotation lifecycle; revoke baseline available) |
-| UC-24 | Admin 신규 캐릭터 publish | `CHARACTER_WORLD_CONTENT`, `API_CONTRACT`, `RELEASE_OBSERVABILITY` | §11 Content, §19 Promotion | COVERED-SOURCE-GAP (`SRC-01` per-character operational override; `SRC-23` executable unlock-condition schema/evaluator) |
-| UC-25 | Admin episode release | `CHARACTER_WORLD_CONTENT`, `API_CONTRACT`, `RELEASE_OBSERVABILITY` | §11 Content, §19 Promotion | COVERED-SOURCE-GAP (`SRC-01` per-episode operational override; `SRC-17` episode transition evaluator; `SRC-23` if episode reward concretely unlocks a character) |
+| UC-24 | Admin 신규 캐릭터 publish | `CHARACTER_WORLD_CONTENT`, `API_CONTRACT`, `RELEASE_OBSERVABILITY` | §11 Content, §19 Promotion | COVERED-SOURCE-GAP (`SRC-27` content bundle/release lifecycle mutation authority; `SRC-01` per-character operational override; `SRC-23` executable unlock-condition schema/evaluator; activation additionally composes with `SRC-15`) |
+| UC-25 | Admin episode release | `CHARACTER_WORLD_CONTENT`, `API_CONTRACT`, `RELEASE_OBSERVABILITY` | §11 Content, §19 Promotion | COVERED-SOURCE-GAP (`SRC-27` content bundle/release lifecycle mutation authority; `SRC-01` per-episode operational override; `SRC-17` episode transition evaluator; `SRC-23` if episode reward concretely unlocks a character; activation additionally composes with `SRC-15`) |
 | UC-26 | 유료 Reading/content 구매 | `COMMERCE_ENTITLEMENT`, `API_CONTRACT`, `SHARED_DOMAIN_CONTRACTS`, `COST_QUOTA_ABUSE` | §12 Commerce | COVERED-SOURCE-GAP (`SRC-18` product→grant target + `SRC-21` event apply/aggregate projection; provider rail additionally `P0-CM-01`) |
 | UC-27 | entitlement restore | `COMMERCE_ENTITLEMENT`, `API_CONTRACT` | §12 Commerce | COVERED-SOURCE-GAP (`SRC-18` historical source→grant target + `SRC-21` restore event/aggregate transition; provider rail additionally `P0-CM-01`) |
 | UC-28 | notification controls/privacy | `NOTIFICATION_RETURN_LOOP`, `API_CONTRACT`, `WEB_MOBILE_CLIENT_ARCHITECTURE` | §13 Notification | COVERED-SOURCE-GAP (`SRC-12` missing-row/default/materialization authority) |
 | UC-29 | unsupported Saju fail-closed | `SAJU_INTEGRATION`, `AI_CHARACTER_RUNTIME`, `API_CONTRACT` | §8 Saju, §9 AI | COVERED |
 | UC-30 | Birth 수정/revision/stale | `API_CONTRACT`, `SAJU_INTEGRATION`, `DB_DDL_MIGRATION` | §4 DB, §6 API, §8 Saju | COVERED |
-| UC-31 | 대화 삭제/캐릭터 forget/Life Fact revoke 분리 | `API_CONTRACT`, `AUTH_RLS_PRIVACY`, `RELATIONSHIP_MEMORY_POLICY`, `SOURCE_AUTHORITY_GAPS` | §5 Auth, §10 Relationship/Memory, §14 Deletion | COVERED-SOURCE-GAP (`SRC-14` duplicate transcript redaction authority; `P0-PR-01` retention also open) |
+| UC-31 | 대화 삭제/캐릭터 forget/Life Fact revoke 분리 | `API_CONTRACT`, `AUTH_RLS_PRIVACY`, `RELATIONSHIP_MEMORY_POLICY`, `SOURCE_AUTHORITY_GAPS` | §5 Auth, §10 Relationship/Memory, §14 Deletion | COVERED-SOURCE-GAP (`SRC-14` duplicate transcript redaction authority; generic cross-scope deletion-job create additionally `SRC-29`, while existing direct Life Fact/Memory/character-forget boundaries remain available; `P0-PR-01` retention also open) |
 | UC-32 | Guest → 기존 Member merge | `API_CONTRACT`, `AUTH_RLS_PRIVACY`, `DB_DDL_MIGRATION`, `SERVER_COMMAND_TRANSACTION_SPEC`, `SOURCE_AUTHORITY_GAPS` | §4 DB, §5 Auth, §6 API, §14 Deletion | COVERED-SOURCE-GAP (`SRC-24` conflict classification + conflicts/resolution schemas + domain action planning/apply + retry/resume/member-lifecycle authority; `SRC-25` additionally for any imported durable Life Fact/Memory value; `SRC-22` additionally for relationship projection transformation, `SRC-23` for Character Unlock transformation, `SRC-17` where Episode transition/effect semantics are involved; stored merge-job read + direct merged-history lineage remain available) |
 | UC-33 | AI/Saju partial failure/retry | `API_CONTRACT`, `AI_CHARACTER_RUNTIME`, `SAJU_INTEGRATION`, `DB_DDL_MIGRATION`, `SERVER_COMMAND_TRANSACTION_SPEC.md` | §7 Chat, §8 Saju, §17 Failure | COVERED-P0 (`P0-AI-01`, `P0-SA-01`); Saju guard metadata also `SRC-09` |
-| UC-34 | account data deletion | `AUTH_RLS_PRIVACY`, `API_CONTRACT`, `DB_DDL_MIGRATION`, `RELEASE_OBSERVABILITY` | §14 Deletion, §19 Promotion | COVERED-P0 (`P0-PR-01`) |
+| UC-34 | account data deletion | `AUTH_RLS_PRIVACY`, `API_CONTRACT`, `DB_DDL_MIGRATION`, `RELEASE_OBSERVABILITY` | §14 Deletion, §19 Promotion | COVERED-P0 (`P0-PR-01`); account-specific start command remains independent of `SRC-29` |
 
 ## 3. Cross-Cutting Traceability
 
@@ -80,17 +80,20 @@ COVERED-SOURCE-GAP
 | relationship event apply policy authority | `RELATIONSHIP_MEMORY_POLICY`, `SHARED_DOMAIN_CONTRACTS`, `SERVER_COMMAND_TRANSACTION_SPEC`, `SOURCE_AUTHORITY_GAPS` (`SRC-22`) | event registry/payload, score bounds/delta, stage transition, anti-farming, concurrency apply gate blocked pending source resolution; ledger/revision structure remains testable |
 | Character Unlock condition/effect authority | `CHARACTER_WORLD_CONTENT`, `SERVER_COMMAND_TRANSACTION_SPEC`, `SOURCE_AUTHORITY_GAPS` (`SRC-23`) | unlock condition schema, World Event payload/causality, condition→target/effect, replay/concurrency and bundle-migration gate blocked; stored projection/current-read remains testable |
 | existing-Member Guest merge policy authority | `API_CONTRACT`, `AUTH_RLS_PRIVACY`, `SERVER_COMMAND_TRANSACTION_SPEC`, `SOURCE_AUTHORITY_GAPS` (`SRC-24`) | conflict classification, conflicts/resolution schema, domain action planning/apply, stale-resolution, retry/resume and member-lifecycle gate blocked; merge-job current read + direct merged-history projection remain testable |
+| Target Person metadata mutation authority | `API_CONTRACT`, `SOURCE_AUTHORITY_GAPS` (`SRC-28`) | post-create display/relationship label mutation blocked pending mutability/schema/validation/CAS/idempotency/history authority; Target Person create/read + owned Target Birth revision append remain testable |
 | episode progress single-projection bundle selection | `CHARACTER_WORLD_CONTENT`, `API_CONTRACT`, `SOURCE_AUTHORITY_GAPS.md` (`SRC-11`) | `GET /api/episodes/:id/progress` projection gate blocked pending source resolution |
 | notification preference missing-row/default/materialization | `NOTIFICATION_RETURN_LOOP`, `API_CONTRACT`, `SOURCE_AUTHORITY_GAPS.md` (`SRC-12`) | preference mutation/default gate blocked pending source resolution |
 | notification inbox status membership | `NOTIFICATION_RETURN_LOOP`, `API_CONTRACT`, `SOURCE_AUTHORITY_GAPS.md` (`SRC-13`) | inbox projection gate blocked pending source resolution |
 | conversation delete duplicate transcript redaction | `API_CONTRACT`, `AUTH_RLS_PRIVACY_SPEC.md`, `SOURCE_AUTHORITY_GAPS.md` (`SRC-14`) | message + turn request snapshot + attempt generated payload redaction/tombstone gate blocked pending source resolution |
+| generic data-deletion-job request authority | `API_CONTRACT`, `AUTH_RLS_PRIVACY`, `SOURCE_AUTHORITY_GAPS` (`SRC-29`) | arbitrary non-account scope/type/id job creation blocked; account-specific start + owner-scoped stored job status read + direct record revoke boundaries remain testable |
 | commerce Purchase Intent minimal offer mapping snapshot | `API_CONTRACT`, `COMMERCE_ENTITLEMENT`, ERD v0.6 | Purchase Intent create/idempotency/concurrency gate |
 | purchased product → grant target authority | `SOURCE_AUTHORITY_GAPS` (`SRC-18`), `COMMERCE_ENTITLEMENT` | purchase/restore grant-target resolution gate blocked pending source resolution |
 | entitlement grant event transition + logical aggregate authority | `SOURCE_AUTHORITY_GAPS` (`SRC-21`), `COMMERCE_ENTITLEMENT`, `SERVER_COMMAND_TRANSACTION_SPEC` | event-type transition/stale-order/valid-grant predicate/active-count/effective-expiry/revision/outbox gate blocked pending source resolution |
 | device installation register/re-register lifecycle | `NOTIFICATION_RETURN_LOOP`, `API_CONTRACT`, `SOURCE_AUTHORITY_GAPS` (`SRC-19`) | register/re-register/token-rotation/row-lineage gate blocked; standalone owner revoke remains testable |
 | Share Artifact create/public projection authority | `API_CONTRACT`, `AUTH_RLS_PRIVACY`, `SOURCE_AUTHORITY_GAPS` (`SRC-20`) | positive snapshot allowlist + Reading eligibility + retry/raw-token/expiry create gate blocked; public read + revoke remain testable |
+| content release lifecycle mutation authority | `CHARACTER_WORLD_CONTENT`, `API_CONTRACT`, `RELEASE_OBSERVABILITY`, `SOURCE_AUTHORITY_GAPS` (`SRC-27`) | bundle register/release create/activate/retire/default-switch mutation gate blocked; stored bundle/release projections and active-default read remain testable; activation additionally requires `SRC-15` |
 | transactional outbox | `DB_DDL_MIGRATION`, `RELEASE_OBSERVABILITY` | failure/recovery tests |
-| content/client compatibility | `CHARACTER_WORLD_CONTENT`, `WEB_MOBILE_CLIENT_ARCHITECTURE`, `UX_SCREEN_STATE_SPEC.md` | content/client compatibility + screen-state tests |
+| content/client compatibility | `CHARACTER_WORLD_CONTENT`, `WEB_MOBILE_CLIENT_ARCHITECTURE`, `UX_SCREEN_STATE_SPEC.md`, `SOURCE_AUTHORITY_GAPS` (`SRC-15`) | compatibility decision/activation gate remains source-gated; raw version/capability components remain testable |
 | rate-limit/quota/context budget | `COST_QUOTA_ABUSE_SPEC.md` | cost/quota/abuse gate |
 | analytics event schemas/experiments | `ANALYTICS_EXPERIMENT_SPEC.md` | analytics/experiment gate |
 | current Saju public contract compatibility | `SAJU_INTEGRATION_SPEC.md`, `SOURCE_AUTHORITY_GAPS.md` (`SRC-08`,`SRC-09`) | exact exported contract fixture tests |

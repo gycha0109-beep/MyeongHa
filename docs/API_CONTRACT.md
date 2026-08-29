@@ -1,8 +1,8 @@
-# 명하 Shared API Contract v0.7 — Source Aligned
+# 명하 Shared API Contract v0.8 — Source Aligned
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.7**  
-> Date: **2026-08-28**  
+> Pack Version: **v0.8**  
+> Date: **2026-08-29**  
 > Source Authority: `Usecase_re_reviewed_v2(1).md`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`, `Myeonghwa_Personalized_Interpretation_Architecture_v1.3_THIRD_REVIEW(1).md`  
 > Rule: source가 결정하지 않은 implementation-critical 사항은 `OPEN-P0`, 비차단 선택은 `CANDIDATE`, source 간 충돌/공백은 `SOURCE_AUTHORITY_GAPS.md` 또는 numbered source-gap 문서에 기록한다.
 
@@ -74,7 +74,7 @@ episode action    → idempotencyKey + expectedRevision
 purchase intent   → idempotencyKey
 receipt/restore   → idempotencyKey or provider source dedupe
 guest merge       → idempotencyKey + guestSession proof (logical uniqueness envelope only; SRC-24)
-deletion request  → requestDedupeKey
+account deletion  → requestDedupeKey
 ```
 
 동일 key + 동일 canonical request → 기존 logical result, 동일 key + 다른 hash → `409 IDEMPOTENCY_CONFLICT` 규칙은 source가 canonical request/hash identity를 실제로 정의한 command에만 적용한다.
@@ -82,6 +82,8 @@ deletion request  → requestDedupeKey
 Guest merge는 ERD가 `(guest_subject_id, member_subject_id, idempotency_key)` uniqueness를 정의하지만 request hash/canonicalization, resolution 포함 request-shape 충돌, completed response-loss replay reconstruction을 정의하지 않는다. 따라서 `SRC-24` 해결 전 guest merge에 일반적인 same-key/same-hash replay 규칙을 임의 적용하지 않는다.
 
 Share Artifact create는 Use Case §21.1의 explicit idempotency-required write 목록에 포함되지 않는다. 그렇다고 non-idempotent semantics가 source-backed인 것도 아니므로 create/retry/raw-token lifecycle은 `SRC-20` 해결 전 normative idempotency model에 넣지 않는다.
+
+ERD의 `data_deletion_jobs.request_dedupe_key` uniqueness는 storage envelope authority다. Account deletion을 제외한 generic cross-scope request의 request identity/replay/conflict contract는 `SRC-29` 해결 전 위 normative idempotency list로 일반화하지 않는다.
 
 ## 6. Error Code Baseline
 
@@ -227,8 +229,13 @@ UPDATE가 아니라 append revision command.
 owner-scoped target metadata + target birth profile/revision 생성.
 
 ### `GET /api/target-persons` / `GET /api/target-persons/:id`
+
 ### `PATCH /api/target-persons/:id`
-label metadata 또는 새 birth revision command를 구분한 versioned action.
+Target Birth correction과 Target metadata edit를 같은 authority로 취급하지 않는다.
+
+- Target Person이 소유한 linked target Birth Profile의 Birth 입력 수정은 기존 append-only Birth revision command boundary를 재사용할 수 있다. Caller는 Target Person ownership을 resolve한 뒤 source-backed `expectedRevisionId + BirthInputV1` precondition으로 새 Birth revision을 append한다.
+- post-create `display_label` / `relationship_label` metadata mutation은 `SRC-28` 해결 전 production-authoritative contract로 승격하지 않는다. Source는 mutability, positive request schema, null/empty normalization, validation, concurrency/CAS, retry/idempotency, history/audit, deletion-race semantics를 정의하지 않는다.
+- 따라서 Pack route가 하나라는 이유만으로 metadata update와 Birth revision append를 하나의 atomic versioned action으로 합성하지 않는다.
 
 ### `DELETE /api/target-persons/:id`
 해당 target-person deletion workflow. reverse lookup/invite 금지. `SRC-06` 해결 전에는 target birth revision을 pin한 기존 compatibility Reading을 어떻게 처리할지 임의 확정하지 않는다.
@@ -425,26 +432,34 @@ lock/upsert grant
 ## 17. Account / Deletion
 
 ```text
-POST /api/data-deletion-jobs
-GET  /api/data-deletion-jobs/:id
-POST /api/account/delete
+POST /api/data-deletion-jobs       # generic non-account mutation: SRC-29 BLOCKED
+GET  /api/data-deletion-jobs/:id   # owner-scoped stored job status read
+POST /api/account/delete           # account-specific source-backed start transaction
 ```
 
-`/api/account/delete`는 재인증 후 account-scope deletion job을 생성하고 즉시 capability/share/device/scheduled notification 차단 단계를 시작한다. 실제 retention은 `OPEN-P0: P0-PR-01`.
+`POST /api/data-deletion-jobs`는 ERD의 `scope` enum과 `target_resource_type/id` storage envelope만으로 production-authoritative generic command가 되지 않는다. `SRC-29` 해결 전 arbitrary `scope + targetResourceType + targetResourceId`를 받아 job row를 만드는 endpoint로 구현하지 않는다. Conversation은 추가로 `SRC-14`, Target Person은 추가로 `SRC-06`이 막고, Memory/Life Fact scope는 기존 direct revoke semantics와 generic job의 관계가 source-defined가 아니다.
+
+`GET /api/data-deletion-jobs/:id`의 owner-scoped stored status read는 이 gap과 독립적으로 유지할 수 있다.
+
+`/api/account/delete`는 UC-34가 별도로 정의한 account-specific authority다. 재인증 후 account-scope deletion job을 생성하고 즉시 capability/share/device/scheduled notification 차단 단계를 시작한다. 실제 retention은 `OPEN-P0: P0-PR-01`이며, `SRC-29`는 이 existing account-specific start boundary를 막지 않는다.
 
 ## 18. Admin / Content Operations
 
-Canon authoring은 Git PR이 authority. Admin API는 operational publish/release만 수행한다.
+Canon authoring은 Git PR이 authority. Admin API는 operational publish/release surface 후보지만, production-authoritative mutation은 source-complete lifecycle contract가 있는 범위에서만 승격한다.
 
 ```text
-POST /api/admin/content/bundles/register
-POST /api/admin/content/releases
-POST /api/admin/content/releases/:id/activate
-POST /api/admin/content/releases/:id/retire
-POST /api/admin/threads/:id/content-transition   # governed migration only
+POST /api/admin/content/bundles/register          # SRC-27 BLOCKED
+POST /api/admin/content/releases                  # SRC-27 BLOCKED
+POST /api/admin/content/releases/:id/activate     # SRC-27 + SRC-15 BLOCKED
+POST /api/admin/content/releases/:id/retire       # SRC-27 BLOCKED
+POST /api/admin/threads/:id/content-transition    # governed migration only
 ```
 
-`ADMIN_CONTENT` authorization + audit actor ref 필수. `SRC-01` 해결 전 per-character/episode runtime override endpoint는 만들지 않는다.
+`SRC-27` 해결 전 bundle registration / release create / activate / retire / default-switch를 production-authoritative command로 구현하지 않는다. Source-backed relational release state와 immutable bundle/provenance, existing bundle/catalog/manifest projections, recorded active-default read는 유지할 수 있지만 write-side legal transition, validation/hash trust boundary, concurrency, retry/idempotency, timestamp, default replacement, admin audit persistence를 임의 합성하지 않는다.
+
+Activation은 추가로 `SRC-15` client/content compatibility decision authority가 필요하다. Subject/cohort별 release resolution은 별도 `SRC-16` 경계이며 activation command가 이를 대신하지 않는다.
+
+`ADMIN_CONTENT` authorization이 필요하다는 원칙은 유지하지만, authorization requirement 자체가 `SRC-27`의 missing positive lifecycle/audit command semantics를 해결하지는 않는다. `SRC-01` 해결 전 per-character/episode runtime override endpoint도 만들지 않는다.
 
 ## 19. Versioning / Compatibility
 
@@ -473,7 +488,8 @@ For personal records, old/new schema compatibility cannot be inferred from the g
 - full guest→existing-Member conflict/resolution/domain-action execution remains blocked until `SRC-24`
 - chat retry + abandon
 - reading clarification + transient retry 구분
-- target-person CRUD isolation
+- target-person create/read isolation + owned Target Birth revision append
+- post-create Target Person metadata mutation remains blocked until `SRC-28`
 - Life Record existing stored read/revoke + Life Fact supersession lineage
 - direct new durable Life Fact create positive type/value validation remains blocked until `SRC-25`
 - Memory Proposal long-term accept positive Life Fact/Memory schema validation remains blocked until `SRC-25`
@@ -487,7 +503,10 @@ For personal records, old/new schema compatibility cannot be inferred from the g
 - Share create positive snapshot/retry/raw-token/expiry contract remains blocked until `SRC-20`
 - conversation delete duplicate transcript redaction (`SRC-14` resolved before write contract promotion)
 - account deletion command
-- admin release authorization
+- stored deletion-job owner status read
+- generic non-account deletion-job create remains blocked until `SRC-29`
+- admin content bundle/release stored projections and active-default read
+- admin content lifecycle mutation remains blocked until `SRC-27`; activation additionally requires `SRC-15`
 - old client capability fallback
 - purchase intent minimal offer mapping snapshot + idempotency
 - purchased product→grant target remains blocked until `SRC-18`
