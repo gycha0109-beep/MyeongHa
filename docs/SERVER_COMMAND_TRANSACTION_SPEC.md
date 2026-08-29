@@ -1,8 +1,8 @@
-# 명하 Server Command / Transaction Specification v0.8
+# 명하 Server Command / Transaction Specification v0.9
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.8**  
-> Date: **2026-08-28**  
+> Pack Version: **v0.9**  
+> Date: **2026-08-29**  
 > Persistence Authority: `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`  
 > API Authority: `API_CONTRACT.md`
 
@@ -548,7 +548,9 @@ Destructive phases는 idempotent하고 dependency order를 따른다. Direct mer
 
 Domain state와 downstream event 생성이 둘 다 필요한 source-approved command는 **같은 DB transaction에서 outbox row를 insert**한다.
 
-Publisher는 at-least-once로 동작할 수 있으므로 consumer가 event dedupe를 구현한다.
+현재 source-complete한 publisher-side boundary는 logical outbox dedupe, pending claim, expired `processing` lease reclaim, 그리고 successful completion까지다. Primary Source는 outbox failure/recovery test와 product-visible duplicate prevention을 요구하지만, publisher failure를 `failed`/`pending`/`dead_lettered` 중 어디로 어떻게 전이할지, retry eligibility/timing/backoff, `attempt_count` lifecycle, dead-letter threshold, manual replay/requeue, 또는 모든 downstream class에 공통인 dedupe protocol은 정의하지 않는다. 이 영역은 `SRC-30` 해결 전 production-authoritative policy로 승격하지 않는다.
+
+Expired `processing` lease reclaim은 source-backed crash recovery boundary이지만, failed-event retry scheduling과 동일한 authority가 아니다. 또한 Notification Delivery attempt retry policy는 transactional outbox retry policy와 별도 domain boundary다.
 
 Source가 Character Unlock 관련 downstream event/outbox schema를 아직 정의하지 않았으므로 `SRC-23` 해결 전 `CHARACTER_UNLOCKED` 명칭을 특정 outbox event contract로 임의 고정하지 않는다.
 
@@ -571,4 +573,6 @@ Source가 Character Unlock 관련 downstream event/outbox schema를 아직 정�
 - purchase provenance → grant target remains blocked until `SRC-18`
 - grant event apply / logical entitlement recompute remains blocked until `SRC-21`
 - expired `effective_valid_until` current projection cannot authorize access after wall-clock expiry
-- outbox publisher retry → domain state not duplicated
+- outbox logical enqueue/dedupe, pending claim, expired-processing lease reclaim, and successful completion → testable now
+- publisher failure finalization/classification, retry scheduling/backoff/jitter, `attempt_count` mutation lifecycle, max attempts, dead-letter threshold/transition, manual replay/requeue, and error taxonomy → blocked until `SRC-30`
+- downstream duplicate prevention remains a required outcome, but generic failed-event retry/dedupe execution semantics are not a PASS condition until `SRC-30` resolves the applicable authority
