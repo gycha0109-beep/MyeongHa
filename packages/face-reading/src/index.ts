@@ -17,6 +17,7 @@ export * from './mayi-three-divisions-boundary-variants-fr33.js';
 export * from './mayi-three-divisions-neutral-anchor-requirements-fr34.js';
 export * from './mediapipe-default-network-runtime-evidence-fr28.js';
 export * from './mediapipe-eye-landmark-adapter-fr25.js';
+export * from './mediapipe-eyebrow-component-geometric-role-probe-fr42.js';
 export * from './mediapipe-eyebrow-source-runtime-semantic-gap-fr40.js';
 export * from './mediapipe-face-landmarker-runtime-fr26.js';
 export * from './mediapipe-npm-artifact-byte-attestation-fr30.js';
