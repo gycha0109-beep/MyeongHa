@@ -1,7 +1,7 @@
-# 명하 Verification / E2E Test Plan v0.12 — Source Aligned
+# 명하 Verification / E2E Test Plan v0.13 — Source Aligned
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.12**  
+> Pack Version: **v0.13**  
 > Date: **2026-08-29**  
 > Source Authority: `Usecase_re_reviewed_v2(1).md`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`, `Myeonghwa_Personalized_Interpretation_Architecture_v1.3_THIRD_REVIEW(1).md`  
 > Rule: source가 결정하지 않은 implementation-critical 사항은 `OPEN-P0`, 비차단 선택은 `CANDIDATE`, source 간 충돌/공백은 `SOURCE_AUTHORITY_GAPS.md` 또는 numbered source-gap 문서에 기록한다.
@@ -514,7 +514,7 @@ A blacklist-only serializer, Pack-invented `ShareArtifactV1`, or plaintext raw-t
 - analytics schema registry/version required
 - raw Birth/chat/Memory/receipt detector PASS
 - client optimistic success not counted as authoritative conversion
-- outbox retry dedupes server conversion event
+- outbox replay/retry-delivered duplicate conversion events remain deduped at the analytics boundary; this tests downstream idempotency and is not evidence of an automatic outbox retry scheduler before `SRC-30`
 - stable experiment assignment for same identity/version
 - experiment cannot mutate Saju semantic authority or privacy/entitlement gates
 - `CHARACTER_UNLOCKED` analytics naming must not be silently treated as the authoritative World Event/command contract before `SRC-23` resolves domain event semantics
@@ -591,7 +591,8 @@ real Saju adapter
 - renderer invalid schema
 - output guard block
 - DB commit then client response loss
-- outbox worker crash/lease expiry
+- outbox worker crash / processing lease expiry → source-backed pending/expired-processing reclaim path only
+- outbox publisher failure classification/retry/backoff/dead-letter/manual replay → `SRC-30` blocked
 - push provider failure
 - duplicate/out-of-order commerce webhook
 - content artifact hash mismatch
@@ -599,7 +600,7 @@ real Saju adapter
 
 중복 charge/event/message/memory 또는 cross-user leakage 0.
 
-Personal-record unknown/invalid type-schema writes fail closed with no durable value before `SRC-25`; exact valid/legacy schema acceptance behavior is not invented until source resolution. Share create response-loss retry는 `SRC-20` 해결 전 기대 결과를 임의 정의하지 않는다. Device register transport/retry도 `SRC-19` 해결 전 기대 lineage를 임의 정의하지 않는다. Commerce out-of-order source application과 aggregate recompute의 exact result는 `SRC-21` 해결 전 임의 정의하지 않는다. Relationship apply retry/concurrent result 중 policy output(delta/stage/anti-farming)은 `SRC-22` 해결 전 임의 정의하지 않으며, 현재는 relational dedupe/revision invariants만 검증한다. Character Unlock response-loss/replay/concurrent trigger의 exact projection/effect result는 `SRC-23` 해결 전 임의 정의하지 않으며, 현재는 stored projection/relational invariants만 검증한다. Existing-Member merge response-loss/stale-resolution/partial-action-failure의 exact resume/result semantics는 `SRC-24` 해결 전 임의 정의하지 않으며, 현재는 relational uniqueness, ownership, direct-lineage history, no-raw-reparent invariants만 검증한다.
+Personal-record unknown/invalid type-schema writes fail closed with no durable value before `SRC-25`; exact valid/legacy schema acceptance behavior is not invented until source resolution. Share create response-loss retry는 `SRC-20` 해결 전 기대 결과를 임의 정의하지 않는다. Device register transport/retry도 `SRC-19` 해결 전 기대 lineage를 임의 정의하지 않는다. Commerce out-of-order source application과 aggregate recompute의 exact result는 `SRC-21` 해결 전 임의 정의하지 않는다. Relationship apply retry/concurrent result 중 policy output(delta/stage/anti-farming)은 `SRC-22` 해결 전 임의 정의하지 않으며, 현재는 relational dedupe/revision invariants만 검증한다. Character Unlock response-loss/replay/concurrent trigger의 exact projection/effect result는 `SRC-23` 해결 전 임의 정의하지 않으며, 현재는 stored projection/relational invariants만 검증한다. Existing-Member merge response-loss/stale-resolution/partial-action-failure의 exact resume/result semantics는 `SRC-24` 해결 전 임의 정의하지 않으며, 현재는 relational uniqueness, ownership, direct-lineage history, no-raw-reparent invariants만 검증한다. Outbox publisher failure finalization/classification, retry scheduling/backoff, `attempt_count` lifecycle, dead-letter threshold/transition, and manual replay/requeue의 exact 결과는 `SRC-30` 해결 전 임의 정의하지 않는다. 현재 source-complete recovery evidence는 pending claim, expired-processing lease reclaim, and successful completion boundary에 한정한다.
 
 ## 19. Evidence Artifact
 
@@ -611,6 +612,8 @@ CI/release evidence:
 - content release/bundle/hash
 - Saju engine/reading contract/grounding versions
 - AI runtime/prompt versions
+- outbox enqueue/dedupe/claim/expired-lease-reclaim/successful-completion evidence for implemented source-backed slices
+- `SRC-30` status for publisher failure finalization/classification, retry/backoff, `attempt_count` lifecycle, dead-letter transition/threshold, and replay/requeue evidence
 - notification stored logical-ledger/delivery/provider-attempt persistence provenance for implemented notification slices
 - `SRC-12` status for effective notification preference defaults/materialization/mutation evidence
 - `SRC-13` status for final user-visible notification inbox membership/history/order/cursor evidence
@@ -640,6 +643,8 @@ Do not invent merge policy hash/artifact, conflict schema version, request hash,
 
 Do not treat the Pack's previous `VersionedRecordTypeDefinition` shape as source evidence. `SRC-25` must define the actual positive personal-record type/schema registry and any required artifact identity/provenance.
 
+Do not treat stored outbox `failed`/`dead_lettered` status, `attempt_count`, `available_at`, lock/error fields, or successful claim/reclaim/completion mechanics as evidence that publisher failure mutation, retry/backoff, dead-letter, or replay policy has been source-resolved.
+
 Do not treat notification stored-ledger, delivery, or attempt provenance as evidence that missing effective defaults, final inbox composition, provider routing, scheduler decisions, or automatic retry policy have been source-resolved.
 
 ## 20. Promotion Criteria
@@ -656,12 +661,15 @@ relevant source blockers closed or feature explicitly disabled
 + failure recovery PASS
 ```
 
+For transactional outbox, `failure recovery PASS` may cover the source-backed worker-crash/expired-processing lease-reclaim path without implying that publisher failure classification, retry/backoff, dead-letter, or replay policy is defined. Those production transitions remain gated by `SRC-30`.
+
 ### Production
 
 추가로 enabled feature가 참조하는 P0 decision이 DECIDED이고 store/privacy/age/release runbook이 준비되어야 한다.
 
 ```text
 Commerce purchase→access enabled → SRC-18 + SRC-21 source-resolved + P0-CM-01 decided
+Transactional outbox publisher failure/retry/backoff/dead-letter/replay enabled → SRC-30 source-resolved
 Notification effective preference defaults/materialization/mutation enabled → SRC-12 source-resolved
 Final user-visible Notification Inbox projection enabled → SRC-13 source-resolved
 Device Installation register enabled → SRC-19 source-resolved
