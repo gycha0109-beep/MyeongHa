@@ -7,16 +7,26 @@
 
 ## Current research state
 
-**Latest research pass:** Pass 2 — Direct Competitors / Access Architecture  
+**Latest research pass:** Pass 3 — Adjacent Monetization Pattern Scan  
 **Snapshot:** 2026-08-30 KST  
-**Current leading hypothesis:** **H-R17 — Open Relationship Core + Replenishing Grounded Analysis Rights + Paid Structured Artifacts + Optional Membership + Premium Compute**  
+**Current leading access hypothesis:** **H-R17 — Open Relationship Core + separately measurable Grounded Analysis execution**  
+**Current leading revenue meta-hypothesis:** **H-R18 — Layered Value Monetization**  
 **Authority status:** **NOT PRODUCT AUTHORITY / requires experiment**
 
-Important:
+Pass 3 does not replace Pass 2. It changes the framing:
 
-> `Free Relationship + Paid Value` from Pass 1 remains a live alternative, but it is no longer treated as the sole leading architecture.
+> `Grounded Analysis Rights` are one monetization primitive, not the entire BM.
 
-Subscription-led access has also been upgraded from low priority to a required control arm because direct Korean competitors and broader subscription benchmarks provide meaningful counterevidence.
+Current layered candidate:
+
+```text
+relationship retention
+→ inquiry / grounded-analysis monetization
+→ structured artifact monetization
+→ recurring membership bundle
+→ premium-compute cost recovery
+→ later IP / gift / human-expert option value
+```
 
 ---
 
@@ -26,6 +36,9 @@ For **current research interpretation**, read in this order:
 
 ```text
 README.md
+→ 13_PASS3_BROAD_SCAN_DELTA.md
+→ 14_DUOLINGO_FREEMIUM_AI_TIER_CASE.md
+→ 12_ADJACENT_MONETIZATION_PATTERN_SCAN.md
 → 11_PASS2_DECISION_DELTA.md
 → 06_DIRECT_COMPETITOR_AND_LAUNCH_BM_REVIEW.md
 → 07_DIRECT_COMPETITOR_ECONOMIC_SIGNALS.md
@@ -35,7 +48,7 @@ README.md
 → Pass 1 documents 01~05 for historical baseline
 ```
 
-Later research passes may supersede Pass 2 explicitly. Old research files remain as historical evidence unless factually wrong.
+Later research passes may supersede Pass 3 explicitly. Old research files remain as historical evidence unless factually wrong.
 
 ---
 
@@ -51,15 +64,15 @@ Bear/Base/Bull stress model for 1K / 10K / 100K / 1M MAU.
 
 ### `03_REVENUE_HYPOTHESES.md`
 
-Pass 1 hypothesis registry. Its original ranking is **historical as of Pass 1**; current delta is in `11_PASS2_DECISION_DELTA.md`.
+Pass 1 hypothesis registry. Its original ranking is historical as of Pass 1.
 
 ### `04_REVENUE_ARCHITECTURE_DECISIONS.md`
 
-Pass 1 working decision register. Current unchanged guardrails still apply; changed items are explicitly listed in Pass 2 delta.
+Pass 1 working decision register.
 
 ### `05_REVENUE_EXPERIMENTS.md`
 
-Pass 1 experiment plan. Pass 2 adds an access-architecture experiment before detailed price optimization.
+Pass 1 experiment plan.
 
 ---
 
@@ -67,7 +80,7 @@ Pass 1 experiment plan. Pass 2 adds an access-architecture experiment before det
 
 ### `06_DIRECT_COMPETITOR_AND_LAUNCH_BM_REVIEW.md`
 
-Direct Korean competitor structure comparison and new H-R17 candidate.
+Direct Korean competitor structure comparison and H-R17 candidate.
 
 ### `07_DIRECT_COMPETITOR_ECONOMIC_SIGNALS.md`
 
@@ -97,7 +110,46 @@ Separates character relationship behavior from Hall/Home monetization discovery 
 
 ### `11_PASS2_DECISION_DELTA.md`
 
-The current business-hypothesis change log and next validation gates.
+Pass 2 business-hypothesis change log and validation gates.
+
+---
+
+## Pass 3 — adjacent monetization patterns
+
+### `12_ADJACENT_MONETIZATION_PATTERN_SCAN.md`
+
+Broad scan across:
+
+```text
+AI companion
+wellness / habit
+astrology / expert marketplace
+interactive fiction
+romance live-service
+online dating
+creator membership
+```
+
+Extracts reusable value primitives rather than copying specific BMs.
+
+### `13_PASS3_BROAD_SCAN_DELTA.md`
+
+Introduces H-R18 `Layered Value Monetization`, reclassifies Premium Compute primarily as cost-recovery/margin protection, strengthens Gift/IP/Human-expert option value, and preserves H-R17 as the leading access architecture.
+
+### `14_DUOLINGO_FREEMIUM_AI_TIER_CASE.md`
+
+Public-company anchor for a mature layered model:
+
+```text
+large free core
++ paid subscription
++ higher-cost AI tier
++ ads
++ IAP
++ separate one-time high-value product
+```
+
+It also documents that AI feature adoption can depress gross margin, reinforcing the need to separate `C_chat`, `C_read`, and `C_premium` economics.
 
 ---
 
@@ -118,6 +170,7 @@ Examples:
 
 - `₩2~3 / turn` is a research target candidate, not runtime quota.
 - `Grounded Analysis Right` is a monetization hypothesis, not an existing entitlement key.
+- `H-R18 value levels` are business taxonomy, not existing SKUs.
 - competitor prices are evidence, not launch prices.
 - experiment event names are not analytics schema until governed through the analytics contract.
 
@@ -125,7 +178,7 @@ Examples:
 
 ## Current invariant business guardrails
 
-Pass 2 has **not** weakened these:
+Pass 3 has **not** weakened these:
 
 1. **No Pay-to-love** — payment does not directly buy affection, trust, closeness, or relationship score.
 2. **No payer-state sales persona** — free users do not receive more aggressive Saju pitches from characters merely because they are free.
@@ -134,27 +187,35 @@ Pass 2 has **not** weakened these:
 5. **No surprise consumption** if an analysis-right model is tested.
 6. **No competitor sticker-price anchoring** without realized conversion/revenue evidence.
 7. **No growth scaling while contribution economics are unknown/negative.**
+8. **No emotional coercion inside paid episodes** — do not sell kindness, affection, or avoidance of relationship punishment.
+9. **No unlimited lifetime AI-compute promise** while marginal inference cost remains open-ended.
+10. **No commerce incentive contaminating Saju semantic recommendations.**
 
 ---
 
 ## Current core question
 
-The next decision is not:
+The next decision is no longer simply:
 
 > `Should chat be free?`
 
+or even:
+
+> `Should a new Reading consume an allowance?`
+
 It is:
 
-> **Which execution boundary should be open, replenishing, transactional, or subscription-bundled so that relationship immersion and contribution economics are both positive?**
+> **At which value layer does the user actually perceive enough incremental value to pay, while relationship immersion and contribution economics remain positive?**
 
-The architecture-native candidate boundary is currently:
+Current conceptual ladder:
 
 ```text
-ordinary relationship chat
-!=
-new governed Saju semantic execution
-!=
-structured paid artifact
-!=
-premium compute
+L0 Relationship
+L1 Inquiry
+L2 Analysis
+L3 Artifact
+L4 Experience
+L5 Human / Social / Gift
 ```
+
+The next high-value work is therefore quantitative measurement of `C_chat`, `C_read`, artifact WTP, membership WTP, and relationship retention lift rather than adding more speculative BM variants.
