@@ -1,10 +1,11 @@
-# 명하 Notification / Return-Loop Specification v0.4 — Source Aligned
+# 명하 Notification / Return-Loop Specification v0.5 — Source Aligned
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.4**  
-> Date: **2026-08-28**  
+> Pack Version: **v0.5**  
+> Date: **2026-08-29**  
 > Source Authority: `Usecase_re_reviewed_v2(1).md`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`  
-> Shared Contracts: `SHARED_DOMAIN_CONTRACTS_SPEC.md`
+> Shared Contracts: `SHARED_DOMAIN_CONTRACTS_SPEC.md`  
+> Source Gaps: `SRC-12`, `SRC-13`, `SRC-19`, `SRC-31`
 
 ---
 
@@ -25,10 +26,16 @@ notification_delivery
 → installation별 delivery authority
 
 notification_delivery_attempt
-→ 실제 provider send retry provenance
+→ 실제 provider send attempt provenance
+
+installation/platform configuration
+→ provider resolver
+→ attempt.provider audit provenance
 ```
 
 Push payload 자체는 캐릭터 메시지나 world event의 authority가 아니다.
+
+`notification_delivery_attempt`의 row-locked attempt allocator와 terminal provenance는 source-backed persistence boundary다. 다만 Primary Source가 요구하는 **installation/platform configuration → provider** resolver의 canonical input/mapping/registry는 아직 정의되지 않았다. 따라서 caller-supplied provider 문자열을 production routing authority로 취급하지 않으며 이 경계는 `SRC-31`을 따른다.
 
 ## 3. Notification Category Contract
 
@@ -94,6 +101,8 @@ POST /api/device-installations/register
 
 `SRC-19` 해결 전 단순 UPSERT나 token-steal/rebind를 production registration authority로 승격하지 않는다.
 
+또한 이미 저장된 eligible installation에서 실제 push attempt를 만들 때의 provider 선택은 별도 `SRC-31` 경계다. `platform IN ('ios','android','web')`와 provider column의 `e.g. apns | fcm | web_push`만으로 `ios→apns`, `android→fcm`, `web→web_push`를 normative mapping으로 만들지 않는다. Registration lifecycle과 provider routing lifecycle은 서로 자동 해결되지 않는다.
+
 ## 6. Preference Model
 
 ```text
@@ -145,10 +154,13 @@ Domain transaction
 → notifications INSERT(dedupe_key)
 → eligible active installations snapshot
 → notification_deliveries INSERT
+→ source-approved provider resolution
 → provider attempts
 ```
 
 동일 source event 재처리로 logical notification을 중복 생성하지 않는다.
+
+마지막 두 단계의 DB attempt allocation/finalization mechanics는 현재 검증 가능하지만, production provider selection은 `SRC-31` 해결 전 source-complete라고 선언하지 않는다.
 
 ## 10. Deep Link Contract
 
@@ -174,11 +186,14 @@ private reading/thread identifier가 포함되더라도 **ID 소유 자체가 au
 
 ## 11. Delivery Retry
 
+Source-backed structural retry chain:
+
 ```text
 notification
 → delivery(device)
 → attempt 1
 → failed
+→ later attempt allocation
 → attempt 2
 ```
 
@@ -190,6 +205,11 @@ notification
 - provider message ref는 delivery authority가 아님
 - revoked installation / cancelled notification은 추가 attempt 금지
 - terminal `sent` logical delivery에 provider retry로 두 번째 logical send를 생성하지 않는다
+- exact attempt replay가 historical provider provenance를 바꾸지 않는다
+
+이 section의 `attempt 1 → failed → attempt 2`는 **재시도 가능한 persistence/concurrency 구조**를 뜻한다. Primary Source는 automatic retry의 delay/backoff, max-attempt, retryable/final provider error taxonomy, provider failover를 정의하지 않는다. 따라서 현재 DB allocator가 failed delivery에서 다음 attempt를 만들 수 있다는 이유만으로 production scheduler가 임의 backoff/limit/error-classification을 채택하지 않는다.
+
+Provider identity 자체도 `SRC-31` 해결 전 caller assertion으로 확정하지 않는다. Retry에서 같은 provider를 유지할지 재-resolve할지, provider failover를 허용할지도 source가 정하기 전에는 정책으로 승격하지 않는다.
 
 ## 12. Notification State vs Delivery State
 
@@ -225,6 +245,7 @@ Account deletion 시작 시:
 - notification A → subject B installation → DENY
 - same logical notification/device duplicate → one delivery
 - concurrent attempt allocation → unique attempt_no
+- exact attempt-id replay → provider/attempt identity immutable
 - revoked installation → no new send
 - quiet hours → defer
 - opted-out category → no push
@@ -234,3 +255,5 @@ Account deletion 시작 시:
 - private deep link unauthorized → DENY
 - push retry → no duplicate character/world event
 - registration lifecycle tests remain blocked until `SRC-19` defines retry/re-registration/token-rotation semantics
+- production provider derivation/mismatch/alias/failover tests remain blocked until `SRC-31` defines the provider resolver authority
+- automatic delivery retry timing/backoff/max-attempt/error-classification tests are not invented from the current allocator-only authority
