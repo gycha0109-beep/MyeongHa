@@ -1,7 +1,7 @@
-# 명하 Specification Traceability Matrix v0.14
+# 명하 Specification Traceability Matrix v0.15
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.14**  
+> Pack Version: **v0.15**  
 > Date: **2026-08-29**  
 > Authority: `Usecase_re_reviewed_v2(1).md`의 UC-01~UC-34(UC-16A 포함)  
 > Rule: Use Case가 implementation spec과 verification gate에 연결되지 않으면 구현 완료로 간주하지 않는다.
@@ -94,7 +94,7 @@ COVERED-SOURCE-GAP
 | device installation register/re-register lifecycle | `NOTIFICATION_RETURN_LOOP`, `API_CONTRACT`, `SOURCE_AUTHORITY_GAPS` (`SRC-19`) | register/re-register/token-rotation/row-lineage gate blocked; standalone owner revoke remains testable |
 | Share Artifact create/public projection authority | `API_CONTRACT`, `AUTH_RLS_PRIVACY`, `SOURCE_AUTHORITY_GAPS` (`SRC-20`) | positive snapshot allowlist + Reading eligibility + retry/raw-token/expiry create gate blocked; public read + revoke remain testable |
 | content release lifecycle mutation authority | `CHARACTER_WORLD_CONTENT`, `API_CONTRACT`, `RELEASE_OBSERVABILITY`, `SOURCE_AUTHORITY_GAPS` (`SRC-27`) | bundle register/release create/activate/retire/default-switch mutation gate blocked; stored bundle/release projections and active-default read remain testable; activation additionally requires `SRC-15` |
-| transactional outbox | `DB_DDL_MIGRATION`, `RELEASE_OBSERVABILITY` | failure/recovery tests |
+| transactional outbox | `DB_DDL_MIGRATION`, `RELEASE_OBSERVABILITY`, `SERVER_COMMAND_TRANSACTION_SPEC`, `SOURCE_AUTHORITY_GAPS` (`SRC-30`) | source-backed enqueue/dedupe, pending claim, expired-processing lease reclaim, and successful completion remain testable; publisher failure finalization/classification, retry scheduling/backoff, `attempt_count` lifecycle, dead-letter transition/threshold, and manual replay/requeue remain blocked pending `SRC-30` resolution |
 | content/client compatibility | `CHARACTER_WORLD_CONTENT`, `WEB_MOBILE_CLIENT_ARCHITECTURE`, `UX_SCREEN_STATE_SPEC.md`, `SOURCE_AUTHORITY_GAPS` (`SRC-15`) | compatibility decision/activation gate remains source-gated; raw version/capability components remain testable |
 | rate-limit/quota/context budget | `COST_QUOTA_ABUSE_SPEC.md` | cost/quota/abuse gate |
 | analytics event schemas/experiments | `ANALYTICS_EXPERIMENT_SPEC.md` | analytics/experiment gate |
