@@ -59,7 +59,7 @@ export interface EyebrowComponentGeometricRoleProbeAuthorityFR42V1 {
   readonly schemaVersion: 'fr42-authority-v1';
   readonly authorityRef: 'authority.face.eyebrow_component_geometric_role_probe.fr42';
   readonly authorityVersion: '0.1.0';
-  readonly authorityState: 'runtime_probe_defined_single_fixture_insufficient';
+  readonly authorityState: 'single_fixture_runtime_signal_observed_mapping_unreviewed';
   readonly packageName: '@mediapipe/tasks-vision';
   readonly packageVersion: '0.10.35';
   readonly upstreamFR41Ref: string;
@@ -77,6 +77,20 @@ export interface EyebrowComponentGeometricRoleProbeAuthorityFR42V1 {
     readonly noCalibrationThresholdInvented: true;
     readonly minimumIndependentSubjectsForRoleAdmission: null;
     readonly currentFixtureCount: 1;
+  };
+  readonly discoveryEvidence: {
+    readonly evidenceLevel: 'single_fixture_runtime_signal';
+    readonly workflowRunId: 33256613542;
+    readonly discoveryHeadCommit: '28ca9ee6e28313ef06368534f988abdb1b5a2eca';
+    readonly chromeVersion: 'Google Chrome 151.0.7922.173';
+    readonly deterministicReplay: true;
+    readonly faceCount: 1;
+    readonly landmarkCount: 478;
+    readonly leftAggregateVerticalOrder: 'component_2_image_upper';
+    readonly rightAggregateVerticalOrder: 'component_2_image_upper';
+    readonly leftMeanYDelta: 0.012352740764617953;
+    readonly rightMeanYDelta: 0.011790221929550149;
+    readonly providerComponentRoleMappingAuthorized: false;
   };
   readonly admissionBoundary: {
     readonly imageUpperMeansAnatomicalUpperBoundary: false;
@@ -99,7 +113,7 @@ export const EYEBROW_COMPONENT_GEOMETRIC_ROLE_PROBE_AUTHORITY_FR42: EyebrowCompo
   schemaVersion: 'fr42-authority-v1' as const,
   authorityRef: 'authority.face.eyebrow_component_geometric_role_probe.fr42' as const,
   authorityVersion: '0.1.0' as const,
-  authorityState: 'runtime_probe_defined_single_fixture_insufficient' as const,
+  authorityState: 'single_fixture_runtime_signal_observed_mapping_unreviewed' as const,
   packageName: '@mediapipe/tasks-vision' as const,
   packageVersion: '0.10.35' as const,
   upstreamFR41Ref: FR41_REF,
@@ -117,6 +131,20 @@ export const EYEBROW_COMPONENT_GEOMETRIC_ROLE_PROBE_AUTHORITY_FR42: EyebrowCompo
     noCalibrationThresholdInvented: true as const,
     minimumIndependentSubjectsForRoleAdmission: null,
     currentFixtureCount: 1 as const,
+  }),
+  discoveryEvidence: Object.freeze({
+    evidenceLevel: 'single_fixture_runtime_signal' as const,
+    workflowRunId: 33256613542 as const,
+    discoveryHeadCommit: '28ca9ee6e28313ef06368534f988abdb1b5a2eca' as const,
+    chromeVersion: 'Google Chrome 151.0.7922.173' as const,
+    deterministicReplay: true as const,
+    faceCount: 1 as const,
+    landmarkCount: 478 as const,
+    leftAggregateVerticalOrder: 'component_2_image_upper' as const,
+    rightAggregateVerticalOrder: 'component_2_image_upper' as const,
+    leftMeanYDelta: 0.012352740764617953 as const,
+    rightMeanYDelta: 0.011790221929550149 as const,
+    providerComponentRoleMappingAuthorized: false as const,
   }),
   admissionBoundary: Object.freeze({
     imageUpperMeansAnatomicalUpperBoundary: false as const,
@@ -224,7 +252,7 @@ export function validateEyebrowComponentGeometricRoleProbeAuthorityFR42(
     authority.schemaVersion !== 'fr42-authority-v1' ||
     authority.authorityRef !== 'authority.face.eyebrow_component_geometric_role_probe.fr42' ||
     authority.authorityVersion !== '0.1.0' ||
-    authority.authorityState !== 'runtime_probe_defined_single_fixture_insufficient' ||
+    authority.authorityState !== 'single_fixture_runtime_signal_observed_mapping_unreviewed' ||
     authority.packageName !== '@mediapipe/tasks-vision' ||
     authority.packageVersion !== '0.10.35' ||
     authority.upstreamFR41Ref !== FR41_REF
@@ -241,6 +269,20 @@ export function validateEyebrowComponentGeometricRoleProbeAuthorityFR42(
     authority.experimentContract.noCalibrationThresholdInvented !== true ||
     authority.experimentContract.aggregateStatistic !== 'mean_normalized_y_per_provider_component'
   ) throw new FaceAuthorityValidationError('FR-42 experiment must remain a single-fixture, threshold-free probe.');
+  const evidence = authority.discoveryEvidence;
+  if (
+    evidence.evidenceLevel !== 'single_fixture_runtime_signal' ||
+    evidence.workflowRunId !== 33256613542 ||
+    evidence.discoveryHeadCommit !== '28ca9ee6e28313ef06368534f988abdb1b5a2eca' ||
+    evidence.deterministicReplay !== true ||
+    evidence.faceCount !== 1 ||
+    evidence.landmarkCount !== 478 ||
+    evidence.leftAggregateVerticalOrder !== 'component_2_image_upper' ||
+    evidence.rightAggregateVerticalOrder !== 'component_2_image_upper' ||
+    !(evidence.leftMeanYDelta > 0) ||
+    !(evidence.rightMeanYDelta > 0) ||
+    evidence.providerComponentRoleMappingAuthorized !== false
+  ) throw new FaceAuthorityValidationError('FR-42 pinned single-fixture runtime discovery evidence drift.');
   if (Object.values(authority.admissionBoundary).some((value) => value !== false)) {
     throw new FaceAuthorityValidationError('FR-42 admission boundary must remain fully fail-closed.');
   }

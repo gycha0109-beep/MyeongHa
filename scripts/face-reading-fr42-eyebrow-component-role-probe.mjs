@@ -19,6 +19,7 @@ const EXPECTED_MODEL_DIGEST = 'sha256:64184e229b263107bc2b804c6625db1341ff2bb731
 const EXPECTED_MODEL_BYTE_LENGTH = 3758596;
 const EXPECTED_FIXTURE_DIGEST = 'sha256:75171e877e92b7a126cca2e7a388fc430225e07e9cd2e9e801eaa67ea6d7f4d9';
 const EXPECTED_FIXTURE_BYTE_LENGTH = 578267;
+const EXPECTED_IMAGE_VERTICAL_ORDER = 'component_2_image_upper';
 const CDP_PORT = 9223;
 
 function sha256(buffer) {
@@ -252,10 +253,16 @@ async function main() {
   }
 })()`;
       const evaluationPromise = cdp.command('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true, timeout: 60000 });
+      let timeoutHandle;
       const timeoutPromise = new Promise((_, rejectPromise) => {
-        setTimeout(() => rejectPromise(new Error(`FR-42 CDP evaluation timeout. console=${JSON.stringify(cdp.consoleEvents)} exceptions=${JSON.stringify(cdp.exceptionEvents)} chrome=${chromeStderr}`)), 65000);
+        timeoutHandle = setTimeout(() => rejectPromise(new Error(`FR-42 CDP evaluation timeout. console=${JSON.stringify(cdp.consoleEvents)} exceptions=${JSON.stringify(cdp.exceptionEvents)} chrome=${chromeStderr}`)), 65000);
       });
-      const evaluation = await Promise.race([evaluationPromise, timeoutPromise]);
+      let evaluation;
+      try {
+        evaluation = await Promise.race([evaluationPromise, timeoutPromise]);
+      } finally {
+        if (timeoutHandle !== undefined) clearTimeout(timeoutHandle);
+      }
       if (evaluation.exceptionDetails) throw new Error(`FR-42 browser exception: ${JSON.stringify(evaluation.exceptionDetails)}`);
       const result = evaluation.result?.value;
       console.log(`FR42_RUNTIME ${JSON.stringify(result)}`);
@@ -263,15 +270,20 @@ async function main() {
         throw new Error(`FR-42 runtime result shape/determinism failure: ${JSON.stringify(result)}`);
       }
       for (const side of [result.firstProbe.left, result.firstProbe.right]) {
-        if (!side || side.aggregateVerticalOrder === 'aggregate_y_tie' || side.anatomicalBoundaryRoleAssigned !== false || side.componentCorrespondenceAuthorized !== false) {
-          throw new Error(`FR-42 runtime side signal invalid or authority promoted: ${JSON.stringify(side)}`);
-        }
+        if (
+          !side ||
+          side.aggregateVerticalOrder !== EXPECTED_IMAGE_VERTICAL_ORDER ||
+          side.anatomicalBoundaryRoleAssigned !== false ||
+          side.componentCorrespondenceAuthorized !== false
+        ) throw new Error(`FR-42 runtime side signal drift or authority promotion: ${JSON.stringify(side)}`);
       }
       if (
+        result.firstProbe.bothSidesProduceNonTieImageVerticalSignal !== true ||
+        result.firstProbe.bothSidesShareSameOrdinalImageUpperSignal !== true ||
         result.firstProbe.providerComponentRoleMappingAuthorized !== false ||
         result.firstProbe.researchCandidateAdmitted !== false ||
         result.firstProbe.productionGeometryAuthorized !== false
-      ) throw new Error(`FR-42 runtime probe promoted authority: ${JSON.stringify(result.firstProbe)}`);
+      ) throw new Error(`FR-42 runtime probe signal/authority drift: ${JSON.stringify(result.firstProbe)}`);
 
       const artifact = {
         schemaVersion: 'fr42-real-runtime-evidence-v1',
@@ -282,6 +294,10 @@ async function main() {
         fixture: { repository: FIXTURE_REPOSITORY, commit: FIXTURE_COMMIT, blobSha: FIXTURE_BLOB_SHA, url: FIXTURE_URL, digest: fixtureDigest, byteLength: fixtureBytes.length },
         chrome: chrome.version,
         runtimeResult: result,
+        expectedQualitativeSignal: {
+          left: EXPECTED_IMAGE_VERTICAL_ORDER,
+          right: EXPECTED_IMAGE_VERTICAL_ORDER,
+        },
         evidenceBoundary: {
           singleFixtureOnly: true,
           anatomicalBoundaryRoleAssigned: false,

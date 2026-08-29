@@ -2,7 +2,7 @@
 
 ## Status
 
-**Runtime probe implemented / single-fixture image-space signal only / provider anatomical role mapping remains blocked**
+**Single-fixture real-runtime image-space signal observed / provider anatomical role mapping remains blocked**
 
 FR-41 established an external neutral target model with medial/lateral eyebrow endpoints and separate upper/lower boundary curves, while keeping the MediaPipe component-role mapping unresolved.
 
@@ -41,23 +41,52 @@ For each provider-labeled eyebrow side independently:
 
 1. FR-39 exact published topology is decomposed into its two 4-edge / 5-vertex components.
 2. Each component's five unique provider vertices are resolved from the detected 478 normalized face landmarks.
-3. For each component, FR-42 records:
-   - mean normalized `y`
-   - median normalized `y`
-   - minimum normalized `y`
-   - maximum normalized `y`
+3. For each component, FR-42 records mean, median, minimum, and maximum normalized `y`.
 4. The component with smaller **mean normalized y** is recorded only as the component that is more image-upper by this aggregate statistic.
 5. Exact two-replay determinism is required for the emitted probe object.
 
 No hand-selected numeric separation threshold is introduced in FR-42.
 
+## Discovery run
+
+Initial discovery was executed by GitHub Actions workflow run `33256613542` against head commit:
+
+`28ca9ee6e28313ef06368534f988abdb1b5a2eca`
+
+Runtime:
+
+- Chrome: `Google Chrome 151.0.7922.173`
+- detected faces: `1`
+- face landmarks: `478`
+- exact replay equality: `true`
+
+Observed left eyebrow:
+
+| Component | Mean y | Median y | Min y | Max y |
+| --- | ---: | ---: | ---: | ---: |
+| 1 `[276,282,283,285,295]` | 0.3069044589996338 | 0.30272361636161804 | 0.29790958762168884 | 0.3190644085407257 |
+| 2 `[293,296,300,334,336]` | 0.29455171823501586 | 0.291939914226532 | 0.28602972626686096 | 0.30588704347610474 |
+
+Result: `component_2_image_upper`, absolute mean-y delta `0.012352740764617953`.
+
+Observed right eyebrow:
+
+| Component | Mean y | Median y | Min y | Max y |
+| --- | ---: | ---: | ---: | ---: |
+| 1 `[46,52,53,55,65]` | 0.3180065035820007 | 0.3163846731185913 | 0.31041011214256287 | 0.3281524181365967 |
+| 2 `[63,66,70,105,107]` | 0.3062162816524506 | 0.3034819960594177 | 0.2988683581352234 | 0.321939617395401 |
+
+Result: `component_2_image_upper`, absolute mean-y delta `0.011790221929550149`.
+
+Thus the pinned fixture gives a coherent bilateral signal: **serialization ordinal 2 is image-upper by mean normalized y on both provider-labeled sides**.
+
+This observation is now an execution-evidence contract, not anatomical authority.
+
 ## Coordinate scope
 
 MediaPipe image coordinates use normalized image x/y and a top-left image origin. Therefore smaller normalized `y` corresponds to a position higher in the image.
 
-This fact authorizes only an **image-coordinate interpretation**.
-
-It does not authorize anatomical eyebrow semantics.
+This fact authorizes only an **image-coordinate interpretation**. It does not authorize anatomical eyebrow semantics.
 
 ## Explicit non-equivalences
 
@@ -77,27 +106,21 @@ mean-y ordering
   == pointwise upper/lower correspondence
 ```
 
-Provider landmark indices also remain evidence coordinates, not neutral anatomical landmark authority.
+Provider landmark indices remain evidence coordinates, not neutral anatomical landmark authority.
 
 ## Runtime evidence artifact
 
-Workflow:
+Workflow: `Face Reading Eyebrow Component Role Probe`  
+Script: `scripts/face-reading-fr42-eyebrow-component-role-probe.mjs`  
+Artifact: `artifacts/face-reading/fr42-eyebrow-component-role-probe.json`
 
-`Face Reading Eyebrow Component Role Probe`
+The workflow now attests the discovered qualitative signal (`component_2_image_upper` on both sides) while still forbidding authority promotion.
 
-Script:
-
-`scripts/face-reading-fr42-eyebrow-component-role-probe.mjs`
-
-Artifact:
-
-`artifacts/face-reading/fr42-eyebrow-component-role-probe.json`
-
-The artifact records exact package/model/fixture provenance, Chrome version, both replay results, per-side component measurements, and the fail-closed evidence boundary.
+The script explicitly clears its CDP evaluation timeout after success and waits for Chrome process exit before recursive temp-profile removal; this avoids the lingering timer and cleanup race patterns observed in the older FR-27 harness.
 
 ## Why one fixture cannot close the mapping gate
 
-A single image can show a useful geometric signal but cannot establish:
+A single image cannot establish:
 
 - cross-subject reproducibility
 - repeated-capture repeatability
@@ -126,8 +149,12 @@ All remain false:
 - production F1
 - production F6
 
-## Expected progression
+## Result
 
-FR-42 can establish only that a reproducible **image-space vertical signal is technically measurable** on the pinned fixture.
+FR-42 has moved the eyebrow question from **“unknown provider topology semantics”** to **“one exact runtime fixture exhibits a deterministic bilateral image-space ordering signal.”**
 
-If the runtime evidence is coherent, the next slice must design an independently labeled multi-capture fixture protocol that can test whether the same coordinate-derived role mapping holds across people/captures without using MediaPipe serialization order as ground truth.
+That is genuine evidence progress, but the FR-41 `provider_component_role_mapping` gate remains blocked.
+
+## Next slice
+
+FR-43 should define an independently labeled, controlled multi-capture validation protocol for the component-role hypothesis. Its ground truth must come from an external anatomical upper/lower eyebrow boundary annotation protocol, never from MediaPipe component serialization order.

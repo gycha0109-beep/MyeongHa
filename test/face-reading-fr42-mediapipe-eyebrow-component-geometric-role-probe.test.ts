@@ -22,13 +22,26 @@ function syntheticFace(): NormalizedFaceLandmarkFR42V1[] {
 }
 
 describe('FR-42 eyebrow component geometric role probe', () => {
-  it('keeps the authority contract single-fixture and fully fail-closed', () => {
+  it('pins the successful single-fixture discovery without promoting authority', () => {
     expect(() => validateEyebrowComponentGeometricRoleProbeAuthorityFR42()).not.toThrow();
     const authority = EYEBROW_COMPONENT_GEOMETRIC_ROLE_PROBE_AUTHORITY_FR42;
-    expect(authority.authorityState).toBe('runtime_probe_defined_single_fixture_insufficient');
+    expect(authority.authorityState).toBe('single_fixture_runtime_signal_observed_mapping_unreviewed');
     expect(authority.experimentContract.currentFixtureCount).toBe(1);
     expect(authority.experimentContract.minimumIndependentSubjectsForRoleAdmission).toBeNull();
     expect(authority.experimentContract.noCalibrationThresholdInvented).toBe(true);
+    expect(authority.discoveryEvidence).toMatchObject({
+      evidenceLevel: 'single_fixture_runtime_signal',
+      workflowRunId: 33256613542,
+      discoveryHeadCommit: '28ca9ee6e28313ef06368534f988abdb1b5a2eca',
+      deterministicReplay: true,
+      faceCount: 1,
+      landmarkCount: 478,
+      leftAggregateVerticalOrder: 'component_2_image_upper',
+      rightAggregateVerticalOrder: 'component_2_image_upper',
+      providerComponentRoleMappingAuthorized: false,
+    });
+    expect(authority.discoveryEvidence.leftMeanYDelta).toBeCloseTo(0.012352740764617953, 15);
+    expect(authority.discoveryEvidence.rightMeanYDelta).toBeCloseTo(0.011790221929550149, 15);
     expect(Object.values(authority.admissionBoundary).every((value) => value === false)).toBe(true);
   });
 
