@@ -54,11 +54,32 @@ Tie policy: exact numeric ties are returned as `ambiguous_exact_tie`. FR-45 intr
 
 This is intentionally a geometric operation. A synthetic test makes a non-152 face-oval vertex the lower-most point and verifies that the algorithm follows geometry rather than a hardcoded provider index.
 
-## Runtime evidence
+## Pinned real-runtime evidence
 
-The FR-45 browser workflow uses the same pinned real MediaPipe package/model/fixture chain already used by the face-reading runtime gates and runs detection twice on the same fixture. It records whether the face-oval inferior extremum is unique and whether both replays are byte-for-byte deterministic at the probe-result level.
+Successful discovery workflow: `33260433549`
 
-The runtime artifact may record the observed provider landmark index, but the workflow does not assert that any particular index is anatomically the chin or `地閣`.
+Discovery head: `8d714a2e31e4d25fe822e2fe45ddc3ec125c1fc3`
+
+Artifact ID: `9717098645`
+
+Chrome: `Google Chrome 151.0.7922.173`
+
+The pinned fixture produced:
+
+- one detected face;
+- 478 landmarks;
+- exact equality across two replays at the FR-45 probe-result level;
+- exact source/runtime `FACE_OVAL` agreement;
+- a 36-edge / 36-vertex simple cycle;
+- one unique image-space inferior extremum;
+- observed provider landmark index `152`;
+- normalized point `(0.5117782354354858, 0.5969638824462891)`.
+
+The observation is stored separately in `mediapipe-face-oval-inferior-extremum-runtime-evidence-fr45.ts`. In particular, index `152` is a **single-fixture runtime observation only**. The evidence contract explicitly forbids using that index as generalized anatomical identity, FR-35 binding, traditional `地閣` equivalence, FR-36 promotion, or production geometry authority.
+
+## Runtime evidence boundary
+
+The FR-45 browser workflow uses the same pinned real MediaPipe package/model/fixture chain already used by the face-reading runtime gates and runs detection twice on the same fixture. The workflow records the observed provider landmark index because it is reproducible evidence, but it does not assert that any particular index is anatomically the chin or `地閣`.
 
 ## Authority boundary
 

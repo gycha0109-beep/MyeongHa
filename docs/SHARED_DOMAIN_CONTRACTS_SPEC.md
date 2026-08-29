@@ -1,8 +1,8 @@
-# 명하 Shared Domain Contracts Specification v0.7 — Source Aligned
+# 명하 Shared Domain Contracts Specification v0.8 — Source Aligned
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.7**  
-> Date: **2026-08-29**  
+> Pack Version: **v0.8**  
+> Date: **2026-08-30**  
 > Purpose: 여러 spec에 흩어진 free-form string/JSON을 bounded versioned contract로 묶는다. Source가 contract shape를 정의하지 않은 영역은 registry를 임의 생성하지 않는다.
 
 ---
@@ -258,9 +258,22 @@ NEEDS_CLARIFICATION/v1 → readingSessionId,readingId,clarificationSchemaRef
 CAPABILITY_UNAVAILABLE/v1 → capabilityKey,availability
 ```
 
-## 9. Outbox Contracts
+## 9. Outbox Contracts — `SRC-30` Boundary
 
-`event_type + event_schema_version`별 payload schema registry를 둔다. Consumer는 unknown major schema를 처리하지 않고 dead-letter/compatibility path로 보낸다.
+`event_type + event_schema_version`별 payload schema validation은 source-approved schema가 실제로 존재하는 범위에서만 수행한다. Consumer는 unknown/unresolved major schema를 **성공적으로 처리한 것으로 기록하거나 authoritative downstream side effect를 실행해서는 안 된다.**
+
+Unknown/unresolved schema의 exact failure disposition은 별도 문제다. `SRC-30` 해결 전 Pack은 다음을 임의 확정하지 않는다.
+
+```text
+failed vs dead_lettered 등 terminal/non-terminal state
+failure classification / error taxonomy
+retry eligibility / retry timing / backoff / jitter
+attempt_count lifecycle / max attempts
+dead-letter threshold / transition
+manual replay / requeue
+```
+
+따라서 unknown major schema를 곧바로 `dead-letter` 또는 특정 compatibility state로 보내는 것을 source-backed contract로 요구하지 않는다. Expired `processing` lease reclaim은 independently source-backed crash recovery이며 schema failure의 retry/dead-letter authority를 제공하지 않는다.
 
 ## 9A. Notification Scheduler Policy — `SRC-32` OPEN
 
@@ -327,5 +340,5 @@ Source가 향후 policy versioning/immutable artifact를 실제로 채택하면 
 - unknown cue → no arbitrary asset resolution
 - Purchase Intent minimal offer mapping snapshot mutation → hash mismatch/deny
 - unresolved product→entitlement mapping (`SRC-18`) → no entitlement mutation
-- unknown outbox schema → no silent consume
+- unknown/unresolved outbox schema → no successful consume or authoritative downstream side effect; exact failure/retry/dead-letter/replay disposition remains blocked by `SRC-30`
 - autonomous notification cadence/frequency/dedupe/template policy → blocked until `SRC-32`; existing stored notification/read/delivery-attempt boundaries remain independently testable
