@@ -1,8 +1,8 @@
-# 명하 Spec Pack — Source Authority Validation Report v0.10
+# 명하 Spec Pack — Source Authority Validation Report v0.11
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.10 Source Alignment**  
-> Date: **2026-08-29**  
+> Pack Version: **v0.11 Source Alignment**  
+> Date: **2026-08-30**  
 > Source Authority: `Usecase_re_reviewed_v2(1).md`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`, `Myeonghwa_Personalized_Interpretation_Architecture_v1.3_THIRD_REVIEW(1).md`  
 > Saju Public Contract Audit Pin: `gycha0109-beep/Saju@7102dc8fe8483c0875f6a093a4fd585b0df51f8b`
 
@@ -473,6 +473,44 @@ publisher failure/retry/dead-letter policy        = BLOCKED by SRC-30
 
 The Pack therefore does not require a generic `at-least-once + consumer dedupe` protocol, fixed retry/backoff model, or dead-letter state machine as current source evidence. Product-visible duplicate prevention remains a required outcome without inventing the missing execution authority.
 
+### 4.10 Source authority and implementation reproducibility artifacts separated
+
+A follow-up cross-cutting audit found that some Pack wording treated concrete registry/policy artifact names as if Primary Source had defined those artifacts, when source actually defined only the bounded/versioned behavior that implementations must preserve.
+
+Primary Source currently fixes requirements such as:
+
+```text
+Analytics event names + payload schemas are version-managed
+Relationship transition rules are versioned
+Life Fact / Character Memory use type/schema-version validation
+server manages rate limits, repeated-request controls, free/paid quota boundaries,
+scene/context budgets, and notification frequency caps
+experiments must not alter Saju semantic authority
+age/content policy must be decided before launch
+```
+
+Those requirements do **not** by themselves define the following artifact identities/interfaces/storage/hash contracts:
+
+```text
+UsagePolicyDefinition / UsagePolicyV1
+AnalyticsEventSchemaRegistry artifact shape/storage/hash
+ExperimentAssignmentPolicy
+ContentPolicyTagRegistry
+```
+
+Implementation may still use versioned config, immutable artifacts, content hashes, registries, or policy objects for deterministic selection, reproducibility, rollout safety, and auditability. When source has not defined the artifact identity/schema/hash itself, those mechanisms are **implementation contracts**, not evidence that Primary Source supplied the product semantics represented inside them.
+
+This distinction does not create a new source gap and does not close an existing one. Missing semantic authority remains governed by the existing decisions, including `SRC-18` commerce mapping, `SRC-22` relationship evaluator/policy content, `SRC-25` personal-record positive registry/schema content, `SRC-32` notification scheduler policy, and `P0-AGE-01` age/content policy.
+
+Current baseline:
+
+```text
+source-defined bounded/versioned behavior requirement = AUTHORITATIVE
+implementation registry/config/hash mechanism          = ALLOWED IMPLEMENTATION DETAIL
+artifact/interface identity as Primary Source contract = NOT CLAIMED unless source defines it
+existing semantic gaps / P0                            = remain independently OPEN
+```
+
 ## 5. Current Saju Public Contract Boundary
 
 Pinned public contract:
@@ -603,6 +641,12 @@ Current verification may assert transactional enqueue/dedupe, pending claim, exp
 
 It must **not** claim publisher failure finalization/classification, failed-event retry eligibility/timing/backoff/jitter, `attempt_count` lifecycle, max attempts, dead-letter threshold/transition, manual replay/requeue, error taxonomy, or a generic downstream analytics/consumer dedupe protocol as source-complete before `SRC-30` resolution.
 
+### Cross-cutting implementation artifact validation
+
+If an implementation uses versioned config, immutable artifacts, registries, or content hashes, tests may prove deterministic selection, immutability, version/hash integrity, rollout compatibility, and reproducible readback for those implementation mechanisms.
+
+Those tests must **not** be cited as evidence that Primary Source defines the artifact/interface/storage/hash contract or that the underlying semantic blocker has been resolved. In particular, implementation-artifact tests do not close `SRC-18`, `SRC-22`, `SRC-25`, `SRC-32`, or `P0-AGE-01` by themselves.
+
 ## 7. OPEN-P0 Register
 
 Current production decisions include:
@@ -707,4 +751,4 @@ FINAL PRODUCTION BASELINE = BLOCKED WHERE SOURCE/P0 REMAINS OPEN
 
 ### Final statement
 
-> Pack은 source authority를 구현 가능하게 구체화하는 문서이지 source에 없는 product semantics를 발명하는 authority가 아니다. 현재 commerce는 `SRC-18` Product→grant mapping과 `SRC-21` event→grant→logical-entitlement aggregation을 독립적으로 fail-closed 처리한다. `SRC-19`는 Device Installation registration lifecycle, `SRC-20`은 Share Artifact create/public projection lifecycle, `SRC-22`는 Relationship Event의 event→score/stage/anti-farming policy evaluator, `SRC-23`은 Character Unlock의 condition/World Event→target/effect evaluator, `SRC-24`는 existing-Member Guest merge의 conflict/resolution/domain-action/retry-resume policy, `SRC-30`은 transactional outbox publisher failure/retry/dead-letter/replay policy를 각각 차단한다. 이미 source-complete한 Purchase Intent, current stored Entitlement read, Device revoke, Share public-read/revoke, Relationship ledger/current-read, World Event/Character Unlock relational current-read, merge-job current read, direct merged guest history, 그리고 outbox enqueue/dedupe·pending claim·expired-processing lease reclaim·successful completion 경계는 이 blocker들과 독립적으로 유지한다.
+> Pack은 source authority를 구현 가능하게 구체화하는 문서이지 source에 없는 product semantics를 발명하는 authority가 아니다. 현재 commerce는 `SRC-18` Product→grant mapping과 `SRC-21` event→grant→logical-entitlement aggregation을 독립적으로 fail-closed 처리한다. `SRC-19`는 Device Installation registration lifecycle, `SRC-20`은 Share Artifact create/public projection lifecycle, `SRC-22`는 Relationship Event의 event→score/stage/anti-farming policy evaluator, `SRC-23`은 Character Unlock의 condition/World Event→target/effect evaluator, `SRC-24`는 existing-Member Guest merge의 conflict/resolution/domain-action/retry-resume policy, `SRC-30`은 transactional outbox publisher failure/retry/dead-letter/replay policy를 각각 차단한다. 이미 source-complete한 Purchase Intent, current stored Entitlement read, Device revoke, Share public-read/revoke, Relationship ledger/current-read, World Event/Character Unlock relational current-read, merge-job current read, direct merged guest history, 그리고 outbox enqueue/dedupe·pending claim·expired-processing lease reclaim·successful completion 경계는 이 blocker들과 독립적으로 유지한다. `UsagePolicyV1`, analytics registry storage/hash, experiment-assignment registry, content-policy-tag registry 같은 구현 artifact는 source가 그 artifact identity/schema/hash를 직접 정의하지 않은 경우 implementation reproducibility mechanism으로만 취급하며 source authority의 증거로 승격하지 않는다.
