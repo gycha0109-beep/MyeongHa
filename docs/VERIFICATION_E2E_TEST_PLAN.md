@@ -1,7 +1,7 @@
-# 명하 Verification / E2E Test Plan v0.11 — Source Aligned
+# 명하 Verification / E2E Test Plan v0.12 — Source Aligned
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.11**  
+> Pack Version: **v0.12**  
 > Date: **2026-08-29**  
 > Source Authority: `Usecase_re_reviewed_v2(1).md`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`, `Myeonghwa_Personalized_Interpretation_Architecture_v1.3_THIRD_REVIEW(1).md`  
 > Rule: source가 결정하지 않은 implementation-critical 사항은 `OPEN-P0`, 비차단 선택은 `CANDIDATE`, source 간 충돌/공백은 `SOURCE_AUTHORITY_GAPS.md` 또는 numbered source-gap 문서에 기록한다.
@@ -611,6 +611,11 @@ CI/release evidence:
 - content release/bundle/hash
 - Saju engine/reading contract/grounding versions
 - AI runtime/prompt versions
+- notification stored logical-ledger/delivery/provider-attempt persistence provenance for implemented notification slices
+- `SRC-12` status for effective notification preference defaults/materialization/mutation evidence
+- `SRC-13` status for final user-visible notification inbox membership/history/order/cursor evidence
+- `SRC-31` status for production notification provider-routing evidence
+- `SRC-32` status for autonomous notification trigger/cadence/frequency-cap/dedupe/template/materialization evidence
 - personal-record type/schema registry/version evidence only after `SRC-25` source resolution
 - `SRC-25` status for any new durable Life Fact/Memory value evidence
 - relationship `policy_version` provenance available in current ERD
@@ -635,6 +640,8 @@ Do not invent merge policy hash/artifact, conflict schema version, request hash,
 
 Do not treat the Pack's previous `VersionedRecordTypeDefinition` shape as source evidence. `SRC-25` must define the actual positive personal-record type/schema registry and any required artifact identity/provenance.
 
+Do not treat notification stored-ledger, delivery, or attempt provenance as evidence that missing effective defaults, final inbox composition, provider routing, scheduler decisions, or automatic retry policy have been source-resolved.
+
 ## 20. Promotion Criteria
 
 ### Engineering baseline
@@ -655,7 +662,12 @@ relevant source blockers closed or feature explicitly disabled
 
 ```text
 Commerce purchase→access enabled → SRC-18 + SRC-21 source-resolved + P0-CM-01 decided
+Notification effective preference defaults/materialization/mutation enabled → SRC-12 source-resolved
+Final user-visible Notification Inbox projection enabled → SRC-13 source-resolved
 Device Installation register enabled → SRC-19 source-resolved
+Production notification provider routing enabled → SRC-31 source-resolved
+Autonomous notification scheduler decision/materialization enabled → SRC-32 source-resolved
+Automatic notification delivery retry timing/backoff/max-attempt/error-taxonomy/failover enabled → explicit source authority required; attempt allocator mechanics alone are insufficient
 Share Artifact create enabled → SRC-20 source-resolved
 Relationship Event score/stage apply enabled → SRC-22 source-resolved
 Character Unlock eligibility/effect apply enabled → SRC-23 source-resolved
