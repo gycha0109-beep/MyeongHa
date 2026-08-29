@@ -120,7 +120,7 @@ describe('FR-48 preregistered Menton scoring/calibration contract', () => {
     expect(authority.metricContract.partitionReporting).toBe('calibration_and_holdout_reported_separately');
     expect(authority.metricContract.holdoutMayTuneThresholds).toBe(false);
     expect(Object.values(authority.acceptanceThresholds)).toEqual(Array(6).fill(null));
-    expect(Object.values(authority.authorityBoundary)).toEqual(Array(15).fill(false));
+    expect(Object.values(authority.authorityBoundary)).toEqual(Array(16).fill(false));
   });
 
   it('builds deterministic descriptive capture/repeat/pose summaries without producing pass-fail authority', () => {
@@ -181,7 +181,7 @@ describe('FR-48 preregistered Menton scoring/calibration contract', () => {
         selectedPoint: null,
       },
     };
-    expect(() => buildMentonPreregisteredScoringReportFR48(dataset, providerCandidates)).toThrow(/unique FR-45 provider candidate point|unique provider candidate/);
+    expect(() => buildMentonPreregisteredScoringReportFR48(dataset, providerCandidates)).toThrow(/unique fail-closed FR-45 provider-neutral candidate/);
   });
 
   it('never promotes scoring into FR-35, traditional 地閣, FR-36, Three Divisions, F1, or F6 production authority', () => {
