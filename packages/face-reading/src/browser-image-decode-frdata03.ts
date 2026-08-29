@@ -23,7 +23,7 @@ export interface BrowserImageDecodeEvidenceFRData03V1 {
 export interface BrowserDecoderProvenanceFRData03V1 {
   readonly protocol: 'chrome_devtools_protocol';
   readonly decodePrimitive: 'html_image_element_load_plus_decode';
-  readonly browserProduct: string;
+  readonly browserProduct: 'Google Chrome' | 'Chromium';
   readonly browserVersion: string;
   readonly platform: string;
   readonly runnerOS: string | null;
@@ -108,6 +108,33 @@ function positiveInteger(value: number, label: string): number {
   return value;
 }
 
+function validateUpstreamAuthorityClosed(
+  report: {
+    readonly empiricalScoringPerformed: boolean;
+    readonly providerCandidateToMentonMappingValidated: boolean;
+    readonly repeatedCaptureRepeatabilityValidated: boolean;
+    readonly poseStabilityValidated: boolean;
+    readonly calibrationThresholdsDefined: boolean;
+    readonly fr35PointToContourRelationValidated: boolean;
+    readonly traditionalDigeEquivalenceValidated: boolean;
+    readonly researchCandidateAdmitted: boolean;
+    readonly productionGeometryAuthorized: boolean;
+  },
+  label: string,
+): void {
+  if (
+    report.empiricalScoringPerformed !== false ||
+    report.providerCandidateToMentonMappingValidated !== false ||
+    report.repeatedCaptureRepeatabilityValidated !== false ||
+    report.poseStabilityValidated !== false ||
+    report.calibrationThresholdsDefined !== false ||
+    report.fr35PointToContourRelationValidated !== false ||
+    report.traditionalDigeEquivalenceValidated !== false ||
+    report.researchCandidateAdmitted !== false ||
+    report.productionGeometryAuthorized !== false
+  ) fail(`${label} prerequisite contains an unauthorized empirical/anatomical/traditional/production promotion.`);
+}
+
 function validateIntakePrerequisite(
   manifest: MentonDatasetIntakeManifestFRData01V1,
   report: MentonDatasetIntakeReportFRData01V1,
@@ -124,8 +151,9 @@ function validateIntakePrerequisite(
     report.assetPathsConfinedToDeclaredRoot !== true
   ) fail('FR-DATA-01 intake prerequisite is not fully verified for this exact dataset.');
   if (report.imageDecodabilityVerified !== false || report.imageDimensionsVerifiedAgainstBytes !== false) {
-    fail('FR-DATA-01 prerequisite report contains an unauthorized downstream promotion.');
+    fail('FR-DATA-01 prerequisite report contains an unauthorized downstream image promotion.');
   }
+  validateUpstreamAuthorityClosed(report, 'FR-DATA-01');
 }
 
 function validateDimensionPrerequisite(
@@ -141,7 +169,32 @@ function validateDimensionPrerequisite(
     report.imageDimensionsVerifiedAgainstBytes !== true
   ) fail('FR-DATA-02 byte-derived dimension prerequisite is not fully verified for this exact dataset.');
   if (report.imageDecodabilityVerified !== false || report.pixelContentIntegrityVerified !== false) {
-    fail('FR-DATA-02 prerequisite report contains an unauthorized downstream promotion.');
+    fail('FR-DATA-02 prerequisite report contains an unauthorized downstream image promotion.');
+  }
+  validateUpstreamAuthorityClosed(report, 'FR-DATA-02');
+
+  if (new Set(report.captureVerifications.map((entry) => entry.captureRef)).size !== report.captureVerifications.length) {
+    fail('FR-DATA-02 capture verification refs must remain unique at FR-DATA-03 admission.');
+  }
+  const expectedRefs = new Set(manifest.dataset.captures.map((capture) => capture.captureRef));
+  for (const entry of report.captureVerifications) {
+    if (!expectedRefs.has(entry.captureRef)) fail(`FR-DATA-02 prerequisite references unknown capture ${entry.captureRef}.`);
+  }
+  for (const capture of manifest.dataset.captures) {
+    const binding = manifest.assets.find((asset) => asset.captureRef === capture.captureRef);
+    if (!binding) fail(`capture ${capture.captureRef} is missing its FR-DATA-01 binding while validating FR-DATA-02.`);
+    const entry = report.captureVerifications.find((candidate) => candidate.captureRef === capture.captureRef);
+    if (!entry) fail(`capture ${capture.captureRef} is missing its FR-DATA-02 capture verification.`);
+    if (entry.relativeAssetPath !== binding.relativeAssetPath) {
+      fail(`capture ${capture.captureRef} FR-DATA-02 prerequisite path differs from its FR-DATA-01 binding.`);
+    }
+    if (
+      entry.manifestWidth !== capture.imageWidth ||
+      entry.manifestHeight !== capture.imageHeight ||
+      entry.encodedWidth !== capture.imageWidth ||
+      entry.encodedHeight !== capture.imageHeight ||
+      entry.dimensionsMatch !== true
+    ) fail(`capture ${capture.captureRef} FR-DATA-02 prerequisite no longer proves exact manifest-to-byte dimension equality.`);
   }
 }
 
@@ -149,8 +202,13 @@ function validateBrowserProvenance(provenance: BrowserDecoderProvenanceFRData03V
   if (provenance.protocol !== 'chrome_devtools_protocol' || provenance.decodePrimitive !== 'html_image_element_load_plus_decode') {
     fail('browser decoder provenance must identify the Chrome DevTools Protocol and HTMLImageElement load+decode primitive.');
   }
-  nonEmpty(provenance.browserProduct, 'browserProduct');
+  if (provenance.browserProduct !== 'Google Chrome' && provenance.browserProduct !== 'Chromium') {
+    fail('browserProduct must identify Google Chrome or Chromium.');
+  }
   nonEmpty(provenance.browserVersion, 'browserVersion');
+  if (!provenance.browserVersion.startsWith(provenance.browserProduct)) {
+    fail('browserVersion must retain the exact version string for the identified browser product.');
+  }
   nonEmpty(provenance.platform, 'platform');
   if (!Number.isFinite(Date.parse(provenance.verificationTimestamp))) fail('verificationTimestamp must be parseable.');
   let pageUrl: URL;
