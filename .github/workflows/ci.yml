@@ -209,6 +209,8 @@ jobs:
         run: bash test/db/character_record_context_query.sh
       - name: Run notification read persistence/concurrency tests
         run: bash test/db/notification_read_concurrency.sh
+      - name: Run notification stored ledger projection read tests
+        run: bash test/db/notification_stored_ledger_query.sh
       - name: Run current relationship projection read tests
         run: bash test/db/relationship_current_query.sh
       - name: Run current Character Unlock projection read tests
