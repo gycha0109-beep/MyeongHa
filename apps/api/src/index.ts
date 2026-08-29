@@ -4,7 +4,7 @@ import {
   type CapabilityGateResult,
 } from '../../../packages/domain/src/index.js';
 
-export const API_FOUNDATION_VERSION = 'myeongha-api-foundation-v0.11' as const;
+export const API_FOUNDATION_VERSION = 'myeongha-api-foundation-v0.12' as const;
 
 export function authorizePlannedCapability(
   input: CapabilityGateInput,
@@ -154,3 +154,15 @@ export {
   type LifeRecordLedgerReadAuthorityPortV1,
   type LifeRecordLedgerReadResponseV1,
 } from './life-record-ledger-read.js';
+
+export {
+  getMemoryItems,
+  MEMORY_ITEMS_READ_AUTHORITY_BINDING_V1,
+  MemoryItemsReadAuthorityPortErrorV1,
+  type GetMemoryItemsInputV1,
+  type MemoryItemCurrentAuthorityRowV1,
+  type MemoryItemReadItemV1,
+  type MemoryItemsReadAuthorityFailureCodeV1,
+  type MemoryItemsReadAuthorityPortV1,
+  type MemoryItemsReadResponseV1,
+} from './memory-items-read.js';
