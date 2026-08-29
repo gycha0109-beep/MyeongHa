@@ -213,9 +213,13 @@ try {
     const chrome = findChrome();
     console.log(`FR45_CHROME ${chrome.version}`);
     const dump = await runChromeDump(chrome, pageUrl, scratch);
-    const match = dump.stdout.match(/FR45_RESULT_START([\s\S]*?)FR45_RESULT_END/);
-    if (!match) throw new Error(`FR-45 browser result marker missing. stderr=${dump.stderr} dom=${dump.stdout.slice(-12000)}`);
-    const result = JSON.parse(decodeHtmlText(match[1]));
+    const preMatch = dump.stdout.match(/<pre id="result">([\s\S]*?)<\/pre>/);
+    if (!preMatch) throw new Error(`FR-45 result element missing. stderr=${dump.stderr} dom=${dump.stdout.slice(-12000)}`);
+    const preText = decodeHtmlText(preMatch[1]);
+    if (preText === 'FR45_PENDING') throw new Error(`FR-45 browser dumped before module probe completed. stderr=${dump.stderr}`);
+    const match = preText.match(/^FR45_RESULT_START([\s\S]*?)FR45_RESULT_END$/);
+    if (!match) throw new Error(`FR-45 result marker missing inside result element: ${preText.slice(0, 1000)}`);
+    const result = JSON.parse(match[1]);
     console.log(`FR45_RUNTIME ${JSON.stringify(result)}`);
     if (!result || result.status !== 'success' || result.faceCount !== 1 || result.landmarkCount !== 478 || result.deterministicReplay !== true) {
       throw new Error(`FR-45 runtime result shape/determinism failure: ${JSON.stringify(result)}`);
