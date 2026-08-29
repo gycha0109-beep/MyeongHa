@@ -19,7 +19,7 @@ const EXPECTED_MODEL_DIGEST = 'sha256:64184e229b263107bc2b804c6625db1341ff2bb731
 const EXPECTED_MODEL_BYTE_LENGTH = 3758596;
 const EXPECTED_FIXTURE_DIGEST = 'sha256:75171e877e92b7a126cca2e7a388fc430225e07e9cd2e9e801eaa67ea6d7f4d9';
 const EXPECTED_FIXTURE_BYTE_LENGTH = 578267;
-const CDP_PORT = 9224;
+const CDP_PORT = 9223;
 
 function sha256(buffer) {
   return `sha256:${createHash('sha256').update(buffer).digest('hex')}`;
