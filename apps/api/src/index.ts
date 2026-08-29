@@ -4,7 +4,7 @@ import {
   type CapabilityGateResult,
 } from '../../../packages/domain/src/index.js';
 
-export const API_FOUNDATION_VERSION = 'myeongha-api-foundation-v0.6' as const;
+export const API_FOUNDATION_VERSION = 'myeongha-api-foundation-v0.7' as const;
 
 export function authorizePlannedCapability(
   input: CapabilityGateInput,
@@ -92,3 +92,14 @@ export {
   type MergeJobReadAuthorityPortV1,
   type MergeJobReadResponseV1,
 } from './merge-job-read.js';
+
+export {
+  DATA_DELETION_JOB_READ_AUTHORITY_BINDING_V1,
+  DataDeletionJobReadAuthorityPortErrorV1,
+  getDataDeletionJob,
+  type DataDeletionJobCurrentAuthorityRowV1,
+  type DataDeletionJobReadAuthorityFailureCodeV1,
+  type DataDeletionJobReadAuthorityPortV1,
+  type DataDeletionJobReadResponseV1,
+  type GetDataDeletionJobInputV1,
+} from './data-deletion-job-read.js';
