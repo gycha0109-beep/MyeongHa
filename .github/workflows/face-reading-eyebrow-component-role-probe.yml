@@ -1,0 +1,42 @@
+name: Face Reading Eyebrow Component Role Probe
+
+on:
+  pull_request:
+    paths:
+      - 'packages/face-reading/**'
+      - 'scripts/face-reading-fr42-eyebrow-component-role-probe.mjs'
+      - '.github/workflows/face-reading-eyebrow-component-role-probe.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'packages/face-reading/**'
+      - 'scripts/face-reading-fr42-eyebrow-component-role-probe.mjs'
+      - '.github/workflows/face-reading-eyebrow-component-role-probe.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  fr42-real-mediapipe-eyebrow-probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install exact workspace dependencies
+        run: npm install --ignore-scripts
+      - name: Build MyeongHa runtime
+        run: npm run build
+      - name: Execute FR-42 eyebrow component role probe
+        run: node scripts/face-reading-fr42-eyebrow-component-role-probe.mjs
+      - name: Upload FR-42 execution evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fr42-eyebrow-component-role-probe
+          path: artifacts/face-reading/fr42-eyebrow-component-role-probe.json
+          if-no-files-found: warn
+          retention-days: 14
