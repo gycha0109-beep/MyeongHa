@@ -4,7 +4,7 @@ import {
   type CapabilityGateResult,
 } from '../../../packages/domain/src/index.js';
 
-export const API_FOUNDATION_VERSION = 'myeongha-api-foundation-v0.7' as const;
+export const API_FOUNDATION_VERSION = 'myeongha-api-foundation-v0.8' as const;
 
 export function authorizePlannedCapability(
   input: CapabilityGateInput,
@@ -103,3 +103,19 @@ export {
   type DataDeletionJobReadResponseV1,
   type GetDataDeletionJobInputV1,
 } from './data-deletion-job-read.js';
+
+export {
+  getNotificationPreferences,
+  NOTIFICATION_PREFERENCE_READ_AUTHORITY_BINDINGS_V1,
+  NotificationPreferenceReadAuthorityPortErrorV1,
+  type GetNotificationPreferencesInputV1,
+  type NotificationCategoryV1,
+  type NotificationPreferenceAuthorityRowV1,
+  type NotificationPreferenceReadAuthorityFailureCodeV1,
+  type NotificationPreferenceReadAuthorityPortV1,
+  type NotificationPreferenceReadItemV1,
+  type NotificationPreferencesReadResponseV1,
+  type NotificationPreviewModeV1,
+  type NotificationSettingsAuthorityRowV1,
+  type NotificationSettingsReadResponseV1,
+} from './notification-preferences-read.js';
