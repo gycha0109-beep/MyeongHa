@@ -24,7 +24,7 @@ describe('FR-45 MediaPipe face oval inferior-extremum candidate', () => {
       blobSha: '644de9d8c7cd90880d92b2393b4913fa93ace927',
       symbol: 'FACE_LANDMARKS_FACE_OVAL',
     });
-    expect(Object.values(authority.authorityBoundary)).toEqual(Array(9).fill(false));
+    expect(Object.values(authority.authorityBoundary)).toEqual(Array(10).fill(false));
     expect(authority.candidateAlgorithm.exactTiePolicy).toBe('ambiguous_no_epsilon');
   });
 
@@ -78,10 +78,11 @@ describe('FR-45 MediaPipe face oval inferior-extremum candidate', () => {
   });
 
   it('fails closed when exact published FACE_OVAL source/runtime order drifts', () => {
-    const fakeRuntime = Object.create(FaceLandmarker) as typeof FaceLandmarker;
-    Object.defineProperty(fakeRuntime, 'FACE_LANDMARKS_FACE_OVAL', {
-      value: [...FaceLandmarker.FACE_LANDMARKS_FACE_OVAL].reverse(),
-      configurable: true,
+    const fakeRuntime = new Proxy(FaceLandmarker, {
+      get(target, property, receiver) {
+        if (property === 'FACE_LANDMARKS_FACE_OVAL') return [...target.FACE_LANDMARKS_FACE_OVAL].reverse();
+        return Reflect.get(target, property, receiver);
+      },
     });
     expect(() => inspectMediaPipeFaceOvalTopologyFR45(fakeRuntime)).toThrow(/edge sequence drifted/);
   });
