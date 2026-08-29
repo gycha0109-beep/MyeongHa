@@ -1,8 +1,8 @@
-# 명하 Spec Pack — Source Authority Validation Report v0.9
+# 명하 Spec Pack — Source Authority Validation Report v0.10
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.9 Source Alignment**  
-> Date: **2026-08-28**  
+> Pack Version: **v0.10 Source Alignment**  
+> Date: **2026-08-29**  
 > Source Authority: `Usecase_re_reviewed_v2(1).md`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`, `Myeonghwa_Personalized_Interpretation_Architecture_v1.3_THIRD_REVIEW(1).md`  
 > Saju Public Contract Audit Pin: `gycha0109-beep/Saju@7102dc8fe8483c0875f6a093a4fd585b0df51f8b`
 
@@ -432,6 +432,47 @@ full conflict/resolution/domain-action merge execution = BLOCKED by SRC-24
 
 A command that invents conflict schemas, request hashes, action planning, or domain projection merge formulas is not a valid workaround. Relationship/Unlock/Episode transformations remain independently gated by `SRC-22`/`SRC-23`/`SRC-17` where applicable.
 
+### 4.9 Transactional outbox failure/retry/dead-letter authority separated — `SRC-30`
+
+Primary source requires domain-state/downstream-event atomicity where applicable, failure/recovery verification, and zero product-visible duplicate side effects. Those requirements do not by themselves define one executable publisher retry state machine.
+
+Current source-backed transactional outbox boundary is:
+
+```text
+transactional enqueue + logical dedupe/uniqueness
+pending claim
+expired `processing` lease reclaim
+successful completion
+stored-state/error telemetry
+```
+
+Primary source does **not** define:
+
+```text
+publisher failure finalization/classification
+retry eligibility
+retry scheduling/timing/backoff/jitter
+attempt_count mutation/increment lifecycle
+max attempts
+dead-letter threshold/transition
+manual replay/requeue
+error taxonomy
+generic downstream consumer dedupe key/store/protocol
+```
+
+Expired `processing` lease reclaim is a source-backed crash-recovery mechanism. It is **not** failed-event retry scheduling authority. Notification Delivery provider-attempt retry is also a separate domain boundary and does not resolve transactional outbox retry policy.
+
+Current baseline:
+
+```text
+transactional enqueue/dedupe                     = SOURCE-COMPLETE
+pending claim + expired processing lease reclaim = SOURCE-COMPLETE
+successful completion / stored telemetry         = SOURCE-COMPLETE
+publisher failure/retry/dead-letter policy        = BLOCKED by SRC-30
+```
+
+The Pack therefore does not require a generic `at-least-once + consumer dedupe` protocol, fixed retry/backoff model, or dead-letter state machine as current source evidence. Product-visible duplicate prevention remains a required outcome without inventing the missing execution authority.
+
 ## 5. Current Saju Public Contract Boundary
 
 Pinned public contract:
@@ -556,6 +597,12 @@ Current verification may assert schema uniqueness, ownership denial, standalone 
 
 Current verification may assert public token fingerprint lookup, active/unexpired stored-snapshot read, private Reading denial, owner revoke, immutable stored snapshot/token identity, and account-deletion revocation. It must not claim Share create serialization/retry/token-response/expiry semantics are source-complete before `SRC-20` resolution.
 
+### Transactional outbox with `SRC-30` open
+
+Current verification may assert transactional enqueue/dedupe, pending claim, expired `processing` lease reclaim, successful completion, and stored-state/error telemetry. Failure/recovery scenarios must still prove no duplicate domain mutation or product-visible duplicate side effect where the source requires that outcome.
+
+It must **not** claim publisher failure finalization/classification, failed-event retry eligibility/timing/backoff/jitter, `attempt_count` lifecycle, max attempts, dead-letter threshold/transition, manual replay/requeue, error taxonomy, or a generic downstream analytics/consumer dedupe protocol as source-complete before `SRC-30` resolution.
+
 ## 7. OPEN-P0 Register
 
 Current production decisions include:
@@ -594,7 +641,7 @@ SRC-23 = additionally required if Character Unlock projection is transformed
 SRC-17 = additionally required where Episode transition/effect semantics are transformed
 ```
 
-Source-gap decisions `SRC-19`, `SRC-20`, `SRC-22`, `SRC-23`, and `SRC-24` are independent of infrastructure/provider P0 choices.
+Source-gap decisions `SRC-19`, `SRC-20`, `SRC-22`, `SRC-23`, `SRC-24`, and `SRC-30` are independent of infrastructure/provider P0 choices.
 
 ## 8. Promotion Gate
 
@@ -642,6 +689,10 @@ episode-driven Character Unlock
 Existing-Member Guest full merge execution
 → SRC-24 resolution + conflict/resolution/domain-action/retry-resume evidence
 → plus applicable SRC-22/SRC-23/SRC-17 authority for transformed projections
+
+Transactional outbox publisher failure/retry/dead-letter execution
+→ SRC-30 resolution + failure-classification/retry/dead-letter/replay evidence
+→ expired-processing lease reclaim remains independently source-backed
 ```
 
 ## 9. Final Classification
@@ -656,4 +707,4 @@ FINAL PRODUCTION BASELINE = BLOCKED WHERE SOURCE/P0 REMAINS OPEN
 
 ### Final statement
 
-> Pack은 source authority를 구현 가능하게 구체화하는 문서이지 source에 없는 product semantics를 발명하는 authority가 아니다. 현재 commerce는 `SRC-18` Product→grant mapping과 `SRC-21` event→grant→logical-entitlement aggregation을 독립적으로 fail-closed 처리한다. `SRC-19`는 Device Installation registration lifecycle, `SRC-20`은 Share Artifact create/public projection lifecycle, `SRC-22`는 Relationship Event의 event→score/stage/anti-farming policy evaluator, `SRC-23`은 Character Unlock의 condition/World Event→target/effect evaluator, `SRC-24`는 existing-Member Guest merge의 conflict/resolution/domain-action/retry-resume policy를 각각 차단한다. 이미 source-complete한 Purchase Intent, current stored Entitlement read, Device revoke, Share public-read/revoke, Relationship ledger/current-read, World Event/Character Unlock relational current-read, merge-job current read 및 direct merged guest history 경계는 이 blocker들과 독립적으로 유지한다.
+> Pack은 source authority를 구현 가능하게 구체화하는 문서이지 source에 없는 product semantics를 발명하는 authority가 아니다. 현재 commerce는 `SRC-18` Product→grant mapping과 `SRC-21` event→grant→logical-entitlement aggregation을 독립적으로 fail-closed 처리한다. `SRC-19`는 Device Installation registration lifecycle, `SRC-20`은 Share Artifact create/public projection lifecycle, `SRC-22`는 Relationship Event의 event→score/stage/anti-farming policy evaluator, `SRC-23`은 Character Unlock의 condition/World Event→target/effect evaluator, `SRC-24`는 existing-Member Guest merge의 conflict/resolution/domain-action/retry-resume policy, `SRC-30`은 transactional outbox publisher failure/retry/dead-letter/replay policy를 각각 차단한다. 이미 source-complete한 Purchase Intent, current stored Entitlement read, Device revoke, Share public-read/revoke, Relationship ledger/current-read, World Event/Character Unlock relational current-read, merge-job current read, direct merged guest history, 그리고 outbox enqueue/dedupe·pending claim·expired-processing lease reclaim·successful completion 경계는 이 blocker들과 독립적으로 유지한다.
