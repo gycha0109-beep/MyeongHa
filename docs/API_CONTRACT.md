@@ -1,7 +1,7 @@
-# 명하 Shared API Contract v0.8 — Source Aligned
+# 명하 Shared API Contract v0.9 — Source Aligned
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.8**  
+> Pack Version: **v0.9**  
 > Date: **2026-08-29**  
 > Source Authority: `Usecase_re_reviewed_v2(1).md`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`, `Myeonghwa_Personalized_Interpretation_Architecture_v1.3_THIRD_REVIEW(1).md`  
 > Rule: source가 결정하지 않은 implementation-critical 사항은 `OPEN-P0`, 비차단 선택은 `CANDIDATE`, source 간 충돌/공백은 `SOURCE_AUTHORITY_GAPS.md` 또는 numbered source-gap 문서에 기록한다.
@@ -370,21 +370,63 @@ write는 `idempotencyKey + expectedRevision` 필요.
 
 ## 15. Notifications / Installations
 
-Use Case의 공식 API 목록은 notification preference/inbox를 정의하지만 Device Installation register/revoke HTTP route 이름 자체는 명시하지 않는다. 아래 두 route는 Pack의 supporting surface 후보이며, source-backed DB/lifecycle 의미와 분리해 본다.
+Use Case의 공식 API 목록은 notification preference/inbox를 정의하지만 Device Installation register/revoke HTTP route 이름 자체는 명시하지 않는다. 아래 두 device route는 Pack의 supporting surface 후보이며, source-backed DB/lifecycle 의미와 분리해 본다.
 
 ```text
 POST   /api/device-installations/register      # SRC-19 BLOCKED
 POST   /api/device-installations/:id/revoke    # supporting route candidate; revoke behavior source-safe
-GET    /api/notifications
-POST   /api/notifications/:id/read
-GET    /api/notification-preferences
-PATCH  /api/notification-preferences
-PATCH  /api/notification-preferences/preview
+GET    /api/notifications                      # final inbox projection SRC-13 BLOCKED
+POST   /api/notifications/:id/read             # explicit owned stored notification read command source-safe
+GET    /api/notification-preferences           # stored-row projection only; effective missing-row defaults SRC-12 BLOCKED
+PATCH  /api/notification-preferences           # SRC-12 BLOCKED
+PATCH  /api/notification-preferences/preview   # SRC-12 BLOCKED
 ```
+
+### Device installation lifecycle
 
 `SRC-19` 해결 전 register endpoint를 production-authoritative contract로 승격하지 않는다. Source는 active identity/token uniqueness와 cross-subject revoke-before-rebind는 정의하지만 same-subject retry, token rotation, revoked-row re-registration, row lineage, observation-field refresh, concurrent registration identity를 정의하지 않는다.
 
 Standalone owner-scoped revoke DB command는 이 gap과 독립적으로 유지할 수 있다. Push token registration이 향후 승격될 때도 subject ownership + installation/token uniqueness는 server가 검증해야 한다.
+
+### Notification inbox read boundary — `SRC-13`
+
+`notifications`의 persisted status vocabulary는 source-backed이지만, `GET /api/notifications`가 `queued | ready | read | cancelled | expired` 중 어떤 상태를 사용자 inbox에 포함할지는 Source가 정의하지 않는다.
+
+따라서 기존 `qry_notification_stored_ledger_v1`처럼 owner-scoped **raw stored logical notification ledger**를 읽을 수 있다는 사실을 public final inbox contract와 동일시하지 않는다. 특히 다음을 임의 확정하지 않는다.
+
+```text
+visible status membership
+read history 포함 여부
+cancelled/expired history 노출 여부
+queued scheduled item 선노출 여부
+final inbox ordering/cursor
+```
+
+`SRC-13` 해결 전 `GET /api/notifications`를 production-authoritative final inbox projection으로 승격하지 않는다.
+
+반면 `POST /api/notifications/:id/read`는 caller가 명시적으로 지목한 owned stored logical notification의 read-state command로 유지할 수 있다. 이 command가 존재한다고 해서 전체 inbox membership이 해결된 것은 아니다.
+
+### Notification preference boundary — `SRC-12`
+
+Persisted `notification_settings` / `notification_preferences` row 자체의 owner-scoped projection은 읽을 수 있다. 그러나 row absence를 effective preference object로 합성하는 규칙은 Source가 정의하지 않는다.
+
+따라서 `GET /api/notification-preferences`가 stored rows만 반환하는 projection으로 사용되는 것은 가능하지만, 다음을 임의 default로 채우는 final effective-preference contract는 `SRC-12` 해결 전 금지한다.
+
+```text
+missing notification_settings.global_enabled
+missing category preference.enabled
+initial category materialization
+exact default preview mode
+new category existing-user default
+```
+
+`PATCH /api/notification-preferences`와 `/preview`도 Source가 missing-row materialization, insert-vs-update, idempotency와 category expansion semantics를 정하기 전 production-authoritative mutation으로 승격하지 않는다.
+
+### Scheduler / provider internal authority
+
+이 HTTP 목록에 autonomous scheduler create endpoint가 없다는 사실은 scheduler authority가 해결됐다는 뜻이 아니다. Candidate → cadence/frequency/eligibility → logical notification materialization은 `SRC-32`가 계속 막는다.
+
+Likewise provider attempt persistence가 존재해도 installation/platform configuration에서 실제 provider를 resolve하는 production routing authority는 `SRC-31`이 계속 막는다. Public notification API가 이 내부 gap을 우회하지 않는다.
 
 ## 16. Commerce
 
@@ -474,8 +516,8 @@ For personal records, old/new schema compatibility cannot be inferred from the g
 ## 20. Pagination / Ordering
 
 - messages: `(thread_id, sequence_no)` cursor
-- notifications: `(scheduled_at,id)` cursor
 - readings/history: `(created_at,id)` cursor
+- final notification inbox membership/order/cursor: `SRC-13` 해결 전 normative contract로 확정하지 않는다. Raw stored notification ledger의 deterministic internal/read projection은 public inbox ordering authority가 아니다.
 - offset pagination은 append-heavy stream 기본값으로 사용하지 않는다.
 
 ## 21. Contract Test Gate
@@ -496,6 +538,12 @@ For personal records, old/new schema compatibility cannot be inferred from the g
 - unresolved/unknown personal-record type/schema → no durable persistence
 - session-only memory no long-term row
 - grant revoke context exclusion
+- notification raw stored-ledger ownership/read projection remains independently testable
+- final `GET /api/notifications` inbox status membership/order remains blocked until `SRC-13`
+- explicit owned `POST /api/notifications/:id/read` remains independently testable
+- stored notification preference projection remains independently testable; effective missing-row/default synthesis and preference PATCH mutation remain blocked until `SRC-12`
+- autonomous notification trigger/cadence/frequency-cap/dedupe/template materialization remains blocked until `SRC-32`
+- notification provider routing resolution remains blocked until `SRC-31`; provider-attempt persistence mechanics remain independently testable
 - Device Installation standalone revoke ownership/lifecycle
 - Device Installation register/re-register/token-rotation contract remains blocked until `SRC-19`
 - public Share active/unexpired read cannot authorize private Reading
