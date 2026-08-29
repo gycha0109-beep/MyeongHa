@@ -1,8 +1,8 @@
-# 명하 Verification / E2E Test Plan v0.10 — Source Aligned
+# 명하 Verification / E2E Test Plan v0.11 — Source Aligned
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.10**  
-> Date: **2026-08-28**  
+> Pack Version: **v0.11**  
+> Date: **2026-08-29**  
 > Source Authority: `Usecase_re_reviewed_v2(1).md`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`, `Myeonghwa_Personalized_Interpretation_Architecture_v1.3_THIRD_REVIEW(1).md`  
 > Rule: source가 결정하지 않은 implementation-critical 사항은 `OPEN-P0`, 비차단 선택은 `CANDIDATE`, source 간 충돌/공백은 `SOURCE_AUTHORITY_GAPS.md` 또는 numbered source-gap 문서에 기록한다.
 
@@ -382,14 +382,44 @@ A lexical provider-order comparator or intuitive `MAX(valid_until)`/NULL-wins ag
 ### Source-complete now
 
 - device cross-user deny
-- active installation identity/token uniqueness constraints
-- owner-scoped revoke
-- revoked installation no new send
-- logical delivery dedupe
-- retry allocator
-- quiet hours/opt-out/frequency cap where stored policy authority exists
-- default privacy preview no sensitive content only after `SRC-12` default authority is resolved; stored explicit preview mode remains testable
-- deep link unauthorized private resource deny
+- active installation identity/token uniqueness structural constraints
+- owner-scoped installation revoke
+- revoked installation excluded from new delivery/attempt targets
+- `(notification_id, installation_id)` logical delivery dedupe
+- row-locked `next_attempt_no` allocation and unique provider-attempt provenance
+- stored logical notification ledger owner-isolated read
+- explicit owned notification `read` state command; push delivered/open remains a different state
+- stored notification preference rows can be read exactly as persisted
+- explicitly stored preview mode can be enforced without inventing a missing-row default
+- provider attempt persistence/finalization remains testable after an already-authoritative provider identity is supplied; this does not prove provider routing
+- private deep link resource authorization deny
+
+These prove persistence, ownership, privacy and retry-allocation mechanics. They do **not** prove final notification inbox composition, missing preference defaults, autonomous scheduling policy, provider routing, or automatic retry timing policy.
+
+### Blocked by `SRC-12`
+
+Do not promote effective notification preference defaults or preference mutation until source resolves:
+
+- missing `notification_settings` effective `global_enabled`
+- missing category preference effective `enabled`
+- bootstrap/materialization of settings/category rows
+- PATCH existing-row-only vs insert/update semantics and idempotency
+- category-registry expansion defaults/migration for existing users
+- exact default preview mode
+
+Stored rows remain testable; absence must not be silently synthesized into a production default.
+
+### Blocked by `SRC-13`
+
+Do not promote final `GET /api/notifications` inbox projection until source resolves:
+
+- visible notification status membership
+- whether `read` history remains visible
+- whether `cancelled` / `expired` history is exposed
+- whether future `queued` rows are visible before ready
+- final public inbox ordering and cursor semantics
+
+Raw stored-ledger reads are evidence of persisted authority, not evidence of final user-visible inbox composition/order.
 
 ### Blocked by `SRC-19`
 
@@ -404,6 +434,40 @@ Do not promote a Device Installation register endpoint until source resolves:
 - concurrent register logical identity/idempotency
 
 Database uniqueness violations alone are not a registration lifecycle PASS.
+
+### Blocked by `SRC-31`
+
+Do not promote production provider routing until source resolves:
+
+- canonical resolver input
+- installation/platform/provider mapping or registry
+- provider aliases and supported provider set
+- routing mismatch behavior
+- provider selection provenance requirements
+- retry-time re-resolution vs same-provider behavior
+- provider failover authority
+
+Persisting `attempt.provider` and provider-message provenance proves audit mechanics only. It does not authorize caller-supplied provider strings as routing decisions.
+
+### Blocked by `SRC-32`
+
+Do not promote autonomous notification scheduler decisions/materialization until source resolves:
+
+- trigger positive schema / final trigger registry
+- category-specific threshold/cadence
+- frequency-cap window/count/scope and exact enforcement
+- candidate replay/concurrency behavior
+- logical notification dedupe identity / `dedupe_key` construction
+- template/locale/preview selection mapping
+- initial logical status / `scheduled_at` / expiry materialization rules
+- stale candidate cancel/defer/expire semantics
+- scheduler policy change/provenance semantics
+
+Primary Source requirements such as “respect quiet hours/opt-out” and “server manages frequency cap” remain mandatory constraints, but they do not supply the missing production evaluator or numeric policy.
+
+### Additional retry-policy boundary
+
+The stored delivery/attempt allocator supports a failed attempt followed by a later attempt. It does not define production automatic retry delay/backoff, max attempts, provider error retryability taxonomy, or failover. Do not turn allocator capability into a scheduler PASS condition without source authority.
 
 ## 14A. Share Gate
 
