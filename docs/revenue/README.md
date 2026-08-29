@@ -37,6 +37,7 @@ For **current research interpretation**, read in this order:
 ```text
 README.md
 → 13_PASS3_BROAD_SCAN_DELTA.md
+→ 14_DUOLINGO_FREEMIUM_AI_TIER_CASE.md
 → 12_ADJACENT_MONETIZATION_PATTERN_SCAN.md
 → 11_PASS2_DECISION_DELTA.md
 → 06_DIRECT_COMPETITOR_AND_LAUNCH_BM_REVIEW.md
@@ -134,6 +135,21 @@ Extracts reusable value primitives rather than copying specific BMs.
 ### `13_PASS3_BROAD_SCAN_DELTA.md`
 
 Introduces H-R18 `Layered Value Monetization`, reclassifies Premium Compute primarily as cost-recovery/margin protection, strengthens Gift/IP/Human-expert option value, and preserves H-R17 as the leading access architecture.
+
+### `14_DUOLINGO_FREEMIUM_AI_TIER_CASE.md`
+
+Public-company anchor for a mature layered model:
+
+```text
+large free core
++ paid subscription
++ higher-cost AI tier
++ ads
++ IAP
++ separate one-time high-value product
+```
+
+It also documents that AI feature adoption can depress gross margin, reinforcing the need to separate `C_chat`, `C_read`, and `C_premium` economics.
 
 ---
 
