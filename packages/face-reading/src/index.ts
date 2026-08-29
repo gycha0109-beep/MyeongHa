@@ -2,6 +2,7 @@ export * from './calibration-authority.js';
 export * from './calibration-authorization.js';
 export * from './calibration-protocol.js';
 export * from './capture-orientation-authority-fr19.js';
+export * from './chin-inferior-neutral-validation-fr46.js';
 export * from './contracts.js';
 export * from './controlled-capture-attestation-fr21b.js';
 export * from './direct-source-verification.js';
