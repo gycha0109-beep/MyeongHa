@@ -1,7 +1,7 @@
-# 명하 Shared Domain Contracts Specification v0.8 — Source Aligned
+# 명하 Shared Domain Contracts Specification v0.9 — Source Aligned
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.8**  
+> Pack Version: **v0.9**  
 > Date: **2026-08-30**  
 > Purpose: 여러 spec에 흩어진 free-form string/JSON을 bounded versioned contract로 묶는다. Source가 contract shape를 정의하지 않은 영역은 registry를 임의 생성하지 않는다.
 
@@ -30,20 +30,52 @@ Outbox EventType
 
 각 source-backed key family는 source가 실제 정의한 범위에서 `registryVersion` 또는 schema version을 가진다. unknown/unresolved value는 실행 authority로 승격하지 않고 reject/fallback한다.
 
-### 1.1 Immutable Registry Authority
+### 1.1 Source Authority vs Implementation Reproducibility Artifacts
 
-다음 registry/policy는 **source-controlled immutable artifact로 source authority가 실제로 정의한 범위에서만** 관리한다. DB free-form JSON이나 admin UI가 같은 version key의 의미를 덮어쓰면 안 된다.
+Primary Source가 어떤 key/policy family에 bounded/versioned behavior를 요구하는 것과, Pack이 그 요구를 구현하기 위해 구체적인 registry/policy artifact/interface를 만드는 것은 구분한다.
+
+Primary Source가 현재 직접 고정하는 범위의 예는 다음과 같다.
+
+```text
+Analytics Event
+→ 핵심 event name + payload schema를 version 관리
+
+Relationship
+→ transition rule은 versioned
+→ concrete evaluator/artifact는 SRC-22 OPEN
+
+Life Fact / Character Memory
+→ type/schema-version validation 필수
+→ positive registry/schema content는 SRC-25 OPEN
+
+Cost / Abuse
+→ rate limit / repeated-request control / free-paid quota boundary /
+  scene max turns / prompt-context budget / notification frequency cap을 server가 관리
+
+Experiment
+→ product experiment가 Saju semantic authority를 변경하면 안 됨
+
+Age / Content
+→ launch 전 age/content policy 결정을 요구
+→ P0-AGE-01 OPEN
+```
+
+이 요구만으로 다음 이름이나 shape가 **Primary Source가 정의한 artifact**가 되는 것은 아니다.
 
 ```text
 UsagePolicyDefinition
-AnalyticsEventSchemaRegistry
+AnalyticsEventSchemaRegistry artifact shape/storage/hash
 ExperimentAssignmentPolicy
 ContentPolicyTagRegistry
 ```
 
-각 source-backed artifact는 해당 source가 실제 정의한 provenance identity를 따른다. Pack이 source에 없는 `contentHash`, condition DSL, registry table을 공통 요구사항으로 추가하지 않는다.
+Pack은 재현성·운영 안전을 위해 versioned config, immutable artifact, content hash 같은 기술 장치를 구현 contract로 채택할 수 있다. 그러나 source가 그 artifact identity/schema/hash를 직접 정의하지 않았다면 그것은 **implementation reproducibility mechanism**이지 source-defined product authority의 증거가 아니다. 같은 version의 의미를 조용히 바꾸지 않는 운영 원칙 역시 artifact의 source provenance를 새로 만들어내지 않는다.
 
-Notification scheduler는 Primary Source가 grounded/non-spam return loop, bounded category, preference/quiet-hours, server-managed frequency cap 같은 **요구와 제약**을 정의하지만, final cadence/frequency/eligibility policy artifact나 `policyVersion + contentHash` schema를 정의하지 않는다. 따라서 `NotificationPolicyDefinition`은 현재 source-controlled immutable artifact 목록에 포함하지 않으며 executable scheduler policy는 `SRC-32`가 OPEN이다.
+Analytics의 경우 source-backed authority는 event name/payload schema versioning 요구다. 이를 `AnalyticsEventSchemaRegistry` 같은 구현 artifact로 표현할 수 있지만 registry 저장소/필드/hash identity 자체를 Primary Source contract라고 주장하지 않는다.
+
+Cost/abuse의 `UsagePolicyV1` 같은 shape와 구체 quota 수치/version/hash는 implementation/config contract로 둘 수 있지만 §21.4가 그 interface를 정의했다고 해석하지 않는다. Age/content tag registry와 experiment assignment artifact도 같은 원칙을 따른다.
+
+Notification scheduler는 Primary Source가 grounded/non-spam return loop, bounded category, preference/quiet-hours, server-managed frequency cap 같은 **요구와 제약**을 정의하지만, final cadence/frequency/eligibility policy artifact나 `policyVersion + contentHash` schema를 정의하지 않는다. 따라서 `NotificationPolicyDefinition`은 source-defined artifact로 취급하지 않으며 executable scheduler policy는 `SRC-32`가 OPEN이다.
 
 Relationship transition rule은 source가 versioned policy로 관리하라고 요구하지만, 구체적인 policy artifact/schema/hash/score bounds/delta/stage/anti-farming contract는 정의하지 않는다. 해당 executable authority는 `SRC-22`가 OPEN이다.
 
