@@ -197,6 +197,8 @@ jobs:
         run: bash test/db/character_forget_concurrency.sh
       - name: Run individual Memory grant revoke persistence/concurrency tests
         run: bash test/db/memory_grant_revoke_concurrency.sh
+      - name: Run individual Life Fact grant revoke persistence/concurrency tests
+        run: bash test/db/life_fact_grant_revoke_concurrency.sh
       - name: Run guest bootstrap persistence/concurrency tests
         run: bash test/db/guest_bootstrap_concurrency.sh
       - name: Run Life Fact revoke persistence/concurrency tests
