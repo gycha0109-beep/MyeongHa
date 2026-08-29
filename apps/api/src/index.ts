@@ -4,7 +4,7 @@ import {
   type CapabilityGateResult,
 } from '../../../packages/domain/src/index.js';
 
-export const API_FOUNDATION_VERSION = 'myeongha-api-foundation-v0.9' as const;
+export const API_FOUNDATION_VERSION = 'myeongha-api-foundation-v0.10' as const;
 
 export function authorizePlannedCapability(
   input: CapabilityGateInput,
@@ -130,3 +130,15 @@ export {
   type NotificationReadCommandAuthorityPortV1,
   type NotificationReadCommandAuthorityRowV1,
 } from './notification-read-command.js';
+
+export {
+  CHAT_THREAD_STREAM_READ_AUTHORITY_BINDING_V1,
+  ChatThreadStreamReadAuthorityPortErrorV1,
+  getChatThreadStream,
+  type ChatThreadStreamAuthorityRowV1,
+  type ChatThreadStreamMessageV1,
+  type ChatThreadStreamReadAuthorityFailureCodeV1,
+  type ChatThreadStreamReadAuthorityPortV1,
+  type ChatThreadStreamReadResponseV1,
+  type GetChatThreadStreamInputV1,
+} from './chat-thread-stream-read.js';
