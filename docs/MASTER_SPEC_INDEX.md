@@ -1,8 +1,8 @@
-# 명하 Master Specification Index — Full Audit v0.3
+# 명하 Master Specification Index — Full Audit v0.4
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.3**  
-> Date: **2026-08-27**  
+> Pack Version: **v0.4**  
+> Date: **2026-08-30**  
 > Source Authority: `Usecase_re_reviewed_v2(1).md`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`, `Myeonghwa_Personalized_Interpretation_Architecture_v1.3_THIRD_REVIEW(1).md`, Face Reading FR-0 source/methodology authority  
 > Rule: 본 문서는 source authority를 구현 수준으로 구체화한다. source가 결정하지 않은 사항은 임의 확정하지 않고 `OPEN-P0` 또는 `CANDIDATE`로 표시한다.
 
@@ -153,9 +153,9 @@ Release / Observability
 - LLM이 생성한 문자열/JSON을 tool/action/fact/event identifier로 그대로 실행하지 않는다. 모든 실행 ID는 versioned bounded registry를 통과한다.
 - Saju-bearing consumer text는 source Saju architecture의 deterministic narrative boundary를 우회하지 않는다.
 - scenario/ambiguity가 material하면 Character context까지 구조적으로 보존한다.
-- verified commerce source가 어떤 entitlement를 부여하는지는 versioned fulfillment definition으로 결정한다.
+- verified commerce source에서 concrete entitlement/grant target을 결정하는 mapping authority는 `SRC-18`이 해결한 source-defined contract만 사용한다. Pack이 `ProductFulfillmentDefinition`이나 fulfillment version/hash registry를 선행 가정하지 않는다.
 - Saju public Product contract를 raw JSON 구조 추정으로 재정의하지 않는다. 실제 exported `ProductReadingResponse` / host input contract와 adapter spec이 다르면 `SOURCE_AUTHORITY_GAPS.md`에서 닫기 전 real integration을 production-ready로 부르지 않는다.
-- versioned policy/fulfillment/face-methodology registry의 같은 version key는 immutable content를 가리켜야 하며, runtime에서 조용히 의미를 바꾸지 않는다.
+- source가 실제로 정의한 versioned registry/artifact의 같은 version key는 immutable content를 가리켜야 하며 runtime에서 조용히 의미를 바꾸지 않는다. `SRC-18` commerce fulfillment mapping, `SRC-22` relationship policy artifact/schema, `SRC-32` notification scheduler policy artifact/versioning이 해결되기 전에는 해당 registry/artifact의 존재나 hash identity를 공통 전제로 만들지 않는다.
 
 ## 6. 미결정 사항 취급
 
@@ -175,7 +175,7 @@ Face Reading에서 source passage는 확보됐지만 modern geometry threshold�
 
 ```text
 0. SOURCE_AUTHORITY_GAPS blocker resolution + P0 decision slots
-1. Shared bounded contracts + immutable policy/fulfillment registries
+1. Shared bounded contracts + source-backed immutable registry/artifact boundaries; unresolved policy/fulfillment artifact slots remain blockers
 2. DB DDL draft + server-command transaction skeleton + constraint/RLS tests
 3. API command skeleton
 4. Character content schema + sample dev bundle
