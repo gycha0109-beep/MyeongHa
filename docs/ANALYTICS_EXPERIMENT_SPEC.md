@@ -1,8 +1,8 @@
-# 명하 Analytics / Experiment Contract Specification v0.3
+# 명하 Analytics / Experiment Contract Specification v0.4
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.3**  
-> Date: **2026-08-25**  
+> Pack Version: **v0.4**  
+> Date: **2026-08-29**  
 > Source Authority: `Usecase_re_reviewed_v2(1).md` §18 Success Metrics / §21.8 Analytics Event Contract  
 > Privacy Authority: `AUTH_RLS_PRIVACY_SPEC.md`
 
@@ -93,9 +93,13 @@ server entitlement commit → purchase/entitlement success analytics
 
 Client가 local optimistic success를 authoritative conversion으로 기록하지 않는다.
 
-## 6. Idempotency
+## 6. Idempotency / Outbox Recovery Boundary
 
-Server analytics는 domain/outbox event의 stable dedupe identity를 사용해 retry 중복을 방지한다.
+Authoritative domain state의 retry/recovery 때문에 동일한 product-visible server conversion이 중복 기록되어서는 안 된다.
+
+현재 source-backed transactional outbox boundary는 logical outbox enqueue/dedupe, pending claim, expired `processing` lease reclaim, successful completion까지다. `AnalyticsEventEnvelopeV1.eventId`는 event identity를 표현할 수 있지만, Primary Source는 publisher failure 시 동일 event ID를 어떻게 재사용하는지, downstream analytics consumer가 어떤 dedupe key/store/protocol을 사용하는지, failed-event retry timing/eligibility가 무엇인지 정의하지 않는다. 따라서 generic analytics retry/dedupe execution policy는 `SRC-30` 해결 전 production authority로 확정하지 않는다.
+
+Expired `processing` lease reclaim은 source-backed crash recovery이며 failed-event retry scheduling과 동일한 authority가 아니다. Product-visible duplicate prevention 요구는 유지되지만 그 구현 메커니즘을 이 spec에서 임의 고정하지 않는다.
 
 Client-only view/click event는 별도 eventId/session rules를 사용한다.
 
@@ -154,7 +158,9 @@ Analytics consent/opt-out와 retention의 법적/제품 정책은 `OPEN-P0: P0-P
 
 - raw Birth/chat/Memory/receipt payload detector
 - client optimistic purchase ≠ server conversion
-- duplicate outbox retry → one server conversion event
+- outbox logical enqueue/dedupe, pending claim, expired-processing lease reclaim, and successful completion → testable now
+- retry/recovery scenario에서 duplicate authoritative server conversion 0은 required product outcome
+- publisher failure finalization/classification, failed-event retry eligibility/scheduling/backoff/jitter, `attempt_count` lifecycle, max attempts, dead-letter threshold/transition, manual replay/requeue, error taxonomy, generic downstream analytics dedupe protocol → blocked until `SRC-30`
 - same experiment identity → stable variant
 - experiment variant cannot alter Saju semantic input/output authority
 - analytics unknown schema → quarantine/reject, silent accept 금지
