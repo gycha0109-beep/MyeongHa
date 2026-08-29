@@ -12,6 +12,7 @@ export * from './facelab-compat.js';
 export * from './facelab-fr3-requirements.js';
 export * from './five-officers-six-fus-research-v0.js';
 export * from './laterality-consumption-policy-fr20.js';
+export * from './mayi-three-divisions-boundary-variants-fr33.js';
 export * from './mediapipe-default-network-runtime-evidence-fr28.js';
 export * from './mediapipe-eye-landmark-adapter-fr25.js';
 export * from './mediapipe-face-landmarker-runtime-fr26.js';
