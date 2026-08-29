@@ -1,0 +1,42 @@
+name: Face Reading Face Oval Inferior Extremum Probe
+
+on:
+  pull_request:
+    paths:
+      - 'packages/face-reading/**'
+      - 'scripts/face-reading-fr45-face-oval-inferior-extremum-probe.mjs'
+      - '.github/workflows/face-reading-face-oval-inferior-extremum-probe.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'packages/face-reading/**'
+      - 'scripts/face-reading-fr45-face-oval-inferior-extremum-probe.mjs'
+      - '.github/workflows/face-reading-face-oval-inferior-extremum-probe.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  fr45-real-mediapipe-face-oval-probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install exact workspace dependencies
+        run: npm install --ignore-scripts
+      - name: Build MyeongHa runtime
+        run: npm run build
+      - name: Execute FR-45 face oval inferior-extremum probe
+        run: node scripts/face-reading-fr45-face-oval-inferior-extremum-probe.mjs
+      - name: Upload FR-45 execution evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fr45-face-oval-inferior-extremum-probe
+          path: artifacts/face-reading/fr45-face-oval-inferior-extremum-probe.json
+          if-no-files-found: warn
+          retention-days: 14

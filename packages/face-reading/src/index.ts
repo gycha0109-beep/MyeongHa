@@ -22,6 +22,7 @@ export * from './mediapipe-eye-landmark-adapter-fr25.js';
 export * from './mediapipe-eyebrow-component-geometric-role-probe-fr42.js';
 export * from './mediapipe-eyebrow-source-runtime-semantic-gap-fr40.js';
 export * from './mediapipe-face-landmarker-runtime-fr26.js';
+export * from './mediapipe-face-oval-inferior-extremum-fr45.js';
 export * from './mediapipe-npm-artifact-byte-attestation-fr30.js';
 export * from './mediapipe-published-derivation-gap-reconciliation-fr38.js';
 export * from './mediapipe-published-eyebrow-component-decomposition-fr39.js';
