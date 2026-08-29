@@ -19,6 +19,7 @@ const EXPECTED_MODEL_DIGEST = 'sha256:64184e229b263107bc2b804c6625db1341ff2bb731
 const EXPECTED_MODEL_BYTE_LENGTH = 3758596;
 const EXPECTED_FIXTURE_DIGEST = 'sha256:75171e877e92b7a126cca2e7a388fc430225e07e9cd2e9e801eaa67ea6d7f4d9';
 const EXPECTED_FIXTURE_BYTE_LENGTH = 578267;
+const CDP_PORT = 9224;
 
 function sha256(buffer) {
   return `sha256:${createHash('sha256').update(buffer).digest('hex')}`;
@@ -70,45 +71,74 @@ function mime(path) {
   }
 }
 
-function decodeHtmlText(value) {
-  return value
-    .replaceAll('&quot;', '"')
-    .replaceAll('&#39;', "'")
-    .replaceAll('&lt;', '<')
-    .replaceAll('&gt;', '>')
-    .replaceAll('&amp;', '&');
+function delay(ms) {
+  return new Promise((resolvePromise) => setTimeout(resolvePromise, ms));
 }
 
-async function runChromeDump(chrome, pageUrl, scratch) {
-  const child = spawn(chrome.path, [
-    '--headless=new', '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage',
-    '--disable-background-networking', '--disable-component-update', '--disable-default-apps',
-    '--disable-extensions', '--no-first-run', `--user-data-dir=${join(scratch, 'chrome-profile')}`,
-    '--dump-dom', pageUrl,
-  ], { stdio: ['ignore', 'pipe', 'pipe'] });
-  child.stdout.setEncoding('utf8');
-  child.stderr.setEncoding('utf8');
-  let stdout = '';
-  let stderr = '';
-  child.stdout.on('data', (chunk) => { stdout += chunk; });
-  child.stderr.on('data', (chunk) => { stderr = (stderr + chunk).slice(-20000); });
-
-  let timeoutHandle;
-  const timeout = new Promise((_, reject) => {
-    timeoutHandle = setTimeout(() => {
-      child.kill('SIGKILL');
-      reject(new Error(`FR-45 Chrome dump timeout: ${stderr}`));
-    }, 70000);
-  });
-  const exited = once(child, 'exit').then(([code, signal]) => ({ code, signal }));
-  let result;
-  try {
-    result = await Promise.race([exited, timeout]);
-  } finally {
-    if (timeoutHandle !== undefined) clearTimeout(timeoutHandle);
+async function waitForPageTarget(pageUrl) {
+  const deadline = Date.now() + 15000;
+  let lastError;
+  while (Date.now() < deadline) {
+    try {
+      const response = await fetch(`http://127.0.0.1:${CDP_PORT}/json/list`);
+      if (response.ok) {
+        const targets = await response.json();
+        const target = targets.find((entry) => entry.type === 'page' && entry.url === pageUrl);
+        if (target?.webSocketDebuggerUrl) return target.webSocketDebuggerUrl;
+      }
+    } catch (error) {
+      lastError = error;
+    }
+    await delay(100);
   }
-  if (result.code !== 0) throw new Error(`FR-45 Chrome exited code=${result.code} signal=${result.signal}: ${stderr}`);
-  return { stdout, stderr };
+  throw new Error(`FR-45 could not discover Chrome DevTools page target: ${lastError instanceof Error ? lastError.message : String(lastError ?? '')}`);
+}
+
+async function connectCdp(wsUrl) {
+  const ws = new WebSocket(wsUrl);
+  await new Promise((resolvePromise, rejectPromise) => {
+    ws.addEventListener('open', resolvePromise, { once: true });
+    ws.addEventListener('error', () => rejectPromise(new Error('FR-45 CDP WebSocket connection failed.')), { once: true });
+  });
+  let nextId = 1;
+  const pending = new Map();
+  const consoleEvents = [];
+  const exceptionEvents = [];
+  ws.addEventListener('message', (event) => {
+    const message = JSON.parse(String(event.data));
+    if (message.id !== undefined) {
+      const waiter = pending.get(message.id);
+      if (!waiter) return;
+      pending.delete(message.id);
+      if (message.error) waiter.reject(new Error(`CDP ${waiter.method} failed: ${JSON.stringify(message.error)}`));
+      else waiter.resolve(message.result);
+      return;
+    }
+    if (message.method === 'Runtime.consoleAPICalled') {
+      const values = message.params.args.map((arg) => arg.value ?? arg.description ?? '').join(' ');
+      consoleEvents.push(values);
+      console.log(`FR45_BROWSER_CONSOLE ${values}`);
+    } else if (message.method === 'Runtime.exceptionThrown') {
+      exceptionEvents.push(message.params.exceptionDetails);
+      console.log(`FR45_BROWSER_EXCEPTION ${JSON.stringify(message.params.exceptionDetails)}`);
+    }
+  });
+  function command(method, params = {}) {
+    const id = nextId++;
+    return new Promise((resolvePromise, rejectPromise) => {
+      pending.set(id, { resolve: resolvePromise, reject: rejectPromise, method });
+      ws.send(JSON.stringify({ id, method, params }));
+    });
+  }
+  await command('Runtime.enable');
+  return { ws, command, consoleEvents, exceptionEvents };
+}
+
+async function stopChrome(child) {
+  if (!child || child.exitCode !== null) return;
+  const exitPromise = once(child, 'exit').catch(() => []);
+  child.kill('SIGKILL');
+  await Promise.race([exitPromise, delay(3000)]);
 }
 
 async function main() {
@@ -120,7 +150,6 @@ async function main() {
   const wasmDir = join(packageRoot, 'wasm');
 
   const scratch = await mkdtemp(join(tmpdir(), 'myeongha-fr45-'));
-  let server;
   try {
     const fixturePath = join(scratch, 'face_model.png');
     const modelPath = join(scratch, 'face_landmarker.task');
@@ -133,47 +162,8 @@ async function main() {
     assertEqual(modelDigest, EXPECTED_MODEL_DIGEST, 'model digest');
     assertEqual(modelBytes.length, EXPECTED_MODEL_BYTE_LENGTH, 'model byte length');
 
-    const html = `<!doctype html><html><head><meta charset="utf-8"><title>FR45</title></head><body>
-<img id="fixture" src="/assets/face_model.png" alt="fr45 fixture">
-<pre id="result">FR45_PENDING</pre>
-<script type="module">
-const target = document.getElementById('result');
-try {
-  const [vision, fr45] = await Promise.all([
-    import('/vendor/vision_bundle.mjs'),
-    import('/dist/packages/face-reading/src/mediapipe-face-oval-inferior-extremum-fr45.js'),
-  ]);
-  const image = document.getElementById('fixture');
-  await image.decode();
-  const fileset = await vision.FilesetResolver.forVisionTasks(location.origin + '/vendor/wasm');
-  const landmarker = await vision.FaceLandmarker.createFromOptions(fileset, {
-    baseOptions: { modelAssetPath: location.origin + '/assets/face_landmarker.task' },
-    runningMode: 'IMAGE', numFaces: 1, outputFaceBlendshapes: false, outputFacialTransformationMatrixes: false,
-  });
-  try {
-    const first = landmarker.detect(image);
-    const second = landmarker.detect(image);
-    if (first.faceLandmarks.length !== 1 || second.faceLandmarks.length !== 1) {
-      target.textContent = 'FR45_RESULT_START' + JSON.stringify({ status: 'invalid_face_count', first: first.faceLandmarks.length, second: second.faceLandmarks.length }) + 'FR45_RESULT_END';
-    } else {
-      const firstProbe = fr45.deriveMediaPipeFaceOvalImageInferiorExtremumFR45(vision.FaceLandmarker, first.faceLandmarks[0]);
-      const secondProbe = fr45.deriveMediaPipeFaceOvalImageInferiorExtremumFR45(vision.FaceLandmarker, second.faceLandmarks[0]);
-      const topology = fr45.inspectMediaPipeFaceOvalTopologyFR45(vision.FaceLandmarker);
-      target.textContent = 'FR45_RESULT_START' + JSON.stringify({
-        status: 'success', faceCount: 1, landmarkCount: first.faceLandmarks[0].length,
-        deterministicReplay: JSON.stringify(firstProbe) === JSON.stringify(secondProbe),
-        topology, firstProbe, secondProbe,
-      }) + 'FR45_RESULT_END';
-    }
-  } finally {
-    landmarker.close();
-  }
-} catch (error) {
-  target.textContent = 'FR45_RESULT_START' + JSON.stringify({ status: 'error', message: String(error?.stack ?? error) }) + 'FR45_RESULT_END';
-}
-</script></body></html>`;
-
-    server = createServer(async (req, res) => {
+    const html = '<!doctype html><html><head><meta charset="utf-8"><title>FR45</title></head><body><img id="fixture" src="/assets/face_model.png" alt="fr45 fixture"></body></html>';
+    const server = createServer(async (req, res) => {
       try {
         const url = new URL(req.url ?? '/', 'http://127.0.0.1');
         let path;
@@ -207,63 +197,125 @@ try {
       server.once('error', rejectPromise);
       server.listen(0, '127.0.0.1', resolvePromise);
     });
-    const address = server.address();
-    if (!address || typeof address === 'string') throw new Error('FR-45 server did not expose an IPv4 port.');
-    const pageUrl = `http://127.0.0.1:${address.port}/fr45.html`;
-    const chrome = findChrome();
-    console.log(`FR45_CHROME ${chrome.version}`);
-    const dump = await runChromeDump(chrome, pageUrl, scratch);
-    const preMatch = dump.stdout.match(/<pre id="result">([\s\S]*?)<\/pre>/);
-    if (!preMatch) throw new Error(`FR-45 result element missing. stderr=${dump.stderr} dom=${dump.stdout.slice(-12000)}`);
-    const preText = decodeHtmlText(preMatch[1]);
-    if (preText === 'FR45_PENDING') throw new Error(`FR-45 browser dumped before module probe completed. stderr=${dump.stderr}`);
-    const match = preText.match(/^FR45_RESULT_START([\s\S]*?)FR45_RESULT_END$/);
-    if (!match) throw new Error(`FR-45 result marker missing inside result element: ${preText.slice(0, 1000)}`);
-    const result = JSON.parse(match[1]);
-    console.log(`FR45_RUNTIME ${JSON.stringify(result)}`);
-    if (!result || result.status !== 'success' || result.faceCount !== 1 || result.landmarkCount !== 478 || result.deterministicReplay !== true) {
-      throw new Error(`FR-45 runtime result shape/determinism failure: ${JSON.stringify(result)}`);
-    }
-    if (!result.topology || result.topology.topologyClass !== 'simple_cycle' || result.topology.edgeCount !== 36 ||
-        result.topology.vertexCount !== 36 || result.topology.sourceRuntimeEdgeSequenceMatch !== true ||
-        result.topology.providerIndexSemanticAuthority !== false) {
-      throw new Error(`FR-45 runtime topology drift/authority promotion: ${JSON.stringify(result.topology)}`);
-    }
-    const probe = result.firstProbe;
-    if (!probe || probe.state !== 'unique_image_inferior_extremum' || !Number.isInteger(probe.selectedProviderLandmarkIndex) ||
-        !probe.selectedPoint || !Number.isFinite(probe.selectedPoint.x) || !Number.isFinite(probe.selectedPoint.y) ||
-        probe.tiedProviderLandmarkIndices?.length !== 1 || probe.providerIndexSemanticAuthority !== false ||
-        probe.chinInferiorContourBindingAuthorized !== false || probe.traditionalDigeEquivalenceAuthorized !== false ||
-        probe.fr36VerticalReferencePromoted !== false || probe.productionGeometryAuthorized !== false) {
-      throw new Error(`FR-45 runtime extremum signal/authority drift: ${JSON.stringify(probe)}`);
-    }
 
-    const artifact = {
-      schemaVersion: 'fr45-real-runtime-evidence-v1',
-      packageName: '@mediapipe/tasks-vision',
-      packageVersion: PACKAGE_VERSION,
-      packageBundleDigest: EXPECTED_PACKAGE_BUNDLE_DIGEST,
-      model: { url: MODEL_URL, digest: modelDigest, byteLength: modelBytes.length },
-      fixture: { repository: FIXTURE_REPOSITORY, commit: FIXTURE_COMMIT, blobSha: FIXTURE_BLOB_SHA, url: FIXTURE_URL, digest: fixtureDigest, byteLength: fixtureBytes.length },
-      chrome: chrome.version,
-      runtimeResult: result,
-      authorityBoundary: {
-        observedProviderLandmarkIndexIsEvidenceOnly: true,
-        providerIndexSemanticAuthority: false,
-        chinInferiorContourBindingAuthorized: false,
-        traditionalDigeEquivalenceAuthorized: false,
-        fr36VerticalReferencePromoted: false,
-        productionGeometryAuthorized: false,
-      },
+    let child;
+    let cdp;
+    try {
+      const address = server.address();
+      if (!address || typeof address === 'string') throw new Error('FR-45 server did not expose an IPv4 port.');
+      const pageUrl = `http://127.0.0.1:${address.port}/fr45.html`;
+      const chrome = findChrome();
+      console.log(`FR45_CHROME ${chrome.version}`);
+      let chromeStderr = '';
+      child = spawn(chrome.path, [
+        '--headless=new', '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage',
+        '--disable-background-networking', '--disable-component-update', '--disable-default-apps',
+        '--disable-extensions', '--no-first-run', `--remote-debugging-port=${CDP_PORT}`,
+        '--remote-allow-origins=*', `--user-data-dir=${join(scratch, 'chrome-profile')}`, pageUrl,
+      ], { stdio: ['ignore', 'ignore', 'pipe'] });
+      child.stderr.setEncoding('utf8');
+      child.stderr.on('data', (chunk) => { chromeStderr = (chromeStderr + chunk).slice(-20000); });
+
+      const wsUrl = await waitForPageTarget(pageUrl);
+      cdp = await connectCdp(wsUrl);
+      const expression = `
+(async () => {
+  const [vision, fr45] = await Promise.all([
+    import('/vendor/vision_bundle.mjs'),
+    import('/dist/packages/face-reading/src/mediapipe-face-oval-inferior-extremum-fr45.js'),
+  ]);
+  const image = document.getElementById('fixture');
+  await image.decode();
+  const fileset = await vision.FilesetResolver.forVisionTasks(location.origin + '/vendor/wasm');
+  const landmarker = await vision.FaceLandmarker.createFromOptions(fileset, {
+    baseOptions: { modelAssetPath: location.origin + '/assets/face_landmarker.task' },
+    runningMode: 'IMAGE', numFaces: 1, outputFaceBlendshapes: false, outputFacialTransformationMatrixes: false,
+  });
+  try {
+    const firstResult = landmarker.detect(image);
+    const secondResult = landmarker.detect(image);
+    if (firstResult.faceLandmarks.length !== 1 || secondResult.faceLandmarks.length !== 1) {
+      return { status: 'invalid_face_count', firstFaceCount: firstResult.faceLandmarks.length, secondFaceCount: secondResult.faceLandmarks.length };
+    }
+    const topology = fr45.inspectMediaPipeFaceOvalTopologyFR45(vision.FaceLandmarker);
+    const firstProbe = fr45.deriveMediaPipeFaceOvalImageInferiorExtremumFR45(vision.FaceLandmarker, firstResult.faceLandmarks[0]);
+    const secondProbe = fr45.deriveMediaPipeFaceOvalImageInferiorExtremumFR45(vision.FaceLandmarker, secondResult.faceLandmarks[0]);
+    return {
+      status: 'success',
+      faceCount: 1,
+      landmarkCount: firstResult.faceLandmarks[0].length,
+      deterministicReplay: JSON.stringify(firstProbe) === JSON.stringify(secondProbe),
+      topology,
+      firstProbe,
+      secondProbe,
     };
-    const artifactPath = join(ROOT, 'artifacts', 'face-reading', 'fr45-face-oval-inferior-extremum-probe.json');
-    await mkdir(dirname(artifactPath), { recursive: true });
-    await writeFile(artifactPath, `${JSON.stringify(artifact, null, 2)}\n`, 'utf8');
-    console.log(`FR45_ARTIFACT ${artifactPath}`);
   } finally {
-    if (server) await new Promise((resolvePromise) => server.close(() => resolvePromise()));
-    await rm(scratch, { recursive: true, force: true });
+    landmarker.close();
+  }
+})()`;
+      const evaluationPromise = cdp.command('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true, timeout: 60000 });
+      let timeoutHandle;
+      const timeoutPromise = new Promise((_, rejectPromise) => {
+        timeoutHandle = setTimeout(() => rejectPromise(new Error(`FR-45 CDP evaluation timeout. console=${JSON.stringify(cdp.consoleEvents)} exceptions=${JSON.stringify(cdp.exceptionEvents)} chrome=${chromeStderr}`)), 65000);
+      });
+      let evaluation;
+      try {
+        evaluation = await Promise.race([evaluationPromise, timeoutPromise]);
+      } finally {
+        if (timeoutHandle !== undefined) clearTimeout(timeoutHandle);
+      }
+      if (evaluation.exceptionDetails) throw new Error(`FR-45 browser exception: ${JSON.stringify(evaluation.exceptionDetails)}`);
+      const result = evaluation.result?.value;
+      console.log(`FR45_RUNTIME ${JSON.stringify(result)}`);
+      if (!result || result.status !== 'success' || result.faceCount !== 1 || result.landmarkCount !== 478 || result.deterministicReplay !== true) {
+        throw new Error(`FR-45 runtime result shape/determinism failure: ${JSON.stringify(result)}`);
+      }
+      if (!result.topology || result.topology.topologyClass !== 'simple_cycle' || result.topology.edgeCount !== 36 ||
+          result.topology.vertexCount !== 36 || result.topology.sourceRuntimeEdgeSequenceMatch !== true ||
+          result.topology.providerIndexSemanticAuthority !== false) {
+        throw new Error(`FR-45 runtime topology drift/authority promotion: ${JSON.stringify(result.topology)}`);
+      }
+      const probe = result.firstProbe;
+      if (!probe || probe.state !== 'unique_image_inferior_extremum' || !Number.isInteger(probe.selectedProviderLandmarkIndex) ||
+          !probe.selectedPoint || !Number.isFinite(probe.selectedPoint.x) || !Number.isFinite(probe.selectedPoint.y) ||
+          probe.tiedProviderLandmarkIndices?.length !== 1 || probe.providerIndexSemanticAuthority !== false ||
+          probe.chinInferiorContourBindingAuthorized !== false || probe.traditionalDigeEquivalenceAuthorized !== false ||
+          probe.fr36VerticalReferencePromoted !== false || probe.productionGeometryAuthorized !== false) {
+        throw new Error(`FR-45 runtime extremum signal/authority drift: ${JSON.stringify(probe)}`);
+      }
+
+      const artifact = {
+        schemaVersion: 'fr45-real-runtime-evidence-v1',
+        packageName: '@mediapipe/tasks-vision',
+        packageVersion: PACKAGE_VERSION,
+        packageBundleDigest: EXPECTED_PACKAGE_BUNDLE_DIGEST,
+        model: { url: MODEL_URL, digest: modelDigest, byteLength: modelBytes.length },
+        fixture: { repository: FIXTURE_REPOSITORY, commit: FIXTURE_COMMIT, blobSha: FIXTURE_BLOB_SHA, url: FIXTURE_URL, digest: fixtureDigest, byteLength: fixtureBytes.length },
+        chrome: chrome.version,
+        runtimeResult: result,
+        authorityBoundary: {
+          observedProviderLandmarkIndexIsEvidenceOnly: true,
+          providerIndexSemanticAuthority: false,
+          chinInferiorContourBindingAuthorized: false,
+          traditionalDigeEquivalenceAuthorized: false,
+          fr36VerticalReferencePromoted: false,
+          productionGeometryAuthorized: false,
+        },
+      };
+      const artifactPath = join(ROOT, 'artifacts', 'face-reading');
+      await mkdir(artifactPath, { recursive: true });
+      await writeFile(join(artifactPath, 'fr45-face-oval-inferior-extremum-probe.json'), `${JSON.stringify(artifact, null, 2)}\n`, 'utf8');
+    } finally {
+      if (cdp) cdp.ws.close();
+      await stopChrome(child);
+      await new Promise((resolvePromise) => server.close(resolvePromise));
+    }
+  } finally {
+    await rm(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   }
 }
 
-await main();
+main().catch((error) => {
+  console.error(error instanceof Error ? error.stack ?? error.message : String(error));
+  process.exitCode = 1;
+});
