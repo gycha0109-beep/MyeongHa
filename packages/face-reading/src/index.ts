@@ -38,6 +38,7 @@ export * from './semantic-anchor-registry-fr13.js';
 export * from './semantic-projection.js';
 export * from './source-corroboration.js';
 export * from './three-divisions.js';
+export * from './three-divisions-neutral-surface-extension-fr35.js';
 export * from './twelve-palaces-authority-fr12.js';
 export * from './twelve-palaces-research-v0.js';
 export * from './validation.js';
