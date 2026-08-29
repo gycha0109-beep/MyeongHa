@@ -4,8 +4,8 @@ import {
   validateMediaPipeFaceOvalInferiorExtremumAuthorityFR45,
 } from './mediapipe-face-oval-inferior-extremum-fr45.js';
 import {
-  THREE_DIVISIONS_NEUTRAL_SURFACE_AUTHORITY_FR35,
-  validateThreeDivisionsNeutralSurfaceAuthorityFR35,
+  THREE_DIVISIONS_NEUTRAL_SURFACE_EXTENSION_AUTHORITY_FR35,
+  validateThreeDivisionsNeutralSurfaceExtensionAuthorityFR35,
 } from './three-divisions-neutral-surface-extension-fr35.js';
 import {
   THREE_DIVISIONS_VERTICAL_REFERENCE_DERIVATION_AUTHORITY_FR36,
@@ -151,7 +151,7 @@ export interface ChinInferiorNeutralValidationReadinessFR46V1 {
   readonly nextRequiredEvidence: readonly string[];
 }
 
-const FR35_REF = `${THREE_DIVISIONS_NEUTRAL_SURFACE_AUTHORITY_FR35.authorityRef}@${THREE_DIVISIONS_NEUTRAL_SURFACE_AUTHORITY_FR35.authorityVersion}`;
+const FR35_REF = `${THREE_DIVISIONS_NEUTRAL_SURFACE_EXTENSION_AUTHORITY_FR35.authorityRef}@${THREE_DIVISIONS_NEUTRAL_SURFACE_EXTENSION_AUTHORITY_FR35.authorityVersion}`;
 const FR36_REF = `${THREE_DIVISIONS_VERTICAL_REFERENCE_DERIVATION_AUTHORITY_FR36.authorityRef}@${THREE_DIVISIONS_VERTICAL_REFERENCE_DERIVATION_AUTHORITY_FR36.authorityVersion}`;
 const FR45_REF = `${MEDIAPIPE_FACE_OVAL_INFERIOR_EXTREMUM_AUTHORITY_FR45.authorityRef}@${MEDIAPIPE_FACE_OVAL_INFERIOR_EXTREMUM_AUTHORITY_FR45.authorityVersion}`;
 
@@ -226,61 +226,28 @@ const ANNOTATION_PROTOCOL: ChinInferiorIndependentAnnotationProtocolFR46V1 = Obj
   poseThreshold: null,
 });
 
+const GATE_IDS: readonly ChinInferiorAdmissionGateFR46V1['gateId'][] = Object.freeze([
+  'external_soft_tissue_menton_target',
+  'provider_candidate_to_menton_mapping',
+  'provider_candidate_midline_stability',
+  'controlled_multi_subject_capture',
+  'repeated_capture_repeatability',
+  'pose_stability',
+  'calibration_error_thresholds',
+  'fr35_point_to_contour_relation',
+  'traditional_dige_equivalence',
+]);
+
 const GATES: readonly ChinInferiorAdmissionGateFR46V1[] = Object.freeze([
-  Object.freeze({
-    gateId: 'external_soft_tissue_menton_target' as const,
-    state: 'satisfied' as const,
-    evidenceRefs: Object.freeze(EVIDENCE.map((entry) => entry.evidenceId)),
-    rationale: 'Independent frontal-photogrammetry and 3D-stereophotogrammetry literature both define a neutral soft-tissue inferior-midline chin point (Me′).',
-  }),
-  Object.freeze({
-    gateId: 'provider_candidate_to_menton_mapping' as const,
-    state: 'blocked' as const,
-    evidenceRefs: Object.freeze([FR45_REF]),
-    rationale: 'FR-45 proves provider-neutral inferior-extremum extraction but no independent blinded dataset compares that candidate against annotated soft-tissue Menton.',
-  }),
-  Object.freeze({
-    gateId: 'provider_candidate_midline_stability' as const,
-    state: 'blocked' as const,
-    evidenceRefs: Object.freeze([]),
-    rationale: 'No multi-subject evidence establishes that the face-oval image-y extremum remains sufficiently close to the independently annotated facial midline target.',
-  }),
-  Object.freeze({
-    gateId: 'controlled_multi_subject_capture' as const,
-    state: 'blocked' as const,
-    evidenceRefs: Object.freeze([]),
-    rationale: 'FR-45 has one pinned fixture only; a reviewed multi-subject controlled-capture dataset has not been supplied.',
-  }),
-  Object.freeze({
-    gateId: 'repeated_capture_repeatability' as const,
-    state: 'blocked' as const,
-    evidenceRefs: Object.freeze([]),
-    rationale: 'Two deterministic inferences on one image do not establish repeated physical-capture repeatability.',
-  }),
-  Object.freeze({
-    gateId: 'pose_stability' as const,
-    state: 'blocked' as const,
-    evidenceRefs: Object.freeze([]),
-    rationale: 'No reviewed yaw/pitch/roll perturbation distribution exists for the FR-45 candidate against independent Me′ annotations.',
-  }),
-  Object.freeze({
-    gateId: 'calibration_error_thresholds' as const,
-    state: 'blocked' as const,
-    evidenceRefs: Object.freeze([]),
-    rationale: 'No reviewed error distribution exists, so FR-46 does not invent a maximum normalized point-distance or pass threshold.',
-  }),
-  Object.freeze({
-    gateId: 'fr35_point_to_contour_relation' as const,
-    state: 'blocked' as const,
-    evidenceRefs: Object.freeze([FR35_REF]),
-    rationale: 'External evidence supports a Menton point; FR-35 requires a chin inferior contour curve. No reviewed membership or point-from-contour derivation rule connects them.',
-  }),
-  Object.freeze({
-    gateId: 'traditional_dige_equivalence' as const,
-    state: 'blocked' as const,
-    evidenceRefs: Object.freeze([FR36_REF]),
-    rationale: 'Neutral soft-tissue Menton evidence does not by itself establish equivalence to the traditional 地閣 anchor or select a 三停 source variant.',
-  }),
+  Object.freeze({ gateId: GATE_IDS[0]!, state: 'satisfied' as const, evidenceRefs: Object.freeze(EVIDENCE.map((entry) => entry.evidenceId)), rationale: 'Independent frontal-photogrammetry and 3D-stereophotogrammetry literature both define a neutral soft-tissue inferior-midline chin point (Me′).' }),
+  Object.freeze({ gateId: GATE_IDS[1]!, state: 'blocked' as const, evidenceRefs: Object.freeze([FR45_REF]), rationale: 'FR-45 proves provider-neutral inferior-extremum extraction but no independent blinded dataset compares that candidate against annotated soft-tissue Menton.' }),
+  Object.freeze({ gateId: GATE_IDS[2]!, state: 'blocked' as const, evidenceRefs: Object.freeze([]), rationale: 'No multi-subject evidence establishes that the face-oval image-y extremum remains sufficiently close to the independently annotated facial midline target.' }),
+  Object.freeze({ gateId: GATE_IDS[3]!, state: 'blocked' as const, evidenceRefs: Object.freeze([]), rationale: 'FR-45 has one pinned fixture only; a reviewed multi-subject controlled-capture dataset has not been supplied.' }),
+  Object.freeze({ gateId: GATE_IDS[4]!, state: 'blocked' as const, evidenceRefs: Object.freeze([]), rationale: 'Two deterministic inferences on one image do not establish repeated physical-capture repeatability.' }),
+  Object.freeze({ gateId: GATE_IDS[5]!, state: 'blocked' as const, evidenceRefs: Object.freeze([]), rationale: 'No reviewed yaw/pitch/roll perturbation distribution exists for the FR-45 candidate against independent Me′ annotations.' }),
+  Object.freeze({ gateId: GATE_IDS[6]!, state: 'blocked' as const, evidenceRefs: Object.freeze([]), rationale: 'No reviewed error distribution exists, so FR-46 does not invent a maximum normalized point-distance or pass threshold.' }),
+  Object.freeze({ gateId: GATE_IDS[7]!, state: 'blocked' as const, evidenceRefs: Object.freeze([FR35_REF]), rationale: 'External evidence supports a Menton point; FR-35 requires a chin inferior contour curve. No reviewed membership or point-from-contour derivation rule connects them.' }),
+  Object.freeze({ gateId: GATE_IDS[8]!, state: 'blocked' as const, evidenceRefs: Object.freeze([FR36_REF]), rationale: 'Neutral soft-tissue Menton evidence does not by itself establish equivalence to the traditional 地閣 anchor or select a 三停 source variant.' }),
 ]);
 
 const POINT_CONTOUR_RELATION: ChinInferiorPointContourRelationFR46V1 = Object.freeze({
@@ -357,9 +324,7 @@ export function scoreFaceOvalInferiorExtremumAgainstMentonFR46(
   }
   assertNormalizedCoordinate(candidate.selectedPoint.x, 'candidate.x');
   assertNormalizedCoordinate(candidate.selectedPoint.y, 'candidate.y');
-  const dx = candidate.selectedPoint.x - annotation.x;
-  const dy = candidate.selectedPoint.y - annotation.y;
-  const normalizedEuclideanDistance = Math.hypot(dx, dy);
+  const normalizedEuclideanDistance = Math.hypot(candidate.selectedPoint.x - annotation.x, candidate.selectedPoint.y - annotation.y);
   return Object.freeze({
     scoringRef: 'algorithm.validation.chin_inferior.menton_point_distance.fr46@0.1.0' as const,
     coordinateFrame: 'normalized_image_2d' as const,
@@ -378,48 +343,57 @@ export function scoreFaceOvalInferiorExtremumAgainstMentonFR46(
 export function validateChinInferiorNeutralValidationAuthorityFR46(
   authority: ChinInferiorNeutralValidationAuthorityFR46V1 = CHIN_INFERIOR_NEUTRAL_VALIDATION_AUTHORITY_FR46,
 ): ChinInferiorNeutralValidationAuthorityFR46V1 {
-  validateThreeDivisionsNeutralSurfaceAuthorityFR35();
+  validateThreeDivisionsNeutralSurfaceExtensionAuthorityFR35();
   validateThreeDivisionsVerticalReferenceDerivationAuthorityFR36();
   validateMediaPipeFaceOvalInferiorExtremumAuthorityFR45();
-  if (authority.schemaVersion !== 'fr46-v1' ||
-      authority.authorityRef !== 'authority.face.chin_inferior_neutral_validation.fr46' ||
-      authority.authorityVersion !== '0.1.0' ||
-      authority.authorityState !== 'soft_tissue_menton_target_supported_provider_mapping_and_contour_binding_blocked' ||
+  if (authority.schemaVersion !== 'fr46-v1' || authority.authorityRef !== 'authority.face.chin_inferior_neutral_validation.fr46' ||
+      authority.authorityVersion !== '0.1.0' || authority.authorityState !== 'soft_tissue_menton_target_supported_provider_mapping_and_contour_binding_blocked' ||
       authority.upstreamFR35Ref !== FR35_REF || authority.upstreamFR36Ref !== FR36_REF || authority.upstreamFR45Ref !== FR45_REF) {
     throw new FaceAuthorityValidationError('FR-46 identity/upstream authority drift.');
   }
-  if (authority.evidence.length !== 2) throw new FaceAuthorityValidationError('FR-46 must preserve exactly two reviewed independent neutral evidence records.');
-  const evidenceIds = new Set<string>();
-  for (const evidence of authority.evidence) {
-    if (evidenceIds.has(evidence.evidenceId) || evidence.title.trim().length === 0 || evidence.doi.trim().length === 0 ||
-        evidence.pmcid.trim().length === 0 || evidence.limitations.length === 0) {
-      throw new FaceAuthorityValidationError(`FR-46 invalid/duplicate evidence: ${evidence.evidenceId}`);
-    }
-    evidenceIds.add(evidence.evidenceId);
-    if (!Object.values(evidence.targetClaims).every((value) => value === true) ||
-        evidence.mediaPipeMappingSupplied !== false || evidence.providerIndexAuthoritySupplied !== false ||
-        evidence.fr35ContourDefinitionSupplied !== false || evidence.traditionalDigeAuthoritySupplied !== false) {
-      throw new FaceAuthorityValidationError(`FR-46 external evidence authority boundary drift: ${evidence.evidenceId}`);
-    }
+
+  const expectedEvidence = [
+    ['evidence.fr46.negi_chitra_2019_soft_tissue_menton', 2019, '10.1016/j.jobcr.2019.06.011', 'PMC6593212', 'frontal_photogrammetry'],
+    ['evidence.fr46.zhang_2024_3d_soft_tissue_menton', 2024, '10.1038/s41598-024-51322-1', 'PMC10827781', 'three_dimensional_stereophotogrammetry'],
+  ] as const;
+  if (authority.evidence.length !== expectedEvidence.length) {
+    throw new FaceAuthorityValidationError('FR-46 must preserve exactly two reviewed independent neutral evidence records.');
   }
+  authority.evidence.forEach((evidence, index) => {
+    const expected = expectedEvidence[index]!;
+    if (evidence.evidenceId !== expected[0] || evidence.year !== expected[1] || evidence.doi !== expected[2] ||
+        evidence.pmcid !== expected[3] || evidence.sourceScope !== expected[4] || evidence.title.trim().length === 0 ||
+        evidence.reviewedObservation.trim().length === 0 || evidence.limitations.length === 0 ||
+        !Object.values(evidence.targetClaims).every((value) => value === true) || evidence.mediaPipeMappingSupplied !== false ||
+        evidence.providerIndexAuthoritySupplied !== false || evidence.fr35ContourDefinitionSupplied !== false ||
+        evidence.traditionalDigeAuthoritySupplied !== false) {
+      throw new FaceAuthorityValidationError(`FR-46 external evidence drift: ${evidence.evidenceId}`);
+    }
+  });
+
   const protocol = authority.annotationProtocol;
   if (protocol.protocolRef !== 'protocol.face.chin_inferior.soft_tissue_menton_annotation.fr46@0.1.0' ||
       protocol.targetName !== 'soft_tissue_menton' || protocol.targetDefinition !== 'most_inferior_midline_point_of_soft_tissue_chin' ||
       protocol.coordinateFrame !== 'normalized_image_2d' || protocol.captureView !== 'frontal_en_face' || protocol.expression !== 'neutral' ||
-      protocol.annotatorProviderBlindRequired !== true || protocol.annotationFrozenBeforeProviderScoringRequired !== true ||
-      protocol.providerLandmarkIndicesVisibleToAnnotator !== false || protocol.providerFaceOvalVisibleToAnnotator !== false ||
-      protocol.fr45ExtremumVisibleToAnnotator !== false || protocol.traditionalLabelVisibleToAnnotator !== false ||
-      protocol.minimumSubjectCount !== null || protocol.maximumAllowedError !== null || protocol.repeatabilityThreshold !== null || protocol.poseThreshold !== null) {
+      protocol.headPosition !== 'natural_or_protocol_neutral' || protocol.annotatorProviderBlindRequired !== true ||
+      protocol.annotationFrozenBeforeProviderScoringRequired !== true || protocol.providerLandmarkIndicesVisibleToAnnotator !== false ||
+      protocol.providerFaceOvalVisibleToAnnotator !== false || protocol.fr45ExtremumVisibleToAnnotator !== false ||
+      protocol.traditionalLabelVisibleToAnnotator !== false || protocol.minimumSubjectCount !== null ||
+      protocol.maximumAllowedError !== null || protocol.repeatabilityThreshold !== null || protocol.poseThreshold !== null) {
     throw new FaceAuthorityValidationError('FR-46 independent annotation protocol drift or invented threshold.');
   }
-  if (authority.admissionGates.length !== 9 || authority.admissionGates[0]?.gateId !== 'external_soft_tissue_menton_target' ||
+
+  if (authority.admissionGates.length !== GATE_IDS.length ||
+      authority.admissionGates.some((gate, index) => gate.gateId !== GATE_IDS[index]) ||
       authority.admissionGates[0]?.state !== 'satisfied' || authority.admissionGates.slice(1).some((gate) => gate.state !== 'blocked')) {
     throw new FaceAuthorityValidationError('FR-46 only the external soft-tissue Menton target gate may be satisfied.');
   }
-  if (authority.pointContourRelation.relationState !== 'blocked_contour_membership_and_derivation_rule_unreviewed' ||
-      Object.entries(authority.pointContourRelation)
-        .filter(([key]) => !['pointTarget', 'fr35SurfaceId', 'relationState'].includes(key))
-        .some(([, value]) => value !== false)) {
+
+  const relation = authority.pointContourRelation;
+  if (relation.pointTarget !== 'soft_tissue_menton' || relation.fr35SurfaceId !== 'neutral.face.chin_inferior_contour' ||
+      relation.relationState !== 'blocked_contour_membership_and_derivation_rule_unreviewed' || relation.pointMaySubstituteForContour !== false ||
+      relation.extremumOfProviderFaceOvalMeansExtremumOfReviewedChinContour !== false ||
+      relation.reviewedContourMembershipRuleAvailable !== false || relation.reviewedPointFromContourDerivationAvailable !== false) {
     throw new FaceAuthorityValidationError('FR-46 point-to-contour relation must remain fail-closed.');
   }
   if (Object.values(authority.authorityBoundary).some((value) => value !== false)) {
