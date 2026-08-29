@@ -134,6 +134,30 @@ async function connectCdp(wsUrl) {
   return { ws, command, consoleEvents, exceptionEvents };
 }
 
+async function waitForPageReady(cdp, pageUrl) {
+  const deadline = Date.now() + 15000;
+  let lastState;
+  while (Date.now() < deadline) {
+    const evaluation = await cdp.command('Runtime.evaluate', {
+      expression: '({ href: location.href, origin: location.origin, readyState: document.readyState })',
+      returnByValue: true,
+    });
+    if (evaluation.exceptionDetails) {
+      lastState = { exceptionDetails: evaluation.exceptionDetails };
+    } else {
+      lastState = evaluation.result?.value;
+      if (
+        lastState?.href === pageUrl &&
+        typeof lastState.origin === 'string' &&
+        lastState.origin.startsWith('http://127.0.0.1:') &&
+        (lastState.readyState === 'interactive' || lastState.readyState === 'complete')
+      ) return lastState;
+    }
+    await delay(50);
+  }
+  throw new Error(`FR-45 page execution context was not ready for module evaluation: ${JSON.stringify(lastState)}`);
+}
+
 async function stopChrome(child) {
   if (!child || child.exitCode !== null) return;
   const exitPromise = once(child, 'exit').catch(() => []);
@@ -218,17 +242,20 @@ async function main() {
 
       const wsUrl = await waitForPageTarget(pageUrl);
       cdp = await connectCdp(wsUrl);
+      const pageState = await waitForPageReady(cdp, pageUrl);
+      console.log(`FR45_PAGE_READY ${JSON.stringify(pageState)}`);
       const expression = `
 (async () => {
+  const origin = location.origin;
   const [vision, fr45] = await Promise.all([
-    import('/vendor/vision_bundle.mjs'),
-    import('/dist/packages/face-reading/src/mediapipe-face-oval-inferior-extremum-fr45.js'),
+    import(origin + '/vendor/vision_bundle.mjs'),
+    import(origin + '/dist/packages/face-reading/src/mediapipe-face-oval-inferior-extremum-fr45.js'),
   ]);
   const image = document.getElementById('fixture');
   await image.decode();
-  const fileset = await vision.FilesetResolver.forVisionTasks(location.origin + '/vendor/wasm');
+  const fileset = await vision.FilesetResolver.forVisionTasks(origin + '/vendor/wasm');
   const landmarker = await vision.FaceLandmarker.createFromOptions(fileset, {
-    baseOptions: { modelAssetPath: location.origin + '/assets/face_landmarker.task' },
+    baseOptions: { modelAssetPath: origin + '/assets/face_landmarker.task' },
     runningMode: 'IMAGE', numFaces: 1, outputFaceBlendshapes: false, outputFacialTransformationMatrixes: false,
   });
   try {
