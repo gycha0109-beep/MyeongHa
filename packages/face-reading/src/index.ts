@@ -6,6 +6,7 @@ export * from './contracts.js';
 export * from './controlled-capture-attestation-fr21b.js';
 export * from './direct-source-verification.js';
 export * from './evidence-reports.js';
+export * from './eyebrow-independent-role-validation-protocol-fr43.js';
 export * from './eyebrow-neutral-anatomical-evidence-admission-fr41.js';
 export * from './face-eye-pair-research-bridge-fr24.js';
 export * from './face-observation-provider-contract-fr22.js';
