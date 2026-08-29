@@ -40,3 +40,20 @@ export {
   type MockCharacterChatTurnResultV1,
   type RunMockCharacterChatTurnInputV1,
 } from './character-chat-orchestration.js';
+
+export {
+  getCurrentSubjectProfile,
+  patchCurrentSubjectProfile,
+  SUBJECT_PROFILE_AUTHORITY_BINDINGS_V1,
+  SubjectProfileAuthorityPortErrorV1,
+  type CurrentSubjectKindV1,
+  type CurrentSubjectProfileAuthorityRowV1,
+  type CurrentSubjectProfileResponseV1,
+  type CurrentSubjectStatusV1,
+  type GetCurrentSubjectProfileInputV1,
+  type PatchedProfileAuthorityRowV1,
+  type PatchCurrentSubjectProfileInputV1,
+  type ProfilePatchV1,
+  type SubjectProfileAuthorityFailureCodeV1,
+  type SubjectProfileAuthorityPortV1,
+} from './subject-profile.js';
