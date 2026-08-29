@@ -4,7 +4,7 @@ import {
   type CapabilityGateResult,
 } from '../../../packages/domain/src/index.js';
 
-export const API_FOUNDATION_VERSION = 'myeongha-api-foundation-v0.10' as const;
+export const API_FOUNDATION_VERSION = 'myeongha-api-foundation-v0.11' as const;
 
 export function authorizePlannedCapability(
   input: CapabilityGateInput,
@@ -142,3 +142,15 @@ export {
   type ChatThreadStreamReadResponseV1,
   type GetChatThreadStreamInputV1,
 } from './chat-thread-stream-read.js';
+
+export {
+  getLifeRecordLedger,
+  LIFE_RECORD_LEDGER_READ_AUTHORITY_BINDING_V1,
+  LifeRecordLedgerReadAuthorityPortErrorV1,
+  type GetLifeRecordLedgerInputV1,
+  type LifeRecordLedgerAuthorityRowV1,
+  type LifeRecordLedgerItemV1,
+  type LifeRecordLedgerReadAuthorityFailureCodeV1,
+  type LifeRecordLedgerReadAuthorityPortV1,
+  type LifeRecordLedgerReadResponseV1,
+} from './life-record-ledger-read.js';
