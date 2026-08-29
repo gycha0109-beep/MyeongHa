@@ -4,7 +4,7 @@ import {
   type CapabilityGateResult,
 } from '../../../packages/domain/src/index.js';
 
-export const API_FOUNDATION_VERSION = 'myeongha-api-foundation-v0.12' as const;
+export const API_FOUNDATION_VERSION = 'myeongha-api-foundation-v0.13' as const;
 
 export function authorizePlannedCapability(
   input: CapabilityGateInput,
@@ -166,3 +166,15 @@ export {
   type MemoryItemsReadAuthorityPortV1,
   type MemoryItemsReadResponseV1,
 } from './memory-items-read.js';
+
+export {
+  getMemoryGrants,
+  MEMORY_GRANTS_READ_AUTHORITY_BINDING_V1,
+  MemoryGrantsReadAuthorityPortErrorV1,
+  type GetMemoryGrantsInputV1,
+  type MemoryGrantCurrentAuthorityRowV1,
+  type MemoryGrantReadItemV1,
+  type MemoryGrantsReadAuthorityFailureCodeV1,
+  type MemoryGrantsReadAuthorityPortV1,
+  type MemoryGrantsReadResponseV1,
+} from './memory-grants-read.js';
