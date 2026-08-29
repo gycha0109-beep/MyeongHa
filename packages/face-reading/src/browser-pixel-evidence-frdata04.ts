@@ -219,6 +219,9 @@ function validateDecodePrerequisite(
   for (let index = 0; index < canonical.captureVerifications.length; index += 1) {
     const expected = canonical.captureVerifications[index];
     const actual = decodeReport.captureVerifications[index];
+    if (expected === undefined || actual === undefined) {
+      fail(`FR-DATA-03 prerequisite capture verification missing at index ${index}.`);
+    }
     if (
       actual.captureRef !== expected.captureRef ||
       actual.relativeAssetPath !== expected.relativeAssetPath ||
