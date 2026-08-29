@@ -1,7 +1,7 @@
-# 명하 Verification / E2E Test Plan v0.12 — Source Aligned
+# 명하 Verification / E2E Test Plan v0.13 — Source Aligned
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.12**  
+> Pack Version: **v0.13**  
 > Date: **2026-08-29**  
 > Source Authority: `Usecase_re_reviewed_v2(1).md`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`, `Myeonghwa_Personalized_Interpretation_Architecture_v1.3_THIRD_REVIEW(1).md`  
 > Rule: source가 결정하지 않은 implementation-critical 사항은 `OPEN-P0`, 비차단 선택은 `CANDIDATE`, source 간 충돌/공백은 `SOURCE_AUTHORITY_GAPS.md` 또는 numbered source-gap 문서에 기록한다.
@@ -591,13 +591,15 @@ real Saju adapter
 - renderer invalid schema
 - output guard block
 - DB commit then client response loss
-- outbox worker crash/lease expiry
+- outbox worker crash / expired `processing` lease
 - push provider failure
 - duplicate/out-of-order commerce webhook
 - content artifact hash mismatch
 - deletion worker partial failure
 
 중복 charge/event/message/memory 또는 cross-user leakage 0.
+
+Transactional outbox failure injection은 authority를 분리해서 판정한다. Worker crash / lease expiry는 pending claim 및 expired `processing` lease reclaim의 exact 결과까지 검증할 수 있다. Publisher failure 시나리오에서는 source-backed stored-state/error telemetry를 관찰할 수 있지만, failed-state finalization/classification, retry eligibility/timing/backoff/jitter, `attempt_count` mutation lifecycle, max attempts, dead-letter threshold/transition, manual replay/requeue, error taxonomy의 exact 결과를 `SRC-30` 해결 전에 PASS로 정의하지 않는다. Notification Delivery attempt retry policy와 transactional outbox retry policy는 서로 다른 domain boundary이며 서로의 evidence를 대체하지 않는다.
 
 Personal-record unknown/invalid type-schema writes fail closed with no durable value before `SRC-25`; exact valid/legacy schema acceptance behavior is not invented until source resolution. Share create response-loss retry는 `SRC-20` 해결 전 기대 결과를 임의 정의하지 않는다. Device register transport/retry도 `SRC-19` 해결 전 기대 lineage를 임의 정의하지 않는다. Commerce out-of-order source application과 aggregate recompute의 exact result는 `SRC-21` 해결 전 임의 정의하지 않는다. Relationship apply retry/concurrent result 중 policy output(delta/stage/anti-farming)은 `SRC-22` 해결 전 임의 정의하지 않으며, 현재는 relational dedupe/revision invariants만 검증한다. Character Unlock response-loss/replay/concurrent trigger의 exact projection/effect result는 `SRC-23` 해결 전 임의 정의하지 않으며, 현재는 stored projection/relational invariants만 검증한다. Existing-Member merge response-loss/stale-resolution/partial-action-failure의 exact resume/result semantics는 `SRC-24` 해결 전 임의 정의하지 않으며, 현재는 relational uniqueness, ownership, direct-lineage history, no-raw-reparent invariants만 검증한다.
 
@@ -611,6 +613,8 @@ CI/release evidence:
 - content release/bundle/hash
 - Saju engine/reading contract/grounding versions
 - AI runtime/prompt versions
+- transactional outbox source-backed enqueue/dedupe, pending claim, expired-processing lease reclaim, successful-completion, and stored-state/error telemetry evidence
+- `SRC-30` status for publisher failure finalization/classification, retry eligibility/scheduling/backoff/jitter, `attempt_count` lifecycle, max attempts, dead-letter threshold/transition, manual replay/requeue, and error-taxonomy evidence
 - notification stored logical-ledger/delivery/provider-attempt persistence provenance for implemented notification slices
 - `SRC-12` status for effective notification preference defaults/materialization/mutation evidence
 - `SRC-13` status for final user-visible notification inbox membership/history/order/cursor evidence
@@ -642,6 +646,8 @@ Do not treat the Pack's previous `VersionedRecordTypeDefinition` shape as source
 
 Do not treat notification stored-ledger, delivery, or attempt provenance as evidence that missing effective defaults, final inbox composition, provider routing, scheduler decisions, or automatic retry policy have been source-resolved.
 
+Do not treat expired-processing lease reclaim as failed-event retry/dead-letter evidence, and do not use Notification Delivery attempt retry evidence as transactional outbox retry evidence.
+
 ## 20. Promotion Criteria
 
 ### Engineering baseline
@@ -668,6 +674,7 @@ Device Installation register enabled → SRC-19 source-resolved
 Production notification provider routing enabled → SRC-31 source-resolved
 Autonomous notification scheduler decision/materialization enabled → SRC-32 source-resolved
 Automatic notification delivery retry timing/backoff/max-attempt/error-taxonomy/failover enabled → explicit source authority required; attempt allocator mechanics alone are insufficient
+Transactional outbox publisher-failure finalization/classification, failed-event retry scheduling/backoff/jitter, `attempt_count` lifecycle/max-attempts, dead-letter transition/threshold, manual replay/requeue, or error taxonomy enabled → SRC-30 source-resolved; expired-processing lease reclaim remains independently source-backed and is not failed-event retry authority
 Share Artifact create enabled → SRC-20 source-resolved
 Relationship Event score/stage apply enabled → SRC-22 source-resolved
 Character Unlock eligibility/effect apply enabled → SRC-23 source-resolved
