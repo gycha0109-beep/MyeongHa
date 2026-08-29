@@ -276,8 +276,10 @@ function validateChannel(
   const max = nonNegativeInteger(summary.max, `${label}.max`);
   const sum = nonNegativeInteger(summary.sum, `${label}.sum`);
   if (min > 255 || max > 255 || min > max) fail(`${label} channel min/max must satisfy 0 <= min <= max <= 255.`);
-  if (sum < min * pixelCount || sum > max * pixelCount) {
-    fail(`${label} channel sum is inconsistent with its min/max and pixel count.`);
+  const minimumPossibleSum = min === max ? min * pixelCount : min * (pixelCount - 1) + max;
+  const maximumPossibleSum = min === max ? max * pixelCount : max * (pixelCount - 1) + min;
+  if (sum < minimumPossibleSum || sum > maximumPossibleSum) {
+    fail(`${label} channel sum is inconsistent with its observed min/max and pixel count.`);
   }
   return Object.freeze({ min, max, sum });
 }
@@ -294,8 +296,15 @@ function validateAlpha(
   if (transparentPixelCount + partialAlphaPixelCount + opaquePixelCount !== pixelCount) {
     fail('alpha occupancy counts must exactly partition the raster pixel count.');
   }
-  if (base.min === 255 && opaquePixelCount !== pixelCount) fail('alpha occupancy contradicts an all-opaque alpha range.');
-  if (base.max === 0 && transparentPixelCount !== pixelCount) fail('alpha occupancy contradicts an all-transparent alpha range.');
+  if ((transparentPixelCount > 0) !== (base.min === 0)) {
+    fail('alpha transparent occupancy must exactly agree with the observed alpha minimum.');
+  }
+  if ((opaquePixelCount > 0) !== (base.max === 255)) {
+    fail('alpha opaque occupancy must exactly agree with the observed alpha maximum.');
+  }
+  if (partialAlphaPixelCount > 0 && (base.min === 255 || base.max === 0)) {
+    fail('alpha partial occupancy contradicts the observed alpha range.');
+  }
   return Object.freeze({
     ...base,
     transparentPixelCount,
@@ -344,10 +353,14 @@ export function buildMentonDatasetBrowserPixelEvidenceReportFRData04(
     if (rasterWidth !== decode.naturalWidth || rasterHeight !== decode.naturalHeight) {
       fail(`capture ${decode.captureRef} raster dimensions must exactly equal FR-DATA-03 natural dimensions.`);
     }
+    const expectedPixelCount = rasterWidth * rasterHeight;
+    if (!Number.isSafeInteger(expectedPixelCount)) fail(`capture ${decode.captureRef} raster area exceeds safe integer range.`);
     const pixelCount = positiveInteger(entry.pixelCount, `capture ${decode.captureRef} pixelCount`);
-    if (pixelCount !== rasterWidth * rasterHeight) fail(`capture ${decode.captureRef} pixelCount must equal rasterWidth * rasterHeight.`);
+    if (pixelCount !== expectedPixelCount) fail(`capture ${decode.captureRef} pixelCount must equal rasterWidth * rasterHeight.`);
+    const expectedRgbaByteLength = pixelCount * 4;
+    if (!Number.isSafeInteger(expectedRgbaByteLength)) fail(`capture ${decode.captureRef} RGBA byte length exceeds safe integer range.`);
     const rgbaByteLength = positiveInteger(entry.rgbaByteLength, `capture ${decode.captureRef} rgbaByteLength`);
-    if (rgbaByteLength !== pixelCount * 4) fail(`capture ${decode.captureRef} RGBA byte length must equal pixelCount * 4.`);
+    if (rgbaByteLength !== expectedRgbaByteLength) fail(`capture ${decode.captureRef} RGBA byte length must equal pixelCount * 4.`);
     if (entry.rasterSha256 === null) fail(`capture ${decode.captureRef} raster SHA-256 is required.`);
     const rasterSha256 = canonicalSha256(entry.rasterSha256, `capture ${decode.captureRef} rasterSha256`);
     const red = validateChannel(entry.red, pixelCount, `capture ${decode.captureRef}.red`);
