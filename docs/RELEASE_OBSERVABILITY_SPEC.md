@@ -1,7 +1,7 @@
-# 명하 Release / Observability Specification v0.5 — Source Aligned
+# 명하 Release / Observability Specification v0.6 — Source Aligned
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.5**  
+> Pack Version: **v0.6**  
 > Date: **2026-08-29**  
 > Source Authority: `Usecase_re_reviewed_v2(1).md`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`, `Myeonghwa_Personalized_Interpretation_Architecture_v1.3_THIRD_REVIEW(1).md`  
 > Rule: source가 결정하지 않은 implementation-critical 사항은 `OPEN-P0` 또는 numbered source-authority gap으로 남기며 Pack이 새 authority를 만들지 않는다.
@@ -32,11 +32,15 @@ Purchase Intent immutable minimal offer mapping snapshot/hash where applicable
 source-gap/P0 status for blocked commerce transitions
 notification logical delivery / provider-attempt stored provenance where applicable
 source-gap status for blocked notification preference/inbox/provider-routing/scheduler decisions
+outbox stored row/status/lease/error provenance where applicable
+source-gap status for blocked outbox failure/retry/dead-letter decisions
 ```
 
 Source에 없는 commerce fulfillment-definition version/hash를 release provenance로 요구하지 않는다.
 
 Notification에서도 stored logical delivery/attempt provenance는 기록할 수 있지만, `SRC-12`, `SRC-13`, `SRC-31`, `SRC-32` 해결 전 missing preference default, final inbox composition, provider-routing policy version, scheduler-policy artifact/version을 존재하는 release provenance처럼 요구하거나 합성하지 않는다.
+
+Outbox에서도 stored row/status/lease/`available_at`/`last_error_code`는 관측할 수 있지만, `SRC-30` 해결 전 retry classifier/backoff formula/attempt-count policy/dead-letter threshold/manual replay policy version을 존재하는 release provenance처럼 요구하거나 합성하지 않는다.
 
 ## 3. Release Units
 
@@ -52,12 +56,15 @@ Notification에서도 stored logical delivery/attempt provenance는 기록할 �
 - commerce product/offer/provider-provenance components
 - relationship/usage/experiment policy registries that have source authority
 - notification stored delivery/attempt persistence components
+- transactional outbox persistence/claim/success-completion components
 
 한 release unit 변경이 과거 provenance를 rewrite하지 않는다. 동일 `(policyKey,version)` artifact content도 immutable하다.
 
 Commerce의 Product→grant mapping은 `SRC-18`, entitlement event→grant→logical-entitlement transition/aggregation은 `SRC-21` 해결 전 source-backed release unit/registry가 존재한다고 가정하지 않는다.
 
 Notification provider-routing registry/policy는 `SRC-31`, autonomous scheduler policy/registry는 `SRC-32` 해결 전 source-backed release unit이 존재한다고 가정하지 않는다. Stored notification/delivery/attempt persistence component가 존재한다는 사실은 이 두 policy authority의 존재를 뜻하지 않는다.
+
+Outbox failure classifier/retry scheduler/dead-letter policy/replay policy는 `SRC-30` 해결 전 source-backed release unit/registry가 존재한다고 가정하지 않는다. Source-backed enqueue, pending/expired-processing claim/reclaim, and successful completion components가 존재한다는 사실은 failure/retry/dead-letter mutation authority의 존재를 뜻하지 않는다.
 
 ## 4. Content Rollout
 
@@ -111,7 +118,7 @@ SRC-01 해결 후 별도 operational override 또는 mutable runtime authority�
 - AI planner/renderer/guard latency/tokens/status
 - Saju transport + contract/grounding failures
 - DB command revision/idempotency conflict
-- outbox backlog/lease/retry
+- outbox backlog / current lease / expired-lease reclaim / stored status and error signals
 - push delivery/attempt failure from stored delivery/attempt state
 - commerce receipt/provider event lag
 - Purchase Intent offer mapping snapshot/provenance mismatch
@@ -120,6 +127,8 @@ SRC-01 해결 후 별도 operational override 또는 mutable runtime authority�
 - deletion job age/failure
 
 Do not emit telemetry that assumes an invented fulfillment registry/version or an unimplemented entitlement recompute policy.
+
+Outbox stored-state telemetry is source-safe now: backlog, pending/processing/processed/failed/dead-lettered counts as persisted, current/expired lease state, `available_at`, `attempt_count`, and `last_error_code` may be observed without assigning policy meaning that Source has not defined. `SRC-30` resolution is required before telemetry labels imply that a failure was authoritatively classified retryable/final, that a specific retry/backoff schedule was applied, that `attempt_count` has an authoritative lifecycle meaning, that a dead-letter threshold fired, or that manual replay/requeue followed an approved policy. Expired-processing lease reclaim is source-backed recovery and must not be conflated with failed-event retry scheduling.
 
 For notification, stored delivery/attempt status and failures are observable now. Telemetry that labels a provider choice as the authoritative routing decision requires `SRC-31`; telemetry that claims scheduler eligibility/cadence/frequency-cap/dedupe/template decisions were evaluated by the authoritative production policy requires `SRC-32`. Missing preference defaults and final inbox membership must likewise not be synthesized as resolved telemetry dimensions before `SRC-12` / `SRC-13`.
 
@@ -164,11 +173,13 @@ Analytics payload에 Saju semantic output/원문 chat을 기본 포함하지 않
 ### High operational
 
 - chat duplicate/turn stuck spike
-- outbox lease backlog
+- outbox lease backlog / expired-processing reclaim spike / persisted failed or dead-lettered state growth
 - Saju/AI sustained failure
 - push provider degradation observed from stored provider-attempt outcomes
 - commerce webhook lag
 - content capability mismatch spike
+
+Outbox stored-state alerting can surface operational risk, but `SRC-30` 해결 전 failed/dead-lettered state growth를 authoritative retry exhaustion, approved dead-letter threshold, or retry-policy correctness evidence로 해석하지 않는다.
 
 A provider-attempt failure spike can be alerted from stored provenance. `SRC-31` 해결 전 그 alert 자체를 provider-routing resolver correctness evidence로 해석하지 않는다.
 
@@ -185,6 +196,8 @@ Character/episode 개별 emergency override는 `SRC-01`.
 
 Notification category/service scheduler policy kill switch는 `SRC-32` 해결 전 source-backed capability로 보장하지 않는다. Provider-routing/failover kill switch도 `SRC-31` 해결 전 source-backed capability로 보장하지 않는다. Device Installation owner revoke와 account-deletion notification blocking은 별도 lifecycle controls이며 global notification policy kill switch와 동일하지 않다.
 
+Outbox failed/dead-lettered replay/requeue 또는 retry-policy disable/override kill switch는 `SRC-30` 해결 전 source-backed capability로 보장하지 않는다. Existing pending/expired-processing claim boundary와 successful completion boundary는 policy kill switch의 존재를 뜻하지 않는다.
+
 Kill switch는 과거 ledger/provenance 삭제가 아니다.
 
 ## 13. Incident Evidence
@@ -197,6 +210,8 @@ Kill switch는 과거 ledger/provenance 삭제가 아니다.
 - repair necessity
 - regression test ID added
 - relevant source-gap/P0 status when an affected path is blocked or partially enabled
+
+Outbox incident evidence may include stored event identity/status, lease fields, `available_at`, `attempt_count`, `last_error_code`, processed/dead-letter timestamps, and source-backed claim/reclaim/success-completion evidence. It must not invent retry/final classification, backoff calculation, attempt-count lifecycle meaning, dead-letter threshold, stale-worker failure-finalization semantics, or replay policy before `SRC-30` resolves them.
 
 Notification incident evidence may include stored logical notification/delivery/attempt identifiers/status and already-recorded provider provenance. It must not invent scheduler policy version, provider-routing configuration version, missing preference defaults, or final inbox membership authority before the corresponding source gaps are resolved.
 
@@ -260,9 +275,30 @@ automatic delivery retry timing/backoff/max-attempt/provider-error taxonomy/fail
 → explicit source authority required; stored allocator/finalizer mechanics alone are insufficient
 ```
 
+Outbox gate도 source-complete recovery와 blocked policy를 분리한다.
+
+```text
+source-backed domain enqueue / logical dedupe
+→ existing transaction + uniqueness evidence
+
+pending claim / expired-processing lease reclaim
+→ existing claim/reclaim concurrency evidence
+
+successful publication completion
+→ existing lock-owner/lease/success-completion evidence
+
+publisher failure finalization / retryable-vs-final classification / retry scheduling or backoff
+→ SRC-30 resolved
+
+attempt_count lifecycle semantics / dead-letter threshold or transition / manual replay-requeue
+→ SRC-30 resolved
+```
+
 Source에 없는 `fulfillmentDefinitionVersion`, `commerce fulfillment registry`, fulfillment snapshot/hash를 PASS condition으로 사용하지 않는다.
 
 Notification에서도 stored delivery/attempt provenance를 missing preference-default, final inbox, provider-routing, scheduler, or automatic retry-policy PASS evidence로 대체하지 않는다.
+
+Outbox에서도 persisted `failed`, `dead_lettered`, `attempt_count`, `available_at`, `last_error_code` columns 또는 source-backed lease reclaim/success completion을 `SRC-30`이 막는 failure/retry/dead-letter policy PASS evidence로 대체하지 않는다.
 
 ## 15. P0 / Source Dependencies
 
@@ -283,6 +319,7 @@ Relevant source gaps include:
 - `SRC-19`: Device Installation registration lifecycle
 - `SRC-20`: Share Artifact create/public projection lifecycle
 - `SRC-21`: entitlement event apply / logical aggregation
+- `SRC-30`: Outbox failure / retry scheduling / dead-letter / replay authority
 - `SRC-31`: Notification Delivery provider-resolution/routing authority
 - `SRC-32`: Notification Scheduler cadence/frequency/dedupe/template/materialization authority
 
