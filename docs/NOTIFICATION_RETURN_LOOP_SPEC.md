@@ -1,11 +1,11 @@
-# 명하 Notification / Return-Loop Specification v0.5 — Source Aligned
+# 명하 Notification / Return-Loop Specification v0.6 — Source Aligned
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.5**  
+> Pack Version: **v0.6**  
 > Date: **2026-08-29**  
 > Source Authority: `Usecase_re_reviewed_v2(1).md`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`  
 > Shared Contracts: `SHARED_DOMAIN_CONTRACTS_SPEC.md`  
-> Source Gaps: `SRC-12`, `SRC-13`, `SRC-19`, `SRC-31`
+> Source Gaps: `SRC-12`, `SRC-13`, `SRC-19`, `SRC-31`, `SRC-32`
 
 ---
 
@@ -17,10 +17,13 @@
 
 ```text
 World/Reading/Content state
-→ notification eligibility
+→ notification candidate
+
+scheduler cadence/frequency/eligibility decision
+→ SRC-32
 
 notification row
-→ logical inbox authority
+→ logical stored notification authority
 
 notification_delivery
 → installation별 delivery authority
@@ -37,6 +40,8 @@ Push payload 자체는 캐릭터 메시지나 world event의 authority가 아니
 
 `notification_delivery_attempt`의 row-locked attempt allocator와 terminal provenance는 source-backed persistence boundary다. 다만 Primary Source가 요구하는 **installation/platform configuration → provider** resolver의 canonical input/mapping/registry는 아직 정의되지 않았다. 따라서 caller-supplied provider 문자열을 production routing authority로 취급하지 않으며 이 경계는 `SRC-31`을 따른다.
 
+자동 notification candidate가 실제 logical notification으로 materialize될지, 언제 materialize될지, frequency cap에 의해 막힐지는 별도 `SRC-32` scheduler decision authority다.
+
 ## 3. Notification Category Contract
 
 초기 bounded category:
@@ -49,7 +54,9 @@ new_character
 service_notice
 ```
 
-category는 `SHARED_DOMAIN_CONTRACTS_SPEC.md`의 versioned `NotificationCategory` registry를 통과한다. Scheduler/provider가 임의 문자열 category를 생성하지 않는다.
+category는 Primary Source가 정의한 bounded initial set을 벗어나 임의 문자열로 확장하지 않는다. Scheduler/provider가 새로운 category를 실행 authority로 만들려면 Source contract가 먼저 확장되어야 한다.
+
+이 category 목록은 **각 category의 cadence/trigger/frequency-cap algorithm까지 정의하지 않는다.** 그 실행 정책은 `SRC-32`가 OPEN이다.
 
 ## 4. Preview Privacy
 
@@ -105,62 +112,94 @@ POST /api/device-installations/register
 
 ## 6. Preference Model
 
+Primary Source가 요구하는 high-level preference boundary:
+
 ```text
-global_enabled
+global notification control
 + category preference
-+ quiet hours
-+ preview mode
++ timezone / quiet hours
++ preview privacy
 + provider/OS permission state
-→ eligible delivery
+→ notification eligibility에 반영
 ```
 
 OS 권한 거절로 핵심 서비스 이용을 막지 않는다.
 
+저장된 preference row가 없을 때의 default/materialization semantics는 `SRC-12`가 OPEN이다. Preference 모델이 존재한다는 사실만으로 scheduler의 최종 cadence/frequency decision이 해결되지는 않으며, 그 부분은 `SRC-32`다.
+
 ## 7. Scheduler Eligibility
 
-Scheduler는 최소 다음을 서버에서 확인한다.
+Primary Source가 source-complete하게 요구하는 scheduler의 **상위 제약**은 다음과 같다.
 
-- canonical subject 상태 active
-- category registry/version
-- notification preference
-- timezone / quiet hours
-- frequency cap
-- 실제 source event/content/reading 존재
-- destination route authorization 가능성
-- deletion_pending이 아님
+- 실제 character/content/reading/world 상태에 근거해야 한다
+- notification opt-in/opt-out을 존중해야 한다
+- timezone / quiet-hours를 존중해야 한다
+- 서버가 frequency cap을 관리해야 한다
+- 허위 urgency나 존재하지 않는 source event를 만들지 않는다
+- account/deletion lifecycle의 차단 경계를 우회하지 않는다
 
-캐릭터가 실제로 사용자를 호출할 근거가 없는데 허위 urgency를 만들지 않는다.
+그러나 이 요구를 실행하는 final production evaluator는 아직 Source-complete하지 않다.
+
+특히 다음은 `SRC-32` 해결 전 Pack이 임의로 정할 수 없다.
+
+```text
+trigger positive schema
+category별 exact threshold/cadence
+frequency-cap window/count/scope
+candidate replay/concurrency
+logical notification dedupe identity
+template-selection mapping
+stale candidate cancel/defer/expire semantics
+policy change/provenance semantics
+```
+
+따라서 “Scheduler가 조건을 확인한다”는 Primary Source 요구를 근거로 Pack이 임의 numeric policy나 DSL을 만들지 않는다.
 
 ## 8. Return Loop Candidate Triggers
 
-Use Case가 허용하는 예:
+Use Case가 제시하는 **candidate example**:
 
-- 마지막 캐릭터 대화 후 일정 기간 경과
+- 마지막 캐릭터 대화 후 일정 기간 경과 — 예시로 3일이 제시됨
 - 월운/연운이 실제 available 상태가 됨
 - episode unlock
 - new character/content release
 - 사용자가 명시적으로 저장한 예정 사건 임박
 
-구체 cadence/frequency threshold는 `SHARED_DOMAIN_CONTRACTS_SPEC.md`의 immutable `NotificationPolicyDefinition`으로 version pin한다. 실험 가능하지만 opt-out/quiet-hours/privacy를 우회하지 않으며 동일 policy version의 rule content를 조용히 변경하지 않는다.
+이 목록은 final closed trigger registry가 아니다.
+
+특히 다음 등치는 금지한다.
+
+```text
+Use Case example “3 days”
+≠ universal character_return threshold
+
+server-managed frequency cap requirement
+≠ source-defined cap window/count
+
+notifications.dedupe_key column
+≠ source-defined scheduler dedupe-key construction
+```
+
+Primary Source는 final `NotificationPolicyDefinition`, `policyVersion`, `contentHash`, cadence registry schema를 정의하지 않는다. 따라서 구체 cadence/frequency/eligibility policy는 `SRC-32` 해결 전 production authority로 승격하지 않는다.
 
 ## 9. Notification Creation
 
-권장 흐름:
+Source-aligned conceptual flow:
 
 ```text
-Domain transaction
-→ state + outbox event commit
-→ notification worker eligibility evaluation
-→ notifications INSERT(dedupe_key)
-→ eligible active installations snapshot
-→ notification_deliveries INSERT
-→ source-approved provider resolution
+Domain/World/Reading/Content state
+→ scheduler candidate
+→ source-approved eligibility/cadence/frequency decision [SRC-32]
+→ logical notification materialization
+→ eligible active installations
+→ notification_deliveries
+→ source-approved provider resolution [SRC-31]
 → provider attempts
 ```
 
-동일 source event 재처리로 logical notification을 중복 생성하지 않는다.
+동일 source event 재처리로 logical notification을 중복 생성해서는 안 된다는 방향은 유지한다. 다만 autonomous scheduler에서 **무엇이 동일 logical notification인지, dedupe_key를 어떻게 canonicalize하는지**는 `SRC-32` 해결 전 임의 구현하지 않는다.
 
-마지막 두 단계의 DB attempt allocation/finalization mechanics는 현재 검증 가능하지만, production provider selection은 `SRC-31` 해결 전 source-complete라고 선언하지 않는다.
+Delivery DB attempt allocation/finalization mechanics는 현재 검증 가능하지만, production provider selection은 `SRC-31` 해결 전 source-complete라고 선언하지 않는다.
 
 ## 10. Deep Link Contract
 
@@ -213,7 +252,7 @@ Provider identity 자체도 `SRC-31` 해결 전 caller assertion으로 확정하
 
 ## 12. Notification State vs Delivery State
 
-`notifications.status=read`는 사용자가 inbox item을 읽었다는 의미다.
+`notifications.status=read`는 사용자가 stored notification item을 읽었다는 의미다.
 
 이는:
 
@@ -225,11 +264,11 @@ character message committed
 
 과 동일하지 않다.
 
-Analytics event와 DB status를 혼합하지 않는다.
+Final inbox status membership/filter/order semantics는 별도 `SRC-13` 경계다. Analytics event와 DB status를 혼합하지 않는다.
 
 ## 13. Deletion / Lifecycle
 
-Account deletion 시작 시:
+Account deletion 시작 시 source-backed cleanup boundary:
 
 - active installations revoke
 - queued/ready notification cancel
@@ -241,19 +280,25 @@ Account deletion 시작 시:
 
 ## 14. Verification
 
-- unknown NotificationCategory → no schedule/send
+현재 independently testable:
+
+- unknown/out-of-contract NotificationCategory → no authoritative schedule/send
 - notification A → subject B installation → DENY
-- same logical notification/device duplicate → one delivery
+- same logical notification/device stored delivery duplicate → one delivery
 - concurrent attempt allocation → unique attempt_no
 - exact attempt-id replay → provider/attempt identity immutable
 - revoked installation → no new send
-- quiet hours → defer
-- opted-out category → no push
 - discreet/default preview → sensitive content absent
-- full preview → only template-approved projection
-- deletion_pending → scheduler deny
+- full preview → only source-approved/template-approved projection where defined
+- deletion_pending → new delivery/scheduler path cannot bypass lifecycle block
 - private deep link unauthorized → DENY
-- push retry → no duplicate character/world event
+- push retry persistence → no duplicate character/world event authority
+
+Source-resolution gates:
+
+- missing preference default/materialization tests remain blocked by `SRC-12`
+- final inbox membership/status tests remain blocked by `SRC-13`
 - registration lifecycle tests remain blocked until `SRC-19` defines retry/re-registration/token-rotation semantics
-- production provider derivation/mismatch/alias/failover tests remain blocked until `SRC-31` defines the provider resolver authority
+- production provider derivation/mismatch/alias/failover tests remain blocked until `SRC-31` defines provider resolver authority
+- autonomous trigger/cadence/frequency-cap/dedupe/template-selection/concurrent materialization tests remain blocked until `SRC-32` defines scheduler decision authority
 - automatic delivery retry timing/backoff/max-attempt/error-classification tests are not invented from the current allocator-only authority

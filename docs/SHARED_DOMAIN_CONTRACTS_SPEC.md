@@ -1,8 +1,8 @@
-# 명하 Shared Domain Contracts Specification v0.6 — Source Aligned
+# 명하 Shared Domain Contracts Specification v0.7 — Source Aligned
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.6**  
-> Date: **2026-08-28**  
+> Pack Version: **v0.7**  
+> Date: **2026-08-29**  
 > Purpose: 여러 spec에 흩어진 free-form string/JSON을 bounded versioned contract로 묶는다. Source가 contract shape를 정의하지 않은 영역은 registry를 임의 생성하지 않는다.
 
 ---
@@ -36,13 +36,14 @@ Outbox EventType
 
 ```text
 UsagePolicyDefinition
-NotificationPolicyDefinition
 AnalyticsEventSchemaRegistry
 ExperimentAssignmentPolicy
 ContentPolicyTagRegistry
 ```
 
 각 source-backed artifact는 해당 source가 실제 정의한 provenance identity를 따른다. Pack이 source에 없는 `contentHash`, condition DSL, registry table을 공통 요구사항으로 추가하지 않는다.
+
+Notification scheduler는 Primary Source가 grounded/non-spam return loop, bounded category, preference/quiet-hours, server-managed frequency cap 같은 **요구와 제약**을 정의하지만, final cadence/frequency/eligibility policy artifact나 `policyVersion + contentHash` schema를 정의하지 않는다. 따라서 `NotificationPolicyDefinition`은 현재 source-controlled immutable artifact 목록에 포함하지 않으며 executable scheduler policy는 `SRC-32`가 OPEN이다.
 
 Relationship transition rule은 source가 versioned policy로 관리하라고 요구하지만, 구체적인 policy artifact/schema/hash/score bounds/delta/stage/anti-farming contract는 정의하지 않는다. 해당 executable authority는 `SRC-22`가 OPEN이다.
 
@@ -261,9 +262,44 @@ CAPABILITY_UNAVAILABLE/v1 → capabilityKey,availability
 
 `event_type + event_schema_version`별 payload schema registry를 둔다. Consumer는 unknown major schema를 처리하지 않고 dead-letter/compatibility path로 보낸다.
 
-## 9A. Notification Policy Definition
+## 9A. Notification Scheduler Policy — `SRC-32` OPEN
 
-Scheduler threshold/frequency cap은 versioned immutable policy artifact로 둔다.
+Primary Source가 source-complete하게 고정한 것은 다음 **제품 요구/relational envelope**까지다.
+
+```text
+return-loop notification은 실제 character/content/reading state에 근거
+허위 urgency / generic spam 금지
+bounded initial notification categories
+notification preference / opt-in / quiet-hours 존중
+server가 notification frequency cap을 관리
+notifications row는 dedupe_key / scheduled_at / template_key 등을 저장 가능
+```
+
+Use Case의 다음 조건들은 **candidate example**이며 final executable registry가 아니다.
+
+```text
+마지막 캐릭터 대화 후 일정 기간 경과 (예: 3일)
+새 월운/reading available
+저장한 중요 일정 임박
+episode unlock
+```
+
+현재 Source가 정의하지 않은 production scheduler authority:
+
+```text
+final trigger inventory + positive schema
+category별 exact cadence/threshold
+frequency-cap window/count/scope
+cap accounting semantics
+trigger → template selection
+logical notification / dedupe-key construction
+scheduler replay/concurrency convergence
+stale candidate cancel/defer/expire semantics
+policy change/experiment semantics
+policy identity/version/provenance representation
+```
+
+따라서 이전 Pack의 다음 형태는 **source-backed interface가 아니다**.
 
 ```ts
 interface NotificationPolicyDefinitionV1 {
@@ -276,7 +312,9 @@ interface NotificationPolicyDefinitionV1 {
 }
 ```
 
-동일 policy version의 cadence를 운영 중 조용히 바꾸지 않는다.
+`SRC-32` 해결 전 이 interface나 `policyVersion + contentHash`를 Primary Source contract로 구현하지 않는다. 특히 Use Case의 “3일” 예시를 universal hard-coded `character_return` threshold로 승격하지 않는다.
+
+Source가 향후 policy versioning/immutable artifact를 실제로 채택하면 그때 해당 source-defined identity/schema를 따른다. 현재 Pack은 그 선택을 대신하지 않는다.
 
 ## 10. Verification
 
@@ -290,3 +328,4 @@ interface NotificationPolicyDefinitionV1 {
 - Purchase Intent minimal offer mapping snapshot mutation → hash mismatch/deny
 - unresolved product→entitlement mapping (`SRC-18`) → no entitlement mutation
 - unknown outbox schema → no silent consume
+- autonomous notification cadence/frequency/dedupe/template policy → blocked until `SRC-32`; existing stored notification/read/delivery-attempt boundaries remain independently testable
