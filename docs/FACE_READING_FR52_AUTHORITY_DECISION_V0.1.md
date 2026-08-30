@@ -12,6 +12,21 @@ It admits and separates three endpoint-related candidate families and sets only 
 
 Final endpoint selection remains `null`.
 
+## Authority revision 0.1.1
+
+FR-53 review exposed an overpromotion in FR-52 v0.1.0. The prose already stated that soft-tissue Mt was **not proven to lie on the inferior chin boundary**, but the code marked the Mt evidence/candidate as FR-51 scope-compatible.
+
+FR-52 v0.1.1 corrects that mismatch:
+
+```text
+soft-tissue Mt chin-region association = true
+soft-tissue Mt central-inferior-boundary compatibility = false
+soft-tissue Mt scopeCompatibleWithFR51 = false
+soft-tissue Mt researchAcquisitionExecutable = false
+```
+
+This is a narrowing correction only. It does not reduce the evidence that Mt is used as a soft-tissue chin-region landmark; it removes the unsupported hop from `chin region` to `FR-51 central inferior boundary`.
+
 ## Why Menton-side is prioritized for acquisition
 
 Zupan et al. 2022 provides a bilateral operational rule:
@@ -24,14 +39,15 @@ This priority is **not** endpoint authority.
 
 ## Why soft-tissue mental tubercle is not yet executable
 
-Recent 3D facial-asymmetry studies explicitly use `soft tissue mental tubercle (Mt)` as the chin landmark and distinguish it from soft-tissue Gonion/mandible and Cheilion/lip.
+Recent 3D facial-asymmetry studies explicitly use `soft tissue mental tubercle (Mt)` as a chin landmark and distinguish it from soft-tissue Gonion/mandible and Cheilion/lip.
 
-However, the reviewed papers do not provide a sufficiently explicit anatomical surface definition that FR-52 can independently reproduce without borrowing hidden model/FaceGen/Meshmonk semantics.
+However, the reviewed papers do not provide a sufficiently explicit anatomical surface definition that FR-52 can independently reproduce without borrowing hidden model/FaceGen/MeshMonk semantics.
 
 Therefore:
 
 - chin-region candidate: admitted;
 - exact surface rule: not admitted;
+- FR-51 inferior-boundary membership: not admitted;
 - equality with Menton-side: not admitted;
 - FR-35 endpoint authority: not admitted.
 
@@ -47,6 +63,7 @@ That definition is useful as a reproducible lateral-chin comparison reference, b
 - endpoint selection rule;
 - endpoint-equivalence tolerance;
 - exact soft-tissue Mt surface definition;
+- Mt membership on the FR-51 inferior boundary;
 - candidate-family interchangeability;
 - dense continuous curve;
 - interpolation/smoothing;
@@ -58,10 +75,6 @@ That definition is useful as a reproducible lateral-chin comparison reference, b
 
 ## Consequence
 
-The blocker changes from:
+The current state is:
 
-`no structured endpoint candidate comparison`
-
-to:
-
-`Menton-side is the strongest currently reproducible acquisition candidate; soft-tissue Mt remains a competing chin-region candidate pending an explicit surface definition; no final endpoint is selected`.
+`Menton-side is the strongest currently reproducible acquisition candidate; soft-tissue Mt remains a chin-region-only candidate pending both an explicit surface definition and direct inferior-boundary membership evidence; no final endpoint is selected`.

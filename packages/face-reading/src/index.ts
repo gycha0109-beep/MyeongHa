@@ -9,6 +9,7 @@ export * from './dige-chin-contour-evidence-bridge-fr49.js';
 export * from './provider-independent-chin-contour-geometry-fr50.js';
 export * from './chin-inferior-contour-scope-adjudication-fr51.js';
 export * from './chin-contour-endpoint-candidate-admission-fr52.js';
+export * from './soft-tissue-mental-tubercle-definition-gap-fr53.js';
 export * from './menton-dataset-intake-frdata01.js';
 export * from './image-byte-dimensions-frdata02.js';
 export * from './browser-image-decode-frdata03.js';

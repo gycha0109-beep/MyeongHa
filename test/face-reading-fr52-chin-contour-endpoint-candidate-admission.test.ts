@@ -31,6 +31,7 @@ describe('FR-52 chin contour endpoint candidate admission', () => {
   it('admits three distinct endpoint candidate families without selecting a final endpoint pair', () => {
     const authority = validateChinContourEndpointCandidateAuthorityFR52();
     expect(authority).toBe(CHIN_CONTOUR_ENDPOINT_CANDIDATE_AUTHORITY_FR52);
+    expect(authority.authorityVersion).toBe('0.1.1');
     expect(authority.candidateAdmissions.map((entry) => entry.candidateKey)).toEqual([
       'bilateral_menton_side',
       'bilateral_soft_tissue_mental_tubercle',
@@ -52,15 +53,20 @@ describe('FR-52 chin contour endpoint candidate admission', () => {
     expect(mentonSide.exactFR35EndpointEstablished).toBe(false);
   });
 
-  it('keeps soft-tissue mental tubercle as a chin-region candidate until an exact surface definition is sourced', () => {
-    const candidate = CHIN_CONTOUR_ENDPOINT_CANDIDATE_AUTHORITY_FR52.candidateAdmissions[1]!;
+  it('keeps soft-tissue mental tubercle as a chin-region candidate without claiming FR-51 inferior-boundary compatibility', () => {
+    const authority = CHIN_CONTOUR_ENDPOINT_CANDIDATE_AUTHORITY_FR52;
+    const candidate = authority.candidateAdmissions[1]!;
+    const evidence = authority.evidence.filter((entry) => entry.candidateKey === 'bilateral_soft_tissue_mental_tubercle');
     expect(candidate.candidateKey).toBe('bilateral_soft_tissue_mental_tubercle');
     expect(candidate.admissionState).toBe('admitted_chin_region_candidate_exact_surface_definition_missing');
     expect(candidate.softTissueSurfaceLandmark).toBe(true);
     expect(candidate.explicitOperationalDefinitionAvailable).toBe(false);
-    expect(candidate.scopeCompatibleWithFR51).toBe(true);
+    expect(candidate.scopeCompatibleWithFR51).toBe(false);
     expect(candidate.researchAcquisitionExecutable).toBe(false);
     expect(candidate.exactFR35EndpointEstablished).toBe(false);
+    expect(evidence).toHaveLength(2);
+    expect(evidence.every((entry) => entry.supports.chinRegionAssociation)).toBe(true);
+    expect(evidence.every((entry) => entry.supports.centralInferiorScopeCompatibility === false)).toBe(true);
   });
 
   it('keeps mental-tubercle-anterior as a non-equivalent lateral-bulge comparison reference only', () => {
@@ -106,6 +112,16 @@ describe('FR-52 chin contour endpoint candidate admission', () => {
     expect(authority.endpointSelectionRule).toBeNull();
     expect(authority.endpointEquivalenceTolerance).toBeNull();
     expect(authority.mentalTubercleSurfaceDefinitionRule).toBeNull();
+  });
+
+  it('rejects mutation that silently restores unsupported soft-tissue Mt scope compatibility', () => {
+    const admissions = [...CHIN_CONTOUR_ENDPOINT_CANDIDATE_AUTHORITY_FR52.candidateAdmissions];
+    admissions[1] = { ...admissions[1]!, scopeCompatibleWithFR51: true };
+    const mutated = {
+      ...CHIN_CONTOUR_ENDPOINT_CANDIDATE_AUTHORITY_FR52,
+      candidateAdmissions: admissions,
+    } as unknown as ChinContourEndpointCandidateAuthorityFR52V1;
+    expect(() => validateChinContourEndpointCandidateAuthorityFR52(mutated)).toThrow(/mental-tubercle candidate boundary drift/u);
   });
 
   it('rejects mutation that silently turns research priority into endpoint authority', () => {
