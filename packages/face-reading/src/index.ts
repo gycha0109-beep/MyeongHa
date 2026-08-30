@@ -18,6 +18,7 @@ export * from './independent-face-adjudication-frdata10.js';
 export * from './adjudicated-provider-raw-join-frdata11.js';
 export * from './metric-eligibility-readiness-frdata12.js';
 export * from './provider-detection-construct-validation-frdata13.js';
+export * from './human-face-construct-reference-admission-frdata14.js';
 export * from './contracts.js';
 export * from './controlled-capture-attestation-fr21b.js';
 export * from './direct-source-verification.js';
