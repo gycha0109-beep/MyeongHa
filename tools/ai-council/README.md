@@ -34,6 +34,8 @@ npm run start:room
 - 화면에서 호출할 Agent만 선택
 - 현재 기본 모델은 `gpt-5-mini`
 
+기존 `COUNCIL_MAX_OUTPUT_TOKENS`가 이미 설정되어 있으면 호환을 위해 모든 Agent에 그 값을 적용합니다. Agent별 분리 상한을 쓰려면 위의 `COUNCIL_*_MAX_OUTPUT_TOKENS`를 추가하면 됩니다.
+
 ## 4. 회의 품질 테스트
 
 프로토콜 구조 검증은 API 비용 없이 실행합니다.

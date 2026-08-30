@@ -54,7 +54,7 @@ for (const testCase of cases) {
   const integrationHeadings = ['AGREED', 'CONFLICT', 'REQUIREMENTS', 'DECISION CANDIDATE', 'FAILURE CASES', 'METRICS / VALIDATION', 'OPEN', 'NEXT TEST'];
   const integrationPass = Boolean(integration) && integrationHeadings.every((heading) => integration.content.includes(heading));
   console.log(`\n${testCase.name}`);
-  console.log(`status=${meeting.status} calls=${meeting.calls} round2_protocol=${roundTwoPass ? 'PASS' : 'FAIL'} integration_sections=${integrationPass ? 'PASS' : 'FAIL'}`);
+  console.log(`status=${meeting.status} calls=${meeting.calls} round2_protocol=${roundTwoPass ? 'PASS' : 'FAIL'} integration_sections=${integrationPass ? 'PASS' : 'FAIL'}${meeting.error ? ` error=${meeting.error}` : ''}`);
   for (const item of meeting.messages) {
     if (item.agent === 'user') continue;
     console.log(`\n[${item.label} / Round ${item.round}]\n${item.content}`);
