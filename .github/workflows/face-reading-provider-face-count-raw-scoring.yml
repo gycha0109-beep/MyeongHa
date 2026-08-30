@@ -1,0 +1,79 @@
+name: Face Reading Provider Face Count Raw Scoring
+
+on:
+  pull_request:
+    paths:
+      - 'packages/face-reading/src/provider-face-count-raw-scoring-frdata08.ts'
+      - 'packages/face-reading/src/independent-face-ground-truth-frdata07.ts'
+      - 'packages/face-reading/src/provider-face-candidate-observations-frdata06.ts'
+      - 'packages/face-reading/src/index.ts'
+      - 'test/face-reading-fr-data08-provider-face-count-raw-scoring.test.ts'
+      - 'docs/FACE_READING_FR_DATA08_PROVIDER_FACE_COUNT_RAW_SCORING.md'
+      - '.github/workflows/face-reading-provider-face-count-raw-scoring.yml'
+  workflow_dispatch:
+
+jobs:
+  fr-data08-provider-face-count-raw-scoring:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install exact workspace dependencies
+        run: npm install --ignore-scripts
+
+      - name: Build MyeongHa runtime
+        run: npm run build
+
+      - name: Run FR-DATA-08 contract tests
+        run: npx vitest run test/face-reading-fr-data08-provider-face-count-raw-scoring.test.ts
+
+      - name: Verify compiled authority boundary
+        run: |
+          node --input-type=module <<'NODE'
+          import {
+            PROVIDER_FACE_COUNT_RAW_SCORING_AUTHORITY_FRDATA08,
+            assertProviderFaceCountRawScoringReadyForPromotionFRData08,
+          } from './dist/packages/face-reading/src/index.js';
+
+          const authority = PROVIDER_FACE_COUNT_RAW_SCORING_AUTHORITY_FRDATA08;
+          const protocol = authority.protocol;
+          if (
+            authority.schemaVersion !== 'fr-data08-v1' ||
+            authority.authorityState !== 'raw_scoring_contract_defined_no_reviewed_empirical_validation' ||
+            protocol.groundTruthSchemaRef !== 'fr-data07-independent-face-ground-truth-v1' ||
+            protocol.providerObservationSchemaRef !== 'fr-data06-provider-face-candidate-observation-v1' ||
+            protocol.scoringUnit !== 'annotation_provider_pair' ||
+            protocol.captureConsensusLabelDerived !== false ||
+            protocol.annotatorVotesCollapsed !== false ||
+            protocol.indeterminateLabelIncludedAsOwnRawRow !== true ||
+            protocol.indeterminateLabelMayBeCoerced !== false ||
+            protocol.providerCandidateCountInterpretedAsHumanFaceCount !== false ||
+            protocol.truePositiveFalsePositiveTerminologyAuthorized !== false ||
+            protocol.sensitivitySpecificityComputationAuthorized !== false ||
+            protocol.providerDecisionThresholdDefined !== false ||
+            protocol.interAnnotatorAgreementThresholdDefined !== false ||
+            protocol.acceptableFalsePositiveRateDefined !== false ||
+            protocol.acceptableFalseNegativeRateDefined !== false ||
+            protocol.holdoutMayTuneLabels !== false ||
+            protocol.holdoutMayTuneDecisionThresholds !== false
+          ) {
+            throw new Error(`FR-DATA-08 authority/protocol drift: ${JSON.stringify(authority)}`);
+          }
+
+          if (Object.values(authority.authorityBoundary).some((value) => value !== false)) {
+            throw new Error(`FR-DATA-08 authority boundary promoted unexpectedly: ${JSON.stringify(authority.authorityBoundary)}`);
+          }
+
+          let promotionBlocked = false;
+          try {
+            assertProviderFaceCountRawScoringReadyForPromotionFRData08();
+          } catch {
+            promotionBlocked = true;
+          }
+          if (!promotionBlocked) throw new Error('FR-DATA-08 promotion assertion unexpectedly succeeded.');
+
+          console.log('FR_DATA08_PROVIDER_FACE_COUNT_RAW_SCORING_CONTRACT_PASS');
+          NODE
