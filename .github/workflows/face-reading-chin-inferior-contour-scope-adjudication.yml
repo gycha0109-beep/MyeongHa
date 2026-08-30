@@ -1,0 +1,95 @@
+name: Face Reading Chin Inferior Contour Scope Adjudication
+
+on:
+  pull_request:
+    paths:
+      - 'packages/face-reading/**'
+      - 'test/face-reading-fr51-chin-inferior-contour-scope-adjudication.test.ts'
+      - 'docs/FACE_READING_FR51_CHIN_INFERIOR_CONTOUR_SCOPE_ADJUDICATION_V0.1.md'
+      - 'docs/FACE_READING_FR51_AUTHORITY_DECISION_V0.1.md'
+      - '.github/workflows/face-reading-chin-inferior-contour-scope-adjudication.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'packages/face-reading/**'
+      - 'test/face-reading-fr51-chin-inferior-contour-scope-adjudication.test.ts'
+      - 'docs/FACE_READING_FR51_CHIN_INFERIOR_CONTOUR_SCOPE_ADJUDICATION_V0.1.md'
+      - 'docs/FACE_READING_FR51_AUTHORITY_DECISION_V0.1.md'
+      - '.github/workflows/face-reading-chin-inferior-contour-scope-adjudication.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  fr51-chin-inferior-contour-scope-adjudication:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install exact workspace dependencies
+        run: npm install --ignore-scripts
+      - name: Build MyeongHa runtime
+        run: npm run build
+      - name: Run FR-51 scope adjudication tests
+        run: npx vitest run test/face-reading-fr51-chin-inferior-contour-scope-adjudication.test.ts
+      - name: Verify compiled FR-51 selects only the scope class and stays fail-closed
+        run: |
+          node --input-type=module <<'NODE'
+          import {
+            CHIN_INFERIOR_CONTOUR_SCOPE_AUTHORITY_FR51,
+            assessChinInferiorContourScopeReadinessFR51,
+            assertChinInferiorContourScopeReadyForProductionFR51,
+            deriveScopeCompatibleCentralChinScaffoldFR51,
+            validateChinInferiorContourScopeAuthorityFR51,
+          } from './dist/packages/face-reading/src/index.js';
+
+          validateChinInferiorContourScopeAuthorityFR51();
+          const authority = CHIN_INFERIOR_CONTOUR_SCOPE_AUTHORITY_FR51;
+          const readiness = assessChinInferiorContourScopeReadinessFR51();
+          if (authority.scopeDecision.selectedScopeClass !== 'central_inferior_soft_tissue_chin_boundary') process.exit(1);
+          if (!authority.scopeDecision.broaderOtobasionToMentonLowerJawlineRejectedAsFR35ConsumerScope) process.exit(1);
+          if (!authority.scopeDecision.softTissueMentonRequiredAsInferiorMidlineAnchor) process.exit(1);
+          if (authority.scopeDecision.fr50MentonSidePointsAreExactFR35Endpoints) process.exit(1);
+          if (authority.scopeDecision.exactLateralEndpointRuleEstablished) process.exit(1);
+          if (authority.scopeDecision.denseContinuousCurveEstablished) process.exit(1);
+          if (authority.scopeDecision.providerMappingEstablished) process.exit(1);
+          if (!readiness.fr35AnatomicalScopeClassReady) process.exit(1);
+          if (readiness.exactLateralEndpointRuleReady || readiness.denseContinuousCurveReady) process.exit(1);
+          if (readiness.providerMappingReady || readiness.productionGeometryReady) process.exit(1);
+          if (!Object.values(authority.authorityBoundary).every((value) => value === false)) process.exit(1);
+          if (Object.values(authority.researchProtocol).filter((value) => value === null).length !== 6) process.exit(1);
+
+          const candidate = deriveScopeCompatibleCentralChinScaffoldFR51({
+            schemaVersion: 'fr50-independent-central-chin-scaffold-v1',
+            subjectId: 'workflow-subject',
+            captureId: 'workflow-capture',
+            annotatorId: 'workflow-annotator',
+            coordinateFrame: 'normalized_image_2d',
+            leftCheilion: { x: 0.34, y: 0.61 },
+            leftMentonSide: { x: 0.34, y: 0.82 },
+            softTissueMenton: { x: 0.5, y: 0.85 },
+            rightMentonSide: { x: 0.66, y: 0.82 },
+            rightCheilion: { x: 0.66, y: 0.61 },
+            providerOutputVisibleDuringAnnotation: false,
+            annotationFrozenBeforeProviderScoring: true,
+            traditionalLabelVisibleDuringAnnotation: false,
+          });
+          if (candidate.geometry.points.length !== 3) process.exit(1);
+          if (candidate.exactFR35CurveAuthorized) process.exit(1);
+          if (candidate.exactLateralEndpointsAuthorized) process.exit(1);
+          if (candidate.providerMappingAuthorized) process.exit(1);
+          if (candidate.traditionalDigeEquivalenceAuthorized) process.exit(1);
+          if (candidate.productionGeometryAuthorized) process.exit(1);
+
+          let blocked = false;
+          try {
+            assertChinInferiorContourScopeReadyForProductionFR51();
+          } catch {
+            blocked = true;
+          }
+          if (!blocked) process.exit(1);
+          NODE

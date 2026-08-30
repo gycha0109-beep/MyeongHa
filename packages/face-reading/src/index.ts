@@ -7,6 +7,7 @@ export * from './chin-inferior-validation-dataset-fr47.js';
 export * from './chin-inferior-preregistered-scoring-fr48.js';
 export * from './dige-chin-contour-evidence-bridge-fr49.js';
 export * from './provider-independent-chin-contour-geometry-fr50.js';
+export * from './chin-inferior-contour-scope-adjudication-fr51.js';
 export * from './menton-dataset-intake-frdata01.js';
 export * from './image-byte-dimensions-frdata02.js';
 export * from './browser-image-decode-frdata03.js';
