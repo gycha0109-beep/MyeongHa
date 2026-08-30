@@ -4,7 +4,7 @@ import {
   type CapabilityGateResult,
 } from '../../../packages/domain/src/index.js';
 
-export const API_FOUNDATION_VERSION = 'myeongha-api-foundation-v0.19' as const;
+export const API_FOUNDATION_VERSION = 'myeongha-api-foundation-v0.20' as const;
 
 export function authorizePlannedCapability(
   input: CapabilityGateInput,
@@ -248,3 +248,17 @@ export {
   type EntitlementsReadResponseV1,
   type GetEntitlementsInputV1,
 } from './entitlements-read.js';
+
+export {
+  ACCOUNT_DELETION_START_AUTHORITY_BINDING_V1,
+  AccountDeletionStartAuthorityPortErrorV1,
+  startAccountDeletion,
+  type AccountDeletionCommandIdPortV1,
+  type AccountDeletionJobStatusV1,
+  type AccountDeletionReauthenticationPortV1,
+  type AccountDeletionStartAuthorityFailureCodeV1,
+  type AccountDeletionStartAuthorityPortV1,
+  type AccountDeletionStartAuthorityRowV1,
+  type StartAccountDeletionInputV1,
+  type StartAccountDeletionResponseV1,
+} from './account-deletion-start-command.js';
