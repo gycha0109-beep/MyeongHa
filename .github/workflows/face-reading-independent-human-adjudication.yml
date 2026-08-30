@@ -1,0 +1,77 @@
+name: Face Reading Independent Human Adjudication
+
+on:
+  pull_request:
+    paths:
+      - 'packages/face-reading/src/independent-face-adjudication-frdata10.ts'
+      - 'packages/face-reading/src/independent-face-ground-truth-frdata07.ts'
+      - 'packages/face-reading/src/index.ts'
+      - 'test/face-reading-fr-data10-independent-face-adjudication.test.ts'
+      - 'docs/FACE_READING_FR_DATA10_INDEPENDENT_FACE_ADJUDICATION.md'
+      - '.github/workflows/face-reading-independent-human-adjudication.yml'
+  workflow_dispatch:
+
+jobs:
+  fr-data10-independent-human-adjudication:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install exact workspace dependencies
+        run: npm install --ignore-scripts
+
+      - name: Build MyeongHa runtime
+        run: npm run build
+
+      - name: Run FR-DATA-10 contract tests
+        run: npx vitest run test/face-reading-fr-data10-independent-face-adjudication.test.ts
+
+      - name: Verify compiled authority boundary
+        run: |
+          node --input-type=module <<'NODE'
+          import {
+            INDEPENDENT_FACE_ADJUDICATION_AUTHORITY_FRDATA10,
+            assertIndependentFaceAdjudicationReadyForPromotionFRData10,
+          } from './dist/packages/face-reading/src/index.js';
+
+          const authority = INDEPENDENT_FACE_ADJUDICATION_AUTHORITY_FRDATA10;
+          const protocol = authority.protocol;
+          if (
+            authority.schemaVersion !== 'fr-data10-v1' ||
+            authority.authorityState !== 'adjudication_contract_defined_no_reviewed_empirical_validation' ||
+            protocol.groundTruthSchemaRef !== 'fr-data07-independent-face-ground-truth-v1' ||
+            protocol.exactlyOneAdjudicationRecordPerCaptureRequired !== true ||
+            protocol.allIndependentAnnotationsForCaptureMustBeReviewed !== true ||
+            protocol.adjudicatorDistinctFromOriginalAnnotatorsRequired !== true ||
+            protocol.providerBlindAdjudicationRequired !== true ||
+            protocol.providerOutputVisibleDuringAdjudication !== false ||
+            protocol.datasetPartitionVisibleDuringAdjudication !== false ||
+            protocol.automaticMajorityRuleAllowed !== false ||
+            protocol.automaticUnanimityRuleAllowed !== false ||
+            protocol.annotationCountRuleAllowed !== false ||
+            protocol.unresolvedOutcomeMustBePreserved !== true ||
+            protocol.minimumIndependentAnnotatorsPerCapture !== null ||
+            protocol.minimumAdjudicatorsPerCapture !== null ||
+            protocol.interAnnotatorAgreementThreshold !== null ||
+            protocol.adjudicationDecisionThreshold !== null
+          ) {
+            throw new Error(`FR-DATA-10 authority/protocol drift: ${JSON.stringify(authority)}`);
+          }
+
+          if (Object.values(authority.authorityBoundary).some((value) => value !== false)) {
+            throw new Error(`FR-DATA-10 authority boundary promoted unexpectedly: ${JSON.stringify(authority.authorityBoundary)}`);
+          }
+
+          let promotionBlocked = false;
+          try {
+            assertIndependentFaceAdjudicationReadyForPromotionFRData10();
+          } catch {
+            promotionBlocked = true;
+          }
+          if (!promotionBlocked) throw new Error('FR-DATA-10 promotion assertion unexpectedly succeeded.');
+
+          console.log('FR_DATA10_INDEPENDENT_HUMAN_ADJUDICATION_CONTRACT_PASS');
+          NODE
