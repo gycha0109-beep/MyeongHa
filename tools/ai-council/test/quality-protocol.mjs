@@ -34,6 +34,8 @@ assert.match(roundTwoPrompt, /\[YOUR ROUND 1 POSITION\]/);
 assert.match(roundTwoPrompt, /\[OTHER AGENTS' ROUND 1 POSITIONS\]/);
 assert.match(roundTwoPrompt, /\[ROUND 2 TASK\]/);
 assert.match(roundTwoPrompt, /ACCEPT[\s\S]*OBJECT[\s\S]*DELTA/);
+assert.match(roundTwoPrompt, /실제로 존재하는 다른 Agent의 명시적 주장/);
+assert.match(roundTwoPrompt, /암묵적으로/);
 assert.match(buildAgentInstructions('world', 2), /ACCEPT \/ OBJECT \/ DELTA/);
 assert.equal(agents.world.maxOutputTokens, 800);
 assert.equal(agents.revenue.maxOutputTokens, 800);
@@ -64,6 +66,8 @@ assert.match(integrationPrompt, /최소 두 Agent의 실제 주장이 양립하�
 assert.match(integrationPrompt, /NONE OBSERVED IN TRANSCRIPT/);
 assert.match(integrationPrompt, /NOT RAISED IN TRANSCRIPT/);
 assert.match(integrationPrompt, /\[World \/ Round 2\]/);
+assert.match(integrationPrompt, /transcript에 없는 이분법/);
+assert.match(integrationPrompt, /반드시 한국어로 작성/);
 
 console.log('PASS Test A: Round 2 own/other-position separation and ACCEPT/OBJECT/DELTA enforcement');
 console.log('PASS Test B: Integration grounding and actual-conflict-only protocol');

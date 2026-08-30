@@ -25,7 +25,7 @@ World: 관계 몰입과 Character accessibility 관점
 Revenue: COGS / conversion / Free-Core Cannibalization 관점
 Engineering: inference cost / abuse / capacity / server-side rate control 관점
 
-가격이나 정확한 quota 숫자는 확정하지 말고 원칙만 논의한다. 모든 관점을 억지로 하나의 합의로 만들지 말고 실제 충돌은 남긴다.`,
+가격이나 정확한 quota 숫자는 확정하지 말고 원칙만 논의한다. World는 접근 가능한 관계 Core를 최대한 열어야 한다는 가장 강한 경험상 요구를 먼저 방어한다. Revenue와 Engineering은 그 요구가 비용·전환·운영 조건 없이는 성립하지 않는다는 반론을 분명히 제시한다. 모든 관점을 억지로 하나의 합의로 만들지 말고 실제 충돌은 남긴다.`,
   },
 ];
 
