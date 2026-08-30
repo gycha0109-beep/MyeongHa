@@ -137,7 +137,7 @@ function providerReport(): MentonDatasetProviderFaceCandidateObservationReportFR
     productionF6Allowed: false,
     researchCandidateAdmitted: false,
     productionGeometryAuthorized: false,
-  } as MentonDatasetProviderFaceCandidateObservationReportFRData06V1;
+  } as unknown as MentonDatasetProviderFaceCandidateObservationReportFRData06V1;
 }
 
 describe('FR-DATA-08 provider face-count raw scoring', () => {
