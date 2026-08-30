@@ -98,6 +98,7 @@ function agentFromPayload(payload) {
 
 function hardenInput(input, agentName) {
   let text = String(input || '').replace(/\[(World|Revenue|Engineering) \/ Round ([12])\]/g, '[$1 R$2]');
+  text = text.replace(/`\[Agent R1\]`\s*또는\s*`\[Agent R2\]`/g, '`[World R1]`, `[Revenue R1]`, `[Engineering R1]` 등 실제 다른 Agent 출처');
   if (text.includes('[ROUND 2 TASK]')) {
     const self = agentName ? agentName[0].toUpperCase() + agentName.slice(1) : 'Current';
     text += `\n\n[ROUND 2 SOURCE RULES]\n- ACCEPT는 다른 Agent의 실제 주장 정확히 1개만 수용하고 [World R1] 같은 구체 출처를 정확히 1개 인용하십시오. [${self} R1]/[${self} R2] 자기 Agent 인용은 금지입니다.\n- OBJECT는 다른 Agent의 실제 주장 정확히 1개를 반박/수정하고 구체 출처를 정확히 1개 인용하십시오. 반박이 없으면 정확히 NO MATERIAL OBJECTION만 작성하십시오.\n- [Agent R1], [Other Agent] 같은 익명 인용은 금지이며 존재하지 않는 집단 주장도 금지입니다.\n- DELTA는 자기 Round 1 대비 실제 변경만 쓰고 없으면 정확히 NO MATERIAL CHANGE라고 작성하십시오.`;
