@@ -4,7 +4,7 @@ import {
   type CapabilityGateResult,
 } from '../../../packages/domain/src/index.js';
 
-export const API_FOUNDATION_VERSION = 'myeongha-api-foundation-v0.18' as const;
+export const API_FOUNDATION_VERSION = 'myeongha-api-foundation-v0.19' as const;
 
 export function authorizePlannedCapability(
   input: CapabilityGateInput,
@@ -234,3 +234,17 @@ export {
   type CharacterRelationshipReadResponseV1,
   type GetCharacterRelationshipInputV1,
 } from './character-relationship-read.js';
+
+export {
+  ENTITLEMENTS_READ_AUTHORITY_BINDING_V1,
+  EntitlementsReadAuthorityPortErrorV1,
+  getEntitlements,
+  type EntitlementCurrentAuthorityRowV1,
+  type EntitlementProjectionStatusV1,
+  type EntitlementReadItemV1,
+  type EntitlementsReadAuthorityFailureCodeV1,
+  type EntitlementsReadAuthorityPortV1,
+  type EntitlementsReadClockV1,
+  type EntitlementsReadResponseV1,
+  type GetEntitlementsInputV1,
+} from './entitlements-read.js';
