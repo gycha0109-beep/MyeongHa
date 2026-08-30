@@ -1,0 +1,99 @@
+name: Face Reading Provider Detection Construct Validation
+
+on:
+  pull_request:
+    paths:
+      - 'packages/face-reading/src/provider-detection-construct-validation-frdata13.ts'
+      - 'packages/face-reading/src/metric-eligibility-readiness-frdata12.ts'
+      - 'packages/face-reading/src/adjudicated-provider-raw-join-frdata11.ts'
+      - 'packages/face-reading/src/independent-face-adjudication-frdata10.ts'
+      - 'packages/face-reading/src/provider-run-identity-binding-frdata09.ts'
+      - 'packages/face-reading/src/independent-face-ground-truth-frdata07.ts'
+      - 'packages/face-reading/src/provider-face-candidate-observations-frdata06.ts'
+      - 'packages/face-reading/src/index.ts'
+      - 'test/face-reading-fr-data13-*.test.ts'
+      - 'docs/FACE_READING_FR_DATA13_PROVIDER_DETECTION_CONSTRUCT_VALIDATION.md'
+      - '.github/workflows/face-reading-provider-detection-construct-validation.yml'
+  workflow_dispatch:
+
+jobs:
+  fr-data13-provider-detection-construct-validation:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install exact workspace dependencies
+        run: npm install --ignore-scripts
+
+      - name: Build MyeongHa runtime
+        run: npm run build
+
+      - name: Run FR-DATA-13 contract tests
+        run: npx vitest run test/face-reading-fr-data13-*.test.ts
+
+      - name: Verify compiled construct-validation authority boundary
+        run: |
+          node --input-type=module <<'NODE'
+          import {
+            PROVIDER_DETECTION_CONSTRUCT_VALIDATION_AUTHORITY_FRDATA13,
+            assertProviderDetectionConstructValidationReadyForPromotionFRData13,
+          } from './dist/packages/face-reading/src/index.js';
+
+          const authority = PROVIDER_DETECTION_CONSTRUCT_VALIDATION_AUTHORITY_FRDATA13;
+          const protocol = authority.protocol;
+
+          if (
+            authority.schemaVersion !== 'fr-data13-v1' ||
+            authority.authorityState !== 'construct_validation_protocol_defined_no_reviewed_empirical_validation' ||
+            protocol.upstreamMetricReadinessSchemaRef !== 'fr-data12-metric-eligibility-readiness-v1' ||
+            protocol.providerObservationSchemaRef !== 'fr-data06-provider-face-candidate-observation-v1' ||
+            protocol.providerRuntimePackageVersion !== '0.10.35' ||
+            protocol.configuredNumFaces !== 1 ||
+            protocol.configuredProviderCandidateCountRange[0] !== 0 ||
+            protocol.configuredProviderCandidateCountRange[1] !== 1 ||
+            protocol.providerCandidateCountMayDefineHumanFaceCount !== false ||
+            protocol.zeroProviderCandidatesMeansNoHumanFace !== false ||
+            protocol.oneProviderCandidateMeansOneHumanFace !== false ||
+            protocol.exactMultipleHumanFaceCountRepresentableByCandidateCountAloneUnderNumFacesOne !== false ||
+            protocol.exactHumanFaceCountConstructMayBeClaimedFromCandidateCountAlone !== false ||
+            protocol.binaryFacePresenceTaskMayBeAssumed !== false ||
+            protocol.exactSingleHumanFaceTaskMayBeAssumed !== false ||
+            protocol.exactHumanFaceCountTaskMayBeAssumed !== false ||
+            protocol.indeterminateMayBeSilentlyExcluded !== false ||
+            protocol.unresolvedMayBeSilentlyExcluded !== false ||
+            protocol.multipleHumanFacesMayBeSilentlyCollapsed !== false ||
+            protocol.currentFRData11HoldoutMayServeAsFuturePreregisteredConstructValidationHoldout !== false ||
+            protocol.newUnseenValidationDatasetRequiredAfterProtocolFreeze !== true ||
+            protocol.acceptanceCriteriaMayBeDerivedFromObservedProviderPerformance !== false ||
+            protocol.syntheticFixturesMayValidateProviderConstruct !== false ||
+            protocol.minimumValidationCaptures !== null ||
+            protocol.minimumCapturesPerConstructStratum !== null ||
+            protocol.minimumIndependentReviewers !== null ||
+            protocol.acceptanceThreshold !== null ||
+            protocol.acceptableFalsePositiveRate !== null ||
+            protocol.acceptableFalseNegativeRate !== null ||
+            protocol.classificationMetricsAuthorized !== false ||
+            protocol.providerDetectionConstructValidityAuthorized !== false
+          ) {
+            throw new Error(`FR-DATA-13 authority/protocol drift: ${JSON.stringify(authority)}`);
+          }
+
+          if (Object.values(authority.authorityBoundary).some((value) => value !== false)) {
+            throw new Error(`FR-DATA-13 authority boundary promoted unexpectedly: ${JSON.stringify(authority.authorityBoundary)}`);
+          }
+
+          let promotionBlocked = false;
+          try {
+            assertProviderDetectionConstructValidationReadyForPromotionFRData13();
+          } catch {
+            promotionBlocked = true;
+          }
+          if (!promotionBlocked) {
+            throw new Error('FR-DATA-13 promotion assertion unexpectedly succeeded.');
+          }
+
+          console.log('FR_DATA13_PROVIDER_DETECTION_CONSTRUCT_VALIDATION_CONTRACT_PASS');
+          NODE
