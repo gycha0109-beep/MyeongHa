@@ -15,7 +15,8 @@ export type MetricEligibilityBlockerFRData12V1 =
   | 'explicit_provider_output_metric_roles'
   | 'explicit_outcome_exclusion_policy'
   | 'explicit_metric_denominator_policy'
-  | 'evaluation_policy_frozen_before_holdout_inspection';
+  | 'evaluation_policy_frozen_before_holdout_inspection'
+  | 'new_unseen_holdout_after_policy_freeze';
 
 export interface MetricEligibilityReadinessProtocolFRData12V1 {
   readonly rawJoinSchemaRef: 'fr-data11-adjudicated-provider-raw-join-v1';
@@ -35,6 +36,9 @@ export interface MetricEligibilityReadinessProtocolFRData12V1 {
   readonly oneProviderCandidateMayBeAssumedPositive: false;
   readonly calibrationPerformanceMayDefineEvaluationSemantics: false;
   readonly holdoutPerformanceMayDefineOrTuneEvaluationSemantics: false;
+  readonly frData11MaterializesHoldoutOutcomeProviderPairing: true;
+  readonly materializedHoldoutMayServeAsFuturePreregisteredConfirmatoryHoldout: false;
+  readonly newUnseenHoldoutRequiredAfterPolicyFreezeForConfirmatoryMetrics: true;
   readonly reviewedGroundTruthAuthorityRequiredForMetricAuthorization: true;
   readonly providerDetectionConstructValidityRequiredForMetricAuthorization: true;
   readonly providerCandidateHumanIdentityRequiredForMetricAuthorization: true;
@@ -64,6 +68,9 @@ export interface MetricEligibilityReadinessReportFRData12V1 {
   readonly rawCrossTabPreservedAsNonConfusionMatrix: true;
   readonly indeterminatePreserved: true;
   readonly unresolvedPreserved: true;
+  readonly holdoutOutcomeProviderPairingMaterialized: true;
+  readonly currentHoldoutEligibleAsFuturePolicyPreregisteredConfirmatoryHoldout: false;
+  readonly newUnseenHoldoutRequiredAfterPolicyFreezeForConfirmatoryMetrics: true;
   readonly metricReadinessState: 'blocked_missing_reviewed_semantic_and_empirical_authority';
   readonly blockedPrerequisites: readonly MetricEligibilityBlockerFRData12V1[];
   readonly reviewedCaptureGroundTruthAuthorityValidated: false;
@@ -126,6 +133,7 @@ export interface MetricEligibilityReadinessAuthorityFRData12V1 {
     readonly unresolvedMayBeExcludedWithoutExplicitPolicy: false;
     readonly calibrationDataMayDefineMetricSemantics: false;
     readonly holdoutDataMayDefineMetricSemantics: false;
+    readonly materializedHoldoutMayBeReclassifiedAsPreregisteredConfirmatoryHoldout: false;
     readonly rawCrossTabMayBeCalledConfusionMatrix: false;
     readonly readinessAssessmentMayAuthorizeClassificationMetrics: false;
     readonly facePresenceVerified: false;
@@ -148,6 +156,7 @@ const BLOCKERS = Object.freeze([
   'explicit_outcome_exclusion_policy',
   'explicit_metric_denominator_policy',
   'evaluation_policy_frozen_before_holdout_inspection',
+  'new_unseen_holdout_after_policy_freeze',
 ] as const satisfies readonly MetricEligibilityBlockerFRData12V1[]);
 
 export const METRIC_ELIGIBILITY_READINESS_AUTHORITY_FRDATA12:
@@ -174,6 +183,9 @@ MetricEligibilityReadinessAuthorityFRData12V1 = Object.freeze({
     oneProviderCandidateMayBeAssumedPositive: false as const,
     calibrationPerformanceMayDefineEvaluationSemantics: false as const,
     holdoutPerformanceMayDefineOrTuneEvaluationSemantics: false as const,
+    frData11MaterializesHoldoutOutcomeProviderPairing: true as const,
+    materializedHoldoutMayServeAsFuturePreregisteredConfirmatoryHoldout: false as const,
+    newUnseenHoldoutRequiredAfterPolicyFreezeForConfirmatoryMetrics: true as const,
     reviewedGroundTruthAuthorityRequiredForMetricAuthorization: true as const,
     providerDetectionConstructValidityRequiredForMetricAuthorization: true as const,
     providerCandidateHumanIdentityRequiredForMetricAuthorization: true as const,
@@ -197,6 +209,7 @@ MetricEligibilityReadinessAuthorityFRData12V1 = Object.freeze({
     unresolvedMayBeExcludedWithoutExplicitPolicy: false as const,
     calibrationDataMayDefineMetricSemantics: false as const,
     holdoutDataMayDefineMetricSemantics: false as const,
+    materializedHoldoutMayBeReclassifiedAsPreregisteredConfirmatoryHoldout: false as const,
     rawCrossTabMayBeCalledConfusionMatrix: false as const,
     readinessAssessmentMayAuthorizeClassificationMetrics: false as const,
     facePresenceVerified: false as const,
@@ -239,6 +252,9 @@ function validateAuthority(): MetricEligibilityReadinessAuthorityFRData12V1 {
     protocol.oneProviderCandidateMayBeAssumedPositive !== false ||
     protocol.calibrationPerformanceMayDefineEvaluationSemantics !== false ||
     protocol.holdoutPerformanceMayDefineOrTuneEvaluationSemantics !== false ||
+    protocol.frData11MaterializesHoldoutOutcomeProviderPairing !== true ||
+    protocol.materializedHoldoutMayServeAsFuturePreregisteredConfirmatoryHoldout !== false ||
+    protocol.newUnseenHoldoutRequiredAfterPolicyFreezeForConfirmatoryMetrics !== true ||
     protocol.reviewedGroundTruthAuthorityRequiredForMetricAuthorization !== true ||
     protocol.providerDetectionConstructValidityRequiredForMetricAuthorization !== true ||
     protocol.providerCandidateHumanIdentityRequiredForMetricAuthorization !== true ||
@@ -299,6 +315,9 @@ export function buildMetricEligibilityReadinessReportFRData12(
   ) fail('FR-DATA-11 semantic/metric authority must remain fail-closed before FR-DATA-12 readiness assessment.');
 
   if (rawJoin.crossTab.length !== 5) fail('FR-DATA-11 raw cross-tab must preserve all five adjudication outcomes.');
+  if (!rawJoin.rows.some((row) => row.partition === 'holdout')) {
+    fail('FR-DATA-11 must contain a holdout partition before FR-DATA-12 can record holdout materialization status.');
+  }
 
   return Object.freeze({
     schemaVersion: 'fr-data12-metric-eligibility-readiness-v1' as const,
@@ -314,6 +333,9 @@ export function buildMetricEligibilityReadinessReportFRData12(
     rawCrossTabPreservedAsNonConfusionMatrix: true as const,
     indeterminatePreserved: true as const,
     unresolvedPreserved: true as const,
+    holdoutOutcomeProviderPairingMaterialized: true as const,
+    currentHoldoutEligibleAsFuturePolicyPreregisteredConfirmatoryHoldout: false as const,
+    newUnseenHoldoutRequiredAfterPolicyFreezeForConfirmatoryMetrics: true as const,
     metricReadinessState: 'blocked_missing_reviewed_semantic_and_empirical_authority' as const,
     blockedPrerequisites: BLOCKERS,
     reviewedCaptureGroundTruthAuthorityValidated: false as const,
@@ -365,6 +387,6 @@ export function buildMetricEligibilityReadinessReportFRData12(
 export function assertMetricEligibilityReadyForPromotionFRData12(): never {
   validateAuthority();
   return fail(
-    'FR-DATA-12 only records why metric semantics are blocked. It does not define positive/negative roles, exclusions, denominators, reviewed ground-truth authority, provider construct validity, classification metrics, thresholds, anatomy, traditional semantics, or production geometry.',
+    'FR-DATA-12 only records why metric semantics are blocked. The FR-DATA-11 holdout outcome/provider pairing is already materialized, so future confirmatory metrics also require a new unseen holdout after policy freeze. FR-DATA-12 does not define positive/negative roles, exclusions, denominators, reviewed ground-truth authority, provider construct validity, classification metrics, thresholds, anatomy, traditional semantics, or production geometry.',
   );
 }
