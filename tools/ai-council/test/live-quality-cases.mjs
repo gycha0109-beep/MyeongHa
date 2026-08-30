@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { runMeeting } from '../room-server.mjs';
+import { runMeeting, validateIntegrationOutput, validateRoundTwoOutput } from '../room-server.mjs';
 
 const cases = [
   {
@@ -45,19 +45,29 @@ function createMeeting(topic) {
   };
 }
 
+function passes(validation) {
+  try {
+    validation();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 for (const testCase of cases) {
   const meeting = createMeeting(testCase.topic);
   await runMeeting(meeting);
-  const roundTwo = meeting.messages.filter((message) => message.round === 2);
+  const roundTwo = meeting.messages.filter((message) => message.round === 2 && ['world', 'revenue', 'engineering'].includes(message.agent));
   const integration = meeting.messages.find((message) => message.agent === 'integration');
-  const roundTwoPass = roundTwo.length === 3 && roundTwo.every((message) => /(^|\n)\s*ACCEPT\b/i.test(message.content) && /(^|\n)\s*OBJECT\b/i.test(message.content) && /(^|\n)\s*DELTA\b/i.test(message.content));
-  const integrationHeadings = ['AGREED', 'CONFLICT', 'REQUIREMENTS', 'DECISION CANDIDATE', 'FAILURE CASES', 'METRICS / VALIDATION', 'OPEN', 'NEXT TEST'];
-  const integrationPass = Boolean(integration) && integrationHeadings.every((heading) => integration.content.includes(heading));
+  const roundTwoPass = roundTwo.length === 3 && roundTwo.every((message) => passes(() => validateRoundTwoOutput(message.agent, message.content)));
+  const integrationPass = Boolean(integration) && passes(() => validateIntegrationOutput(integration.content));
+  const sevenCallsPass = meeting.calls === 7;
+
   console.log(`\n${testCase.name}`);
   console.log(`status=${meeting.status} calls=${meeting.calls} round2_protocol=${roundTwoPass ? 'PASS' : 'FAIL'} integration_sections=${integrationPass ? 'PASS' : 'FAIL'}${meeting.error ? ` error=${meeting.error}` : ''}`);
   for (const item of meeting.messages) {
     if (item.agent === 'user') continue;
     console.log(`\n[${item.label} / Round ${item.round}]\n${item.content}`);
   }
-  if (meeting.status !== 'completed' || !roundTwoPass || !integrationPass) process.exitCode = 1;
+  if (meeting.status !== 'completed' || !sevenCallsPass || !roundTwoPass || !integrationPass) process.exitCode = 1;
 }
