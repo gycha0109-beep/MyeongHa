@@ -240,6 +240,9 @@ describe('FR-DATA-12 metric eligibility readiness', () => {
     expect(report.upstreamRawCrossTab).toHaveLength(5);
     expect(report.upstreamRawCrossTab.find((row) => row.adjudicationOutcome === 'indeterminate')?.total).toBe(1);
     expect(report.upstreamRawCrossTab.find((row) => row.adjudicationOutcome === 'unresolved')?.total).toBe(1);
+    expect(report.holdoutOutcomeProviderPairingMaterialized).toBe(true);
+    expect(report.currentHoldoutEligibleAsFuturePolicyPreregisteredConfirmatoryHoldout).toBe(false);
+    expect(report.newUnseenHoldoutRequiredAfterPolicyFreezeForConfirmatoryMetrics).toBe(true);
     expect(report.classificationMetricsAuthorized).toBe(false);
     expect(report.confusionMatrixAuthorized).toBe(false);
   });
@@ -276,6 +279,7 @@ describe('FR-DATA-12 metric eligibility readiness', () => {
       'explicit_outcome_exclusion_policy',
       'explicit_metric_denominator_policy',
       'evaluation_policy_frozen_before_holdout_inspection',
+      'new_unseen_holdout_after_policy_freeze',
     ]);
     expect(report.reviewedCaptureGroundTruthAuthorityValidated).toBe(false);
     expect(report.providerDetectionConstructValidityValidated).toBe(false);
@@ -295,6 +299,9 @@ describe('FR-DATA-12 metric eligibility readiness', () => {
     expect(protocol.oneProviderCandidateMayBeAssumedPositive).toBe(false);
     expect(protocol.calibrationPerformanceMayDefineEvaluationSemantics).toBe(false);
     expect(protocol.holdoutPerformanceMayDefineOrTuneEvaluationSemantics).toBe(false);
+    expect(protocol.frData11MaterializesHoldoutOutcomeProviderPairing).toBe(true);
+    expect(protocol.materializedHoldoutMayServeAsFuturePreregisteredConfirmatoryHoldout).toBe(false);
+    expect(protocol.newUnseenHoldoutRequiredAfterPolicyFreezeForConfirmatoryMetrics).toBe(true);
   });
 
   it('does not invent sample-size, acceptance, or decision thresholds', () => {
