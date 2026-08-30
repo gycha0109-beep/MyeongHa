@@ -74,7 +74,7 @@ export interface MentonSideEndpointCandidatePairFR52V1 {
 export interface ChinContourEndpointCandidateAuthorityFR52V1 {
   readonly schemaVersion: 'fr52-v1';
   readonly authorityRef: 'authority.face.chin_contour_endpoint_candidate_admission.fr52';
-  readonly authorityVersion: '0.1.0';
+  readonly authorityVersion: '0.1.1';
   readonly authorityState: 'endpoint_candidate_families_admitted_menton_side_operationally_prioritized_final_endpoint_selection_blocked';
   readonly upstreamFR51Ref: string;
   readonly selectedScopeClass: 'central_inferior_soft_tissue_chin_boundary';
@@ -134,7 +134,7 @@ const EVIDENCE: readonly ChinContourEndpointEvidenceFR52V1[] = Object.freeze([
     year: 2022,
     sourceRef: 'DOI:10.1186/s12903-022-02179-1',
     evidenceScope: 'three_dimensional_soft_tissue_facial_landmark' as const,
-    reviewedObservation: 'The 3D facial landmark protocol defines left and right Menton-side as the point where the vertical through the corresponding Cheilion reaches the lowest point of the chin. It separately defines midline Menton and bilateral Gonion, making Menton-side the strongest currently explicit provider-independent bilateral acquisition rule near the selected central-inferior chin scope.',
+    reviewedObservation: 'The 3D facial landmark protocol defines left and right Menton-side as the point where the vertical through the corresponding Cheilion reaches the lowest point of the chin. It separately defines midline Menton and bilateral Gonion.',
     supports: Object.freeze({
       bilateralLandmarkAvailable: true,
       chinRegionAssociation: true,
@@ -155,18 +155,18 @@ const EVIDENCE: readonly ChinContourEndpointEvidenceFR52V1[] = Object.freeze([
     year: 2023,
     sourceRef: 'DOI:10.1186/s12903-023-03167-9',
     evidenceScope: 'three_dimensional_soft_tissue_chin_region_landmark' as const,
-    reviewedObservation: 'The 3D study explicitly labels soft-tissue mental tubercle (mt) as the manipulated chin landmark, while soft-tissue gonion represents mandible, Cheilion represents lip, and zygion represents cheek. This supports soft-tissue Mt as a bilateral chin-region landmark family distinct from mandibular-angle geometry.',
+    reviewedObservation: 'The 3D study labels soft-tissue mental tubercle (Mt) as a manipulated chin landmark while soft-tissue Gonion represents mandible, Cheilion represents lip, and zygion represents cheek. This supports chin-region association only.',
     supports: Object.freeze({
       bilateralLandmarkAvailable: true,
       chinRegionAssociation: true,
       explicitOperationalDefinitionAvailable: false,
       providerIndependentConstructionAvailable: false,
-      centralInferiorScopeCompatibility: true,
+      centralInferiorScopeCompatibility: false,
     }),
     doesNotSupport: Object.freeze([
-      'The article identifies and uses soft-tissue Mt but does not provide a sufficiently explicit surface landmark definition for independent reproduction in FR-52.',
+      'The article does not provide a sufficiently explicit surface-landmark definition for independent reproduction.',
+      'Chin-region association does not establish membership on the FR-51 central inferior boundary.',
       'The paper does not state that soft-tissue Mt is an inferior-contour endpoint or that it equals Menton-side.',
-      'Manipulating an Mt peripheral region for asymmetry perception does not establish an FR-35 endpoint rule.',
     ]),
   }),
   Object.freeze({
@@ -174,19 +174,19 @@ const EVIDENCE: readonly ChinContourEndpointEvidenceFR52V1[] = Object.freeze([
     candidateKey: 'bilateral_soft_tissue_mental_tubercle' as const,
     title: 'Preliminary evaluation of chin symmetry with three dimentional soft tissue spatial angle wireframe template',
     year: 2024,
-    sourceRef: 'PMCID:PMC10845189',
+    sourceRef: 'DOI:10.19723/j.issn.1671-167X.2024.01.017',
     evidenceScope: 'three_dimensional_soft_tissue_chin_region_landmark' as const,
-    reviewedObservation: 'The 3D facial-scan wireframe study uses soft-tissue mental tubercle (Mt) as a chin-region landmark together with Cheilion, Gnathion, tragus and other facial landmarks, and perturbs Mt coordinates to evaluate chin asymmetry. This corroborates Mt as a real soft-tissue chin landmark family but still does not publish an exact reproducible Mt surface definition in the reviewed text.',
+    reviewedObservation: 'The 3D facial-scan wireframe study uses soft-tissue mental tubercle (Mt) as a chin-region landmark and obtains landmarks through MeshMonk registration, but the reviewed text does not publish an independently reproducible Mt surface definition.',
     supports: Object.freeze({
       bilateralLandmarkAvailable: true,
       chinRegionAssociation: true,
       explicitOperationalDefinitionAvailable: false,
       providerIndependentConstructionAvailable: false,
-      centralInferiorScopeCompatibility: true,
+      centralInferiorScopeCompatibility: false,
     }),
     doesNotSupport: Object.freeze([
-      'Automatic Meshmonk landmark determination in the study does not supply FR-52 with an independent anatomical definition of soft-tissue Mt.',
-      'The study does not define Mt as the left/right endpoint of the inferior chin boundary.',
+      'Automatic MeshMonk landmark determination does not supply an independent anatomical definition of soft-tissue Mt.',
+      'The study does not define Mt as a point on, or endpoint of, the FR-51 inferior chin boundary.',
       'Reported asymmetry recognition performance is not imported as an endpoint-validation threshold.',
     ]),
   }),
@@ -195,9 +195,9 @@ const EVIDENCE: readonly ChinContourEndpointEvidenceFR52V1[] = Object.freeze([
     candidateKey: 'bilateral_mental_tubercle_anterior_reference' as const,
     title: 'Craniofacial soft-tissue thickness landmark definition lineage — mental tubercle anterior',
     year: 2006,
-    sourceRef: 'De Greef et al. landmark lineage; definition corroborated in PMCID:PMC10895148 and later FSTT studies',
+    sourceRef: 'De Greef et al. landmark lineage; definition corroborated in later FSTT studies',
     evidenceScope: 'craniofacial_soft_tissue_thickness_reference_landmark' as const,
-    reviewedObservation: 'The mental-tubercle-anterior reference is repeatedly defined as the most prominent point on the lateral bulge of the chin mound. This gives a reproducible bilateral lateral-chin comparison landmark, but in the cited FSTT/ultrasound lineage it functions as an underlying anatomical measurement location rather than a demonstrated soft-tissue-surface inferior-contour endpoint.',
+    reviewedObservation: 'Mental-tubercle-anterior is repeatedly defined as the most prominent point on the lateral bulge of the chin mound. This is a reproducible lateral-chin comparison reference, not a demonstrated facial-surface inferior-contour endpoint.',
     supports: Object.freeze({
       bilateralLandmarkAvailable: true,
       chinRegionAssociation: true,
@@ -206,7 +206,7 @@ const EVIDENCE: readonly ChinContourEndpointEvidenceFR52V1[] = Object.freeze([
       centralInferiorScopeCompatibility: false,
     }),
     doesNotSupport: Object.freeze([
-      'Mental tubercle anterior in the FSTT landmark lineage is not treated as equivalent to the soft-tissue Mt used in 3D facial-asymmetry studies.',
+      'Mental tubercle anterior is not established as equivalent to the soft-tissue Mt used in 3D facial-asymmetry studies.',
       'A lateral chin-mound prominence is not established as a point on the inferior chin boundary.',
       'The definition does not authorize a canonical 2D surface endpoint or provider binding.',
     ]),
@@ -236,7 +236,7 @@ const ADMISSIONS: readonly ChinContourEndpointCandidateAdmissionFR52V1[] = Objec
     ]),
     softTissueSurfaceLandmark: true,
     explicitOperationalDefinitionAvailable: false,
-    scopeCompatibleWithFR51: true,
+    scopeCompatibleWithFR51: false,
     researchAcquisitionExecutable: false,
     exactFR35EndpointEstablished: false as const,
     traditionalDigeEdgeEstablished: false as const,
@@ -261,7 +261,7 @@ const ADMISSIONS: readonly ChinContourEndpointCandidateAdmissionFR52V1[] = Objec
 export const CHIN_CONTOUR_ENDPOINT_CANDIDATE_AUTHORITY_FR52: ChinContourEndpointCandidateAuthorityFR52V1 = Object.freeze({
   schemaVersion: 'fr52-v1' as const,
   authorityRef: 'authority.face.chin_contour_endpoint_candidate_admission.fr52' as const,
-  authorityVersion: '0.1.0' as const,
+  authorityVersion: '0.1.1' as const,
   authorityState: 'endpoint_candidate_families_admitted_menton_side_operationally_prioritized_final_endpoint_selection_blocked' as const,
   upstreamFR51Ref: FR51_REF,
   selectedScopeClass: 'central_inferior_soft_tissue_chin_boundary' as const,
@@ -314,7 +314,7 @@ export function validateChinContourEndpointCandidateAuthorityFR52(
   if (
     authority.schemaVersion !== 'fr52-v1' ||
     authority.authorityRef !== 'authority.face.chin_contour_endpoint_candidate_admission.fr52' ||
-    authority.authorityVersion !== '0.1.0' ||
+    authority.authorityVersion !== '0.1.1' ||
     authority.authorityState !== 'endpoint_candidate_families_admitted_menton_side_operationally_prioritized_final_endpoint_selection_blocked' ||
     authority.upstreamFR51Ref !== FR51_REF ||
     authority.selectedScopeClass !== 'central_inferior_soft_tissue_chin_boundary'
@@ -345,7 +345,7 @@ export function validateChinContourEndpointCandidateAuthorityFR52(
     softTissueMt.admissionState !== 'admitted_chin_region_candidate_exact_surface_definition_missing' ||
     softTissueMt.softTissueSurfaceLandmark !== true ||
     softTissueMt.explicitOperationalDefinitionAvailable !== false ||
-    softTissueMt.scopeCompatibleWithFR51 !== true ||
+    softTissueMt.scopeCompatibleWithFR51 !== false ||
     softTissueMt.researchAcquisitionExecutable !== false
   ) {
     throw new FaceAuthorityValidationError('FR-52 soft-tissue mental-tubercle candidate boundary drift.');
@@ -359,6 +359,13 @@ export function validateChinContourEndpointCandidateAuthorityFR52(
     mta.researchAcquisitionExecutable !== false
   ) {
     throw new FaceAuthorityValidationError('FR-52 mental-tubercle-anterior comparison-reference boundary drift.');
+  }
+  const softTissueEvidence = authority.evidence.filter((entry) => entry.candidateKey === 'bilateral_soft_tissue_mental_tubercle');
+  if (
+    softTissueEvidence.length !== 2 ||
+    softTissueEvidence.some((entry) => entry.supports.centralInferiorScopeCompatibility !== false)
+  ) {
+    throw new FaceAuthorityValidationError('FR-52 soft-tissue Mt chin-region evidence must not imply FR-51 inferior-boundary compatibility.');
   }
   for (const candidate of authority.candidateAdmissions) {
     if (
@@ -423,8 +430,8 @@ export function assessChinContourEndpointCandidateReadinessFR52(): ChinContourEn
     productionGeometryReady: false as const,
     nextRequiredEvidence: Object.freeze([
       'Locate a peer-reviewed or standard anthropometric source that explicitly defines the soft-tissue mental tubercle surface landmark before it can be compared geometrically with Menton-side.',
+      'Treat chin-region usage as insufficient for FR-51 inferior-boundary membership until that membership is directly supported.',
       'Acquire provider-blind bilateral Menton-side annotations under the existing Zupan definition and, only if a reproducible soft-tissue Mt definition is found, paired Mt annotations on the same captures.',
-      'Do not select a final FR-35 endpoint pair until candidate-to-reference-boundary membership is directly supported; research acquisition priority is not endpoint authority.',
       'Keep mental-tubercle-anterior/FSTT landmarks separate from soft-tissue-surface Mt unless an explicit cross-representation mapping is independently validated.',
     ]),
   });

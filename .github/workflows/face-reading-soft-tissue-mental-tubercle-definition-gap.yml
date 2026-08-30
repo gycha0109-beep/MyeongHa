@@ -1,0 +1,94 @@
+name: Face Reading Soft Tissue Mental Tubercle Definition Gap
+
+on:
+  pull_request:
+    paths:
+      - 'packages/face-reading/**'
+      - 'test/face-reading-fr52-chin-contour-endpoint-candidate-admission.test.ts'
+      - 'test/face-reading-fr53-soft-tissue-mental-tubercle-definition-gap.test.ts'
+      - 'docs/FACE_READING_FR52_CHIN_CONTOUR_ENDPOINT_CANDIDATE_ADMISSION_V0.1.md'
+      - 'docs/FACE_READING_FR53_SOFT_TISSUE_MENTAL_TUBERCLE_DEFINITION_GAP_V0.1.md'
+      - 'docs/FACE_READING_FR53_AUTHORITY_DECISION_V0.1.md'
+      - '.github/workflows/face-reading-soft-tissue-mental-tubercle-definition-gap.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'packages/face-reading/**'
+      - 'test/face-reading-fr52-chin-contour-endpoint-candidate-admission.test.ts'
+      - 'test/face-reading-fr53-soft-tissue-mental-tubercle-definition-gap.test.ts'
+      - 'docs/FACE_READING_FR52_CHIN_CONTOUR_ENDPOINT_CANDIDATE_ADMISSION_V0.1.md'
+      - 'docs/FACE_READING_FR53_SOFT_TISSUE_MENTAL_TUBERCLE_DEFINITION_GAP_V0.1.md'
+      - 'docs/FACE_READING_FR53_AUTHORITY_DECISION_V0.1.md'
+      - '.github/workflows/face-reading-soft-tissue-mental-tubercle-definition-gap.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  fr53-soft-tissue-mental-tubercle-definition-gap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install exact workspace dependencies
+        run: npm install --ignore-scripts
+      - name: Build MyeongHa runtime
+        run: npm run build
+      - name: Run FR-52 corrected boundary tests
+        run: npx vitest run test/face-reading-fr52-chin-contour-endpoint-candidate-admission.test.ts
+      - name: Run FR-53 definition-gap tests
+        run: npx vitest run test/face-reading-fr53-soft-tissue-mental-tubercle-definition-gap.test.ts
+      - name: Verify compiled FR-53 remains fail-closed
+        run: |
+          node --input-type=module <<'NODE'
+          import {
+            CHIN_CONTOUR_ENDPOINT_CANDIDATE_AUTHORITY_FR52,
+            SOFT_TISSUE_MENTAL_TUBERCLE_DEFINITION_AUTHORITY_FR53,
+            assessSoftTissueMentalTubercleDefinitionReadinessFR53,
+            assertSoftTissueMentalTubercleAcquisitionReadyFR53,
+            validateSoftTissueMentalTubercleDefinitionAuthorityFR53,
+          } from './dist/packages/face-reading/src/index.js';
+
+          validateSoftTissueMentalTubercleDefinitionAuthorityFR53();
+          const mt = CHIN_CONTOUR_ENDPOINT_CANDIDATE_AUTHORITY_FR52.candidateAdmissions.find(
+            (entry) => entry.candidateKey === 'bilateral_soft_tissue_mental_tubercle',
+          );
+          if (!mt) process.exit(1);
+          if (CHIN_CONTOUR_ENDPOINT_CANDIDATE_AUTHORITY_FR52.authorityVersion !== '0.1.1') process.exit(1);
+          if (mt.scopeCompatibleWithFR51 !== false) process.exit(1);
+          if (mt.researchAcquisitionExecutable !== false) process.exit(1);
+
+          const authority = SOFT_TISSUE_MENTAL_TUBERCLE_DEFINITION_AUTHORITY_FR53;
+          if (!authority.surfaceUsageCorroborated) process.exit(1);
+          if (!authority.bilateralChinRegionAssociationCorroborated) process.exit(1);
+          if (authority.explicitSurfaceDefinitionAvailable) process.exit(1);
+          if (authority.fr51InferiorBoundaryMembershipEstablished) process.exit(1);
+          if (authority.equivalenceToMentonSideEstablished) process.exit(1);
+          if (authority.equivalenceToMentalTubercleAnteriorEstablished) process.exit(1);
+          if (authority.crossRepresentationMappingAvailable) process.exit(1);
+          if (authority.researchAcquisitionExecutable) process.exit(1);
+          if (authority.candidateGeometryComparisonExecutable) process.exit(1);
+          if (authority.softTissueMentalTubercleSurfaceDefinitionRule !== null) process.exit(1);
+          if (authority.crossRepresentationMappingRule !== null) process.exit(1);
+          if (authority.endpointSelectionRule !== null) process.exit(1);
+          if (authority.endpointEquivalenceTolerance !== null) process.exit(1);
+          if (!Object.values(authority.authorityBoundary).every((value) => value === false)) process.exit(1);
+
+          const readiness = assessSoftTissueMentalTubercleDefinitionReadinessFR53();
+          if (!readiness.surfaceUsageEvidenceReady || !readiness.reviewedCorpusGapAdjudicated) process.exit(1);
+          if (readiness.explicitSurfaceDefinitionReady || readiness.pairedMtAnnotationReady) process.exit(1);
+          if (readiness.mentonSideComparisonReady || readiness.finalEndpointSelectionReady) process.exit(1);
+          if (readiness.productionGeometryReady) process.exit(1);
+
+          let blocked = false;
+          try {
+            assertSoftTissueMentalTubercleAcquisitionReadyFR53();
+          } catch {
+            blocked = true;
+          }
+          if (!blocked) process.exit(1);
+          NODE
