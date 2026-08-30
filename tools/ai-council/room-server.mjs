@@ -10,6 +10,7 @@ const port = Number(process.env.COUNCIL_PORT || 3000);
 const apiKey = process.env.OPENAI_API_KEY || '';
 const maxContextChars = Number(process.env.COUNCIL_MAX_CONTEXT_CHARS || 24000);
 const legacyMaxOutputTokens = Number(process.env.COUNCIL_MAX_OUTPUT_TOKENS || 0);
+const reasoningEffort = String(process.env.COUNCIL_REASONING_EFFORT || 'low').trim();
 const meetings = new Map();
 const subscribers = new Map();
 
@@ -138,6 +139,18 @@ function validateAgentOutput(agentName, round, content) {
   if (missing.length) throw new Error(`${agents[agentName].label} Round 2 응답에 필수 섹션이 없습니다: ${missing.join(', ')}`);
 }
 
+function buildResponsePayload(meeting, agentName, round) {
+  const agent = agents[agentName];
+  return {
+    model: agent.model,
+    instructions: buildAgentInstructions(agentName, round),
+    input: buildAgentInput(meeting, agentName, round),
+    max_output_tokens: agent.maxOutputTokens,
+    ...(reasoningEffort ? { reasoning: { effort: reasoningEffort } } : {}),
+    ...(meeting.webSearch ? { tools: [{ type: 'web_search' }] } : {}),
+  };
+}
+
 async function callAgent(meeting, agentName, round) {
   if (!apiKey) throw new Error('OPENAI_API_KEY가 설정되지 않았습니다.');
   const agent = agents[agentName];
@@ -145,13 +158,7 @@ async function callAgent(meeting, agentName, round) {
   const response = await fetch('https://api.openai.com/v1/responses', {
     method: 'POST',
     headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
-    body: JSON.stringify({
-      model: agent.model,
-      instructions: buildAgentInstructions(agentName, round),
-      input: buildAgentInput(meeting, agentName, round),
-      max_output_tokens: agent.maxOutputTokens,
-      ...(meeting.webSearch ? { tools: [{ type: 'web_search' }] } : {}),
-    }),
+    body: JSON.stringify(buildResponsePayload(meeting, agentName, round)),
   });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(body.error?.message || `OpenAI HTTP ${response.status}`);
@@ -262,4 +269,4 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   });
 }
 
-export { agents, buildAgentInput, buildAgentInstructions, buildIntegrationInput, formatMessages, runMeeting, validateAgentOutput };
+export { agents, buildAgentInput, buildAgentInstructions, buildIntegrationInput, buildResponsePayload, formatMessages, runMeeting, validateAgentOutput };
