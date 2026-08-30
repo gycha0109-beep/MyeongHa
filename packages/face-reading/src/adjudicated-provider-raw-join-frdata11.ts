@@ -242,10 +242,12 @@ function validateAuthority(): AdjudicatedProviderRawJoinAuthorityFRData11V1 {
     protocol.exactAssetDigestMatchRequired !== true ||
     protocol.exactProviderRunBindingRequired !== true ||
     protocol.frozenAdjudicationLedgerRequired !== true ||
+    protocol.providerCandidateCountDomain.length !== 2 ||
     protocol.providerCandidateCountDomain[0] !== 0 ||
     protocol.providerCandidateCountDomain[1] !== 1 ||
     protocol.zeroProviderCandidatesBucket !== 'zero_provider_candidates' ||
     protocol.oneProviderCandidateBucket !== 'one_provider_candidate' ||
+    protocol.adjudicationOutcomeVocabulary.length !== OUTCOMES.length ||
     protocol.adjudicationOutcomeVocabulary.some((value, index) => value !== OUTCOMES[index]) ||
     protocol.indeterminateMustRemainDistinct !== true ||
     protocol.unresolvedMustRemainDistinct !== true ||
@@ -298,6 +300,7 @@ export function buildAdjudicatedProviderRawJoinReportFRData11(
       adjudicationDataset.adjudicationLedgerDigest === null || !adjudicationDataset.adjudicationLedgerFrozen) {
     fail('a frozen exact FR-DATA-10 adjudication ledger is required before raw join.');
   }
+  const adjudicationLedgerDigest = adjudicationDataset.adjudicationLedgerDigest;
   if (
     adjudicationReport.exactCaptureAdjudicationCoverageVerified !== true ||
     adjudicationReport.exactIndependentAnnotationReviewSetCoverageVerified !== true ||
@@ -344,7 +347,7 @@ export function buildAdjudicatedProviderRawJoinReportFRData11(
       providerCandidateCountBucket: normalized.bucket,
       providerRunRef: capture.providerRunRef,
       providerReportDigest: providerBindingReport.providerReportDigest,
-      adjudicationLedgerDigest: adjudicationDataset.adjudicationLedgerDigest,
+      adjudicationLedgerDigest,
       exactAssetDigestMatched: true as const,
       exactProviderRunBindingMatched: true as const,
       frozenAdjudicationLedgerBound: true as const,
@@ -379,7 +382,7 @@ export function buildAdjudicatedProviderRawJoinReportFRData11(
     adjudicationDatasetSchemaRef: 'fr-data10-independent-face-count-adjudication-v1' as const,
     adjudicationReportSchemaRef: 'fr-data10-independent-face-count-adjudication-report-v1' as const,
     providerReportDigest: providerBindingReport.providerReportDigest,
-    adjudicationLedgerDigest: adjudicationDataset.adjudicationLedgerDigest,
+    adjudicationLedgerDigest,
     captureCount: rows.length,
     rows: Object.freeze(rows),
     crossTab: Object.freeze(crossTab),
