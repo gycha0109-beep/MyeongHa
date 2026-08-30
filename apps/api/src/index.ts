@@ -4,7 +4,7 @@ import {
   type CapabilityGateResult,
 } from '../../../packages/domain/src/index.js';
 
-export const API_FOUNDATION_VERSION = 'myeongha-api-foundation-v0.27' as const;
+export const API_FOUNDATION_VERSION = 'myeongha-api-foundation-v0.28' as const;
 
 export function authorizePlannedCapability(
   input: CapabilityGateInput,
@@ -358,3 +358,20 @@ export {
   type PurchaseIntentPlatformV1,
   type PurchaseIntentStatusV1,
 } from './purchase-intent-create-command.js';
+
+export {
+  BIRTH_PROFILE_CREATE_AUTHORITY_BINDING_V1,
+  BirthProfileCreateAuthorityPortErrorV1,
+  createBirthProfile,
+  type BirthCalendarTypeV1,
+  type BirthInputFingerprintPortV1,
+  type BirthInputV1,
+  type BirthProfileCreateAuthorityFailureCodeV1,
+  type BirthProfileCreateAuthorityPortV1,
+  type BirthProfileCreateAuthorityRowV1,
+  type BirthProfileCreateIdPortV1,
+  type BirthProfileCreateRequestV1,
+  type BirthSexV1,
+  type CreateBirthProfileInputV1,
+  type CreateBirthProfileResponseV1,
+} from './birth-profile-create-command.js';
