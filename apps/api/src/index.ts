@@ -4,7 +4,7 @@ import {
   type CapabilityGateResult,
 } from '../../../packages/domain/src/index.js';
 
-export const API_FOUNDATION_VERSION = 'myeongha-api-foundation-v0.21' as const;
+export const API_FOUNDATION_VERSION = 'myeongha-api-foundation-v0.22' as const;
 
 export function authorizePlannedCapability(
   input: CapabilityGateInput,
@@ -277,3 +277,15 @@ export {
   type VerifiedGuestPromotionAuthIdentityV1,
   type VerifiedGuestPromotionProofV1,
 } from './guest-promotion-command.js';
+
+export {
+  SHARE_ARTIFACT_REVOKE_COMMAND_AUTHORITY_BINDING_V1,
+  ShareArtifactRevokeCommandAuthorityPortErrorV1,
+  revokeShareArtifact,
+  type RevokeShareArtifactInputV1,
+  type RevokeShareArtifactResponseV1,
+  type ShareArtifactEffectiveStatusV1,
+  type ShareArtifactRevokeCommandAuthorityFailureCodeV1,
+  type ShareArtifactRevokeCommandAuthorityPortV1,
+  type ShareArtifactRevokeCommandAuthorityRowV1,
+} from './share-artifact-revoke-command.js';
