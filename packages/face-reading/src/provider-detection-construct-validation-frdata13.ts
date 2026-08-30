@@ -9,7 +9,7 @@ export type ProviderDetectionConstructValidationBlockerFRData13V1 =
   | 'reviewed_human_reference_standard_authority'
   | 'capture_domain_scope_definition'
   | 'out_of_scope_outcome_handling_policy'
-  | 'construct_validation_protocol_freeze_before_provider_inspection'
+  | 'construct_validation_protocol_freeze_before_provider_output_inspection'
   | 'new_unseen_construct_validation_dataset_after_protocol_freeze'
   | 'near_duplicate_partition_leakage_control'
   | 'acceptance_criteria_defined_before_validation_data_inspection'
@@ -42,7 +42,7 @@ export interface ProviderDetectionConstructValidationProtocolFRData13V1 {
   readonly multipleHumanFacesMayBeSilentlyCollapsed: false;
   readonly reviewedHumanReferenceStandardRequired: true;
   readonly providerBlindHumanReferenceRequired: true;
-  readonly humanReferenceMustFreezeBeforeProviderScoring: true;
+  readonly humanReferenceMustFreezeBeforeProviderOutcomeComparison: true;
   readonly providerRuntimeAndModelIdentityMustFreezeBeforeValidation: true;
   readonly currentFRData11HoldoutAlreadyMaterialized: true;
   readonly currentFRData11HoldoutMayServeAsFuturePreregisteredConstructValidationHoldout: false;
@@ -90,7 +90,7 @@ export interface ProviderDetectionConstructValidationReadinessReportFRData13V1 {
   readonly captureDomainScopeDefined: false;
   readonly outOfScopeOutcomeHandlingPolicyDefined: false;
   readonly reviewedHumanReferenceStandardAuthorityValidated: false;
-  readonly constructValidationProtocolFrozenBeforeProviderInspection: false;
+  readonly constructValidationProtocolFrozenBeforeProviderOutputInspection: false;
   readonly newUnseenConstructValidationDatasetPresent: false;
   readonly nearDuplicatePartitionLeakageControlValidated: false;
   readonly acceptanceCriteriaDefinedBeforeValidationDataInspection: false;
@@ -156,7 +156,7 @@ const BLOCKERS = Object.freeze([
   'reviewed_human_reference_standard_authority',
   'capture_domain_scope_definition',
   'out_of_scope_outcome_handling_policy',
-  'construct_validation_protocol_freeze_before_provider_inspection',
+  'construct_validation_protocol_freeze_before_provider_output_inspection',
   'new_unseen_construct_validation_dataset_after_protocol_freeze',
   'near_duplicate_partition_leakage_control',
   'acceptance_criteria_defined_before_validation_data_inspection',
@@ -196,7 +196,7 @@ ProviderDetectionConstructValidationAuthorityFRData13V1 = Object.freeze({
     multipleHumanFacesMayBeSilentlyCollapsed: false as const,
     reviewedHumanReferenceStandardRequired: true as const,
     providerBlindHumanReferenceRequired: true as const,
-    humanReferenceMustFreezeBeforeProviderScoring: true as const,
+    humanReferenceMustFreezeBeforeProviderOutcomeComparison: true as const,
     providerRuntimeAndModelIdentityMustFreezeBeforeValidation: true as const,
     currentFRData11HoldoutAlreadyMaterialized: true as const,
     currentFRData11HoldoutMayServeAsFuturePreregisteredConstructValidationHoldout: false as const,
@@ -278,7 +278,7 @@ function validateAuthority(): ProviderDetectionConstructValidationAuthorityFRDat
     protocol.multipleHumanFacesMayBeSilentlyCollapsed !== false ||
     protocol.reviewedHumanReferenceStandardRequired !== true ||
     protocol.providerBlindHumanReferenceRequired !== true ||
-    protocol.humanReferenceMustFreezeBeforeProviderScoring !== true ||
+    protocol.humanReferenceMustFreezeBeforeProviderOutcomeComparison !== true ||
     protocol.providerRuntimeAndModelIdentityMustFreezeBeforeValidation !== true ||
     protocol.currentFRData11HoldoutAlreadyMaterialized !== true ||
     protocol.currentFRData11HoldoutMayServeAsFuturePreregisteredConstructValidationHoldout !== false ||
@@ -379,7 +379,7 @@ export function buildProviderDetectionConstructValidationReadinessReportFRData13
     captureDomainScopeDefined: false as const,
     outOfScopeOutcomeHandlingPolicyDefined: false as const,
     reviewedHumanReferenceStandardAuthorityValidated: false as const,
-    constructValidationProtocolFrozenBeforeProviderInspection: false as const,
+    constructValidationProtocolFrozenBeforeProviderOutputInspection: false as const,
     newUnseenConstructValidationDatasetPresent: false as const,
     nearDuplicatePartitionLeakageControlValidated: false as const,
     acceptanceCriteriaDefinedBeforeValidationDataInspection: false as const,
