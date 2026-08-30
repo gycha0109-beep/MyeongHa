@@ -1,0 +1,66 @@
+name: Face Reading Dige Chin Contour Evidence Bridge
+
+on:
+  pull_request:
+    paths:
+      - 'packages/face-reading/**'
+      - 'test/face-reading-fr49-dige-chin-contour-evidence-bridge.test.ts'
+      - 'docs/FACE_READING_FR49_DIGE_CHIN_CONTOUR_EVIDENCE_BRIDGE_V0.1.md'
+      - '.github/workflows/face-reading-dige-chin-contour-evidence-bridge.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'packages/face-reading/**'
+      - 'test/face-reading-fr49-dige-chin-contour-evidence-bridge.test.ts'
+      - 'docs/FACE_READING_FR49_DIGE_CHIN_CONTOUR_EVIDENCE_BRIDGE_V0.1.md'
+      - '.github/workflows/face-reading-dige-chin-contour-evidence-bridge.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  fr49-dige-chin-contour-evidence-bridge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install exact workspace dependencies
+        run: npm install --ignore-scripts
+      - name: Build MyeongHa runtime
+        run: npm run build
+      - name: Run FR-49 evidence bridge tests
+        run: npx vitest run test/face-reading-fr49-dige-chin-contour-evidence-bridge.test.ts
+      - name: Verify compiled FR-49 authority remains fail-closed
+        run: |
+          node --input-type=module <<'NODE'
+          import {
+            DIGE_CHIN_CONTOUR_EVIDENCE_BRIDGE_AUTHORITY_FR49,
+            assessDigeChinContourEvidenceBridgeReadinessFR49,
+            assertDigeChinContourEvidenceBridgeReadyForProductionFR49,
+            validateDigeChinContourEvidenceBridgeAuthorityFR49,
+          } from './dist/packages/face-reading/src/index.js';
+
+          validateDigeChinContourEvidenceBridgeAuthorityFR49();
+          const authority = DIGE_CHIN_CONTOUR_EVIDENCE_BRIDGE_AUTHORITY_FR49;
+          const readiness = assessDigeChinContourEvidenceBridgeReadinessFR49();
+          if (!authority.relation.traditionalDigeChinRegionSupported) process.exit(1);
+          if (!authority.relation.softTissueMentonDefinedFromChinContourSupported) process.exit(1);
+          if (!authority.relation.conceptualPointFromContourDefinitionAvailable) process.exit(1);
+          if (authority.relation.traditionalDigeEqualsSoftTissueMenton) process.exit(1);
+          if (authority.relation.providerFaceOvalEqualsSoftTissueChinContour) process.exit(1);
+          if (authority.relation.fr45InferiorExtremumEqualsSoftTissueMenton) process.exit(1);
+          if (readiness.providerMappingReady || readiness.traditionalDigePointEquivalenceReady || readiness.productionGeometryReady) process.exit(1);
+          if (!Object.values(authority.authorityBoundary).every((value) => value === false)) process.exit(1);
+
+          let blocked = false;
+          try {
+            assertDigeChinContourEvidenceBridgeReadyForProductionFR49();
+          } catch {
+            blocked = true;
+          }
+          if (!blocked) process.exit(1);
+          NODE
