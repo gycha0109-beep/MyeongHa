@@ -30,7 +30,8 @@ npm run start:room
 - `COUNCIL_ENGINEERING_MAX_OUTPUT_TOKENS`: Engineering 1회 출력 상한 (기본 900)
 - `COUNCIL_INTEGRATION_MAX_OUTPUT_TOKENS`: Integration 1회 출력 상한 (기본 1400)
 - `COUNCIL_MAX_CONTEXT_CHARS`: transcript context 상한 (기본 24000)
-- `COUNCIL_REASONING_EFFORT`: Responses API reasoning 강도 (기본 `low`)
+- `COUNCIL_SPECIALIST_REASONING_EFFORT`: World/Revenue/Engineering reasoning 강도 (기본 `minimal`)
+- `COUNCIL_INTEGRATION_REASONING_EFFORT`: Integration reasoning 강도 (기본 `low`)
 - `COUNCIL_*_MODEL`: Agent별 모델
 - 화면에서 호출할 Agent만 선택
 - 현재 기본 모델은 `gpt-5-mini`

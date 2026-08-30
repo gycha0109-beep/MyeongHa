@@ -10,7 +10,8 @@ const port = Number(process.env.COUNCIL_PORT || 3000);
 const apiKey = process.env.OPENAI_API_KEY || '';
 const maxContextChars = Number(process.env.COUNCIL_MAX_CONTEXT_CHARS || 24000);
 const legacyMaxOutputTokens = Number(process.env.COUNCIL_MAX_OUTPUT_TOKENS || 0);
-const reasoningEffort = String(process.env.COUNCIL_REASONING_EFFORT || 'low').trim();
+const specialistReasoningEffort = String(process.env.COUNCIL_SPECIALIST_REASONING_EFFORT || process.env.COUNCIL_REASONING_EFFORT || 'minimal').trim();
+const integrationReasoningEffort = String(process.env.COUNCIL_INTEGRATION_REASONING_EFFORT || process.env.COUNCIL_REASONING_EFFORT || 'low').trim();
 const meetings = new Map();
 const subscribers = new Map();
 
@@ -103,19 +104,19 @@ function formatMessages(messages, { perMessage = 3600, total = maxContextChars }
 
 function buildRoundOneInput(meeting) {
   const prior = meeting.messages.filter((message) => message.agent !== 'user');
-  return `회의 주제:\n${meeting.topic}\n\n[ROUND 1 TASK]\n당신의 전문영역 책임으로 최초 분석을 제시하십시오. 다른 Agent의 앞선 발언이 있으면 참고하되 그 의견에 맞추기 위해 자기 전문영역의 판단을 포기하지 마십시오. 아직 확정하지 말고, 실제 trade-off와 상대 트랙에 요구할 조건을 분명히 하십시오.\n\n권장 구조:\nPOSITION\n- 현재 입장\n\nREASONS\n- 핵심 근거\n\nRISKS\n- 전문영역 관점의 가장 큰 위험\n\nREQUIREMENTS FOR OTHER TRACKS\n- 상대 트랙에 요구하는 조건\n\nOPEN\n- 아직 판단할 수 없는 것\n\n[PRIOR POSITIONS IN THIS ROUND]\n${formatMessages(prior, { perMessage: 3000, total: 9000 }) || '(아직 다른 전문 Agent 발언 없음)'}`;
+  return `회의 주제:\n${meeting.topic}\n\n[ROUND 1 TASK]\n당신의 전문영역 책임으로 최초 분석을 제시하십시오. 다른 Agent의 앞선 발언이 있으면 참고하되 그 의견에 맞추기 위해 자기 전문영역의 판단을 포기하지 마십시오. 아직 확정하지 말고, 실제 trade-off와 상대 트랙에 요구할 조건을 분명히 하십시오.\n\n아래 다섯 제목을 사용하고, 각 제목에는 최대 1개 bullet만 작성하십시오. 각 bullet은 최대 2개의 짧은 문장으로 제한하고 전체 답변은 900자 이내로 끝내십시오. 긴 배경 설명·같은 주장 반복은 금지입니다.\n\nPOSITION\n- 현재 입장\n\nREASONS\n- 핵심 근거\n\nRISKS\n- 전문영역 관점의 가장 큰 위험\n\nREQUIREMENTS FOR OTHER TRACKS\n- 상대 트랙에 요구하는 조건\n\nOPEN\n- 아직 판단할 수 없는 것\n\n[PRIOR POSITIONS IN THIS ROUND]\n${formatMessages(prior, { perMessage: 3000, total: 9000 }) || '(아직 다른 전문 Agent 발언 없음)'}`;
 }
 
 function buildRoundTwoInput(meeting, agentName) {
   const ownRoundOne = meeting.messages.find((message) => message.agent === agentName && message.round === 1);
   const otherRoundOne = meeting.messages.filter((message) => message.round === 1 && message.agent !== agentName && message.agent !== 'user');
   const roundTwoDevelopments = meeting.messages.filter((message) => message.round === 2 && message.agent !== agentName);
-  return `회의 주제:\n${meeting.topic}\n\n[YOUR ROUND 1 POSITION]\n${ownRoundOne ? formatMessages([ownRoundOne], { perMessage: 4600, total: 4600 }) : '(없음)'}\n\n[OTHER AGENTS' ROUND 1 POSITIONS]\n${formatMessages(otherRoundOne, { perMessage: 3900, total: 12000 }) || '(없음)'}\n\n[ROUND 2 DEVELOPMENTS]\n${formatMessages(roundTwoDevelopments, { perMessage: 3200, total: 6000 }) || '(아직 없음)'}\n\n[ROUND 2 TASK]\nRound 1 답변을 요약하거나 표현만 바꿔 반복하지 마십시오. 핵심은 다른 Agent의 실제 주장 이후 생긴 입장 변화입니다. 합의가 Round 2의 목적이 아니며, 자기 전문영역의 책임을 유지하십시오. 아래 정확한 형식으로 작성하십시오.\n\nACCEPT\n- 다른 Agent의 주장 중 가장 강하게 수용하는 것 1개와 짧은 이유\n\nOBJECT\n- 다른 Agent의 주장 중 가장 강하게 반대하거나 수정해야 하는 것 1개, 반대 이유와 대안\n- 실질적인 반대가 정말 없다면 정확히 \`NO MATERIAL OBJECTION\`이라고 작성\n\nDELTA\n- 위 검토 때문에 Round 1 자기 제안에서 실제로 변경된 내용만 작성\n- 변경이 없다면 \`NO MATERIAL CHANGE\`라고 작성\n\n다른 Agent의 실제 주장에 근거해 수용·반박·조건부 수용 중 하나를 수행하십시오.`;
+  return `회의 주제:\n${meeting.topic}\n\n[YOUR ROUND 1 POSITION]\n${ownRoundOne ? formatMessages([ownRoundOne], { perMessage: 4600, total: 4600 }) : '(없음)'}\n\n[OTHER AGENTS' ROUND 1 POSITIONS]\n${formatMessages(otherRoundOne, { perMessage: 3900, total: 12000 }) || '(없음)'}\n\n[ROUND 2 DEVELOPMENTS]\n${formatMessages(roundTwoDevelopments, { perMessage: 3200, total: 6000 }) || '(아직 없음)'}\n\n[ROUND 2 TASK]\nRound 1 답변을 요약하거나 표현만 바꿔 반복하지 마십시오. 핵심은 다른 Agent의 실제 주장 이후 생긴 입장 변화입니다. 합의가 Round 2의 목적이 아니며, 자기 전문영역의 책임을 유지하십시오. 아래 정확한 형식으로 작성하십시오. 각 섹션은 bullet 정확히 1개, 최대 2개의 짧은 문장으로 쓰고 전체 답변은 650자 이내로 끝내십시오.\n\nACCEPT\n- 다른 Agent의 주장 중 가장 강하게 수용하는 것 1개와 짧은 이유\n\nOBJECT\n- 다른 Agent의 주장 중 가장 강하게 반대하거나 수정해야 하는 것 1개, 반대 이유와 대안\n- 실질적인 반대가 정말 없다면 정확히 \`NO MATERIAL OBJECTION\`이라고 작성\n\nDELTA\n- 위 검토 때문에 Round 1 자기 제안에서 실제로 변경된 내용만 작성\n- 변경이 없다면 \`NO MATERIAL CHANGE\`라고 작성\n\n다른 Agent의 실제 주장에 근거해 수용·반박·조건부 수용 중 하나를 수행하십시오.`;
 }
 
 function buildIntegrationInput(meeting) {
   const transcript = formatMessages(meeting.messages.filter((message) => message.agent !== 'integration'), { perMessage: 3600, total: maxContextChars });
-  return `회의 주제:\n${meeting.topic}\n\n[ACTUAL TRANSCRIPT]\n${transcript || '(전문 Agent 발언 없음)'}\n\n[INTEGRATION TASK]\nTranscript에 실제로 확인되는 주장만 분류하십시오. 항목마다 근거 Agent와 Round를 \`[World R2]\`처럼 표시하십시오.\n\nAGREED는 다음 중 하나일 때만 작성하십시오.\nA. 최소 2개 Agent가 명시적으로 같은 방향을 수용했을 때\nB. 한 Agent의 제안에 다른 Agent들이 Round 2에서 명시적으로 objection하지 않았을 때\n누구도 말하지 않은 내용을 상식적으로 타당하다고 판단해 AGREED로 만들면 안 됩니다.\n\nCONFLICT는 최소 두 Agent의 실제 주장이 양립하지 않을 때만 작성하십시오. 강조점이 다르다는 이유만으로 conflict로 만들면 안 됩니다. 각 conflict는 다음 형태를 따르십시오.\n1. 논점\nWorld: 실제 주장 요약 [World R1/R2]\nRevenue: 실제 주장 요약 [Revenue R1/R2]\nEngineering: 실제 주장 요약 [Engineering R1/R2]\nStatus: unresolved 또는 partially resolved in Round 2\n\n실제 충돌이 없으면 CONFLICT에 \`NONE OBSERVED IN TRANSCRIPT\`라고 작성하십시오.\n\n기본 출력 형식은 다음입니다. 사용자가 회의 주제에서 별도 출력 형식을 명시한 경우 그 형식을 우선하되, grounding 규칙은 항상 지키십시오.\n\nAGREED\n\nCONFLICT\n\nREQUIREMENTS\n\nDECISION CANDIDATE\n\nFAILURE CASES\n\nMETRICS / VALIDATION\n\nOPEN\n\nNEXT TEST\n\nFAILURE CASES와 METRICS / VALIDATION도 transcript에서 실제로 제기된 위험·검증만 기록하십시오. 근거가 없으면 \`NOT RAISED IN TRANSCRIPT\`라고 작성하십시오. 긴 재서술은 금지하고 핵심 결정·실제 충돌·통합 요구·미해결점·다음 검증만 간결하게 작성하십시오.`;
+  return `회의 주제:\n${meeting.topic}\n\n[ACTUAL TRANSCRIPT]\n${transcript || '(전문 Agent 발언 없음)'}\n\n[INTEGRATION TASK]\nTranscript에 실제로 확인되는 주장만 분류하십시오. 항목마다 근거 Agent와 Round를 \`[World R2]\`처럼 표시하십시오.\n\nAGREED는 다음 중 하나일 때만 작성하십시오.\nA. 최소 2개 Agent가 명시적으로 같은 방향을 수용했을 때\nB. 한 Agent의 제안에 다른 Agent들이 Round 2에서 명시적으로 objection하지 않았을 때\n누구도 말하지 않은 내용을 상식적으로 타당하다고 판단해 AGREED로 만들면 안 됩니다.\n\nCONFLICT는 최소 두 Agent의 실제 주장이 양립하지 않을 때만 작성하십시오. 강조점이 다르다는 이유만으로 conflict로 만들면 안 됩니다. 각 conflict는 다음 형태를 따르십시오.\n1. 논점\nWorld: 실제 주장 요약 [World R1/R2]\nRevenue: 실제 주장 요약 [Revenue R1/R2]\nEngineering: 실제 주장 요약 [Engineering R1/R2]\nStatus: unresolved 또는 partially resolved in Round 2\n\n실제 충돌이 없으면 CONFLICT에 \`NONE OBSERVED IN TRANSCRIPT\`라고 작성하십시오.\n\n기본 출력 형식은 다음입니다. 사용자가 회의 주제에서 별도 출력 형식을 명시한 경우 그 형식을 우선하되, grounding 규칙은 항상 지키십시오. 각 섹션은 최대 2개 bullet, 전체 답변은 1800자 이내로 작성합니다.\n\nAGREED\n\nCONFLICT\n\nREQUIREMENTS\n\nDECISION CANDIDATE\n\nFAILURE CASES\n\nMETRICS / VALIDATION\n\nOPEN\n\nNEXT TEST\n\nFAILURE CASES와 METRICS / VALIDATION도 transcript에서 실제로 제기된 위험·검증만 기록하십시오. 근거가 없으면 \`NOT RAISED IN TRANSCRIPT\`라고 작성하십시오. 긴 재서술은 금지하고 핵심 결정·실제 충돌·통합 요구·미해결점·다음 검증만 간결하게 작성하십시오.`;
 }
 
 function buildAgentInput(meeting, agentName, round) {
@@ -141,12 +142,13 @@ function validateAgentOutput(agentName, round, content) {
 
 function buildResponsePayload(meeting, agentName, round) {
   const agent = agents[agentName];
+  const effort = agentName === 'integration' ? integrationReasoningEffort : specialistReasoningEffort;
   return {
     model: agent.model,
     instructions: buildAgentInstructions(agentName, round),
     input: buildAgentInput(meeting, agentName, round),
     max_output_tokens: agent.maxOutputTokens,
-    ...(reasoningEffort ? { reasoning: { effort: reasoningEffort } } : {}),
+    ...(effort ? { reasoning: { effort } } : {}),
     ...(meeting.webSearch ? { tools: [{ type: 'web_search' }] } : {}),
   };
 }

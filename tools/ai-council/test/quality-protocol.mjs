@@ -39,7 +39,8 @@ assert.equal(agents.world.maxOutputTokens, 800);
 assert.equal(agents.revenue.maxOutputTokens, 800);
 assert.equal(agents.engineering.maxOutputTokens, 900);
 assert.equal(agents.integration.maxOutputTokens, 1400);
-assert.equal(buildResponsePayload(lifeThreadMeeting, 'world', 1).reasoning.effort, 'low');
+assert.equal(buildResponsePayload(lifeThreadMeeting, 'world', 1).reasoning.effort, 'minimal');
+assert.equal(buildResponsePayload(lifeThreadMeeting, 'integration', 3).reasoning.effort, 'low');
 assert.doesNotThrow(() => validateAgentOutput('revenue', 2, 'ACCEPT\n- x\nOBJECT\n- y\nDELTA\n- z'));
 assert.throws(() => validateAgentOutput('revenue', 2, 'ACCEPT\n- x\nDELTA\n- z'), /OBJECT/);
 
