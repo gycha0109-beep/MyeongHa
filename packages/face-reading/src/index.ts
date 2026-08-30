@@ -12,6 +12,7 @@ export * from './browser-pixel-evidence-frdata04.js';
 export * from './capture-quality-raw-observations-frdata05.js';
 export * from './provider-face-candidate-observations-frdata06.js';
 export * from './independent-face-ground-truth-frdata07.js';
+export * from './provider-face-count-raw-scoring-frdata08.js';
 export * from './contracts.js';
 export * from './controlled-capture-attestation-fr21b.js';
 export * from './direct-source-verification.js';
