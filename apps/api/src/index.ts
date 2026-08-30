@@ -4,7 +4,7 @@ import {
   type CapabilityGateResult,
 } from '../../../packages/domain/src/index.js';
 
-export const API_FOUNDATION_VERSION = 'myeongha-api-foundation-v0.31' as const;
+export const API_FOUNDATION_VERSION = 'myeongha-api-foundation-v0.32' as const;
 
 export function authorizePlannedCapability(
   input: CapabilityGateInput,
@@ -412,3 +412,14 @@ export {
   type RevokeDeviceInstallationInputV1,
   type RevokeDeviceInstallationResponseV1,
 } from './device-installation-revoke-command.js';
+
+export {
+  getReadingProvenance,
+  READING_PROVENANCE_READ_AUTHORITY_BINDING_V1,
+  ReadingProvenanceReadAuthorityPortErrorV1,
+  type GetReadingProvenanceInputV1,
+  type ReadingProvenanceAuthorityRowV1,
+  type ReadingProvenanceReadAuthorityFailureCodeV1,
+  type ReadingProvenanceReadAuthorityPortV1,
+  type ReadingProvenanceReadResponseV1,
+} from './reading-provenance-read.js';
