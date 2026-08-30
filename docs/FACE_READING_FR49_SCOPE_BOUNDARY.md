@@ -1,0 +1,1 @@
+Scope: classical 地閣/chin-region evidence + modern soft-tissue Menton/chin-contour definition + research-only y-coordinate derivation from an already independent Me′ observation. Everything provider-specific and production-authorizing remains blocked.
