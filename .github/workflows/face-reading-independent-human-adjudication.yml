@@ -6,7 +6,7 @@ on:
       - 'packages/face-reading/src/independent-face-adjudication-frdata10.ts'
       - 'packages/face-reading/src/independent-face-ground-truth-frdata07.ts'
       - 'packages/face-reading/src/index.ts'
-      - 'test/face-reading-fr-data10-independent-face-adjudication.test.ts'
+      - 'test/face-reading-fr-data10-*.test.ts'
       - 'docs/FACE_READING_FR_DATA10_INDEPENDENT_FACE_ADJUDICATION.md'
       - '.github/workflows/face-reading-independent-human-adjudication.yml'
   workflow_dispatch:
@@ -27,7 +27,7 @@ jobs:
         run: npm run build
 
       - name: Run FR-DATA-10 contract tests
-        run: npx vitest run test/face-reading-fr-data10-independent-face-adjudication.test.ts
+        run: npx vitest run test/face-reading-fr-data10-*.test.ts
 
       - name: Verify compiled authority boundary
         run: |
@@ -53,6 +53,7 @@ jobs:
             protocol.automaticUnanimityRuleAllowed !== false ||
             protocol.annotationCountRuleAllowed !== false ||
             protocol.unresolvedOutcomeMustBePreserved !== true ||
+            protocol.adjudicationAfterGroundTruthLedgerFreezeRequired !== true ||
             protocol.minimumIndependentAnnotatorsPerCapture !== null ||
             protocol.minimumAdjudicatorsPerCapture !== null ||
             protocol.interAnnotatorAgreementThreshold !== null ||

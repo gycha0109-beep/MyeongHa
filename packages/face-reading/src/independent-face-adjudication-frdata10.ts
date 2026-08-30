@@ -42,6 +42,7 @@ export interface IndependentFaceAdjudicationProtocolFRData10V1 {
   readonly unresolvedOutcomeMustBePreserved: true;
   readonly unresolvedOutcomeMayBeSilentlyCoerced: false;
   readonly indeterminateOutcomeMayBeSilentlyCoerced: false;
+  readonly adjudicationAfterGroundTruthLedgerFreezeRequired: true;
   readonly adjudicationLedgerFreezeBeforeAdjudicatedProviderScoringRequired: true;
   readonly minimumIndependentAnnotatorsPerCapture: null;
   readonly minimumAdjudicatorsPerCapture: null;
@@ -115,6 +116,7 @@ export interface IndependentFaceAdjudicationReportFRData10V1 {
   readonly outcomeCounts: Readonly<Record<IndependentFaceAdjudicationOutcomeFRData10V1, number>>;
   readonly captureSummaries: readonly IndependentFaceAdjudicationCaptureSummaryFRData10V1[];
   readonly upstreamAnnotationLedgerBindingVerified: true;
+  readonly adjudicationAfterGroundTruthLedgerFreezeVerified: true;
   readonly exactCaptureAdjudicationCoverageVerified: true;
   readonly exactIndependentAnnotationReviewSetCoverageVerified: true;
   readonly providerBlindAdjudicationRecordedForEveryCapture: true;
@@ -217,6 +219,7 @@ IndependentFaceAdjudicationAuthorityFRData10V1 = Object.freeze({
     unresolvedOutcomeMustBePreserved: true as const,
     unresolvedOutcomeMayBeSilentlyCoerced: false as const,
     indeterminateOutcomeMayBeSilentlyCoerced: false as const,
+    adjudicationAfterGroundTruthLedgerFreezeRequired: true as const,
     adjudicationLedgerFreezeBeforeAdjudicatedProviderScoringRequired: true as const,
     minimumIndependentAnnotatorsPerCapture: null,
     minimumAdjudicatorsPerCapture: null,
@@ -354,6 +357,7 @@ export function validateIndependentFaceAdjudicationAuthorityFRData10(
     protocol.unresolvedOutcomeMustBePreserved !== true ||
     protocol.unresolvedOutcomeMayBeSilentlyCoerced !== false ||
     protocol.indeterminateOutcomeMayBeSilentlyCoerced !== false ||
+    protocol.adjudicationAfterGroundTruthLedgerFreezeRequired !== true ||
     protocol.adjudicationLedgerFreezeBeforeAdjudicatedProviderScoringRequired !== true
   ) fail('protocol authority boundary drift.');
 
@@ -397,15 +401,21 @@ export function validateIndependentFaceAdjudicationDatasetFRData10(
   if (dataset.schemaVersion !== 'fr-data10-independent-face-count-adjudication-v1') fail('dataset schema drift.');
   if (dataset.upstreamGroundTruthSchemaRef !== 'fr-data07-independent-face-ground-truth-v1') fail('upstream ground-truth schema drift.');
   if (dataset.datasetRef !== groundTruthDataset.datasetRef) fail('datasetRef must exactly match FR-DATA-07.');
-  if (!groundTruthDataset.annotationLedgerFrozen || groundTruthDataset.annotationLedgerDigest === null) {
-    fail('FR-DATA-07 annotation ledger must be frozen before adjudication can bind to it.');
+  if (
+    !groundTruthDataset.annotationLedgerFrozen ||
+    groundTruthDataset.annotationLedgerDigest === null ||
+    groundTruthDataset.annotationLedgerFrozenAt === null
+  ) {
+    fail('FR-DATA-07 annotation ledger must be frozen with digest and timestamp before adjudication can bind to it.');
   }
   canonicalSha256(groundTruthDataset.annotationLedgerDigest, 'groundTruth.annotationLedgerDigest');
+  const groundTruthLedgerFrozenAt = parseTimestamp(groundTruthDataset.annotationLedgerFrozenAt, 'groundTruth.annotationLedgerFrozenAt');
   if (dataset.upstreamAnnotationLedgerDigest !== groundTruthDataset.annotationLedgerDigest) {
     fail('upstream annotation ledger digest must exactly match FR-DATA-07.');
   }
   canonicalSha256(dataset.upstreamAnnotationLedgerDigest, 'upstreamAnnotationLedgerDigest');
   if (!Array.isArray(dataset.adjudications)) fail('adjudications must be an array.');
+  if (groundTruthDataset.captures.length === 0) fail('at least one FR-DATA-07 capture is required for adjudication.');
 
   unique(dataset.adjudications.map((entry) => entry.captureRef), 'adjudication capture refs');
   unique(dataset.adjudications.map((entry) => entry.adjudicationSessionRef), 'adjudication session refs');
@@ -434,7 +444,10 @@ export function validateIndependentFaceAdjudicationDatasetFRData10(
       fail(`adjudication asset digest drift for ${entry.captureRef}.`);
     }
     validateOutcome(entry.outcome, `${entry.captureRef}.outcome`);
-    parseTimestamp(entry.adjudicatedAt, `${entry.captureRef}.adjudicatedAt`);
+    const adjudicatedAt = parseTimestamp(entry.adjudicatedAt, `${entry.captureRef}.adjudicatedAt`);
+    if (adjudicatedAt < groundTruthLedgerFrozenAt) {
+      fail(`capture ${entry.captureRef} adjudication cannot precede the frozen FR-DATA-07 annotation ledger.`);
+    }
 
     const sourceAnnotations = annotationsByCapture.get(entry.captureRef) ?? [];
     if (sourceAnnotations.length === 0) fail(`capture ${entry.captureRef} has no independent annotations to adjudicate.`);
@@ -511,14 +524,13 @@ export function buildIndependentFaceAdjudicationReportFRData10(
     const adjudication = adjudicationByCapture.get(capture.captureRef);
     if (adjudication === undefined) fail(`missing validated adjudication for ${capture.captureRef}.`);
     const independentAnnotationLabels = sourceAnnotations.map((entry) => entry.label);
-    const annotatorDisagreementObserved = new Set(independentAnnotationLabels).size > 1;
     return Object.freeze({
       captureRef: capture.captureRef,
       partition: capture.partition,
       canonicalAssetDigest: capture.canonicalAssetDigest,
       independentAnnotationCount: sourceAnnotations.length,
       independentAnnotationLabels: Object.freeze(independentAnnotationLabels),
-      annotatorDisagreementObserved,
+      annotatorDisagreementObserved: new Set(independentAnnotationLabels).size > 1,
       adjudicatorRef: adjudication.adjudicatorRef,
       adjudicationOutcome: adjudication.outcome,
       unresolved: adjudication.outcome === 'unresolved',
@@ -550,6 +562,7 @@ export function buildIndependentFaceAdjudicationReportFRData10(
     outcomeCounts: Object.freeze(outcomeCounts),
     captureSummaries: Object.freeze(captureSummaries),
     upstreamAnnotationLedgerBindingVerified: true as const,
+    adjudicationAfterGroundTruthLedgerFreezeVerified: true as const,
     exactCaptureAdjudicationCoverageVerified: true as const,
     exactIndependentAnnotationReviewSetCoverageVerified: true as const,
     providerBlindAdjudicationRecordedForEveryCapture: true as const,
