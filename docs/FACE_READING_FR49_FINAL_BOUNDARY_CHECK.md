@@ -1,0 +1,1 @@
+Final boundary check before PR: no traditional 地閣=Me′ equality, no MediaPipe mapping, no provider index authority, no source-variant selection, no empirical threshold, no production geometry promotion.
