@@ -4,7 +4,7 @@ import {
   type CapabilityGateResult,
 } from '../../../packages/domain/src/index.js';
 
-export const API_FOUNDATION_VERSION = 'myeongha-api-foundation-v0.20' as const;
+export const API_FOUNDATION_VERSION = 'myeongha-api-foundation-v0.21' as const;
 
 export function authorizePlannedCapability(
   input: CapabilityGateInput,
@@ -262,3 +262,18 @@ export {
   type StartAccountDeletionInputV1,
   type StartAccountDeletionResponseV1,
 } from './account-deletion-start-command.js';
+
+export {
+  GUEST_PROMOTION_AUTHORITY_BINDING_V1,
+  GuestPromotionAuthorityPortErrorV1,
+  promoteGuestToMember,
+  type GuestPromotionAuthIdentityPortV1,
+  type GuestPromotionAuthorityFailureCodeV1,
+  type GuestPromotionAuthorityPortV1,
+  type GuestPromotionAuthorityRowV1,
+  type GuestPromotionGuestProofPortV1,
+  type PromoteGuestInputV1,
+  type PromoteGuestResponseV1,
+  type VerifiedGuestPromotionAuthIdentityV1,
+  type VerifiedGuestPromotionProofV1,
+} from './guest-promotion-command.js';
