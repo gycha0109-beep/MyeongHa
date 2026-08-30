@@ -4,7 +4,7 @@ import {
   type CapabilityGateResult,
 } from '../../../packages/domain/src/index.js';
 
-export const API_FOUNDATION_VERSION = 'myeongha-api-foundation-v0.26' as const;
+export const API_FOUNDATION_VERSION = 'myeongha-api-foundation-v0.27' as const;
 
 export function authorizePlannedCapability(
   input: CapabilityGateInput,
@@ -341,3 +341,20 @@ export {
   type RetryChatTurnInputV1,
   type RetryChatTurnResponseV1,
 } from './chat-turn-retry-command.js';
+
+export {
+  PURCHASE_INTENT_CREATE_AUTHORITY_BINDING_V1,
+  PurchaseIntentCreateAuthorityPortErrorV1,
+  createPurchaseIntent,
+  type CreatePurchaseIntentInputV1,
+  type CreatePurchaseIntentResponseV1,
+  type PurchaseIntentCreateAuthorityFailureCodeV1,
+  type PurchaseIntentCreateAuthorityPortV1,
+  type PurchaseIntentCreateAuthorityRowV1,
+  type PurchaseIntentCreateRequestV1,
+  type PurchaseIntentIdPortV1,
+  type PurchaseIntentOfferSnapshotPortV1,
+  type PurchaseIntentOfferSnapshotV1,
+  type PurchaseIntentPlatformV1,
+  type PurchaseIntentStatusV1,
+} from './purchase-intent-create-command.js';
