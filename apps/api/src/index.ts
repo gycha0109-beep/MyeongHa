@@ -4,7 +4,7 @@ import {
   type CapabilityGateResult,
 } from '../../../packages/domain/src/index.js';
 
-export const API_FOUNDATION_VERSION = 'myeongha-api-foundation-v0.30' as const;
+export const API_FOUNDATION_VERSION = 'myeongha-api-foundation-v0.31' as const;
 
 export function authorizePlannedCapability(
   input: CapabilityGateInput,
@@ -401,3 +401,14 @@ export {
   type TargetPersonCreateIdPortV1,
   type TargetPersonCreateRequestV1,
 } from './target-person-create-command.js';
+
+export {
+  DEVICE_INSTALLATION_REVOKE_COMMAND_AUTHORITY_BINDING_V1,
+  DeviceInstallationRevokeAuthorityPortErrorV1,
+  revokeDeviceInstallation,
+  type DeviceInstallationRevokeAuthorityFailureCodeV1,
+  type DeviceInstallationRevokeAuthorityPortV1,
+  type DeviceInstallationRevokeAuthorityRowV1,
+  type RevokeDeviceInstallationInputV1,
+  type RevokeDeviceInstallationResponseV1,
+} from './device-installation-revoke-command.js';
