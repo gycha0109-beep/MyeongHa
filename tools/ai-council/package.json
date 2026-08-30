@@ -1,0 +1,14 @@
+{
+  "name": "myeongha-ai-council-mvp",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node bridge.mjs",
+    "start:room": "node room-server.mjs",
+    "check": "node --check bridge.mjs && node --check room-server.mjs"
+  },
+  "dependencies": {
+    "discord.js": "14.27.0",
+    "dotenv": "16.6.1"
+  }
+}

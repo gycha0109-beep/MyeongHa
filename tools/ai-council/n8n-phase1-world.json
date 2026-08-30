@@ -1,0 +1,104 @@
+{
+  "name": "MyeongHa Council - Phase 1 - World",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "myeongha-world",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "world-webhook",
+      "name": "World Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [260, 300],
+      "webhookId": "myeongha-world"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body ?? $json;\nconst headers = $json.headers ?? {};\nconst expected = $env.COUNCIL_WEBHOOK_SECRET;\nif (!expected || headers['x-council-secret'] !== expected) throw new Error('Unauthorized council webhook request');\nif (body.agent !== 'world') throw new Error('Phase 1 accepts only the world agent');\nif (!body.user_message || !body.channel_id || !body.message_id) throw new Error('Invalid council payload');\nreturn [{ json: {\n  ok: true,\n  message_id: String(body.message_id),\n  channel_id: String(body.channel_id),\n  agent: 'world',\n  user_message: String(body.user_message).slice(0, 12000),\n  openai_body: {\n    model: $env.MYEONGHA_WORLD_MODEL || 'gpt-5-mini',\n    instructions: '당신은 MyeongHa World Agent입니다. Worldbuilding, Character Experience, Narrative, Relationship Experience, character consistency를 검토합니다. 캐릭터를 상품 판매자처럼 다루지 마십시오. 서비스가 아는 것과 캐릭터가 아는 것을 구분하십시오. 관계, 기억, 서사 진행을 동일시하지 마십시오. 답변은 한국어로 작성하고, 결론·근거·주의점·다음 검증 항목 순서로 간결하게 제시하십시오. 아직 확정되지 않은 정책을 확정된 사실처럼 말하지 마십시오. 이번 Phase 1에서는 다른 Agent를 호출하지 말고 World 관점의 단독 검토만 수행하십시오.',\n    input: String(body.user_message).slice(0, 12000),\n    max_output_tokens: 900\n  }\n} }];"
+      },
+      "id": "normalize-world",
+      "name": "Normalize World Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/responses",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.OPENAI_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.openai_body) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "openai-world",
+      "name": "OpenAI World Response",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [760, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $json;\nconst outputText = response.output_text || (Array.isArray(response.output) ? response.output.flatMap(item => Array.isArray(item.content) ? item.content : []).filter(item => item.type === 'output_text').map(item => item.text).join('\\n') : '');\nconst content = String(outputText || '').trim();\nif (!content) throw new Error('OpenAI returned no output text');\nreturn [{ json: {\n  ok: true,\n  content: content.slice(0, 1900),\n  model: response.model || null,\n  request_id: response.id || null,\n  usage: response.usage || null\n} }];"
+      },
+      "id": "reply-world",
+      "name": "Build World Reply",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1020, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "respond-world",
+      "name": "Return to Discord Adapter",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1280, 300]
+    }
+  ],
+  "connections": {
+    "World Webhook": {
+      "main": [[{"node": "Normalize World Request", "type": "main", "index": 0}]]
+    },
+    "Normalize World Request": {
+      "main": [[{"node": "OpenAI World Response", "type": "main", "index": 0}]]
+    },
+    "OpenAI World Response": {
+      "main": [[{"node": "Build World Reply", "type": "main", "index": 0}]]
+    },
+    "Build World Reply": {
+      "main": [[{"node": "Return to Discord Adapter", "type": "main", "index": 0}]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "myeongha-phase1-world-v1",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": []
+}
