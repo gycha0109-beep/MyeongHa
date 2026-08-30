@@ -4,7 +4,7 @@ import {
   type CapabilityGateResult,
 } from '../../../packages/domain/src/index.js';
 
-export const API_FOUNDATION_VERSION = 'myeongha-api-foundation-v0.24' as const;
+export const API_FOUNDATION_VERSION = 'myeongha-api-foundation-v0.25' as const;
 
 export function authorizePlannedCapability(
   input: CapabilityGateInput,
@@ -319,3 +319,13 @@ export {
   type ReusableGuestBootstrapIdentityV1,
   type ReusableMemberBootstrapIdentityV1,
 } from './guest-bootstrap-command.js';
+
+export {
+  CHAT_TURN_ABANDON_AUTHORITY_BINDING_V1,
+  ChatTurnAbandonAuthorityPortErrorV1,
+  abandonChatTurn,
+  type AbandonChatTurnInputV1,
+  type AbandonChatTurnResponseV1,
+  type ChatTurnAbandonAuthorityFailureCodeV1,
+  type ChatTurnAbandonAuthorityPortV1,
+} from './chat-turn-abandon-command.js';
