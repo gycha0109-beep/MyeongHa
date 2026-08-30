@@ -4,7 +4,7 @@ import {
   type CapabilityGateResult,
 } from '../../../packages/domain/src/index.js';
 
-export const API_FOUNDATION_VERSION = 'myeongha-api-foundation-v0.14' as const;
+export const API_FOUNDATION_VERSION = 'myeongha-api-foundation-v0.15' as const;
 
 export function authorizePlannedCapability(
   input: CapabilityGateInput,
@@ -189,3 +189,14 @@ export {
   type RevokeMemoryItemInputV1,
   type RevokeMemoryItemResponseV1,
 } from './memory-item-revoke-command.js';
+
+export {
+  MEMORY_GRANT_REVOKE_COMMAND_AUTHORITY_BINDING_V1,
+  MemoryGrantRevokeCommandAuthorityPortErrorV1,
+  revokeMemoryCharacterGrant,
+  type MemoryGrantRevokeCommandAuthorityFailureCodeV1,
+  type MemoryGrantRevokeCommandAuthorityPortV1,
+  type MemoryGrantRevokeCommandAuthorityRowV1,
+  type RevokeMemoryCharacterGrantInputV1,
+  type RevokeMemoryCharacterGrantResponseV1,
+} from './memory-grant-revoke-command.js';
