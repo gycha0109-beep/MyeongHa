@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 const root = path.dirname(fileURLToPath(import.meta.url));
 const port = Number(process.env.COUNCIL_PORT || 3000);
 const apiKey = process.env.OPENAI_API_KEY || '';
+const maxContextChars = Number(process.env.COUNCIL_MAX_CONTEXT_CHARS || 24000);
 const meetings = new Map();
 const subscribers = new Map();
 
@@ -15,22 +16,26 @@ const agents = {
   world: {
     label: 'World',
     model: process.env.COUNCIL_WORLD_MODEL || 'gpt-5-mini',
-    instructions: '당신은 MyeongHa World Agent입니다. Worldbuilding, Character Experience, Narrative, Relationship Experience, character consistency를 검토합니다. 서비스가 아는 것과 캐릭터가 아는 것을 구분하십시오. Relationship, Memory, Narrative Progress를 동일시하지 마십시오. 캐릭터를 상품 판매자처럼 다루지 마십시오. 다른 트랙의 의견을 존중하되 World 관점의 위험과 요구사항을 분명히 제시하십시오. 확정되지 않은 정책을 확정된 사실처럼 말하지 마십시오. 한국어로 답하고 결론, 근거, 리스크, 다음 검증 항목 순서를 사용하십시오.',
+    maxOutputTokens: Number(process.env.COUNCIL_WORLD_MAX_OUTPUT_TOKENS || 800),
+    instructions: '당신은 MyeongHa World Agent입니다. Worldbuilding, Character Experience, Narrative, Relationship Experience, character consistency를 검토합니다. 서비스가 아는 것과 캐릭터가 아는 것을 구분하십시오. Relationship, Memory, Narrative Progress를 동일시하지 마십시오. 캐릭터를 상품 판매자처럼 다루지 마십시오. 사용자 경험이 자연스러운지, 캐릭터가 살아 있는 사람처럼 느껴지는지, World/Relationship continuity가 유지되는지, 제품이 CRM·상담봇·판매봇처럼 변하지 않는지를 우선 판단하십시오. Revenue의 경제성은 고려하되 Revenue 최적화가 World 결론의 authority는 아닙니다. 확정되지 않은 정책을 확정된 사실처럼 말하지 마십시오.',
   },
   revenue: {
     label: 'Revenue',
     model: process.env.COUNCIL_REVENUE_MODEL || 'gpt-5-mini',
-    instructions: '당신은 MyeongHa Revenue Agent입니다. BM, Unit Economics, COGS, Monetization, Retention economics, Artifact conversion을 검토합니다. H-R19 Open / Low-friction Relationship Core + Free Grounded First Value + Explicit Paid Structured Artifacts + Optional Membership + Premium Compute / Cost Control과 H-R20 Longitudinal Value Accumulation을 기준 가설로 참고하십시오. Free-Core Cannibalization을 반드시 점검하십시오. 한국어로 답하고 경제적 전제, 수익 기회, 비용·리스크, 검증 항목 순서를 사용하십시오. 확정되지 않은 정책을 임의로 확정하지 마십시오.',
+    maxOutputTokens: Number(process.env.COUNCIL_REVENUE_MAX_OUTPUT_TOKENS || 800),
+    instructions: '당신은 MyeongHa Revenue Agent입니다. BM, Unit Economics, COGS, Monetization, Retention economics, Artifact conversion을 검토합니다. H-R19 Open / Low-friction Relationship Core + Free Grounded First Value + Explicit Paid Structured Artifacts + Optional Membership + Premium Compute / Cost Control과 H-R20 Longitudinal Value Accumulation을 기준 가설로 참고하십시오. Retention 상승이 실제 monetization으로 이어지는지, COGS가 감당 가능한지, Free-Core Cannibalization이 생기는지, 장기 데이터가 WTP/ARPU를 실제로 올릴 수 있는지를 우선 판단하십시오. World가 재미있다고 해서 경제성이 없는 구조를 감싸지 마십시오. 확정되지 않은 정책을 임의로 확정하지 마십시오.',
   },
   engineering: {
     label: 'Engineering',
     model: process.env.COUNCIL_ENGINEERING_MODEL || 'gpt-5-mini',
-    instructions: '당신은 MyeongHa Engineering Agent입니다. Backend feasibility, runtime architecture, DB authority, LLM orchestration, retrieval, context size, latency, cost observability, security/privacy를 검토합니다. LLM은 proposal/rendering이고 Server가 authority라는 원칙을 지키십시오. relationship state, unlock, entitlement, DB authority state를 LLM이 직접 확정하지 않도록 하십시오. 한국어로 답하고 구현 가능성, 구조적 리스크, 비용·보안 영향, 최소 구현안을 순서대로 제시하십시오. 프로젝트 파일을 실제로 변경하라는 지시가 없으면 분석만 하십시오.',
+    maxOutputTokens: Number(process.env.COUNCIL_ENGINEERING_MAX_OUTPUT_TOKENS || 900),
+    instructions: '당신은 MyeongHa Engineering Agent입니다. Backend feasibility, runtime architecture, DB authority, LLM orchestration, retrieval, context size, latency, cost observability, security/privacy를 검토합니다. 실제 구현 가능성, state cardinality, authority의 명확성, bounded context/latency/COGS, privacy·data leakage를 우선 판단하십시오. LLM은 proposal/rendering이고 Server가 authority라는 원칙을 지키십시오. relationship state, unlock, entitlement, DB authority state를 LLM이 직접 확정하지 않도록 하십시오. World나 Revenue가 좋은 아이디어라고 해도 구조상 위험하면 명확히 반대하십시오. 프로젝트 파일을 실제로 변경하라는 지시가 없으면 분석만 하십시오.',
   },
   integration: {
     label: 'Integration',
     model: process.env.COUNCIL_INTEGRATION_MODEL || 'gpt-5-mini',
-    instructions: '당신은 MyeongHa Integration Agent입니다. 앞선 Agent의 의견을 AGREED, CONFLICT, REQUIREMENTS, OPEN, DECISION CANDIDATE, NEXT TEST로 구조화하십시오. World, Revenue, Engineering 정책을 새로 창조하지 마십시오. 의견을 하나로 뭉개지 말고 충돌을 보존하십시오. 결정 후보는 가장 안전한 통합안으로 표현하고, 실제 프로젝트 authority를 자동 변경하지 마십시오. 한국어로 간결하게 답하십시오.',
+    maxOutputTokens: Number(process.env.COUNCIL_INTEGRATION_MAX_OUTPUT_TOKENS || 1400),
+    instructions: '당신은 MyeongHa Integration Agent입니다. 당신은 4번째 전문가가 아니라 실제 발언을 비교·분류하는 기록자입니다. World, Revenue, Engineering의 정책·가격·DB·Character rule을 새로 창조하거나 authority를 확정하지 마십시오. 모든 분류는 transcript의 실제 주장에만 근거해야 하며, 각 항목에 근거 Agent와 Round를 대괄호로 표시하십시오. 예상되는 입장, 잠재적 갈등, 일반 지식으로 보충한 반론, "World라면 이렇게 생각할 수 있다" 같은 추론은 금지입니다. 실제 충돌은 보존하고, 해소되지 않았으면 OPEN 또는 CONFLICT로 남기십시오.',
   },
 };
 
@@ -71,12 +76,60 @@ function extractOutput(response) {
     .trim();
 }
 
-function boundedTranscript(meeting) {
-  return meeting.messages
-    .slice(-8)
-    .map((message) => `[${message.label}]\n${message.content}`)
-    .join('\n\n')
-    .slice(-18000);
+function truncate(value, limit) {
+  const text = String(value || '').trim();
+  return text.length <= limit ? text : `${text.slice(0, limit)}\n…(context truncated)`;
+}
+
+function formatMessages(messages, { perMessage = 3600, total = maxContextChars } = {}) {
+  const parts = [];
+  let used = 0;
+  for (const message of messages) {
+    const header = `[${message.label}${message.round ? ` / Round ${message.round}` : ''}]\n`;
+    const part = `${header}${truncate(message.content, perMessage)}`;
+    if (used + part.length > total) break;
+    parts.push(part);
+    used += part.length + 2;
+  }
+  return parts.join('\n\n');
+}
+
+function buildRoundOneInput(meeting) {
+  const prior = meeting.messages.filter((message) => message.agent !== 'user');
+  return `회의 주제:\n${meeting.topic}\n\n[ROUND 1 TASK]\n당신의 전문영역 책임으로 최초 분석을 제시하십시오. 다른 Agent의 앞선 발언이 있으면 참고하되 그 의견에 맞추기 위해 자기 전문영역의 판단을 포기하지 마십시오. 아직 확정하지 말고, 실제 trade-off와 상대 트랙에 요구할 조건을 분명히 하십시오.\n\n권장 구조:\nPOSITION\n- 현재 입장\n\nREASONS\n- 핵심 근거\n\nRISKS\n- 전문영역 관점의 가장 큰 위험\n\nREQUIREMENTS FOR OTHER TRACKS\n- 상대 트랙에 요구하는 조건\n\nOPEN\n- 아직 판단할 수 없는 것\n\n[PRIOR POSITIONS IN THIS ROUND]\n${formatMessages(prior, { perMessage: 3000, total: 9000 }) || '(아직 다른 전문 Agent 발언 없음)'}`;
+}
+
+function buildRoundTwoInput(meeting, agentName) {
+  const ownRoundOne = meeting.messages.find((message) => message.agent === agentName && message.round === 1);
+  const otherRoundOne = meeting.messages.filter((message) => message.round === 1 && message.agent !== agentName && message.agent !== 'user');
+  const roundTwoDevelopments = meeting.messages.filter((message) => message.round === 2 && message.agent !== agentName);
+  return `회의 주제:\n${meeting.topic}\n\n[YOUR ROUND 1 POSITION]\n${ownRoundOne ? formatMessages([ownRoundOne], { perMessage: 4600, total: 4600 }) : '(없음)'}\n\n[OTHER AGENTS' ROUND 1 POSITIONS]\n${formatMessages(otherRoundOne, { perMessage: 3900, total: 12000 }) || '(없음)'}\n\n[ROUND 2 DEVELOPMENTS]\n${formatMessages(roundTwoDevelopments, { perMessage: 3200, total: 6000 }) || '(아직 없음)'}\n\n[ROUND 2 TASK]\nRound 1 답변을 요약하거나 표현만 바꿔 반복하지 마십시오. 핵심은 다른 Agent의 실제 주장 이후 생긴 입장 변화입니다. 합의가 Round 2의 목적이 아니며, 자기 전문영역의 책임을 유지하십시오. 아래 정확한 형식으로 작성하십시오.\n\nACCEPT\n- 다른 Agent의 주장 중 가장 강하게 수용하는 것 1개와 짧은 이유\n\nOBJECT\n- 다른 Agent의 주장 중 가장 강하게 반대하거나 수정해야 하는 것 1개, 반대 이유와 대안\n- 실질적인 반대가 정말 없다면 정확히 \`NO MATERIAL OBJECTION\`이라고 작성\n\nDELTA\n- 위 검토 때문에 Round 1 자기 제안에서 실제로 변경된 내용만 작성\n- 변경이 없다면 \`NO MATERIAL CHANGE\`라고 작성\n\n다른 Agent의 실제 주장에 근거해 수용·반박·조건부 수용 중 하나를 수행하십시오.`;
+}
+
+function buildIntegrationInput(meeting) {
+  const transcript = formatMessages(meeting.messages.filter((message) => message.agent !== 'integration'), { perMessage: 3600, total: maxContextChars });
+  return `회의 주제:\n${meeting.topic}\n\n[ACTUAL TRANSCRIPT]\n${transcript || '(전문 Agent 발언 없음)'}\n\n[INTEGRATION TASK]\nTranscript에 실제로 확인되는 주장만 분류하십시오. 항목마다 근거 Agent와 Round를 \`[World R2]\`처럼 표시하십시오.\n\nAGREED는 다음 중 하나일 때만 작성하십시오.\nA. 최소 2개 Agent가 명시적으로 같은 방향을 수용했을 때\nB. 한 Agent의 제안에 다른 Agent들이 Round 2에서 명시적으로 objection하지 않았을 때\n누구도 말하지 않은 내용을 상식적으로 타당하다고 판단해 AGREED로 만들면 안 됩니다.\n\nCONFLICT는 최소 두 Agent의 실제 주장이 양립하지 않을 때만 작성하십시오. 강조점이 다르다는 이유만으로 conflict로 만들면 안 됩니다. 각 conflict는 다음 형태를 따르십시오.\n1. 논점\nWorld: 실제 주장 요약 [World R1/R2]\nRevenue: 실제 주장 요약 [Revenue R1/R2]\nEngineering: 실제 주장 요약 [Engineering R1/R2]\nStatus: unresolved 또는 partially resolved in Round 2\n\n실제 충돌이 없으면 CONFLICT에 \`NONE OBSERVED IN TRANSCRIPT\`라고 작성하십시오.\n\n기본 출력 형식은 다음입니다. 사용자가 회의 주제에서 별도 출력 형식을 명시한 경우 그 형식을 우선하되, grounding 규칙은 항상 지키십시오.\n\nAGREED\n\nCONFLICT\n\nREQUIREMENTS\n\nDECISION CANDIDATE\n\nFAILURE CASES\n\nMETRICS / VALIDATION\n\nOPEN\n\nNEXT TEST\n\nFAILURE CASES와 METRICS / VALIDATION도 transcript에서 실제로 제기된 위험·검증만 기록하십시오. 근거가 없으면 \`NOT RAISED IN TRANSCRIPT\`라고 작성하십시오. 긴 재서술은 금지하고 핵심 결정·실제 충돌·통합 요구·미해결점·다음 검증만 간결하게 작성하십시오.`;
+}
+
+function buildAgentInput(meeting, agentName, round) {
+  if (agentName === 'integration') return buildIntegrationInput(meeting);
+  return round === 1 ? buildRoundOneInput(meeting) : buildRoundTwoInput(meeting, agentName);
+}
+
+function buildAgentInstructions(agentName, round) {
+  const agent = agents[agentName];
+  const webSearchRule = '웹 검색을 사용했다면 답변 마지막에 핵심 출처를 URL과 함께 짧게 적으십시오.';
+  if (agentName === 'integration') return `${agent.instructions}\n${webSearchRule}`;
+  const phaseRule = round === 1
+    ? '한국어로 간결하게 답하고, 요청된 Round 1 구조를 따르십시오.'
+    : '한국어로 간결하게 답하고, ACCEPT / OBJECT / DELTA 세 제목을 반드시 모두 사용하십시오.';
+  return `${agent.instructions}\n${phaseRule}\n${webSearchRule}`;
+}
+
+function validateAgentOutput(agentName, round, content) {
+  if (agentName === 'integration' || round !== 2) return;
+  const missing = ['ACCEPT', 'OBJECT', 'DELTA'].filter((heading) => !new RegExp(`(^|\\n)\\s*#*\\s*${heading}\\b`, 'i').test(content));
+  if (missing.length) throw new Error(`${agents[agentName].label} Round 2 응답에 필수 섹션이 없습니다: ${missing.join(', ')}`);
 }
 
 async function callAgent(meeting, agentName, round) {
@@ -85,29 +138,21 @@ async function callAgent(meeting, agentName, round) {
   const startedAt = Date.now();
   const response = await fetch('https://api.openai.com/v1/responses', {
     method: 'POST',
-    headers: {
-      authorization: `Bearer ${apiKey}`,
-      'content-type': 'application/json',
-    },
+    headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
     body: JSON.stringify({
       model: agent.model,
-      instructions: agent.instructions,
-      input: `회의 주제:\n${meeting.topic}\n\n현재 라운드: ${round}/${meeting.maxRounds}\n\n현재까지의 회의 발언:\n${boundedTranscript(meeting) || '(아직 다른 발언 없음)'}\n\n당신의 차례입니다. 앞선 Agent의 발언을 읽고, 동의·반박·수정안을 분명히 밝히십시오. ${round > 1 ? '이번 라운드는 앞선 라운드에 대한 재검토입니다.' : '이번 라운드는 최초 분석입니다.'} 웹 검색을 사용했다면 답변 마지막에 핵심 출처를 URL과 함께 짧게 적으십시오.`,
-      max_output_tokens: Number(process.env.COUNCIL_MAX_OUTPUT_TOKENS || 700),
+      instructions: buildAgentInstructions(agentName, round),
+      input: buildAgentInput(meeting, agentName, round),
+      max_output_tokens: agent.maxOutputTokens,
       ...(meeting.webSearch ? { tools: [{ type: 'web_search' }] } : {}),
     }),
   });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(body.error?.message || `OpenAI HTTP ${response.status}`);
   const content = extractOutput(body);
-  if (!content) throw new Error('OpenAI가 빈 응답을 반환했습니다.');
-  return {
-    content,
-    model: body.model || agent.model,
-    request_id: body.id || null,
-    usage: body.usage || null,
-    latency_ms: Date.now() - startedAt,
-  };
+  if (!content) throw new Error(`OpenAI 응답에 출력 텍스트가 없습니다. status=${body.status || 'unknown'}, reason=${body.incomplete_details?.reason || 'unknown'}`);
+  validateAgentOutput(agentName, round, content);
+  return { content, model: body.model || agent.model, request_id: body.id || null, usage: body.usage || null, latency_ms: Date.now() - startedAt, max_output_tokens: agent.maxOutputTokens };
 }
 
 async function runMeeting(meeting) {
@@ -120,20 +165,8 @@ async function runMeeting(meeting) {
         publish(meeting.id, 'status', { agent: agentName, round, status: 'thinking' });
         const result = await callAgent(meeting, agentName, round);
         meeting.calls += 1;
-        meeting.usage.push({
-          agent: agentName,
-          round,
-          model: result.model,
-          request_id: result.request_id,
-          usage: result.usage,
-          latency_ms: result.latency_ms,
-        });
-        addMessage(meeting, agentName, result.content, {
-          round,
-          model: result.model,
-          usage: result.usage,
-          latency_ms: result.latency_ms,
-        });
+        meeting.usage.push({ agent: agentName, round, model: result.model, request_id: result.request_id, usage: result.usage, latency_ms: result.latency_ms, max_output_tokens: result.max_output_tokens });
+        addMessage(meeting, agentName, result.content, { round, model: result.model, usage: result.usage, latency_ms: result.latency_ms, max_output_tokens: result.max_output_tokens });
         publish(meeting.id, 'status', { agent: agentName, round, status: 'completed' });
       }
     }
@@ -142,20 +175,8 @@ async function runMeeting(meeting) {
       publish(meeting.id, 'status', { agent: 'integration', round, status: 'thinking' });
       const result = await callAgent(meeting, 'integration', round);
       meeting.calls += 1;
-      meeting.usage.push({
-        agent: 'integration',
-        round,
-        model: result.model,
-        request_id: result.request_id,
-        usage: result.usage,
-        latency_ms: result.latency_ms,
-      });
-      addMessage(meeting, 'integration', result.content, {
-        round,
-        model: result.model,
-        usage: result.usage,
-        latency_ms: result.latency_ms,
-      });
+      meeting.usage.push({ agent: 'integration', round, model: result.model, request_id: result.request_id, usage: result.usage, latency_ms: result.latency_ms, max_output_tokens: result.max_output_tokens });
+      addMessage(meeting, 'integration', result.content, { round, model: result.model, usage: result.usage, latency_ms: result.latency_ms, max_output_tokens: result.max_output_tokens });
       publish(meeting.id, 'status', { agent: 'integration', round, status: 'completed' });
     }
     meeting.status = 'completed';
@@ -227,6 +248,10 @@ const server = http.createServer(async (request, response) => {
   }
 });
 
-server.listen(port, '127.0.0.1', () => {
-  console.log(`MyeongHa Council Room: http://127.0.0.1:${port}`);
-});
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  server.listen(port, '127.0.0.1', () => {
+    console.log(`MyeongHa Council Room: http://127.0.0.1:${port}`);
+  });
+}
+
+export { agents, buildAgentInput, buildAgentInstructions, buildIntegrationInput, formatMessages, runMeeting, validateAgentOutput };

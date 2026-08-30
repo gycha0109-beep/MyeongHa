@@ -1,0 +1,63 @@
+import { randomUUID } from 'node:crypto';
+import { runMeeting } from '../room-server.mjs';
+
+const cases = [
+  {
+    name: 'Test A — Life Thread resurfacing v0.1',
+    topic: `Life Thread resurfacing v0.1을 검토한다.
+
+중요 원칙:
+- 캐릭터는 자신이 실제로 참여한 Thread에 한해서만 자연스럽게 과거 선택과 이후 결과를 되짚을 수 있다.
+- 서버가 Thread association과 eligibility를 authority로 확정하고, LLM은 proposal/rendering만 한다.
+- 가격, 정확한 cooldown 일수, DB schema, relationship score 공식은 확정하지 않는다.
+
+World: 관계 몰입·캐릭터 자연스러움·continuity 관점
+Revenue: Artifact 가치·cannibalization·장기 경제성 관점
+Engineering: authority·metadata·context·privacy·cost 관점
+
+Round 2에는 실제 상대 주장에 반응해 ACCEPT / OBJECT / DELTA를 작성한다.`,
+  },
+  {
+    name: 'Test B — Free unlimited Character Chat conflict',
+    topic: `명하의 기본 Character Chat을 무료 사용자에게 완전 무제한으로 제공해야 하는가?
+
+World: 관계 몰입과 Character accessibility 관점
+Revenue: COGS / conversion / Free-Core Cannibalization 관점
+Engineering: inference cost / abuse / capacity / server-side rate control 관점
+
+가격이나 정확한 quota 숫자는 확정하지 말고 원칙만 논의한다. 모든 관점을 억지로 하나의 합의로 만들지 말고 실제 충돌은 남긴다.`,
+  },
+];
+
+function createMeeting(topic) {
+  return {
+    id: randomUUID(),
+    topic,
+    agents: ['world', 'revenue', 'engineering', 'integration'],
+    maxRounds: 2,
+    maxAgentCalls: 7,
+    webSearch: false,
+    calls: 0,
+    status: 'running',
+    messages: [],
+    usage: [],
+    created_at: new Date().toISOString(),
+  };
+}
+
+for (const testCase of cases) {
+  const meeting = createMeeting(testCase.topic);
+  await runMeeting(meeting);
+  const roundTwo = meeting.messages.filter((message) => message.round === 2);
+  const integration = meeting.messages.find((message) => message.agent === 'integration');
+  const roundTwoPass = roundTwo.length === 3 && roundTwo.every((message) => /(^|\n)\s*ACCEPT\b/i.test(message.content) && /(^|\n)\s*OBJECT\b/i.test(message.content) && /(^|\n)\s*DELTA\b/i.test(message.content));
+  const integrationHeadings = ['AGREED', 'CONFLICT', 'REQUIREMENTS', 'DECISION CANDIDATE', 'FAILURE CASES', 'METRICS / VALIDATION', 'OPEN', 'NEXT TEST'];
+  const integrationPass = Boolean(integration) && integrationHeadings.every((heading) => integration.content.includes(heading));
+  console.log(`\n${testCase.name}`);
+  console.log(`status=${meeting.status} calls=${meeting.calls} round2_protocol=${roundTwoPass ? 'PASS' : 'FAIL'} integration_sections=${integrationPass ? 'PASS' : 'FAIL'}`);
+  for (const item of meeting.messages) {
+    if (item.agent === 'user') continue;
+    console.log(`\n[${item.label} / Round ${item.round}]\n${item.content}`);
+  }
+  if (meeting.status !== 'completed' || !roundTwoPass || !integrationPass) process.exitCode = 1;
+}
