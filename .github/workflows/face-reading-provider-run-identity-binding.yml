@@ -1,0 +1,76 @@
+name: Face Reading Provider Run Identity Binding
+
+on:
+  pull_request:
+    paths:
+      - 'packages/face-reading/src/provider-run-identity-binding-frdata09.ts'
+      - 'packages/face-reading/src/provider-face-count-raw-scoring-frdata08.ts'
+      - 'packages/face-reading/src/independent-face-ground-truth-frdata07.ts'
+      - 'packages/face-reading/src/provider-face-candidate-observations-frdata06.ts'
+      - 'packages/face-reading/src/index.ts'
+      - 'test/face-reading-fr-data09-provider-run-identity-binding.test.ts'
+      - 'docs/FACE_READING_FR_DATA09_PROVIDER_RUN_IDENTITY_BINDING.md'
+      - '.github/workflows/face-reading-provider-run-identity-binding.yml'
+  workflow_dispatch:
+
+jobs:
+  fr-data09-provider-run-identity-binding:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install exact workspace dependencies
+        run: npm install --ignore-scripts
+
+      - name: Build MyeongHa runtime
+        run: npm run build
+
+      - name: Run FR-DATA-09 contract tests
+        run: npx vitest run test/face-reading-fr-data09-provider-run-identity-binding.test.ts
+
+      - name: Verify compiled authority boundary
+        run: |
+          node --input-type=module <<'NODE'
+          import {
+            PROVIDER_RUN_IDENTITY_BINDING_AUTHORITY_FRDATA09,
+            assertProviderRunIdentityBindingReadyForPromotionFRData09,
+          } from './dist/packages/face-reading/src/index.js';
+
+          const authority = PROVIDER_RUN_IDENTITY_BINDING_AUTHORITY_FRDATA09;
+          const protocol = authority.protocol;
+          if (
+            authority.schemaVersion !== 'fr-data09-v1' ||
+            authority.authorityState !== 'report_instance_binding_defined_no_external_execution_attestation' ||
+            protocol.groundTruthSchemaRef !== 'fr-data07-independent-face-ground-truth-v1' ||
+            protocol.providerObservationSchemaRef !== 'fr-data06-provider-face-candidate-observation-v1' ||
+            protocol.rawJoinSchemaRef !== 'fr-data08-provider-face-count-raw-scoring-v1' ||
+            protocol.reportCanonicalizationAlgorithm !== 'sorted_object_keys_preserve_array_order_json_v1' ||
+            protocol.reportDigestAlgorithm !== 'sha256' ||
+            protocol.providerRunRefPrefix !== 'frdata06-report-instance' ||
+            protocol.providerRunRefLocator !== 'report_digest_plus_capture_ref' ||
+            protocol.providerRunRefMayBeInferredFromGithubRunId !== false ||
+            protocol.providerRunRefMayBeInferredFromTimestamp !== false ||
+            protocol.reportDigestMeansExternalProcessIdentity !== false ||
+            protocol.reportDigestMeansProviderConstructValidity !== false ||
+            protocol.reportDigestMeansHumanFaceIdentity !== false
+          ) {
+            throw new Error(`FR-DATA-09 authority/protocol drift: ${JSON.stringify(authority)}`);
+          }
+
+          if (Object.values(authority.authorityBoundary).some((value) => value !== false)) {
+            throw new Error(`FR-DATA-09 authority boundary promoted unexpectedly: ${JSON.stringify(authority.authorityBoundary)}`);
+          }
+
+          let promotionBlocked = false;
+          try {
+            assertProviderRunIdentityBindingReadyForPromotionFRData09();
+          } catch {
+            promotionBlocked = true;
+          }
+          if (!promotionBlocked) throw new Error('FR-DATA-09 promotion assertion unexpectedly succeeded.');
+
+          console.log('FR_DATA09_PROVIDER_RUN_IDENTITY_BINDING_CONTRACT_PASS');
+          NODE
