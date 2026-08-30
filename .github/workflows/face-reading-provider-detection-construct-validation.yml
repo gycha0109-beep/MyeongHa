@@ -62,9 +62,12 @@ jobs:
             protocol.binaryFacePresenceTaskMayBeAssumed !== false ||
             protocol.exactSingleHumanFaceTaskMayBeAssumed !== false ||
             protocol.exactHumanFaceCountTaskMayBeAssumed !== false ||
+            protocol.captureDomainMustBeDefinedBeforeValidationDataInspection !== true ||
+            protocol.outcomeHandlingMustBeDefinedBeforeValidationDataInspection !== true ||
             protocol.indeterminateMayBeSilentlyExcluded !== false ||
             protocol.unresolvedMayBeSilentlyExcluded !== false ||
             protocol.multipleHumanFacesMayBeSilentlyCollapsed !== false ||
+            protocol.humanReferenceMustFreezeBeforeProviderOutcomeComparison !== true ||
             protocol.currentFRData11HoldoutMayServeAsFuturePreregisteredConstructValidationHoldout !== false ||
             protocol.newUnseenValidationDatasetRequiredAfterProtocolFreeze !== true ||
             protocol.acceptanceCriteriaMayBeDerivedFromObservedProviderPerformance !== false ||
