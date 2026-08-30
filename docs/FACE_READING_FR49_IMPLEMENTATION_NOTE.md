@@ -1,1 +1,0 @@
-Implementation intentionally consumes only a provider-blind frozen FR-46 independent Menton observation. It does not inspect provider output, provider indices, FACE_OVAL, or traditional semantic labels while deriving the research-only vertical coordinate.
