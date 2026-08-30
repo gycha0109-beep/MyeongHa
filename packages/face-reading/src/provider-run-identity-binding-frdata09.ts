@@ -197,7 +197,7 @@ function canonicalJson(value: unknown, path: string): string {
       const prototype = Object.getPrototypeOf(value);
       if (prototype !== Object.prototype && prototype !== null) fail(`${path} must contain JSON-compatible plain objects only.`);
       const record = value as Record<string, unknown>;
-      const keys = Object.keys(record).sort((left, right) => left.localeCompare(right));
+      const keys = Object.keys(record).sort((left, right) => (left < right ? -1 : left > right ? 1 : 0));
       return `{${keys.map((key) => {
         const child = record[key];
         if (child === undefined) fail(`${path}.${key} cannot be undefined.`);
