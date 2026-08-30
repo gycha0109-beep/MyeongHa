@@ -4,7 +4,7 @@ import {
   type CapabilityGateResult,
 } from '../../../packages/domain/src/index.js';
 
-export const API_FOUNDATION_VERSION = 'myeongha-api-foundation-v0.23' as const;
+export const API_FOUNDATION_VERSION = 'myeongha-api-foundation-v0.24' as const;
 
 export function authorizePlannedCapability(
   input: CapabilityGateInput,
@@ -301,3 +301,21 @@ export {
   type PublicShareReadAuthorityPortV1,
   type PublicShareTokenFingerprintPortV1,
 } from './public-share-read.js';
+
+export {
+  GUEST_BOOTSTRAP_AUTHORITY_BINDING_V1,
+  GuestBootstrapAuthorityPortErrorV1,
+  bootstrapSession,
+  type BootstrapSessionInputV1,
+  type BootstrapSessionResponseV1,
+  type GuestBootstrapAuthorityFailureCodeV1,
+  type GuestBootstrapAuthorityPortV1,
+  type GuestBootstrapAuthorityRowV1,
+  type GuestBootstrapCredentialIssuerPortV1,
+  type GuestBootstrapIdentityResolverPortV1,
+  type GuestBootstrapTokenFingerprintPortV1,
+  type IssuedGuestBootstrapCredentialV1,
+  type ReusableBootstrapIdentityV1,
+  type ReusableGuestBootstrapIdentityV1,
+  type ReusableMemberBootstrapIdentityV1,
+} from './guest-bootstrap-command.js';
