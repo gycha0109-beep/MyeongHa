@@ -44,7 +44,8 @@ FR-DATA-12 records the following unresolved prerequisites:
 5. explicit provider-output metric-role policy;
 6. explicit outcome-exclusion policy;
 7. explicit metric-denominator policy;
-8. evaluation-policy freeze before holdout inspection.
+8. evaluation-policy freeze before holdout inspection;
+9. a new unseen holdout collected/admitted after that policy freeze for confirmatory metrics.
 
 These are blockers, not inferred facts.
 
@@ -52,15 +53,23 @@ These are blockers, not inferred facts.
 
 Neither calibration performance nor holdout performance may be used to invent evaluation semantics.
 
-In particular, holdout results cannot be inspected and then used to decide:
+There is an additional non-retroactivity constraint: **FR-DATA-11 already materializes the pairing between holdout adjudication outcomes and provider candidate counts.** Therefore the existing FR-DATA-11 holdout cannot later be relabeled as a policy-preregistered confirmatory holdout after metric semantics are chosen.
+
+For any future confirmatory performance claim:
+
+1. the evaluation semantics must first be justified and frozen;
+2. then a new unseen holdout must be admitted without using its provider behavior to change the policy;
+3. only that new untouched holdout could become eligible for confirmatory metric evaluation, subject to all other authority gaps also being closed.
+
+The existing FR-DATA-11 holdout may remain research/exploratory evidence, but FR-DATA-12 does not authorize it as future preregistered confirmatory evidence.
+
+In particular, already materialized holdout results cannot be used to decide:
 
 - which human outcomes count as positive or negative;
 - which outcomes are excluded;
 - which provider bucket is positive or negative;
 - which denominator produces a preferred metric;
 - which threshold gives a preferred score.
-
-A future evaluation policy must be justified and frozen before holdout inspection for the intended evaluation claim.
 
 ## Undefined empirical quantities
 
@@ -85,6 +94,9 @@ It may state only that:
 - `indeterminate` remains present;
 - `unresolved` remains present;
 - the raw cross-tab remains non-confusion-matrix evidence;
+- FR-DATA-11 has already materialized the current holdout outcome/provider pairing;
+- the current holdout is not eligible to be retroactively treated as a future policy-preregistered confirmatory holdout;
+- a new unseen holdout is required after evaluation-policy freeze for any future confirmatory metric claim;
 - metric semantics are blocked because named prerequisites remain unresolved.
 
 ## What remains false
@@ -106,6 +118,7 @@ FR-DATA-12 does not establish or authorize:
 - ROC / AUC;
 - provider decision thresholds;
 - calibration thresholds;
+- retrospective requalification of the existing holdout as preregistered confirmatory evidence;
 - holdout tuning;
 - near-duplicate / burst / transformed-image leakage validation;
 - reviewed empirical validation;
@@ -126,4 +139,4 @@ Dedicated tests use synthetic typed metadata only to verify the readiness gate a
 
 The next step should not be metric computation. The current blockers show that a meaningful evaluation policy still depends on external authority work.
 
-A coherent next slice is to define a **provider detection construct-validation protocol** or a **reviewed ground-truth admission protocol**. Either must remain separate from observed holdout performance and must not manufacture empirical thresholds merely to unblock CI.
+A coherent next slice is to define a **provider detection construct-validation protocol** or a **reviewed ground-truth admission protocol**. Either must remain separate from observed holdout performance and must not manufacture empirical thresholds merely to unblock CI. Once a metric policy is eventually justified and frozen, confirmatory evaluation must use a new unseen holdout rather than the already-materialized FR-DATA-11 holdout.
