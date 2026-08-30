@@ -1,0 +1,1 @@
+Evidence levels are kept separate: traditional text supports 地閣 as a chin-region anchor; historical medical terminology supports 地閣/頦/lower-jaw lexical locality; modern anthropometry supports Me′ as an inferior midpoint on the soft-tissue chin contour. None alone or together establishes provider or exact traditional-point equivalence.
