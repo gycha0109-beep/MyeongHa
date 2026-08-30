@@ -1,0 +1,85 @@
+name: Face Reading Metric Eligibility Readiness
+
+on:
+  pull_request:
+    paths:
+      - 'packages/face-reading/src/metric-eligibility-readiness-frdata12.ts'
+      - 'packages/face-reading/src/adjudicated-provider-raw-join-frdata11.ts'
+      - 'packages/face-reading/src/independent-face-adjudication-frdata10.ts'
+      - 'packages/face-reading/src/provider-run-identity-binding-frdata09.ts'
+      - 'packages/face-reading/src/provider-face-candidate-observations-frdata06.ts'
+      - 'packages/face-reading/src/index.ts'
+      - 'test/face-reading-fr-data12-*.test.ts'
+      - 'docs/FACE_READING_FR_DATA12_METRIC_ELIGIBILITY_READINESS.md'
+      - '.github/workflows/face-reading-metric-eligibility-readiness.yml'
+  workflow_dispatch:
+
+jobs:
+  fr-data12-metric-eligibility-readiness:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install exact workspace dependencies
+        run: npm install --ignore-scripts
+
+      - name: Build MyeongHa runtime
+        run: npm run build
+
+      - name: Run FR-DATA-12 contract tests
+        run: npx vitest run test/face-reading-fr-data12-*.test.ts
+
+      - name: Verify compiled readiness authority boundary
+        run: |
+          node --input-type=module <<'NODE'
+          import {
+            METRIC_ELIGIBILITY_READINESS_AUTHORITY_FRDATA12,
+            assertMetricEligibilityReadyForPromotionFRData12,
+          } from './dist/packages/face-reading/src/index.js';
+
+          const authority = METRIC_ELIGIBILITY_READINESS_AUTHORITY_FRDATA12;
+          const protocol = authority.protocol;
+          if (
+            authority.schemaVersion !== 'fr-data12-v1' ||
+            authority.authorityState !== 'prerequisite_contract_defined_metric_semantics_blocked' ||
+            protocol.rawJoinSchemaRef !== 'fr-data11-adjudicated-provider-raw-join-v1' ||
+            protocol.assessmentUnit !== 'frdata11_raw_join_report' ||
+            protocol.frData12MayAssignMetricRoles !== false ||
+            protocol.positiveNegativeMappingMayBeInferredFromOutcomeNames !== false ||
+            protocol.indeterminateMayBeAutoExcluded !== false ||
+            protocol.unresolvedMayBeAutoExcluded !== false ||
+            protocol.calibrationPerformanceMayDefineEvaluationSemantics !== false ||
+            protocol.holdoutPerformanceMayDefineOrTuneEvaluationSemantics !== false ||
+            protocol.reviewedGroundTruthAuthorityRequiredForMetricAuthorization !== true ||
+            protocol.providerDetectionConstructValidityRequiredForMetricAuthorization !== true ||
+            protocol.explicitHumanOutcomeMetricRolePolicyRequired !== true ||
+            protocol.explicitProviderOutputMetricRolePolicyRequired !== true ||
+            protocol.explicitOutcomeExclusionPolicyRequired !== true ||
+            protocol.explicitMetricDenominatorPolicyRequired !== true ||
+            protocol.evaluationPolicyFreezeBeforeHoldoutInspectionRequired !== true ||
+            protocol.minimumEvaluationSampleSize !== null ||
+            protocol.minimumPerClassSampleSize !== null ||
+            protocol.acceptanceThreshold !== null ||
+            protocol.binaryDecisionThreshold !== null ||
+            protocol.classificationMetricsAuthorized !== false
+          ) {
+            throw new Error(`FR-DATA-12 authority/protocol drift: ${JSON.stringify(authority)}`);
+          }
+
+          if (Object.values(authority.authorityBoundary).some((value) => value !== false)) {
+            throw new Error(`FR-DATA-12 authority boundary promoted unexpectedly: ${JSON.stringify(authority.authorityBoundary)}`);
+          }
+
+          let promotionBlocked = false;
+          try {
+            assertMetricEligibilityReadyForPromotionFRData12();
+          } catch {
+            promotionBlocked = true;
+          }
+          if (!promotionBlocked) throw new Error('FR-DATA-12 promotion assertion unexpectedly succeeded.');
+
+          console.log('FR_DATA12_METRIC_ELIGIBILITY_READINESS_CONTRACT_PASS');
+          NODE
