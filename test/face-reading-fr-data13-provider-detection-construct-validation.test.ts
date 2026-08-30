@@ -292,6 +292,7 @@ describe('FR-DATA-13 provider detection construct validation protocol', () => {
     expect(result.exactHumanFaceCountConstructSelected).toBe(false);
     expect(result.captureDomainScopeDefined).toBe(false);
     expect(result.outOfScopeOutcomeHandlingPolicyDefined).toBe(false);
+    expect(result.constructValidationProtocolFrozenBeforeProviderOutputInspection).toBe(false);
   });
 
   it('preserves the FR-DATA-12 holdout non-retroactivity boundary for construct validation', () => {
@@ -312,7 +313,7 @@ describe('FR-DATA-13 provider detection construct validation protocol', () => {
       'reviewed_human_reference_standard_authority',
       'capture_domain_scope_definition',
       'out_of_scope_outcome_handling_policy',
-      'construct_validation_protocol_freeze_before_provider_inspection',
+      'construct_validation_protocol_freeze_before_provider_output_inspection',
       'new_unseen_construct_validation_dataset_after_protocol_freeze',
       'near_duplicate_partition_leakage_control',
       'acceptance_criteria_defined_before_validation_data_inspection',
@@ -338,6 +339,7 @@ describe('FR-DATA-13 provider detection construct validation protocol', () => {
     expect(protocol.indeterminateMayBeSilentlyExcluded).toBe(false);
     expect(protocol.unresolvedMayBeSilentlyExcluded).toBe(false);
     expect(protocol.multipleHumanFacesMayBeSilentlyCollapsed).toBe(false);
+    expect(protocol.humanReferenceMustFreezeBeforeProviderOutcomeComparison).toBe(true);
   });
 
   it('does not invent empirical minima or acceptance thresholds', () => {
