@@ -1,0 +1,82 @@
+name: Face Reading Adjudicated Provider Raw Join
+
+on:
+  pull_request:
+    paths:
+      - 'packages/face-reading/src/adjudicated-provider-raw-join-frdata11.ts'
+      - 'packages/face-reading/src/independent-face-adjudication-frdata10.ts'
+      - 'packages/face-reading/src/provider-run-identity-binding-frdata09.ts'
+      - 'packages/face-reading/src/provider-face-candidate-observations-frdata06.ts'
+      - 'packages/face-reading/src/index.ts'
+      - 'test/face-reading-fr-data11-*.test.ts'
+      - 'docs/FACE_READING_FR_DATA11_ADJUDICATED_PROVIDER_RAW_JOIN.md'
+      - '.github/workflows/face-reading-adjudicated-provider-raw-join.yml'
+  workflow_dispatch:
+
+jobs:
+  fr-data11-adjudicated-provider-raw-join:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install exact workspace dependencies
+        run: npm install --ignore-scripts
+
+      - name: Build MyeongHa runtime
+        run: npm run build
+
+      - name: Run FR-DATA-11 contract tests
+        run: npx vitest run test/face-reading-fr-data11-*.test.ts
+
+      - name: Verify compiled authority boundary
+        run: |
+          node --input-type=module <<'NODE'
+          import {
+            ADJUDICATED_PROVIDER_RAW_JOIN_AUTHORITY_FRDATA11,
+            assertAdjudicatedProviderRawJoinReadyForPromotionFRData11,
+          } from './dist/packages/face-reading/src/index.js';
+
+          const authority = ADJUDICATED_PROVIDER_RAW_JOIN_AUTHORITY_FRDATA11;
+          const protocol = authority.protocol;
+          if (
+            authority.schemaVersion !== 'fr-data11-v1' ||
+            authority.authorityState !== 'raw_join_contract_defined_no_metric_or_ground_truth_authority' ||
+            protocol.joinUnit !== 'capture_adjudication_provider_observation' ||
+            protocol.exactDatasetRefMatchRequired !== true ||
+            protocol.exactCaptureRefSetMatchRequired !== true ||
+            protocol.exactAssetDigestMatchRequired !== true ||
+            protocol.exactProviderRunBindingRequired !== true ||
+            protocol.frozenAdjudicationLedgerRequired !== true ||
+            protocol.indeterminateMustRemainDistinct !== true ||
+            protocol.unresolvedMustRemainDistinct !== true ||
+            protocol.unresolvedMayBeDropped !== false ||
+            protocol.indeterminateMayBeDropped !== false ||
+            protocol.rawCrossTabMayBeComputed !== true ||
+            protocol.providerCandidateCountMayBeInterpretedAsHumanFaceCount !== false ||
+            protocol.truePositiveFalsePositiveTerminologyAuthorized !== false ||
+            protocol.classificationMetricsAuthorized !== false ||
+            protocol.metricEligibilityPolicyDefined !== false ||
+            protocol.providerDecisionThresholdDefined !== false ||
+            protocol.calibrationThresholdDefined !== false ||
+            protocol.holdoutMayTuneEvaluationPolicy !== false
+          ) {
+            throw new Error(`FR-DATA-11 authority/protocol drift: ${JSON.stringify(authority)}`);
+          }
+
+          if (Object.values(authority.authorityBoundary).some((value) => value !== false)) {
+            throw new Error(`FR-DATA-11 authority boundary promoted unexpectedly: ${JSON.stringify(authority.authorityBoundary)}`);
+          }
+
+          let promotionBlocked = false;
+          try {
+            assertAdjudicatedProviderRawJoinReadyForPromotionFRData11();
+          } catch {
+            promotionBlocked = true;
+          }
+          if (!promotionBlocked) throw new Error('FR-DATA-11 promotion assertion unexpectedly succeeded.');
+
+          console.log('FR_DATA11_ADJUDICATED_PROVIDER_RAW_JOIN_CONTRACT_PASS');
+          NODE
