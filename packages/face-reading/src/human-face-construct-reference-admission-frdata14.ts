@@ -1,7 +1,6 @@
 import { createHash } from 'node:crypto';
 import type {
   IndependentFaceGroundTruthDatasetFRData07V1,
-  IndependentHumanFaceCountLabelFRData07V1,
 } from './independent-face-ground-truth-frdata07.js';
 import { INDEPENDENT_FACE_GROUND_TRUTH_AUTHORITY_FRDATA07 } from './independent-face-ground-truth-frdata07.js';
 import type {
@@ -412,8 +411,9 @@ export function validateHumanFaceConstructReferenceAdmissionAuthorityFRData14(
   }
 
   if (
-    INDEPENDENT_FACE_GROUND_TRUTH_AUTHORITY_FRDATA07.protocol.labelVocabulary.some((value, index) => value !== HUMAN_LABELS[index]) ||
-    INDEPENDENT_FACE_ADJUDICATION_AUTHORITY_FRDATA10.protocol.outcomeVocabulary.some((value, index) => value !== ADJUDICATION_OUTCOMES[index]) ||
+    !sameOrdered(INDEPENDENT_FACE_GROUND_TRUTH_AUTHORITY_FRDATA07.protocol.labelVocabulary, HUMAN_LABELS) ||
+    !sameOrdered(INDEPENDENT_FACE_GROUND_TRUTH_AUTHORITY_FRDATA07.protocol.requiredEvaluationLabels, SCORING_REFERENCE_CLASSES) ||
+    !sameOrdered(INDEPENDENT_FACE_ADJUDICATION_AUTHORITY_FRDATA10.protocol.outcomeVocabulary, ADJUDICATION_OUTCOMES) ||
     PROVIDER_DETECTION_CONSTRUCT_VALIDATION_AUTHORITY_FRDATA13.protocol.targetConstructMustBeDefinedBeforeScoring !== true ||
     PROVIDER_DETECTION_CONSTRUCT_VALIDATION_AUTHORITY_FRDATA13.protocol.targetConstructMayBeInferredFromProviderOutput !== false
   ) fail('upstream human-label or construct-validation authority drift.');
