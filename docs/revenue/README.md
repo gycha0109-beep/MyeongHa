@@ -7,7 +7,7 @@
 
 ## Current research state
 
-**Latest research pass:** Pass 5 — World / Character Service Economics  
+**Latest research pass:** Pass 5A — World Economics + Free/Paid Boundary Benchmark  
 **Snapshot:** 2026-08-30 KST  
 **Current leading revenue meta-hypothesis:** **H-R18 — Layered Value Monetization**  
 **Current leading launch hypothesis:** **H-R19 — Explicit Value Artifact Launch**  
@@ -25,7 +25,7 @@ open / low-friction relationship core
 + premium compute as cost guard
 ```
 
-Pass 5 keeps H-R19 but adds a stronger condition:
+Pass 5/5A keeps H-R19 but sharpens the boundary:
 
 > Long-term Character / Memory value must raise retention **and** create differentiated paid Artifact value. If it only raises free usage and COGS, the business model gets worse.
 
@@ -39,6 +39,16 @@ cross-history synthesis / formal compilation
 = monetizable artifact candidate
 ```
 
+Cross-platform boundary benchmark currently points toward:
+
+```text
+FREE
+relationship / natural continuity / lightweight recurring value
+
+PAID
+explicit synthesis / deeper time horizon / durable artifact / costly modality
+```
+
 ---
 
 ## Precedence
@@ -47,6 +57,7 @@ For **current research interpretation**, read in this order:
 
 ```text
 README.md
+→ 19_FREE_PAID_BOUNDARY_BENCHMARK.md
 → 18_PASS5_WORLD_INTEGRATION_DELTA.md
 → 17_WORLD_CHARACTER_SERVICE_REVENUE_IMPACT.md
 → 16_PASS4_PRICING_DECISION_DELTA.md
@@ -63,7 +74,7 @@ README.md
 → Pass 1 documents 01~05 for historical baseline
 ```
 
-Later research passes may supersede Pass 5 explicitly. Old research files remain as historical evidence unless factually wrong.
+Later research passes may supersede Pass 5A explicitly. Old research files remain as historical evidence unless factually wrong.
 
 ---
 
@@ -173,6 +184,29 @@ outcome closure
 artifact role separation
 data minimization
 ```
+
+---
+
+## Pass 5A — free / paid boundary benchmark
+
+### `19_FREE_PAID_BOUNDARY_BENCHMARK.md`
+Compares the current free/paid boundary across Character.AI, Replika, Kindroid, Nomi, Tinder, Duolingo, Finch, The Pattern, Co-Star, Nebula, Sajuping, Jamo, DoSa and Patreon.
+
+Extracted boundary patterns:
+
+```text
+A. core action free / efficiency paid
+B. relationship free / depth & modality paid
+C. recurring free value / deep analysis paid
+D. allowance free / heavy usage paid
+E. free relationship / paid artifact or ownership
+```
+
+Current MyeongHa interpretation:
+
+> Preserve the emotional/relationship loop without payment; monetize explicit synthesis, deeper temporal scope, durable artifacts, and high-cost modalities when required.
+
+This strengthens H-R19 but does not make it product authority.
 
 ---
 
