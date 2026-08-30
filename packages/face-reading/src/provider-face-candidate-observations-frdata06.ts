@@ -3,20 +3,18 @@ import {
   type CaptureQualityRawEvidenceFRData05V1,
   type MentonDatasetCaptureQualityRawObservationReportFRData05V1,
 } from './capture-quality-raw-observations-frdata05.js';
-import {
-  MEDIAPIPE_FACE_LANDMARKER_RUNTIME_EVIDENCE_FR26,
-} from './mediapipe-face-landmarker-runtime-fr26.js';
-import {
-  MEDIAPIPE_REAL_RUNTIME_VERIFICATION_EVIDENCE_FR27,
-  validateMediaPipeRealRuntimeVerificationEvidenceFR27,
-  type MediaPipeRuntimeFileDigestFR27V1,
-} from './mediapipe-real-runtime-evidence-fr27.js';
+import type { MentonDatasetBrowserPixelEvidenceReportFRData04V1 } from './browser-pixel-evidence-frdata04.js';
 import type { MentonDatasetImageDimensionReportFRData02V1 } from './image-byte-dimensions-frdata02.js';
 import type {
   MentonDatasetIntakeManifestFRData01V1,
   MentonDatasetIntakeReportFRData01V1,
 } from './menton-dataset-intake-frdata01.js';
-import type { MentonDatasetBrowserPixelEvidenceReportFRData04V1 } from './browser-pixel-evidence-frdata04.js';
+import { MEDIAPIPE_FACE_LANDMARKER_RUNTIME_EVIDENCE_FR26 } from './mediapipe-face-landmarker-runtime-fr26.js';
+import {
+  MEDIAPIPE_REAL_RUNTIME_VERIFICATION_EVIDENCE_FR27,
+  validateMediaPipeRealRuntimeVerificationEvidenceFR27,
+  type MediaPipeRuntimeFileDigestFR27V1,
+} from './mediapipe-real-runtime-evidence-fr27.js';
 import { FaceAuthorityValidationError } from './validation.js';
 
 export type ProviderFaceCandidateObservationStatusFRData06V1 = 'observed' | 'provider_error';
@@ -145,67 +143,25 @@ export interface MentonDatasetProviderFaceCandidateObservationReportFRData06V1 {
   readonly productionGeometryAuthorized: false;
 }
 
-const ROOT_RESULT_FIELDS = Object.freeze([
-  'faceBlendshapes',
-  'faceLandmarks',
-  'facialTransformationMatrixes',
-] as const);
+const ROOT_RESULT_FIELDS = Object.freeze(['faceBlendshapes', 'faceLandmarks', 'facialTransformationMatrixes'] as const);
 const LANDMARK_FIELDS = Object.freeze(['visibility', 'x', 'y', 'z'] as const);
 const SHA256 = /^sha256:[0-9a-f]{64}$/u;
 const PROVENANCE_KEYS = new Set([
-  'protocol',
-  'providerRuntime',
-  'runtimePackageName',
-  'runtimePackageVersion',
-  'packageBundleDigest',
-  'wasmFiles',
-  'modelAssetRef',
-  'modelDigest',
-  'modelByteLength',
-  'runningMode',
-  'numFaces',
-  'outputFaceBlendshapes',
-  'outputFacialTransformationMatrixes',
-  'sourceImagePrimitive',
-  'rasterReconfirmationPrimitive',
-  'browserProduct',
-  'browserVersion',
-  'platform',
-  'runnerOS',
-  'runnerArch',
-  'githubRunId',
-  'githubRunAttempt',
-  'githubSha',
-  'verificationTimestamp',
-  'pageUrl',
-  'pageOrigin',
-  'pageReadyState',
-  'deterministicSummaryReplay',
-  'rawProviderResponsePersisted',
-  'rawProviderCoordinatesPersisted',
+  'protocol', 'providerRuntime', 'runtimePackageName', 'runtimePackageVersion', 'packageBundleDigest', 'wasmFiles',
+  'modelAssetRef', 'modelDigest', 'modelByteLength', 'runningMode', 'numFaces', 'outputFaceBlendshapes',
+  'outputFacialTransformationMatrixes', 'sourceImagePrimitive', 'rasterReconfirmationPrimitive', 'browserProduct',
+  'browserVersion', 'platform', 'runnerOS', 'runnerArch', 'githubRunId', 'githubRunAttempt', 'githubSha',
+  'verificationTimestamp', 'pageUrl', 'pageOrigin', 'pageReadyState', 'deterministicSummaryReplay',
+  'rawProviderResponsePersisted', 'rawProviderCoordinatesPersisted',
 ]);
 const EVIDENCE_KEYS = new Set([
-  'captureRef',
-  'relativeAssetPath',
-  'actualDigest',
-  'rasterSha256',
-  'status',
-  'rasterIdentityReconfirmedBeforeProviderRun',
-  'providerResultRootFieldSet',
-  'faceCandidateCount',
-  'candidateSummaries',
-  'faceBlendshapeCount',
-  'facialTransformationMatrixCount',
-  'errorCode',
+  'captureRef', 'relativeAssetPath', 'actualDigest', 'rasterSha256', 'status',
+  'rasterIdentityReconfirmedBeforeProviderRun', 'providerResultRootFieldSet', 'faceCandidateCount',
+  'candidateSummaries', 'faceBlendshapeCount', 'facialTransformationMatrixCount', 'errorCode',
 ]);
 const CANDIDATE_KEYS = new Set([
-  'providerCandidateOrdinal',
-  'landmarkCount',
-  'landmarkFieldSet',
-  'allXFiniteNormalized',
-  'allYFiniteNormalized',
-  'allZFinite',
-  'allVisibilityFiniteWhenPresent',
+  'providerCandidateOrdinal', 'landmarkCount', 'landmarkFieldSet', 'allXFiniteNormalized', 'allYFiniteNormalized',
+  'allZFinite', 'allVisibilityFiniteWhenPresent',
 ]);
 
 function fail(message: string): never {
@@ -233,9 +189,7 @@ function positiveSafeInteger(value: number, label: string): number {
 }
 
 function exactStringArray(actual: readonly string[], expected: readonly string[], label: string): void {
-  if (actual.length !== expected.length || actual.some((value, index) => value !== expected[index])) {
-    fail(`${label} mismatch.`);
-  }
+  if (actual.length !== expected.length || actual.some((value, index) => value !== expected[index])) fail(`${label} mismatch.`);
 }
 
 function exactWasmSet(actual: readonly MediaPipeRuntimeFileDigestFR27V1[]): void {
@@ -262,12 +216,9 @@ function validateLocalPage(provenance: ProviderFaceCandidateRuntimeProvenanceFRD
     return fail('provider provenance page URL/origin must be valid URLs.');
   }
   if (
-    page.protocol !== 'http:' ||
-    page.hostname !== '127.0.0.1' ||
-    origin.protocol !== 'http:' ||
-    origin.hostname !== '127.0.0.1' ||
-    page.origin !== origin.origin ||
-    provenance.pageOrigin !== origin.origin
+    page.protocol !== 'http:' || page.hostname !== '127.0.0.1' ||
+    origin.protocol !== 'http:' || origin.hostname !== '127.0.0.1' ||
+    page.origin !== origin.origin || provenance.pageOrigin !== origin.origin
   ) {
     fail('provider provenance must remain bound to the local 127.0.0.1 browser harness origin.');
   }
@@ -320,17 +271,16 @@ function validateProviderProvenance(
   if (typeof provenance !== 'object' || provenance === null) fail('provider provenance must be an object.');
   exactKeys(provenance, PROVENANCE_KEYS, 'provider provenance');
   validateMediaPipeRealRuntimeVerificationEvidenceFR27();
-
   const runtime = MEDIAPIPE_FACE_LANDMARKER_RUNTIME_EVIDENCE_FR26;
   const verified = MEDIAPIPE_REAL_RUNTIME_VERIFICATION_EVIDENCE_FR27;
+
   if (
     provenance.protocol !== 'chrome_devtools_protocol' ||
     provenance.providerRuntime !== 'mediapipe_tasks_vision_face_landmarker' ||
     provenance.runtimePackageName !== runtime.runtimePackageName ||
     provenance.runtimePackageVersion !== runtime.runtimePackageVersion
-  ) {
-    fail('provider provenance runtime identity must exactly match the pinned FR-26 runtime.');
-  }
+  ) fail('provider provenance runtime identity must exactly match the pinned FR-26 runtime.');
+
   if (canonicalSha256(provenance.packageBundleDigest, 'providerProvenance.packageBundleDigest') !== verified.installedPackageAssets.packageBundleDigest) {
     fail('provider provenance package bundle digest must match FR-27 installed package evidence.');
   }
@@ -339,34 +289,28 @@ function validateProviderProvenance(
     provenance.modelAssetRef !== runtime.model.assetRef ||
     canonicalSha256(provenance.modelDigest, 'providerProvenance.modelDigest') !== verified.model.independentByteDigest ||
     provenance.modelByteLength !== verified.model.byteLength
-  ) {
-    fail('provider provenance model identity must match the FR-27 independently hashed model bytes.');
-  }
+  ) fail('provider provenance model identity must match the FR-27 independently hashed model bytes.');
+
   if (
-    provenance.runningMode !== runtime.runningMode ||
-    provenance.numFaces !== runtime.numFaces ||
+    provenance.runningMode !== runtime.runningMode || provenance.numFaces !== runtime.numFaces ||
     provenance.outputFaceBlendshapes !== runtime.outputFaceBlendshapes ||
     provenance.outputFacialTransformationMatrixes !== runtime.outputFacialTransformationMatrixes
-  ) {
-    fail('provider provenance runtime options must remain pinned to the FR-26 bounded single-image path.');
-  }
+  ) fail('provider provenance runtime options must remain pinned to the FR-26 bounded single-image path.');
+
   if (
     provenance.sourceImagePrimitive !== 'html_image_element_after_decode' ||
     provenance.rasterReconfirmationPrimitive !== 'canvas_2d_get_image_data_sha256_before_provider_detect' ||
-    provenance.deterministicSummaryReplay !== true ||
-    provenance.rawProviderResponsePersisted !== false ||
+    provenance.deterministicSummaryReplay !== true || provenance.rawProviderResponsePersisted !== false ||
     provenance.rawProviderCoordinatesPersisted !== false
-  ) {
-    fail('provider provenance cannot weaken raster reconfirmation, replay, or raw-response/coordinate non-persistence.');
-  }
-  if (provenance.browserProduct !== 'Google Chrome' && provenance.browserProduct !== 'Chromium') {
-    fail('provider provenance browser product is unsupported.');
-  }
+  ) fail('provider provenance cannot weaken raster reconfirmation, replay, or raw-response/coordinate non-persistence.');
+
+  if (provenance.browserProduct !== 'Google Chrome' && provenance.browserProduct !== 'Chromium') fail('provider provenance browser product is unsupported.');
   if (typeof provenance.browserVersion !== 'string' || provenance.browserVersion.length < 1) fail('provider provenance browserVersion is required.');
   if (typeof provenance.platform !== 'string' || provenance.platform.length < 1) fail('provider provenance platform is required.');
   if (provenance.pageReadyState !== 'interactive' && provenance.pageReadyState !== 'complete') fail('provider provenance pageReadyState is unsupported.');
   if (!Number.isFinite(Date.parse(provenance.verificationTimestamp))) fail('provider provenance verificationTimestamp must be parseable.');
   validateLocalPage(provenance);
+
   return Object.freeze({
     ...provenance,
     wasmFiles: Object.freeze(provenance.wasmFiles.map((entry) => Object.freeze({ ...entry }))),
@@ -386,13 +330,10 @@ function validateCandidate(
   if (!Array.isArray(candidate.landmarkFieldSet)) fail(`capture ${captureRef} provider candidate ${index} landmarkFieldSet must be an array.`);
   exactStringArray(candidate.landmarkFieldSet, LANDMARK_FIELDS, `${captureRef}.candidate[${index}].landmarkFieldSet`);
   if (
-    candidate.allXFiniteNormalized !== true ||
-    candidate.allYFiniteNormalized !== true ||
-    candidate.allZFinite !== true ||
+    candidate.allXFiniteNormalized !== true || candidate.allYFiniteNormalized !== true || candidate.allZFinite !== true ||
     candidate.allVisibilityFiniteWhenPresent !== true
-  ) {
-    fail(`capture ${captureRef} provider candidate ${index} landmark numeric-shape summary failed closed.`);
-  }
+  ) fail(`capture ${captureRef} provider candidate ${index} landmark numeric-shape summary failed closed.`);
+
   return Object.freeze({
     providerCandidateOrdinal: ordinal,
     landmarkCount,
@@ -413,22 +354,12 @@ export function buildMentonDatasetProviderFaceCandidateObservationReportFRData06
   providerProvenance: ProviderFaceCandidateRuntimeProvenanceFRData06V1,
   evidence: readonly ProviderFaceCandidateEvidenceFRData06V1[],
 ): MentonDatasetProviderFaceCandidateObservationReportFRData06V1 {
-  const canonicalQuality = validateQualityPrerequisite(
-    manifest,
-    intakeReport,
-    dimensionReport,
-    pixelReport,
-    qualityReport,
-  );
+  const canonicalQuality = validateQualityPrerequisite(manifest, intakeReport, dimensionReport, pixelReport, qualityReport);
   const provenance = validateProviderProvenance(providerProvenance);
 
   if (!Array.isArray(evidence)) fail('provider face-candidate evidence must be an array.');
-  if (new Set(evidence.map((entry) => entry.captureRef)).size !== evidence.length) {
-    fail('provider face-candidate evidence capture refs must be unique.');
-  }
-  if (evidence.length !== canonicalQuality.captureObservations.length) {
-    fail('provider face-candidate evidence count must exactly equal FR-DATA-05 capture count.');
-  }
+  if (new Set(evidence.map((entry) => entry.captureRef)).size !== evidence.length) fail('provider face-candidate evidence capture refs must be unique.');
+  if (evidence.length !== canonicalQuality.captureObservations.length) fail('provider face-candidate evidence count must exactly equal FR-DATA-05 capture count.');
   const expectedRefs = new Set(canonicalQuality.captureObservations.map((entry) => entry.captureRef));
   for (const entry of evidence) {
     if (!expectedRefs.has(entry.captureRef)) fail(`provider face-candidate evidence references unknown capture ${entry.captureRef}.`);
@@ -440,46 +371,32 @@ export function buildMentonDatasetProviderFaceCandidateObservationReportFRData06
     if (typeof entry !== 'object' || entry === null) fail(`capture ${quality.captureRef} provider evidence must be an object.`);
     exactKeys(entry, EVIDENCE_KEYS, `capture ${quality.captureRef} provider evidence`);
     if (entry.relativeAssetPath !== quality.relativeAssetPath) fail(`capture ${quality.captureRef} path drifted from FR-DATA-05.`);
-    if (canonicalSha256(entry.actualDigest, `${quality.captureRef}.actualDigest`) !== quality.actualDigest) {
-      fail(`capture ${quality.captureRef} asset digest drifted from FR-DATA-05.`);
-    }
-    if (canonicalSha256(entry.rasterSha256, `${quality.captureRef}.rasterSha256`) !== quality.rasterSha256) {
-      fail(`capture ${quality.captureRef} raster identity drifted from FR-DATA-05.`);
-    }
-    if (
-      entry.status !== 'observed' ||
-      entry.errorCode !== null ||
-      entry.rasterIdentityReconfirmedBeforeProviderRun !== true
-    ) {
+    if (canonicalSha256(entry.actualDigest, `${quality.captureRef}.actualDigest`) !== quality.actualDigest) fail(`capture ${quality.captureRef} asset digest drifted from FR-DATA-05.`);
+    if (canonicalSha256(entry.rasterSha256, `${quality.captureRef}.rasterSha256`) !== quality.rasterSha256) fail(`capture ${quality.captureRef} raster identity drifted from FR-DATA-05.`);
+    if (entry.status !== 'observed' || entry.errorCode !== null || entry.rasterIdentityReconfirmedBeforeProviderRun !== true) {
       fail(`capture ${quality.captureRef} provider observation failed closed with status ${entry.status}.`);
     }
-    if (!Array.isArray(entry.providerResultRootFieldSet)) fail(`capture ${quality.captureRef} provider result root field set is required.`);
-    exactStringArray(entry.providerResultRootFieldSet, ROOT_RESULT_FIELDS, `${quality.captureRef}.providerResultRootFieldSet`);
+
+    const rootFields = entry.providerResultRootFieldSet;
+    if (rootFields === null || !Array.isArray(rootFields)) fail(`capture ${quality.captureRef} provider result root field set is required.`);
+    exactStringArray(rootFields, ROOT_RESULT_FIELDS, `${quality.captureRef}.providerResultRootFieldSet`);
 
     if (entry.faceCandidateCount === null) fail(`capture ${quality.captureRef} faceCandidateCount is required.`);
     const candidateCount = nonNegativeSafeInteger(entry.faceCandidateCount, `${quality.captureRef}.faceCandidateCount`);
-    if (candidateCount > MEDIAPIPE_FACE_LANDMARKER_RUNTIME_EVIDENCE_FR26.numFaces) {
-      fail(`capture ${quality.captureRef} faceCandidateCount exceeds configured provider numFaces.`);
-    }
-    if (!Array.isArray(entry.candidateSummaries)) fail(`capture ${quality.captureRef} candidateSummaries are required.`);
-    if (entry.candidateSummaries.length !== candidateCount) {
-      fail(`capture ${quality.captureRef} candidate summary count must equal provider faceCandidateCount.`);
-    }
-    const candidateSummaries = Object.freeze(entry.candidateSummaries.map((candidate, index) => (
-      validateCandidate(candidate, index, quality.captureRef)
-    )));
+    if (candidateCount > MEDIAPIPE_FACE_LANDMARKER_RUNTIME_EVIDENCE_FR26.numFaces) fail(`capture ${quality.captureRef} faceCandidateCount exceeds configured provider numFaces.`);
 
-    if (entry.faceBlendshapeCount === null || entry.facialTransformationMatrixCount === null) {
-      fail(`capture ${quality.captureRef} provider disabled-output counts are required.`);
-    }
+    const rawCandidates = entry.candidateSummaries;
+    if (rawCandidates === null || !Array.isArray(rawCandidates)) fail(`capture ${quality.captureRef} candidateSummaries are required.`);
+    const candidates = rawCandidates as readonly ProviderFaceCandidateLandmarkSummaryFRData06V1[];
+    if (candidates.length !== candidateCount) fail(`capture ${quality.captureRef} candidate summary count must equal provider faceCandidateCount.`);
+    const candidateSummaries = Object.freeze(candidates.map(
+      (candidate: ProviderFaceCandidateLandmarkSummaryFRData06V1, index: number) => validateCandidate(candidate, index, quality.captureRef),
+    ));
+
+    if (entry.faceBlendshapeCount === null || entry.facialTransformationMatrixCount === null) fail(`capture ${quality.captureRef} provider disabled-output counts are required.`);
     const faceBlendshapeCount = nonNegativeSafeInteger(entry.faceBlendshapeCount, `${quality.captureRef}.faceBlendshapeCount`);
-    const facialTransformationMatrixCount = nonNegativeSafeInteger(
-      entry.facialTransformationMatrixCount,
-      `${quality.captureRef}.facialTransformationMatrixCount`,
-    );
-    if (faceBlendshapeCount !== 0 || facialTransformationMatrixCount !== 0) {
-      fail(`capture ${quality.captureRef} disabled provider outputs must remain empty.`);
-    }
+    const facialTransformationMatrixCount = nonNegativeSafeInteger(entry.facialTransformationMatrixCount, `${quality.captureRef}.facialTransformationMatrixCount`);
+    if (faceBlendshapeCount !== 0 || facialTransformationMatrixCount !== 0) fail(`capture ${quality.captureRef} disabled provider outputs must remain empty.`);
 
     return Object.freeze({
       captureRef: quality.captureRef,
