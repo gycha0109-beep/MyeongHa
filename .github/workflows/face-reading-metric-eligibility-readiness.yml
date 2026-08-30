@@ -53,6 +53,9 @@ jobs:
             protocol.unresolvedMayBeAutoExcluded !== false ||
             protocol.calibrationPerformanceMayDefineEvaluationSemantics !== false ||
             protocol.holdoutPerformanceMayDefineOrTuneEvaluationSemantics !== false ||
+            protocol.frData11MaterializesHoldoutOutcomeProviderPairing !== true ||
+            protocol.materializedHoldoutMayServeAsFuturePreregisteredConfirmatoryHoldout !== false ||
+            protocol.newUnseenHoldoutRequiredAfterPolicyFreezeForConfirmatoryMetrics !== true ||
             protocol.reviewedGroundTruthAuthorityRequiredForMetricAuthorization !== true ||
             protocol.providerDetectionConstructValidityRequiredForMetricAuthorization !== true ||
             protocol.explicitHumanOutcomeMetricRolePolicyRequired !== true ||
