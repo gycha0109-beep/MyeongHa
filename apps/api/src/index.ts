@@ -4,7 +4,7 @@ import {
   type CapabilityGateResult,
 } from '../../../packages/domain/src/index.js';
 
-export const API_FOUNDATION_VERSION = 'myeongha-api-foundation-v0.16' as const;
+export const API_FOUNDATION_VERSION = 'myeongha-api-foundation-v0.17' as const;
 
 export function authorizePlannedCapability(
   input: CapabilityGateInput,
@@ -211,3 +211,14 @@ export {
   type RevokeLifeFactInputV1,
   type RevokeLifeFactResponseV1,
 } from './life-fact-revoke-command.js';
+
+export {
+  CHARACTER_FORGET_COMMAND_AUTHORITY_BINDING_V1,
+  CharacterForgetCommandAuthorityPortErrorV1,
+  forgetCharacter,
+  type CharacterForgetCommandAuthorityFailureCodeV1,
+  type CharacterForgetCommandAuthorityPortV1,
+  type CharacterForgetCommandAuthorityRowV1,
+  type ForgetCharacterInputV1,
+  type ForgetCharacterResponseV1,
+} from './character-forget-command.js';
