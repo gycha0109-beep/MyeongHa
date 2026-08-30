@@ -418,14 +418,16 @@ export function validateExternalHumanReferenceReviewAttestationAuthorityFRData15
 }
 
 function admissionProjection(report: HumanFaceConstructReferenceAdmissionReportFRData14V1): unknown {
-  return report.admissions.map((entry) => ({
-    captureRef: entry.captureRef,
-    partition: entry.partition,
-    canonicalAssetDigest: entry.canonicalAssetDigest,
-    adjudicationOutcome: entry.adjudicationOutcome,
-    admissionState: entry.admissionState,
-    scoringReferenceClass: entry.scoringReferenceClass,
-  }));
+  return report.admissions
+    .map((entry) => ({
+      captureRef: entry.captureRef,
+      partition: entry.partition,
+      canonicalAssetDigest: entry.canonicalAssetDigest,
+      adjudicationOutcome: entry.adjudicationOutcome,
+      admissionState: entry.admissionState,
+      scoringReferenceClass: entry.scoringReferenceClass,
+    }))
+    .sort((left, right) => lexicalCompare(left.captureRef, right.captureRef));
 }
 
 export function computeHumanReferenceAdmissionSetDigestFRData15(
@@ -435,17 +437,11 @@ export function computeHumanReferenceAdmissionSetDigestFRData15(
   return sha256Canonical(admissionProjection(report), 'referenceAdmissionSet');
 }
 
-function packageProjection(
-  value: Omit<HumanReferenceReviewPackageFRData15V1, 'reviewPackageDigest'>,
-): unknown {
-  return value;
-}
-
 export function computeHumanReferenceReviewPackageDigestFRData15(
   value: Omit<HumanReferenceReviewPackageFRData15V1, 'reviewPackageDigest'>,
 ): string {
   validateExternalHumanReferenceReviewAttestationAuthorityFRData15();
-  return sha256Canonical(packageProjection(value), 'humanReferenceReviewPackage');
+  return sha256Canonical(value, 'humanReferenceReviewPackage');
 }
 
 export function buildHumanReferenceReviewPackageFRData15(
@@ -525,6 +521,9 @@ export function validateHumanReferenceReviewPackageFRData15(
   canonicalSha256(reviewPackage.upstreamAdjudicationLedgerDigest, 'reviewPackage.upstreamAdjudicationLedgerDigest');
   canonicalSha256(reviewPackage.admissionSetDigest, 'reviewPackage.admissionSetDigest');
   canonicalSha256(reviewPackage.reviewPackageDigest, 'reviewPackage.reviewPackageDigest');
+  if (reviewPackage.constructDefinitionDigest !== computeHumanFaceConstructDefinitionDigestFRData14()) {
+    fail('review package construct-definition digest must exactly match the current frozen FR-DATA-14 definition.');
+  }
 
   for (const [label, value] of [
     ['captureCount', reviewPackage.captureCount],
@@ -555,6 +554,13 @@ export function validateExternalHumanReferenceReviewAttestationFRData15(
   attestation: ExternalHumanReferenceReviewAttestationFRData15V1,
 ): ExternalHumanReferenceReviewAttestationFRData15V1 {
   validateHumanReferenceReviewPackageFRData15(reviewPackage);
+  const expectedReviewPackage = buildHumanReferenceReviewPackageFRData15(
+    groundTruthDataset,
+    adjudicationDataset,
+  );
+  if (reviewPackage.reviewPackageDigest !== expectedReviewPackage.reviewPackageDigest) {
+    fail('supplied review package must exactly match the package recomputed from the supplied FR-DATA-07/10 evidence.');
+  }
 
   if (attestation.schemaVersion !== 'fr-data15-external-human-reference-review-attestation-v1') {
     fail('attestation schema drift.');
