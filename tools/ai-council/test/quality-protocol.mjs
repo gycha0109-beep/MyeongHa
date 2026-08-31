@@ -25,6 +25,11 @@ function configuredOutputLimit(specificName, fallback) {
   return Number.isFinite(value) && value > 0 ? value : fallback;
 }
 
+function configuredIntegrationOutputLimit() {
+  const value = Number(process.env.COUNCIL_INTEGRATION_MAX_OUTPUT_TOKENS || 0);
+  return Number.isFinite(value) && value > 0 ? value : 3000;
+}
+
 const lifeThreadMeeting = {
   topic: 'Life Thread resurfacing v0.1을 설계한다. 가격·정확한 cooldown 일수·DB schema는 확정하지 않는다.',
   maxRounds: 2,
@@ -50,7 +55,7 @@ assert.match(buildAgentInstructions('world', 2), /ACCEPT \/ OBJECT \/ DELTA/);
 assert.equal(agents.world.maxOutputTokens, configuredOutputLimit('COUNCIL_WORLD_MAX_OUTPUT_TOKENS', 800));
 assert.equal(agents.revenue.maxOutputTokens, configuredOutputLimit('COUNCIL_REVENUE_MAX_OUTPUT_TOKENS', 800));
 assert.equal(agents.engineering.maxOutputTokens, configuredOutputLimit('COUNCIL_ENGINEERING_MAX_OUTPUT_TOKENS', 900));
-assert.equal(agents.integration.maxOutputTokens, configuredOutputLimit('COUNCIL_INTEGRATION_MAX_OUTPUT_TOKENS', 1500));
+assert.equal(agents.integration.maxOutputTokens, configuredIntegrationOutputLimit());
 assert.equal(buildResponsePayload(lifeThreadMeeting, 'world', 1).reasoning.effort, 'minimal');
 assert.equal(buildResponsePayload(lifeThreadMeeting, 'integration', 3).reasoning.effort, 'low');
 assert.equal(buildResponsePayload(lifeThreadMeeting, 'integration', 3).max_output_tokens, agents.integration.maxOutputTokens);
@@ -108,6 +113,9 @@ assert.match(integrationPrompt, /\[World R2\]/);
 assert.match(integrationPrompt, /transcript에 없는 이분법/);
 assert.match(integrationPrompt, /NEXT TEST.*실행 가능한 다음 검증/s);
 assert.match(integrationPrompt, /반드시 한국어로 작성/);
+assert.match(integrationPrompt, /slash 축약 citation은 금지/);
+assert.match(integrationPrompt, /NEXT TEST의 모든 내용 줄은 반드시 `- `/);
+assert.doesNotMatch(integrationPrompt, /\[World R1\/R2\]/);
 
 const completeIntegration = `AGREED
 - 관계 continuity를 보존한다. [World R2]
@@ -140,5 +148,11 @@ const emptySection = completeIntegration.replace(
 );
 assert.throws(() => validateIntegrationOutput(emptySection), /섹션 내용이 비었습니다: OPEN/);
 
+const malformedCitation = completeIntegration.replace('[Revenue R2]', '[Revenue R1/R2]');
+assert.throws(() => validateIntegrationOutput(malformedCitation), /모호하거나 잘못된 citation/);
+
+const trailingText = `${completeIntegration}\nORIGIN: transcript only`;
+assert.throws(() => validateIntegrationOutput(trailingText), /꼬리 텍스트|형식 밖/);
+
 console.log('PASS Test A: Round 2 concrete citation, self-citation, anonymous-citation, and DELTA protocol');
-console.log('PASS Test B: Integration section completeness and actionable NEXT TEST protocol');
+console.log('PASS Test B: Integration completeness, exact citation, and terminal NEXT TEST protocol');
