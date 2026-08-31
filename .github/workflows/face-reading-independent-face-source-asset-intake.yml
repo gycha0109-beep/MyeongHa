@@ -1,0 +1,72 @@
+name: Face Reading Independent Face Source Asset Intake
+
+on:
+  pull_request:
+    paths:
+      - 'packages/face-reading/**'
+      - 'test/face-reading-frdata07a-independent-face-source-asset-intake.test.ts'
+      - 'docs/FACE_READING_FRDATA07A_INDEPENDENT_FACE_SOURCE_ASSET_INTAKE_V0.1.md'
+      - 'docs/FACE_READING_FRDATA07A_AUTHORITY_DECISION_V0.1.md'
+      - '.github/workflows/face-reading-independent-face-source-asset-intake.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'packages/face-reading/**'
+      - 'test/face-reading-frdata07a-independent-face-source-asset-intake.test.ts'
+      - 'docs/FACE_READING_FRDATA07A_INDEPENDENT_FACE_SOURCE_ASSET_INTAKE_V0.1.md'
+      - 'docs/FACE_READING_FRDATA07A_AUTHORITY_DECISION_V0.1.md'
+      - '.github/workflows/face-reading-independent-face-source-asset-intake.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  frdata07a-independent-face-source-asset-intake:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install exact workspace dependencies
+        run: npm install --ignore-scripts
+      - name: Build MyeongHa runtime
+        run: npm run build
+      - name: Run FR-DATA-07A source-asset intake tests
+        run: npx vitest run test/face-reading-frdata07a-independent-face-source-asset-intake.test.ts
+      - name: Verify compiled FR-DATA-07A authority boundary and empirical fail-closed gate
+        run: |
+          node --input-type=module <<'NODE'
+          import {
+            INDEPENDENT_FACE_SOURCE_ASSET_INTAKE_AUTHORITY_FRDATA07A,
+            assertIndependentFaceSourceAssetsReadyForEmpiricalAdmissionFRData07A,
+            validateIndependentFaceSourceAssetIntakeAuthorityFRData07A,
+          } from './dist/packages/face-reading/src/index.js';
+
+          const authority = validateIndependentFaceSourceAssetIntakeAuthorityFRData07A();
+          if (authority !== INDEPENDENT_FACE_SOURCE_ASSET_INTAKE_AUTHORITY_FRDATA07A) process.exit(1);
+          if (!authority.protocol.exactProvidedBytesSha256MatchRequired) process.exit(1);
+          if (!authority.protocol.supportedImageHeaderInspectionRequired) process.exit(1);
+          if (!authority.protocol.exactDatasetCaptureBindingRequired) process.exit(1);
+          if (authority.protocol.frozenRecordRetainsRawBytes) process.exit(1);
+          if (authority.protocol.frozenVerifierReperformsByteVerification) process.exit(1);
+          if (authority.protocol.sourceMetadataThatCouldHintLabelMayBeIncludedInHumanAnnotationPacket) process.exit(1);
+          if (authority.protocol.filenameOrSourceDescriptionMayDefineHumanFaceCountLabel) process.exit(1);
+          if (authority.protocol.sourceUrlMayProveByteOriginWithoutExternalAuthentication) process.exit(1);
+          if (authority.protocol.rightsMetadataMayConstituteLegalAdjudication) process.exit(1);
+          if (authority.protocol.rightsMetadataMayConstitutePrivacyClearance) process.exit(1);
+          if (authority.protocol.minimumAssetsForEmpiricalAdmission !== null) process.exit(1);
+          if (authority.protocol.acceptedRightsBasis !== null) process.exit(1);
+          if (authority.protocol.privacyRiskAcceptanceCriterion !== null) process.exit(1);
+          if (!Object.values(authority.authorityBoundary).every((value) => value === false)) process.exit(1);
+
+          let admissionBlocked = false;
+          try {
+            assertIndependentFaceSourceAssetsReadyForEmpiricalAdmissionFRData07A();
+          } catch {
+            admissionBlocked = true;
+          }
+          if (!admissionBlocked) process.exit(1);
+          NODE
