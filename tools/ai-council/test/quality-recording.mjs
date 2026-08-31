@@ -29,11 +29,11 @@ export function evaluateMeeting(meeting) {
   const integration = meeting.messages.find((message) => message.agent === 'integration');
   const roundTwoPass = roundTwo.length === 3
     && roundTwo.every((message) => passes(() => validateRoundTwoOutput(message.agent, message.content)));
-  const integrationPass = Boolean(integration)
-    && passes(() => {
-      validateIntegrationGrounding(meeting, integration.content);
-      validateIntegrationSemanticEvolution(meeting, integration.content);
-    });
+  const integrationGroundingPass = Boolean(integration)
+    && passes(() => validateIntegrationGrounding(meeting, integration.content));
+  const semanticEvolutionPass = Boolean(integration)
+    && passes(() => validateIntegrationSemanticEvolution(meeting, integration.content));
+  const integrationPass = integrationGroundingPass && semanticEvolutionPass;
   const sevenCallsPass = meeting.calls === 7;
   const completedPass = meeting.status === 'completed';
 
@@ -41,6 +41,8 @@ export function evaluateMeeting(meeting) {
     completedPass,
     sevenCallsPass,
     roundTwoPass,
+    integrationGroundingPass,
+    semanticEvolutionPass,
     integrationPass,
     passed: completedPass && sevenCallsPass && roundTwoPass && integrationPass,
   };
