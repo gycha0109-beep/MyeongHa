@@ -41,7 +41,16 @@ const staleRevenue = valid.replace(
 );
 assert.throws(
   () => validateIntegrationSemanticEvolution(meeting, staleRevenue),
-  /Revenue.*\[Revenue R2\].*재활성화/,
+  /Revenue.*\[Revenue R2\]만.*\[Revenue R1\].*사용할 수 없습니다/,
+);
+
+const mixedRevenue = valid.replace(
+  'Revenue: level 분기는 플랫폼이 맡는다. | EVIDENCE "level 분기는 플랫폼이 맡는다." [Revenue R2]',
+  'Revenue: 현재 입장과 초기 입장을 함께 둔다. | EVIDENCE "level 분기는 플랫폼이 맡는다." [Revenue R2] [Revenue R1]',
+);
+assert.throws(
+  () => validateIntegrationSemanticEvolution(meeting, mixedRevenue),
+  /Revenue.*\[Revenue R2\]만.*\[Revenue R1\].*사용할 수 없습니다/,
 );
 
 const inventedDuration = valid.replace(
@@ -54,8 +63,10 @@ assert.throws(
 );
 
 const instruction = integrationSemanticInstruction();
-assert.match(instruction, /R1의 초기 입장이 R2에서 수정·수용·철회되었다면/);
+assert.match(instruction, /현재 CONFLICT는 최신 stance만 비교/);
+assert.match(instruction, /\[Agent R1\]은 CONFLICT 현재 입장 근거로 쓰지 마십시오/);
+assert.match(instruction, /현재 R2끼리 실제로 양립하지 않을 때만 CONFLICT/);
 assert.match(instruction, /transcript 또는 사용자 topic에 없는 정확한 기간·quota·threshold·가격·횟수·비율/);
 assert.match(instruction, /"4주"/);
 
-console.log('PASS Test F: superseded R1 conflicts and invented quantitative commitments are rejected');
+console.log('PASS Test F: current conflicts are R2-only and invented quantitative commitments are rejected');
