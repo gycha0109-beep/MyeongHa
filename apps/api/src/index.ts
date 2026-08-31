@@ -4,7 +4,7 @@ import {
   type CapabilityGateResult,
 } from '../../../packages/domain/src/index.js';
 
-export const API_FOUNDATION_VERSION = 'myeongha-api-foundation-v0.34' as const;
+export const API_FOUNDATION_VERSION = 'myeongha-api-foundation-v0.35' as const;
 
 export function authorizePlannedCapability(
   input: CapabilityGateInput,
@@ -442,3 +442,17 @@ export {
   type CorrectTargetPersonBirthResponseV1,
   type TargetPersonBirthCorrectionRequestV1,
 } from './target-person-birth-correction-command.js';
+
+export {
+  createDirectReading,
+  READING_CREATE_AUTHORITY_BINDING_V1,
+  READING_CREATE_REQUEST_CONTRACT_VERSION_V1,
+  ReadingCreateAuthorityPortErrorV1,
+  type CreateDirectReadingInputV1,
+  type CreateDirectReadingResponseV1,
+  type DirectReadingCreateRequestV1,
+  type ReadingCreateAuthorityFailureCodeV1,
+  type ReadingCreateAuthorityPortV1,
+  type ReadingCreateAuthorityRowV1,
+  type ReadingCreateIdPortV1,
+} from './reading-create-command.js';
