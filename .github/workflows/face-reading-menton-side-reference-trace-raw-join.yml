@@ -1,0 +1,140 @@
+name: Face Reading Menton Side Reference Trace Raw Join
+
+on:
+  pull_request:
+    paths:
+      - 'packages/face-reading/**'
+      - 'test/face-reading-fr55-menton-side-reference-trace-raw-join.test.ts'
+      - 'docs/FACE_READING_FR55_MENTON_SIDE_REFERENCE_TRACE_RAW_JOIN_V0.1.md'
+      - 'docs/FACE_READING_FR55_AUTHORITY_DECISION_V0.1.md'
+      - '.github/workflows/face-reading-menton-side-reference-trace-raw-join.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'packages/face-reading/**'
+      - 'test/face-reading-fr55-menton-side-reference-trace-raw-join.test.ts'
+      - 'docs/FACE_READING_FR55_MENTON_SIDE_REFERENCE_TRACE_RAW_JOIN_V0.1.md'
+      - 'docs/FACE_READING_FR55_AUTHORITY_DECISION_V0.1.md'
+      - '.github/workflows/face-reading-menton-side-reference-trace-raw-join.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  fr55-menton-side-reference-trace-raw-join:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install exact workspace dependencies
+        run: npm install --ignore-scripts
+      - name: Build MyeongHa runtime
+        run: npm run build
+      - name: Run FR-55 raw join tests
+        run: npx vitest run test/face-reading-fr55-menton-side-reference-trace-raw-join.test.ts
+      - name: Verify compiled FR-55 remains threshold-free and fail-closed
+        run: |
+          node --input-type=module <<'NODE'
+          import {
+            MENTON_SIDE_REFERENCE_TRACE_RAW_JOIN_AUTHORITY_FR55,
+            assessMentonSideReferenceTraceRawJoinReadinessFR55,
+            assertMentonSideReferenceTraceJoinReadyForProductionFR55,
+            joinMentonSideCandidatesToReferenceTraceFR55,
+            validateMentonSideReferenceTraceRawJoinAuthorityFR55,
+          } from './dist/packages/face-reading/src/index.js';
+
+          validateMentonSideReferenceTraceRawJoinAuthorityFR55();
+          const authority = MENTON_SIDE_REFERENCE_TRACE_RAW_JOIN_AUTHORITY_FR55;
+          if (authority.joinProtocol.membershipThreshold !== null) process.exit(1);
+          if (authority.joinProtocol.anchorAgreementTolerance !== null) process.exit(1);
+          if (authority.joinProtocol.endpointSelectionRule !== null) process.exit(1);
+          if (authority.joinProtocol.candidateEquivalenceTolerance !== null) process.exit(1);
+          if (authority.joinProtocol.empiricalAcceptanceCriterion !== null) process.exit(1);
+          if (authority.joinProtocol.exactTiePolicy !== 'preserve_all_exact_minimum_segment_projections') process.exit(1);
+          if (!Object.values(authority.authorityBoundary).every((value) => value === false)) process.exit(1);
+
+          const referenceTraceAnnotation = {
+            schemaVersion: 'fr54-provider-blind-central-chin-reference-trace-v1',
+            subjectId: 'workflow-fr55-subject',
+            captureId: 'workflow-fr55-capture',
+            annotatorId: 'workflow-trace-annotator',
+            coordinateFrame: 'normalized_image_2d',
+            captureView: 'frontal_en_face',
+            expression: 'neutral',
+            traceOrder: 'raw_annotator_draw_order',
+            tracePoints: [
+              { x: 0.30, y: 0.80 },
+              { x: 0.34, y: 0.82 },
+              { x: 0.50, y: 0.85 },
+              { x: 0.66, y: 0.82 },
+              { x: 0.70, y: 0.80 },
+            ],
+            mentonTracePointIndex: 2,
+            visibleCoverageOnBothSidesOfMentonAttested: true,
+            lateralExtentState: 'annotation_coverage_extent_non_authoritative',
+            providerOutputVisibleDuringTraceAnnotation: false,
+            traditionalLabelVisibleDuringTraceAnnotation: false,
+            mentonSideCandidateVisibleDuringTraceAnnotation: false,
+            softTissueMentalTubercleCandidateVisibleDuringTraceAnnotation: false,
+            traceFrozenBeforeCandidateAnnotationOrComparison: true,
+            fullLowerJawlineIntentionallyTraced: false,
+            gonionOrOtobasionUsedAsTraceEndpoint: false,
+            traceEndpointsAssertedAsFR35Endpoints: false,
+          };
+          const mentonSideAnnotation = {
+            schemaVersion: 'fr50-independent-central-chin-scaffold-v1',
+            subjectId: 'workflow-fr55-subject',
+            captureId: 'workflow-fr55-capture',
+            annotatorId: 'workflow-candidate-annotator',
+            coordinateFrame: 'normalized_image_2d',
+            leftCheilion: { x: 0.34, y: 0.61 },
+            leftMentonSide: { x: 0.34, y: 0.82 },
+            softTissueMenton: { x: 0.50, y: 0.84 },
+            rightMentonSide: { x: 0.66, y: 0.82 },
+            rightCheilion: { x: 0.66, y: 0.61 },
+            providerOutputVisibleDuringAnnotation: false,
+            annotationFrozenBeforeProviderScoring: true,
+            traditionalLabelVisibleDuringAnnotation: false,
+          };
+
+          const joined = joinMentonSideCandidatesToReferenceTraceFR55({
+            referenceTraceAnnotation,
+            mentonSideAnnotation,
+          });
+          if (joined.identityBinding !== 'subject_and_capture_exact_match_verified') process.exit(1);
+          if (joined.leftCandidate.minimumDistance !== 0 || joined.rightCandidate.minimumDistance !== 0) process.exit(1);
+          if (joined.leftCandidate.closestProjections.length !== 2 || joined.rightCandidate.closestProjections.length !== 2) process.exit(1);
+          if (joined.leftCandidate.membershipDecision !== null || joined.leftCandidate.endpointDecision !== null) process.exit(1);
+          if (joined.rightCandidate.membershipDecision !== null || joined.rightCandidate.endpointDecision !== null) process.exit(1);
+          if (joined.midlineAnchorOffset.agreementDecision !== null) process.exit(1);
+          if (joined.referenceStandardAuthorized || joined.endpointAuthority || joined.providerMappingAuthorized) process.exit(1);
+          if (joined.traditionalDigeEquivalenceAuthorized || joined.empiricalValidationAuthorized || joined.productionGeometryAuthorized) process.exit(1);
+
+          let mismatchBlocked = false;
+          try {
+            joinMentonSideCandidatesToReferenceTraceFR55({
+              referenceTraceAnnotation,
+              mentonSideAnnotation: { ...mentonSideAnnotation, captureId: 'different-capture' },
+            });
+          } catch {
+            mismatchBlocked = true;
+          }
+          if (!mismatchBlocked) process.exit(1);
+
+          const readiness = assessMentonSideReferenceTraceRawJoinReadinessFR55();
+          if (!readiness.rawJoinResearchExecutionReady || !readiness.thresholdFreeDistanceComputationReady) process.exit(1);
+          if (readiness.realReferenceTraceDatasetPresent || readiness.realPairedJoinDatasetPresent) process.exit(1);
+          if (readiness.membershipDecisionReady || readiness.endpointSelectionReady || readiness.productionGeometryReady) process.exit(1);
+
+          let productionBlocked = false;
+          try {
+            assertMentonSideReferenceTraceJoinReadyForProductionFR55();
+          } catch {
+            productionBlocked = true;
+          }
+          if (!productionBlocked) process.exit(1);
+          NODE
