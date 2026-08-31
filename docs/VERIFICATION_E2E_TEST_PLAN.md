@@ -1,8 +1,8 @@
-# 명하 Verification / E2E Test Plan v0.13 — Source Aligned
+# 명하 Verification / E2E Test Plan v0.14 — SRC-33 Bound
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.13**  
-> Date: **2026-08-29**  
+> Pack Version: **v0.14**  
+> Date: **2026-08-31**  
 > Source Authority: `Usecase_re_reviewed_v2(1).md`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`, `Myeonghwa_Personalized_Interpretation_Architecture_v1.3_THIRD_REVIEW(1).md`  
 > Rule: source가 결정하지 않은 implementation-critical 사항은 `OPEN-P0`, 비차단 선택은 `CANDIDATE`, source 간 충돌/공백은 `SOURCE_AUTHORITY_GAPS.md` 또는 numbered source-gap 문서에 기록한다.
 
@@ -101,7 +101,8 @@ behavior spec
 - profile nickname update
 - target-person CRUD/isolation
 - chat retry + abandon
-- reading clarification + transient retry
+- Reading Session create / transport retry / lower-level clarification chain persistence boundaries are independently testable
+- public Reading clarification positive validation/mutation is **not** a production API PASS condition before `SRC-33`; lower-level append/current-pointer/parent/idempotency tests must use an explicitly prevalidated canonical fixture
 - conversation delete scope semantics (`SRC-14` resolution required before final write authority)
 - Life Record current read / revoke / source-complete supersession lineage
 - direct `POST /api/life-record` durable value create는 `SRC-25` 해결 전 production API PASS 대상에서 제외
@@ -135,24 +136,56 @@ behavior spec
 
 ## 8. Saju Gate
 
-Saju repo semantic tests는 별도 authority. 명하에서는:
+Saju repo semantic tests는 별도 authority. 명하에서는 **integration conformance**, **relational persistence**, **product-semantic validation**을 같은 PASS로 합치지 않는다.
+
+### Source-complete / independently testable now
 
 - immutable birth snapshots
-- domain/character capability
-- exact Saju public response contract state preservation
-- clarification vs transport retry
+- domain/character capability boundary
+- clarification logical attempt vs transport retry relational distinction
 - reading version/revision provenance
 - stale detection
-- grounding no semantic invention
-- prohibited inference preservation
-- current Saju exported `ProductReadingResponse` fixture exact-deserialize
 - current public host input shape vs adapter contract checked (`SRC-08`)
-- material public ambiguity reaches `CharacterSajuContextEnvelopeV2`
+- current Saju exported `ProductReadingResponse` TypeScript shape/fixture compile-deserialize compatibility as **integration audit/conformance evidence only**
+- raw transport/provider response is not serialized directly as Myeongha client DTO
 - public response에 없는 semanticClaims/prohibited metadata를 fabricate하지 않음
+- lower-level clarification append/current-pointer/parent/idempotency invariants with an **explicitly prevalidated canonical fixture**
+
+These tests do **not** prove that an arbitrary transport response is a valid `ProductReadingResponse`, nor that an arbitrary public clarification body is executable.
+
+### Blocked by `SRC-33`
+
+Do not claim production PASS until Primary Source supplies or adopts a complete positive application validation contract for:
+
+- complete `ProductReadingResponse` positive schema
+- state-specific required/optional nested payload rules
+- `requiredAction` / clarification / calculation-ambiguity positive variants
+- unknown/additional field, cardinality, bounds, null-vs-absent semantics
+- transport success → authoritative `reading_ref` / product-semantic finalization
+- `ClarificationAnswerV1` positive schema
+- question/answer identifier grammar and correlation
+- answer cardinality / duplicate / unknown-field behavior
+- free-text/scalar/structured answer representation where applicable
+- clarification canonicalization and request-hash material
+- pending clarification contract-version compatibility/evolution
+- validator ownership/result contract
+- validation-failure public error/detail mapping
+- public `POST /api/reading-sessions/:sessionId/clarifications` mutation
+- grounding/context envelope construction from a validated immutable Reading response rather than raw transport body
+
+`current exported ProductReadingResponse fixture exact-deserialize` alone is not a substitute for these gates.
+
+### After valid Product response authority exists
+
+- exact validated Saju public response state preservation
+- material public ambiguity reaches `CharacterSajuContextEnvelopeV2`
+- grounding no semantic invention
+- prohibited inference / explicit guard metadata preservation to the extent source public contract exports it (`SRC-09` remains independent)
 - protected-block 밖 free-form Saju generation denied in production baseline
 - protected narrative block ref/hash integrity
+- invalid semantic response fails closed before character rendering
 
-A completed Reading may be represented as an authoritative source fact, but Reading completion → concrete Character Unlock mapping is not a PASS condition until `SRC-23` resolves that trigger/effect contract.
+A completed validated Reading may be represented as an authoritative source fact, but Reading completion → concrete Character Unlock mapping is not a PASS condition until `SRC-23` resolves that trigger/effect contract.
 
 ## 9. AI / Character Gate
 
@@ -163,8 +196,9 @@ Deterministic fixtures:
 - renderer context excludes non-granted/private data
 - unknown cue/action → reject/fallback
 - absent canon relation → official-history assertion not accepted
-- material ambiguity → no single-outcome certainty
-- protected Saju semantic segment not paraphrased/mutated
+- material ambiguity → no single-outcome certainty after validated Product response authority exists
+- protected Saju semantic segment not paraphrased/mutated after validated Product response authority exists
+- raw/unvalidated Saju transport body never becomes protected semantic context while `SRC-33` is open
 - proposal alone → no authority mutation
 - LLM-proposed personal-record type/schema/value → never treated as durable authority without `SRC-25` validator
 - LLM-proposed relationship delta/stage → never treated as authority
@@ -502,7 +536,7 @@ A blacklist-only serializer, Pack-invented `ShareArtifactV1`, or plaintext raw-t
 - subject/guest rate limit owner resolved server-side
 - client supplied rate-limit owner ignored
 - AI context/token budget bounded
-- budget reduction never drops mandatory qualifier/prohibited inference/material ambiguity
+- budget reduction never drops mandatory qualifier/prohibited inference/material ambiguity after valid Product response authority exists
 - Saju transport retry bounded
 - multi-character maxTurns/call cap enforced
 - entitlement-required quota deny without effective entitlement
@@ -547,17 +581,18 @@ A blacklist-only serializer, Pack-invented `ShareArtifactV1`, or plaintext raw-t
 - `SRC-23`: Character Unlock condition/effect apply remains blocked; World Event/Character Unlock relational envelope and stored current read remain valid
 - `SRC-24`: existing-Member Guest merge conflict/resolution/domain-action execution remains blocked; merge-job current read + direct merged guest history remain valid
 - `SRC-25`: new durable Life Fact/Character Memory positive type-schema validation remains blocked; already-valid stored record read/revoke and Life Fact lineage constraints remain valid
+- `SRC-33`: ProductReadingResponse semantic finalization and public clarification positive validation remain blocked; transport execution provenance and lower-level clarification persistence remain independently valid
 
 ## 16. Engineering Vertical Slice
 
-Source-complete vertical slice may include current relationship/unlock projections and non-authoritative candidates, but must not claim real score/stage progression, Character Unlock eligibility/effect evaluation, or new durable personal-record schema validation until the relevant gaps resolve.
+Source-complete vertical slice may include current relationship/unlock projections and non-authoritative candidates, but must not claim real score/stage progression, Character Unlock eligibility/effect evaluation, new durable personal-record schema validation, or real Saju product-semantic validation that is still blocked by `SRC-33`.
 
 ```text
 Guest bootstrap
 → character choose
 → nickname
 → birth revision
-→ Mock Saju governed narrative
+→ Mock Saju explicitly prevalidated governed narrative fixture
 → protected grounded response + character framing
 → current-life question
 → memory proposal
@@ -573,20 +608,34 @@ Guest bootstrap
 
 Existing-Member Guest merge may contribute only its source-complete stored job/history-read envelope to this baseline until `SRC-24` resolves the actual conflict/action workflow. Any merge-import of new Life Fact/Memory values additionally requires `SRC-25`.
 
-## 17. Real Saju Slice
+## 17. Real Saju Slice — semantic promotion blocked by `SRC-33`
+
+Transport/integration evidence may currently reach:
 
 ```text
 real Saju adapter
-→ versioned ProductResponse
+→ transport attempt/provenance
+→ current exported shape conformance audit
+```
+
+The production semantic slice requires `SRC-33` resolution before continuing:
+
+```text
+source-approved positive ProductReadingResponse validator
+→ validated immutable ProductResponse / reading_ref
 → ambiguity preserved
 → grounding/context envelope
 → protected semantic segment
 → controlled reveal
 ```
 
+Do not substitute current TypeScript exact-deserialization for the validator gate.
+
 ## 18. Failure Injection
 
-- Saju timeout/invalid contract
+- Saju timeout/invalid transport contract
+- Saju transport success + semantically unvalidated/invalid Product response → no authoritative `reading_ref` promotion while `SRC-33` is open
+- malformed/unknown public clarification answer body → no authoritative clarification append while `SRC-33` is open
 - planner timeout/invalid schema
 - renderer invalid schema
 - output guard block
@@ -601,7 +650,7 @@ real Saju adapter
 
 Transactional outbox failure injection은 authority를 분리해서 판정한다. Worker crash / lease expiry는 pending claim 및 expired `processing` lease reclaim의 exact 결과까지 검증할 수 있다. Publisher failure 시나리오에서는 source-backed stored-state/error telemetry를 관찰할 수 있지만, failed-state finalization/classification, retry eligibility/timing/backoff/jitter, `attempt_count` mutation lifecycle, max attempts, dead-letter threshold/transition, manual replay/requeue, error taxonomy의 exact 결과를 `SRC-30` 해결 전에 PASS로 정의하지 않는다. Notification Delivery attempt retry policy와 transactional outbox retry policy는 서로 다른 domain boundary이며 서로의 evidence를 대체하지 않는다.
 
-Personal-record unknown/invalid type-schema writes fail closed with no durable value before `SRC-25`; exact valid/legacy schema acceptance behavior is not invented until source resolution. Share create response-loss retry는 `SRC-20` 해결 전 기대 결과를 임의 정의하지 않는다. Device register transport/retry도 `SRC-19` 해결 전 기대 lineage를 임의 정의하지 않는다. Commerce out-of-order source application과 aggregate recompute의 exact result는 `SRC-21` 해결 전 임의 정의하지 않는다. Relationship apply retry/concurrent result 중 policy output(delta/stage/anti-farming)은 `SRC-22` 해결 전 임의 정의하지 않으며, 현재는 relational dedupe/revision invariants만 검증한다. Character Unlock response-loss/replay/concurrent trigger의 exact projection/effect result는 `SRC-23` 해결 전 임의 정의하지 않으며, 현재는 stored projection/relational invariants만 검증한다. Existing-Member merge response-loss/stale-resolution/partial-action-failure의 exact resume/result semantics는 `SRC-24` 해결 전 임의 정의하지 않으며, 현재는 relational uniqueness, ownership, direct-lineage history, no-raw-reparent invariants만 검증한다.
+Personal-record unknown/invalid type-schema writes fail closed with no durable value before `SRC-25`; exact valid/legacy schema acceptance behavior is not invented until source resolution. Share create response-loss retry는 `SRC-20` 해결 전 기대 결과를 임의 정의하지 않는다. Device register transport/retry도 `SRC-19` 해결 전 기대 lineage를 임의 정의하지 않는다. Commerce out-of-order source application과 aggregate recompute의 exact result는 `SRC-21` 해결 전 임의 정의하지 않는다. Relationship apply retry/concurrent result 중 policy output(delta/stage/anti-farming)은 `SRC-22` 해결 전 임의 정의하지 않으며, 현재는 relational dedupe/revision invariants만 검증한다. Character Unlock response-loss/replay/concurrent trigger의 exact projection/effect result는 `SRC-23` 해결 전 임의 정의하지 않으며, 현재는 stored projection/relational invariants만 검증한다. Existing-Member merge response-loss/stale-resolution/partial-action-failure의 exact resume/result semantics는 `SRC-24` 해결 전 임의 정의하지 않으며, 현재는 relational uniqueness, ownership, direct-lineage history, no-raw-reparent invariants만 검증한다. Product response positive validation failure, clarification answer correlation/canonicalization failure, pending clarification cross-version failure, and validator error-detail shape are not assigned invented exact results before `SRC-33` resolution; the only current safe outcome is no product-semantic promotion/public clarification mutation.
 
 ## 19. Evidence Artifact
 
@@ -611,7 +660,10 @@ CI/release evidence:
 - migration version/catalog hash
 - API contract version
 - content release/bundle/hash
-- Saju engine/reading contract/grounding versions
+- Saju engine/transport execution provenance available independently
+- Saju reading contract/grounding versions only when backed by a source-approved validated Product response
+- `SRC-33` status for ProductReadingResponse validation, transport→reading_ref semantic finalization, clarification positive validation/correlation/canonicalization, public clarification mutation and validated grounding evidence
+- current exported ProductReadingResponse exact-deserialize result labeled **integration audit/conformance**, not semantic-validation evidence
 - AI runtime/prompt versions
 - transactional outbox source-backed enqueue/dedupe, pending claim, expired-processing lease reclaim, successful-completion, and stored-state/error telemetry evidence
 - `SRC-30` status for publisher failure finalization/classification, retry eligibility/scheduling/backoff/jitter, `attempt_count` lifecycle, max attempts, dead-letter threshold/transition, manual replay/requeue, and error-taxonomy evidence
@@ -644,6 +696,8 @@ Do not invent merge policy hash/artifact, conflict schema version, request hash,
 
 Do not treat the Pack's previous `VersionedRecordTypeDefinition` shape as source evidence. `SRC-25` must define the actual positive personal-record type/schema registry and any required artifact identity/provenance.
 
+Do not treat current Saju exported TypeScript shape/deserialization as evidence that `SRC-33` positive Product/clarification validation has been resolved.
+
 Do not treat notification stored-ledger, delivery, or attempt provenance as evidence that missing effective defaults, final inbox composition, provider routing, scheduler decisions, or automatic retry policy have been source-resolved.
 
 Do not treat expired-processing lease reclaim as failed-event retry/dead-letter evidence, and do not use Notification Delivery attempt retry evidence as transactional outbox retry evidence.
@@ -655,9 +709,9 @@ Do not treat expired-processing lease reclaim as failed-event retry/dead-letter 
 ```text
 relevant source blockers closed or feature explicitly disabled
 + DB schema gate PASS
-+ API contract PASS
++ API contract PASS for source-complete routes
 + security/RLS model testable and PASS for selected environment
-+ AI/Saju protected semantic boundary PASS
++ AI/Saju protected semantic boundary PASS only for source-validated semantic inputs
 + E2E slice PASS
 + failure recovery PASS
 ```
@@ -667,6 +721,8 @@ relevant source blockers closed or feature explicitly disabled
 추가로 enabled feature가 참조하는 P0 decision이 DECIDED이고 store/privacy/age/release runbook이 준비되어야 한다.
 
 ```text
+Real Saju Product response semantic finalization / grounding enabled → SRC-33 source-resolved
+Public Reading clarification mutation enabled → SRC-33 source-resolved
 Commerce purchase→access enabled → SRC-18 + SRC-21 source-resolved + P0-CM-01 decided
 Notification effective preference defaults/materialization/mutation enabled → SRC-12 source-resolved
 Final user-visible Notification Inbox projection enabled → SRC-13 source-resolved
