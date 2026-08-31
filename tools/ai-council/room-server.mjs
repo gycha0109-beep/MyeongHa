@@ -58,7 +58,7 @@ function integrationItems(value) {
   const items = [];
   let current = [];
   for (const line of String(value || '').split(/\r?\n/)) {
-    if (/^[-*+]\s+\S/.test(line.trimStart())) {
+    if (/^[-*+]\s+\S/.test(line)) {
       if (current.length) items.push(current.join('\n').trim());
       current = [line];
     } else if (current.length) {
@@ -121,11 +121,15 @@ function citedAgentRounds(item) {
   return cited;
 }
 
+function stripBullet(line) {
+  return String(line || '').trim().replace(/^[-*+]\s+/, '');
+}
+
 function attributedAgents(item) {
   const text = String(item || '').replace(/\[(World|Revenue|Engineering)\s+R[12]\]/gi, '');
   const agents = new Set();
   for (const line of text.split(/\r?\n/)) {
-    const lineOwner = line.trim().match(/^(World|Revenue|Engineering)\s*:/i);
+    const lineOwner = stripBullet(line).match(/^(World|Revenue|Engineering)\s*:/i);
     if (lineOwner) agents.add(integrationAgentLabels.find((label) => label.toLowerCase() === lineOwner[1].toLowerCase()));
   }
   const attributionPattern = /((?:World|Revenue|Engineering)(?:\s*\/\s*(?:World|Revenue|Engineering))*)(?:\s+R[12])?\s*(?:대안|제안|주장|입장|수용|반대|요구|delta|방향)/gi;
@@ -139,7 +143,7 @@ function attributedAgents(item) {
 }
 
 function conflictAgentLines(item) {
-  return String(item || '').split(/\r?\n/).map((line) => line.trim()).map((line) => {
+  return String(item || '').split(/\r?\n/).map((line) => stripBullet(line)).map((line) => {
     const match = line.match(/^(World|Revenue|Engineering)\s*:\s*(.+)$/i);
     if (!match) return null;
     const label = integrationAgentLabels.find((candidate) => candidate.toLowerCase() === match[1].toLowerCase());
@@ -283,7 +287,7 @@ function hardenInput(input, agentName) {
     text += `\n\n[ROUND 2 SOURCE RULES — STRICT OUTPUT CONTRACT]\n허용 출처 토큰: ${allowedSources.length ? allowedSources.join(', ') : '(없음)'}\n- ACCEPT는 위 허용 출처 중 정확히 1개를 골라 그 Agent가 transcript에서 실제로 한 주장 1개만 수용하십시오. bullet의 첫 토큰을 반드시 해당 출처로 시작하고, ACCEPT 전체에서 대괄호 출처 토큰을 정확히 1번만 쓰십시오. [${self} R1]/[${self} R2] 자기 Agent 인용은 금지입니다.\n- OBJECT는 위 허용 출처 중 정확히 1개를 골라 실제 주장 1개만 반박/수정하십시오. 반박한다면 bullet의 첫 토큰을 반드시 해당 출처로 시작하고 OBJECT 전체에서 대괄호 출처 토큰을 정확히 1번만 쓰십시오. 실질적 반대가 없으면 bullet 전체를 정확히 \`- NO MATERIAL OBJECTION\`으로 작성하십시오.\n- [Agent R1], [Other Agent], [Specialist] 같은 익명 인용은 금지이며 transcript에 없는 출처나 집단 주장을 만들지 마십시오.\n- DELTA는 자기 Round 1 대비 실제 변경만 쓰고 없으면 bullet 전체를 정확히 \`- NO MATERIAL CHANGE\`로 작성하십시오. DELTA에는 출처 토큰을 반복하지 마십시오.\n- 출처를 설명문 뒤에 붙이지 말고 반드시 bullet 첫 토큰으로 쓰십시오. 같은 출처를 문장 안에서 다시 반복하지 마십시오.\n\n출력은 다른 문장이나 서론 없이 아래 골격만 사용하십시오.\nACCEPT\n- [허용된 다른 Agent 출처 1개] 실제 수용 주장과 이유\nOBJECT\n- [허용된 다른 Agent 출처 1개] 실제 반박 주장과 대안\nDELTA\n- 실제 변경 또는 NO MATERIAL CHANGE`;
   }
   if (text.includes('[INTEGRATION TASK]')) {
-    text += '\n\n[INTEGRATION STRICT OUTPUT CONTRACT]\n- citation은 반드시 [World R1], [World R2], [Revenue R1], [Revenue R2], [Engineering R1], [Engineering R2] 중 하나를 하나씩 사용하십시오. [Revenue R1/R2] 같은 slash 축약 citation은 금지입니다. 여러 Round가 근거면 [Revenue R1], [Revenue R2]처럼 각각 적으십시오.\n- 모든 실제 bullet/block은 최소 1개의 구체 citation을 포함하십시오. NONE OBSERVED IN TRANSCRIPT와 NOT RAISED IN TRANSCRIPT sentinel만 예외입니다.\n- CONFLICT에서 어떤 Agent에게 Round 2 발언이 있으면 현재 unresolved/partially resolved 상태를 설명할 때 그 Agent의 [Agent R2]를 반드시 포함하십시오. R1은 역사적 배경으로 함께 쓸 수 있지만 최신 입장의 단독 근거가 될 수 없습니다.\n- CONFLICT의 World:/Revenue:/Engineering: 각 줄은 `Agent: 요약 | EVIDENCE "transcript 원문에서 그대로 복사한 8자 이상 구절" [Agent R1 또는 R2]` 형식을 사용하십시오. EVIDENCE는 cited source에 실제로 존재하는 연속 원문이어야 합니다.\n- 어떤 bullet/block에서 World, Revenue, Engineering을 제안자·지지자·반대자·대안의 주체로 직접 이름 붙이면 같은 항목에 해당 Agent citation을 반드시 넣으십시오. 예: Engineering/Revenue 대안이라고 쓰려면 Engineering과 Revenue 각각의 실제 근거 citation이 모두 필요합니다.\n- 원문의 강도를 키우지 마십시오. "유료 전환 경로가 필요"를 "반드시 유료로만 제공"처럼 더 강한 배타적 주장으로 바꾸면 안 됩니다.\n- 8개 기본 섹션은 모두 실제 내용이 있어야 합니다. 근거가 없으면 NOT RAISED IN TRANSCRIPT를 사용할 수 있지만 NEXT TEST에는 사용할 수 없습니다.\n- NEXT TEST의 모든 내용 줄은 반드시 `- `로 시작하는 실행 가능한 bullet이어야 합니다. 마지막 NEXT TEST bullet 뒤에는 ORIGIN, NOTE, 설명, 맺음말 등 어떤 추가 텍스트도 출력하지 마십시오.\n- 전체 답변은 NEXT TEST의 마지막 bullet에서 즉시 종료하십시오.';
+    text += '\n\n[INTEGRATION STRICT OUTPUT CONTRACT]\n- citation은 반드시 [World R1], [World R2], [Revenue R1], [Revenue R2], [Engineering R1], [Engineering R2] 중 하나를 하나씩 사용하십시오. [Revenue R1/R2] 같은 slash 축약 citation은 금지입니다. 여러 Round가 근거면 [Revenue R1], [Revenue R2]처럼 각각 적으십시오.\n- 모든 실제 bullet/block은 최소 1개의 구체 citation을 포함하십시오. NONE OBSERVED IN TRANSCRIPT와 NOT RAISED IN TRANSCRIPT sentinel만 예외입니다.\n- CONFLICT에서 어떤 Agent에게 Round 2 발언이 있으면 현재 unresolved/partially resolved 상태를 설명할 때 그 Agent의 [Agent R2]를 반드시 포함하십시오. R1은 역사적 배경으로 함께 쓸 수 있지만 최신 입장의 단독 근거가 될 수 없습니다.\n- CONFLICT의 World:/Revenue:/Engineering: 각 줄은 `Agent: 요약 | EVIDENCE "transcript 원문에서 그대로 복사한 8자 이상 구절" [Agent R1 또는 R2]` 형식을 사용하십시오. Agent 줄 앞에 들여쓴 `- ` bullet을 붙여도 같은 conflict block으로 처리됩니다. EVIDENCE는 cited source에 실제로 존재하는 연속 원문이어야 합니다.\n- 어떤 bullet/block에서 World, Revenue, Engineering을 제안자·지지자·반대자·대안의 주체로 직접 이름 붙이면 같은 항목에 해당 Agent citation을 반드시 넣으십시오. 예: Engineering/Revenue 대안이라고 쓰려면 Engineering과 Revenue 각각의 실제 근거 citation이 모두 필요합니다.\n- 원문의 강도를 키우지 마십시오. "유료 전환 경로가 필요"를 "반드시 유료로만 제공"처럼 더 강한 배타적 주장으로 바꾸면 안 됩니다.\n- 8개 기본 섹션은 모두 실제 내용이 있어야 합니다. 근거가 없으면 NOT RAISED IN TRANSCRIPT를 사용할 수 있지만 NEXT TEST에는 사용할 수 없습니다.\n- NEXT TEST의 모든 내용 줄은 반드시 `- `로 시작하는 실행 가능한 bullet이어야 합니다. 마지막 NEXT TEST bullet 뒤에는 ORIGIN, NOTE, 설명, 맺음말 등 어떤 추가 텍스트도 출력하지 마십시오.\n- 전체 답변은 NEXT TEST의 마지막 bullet에서 즉시 종료하십시오.';
   }
   return text;
 }
