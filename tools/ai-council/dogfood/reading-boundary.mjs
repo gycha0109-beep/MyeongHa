@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import { randomUUID } from 'node:crypto';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import {
   getApiAttemptCount,
@@ -70,10 +70,24 @@ function validateMeeting(meeting) {
   return { roundTwoPass: true, integrationGroundingPass: true, semanticEvolutionPass: true };
 }
 
+async function archiveExisting(target, dir) {
+  try {
+    const existing = JSON.parse(await readFile(target, 'utf8'));
+    const stamp = String(existing.recordedAt || new Date().toISOString()).replace(/[:.]/g, '-');
+    const archiveUrl = new URL(`reading-boundary.${stamp}.json`, dir);
+    await copyFile(target, archiveUrl);
+    return fileURLToPath(archiveUrl);
+  } catch (error) {
+    if (error?.code === 'ENOENT') return null;
+    throw error;
+  }
+}
+
 async function saveRecording(meeting, validation) {
   const dir = new URL('../test/.recordings/dogfood/', import.meta.url);
   const target = new URL('reading-boundary.latest.json', dir);
   await mkdir(dir, { recursive: true });
+  const archivedPrevious = await archiveExisting(target, dir);
   const payload = {
     version: 2,
     recordedAt: new Date().toISOString(),
@@ -94,7 +108,7 @@ async function saveRecording(meeting, validation) {
     },
   };
   await writeFile(target, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
-  return fileURLToPath(target);
+  return { recordingPath: fileURLToPath(target), archivedPrevious };
 }
 
 const live = process.argv.includes('--live');
@@ -128,14 +142,15 @@ try {
   validationError = error;
 }
 
-const recordingPath = await saveRecording(meeting, validation);
+const { recordingPath, archivedPrevious } = await saveRecording(meeting, validation);
 console.log(`\n${name}`);
 console.log(`status=${meeting.status} calls=${meeting.calls} api_attempts=${meeting.apiAttempts} round_one_isolation=ON round2_protocol=${validation.roundTwoPass ? 'PASS' : 'FAIL'} integration_grounding=${validation.integrationGroundingPass ? 'PASS' : 'FAIL'} semantic_evolution=${validation.semanticEvolutionPass ? 'PASS' : 'FAIL'}${meeting.error ? ` runtime_error=${meeting.error}` : ''}${validationError ? ` validation_error=${validationError.message}` : ''}`);
 for (const item of meeting.messages) {
   if (item.agent === 'user') continue;
   console.log(`\n[${item.label} / Round ${item.round}]\n${item.content}`);
 }
-console.log(`\nrecording=${recordingPath}`);
+if (archivedPrevious) console.log(`\narchived_previous=${archivedPrevious}`);
+console.log(`recording=${recordingPath}`);
 
 if (validationError) {
   console.error('FAIL: dogfood output was preserved. Do not rerun automatically; inspect the saved specialist outputs before spending more API calls.');
