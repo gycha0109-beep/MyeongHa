@@ -75,7 +75,7 @@ meeting.status = 'completed';
 meeting.error = null;
 
 const recordingPath = await saveLiveRecording([{ name: source.name, meeting }], true);
-console.log(`Test ${requested}: status=completed calls=7 retry_api_attempts=${getApiAttemptCount()} total_api_attempts=${meeting.apiAttempts} round2_protocol=PASS integration_sections=PASS semantic_evolution=PASS`);
+console.log(`Test ${requested}: status=completed calls=7 retry_api_attempts=${getApiAttemptCount()} total_api_attempts=${meeting.apiAttempts} round2_protocol=PASS integration_grounding=PASS semantic_evolution=PASS`);
 console.log(`\n[Integration / Round ${meeting.maxRounds + 1}]\n${content}`);
 console.log(`\nrecording=${recordingPath}`);
 console.log('PASS: reused the six successful specialist outputs and paid only for the Integration retry.');
