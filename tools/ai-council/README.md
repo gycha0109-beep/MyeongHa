@@ -19,9 +19,9 @@ npm run start:room
 
 브라우저에서 `http://127.0.0.1:3000`을 엽니다.
 
-기본 회의는 World, Revenue, Engineering이 앞선 발언을 읽고 2개 라운드 동안 서로 검토한 뒤 Integration이 정리합니다. Round 2의 전문 Agent는 반드시 `ACCEPT / OBJECT / DELTA` 형식으로 실제 입장 변화를 작성합니다. Integration은 transcript에 존재하는 실제 주장만 사용하며, 근거 Agent와 Round를 표시합니다. 각 Agent의 발언은 SSE로 완료되는 즉시 화면에 표시됩니다.
+기본 회의는 World, Revenue, Engineering이 2개 라운드 동안 검토한 뒤 Integration이 정리합니다. **Round 1 specialist는 서로의 같은 라운드 출력을 보지 않고 독립적으로 최초 입장을 생성합니다.** 상호 발언 검토는 Round 2에서만 시작합니다. Round 2의 전문 Agent는 반드시 `ACCEPT / OBJECT / DELTA` 형식으로 실제 입장 변화를 작성합니다. Integration은 transcript에 존재하는 실제 주장만 사용하며, 근거 Agent와 Round를 표시합니다. 각 Agent의 발언은 SSE로 완료되는 즉시 화면에 표시됩니다.
 
-Production Integration 호출에는 semantic evolution gate가 적용됩니다. 현재 CONFLICT는 Round 2가 존재하는 Agent의 최신 R2 stance만 현재 근거로 사용할 수 있고, superseded R1을 현재 충돌로 재활성화할 수 없습니다. 또한 회의 주제와 실제 transcript에 없는 정확한 기간·quota·threshold·가격·횟수·비율을 새로 확정하면 fail-closed 처리합니다. 이 검증은 `integration-semantic-evolution.mjs`를 공용 source of truth로 사용하며 runtime, retry, replay가 같은 규칙을 공유합니다.
+Production Integration 호출에는 semantic evolution gate가 적용됩니다. 현재 CONFLICT는 Round 2가 존재하는 Agent의 최신 R2 stance만 현재 근거로 사용할 수 있고, superseded R1을 현재 충돌로 재활성화할 수 없습니다. 또한 회의 주제와 실제 transcript에 없는 정확한 기간·quota·threshold·가격·횟수·비율을 새로 확정하면 fail-closed 처리합니다. Round 1 isolation과 Integration semantic 검증은 production fetch gate에서 적용되며, `integration-semantic-runtime-gate.mjs`와 `integration-semantic-evolution.mjs`가 runtime 검증의 source of truth입니다.
 
 `웹 검색 허용`을 켜면 각 Agent의 Responses API 호출에 `web_search` 도구를 함께 전달합니다. 검색 호출은 추가 비용과 지연이 발생할 수 있으므로 회의별로 끌 수 있습니다.
 
@@ -77,7 +77,7 @@ npm run test:quality:retry-integration:b
 npm run dogfood:reading-boundary
 ```
 
-실제 Council을 실행할 때만 아래 명령을 사용합니다. 정상 완료 시 World/Revenue/Engineering R1 3회 + R2 3회 + Integration 1회, 최대 7 calls입니다. 웹 검색은 꺼져 있습니다.
+실제 Council을 실행할 때만 아래 명령을 사용합니다. 정상 완료 시 World/Revenue/Engineering R1 3회 + R2 3회 + Integration 1회, 최대 7 calls입니다. 웹 검색은 꺼져 있습니다. 새 recording에는 `roundOneIsolation=true`가 저장됩니다.
 
 ```powershell
 npm run dogfood:reading-boundary:live
@@ -99,7 +99,7 @@ retry는 accepted call 수와 실제 API attempt를 분리해 기록합니다. �
 npm run dogfood:reading-boundary:review
 ```
 
-이 review는 Round 2 protocol, Integration grounding, semantic evolution을 다시 검사하고 Integration 결과만 재출력합니다.
+이 review는 Round 2 protocol, Integration grounding, semantic evolution을 다시 검사하고 Integration 결과만 재출력합니다. 또한 recording의 `roundOneIsolation`을 확인합니다. isolation 도입 이전 결과처럼 필드가 없거나 false이면 validator가 PASS여도 `LEGACY_ANCHORED_R1_NOT_ADOPTABLE`로 표시하며 제품 정책 증거로 승격하지 않습니다.
 
 ## 6. Discord / n8n
 
