@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "id": "A",
+      "name": "Test A — Life Thread resurfacing v0.1",
+      "evidenceType": "operator-observed-replay",
+      "observedRecordingAt": "2026-08-31T09:18:03.838Z",
+      "freshAtObservation": true,
+      "status": "completed",
+      "calls": 7,
+      "round2Protocol": "PASS",
+      "integrationGrounding": "PASS",
+      "semanticEvolution": "PASS",
+      "replayableSourceAvailable": false,
+      "currentGenerationCoverage": false,
+      "note": "The legacy aggregate recorder later overwrote Test A's specialist source snapshot during Test B work. This preserves the fact of the observed FRESH PASS but is not a replacement for current-runtime replayable generation evidence."
+    },
+    {
+      "id": "B",
+      "name": "Test B — Free unlimited Character Chat conflict",
+      "evidenceType": "replayable-recording",
+      "observedRecordingAt": "2026-08-31T09:53:41.357Z",
+      "freshAtObservation": true,
+      "status": "completed",
+      "calls": 7,
+      "round2Protocol": "PASS",
+      "integrationGrounding": "PASS",
+      "semanticEvolution": "PASS",
+      "replayableSourceAvailable": true,
+      "currentGenerationCoverage": true,
+      "note": "The saved live-quality.latest.json recording remains replayable under the unchanged Council runtime fingerprint; later bookkeeping-only test changes are outside runtimeFingerprint()."
+    }
+  ]
+}
