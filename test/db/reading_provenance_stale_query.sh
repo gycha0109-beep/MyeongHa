@@ -65,7 +65,7 @@ set availability=excluded.availability,
     updated_at=excluded.updated_at;
 SQL
 
-# Successful general reading pins source r1 and gains validated response provenance.
+# Successful general reading pins source r1 and persists an explicitly prevalidated canonical response-provenance fixture.
 "${psql_base[@]}" -q -c "select * from public.cmd_create_reading_session_v1(
   '7b200000-0000-0000-0000-000000000001',
   '7b500000-0000-0000-0000-000000000001','7b600000-0000-0000-0000-000000000001',
@@ -100,7 +100,7 @@ from public.qry_reading_provenance_stale_v1(
 );")
 expected='7b600000-0000-0000-0000-000000000001|7b500000-0000-0000-0000-000000000001|general|reading-general-v1|1|succeeded|reading-request-v1|7b300000-0000-0000-0000-000000000001|7b400000-0000-0000-0000-000000000011|7b400000-0000-0000-0000-000000000011|||f|saju-public|engine-resolved-v1|product-reading-v1|delivered'
 [[ "$shape" == "$expected" ]] || fail "successful Reading provenance projection mismatch: $shape"
-pass "successful Reading projection exposes pinned/current revision and validated version provenance"
+pass "successful Reading projection exposes pinned/current revision and persisted response provenance without asserting Product semantic validation"
 
 json_shape=$("${psql_base[@]}" -Atc "select row_to_json(q)::text from public.qry_reading_provenance_stale_v1('7b200000-0000-0000-0000-000000000001','7b600000-0000-0000-0000-000000000001') q;")
 [[ "$json_shape" != *'response_snapshot_jsonb'* ]] || fail "raw response snapshot field leaked into Reading projection"
