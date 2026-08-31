@@ -5,8 +5,10 @@ import { validateIntegrationGrounding, validateRoundTwoOutput } from '../room-se
 import { validateIntegrationSemanticEvolution } from './integration-semantic-evolution.mjs';
 
 const recordingDir = new URL('./.recordings/', import.meta.url);
+const caseArchiveDir = new URL('./.recordings/cases/', import.meta.url);
 const latestRecordingUrl = new URL('./.recordings/live-quality.latest.json', import.meta.url);
 const failedRecordingUrl = new URL('./.recordings/live-quality.failed.json', import.meta.url);
+const retryFailureUrl = new URL('./.recordings/integration-retry.failed.json', import.meta.url);
 const runtimeFiles = [
   new URL('../room-server.mjs', import.meta.url),
   new URL('../room-server-core.mjs', import.meta.url),
@@ -83,26 +85,62 @@ async function readRecording(url) {
   }
 }
 
+function caseKey(name) {
+  const match = String(name || '').match(/^Test\s+([A-Za-z0-9_-]+)/i);
+  if (match) return `test-${match[1].toLowerCase()}`;
+  return String(name || 'case').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'case';
+}
+
+function normalizeStoredCases(recording) {
+  const fallbackFingerprint = recording?.runtimeFingerprint || null;
+  return (recording?.cases || []).map((item) => ({
+    ...item,
+    runtimeFingerprint: item.runtimeFingerprint || fallbackFingerprint,
+  }));
+}
+
+export function mergeRecordedCases(existing, incoming, fallbackFingerprint = null) {
+  const merged = new Map(
+    normalizeStoredCases(existing).map((item) => [item.name, item]),
+  );
+  for (const item of incoming || []) {
+    merged.set(item.name, {
+      ...item,
+      runtimeFingerprint: item.runtimeFingerprint || fallbackFingerprint,
+    });
+  }
+  return [...merged.values()];
+}
+
+async function writeCaseArchive(item, passed) {
+  await mkdir(caseArchiveDir, { recursive: true });
+  const archiveUrl = new URL(`${caseKey(item.name)}.${passed ? 'passed' : 'failed'}.json`, caseArchiveDir);
+  const payload = {
+    version: 2,
+    recordedAt: new Date().toISOString(),
+    runtimeFingerprint: item.runtimeFingerprint,
+    name: item.name,
+    meeting: item.meeting,
+  };
+  await writeFile(archiveUrl, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
+}
+
 export async function saveLiveRecording(results, passed) {
   await mkdir(recordingDir, { recursive: true });
   const target = passed ? latestRecordingUrl : failedRecordingUrl;
   const fingerprint = await runtimeFingerprint();
-  let cases = results.map(({ name, meeting }) => ({
+  const incoming = results.map(({ name, meeting }) => ({
     name,
+    runtimeFingerprint: fingerprint,
     meeting: snapshotMeeting(meeting),
   }));
 
-  if (passed) {
-    const existing = await readRecording(latestRecordingUrl);
-    if (existing?.runtimeFingerprint === fingerprint) {
-      const merged = new Map((existing.cases || []).map((item) => [item.name, item]));
-      for (const item of cases) merged.set(item.name, item);
-      cases = [...merged.values()];
-    }
-  }
+  for (const item of incoming) await writeCaseArchive(item, passed);
 
+  const existing = await readRecording(target);
+  const cases = mergeRecordedCases(existing, incoming, fingerprint);
   const payload = {
-    version: 1,
+    version: 2,
     recordedAt: new Date().toISOString(),
     runtimeFingerprint: fingerprint,
     cases,
@@ -113,4 +151,38 @@ export async function saveLiveRecording(results, passed) {
 
 export async function loadLatestRecording() {
   return readRecording(latestRecordingUrl);
+}
+
+export async function loadFailedRecording() {
+  return readRecording(failedRecordingUrl);
+}
+
+export async function loadRecordedCase(name, { passed = null } = {}) {
+  const key = caseKey(name);
+  const candidates = [];
+  if (passed !== false) candidates.push(new URL(`${key}.passed.json`, caseArchiveDir));
+  if (passed !== true) candidates.push(new URL(`${key}.failed.json`, caseArchiveDir));
+  for (const url of candidates) {
+    const archive = await readRecording(url);
+    if (archive?.meeting) return {
+      name: archive.name || name,
+      runtimeFingerprint: archive.runtimeFingerprint || null,
+      meeting: archive.meeting,
+    };
+  }
+
+  for (const url of [latestRecordingUrl, failedRecordingUrl, retryFailureUrl]) {
+    const recording = await readRecording(url);
+    const cases = normalizeStoredCases(recording);
+    const found = cases.find((item) => item.name === name || item.name.startsWith(`${name} `) || item.name.startsWith(`${name} —`));
+    if (found) return found;
+    if (recording?.sourceMeeting && (recording.case === name || String(recording.case || '').startsWith(`${name} `) || String(recording.case || '').startsWith(`${name} —`))) {
+      return {
+        name: recording.case,
+        runtimeFingerprint: recording.runtimeFingerprint || null,
+        meeting: recording.sourceMeeting,
+      };
+    }
+  }
+  return null;
 }
