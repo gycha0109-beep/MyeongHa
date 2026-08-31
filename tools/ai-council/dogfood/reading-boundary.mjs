@@ -75,9 +75,10 @@ async function saveRecording(meeting, validation) {
   const target = new URL('reading-boundary.latest.json', dir);
   await mkdir(dir, { recursive: true });
   const payload = {
-    version: 1,
+    version: 2,
     recordedAt: new Date().toISOString(),
     name,
+    roundOneIsolation: true,
     validation,
     meeting: {
       topic: meeting.topic,
@@ -99,7 +100,7 @@ async function saveRecording(meeting, validation) {
 const live = process.argv.includes('--live');
 if (!live) {
   console.log(`${name}`);
-  console.log('mode=DRY_RUN api_attempts=0 max_paid_calls_if_live=7 web_search=OFF');
+  console.log('mode=DRY_RUN api_attempts=0 max_paid_calls_if_live=7 web_search=OFF round_one_isolation=ON');
   console.log('\n[TOPIC]\n');
   console.log(topic);
   console.log('\nNo API call was made. Use npm run dogfood:reading-boundary:live only when you intentionally want the 7-call live Council meeting.');
@@ -129,7 +130,7 @@ try {
 
 const recordingPath = await saveRecording(meeting, validation);
 console.log(`\n${name}`);
-console.log(`status=${meeting.status} calls=${meeting.calls} api_attempts=${meeting.apiAttempts} round2_protocol=${validation.roundTwoPass ? 'PASS' : 'FAIL'} integration_grounding=${validation.integrationGroundingPass ? 'PASS' : 'FAIL'} semantic_evolution=${validation.semanticEvolutionPass ? 'PASS' : 'FAIL'}${meeting.error ? ` runtime_error=${meeting.error}` : ''}${validationError ? ` validation_error=${validationError.message}` : ''}`);
+console.log(`status=${meeting.status} calls=${meeting.calls} api_attempts=${meeting.apiAttempts} round_one_isolation=ON round2_protocol=${validation.roundTwoPass ? 'PASS' : 'FAIL'} integration_grounding=${validation.integrationGroundingPass ? 'PASS' : 'FAIL'} semantic_evolution=${validation.semanticEvolutionPass ? 'PASS' : 'FAIL'}${meeting.error ? ` runtime_error=${meeting.error}` : ''}${validationError ? ` validation_error=${validationError.message}` : ''}`);
 for (const item of meeting.messages) {
   if (item.agent === 'user') continue;
   console.log(`\n[${item.label} / Round ${item.round}]\n${item.content}`);
@@ -140,5 +141,5 @@ if (validationError) {
   console.error('FAIL: dogfood output was preserved. Do not rerun automatically; inspect the saved specialist outputs before spending more API calls.');
   process.exitCode = 1;
 } else {
-  console.log('PASS: production Council completed the first real product-decision dogfood case.');
+  console.log('PASS: production Council completed the first real product-decision dogfood case with isolated specialist Round 1 outputs.');
 }
