@@ -1,0 +1,73 @@
+name: Supabase Production
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'supabase/migrations/**'
+  workflow_dispatch:
+    inputs:
+      bootstrap_history:
+        description: 'One-time repair of the legacy 0010 migration history before the first production push'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-production-migrations
+  cancel-in-progress: false
+
+env:
+  SUPABASE_PROJECT_ID: cnsfpcdiyofqvhpcegfc
+
+jobs:
+  deploy:
+    name: deploy-migrations
+    runs-on: ubuntu-24.04
+    environment: production
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v3.0.0
+        with:
+          version: 2.116.0
+
+      - name: Verify deployment credentials
+        shell: bash
+        run: |
+          test -n "$SUPABASE_ACCESS_TOKEN" || { echo 'SUPABASE_ACCESS_TOKEN is not configured'; exit 1; }
+          test -n "$SUPABASE_DB_PASSWORD" || { echo 'SUPABASE_DB_PASSWORD is not configured'; exit 1; }
+          test "$SUPABASE_PROJECT_ID" = 'cnsfpcdiyofqvhpcegfc'
+
+      - name: Link production project
+        run: supabase link --project-ref "$SUPABASE_PROJECT_ID"
+
+      - name: Show migration state before deploy
+        run: supabase migration list
+
+      - name: Bootstrap legacy 0010 migration history
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.bootstrap_history == true }}
+        shell: bash
+        run: |
+          supabase migration repair 20260830072444 --status reverted
+          supabase migration repair 0010 --status applied
+          supabase migration list
+
+      - name: Preview pending production migrations
+        run: supabase db push --dry-run
+
+      - name: Apply pending production migrations
+        run: supabase db push
+
+      - name: Verify production migration state
+        run: supabase migration list
