@@ -16,6 +16,7 @@ export * from './central-chin-paired-evidence-intake-fr56.js';
 export * from './central-chin-paired-dataset-ledger-fr57.js';
 export * from './central-chin-paired-acquisition-provenance-fr58.js';
 export * from './central-chin-external-provenance-verification-fr59.js';
+export * from './central-chin-external-trust-evidence-intake-fr60.js';
 export * from './menton-dataset-intake-frdata01.js';
 export * from './image-byte-dimensions-frdata02.js';
 export * from './browser-image-decode-frdata03.js';
