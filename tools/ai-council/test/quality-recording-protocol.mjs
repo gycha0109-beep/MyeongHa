@@ -25,16 +25,19 @@ const meeting = {
   ],
 };
 
-assert.deepEqual(evaluateMeeting(meeting), {
-  completedPass: true,
-  sevenCallsPass: true,
-  roundTwoPass: true,
-  integrationPass: true,
-  passed: true,
-});
+const evaluation = evaluateMeeting(meeting);
+assert.equal(evaluation.completedPass, true);
+assert.equal(evaluation.sevenCallsPass, true);
+assert.equal(evaluation.roundTwoPass, true);
+assert.equal(evaluation.integrationGroundingPass, true);
+assert.equal(evaluation.semanticEvolutionPass, true);
+assert.equal(evaluation.integrationPass, true);
+assert.equal(evaluation.passed, true);
 
 const sixCalls = structuredClone(meeting);
 sixCalls.calls = 6;
-assert.equal(evaluateMeeting(sixCalls).passed, false);
+const sixCallEvaluation = evaluateMeeting(sixCalls);
+assert.equal(sixCallEvaluation.sevenCallsPass, false);
+assert.equal(sixCallEvaluation.passed, false);
 assert.equal(snapshotMeeting(meeting).messages.length, 4);
 console.log('PASS Test C: recorded live meeting replay validates without API calls');
