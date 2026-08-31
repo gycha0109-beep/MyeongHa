@@ -5,6 +5,11 @@ import {
   type CharacterRelationshipReadItemV1,
 } from './character-relationship-read.js';
 import {
+  resolveCharacterPresentationIdentity,
+  type CharacterPresentationIdentityAuthorityPortV1,
+  type CharacterPresentationKeyV1,
+} from './character-presentation-resolver.js';
+import {
   getChatThreadStream,
   type ChatThreadStreamMessageV1,
   type ChatThreadStreamReadAuthorityPortV1,
@@ -20,11 +25,28 @@ export interface CharacterRoomReadStateV1 {
   readonly relationship: Readonly<CharacterRelationshipReadItemV1> | null;
 }
 
+export interface CharacterRoomPresentationReadStateV1
+  extends CharacterRoomReadStateV1 {
+  readonly presentationKey: CharacterPresentationKeyV1;
+  readonly contentBundleId: string;
+}
+
 export interface ReadCharacterRoomStateInputV1 {
   readonly resolvedSubjectId?: string;
   readonly threadId: unknown;
   readonly characterId: unknown;
   readonly afterSequenceNo?: unknown;
+  readonly streamAuthorityPort: ChatThreadStreamReadAuthorityPortV1;
+  readonly relationshipAuthorityPort: CharacterRelationshipReadAuthorityPortV1;
+}
+
+export interface ReadCharacterRoomStateByPresentationKeyInputV1 {
+  readonly resolvedSubjectId?: string;
+  readonly threadId: unknown;
+  readonly contentBundleId: unknown;
+  readonly presentationKey: unknown;
+  readonly afterSequenceNo?: unknown;
+  readonly identityAuthorityPort: CharacterPresentationIdentityAuthorityPortV1;
   readonly streamAuthorityPort: ChatThreadStreamReadAuthorityPortV1;
   readonly relationshipAuthorityPort: CharacterRelationshipReadAuthorityPortV1;
 }
@@ -68,7 +90,7 @@ function findLatestCharacterMessage(
 }
 
 /**
- * Character Room read composition.
+ * Character Room read composition over already canonical server-side characterId.
  *
  * This function does not infer a Life Thread, summarize past messages, create a
  * relationship baseline, or fabricate a character line. It only combines the
@@ -111,5 +133,46 @@ export async function readCharacterRoomState(
     messages: stream.messages,
     latestCharacterMessage: findLatestCharacterMessage(stream.messages, characterId),
     relationship: relationshipResponse.relationship,
+  });
+}
+
+/**
+ * HTTP/UI-facing Character Room composition.
+ *
+ * The browser-facing presentation key is resolved through trusted content
+ * authority first. `contentBundleId` must be server-resolved from the pinned or
+ * otherwise authoritative content release; it must never be trusted from the
+ * browser as proof of content membership.
+ */
+export async function readCharacterRoomStateByPresentationKey(
+  input: ReadCharacterRoomStateByPresentationKeyInputV1,
+): Promise<CharacterRoomPresentationReadStateV1> {
+  const identity = await resolveCharacterPresentationIdentity({
+    contentBundleId: input.contentBundleId,
+    presentationKey: input.presentationKey,
+    authorityPort: input.identityAuthorityPort,
+  });
+  const subjectBinding =
+    input.resolvedSubjectId === undefined
+      ? {}
+      : { resolvedSubjectId: input.resolvedSubjectId };
+  const cursorBinding =
+    input.afterSequenceNo === undefined
+      ? {}
+      : { afterSequenceNo: input.afterSequenceNo };
+
+  const roomState = await readCharacterRoomState({
+    ...subjectBinding,
+    ...cursorBinding,
+    threadId: input.threadId,
+    characterId: identity.characterId,
+    streamAuthorityPort: input.streamAuthorityPort,
+    relationshipAuthorityPort: input.relationshipAuthorityPort,
+  });
+
+  return Object.freeze({
+    ...roomState,
+    presentationKey: identity.presentationKey,
+    contentBundleId: identity.contentBundleId,
   });
 }
