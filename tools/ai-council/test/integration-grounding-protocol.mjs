@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
-import { validateIntegrationGrounding } from '../room-server.mjs';
+import { buildIntegrationInput, validateIntegrationGrounding } from '../room-server.mjs';
 
 const meeting = {
+  topic: 'Integration grounding regression fixture',
   messages: [
     { agent: 'world', label: 'World', round: 1, content: 'POSITION\n- 서버 authority를 유지한다.' },
     { agent: 'revenue', label: 'Revenue', round: 1, content: 'POSITION\n- 유료 전환 경로가 명확해야 한다.' },
@@ -11,6 +12,12 @@ const meeting = {
     { agent: 'engineering', label: 'Engineering', round: 2, content: 'ACCEPT\n- [World R2] summary/detail 분리를 수용한다.\nOBJECT\n- [Revenue R2] level 분기 완전 위임에 반대한다.\nDELTA\n- level flag를 서버가 보유한다.' },
   ],
 };
+
+const prompt = buildIntegrationInput(meeting);
+assert.match(prompt, /모든 실제 bullet\/block은 최소 1개의 구체 citation/);
+assert.match(prompt, /R1은 역사적 배경으로 함께 쓸 수 있지만 최신 입장의 단독 근거가 될 수 없습니다/);
+assert.match(prompt, /EVIDENCE \"transcript 원문에서 그대로 복사한 8자 이상 구절\"/);
+assert.match(prompt, /원문의 강도를 키우지 마십시오/);
 
 const base = `AGREED
 - summary 무료/detail 유료 분리를 수용한다. [World R2] [Revenue R2]
