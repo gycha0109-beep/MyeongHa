@@ -2,7 +2,7 @@ import 'dotenv/config';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { canonicalizeIntegrationOutput } from './integration-output-normalizer.mjs';
-import { integrationSemanticInstruction, validateIntegrationSemanticEvolution } from './integration-semantic-evolution.mjs';
+import { integrationSemanticInstruction, validateIntegrationSemanticEvolution } from '../integration-semantic-evolution.mjs';
 
 const rawFetch = globalThis.fetch.bind(globalThis);
 const configuredIntegrationTokens = Number(process.env.COUNCIL_INTEGRATION_MAX_OUTPUT_TOKENS || 0);
