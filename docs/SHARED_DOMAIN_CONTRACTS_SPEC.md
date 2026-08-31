@@ -1,8 +1,8 @@
-# 명하 Shared Domain Contracts Specification v0.9 — Source Aligned
+# 명하 Shared Domain Contracts Specification v0.10 — SRC-33 Bound
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.9**  
-> Date: **2026-08-30**  
+> Pack Version: **v0.10**  
+> Date: **2026-08-31**  
 > Purpose: 여러 spec에 흩어진 free-form string/JSON을 bounded versioned contract로 묶는다. Source가 contract shape를 정의하지 않은 영역은 registry를 임의 생성하지 않는다.
 
 ---
@@ -30,6 +30,15 @@ Outbox EventType
 
 각 source-backed key family는 source가 실제 정의한 범위에서 `registryVersion` 또는 schema version을 가진다. unknown/unresolved value는 실행 authority로 승격하지 않고 reject/fallback한다.
 
+같은 원칙은 Saju product payload에도 적용한다.
+
+```text
+ProductReadingResponse
+ClarificationAnswerV1 / clarification continuation body
+```
+
+는 relational `jsonb` slot, current TypeScript export 관찰, UI example 또는 API error example만으로 positive application contract가 되지 않는다. Complete positive validation/correlation/canonicalization authority는 `SRC-33` 해결 전 OPEN이다.
+
 ### 1.1 Source Authority vs Implementation Reproducibility Artifacts
 
 Primary Source가 어떤 key/policy family에 bounded/versioned behavior를 요구하는 것과, Pack이 그 요구를 구현하기 위해 구체적인 registry/policy artifact/interface를 만드는 것은 구분한다.
@@ -47,6 +56,10 @@ Relationship
 Life Fact / Character Memory
 → type/schema-version validation 필수
 → positive registry/schema content는 SRC-25 OPEN
+
+Saju Product / Clarification
+→ validated Product response/request snapshots를 요구
+→ complete positive ProductReadingResponse / ClarificationAnswer contract는 SRC-33 OPEN
 
 Cost / Abuse
 → rate limit / repeated-request control / free-paid quota boundary /
@@ -82,6 +95,8 @@ Relationship transition rule은 source가 versioned policy로 관리하라고 �
 Commerce의 purchased product → entitlement mapping은 현재 source-backed registry contract가 없으며 `SRC-18`로 분리한다. 기존 Pack의 `ProductFulfillmentDefinition`은 source authority로 취급하지 않는다.
 
 Life Fact/Character Memory는 versioned type/schema validation이 **필수**라는 authority까지 source-complete지만, final positive type inventory와 schema content가 없다. Personal-record registry authority는 `SRC-25`가 OPEN이다.
+
+Saju Reading은 validated Product response/request snapshot을 요구한다는 authority까지 source-complete하지만, complete positive application validator와 clarification answer/correlation/canonicalization contract가 없다. Current exported type shape나 persistence JSON column을 source-approved validator로 승격하지 않으며 `SRC-33`이 OPEN이다.
 
 ## 2. Chat Structured Action Registry
 
@@ -280,14 +295,78 @@ one_off | subscription | promo_compatible
 
 ## 8. API Error Details
 
-`ApiError.details`는 code별 versioned schema만 허용한다. arbitrary provider/body dump 금지.
+`ApiError.details`는 **source-approved positive schema가 존재하는 code에 한해서만** versioned detail contract를 가질 수 있다. arbitrary provider/body dump 금지.
 
-예:
+Source-complete schema가 별도로 확인된 code의 detail contract와, 아직 source gap이 있는 code의 UI/example hint를 구분한다.
+
+예를 들어 다음 표현은 개념적 예시일 수 있다.
 
 ```text
-REVISION_CONFLICT/v1 → expectedRevisionId,currentRevisionId
+REVISION_CONFLICT → expected/current revision information
+CAPABILITY_UNAVAILABLE → capability/availability information
+```
+
+하지만 정확한 field set/version을 source가 고정하지 않았다면 Pack 예시를 곧바로 normative schema로 승격하지 않는다.
+
+특히 이전 문서의:
+
+```text
 NEEDS_CLARIFICATION/v1 → readingSessionId,readingId,clarificationSchemaRef
-CAPABILITY_UNAVAILABLE/v1 → capabilityKey,availability
+```
+
+는 **`SRC-33` 해결 전 source-approved public error-detail schema가 아니다.** `clarificationSchemaRef`라는 필드가 존재해야 한다고 Primary Source가 확정한 것도 아니며, validator failure/public error taxonomy 역시 `SRC-33`의 missing authority다.
+
+## 8A. Saju Product / Clarification Positive Contracts — `SRC-33` OPEN
+
+Primary Source가 source-complete하게 고정하는 것은 다음 relational/product requirements까지다.
+
+```text
+ProductReadingResponse 저장 전 validation 필요
+request_snapshot_jsonb는 validated/minimized Product Request projection
+clarification은 같은 Reading Session의 새 immutable logical Reading attempt
+clarification attempt와 transient transport retry는 분리
+cmd_append_reading_clarification_v1은 ownership/idempotency/current-parent/attempt allocation persistence authority
+transport success alone != consumer semantic completion
+```
+
+하지만 다음 positive contract는 아직 source-complete하지 않다.
+
+```text
+complete ProductReadingResponse schema
+state-specific required/optional nested payload rules
+requiredAction/clarifications/calculationAmbiguity positive variants
+ClarificationAnswerV1 schema
+question/answer identifier grammar
+question→answer correlation
+answer cardinality / duplicate / unknown-field rules
+free-text/scalar/structured answer representation
+null/absent/coercion/canonicalization rules
+clarification request-hash material
+pending clarification contract-version compatibility
+validator ownership/result/error detail schema
+```
+
+따라서 `SRC-33` 해결 전 금지:
+
+- current TypeScript export나 UI fixture에서 Pack 자체 validator를 역설계해 source authority라고 주장;
+- arbitrary `answers: unknown[]` 또는 caller-defined question/answer key를 durable clarification request로 승인;
+- syntactically valid client body를 `cmd_append_reading_clarification_v1`에 직결;
+- successful provider/package response를 validated ProductReadingResponse로 승격;
+- `required_action_jsonb`/`clarifications_jsonb`/ambiguity JSON slot을 positive schema authority로 해석;
+- `NEEDS_CLARIFICATION` error details를 Pack example만으로 고정.
+
+Source-safe boundary:
+
+```text
+explicitly prevalidated canonical clarification fixture
+→ lower-level clarification persistence/concurrency tests 가능
+
+transport execution attempt/provenance
+→ independently testable
+
+public clarification positive validation
+ProductReadingResponse semantic finalization
+→ SRC-33 해결 전 BLOCKED
 ```
 
 ## 9. Outbox Contracts — `SRC-30` Boundary
@@ -372,5 +451,10 @@ Source가 향후 policy versioning/immutable artifact를 실제로 채택하면 
 - unknown cue → no arbitrary asset resolution
 - Purchase Intent minimal offer mapping snapshot mutation → hash mismatch/deny
 - unresolved product→entitlement mapping (`SRC-18`) → no entitlement mutation
+- current Saju exported Product response shape/deserialization may be audited for integration compatibility, but does not constitute positive ProductReadingResponse validation PASS while `SRC-33` is open
+- arbitrary/unregistered clarification answer body → no authoritative clarification persistence
+- lower-level clarification relational/idempotency/current-parent behavior remains testable only with an explicitly prevalidated canonical fixture while `SRC-33` is open
+- transport success → no authoritative ProductReadingResponse/reading_ref semantic promotion while `SRC-33` is open
+- `NEEDS_CLARIFICATION` public error detail schema remains non-normative until `SRC-33` resolves validator/error authority
 - unknown/unresolved outbox schema → no successful consume or authoritative downstream side effect; exact failure/retry/dead-letter/replay disposition remains blocked by `SRC-30`
 - autonomous notification cadence/frequency/dedupe/template policy → blocked until `SRC-32`; existing stored notification/read/delivery-attempt boundaries remain independently testable
