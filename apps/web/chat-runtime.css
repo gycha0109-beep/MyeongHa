@@ -1,0 +1,39 @@
+.character-room-context[hidden],
+.history-runtime-empty[hidden] {
+  display: none !important;
+}
+
+.history-runtime-empty {
+  margin: 28px 4px;
+  padding: 24px 18px;
+  border: 1px solid rgba(145, 112, 75, .18);
+  border-radius: 10px;
+  color: var(--mh-ink-muted, #756c64);
+  background: rgba(255, 255, 255, .18);
+  font-family: var(--mh-serif);
+  font-size: 13px;
+  line-height: 1.7;
+  text-align: center;
+}
+
+.character-composer[data-runtime-busy="true"] textarea {
+  opacity: .72;
+}
+
+.character-send-button:disabled {
+  cursor: wait;
+  opacity: .62;
+}
+
+.character-compose-status:not(:empty) {
+  min-height: 20px;
+}
+
+.history-entry[data-sender="user"] strong {
+  color: var(--mh-ink-muted, #756c64);
+}
+
+.history-entry[data-redacted="true"] p {
+  opacity: .62;
+  font-style: italic;
+}
