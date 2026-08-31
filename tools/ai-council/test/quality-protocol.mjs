@@ -19,6 +19,12 @@ function message(agent, content, round) {
   };
 }
 
+function configuredOutputLimit(specificName, fallback) {
+  const legacyMaxOutputTokens = Number(process.env.COUNCIL_MAX_OUTPUT_TOKENS || 0);
+  const value = Number(process.env[specificName] || legacyMaxOutputTokens || fallback);
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
 const lifeThreadMeeting = {
   topic: 'Life Thread resurfacing v0.1을 설계한다. 가격·정확한 cooldown 일수·DB schema는 확정하지 않는다.',
   maxRounds: 2,
@@ -41,12 +47,13 @@ assert.match(roundTwoPrompt, /\[Engineering R1\]/);
 assert.match(roundTwoPrompt, /자기 Agent 인용은 금지/);
 assert.match(roundTwoPrompt, /\[Agent R1\].*익명 인용은 금지/);
 assert.match(buildAgentInstructions('world', 2), /ACCEPT \/ OBJECT \/ DELTA/);
-assert.equal(agents.world.maxOutputTokens, 800);
-assert.equal(agents.revenue.maxOutputTokens, 800);
-assert.equal(agents.engineering.maxOutputTokens, 900);
-assert.equal(agents.integration.maxOutputTokens, 1500);
+assert.equal(agents.world.maxOutputTokens, configuredOutputLimit('COUNCIL_WORLD_MAX_OUTPUT_TOKENS', 800));
+assert.equal(agents.revenue.maxOutputTokens, configuredOutputLimit('COUNCIL_REVENUE_MAX_OUTPUT_TOKENS', 800));
+assert.equal(agents.engineering.maxOutputTokens, configuredOutputLimit('COUNCIL_ENGINEERING_MAX_OUTPUT_TOKENS', 900));
+assert.equal(agents.integration.maxOutputTokens, configuredOutputLimit('COUNCIL_INTEGRATION_MAX_OUTPUT_TOKENS', 1500));
 assert.equal(buildResponsePayload(lifeThreadMeeting, 'world', 1).reasoning.effort, 'minimal');
 assert.equal(buildResponsePayload(lifeThreadMeeting, 'integration', 3).reasoning.effort, 'low');
+assert.equal(buildResponsePayload(lifeThreadMeeting, 'integration', 3).max_output_tokens, agents.integration.maxOutputTokens);
 
 const validRoundTwo = `ACCEPT
 - World의 주장 수용. [World R1]
