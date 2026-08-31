@@ -21,6 +21,8 @@ npm run start:room
 
 기본 회의는 World, Revenue, Engineering이 앞선 발언을 읽고 2개 라운드 동안 서로 검토한 뒤 Integration이 정리합니다. Round 2의 전문 Agent는 반드시 `ACCEPT / OBJECT / DELTA` 형식으로 실제 입장 변화를 작성합니다. Integration은 transcript에 존재하는 실제 주장만 사용하며, 근거 Agent와 Round를 표시합니다. 각 Agent의 발언은 SSE로 완료되는 즉시 화면에 표시됩니다.
 
+Production Integration 호출에는 semantic evolution gate가 적용됩니다. 현재 CONFLICT는 Round 2가 존재하는 Agent의 최신 R2 stance만 현재 근거로 사용할 수 있고, superseded R1을 현재 충돌로 재활성화할 수 없습니다. 또한 회의 주제와 실제 transcript에 없는 정확한 기간·quota·threshold·가격·횟수·비율을 새로 확정하면 fail-closed 처리합니다. 이 검증은 `integration-semantic-evolution.mjs`를 공용 source of truth로 사용하며 runtime, retry, replay가 같은 규칙을 공유합니다.
+
 `웹 검색 허용`을 켜면 각 Agent의 Responses API 호출에 `web_search` 도구를 함께 전달합니다. 검색 호출은 추가 비용과 지연이 발생할 수 있으므로 회의별로 끌 수 있습니다.
 
 ## 3. 비용 제한
@@ -28,7 +30,7 @@ npm run start:room
 - `COUNCIL_WORLD_MAX_OUTPUT_TOKENS`: World 1회 출력 상한 (기본 800)
 - `COUNCIL_REVENUE_MAX_OUTPUT_TOKENS`: Revenue 1회 출력 상한 (기본 800)
 - `COUNCIL_ENGINEERING_MAX_OUTPUT_TOKENS`: Engineering 1회 출력 상한 (기본 900)
-- `COUNCIL_INTEGRATION_MAX_OUTPUT_TOKENS`: Integration 1회 출력 상한 (기본 1400)
+- `COUNCIL_INTEGRATION_MAX_OUTPUT_TOKENS`: Integration 1회 출력 상한 (기본 3000)
 - `COUNCIL_MAX_CONTEXT_CHARS`: transcript context 상한 (기본 24000)
 - `COUNCIL_SPECIALIST_REASONING_EFFORT`: World/Revenue/Engineering reasoning 강도 (기본 `minimal`)
 - `COUNCIL_INTEGRATION_REASONING_EFFORT`: Integration reasoning 강도 (기본 `low`)
@@ -36,20 +38,32 @@ npm run start:room
 - 화면에서 호출할 Agent만 선택
 - 현재 기본 모델은 `gpt-5-mini`
 
-기존 `COUNCIL_MAX_OUTPUT_TOKENS`가 이미 설정되어 있으면 호환을 위해 모든 Agent에 그 값을 적용합니다. Agent별 분리 상한을 쓰려면 위의 `COUNCIL_*_MAX_OUTPUT_TOKENS`를 추가하면 됩니다.
+기존 `COUNCIL_MAX_OUTPUT_TOKENS`가 이미 설정되어 있으면 호환을 위해 specialist Agent에 적용됩니다. Integration은 완결된 8-section 출력을 위해 별도 `COUNCIL_INTEGRATION_MAX_OUTPUT_TOKENS`를 사용하며, 양의 값이 없으면 wrapper 기본값 3000을 사용합니다.
 
 ## 4. 회의 품질 테스트
 
-프로토콜 구조 검증은 API 비용 없이 실행합니다.
+프로토콜과 production semantic runtime gate 검증은 API 비용 없이 실행합니다.
 
 ```powershell
 npm test
 ```
 
-실제 모델 품질 검증은 아래 명령으로 Life Thread resurfacing과 무제한 기본 Character Chat 충돌 사례를 각각 7회 호출로 실행합니다. 웹 검색은 꺼져 있습니다.
+저장된 live 결과의 replay와 증거 상태는 API 호출 없이 확인할 수 있습니다.
 
 ```powershell
-npm run test:quality:live
+npm run test:quality:replay
+npm run test:quality:status
+```
+
+`test:quality:status`는 `CURRENT_FRESH_PASS`, `HISTORICAL_PASS_SOURCE_LOST` 등 case별 evidence state를 구분합니다. runtime fingerprint가 달라졌다고 해서 과거 live 결과를 자동으로 현재 generation coverage로 승격하지 않습니다.
+
+실제 모델 generation이 꼭 필요한 경우에만 targeted live test를 실행합니다. 각 case의 정상 full live는 7 API calls이며, specialist 6개가 성공한 뒤 Integration만 실패한 경우 full rerun 대신 Integration retry를 사용합니다.
+
+```powershell
+npm run test:quality:live:a
+npm run test:quality:live:b
+npm run test:quality:retry-integration:a
+npm run test:quality:retry-integration:b
 ```
 
 ## 5. Discord / n8n
