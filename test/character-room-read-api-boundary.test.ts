@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { ApiCommandError } from '../apps/api/src/chat-receive.js';
 import {
   readCharacterRoomState,
   readCharacterRoomStateByPresentationKey,
@@ -9,6 +10,9 @@ import type {
 import type {
   CharacterRelationshipReadAuthorityPortV1,
 } from '../apps/api/src/character-relationship-read.js';
+import type {
+  ChatThreadRuntimeBindingReadAuthorityPortV1,
+} from '../apps/api/src/chat-thread-runtime-binding-read.js';
 import type {
   ChatThreadStreamReadAuthorityPortV1,
 } from '../apps/api/src/chat-thread-stream-read.js';
@@ -71,6 +75,32 @@ const relationshipAuthorityPort: CharacterRelationshipReadAuthorityPortV1 = {
   ],
 };
 
+const threadBindingAuthorityPort: ChatThreadRuntimeBindingReadAuthorityPortV1 = {
+  readRuntimeBinding: async ({ threadId }) => [
+    {
+      threadId,
+      status: 'active',
+      activeContentReleaseId: 'release-active',
+      activeContentBundleId: 'bundle-from-thread',
+      contentRevision: 5,
+      participantCharacterIds: ['character-baekheon', 'character-seyeon'],
+    },
+  ],
+};
+
+async function expectApiCode(
+  promise: Promise<unknown>,
+  code: string,
+): Promise<void> {
+  try {
+    await promise;
+    throw new Error('Expected ApiCommandError.');
+  } catch (error) {
+    expect(error).toBeInstanceOf(ApiCommandError);
+    expect((error as ApiCommandError).code).toBe(code);
+  }
+}
+
 describe('Character Room authoritative read composition', () => {
   it('combines the owner-authorized message stream and stored relationship projection', async () => {
     const state = await readCharacterRoomState({
@@ -92,33 +122,82 @@ describe('Character Room authoritative read composition', () => {
     );
   });
 
-  it('resolves the browser presentation key before reading canonical character state', async () => {
+  it('derives release/bundle from the owned thread before resolving the browser presentation key', async () => {
+    let identityBundleId: string | null = null;
     const identityAuthorityPort: CharacterPresentationIdentityAuthorityPortV1 = {
-      resolveCharacterIdentity: async ({ contentBundleId, presentationKey }) => [
-        {
-          presentationKey,
-          characterId: 'character-baekheon',
-          contentBundleId,
-        },
-      ],
+      resolveCharacterIdentity: async ({ contentBundleId, presentationKey }) => {
+        identityBundleId = contentBundleId;
+        return [
+          {
+            presentationKey,
+            characterId: 'character-baekheon',
+            contentBundleId,
+          },
+        ];
+      },
     };
 
     const state = await readCharacterRoomStateByPresentationKey({
       resolvedSubjectId: 'subject-1',
       threadId: 'thread-1',
-      contentBundleId: 'bundle-active',
       presentationKey: 'baekheon',
+      threadBindingAuthorityPort,
       identityAuthorityPort,
       streamAuthorityPort,
       relationshipAuthorityPort,
     });
 
+    expect(identityBundleId).toBe('bundle-from-thread');
     expect(state.presentationKey).toBe('baekheon');
     expect(state.characterId).toBe('character-baekheon');
     expect(state.characterId).not.toBe(state.presentationKey);
-    expect(state.contentBundleId).toBe('bundle-active');
+    expect(state.contentReleaseId).toBe('release-active');
+    expect(state.contentBundleId).toBe('bundle-from-thread');
+    expect(state.contentRevision).toBe(5);
     expect(state.latestCharacterMessage?.messageId).toBe('message-2');
     expect(state.relationship?.characterId).toBe('character-baekheon');
+  });
+
+  it('rejects a bundle-valid character that is not an active participant before reading room projections', async () => {
+    let streamCalls = 0;
+    let relationshipCalls = 0;
+    const identityAuthorityPort: CharacterPresentationIdentityAuthorityPortV1 = {
+      resolveCharacterIdentity: async ({ contentBundleId, presentationKey }) => [
+        {
+          presentationKey,
+          characterId: 'character-yunho',
+          contentBundleId,
+        },
+      ],
+    };
+    const guardedStreamPort: ChatThreadStreamReadAuthorityPortV1 = {
+      readStream: async () => {
+        streamCalls += 1;
+        return [];
+      },
+    };
+    const guardedRelationshipPort: CharacterRelationshipReadAuthorityPortV1 = {
+      readCurrentRelationship: async () => {
+        relationshipCalls += 1;
+        return [];
+      },
+    };
+
+    await expectApiCode(
+      readCharacterRoomStateByPresentationKey({
+        resolvedSubjectId: 'subject-1',
+        threadId: 'thread-1',
+        presentationKey: 'yunho',
+        threadBindingAuthorityPort,
+        identityAuthorityPort,
+        streamAuthorityPort: guardedStreamPort,
+        relationshipAuthorityPort: guardedRelationshipPort,
+      }),
+      'NOT_FOUND',
+    );
+
+    expect(streamCalls).toBe(0);
+    expect(relationshipCalls).toBe(0);
   });
 
   it('does not synthesize a character message when the stored stream has none for that character', async () => {
