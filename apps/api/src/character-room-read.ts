@@ -79,16 +79,20 @@ export async function readCharacterRoomState(
 ): Promise<CharacterRoomReadStateV1> {
   const characterId = requireCharacterId(input.characterId);
   const afterSequenceNo = requireAfterSequenceNo(input.afterSequenceNo);
+  const subjectBinding =
+    input.resolvedSubjectId === undefined
+      ? {}
+      : { resolvedSubjectId: input.resolvedSubjectId };
 
   const [stream, relationshipResponse] = await Promise.all([
     getChatThreadStream({
-      resolvedSubjectId: input.resolvedSubjectId,
+      ...subjectBinding,
       threadId: input.threadId,
       afterSequenceNo,
       authorityPort: input.streamAuthorityPort,
     }),
     getCharacterRelationship({
-      resolvedSubjectId: input.resolvedSubjectId,
+      ...subjectBinding,
       characterId,
       authorityPort: input.relationshipAuthorityPort,
     }),
