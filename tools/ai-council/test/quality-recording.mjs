@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { validateIntegrationOutput, validateRoundTwoOutput } from '../room-server.mjs';
+import { validateIntegrationGrounding, validateRoundTwoOutput } from '../room-server.mjs';
 
 const recordingDir = new URL('./.recordings/', import.meta.url);
 const latestRecordingUrl = new URL('./.recordings/live-quality.latest.json', import.meta.url);
@@ -28,7 +28,7 @@ export function evaluateMeeting(meeting) {
   const roundTwoPass = roundTwo.length === 3
     && roundTwo.every((message) => passes(() => validateRoundTwoOutput(message.agent, message.content)));
   const integrationPass = Boolean(integration)
-    && passes(() => validateIntegrationOutput(integration.content));
+    && passes(() => validateIntegrationGrounding(meeting, integration.content));
   const sevenCallsPass = meeting.calls === 7;
   const completedPass = meeting.status === 'completed';
 
