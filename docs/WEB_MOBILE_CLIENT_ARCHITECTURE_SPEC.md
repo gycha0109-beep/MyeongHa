@@ -1,8 +1,8 @@
-# 명하 Web / Mobile Client Architecture Specification v0.3 — Full Audit
+# 명하 Web / Mobile Client Architecture Specification v0.4 — SRC-33 Bound
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.3**  
-> Date: **2026-08-25**  
+> Pack Version: **v0.4**  
+> Date: **2026-08-31**  
 > Source Authority: `Usecase_re_reviewed_v2(1).md`  
 > API Authority: `API_CONTRACT.md`  
 > Shared Contracts: `SHARED_DOMAIN_CONTRACTS_SPEC.md`
@@ -138,6 +138,8 @@ Client가 owner FK 이동을 직접 수행하지 않는다.
 - immutable Reading/report snapshot
 - user current projection with revision
 
+`immutable Reading/report snapshot`은 source-approved validation을 거쳐 authoritative Reading으로 승격된 projection을 뜻한다. `SRC-33` 해결 전 raw/successful Saju transport body나 exported-shape deserialize 결과를 final Reading cache로 저장하지 않는다.
+
 Write에는 API가 요구하는:
 
 ```text
@@ -185,29 +187,38 @@ Network reconnect:
 - committed assistant message가 있으면 재사용
 - duplicate bubble 금지
 
-## 11. Grounded Saju Rendering UX
+## 11. Grounded Saju Rendering UX — `SRC-33` semantic-finalization gate
 
-Saju-bearing semantic segment는 서버 validation/commit 이전에 공개하지 않는다.
+Saju-bearing semantic segment는 source-approved Product response validation/commit 이전에 공개하지 않는다.
+
+`SRC-33` 해결 전 successful transport, JSON persistence, exported TypeScript shape compile/deserialization은 `validated ProductReadingResponse` authority가 아니다. 따라서 Client는 그 evidence만으로 grounded segment, report, clarification-required state를 authoritative state로 표시하지 않는다.
 
 Client는 기다림을 감추기 위해 검증 전 의미 문장을 임의 stream하지 않고 다음을 사용할 수 있다.
 
 - deterministic loading/status animation
 - character idle/reaction cue
-- validated chunk가 실제 존재할 때 controlled reveal
+- source-approved validated chunk가 실제 존재할 때 controlled reveal
 
 `semanticClaims`를 client가 자체 문장으로 생성/요약하지 않는다.
 
-## 12. Reading Clarification UX
+## 12. Reading Clarification UX — `SRC-33` public input blocked
 
-Saju Product Response가 clarification을 요구하면 Client는 `requiredAction/clarification schema`에 따라 bounded UI를 표시한다.
+Saju Product Response가 clarification을 요구한다는 authoritative state와 executable `requiredAction/clarification` positive schema는 source-approved Product/Clarification validator를 통과한 경우에만 Client input contract가 된다.
+
+현재 `SRC-33`은 complete `ProductReadingResponse` positive validation, `ClarificationAnswerV1`, question↔answer correlation, cardinality/unknown-field behavior, canonicalization/request-hash material, pending contract-version compatibility를 차단한다. Client가 exported shape 또는 UX fixture에서 임의 request schema를 재정의하면 안 된다.
+
+Source-complete lineage semantics:
 
 ```text
-Reading session
-→ clarification choice/input
+validated Reading session state
+→ source-approved canonical clarification choice/input
 → same session new Reading attempt
 ```
 
-이를 새로운 unrelated Reading으로 만들지 않는다.
+- 이를 새로운 unrelated Reading으로 만들지 않는다.
+- transport retry와 clarification logical attempt를 동일 client action으로 합치지 않는다.
+- lower-level UI/lineage test는 explicitly prevalidated canonical fixture로 수행할 수 있다.
+- `SRC-33` 해결 전 production public clarification submit은 disabled/fail-closed다.
 
 ## 13. Personal Record UX
 
@@ -297,7 +308,10 @@ Client는 `productKey/offer`를 표시하지만 access authority는 server entit
 - failed_retryable → retry without duplicate user bubble
 - abandon → next turn possible
 - reconnect committed turn → no duplicate assistant message
-- clarification → same Reading session lineage
+- clarification vs transport retry remains distinct with explicitly prevalidated fixture
+- `SRC-33` open → public clarification submit disabled/fail-closed
+- Saju transport success + semantically unvalidated Product response → no final Reading/report/grounded/clarification-required promotion
+- exported ProductReadingResponse fixture deserialize → integration compatibility evidence only, not semantic-validation PASS
 - session-only → no durable record appears
 - unauthorized deep link → access denied UX
 - Guest→new member continuity
