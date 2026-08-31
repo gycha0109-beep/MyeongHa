@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { validateIntegrationGrounding, validateRoundTwoOutput } from '../room-server.mjs';
-import { validateIntegrationSemanticEvolution } from './integration-semantic-evolution.mjs';
+import { validateIntegrationSemanticEvolution } from '../integration-semantic-evolution.mjs';
 import { loadRecordedCase, saveLiveRecording } from './quality-recording.mjs';
 
 const requested = String(process.argv[2] || 'A').trim().toUpperCase();
