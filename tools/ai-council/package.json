@@ -12,7 +12,9 @@
     "test:quality:offline": "npm test && npm run test:quality:replay",
     "test:quality:live": "node test/live-quality-cases.mjs",
     "test:quality:live:a": "node test/live-quality-cases.mjs A",
-    "test:quality:live:b": "node test/live-quality-cases.mjs B"
+    "test:quality:live:b": "node test/live-quality-cases.mjs B",
+    "test:quality:retry-integration:a": "node test/retry-integration-from-failed.mjs A",
+    "test:quality:retry-integration:b": "node test/retry-integration-from-failed.mjs B"
   },
   "dependencies": {
     "discord.js": "14.27.0",
