@@ -13,6 +13,7 @@ import {
   resolveMemoryProposal,
   type RelationshipPolicyV1,
 } from '../../../packages/domain/src/index.js';
+import { assertEngineeringVerticalSliceMockExecution } from './mock-execution-boundary.js';
 
 export interface MockFirstReadingTurnInput {
   readonly requestId: string;
@@ -45,6 +46,8 @@ export function runMockFirstReadingTurn(
   relationshipPolicy: ImmutableArtifact<RelationshipPolicyV1>,
   sajuAdapter = new MockSajuAdapter(),
 ): MockFirstReadingTurnResult {
+  assertEngineeringVerticalSliceMockExecution('runMockFirstReadingTurn');
+
   const capability = evaluateCapabilityGate(input.capability);
   if (!capability.allowed) {
     return Object.freeze({ status: 'denied', reason: capability.reason });

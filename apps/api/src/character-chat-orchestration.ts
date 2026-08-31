@@ -12,6 +12,7 @@ import {
   type CharacterRuntimeContextV1,
   type CapabilityGateInput,
 } from '../../../packages/domain/src/index.js';
+import { assertEngineeringVerticalSliceMockExecution } from './mock-execution-boundary.js';
 
 export type CharacterRuntimeContextAssemblyInputV1 = Parameters<
   typeof assembleCharacterRuntimeContext
@@ -238,6 +239,8 @@ function assertCoverageConsistency(
 export function runMockCharacterChatTurn(
   input: RunMockCharacterChatTurnInputV1,
 ): MockCharacterChatTurnResultV1 {
+  assertEngineeringVerticalSliceMockExecution('runMockCharacterChatTurn');
+
   const turnId = requiredIdentifier(input.turnId, 'turnId');
   const attemptId = requiredIdentifier(input.attemptId, 'attemptId');
 
