@@ -15,6 +15,19 @@ globalThis.fetch = async (resource, options = {}) => {
 
 await import(`../integration-semantic-runtime-gate.mjs?protocol=${Date.now()}`);
 
+output = 'POSITION\n- 독립 Revenue 입장';
+const contaminatedRoundOne = `회의 주제:\n무료/유료 경계를 검토한다.\n\n[ROUND 1 TASK]\nRevenue의 독립 입장을 작성한다.\n\n[PRIOR POSITIONS IN THIS ROUND]\n[World / Round 1]\nWORLD_ANCHOR_SHOULD_NOT_REACH_REVENUE`;
+const roundOneResponse = await globalThis.fetch('https://api.openai.com/v1/responses', {
+  method: 'POST',
+  body: JSON.stringify({ instructions: '당신은 MyeongHa Revenue Agent입니다.', input: contaminatedRoundOne }),
+});
+assert.equal(roundOneResponse.ok, true);
+assert.equal(requests.length, 1);
+assert.doesNotMatch(requests[0].payload.input, /WORLD_ANCHOR_SHOULD_NOT_REACH_REVENUE/);
+assert.doesNotMatch(requests[0].payload.input, /\[PRIOR POSITIONS IN THIS ROUND\]/);
+assert.match(requests[0].payload.input, /\[ROUND 1 ISOLATION\]/);
+assert.match(requests[0].payload.input, /상호 검토는 Round 2에서만/);
+
 const source = `회의 주제:\n정확한 기간은 확정하지 않는다.\n\n[ACTUAL TRANSCRIPT]\n[World R2]\n관계 코어를 무료로 보장한다.\n\n[Revenue R2]\n관계 코어 무료를 수용하고 심화 기능은 유료화한다.\n\n[Engineering R2]\n관계 코어 무료를 수용하되 서버 QoS 안전경계를 요구한다.\n\n[INTEGRATION TASK]\n실제 transcript만 통합한다.`;
 
 output = `AGREED
@@ -39,9 +52,9 @@ const success = await globalThis.fetch('https://api.openai.com/v1/responses', {
   body: JSON.stringify({ instructions: 'MyeongHa Integration Agent', input: source }),
 });
 assert.equal(success.ok, true);
-assert.equal(requests.length, 1);
-assert.match(requests[0].payload.input, /\[INTEGRATION SEMANTIC EVOLUTION RULE\]/);
-assert.equal((requests[0].payload.input.match(/\[INTEGRATION SEMANTIC EVOLUTION RULE\]/g) || []).length, 1);
+assert.equal(requests.length, 2);
+assert.match(requests[1].payload.input, /\[INTEGRATION SEMANTIC EVOLUTION RULE\]/);
+assert.equal((requests[1].payload.input.match(/\[INTEGRATION SEMANTIC EVOLUTION RULE\]/g) || []).length, 1);
 
 output = output.replace(
   '- 기간 미정 상태로 QoS와 전환 효과를 검증한다. [Engineering R2]',
@@ -54,8 +67,8 @@ await assert.rejects(
   }),
   /없는 정량 수치.*4주.*REJECTED integration OUTPUT/s,
 );
-assert.equal(requests.length, 2);
-assert.match(requests[1].payload.input, /예: source에 없는 "4주", "30일", "10%"/);
+assert.equal(requests.length, 3);
+assert.match(requests[2].payload.input, /예: source에 없는 "4주", "30일", "10%"/);
 
 output = `CONFLICT
 - 논점: 현재 stance
@@ -72,4 +85,4 @@ const roomServerSource = await readFile(new URL('../room-server.mjs', import.met
 assert.match(roomServerSource, /import '\.\/integration-semantic-runtime-gate\.mjs';/);
 
 globalThis.fetch = originalFetch;
-console.log('PASS Test H: production semantic fetch gate injects instructions and rejects stale stance/invented numbers without API calls');
+console.log('PASS Test H: production runtime isolates specialist R1, injects Integration semantics, and rejects stale stance/invented numbers without API calls');
