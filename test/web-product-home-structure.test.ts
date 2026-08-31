@@ -3,8 +3,12 @@ import { describe, expect, it } from 'vitest';
 
 const hallPath = new URL('../apps/web/hall.html', import.meta.url);
 const productCssPath = new URL('../apps/web/product.css', import.meta.url);
+const homeV2CssPath = new URL('../apps/web/home-v2.css', import.meta.url);
+const landscapePath = new URL('../apps/web/home-landscape.svg', import.meta.url);
+const mountainsPath = new URL('../apps/web/home-paper-mountains.svg', import.meta.url);
+const plumPath = new URL('../apps/web/home-plum-branch.svg', import.meta.url);
 
-describe('MyeongHa product Home v1', () => {
+describe('MyeongHa product Home web v2', () => {
   it('keeps the approved five-destination IA in both desktop and mobile navigation', async () => {
     const html = await readFile(hallPath, 'utf8');
 
@@ -16,7 +20,7 @@ describe('MyeongHa product Home v1', () => {
     }
   });
 
-  it('preserves the Home information hierarchy instead of turning into a dashboard', async () => {
+  it('preserves the Home hierarchy instead of turning the page into a dashboard', async () => {
     const html = await readFile(hallPath, 'utf8');
 
     const today = html.indexOf('오늘의 흐름');
@@ -30,13 +34,15 @@ describe('MyeongHa product Home v1', () => {
     expect(person).toBeGreaterThan(topics);
   });
 
-  it('uses the product visual system and removes legacy placeholder roster content', async () => {
-    const [html, css] = await Promise.all([
+  it('loads the base product system plus the approved Home v2 refinement layer', async () => {
+    const [html, productCss, homeV2Css] = await Promise.all([
       readFile(hallPath, 'utf8'),
       readFile(productCssPath, 'utf8'),
+      readFile(homeV2CssPath, 'utf8'),
     ]);
 
     expect(html).toContain('href="product.css"');
+    expect(html).toContain('href="home-v2.css"');
     expect(html).not.toContain('John Doe');
     expect(html).not.toContain('DEMO');
 
@@ -47,15 +53,35 @@ describe('MyeongHa product Home v1', () => {
       '--mh-brass',
       '--mh-seal',
     ]) {
-      expect(css).toContain(token);
+      expect(productCss).toContain(token);
     }
+
+    expect(homeV2Css).toContain('grid-template-columns: minmax(0, 1.305fr)');
+    expect(homeV2Css).toContain('url("home-landscape.svg")');
+    expect(homeV2Css).toContain('url("home-paper-mountains.svg")');
+    expect(homeV2Css).toContain('url("home-plum-branch.svg")');
   });
 
-  it('keeps Saju and relationship surfaces as separate Home entry points', async () => {
+  it('ships the decorative reference artwork as static SVG assets rather than screenshot slices', async () => {
+    const [landscape, mountains, plum] = await Promise.all([
+      readFile(landscapePath, 'utf8'),
+      readFile(mountainsPath, 'utf8'),
+      readFile(plumPath, 'utf8'),
+    ]);
+
+    expect(landscape).toContain('<svg');
+    expect(landscape).toContain('오늘의 흐름 산수 장식');
+    expect(mountains).toContain('<svg');
+    expect(plum).toContain('<svg');
+  });
+
+  it('keeps Saju and relationship surfaces separate and gives the person strip a contextual tag', async () => {
     const html = await readFile(hallPath, 'utf8');
 
     expect(html).toContain('href="reading.html"');
     expect(html).toContain('href="records.html"');
     expect(html).toContain('href="chat.html?character=seyeon"');
+    expect(html).toContain('class="home-person-tag"');
+    expect(html).toContain('마음과 인연의 흐름');
   });
 });
