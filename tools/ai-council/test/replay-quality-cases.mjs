@@ -15,6 +15,6 @@ if (freshness === 'STALE') {
 
 for (const item of recording.cases || []) {
   const result = evaluateMeeting(item.meeting);
-  console.log(`${item.name}: status=${item.meeting.status} calls=${item.meeting.calls} round2_protocol=${result.roundTwoPass ? 'PASS' : 'FAIL'} integration_sections=${result.integrationPass ? 'PASS' : 'FAIL'}`);
+  console.log(`${item.name}: status=${item.meeting.status} calls=${item.meeting.calls} round2_protocol=${result.roundTwoPass ? 'PASS' : 'FAIL'} integration_grounding=${result.integrationGroundingPass ? 'PASS' : 'FAIL'} semantic_evolution=${result.semanticEvolutionPass ? 'PASS' : 'FAIL'}`);
   if (!result.passed) process.exitCode = 1;
 }
