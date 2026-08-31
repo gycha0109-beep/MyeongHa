@@ -10,7 +10,7 @@ const {
   councilCore,
   getApiAttemptCount,
   resetApiAttemptCount,
-  validateIntegrationOutput,
+  validateIntegrationGrounding,
   validateRoundTwoOutput,
 } = await import('../room-server.mjs');
 const { saveLiveRecording } = await import('./quality-recording.mjs');
@@ -58,7 +58,7 @@ const content = typeof body.output_text === 'string'
 if (body.status === 'incomplete') {
   throw new Error(`Integration retry incomplete. reason=${body.incomplete_details?.reason || 'unknown'}${content ? `\n[PARTIAL OUTPUT]\n${content}` : ''}`);
 }
-validateIntegrationOutput(content);
+validateIntegrationGrounding(meeting, content);
 
 meeting.messages.push({
   agent: 'integration',
