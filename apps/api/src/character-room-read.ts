@@ -10,6 +10,10 @@ import {
   type CharacterPresentationKeyV1,
 } from './character-presentation-resolver.js';
 import {
+  getChatThreadRuntimeBinding,
+  type ChatThreadRuntimeBindingReadAuthorityPortV1,
+} from './chat-thread-runtime-binding-read.js';
+import {
   getChatThreadStream,
   type ChatThreadStreamMessageV1,
   type ChatThreadStreamReadAuthorityPortV1,
@@ -28,7 +32,9 @@ export interface CharacterRoomReadStateV1 {
 export interface CharacterRoomPresentationReadStateV1
   extends CharacterRoomReadStateV1 {
   readonly presentationKey: CharacterPresentationKeyV1;
+  readonly contentReleaseId: string;
   readonly contentBundleId: string;
+  readonly contentRevision: number;
 }
 
 export interface ReadCharacterRoomStateInputV1 {
@@ -43,9 +49,9 @@ export interface ReadCharacterRoomStateInputV1 {
 export interface ReadCharacterRoomStateByPresentationKeyInputV1 {
   readonly resolvedSubjectId?: string;
   readonly threadId: unknown;
-  readonly contentBundleId: unknown;
   readonly presentationKey: unknown;
   readonly afterSequenceNo?: unknown;
+  readonly threadBindingAuthorityPort: ChatThreadRuntimeBindingReadAuthorityPortV1;
   readonly identityAuthorityPort: CharacterPresentationIdentityAuthorityPortV1;
   readonly streamAuthorityPort: ChatThreadStreamReadAuthorityPortV1;
   readonly relationshipAuthorityPort: CharacterRelationshipReadAuthorityPortV1;
@@ -139,23 +145,39 @@ export async function readCharacterRoomState(
 /**
  * HTTP/UI-facing Character Room composition.
  *
- * The browser-facing presentation key is resolved through trusted content
- * authority first. `contentBundleId` must be server-resolved from the pinned or
- * otherwise authoritative content release; it must never be trusted from the
- * browser as proof of content membership.
+ * The client supplies only its owned thread identity and a presentation key.
+ * Thread authority resolves the active release/bundle and active participants;
+ * content authority then resolves the presentation key inside that exact bundle.
+ * The canonical character must also be an active participant before any
+ * relationship or message projection is read for the room.
  */
 export async function readCharacterRoomStateByPresentationKey(
   input: ReadCharacterRoomStateByPresentationKeyInputV1,
 ): Promise<CharacterRoomPresentationReadStateV1> {
-  const identity = await resolveCharacterPresentationIdentity({
-    contentBundleId: input.contentBundleId,
-    presentationKey: input.presentationKey,
-    authorityPort: input.identityAuthorityPort,
-  });
   const subjectBinding =
     input.resolvedSubjectId === undefined
       ? {}
       : { resolvedSubjectId: input.resolvedSubjectId };
+
+  const threadBinding = await getChatThreadRuntimeBinding({
+    ...subjectBinding,
+    threadId: input.threadId,
+    authorityPort: input.threadBindingAuthorityPort,
+  });
+
+  const identity = await resolveCharacterPresentationIdentity({
+    contentBundleId: threadBinding.activeContentBundleId,
+    presentationKey: input.presentationKey,
+    authorityPort: input.identityAuthorityPort,
+  });
+
+  if (!threadBinding.participantCharacterIds.includes(identity.characterId)) {
+    throw new ApiCommandError(
+      'NOT_FOUND',
+      'Character is not an active participant in this chat thread.',
+    );
+  }
+
   const cursorBinding =
     input.afterSequenceNo === undefined
       ? {}
@@ -164,7 +186,7 @@ export async function readCharacterRoomStateByPresentationKey(
   const roomState = await readCharacterRoomState({
     ...subjectBinding,
     ...cursorBinding,
-    threadId: input.threadId,
+    threadId: threadBinding.threadId,
     characterId: identity.characterId,
     streamAuthorityPort: input.streamAuthorityPort,
     relationshipAuthorityPort: input.relationshipAuthorityPort,
@@ -173,6 +195,8 @@ export async function readCharacterRoomStateByPresentationKey(
   return Object.freeze({
     ...roomState,
     presentationKey: identity.presentationKey,
-    contentBundleId: identity.contentBundleId,
+    contentReleaseId: threadBinding.activeContentReleaseId,
+    contentBundleId: threadBinding.activeContentBundleId,
+    contentRevision: threadBinding.contentRevision,
   });
 }
