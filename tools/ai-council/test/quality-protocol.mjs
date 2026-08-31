@@ -111,7 +111,7 @@ assert.match(integrationPrompt, /NONE OBSERVED IN TRANSCRIPT/);
 assert.match(integrationPrompt, /NOT RAISED IN TRANSCRIPT/);
 assert.match(integrationPrompt, /\[World R2\]/);
 assert.match(integrationPrompt, /transcript에 없는 이분법/);
-assert.match(integrationPrompt, /NEXT TEST.*실행 가능한 다음 검증/s);
+assert.match(integrationPrompt, /NEXT TEST.*실행 가능한.*bullet/s);
 assert.match(integrationPrompt, /반드시 한국어로 작성/);
 assert.match(integrationPrompt, /slash 축약 citation은 금지/);
 assert.match(integrationPrompt, /NEXT TEST의 모든 내용 줄은 반드시 `- `/);
