@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { evaluateMeeting, snapshotMeeting } from './quality-recording.mjs';
+import { evaluateMeeting, mergeRecordedCases, snapshotMeeting } from './quality-recording.mjs';
 
 const validRoundTwo = {
   world: `ACCEPT\n- Engineering의 요구를 수용한다. [Engineering R1]\nOBJECT\n- NO MATERIAL OBJECTION\nDELTA\n- NO MATERIAL CHANGE`,
@@ -40,4 +40,23 @@ const sixCallEvaluation = evaluateMeeting(sixCalls);
 assert.equal(sixCallEvaluation.sevenCallsPass, false);
 assert.equal(sixCallEvaluation.passed, false);
 assert.equal(snapshotMeeting(meeting).messages.length, 4);
-console.log('PASS Test C: recorded live meeting replay validates without API calls');
+
+const oldRecording = {
+  version: 1,
+  runtimeFingerprint: 'old-runtime',
+  cases: [{ name: 'Test A — old', meeting: snapshotMeeting(meeting) }],
+};
+const merged = mergeRecordedCases(oldRecording, [
+  { name: 'Test B — new', runtimeFingerprint: 'new-runtime', meeting: snapshotMeeting(meeting) },
+], 'new-runtime');
+assert.equal(merged.length, 2);
+assert.equal(merged.find((item) => item.name.startsWith('Test A')).runtimeFingerprint, 'old-runtime');
+assert.equal(merged.find((item) => item.name.startsWith('Test B')).runtimeFingerprint, 'new-runtime');
+
+const replaced = mergeRecordedCases({ version: 2, cases: merged }, [
+  { name: 'Test A — old', runtimeFingerprint: 'newer-runtime', meeting: snapshotMeeting(meeting) },
+], 'newer-runtime');
+assert.equal(replaced.length, 2);
+assert.equal(replaced.find((item) => item.name.startsWith('Test A')).runtimeFingerprint, 'newer-runtime');
+
+console.log('PASS Test C: recorded replay validates and case history survives runtime fingerprint changes');
