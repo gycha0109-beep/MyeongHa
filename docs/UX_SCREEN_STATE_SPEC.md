@@ -1,8 +1,8 @@
-# 명하 UX / Screen State Specification v0.3
+# 명하 UX / Screen State Specification v0.4 — SRC-33 Bound
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.3**  
-> Date: **2026-08-25**  
+> Pack Version: **v0.4**  
+> Date: **2026-08-31**  
 > Product Authority: `Usecase_re_reviewed_v2(1).md`  
 > Client Authority: `WEB_MOBILE_CLIENT_ARCHITECTURE_SPEC.md`
 
@@ -74,7 +74,8 @@ committed/revealing
 - retry는 동일 logical turn
 - abandon 제공
 - duplicate user/assistant bubble 금지
-- protected Saju segment는 validation 전 표시 금지
+- protected Saju segment는 source-approved product-semantic validation 전 표시 금지
+- `SRC-33` 해결 전 transport success/JSON 저장/exported TypeScript shape deserialize를 validation 완료로 간주해 `awaiting_clarification` 또는 `committed/revealing`로 승격하지 않음
 - general character framing과 grounded segment를 UX상 자연스럽게 결합하되 semantic provenance를 잃지 않음
 
 ## 6. Birth Record Flow
@@ -107,16 +108,24 @@ Standalone privacy delete는 `SRC-06` resolution 전 UX를 확정하지 않는�
 - insufficient/unavailable
 - material/public calculation ambiguity
 
+위 Saju product-semantic 상태는 source-approved validated `ProductReadingResponse`가 존재할 때의 UI projection이다. `SRC-33` 해결 전 successful transport body를 이 상태들로 authoritative promotion하지 않는다.
+
 `insufficient`를 캐릭터 generic AI fortune으로 메우지 않는다.
 
-## 8. Clarification
+## 8. Clarification — `SRC-33` public input blocked
 
-Saju clarification UI는 contract-defined 선택/입력만 받는다.
+Saju clarification UI의 bounded 선택/입력은 source-approved versioned `ProductReadingResponse`와 clarification-answer positive contract가 있을 때만 executable하다.
+
+현재 `SRC-33`은 complete `ProductReadingResponse` positive validation, `ClarificationAnswerV1`, question↔answer correlation, canonicalization/request-hash material, pending contract-version compatibility를 차단한다. 따라서 exported shape 또는 UX 예시에서 임의 선택/입력 schema를 만들어 public submit surface로 승격하지 않는다.
+
+Source-complete UX invariants는 유지한다.
 
 - prior response를 overwrite하지 않음
 - same reading session lineage
 - 취소/뒤로가기 가능
 - clarification과 provider retry를 같은 버튼/상태로 표시하지 않음
+- lower-level lineage/persistence test에서는 explicitly prevalidated canonical fixture를 사용할 수 있음
+- `SRC-33` 해결 전 production public clarification submit은 disabled/fail-closed
 
 ## 9. Memory Decision UI
 
@@ -180,6 +189,8 @@ Mobile:
 - character follow-up CTA
 
 Stale reading은 현재 결과처럼 표시하지 않고 stale badge/recompute action 제공.
+
+`SRC-33` 해결 전 raw/successful transport response를 authoritative Reading report snapshot으로 표시하지 않는다.
 
 ## 13. Share
 
@@ -249,6 +260,8 @@ stale revision → refresh/recompute
 content incompatible → fallback/update guidance
 ```
 
+`SRC-33` 해결 전 Product response/clarification positive validation failure의 세부 public error schema를 임의 발명하지 않는다. Source-safe 결과는 unvalidated product response의 no-promotion 및 public clarification mutation의 fail-closed다.
+
 ## 19. Accessibility / Reduced Motion
 
 명식 생성/캐릭터 등장 animation은 reduced-motion/skip path를 제공한다. 중요한 의미를 animation만으로 전달하지 않는다.
@@ -257,8 +270,10 @@ content incompatible → fallback/update guidance
 
 - Guest no-login first value path
 - one in-flight chat retry/abandon
-- Saju clarification vs retry visually distinct
-- material ambiguity visible
+- Saju clarification vs retry visually distinct using source-approved/prevalidated state fixture
+- `SRC-33` open → public clarification submit disabled/fail-closed
+- transport success + unvalidated Product response → no authoritative ready/grounded/awaiting-clarification/revealing promotion
+- validated material ambiguity visible when authoritative Product response exists
 - session-only no durable record UI
 - future/locked char not included in current-share grant
 - stale Reading visible
