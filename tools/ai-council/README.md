@@ -55,7 +55,7 @@ npm run test:quality:replay
 npm run test:quality:status
 ```
 
-`test:quality:status`는 `CURRENT_FRESH_PASS`, `HISTORICAL_PASS_SOURCE_LOST` 등 case별 evidence state를 구분합니다. runtime fingerprint가 달라졌다고 해서 과거 live 결과를 자동으로 현재 generation coverage로 승격하지 않습니다.
+`test:quality:status`는 `CURRENT_FRESH_PASS`, `REPLAYABLE_STALE_PASS`, `HISTORICAL_PASS_SOURCE_LOST` 등 case별 evidence state를 구분합니다. runtime fingerprint가 달라졌다고 해서 과거 live 결과를 자동으로 현재 generation coverage로 승격하지 않습니다.
 
 실제 모델 generation이 꼭 필요한 경우에만 targeted live test를 실행합니다. 각 case의 정상 full live는 7 API calls이며, specialist 6개가 성공한 뒤 Integration만 실패한 경우 full rerun 대신 Integration retry를 사용합니다.
 
@@ -66,6 +66,24 @@ npm run test:quality:retry-integration:a
 npm run test:quality:retry-integration:b
 ```
 
-## 5. Discord / n8n
+## 5. 첫 Product Dogfood
+
+첫 실전 Council case는 `무료 첫 Saju/Reading 가치 vs 유료 structured artifact` 경계입니다. 품질 test fixture와 별도로 기록하며, 정확한 가격/quota나 `SRC-18`/`SRC-21` commerce authority를 새로 발명하지 않습니다.
+
+기본 명령은 **dry-run**이며 API를 호출하지 않고 실제 회의 주제와 최대 호출 수만 확인합니다.
+
+```powershell
+npm run dogfood:reading-boundary
+```
+
+실제 Council을 실행할 때만 아래 명령을 사용합니다. 정상 완료 시 World/Revenue/Engineering R1 3회 + R2 3회 + Integration 1회, 최대 7 calls입니다. 웹 검색은 꺼져 있습니다.
+
+```powershell
+npm run dogfood:reading-boundary:live
+```
+
+실행 결과는 Git에서 제외된 `test/.recordings/dogfood/reading-boundary.latest.json`에 저장됩니다. 실패하더라도 자동 재실행하지 말고 저장된 specialist output을 먼저 검토합니다.
+
+## 6. Discord / n8n
 
 `bridge.mjs`와 `n8n-phase1-world.json`은 선택형 Discord 어댑터 초안입니다. 로컬 회의실 MVP가 검증된 뒤 Discord를 입력·출력 채널로 붙이고, n8n은 GitHub 기록·예약 실행·외부 자동화에 사용합니다.
