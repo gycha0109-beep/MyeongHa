@@ -1,0 +1,44 @@
+AGREED
+- 서버가 Thread 참여 메타데이터와 eligibility를 단독 인증(authority)하도록 해야 한다. [World R2] [Engineering R1]
+  - Evidence: "서버가 Thread 참여 메타데이터와 eligibility를 단독 인증하도록 해야 한다" [Engineering R1]; "서버가 Thread 참여 메타데이터와 eligibility를 단독 인증하도록 해야 한다는 요구를 수용" [World R2]
+- 회상 레벨(요약 vs 상세)을 설계해 무료/유료 분리를 반영한다(요약 무료/상세 유도 가능). [World R2] [Revenue R2] [Engineering R2]
+  - Evidence: "회상 레벨(요약 vs. 상세)을 명시적으로 설계해 무료/유료 분리를 반영" [World R2]; "회상 레벨(요약 vs 상세)을 명시적으로 설계해 무료/유료 분리를 반영하자는 제안" [Revenue R2]; "캐릭터 회상 레벨(요약 vs 상세)을 명시적으로 설계" [Engineering R2]
+
+CONFLICT
+- 논점: 서버가 metadata로 summary/detail 허용 여부를 불변으로 제공할지 여부
+  - World: 제안 수용/요구 없음 | EVIDENCE "회상 레벨(요약 vs. 상세)을 명시적으로 설계해 무료/유료 분리를 반영" [World R2]
+  - Revenue: 서버는 참여여부·시점·visibility만 제공하고 회상 레벨 분기는 플랫폼 레이어에 위임하자 | EVIDENCE "서버는 세분화를 참여 여부·시점·visibility만 제공하고, 회상 레벨 분기는 애플리케이션 레이어에서" [Revenue R2]
+  - Engineering: 서버는 최소한의 level flag(summary_allowed/detail_allowed)를 불변 메타데이터로 제공해야 한다 | EVIDENCE "level 허용 여부(summary_allowed/detail_allowed)를 추가하도록" [Engineering R2]
+  - Status: partially resolved in Round 2
+
+REQUIREMENTS
+- 서버(불변 권한) 제공: Thread 참여 여부, 참여 시점, visibility flag 제공(요구) [Engineering R1] [World R1]
+  - Evidence: "서버는 Thread 참여 여부, 참여 시점, visibility flag(공개·비공개)..." [Engineering R1]; "각 Thread 참여 메타데이터(참여 여부, 시점, visibility flag)를 불변의 권한 소스로" [World R1]
+- 플랫폼·비즈니스 레이어는 회상 레벨별(요약/상세) 가격·노출 정책을 구현하되, 서버는 level 허용 여부 옵션을 제공할지 결정 필요(OPEN). [Revenue R2] [Engineering R2]
+  - Evidence: "회상 레벨 분기는 애플리케이션 레이어에서" [Revenue R2]; "level 허용 여부(summary_allowed/detail_allowed)를 추가" [Engineering R2]
+
+DECISION CANDIDATE
+- 서버는 participation,timestamp,visibility를 불변으로 제공하고, 추가로 level flag 제공 여부를 옵션으로 채택(권장). 회상은 요약 무료·상세 유료 구조로 파일럿 시행. [Engineering R1] [World R2] [Revenue R2]
+  - Evidence: "서버가 Thread 참여 메타데이터와 eligibility를 단독 인증" [Engineering R1]; "요약 vs 상세" [World R2]; "요약 vs 상세을 명시적으로 설계" [Revenue R2]
+
+FAILURE CASES
+- 캐릭터의 잘못된 회상(허구 주장)으로 몰입/프라이버시 훼손 가능성. [World R1]
+  - Evidence: "캐릭터가 비참여 Thread에 대해 부당하게 추론...세계관 붕괴" [World R1]
+- Free‑core 기능이 Artifact 구매를 잠식할 위험(수익 저하). [Revenue R1]
+  - Evidence: "Free‑core 기능으로서 자주 무료 노출되면 Artifact 구매를 잠식" [Revenue R1]
+
+METRICS / VALIDATION
+- A/B 실험으로 resurfacing(요약 vs 상세)에서의 전환율·ARPU 변화를 측정해야 함. [Revenue R1]
+  - Evidence: "resurfacing을 통해 실제 WTP/ARPU가 얼마나 상승하는지는 A/B 실험 데이터" [Revenue R1]
+- COGS(LLM 호출 비용) 및 premium compute 비용을 단위당 측정해 비용 대비 수익 분석 필요. [Revenue R1] [Engineering R1]
+  - Evidence: "COGS(LLM 호출·프리젠테이션 비용)와 premium compute 요금..." [Revenue R1]; "COGS...는 현재 미정" [Engineering R1]
+
+OPEN
+- cooldown 빈도·정확한 가격·DB 스키마·relationship 점수 공식 등은 미정. [World R1] [Engineering R1]
+  - Evidence: "가격·정확한 cooldown·DB 스키마·relationship 점수 공식은 아직 판단 불가" [World R1]; "DB 스키마...는 현재 미정" [Engineering R1]
+- 서버가 level flag를 반드시 제공할지 여부(privacy·운영 부담 균형). [Revenue R2] [Engineering R2]
+  - Evidence: "서버는 ...회상 레벨 분기를 완전히 플랫폼/비즈니스 레이어에 위임" [Revenue R2]; "level 허용 여부...를 추가" [Engineering R2]
+
+NEXT TEST
+- 파일럿: 서버는 participation,timestamp,visibility만 불변으로 제공하고 플랫폼은 요약 무료/상세 유료 흐름을 적용해 A/B로 전환율·ARPU·COGS 비교 측정 실시. [Revenue R1] [Engineering R1]
+- 기술검증: 서버가 level flag(summary_allowed/detail_allowed)를 제공하는 경우와 제공하지 않는 경우의 운영·프라이버시·복잡도 영향(로그·권한 체크·latency) 비교 평가. [Engineering R2]
