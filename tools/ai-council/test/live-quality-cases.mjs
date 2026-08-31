@@ -68,7 +68,7 @@ for (const testCase of selectedCases) {
   allPassed &&= result.passed;
 
   console.log(`\n${testCase.name}`);
-  console.log(`status=${meeting.status} calls=${meeting.calls} api_attempts=${meeting.apiAttempts} round2_protocol=${result.roundTwoPass ? 'PASS' : 'FAIL'} integration_sections=${result.integrationPass ? 'PASS' : 'FAIL'}${meeting.error ? ` error=${meeting.error}` : ''}`);
+  console.log(`status=${meeting.status} calls=${meeting.calls} api_attempts=${meeting.apiAttempts} round2_protocol=${result.roundTwoPass ? 'PASS' : 'FAIL'} integration_grounding=${result.integrationGroundingPass ? 'PASS' : 'FAIL'} semantic_evolution=${result.semanticEvolutionPass ? 'PASS' : 'FAIL'}${meeting.error ? ` error=${meeting.error}` : ''}`);
   for (const item of meeting.messages) {
     if (item.agent === 'user') continue;
     console.log(`\n[${item.label} / Round ${item.round}]\n${item.content}`);
