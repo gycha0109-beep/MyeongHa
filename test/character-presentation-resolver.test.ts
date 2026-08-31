@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ApiCommandError } from '../apps/api/src/chat-receive.js';
 import {
-  CHARACTER_PRESENTATION_KEYS_V1,
   CharacterPresentationIdentityAuthorityPortErrorV1,
   resolveCharacterPresentationIdentity,
   type CharacterPresentationIdentityAuthorityPortV1,
@@ -21,20 +20,6 @@ async function expectApiCode(
 }
 
 describe('character presentation identity resolver', () => {
-  it('defines the current Character Room route vocabulary without defining canonical ids', () => {
-    expect(CHARACTER_PRESENTATION_KEYS_V1).toEqual([
-      'baekheon',
-      'seyeon',
-      'yeoul',
-      'seorin',
-      'rahyeon',
-      'mira',
-      'taegyeom',
-      'yunho',
-      'doyoon',
-    ]);
-  });
-
   it('resolves a presentation key to a distinct canonical character identity inside the trusted bundle', async () => {
     const authorityPort: CharacterPresentationIdentityAuthorityPortV1 = {
       resolveCharacterIdentity: async (input) => [
@@ -60,7 +45,28 @@ describe('character presentation identity resolver', () => {
     expect(identity.characterId).not.toBe(identity.presentationKey);
   });
 
-  it('rejects an unknown browser route key before consulting authority', async () => {
+  it('keeps the API roster-agnostic so a future presentation key can be admitted by content authority', async () => {
+    const authorityPort: CharacterPresentationIdentityAuthorityPortV1 = {
+      resolveCharacterIdentity: async ({ contentBundleId, presentationKey }) => [
+        {
+          presentationKey,
+          characterId: 'canonical-future-character',
+          contentBundleId,
+        },
+      ],
+    };
+
+    const identity = await resolveCharacterPresentationIdentity({
+      contentBundleId: 'bundle-future',
+      presentationKey: 'future-character-10',
+      authorityPort,
+    });
+
+    expect(identity.presentationKey).toBe('future-character-10');
+    expect(identity.characterId).toBe('canonical-future-character');
+  });
+
+  it('rejects an empty browser route key before consulting authority', async () => {
     let authorityCalls = 0;
     const authorityPort: CharacterPresentationIdentityAuthorityPortV1 = {
       resolveCharacterIdentity: async () => {
@@ -72,7 +78,7 @@ describe('character presentation identity resolver', () => {
     await expectApiCode(
       resolveCharacterPresentationIdentity({
         contentBundleId: 'bundle-release-a',
-        presentationKey: 'john-doe-01',
+        presentationKey: '   ',
         authorityPort,
       }),
       'INVALID_REQUEST',
@@ -80,7 +86,7 @@ describe('character presentation identity resolver', () => {
     expect(authorityCalls).toBe(0);
   });
 
-  it('fails closed when the trusted bundle has no mapping', async () => {
+  it('fails closed when the trusted bundle has no mapping for a supplied route key', async () => {
     const authorityPort: CharacterPresentationIdentityAuthorityPortV1 = {
       resolveCharacterIdentity: async () => [],
     };
@@ -88,7 +94,7 @@ describe('character presentation identity resolver', () => {
     await expectApiCode(
       resolveCharacterPresentationIdentity({
         contentBundleId: 'bundle-release-a',
-        presentationKey: 'seyeon',
+        presentationKey: 'unreleased-character',
         authorityPort,
       }),
       'NOT_FOUND',
