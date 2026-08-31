@@ -8,20 +8,12 @@ import {
   buildCoherentContentRelease,
   buildWorldContentManifest,
   ContentReleaseRuntime,
-  type ContentCompatibilityPolicy,
   type ContentReleaseRuntimeEntry,
 } from '../packages/world-content/src/index.js';
 import {
   DEV_CHARACTER_CONTENT_BUNDLE,
   DEV_WORLD_CONTENT_BUNDLE,
 } from '../packages/test-fixtures/src/index.js';
-
-const compatibilityPolicy: ContentCompatibilityPolicy = {
-  policyVersion: 'chat-test-capability-v1',
-  supports(clientCapability, minimum) {
-    return clientCapability === minimum || clientCapability === 'future-client';
-  },
-};
 
 const characterManifest = buildCharacterContentManifest(
   DEV_CHARACTER_CONTENT_BUNDLE,
@@ -50,7 +42,7 @@ function releaseEntry(
 function runtime(
   entries: readonly ContentReleaseRuntimeEntry[] = [releaseEntry('active-v1', 'active')],
 ) {
-  return new ContentReleaseRuntime(entries, compatibilityPolicy);
+  return new ContentReleaseRuntime(entries);
 }
 
 function expectApiCode(fn: () => unknown, code: string): void {
@@ -64,59 +56,64 @@ function expectApiCode(fn: () => unknown, code: string): void {
 }
 
 describe('chat receive command planner', () => {
-  it('normalizes a new-thread request and pins the operationally resolved release', () => {
-    const command = prepareChatReceiveCommand({
-      request: {
-        clientTurnId: ' turn-1 ',
-        characterId: 'john-doe-02',
-        text: '  진로가 궁금합니다.  ',
-        clientCapability: '0.0.1-dev',
-      },
-      releaseRuntime: runtime(),
-      orderedReleaseIdsForNewThread: ['active-v1'],
-    });
-
-    expect(command).toMatchObject({
-      isNewThread: true,
-      normalizedRequest: {
-        clientTurnId: 'turn-1',
-        characterId: 'john-doe-02',
-        text: '진로가 궁금합니다.',
-      },
-      resolvedContent: {
-        releaseId: 'active-v1',
-        bundleId: 'dev-content-bundle-0001',
-        compatibilityPolicyVersion: 'chat-test-capability-v1',
-      },
-      requestedCharacterId: 'john-doe-02',
-    });
-    expect(command.requestHash).toMatch(/^sha256:v1:[a-f0-9]{64}$/u);
+  it('fails closed for a new thread while SRC-15 compatibility authority is unresolved', () => {
+    expectApiCode(
+      () =>
+        prepareChatReceiveCommand({
+          request: {
+            clientTurnId: 'turn-1',
+            characterId: 'john-doe-02',
+            text: '진로가 궁금합니다.',
+            clientCapability: '0.0.1-dev',
+          },
+          releaseRuntime: runtime(),
+          orderedReleaseIdsForNewThread: ['active-v1'],
+        }),
+      'CAPABILITY_UNAVAILABLE',
+    );
   });
 
-  it('produces the same canonical request hash for equivalent normalized input', () => {
-    const first = prepareChatReceiveCommand({
-      request: {
-        clientTurnId: 'same-turn',
-        text: ' hello ',
-        clientCapability: '0.0.1-dev',
-      },
-      releaseRuntime: runtime(),
-      orderedReleaseIdsForNewThread: ['active-v1'],
-    });
-    const second = prepareChatReceiveCommand({
-      request: {
-        clientCapability: '0.0.1-dev',
-        text: 'hello',
-        clientTurnId: 'same-turn',
-      },
-      releaseRuntime: runtime(),
-      orderedReleaseIdsForNewThread: ['active-v1'],
-    });
-
-    expect(second.requestHash).toBe(first.requestHash);
+  it('does not treat equality with minClientCapability as an authoritative activation verdict', () => {
+    expectApiCode(
+      () =>
+        prepareChatReceiveCommand({
+          request: {
+            clientTurnId: 'turn-equal',
+            text: 'hello',
+            clientCapability: characterManifest.minClientCapability,
+          },
+          releaseRuntime: runtime(),
+          orderedReleaseIdsForNewThread: ['active-v1'],
+        }),
+      'CAPABILITY_UNAVAILABLE',
+    );
   });
 
-  it('maps malformed chat shapes to INVALID_REQUEST', () => {
+  it('fails closed for an existing pinned thread instead of inventing compatibility', () => {
+    expectApiCode(
+      () =>
+        prepareChatReceiveCommand({
+          request: {
+            threadId: 'thread-1',
+            clientTurnId: 'turn-2',
+            text: '이어갈게요.',
+            clientCapability: 'future-client',
+          },
+          releaseRuntime: runtime([
+            releaseEntry('retired-pinned', 'retired'),
+            releaseEntry('current', 'active'),
+          ]),
+          trustedThread: {
+            threadId: 'thread-1',
+            pinnedReleaseId: 'retired-pinned',
+            participantCharacterIds: ['john-doe-02'],
+          },
+        }),
+      'CAPABILITY_UNAVAILABLE',
+    );
+  });
+
+  it('maps malformed chat shapes to INVALID_REQUEST before content resolution', () => {
     expectApiCode(
       () =>
         prepareChatReceiveCommand({
@@ -134,53 +131,6 @@ describe('chat receive command planner', () => {
           orderedReleaseIdsForNewThread: ['active-v1'],
         }),
       'INVALID_REQUEST',
-    );
-  });
-
-  it('keeps an existing thread on its retired pinned release', () => {
-    const command = prepareChatReceiveCommand({
-      request: {
-        threadId: 'thread-1',
-        clientTurnId: 'turn-2',
-        text: '이어갈게요.',
-        clientCapability: '0.0.1-dev',
-      },
-      releaseRuntime: runtime([
-        releaseEntry('retired-pinned', 'retired'),
-        releaseEntry('current', 'active'),
-      ]),
-      trustedThread: {
-        threadId: 'thread-1',
-        pinnedReleaseId: 'retired-pinned',
-        participantCharacterIds: ['john-doe-02'],
-      },
-    });
-
-    expect(command.isNewThread).toBe(false);
-    expect(command.resolvedContent.releaseId).toBe('retired-pinned');
-  });
-
-  it('fails closed instead of silently upgrading an incompatible pinned thread', () => {
-    expectApiCode(
-      () =>
-        prepareChatReceiveCommand({
-          request: {
-            threadId: 'thread-1',
-            clientTurnId: 'turn-3',
-            text: '이어갈게요.',
-            clientCapability: 'old-client',
-          },
-          releaseRuntime: runtime([
-            releaseEntry('retired-pinned', 'retired'),
-            releaseEntry('current', 'active'),
-          ]),
-          trustedThread: {
-            threadId: 'thread-1',
-            pinnedReleaseId: 'retired-pinned',
-            participantCharacterIds: ['john-doe-02'],
-          },
-        }),
-      'CONTENT_INCOMPATIBLE',
     );
   });
 
@@ -205,80 +155,24 @@ describe('chat receive command planner', () => {
     );
   });
 
-  it('rejects a character outside the resolved bundle or existing thread participants', () => {
+  it('rejects a trusted thread binding on a new-thread request before content resolution', () => {
     expectApiCode(
       () =>
         prepareChatReceiveCommand({
           request: {
-            clientTurnId: 'turn-5',
-            characterId: 'future-character',
-            text: 'hello',
-            clientCapability: '0.0.1-dev',
-          },
-          releaseRuntime: runtime(),
-          orderedReleaseIdsForNewThread: ['active-v1'],
-        }),
-      'NOT_FOUND',
-    );
-
-    expectApiCode(
-      () =>
-        prepareChatReceiveCommand({
-          request: {
-            threadId: 'thread-2',
-            clientTurnId: 'turn-6',
-            characterId: 'john-doe-03',
+            clientTurnId: 'turn-new-with-binding',
             text: 'hello',
             clientCapability: '0.0.1-dev',
           },
           releaseRuntime: runtime(),
           trustedThread: {
-            threadId: 'thread-2',
+            threadId: 'server-thread',
             pinnedReleaseId: 'active-v1',
             participantCharacterIds: ['john-doe-02'],
           },
-        }),
-      'FORBIDDEN',
-    );
-  });
-
-  it('early-rejects a selected Saju domain that the requested character cannot serve', () => {
-    expectApiCode(
-      () =>
-        prepareChatReceiveCommand({
-          request: {
-            clientTurnId: 'turn-7',
-            characterId: 'john-doe-02',
-            structuredAction: {
-              type: 'SELECT_SAJU_DOMAIN',
-              version: 'v1',
-              domain: 'relationship',
-            },
-            clientCapability: '0.0.1-dev',
-          },
-          releaseRuntime: runtime(),
           orderedReleaseIdsForNewThread: ['active-v1'],
         }),
-      'CAPABILITY_UNAVAILABLE',
+      'INVALID_REQUEST',
     );
-  });
-
-  it('accepts a selected Saju domain that exists in the requested character capability', () => {
-    const command = prepareChatReceiveCommand({
-      request: {
-        clientTurnId: 'turn-8',
-        characterId: 'john-doe-02',
-        structuredAction: {
-          type: 'SELECT_SAJU_DOMAIN',
-          version: 'v1',
-          domain: 'career',
-        },
-        clientCapability: '0.0.1-dev',
-      },
-      releaseRuntime: runtime(),
-      orderedReleaseIdsForNewThread: ['active-v1'],
-    });
-
-    expect(command.requestedCharacterId).toBe('john-doe-02');
   });
 });

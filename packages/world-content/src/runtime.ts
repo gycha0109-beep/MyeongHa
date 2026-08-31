@@ -14,14 +14,6 @@ export interface ContentReleaseRuntimeEntry {
   readonly lifecycle: ContentReleaseLifecycle;
 }
 
-export interface ContentCompatibilityPolicy {
-  readonly policyVersion: string;
-  supports(
-    clientCapability: string,
-    minClientCapability: string,
-  ): boolean;
-}
-
 export interface ResolveNewThreadInput {
   readonly clientCapability: string;
   readonly orderedReleaseIds: readonly string[];
@@ -33,6 +25,7 @@ export class ContentReleaseRuntimeError extends Error {
       | 'INVALID_CATALOG'
       | 'INVALID_RELEASE_ORDER'
       | 'CONTENT_INCOMPATIBLE'
+      | 'COMPATIBILITY_AUTHORITY_UNAVAILABLE'
       | 'UNKNOWN_RELEASE',
     message: string,
   ) {
@@ -95,14 +88,17 @@ function validateEntry(entry: ContentReleaseRuntimeEntry): void {
   }
 }
 
+function compatibilityAuthorityUnavailable(): ContentReleaseRuntimeError {
+  return new ContentReleaseRuntimeError(
+    'COMPATIBILITY_AUTHORITY_UNAVAILABLE',
+    'Client/content compatibility verdict is unavailable until SRC-15 source authority is resolved.',
+  );
+}
+
 export class ContentReleaseRuntime {
   readonly #entriesByReleaseId = new Map<string, ContentReleaseRuntimeEntry>();
 
-  constructor(
-    entries: readonly ContentReleaseRuntimeEntry[],
-    readonly compatibilityPolicy: ContentCompatibilityPolicy,
-  ) {
-    assertNonEmpty(compatibilityPolicy.policyVersion, 'compatibility policy version');
+  constructor(entries: readonly ContentReleaseRuntimeEntry[]) {
     if (entries.length === 0) {
       throw new ContentReleaseRuntimeError(
         'INVALID_CATALOG',
@@ -123,70 +119,8 @@ export class ContentReleaseRuntime {
     }
   }
 
-  #validateReleaseOrder(orderedReleaseIds: readonly string[]): readonly string[] {
-    if (orderedReleaseIds.length === 0) {
-      throw new ContentReleaseRuntimeError(
-        'INVALID_RELEASE_ORDER',
-        'Operational release order must not be empty.',
-      );
-    }
-
-    const seen = new Set<string>();
-    const normalized: string[] = [];
-    for (const rawReleaseId of orderedReleaseIds) {
-      const releaseId = rawReleaseId.trim();
-      if (releaseId.length === 0 || seen.has(releaseId)) {
-        throw new ContentReleaseRuntimeError(
-          'INVALID_RELEASE_ORDER',
-          'Operational release order contains an empty or duplicate release id.',
-        );
-      }
-      if (!this.#entriesByReleaseId.has(releaseId)) {
-        throw new ContentReleaseRuntimeError(
-          'INVALID_RELEASE_ORDER',
-          `Operational release order references unknown release: ${releaseId}`,
-        );
-      }
-      seen.add(releaseId);
-      normalized.push(releaseId);
-    }
-    return normalized;
-  }
-
-  resolveForNewThread(input: ResolveNewThreadInput): ContentReleaseRuntimeEntry {
-    const clientCapability = input.clientCapability.trim();
-    if (clientCapability.length === 0) {
-      throw new ContentReleaseRuntimeError(
-        'CONTENT_INCOMPATIBLE',
-        'Client capability must not be empty.',
-      );
-    }
-
-    const orderedReleaseIds = this.#validateReleaseOrder(input.orderedReleaseIds);
-    for (const releaseId of orderedReleaseIds) {
-      const entry = this.#entriesByReleaseId.get(releaseId);
-      if (entry === undefined) {
-        throw new ContentReleaseRuntimeError(
-          'INVALID_RELEASE_ORDER',
-          `Operational release order references unknown release: ${releaseId}`,
-        );
-      }
-      if (entry.lifecycle !== 'active') continue;
-      if (
-        !this.compatibilityPolicy.supports(
-          clientCapability,
-          entry.release.minClientCapability,
-        )
-      ) {
-        continue;
-      }
-      return entry;
-    }
-
-    throw new ContentReleaseRuntimeError(
-      'CONTENT_INCOMPATIBLE',
-      'No active client-compatible content release is available.',
-    );
+  resolveForNewThread(_input: ResolveNewThreadInput): never {
+    throw compatibilityAuthorityUnavailable();
   }
 
   resolvePinned(releaseIdInput: string): ContentReleaseRuntimeEntry {
@@ -202,23 +136,9 @@ export class ContentReleaseRuntime {
   }
 
   assertPinnedClientCompatible(
-    releaseId: string,
-    clientCapabilityInput: string,
-  ): ContentReleaseRuntimeEntry {
-    const entry = this.resolvePinned(releaseId);
-    const clientCapability = clientCapabilityInput.trim();
-    if (
-      clientCapability.length === 0 ||
-      !this.compatibilityPolicy.supports(
-        clientCapability,
-        entry.release.minClientCapability,
-      )
-    ) {
-      throw new ContentReleaseRuntimeError(
-        'CONTENT_INCOMPATIBLE',
-        `Client cannot render pinned content release: ${entry.release.releaseId}`,
-      );
-    }
-    return entry;
+    _releaseId: string,
+    _clientCapabilityInput: string,
+  ): never {
+    throw compatibilityAuthorityUnavailable();
   }
 }
