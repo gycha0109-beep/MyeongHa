@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { runMeeting, validateIntegrationOutput, validateRoundTwoOutput } from '../room-server.mjs';
+import { runMeeting } from '../room-server.mjs';
+import { evaluateMeeting, saveLiveRecording } from './quality-recording.mjs';
 
 const cases = [
   {
@@ -45,29 +46,27 @@ function createMeeting(topic) {
   };
 }
 
-function passes(validation) {
-  try {
-    validation();
-    return true;
-  } catch {
-    return false;
-  }
-}
+const results = [];
+let allPassed = true;
 
 for (const testCase of cases) {
   const meeting = createMeeting(testCase.topic);
   await runMeeting(meeting);
-  const roundTwo = meeting.messages.filter((message) => message.round === 2 && ['world', 'revenue', 'engineering'].includes(message.agent));
-  const integration = meeting.messages.find((message) => message.agent === 'integration');
-  const roundTwoPass = roundTwo.length === 3 && roundTwo.every((message) => passes(() => validateRoundTwoOutput(message.agent, message.content)));
-  const integrationPass = Boolean(integration) && passes(() => validateIntegrationOutput(integration.content));
-  const sevenCallsPass = meeting.calls === 7;
+  const result = evaluateMeeting(meeting);
+  results.push({ name: testCase.name, meeting });
+  allPassed &&= result.passed;
 
   console.log(`\n${testCase.name}`);
-  console.log(`status=${meeting.status} calls=${meeting.calls} round2_protocol=${roundTwoPass ? 'PASS' : 'FAIL'} integration_sections=${integrationPass ? 'PASS' : 'FAIL'}${meeting.error ? ` error=${meeting.error}` : ''}`);
+  console.log(`status=${meeting.status} calls=${meeting.calls} round2_protocol=${result.roundTwoPass ? 'PASS' : 'FAIL'} integration_sections=${result.integrationPass ? 'PASS' : 'FAIL'}${meeting.error ? ` error=${meeting.error}` : ''}`);
   for (const item of meeting.messages) {
     if (item.agent === 'user') continue;
     console.log(`\n[${item.label} / Round ${item.round}]\n${item.content}`);
   }
-  if (meeting.status !== 'completed' || !sevenCallsPass || !roundTwoPass || !integrationPass) process.exitCode = 1;
+  if (!result.passed) process.exitCode = 1;
 }
+
+const recordingPath = await saveLiveRecording(results, allPassed);
+console.log(`\nrecording=${recordingPath}`);
+console.log(allPassed
+  ? 'PASS: successful live output was recorded for future zero-cost replay.'
+  : 'FAIL: failed live output was recorded separately; the last successful replay fixture was preserved.');
