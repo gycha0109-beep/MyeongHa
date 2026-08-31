@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { canonicalizeIntegrationOutput } from './integration-output-normalizer.mjs';
-import { validateIntegrationSemanticEvolution } from './integration-semantic-evolution.mjs';
+import { validateIntegrationSemanticEvolution } from '../integration-semantic-evolution.mjs';
 
 const raw = `AGREED
 - 관계 코어 무료 + 안전경계를 수용한다. [World R2] [Revenue R2]
