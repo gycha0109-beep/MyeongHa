@@ -35,12 +35,27 @@ NEXT TEST
 
 assert.doesNotThrow(() => validateIntegrationSemanticEvolution(meeting, valid));
 
+const nestedValid = valid
+  .replace('  Revenue: level 분기는 플랫폼이 맡는다.', '  - Revenue: level 분기는 플랫폼이 맡는다.')
+  .replace('  Engineering: level flag는 서버가 보유한다.', '  - Engineering: level flag는 서버가 보유한다.')
+  .replace('  Status: unresolved in Round 2', '  - Status: unresolved in Round 2');
+assert.doesNotThrow(() => validateIntegrationSemanticEvolution(meeting, nestedValid));
+
 const staleRevenue = valid.replace(
   'Revenue: level 분기는 플랫폼이 맡는다. | EVIDENCE "level 분기는 플랫폼이 맡는다." [Revenue R2]',
   'Revenue: 초기 유료 전환 조건은 여전히 현재 충돌이다. | EVIDENCE "유료 전환 경로가 명확하지 않으면 시행하지 않는다." [Revenue R1]',
 );
 assert.throws(
   () => validateIntegrationSemanticEvolution(meeting, staleRevenue),
+  /Revenue.*\[Revenue R2\]만.*\[Revenue R1\].*사용할 수 없습니다/,
+);
+
+const nestedStaleRevenue = nestedValid.replace(
+  '- Revenue: level 분기는 플랫폼이 맡는다. | EVIDENCE "level 분기는 플랫폼이 맡는다." [Revenue R2]',
+  '- Revenue: 초기 유료 전환 조건은 여전히 현재 충돌이다. | EVIDENCE "유료 전환 경로가 명확하지 않으면 시행하지 않는다." [Revenue R1]',
+);
+assert.throws(
+  () => validateIntegrationSemanticEvolution(meeting, nestedStaleRevenue),
   /Revenue.*\[Revenue R2\]만.*\[Revenue R1\].*사용할 수 없습니다/,
 );
 
@@ -69,4 +84,4 @@ assert.match(instruction, /현재 R2끼리 실제로 양립하지 않을 때만 
 assert.match(instruction, /transcript 또는 사용자 topic에 없는 정확한 기간·quota·threshold·가격·횟수·비율/);
 assert.match(instruction, /"4주"/);
 
-console.log('PASS Test F: current conflicts are R2-only and invented quantitative commitments are rejected');
+console.log('PASS Test F: current conflicts are R2-only, nested bullets are parsed, and invented quantitative commitments are rejected');
