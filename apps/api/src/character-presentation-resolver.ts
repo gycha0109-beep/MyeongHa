@@ -1,19 +1,11 @@
 import { ApiCommandError } from './chat-receive.js';
 
-export const CHARACTER_PRESENTATION_KEYS_V1 = Object.freeze([
-  'baekheon',
-  'seyeon',
-  'yeoul',
-  'seorin',
-  'rahyeon',
-  'mira',
-  'taegyeom',
-  'yunho',
-  'doyoon',
-] as const);
-
-export type CharacterPresentationKeyV1 =
-  (typeof CHARACTER_PRESENTATION_KEYS_V1)[number];
+/**
+ * Public Character Room routing identity. The concrete roster is content data,
+ * not an API enum, so new characters do not require an API code release merely
+ * to become resolvable.
+ */
+export type CharacterPresentationKeyV1 = string;
 
 export interface CharacterPresentationIdentityAuthorityRowV1 {
   readonly presentationKey: string;
@@ -73,21 +65,6 @@ function requireNonEmptyString(name: string, value: unknown): string {
     );
   }
   return value.trim();
-}
-
-function requirePresentationKey(value: unknown): CharacterPresentationKeyV1 {
-  const normalized = requireNonEmptyString('presentationKey', value);
-  if (
-    !CHARACTER_PRESENTATION_KEYS_V1.includes(
-      normalized as CharacterPresentationKeyV1,
-    )
-  ) {
-    throw new ApiCommandError(
-      'INVALID_REQUEST',
-      'presentationKey is not a supported Character Room route key.',
-    );
-  }
-  return normalized as CharacterPresentationKeyV1;
 }
 
 function mapAuthorityError(error: unknown): never {
@@ -173,7 +150,10 @@ export async function resolveCharacterPresentationIdentity(
     'contentBundleId',
     input.contentBundleId,
   );
-  const presentationKey = requirePresentationKey(input.presentationKey);
+  const presentationKey = requireNonEmptyString(
+    'presentationKey',
+    input.presentationKey,
+  );
 
   try {
     const rows = await input.authorityPort.resolveCharacterIdentity({
