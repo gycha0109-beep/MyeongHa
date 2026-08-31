@@ -16,7 +16,7 @@ const meeting = {
 const prompt = buildIntegrationInput(meeting);
 assert.match(prompt, /모든 실제 bullet\/block은 최소 1개의 구체 citation/);
 assert.match(prompt, /R1은 역사적 배경으로 함께 쓸 수 있지만 최신 입장의 단독 근거가 될 수 없습니다/);
-assert.match(prompt, /EVIDENCE \"transcript 원문에서 그대로 복사한 8자 이상 구절\"/);
+assert.match(prompt, /EVIDENCE \"transcript 근거를 짧게 보존한 8자 이상 구절\"/);
 assert.match(prompt, /들여쓴 `- ` bullet을 붙여도 같은 conflict block으로 처리/);
 assert.match(prompt, /원문의 강도를 키우지 마십시오/);
 
@@ -74,13 +74,19 @@ assert.throws(
   /Engineering.*citation이 없습니다/,
 );
 
+const paraphrasedEvidence = base.replace(
+  'EVIDENCE "level 분기는 플랫폼이 맡는다." [Revenue R2]',
+  'EVIDENCE "level 분기는 플랫폼 레이어가 맡는다." [Revenue R2]',
+);
+assert.doesNotThrow(() => validateIntegrationGrounding(meeting, paraphrasedEvidence));
+
 const inventedEvidence = base.replace(
   'EVIDENCE "level 분기는 플랫폼이 맡는다." [Revenue R2]',
-  'EVIDENCE "서버는 절대로 level을 가져서는 안 된다." [Revenue R2]',
+  'EVIDENCE "서버는 절대로 접근 권한을 자동 확대해야 한다." [Revenue R2]',
 );
 assert.throws(
   () => validateIntegrationGrounding(meeting, inventedEvidence),
-  /Revenue EVIDENCE가 cited transcript 원문과 일치하지 않습니다/,
+  /Revenue EVIDENCE가 cited transcript와 충분히 겹치지 않습니다/,
 );
 
 const ungroundedCandidate = base.replace(
@@ -92,4 +98,4 @@ assert.throws(
   /DECISION CANDIDATE.*최소 1개의 구체 citation/,
 );
 
-console.log('PASS Test E: Integration latest stance, exact evidence, nested conflict bullets, and named-agent attribution are transcript-grounded');
+console.log('PASS Test E: Integration latest stance, lexical evidence, nested conflict bullets, and named-agent attribution are transcript-grounded');
