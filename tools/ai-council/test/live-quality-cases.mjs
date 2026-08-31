@@ -1,9 +1,10 @@
 import { randomUUID } from 'node:crypto';
-import { runMeeting } from '../room-server.mjs';
+import { getApiAttemptCount, resetApiAttemptCount, runMeeting } from '../room-server.mjs';
 import { evaluateMeeting, saveLiveRecording } from './quality-recording.mjs';
 
 const cases = [
   {
+    id: 'A',
     name: 'Test A — Life Thread resurfacing v0.1',
     topic: `Life Thread resurfacing v0.1을 검토한다.
 
@@ -19,6 +20,7 @@ Engineering: authority·metadata·context·privacy·cost 관점
 Round 2에는 실제 상대 주장에 반응해 ACCEPT / OBJECT / DELTA를 작성한다.`,
   },
   {
+    id: 'B',
     name: 'Test B — Free unlimited Character Chat conflict',
     topic: `명하의 기본 Character Chat을 무료 사용자에게 완전 무제한으로 제공해야 하는가?
 
@@ -46,18 +48,27 @@ function createMeeting(topic) {
   };
 }
 
+const requested = String(process.argv[2] || process.env.COUNCIL_LIVE_CASE || '').trim().toUpperCase();
+const selectedCases = requested ? cases.filter((item) => item.id === requested) : cases;
+if (requested && selectedCases.length === 0) {
+  console.error(`Unknown live quality case: ${requested}. Use A or B.`);
+  process.exit(2);
+}
+
 const results = [];
 let allPassed = true;
 
-for (const testCase of cases) {
+for (const testCase of selectedCases) {
+  resetApiAttemptCount();
   const meeting = createMeeting(testCase.topic);
   await runMeeting(meeting);
+  meeting.apiAttempts = getApiAttemptCount();
   const result = evaluateMeeting(meeting);
   results.push({ name: testCase.name, meeting });
   allPassed &&= result.passed;
 
   console.log(`\n${testCase.name}`);
-  console.log(`status=${meeting.status} calls=${meeting.calls} round2_protocol=${result.roundTwoPass ? 'PASS' : 'FAIL'} integration_sections=${result.integrationPass ? 'PASS' : 'FAIL'}${meeting.error ? ` error=${meeting.error}` : ''}`);
+  console.log(`status=${meeting.status} calls=${meeting.calls} api_attempts=${meeting.apiAttempts} round2_protocol=${result.roundTwoPass ? 'PASS' : 'FAIL'} integration_sections=${result.integrationPass ? 'PASS' : 'FAIL'}${meeting.error ? ` error=${meeting.error}` : ''}`);
   for (const item of meeting.messages) {
     if (item.agent === 'user') continue;
     console.log(`\n[${item.label} / Round ${item.round}]\n${item.content}`);
@@ -68,5 +79,5 @@ for (const testCase of cases) {
 const recordingPath = await saveLiveRecording(results, allPassed);
 console.log(`\nrecording=${recordingPath}`);
 console.log(allPassed
-  ? 'PASS: successful live output was recorded for future zero-cost replay.'
+  ? `PASS: ${selectedCases.map((item) => item.id).join(',')} live output recorded; matching-runtime successful cases are merged for future zero-cost replay.`
   : 'FAIL: failed live output was recorded separately; the last successful replay fixture was preserved.');
