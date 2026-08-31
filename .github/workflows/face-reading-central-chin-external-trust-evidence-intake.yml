@@ -1,0 +1,83 @@
+name: Face Reading Central Chin External Trust Evidence Intake
+
+on:
+  pull_request:
+    paths:
+      - 'packages/face-reading/**'
+      - 'test/face-reading-fr60-central-chin-external-trust-evidence-intake.test.ts'
+      - 'docs/FACE_READING_FR60_CENTRAL_CHIN_EXTERNAL_TRUST_EVIDENCE_INTAKE_V0.1.md'
+      - 'docs/FACE_READING_FR60_CENTRAL_CHIN_EXTERNAL_TRUST_EVIDENCE_AUTHORITY_DECISION_V0.1.md'
+      - '.github/workflows/face-reading-central-chin-external-trust-evidence-intake.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'packages/face-reading/**'
+      - 'test/face-reading-fr60-central-chin-external-trust-evidence-intake.test.ts'
+      - 'docs/FACE_READING_FR60_CENTRAL_CHIN_EXTERNAL_TRUST_EVIDENCE_INTAKE_V0.1.md'
+      - 'docs/FACE_READING_FR60_CENTRAL_CHIN_EXTERNAL_TRUST_EVIDENCE_AUTHORITY_DECISION_V0.1.md'
+      - '.github/workflows/face-reading-central-chin-external-trust-evidence-intake.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  fr60-central-chin-external-trust-evidence-intake:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install exact workspace dependencies
+        run: npm install --ignore-scripts
+      - name: Build MyeongHa runtime
+        run: npm run build
+      - name: Run FR-60 external trust-evidence intake tests
+        run: npx vitest run test/face-reading-fr60-central-chin-external-trust-evidence-intake.test.ts
+      - name: Verify compiled FR-60 trust boundary and production fail-closed gate
+        run: |
+          node --input-type=module <<'NODE'
+          import {
+            CENTRAL_CHIN_EXTERNAL_TRUST_EVIDENCE_INTAKE_AUTHORITY_FR60,
+            assertCentralChinExternalTrustEvidenceReadyForProductionFR60,
+            validateCentralChinExternalTrustEvidenceIntakeAuthorityFR60,
+          } from './dist/packages/face-reading/src/index.js';
+
+          const authority = validateCentralChinExternalTrustEvidenceIntakeAuthorityFR60();
+          if (authority !== CENTRAL_CHIN_EXTERNAL_TRUST_EVIDENCE_INTAKE_AUTHORITY_FR60) process.exit(1);
+          if (!authority.protocol.exactFR59MechanicalVerificationRequiredAtIntake) process.exit(1);
+          if (!authority.protocol.candidateEvidenceDeclaredDigestExactMatchRequired) process.exit(1);
+          if (!authority.protocol.candidateEvidenceArtifactRefUniqueRequired) process.exit(1);
+          if (authority.protocol.candidateEvidenceInputOrderDefinesBundleIdentity) process.exit(1);
+          if (authority.protocol.frozenArtifactRetainsCandidateEvidenceBytes) process.exit(1);
+          if (authority.protocol.frozenArtifactRetainsSignerPublicKeyPem) process.exit(1);
+          if (authority.protocol.frozenVerifierReperformsFR59MechanicalVerification) process.exit(1);
+          for (const value of [
+            authority.protocol.minimumCandidateArtifactsForTrustSufficiency,
+            authority.protocol.requiredReviewerCredential,
+            authority.protocol.acceptedTrustRootType,
+            authority.protocol.trustedTimestampMechanism,
+            authority.protocol.externalTrustAcceptanceCriterion,
+            authority.protocol.partitionAllocationRule,
+            authority.protocol.calibrationFraction,
+            authority.protocol.minimumPairs,
+            authority.protocol.minimumSubjects,
+            authority.protocol.membershipThreshold,
+            authority.protocol.anchorAgreementTolerance,
+            authority.protocol.endpointSelectionRule,
+            authority.protocol.empiricalAcceptanceCriterion,
+          ]) {
+            if (value !== null) process.exit(1);
+          }
+          if (!Object.values(authority.authorityBoundary).every((value) => value === false)) process.exit(1);
+
+          let productionBlocked = false;
+          try {
+            assertCentralChinExternalTrustEvidenceReadyForProductionFR60();
+          } catch {
+            productionBlocked = true;
+          }
+          if (!productionBlocked) process.exit(1);
+          NODE
