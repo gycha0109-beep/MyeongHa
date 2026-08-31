@@ -1,7 +1,8 @@
 import 'dotenv/config';
 import { readFile } from 'node:fs/promises';
 
-if (!process.env.COUNCIL_INTEGRATION_MAX_OUTPUT_TOKENS) {
+const configuredIntegrationTokens = Number(process.env.COUNCIL_INTEGRATION_MAX_OUTPUT_TOKENS || 0);
+if (!Number.isFinite(configuredIntegrationTokens) || configuredIntegrationTokens < 2200) {
   process.env.COUNCIL_INTEGRATION_MAX_OUTPUT_TOKENS = '2200';
 }
 
