@@ -1,30 +1,164 @@
 <!doctype html>
-<html lang="ko" data-theme="night">
+<html lang="ko">
 <head>
-  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Hall · 명하</title><link rel="stylesheet" href="styles.css" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="명하 홈 — 오늘의 흐름, 이어지는 이야기, 사주 주제와 관계를 한곳에서 이어봅니다." />
+  <title>홈 · 명하</title>
+  <link rel="stylesheet" href="product.css" />
+  <link rel="stylesheet" href="home-v2.css" />
 </head>
-<body data-page="hall">
-<header class="topbar"><div class="shell topbar-inner"><a class="brand" href="index.html"><span class="brand-seal">命河</span><span>명하</span></a><nav class="topnav" aria-label="주요 메뉴"><a href="records.html">기록</a><a class="desktop-only" href="#">알림</a><a class="desktop-only" href="#">계정</a><button class="theme-toggle" type="button" data-theme-toggle>☼</button></nav></div></header>
-<main class="world-frame"><section class="page"><div class="shell">
-  <div class="saju-signature"><span>나의 명식</span><span class="signature-pills"><span class="demo-badge">DEMO</span> 年柱 · 月柱 · 日柱 · 時柱</span><a href="reading.html">명식 자세히 보기 →</a></div>
+<body class="product-page" data-page="home">
+  <header class="product-header">
+    <div class="product-shell product-header-inner">
+      <a class="product-brand" href="hall.html" aria-label="명하 홈">
+        <span class="product-brand-name">명하</span>
+        <span class="product-brand-seal" aria-hidden="true">明河</span>
+        <span class="product-brand-sub">MyeongHa</span>
+      </a>
 
-  <div class="panel hall-grid">
-    <div class="hall-presence"><div style="text-align:center"><div class="avatar avatar-lg" aria-label="John Doe 03 플레이스홀더">JD03</div><p class="eyebrow" style="margin-top:18px">함께 읽은 대리자</p><div class="display display-md">John Doe 03</div></div></div>
-    <div class="hall-story">
-      <div data-returning-only><div class="eyebrow">지난번 함께 읽던 기록</div><h1 class="display display-lg">일과 선택</h1><p class="lead">지금의 방향을 바꿀지 이야기하던 중이었습니다.</p><a class="button button-primary" href="chat.html">이야기 이어가기 <span>→</span></a></div>
-      <div data-guest-only hidden><div class="eyebrow">첫 기록을 열기 전</div><h1 class="display display-lg">누구와 처음 이야기를 시작할까요?</h1><p class="lead">대리자를 먼저 만나고, 대화 속에서 태어난 순간의 기록을 열 수 있습니다.</p><a class="button button-primary" href="chat.html?first=1">John Doe 03 만나기 <span>→</span></a></div>
+      <nav class="product-nav" aria-label="주요 메뉴">
+        <a class="product-nav-link" href="hall.html" aria-current="page">홈</a>
+        <a class="product-nav-link" href="reading.html">사주</a>
+        <a class="product-nav-link" href="chat.html">대화</a>
+        <a class="product-nav-link" href="records.html">기록</a>
+        <a class="product-nav-link" href="#" aria-disabled="true">마이</a>
+      </nav>
+
+      <div class="product-utilities">
+        <button class="product-icon-button" type="button" aria-label="알림"></button>
+        <a class="product-profile" href="#" aria-label="내 프로필">
+          <span class="product-profile-mark" aria-hidden="true">之</span>
+          <span>지환</span>
+          <span aria-hidden="true">⌄</span>
+        </a>
+      </div>
     </div>
-  </div>
+  </header>
 
-  <div class="panel rep-row" aria-label="다른 대리자">
-    <a class="rep-item" href="chat.html"><span class="avatar">JD01</span><span><strong>John Doe 01</strong><small class="muted">지난 이야기</small></span></a>
-    <a class="rep-item" href="chat.html"><span class="avatar">JD02</span><span><strong>John Doe 02</strong><small class="muted">처음 만남</small></span></a>
-    <a class="rep-item" href="chat.html"><span class="avatar">JD04</span><span><strong>John Doe 04</strong><small class="muted">기록 있음</small></span></a>
-    <a class="rep-item" href="chat.html"><span class="avatar">JD05</span><span><strong>John Doe 05</strong><small class="muted">지난 이야기</small></span></a>
-  </div>
+  <main class="product-main">
+    <div class="product-shell">
+      <section class="home-intro" aria-labelledby="home-title">
+        <h1 id="home-title">오늘은 무엇을 읽어볼까요?<span class="home-title-ornament" aria-hidden="true">✦</span></h1>
+      </section>
 
-  <div class="panel trace" data-returning-only><span class="trace-icon">▤</span><div><div class="eyebrow">최근 남겨진 기록</div><div class="muted">John Doe 03와 나눈 이야기가 현세록과 인연록의 데모 흔적으로 연결되어 있습니다.</div></div><a class="button button-ghost" href="records.html">기록 보기 →</a></div>
-</div></section></main>
-<script src="app.js" defer></script>
-</body></html>
+      <section class="home-primary-grid" aria-label="오늘의 흐름과 이어지는 이야기">
+        <article class="home-today">
+          <div class="home-orbit-art" aria-hidden="true"></div>
+          <div class="home-today-copy">
+            <span class="home-kicker">8월 31일 · 오늘의 흐름</span>
+            <h2>오늘은 움직이기보다<br />정리할 것이 먼저입니다.</h2>
+            <p>지금은 한 걸음 멈춰 내면을 가다듬는 시간이 좋은 흐름을 만듭니다.</p>
+            <div class="home-rule" aria-hidden="true"></div>
+            <a class="home-primary-action" href="reading.html">
+              <span>오늘 읽어보기</span>
+              <span class="home-arrow" aria-hidden="true">→</span>
+            </a>
+          </div>
+        </article>
+
+        <aside class="paper-card home-thread" aria-labelledby="thread-title">
+          <div class="home-card-head">
+            <h2 id="thread-title">이어지는 이야기 <span class="home-title-ornament" aria-hidden="true">✦</span></h2>
+            <a class="home-text-link" href="records.html">전체 보기 →</a>
+          </div>
+
+          <div class="home-thread-body">
+            <h3 class="home-thread-title">퇴사를 고민했던 이야기</h3>
+            <div class="home-thread-step">고민하기 시작했어요.</div>
+            <div class="home-thread-step is-decision">남기로 결정했어요.</div>
+            <div class="home-thread-step is-open">그 이후 이야기는 아직 없습니다.</div>
+            <div class="home-thread-foot">
+              <span>마지막 변화 · 8월 24일</span>
+              <a class="home-inline-action" href="records.html">이야기 이어보기 →</a>
+            </div>
+          </div>
+        </aside>
+      </section>
+
+      <section class="home-section" aria-labelledby="topics-title">
+        <div class="home-section-head">
+          <h2 class="home-section-title" id="topics-title">무엇을 보고 싶으세요?<span class="home-title-ornament" aria-hidden="true">✦</span></h2>
+        </div>
+
+        <div class="home-topic-grid">
+          <a class="home-topic" href="reading.html?topic=love" data-motif="花">
+            <span>
+              <span class="home-topic-title">연애</span>
+              <span class="home-topic-copy">마음과 인연의 흐름</span>
+            </span>
+            <span class="home-topic-arrow" aria-hidden="true">→</span>
+          </a>
+          <a class="home-topic" href="reading.html?topic=career" data-motif="山">
+            <span>
+              <span class="home-topic-title">직업</span>
+              <span class="home-topic-copy">일과 진로의 방향</span>
+            </span>
+            <span class="home-topic-arrow" aria-hidden="true">→</span>
+          </a>
+          <a class="home-topic" href="reading.html?topic=money" data-motif="財">
+            <span>
+              <span class="home-topic-title">금전</span>
+              <span class="home-topic-copy">재물과 재정의 흐름</span>
+            </span>
+            <span class="home-topic-arrow" aria-hidden="true">→</span>
+          </a>
+          <a class="home-topic" href="reading.html?scope=year" data-motif="命">
+            <span>
+              <span class="home-topic-title">올해 흐름</span>
+              <span class="home-topic-copy">한 해의 흐름과 중요한 시기</span>
+            </span>
+            <span class="home-topic-arrow" aria-hidden="true">→</span>
+          </a>
+        </div>
+      </section>
+
+      <section class="home-section" aria-labelledby="person-title">
+        <div class="home-section-head">
+          <h2 class="home-section-title" id="person-title">오늘 이야기할 사람<span class="home-title-ornament" aria-hidden="true">✦</span></h2>
+          <a class="home-text-link" href="chat.html">대화로 가기 →</a>
+        </div>
+
+        <article class="paper-card home-person">
+          <div class="home-person-avatar" aria-label="세연 이미지 자리">세연</div>
+          <div class="home-person-copy">
+            <div class="home-person-name-row">
+              <h3 class="home-person-name">세연</h3>
+              <span class="home-person-tag">마음과 인연의 흐름</span>
+            </div>
+            <p class="home-person-message">오늘은 좀 괜찮았어요?</p>
+            <div class="home-person-context">지난 이야기가 조금 신경 쓰였어요.</div>
+          </div>
+          <a class="home-person-action" href="chat.html?character=seyeon">
+            <span>이야기하기</span>
+            <span aria-hidden="true">→</span>
+          </a>
+        </article>
+      </section>
+    </div>
+  </main>
+
+  <footer class="product-footer">
+    <div class="product-shell product-footer-inner">
+      <div class="product-footer-links">
+        <a href="#">서비스 안내</a>
+        <a href="#">이용약관</a>
+        <a href="#">개인정보처리방침</a>
+        <a href="#">고객지원</a>
+      </div>
+      <div class="product-footer-copy">
+        <span>© 2026 MyeongHa. All rights reserved.</span>
+        <span class="product-footer-seal" aria-hidden="true">明河</span>
+      </div>
+    </div>
+  </footer>
+
+  <nav class="mobile-bottom-nav" aria-label="모바일 주요 메뉴">
+    <a class="mobile-nav-link" href="hall.html" aria-current="page"><span class="mobile-nav-icon" aria-hidden="true">⌂</span><span>홈</span></a>
+    <a class="mobile-nav-link" href="reading.html"><span class="mobile-nav-icon" aria-hidden="true">✦</span><span>사주</span></a>
+    <a class="mobile-nav-link" href="chat.html"><span class="mobile-nav-icon" aria-hidden="true">◌</span><span>대화</span></a>
+    <a class="mobile-nav-link" href="records.html"><span class="mobile-nav-icon" aria-hidden="true">▤</span><span>기록</span></a>
+    <a class="mobile-nav-link" href="#" aria-disabled="true"><span class="mobile-nav-icon" aria-hidden="true">♙</span><span>마이</span></a>
+  </nav>
+</body>
+</html>

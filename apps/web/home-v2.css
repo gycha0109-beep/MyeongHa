@@ -1,0 +1,516 @@
+:root {
+  --mh-max: 1370px;
+  --mh-paper-base: #f1e8de;
+  --mh-paper-raised: #f8f1e8;
+  --mh-paper-muted: #eadfd3;
+  --mh-ink-strong: #20252d;
+  --mh-ink: #3d3937;
+  --mh-ink-muted: #766d66;
+  --mh-night-900: #101d2d;
+  --mh-night-800: #172638;
+  --mh-brass-strong: #a9814c;
+  --mh-brass: #b99a70;
+  --mh-seal: #863834;
+}
+
+body.product-page {
+  background:
+    radial-gradient(circle at 82% 3%, rgba(69, 79, 88, .045), transparent 23rem),
+    linear-gradient(180deg, #f8f1e8 0%, #f4ece3 48%, #eee3d8 100%);
+}
+
+body.product-page::after {
+  content: "";
+  position: fixed;
+  z-index: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 180px;
+  pointer-events: none;
+  opacity: .46;
+  background:
+    url("home-paper-mountains.svg") left bottom / 420px auto no-repeat,
+    url("home-paper-mountains.svg") right -120px bottom -14px / 560px auto no-repeat;
+  filter: grayscale(.22);
+}
+
+.product-header {
+  min-height: 96px;
+  background: rgba(248, 241, 232, .95);
+  box-shadow: 0 1px 0 rgba(255,255,255,.48);
+}
+.product-header::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: .64;
+  background: url("home-paper-mountains.svg") right 78px bottom -52px / 430px auto no-repeat;
+}
+.product-header::after {
+  bottom: -10px;
+  width: 30px;
+  color: #b79460;
+  background: #f6eee5;
+}
+.product-header-inner {
+  min-height: 95px;
+  grid-template-columns: 250px minmax(450px, 1fr) 250px;
+}
+.product-brand-name {
+  font-size: 34px;
+  letter-spacing: .13em;
+}
+.product-brand-seal {
+  width: 25px;
+  min-height: 38px;
+  color: #943b34;
+  border-color: rgba(148,59,52,.62);
+  background: rgba(255,255,255,.24);
+}
+.product-brand-sub {
+  margin-top: 8px;
+  font-family: Georgia, serif;
+  font-size: 9px;
+  letter-spacing: .31em;
+}
+.product-nav {
+  height: 95px;
+  gap: clamp(38px, 4.8vw, 70px);
+}
+.product-nav-link {
+  font-size: 18px;
+}
+.product-nav-link[aria-current="page"]::after {
+  left: -4px;
+  right: -4px;
+  bottom: 13px;
+}
+.product-nav-link[aria-current="page"]::before {
+  bottom: 5px;
+  background: #f6eee5;
+}
+.product-utilities {
+  gap: 12px;
+}
+.product-icon-button {
+  width: 40px;
+  min-height: 40px;
+  border: 0;
+  background: transparent;
+}
+.product-profile {
+  min-height: 43px;
+  padding: 0 14px 0 11px;
+  gap: 8px;
+  background: rgba(250,246,239,.50);
+  border-color: rgba(149,116,76,.30);
+}
+.product-profile-mark {
+  position: relative;
+  width: 25px;
+  height: 25px;
+  border: 0;
+  background: transparent;
+  color: transparent;
+}
+.product-profile-mark::before {
+  content: "";
+  position: absolute;
+  left: 8px;
+  top: 3px;
+  width: 8px;
+  height: 8px;
+  border: 1.7px solid var(--mh-ink);
+  border-radius: 50%;
+}
+.product-profile-mark::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 13px;
+  width: 16px;
+  height: 10px;
+  border: 1.7px solid var(--mh-ink);
+  border-radius: 12px 12px 5px 5px;
+}
+
+.product-main {
+  padding: 28px 0 20px;
+}
+.home-intro {
+  margin-bottom: 18px;
+  padding-left: 8px;
+}
+.home-intro h1 {
+  font-size: clamp(25px, 2vw, 31px);
+  line-height: 1.25;
+}
+.home-title-ornament {
+  margin-left: 9px;
+  color: #b89769;
+  font-size: .72em;
+}
+
+.home-primary-grid {
+  grid-template-columns: minmax(0, 1.305fr) minmax(390px, .995fr);
+  gap: 24px;
+}
+.home-today {
+  min-height: 360px;
+  grid-template-columns: minmax(260px, .86fr) minmax(360px, 1.14fr);
+  padding: 30px 42px 28px 38px;
+  border-color: #a47d4b;
+  border-radius: 15px;
+  background:
+    radial-gradient(circle at 22% 18%, rgba(198, 165, 105, .08), transparent 17rem),
+    linear-gradient(145deg, #102033 0%, #13253a 48%, #111d2b 100%);
+  box-shadow:
+    0 12px 24px rgba(50,37,25,.12),
+    inset 0 0 0 3px rgba(187,151,92,.08),
+    inset 0 0 0 7px rgba(4,11,18,.20);
+}
+.home-today::before {
+  inset: 7px;
+  border-color: rgba(203, 170, 112, .44);
+  border-radius: 10px;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.035);
+}
+.home-today::after {
+  width: 210px;
+  height: 210px;
+  right: -86px;
+  bottom: -90px;
+  border-color: rgba(198,159,94,.20);
+}
+.home-orbit-art {
+  width: min(100%, 286px);
+  border-color: rgba(196, 157, 92, .78);
+  background: url("home-landscape.svg") center / cover no-repeat;
+  box-shadow:
+    0 0 0 7px rgba(176,139,80,.075),
+    0 0 0 9px rgba(188,150,88,.42),
+    inset 0 0 0 5px rgba(217,187,130,.05);
+}
+.home-orbit-art::before,
+.home-orbit-art::after {
+  display: none;
+}
+.home-today-copy {
+  padding-left: 22px;
+}
+.home-kicker {
+  min-height: 30px;
+  padding: 0 14px;
+  font-size: 12px;
+  letter-spacing: .03em;
+  color: #d5b886;
+  background: rgba(6,15,24,.18);
+}
+.home-today h2 {
+  margin: 20px 0 13px;
+  font-size: clamp(29px, 2.6vw, 40px);
+  line-height: 1.48;
+}
+.home-today p {
+  max-width: 430px;
+  color: #d7cfc4;
+  font-family: var(--mh-serif);
+  font-size: 15px;
+  line-height: 1.75;
+}
+.home-rule {
+  width: 84%;
+  margin: 18px 0 14px;
+  background: linear-gradient(90deg, #ae8951 0 38%, rgba(174,137,81,.22) 38% 100%);
+}
+.home-primary-action {
+  min-width: 280px;
+  min-height: 54px;
+  border-color: #b48c58;
+  border-radius: 7px;
+  background: #f7eee5;
+  box-shadow: inset 0 0 0 4px rgba(255,255,255,.30);
+  font-size: 17px;
+}
+
+.paper-card {
+  background: rgba(248,241,232,.88);
+  border-color: rgba(147,107,64,.28);
+  box-shadow: 0 10px 24px rgba(73,53,34,.075);
+}
+.home-thread {
+  min-height: 360px;
+  padding: 27px 28px 28px;
+  border-color: rgba(153,111,65,.38);
+  background:
+    linear-gradient(rgba(248,241,232,.92), rgba(248,241,232,.92)),
+    url("home-paper-mountains.svg") right -90px bottom -18px / 370px auto no-repeat;
+  box-shadow:
+    0 10px 25px rgba(75,53,32,.07),
+    inset 0 0 0 5px rgba(255,255,255,.22);
+}
+.home-card-head h2,
+.home-section-head h2 {
+  font-size: 20px;
+}
+.home-text-link {
+  font-family: var(--mh-serif);
+  font-size: 12px;
+}
+.home-thread-body {
+  margin-top: 21px;
+  padding: 22px 22px 19px;
+  border-color: rgba(137,98,58,.20);
+  background: rgba(255,255,255,.16);
+  box-shadow: inset 0 0 0 2px rgba(255,255,255,.16);
+}
+.home-thread-title {
+  margin-bottom: 19px;
+  font-size: 17px;
+}
+.home-thread-step {
+  min-height: 44px;
+  padding-left: 37px;
+  font-family: var(--mh-serif);
+  font-size: 13px;
+}
+.home-thread-step::before {
+  left: 7px;
+  top: 5px;
+  width: 10px;
+  height: 10px;
+}
+.home-thread-step:not(:last-of-type)::after {
+  left: 12px;
+}
+.home-thread-foot {
+  margin-top: 5px;
+  padding-top: 15px;
+  font-size: 11px;
+}
+.home-inline-action {
+  font-size: 14px;
+}
+
+.home-section {
+  margin-top: 27px;
+}
+.home-section-head {
+  margin-bottom: 13px;
+  padding: 0 6px;
+}
+.home-section-title {
+  font-size: 25px !important;
+}
+.home-topic-grid {
+  gap: 18px;
+}
+.home-topic {
+  min-height: 132px;
+  padding: 24px 27px 20px;
+  border-color: rgba(148,107,63,.28);
+  border-radius: 12px;
+  background: rgba(248,241,232,.79);
+  box-shadow: 0 6px 14px rgba(75,55,35,.035);
+}
+.home-topic::before {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  pointer-events: none;
+  inset: 0;
+  opacity: .72;
+}
+.home-topic[data-motif="花"]::before {
+  background: url("home-plum-branch.svg") right -94px top 4px / 330px auto no-repeat;
+}
+.home-topic[data-motif="山"]::before {
+  background: url("home-paper-mountains.svg") right -65px bottom -20px / 330px auto no-repeat;
+  opacity: .82;
+}
+.home-topic[data-motif="財"]::before {
+  inset: auto 10px 2px auto;
+  width: 150px;
+  height: 92px;
+  opacity: .12;
+  background:
+    radial-gradient(circle at 35% 62%, transparent 0 18px, #9d7444 19px 21px, transparent 22px),
+    radial-gradient(circle at 58% 42%, transparent 0 22px, #9d7444 23px 25px, transparent 26px),
+    radial-gradient(circle at 77% 70%, transparent 0 16px, #9d7444 17px 19px, transparent 20px);
+}
+.home-topic[data-motif="命"]::before {
+  inset: auto 12px 7px auto;
+  width: 112px;
+  height: 112px;
+  border-radius: 50%;
+  opacity: .12;
+  background:
+    radial-gradient(circle, transparent 0 26px, #8c7357 27px 28px, transparent 29px 40px, #8c7357 41px 42px, transparent 43px),
+    repeating-conic-gradient(from 0deg, #8c7357 0 1deg, transparent 1deg 22.5deg);
+}
+.home-topic::after {
+  content: "";
+}
+.home-topic-title {
+  font-size: 21px;
+}
+.home-topic-copy {
+  margin-top: 8px;
+  font-family: var(--mh-serif);
+  font-size: 12px;
+}
+.home-topic-arrow {
+  font-size: 20px;
+}
+
+.home-person {
+  min-height: 138px;
+  padding: 18px 34px 18px 64px;
+  grid-template-columns: 128px 1fr auto;
+  gap: 25px;
+  border-radius: 12px;
+  background:
+    linear-gradient(rgba(248,241,232,.90), rgba(248,241,232,.90)),
+    url("home-plum-branch.svg") right -78px bottom -14px / 360px auto no-repeat;
+}
+.home-person::after {
+  display: none;
+}
+.home-person-avatar {
+  width: 110px;
+  height: 110px;
+  border-color: rgba(146,92,77,.32);
+  background:
+    radial-gradient(circle at 48% 38%, rgba(170,103,88,.24), transparent 34%),
+    radial-gradient(circle at 52% 66%, rgba(99,63,57,.18), transparent 35%),
+    linear-gradient(145deg, #f1ddd1, #e4c5ba);
+  box-shadow: inset 0 0 0 5px rgba(255,255,255,.26);
+}
+.home-person-name-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 7px;
+}
+.home-person-name {
+  margin: 0;
+  font-size: 23px;
+}
+.home-person-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 10px;
+  border: 1px solid rgba(157,111,73,.30);
+  border-radius: 999px;
+  color: #865f4e;
+  background: rgba(255,250,244,.30);
+  font-family: var(--mh-serif);
+  font-size: 10px;
+}
+.home-person-message {
+  font-family: var(--mh-serif);
+  font-size: 14px;
+}
+.home-person-context {
+  margin-top: 3px;
+  font-family: var(--mh-serif);
+  font-size: 12px;
+}
+.home-person-action {
+  min-width: 218px;
+  min-height: 52px;
+  justify-content: center;
+  gap: 30px;
+  border-color: #8e724f;
+  border-radius: 8px;
+  background: #132236;
+  box-shadow: inset 0 0 0 4px rgba(185,154,111,.055);
+  font-size: 16px;
+}
+
+.product-footer {
+  position: relative;
+  z-index: 1;
+  padding: 9px 0 31px;
+}
+.product-footer-inner {
+  min-height: 78px;
+  padding-top: 11px;
+  display: grid;
+  grid-template-columns: 1fr;
+  justify-items: center;
+  align-content: center;
+  row-gap: 10px;
+  border-top: 1px solid rgba(137,99,61,.16);
+}
+.product-footer-links {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  flex-wrap: wrap;
+}
+.product-footer-links a:not(:last-child)::after {
+  content: "";
+  display: inline-block;
+  width: 1px;
+  height: 12px;
+  margin-left: 22px;
+  vertical-align: -2px;
+  background: rgba(117,92,68,.28);
+}
+.product-footer-copy {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: Georgia, serif;
+  letter-spacing: .02em;
+}
+.product-footer-seal {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 28px;
+  border: 1px solid rgba(134,56,52,.55);
+  border-radius: 3px;
+  font-size: 8px;
+  writing-mode: vertical-rl;
+}
+
+@media (max-width: 1099px) {
+  .product-header::before { opacity: .35; background-size: 340px auto; }
+  .product-header-inner { grid-template-columns: 190px 1fr 160px; }
+  .home-primary-grid { grid-template-columns: 1fr; }
+  .home-today { grid-template-columns: minmax(240px,.8fr) minmax(340px,1.2fr); }
+  .home-person { padding-left: 28px; grid-template-columns: 104px 1fr auto; }
+  .home-person-avatar { width: 92px; height: 92px; }
+}
+
+@media (max-width: 767px) {
+  body.product-page::after { height: 110px; opacity: .28; background-size: 250px auto, 340px auto; }
+  .product-header::before { display: none; }
+  .home-intro { padding-left: 0; }
+  .home-today {
+    grid-template-columns: 1fr;
+    padding: 24px 20px 22px;
+  }
+  .home-orbit-art { width: 210px; }
+  .home-today-copy { padding-left: 0; }
+  .home-primary-action { min-width: 0; }
+  .home-topic { min-height: 120px; padding: 17px 16px; }
+  .home-topic[data-motif="花"]::before { background-size: 250px auto; background-position: right -100px top 8px; }
+  .home-topic[data-motif="山"]::before { background-size: 250px auto; }
+  .home-person {
+    grid-template-columns: 72px 1fr;
+    padding: 18px 16px;
+    gap: 14px;
+  }
+  .home-person-avatar { width: 68px; height: 68px; }
+  .home-person-name-row { gap: 8px; flex-wrap: wrap; }
+  .home-person-tag { min-height: 21px; padding: 0 8px; }
+  .home-person-action { grid-column: 1 / -1; min-width: 0; width: 100%; }
+  .product-footer-inner { display: none; }
+}

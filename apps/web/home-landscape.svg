@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" role="img" aria-labelledby="title desc">
+  <title id="title">오늘의 흐름 산수 장식</title>
+  <desc id="desc">달과 겹산, 소나무를 단순화한 명하 홈 장식 일러스트</desc>
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#293443"/>
+      <stop offset="1" stop-color="#182332"/>
+    </linearGradient>
+    <linearGradient id="mist" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#d9d1c2" stop-opacity=".05"/>
+      <stop offset=".5" stop-color="#d9d1c2" stop-opacity=".28"/>
+      <stop offset="1" stop-color="#d9d1c2" stop-opacity=".02"/>
+    </linearGradient>
+    <linearGradient id="ridge" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#9aa1a1" stop-opacity=".56"/>
+      <stop offset="1" stop-color="#4f5d65" stop-opacity=".18"/>
+    </linearGradient>
+  </defs>
+  <rect width="320" height="320" rx="160" fill="url(#sky)"/>
+  <circle cx="148" cy="92" r="17" fill="#d8b887" opacity=".96"/>
+  <path d="M-12 236 48 173l28 28 37-47 40 53 34-42 44 54 30-26 72 63v80H-12Z" fill="url(#ridge)"/>
+  <path d="M-10 250 45 216l31 16 43-26 37 20 52-30 37 27 39-18 48 37v86H-10Z" fill="#17222f" opacity=".86"/>
+  <path d="M8 219c45-21 85-14 119 3s68 22 104 8 65-15 94 1" fill="none" stroke="url(#mist)" stroke-width="12" stroke-linecap="round"/>
+  <path d="M227 207c-5-29 4-57 22-83m-21 51c-17-10-31-12-43-7m49-22c16-11 31-16 45-15m-42 32c16-4 30-2 44 7" fill="none" stroke="#0f1924" stroke-width="4" stroke-linecap="round"/>
+  <path d="m187 168 21-15 18 13-19-4-14 10 16-5m-1-14 14-11 14 8-14-2-10 7" fill="#101a24" opacity=".88"/>
+  <g fill="none" stroke="#c5a46f" stroke-opacity=".30">
+    <circle cx="160" cy="160" r="145"/>
+    <circle cx="160" cy="160" r="132" stroke-dasharray="2 8"/>
+  </g>
+</svg>
