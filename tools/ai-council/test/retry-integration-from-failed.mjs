@@ -37,6 +37,13 @@ if (meeting.messages.some((message) => message.agent === 'integration')) {
 const apiKey = process.env.OPENAI_API_KEY || '';
 if (!apiKey) throw new Error('OPENAI_API_KEY가 설정되지 않았습니다.');
 
+function rejectedContentFromError(error) {
+  const text = String(error?.message || '');
+  const marker = '[REJECTED integration OUTPUT]';
+  const index = text.indexOf(marker);
+  return index >= 0 ? text.slice(index + marker.length).trim() : '';
+}
+
 async function recordRetryFailure({ content = '', error, responseStatus = null, responseBody = null }) {
   await mkdir(new URL('./.recordings/', import.meta.url), { recursive: true });
   const payload = {
@@ -60,29 +67,38 @@ meeting.error = null;
 resetApiAttemptCount();
 const payload = councilCore.buildResponsePayload(meeting, 'integration', meeting.maxRounds + 1);
 payload.input = `${payload.input}\n\n${integrationSemanticInstruction()}`;
-const response = await fetch('https://api.openai.com/v1/responses', {
-  method: 'POST',
-  headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
-  body: JSON.stringify(payload),
-});
-const body = await response.json().catch(() => ({}));
 
-const content = typeof body.output_text === 'string'
-  ? body.output_text.trim()
-  : (Array.isArray(body.output)
-    ? body.output.flatMap((item) => Array.isArray(item.content) ? item.content : [])
-      .filter((item) => item.type === 'output_text' && typeof item.text === 'string')
-      .map((item) => item.text)
-      .join('\n')
-      .trim()
-    : '');
-
+let response = null;
+let body = {};
+let content = '';
 let retryError = null;
-if (!response.ok) {
+
+try {
+  response = await fetch('https://api.openai.com/v1/responses', {
+    method: 'POST',
+    headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  body = await response.json().catch(() => ({}));
+  content = typeof body.output_text === 'string'
+    ? body.output_text.trim()
+    : (Array.isArray(body.output)
+      ? body.output.flatMap((item) => Array.isArray(item.content) ? item.content : [])
+        .filter((item) => item.type === 'output_text' && typeof item.text === 'string')
+        .map((item) => item.text)
+        .join('\n')
+        .trim()
+      : '');
+} catch (error) {
+  retryError = error;
+  content = rejectedContentFromError(error);
+}
+
+if (!retryError && !response.ok) {
   retryError = new Error(body.error?.message || `OpenAI HTTP ${response.status}`);
-} else if (body.status === 'incomplete') {
+} else if (!retryError && body.status === 'incomplete') {
   retryError = new Error(`Integration retry incomplete. reason=${body.incomplete_details?.reason || 'unknown'}`);
-} else {
+} else if (!retryError) {
   try {
     validateIntegrationGrounding(meeting, content);
     validateIntegrationSemanticEvolution(meeting, content);
@@ -95,8 +111,8 @@ if (retryError) {
   const failurePath = await recordRetryFailure({
     content,
     error: retryError,
-    responseStatus: response.status,
-    responseBody: response.ok ? null : body,
+    responseStatus: response?.status ?? null,
+    responseBody: response && !response.ok ? body : null,
   });
   console.error(`Test ${requested}: status=failed source_api_attempts=${sourceApiAttempts} retry_api_attempts=${getApiAttemptCount()} integration_grounding_or_semantic=FAIL error=${retryError.message}`);
   if (content) console.error(`\n[REJECTED Integration / Round ${meeting.maxRounds + 1}]\n${content}`);
