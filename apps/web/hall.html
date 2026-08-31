@@ -6,6 +6,7 @@
   <meta name="description" content="명하 홈 — 오늘의 흐름, 이어지는 이야기, 사주 주제와 관계를 한곳에서 이어봅니다." />
   <title>홈 · 명하</title>
   <link rel="stylesheet" href="product.css" />
+  <link rel="stylesheet" href="home-v2.css" />
 </head>
 <body class="product-page" data-page="home">
   <header class="product-header">
@@ -121,8 +122,11 @@
         <article class="paper-card home-person">
           <div class="home-person-avatar" aria-label="세연 이미지 자리">세연</div>
           <div class="home-person-copy">
-            <h3 class="home-person-name">세연</h3>
-            <p class="home-person-message">“오늘은 좀 괜찮았어요?”</p>
+            <div class="home-person-name-row">
+              <h3 class="home-person-name">세연</h3>
+              <span class="home-person-tag">마음과 인연의 흐름</span>
+            </div>
+            <p class="home-person-message">오늘은 좀 괜찮았어요?</p>
             <div class="home-person-context">지난 이야기가 조금 신경 쓰였어요.</div>
           </div>
           <a class="home-person-action" href="chat.html?character=seyeon">
@@ -136,12 +140,16 @@
 
   <footer class="product-footer">
     <div class="product-shell product-footer-inner">
-      <a href="#">서비스 안내</a>
-      <a href="#">이용약관</a>
-      <a href="#">개인정보처리방침</a>
-      <a href="#">고객지원</a>
-      <span class="product-footer-seal" aria-hidden="true">明河</span>
-      <span>© 2026 MyeongHa</span>
+      <div class="product-footer-links">
+        <a href="#">서비스 안내</a>
+        <a href="#">이용약관</a>
+        <a href="#">개인정보처리방침</a>
+        <a href="#">고객지원</a>
+      </div>
+      <div class="product-footer-copy">
+        <span>© 2026 MyeongHa. All rights reserved.</span>
+        <span class="product-footer-seal" aria-hidden="true">明河</span>
+      </div>
     </div>
   </footer>
 
