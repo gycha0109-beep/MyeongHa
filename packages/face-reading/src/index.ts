@@ -12,6 +12,7 @@ export * from './chin-contour-endpoint-candidate-admission-fr52.js';
 export * from './soft-tissue-mental-tubercle-definition-gap-fr53.js';
 export * from './central-chin-reference-trace-protocol-fr54.js';
 export * from './menton-side-reference-trace-raw-join-fr55.js';
+export * from './central-chin-paired-evidence-intake-fr56.js';
 export * from './menton-dataset-intake-frdata01.js';
 export * from './image-byte-dimensions-frdata02.js';
 export * from './browser-image-decode-frdata03.js';
