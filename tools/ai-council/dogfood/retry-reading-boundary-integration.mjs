@@ -118,6 +118,7 @@ if (error) {
     version: 2,
     recordedAt: new Date().toISOString(),
     name: recording.name || 'Dogfood D1 — Free First Saju Value vs Paid Structured Artifact',
+    roundOneIsolation: recording.roundOneIsolation === true,
     validation: {
       roundTwoPass: true,
       integrationGroundingPass: true,
@@ -131,7 +132,7 @@ if (error) {
     meeting,
   };
   await writeFile(recordingUrl, `${JSON.stringify(successPayload, null, 2)}\n`, 'utf8');
-  console.log(`Dogfood D1: status=completed calls=7 source_api_attempts=${sourceApiAttempts} retry_api_attempts=${retryApiAttempts} total_api_attempts=${meeting.apiAttempts} round2_protocol=PASS integration_grounding=PASS semantic_evolution=PASS`);
+  console.log(`Dogfood D1: status=completed calls=7 source_api_attempts=${sourceApiAttempts} retry_api_attempts=${retryApiAttempts} total_api_attempts=${meeting.apiAttempts} round_one_isolation=${successPayload.roundOneIsolation ? 'ON' : 'OFF'} round2_protocol=PASS integration_grounding=PASS semantic_evolution=PASS`);
   console.log(`\n[Integration / Round ${meeting.maxRounds + 1}]\n${content}`);
   console.log(`\nrecording=${recordingUrl.pathname}`);
   console.log('PASS: reused all six specialist outputs and paid only for one new Integration attempt.');
