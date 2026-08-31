@@ -194,3 +194,19 @@ The acquisition script must:
 14. push the evidence to a separate review branch rather than directly to `main`.
 
 The live Commons metadata check is an acquisition-time consistency gate, not legal adjudication. The acquisition branch is still not empirical ground truth. Provider-blind human annotation and FR-DATA-10 adjudication remain separate later gates.
+
+## 13. Wikimedia automated-access policy
+
+The acquisition client identifies itself on both Commons API and original-media requests with a descriptive bot User-Agent that points to this repository. A generic/default client identity is not used.
+
+For HTTP `429 Too Many Requests` or `503 Service Unavailable`, the client:
+
+1. respects a valid server-provided `Retry-After` value before retrying;
+2. uses bounded exponential backoff only when no valid `Retry-After` is present;
+3. limits the number of attempts;
+4. fails rather than ignoring a server delay that exceeds the governed workflow retry budget; and
+5. never rotates identities, hosts, or URLs to circumvent rate limiting.
+
+A separate PR/push smoke workflow performs a range-based access probe against all pinned source assets. The probe verifies automated-client access, live rights-family metadata, and the upload-host allowlist without freezing source evidence or assigning human labels.
+
+These transport controls exist to comply with the upstream service's automated-access requirements. They do not establish source authenticity, legal rights adjudication, privacy clearance, human ground truth, empirical validity, or production authority.
