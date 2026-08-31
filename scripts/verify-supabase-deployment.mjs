@@ -14,9 +14,13 @@ const [workflow, config, migrationFiles] = await Promise.all([
 const requiredWorkflowFragments = [
   "branches:\n      - main",
   "paths:\n      - 'supabase/migrations/**'",
+  "- '.github/workflows/supabase-production.yml'",
   `SUPABASE_PROJECT_ID: ${expectedProjectRef}`,
   'supabase/setup-cli@v3.0.0',
   'version: 2.116.0',
+  "grep -q '20260830072444'",
+  'supabase migration repair 20260830072444 --status reverted',
+  'supabase migration repair 0010 --status applied',
   'supabase db push --dry-run',
   'supabase db push',
   'cancel-in-progress: false',
