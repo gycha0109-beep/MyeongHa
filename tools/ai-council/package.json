@@ -5,7 +5,7 @@
   "scripts": {
     "start": "node bridge.mjs",
     "start:room": "node room-server.mjs",
-    "check": "node --check bridge.mjs && node --check room-server.mjs && node --check test/live-quality-cases.mjs && node --check test/retry-integration-from-failed.mjs && node --check test/recover-integration-fixture.mjs && node --check test/quality-validation-status.mjs && node --check test/integration-grounding-protocol.mjs && node --check test/integration-semantic-evolution.mjs && node --check test/integration-semantic-evolution-protocol.mjs && node --check test/integration-output-normalizer.mjs && node --check test/integration-output-normalizer-protocol.mjs",
+    "check": "node --check bridge.mjs && node --check room-server.mjs && node --check integration-semantic-evolution.mjs && node --check integration-semantic-runtime-gate.mjs && node --check test/live-quality-cases.mjs && node --check test/retry-integration-from-failed.mjs && node --check test/recover-integration-fixture.mjs && node --check test/quality-validation-status.mjs && node --check test/integration-grounding-protocol.mjs && node --check test/integration-semantic-evolution-protocol.mjs && node --check test/integration-output-normalizer.mjs && node --check test/integration-output-normalizer-protocol.mjs",
     "test:protocol": "node test/quality-protocol.mjs && node test/quality-recording-protocol.mjs && node test/strict-round-two-protocol.mjs && node test/integration-grounding-protocol.mjs && node test/integration-semantic-evolution-protocol.mjs && node test/integration-output-normalizer-protocol.mjs",
     "test": "npm run check && npm run test:protocol",
     "test:quality:replay": "node test/replay-quality-cases.mjs",
