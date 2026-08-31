@@ -31,6 +31,7 @@ Production Integration 호출에는 semantic evolution gate가 적용됩니다. 
 - `COUNCIL_REVENUE_MAX_OUTPUT_TOKENS`: Revenue 1회 출력 상한 (기본 800)
 - `COUNCIL_ENGINEERING_MAX_OUTPUT_TOKENS`: Engineering 1회 출력 상한 (기본 900)
 - `COUNCIL_INTEGRATION_MAX_OUTPUT_TOKENS`: Integration 1회 출력 상한 (기본 3000)
+- `COUNCIL_DOGFOOD_INTEGRATION_MAX_OUTPUT_TOKENS`: Dogfood Integration-only retry 상한 (기본 5000, 최소 4000)
 - `COUNCIL_MAX_CONTEXT_CHARS`: transcript context 상한 (기본 24000)
 - `COUNCIL_SPECIALIST_REASONING_EFFORT`: World/Revenue/Engineering reasoning 강도 (기본 `minimal`)
 - `COUNCIL_INTEGRATION_REASONING_EFFORT`: Integration reasoning 강도 (기본 `low`)
@@ -83,6 +84,14 @@ npm run dogfood:reading-boundary:live
 ```
 
 실행 결과는 Git에서 제외된 `test/.recordings/dogfood/reading-boundary.latest.json`에 저장됩니다. 실패하더라도 자동 재실행하지 말고 저장된 specialist output을 먼저 검토합니다.
+
+specialist 6개가 성공하고 Integration만 실패했다면 full dogfood를 다시 실행하지 않습니다. 아래 명령은 기존 6개를 재사용하고 Integration만 1회 새로 요청합니다. 첫 3000-token Integration이 `max_output_tokens`로 잘린 경우를 위해 기본 5000 tokens를 사용합니다.
+
+```powershell
+npm run dogfood:reading-boundary:retry-integration
+```
+
+retry는 accepted call 수와 실제 API attempt를 분리해 기록합니다. 예를 들어 최초 run에서 7 attempts 후 Integration이 실패하고 retry가 성공하면 `calls=7`, `source_api_attempts=7`, `retry_api_attempts=1`, `total_api_attempts=8`입니다. retry가 다시 실패해도 자동 재실행하지 않습니다.
 
 저장된 dogfood 결과는 추가 API 호출 없이 현재 validator로 다시 검증할 수 있습니다.
 
