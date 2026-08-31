@@ -1,25 +1,110 @@
 <!doctype html>
-<html lang="ko" data-theme="night"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>대화 · 명하</title><link rel="stylesheet" href="styles.css" /></head>
-<body data-page="chat"><header class="topbar"><div class="shell topbar-inner"><a class="brand" href="index.html"><span class="brand-seal">命河</span><span>명하</span></a><nav class="topnav"><a href="records.html">기록</a><a class="desktop-only" href="#">알림</a><a class="desktop-only" href="#">계정</a><button class="theme-toggle" data-theme-toggle type="button">☼</button></nav></div></header>
-<main class="world-frame"><section class="page"><div class="shell chat-shell">
-  <a class="backlink" href="hall.html">← Hall로 돌아가기</a>
-  <div class="chat-head"><div class="avatar" style="margin:0 auto 12px">JD03</div><h1 class="display display-md">John Doe 03</h1><div class="saju-signature" style="justify-content:center;border:0"><span>나의 명식</span><span class="signature-pills"><span class="demo-badge">DEMO</span> 年柱 · 月柱 · 日柱 · 時柱</span></div></div>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="명하 대화 — 각 인물의 공간에서 이전 이야기와 기억을 이어갑니다." />
+  <title>대화 · 명하</title>
+  <link rel="stylesheet" href="product.css" />
+  <link rel="stylesheet" href="chat-room.css" />
+</head>
+<body class="character-room" data-page="chat" data-character="baekheon">
+  <header class="character-room-header">
+    <a class="character-room-back" href="hall.html" aria-label="대화 허브로 돌아가기">
+      <span aria-hidden="true">‹</span>
+      <span>대화</span>
+    </a>
 
-  <div class="chat-thread" aria-label="대화 데모">
-    <div class="message"><div class="avatar">JD03</div><div><div class="message-meta">John Doe 03 · 지난 이야기에서</div><div class="bubble">지난번에는 일의 방향을 이야기했죠. 지금 마음속에서 가장 무게가 실리는 쪽은 어디인가요?</div></div></div>
-    <div class="message user"><div><div class="message-meta">나</div><div class="bubble">두 가지 길 사이에서 계속 고민 중이에요. 안정적인 길과 제가 진짜 하고 싶은 길 사이요.</div></div></div>
-    <div class="message"><div class="avatar">JD03</div><div><div class="message-meta">John Doe 03</div><div class="bubble">그 선택에 관해, 명식에서 확인된 기록을 먼저 펼쳐볼게요.</div></div></div>
+    <div class="character-room-identity" aria-live="polite">
+      <strong data-character-name>백헌</strong>
+      <span class="character-room-dot" aria-hidden="true">·</span>
+      <span data-character-title>충추원의 장</span>
+      <span class="character-room-seal" aria-hidden="true">明河</span>
+    </div>
 
-    <section class="authority-card" aria-label="검증된 사주 기록 데모">
-      <div class="authority-head"><span>▤</span><span>명식에서 확인된 기록</span><span class="demo-badge">SAMPLE · NOT ENGINE OUTPUT</span></div>
-      <div class="authority-body"><div class="authority-placeholder">이 영역에는 Saju Engine이 검증·커밋한 ProductReadingResponse의 보호된 의미 블록만 표시됩니다. 캐릭터가 이 내용을 새로 만들거나 강화하지 않습니다.</div><div style="margin-top:16px"><button class="button button-ghost" type="button" data-record-toggle="grounded-reading" aria-expanded="false">기록 펼치기</button></div><div id="grounded-reading" hidden style="margin-top:18px" class="authority-placeholder">상세 Reading 자리: 핵심 구조 · 근거 · 한계 · 관련 시기 · disclosure. 현재 UI 데모에는 실제 사주 주장을 넣지 않습니다.</div></div>
+    <div class="character-room-actions">
+      <button class="character-room-history-button" type="button" data-history-open>
+        <span class="character-room-clock" aria-hidden="true"></span>
+        <span>지난 대화</span>
+      </button>
+      <button class="character-room-menu-button" type="button" aria-label="대화 메뉴" data-menu-toggle>•••</button>
+    </div>
+  </header>
+
+  <main class="character-room-stage" aria-label="캐릭터 대화 공간">
+    <div class="character-room-scene" data-character-scene role="img" aria-label="백헌의 대화 공간">
+      <div class="character-room-scene-decoration" aria-hidden="true">
+        <span class="scene-window"></span>
+        <span class="scene-lamp"></span>
+        <span class="scene-branch"></span>
+        <span class="scene-character-placeholder"></span>
+      </div>
+    </div>
+
+    <div class="character-room-context" data-context-pill>
+      <span class="character-room-context-mark" aria-hidden="true">◇</span>
+      <span>이어진 이야기 · </span>
+      <strong data-context-title>퇴사를 고민했던 이야기</strong>
+    </div>
+
+    <section class="character-dialogue-panel" aria-label="현재 대화">
+      <div class="character-dialogue-copy">
+        <div class="character-dialogue-name-row">
+          <h1 data-dialogue-name>백헌</h1>
+          <span aria-hidden="true">✦</span>
+        </div>
+        <p class="character-dialogue-line" data-dialogue-line>결정하지 못한 게 아닙니다.<br />어느 쪽의 책임을 질지, 아직 정하지 않은 거죠.</p>
+      </div>
+
+      <button class="character-continue-button" type="button" data-continue-context>
+        <span>이야기 이어가기</span>
+        <span aria-hidden="true">→</span>
+      </button>
+
+      <form class="character-composer" data-composer>
+        <label class="sr-only" for="character-message">메시지</label>
+        <textarea id="character-message" rows="1" placeholder="메시지를 입력하세요…" data-message-input></textarea>
+        <button class="character-send-button" type="submit" aria-label="메시지 보내기">
+          <span aria-hidden="true">➤</span>
+        </button>
+      </form>
+
+      <p class="character-compose-status" data-compose-status aria-live="polite"></p>
     </section>
+  </main>
 
-    <div class="message"><div class="avatar">JD03</div><div><div class="message-meta">John Doe 03</div><div class="bubble">기록은 여기까지예요. 그렇다면 지금 실제 삶에서, 두 선택 중 무엇을 잃는 게 더 두렵나요?</div></div></div>
+  <aside class="character-history-drawer" data-history-drawer aria-hidden="true" aria-label="지난 대화">
+    <div class="character-history-head">
+      <div>
+        <span class="character-history-kicker">지난 대화</span>
+        <h2 data-history-character-name>백헌과 나눈 이야기</h2>
+      </div>
+      <button type="button" data-history-close aria-label="지난 대화 닫기">×</button>
+    </div>
+
+    <div class="character-history-list" data-history-list>
+      <article class="history-entry">
+        <time datetime="2026-08-24">8월 24일</time>
+        <strong>퇴사를 고민했던 이야기</strong>
+        <p>남기로 결정했다고 이야기했습니다.</p>
+      </article>
+      <article class="history-entry">
+        <time datetime="2026-08-18">8월 18일</time>
+        <strong>선택을 미루고 있던 이유</strong>
+        <p>안정과 하고 싶은 일 사이의 고민을 나눴습니다.</p>
+      </article>
+    </div>
+  </aside>
+
+  <div class="character-room-scrim" data-room-scrim hidden></div>
+
+  <div class="character-room-menu" data-room-menu hidden>
+    <a href="#" aria-disabled="true">캐릭터 정보</a>
+    <a href="records.html">이어진 기록 보기</a>
+    <a href="#" aria-disabled="true">기억 관리</a>
+    <a href="#" aria-disabled="true">대화에서 찾기</a>
   </div>
 
-  <section class="panel memory-chooser" aria-label="기억 범위 선택"><div class="memory-title"><span class="eyebrow">이 이야기를 어디까지 남길까요?</span><span class="fine">사용자가 결정합니다.</span></div><div class="memory-options"><button class="memory-option" data-label="이 대화에서만" aria-pressed="false">이 대화에서만</button><button class="memory-option" data-label="John Doe 03에게만" aria-pressed="false">John Doe 03에게만</button><button class="memory-option" data-label="현재 접근 가능한 대리자들과 공유" aria-pressed="false">현재 대리자들과 공유</button><button class="memory-option" data-label="기록하지 않기" aria-pressed="false">기록하지 않기</button></div><div class="status-note" data-memory-status aria-live="polite"></div></section>
-
-  <div class="chat-compose"><label class="sr-only" for="message">메시지</label><textarea id="message" placeholder="메시지를 입력하세요…"></textarea><button class="send" type="button" aria-label="메시지 보내기">→</button></div>
-  <div class="button-row" style="margin-top:14px"><a class="button button-ghost" href="birth.html">태어난 순간의 기록 열기</a><a class="button button-ghost" href="reading.html">Reading 화면 보기</a></div>
-</div></section></main><script src="app.js" defer></script></body></html>
+  <script src="chat-character.js" defer></script>
+</body>
+</html>
