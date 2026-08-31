@@ -32,7 +32,6 @@ export interface ChatReceivePlan {
     readonly releaseId: string;
     readonly bundleId: string;
     readonly contentVersion: string;
-    readonly compatibilityPolicyVersion: string;
   };
   readonly requestedCharacterId?: string;
 }
@@ -55,6 +54,12 @@ function hashRequest(request: ChatRequestV1): string {
 
 function mapReleaseError(error: unknown): never {
   if (error instanceof ContentReleaseRuntimeError) {
+    if (error.code === 'COMPATIBILITY_AUTHORITY_UNAVAILABLE') {
+      throw new ApiCommandError(
+        'CAPABILITY_UNAVAILABLE',
+        'Client/content compatibility authority is unavailable.',
+      );
+    }
     throw new ApiCommandError(
       'CONTENT_INCOMPATIBLE',
       'Requested content cannot be resolved for this client.',
@@ -175,7 +180,6 @@ export function prepareChatReceiveCommand(
       releaseId: entry.release.releaseId,
       bundleId: entry.release.bundleId,
       contentVersion: entry.release.contentVersion,
-      compatibilityPolicyVersion: input.releaseRuntime.compatibilityPolicy.policyVersion,
     }),
     ...(characterId === undefined ? {} : { requestedCharacterId: characterId }),
   });

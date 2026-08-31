@@ -5,23 +5,12 @@ import {
   buildWorldContentManifest,
   ContentReleaseRuntime,
   ContentReleaseRuntimeError,
-  type ContentCompatibilityPolicy,
   type ContentReleaseRuntimeEntry,
 } from '../packages/world-content/src/index.js';
 import {
   DEV_CHARACTER_CONTENT_BUNDLE,
   DEV_WORLD_CONTENT_BUNDLE,
 } from '../packages/test-fixtures/src/index.js';
-
-const compatibilityPolicy: ContentCompatibilityPolicy = {
-  policyVersion: 'test-client-capability-v1',
-  supports(clientCapability, minClientCapability) {
-    return (
-      clientCapability === minClientCapability ||
-      clientCapability === 'future-compatible-client'
-    );
-  },
-};
 
 const characterManifest = buildCharacterContentManifest(
   DEV_CHARACTER_CONTENT_BUNDLE,
@@ -47,40 +36,51 @@ function entry(
   };
 }
 
+function expectRuntimeCode(fn: () => unknown, code: string): void {
+  try {
+    fn();
+    throw new Error('Expected ContentReleaseRuntimeError.');
+  } catch (error) {
+    expect(error).toBeInstanceOf(ContentReleaseRuntimeError);
+    expect((error as ContentReleaseRuntimeError).code).toBe(code);
+  }
+}
+
 describe('content release runtime', () => {
-  it('uses operational ordering instead of inventing release precedence', () => {
-    const runtime = new ContentReleaseRuntime(
-      [entry('release-a', 'active'), entry('release-b', 'active')],
-      compatibilityPolicy,
-    );
+  it('fails closed instead of inventing a new-thread client compatibility verdict', () => {
+    const runtime = new ContentReleaseRuntime([
+      entry('release-a', 'active'),
+      entry('release-b', 'active'),
+    ]);
 
-    expect(
-      runtime.resolveForNewThread({
-        clientCapability: '0.0.1-dev',
-        orderedReleaseIds: ['release-b', 'release-a'],
-      }).release.releaseId,
-    ).toBe('release-b');
+    expectRuntimeCode(
+      () =>
+        runtime.resolveForNewThread({
+          clientCapability: '0.0.1-dev',
+          orderedReleaseIds: ['release-b', 'release-a'],
+        }),
+      'COMPATIBILITY_AUTHORITY_UNAVAILABLE',
+    );
   });
 
-  it('never selects a retired release for a new thread', () => {
-    const runtime = new ContentReleaseRuntime(
-      [entry('retired-first', 'retired'), entry('active-second', 'active')],
-      compatibilityPolicy,
-    );
+  it('does not treat equality with minClientCapability as compatibility authority', () => {
+    const runtime = new ContentReleaseRuntime([entry('active', 'active')]);
 
-    expect(
-      runtime.resolveForNewThread({
-        clientCapability: '0.0.1-dev',
-        orderedReleaseIds: ['retired-first', 'active-second'],
-      }).release.releaseId,
-    ).toBe('active-second');
+    expectRuntimeCode(
+      () =>
+        runtime.resolveForNewThread({
+          clientCapability: characterManifest.minClientCapability,
+          orderedReleaseIds: ['active'],
+        }),
+      'COMPATIBILITY_AUTHORITY_UNAVAILABLE',
+    );
   });
 
-  it('continues resolving an explicitly pinned retired release', () => {
-    const runtime = new ContentReleaseRuntime(
-      [entry('retired-pinned', 'retired'), entry('current', 'active')],
-      compatibilityPolicy,
-    );
+  it('continues resolving an explicitly pinned retired release for historical lookup', () => {
+    const runtime = new ContentReleaseRuntime([
+      entry('retired-pinned', 'retired'),
+      entry('current', 'active'),
+    ]);
 
     expect(runtime.resolvePinned('retired-pinned')).toMatchObject({
       lifecycle: 'retired',
@@ -88,61 +88,38 @@ describe('content release runtime', () => {
     });
   });
 
-  it('does not silently move an incompatible pinned thread to another release', () => {
-    const runtime = new ContentReleaseRuntime(
-      [entry('pinned', 'retired'), entry('newer', 'active')],
-      compatibilityPolicy,
-    );
+  it('fails closed instead of inventing a pinned-thread client compatibility verdict', () => {
+    const runtime = new ContentReleaseRuntime([
+      entry('pinned', 'retired'),
+      entry('newer', 'active'),
+    ]);
 
-    expect(() =>
-      runtime.assertPinnedClientCompatible('pinned', 'older-client'),
-    ).toThrowError(ContentReleaseRuntimeError);
-    expect(() =>
-      runtime.assertPinnedClientCompatible('pinned', 'older-client'),
-    ).toThrow(/cannot render pinned content release/u);
+    expectRuntimeCode(
+      () => runtime.assertPinnedClientCompatible('pinned', 'future-client'),
+      'COMPATIBILITY_AUTHORITY_UNAVAILABLE',
+    );
   });
 
-  it('fails closed when there is no active compatible release', () => {
-    const runtime = new ContentReleaseRuntime(
-      [entry('only-active', 'active')],
-      compatibilityPolicy,
+  it('does not use operational release ordering as a substitute for compatibility authority', () => {
+    const runtime = new ContentReleaseRuntime([entry('known', 'active')]);
+
+    expectRuntimeCode(
+      () =>
+        runtime.resolveForNewThread({
+          clientCapability: '0.0.1-dev',
+          orderedReleaseIds: ['known'],
+        }),
+      'COMPATIBILITY_AUTHORITY_UNAVAILABLE',
     );
-
-    expect(() =>
-      runtime.resolveForNewThread({
-        clientCapability: 'older-client',
-        orderedReleaseIds: ['only-active'],
-      }),
-    ).toThrow(/No active client-compatible content release/u);
-  });
-
-  it('rejects unknown and duplicate operational release ordering', () => {
-    const runtime = new ContentReleaseRuntime(
-      [entry('known', 'active')],
-      compatibilityPolicy,
-    );
-
-    expect(() =>
-      runtime.resolveForNewThread({
-        clientCapability: '0.0.1-dev',
-        orderedReleaseIds: ['unknown'],
-      }),
-    ).toThrow(/unknown release/u);
-    expect(() =>
-      runtime.resolveForNewThread({
-        clientCapability: '0.0.1-dev',
-        orderedReleaseIds: ['known', 'known'],
-      }),
-    ).toThrow(/duplicate release id/u);
   });
 
   it('rejects duplicate catalog release ids', () => {
     expect(
       () =>
-        new ContentReleaseRuntime(
-          [entry('duplicate', 'active'), entry('duplicate', 'retired')],
-          compatibilityPolicy,
-        ),
+        new ContentReleaseRuntime([
+          entry('duplicate', 'active'),
+          entry('duplicate', 'retired'),
+        ]),
     ).toThrow(/Duplicate content release id/u);
   });
 
@@ -156,18 +133,17 @@ describe('content release runtime', () => {
       },
     };
 
-    expect(
-      () => new ContentReleaseRuntime([tampered], compatibilityPolicy),
-    ).toThrow(/character content hash mismatch/u);
+    expect(() => new ContentReleaseRuntime([tampered])).toThrow(
+      /character content hash mismatch/u,
+    );
   });
 
-  it('requires the compatibility policy itself to be versioned', () => {
-    expect(
-      () =>
-        new ContentReleaseRuntime([entry('valid', 'active')], {
-          policyVersion: '   ',
-          supports: () => true,
-        }),
-    ).toThrow(/compatibility policy version/u);
+  it('rejects unknown pinned release ids without making a compatibility verdict', () => {
+    const runtime = new ContentReleaseRuntime([entry('known', 'active')]);
+
+    expectRuntimeCode(
+      () => runtime.resolvePinned('unknown'),
+      'UNKNOWN_RELEASE',
+    );
   });
 });
