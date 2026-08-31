@@ -6,13 +6,8 @@ on:
       - main
     paths:
       - 'supabase/migrations/**'
+      - '.github/workflows/supabase-production.yml'
   workflow_dispatch:
-    inputs:
-      bootstrap_history:
-        description: 'One-time repair of the legacy 0010 migration history before the first production push'
-        required: false
-        default: false
-        type: boolean
 
 permissions:
   contents: read
@@ -52,11 +47,27 @@ jobs:
       - name: Link production project
         run: supabase link --project-ref "$SUPABASE_PROJECT_ID"
 
-      - name: Show migration state before deploy
-        run: supabase migration list
+      - name: Detect legacy 0010 migration history
+        id: legacy-history
+        shell: bash
+        run: |
+          set +e
+          supabase migration list 2>&1 | tee /tmp/myeongha-migration-state.txt
+          list_status=${PIPESTATUS[0]}
+          set -e
 
-      - name: Bootstrap legacy 0010 migration history
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.bootstrap_history == true }}
+          if grep -q '20260830072444' /tmp/myeongha-migration-state.txt; then
+            echo 'repair_required=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'repair_required=false' >> "$GITHUB_OUTPUT"
+            if [ "$list_status" -ne 0 ]; then
+              echo 'Migration list failed without the known legacy 0010 history marker.'
+              exit "$list_status"
+            fi
+          fi
+
+      - name: Repair legacy 0010 migration history
+        if: ${{ steps.legacy-history.outputs.repair_required == 'true' }}
         shell: bash
         run: |
           supabase migration repair 20260830072444 --status reverted
