@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { validateIntegrationGrounding, validateRoundTwoOutput } from '../room-server.mjs';
-import { validateIntegrationSemanticEvolution } from './integration-semantic-evolution.mjs';
+import { validateIntegrationSemanticEvolution } from '../integration-semantic-evolution.mjs';
 
 const recordingDir = new URL('./.recordings/', import.meta.url);
 const caseArchiveDir = new URL('./.recordings/cases/', import.meta.url);
@@ -12,7 +12,8 @@ const retryFailureUrl = new URL('./.recordings/integration-retry.failed.json', i
 const runtimeFiles = [
   new URL('../room-server.mjs', import.meta.url),
   new URL('../room-server-core.mjs', import.meta.url),
-  new URL('./integration-semantic-evolution.mjs', import.meta.url),
+  new URL('../integration-semantic-runtime-gate.mjs', import.meta.url),
+  new URL('../integration-semantic-evolution.mjs', import.meta.url),
 ];
 
 function passes(validation) {
