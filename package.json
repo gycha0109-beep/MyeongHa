@@ -15,7 +15,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "build": "tsc -p tsconfig.build.json",
-    "check": "npm run typecheck && npm run test && npm run build"
+    "build:web": "node scripts/build-web-static.mjs",
+    "verify:deploy": "node scripts/verify-web-deployment.mjs",
+    "check": "npm run typecheck && npm run test && npm run build && npm run build:web && npm run verify:deploy"
   },
   "devDependencies": {
     "@types/node": "24.13.3",
