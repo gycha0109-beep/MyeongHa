@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "fr-data07c-provider-blind-annotation-packet-manifest-v1",
+  "packetRef": "frdata224-batch-a-annotation-v1",
+  "taskConstruct": "categorical_human_face_count_state",
+  "labelVocabulary": [
+    "zero_human_faces",
+    "one_human_face",
+    "multiple_human_faces",
+    "indeterminate"
+  ],
+  "instructions": [
+    "Inspect only the presented canonical image and choose exactly one label from labelVocabulary.",
+    "Do not infer or report identity, demographics, emotion, attractiveness, health, personality, or physiognomic meaning.",
+    "If the visible image does not support a reliable categorical human-face-count judgment, choose indeterminate."
+  ],
+  "items": [
+    {
+      "itemRef": "item-569ccfc84561411b9c5815967bacde64cc3c6d7f37a374d90004ff163bf91a49",
+      "assetPath": "assets/item-569ccfc84561411b9c5815967bacde64cc3c6d7f37a374d90004ff163bf91a49.jpg",
+      "mediaType": "image/jpeg"
+    },
+    {
+      "itemRef": "item-830a0839c606819e075bf5d0293b3b4af2f152d1d7c23b7ddde2abc5618176f2",
+      "assetPath": "assets/item-830a0839c606819e075bf5d0293b3b4af2f152d1d7c23b7ddde2abc5618176f2.jpg",
+      "mediaType": "image/jpeg"
+    },
+    {
+      "itemRef": "item-ca9422872cd1e0852aac88f357d274ff6b13c6f9cfc11723bfe5cd57aa1727b1",
+      "assetPath": "assets/item-ca9422872cd1e0852aac88f357d274ff6b13c6f9cfc11723bfe5cd57aa1727b1.jpg",
+      "mediaType": "image/jpeg"
+    }
+  ]
+}
