@@ -71,12 +71,17 @@ describe('MyeongHa immersive Character Room v1', () => {
     expect(css).toContain('url("home-plum-branch.svg")');
   });
 
-  it('hydrates only through same-origin runtime endpoints and never embeds Supabase credentials in the browser', async () => {
+  it('hydrates only through same-origin runtime endpoints and sends presentation keys, never inferred canonical ids', async () => {
     const transport = await readFile(transportPath, 'utf8');
 
     expect(transport).toContain("new URL('/api/chat/thread', window.location.origin)");
     expect(transport).toContain("fetch('/api/chat/turn'");
     expect(transport).toContain("credentials: 'same-origin'");
+    expect(transport).toContain("url.searchParams.set('presentationKey', characterKey)");
+    expect(transport).toContain('presentationKey: characterKey');
+    expect(transport).toContain('payload.presentationKey !== characterKey');
+    expect(transport).not.toContain("url.searchParams.set('character', characterKey)");
+    expect(transport).not.toContain('characterId: characterKey');
     expect(transport).not.toContain('supabase.co');
     expect(transport).not.toContain('sb_publishable_');
     expect(transport).not.toContain('service_role');
