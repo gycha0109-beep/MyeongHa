@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { integrationSemanticInstruction, validateIntegrationSemanticEvolution } from './integration-semantic-evolution.mjs';
+import { integrationSemanticInstruction, validateIntegrationSemanticEvolution } from '../integration-semantic-evolution.mjs';
 
 const meeting = {
   topic: 'Life Thread resurfacing. 가격·정확한 cooldown·DB schema는 확정하지 않는다.',
@@ -78,6 +78,13 @@ assert.throws(
 );
 
 const instruction = integrationSemanticInstruction();
+const runtimeSource = `회의 주제:\n${meeting.topic}\n\n[ACTUAL TRANSCRIPT]\n${meeting.messages.map((message) => `[${message.label} R${message.round}]\n${message.content}`).join('\n\n')}\n\n[INTEGRATION TASK]\nTranscript만 근거로 통합하십시오.\n\n${instruction}`;
+assert.doesNotThrow(() => validateIntegrationSemanticEvolution(runtimeSource, valid));
+assert.throws(
+  () => validateIntegrationSemanticEvolution(runtimeSource, inventedDuration),
+  /없는 정량 수치.*4주/,
+);
+
 assert.match(instruction, /현재 CONFLICT는 최신 stance만 비교/);
 assert.match(instruction, /\[Agent R1\]은 CONFLICT 현재 입장 근거로 쓰지 마십시오/);
 assert.match(instruction, /현재 R2끼리 실제로 양립하지 않을 때만 CONFLICT/);
@@ -86,4 +93,4 @@ assert.match(instruction, /R1에만 존재하는 요구를 \[Agent R2\]만으로
 assert.match(instruction, /transcript 또는 사용자 topic에 없는 정확한 기간·quota·threshold·가격·횟수·비율/);
 assert.match(instruction, /"4주"/);
 
-console.log('PASS Test F: current conflicts are R2-only, nested bullets are parsed, mixed-round claims are instructed precisely, and invented quantitative commitments are rejected');
+console.log('PASS Test F: production semantic gate uses transcript-only source, current conflicts are R2-only, and invented quantitative commitments are rejected');
