@@ -84,6 +84,14 @@ npm run dogfood:reading-boundary:live
 
 실행 결과는 Git에서 제외된 `test/.recordings/dogfood/reading-boundary.latest.json`에 저장됩니다. 실패하더라도 자동 재실행하지 말고 저장된 specialist output을 먼저 검토합니다.
 
+저장된 dogfood 결과는 추가 API 호출 없이 현재 validator로 다시 검증할 수 있습니다.
+
+```powershell
+npm run dogfood:reading-boundary:review
+```
+
+이 review는 Round 2 protocol, Integration grounding, semantic evolution을 다시 검사하고 Integration 결과만 재출력합니다.
+
 ## 6. Discord / n8n
 
 `bridge.mjs`와 `n8n-phase1-world.json`은 선택형 Discord 어댑터 초안입니다. 로컬 회의실 MVP가 검증된 뒤 Discord를 입력·출력 채널로 붙이고, n8n은 GitHub 기록·예약 실행·외부 자동화에 사용합니다.
