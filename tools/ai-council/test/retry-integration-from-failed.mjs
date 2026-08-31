@@ -1,5 +1,6 @@
 import 'dotenv/config';
-import { readFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
 import { integrationSemanticInstruction, validateIntegrationSemanticEvolution } from './integration-semantic-evolution.mjs';
 
 const configuredIntegrationTokens = Number(process.env.COUNCIL_INTEGRATION_MAX_OUTPUT_TOKENS || 0);
@@ -17,6 +18,7 @@ const {
 const { saveLiveRecording } = await import('./quality-recording.mjs');
 
 const failedRecordingUrl = new URL('./.recordings/live-quality.failed.json', import.meta.url);
+const retryFailureUrl = new URL('./.recordings/integration-retry.failed.json', import.meta.url);
 const requested = String(process.argv[2] || 'A').trim().toUpperCase();
 const failed = JSON.parse(await readFile(failedRecordingUrl, 'utf8'));
 const source = (failed.cases || []).find((item) => item.name.startsWith(`Test ${requested} `) || item.name.startsWith(`Test ${requested} —`));
@@ -34,6 +36,24 @@ if (meeting.messages.some((message) => message.agent === 'integration')) {
 const apiKey = process.env.OPENAI_API_KEY || '';
 if (!apiKey) throw new Error('OPENAI_API_KEY가 설정되지 않았습니다.');
 
+async function recordRetryFailure({ content = '', error, responseStatus = null, responseBody = null }) {
+  await mkdir(new URL('./.recordings/', import.meta.url), { recursive: true });
+  const payload = {
+    version: 1,
+    recordedAt: new Date().toISOString(),
+    case: source.name,
+    retryApiAttempts: getApiAttemptCount(),
+    totalApiAttempts: Number(source.meeting.apiAttempts || 0) + getApiAttemptCount(),
+    responseStatus,
+    validationError: String(error?.message || error || 'unknown retry failure'),
+    rejectedIntegration: content || null,
+    responseBody,
+    sourceMeeting: source.meeting,
+  };
+  await writeFile(retryFailureUrl, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
+  return fileURLToPath(retryFailureUrl);
+}
+
 meeting.status = 'running';
 meeting.error = null;
 resetApiAttemptCount();
@@ -45,7 +65,6 @@ const response = await fetch('https://api.openai.com/v1/responses', {
   body: JSON.stringify(payload),
 });
 const body = await response.json().catch(() => ({}));
-if (!response.ok) throw new Error(body.error?.message || `OpenAI HTTP ${response.status}`);
 
 const content = typeof body.output_text === 'string'
   ? body.output_text.trim()
@@ -57,25 +76,46 @@ const content = typeof body.output_text === 'string'
       .trim()
     : '');
 
-if (body.status === 'incomplete') {
-  throw new Error(`Integration retry incomplete. reason=${body.incomplete_details?.reason || 'unknown'}${content ? `\n[PARTIAL OUTPUT]\n${content}` : ''}`);
+let retryError = null;
+if (!response.ok) {
+  retryError = new Error(body.error?.message || `OpenAI HTTP ${response.status}`);
+} else if (body.status === 'incomplete') {
+  retryError = new Error(`Integration retry incomplete. reason=${body.incomplete_details?.reason || 'unknown'}`);
+} else {
+  try {
+    validateIntegrationGrounding(meeting, content);
+    validateIntegrationSemanticEvolution(meeting, content);
+  } catch (error) {
+    retryError = error;
+  }
 }
-validateIntegrationGrounding(meeting, content);
-validateIntegrationSemanticEvolution(meeting, content);
 
-meeting.messages.push({
-  agent: 'integration',
-  label: 'Integration',
-  content,
-  round: meeting.maxRounds + 1,
-});
-meeting.calls = 7;
-meeting.apiAttempts = Number(source.meeting.apiAttempts || 0) + getApiAttemptCount();
-meeting.status = 'completed';
-meeting.error = null;
+if (retryError) {
+  const failurePath = await recordRetryFailure({
+    content,
+    error: retryError,
+    responseStatus: response.status,
+    responseBody: response.ok ? null : body,
+  });
+  console.error(`Test ${requested}: status=failed retry_api_attempts=${getApiAttemptCount()} total_api_attempts=${Number(source.meeting.apiAttempts || 0) + getApiAttemptCount()} integration_grounding_or_semantic=FAIL error=${retryError.message}`);
+  if (content) console.error(`\n[REJECTED Integration / Round ${meeting.maxRounds + 1}]\n${content}`);
+  console.error(`\nretry_failure_recording=${failurePath}`);
+  process.exitCode = 1;
+} else {
+  meeting.messages.push({
+    agent: 'integration',
+    label: 'Integration',
+    content,
+    round: meeting.maxRounds + 1,
+  });
+  meeting.calls = 7;
+  meeting.apiAttempts = Number(source.meeting.apiAttempts || 0) + getApiAttemptCount();
+  meeting.status = 'completed';
+  meeting.error = null;
 
-const recordingPath = await saveLiveRecording([{ name: source.name, meeting }], true);
-console.log(`Test ${requested}: status=completed calls=7 retry_api_attempts=${getApiAttemptCount()} total_api_attempts=${meeting.apiAttempts} round2_protocol=PASS integration_grounding=PASS semantic_evolution=PASS`);
-console.log(`\n[Integration / Round ${meeting.maxRounds + 1}]\n${content}`);
-console.log(`\nrecording=${recordingPath}`);
-console.log('PASS: reused the six successful specialist outputs and paid only for the Integration retry.');
+  const recordingPath = await saveLiveRecording([{ name: source.name, meeting }], true);
+  console.log(`Test ${requested}: status=completed calls=7 retry_api_attempts=${getApiAttemptCount()} total_api_attempts=${meeting.apiAttempts} round2_protocol=PASS integration_grounding=PASS semantic_evolution=PASS`);
+  console.log(`\n[Integration / Round ${meeting.maxRounds + 1}]\n${content}`);
+  console.log(`\nrecording=${recordingPath}`);
+  console.log('PASS: reused the six successful specialist outputs and paid only for the Integration retry.');
+}
