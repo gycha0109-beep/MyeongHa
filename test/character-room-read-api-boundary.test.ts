@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   readCharacterRoomState,
+  readCharacterRoomStateByPresentationKey,
 } from '../apps/api/src/character-room-read.js';
+import type {
+  CharacterPresentationIdentityAuthorityPortV1,
+} from '../apps/api/src/character-presentation-resolver.js';
 import type {
   CharacterRelationshipReadAuthorityPortV1,
 } from '../apps/api/src/character-relationship-read.js';
@@ -86,6 +90,35 @@ describe('Character Room authoritative read composition', () => {
     expect(state.latestCharacterMessage?.bodyText).toBe(
       '어떤 결과까지 감당할 수 있는지부터 봅시다.',
     );
+  });
+
+  it('resolves the browser presentation key before reading canonical character state', async () => {
+    const identityAuthorityPort: CharacterPresentationIdentityAuthorityPortV1 = {
+      resolveCharacterIdentity: async ({ contentBundleId, presentationKey }) => [
+        {
+          presentationKey,
+          characterId: 'character-baekheon',
+          contentBundleId,
+        },
+      ],
+    };
+
+    const state = await readCharacterRoomStateByPresentationKey({
+      resolvedSubjectId: 'subject-1',
+      threadId: 'thread-1',
+      contentBundleId: 'bundle-active',
+      presentationKey: 'baekheon',
+      identityAuthorityPort,
+      streamAuthorityPort,
+      relationshipAuthorityPort,
+    });
+
+    expect(state.presentationKey).toBe('baekheon');
+    expect(state.characterId).toBe('character-baekheon');
+    expect(state.characterId).not.toBe(state.presentationKey);
+    expect(state.contentBundleId).toBe('bundle-active');
+    expect(state.latestCharacterMessage?.messageId).toBe('message-2');
+    expect(state.relationship?.characterId).toBe('character-baekheon');
   });
 
   it('does not synthesize a character message when the stored stream has none for that character', async () => {
