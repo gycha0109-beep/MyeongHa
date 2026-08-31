@@ -1,0 +1,88 @@
+name: Face Reading Independent Face Annotation Packet
+
+on:
+  pull_request:
+    paths:
+      - 'packages/face-reading/src/independent-face-annotation-packet-frdata07c.ts'
+      - 'packages/face-reading/src/index.ts'
+      - 'test/face-reading-frdata07c-independent-face-annotation-packet.test.ts'
+      - 'docs/FACE_READING_FRDATA07C_PROVIDER_BLIND_ANNOTATION_PACKET_V0.1.md'
+      - 'docs/FACE_READING_FRDATA07C_AUTHORITY_DECISION_V0.1.md'
+      - 'scripts/face-reading/prepare-frdata224-batch-a-annotation-packet.mjs'
+      - 'research-evidence/face-reading/frdata224/batch-a/annotation-packet-v1/**'
+      - 'research-evidence/face-reading/frdata224/batch-a/annotation-packet-v1-binding.json'
+      - '.github/workflows/face-reading-independent-face-annotation-packet.yml'
+      - '.github/workflows/face-reading-frdata224-batch-a-annotation-packet.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'packages/face-reading/src/independent-face-annotation-packet-frdata07c.ts'
+      - 'packages/face-reading/src/index.ts'
+      - 'test/face-reading-frdata07c-independent-face-annotation-packet.test.ts'
+      - 'docs/FACE_READING_FRDATA07C_PROVIDER_BLIND_ANNOTATION_PACKET_V0.1.md'
+      - 'docs/FACE_READING_FRDATA07C_AUTHORITY_DECISION_V0.1.md'
+      - 'scripts/face-reading/prepare-frdata224-batch-a-annotation-packet.mjs'
+      - 'research-evidence/face-reading/frdata224/batch-a/annotation-packet-v1/**'
+      - 'research-evidence/face-reading/frdata224/batch-a/annotation-packet-v1-binding.json'
+      - '.github/workflows/face-reading-independent-face-annotation-packet.yml'
+      - '.github/workflows/face-reading-frdata224-batch-a-annotation-packet.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  frdata07c-independent-face-annotation-packet:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install exact workspace dependencies
+        run: npm install --ignore-scripts
+      - name: Build MyeongHa runtime
+        run: npm run build
+      - name: Check packet generator syntax
+        run: node --check scripts/face-reading/prepare-frdata224-batch-a-annotation-packet.mjs
+      - name: Run FR-DATA-07C packet tests
+        run: npx vitest run test/face-reading-frdata07c-independent-face-annotation-packet.test.ts
+      - name: Verify frozen Batch-A annotation packet when present
+        run: |
+          if [ -f research-evidence/face-reading/frdata224/batch-a/annotation-packet-v1-binding.json ]; then
+            node scripts/face-reading/acquire-frdata224-batch-a.mjs verify-existing
+            node scripts/face-reading/prepare-frdata224-batch-a-annotation-packet.mjs verify-existing
+          fi
+      - name: Verify compiled FR-DATA-07C fail-closed authority
+        run: |
+          node --input-type=module <<'NODE'
+          import {
+            INDEPENDENT_FACE_ANNOTATION_PACKET_AUTHORITY_FRDATA07C,
+            assertIndependentFaceAnnotationPacketReadyForEmpiricalAdmissionFRData07C,
+            validateIndependentFaceAnnotationPacketAuthorityFRData07C,
+          } from './dist/packages/face-reading/src/index.js';
+
+          const authority = validateIndependentFaceAnnotationPacketAuthorityFRData07C();
+          if (authority !== INDEPENDENT_FACE_ANNOTATION_PACKET_AUTHORITY_FRDATA07C) process.exit(1);
+          if (authority.protocol.packetMayTransformCanonicalAssetBytes) process.exit(1);
+          if (authority.protocol.annotatorFacingSourceMetadataAllowed) process.exit(1);
+          if (authority.protocol.annotatorFacingPartitionAllowed) process.exit(1);
+          if (authority.protocol.annotatorFacingProviderEvidenceAllowed) process.exit(1);
+          if (authority.protocol.annotatorFacingSuggestedLabelAllowed) process.exit(1);
+          if (authority.protocol.annotatorFacingExistingAnnotationsAllowed) process.exit(1);
+          if (authority.protocol.minimumPacketItemsForEmpiricalAdmission !== null) process.exit(1);
+          if (authority.protocol.minimumIndependentAnnotatorsPerCapture !== null) process.exit(1);
+          if (authority.protocol.partitionAssignmentRule !== null) process.exit(1);
+          if (authority.protocol.humanAnnotationAcceptanceCriterion !== null) process.exit(1);
+          if (authority.protocol.empiricalAdmissionCriterion !== null) process.exit(1);
+          if (!Object.values(authority.authorityBoundary).every((value) => value === false)) process.exit(1);
+
+          let blocked = false;
+          try {
+            assertIndependentFaceAnnotationPacketReadyForEmpiricalAdmissionFRData07C();
+          } catch {
+            blocked = true;
+          }
+          if (!blocked) process.exit(1);
+          NODE
