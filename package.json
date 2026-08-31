@@ -17,7 +17,8 @@
     "build": "tsc -p tsconfig.build.json",
     "build:web": "node scripts/build-web-static.mjs",
     "verify:deploy": "node scripts/verify-web-deployment.mjs",
-    "check": "npm run typecheck && npm run test && npm run build && npm run build:web && npm run verify:deploy"
+    "verify:deploy:supabase": "node scripts/verify-supabase-deployment.mjs",
+    "check": "npm run typecheck && npm run test && npm run build && npm run build:web && npm run verify:deploy && npm run verify:deploy:supabase"
   },
   "devDependencies": {
     "@types/node": "24.13.3",
