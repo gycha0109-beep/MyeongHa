@@ -49,6 +49,7 @@ export function snapshotMeeting(meeting) {
     maxAgentCalls: meeting.maxAgentCalls,
     webSearch: Boolean(meeting.webSearch),
     calls: meeting.calls,
+    apiAttempts: Number(meeting.apiAttempts || 0),
     status: meeting.status,
     error: meeting.error ? String(meeting.error) : null,
     messages: (meeting.messages || []).map(({ agent, label, content, round }) => ({
@@ -66,27 +67,43 @@ export async function runtimeFingerprint() {
   return hash.digest('hex');
 }
 
+async function readRecording(url) {
+  try {
+    return JSON.parse(await readFile(url, 'utf8'));
+  } catch (error) {
+    if (error?.code === 'ENOENT') return null;
+    throw error;
+  }
+}
+
 export async function saveLiveRecording(results, passed) {
   await mkdir(recordingDir, { recursive: true });
   const target = passed ? latestRecordingUrl : failedRecordingUrl;
+  const fingerprint = await runtimeFingerprint();
+  let cases = results.map(({ name, meeting }) => ({
+    name,
+    meeting: snapshotMeeting(meeting),
+  }));
+
+  if (passed) {
+    const existing = await readRecording(latestRecordingUrl);
+    if (existing?.runtimeFingerprint === fingerprint) {
+      const merged = new Map((existing.cases || []).map((item) => [item.name, item]));
+      for (const item of cases) merged.set(item.name, item);
+      cases = [...merged.values()];
+    }
+  }
+
   const payload = {
     version: 1,
     recordedAt: new Date().toISOString(),
-    runtimeFingerprint: await runtimeFingerprint(),
-    cases: results.map(({ name, meeting }) => ({
-      name,
-      meeting: snapshotMeeting(meeting),
-    })),
+    runtimeFingerprint: fingerprint,
+    cases,
   };
   await writeFile(target, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
   return fileURLToPath(target);
 }
 
 export async function loadLatestRecording() {
-  try {
-    return JSON.parse(await readFile(latestRecordingUrl, 'utf8'));
-  } catch (error) {
-    if (error?.code === 'ENOENT') return null;
-    throw error;
-  }
+  return readRecording(latestRecordingUrl);
 }
