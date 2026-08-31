@@ -81,7 +81,9 @@ const instruction = integrationSemanticInstruction();
 assert.match(instruction, /현재 CONFLICT는 최신 stance만 비교/);
 assert.match(instruction, /\[Agent R1\]은 CONFLICT 현재 입장 근거로 쓰지 마십시오/);
 assert.match(instruction, /현재 R2끼리 실제로 양립하지 않을 때만 CONFLICT/);
+assert.match(instruction, /서로 다른 Round의 주장을 함께 요약하면 각 주장에 해당하는 실제 Round citation을 모두/);
+assert.match(instruction, /R1에만 존재하는 요구를 \[Agent R2\]만으로 인용/);
 assert.match(instruction, /transcript 또는 사용자 topic에 없는 정확한 기간·quota·threshold·가격·횟수·비율/);
 assert.match(instruction, /"4주"/);
 
-console.log('PASS Test F: current conflicts are R2-only, nested bullets are parsed, and invented quantitative commitments are rejected');
+console.log('PASS Test F: current conflicts are R2-only, nested bullets are parsed, mixed-round claims are instructed precisely, and invented quantitative commitments are rejected');
