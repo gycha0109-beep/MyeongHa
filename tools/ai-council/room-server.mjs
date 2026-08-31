@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import './integration-semantic-runtime-gate.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
