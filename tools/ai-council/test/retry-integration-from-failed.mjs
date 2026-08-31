@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { readFile } from 'node:fs/promises';
+import { integrationSemanticInstruction, validateIntegrationSemanticEvolution } from './integration-semantic-evolution.mjs';
 
 const configuredIntegrationTokens = Number(process.env.COUNCIL_INTEGRATION_MAX_OUTPUT_TOKENS || 0);
 if (!Number.isFinite(configuredIntegrationTokens) || configuredIntegrationTokens < 3000) {
@@ -37,6 +38,7 @@ meeting.status = 'running';
 meeting.error = null;
 resetApiAttemptCount();
 const payload = councilCore.buildResponsePayload(meeting, 'integration', meeting.maxRounds + 1);
+payload.input = `${payload.input}\n\n${integrationSemanticInstruction()}`;
 const response = await fetch('https://api.openai.com/v1/responses', {
   method: 'POST',
   headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
@@ -59,6 +61,7 @@ if (body.status === 'incomplete') {
   throw new Error(`Integration retry incomplete. reason=${body.incomplete_details?.reason || 'unknown'}${content ? `\n[PARTIAL OUTPUT]\n${content}` : ''}`);
 }
 validateIntegrationGrounding(meeting, content);
+validateIntegrationSemanticEvolution(meeting, content);
 
 meeting.messages.push({
   agent: 'integration',
@@ -72,7 +75,7 @@ meeting.status = 'completed';
 meeting.error = null;
 
 const recordingPath = await saveLiveRecording([{ name: source.name, meeting }], true);
-console.log(`Test ${requested}: status=completed calls=7 retry_api_attempts=${getApiAttemptCount()} total_api_attempts=${meeting.apiAttempts} round2_protocol=PASS integration_sections=PASS`);
+console.log(`Test ${requested}: status=completed calls=7 retry_api_attempts=${getApiAttemptCount()} total_api_attempts=${meeting.apiAttempts} round2_protocol=PASS integration_sections=PASS semantic_evolution=PASS`);
 console.log(`\n[Integration / Round ${meeting.maxRounds + 1}]\n${content}`);
 console.log(`\nrecording=${recordingPath}`);
 console.log('PASS: reused the six successful specialist outputs and paid only for the Integration retry.');
