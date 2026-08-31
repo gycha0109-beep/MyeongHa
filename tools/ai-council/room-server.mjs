@@ -48,8 +48,17 @@ function concreteCitations(value) {
   return [...String(value || '').matchAll(concreteCitationPattern)].map((match) => ({ label: match[1], round: Number(match[2]), raw: match[0] }));
 }
 
+function integrationCitationTokens(value) {
+  return [...String(value || '').matchAll(/\[(World|Revenue|Engineering)[^\]\r\n]*\]/gi)].map((match) => match[0]);
+}
+
 function isExactSentinel(value, sentinel) {
   return sectionCoreText(value).toUpperCase() === sentinel;
+}
+
+function integrationOutputLimit() {
+  const configured = Number(process.env.COUNCIL_INTEGRATION_MAX_OUTPUT_TOKENS || 0);
+  return Number.isFinite(configured) && configured > 0 ? configured : 3000;
 }
 
 function validateRoundTwoOutput(agentName, content) {
@@ -81,9 +90,24 @@ function validateIntegrationOutput(content) {
   if (missing.length) throw new Error(`Integration 응답에 필수 섹션이 없습니다: ${missing.join(', ')}`);
   const empty = integrationHeadings.filter((heading) => !sectionCoreText(sections[heading]));
   if (empty.length) throw new Error(`Integration 응답의 섹션 내용이 비었습니다: ${empty.join(', ')}`);
+
+  const malformedCitations = integrationCitationTokens(content).filter(
+    (token) => !/^\[(World|Revenue|Engineering)\s+R[12]\]$/i.test(token),
+  );
+  if (malformedCitations.length) {
+    throw new Error(`Integration 응답에 모호하거나 잘못된 citation이 있습니다: ${[...new Set(malformedCitations)].join(', ')}. [World R1]처럼 Agent와 Round를 하나씩 정확히 인용해야 합니다.`);
+  }
+
+  const nextLines = String(sections['NEXT TEST'] || '').split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
   const nextTest = sectionCoreText(sections['NEXT TEST']);
   if (nextTest === 'NOT RAISED IN TRANSCRIPT' || nextTest === 'NONE OBSERVED IN TRANSCRIPT' || nextTest.length < 8) {
-    throw new Error('Integration NEXT TEST는 제목이나 짧은 조각이 아니라 실행 가능한 다음 검증 bullet/문장이어야 합니다.');
+    throw new Error('Integration NEXT TEST는 제목이나 짧은 조각이 아니라 실행 가능한 다음 검증 bullet이어야 합니다.');
+  }
+  if (nextLines.some((line) => !/^[-*+]\s+\S/.test(line))) {
+    throw new Error('Integration NEXT TEST에는 bullet 외의 꼬리 텍스트나 형식 밖 문장을 둘 수 없습니다.');
+  }
+  if (nextLines.some((line) => sectionCoreText(line).length < 8)) {
+    throw new Error('Integration NEXT TEST의 각 bullet은 실행 가능한 완결 문장이어야 합니다.');
   }
   return sections;
 }
@@ -109,13 +133,14 @@ function availableRoundTwoSources(text, agentName) {
 function hardenInput(input, agentName) {
   let text = String(input || '').replace(/\[(World|Revenue|Engineering) \/ Round ([12])\]/g, '[$1 R$2]');
   text = text.replace(/`\[Agent R1\]`\s*또는\s*`\[Agent R2\]`/g, '`[World R1]`, `[Revenue R1]`, `[Engineering R1]` 등 실제 다른 Agent 출처');
+  text = text.replace(/\[(World|Revenue|Engineering) R1\/R2\]/g, '[$1 R1] 또는 [$1 R2]');
   if (text.includes('[ROUND 2 TASK]')) {
     const self = agentName ? agentName[0].toUpperCase() + agentName.slice(1) : 'Current';
     const allowedSources = availableRoundTwoSources(text, agentName);
     text += `\n\n[ROUND 2 SOURCE RULES — STRICT OUTPUT CONTRACT]\n허용 출처 토큰: ${allowedSources.length ? allowedSources.join(', ') : '(없음)'}\n- ACCEPT는 위 허용 출처 중 정확히 1개를 골라 그 Agent가 transcript에서 실제로 한 주장 1개만 수용하십시오. bullet의 첫 토큰을 반드시 해당 출처로 시작하고, ACCEPT 전체에서 대괄호 출처 토큰을 정확히 1번만 쓰십시오. [${self} R1]/[${self} R2] 자기 Agent 인용은 금지입니다.\n- OBJECT는 위 허용 출처 중 정확히 1개를 골라 실제 주장 1개만 반박/수정하십시오. 반박한다면 bullet의 첫 토큰을 반드시 해당 출처로 시작하고 OBJECT 전체에서 대괄호 출처 토큰을 정확히 1번만 쓰십시오. 실질적 반대가 없으면 bullet 전체를 정확히 \`- NO MATERIAL OBJECTION\`으로 작성하십시오.\n- [Agent R1], [Other Agent], [Specialist] 같은 익명 인용은 금지이며 transcript에 없는 출처나 집단 주장을 만들지 마십시오.\n- DELTA는 자기 Round 1 대비 실제 변경만 쓰고 없으면 bullet 전체를 정확히 \`- NO MATERIAL CHANGE\`로 작성하십시오. DELTA에는 출처 토큰을 반복하지 마십시오.\n- 출처를 설명문 뒤에 붙이지 말고 반드시 bullet 첫 토큰으로 쓰십시오. 같은 출처를 문장 안에서 다시 반복하지 마십시오.\n\n출력은 다른 문장이나 서론 없이 아래 골격만 사용하십시오.\nACCEPT\n- [허용된 다른 Agent 출처 1개] 실제 수용 주장과 이유\nOBJECT\n- [허용된 다른 Agent 출처 1개] 실제 반박 주장과 대안\nDELTA\n- 실제 변경 또는 NO MATERIAL CHANGE`;
   }
   if (text.includes('[INTEGRATION TASK]')) {
-    text += '\n\n[INTEGRATION COMPLETENESS RULE]\n8개 기본 섹션은 모두 실제 내용이 있어야 합니다. 근거가 없으면 NOT RAISED IN TRANSCRIPT를 사용할 수 있지만 NEXT TEST에는 사용할 수 없습니다. NEXT TEST는 제목이나 짧은 명사 조각이 아니라 실행 가능한 다음 검증 bullet/문장이어야 합니다.';
+    text += '\n\n[INTEGRATION STRICT OUTPUT CONTRACT]\n- citation은 반드시 [World R1], [World R2], [Revenue R1], [Revenue R2], [Engineering R1], [Engineering R2] 중 하나를 하나씩 사용하십시오. [Revenue R1/R2] 같은 slash 축약 citation은 금지입니다. 여러 Round가 근거면 [Revenue R1], [Revenue R2]처럼 각각 적으십시오.\n- 8개 기본 섹션은 모두 실제 내용이 있어야 합니다. 근거가 없으면 NOT RAISED IN TRANSCRIPT를 사용할 수 있지만 NEXT TEST에는 사용할 수 없습니다.\n- NEXT TEST의 모든 내용 줄은 반드시 `- `로 시작하는 실행 가능한 bullet이어야 합니다. 마지막 NEXT TEST bullet 뒤에는 ORIGIN, NOTE, 설명, 맺음말 등 어떤 추가 텍스트도 출력하지 마십시오.\n- 전체 답변은 NEXT TEST의 마지막 bullet에서 즉시 종료하십시오.';
   }
   return text;
 }
@@ -124,10 +149,7 @@ function hardenPayload(payload) {
   const next = { ...payload };
   const agentName = agentFromPayload(next);
   next.input = hardenInput(next.input, agentName);
-  if (agentName === 'integration') {
-    const configured = Number(process.env.COUNCIL_INTEGRATION_MAX_OUTPUT_TOKENS || process.env.COUNCIL_MAX_OUTPUT_TOKENS || 1500);
-    next.max_output_tokens = Number.isFinite(configured) && configured > 0 ? configured : 1500;
-  }
+  if (agentName === 'integration') next.max_output_tokens = integrationOutputLimit();
   return { payload: next, agentName };
 }
 
@@ -171,8 +193,7 @@ const core = await import('./room-server-core.mjs');
 if (isEntrypoint) process.argv[1] = originalArgv1;
 
 const agents = core.agents;
-const integrationConfigured = Number(process.env.COUNCIL_INTEGRATION_MAX_OUTPUT_TOKENS || process.env.COUNCIL_MAX_OUTPUT_TOKENS || 1500);
-agents.integration.maxOutputTokens = Number.isFinite(integrationConfigured) && integrationConfigured > 0 ? integrationConfigured : 1500;
+agents.integration.maxOutputTokens = integrationOutputLimit();
 
 function buildAgentInput(meeting, agentName, round) {
   return hardenInput(core.buildAgentInput(meeting, agentName, round), agentName);
