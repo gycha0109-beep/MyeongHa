@@ -25,6 +25,7 @@ const source = (failed.cases || []).find((item) => item.name.startsWith(`Test ${
 if (!source) throw new Error(`Failed recording does not contain Test ${requested}.`);
 
 const meeting = structuredClone(source.meeting);
+const sourceApiAttempts = Number(source.meeting.apiAttempts || 0);
 const specialists = meeting.messages.filter((message) => ['world', 'revenue', 'engineering'].includes(message.agent));
 const roundTwo = specialists.filter((message) => message.round === 2);
 if (roundTwo.length !== 3) throw new Error(`Test ${requested} failed recording does not contain all three Round 2 outputs.`);
@@ -42,8 +43,8 @@ async function recordRetryFailure({ content = '', error, responseStatus = null, 
     version: 1,
     recordedAt: new Date().toISOString(),
     case: source.name,
+    sourceApiAttempts,
     retryApiAttempts: getApiAttemptCount(),
-    totalApiAttempts: Number(source.meeting.apiAttempts || 0) + getApiAttemptCount(),
     responseStatus,
     validationError: String(error?.message || error || 'unknown retry failure'),
     rejectedIntegration: content || null,
@@ -97,7 +98,7 @@ if (retryError) {
     responseStatus: response.status,
     responseBody: response.ok ? null : body,
   });
-  console.error(`Test ${requested}: status=failed retry_api_attempts=${getApiAttemptCount()} total_api_attempts=${Number(source.meeting.apiAttempts || 0) + getApiAttemptCount()} integration_grounding_or_semantic=FAIL error=${retryError.message}`);
+  console.error(`Test ${requested}: status=failed source_api_attempts=${sourceApiAttempts} retry_api_attempts=${getApiAttemptCount()} integration_grounding_or_semantic=FAIL error=${retryError.message}`);
   if (content) console.error(`\n[REJECTED Integration / Round ${meeting.maxRounds + 1}]\n${content}`);
   console.error(`\nretry_failure_recording=${failurePath}`);
   process.exitCode = 1;
@@ -109,13 +110,13 @@ if (retryError) {
     round: meeting.maxRounds + 1,
   });
   meeting.calls = 7;
-  meeting.apiAttempts = Number(source.meeting.apiAttempts || 0) + getApiAttemptCount();
+  meeting.apiAttempts = sourceApiAttempts + getApiAttemptCount();
   meeting.status = 'completed';
   meeting.error = null;
 
   const recordingPath = await saveLiveRecording([{ name: source.name, meeting }], true);
-  console.log(`Test ${requested}: status=completed calls=7 retry_api_attempts=${getApiAttemptCount()} total_api_attempts=${meeting.apiAttempts} round2_protocol=PASS integration_grounding=PASS semantic_evolution=PASS`);
+  console.log(`Test ${requested}: status=completed calls=7 source_api_attempts=${sourceApiAttempts} retry_api_attempts=${getApiAttemptCount()} round2_protocol=PASS integration_grounding=PASS semantic_evolution=PASS`);
   console.log(`\n[Integration / Round ${meeting.maxRounds + 1}]\n${content}`);
   console.log(`\nrecording=${recordingPath}`);
-  console.log('PASS: reused the six successful specialist outputs and paid only for the Integration retry.');
+  console.log('PASS: reused the six successful specialist outputs and paid only for this Integration retry.');
 }
