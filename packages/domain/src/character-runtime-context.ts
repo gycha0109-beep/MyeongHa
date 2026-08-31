@@ -195,6 +195,16 @@ export interface CharacterSajuRuntimeContextV1 {
   readonly capability: CharacterCapabilityContent;
 }
 
+function assertDirectSajuContextAdmissionBoundary(
+  saju: Omit<CharacterSajuRuntimeContextV1, 'capability'> | undefined,
+): void {
+  if (saju === undefined) return;
+  if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') return;
+  throw new TypeError(
+    'Direct Saju context assembly is blocked outside development/test fixtures while SRC-09/SRC-33 authority is unresolved.',
+  );
+}
+
 export interface CharacterRendererPolicyV1 {
   readonly allowedEmotionIds: readonly string[];
   readonly allowedAnimationCueIds: readonly string[];
@@ -270,6 +280,7 @@ export function assembleCharacterRuntimeContext(input: {
   readonly recentMessages: readonly string[];
   readonly saju?: Omit<CharacterSajuRuntimeContextV1, 'capability'>;
 }): CharacterRuntimeContextV1 {
+  assertDirectSajuContextAdmissionBoundary(input.saju);
   requireAuthoredCharacter(input.character);
   const characterId = input.character.characterId;
   const contentBundleId = input.contentBundleId.trim();
