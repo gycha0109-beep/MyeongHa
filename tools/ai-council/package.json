@@ -6,8 +6,10 @@
     "start": "node bridge.mjs",
     "start:room": "node room-server.mjs",
     "check": "node --check bridge.mjs && node --check room-server.mjs",
-    "test:protocol": "node test/quality-protocol.mjs",
+    "test:protocol": "node test/quality-protocol.mjs && node test/quality-recording-protocol.mjs",
     "test": "npm run check && npm run test:protocol",
+    "test:quality:replay": "node test/replay-quality-cases.mjs",
+    "test:quality:offline": "npm test && npm run test:quality:replay",
     "test:quality:live": "node test/live-quality-cases.mjs"
   },
   "dependencies": {
