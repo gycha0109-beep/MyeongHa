@@ -42,6 +42,9 @@ function assertRoomState(payload) {
   if (typeof payload.threadId !== 'string' || payload.threadId !== threadId) {
     throw new Error('Character Room runtime returned a different thread identity.');
   }
+  if (payload.presentationKey !== characterKey) {
+    throw new Error('Character Room runtime returned a different presentation identity.');
+  }
   if (typeof payload.characterId !== 'string' || payload.characterId.trim().length === 0) {
     throw new Error('Character Room runtime did not return an authoritative character identity.');
   }
@@ -139,7 +142,7 @@ async function loadRoomState() {
     const url = new URL('/api/chat/thread', window.location.origin);
     url.searchParams.set('threadId', threadId);
     url.searchParams.set('afterSequenceNo', '0');
-    url.searchParams.set('character', characterKey);
+    url.searchParams.set('presentationKey', characterKey);
 
     const response = await fetch(url, {
       method: 'GET',
@@ -186,7 +189,7 @@ async function submitTurn(event) {
       },
       body: JSON.stringify({
         threadId,
-        character: characterKey,
+        presentationKey: characterKey,
         clientTurnId: crypto.randomUUID(),
         text: message.trim(),
         afterSequenceNo: lastSequenceNo,
