@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
 import { validateIntegrationOutput, validateRoundTwoOutput } from '../room-server.mjs';
 
 const recordingDir = new URL('./.recordings/', import.meta.url);
@@ -78,7 +79,7 @@ export async function saveLiveRecording(results, passed) {
     })),
   };
   await writeFile(target, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
-  return target.pathname;
+  return fileURLToPath(target);
 }
 
 export async function loadLatestRecording() {
