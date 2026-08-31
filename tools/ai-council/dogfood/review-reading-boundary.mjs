@@ -43,13 +43,20 @@ try {
   error = caught;
 }
 
-console.log(`${recording.name || 'Dogfood D1'}: recorded_at=${recording.recordedAt || 'unknown'} status=${meeting.status} calls=${meeting.calls} api_attempts=${meeting.apiAttempts} round2_protocol=${roundTwoPass ? 'PASS' : 'FAIL'} integration_grounding=${integrationGroundingPass ? 'PASS' : 'FAIL'} semantic_evolution=${semanticEvolutionPass ? 'PASS' : 'FAIL'}${error ? ` error=${error.message}` : ''}`);
+const roundOneIsolation = recording.roundOneIsolation === true;
+const decisionEvidence = roundOneIsolation
+  ? 'ISOLATED_R1_VALIDATION_PASS'
+  : 'LEGACY_ANCHORED_R1_NOT_ADOPTABLE';
+
+console.log(`${recording.name || 'Dogfood D1'}: recorded_at=${recording.recordedAt || 'unknown'} status=${meeting.status} calls=${meeting.calls} api_attempts=${meeting.apiAttempts} round_one_isolation=${roundOneIsolation ? 'YES' : 'NO'} decision_evidence=${decisionEvidence} round2_protocol=${roundTwoPass ? 'PASS' : 'FAIL'} integration_grounding=${integrationGroundingPass ? 'PASS' : 'FAIL'} semantic_evolution=${semanticEvolutionPass ? 'PASS' : 'FAIL'}${error ? ` error=${error.message}` : ''}`);
 
 const integration = meeting.messages.find((message) => message.agent === 'integration');
 if (integration) console.log(`\n[Integration / Round ${integration.round}]\n${integration.content}`);
 
 if (error || meeting.status !== 'completed' || meeting.calls !== 7) {
   process.exitCode = 1;
+} else if (!roundOneIsolation) {
+  console.log('\nVALIDATION PASS / DECISION EVIDENCE NOT ADOPTABLE: this recording predates isolated specialist Round 1. The output may be useful as an observed hypothesis, but do not promote it to product policy without a future isolated-R1 dogfood run. API calls=0.');
 } else {
-  console.log('\nPASS: saved dogfood output still satisfies the current Council validators; API calls=0.');
+  console.log('\nPASS: saved dogfood output satisfies the current Council validators and was generated with isolated specialist Round 1; API calls=0.');
 }
