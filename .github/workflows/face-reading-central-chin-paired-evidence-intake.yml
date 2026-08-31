@@ -1,0 +1,158 @@
+name: Face Reading Central Chin Paired Evidence Intake
+
+on:
+  pull_request:
+    paths:
+      - 'packages/face-reading/**'
+      - 'test/face-reading-fr56-central-chin-paired-evidence-intake.test.ts'
+      - 'docs/FACE_READING_FR56_CENTRAL_CHIN_PAIRED_EVIDENCE_INTAKE_V0.1.md'
+      - 'docs/FACE_READING_FR56_AUTHORITY_DECISION_V0.1.md'
+      - '.github/workflows/face-reading-central-chin-paired-evidence-intake.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'packages/face-reading/**'
+      - 'test/face-reading-fr56-central-chin-paired-evidence-intake.test.ts'
+      - 'docs/FACE_READING_FR56_CENTRAL_CHIN_PAIRED_EVIDENCE_INTAKE_V0.1.md'
+      - 'docs/FACE_READING_FR56_AUTHORITY_DECISION_V0.1.md'
+      - '.github/workflows/face-reading-central-chin-paired-evidence-intake.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  fr56-central-chin-paired-evidence-intake:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install exact workspace dependencies
+        run: npm install --ignore-scripts
+      - name: Build MyeongHa runtime
+        run: npm run build
+      - name: Run FR-56 paired evidence intake tests
+        run: npx vitest run test/face-reading-fr56-central-chin-paired-evidence-intake.test.ts
+      - name: Verify compiled FR-56 byte binding, source freeze, and fail-closed boundary
+        run: |
+          node --input-type=module <<'NODE'
+          import {
+            CENTRAL_CHIN_PAIRED_EVIDENCE_INTAKE_AUTHORITY_FR56,
+            assessCentralChinPairedEvidenceIntakeReadinessFR56,
+            buildCentralChinPairedEvidenceIntakeReportFR56,
+            computeCentralChinSourceAssetDigestFR56,
+            validateCentralChinPairedEvidenceIntakeAuthorityFR56,
+            verifyFrozenCentralChinPairedEvidenceRecordFR56,
+          } from './dist/packages/face-reading/src/index.js';
+
+          validateCentralChinPairedEvidenceIntakeAuthorityFR56();
+          const authority = CENTRAL_CHIN_PAIRED_EVIDENCE_INTAKE_AUTHORITY_FR56;
+          if (!authority.protocol.perAnnotationObservedAssetDigestRequired) process.exit(1);
+          if (!authority.protocol.exactObservedAssetDigestMatchRequired) process.exit(1);
+          if (authority.protocol.minimumPairs !== null) process.exit(1);
+          if (authority.protocol.minimumSubjects !== null) process.exit(1);
+          if (authority.protocol.distinctAnnotatorsRequired !== null) process.exit(1);
+          if (authority.protocol.membershipThreshold !== null) process.exit(1);
+          if (authority.protocol.endpointSelectionRule !== null) process.exit(1);
+          if (authority.protocol.empiricalAcceptanceCriterion !== null) process.exit(1);
+          if (!Object.values(authority.authorityBoundary).every((value) => value === false)) process.exit(1);
+
+          const assetBytes = new TextEncoder().encode('workflow-fr56-source-asset');
+          const canonicalAssetDigest = computeCentralChinSourceAssetDigestFR56(assetBytes);
+          const traceAnnotation = {
+            schemaVersion: 'fr54-provider-blind-central-chin-reference-trace-v1',
+            subjectId: 'workflow-fr56-subject',
+            captureId: 'workflow-fr56-capture',
+            annotatorId: 'workflow-fr56-trace',
+            coordinateFrame: 'normalized_image_2d',
+            captureView: 'frontal_en_face',
+            expression: 'neutral',
+            traceOrder: 'raw_annotator_draw_order',
+            tracePoints: [
+              { x: 0.30, y: 0.80 },
+              { x: 0.34, y: 0.82 },
+              { x: 0.50, y: 0.85 },
+              { x: 0.66, y: 0.82 },
+              { x: 0.70, y: 0.80 },
+            ],
+            mentonTracePointIndex: 2,
+            visibleCoverageOnBothSidesOfMentonAttested: true,
+            lateralExtentState: 'annotation_coverage_extent_non_authoritative',
+            providerOutputVisibleDuringTraceAnnotation: false,
+            traditionalLabelVisibleDuringTraceAnnotation: false,
+            mentonSideCandidateVisibleDuringTraceAnnotation: false,
+            softTissueMentalTubercleCandidateVisibleDuringTraceAnnotation: false,
+            traceFrozenBeforeCandidateAnnotationOrComparison: true,
+            fullLowerJawlineIntentionallyTraced: false,
+            gonionOrOtobasionUsedAsTraceEndpoint: false,
+            traceEndpointsAssertedAsFR35Endpoints: false,
+          };
+          const mentonSideAnnotation = {
+            schemaVersion: 'fr50-independent-central-chin-scaffold-v1',
+            subjectId: 'workflow-fr56-subject',
+            captureId: 'workflow-fr56-capture',
+            annotatorId: 'workflow-fr56-candidate',
+            coordinateFrame: 'normalized_image_2d',
+            leftCheilion: { x: 0.34, y: 0.61 },
+            leftMentonSide: { x: 0.34, y: 0.82 },
+            softTissueMenton: { x: 0.50, y: 0.84 },
+            rightMentonSide: { x: 0.66, y: 0.82 },
+            rightCheilion: { x: 0.66, y: 0.61 },
+            providerOutputVisibleDuringAnnotation: false,
+            annotationFrozenBeforeProviderScoring: true,
+            traditionalLabelVisibleDuringAnnotation: false,
+          };
+          const intake = {
+            schemaVersion: 'fr56-central-chin-paired-evidence-intake-v1',
+            pairRef: 'workflow-fr56-pair',
+            canonicalAssetDigest,
+            traceObservedAssetDigest: canonicalAssetDigest,
+            mentonSideObservedAssetDigest: canonicalAssetDigest,
+            traceAnnotation,
+            traceFrozenAt: '2026-08-31T01:00:00.000Z',
+            mentonSideAnnotation,
+            mentonSideAnnotationFrozenAt: '2026-08-31T01:05:00.000Z',
+            pairedAt: '2026-08-31T01:10:00.000Z',
+            traceFrozenBeforeCandidateAnnotationAttested: true,
+            pairingPerformedAfterBothAnnotationsFrozenAttested: true,
+          };
+
+          const report = buildCentralChinPairedEvidenceIntakeReportFR56(intake, assetBytes);
+          verifyFrozenCentralChinPairedEvidenceRecordFR56(report.record);
+          if (!report.record.assetDigestVerifiedAgainstProvidedBytes) process.exit(1);
+          if (!report.record.exactObservedAssetDigestMatchVerified) process.exit(1);
+          if (report.record.observedDigestBindingProofState !== 'annotation_declared_digests_match_intake_bytes_not_externally_attested_history') process.exit(1);
+          if (report.record.rawAssetBytesRetained) process.exit(1);
+          if (report.record.derivedJoinIncludedInPairedRecordDigest) process.exit(1);
+          if (report.rawJoin.membershipThreshold !== null || report.rawJoin.endpointSelectionRule !== null) process.exit(1);
+          if (report.rawJoin.leftCandidate.membershipDecision !== null || report.rawJoin.leftCandidate.endpointDecision !== null) process.exit(1);
+          if (report.empiricalScoringPerformed || report.endpointSelectionPerformed) process.exit(1);
+
+          let badObservedDigestBlocked = false;
+          try {
+            buildCentralChinPairedEvidenceIntakeReportFR56({
+              ...intake,
+              traceObservedAssetDigest: `sha256:${'0'.repeat(64)}`,
+            }, assetBytes);
+          } catch {
+            badObservedDigestBlocked = true;
+          }
+          if (!badObservedDigestBlocked) process.exit(1);
+
+          let badAssetBlocked = false;
+          try {
+            buildCentralChinPairedEvidenceIntakeReportFR56(intake, new TextEncoder().encode('wrong-asset'));
+          } catch {
+            badAssetBlocked = true;
+          }
+          if (!badAssetBlocked) process.exit(1);
+
+          const readiness = assessCentralChinPairedEvidenceIntakeReadinessFR56();
+          if (!readiness.pairedIntakeProtocolReady || !readiness.sourceAssetByteDigestVerificationReady) process.exit(1);
+          if (!readiness.perAnnotationObservedAssetDigestBindingReady) process.exit(1);
+          if (readiness.externalAnnotationAssetHistoryAttestationPresent) process.exit(1);
+          if (readiness.realPairedEvidenceDatasetPresent || readiness.empiricalValidationReady || readiness.productionGeometryReady) process.exit(1);
+          NODE
