@@ -26,8 +26,12 @@ function sourceHasRoundTwo(meeting, label) {
   return (meeting.messages || []).some((message) => message.agent === agent && message.round === 2);
 }
 
+function stripBullet(line) {
+  return String(line || '').trim().replace(/^[-*+]\s+/, '');
+}
+
 function conflictAgentLines(value) {
-  return String(value || '').split(/\r?\n/).map((line) => line.trim()).map((line) => {
+  return String(value || '').split(/\r?\n/).map((line) => stripBullet(line)).map((line) => {
     const match = line.match(/^(World|Revenue|Engineering)\s*:\s*(.+)$/i);
     if (!match) return null;
     const label = agentLabels.find((candidate) => candidate.toLowerCase() === match[1].toLowerCase());
