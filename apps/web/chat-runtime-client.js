@@ -42,6 +42,9 @@ function assertRoomState(payload) {
   if (typeof payload.threadId !== 'string' || payload.threadId !== threadId) {
     throw new Error('Character Room runtime returned a different thread identity.');
   }
+  if (typeof payload.characterId !== 'string' || payload.characterId.trim().length === 0) {
+    throw new Error('Character Room runtime did not return an authoritative character identity.');
+  }
   if (!Array.isArray(payload.messages)) {
     throw new Error('Character Room runtime did not return an authoritative message stream.');
   }
@@ -51,7 +54,7 @@ function assertRoomState(payload) {
   return payload;
 }
 
-function renderHistory(messages) {
+function renderHistory(messages, authoritativeCharacterId) {
   if (!historyList) return;
   historyList.replaceChildren();
 
@@ -80,7 +83,8 @@ function renderHistory(messages) {
     if (message.senderType === 'user') {
       strong.textContent = '나';
     } else if (message.senderType === 'character') {
-      strong.textContent = message.characterId ? characterName : '대리자';
+      strong.textContent =
+        message.characterId === authoritativeCharacterId ? characterName : '다른 대리자';
     } else {
       strong.textContent = '대화 기록';
     }
@@ -102,12 +106,13 @@ function renderHistory(messages) {
 function renderRoomState(payload) {
   const state = assertRoomState(payload);
   lastSequenceNo = state.lastSequenceNo;
-  renderHistory(state.messages);
+  renderHistory(state.messages, state.characterId);
 
   const latest = state.latestCharacterMessage;
   if (
     latest &&
     latest.redacted !== true &&
+    latest.characterId === state.characterId &&
     typeof latest.bodyText === 'string' &&
     latest.bodyText.trim().length > 0
   ) {
