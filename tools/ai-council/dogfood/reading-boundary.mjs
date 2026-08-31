@@ -56,11 +56,12 @@ function validateMeeting(meeting) {
   const roundTwo = meeting.messages.filter(
     (message) => message.round === 2 && ['world', 'revenue', 'engineering'].includes(message.agent),
   );
-  const integration = meeting.messages.find((message) => message.agent === 'integration');
-  const roundTwoPass = roundTwo.length === 3;
-  if (roundTwoPass) {
-    for (const message of roundTwo) validateRoundTwoOutput(message.agent, message.content);
+  if (roundTwo.length !== 3) {
+    throw new Error(`Dogfood meeting expected 3 Round 2 specialist outputs, got ${roundTwo.length}.`);
   }
+  for (const message of roundTwo) validateRoundTwoOutput(message.agent, message.content);
+
+  const integration = meeting.messages.find((message) => message.agent === 'integration');
   if (!integration) throw new Error('Dogfood meeting completed without an Integration message.');
   validateIntegrationGrounding(meeting, integration.content);
   validateIntegrationSemanticEvolution(meeting, integration.content);
