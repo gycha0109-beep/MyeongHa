@@ -17,6 +17,7 @@ const prompt = buildIntegrationInput(meeting);
 assert.match(prompt, /모든 실제 bullet\/block은 최소 1개의 구체 citation/);
 assert.match(prompt, /R1은 역사적 배경으로 함께 쓸 수 있지만 최신 입장의 단독 근거가 될 수 없습니다/);
 assert.match(prompt, /EVIDENCE \"transcript 원문에서 그대로 복사한 8자 이상 구절\"/);
+assert.match(prompt, /들여쓴 `- ` bullet을 붙여도 같은 conflict block으로 처리/);
 assert.match(prompt, /원문의 강도를 키우지 마십시오/);
 
 const base = `AGREED
@@ -40,6 +41,12 @@ NEXT TEST
 - level flag를 서버와 플랫폼 중 어디에 둘지 권한 검증 테스트를 수행한다. [Engineering R2]`;
 
 assert.doesNotThrow(() => validateIntegrationGrounding(meeting, base));
+
+const nestedConflictBullets = base
+  .replace('  Revenue: 플랫폼이 level 분기를 맡는다.', '  - Revenue: 플랫폼이 level 분기를 맡는다.')
+  .replace('  Engineering: 서버가 level flag를 보유한다.', '  - Engineering: 서버가 level flag를 보유한다.')
+  .replace('  Status: unresolved in Round 2', '  - Status: unresolved in Round 2');
+assert.doesNotThrow(() => validateIntegrationGrounding(meeting, nestedConflictBullets));
 
 const staleRoundOneConflict = base.replace(
   `CONFLICT
@@ -85,4 +92,4 @@ assert.throws(
   /DECISION CANDIDATE.*최소 1개의 구체 citation/,
 );
 
-console.log('PASS Test E: Integration latest stance, exact evidence, and named-agent attribution are transcript-grounded');
+console.log('PASS Test E: Integration latest stance, exact evidence, nested conflict bullets, and named-agent attribution are transcript-grounded');
