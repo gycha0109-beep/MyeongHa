@@ -1,10 +1,14 @@
 -- MyeongHa Reading transport persistence authority.
 --
--- Implements SERVER_COMMAND_TRANSACTION_SPEC §16 at the DB transaction boundary only.
+-- Implements SERVER_COMMAND_TRANSACTION_SPEC §17 at the DB transaction boundary only.
 -- The real Saju adapter/request mapping remains blocked by SRC-08 and MUST run outside
--- these transactions. ProductReadingResponse schema validation is an application-boundary
--- prerequisite; this migration persists only already-validated response provenance and
--- enforces DB-owned execution/input/ref invariants.
+-- these transactions. Source-approved ProductReadingResponse semantic validation is an
+-- application-boundary prerequisite and remains SRC-33 BLOCKED; this migration cannot
+-- establish that authority from transport success, JSON persistence, type/shape conformance,
+-- or hash/ref consistency. The success command is a lower-level persistence boundary for
+-- a trusted prevalidated canonical response only and enforces DB-owned execution/input/ref
+-- invariants. Until SRC-33 resolves, production callers MUST NOT pass provider/raw-engine
+-- response bodies directly; DB tests may use explicitly prevalidated canonical fixtures.
 --
 -- P0-AUTH-01 remains unresolved. SECURITY INVOKER is retained and PUBLIC EXECUTE is
 -- revoked until the API -> PostgreSQL execution identity is fixed.
