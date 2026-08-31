@@ -16,8 +16,8 @@ const base = `AGREED
 - summary 무료/detail 유료 분리를 수용한다. [World R2] [Revenue R2]
 CONFLICT
 - 논점: level flag authority
-  Revenue: 플랫폼이 level 분기를 맡는다. [Revenue R2]
-  Engineering: 서버가 level flag를 보유한다. [Engineering R2]
+  Revenue: 플랫폼이 level 분기를 맡는다. | EVIDENCE "level 분기는 플랫폼이 맡는다." [Revenue R2]
+  Engineering: 서버가 level flag를 보유한다. | EVIDENCE "level flag를 서버가 보유한다." [Engineering R2]
   Status: unresolved in Round 2
 REQUIREMENTS
 - 서버 authority를 유지한다. [Engineering R1]
@@ -37,13 +37,13 @@ assert.doesNotThrow(() => validateIntegrationGrounding(meeting, base));
 const staleRoundOneConflict = base.replace(
   `CONFLICT
 - 논점: level flag authority
-  Revenue: 플랫폼이 level 분기를 맡는다. [Revenue R2]
-  Engineering: 서버가 level flag를 보유한다. [Engineering R2]
+  Revenue: 플랫폼이 level 분기를 맡는다. | EVIDENCE "level 분기는 플랫폼이 맡는다." [Revenue R2]
+  Engineering: 서버가 level flag를 보유한다. | EVIDENCE "level flag를 서버가 보유한다." [Engineering R2]
   Status: unresolved in Round 2`,
   `CONFLICT
 - 논점: 유료 전환 요구 vs 무료 summary
-  World: summary 무료/detail 유료를 제안한다. [World R2]
-  Revenue: 반드시 유료 Artifact로만 연결해야 한다. [Revenue R1]
+  World: summary 무료/detail 유료를 제안한다. | EVIDENCE "summary 무료/detail 유료를 제안한다." [World R2]
+  Revenue: 반드시 유료 Artifact로만 연결해야 한다. | EVIDENCE "유료 전환 경로가 명확해야 한다." [Revenue R1]
   Status: partially resolved in Round 2`,
 );
 assert.throws(
@@ -60,4 +60,22 @@ assert.throws(
   /Engineering.*citation이 없습니다/,
 );
 
-console.log('PASS Test E: Integration latest stance and named-agent attribution are transcript-grounded');
+const inventedEvidence = base.replace(
+  'EVIDENCE "level 분기는 플랫폼이 맡는다." [Revenue R2]',
+  'EVIDENCE "서버는 절대로 level을 가져서는 안 된다." [Revenue R2]',
+);
+assert.throws(
+  () => validateIntegrationGrounding(meeting, inventedEvidence),
+  /Revenue EVIDENCE가 cited transcript 원문과 일치하지 않습니다/,
+);
+
+const ungroundedCandidate = base.replace(
+  '- level authority는 별도 결정이 필요하다. [Revenue R2] [Engineering R2]',
+  '- level authority는 별도 결정이 필요하다.',
+);
+assert.throws(
+  () => validateIntegrationGrounding(meeting, ungroundedCandidate),
+  /DECISION CANDIDATE.*최소 1개의 구체 citation/,
+);
+
+console.log('PASS Test E: Integration latest stance, exact evidence, and named-agent attribution are transcript-grounded');
