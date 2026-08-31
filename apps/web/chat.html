@@ -7,6 +7,7 @@
   <title>대화 · 명하</title>
   <link rel="stylesheet" href="product.css" />
   <link rel="stylesheet" href="chat-room.css" />
+  <link rel="stylesheet" href="chat-runtime.css" />
 </head>
 <body class="character-room" data-page="chat" data-character="baekheon">
   <header class="character-room-header">
@@ -41,10 +42,10 @@
       </div>
     </div>
 
-    <div class="character-room-context" data-context-pill>
+    <div class="character-room-context" data-context-pill hidden>
       <span class="character-room-context-mark" aria-hidden="true">◇</span>
       <span>이어진 이야기 · </span>
-      <strong data-context-title>퇴사를 고민했던 이야기</strong>
+      <strong data-context-title></strong>
     </div>
 
     <section class="character-dialogue-panel" aria-label="현재 대화">
@@ -53,7 +54,7 @@
           <h1 data-dialogue-name>백헌</h1>
           <span aria-hidden="true">✦</span>
         </div>
-        <p class="character-dialogue-line" data-dialogue-line>결정하지 못한 게 아닙니다.<br />어느 쪽의 책임을 질지, 아직 정하지 않은 거죠.</p>
+        <p class="character-dialogue-line" data-dialogue-line>이야기를 시작하죠.<br />지금 가장 먼저 꺼내고 싶은 것은 무엇입니까?</p>
       </div>
 
       <button class="character-continue-button" type="button" data-continue-context>
@@ -61,7 +62,7 @@
         <span aria-hidden="true">→</span>
       </button>
 
-      <form class="character-composer" data-composer>
+      <form class="character-composer" data-composer data-runtime-busy="false">
         <label class="sr-only" for="character-message">메시지</label>
         <textarea id="character-message" rows="1" placeholder="메시지를 입력하세요…" data-message-input></textarea>
         <button class="character-send-button" type="submit" aria-label="메시지 보내기">
@@ -82,18 +83,8 @@
       <button type="button" data-history-close aria-label="지난 대화 닫기">×</button>
     </div>
 
-    <div class="character-history-list" data-history-list>
-      <article class="history-entry">
-        <time datetime="2026-08-24">8월 24일</time>
-        <strong>퇴사를 고민했던 이야기</strong>
-        <p>남기로 결정했다고 이야기했습니다.</p>
-      </article>
-      <article class="history-entry">
-        <time datetime="2026-08-18">8월 18일</time>
-        <strong>선택을 미루고 있던 이유</strong>
-        <p>안정과 하고 싶은 일 사이의 고민을 나눴습니다.</p>
-      </article>
-    </div>
+    <div class="character-history-list" data-history-list></div>
+    <p class="history-runtime-empty" data-history-empty>이어갈 대화를 선택하면 지난 대화가 여기에 표시됩니다.</p>
   </aside>
 
   <div class="character-room-scrim" data-room-scrim hidden></div>
@@ -106,5 +97,6 @@
   </div>
 
   <script src="chat-character.js" defer></script>
+  <script src="chat-runtime-client.js" defer></script>
 </body>
 </html>
