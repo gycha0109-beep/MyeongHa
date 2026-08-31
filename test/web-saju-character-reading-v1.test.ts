@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest';
 
 const readingHtmlPath = new URL('../apps/web/reading.html', import.meta.url);
 const readingCssPath = new URL('../apps/web/reading-v3.css', import.meta.url);
+const readingScenesCssPath = new URL('../apps/web/reading-scenes.css', import.meta.url);
 const readingRuntimePath = new URL('../apps/web/reading-character.js', import.meta.url);
+const baekheonScenePath = new URL('../apps/web/baekheon-reading-scene.jpg', import.meta.url);
 
 describe('MyeongHa character-led Saju Reading v1', () => {
   it('uses the approved product shell and keeps Saju as the active destination', async () => {
@@ -11,6 +13,7 @@ describe('MyeongHa character-led Saju Reading v1', () => {
 
     expect(html).toContain('href="product.css"');
     expect(html).toContain('href="reading-v3.css"');
+    expect(html).toContain('href="reading-scenes.css"');
     expect(html).toContain('href="reading.html" aria-current="page"');
     expect(html).toContain('class="reading-stage"');
     expect(html).toContain('class="reader-scene"');
@@ -50,6 +53,7 @@ describe('MyeongHa character-led Saju Reading v1', () => {
 
     expect(runtime).toContain("params.get('character') || params.get('reader')");
     expect(runtime).toContain('root.dataset.reader = readerKey');
+    expect(runtime).toContain('data-reader-hanja');
   });
 
   it('keeps the reading as a fixed four-step progression with on-demand chart access', async () => {
@@ -86,5 +90,17 @@ describe('MyeongHa character-led Saju Reading v1', () => {
     expect(css).toContain('@media (max-width: 900px)');
     expect(css).toContain('grid-template-columns: 1fr;');
     expect(css).toContain('@media (max-width: 767px)');
+  });
+
+  it('ships Baekheon with an actual reading scene while leaving other characters asset-safe', async () => {
+    const [sceneCss, baekheonScene] = await Promise.all([
+      readFile(readingScenesCssPath, 'utf8'),
+      readFile(baekheonScenePath),
+    ]);
+
+    expect(sceneCss).toContain('body[data-reader="baekheon"] .reader-scene-art');
+    expect(sceneCss).toContain('url("baekheon-reading-scene.jpg")');
+    expect(sceneCss).toContain('other readers keep the shared');
+    expect(baekheonScene.byteLength).toBeGreaterThan(10_000);
   });
 });
