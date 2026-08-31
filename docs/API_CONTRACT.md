@@ -257,17 +257,39 @@ interface CreateReadingRequest {
 
 Server가 exact immutable revisions와 character participation/capability를 resolve한다. `SRC-08` 해결 전 real Saju adapter가 current public host에 second Birth snapshot을 소비한다고 가정하지 않는다. compatibility capability는 실제 Saju public contract/authority가 준비된 경우에만 available이다.
 
-### `POST /api/reading-sessions/:sessionId/clarifications`
+### `POST /api/reading-sessions/:sessionId/clarifications` — `SRC-33 BLOCKED`
 
-```ts
-interface SubmitClarificationRequest {
-  idempotencyKey: string;
-  expectedCurrentReadingId: string;
-  answers: ClarificationAnswerV1[];
-}
+이 route의 **relational command envelope**는 source-backed이지만, public request body의 positive validation contract는 아직 source-backed가 아니다.
+
+현재 확정 가능한 것은 다음뿐이다.
+
+```text
+logical clarification command identity
+→ idempotencyKey + expectedCurrentReadingId
+
+already-validated canonical clarification continuation
+→ same Reading Session에 새 immutable readings attempt append
+→ prior Reading을 parent로 pin
+→ transport retry와 분리
 ```
 
-새 `readings` clarification attempt를 append. transport retry와 구분.
+반면 다음은 `SRC-33` 해결 전 production-authoritative contract가 아니다.
+
+```text
+ClarificationAnswerV1 positive schema
+question/answer identifier grammar
+single/multi/free-text/structured answer representation
+question-to-answer correlation rule
+answer cardinality / duplicate / unknown-field handling
+null/absent/coercion/canonicalization rules
+clarification request hash material
+pending clarification contract-version compatibility
+validation-failure public error detail schema
+```
+
+따라서 기존 예시의 `answers: ClarificationAnswerV1[]`를 현재 executable request schema로 해석하지 않는다. `SRC-33` 해결 전 public route는 arbitrary JSON, UI example-derived body, caller-supplied free-form question/answer key를 받아 persistence command로 전달해서는 안 된다.
+
+`public.cmd_append_reading_clarification_v1(...)`는 **source-approved application validator가 이미 검증·canonicalize한 request snapshot/hash를 전달한다는 전제의 lower-level persistence/concurrency authority**다. DB command의 존재는 public input validation authority가 아니다.
 
 ### `POST /api/readings/:id/retry`
 동일 logical reading의 transient execution retry만 수행. semantic clarification을 생성하지 않는다.
@@ -276,6 +298,8 @@ interface SubmitClarificationRequest {
 Myeongha versioned Reading DTO + provenance summary. current birth revision mismatch 시 `stale=true`.
 
 DB의 raw `reading_refs.response_snapshot_jsonb`를 그대로 client에 serialize하지 않는다. Saju public response의 legacy/internal brand field, internal-only provenance 또는 향후 contract field가 Myeongha API contract를 우회하면 안 된다. Protected consumer blocks/disclosures는 explicit projection schema를 통해 전달한다.
+
+`ProductReadingResponse`의 complete positive validation contract 역시 `SRC-33` 해결 전 미확정이다. Transport success나 JSON 저장 성공만으로 provider/raw-engine body를 product-semantically validated response로 승격하지 않는다.
 
 ## 12. Share
 
@@ -529,6 +553,9 @@ For personal records, old/new schema compatibility cannot be inferred from the g
 - existing-Member merge-job current read + direct merged guest history authorization
 - full guest→existing-Member conflict/resolution/domain-action execution remains blocked until `SRC-24`
 - chat retry + abandon
+- reading clarification relational append/current-pointer/idempotency boundary with an already-validated canonical fixture remains independently testable
+- public clarification positive answer validation/correlation/canonicalization remains blocked until `SRC-33`
+- transport success cannot promote an invalid/unvalidated `ProductReadingResponse`; product-semantic response validation remains blocked until `SRC-33`
 - reading clarification + transient retry 구분
 - target-person create/read isolation + owned Target Birth revision append
 - post-create Target Person metadata mutation remains blocked until `SRC-28`

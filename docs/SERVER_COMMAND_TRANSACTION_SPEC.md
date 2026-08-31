@@ -364,7 +364,7 @@ lock user_episode_progress
 
 `SRC-17` 해결 전 scene graph/condition/choice evaluator가 필요한 실제 start/advance write authority는 final production command로 승격하지 않는다. Episode가 relationship state를 바꾸는 경우 그 side effect는 추가로 `SRC-22`가 필요하다. Episode reward가 concrete Character Unlock을 발생시키는 경우 추가로 `SRC-23`이 필요하다.
 
-## 16. Reading Session / Clarification
+## 16. Reading Session / Clarification — persistence skeleton; public input blocked by `SRC-33`
 
 Create session:
 
@@ -377,17 +377,35 @@ lock/resolve immutable current source/target Birth revisions
 → commit
 ```
 
-Clarification:
+Clarification has an application-layer prerequisite **before** the DB transaction:
 
 ```text
-lock reading_session
+exact prior ProductReadingResponse
++ incoming clarification body
+→ validate under source-approved versioned Product/Clarification contract
+→ prove question/answer correlation
+→ canonicalize the accepted continuation
+→ derive authoritative request snapshot/hash
+```
+
+That prerequisite is currently **`SRC-33 BLOCKED`**. Source does not yet define the complete positive `ProductReadingResponse` schema, `ClarificationAnswerV1` schema, correlation rules, canonicalization/hash semantics, contract-version compatibility, or validator failure contract.
+
+Therefore the following transaction is a lower-level persistence/concurrency boundary only. It is executable only when a trusted application boundary has already supplied an authoritative validated canonical continuation:
+
+```text
+validated canonical clarification request snapshot/hash
+→ lock reading_session
 → expectedCurrentReadingId
-→ validate prior ProductResponse requires clarification
+→ verify prior validated ProductResponse requires clarification
 → allocate next attempt_no
 → append new reading with parent=current
 → update current pointer as command policy defines
 → commit
 ```
+
+`public.cmd_append_reading_clarification_v1(...)` does not validate arbitrary public answer JSON and must not be called directly from a merely syntactically valid client request. DB persistence skeleton ≠ public input validation authority.
+
+Until `SRC-33` is resolved, `POST /api/reading-sessions/:sessionId/clarifications` remains fail-closed as a production public mutation surface. The relational clarification-chain, stale-current, idempotency, attempt allocation, parent linkage, and pointer invariants remain independently testable using an explicitly prevalidated canonical fixture.
 
 A completed Reading may become a future Character Unlock trigger according to UC-14 examples, but Reading completion provenance alone does not authorize a specific character unlock before `SRC-23` defines the mapping/condition.
 
@@ -407,6 +425,10 @@ lock reading + execution attempt
 → outbox
 → commit
 ```
+
+The `validate public Product contract` step above is an application-layer semantic prerequisite, not a property implied by transport success or JSON persistence. Its complete positive contract is also `SRC-33 BLOCKED`.
+
+Until `SRC-33` is resolved, transport execution-attempt lifecycle/provenance may be persisted and tested independently, but a provider/raw-engine response must not be promoted to a product-semantically validated `ProductReadingResponse` merely because the external call succeeded.
 
 Clarification response가 transport success라도 consumer semantic completion과 동일하지 않다.
 
@@ -568,6 +590,9 @@ Source가 Character Unlock 관련 downstream event/outbox schema를 아직 정�
 - `character_unlocks` relational status/timestamp/owner/source-FK/current-read invariants → testable now
 - Character Unlock condition→target/effect/replay/concurrency correctness → blocked until `SRC-23`
 - episode advance with unlock → requires `SRC-17` + `SRC-23` and any other applicable authority before both-or-neither atomicity can be asserted
+- Reading clarification lower-level append/current-pointer/idempotency/parent-link invariants → testable now with an explicitly prevalidated canonical fixture
+- public clarification answer schema/correlation/canonicalization/application validation → blocked until `SRC-33`
+- transport attempt persistence/provenance → independently testable; transport success alone cannot satisfy `ProductReadingResponse` semantic validation while `SRC-33` is open
 - Purchase Intent same-key concurrency → one logical intent
 - Purchase Intent replay does not depend on later offer availability
 - purchase provenance → grant target remains blocked until `SRC-18`
