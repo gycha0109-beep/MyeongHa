@@ -5,7 +5,7 @@
   "scripts": {
     "start": "node bridge.mjs",
     "start:room": "node room-server.mjs",
-    "check": "node --check bridge.mjs && node --check room-server.mjs && node --check integration-semantic-evolution.mjs && node --check integration-semantic-runtime-gate.mjs && node --check test/live-quality-cases.mjs && node --check test/retry-integration-from-failed.mjs && node --check test/recover-integration-fixture.mjs && node --check test/quality-validation-status.mjs && node --check test/integration-grounding-protocol.mjs && node --check test/integration-semantic-evolution-protocol.mjs && node --check test/integration-semantic-runtime-gate-protocol.mjs && node --check test/integration-output-normalizer.mjs && node --check test/integration-output-normalizer-protocol.mjs",
+    "check": "node --check bridge.mjs && node --check room-server.mjs && node --check integration-semantic-evolution.mjs && node --check integration-semantic-runtime-gate.mjs && node --check dogfood/reading-boundary.mjs && node --check test/live-quality-cases.mjs && node --check test/retry-integration-from-failed.mjs && node --check test/recover-integration-fixture.mjs && node --check test/quality-validation-status.mjs && node --check test/integration-grounding-protocol.mjs && node --check test/integration-semantic-evolution-protocol.mjs && node --check test/integration-semantic-runtime-gate-protocol.mjs && node --check test/integration-output-normalizer.mjs && node --check test/integration-output-normalizer-protocol.mjs",
     "test:protocol": "node test/quality-protocol.mjs && node test/quality-recording-protocol.mjs && node test/strict-round-two-protocol.mjs && node test/integration-grounding-protocol.mjs && node test/integration-semantic-evolution-protocol.mjs && node test/integration-semantic-runtime-gate-protocol.mjs && node test/integration-output-normalizer-protocol.mjs",
     "test": "npm run check && npm run test:protocol",
     "test:quality:replay": "node test/replay-quality-cases.mjs",
@@ -16,7 +16,9 @@
     "test:quality:live:b": "node test/live-quality-cases.mjs B",
     "test:quality:retry-integration:a": "node test/retry-integration-from-failed.mjs A",
     "test:quality:retry-integration:b": "node test/retry-integration-from-failed.mjs B",
-    "test:quality:recover-integration:a": "node test/recover-integration-fixture.mjs A"
+    "test:quality:recover-integration:a": "node test/recover-integration-fixture.mjs A",
+    "dogfood:reading-boundary": "node dogfood/reading-boundary.mjs",
+    "dogfood:reading-boundary:live": "node dogfood/reading-boundary.mjs --live"
   },
   "dependencies": {
     "discord.js": "14.27.0",
