@@ -1,8 +1,8 @@
-# 명하 Spec Pack — Source Authority Validation Report v0.11
+# 명하 Spec Pack — Source Authority Validation Report v0.12
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.11 Source Alignment**  
-> Date: **2026-08-30**  
+> Pack Version: **v0.12 Source Alignment**  
+> Date: **2026-08-31**  
 > Source Authority: `Usecase_re_reviewed_v2(1).md`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`, `Myeonghwa_Personalized_Interpretation_Architecture_v1.3_THIRD_REVIEW(1).md`  
 > Saju Public Contract Audit Pin: `gycha0109-beep/Saju@7102dc8fe8483c0875f6a093a4fd585b0df51f8b`
 
@@ -62,6 +62,7 @@ The Pack continues to preserve explicit blockers rather than converting ambiguit
 - Birth/Target deletion vs Reading provenance → `SRC-06`
 - Saju target-birth adapter → `SRC-08`
 - Saju grounding guard metadata → `SRC-09`
+- Saju Product response / clarification positive validation → `SRC-33`
 - record grant create/regrant → `SRC-10`
 - Episode current progress bundle selection → `SRC-11`
 - notification defaults/materialization → `SRC-12`
@@ -511,6 +512,37 @@ artifact/interface identity as Primary Source contract = NOT CLAIMED unless sour
 existing semantic gaps / P0                            = remain independently OPEN
 ```
 
+### 4.11 Saju Product response / clarification validation authority separated — `SRC-33`
+
+Primary Source fixes the Reading/Reading Session relational lifecycle, immutable provenance, and the requirement that stored Product responses and request projections be validated. It does **not** provide the complete closed positive application contract required to turn arbitrary response or clarification JSON into authoritative product data.
+
+Missing authority includes:
+
+```text
+complete versioned ProductReadingResponse positive schema
+state-specific required_action / clarification / ambiguity payload rules
+complete ClarificationAnswerV1 positive schema
+question-to-answer correlation identity
+cardinality / bounds / null-vs-absent / unknown-field behavior
+clarification canonicalization and request-hash material
+pending-contract version compatibility
+validator ownership and deterministic public failure mapping
+```
+
+Current baseline:
+
+```text
+Reading Session + logical attempt-1 persistence           = SOURCE-SAFE
+transport-attempt persistence                              = SOURCE-SAFE
+clarification-chain relational invariants                 = SOURCE-SAFE
+cmd_append_reading_clarification_v1 with prevalidated input = SOURCE-SAFE lower-level persistence
+exported TypeScript shape / fixture conformance            = INTEGRATION EVIDENCE ONLY
+transport body → authoritative Product semantic result     = BLOCKED by SRC-33
+public arbitrary clarification body → mutation             = BLOCKED by SRC-33
+```
+
+A successful transport, exported TypeScript shape match, JSON deserialization, or database `jsonb` slot is not a positive semantic validator. Likewise, the lower-level clarification command remains testable with an explicitly prevalidated canonical fixture, but its existence does not make the public clarification input contract source-complete.
+
 ## 5. Current Saju Public Contract Boundary
 
 Pinned public contract:
@@ -522,9 +554,31 @@ gycha0109-beep/Saju
 
 Current public boundary supports one Birth input plus reading text/optional target person reference and returns `ProductReadingResponse`.
 
-The Pack does not fabricate second-Birth compatibility input or semantic guard fields absent from the exported public contract. `SRC-08` and `SRC-09` remain the applicable blockers.
+The exported TypeScript shape and exact-contract fixture can prove host/integration conformance at the pinned version. They do **not** define the missing complete positive application-layer semantic validator for `ProductReadingResponse` or `ClarificationAnswerV1`.
+
+The Pack does not fabricate second-Birth compatibility input, semantic guard fields, or positive response/clarification validation rules absent from source. `SRC-08` governs host/request conformance, `SRC-09` governs downstream grounding/evidence metadata, and `SRC-33` governs product-response/clarification semantic validation. These remain distinct applicable blockers.
 
 ## 6. Source-Complete Validation Boundaries
+
+### Saju Reading with `SRC-33` open
+
+Source-complete verification may assert:
+
+- Reading Session + logical Reading attempt-1 creation and immutable Birth revision pinning;
+- Reading / Reading Session provenance reads and ownership isolation;
+- transient Saju transport-attempt persistence lifecycle;
+- clarification-chain relational parent/attempt/current-pointer invariants;
+- lower-level `cmd_append_reading_clarification_v1` persistence/concurrency behavior using an explicitly prevalidated canonical fixture;
+- exact pinned exported TypeScript shape/fixture conformance as integration evidence.
+
+It must **not** claim the following as source-complete before `SRC-33` resolution:
+
+- complete positive `ProductReadingResponse` semantic validation;
+- transport success or shape deserialization → authoritative product-semantic completion / `reading_ref` finalization;
+- complete positive `ClarificationAnswerV1` validation;
+- deterministic question/answer correlation, canonicalization, cardinality, bounds, or pending-version compatibility;
+- arbitrary client clarification JSON → public mutation;
+- unvalidated Saju Product response → protected Character grounding context.
 
 ### Existing-Member Guest merge with `SRC-24` open
 
@@ -660,6 +714,15 @@ Current production decisions include:
 | `P0-PR-01` | retention / backup / legal retention |
 | `P0-AUTH-01` | API→PostgreSQL execution identity / RLS enforcement model |
 
+Saju blockers compose independently:
+
+```text
+P0-SA-01 = which real Saju repository/transport deployment path is used
+SRC-08    = what public host/request contract can be called, including target/compatibility capability
+SRC-33    = how ProductReadingResponse / clarification bodies become validated authoritative product data
+SRC-09    = what grounding/evidence guard metadata is available after a valid Product response exists
+```
+
 Commerce blockers are independent layers:
 
 ```text
@@ -685,7 +748,7 @@ SRC-23 = additionally required if Character Unlock projection is transformed
 SRC-17 = additionally required where Episode transition/effect semantics are transformed
 ```
 
-Source-gap decisions `SRC-19`, `SRC-20`, `SRC-22`, `SRC-23`, `SRC-24`, and `SRC-30` are independent of infrastructure/provider P0 choices.
+Source-gap decisions `SRC-08`, `SRC-09`, `SRC-19`, `SRC-20`, `SRC-22`, `SRC-23`, `SRC-24`, `SRC-30`, and `SRC-33` are independent of infrastructure/provider P0 choices.
 
 ## 8. Promotion Gate
 
@@ -706,6 +769,18 @@ relevant source gap closed or affected behavior explicitly disabled
 Specific promotion boundaries:
 
 ```text
+real Saju transport integration
+→ P0-SA-01 + SRC-08 resolution + exact host/request conformance evidence
+
+Saju Product response semantic finalization
+→ SRC-33 resolution + positive/negative/versioned validator evidence
+
+public Reading clarification mutation
+→ SRC-33 resolution + correlation/canonicalization/idempotency/version-compatibility evidence
+
+Character Saju grounding from Product response
+→ SRC-33 + SRC-09 resolution + protected-context/Output-Guard evidence
+
 provider-independent entitlement event apply/recompute
 → SRC-21 resolution + transition/aggregation/concurrency evidence
 
@@ -751,4 +826,4 @@ FINAL PRODUCTION BASELINE = BLOCKED WHERE SOURCE/P0 REMAINS OPEN
 
 ### Final statement
 
-> Pack은 source authority를 구현 가능하게 구체화하는 문서이지 source에 없는 product semantics를 발명하는 authority가 아니다. 현재 commerce는 `SRC-18` Product→grant mapping과 `SRC-21` event→grant→logical-entitlement aggregation을 독립적으로 fail-closed 처리한다. `SRC-19`는 Device Installation registration lifecycle, `SRC-20`은 Share Artifact create/public projection lifecycle, `SRC-22`는 Relationship Event의 event→score/stage/anti-farming policy evaluator, `SRC-23`은 Character Unlock의 condition/World Event→target/effect evaluator, `SRC-24`는 existing-Member Guest merge의 conflict/resolution/domain-action/retry-resume policy, `SRC-30`은 transactional outbox publisher failure/retry/dead-letter/replay policy를 각각 차단한다. 이미 source-complete한 Purchase Intent, current stored Entitlement read, Device revoke, Share public-read/revoke, Relationship ledger/current-read, World Event/Character Unlock relational current-read, merge-job current read, direct merged guest history, 그리고 outbox enqueue/dedupe·pending claim·expired-processing lease reclaim·successful completion 경계는 이 blocker들과 독립적으로 유지한다. `UsagePolicyV1`, analytics registry storage/hash, experiment-assignment registry, content-policy-tag registry 같은 구현 artifact는 source가 그 artifact identity/schema/hash를 직접 정의하지 않은 경우 implementation reproducibility mechanism으로만 취급하며 source authority의 증거로 승격하지 않는다.
+> Pack은 source authority를 구현 가능하게 구체화하는 문서이지 source에 없는 product semantics를 발명하는 authority가 아니다. Saju에서는 `SRC-08` host/request conformance, `SRC-33` ProductResponse/clarification positive validation, `SRC-09` downstream grounding/evidence authority를 서로 다른 blocker로 유지하며, transport 성공이나 exported type/fixture conformance를 product-semantic validation으로 승격하지 않는다. 현재 commerce는 `SRC-18` Product→grant mapping과 `SRC-21` event→grant→logical-entitlement aggregation을 독립적으로 fail-closed 처리한다. `SRC-19`는 Device Installation registration lifecycle, `SRC-20`은 Share Artifact create/public projection lifecycle, `SRC-22`는 Relationship Event의 event→score/stage/anti-farming policy evaluator, `SRC-23`은 Character Unlock의 condition/World Event→target/effect evaluator, `SRC-24`는 existing-Member Guest merge의 conflict/resolution/domain-action/retry-resume policy, `SRC-30`은 transactional outbox publisher failure/retry/dead-letter/replay policy를 각각 차단한다. 이미 source-complete한 Reading Session/attempt persistence, transport-attempt persistence, lower-level prevalidated clarification persistence, Purchase Intent, current stored Entitlement read, Device revoke, Share public-read/revoke, Relationship ledger/current-read, World Event/Character Unlock relational current-read, merge-job current read, direct merged guest history, 그리고 outbox enqueue/dedupe·pending claim·expired-processing lease reclaim·successful completion 경계는 이 blocker들과 독립적으로 유지한다. `UsagePolicyV1`, analytics registry storage/hash, experiment-assignment registry, content-policy-tag registry 같은 구현 artifact는 source가 그 artifact identity/schema/hash를 직접 정의하지 않은 경우 implementation reproducibility mechanism으로만 취급하며 source authority의 증거로 승격하지 않는다.
