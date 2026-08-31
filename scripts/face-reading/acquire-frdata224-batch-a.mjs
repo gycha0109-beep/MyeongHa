@@ -10,6 +10,10 @@ const outputRoot = path.join(repoRoot, 'research-evidence/face-reading/frdata224
 const mode = process.argv[2] ?? 'acquire';
 const COMMONS_API = 'https://commons.wikimedia.org/w/api.php';
 const ALLOWED_ASSET_HOST = 'upload.wikimedia.org';
+const WIKIMEDIA_USER_AGENT = 'MyeongHa-FRData224Bot/0.1 (https://github.com/gycha0109-beep/MyeongHa)';
+const WIKIMEDIA_MAX_ATTEMPTS = 4;
+const WIKIMEDIA_MAX_RETRY_AFTER_MS = 5 * 60 * 1000;
+const WIKIMEDIA_RETRYABLE_STATUSES = new Set([429, 503]);
 
 const candidates = Object.freeze([
   Object.freeze({
@@ -94,6 +98,44 @@ function extmetadataValue(info, key) {
   return typeof value === 'string' && value.trim() ? value : null;
 }
 
+function sleep(milliseconds) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+function parseRetryAfterMilliseconds(value) {
+  if (value === null) return null;
+  const trimmed = value.trim();
+  if (/^\d+$/u.test(trimmed)) return Number.parseInt(trimmed, 10) * 1000;
+  const timestamp = Date.parse(trimmed);
+  if (Number.isNaN(timestamp)) return null;
+  return Math.max(0, timestamp - Date.now());
+}
+
+async function fetchWikimedia(url, options, label) {
+  for (let attempt = 1; attempt <= WIKIMEDIA_MAX_ATTEMPTS; attempt += 1) {
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        'User-Agent': WIKIMEDIA_USER_AGENT,
+        'Api-User-Agent': WIKIMEDIA_USER_AGENT,
+        ...(options?.headers ?? {}),
+      },
+    });
+    if (!WIKIMEDIA_RETRYABLE_STATUSES.has(response.status)) return response;
+    if (attempt === WIKIMEDIA_MAX_ATTEMPTS) {
+      fail(`${label} remained unavailable after ${WIKIMEDIA_MAX_ATTEMPTS} attempts: ${response.status}`);
+    }
+    const retryAfter = parseRetryAfterMilliseconds(response.headers.get('retry-after'));
+    const delay = retryAfter ?? (1000 * (2 ** (attempt - 1)));
+    if (delay > WIKIMEDIA_MAX_RETRY_AFTER_MS) {
+      fail(`${label} Retry-After exceeds governed retry budget: ${delay}ms`);
+    }
+    await response.body?.cancel();
+    await sleep(delay);
+  }
+  fail(`${label} retry loop exhausted unexpectedly`);
+}
+
 function assertExpectedRightsMetadata(candidate, info) {
   const shortName = info.licenseShortName;
   if (typeof shortName !== 'string' || shortName.trim().length === 0) {
@@ -130,7 +172,7 @@ async function commonsInfo(fileTitle) {
     rvlimit: '1',
     origin: '*',
   });
-  const response = await fetch(`${COMMONS_API}?${params.toString()}`, { redirect: 'error' });
+  const response = await fetchWikimedia(`${COMMONS_API}?${params.toString()}`, { redirect: 'error' }, `Commons API ${fileTitle}`);
   if (!response.ok) fail(`Commons API failed for ${fileTitle}: ${response.status}`);
   const payload = await response.json();
   const page = payload?.query?.pages?.[0];
@@ -173,9 +215,32 @@ async function commonsInfo(fileTitle) {
   };
 }
 
-async function downloadExact(url) {
-  const response = await fetch(url, { redirect: 'follow' });
-  if (!response.ok) fail(`source asset download failed: ${response.status}`);
+async function probeSourceAccess() {
+  const probed = [];
+  for (const candidate of candidates) {
+    const info = await commonsInfo(candidate.fileTitle);
+    assertExpectedRightsMetadata(candidate, info);
+    const response = await fetchWikimedia(info.sourceAssetUrl, {
+      redirect: 'follow',
+      headers: { Range: 'bytes=0-0' },
+    }, `source access probe ${candidate.captureRef}`);
+    if (!response.ok) fail(`source access probe failed for ${candidate.captureRef}: ${response.status}`);
+    const effective = new URL(response.url);
+    if (effective.protocol !== 'https:' || effective.hostname !== ALLOWED_ASSET_HOST) {
+      fail(`source access probe escaped pinned Wikimedia upload host for ${candidate.captureRef}: ${effective.href}`);
+    }
+    if (response.status !== 200 && response.status !== 206) {
+      fail(`source access probe returned unexpected status for ${candidate.captureRef}: ${response.status}`);
+    }
+    await response.body?.cancel();
+    probed.push({ captureRef: candidate.captureRef, status: response.status, expectedLicenseFamily: candidate.expectedLicenseFamily });
+  }
+  console.log(JSON.stringify({ status: 'FRDATA224_WIKIMEDIA_ACCESS_PROBE_PASS', assetCount: probed.length, assets: probed }));
+}
+
+async function downloadExact(url, captureRef) {
+  const response = await fetchWikimedia(url, { redirect: 'follow' }, `source asset download ${captureRef}`);
+  if (!response.ok) fail(`source asset download failed for ${captureRef}: ${response.status}`);
   const effective = new URL(response.url);
   if (effective.protocol !== 'https:' || effective.hostname !== ALLOWED_ASSET_HOST) {
     fail(`download escaped pinned Wikimedia upload host: ${effective.href}`);
@@ -196,7 +261,7 @@ async function acquire() {
   for (const candidate of candidates) {
     const info = await commonsInfo(candidate.fileTitle);
     assertExpectedRightsMetadata(candidate, info);
-    const { bytes, effectiveUrl } = await downloadExact(info.sourceAssetUrl);
+    const { bytes, effectiveUrl } = await downloadExact(info.sourceAssetUrl, candidate.captureRef);
     if (effectiveUrl !== info.sourceAssetUrl) fail(`effective asset URL changed after MediaWiki resolution for ${candidate.fileTitle}`);
     if (bytes.length !== info.byteLength) fail(`downloaded byte length mismatch for ${candidate.fileTitle}`);
     if (sha1(bytes) !== info.mediaWikiSha1) fail(`downloaded SHA-1 mismatch for ${candidate.fileTitle}`);
@@ -367,4 +432,5 @@ async function verifyExisting() {
 
 if (mode === 'acquire') await acquire();
 else if (mode === 'verify-existing') await verifyExisting();
+else if (mode === 'probe-access') await probeSourceAccess();
 else fail(`unsupported mode ${mode}`);
