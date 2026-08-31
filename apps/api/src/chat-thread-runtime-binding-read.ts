@@ -1,5 +1,8 @@
 import { ApiCommandError } from './chat-receive.js';
 
+export const CHAT_THREAD_RUNTIME_BINDING_READ_AUTHORITY_BINDING_V1 =
+  'public.qry_chat_thread_runtime_binding_v1' as const;
+
 export interface ChatThreadRuntimeBindingAuthorityRowV1 {
   readonly threadId: string;
   readonly status: string;
@@ -29,10 +32,9 @@ type Awaitable<T> = T | Promise<T>;
 /**
  * Trusted server-side read boundary for the runtime binding of one owned thread.
  *
- * The adapter must read authoritative thread ownership/status/content binding and
- * active participants from persistence. No SQL/RPC binding is named here because
- * the repository currently has no dedicated query for this projection and
- * P0-AUTH-01 remains unresolved.
+ * A production adapter may bind this port to
+ * `public.qry_chat_thread_runtime_binding_v1`. PostgreSQL execution identity is
+ * deliberately outside this contract while P0-AUTH-01 remains unresolved.
  */
 export interface ChatThreadRuntimeBindingReadAuthorityPortV1 {
   readRuntimeBinding(input: {
