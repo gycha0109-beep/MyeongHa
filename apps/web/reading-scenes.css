@@ -1,0 +1,21 @@
+body[data-reader="baekheon"] .reader-scene-art {
+  background:
+    linear-gradient(90deg, rgba(5, 8, 10, .58) 0%, rgba(8, 10, 12, .18) 48%, rgba(6, 8, 10, .46) 100%),
+    linear-gradient(180deg, rgba(8, 10, 12, .08) 0%, rgba(8, 10, 12, .16) 64%, rgba(7, 8, 9, .58) 100%),
+    url("baekheon-reading-scene.jpg") center 35% / cover no-repeat;
+}
+
+body[data-reader="baekheon"] .reader-silhouette {
+  opacity: 0;
+}
+
+body[data-reader="baekheon"] .reader-orbit {
+  opacity: .24;
+}
+
+body[data-reader="baekheon"] .reader-lamp {
+  opacity: .32;
+}
+
+/* Until an approved scene asset is assigned, other readers keep the shared
+   geometry and their own atmosphere palette from reading-v3.css. */
