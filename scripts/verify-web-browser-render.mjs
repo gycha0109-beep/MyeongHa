@@ -139,6 +139,34 @@ try {
   assert(!nav.errorText, `Hall navigation failed: ${nav.errorText}`);
   await waitForPage(client, '/hall.html', 'a.product-nav-link[href="reading.html"]');
 
+  const hallState = await client.evaluate(`(() => {
+    const inspect = (selector, minW, minH) => {
+      const el = document.querySelector(selector); if (!el) return { selector, exists: false };
+      const r = el.getBoundingClientRect(); const s = getComputedStyle(el);
+      return { selector, exists: true, width: Math.round(r.width), height: Math.round(r.height), display: s.display,
+        visibility: s.visibility, opacity: Number(s.opacity), visible: r.width >= minW && r.height >= minH && s.display !== 'none' && s.visibility !== 'hidden' && Number(s.opacity) > 0 };
+    };
+    return {
+      pathname: location.pathname,
+      bodyText: document.body.innerText,
+      styles: [...document.styleSheets].map((sheet) => sheet.href ? new URL(sheet.href).pathname : 'inline'),
+      elements: [inspect('.product-header', 100, 40), inspect('.home-today', 500, 250),
+        inspect('.home-thread', 260, 240), inspect('.home-topic-grid', 500, 70), inspect('.home-person', 500, 90)],
+    };
+  })()`);
+
+  assert(hallState.pathname === '/hall.html', `Expected /hall.html, got ${hallState.pathname}`);
+  for (const css of ['/product.css', '/home-v2.css', '/home-v3.css']) assert(hallState.styles.includes(css), `Home stylesheet not loaded: ${css}`);
+  for (const el of hallState.elements) {
+    assert(el.exists, `Missing browser-rendered Home element ${el.selector}`);
+    assert(el.visible, `Invisible Home element ${el.selector}: ${el.width}x${el.height}, ${el.display}/${el.visibility}/${el.opacity}`);
+  }
+  assert(hallState.bodyText.includes('오늘은 무엇을 읽어볼까요?'), 'Home title missing');
+  assert(hallState.bodyText.includes('오늘의 흐름을') && hallState.bodyText.includes('오늘 읽어보기'), 'Home primary Reading entry missing');
+  assert(hallState.bodyText.includes('지금은 저장된 사실을 이야기로 추측해 이어 붙이지 않습니다.'), 'Home Life Thread non-inference boundary missing');
+  assert(hallState.bodyText.includes('캐릭터와 이야기하기') && hallState.bodyText.includes('대화 시작하기'), 'Home character entry missing');
+  await artifact(client, '-home');
+
   const hallVisible = await client.evaluate(`(() => {
     const el = document.querySelector('a.product-nav-link[href="reading.html"]');
     const r = el.getBoundingClientRect(); const s = getComputedStyle(el);
@@ -182,7 +210,7 @@ try {
   const advanced = await client.evaluate(`(() => { document.querySelector('[data-reading-next]').click(); return document.querySelector('[data-reading-progress-label]').textContent.trim(); })()`);
   assert(advanced === '읽기 2 / 4', `Reading runtime did not advance: ${advanced}`);
   await artifact(client);
-  console.log(JSON.stringify({ status: 'MyeongHa_WEB_BROWSER_RENDER_PASS', pathname: state.pathname, scope: state.scope, rendered: state.elements }));
+  console.log(JSON.stringify({ status: 'MyeongHa_WEB_BROWSER_RENDER_PASS', home: hallState.elements, pathname: state.pathname, scope: state.scope, rendered: state.elements }));
 } catch (error) {
   if (client) { try { await artifact(client, '-failure'); } catch {} }
   if (chromeError.trim()) console.error(chromeError.trim());
