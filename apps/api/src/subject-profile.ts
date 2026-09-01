@@ -52,16 +52,18 @@ export class SubjectProfileAuthorityPortErrorV1 extends Error {
 
 type Awaitable<T> = T | Promise<T>;
 
-/**
- * Port for the already-verified PostgreSQL profile authorities.
- *
- * A production adapter may bind these methods to
- * `qry_subject_profile_current_v1` and `cmd_patch_profile_v1`, but the
- * PostgreSQL execution identity remains outside this contract while
- * P0-AUTH-01 is unresolved.
- */
-export interface SubjectProfileAuthorityPortV1 {
+/** Read-only port for the verified current Subject/Profile projection. */
+export interface SubjectProfileReadAuthorityPortV1 {
   readCurrent(subjectId: string): Awaitable<CurrentSubjectProfileAuthorityRowV1>;
+}
+
+/**
+ * Full Subject/Profile authority port.
+ *
+ * Production adapters bind these operations to the already-verified PostgreSQL
+ * authorities under the transaction-scoped canonical subject execution model.
+ */
+export interface SubjectProfileAuthorityPortV1 extends SubjectProfileReadAuthorityPortV1 {
   patchCurrent(input: {
     readonly subjectId: string;
     readonly expectedUpdatedAt: string | null;
@@ -91,7 +93,7 @@ export interface PatchCurrentSubjectProfileInputV1 {
 
 export interface GetCurrentSubjectProfileInputV1 {
   readonly resolvedSubjectId?: string;
-  readonly authorityPort: SubjectProfileAuthorityPortV1;
+  readonly authorityPort: SubjectProfileReadAuthorityPortV1;
 }
 
 function requireResolvedSubjectId(value: string | undefined): string {
