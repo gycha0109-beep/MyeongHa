@@ -1,4 +1,4 @@
-import { ApiCommandError } from './chat-receive.js';
+import { ApiCommandError } from './api-error.js';
 
 export const CHAT_TURN_RETRY_AUTHORITY_BINDING_V1 =
   'public.cmd_retry_chat_turn_attempt_v1' as const;
