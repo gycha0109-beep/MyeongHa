@@ -43,7 +43,7 @@ describe('web shared API envelope', () => {
     ).toThrow(WebApiEnvelopeError);
   });
 
-  it('reads only a non-blank public error code from a valid error envelope shape', () => {
+  it('reads only a public code from a complete error envelope', () => {
     expect(
       readApiErrorCode({
         ok: false,
@@ -51,7 +51,29 @@ describe('web shared API envelope', () => {
         meta: { apiContractVersion: 'v0.9', requestId: 'req-123' },
       }),
     ).toBe('INVALID_REQUEST');
-    expect(readApiErrorCode({ ok: false, error: { code: '' } })).toBeNull();
+  });
+
+  it('fails closed on partial or malformed error envelopes', () => {
+    expect(
+      readApiErrorCode({
+        ok: false,
+        error: { code: 'INVALID_REQUEST', messageKey: 'invalid.request', retryable: false },
+      }),
+    ).toBeNull();
+    expect(
+      readApiErrorCode({
+        ok: false,
+        error: { code: 'INVALID_REQUEST', retryable: false },
+        meta: { apiContractVersion: 'v0.9', requestId: 'req-123' },
+      }),
+    ).toBeNull();
+    expect(
+      readApiErrorCode({
+        ok: false,
+        error: { code: 'INVALID_REQUEST', messageKey: 'invalid.request', retryable: 'no' },
+        meta: { apiContractVersion: 'v0.9', requestId: 'req-123' },
+      }),
+    ).toBeNull();
     expect(readApiErrorCode({ ok: true, data: {} })).toBeNull();
   });
 });
