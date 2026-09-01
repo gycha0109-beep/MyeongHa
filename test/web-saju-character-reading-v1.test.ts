@@ -56,6 +56,15 @@ describe('MyeongHa character-led Saju Reading v1', () => {
     expect(runtime).toContain('data-reader-hanja');
   });
 
+  it('keeps reading scope state separate from the rendered scope hook so runtime cannot replace the document body', async () => {
+    const runtime = await readFile(readingRuntimePath, 'utf8');
+
+    expect(runtime).toContain('root.dataset.readingScopeKey = requestedScope');
+    expect(runtime).not.toContain('root.dataset.readingScope = requestedScope');
+    expect(runtime).toContain("document.querySelectorAll('.reading-scope[data-reading-scope]')");
+    expect(runtime).not.toContain("document.querySelectorAll('[data-reading-scope]')");
+  });
+
   it('keeps the reading as a fixed four-step progression with on-demand chart access', async () => {
     const [html, runtime] = await Promise.all([
       readFile(readingHtmlPath, 'utf8'),

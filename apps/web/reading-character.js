@@ -166,7 +166,7 @@ const currentYear = new Date().getFullYear();
 
 const root = document.body;
 root.dataset.reader = readerKey;
-root.dataset.readingScope = requestedScope;
+root.dataset.readingScopeKey = requestedScope;
 
 document.querySelectorAll('[data-reader-name]').forEach((element) => { element.textContent = reader.name; });
 document.querySelectorAll('[data-reader-title]').forEach((element) => {
@@ -178,7 +178,7 @@ document.querySelectorAll('[data-reader-hanja]').forEach((element) => {
   element.textContent = reader.hanja;
   element.hidden = !reader.hanja;
 });
-document.querySelectorAll('[data-reading-scope]').forEach((element) => {
+document.querySelectorAll('.reading-scope[data-reading-scope]').forEach((element) => {
   element.textContent = scopeName === '올해' ? `${currentYear}년 · 올해` : scopeName;
 });
 
