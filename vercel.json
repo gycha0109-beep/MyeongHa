@@ -10,6 +10,23 @@
       "main": true
     }
   },
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "header",
+          "key": "host",
+          "value": {
+            "pre": "myeongha-",
+            "suf": "-johnny-self.vercel.app"
+          }
+        }
+      ],
+      "destination": "https://myeongha.vercel.app/:path*",
+      "permanent": false
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",
