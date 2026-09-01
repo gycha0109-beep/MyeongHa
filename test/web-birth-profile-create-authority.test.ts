@@ -61,6 +61,13 @@ describe('web Birth Profile create authority boundary', () => {
     expect(page).toContain("? sexValue : null");
   });
 
+  it('unwraps only the shared success envelope and reads public error codes from the error envelope', () => {
+    expect(client).toContain("from './api-envelope.js'");
+    expect(client).toContain('unwrapApiSuccessEnvelope(envelope)');
+    expect(client).toContain('readApiErrorCode(payload)');
+    expect(client).toContain('WebApiEnvelopeError');
+  });
+
   it('fails closed unless the server returns revision 1 with server-owned identities', () => {
     expect(client).toContain('WEB_BIRTH_SESSION_REQUIRED');
     expect(client).toContain('WEB_BIRTH_INVALID_REQUEST');
