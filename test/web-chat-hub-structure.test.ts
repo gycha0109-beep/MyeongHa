@@ -81,6 +81,17 @@ describe('MyeongHa conversation hub v1', () => {
     expect(records).toContain('href="chat-hub.html">대화</a>');
   });
 
+  it('keeps My as the fifth active destination instead of falling back to Records', async () => {
+    const html = await readFile(hubHtmlPath, 'utf8');
+
+    expect(html).toContain('class="product-nav-link" href="my.html">마이</a>');
+    expect(html).toContain('class="product-profile" href="my.html" aria-label="내 프로필"');
+    expect(html).toContain('<span>마이</span>');
+    expect(html).toContain('class="mobile-nav-link" href="my.html"');
+    expect(html).not.toContain('href="#" aria-disabled="true">마이</a>');
+    expect(html).not.toContain('class="product-profile" href="records.html" aria-label="내 기록"');
+  });
+
   it('uses the shared MyeongHa product shell while giving the hub its own relationship and discovery surfaces', async () => {
     const [html, css] = await Promise.all([
       readFile(hubHtmlPath, 'utf8'),
