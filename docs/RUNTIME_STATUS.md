@@ -21,6 +21,8 @@
 
 `npm run check` validates repository-local typechecking, tests, builds, static web output, and deployment-configuration contracts. It does **not** by itself prove that a remote Vercel API runtime exists or that the current Supabase production schema matches this repository.
 
+`npm run verify:production:api` performs a networked remote check against the canonical production health endpoint by default. It is intentionally excluded from `npm run check` so repository CI does not depend on production availability. `MYEONGHA_PRODUCTION_ORIGIN` may override the origin for an explicit remote target.
+
 Remote production state requires separate production checks. The current Integration Spine production evidence is:
 
 ```text
