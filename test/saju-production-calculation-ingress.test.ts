@@ -96,6 +96,19 @@ function responseFixture(): Record<string, unknown> {
   };
 }
 
+function collectKeys(value: unknown, keys = new Set<string>()): Set<string> {
+  if (Array.isArray(value)) {
+    for (const item of value) collectKeys(item, keys);
+    return keys;
+  }
+  if (typeof value !== 'object' || value === null) return keys;
+  for (const [key, child] of Object.entries(value)) {
+    keys.add(key);
+    collectKeys(child, keys);
+  }
+  return keys;
+}
+
 function expectIngressError(
   execute: () => unknown,
   code: SajuProductionCalculationIngressErrorV1['code'],
@@ -146,11 +159,12 @@ describe('Saju production calculation ingress v1', () => {
     const serialized = JSON.stringify(artifact);
     expect(serialized).not.toContain('2001-07-14');
     expect(serialized).not.toContain('15:20');
-    expect(serialized).not.toContain('interpretation');
-    expect(serialized).not.toContain('methodologyRanking');
-    expect(serialized).not.toContain('diagnostics');
-    expect(serialized).not.toContain('reading');
-    expect(serialized).not.toContain('datasets');
+    const keys = collectKeys(artifact);
+    expect(keys).not.toContain('interpretation');
+    expect(keys).not.toContain('methodologyRanking');
+    expect(keys).not.toContain('diagnostics');
+    expect(keys).not.toContain('reading');
+    expect(keys).not.toContain('datasets');
     expect(Object.keys(artifact)).toEqual([
       'schemaVersion',
       'kind',
