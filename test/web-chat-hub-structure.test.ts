@@ -43,26 +43,15 @@ describe('MyeongHa conversation hub v1', () => {
     expect(js).toContain('setIncoming([])');
   });
 
-  it('supports the current nine-person presentation roster without turning the main hub into a fixed nine-card wall', async () => {
+  it('keeps discovery searchable and pageable without freezing a concrete roster as an architectural invariant', async () => {
     const js = await readFile(hubJsPath, 'utf8');
-
-    for (const key of [
-      'seyeon',
-      'baekheon',
-      'yeoul',
-      'seorin',
-      'rahyeon',
-      'mira',
-      'taegyeom',
-      'yunho',
-      'doyoon',
-    ]) {
-      expect(js).toContain(`key: '${key}'`);
-    }
 
     expect(js).toContain('const PAGE_SIZE = 6');
     expect(js).toContain('data-people-search');
     expect(js).toContain('visibleCount + PAGE_SIZE');
+    expect(js).toContain('safePresentationKey');
+    expect(js).toContain('encodeURIComponent(safeKey)');
+    expect(js).not.toContain('characterId:');
   });
 
   it('keeps character rooms as focused destinations and routes global conversation entries through the hub', async () => {
