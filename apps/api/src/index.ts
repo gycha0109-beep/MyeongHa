@@ -251,6 +251,17 @@ export {
 } from './character-catalog-read.js';
 
 export {
+  CharacterDetailContentAuthorityPortErrorV1,
+  readCharacterDetailForResolvedBundle,
+  type CharacterDetailContentAuthorityFailureCodeV1,
+  type CharacterDetailContentAuthorityPortV1,
+  type CharacterDetailContentRowV1,
+  type CharacterDetailReadItemV1,
+  type CharacterDetailReadResponseV1,
+  type ReadCharacterDetailForResolvedBundleInputV1,
+} from './character-detail-read.js';
+
+export {
   ENTITLEMENTS_READ_AUTHORITY_BINDING_V1,
   EntitlementsReadAuthorityPortErrorV1,
   getEntitlements,
