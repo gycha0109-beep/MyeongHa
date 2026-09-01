@@ -26,12 +26,15 @@ describe('web My profile authority boundary', () => {
     expect(reading).toContain('class="mobile-nav-link" href="my.html"');
   });
 
-  it('reads only the verified current profile surface', () => {
+  it('reads only the verified current profile surface through GET /api/me', () => {
     expect(profileAuthority).toContain("readCurrent: 'public.qry_subject_profile_current_v1'");
-    expect(client).toContain("const DEFAULT_PROFILE_ENDPOINT = '/v1/profile'");
+    expect(client).toContain("const DEFAULT_PROFILE_ENDPOINT = '/api/me'");
     expect(client).toContain("method: 'GET'");
     expect(client).toContain("credentials: 'same-origin'");
     expect(client).toContain("cache: 'no-store'");
+    expect(client).toContain("from './api-envelope.js'");
+    expect(client).toContain('unwrapApiSuccessEnvelope(envelope)');
+    expect(client).not.toContain('/v1/profile');
     expect(client).not.toContain('subjectId');
     expect(client).not.toContain('authUserId');
     expect(client).not.toContain('entitlement');
@@ -91,10 +94,11 @@ describe('web My profile authority boundary', () => {
     expect(reading).toContain('data-reader="baekheon"');
   });
 
-  it('fails closed when the current session or profile read is unavailable', () => {
+  it('fails closed when the current session, envelope, or profile read is unavailable', () => {
     expect(client).toContain('WEB_MY_SESSION_REQUIRED');
     expect(client).toContain('WEB_MY_PROFILE_REQUEST_FAILED');
     expect(client).toContain('WEB_MY_MALFORMED_PROFILE');
+    expect(client).toContain('WebApiEnvelopeError');
     expect(page).toContain('내 정보를 보려면 현재 세션이 필요합니다.');
     expect(page).toContain('확인되지 않은 계정 정보를 대신 표시하지 않습니다.');
   });

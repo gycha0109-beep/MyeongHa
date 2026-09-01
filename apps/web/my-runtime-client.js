@@ -1,4 +1,6 @@
-const DEFAULT_PROFILE_ENDPOINT = '/v1/profile';
+import { unwrapApiSuccessEnvelope, WebApiEnvelopeError } from './api-envelope.js';
+
+const DEFAULT_PROFILE_ENDPOINT = '/api/me';
 
 export class MyRuntimeError extends Error {
   constructor(code, message, cause) {
@@ -84,14 +86,21 @@ export function createMyRuntimeClient(options = {}) {
         );
       }
 
-      let payload;
+      let envelope;
       try {
-        payload = await response.json();
+        envelope = await response.json();
       } catch (error) {
         throw new MyRuntimeError('WEB_MY_MALFORMED_PROFILE', 'Profile API returned invalid JSON.', error);
       }
 
-      return assertProfile(payload);
+      try {
+        return assertProfile(unwrapApiSuccessEnvelope(envelope));
+      } catch (error) {
+        if (error instanceof WebApiEnvelopeError) {
+          throw new MyRuntimeError('WEB_MY_MALFORMED_PROFILE', error.message, error);
+        }
+        throw error;
+      }
     },
   });
 }

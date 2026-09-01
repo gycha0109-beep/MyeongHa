@@ -1,8 +1,9 @@
+import { unwrapApiSuccessEnvelope, WebApiEnvelopeError } from './api-envelope.js';
+
 const DEFAULT_ENDPOINTS = Object.freeze({
-  profile: '/v1/profile',
-  birthProfile: '/v1/records/birth-profile',
-  lifeFacts: '/v1/records/life-facts',
-  memories: '/v1/records/memories',
+  profile: '/api/me',
+  lifeFacts: '/api/life-record',
+  memories: '/api/memories',
 });
 
 export class RecordsRuntimeError extends Error {
@@ -47,13 +48,21 @@ async function readJson(fetchImpl, endpoint) {
     throw new RecordsRuntimeError('WEB_RECORDS_REQUEST_FAILED', `Records API request failed with status ${response.status}.`);
   }
 
-  let payload;
+  let envelope;
   try {
-    payload = await response.json();
+    envelope = await response.json();
   } catch (error) {
     throw new RecordsRuntimeError('WEB_RECORDS_MALFORMED_RESPONSE', 'Records API returned invalid JSON.', error);
   }
-  return assertJsonObject(payload, endpoint);
+
+  try {
+    return assertJsonObject(unwrapApiSuccessEnvelope(envelope), endpoint);
+  } catch (error) {
+    if (error instanceof WebApiEnvelopeError) {
+      throw new RecordsRuntimeError('WEB_RECORDS_MALFORMED_RESPONSE', error.message, error);
+    }
+    throw error;
+  }
 }
 
 export function createRecordsRuntimeClient(options = {}) {
@@ -62,17 +71,15 @@ export function createRecordsRuntimeClient(options = {}) {
 
   return Object.freeze({
     readProfile: () => readJson(fetchImpl, endpoints.profile),
-    readBirthProfile: () => readJson(fetchImpl, endpoints.birthProfile),
     readLifeFacts: () => readJson(fetchImpl, endpoints.lifeFacts),
     readMemories: () => readJson(fetchImpl, endpoints.memories),
     async readRecords() {
-      const [profile, birthProfile, lifeFacts, memories] = await Promise.all([
+      const [profile, lifeFacts, memories] = await Promise.all([
         readJson(fetchImpl, endpoints.profile),
-        readJson(fetchImpl, endpoints.birthProfile),
         readJson(fetchImpl, endpoints.lifeFacts),
         readJson(fetchImpl, endpoints.memories),
       ]);
-      return Object.freeze({ profile, birthProfile, lifeFacts, memories });
+      return Object.freeze({ profile, lifeFacts, memories });
     },
   });
 }

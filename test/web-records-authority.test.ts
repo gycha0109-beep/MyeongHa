@@ -25,22 +25,36 @@ describe('web records authority boundary', () => {
     expect(client).not.toContain("method: 'DELETE'");
   });
 
-  it('uses only server-resolved current-subject reads', () => {
-    expect(client).toContain("profile: '/v1/profile'");
-    expect(client).toContain("birthProfile: '/v1/records/birth-profile'");
-    expect(client).toContain("lifeFacts: '/v1/records/life-facts'");
-    expect(client).toContain("memories: '/v1/records/memories'");
+  it('uses only canonical server-resolved current-subject reads', () => {
+    expect(client).toContain("profile: '/api/me'");
+    expect(client).toContain("lifeFacts: '/api/life-record'");
+    expect(client).toContain("memories: '/api/memories'");
+    expect(client).not.toContain('/v1/');
+    expect(client).not.toContain('birthProfile:');
     expect(client).not.toContain('subjectId=');
     expect(client).not.toContain('authUserId');
     expect(client).toContain("credentials: 'same-origin'");
     expect(client).toContain("cache: 'no-store'");
   });
 
-  it('fails closed for missing session, failed transport, and malformed JSON', () => {
+  it('unwraps the common API success envelope before rendering stored projections', () => {
+    expect(client).toContain("from './api-envelope.js'");
+    expect(client).toContain('unwrapApiSuccessEnvelope(envelope)');
+    expect(client).toContain('WebApiEnvelopeError');
+  });
+
+  it('does not invent a current Birth Profile locator route', () => {
+    expect(client).not.toContain('birth-profile');
+    expect(client).not.toContain('readBirthProfile');
+    expect(page).toContain('현재 명식록을 자동으로 찾아오는 조회는 아직 연결되지 않았습니다.');
+    expect(page).toContain('확인되지 않은 명식 정보를 대신 표시하지 않습니다.');
+  });
+
+  it('fails closed for missing session, failed transport, malformed JSON, and malformed envelopes', () => {
     expect(client).toContain('WEB_RECORDS_SESSION_REQUIRED');
     expect(client).toContain('WEB_RECORDS_REQUEST_FAILED');
     expect(client).toContain('WEB_RECORDS_MALFORMED_RESPONSE');
-    expect(page).toContain('서버 read authority가 연결되기 전에는 임의의 기록을 대신 표시하지 않습니다.');
+    expect(page).toContain('현재 기록을 불러올 수 없습니다. 확인되지 않은 기록을 대신 표시하지 않습니다.');
   });
 
   it('renders stored values as text rather than HTML', () => {

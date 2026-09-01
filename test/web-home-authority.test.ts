@@ -23,11 +23,14 @@ describe('web Home authority boundary', () => {
     expect(html).not.toContain('chat.html?character=seyeon');
   });
 
-  it('binds only the current profile projection that Home can safely consume', () => {
-    expect(client).toContain("const DEFAULT_PROFILE_ENDPOINT = '/v1/profile'");
+  it('binds only the canonical current-subject profile route', () => {
+    expect(client).toContain("const DEFAULT_PROFILE_ENDPOINT = '/api/me'");
     expect(client).toContain("method: 'GET'");
     expect(client).toContain("credentials: 'same-origin'");
     expect(client).toContain("cache: 'no-store'");
+    expect(client).toContain("from './api-envelope.js'");
+    expect(client).toContain('unwrapApiSuccessEnvelope(envelope)');
+    expect(client).not.toContain('/v1/profile');
     expect(client).not.toContain('subjectId');
     expect(client).not.toContain('authUserId');
     expect(client).not.toContain('life-facts');
@@ -44,7 +47,7 @@ describe('web Home authority boundary', () => {
   it('does not derive a Life Thread from unresolved Life Fact type/value schemas', () => {
     expect(lifeRecordRead).toContain('does not define positive Life Fact type/value schemas while SRC-25 remains');
     expect(html).toContain('지금은 저장된 사실을 이야기로 추측해 이어 붙이지 않습니다.');
-    expect(client).not.toContain('/v1/records/life-facts');
+    expect(client).not.toContain('/api/life-record');
   });
 
   it('does not infer a today-character mapping in the browser', () => {
