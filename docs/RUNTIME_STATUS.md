@@ -7,8 +7,8 @@
 | Area | State | Notes |
 |---|---|---|
 | Static Web | DEPLOYED | Vercel builds the static `public/` output through `npm run build:web`. |
-| Executable `/api` runtime | NOT ACTIVE | The current Vercel configuration deploys static output only; no production API function/adapter is configured. |
-| Browser → API | NOT ACTIVE IN PRODUCTION | Web runtime clients may reference `/api/*`, but production API transport is not deployed yet. |
+| Executable `/api` runtime | ACTIVE — INFRASTRUCTURE ONLY | `GET /api/health` is deployed as a root Vercel Function and has been remotely verified on the canonical production host. This does not imply user-data or DB runtime availability. |
+| Browser → API | USER-DATA ROUTES NOT ACTIVE | The infrastructure API runtime exists, but web runtime clients that reference user-data `/api/*` routes are not yet backed by an authorized production identity/DB adapter. |
 | Canonical Subject Resolution | REQUIRED / NOT WIRED | Existing API use cases consume trusted `resolvedSubjectId`; the runtime identity-resolution boundary is not connected yet. |
 | API → PostgreSQL execution identity | BLOCKED | `P0-AUTH-01` remains `OPEN-P0`; production user-data execution must not invent an RLS/execution model. |
 | Character compatibility verdict | BLOCKED | `SRC-15` remains unresolved. |
@@ -19,20 +19,28 @@
 
 ## Verification semantics
 
-`npm run check` validates repository-local typechecking, tests, builds, static web output, and deployment-configuration contracts. It does **not** prove that a remote Vercel API runtime exists or that the current Supabase production schema matches this repository.
+`npm run check` validates repository-local typechecking, tests, builds, static web output, and deployment-configuration contracts. It does **not** by itself prove that a remote Vercel API runtime exists or that the current Supabase production schema matches this repository.
 
-Remote production state requires separate production checks. The initial Integration Spine production contract is intended to become:
+Remote production state requires separate production checks. The current Integration Spine production evidence is:
 
 ```text
-GET /api/health
+GET https://myeongha.vercel.app/api/health
 → 200
+→ {"status":"ok"}
 
+verified production source commit
+→ 6ea77781a3ec6580c741f6fee236774283e91c77
+```
+
+The next protected user-data contract remains intentionally inactive:
+
+```text
 GET /api/me
 without valid member or guest identity evidence
 → 401
 ```
 
-These endpoints are not considered active until an executable API runtime is actually deployed.
+`GET /api/me` and other user-data routes are not considered active until `P0-AUTH-01` selects the production API → PostgreSQL execution identity / RLS enforcement model and the corresponding runtime adapter is implemented and remotely verified.
 
 ## Authority blockers
 
