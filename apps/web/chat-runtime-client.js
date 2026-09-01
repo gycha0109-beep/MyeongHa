@@ -3,25 +3,16 @@ const threadId = params.get('threadId');
 const room = window.MyeongHaCharacterRoom;
 const characterKey = room?.characterKey ?? document.body.dataset.character ?? 'baekheon';
 const characterName = room?.characterName ?? document.querySelector('[data-character-name]')?.textContent ?? '대리자';
+const apiEnvelopePromise = import('./api-envelope.js');
 
 const historyList = document.querySelector('[data-history-list]');
 const historyEmpty = document.querySelector('[data-history-empty]');
 const contextPill = document.querySelector('[data-context-pill]');
 const contextTitle = document.querySelector('[data-context-title]');
 const composeStatus = document.querySelector('[data-compose-status]');
-const composer = document.querySelector('[data-composer]');
-const messageInput = document.querySelector('[data-message-input]');
-const sendButton = document.querySelector('.character-send-button');
-
-let lastSequenceNo = 0;
 
 function setComposeStatus(message) {
   if (composeStatus) composeStatus.textContent = message;
-}
-
-function setBusy(busy) {
-  if (composer) composer.dataset.runtimeBusy = String(busy);
-  if (sendButton instanceof HTMLButtonElement) sendButton.disabled = busy;
 }
 
 function formatTimestamp(value) {
@@ -108,7 +99,6 @@ function renderHistory(messages, authoritativeCharacterId) {
 
 function renderRoomState(payload) {
   const state = assertRoomState(payload);
-  lastSequenceNo = state.lastSequenceNo;
   renderHistory(state.messages, state.characterId);
 
   const latest = state.latestCharacterMessage;
@@ -139,14 +129,14 @@ async function loadRoomState() {
   }
 
   try {
-    const url = new URL('/api/chat/thread', window.location.origin);
-    url.searchParams.set('threadId', threadId);
+    const url = new URL(`/api/chat/${encodeURIComponent(threadId)}`, window.location.origin);
     url.searchParams.set('afterSequenceNo', '0');
     url.searchParams.set('presentationKey', characterKey);
 
     const response = await fetch(url, {
       method: 'GET',
       credentials: 'same-origin',
+      cache: 'no-store',
       headers: { Accept: 'application/json' },
     });
 
@@ -154,7 +144,9 @@ async function loadRoomState() {
       throw new Error(`Character Room read failed with ${response.status}.`);
     }
 
-    renderRoomState(await response.json());
+    const envelope = await response.json();
+    const { unwrapApiSuccessEnvelope } = await apiEnvelopePromise;
+    renderRoomState(unwrapApiSuccessEnvelope(envelope));
   } catch {
     if (historyEmpty) {
       historyEmpty.hidden = false;
@@ -164,7 +156,7 @@ async function loadRoomState() {
   }
 }
 
-async function submitTurn(event) {
+function submitTurn(event) {
   if (!(event instanceof CustomEvent)) return;
   event.preventDefault();
 
@@ -176,47 +168,11 @@ async function submitTurn(event) {
     return;
   }
 
-  setBusy(true);
-  setComposeStatus('보내는 중…');
-
-  try {
-    const response = await fetch('/api/chat/turn', {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        threadId,
-        presentationKey: characterKey,
-        clientTurnId: crypto.randomUUID(),
-        text: message.trim(),
-        afterSequenceNo: lastSequenceNo,
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Character Room submit failed with ${response.status}.`);
-    }
-
-    const payload = await response.json();
-    if (payload?.roomState) {
-      renderRoomState(payload.roomState);
-    } else {
-      await loadRoomState();
-    }
-
-    if (messageInput instanceof HTMLTextAreaElement) {
-      messageInput.value = '';
-      messageInput.style.height = 'auto';
-    }
-    setComposeStatus('');
-  } catch {
-    setComposeStatus('메시지를 보내지 못했습니다. 입력한 내용은 그대로 남아 있습니다.');
-  } finally {
-    setBusy(false);
-  }
+  // ChatRequestV1 requires clientCapability. The current web surface has no
+  // source-backed capability acquisition contract or live HTTP adapter, so a
+  // valid command cannot be formed without inventing client authority. Keep
+  // the user's draft and fail closed before any mutation request is sent.
+  setComposeStatus('현재 메시지를 보낼 수 없습니다. 입력한 내용은 그대로 남아 있습니다.');
 }
 
 document.addEventListener('myeongha:chat-submit', submitTurn);
