@@ -1,4 +1,4 @@
-import { ApiCommandError } from './chat-receive.js';
+import { ApiCommandError } from './api-error.js';
 
 export const LIFE_RECORD_LEDGER_READ_AUTHORITY_BINDING_V1 =
   'public.qry_life_record_ledger_v1' as const;
