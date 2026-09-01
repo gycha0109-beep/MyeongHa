@@ -128,7 +128,7 @@ if (vercelConfig.buildCommand !== 'npm run build:web') {
 if (vercelConfig.outputDirectory !== 'public') {
   throw new Error('vercel.json outputDirectory must remain public.');
 }
-if (vercelConfig.git?.deploymentEnabled?.['*'] !== false) {
+if (vercelConfig.git?.deploymentEnabled?.['**'] !== false) {
   throw new Error('Automatic Vercel deployments must default to disabled for non-main branches.');
 }
 if (vercelConfig.git?.deploymentEnabled?.main !== true) {
