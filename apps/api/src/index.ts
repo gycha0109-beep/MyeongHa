@@ -262,6 +262,18 @@ export {
 } from './character-detail-read.js';
 
 export {
+  CONTENT_BUNDLE_MANIFEST_READ_AUTHORITY_BINDING_V1,
+  ContentBundleManifestReadAuthorityPortErrorV1,
+  getContentBundleManifest,
+  type ContentBundleManifestAuthorityRowV1,
+  type ContentBundleManifestReadAuthorityFailureCodeV1,
+  type ContentBundleManifestReadAuthorityPortV1,
+  type ContentBundleManifestReadResponseV1,
+  type ContentManifestV1,
+  type GetContentBundleManifestInputV1,
+} from './content-bundle-manifest-read.js';
+
+export {
   ENTITLEMENTS_READ_AUTHORITY_BINDING_V1,
   EntitlementsReadAuthorityPortErrorV1,
   getEntitlements,
