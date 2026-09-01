@@ -55,9 +55,9 @@ describe('web Home authority boundary', () => {
     expect(html).not.toContain('오늘 이야기할 사람');
   });
 
-  it('fails profile personalization back to a generic non-private label', () => {
-    expect(html).toContain('id="home-profile-name">내 기록</span>');
-    expect(page).toContain("byId('home-profile-name').textContent = '내 기록'");
+  it('fails profile personalization back to a generic non-private My label', () => {
+    expect(html).toContain('id="home-profile-name">마이</span>');
+    expect(page).toContain("byId('home-profile-name').textContent = '마이'");
     expect(page).toContain('catch {');
     expect(page).not.toContain('innerHTML');
   });

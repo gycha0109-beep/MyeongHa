@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="명하 마이 — 현재 계정과 저장된 기록으로 이동하는 개인 영역입니다." />
+  <title>마이 · 명하</title>
+  <link rel="stylesheet" href="product.css" />
+  <link rel="stylesheet" href="my.css" />
+</head>
+<body class="product-page" data-page="my">
+  <header class="product-header">
+    <div class="product-shell product-header-inner">
+      <a class="product-brand" href="hall.html" aria-label="명하 홈">
+        <span class="product-brand-name">명하</span>
+        <span class="product-brand-seal" aria-hidden="true">明河</span>
+        <span class="product-brand-sub">MyeongHa</span>
+      </a>
+      <nav class="product-nav" aria-label="주요 메뉴">
+        <a class="product-nav-link" href="hall.html">홈</a>
+        <a class="product-nav-link" href="reading.html">사주</a>
+        <a class="product-nav-link" href="chat.html">대화</a>
+        <a class="product-nav-link" href="records.html">기록</a>
+        <a class="product-nav-link" href="my.html" aria-current="page">마이</a>
+      </nav>
+      <div class="product-utilities">
+        <a class="product-profile" href="my.html" aria-label="마이 페이지">
+          <span class="product-profile-mark" aria-hidden="true">之</span>
+          <span>마이</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main class="my-main">
+    <div class="product-shell">
+      <header class="my-head">
+        <div>
+          <div class="my-kicker">MY MyeongHa</div>
+          <h1 class="my-title">마이</h1>
+        </div>
+        <p class="my-lead">현재 계정에 저장된 프로필과 기록으로 이동합니다. 확인되지 않은 구독 상태나 알림 설정은 임의로 만들어 표시하지 않습니다.</p>
+      </header>
+
+      <div class="my-status" id="my-status" role="status">내 정보를 불러오는 중입니다…</div>
+
+      <div id="my-content" hidden>
+        <section class="my-layout" aria-label="내 계정 정보">
+          <article class="my-card">
+            <div class="my-profile-mark" aria-hidden="true">之</div>
+            <div class="my-profile-name" id="my-display-name">호칭 미설정</div>
+            <div class="my-profile-kind"><span id="my-subject-kind">현재 계정</span> · <span id="my-subject-status">—</span></div>
+          </article>
+
+          <article class="my-card">
+            <dl class="my-facts">
+              <div class="my-fact"><dt>언어</dt><dd id="my-locale">—</dd></div>
+              <div class="my-fact"><dt>시간대</dt><dd id="my-timezone">—</dd></div>
+              <div class="my-fact"><dt>온보딩 상태</dt><dd id="my-onboarding-state">—</dd></div>
+              <div class="my-fact"><dt>프로필 갱신</dt><dd id="my-profile-updated">—</dd></div>
+            </dl>
+          </article>
+        </section>
+
+        <section class="my-link-grid" aria-label="내 기록 바로가기">
+          <a class="my-link-card" href="records.html"><span><strong>내 기록</strong><span>명식록 · 현세록 · 기억 확인</span></span><span aria-hidden="true">→</span></a>
+          <a class="my-link-card" href="birth.html"><span><strong>명식록 추가</strong><span>태어난 순간의 원본 입력 저장</span></span><span aria-hidden="true">→</span></a>
+        </section>
+
+        <section class="my-pending" aria-label="준비 중인 계정 기능">
+          <strong>알림 · 이용 권한</strong>
+          알림과 이용 권한 설정은 준비 중입니다. 확인 가능한 연결이 갖춰지기 전에는 현재 상태를 임의로 표시하지 않습니다.
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <nav class="mobile-bottom-nav" aria-label="모바일 주요 메뉴">
+    <a class="mobile-nav-link" href="hall.html"><span class="mobile-nav-icon" aria-hidden="true">⌂</span><span>홈</span></a>
+    <a class="mobile-nav-link" href="reading.html"><span class="mobile-nav-icon" aria-hidden="true">✦</span><span>사주</span></a>
+    <a class="mobile-nav-link" href="chat.html"><span class="mobile-nav-icon" aria-hidden="true">◌</span><span>대화</span></a>
+    <a class="mobile-nav-link" href="records.html"><span class="mobile-nav-icon" aria-hidden="true">▤</span><span>기록</span></a>
+    <a class="mobile-nav-link" href="my.html" aria-current="page"><span class="mobile-nav-icon" aria-hidden="true">♙</span><span>마이</span></a>
+  </nav>
+  <script type="module" src="my-page.js"></script>
+</body>
+</html>
