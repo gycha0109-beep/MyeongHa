@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="명하 대화 — 이어갈 대화를 확인하고, 다른 사람을 찾아 이야기를 시작합니다." />
+  <title>대화 · 명하</title>
+  <link rel="stylesheet" href="product.css" />
+  <link rel="stylesheet" href="chat-hub.css" />
+</head>
+<body class="product-page chat-hub-page" data-page="chat-hub">
+  <header class="product-header">
+    <div class="product-shell product-header-inner">
+      <a class="product-brand" href="hall.html" aria-label="명하 홈">
+        <span class="product-brand-name">명하</span>
+        <span class="product-brand-seal" aria-hidden="true">明河</span>
+        <span class="product-brand-sub">MyeongHa</span>
+      </a>
+
+      <nav class="product-nav" aria-label="주요 메뉴">
+        <a class="product-nav-link" href="hall.html">홈</a>
+        <a class="product-nav-link" href="reading.html">사주</a>
+        <a class="product-nav-link" href="chat-hub.html" aria-current="page">대화</a>
+        <a class="product-nav-link" href="records.html">기록</a>
+        <a class="product-nav-link" href="#" aria-disabled="true">마이</a>
+      </nav>
+
+      <div class="product-utilities">
+        <button class="product-icon-button" type="button" aria-label="알림"></button>
+        <a class="product-profile" href="records.html" aria-label="내 기록">
+          <span class="product-profile-mark" aria-hidden="true">之</span>
+          <span>내 기록</span>
+          <span aria-hidden="true">⌄</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main class="chat-hub-main">
+    <div class="product-shell">
+      <section class="chat-hub-intro" aria-labelledby="chat-hub-title">
+        <div>
+          <span class="chat-hub-eyebrow">CONVERSATION</span>
+          <h1 id="chat-hub-title">누구와 이야기를 이어갈까요?<span aria-hidden="true">✦</span></h1>
+          <p>이어갈 수 있는 대화가 있다면 먼저 보여드리고, 다른 사람을 찾고 싶을 때는 아래에서 살펴볼 수 있습니다.</p>
+        </div>
+      </section>
+
+      <section class="chat-hub-primary" aria-label="이어갈 대화와 최근 대화">
+        <article class="chat-continuation-card" data-continuation-card>
+          <div class="chat-continuation-empty" data-continuation-empty>
+            <span class="chat-continuation-kicker">이어갈 대화</span>
+            <div class="chat-continuation-mark" aria-hidden="true">明</div>
+            <h2>아직 이어서 보여줄 대화가 없습니다.</h2>
+            <p>이어갈 수 있는 대화가 확인되면 이 자리에 표시됩니다.</p>
+            <a class="chat-continuation-action" href="#people">
+              <span>사람 만나기</span><span aria-hidden="true">→</span>
+            </a>
+          </div>
+
+          <div class="chat-continuation-active" data-continuation-active hidden>
+            <div class="chat-continuation-scene" data-continuation-scene aria-hidden="true">
+              <span data-continuation-initial>明</span>
+            </div>
+            <div class="chat-continuation-copy">
+              <span class="chat-continuation-kicker">이어갈 대화</span>
+              <div class="chat-continuation-name-row">
+                <h2 data-continuation-name></h2>
+                <span data-continuation-title></span>
+              </div>
+              <p data-continuation-context></p>
+              <a class="chat-continuation-action" href="chat.html" data-continuation-link>
+                <span>이야기 이어가기</span><span aria-hidden="true">→</span>
+              </a>
+            </div>
+          </div>
+        </article>
+
+        <aside class="chat-recent-card" aria-labelledby="recent-title">
+          <div class="chat-hub-section-head">
+            <div>
+              <span class="chat-hub-section-kicker">RECENT</span>
+              <h2 id="recent-title">최근 대화</h2>
+            </div>
+            <button class="chat-text-button" type="button" data-recent-all hidden>전체 보기 →</button>
+          </div>
+
+          <div class="chat-recent-list" data-recent-list hidden></div>
+          <div class="chat-recent-empty" data-recent-empty>
+            <span class="chat-recent-empty-mark" aria-hidden="true">◇</span>
+            <strong>아직 남아 있는 최근 대화가 없습니다.</strong>
+            <p>대화를 시작하면 최근에 만난 사람이 이곳에 표시됩니다.</p>
+          </div>
+        </aside>
+      </section>
+
+      <section class="chat-incoming" data-incoming-section hidden aria-labelledby="incoming-title">
+        <div class="chat-hub-section-head">
+          <div>
+            <span class="chat-hub-section-kicker">FOR YOU</span>
+            <h2 id="incoming-title">나에게 온 이야기</h2>
+          </div>
+        </div>
+        <div class="chat-incoming-grid" data-incoming-list></div>
+      </section>
+
+      <section class="chat-people-section" id="people" aria-labelledby="people-title">
+        <div class="chat-people-heading">
+          <div>
+            <span class="chat-hub-section-kicker">MEET</span>
+            <h2 id="people-title">다른 사람 만나기<span aria-hidden="true">✦</span></h2>
+            <p>이름이나 분위기로 찾아보세요. 사람마다 말하는 방식과 거리감이 다릅니다.</p>
+          </div>
+
+          <label class="chat-search">
+            <span class="sr-only">사람 찾기</span>
+            <span class="chat-search-icon" aria-hidden="true"></span>
+            <input type="search" placeholder="이름이나 분위기로 찾아보세요" autocomplete="off" data-people-search />
+          </label>
+        </div>
+
+        <div class="chat-people-grid" data-people-grid aria-live="polite"></div>
+        <p class="chat-search-empty" data-search-empty hidden>조건에 맞는 사람을 찾지 못했습니다.</p>
+
+        <div class="chat-people-more-row">
+          <button class="chat-people-more" type="button" data-people-more>
+            <span>다른 사람 더 보기</span>
+            <span aria-hidden="true">⌄</span>
+          </button>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="product-footer">
+    <div class="product-shell product-footer-inner">
+      <div class="product-footer-links">
+        <a href="#">서비스 안내</a>
+        <a href="#">이용약관</a>
+        <a href="#">개인정보처리방침</a>
+        <a href="#">고객지원</a>
+      </div>
+      <div class="product-footer-copy">
+        <span>© 2026 MyeongHa. All rights reserved.</span>
+        <span class="product-footer-seal" aria-hidden="true">明河</span>
+      </div>
+    </div>
+  </footer>
+
+  <nav class="mobile-bottom-nav" aria-label="모바일 주요 메뉴">
+    <a class="mobile-nav-link" href="hall.html"><span class="mobile-nav-icon" aria-hidden="true">⌂</span><span>홈</span></a>
+    <a class="mobile-nav-link" href="reading.html"><span class="mobile-nav-icon" aria-hidden="true">✦</span><span>사주</span></a>
+    <a class="mobile-nav-link" href="chat-hub.html" aria-current="page"><span class="mobile-nav-icon" aria-hidden="true">◌</span><span>대화</span></a>
+    <a class="mobile-nav-link" href="records.html"><span class="mobile-nav-icon" aria-hidden="true">▤</span><span>기록</span></a>
+    <a class="mobile-nav-link" href="#" aria-disabled="true"><span class="mobile-nav-icon" aria-hidden="true">♙</span><span>마이</span></a>
+  </nav>
+
+  <script type="module" src="chat-hub.js"></script>
+</body>
+</html>
