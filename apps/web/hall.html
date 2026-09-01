@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="명하 홈 — 오늘의 흐름, 이어지는 이야기, 사주 주제와 관계를 한곳에서 이어봅니다." />
+  <meta name="description" content="명하 홈 — 사주 주제, 기록, 캐릭터 대화로 이어지는 시작 화면입니다." />
   <title>홈 · 명하</title>
   <link rel="stylesheet" href="product.css" />
   <link rel="stylesheet" href="home-v2.css" />
@@ -27,9 +27,9 @@
 
       <div class="product-utilities">
         <button class="product-icon-button" type="button" aria-label="알림"></button>
-        <a class="product-profile" href="#" aria-label="내 프로필">
+        <a class="product-profile" id="home-profile-link" href="records.html" aria-label="내 기록">
           <span class="product-profile-mark" aria-hidden="true">之</span>
-          <span>지환</span>
+          <span id="home-profile-name">내 기록</span>
           <span aria-hidden="true">⌄</span>
         </a>
       </div>
@@ -42,13 +42,13 @@
         <h1 id="home-title">오늘은 무엇을 읽어볼까요?<span class="home-title-ornament" aria-hidden="true">✦</span></h1>
       </section>
 
-      <section class="home-primary-grid" aria-label="오늘의 흐름과 이어지는 이야기">
+      <section class="home-primary-grid" aria-label="오늘의 흐름과 이어지는 기록">
         <article class="home-today">
           <div class="home-orbit-art" aria-hidden="true"></div>
           <div class="home-today-copy">
-            <span class="home-kicker">8월 31일 · 오늘의 흐름</span>
-            <h2>오늘은 움직이기보다<br />정리할 것이 먼저입니다.</h2>
-            <p>지금은 한 걸음 멈춰 내면을 가다듬는 시간이 좋은 흐름을 만듭니다.</p>
+            <span class="home-kicker" id="home-current-date">오늘 · 오늘의 흐름</span>
+            <h2>오늘의 흐름을<br />직접 펼쳐보세요.</h2>
+            <p>오늘의 흐름은 사주 화면에서 직접 펼쳐볼 수 있습니다.</p>
             <div class="home-rule" aria-hidden="true"></div>
             <a class="home-primary-action" href="reading.html">
               <span>오늘 읽어보기</span>
@@ -60,17 +60,16 @@
         <aside class="paper-card home-thread" aria-labelledby="thread-title">
           <div class="home-card-head">
             <h2 id="thread-title">이어지는 이야기 <span class="home-title-ornament" aria-hidden="true">✦</span></h2>
-            <a class="home-text-link" href="records.html">전체 보기 →</a>
+            <a class="home-text-link" href="records.html">기록 보기 →</a>
           </div>
 
           <div class="home-thread-body">
-            <h3 class="home-thread-title">퇴사를 고민했던 이야기</h3>
-            <div class="home-thread-step">고민하기 시작했어요.</div>
-            <div class="home-thread-step is-decision">남기로 결정했어요.</div>
-            <div class="home-thread-step is-open">그 이후 이야기는 아직 없습니다.</div>
+            <h3 class="home-thread-title">이어지는 이야기는 기록과 함께 열립니다.</h3>
+            <div class="home-thread-step">확인된 기록은 기록 화면에서 볼 수 있습니다.</div>
+            <div class="home-thread-step is-open">지금은 저장된 사실을 이야기로 추측해 이어 붙이지 않습니다.</div>
             <div class="home-thread-foot">
-              <span>마지막 변화 · 8월 24일</span>
-              <a class="home-inline-action" href="records.html">이야기 이어보기 →</a>
+              <span>내 기록을 기준으로 확인</span>
+              <a class="home-inline-action" href="records.html">내 기록 보기 →</a>
             </div>
           </div>
         </aside>
@@ -115,22 +114,22 @@
 
       <section class="home-section" aria-labelledby="person-title">
         <div class="home-section-head">
-          <h2 class="home-section-title" id="person-title">오늘 이야기할 사람<span class="home-title-ornament" aria-hidden="true">✦</span></h2>
+          <h2 class="home-section-title" id="person-title">캐릭터와 이야기하기<span class="home-title-ornament" aria-hidden="true">✦</span></h2>
           <a class="home-text-link" href="chat.html">대화로 가기 →</a>
         </div>
 
         <article class="paper-card home-person">
-          <div class="home-person-avatar" aria-label="세연 이미지 자리">세연</div>
+          <div class="home-person-avatar" aria-hidden="true">明</div>
           <div class="home-person-copy">
             <div class="home-person-name-row">
-              <h3 class="home-person-name">세연</h3>
-              <span class="home-person-tag">마음과 인연의 흐름</span>
+              <h3 class="home-person-name">대화 공간</h3>
+              <span class="home-person-tag">캐릭터 선택</span>
             </div>
-            <p class="home-person-message">오늘은 좀 괜찮았어요?</p>
-            <div class="home-person-context">지난 이야기가 조금 신경 쓰였어요.</div>
+            <p class="home-person-message">지금 만날 수 있는 캐릭터를 대화 화면에서 확인하세요.</p>
+            <div class="home-person-context">오늘의 추천은 확인된 선택이 있을 때만 보여드립니다.</div>
           </div>
-          <a class="home-person-action" href="chat.html?character=seyeon">
-            <span>이야기하기</span>
+          <a class="home-person-action" href="chat.html">
+            <span>대화 시작하기</span>
             <span aria-hidden="true">→</span>
           </a>
         </article>
@@ -160,5 +159,6 @@
     <a class="mobile-nav-link" href="records.html"><span class="mobile-nav-icon" aria-hidden="true">▤</span><span>기록</span></a>
     <a class="mobile-nav-link" href="#" aria-disabled="true"><span class="mobile-nav-icon" aria-hidden="true">♙</span><span>마이</span></a>
   </nav>
+  <script type="module" src="home-page.js"></script>
 </body>
 </html>
