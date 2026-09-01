@@ -7,11 +7,11 @@ import type {
   CharacterFacePresentationProfileV1,
   CharacterFacePresentationContentIdentityV1,
 } from '../../character-content/src/face-presentation.js';
-import type { FaceResearchDiagnosisOutput } from '../../face-reading/src/index.js';
 import type { CharacterRelationshipProjectionV1 } from './character-runtime-context.js';
 import {
-  presentResearchFaceDiagnosisForCharacter,
+  presentResearchFaceGroundingForCharacter,
   type CharacterFacePresentationV1,
+  type ResearchCharacterFaceGroundingV1,
 } from './character-face-presentation.js';
 
 export interface CharacterFaceRuntimeProjectionV1 extends CharacterFacePresentationContentIdentityV1 {
@@ -70,8 +70,7 @@ function validateRuntimeProjection(context: CharacterFaceRuntimeProjectionV1): v
 }
 
 export function renderResearchFaceCharacterRuntimeTurn(input: {
-  readonly diagnosis: FaceResearchDiagnosisOutput;
-  readonly groundingVersion: string;
+  readonly grounding: ResearchCharacterFaceGroundingV1;
   readonly context: CharacterFaceRuntimeProjectionV1;
   readonly presentationProfile: CharacterFacePresentationProfileV1;
   readonly followUpCatalog: CharacterFaceSafeFollowUpCatalogV1;
@@ -79,9 +78,8 @@ export function renderResearchFaceCharacterRuntimeTurn(input: {
   validateRuntimeProjection(input.context);
   validateCharacterFaceSafeFollowUpCatalogForCharacterV1(input.followUpCatalog, input.context);
 
-  const presentation = presentResearchFaceDiagnosisForCharacter({
-    diagnosis: input.diagnosis,
-    groundingVersion: input.groundingVersion,
+  const presentation = presentResearchFaceGroundingForCharacter({
+    grounding: input.grounding,
     character: input.context,
     profile: input.presentationProfile,
   });

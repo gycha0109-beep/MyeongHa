@@ -75,16 +75,18 @@ export {
 
 export {
   CharacterFacePresentationError,
-  presentResearchFaceDiagnosisForCharacter,
+  presentResearchFaceGroundingForCharacter,
   validateCharacterFacePresentationProfileForCharacterV1,
   validateCharacterFacePresentationProfileV1,
   type CharacterFaceFollowUpStrategyV1,
+  type CharacterFaceGroundingV1,
   type CharacterFacePresentationBlockV1,
   type CharacterFacePresentationContentIdentityV1,
   type CharacterFacePresentationFocusV1,
   type CharacterFacePresentationModeV1,
   type CharacterFacePresentationProfileV1,
   type CharacterFacePresentationV1,
+  type ResearchCharacterFaceGroundingV1,
 } from './character-face-presentation.js';
 
 export {
