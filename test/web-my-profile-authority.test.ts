@@ -9,6 +9,7 @@ const myCss = readFileSync(join(webRoot, 'my.css'), 'utf8');
 const client = readFileSync(join(webRoot, 'my-runtime-client.js'), 'utf8');
 const page = readFileSync(join(webRoot, 'my-page.js'), 'utf8');
 const hall = readFileSync(join(webRoot, 'hall.html'), 'utf8');
+const homePage = readFileSync(join(webRoot, 'home-page.js'), 'utf8');
 const reading = readFileSync(join(webRoot, 'reading.html'), 'utf8');
 const profileAuthority = readFileSync(join(root, 'apps', 'api', 'src', 'subject-profile.ts'), 'utf8');
 
@@ -35,6 +36,16 @@ describe('web My profile authority boundary', () => {
     expect(client).not.toContain('authUserId');
     expect(client).not.toContain('entitlement');
     expect(client).not.toContain('notification');
+  });
+
+  it('validates the bounded current-profile response before rendering', () => {
+    expect(client).toContain("payload.subjectKind !== 'guest'");
+    expect(client).toContain("payload.subjectKind !== 'member'");
+    expect(client).toContain("payload.subjectStatus !== 'active'");
+    expect(client).toContain("payload.subjectStatus !== 'deletion_pending'");
+    expect(client).toContain("['displayName', 'locale', 'timezone', 'onboardingState']");
+    expect(client).toContain('Date.parse(profile.updatedAt)');
+    expect(client).toContain('WEB_MY_MALFORMED_PROFILE');
   });
 
   it('renders only fields present in the current profile response', () => {
@@ -70,9 +81,12 @@ describe('web My profile authority boundary', () => {
     expect(myHtml).not.toContain('class="home-kicker"');
   });
 
-  it('removes the hardcoded user name from the Reading header without changing reader routing', () => {
+  it('aligns Home and Reading profile affordances with the My destination', () => {
+    expect(hall).toContain('<span id="home-profile-name">마이</span>');
+    expect(homePage).toContain("byId('home-profile-name').textContent = '마이'");
     expect(reading).not.toContain('<span>지환</span>');
-    expect(reading).toContain('<span>내 기록</span>');
+    expect(reading).toContain('<span>마이</span>');
+    expect(reading).toContain('href="my.html" aria-label="내 프로필"');
     expect(reading).toContain('src="reading-character.js"');
     expect(reading).toContain('data-reader="baekheon"');
   });
