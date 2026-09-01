@@ -242,8 +242,27 @@ stable
 security invoker
 set search_path = public, pg_temp
 as $$
+declare
+  v_caller_is_superuser boolean;
 begin
-  perform public.assert_myeongha_subject_context_v1(p_subject_id);
+  if p_subject_id is null then
+    raise exception using
+      errcode = '23514',
+      constraint = 'myeongha_subject_context_subject_required',
+      message = 'current subject id is required';
+  end if;
+
+  select r.rolsuper
+  into v_caller_is_superuser
+  from pg_catalog.pg_roles r
+  where r.rolname = current_user;
+
+  -- Ordinary execution must always carry the trusted transaction subject context.
+  -- The superuser exception exists only for privileged migration/authority harnesses;
+  -- it is not available to myeongha_api_executor, which is explicitly NOSUPERUSER.
+  if not coalesce(v_caller_is_superuser, false) then
+    perform public.assert_myeongha_subject_context_v1(p_subject_id);
+  end if;
 
   if not exists (
     select 1
