@@ -15,10 +15,44 @@ function requireFetch(fetchImpl) {
   return fetchImpl;
 }
 
+function malformed(message) {
+  throw new MyRuntimeError('WEB_MY_MALFORMED_PROFILE', message);
+}
+
+function isRecord(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isNullableString(value) {
+  return value === null || typeof value === 'string';
+}
+
 function assertProfile(payload) {
-  if (payload === null || typeof payload !== 'object' || Array.isArray(payload)) {
-    throw new MyRuntimeError('WEB_MY_MALFORMED_PROFILE', 'Profile API returned a malformed payload.');
+  if (!isRecord(payload)) malformed('Profile API returned a malformed payload.');
+  if (payload.subjectKind !== 'guest' && payload.subjectKind !== 'member') {
+    malformed('Profile API returned an invalid subject kind.');
   }
+  if (payload.subjectStatus !== 'active' && payload.subjectStatus !== 'deletion_pending') {
+    malformed('Profile API returned an invalid subject status.');
+  }
+
+  const profile = payload.profile;
+  if (profile === null) return payload;
+  if (!isRecord(profile)) malformed('Profile API returned an invalid profile object.');
+
+  for (const field of ['displayName', 'locale', 'timezone', 'onboardingState']) {
+    if (!isNullableString(profile[field])) {
+      malformed(`Profile API returned an invalid ${field}.`);
+    }
+  }
+  if (
+    typeof profile.updatedAt !== 'string' ||
+    profile.updatedAt.trim().length === 0 ||
+    Number.isNaN(Date.parse(profile.updatedAt))
+  ) {
+    malformed('Profile API returned an invalid updatedAt timestamp.');
+  }
+
   return payload;
 }
 
@@ -44,7 +78,10 @@ export function createMyRuntimeClient(options = {}) {
         throw new MyRuntimeError('WEB_MY_SESSION_REQUIRED', 'A current session is required.');
       }
       if (!response.ok) {
-        throw new MyRuntimeError('WEB_MY_PROFILE_REQUEST_FAILED', `Profile API request failed with status ${response.status}.`);
+        throw new MyRuntimeError(
+          'WEB_MY_PROFILE_REQUEST_FAILED',
+          `Profile API request failed with status ${response.status}.`,
+        );
       }
 
       let payload;
