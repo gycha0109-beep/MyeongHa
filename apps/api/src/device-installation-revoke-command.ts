@@ -1,4 +1,4 @@
-import { ApiCommandError } from './chat-receive.js';
+import { ApiCommandError } from './api-error.js';
 
 export const DEVICE_INSTALLATION_REVOKE_COMMAND_AUTHORITY_BINDING_V1 =
   'public.cmd_revoke_device_installation_v1' as const;
