@@ -46,36 +46,12 @@ function renderProfile(payload) {
   byId('records-subject-kind').textContent = kind;
 }
 
-function renderBirthProfile(payload) {
+function renderBirthProfileUnavailable() {
   const target = byId('birth-records-list');
   clear(target);
-  const current = payload?.currentRevision;
-  if (!current || typeof current !== 'object') {
-    target.append(textElement('p', 'muted', '저장된 명식 revision이 없습니다.'));
-    return;
-  }
-
-  const input = current.input && typeof current.input === 'object' ? current.input : {};
   const card = textElement('article', 'panel side-card', '');
-  card.append(textElement('div', 'eyebrow', `현재 revision ${String(current.revisionNo ?? '—')}`));
-  card.append(textElement('h3', 'display display-md', payload.label || '나의 명식록'));
-  const facts = document.createElement('div');
-  facts.className = 'timeline';
-  for (const [label, value] of [
-    ['달력', input.calendarType ?? '—'],
-    ['생년월일', input.birthDate ?? '—'],
-    ['출생시간', input.timeKnown === false ? '모름' : input.birthTime ?? '—'],
-    ['성별 입력', input.sex ?? '미지정'],
-  ]) {
-    const item = document.createElement('div');
-    item.className = 'timeline-item';
-    item.append(textElement('strong', '', label));
-    item.append(textElement('span', 'fine', String(value)));
-    facts.append(item);
-  }
-  card.append(facts);
-  const revisions = Array.isArray(payload.revisions) ? payload.revisions : [];
-  card.append(textElement('p', 'fine', `보존된 revision ${revisions.length}개 · 과거 revision은 덮어쓰지 않습니다.`));
+  card.append(textElement('h3', 'display display-md', '명식록'));
+  card.append(textElement('p', 'muted', '현재 명식록을 자동으로 찾아오는 조회는 아직 연결되지 않았습니다. 확인되지 않은 명식 정보를 대신 표시하지 않습니다.'));
   target.append(card);
 }
 
@@ -136,7 +112,7 @@ function setFailure(error) {
     status.textContent = '기록을 보려면 현재 세션이 필요합니다. 로그인/게스트 세션 연결 후 다시 열어 주세요.';
     return;
   }
-  status.textContent = '현재 기록을 불러올 수 없습니다. 서버 read authority가 연결되기 전에는 임의의 기록을 대신 표시하지 않습니다.';
+  status.textContent = '현재 기록을 불러올 수 없습니다. 확인되지 않은 기록을 대신 표시하지 않습니다.';
 }
 
 async function boot() {
@@ -147,7 +123,7 @@ async function boot() {
   try {
     const records = await createRecordsRuntimeClient().readRecords();
     renderProfile(records.profile);
-    renderBirthProfile(records.birthProfile);
+    renderBirthProfileUnavailable();
     renderLifeFacts(records.lifeFacts);
     renderMemories(records.memories);
     setReady();
