@@ -16,7 +16,7 @@ function renderCalendarDate() {
 
 function renderGenericProfile() {
   byId('home-profile-name').textContent = '내 기록';
-  byId('home-profile-link').setAttribute('aria-label', '내 기록');
+  byId('home-profile-link').setAttribute('aria-label', '내 프로필');
 }
 
 function renderProfile(payload) {
@@ -26,7 +26,7 @@ function renderProfile(payload) {
     return;
   }
   byId('home-profile-name').textContent = name;
-  byId('home-profile-link').setAttribute('aria-label', `${name}의 기록`);
+  byId('home-profile-link').setAttribute('aria-label', `${name}의 프로필`);
 }
 
 async function boot() {
