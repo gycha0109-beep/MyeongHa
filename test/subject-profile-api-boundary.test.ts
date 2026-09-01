@@ -151,19 +151,31 @@ describe('subject profile API authority boundary', () => {
   });
 
   it('maps unavailable current-subject reads to NOT_FOUND', async () => {
-    const port = new FakeSubjectProfileAuthorityPortV1();
-    port.readResult = new SubjectProfileAuthorityPortErrorV1(
-      'SUBJECT_NOT_CURRENT',
-      'subject is merged',
-    );
+    for (const code of ['SUBJECT_NOT_FOUND', 'SUBJECT_NOT_CURRENT'] as const) {
+      const port = new FakeSubjectProfileAuthorityPortV1();
+      port.readResult = new SubjectProfileAuthorityPortErrorV1(code, code);
 
-    await expectApiCode(
+      await expectApiCode(
+        getCurrentSubjectProfile({
+          resolvedSubjectId: SUBJECT_ID,
+          authorityPort: port,
+        }),
+        'NOT_FOUND',
+      );
+    }
+  });
+
+  it('does not convert unexpected read infrastructure failures into product error codes', async () => {
+    const port = new FakeSubjectProfileAuthorityPortV1();
+    const infrastructureFailure = new Error('database read transport unavailable');
+    port.readResult = infrastructureFailure;
+
+    await expect(
       getCurrentSubjectProfile({
         resolvedSubjectId: SUBJECT_ID,
         authorityPort: port,
       }),
-      'NOT_FOUND',
-    );
+    ).rejects.toBe(infrastructureFailure);
   });
 
   it('fails closed if a read authority returns another subject projection', async () => {
@@ -179,6 +191,31 @@ describe('subject profile API authority boundary', () => {
         authorityPort: port,
       }),
     ).rejects.toThrow('different subject');
+  });
+
+  it('requires a trusted resolved subject before invoking the patch authority', async () => {
+    const missingSubjectPort = new FakeSubjectProfileAuthorityPortV1();
+    await expectApiCode(
+      patchCurrentSubjectProfile({
+        expectedUpdatedAt: null,
+        patch: { displayName: '닉네임' },
+        authorityPort: missingSubjectPort,
+      }),
+      'AUTH_REQUIRED',
+    );
+    expect(missingSubjectPort.patchCalls).toHaveLength(0);
+
+    const blankSubjectPort = new FakeSubjectProfileAuthorityPortV1();
+    await expectApiCode(
+      patchCurrentSubjectProfile({
+        resolvedSubjectId: '   ',
+        expectedUpdatedAt: null,
+        patch: { displayName: '닉네임' },
+        authorityPort: blankSubjectPort,
+      }),
+      'AUTH_REQUIRED',
+    );
+    expect(blankSubjectPort.patchCalls).toHaveLength(0);
   });
 
   it('forwards first profile materialization with null expectedUpdatedAt and exact allowed patch fields', async () => {
@@ -287,6 +324,26 @@ describe('subject profile API authority boundary', () => {
     );
 
     expect(error.message).toContain('updatedAt');
+  });
+
+  it('maps authority INVALID_PATCH failures to INVALID_REQUEST', async () => {
+    const port = new FakeSubjectProfileAuthorityPortV1();
+    port.patchResult = new SubjectProfileAuthorityPortErrorV1(
+      'INVALID_PATCH',
+      'profile patch violates stored authority constraints',
+    );
+
+    const error = await expectApiCode(
+      patchCurrentSubjectProfile({
+        resolvedSubjectId: SUBJECT_ID,
+        expectedUpdatedAt: null,
+        patch: { displayName: '닉네임' },
+        authorityPort: port,
+      }),
+      'INVALID_REQUEST',
+    );
+
+    expect(error.message).toContain('stored authority constraints');
   });
 
   it('maps non-current or missing subject patch authority to NOT_FOUND', async () => {
