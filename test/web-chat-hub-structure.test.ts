@@ -36,6 +36,8 @@ describe('MyeongHa conversation hub v1', () => {
     expect(html).not.toContain('지난번 당신');
     expect(html).not.toContain('기억하고 있습니다');
     expect(html).not.toContain('퇴사를 고민');
+    expect(js).not.toContain('처음 이야기하기');
+    expect(js).toContain("actionLabel.textContent = '이야기하기'");
     expect(js).toContain('setContinuation(null)');
     expect(js).toContain('setRecent([])');
     expect(js).toContain('setIncoming([])');
