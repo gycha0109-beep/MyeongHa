@@ -1,4 +1,4 @@
-import { ApiCommandError } from './chat-receive.js';
+import { ApiCommandError } from './api-error.js';
 
 export const BIRTH_PROFILE_CREATE_AUTHORITY_BINDING_V1 =
   'public.cmd_create_birth_profile_v1' as const;
