@@ -84,11 +84,11 @@ function requireResolverRow(
   rows: readonly ResolverRowV1[],
   expectedKind: ResolvedSubjectKindV1,
 ): ResolvedSubjectContextV1 {
-  if (rows.length !== 1) {
+  const row = rows[0];
+  if (rows.length !== 1 || row === undefined) {
     throw new Error('PostgreSQL subject resolver did not return exactly one canonical subject.');
   }
 
-  const row = rows[0];
   if (typeof row.subjectId !== 'string' || row.subjectId.trim().length === 0) {
     throw new Error('PostgreSQL subject resolver returned an invalid canonical subject id.');
   }
