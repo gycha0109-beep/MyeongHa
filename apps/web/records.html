@@ -1,28 +1,117 @@
 <!doctype html>
-<html lang="ko" data-theme="night">
+<html lang="ko">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="명하 기록 — 현세록, 명식록, 대리자 기억을 한곳에서 확인합니다." />
   <title>기록 · 명하</title>
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="product.css" />
+  <link rel="stylesheet" href="records-v2.css" />
 </head>
-<body data-page="records">
-  <header class="topbar"><div class="shell topbar-inner"><a class="brand" href="index.html"><span class="brand-seal">命河</span><span>명하</span></a><nav class="topnav"><a href="records.html" aria-current="page">기록</a><button class="theme-toggle" data-theme-toggle type="button">☼</button></nav></div></header>
-  <main class="world-frame"><section class="page"><div class="shell records-layout">
-    <aside class="records-side"><div class="avatar avatar-lg" aria-hidden="true">命</div><div id="records-display-name" class="display display-md">기록 불러오는 중</div><p id="records-subject-kind" class="muted">현재 기록</p><nav aria-label="기록 메뉴"><a href="hall.html">개요</a><a href="records.html" aria-current="page">기록</a><a href="chat-hub.html">대화</a></nav></aside>
-    <section class="records-main">
-      <div class="eyebrow">MY RECORDS</div><h1 class="display display-lg" style="margin:6px 0 8px">기록</h1>
-      <p class="lead" style="margin-top:0">태어난 순간의 기록, 사용자가 확인한 현재 삶의 사실, 대리자에게 허용한 기억을 서로 다른 authority로 조회합니다.</p>
-      <p class="fine">이 화면은 현재 read-only입니다. 삭제·철회·수정 정책을 화면에서 임의로 확정하지 않습니다.</p>
-      <div id="records-status" class="panel" style="padding:22px;margin-top:22px" role="status">기록을 불러오는 중입니다…</div>
-      <div id="records-content" hidden>
-        <div class="tabs" role="tablist" aria-label="기록 종류"><button class="tab" role="tab" aria-selected="true" aria-controls="life-records">현세록</button><button class="tab" role="tab" aria-selected="false" aria-controls="birth-records">명식록</button><button class="tab" role="tab" aria-selected="false" aria-controls="memory-records">대리자 기억</button></div>
-        <section id="life-records" class="tab-panel"><div class="panel ledger" style="margin-top:20px"><div class="ledger-row ledger-head"><div>확인일</div><div>저장된 사실</div><div>상태</div></div><div id="life-records-list"></div></div></section>
-        <section id="birth-records" class="tab-panel" hidden><div id="birth-records-list" class="records-grid" style="margin-top:20px"></div></section>
-        <section id="memory-records" class="tab-panel" hidden><div class="panel side-card" style="margin-top:20px"><div class="eyebrow">현재 기억</div><div id="memory-records-list" class="timeline"></div><p class="fine">캐릭터별 공개 grant는 별도 authority이며 이 첫 read-only slice에서는 집계해 추측하지 않습니다.</p></div></section>
+<body class="product-page records-page" data-page="records">
+  <header class="product-header">
+    <div class="product-shell product-header-inner">
+      <a class="product-brand" href="hall.html" aria-label="명하 홈">
+        <span class="product-brand-name">명하</span>
+        <span class="product-brand-seal" aria-hidden="true">明河</span>
+        <span class="product-brand-sub">MyeongHa</span>
+      </a>
+      <nav class="product-nav" aria-label="주요 메뉴">
+        <a class="product-nav-link" href="hall.html">홈</a>
+        <a class="product-nav-link" href="reading.html">사주</a>
+        <a class="product-nav-link" href="chat-hub.html">대화</a>
+        <a class="product-nav-link" href="records.html" aria-current="page">기록</a>
+        <a class="product-nav-link" href="my.html">마이</a>
+      </nav>
+      <div class="product-utilities">
+        <button class="product-icon-button" type="button" aria-label="알림"></button>
+        <a class="product-profile" href="my.html" aria-label="마이 페이지">
+          <span class="product-profile-mark" aria-hidden="true">之</span>
+          <span>마이</span>
+        </a>
       </div>
-    </section>
-  </div></section></main>
-  <script src="app.js" defer></script><script type="module" src="records-page.js"></script>
+    </div>
+  </header>
+
+  <main class="records-main">
+    <div class="product-shell">
+      <header class="records-head">
+        <div>
+          <div class="records-kicker">MY RECORDS</div>
+          <h1 class="records-title">기록</h1>
+        </div>
+        <p class="records-lead">내가 남긴 삶의 사실과 태어난 순간의 기록, 대리자가 기억하고 있는 내용을 서로 섞지 않고 확인합니다.</p>
+      </header>
+
+      <div id="records-status" class="records-status" role="status">기록을 불러오는 중입니다…</div>
+
+      <div id="records-content" hidden>
+        <section class="records-profile-strip" aria-label="현재 기록 주체">
+          <div class="records-profile-mark" aria-hidden="true">之</div>
+          <div>
+            <div id="records-display-name" class="records-profile-name">호칭 미설정</div>
+            <div id="records-subject-kind" class="records-profile-kind">현재 기록</div>
+          </div>
+          <div class="records-profile-actions">
+            <a href="birth.html">명식록 추가</a>
+            <a href="my.html">내 정보 보기</a>
+          </div>
+        </section>
+
+        <div class="records-tabs" role="tablist" aria-label="기록 종류">
+          <button class="records-tab" type="button" role="tab" aria-selected="true" aria-controls="life-records" id="life-records-tab">현세록</button>
+          <button class="records-tab" type="button" role="tab" aria-selected="false" aria-controls="birth-records" id="birth-records-tab">명식록</button>
+          <button class="records-tab" type="button" role="tab" aria-selected="false" aria-controls="memory-records" id="memory-records-tab">대리자 기억</button>
+        </div>
+
+        <section id="life-records" class="records-tab-panel" role="tabpanel" aria-labelledby="life-records-tab">
+          <div class="records-panel ledger">
+            <div class="records-panel-head">
+              <div><span class="records-kicker">LIFE</span><h2>현세록</h2></div>
+              <p>현재 계정에 확인되어 남아 있는 삶의 사실을 시간 순서대로 봅니다.</p>
+            </div>
+            <div class="ledger-row ledger-head"><div>확인일</div><div>기록</div><div>상태</div></div>
+            <div id="life-records-list"></div>
+          </div>
+        </section>
+
+        <section id="birth-records" class="records-tab-panel" role="tabpanel" aria-labelledby="birth-records-tab" hidden>
+          <div class="records-panel-head records-panel" style="margin-bottom:14px">
+            <div><span class="records-kicker">BIRTH</span><h2>명식록</h2></div>
+            <p>태어난 순간의 원본 입력과 연결된 기록을 확인합니다.</p>
+          </div>
+          <div id="birth-records-list" class="records-grid"></div>
+        </section>
+
+        <section id="memory-records" class="records-tab-panel" role="tabpanel" aria-labelledby="memory-records-tab" hidden>
+          <div class="records-panel">
+            <div class="records-panel-head">
+              <div><span class="records-kicker">MEMORY</span><h2>대리자 기억</h2></div>
+              <p>현재 저장되어 있는 기억 항목만 보여드립니다.</p>
+            </div>
+            <div id="memory-records-list" class="timeline"></div>
+            <p class="records-memory-note">캐릭터마다 실제로 볼 수 있는 기억 범위는 서로 다를 수 있습니다.</p>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <footer class="product-footer">
+    <div class="product-shell product-footer-inner">
+      <span>© 2026 MyeongHa. All rights reserved.</span>
+      <span class="product-footer-seal" aria-hidden="true">明河</span>
+    </div>
+  </footer>
+
+  <nav class="mobile-bottom-nav" aria-label="모바일 주요 메뉴">
+    <a class="mobile-nav-link" href="hall.html"><span class="mobile-nav-icon" aria-hidden="true">⌂</span><span>홈</span></a>
+    <a class="mobile-nav-link" href="reading.html"><span class="mobile-nav-icon" aria-hidden="true">✦</span><span>사주</span></a>
+    <a class="mobile-nav-link" href="chat-hub.html"><span class="mobile-nav-icon" aria-hidden="true">◌</span><span>대화</span></a>
+    <a class="mobile-nav-link" href="records.html" aria-current="page"><span class="mobile-nav-icon" aria-hidden="true">▤</span><span>기록</span></a>
+    <a class="mobile-nav-link" href="my.html"><span class="mobile-nav-icon" aria-hidden="true">♙</span><span>마이</span></a>
+  </nav>
+
+  <script type="module" src="records-page.js"></script>
 </body>
 </html>
