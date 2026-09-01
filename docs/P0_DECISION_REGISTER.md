@@ -1,8 +1,8 @@
-# 명하 Production P0 Decision Register — Full Audit v0.3
+# 명하 Production P0 Decision Register — Full Audit v0.4
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.3**  
-> Date: **2026-08-25**  
+> Pack Version: **v0.4**  
+> Date: **2026-09-02**  
 > Source Authority: `Usecase_re_reviewed_v2(1).md`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`, `Myeonghwa_Personalized_Interpretation_Architecture_v1.3_THIRD_REVIEW(1).md`  
 > Rule: 본 문서는 위 source authority를 구현 수준으로 구체화한다. source가 결정하지 않은 사항은 임의 확정하지 않고 `OPEN-P0` 또는 `CANDIDATE`로 표시한다.
 
@@ -21,7 +21,7 @@
 | `P0-AI-01` | AI provider/model/fallback | **OPEN-P0** | provider, model family, fallback, grounded-response validation implementation |
 | `P0-AGE-01` | Minimum age / character content policy | **OPEN-P0** | 최소 이용 연령, 미성년 허용 여부, 표현 강도/제한; content bundle policy-tag slot은 미리 두되 threshold/matrix는 미확정 |
 | `P0-PR-01` | Retention / backup / legal retention | **OPEN-P0** | 제품 개인정보, AI trace, 결제/회계 증적, backup retention/deletion |
-| `P0-AUTH-01` | API→PostgreSQL execution identity / RLS enforcement model | **OPEN-P0** | user JWT/PostgREST delegation vs non-BYPASSRLS API role + transaction-scoped subject context; service-role-only user CRUD는 RLS baseline으로 간주하지 않음 |
+| `P0-AUTH-01` | API→PostgreSQL execution identity / RLS enforcement model | **DECIDED** | non-BYPASSRLS API execution role + transaction-scoped trusted canonical `subject_id` context |
 
 ## 3. 상태 규칙
 
@@ -36,7 +36,59 @@ SUPERSEDED
 → 새 decision ID를 가리킨다.
 ```
 
-## 4. Decision Record Template
+## 4. Decision Records
+
+### P0-AUTH-01
+
+```yaml
+id: P0-AUTH-01
+status: DECIDED
+decided_at: 2026-09-02
+choice: non-BYPASSRLS API execution role + transaction-scoped trusted canonical subject context
+canonical_owner: subjects.id
+member_resolution:
+  evidence: verified Supabase authentication identity
+  mapping: auth.users.id -> subjects.auth_user_id -> canonical subjects.id
+  eligible_subject: member with status active or deletion_pending
+guest_resolution:
+  evidence: API-verified guest credential
+  mapping: guest verifier fingerprint -> guest_sessions -> canonical subjects.id
+  eligible_subject: active guest with active unconsumed session
+ordinary_user_execution:
+  role: dedicated NOBYPASSRLS API execution role
+  context: canonical subject_id scoped to the current PostgreSQL transaction
+authorization:
+  - RLS/default-deny on activated user-owned tables
+  - existing qry_*/cmd_* object-level authorization
+  - explicit subject-parameter/context parity checks on activated boundaries
+system_execution:
+  model: separate explicitly privileged execution identity for workers/admin/lifecycle operations
+forbidden:
+  - auth.uid() == subject_id assumption
+  - client-supplied subject_id or userId as owner authority
+  - service-role/BYPASSRLS-only ordinary user CRUD baseline
+  - request subject context surviving the transaction or leaking through a pooled connection
+rationale:
+  - subjects.id is the canonical owner for both Guest and Member resources.
+  - Guest identity has no auth.users identity and is already API-verified before canonical subject resolution.
+  - A single server-trusted subject execution model keeps Member and Guest authorization on the same owner axis without making auth.uid() the product owner key.
+  - Existing qry_*/cmd_* contracts already accept canonical subject_id and are compatible with an API-resolved execution context.
+affected_specs:
+  - docs/AUTH_RLS_PRIVACY_SPEC.md
+  - docs/RUNTIME_STATUS.md
+  - supabase/migrations/0010_auth_owner.sql
+  - supabase/migrations/0510_subject_profile_current_query.sql
+migration_impact:
+  - introduce a dedicated non-login NOBYPASSRLS API execution role contract
+  - introduce transaction-scoped canonical subject context and narrow Member/Guest resolver functions
+  - activate RLS incrementally per user-owned vertical slice rather than enabling unverified broad access in one migration
+  - grant only the table columns/functions required by each activated slice
+rollback_or_change_policy: execution-model changes require a new explicit decision record and migration; never silently fall back to user-JWT delegation or privileged ordinary CRUD
+```
+
+### Remaining open decisions
+
+Use the following template when another P0 becomes authoritative:
 
 ```yaml
 id: P0-...
