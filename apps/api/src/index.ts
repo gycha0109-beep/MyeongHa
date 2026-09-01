@@ -236,6 +236,21 @@ export {
 } from './character-relationship-read.js';
 
 export {
+  CHARACTER_CATALOG_READ_AUTHORITY_BINDING_V1,
+  CharacterCatalogReadAuthorityPortErrorV1,
+  readCharacterCatalogForResolvedBundle,
+  type CharacterCatalogAuthorityRowV1,
+  type CharacterCatalogAvailabilityV1,
+  type CharacterCatalogContentAuthorityPortV1,
+  type CharacterCatalogContentRowV1,
+  type CharacterCatalogReadAuthorityFailureCodeV1,
+  type CharacterCatalogReadAuthorityPortV1,
+  type CharacterCatalogReadItemV1,
+  type CharacterCatalogReadResponseV1,
+  type ReadCharacterCatalogForResolvedBundleInputV1,
+} from './character-catalog-read.js';
+
+export {
   ENTITLEMENTS_READ_AUTHORITY_BINDING_V1,
   EntitlementsReadAuthorityPortErrorV1,
   getEntitlements,
