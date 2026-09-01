@@ -6,6 +6,8 @@ const chatCssPath = new URL('../apps/web/chat-room.css', import.meta.url);
 const chatRuntimeCssPath = new URL('../apps/web/chat-runtime.css', import.meta.url);
 const characterPresentationPath = new URL('../apps/web/chat-character.js', import.meta.url);
 const transportPath = new URL('../apps/web/chat-runtime-client.js', import.meta.url);
+const chatRequestContractPath = new URL('../packages/contracts/src/chat-request.ts', import.meta.url);
+const apiContractPath = new URL('../docs/API_CONTRACT.md', import.meta.url);
 
 describe('MyeongHa immersive Character Room v1', () => {
   it('keeps the focused visual-novel-like room and adds the runtime transport layer', async () => {
@@ -71,20 +73,48 @@ describe('MyeongHa immersive Character Room v1', () => {
     expect(css).toContain('url("home-plum-branch.svg")');
   });
 
-  it('hydrates only through same-origin runtime endpoints and sends presentation keys, never inferred canonical ids', async () => {
-    const transport = await readFile(transportPath, 'utf8');
+  it('hydrates the room through the canonical read route and common success envelope', async () => {
+    const [transport, apiContract] = await Promise.all([
+      readFile(transportPath, 'utf8'),
+      readFile(apiContractPath, 'utf8'),
+    ]);
 
-    expect(transport).toContain("new URL('/api/chat/thread', window.location.origin)");
-    expect(transport).toContain("fetch('/api/chat/turn'");
+    expect(apiContract).toContain('### `GET /api/chat/:threadId`');
+    expect(transport).toContain("new URL(`/api/chat/${encodeURIComponent(threadId)}`, window.location.origin)");
     expect(transport).toContain("credentials: 'same-origin'");
+    expect(transport).toContain("cache: 'no-store'");
+    expect(transport).toContain("url.searchParams.set('afterSequenceNo', '0')");
     expect(transport).toContain("url.searchParams.set('presentationKey', characterKey)");
-    expect(transport).toContain('presentationKey: characterKey');
+    expect(transport).toContain("import('./api-envelope.js')");
+    expect(transport).toContain('unwrapApiSuccessEnvelope(envelope)');
     expect(transport).toContain('payload.presentationKey !== characterKey');
+    expect(transport).not.toContain("new URL('/api/chat/thread', window.location.origin)");
     expect(transport).not.toContain("url.searchParams.set('character', characterKey)");
-    expect(transport).not.toContain('characterId: characterKey');
     expect(transport).not.toContain('supabase.co');
     expect(transport).not.toContain('sb_publishable_');
     expect(transport).not.toContain('service_role');
+  });
+
+  it('fails chat mutation closed instead of inventing a client capability or canonical character authority', async () => {
+    const [transport, requestContract, apiContract] = await Promise.all([
+      readFile(transportPath, 'utf8'),
+      readFile(chatRequestContractPath, 'utf8'),
+      readFile(apiContractPath, 'utf8'),
+    ]);
+
+    expect(apiContract).toContain('### `POST /api/chat`');
+    expect(apiContract).toContain('### `GET /api/capabilities`');
+    expect(apiContract).toContain('Character/thread resolution은 server가 한다.');
+    expect(requestContract).toContain('readonly clientCapability: string;');
+    expect(requestContract).toContain('readonly characterId?: string;');
+
+    expect(transport).toContain('ChatRequestV1 requires clientCapability');
+    expect(transport).toContain('현재 메시지를 보낼 수 없습니다. 입력한 내용은 그대로 남아 있습니다.');
+    expect(transport).not.toContain("fetch('/api/chat/turn'");
+    expect(transport).not.toContain("method: 'POST'");
+    expect(transport).not.toContain('presentationKey: characterKey');
+    expect(transport).not.toContain('characterId: characterKey');
+    expect(transport).not.toContain('clientCapability:');
   });
 
   it('keeps failed submissions in the composer and does not fabricate a reply', async () => {
@@ -99,8 +129,8 @@ describe('MyeongHa immersive Character Room v1', () => {
     expect(presentation).not.toContain('setTimeout');
 
     expect(transport).toContain('event.preventDefault()');
-    expect(transport).toContain('메시지를 보내지 못했습니다. 입력한 내용은 그대로 남아 있습니다.');
-    expect(transport).toContain("messageInput.value = ''");
+    expect(transport).toContain('현재 메시지를 보낼 수 없습니다. 입력한 내용은 그대로 남아 있습니다.');
+    expect(transport).not.toContain("messageInput.value = ''");
   });
 
   it('keeps unverified continuation context hidden until an authority supplies it', async () => {
