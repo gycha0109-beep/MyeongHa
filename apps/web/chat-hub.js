@@ -147,7 +147,7 @@ function createPersonCard(person) {
   action.href = roomHref(person.key);
 
   const actionLabel = document.createElement('span');
-  actionLabel.textContent = '처음 이야기하기';
+  actionLabel.textContent = '이야기하기';
   const actionArrow = document.createElement('span');
   actionArrow.setAttribute('aria-hidden', 'true');
   actionArrow.textContent = '→';
