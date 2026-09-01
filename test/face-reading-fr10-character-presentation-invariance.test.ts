@@ -1,37 +1,66 @@
 import { describe, expect, it } from 'vitest';
 import {
-  buildResearchFaceDiagnosis,
-  type FaceResearchDiagnosisInput,
-} from '../packages/face-reading/src/index.js';
-import {
-  presentResearchFaceDiagnosisForCharacter,
+  presentResearchFaceGroundingForCharacter,
   validateCharacterFacePresentationProfileV1,
   type CharacterFacePresentationModeV1,
+  type ResearchCharacterFaceGroundingV1,
 } from '../packages/domain/src/index.js';
 
-function diagnosisInput(): FaceResearchDiagnosisInput {
+function grounding(options: { readonly tension?: boolean } = {}): ResearchCharacterFaceGroundingV1 {
+  const tension = options.tension ?? true;
   return {
-    readingRef: 'reading:fr10:test',
-    engineVersion: 'face-research-engine-fr10-v1',
-    sourceSnapshotRef: 'source-snapshot:fr10-v1',
-    assertionAuthority: 'research_fixture',
-    evidenceRefs: ['fixture:fr10:v1'],
-    fiveOfficers: [
+    groundingVersion: 'face-grounding-fr10-v1',
+    faceReadingRef: 'reading:fr10:test',
+    faceEngineVersion: 'face-research-engine-fr10-v1',
+    methodologyPackRef: 'face-fr3-research-pack-v0@0.1.0',
+    semanticClaims: [
       {
-        officerKey: 'discernment',
-        criterionStates: {
-          'criterion.discernment.bridge_straight': 'met',
-          'criterion.discernment.tip_round_full': 'met',
-        },
+        key: 'face.five_officers.discernment.static_support.complete',
+        axis: 'five_officers',
+        pattern: 'complete',
+        claimRef: 'claim.research.five_officers.discernment.static_support.complete',
       },
       {
-        officerKey: 'intake',
-        criterionStates: {
-          'criterion.intake.square_broad': 'not_met',
-          'criterion.intake.lips_substantial': 'met',
-        },
+        key: 'face.five_officers.intake.static_support.contradicted',
+        axis: 'five_officers',
+        pattern: 'contradicted',
+        claimRef: 'claim.research.five_officers.intake.static_support.contradicted',
       },
     ],
+    approvedNarrativeBlocks: [
+      {
+        key: 'face.research.framing',
+        text: '이 결과는 연구 단계 관상 판독의 보호된 설명입니다.',
+      },
+      {
+        key: 'face.research.verdict.discernment_complete',
+        text: '심변관이 중심을 잡는 관상입니다.',
+      },
+      {
+        key: 'face.research.feature.discernment_bridge_straight',
+        text: '심변관에서 코의 정적 조건이 선명하게 잡힙니다.',
+      },
+      {
+        key: 'face.research.feature.intake_square_broad',
+        text: '출납관에서 입의 정적 조건에는 분명한 깨짐이 있습니다.',
+      },
+      ...(tension
+        ? [
+            {
+              key: 'face.five_officers.tension.discernment_complete__intake_contradicted',
+              text: '심변관은 서고 출납관은 꺾이는 대비가 이번 판독의 핵심입니다.',
+            },
+          ]
+        : []),
+    ],
+    unavailableSections: [],
+    prohibitedInferences: ['medical_diagnosis', 'biometric_identity'],
+    authorityState: 'research_only',
+    assertionAuthority: 'research_fixture',
+    evidenceRefs: ['fixture:fr10:v1'],
+    semanticSignature: tension
+      ? 'face-research-diagnosis@0.1.0|fr10:tension'
+      : 'face-research-diagnosis@0.1.0|fr10:no-tension',
   };
 }
 
@@ -50,10 +79,8 @@ function profile(mode: CharacterFacePresentationModeV1, characterId: string) {
 }
 
 function presentation(mode: CharacterFacePresentationModeV1, characterId: string) {
-  const diagnosis = buildResearchFaceDiagnosis(diagnosisInput());
-  return presentResearchFaceDiagnosisForCharacter({
-    diagnosis,
-    groundingVersion: 'face-grounding-fr10-v1',
+  return presentResearchFaceGroundingForCharacter({
+    grounding: grounding(),
     character: character(characterId),
     profile: profile(mode, characterId),
   });
@@ -70,7 +97,7 @@ function blockTextMap(value: ReturnType<typeof presentation>): Map<string, strin
 }
 
 describe('FR-10 character Face presentation invariance', () => {
-  it('lets three character modes reorder one protected diagnosis without changing semantics', () => {
+  it('lets three character modes reorder one protected grounding without changing semantics', () => {
     const strongest = presentation('strongest_first', 'character.alpha');
     const contrast = presentation('contrast_first', 'character.beta');
     const detail = presentation('detail_first', 'character.gamma');
@@ -113,7 +140,7 @@ describe('FR-10 character Face presentation invariance', () => {
     expect(detail.followUpStrategy).toBe('inspect_local_detail');
   });
 
-  it('pins each presentation to active character identity and content version without changing diagnosis digest', () => {
+  it('pins each presentation to active character identity and content version without changing grounding digest', () => {
     const alpha = presentation('strongest_first', 'character.alpha');
     const beta = presentation('strongest_first', 'character.beta');
 
@@ -125,21 +152,17 @@ describe('FR-10 character Face presentation invariance', () => {
   });
 
   it('rejects a profile whose character or content version does not match the active character', () => {
-    const diagnosis = buildResearchFaceDiagnosis(diagnosisInput());
-
     expect(() =>
-      presentResearchFaceDiagnosisForCharacter({
-        diagnosis,
-        groundingVersion: 'face-grounding-fr10-v1',
+      presentResearchFaceGroundingForCharacter({
+        grounding: grounding(),
         character: character('character.alpha'),
         profile: profile('strongest_first', 'character.beta'),
       }),
     ).toThrow(/characterId mismatch/u);
 
     expect(() =>
-      presentResearchFaceDiagnosisForCharacter({
-        diagnosis,
-        groundingVersion: 'face-grounding-fr10-v1',
+      presentResearchFaceGroundingForCharacter({
+        grounding: grounding(),
         character: character('character.alpha', 'character-content-other-v1'),
         profile: profile('strongest_first', 'character.alpha'),
       }),
@@ -171,29 +194,8 @@ describe('FR-10 character Face presentation invariance', () => {
   });
 
   it('falls back deterministically when contrast-first has no tension block', () => {
-    const diagnosis = buildResearchFaceDiagnosis({
-      ...diagnosisInput(),
-      fiveOfficers: [
-        {
-          officerKey: 'discernment',
-          criterionStates: {
-            'criterion.discernment.bridge_straight': 'met',
-            'criterion.discernment.tip_round_full': 'met',
-          },
-        },
-        {
-          officerKey: 'intake',
-          criterionStates: {
-            'criterion.intake.square_broad': 'met',
-            'criterion.intake.lips_substantial': 'met',
-          },
-        },
-      ],
-    });
-
-    const value = presentResearchFaceDiagnosisForCharacter({
-      diagnosis,
-      groundingVersion: 'face-grounding-fr10-v1',
+    const value = presentResearchFaceGroundingForCharacter({
+      grounding: grounding({ tension: false }),
       character: character('character.beta'),
       profile: profile('contrast_first', 'character.beta'),
     });
@@ -205,18 +207,19 @@ describe('FR-10 character Face presentation invariance', () => {
     expect(value.orderedBlocks[1]?.key).toMatch(/^face\.research\.verdict\./u);
   });
 
-  it('rejects a structurally forged diagnosis before character presentation', () => {
-    const issued = buildResearchFaceDiagnosis(diagnosisInput());
-    const forged = { ...issued };
+  it('fails closed on malformed grounding before character presentation', () => {
+    const malformed: ResearchCharacterFaceGroundingV1 = {
+      ...grounding(),
+      evidenceRefs: [],
+    };
 
     expect(() =>
-      presentResearchFaceDiagnosisForCharacter({
-        diagnosis: forged,
-        groundingVersion: 'face-grounding-fr10-v1',
+      presentResearchFaceGroundingForCharacter({
+        grounding: malformed,
         character: character('character.fake'),
         profile: profile('strongest_first', 'character.fake'),
       }),
-    ).toThrow(/was not issued/u);
+    ).toThrow(/evidenceRefs must be non-empty/u);
   });
 
   it('fails closed on an unsupported presentation mode', () => {

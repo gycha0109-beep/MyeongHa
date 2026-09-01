@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  buildResearchFaceDiagnosis,
-  type FaceResearchDiagnosisInput,
-} from '../packages/face-reading/src/index.js';
-import {
   validateCharacterFaceSafeFollowUpCatalogV1,
   type CharacterFaceSafeFollowUpCatalogV1,
 } from '../packages/character-content/src/index.js';
@@ -11,31 +7,57 @@ import {
   renderResearchFaceCharacterRuntimeTurn,
   type CharacterFaceRuntimeProjectionV1,
   type CharacterFacePresentationModeV1,
+  type ResearchCharacterFaceGroundingV1,
 } from '../packages/domain/src/index.js';
 
-function diagnosisInput(): FaceResearchDiagnosisInput {
+function grounding(): ResearchCharacterFaceGroundingV1 {
   return {
-    readingRef: 'reading:fr11:test',
-    engineVersion: 'face-research-engine-fr11-v1',
-    sourceSnapshotRef: 'source-snapshot:fr11-v1',
-    assertionAuthority: 'research_fixture',
-    evidenceRefs: ['fixture:fr11:v1'],
-    fiveOfficers: [
+    groundingVersion: 'face-grounding-fr11-v1',
+    faceReadingRef: 'reading:fr11:test',
+    faceEngineVersion: 'face-research-engine-fr11-v1',
+    methodologyPackRef: 'face-fr3-research-pack-v0@0.1.0',
+    semanticClaims: [
       {
-        officerKey: 'discernment',
-        criterionStates: {
-          'criterion.discernment.bridge_straight': 'met',
-          'criterion.discernment.tip_round_full': 'met',
-        },
+        key: 'face.five_officers.discernment.static_support.complete',
+        axis: 'five_officers',
+        pattern: 'complete',
+        claimRef: 'claim.research.five_officers.discernment.static_support.complete',
       },
       {
-        officerKey: 'intake',
-        criterionStates: {
-          'criterion.intake.square_broad': 'not_met',
-          'criterion.intake.lips_substantial': 'met',
-        },
+        key: 'face.five_officers.intake.static_support.contradicted',
+        axis: 'five_officers',
+        pattern: 'contradicted',
+        claimRef: 'claim.research.five_officers.intake.static_support.contradicted',
       },
     ],
+    approvedNarrativeBlocks: [
+      {
+        key: 'face.research.framing',
+        text: '이 결과는 연구 단계 관상 판독의 보호된 설명입니다.',
+      },
+      {
+        key: 'face.research.verdict.discernment_complete',
+        text: '심변관이 중심을 잡는 관상입니다.',
+      },
+      {
+        key: 'face.research.feature.discernment_bridge_straight',
+        text: '심변관에서 코의 정적 조건이 선명하게 잡힙니다.',
+      },
+      {
+        key: 'face.research.feature.intake_square_broad',
+        text: '출납관에서 입의 정적 조건에는 분명한 깨짐이 있습니다.',
+      },
+      {
+        key: 'face.five_officers.tension.discernment_complete__intake_contradicted',
+        text: '심변관은 서고 출납관은 꺾이는 대비가 이번 판독의 핵심입니다.',
+      },
+    ],
+    unavailableSections: [],
+    prohibitedInferences: ['medical_diagnosis', 'biometric_identity'],
+    authorityState: 'research_only',
+    assertionAuthority: 'research_fixture',
+    evidenceRefs: ['fixture:fr11:v1'],
+    semanticSignature: 'face-research-diagnosis@0.1.0|fr11:tension',
   };
 }
 
@@ -97,10 +119,8 @@ function runtimeTurn(
   characterId: string,
   trustBand: 'low' | 'medium' | 'high',
 ) {
-  const diagnosis = buildResearchFaceDiagnosis(diagnosisInput());
   return renderResearchFaceCharacterRuntimeTurn({
-    diagnosis,
-    groundingVersion: 'face-grounding-fr11-v1',
+    grounding: grounding(),
     context: runtimeContext(characterId, trustBand),
     presentationProfile: presentationProfile(mode, characterId),
     followUpCatalog: followUpCatalog(characterId),
@@ -159,11 +179,9 @@ describe('FR-11 Character Runtime Face follow-up projection', () => {
     expect(value.presentation.orderedBlocks.every((block) => protectedTexts.has(block.text))).toBe(true);
   });
 
-  it('relationship revision changes do not alter the protected diagnosis digest', () => {
-    const diagnosis = buildResearchFaceDiagnosis(diagnosisInput());
+  it('relationship revision changes do not alter the protected grounding digest', () => {
     const common = {
-      diagnosis,
-      groundingVersion: 'face-grounding-fr11-v1',
+      grounding: grounding(),
       presentationProfile: presentationProfile('detail_first', 'character.gamma'),
       followUpCatalog: followUpCatalog('character.gamma'),
     };
@@ -182,12 +200,9 @@ describe('FR-11 Character Runtime Face follow-up projection', () => {
   });
 
   it('rejects follow-up catalogs that do not belong to the active character content', () => {
-    const diagnosis = buildResearchFaceDiagnosis(diagnosisInput());
-
     expect(() =>
       renderResearchFaceCharacterRuntimeTurn({
-        diagnosis,
-        groundingVersion: 'face-grounding-fr11-v1',
+        grounding: grounding(),
         context: runtimeContext('character.alpha', 'medium'),
         presentationProfile: presentationProfile('strongest_first', 'character.alpha'),
         followUpCatalog: followUpCatalog('character.beta'),
@@ -196,8 +211,7 @@ describe('FR-11 Character Runtime Face follow-up projection', () => {
 
     expect(() =>
       renderResearchFaceCharacterRuntimeTurn({
-        diagnosis,
-        groundingVersion: 'face-grounding-fr11-v1',
+        grounding: grounding(),
         context: runtimeContext('character.alpha', 'medium', { contentVersion: 'character-content-other-v1' }),
         presentationProfile: presentationProfile('strongest_first', 'character.alpha'),
         followUpCatalog: followUpCatalog('character.alpha'),
@@ -232,18 +246,19 @@ describe('FR-11 Character Runtime Face follow-up projection', () => {
     expect(() => validateCharacterFaceSafeFollowUpCatalogV1(declarative)).toThrow(/must end as a question/u);
   });
 
-  it('rejects a forged FR-9 diagnosis before Character Runtime projection', () => {
-    const issued = buildResearchFaceDiagnosis(diagnosisInput());
-    const forged = { ...issued };
+  it('fails closed on malformed Face grounding before Character Runtime projection', () => {
+    const malformed: ResearchCharacterFaceGroundingV1 = {
+      ...grounding(),
+      semanticClaims: [],
+    };
 
     expect(() =>
       renderResearchFaceCharacterRuntimeTurn({
-        diagnosis: forged,
-        groundingVersion: 'face-grounding-fr11-v1',
+        grounding: malformed,
         context: runtimeContext('character.alpha', 'medium'),
         presentationProfile: presentationProfile('strongest_first', 'character.alpha'),
         followUpCatalog: followUpCatalog('character.alpha'),
       }),
-    ).toThrow(/was not issued/u);
+    ).toThrow(/semanticClaims must be non-empty/u);
   });
 });

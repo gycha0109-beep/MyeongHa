@@ -7,11 +7,6 @@ import {
   type CharacterFacePresentationModeV1,
   type CharacterFacePresentationProfileV1,
 } from '../../character-content/src/face-presentation.js';
-import {
-  projectResearchFaceDiagnosisGrounding,
-  type FaceResearchCharacterGrounding,
-  type FaceResearchDiagnosisOutput,
-} from '../../face-reading/src/index.js';
 
 export {
   validateCharacterFacePresentationProfileForCharacterV1,
@@ -23,6 +18,32 @@ export type {
   CharacterFacePresentationModeV1,
   CharacterFacePresentationProfileV1,
 };
+
+export interface CharacterFaceGroundingV1 {
+  readonly groundingVersion: string;
+  readonly faceReadingRef: string;
+  readonly faceEngineVersion: string;
+  readonly methodologyPackRef: string;
+  readonly semanticClaims: readonly {
+    readonly key: string;
+    readonly axis?: string;
+    readonly pattern?: string;
+    readonly claimRef: string;
+  }[];
+  readonly approvedNarrativeBlocks?: readonly {
+    readonly key: string;
+    readonly text: string;
+  }[];
+  readonly unavailableSections: readonly string[];
+  readonly prohibitedInferences: readonly string[];
+}
+
+export interface ResearchCharacterFaceGroundingV1 extends CharacterFaceGroundingV1 {
+  readonly authorityState: 'research_only';
+  readonly assertionAuthority: 'research_fixture' | 'human_label_assertion';
+  readonly evidenceRefs: readonly string[];
+  readonly semanticSignature: string;
+}
 
 export type CharacterFacePresentationFocusV1 =
   | 'dominant_feature'
@@ -46,7 +67,7 @@ export interface CharacterFacePresentationV1 {
   readonly fallbackReason: 'no_tension_block' | null;
   readonly emphasisBlockKey: string;
   readonly protectedDiagnosisDigest: string;
-  readonly protectedGrounding: FaceResearchCharacterGrounding;
+  readonly protectedGrounding: ResearchCharacterFaceGroundingV1;
   readonly orderedBlocks: readonly CharacterFacePresentationBlockV1[];
 }
 
@@ -65,6 +86,21 @@ function nonEmpty(value: string, path: string): void {
   }
 }
 
+function nonEmptyUnique(values: readonly string[], path: string): readonly string[] {
+  if (values.length === 0) {
+    throw new CharacterFacePresentationError(`${path} must be non-empty.`);
+  }
+  const seen = new Set<string>();
+  return values.map((value) => {
+    nonEmpty(value, path);
+    if (seen.has(value)) {
+      throw new CharacterFacePresentationError(`${path} contains duplicate value: ${value}`);
+    }
+    seen.add(value);
+    return value;
+  });
+}
+
 function deepFreeze<T>(value: T): T {
   if (value !== null && typeof value === 'object' && !Object.isFrozen(value)) {
     for (const child of Object.values(value as Record<string, unknown>)) deepFreeze(child);
@@ -73,7 +109,86 @@ function deepFreeze<T>(value: T): T {
   return value;
 }
 
-function classifyApprovedBlocks(grounding: FaceResearchCharacterGrounding): ClassifiedBlocks {
+function normalizeResearchGrounding(
+  grounding: ResearchCharacterFaceGroundingV1,
+): ResearchCharacterFaceGroundingV1 {
+  if (grounding.authorityState !== 'research_only') {
+    throw new CharacterFacePresentationError(
+      `Unsupported Face grounding authority state: ${String(grounding.authorityState)}`,
+    );
+  }
+  if (
+    grounding.assertionAuthority !== 'research_fixture' &&
+    grounding.assertionAuthority !== 'human_label_assertion'
+  ) {
+    throw new CharacterFacePresentationError(
+      `Unsupported Face grounding assertion authority: ${String(grounding.assertionAuthority)}`,
+    );
+  }
+
+  nonEmpty(grounding.groundingVersion, 'faceGrounding.groundingVersion');
+  nonEmpty(grounding.faceReadingRef, 'faceGrounding.faceReadingRef');
+  nonEmpty(grounding.faceEngineVersion, 'faceGrounding.faceEngineVersion');
+  nonEmpty(grounding.methodologyPackRef, 'faceGrounding.methodologyPackRef');
+  nonEmpty(grounding.semanticSignature, 'faceGrounding.semanticSignature');
+
+  const evidenceRefs = nonEmptyUnique(grounding.evidenceRefs, 'faceGrounding.evidenceRefs');
+  const prohibitedInferences = nonEmptyUnique(
+    grounding.prohibitedInferences,
+    'faceGrounding.prohibitedInferences',
+  );
+  const unavailableSections = grounding.unavailableSections.map((section) => {
+    nonEmpty(section, 'faceGrounding.unavailableSections');
+    return section;
+  });
+
+  if (grounding.semanticClaims.length === 0) {
+    throw new CharacterFacePresentationError('faceGrounding.semanticClaims must be non-empty.');
+  }
+  const claimRefs = new Set<string>();
+  const semanticClaims = grounding.semanticClaims.map((claim) => {
+    nonEmpty(claim.key, 'faceGrounding.semanticClaim.key');
+    nonEmpty(claim.claimRef, 'faceGrounding.semanticClaim.claimRef');
+    if (claimRefs.has(claim.claimRef)) {
+      throw new CharacterFacePresentationError(
+        `faceGrounding.semanticClaims contains duplicate claimRef: ${claim.claimRef}`,
+      );
+    }
+    claimRefs.add(claim.claimRef);
+    if (claim.axis !== undefined) nonEmpty(claim.axis, `faceGrounding.semanticClaim.${claim.claimRef}.axis`);
+    if (claim.pattern !== undefined) {
+      nonEmpty(claim.pattern, `faceGrounding.semanticClaim.${claim.claimRef}.pattern`);
+    }
+    return {
+      key: claim.key,
+      ...(claim.axis === undefined ? {} : { axis: claim.axis }),
+      ...(claim.pattern === undefined ? {} : { pattern: claim.pattern }),
+      claimRef: claim.claimRef,
+    };
+  });
+
+  const approvedNarrativeBlocks = grounding.approvedNarrativeBlocks?.map((block) => ({
+    key: block.key,
+    text: block.text,
+  }));
+
+  return deepFreeze({
+    groundingVersion: grounding.groundingVersion,
+    faceReadingRef: grounding.faceReadingRef,
+    faceEngineVersion: grounding.faceEngineVersion,
+    methodologyPackRef: grounding.methodologyPackRef,
+    semanticClaims,
+    ...(approvedNarrativeBlocks === undefined ? {} : { approvedNarrativeBlocks }),
+    unavailableSections,
+    prohibitedInferences,
+    authorityState: 'research_only' as const,
+    assertionAuthority: grounding.assertionAuthority,
+    evidenceRefs,
+    semanticSignature: grounding.semanticSignature,
+  });
+}
+
+function classifyApprovedBlocks(grounding: ResearchCharacterFaceGroundingV1): ClassifiedBlocks {
   const blocks = grounding.approvedNarrativeBlocks;
   if (blocks === undefined || blocks.length === 0) {
     throw new CharacterFacePresentationError('Research Face grounding requires approved narrative blocks.');
@@ -128,7 +243,7 @@ function classifyApprovedBlocks(grounding: FaceResearchCharacterGrounding): Clas
   });
 }
 
-function protectedGroundingDigest(grounding: FaceResearchCharacterGrounding): string {
+function protectedGroundingDigest(grounding: ResearchCharacterFaceGroundingV1): string {
   const semanticClaims = [...grounding.semanticClaims]
     .sort((left, right) => left.claimRef.localeCompare(right.claimRef))
     .map((claim) => ({
@@ -160,7 +275,7 @@ function protectedGroundingDigest(grounding: FaceResearchCharacterGrounding): st
 }
 
 function assertExactBlockCoverage(
-  grounding: FaceResearchCharacterGrounding,
+  grounding: ResearchCharacterFaceGroundingV1,
   orderedBlocks: readonly CharacterFacePresentationBlockV1[],
 ): void {
   const source = grounding.approvedNarrativeBlocks ?? [];
@@ -236,15 +351,14 @@ function presentationPlan(
   };
 }
 
-export function presentResearchFaceDiagnosisForCharacter(input: {
-  readonly diagnosis: FaceResearchDiagnosisOutput;
-  readonly groundingVersion: string;
+export function presentResearchFaceGroundingForCharacter(input: {
+  readonly grounding: ResearchCharacterFaceGroundingV1;
   readonly character: CharacterFacePresentationContentIdentityV1;
   readonly profile: CharacterFacePresentationProfileV1;
 }): CharacterFacePresentationV1 {
   validateCharacterFacePresentationProfileForCharacterV1(input.profile, input.character);
 
-  const grounding = projectResearchFaceDiagnosisGrounding(input.diagnosis, input.groundingVersion);
+  const grounding = normalizeResearchGrounding(input.grounding);
   const blocks = classifyApprovedBlocks(grounding);
   const plan = presentationPlan(input.profile.mode, blocks);
   assertExactBlockCoverage(grounding, plan.orderedBlocks);
