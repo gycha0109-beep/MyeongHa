@@ -1,4 +1,6 @@
-const DEFAULT_PROFILE_ENDPOINT = '/v1/profile';
+import { unwrapApiSuccessEnvelope, WebApiEnvelopeError } from './api-envelope.js';
+
+const DEFAULT_PROFILE_ENDPOINT = '/api/me';
 
 export class HomeRuntimeError extends Error {
   constructor(code, message, cause) {
@@ -47,14 +49,21 @@ export function createHomeRuntimeClient(options = {}) {
         throw new HomeRuntimeError('WEB_HOME_PROFILE_REQUEST_FAILED', `Home profile request failed with status ${response.status}.`);
       }
 
-      let payload;
+      let envelope;
       try {
-        payload = await response.json();
+        envelope = await response.json();
       } catch (error) {
         throw new HomeRuntimeError('WEB_HOME_MALFORMED_PROFILE', 'Home profile API returned invalid JSON.', error);
       }
 
-      return assertProfilePayload(payload);
+      try {
+        return assertProfilePayload(unwrapApiSuccessEnvelope(envelope));
+      } catch (error) {
+        if (error instanceof WebApiEnvelopeError) {
+          throw new HomeRuntimeError('WEB_HOME_MALFORMED_PROFILE', error.message, error);
+        }
+        throw error;
+      }
     },
   });
 }
