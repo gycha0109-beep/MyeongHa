@@ -23,12 +23,12 @@ function formatTimestamp(value) {
 }
 
 function formatStoredValue(value) {
-  if (value === null) return 'null';
+  if (value === null) return '—';
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return String(value);
   try {
     return JSON.stringify(value);
   } catch {
-    return '[표시할 수 없는 구조화 값]';
+    return '[표시할 수 없는 기록]';
   }
 }
 
@@ -37,6 +37,29 @@ function requireArray(payload, key) {
     throw new RecordsRuntimeError('WEB_RECORDS_MALFORMED_RESPONSE', `Records payload is missing ${key}.`);
   }
   return payload[key];
+}
+
+function setupTabs() {
+  const tabs = Array.from(document.querySelectorAll('.records-tab[role="tab"]'));
+  const panels = Array.from(document.querySelectorAll('.records-tab-panel[role="tabpanel"]'));
+
+  function activate(tab) {
+    const targetId = tab.getAttribute('aria-controls');
+    for (const candidate of tabs) candidate.setAttribute('aria-selected', candidate === tab ? 'true' : 'false');
+    for (const panel of panels) panel.hidden = panel.id !== targetId;
+  }
+
+  tabs.forEach((tab, index) => {
+    tab.addEventListener('click', () => activate(tab));
+    tab.addEventListener('keydown', (event) => {
+      if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+      event.preventDefault();
+      const delta = event.key === 'ArrowRight' ? 1 : -1;
+      const next = tabs[(index + delta + tabs.length) % tabs.length];
+      next.focus();
+      activate(next);
+    });
+  });
 }
 
 function renderProfile(payload) {
@@ -50,8 +73,8 @@ function renderBirthProfileUnavailable() {
   const target = byId('birth-records-list');
   clear(target);
   const card = textElement('article', 'panel side-card', '');
-  card.append(textElement('h3', 'display display-md', '명식록'));
-  card.append(textElement('p', 'muted', '현재 명식록을 자동으로 찾아오는 조회는 아직 연결되지 않았습니다. 확인되지 않은 명식 정보를 대신 표시하지 않습니다.'));
+  card.append(textElement('h3', '', '아직 표시할 명식록이 없습니다.'));
+  card.append(textElement('p', 'muted', '저장된 명식을 이 화면에서 확인할 수 있게 되면 이곳에 표시됩니다. 확인되지 않은 정보는 대신 보여드리지 않습니다.'));
   target.append(card);
 }
 
@@ -60,7 +83,7 @@ function renderLifeFacts(payload) {
   clear(target);
   const facts = requireArray(payload, 'facts');
   if (facts.length === 0) {
-    target.append(textElement('p', 'muted', '저장된 현세록 사실이 없습니다.'));
+    target.append(textElement('p', 'muted records-empty', '아직 남아 있는 현세록이 없습니다.'));
     return;
   }
   for (const fact of facts) {
@@ -68,7 +91,7 @@ function renderLifeFacts(payload) {
     row.className = 'ledger-row';
     row.append(textElement('div', '', formatTimestamp(fact.confirmedAt)));
     const detail = document.createElement('div');
-    detail.append(textElement('strong', '', String(fact.factType ?? '알 수 없는 fact type')));
+    detail.append(textElement('strong', '', String(fact.factType ?? '기록 항목')));
     detail.append(document.createElement('br'));
     detail.append(textElement('span', 'fine', formatStoredValue(fact.valueJsonb)));
     row.append(detail);
@@ -82,13 +105,13 @@ function renderMemories(payload) {
   clear(target);
   const memories = requireArray(payload, 'memories');
   if (memories.length === 0) {
-    target.append(textElement('p', 'muted', '현재 저장된 대리자 기억이 없습니다.'));
+    target.append(textElement('p', 'muted records-empty', '현재 저장된 대리자 기억이 없습니다.'));
     return;
   }
   for (const memory of memories) {
     const item = document.createElement('div');
     item.className = 'timeline-item';
-    item.append(textElement('strong', '', String(memory.memoryType ?? '알 수 없는 memory type')));
+    item.append(textElement('strong', '', String(memory.memoryType ?? '기억 항목')));
     item.append(textElement('span', 'fine', formatStoredValue(memory.contentJsonb)));
     const provenance = memory.createdByCharacterId ? `${memory.createdByCharacterId} · ${formatTimestamp(memory.createdAt)}` : formatTimestamp(memory.createdAt);
     item.append(textElement('span', 'fine', provenance));
@@ -109,13 +132,14 @@ function setFailure(error) {
   status.hidden = false;
   status.setAttribute('role', 'status');
   if (error instanceof RecordsRuntimeError && error.code === 'WEB_RECORDS_SESSION_REQUIRED') {
-    status.textContent = '기록을 보려면 현재 세션이 필요합니다. 로그인/게스트 세션 연결 후 다시 열어 주세요.';
+    status.textContent = '기록을 확인하려면 현재 세션이 필요합니다. 로그인하거나 게스트 세션을 다시 연결한 뒤 확인해 주세요.';
     return;
   }
-  status.textContent = '현재 기록을 불러올 수 없습니다. 확인되지 않은 기록을 대신 표시하지 않습니다.';
+  status.textContent = '현재 기록을 불러올 수 없습니다. 잠시 뒤 다시 확인해 주세요.';
 }
 
 async function boot() {
+  setupTabs();
   const status = byId('records-status');
   status.hidden = false;
   status.textContent = '기록을 불러오는 중입니다…';
