@@ -1,4 +1,4 @@
-import { ApiCommandError } from './chat-receive.js';
+import { ApiCommandError } from './api-error.js';
 
 export const CHARACTER_FORGET_COMMAND_AUTHORITY_BINDING_V1 =
   'public.cmd_forget_character_records_v1' as const;
