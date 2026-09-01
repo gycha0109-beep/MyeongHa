@@ -28,3 +28,9 @@
 - API boundary skeleton
 
 Web/Mobile framework와 production database migration은 authority gap을 우회해 먼저 확정하지 않습니다.
+
+## Runtime status
+
+실제 production/runtime 실행 상태는 repository-local build 및 deployment-configuration 검사와 분리해 [`docs/RUNTIME_STATUS.md`](docs/RUNTIME_STATUS.md)에서 관리합니다.
+
+특히 green `npm run check` 또는 READY 상태의 static Vercel deployment만으로 executable `/api` runtime이나 현재 production Supabase schema가 검증되었다고 간주하지 않습니다.
