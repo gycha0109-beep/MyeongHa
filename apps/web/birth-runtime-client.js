@@ -1,3 +1,5 @@
+import { readApiErrorCode, unwrapApiSuccessEnvelope, WebApiEnvelopeError } from './api-envelope.js';
+
 const DEFAULT_ENDPOINT = '/api/birth-profiles';
 
 export class BirthRuntimeError extends Error {
@@ -69,7 +71,7 @@ export function createBirthRuntimeClient(options = {}) {
 
       if (!response.ok) {
         const payload = await readErrorPayload(response);
-        const publicCode = typeof payload?.code === 'string' ? payload.code : null;
+        const publicCode = readApiErrorCode(payload);
         if (publicCode === 'INVALID_REQUEST') {
           throw new BirthRuntimeError('WEB_BIRTH_INVALID_REQUEST', 'Birth Profile input was rejected.');
         }
@@ -79,14 +81,21 @@ export function createBirthRuntimeClient(options = {}) {
         throw new BirthRuntimeError('WEB_BIRTH_REQUEST_FAILED', `Birth Profile API request failed with status ${response.status}.`);
       }
 
-      let payload;
+      let envelope;
       try {
-        payload = await response.json();
+        envelope = await response.json();
       } catch (error) {
         throw new BirthRuntimeError('WEB_BIRTH_MALFORMED_RESPONSE', 'Birth Profile API returned invalid JSON.', error);
       }
 
-      return assertCreateResponse(payload);
+      try {
+        return assertCreateResponse(unwrapApiSuccessEnvelope(envelope));
+      } catch (error) {
+        if (error instanceof WebApiEnvelopeError) {
+          throw new BirthRuntimeError('WEB_BIRTH_MALFORMED_RESPONSE', error.message, error);
+        }
+        throw error;
+      }
     },
   });
 }
