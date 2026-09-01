@@ -1,4 +1,4 @@
-import { ApiCommandError } from './chat-receive.js';
+import { ApiCommandError } from './api-error.js';
 
 export const DATA_DELETION_JOB_READ_AUTHORITY_BINDING_V1 = 'public.qry_data_deletion_job_v1' as const;
 
