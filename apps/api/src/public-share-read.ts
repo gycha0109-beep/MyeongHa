@@ -1,4 +1,4 @@
-import { ApiCommandError } from './chat-receive.js';
+import { ApiCommandError } from './api-error.js';
 
 export const PUBLIC_SHARE_READ_AUTHORITY_BINDING_V1 =
   'public.qry_public_share_artifact_v1' as const;

@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import type { ApiErrorCode, SajuDomain } from '../../../packages/contracts/src/index.js';
+import type { SajuDomain } from '../../../packages/contracts/src/index.js';
 import {
   parseChatRequestV1,
   type ChatRequestV1,
@@ -10,6 +10,9 @@ import {
   ContentReleaseRuntimeError,
   type ContentReleaseRuntimeEntry,
 } from '../../../packages/world-content/src/index.js';
+import { ApiCommandError } from './api-error.js';
+
+export { ApiCommandError } from './api-error.js';
 
 export interface TrustedThreadBinding {
   readonly threadId: string;
@@ -34,16 +37,6 @@ export interface ChatReceivePlan {
     readonly contentVersion: string;
   };
   readonly requestedCharacterId?: string;
-}
-
-export class ApiCommandError extends Error {
-  constructor(
-    readonly code: ApiErrorCode,
-    message: string,
-  ) {
-    super(message);
-    this.name = 'ApiCommandError';
-  }
 }
 
 function hashRequest(request: ChatRequestV1): string {

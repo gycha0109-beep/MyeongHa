@@ -1,4 +1,4 @@
-import { ApiCommandError } from './chat-receive.js';
+import { ApiCommandError } from './api-error.js';
 
 export const NOTIFICATION_PREFERENCE_READ_AUTHORITY_BINDINGS_V1 = Object.freeze({
   settings: 'public.qry_notification_settings_v1',

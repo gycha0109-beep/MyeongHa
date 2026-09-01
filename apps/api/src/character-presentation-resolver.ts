@@ -1,4 +1,4 @@
-import { ApiCommandError } from './chat-receive.js';
+import { ApiCommandError } from './api-error.js';
 
 /**
  * Public Character Room routing identity. The concrete roster is content data,

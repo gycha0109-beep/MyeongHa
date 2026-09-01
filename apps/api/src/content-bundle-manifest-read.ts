@@ -1,4 +1,4 @@
-import { ApiCommandError } from './chat-receive.js';
+import { ApiCommandError } from './api-error.js';
 
 export const CONTENT_BUNDLE_MANIFEST_READ_AUTHORITY_BINDING_V1 =
   'public.qry_content_bundle_manifest_v1' as const;

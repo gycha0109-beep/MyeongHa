@@ -1,4 +1,4 @@
-import { ApiCommandError } from './chat-receive.js';
+import { ApiCommandError } from './api-error.js';
 
 export const ACCOUNT_DELETION_START_AUTHORITY_BINDING_V1 =
   'public.cmd_start_account_deletion_v1' as const;

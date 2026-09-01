@@ -1,4 +1,4 @@
-import { ApiCommandError } from './chat-receive.js';
+import { ApiCommandError } from './api-error.js';
 
 export const CHAT_TURN_ABANDON_AUTHORITY_BINDING_V1 =
   'public.cmd_abandon_chat_turn_v1' as const;

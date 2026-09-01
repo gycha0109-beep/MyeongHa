@@ -1,4 +1,4 @@
-import { ApiCommandError } from './chat-receive.js';
+import { ApiCommandError } from './api-error.js';
 
 export const SUBJECT_PROFILE_AUTHORITY_BINDINGS_V1 = Object.freeze({
   readCurrent: 'public.qry_subject_profile_current_v1',

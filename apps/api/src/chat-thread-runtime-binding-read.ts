@@ -1,4 +1,4 @@
-import { ApiCommandError } from './chat-receive.js';
+import { ApiCommandError } from './api-error.js';
 
 export const CHAT_THREAD_RUNTIME_BINDING_READ_AUTHORITY_BINDING_V1 =
   'public.qry_chat_thread_runtime_binding_v1' as const;

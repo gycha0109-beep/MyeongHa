@@ -1,4 +1,4 @@
-import { ApiCommandError } from './chat-receive.js';
+import { ApiCommandError } from './api-error.js';
 import {
   getCharacterRelationship,
   type CharacterRelationshipReadAuthorityPortV1,

@@ -1,4 +1,4 @@
-import { ApiCommandError } from './chat-receive.js';
+import { ApiCommandError } from './api-error.js';
 
 export const MEMORY_GRANT_REVOKE_COMMAND_AUTHORITY_BINDING_V1 =
   'public.cmd_revoke_memory_character_grant_v1' as const;

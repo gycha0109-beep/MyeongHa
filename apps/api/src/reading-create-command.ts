@@ -5,7 +5,7 @@ import {
   type SajuDomain,
 } from '../../../packages/contracts/src/index.js';
 import { canonicalJson } from '../../../packages/domain/src/index.js';
-import { ApiCommandError } from './chat-receive.js';
+import { ApiCommandError } from './api-error.js';
 
 export const READING_CREATE_AUTHORITY_BINDING_V1 =
   'public.cmd_create_reading_session_v1' as const;

@@ -1,4 +1,4 @@
-import { ApiCommandError } from './chat-receive.js';
+import { ApiCommandError } from './api-error.js';
 
 export const NOTIFICATION_READ_COMMAND_AUTHORITY_BINDING_V1 =
   'public.cmd_mark_notification_read_v1' as const;

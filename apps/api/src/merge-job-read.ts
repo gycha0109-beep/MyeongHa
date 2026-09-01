@@ -1,4 +1,4 @@
-import { ApiCommandError } from './chat-receive.js';
+import { ApiCommandError } from './api-error.js';
 
 export const MERGE_JOB_READ_AUTHORITY_BINDING_V1 = 'public.qry_subject_merge_job_v1' as const;
 
