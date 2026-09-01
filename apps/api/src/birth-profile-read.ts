@@ -212,8 +212,12 @@ export async function getBirthProfile(
 ): Promise<BirthProfileReadResponseV1> {
   const subjectId = requireResolvedSubjectId(input.resolvedSubjectId);
   const birthProfileId = requireBirthProfileId(input.birthProfileId);
+
   try {
-    const rows = await input.authorityPort.readCurrentRevisionSummary({ subjectId, birthProfileId });
+    const rows = await input.authorityPort.readCurrentRevisionSummary({
+      subjectId,
+      birthProfileId,
+    });
     return assembleBirthProfileResponse(birthProfileId, rows);
   } catch (error) {
     return mapAuthorityError(error);
