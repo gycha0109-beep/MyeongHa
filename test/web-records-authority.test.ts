@@ -16,13 +16,14 @@ describe('web records authority boundary', () => {
     expect(html).not.toContain('관계 이벤트');
   });
 
-  it('keeps the first records slice explicitly read-only', () => {
-    expect(html).toContain('이 화면은 현재 read-only입니다.');
-    expect(html).not.toContain('수정 · 철회');
+  it('keeps Records read-only without exposing mutation controls', () => {
     expect(client).toContain("method: 'GET'");
     expect(client).not.toContain("method: 'POST'");
     expect(client).not.toContain("method: 'PATCH'");
     expect(client).not.toContain("method: 'DELETE'");
+    expect(html).not.toContain('data-record-delete');
+    expect(html).not.toContain('data-record-revoke');
+    expect(html).not.toContain('data-record-edit');
   });
 
   it('uses only canonical server-resolved current-subject reads', () => {
@@ -46,15 +47,15 @@ describe('web records authority boundary', () => {
   it('does not invent a current Birth Profile locator route', () => {
     expect(client).not.toContain('birth-profile');
     expect(client).not.toContain('readBirthProfile');
-    expect(page).toContain('현재 명식록을 자동으로 찾아오는 조회는 아직 연결되지 않았습니다.');
-    expect(page).toContain('확인되지 않은 명식 정보를 대신 표시하지 않습니다.');
+    expect(page).toContain('function renderBirthProfileUnavailable()');
+    expect(page).toContain('확인되지 않은 정보는 대신 보여드리지 않습니다.');
   });
 
   it('fails closed for missing session, failed transport, malformed JSON, and malformed envelopes', () => {
     expect(client).toContain('WEB_RECORDS_SESSION_REQUIRED');
     expect(client).toContain('WEB_RECORDS_REQUEST_FAILED');
     expect(client).toContain('WEB_RECORDS_MALFORMED_RESPONSE');
-    expect(page).toContain('현재 기록을 불러올 수 없습니다. 확인되지 않은 기록을 대신 표시하지 않습니다.');
+    expect(page).toContain('현재 기록을 불러올 수 없습니다. 잠시 뒤 다시 확인해 주세요.');
   });
 
   it('renders stored values as text rather than HTML', () => {
@@ -64,7 +65,7 @@ describe('web records authority boundary', () => {
   });
 
   it('keeps memory grants separate instead of inventing an aggregate grant API', () => {
-    expect(html).toContain('캐릭터별 공개 grant는 별도 authority');
+    expect(html).toContain('캐릭터마다 실제로 볼 수 있는 기억 범위는 서로 다를 수 있습니다.');
     expect(client).not.toContain('access-grants');
     expect(client).not.toContain('readAccessGrants');
   });
