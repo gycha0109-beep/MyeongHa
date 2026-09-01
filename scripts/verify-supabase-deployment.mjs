@@ -52,4 +52,4 @@ if (!migrationFiles.includes('0010_auth_owner.sql')) {
   throw new Error('Expected baseline migration 0010_auth_owner.sql is missing.');
 }
 
-console.log(`MyeongHa Supabase deployment verification passed for ${migrationFiles.length} migration files.`);
+console.log(`MyeongHa Supabase deployment configuration verification passed for ${migrationFiles.length} migration files.`);

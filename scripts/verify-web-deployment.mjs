@@ -145,4 +145,4 @@ if (robotsHeader !== 'noindex, nofollow, noarchive') {
   throw new Error('Prototype deployment must remain noindex until the public-launch gate changes it.');
 }
 
-console.log(`MyeongHa deployment verification passed for ${deployedFiles.length} static files.`);
+console.log(`MyeongHa deployment configuration verification passed for ${deployedFiles.length} static files.`);

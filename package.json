@@ -16,9 +16,9 @@
     "test": "vitest run",
     "build": "tsc -p tsconfig.build.json",
     "build:web": "node scripts/build-web-static.mjs",
-    "verify:deploy": "node scripts/verify-web-deployment.mjs",
-    "verify:deploy:supabase": "node scripts/verify-supabase-deployment.mjs",
-    "check": "npm run typecheck && npm run test && npm run build && npm run build:web && npm run verify:deploy && npm run verify:deploy:supabase"
+    "verify:deployment-config": "node scripts/verify-web-deployment.mjs",
+    "verify:supabase-deployment-config": "node scripts/verify-supabase-deployment.mjs",
+    "check": "npm run typecheck && npm run test && npm run build && npm run build:web && npm run verify:deployment-config && npm run verify:supabase-deployment-config"
   },
   "devDependencies": {
     "@types/node": "24.13.3",
