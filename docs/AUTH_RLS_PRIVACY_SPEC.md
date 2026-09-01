@@ -1,10 +1,10 @@
-# 명하 Auth / RLS / Privacy Specification v0.4 — Source Aligned
+# 명하 Auth / RLS / Privacy Specification v0.5 — Source Aligned
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.4**  
-> Date: **2026-08-28**  
+> Pack Version: **v0.5**  
+> Date: **2026-09-02**  
 > Source Authority: `Usecase_re_reviewed_v2(1).md`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`, `Myeonghwa_Personalized_Interpretation_Architecture_v1.3_THIRD_REVIEW(1).md`  
-> Rule: source가 결정하지 않은 implementation-critical 사항은 `OPEN-P0`, 비차단 선택은 `CANDIDATE`, source 간 충돌/공백은 `SOURCE_AUTHORITY_GAPS.md` 또는 numbered source-gap 문서에 기록한다.
+> Rule: source가 결정하지 않은 implementation-critical 사항은 `OPEN-P0`, 비차단 선택은 `CANDIDATE`, source 간 충돌/공백은 `SOURCE_AUTHORITY_GAPS.md` 또는 numbered source-gap 문서에 기록한다. Production P0 decision은 `P0_DECISION_REGISTER.md`가 단일 관리한다.
 
 ---
 
@@ -90,20 +90,54 @@ raw historical ledger reparent deny
 
 Full conflict detection → resolution → domain action apply → merge completion command는 `SRC-24` 해결 전 production-authoritative로 승격하지 않는다. Relationship/Character Unlock/Episode semantics가 merge action에 포함되면 각각 `SRC-22`/`SRC-23`/`SRC-17` 등 해당 domain authority도 추가로 필요하다.
 
-## 6. Database Execution Identity — OPEN P0
+## 6. Database Execution Identity — DECIDED
 
-`OPEN-P0: P0-AUTH-01`.
-
-RLS를 실제 security control로 주장하려면 API가 DB에서 어떤 identity로 실행되는지 확정해야 한다. 허용 후보:
+`P0-AUTH-01`은 2026-09-02에 다음으로 결정되었다.
 
 ```text
-A. User JWT를 PostgREST/Supabase RLS context로 위임
-   + service-only commands는 별도 restricted role
-
-B. Fastify API가 non-BYPASSRLS DB role 사용
-   + verified auth/guest identity를 transaction-scoped trusted context로 설정
-   + RLS policy가 그 context로 current subject를 resolve
+ordinary user HTTP request
+→ API verifies Member or Guest evidence
+→ canonical subjects.id resolution
+→ dedicated non-BYPASSRLS API execution role
+→ canonical subject_id bound to the current PostgreSQL transaction
+→ RLS + existing qry_*/cmd_* object authorization
 ```
+
+Member resolution:
+
+```text
+verified Supabase authentication identity
+→ auth.users.id
+→ subjects.auth_user_id
+→ active/deletion_pending member subjects.id
+```
+
+Guest resolution:
+
+```text
+API-verified guest credential
+→ verifier fingerprint
+→ active, unconsumed guest_sessions row
+→ active guest subjects.id
+```
+
+Canonical owner는 항상 `subjects.id`다. 다음 가정은 금지한다.
+
+```text
+auth.uid() == subject_id
+client-supplied subject_id == current owner
+```
+
+Ordinary user execution baseline:
+
+```text
+dedicated NOLOGIN/NOBYPASSRLS API execution role contract
++ transaction-scoped trusted canonical subject context
+```
+
+실제 network/login principal과 credential 배포는 deployment configuration이 소유한다. Product migration은 login secret을 생성하지 않는다. 실행 principal이 execution role membership을 가질 경우 명시적으로 해당 role로 진입한 transaction 안에서만 user-owned query/command를 실행한다.
+
+System/worker/admin/lifecycle operation은 ordinary user execution과 별도 privileged identity를 사용한다.
 
 금지 baseline:
 
@@ -112,21 +146,44 @@ service_role/BYPASSRLS 하나로 모든 user-owned CRUD
 + application WHERE subject_id만 믿음
 ```
 
-이 방식은 application authorization은 될 수 있어도 본 spec의 `RLS negative test`를 충족했다고 부르지 않는다.
+P0 decision의 rationale/migration/change policy는 `docs/P0_DECISION_REGISTER.md`의 `P0-AUTH-01` record가 authority다.
 
 ## 7. Subject Resolution Function Contract
 
-P0-AUTH-01 결정 후 하나의 trusted resolver를 둔다. conceptual contract:
+API가 raw credential을 DB에 전달하지 않는다. API verification 결과를 narrow resolver input으로 변환한다.
+
+첫 runtime contract:
 
 ```text
-current_authenticated_subject()
-→ exactly one active/deletion_pending member subject mapped to verified auth identity
+begin_member_subject_context_v1(verified auth user id)
+→ exactly one active/deletion_pending member subject
+→ transaction-local canonical subject context
 
-current_guest_subject()
-→ API-only verified guest context; direct public DB invocation 불가
+begin_guest_subject_context_v1(verified guest verifier fingerprint)
+→ exactly one active guest with active/unconsumed session
+→ transaction-local canonical subject context
+
+current_myeongha_subject_id()
+→ current transaction의 canonical subject_id 또는 NULL
+
+assert_myeongha_subject_context_v1(p_subject_id)
+→ p_subject_id와 trusted transaction subject가 동일하지 않으면 fail-closed
 ```
 
-Resolver는 client-supplied subject_id를 신뢰하지 않는다.
+Resolver는 client-supplied `subject_id`를 입력으로 받지 않는다. Member resolver의 UUID는 API가 검증한 authentication identity이며 product owner ID가 아니다. Guest resolver는 raw bearer token이 아니라 API가 검증/정규화한 verifier fingerprint만 소비한다.
+
+Resolver DB function은 direct public invocation을 허용하지 않고, ordinary API execution role에 필요한 `EXECUTE`만 부여한다. Resolver가 필요한 identity mapping table을 읽기 위해 broad table `SELECT`를 API role에 열지 않는다.
+
+Transaction-local context는 connection pool에서 request 간 잔존해서는 안 된다. Production adapter는 다음 경계를 사용한다.
+
+```text
+BEGIN
+→ enter API execution role
+→ resolve + bind canonical subject
+→ qry_*/cmd_*
+→ COMMIT / ROLLBACK
+→ context 소멸
+```
 
 ## 7.1 Web / Mobile Session Transport Security
 
@@ -145,10 +202,24 @@ Client가 보낸 `subject_id` header/body는 identity proof가 아니다.
 
 - user-owned table: RLS/default deny
 - normal current path: `row.subject_id = trusted current subject`
+- user-facing query/command의 explicit `p_subject_id`는 transaction subject와 parity 검증
 - merged guest history: generic current policy에 union하지 않음
 - merged lineage read: dedicated view/command with direct one-hop lineage validation
 - merged lineage write: deny except controlled security/lifecycle service command whose semantics are independently source-approved
 - service-only ledger/projection tables: client policy 없음
+- API execution role에는 concrete vertical slice가 요구하는 최소 table column/function privilege만 부여
+
+RLS rollout은 한 번에 59개 table을 열지 않는다. 실제 Browser/API caller가 연결되는 vertical slice마다 해당 table의 policy/grant/negative test를 함께 활성화한다.
+
+첫 activated DB slice:
+
+```text
+subjects
+profiles
+qry_subject_profile_current_v1
+```
+
+이 slice는 `/api/me`의 PostgreSQL authority 기반이며 HTTP identity verification/adapter가 아직 연결되지 않은 동안 production user-data route 활성화를 의미하지 않는다.
 
 `SRC-24` 해결 전 merge executor를 privileged lifecycle path라는 이유만으로 허용하지 않는다. Privilege boundary와 merge policy authority는 별개다.
 
@@ -250,8 +321,14 @@ Canonical member가 deletion lifecycle에 들어간 동안 새로운 Guest merge
 
 - own current row → allow expected operation
 - different subject → deny
-- forged subject context/GUC/JWT claim → deny
-- guest direct DB access → deny
+- missing transaction subject context → deny
+- context/explicit subject mismatch → deny
+- browser/client-supplied subject ID → never accepted as resolver evidence
+- API role without trusted resolver context → RLS default deny
+- API role auth mapping column read → deny
+- API role direct Subject mutation → deny
+- Guest direct public DB access → deny
+- invalid/expired/consumed Guest verifier → resolver deny
 - merged guest generic endpoint → deny
 - merged history dedicated endpoint → read-only allow
 - merged history write → deny
@@ -264,4 +341,5 @@ Canonical member가 deletion lifecycle에 들어간 동안 새로운 Guest merge
 - share token → minimized share only
 - deletion_pending subject → new AI/Saju/purchase deny
 - deletion_pending member merge lifecycle → no source-invented allow/deny claim before `SRC-24`
-- P0-AUTH-01 selected model RLS negative tests PASS before production baseline
+- transaction-local subject context → cleared after transaction boundary
+- selected P0-AUTH-01 RLS negative tests PASS before production user-data activation
