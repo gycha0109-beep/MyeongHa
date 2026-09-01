@@ -189,7 +189,11 @@ try {
   throw error;
 } finally {
   client?.close();
-  if (chrome.exitCode === null) chrome.kill('SIGTERM');
+  if (chrome.exitCode === null) {
+    const exited = new Promise((done) => chrome.once('exit', done));
+    chrome.kill('SIGTERM');
+    await Promise.race([exited, sleep(2_000)]);
+  }
   await new Promise((done) => server.close(done));
-  await rm(profile, { recursive: true, force: true });
+  await rm(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
 }
