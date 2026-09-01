@@ -10,7 +10,7 @@
 | Executable `/api` runtime | ACTIVE — INFRASTRUCTURE ONLY | `GET /api/health` is deployed as a root Vercel Function and has been remotely verified on the canonical production host. This does not imply user-data or DB runtime availability. |
 | Browser → API | USER-DATA ROUTES NOT ACTIVE | `GET /api/me` still returns production 404. The source-safe application/HTTP boundary exists, but concrete production credential verification and DB runtime binding are not wired. |
 | Canonical Subject Resolution | DB + APPLICATION CONTRACT IMPLEMENTED / PRODUCTION VERIFIER NOT WIRED | P0-AUTH-01 defines Member/Guest evidence → canonical `subjects.id`; migration `0790_subject_execution_context.sql`, `SubjectIdentityResolver`, and the current-subject HTTP/application boundary are implemented. Raw HTTP credential verification remains pending. |
-| API → PostgreSQL execution identity | DECIDED / TRANSACTION ADAPTER IMPLEMENTED | `P0-AUTH-01` selects a dedicated non-BYPASSRLS execution role + transaction-scoped canonical `subject_id`. The first `subjects`/`profiles` RLS slice and PostgreSQL transaction adapter exist. A dedicated production network login principal and Vercel credential binding remain separate deployment gates. |
+| API → PostgreSQL execution identity | DECIDED / TRANSACTION + NODE PG POOL ADAPTER IMPLEMENTED | `P0-AUTH-01` selects a dedicated non-BYPASSRLS execution role + transaction-scoped canonical `subject_id`. The first `subjects`/`profiles` RLS slice, transaction adapter, and concrete `node-postgres` pool adapter exist. A dedicated production network login principal and Vercel credential binding remain separate deployment gates. |
 | Production user-data config | CONTRACT DEFINED / NOT PROVISIONED | `production-user-data-runtime-config.ts` and `PRODUCTION_USER_DATA_RUNTIME_CONFIG_V1.md` define fail-closed environment requirements and redacted diagnostics. This does not prove that Vercel settings or a DB login principal exist. |
 | Character compatibility verdict | BLOCKED | `SRC-15` remains unresolved. |
 | Subject-specific content rollout | BLOCKED | `SRC-16` remains unresolved. |
@@ -54,7 +54,8 @@ Production activation still requires:
 HTTP Member/Guest credential verifier
 → trusted evidence
 → existing SubjectIdentityResolver/application boundary
-→ production PostgreSQL pool/login binding
+→ concrete node-postgres pool + production DB login binding
+→ connection preflight: current_user + pg_has_role(..., myeongha_api_executor, MEMBER)
 → explicit DB transaction
 → SET LOCAL ROLE myeongha_api_executor
 → begin_*_subject_context_v1(...)
@@ -77,7 +78,8 @@ Completed Integration Spine foundations for the first user-data slice:
 
 - DB Member/Guest subject-context resolver functions.
 - `SubjectIdentityResolver` trusted-evidence boundary.
-- concrete transaction-scoped PostgreSQL execution adapter seam.
+- transaction-scoped PostgreSQL subject execution adapter.
+- concrete `node-postgres` subject pool adapter with per-checkout login-principal and execution-role-membership preflight.
 - source-safe `GET /api/me` application/HTTP boundary with 401/405/fail-closed tests.
 - production user-data configuration parser contract with secret-redacted diagnostics.
 
@@ -85,7 +87,6 @@ Remaining production activation gates:
 
 - provision a dedicated non-privileged PostgreSQL network login principal authorized to enter `myeongha_api_executor`.
 - bind `MYEONGHA_DATABASE_URL`, `MYEONGHA_DATABASE_PRINCIPAL`, `MYEONGHA_SUPABASE_URL`, `MYEONGHA_SUPABASE_API_KEY`, and `MYEONGHA_GUEST_FINGERPRINT_SECRET` in Vercel production.
-- implement concrete PostgreSQL pool adapter.
 - implement concrete Member credential verification.
 - implement concrete Guest credential fingerprint verification and transport, consistently with Guest bootstrap issuance/storage.
 - add `/api/me` production route.
