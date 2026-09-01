@@ -1,6 +1,6 @@
 # MyeongHa Production User-Data Runtime Configuration V1
 
-Status: **implementation contract only — credentials are not provisioned by this document**
+Status: **implementation contract + concrete DB pool adapter — credentials are not provisioned by this document**
 
 ## Purpose
 
@@ -22,6 +22,27 @@ myeongha_api_executor
 ```
 
 `myeongha_api_executor` remains the migration-owned `NOLOGIN / NOBYPASSRLS` execution role. The network connection must use a separate, non-privileged login principal that is authorized to enter that role for the user-owned transaction.
+
+## Concrete PostgreSQL pool adapter
+
+`apps/api/src/node-postgres-subject-pool.ts` provides the concrete Node runtime adapter using `node-postgres`.
+
+Each checked-out connection is verified before it is exposed to the subject transaction boundary:
+
+```sql
+select
+  current_user::text as "currentUser",
+  pg_catalog.pg_has_role(current_user, 'myeongha_api_executor', 'MEMBER')
+    as "canEnterExecutionRole"
+```
+
+The adapter fails closed and discards the checkout when:
+
+- `current_user` does not exactly match the configured `MYEONGHA_DATABASE_PRINCIPAL`;
+- the login principal cannot enter `myeongha_api_executor`;
+- the preflight projection is malformed.
+
+The pool is deliberately bounded for a serverless runtime. This adapter does not provision the login role/password and does not make an absent Vercel binding valid.
 
 ## Required runtime settings
 
@@ -96,7 +117,7 @@ The parser therefore exposes a separate redacted summary containing only configu
 
 ## Activation gate
 
-This configuration contract by itself does not activate `/api/me`.
+The configuration contract and concrete pool adapter do not activate `/api/me` by themselves.
 
 Production activation still requires:
 
@@ -104,14 +125,13 @@ Production activation still requires:
 1. provision dedicated PostgreSQL login principal
 2. grant only the ability required to enter myeongha_api_executor
 3. bind the required settings in Vercel production
-4. implement concrete PostgreSQL pool adapter
-5. implement concrete Member identity verifier
-6. implement concrete Guest fingerprint verifier/transport
-7. add api/me.ts runtime adapter
-8. unauthenticated smoke => 401
-9. Member own-subject smoke => 200
-10. Guest own-subject smoke => 200
-11. cross-subject negative proof => denied
+4. implement concrete Member identity verifier
+5. implement concrete Guest fingerprint verifier/transport
+6. add api/me.ts runtime adapter
+7. unauthenticated smoke => 401
+8. Member own-subject smoke => 200
+9. Guest own-subject smoke => 200
+10. cross-subject negative proof => denied
 ```
 
-Until those gates are evidenced, `GET /api/me` remains production-inactive even though the application/HTTP boundary and database authority contracts exist.
+Until those gates are evidenced, `GET /api/me` remains production-inactive even though the application/HTTP boundary, database authority contracts, and concrete Node/PostgreSQL pool adapter exist.

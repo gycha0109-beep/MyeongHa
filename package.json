@@ -21,8 +21,12 @@
     "verify:production:api": "node scripts/verify-production-api.mjs",
     "check": "npm run typecheck && npm run test && npm run build && npm run build:web && npm run verify:deployment-config && npm run verify:supabase-deployment-config"
   },
+  "dependencies": {
+    "pg": "8.23.0"
+  },
   "devDependencies": {
     "@types/node": "24.13.3",
+    "@types/pg": "8.23.1",
     "typescript": "6.0.2",
     "vitest": "4.1.10"
   }
