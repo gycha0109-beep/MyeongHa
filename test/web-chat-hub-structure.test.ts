@@ -43,26 +43,15 @@ describe('MyeongHa conversation hub v1', () => {
     expect(js).toContain('setIncoming([])');
   });
 
-  it('supports the current nine-person presentation roster without turning the main hub into a fixed nine-card wall', async () => {
+  it('keeps discovery searchable and pageable without freezing a concrete roster as an architectural invariant', async () => {
     const js = await readFile(hubJsPath, 'utf8');
-
-    for (const key of [
-      'seyeon',
-      'baekheon',
-      'yeoul',
-      'seorin',
-      'rahyeon',
-      'mira',
-      'taegyeom',
-      'yunho',
-      'doyoon',
-    ]) {
-      expect(js).toContain(`key: '${key}'`);
-    }
 
     expect(js).toContain('const PAGE_SIZE = 6');
     expect(js).toContain('data-people-search');
     expect(js).toContain('visibleCount + PAGE_SIZE');
+    expect(js).toContain('safePresentationKey');
+    expect(js).toContain('encodeURIComponent(safeKey)');
+    expect(js).not.toContain('characterId:');
   });
 
   it('keeps character rooms as focused destinations and routes global conversation entries through the hub', async () => {
@@ -79,6 +68,17 @@ describe('MyeongHa conversation hub v1', () => {
     expect(home).toContain('href="chat-hub.html">대화로 가기 →</a>');
     expect(reading).toContain('href="chat-hub.html">대화</a>');
     expect(records).toContain('href="chat-hub.html">대화</a>');
+  });
+
+  it('keeps My as the fifth active destination instead of falling back to Records', async () => {
+    const html = await readFile(hubHtmlPath, 'utf8');
+
+    expect(html).toContain('class="product-nav-link" href="my.html">마이</a>');
+    expect(html).toContain('class="product-profile" href="my.html" aria-label="내 프로필"');
+    expect(html).toContain('<span>마이</span>');
+    expect(html).toContain('class="mobile-nav-link" href="my.html"');
+    expect(html).not.toContain('href="#" aria-disabled="true">마이</a>');
+    expect(html).not.toContain('class="product-profile" href="records.html" aria-label="내 기록"');
   });
 
   it('uses the shared MyeongHa product shell while giving the hub its own relationship and discovery surfaces', async () => {
