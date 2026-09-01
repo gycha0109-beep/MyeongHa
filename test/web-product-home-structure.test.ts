@@ -23,10 +23,10 @@ describe('MyeongHa product Home web v2', () => {
   it('preserves the Home hierarchy instead of turning the page into a dashboard', async () => {
     const html = await readFile(hallPath, 'utf8');
 
-    const today = html.indexOf('오늘의 흐름');
-    const continuingStory = html.indexOf('이어지는 이야기');
-    const topics = html.indexOf('무엇을 보고 싶으세요?');
-    const person = html.indexOf('오늘 이야기할 사람');
+    const today = html.indexOf('class="home-today"');
+    const continuingStory = html.indexOf('class="paper-card home-thread"');
+    const topics = html.indexOf('id="topics-title"');
+    const person = html.indexOf('id="person-title"');
 
     expect(today).toBeGreaterThan(-1);
     expect(continuingStory).toBeGreaterThan(today);
@@ -75,13 +75,14 @@ describe('MyeongHa product Home web v2', () => {
     expect(plum).toContain('<svg');
   });
 
-  it('keeps Saju and relationship surfaces separate and gives the person strip a contextual tag', async () => {
+  it('keeps Saju, records, and character surfaces separate without hardcoding a recommended character', async () => {
     const html = await readFile(hallPath, 'utf8');
 
     expect(html).toContain('href="reading.html"');
     expect(html).toContain('href="records.html"');
-    expect(html).toContain('href="chat.html?character=seyeon"');
-    expect(html).toContain('class="home-person-tag"');
-    expect(html).toContain('마음과 인연의 흐름');
+    expect(html).toContain('class="home-person-action" href="chat.html"');
+    expect(html).toContain('class="home-person-tag">캐릭터 선택</span>');
+    expect(html).toContain('캐릭터와 이야기하기');
+    expect(html).not.toContain('href="chat.html?character=seyeon"');
   });
 });
