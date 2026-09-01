@@ -2,8 +2,12 @@ function isObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
+function isNonBlankString(value) {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
 function requireNonBlankString(value, field) {
-  if (typeof value !== 'string' || value.trim().length === 0) {
+  if (!isNonBlankString(value)) {
     throw new WebApiEnvelopeError(`API success envelope is missing ${field}.`);
   }
   return value;
@@ -36,8 +40,17 @@ export function unwrapApiSuccessEnvelope(payload) {
 }
 
 export function readApiErrorCode(payload) {
-  if (!isObject(payload) || payload.ok !== false || !isObject(payload.error)) return null;
-  return typeof payload.error.code === 'string' && payload.error.code.trim().length > 0
-    ? payload.error.code
-    : null;
+  if (!isObject(payload) || payload.ok !== false || !isObject(payload.error) || !isObject(payload.meta)) {
+    return null;
+  }
+  if (
+    !isNonBlankString(payload.error.code) ||
+    !isNonBlankString(payload.error.messageKey) ||
+    typeof payload.error.retryable !== 'boolean' ||
+    !isNonBlankString(payload.meta.apiContractVersion) ||
+    !isNonBlankString(payload.meta.requestId)
+  ) {
+    return null;
+  }
+  return payload.error.code;
 }
