@@ -15,7 +15,7 @@ function renderCalendarDate() {
 }
 
 function renderGenericProfile() {
-  byId('home-profile-name').textContent = '내 기록';
+  byId('home-profile-name').textContent = '마이';
   byId('home-profile-link').setAttribute('aria-label', '내 프로필');
 }
 
