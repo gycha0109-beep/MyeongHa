@@ -60,16 +60,34 @@ export class PurchaseIntentCreateAuthorityPortErrorV1 extends Error {
   }
 }
 
+/**
+ * Resolves only the immutable provider/store product mapping pinned by ERD 12.2.
+ *
+ * This port must not turn current enabled/retired state into an API-side purchase
+ * decision. `cmd_create_purchase_intent_v1` intentionally resolves an existing
+ * idempotent request before current availability checks so replay still works after
+ * an offer is disabled or retired. The DB command remains the availability authority
+ * for a new intent.
+ */
 export interface PurchaseIntentOfferSnapshotPortV1 {
   resolveImmutableOfferMapping(input: {
     readonly productOfferId: string;
   }): Awaitable<PurchaseIntentOfferSnapshotV1 | null>;
 }
 
+/** Server-owned logical Purchase Intent identity. Never accepted from the client. */
 export interface PurchaseIntentIdPortV1 {
   nextPurchaseIntentId(): Awaitable<string>;
 }
 
+/**
+ * Persistence command boundary for UC-26 Purchase Intent creation only.
+ *
+ * P0-AUTH-01 still blocks choosing a production PostgreSQL execution identity, so
+ * this slice exposes a port but no PostgreSQL adapter. P0-CM-01 also remains open:
+ * this boundary does not call a provider/store rail, verify a receipt, persist a
+ * provider event, or create/recompute entitlement state.
+ */
 export interface PurchaseIntentCreateAuthorityPortV1 {
   createPurchaseIntent(input: {
     readonly subjectId: string;
@@ -107,6 +125,7 @@ function parseRequest(value: unknown): PurchaseIntentCreateRequestV1 {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     throw new ApiCommandError('INVALID_REQUEST', 'Purchase Intent request must be an object.');
   }
+
   const request = value as Record<string, unknown>;
   const keys = Object.keys(request);
   if (
@@ -114,16 +133,29 @@ function parseRequest(value: unknown): PurchaseIntentCreateRequestV1 {
     !Object.prototype.hasOwnProperty.call(request, 'productOfferId') ||
     !Object.prototype.hasOwnProperty.call(request, 'idempotencyKey')
   ) {
-    throw new ApiCommandError('INVALID_REQUEST', 'Purchase Intent request contains unsupported fields.');
+    throw new ApiCommandError(
+      'INVALID_REQUEST',
+      'Purchase Intent request contains unsupported fields.',
+    );
   }
+
   const productOfferId = request.productOfferId;
   const idempotencyKey = request.idempotencyKey;
   if (typeof productOfferId !== 'string' || productOfferId.trim().length === 0) {
-    throw new ApiCommandError('INVALID_REQUEST', 'productOfferId must be a non-empty string.');
+    throw new ApiCommandError(
+      'INVALID_REQUEST',
+      'productOfferId must be a non-empty string.',
+    );
   }
   if (typeof idempotencyKey !== 'string' || idempotencyKey.trim().length === 0) {
-    throw new ApiCommandError('INVALID_REQUEST', 'idempotencyKey must be a non-empty string.');
+    throw new ApiCommandError(
+      'INVALID_REQUEST',
+      'idempotencyKey must be a non-empty string.',
+    );
   }
+
+  // Preserve exact caller identity. Normalizing either field would silently change
+  // the source-backed offer selection or idempotency identity.
   return Object.freeze({ productOfferId, idempotencyKey });
 }
 
@@ -145,26 +177,44 @@ function requirePlatform(value: unknown): PurchaseIntentPlatformV1 {
   }
 }
 
-function normalizeOfferSnapshot(value: PurchaseIntentOfferSnapshotV1, expectedProductOfferId: string): PurchaseIntentOfferSnapshotV1 {
+function normalizeOfferSnapshot(
+  value: PurchaseIntentOfferSnapshotV1,
+  expectedProductOfferId: string,
+): PurchaseIntentOfferSnapshotV1 {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     throw new Error('Purchase Intent immutable offer snapshot is invalid.');
   }
+
   const snapshot = value as unknown as Record<string, unknown>;
   const keys = Object.keys(snapshot);
-  const expectedKeys = ['productOfferId', 'productId', 'platform', 'provider', 'externalProductId'];
-  if (keys.length !== expectedKeys.length || expectedKeys.some((key) => !Object.prototype.hasOwnProperty.call(snapshot, key))) {
+  const expectedKeys = [
+    'productOfferId',
+    'productId',
+    'platform',
+    'provider',
+    'externalProductId',
+  ];
+  if (
+    keys.length !== expectedKeys.length ||
+    expectedKeys.some((key) => !Object.prototype.hasOwnProperty.call(snapshot, key))
+  ) {
     throw new Error('Purchase Intent immutable offer snapshot has unsupported fields.');
   }
+
   const productOfferId = requireServerString('snapshot productOfferId', snapshot.productOfferId);
   if (productOfferId !== expectedProductOfferId) {
     throw new Error('Purchase Intent immutable offer snapshot targets a different offer.');
   }
+
   return Object.freeze({
     productOfferId,
     productId: requireServerString('snapshot productId', snapshot.productId),
     platform: requirePlatform(snapshot.platform),
     provider: requireServerString('snapshot provider', snapshot.provider),
-    externalProductId: requireServerString('snapshot externalProductId', snapshot.externalProductId),
+    externalProductId: requireServerString(
+      'snapshot externalProductId',
+      snapshot.externalProductId,
+    ),
   });
 }
 
@@ -172,7 +222,12 @@ function hashCanonical(value: unknown): string {
   return `sha256:v1:${createHash('sha256').update(canonicalJson(value)).digest('hex')}`;
 }
 
-function canonicalPurchaseRequest(request: PurchaseIntentCreateRequestV1): { readonly productOfferId: string } {
+function canonicalPurchaseRequest(request: PurchaseIntentCreateRequestV1): {
+  readonly productOfferId: string;
+} {
+  // The idempotency key scopes the logical command and is not itself semantic
+  // purchase payload. With the current source-backed public body, offer selection is
+  // the complete canonical payload hashed for same-key conflict detection.
   return Object.freeze({ productOfferId: request.productOfferId });
 }
 
@@ -189,22 +244,41 @@ function requireStatus(value: unknown): PurchaseIntentStatusV1 {
   }
 }
 
-function snapshotsEqual(left: PurchaseIntentOfferSnapshotV1, right: PurchaseIntentOfferSnapshotV1): boolean {
-  return left.productOfferId === right.productOfferId && left.productId === right.productId && left.platform === right.platform && left.provider === right.provider && left.externalProductId === right.externalProductId;
+function snapshotsEqual(
+  left: PurchaseIntentOfferSnapshotV1,
+  right: PurchaseIntentOfferSnapshotV1,
+): boolean {
+  return (
+    left.productOfferId === right.productOfferId &&
+    left.productId === right.productId &&
+    left.platform === right.platform &&
+    left.provider === right.provider &&
+    left.externalProductId === right.externalProductId
+  );
 }
 
 function mapAuthorityError(error: unknown): never {
   if (!(error instanceof PurchaseIntentCreateAuthorityPortErrorV1)) throw error;
+
   switch (error.code) {
     case 'SUBJECT_NOT_FOUND':
-      throw new ApiCommandError('NOT_FOUND', 'Purchase Intent is unavailable for the current subject.');
+      throw new ApiCommandError(
+        'NOT_FOUND',
+        'Purchase Intent is unavailable for the current subject.',
+      );
     case 'SUBJECT_INELIGIBLE':
-      throw new ApiCommandError('FORBIDDEN', 'Purchase Intent requires an active member subject.');
+      throw new ApiCommandError(
+        'FORBIDDEN',
+        'Purchase Intent requires an active member subject.',
+      );
     case 'OFFER_NOT_FOUND':
     case 'OFFER_UNAVAILABLE':
       throw new ApiCommandError('NOT_FOUND', 'Selected product offer is unavailable.');
     case 'IDEMPOTENCY_CONFLICT':
-      throw new ApiCommandError('IDEMPOTENCY_CONFLICT', 'idempotencyKey already represents a different purchase request.');
+      throw new ApiCommandError(
+        'IDEMPOTENCY_CONFLICT',
+        'idempotencyKey already represents a different purchase request.',
+      );
     case 'INVALID_INPUT':
       throw new ApiCommandError('INVALID_REQUEST', 'Purchase Intent request is invalid.');
     case 'REPLAY_SHAPE_CONFLICT':
@@ -214,46 +288,100 @@ function mapAuthorityError(error: unknown): never {
   }
 }
 
-function assembleResponse(row: PurchaseIntentCreateAuthorityRowV1, request: PurchaseIntentCreateRequestV1, proposedPurchaseIntentId: string, expectedSnapshot: PurchaseIntentOfferSnapshotV1, expectedSnapshotHash: string): CreatePurchaseIntentResponseV1 {
-  const purchaseIntentId = requireServerString('authority purchase intent id', row.purchaseIntentId);
-  if (row.productOfferId !== request.productOfferId) throw new Error('Purchase Intent authority returned a different product offer id.');
-  if (row.providerAccountLinkId !== null) throw new Error('Purchase Intent authority unexpectedly bound a provider account link.');
-  const returnedSnapshot = normalizeOfferSnapshot(row.offerSnapshotJsonb as PurchaseIntentOfferSnapshotV1, request.productOfferId);
-  if (!snapshotsEqual(returnedSnapshot, expectedSnapshot)) throw new Error('Purchase Intent authority returned a different immutable offer snapshot.');
-  if (row.offerSnapshotHash !== expectedSnapshotHash) throw new Error('Purchase Intent authority returned a different offer snapshot hash.');
-  if (typeof row.replayed !== 'boolean') throw new Error('Purchase Intent authority returned an invalid replay marker.');
+function assembleResponse(
+  row: PurchaseIntentCreateAuthorityRowV1,
+  request: PurchaseIntentCreateRequestV1,
+  proposedPurchaseIntentId: string,
+  expectedSnapshot: PurchaseIntentOfferSnapshotV1,
+  expectedSnapshotHash: string,
+): CreatePurchaseIntentResponseV1 {
+  const purchaseIntentId = requireServerString(
+    'authority purchase intent id',
+    row.purchaseIntentId,
+  );
+  if (row.productOfferId !== request.productOfferId) {
+    throw new Error('Purchase Intent authority returned a different product offer id.');
+  }
+  if (row.providerAccountLinkId !== null) {
+    throw new Error('Purchase Intent authority unexpectedly bound a provider account link.');
+  }
+
+  const returnedSnapshot = normalizeOfferSnapshot(
+    row.offerSnapshotJsonb as PurchaseIntentOfferSnapshotV1,
+    request.productOfferId,
+  );
+  if (!snapshotsEqual(returnedSnapshot, expectedSnapshot)) {
+    throw new Error('Purchase Intent authority returned a different immutable offer snapshot.');
+  }
+  if (row.offerSnapshotHash !== expectedSnapshotHash) {
+    throw new Error('Purchase Intent authority returned a different offer snapshot hash.');
+  }
+  if (typeof row.replayed !== 'boolean') {
+    throw new Error('Purchase Intent authority returned an invalid replay marker.');
+  }
+
   const status = requireStatus(row.status);
   if (!row.replayed) {
-    if (purchaseIntentId !== proposedPurchaseIntentId) throw new Error('Purchase Intent authority returned a different new logical identity.');
-    if (status !== 'created') throw new Error('Purchase Intent authority returned a non-created new intent.');
+    if (purchaseIntentId !== proposedPurchaseIntentId) {
+      throw new Error('Purchase Intent authority returned a different new logical identity.');
+    }
+    if (status !== 'created') {
+      throw new Error('Purchase Intent authority returned a non-created new intent.');
+    }
   }
+
   return Object.freeze({ purchaseIntentId, status });
 }
 
-export async function createPurchaseIntent(input: CreatePurchaseIntentInputV1): Promise<CreatePurchaseIntentResponseV1> {
+export async function createPurchaseIntent(
+  input: CreatePurchaseIntentInputV1,
+): Promise<CreatePurchaseIntentResponseV1> {
   const subjectId = requireResolvedSubjectId(input.resolvedSubjectId);
   const request = parseRequest(input.request);
-  const resolvedSnapshot = await input.offerSnapshotPort.resolveImmutableOfferMapping({ productOfferId: request.productOfferId });
-  if (resolvedSnapshot === null) throw new ApiCommandError('NOT_FOUND', 'Selected product offer is unavailable.');
+
+  const resolvedSnapshot = await input.offerSnapshotPort.resolveImmutableOfferMapping({
+    productOfferId: request.productOfferId,
+  });
+  if (resolvedSnapshot === null) {
+    throw new ApiCommandError('NOT_FOUND', 'Selected product offer is unavailable.');
+  }
   const offerSnapshot = normalizeOfferSnapshot(resolvedSnapshot, request.productOfferId);
-  const purchaseIntentId = requireServerString('generated purchase intent id', await input.idPort.nextPurchaseIntentId());
+
+  const purchaseIntentId = requireServerString(
+    'generated purchase intent id',
+    await input.idPort.nextPurchaseIntentId(),
+  );
   const requestHash = hashCanonical(canonicalPurchaseRequest(request));
   const offerSnapshotHash = hashCanonical(offerSnapshot);
+
   try {
     const rows = await input.authorityPort.createPurchaseIntent({
       subjectId,
       purchaseIntentId,
       productOfferId: request.productOfferId,
+      // Provider account-link selection belongs to the unresolved provider/store rail
+      // policy. Do not guess an account binding in the public baseline command.
       providerAccountLinkId: null,
       idempotencyKey: request.idempotencyKey,
       requestHash,
       offerSnapshotJsonb: offerSnapshot,
       offerSnapshotHash,
     });
-    if (rows.length !== 1) throw new Error('Purchase Intent authority must return exactly one successful row.');
+    if (rows.length !== 1) {
+      throw new Error('Purchase Intent authority must return exactly one successful row.');
+    }
     const row = rows[0];
-    if (row === undefined) throw new Error('Purchase Intent authority returned an impossible empty successful row.');
-    return assembleResponse(row, request, purchaseIntentId, offerSnapshot, offerSnapshotHash);
+    if (row === undefined) {
+      throw new Error('Purchase Intent authority returned an impossible empty successful row.');
+    }
+
+    return assembleResponse(
+      row,
+      request,
+      purchaseIntentId,
+      offerSnapshot,
+      offerSnapshotHash,
+    );
   } catch (error) {
     return mapAuthorityError(error);
   }
