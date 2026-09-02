@@ -115,10 +115,12 @@ function texts(connection: FakeConnection): string[] {
 }
 
 function request(authorization?: string): Request {
-  return new Request('https://myeongha.example/api/session/bootstrap', {
-    method: 'POST',
-    headers: authorization === undefined ? undefined : { authorization },
-  });
+  return new Request(
+    'https://myeongha.example/api/session/bootstrap',
+    authorization === undefined
+      ? { method: 'POST' }
+      : { method: 'POST', headers: { authorization } },
+  );
 }
 
 describe('production Guest bootstrap runtime', () => {
