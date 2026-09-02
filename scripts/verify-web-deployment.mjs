@@ -135,6 +135,32 @@ if (vercelConfig.git?.deploymentEnabled?.main !== true) {
   throw new Error('Automatic Vercel production deployment must remain enabled for main.');
 }
 
+const birthProfileRewrite = (vercelConfig.rewrites ?? []).find(
+  (entry) => entry.source === '/api/birth-profiles/:id',
+);
+if (birthProfileRewrite?.destination !== '/api/birth-profiles') {
+  throw new Error(
+    'Birth Profile dynamic API route must dispatch to the static /api/birth-profiles function.',
+  );
+}
+if (
+  (vercelConfig.rewrites ?? []).filter(
+    (entry) => entry.source === '/api/birth-profiles/:id',
+  ).length !== 1
+) {
+  throw new Error('Birth Profile dynamic API route must have exactly one static-function rewrite.');
+}
+
+await assertExists(resolve('api/birth-profiles.ts'));
+try {
+  await access(resolve('api/birth-profiles/[id].ts'));
+  throw new Error('Bracket Birth Profile function must not coexist with the static dispatcher.');
+} catch (error) {
+  if (error instanceof Error && error.message.startsWith('Bracket Birth Profile')) {
+    throw error;
+  }
+}
+
 const globalHeaders = (vercelConfig.headers ?? []).find(
   (entry) => entry.source === '/(.*)',
 )?.headers ?? [];
