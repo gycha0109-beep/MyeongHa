@@ -89,7 +89,7 @@ function readBearerToken(request: Request): string | null {
   const authorization = request.headers.get(AUTHORIZATION_HEADER);
   if (authorization === null) return null;
 
-  const match = /^Bearer ([^\s]+)$/u.exec(authorization);
+  const match = /^Bearer ([^\s]+)$/iu.exec(authorization);
   if (match === null) return null;
 
   const token = match[1];
@@ -107,7 +107,7 @@ function requireUserId(payload: unknown): string {
   const id = (payload as { id?: unknown }).id;
   if (
     typeof id !== 'string' ||
-    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(id)
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu.test(id)
   ) {
     throw new SupabaseMemberIdentityVerifierErrorV1(
       'SUPABASE_MEMBER_VERIFIER_RESPONSE_INVALID',
