@@ -106,6 +106,38 @@ function resolveInjectedBirthProfileId(
   return null;
 }
 
+function describeRouteMetadata(request: VercelNodeRequestLike): Record<string, unknown> {
+  let pathname: string | null = null;
+  let urlQueryKeys: string[] = [];
+  let urlParseable = false;
+
+  if (typeof request.url === 'string') {
+    try {
+      const parsed = new URL(request.url, 'https://myeongha.internal');
+      pathname = parsed.pathname;
+      urlQueryKeys = [...new Set(parsed.searchParams.keys())].sort();
+      urlParseable = true;
+    } catch {
+      urlParseable = false;
+    }
+  }
+
+  return {
+    requestConstructor:
+      typeof request === 'object' && request !== null
+        ? request.constructor?.name ?? null
+        : null,
+    method: request.method ?? null,
+    queryPropertyPresent:
+      typeof request === 'object' && request !== null && 'query' in request,
+    queryKeys: request.query === undefined ? [] : Object.keys(request.query).sort(),
+    urlPropertyType: typeof request.url,
+    urlParseable,
+    pathname,
+    urlQueryKeys,
+  };
+}
+
 function toWebHeaders(
   source: VercelNodeRequestLike['headers'],
 ): Headers {
@@ -168,6 +200,10 @@ export default async function handler(
 ): Promise<void> {
   const birthProfileId = resolveInjectedBirthProfileId(request);
   if (birthProfileId === null) {
+    console.info(
+      'BirthProfileRouteDiagnostic',
+      JSON.stringify(describeRouteMetadata(request)),
+    );
     await writeRouteNotFound(response);
     return;
   }
