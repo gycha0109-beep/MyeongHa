@@ -19,8 +19,9 @@
     "verify:deployment-config": "node scripts/verify-web-deployment.mjs",
     "verify:supabase-deployment-config": "node scripts/verify-supabase-deployment.mjs",
     "verify:production-user-data-bindings": "node scripts/verify-production-user-data-bindings.mjs",
+    "verify:production-guest-bootstrap-ttl-binding": "node scripts/verify-production-guest-bootstrap-ttl-binding.mjs",
     "verify:production:api": "node scripts/verify-production-api.mjs",
-    "check": "npm run typecheck && npm run test && npm run build && npm run build:web && npm run verify:deployment-config && npm run verify:supabase-deployment-config && npm run verify:production-user-data-bindings"
+    "check": "npm run typecheck && npm run test && npm run build && npm run build:web && npm run verify:deployment-config && npm run verify:supabase-deployment-config && npm run verify:production-user-data-bindings && npm run verify:production-guest-bootstrap-ttl-binding"
   },
   "dependencies": {
     "pg": "8.23.0"
