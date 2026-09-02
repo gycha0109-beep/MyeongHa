@@ -138,9 +138,9 @@ if (vercelConfig.git?.deploymentEnabled?.main !== true) {
 const birthProfileRewrite = (vercelConfig.rewrites ?? []).find(
   (entry) => entry.source === '/api/birth-profiles/:id',
 );
-if (birthProfileRewrite?.destination !== '/api/birth-profiles') {
+if (birthProfileRewrite?.destination !== '/api/birth-profiles?id=:id') {
   throw new Error(
-    'Birth Profile dynamic API route must dispatch to the static /api/birth-profiles function.',
+    'Birth Profile dynamic API route must explicitly forward :id to the static dispatcher query.',
   );
 }
 if (
