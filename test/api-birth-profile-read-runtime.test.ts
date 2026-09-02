@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from 'vitest';
-import birthProfileEndpoint from '../api/birth-profiles/[id].js';
+import birthProfileEndpoint from '../api/birth-profiles.js';
 
 const PROFILE_ID = 'b6300000-0000-0000-0000-000000000001';
 const OTHER_PROFILE_ID = 'b6300000-0000-0000-0000-000000000002';
@@ -35,10 +35,10 @@ async function expectAuthRequired(response: Response): Promise<void> {
   );
 }
 
-describe('GET /api/birth-profiles/:id production route adapter', () => {
-  it('returns governed AUTH_REQUIRED without opening PostgreSQL when credentials are absent', async () => {
+describe('GET /api/birth-profiles/:id production static dispatcher', () => {
+  it('normalizes the Vercel rewrite destination shape and returns governed AUTH_REQUIRED', async () => {
     const response = await birthProfileEndpoint.fetch(
-      new Request(`https://myeongha.example/api/birth-profiles/${PROFILE_ID}`, {
+      new Request(`https://myeongha.example/api/birth-profiles?id=${PROFILE_ID}`, {
         method: 'GET',
       }),
     );
@@ -46,7 +46,7 @@ describe('GET /api/birth-profiles/:id production route adapter', () => {
     await expectAuthRequired(response);
   });
 
-  it('normalizes the Vercel-injected dynamic id query when it matches the public path id', async () => {
+  it('also accepts the preserved public pathname when the injected id matches', async () => {
     const response = await birthProfileEndpoint.fetch(
       new Request(
         `https://myeongha.example/api/birth-profiles/${PROFILE_ID}?id=${PROFILE_ID}`,
@@ -57,18 +57,7 @@ describe('GET /api/birth-profiles/:id production route adapter', () => {
     await expectAuthRequired(response);
   });
 
-  it('normalizes the internal square-bracket route shape when Vercel supplies the matching id', async () => {
-    const response = await birthProfileEndpoint.fetch(
-      new Request(
-        `https://myeongha.example/api/birth-profiles/%5Bid%5D?id=${PROFILE_ID}`,
-        { method: 'GET' },
-      ),
-    );
-
-    await expectAuthRequired(response);
-  });
-
-  it('does not normalize a mismatched dynamic id query', async () => {
+  it('does not normalize a mismatched public path id', async () => {
     const response = await birthProfileEndpoint.fetch(
       new Request(
         `https://myeongha.example/api/birth-profiles/${PROFILE_ID}?id=${OTHER_PROFILE_ID}`,
@@ -80,24 +69,37 @@ describe('GET /api/birth-profiles/:id production route adapter', () => {
     expect(response.headers.get('cache-control')).toBe('no-store');
   });
 
-  it('does not normalize additional client query parameters', async () => {
-    const response = await birthProfileEndpoint.fetch(
+  it('fails closed when the injected id is absent, duplicated, or polluted', async () => {
+    const missing = await birthProfileEndpoint.fetch(
+      new Request('https://myeongha.example/api/birth-profiles', { method: 'GET' }),
+    );
+    expect(missing.status).toBe(404);
+    expect(missing.headers.get('cache-control')).toBe('no-store');
+
+    const duplicated = await birthProfileEndpoint.fetch(
       new Request(
-        `https://myeongha.example/api/birth-profiles/${PROFILE_ID}?id=${PROFILE_ID}&debug=1`,
+        `https://myeongha.example/api/birth-profiles?id=${PROFILE_ID}&id=${PROFILE_ID}`,
         { method: 'GET' },
       ),
     );
+    expect(duplicated.status).toBe(404);
+    expect(duplicated.headers.get('cache-control')).toBe('no-store');
 
-    expect(response.status).toBe(404);
-    expect(response.headers.get('cache-control')).toBe('no-store');
+    const polluted = await birthProfileEndpoint.fetch(
+      new Request(
+        `https://myeongha.example/api/birth-profiles?id=${PROFILE_ID}&debug=1`,
+        { method: 'GET' },
+      ),
+    );
+    expect(polluted.status).toBe(404);
+    expect(polluted.headers.get('cache-control')).toBe('no-store');
   });
 
-  it('preserves the GET-only method boundary for the injected dynamic route shape', async () => {
+  it('preserves the GET-only method boundary after static dispatch', async () => {
     const response = await birthProfileEndpoint.fetch(
-      new Request(
-        `https://myeongha.example/api/birth-profiles/${PROFILE_ID}?id=${PROFILE_ID}`,
-        { method: 'POST' },
-      ),
+      new Request(`https://myeongha.example/api/birth-profiles?id=${PROFILE_ID}`, {
+        method: 'POST',
+      }),
     );
 
     expect(response.status).toBe(405);
