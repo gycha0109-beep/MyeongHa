@@ -1,9 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { createProductionBirthProfileReadRuntimeV1 } from '../apps/api/src/production-birth-profile-read-runtime.js';
 
+const ROUTE_PATH = '/api/birth-profiles' as const;
 const ROUTE_PREFIX = '/api/birth-profiles/' as const;
 const INTERNAL_ROUTE_PARAM = '__myeongha_birth_profile_id' as const;
 const NO_STORE_CACHE_CONTROL = 'no-store' as const;
+const ROUTE_SHAPE_DIAGNOSTIC_EVENT = 'myeongha.birth-profile-route-shape-v1' as const;
 
 type HeaderValue = string | string[] | undefined;
 type QueryValue = string | string[] | undefined;
@@ -106,6 +108,54 @@ function resolveInjectedBirthProfileId(
   return null;
 }
 
+function classifyQueryValue(value: QueryValue): 'string' | 'array' | 'undefined' {
+  if (Array.isArray(value)) return 'array';
+  if (typeof value === 'string') return 'string';
+  return 'undefined';
+}
+
+function classifyPathname(pathname: string): string {
+  if (pathname === ROUTE_PATH) return 'static-dispatcher';
+  if (!pathname.startsWith(ROUTE_PREFIX)) return 'other';
+
+  const segment = pathname.slice(ROUTE_PREFIX.length);
+  return segment.length > 0 && !segment.includes('/')
+    ? 'dynamic-single-segment'
+    : 'dynamic-empty-or-multi-segment';
+}
+
+function logRejectedRouteShape(request: VercelNodeRequestLike): void {
+  const queryKeys = Object.keys(request.query ?? {}).sort();
+  const queryValueKinds = Object.fromEntries(
+    queryKeys.map((key) => [key, classifyQueryValue(request.query?.[key])]),
+  );
+
+  let urlParseState: 'absent' | 'valid' | 'invalid' = 'absent';
+  let pathnameShape: string | null = null;
+  let urlSearchKeys: string[] = [];
+
+  if (request.url !== undefined) {
+    try {
+      const parsed = new URL(request.url, 'https://myeongha.internal');
+      urlParseState = 'valid';
+      pathnameShape = classifyPathname(parsed.pathname);
+      urlSearchKeys = [...new Set(parsed.searchParams.keys())].sort();
+    } catch {
+      urlParseState = 'invalid';
+    }
+  }
+
+  console.info(ROUTE_SHAPE_DIAGNOSTIC_EVENT, {
+    method: request.method ?? null,
+    queryKeys,
+    queryValueKinds,
+    urlPresent: request.url !== undefined,
+    urlParseState,
+    pathnameShape,
+    urlSearchKeys,
+  });
+}
+
 function toWebHeaders(
   source: VercelNodeRequestLike['headers'],
 ): Headers {
@@ -168,6 +218,7 @@ export default async function handler(
 ): Promise<void> {
   const birthProfileId = resolveInjectedBirthProfileId(request);
   if (birthProfileId === null) {
+    logRejectedRouteShape(request);
     await writeRouteNotFound(response);
     return;
   }
