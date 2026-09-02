@@ -1,6 +1,6 @@
 # MyeongHa Production User-Data Runtime Configuration V1
 
-Status: **implementation contract + concrete DB pool adapter — credentials are not provisioned by this document**
+Status: **implementation contract + concrete DB pool + request identity verifier — public route credentials are not yet provisioned**
 
 ## Purpose
 
@@ -79,15 +79,23 @@ Must exactly identify the governed production Supabase project origin above. Cro
 
 ### `MYEONGHA_SUPABASE_API_KEY`
 
-Credential/configuration material for the future concrete Supabase Member identity verifier. The runtime contract stores it only in parsed configuration; diagnostics expose only a configured/not-configured marker.
+The concrete Member verifier uses this only as the application API key for the governed Supabase Auth `/auth/v1/user` verification request.
 
-The concrete Member HTTP transport and verifier are a separate implementation slice.
+V1 requires a modern `sb_publishable_...` key. Secret/service-role credentials and legacy JWT-style anon keys are rejected by the configuration parser. The access token itself remains in the request `Authorization` header and is never exposed in diagnostics.
 
 ### `MYEONGHA_GUEST_FINGERPRINT_SECRET`
 
-Secret material reserved for the future concrete Guest credential fingerprint verifier. This configuration contract does **not** choose the fingerprint algorithm, key-id format, token transport, rotation procedure, or bootstrap issuance format.
+Secret material for the concrete Guest bearer fingerprint contract.
 
-Those semantics must be implemented consistently with `GuestBootstrapTokenFingerprintPortV1` and the stored `guest_sessions.token_hash` verifier contract before a Guest production route is activated.
+V1 uses HMAC-SHA-256 with explicit domain/version separation and stores/passes only:
+
+```text
+myeongha-guest-bearer-hmac-sha256-v1:<64 lowercase hex chars>
+```
+
+The exact request transport, Member/Guest classification, HMAC message, and bootstrap-compatible fingerprint port are documented in `PRODUCTION_REQUEST_IDENTITY_VERIFIER_V1.md`.
+
+Guest TTL/expiry selection remains outside this configuration contract and is still constrained by `P0-PR-01`.
 
 ## Security invariants
 
@@ -115,23 +123,44 @@ Runtime logs and error envelopes must not contain:
 
 The parser therefore exposes a separate redacted summary containing only configuration presence, the explicit database principal name, the fixed execution role, and the fixed Supabase origin.
 
+## Live production gate evidence — 2026-09-02
+
+Read-only production inspection confirmed:
+
+```text
+myeongha_api_executor
+→ exists
+→ NOLOGIN
+→ NOBYPASSRLS
+
+begin_member_subject_context_v1
+begin_guest_subject_context_v1
+current_myeongha_subject_id
+qry_subject_profile_current_v1
+→ present in production
+```
+
+However, the only current role observed as a member of `myeongha_api_executor` is privileged `postgres`, which has `BYPASSRLS`. That role is explicitly forbidden as the ordinary user runtime login principal.
+
+Therefore the dedicated production network login principal is still unprovisioned.
+
 ## Activation gate
 
-The configuration contract and concrete pool adapter do not activate `/api/me` by themselves.
+The configuration contract, concrete pool adapter, and concrete request verifier do not activate `/api/me` by themselves.
 
 Production activation still requires:
 
 ```text
-1. provision dedicated PostgreSQL login principal
+1. provision dedicated non-privileged PostgreSQL login principal
 2. grant only the ability required to enter myeongha_api_executor
-3. bind the required settings in Vercel production
-4. implement concrete Member identity verifier
-5. implement concrete Guest fingerprint verifier/transport
+3. bind MYEONGHA_DATABASE_URL / MYEONGHA_DATABASE_PRINCIPAL in Vercel production
+4. bind the governed Supabase URL + publishable key
+5. bind MYEONGHA_GUEST_FINGERPRINT_SECRET
 6. add api/me.ts runtime adapter
 7. unauthenticated smoke => 401
 8. Member own-subject smoke => 200
-9. Guest own-subject smoke => 200
+9. Guest own-subject smoke => 200 when a production Guest session can be issued
 10. cross-subject negative proof => denied
 ```
 
-Until those gates are evidenced, `GET /api/me` remains production-inactive even though the application/HTTP boundary, database authority contracts, and concrete Node/PostgreSQL pool adapter exist.
+Until those gates are evidenced, `GET /api/me` remains production-inactive even though the application/HTTP boundary, database authority contracts, concrete Node/PostgreSQL pool adapter, and production Request identity verifier exist.
