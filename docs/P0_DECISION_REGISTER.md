@@ -1,10 +1,10 @@
-# 명하 Production P0 Decision Register — Full Audit v0.4
+# 명하 Production P0 Decision Register — Full Audit v0.5
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.4**  
-> Date: **2026-09-02**  
+> Pack Version: **v0.5**  
+> Date: **2026-09-03**  
 > Source Authority: `Usecase_re_reviewed_v2(1).md`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`, `Myeonghwa_Personalized_Interpretation_Architecture_v1.3_THIRD_REVIEW(1).md`  
-> Rule: 본 문서는 위 source authority를 구현 수준으로 구체화한다. source가 결정하지 않은 사항은 임의 확정하지 않고 `OPEN-P0` 또는 `CANDIDATE`로 표시한다.
+> Rule: 본 문서는 위 source authority를 구현 수준으로 구체화한다. source가 결정하지 않은 사항은 임의 확정하지 않고 `OPEN-P0` 또는 `CANDIDATE`로 표시한다. Production 운영을 열기 위해 별도 security/operations decision을 확정할 경우 source requirement를 좁혀야 하며, 상위 미결정 retention/legal policy를 대신 결정한 것으로 간주하지 않는다.
 
 ---
 
@@ -21,6 +21,7 @@
 | `P0-AI-01` | AI provider/model/fallback | **OPEN-P0** | provider, model family, fallback, grounded-response validation implementation |
 | `P0-AGE-01` | Minimum age / character content policy | **OPEN-P0** | 최소 이용 연령, 미성년 허용 여부, 표현 강도/제한; content bundle policy-tag slot은 미리 두되 threshold/matrix는 미확정 |
 | `P0-PR-01` | Retention / backup / legal retention | **OPEN-P0** | 제품 개인정보, AI trace, 결제/회계 증적, backup retention/deletion |
+| `P0-PR-01A` | Guest bearer/session authentication TTL | **DECIDED** | 7 days / 604800 seconds for newly issued Guest credentials; does not decide expired-Guest data deletion or parent retention policy |
 | `P0-AUTH-01` | API→PostgreSQL execution identity / RLS enforcement model | **DECIDED** | non-BYPASSRLS API execution role + transaction-scoped trusted canonical `subject_id` context |
 
 ## 3. 상태 규칙
@@ -86,6 +87,43 @@ migration_impact:
 rollback_or_change_policy: execution-model changes require a new explicit decision record and migration; never silently fall back to user-JWT delegation or privileged ordinary CRUD
 ```
 
+### P0-PR-01A
+
+```yaml
+id: P0-PR-01A
+parent: P0-PR-01
+status: DECIDED
+decided_at: 2026-09-03
+choice: Guest bearer/session authentication TTL = 7 days = 604800 seconds
+production_binding: MYEONGHA_GUEST_SESSION_TTL_SECONDS=604800
+scope:
+  decides:
+    - authentication lifetime for newly issued unconsumed Guest bearer credentials
+  does_not_decide:
+    - expired Guest subject/product-data deletion timing
+    - backup retention
+    - AI trace retention
+    - commerce/legal/accounting retention
+    - anonymization/destructive cleanup cadence
+rationale:
+  - primary source requires a finite Guest Session TTL and forbids indefinite Guest retention but does not define the period.
+  - seven days supports short-term D1/D7 continuation without carrying a browser/mobile bearer through a D30-style long-retention window.
+  - a finite seven-day bearer lifetime limits credential exposure while preserving a practical no-login resume window.
+  - authentication expiry remains separable from the still-open product/privacy/legal retention policy.
+security_invariants:
+  - server owns issued_at/expires_at and clients cannot request or extend TTL
+  - raw Guest bearer is never stored in PostgreSQL
+  - guest_sessions stores only the versioned keyed fingerprint
+  - expired, consumed, or claimed sessions cannot authenticate
+activation:
+  - bind exactly 604800 through the dedicated production Guest TTL workflow
+  - expose Guest bootstrap network route only after binding evidence
+  - verify issuance -> Guest /api/me own-subject success
+  - keep parent P0-PR-01 OPEN
+change_policy: changing Guest authentication TTL requires a new explicit decision record; environment changes must not silently lengthen it
+record: docs/GUEST_SESSION_SECURITY_TTL_DECISION_V1.md
+```
+
 ### Remaining open decisions
 
 Use the following template when another P0 becomes authoritative:
@@ -108,3 +146,4 @@ rollback_or_change_policy: ...
 - provider 이름을 business/domain model key로 사용하는 것
 - 미결정 retention을 전제로 destructive migration을 작성하는 것
 - commerce rail 결정 전 entitlement authority를 특정 store에 종속시키는 것
+- `P0-PR-01A` Guest authentication TTL을 expired Guest data deletion/backup/legal retention 기간으로 재해석하는 것
