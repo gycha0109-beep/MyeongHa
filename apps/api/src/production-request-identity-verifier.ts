@@ -113,7 +113,11 @@ export function createProductionGuestBearerTokenFingerprintPortV1(
   config: ProductionUserDataRuntimeConfigV1,
 ): GuestBootstrapTokenFingerprintPortV1 {
   return Object.freeze({
-    fingerprintGuestBearerToken({ rawBearerToken }) {
+    fingerprintGuestBearerToken({
+      rawBearerToken,
+    }: {
+      readonly rawBearerToken: string;
+    }) {
       return fingerprintProductionGuestBearerTokenV1({
         rawBearerToken,
         secret: config.guestFingerprintSecret,
@@ -146,7 +150,7 @@ function requireVerifiedAuthUserId(payload: unknown): string {
   const id = (payload as Record<string, unknown>).id;
   if (
     typeof id !== 'string' ||
-    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(id)
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu.test(id)
   ) {
     throw new ProductionRequestIdentityVerifierErrorV1(
       'INVALID_SUPABASE_RESPONSE',
