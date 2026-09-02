@@ -1,0 +1,189 @@
+name: Production Guest Bootstrap TTL Owner Bridge
+
+on:
+  issue_comment:
+    types: [edited]
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+
+concurrency:
+  group: production-guest-bootstrap-ttl-binding
+  cancel-in-progress: false
+
+env:
+  VERCEL_PROJECT_ID: prj_nXF0b5uv27Lyucz2SEBxzdCRXVsP
+  VERCEL_TEAM_ID: team_xuYA9OhCWlJETaYFOmeVodgS
+  VERCEL_PROJECT_NAME: myeongha
+  DECIDED_GUEST_SESSION_TTL_SECONDS: '604800'
+  EXPECTED_PR_NUMBER: '329'
+  EXPECTED_COMMENT_ID: '5514124938'
+  EXPECTED_ROUTE_HEAD_SHA: ba062462fe2b8914913c6b82406ff2310c3cf21e
+  EXPECTED_COMMAND: BIND_GUEST_TTL_V1_PR329_BA062462_604800
+
+jobs:
+  bind:
+    name: bind-production-guest-bootstrap-ttl-owner-bridge
+    if: >-
+      github.event.issue.pull_request != null &&
+      github.event.issue.number == 329 &&
+      github.event.comment.id == 5514124938 &&
+      github.event.comment.user.login == 'gycha0109-beep' &&
+      github.event.comment.author_association == 'OWNER' &&
+      github.event.comment.body == 'BIND_GUEST_TTL_V1_PR329_BA062462_604800'
+    runs-on: ubuntu-24.04
+    environment: production
+    env:
+      GH_READ_TOKEN: ${{ github.token }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+    steps:
+      - name: Verify one-shot owner command and activation PR state
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          test -n "${GH_READ_TOKEN:-}"
+          test -n "${VERCEL_TOKEN:-}"
+
+          repo_file="$RUNNER_TEMP/guest-ttl-bridge-repo.json"
+          pr_file="$RUNNER_TEMP/guest-ttl-bridge-pr.json"
+          compare_file="$RUNNER_TEMP/guest-ttl-bridge-compare.json"
+          cleanup() {
+            exit_code=$?
+            trap - EXIT
+            rm -f "$repo_file" "$pr_file" "$compare_file"
+            exit "$exit_code"
+          }
+          trap cleanup EXIT
+
+          curl -fsS \
+            -H "Authorization: Bearer $GH_READ_TOKEN" \
+            -H 'Accept: application/vnd.github+json' \
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/branches/main" \
+            -o "$repo_file"
+          main_sha="$(jq -er '.commit.sha' "$repo_file")"
+
+          curl -fsS \
+            -H "Authorization: Bearer $GH_READ_TOKEN" \
+            -H 'Accept: application/vnd.github+json' \
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/pulls/$EXPECTED_PR_NUMBER" \
+            -o "$pr_file"
+
+          jq -e \
+            --arg main "$main_sha" \
+            --arg head "$EXPECTED_ROUTE_HEAD_SHA" \
+            '.state == "open"
+              and .draft == true
+              and .base.ref == "main"
+              and .base.sha == $main
+              and .head.sha == $head' \
+            "$pr_file" >/dev/null
+
+          curl -fsS \
+            -H "Authorization: Bearer $GH_READ_TOKEN" \
+            -H 'Accept: application/vnd.github+json' \
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/compare/$main_sha...$EXPECTED_ROUTE_HEAD_SHA" \
+            -o "$compare_file"
+
+          jq -e \
+            '.status == "ahead"
+              and .behind_by == 0
+              and .ahead_by > 0
+              and ([.files[].filename] | sort)
+                == (["api/session/bootstrap.ts", "test/api-session-bootstrap-runtime.test.ts"] | sort)' \
+            "$compare_file" >/dev/null
+
+      - name: Verify governed Vercel production project
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+
+          project_file="$RUNNER_TEMP/vercel-project.json"
+          cleanup() {
+            exit_code=$?
+            trap - EXIT
+            rm -f "$project_file"
+            exit "$exit_code"
+          }
+          trap cleanup EXIT
+
+          curl -fsS \
+            -H "Authorization: Bearer $VERCEL_TOKEN" \
+            "https://api.vercel.com/v9/projects/$VERCEL_PROJECT_ID?teamId=$VERCEL_TEAM_ID" \
+            -o "$project_file"
+
+          jq -e \
+            --arg id "$VERCEL_PROJECT_ID" \
+            --arg name "$VERCEL_PROJECT_NAME" \
+            '.id == $id and .name == $name' \
+            "$project_file" >/dev/null
+
+      - name: Bind and verify decided Guest session TTL
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+
+          payload_file="$RUNNER_TEMP/vercel-guest-bootstrap-ttl.json"
+          response_file="$RUNNER_TEMP/vercel-guest-bootstrap-ttl-response.json"
+          readback_file="$RUNNER_TEMP/vercel-guest-bootstrap-ttl-readback.json"
+
+          cleanup() {
+            exit_code=$?
+            trap - EXIT
+            rm -f "$payload_file" "$response_file" "$readback_file"
+            exit "$exit_code"
+          }
+          trap cleanup EXIT
+
+          jq -n \
+            --arg ttl "$DECIDED_GUEST_SESSION_TTL_SECONDS" \
+            '[
+              {
+                key: "MYEONGHA_GUEST_SESSION_TTL_SECONDS",
+                value: $ttl,
+                type: "encrypted",
+                target: ["production"],
+                comment: "MyeongHa P0-PR-01A Guest authentication TTL binding v1"
+              }
+            ]' > "$payload_file"
+
+          curl -fsS \
+            -X POST \
+            -H "Authorization: Bearer $VERCEL_TOKEN" \
+            -H 'Content-Type: application/json' \
+            --data-binary "@$payload_file" \
+            "https://api.vercel.com/v10/projects/$VERCEL_PROJECT_ID/env?upsert=true&teamId=$VERCEL_TEAM_ID" \
+            -o "$response_file"
+
+          jq -e '((.failed // []) | length) == 0' "$response_file" >/dev/null
+
+          env_id="$(jq -er '
+            if (.created | type) == "array" then
+              ([.created[] | select(.key == "MYEONGHA_GUEST_SESSION_TTL_SECONDS") | .id][0] // empty)
+            elif (.created | type) == "object" and .created.key == "MYEONGHA_GUEST_SESSION_TTL_SECONDS" then
+              (.created.id // empty)
+            else
+              empty
+            end
+          ' "$response_file")"
+          test -n "$env_id"
+
+          curl -fsS \
+            -H "Authorization: Bearer $VERCEL_TOKEN" \
+            "https://api.vercel.com/v1/projects/$VERCEL_PROJECT_ID/env/$env_id?teamId=$VERCEL_TEAM_ID" \
+            -o "$readback_file"
+
+          jq -e \
+            --arg ttl "$DECIDED_GUEST_SESSION_TTL_SECONDS" \
+            '.key == "MYEONGHA_GUEST_SESSION_TTL_SECONDS"
+              and .type == "encrypted"
+              and (.target | type) == "array"
+              and (.target | index("production")) != null
+              and .value == $ttl' \
+            "$readback_file" >/dev/null
+
+          echo 'One-shot owner bridge bound and verified Guest authentication TTL 604800 in Vercel production. No route activation was performed.'
