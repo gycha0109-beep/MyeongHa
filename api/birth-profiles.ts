@@ -23,14 +23,17 @@ function routeNotFound(): Response {
 function toCanonicalBirthProfileRequest(request: Request): Request | null {
   const incomingUrl = new URL(request.url);
   const ids = incomingUrl.searchParams.getAll(INTERNAL_BIRTH_PROFILE_ID_PARAM);
-  if (ids.length !== 1 || ids[0].length === 0) return null;
+  const birthProfileId = ids[0];
+  if (ids.length !== 1 || birthProfileId === undefined || birthProfileId.length === 0) {
+    return null;
+  }
 
   for (const key of incomingUrl.searchParams.keys()) {
     if (key !== INTERNAL_BIRTH_PROFILE_ID_PARAM) return null;
   }
 
   const canonicalUrl = new URL(
-    `/api/birth-profiles/${encodeURIComponent(ids[0])}`,
+    `/api/birth-profiles/${encodeURIComponent(birthProfileId)}`,
     incomingUrl.origin,
   );
 
