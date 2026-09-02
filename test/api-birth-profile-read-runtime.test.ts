@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import birthProfileEndpoint from '../api/birth-profiles.js';
 
 const PROFILE_ID = 'b6300000-0000-0000-0000-000000000001';
+const OTHER_PROFILE_ID = 'b6300000-0000-0000-0000-000000000002';
 
 type EndpointRequest = Parameters<typeof birthProfileEndpoint>[0];
 
@@ -84,7 +85,27 @@ async function expectAuthRequired(response: CapturedResponse): Promise<void> {
 }
 
 describe('GET /api/birth-profiles/:id production Vercel Node adapter', () => {
-  it('uses the Vercel query metadata id and reaches governed AUTH_REQUIRED', async () => {
+  it('uses an explicitly forwarded id from the rewritten Node request URL', async () => {
+    const response = await invokeEndpoint({
+      method: 'GET',
+      headers: {},
+      url: `/api/birth-profiles?id=${PROFILE_ID}`,
+    });
+
+    await expectAuthRequired(response);
+  });
+
+  it('accepts the original public dynamic URL when Vercel preserves it', async () => {
+    const response = await invokeEndpoint({
+      method: 'GET',
+      headers: {},
+      url: `/api/birth-profiles/${PROFILE_ID}`,
+    });
+
+    await expectAuthRequired(response);
+  });
+
+  it('keeps the Vercel query helper as compatible route metadata evidence', async () => {
     const response = await invokeEndpoint({
       method: 'GET',
       headers: {},
@@ -94,18 +115,38 @@ describe('GET /api/birth-profiles/:id production Vercel Node adapter', () => {
     await expectAuthRequired(response);
   });
 
+  it('requires Node URL and query-helper evidence to agree when both exist', async () => {
+    const accepted = await invokeEndpoint({
+      method: 'GET',
+      headers: {},
+      url: `/api/birth-profiles?id=${PROFILE_ID}`,
+      query: { id: PROFILE_ID },
+    });
+    await expectAuthRequired(accepted);
+
+    const rejected = await invokeEndpoint({
+      method: 'GET',
+      headers: {},
+      url: `/api/birth-profiles?id=${PROFILE_ID}`,
+      query: { id: OTHER_PROFILE_ID },
+    });
+    expect(rejected.status).toBe(404);
+    expect(header(rejected, 'cache-control')).toBe('no-store');
+    expect(rejected.body).toBe('');
+  });
+
   it('preserves incoming authorization evidence when bridging to the Web runtime', async () => {
     const response = await invokeEndpoint({
       method: 'GET',
       headers: { authorization: 'Bearer invalid-test-evidence' },
-      query: { id: PROFILE_ID },
+      url: `/api/birth-profiles?id=${PROFILE_ID}`,
     });
 
     expect(response.status).toBe(401);
     expect(header(response, 'cache-control')).toBe('no-store');
   });
 
-  it('fails closed when route metadata is missing, array-valued, or polluted', async () => {
+  it('fails closed for missing, array-valued, polluted, mismatched, or multi-segment route metadata', async () => {
     const cases: EndpointRequest[] = [
       { method: 'GET', headers: {} },
       { method: 'GET', headers: {}, query: {} },
@@ -113,6 +154,11 @@ describe('GET /api/birth-profiles/:id production Vercel Node adapter', () => {
       { method: 'GET', headers: {}, query: { id: PROFILE_ID, debug: '1' } },
       { method: 'GET', headers: {}, query: { id: '' } },
       { method: 'GET', headers: {}, query: { id: `${PROFILE_ID}/extra` } },
+      { method: 'GET', headers: {}, url: '/api/birth-profiles' },
+      { method: 'GET', headers: {}, url: `/api/birth-profiles?id=${PROFILE_ID}&debug=1` },
+      { method: 'GET', headers: {}, url: `/api/birth-profiles/${PROFILE_ID}?debug=1` },
+      { method: 'GET', headers: {}, url: `/api/birth-profiles/${PROFILE_ID}/extra` },
+      { method: 'GET', headers: {}, url: `/api/birth-profiles?id=${encodeURIComponent(`${PROFILE_ID}/extra`)}` },
     ];
 
     for (const request of cases) {
@@ -123,11 +169,11 @@ describe('GET /api/birth-profiles/:id production Vercel Node adapter', () => {
     }
   });
 
-  it('preserves the GET-only method boundary after Vercel Node dispatch', async () => {
+  it('preserves the GET-only method boundary after explicit Vercel Node dispatch', async () => {
     const response = await invokeEndpoint({
       method: 'POST',
       headers: {},
-      query: { id: PROFILE_ID },
+      url: `/api/birth-profiles?id=${PROFILE_ID}`,
     });
 
     expect(response.status).toBe(405);
