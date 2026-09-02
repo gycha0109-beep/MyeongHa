@@ -10,6 +10,12 @@
       "main": true
     }
   },
+  "rewrites": [
+    {
+      "source": "/api/birth-profiles/:id",
+      "destination": "/api/birth-profiles/[id]"
+    }
+  ],
   "redirects": [
     {
       "source": "/:path*",
