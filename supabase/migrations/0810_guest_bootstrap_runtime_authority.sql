@@ -65,20 +65,29 @@ begin
 end;
 $$;
 
--- Supabase grants explicit function EXECUTE to API-facing roles at creation time.
--- Remove every ambient path before granting only the governed direct-DB executor.
+-- Supabase may grant explicit function EXECUTE to API-facing roles through default
+-- privileges. CI's plain PostgreSQL fixture does not create those roles, so revoke
+-- them only when present while always removing PUBLIC access.
 revoke all on function public.cmd_create_guest_session_runtime_v1(
   uuid, uuid, text, timestamptz
 ) from public;
-revoke all on function public.cmd_create_guest_session_runtime_v1(
-  uuid, uuid, text, timestamptz
-) from anon;
-revoke all on function public.cmd_create_guest_session_runtime_v1(
-  uuid, uuid, text, timestamptz
-) from authenticated;
-revoke all on function public.cmd_create_guest_session_runtime_v1(
-  uuid, uuid, text, timestamptz
-) from service_role;
+
+DO $$
+DECLARE
+  v_role text;
+BEGIN
+  FOR v_role IN
+    SELECT r.rolname
+    FROM pg_catalog.pg_roles r
+    WHERE r.rolname IN ('anon', 'authenticated', 'service_role')
+  LOOP
+    EXECUTE pg_catalog.format(
+      'revoke all on function public.cmd_create_guest_session_runtime_v1(uuid,uuid,text,timestamptz) from %I',
+      v_role
+    );
+  END LOOP;
+END
+$$;
 
 grant execute on function public.cmd_create_guest_session_runtime_v1(
   uuid, uuid, text, timestamptz
