@@ -17,7 +17,7 @@ env:
   PRODUCTION_BASE_URL: https://myeongha.vercel.app
   EXPECTED_TARGET_PR_NUMBER: '334'
   EXPECTED_ROUTE_ACTIVATION_SHA: ca503767d89553dd31026b3a995bee788e304adf
-  EXPECTED_COMMAND: VERIFY_GUEST_BOOTSTRAP_V1_CA503767
+  EXPECTED_COMMAND: VERIFY_GUEST_BOOTSTRAP_V2_TLS_CA
 
 jobs:
   verify:
@@ -27,7 +27,7 @@ jobs:
       github.event.issue.number == 334 &&
       github.event.comment.user.login == 'gycha0109-beep' &&
       github.event.comment.author_association == 'OWNER' &&
-      github.event.comment.body == 'VERIFY_GUEST_BOOTSTRAP_V1_CA503767'
+      github.event.comment.body == 'VERIFY_GUEST_BOOTSTRAP_V2_TLS_CA'
     runs-on: ubuntu-24.04
     environment: production
     steps:
@@ -36,12 +36,15 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Verify activation commit ancestry and command gate
+      - name: Verify activation ancestry, TLS hardening, and command gate
         shell: bash
         run: |
           set -euo pipefail
           git merge-base --is-ancestor "$EXPECTED_ROUTE_ACTIVATION_SHA" HEAD
-          [[ "$EXPECTED_COMMAND" == 'VERIFY_GUEST_BOOTSTRAP_V1_CA503767' ]]
+          [[ "$EXPECTED_COMMAND" == 'VERIFY_GUEST_BOOTSTRAP_V2_TLS_CA' ]]
+          grep -F "SUPABASE_ROOT_CA_2021_PEM" apps/api/src/node-postgres-subject-pool.ts >/dev/null
+          grep -F "rejectUnauthorized: true" apps/api/src/node-postgres-subject-pool.ts >/dev/null
+          grep -F "SUPABASE_ROOT_CA_2021_SHA256_FINGERPRINT" apps/api/src/supabase-root-ca-2021.ts >/dev/null
 
       - name: Verify production Guest bootstrap and current-subject boundary
         shell: bash
