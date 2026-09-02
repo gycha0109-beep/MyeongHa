@@ -5,18 +5,20 @@ const workflow = await readFile(workflowPath, 'utf8');
 
 const requiredFragments = [
   'workflow_dispatch:',
-  "description: 'Type BIND_GUEST_TTL to bind an already-approved Guest session TTL without deploying routes.'",
-  "description: 'Approved Guest session TTL in seconds. No repository default is provided.'",
+  "description: 'Type BIND_GUEST_TTL to bind the decided Guest authentication TTL without deploying routes.'",
+  "description: 'Enter the decided P0-PR-01A Guest authentication TTL in seconds: 604800.'",
   'environment: production',
   'cancel-in-progress: false',
   'DISPATCH_CONFIRM: ${{ inputs.confirm }}',
   'GUEST_SESSION_TTL_SECONDS: ${{ inputs.ttl_seconds }}',
+  'DECIDED_GUEST_SESSION_TTL_SECONDS: \'604800\'',
   'VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}',
   'VERCEL_PROJECT_ID: prj_nXF0b5uv27Lyucz2SEBxzdCRXVsP',
   'VERCEL_TEAM_ID: team_xuYA9OhCWlJETaYFOmeVodgS',
   'VERCEL_PROJECT_NAME: myeongha',
   '[[ "$DISPATCH_CONFIRM" == \'BIND_GUEST_TTL\' ]]',
   '[[ "$GUEST_SESSION_TTL_SECONDS" =~ ^[1-9][0-9]*$ ]]',
+  '[[ "$GUEST_SESSION_TTL_SECONDS" == "$DECIDED_GUEST_SESSION_TTL_SECONDS" ]]',
   'https://api.vercel.com/v9/projects/$VERCEL_PROJECT_ID?teamId=$VERCEL_TEAM_ID',
   '.id == $id and .name == $name',
   '"MYEONGHA_GUEST_SESSION_TTL_SECONDS"',
@@ -24,6 +26,11 @@ const requiredFragments = [
   'target: ["production"]',
   'https://api.vercel.com/v10/projects/$VERCEL_PROJECT_ID/env?upsert=true&teamId=$VERCEL_TEAM_ID',
   "jq -e '((.failed // []) | length) == 0'",
+  'env_id="$(jq -er',
+  'https://api.vercel.com/v1/projects/$VERCEL_PROJECT_ID/env/$env_id?teamId=$VERCEL_TEAM_ID',
+  '.value == $ttl',
+  'rm -f "$payload_file" "$response_file" "$readback_file"',
+  'Decided Guest authentication TTL 604800 was bound and verified in Vercel production.',
   'No deployment or route activation was performed.',
 ];
 
@@ -51,6 +58,7 @@ const forbiddenFragments = [
   'alter role',
   'service_role',
   'supabase_admin',
+  '/env?decrypt=true',
 ];
 
 for (const fragment of forbiddenFragments) {
@@ -63,7 +71,7 @@ const ttlKeyIndex = workflow.indexOf('key: "MYEONGHA_GUEST_SESSION_TTL_SECONDS"'
 if (ttlKeyIndex < 0) {
   throw new Error('Missing Vercel production binding for MYEONGHA_GUEST_SESSION_TTL_SECONDS.');
 }
-const ttlBindingWindow = workflow.slice(ttlKeyIndex, ttlKeyIndex + 360);
+const ttlBindingWindow = workflow.slice(ttlKeyIndex, ttlKeyIndex + 420);
 if (!ttlBindingWindow.includes('type: "encrypted"')) {
   throw new Error('Guest session TTL must use an encrypted Vercel environment variable.');
 }
@@ -83,4 +91,14 @@ if (
   );
 }
 
-console.log('MyeongHa production Guest bootstrap TTL binding workflow contract verification passed.');
+if (!workflow.includes('select(.key == "MYEONGHA_GUEST_SESSION_TTL_SECONDS")')) {
+  throw new Error('Guest TTL binding must extract only the just-bound environment variable id.');
+}
+if (!workflow.includes('and (.target | index("production")) != null')) {
+  throw new Error('Guest TTL readback must verify the production target.');
+}
+if (!workflow.includes('and .type == "encrypted"')) {
+  throw new Error('Guest TTL readback must verify encrypted storage type.');
+}
+
+console.log('MyeongHa production Guest bootstrap TTL binding/readback contract verification passed.');
