@@ -1,6 +1,6 @@
 # MyeongHa Production User-Data Runtime Configuration V1
 
-Status: **implementation contract + concrete DB pool + Member verifier — credentials are not provisioned by this document**
+Status: **implementation contract + concrete DB pool + Member/Guest request verifiers — public user-data routes remain gated**
 
 ## Purpose
 
@@ -46,9 +46,9 @@ The pool is deliberately bounded for a serverless runtime. This adapter does not
 
 ## Concrete Supabase Member verifier
 
-`apps/api/src/supabase-member-identity-verifier.ts` implements the production Member credential verification boundary using the Supabase Auth server.
+`apps/api/src/supabase-member-identity-verifier.ts` remains the authoritative production Member credential verifier introduced by PR #311.
 
-The verifier accepts only an HTTP Bearer credential and validates it by calling:
+The verifier accepts an HTTP Bearer credential and validates it by calling:
 
 ```http
 GET https://cnsfpcdiyofqvhpcegfc.supabase.co/auth/v1/user
@@ -56,13 +56,65 @@ apikey: <MYEONGHA_SUPABASE_API_KEY>
 Authorization: Bearer <user access token>
 ```
 
-A 200 response must contain a syntactically valid Auth user UUID. Only that UUID becomes trusted Member evidence:
+A successful response must contain a syntactically valid Auth user UUID. Only that UUID becomes trusted Member evidence:
 
 ```text
 { kind: "member", verifiedAuthUserId: <auth.users.id> }
 ```
 
-The verifier does not trust `user_metadata`, client-supplied `subjectId`, or any profile field as owner authority. `401`/`403` produce no verified identity; upstream 5xx/network/malformed responses fail closed instead of being downgraded to `AUTH_REQUIRED`. Raw access tokens and API keys are not included in verifier error messages.
+The verifier does not trust `user_metadata`, client-supplied `subjectId`, or any profile field as owner authority. `401`/`403` produce no verified identity; upstream/network/malformed responses fail closed. Raw access tokens and API keys are not included in verifier error messages.
+
+## Production Member/Guest request classifier
+
+`apps/api/src/production-request-identity-verifier.ts` composes the authoritative Member verifier with the Guest fingerprint contract.
+
+V1 request transport is:
+
+```text
+Authorization: Bearer <credential>
+```
+
+Classification is fail-closed and non-overlapping:
+
+```text
+JWT-shaped bearer
+→ Supabase Member verifier only
+
+supported non-JWT opaque bearer
+→ Guest fingerprint only
+
+missing / malformed / unsupported bearer
+→ no verified identity
+```
+
+A Member credential rejected by Supabase does not fall through to Guest identity. A normal Guest request does not call Supabase Auth and therefore does not disclose the raw Guest bearer to that upstream.
+
+## Concrete Guest fingerprint contract
+
+Supported Guest bearers are non-JWT opaque printable credentials with bounded length. The raw bearer is converted locally using:
+
+```text
+algorithm
+HMAC-SHA-256
+
+version/domain
+myeongha-guest-bearer-hmac-sha256-v1
+
+message
+"myeongha-guest-bearer-hmac-sha256-v1\0" + raw bearer token
+
+key
+MYEONGHA_GUEST_FINGERPRINT_SECRET
+
+resolver/storage representation
+myeongha-guest-bearer-hmac-sha256-v1:<64 lowercase hex chars>
+```
+
+Only this fingerprint is eligible to enter the Guest subject resolver. The raw Guest bearer is never passed to PostgreSQL.
+
+`createProductionGuestBearerTokenFingerprintPortV1()` implements the same contract for `GuestBootstrapTokenFingerprintPortV1`, preventing Guest bootstrap storage and subsequent request verification from silently using different fingerprints.
+
+This contract does not choose Guest TTL or retention. `P0-PR-01` remains separate.
 
 ## Required runtime settings
 
@@ -105,9 +157,7 @@ The runtime contract stores the key only in parsed configuration; diagnostics ex
 
 ### `MYEONGHA_GUEST_FINGERPRINT_SECRET`
 
-Secret material reserved for the future concrete Guest credential fingerprint verifier. This configuration contract does **not** choose the fingerprint algorithm, key-id format, token transport, rotation procedure, or bootstrap issuance format.
-
-Those semantics must be implemented consistently with `GuestBootstrapTokenFingerprintPortV1` and the stored `guest_sessions.token_hash` verifier contract before a Guest production route is activated.
+Secret HMAC key material for the concrete Guest bearer fingerprint contract. It is not a Guest session token and must never be returned to clients or emitted in diagnostics.
 
 ## Security invariants
 
@@ -123,6 +173,9 @@ myeongha_api_executor
 
 service/admin/BYPASSRLS credential
 != ordinary user runtime baseline
+
+rejected Member bearer
+!= Guest credential fallback
 ```
 
 Runtime logs and error envelopes must not contain:
@@ -135,22 +188,42 @@ Runtime logs and error envelopes must not contain:
 
 The parser therefore exposes a separate redacted summary containing only configuration presence, the explicit database principal name, the fixed execution role, and the fixed Supabase origin.
 
+## Live production gate evidence — 2026-09-02
+
+Read-only production inspection confirmed:
+
+```text
+myeongha_api_executor
+→ exists
+→ NOLOGIN
+→ NOBYPASSRLS
+
+begin_member_subject_context_v1
+begin_guest_subject_context_v1
+current_myeongha_subject_id
+qry_subject_profile_current_v1
+→ present in production
+```
+
+The only observed role currently holding membership in `myeongha_api_executor` is privileged `postgres`, which has `BYPASSRLS`. It is explicitly forbidden as the ordinary user runtime login principal.
+
+Therefore the dedicated non-privileged production network login principal is still unprovisioned.
+
 ## Activation gate
 
-The configuration contract, concrete pool adapter, and Member verifier do not activate `/api/me` by themselves.
+The configuration contract, concrete pool adapter, Member verifier, Guest verifier, and production composition roots do not activate `/api/me` by themselves.
 
 Production activation still requires:
 
 ```text
-1. provision dedicated PostgreSQL login principal
+1. provision dedicated non-privileged PostgreSQL login principal
 2. grant only the ability required to enter myeongha_api_executor
 3. bind the required settings in Vercel production
-4. implement concrete Guest fingerprint verifier/transport
-5. add api/me.ts runtime adapter
-6. unauthenticated smoke => 401
-7. Member own-subject smoke => 200
-8. Guest own-subject smoke => 200
-9. cross-subject negative proof => denied
+4. add api/me.ts runtime adapter
+5. unauthenticated smoke => 401
+6. Member own-subject smoke => 200
+7. Guest own-subject smoke => 200 when Guest issuance is active
+8. cross-subject negative proof => denied
 ```
 
-Until those gates are evidenced, `GET /api/me` remains production-inactive even though the application/HTTP boundary, database authority contracts, concrete Node/PostgreSQL pool adapter, and Supabase Member verifier exist.
+Until those gates are evidenced, `GET /api/me` remains production-inactive even though the application/HTTP boundary, database authority contracts, concrete Node/PostgreSQL pool adapter, Member verifier, Guest verifier, and composition root exist.
