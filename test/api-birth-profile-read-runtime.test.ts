@@ -4,6 +4,9 @@ import birthProfileEndpoint from '../api/birth-profiles.js';
 const PROFILE_ID = 'b6300000-0000-0000-0000-000000000001';
 const OTHER_PROFILE_ID = 'b6300000-0000-0000-0000-000000000002';
 const INTERNAL_ROUTE_PARAM = '__myeongha_birth_profile_id';
+const VERCEL_DYNAMIC_ROUTE_PARAM = 'id';
+const VERCEL_SHARE_PARAM = '_vercel_share';
+const TEST_SHARE_TOKEN = 'test-vercel-share-token';
 
 type EndpointRequest = Parameters<typeof birthProfileEndpoint>[0];
 
@@ -85,29 +88,50 @@ async function expectAuthRequired(response: CapturedResponse): Promise<void> {
   );
 }
 
+function observedDynamicMetadataUrl(profileId: string): string {
+  const search = new URLSearchParams({
+    [INTERNAL_ROUTE_PARAM]: profileId,
+    [VERCEL_SHARE_PARAM]: TEST_SHARE_TOKEN,
+    [VERCEL_DYNAMIC_ROUTE_PARAM]: profileId,
+  });
+  return `/api/birth-profiles/${profileId}?${search.toString()}`;
+}
+
 describe('GET /api/birth-profiles/:id production Vercel Node adapter', () => {
-  it('uses explicit Vercel query metadata and reaches governed AUTH_REQUIRED', async () => {
+  it('accepts the production-observed Vercel dynamic route metadata shape', async () => {
     const response = await invokeEndpoint({
       method: 'GET',
       headers: {},
-      query: { [INTERNAL_ROUTE_PARAM]: PROFILE_ID },
+      query: {
+        [INTERNAL_ROUTE_PARAM]: PROFILE_ID,
+        [VERCEL_SHARE_PARAM]: TEST_SHARE_TOKEN,
+        [VERCEL_DYNAMIC_ROUTE_PARAM]: PROFILE_ID,
+      },
+      url: observedDynamicMetadataUrl(PROFILE_ID),
     });
 
     await expectAuthRequired(response);
   });
 
-  it('falls back to the raw Node request URL when Vercel query metadata is absent', async () => {
+  it('accepts protected static-dispatcher metadata without the dynamic id helper', async () => {
+    const search = new URLSearchParams({
+      [INTERNAL_ROUTE_PARAM]: PROFILE_ID,
+      [VERCEL_SHARE_PARAM]: TEST_SHARE_TOKEN,
+    });
     const response = await invokeEndpoint({
       method: 'GET',
       headers: {},
-      query: {},
-      url: `/api/birth-profiles?${INTERNAL_ROUTE_PARAM}=${PROFILE_ID}`,
+      query: {
+        [INTERNAL_ROUTE_PARAM]: PROFILE_ID,
+        [VERCEL_SHARE_PARAM]: TEST_SHARE_TOKEN,
+      },
+      url: `/api/birth-profiles?${search.toString()}`,
     });
 
     await expectAuthRequired(response);
   });
 
-  it('accepts matching query and raw URL locator evidence', async () => {
+  it('still accepts the minimal explicit private locator shape', async () => {
     const response = await invokeEndpoint({
       method: 'GET',
       headers: {},
@@ -122,14 +146,18 @@ describe('GET /api/birth-profiles/:id production Vercel Node adapter', () => {
     const response = await invokeEndpoint({
       method: 'GET',
       headers: { authorization: 'Bearer invalid-test-evidence' },
-      url: `/api/birth-profiles?${INTERNAL_ROUTE_PARAM}=${PROFILE_ID}`,
+      query: {
+        [INTERNAL_ROUTE_PARAM]: PROFILE_ID,
+        [VERCEL_DYNAMIC_ROUTE_PARAM]: PROFILE_ID,
+      },
+      url: `/api/birth-profiles/${PROFILE_ID}?${INTERNAL_ROUTE_PARAM}=${PROFILE_ID}&${VERCEL_DYNAMIC_ROUTE_PARAM}=${PROFILE_ID}`,
     });
 
     expect(response.status).toBe(401);
     expect(header(response, 'cache-control')).toBe('no-store');
   });
 
-  it('fails closed when route metadata is missing, array-valued, polluted, or conflicting', async () => {
+  it('fails closed for unknown, duplicate, array-valued, missing, or conflicting route metadata', async () => {
     const cases: EndpointRequest[] = [
       { method: 'GET', headers: {} },
       { method: 'GET', headers: {}, query: {} },
@@ -146,28 +174,37 @@ describe('GET /api/birth-profiles/:id production Vercel Node adapter', () => {
       {
         method: 'GET',
         headers: {},
-        query: { [INTERNAL_ROUTE_PARAM]: '' },
+        query: { [INTERNAL_ROUTE_PARAM]: PROFILE_ID, [VERCEL_DYNAMIC_ROUTE_PARAM]: OTHER_PROFILE_ID },
       },
       {
         method: 'GET',
         headers: {},
-        query: { [INTERNAL_ROUTE_PARAM]: `${PROFILE_ID}/extra` },
+        query: { [INTERNAL_ROUTE_PARAM]: PROFILE_ID, [VERCEL_SHARE_PARAM]: [TEST_SHARE_TOKEN] },
       },
       {
         method: 'GET',
         headers: {},
-        query: { id: PROFILE_ID },
+        query: { [VERCEL_DYNAMIC_ROUTE_PARAM]: PROFILE_ID },
       },
       {
         method: 'GET',
         headers: {},
-        url: `/api/birth-profiles?${INTERNAL_ROUTE_PARAM}=${PROFILE_ID}&debug=1`,
+        url: `/api/birth-profiles/${OTHER_PROFILE_ID}?${INTERNAL_ROUTE_PARAM}=${PROFILE_ID}&${VERCEL_DYNAMIC_ROUTE_PARAM}=${PROFILE_ID}`,
       },
       {
         method: 'GET',
         headers: {},
-        query: { [INTERNAL_ROUTE_PARAM]: PROFILE_ID },
-        url: `/api/birth-profiles?${INTERNAL_ROUTE_PARAM}=${OTHER_PROFILE_ID}`,
+        url: `/api/birth-profiles?${INTERNAL_ROUTE_PARAM}=${PROFILE_ID}&${INTERNAL_ROUTE_PARAM}=${PROFILE_ID}`,
+      },
+      {
+        method: 'GET',
+        headers: {},
+        url: `/api/birth-profiles/${PROFILE_ID}?${INTERNAL_ROUTE_PARAM}=${PROFILE_ID}&${VERCEL_DYNAMIC_ROUTE_PARAM}=${OTHER_PROFILE_ID}`,
+      },
+      {
+        method: 'GET',
+        headers: {},
+        url: `/api/birth-profiles/${PROFILE_ID}?${INTERNAL_ROUTE_PARAM}=${PROFILE_ID}&debug=1`,
       },
     ];
 
@@ -179,11 +216,16 @@ describe('GET /api/birth-profiles/:id production Vercel Node adapter', () => {
     }
   });
 
-  it('preserves the GET-only method boundary after Vercel Node dispatch', async () => {
+  it('preserves the GET-only method boundary with observed Vercel metadata', async () => {
     const response = await invokeEndpoint({
       method: 'POST',
       headers: {},
-      url: `/api/birth-profiles?${INTERNAL_ROUTE_PARAM}=${PROFILE_ID}`,
+      query: {
+        [INTERNAL_ROUTE_PARAM]: PROFILE_ID,
+        [VERCEL_SHARE_PARAM]: TEST_SHARE_TOKEN,
+        [VERCEL_DYNAMIC_ROUTE_PARAM]: PROFILE_ID,
+      },
+      url: observedDynamicMetadataUrl(PROFILE_ID),
     });
 
     expect(response.status).toBe(405);
