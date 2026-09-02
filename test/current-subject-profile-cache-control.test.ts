@@ -27,13 +27,13 @@ class FakeConnection implements PostgresSubjectConnectionV1 {
   ): Promise<PostgresQueryResultV1<Row>> {
     if (text.includes('begin_member_subject_context_v1')) {
       return {
-        rows: [{ subjectId: SUBJECT_ID, subjectKind: 'member' }] as readonly Row[],
+        rows: ([{ subjectId: SUBJECT_ID, subjectKind: 'member' }] as unknown) as readonly Row[],
       };
     }
 
     if (text.includes('qry_subject_profile_current_v1')) {
       return {
-        rows: [
+        rows: ([
           {
             subjectId: SUBJECT_ID,
             subjectKind: 'member',
@@ -44,7 +44,7 @@ class FakeConnection implements PostgresSubjectConnectionV1 {
             onboardingState: null,
             profileUpdatedAt: null,
           },
-        ] as readonly Row[],
+        ] as unknown) as readonly Row[],
       };
     }
 
