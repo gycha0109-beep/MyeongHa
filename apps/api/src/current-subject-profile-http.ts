@@ -18,6 +18,7 @@ type Awaitable<T> = T | Promise<T>;
 
 const GET_METHOD = 'GET' as const;
 const API_CONTRACT_VERSION = 'v0.9' as const;
+const NO_STORE_CACHE_CONTROL = 'no-store' as const;
 
 export const CURRENT_SUBJECT_PROFILE_HTTP_BINDINGS_V1 = Object.freeze({
   method: GET_METHOD,
@@ -173,6 +174,7 @@ function methodNotAllowed(): Response {
     status: 405,
     headers: {
       Allow: GET_METHOD,
+      'Cache-Control': NO_STORE_CACHE_CONTROL,
     },
   });
 }
@@ -191,7 +193,12 @@ function authRequired(requestId: string): Response {
         requestId,
       },
     },
-    { status: 401 },
+    {
+      status: 401,
+      headers: {
+        'Cache-Control': NO_STORE_CACHE_CONTROL,
+      },
+    },
   );
 }
 
@@ -200,15 +207,22 @@ function successResponse(
   requestId: string,
   serverTime: string,
 ): Response {
-  return Response.json({
-    ok: true,
-    data,
-    meta: {
-      apiContractVersion: API_CONTRACT_VERSION,
-      requestId,
-      serverTime,
+  return Response.json(
+    {
+      ok: true,
+      data,
+      meta: {
+        apiContractVersion: API_CONTRACT_VERSION,
+        requestId,
+        serverTime,
+      },
     },
-  });
+    {
+      headers: {
+        'Cache-Control': NO_STORE_CACHE_CONTROL,
+      },
+    },
+  );
 }
 
 /**
