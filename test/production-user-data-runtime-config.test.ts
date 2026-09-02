@@ -77,6 +77,20 @@ describe('production user-data runtime configuration', () => {
     );
   });
 
+  it('requires a modern publishable Supabase API key and rejects privileged or legacy key classes', () => {
+    for (const apiKey of [
+      'too-short',
+      'sb_secret_example_secret_key_that_must_not_be_used_here',
+      'eyJhbGciOiJIUzI1NiJ9.legacy-anon-key.signature',
+    ]) {
+      const env = validEnv();
+      env[PRODUCTION_USER_DATA_RUNTIME_ENV_V1.supabaseApiKey] = apiKey;
+      expect(() => parseProductionUserDataRuntimeConfigV1(env)).toThrow(
+        'must be a modern Supabase publishable key',
+      );
+    }
+  });
+
   it('rejects privileged/default PostgreSQL principals', () => {
     const principalNames = ['postgres', 'supabase_admin', 'service_role'];
 
@@ -112,13 +126,7 @@ describe('production user-data runtime configuration', () => {
     );
   });
 
-  it('rejects weak or empty credential material', () => {
-    const weakApiKey = validEnv();
-    weakApiKey[PRODUCTION_USER_DATA_RUNTIME_ENV_V1.supabaseApiKey] = 'too-short';
-    expect(() => parseProductionUserDataRuntimeConfigV1(weakApiKey)).toThrow(
-      'MYEONGHA_SUPABASE_API_KEY is shorter than the production minimum',
-    );
-
+  it('rejects weak Guest fingerprint secret material', () => {
     const weakGuestSecret = validEnv();
     weakGuestSecret[PRODUCTION_USER_DATA_RUNTIME_ENV_V1.guestFingerprintSecret] =
       'too-short';
@@ -127,7 +135,7 @@ describe('production user-data runtime configuration', () => {
     );
   });
 
-  it('produces a diagnostic summary without exposing secret values or the database URL', () => {
+  it('produces a diagnostic summary without exposing credential values or the database URL', () => {
     const config = parseProductionUserDataRuntimeConfigV1(validEnv());
     const summary = summarizeProductionUserDataRuntimeConfigV1(config);
     const serialized = JSON.stringify(summary);
