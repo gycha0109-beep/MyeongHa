@@ -89,13 +89,33 @@ jobs:
           pooler_record="$({
             jq -ce '
               (if type == "array" then . elif (.data? | type) == "array" then .data else [.] end)
-              | map(select(((.db_port // 0) | tonumber) == 5432))
+              | map(
+                  select((.database_type // "") == "PRIMARY")
+                  | . + {
+                      resolved_connection_string:
+                        (.connection_string // .connectionString // "")
+                    }
+                )
+              | map(
+                  select(
+                    (.resolved_connection_string | type) == "string"
+                    and (.resolved_connection_string | length) > 0
+                    and (.resolved_connection_string
+                      | test("\\.pooler\\.supabase\\.com:(5432|6543)/postgres(?:\\?|$)"))
+                  )
+                )
+              | sort_by(
+                  if (.resolved_connection_string | test(":5432/postgres(?:\\?|$)"))
+                  then 0
+                  else 1
+                  end
+                )
               | first // empty
             ' "$pooler_file"
           })"
           test -n "$pooler_record"
 
-          connection_string="$(jq -r '.connection_string // .connectionString // empty' <<<"$pooler_record")"
+          connection_string="$(jq -r '.resolved_connection_string // empty' <<<"$pooler_record")"
           test -n "$connection_string"
 
           admin_pool_user="$(sed -E 's#^[a-zA-Z0-9+.-]+://([^:]+):.*#\1#' <<<"$connection_string")"
@@ -105,7 +125,7 @@ jobs:
 
           [[ "$admin_pool_user" == "postgres.$SUPABASE_PROJECT_ID" ]]
           [[ "$pool_host" == *.pooler.supabase.com ]]
-          [[ "$pool_port" == '5432' ]]
+          [[ "$pool_port" == '5432' || "$pool_port" == '6543' ]]
           [[ "$pool_db" == 'postgres' ]]
 
           runtime_pool_user="$RUNTIME_DB_PRINCIPAL.$SUPABASE_PROJECT_ID"
