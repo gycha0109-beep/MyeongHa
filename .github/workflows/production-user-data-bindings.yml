@@ -323,13 +323,8 @@ jobs:
             -h "$POOL_HOST" \
             -p "$POOL_PORT" \
             -U "$RUNTIME_POOL_USER" \
-            -d "$POOL_DB" <<SQL
-begin;
-set local role $API_EXECUTION_ROLE;
-select case when current_user = '$API_EXECUTION_ROLE' then 'READY' else 'BLOCKED' end;
-rollback;
-SQL
-          )"
+            -d "$POOL_DB" \
+            -c "begin; set local role $API_EXECUTION_ROLE; select case when current_user = '$API_EXECUTION_ROLE' then 'READY' else 'BLOCKED' end; rollback;")"
           [[ "$execution_state" == *'READY'* ]]
 
           binding_verified=1
