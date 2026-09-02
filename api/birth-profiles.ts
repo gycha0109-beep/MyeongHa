@@ -1,9 +1,17 @@
 import { randomUUID } from 'node:crypto';
 import { createProductionBirthProfileReadRuntimeV1 } from '../apps/api/src/production-birth-profile-read-runtime.js';
 
+const ROUTE_PATH = '/api/birth-profiles' as const;
 const ROUTE_PREFIX = '/api/birth-profiles/' as const;
 const INTERNAL_ROUTE_PARAM = '__myeongha_birth_profile_id' as const;
+const VERCEL_DYNAMIC_ROUTE_PARAM = 'id' as const;
+const VERCEL_SHARE_PARAM = '_vercel_share' as const;
 const NO_STORE_CACHE_CONTROL = 'no-store' as const;
+const ALLOWED_ROUTE_METADATA_KEYS = new Set([
+  INTERNAL_ROUTE_PARAM,
+  VERCEL_DYNAMIC_ROUTE_PARAM,
+  VERCEL_SHARE_PARAM,
+]);
 
 type HeaderValue = string | string[] | undefined;
 type QueryValue = string | string[] | undefined;
@@ -40,6 +48,10 @@ function validateLocator(value: string): string | null {
   return value;
 }
 
+function isSingleNonEmptyString(value: QueryValue): value is string {
+  return typeof value === 'string' && value.length > 0;
+}
+
 function locatorFromQueryRecord(
   query: VercelNodeRequestLike['query'],
 ): LocatorEvidence {
@@ -47,17 +59,55 @@ function locatorFromQueryRecord(
 
   const keys = Object.keys(query);
   if (keys.length === 0) return { state: 'absent' };
-  if (keys.length !== 1 || keys[0] !== INTERNAL_ROUTE_PARAM) {
+  if (keys.some((key) => !ALLOWED_ROUTE_METADATA_KEYS.has(key))) {
     return { state: 'invalid' };
   }
 
-  const value = query[INTERNAL_ROUTE_PARAM];
-  if (typeof value !== 'string') return { state: 'invalid' };
+  const internalValue = query[INTERNAL_ROUTE_PARAM];
+  if (typeof internalValue !== 'string') return { state: 'invalid' };
 
-  const locator = validateLocator(value);
-  return locator === null
-    ? { state: 'invalid' }
-    : { state: 'valid', value: locator };
+  const locator = validateLocator(internalValue);
+  if (locator === null) return { state: 'invalid' };
+
+  const dynamicValue = query[VERCEL_DYNAMIC_ROUTE_PARAM];
+  if (
+    dynamicValue !== undefined &&
+    (typeof dynamicValue !== 'string' || dynamicValue !== locator)
+  ) {
+    return { state: 'invalid' };
+  }
+
+  const shareValue = query[VERCEL_SHARE_PARAM];
+  if (shareValue !== undefined && !isSingleNonEmptyString(shareValue)) {
+    return { state: 'invalid' };
+  }
+
+  return { state: 'valid', value: locator };
+}
+
+function pathnameMatchesLocator(pathname: string, locator: string): boolean {
+  if (pathname === ROUTE_PATH) return true;
+  if (!pathname.startsWith(ROUTE_PREFIX)) return false;
+
+  const rawSegment = pathname.slice(ROUTE_PREFIX.length);
+  if (rawSegment.length === 0 || rawSegment.includes('/')) return false;
+
+  try {
+    return decodeURIComponent(rawSegment) === locator;
+  } catch {
+    return false;
+  }
+}
+
+function getSingleUrlParam(
+  searchParams: URLSearchParams,
+  key: string,
+): string | null | undefined {
+  const values = searchParams.getAll(key);
+  if (values.length === 0) return undefined;
+  if (values.length !== 1) return null;
+  const value = values[0];
+  return value === undefined || value.length === 0 ? null : value;
 }
 
 function locatorFromRequestUrl(url: string | undefined): LocatorEvidence {
@@ -70,19 +120,38 @@ function locatorFromRequestUrl(url: string | undefined): LocatorEvidence {
     return { state: 'invalid' };
   }
 
-  const entries = [...parsed.searchParams.entries()];
-  if (entries.length === 0) return { state: 'absent' };
-  if (entries.length !== 1) return { state: 'invalid' };
+  if (parsed.hash !== '') return { state: 'invalid' };
 
-  const entry = entries[0];
-  if (entry === undefined) return { state: 'invalid' };
-  const [key, value] = entry;
-  if (key !== INTERNAL_ROUTE_PARAM) return { state: 'invalid' };
+  const keys = [...new Set(parsed.searchParams.keys())];
+  if (keys.length === 0) return { state: 'absent' };
+  if (keys.some((key) => !ALLOWED_ROUTE_METADATA_KEYS.has(key))) {
+    return { state: 'invalid' };
+  }
 
-  const locator = validateLocator(value);
-  return locator === null
-    ? { state: 'invalid' }
-    : { state: 'valid', value: locator };
+  const internalValue = getSingleUrlParam(parsed.searchParams, INTERNAL_ROUTE_PARAM);
+  if (typeof internalValue !== 'string') return { state: 'invalid' };
+
+  const locator = validateLocator(internalValue);
+  if (locator === null) return { state: 'invalid' };
+  if (!pathnameMatchesLocator(parsed.pathname, locator)) {
+    return { state: 'invalid' };
+  }
+
+  const dynamicValue = getSingleUrlParam(
+    parsed.searchParams,
+    VERCEL_DYNAMIC_ROUTE_PARAM,
+  );
+  if (
+    dynamicValue === null ||
+    (dynamicValue !== undefined && dynamicValue !== locator)
+  ) {
+    return { state: 'invalid' };
+  }
+
+  const shareValue = getSingleUrlParam(parsed.searchParams, VERCEL_SHARE_PARAM);
+  if (shareValue === null) return { state: 'invalid' };
+
+  return { state: 'valid', value: locator };
 }
 
 function resolveInjectedBirthProfileId(
@@ -104,38 +173,6 @@ function resolveInjectedBirthProfileId(
   if (queryEvidence.state === 'valid') return queryEvidence.value;
   if (urlEvidence.state === 'valid') return urlEvidence.value;
   return null;
-}
-
-function describeRouteMetadata(request: VercelNodeRequestLike): Record<string, unknown> {
-  let pathname: string | null = null;
-  let urlQueryKeys: string[] = [];
-  let urlParseable = false;
-
-  if (typeof request.url === 'string') {
-    try {
-      const parsed = new URL(request.url, 'https://myeongha.internal');
-      pathname = parsed.pathname;
-      urlQueryKeys = [...new Set(parsed.searchParams.keys())].sort();
-      urlParseable = true;
-    } catch {
-      urlParseable = false;
-    }
-  }
-
-  return {
-    requestConstructor:
-      typeof request === 'object' && request !== null
-        ? request.constructor?.name ?? null
-        : null,
-    method: request.method ?? null,
-    queryPropertyPresent:
-      typeof request === 'object' && request !== null && 'query' in request,
-    queryKeys: request.query === undefined ? [] : Object.keys(request.query).sort(),
-    urlPropertyType: typeof request.url,
-    urlParseable,
-    pathname,
-    urlQueryKeys,
-  };
 }
 
 function toWebHeaders(
@@ -200,10 +237,6 @@ export default async function handler(
 ): Promise<void> {
   const birthProfileId = resolveInjectedBirthProfileId(request);
   if (birthProfileId === null) {
-    console.info(
-      'BirthProfileRouteDiagnostic',
-      JSON.stringify(describeRouteMetadata(request)),
-    );
     await writeRouteNotFound(response);
     return;
   }
