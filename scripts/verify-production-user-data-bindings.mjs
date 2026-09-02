@@ -8,6 +8,7 @@ const requiredFragments = [
   "description: 'Type BIND to provision production user-data credentials without deploying routes.'",
   'environment: production',
   'cancel-in-progress: false',
+  'DISPATCH_CONFIRM: ${{ inputs.confirm }}',
   'SUPABASE_PROJECT_ID: cnsfpcdiyofqvhpcegfc',
   'SUPABASE_ORIGIN: https://cnsfpcdiyofqvhpcegfc.supabase.co',
   'RUNTIME_DB_PRINCIPAL: myeongha_runtime',
@@ -18,15 +19,17 @@ const requiredFragments = [
   'SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}',
   'SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}',
   'VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}',
-  "if [[ '${{ inputs.confirm }}' != 'BIND' ]]",
+  '[[ "$DISPATCH_CONFIRM" == \'BIND\' ]]',
   'https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_ID/config/database/pooler',
   'https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_ID/api-keys?reveal=true',
   '[[ "$admin_pool_user" == "postgres.$SUPABASE_PROJECT_ID" ]]',
   'runtime_pool_user="$RUNTIME_DB_PRINCIPAL.$SUPABASE_PROJECT_ID"',
   '.type == "publishable" and (.disabled != true)',
+  '[[ "$supabase_publishable_key" == sb_publishable_* ]]',
+  '::add-mask::$supabase_publishable_key',
   'authid.rolpassword is null',
-  "and not runtime.rolbypassrls",
-  "and not executor.rolbypassrls",
+  'and not runtime.rolbypassrls',
+  'and not executor.rolbypassrls',
   'openssl rand -hex 32',
   '"MYEONGHA_DATABASE_URL"',
   '"MYEONGHA_DATABASE_PRINCIPAL"',
@@ -40,7 +43,7 @@ const requiredFragments = [
   'alter role $RUNTIME_DB_PRINCIPAL password',
   'current_user = \'$RUNTIME_DB_PRINCIPAL\'',
   'set local role $API_EXECUTION_ROLE;',
-  "binding_verified=1",
+  'binding_verified=1',
   'No deployment or route activation was performed.',
 ];
 
@@ -61,6 +64,10 @@ const forbiddenFragments = [
   'supabase_admin',
   'MYEONGHA_DATABASE_PRINCIPAL: postgres',
   'sslmode=disable',
+  'echo "publishable_key=',
+  'echo "database_url=',
+  'echo "runtime_password=',
+  'echo "guest_fingerprint_secret=',
 ];
 
 for (const fragment of forbiddenFragments) {
@@ -112,7 +119,7 @@ if (rollbackIndex < 0 || rollbackIndex >= passwordWriteIndex) {
 }
 
 if (!workflow.includes('trap cleanup EXIT')) {
-  throw new Error('Production binding workflow must install the EXIT rollback trap.');
+  throw new Error('Production binding workflow must install the EXIT cleanup/rollback trap.');
 }
 
 console.log('MyeongHa production user-data binding workflow contract verification passed.');
