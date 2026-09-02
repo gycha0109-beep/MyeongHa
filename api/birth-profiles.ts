@@ -125,6 +125,8 @@ function classifyPathname(pathname: string): string {
 }
 
 function logRejectedRouteShape(request: VercelNodeRequestLike): void {
+  if (process.env.VERCEL !== '1') return;
+
   const queryKeys = Object.keys(request.query ?? {}).sort();
   const queryValueKinds = Object.fromEntries(
     queryKeys.map((key) => [key, classifyQueryValue(request.query?.[key])]),
