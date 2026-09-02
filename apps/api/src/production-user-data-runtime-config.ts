@@ -132,6 +132,15 @@ function parseSupabaseOrigin(value: string): typeof MYEONGHA_PRODUCTION_SUPABASE
   return MYEONGHA_PRODUCTION_SUPABASE_ORIGIN;
 }
 
+function parseSupabasePublishableApiKey(value: string): string {
+  if (!/^sb_publishable_[A-Za-z0-9_-]{16,}$/u.test(value)) {
+    return fail(
+      'MYEONGHA_SUPABASE_API_KEY must be a modern Supabase publishable key, not a secret/service credential.',
+    );
+  }
+  return value;
+}
+
 function requireSecret(name: string, value: string, minimumLength: number): string {
   if (value.length < minimumLength) {
     return fail(`${name} is shorter than the production minimum.`);
@@ -151,10 +160,8 @@ export function parseProductionUserDataRuntimeConfigV1(
   const supabaseOrigin = parseSupabaseOrigin(
     requiredEnv(env, PRODUCTION_USER_DATA_RUNTIME_ENV_V1.supabaseUrl),
   );
-  const supabaseApiKey = requireSecret(
-    PRODUCTION_USER_DATA_RUNTIME_ENV_V1.supabaseApiKey,
+  const supabaseApiKey = parseSupabasePublishableApiKey(
     requiredEnv(env, PRODUCTION_USER_DATA_RUNTIME_ENV_V1.supabaseApiKey),
-    20,
   );
   const guestFingerprintSecret = requireSecret(
     PRODUCTION_USER_DATA_RUNTIME_ENV_V1.guestFingerprintSecret,
