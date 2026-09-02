@@ -91,8 +91,16 @@ if (!triggerBlock.includes('issue_comment:') || !triggerBlock.includes('types: [
   throw new Error('One-shot bridge must trigger only from an edited issue comment.');
 }
 
-if ((workflow.match(/MYEONGHA_GUEST_SESSION_TTL_SECONDS/g) ?? []).length !== 3) {
-  throw new Error('One-shot bridge must bind and read back only the approved Guest TTL environment key.');
+const envKeyMatches = [...workflow.matchAll(/key: "(MYEONGHA_[A-Z0-9_]+)"/g)].map(
+  (match) => match[1],
+);
+if (
+  envKeyMatches.length !== 1 ||
+  envKeyMatches[0] !== 'MYEONGHA_GUEST_SESSION_TTL_SECONDS'
+) {
+  throw new Error(
+    `One-shot bridge must mutate exactly one approved MyeongHa environment key; found: ${envKeyMatches.join(', ')}`,
+  );
 }
 
 console.log('MyeongHa one-shot production Guest TTL owner bridge contract verification passed.');
