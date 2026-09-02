@@ -1,4 +1,4 @@
-import { Pool, type PoolClient } from 'pg';
+import { Pool, type PoolClient, type PoolConfig } from 'pg';
 import type {
   PostgresQueryResultV1,
   PostgresSubjectConnectionV1,
@@ -8,12 +8,21 @@ import {
   MYEONGHA_API_EXECUTION_ROLE,
   type ProductionUserDataRuntimeConfigV1,
 } from './production-user-data-runtime-config.js';
+import { SUPABASE_ROOT_CA_2021_PEM } from './supabase-root-ca-2021.js';
 
 export const NODE_POSTGRES_SUBJECT_POOL_DEFAULTS_V1 = Object.freeze({
   maxConnectionsPerRuntime: 4,
   connectionTimeoutMs: 5_000,
   idleTimeoutMs: 10_000,
 } as const);
+
+const CONNECTION_STRING_SSL_PARAMETERS_V1 = Object.freeze([
+  'sslmode',
+  'sslcert',
+  'sslkey',
+  'sslrootcert',
+  'uselibpqcompat',
+] as const);
 
 const VERIFY_LOGIN_PRINCIPAL_SQL = `
 select
@@ -51,6 +60,34 @@ export class NodePostgresSubjectPoolErrorV1 extends Error {
   }
 }
 
+/**
+ * node-postgres gives SSL parameters embedded in the connection string precedence
+ * over an explicit `ssl` object. Production therefore removes URI-level SSL
+ * controls before constructing the driver and supplies the governed Supabase CA
+ * explicitly with certificate verification enabled.
+ */
+export function createNodePostgresDriverPoolConfigV1(
+  connectionString: string,
+): PoolConfig {
+  const url = new URL(connectionString);
+  for (const parameter of CONNECTION_STRING_SSL_PARAMETERS_V1) {
+    url.searchParams.delete(parameter);
+  }
+
+  return {
+    connectionString: url.toString(),
+    ssl: {
+      ca: SUPABASE_ROOT_CA_2021_PEM,
+      rejectUnauthorized: true,
+    },
+    max: NODE_POSTGRES_SUBJECT_POOL_DEFAULTS_V1.maxConnectionsPerRuntime,
+    connectionTimeoutMillis:
+      NODE_POSTGRES_SUBJECT_POOL_DEFAULTS_V1.connectionTimeoutMs,
+    idleTimeoutMillis: NODE_POSTGRES_SUBJECT_POOL_DEFAULTS_V1.idleTimeoutMs,
+    allowExitOnIdle: true,
+  };
+}
+
 class PgDriverClientV1 implements NodePostgresDriverClientV1 {
   constructor(private readonly client: PoolClient) {}
 
@@ -77,14 +114,7 @@ class PgDriverPoolV1 implements NodePostgresDriverPoolV1 {
   private readonly pool: Pool;
 
   constructor(connectionString: string) {
-    this.pool = new Pool({
-      connectionString,
-      max: NODE_POSTGRES_SUBJECT_POOL_DEFAULTS_V1.maxConnectionsPerRuntime,
-      connectionTimeoutMillis:
-        NODE_POSTGRES_SUBJECT_POOL_DEFAULTS_V1.connectionTimeoutMs,
-      idleTimeoutMillis: NODE_POSTGRES_SUBJECT_POOL_DEFAULTS_V1.idleTimeoutMs,
-      allowExitOnIdle: true,
-    });
+    this.pool = new Pool(createNodePostgresDriverPoolConfigV1(connectionString));
 
     this.pool.on('error', (error) => {
       const code = (error as Error & { code?: unknown }).code;
