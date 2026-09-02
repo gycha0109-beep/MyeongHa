@@ -105,9 +105,9 @@ describe('GET /api/birth-profiles/:id production Vercel Node adapter', () => {
     expect(header(response, 'cache-control')).toBe('no-store');
   });
 
-  it('fails closed when route metadata is missing, duplicated, array-valued, or polluted', async () => {
+  it('fails closed when route metadata is missing, array-valued, or polluted', async () => {
     const cases: EndpointRequest[] = [
-      { method: 'GET', headers: {}, query: undefined },
+      { method: 'GET', headers: {} },
       { method: 'GET', headers: {}, query: {} },
       { method: 'GET', headers: {}, query: { id: [PROFILE_ID, PROFILE_ID] } },
       { method: 'GET', headers: {}, query: { id: PROFILE_ID, debug: '1' } },
