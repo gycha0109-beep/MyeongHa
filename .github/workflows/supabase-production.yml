@@ -47,8 +47,8 @@ jobs:
       - name: Link production project
         run: supabase link --project-ref "$SUPABASE_PROJECT_ID"
 
-      - name: Detect legacy 0010 migration history
-        id: legacy-history
+      - name: Detect known migration history repairs
+        id: migration-history
         shell: bash
         run: |
           set +e
@@ -56,23 +56,40 @@ jobs:
           list_status=${PIPESTATUS[0]}
           set -e
 
+          legacy_repair=false
+          duplicate_0830_repair=false
+
           if grep -q '20260830072444' /tmp/myeongha-migration-state.txt; then
-            echo 'repair_required=true' >> "$GITHUB_OUTPUT"
-          else
-            echo 'repair_required=false' >> "$GITHUB_OUTPUT"
-            if [ "$list_status" -ne 0 ]; then
-              echo 'Migration list failed without the known legacy 0010 history marker.'
-              exit "$list_status"
-            fi
+            legacy_repair=true
+          fi
+          if grep -q '20260902193252' /tmp/myeongha-migration-state.txt; then
+            duplicate_0830_repair=true
+          fi
+
+          echo "legacy_repair=$legacy_repair" >> "$GITHUB_OUTPUT"
+          echo "duplicate_0830_repair=$duplicate_0830_repair" >> "$GITHUB_OUTPUT"
+
+          if [ "$list_status" -ne 0 ] \
+             && [ "$legacy_repair" != 'true' ] \
+             && [ "$duplicate_0830_repair" != 'true' ]; then
+            echo 'Migration list failed without a known repair marker.'
+            exit "$list_status"
           fi
 
       - name: Repair legacy 0010 migration history
-        if: ${{ steps.legacy-history.outputs.repair_required == 'true' }}
+        if: ${{ steps.migration-history.outputs.legacy_repair == 'true' }}
         shell: bash
         run: |
           supabase migration repair 20260830072444 --status reverted
           supabase migration repair 0010 --status applied
-          supabase migration list
+
+      - name: Repair duplicate 0830 connector migration history
+        if: ${{ steps.migration-history.outputs.duplicate_0830_repair == 'true' }}
+        shell: bash
+        run: supabase migration repair 20260902193252 --status reverted
+
+      - name: Verify repaired migration history
+        run: supabase migration list
 
       - name: Preview pending production migrations
         run: supabase db push --dry-run
