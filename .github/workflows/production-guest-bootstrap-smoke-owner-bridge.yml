@@ -1,0 +1,86 @@
+name: Production Guest Bootstrap Owner Smoke Bridge
+
+on:
+  issue_comment:
+    types: [edited]
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+
+concurrency:
+  group: production-guest-bootstrap-owner-smoke
+  cancel-in-progress: false
+
+env:
+  EXPECTED_ISSUE_NUMBER: '329'
+  EXPECTED_COMMENT_ID: '5514124938'
+  EXPECTED_COMMAND: SMOKE_GUEST_BOOTSTRAP_V1_CA503767_7A9E4C21
+  EXPECTED_ROUTE_MERGE_SHA: ca503767d89553dd31026b3a995bee788e304adf
+  EXPECTED_ROUTE_BLOB_SHA: 5b9707781a5481d9e1c12ad3d6c0848dfccf67f3
+  EXPECTED_ACTIVATION_PR_NUMBER: '334'
+
+jobs:
+  smoke:
+    name: production-guest-bootstrap-owner-smoke
+    if: >-
+      github.event.issue.pull_request != null &&
+      github.event.issue.number == 329 &&
+      github.event.comment.id == 5514124938 &&
+      github.event.comment.user.login == 'gycha0109-beep' &&
+      github.event.comment.author_association == 'OWNER' &&
+      github.actor == 'gycha0109-beep' &&
+      github.event.comment.body == 'SMOKE_GUEST_BOOTSTRAP_V1_CA503767_7A9E4C21'
+    runs-on: ubuntu-24.04
+    environment: production
+    env:
+      GH_READ_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check out exact default-branch smoke verifier
+        uses: actions/checkout@v4
+
+      - name: Verify exact main and activated route authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          test -n "${GH_READ_TOKEN:-}"
+
+          remote_main="$(git ls-remote origin refs/heads/main | awk '{print $1}')"
+          test -n "$remote_main"
+          test "$remote_main" = "$GITHUB_SHA"
+
+          git merge-base --is-ancestor "$EXPECTED_ROUTE_MERGE_SHA" HEAD
+          test "$(git rev-parse HEAD:api/session/bootstrap.ts)" = "$EXPECTED_ROUTE_BLOB_SHA"
+
+          pr_file="$RUNNER_TEMP/guest-bootstrap-smoke-activation-pr.json"
+          cleanup() {
+            exit_code=$?
+            trap - EXIT
+            rm -f "$pr_file"
+            exit "$exit_code"
+          }
+          trap cleanup EXIT
+
+          curl -fsS \
+            -H "Authorization: Bearer $GH_READ_TOKEN" \
+            -H 'Accept: application/vnd.github+json' \
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/pulls/$EXPECTED_ACTIVATION_PR_NUMBER" \
+            -o "$pr_file"
+
+          jq -e \
+            --arg merged "$EXPECTED_ROUTE_MERGE_SHA" \
+            '.merged == true
+              and .state == "closed"
+              and .base.ref == "main"
+              and .merge_commit_sha == $merged' \
+            "$pr_file" >/dev/null
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Run guarded production Guest bootstrap smoke
+        run: node scripts/verify-production-guest-bootstrap.mjs
