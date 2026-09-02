@@ -43,12 +43,57 @@ export class NodePostgresSubjectPoolErrorV1 extends Error {
     readonly code:
       | 'PRINCIPAL_MISMATCH'
       | 'EXECUTION_ROLE_UNAVAILABLE'
-      | 'INVALID_PREFLIGHT_RESULT',
+      | 'INVALID_PREFLIGHT_RESULT'
+      | 'TLS_MODE_UNSUPPORTED',
     message: string,
   ) {
     super(message);
     this.name = 'NodePostgresSubjectPoolErrorV1';
   }
+}
+
+/**
+ * node-postgres 8.x currently interprets sslmode=require without libpq
+ * compatibility as certificate/hostname verification. The production Supabase
+ * connection authority is explicitly bound as libpq sslmode=require, whose
+ * contract is encrypted transport without CA/hostname verification. Pin that
+ * interpretation explicitly so a pg-connection-string compatibility change
+ * cannot silently change the deployed meaning of the governed URL.
+ *
+ * Stronger modes such as verify-ca / verify-full are deliberately untouched.
+ * They require their corresponding CA material and must never be downgraded by
+ * this adapter.
+ */
+export function normalizeNodePostgresConnectionStringV1(
+  connectionString: string,
+): string {
+  let url: URL;
+  try {
+    url = new URL(connectionString);
+  } catch {
+    throw new NodePostgresSubjectPoolErrorV1(
+      'TLS_MODE_UNSUPPORTED',
+      'PostgreSQL runtime connection URL could not be parsed for TLS semantics.',
+    );
+  }
+
+  if (url.searchParams.get('sslmode')?.toLowerCase() !== 'require') {
+    return connectionString;
+  }
+
+  const existingCompatibility = url.searchParams.get('uselibpqcompat');
+  if (
+    existingCompatibility !== null &&
+    existingCompatibility.toLowerCase() !== 'true'
+  ) {
+    throw new NodePostgresSubjectPoolErrorV1(
+      'TLS_MODE_UNSUPPORTED',
+      'PostgreSQL runtime sslmode=require must use explicit libpq-compatible TLS semantics.',
+    );
+  }
+
+  url.searchParams.set('uselibpqcompat', 'true');
+  return url.toString();
 }
 
 class PgDriverClientV1 implements NodePostgresDriverClientV1 {
@@ -78,7 +123,7 @@ class PgDriverPoolV1 implements NodePostgresDriverPoolV1 {
 
   constructor(connectionString: string) {
     this.pool = new Pool({
-      connectionString,
+      connectionString: normalizeNodePostgresConnectionStringV1(connectionString),
       max: NODE_POSTGRES_SUBJECT_POOL_DEFAULTS_V1.maxConnectionsPerRuntime,
       connectionTimeoutMillis:
         NODE_POSTGRES_SUBJECT_POOL_DEFAULTS_V1.connectionTimeoutMs,
