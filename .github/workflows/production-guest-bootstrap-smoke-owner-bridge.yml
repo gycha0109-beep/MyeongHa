@@ -1,0 +1,171 @@
+name: Production Guest Bootstrap Smoke Owner Bridge
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+
+concurrency:
+  group: production-guest-bootstrap-smoke
+  cancel-in-progress: false
+
+env:
+  PRODUCTION_BASE_URL: https://myeongha.vercel.app
+  EXPECTED_TARGET_PR_NUMBER: '334'
+  EXPECTED_ROUTE_ACTIVATION_SHA: ca503767d89553dd31026b3a995bee788e304adf
+  EXPECTED_COMMAND: VERIFY_GUEST_BOOTSTRAP_V1_CA503767
+
+jobs:
+  verify:
+    name: verify-production-guest-bootstrap-owner-bridge
+    if: >-
+      github.event.issue.pull_request != null &&
+      github.event.issue.number == 334 &&
+      github.event.comment.user.login == 'gycha0109-beep' &&
+      github.event.comment.author_association == 'OWNER' &&
+      github.event.comment.body == 'VERIFY_GUEST_BOOTSTRAP_V1_CA503767'
+    runs-on: ubuntu-24.04
+    environment: production
+    steps:
+      - name: Check out exact repository verifier
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify activation commit ancestry and command gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor "$EXPECTED_ROUTE_ACTIVATION_SHA" HEAD
+          [[ "$EXPECTED_COMMAND" == 'VERIFY_GUEST_BOOTSTRAP_V1_CA503767' ]]
+
+      - name: Verify production Guest bootstrap and current-subject boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+
+          work="$(mktemp -d)"
+          cleanup() {
+            exit_code=$?
+            trap - EXIT
+            rm -rf "$work"
+            exit "$exit_code"
+          }
+          trap cleanup EXIT
+
+          header_value() {
+            local file="$1"
+            local name="$2"
+            awk -v wanted="$name" '
+              BEGIN { IGNORECASE=1 }
+              index($0, wanted ":") == 1 {
+                gsub(/\r/, "")
+                sub(/^[^:]+:[[:space:]]*/, "")
+                print
+                exit
+              }
+            ' "$file"
+          }
+
+          status_code() {
+            awk 'NR == 1 { print $2 }' "$1"
+          }
+
+          # Route must already be live and source-safe before mutating production.
+          curl -fsS -D "$work/method.headers" -o "$work/method.body" "$PRODUCTION_BASE_URL/api/session/bootstrap" || true
+          [[ "$(status_code "$work/method.headers")" == '405' ]]
+          [[ "$(header_value "$work/method.headers" 'allow')" == 'POST' ]]
+          [[ "$(header_value "$work/method.headers" 'cache-control')" == 'no-store' ]]
+          [[ ! -s "$work/method.body" ]]
+
+          # Create exactly one fresh Guest credential. The raw bearer stays only in this runner's 0700 temp directory.
+          curl -fsS -D "$work/bootstrap.headers" -o "$work/bootstrap.json" \
+            -X POST "$PRODUCTION_BASE_URL/api/session/bootstrap"
+          [[ "$(status_code "$work/bootstrap.headers")" == '200' ]]
+          [[ "$(header_value "$work/bootstrap.headers" 'cache-control')" == 'no-store' ]]
+          jq -e '
+            .ok == true
+            and .data.kind == "guest"
+            and (.data.subjectId | type == "string" and length > 0)
+            and (.data.guestSession.guestSessionId | type == "string" and length > 0)
+            and (.data.guestSession.expiresAt | type == "string" and length > 0)
+            and (.data.guestSession.bearerToken | type == "string" and length > 0)
+            and .meta.apiContractVersion == "v0.9"
+          ' "$work/bootstrap.json" >/dev/null
+
+          subject_id="$(jq -er '.data.subjectId' "$work/bootstrap.json")"
+          guest_session_id="$(jq -er '.data.guestSession.guestSessionId' "$work/bootstrap.json")"
+          bearer_token="$(jq -er '.data.guestSession.bearerToken' "$work/bootstrap.json")"
+          expires_at="$(jq -er '.data.guestSession.expiresAt' "$work/bootstrap.json")"
+          server_time="$(jq -er '.meta.serverTime' "$work/bootstrap.json")"
+
+          # The bound security TTL is 7 days. Allow only small request/runtime skew.
+          node - "$server_time" "$expires_at" <<'NODE'
+          const [serverTime, expiresAt] = process.argv.slice(2);
+          const delta = (Date.parse(expiresAt) - Date.parse(serverTime)) / 1000;
+          if (!Number.isFinite(delta) || delta < 604790 || delta > 604810) {
+            throw new Error(`Unexpected Guest TTL delta: ${delta}`);
+          }
+          NODE
+
+          # The fresh bearer must resolve to the same canonical Guest through /api/me.
+          curl -fsS -D "$work/me.headers" -o "$work/me.json" \
+            -H "Authorization: Bearer $bearer_token" \
+            "$PRODUCTION_BASE_URL/api/me"
+          [[ "$(status_code "$work/me.headers")" == '200' ]]
+          [[ "$(header_value "$work/me.headers" 'cache-control')" == 'no-store' ]]
+          jq -e --arg subject "$subject_id" '
+            .ok == true
+            and .data.subjectId == $subject
+            and .data.subjectKind == "guest"
+            and .meta.apiContractVersion == "v0.9"
+          ' "$work/me.json" >/dev/null
+
+          # Reusing the same bearer must reuse the same Guest session and never re-emit the raw bearer.
+          curl -fsS -D "$work/reuse.headers" -o "$work/reuse.json" \
+            -X POST \
+            -H "Authorization: Bearer $bearer_token" \
+            "$PRODUCTION_BASE_URL/api/session/bootstrap"
+          [[ "$(status_code "$work/reuse.headers")" == '200' ]]
+          [[ "$(header_value "$work/reuse.headers" 'cache-control')" == 'no-store' ]]
+          jq -e --arg subject "$subject_id" --arg session "$guest_session_id" '
+            .ok == true
+            and .data.kind == "guest"
+            and .data.subjectId == $subject
+            and .data.guestSession.guestSessionId == $session
+            and .data.guestSession.bearerToken == null
+          ' "$work/reuse.json" >/dev/null
+
+          # Invalid opaque credentials and invalid JWT-shaped credentials both fail closed.
+          curl -sS -D "$work/invalid.headers" -o "$work/invalid.json" \
+            -H 'Authorization: Bearer invalid-opaque-credential-for-production-smoke' \
+            "$PRODUCTION_BASE_URL/api/me" || true
+          [[ "$(status_code "$work/invalid.headers")" == '401' ]]
+          [[ "$(header_value "$work/invalid.headers" 'cache-control')" == 'no-store' ]]
+          jq -e '.ok == false and .error.code == "AUTH_REQUIRED"' "$work/invalid.json" >/dev/null
+
+          bogus_jwt='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJib2d1cyJ9.invalidsignature'
+          curl -sS -D "$work/jwt.headers" -o "$work/jwt.json" \
+            -H "Authorization: Bearer $bogus_jwt" \
+            "$PRODUCTION_BASE_URL/api/me" || true
+          [[ "$(status_code "$work/jwt.headers")" == '401' ]]
+          [[ "$(header_value "$work/jwt.headers" 'cache-control')" == 'no-store' ]]
+          jq -e '.ok == false and .error.code == "AUTH_REQUIRED"' "$work/jwt.json" >/dev/null
+
+          curl -sS -D "$work/unauth.headers" -o "$work/unauth.json" \
+            "$PRODUCTION_BASE_URL/api/me" || true
+          [[ "$(status_code "$work/unauth.headers")" == '401' ]]
+          [[ "$(header_value "$work/unauth.headers" 'cache-control')" == 'no-store' ]]
+          jq -e '.ok == false and .error.code == "AUTH_REQUIRED"' "$work/unauth.json" >/dev/null
+
+          curl -fsS -D "$work/health.headers" -o "$work/health.json" \
+            "$PRODUCTION_BASE_URL/api/health"
+          [[ "$(status_code "$work/health.headers")" == '200' ]]
+          jq -e '.status == "ok"' "$work/health.json" >/dev/null
+
+          echo "Production Guest bootstrap smoke succeeded for one canonical Guest subject/session; raw bearer was not emitted to logs."
