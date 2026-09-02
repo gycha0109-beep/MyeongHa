@@ -1,6 +1,6 @@
 # MyeongHa Production User-Data Runtime Configuration V1
 
-Status: **implementation contract + concrete DB pool adapter — credentials are not provisioned by this document**
+Status: **implementation contract + concrete DB pool + Member verifier — credentials are not provisioned by this document**
 
 ## Purpose
 
@@ -44,6 +44,26 @@ The adapter fails closed and discards the checkout when:
 
 The pool is deliberately bounded for a serverless runtime. This adapter does not provision the login role/password and does not make an absent Vercel binding valid.
 
+## Concrete Supabase Member verifier
+
+`apps/api/src/supabase-member-identity-verifier.ts` implements the production Member credential verification boundary using the Supabase Auth server.
+
+The verifier accepts only an HTTP Bearer credential and validates it by calling:
+
+```http
+GET https://cnsfpcdiyofqvhpcegfc.supabase.co/auth/v1/user
+apikey: <MYEONGHA_SUPABASE_API_KEY>
+Authorization: Bearer <user access token>
+```
+
+A 200 response must contain a syntactically valid Auth user UUID. Only that UUID becomes trusted Member evidence:
+
+```text
+{ kind: "member", verifiedAuthUserId: <auth.users.id> }
+```
+
+The verifier does not trust `user_metadata`, client-supplied `subjectId`, or any profile field as owner authority. `401`/`403` produce no verified identity; upstream 5xx/network/malformed responses fail closed instead of being downgraded to `AUTH_REQUIRED`. Raw access tokens and API keys are not included in verifier error messages.
+
 ## Required runtime settings
 
 ```text
@@ -79,9 +99,9 @@ Must exactly identify the governed production Supabase project origin above. Cro
 
 ### `MYEONGHA_SUPABASE_API_KEY`
 
-Credential/configuration material for the future concrete Supabase Member identity verifier. The runtime contract stores it only in parsed configuration; diagnostics expose only a configured/not-configured marker.
+Credential/configuration material for the concrete Supabase Member identity verifier. It is sent only as the Auth server `apikey` header while the user's access token is sent separately in `Authorization: Bearer ...`.
 
-The concrete Member HTTP transport and verifier are a separate implementation slice.
+The runtime contract stores the key only in parsed configuration; diagnostics expose only a configured/not-configured marker.
 
 ### `MYEONGHA_GUEST_FINGERPRINT_SECRET`
 
@@ -117,7 +137,7 @@ The parser therefore exposes a separate redacted summary containing only configu
 
 ## Activation gate
 
-The configuration contract and concrete pool adapter do not activate `/api/me` by themselves.
+The configuration contract, concrete pool adapter, and Member verifier do not activate `/api/me` by themselves.
 
 Production activation still requires:
 
@@ -125,13 +145,12 @@ Production activation still requires:
 1. provision dedicated PostgreSQL login principal
 2. grant only the ability required to enter myeongha_api_executor
 3. bind the required settings in Vercel production
-4. implement concrete Member identity verifier
-5. implement concrete Guest fingerprint verifier/transport
-6. add api/me.ts runtime adapter
-7. unauthenticated smoke => 401
-8. Member own-subject smoke => 200
-9. Guest own-subject smoke => 200
-10. cross-subject negative proof => denied
+4. implement concrete Guest fingerprint verifier/transport
+5. add api/me.ts runtime adapter
+6. unauthenticated smoke => 401
+7. Member own-subject smoke => 200
+8. Guest own-subject smoke => 200
+9. cross-subject negative proof => denied
 ```
 
-Until those gates are evidenced, `GET /api/me` remains production-inactive even though the application/HTTP boundary, database authority contracts, and concrete Node/PostgreSQL pool adapter exist.
+Until those gates are evidenced, `GET /api/me` remains production-inactive even though the application/HTTP boundary, database authority contracts, concrete Node/PostgreSQL pool adapter, and Supabase Member verifier exist.
