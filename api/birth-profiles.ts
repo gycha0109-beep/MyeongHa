@@ -7,7 +7,7 @@ const INTERNAL_ROUTE_PARAM = '__myeongha_birth_profile_id' as const;
 const VERCEL_DYNAMIC_ROUTE_PARAM = 'id' as const;
 const VERCEL_SHARE_PARAM = '_vercel_share' as const;
 const NO_STORE_CACHE_CONTROL = 'no-store' as const;
-const ALLOWED_ROUTE_METADATA_KEYS = new Set([
+const ALLOWED_ROUTE_METADATA_KEYS: ReadonlySet<string> = new Set([
   INTERNAL_ROUTE_PARAM,
   VERCEL_DYNAMIC_ROUTE_PARAM,
   VERCEL_SHARE_PARAM,
