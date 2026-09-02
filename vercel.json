@@ -30,7 +30,7 @@
   "rewrites": [
     {
       "source": "/api/birth-profiles/:id",
-      "destination": "/api/birth-profiles"
+      "destination": "/api/birth-profiles?id=:id"
     }
   ],
   "headers": [
