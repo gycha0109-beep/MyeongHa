@@ -154,12 +154,12 @@ describe('production request identity verifier v1', () => {
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
-  it('uses the exact same Guest fingerprint contract for bootstrap storage and request verification', async () => {
+  it('uses the exact same Guest fingerprint contract for bootstrap storage and request verification', () => {
     const config = configFixture();
     const port = createProductionGuestBearerTokenFingerprintPortV1(config);
-    await expect(
+    expect(
       port.fingerprintGuestBearerToken({ rawBearerToken: GUEST_TOKEN }),
-    ).resolves.toBe(
+    ).toBe(
       fingerprintProductionGuestBearerTokenV1({
         rawBearerToken: GUEST_TOKEN,
         secret: GUEST_FINGERPRINT_SECRET,
