@@ -29,12 +29,12 @@ const requiredFragments = [
   '.state == "open"',
   'and .draft == true',
   'and .base.ref == "main"',
-  'and .base.sha == $main',
   'and .head.sha == $head',
-  '/compare/$main_sha...$EXPECTED_ROUTE_HEAD_SHA',
-  '.behind_by == 0',
+  '/pulls/$EXPECTED_PR_NUMBER/files?per_page=100',
+  'length == 2',
   '"api/session/bootstrap.ts"',
   '"test/api-session-bootstrap-runtime.test.ts"',
+  'all(.[]; .status == "added")',
   'VERCEL_PROJECT_ID: prj_nXF0b5uv27Lyucz2SEBxzdCRXVsP',
   'VERCEL_TEAM_ID: team_xuYA9OhCWlJETaYFOmeVodgS',
   'VERCEL_PROJECT_NAME: myeongha',
@@ -58,7 +58,6 @@ const forbiddenFragments = [
   '\n  pull_request:',
   '\n  schedule:',
   'workflow_dispatch:',
-  'api/session/bootstrap.ts\n',
   'vercel deploy',
   'vercel --prod',
   'MYEONGHA_DATABASE_URL',
@@ -74,6 +73,8 @@ const forbiddenFragments = [
   'pull-requests: write',
   'issues: write',
   'contents: write',
+  '/compare/',
+  '.behind_by',
 ];
 
 for (const fragment of forbiddenFragments) {
@@ -90,8 +91,8 @@ if (!triggerBlock.includes('issue_comment:') || !triggerBlock.includes('types: [
   throw new Error('One-shot bridge must trigger only from an edited issue comment.');
 }
 
-if ((workflow.match(/MYEONGHA_GUEST_SESSION_TTL_SECONDS/g) ?? []).length !== 2) {
-  throw new Error('One-shot bridge must mutate only the approved Guest TTL environment key.');
+if ((workflow.match(/MYEONGHA_GUEST_SESSION_TTL_SECONDS/g) ?? []).length !== 3) {
+  throw new Error('One-shot bridge must bind and read back only the approved Guest TTL environment key.');
 }
 
 console.log('MyeongHa one-shot production Guest TTL owner bridge contract verification passed.');
