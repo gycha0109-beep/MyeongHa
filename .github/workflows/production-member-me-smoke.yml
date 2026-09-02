@@ -1,0 +1,45 @@
+name: Production Member API Me Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type VERIFY_MEMBER_ME to run the read-only production Member /api/me smoke.'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-member-me-smoke
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: verify-production-member-me
+    runs-on: ubuntu-24.04
+    environment: production
+    env:
+      DISPATCH_CONFIRM: ${{ inputs.confirm }}
+      MYEONGHA_PRODUCTION_MEMBER_BEARER: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_BEARER }}
+      MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID }}
+    steps:
+      - name: Verify explicit dispatch and governed smoke secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$DISPATCH_CONFIRM" == 'VERIFY_MEMBER_ME' ]]
+          test -n "${MYEONGHA_PRODUCTION_MEMBER_BEARER:-}"
+          test -n "${MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID:-}"
+
+      - name: Check out exact repository verifier
+        uses: actions/checkout@v4
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Verify production Member current-subject boundary
+        run: node scripts/verify-production-member-me.mjs
