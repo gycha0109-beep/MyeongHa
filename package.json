@@ -20,10 +20,11 @@
     "verify:supabase-deployment-config": "node scripts/verify-supabase-deployment.mjs",
     "verify:production-user-data-bindings": "node scripts/verify-production-user-data-bindings.mjs",
     "verify:production-guest-bootstrap-ttl-binding": "node scripts/verify-production-guest-bootstrap-ttl-binding.mjs",
+    "verify:production-guest-bootstrap-ttl-owner-bridge": "node scripts/verify-production-guest-bootstrap-ttl-owner-bridge.mjs",
     "verify:production-member-me-smoke-workflow": "node scripts/verify-production-member-me-smoke-workflow.mjs",
     "verify:production:api": "node scripts/verify-production-api.mjs",
     "verify:production:member-me": "node scripts/verify-production-member-me.mjs",
-    "check": "npm run typecheck && npm run test && npm run build && npm run build:web && npm run verify:deployment-config && npm run verify:supabase-deployment-config && npm run verify:production-user-data-bindings && npm run verify:production-guest-bootstrap-ttl-binding && npm run verify:production-member-me-smoke-workflow"
+    "check": "npm run typecheck && npm run test && npm run build && npm run build:web && npm run verify:deployment-config && npm run verify:supabase-deployment-config && npm run verify:production-user-data-bindings && npm run verify:production-guest-bootstrap-ttl-binding && npm run verify:production-guest-bootstrap-ttl-owner-bridge && npm run verify:production-member-me-smoke-workflow"
   },
   "dependencies": {
     "pg": "8.23.0"
