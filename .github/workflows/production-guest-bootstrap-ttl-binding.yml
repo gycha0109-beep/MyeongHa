@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       confirm:
-        description: 'Type BIND_GUEST_TTL to bind an already-approved Guest session TTL without deploying routes.'
+        description: 'Type BIND_GUEST_TTL to bind the decided Guest authentication TTL without deploying routes.'
         required: true
         type: string
       ttl_seconds:
-        description: 'Approved Guest session TTL in seconds. No repository default is provided.'
+        description: 'Enter the decided P0-PR-01A Guest authentication TTL in seconds: 604800.'
         required: true
         type: string
 
@@ -23,6 +23,7 @@ env:
   VERCEL_PROJECT_ID: prj_nXF0b5uv27Lyucz2SEBxzdCRXVsP
   VERCEL_TEAM_ID: team_xuYA9OhCWlJETaYFOmeVodgS
   VERCEL_PROJECT_NAME: myeongha
+  DECIDED_GUEST_SESSION_TTL_SECONDS: '604800'
 
 jobs:
   bind:
@@ -34,12 +35,13 @@ jobs:
       GUEST_SESSION_TTL_SECONDS: ${{ inputs.ttl_seconds }}
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
     steps:
-      - name: Verify explicit dispatch and approved TTL input
+      - name: Verify explicit dispatch and decided TTL input
         shell: bash
         run: |
           set -euo pipefail
           [[ "$DISPATCH_CONFIRM" == 'BIND_GUEST_TTL' ]]
           [[ "$GUEST_SESSION_TTL_SECONDS" =~ ^[1-9][0-9]*$ ]]
+          [[ "$GUEST_SESSION_TTL_SECONDS" == "$DECIDED_GUEST_SESSION_TTL_SECONDS" ]]
           test -n "${VERCEL_TOKEN:-}"
 
       - name: Verify governed Vercel production project
@@ -68,7 +70,7 @@ jobs:
             '.id == $id and .name == $name' \
             "$project_file" >/dev/null
 
-      - name: Bind Guest session TTL to Vercel production
+      - name: Bind and verify Guest session TTL in Vercel production
         shell: bash
         run: |
           set -euo pipefail
@@ -76,11 +78,12 @@ jobs:
 
           payload_file="$RUNNER_TEMP/vercel-guest-bootstrap-ttl.json"
           response_file="$RUNNER_TEMP/vercel-guest-bootstrap-ttl-response.json"
+          readback_file="$RUNNER_TEMP/vercel-guest-bootstrap-ttl-readback.json"
 
           cleanup() {
             exit_code=$?
             trap - EXIT
-            rm -f "$payload_file" "$response_file"
+            rm -f "$payload_file" "$response_file" "$readback_file"
             exit "$exit_code"
           }
           trap cleanup EXIT
@@ -93,7 +96,7 @@ jobs:
                 value: $ttl,
                 type: "encrypted",
                 target: ["production"],
-                comment: "MyeongHa approved production Guest session TTL binding v1"
+                comment: "MyeongHa P0-PR-01A Guest authentication TTL binding v1"
               }
             ]' > "$payload_file"
 
@@ -107,4 +110,29 @@ jobs:
 
           jq -e '((.failed // []) | length) == 0' "$response_file" >/dev/null
 
-          echo 'Approved Guest session TTL was bound to Vercel production. No deployment or route activation was performed.'
+          env_id="$(jq -er '
+            if (.created | type) == "array" then
+              ([.created[] | select(.key == "MYEONGHA_GUEST_SESSION_TTL_SECONDS") | .id][0] // empty)
+            elif (.created | type) == "object" and .created.key == "MYEONGHA_GUEST_SESSION_TTL_SECONDS" then
+              (.created.id // empty)
+            else
+              empty
+            end
+          ' "$response_file")"
+          test -n "$env_id"
+
+          curl -fsS \
+            -H "Authorization: Bearer $VERCEL_TOKEN" \
+            "https://api.vercel.com/v1/projects/$VERCEL_PROJECT_ID/env/$env_id?teamId=$VERCEL_TEAM_ID" \
+            -o "$readback_file"
+
+          jq -e \
+            --arg ttl "$DECIDED_GUEST_SESSION_TTL_SECONDS" \
+            '.key == "MYEONGHA_GUEST_SESSION_TTL_SECONDS"
+              and .type == "encrypted"
+              and (.target | type) == "array"
+              and (.target | index("production")) != null
+              and .value == $ttl' \
+            "$readback_file" >/dev/null
+
+          echo 'Decided Guest authentication TTL 604800 was bound and verified in Vercel production. No deployment or route activation was performed.'
