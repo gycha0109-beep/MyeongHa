@@ -1,12 +1,12 @@
 # MyeongHa Production User-Data Runtime Configuration V1
 
-Status: **implementation contract + concrete DB pool + Member/Guest request verifiers — public user-data routes remain gated**
+Status: **implementation contract + Member/Guest verifiers + live least-privilege DB login principal — runtime secrets and public user-data routes remain gated**
 
 ## Purpose
 
 This contract defines the configuration boundary that a production Vercel user-data runtime must satisfy before `GET /api/me` can be activated.
 
-It implements the deployment side of `P0-AUTH-01` without creating database login secrets, exposing privileged Supabase credentials, or claiming that the required Vercel environment variables already exist.
+It implements the deployment side of `P0-AUTH-01` without committing database passwords, exposing privileged Supabase credentials, or claiming that the required Vercel environment variables already exist.
 
 ## Governed production targets
 
@@ -17,11 +17,14 @@ cnsfpcdiyofqvhpcegfc
 Supabase origin
 https://cnsfpcdiyofqvhpcegfc.supabase.co
 
+network PostgreSQL login principal
+myeongha_runtime
+
 ordinary PostgreSQL execution role
 myeongha_api_executor
 ```
 
-`myeongha_api_executor` remains the migration-owned `NOLOGIN / NOBYPASSRLS` execution role. The network connection must use a separate, non-privileged login principal that is authorized to enter that role for the user-owned transaction.
+`myeongha_api_executor` remains the migration-owned `NOLOGIN / NOBYPASSRLS` execution role. `myeongha_runtime` is the separate non-privileged LOGIN principal and may enter that role only for the user-owned transaction.
 
 ## Concrete PostgreSQL pool adapter
 
@@ -42,7 +45,33 @@ The adapter fails closed and discards the checkout when:
 - the login principal cannot enter `myeongha_api_executor`;
 - the preflight projection is malformed.
 
-The pool is deliberately bounded for a serverless runtime. This adapter does not provision the login role/password and does not make an absent Vercel binding valid.
+The pool is deliberately bounded for a serverless runtime. It does not provision or recover database credentials and does not make an absent Vercel binding valid.
+
+## Production login principal
+
+Migration `0800_production_api_login_principal.sql` provisions the governed network login role:
+
+```text
+myeongha_runtime
+→ LOGIN
+→ NOSUPERUSER
+→ NOCREATEDB
+→ NOCREATEROLE
+→ NOINHERIT
+→ NOREPLICATION
+→ NOBYPASSRLS
+→ member of myeongha_api_executor
+```
+
+The migration creates the role with `PASSWORD NULL`. This is deliberate: repository migration authority may establish the role and its least-privilege membership, but it must not create an orphan production credential that has no secret-safe consumer binding.
+
+The role carries the management marker:
+
+```text
+myeongha:production-api-login-principal:v1
+```
+
+Because PostgreSQL roles are cluster-wide while CI applies migrations across multiple isolated databases, a pre-existing role is accepted only when this marker and the exact least-privilege shape remain intact. Unmarked or privilege-drifted roles fail closed.
 
 ## Concrete Supabase Member verifier
 
@@ -141,9 +170,13 @@ The URL itself is secret configuration and must never be emitted by runtime diag
 
 ### `MYEONGHA_DATABASE_PRINCIPAL`
 
-Names the dedicated network login principal. It must be distinct from `myeongha_api_executor` because the latter is intentionally `NOLOGIN`.
+Must name the governed dedicated network login principal:
 
-Provisioning the login principal, its password, and its membership/ability to `SET LOCAL ROLE myeongha_api_executor` belongs to deployment configuration. Repository migrations do not create that password.
+```text
+myeongha_runtime
+```
+
+It is distinct from `myeongha_api_executor` because the execution role is intentionally `NOLOGIN`. Migration 0800 provisions the login role and executor membership but deliberately does not provision a usable password. Password assignment belongs to the same secret-safe activation operation that binds the consuming Vercel runtime.
 
 ### `MYEONGHA_SUPABASE_URL`
 
@@ -166,6 +199,7 @@ client subjectId/userId
 != identity authority
 
 network DB login principal
+= myeongha_runtime
 != myeongha_api_executor
 
 myeongha_api_executor
@@ -190,13 +224,29 @@ The parser therefore exposes a separate redacted summary containing only configu
 
 ## Live production gate evidence — 2026-09-02
 
-Read-only production inspection confirmed:
+`Supabase Production #7` applied and verified migration `0800_production_api_login_principal` on project `cnsfpcdiyofqvhpcegfc`.
+
+Read-only inspection after deployment confirmed:
 
 ```text
 myeongha_api_executor
 → exists
 → NOLOGIN
 → NOBYPASSRLS
+
+myeongha_runtime
+→ LOGIN
+→ NOSUPERUSER
+→ NOCREATEDB
+→ NOCREATEROLE
+→ NOINHERIT
+→ NOREPLICATION
+→ NOBYPASSRLS
+→ marker = myeongha:production-api-login-principal:v1
+→ member of myeongha_api_executor
+
+0800 production_api_login_principal
+→ present in supabase_migrations.schema_migrations
 
 begin_member_subject_context_v1
 begin_guest_subject_context_v1
@@ -205,25 +255,29 @@ qry_subject_profile_current_v1
 → present in production
 ```
 
-The only observed role currently holding membership in `myeongha_api_executor` is privileged `postgres`, which has `BYPASSRLS`. It is explicitly forbidden as the ordinary user runtime login principal.
+The Vercel production invariant remains intentionally unchanged:
 
-Therefore the dedicated non-privileged production network login principal is still unprovisioned.
+```text
+GET /api/health → 200
+GET /api/me     → 404
+```
+
+The role exists, but no public user-data route may be activated until the runtime password and all required Vercel bindings are established through a secret-safe path.
 
 ## Activation gate
 
-The configuration contract, concrete pool adapter, Member verifier, Guest verifier, and production composition roots do not activate `/api/me` by themselves.
+The configuration contract, concrete pool adapter, Member verifier, Guest verifier, production composition roots, and live passwordless login role do not activate `/api/me` by themselves.
 
 Production activation still requires:
 
 ```text
-1. provision dedicated non-privileged PostgreSQL login principal
-2. grant only the ability required to enter myeongha_api_executor
-3. bind the required settings in Vercel production
-4. add api/me.ts runtime adapter
-5. unauthenticated smoke => 401
-6. Member own-subject smoke => 200
-7. Guest own-subject smoke => 200 when Guest issuance is active
-8. cross-subject negative proof => denied
+1. assign a strong myeongha_runtime password only together with its consuming secret binding
+2. bind the required settings in Vercel production
+3. add api/me.ts runtime adapter
+4. unauthenticated smoke => 401
+5. Member own-subject smoke => 200
+6. Guest own-subject smoke => 200 when Guest issuance is active
+7. cross-subject negative proof => denied
 ```
 
-Until those gates are evidenced, `GET /api/me` remains production-inactive even though the application/HTTP boundary, database authority contracts, concrete Node/PostgreSQL pool adapter, Member verifier, Guest verifier, and composition root exist.
+Until those gates are evidenced, `GET /api/me` remains production-inactive even though the application/HTTP boundary, database authority contracts, concrete Node/PostgreSQL pool adapter, Member verifier, Guest verifier, composition root, and governed network login role exist.
