@@ -15,12 +15,15 @@ const requiredFragments = [
   'environment: production',
   "EXPECTED_TARGET_PR_NUMBER: '334'",
   'EXPECTED_ROUTE_ACTIVATION_SHA: ca503767d89553dd31026b3a995bee788e304adf',
-  'EXPECTED_COMMAND: VERIFY_GUEST_BOOTSTRAP_V1_CA503767',
+  'EXPECTED_COMMAND: VERIFY_GUEST_BOOTSTRAP_V2_TLS_CA',
   'github.event.issue.number == 334',
   "github.event.comment.user.login == 'gycha0109-beep'",
   "github.event.comment.author_association == 'OWNER'",
-  "github.event.comment.body == 'VERIFY_GUEST_BOOTSTRAP_V1_CA503767'",
+  "github.event.comment.body == 'VERIFY_GUEST_BOOTSTRAP_V2_TLS_CA'",
   'git merge-base --is-ancestor "$EXPECTED_ROUTE_ACTIVATION_SHA" HEAD',
+  'grep -F "SUPABASE_ROOT_CA_2021_PEM" apps/api/src/node-postgres-subject-pool.ts',
+  'grep -F "rejectUnauthorized: true" apps/api/src/node-postgres-subject-pool.ts',
+  'grep -F "SUPABASE_ROOT_CA_2021_SHA256_FINGERPRINT" apps/api/src/supabase-root-ca-2021.ts',
   '-X POST "$PRODUCTION_BASE_URL/api/session/bootstrap"',
   '-H "Authorization: Bearer $bearer_token"',
   '.data.guestSession.bearerToken == null',
@@ -42,6 +45,7 @@ for (const fragment of requiredFragments) {
 }
 
 const forbiddenFragments = [
+  'VERIFY_GUEST_BOOTSTRAP_V1_CA503767',
   '\n  push:',
   '\n  pull_request:',
   '\n  schedule:',
@@ -69,4 +73,4 @@ for (const fragment of forbiddenFragments) {
   }
 }
 
-console.log('Production Guest bootstrap one-shot owner smoke bridge contract: verified');
+console.log('Production Guest bootstrap TLS V2 owner smoke bridge contract: verified');
