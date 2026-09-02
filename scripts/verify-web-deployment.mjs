@@ -138,9 +138,12 @@ if (vercelConfig.git?.deploymentEnabled?.main !== true) {
 const birthProfileRewrite = (vercelConfig.rewrites ?? []).find(
   (entry) => entry.source === '/api/birth-profiles/:id',
 );
-if (birthProfileRewrite?.destination !== '/api/birth-profiles/[id]') {
+if (
+  birthProfileRewrite?.destination !==
+  '/api/birth-profiles?__myeongha_birth_profile_id=:id'
+) {
   throw new Error(
-    'Birth Profile dynamic API route must rewrite /api/birth-profiles/:id to /api/birth-profiles/[id].',
+    'Birth Profile dynamic API route must rewrite to the static Birth Profile dispatcher with the internal locator.',
   );
 }
 if (
@@ -149,6 +152,16 @@ if (
   ).length !== 1
 ) {
   throw new Error('Birth Profile dynamic API route must have exactly one Vercel rewrite.');
+}
+
+await assertExists(resolve('api/birth-profiles.ts'));
+try {
+  await access(resolve('api/birth-profiles/[id].ts'));
+  throw new Error('Unroutable bracket Birth Profile function must not remain in the deployment source.');
+} catch (error) {
+  if (error instanceof Error && error.message.startsWith('Unroutable bracket')) {
+    throw error;
+  }
 }
 
 const globalHeaders = (vercelConfig.headers ?? []).find(
