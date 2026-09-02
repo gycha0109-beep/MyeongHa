@@ -43,8 +43,11 @@ pass "runtime guest bootstrap is postgres-owned SECURITY DEFINER behind safe exe
 
 [[ "$("${psql_base[@]}" -Atc "select case when has_function_privilege('myeongha_api_executor','$signature','EXECUTE') then '1' else '0' end")" == '1' ]] || fail "executor cannot execute runtime guest bootstrap"
 [[ "$("${psql_base[@]}" -Atc "select case when has_function_privilege('myeongha_api_executor','$core_signature','EXECUTE') then '1' else '0' end")" == '0' ]] || fail "executor unexpectedly gained core guest bootstrap EXECUTE"
-for role in public anon authenticated service_role; do
-  [[ "$("${psql_base[@]}" -Atc "select case when has_function_privilege('$role','$signature','EXECUTE') then '1' else '0' end")" == '0' ]] || fail "$role unexpectedly has runtime guest bootstrap EXECUTE"
+[[ "$("${psql_base[@]}" -Atc "select case when has_function_privilege('public','$signature','EXECUTE') then '1' else '0' end")" == '0' ]] || fail "PUBLIC unexpectedly has runtime guest bootstrap EXECUTE"
+for role in anon authenticated service_role; do
+  if [[ "$("${psql_base[@]}" -Atc "select case when exists(select 1 from pg_catalog.pg_roles where rolname='$role') then '1' else '0' end")" == '1' ]]; then
+    [[ "$("${psql_base[@]}" -Atc "select case when has_function_privilege('$role','$signature','EXECUTE') then '1' else '0' end")" == '0' ]] || fail "$role unexpectedly has runtime guest bootstrap EXECUTE"
+  fi
 done
 pass "runtime guest bootstrap EXECUTE is isolated to myeongha_api_executor"
 
