@@ -1,6 +1,9 @@
-import type { IdentityEvidenceVerificationPortV1 } from './current-subject-profile-http.js';
 import { handleCurrentSubjectSajuCalculationRequestV1 } from './current-subject-saju-calculation-http.js';
 import { createNodePostgresSubjectPoolV1 } from './node-postgres-subject-pool.js';
+import {
+  createProductionRequestIdentityVerifierV1,
+  type ProductionRequestIdentityFetchV1,
+} from './production-request-identity-verifier.js';
 import {
   parseProductionSajuRuntimeConfigV1,
   type ProductionSajuRuntimeEnvV1,
@@ -24,21 +27,19 @@ export interface ProductionCurrentSubjectSajuCalculationRuntimeV1 {
 
 export interface CreateProductionCurrentSubjectSajuCalculationRuntimeInputV1 {
   readonly env: ProductionSajuRuntimeEnvV1;
-  readonly identityEvidenceVerifier: IdentityEvidenceVerificationPortV1;
   /** Server-side test/runtime injection only. Never derived from the client request. */
-  readonly fetchImpl?: SajuProductionCalculationHttpFetchV1;
+  readonly identityFetchImpl?: ProductionRequestIdentityFetchV1;
+  /** Server-side test/runtime injection only. Never derived from the client request. */
+  readonly sajuFetchImpl?: SajuProductionCalculationHttpFetchV1;
 }
 
 /**
  * Production composition root for current-subject Saju calculation-only execution.
  *
- * Database credentials and the Saju service origin are read exclusively from server
- * environment configuration. The request cannot select a database, upstream origin,
- * calculation policy, Birth Profile, or Birth revision.
- *
- * The identity verifier remains an explicit dependency because this repository still
- * does not own an authoritative production Request credential verifier. Consequently
- * this runtime is ready for that deployment adapter but does not claim to provide it.
+ * Database credentials, Supabase identity verification, Guest credential fingerprinting,
+ * and the Saju service origin are all owned by server runtime configuration. The request
+ * cannot inject trusted subject evidence, select an upstream origin, calculation policy,
+ * Birth Profile, or Birth revision.
  */
 export function createProductionCurrentSubjectSajuCalculationRuntimeV1(
   input: CreateProductionCurrentSubjectSajuCalculationRuntimeInputV1,
@@ -46,9 +47,15 @@ export function createProductionCurrentSubjectSajuCalculationRuntimeV1(
   const userDataConfig = parseProductionUserDataRuntimeConfigV1(input.env);
   const sajuConfig = parseProductionSajuRuntimeConfigV1(input.env);
   const pool = createNodePostgresSubjectPoolV1(userDataConfig);
+  const identityEvidenceVerifier = createProductionRequestIdentityVerifierV1({
+    config: userDataConfig,
+    ...(input.identityFetchImpl === undefined
+      ? {}
+      : { fetchImpl: input.identityFetchImpl }),
+  });
   const sajuAdapter = createSajuProductionCalculationHttpAdapterV1({
     baseUrl: sajuConfig.serviceOrigin,
-    ...(input.fetchImpl === undefined ? {} : { fetchImpl: input.fetchImpl }),
+    ...(input.sajuFetchImpl === undefined ? {} : { fetchImpl: input.sajuFetchImpl }),
   });
 
   return Object.freeze({
@@ -57,7 +64,7 @@ export function createProductionCurrentSubjectSajuCalculationRuntimeV1(
         request: requestInput.request,
         requestId: requestInput.requestId,
         serverTime: requestInput.serverTime,
-        identityEvidenceVerifier: input.identityEvidenceVerifier,
+        identityEvidenceVerifier,
         pool,
         sajuAdapter,
       });
