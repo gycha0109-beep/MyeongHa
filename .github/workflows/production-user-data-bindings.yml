@@ -31,6 +31,7 @@ jobs:
     runs-on: ubuntu-24.04
     environment: production
     env:
+      DISPATCH_CONFIRM: ${{ inputs.confirm }}
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
@@ -39,10 +40,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [[ '${{ inputs.confirm }}' != 'BIND' ]]; then
-            echo 'Production binding requires the exact BIND confirmation.' >&2
-            exit 1
-          fi
+          [[ "$DISPATCH_CONFIRM" == 'BIND' ]]
           test -n "${SUPABASE_ACCESS_TOKEN:-}"
           test -n "${SUPABASE_DB_PASSWORD:-}"
           test -n "${VERCEL_TOKEN:-}"
@@ -63,6 +61,14 @@ jobs:
 
           vercel_project_file="$RUNNER_TEMP/vercel-project.json"
           pooler_file="$RUNNER_TEMP/supabase-pooler.json"
+
+          cleanup() {
+            exit_code=$?
+            trap - EXIT
+            rm -f "$vercel_project_file" "$pooler_file"
+            exit "$exit_code"
+          }
+          trap cleanup EXIT
 
           curl -fsS \
             -H "Authorization: Bearer $VERCEL_TOKEN" \
@@ -109,8 +115,6 @@ jobs:
           echo "pool_db=$pool_db" >> "$GITHUB_OUTPUT"
           echo "admin_pool_user=$admin_pool_user" >> "$GITHUB_OUTPUT"
           echo "runtime_pool_user=$runtime_pool_user" >> "$GITHUB_OUTPUT"
-
-          rm -f "$vercel_project_file" "$pooler_file"
 
       - name: Verify production principal is ready for one-time binding
         shell: bash
@@ -178,6 +182,29 @@ jobs:
           api_keys_file="$RUNNER_TEMP/supabase-api-keys.json"
           payload_file="$RUNNER_TEMP/vercel-user-data-bindings.json"
           response_file="$RUNNER_TEMP/vercel-user-data-bindings-response.json"
+          password_assigned=0
+          binding_verified=0
+
+          cleanup() {
+            exit_code=$?
+            trap - EXIT
+            if [[ "$password_assigned" == '1' && "$binding_verified" != '1' ]]; then
+              echo 'Binding did not verify; resetting myeongha_runtime to PASSWORD NULL.' >&2
+              if ! PGPASSWORD="$SUPABASE_DB_PASSWORD" PGSSLMODE=require psql \
+                -X -q -v ON_ERROR_STOP=1 \
+                -h "$POOL_HOST" \
+                -p "$POOL_PORT" \
+                -U "$ADMIN_POOL_USER" \
+                -d "$POOL_DB" \
+                -c "alter role $RUNTIME_DB_PRINCIPAL password null;" >/dev/null; then
+                echo 'Failed to reset the runtime password; manual production intervention is required.' >&2
+                exit_code=1
+              fi
+            fi
+            rm -f "$api_keys_file" "$payload_file" "$response_file"
+            exit "$exit_code"
+          }
+          trap cleanup EXIT
 
           curl -fsS \
             -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
@@ -202,30 +229,6 @@ jobs:
           echo "::add-mask::$guest_fingerprint_secret"
           echo "::add-mask::$supabase_publishable_key"
           echo "::add-mask::$database_url"
-
-          password_assigned=0
-          binding_verified=0
-
-          cleanup() {
-            exit_code=$?
-            trap - EXIT
-            if [[ "$password_assigned" == '1' && "$binding_verified" != '1' ]]; then
-              echo 'Binding did not verify; resetting myeongha_runtime to PASSWORD NULL.' >&2
-              if ! PGPASSWORD="$SUPABASE_DB_PASSWORD" PGSSLMODE=require psql \
-                -X -q -v ON_ERROR_STOP=1 \
-                -h "$POOL_HOST" \
-                -p "$POOL_PORT" \
-                -U "$ADMIN_POOL_USER" \
-                -d "$POOL_DB" \
-                -c "alter role $RUNTIME_DB_PRINCIPAL password null;" >/dev/null; then
-                echo 'Failed to reset the runtime password; manual production intervention is required.' >&2
-                exit_code=1
-              fi
-            fi
-            rm -f "$api_keys_file" "$payload_file" "$response_file"
-            exit "$exit_code"
-          }
-          trap cleanup EXIT
 
           jq -n \
             --arg database_url "$database_url" \
