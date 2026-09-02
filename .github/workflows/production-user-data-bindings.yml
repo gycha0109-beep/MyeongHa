@@ -63,7 +63,6 @@ jobs:
 
           vercel_project_file="$RUNNER_TEMP/vercel-project.json"
           pooler_file="$RUNNER_TEMP/supabase-pooler.json"
-          api_keys_file="$RUNNER_TEMP/supabase-api-keys.json"
 
           curl -fsS \
             -H "Authorization: Bearer $VERCEL_TOKEN" \
@@ -105,27 +104,13 @@ jobs:
 
           runtime_pool_user="$RUNTIME_DB_PRINCIPAL.$SUPABASE_PROJECT_ID"
 
-          curl -fsS \
-            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
-            "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_ID/api-keys?reveal=true" \
-            -o "$api_keys_file"
-
-          publishable_key="$(jq -er '
-            [ .[] | select(.type == "publishable" and (.disabled != true)) ]
-            | sort_by(if .name == "default" then 0 else 1 end)
-            | .[0].api_key
-          ' "$api_keys_file")"
-          [[ "$publishable_key" == sb_publishable_* ]]
-
-          echo "::add-mask::$publishable_key"
           echo "pool_host=$pool_host" >> "$GITHUB_OUTPUT"
           echo "pool_port=$pool_port" >> "$GITHUB_OUTPUT"
           echo "pool_db=$pool_db" >> "$GITHUB_OUTPUT"
           echo "admin_pool_user=$admin_pool_user" >> "$GITHUB_OUTPUT"
           echo "runtime_pool_user=$runtime_pool_user" >> "$GITHUB_OUTPUT"
-          echo "publishable_key=$publishable_key" >> "$GITHUB_OUTPUT"
 
-          rm -f "$vercel_project_file" "$pooler_file" "$api_keys_file"
+          rm -f "$vercel_project_file" "$pooler_file"
 
       - name: Verify production principal is ready for one-time binding
         shell: bash
@@ -186,10 +171,25 @@ jobs:
           POOL_DB: ${{ steps.endpoints.outputs.pool_db }}
           ADMIN_POOL_USER: ${{ steps.endpoints.outputs.admin_pool_user }}
           RUNTIME_POOL_USER: ${{ steps.endpoints.outputs.runtime_pool_user }}
-          SUPABASE_PUBLISHABLE_KEY: ${{ steps.endpoints.outputs.publishable_key }}
         run: |
           set -euo pipefail
           umask 077
+
+          api_keys_file="$RUNNER_TEMP/supabase-api-keys.json"
+          payload_file="$RUNNER_TEMP/vercel-user-data-bindings.json"
+          response_file="$RUNNER_TEMP/vercel-user-data-bindings-response.json"
+
+          curl -fsS \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_ID/api-keys?reveal=true" \
+            -o "$api_keys_file"
+
+          supabase_publishable_key="$(jq -er '
+            [ .[] | select(.type == "publishable" and (.disabled != true)) ]
+            | sort_by(if .name == "default" then 0 else 1 end)
+            | .[0].api_key
+          ' "$api_keys_file")"
+          [[ "$supabase_publishable_key" == sb_publishable_* ]]
 
           runtime_password="$(openssl rand -hex 32)"
           guest_fingerprint_secret="$(openssl rand -hex 32)"
@@ -200,11 +200,9 @@ jobs:
 
           echo "::add-mask::$runtime_password"
           echo "::add-mask::$guest_fingerprint_secret"
-          echo "::add-mask::$SUPABASE_PUBLISHABLE_KEY"
+          echo "::add-mask::$supabase_publishable_key"
           echo "::add-mask::$database_url"
 
-          payload_file="$RUNNER_TEMP/vercel-user-data-bindings.json"
-          response_file="$RUNNER_TEMP/vercel-user-data-bindings-response.json"
           password_assigned=0
           binding_verified=0
 
@@ -224,7 +222,7 @@ jobs:
                 exit_code=1
               fi
             fi
-            rm -f "$payload_file" "$response_file"
+            rm -f "$api_keys_file" "$payload_file" "$response_file"
             exit "$exit_code"
           }
           trap cleanup EXIT
@@ -233,7 +231,7 @@ jobs:
             --arg database_url "$database_url" \
             --arg database_principal "$RUNTIME_DB_PRINCIPAL" \
             --arg supabase_url "$SUPABASE_ORIGIN" \
-            --arg supabase_api_key "$SUPABASE_PUBLISHABLE_KEY" \
+            --arg supabase_api_key "$supabase_publishable_key" \
             --arg guest_secret "$guest_fingerprint_secret" \
             '[
               {
