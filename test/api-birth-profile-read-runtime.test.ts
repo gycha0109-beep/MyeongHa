@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import birthProfileEndpoint from '../api/birth-profiles.js';
 
 const PROFILE_ID = 'b6300000-0000-0000-0000-000000000001';
@@ -176,6 +176,41 @@ describe('GET /api/birth-profiles/:id production Vercel Node adapter', () => {
       expect(response.status).toBe(404);
       expect(header(response, 'cache-control')).toBe('no-store');
       expect(response.body).toBe('');
+    }
+  });
+
+  it('logs only non-sensitive request shape for a rejected Vercel route', async () => {
+    const previousVercel = process.env.VERCEL;
+    const secretLocator = 'sensitive-locator-value-must-not-appear';
+    const secretAuthorization = 'Bearer sensitive-authorization-must-not-appear';
+    const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+    process.env.VERCEL = '1';
+
+    try {
+      const response = await invokeEndpoint({
+        method: 'GET',
+        headers: { authorization: secretAuthorization },
+        query: { debug: secretLocator },
+        url: `/api/birth-profiles/${secretLocator}?debug=${secretLocator}`,
+      });
+
+      expect(response.status).toBe(404);
+      expect(info).toHaveBeenCalledTimes(1);
+
+      const serializedLog = JSON.stringify(info.mock.calls);
+      expect(serializedLog).toContain('myeongha.birth-profile-route-shape-v1');
+      expect(serializedLog).toContain('debug');
+      expect(serializedLog).toContain('dynamic-single-segment');
+      expect(serializedLog).toContain('string');
+      expect(serializedLog).not.toContain(secretLocator);
+      expect(serializedLog).not.toContain(secretAuthorization);
+    } finally {
+      info.mockRestore();
+      if (previousVercel === undefined) {
+        delete process.env.VERCEL;
+      } else {
+        process.env.VERCEL = previousVercel;
+      }
     }
   });
 
