@@ -28,7 +28,7 @@ describe('production Guest bootstrap credential issuer', () => {
     );
   });
 
-  it.each(['0', '-1', '1.5', '1e3', 'NaN', 'Infinity']) (
+  it.each(['0', '-1', '1.5', '1e3', 'NaN', 'Infinity'])(
     'rejects non-positive or non-whole TTL policy value %s',
     (ttl) => {
       expect(() => parseProductionGuestBootstrapActivationConfigV1(env(ttl))).toThrow(
@@ -56,7 +56,7 @@ describe('production Guest bootstrap credential issuer', () => {
       generateBearerToken: () => OPAQUE_BEARER,
     });
 
-    await expect(issuer.issueGuestBootstrapCredential()).resolves.toEqual({
+    expect(await issuer.issueGuestBootstrapCredential()).toEqual({
       subjectId: SUBJECT_ID,
       guestSessionId: GUEST_SESSION_ID,
       bearerToken: OPAQUE_BEARER,
@@ -80,7 +80,7 @@ describe('production Guest bootstrap credential issuer', () => {
     ).toMatch(/^myeongha-guest-bearer-hmac-sha256-v1:[0-9a-f]{64}$/u);
   });
 
-  it('fails closed if an injected generator emits a JWT-shaped bearer', async () => {
+  it('fails closed if an injected generator emits a JWT-shaped bearer', () => {
     const issuer = createProductionGuestBootstrapCredentialIssuerPortV1({
       config: { guestSessionTtlSeconds: 60 },
       generateUuid: (() => {
@@ -91,12 +91,12 @@ describe('production Guest bootstrap credential issuer', () => {
         'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.cccccccccccccccccccccccccccccccc',
     });
 
-    await expect(issuer.issueGuestBootstrapCredential()).rejects.toThrow(
+    expect(() => issuer.issueGuestBootstrapCredential()).toThrow(
       'outside the Guest transport contract',
     );
   });
 
-  it('fails closed when an explicit TTL cannot be represented as a Date expiry', async () => {
+  it('fails closed when an explicit TTL cannot be represented as a Date expiry', () => {
     const issuer = createProductionGuestBootstrapCredentialIssuerPortV1({
       config: { guestSessionTtlSeconds: Number.MAX_SAFE_INTEGER },
       now: () => new Date('2026-09-02T00:00:00.000Z'),
@@ -107,7 +107,7 @@ describe('production Guest bootstrap credential issuer', () => {
       generateBearerToken: () => OPAQUE_BEARER,
     });
 
-    await expect(issuer.issueGuestBootstrapCredential()).rejects.toThrow(
+    expect(() => issuer.issueGuestBootstrapCredential()).toThrow(
       'cannot be represented as an expiry instant',
     );
   });
