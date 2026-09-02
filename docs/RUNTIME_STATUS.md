@@ -7,45 +7,51 @@
 | Area | State | Notes |
 |---|---|---|
 | Static Web | DEPLOYED | Vercel builds the static `public/` output through `npm run build:web`. |
-| Executable `/api` runtime | ACTIVE — INFRASTRUCTURE ONLY | `GET /api/health` is deployed as a root Vercel Function and has been remotely verified on the canonical production host. This does not imply user-data or DB runtime availability. |
-| Browser → API | USER-DATA ROUTES NOT ACTIVE | `GET /api/me` still returns production 404. Member/Guest request verification and the dedicated DB login principal now exist, but the runtime password and Vercel user-data bindings are not provisioned. |
-| Canonical Subject Resolution | DB + APPLICATION + MEMBER/GUEST REQUEST VERIFIERS IMPLEMENTED / ROUTE NOT ACTIVE | P0-AUTH-01 defines trusted Member/Guest evidence → canonical `subjects.id`; Member JWT verification, Guest HMAC fingerprinting, and production composition roots are implemented. |
-| API → PostgreSQL execution identity | LIVE PRINCIPAL PROVISIONED / RUNTIME CREDENTIAL UNBOUND | `myeongha_runtime` now exists in production as LOGIN / NOINHERIT / NOBYPASSRLS / non-privileged and is a member of the NOLOGIN `myeongha_api_executor` execution role. It was created by migration 0800 with `PASSWORD NULL`; a usable runtime credential is intentionally not provisioned yet. |
-| Production user-data config | CONTRACT + VERIFIERS + LOGIN PRINCIPAL READY / VERCEL BINDINGS NOT PROVISIONED | `production-user-data-runtime-config.ts` defines fail-closed environment requirements. The database role exists, but Vercel settings and the runtime password are not bound. |
+| Executable `/api` runtime | ACTIVE | `GET /api/health` and protected `GET /api/me` are deployed as root Vercel Functions on the canonical production host. |
+| Browser → API | `/api/me` ACTIVE / GUEST BOOTSTRAP ROUTE NOT ACTIVE | `GET /api/me` is production-active and rejects missing identity with `401 AUTH_REQUIRED`. Guest bootstrap application/production composition exists, but no root network route is exposed yet. |
+| Canonical Subject Resolution | DB + APPLICATION + MEMBER/GUEST REQUEST VERIFIERS ACTIVE FOR `/api/me` | P0-AUTH-01 defines trusted Member/Guest evidence → canonical `subjects.id`; Member JWT verification, Guest HMAC fingerprinting, and production composition roots are implemented. |
+| API → PostgreSQL execution identity | PRODUCTION BOUND | `myeongha_runtime` is the governed production LOGIN principal, remains NOINHERIT / NOBYPASSRLS / non-privileged, and can enter the NOLOGIN `myeongha_api_executor` execution role. Its runtime credential was assigned together with the consuming Vercel production binding. |
+| Production user-data config | BOUND FOR `/api/me` | Vercel production has the governed DB/Supabase/Guest-fingerprint settings required by the current user-data runtime. Guest bootstrap additionally requires `MYEONGHA_GUEST_SESSION_TTL_SECONDS`, which remains intentionally unbound until an approved TTL exists. |
+| Guest bootstrap HTTP composition | IMPLEMENTED / NETWORK ROUTE HOLD | Source-safe POST boundary, production composition, DB authority, current-session lookup, credential issuer, and activation gate exist. No root `/api/session/bootstrap` route is active. |
+| Guest session TTL | POLICY OPEN / BINDING WORKFLOW READY | `P0-PR-01` still owns the TTL/retention decision. The repository provides a manual production-only TTL binding workflow with no default; it must not be dispatched until an approved TTL value exists. |
 | Character compatibility verdict | BLOCKED | `SRC-15` remains unresolved. |
 | Subject-specific content rollout | BLOCKED | `SRC-16` remains unresolved. |
 | Character HTTP activation | HOLD | Do not claim subject-specific activation while SRC-15/SRC-16 are unresolved. |
 | Chat send/runtime activation | HOLD / FAIL-CLOSED | Do not invent compatibility or rollout fallback semantics. |
-| Supabase production migration deployment | LIVE THROUGH 0800 | `Supabase Production #7` applied and verified migration `0800_production_api_login_principal` against project `cnsfpcdiyofqvhpcegfc`. `.github/workflows/supabase-production.yml` remains the governed migration deployment path. |
+| Supabase production migration deployment | LIVE THROUGH 0820 | Production contains `0790_subject_execution_context`, `0800_runtime_api_login_principal`, `0810_guest_bootstrap_runtime_authority`, and `0820_guest_bootstrap_runtime_current_query` on project `cnsfpcdiyofqvhpcegfc`. `.github/workflows/supabase-production.yml` remains the governed migration deployment path. |
 
 ## Verification semantics
 
-`npm run check` validates repository-local typechecking, tests, builds, static web output, and deployment-configuration contracts. It does **not** by itself prove that a remote Vercel user-data runtime exists or that its environment contains the required credentials.
+`npm run check` validates repository-local typechecking, tests, builds, static web output, deployment-configuration contracts, the production user-data binding workflow contract, and the Guest bootstrap TTL binding workflow contract. It does **not** by itself prove remote Vercel environment state or successful remote request execution.
 
 `npm run verify:production:api` performs a networked remote check against the canonical production health endpoint by default. It is intentionally excluded from `npm run check` so repository CI does not depend on production availability. `MYEONGHA_PRODUCTION_ORIGIN` may override the origin for an explicit remote target.
 
-Remote production state requires separate production checks. The executable infrastructure evidence remains:
+Remote production evidence currently includes:
 
 ```text
 GET https://myeongha.vercel.app/api/health
 → 200
 → {"status":"ok"}
-```
 
-The next protected user-data contract remains intentionally inactive in production:
-
-```text
 GET https://myeongha.vercel.app/api/me
-→ 404
-```
-
-The application/HTTP boundary already defines the target unauthenticated behavior once the production route is wired:
-
-```text
-GET /api/me
 without valid member or guest identity evidence
 → 401 AUTH_REQUIRED
-→ no DB connection opened
+```
+
+The `401` proves that the protected `/api/me` production function exists and rejects missing identity through the application boundary. It does not by itself prove Member own-subject or Guest own-subject success; those require production-safe credentials and subject fixtures.
+
+Guest bootstrap remains intentionally non-routable:
+
+```text
+production Guest bootstrap composition
+→ implemented
+
+MYEONGHA_GUEST_SESSION_TTL_SECONDS
+→ no repository default
+→ production value not bound until P0-PR-01 approves one
+
+root /api/session/bootstrap route
+→ not active
 ```
 
 ## Production Request identity verification
@@ -60,7 +66,7 @@ Classification is deliberately disjoint:
 
 ```text
 JWT-shaped bearer
-→ existing Supabase Member verifier from PR #311
+→ Supabase Member verifier
 → GET /auth/v1/user
 → verified auth.users.id
 
@@ -73,15 +79,16 @@ A rejected JWT-shaped Member credential never falls through to Guest identity. G
 
 The same Guest fingerprint implementation is exposed through `GuestBootstrapTokenFingerprintPortV1` so bootstrap storage and later request verification use an identical token-hash contract.
 
-Guest TTL remains outside this slice under `P0-PR-01`.
+Guest bootstrap issuance uses an opaque server-generated bearer and stores only its deterministic keyed fingerprint. Its issuer requires an explicit positive whole-number `MYEONGHA_GUEST_SESSION_TTL_SECONDS`; there is deliberately no fallback TTL.
 
-## Live production DB evidence — 2026-09-02
+## Live production DB evidence — 2026-09-03
 
 Read-only inspection against project `cnsfpcdiyofqvhpcegfc` confirms:
 
 ```text
 myeongha_api_executor
 → rolcanlogin = false
+→ rolsuper = false
 → rolbypassrls = false
 
 myeongha_runtime
@@ -92,34 +99,71 @@ myeongha_runtime
 → rolinherit = false
 → rolreplication = false
 → rolbypassrls = false
-→ managed marker = myeongha:production-api-login-principal:v1
+→ password present = true
 → member of myeongha_api_executor = true
 
-migration history
-→ 0800 production_api_login_principal
-
-present functions
-→ begin_member_subject_context_v1(p_verified_auth_user_id uuid)
-→ begin_guest_subject_context_v1(p_verified_token_hash text)
-→ current_myeongha_subject_id()
-→ qry_subject_profile_current_v1(p_subject_id uuid)
+production migration history
+→ 0790 subject execution context
+→ 0800 runtime API login principal
+→ 0810 Guest bootstrap runtime authority
+→ 0820 Guest bootstrap current-session query
 ```
 
-Current execution-role membership is:
+Current ordinary execution path remains:
 
 ```text
-myeongha_runtime
-→ LOGIN
-→ NOBYPASSRLS
-→ member of myeongha_api_executor
-
-postgres
-→ LOGIN
-→ BYPASSRLS
-→ member of myeongha_api_executor
+network connection
+→ myeongha_runtime
+→ BEGIN
+→ SET LOCAL ROLE myeongha_api_executor
+→ begin_member_subject_context_v1(...)
+   or begin_guest_subject_context_v1(...)
+→ same transaction authority work
+→ COMMIT / ROLLBACK
 ```
 
-`postgres` remains explicitly forbidden as the ordinary user runtime principal. `myeongha_runtime` is now the governed network-login principal, but migration 0800 deliberately created it with `PASSWORD NULL` so repository deployment cannot create an orphan runtime secret. Password assignment must occur only together with the Vercel secret binding that consumes it.
+`postgres`, `supabase_admin`, `service_role`, or another BYPASSRLS identity remains forbidden as the ordinary user runtime principal.
+
+## Production binding operations
+
+The already-completed one-time user-data credential workflow is:
+
+```text
+.github/workflows/production-user-data-bindings.yml
+```
+
+It atomically paired the `myeongha_runtime` password assignment with the Vercel production bindings for:
+
+```text
+MYEONGHA_DATABASE_URL
+MYEONGHA_DATABASE_PRINCIPAL
+MYEONGHA_SUPABASE_URL
+MYEONGHA_SUPABASE_API_KEY
+MYEONGHA_GUEST_FINGERPRINT_SECRET
+```
+
+It must **not** be rerun merely to add Guest TTL configuration, because it is designed around first-time password provisioning.
+
+Guest TTL has a separate manual operation:
+
+```text
+.github/workflows/production-guest-bootstrap-ttl-binding.yml
+```
+
+That workflow:
+
+```text
+requires GitHub production environment
++ exact BIND_GUEST_TTL confirmation
++ operator-supplied positive whole-number TTL
++ exact governed Vercel project/team verification
+→ upserts only MYEONGHA_GUEST_SESSION_TTL_SECONDS for production
+→ performs no DB password mutation
+→ performs no deployment
+→ performs no route activation
+```
+
+The workflow intentionally provides no TTL default and is not authority to choose a retention/session-expiry policy.
 
 ## Authority blockers and implementation gates
 
@@ -127,7 +171,7 @@ Authority blockers still open:
 
 - `SRC-15`: client capability / asset manifest compatibility decision authority.
 - `SRC-16`: subject-specific content rollout resolver authority.
-- `P0-PR-01`: Guest TTL/retention remains open; the fingerprint algorithm does not decide expiry policy.
+- `P0-PR-01`: Guest TTL/retention remains open; neither the fingerprint algorithm nor the binding workflow decides expiry policy.
 
 Resolved architecture decision:
 
@@ -144,17 +188,24 @@ Completed Integration Spine foundations for the first user-data slice:
 - production request classifier preventing Member→Guest fallback.
 - source-safe `GET /api/me` application/HTTP boundary with 401/405/fail-closed tests.
 - production `/api/me` composition root using the concrete request verifier and PostgreSQL pool.
-- production current-subject Saju composition root owns the concrete request verifier instead of accepting caller-supplied trusted identity evidence.
+- active root `api/me.ts` Vercel Function.
 - production user-data configuration parser contract with secret-redacted diagnostics.
-- migration 0800 production `myeongha_runtime` login principal with managed-role marker and least-privilege executor membership.
+- production `myeongha_runtime` login principal and live Vercel user-data bindings.
+- Guest bootstrap DB create/current-query authorities through migration 0820.
+- Guest bootstrap production DB runtime, opaque credential issuer, source-safe POST HTTP boundary, and production HTTP composition root.
+- manual, TTL-only production Vercel binding operation with no policy default.
 
-Remaining production activation gates:
+Remaining activation gates:
 
-- assign a strong password to `myeongha_runtime` only in the same secret-safe operation that binds the consuming Vercel environment.
-- bind `MYEONGHA_DATABASE_URL`, `MYEONGHA_DATABASE_PRINCIPAL`, `MYEONGHA_SUPABASE_URL`, `MYEONGHA_SUPABASE_API_KEY`, and `MYEONGHA_GUEST_FINGERPRINT_SECRET` in Vercel production.
-- add `/api/me` production route only after those bindings are evidenced.
-- add `/api/me/saju/calculation` only when the same identity/DB gate and its Saju service-origin deployment gate are evidenced.
-- verify unauthenticated 401, Member own-subject, Guest own-subject when Guest issuance is active, and cross-subject denial against production-safe test identities.
+- obtain an approved Guest session TTL under the applicable product/privacy retention authority (`P0-PR-01`).
+- only after approval, bind `MYEONGHA_GUEST_SESSION_TTL_SECONDS` through the dedicated production TTL workflow.
+- then expose the thin root Guest bootstrap Vercel route over the already-existing production composition boundary.
+- verify Guest bootstrap issuance remotely without logging or persisting the raw bearer outside its intended client return path.
+- verify Guest own-subject `/api/me` using the issued credential.
+- verify Member own-subject `/api/me` using a production-safe Member identity.
+- verify cross-subject negative behavior.
+- keep `/api/health` regression at 200.
+- activate Birth Profile production HTTP only after the generic identity/runtime spine is fully evidenced for supported Member/Guest paths.
 
 ## Canonical identity boundary
 
