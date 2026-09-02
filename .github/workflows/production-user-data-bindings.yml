@@ -1,0 +1,331 @@
+name: Production User-Data Bindings
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type BIND to provision production user-data credentials without deploying routes.'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-user-data-bindings
+  cancel-in-progress: false
+
+env:
+  SUPABASE_PROJECT_ID: cnsfpcdiyofqvhpcegfc
+  SUPABASE_ORIGIN: https://cnsfpcdiyofqvhpcegfc.supabase.co
+  RUNTIME_DB_PRINCIPAL: myeongha_runtime
+  API_EXECUTION_ROLE: myeongha_api_executor
+  RUNTIME_ROLE_MARKER: myeongha:production-api-login-principal:v1
+  VERCEL_PROJECT_ID: prj_nXF0b5uv27Lyucz2SEBxzdCRXVsP
+  VERCEL_TEAM_ID: team_xuYA9OhCWlJETaYFOmeVodgS
+  VERCEL_PROJECT_NAME: myeongha
+
+jobs:
+  bind:
+    name: bind-production-user-data-secrets
+    runs-on: ubuntu-24.04
+    environment: production
+    env:
+      DISPATCH_CONFIRM: ${{ inputs.confirm }}
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+    steps:
+      - name: Verify explicit dispatch and credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$DISPATCH_CONFIRM" == 'BIND' ]]
+          test -n "${SUPABASE_ACCESS_TOKEN:-}"
+          test -n "${SUPABASE_DB_PASSWORD:-}"
+          test -n "${VERCEL_TOKEN:-}"
+
+      - name: Install PostgreSQL client
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Resolve and verify governed production endpoints
+        id: endpoints
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+
+          vercel_project_file="$RUNNER_TEMP/vercel-project.json"
+          pooler_file="$RUNNER_TEMP/supabase-pooler.json"
+
+          cleanup() {
+            exit_code=$?
+            trap - EXIT
+            rm -f "$vercel_project_file" "$pooler_file"
+            exit "$exit_code"
+          }
+          trap cleanup EXIT
+
+          curl -fsS \
+            -H "Authorization: Bearer $VERCEL_TOKEN" \
+            "https://api.vercel.com/v9/projects/$VERCEL_PROJECT_ID?teamId=$VERCEL_TEAM_ID" \
+            -o "$vercel_project_file"
+
+          jq -e \
+            --arg id "$VERCEL_PROJECT_ID" \
+            --arg name "$VERCEL_PROJECT_NAME" \
+            '.id == $id and .name == $name' \
+            "$vercel_project_file" >/dev/null
+
+          curl -fsS \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_ID/config/database/pooler" \
+            -o "$pooler_file"
+
+          pooler_record="$({
+            jq -ce '
+              (if type == "array" then . elif (.data? | type) == "array" then .data else [.] end)
+              | map(select(((.db_port // 0) | tonumber) == 5432))
+              | first // empty
+            ' "$pooler_file"
+          })"
+          test -n "$pooler_record"
+
+          connection_string="$(jq -r '.connection_string // .connectionString // empty' <<<"$pooler_record")"
+          test -n "$connection_string"
+
+          admin_pool_user="$(sed -E 's#^[a-zA-Z0-9+.-]+://([^:]+):.*#\1#' <<<"$connection_string")"
+          pool_host="$(sed -E 's#^[^@]+@([^:/]+):([0-9]+)/.*#\1#' <<<"$connection_string")"
+          pool_port="$(sed -E 's#^[^@]+@([^:/]+):([0-9]+)/.*#\2#' <<<"$connection_string")"
+          pool_db="$(sed -E 's#^[^@]+@[^/]+/([^?]+).*$#\1#' <<<"$connection_string")"
+
+          [[ "$admin_pool_user" == "postgres.$SUPABASE_PROJECT_ID" ]]
+          [[ "$pool_host" == *.pooler.supabase.com ]]
+          [[ "$pool_port" == '5432' ]]
+          [[ "$pool_db" == 'postgres' ]]
+
+          runtime_pool_user="$RUNTIME_DB_PRINCIPAL.$SUPABASE_PROJECT_ID"
+
+          echo "pool_host=$pool_host" >> "$GITHUB_OUTPUT"
+          echo "pool_port=$pool_port" >> "$GITHUB_OUTPUT"
+          echo "pool_db=$pool_db" >> "$GITHUB_OUTPUT"
+          echo "admin_pool_user=$admin_pool_user" >> "$GITHUB_OUTPUT"
+          echo "runtime_pool_user=$runtime_pool_user" >> "$GITHUB_OUTPUT"
+
+      - name: Verify production principal is ready for one-time binding
+        shell: bash
+        env:
+          POOL_HOST: ${{ steps.endpoints.outputs.pool_host }}
+          POOL_PORT: ${{ steps.endpoints.outputs.pool_port }}
+          POOL_DB: ${{ steps.endpoints.outputs.pool_db }}
+          ADMIN_POOL_USER: ${{ steps.endpoints.outputs.admin_pool_user }}
+        run: |
+          set -euo pipefail
+          export PGPASSWORD="$SUPABASE_DB_PASSWORD"
+          export PGSSLMODE=require
+
+          role_state="$(psql \
+            -X -A -t -v ON_ERROR_STOP=1 \
+            -h "$POOL_HOST" \
+            -p "$POOL_PORT" \
+            -U "$ADMIN_POOL_USER" \
+            -d "$POOL_DB" \
+            -c "
+              select case when exists (
+                select 1
+                from pg_catalog.pg_roles runtime
+                join pg_catalog.pg_authid authid on authid.oid = runtime.oid
+                where runtime.rolname = '$RUNTIME_DB_PRINCIPAL'
+                  and runtime.rolcanlogin
+                  and not runtime.rolsuper
+                  and not runtime.rolcreatedb
+                  and not runtime.rolcreaterole
+                  and not runtime.rolinherit
+                  and not runtime.rolreplication
+                  and not runtime.rolbypassrls
+                  and authid.rolpassword is null
+                  and pg_catalog.shobj_description(runtime.oid, 'pg_authid') = '$RUNTIME_ROLE_MARKER'
+                  and pg_catalog.pg_has_role('$RUNTIME_DB_PRINCIPAL', '$API_EXECUTION_ROLE', 'MEMBER')
+                  and exists (
+                    select 1
+                    from pg_catalog.pg_roles executor
+                    where executor.rolname = '$API_EXECUTION_ROLE'
+                      and not executor.rolcanlogin
+                      and not executor.rolsuper
+                      and not executor.rolcreatedb
+                      and not executor.rolcreaterole
+                      and not executor.rolinherit
+                      and not executor.rolreplication
+                      and not executor.rolbypassrls
+                  )
+              ) then 'READY' else 'BLOCKED' end;
+            ")"
+
+          [[ "$role_state" == 'READY' ]]
+
+      - name: Bind Vercel production secrets and assign runtime password
+        shell: bash
+        env:
+          POOL_HOST: ${{ steps.endpoints.outputs.pool_host }}
+          POOL_PORT: ${{ steps.endpoints.outputs.pool_port }}
+          POOL_DB: ${{ steps.endpoints.outputs.pool_db }}
+          ADMIN_POOL_USER: ${{ steps.endpoints.outputs.admin_pool_user }}
+          RUNTIME_POOL_USER: ${{ steps.endpoints.outputs.runtime_pool_user }}
+        run: |
+          set -euo pipefail
+          umask 077
+
+          api_keys_file="$RUNNER_TEMP/supabase-api-keys.json"
+          payload_file="$RUNNER_TEMP/vercel-user-data-bindings.json"
+          response_file="$RUNNER_TEMP/vercel-user-data-bindings-response.json"
+          password_assigned=0
+          binding_verified=0
+
+          cleanup() {
+            exit_code=$?
+            trap - EXIT
+            if [[ "$password_assigned" == '1' && "$binding_verified" != '1' ]]; then
+              echo 'Binding did not verify; resetting myeongha_runtime to PASSWORD NULL.' >&2
+              if ! PGPASSWORD="$SUPABASE_DB_PASSWORD" PGSSLMODE=require psql \
+                -X -q -v ON_ERROR_STOP=1 \
+                -h "$POOL_HOST" \
+                -p "$POOL_PORT" \
+                -U "$ADMIN_POOL_USER" \
+                -d "$POOL_DB" \
+                -c "alter role $RUNTIME_DB_PRINCIPAL password null;" >/dev/null; then
+                echo 'Failed to reset the runtime password; manual production intervention is required.' >&2
+                exit_code=1
+              fi
+            fi
+            rm -f "$api_keys_file" "$payload_file" "$response_file"
+            exit "$exit_code"
+          }
+          trap cleanup EXIT
+
+          curl -fsS \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_ID/api-keys?reveal=true" \
+            -o "$api_keys_file"
+
+          supabase_publishable_key="$(jq -er '
+            [ .[] | select(.type == "publishable" and (.disabled != true)) ]
+            | sort_by(if .name == "default" then 0 else 1 end)
+            | .[0].api_key
+          ' "$api_keys_file")"
+          [[ "$supabase_publishable_key" == sb_publishable_* ]]
+
+          runtime_password="$(openssl rand -hex 32)"
+          guest_fingerprint_secret="$(openssl rand -hex 32)"
+          [[ "$runtime_password" =~ ^[0-9a-f]{64}$ ]]
+          [[ "$guest_fingerprint_secret" =~ ^[0-9a-f]{64}$ ]]
+
+          database_url="postgresql://$RUNTIME_POOL_USER:$runtime_password@$POOL_HOST:$POOL_PORT/$POOL_DB?sslmode=require"
+
+          echo "::add-mask::$runtime_password"
+          echo "::add-mask::$guest_fingerprint_secret"
+          echo "::add-mask::$supabase_publishable_key"
+          echo "::add-mask::$database_url"
+
+          jq -n \
+            --arg database_url "$database_url" \
+            --arg database_principal "$RUNTIME_DB_PRINCIPAL" \
+            --arg supabase_url "$SUPABASE_ORIGIN" \
+            --arg supabase_api_key "$supabase_publishable_key" \
+            --arg guest_secret "$guest_fingerprint_secret" \
+            '[
+              {
+                key: "MYEONGHA_DATABASE_URL",
+                value: $database_url,
+                type: "sensitive",
+                target: ["production"],
+                comment: "MyeongHa governed production DB runtime binding v1"
+              },
+              {
+                key: "MYEONGHA_DATABASE_PRINCIPAL",
+                value: $database_principal,
+                type: "encrypted",
+                target: ["production"],
+                comment: "MyeongHa governed production DB principal v1"
+              },
+              {
+                key: "MYEONGHA_SUPABASE_URL",
+                value: $supabase_url,
+                type: "encrypted",
+                target: ["production"],
+                comment: "MyeongHa governed production Supabase origin v1"
+              },
+              {
+                key: "MYEONGHA_SUPABASE_API_KEY",
+                value: $supabase_api_key,
+                type: "sensitive",
+                target: ["production"],
+                comment: "MyeongHa production Supabase publishable key v1"
+              },
+              {
+                key: "MYEONGHA_GUEST_FINGERPRINT_SECRET",
+                value: $guest_secret,
+                type: "sensitive",
+                target: ["production"],
+                comment: "MyeongHa production Guest HMAC secret v1"
+              }
+            ]' > "$payload_file"
+
+          curl -fsS \
+            -X POST \
+            -H "Authorization: Bearer $VERCEL_TOKEN" \
+            -H 'Content-Type: application/json' \
+            --data-binary "@$payload_file" \
+            "https://api.vercel.com/v10/projects/$VERCEL_PROJECT_ID/env?upsert=true&teamId=$VERCEL_TEAM_ID" \
+            -o "$response_file"
+
+          jq -e '((.failed // []) | length) == 0' "$response_file" >/dev/null
+
+          PGPASSWORD="$SUPABASE_DB_PASSWORD" PGSSLMODE=require psql \
+            -X -q -v ON_ERROR_STOP=1 \
+            -h "$POOL_HOST" \
+            -p "$POOL_PORT" \
+            -U "$ADMIN_POOL_USER" \
+            -d "$POOL_DB" \
+            -c "alter role $RUNTIME_DB_PRINCIPAL password '$runtime_password';" >/dev/null
+          password_assigned=1
+
+          runtime_state="$(PGPASSWORD="$runtime_password" PGSSLMODE=require psql \
+            -X -A -t -v ON_ERROR_STOP=1 \
+            -h "$POOL_HOST" \
+            -p "$POOL_PORT" \
+            -U "$RUNTIME_POOL_USER" \
+            -d "$POOL_DB" \
+            -c "
+              select case when
+                current_user = '$RUNTIME_DB_PRINCIPAL'
+                and pg_catalog.pg_has_role(current_user, '$API_EXECUTION_ROLE', 'MEMBER')
+                and exists (
+                  select 1 from pg_catalog.pg_roles
+                  where rolname = current_user
+                    and rolcanlogin
+                    and not rolsuper
+                    and not rolcreatedb
+                    and not rolcreaterole
+                    and not rolinherit
+                    and not rolreplication
+                    and not rolbypassrls
+                )
+              then 'READY' else 'BLOCKED' end;
+            ")"
+          [[ "$runtime_state" == 'READY' ]]
+
+          execution_state="$(PGPASSWORD="$runtime_password" PGSSLMODE=require psql \
+            -X -A -t -v ON_ERROR_STOP=1 \
+            -h "$POOL_HOST" \
+            -p "$POOL_PORT" \
+            -U "$RUNTIME_POOL_USER" \
+            -d "$POOL_DB" \
+            -c "begin; set local role $API_EXECUTION_ROLE; select case when current_user = '$API_EXECUTION_ROLE' then 'READY' else 'BLOCKED' end; rollback;")"
+          [[ "$execution_state" == *'READY'* ]]
+
+          binding_verified=1
+          echo 'Production user-data credentials are bound and verified. No deployment or route activation was performed.'
