@@ -1,7 +1,7 @@
 import { ApiCommandError } from './api-error.js';
 
 export const GUEST_BOOTSTRAP_AUTHORITY_BINDING_V1 =
-  'public.cmd_create_guest_session_v1' as const;
+  'public.cmd_create_guest_session_runtime_v1' as const;
 
 type Awaitable<T> = T | Promise<T>;
 
@@ -75,10 +75,7 @@ export class GuestBootstrapAuthorityPortErrorV1 extends Error {
   }
 }
 
-/**
- * Persistence port for the fresh Guest owner + verifier-only Guest Session.
- * A production PostgreSQL adapter remains blocked on P0-AUTH-01.
- */
+/** Persistence port for the fresh Guest owner + verifier-only Guest Session. */
 export interface GuestBootstrapAuthorityPortV1 {
   createGuestSession(input: {
     readonly subjectId: string;
