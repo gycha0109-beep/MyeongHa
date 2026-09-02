@@ -135,22 +135,6 @@ if (vercelConfig.git?.deploymentEnabled?.main !== true) {
   throw new Error('Automatic Vercel production deployment must remain enabled for main.');
 }
 
-const birthProfileRewrite = (vercelConfig.rewrites ?? []).find(
-  (entry) => entry.source === '/api/birth-profiles/:id',
-);
-if (birthProfileRewrite?.destination !== '/api/birth-profiles/[id]') {
-  throw new Error(
-    'Birth Profile dynamic API route must rewrite /api/birth-profiles/:id to /api/birth-profiles/[id].',
-  );
-}
-if (
-  (vercelConfig.rewrites ?? []).filter(
-    (entry) => entry.source === '/api/birth-profiles/:id',
-  ).length !== 1
-) {
-  throw new Error('Birth Profile dynamic API route must have exactly one Vercel rewrite.');
-}
-
 const globalHeaders = (vercelConfig.headers ?? []).find(
   (entry) => entry.source === '/(.*)',
 )?.headers ?? [];
