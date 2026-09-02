@@ -109,9 +109,9 @@ async function expectApiCode(
 }
 
 describe('Guest session bootstrap API authority boundary', () => {
-  it('pins POST /api/session/bootstrap to the atomic Guest owner/session command', () => {
+  it('pins POST /api/session/bootstrap to the governed runtime Guest owner/session command', () => {
     expect(GUEST_BOOTSTRAP_AUTHORITY_BINDING_V1).toBe(
-      'public.cmd_create_guest_session_v1',
+      'public.cmd_create_guest_session_runtime_v1',
     );
   });
 
