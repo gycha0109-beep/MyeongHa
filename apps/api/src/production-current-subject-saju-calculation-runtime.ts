@@ -11,12 +11,14 @@ import {
   type SajuProductionCalculationHttpFetchV1,
 } from './saju-production-calculation-http-adapter.js';
 
+export interface ProductionCurrentSubjectSajuCalculationRequestV1 {
+  readonly request: Request;
+  readonly requestId: string;
+  readonly serverTime: string;
+}
+
 export interface ProductionCurrentSubjectSajuCalculationRuntimeV1 {
-  handleRequest(input: {
-    readonly request: Request;
-    readonly requestId: string;
-    readonly serverTime: string;
-  }): Promise<Response>;
+  handleRequest(input: ProductionCurrentSubjectSajuCalculationRequestV1): Promise<Response>;
   close(): Promise<void>;
 }
 
@@ -50,7 +52,7 @@ export function createProductionCurrentSubjectSajuCalculationRuntimeV1(
   });
 
   return Object.freeze({
-    handleRequest(requestInput) {
+    handleRequest(requestInput: ProductionCurrentSubjectSajuCalculationRequestV1) {
       return handleCurrentSubjectSajuCalculationRequestV1({
         request: requestInput.request,
         requestId: requestInput.requestId,
