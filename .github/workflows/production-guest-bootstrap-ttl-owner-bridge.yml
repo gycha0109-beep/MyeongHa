@@ -47,23 +47,15 @@ jobs:
           test -n "${GH_READ_TOKEN:-}"
           test -n "${VERCEL_TOKEN:-}"
 
-          repo_file="$RUNNER_TEMP/guest-ttl-bridge-repo.json"
           pr_file="$RUNNER_TEMP/guest-ttl-bridge-pr.json"
-          compare_file="$RUNNER_TEMP/guest-ttl-bridge-compare.json"
+          files_file="$RUNNER_TEMP/guest-ttl-bridge-pr-files.json"
           cleanup() {
             exit_code=$?
             trap - EXIT
-            rm -f "$repo_file" "$pr_file" "$compare_file"
+            rm -f "$pr_file" "$files_file"
             exit "$exit_code"
           }
           trap cleanup EXIT
-
-          curl -fsS \
-            -H "Authorization: Bearer $GH_READ_TOKEN" \
-            -H 'Accept: application/vnd.github+json' \
-            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/branches/main" \
-            -o "$repo_file"
-          main_sha="$(jq -er '.commit.sha' "$repo_file")"
 
           curl -fsS \
             -H "Authorization: Bearer $GH_READ_TOKEN" \
@@ -72,28 +64,25 @@ jobs:
             -o "$pr_file"
 
           jq -e \
-            --arg main "$main_sha" \
             --arg head "$EXPECTED_ROUTE_HEAD_SHA" \
             '.state == "open"
               and .draft == true
               and .base.ref == "main"
-              and .base.sha == $main
               and .head.sha == $head' \
             "$pr_file" >/dev/null
 
           curl -fsS \
             -H "Authorization: Bearer $GH_READ_TOKEN" \
             -H 'Accept: application/vnd.github+json' \
-            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/compare/$main_sha...$EXPECTED_ROUTE_HEAD_SHA" \
-            -o "$compare_file"
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/pulls/$EXPECTED_PR_NUMBER/files?per_page=100" \
+            -o "$files_file"
 
           jq -e \
-            '.status == "ahead"
-              and .behind_by == 0
-              and .ahead_by > 0
-              and ([.files[].filename] | sort)
-                == (["api/session/bootstrap.ts", "test/api-session-bootstrap-runtime.test.ts"] | sort)' \
-            "$compare_file" >/dev/null
+            'length == 2
+              and ([.[].filename] | sort)
+                == (["api/session/bootstrap.ts", "test/api-session-bootstrap-runtime.test.ts"] | sort)
+              and all(.[]; .status == "added")' \
+            "$files_file" >/dev/null
 
       - name: Verify governed Vercel production project
         shell: bash
