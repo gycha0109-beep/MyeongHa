@@ -62,6 +62,7 @@ class FakeAuthorityPort implements GuestBootstrapAuthorityPortV1 {
     tokenHash: string;
     expiresAt: string;
   }> = [];
+  failure: Error | null = null;
 
   createGuestSession(input: {
     readonly subjectId: string;
@@ -70,6 +71,7 @@ class FakeAuthorityPort implements GuestBootstrapAuthorityPortV1 {
     readonly expiresAt: string;
   }) {
     this.calls.push(input);
+    if (this.failure !== null) throw this.failure;
     return [
       {
         subjectId: SUBJECT_ID,
@@ -156,6 +158,31 @@ describe('Guest bootstrap HTTP boundary', () => {
       },
     });
     expect(runtimePorts.identityResolverPort.calls).toBe(0);
+  });
+
+  it.each([
+    ['null', 'null'],
+    ['array', '[]'],
+    ['string', JSON.stringify('client-value')],
+    ['number', '1'],
+  ])('rejects a non-object %s body fail-closed', async (_label, body) => {
+    const runtimePorts = ports();
+    const response = await handleGuestBootstrapRequestV1({
+      request: request('POST', body),
+      requestId: REQUEST_ID,
+      serverTime: SERVER_TIME,
+      ...runtimePorts,
+    });
+
+    expect(response.status).toBe(400);
+    expect((await json(response)).error).toEqual({
+      code: 'INVALID_REQUEST',
+      messageKey: 'request.invalid',
+      retryable: false,
+    });
+    expect(runtimePorts.identityResolverPort.calls).toBe(0);
+    expect(runtimePorts.credentialIssuerPort.calls).toBe(0);
+    expect(runtimePorts.authorityPort.calls).toHaveLength(0);
   });
 
   it('rejects client-controlled identity/token/expiry fields', async () => {
@@ -267,6 +294,31 @@ describe('Guest bootstrap HTTP boundary', () => {
     expect(runtimePorts.authorityPort.calls).toHaveLength(0);
   });
 
+  it('reuses an existing Member without creating any Guest state', async () => {
+    const runtimePorts = ports();
+    runtimePorts.identityResolverPort.result = {
+      kind: 'member',
+      subjectId: SUBJECT_ID,
+    };
+    const response = await handleGuestBootstrapRequestV1({
+      request: request('POST'),
+      requestId: REQUEST_ID,
+      serverTime: SERVER_TIME,
+      ...runtimePorts,
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect((await json(response)).data).toEqual({
+      subjectId: SUBJECT_ID,
+      kind: 'member',
+      guestSession: null,
+    });
+    expect(runtimePorts.credentialIssuerPort.calls).toBe(0);
+    expect(runtimePorts.tokenFingerprintPort.calls).toHaveLength(0);
+    expect(runtimePorts.authorityPort.calls).toHaveLength(0);
+  });
+
   it('maps a rejected supplied credential to AUTH_REQUIRED and never creates a new Guest', async () => {
     const runtimePorts = ports();
     runtimePorts.identityResolverPort.result = new ApiCommandError(
@@ -291,7 +343,7 @@ describe('Guest bootstrap HTTP boundary', () => {
     expect(runtimePorts.authorityPort.calls).toHaveLength(0);
   });
 
-  it('does not flatten unexpected infrastructure failures into client errors', async () => {
+  it('does not flatten unexpected identity infrastructure failures into client errors', async () => {
     const runtimePorts = ports();
     const failure = new Error('database unavailable');
     runtimePorts.identityResolverPort.result = failure;
@@ -304,5 +356,25 @@ describe('Guest bootstrap HTTP boundary', () => {
         ...runtimePorts,
       }),
     ).rejects.toBe(failure);
+  });
+
+  it('does not silently fall back after a fresh Guest authority failure', async () => {
+    const runtimePorts = ports();
+    const failure = new Error('guest session authority unavailable');
+    runtimePorts.authorityPort.failure = failure;
+
+    await expect(
+      handleGuestBootstrapRequestV1({
+        request: request('POST'),
+        requestId: REQUEST_ID,
+        serverTime: SERVER_TIME,
+        ...runtimePorts,
+      }),
+    ).rejects.toBe(failure);
+
+    expect(runtimePorts.credentialIssuerPort.calls).toBe(1);
+    expect(runtimePorts.tokenFingerprintPort.calls).toEqual([BEARER]);
+    expect(runtimePorts.authorityPort.calls).toHaveLength(1);
+    expect(failure.message).not.toContain(BEARER);
   });
 });
