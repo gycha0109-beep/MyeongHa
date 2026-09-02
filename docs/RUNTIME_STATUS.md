@@ -18,7 +18,7 @@
 | Subject-specific content rollout | BLOCKED | `SRC-16` remains unresolved. |
 | Character HTTP activation | HOLD | Do not claim subject-specific activation while SRC-15/SRC-16 are unresolved. |
 | Chat send/runtime activation | HOLD / FAIL-CLOSED | Do not invent compatibility or rollout fallback semantics. |
-| Supabase production migration deployment | LIVE THROUGH 0820 | Production contains `0790_subject_execution_context`, `0800_runtime_api_login_principal`, `0810_guest_bootstrap_runtime_authority`, and `0820_guest_bootstrap_runtime_current_query` on project `cnsfpcdiyofqvhpcegfc`. `.github/workflows/supabase-production.yml` remains the governed migration deployment path. |
+| Supabase production migration deployment | LIVE THROUGH 0820 | Production contains `0790_subject_execution_context`, `0800_production_api_login_principal`, `0810_guest_bootstrap_runtime_authority`, and `0820_guest_bootstrap_current_query` on project `cnsfpcdiyofqvhpcegfc`. `.github/workflows/supabase-production.yml` remains the governed migration deployment path. |
 
 ## Verification semantics
 
@@ -103,10 +103,10 @@ myeongha_runtime
 → member of myeongha_api_executor = true
 
 production migration history
-→ 0790 subject execution context
-→ 0800 runtime API login principal
-→ 0810 Guest bootstrap runtime authority
-→ 0820 Guest bootstrap current-session query
+→ 0790 subject_execution_context
+→ 0800 production_api_login_principal
+→ 0810 guest_bootstrap_runtime_authority
+→ 0820 guest_bootstrap_current_query
 ```
 
 Current ordinary execution path remains:
