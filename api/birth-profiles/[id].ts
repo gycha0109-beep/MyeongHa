@@ -26,9 +26,12 @@ function normalizeVercelDynamicRouteRequest(request: Request): Request {
   const entries = [...url.searchParams.entries()];
 
   if (entries.length === 0) return request;
-  if (entries.length !== 1 || entries[0]?.[0] !== 'id') return request;
+  if (entries.length !== 1) return request;
 
-  const injectedId = entries[0][1];
+  const entry = entries[0];
+  if (entry === undefined) return request;
+  const [key, injectedId] = entry;
+  if (key !== 'id') return request;
   if (injectedId.length === 0 || injectedId.includes('/')) return request;
   if (!url.pathname.startsWith(ROUTE_PREFIX)) return request;
 
