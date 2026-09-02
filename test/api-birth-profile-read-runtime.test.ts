@@ -2,6 +2,8 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import birthProfileEndpoint from '../api/birth-profiles.js';
 
 const PROFILE_ID = 'b6300000-0000-0000-0000-000000000001';
+const OTHER_PROFILE_ID = 'b6300000-0000-0000-0000-000000000002';
+const INTERNAL_ROUTE_PARAM = '__myeongha_birth_profile_id';
 
 type EndpointRequest = Parameters<typeof birthProfileEndpoint>[0];
 
@@ -84,11 +86,33 @@ async function expectAuthRequired(response: CapturedResponse): Promise<void> {
 }
 
 describe('GET /api/birth-profiles/:id production Vercel Node adapter', () => {
-  it('uses the Vercel query metadata id and reaches governed AUTH_REQUIRED', async () => {
+  it('uses explicit Vercel query metadata and reaches governed AUTH_REQUIRED', async () => {
     const response = await invokeEndpoint({
       method: 'GET',
       headers: {},
-      query: { id: PROFILE_ID },
+      query: { [INTERNAL_ROUTE_PARAM]: PROFILE_ID },
+    });
+
+    await expectAuthRequired(response);
+  });
+
+  it('falls back to the raw Node request URL when Vercel query metadata is absent', async () => {
+    const response = await invokeEndpoint({
+      method: 'GET',
+      headers: {},
+      query: {},
+      url: `/api/birth-profiles?${INTERNAL_ROUTE_PARAM}=${PROFILE_ID}`,
+    });
+
+    await expectAuthRequired(response);
+  });
+
+  it('accepts matching query and raw URL locator evidence', async () => {
+    const response = await invokeEndpoint({
+      method: 'GET',
+      headers: {},
+      query: { [INTERNAL_ROUTE_PARAM]: PROFILE_ID },
+      url: `/api/birth-profiles?${INTERNAL_ROUTE_PARAM}=${PROFILE_ID}`,
     });
 
     await expectAuthRequired(response);
@@ -98,21 +122,53 @@ describe('GET /api/birth-profiles/:id production Vercel Node adapter', () => {
     const response = await invokeEndpoint({
       method: 'GET',
       headers: { authorization: 'Bearer invalid-test-evidence' },
-      query: { id: PROFILE_ID },
+      url: `/api/birth-profiles?${INTERNAL_ROUTE_PARAM}=${PROFILE_ID}`,
     });
 
     expect(response.status).toBe(401);
     expect(header(response, 'cache-control')).toBe('no-store');
   });
 
-  it('fails closed when route metadata is missing, array-valued, or polluted', async () => {
+  it('fails closed when route metadata is missing, array-valued, polluted, or conflicting', async () => {
     const cases: EndpointRequest[] = [
       { method: 'GET', headers: {} },
       { method: 'GET', headers: {}, query: {} },
-      { method: 'GET', headers: {}, query: { id: [PROFILE_ID, PROFILE_ID] } },
-      { method: 'GET', headers: {}, query: { id: PROFILE_ID, debug: '1' } },
-      { method: 'GET', headers: {}, query: { id: '' } },
-      { method: 'GET', headers: {}, query: { id: `${PROFILE_ID}/extra` } },
+      {
+        method: 'GET',
+        headers: {},
+        query: { [INTERNAL_ROUTE_PARAM]: [PROFILE_ID, PROFILE_ID] },
+      },
+      {
+        method: 'GET',
+        headers: {},
+        query: { [INTERNAL_ROUTE_PARAM]: PROFILE_ID, debug: '1' },
+      },
+      {
+        method: 'GET',
+        headers: {},
+        query: { [INTERNAL_ROUTE_PARAM]: '' },
+      },
+      {
+        method: 'GET',
+        headers: {},
+        query: { [INTERNAL_ROUTE_PARAM]: `${PROFILE_ID}/extra` },
+      },
+      {
+        method: 'GET',
+        headers: {},
+        query: { id: PROFILE_ID },
+      },
+      {
+        method: 'GET',
+        headers: {},
+        url: `/api/birth-profiles?${INTERNAL_ROUTE_PARAM}=${PROFILE_ID}&debug=1`,
+      },
+      {
+        method: 'GET',
+        headers: {},
+        query: { [INTERNAL_ROUTE_PARAM]: PROFILE_ID },
+        url: `/api/birth-profiles?${INTERNAL_ROUTE_PARAM}=${OTHER_PROFILE_ID}`,
+      },
     ];
 
     for (const request of cases) {
@@ -127,7 +183,7 @@ describe('GET /api/birth-profiles/:id production Vercel Node adapter', () => {
     const response = await invokeEndpoint({
       method: 'POST',
       headers: {},
-      query: { id: PROFILE_ID },
+      url: `/api/birth-profiles?${INTERNAL_ROUTE_PARAM}=${PROFILE_ID}`,
     });
 
     expect(response.status).toBe(405);

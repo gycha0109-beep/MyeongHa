@@ -2,15 +2,22 @@ import { randomUUID } from 'node:crypto';
 import { createProductionBirthProfileReadRuntimeV1 } from '../apps/api/src/production-birth-profile-read-runtime.js';
 
 const ROUTE_PREFIX = '/api/birth-profiles/' as const;
+const INTERNAL_ROUTE_PARAM = '__myeongha_birth_profile_id' as const;
 const NO_STORE_CACHE_CONTROL = 'no-store' as const;
 
 type HeaderValue = string | string[] | undefined;
 type QueryValue = string | string[] | undefined;
 
+type LocatorEvidence =
+  | { readonly state: 'absent' }
+  | { readonly state: 'invalid' }
+  | { readonly state: 'valid'; readonly value: string };
+
 interface VercelNodeRequestLike {
   readonly method?: string;
   readonly headers?: Readonly<Record<string, HeaderValue>>;
   readonly query?: Readonly<Record<string, QueryValue>>;
+  readonly url?: string;
 }
 
 interface VercelNodeResponseLike {
@@ -28,18 +35,75 @@ function getRuntime(): ReturnType<typeof createProductionBirthProfileReadRuntime
   return runtime;
 }
 
-function resolveInjectedBirthProfileId(
-  query: VercelNodeRequestLike['query'],
-): string | null {
-  if (query === undefined) return null;
-
-  const keys = Object.keys(query);
-  if (keys.length !== 1 || keys[0] !== 'id') return null;
-
-  const value = query.id;
-  if (typeof value !== 'string') return null;
+function validateLocator(value: string): string | null {
   if (value.length === 0 || value.includes('/')) return null;
   return value;
+}
+
+function locatorFromQueryRecord(
+  query: VercelNodeRequestLike['query'],
+): LocatorEvidence {
+  if (query === undefined) return { state: 'absent' };
+
+  const keys = Object.keys(query);
+  if (keys.length === 0) return { state: 'absent' };
+  if (keys.length !== 1 || keys[0] !== INTERNAL_ROUTE_PARAM) {
+    return { state: 'invalid' };
+  }
+
+  const value = query[INTERNAL_ROUTE_PARAM];
+  if (typeof value !== 'string') return { state: 'invalid' };
+
+  const locator = validateLocator(value);
+  return locator === null
+    ? { state: 'invalid' }
+    : { state: 'valid', value: locator };
+}
+
+function locatorFromRequestUrl(url: string | undefined): LocatorEvidence {
+  if (url === undefined) return { state: 'absent' };
+
+  let parsed: URL;
+  try {
+    parsed = new URL(url, 'https://myeongha.internal');
+  } catch {
+    return { state: 'invalid' };
+  }
+
+  const entries = [...parsed.searchParams.entries()];
+  if (entries.length === 0) return { state: 'absent' };
+  if (entries.length !== 1) return { state: 'invalid' };
+
+  const entry = entries[0];
+  if (entry === undefined) return { state: 'invalid' };
+  const [key, value] = entry;
+  if (key !== INTERNAL_ROUTE_PARAM) return { state: 'invalid' };
+
+  const locator = validateLocator(value);
+  return locator === null
+    ? { state: 'invalid' }
+    : { state: 'valid', value: locator };
+}
+
+function resolveInjectedBirthProfileId(
+  request: VercelNodeRequestLike,
+): string | null {
+  const queryEvidence = locatorFromQueryRecord(request.query);
+  const urlEvidence = locatorFromRequestUrl(request.url);
+
+  if (queryEvidence.state === 'invalid' || urlEvidence.state === 'invalid') {
+    return null;
+  }
+
+  if (queryEvidence.state === 'valid' && urlEvidence.state === 'valid') {
+    return queryEvidence.value === urlEvidence.value
+      ? queryEvidence.value
+      : null;
+  }
+
+  if (queryEvidence.state === 'valid') return queryEvidence.value;
+  if (urlEvidence.state === 'valid') return urlEvidence.value;
+  return null;
 }
 
 function toWebHeaders(
@@ -102,7 +166,7 @@ export default async function handler(
   request: VercelNodeRequestLike,
   response: VercelNodeResponseLike,
 ): Promise<void> {
-  const birthProfileId = resolveInjectedBirthProfileId(request.query);
+  const birthProfileId = resolveInjectedBirthProfileId(request);
   if (birthProfileId === null) {
     await writeRouteNotFound(response);
     return;
