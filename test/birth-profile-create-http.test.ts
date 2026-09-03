@@ -124,11 +124,18 @@ function validRequestBody(): object {
 }
 
 function jsonRequest(body: unknown, method = 'POST'): Request {
-  return new Request('https://myeongha.vercel.app/api/birth-profiles', {
-    method,
-    headers: { 'content-type': 'application/json' },
-    body: method === 'POST' ? JSON.stringify(body) : undefined,
-  });
+  const init: RequestInit =
+    method === 'POST'
+      ? {
+          method,
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(body),
+        }
+      : {
+          method,
+          headers: { 'content-type': 'application/json' },
+        };
+  return new Request('https://myeongha.vercel.app/api/birth-profiles', init);
 }
 
 function makeInput(overrides: Partial<HandleBirthProfileCreateRequestInputV1> = {}) {
