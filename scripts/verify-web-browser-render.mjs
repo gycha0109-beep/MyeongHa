@@ -107,6 +107,22 @@ async function waitForPage(client, pathname, selector, timeout = 10_000) {
   throw new Error(`Timed out waiting for ${pathname} ${selector}`);
 }
 
+async function waitForVisible(client, selector, timeout = 5_000) {
+  const selectorLiteral = JSON.stringify(selector);
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    const visible = await client.evaluate(`(() => {
+      const el = document.querySelector(${selectorLiteral});
+      if (!el || el.hidden) return false;
+      const r = el.getBoundingClientRect(); const s = getComputedStyle(el);
+      return r.width > 0 && r.height > 0 && s.display !== 'none' && s.visibility !== 'hidden' && Number(s.opacity) > 0;
+    })()`);
+    if (visible) return;
+    await sleep(50);
+  }
+  throw new Error(`Timed out waiting for visible ${selector}`);
+}
+
 async function artifact(client, suffix = '') {
   const dir = resolve(process.cwd(), 'artifacts');
   await mkdir(dir, { recursive: true });
@@ -122,6 +138,7 @@ async function artifact(client, suffix = '') {
 
 await stat(join(root, 'hall.html'));
 await stat(join(root, 'reading.html'));
+await stat(join(root, 'reading-detail.html'));
 const { server, origin } = await serve();
 const profile = await mkdtemp(join(tmpdir(), 'myeongha-browser-smoke-'));
 const chrome = spawn(chromeBin, [
@@ -150,6 +167,7 @@ try {
       pathname: location.pathname,
       bodyText: document.body.innerText,
       styles: [...document.styleSheets].map((sheet) => sheet.href ? new URL(sheet.href).pathname : 'inline'),
+      detailLinks: [...document.querySelectorAll('a[href^="reading-detail.html"]')].map((link) => link.getAttribute('href')),
       elements: [inspect('.product-header', 100, 40), inspect('.home-today', 500, 250),
         inspect('.home-thread', 260, 240), inspect('.home-topic-grid', 500, 70), inspect('.home-person', 500, 90)],
     };
@@ -165,6 +183,7 @@ try {
   assert(hallState.bodyText.includes('오늘의 흐름을') && hallState.bodyText.includes('오늘 읽어보기'), 'Home primary Reading entry missing');
   assert(hallState.bodyText.includes('지금은 저장된 사실을 이야기로 추측해 이어 붙이지 않습니다.'), 'Home Life Thread non-inference boundary missing');
   assert(hallState.bodyText.includes('오늘 이야기할 사람') && hallState.bodyText.includes('이야기하기'), 'Home character entry missing');
+  assert(hallState.detailLinks.length >= 5, 'Home Reading entries are not routed to reading-detail.html');
   await artifact(client, '-home');
 
   const hallVisible = await client.evaluate(`(() => {
@@ -174,7 +193,69 @@ try {
   })()`);
   assert(hallVisible, 'Hall Saju navigation link is not visible');
   assert(await client.evaluate(`(() => { document.querySelector('a.product-nav-link[href="reading.html"]').click(); return true; })()`), 'Hall Saju click failed');
-  await waitForPage(client, '/reading.html', '.reading-stage');
+  await waitForPage(client, '/reading.html', '#saju-empty');
+  await waitForVisible(client, '#saju-empty');
+
+  const sajuState = await client.evaluate(`(() => {
+    const inspect = (selector, minW, minH) => {
+      const el = document.querySelector(selector); if (!el) return { selector, exists: false };
+      const r = el.getBoundingClientRect(); const s = getComputedStyle(el);
+      return { selector, exists: true, width: Math.round(r.width), height: Math.round(r.height), display: s.display,
+        visibility: s.visibility, opacity: Number(s.opacity), hidden: Boolean(el.hidden), visible: !el.hidden && r.width >= minW && r.height >= minH && s.display !== 'none' && s.visibility !== 'hidden' && Number(s.opacity) > 0 };
+    };
+    const isRendered = (selector) => {
+      const el = document.querySelector(selector); if (!el) return false;
+      const r = el.getBoundingClientRect(); const s = getComputedStyle(el);
+      return r.width > 0 && r.height > 0 && s.display !== 'none' && s.visibility !== 'hidden' && Number(s.opacity) > 0;
+    };
+    return {
+      pathname: location.pathname,
+      bodyText: document.body.innerText,
+      styles: [...document.styleSheets].map((sheet) => sheet.href ? new URL(sheet.href).pathname : 'inline'),
+      hubHidden: document.querySelector('#saju-hub')?.hidden,
+      hubRendered: isRendered('#saju-hub'),
+      elements: [inspect('.product-header', 100, 40), inspect('#saju-empty', 500, 400),
+        inspect('.saju-empty-card', 360, 300), inspect('#saju-birth-form', 300, 180), inspect('#saju-create-button', 240, 40)],
+    };
+  })()`);
+
+  assert(sajuState.pathname === '/reading.html', `Expected /reading.html Saju hub, got ${sajuState.pathname}`);
+  for (const css of ['/product.css', '/saju-hub.css']) assert(sajuState.styles.includes(css), `Saju hub stylesheet not loaded: ${css}`);
+  for (const el of sajuState.elements) {
+    assert(el.exists, `Missing browser-rendered Saju hub element ${el.selector}`);
+    assert(el.visible, `Invisible Saju hub element ${el.selector}: ${el.width}x${el.height}, ${el.display}/${el.visibility}/${el.opacity}`);
+  }
+  assert(sajuState.hubHidden === true, 'Populated Saju state must remain hidden without a current Birth Profile');
+  assert(sajuState.hubRendered === false, 'Hidden populated Saju state must not occupy visual layout');
+  assert(sajuState.bodyText.includes('아직 등록된 사주가 없습니다.'), 'Saju empty-state title missing');
+  assert(sajuState.bodyText.includes('내 사주 만들기'), 'Saju onboarding CTA missing');
+  assert(sajuState.bodyText.includes('게스트로 먼저 볼 수 있으며'), 'Guest-first Saju guidance missing');
+  await artifact(client, '-saju');
+
+  await client.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+  await sleep(150);
+  const mobileState = await client.evaluate(`(() => {
+    const visible = (selector) => {
+      const el = document.querySelector(selector); if (!el || el.hidden) return false;
+      const r = el.getBoundingClientRect(); const s = getComputedStyle(el);
+      return r.width > 0 && r.height > 0 && s.display !== 'none' && s.visibility !== 'hidden';
+    };
+    const rendered = (selector) => {
+      const el = document.querySelector(selector); if (!el) return false;
+      const r = el.getBoundingClientRect(); const s = getComputedStyle(el);
+      return r.width > 0 && r.height > 0 && s.display !== 'none' && s.visibility !== 'hidden';
+    };
+    return { width: innerWidth, empty: visible('#saju-empty'), form: visible('#saju-birth-form'), bottomNav: visible('.mobile-bottom-nav'), hubRendered: rendered('#saju-hub') };
+  })()`);
+  assert(mobileState.width === 390, `Unexpected mobile viewport width: ${mobileState.width}`);
+  assert(mobileState.empty && mobileState.form && mobileState.bottomNav, 'Mobile Saju onboarding is not fully visible');
+  assert(mobileState.hubRendered === false, 'Hidden populated Saju state occupies mobile layout');
+  await artifact(client, '-saju-mobile');
+
+  await client.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
+  const detailNav = await client.send('Page.navigate', { url: `${origin}/reading-detail.html?scope=year` });
+  assert(!detailNav.errorText, `Reading detail navigation failed: ${detailNav.errorText}`);
+  await waitForPage(client, '/reading-detail.html', '.reading-stage');
 
   const state = await client.evaluate(`(() => {
     const inspect = (selector, minW, minH) => {
@@ -188,6 +269,7 @@ try {
       scope: document.querySelector('[data-reading-scope]')?.textContent?.trim() ?? '',
       progress: document.querySelector('[data-reading-progress-label]')?.textContent?.trim() ?? '',
       title: document.querySelector('[data-reading-step-title]')?.textContent?.trim() ?? '',
+      hubHref: document.querySelector('.reading-back-to-hub')?.getAttribute('href') ?? '',
       styles: [...document.styleSheets].map((sheet) => sheet.href ? new URL(sheet.href).pathname : 'inline'),
       elements: [inspect('.product-header', 100, 40), inspect('.reading-stage', 500, 500),
         inspect('.reader-scene', 200, 400), inspect('.reader-identity', 100, 40),
@@ -195,22 +277,23 @@ try {
     };
   })()`);
 
-  assert(state.pathname === '/reading.html', `Expected /reading.html, got ${state.pathname}`);
-  for (const css of ['/product.css', '/reading-v3.css', '/reading-scenes.css']) assert(state.styles.includes(css), `Stylesheet not loaded: ${css}`);
+  assert(state.pathname === '/reading-detail.html', `Expected /reading-detail.html, got ${state.pathname}`);
+  for (const css of ['/product.css', '/reading-v3.css', '/reading-scenes.css']) assert(state.styles.includes(css), `Reading detail stylesheet not loaded: ${css}`);
   for (const el of state.elements) {
-    assert(el.exists, `Missing browser-rendered element ${el.selector}`);
-    assert(el.visible, `Invisible browser element ${el.selector}: ${el.width}x${el.height}, ${el.display}/${el.visibility}/${el.opacity}`);
+    assert(el.exists, `Missing browser-rendered Reading detail element ${el.selector}`);
+    assert(el.visible, `Invisible Reading detail element ${el.selector}: ${el.width}x${el.height}, ${el.display}/${el.visibility}/${el.opacity}`);
   }
   assert(/^\d{4}년 · 올해$/.test(state.scope), `Unexpected scope: ${state.scope}`);
   assert(state.progress === '읽기 1 / 4', `Unexpected progress: ${state.progress}`);
   assert(state.title === '지금 읽히는 흐름', `Unexpected title: ${state.title}`);
+  assert(state.hubHref === 'reading.html', `Reading detail does not return to Saju hub: ${state.hubHref}`);
   assert(state.bodyText.includes('내 명식 보기') && state.bodyText.includes('다음 읽기'), 'Reading actions missing');
   assert(state.bodyText.trim() !== state.scope, 'Reading collapsed to only the scope text');
 
   const advanced = await client.evaluate(`(() => { document.querySelector('[data-reading-next]').click(); return document.querySelector('[data-reading-progress-label]').textContent.trim(); })()`);
   assert(advanced === '읽기 2 / 4', `Reading runtime did not advance: ${advanced}`);
-  await artifact(client);
-  console.log(JSON.stringify({ status: 'MyeongHa_WEB_BROWSER_RENDER_PASS', home: hallState.elements, pathname: state.pathname, scope: state.scope, rendered: state.elements }));
+  await artifact(client, '-reading-detail');
+  console.log(JSON.stringify({ status: 'MyeongHa_WEB_BROWSER_RENDER_PASS', home: hallState.elements, saju: sajuState.elements, mobile: mobileState, pathname: state.pathname, scope: state.scope, rendered: state.elements }));
 } catch (error) {
   if (client) { try { await artifact(client, '-failure'); } catch {} }
   if (chromeError.trim()) console.error(chromeError.trim());

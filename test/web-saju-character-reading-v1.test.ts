@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 
-const readingHtmlPath = new URL('../apps/web/reading.html', import.meta.url);
+const readingHtmlPath = new URL('../apps/web/reading-detail.html', import.meta.url);
 const readingCssPath = new URL('../apps/web/reading-v3.css', import.meta.url);
 const readingScenesCssPath = new URL('../apps/web/reading-scenes.css', import.meta.url);
 const readingRuntimePath = new URL('../apps/web/reading-character.js', import.meta.url);

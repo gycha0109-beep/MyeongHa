@@ -11,6 +11,7 @@ const page = readFileSync(join(webRoot, 'my-page.js'), 'utf8');
 const hall = readFileSync(join(webRoot, 'hall.html'), 'utf8');
 const homePage = readFileSync(join(webRoot, 'home-page.js'), 'utf8');
 const reading = readFileSync(join(webRoot, 'reading.html'), 'utf8');
+const readingDetail = readFileSync(join(webRoot, 'reading-detail.html'), 'utf8');
 const profileAuthority = readFileSync(join(root, 'apps', 'api', 'src', 'subject-profile.ts'), 'utf8');
 
 describe('web My profile authority boundary', () => {
@@ -24,6 +25,8 @@ describe('web My profile authority boundary', () => {
     expect(hall).toContain('class="mobile-nav-link" href="my.html"');
     expect(reading).toContain('class="product-nav-link" href="my.html">마이</a>');
     expect(reading).toContain('class="mobile-nav-link" href="my.html"');
+    expect(readingDetail).toContain('class="product-nav-link" href="my.html">마이</a>');
+    expect(readingDetail).toContain('class="mobile-nav-link" href="my.html"');
   });
 
   it('reads only the verified current profile surface through GET /api/me', () => {
@@ -84,14 +87,19 @@ describe('web My profile authority boundary', () => {
     expect(myHtml).not.toContain('class="home-kicker"');
   });
 
-  it('aligns Home and Reading profile affordances with the My destination', () => {
+  it('aligns Home, Saju hub, and Reading detail profile affordances with the My destination', () => {
     expect(hall).toContain('<span id="home-profile-name">마이</span>');
     expect(homePage).toContain("byId('home-profile-name').textContent = '마이'");
+
     expect(reading).not.toContain('<span>지환</span>');
     expect(reading).toContain('<span>마이</span>');
     expect(reading).toContain('href="my.html" aria-label="내 프로필"');
-    expect(reading).toContain('src="reading-character.js"');
-    expect(reading).toContain('data-reader="baekheon"');
+
+    expect(readingDetail).not.toContain('<span>지환</span>');
+    expect(readingDetail).toContain('<span>마이</span>');
+    expect(readingDetail).toContain('href="my.html" aria-label="내 프로필"');
+    expect(readingDetail).toContain('src="reading-character.js"');
+    expect(readingDetail).toContain('data-reader="baekheon"');
   });
 
   it('fails closed when the current session, envelope, or profile read is unavailable', () => {
