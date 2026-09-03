@@ -5,7 +5,6 @@ const hallPath = new URL('../apps/web/hall.html', import.meta.url);
 const cssPath = new URL('../apps/web/home-assets-v5.css', import.meta.url);
 const assets = [
   'home-v5-orbit.webp',
-  'home-v5-plum.webp',
   'home-v5-mountain.webp',
   'home-v5-wealth.webp',
   'home-v5-compass.webp',
@@ -29,6 +28,7 @@ describe('Home approved illustration assets v5', () => {
       expect(css).toContain(asset);
     }
     expect(css).not.toContain('home-v5-art-sprite.webp');
+    expect(css).not.toContain('home-v5-plum.webp');
     for (const motif of ['花', '山', '財', '命']) {
       expect(css).toContain(`.home-topic[data-motif="${motif}"]::before`);
     }
