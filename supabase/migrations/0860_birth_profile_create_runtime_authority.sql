@@ -8,6 +8,11 @@
 -- already-verified atomic create command.
 
 DO $$
+DECLARE
+  v_owner_oid oid;
+  v_server_version_num integer := current_setting('server_version_num')::integer;
+  v_membership_count integer;
+  v_expected_admin_count integer;
 BEGIN
   IF NOT EXISTS (
     SELECT 1
@@ -24,31 +29,54 @@ BEGIN
       NOBYPASSRLS;
   END IF;
 
-  IF NOT EXISTS (
-    SELECT 1
-    FROM pg_catalog.pg_roles r
-    WHERE r.rolname = 'myeongha_birth_profile_create_owner'
-      AND NOT r.rolcanlogin
-      AND NOT r.rolsuper
-      AND NOT r.rolcreatedb
-      AND NOT r.rolcreaterole
-      AND NOT r.rolinherit
-      AND NOT r.rolreplication
-      AND NOT r.rolbypassrls
-      AND NOT EXISTS (
-        SELECT 1
-        FROM pg_catalog.pg_auth_members m
-        WHERE m.roleid = r.oid
-      )
-  ) THEN
-    RAISE EXCEPTION 'myeongha_birth_profile_create_owner is outside the least-privilege contract';
+  SELECT r.oid
+  INTO v_owner_oid
+  FROM pg_catalog.pg_roles r
+  WHERE r.rolname = 'myeongha_birth_profile_create_owner'
+    AND NOT r.rolcanlogin
+    AND NOT r.rolsuper
+    AND NOT r.rolcreatedb
+    AND NOT r.rolcreaterole
+    AND NOT r.rolinherit
+    AND NOT r.rolreplication
+    AND NOT r.rolbypassrls;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'myeongha_birth_profile_create_owner is outside the least-privilege role contract';
+  END IF;
+
+  SELECT count(*)
+  INTO v_membership_count
+  FROM pg_catalog.pg_auth_members m
+  WHERE m.roleid = v_owner_oid;
+
+  IF v_server_version_num >= 160000 THEN
+    SELECT count(*)
+    INTO v_expected_admin_count
+    FROM pg_catalog.pg_auth_members m
+    JOIN pg_catalog.pg_roles member_role
+      ON member_role.oid = m.member
+    JOIN pg_catalog.pg_roles grantor_role
+      ON grantor_role.oid = m.grantor
+    WHERE m.roleid = v_owner_oid
+      AND member_role.rolname = CURRENT_USER
+      AND m.admin_option
+      AND NOT m.inherit_option
+      AND NOT m.set_option
+      AND grantor_role.rolsuper;
+
+    IF v_membership_count <> 1 OR v_expected_admin_count <> 1 THEN
+      RAISE EXCEPTION 'myeongha_birth_profile_create_owner has unexpected PostgreSQL 16+ creator membership';
+    END IF;
+  ELSIF v_membership_count <> 0 THEN
+    RAISE EXCEPTION 'myeongha_birth_profile_create_owner has unexpected pre-PostgreSQL-16 membership';
   END IF;
 END
 $$;
 
 -- The command owner can evaluate the canonical Subject context and invoke only the
--- existing Birth create core command. It is intentionally not a member of the ordinary
--- API role and receives no login capability.
+-- existing Birth create core command. It is intentionally not a runtime member of the
+-- ordinary API role and receives no login capability.
 grant usage on schema public to myeongha_birth_profile_create_owner;
 grant execute on function public.current_myeongha_subject_id()
 to myeongha_birth_profile_create_owner;
@@ -214,11 +242,12 @@ begin
 end;
 $$;
 
--- Supabase production migrations run through a managed CREATEROLE principal that is
--- intentionally not automatically a member of newly created NOLOGIN roles. PostgreSQL
--- requires both SET ROLE capability and CREATE privilege for the target owner on the
--- containing schema before ALTER ... OWNER. Grant those capabilities only for this
--- transactional ownership/ACL setup and remove both before the migration completes.
+-- PostgreSQL 16+ gives a non-superuser CREATEROLE principal an automatic ADMIN-only
+-- membership in roles it creates, granted by the bootstrap superuser with SET FALSE and
+-- INHERIT FALSE. That management-plane membership is required for the managed migration
+-- principal to administer the role and cannot be revoked by the creator itself. It does
+-- not confer runtime role privileges. Add a temporary self-grant with SET capability for
+-- ownership transfer, grant schema CREATE only for that transfer, then remove both.
 grant myeongha_birth_profile_create_owner to current_user;
 grant create on schema public to myeongha_birth_profile_create_owner;
 
@@ -253,3 +282,56 @@ grant execute on function public.cmd_create_birth_profile_runtime_v1(
 
 revoke create on schema public from myeongha_birth_profile_create_owner;
 revoke myeongha_birth_profile_create_owner from current_user;
+
+DO $$
+DECLARE
+  v_owner_oid oid;
+  v_server_version_num integer := current_setting('server_version_num')::integer;
+  v_membership_count integer;
+  v_expected_admin_count integer;
+BEGIN
+  SELECT r.oid
+  INTO STRICT v_owner_oid
+  FROM pg_catalog.pg_roles r
+  WHERE r.rolname = 'myeongha_birth_profile_create_owner';
+
+  SELECT count(*)
+  INTO v_membership_count
+  FROM pg_catalog.pg_auth_members m
+  WHERE m.roleid = v_owner_oid;
+
+  IF v_server_version_num >= 160000 THEN
+    SELECT count(*)
+    INTO v_expected_admin_count
+    FROM pg_catalog.pg_auth_members m
+    JOIN pg_catalog.pg_roles member_role
+      ON member_role.oid = m.member
+    JOIN pg_catalog.pg_roles grantor_role
+      ON grantor_role.oid = m.grantor
+    WHERE m.roleid = v_owner_oid
+      AND member_role.rolname = CURRENT_USER
+      AND m.admin_option
+      AND NOT m.inherit_option
+      AND NOT m.set_option
+      AND grantor_role.rolsuper;
+
+    IF v_membership_count <> 1 OR v_expected_admin_count <> 1 THEN
+      RAISE EXCEPTION 'myeongha_birth_profile_create_owner did not return to the PostgreSQL 16+ admin-only creator membership contract';
+    END IF;
+  ELSIF v_membership_count <> 0 THEN
+    RAISE EXCEPTION 'myeongha_birth_profile_create_owner retained unexpected pre-PostgreSQL-16 membership';
+  END IF;
+
+  IF NOT has_schema_privilege(
+    'myeongha_birth_profile_create_owner',
+    'public',
+    'USAGE'
+  ) OR has_schema_privilege(
+    'myeongha_birth_profile_create_owner',
+    'public',
+    'CREATE'
+  ) THEN
+    RAISE EXCEPTION 'myeongha_birth_profile_create_owner retained unexpected schema privilege';
+  END IF;
+END
+$$;
