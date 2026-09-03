@@ -1,0 +1,50 @@
+name: Production Birth Profile Guest Create Read Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type VERIFY_GUEST_BIRTH_CREATE_READ_ONCE to create one persistent synthetic Guest Birth fixture. Do not rerun after success.'
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: production-birth-profile-guest-create-read-smoke
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: verify-production-birth-profile-guest-create-read
+    runs-on: ubuntu-24.04
+    environment: production
+    env:
+      DISPATCH_CONFIRM: ${{ inputs.confirm }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Verify explicit one-shot dispatch
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$DISPATCH_CONFIRM" == 'VERIFY_GUEST_BIRTH_CREATE_READ_ONCE' ]]
+
+          prior_successes="$(
+            gh api \
+              "repos/${GITHUB_REPOSITORY}/actions/workflows/production-birth-profile-guest-create-read-smoke.yml/runs?event=workflow_dispatch&status=completed&per_page=100" \
+              --jq '[.workflow_runs[] | select(.conclusion == "success")] | length'
+          )"
+          [[ "$prior_successes" == '0' ]]
+
+      - name: Check out exact repository verifier
+        uses: actions/checkout@v4
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Bootstrap Guest and verify production Birth create/read
+        run: node scripts/verify-production-birth-profile-guest-create-read.mjs
