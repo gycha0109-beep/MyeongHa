@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { createProductionBirthProfileCreateRuntimeV1 } from '../apps/api/src/production-birth-profile-create-runtime.js';
 import { createProductionBirthProfileReadRuntimeV1 } from '../apps/api/src/production-birth-profile-read-runtime.js';
 
 const ROUTE_PATH = '/api/birth-profiles' as const;
@@ -10,6 +11,9 @@ const NO_STORE_CACHE_CONTROL = 'no-store' as const;
 const ALLOWED_ROUTE_METADATA_KEYS: ReadonlySet<string> = new Set([
   INTERNAL_ROUTE_PARAM,
   VERCEL_DYNAMIC_ROUTE_PARAM,
+  VERCEL_SHARE_PARAM,
+]);
+const ALLOWED_CREATE_METADATA_KEYS: ReadonlySet<string> = new Set([
   VERCEL_SHARE_PARAM,
 ]);
 
@@ -26,6 +30,7 @@ interface VercelNodeRequestLike {
   readonly headers?: Readonly<Record<string, HeaderValue>>;
   readonly query?: Readonly<Record<string, QueryValue>>;
   readonly url?: string;
+  readonly body?: unknown;
 }
 
 interface VercelNodeResponseLike {
@@ -34,13 +39,34 @@ interface VercelNodeResponseLike {
   end(body?: Uint8Array): void;
 }
 
-let runtime:
+interface BirthProfileVercelRuntimePortV1 {
+  handleRequest(input: {
+    readonly request: Request;
+    readonly requestId: string;
+    readonly serverTime: string;
+  }): Promise<Response>;
+}
+
+export interface CreateBirthProfilesVercelHandlerInputV1 {
+  readonly getReadRuntime: () => BirthProfileVercelRuntimePortV1;
+  readonly getCreateRuntime: () => BirthProfileVercelRuntimePortV1;
+}
+
+let readRuntime:
   | ReturnType<typeof createProductionBirthProfileReadRuntimeV1>
   | undefined;
+let createRuntime:
+  | ReturnType<typeof createProductionBirthProfileCreateRuntimeV1>
+  | undefined;
 
-function getRuntime(): ReturnType<typeof createProductionBirthProfileReadRuntimeV1> {
-  runtime ??= createProductionBirthProfileReadRuntimeV1({ env: process.env });
-  return runtime;
+function getProductionReadRuntime(): ReturnType<typeof createProductionBirthProfileReadRuntimeV1> {
+  readRuntime ??= createProductionBirthProfileReadRuntimeV1({ env: process.env });
+  return readRuntime;
+}
+
+function getProductionCreateRuntime(): ReturnType<typeof createProductionBirthProfileCreateRuntimeV1> {
+  createRuntime ??= createProductionBirthProfileCreateRuntimeV1({ env: process.env });
+  return createRuntime;
 }
 
 function validateLocator(value: string): string | null {
@@ -175,6 +201,43 @@ function resolveInjectedBirthProfileId(
   return null;
 }
 
+function hasCanonicalCreateQueryMetadata(
+  query: VercelNodeRequestLike['query'],
+): boolean {
+  if (query === undefined) return true;
+  const keys = Object.keys(query);
+  if (keys.some((key) => !ALLOWED_CREATE_METADATA_KEYS.has(key))) return false;
+
+  const shareValue = query[VERCEL_SHARE_PARAM];
+  return shareValue === undefined || isSingleNonEmptyString(shareValue);
+}
+
+function hasCanonicalCreateUrlMetadata(url: string | undefined): boolean {
+  if (url === undefined) return true;
+
+  let parsed: URL;
+  try {
+    parsed = new URL(url, 'https://myeongha.internal');
+  } catch {
+    return false;
+  }
+
+  if (parsed.pathname !== ROUTE_PATH || parsed.hash !== '') return false;
+  const keys = [...new Set(parsed.searchParams.keys())];
+  if (keys.some((key) => !ALLOWED_CREATE_METADATA_KEYS.has(key))) return false;
+
+  const shareValue = getSingleUrlParam(parsed.searchParams, VERCEL_SHARE_PARAM);
+  return shareValue !== null;
+}
+
+function isCanonicalCreateRequest(request: VercelNodeRequestLike): boolean {
+  return (
+    request.method === 'POST' &&
+    hasCanonicalCreateQueryMetadata(request.query) &&
+    hasCanonicalCreateUrlMetadata(request.url)
+  );
+}
+
 function toWebHeaders(
   source: VercelNodeRequestLike['headers'],
 ): Headers {
@@ -193,7 +256,7 @@ function toWebHeaders(
   return headers;
 }
 
-function toCanonicalRequest(
+function toCanonicalReadRequest(
   request: VercelNodeRequestLike,
   birthProfileId: string,
 ): Request {
@@ -204,6 +267,30 @@ function toCanonicalRequest(
       headers: toWebHeaders(request.headers),
     },
   );
+}
+
+function serializeParsedCreateBody(body: unknown): string | undefined {
+  if (body === undefined) return undefined;
+  if (typeof body === 'string') return body;
+
+  try {
+    return JSON.stringify(body) ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function toCanonicalCreateRequest(request: VercelNodeRequestLike): Request {
+  const headers = toWebHeaders(request.headers);
+  headers.delete('content-length');
+  headers.delete('transfer-encoding');
+  const body = serializeParsedCreateBody(request.body);
+
+  return new Request(`https://myeongha.internal${ROUTE_PATH}`, {
+    method: 'POST',
+    headers,
+    ...(body === undefined ? {} : { body }),
+  });
 }
 
 async function writeWebResponse(
@@ -231,21 +318,44 @@ async function writeRouteNotFound(
   );
 }
 
-export default async function handler(
+export function createBirthProfilesVercelHandlerV1(
+  input: CreateBirthProfilesVercelHandlerInputV1,
+): (
   request: VercelNodeRequestLike,
   response: VercelNodeResponseLike,
-): Promise<void> {
-  const birthProfileId = resolveInjectedBirthProfileId(request);
-  if (birthProfileId === null) {
+) => Promise<void> {
+  return async function birthProfilesVercelHandler(
+    request: VercelNodeRequestLike,
+    response: VercelNodeResponseLike,
+  ): Promise<void> {
+    const birthProfileId = resolveInjectedBirthProfileId(request);
+    if (birthProfileId !== null) {
+      const runtimeResponse = await input.getReadRuntime().handleRequest({
+        request: toCanonicalReadRequest(request, birthProfileId),
+        requestId: randomUUID(),
+        serverTime: new Date().toISOString(),
+      });
+      await writeWebResponse(runtimeResponse, response);
+      return;
+    }
+
+    if (isCanonicalCreateRequest(request)) {
+      const runtimeResponse = await input.getCreateRuntime().handleRequest({
+        request: toCanonicalCreateRequest(request),
+        requestId: randomUUID(),
+        serverTime: new Date().toISOString(),
+      });
+      await writeWebResponse(runtimeResponse, response);
+      return;
+    }
+
     await writeRouteNotFound(response);
-    return;
-  }
-
-  const runtimeResponse = await getRuntime().handleRequest({
-    request: toCanonicalRequest(request, birthProfileId),
-    requestId: randomUUID(),
-    serverTime: new Date().toISOString(),
-  });
-
-  await writeWebResponse(runtimeResponse, response);
+  };
 }
+
+const handler = createBirthProfilesVercelHandlerV1({
+  getReadRuntime: getProductionReadRuntime,
+  getCreateRuntime: getProductionCreateRuntime,
+});
+
+export default handler;

@@ -1,5 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
-import birthProfileEndpoint from '../api/birth-profiles.js';
+import birthProfileEndpoint, {
+  createBirthProfilesVercelHandlerV1,
+} from '../api/birth-profiles.js';
 
 const PROFILE_ID = 'b6300000-0000-0000-0000-000000000001';
 const OTHER_PROFILE_ID = 'b6300000-0000-0000-0000-000000000002';
@@ -8,7 +10,8 @@ const VERCEL_DYNAMIC_ROUTE_PARAM = 'id';
 const VERCEL_SHARE_PARAM = '_vercel_share';
 const TEST_SHARE_TOKEN = 'test-vercel-share-token';
 
-type EndpointRequest = Parameters<typeof birthProfileEndpoint>[0];
+type Endpoint = typeof birthProfileEndpoint;
+type EndpointRequest = Parameters<Endpoint>[0];
 
 type CapturedResponse = {
   status: number;
@@ -25,9 +28,14 @@ beforeAll(() => {
     'sb_publishable_test_key_material_for_birth_profile_runtime';
   process.env.MYEONGHA_GUEST_FINGERPRINT_SECRET =
     'test-guest-fingerprint-secret-material-at-least-thirty-two-bytes';
+  process.env.MYEONGHA_BIRTH_INPUT_HMAC_K1_SECRET =
+    '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 });
 
-async function invokeEndpoint(request: EndpointRequest): Promise<CapturedResponse> {
+async function invokeEndpoint(
+  request: EndpointRequest,
+  endpoint: Endpoint = birthProfileEndpoint,
+): Promise<CapturedResponse> {
   const headers = new Map<string, string>();
   let body = '';
 
@@ -41,7 +49,7 @@ async function invokeEndpoint(request: EndpointRequest): Promise<CapturedRespons
     },
   };
 
-  await birthProfileEndpoint(request, response);
+  await endpoint(request, response);
 
   return {
     status: response.statusCode,
@@ -95,6 +103,20 @@ function observedDynamicMetadataUrl(profileId: string): string {
     [VERCEL_DYNAMIC_ROUTE_PARAM]: profileId,
   });
   return `/api/birth-profiles/${profileId}?${search.toString()}`;
+}
+
+function validCreateBody(): object {
+  return {
+    label: '나의 명식록',
+    input: {
+      calendarType: 'solar',
+      birthDate: '1990-01-02',
+      birthTime: '08:30:00',
+      timeKnown: true,
+      isLeapMonth: false,
+      sex: 'female',
+    },
+  };
 }
 
 describe('GET /api/birth-profiles/:id production Vercel Node adapter', () => {
@@ -231,5 +253,214 @@ describe('GET /api/birth-profiles/:id production Vercel Node adapter', () => {
     expect(response.status).toBe(405);
     expect(header(response, 'allow')).toBe('GET');
     expect(header(response, 'cache-control')).toBe('no-store');
+  });
+});
+
+describe('POST /api/birth-profiles production Vercel Node adapter', () => {
+  it('activates the canonical root POST boundary without opening PostgreSQL for an unauthenticated request', async () => {
+    const response = await invokeEndpoint({
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      query: {},
+      url: '/api/birth-profiles',
+      body: validCreateBody(),
+    });
+
+    await expectAuthRequired(response);
+  });
+
+  it('accepts only benign Vercel share metadata on the canonical POST route', async () => {
+    const response = await invokeEndpoint({
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      query: { [VERCEL_SHARE_PARAM]: TEST_SHARE_TOKEN },
+      url: `/api/birth-profiles?${VERCEL_SHARE_PARAM}=${TEST_SHARE_TOKEN}`,
+      body: validCreateBody(),
+    });
+
+    await expectAuthRequired(response);
+  });
+
+  it('canonicalizes parsed Vercel JSON body and authorization evidence without constructing the read runtime', async () => {
+    let readRuntimeFactoryCalls = 0;
+    let createRuntimeFactoryCalls = 0;
+    const capturedRequests: Request[] = [];
+
+    const endpoint: Endpoint = createBirthProfilesVercelHandlerV1({
+      getReadRuntime() {
+        readRuntimeFactoryCalls += 1;
+        return {
+          async handleRequest() {
+            return new Response(null, { status: 599 });
+          },
+        };
+      },
+      getCreateRuntime() {
+        createRuntimeFactoryCalls += 1;
+        return {
+          async handleRequest(input) {
+            capturedRequests.push(input.request);
+            return Response.json(
+              { ok: true },
+              {
+                status: 201,
+                headers: { 'Cache-Control': 'no-store' },
+              },
+            );
+          },
+        };
+      },
+    });
+
+    const requestBody = validCreateBody();
+    const response = await invokeEndpoint(
+      {
+        method: 'POST',
+        headers: {
+          authorization: 'Bearer opaque-test-evidence',
+          'content-type': 'application/json',
+          'content-length': '9999',
+          'x-request-context': 'birth-create-test',
+        },
+        query: { [VERCEL_SHARE_PARAM]: TEST_SHARE_TOKEN },
+        url: `/api/birth-profiles?${VERCEL_SHARE_PARAM}=${TEST_SHARE_TOKEN}`,
+        body: requestBody,
+      },
+      endpoint,
+    );
+
+    expect(response.status).toBe(201);
+    expect(header(response, 'cache-control')).toBe('no-store');
+    expect(readRuntimeFactoryCalls).toBe(0);
+    expect(createRuntimeFactoryCalls).toBe(1);
+
+    const canonicalRequest = capturedRequests[0];
+    if (canonicalRequest === undefined) {
+      throw new Error('Create runtime did not receive the canonical Vercel request.');
+    }
+
+    expect(canonicalRequest.method).toBe('POST');
+    expect(canonicalRequest.url).toBe('https://myeongha.internal/api/birth-profiles');
+    expect(canonicalRequest.headers.get('authorization')).toBe(
+      'Bearer opaque-test-evidence',
+    );
+    expect(canonicalRequest.headers.get('content-type')).toBe('application/json');
+    expect(canonicalRequest.headers.get('content-length')).toBeNull();
+    expect(canonicalRequest.headers.get('transfer-encoding')).toBeNull();
+    expect(canonicalRequest.headers.get('x-request-context')).toBe(
+      'birth-create-test',
+    );
+    expect(await canonicalRequest.json()).toEqual(requestBody);
+  });
+
+  it('keeps the create-only HMAC runtime isolated from dynamic Birth reads', async () => {
+    let readRuntimeFactoryCalls = 0;
+    let createRuntimeFactoryCalls = 0;
+    const capturedReadRequests: Request[] = [];
+
+    const endpoint: Endpoint = createBirthProfilesVercelHandlerV1({
+      getReadRuntime() {
+        readRuntimeFactoryCalls += 1;
+        return {
+          async handleRequest(input) {
+            capturedReadRequests.push(input.request);
+            return new Response(null, {
+              status: 401,
+              headers: { 'Cache-Control': 'no-store' },
+            });
+          },
+        };
+      },
+      getCreateRuntime() {
+        createRuntimeFactoryCalls += 1;
+        throw new Error('Create runtime must stay lazy during Birth reads.');
+      },
+    });
+
+    const response = await invokeEndpoint(
+      {
+        method: 'GET',
+        headers: { authorization: 'Bearer read-test-evidence' },
+        query: { [INTERNAL_ROUTE_PARAM]: PROFILE_ID },
+        url: `/api/birth-profiles?${INTERNAL_ROUTE_PARAM}=${PROFILE_ID}`,
+      },
+      endpoint,
+    );
+
+    expect(response.status).toBe(401);
+    expect(readRuntimeFactoryCalls).toBe(1);
+    expect(createRuntimeFactoryCalls).toBe(0);
+
+    const canonicalRequest = capturedReadRequests[0];
+    if (canonicalRequest === undefined) {
+      throw new Error('Read runtime did not receive the canonical Vercel request.');
+    }
+    expect(canonicalRequest.url).toBe(
+      `https://myeongha.internal/api/birth-profiles/${PROFILE_ID}`,
+    );
+  });
+
+  it('fails closed instead of creating when POST route metadata is unknown or malformed', async () => {
+    let readRuntimeFactoryCalls = 0;
+    let createRuntimeFactoryCalls = 0;
+    const endpoint: Endpoint = createBirthProfilesVercelHandlerV1({
+      getReadRuntime() {
+        readRuntimeFactoryCalls += 1;
+        return {
+          async handleRequest() {
+            return new Response(null, { status: 599 });
+          },
+        };
+      },
+      getCreateRuntime() {
+        createRuntimeFactoryCalls += 1;
+        return {
+          async handleRequest() {
+            return new Response(null, { status: 598 });
+          },
+        };
+      },
+    });
+
+    const cases: EndpointRequest[] = [
+      {
+        method: 'POST',
+        headers: {},
+        query: { debug: '1' },
+        url: '/api/birth-profiles?debug=1',
+        body: validCreateBody(),
+      },
+      {
+        method: 'POST',
+        headers: {},
+        query: { [VERCEL_SHARE_PARAM]: [TEST_SHARE_TOKEN] },
+        url: '/api/birth-profiles',
+        body: validCreateBody(),
+      },
+      {
+        method: 'POST',
+        headers: {},
+        query: {},
+        url: `/api/birth-profiles/${PROFILE_ID}`,
+        body: validCreateBody(),
+      },
+      {
+        method: 'POST',
+        headers: {},
+        query: {},
+        url: '/api/birth-profiles#fragment',
+        body: validCreateBody(),
+      },
+    ];
+
+    for (const request of cases) {
+      const response = await invokeEndpoint(request, endpoint);
+      expect(response.status).toBe(404);
+      expect(header(response, 'cache-control')).toBe('no-store');
+      expect(response.body).toBe('');
+    }
+
+    expect(readRuntimeFactoryCalls).toBe(0);
+    expect(createRuntimeFactoryCalls).toBe(0);
   });
 });
