@@ -20,7 +20,7 @@ body.product-page[data-page="home"] .home-today::after {
   bottom: -17px;
   border: 0;
   border-radius: 0;
-  background: url("home-v5-plum.webp") center / contain no-repeat;
+  background: url("home-v5-plum-corner.webp") right bottom / contain no-repeat;
   opacity: .13;
   filter: sepia(.3) saturate(.72) brightness(.92);
   transform: none;
@@ -34,12 +34,12 @@ body.product-page[data-page="home"] .home-topic::before {
 }
 
 body.product-page[data-page="home"] .home-topic[data-motif="花"]::before {
-  width: 220px;
-  height: 145px;
-  right: -18px;
-  top: -6px;
-  background-image: url("home-v5-plum.webp");
-  opacity: .48;
+  width: 205px;
+  height: 174px;
+  right: -20px;
+  top: -30px;
+  background-image: url("home-v5-plum-corner.webp");
+  opacity: .43;
 }
 
 body.product-page[data-page="home"] .home-topic[data-motif="山"]::before {
@@ -120,7 +120,7 @@ body.product-page[data-page="home"] .product-footer {
 @media (max-width: 767px) {
   body.product-page[data-page="home"] .home-orbit-art { width: 210px; }
   body.product-page[data-page="home"] .home-today::after { right: -74px; opacity: .08; }
-  body.product-page[data-page="home"] .home-topic[data-motif="花"]::before { right: -70px; opacity: .34; }
+  body.product-page[data-page="home"] .home-topic[data-motif="花"]::before { right: -70px; opacity: .31; }
   body.product-page[data-page="home"] .home-topic[data-motif="山"]::before { right: -72px; opacity: .42; }
   body.product-page[data-page="home"] .home-topic[data-motif="財"]::before { right: -58px; opacity: .23; }
   body.product-page[data-page="home"] .home-topic[data-motif="命"]::before { right: -42px; opacity: .16; }
