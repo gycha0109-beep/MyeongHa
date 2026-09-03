@@ -216,10 +216,11 @@ $$;
 
 -- Supabase production migrations run through a managed CREATEROLE principal that is
 -- intentionally not automatically a member of newly created NOLOGIN roles. PostgreSQL
--- requires the current principal to be able to SET ROLE to a target owner before
--- ALTER ... OWNER. Grant that membership only for this transactional ownership/ACL
--- setup and remove it before the migration completes.
+-- requires both SET ROLE capability and CREATE privilege for the target owner on the
+-- containing schema before ALTER ... OWNER. Grant those capabilities only for this
+-- transactional ownership/ACL setup and remove both before the migration completes.
 grant myeongha_birth_profile_create_owner to current_user;
+grant create on schema public to myeongha_birth_profile_create_owner;
 
 alter function public.cmd_create_birth_profile_runtime_v1(
   uuid, uuid, uuid, text, text, date, time, boolean, boolean, text, text
@@ -250,4 +251,5 @@ grant execute on function public.cmd_create_birth_profile_runtime_v1(
   uuid, uuid, uuid, text, text, date, time, boolean, boolean, text, text
 ) to myeongha_api_executor;
 
+revoke create on schema public from myeongha_birth_profile_create_owner;
 revoke myeongha_birth_profile_create_owner from current_user;
