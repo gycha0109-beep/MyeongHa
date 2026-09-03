@@ -1,0 +1,55 @@
+.saju-date-fields {
+  min-height: 48px;
+  display: grid;
+  grid-template-columns: minmax(92px, 1.35fr) auto minmax(58px, .75fr) auto minmax(58px, .75fr);
+  align-items: center;
+  gap: 7px;
+  padding: 0 12px;
+  border: 1px solid var(--mh-line-strong);
+  border-radius: 9px;
+  background: #fffaf4;
+  transition: border-color .16s ease, box-shadow .16s ease;
+}
+
+.saju-date-fields:focus-within {
+  border-color: var(--mh-brass-strong);
+  box-shadow: 0 0 0 3px rgba(169, 130, 80, .1);
+}
+
+.saju-field .saju-date-part {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 3px;
+  border: 0;
+  border-radius: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--mh-night-900);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  box-shadow: none;
+}
+
+.saju-field .saju-date-year {
+  text-align: left;
+}
+
+.saju-field .saju-date-part::placeholder {
+  color: var(--mh-ink-faint);
+  opacity: .72;
+}
+
+.saju-date-separator {
+  color: var(--mh-ink-faint);
+  user-select: none;
+}
+
+@media (max-width: 420px) {
+  .saju-date-fields {
+    grid-template-columns: minmax(84px, 1.3fr) auto minmax(52px, .7fr) auto minmax(52px, .7fr);
+    gap: 4px;
+    padding: 0 10px;
+  }
+}
