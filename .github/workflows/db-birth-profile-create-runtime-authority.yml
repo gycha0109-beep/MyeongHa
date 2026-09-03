@@ -95,7 +95,7 @@ jobs:
           psql -v ON_ERROR_STOP=1 \
             -f supabase/migrations/0860_birth_profile_create_runtime_authority.sql \
             >/dev/null
-      - name: Verify temporary owner membership was removed
+      - name: Verify temporary migration privileges were removed
         shell: bash
         run: |
           set -euo pipefail
@@ -108,5 +108,7 @@ jobs:
               and member_role.rolname = 'myeongha_migration_principal_test';
           ")"
           test "${membership_count}" = '0'
+          test "$(psql -Atqc "select has_schema_privilege('myeongha_birth_profile_create_owner', 'public', 'USAGE');")" = 't'
+          test "$(psql -Atqc "select has_schema_privilege('myeongha_birth_profile_create_owner', 'public', 'CREATE');")" = 'f'
       - name: Verify Birth Profile production create runtime authority
         run: bash test/db/birth_profile_create_runtime_authority.sh
