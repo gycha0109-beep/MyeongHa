@@ -1,0 +1,41 @@
+name: Production Birth Profile Create Boundary Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type VERIFY_BIRTH_CREATE_BOUNDARY to run the non-mutating production Birth create boundary smoke.'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-birth-profile-create-boundary-smoke
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: verify-production-birth-profile-create-boundary
+    runs-on: ubuntu-24.04
+    environment: production
+    env:
+      DISPATCH_CONFIRM: ${{ inputs.confirm }}
+    steps:
+      - name: Verify explicit dispatch
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$DISPATCH_CONFIRM" == 'VERIFY_BIRTH_CREATE_BOUNDARY' ]]
+
+      - name: Check out exact repository verifier
+        uses: actions/checkout@v4
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Verify production Birth create boundary
+        run: node scripts/verify-production-birth-profile-create-boundary.mjs
