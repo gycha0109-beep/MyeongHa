@@ -58,6 +58,7 @@ export type SajuProductionCalculationHttpFetchV1 = (
 
 export interface SajuProductionCalculationHttpAdapterConfigV1 {
   readonly baseUrl: string;
+  readonly bearerToken: string;
   readonly timeoutMs?: number;
   readonly fetchImpl?: SajuProductionCalculationHttpFetchV1;
 }
@@ -194,6 +195,17 @@ function resolveEndpoint(baseUrl: string): string {
   return new URL(SAJU_PRODUCTION_CALCULATION_HTTP_PATH_V1, parsed).toString();
 }
 
+function resolveBearerToken(value: string): string {
+  const bearerToken = value.trim();
+  if (bearerToken.length === 0) {
+    throw new SajuProductionCalculationHttpAdapterErrorV1(
+      'INVALID_CONFIGURATION',
+      'Saju calculation Bearer credential must be non-empty.',
+    );
+  }
+  return bearerToken;
+}
+
 function resolveTimeoutMs(value: number | undefined): number {
   const timeoutMs = value ?? SAJU_PRODUCTION_CALCULATION_HTTP_DEFAULT_TIMEOUT_MS_V1;
   if (
@@ -222,6 +234,7 @@ async function fetchWithTimeout(input: {
   readonly fetchImpl: SajuProductionCalculationHttpFetchV1;
   readonly url: string;
   readonly request: SajuProductionCalculationRequestV1;
+  readonly bearerToken: string;
   readonly timeoutMs: number;
 }): Promise<SajuProductionCalculationHttpResponseV1> {
   const controller = new AbortController();
@@ -247,6 +260,7 @@ async function fetchWithTimeout(input: {
         method: 'POST',
         headers: Object.freeze({
           accept: 'application/json',
+          authorization: `Bearer ${input.bearerToken}`,
           'content-type': 'application/json',
         }),
         body: JSON.stringify(input.request),
@@ -342,6 +356,7 @@ export function createSajuProductionCalculationHttpAdapterV1(
   config: SajuProductionCalculationHttpAdapterConfigV1,
 ): SajuProductionCalculationHttpAdapterV1 {
   const url = resolveEndpoint(config.baseUrl);
+  const bearerToken = resolveBearerToken(config.bearerToken);
   const timeoutMs = resolveTimeoutMs(config.timeoutMs);
   const fetchImpl = config.fetchImpl ?? defaultFetch;
 
@@ -350,7 +365,7 @@ export function createSajuProductionCalculationHttpAdapterV1(
       birthRevision: SajuBirthRevisionBindingV1,
     ): Promise<SajuProductionCalculationIngressArtifactV1> {
       const request = buildSajuProductionCalculationRequestV1(birthRevision);
-      const response = await fetchWithTimeout({ fetchImpl, url, request, timeoutMs });
+      const response = await fetchWithTimeout({ fetchImpl, url, request, bearerToken, timeoutMs });
       assertSuccessfulStatus(response.status);
       assertJsonContentType(response);
       const payload = await parseJsonResponse(response);
