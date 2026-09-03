@@ -76,6 +76,8 @@ const continuationContext = document.querySelector('[data-continuation-context]'
 const continuationInitial = document.querySelector('[data-continuation-initial]');
 const continuationLink = document.querySelector('[data-continuation-link]');
 const continuationScene = document.querySelector('[data-continuation-scene]');
+const continuationThreadNote = document.querySelector('[data-continuation-thread-note]');
+const continuationThreadTitle = document.querySelector('[data-continuation-thread-title]');
 const recentList = document.querySelector('[data-recent-list]');
 const recentEmpty = document.querySelector('[data-recent-empty]');
 const recentAll = document.querySelector('[data-recent-all]');
@@ -92,9 +94,13 @@ function safePresentationKey(value) {
   return /^[a-z0-9_-]{1,64}$/.test(normalized) ? normalized : null;
 }
 
-function roomHref(characterKey) {
+function roomHref(characterKey, threadId) {
   const safeKey = safePresentationKey(characterKey);
-  return safeKey ? `chat.html?character=${encodeURIComponent(safeKey)}` : 'chat.html';
+  if (!safeKey) return 'chat.html';
+  const url = new URL('chat.html', window.location.href);
+  url.searchParams.set('character', safeKey);
+  if (typeof threadId === 'string' && threadId.trim()) url.searchParams.set('threadId', threadId.trim());
+  return `${url.pathname.split('/').pop()}${url.search}`;
 }
 
 function findPerson(characterKey) {
@@ -109,6 +115,7 @@ function createPersonCard(person) {
 
   const art = document.createElement('div');
   art.className = 'chat-person-art';
+  art.dataset.character = person.key;
   art.setAttribute('aria-hidden', 'true');
 
   const initial = document.createElement('span');
@@ -223,8 +230,12 @@ function setContinuation(state) {
   if (continuationTitle) continuationTitle.textContent = typeof state.title === 'string' ? state.title : (person?.title ?? '');
   if (continuationContext) continuationContext.textContent = state.context.trim();
   if (continuationInitial) continuationInitial.textContent = name.slice(0, 2);
-  if (continuationLink) continuationLink.href = roomHref(characterKey);
+  if (continuationLink) continuationLink.href = roomHref(characterKey, state.threadId);
   if (continuationScene) continuationScene.dataset.character = characterKey;
+
+  const threadTitle = typeof state.threadTitle === 'string' ? state.threadTitle.trim() : '';
+  if (continuationThreadNote) continuationThreadNote.hidden = !threadTitle;
+  if (continuationThreadTitle) continuationThreadTitle.textContent = threadTitle;
 }
 
 function createRecentItem(item) {
@@ -236,26 +247,46 @@ function createRecentItem(item) {
 
   const link = document.createElement('a');
   link.className = 'chat-recent-item';
-  link.href = roomHref(characterKey);
+  link.dataset.character = characterKey;
+  link.href = roomHref(characterKey, item.threadId);
 
   const avatar = document.createElement('span');
   avatar.className = 'chat-recent-avatar';
+  avatar.dataset.character = characterKey;
   avatar.setAttribute('aria-hidden', 'true');
   avatar.textContent = name.slice(0, 2);
 
   const copy = document.createElement('span');
   copy.className = 'chat-recent-copy';
+  const heading = document.createElement('span');
+  heading.className = 'chat-recent-heading';
   const strong = document.createElement('strong');
   strong.textContent = name;
+  heading.append(strong);
+  if (item.hasIncoming === true) {
+    const badge = document.createElement('em');
+    badge.className = 'chat-thread-badge';
+    badge.textContent = '새 이야기';
+    heading.append(badge);
+  }
   const preview = document.createElement('span');
   preview.textContent = typeof item.preview === 'string' ? item.preview : '';
-  copy.append(strong, preview);
+  copy.append(heading, preview);
 
+  const meta = document.createElement('span');
+  meta.className = 'chat-recent-meta';
   const time = document.createElement('time');
   time.className = 'chat-recent-time';
   time.textContent = typeof item.timeLabel === 'string' ? item.timeLabel : '';
+  meta.append(time);
+  if (item.unread === true || item.hasIncoming === true) {
+    const dot = document.createElement('span');
+    dot.className = 'chat-thread-unread';
+    dot.setAttribute('aria-label', '새 이야기 있음');
+    meta.append(dot);
+  }
 
-  link.append(avatar, copy, time);
+  link.append(avatar, copy, meta);
   return link;
 }
 
@@ -288,26 +319,33 @@ function createIncomingItem(item) {
 
   const link = document.createElement('a');
   link.className = 'chat-incoming-item';
-  link.href = roomHref(characterKey);
+  link.dataset.character = characterKey;
+  link.href = roomHref(characterKey, item.threadId);
 
-  const avatar = document.createElement('span');
-  avatar.className = 'chat-recent-avatar';
-  avatar.setAttribute('aria-hidden', 'true');
-  avatar.textContent = name.slice(0, 2);
+  const art = document.createElement('span');
+  art.className = 'chat-incoming-art';
+  art.dataset.character = characterKey;
+  art.setAttribute('aria-hidden', 'true');
+  const initial = document.createElement('span');
+  initial.textContent = name.slice(0, 2);
+  art.append(initial);
 
   const copy = document.createElement('span');
+  copy.className = 'chat-incoming-copy';
   const strong = document.createElement('strong');
   strong.textContent = name;
   const message = document.createElement('p');
   message.textContent = item.message.trim();
-  copy.append(strong, message);
+  const note = document.createElement('small');
+  note.textContent = '새로운 이야기가 도착했어요.';
+  copy.append(strong, message, note);
 
   const arrow = document.createElement('span');
   arrow.className = 'chat-incoming-arrow';
   arrow.setAttribute('aria-hidden', 'true');
   arrow.textContent = '→';
 
-  link.append(avatar, copy, arrow);
+  link.append(art, copy, arrow);
   return link;
 }
 
