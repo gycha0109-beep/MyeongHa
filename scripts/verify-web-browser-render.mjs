@@ -203,11 +203,17 @@ try {
       return { selector, exists: true, width: Math.round(r.width), height: Math.round(r.height), display: s.display,
         visibility: s.visibility, opacity: Number(s.opacity), hidden: Boolean(el.hidden), visible: !el.hidden && r.width >= minW && r.height >= minH && s.display !== 'none' && s.visibility !== 'hidden' && Number(s.opacity) > 0 };
     };
+    const isRendered = (selector) => {
+      const el = document.querySelector(selector); if (!el) return false;
+      const r = el.getBoundingClientRect(); const s = getComputedStyle(el);
+      return r.width > 0 && r.height > 0 && s.display !== 'none' && s.visibility !== 'hidden' && Number(s.opacity) > 0;
+    };
     return {
       pathname: location.pathname,
       bodyText: document.body.innerText,
       styles: [...document.styleSheets].map((sheet) => sheet.href ? new URL(sheet.href).pathname : 'inline'),
       hubHidden: document.querySelector('#saju-hub')?.hidden,
+      hubRendered: isRendered('#saju-hub'),
       elements: [inspect('.product-header', 100, 40), inspect('#saju-empty', 500, 400),
         inspect('.saju-empty-card', 360, 300), inspect('#saju-birth-form', 300, 180), inspect('#saju-create-button', 240, 40)],
     };
@@ -219,7 +225,8 @@ try {
     assert(el.exists, `Missing browser-rendered Saju hub element ${el.selector}`);
     assert(el.visible, `Invisible Saju hub element ${el.selector}: ${el.width}x${el.height}, ${el.display}/${el.visibility}/${el.opacity}`);
   }
-  assert(sajuState.hubHidden === true, 'Populated Saju state must not fake results without a current Birth Profile');
+  assert(sajuState.hubHidden === true, 'Populated Saju state must remain hidden without a current Birth Profile');
+  assert(sajuState.hubRendered === false, 'Hidden populated Saju state must not occupy visual layout');
   assert(sajuState.bodyText.includes('아직 등록된 사주가 없습니다.'), 'Saju empty-state title missing');
   assert(sajuState.bodyText.includes('내 사주 만들기'), 'Saju onboarding CTA missing');
   assert(sajuState.bodyText.includes('게스트로 먼저 볼 수 있으며'), 'Guest-first Saju guidance missing');
@@ -233,10 +240,16 @@ try {
       const r = el.getBoundingClientRect(); const s = getComputedStyle(el);
       return r.width > 0 && r.height > 0 && s.display !== 'none' && s.visibility !== 'hidden';
     };
-    return { width: innerWidth, empty: visible('#saju-empty'), form: visible('#saju-birth-form'), bottomNav: visible('.mobile-bottom-nav') };
+    const rendered = (selector) => {
+      const el = document.querySelector(selector); if (!el) return false;
+      const r = el.getBoundingClientRect(); const s = getComputedStyle(el);
+      return r.width > 0 && r.height > 0 && s.display !== 'none' && s.visibility !== 'hidden';
+    };
+    return { width: innerWidth, empty: visible('#saju-empty'), form: visible('#saju-birth-form'), bottomNav: visible('.mobile-bottom-nav'), hubRendered: rendered('#saju-hub') };
   })()`);
   assert(mobileState.width === 390, `Unexpected mobile viewport width: ${mobileState.width}`);
   assert(mobileState.empty && mobileState.form && mobileState.bottomNav, 'Mobile Saju onboarding is not fully visible');
+  assert(mobileState.hubRendered === false, 'Hidden populated Saju state occupies mobile layout');
   await artifact(client, '-saju-mobile');
 
   await client.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
