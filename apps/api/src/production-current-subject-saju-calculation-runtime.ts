@@ -35,8 +35,8 @@ export interface CreateProductionCurrentSubjectSajuCalculationRuntimeInputV1 {
  * Production composition root for current-subject Saju calculation-only execution.
  *
  * Database credentials, Member/Guest request verification, and the Saju service origin
- * are server-owned. The request cannot inject trusted subject evidence, select an
- * upstream origin, calculation policy, Birth Profile, or Birth revision.
+ * and credential are server-owned. The request cannot inject trusted subject evidence,
+ * select an upstream origin or credential, calculation policy, Birth Profile, or Birth revision.
  */
 export function createProductionCurrentSubjectSajuCalculationRuntimeV1(
   input: CreateProductionCurrentSubjectSajuCalculationRuntimeInputV1,
@@ -52,6 +52,7 @@ export function createProductionCurrentSubjectSajuCalculationRuntimeV1(
   });
   const sajuAdapter = createSajuProductionCalculationHttpAdapterV1({
     baseUrl: sajuConfig.serviceOrigin,
+    bearerToken: sajuConfig.serviceBearer,
     ...(input.sajuFetchImpl === undefined ? {} : { fetchImpl: input.sajuFetchImpl }),
   });
 
