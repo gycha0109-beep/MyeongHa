@@ -156,7 +156,7 @@ try {
   })()`);
 
   assert(hallState.pathname === '/hall.html', `Expected /hall.html, got ${hallState.pathname}`);
-  for (const css of ['/product.css', '/home-v2.css', '/home-v3.css']) assert(hallState.styles.includes(css), `Home stylesheet not loaded: ${css}`);
+  for (const css of ['/product.css', '/home-v2.css', '/home-v3.css', '/home-showcase-v4.css']) assert(hallState.styles.includes(css), `Home stylesheet not loaded: ${css}`);
   for (const el of hallState.elements) {
     assert(el.exists, `Missing browser-rendered Home element ${el.selector}`);
     assert(el.visible, `Invisible Home element ${el.selector}: ${el.width}x${el.height}, ${el.display}/${el.visibility}/${el.opacity}`);
@@ -164,7 +164,7 @@ try {
   assert(hallState.bodyText.includes('오늘은 무엇을 읽어볼까요?'), 'Home title missing');
   assert(hallState.bodyText.includes('오늘의 흐름을') && hallState.bodyText.includes('오늘 읽어보기'), 'Home primary Reading entry missing');
   assert(hallState.bodyText.includes('지금은 저장된 사실을 이야기로 추측해 이어 붙이지 않습니다.'), 'Home Life Thread non-inference boundary missing');
-  assert(hallState.bodyText.includes('캐릭터와 이야기하기') && hallState.bodyText.includes('대화 시작하기'), 'Home character entry missing');
+  assert(hallState.bodyText.includes('오늘 이야기할 사람') && hallState.bodyText.includes('이야기하기'), 'Home character entry missing');
   await artifact(client, '-home');
 
   const hallVisible = await client.evaluate(`(() => {

@@ -50,12 +50,13 @@ describe('web Home authority boundary', () => {
     expect(client).not.toContain('/api/life-record');
   });
 
-  it('does not infer a today-character mapping in the browser', () => {
+  it('does not infer a named today-character mapping in the browser', () => {
     expect(characterResolver).toContain('callers must not substitute');
     expect(characterResolver).toContain('infer the mapping in the browser');
-    expect(html).toContain('캐릭터와 이야기하기');
+    expect(html).toContain('오늘 이야기할 사람');
+    expect(html).toContain('캐릭터 선택');
     expect(html).not.toContain('세연');
-    expect(html).not.toContain('오늘 이야기할 사람');
+    expect(html).not.toContain('chat.html?character=');
   });
 
   it('fails profile personalization back to a generic non-private My label', () => {
