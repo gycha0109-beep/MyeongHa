@@ -1,0 +1,45 @@
+name: Production Birth Profile Authenticated Create Read Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type VERIFY_BIRTH_AUTHENTICATED_CREATE_READ to perform the one-time persistent production Birth smoke write.'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-birth-profile-authenticated-create-read-smoke
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: verify-production-birth-profile-authenticated-create-read
+    runs-on: ubuntu-24.04
+    environment: production
+    env:
+      DISPATCH_CONFIRM: ${{ inputs.confirm }}
+      MYEONGHA_PRODUCTION_BIRTH_SMOKE_MEMBER_BEARER: ${{ secrets.MYEONGHA_PRODUCTION_BIRTH_SMOKE_MEMBER_BEARER }}
+      MYEONGHA_PRODUCTION_BIRTH_SMOKE_MEMBER_EXPECTED_SUBJECT_ID: ${{ secrets.MYEONGHA_PRODUCTION_BIRTH_SMOKE_MEMBER_EXPECTED_SUBJECT_ID }}
+    steps:
+      - name: Verify explicit dispatch and dedicated write-smoke credential
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$DISPATCH_CONFIRM" == 'VERIFY_BIRTH_AUTHENTICATED_CREATE_READ' ]]
+          test -n "${MYEONGHA_PRODUCTION_BIRTH_SMOKE_MEMBER_BEARER:-}"
+          test -n "${MYEONGHA_PRODUCTION_BIRTH_SMOKE_MEMBER_EXPECTED_SUBJECT_ID:-}"
+
+      - name: Check out exact repository verifier
+        uses: actions/checkout@v4
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Verify authenticated production Birth create and owner read-after-create
+        run: node scripts/verify-production-birth-profile-authenticated-create-read.mjs
