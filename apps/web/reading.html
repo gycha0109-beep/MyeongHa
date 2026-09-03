@@ -3,14 +3,13 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="명하 사주 읽기 — 검증된 사주 결과를 선택한 캐릭터와 함께 단계적으로 읽습니다." />
+  <meta name="description" content="명하 사주 — 입력한 태어난 기록으로 계산된 내 명식과 해석 진입점을 확인합니다." />
   <title>사주 · 명하</title>
   <link rel="stylesheet" href="product.css" />
-  <link rel="stylesheet" href="reading-v3.css" />
-  <link rel="stylesheet" href="reading-scenes.css" />
+  <link rel="stylesheet" href="saju-hub.css" />
 </head>
-<body class="product-page reading-page" data-page="reading" data-reader="baekheon">
-  <header class="product-header reading-product-header">
+<body class="product-page saju-hub-page" data-page="saju">
+  <header class="product-header">
     <div class="product-shell product-header-inner">
       <a class="product-brand" href="hall.html" aria-label="명하 홈">
         <span class="product-brand-name">명하</span>
@@ -37,101 +36,151 @@
     </div>
   </header>
 
-  <main class="reading-main">
-    <section class="reading-stage" aria-label="캐릭터와 함께 읽는 사주">
-      <div class="reader-scene" data-reader-portrait role="img" aria-label="백헌 사주 읽기 장면">
-        <div class="reader-scene-art" aria-hidden="true">
-          <span class="reader-orbit"></span>
-          <span class="reader-lamp"></span>
-          <span class="reader-silhouette"></span>
+  <main class="saju-main">
+    <div class="product-shell">
+      <header class="saju-page-head">
+        <div>
+          <span class="saju-kicker">MY SAJU</span>
+          <h1>내 사주</h1>
         </div>
+        <p>태어난 기록으로 계산된 명식의 구조를 확인하고, 필요한 해석으로 들어가는 공간입니다.</p>
+      </header>
 
-        <div class="reader-identity">
-          <span class="reader-title-badge" data-reader-title>충추원의 장</span>
-          <div class="reader-name-line">
-            <h1 data-reader-name>백헌</h1>
-            <span class="reader-name-hanja" data-reader-hanja aria-hidden="true">白憲</span>
+      <div class="saju-status" id="saju-status" role="status">내 사주를 확인하는 중입니다…</div>
+
+      <section class="saju-empty" id="saju-empty" hidden aria-labelledby="saju-empty-title">
+        <div class="saju-empty-art" aria-hidden="true">
+          <span class="saju-empty-orbit"></span>
+          <span class="saju-empty-mark">命</span>
+        </div>
+        <div class="saju-empty-card">
+          <span class="saju-section-kicker">처음 시작하기</span>
+          <h2 id="saju-empty-title">아직 등록된 사주가 없습니다.</h2>
+          <p>태어난 정보를 입력하면 명하가 현재 세션의 자기 명식을 계산합니다. 로그인하지 않아도 먼저 확인할 수 있습니다.</p>
+
+          <form class="saju-birth-form" id="saju-birth-form" novalidate>
+            <div class="saju-form-grid">
+              <label class="saju-field">
+                <span>생년월일</span>
+                <input id="saju-birth-date" type="date" required />
+              </label>
+              <label class="saju-field">
+                <span>출생시간</span>
+                <input id="saju-birth-time" type="time" step="60" required />
+              </label>
+            </div>
+
+            <div class="saju-form-options">
+              <label><input id="saju-time-unknown" type="checkbox" /> 출생시간을 모릅니다</label>
+              <div class="saju-calendar-options" role="group" aria-label="달력 기준">
+                <label><input type="radio" name="saju-calendar" value="solar" checked /> 양력</label>
+                <label><input type="radio" name="saju-calendar" value="lunar" /> 음력</label>
+                <label id="saju-leap-wrap" hidden><input id="saju-leap-month" type="checkbox" /> 윤달</label>
+              </div>
+            </div>
+
+            <label class="saju-field saju-field-select">
+              <span>성별 입력 <small>선택 사항</small></span>
+              <select id="saju-birth-sex">
+                <option value="">선택하지 않음</option>
+                <option value="male">남성</option>
+                <option value="female">여성</option>
+                <option value="unspecified">미지정</option>
+              </select>
+            </label>
+
+            <div class="saju-form-error" id="saju-form-error" hidden role="alert"></div>
+            <button class="saju-primary-button" id="saju-create-button" type="submit">
+              <span>내 사주 만들기</span><span aria-hidden="true">→</span>
+            </button>
+            <p class="saju-guest-note"><span aria-hidden="true">◇</span> 게스트로 먼저 볼 수 있으며, 저장·동기화가 필요할 때 계정 연결을 사용합니다.</p>
+          </form>
+        </div>
+      </section>
+
+      <section class="saju-hub" id="saju-hub" hidden aria-label="계산된 내 사주">
+        <article class="saju-chart-card">
+          <header class="saju-card-head">
+            <div>
+              <span class="saju-section-kicker">나의 명식</span>
+              <h2>태어난 기록의 구조</h2>
+              <p id="saju-birth-summary">현재 자기 Birth Profile과 연결된 계산 결과입니다.</p>
+            </div>
+            <a class="saju-text-link" href="my.html">출생정보 관리 →</a>
+          </header>
+
+          <div class="saju-pillar-grid" id="saju-pillar-grid" aria-label="사주 네 기둥"></div>
+
+          <div class="saju-chart-summary">
+            <div class="saju-day-master">
+              <span>일간</span>
+              <strong id="saju-day-master">—</strong>
+              <small id="saju-day-master-meta">계산 결과 확인 중</small>
+            </div>
+            <div class="saju-elements">
+              <span class="saju-summary-label">오행 분포</span>
+              <div class="saju-element-bars" id="saju-element-bars"></div>
+            </div>
+            <div class="saju-structure-note">
+              <span class="saju-summary-label">계산 상태</span>
+              <strong id="saju-completeness-title">—</strong>
+              <p id="saju-completeness-copy">확정된 계산 사실만 표시합니다.</p>
+            </div>
           </div>
-          <p data-reader-intro>당신의 사주를 바탕으로 지금의 흐름부터 하나씩 살펴보겠습니다.</p>
-        </div>
+          <p class="saju-authority-note">이 영역은 계산된 명식 사실만 보여줍니다. 의미 해석은 별도 Reading에서 제공합니다.</p>
+        </article>
 
-        <div class="reader-dialogue" aria-label="함께 읽는 사람의 말">
-          <span class="reader-dialogue-mark" aria-hidden="true">明</span>
-          <p data-reader-step-line data-reader-line>결과를 보고, 그 선택의 귀결까지 함께 보겠습니다.</p>
-        </div>
-      </div>
-
-      <article class="reading-sheet" aria-live="polite">
-        <header class="reading-sheet-head">
-          <span class="reading-scope" data-reading-scope>2026년 · 올해</span>
-          <div class="reading-progress" aria-label="읽기 진행 상태">
-            <span data-reading-progress-label>읽기 1 / 4</span>
-            <div class="reading-progress-track" aria-hidden="true">
-              <span class="reading-progress-dot is-active" data-reading-progress-dot></span>
-              <span class="reading-progress-dot" data-reading-progress-dot></span>
-              <span class="reading-progress-dot" data-reading-progress-dot></span>
-              <span class="reading-progress-dot" data-reading-progress-dot></span>
+        <article class="saju-flow-card">
+          <header class="saju-card-head saju-flow-head">
+            <div>
+              <span class="saju-section-kicker">시간의 흐름</span>
+              <h2>해석할 시기를 선택하세요.</h2>
             </div>
+            <div class="saju-flow-tabs" aria-label="사주 해석 시기">
+              <a href="reading-detail.html?scope=daewoon">대운</a>
+              <a class="is-active" href="reading-detail.html?scope=year">올해</a>
+              <a href="reading-detail.html?scope=month">이번 달</a>
+            </div>
+          </header>
+          <div class="saju-flow-body">
+            <div class="saju-flow-orbit" aria-hidden="true"><span></span></div>
+            <div class="saju-flow-copy">
+              <span id="saju-flow-year">올해의 흐름</span>
+              <h3>계산 결과에서 해석으로 이어갑니다.</h3>
+              <p>검증된 시기 해석은 Reading 화면에서 구조적 근거와 함께 읽습니다. 이 허브에서는 확인되지 않은 운세 문장을 미리 만들지 않습니다.</p>
+            </div>
+            <a class="saju-flow-action" href="reading-detail.html?scope=year">올해 읽기 <span aria-hidden="true">→</span></a>
           </div>
-        </header>
+        </article>
 
-        <div class="reading-sheet-body">
-          <section class="reading-block reading-block-primary">
-            <span class="reading-block-icon" aria-hidden="true">✿</span>
+        <section class="saju-interpretation" aria-labelledby="saju-interpretation-title">
+          <header class="saju-section-head">
             <div>
-              <h2 data-reading-step-title>지금 읽히는 흐름</h2>
-              <p data-reading-step-body>검증된 Saju Reading의 핵심 흐름 요약이 이 영역에 표시됩니다.</p>
+              <span class="saju-section-kicker">사주 해석</span>
+              <h2 id="saju-interpretation-title">궁금한 영역을 골라 읽어보세요.</h2>
             </div>
-          </section>
+          </header>
+          <div class="saju-topic-grid">
+            <a class="saju-topic-card" href="reading-detail.html?topic=temperament&scope=original"><span class="saju-topic-icon" aria-hidden="true">本</span><strong>기본 성향</strong><span>명식의 기본 구조</span><em>읽기 →</em></a>
+            <a class="saju-topic-card" href="reading-detail.html?topic=career"><span class="saju-topic-icon" aria-hidden="true">業</span><strong>직업</strong><span>일과 진로의 해석</span><em>읽기 →</em></a>
+            <a class="saju-topic-card" href="reading-detail.html?topic=money"><span class="saju-topic-icon" aria-hidden="true">財</span><strong>재물</strong><span>재정과 재물의 해석</span><em>읽기 →</em></a>
+            <a class="saju-topic-card" href="reading-detail.html?topic=love"><span class="saju-topic-icon" aria-hidden="true">緣</span><strong>연애</strong><span>마음과 인연의 해석</span><em>읽기 →</em></a>
+            <a class="saju-topic-card" href="reading-detail.html?topic=relationship"><span class="saju-topic-icon" aria-hidden="true">人</span><strong>관계</strong><span>대인관계와 인연</span><em>읽기 →</em></a>
+          </div>
+        </section>
 
-          <section class="reading-block">
-            <span class="reading-block-icon" aria-hidden="true">✿</span>
-            <div>
-              <h2 data-reading-structure-title>이 흐름을 만드는 구조</h2>
-              <p data-reading-structure-body>Saju Engine이 확정한 구조적 근거와 적용 범위가 표시됩니다.</p>
-            </div>
-          </section>
-
-          <section class="reading-block reading-character-block">
-            <span class="reading-block-icon" aria-hidden="true">✿</span>
-            <div>
-              <h2><span data-reader-name>백헌</span>의 한 마디</h2>
-              <p data-reader-line>결과를 보고, 그 선택의 귀결까지 함께 보겠습니다.</p>
-              <span class="reading-authority-note">사주 의미는 검증된 Reading을 따르며, 캐릭터는 표현과 후속 질문만 담당합니다.</span>
-            </div>
-          </section>
-        </div>
-
-        <footer class="reading-sheet-actions">
-          <button class="reading-icon-action" type="button" data-reading-prev aria-label="이전 읽기" disabled>←</button>
-          <button class="reading-secondary-action" type="button" data-chart-open>내 명식 보기</button>
-          <button class="reading-primary-action" type="button" data-reading-next>
-            <span>다음 읽기</span>
-            <span aria-hidden="true">→</span>
-          </button>
-        </footer>
-      </article>
-    </section>
+        <aside class="saju-chat-bridge" aria-label="사주에서 대화로 이어가기">
+          <div class="saju-chat-mark" aria-hidden="true">話</div>
+          <div>
+            <span class="saju-section-kicker">대화로 이어가기</span>
+            <h2>읽다가 궁금해진 부분은 대화에서 더 물어보세요.</h2>
+            <p>사주 허브는 구조를 확인하는 곳이고, 질문을 주고받는 경험은 대화에서 이어집니다.</p>
+          </div>
+          <a href="chat-hub.html?from=saju">대화로 가기 <span aria-hidden="true">→</span></a>
+        </aside>
+      </section>
+    </div>
   </main>
-
-  <dialog class="reading-chart-dialog" data-chart-dialog aria-labelledby="chart-title">
-    <div class="reading-chart-dialog-head">
-      <div>
-        <span class="reading-dialog-kicker">태어난 기록</span>
-        <h2 id="chart-title">내 명식</h2>
-      </div>
-      <button type="button" data-chart-close aria-label="명식 닫기">×</button>
-    </div>
-    <div class="reading-chart-placeholder" aria-label="서버에서 확인된 명식 정보 자리">
-      <div class="reading-pillars">
-        <span><small>년</small><strong>年柱</strong></span>
-        <span><small>월</small><strong>月柱</strong></span>
-        <span><small>일</small><strong>日柱</strong></span>
-        <span><small>시</small><strong>時柱</strong></span>
-      </div>
-      <p>실제 서비스에서는 서버에서 확인된 Birth Profile revision과 Saju Engine 계산 결과만 이 영역에 표시됩니다.</p>
-    </div>
-  </dialog>
 
   <nav class="mobile-bottom-nav" aria-label="모바일 주요 메뉴">
     <a class="mobile-nav-link" href="hall.html"><span class="mobile-nav-icon" aria-hidden="true">⌂</span><span>홈</span></a>
@@ -141,6 +190,6 @@
     <a class="mobile-nav-link" href="my.html"><span class="mobile-nav-icon" aria-hidden="true">♙</span><span>마이</span></a>
   </nav>
 
-  <script src="reading-character.js" defer></script>
+  <script type="module" src="saju-hub.js"></script>
 </body>
 </html>
