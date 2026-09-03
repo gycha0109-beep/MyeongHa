@@ -6,7 +6,7 @@ body.product-page[data-page="home"] .home-orbit-art {
   width: min(100%, 258px);
   aspect-ratio: 1 / 1;
   background-color: #101f2f;
-  background-image: url("_candidate-01.webp");
+  background-image: url("home-v5-orbit.webp");
   background-repeat: no-repeat;
   background-position: center;
   background-size: cover;
@@ -20,7 +20,7 @@ body.product-page[data-page="home"] .home-today::after {
   bottom: -17px;
   border: 0;
   border-radius: 0;
-  background: url("_candidate-05.webp") center / contain no-repeat;
+  background: url("home-v5-plum.webp") center / contain no-repeat;
   opacity: .13;
   filter: sepia(.3) saturate(.72) brightness(.92);
   transform: none;
@@ -38,7 +38,7 @@ body.product-page[data-page="home"] .home-topic[data-motif="花"]::before {
   height: 145px;
   right: -18px;
   top: -6px;
-  background-image: url("_candidate-05.webp");
+  background-image: url("home-v5-plum.webp");
   opacity: .48;
 }
 
@@ -47,7 +47,7 @@ body.product-page[data-page="home"] .home-topic[data-motif="山"]::before {
   height: 150px;
   right: -12px;
   bottom: -28px;
-  background-image: url("_candidate-03.webp");
+  background-image: url("home-v5-mountain.webp");
   opacity: .62;
 }
 
@@ -56,7 +56,7 @@ body.product-page[data-page="home"] .home-topic[data-motif="財"]::before {
   height: 145px;
   right: -3px;
   bottom: -18px;
-  background-image: url("_candidate-04.webp");
+  background-image: url("home-v5-wealth.webp");
   opacity: .34;
 }
 
@@ -65,7 +65,7 @@ body.product-page[data-page="home"] .home-topic[data-motif="命"]::before {
   height: 132px;
   right: 9px;
   bottom: -12px;
-  background-image: url("_candidate-08.webp");
+  background-image: url("home-v5-compass.webp");
   opacity: .22;
 }
 
@@ -85,7 +85,7 @@ body.product-page[data-page="home"] .home-person::after {
   bottom: -84px;
   width: 248px;
   height: 330px;
-  background: url("_candidate-09.webp") right bottom / contain no-repeat;
+  background: url("home-v5-plum-corner.webp") right bottom / contain no-repeat;
   opacity: .43;
 }
 
@@ -101,7 +101,7 @@ body.product-page[data-page="home"]::after {
   opacity: .28;
   background:
     url("home-paper-mountains.svg") left -42px bottom -12px / 500px auto no-repeat,
-    url("_candidate-09.webp") right -34px bottom -52px / 250px auto no-repeat,
+    url("home-v5-plum-corner.webp") right -34px bottom -52px / 250px auto no-repeat,
     url("home-paper-mountains.svg") right 125px bottom -45px / 650px auto no-repeat;
 }
 
