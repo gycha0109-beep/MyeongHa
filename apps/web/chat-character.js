@@ -8,7 +8,7 @@ const characters = {
   seyeon: {
     name: '세연',
     title: '무녀',
-    sceneLabel: '세연의 따뜻한 낮 생활 공간',
+    sceneLabel: '세연의 봄날 산책 공간',
     intro: ['왔네요.', '오늘은 어떤 이야기부터 해볼까요?'],
   },
   yeoul: {
@@ -72,6 +72,11 @@ document.querySelectorAll('[data-character-title]').forEach((node) => {
   node.textContent = character.title;
 });
 
+document.querySelectorAll('[data-character-avatar]').forEach((node) => {
+  node.dataset.character = characterKey;
+  node.textContent = character.name.slice(0, 1);
+});
+
 document.querySelectorAll('[data-history-character-name]').forEach((node) => {
   node.textContent = `${character.name}과 나눈 이야기`;
 });
@@ -102,7 +107,7 @@ window.MyeongHaCharacterRoom = Object.freeze({
 });
 
 const historyDrawer = document.querySelector('[data-history-drawer]');
-const historyOpen = document.querySelector('[data-history-open]');
+const historyOpenButtons = document.querySelectorAll('[data-history-open]');
 const historyClose = document.querySelector('[data-history-close]');
 const scrim = document.querySelector('[data-room-scrim]');
 const roomMenu = document.querySelector('[data-room-menu]');
@@ -125,7 +130,7 @@ function closeMenu() {
   if (scrim && !historyDrawer?.classList.contains('is-open')) scrim.hidden = true;
 }
 
-historyOpen?.addEventListener('click', openHistory);
+historyOpenButtons.forEach((button) => button.addEventListener('click', openHistory));
 historyClose?.addEventListener('click', closeHistory);
 
 menuToggle?.addEventListener('click', () => {
@@ -145,9 +150,6 @@ document.addEventListener('keydown', (event) => {
     closeMenu();
   }
 });
-
-const continueButton = document.querySelector('[data-continue-context]');
-continueButton?.addEventListener('click', openHistory);
 
 const composer = document.querySelector('[data-composer]');
 const messageInput = document.querySelector('[data-message-input]');
