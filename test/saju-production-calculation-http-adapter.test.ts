@@ -10,6 +10,8 @@ import {
   type SajuProductionCalculationHttpResponseV1,
 } from '../apps/api/src/saju-production-calculation-http-adapter.js';
 
+const BEARER_TOKEN = 'test-saju-service-bearer-secret';
+
 const BIRTH_REVISION = {
   birthRevisionRef: 'birth-revision:test:1',
   calendarType: 'solar',
@@ -158,7 +160,7 @@ describe('Saju production calculation HTTP adapter v1', () => {
     });
   });
 
-  it('posts only to /api/calculations and forces every 200 response through the ingress boundary', async () => {
+  it('posts only to /api/calculations with Bearer auth and forces every 200 response through the ingress boundary', async () => {
     const calls: Array<{ url: string; body: unknown; redirect: string; aborted: boolean }> = [];
     const fetchImpl: SajuProductionCalculationHttpFetchV1 = async (url, init) => {
       calls.push({
@@ -170,6 +172,7 @@ describe('Saju production calculation HTTP adapter v1', () => {
       expect(init.method).toBe('POST');
       expect(init.headers).toEqual({
         accept: 'application/json',
+        authorization: `Bearer ${BEARER_TOKEN}`,
         'content-type': 'application/json',
       });
       return jsonResponse(responseFixture());
@@ -177,6 +180,7 @@ describe('Saju production calculation HTTP adapter v1', () => {
 
     const adapter = createSajuProductionCalculationHttpAdapterV1({
       baseUrl: 'https://saju.internal.example',
+      bearerToken: BEARER_TOKEN,
       fetchImpl,
       timeoutMs: 100,
     });
@@ -206,23 +210,49 @@ describe('Saju production calculation HTTP adapter v1', () => {
     });
   });
 
-  it('fails closed on invalid endpoint configuration and invalid stored birth revision shape', async () => {
+  it('fails closed on invalid endpoint, Bearer, timeout, and stored birth revision configuration', async () => {
     expect(() =>
-      createSajuProductionCalculationHttpAdapterV1({ baseUrl: 'file:///tmp/saju' }),
+      createSajuProductionCalculationHttpAdapterV1({
+        baseUrl: 'file:///tmp/saju',
+        bearerToken: BEARER_TOKEN,
+      }),
     ).toThrowError(SajuProductionCalculationHttpAdapterErrorV1);
     expect(() =>
-      createSajuProductionCalculationHttpAdapterV1({ baseUrl: 'https://user:pass@saju.example' }),
+      createSajuProductionCalculationHttpAdapterV1({
+        baseUrl: 'https://user:pass@saju.example',
+        bearerToken: BEARER_TOKEN,
+      }),
     ).toThrowError(SajuProductionCalculationHttpAdapterErrorV1);
     expect(() =>
-      createSajuProductionCalculationHttpAdapterV1({ baseUrl: 'https://saju.example/service' }),
+      createSajuProductionCalculationHttpAdapterV1({
+        baseUrl: 'https://saju.example/service',
+        bearerToken: BEARER_TOKEN,
+      }),
     ).toThrowError(SajuProductionCalculationHttpAdapterErrorV1);
     expect(() =>
-      createSajuProductionCalculationHttpAdapterV1({ baseUrl: 'https://saju.example', timeoutMs: 0 }),
+      createSajuProductionCalculationHttpAdapterV1({
+        baseUrl: 'https://saju.example',
+        bearerToken: '',
+      }),
+    ).toThrowError(SajuProductionCalculationHttpAdapterErrorV1);
+    expect(() =>
+      createSajuProductionCalculationHttpAdapterV1({
+        baseUrl: 'https://saju.example',
+        bearerToken: '   ',
+      }),
+    ).toThrowError(SajuProductionCalculationHttpAdapterErrorV1);
+    expect(() =>
+      createSajuProductionCalculationHttpAdapterV1({
+        baseUrl: 'https://saju.example',
+        bearerToken: BEARER_TOKEN,
+        timeoutMs: 0,
+      }),
     ).toThrowError(SajuProductionCalculationHttpAdapterErrorV1);
 
     const fetchImpl = vi.fn<SajuProductionCalculationHttpFetchV1>();
     const adapter = createSajuProductionCalculationHttpAdapterV1({
       baseUrl: 'https://saju.example',
+      bearerToken: BEARER_TOKEN,
       fetchImpl,
     });
     await expectAdapterError(
@@ -232,7 +262,7 @@ describe('Saju production calculation HTTP adapter v1', () => {
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
-  it('separates timeout, network, 4xx, 5xx, redirect/status, content-type, and JSON failures', async () => {
+  it('separates timeout, network, 4xx, 5xx, redirect/status, content-type, and JSON failures without reflecting the Bearer', async () => {
     const cases: readonly [
       string,
       SajuProductionCalculationHttpFetchV1,
@@ -242,7 +272,7 @@ describe('Saju production calculation HTTP adapter v1', () => {
       [
         'network',
         async () => {
-          throw new Error('socket reset');
+          throw new Error(`socket reset ${BEARER_TOKEN}`);
         },
         'NETWORK_FAILURE',
         null,
@@ -257,19 +287,26 @@ describe('Saju production calculation HTTP adapter v1', () => {
     for (const [, fetchImpl, expectedCode, expectedStatus] of cases) {
       const adapter = createSajuProductionCalculationHttpAdapterV1({
         baseUrl: 'https://saju.example',
+        bearerToken: BEARER_TOKEN,
         fetchImpl,
         timeoutMs: 100,
       });
       const error = await expectAdapterError(() => adapter.calculate(BIRTH_REVISION), expectedCode);
       expect(error.httpStatus).toBe(expectedStatus);
+      expect(error.message).not.toContain(BEARER_TOKEN);
     }
 
     const timeoutAdapter = createSajuProductionCalculationHttpAdapterV1({
       baseUrl: 'https://saju.example',
+      bearerToken: BEARER_TOKEN,
       timeoutMs: 5,
       fetchImpl: async () => new Promise<SajuProductionCalculationHttpResponseV1>(() => undefined),
     });
-    await expectAdapterError(() => timeoutAdapter.calculate(BIRTH_REVISION), 'TIMEOUT');
+    const timeoutError = await expectAdapterError(
+      () => timeoutAdapter.calculate(BIRTH_REVISION),
+      'TIMEOUT',
+    );
+    expect(timeoutError.message).not.toContain(BEARER_TOKEN);
   });
 
   it('rejects a syntactically successful upstream response when ingress authority or birth binding fails', async () => {
@@ -277,6 +314,7 @@ describe('Saju production calculation HTTP adapter v1', () => {
     (unauthorized.authority as Record<string, unknown>).calculationPolicyId = 'caller-selected-policy';
     const unauthorizedAdapter = createSajuProductionCalculationHttpAdapterV1({
       baseUrl: 'https://saju.example',
+      bearerToken: BEARER_TOKEN,
       fetchImpl: async () => jsonResponse(unauthorized),
     });
     const unauthorizedError = await expectAdapterError(
@@ -284,6 +322,7 @@ describe('Saju production calculation HTTP adapter v1', () => {
       'INGRESS_REJECTED',
     );
     expect(unauthorizedError.ingressCode).toBe('UNAUTHORIZED_CALCULATION');
+    expect(unauthorizedError.message).not.toContain(BEARER_TOKEN);
 
     const mismatched = responseFixture();
     const snapshot = mismatched.snapshot as Record<string, unknown>;
@@ -291,6 +330,7 @@ describe('Saju production calculation HTTP adapter v1', () => {
     input.date = { year: 2001, month: 7, day: 15 };
     const mismatchedAdapter = createSajuProductionCalculationHttpAdapterV1({
       baseUrl: 'https://saju.example',
+      bearerToken: BEARER_TOKEN,
       fetchImpl: async () => jsonResponse(mismatched),
     });
     const mismatchedError = await expectAdapterError(
@@ -298,12 +338,13 @@ describe('Saju production calculation HTTP adapter v1', () => {
       'INGRESS_REJECTED',
     );
     expect(mismatchedError.ingressCode).toBe('BIRTH_REVISION_MISMATCH');
+    expect(mismatchedError.message).not.toContain(BEARER_TOKEN);
   });
 
   it('collapses internal transport detail to the public SAJU_TEMPORARILY_UNAVAILABLE API code', () => {
     const internal = new SajuProductionCalculationHttpAdapterErrorV1(
       'HTTP_5XX',
-      'upstream detail',
+      `upstream detail ${BEARER_TOKEN}`,
       503,
     );
     const apiError = toSajuProductionCalculationApiErrorV1(internal);
@@ -312,5 +353,6 @@ describe('Saju production calculation HTTP adapter v1', () => {
     expect(apiError.message).toBe('Saju calculation is temporarily unavailable.');
     expect(apiError.message).not.toContain('503');
     expect(apiError.message).not.toContain('upstream detail');
+    expect(apiError.message).not.toContain(BEARER_TOKEN);
   });
 });
