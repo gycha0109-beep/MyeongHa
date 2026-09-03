@@ -1,0 +1,168 @@
+name: Production Birth Input HMAC K1 Binding
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type BIND_BIRTH_HMAC_K1 to create the production Birth input HMAC k1 exactly once without deploying routes.'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-birth-input-hmac-k1-binding
+  cancel-in-progress: false
+
+env:
+  VERCEL_PROJECT_ID: prj_nXF0b5uv27Lyucz2SEBxzdCRXVsP
+  VERCEL_TEAM_ID: team_xuYA9OhCWlJETaYFOmeVodgS
+  VERCEL_PROJECT_NAME: myeongha
+  BIRTH_INPUT_HMAC_ENV_KEY: MYEONGHA_BIRTH_INPUT_HMAC_K1_SECRET
+
+jobs:
+  bind:
+    name: bind-production-birth-input-hmac-k1
+    runs-on: ubuntu-24.04
+    environment: production
+    env:
+      DISPATCH_CONFIRM: ${{ inputs.confirm }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+    steps:
+      - name: Verify explicit dispatch and credential
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$DISPATCH_CONFIRM" == 'BIND_BIRTH_HMAC_K1' ]]
+          test -n "${VERCEL_TOKEN:-}"
+
+      - name: Verify governed Vercel production project
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+
+          project_file="$RUNNER_TEMP/vercel-project.json"
+          cleanup() {
+            exit_code=$?
+            trap - EXIT
+            rm -f "$project_file"
+            exit "$exit_code"
+          }
+          trap cleanup EXIT
+
+          curl -fsS \
+            -H "Authorization: Bearer $VERCEL_TOKEN" \
+            "https://api.vercel.com/v9/projects/$VERCEL_PROJECT_ID?teamId=$VERCEL_TEAM_ID" \
+            -o "$project_file"
+
+          jq -e \
+            --arg id "$VERCEL_PROJECT_ID" \
+            --arg name "$VERCEL_PROJECT_NAME" \
+            '.id == $id and .name == $name' \
+            "$project_file" >/dev/null
+
+      - name: Verify Birth input HMAC k1 is not already bound
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+
+          envs_file="$RUNNER_TEMP/vercel-birth-input-hmac-envs.json"
+          cleanup() {
+            exit_code=$?
+            trap - EXIT
+            rm -f "$envs_file"
+            exit "$exit_code"
+          }
+          trap cleanup EXIT
+
+          curl -fsS \
+            -H "Authorization: Bearer $VERCEL_TOKEN" \
+            "https://api.vercel.com/v10/projects/$VERCEL_PROJECT_ID/env?teamId=$VERCEL_TEAM_ID" \
+            -o "$envs_file"
+
+          jq -e '(.envs | type) == "array"' "$envs_file" >/dev/null
+          existing_count="$(jq -r \
+            --arg key "$BIRTH_INPUT_HMAC_ENV_KEY" \
+            '[.envs[] | select(.key == $key)] | length' \
+            "$envs_file")"
+
+          if [[ "$existing_count" != '0' ]]; then
+            echo 'Birth input HMAC k1 is already present. Refusing to overwrite or rotate it.' >&2
+            exit 1
+          fi
+
+      - name: Bind and metadata-verify Birth input HMAC k1 in Vercel production
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+
+          payload_file="$RUNNER_TEMP/vercel-birth-input-hmac-k1.json"
+          response_file="$RUNNER_TEMP/vercel-birth-input-hmac-k1-response.json"
+          readback_file="$RUNNER_TEMP/vercel-birth-input-hmac-k1-readback.json"
+
+          cleanup() {
+            exit_code=$?
+            trap - EXIT
+            rm -f "$payload_file" "$response_file" "$readback_file"
+            exit "$exit_code"
+          }
+          trap cleanup EXIT
+
+          birth_hmac_k1_secret="$(openssl rand -hex 32)"
+          [[ "$birth_hmac_k1_secret" =~ ^[0-9a-f]{64}$ ]]
+          echo "::add-mask::$birth_hmac_k1_secret"
+
+          jq -n \
+            --arg key "$BIRTH_INPUT_HMAC_ENV_KEY" \
+            --arg secret "$birth_hmac_k1_secret" \
+            '[
+              {
+                key: $key,
+                value: $secret,
+                type: "sensitive",
+                target: ["production"],
+                comment: "MyeongHa production Birth input HMAC k1 binding v1"
+              }
+            ]' > "$payload_file"
+
+          curl -fsS \
+            -X POST \
+            -H "Authorization: Bearer $VERCEL_TOKEN" \
+            -H 'Content-Type: application/json' \
+            --data-binary "@$payload_file" \
+            "https://api.vercel.com/v10/projects/$VERCEL_PROJECT_ID/env?teamId=$VERCEL_TEAM_ID" \
+            -o "$response_file"
+
+          jq -e '((.failed // []) | length) == 0' "$response_file" >/dev/null
+
+          env_id="$(jq -er \
+            --arg key "$BIRTH_INPUT_HMAC_ENV_KEY" '
+            if (.created | type) == "array" then
+              ([.created[] | select(.key == $key) | .id][0] // empty)
+            elif (.created | type) == "object" and .created.key == $key then
+              (.created.id // empty)
+            else
+              empty
+            end
+          ' "$response_file")"
+          test -n "$env_id"
+
+          curl -fsS \
+            -H "Authorization: Bearer $VERCEL_TOKEN" \
+            "https://api.vercel.com/v1/projects/$VERCEL_PROJECT_ID/env/$env_id?teamId=$VERCEL_TEAM_ID" \
+            -o "$readback_file"
+
+          jq -e \
+            --arg key "$BIRTH_INPUT_HMAC_ENV_KEY" \
+            '.key == $key
+              and .type == "sensitive"
+              and (.target | type) == "array"
+              and (.target | length) == 1
+              and .target[0] == "production"' \
+            "$readback_file" >/dev/null
+
+          echo 'Production Birth input HMAC k1 was bound and metadata-verified. No deployment or route activation was performed.'
