@@ -54,10 +54,10 @@ export interface BirthProfileCreateIdPortV1 {
 /**
  * Produces the version-prefixed integrity/idempotency provenance stored on the immutable
  * Birth revision. Birth input is low-entropy personal data, so the production binding
- * should use a keyed/versioned fingerprint rather than a plain unsalted digest.
+ * uses a dedicated keyed/versioned fingerprint rather than a plain unsalted digest.
  *
- * P0-AUTH-01 remains open, therefore this API slice defines the port only and does not
- * choose a deployment key store or PostgreSQL execution identity.
+ * P0-AUTH-01 is resolved. The production fingerprint/key binding is implemented by the
+ * dedicated Birth fingerprint runtime module and remains server-owned.
  */
 export interface BirthInputFingerprintPortV1 {
   fingerprintBirthInput(input: BirthInputV1): Awaitable<string>;
@@ -68,7 +68,8 @@ export interface BirthInputFingerprintPortV1 {
  *
  * The verified DB command creates one logical self profile plus immutable revision 1
  * atomically and enforces the one-active-self constraint under subject locking. This
- * port deliberately does not expose a PostgreSQL adapter while P0-AUTH-01 is unresolved.
+ * port remains adapter-free here so PostgreSQL write grants and public POST activation
+ * can be reviewed as separate production-authority slices.
  */
 export interface BirthProfileCreateAuthorityPortV1 {
   createSelfBirthProfile(input: {
