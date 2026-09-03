@@ -1,7 +1,7 @@
-# 명하 Production P0 Decision Register — Full Audit v0.5
+# 명하 Production P0 Decision Register — Full Audit v0.6
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.5**  
+> Pack Version: **v0.6**  
 > Date: **2026-09-03**  
 > Source Authority: `Usecase_re_reviewed_v2(1).md`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`, `Myeonghwa_Personalized_Interpretation_Architecture_v1.3_THIRD_REVIEW(1).md`  
 > Rule: 본 문서는 위 source authority를 구현 수준으로 구체화한다. source가 결정하지 않은 사항은 임의 확정하지 않고 `OPEN-P0` 또는 `CANDIDATE`로 표시한다. Production 운영을 열기 위해 별도 security/operations decision을 확정할 경우 source requirement를 좁혀야 하며, 상위 미결정 retention/legal policy를 대신 결정한 것으로 간주하지 않는다.
@@ -16,7 +16,7 @@
 
 | ID | Decision | Status | Current Options / Required Resolution |
 |---|---|---|---|
-| `P0-SA-01` | Saju transport | **OPEN-P0** | version-pinned package vs internal HTTP/RPC service |
+| `P0-SA-01` | Saju transport | **DECIDED** | authenticated internal HTTP service; calculation-only V1; no `/api/readings` activation |
 | `P0-CM-01` | Commerce rail | **OPEN-P0** | Web provider / Apple IAP / Google Play Billing 및 one-off/subscription/bundle matrix |
 | `P0-AI-01` | AI provider/model/fallback | **OPEN-P0** | provider, model family, fallback, grounded-response validation implementation |
 | `P0-AGE-01` | Minimum age / character content policy | **OPEN-P0** | 최소 이용 연령, 미성년 허용 여부, 표현 강도/제한; content bundle policy-tag slot은 미리 두되 threshold/matrix는 미확정 |
@@ -38,6 +38,70 @@ SUPERSEDED
 ```
 
 ## 4. Decision Records
+
+### P0-SA-01
+
+```yaml
+id: P0-SA-01
+status: DECIDED
+decided_at: 2026-09-03
+choice: authenticated internal HTTP service for governed production calculation-only V1
+consumer: MyeongHa server runtime
+producer: gycha0109-beep/Saju calculation-only production host
+network_contract:
+  health: GET /healthz
+  calculation: POST /api/calculations
+  readings: NOT AUTHORIZED by this decision
+authentication:
+  transport: HTTPS
+  scheme: opaque high-entropy service Bearer credential
+  consumer_bindings:
+    - MYEONGHA_SAJU_SERVICE_ORIGIN
+    - MYEONGHA_SAJU_SERVICE_BEARER
+  producer_requirement: active credential plus bounded previous credential during rotation
+scope:
+  decides:
+    - MyeongHa-to-Saju calculation transport topology
+    - mandatory server-to-server authentication
+    - independent producer deployment and exact deploy-SHA evidence
+    - fail-closed calculation transport behavior
+  does_not_decide:
+    - ProductReadingResponse positive validation
+    - /api/readings activation
+    - Reading persistence/finalization
+    - Character Saju grounding
+    - compatibility / second-Birth transport
+    - interpretation/narrative production authority
+rationale:
+  - Saju already exposes a calculation-only HTTP host and MyeongHa already implements the matching HTTP consumer adapter.
+  - MyeongHa already owns a strict calculation ingress that preserves calculation-only authority and rejects interpretation promotion.
+  - The Saju repository currently has no GitHub Release/package-publish pipeline and its package remains private/version 0.0.0, so the package option would require a new reproducible distribution authority before consumption.
+  - Independent deployment preserves the Saju repository as producer authority while avoiding vendoring/copying engine internals into MyeongHa.
+security_invariants:
+  - internal service credential never reaches browser/mobile clients
+  - raw service credential is not persisted or logged
+  - invalid/missing credentials fail before calculation execution
+  - producer credential verification is timing-safe for equal-length decoded material
+  - redirects are not followed by the MyeongHa consumer
+  - upstream error bodies/secrets are not passed through to Product clients
+  - service outage never falls back to LLM/generic Saju generation
+version_invariants:
+  - producer deployment records an exact Saju Git SHA and successful producer CI
+  - MyeongHa still validates producer HTTP schema/runtime/policy through the governed calculation ingress
+  - endpoint reachability or a newer producer deployment does not imply semantic compatibility
+independent_gates_preserved:
+  - SRC-08
+  - SRC-09
+  - SRC-33
+migration_impact:
+  - no PostgreSQL migration required
+  - add producer service-auth/correlation enforcement
+  - add MyeongHa service-bearer/correlation transport support
+  - provision and verify an independent Saju calculation-only deployment
+  - bind MyeongHa production service origin/credential before thin route activation
+rollback_or_change_policy: operational rollback may target the last verified compatible authenticated calculation-service deployment; changing to in-process package, enabling /api/readings, weakening service authentication, or bypassing governed ingress requires a new explicit decision/review
+record: docs/SAJU_TRANSPORT_DECISION_V1.md
+```
 
 ### P0-AUTH-01
 
@@ -147,3 +211,4 @@ rollback_or_change_policy: ...
 - 미결정 retention을 전제로 destructive migration을 작성하는 것
 - commerce rail 결정 전 entitlement authority를 특정 store에 종속시키는 것
 - `P0-PR-01A` Guest authentication TTL을 expired Guest data deletion/backup/legal retention 기간으로 재해석하는 것
+- `P0-SA-01` transport 결정을 `/api/readings`, ProductReadingResponse validation, Character grounding, compatibility authority로 확대 해석하는 것
