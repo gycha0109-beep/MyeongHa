@@ -3,10 +3,11 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="명하 대화 — 이어갈 대화를 확인하고, 다른 사람을 찾아 이야기를 시작합니다." />
+  <meta name="description" content="명하 대화 — 이어지고 있는 관계와 이야기를 확인하고 대화를 계속합니다." />
   <title>대화 · 명하</title>
   <link rel="stylesheet" href="product.css" />
   <link rel="stylesheet" href="chat-hub.css" />
+  <link rel="stylesheet" href="conversation-v2.css" />
 </head>
 <body class="product-page chat-hub-page" data-page="chat-hub">
   <header class="product-header">
@@ -36,39 +37,46 @@
     </div>
   </header>
 
-  <main class="chat-hub-main">
+  <main class="chat-hub-main conversation-hub-v2">
     <div class="product-shell">
-      <section class="chat-hub-intro" aria-labelledby="chat-hub-title">
+      <section class="chat-hub-intro conversation-hub-intro" aria-labelledby="chat-hub-title">
         <div>
           <span class="chat-hub-eyebrow">CONVERSATION</span>
-          <h1 id="chat-hub-title">누구와 이야기를 이어갈까요?<span aria-hidden="true">✦</span></h1>
-          <p>이어갈 수 있는 대화가 있다면 먼저 보여드리고, 다른 사람을 찾고 싶을 때는 아래에서 살펴볼 수 있습니다.</p>
+          <h1 id="chat-hub-title">대화</h1>
+          <p>누구와 이야기를 이어갈까요?</p>
         </div>
+        <a class="conversation-meet-button" href="#people">
+          <span>다른 사람 만나기</span><span aria-hidden="true">›</span>
+        </a>
       </section>
 
-      <section class="chat-hub-primary" aria-label="이어갈 대화와 최근 대화">
-        <article class="chat-continuation-card" data-continuation-card>
-          <div class="chat-continuation-empty" data-continuation-empty>
-            <span class="chat-continuation-kicker">이어갈 대화</span>
+      <section class="chat-hub-primary conversation-primary" aria-label="이어갈 대화와 내 대화">
+        <article class="chat-continuation-card conversation-featured" data-continuation-card>
+          <div class="chat-continuation-empty conversation-featured-empty" data-continuation-empty>
+            <span class="chat-continuation-kicker">지금 이어갈 사람</span>
             <div class="chat-continuation-mark" aria-hidden="true">明</div>
-            <h2>아직 이어서 보여줄 대화가 없습니다.</h2>
-            <p>이어갈 수 있는 대화가 확인되면 이 자리에 표시됩니다.</p>
+            <h2>아직 이어지고 있는 대화가 없습니다.</h2>
+            <p>누군가와 이야기를 시작하면, 다시 이어가기 좋은 관계가 이곳에 먼저 나타납니다.</p>
             <a class="chat-continuation-action" href="#people">
-              <span>사람 만나기</span><span aria-hidden="true">→</span>
+              <span>다른 사람 만나기</span><span aria-hidden="true">→</span>
             </a>
           </div>
 
-          <div class="chat-continuation-active" data-continuation-active hidden>
+          <div class="chat-continuation-active conversation-featured-active" data-continuation-active hidden>
             <div class="chat-continuation-scene" data-continuation-scene aria-hidden="true">
               <span data-continuation-initial>明</span>
             </div>
-            <div class="chat-continuation-copy">
-              <span class="chat-continuation-kicker">이어갈 대화</span>
+            <div class="chat-continuation-copy conversation-featured-copy">
+              <span class="chat-continuation-kicker">지금 이어갈 사람</span>
               <div class="chat-continuation-name-row">
                 <h2 data-continuation-name></h2>
                 <span data-continuation-title></span>
               </div>
               <p data-continuation-context></p>
+              <div class="conversation-thread-note" data-continuation-thread-note hidden>
+                <span>이어진 이야기</span>
+                <strong data-continuation-thread-title></strong>
+              </div>
               <a class="chat-continuation-action" href="chat.html" data-continuation-link>
                 <span>이야기 이어가기</span><span aria-hidden="true">→</span>
               </a>
@@ -76,25 +84,25 @@
           </div>
         </article>
 
-        <aside class="chat-recent-card" aria-labelledby="recent-title">
+        <aside class="chat-recent-card conversation-thread-panel" aria-labelledby="recent-title">
           <div class="chat-hub-section-head">
             <div>
-              <span class="chat-hub-section-kicker">RECENT</span>
-              <h2 id="recent-title">최근 대화</h2>
+              <span class="chat-hub-section-kicker">MY CONVERSATIONS</span>
+              <h2 id="recent-title">내 대화</h2>
             </div>
             <button class="chat-text-button" type="button" data-recent-all hidden>전체 보기 →</button>
           </div>
 
           <div class="chat-recent-list" data-recent-list hidden></div>
-          <div class="chat-recent-empty" data-recent-empty>
+          <div class="chat-recent-empty conversation-thread-empty" data-recent-empty>
             <span class="chat-recent-empty-mark" aria-hidden="true">◇</span>
-            <strong>아직 남아 있는 최근 대화가 없습니다.</strong>
-            <p>대화를 시작하면 최근에 만난 사람이 이곳에 표시됩니다.</p>
+            <strong>아직 이어지고 있는 관계가 없습니다.</strong>
+            <p>대화를 시작하면 그 사람과의 이야기가 여기에 남습니다.</p>
           </div>
         </aside>
       </section>
 
-      <section class="chat-incoming" data-incoming-section hidden aria-labelledby="incoming-title">
+      <section class="chat-incoming conversation-incoming" data-incoming-section hidden aria-labelledby="incoming-title">
         <div class="chat-hub-section-head">
           <div>
             <span class="chat-hub-section-kicker">FOR YOU</span>
@@ -104,12 +112,12 @@
         <div class="chat-incoming-grid" data-incoming-list></div>
       </section>
 
-      <section class="chat-people-section" id="people" aria-labelledby="people-title">
+      <section class="chat-people-section conversation-people" id="people" aria-labelledby="people-title">
         <div class="chat-people-heading">
           <div>
             <span class="chat-hub-section-kicker">MEET</span>
             <h2 id="people-title">다른 사람 만나기<span aria-hidden="true">✦</span></h2>
-            <p>이름이나 분위기로 찾아보세요. 사람마다 말하는 방식과 거리감이 다릅니다.</p>
+            <p>새로운 이야기를 시작하고 싶을 때만 열어보세요. 사람마다 말하는 방식과 거리감이 다릅니다.</p>
           </div>
 
           <label class="chat-search">
@@ -129,6 +137,11 @@
           </button>
         </div>
       </section>
+
+      <aside class="conversation-memory-note" aria-label="대화 안내">
+        <span class="conversation-memory-mark" aria-hidden="true">◇</span>
+        <p><strong>이야기는 언제든 이어집니다.</strong><br />당신이 남긴 말은, 그 사람과의 다음 대화로 이어집니다.</p>
+      </aside>
     </div>
   </main>
 
