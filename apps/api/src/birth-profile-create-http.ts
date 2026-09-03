@@ -15,6 +15,7 @@ const POST_METHOD = 'POST' as const;
 const ROUTE = '/api/birth-profiles' as const;
 const API_CONTRACT_VERSION = 'v0.9' as const;
 const NO_STORE_CACHE_CONTROL = 'no-store' as const;
+const BIRTH_DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/u;
 
 export const BIRTH_PROFILE_CREATE_HTTP_BINDINGS_V1 = Object.freeze({
   method: POST_METHOD,
@@ -51,6 +52,20 @@ function requireServerTime(value: unknown): string {
 function matchesRoute(request: Request): boolean {
   const url = new URL(request.url);
   return url.pathname === ROUTE && url.search === '' && url.hash === '';
+}
+
+function hasSupportedBirthDate(value: unknown): boolean {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  const request = value as Record<string, unknown>;
+  if (typeof request.input !== 'object' || request.input === null || Array.isArray(request.input)) return false;
+  const input = request.input as Record<string, unknown>;
+  if (typeof input.birthDate !== 'string') return false;
+  const match = BIRTH_DATE_PATTERN.exec(input.birthDate);
+  if (match === null) return false;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  return Number.isInteger(year) && year >= 1 && month >= 1 && month <= 12 && day >= 1 && day <= 31;
 }
 
 function jsonError(input: {
@@ -119,13 +134,6 @@ function routeNotFound(): Response {
   });
 }
 
-/**
- * Source-safe application/runtime boundary for POST /api/birth-profiles.
- *
- * This module intentionally does not activate the public Vercel route. Request identity
- * is verified outside PostgreSQL, canonical subject identity is resolved transactionally,
- * and the write adapter can invoke only the approved Birth create runtime wrapper.
- */
 export async function handleBirthProfileCreateRequestV1(
   input: HandleBirthProfileCreateRequestInputV1,
 ): Promise<Response> {
@@ -152,6 +160,16 @@ export async function handleBirthProfileCreateRequestV1(
   try {
     requestBody = await input.request.json();
   } catch {
+    return jsonError({
+      status: 400,
+      code: 'INVALID_REQUEST',
+      messageKey: 'request.invalid',
+      retryable: false,
+      requestId,
+    });
+  }
+
+  if (!hasSupportedBirthDate(requestBody)) {
     return jsonError({
       status: 400,
       code: 'INVALID_REQUEST',

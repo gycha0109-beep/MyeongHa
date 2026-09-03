@@ -7,6 +7,7 @@
   <title>사주 · 명하</title>
   <link rel="stylesheet" href="product.css" />
   <link rel="stylesheet" href="saju-hub.css" />
+  <link rel="stylesheet" href="saju-birth-input.css" />
 </head>
 <body class="product-page saju-hub-page" data-page="saju">
   <header class="product-header">
@@ -62,7 +63,13 @@
             <div class="saju-form-grid">
               <label class="saju-field">
                 <span>생년월일</span>
-                <input id="saju-birth-date" type="date" required />
+                <div class="saju-date-fields" role="group" aria-label="생년월일">
+                  <input id="saju-birth-year" class="saju-date-part saju-date-year" type="text" inputmode="numeric" autocomplete="bday-year" maxlength="4" pattern="[0-9]{4}" placeholder="YYYY" aria-label="출생 연도" required />
+                  <span class="saju-date-separator" aria-hidden="true">.</span>
+                  <input id="saju-birth-month" class="saju-date-part" type="text" inputmode="numeric" autocomplete="bday-month" maxlength="2" pattern="[0-9]{1,2}" placeholder="MM" aria-label="출생 월" required />
+                  <span class="saju-date-separator" aria-hidden="true">.</span>
+                  <input id="saju-birth-day" class="saju-date-part" type="text" inputmode="numeric" autocomplete="bday-day" maxlength="2" pattern="[0-9]{1,2}" placeholder="DD" aria-label="출생 일" required />
+                </div>
               </label>
               <label class="saju-field">
                 <span>출생시간</span>
