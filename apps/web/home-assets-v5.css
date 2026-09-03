@@ -21,9 +21,22 @@ body.product-page[data-page="home"] .home-today::after {
   border: 0;
   border-radius: 0;
   background: url("home-v5-plum-corner.webp") right bottom / contain no-repeat;
-  opacity: .13;
-  filter: sepia(.3) saturate(.72) brightness(.92);
+  opacity: .18;
+  filter: sepia(.2) saturate(.82) contrast(1.08) brightness(.94);
   transform: none;
+}
+
+/* Replace the old geometric SVG header mountains with a compact real ink-wash crop. */
+body.product-page[data-page="home"] .product-header::before {
+  content: "";
+  position: absolute;
+  inset: auto 220px -2px auto;
+  width: 210px;
+  height: 62px;
+  pointer-events: none;
+  opacity: .31;
+  background: url("home-v5-mountain.webp") center bottom -16px / 205px auto no-repeat;
+  filter: grayscale(.28) sepia(.08) contrast(1.08) brightness(1.03);
 }
 
 body.product-page[data-page="home"] .home-topic::before {
@@ -31,6 +44,7 @@ body.product-page[data-page="home"] .home-topic::before {
   background-repeat: no-repeat;
   background-position: center;
   background-size: contain;
+  filter: contrast(1.14) saturate(.93);
 }
 
 body.product-page[data-page="home"] .home-topic[data-motif="花"]::before {
@@ -39,7 +53,7 @@ body.product-page[data-page="home"] .home-topic[data-motif="花"]::before {
   right: -20px;
   top: -30px;
   background-image: url("home-v5-plum-corner.webp");
-  opacity: .43;
+  opacity: .64;
 }
 
 body.product-page[data-page="home"] .home-topic[data-motif="山"]::before {
@@ -48,7 +62,7 @@ body.product-page[data-page="home"] .home-topic[data-motif="山"]::before {
   right: -12px;
   bottom: -28px;
   background-image: url("home-v5-mountain.webp");
-  opacity: .62;
+  opacity: .78;
 }
 
 body.product-page[data-page="home"] .home-topic[data-motif="財"]::before {
@@ -57,22 +71,42 @@ body.product-page[data-page="home"] .home-topic[data-motif="財"]::before {
   right: -3px;
   bottom: -18px;
   background-image: url("home-v5-wealth.webp");
-  opacity: .34;
+  opacity: .61;
 }
 
+/* The compass is a supporting motif, but it must still be visibly present. */
 body.product-page[data-page="home"] .home-topic[data-motif="命"]::before {
   width: 132px;
   height: 132px;
   right: 9px;
   bottom: -12px;
   background-image: url("home-v5-compass.webp");
-  opacity: .22;
+  opacity: .67;
+  filter: contrast(1.3) saturate(.9) brightness(.94);
 }
 
 body.product-page[data-page="home"] .home-topic > span,
 body.product-page[data-page="home"] .home-topic-arrow {
   position: relative;
   z-index: 1;
+}
+
+/* Do not rely on inherited foregrounds for CTA labels in any interactive state. */
+body.product-page[data-page="home"] .home-primary-action,
+body.product-page[data-page="home"] .home-primary-action:visited,
+body.product-page[data-page="home"] .home-primary-action:hover,
+body.product-page[data-page="home"] .home-primary-action:focus-visible,
+body.product-page[data-page="home"] .home-primary-action > span:first-child {
+  color: #14243a !important;
+  -webkit-text-fill-color: #14243a;
+  opacity: 1 !important;
+  text-shadow: none;
+}
+
+body.product-page[data-page="home"] .home-primary-action .home-arrow {
+  color: #9f7137 !important;
+  -webkit-text-fill-color: #9f7137;
+  opacity: 1 !important;
 }
 
 body.product-page[data-page="home"] .home-person {
@@ -86,7 +120,7 @@ body.product-page[data-page="home"] .home-person::after {
   width: 248px;
   height: 330px;
   background: url("home-v5-plum-corner.webp") right bottom / contain no-repeat;
-  opacity: .43;
+  opacity: .5;
 }
 
 body.product-page[data-page="home"] .home-person-avatar,
@@ -94,6 +128,17 @@ body.product-page[data-page="home"] .home-person-copy,
 body.product-page[data-page="home"] .home-person-action {
   position: relative;
   z-index: 2;
+}
+
+body.product-page[data-page="home"] .home-person-action,
+body.product-page[data-page="home"] .home-person-action:visited,
+body.product-page[data-page="home"] .home-person-action:hover,
+body.product-page[data-page="home"] .home-person-action:focus-visible,
+body.product-page[data-page="home"] .home-person-action > span {
+  color: #f7f0e7 !important;
+  -webkit-text-fill-color: #f7f0e7;
+  opacity: 1 !important;
+  text-shadow: none;
 }
 
 body.product-page[data-page="home"]::after {
@@ -115,16 +160,28 @@ body.product-page[data-page="home"] .product-footer {
 
 @media (max-width: 1180px) {
   body.product-page[data-page="home"] .home-orbit-art { width: 238px; }
+  body.product-page[data-page="home"] .product-header::before {
+    right: 165px;
+    width: 165px;
+    height: 54px;
+    background-position: center bottom -13px;
+    background-size: 165px auto;
+    opacity: .25;
+  }
+}
+
+@media (max-width: 900px) {
+  body.product-page[data-page="home"] .product-header::before { display: none; }
 }
 
 @media (max-width: 767px) {
   body.product-page[data-page="home"] .home-orbit-art { width: 210px; }
-  body.product-page[data-page="home"] .home-today::after { right: -74px; opacity: .08; }
-  body.product-page[data-page="home"] .home-topic[data-motif="花"]::before { right: -70px; opacity: .31; }
-  body.product-page[data-page="home"] .home-topic[data-motif="山"]::before { right: -72px; opacity: .42; }
-  body.product-page[data-page="home"] .home-topic[data-motif="財"]::before { right: -58px; opacity: .23; }
-  body.product-page[data-page="home"] .home-topic[data-motif="命"]::before { right: -42px; opacity: .16; }
-  body.product-page[data-page="home"] .home-person::after { right: -84px; opacity: .28; }
+  body.product-page[data-page="home"] .home-today::after { right: -74px; opacity: .12; }
+  body.product-page[data-page="home"] .home-topic[data-motif="花"]::before { right: -38px; opacity: .52; }
+  body.product-page[data-page="home"] .home-topic[data-motif="山"]::before { right: -34px; opacity: .62; }
+  body.product-page[data-page="home"] .home-topic[data-motif="財"]::before { right: -28px; opacity: .52; }
+  body.product-page[data-page="home"] .home-topic[data-motif="命"]::before { right: -16px; opacity: .58; }
+  body.product-page[data-page="home"] .home-person::after { right: -84px; opacity: .34; }
 }
 
 @media (max-width: 420px) {
