@@ -1,3 +1,11 @@
+.saju-hub[hidden],
+.saju-empty[hidden],
+.saju-status[hidden],
+.saju-form-error[hidden],
+#saju-leap-wrap[hidden] {
+  display: none !important;
+}
+
 .saju-main {
   padding: 34px 0 80px;
 }
