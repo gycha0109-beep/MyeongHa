@@ -35,6 +35,11 @@ BEGIN
       AND NOT r.rolinherit
       AND NOT r.rolreplication
       AND NOT r.rolbypassrls
+      AND NOT EXISTS (
+        SELECT 1
+        FROM pg_catalog.pg_auth_members m
+        WHERE m.roleid = r.oid
+      )
   ) THEN
     RAISE EXCEPTION 'myeongha_birth_profile_create_owner is outside the least-privilege contract';
   END IF;
@@ -209,6 +214,13 @@ begin
 end;
 $$;
 
+-- Supabase production migrations run through a managed CREATEROLE principal that is
+-- intentionally not automatically a member of newly created NOLOGIN roles. PostgreSQL
+-- requires the current principal to be able to SET ROLE to a target owner before
+-- ALTER ... OWNER. Grant that membership only for this transactional ownership/ACL
+-- setup and remove it before the migration completes.
+grant myeongha_birth_profile_create_owner to current_user;
+
 alter function public.cmd_create_birth_profile_runtime_v1(
   uuid, uuid, uuid, text, text, date, time, boolean, boolean, text, text
 ) owner to myeongha_birth_profile_create_owner;
@@ -237,3 +249,5 @@ $$;
 grant execute on function public.cmd_create_birth_profile_runtime_v1(
   uuid, uuid, uuid, text, text, date, time, boolean, boolean, text, text
 ) to myeongha_api_executor;
+
+revoke myeongha_birth_profile_create_owner from current_user;
