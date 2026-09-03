@@ -1,0 +1,8 @@
+.landing-v2::before {
+  z-index: 0;
+}
+
+.landing-v2 > main {
+  position: relative;
+  z-index: 1;
+}
