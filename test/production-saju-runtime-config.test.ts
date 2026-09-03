@@ -8,10 +8,7 @@ import {
 
 const SERVICE_BEARER = 'test-saju-service-bearer-secret';
 
-function env(
-  origin?: string,
-  bearer: string | undefined = SERVICE_BEARER,
-): Record<string, string | undefined> {
+function env(origin?: string, bearer?: string): Record<string, string | undefined> {
   return {
     [PRODUCTION_SAJU_RUNTIME_ENV_V1.serviceOrigin]: origin,
     [PRODUCTION_SAJU_RUNTIME_ENV_V1.serviceBearer]: bearer,
@@ -20,7 +17,9 @@ function env(
 
 describe('production Saju runtime config v1', () => {
   it('accepts only an exact HTTPS service origin with a non-empty service Bearer', () => {
-    const config = parseProductionSajuRuntimeConfigV1(env('https://saju.internal.example'));
+    const config = parseProductionSajuRuntimeConfigV1(
+      env('https://saju.internal.example', SERVICE_BEARER),
+    );
     expect(config).toEqual({
       serviceOrigin: 'https://saju.internal.example',
       serviceBearer: SERVICE_BEARER,
@@ -50,8 +49,8 @@ describe('production Saju runtime config v1', () => {
     'https://saju.internal.example#fragment',
     'not-a-url',
   ])('fails closed for invalid production origin %s', (origin) => {
-    expect(() => parseProductionSajuRuntimeConfigV1(env(origin))).toThrowError(
-      ProductionSajuRuntimeConfigErrorV1,
-    );
+    expect(() =>
+      parseProductionSajuRuntimeConfigV1(env(origin, SERVICE_BEARER)),
+    ).toThrowError(ProductionSajuRuntimeConfigErrorV1);
   });
 });
