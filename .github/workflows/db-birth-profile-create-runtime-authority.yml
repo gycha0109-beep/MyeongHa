@@ -47,13 +47,66 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y postgresql-client
       - name: Bootstrap Supabase auth test fixture
         run: psql -v ON_ERROR_STOP=1 -f test/db/bootstrap_supabase_auth_stub.sql
-      - name: Apply migrations
+      - name: Apply migrations before Birth create runtime authority
         shell: bash
         run: |
           set -euo pipefail
           for migration in supabase/migrations/*.sql; do
+            if [[ "${migration}" == *'/0860_birth_profile_create_runtime_authority.sql' ]]; then
+              continue
+            fi
             echo "Applying ${migration}"
             psql -v ON_ERROR_STOP=1 -f "${migration}" >/dev/null
           done
+      - name: Prepare managed non-superuser migration principal
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          create role myeongha_migration_principal_test
+            login
+            nosuperuser
+            nocreatedb
+            createrole
+            inherit
+            noreplication
+            nobypassrls
+            password 'myeongha-migration-principal-test';
+
+          alter schema public owner to myeongha_migration_principal_test;
+          alter table public.subjects owner to myeongha_migration_principal_test;
+          alter table public.birth_profiles owner to myeongha_migration_principal_test;
+          alter table public.birth_profile_revisions owner to myeongha_migration_principal_test;
+          alter function public.current_myeongha_subject_id()
+            owner to myeongha_migration_principal_test;
+          alter function public.assert_myeongha_subject_context_v1(uuid)
+            owner to myeongha_migration_principal_test;
+          alter function public.cmd_create_birth_profile_v1(
+            uuid, uuid, uuid, text, text, date, time, boolean, boolean, text, text
+          ) owner to myeongha_migration_principal_test;
+          SQL
+      - name: Apply Birth create runtime authority as managed migration principal
+        shell: bash
+        env:
+          PGUSER: myeongha_migration_principal_test
+          PGPASSWORD: myeongha-migration-principal-test
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 \
+            -f supabase/migrations/0860_birth_profile_create_runtime_authority.sql \
+            >/dev/null
+      - name: Verify temporary owner membership was removed
+        shell: bash
+        run: |
+          set -euo pipefail
+          membership_count="$(psql -Atqc "
+            select count(*)
+            from pg_catalog.pg_auth_members m
+            join pg_catalog.pg_roles owner_role on owner_role.oid = m.roleid
+            join pg_catalog.pg_roles member_role on member_role.oid = m.member
+            where owner_role.rolname = 'myeongha_birth_profile_create_owner'
+              and member_role.rolname = 'myeongha_migration_principal_test';
+          ")"
+          test "${membership_count}" = '0'
       - name: Verify Birth Profile production create runtime authority
         run: bash test/db/birth_profile_create_runtime_authority.sh
