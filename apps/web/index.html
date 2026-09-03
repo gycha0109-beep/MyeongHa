@@ -11,9 +11,10 @@
   <link rel="stylesheet" href="landing-v2.css" />
   <link rel="stylesheet" href="landing-csp.css" />
   <link rel="stylesheet" href="landing-art.css" />
+  <link rel="stylesheet" href="landing-showcase.css" />
 </head>
 <body data-page="landing">
-  <div class="landing-v2">
+  <div class="landing-v2 landing-showcase">
     <div class="landing-art" aria-hidden="true">
       <img class="landing-art-image landing-art-night" data-landing-art="night" alt="" />
       <img class="landing-art-image landing-art-day" data-landing-art="day" alt="" />
@@ -28,28 +29,30 @@
         </a>
 
         <nav class="landing-nav" aria-label="대문 주요 메뉴">
+          <a href="#world">세계관</a>
           <a href="chat-hub.html">대리자들</a>
-          <a href="records.html">기록</a>
-          <a href="#about">서비스 안내</a>
-          <button class="landing-theme-toggle" type="button" data-theme-toggle aria-label="화면 테마 전환">☼</button>
+          <a href="#record-method">기록의 방식</a>
+          <a href="#experience">이용 안내</a>
+          <a href="my.html">로그인</a>
+          <button class="landing-theme-toggle" type="button" data-theme-toggle aria-label="화면 테마 전환" title="라이트·다크 전환">☼</button>
           <a class="landing-header-cta" href="hall.html?mode=guest">명하에 들어가기</a>
         </nav>
       </div>
     </header>
 
-    <main>
-      <section class="landing-hero-v2" id="about" aria-labelledby="landing-title">
-        <div class="landing-hero-copy-v2">
-          <div class="landing-kicker">命河 · The Record That Continues</div>
+    <main class="landing-showcase-main">
+      <section class="landing-showcase-hero" id="world" aria-labelledby="landing-title">
+        <div class="landing-showcase-copy">
+          <div class="landing-kicker"><span aria-hidden="true"></span>命河 · The Record That Continues</div>
+
           <h1 class="landing-hero-title" id="landing-title">
-            태어난 순간부터<br />적혀 있던 기록을,
+            태어난 순간부터<br />
+            적혀 있던 기록을,<br />
             <em>대리자와 함께 읽습니다.</em>
           </h1>
 
           <p class="landing-description">
-            명하는 사주 명식을 바탕으로 당신의 기록을 읽고,
-            그 해석을 대화와 관계 속에서 이어가는 세계입니다.
-            대리자는 기록을 바꾸지 않습니다. 함께 읽고, 묻고, 다음 이야기를 기억합니다.
+            명하는 사주 명식을 바탕으로 당신의 기록을 읽고, 그 해석을 대화와 관계 속에서 이어가는 세계입니다.
           </p>
 
           <div class="landing-actions">
@@ -57,25 +60,88 @@
               <span>명하에 들어가기</span>
               <span aria-hidden="true">→</span>
             </a>
-            <a class="landing-secondary-cta" href="hall.html">
-              <span>내 기록 이어보기</span>
-              <span aria-hidden="true">↗</span>
+            <a class="landing-secondary-cta" href="#experience">
+              <span>세계관 둘러보기</span>
+              <span class="landing-play-icon" aria-hidden="true">▶</span>
             </a>
           </div>
 
-          <div class="landing-trust">
-            <span class="landing-trust-mark" aria-hidden="true">明</span>
-            <span>첫 경험은 로그인 없이 시작할 수 있습니다. 사주 의미는 검증된 Reading을 따르며, 대리자는 그 의미를 바꾸지 않습니다.</span>
+          <div class="landing-ambassadors" aria-label="명하의 대리자 안내">
+            <div class="landing-avatar-stack" aria-hidden="true">
+              <span class="landing-avatar landing-avatar-1">미</span>
+              <span class="landing-avatar landing-avatar-2">세</span>
+              <span class="landing-avatar landing-avatar-3">라</span>
+              <span class="landing-avatar landing-avatar-4">백</span>
+              <span class="landing-avatar landing-avatar-5">+</span>
+            </div>
+            <p><strong>7명의 신의 대리자가</strong><br />당신의 이야기를 기다리고 있습니다.</p>
           </div>
+        </div>
+
+        <aside class="landing-reading-preview" aria-label="명식 미리보기">
+          <div class="landing-preview-eyebrow">태어난 순간의 기록</div>
+          <h2>명식은 하나,<br />읽는 관계는 여러 갈래.</h2>
+
+          <div class="landing-preview-pillars" aria-label="사주 네 기둥 예시">
+            <div><small>년주</small><strong>年柱</strong></div>
+            <div><small>월주</small><strong>月柱</strong></div>
+            <div><small>일주</small><strong>日柱</strong></div>
+            <div><small>시주</small><strong>時柱</strong></div>
+          </div>
+
+          <a class="landing-preview-link" href="birth.html?from=landing">
+            <span>내 명식 미리보기</span>
+            <span aria-hidden="true">→</span>
+          </a>
+        </aside>
+      </section>
+
+      <section class="landing-experience" id="experience" aria-labelledby="experience-title">
+        <h2 id="experience-title">명하에서는 이런 경험을 할 수 있습니다</h2>
+
+        <div class="landing-experience-grid">
+          <article class="landing-experience-card">
+            <div class="landing-experience-icon" aria-hidden="true">
+              <svg viewBox="0 0 48 48" role="img"><path d="M8 15.5 24 8l16 7.5v20L24 42 8 35.5v-20Z"/><path d="M15 19.5 24 16l9 3.5v11L24 34l-9-3.5v-11Z"/><path d="M24 16v18"/></svg>
+            </div>
+            <div>
+              <h3>나의 기록 열기</h3>
+              <p>태어난 순간의 명식과 현재의 삶을 하나의 기록으로 엽니다.</p>
+            </div>
+          </article>
+
+          <article class="landing-experience-card" id="record-method">
+            <div class="landing-experience-icon" aria-hidden="true">
+              <svg viewBox="0 0 48 48" role="img"><circle cx="12" cy="35" r="3"/><circle cx="23" cy="24" r="3"/><circle cx="36" cy="11" r="3"/><path d="m14 33 7-7m4-4 9-9"/></svg>
+            </div>
+            <div>
+              <h3>여러 관점으로 읽기</h3>
+              <p>다양한 분야의 대리자들이 각자의 관점으로 당신을 읽어줍니다.</p>
+            </div>
+          </article>
+
+          <article class="landing-experience-card">
+            <div class="landing-experience-icon" aria-hidden="true">
+              <svg viewBox="0 0 48 48" role="img"><path d="M7 11h25a7 7 0 0 1 7 7v8a7 7 0 0 1-7 7H19l-8 7v-7H7V11Z"/><path d="M14 21h1m7 0h1m7 0h1"/></svg>
+            </div>
+            <div>
+              <h3>대리자와 대화하기</h3>
+              <p>질문하고, 듣고, 더 깊이 이야기하며 당신만의 해석을 완성합니다.</p>
+            </div>
+          </article>
+
+          <article class="landing-experience-card">
+            <div class="landing-experience-icon" aria-hidden="true">
+              <svg viewBox="0 0 48 48" role="img"><path d="M24 40c-3-8-3-16 0-29 3 13 3 21 0 29Z"/><path d="M23 39C15 35 10 30 7 21c9 3 14 8 17 16m1 2c8-4 13-9 16-18-9 3-14 8-17 16M22 40c-7 0-13-2-18-7 7-2 13-1 18 4m4 3c7 0 13-2 18-7-7-2-13-1-18 4"/></svg>
+            </div>
+            <div>
+              <h3>관계와 기록이 쌓이기</h3>
+              <p>대화와 기록이 쌓이며 당신과 대리자의 관계가 깊어집니다.</p>
+            </div>
+          </article>
         </div>
       </section>
     </main>
-
-    <div class="landing-path" aria-label="명하의 기본 경험 흐름">
-      <span>내 기록을 읽고</span>
-      <span>대리자와 이야기하고</span>
-      <span>관계와 기록이 이어집니다</span>
-    </div>
   </div>
 
   <script src="landing-art-dark-01.js"></script>
