@@ -1,11 +1,13 @@
 export const PRODUCTION_SAJU_RUNTIME_ENV_V1 = Object.freeze({
   serviceOrigin: 'MYEONGHA_SAJU_SERVICE_ORIGIN',
+  serviceBearer: 'MYEONGHA_SAJU_SERVICE_BEARER',
 } as const);
 
 export type ProductionSajuRuntimeEnvV1 = Readonly<Record<string, string | undefined>>;
 
 export interface ProductionSajuRuntimeConfigV1 {
   readonly serviceOrigin: string;
+  readonly serviceBearer: string;
 }
 
 export interface ProductionSajuRuntimeConfigSummaryV1 {
@@ -65,6 +67,7 @@ export function parseProductionSajuRuntimeConfigV1(
     serviceOrigin: parseServiceOrigin(
       requiredEnv(env, PRODUCTION_SAJU_RUNTIME_ENV_V1.serviceOrigin),
     ),
+    serviceBearer: requiredEnv(env, PRODUCTION_SAJU_RUNTIME_ENV_V1.serviceBearer),
   });
 }
 
