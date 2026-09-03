@@ -22,13 +22,28 @@ function withNoStore(response: Response): Response {
   });
 }
 
+function internalServerErrorNoStore(): Response {
+  return new Response('Internal Server Error', {
+    status: 500,
+    headers: {
+      'Cache-Control': NO_STORE_CACHE_CONTROL,
+      'Content-Type': 'text/plain; charset=utf-8',
+    },
+  });
+}
+
 export default {
   async fetch(request: Request): Promise<Response> {
-    const response = await getRuntime().handleRequest({
-      request,
-      requestId: randomUUID(),
-      serverTime: new Date().toISOString(),
-    });
-    return withNoStore(response);
+    try {
+      const response = await getRuntime().handleRequest({
+        request,
+        requestId: randomUUID(),
+        serverTime: new Date().toISOString(),
+      });
+      return withNoStore(response);
+    } catch {
+      console.error('MyeongHa Saju calculation route failed.');
+      return internalServerErrorNoStore();
+    }
   },
 };
