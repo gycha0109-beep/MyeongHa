@@ -102,7 +102,7 @@ jobs:
           psql -v ON_ERROR_STOP=1 \
             -f supabase/migrations/0860_birth_profile_create_runtime_authority.sql \
             >/dev/null
-      - name: Verify temporary migration privileges were removed
+      - name: Verify PostgreSQL 17 admin-only creator membership and schema cleanup
         shell: bash
         run: |
           set -euo pipefail
@@ -112,7 +112,21 @@ jobs:
             join pg_catalog.pg_roles owner_role on owner_role.oid = m.roleid
             where owner_role.rolname = 'myeongha_birth_profile_create_owner';
           ")"
-          test "${membership_count}" = '0'
+          expected_admin_count="$(psql -Atqc "
+            select count(*)
+            from pg_catalog.pg_auth_members m
+            join pg_catalog.pg_roles owner_role on owner_role.oid = m.roleid
+            join pg_catalog.pg_roles member_role on member_role.oid = m.member
+            join pg_catalog.pg_roles grantor_role on grantor_role.oid = m.grantor
+            where owner_role.rolname = 'myeongha_birth_profile_create_owner'
+              and member_role.rolname = 'myeongha_migration_principal_test'
+              and m.admin_option
+              and not m.inherit_option
+              and not m.set_option
+              and grantor_role.rolsuper;
+          ")"
+          test "${membership_count}" = '1'
+          test "${expected_admin_count}" = '1'
           test "$(psql -Atqc "select has_schema_privilege('myeongha_birth_profile_create_owner', 'public', 'USAGE');")" = 't'
           test "$(psql -Atqc "select has_schema_privilege('myeongha_birth_profile_create_owner', 'public', 'CREATE');")" = 'f'
       - name: Verify Birth Profile production create runtime authority
