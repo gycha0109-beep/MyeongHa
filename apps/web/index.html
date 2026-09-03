@@ -6,21 +6,12 @@
   <meta name="description" content="명하 — 태어난 순간부터 적혀 있던 기록을 대리자와 함께 읽는 캐릭터 기반 사주 세계관 서비스." />
   <meta name="theme-color" content="#071018" />
   <title>명하 · MyeongHa</title>
-  <script>
-    (() => {
-      const saved = localStorage.getItem('myeongha-theme');
-      const hour = new Date().getHours();
-      document.documentElement.dataset.theme = saved || (hour >= 7 && hour < 18 ? 'day' : 'night');
-    })();
-  </script>
+  <script src="landing-theme-init.js"></script>
   <link rel="preload" href="landing-dark.webp" as="image" type="image/webp" />
   <link rel="preload" href="landing-light.webp" as="image" type="image/webp" />
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="landing-v2.css" />
-  <style>
-    .landing-v2::before { z-index: 0; }
-    .landing-v2 > main { position: relative; z-index: 1; }
-  </style>
+  <link rel="stylesheet" href="landing-csp.css" />
 </head>
 <body data-page="landing">
   <div class="landing-v2">
