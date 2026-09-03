@@ -3,55 +3,73 @@ import { describe, expect, it } from 'vitest';
 
 const hubHtmlPath = new URL('../apps/web/chat-hub.html', import.meta.url);
 const hubCssPath = new URL('../apps/web/chat-hub.css', import.meta.url);
+const hubV2CssPath = new URL('../apps/web/conversation-v2.css', import.meta.url);
 const hubJsPath = new URL('../apps/web/chat-hub.js', import.meta.url);
 const roomHtmlPath = new URL('../apps/web/chat.html', import.meta.url);
 const homeHtmlPath = new URL('../apps/web/hall.html', import.meta.url);
 const readingHtmlPath = new URL('../apps/web/reading.html', import.meta.url);
 const recordsHtmlPath = new URL('../apps/web/records.html', import.meta.url);
 
-describe('MyeongHa conversation hub v1', () => {
-  it('keeps the relationship-first hub IA while leaving discovery as a separate lower layer', async () => {
+describe('MyeongHa conversation hub relationship-first IA', () => {
+  it('puts ongoing relationships before character discovery', async () => {
     const html = await readFile(hubHtmlPath, 'utf8');
 
-    const continuation = html.indexOf('이어갈 대화');
-    const recent = html.indexOf('최근 대화');
+    const primary = html.indexOf('class="chat-hub-primary conversation-primary"');
+    const myConversations = html.indexOf('내 대화');
     const incoming = html.indexOf('나에게 온 이야기');
-    const discovery = html.indexOf('다른 사람 만나기');
+    const discoverySection = html.indexOf('id="people"');
 
-    expect(continuation).toBeGreaterThan(-1);
-    expect(recent).toBeGreaterThan(continuation);
-    expect(incoming).toBeGreaterThan(recent);
-    expect(discovery).toBeGreaterThan(incoming);
+    expect(primary).toBeGreaterThan(-1);
+    expect(myConversations).toBeGreaterThan(primary);
+    expect(incoming).toBeGreaterThan(myConversations);
+    expect(discoverySection).toBeGreaterThan(incoming);
+    expect(html).toContain('누구와 이야기를 이어갈까요?');
+    expect(html).toContain('지금 이어갈 사람');
     expect(html).toContain('data-incoming-section hidden');
+    expect(html).not.toContain('<h2 id="recent-title">최근 대화</h2>');
   });
 
-  it('fails closed instead of fabricating a current relationship, recent thread, or incoming character message', async () => {
+  it('fails closed instead of fabricating a relationship, recent thread, or incoming story', async () => {
     const [html, js] = await Promise.all([
       readFile(hubHtmlPath, 'utf8'),
       readFile(hubJsPath, 'utf8'),
     ]);
 
-    expect(html).toContain('아직 이어서 보여줄 대화가 없습니다.');
-    expect(html).toContain('아직 남아 있는 최근 대화가 없습니다.');
+    expect(html).toContain('아직 이어지고 있는 대화가 없습니다.');
+    expect(html).toContain('아직 이어지고 있는 관계가 없습니다.');
+    expect(html).not.toContain('퇴사를 고민했던 이야기');
     expect(html).not.toContain('지난번 당신');
-    expect(html).not.toContain('기억하고 있습니다');
-    expect(html).not.toContain('퇴사를 고민');
-    expect(js).not.toContain('처음 이야기하기');
-    expect(js).toContain("actionLabel.textContent = '이야기하기'");
     expect(js).toContain('setContinuation(null)');
     expect(js).toContain('setRecent([])');
     expect(js).toContain('setIncoming([])');
+    expect(js).toContain('typeof state.threadTitle');
+    expect(js).toContain('item.hasIncoming === true');
+    expect(js).not.toContain('threadTitle:');
+    expect(js).not.toContain('hasIncoming: true');
   });
 
-  it('keeps discovery searchable and pageable without freezing a concrete roster as an architectural invariant', async () => {
+  it('keeps discovery searchable and pageable without inventing canonical character authority', async () => {
     const js = await readFile(hubJsPath, 'utf8');
 
     expect(js).toContain('const PAGE_SIZE = 6');
     expect(js).toContain('data-people-search');
     expect(js).toContain('visibleCount + PAGE_SIZE');
     expect(js).toContain('safePresentationKey');
-    expect(js).toContain('encodeURIComponent(safeKey)');
+    expect(js).toContain("url.searchParams.set('character', safeKey)");
     expect(js).not.toContain('characterId:');
+  });
+
+  it('uses the approved Se-yeon image only for Se-yeon presentation hooks', async () => {
+    const css = await readFile(hubV2CssPath, 'utf8');
+
+    expect(css).toContain('.chat-person-art[data-character="seyeon"]');
+    expect(css).toContain('.chat-incoming-art[data-character="seyeon"]');
+    expect(css).toContain('.chat-recent-avatar[data-character="seyeon"]');
+    expect(css).toContain('url("seyeon-chat.webp")');
+
+    for (const key of ['baekheon', 'yeoul', 'seorin', 'rahyeon', 'mira', 'taegyeom', 'yunho', 'doyoon']) {
+      expect(css).not.toContain(`[data-character="${key}"] {\n  background-image: url("seyeon-chat.webp")`);
+    }
   });
 
   it('keeps character rooms as focused destinations and routes global conversation entries through the hub', async () => {
@@ -62,7 +80,7 @@ describe('MyeongHa conversation hub v1', () => {
       readFile(recordsHtmlPath, 'utf8'),
     ]);
 
-    expect(room).toContain('class="character-room"');
+    expect(room).toContain('class="product-page character-room character-room-v2"');
     expect(room).toContain('href="chat-hub.html" aria-label="대화 허브로 돌아가기"');
     expect(home).toContain('href="chat-hub.html">대화</a>');
     expect(home).toContain('href="chat-hub.html">대화로 가기 →</a>');
@@ -81,19 +99,23 @@ describe('MyeongHa conversation hub v1', () => {
     expect(html).not.toContain('class="product-profile" href="records.html" aria-label="내 기록"');
   });
 
-  it('uses the shared MyeongHa product shell while giving the hub its own relationship and discovery surfaces', async () => {
-    const [html, css] = await Promise.all([
+  it('keeps the shared product shell and adds a responsive relationship-first presentation layer', async () => {
+    const [html, css, v2Css] = await Promise.all([
       readFile(hubHtmlPath, 'utf8'),
       readFile(hubCssPath, 'utf8'),
+      readFile(hubV2CssPath, 'utf8'),
     ]);
 
     expect(html).toContain('href="product.css"');
     expect(html).toContain('href="chat-hub.css"');
+    expect(html).toContain('href="conversation-v2.css"');
     expect(html).toContain('class="product-nav"');
     expect(html).toContain('class="mobile-bottom-nav"');
     expect(css).toContain('.chat-hub-primary');
-    expect(css).toContain('.chat-continuation-card');
     expect(css).toContain('.chat-people-grid');
-    expect(css).toContain('@media (max-width: 767px)');
+    expect(v2Css).toContain('.conversation-primary');
+    expect(v2Css).toContain('.conversation-thread-panel');
+    expect(v2Css).toContain('.conversation-incoming');
+    expect(v2Css).toContain('@media (max-width: 640px)');
   });
 });

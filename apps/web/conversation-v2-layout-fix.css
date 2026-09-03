@@ -1,0 +1,133 @@
+/* Conversation V2 owns layout geometry after the legacy Character Room presentation layer. */
+body.character-room.character-room-v2 {
+  min-height: 100dvh;
+  overflow: hidden;
+  color: var(--conversation-ink);
+  background: #f5eee5;
+}
+
+body.character-room.character-room-v2 .conversation-room-header {
+  position: relative;
+  inset: auto;
+  width: min(1320px, calc(100% - 48px));
+  height: 66px;
+  padding: 0 4px;
+  border-bottom: 1px solid rgba(154,117,69,.22);
+  background: rgba(249,244,236,.94);
+  box-shadow: none;
+}
+
+body.character-room.character-room-v2 .conversation-room-stage {
+  position: relative;
+  min-height: 0;
+  padding-top: 0;
+  overflow: hidden;
+}
+
+body.character-room.character-room-v2 .conversation-room-scene {
+  position: relative;
+  inset: auto;
+  width: auto;
+  height: auto;
+  min-height: 0;
+  flex: initial;
+  background-position: center 37%;
+}
+
+body.character-room.character-room-v2 .conversation-context {
+  position: absolute;
+  inset: 18px auto auto 18px;
+  bottom: auto;
+  min-height: auto;
+}
+
+body.character-room.character-room-v2 .conversation-chat-panel {
+  position: relative;
+  inset: auto;
+  left: auto;
+  bottom: auto;
+  width: auto;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  transform: none;
+}
+
+body.character-room.character-room-v2 .conversation-chat-panel::before,
+body.character-room.character-room-v2 .conversation-chat-panel::after {
+  display: none;
+}
+
+body.character-room.character-room-v2 .conversation-composer {
+  position: relative;
+  inset: auto;
+}
+
+@media (max-width: 900px) {
+  body.character-room.character-room-v2 {
+    overflow: hidden;
+    background: #f5eee5;
+  }
+
+  body.character-room.character-room-v2 .conversation-room-header {
+    position: relative;
+    inset: auto;
+    width: 100%;
+    height: 58px;
+    padding: 0 14px;
+    grid-template-columns: auto 1fr auto;
+    background: rgba(249,244,236,.97);
+  }
+
+  body.character-room.character-room-v2 .conversation-room-stage {
+    min-height: 0;
+    height: calc(100dvh - 58px);
+    padding: 0;
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: 190px minmax(0,1fr);
+    overflow: hidden;
+  }
+
+  body.character-room.character-room-v2 .conversation-scene-column {
+    min-height: 190px;
+    height: 190px;
+  }
+
+  body.character-room.character-room-v2 .conversation-room-scene {
+    width: 100%;
+    height: 190px;
+    min-height: 190px;
+    flex: initial;
+    background-position: center 30% !important;
+  }
+
+  body.character-room.character-room-v2 .conversation-context {
+    inset: auto auto 10px 12px;
+    top: auto;
+    bottom: 10px;
+  }
+
+  body.character-room.character-room-v2 .conversation-chat-panel {
+    width: 100%;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .conversation-hub-v2 .product-shell {
+    width: min(calc(100% - 24px), var(--product-shell, 1180px));
+  }
+
+  body.character-room.character-room-v2 .conversation-room-stage {
+    grid-template-rows: 166px minmax(0,1fr);
+  }
+
+  body.character-room.character-room-v2 .conversation-scene-column,
+  body.character-room.character-room-v2 .conversation-room-scene {
+    min-height: 166px;
+    height: 166px;
+  }
+}

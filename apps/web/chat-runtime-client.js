@@ -10,6 +10,8 @@ const historyEmpty = document.querySelector('[data-history-empty]');
 const contextPill = document.querySelector('[data-context-pill]');
 const contextTitle = document.querySelector('[data-context-title]');
 const composeStatus = document.querySelector('[data-compose-status]');
+const chatStream = document.querySelector('[data-chat-stream]');
+const chatIntro = document.querySelector('[data-chat-intro]');
 
 function setComposeStatus(message) {
   if (composeStatus) composeStatus.textContent = message;
@@ -48,6 +50,20 @@ function assertRoomState(payload) {
   return payload;
 }
 
+function senderLabel(message, authoritativeCharacterId) {
+  if (message.senderType === 'user') return '나';
+  if (message.senderType === 'character') {
+    return message.characterId === authoritativeCharacterId ? characterName : '다른 대리자';
+  }
+  return '대화 기록';
+}
+
+function safeMessageText(message) {
+  if (message.redacted === true) return '삭제된 메시지입니다.';
+  if (typeof message.bodyText === 'string' && message.bodyText.trim().length > 0) return message.bodyText;
+  return '표시할 수 있는 텍스트가 없습니다.';
+}
+
 function renderHistory(messages, authoritativeCharacterId) {
   if (!historyList) return;
   historyList.replaceChildren();
@@ -74,32 +90,65 @@ function renderHistory(messages, authoritativeCharacterId) {
     if (typeof message.createdAt === 'string') time.dateTime = message.createdAt;
 
     const strong = document.createElement('strong');
-    if (message.senderType === 'user') {
-      strong.textContent = '나';
-    } else if (message.senderType === 'character') {
-      strong.textContent =
-        message.characterId === authoritativeCharacterId ? characterName : '다른 대리자';
-    } else {
-      strong.textContent = '대화 기록';
-    }
+    strong.textContent = senderLabel(message, authoritativeCharacterId);
 
     const paragraph = document.createElement('p');
-    if (message.redacted === true) {
-      paragraph.textContent = '삭제된 메시지입니다.';
-    } else if (typeof message.bodyText === 'string' && message.bodyText.trim().length > 0) {
-      paragraph.textContent = message.bodyText;
-    } else {
-      paragraph.textContent = '표시할 수 있는 텍스트가 없습니다.';
-    }
+    paragraph.textContent = safeMessageText(message);
 
     article.append(time, strong, paragraph);
     historyList.append(article);
   });
 }
 
+function createStreamMessage(message, authoritativeCharacterId) {
+  if (!message || typeof message !== 'object') return null;
+  if (!Number.isSafeInteger(message.sequenceNo) || typeof message.senderType !== 'string') return null;
+
+  const article = document.createElement('article');
+  article.className = 'conversation-message';
+  article.dataset.sender = message.senderType;
+  article.dataset.redacted = String(message.redacted === true);
+
+  const avatar = document.createElement('span');
+  avatar.className = 'conversation-message-avatar';
+  avatar.setAttribute('aria-hidden', 'true');
+  avatar.dataset.character = message.senderType === 'character' ? characterKey : 'user';
+  avatar.textContent = message.senderType === 'user' ? '나' : characterName.slice(0, 1);
+
+  const body = document.createElement('div');
+  body.className = 'conversation-message-body';
+
+  const heading = document.createElement('div');
+  heading.className = 'conversation-message-heading';
+  const strong = document.createElement('strong');
+  strong.textContent = senderLabel(message, authoritativeCharacterId);
+  const time = document.createElement('time');
+  time.textContent = formatTimestamp(message.createdAt);
+  if (typeof message.createdAt === 'string') time.dateTime = message.createdAt;
+  heading.append(strong, time);
+
+  const paragraph = document.createElement('p');
+  paragraph.textContent = safeMessageText(message);
+  body.append(heading, paragraph);
+  article.append(avatar, body);
+  return article;
+}
+
+function renderConversation(messages, authoritativeCharacterId) {
+  if (!chatStream) return;
+  const nodes = messages.map((message) => createStreamMessage(message, authoritativeCharacterId)).filter(Boolean);
+  if (nodes.length === 0) {
+    if (chatIntro) chatIntro.hidden = false;
+    return;
+  }
+  chatStream.replaceChildren(...nodes);
+  chatStream.scrollTop = chatStream.scrollHeight;
+}
+
 function renderRoomState(payload) {
   const state = assertRoomState(payload);
   renderHistory(state.messages, state.characterId);
+  renderConversation(state.messages, state.characterId);
 
   const latest = state.latestCharacterMessage;
   if (
