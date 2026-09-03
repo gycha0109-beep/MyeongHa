@@ -7,14 +7,18 @@
   <meta name="theme-color" content="#071018" />
   <title>명하 · MyeongHa</title>
   <script src="landing-theme-init.js"></script>
-  <link rel="preload" href="landing-dark.webp" as="image" type="image/webp" />
-  <link rel="preload" href="landing-light.webp" as="image" type="image/webp" />
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="landing-v2.css" />
   <link rel="stylesheet" href="landing-csp.css" />
+  <link rel="stylesheet" href="landing-art.css" />
 </head>
 <body data-page="landing">
   <div class="landing-v2">
+    <div class="landing-art" aria-hidden="true">
+      <img class="landing-art-image landing-art-night" data-landing-art="night" alt="" />
+      <img class="landing-art-image landing-art-day" data-landing-art="day" alt="" />
+    </div>
+
     <header class="landing-header">
       <div class="landing-header-inner">
         <a class="landing-brand" href="index.html" aria-label="명하 대문으로 이동">
@@ -74,6 +78,17 @@
     </div>
   </div>
 
+  <script src="landing-art-dark-01.js"></script>
+  <script src="landing-art-dark-02.js"></script>
+  <script src="landing-art-dark-03.js"></script>
+  <script src="landing-art-dark-04.js"></script>
+  <script src="landing-art-dark-05.js"></script>
+  <script src="landing-art-light-01.js"></script>
+  <script src="landing-art-light-02.js"></script>
+  <script src="landing-art-light-03.js"></script>
+  <script src="landing-art-light-04.js"></script>
+  <script src="landing-art-light-05.js"></script>
+  <script src="landing-art-init.js"></script>
   <script src="app.js" defer></script>
 </body>
 </html>
