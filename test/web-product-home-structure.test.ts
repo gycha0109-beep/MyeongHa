@@ -82,7 +82,8 @@ describe('MyeongHa product Home web v2', () => {
     expect(html).toContain('href="records.html"');
     expect(html).toContain('class="home-person-action" href="chat-hub.html"');
     expect(html).toContain('class="home-person-tag">캐릭터 선택</span>');
-    expect(html).toContain('캐릭터와 이야기하기');
+    expect(html).toContain('오늘 이야기할 사람');
     expect(html).not.toContain('href="chat.html?character=seyeon"');
+    expect(html).not.toContain('href="chat.html?character=');
   });
 });
