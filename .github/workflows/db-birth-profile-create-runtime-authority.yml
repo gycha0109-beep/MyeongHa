@@ -1,0 +1,59 @@
+name: DB Birth Profile Create Runtime Authority
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/migrations/**'
+      - 'test/db/birth_profile_create_runtime_authority.sh'
+      - '.github/workflows/db-birth-profile-create-runtime-authority.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'supabase/migrations/**'
+      - 'test/db/birth_profile_create_runtime_authority.sh'
+      - '.github/workflows/db-birth-profile-create-runtime-authority.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: myeongha_birth_profile_create_runtime_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d myeongha_birth_profile_create_runtime_test"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: myeongha_birth_profile_create_runtime_test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Bootstrap Supabase auth test fixture
+        run: psql -v ON_ERROR_STOP=1 -f test/db/bootstrap_supabase_auth_stub.sql
+      - name: Apply migrations
+        shell: bash
+        run: |
+          set -euo pipefail
+          for migration in supabase/migrations/*.sql; do
+            echo "Applying ${migration}"
+            psql -v ON_ERROR_STOP=1 -f "${migration}" >/dev/null
+          done
+      - name: Verify Birth Profile production create runtime authority
+        run: bash test/db/birth_profile_create_runtime_authority.sh
