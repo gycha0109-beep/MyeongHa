@@ -3,29 +3,29 @@
 > Repository: `gycha0109-beep/MyeongHa`  
 > Baseline date: 2026-09-04 KST  
 > Baseline MyeongHa `main`: `0fcd9f2b0dd18e6a9a97edc408b5a10204bdbbfd`  
-> Baseline Saju `main`: `a64c3b12b0e2cfa791d4a878b941f85a6a4d5001`  
-> Status: **SELF-REVIEW PASS / IMPLEMENTATION P0 OPEN / PRODUCTION OPERATIONS NOT COMPLETE**
+> Baseline Saju `main`: `2f92f59c3f27c471127bfe3dad8260b192bc8c31`  
+> Status: **SECOND SELF-REVIEW PASS / IMPLEMENTATION P0 OPEN / PRODUCTION OPERATIONS NOT COMPLETE**
 
 ---
 
 ## 1. 목적
 
-이 문서는 명하의 production runtime을 실제 장애, 배포 실패, 외부 provider 장애, credential rotation, DB 장애, latency 증가, burst traffic 상황에서도 **관찰·격리·복구·재현·측정 가능**하게 운영하기 위한 기준을 정의한다.
+이 문서는 명하 production runtime을 실제 장애, 배포 실패, 외부 provider 장애, credential rotation, DB 장애, latency 증가, burst traffic 상황에서도 **관찰·격리·복구·재현·측정 가능**하게 운영하기 위한 기준을 정의한다.
 
-목표는 특정 cloud product를 많이 도입하는 것이 아니다. 목표는 다음 질문에 실행 가능한 답을 갖는 것이다.
+목표는 특정 cloud product를 많이 도입하는 것이 아니다. 다음 질문에 실행 가능한 답을 갖는 것이 목표다.
 
 - 어떤 서비스가 어디에서 실행되는가?
 - 한 dependency가 죽을 때 전체 서비스까지 같이 죽는가?
-- 장애를 몇 분 안에 감지할 수 있는가?
+- 장애를 어떤 signal로 감지하는가?
 - 느린 요청과 실패 dependency를 구분할 수 있는가?
 - bad deployment를 exact previous artifact로 되돌릴 수 있는가?
 - DB 손상 또는 삭제 시 복구 가능한가?
-- Saju 서비스가 장애여도 기존 product surface가 유지되는가?
+- Saju 장애 시 기존 product surface가 유지되는가?
 - traffic 증가 시 병목 위치를 측정할 수 있는가?
 - cache로 사용자별 민감 데이터가 섞이지 않는가?
 - logs/traces/metrics/alerts/CI에 secret 또는 민감 데이터가 노출되지 않는가?
 
-이 문서는 **설계 authority**이며, provider dashboard 설정이 존재한다는 이유만으로 해당 capability가 검증되었다고 간주하지 않는다.
+Provider dashboard에 기능이 보인다는 이유만으로 해당 capability가 검증되었다고 간주하지 않는다.
 
 ---
 
@@ -65,18 +65,16 @@
 - Saju semantic calculation rules
 - Character semantic/presentation authority
 
-운영 인프라는 위 영역의 **runtime deployment, timeout/retry, observability, recovery** 연결부만 다룬다.
+Operations는 위 영역의 runtime deployment, timeout/retry, observability, recovery 연결부만 다룬다.
 
 ---
 
 ## 3. Authority Baseline
 
-이 문서는 다음 authority 경계를 보존한다.
-
 ```text
 MyeongHa Web/API
-→ user identity
-→ product state
+→ user identity orchestration
+→ product state orchestration
 → entitlement orchestration
 → API orchestration
 
@@ -100,21 +98,32 @@ Supabase/PostgreSQL
 - `MyeongHa Character System Architecture — Phase C1 v0.1`
 - `Myeonghwa Personalized Interpretation Architecture v1.3`
 
-문서와 현재 production 구현이 충돌할 경우 다음 순서로 판정한다.
+특히 다음 경계를 유지한다.
 
-1. 기존 semantic/domain authority 확인
-2. 최신 architecture/decision 문서 확인
+```text
+Saju Engine
+→ 무엇을 계산/해석할 수 있는가
+
+MyeongHa Product DB
+→ 누구의 어떤 입력/대화/관계/권한/결과인가
+
+Character Runtime
+→ 허용된 의미를 어떤 캐릭터 화법으로 전달하는가
+```
+
+Operations 문서가 이 semantic/domain authority를 재정의해서는 안 된다.
+
+문서와 현재 구현이 충돌하면:
+
+1. semantic/domain authority 확인
+2. 최신 architecture/decision 확인
 3. 최신 `main` implementation 확인
 4. 실제 production runtime 확인
-5. 충돌을 명시한 뒤 본 operations 문서에서 운영 authority 결정
-
-Operations 문서가 domain authority를 재정의해서는 안 된다.
+5. 충돌을 명시하고 operations 범위에서만 결정
 
 ---
 
 ## 4. Evidence / Current-State Classification
-
-모든 상태는 다음 네 class 중 하나로 기록한다.
 
 ```text
 CONFIRMED
@@ -124,13 +133,15 @@ PARTIAL
 → 일부 capability는 있으나 운영 contract 전체는 미검증
 
 UNKNOWN
-→ provider/account-level evidence를 현재 확인할 수 없음
+→ provider/account-level evidence를 확인하지 못함
 
 BLOCKED
 → known dependency/decision 때문에 production-ready가 아님
 ```
 
 `READY`, CI `green`, 단일 HTTP `200`은 독립 evidence일 뿐 production health 전체를 의미하지 않는다.
+
+Current-state assertion은 point-in-time snapshot이다. 다른 repo의 `main`이 이동하면 baseline SHA를 다시 확인한다.
 
 ---
 
@@ -157,32 +168,38 @@ MyeongHa Web + Node Serverless API
              actual production host/binding is not verified
 ```
 
-현재 확인된 provider/runtime:
+확인된 provider/runtime:
 
 - MyeongHa hosting: Vercel
 - production project: `myeongha`
 - production alias: `myeongha.vercel.app`
 - MyeongHa runtime: Node 24.x serverless functions
-- current deployment is exact-Git-SHA attributable and a prior rollback candidate exists
+- current production deployment is exact Git SHA attributable
+- prior rollback candidate exists
+- current Vercel plan observed during investigation: Hobby
 - database provider: Supabase
 - database region: `ap-southeast-1`
 - PostgreSQL: 17.x
-- Saju: Node 24 + OCI/Docker production contract exists on latest `main`
+- Supabase project status observed: healthy
+- Saju: Node 24 + OCI/Docker production contract exists
 - Saju live production origin: **UNKNOWN / activation incomplete**
 
-### 현재 중요 production evidence
+### 현재 중요 evidence
 
-- `/api/health` returns `200 {"status":"ok"}` but only proves route/process liveness.
-- protected current-user API returns auth failure with `Cache-Control: no-store` when identity evidence is absent.
-- `/api/me/saju/calculation` currently fails when required Saju production configuration is missing.
-- therefore Vercel deployment `READY` does not imply Saju product path readiness.
-- MyeongHa `main` branch is currently **unprotected**. Because current Vercel behavior deploys `main` to production, branch governance is an operations risk even though it is not a domain-authority problem.
+- `/api/health` returns `200 {"status":"ok"}` but proves route/process liveness only.
+- protected current-user API rejects absent identity evidence and uses `Cache-Control: no-store`.
+- `/api/me/saju/calculation` fails when required Saju production configuration is missing.
+- therefore Vercel `READY` does not imply Saju capability readiness.
+- MyeongHa `main` is currently unprotected while `main` maps to production deployment.
+- Saju `main` is also currently unprotected. It is not a live production deployment source yet, but it becomes a supply-chain governance risk once production artifact promotion begins.
+
+Saju baseline moved during architecture review from `a64c3b12...` to `2f92f59c...`; the delta was a product-host monthly-reading E2E test addition only. Production container/process files were not changed by that one-commit delta.
 
 ---
 
 ## 6. 목표 Production Topology
 
-초기 제품의 minimum viable reliability 기준 target은 다음과 같다.
+Minimum viable reliability target:
 
 ```text
 Client
@@ -193,7 +210,7 @@ MyeongHa Web/API deployment unit
   ├─ Supabase Auth
   ├─ PostgreSQL
   ├─ Saju Calculation Service
-  └─ external providers as explicitly required
+  └─ explicitly activated external providers
 
 Independent runtime units
   ├─ Saju Calculation Service
@@ -203,10 +220,11 @@ Independent runtime units
 원칙:
 
 - Saju를 deployment 편의 때문에 MyeongHa function 내부 semantic engine으로 합치지 않는다.
-- degradable dependency는 MyeongHa 전체 readiness를 무조건 내리지 않는다.
+- degradable dependency failure가 전체 readiness를 무조건 내리지 않는다.
 - correctness-critical dependency failure는 bounded failure로 종료한다.
 - state authority를 application-local ephemeral storage에 두지 않는다.
 - worker/runtime class는 실제 use case가 존재할 때만 추가한다.
+- deployment topology는 domain authority를 바꾸지 않는다.
 
 ---
 
@@ -215,20 +233,18 @@ Independent runtime units
 | service_id | owner | repository | runtime | deployment unit | public/private | state | dependencies | health | criticality | data class | scaling |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | `myeongha-web` | MyeongHa | `MyeongHa` | Vercel web/edge delivery | web deployment | public | stateless | Vercel/CDN | provider + page smoke | core | public + user UI | provider-managed |
-| `myeongha-api` | MyeongHa | `MyeongHa` | Node 24 serverless | API functions | public ingress / server execution | stateless except DB connections | Auth, PostgreSQL, Saju | current `/api/health` liveness; target readiness/dependency telemetry | core | private/security-sensitive | serverless |
-| `saju-calculation` | Saju | `Saju` | Node 24 OCI long-running HTTP | container image/process | public HTTPS endpoint with service auth; not user-public authority | stateless | calculation assets | `/healthz`; target readiness definition | feature-critical, not whole-product-critical | birth-derived calculation input/output | container instance |
+| `myeongha-api` | MyeongHa | `MyeongHa` | Node 24 serverless | API functions | public ingress / server execution | stateless except DB connections | Auth, PostgreSQL, Saju | current liveness; target capability readiness/dependency telemetry | core | private/security-sensitive | serverless |
+| `saju-calculation` | Saju | `Saju` | Node 24 OCI long-running HTTP | container image/process | network-public HTTPS + service auth; not user authority | stateless | calculation assets | `/healthz`; target calculation readiness | feature-critical | birth-derived calculation input/output | container instances |
 | `postgres` | data platform | `MyeongHa` schema authority | Supabase PostgreSQL 17 | managed DB | private | stateful | provider storage/network | provider health + application DB signals | P0 | persistent private data | provider DB |
-| `supabase-auth` | identity platform | external managed | Supabase Auth | managed service | public auth surface / server verification | stateful managed | provider | provider + auth verification metrics | core | identity/security-sensitive | provider-managed |
-| `character-runtime` | Character | TBD current deployment unit | TBD | must preserve Character authority | TBD | preferably stateless runtime over persistent authority | content, DB, AI provider | REQUIRED before activation | feature-critical | private conversation/context | TBD |
-| `outbox-worker` | platform operations | future | TBD | separate worker if/when activated | private | stateless worker over DB state | PostgreSQL, delivery providers | REQUIRED before activation | background-critical | event metadata | queue/backlog driven |
+| `supabase-auth` | identity platform | external managed | Supabase Auth | managed service | public auth surface / server verification | managed state | provider | provider + auth verification metrics | core | identity/security-sensitive | provider-managed |
+| `character-runtime` | Character | TBD | TBD | must preserve Character authority | TBD | preferably stateless over persistent authority | content, DB, AI | REQUIRED before activation | feature-critical | private conversation/context | TBD |
+| `outbox-worker` | platform operations | future | TBD | separate worker if activated | private | stateless worker over DB state | PostgreSQL, providers | REQUIRED before activation | background-critical | event metadata | backlog-driven |
 
-Future service rows are **not evidence that those runtimes exist today**.
+Future rows are not evidence that those runtimes exist today.
 
 ---
 
 ## 8. Environment Model
-
-Initial environment model:
 
 ```text
 local
@@ -238,24 +254,26 @@ test
 → deterministic automated tests; no production secret/data
 
 preview
-→ per-PR or non-production deployment; isolated/non-production credentials
+→ per-PR/non-production deployment; isolated non-production credentials/data
 
 production
 → real user traffic and persistent authority
 ```
 
-`staging` is not mandatory at v1. It becomes required only when one of the following becomes true:
+`staging` is not mandatory at v1. It becomes required when:
 
-- DB migration or multi-service promotion requires production-like coordination not safely covered by preview.
-- payment/webhook/provider integration cannot be validated in preview.
+- DB migration or multi-service promotion needs production-like coordination not safely covered by preview.
+- payment/webhook/provider integration cannot be validated safely in preview.
 - destructive/failure/load tests need a persistent shared non-production environment.
 
 Environment invariants:
 
 - production secrets never flow to preview/test.
-- preview must not point at production PostgreSQL by default.
-- synthetic or explicitly designated test data only for load/failure tests.
-- environment name is explicit in logs/metrics/deployment metadata.
+- preview/test must not use production DB credentials.
+- preview/test must not intentionally query production user-owned rows.
+- production diagnostics that require real production state run through explicitly authorized production tooling, not by pointing preview at production.
+- load/failure tests use synthetic or explicitly designated non-production data.
+- environment is explicit in logs/metrics/deployment metadata.
 
 ---
 
@@ -263,7 +281,7 @@ Environment invariants:
 
 ### MyeongHa Web/API
 
-Required capability:
+Required:
 
 - Node 24 compatibility
 - static/web delivery + server API runtime
@@ -278,7 +296,7 @@ Current Vercel hosting satisfies part of this requirement. Provider choice is no
 
 ### Saju Calculation Service
 
-Required capability:
+Required:
 
 ```text
 Node 24
@@ -297,7 +315,18 @@ resource metrics
 rollback to previous image/digest
 ```
 
-Current `Dockerfile` uses `node:24-bookworm-slim`, runs as `node`, exposes port `3000`, and starts `dist/production-calculation-server.js`. Current container CI builds the exact SHA-tagged image, verifies non-root execution, checks `/healthz`, negative/positive authentication behavior, and rejects secret reflection in HTTP responses/logs.
+Current Saju `Dockerfile` uses `node:24-bookworm-slim`, runs as `node`, exposes `3000`, and starts `dist/production-calculation-server.js`.
+
+Current container CI verifies:
+
+- exact SHA-tagged image build
+- non-root `node`
+- `/healthz`
+- unauthenticated/wrong-token reject
+- active-token acceptance to request-validation boundary
+- service credential non-reflection in response/logs
+
+Current process configuration also supports an optional previous service bearer for rotation. Production rotation itself remains unverified until Phase 3.
 
 Provider selection must compare container support, secret management, health checks, restart, rollback, region, logs/metrics, scaling, cold start, and cost before activation.
 
@@ -311,9 +340,9 @@ Provider selection must compare container support, secret management, health che
 - exact origin, no embedded credentials/path/query/fragment
 - Bearer credential injected server-side only
 - client cannot choose upstream origin or credential
-- redirects must not silently forward credentials to arbitrary hosts
+- redirect must not silently forward credentials
 - bounded timeout
-- failure must be classified as dependency failure, not generic whole-product failure
+- failure classified as dependency failure, not whole-product failure
 
 Current required MyeongHa env names:
 
@@ -330,10 +359,10 @@ Current runtime baseline:
 - max connections per runtime: `4`
 - connection timeout: `5s`
 - idle timeout: `10s`
-- TLS required by governed connection configuration
-- login principal / execution role preflight
+- governed TLS configuration
+- login principal / execution-role preflight
 
-This per-runtime pool limit is not a database-wide capacity guarantee. Total possible connections depend on concurrent serverless runtime count and provider-side pool/connection limits.
+The per-runtime pool limit is not a DB-wide capacity guarantee. Total connections depend on serverless concurrency and provider-side limits/pooling.
 
 ---
 
@@ -356,15 +385,27 @@ Rules:
 
 - git commit: forbidden
 - container/image bake: forbidden
-- browser/client exposure: forbidden for server secrets
+- browser/client exposure: forbidden for server secret
 - logs/traces/metrics labels: forbidden
 - error response reflection: forbidden
 - CI echo: forbidden
 - environment isolation: required
-- owner and rotation path: required
-- active/previous overlap only when the credential protocol explicitly supports it
+- explicit owner: required
+- rotation/revocation path: required
+- active/previous overlap only when protocol supports it
 
-Saju producer-side active/previous Bearer rotation may be used for zero-downtime transition, but rotation completion requires old credential rejection verification.
+Saju producer-side rotation contract supports current + optional previous bearer. Zero-downtime rotation is accepted only after verifying:
+
+```text
+new active succeeds
+old previous succeeds during overlap
+MyeongHa binds new active
+new path succeeds
+old credential removed
+old credential is rejected
+```
+
+No credential rotation is considered complete merely because a new secret was stored in a provider dashboard.
 
 ---
 
@@ -374,14 +415,16 @@ Provider-neutral target flow:
 
 ```text
 commit
-→ CI
+→ required CI
 → immutable artifact/image
 → deploy candidate
-→ provider readiness
-→ application health verification
+→ configuration preflight
+→ provider health
+→ application/capability readiness
 → negative auth smoke
-→ positive smoke
+→ positive synthetic smoke
 → dependency verification
+→ compatibility verification
 → production promotion/alias
 → post-promotion observation
 ```
@@ -393,16 +436,20 @@ main push/merge
 → Vercel production deployment
 ```
 
-Current `main` is unprotected, so a direct main update can become a production deployment without branch-protection enforcement. v1 operations must close this governance gap before claiming controlled promotion.
+Current MyeongHa `main` is unprotected. v1 operations must close this governance gap before claiming controlled promotion.
 
-Target deployment invariants:
+Before Saju production activation, Saju source/artifact promotion must also gain an explicit gate because Saju `main` is currently unprotected.
+
+Target invariants:
 
 - every production deployment resolves to exact Git SHA.
-- Saju image resolves to exact image digest plus source SHA.
-- stale concurrent deployments must not silently supersede a newer approved artifact.
-- unhealthy candidate must not be considered healthy because provider state is `READY`.
-- rollback candidate must be identified before risky promotion.
-- production branch/ref governance must prevent accidental unreviewed promotion, or an equivalent explicit gate must exist.
+- Saju image resolves to exact OCI digest plus source SHA.
+- stale concurrent deployments do not silently supersede a newer approved artifact.
+- required production config is validated without printing secret values.
+- provider `READY` is not product readiness.
+- rollback candidate is identified before risky promotion.
+- source/ref governance prevents accidental unreviewed promotion, or an equivalent immutable manual promotion gate exists.
+- MyeongHa↔Saju compatibility is verified before or immediately after promotion with bounded synthetic data.
 
 Canary/blue-green/Kubernetes are not v1 requirements.
 
@@ -410,7 +457,7 @@ Canary/blue-green/Kubernetes are not v1 requirements.
 
 ## 13. Artifact / Version / Provenance
 
-Required metadata for every production deployment:
+Required metadata:
 
 ```text
 service
@@ -423,26 +470,20 @@ environment
 deployed_at
 ```
 
-MyeongHa may use provider deployment identity plus Git SHA.
-Saju must use OCI digest plus source SHA; mutable `latest` alone is not production provenance.
+MyeongHa may use provider deployment identity + Git SHA.
+Saju must use OCI digest + source SHA; mutable `latest` alone is not production provenance.
+
+Cross-service compatibility evidence is separate from provenance. Two exact SHAs can still be incompatible.
 
 ---
 
 ## 14. Liveness / Readiness / Dependency Health
 
-### Definitions
-
-**Liveness**
-: process/runtime can execute a minimal local request path.
-
-**Readiness**
-: service can safely accept the class of traffic assigned to it.
-
-**Dependency health**
-: independently measured state of Auth, DB, Saju, payment, AI, notification, etc.
-
-**Degraded**
-: one feature/dependency is unavailable while unaffected product surfaces remain serviceable.
+**Liveness**: runtime can execute a minimal local request path.  
+**Readiness**: service can safely accept its assigned traffic class.  
+**Dependency health**: independently measured Auth/DB/Saju/provider state.  
+**Capability readiness**: a specific product capability has required config/dependencies and can execute safely.  
+**Degraded**: one capability/dependency is unavailable while unaffected surfaces remain serviceable.
 
 ### MyeongHa
 
@@ -450,31 +491,28 @@ Current `/api/health` is liveness only.
 
 Target:
 
-- keep a cheap public liveness endpoint with no secret/data details.
-- add readiness/dependency instrumentation without turning optional dependency failure into whole-product failure.
-- DB/Auth failure may make user-data paths unready.
-- Saju failure marks Saju capability degraded while core MyeongHa remains live.
-- readiness must be measurable independently from provider deployment state.
+- keep cheap public liveness with no secret/data detail.
+- do not turn every optional dependency failure into whole-product unready.
+- DB/Auth failure can make user-data capability unready.
+- Saju failure marks Saju capability degraded while core remains live.
+- missing required Saju config must be detected during deployment/capability preflight rather than discovered only by user traffic.
+- readiness/capability state must be measurable independently from Vercel deployment state.
 
-Public health response must not reveal credentials, DB hostname, bearer state, internal stack, or user data.
+Public health responses must not expose credentials, DB hostname, bearer state, stack, or user data.
 
 ### Saju
 
-`/healthz` must have explicit semantics.
+`/healthz` semantics:
 
-v1 requirement:
-
-- liveness: process booted and HTTP loop responsive.
+- liveness: HTTP loop responsive.
 - calculation readiness: runtime initialized and able to execute a bounded deterministic non-sensitive self-check or equivalent initialization proof.
-- external dependency status, if any, is separately instrumented.
-
-A provider health probe must not repeatedly execute an expensive or privacy-sensitive real-user calculation.
+- provider probe must not execute privacy-sensitive real-user calculation.
 
 ---
 
 ## 15. Structured Logging Contract
 
-Common fields:
+Common target fields:
 
 ```text
 timestamp
@@ -492,11 +530,9 @@ dependency
 dependencyStatus
 ```
 
-`traceId` is a target field; it is not a claim that distributed tracing already exists.
+`traceId` is a target field, not a current tracing claim.
 
-Optional internal identifiers must be pseudonymous/stable only when operationally necessary.
-
-Never log:
+Never log in standard operational telemetry:
 
 ```text
 Authorization header
@@ -504,24 +540,26 @@ Bearer token
 session token
 cookie value
 database password
-service-role or secret API key
+service-role/secret API key
 raw payment credential
 raw receipt payload
-full Birth raw payload
+raw Birth payload
 full chat transcript
 private conversation body
 unbounded user-entered text
 ```
 
-Error logs should prefer stable error codes and bounded metadata over raw exception context when the latter can contain sensitive values.
+Use stable bounded error codes and normalized metadata. Optional internal IDs must be pseudonymous and operationally necessary.
 
-Retention and sampling are `OPEN DECISION` until provider/tool selection and traffic baseline.
+Raw prompt/response debug capture, if ever required by another authority, is not standard logging and requires separate access/retention approval.
+
+Retention and sampling remain `OPEN DECISION` until tool selection and traffic baseline.
 
 ---
 
 ## 16. Metrics / SLI Architecture
 
-Minimum golden signals:
+Golden signals:
 
 ```text
 latency
@@ -533,67 +571,60 @@ saturation
 ### MyeongHa API
 
 - request count by normalized route/method/status class
-- 2xx / 4xx / 5xx
-- p50 / p95 / p99 duration
+- 2xx/4xx/5xx
+- p50/p95/p99 duration
 - DB query/transaction latency
 - DB connection acquisition failures/timeouts
 - auth verification latency/failure
-- dependency request latency/error/timeout
-- serverless execution/cold-start signal when provider exposes it
+- dependency latency/error/timeout
+- serverless/cold-start signal when available
 
 ### Saju
 
 - calculation request count
-- calculation p50/p95/p99
-- 401 auth rejects
-- calculation error count
-- timeout count
-- process restarts
-- CPU / memory
-- concurrent requests
+- p50/p95/p99
+- auth reject count
+- calculation error/timeout count
+- process restart count
+- CPU/memory
+- concurrency
 
 ### Dependencies
 
-Separate dimensions for:
+Separate dimensions for PostgreSQL, Supabase Auth, Saju, payment, AI, notification.
 
-- PostgreSQL/Supabase
-- Supabase Auth
-- Saju
-- payment provider
-- AI provider
-- notification provider
-
-Dependency label cardinality must be bounded and must never contain URLs with secrets or user IDs.
+Metric labels must be bounded and never contain user IDs, raw URLs with secrets, Birth values, or user text.
 
 ---
 
 ## 17. SLO Catalog
 
-No availability/latency/error-rate number is authoritative until baseline and product criticality measurement are complete.
+No availability/latency/error-rate number is authoritative until product criticality and baseline are approved.
 
 | SLO | SLI | window | target | source | user impact |
 |---|---|---|---|---|---|
-| Core API availability | valid core requests excluding client faults that complete without service failure | rolling window `TBD` | `TBD-BY-MEASUREMENT` | API metrics | login/profile/core use |
-| Core API error rate | normalized core requests ending in 5xx / eligible core requests | rolling window `TBD` | `TBD-BY-MEASUREMENT` | API metrics | failed core operations |
-| Core API latency | route-normalized p95 | rolling window `TBD` | `TBD-BY-MEASUREMENT` | API metrics | perceived responsiveness |
-| Saju capability availability | eligible Saju requests completing without dependency/internal failure | rolling window `TBD` | `TBD-BY-MEASUREMENT` | MyeongHa + Saju metrics | new Saju calculation |
-| Saju latency | end-to-end calculation p95 | rolling window `TBD` | `TBD-BY-MEASUREMENT` | trace/metrics | Saju wait time |
-| DB dependency success | DB operations without timeout/connection failure | rolling window `TBD` | `TBD-BY-MEASUREMENT` | DB/app metrics | persistent product paths |
+| Core API availability | eligible core requests completing without service failure | `TBD` | `TBD-BY-MEASUREMENT` | API metrics | login/profile/core use |
+| Core API error rate | eligible core requests ending 5xx / eligible core requests | `TBD` | `TBD-BY-MEASUREMENT` | API metrics | failed core operations |
+| Core API latency | route-normalized p95 | `TBD` | `TBD-BY-MEASUREMENT` | API metrics | responsiveness |
+| Saju capability availability | eligible Saju requests completing without dependency/internal failure | `TBD` | `TBD-BY-MEASUREMENT` | MyeongHa + Saju metrics | new calculation |
+| Saju latency | end-to-end calculation p95 | `TBD` | `TBD-BY-MEASUREMENT` | metrics/trace | wait time |
+| DB dependency success | DB operations without timeout/connection failure | `TBD` | `TBD-BY-MEASUREMENT` | DB/app metrics | persistent paths |
 
-Target values are set only after Phase 10 baseline measurement.
+Current 5s Saju adapter timeout is an implementation boundary, not an SLO.
 
 ---
 
 ## 18. Monitoring / Dashboard
 
-Minimum dashboard views:
+Minimum views:
 
-1. **Core service overview** — traffic, 5xx, p95, deployment SHA.
-2. **Dependency overview** — DB/Auth/Saju/provider latency + errors + timeouts.
-3. **Saju service** — request rate, auth rejects, latency, CPU/memory, restarts.
-4. **Database operations** — connection acquisition, query latency, provider health, capacity signals.
-5. **Deployment comparison** — before/after error and latency by SHA.
-6. **Background processing** — only when workers exist; backlog/age/retry signals.
+1. Core service — traffic, 5xx, latency, deployment SHA.
+2. Dependencies — DB/Auth/Saju/provider latency/errors/timeouts.
+3. Saju — request rate, rejects, latency, CPU/memory, restarts.
+4. DB — connection acquisition, query latency, provider capacity signals.
+5. Deployment comparison — before/after by SHA.
+6. Background processing — only when workers exist; backlog/age/retry.
+7. Capability readiness — config/dependency state without secret disclosure.
 
 A dashboard is not alerting.
 
@@ -603,16 +634,16 @@ A dashboard is not alerting.
 
 ```text
 P0
-→ broad outage, data corruption/loss risk, credential compromise, irreversible payment/data risk
+→ data corruption/loss risk, credential compromise, irreversible payment/data risk, broad catastrophic outage
 
 P1
-→ core product unavailable or major critical feature unavailable
+→ core product unavailable or major critical capability unavailable
 
 P2
-→ bounded degradation with workaround or limited blast radius
+→ bounded degradation with limited blast radius/workaround
 
 P3
-→ operational anomaly requiring investigation but no immediate user-critical impact
+→ anomaly requiring investigation but no immediate critical impact
 ```
 
 Initial alert candidates:
@@ -620,115 +651,111 @@ Initial alert candidates:
 - sustained core 5xx regression
 - DB unavailable / connection exhaustion
 - Saju unavailable or timeout spike
-- production deployment verification failure
-- unexpected process restart loop
-- backup failure once backup monitoring exists
+- production verification failure
+- repeated process restart
+- backup failure once monitoring exists
 - outbox/worker backlog when activated
-- payment webhook processing failures when payment runtime is activated
+- payment webhook failures when activated
 
-Thresholds and evaluation windows remain `TBD-BY-MEASUREMENT`. Single isolated warning events should not automatically page.
+Thresholds and windows remain `TBD-BY-MEASUREMENT`. Single isolated warnings should not page by default.
 
 ---
 
 ## 20. Dependency Failure Matrix
 
-| Failure | Detection | User impact | Blast radius | Automatic recovery | Manual action | Data risk | Expected degraded state |
+| Failure | Detection | User impact | Blast radius | Automatic recovery | Manual action | Data risk | Expected state |
 |---|---|---|---|---|---|---|---|
-| MyeongHa API unavailable | synthetic/API metrics | API features unavailable | web static may remain | provider restart/redeploy | rollback/investigate | low unless in-flight writes | API unavailable |
-| Saju unavailable | dependency timeout/health/5xx | new Saju calculation unavailable | Saju only | service restart if supported | rollback Saju / provider action | low if no partial commit | core remains available |
-| Saju timeout | dependency latency/timeout | bounded Saju error | Saju request only | timeout releases request | inspect capacity/provider | low | core remains available |
-| DB unavailable | DB connection errors | persistent user-data paths fail | broad API | provider recovery | incident/restore if needed | potentially high | static/non-DB surfaces only |
-| DB slow | p95/query/acquire latency | API slow/timeouts | DB-dependent routes | bounded timeout | query/capacity analysis | low-to-medium | degraded core |
-| Supabase Auth unavailable | verifier/provider errors | member auth flows fail | member routes | provider recovery | provider incident | low | public/static surfaces remain |
-| credential mismatch | 401/explicit auth metric | service-to-service function fails | affected dependency only | overlap credential only if valid by protocol | rotate/bind correctly | low | bounded feature outage |
-| bad production deployment | smoke + regression metrics | varies | deployment unit | promotion stop/rollback | rollback or roll-forward | migration-dependent | previous healthy version |
-| partial deployment | SHA/provenance mismatch | inconsistent behavior | involved services | stop promotion | align exact versions | medium | fail closed where incompatible |
-| DNS/TLS failure | network classification | affected dependency fails | dependency only | resolver/provider recovery | provider/network action | low | bounded feature degradation |
-| external AI/provider timeout | dependency metrics | generated feature degraded | AI-dependent surfaces | bounded failure | provider switch only if pre-approved | low | non-AI core remains |
-| logging provider unavailable | log export health | observability reduced | operations only | buffering if supported | restore export | no product correctness impact | product continues |
-| metrics provider unavailable | scrape/export health | detection reduced | operations only | retry/export recovery | restore metrics | no product correctness impact | product continues |
-| worker crash | heartbeat/backlog | delayed async work | worker-owned feature | restart | inspect poison work item | depends on event semantics | synchronous core remains |
-| cache failure | cache errors | slower response | cached surfaces | bypass cache | restore/invalidate | correctness must remain intact | uncached operation |
+| MyeongHa API unavailable | synthetic/API metrics | API unavailable | static web may remain | provider restart/redeploy | rollback/investigate | low unless in-flight write | API unavailable |
+| Saju unavailable | timeout/health/5xx | new calculation unavailable | Saju only | service restart if supported | rollback/provider action | low if no partial commit | core available |
+| Saju timeout | latency/timeout | bounded Saju error | request/capability | timeout releases caller | inspect capacity/provider | low | core available |
+| DB unavailable | DB connection errors | user-data paths fail | broad API | provider recovery | incident/restore | potentially high | static/non-DB only |
+| DB slow | latency/acquire signal | slow/timeouts | DB routes | bounded by configured limits when implemented | query/capacity analysis | low-medium | degraded core |
+| Supabase Auth unavailable | verifier/provider errors | member auth fails | protected routes | provider recovery | provider incident | low | public/static remain |
+| credential mismatch | 401/auth metric | affected S2S capability fails | dependency only | overlap only if protocol supports | rotate/bind | low | bounded outage |
+| bad deployment | smoke/regression | varies | deployment unit | promotion stop/rollback | rollback/roll-forward | migration-dependent | previous healthy version |
+| partial deployment | provenance/compatibility failure | inconsistent behavior | involved services | stop promotion | align versions | medium | fail closed |
+| DNS/TLS failure | network classification | affected dependency fails | dependency | provider recovery | network action | low | bounded degradation |
+| AI/provider timeout | dependency metrics | generated feature degraded | AI surface | bounded timeout | approved provider action | low | non-AI core remains |
+| logging provider unavailable | export health | observability reduced | operations | buffer if supported | restore export | no correctness impact | product continues |
+| metrics provider unavailable | export health | detection reduced | operations | retry/export recovery | restore metrics | no correctness impact | product continues |
+| worker crash | heartbeat/backlog | async delay | worker feature | restart | inspect poison item | event-semantic dependent | sync core remains |
+| cache failure | cache errors | slower responses | cached surfaces | bypass | restore/invalidate | correctness must remain | uncached operation |
 
 ---
 
 ## 21. Failure Isolation Invariants
 
-Mandatory invariants:
-
 ```text
 Saju down
 → new Saju calculation unavailable
-→ existing persisted Reading retrieval remains possible when DB is healthy
-→ Character surfaces that do not require a new Saju call may remain available
-→ login/home/core API must not fail solely because Saju is down
+→ existing persisted Reading retrieval remains possible when DB healthy
+→ Character surfaces not requiring a new Saju call may remain available
+→ login/home/core API do not fail solely because Saju is down
 
 DB down
 → DB-dependent requests fail bounded
-→ serverless/process connection storm must be limited
+→ connection storm is limited
 → static assets remain available
 
 Auth down
 → protected member paths fail closed
-→ no identity fallback that trusts client-supplied subject IDs
+→ no client-supplied subject fallback
 
 observability down
 → product correctness unchanged
 
 cache down/corrupt
-→ correctness preserved; bypass/invalidate rather than serve uncertain private data
+→ correctness preserved
+→ uncertain private cached data is bypassed/invalidated
 ```
 
 ---
 
 ## 22. Timeout / Retry / Circuit Policy
 
-Every dependency must define connect/request timeout, retryability, count, backoff/jitter, and optional circuit behavior. Unknown values remain explicit rather than guessed.
+Every dependency defines connect/request timeout, retryability, count, backoff/jitter, and optional circuit behavior before activation.
 
 | dependency | current evidence | timeout authority | retry authority | circuit authority |
 |---|---|---|---|---|
-| Saju | bounded HTTP adapter; default `5s`, max config boundary `30s`; redirect not silently followed | keep bounded; final production timeout validated by baseline | no automatic application retry until retry safety/idempotency is proven | introduce only if repeated failure causes measurable resource pressure |
-| PostgreSQL | pool connection timeout `5s`; max 4 connections/runtime | connection timeout confirmed; query/transaction timeout policy `TBD` | transaction/command retry belongs to platform semantics; operations must not invent it | application circuit generally not default; use bounded connection/backpressure first |
-| Supabase Auth | server verifier exists | `TBD-BY-MEASUREMENT/IMPLEMENTATION` | auth rejection is non-retryable; transient provider retry only after explicit safe policy | `TBD` |
-| AI provider | activation-dependent | REQUIRED before activation | write/side-effect retry requires idempotency contract | consider only after measured failure mode |
-| payment provider | activation-dependent | REQUIRED before activation | never retry payment command blindly; provider/idempotency contract required | provider-specific decision |
-| notification provider | activation-dependent | REQUIRED before activation | async delivery retry governed by delivery semantics/outbox authority | worker/backoff policy after activation |
+| Saju | HTTP adapter default 5s; adapter accepts integer up to 30s; production composition currently uses default | bounded; final value validated by baseline | no automatic application retry until safety/load behavior is proven | only if repeated failure creates measured pressure |
+| PostgreSQL | pool connect timeout 5s; max 4/runtime | query/transaction timeout still `TBD` | transaction/write retry belongs to platform semantics | bounded connection/backpressure first |
+| Supabase Auth | verifier exists | `TBD-BY-IMPLEMENTATION` | auth rejection non-retryable; transient retry only by explicit policy | `TBD` |
+| AI | activation-dependent | REQUIRED before activation | side-effect retry requires idempotency | measured decision |
+| payment | activation-dependent | REQUIRED before activation | never retry command blindly | provider/idempotency contract |
+| notification | activation-dependent | REQUIRED before activation | async retry governed by delivery/outbox semantics | worker/backoff after activation |
 
-General rules:
+Rules:
 
-- no unbounded network waits.
+- no unbounded network wait.
 - no automatic write retry without platform idempotency authority.
-- authentication/authorization failures are non-retryable.
-- schema/contract 4xx failures are non-retryable.
-- retry must not multiply load during provider outage.
-- timeout values are not SLO values.
+- auth/authz failure is non-retryable.
+- schema/contract 4xx is non-retryable.
+- retry must not amplify outage load.
+- timeout is not SLO.
 
 ---
 
 ## 23. Rollback / Roll-forward Strategy
 
-### Bad application deployment
+### Application deployment
 
 ```text
 detect
-→ smoke or post-deploy regression
-contain
-→ stop further promotion
-rollback
-→ exact previous healthy deployment/artifact
-verify
-→ health + negative auth + positive smoke + dependency checks
+→ contain / stop further promotion
+→ identify exact previous healthy artifact
+→ rollback or roll-forward
+→ verify health + auth + dependency + cache/privacy contracts
 ```
 
 ### Saju regression
 
-- previous OCI digest must remain identifiable.
-- rollback changes only Saju deployment unit.
-- MyeongHa need not roll back unless API contract incompatibility exists.
+- previous OCI digest remains identifiable.
+- rollback only Saju unit when contract remains compatible.
+- MyeongHa rollback is not required unless compatibility demands it.
 
 ### DB migration regression
 
-Application rollback must not assume schema rollback is safe. Migration semantics remain DB authority; operations runbook must classify migrations as backward-compatible, forward-only, or requiring coordinated recovery.
+Application rollback must not assume schema rollback is safe. DB authority classifies migrations as backward-compatible, forward-only, or coordinated-recovery.
 
 Roll-forward is preferred when data/schema state makes code rollback unsafe.
 
@@ -736,7 +763,7 @@ Roll-forward is preferred when data/schema state makes code rollback unsafe.
 
 ## 24. Backup / Restore
 
-Current state:
+Current evidence:
 
 ```text
 Supabase project healthy
@@ -744,19 +771,38 @@ backup schedule = UNKNOWN
 retention = UNKNOWN
 PITR = UNKNOWN
 restore procedure = UNVERIFIED
-restore drill = NOT PERFORMED/NOT EVIDENCED
+restore drill = NOT EVIDENCED
 ```
 
-Architecture requirement:
+Requirements:
 
-- authoritative PostgreSQL data must have provider-supported backup.
-- backup retention must be explicitly recorded.
-- restore must be tested, not assumed.
-- restore test must use an isolated target where feasible.
-- credentials/configuration needed for restore must not exist only in one operator's local machine.
-- backup status/failure must be observable.
+- authoritative PostgreSQL data has provider-supported backup.
+- backup schedule and retention are explicitly recorded.
+- backup failure/status is observable.
+- restore is tested, not assumed.
+- restore drill uses isolated target where feasible.
+- restore credentials/procedure do not exist only on one operator machine.
+- repository reconstructability is not a substitute for database backup.
 
-Repository artifacts/content reconstructable from Git are not a substitute for DB backup.
+### Privacy / deletion / legal-retention restore invariant
+
+Backup retention and restore do not override product privacy/deletion/legal-retention authority.
+
+The DB authority explicitly separates personalization erase from legally retained commerce history. Therefore a restore runbook must include reconciliation before restored data can serve production traffic.
+
+At minimum:
+
+```text
+restore isolated copy
+→ identify backup point/time
+→ reconcile account-deletion state and deletion jobs/tombstones as defined by data authority
+→ preserve legally retained commerce data only under its governing policy
+→ prevent resurrected personalization/share/device/notification access where deletion should remain effective
+→ verify authorization/integrity
+→ promote recovered state
+```
+
+Operations owns execution/recovery mechanics; privacy/legal/product authority owns what must remain deleted or retained.
 
 ---
 
@@ -765,50 +811,66 @@ Repository artifacts/content reconstructable from Git are not a substitute for D
 Definitions:
 
 - **RPO**: maximum acceptable persistent-data loss window.
-- **RTO**: maximum acceptable time to restore service after qualifying failure.
+- **RTO**: maximum acceptable service-recovery duration after a qualifying failure.
 
-Current authority:
+Current numeric authority:
 
 ```text
 RPO = OPEN DECISION
 RTO = OPEN DECISION
 ```
 
-Initial candidate values may be proposed only after confirming Supabase plan backup capability and running at least one restore exercise. Until then no `DR Ready` claim is allowed.
+Decision direction is **product requirement → infrastructure validation**, not provider capability → product requirement.
+
+Correct sequence:
+
+```text
+1. classify data/service criticality and acceptable business impact
+2. approve provisional RPO/RTO objectives
+3. compare provider backup/PITR/restore capability against those objectives
+4. change plan/provider/design if capability cannot meet the objectives, or explicitly accept a documented gap
+5. run restore drill
+6. measure achieved recovery and verify whether the approved objectives are met
+```
+
+A restore drill proves achievable recovery; it does not define what loss/downtime the product should accept.
+
+Until objectives and achieved evidence are both present, no `DR Ready` claim is allowed.
 
 ---
 
 ## 26. Incident Recovery
 
-Every operational incident follows:
+General flow:
 
 ```text
 detect
-→ classify dependency/service
+→ classify service/dependency
 → contain blast radius
 → preserve evidence
 → rollback/restore/recover
 → verify exact production state
-→ document root cause and preventive action
+→ root cause / preventive action
 ```
 
-Credential compromise adds:
+Credential compromise:
 
 ```text
 revoke/rotate
 → bind active credential
-→ verify new credential succeeds
-→ verify old credential fails
-→ review logs for exposure
+→ verify new succeeds
+→ verify old fails
+→ review exposure evidence
 ```
 
-Data corruption adds:
+Data corruption:
 
 ```text
-stop destructive writers if needed
+stop destructive writers when needed
 → identify corruption boundary
-→ select restore/repair path under DB authority
-→ verify consistency
+→ select repair/restore under DB authority
+→ perform privacy/deletion/legal-retention reconciliation
+→ verify consistency/authorization
 → reopen traffic
 ```
 
@@ -816,24 +878,22 @@ stop destructive writers if needed
 
 ## 27. Cache / CDN Classification
 
-| data class | cache policy |
+| data class | policy |
 |---|---|
 | hashed static immutable asset | aggressive CDN cache allowed |
 | public versioned content | shared cache allowed with versioned key; TTL `TBD` |
-| shared dynamic public content | only after explicit freshness/correctness review |
-| user-private API | `private` or `no-store`; shared cache forbidden by default |
+| shared dynamic public content | only after freshness/correctness review |
+| user-private API | `no-store` by default; any private-cache exception requires explicit contract |
 | auth/session/security-sensitive | `no-store` |
 | current-subject Saju calculation | `no-store` |
-| mutation/write result | `no-store` unless explicit safe contract exists |
+| mutation/write result | `no-store` unless explicit safe contract |
 
-Current evidence already shows `no-store` on current-user/Saju route paths.
+Cross-user invariant:
 
-Cross-user leakage invariant:
+- shared cache never serves user-private content across subjects.
+- where correctness is uncertain, disable shared cache.
 
-- a shared cache key must never depend on an omitted user/subject discriminator for private content.
-- where correctness is uncertain, disable shared caching rather than invent a user-key scheme.
-
-Cache outage must reduce performance, not correctness.
+Cache outage affects performance, not correctness.
 
 ---
 
@@ -841,22 +901,22 @@ Cache outage must reduce performance, not correctness.
 
 No fabricated p95 target is authoritative in v1.
 
-Required baseline measurements:
+Required baseline:
 
 ```text
-web page TTFB / load
-API p50 / p95 / p99
-serverless cold-start contribution
-DB connection acquisition latency
+web TTFB/load
+API p50/p95/p99
+cold-start contribution
+DB connection acquisition
 DB query/transaction latency
-Supabase Auth verification latency
-MyeongHa → Saju network latency
+Auth verification latency
+MyeongHa→Saju network latency
 Saju calculation latency
 ```
 
-Performance budget values are `TBD-BY-MEASUREMENT` until Phase 10.
+Values remain `TBD-BY-MEASUREMENT`.
 
-Performance work prioritization:
+Priority:
 
 1. correctness/resource leak
 2. pathological saturation
@@ -864,25 +924,27 @@ Performance work prioritization:
 4. cost efficiency
 5. micro-optimization
 
-Supabase index advisor findings are investigation inputs, not automatic index-authority changes.
+Supabase advisor warnings are investigation inputs, not automatic schema changes.
 
 ---
 
 ## 29. Load / Capacity Model
 
-Load testing must not target production user data or perform destructive writes against production DB.
+No destructive load test runs against production user data.
 
-| scenario | RPS | concurrency | duration | dataset | expected p95 | expected errors | resource ceiling |
-|---|---:|---:|---:|---|---|---|---|
-| single-user baseline | `TBD` | 1 | 5m initial | synthetic | `TBD` | 0 unexpected | measure |
-| normal concurrency | `TBD` | `TBD-BY-MEASUREMENT` | 15m initial | synthetic/staging | `TBD` | bounded | measure |
-| burst | derived from normal; include 10x scenario if safe | `TBD` | 1–5m | synthetic/staging | `TBD` | bounded degradation acceptable | no resource collapse |
-| dependency latency | `TBD` | `TBD` | 5m | injected latency | bounded by timeout | expected dependency errors | no leak |
-| DB saturation | `TBD` | `TBD` | controlled | isolated non-prod DB | `TBD` | bounded | connection budget respected |
-| Saju saturation | `TBD` | `TBD` | controlled | deterministic fixtures | `TBD` | bounded | CPU/memory ceiling measured |
-| rate-limit boundary | `TBD` | `TBD` | controlled | synthetic | n/a | intended 429/limit behavior only | no cascade |
+| scenario | RPS | concurrency | duration | dataset | expected result |
+|---|---:|---:|---:|---|---|
+| single-user baseline | `TBD` | 1 | 5m initial | synthetic | measure stable baseline |
+| normal concurrency | `TBD` | `TBD` | 15m initial | synthetic/non-prod | bounded latency/errors |
+| burst | derived; 10x only if safe | `TBD` | 1–5m | synthetic/non-prod | no resource collapse |
+| dependency latency | `TBD` | `TBD` | 5m | injected | bounded by implemented timeout |
+| DB saturation | `TBD` | `TBD` | controlled | isolated DB | connection budget respected |
+| Saju saturation | `TBD` | `TBD` | controlled | deterministic fixtures | CPU/memory ceiling measured |
+| rate-limit boundary | `TBD` | `TBD` | controlled | synthetic | intended limit behavior only |
 
-`10x` is a resilience test scenario, not a statement that production currently supports ten times traffic.
+A scenario requiring a timeout that is still `TBD` is BLOCKED until that timeout contract is implemented; the test must not pretend the control exists.
+
+`10x` is a resilience scenario, not a capacity claim.
 
 ---
 
@@ -890,41 +952,34 @@ Load testing must not target production user data or perform destructive writes 
 
 ### MyeongHa API
 
-Current model is provider-managed serverless horizontal scaling.
+Provider-managed serverless horizontal scaling.
 
-Risk:
+Risk: every runtime can own a DB pool, so total DB connections can rise with runtime concurrency.
 
-- each runtime may create its own small DB pool.
-- total database connections can therefore grow with serverless concurrency.
-
-Scaling gate must observe DB connection capacity before increasing application concurrency.
+Application scaling must observe DB capacity before concurrency is increased.
 
 ### Saju
 
-Initial scaling model should prefer simple container horizontal scaling only when:
-
-- CPU or memory saturation is measured,
-- calculation concurrency grows,
-- p95 degrades while downstream dependencies are healthy.
+Horizontal scale only when measured concurrency/CPU/memory/latency justify it.
 
 ### PostgreSQL
 
-Scaling order:
+Order:
 
 1. query/index/workload correction under DB authority
 2. connection pooling/limits
 3. provider resource scaling
 4. architectural expansion only when measured workload requires it
 
-Kubernetes is not a v1 scaling requirement.
+Numeric triggers remain `TBD-BY-MEASUREMENT`.
 
-Numeric trigger thresholds remain `TBD-BY-MEASUREMENT`.
+Kubernetes is not a v1 requirement.
 
 ---
 
 ## 31. Resource / Cost Boundary
 
-Track at least:
+Track:
 
 ```text
 web/serverless compute
@@ -934,25 +989,26 @@ network/egress
 logs
 metrics/traces
 backup storage
-AI/provider API usage
-notification/provider usage
+AI/provider API
+notification/provider
 ```
 
-Cost controls:
+Controls:
 
-- avoid high-cardinality metrics.
-- log bodies are forbidden; sample low-value success logs if volume requires.
-- keep container minimum instances/resource sizes no larger than reliability requires.
-- retain only operationally necessary logs/traces.
-- scaling decisions require both latency/error evidence and cost impact.
+- bounded metric cardinality.
+- no log bodies.
+- sample low-value success logs if volume requires.
+- minimum container resources only as reliability requires.
+- retain only operationally necessary telemetry.
+- scaling decisions include latency/error and cost evidence.
 
-Target is **minimum viable reliability**, not enterprise infrastructure imitation.
+Target is minimum viable reliability, not enterprise-infrastructure imitation.
 
 ---
 
 ## 32. Security / Privacy Observability Boundary
 
-Acceptance gate applies to:
+Applies to:
 
 ```text
 application logs
@@ -965,43 +1021,53 @@ deployment logs
 backup metadata
 ```
 
-Forbidden raw values include:
+Forbidden raw values:
 
 - auth/session/service tokens
 - DB credentials
 - Birth raw data
-- private conversation/chat transcript
+- private chat/transcript
 - payment secrets/receipts
 - unrestricted user input
 
-Trace/span attributes must use normalized route names, not full URLs containing user identifiers or query strings.
+Trace/span attributes use normalized routes, not full URLs with identifiers/query strings.
 
-Request IDs and trace IDs are operational identifiers, not authentication evidence.
+Request/trace IDs are operational identifiers, never authentication evidence.
 
 ---
 
 ## 33. Production Verification Contract
 
-A production deployment is not accepted by provider `READY` alone.
+Provider `READY` alone does not accept a deployment.
 
 Minimum verification:
 
 ```text
 1. expected source SHA / image digest
 2. provider deployment state
-3. liveness
-4. readiness semantics for the deployment unit
-5. negative auth smoke
-6. positive authenticated smoke where safe credential exists
-7. required dependency check
-8. user-private no-store/cache contract
-9. secret non-reflection
-10. log event presence/redaction
-11. metrics presence
-12. rollback candidate identification
+3. configuration preflight without secret-value output
+4. liveness
+5. readiness/capability readiness for assigned traffic
+6. negative auth smoke
+7. positive authenticated synthetic smoke
+8. required dependency check
+9. MyeongHa↔Saju compatibility/contract check when relevant
+10. user-private no-store/cache contract
+11. secret non-reflection
+12. log presence/redaction
+13. metrics presence
+14. rollback candidate identification
 ```
 
-MyeongHa/Saju existing exact-head and production smoke mechanisms should be extended/reused rather than duplicated.
+Positive smoke requirements:
+
+- use dedicated synthetic smoke identity/data.
+- do not use another user's production record.
+- do not create real payment side effects.
+- do not print credentials or raw private payloads.
+- clean up synthetic mutable state where required by product semantics.
+
+Existing exact-head/production smoke mechanisms should be extended rather than duplicated.
 
 ---
 
@@ -1009,41 +1075,40 @@ MyeongHa/Saju existing exact-head and production smoke mechanisms should be exte
 
 | test | injected condition | required result |
 |---|---|---|
-| Saju kill | stop Saju process | new calculation fails bounded; core stays available |
-| Saju slow | latency > client timeout | timeout; no hanging request/resource leak |
-| Saju wrong credential | mismatch Bearer | explicit auth reject; no secret reflection |
-| credential rotation | active + previous overlap then remove previous | zero-downtime transition; old token eventually rejected |
-| DB unavailable | block DB connection | DB routes fail bounded; static remains |
-| DB slow | injected/query latency | timeout/alert; no runaway connection growth |
-| DB connection exhaustion | cap available connections | bounded failures; saturation metric/alert |
-| Auth provider unavailable | fail verifier | protected routes fail closed |
-| bad deployment | candidate returns unhealthy behavior | promotion stopped or rollback executed |
-| partial service versions | incompatible MyeongHa/Saju versions | fail closed; no silent semantic corruption |
-| DNS/TLS failure | break dependency resolution/TLS | classified network dependency failure |
+| Saju kill | stop process | new calculation bounded-fails; core stays available |
+| Saju slow | latency > caller timeout | timeout; no hanging resource |
+| Saju wrong credential | mismatch bearer | explicit reject; no reflection |
+| credential rotation | current+previous overlap then remove previous | transition succeeds; old eventually rejected |
+| missing Saju config | omit required origin/bearer in candidate | candidate/capability preflight fails before user promotion |
+| DB unavailable | block DB | DB routes bounded-fail; static remains |
+| DB slow | inject latency | bounded by implemented timeout; otherwise test reports missing control, not PASS |
+| DB connection exhaustion | cap connections | bounded failures; saturation observable |
+| Auth unavailable | fail verifier | protected routes fail closed |
+| bad deployment | unhealthy candidate | promotion stops or exact rollback executes |
+| incompatible service versions | contract mismatch | promotion blocked/fail closed |
+| DNS/TLS failure | break resolution/TLS | classified network dependency failure |
 | cache unavailable | disable cache | correctness maintained |
-| cache poison simulation | wrong/shared private entry attempt | private response never crosses subject boundary |
-| log/metric provider outage | disable export | product correctness unaffected; observability degradation visible when possible |
+| cache poison | wrong/shared private entry | no cross-subject private response |
+| telemetry outage | disable export | correctness unaffected; observability degradation visible when feasible |
 
-Failure tests against production require a separate explicit safety decision. Default target is controlled non-production runtime.
+Default target is controlled non-production runtime. Production failure injection requires separate explicit safety approval.
 
 ---
 
 ## 35. Required Runbooks
 
-Minimum runbooks:
-
 1. bad MyeongHa deployment rollback
 2. bad Saju deployment rollback
-3. Saju service outage/degradation
+3. Saju outage/degradation
 4. DB unavailable / connection exhaustion
-5. DB backup restore
+5. DB backup restore + privacy/deletion/legal-retention reconciliation
 6. credential leak / rotation
 7. provider outage classification
 8. production smoke failure
-9. cache corruption/invalidation when shared cache is introduced
-10. worker poison/backlog recovery when workers are introduced
+9. cache corruption/invalidation when shared cache exists
+10. worker poison/backlog recovery when worker exists
 
-Runbooks must name observable evidence, exact containment action, rollback/recovery verification, and stop conditions.
+Each runbook names observable evidence, containment action, rollback/recovery verification, stop condition, and authority boundary.
 
 ---
 
@@ -1051,46 +1116,60 @@ Runbooks must name observable evidence, exact containment action, rollback/recov
 
 ### P0
 
-`P0-OPS-01 — Saju production activation`
+#### P0-OPS-01 — Saju production activation
 
-- choose/confirm actual Saju hosting target
+- choose/confirm hosting target
 - provision HTTPS origin
-- bind production Bearer
+- deploy exact OCI digest
+- bind production bearer
 - bind `MYEONGHA_SAJU_SERVICE_ORIGIN`
-- authenticated positive/negative production E2E
-- runtime monitoring + rollback evidence
+- verify active/previous rotation behavior
+- authenticated positive/negative synthetic E2E
+- runtime monitoring
+- rollback evidence
+- compatibility gate
 
-`P0-OPS-02 — PostgreSQL backup / restore / RPO / RTO`
+#### P0-OPS-02 — PostgreSQL backup / restore / RPO / RTO
 
-- confirm Supabase plan capability
-- record backup schedule/retention/PITR
+- classify product/data criticality
+- approve provisional RPO/RTO objectives
+- confirm Supabase plan backup/PITR capability
+- record backup schedule/retention
+- reconcile retention with privacy/deletion/legal-retention authority
 - define restore target/procedure
 - execute restore drill
-- then approve RPO/RTO
+- measure achieved RPO/RTO against objectives
 
-`P0-OPS-03 — readiness semantics`
+#### P0-OPS-03 — readiness / configuration preflight
 
 - preserve `/api/health` as liveness or rename semantics explicitly
-- define dependency readiness/degraded telemetry
+- define capability readiness/degraded telemetry
+- detect missing required production configuration before user traffic
 - ensure Saju failure does not mark whole MyeongHa down
 
 ### P1
 
-`P1-DEP-01 — controlled production promotion`
+#### P1-DEP-01 — MyeongHa controlled production promotion
 
-- current `main` branch protection is disabled
-- select branch protection/ruleset or equivalent explicit promotion gate
-- define required checks and stale-deployment handling
+- MyeongHa `main` protection currently disabled
+- choose branch/ruleset or equivalent immutable promotion gate
+- define required checks/stale-deployment handling
+
+#### P1-DEP-02 — Saju source/artifact promotion governance
+
+- Saju `main` protection currently disabled
+- before production activation, require branch/ruleset or equivalent exact-SHA/digest manual promotion gate
+- production deployment authority must not be mutable `latest` or an unreviewed moving ref
 
 Additional P1:
 
 - observability provider/tool selection
 - structured logger implementation
 - trace propagation
-- SLI/SLO target values after baseline
+- SLI/SLO targets after baseline
 - alert thresholds/destinations
 - performance/load environment
-- cache matrix enforcement tests
+- cache enforcement tests
 - capacity/scaling thresholds
 
 ### UNKNOWN / NEEDS OWNER OR PROVIDER EVIDENCE
@@ -1098,8 +1177,9 @@ Additional P1:
 - Supabase backup/PITR plan settings
 - production DB provider-side pool/connection ceiling
 - final custom domain
-- final Saju production hosting target
-- logs/metrics retention policy
+- final Saju hosting target
+- logs/metrics retention
+- approved numeric RPO/RTO
 
 ---
 
@@ -1109,57 +1189,66 @@ Architecture stage closes only when:
 
 - [x] current topology is evidence-based.
 - [x] service deployment units are classified.
-- [x] environment model is defined.
-- [x] secret classes and non-exposure rules are defined.
+- [x] environment isolation is defined and preview/test production-DB use is forbidden.
+- [x] secret classes/non-exposure/rotation rules are defined.
 - [x] deployment/provenance/rollback requirements are defined.
-- [x] liveness/readiness/degraded semantics are defined.
-- [x] structured logging contract is defined.
+- [x] liveness/readiness/capability-degraded semantics are defined.
+- [x] configuration preflight is part of promotion architecture.
+- [x] structured logging/privacy contract is defined.
 - [x] metrics/monitoring target set is defined.
-- [x] availability/latency/error-rate SLI/SLO structure is defined without fabricated target values.
+- [x] SLI/SLO structure exists without fabricated targets.
 - [x] alert severity model is defined.
 - [x] dependency failure matrix is defined.
 - [x] failure isolation invariants are defined.
-- [x] per-dependency timeout/retry boundary is defined without changing idempotency authority.
-- [x] backup/restore requirement is defined.
-- [x] RPO/RTO remain explicitly unresolved until evidence exists.
+- [x] timeout/retry boundaries do not redefine platform idempotency.
+- [x] backup/restore requirements are defined.
+- [x] restore privacy/deletion/legal-retention reconciliation is defined.
+- [x] RPO/RTO direction is product requirement → provider validation.
+- [x] RPO/RTO numeric values remain unresolved until approved.
 - [x] cacheability classification is defined.
 - [x] performance baseline plan exists.
 - [x] load/capacity matrix exists.
 - [x] scaling trigger method is defined.
-- [x] privacy/security observability boundary is defined.
+- [x] production synthetic smoke privacy rules are defined.
+- [x] cross-service compatibility gate is explicit.
 - [x] Saju activation path is explicit.
-- [x] unresolved P0/P1 operations items are explicit.
-- [x] self-review complete.
+- [x] both MyeongHa and Saju source-governance risks are explicit.
+- [x] unresolved P0/P1 items are explicit.
+- [x] second self-review complete.
 
-Passing this architecture stage does **not** mean production infrastructure implementation is complete.
+Passing architecture does not mean infrastructure implementation is complete.
 
 ---
 
 ## 38. Implementation Phases
 
-### Phase 1 — topology/service catalog authority
+### Phase 1 — topology / service catalog authority
 
-- freeze this document after review/approval
-- resolve stale/unknown evidence as implementation proceeds
+- freeze reviewed document
+- refresh evidence snapshot as implementation proceeds
 
 ### Phase 2 — Saju production hosting
 
-- provider comparison against Section 9 requirements
+- provider comparison against Section 9
+- close exact-SHA/digest promotion governance
 - deploy exact OCI artifact
-- HTTPS + `/healthz`
+- HTTPS + liveness/readiness
 
-### Phase 3 — secret/environment binding
+### Phase 3 — secret / environment binding
 
-- production origin/Bearer
-- active/previous rotation test
+- production origin/bearer
+- current/previous rotation test
 - secret reflection negative test
+- preview/test isolation validation
 
 ### Phase 4 — deployment / health / rollback
 
 - controlled promotion gate
-- readiness model
+- configuration preflight
+- capability readiness/degraded model
 - exact artifact verification
-- production smoke
+- synthetic production smoke
+- MyeongHa↔Saju compatibility gate
 - rollback runbook
 
 ### Phase 5 — structured logging
@@ -1170,19 +1259,22 @@ Passing this architecture stage does **not** mean production infrastructure impl
 ### Phase 6 — metrics / monitoring / alerting
 
 - golden signals
-- dependency metrics
-- alert severity and destinations
+- dependency/capability metrics
+- alert severity/destination
 
 ### Phase 7 — failure isolation / timeout / retry
 
 - bounded dependency failures
+- missing-control tests fail rather than fake PASS
 - chaos matrix execution
 
 ### Phase 8 — backup / restore / recovery
 
-- provider backup evidence
-- restore drill
-- approve RPO/RTO
+- approve provisional RPO/RTO from product criticality
+- provider backup/PITR evidence
+- retention/privacy/legal reconciliation design
+- isolated restore drill
+- measure achieved recovery
 
 ### Phase 9 — cache / CDN
 
@@ -1191,13 +1283,13 @@ Passing this architecture stage does **not** mean production infrastructure impl
 
 ### Phase 10 — performance baseline
 
-- collect p50/p95/p99 and dependency latency
+- collect p50/p95/p99 + dependency latency
 - identify hot DB/Saju paths
 
 ### Phase 11 — load / capacity
 
-- controlled non-production load tests
-- DB connection and Saju saturation ceilings
+- controlled non-production tests
+- DB/Saju saturation ceilings
 
 ### Phase 12 — scaling thresholds
 
@@ -1205,57 +1297,69 @@ Passing this architecture stage does **not** mean production infrastructure impl
 
 ### Phase 13 — production operations acceptance
 
-Only after implementation and verification may individual capabilities be marked production-ready.
+Only verified capabilities may be marked production-ready.
 
 ---
 
-## 39. Self-Review Record
+## 39. First Self-Review Record
 
-Self-review 기준:
+First review found and corrected:
 
-```text
-authority conflict
-current-state evidence freshness
-provider-specific overfit
-platform-integrity/payment boundary intrusion
-unverifiable reliability claims
-fabricated SLO/capacity numbers
-privacy/secret leakage path
-failure-isolation completeness
-recovery/rollback completeness
-P0/P1 omission
-```
+| ID | finding | correction |
+|---|---|---|
+| SR-01 | stale Saju baseline | refreshed SHA |
+| SR-02 | MyeongHa branch protection omission | added controlled-promotion risk |
+| SR-03 | implicit error-rate SLO | added explicit row |
+| SR-04 | dependency retry policy incomplete | expanded dependency table |
+| SR-05 | 5s timeout could be misread as SLO | marked implementation boundary |
+| SR-06 | latest container contract needed recheck | rechecked Dockerfile/workflow |
+| SR-07 | fabricated RPO/RTO risk | kept numeric values unresolved |
+| SR-08 | platform/payment boundary risk | preserved semantic authority |
+| SR-09 | whole-product readiness risk | separated Saju degradation |
+| SR-10 | telemetry privacy risk | bounded/redacted schema |
 
-### 발견 및 수정
+First-review verdict was PASS for architecture structure, with implementation P0 open.
 
-| ID | finding | correction | result |
-|---|---|---|---|
-| SR-01 | 초안의 Saju `main` SHA가 stale evidence였다. | 최신 `main`을 다시 조회해 `a64c3b12b0e2cfa791d4a878b941f85a6a4d5001`로 교정했다. | PASS |
-| SR-02 | 초안에서 현재 `main` branch protection disabled 상태가 빠졌다. | current topology/deployment/open decisions에 controlled-promotion P1을 추가했다. | PASS |
-| SR-03 | SLO 표에서 error-rate가 availability에 암묵적으로만 포함됐다. | Core API error-rate SLO row를 명시적으로 추가했다. | PASS |
-| SR-04 | timeout/retry 정책이 Saju 중심이고 dependency별 결정 상태가 불명확했다. | PostgreSQL/Auth/AI/payment/notification을 포함한 dependency policy table을 추가했다. | PASS |
-| SR-05 | 현재 Saju `5s` timeout이 성능 목표로 오독될 수 있었다. | implementation baseline이며 SLO가 아니라고 명시했다. | PASS |
-| SR-06 | Saju container contract가 최신 main에도 유지되는지 재검증이 필요했다. | 최신 `Dockerfile`과 `production-calculation-container.yml`에서 Node 24, non-root, health/auth/secret-reflection smoke를 재확인했다. | PASS |
-| SR-07 | RPO/RTO를 근거 없이 authority 수치로 만들 위험이 있었다. | provider backup capability + restore drill 전까지 `OPEN DECISION`으로 유지했다. | PASS |
-| SR-08 | operations가 idempotency/payment/domain semantics를 침범할 위험을 검토했다. | retry/deployment/hosting만 정의하고 semantic authority는 별도 트랙에 유지했다. | PASS |
-| SR-09 | aggregate readiness가 Saju 장애를 whole-product outage로 오판할 위험이 있었다. | Saju를 degradable feature dependency로 명시하고 core readiness와 분리했다. | PASS |
-| SR-10 | 로그/trace 설계가 Birth/chat/token을 새 유출 경로로 만들 가능성을 검토했다. | raw Birth/chat/credential/user text 금지와 bounded labels를 acceptance gate로 유지했다. | PASS |
+---
 
-### Self-Review Verdict
+## 40. Second Self-Review Record
+
+Second review deliberately challenged the first PASS against current repositories and uploaded authority documents.
+
+### Findings and corrections
+
+| ID | finding | severity | correction | result |
+|---|---|---|---|---|
+| SR2-01 | Saju `main` moved again after first review. | evidence freshness | baseline refreshed to `2f92f59c3f27c471127bfe3dad8260b192bc8c31`; one-commit delta verified test-only. | PASS |
+| SR2-02 | RPO/RTO wording incorrectly risked deriving business objectives from provider capability/restore drill. | architecture correctness | reversed direction to product-impact objective first, infrastructure capability/drill second. | PASS |
+| SR2-03 | restore design did not explicitly reconcile personalization deletion with legal commerce retention. | P0 data/privacy recovery | added restore reconciliation invariant/runbook requirement. | PASS |
+| SR2-04 | only MyeongHa unprotected `main` was recorded; Saju `main` is also unprotected. | P1 supply-chain | added `P1-DEP-02` and Phase 2 promotion-governance gate. | PASS |
+| SR2-05 | preview wording allowed interpretation that production DB might be used by default exception. | privacy/environment | prohibited production DB credentials/user rows in preview/test; production diagnostics separated. | PASS |
+| SR2-06 | current missing Saju config failure was classified only as runtime readiness gap. | P0 deployment safety | added required configuration preflight before user promotion and chaos case. | PASS |
+| SR2-07 | exact SHA provenance alone did not guarantee MyeongHa↔Saju compatibility. | P1 deploy safety | added cross-service compatibility gate to promotion/verification. | PASS |
+| SR2-08 | positive production smoke lacked explicit data/privacy/side-effect constraints. | privacy/operations | required dedicated synthetic identity/data and no real payment/user side effects. | PASS |
+| SR2-09 | DB slow chaos expected a timeout even though query timeout policy is still TBD. | verification honesty | test now fails/reports missing control until timeout is actually implemented. | PASS |
+| SR2-10 | Saju credential overlap was described without explicitly separating code support from production proof. | evidence precision | code support recorded; production rotation remains Phase 3 unverified requirement. | PASS |
+
+### Second Self-Review Verdict
 
 ```text
 Authority conflict: NONE FOUND
 Provider-specific overfit: NONE BLOCKING
 Platform Integrity boundary violation: NONE FOUND
 Payment semantic boundary violation: NONE FOUND
-Fabricated SLO/RPO/RTO authority: NONE
-Privacy-observability P0 omission: NONE FOUND
+RPO/RTO direction error: CORRECTED
+Restore privacy/legal-retention gap: CORRECTED
+Source-governance omission: CORRECTED
+Configuration-preflight gap: CORRECTED
+Compatibility-verification gap: CORRECTED
+Fabricated SLO/capacity/RPO/RTO authority: NONE
 Unresolved production operations P0: YES — explicitly recorded
-Architecture self-review: PASS
+Second architecture self-review: PASS
 Implementation readiness: NOT YET COMPLETE
 ```
 
-이 판정은 문서 구조가 구현 단계로 넘어갈 수 있다는 뜻이며, production reliability가 구현/검증 완료되었다는 뜻이 아니다.
+This PASS means the architecture is internally coherent enough to proceed to implementation decisions. It does not assert production reliability.
 
 ---
 
@@ -1263,10 +1367,11 @@ Implementation readiness: NOT YET COMPLETE
 
 | ID | risk | severity | current state | closure evidence |
 |---|---|---|---|---|
-| P0-OPS-01 | Saju route not production-activated | P0 | BLOCKED | live host + env binding + authenticated E2E + monitoring + rollback |
-| P0-OPS-02 | DB backup/restore not proven | P0 | UNKNOWN/BLOCKED | provider config + restore drill + approved RPO/RTO |
-| P0-OPS-03 | liveness/readiness/degraded distinction not implemented | P0 | PARTIAL | explicit health semantics + dependency metrics + smoke |
-| P1-DEP-01 | `main` unprotected while main deploys to production | P1 | CONFIRMED | branch/ruleset or equivalent controlled promotion gate + verification |
+| P0-OPS-01 | Saju route not production-activated | P0 | BLOCKED | host + exact digest + env binding + rotation + synthetic E2E + compatibility + monitoring + rollback |
+| P0-OPS-02 | DB backup/restore/RPO/RTO not proven | P0 | UNKNOWN/BLOCKED | objectives + provider capability + retention reconciliation + isolated restore drill + measured recovery |
+| P0-OPS-03 | liveness/readiness/capability/config-preflight distinction not implemented | P0 | PARTIAL | explicit implementation + dependency metrics + promotion smoke |
+| P1-DEP-01 | MyeongHa `main` unprotected while deploying to production | P1 | CONFIRMED | branch/ruleset or equivalent controlled promotion gate |
+| P1-DEP-02 | Saju `main` unprotected before production artifact activation | P1 | CONFIRMED | branch/ruleset or exact-SHA/digest promotion authority |
 
 ---
 
@@ -1283,6 +1388,6 @@ Zero-Downtime Deployment
 Automatic Failover
 ```
 
-The current approved statement is limited to:
+Current statement is limited to:
 
-> MyeongHa has a production-connected application runtime, exact deployment provenance and partial reliability controls, while Saju production activation, controlled promotion, observability, backup/restore, measured capacity and recovery validation remain incomplete.
+> MyeongHa has a production-connected application runtime, exact deployment provenance and partial reliability controls. Saju production activation, controlled source/artifact promotion, capability readiness, observability, backup/restore, measured capacity and recovery validation remain incomplete.
