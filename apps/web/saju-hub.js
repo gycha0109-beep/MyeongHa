@@ -3,6 +3,7 @@ const BIRTH_PROFILE_ID_KEY = 'myeongha.guestBirthProfileId.v1';
 const SESSION_BOOTSTRAP_ENDPOINT = '/api/session/bootstrap';
 const BIRTH_PROFILE_ENDPOINT = '/api/birth-profiles';
 const SAJU_CALCULATION_ENDPOINT = '/api/me/saju/calculation';
+const STORED_BIRTH_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/u;
 const ELEMENTS = ['목', '화', '토', '금', '수'];
 const PILLARS = [
   ['year', '년주'],
@@ -29,7 +30,7 @@ function writeSessionValue(key, value) {
   try {
     sessionStorage.setItem(key, value);
   } catch {
-    // The guest experience still works for the current navigation even when storage is unavailable.
+    return;
   }
 }
 
@@ -37,8 +38,13 @@ function removeSessionValue(key) {
   try {
     sessionStorage.removeItem(key);
   } catch {
-    // No-op when browser storage is unavailable.
+    return;
   }
+}
+
+function clearGuestBirthSession() {
+  removeSessionValue(GUEST_TOKEN_KEY);
+  removeSessionValue(BIRTH_PROFILE_ID_KEY);
 }
 
 function bearerHeaders(token, includeJson = false) {
@@ -69,6 +75,14 @@ function readPublicErrorCode(payload) {
     : null;
 }
 
+function requestError(operation, status, code, message) {
+  const error = new Error(message);
+  error.operation = operation;
+  error.status = status;
+  error.code = code;
+  return error;
+}
+
 async function bootstrapGuest(existingToken = null) {
   const response = await fetch(SESSION_BOOTSTRAP_ENDPOINT, {
     method: 'POST',
@@ -78,7 +92,9 @@ async function bootstrapGuest(existingToken = null) {
     body: '{}',
   });
   const payload = await readJson(response);
-  if (!response.ok) throw new Error(`Guest bootstrap failed with status ${response.status}.`);
+  if (!response.ok) {
+    throw requestError('guest-bootstrap', response.status, readPublicErrorCode(payload), `Guest bootstrap failed with status ${response.status}.`);
+  }
   const data = unwrapSuccess(payload);
 
   if (data?.kind === 'member') return existingToken;
@@ -105,9 +121,7 @@ async function createBirthProfile(token, request) {
   });
   const payload = await readJson(response);
   if (!response.ok) {
-    const error = new Error(`Birth Profile create failed with status ${response.status}.`);
-    error.code = readPublicErrorCode(payload);
-    throw error;
+    throw requestError('birth-create', response.status, readPublicErrorCode(payload), `Birth Profile create failed with status ${response.status}.`);
   }
   const data = unwrapSuccess(payload);
   if (!data || typeof data.birthProfileId !== 'string' || data.birthProfileId.length === 0) {
@@ -125,8 +139,11 @@ async function readBirthProfile(token, birthProfileId) {
     credentials: 'same-origin',
     cache: 'no-store',
   });
-  if (!response.ok) return null;
   const payload = await readJson(response);
+  if (response.status === 404) return null;
+  if (!response.ok) {
+    throw requestError('birth-read', response.status, readPublicErrorCode(payload), `Birth Profile read failed with status ${response.status}.`);
+  }
   try {
     return unwrapSuccess(payload);
   } catch {
@@ -143,10 +160,7 @@ async function calculateSaju(token) {
   });
   const payload = await readJson(response);
   if (!response.ok) {
-    const error = new Error(`Saju calculation failed with status ${response.status}.`);
-    error.status = response.status;
-    error.code = readPublicErrorCode(payload);
-    throw error;
+    throw requestError('saju-calculation', response.status, readPublicErrorCode(payload), `Saju calculation failed with status ${response.status}.`);
   }
   const data = unwrapSuccess(payload);
   if (!data || !data.calculation || typeof data.calculation !== 'object') {
@@ -158,6 +172,62 @@ async function calculateSaju(token) {
 function selectedCalendarType() {
   const selected = document.querySelector('input[name="saju-calendar"]:checked');
   return selected?.value === 'lunar' ? 'lunar' : 'solar';
+}
+
+function digitsOnly(value, length) {
+  return String(value ?? '').replace(/\D/gu, '').slice(0, length);
+}
+
+function setupBirthDateSegment(input, length, nextInput = null, previousInput = null) {
+  input.addEventListener('input', () => {
+    const normalized = digitsOnly(input.value, length);
+    if (input.value !== normalized) input.value = normalized;
+    if (nextInput && normalized.length === length) nextInput.focus();
+  });
+
+  input.addEventListener('keydown', (event) => {
+    if (event.key === 'Backspace' && input.value.length === 0 && previousInput) {
+      event.preventDefault();
+      previousInput.focus();
+      previousInput.setSelectionRange(previousInput.value.length, previousInput.value.length);
+    }
+  });
+}
+
+function setupBirthDateInputs() {
+  const year = byId('saju-birth-year');
+  const month = byId('saju-birth-month');
+  const day = byId('saju-birth-day');
+  setupBirthDateSegment(year, 4, month);
+  setupBirthDateSegment(month, 2, day, year);
+  setupBirthDateSegment(day, 2, null, month);
+}
+
+function buildBirthDate(calendarType) {
+  const yearText = digitsOnly(byId('saju-birth-year').value, 4);
+  const monthText = digitsOnly(byId('saju-birth-month').value, 2);
+  const dayText = digitsOnly(byId('saju-birth-day').value, 2);
+
+  if (yearText.length !== 4) throw new Error('출생 연도는 네 자리로 입력해 주세요.');
+  if (monthText.length === 0 || dayText.length === 0) throw new Error('생년월일을 모두 입력해 주세요.');
+
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+  if (!Number.isInteger(year) || year < 1) throw new Error('출생 연도를 확인해 주세요.');
+  if (!Number.isInteger(month) || month < 1 || month > 12) throw new Error('출생 월은 1월부터 12월 사이로 입력해 주세요.');
+  if (!Number.isInteger(day) || day < 1 || day > (calendarType === 'lunar' ? 30 : 31)) {
+    throw new Error('출생 일을 확인해 주세요.');
+  }
+
+  if (calendarType === 'solar') {
+    const date = new Date(Date.UTC(year, month - 1, day));
+    if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) {
+      throw new Error('존재하는 양력 생년월일을 입력해 주세요.');
+    }
+  }
+
+  return `${yearText}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
 function syncBirthControls() {
@@ -175,13 +245,12 @@ function syncBirthControls() {
 }
 
 function buildBirthRequest() {
-  const birthDate = byId('saju-birth-date').value;
+  const calendarType = selectedCalendarType();
+  const birthDate = buildBirthDate(calendarType);
   const timeKnown = !byId('saju-time-unknown').checked;
   const birthTime = timeKnown ? byId('saju-birth-time').value : null;
-  const calendarType = selectedCalendarType();
   const sexValue = byId('saju-birth-sex').value;
 
-  if (!birthDate) throw new Error('생년월일을 입력해 주세요.');
   if (timeKnown && !birthTime) throw new Error('출생시간을 입력하거나 시간 모름을 선택해 주세요.');
 
   return Object.freeze({
@@ -330,6 +399,15 @@ function renderCalculation(calculation, profile) {
   setState('ready');
 }
 
+function storedProfileHasSupportedBirthDate(profile) {
+  const birthDate = profile?.currentRevision?.input?.birthDate;
+  return typeof birthDate === 'string' && STORED_BIRTH_DATE_PATTERN.test(birthDate);
+}
+
+function showCalculationUnavailable() {
+  setState('error', '출생정보는 등록되어 있지만 현재 사주 계산 서비스를 사용할 수 없습니다. 입력을 다시 등록하지 말고 잠시 후 새로고침해 주세요.');
+}
+
 async function loadExistingSaju() {
   const token = readSessionValue(GUEST_TOKEN_KEY);
   if (!token) {
@@ -337,23 +415,44 @@ async function loadExistingSaju() {
     return;
   }
 
-  setState('loading', '현재 세션의 명식을 계산하는 중입니다…');
+  const birthProfileId = readSessionValue(BIRTH_PROFILE_ID_KEY);
+  setState('loading', '현재 세션의 명식을 확인하는 중입니다…');
+
   try {
+    let profile = birthProfileId ? await readBirthProfile(token, birthProfileId) : null;
+    if (birthProfileId && profile === null) removeSessionValue(BIRTH_PROFILE_ID_KEY);
+
+    if (profile && !storedProfileHasSupportedBirthDate(profile)) {
+      clearGuestBirthSession();
+      setState('empty', '이전 세션의 생년월일 형식이 올바르지 않아 입력 상태를 초기화했습니다. 네 자리 연도로 다시 입력해 주세요.');
+      return;
+    }
+
     const calculation = await calculateSaju(token);
-    const profile = await readBirthProfile(token, readSessionValue(BIRTH_PROFILE_ID_KEY));
+    if (!profile) {
+      const storedId = readSessionValue(BIRTH_PROFILE_ID_KEY);
+      profile = storedId ? await readBirthProfile(token, storedId) : null;
+    }
     renderCalculation(calculation, profile);
   } catch (error) {
     if (error?.status === 401) {
-      removeSessionValue(GUEST_TOKEN_KEY);
-      removeSessionValue(BIRTH_PROFILE_ID_KEY);
+      clearGuestBirthSession();
       setState('empty');
       return;
     }
-    if (error?.status === 404 || error?.code === 'NOT_FOUND') {
-      setState('empty');
+    if (error?.operation === 'saju-calculation' && (error?.status === 404 || error?.code === 'NOT_FOUND')) {
+      if (birthProfileId) {
+        setState('error', '등록된 출생정보가 있지만 현재 자기 명식 계산 대상과 연결되지 않았습니다. 잠시 후 다시 확인해 주세요.');
+      } else {
+        setState('empty');
+      }
       return;
     }
-    setState('empty', '현재 사주 계산을 불러오지 못했습니다. 새로 입력하기 전에 잠시 후 다시 확인해 주세요.');
+    if (error?.operation === 'saju-calculation') {
+      showCalculationUnavailable();
+      return;
+    }
+    setState('error', '현재 등록된 출생정보를 확인하지 못했습니다. 잠시 후 새로고침해 주세요.');
   }
 }
 
@@ -361,32 +460,46 @@ async function submitBirthProfile(event) {
   event.preventDefault();
   setFormError('');
   const button = byId('saju-create-button');
+  const label = button.querySelector('span:first-child');
   button.disabled = true;
-  button.querySelector('span:first-child').textContent = '명식을 계산하는 중…';
+  label.textContent = '명식을 계산하는 중…';
+  let profileCreated = false;
 
   try {
     const request = buildBirthRequest();
     const existingToken = readSessionValue(GUEST_TOKEN_KEY);
     const token = await bootstrapGuest(existingToken);
-    await createBirthProfile(token, request);
+    const receipt = await createBirthProfile(token, request);
+    profileCreated = true;
     const calculation = await calculateSaju(token);
-    const profile = await readBirthProfile(token, readSessionValue(BIRTH_PROFILE_ID_KEY));
+    const profile = await readBirthProfile(token, receipt.birthProfileId);
     renderCalculation(calculation, profile);
   } catch (error) {
-    const message = error?.code === 'INVALID_REQUEST'
-      ? '입력한 태어난 정보를 확인해 주세요.'
-      : error?.code === 'NOT_FOUND'
-        ? '현재 세션에서는 자기 명식록을 만들 수 없습니다.'
-        : error instanceof Error && /입력|시간/u.test(error.message)
-          ? error.message
-          : '사주를 만들지 못했습니다. 서버에서 계산이 완료되기 전에는 결과를 표시하지 않습니다.';
-    setFormError(message);
+    if (profileCreated && error?.operation === 'saju-calculation') {
+      showCalculationUnavailable();
+      return;
+    }
+
+    if (error?.operation === 'birth-create' && error?.code === 'INVALID_REQUEST') {
+      setFormError('입력값을 처리하지 못했습니다. 생년월일·출생시간을 확인하고, 이미 등록한 적이 있다면 새로고침해 주세요.');
+      return;
+    }
+    if (error?.code === 'NOT_FOUND') {
+      setFormError('현재 세션에서는 자기 명식록을 만들 수 없습니다.');
+      return;
+    }
+    if (error instanceof Error && /입력|연도|월|일|시간|생년월일/u.test(error.message)) {
+      setFormError(error.message);
+      return;
+    }
+    setFormError('사주 입력을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.');
   } finally {
     button.disabled = false;
-    button.querySelector('span:first-child').textContent = '내 사주 만들기';
+    label.textContent = '내 사주 만들기';
   }
 }
 
+setupBirthDateInputs();
 byId('saju-time-unknown').addEventListener('change', syncBirthControls);
 for (const input of document.querySelectorAll('input[name="saju-calendar"]')) {
   input.addEventListener('change', syncBirthControls);
