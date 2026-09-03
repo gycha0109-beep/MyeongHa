@@ -1,0 +1,132 @@
+/* Home assets v5 — approved illustration integration layer.
+   Presentation only. The browser still does not author Saju meaning, Life Facts,
+   relationship history, or canonical character identity. */
+
+body.product-page[data-page="home"] .home-orbit-art {
+  width: min(100%, 258px);
+  aspect-ratio: 1 / 1;
+  background-color: #101f2f;
+  background-image: url("home-v5-orbit.webp");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
+  filter: saturate(.86) contrast(1.03);
+}
+
+body.product-page[data-page="home"] .home-today::after {
+  width: 282px;
+  height: 205px;
+  right: -30px;
+  bottom: -17px;
+  border: 0;
+  border-radius: 0;
+  background: url("home-v5-plum-corner.webp") right bottom / contain no-repeat;
+  opacity: .13;
+  filter: sepia(.3) saturate(.72) brightness(.92);
+  transform: none;
+}
+
+body.product-page[data-page="home"] .home-topic::before {
+  inset: auto;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+}
+
+body.product-page[data-page="home"] .home-topic[data-motif="花"]::before {
+  width: 205px;
+  height: 174px;
+  right: -20px;
+  top: -30px;
+  background-image: url("home-v5-plum-corner.webp");
+  opacity: .43;
+}
+
+body.product-page[data-page="home"] .home-topic[data-motif="山"]::before {
+  width: 205px;
+  height: 150px;
+  right: -12px;
+  bottom: -28px;
+  background-image: url("home-v5-mountain.webp");
+  opacity: .62;
+}
+
+body.product-page[data-page="home"] .home-topic[data-motif="財"]::before {
+  width: 180px;
+  height: 145px;
+  right: -3px;
+  bottom: -18px;
+  background-image: url("home-v5-wealth.webp");
+  opacity: .34;
+}
+
+body.product-page[data-page="home"] .home-topic[data-motif="命"]::before {
+  width: 132px;
+  height: 132px;
+  right: 9px;
+  bottom: -12px;
+  background-image: url("home-v5-compass.webp");
+  opacity: .22;
+}
+
+body.product-page[data-page="home"] .home-topic > span,
+body.product-page[data-page="home"] .home-topic-arrow {
+  position: relative;
+  z-index: 1;
+}
+
+body.product-page[data-page="home"] .home-person {
+  background: linear-gradient(rgba(250,244,236,.94), rgba(250,244,236,.94));
+}
+
+body.product-page[data-page="home"] .home-person::after {
+  content: "";
+  right: -16px;
+  bottom: -84px;
+  width: 248px;
+  height: 330px;
+  background: url("home-v5-plum-corner.webp") right bottom / contain no-repeat;
+  opacity: .43;
+}
+
+body.product-page[data-page="home"] .home-person-avatar,
+body.product-page[data-page="home"] .home-person-copy,
+body.product-page[data-page="home"] .home-person-action {
+  position: relative;
+  z-index: 2;
+}
+
+body.product-page[data-page="home"]::after {
+  height: 210px;
+  opacity: .28;
+  background:
+    url("home-paper-mountains.svg") left -42px bottom -12px / 500px auto no-repeat,
+    url("home-v5-plum-corner.webp") right -34px bottom -52px / 250px auto no-repeat,
+    url("home-paper-mountains.svg") right 125px bottom -45px / 650px auto no-repeat;
+}
+
+body.product-page[data-page="home"] .product-footer {
+  position: relative;
+  z-index: 2;
+  margin-top: 18px;
+  padding: 16px 0 20px;
+  background: rgba(247, 240, 231, .36);
+}
+
+@media (max-width: 1180px) {
+  body.product-page[data-page="home"] .home-orbit-art { width: 238px; }
+}
+
+@media (max-width: 767px) {
+  body.product-page[data-page="home"] .home-orbit-art { width: 210px; }
+  body.product-page[data-page="home"] .home-today::after { right: -74px; opacity: .08; }
+  body.product-page[data-page="home"] .home-topic[data-motif="花"]::before { right: -70px; opacity: .31; }
+  body.product-page[data-page="home"] .home-topic[data-motif="山"]::before { right: -72px; opacity: .42; }
+  body.product-page[data-page="home"] .home-topic[data-motif="財"]::before { right: -58px; opacity: .23; }
+  body.product-page[data-page="home"] .home-topic[data-motif="命"]::before { right: -42px; opacity: .16; }
+  body.product-page[data-page="home"] .home-person::after { right: -84px; opacity: .28; }
+}
+
+@media (max-width: 420px) {
+  body.product-page[data-page="home"] .home-orbit-art { width: 184px; }
+}
