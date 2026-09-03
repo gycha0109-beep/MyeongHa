@@ -38,7 +38,10 @@ BEGIN
       AND NOT EXISTS (
         SELECT 1
         FROM pg_catalog.pg_auth_members m
+        JOIN pg_catalog.pg_roles member_role
+          ON member_role.oid = m.member
         WHERE m.roleid = r.oid
+          AND member_role.rolname <> CURRENT_USER
       )
   ) THEN
     RAISE EXCEPTION 'myeongha_birth_profile_create_owner is outside the least-privilege contract';
@@ -214,11 +217,12 @@ begin
 end;
 $$;
 
--- Supabase production migrations run through a managed CREATEROLE principal that is
--- intentionally not automatically a member of newly created NOLOGIN roles. PostgreSQL
--- requires both SET ROLE capability and CREATE privilege for the target owner on the
--- containing schema before ALTER ... OWNER. Grant those capabilities only for this
--- transactional ownership/ACL setup and remove both before the migration completes.
+-- Supabase production currently runs PostgreSQL 17. On PostgreSQL 16+, a CREATEROLE
+-- principal automatically receives ADMIN membership in roles that it creates. That
+-- CURRENT_USER membership is trusted only as transient migration authority; memberships
+-- for any other role are rejected above. Normalize SET ROLE capability explicitly, grant
+-- CREATE on the containing schema only for ownership transfer, and remove both privileges
+-- before the migration completes.
 grant myeongha_birth_profile_create_owner to current_user;
 grant create on schema public to myeongha_birth_profile_create_owner;
 
