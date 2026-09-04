@@ -12,6 +12,8 @@ Hosting provider decision        CLOSED
 Repository deployment contract  MERGED
 Saju merged main                 4072f9dd34a51fe3062f0cff9de25f57d3963533
 Pull request                     gycha0109-beep/Saju#247
+Merged-main container CI         PASS
+Merged-main general CI           PASS
 Live Google Cloud resources      NOT VERIFIED
 Saju production activation       BLOCKED
 MyeongHa production binding      NOT COMPLETE
@@ -80,12 +82,16 @@ Verified PR checks before merge:
 | `CI` | PASS |
 | `PIE Prospective Shadow` | PASS |
 
-The general CI verification included repository lint/typecheck/tests/build; the observed test run completed with 574 passing test files and 3934 passing tests.
+The general PR CI verification included repository lint/typecheck/tests/build; the observed test run completed with 574 passing test files and 3934 passing tests.
 
 Post-merge on Saju main `4072f9dd34a51fe3062f0cff9de25f57d3963533`:
 
-- `Production Calculation Container` push run: PASS.
-- general `CI` push run: running at the time this evidence record was first created; it must not be marked PASS until GitHub reports a completed successful conclusion.
+| workflow | event | result |
+|---|---|---|
+| `Production Calculation Container` run `33820457220` | push | PASS |
+| `CI` run `33820457223` | push | PASS |
+
+The general merged-main CI completed successfully at `2026-09-04T00:09:25Z`.
 
 ## 5. Source-governance evidence
 
