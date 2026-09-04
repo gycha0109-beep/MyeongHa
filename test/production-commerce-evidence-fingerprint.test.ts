@@ -89,11 +89,9 @@ describe('Production Commerce evidence fingerprint V1', () => {
       canonicalEvidenceBytes: CANONICAL_EVIDENCE,
       secret: SECRET,
     });
-    const changedBytes = Buffer.from(CANONICAL_EVIDENCE);
-    changedBytes[changedBytes.length - 1] ^= 0x01;
     const changed = fingerprintProductionCommerceEvidenceV1({
       domain: DOMAINS.receiptEvidence,
-      canonicalEvidenceBytes: changedBytes,
+      canonicalEvidenceBytes: Buffer.from('provider:v1:txn_122', 'utf8'),
       secret: SECRET,
     });
 
