@@ -212,17 +212,21 @@ If product intent genuinely requires one-purchase-per-reading-artifact ownership
 
 ## 8. Implementation gate after this decision
 
-This decision closes only the rail-shape part of Commerce launch planning.
+Current gate state after the later privacy child decision:
 
 ```text
 Commerce Architecture                         = CLOSED
 P0-CM-01 launch rail                           = DECIDED: Web + one-off
 P0-CM-02 exact Web PSP                         = OPEN-P0
 P0-CM-03 launch paid Product/Capability        = OPEN-P0 / upstream-blocked
-P0-PR-01 commerce evidence retention subset   = OPEN-P0
+P0-PR-01B Commerce evidence minimization       = DECIDED
+P0-PR-01 parent legal/accounting/backup        = OPEN-P0
 provider SDK/webhook                           = HOLD
+production evidence persistence                = HOLD
 production Commerce activation                 = NOT AUTHORIZED
 ```
+
+`P0-PR-01B` closes only the provider-evidence minimization/security shape. It does not decide legal/accounting retention duration, backup retention, account-deletion Commerce handling, or authorize production evidence persistence.
 
 No database migration, provider dependency, webhook route, or production secret is authorized by this document alone.
 
@@ -248,7 +252,7 @@ Concrete paid catalog selection does **not** reopen `P0-CM-01`; it closes `P0-CM
 
 `COMMERCE_ENTITLEMENT_ARCHITECTURE_V1.md` was closed before this launch-rail decision and therefore contains historical status text that names `P0-CM-01` as still open.
 
-Those statements remain valid as historical evidence of the Architecture closure point but are **superseded for current P0 status** by this decision and `docs/P0_DECISION_REGISTER.md`.
+Those statements remain valid as historical evidence of the Architecture closure point but are **superseded for current P0 status** by this decision, later explicit P0 decisions, and `docs/P0_DECISION_REGISTER.md`.
 
 Interpretation rule:
 
@@ -258,9 +262,11 @@ Architecture provider-neutral semantics
 
 Architecture text: "P0-CM-01 open / provider selection blocked"
 → read using latest P0 split:
-   P0-CM-01 = DECIDED Web + one-off
-   P0-CM-02 = exact Web PSP OPEN
-   P0-CM-03 = launch paid Product/Capability OPEN
+   P0-CM-01  = DECIDED Web + one-off
+   P0-CM-02  = exact Web PSP OPEN
+   P0-CM-03  = launch paid Product/Capability OPEN
+   P0-PR-01B = Commerce evidence minimization DECIDED
+   P0-PR-01  = parent retention/legal/backup OPEN
 ```
 
 No Architecture invariant, schema authority, entitlement transition, ordering rule, reconciliation rule, or provider-neutral evidence contract is modified by this supersession.
