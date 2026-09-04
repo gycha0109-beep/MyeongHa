@@ -7,10 +7,17 @@
 --
 -- service_role is intentionally NOT targeted here. supabase_admin default privileges
 -- are intentionally NOT altered: both require separate platform-authority review.
+--
+-- Some runtime functions are deliberately transferred to narrow myeongha_* owners.
+-- The migration principal must not mutate those functions: their ACLs were hardened by
+-- the owner-transfer migrations that created them. This migration only mutates public
+-- functions owned by current_user and verifies all MyeongHa-owned application functions
+-- are already fail-closed to anon/authenticated.
 
 DO $$
 DECLARE
   v_role text;
+  v_function record;
 BEGIN
   FOR v_role IN
     SELECT r.rolname
@@ -27,12 +34,27 @@ BEGIN
       v_role
     );
 
-    -- Remove explicit function grants. PUBLIC is revoked separately below because
-    -- PUBLIC EXECUTE would otherwise remain an effective grant to both API roles.
-    EXECUTE pg_catalog.format(
-      'revoke all privileges on all functions in schema public from %I',
-      v_role
-    );
+    -- Revoke explicit API-role function grants only where the migration principal owns
+    -- the function. Narrow myeongha_* owners remain untouched and are verified below.
+    FOR v_function IN
+      SELECT n.nspname,
+             p.proname,
+             pg_catalog.pg_get_function_identity_arguments(p.oid) AS identity_args
+      FROM pg_catalog.pg_proc p
+      JOIN pg_catalog.pg_namespace n ON n.oid = p.pronamespace
+      WHERE n.nspname = 'public'
+        AND p.prokind = 'f'
+        AND p.proowner = (SELECT oid FROM pg_catalog.pg_roles WHERE rolname = current_user)
+      ORDER BY p.oid
+    LOOP
+      EXECUTE pg_catalog.format(
+        'revoke all privileges on function %I.%I(%s) from %I',
+        v_function.nspname,
+        v_function.proname,
+        v_function.identity_args,
+        v_role
+      );
+    END LOOP;
 
     -- API roles may retain schema USAGE for platform compatibility, but they may not
     -- create new objects in the application schema.
@@ -59,12 +81,38 @@ BEGIN
 END
 $$;
 
+-- Remove PUBLIC EXECUTE from existing public functions owned by the migration principal.
+-- Narrow myeongha_* owner functions were already explicitly revoked from PUBLIC when
+-- ownership was transferred and are verified below rather than mutated here.
+DO $$
+DECLARE
+  v_function record;
+BEGIN
+  FOR v_function IN
+    SELECT n.nspname,
+           p.proname,
+           pg_catalog.pg_get_function_identity_arguments(p.oid) AS identity_args
+    FROM pg_catalog.pg_proc p
+    JOIN pg_catalog.pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public'
+      AND p.prokind = 'f'
+      AND p.proowner = (SELECT oid FROM pg_catalog.pg_roles WHERE rolname = current_user)
+    ORDER BY p.oid
+  LOOP
+    EXECUTE pg_catalog.format(
+      'revoke all privileges on function %I.%I(%s) from public',
+      v_function.nspname,
+      v_function.proname,
+      v_function.identity_args
+    );
+  END LOOP;
+END
+$$;
+
 -- PostgreSQL grants EXECUTE on newly-created functions to PUBLIC through the global
 -- function default. Per-schema default privileges are additive and cannot subtract that
 -- global grant, so this PUBLIC revoke must intentionally be global for postgres-created
 -- functions. Explicit function grants remain the runtime authority mechanism.
-revoke all privileges on all functions in schema public from public;
-
 alter default privileges for role postgres
   revoke execute on functions from public;
 
@@ -118,15 +166,24 @@ BEGIN
         v_role, v_count;
     END IF;
 
+    -- Application-function closure is asserted across postgres-owned functions plus
+    -- deliberately narrow myeongha_* owners. Supabase/platform-owned public helpers are
+    -- outside this migration's authority and are not reclassified here.
     SELECT count(*)
       INTO v_count
     FROM pg_catalog.pg_proc p
     JOIN pg_catalog.pg_namespace n ON n.oid = p.pronamespace
+    JOIN pg_catalog.pg_roles owner_role ON owner_role.oid = p.proowner
     WHERE n.nspname = 'public'
+      AND p.prokind = 'f'
+      AND (
+        owner_role.rolname = current_user
+        OR owner_role.rolname LIKE 'myeongha\_%' ESCAPE '\'
+      )
       AND pg_catalog.has_function_privilege(v_role, p.oid, 'EXECUTE');
 
     IF v_count <> 0 THEN
-      RAISE EXCEPTION '% still has effective EXECUTE on % public functions',
+      RAISE EXCEPTION '% still has effective EXECUTE on % MyeongHa application functions',
         v_role, v_count;
     END IF;
 
