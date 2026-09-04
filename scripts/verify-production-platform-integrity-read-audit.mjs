@@ -1,7 +1,10 @@
+import { execFileSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 
 const workflowPath = '.github/workflows/production-platform-integrity-read-audit.yml';
 const auditScriptPath = 'scripts/run-production-platform-integrity-read-audit.sh';
+
+execFileSync('bash', ['-n', auditScriptPath], { stdio: 'inherit' });
 
 const [workflow, auditScript] = await Promise.all([
   readFile(workflowPath, 'utf8'),
