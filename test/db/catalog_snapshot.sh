@@ -2,6 +2,12 @@
 set -euo pipefail
 
 expected_file="${1:-test/db/catalog.expected.sha256}"
+acl_migration="supabase/migrations/0880_api_role_acl_default_privilege_hardening.sql"
+
+if grep -Eiq 'revoke[[:space:]]+.*on[[:space:]]+all[[:space:]]+functions[[:space:]]+in[[:space:]]+schema[[:space:]]+public' "${acl_migration}"; then
+  echo "unsafe schema-wide function REVOKE detected in ${acl_migration}; narrow runtime owners must not be mutated by the postgres migration principal" >&2
+  exit 5
+fi
 
 if [[ ! -f "${expected_file}" ]]; then
   echo "missing expected catalog hash: ${expected_file}" >&2
