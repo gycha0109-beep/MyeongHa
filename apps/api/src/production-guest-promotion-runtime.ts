@@ -30,6 +30,12 @@ type PromotionRowV1 = Readonly<{
 
 type GuestSessionRowV1 = Readonly<{ guestSessionId: unknown }>;
 
+type PromotionRequestInputV1 = Readonly<{
+  request: Request;
+  requestId: string;
+  serverTime: string;
+}>;
+
 function envelope(data: unknown, requestId: string, serverTime: string): Response {
   return Response.json(
     {
@@ -101,7 +107,7 @@ export function createProductionGuestPromotionRuntimeV1(input: {
   const verifier = createProductionRequestIdentityVerifierV1({ config });
 
   return Object.freeze({
-    async handleRequest(requestInput) {
+    async handleRequest(requestInput: PromotionRequestInputV1): Promise<Response> {
       const { request, requestId, serverTime } = requestInput;
       if (request.method !== 'POST') {
         return new Response(null, {
