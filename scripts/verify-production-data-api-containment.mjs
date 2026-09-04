@@ -1,17 +1,13 @@
-import { execFileSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 
 const workflowPath = '.github/workflows/production-data-api-containment.yml';
 const runnerPath = 'scripts/run-production-data-api-containment.sh';
-const directDbPath = 'scripts/verify-production-data-api-containment-direct-db.sh';
+const runtimeSmokePath = 'scripts/verify-production-data-api-containment-guest-runtime.mjs';
 
-execFileSync('bash', ['-n', runnerPath], { stdio: 'inherit' });
-execFileSync('bash', ['-n', directDbPath], { stdio: 'inherit' });
-
-const [workflow, runner, directDb] = await Promise.all([
+const [workflow, runner, runtimeSmoke] = await Promise.all([
   readFile(workflowPath, 'utf8'),
   readFile(runnerPath, 'utf8'),
-  readFile(directDbPath, 'utf8'),
+  readFile(runtimeSmokePath, 'utf8'),
 ]);
 
 const requiredWorkflowFragments = [
@@ -24,19 +20,21 @@ const requiredWorkflowFragments = [
   'permissions:\n  contents: read',
   'cancel-in-progress: false',
   'SUPABASE_PROJECT_ID: cnsfpcdiyofqvhpcegfc',
-  'RUNTIME_DB_PRINCIPAL: myeongha_runtime',
-  'API_EXECUTION_ROLE: myeongha_api_executor',
   'environment: production',
   'SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}',
-  'SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}',
   'test -n "${SUPABASE_ACCESS_TOKEN:-}"',
-  'test -n "${SUPABASE_DB_PASSWORD:-}"',
-  'Install PostgreSQL client',
-  'Resolve governed production pooler endpoint',
-  'Preflight direct PostgreSQL execution authority',
+  'Set up Node 24 for governed runtime smoke',
+  "node-version: '24'",
+  'Bootstrap and preflight governed Guest canonical-subject path',
+  'CONTAINMENT_RUNTIME_SMOKE_MODE: bootstrap',
+  'RUNTIME_SMOKE_STATE_PATH: ${{ runner.temp }}/myeongha-data-api-containment-runtime-smoke.json',
+  'run: node scripts/verify-production-data-api-containment-guest-runtime.mjs',
   'run: bash scripts/run-production-data-api-containment.sh',
   'https://myeongha.vercel.app/api/health',
-  'Verify direct PostgreSQL execution authority after transition',
+  'Verify governed Guest canonical-subject path after transition',
+  'CONTAINMENT_RUNTIME_SMOKE_MODE: verify',
+  'Remove runtime smoke credential material',
+  'rm -f "${{ runner.temp }}/myeongha-data-api-containment-runtime-smoke.json"',
   'if: always()',
   'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1',
   'retention-days: 14',
@@ -51,10 +49,16 @@ for (const fragment of requiredWorkflowFragments) {
 for (const forbiddenWorkflowFragment of [
   'MYEONGHA_PRODUCTION_MEMBER_BEARER',
   'MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID',
+  'SUPABASE_DB_PASSWORD',
+  'RUNTIME_DB_PRINCIPAL',
+  'API_EXECUTION_ROLE',
+  'Install PostgreSQL client',
+  'Resolve governed production pooler endpoint',
+  'verify-production-data-api-containment-direct-db.sh',
   'verify-production-member-me.mjs',
 ]) {
   if (workflow.includes(forbiddenWorkflowFragment)) {
-    throw new Error(`Containment must not depend on unprovisioned Member smoke material: ${forbiddenWorkflowFragment}`);
+    throw new Error(`Containment must not depend on invalid preflight material: ${forbiddenWorkflowFragment}`);
   }
 }
 
@@ -90,25 +94,30 @@ for (const fragment of requiredRunnerFragments) {
   }
 }
 
-const requiredDirectDbFragments = [
-  "[[ \"$SUPABASE_PROJECT_ID\" == 'cnsfpcdiyofqvhpcegfc' ]]",
-  "[[ \"$RUNTIME_DB_PRINCIPAL\" == 'myeongha_runtime' ]]",
-  "[[ \"$API_EXECUTION_ROLE\" == 'myeongha_api_executor' ]]",
-  'export PGSSLMODE=require',
-  'BEGIN READ ONLY;',
-  "pg_catalog.pg_has_role('$RUNTIME_DB_PRINCIPAL', '$API_EXECUTION_ROLE', 'MEMBER')",
-  'SET LOCAL ROLE $API_EXECUTION_ROLE;',
-  "current_setting('transaction_read_only') = 'on'",
-  'ROLLBACK;',
-  "[[ \"$role_state\" == *'READY'* ]]",
-  "[[ \"$role_state\" != *'BLOCKED'* ]]",
-  "[[ \"$execution_state\" == *'READY'* ]]",
-  "[[ \"$execution_state\" != *'BLOCKED'* ]]",
+const requiredRuntimeSmokeFragments = [
+  "const PRODUCTION_ORIGIN = 'https://myeongha.vercel.app';",
+  'const BOOTSTRAP_URL = `${PRODUCTION_ORIGIN}/api/session/bootstrap`;',
+  'const MEMBER_ME_URL = `${PRODUCTION_ORIGIN}/api/me`;',
+  "mode !== 'bootstrap' && mode !== 'verify'",
+  "fetchCanonical(BOOTSTRAP_URL",
+  "method: 'POST'",
+  "fetchCanonical(MEMBER_ME_URL",
+  "method: 'GET'",
+  "directives.includes('no-store')",
+  "body.meta.apiContractVersion !== 'v0.9'",
+  "body.data.kind !== 'guest'",
+  "body.data.subjectKind !== 'guest'",
+  "body.data.subjectStatus !== 'active'",
+  "JSON.stringify({ subjectId, bearerToken: bearer, expiresAt })",
+  'mode: 0o600',
+  'await chmod(statePath, 0o600);',
+  "JSON.parse(await readFile(statePath, 'utf8'))",
+  'await verifyCanonicalGuest(subjectId, bearer);',
 ];
 
-for (const fragment of requiredDirectDbFragments) {
-  if (!directDb.includes(fragment)) {
-    throw new Error(`Missing direct PostgreSQL containment smoke fragment: ${fragment}`);
+for (const fragment of requiredRuntimeSmokeFragments) {
+  if (!runtimeSmoke.includes(fragment)) {
+    throw new Error(`Missing canonical Guest containment smoke fragment: ${fragment}`);
   }
 }
 
@@ -119,29 +128,45 @@ for (const forbiddenTrigger of ['\npush:', '\npull_request:', '\nschedule:']) {
 }
 
 const mutationStepIndex = workflow.indexOf('run: bash scripts/run-production-data-api-containment.sh');
-for (const preflightFragment of [
-  'test -n "${SUPABASE_ACCESS_TOKEN:-}"',
-  'test -n "${SUPABASE_DB_PASSWORD:-}"',
-]) {
-  const preflightIndex = workflow.indexOf(preflightFragment);
-  if (preflightIndex < 0 || preflightIndex > mutationStepIndex) {
-    throw new Error(`Production containment credential preflight must occur before mutation: ${preflightFragment}`);
-  }
+if (mutationStepIndex < 0) {
+  throw new Error('Containment mutation step is missing.');
 }
 
-const directDbSmokeMatches = [
-  ...workflow.matchAll(/run: bash scripts\/verify-production-data-api-containment-direct-db\.sh/g),
+const accessTokenPreflightIndex = workflow.indexOf('test -n "${SUPABASE_ACCESS_TOKEN:-}"');
+if (accessTokenPreflightIndex < 0 || accessTokenPreflightIndex > mutationStepIndex) {
+  throw new Error('Supabase access-token preflight must occur before mutation.');
+}
+
+const runtimeSmokeMatches = [
+  ...workflow.matchAll(/run: node scripts\/verify-production-data-api-containment-guest-runtime\.mjs/g),
 ];
-if (directDbSmokeMatches.length !== 2) {
-  throw new Error(`Expected exactly two direct PostgreSQL authority smokes, found ${directDbSmokeMatches.length}.`);
+if (runtimeSmokeMatches.length !== 2) {
+  throw new Error(`Expected exactly two canonical Guest runtime smokes, found ${runtimeSmokeMatches.length}.`);
 }
-const preDirectDbSmokeIndex = directDbSmokeMatches[0]?.index ?? -1;
-const postDirectDbSmokeIndex = directDbSmokeMatches[1]?.index ?? -1;
-if (preDirectDbSmokeIndex < 0 || preDirectDbSmokeIndex >= mutationStepIndex) {
-  throw new Error('Direct PostgreSQL authority preflight must pass before the Data API transition.');
+
+const preRuntimeSmokeIndex = runtimeSmokeMatches[0]?.index ?? -1;
+const postRuntimeSmokeIndex = runtimeSmokeMatches[1]?.index ?? -1;
+const bootstrapModeIndex = workflow.indexOf('CONTAINMENT_RUNTIME_SMOKE_MODE: bootstrap');
+const verifyModeIndex = workflow.indexOf('CONTAINMENT_RUNTIME_SMOKE_MODE: verify');
+const cleanupIndex = workflow.indexOf('Remove runtime smoke credential material');
+
+if (
+  bootstrapModeIndex < 0 ||
+  preRuntimeSmokeIndex < 0 ||
+  bootstrapModeIndex > preRuntimeSmokeIndex ||
+  preRuntimeSmokeIndex >= mutationStepIndex
+) {
+  throw new Error('Canonical Guest bootstrap/runtime preflight must pass before the Data API transition.');
 }
-if (postDirectDbSmokeIndex <= mutationStepIndex) {
-  throw new Error('Direct PostgreSQL authority post-transition smoke must run after the Data API transition.');
+if (
+  verifyModeIndex <= mutationStepIndex ||
+  postRuntimeSmokeIndex <= mutationStepIndex ||
+  verifyModeIndex > postRuntimeSmokeIndex
+) {
+  throw new Error('Canonical Guest post-transition smoke must run after the Data API transition.');
+}
+if (cleanupIndex <= postRuntimeSmokeIndex) {
+  throw new Error('Runtime smoke credential material must be removed after post-transition verification.');
 }
 
 const patchCount = [...runner.matchAll(/-X PATCH/g)].length;
@@ -178,39 +203,34 @@ for (const fragment of forbiddenRunnerFragments) {
   }
 }
 
-const forbiddenDirectDbFragments = [
-  'alter ',
-  'create ',
-  'drop ',
-  'grant ',
-  'revoke ',
-  'insert ',
-  'update ',
-  'delete ',
-  'truncate ',
-  'copy ',
-  '-X PATCH',
-  '-X POST',
-  '-X PUT',
-  '-X DELETE',
+const forbiddenRuntimeSmokeFragments = [
+  '/api/birth-profiles',
   'api.supabase.com',
+  'SUPABASE_DB_PASSWORD',
+  'psql',
+  'SET LOCAL ROLE',
   'pg_authid',
   'rolpassword',
+  'alter table',
+  'alter role',
+  'create schema',
+  'drop schema',
+  'grant ',
+  'revoke ',
+  'insert into',
+  'update ',
+  'delete from',
+  'truncate ',
+  'console.log(bearer',
+  'console.log(state',
+  'console.log(body',
 ];
 
-const lowerDirectDb = directDb.toLowerCase();
-for (const fragment of forbiddenDirectDbFragments) {
-  if (lowerDirectDb.includes(fragment.toLowerCase())) {
-    throw new Error(`Forbidden direct PostgreSQL containment smoke mutation surface: ${fragment}`);
+const lowerRuntimeSmoke = runtimeSmoke.toLowerCase();
+for (const fragment of forbiddenRuntimeSmokeFragments) {
+  if (lowerRuntimeSmoke.includes(fragment.toLowerCase())) {
+    throw new Error(`Forbidden canonical Guest containment smoke surface: ${fragment}`);
   }
-}
-
-const beginReadOnlyCount = [...directDb.matchAll(/BEGIN READ ONLY;/g)].length;
-const rollbackCount = [...directDb.matchAll(/ROLLBACK;/g)].length;
-if (beginReadOnlyCount !== 2 || rollbackCount !== 2) {
-  throw new Error(
-    `Direct DB smoke must use exactly two explicit read-only transactions: begin=${beginReadOnlyCount}, rollback=${rollbackCount}.`,
-  );
 }
 
 const requestBodyMatch = runner.match(/jq -n --arg db_schema[^\n]+\n?/g) ?? [];
@@ -227,6 +247,10 @@ for (const rawFile of ['$pre_raw', '$patch_raw', '$post_raw', '$request_body']) 
   if (artifactCopyPattern.test(runner)) {
     throw new Error(`Raw Management API material must not be copied into the artifact: ${rawFile}`);
   }
+}
+
+if (workflow.includes('myeongha-data-api-containment-runtime-smoke.json\n          path:')) {
+  throw new Error('Runtime Guest credential material must never be uploaded as containment evidence.');
 }
 
 console.log('MyeongHa guarded production Data API containment contract verification passed.');
