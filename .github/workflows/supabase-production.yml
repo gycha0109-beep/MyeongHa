@@ -114,6 +114,18 @@ jobs:
         shell: bash
         run: bash scripts/run-production-platform-integrity-postdeploy-verify.sh
 
+      - name: Run one-time canonical Guest production smoke
+        if: ${{ contains(github.event.head_commit.message, '[pi-guest-smoke-once]') }}
+        shell: bash
+        env:
+          RUNTIME_SMOKE_STATE_PATH: ${{ runner.temp }}/myeongha-pi-guest-runtime.json
+        run: |
+          set -euo pipefail
+          umask 077
+          trap 'rm -f "$RUNTIME_SMOKE_STATE_PATH"' EXIT
+          CONTAINMENT_RUNTIME_SMOKE_MODE=bootstrap node scripts/verify-production-data-api-containment-guest-runtime.mjs
+          CONTAINMENT_RUNTIME_SMOKE_MODE=verify node scripts/verify-production-data-api-containment-guest-runtime.mjs
+
       - name: Upload post-deploy platform integrity evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
