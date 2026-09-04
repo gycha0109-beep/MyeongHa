@@ -1,0 +1,29 @@
+name: TEMP Dispatch Production Saju Current Subject Smoke
+
+on:
+  push:
+    branches:
+      - ops/dispatch-saju-current-subject-smoke-20260905
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Dispatch governed production Saju current-subject smoke
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail-with-body --silent --show-error \
+            -X POST \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GH_REPO}/actions/workflows/production-saju-current-subject-smoke.yml/dispatches" \
+            -d '{"ref":"main","inputs":{"confirm":"VERIFY_SAJU_CURRENT_SUBJECT"}}'
