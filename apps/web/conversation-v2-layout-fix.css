@@ -65,6 +65,8 @@ body.character-room.character-room-v2 .conversation-composer {
 
 @media (max-width: 900px) {
   body.character-room.character-room-v2 {
+    width: 100%;
+    max-width: 100vw;
     overflow: hidden;
     background: #f5eee5;
   }
@@ -73,29 +75,47 @@ body.character-room.character-room-v2 .conversation-composer {
     position: relative;
     inset: auto;
     width: 100%;
+    max-width: 100vw;
+    min-width: 0;
     height: 58px;
     padding: 0 14px;
-    grid-template-columns: auto 1fr auto;
+    grid-template-columns: minmax(0, auto) minmax(0, 1fr) minmax(0, auto);
+    overflow: hidden;
     background: rgba(249,244,236,.97);
   }
 
+  body.character-room.character-room-v2 .conversation-room-header .character-room-back,
+  body.character-room.character-room-v2 .conversation-room-header .character-room-identity,
+  body.character-room.character-room-v2 .conversation-room-header .character-room-actions {
+    min-width: 0;
+    max-width: 100%;
+  }
+
   body.character-room.character-room-v2 .conversation-room-stage {
+    width: 100%;
+    max-width: 100vw;
+    min-width: 0;
     min-height: 0;
     height: calc(100dvh - 58px);
     padding: 0;
     display: grid;
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: 190px minmax(0,1fr);
     overflow: hidden;
   }
 
   body.character-room.character-room-v2 .conversation-scene-column {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
     min-height: 190px;
     height: 190px;
   }
 
   body.character-room.character-room-v2 .conversation-room-scene {
     width: 100%;
+    max-width: 100%;
+    min-width: 0;
     height: 190px;
     min-height: 190px;
     flex: initial;
@@ -106,6 +126,14 @@ body.character-room.character-room-v2 .conversation-composer {
     inset: auto auto 10px 12px;
     top: auto;
     bottom: 10px;
+    max-width: calc(100% - 24px);
+  }
+
+  body.character-room.character-room-v2 .conversation-chat-panel,
+  body.character-room.character-room-v2 .conversation-message-stream,
+  body.character-room.character-room-v2 .conversation-composer {
+    max-width: 100%;
+    min-width: 0;
   }
 
   body.character-room.character-room-v2 .conversation-chat-panel {
@@ -113,6 +141,10 @@ body.character-room.character-room-v2 .conversation-composer {
     min-height: 0;
     margin: 0;
     padding: 0;
+  }
+
+  body.character-room.character-room-v2 .conversation-composer > * {
+    min-width: 0;
   }
 }
 
