@@ -69,6 +69,29 @@ function selectMode(nextMode) {
   setBusy(false);
 }
 
+function consumeConfirmationReturn() {
+  const url = new URL(location.href);
+  if (url.searchParams.get('confirmed') !== '1') return false;
+
+  const fragment = new URLSearchParams(url.hash.startsWith('#') ? url.hash.slice(1) : url.hash);
+  const hasError = fragment.has('error') || fragment.has('error_code');
+  const hasImplicitSession = fragment.has('access_token') && fragment.has('refresh_token');
+
+  url.searchParams.delete('confirmed');
+  url.hash = '';
+  history.replaceState(null, '', `${url.pathname}${url.search}`);
+
+  selectMode('sign-in');
+  if (hasError) {
+    setStatus('이메일 확인 링크를 처리하지 못했습니다. 링크가 만료됐거나 이미 사용됐을 수 있습니다. 가입한 계정으로 로그인을 시도해 주세요.', 'error');
+  } else if (hasImplicitSession) {
+    setStatus('이메일 확인이 처리되었습니다. 가입한 이메일과 비밀번호로 로그인해 주세요.', 'success');
+  } else {
+    setStatus('이메일 확인 화면에서 돌아왔습니다. 가입한 이메일과 비밀번호로 로그인해 주세요.');
+  }
+  return true;
+}
+
 function readPublicErrorCode(payload) {
   return payload && typeof payload === 'object' && payload.error && typeof payload.error === 'object'
     ? payload.error.code
@@ -191,9 +214,9 @@ async function onSubmit(event) {
   try {
     if (mode === 'sign-up') {
       await ensureGuestForNewAccount();
-      const result = await signUpWithPassword(email, password);
+      const result = await signUpWithPassword(email, password, nextHref());
       if (result.status === 'verification_required') {
-        setStatus(`${result.email}로 확인 메일을 보냈습니다. 같은 브라우저에서 인증 후 로그인하면 현재 게스트 흐름을 이어갈 수 있습니다.`, 'success');
+        setStatus(`${result.email}로 확인 메일을 보냈습니다. 이메일 확인 후 이 로그인 화면으로 돌아와 현재 게스트 흐름을 이어갈 수 있습니다.`, 'success');
         return;
       }
       await finishAuthenticated(result.session);
@@ -213,7 +236,8 @@ byId('auth-tab-signin').addEventListener('click', () => selectMode('sign-in'));
 byId('auth-tab-signup').addEventListener('click', () => selectMode('sign-up'));
 byId('auth-form').addEventListener('submit', (event) => void onSubmit(event));
 
-if (readMemberSession()) {
+const confirmationReturn = consumeConfirmationReturn();
+if (readMemberSession() && !confirmationReturn) {
   setStatus('이미 로그인되어 있습니다. 잠시 후 이전 화면으로 이동합니다.', 'success');
   setTimeout(() => location.assign(nextHref()), 350);
 }

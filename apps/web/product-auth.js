@@ -225,8 +225,8 @@ export async function signInWithPassword(email, password) {
   return saveSession(data.session);
 }
 
-export async function signUpWithPassword(email, password) {
-  const data = await postJson('/api/auth/sign-up', { email, password });
+export async function signUpWithPassword(email, password, next = 'hall.html') {
+  const data = await postJson('/api/auth/sign-up', { email, password, next });
   if (!isRecord(data)) {
     throw new ProductAuthError('WEB_AUTH_MALFORMED_RESPONSE', '회원가입 응답이 올바르지 않습니다.');
   }

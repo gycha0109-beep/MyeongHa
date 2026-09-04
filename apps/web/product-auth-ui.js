@@ -13,7 +13,7 @@ function render() {
   const profile = document.querySelector('.product-profile');
   if (!(profile instanceof HTMLAnchorElement)) return;
   const mark = profile.querySelector('.product-profile-mark');
-  const label = profile.querySelector('span:last-child');
+  const label = profile.querySelector('.product-profile-mark + span');
   const member = readMemberSession();
 
   if (member) {

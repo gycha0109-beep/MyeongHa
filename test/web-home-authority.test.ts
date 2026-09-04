@@ -7,6 +7,7 @@ const webRoot = join(root, 'apps', 'web');
 const html = readFileSync(join(webRoot, 'hall.html'), 'utf8');
 const client = readFileSync(join(webRoot, 'home-runtime-client.js'), 'utf8');
 const page = readFileSync(join(webRoot, 'home-page.js'), 'utf8');
+const authUi = readFileSync(join(webRoot, 'product-auth-ui.js'), 'utf8');
 const lifeRecordRead = readFileSync(join(root, 'apps', 'api', 'src', 'life-record-ledger-read.ts'), 'utf8');
 const characterResolver = readFileSync(join(root, 'apps', 'api', 'src', 'character-presentation-resolver.ts'), 'utf8');
 
@@ -59,10 +60,13 @@ describe('web Home authority boundary', () => {
     expect(html).not.toContain('chat.html?character=');
   });
 
-  it('fails profile personalization back to a generic non-private My label', () => {
+  it('keeps the static My fallback while delegating live header auth state to the shared renderer', () => {
     expect(html).toContain('id="home-profile-name">마이</span>');
-    expect(page).toContain("byId('home-profile-name').textContent = '마이'");
-    expect(page).toContain('catch {');
+    expect(page).not.toContain('home-profile-name');
+    expect(page).not.toContain('createHomeRuntimeClient');
+    expect(authUi).toContain("const label = profile.querySelector('.product-profile-mark + span')");
+    expect(authUi).toContain("if (label) label.textContent = '마이'");
+    expect(authUi).toContain("if (label) label.textContent = '로그인'");
     expect(page).not.toContain('innerHTML');
   });
 });

@@ -10,6 +10,7 @@ const client = readFileSync(join(webRoot, 'my-runtime-client.js'), 'utf8');
 const page = readFileSync(join(webRoot, 'my-page.js'), 'utf8');
 const hall = readFileSync(join(webRoot, 'hall.html'), 'utf8');
 const homePage = readFileSync(join(webRoot, 'home-page.js'), 'utf8');
+const productAuthUi = readFileSync(join(webRoot, 'product-auth-ui.js'), 'utf8');
 const reading = readFileSync(join(webRoot, 'reading.html'), 'utf8');
 const readingDetail = readFileSync(join(webRoot, 'reading-detail.html'), 'utf8');
 const profileAuthority = readFileSync(join(root, 'apps', 'api', 'src', 'subject-profile.ts'), 'utf8');
@@ -89,7 +90,10 @@ describe('web My profile authority boundary', () => {
 
   it('aligns Home, Saju hub, and Reading detail profile affordances with the My destination', () => {
     expect(hall).toContain('<span id="home-profile-name">마이</span>');
-    expect(homePage).toContain("byId('home-profile-name').textContent = '마이'");
+    expect(homePage).not.toContain('home-profile-name');
+    expect(productAuthUi).toContain("const label = profile.querySelector('.product-profile-mark + span')");
+    expect(productAuthUi).toContain("if (label) label.textContent = '마이'");
+    expect(productAuthUi).toContain("if (label) label.textContent = '로그인'");
 
     expect(reading).not.toContain('<span>지환</span>');
     expect(reading).toContain('<span>마이</span>');
