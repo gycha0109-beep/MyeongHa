@@ -27,13 +27,14 @@
     "verify:production-birth-profile-guest-create-read-smoke-workflow": "node scripts/verify-production-birth-profile-guest-create-read-smoke-workflow.mjs",
     "verify:production-saju-current-subject-smoke-workflow": "node scripts/verify-production-saju-current-subject-smoke-workflow.mjs",
     "verify:production-platform-integrity-read-audit": "node scripts/verify-production-platform-integrity-read-audit.mjs",
+    "verify:production-data-api-containment": "node scripts/verify-production-data-api-containment.mjs",
     "verify:production:api": "node scripts/verify-production-api.mjs",
     "verify:production:member-me": "node scripts/verify-production-member-me.mjs",
     "verify:production:birth-profile-create-boundary": "node scripts/verify-production-birth-profile-create-boundary.mjs",
     "verify:production:birth-profile-authenticated-create-read": "node scripts/verify-production-birth-profile-authenticated-create-read.mjs",
     "verify:production:birth-profile-guest-create-read": "node scripts/verify-production-birth-profile-guest-create-read.mjs",
     "verify:production:saju-current-subject": "node scripts/verify-production-saju-current-subject.mjs",
-    "check": "npm run typecheck && npm run test && npm run build && npm run build:web && npm run verify:deployment-config && npm run verify:supabase-deployment-config && npm run verify:production-user-data-bindings && npm run verify:production-guest-bootstrap-ttl-binding && npm run verify:production-birth-input-hmac-k1-binding && npm run verify:production-member-me-smoke-workflow && npm run verify:production-birth-profile-create-boundary-smoke-workflow && npm run verify:production-birth-profile-authenticated-create-read-smoke-workflow && npm run verify:production-birth-profile-guest-create-read-smoke-workflow && npm run verify:production-saju-current-subject-smoke-workflow && npm run verify:production-platform-integrity-read-audit"
+    "check": "npm run typecheck && npm run test && npm run build && npm run build:web && npm run verify:deployment-config && npm run verify:supabase-deployment-config && npm run verify:production-user-data-bindings && npm run verify:production-guest-bootstrap-ttl-binding && npm run verify:production-birth-input-hmac-k1-binding && npm run verify:production-member-me-smoke-workflow && npm run verify:production-birth-profile-create-boundary-smoke-workflow && npm run verify:production-birth-profile-authenticated-create-read-smoke-workflow && npm run verify:production-birth-profile-guest-create-read-smoke-workflow && npm run verify:production-saju-current-subject-smoke-workflow && npm run verify:production-platform-integrity-read-audit && npm run verify:production-data-api-containment"
   },
   "dependencies": {
     "pg": "8.23.0"
