@@ -13,6 +13,7 @@ function textOrDash(value) {
 
 function renderUnavailable(message, login = false) {
   byId('my-content').hidden = true;
+  byId('my-birth-content').hidden = true;
   const status = byId('my-status');
   status.hidden = false;
   status.replaceChildren(document.createTextNode(message));
@@ -94,21 +95,101 @@ function renderProfile(payload) {
   byId('my-content').hidden = false;
 }
 
+function birthDateText(value) {
+  if (typeof value !== 'string') return '—';
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/u.exec(value);
+  return match ? `${match[1]}.${match[2]}.${match[3]}` : '—';
+}
+
+function birthTimeText(input) {
+  if (!input?.timeKnown) return '시간 모름';
+  if (typeof input.birthTime !== 'string') return '—';
+  return input.birthTime.slice(0, 5);
+}
+
+function calendarText(input) {
+  if (input?.calendarType === 'solar') return '양력';
+  if (input?.calendarType === 'lunar') return input.isLeapMonth ? '음력 · 윤달' : '음력';
+  return '—';
+}
+
+function sexText(value) {
+  if (value === 'male') return '남성';
+  if (value === 'female') return '여성';
+  if (value === 'unspecified') return '미지정';
+  return '미입력';
+}
+
+function renderBirthEmpty() {
+  byId('my-birth-content').hidden = true;
+  const status = byId('my-birth-status');
+  status.hidden = false;
+  status.replaceChildren(document.createTextNode('저장된 본인 출생 정보가 없습니다.'));
+  status.append(document.createElement('br'));
+  const link = document.createElement('a');
+  link.href = 'birth.html';
+  link.textContent = '출생 정보 입력하기 →';
+  status.append(link);
+}
+
+function renderBirthUnavailable(message) {
+  byId('my-birth-content').hidden = true;
+  const status = byId('my-birth-status');
+  status.hidden = false;
+  status.textContent = message;
+}
+
+function renderBirthProfile(payload) {
+  const birthProfile = payload?.birthProfile ?? null;
+  if (birthProfile === null) {
+    renderBirthEmpty();
+    return;
+  }
+
+  const revision = birthProfile.currentRevision;
+  const input = revision.input;
+  byId('my-birth-date').textContent = birthDateText(input.birthDate);
+  byId('my-birth-time').textContent = birthTimeText(input);
+  byId('my-birth-calendar').textContent = calendarText(input);
+  byId('my-birth-sex').textContent = sexText(input.sex);
+  byId('my-birth-revision').textContent = `현재 입력 · revision ${revision.revisionNo}`;
+  byId('my-birth-status').hidden = true;
+  byId('my-birth-content').hidden = false;
+}
+
 async function boot() {
   byId('my-content').hidden = true;
+  byId('my-birth-content').hidden = true;
   const status = byId('my-status');
   status.hidden = false;
   status.textContent = '내 정보를 불러오는 중입니다…';
+  const birthStatus = byId('my-birth-status');
+  birthStatus.hidden = false;
+  birthStatus.textContent = '출생 정보를 확인하는 중입니다…';
 
+  const client = createMyRuntimeClient();
   try {
-    const payload = await createMyRuntimeClient().readProfile();
+    const payload = await client.readProfile();
     renderProfile(payload);
   } catch (error) {
     if (error instanceof MyRuntimeError && error.code === 'WEB_MY_SESSION_REQUIRED') {
       renderUnavailable('내 정보를 보려면 현재 세션이 필요합니다. 아래의 사주·기록·대화 진입은 로그인 전에도 확인할 수 있습니다.', true);
+      renderBirthUnavailable('현재 세션이 연결되면 저장된 출생 정보를 확인할 수 있습니다.');
       return;
     }
     renderUnavailable('현재 내 정보를 불러올 수 없습니다. 확인되지 않은 계정 정보를 대신 표시하지 않습니다.');
+    renderBirthUnavailable('현재 출생 정보를 확인할 수 없습니다.');
+    return;
+  }
+
+  try {
+    renderBirthProfile(await client.readBirthProfile());
+  } catch (error) {
+    if (error instanceof MyRuntimeError && error.code === 'WEB_MY_SESSION_REQUIRED') {
+      renderBirthUnavailable('현재 세션이 만료되어 출생 정보를 확인할 수 없습니다.');
+      return;
+    }
+    renderBirthUnavailable('현재 출생 정보를 불러올 수 없습니다. 확인되지 않은 값을 대신 표시하지 않습니다.');
   }
 }
 
