@@ -1,11 +1,11 @@
-# 명하 Commerce / Entitlement Implementation Specification v0.8
+# 명하 Commerce / Entitlement Implementation Specification v0.9
 
 > Product: **명하 (MyeongHa)**  
 > Date: **2026-09-05**  
 > Architecture Authority: `docs/architecture/COMMERCE_ENTITLEMENT_ARCHITECTURE_V1.md`  
 > Launch Rail Decision: `docs/COMMERCE_LAUNCH_RAIL_DECISION_V1.md`  
 > Evidence Minimization Decision: `docs/COMMERCE_EVIDENCE_DATA_MINIMIZATION_DECISION_V1.md`  
-> Status: **DERIVED IMPLEMENTATION SPEC / ARCHITECTURE CLOSED / LAUNCH RAIL DECIDED / EVIDENCE MINIMIZATION DECIDED / IMPLEMENTATION HOLD**  
+> Status: **DERIVED IMPLEMENTATION SPEC / ARCHITECTURE CLOSED / LAUNCH RAIL DECIDED / EVIDENCE MINIMIZATION DECIDED / FINGERPRINT PRIMITIVE IMPLEMENTED / IMPLEMENTATION HOLD**  
 > Rule: 이 문서는 Architecture와 이후 explicit P0 decision을 요약해 구현 경계를 연결하는 companion이다. Domain semantics 충돌 시 Architecture가 우선하고, Architecture 작성 뒤 결정된 P0 status는 최신 `docs/P0_DECISION_REGISTER.md`와 해당 decision record가 우선한다.
 
 ---
@@ -21,10 +21,11 @@ P0-CM-02 exact Web PSP                        = OPEN-P0
 P0-CM-03 launch paid Product / Capability     = OPEN-P0 / BLOCKED BY CURRENT SAJU AUTHORITY
 P0-PR-01 parent retention/legal/backup        = OPEN-P0
 P0-PR-01B provider-evidence minimization      = DECIDED
+provider-neutral evidence fingerprint primitive = IMPLEMENTED / PURE HELPER / NOT WIRED TO PROD CONFIG
 provider adapter / webhook / apply runtime    = NOT IMPLEMENTED
 ```
 
-따라서 Web-first rail shape와 provider-evidence 최소화 경계는 결정됐지만 provider SDK, webhook route, production schema mutation, enabled paid catalog, production evidence persistence는 아직 허가되지 않는다.
+따라서 Web-first rail shape와 provider-evidence 최소화 경계, provider-neutral fingerprint primitive는 준비됐지만 provider SDK, provider-specific canonical serializer, webhook route, production schema mutation, enabled paid catalog, production evidence persistence는 아직 허가되지 않는다.
 
 ---
 
@@ -94,9 +95,27 @@ qry_entitlements_v1
 
 `cmd_create_purchase_intent_v1`은 현재 minimal Offer mapping만 pin하며 receipt/grant를 만들지 않는다.
 
+### Provider-neutral security primitive
+
+```text
+apps/api/src/production-commerce-evidence-fingerprint.ts
+```
+
+현재 구현 범위:
+
+- HMAC-SHA-256
+- `hmac-sha256:k1:<64 lowercase hex>`
+- Commerce 전용 32 UTF-8 byte 이상 secret contract
+- receipt / provider-event payload / provider-account domain separation
+- canonical evidence bytes 입력의 deterministic fingerprint
+- unsupported domain / weak secret / non-byte input fail-closed
+
+이 helper는 provider-specific canonicalization, environment binding, DB persistence, verifier, webhook 또는 entitlement mutation을 수행하지 않는다.
+
 ### Missing runtime
 
 ```text
+provider-specific canonical evidence serializer
 provider verification adapter
 public Commerce payment handoff route
 provider webhook/server-notification route
@@ -457,6 +476,14 @@ myeongha.commerce.provider-event-payload.v1
 myeongha.commerce.provider-account.v1
 ```
 
+Runtime primitive:
+
+```text
+apps/api/src/production-commerce-evidence-fingerprint.ts
+```
+
+이 primitive는 세 domain과 HMAC format/secret minimum을 fail-closed로 고정하지만, 실제 provider canonical bytes는 `P0-CM-02` 이후 adapter contract가 소유한다. Production env secret wiring과 DB evidence persistence는 아직 활성화하지 않는다.
+
 ### `verified_payload_jsonb`
 
 Positive allowlist only:
@@ -540,6 +567,8 @@ one-byte-different evidence → different fingerprint
 missing/weak Commerce HMAC secret → fail before evidence persistence
 ```
 
+The fingerprint-specific subset above is implemented by `test/production-commerce-evidence-fingerprint.test.ts`. Provider payload allowlist/leakage tests remain blocked until a concrete adapter schema exists.
+
 ---
 
 ## 18. Implementation status
@@ -550,7 +579,8 @@ Launch rail                                       = DECIDED: Web + one-off
 Commerce evidence minimization                    = DECIDED: P0-PR-01B
 Product Capability Set schema                    = NOT IMPLEMENTED / HOLD UNTIL P0-CM-03
 Purchase Intent v2 Capability pin                = NOT IMPLEMENTED / HOLD UNTIL P0-CM-03
-provider-neutral evidence serializer/fingerprint = NOT IMPLEMENTED / DESIGN MAY PROCEED UNDER P0-PR-01B
+provider-neutral evidence fingerprint primitive = IMPLEMENTED / PURE HELPER / MERGED-MAIN CI GREEN
+provider-specific canonical evidence serializer = NOT IMPLEMENTED / BLOCKED BY P0-CM-02
 provider-neutral verification runtime            = NOT IMPLEMENTED
 concrete provider adapter                         = BLOCKED BY P0-CM-02 + P0-CM-03
 verified receipt → grant/event/projection command= NOT IMPLEMENTED
