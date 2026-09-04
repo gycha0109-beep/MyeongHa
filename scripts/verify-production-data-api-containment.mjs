@@ -23,8 +23,16 @@ const requiredWorkflowFragments = [
   'SUPABASE_PROJECT_ID: cnsfpcdiyofqvhpcegfc',
   'environment: production',
   'SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}',
+  'MYEONGHA_PRODUCTION_MEMBER_BEARER: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_BEARER }}',
+  'MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID }}',
+  'test -n "${SUPABASE_ACCESS_TOKEN:-}"',
+  'test -n "${MYEONGHA_PRODUCTION_MEMBER_BEARER:-}"',
+  'test -n "${MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID:-}"',
+  'actions/setup-node@v4',
+  "node-version: '24'",
   'run: bash scripts/run-production-data-api-containment.sh',
   'https://myeongha.vercel.app/api/health',
+  'node scripts/verify-production-member-me.mjs',
   'if: always()',
   'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1',
   'retention-days: 14',
@@ -50,6 +58,9 @@ const requiredRunnerFragments = [
   "[[ \"$patch_http_status\" == '200' ]]",
   'read_postgrest_config "$post_raw"',
   '[[ "$after_schema" == "$expected_after" ]]',
+  'pre_non_schema="$(jq -S \'del(.db_schema)\' "$snapshot_dir/pre_config.json")"',
+  'post_non_schema="$(jq -S \'del(.db_schema)\' "$snapshot_dir/post_config.json")"',
+  '[[ "$pre_non_schema" == "$post_non_schema" ]]',
   '[[ "$after_schema" != *\'public\'* ]]',
   '[[ "$after_schema" != *\'graphql_public\'* ]]',
   'mutation_scope=management_api_postgrest_db_schema_only',
@@ -69,6 +80,23 @@ for (const forbiddenTrigger of ['\npush:', '\npull_request:', '\nschedule:']) {
   if (workflow.includes(forbiddenTrigger)) {
     throw new Error(`Production Data API containment must remain manual-only: ${forbiddenTrigger}`);
   }
+}
+
+const mutationStepIndex = workflow.indexOf('run: bash scripts/run-production-data-api-containment.sh');
+for (const preflightFragment of [
+  'test -n "${SUPABASE_ACCESS_TOKEN:-}"',
+  'test -n "${MYEONGHA_PRODUCTION_MEMBER_BEARER:-}"',
+  'test -n "${MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID:-}"',
+]) {
+  const preflightIndex = workflow.indexOf(preflightFragment);
+  if (preflightIndex < 0 || preflightIndex > mutationStepIndex) {
+    throw new Error(`Production containment credential preflight must occur before mutation: ${preflightFragment}`);
+  }
+}
+
+const memberSmokeIndex = workflow.indexOf('node scripts/verify-production-member-me.mjs');
+if (memberSmokeIndex <= mutationStepIndex) {
+  throw new Error('Governed Member /api/me smoke must run after the Data API transition.');
 }
 
 const patchCount = [...runner.matchAll(/-X PATCH/g)].length;
