@@ -33,13 +33,34 @@ function renderUnavailable(message, login = false) {
   const status = byId('my-status');
   status.hidden = false;
   status.replaceChildren(document.createTextNode(message));
-  if (login) {
-    status.append(document.createElement('br'));
-    const link = document.createElement('a');
-    link.href = 'auth.html?next=my.html';
-    link.textContent = '로그인하기 →';
-    status.append(link);
+  if (!login) return;
+
+  status.append(document.createElement('br'));
+  const actions = document.createElement('div');
+  actions.className = 'my-auth-actions';
+  const hasStoredMemberSession = Boolean(readMemberSession());
+
+  const link = document.createElement('a');
+  link.className = 'my-auth-action';
+  link.href = 'auth.html?next=my.html';
+  link.textContent = hasStoredMemberSession ? '다시 로그인 →' : '로그인하기 →';
+  actions.append(link);
+
+  if (hasStoredMemberSession) {
+    const button = document.createElement('button');
+    button.className = 'my-auth-action';
+    button.type = 'button';
+    button.textContent = '로그아웃';
+    button.addEventListener('click', async () => {
+      button.disabled = true;
+      button.textContent = '로그아웃 중…';
+      await signOutMember();
+      location.assign('auth.html?next=hall.html');
+    });
+    actions.append(button);
   }
+
+  status.append(actions);
 }
 
 function renderAccountIdentity(subjectKind) {

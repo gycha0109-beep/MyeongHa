@@ -9,6 +9,8 @@ import {
 } from './product-auth.js';
 
 const BIRTH_PROFILE_ID_KEY = 'myeongha.guestBirthProfileId.v1';
+const CONFIRMATION_GUEST_HANDOFF_KEY = 'myeongha.pendingGuestConfirmation.v1';
+const CONFIRMATION_GUEST_HANDOFF_TTL_MS = 24 * 60 * 60 * 1000;
 const ALLOWED_NEXT = new Set([
   'hall.html',
   'reading.html',
@@ -98,6 +100,63 @@ function readPublicErrorCode(payload) {
     : null;
 }
 
+function normalizeEmail(value) {
+  return typeof value === 'string' ? value.trim().toLowerCase() : '';
+}
+
+function clearConfirmationGuestHandoff() {
+  try {
+    localStorage.removeItem(CONFIRMATION_GUEST_HANDOFF_KEY);
+  } catch {
+    return;
+  }
+}
+
+function stageConfirmationGuestHandoff(email) {
+  const guestBearer = readGuestBearer();
+  const normalizedEmail = normalizeEmail(email);
+  if (!guestBearer || !normalizedEmail) return false;
+  try {
+    localStorage.setItem(CONFIRMATION_GUEST_HANDOFF_KEY, JSON.stringify({
+      guestBearer,
+      email: normalizedEmail,
+      expiresAt: new Date(Date.now() + CONFIRMATION_GUEST_HANDOFF_TTL_MS).toISOString(),
+    }));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function readConfirmationGuestHandoff(memberEmail) {
+  let raw = null;
+  try {
+    raw = localStorage.getItem(CONFIRMATION_GUEST_HANDOFF_KEY);
+  } catch {
+    return null;
+  }
+  if (!raw) return null;
+
+  let value = null;
+  try {
+    value = JSON.parse(raw);
+  } catch {
+    clearConfirmationGuestHandoff();
+    return null;
+  }
+
+  const expectedEmail = normalizeEmail(memberEmail);
+  const handoffEmail = normalizeEmail(value?.email);
+  const guestBearer = typeof value?.guestBearer === 'string' ? value.guestBearer : '';
+  const expiresAt = typeof value?.expiresAt === 'string' ? Date.parse(value.expiresAt) : Number.NaN;
+  if (!handoffEmail || !guestBearer || guestBearer.includes('.') || Number.isNaN(expiresAt) || expiresAt <= Date.now()) {
+    clearConfirmationGuestHandoff();
+    return null;
+  }
+  if (!expectedEmail || expectedEmail !== handoffEmail) return null;
+  return guestBearer;
+}
+
 async function ensureGuestForNewAccount() {
   if (readGuestBearer()) return;
   const response = await fetch('/api/session/bootstrap', {
@@ -124,8 +183,8 @@ async function ensureGuestForNewAccount() {
   sessionStorage.setItem(PRODUCT_AUTH_STORAGE_V1.guestBearer, token);
 }
 
-async function promoteGuestIfPresent(accessToken) {
-  const guestBearer = readGuestBearer();
+async function promoteGuestIfPresent(accessToken, memberEmail) {
+  const guestBearer = readGuestBearer() ?? readConfirmationGuestHandoff(memberEmail);
   if (!guestBearer) return { status: 'none' };
 
   const response = await fetch('/api/auth/promote-guest', {
@@ -150,11 +209,13 @@ async function promoteGuestIfPresent(accessToken) {
 
   if (response.ok && payload?.ok === true) {
     clearPromotedGuestBearer();
+    clearConfirmationGuestHandoff();
     return { status: 'promoted' };
   }
 
   const code = readPublicErrorCode(payload);
   if (response.status === 409 && code === 'GUEST_MERGE_REQUIRED') {
+    clearConfirmationGuestHandoff();
     return { status: 'merge-required' };
   }
   return { status: 'preserved' };
@@ -180,7 +241,7 @@ function authErrorMessage(error) {
 }
 
 async function finishAuthenticated(session) {
-  const promotion = await promoteGuestIfPresent(session.accessToken);
+  const promotion = await promoteGuestIfPresent(session.accessToken, session.user?.email);
   if (promotion.status === 'merge-required') {
     setStatus('로그인되었습니다. 이 브라우저의 별도 게스트 기록은 기존 계정에 임의로 합치지 않고 그대로 보존했습니다.', 'success');
   } else if (promotion.status === 'preserved') {
@@ -216,6 +277,10 @@ async function onSubmit(event) {
       await ensureGuestForNewAccount();
       const result = await signUpWithPassword(email, password, nextHref());
       if (result.status === 'verification_required') {
+        if (!stageConfirmationGuestHandoff(result.email)) {
+          setStatus('확인 메일은 전송됐지만 현재 게스트 흐름의 계정 연결 정보를 안전하게 보존하지 못했습니다. 이 탭을 닫지 말고 이메일 확인 후 돌아와 주세요.', 'error');
+          return;
+        }
         setStatus(`${result.email}로 확인 메일을 보냈습니다. 이메일 확인 후 이 로그인 화면으로 돌아와 현재 게스트 흐름을 이어갈 수 있습니다.`, 'success');
         return;
       }
@@ -238,6 +303,5 @@ byId('auth-form').addEventListener('submit', (event) => void onSubmit(event));
 
 const confirmationReturn = consumeConfirmationReturn();
 if (readMemberSession() && !confirmationReturn) {
-  setStatus('이미 로그인되어 있습니다. 잠시 후 이전 화면으로 이동합니다.', 'success');
-  setTimeout(() => location.assign(nextHref()), 350);
+  setStatus('현재 브라우저에 이전 로그인 세션이 있습니다. 계정 상태가 맞지 않으면 아래에서 다시 로그인해 세션을 갱신할 수 있습니다.');
 }
