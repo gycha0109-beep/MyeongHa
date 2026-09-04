@@ -11,9 +11,25 @@ function textOrDash(value) {
   return typeof value === 'string' && value.trim().length > 0 ? value : '—';
 }
 
+function setBirthRoute(mode) {
+  const route = byId('my-birth-route');
+  const title = byId('my-birth-route-title');
+  const copy = byId('my-birth-route-copy');
+  if (mode === 'create') {
+    route.href = 'birth.html';
+    title.textContent = '출생 정보 입력하기';
+    copy.textContent = '저장된 본인 출생 정보가 없으므로 새 원본 입력을 시작합니다.';
+    return;
+  }
+  route.href = '#my-birth-title';
+  title.textContent = '현재 출생 정보 확인';
+  copy.textContent = '현재 저장된 원본 입력을 이 화면에서 확인합니다. 수정 기능은 아직 열지 않습니다.';
+}
+
 function renderUnavailable(message, login = false) {
   byId('my-content').hidden = true;
   byId('my-birth-content').hidden = true;
+  setBirthRoute('current');
   const status = byId('my-status');
   status.hidden = false;
   status.replaceChildren(document.createTextNode(message));
@@ -121,6 +137,7 @@ function sexText(value) {
 }
 
 function renderBirthEmpty() {
+  setBirthRoute('create');
   byId('my-birth-content').hidden = true;
   const status = byId('my-birth-status');
   status.hidden = false;
@@ -133,6 +150,7 @@ function renderBirthEmpty() {
 }
 
 function renderBirthUnavailable(message) {
+  setBirthRoute('current');
   byId('my-birth-content').hidden = true;
   const status = byId('my-birth-status');
   status.hidden = false;
@@ -146,6 +164,7 @@ function renderBirthProfile(payload) {
     return;
   }
 
+  setBirthRoute('current');
   const revision = birthProfile.currentRevision;
   const input = revision.input;
   byId('my-birth-date').textContent = birthDateText(input.birthDate);
@@ -158,6 +177,7 @@ function renderBirthProfile(payload) {
 }
 
 async function boot() {
+  setBirthRoute('current');
   byId('my-content').hidden = true;
   byId('my-birth-content').hidden = true;
   const status = byId('my-status');

@@ -48,6 +48,10 @@ jobs:
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
         run: node scripts/verify-web-my-birth-browser.mjs
+      - name: Verify Birth session and duplicate-create guard
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/run-web-birth-session-browser-smoke-v2.mjs
       - name: Verify conversation browser render
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
@@ -62,5 +66,6 @@ jobs:
             artifacts/web-auth-browser-smoke*
             artifacts/web-my-browser-smoke*
             artifacts/web-my-birth-browser-smoke*
+            artifacts/web-birth-session-browser-smoke*
             artifacts/web-conversation-browser-smoke*
           if-no-files-found: ignore

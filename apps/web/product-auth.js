@@ -217,6 +217,25 @@ export async function getActiveBearer() {
   return guest ? Object.freeze({ kind: 'guest', token: guest }) : null;
 }
 
+export async function ensureActiveBearer() {
+  const active = await getActiveBearer();
+  if (active) return active;
+
+  const data = await postJson('/api/session/bootstrap', {});
+  const guestSession = isRecord(data) && isRecord(data.guestSession) ? data.guestSession : null;
+  const token = guestSession?.bearerToken;
+  if (
+    !isRecord(data) || data.kind !== 'guest' ||
+    typeof token !== 'string' || token.length === 0 || isJwtLike(token)
+  ) {
+    throw new ProductAuthError('WEB_AUTH_GUEST_PREPARE_FAILED', '게스트 세션을 준비하지 못했습니다.');
+  }
+
+  writeSession(GUEST_TOKEN_KEY, token);
+  emitAuthChanged();
+  return Object.freeze({ kind: 'guest', token });
+}
+
 export async function signInWithPassword(email, password) {
   const data = await postJson('/api/auth/sign-in', { email, password });
   if (!isRecord(data) || data.status !== 'authenticated') {

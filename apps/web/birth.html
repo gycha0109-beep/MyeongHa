@@ -16,7 +16,20 @@
       <p class="lead">명식 계산에 필요한 원본 입력만 저장합니다. Birth Profile과 첫 revision의 식별자는 서버가 생성하며, 브라우저에서는 지정하지 않습니다.</p>
     </div>
 
-    <form class="panel birth-panel" id="birth-form" novalidate>
+    <div class="panel" id="birth-status" role="status" style="padding:18px;margin-bottom:20px">현재 저장된 출생 정보를 확인하는 중입니다…</div>
+
+    <article class="panel birth-panel" id="birth-existing" hidden>
+      <div class="eyebrow">CURRENT BIRTH PROFILE</div>
+      <h2 style="margin:8px 0 10px">이미 저장된 출생 정보가 있습니다.</h2>
+      <p class="lead" style="font-size:1rem">현재 production에는 기존 입력을 수정하는 PATCH transport가 연결되어 있지 않습니다. 이 화면에서는 두 번째 본인 Birth Profile을 만들지 않습니다.</p>
+      <p class="fine" id="birth-existing-revision"></p>
+      <div class="birth-submit" style="gap:10px;flex-wrap:wrap">
+        <a class="button button-primary" href="my.html#my-birth-title">My에서 확인하기 →</a>
+        <a class="button button-secondary" href="reading.html">사주에서 결과 보기 →</a>
+      </div>
+    </article>
+
+    <form class="panel birth-panel" id="birth-form" novalidate hidden>
       <div class="form-row">
         <label class="form-label" for="birth-date">생년월일</label>
         <div><input class="input" id="birth-date" type="date" required /><div class="fine">선택한 달력 기준의 날짜를 입력합니다.</div></div>
@@ -54,7 +67,6 @@
         </div>
       </div>
 
-      <div class="panel" id="birth-status" hidden role="status" style="padding:18px;margin-top:20px"></div>
       <div class="birth-submit"><button class="button button-primary" id="birth-submit-button" type="submit">명식록 저장하기 →</button></div>
       <p class="fine" style="text-align:center">현재 create contract가 허용하지 않는 출생지·클라이언트 ID·해시 값은 전송하지 않습니다.</p>
     </form>
