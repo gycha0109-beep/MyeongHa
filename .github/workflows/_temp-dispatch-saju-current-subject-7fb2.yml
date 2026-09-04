@@ -1,0 +1,25 @@
+name: Temporary Dispatch Production Saju Current Subject
+
+on:
+  push:
+    branches:
+      - ops/dispatch-saju-current-subject-20260905-7fb2d2e
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Dispatch governed production Saju current-subject smoke
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api --method POST \
+            "repos/${GITHUB_REPOSITORY}/actions/workflows/production-saju-current-subject-smoke.yml/dispatches" \
+            -f ref=main \
+            -f 'inputs[confirm]=VERIFY_SAJU_CURRENT_SUBJECT'
