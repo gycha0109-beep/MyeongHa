@@ -1,0 +1,96 @@
+name: Production Data API Surface Containment
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Contain removes product schemas from the Data API; rollback restores the captured baseline schema list.'
+        required: true
+        type: choice
+        default: contain
+        options:
+          - contain
+          - rollback
+      confirm:
+        description: 'contain: DISABLE_PRODUCT_DATA_API / rollback: RESTORE_PRODUCT_DATA_API'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-data-api-surface-containment
+  cancel-in-progress: false
+
+env:
+  SUPABASE_PROJECT_ID: cnsfpcdiyofqvhpcegfc
+
+jobs:
+  containment:
+    name: guarded-postgrest-schema-containment
+    runs-on: ubuntu-24.04
+    environment: production
+    env:
+      CONTAINMENT_MODE: ${{ inputs.mode }}
+      DISPATCH_CONFIRM: ${{ inputs.confirm }}
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+    steps:
+      - name: Checkout exact workflow revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Verify explicit production action
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$SUPABASE_PROJECT_ID" == 'cnsfpcdiyofqvhpcegfc' ]]
+          test -n "${SUPABASE_ACCESS_TOKEN:-}"
+          case "$CONTAINMENT_MODE" in
+            contain)
+              [[ "$DISPATCH_CONFIRM" == 'DISABLE_PRODUCT_DATA_API' ]]
+              ;;
+            rollback)
+              [[ "$DISPATCH_CONFIRM" == 'RESTORE_PRODUCT_DATA_API' ]]
+              ;;
+            *)
+              echo 'Unsupported containment mode.' >&2
+              exit 1
+              ;;
+          esac
+
+      - name: Apply guarded Data API surface transition
+        shell: bash
+        run: bash scripts/run-production-data-api-containment.sh
+
+      - name: Verify governed application health remains available
+        shell: bash
+        run: |
+          set -euo pipefail
+          response_file="$RUNNER_TEMP/myeongha-health.json"
+          cleanup() {
+            exit_code=$?
+            trap - EXIT
+            rm -f "$response_file"
+            exit "$exit_code"
+          }
+          trap cleanup EXIT
+
+          http_status="$(curl -sS \
+            -o "$response_file" \
+            -w '%{http_code}' \
+            --connect-timeout 5 \
+            --max-time 15 \
+            -H 'Accept: application/json' \
+            'https://myeongha.vercel.app/api/health')"
+
+          [[ "$http_status" == '200' ]]
+          jq -e 'type == "object" and .status == "ok" and length == 1' "$response_file" >/dev/null
+
+      - name: Upload containment evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: myeongha-production-data-api-containment-${{ github.run_id }}
+          path: ${{ runner.temp }}/myeongha-data-api-containment
+          if-no-files-found: warn
+          retention-days: 14
