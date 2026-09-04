@@ -2,6 +2,15 @@
   const STORAGE_KEY = 'myeongha.productTheme.v1';
   const root = document.documentElement;
   const media = window.matchMedia?.('(prefers-color-scheme: dark)');
+  const currentScript = document.currentScript;
+
+  if (currentScript && !document.querySelector('link[data-product-theme]')) {
+    const stylesheet = document.createElement('link');
+    stylesheet.rel = 'stylesheet';
+    stylesheet.href = 'product-theme.css';
+    stylesheet.dataset.productTheme = 'true';
+    currentScript.after(stylesheet);
+  }
 
   const readStoredTheme = () => {
     try {
