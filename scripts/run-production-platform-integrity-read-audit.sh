@@ -208,6 +208,50 @@ where n.nspname = 'public'
 order by c.relname
 SQL
 
+csv_query schema_acl.csv <<'SQL'
+select
+  n.nspname as schema_name,
+  pg_catalog.pg_get_userbyid(n.nspowner) as owner_name,
+  coalesce(n.nspacl::text, '<NULL>') as raw_acl,
+  coalesce(n.nspacl, pg_catalog.acldefault('n', n.nspowner))::text as effective_acl
+from pg_catalog.pg_namespace n
+where n.nspname = 'public'
+SQL
+
+csv_query schema_acl_entries.csv <<'SQL'
+select
+  n.nspname as schema_name,
+  pg_catalog.pg_get_userbyid(a.grantor) as grantor_name,
+  case
+    when a.grantee = 0 then 'PUBLIC'
+    else pg_catalog.pg_get_userbyid(a.grantee)
+  end as grantee_name,
+  a.privilege_type,
+  a.is_grantable
+from pg_catalog.pg_namespace n
+cross join lateral pg_catalog.aclexplode(
+  coalesce(n.nspacl, pg_catalog.acldefault('n', n.nspowner))
+) a
+where n.nspname = 'public'
+order by grantee_name, privilege_type, grantor_name
+SQL
+
+csv_query schema_init_privileges.csv <<'SQL'
+select
+  n.nspname as schema_name,
+  p.classoid::pg_catalog.regclass::text as class_name,
+  p.objoid,
+  p.objsubid,
+  p.privtype,
+  p.initprivs::text as initprivs
+from pg_catalog.pg_init_privs p
+join pg_catalog.pg_namespace n
+  on p.classoid = 'pg_catalog.pg_namespace'::pg_catalog.regclass
+ and p.objoid = n.oid
+where n.nspname = 'public'
+order by p.privtype, p.objsubid
+SQL
+
 csv_query role_state.csv <<'SQL'
 select
   rolname,
