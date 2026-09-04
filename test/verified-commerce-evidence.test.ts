@@ -208,16 +208,19 @@ describe('VerifiedCommerceEvidenceV1 structural contract', () => {
 
   it('does not include rejected raw evidence values in validation errors', () => {
     const rawReceipt = 'raw-secret-receipt-value';
+    let thrown: unknown;
 
     try {
       requireVerifiedCommerceEvidenceV1({
         ...validEvidence(),
         rawReceipt,
       });
-      throw new Error('expected validation to fail');
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      expect(message).not.toContain(rawReceipt);
+      thrown = error;
     }
+
+    expect(thrown).toBeInstanceOf(Error);
+    const message = thrown instanceof Error ? thrown.message : String(thrown);
+    expect(message).not.toContain(rawReceipt);
   });
 });
