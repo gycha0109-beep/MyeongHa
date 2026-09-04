@@ -35,6 +35,8 @@ jobs:
       CONTAINMENT_MODE: ${{ inputs.mode }}
       DISPATCH_CONFIRM: ${{ inputs.confirm }}
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      MYEONGHA_PRODUCTION_MEMBER_BEARER: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_BEARER }}
+      MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID }}
     steps:
       - name: Checkout exact workflow revision
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -45,6 +47,8 @@ jobs:
           set -euo pipefail
           [[ "$SUPABASE_PROJECT_ID" == 'cnsfpcdiyofqvhpcegfc' ]]
           test -n "${SUPABASE_ACCESS_TOKEN:-}"
+          test -n "${MYEONGHA_PRODUCTION_MEMBER_BEARER:-}"
+          test -n "${MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID:-}"
           case "$CONTAINMENT_MODE" in
             contain)
               [[ "$DISPATCH_CONFIRM" == 'DISABLE_PRODUCT_DATA_API' ]]
@@ -57,6 +61,11 @@ jobs:
               exit 1
               ;;
           esac
+
+      - name: Set up Node 24 for governed runtime smoke
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
 
       - name: Apply guarded Data API surface transition
         shell: bash
@@ -85,6 +94,9 @@ jobs:
 
           [[ "$http_status" == '200' ]]
           jq -e 'type == "object" and .status == "ok" and length == 1' "$response_file" >/dev/null
+
+      - name: Verify governed Member canonical-subject path remains available
+        run: node scripts/verify-production-member-me.mjs
 
       - name: Upload containment evidence
         if: always()
