@@ -1,8 +1,8 @@
-# 명하 Auth / RLS / Privacy Specification v0.5 — Source Aligned
+# 명하 Auth / RLS / Privacy Specification v0.6 — Source Aligned
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.5**  
-> Date: **2026-09-02**  
+> Pack Version: **v0.6**  
+> Date: **2026-09-05**  
 > Source Authority: `Usecase_re_reviewed_v2(1).md`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`, `Myeonghwa_Personalized_Interpretation_Architecture_v1.3_THIRD_REVIEW(1).md`  
 > Rule: source가 결정하지 않은 implementation-critical 사항은 `OPEN-P0`, 비차단 선택은 `CANDIDATE`, source 간 충돌/공백은 `SOURCE_AUTHORITY_GAPS.md` 또는 numbered source-gap 문서에 기록한다. Production P0 decision은 `P0_DECISION_REGISTER.md`가 단일 관리한다.
 
@@ -34,7 +34,7 @@ raw guest token
 → object authorization
 ```
 
-Supabase anon direct row CRUD를 guest persistence mechanism으로 사용하지 않는다. Guest TTL은 `OPEN-P0: P0-PR-01`.
+Supabase anon direct row CRUD를 guest persistence mechanism으로 사용하지 않는다. Guest bearer/session authentication TTL은 `P0-PR-01A`로 **DECIDED: 7 days / 604800 seconds**다. Expired Guest product-data deletion, backup, legal retention은 parent `P0-PR-01`로 계속 OPEN이다.
 
 ## 4. New Signup Promotion
 
@@ -281,8 +281,14 @@ default preview는 sensitive content를 포함하지 않는 mode. full preview�
 - full transcript
 - auth/service token
 - raw receipt/provider account ID
+- provider Authorization/OAuth/bearer credential
+- raw receipt/purchase token
+- full provider request/response or full `verified_payload_jsonb`
+- card PAN/CVV/PIN/raw PCI authentication material
 
 Stable ref/versioned HMAC fingerprint 우선. hash는 anonymization 주장이 아니다.
+
+Commerce provider-evidence minimization은 `P0-PR-01B`로 DECIDED다. Commerce opaque equality/dedupe evidence는 provider lookup에 raw value가 필요하지 않을 경우 Commerce 전용 versioned keyed HMAC fingerprint를 사용하고, `verified_payload_jsonb`는 positive allowlist + bounded schema만 허용한다. Exact contract는 `docs/COMMERCE_EVIDENCE_DATA_MINIMIZATION_DECISION_V1.md`가 authority다.
 
 ## 15. Deletion Lifecycle
 
@@ -303,7 +309,11 @@ Deletion graph:
 - birth/target/life fact/memory/conversation/reading personalization artifacts
 - AI raw trace가 별도 restricted store에 있으면 동일 deletion/retention policy 대상
 
-법적 commerce retention은 product personalization과 분리. 실제 기간 `OPEN-P0: P0-PR-01`.
+법적 commerce retention은 product personalization과 분리. 실제 legal/accounting/backup retention 기간과 account-deletion Commerce tombstone/pseudonymization/destructive schedule은 `OPEN-P0: P0-PR-01`이다.
+
+`P0-PR-01B`는 Commerce evidence의 **저장 최소화/security shape**만 결정한다. 이를 legal retention 기간으로 해석하지 않는다. 반대로 legal retention 미결정을 이유로 raw provider payload 전체를 보존하지도 않는다.
+
+`P0-PR-01` 결정 전 Commerce history cascade-delete/destructive scheduler, indefinite-retention default, raw provider payload archival을 활성화하지 않는다.
 
 Standalone Birth/Target privacy deletion과 historical Reading provenance 충돌은 `SRC-06`이 authority다.
 
@@ -343,3 +353,8 @@ Canonical member가 deletion lifecycle에 들어간 동안 새로운 Guest merge
 - deletion_pending member merge lifecycle → no source-invented allow/deny claim before `SRC-24`
 - transaction-local subject context → cleared after transaction boundary
 - selected P0-AUTH-01 RLS negative tests PASS before production user-data activation
+- raw provider secret/bearer/receipt fixture → business persistence/log/trace leak 없음
+- unknown/oversized provider verified-payload field → drop/reject
+- same Commerce opaque evidence replay → same versioned keyed HMAC fingerprint
+- missing/weak Commerce fingerprint secret → evidence persistence fail-closed
+- parent `P0-PR-01` OPEN 상태 → destructive Commerce retention/deletion scheduler 비활성
