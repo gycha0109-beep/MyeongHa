@@ -1,7 +1,7 @@
-# 명하 Production P0 Decision Register — Full Audit v0.7
+# 명하 Production P0 Decision Register — Full Audit v0.8
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.7**  
+> Pack Version: **v0.8**  
 > Date: **2026-09-05**  
 > Source Authority: `Usecase_re_reviewed_v2(1).md`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`, `Myeonghwa_Personalized_Interpretation_Architecture_v1.3_THIRD_REVIEW(1).md`, `docs/architecture/COMMERCE_ENTITLEMENT_ARCHITECTURE_V1.md`  
 > Rule: 본 문서는 위 source authority를 구현 수준으로 구체화한다. source가 결정하지 않은 사항은 임의 확정하지 않고 `OPEN-P0` 또는 `CANDIDATE`로 표시한다. Production 운영을 열기 위해 별도 security/operations decision을 확정할 경우 source requirement를 좁혀야 하며, 상위 미결정 retention/legal policy를 대신 결정한 것으로 간주하지 않는다.
@@ -24,6 +24,7 @@
 | `P0-AGE-01` | Minimum age / character content policy | **OPEN-P0** | 최소 이용 연령, 미성년 허용 여부, 표현 강도/제한; content bundle policy-tag slot은 미리 두되 threshold/matrix는 미확정 |
 | `P0-PR-01` | Retention / backup / legal retention | **OPEN-P0** | 제품 개인정보, AI trace, 결제/회계 증적, backup retention/deletion |
 | `P0-PR-01A` | Guest bearer/session authentication TTL | **DECIDED** | 7 days / 604800 seconds for newly issued Guest credentials; does not decide expired-Guest data deletion or parent retention policy |
+| `P0-PR-01B` | Commerce provider-evidence data minimization | **DECIDED** | no raw secret/bearer/receipt/PCI storage; versioned keyed fingerprints + allowlisted bounded verified payload; parent retention duration remains OPEN |
 | `P0-AUTH-01` | API→PostgreSQL execution identity / RLS enforcement model | **DECIDED** | non-BYPASSRLS API execution role + transaction-scoped trusted canonical `subject_id` context |
 
 ## 3. 상태 규칙
@@ -125,7 +126,7 @@ scope:
     - exact price/currency/tax/settlement policy
     - concrete launch Product or Capability key/scope/validity
     - paid Reading artifact ownership semantics
-    - commerce/legal/accounting evidence retention
+    - commerce/legal/accounting evidence retention duration
     - future native-store purchase/restore/refund lifecycle
 rationale:
   - primary product/use-case authority assigns long detailed Saju reports and payment to Web while Mobile centers on Character Hall/chat/relationship/push flows.
@@ -136,7 +137,8 @@ rationale:
 implementation_gates_preserved:
   - P0-CM-02 exact Web PSP must close before provider SDK/webhook/credential implementation.
   - P0-CM-03 concrete launch paid Product/Capability must close before enabled paid catalog rows or purchase fulfillment implementation.
-  - P0-PR-01 implementation-safe commerce evidence retention subset must close before real provider evidence persistence.
+  - P0-PR-01B Commerce evidence data-minimization boundary is DECIDED; selected provider must fit it or receive a new explicit provider-specific security decision.
+  - parent P0-PR-01 legal/accounting/backup retention remains OPEN before production retention/deletion activation.
   - selected-provider ordering/reconciliation semantics must be proven before provider lifecycle activation.
 upstream_saju_gate:
   status: BLOCKED
@@ -239,9 +241,54 @@ change_policy: changing Guest authentication TTL requires a new explicit decisio
 record: docs/GUEST_SESSION_SECURITY_TTL_DECISION_V1.md
 ```
 
+### P0-PR-01B
+
+```yaml
+id: P0-PR-01B
+parent: P0-PR-01
+status: DECIDED
+decided_at: 2026-09-05
+choice: provider-neutral Commerce evidence data minimization baseline
+scope:
+  decides:
+    - raw provider API secrets, Authorization/bearer credentials, raw receipt/purchase tokens, and raw PCI-sensitive payment material are never persisted/emitted by the ordinary Commerce path
+    - opaque equality/dedupe evidence uses versioned keyed HMAC fingerprints when raw value is not required for provider lookup
+    - verified_payload_jsonb is a positive-allowlist, bounded, schema-versioned normalized payload and never a raw provider response archive
+    - provider transaction/event/product references may be stored first-class only when non-secret and required for idempotency/reconciliation/audit
+    - raw provider account identity is fingerprinted rather than stored as ordinary Commerce account authority
+    - provider requiring durable raw bearer-like receipt/token storage needs an explicit provider-specific security/retention decision before P0-CM-02 can close
+  does_not_decide:
+    - legal/accounting Commerce evidence retention duration
+    - backup retention duration
+    - account deletion commerce tombstone/pseudonymization/destructive schedule
+    - merchant tax/accounting record requirements
+    - exact provider-specific canonical evidence bytes
+fingerprint_binding:
+  algorithm: HMAC-SHA-256
+  stored_format: hmac-sha256:k1:<64 lowercase hex>
+  secret_env: MYEONGHA_COMMERCE_EVIDENCE_HMAC_K1_SECRET
+  minimum_secret: 32 UTF-8 bytes
+  domains:
+    - myeongha.commerce.receipt-evidence.v1
+    - myeongha.commerce.provider-event-payload.v1
+    - myeongha.commerce.provider-account.v1
+rationale:
+  - Commerce Architecture already requires minimized verified evidence, fingerprint/reference preference, and no raw PCI/credential persistence.
+  - AUTH_RLS_PRIVACY_SPEC already forbids raw receipt/provider-account identifiers in ordinary logs and separates legal Commerce retention from product personalization deletion.
+  - current schema has first-class transaction/event lineage plus fingerprint columns, so raw SDK object archival is unnecessary for rights correctness.
+  - a positive allowlist prevents provider SDK/schema drift from silently widening stored personal/payment data.
+implementation_effect:
+  - provider-neutral fingerprint/serializer validators and leakage-negative tests may be implemented after this decision
+  - no provider SDK, production credential, webhook, paid catalog, or production evidence persistence is authorized by this decision alone
+  - parent P0-PR-01 remains OPEN
+record: docs/COMMERCE_EVIDENCE_DATA_MINIMIZATION_DECISION_V1.md
+```
+
 ### Remaining open decisions
 
 `P0-CM-02` exact Web PSP and `P0-CM-03` launch paid Product/Capability remain explicitly open. `P0-CM-03` is upstream-blocked by current Saju production interpretation authority and cannot be closed by inventing product semantics inside Commerce.
+
+`P0-PR-01` parent retention/legal decision also remains OPEN. `P0-PR-01B` closes only the Commerce evidence minimization/security subset and must not be interpreted as a legal/accounting retention period.
 
 Use the following template when another P0 becomes authoritative:
 
@@ -267,4 +314,7 @@ rollback_or_change_policy: ...
 - current Saju production interpretation authority가 BLOCKED인 상태에서 `P0-CM-03`을 Paid Deep/Detailed Reading production SKU로 임의 승격하는 것
 - paid one-reading ownership을 기존 `global | fixed` Capability scope에 client resource ID로 몰래 삽입하는 것
 - `P0-PR-01A` Guest authentication TTL을 expired Guest data deletion/backup/legal retention 기간으로 재해석하는 것
+- `P0-PR-01B`를 legal/accounting/backup retention 기간 결정으로 재해석하는 것
+- `verified_payload_jsonb`에 full raw provider request/response를 우회 저장하는 것
+- 별도 provider-specific security decision 없이 raw receipt/purchase/bearer token durable storage를 허용하는 것
 - `P0-SA-01` transport 결정을 `/api/readings`, ProductReadingResponse validation, Character grounding, compatibility authority로 확대 해석하는 것
