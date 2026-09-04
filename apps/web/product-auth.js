@@ -197,7 +197,10 @@ export async function refreshMemberSession() {
 export async function getMemberAccessToken() {
   const current = readMemberSession();
   if (!current) return null;
-  if (Date.parse(current.expiresAt) - Date.now() > REFRESH_SKEW_MS) return current.accessToken;
+  if (Date.parse(current.expiresAt) - Date.now() > REFRESH_SKEW_MS) {
+    stageMemberBearerForLegacyProductClients(current.accessToken);
+    return current.accessToken;
+  }
   const refreshed = await refreshMemberSession();
   return refreshed?.accessToken ?? null;
 }
