@@ -124,6 +124,15 @@ jobs:
           ADMIN_POOL_USER: ${{ steps.endpoint.outputs.admin_pool_user }}
         run: bash scripts/run-production-platform-integrity-read-audit.sh
 
+      - name: Snapshot production Data API and default ACL surface
+        shell: bash
+        env:
+          POOL_HOST: ${{ steps.endpoint.outputs.pool_host }}
+          POOL_PORT: ${{ steps.endpoint.outputs.pool_port }}
+          POOL_DB: ${{ steps.endpoint.outputs.pool_db }}
+          ADMIN_POOL_USER: ${{ steps.endpoint.outputs.admin_pool_user }}
+        run: bash scripts/run-production-platform-integrity-data-api-surface-audit.sh
+
       - name: Upload immutable catalog snapshot artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
