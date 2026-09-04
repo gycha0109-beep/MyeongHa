@@ -114,6 +114,51 @@ jobs:
         shell: bash
         run: bash scripts/run-production-platform-integrity-postdeploy-verify.sh
 
+      - name: Run one-time sanitized production Auth config audit
+        if: ${{ contains(github.event.head_commit.message, '[auth-config-audit-once]') }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$SUPABASE_PROJECT_ID" == 'cnsfpcdiyofqvhpcegfc' ]]
+          raw_config="$(mktemp)"
+          sanitized="$RUNNER_TEMP/myeongha-auth-config-sanitized.json"
+          trap 'rm -f "$raw_config"' EXIT
+
+          status="$(curl --silent --show-error \
+            --output "$raw_config" \
+            --write-out '%{http_code}' \
+            --header "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_ID/config/auth")"
+          [[ "$status" == '200' ]]
+          jq -e 'type == "object"' "$raw_config" >/dev/null
+          jq '{
+            external_email_enabled: (.external_email_enabled // null),
+            signup_disabled: (.disable_signup // null),
+            mailer_autoconfirm: (.mailer_autoconfirm // null),
+            site_url: (.site_url // null),
+            uri_allow_list: (.uri_allow_list // null),
+            password_min_length: (.password_min_length // null),
+            password_required_characters: (.password_required_characters // null),
+            security_manual_linking_enabled: (.security_manual_linking_enabled // null),
+            mailer_otp_exp: (.mailer_otp_exp // null),
+            mailer_otp_length: (.mailer_otp_length // null),
+            custom_smtp_configured: (((.smtp_host // "") | length) > 0),
+            smtp_sender_configured: (((.smtp_admin_email // "") | length) > 0),
+            external_google_enabled: (.external_google_enabled // null)
+          }' "$raw_config" > "$sanitized"
+          chmod 600 "$sanitized"
+          echo 'MyeongHa production Auth sanitized config:'
+          cat "$sanitized"
+
+      - name: Upload one-time sanitized Auth config evidence
+        if: ${{ contains(github.event.head_commit.message, '[auth-config-audit-once]') }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: myeongha-production-auth-config-sanitized-${{ github.run_id }}
+          path: ${{ runner.temp }}/myeongha-auth-config-sanitized.json
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Upload post-deploy platform integrity evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
