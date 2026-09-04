@@ -2,7 +2,7 @@
 
 > Repository: `gycha0109-beep/MyeongHa`  
 > Production project: `cnsfpcdiyofqvhpcegfc`  
-> Production application baseline: `e9ed33ff1eeefde45069610f029556cf045d41c5`  
+> Current verified production application: `8f008002690748583beedfd82da0337731f1f41b`  
 > Date: 2026-09-04  
 > Status: **APPLICATION API-ROLE ACL REMEDIATED / DATA API CONTAINED / SUPABASE_ADMIN DEFAULT-ACL FOLLOW-UP OPEN**
 
@@ -66,7 +66,7 @@ myeongha_* narrow-owner functions
 → effective ACL verified instead
 
 myeongha_api_executor
-→ required explicit EXECUTE retained
+→ required explicit runtime EXECUTE retained
 ```
 
 It also added a static CI guard forbidding schema-wide public-function REVOKE from returning.
@@ -417,21 +417,163 @@ returned Guest bearer
 → Cache-Control: no-store
 ```
 
-This contract previously passed during Data API containment and is implemented by `scripts/verify-production-data-api-containment-guest-runtime.mjs`.
+A fresh post-0880 positive smoke was re-established through the governed Supabase Production workflow using a temporary, one-time activation marker.
 
-A fresh direct smoke from the current execution environment could not be completed because DNS resolution for `myeongha.vercel.app` returned `EAI_AGAIN`. This is an execution-environment network failure, not application-failure evidence.
+### One-time production smoke
 
-The available GitHub connector can re-run existing jobs but does not expose workflow-dispatch creation with required inputs. The old containment run must not be re-run because its workflow snapshot predates subsequent containment workflow changes and includes a production mutation path.
+PR `#411` temporarily enabled the existing canonical Guest verifier only when the merge commit message contained:
+
+```text
+[pi-guest-smoke-once]
+```
+
+Marker merge:
+
+```text
+2395527528c09b75d512a1b43f76d018f5758d0b
+```
+
+Supabase Production run:
+
+```text
+33842794502
+```
+
+Observed log contract:
+
+```text
+guestBootstrap=200
+apiMe=200 canonicalGuest
+cacheControl=no-store
+
+post-transition:
+apiMe=200 same canonicalGuest
+cacheControl=no-store
+```
+
+The run did not print the Guest bearer or subject UUID.
+
+The one-time smoke validated the canonical production Guest bootstrap and `/api/me` path after the ACL remediation. It was intentionally separated from the permanent post-deploy read-only integrity verifier.
+
+### Deployment boundary discovered during smoke closeout
+
+The Vercel deployment for merge `2395527528c09b75d512a1b43f76d018f5758d0b` itself was not READY because an unrelated test file had been placed under `api/`, taking the Hobby deployment from 12 to 13 Serverless Functions.
+
+Vercel reported:
+
+```text
+exceeded_serverless_functions_per_deployment
+```
+
+PR `#412` moved the Birth Profile adapter test out of the Vercel function root and added a 12-function deployment budget guard.
+
+Verified production after `#412`:
+
+```text
+commit
+afb5724e575fcde3fec98d0d33ee7815c1185dc3
+
+Vercel deployment
+dpl_H3HLeWQNgryY1xA8YnbsUvRUtF1a
+
+state
+READY
+
+lambdaRuntimeStats
+nodejs=12
+```
+
+No Guest bootstrap or `/api/me` runtime implementation was changed by `#412`.
+
+### One-time path cleanup and final production verification
+
+PR `#413` removed the temporary one-time Guest smoke step after evidence capture.
+
+Cleanup merge / current verified production application:
+
+```text
+8f008002690748583beedfd82da0337731f1f41b
+```
+
+The merged workflow no longer contains the one-time Guest smoke step. Permanent migration parity, read-only post-deploy integrity verification, and artifact upload remain enabled.
+
+Merged-main Supabase Production run:
+
+```text
+33848781287
+→ SUCCESS
+```
+
+Verified production state in that run:
+
+```text
+migration Local/Remote through 0880             MATCH
+supabase db push --dry-run                       Remote database is up to date
+supabase db push                                 Remote database is up to date
+production catalog snapshot                      checksum OK
+Data API/default-ACL surface snapshot            checksum OK
+ACL drift gate                                   PASS
+post-deploy read-only verification               PASS
+```
+
+Post-deploy evidence artifact:
+
+```text
+artifact id
+9927560359
+
+artifact digest
+sha256:25a19ae342f7773270cbde3eb962e89027c8446c8e8255fc63aaec2a63ea57dd
+```
+
+Current Vercel production:
+
+```text
+deployment
+dpl_8NdhPRnBWP2hffAQMbytJFac4Lac
+
+commit
+8f008002690748583beedfd82da0337731f1f41b
+
+state
+READY
+
+lambdaRuntimeStats
+nodejs=12
+```
+
+Merged-main CI also passed:
+
+```text
+CI run 33848781385
+→ foundation SUCCESS
+→ db-authority-core 63/63 SUCCESS
+
+Web Browser Render Smoke run 33848781336
+→ Hall SUCCESS
+→ Auth SUCCESS
+→ My SUCCESS
+→ My Birth Profile SUCCESS
+→ Conversation SUCCESS
+```
 
 Therefore:
 
 ```text
 fresh post-0880 Guest positive smoke
-→ NOT RE-ESTABLISHED IN THIS EVIDENCE RECORD
-→ tool/environment constrained
+→ RE-ESTABLISHED / PASS
+
+one-time smoke activation path
+→ REMOVED
+
+current Vercel production
+→ READY / 12 functions
+
+current post-deploy platform-integrity read-only gate
+→ PASS
 ```
 
-This limitation does not invalidate the fresh database catalog evidence, but it prevents promoting this record to a blanket `Production-Safe` verdict.
+This closes the runtime-smoke evidence gap recorded by the earlier revision of this document. It does **not** convert the broader platform into a blanket `Production-Safe` state because the `supabase_admin` default-ACL recurrence path and the unrelated P0/governance blockers below remain open.
 
 ---
 
@@ -505,7 +647,16 @@ supabase_admin default ACL recurrence
 → OPEN-PLATFORM
 
 fresh post-0880 Guest positive smoke
-→ NOT RE-ESTABLISHED due execution/dispatch tooling constraint
+→ PASS / governed production evidence
+
+one-time Guest smoke activation cleanup
+→ PASS / removed after evidence capture
+
+current Vercel production 8f008002690748583beedfd82da0337731f1f41b
+→ READY / 12 Serverless Functions
+
+merged-main CI and browser smoke
+→ PASS
 
 Migration-Ready (blanket)
 → NO
@@ -519,4 +670,4 @@ Integrity-Complete
 
 The correct current statement is narrower:
 
-> The ordinary MyeongHa application database path has had its `anon` / `authenticated` latent object authority removed in production, the external Data API remains contained, and recurrence through `postgres` defaults is blocked. A Supabase-managed `supabase_admin` future-object default-ACL path remains open for separate platform-authority resolution, and a fresh post-0880 Guest positive runtime smoke has not yet been re-established in this evidence record.
+> The ordinary MyeongHa application database path has had its `anon` / `authenticated` latent object authority removed in production, the external Data API remains contained, recurrence through `postgres` defaults is blocked, and the canonical Guest positive runtime contract has been re-established under governed production verification. The temporary smoke activation path has been removed, current Vercel production is READY at 12 functions, and the permanent post-deploy read-only integrity gate passes. A Supabase-managed `supabase_admin` future-object default-ACL path remains open for separate platform-authority resolution, and unrelated Platform Integrity/product/governance blockers remain open.
