@@ -53,6 +53,11 @@ if jq -e 'has("jwt_secret")' "$snapshot_dir/postgrest_config.json" >/dev/null; t
   exit 1
 fi
 
+if [[ "$(jq -r '.db_schema' "$snapshot_dir/postgrest_config.json")" != '' ]]; then
+  echo 'Production Data API containment drift detected: PostgREST db_schema is not disabled.' >&2
+  exit 1
+fi
+
 export PGPASSWORD="$SUPABASE_DB_PASSWORD"
 export PGSSLMODE=require
 
@@ -133,9 +138,145 @@ where exists (
 order by role_name
 SQL
 
+csv_query acl_invariants.csv <<'SQL'
+with default_acl_entries as (
+  select
+    owner_role.rolname as owner_role,
+    coalesce(n.nspname, '') as schema_name,
+    d.defaclobjtype as object_type,
+    acl.grantee,
+    grantee_role.rolname as grantee_role,
+    acl.privilege_type
+  from pg_catalog.pg_default_acl d
+  join pg_catalog.pg_roles owner_role on owner_role.oid = d.defaclrole
+  left join pg_catalog.pg_namespace n on n.oid = d.defaclnamespace
+  cross join lateral pg_catalog.aclexplode(d.defaclacl) acl
+  left join pg_catalog.pg_roles grantee_role on grantee_role.oid = acl.grantee
+), invariant_values as (
+  select 'anon_public_table_privilege_count' as metric,
+         count(*)::bigint as value
+    from information_schema.table_privileges
+   where table_schema = 'public' and grantee = 'anon'
+  union all
+  select 'authenticated_public_table_privilege_count', count(*)::bigint
+    from information_schema.table_privileges
+   where table_schema = 'public' and grantee = 'authenticated'
+  union all
+  select 'public_public_table_privilege_count', count(*)::bigint
+    from information_schema.table_privileges
+   where table_schema = 'public' and grantee = 'PUBLIC'
+  union all
+  select 'anon_public_routine_privilege_count', count(*)::bigint
+    from information_schema.routine_privileges
+   where routine_schema = 'public' and grantee = 'anon'
+  union all
+  select 'authenticated_public_routine_privilege_count', count(*)::bigint
+    from information_schema.routine_privileges
+   where routine_schema = 'public' and grantee = 'authenticated'
+  union all
+  select 'public_public_routine_privilege_count', count(*)::bigint
+    from information_schema.routine_privileges
+   where routine_schema = 'public' and grantee = 'PUBLIC'
+  union all
+  select 'anon_public_schema_create',
+         case when pg_catalog.has_schema_privilege('anon', 'public', 'CREATE') then 1 else 0 end
+  union all
+  select 'authenticated_public_schema_create',
+         case when pg_catalog.has_schema_privilege('authenticated', 'public', 'CREATE') then 1 else 0 end
+  union all
+  select 'postgres_default_anon_authenticated_grant_count', count(*)::bigint
+    from default_acl_entries
+   where owner_role = 'postgres'
+     and grantee_role in ('anon', 'authenticated')
+     and (schema_name = '' or schema_name = 'public')
+  union all
+  select 'postgres_global_public_function_execute_default_count', count(*)::bigint
+    from default_acl_entries
+   where owner_role = 'postgres'
+     and schema_name = ''
+     and object_type = 'f'
+     and grantee = 0
+     and privilege_type = 'EXECUTE'
+  union all
+  select 'supabase_admin_public_object_owner_count', count(*)::bigint
+    from pg_catalog.pg_class c
+    join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+    join pg_catalog.pg_roles owner_role on owner_role.oid = c.relowner
+   where n.nspname = 'public'
+     and c.relkind in ('r','p','v','m','S')
+     and owner_role.rolname = 'supabase_admin'
+  union all
+  select 'supabase_admin_public_routine_owner_count', count(*)::bigint
+    from pg_catalog.pg_proc p
+    join pg_catalog.pg_namespace n on n.oid = p.pronamespace
+    join pg_catalog.pg_roles owner_role on owner_role.oid = p.proowner
+   where n.nspname = 'public'
+     and p.prokind in ('f','p','w')
+     and owner_role.rolname = 'supabase_admin'
+  union all
+  select 'supabase_admin_default_anon_authenticated_grant_count', count(*)::bigint
+    from default_acl_entries
+   where owner_role = 'supabase_admin'
+     and grantee_role in ('anon', 'authenticated')
+     and (schema_name = '' or schema_name = 'public')
+)
+select metric, value
+from invariant_values
+order by metric
+SQL
+
+assert_zero_metric() {
+  local metric="$1"
+  local invariant_file="$snapshot_dir/acl_invariants.csv"
+  local value
+
+  value="$(awk -F, -v metric="$metric" '$1 == metric { gsub(/\r/, "", $2); print $2 }' "$invariant_file")"
+  if [[ -z "$value" ]]; then
+    echo "Production ACL drift gate is missing invariant metric: $metric" >&2
+    exit 1
+  fi
+  if [[ "$value" != '0' ]]; then
+    echo "Production ACL drift detected: $metric=$value" >&2
+    exit 1
+  fi
+}
+
+migration_max_version="$(awk -F, '$1 == "migration_max_version" { gsub(/\r/, "", $2); print $2 }' "$snapshot_dir/summary.csv")"
+if [[ ! "$migration_max_version" =~ ^[0-9]+$ ]] || (( 10#$migration_max_version < 880 )); then
+  echo "Production migration lineage drift detected: migration_max_version=${migration_max_version:-missing}" >&2
+  exit 1
+fi
+
+for metric in \
+  anon_public_table_privilege_count \
+  authenticated_public_table_privilege_count \
+  public_public_table_privilege_count \
+  anon_public_routine_privilege_count \
+  authenticated_public_routine_privilege_count \
+  public_public_routine_privilege_count \
+  anon_public_schema_create \
+  authenticated_public_schema_create \
+  postgres_default_anon_authenticated_grant_count \
+  postgres_global_public_function_execute_default_count \
+  supabase_admin_public_object_owner_count \
+  supabase_admin_public_routine_owner_count
+do
+  assert_zero_metric "$metric"
+done
+
+# The remaining supabase_admin default ACL is captured as evidence but is not mutated or
+# treated as a current-object exposure while no public application object is owned by it.
+# Its count is intentionally not asserted to zero until supported platform authority and
+# rollback semantics are established.
+if ! awk -F, '$1 == "supabase_admin_default_anon_authenticated_grant_count" { found=1 } END { exit(found ? 0 : 1) }' "$snapshot_dir/acl_invariants.csv"; then
+  echo 'Production ACL drift gate is missing the supabase_admin default-ACL residual metric.' >&2
+  exit 1
+fi
+
 {
   echo 'data_api_config_source=management_api_v1_postgrest'
   echo 'data_api_surface_metadata_captured=yes'
+  echo 'api_role_acl_drift_gate=pass'
 } >> "$snapshot_dir/audit_metadata.txt"
 
 (
@@ -144,4 +285,4 @@ SQL
   sha256sum --check SHA256SUMS
 )
 
-echo 'Production Data API/default-ACL surface snapshot completed without mutations.'
+echo 'Production Data API/default-ACL surface snapshot completed without mutations; ACL drift gate passed.'
