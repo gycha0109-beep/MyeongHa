@@ -1,11 +1,11 @@
-# 명하 Commerce / Entitlement Implementation Specification v0.9
+# 명하 Commerce / Entitlement Implementation Specification v0.10
 
 > Product: **명하 (MyeongHa)**  
 > Date: **2026-09-05**  
 > Architecture Authority: `docs/architecture/COMMERCE_ENTITLEMENT_ARCHITECTURE_V1.md`  
 > Launch Rail Decision: `docs/COMMERCE_LAUNCH_RAIL_DECISION_V1.md`  
 > Evidence Minimization Decision: `docs/COMMERCE_EVIDENCE_DATA_MINIMIZATION_DECISION_V1.md`  
-> Status: **DERIVED IMPLEMENTATION SPEC / ARCHITECTURE CLOSED / LAUNCH RAIL DECIDED / EVIDENCE MINIMIZATION DECIDED / FINGERPRINT PRIMITIVE IMPLEMENTED / IMPLEMENTATION HOLD**  
+> Status: **DERIVED IMPLEMENTATION SPEC / ARCHITECTURE CLOSED / LAUNCH RAIL DECIDED / EVIDENCE MINIMIZATION DECIDED / FINGERPRINT PRIMITIVE IMPLEMENTED / EVIDENCE STRUCTURAL CONTRACT IMPLEMENTED / IMPLEMENTATION HOLD**  
 > Rule: 이 문서는 Architecture와 이후 explicit P0 decision을 요약해 구현 경계를 연결하는 companion이다. Domain semantics 충돌 시 Architecture가 우선하고, Architecture 작성 뒤 결정된 P0 status는 최신 `docs/P0_DECISION_REGISTER.md`와 해당 decision record가 우선한다.
 
 ---
@@ -22,10 +22,11 @@ P0-CM-03 launch paid Product / Capability     = OPEN-P0 / BLOCKED BY CURRENT SAJ
 P0-PR-01 parent retention/legal/backup        = OPEN-P0
 P0-PR-01B provider-evidence minimization      = DECIDED
 provider-neutral evidence fingerprint primitive = IMPLEMENTED / PURE HELPER / NOT WIRED TO PROD CONFIG
+provider-neutral evidence structural contract = IMPLEMENTED / PURE VALIDATOR / NO PROVIDER AUTHENTICITY
 provider adapter / webhook / apply runtime    = NOT IMPLEMENTED
 ```
 
-따라서 Web-first rail shape와 provider-evidence 최소화 경계, provider-neutral fingerprint primitive는 준비됐지만 provider SDK, provider-specific canonical serializer, webhook route, production schema mutation, enabled paid catalog, production evidence persistence는 아직 허가되지 않는다.
+따라서 Web-first rail shape와 provider-evidence 최소화 경계, provider-neutral fingerprint primitive, `VerifiedCommerceEvidenceV1` structural contract는 준비됐지만 provider authenticity verification, provider SDK, provider-specific canonical serializer, webhook route, production schema mutation, enabled paid catalog, production evidence persistence는 아직 허가되지 않는다.
 
 ---
 
@@ -112,11 +113,36 @@ apps/api/src/production-commerce-evidence-fingerprint.ts
 
 이 helper는 provider-specific canonicalization, environment binding, DB persistence, verifier, webhook 또는 entitlement mutation을 수행하지 않는다.
 
+### Provider-neutral evidence structural contract
+
+```text
+apps/api/src/verified-commerce-evidence.ts
+test/verified-commerce-evidence.test.ts
+```
+
+현재 구현 범위:
+
+- exact `commerce-evidence-v1` schema version
+- `web | ios | android` platform vocabulary
+- `sandbox | production` environment vocabulary
+- `active | expired | revoked | refunded` current-state vocabulary
+- Architecture-authorized optional provider provenance fields
+- server-resolved owner binding 3종만 허용
+  - `purchase_intent`
+  - `account_link`
+  - `receipt_lineage`
+- `hmac-sha256:k1:<64 lowercase hex>` fingerprint shape validation
+- unknown top-level / owner-binding field fail-closed
+- raw/client authority field hitchhiking 방지
+- 새 frozen normalized object 반환
+
+이 validator는 **provider authenticity를 검증하지 않는다**. Raw provider payload를 파싱하거나 PSP signature/API를 확인하지 않으며 provider ordering을 추론하거나 DB에 저장하거나 entitlement를 변경하지 않는다.
+
 ### Missing runtime
 
 ```text
 provider-specific canonical evidence serializer
-provider verification adapter
+provider authenticity verification adapter
 public Commerce payment handoff route
 provider webhook/server-notification route
 verified receipt → grant/event/projection apply command
@@ -238,6 +264,8 @@ verifier revision
 Sandbox evidence는 production grant를 만들 수 없다.
 
 Raw provider secret/bearer/receipt object는 normalized evidence contract에 포함시키지 않는다.
+
+`apps/api/src/verified-commerce-evidence.ts`는 위 normalized shape의 **structural validation만** 수행한다. Provider signature/API response authenticity, semantic state truth, provider ordering truth를 증명하는 verifier가 아니므로 이 contract를 통과했다는 사실만으로 verified payment 또는 entitlement grant를 인정하지 않는다.
 
 ---
 
@@ -567,7 +595,9 @@ one-byte-different evidence → different fingerprint
 missing/weak Commerce HMAC secret → fail before evidence persistence
 ```
 
-The fingerprint-specific subset above is implemented by `test/production-commerce-evidence-fingerprint.test.ts`. Provider payload allowlist/leakage tests remain blocked until a concrete adapter schema exists.
+The fingerprint-specific subset above is implemented by `test/production-commerce-evidence-fingerprint.test.ts`.
+
+The provider-neutral structural subset is implemented by `test/verified-commerce-evidence.test.ts`, including unknown/raw/client-authority field rejection, exact owner-binding vocabulary, malformed fingerprint rejection, non-plain input rejection, and validation-error non-leakage. 이 structural test는 provider authenticity 또는 provider-specific payload allowlist를 검증하지 않는다. Provider-specific canonicalization/payload allowlist/authenticity tests remain blocked until a concrete adapter schema exists.
 
 ---
 
@@ -580,6 +610,7 @@ Commerce evidence minimization                    = DECIDED: P0-PR-01B
 Product Capability Set schema                    = NOT IMPLEMENTED / HOLD UNTIL P0-CM-03
 Purchase Intent v2 Capability pin                = NOT IMPLEMENTED / HOLD UNTIL P0-CM-03
 provider-neutral evidence fingerprint primitive = IMPLEMENTED / PURE HELPER / MERGED-MAIN CI GREEN
+provider-neutral evidence structural contract   = IMPLEMENTED / PURE VALIDATOR / MERGED-MAIN CI GREEN / NO AUTHENTICITY VERIFICATION
 provider-specific canonical evidence serializer = NOT IMPLEMENTED / BLOCKED BY P0-CM-02
 provider-neutral verification runtime            = NOT IMPLEMENTED
 concrete provider adapter                         = BLOCKED BY P0-CM-02 + P0-CM-03
