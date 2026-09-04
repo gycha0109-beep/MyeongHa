@@ -39,7 +39,7 @@ jobs:
       - name: Verify authentication confirmation handoff
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
-        run: node scripts/verify-web-auth-confirmation-browser.mjs
+        run: node scripts/run-web-auth-confirmation-browser-smoke.mjs
       - name: Verify My browser render
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
