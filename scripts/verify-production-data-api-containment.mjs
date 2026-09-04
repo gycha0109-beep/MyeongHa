@@ -64,23 +64,32 @@ for (const forbiddenWorkflowFragment of [
 
 const requiredRunnerFragments = [
   "baseline_schema='public,graphql_public'",
-  "contained_schema='pg_pgrst_no_exposed_schemas'",
+  "contained_schema_request='pg_pgrst_no_exposed_schemas'",
+  'is_contained_schema()',
+  '[[ -z "$schema" || "$schema" == "$contained_schema_request" ]]',
+  'is_expected_before_schema()',
+  'is_expected_after_schema()',
+  "expected_after_label='disabled'",
+  'patch_schema="$contained_schema_request"',
   "[[ \"$DISPATCH_CONFIRM\" == 'DISABLE_PRODUCT_DATA_API' ]]",
   "[[ \"$DISPATCH_CONFIRM\" == 'RESTORE_PRODUCT_DATA_API' ]]",
-  'if [[ "$before_schema" == "$expected_after" ]]',
-  'elif [[ "$before_schema" != "$expected_before" ]]',
+  'if is_expected_after_schema "$before_schema"; then',
+  'elif ! is_expected_before_schema "$before_schema"; then',
   'Refusing Data API containment mutation because production db_schema drifted',
   'https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_ID/postgrest',
-  "jq -n --arg db_schema \"$expected_after\" '{db_schema: $db_schema}'",
+  "jq -n --arg db_schema \"$patch_schema\" '{db_schema: $db_schema}'",
   '-X PATCH',
   "[[ \"$patch_http_status\" == '200' ]]",
   'read_postgrest_config "$post_raw"',
-  '[[ "$after_schema" == "$expected_after" ]]',
+  'if ! is_expected_after_schema "$after_schema"; then',
+  'Data API containment post-state did not match expected state',
   'pre_non_schema="$(jq -S \'del(.db_schema)\' "$snapshot_dir/pre_config.json")"',
   'post_non_schema="$(jq -S \'del(.db_schema)\' "$snapshot_dir/post_config.json")"',
   '[[ "$pre_non_schema" == "$post_non_schema" ]]',
   '[[ "$after_schema" != *\'public\'* ]]',
   '[[ "$after_schema" != *\'graphql_public\'* ]]',
+  'request_db_schema=$patch_schema',
+  'expected_after_db_schema=$expected_after_label',
   'mutation_scope=management_api_postgrest_db_schema_only',
   'sha256sum pre_config.json post_config.json containment_metadata.txt > SHA256SUMS',
   'sha256sum --check SHA256SUMS',
@@ -94,6 +103,7 @@ const requiredRunnerFragments = [
   "state_change='unknown'",
   "post_read_state='captured'",
   "state_change='unchanged'",
+  'elif is_expected_after_schema "$observed_after_schema"; then',
   "state_change='expected_after_observed'",
   "state_change='unexpected_drift'",
   'echo "post_read_state=$post_read_state"',
@@ -195,6 +205,11 @@ if (patchCount !== 1) {
 const postReadCalls = [...runner.matchAll(/read_postgrest_config \"\$post_raw\"/g)].length;
 if (postReadCalls !== 2) {
   throw new Error(`Expected a post-state GET on both failure and success paths, found ${postReadCalls}.`);
+}
+
+const containedPredicateCount = [...runner.matchAll(/is_contained_schema /g)].length;
+if (containedPredicateCount < 3) {
+  throw new Error('Containment must consistently recognize the normalized disabled Data API state.');
 }
 
 const forbiddenRunnerFragments = [
