@@ -1,9 +1,9 @@
-# 명하 Production P0 Decision Register — Full Audit v0.6
+# 명하 Production P0 Decision Register — Full Audit v0.7
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.6**  
-> Date: **2026-09-03**  
-> Source Authority: `Usecase_re_reviewed_v2(1).md`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`, `Myeonghwa_Personalized_Interpretation_Architecture_v1.3_THIRD_REVIEW(1).md`  
+> Pack Version: **v0.7**  
+> Date: **2026-09-05**  
+> Source Authority: `Usecase_re_reviewed_v2(1).md`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`, `Myeonghwa_Personalized_Interpretation_Architecture_v1.3_THIRD_REVIEW(1).md`, `docs/architecture/COMMERCE_ENTITLEMENT_ARCHITECTURE_V1.md`  
 > Rule: 본 문서는 위 source authority를 구현 수준으로 구체화한다. source가 결정하지 않은 사항은 임의 확정하지 않고 `OPEN-P0` 또는 `CANDIDATE`로 표시한다. Production 운영을 열기 위해 별도 security/operations decision을 확정할 경우 source requirement를 좁혀야 하며, 상위 미결정 retention/legal policy를 대신 결정한 것으로 간주하지 않는다.
 
 ---
@@ -17,7 +17,9 @@
 | ID | Decision | Status | Current Options / Required Resolution |
 |---|---|---|---|
 | `P0-SA-01` | Saju transport | **DECIDED** | authenticated internal HTTP service; calculation-only V1; no `/api/readings` activation |
-| `P0-CM-01` | Commerce rail | **OPEN-P0** | Web provider / Apple IAP / Google Play Billing 및 one-off/subscription/bundle matrix |
+| `P0-CM-01` | Commerce launch rail | **DECIDED** | Web + one-off only for launch MVP; no subscription/bundle/native-store billing |
+| `P0-CM-02` | Web payment provider / PSP | **OPEN-P0** | merchant geography/legal entity, settlement/currency, verification, webhook/refund/reconciliation semantics를 만족하는 exact provider 선택 |
+| `P0-CM-03` | Launch paid Product / Capability catalog | **OPEN-P0** | Paid Deep/Detailed Reading은 후보일 뿐이며 current Saju production interpretation authority가 BLOCKED이므로 saleable SKU 확정 금지 |
 | `P0-AI-01` | AI provider/model/fallback | **OPEN-P0** | provider, model family, fallback, grounded-response validation implementation |
 | `P0-AGE-01` | Minimum age / character content policy | **OPEN-P0** | 최소 이용 연령, 미성년 허용 여부, 표현 강도/제한; content bundle policy-tag slot은 미리 두되 threshold/matrix는 미확정 |
 | `P0-PR-01` | Retention / backup / legal retention | **OPEN-P0** | 제품 개인정보, AI trace, 결제/회계 증적, backup retention/deletion |
@@ -101,6 +103,55 @@ migration_impact:
   - bind MyeongHa production service origin/credential before thin route activation
 rollback_or_change_policy: operational rollback may target the last verified compatible authenticated calculation-service deployment; changing to in-process package, enabling /api/readings, weakening service authentication, or bypassing governed ingress requires a new explicit decision/review
 record: docs/SAJU_TRANSPORT_DECISION_V1.md
+```
+
+### P0-CM-01
+
+```yaml
+id: P0-CM-01
+status: DECIDED
+decided_at: 2026-09-05
+choice: Web + one-off purchase only for launch MVP
+scope:
+  decides:
+    - launch payment surface is Web
+    - launch billing shape is one-off purchase
+    - subscription billing is not launch MVP
+    - bundle billing is not launch MVP
+    - Apple IAP and Google Play Billing are deferred until a real native paid surface exists and current store policy is revalidated
+  does_not_decide:
+    - exact Web PSP/vendor
+    - merchant legal entity or launch sales geography
+    - exact price/currency/tax/settlement policy
+    - concrete launch Product or Capability key/scope/validity
+    - paid Reading artifact ownership semantics
+    - commerce/legal/accounting evidence retention
+    - future native-store purchase/restore/refund lifecycle
+rationale:
+  - primary product/use-case authority assigns long detailed Saju reports and payment to Web while Mobile centers on Character Hall/chat/relationship/push flows.
+  - current apps/mobile is only a placeholder and explicitly defers Expo/React Native bootstrap.
+  - no current product authority authorizes subscription or bundle billing for MVP.
+  - selecting a native store rail before a real native paid product surface would introduce provider-specific lifecycle complexity without satisfying a current launch requirement.
+  - provider-neutral Commerce Architecture v1 already preserves Web/iOS/Android future compatibility without requiring an Apple/Google adapter now.
+implementation_gates_preserved:
+  - P0-CM-02 exact Web PSP must close before provider SDK/webhook/credential implementation.
+  - P0-CM-03 concrete launch paid Product/Capability must close before enabled paid catalog rows or purchase fulfillment implementation.
+  - P0-PR-01 implementation-safe commerce evidence retention subset must close before real provider evidence persistence.
+  - selected-provider ordering/reconciliation semantics must be proven before provider lifecycle activation.
+upstream_saju_gate:
+  status: BLOCKED
+  evidence: gycha0109-beep/Saju docs/product/22-production-interpretation-authority-audit.md on current main still states PRODUCTION INTERPRETATION AUTHORITY and PUBLIC PRODUCTION READING RUNTIME are BLOCKED.
+  consequence: Paid Deep/Detailed Reading remains a UX/product candidate and MUST NOT be promoted to an enabled production SKU merely to unblock Commerce.
+migration_impact:
+  - no PostgreSQL migration required for this decision itself
+  - no provider dependency or production secret authorized
+  - provider-neutral additive Commerce schema remains governed by COMMERCE_ENTITLEMENT_ARCHITECTURE_V1
+reopen_triggers:
+  - native iOS/Android paid digital surface becomes MVP scope
+  - subscription or bundle billing becomes MVP scope
+  - approved launch distribution plan is incompatible with Web-first payment
+  - material current store/provider policy requires a different compliant launch rail
+record: docs/COMMERCE_LAUNCH_RAIL_DECISION_V1.md
 ```
 
 ### P0-AUTH-01
@@ -190,6 +241,8 @@ record: docs/GUEST_SESSION_SECURITY_TTL_DECISION_V1.md
 
 ### Remaining open decisions
 
+`P0-CM-02` exact Web PSP and `P0-CM-03` launch paid Product/Capability remain explicitly open. `P0-CM-03` is upstream-blocked by current Saju production interpretation authority and cannot be closed by inventing product semantics inside Commerce.
+
 Use the following template when another P0 becomes authoritative:
 
 ```yaml
@@ -209,6 +262,9 @@ rollback_or_change_policy: ...
 - 각 spec에서 서로 다른 임시 결론을 확정하는 것
 - provider 이름을 business/domain model key로 사용하는 것
 - 미결정 retention을 전제로 destructive migration을 작성하는 것
-- commerce rail 결정 전 entitlement authority를 특정 store에 종속시키는 것
+- `P0-CM-01` Web-first 결정을 exact PSP 선택이나 concrete paid SKU 승인으로 확대 해석하는 것
+- `P0-CM-02` 결정 전 provider SDK/webhook/production credential을 도입하는 것
+- current Saju production interpretation authority가 BLOCKED인 상태에서 `P0-CM-03`을 Paid Deep/Detailed Reading production SKU로 임의 승격하는 것
+- paid one-reading ownership을 기존 `global | fixed` Capability scope에 client resource ID로 몰래 삽입하는 것
 - `P0-PR-01A` Guest authentication TTL을 expired Guest data deletion/backup/legal retention 기간으로 재해석하는 것
 - `P0-SA-01` transport 결정을 `/api/readings`, ProductReadingResponse validation, Character grounding, compatibility authority로 확대 해석하는 것
