@@ -1,10 +1,11 @@
-# 명하 Commerce / Entitlement Implementation Specification v0.7
+# 명하 Commerce / Entitlement Implementation Specification v0.8
 
 > Product: **명하 (MyeongHa)**  
 > Date: **2026-09-05**  
 > Architecture Authority: `docs/architecture/COMMERCE_ENTITLEMENT_ARCHITECTURE_V1.md`  
 > Launch Rail Decision: `docs/COMMERCE_LAUNCH_RAIL_DECISION_V1.md`  
-> Status: **DERIVED IMPLEMENTATION SPEC / ARCHITECTURE CLOSED / LAUNCH RAIL DECIDED / IMPLEMENTATION HOLD**  
+> Evidence Minimization Decision: `docs/COMMERCE_EVIDENCE_DATA_MINIMIZATION_DECISION_V1.md`  
+> Status: **DERIVED IMPLEMENTATION SPEC / ARCHITECTURE CLOSED / LAUNCH RAIL DECIDED / EVIDENCE MINIMIZATION DECIDED / IMPLEMENTATION HOLD**  
 > Rule: 이 문서는 Architecture와 이후 explicit P0 decision을 요약해 구현 경계를 연결하는 companion이다. Domain semantics 충돌 시 Architecture가 우선하고, Architecture 작성 뒤 결정된 P0 status는 최신 `docs/P0_DECISION_REGISTER.md`와 해당 decision record가 우선한다.
 
 ---
@@ -18,11 +19,12 @@ SRC-21 Grant apply / aggregate authority      = RESOLVED BY ARCHITECTURE
 P0-CM-01 launch rail                          = DECIDED: Web + one-off only
 P0-CM-02 exact Web PSP                        = OPEN-P0
 P0-CM-03 launch paid Product / Capability     = OPEN-P0 / BLOCKED BY CURRENT SAJU AUTHORITY
-P0-PR-01 provider-evidence retention subset   = OPEN before real evidence persistence
+P0-PR-01 parent retention/legal/backup        = OPEN-P0
+P0-PR-01B provider-evidence minimization      = DECIDED
 provider adapter / webhook / apply runtime    = NOT IMPLEMENTED
 ```
 
-따라서 Web-first rail shape는 결정됐지만 provider SDK, webhook route, production schema mutation, enabled paid catalog는 아직 허가되지 않는다.
+따라서 Web-first rail shape와 provider-evidence 최소화 경계는 결정됐지만 provider SDK, webhook route, production schema mutation, enabled paid catalog, production evidence persistence는 아직 허가되지 않는다.
 
 ---
 
@@ -34,7 +36,7 @@ MyeongHa Product
 → Product Offer(provider/platform/external product + pinned Capability Set)
 → Member-owned Purchase Intent
 → server-side provider verification
-→ verified Receipt / Provider Event provenance
+→ minimized verified Receipt / Provider Event provenance
 → Entitlement Effect v1
 → independent Entitlement Grant(s)
 → append-only Entitlement Event(s)
@@ -49,6 +51,7 @@ client payment success → entitlement
 provider SKU → entitlement_key
 client subject/price/capability/scope → authority
 current mutable catalog → historical purchase reinterpretation
+raw provider SDK object → persistence authority
 ```
 
 ---
@@ -214,6 +217,8 @@ verifier revision
 ```
 
 Sandbox evidence는 production grant를 만들 수 없다.
+
+Raw provider secret/bearer/receipt object는 normalized evidence contract에 포함시키지 않는다.
 
 ---
 
@@ -418,31 +423,74 @@ Ledger/grant/projection/outbox partial commit은 허용하지 않는다.
 
 ---
 
-## 15. Privacy / audit
+## 15. Privacy / audit — P0-PR-01B DECIDED
 
-Exact retention period는 `P0-PR-01`이다.
+Exact legal/accounting/backup retention period는 parent `P0-PR-01`로 계속 OPEN이다.
 
-Implementation hard requirements:
+Provider-evidence minimization은 `P0-PR-01B`로 다음처럼 DECIDED다.
 
-- raw provider secret/bearer/Authorization을 business DB/log/response/trace에 노출하지 않음
-- raw receipt/purchase token 저장 최소화; keyed/versioned fingerprint/reference 우선
-- verified payload는 correctness/support 최소 필드만
-- card number/CVV/raw PCI data 직접 저장 금지
-- support는 Member→Intent→Offer/Capability Set→receipt/event→grant→entitlement event→effective entitlement chain을 재구축 가능해야 함
+### Never persist / emit
+
+```text
+raw provider API secret
+Authorization / OAuth / bearer credential
+checkout/session bearer secret
+raw receipt / raw purchase token / opaque payment bearer token
+card PAN / CVV / PIN / raw PCI authentication material
+full provider request/response headers or bodies as an archive
+```
+
+### Fingerprint-first opaque evidence
+
+```text
+algorithm      = HMAC-SHA-256
+stored format  = hmac-sha256:k1:<64 lowercase hex>
+secret env     = MYEONGHA_COMMERCE_EVIDENCE_HMAC_K1_SECRET
+minimum secret = 32 UTF-8 bytes
+```
+
+Domains:
+
+```text
+myeongha.commerce.receipt-evidence.v1
+myeongha.commerce.provider-event-payload.v1
+myeongha.commerce.provider-account.v1
+```
+
+### `verified_payload_jsonb`
+
+Positive allowlist only:
+
+- schema-versioned
+- bounded strings/arrays
+- correctness/reconciliation/conflict/support에 실제 필요한 provider-specific verified fact만
+- unknown field drop/reject
+- raw response nesting 금지
+- raw secret/token/account identifier/PCI material 금지
+- first-class provenance를 불필요하게 중복하지 않음
+
+Provider-specific allowlist와 canonical fingerprint input은 selected adapter implementation/test가 고정한다.
+
+Provider transaction/event/product reference는 **non-secret이며** idempotency/reconciliation에 필요한 경우 first-class column으로 저장할 수 있다.
+
+Support는 Member→Intent→Offer/Capability Set→receipt/event→grant→entitlement event→effective entitlement chain을 raw bearer 없이 재구축 가능해야 한다.
+
+Selected provider가 raw bearer-like receipt/token의 durable storage를 필수로 요구하면 별도 provider-specific security/retention decision 없이는 `P0-CM-02`를 닫을 수 없다.
 
 ---
 
 ## 16. Current implementation gates
 
-### Architecture / rail resolved
+### Architecture / rail / evidence-minimization resolved
 
 ```text
-SRC-18   = CLOSED by Commerce Architecture v1
-SRC-21   = CLOSED by Commerce Architecture v1
-P0-CM-01 = DECIDED: Web + one-off launch MVP
+SRC-18      = CLOSED by Commerce Architecture v1
+SRC-21      = CLOSED by Commerce Architecture v1
+P0-CM-01    = DECIDED: Web + one-off launch MVP
+P0-PR-01B   = DECIDED: Commerce evidence minimization/security baseline
 ```
 
-### Still OPEN before provider-specific or paid-catalog implementation
+### Still OPEN before provider-specific / paid-catalog / production activation
 
 ```text
 P0-CM-02
@@ -452,14 +500,16 @@ P0-CM-03
 → launch paid Product / Capability catalog
 → current Paid Deep/Detailed Reading candidate is upstream-blocked because Saju production interpretation authority remains BLOCKED
 
-P0-PR-01 subset
-→ real provider evidence retention/legal handling
+P0-PR-01 parent
+→ legal/accounting evidence retention duration
+→ backup retention/deletion
+→ account-deletion Commerce retention/tombstone/pseudonymization lifecycle
 
 selected-provider ordering proof
 → safe comparator or equivalent fail-closed reconciliation
 ```
 
-`P0-CM-01` 결정은 exact PSP나 paid SKU를 승인하지 않는다.
+`P0-CM-01` 결정은 exact PSP나 paid SKU를 승인하지 않는다. `P0-PR-01B` 결정은 retention duration이나 production persistence activation을 승인하지 않는다.
 
 ---
 
@@ -483,6 +533,11 @@ projection rebuild → deterministic same result
 restore repeated → same receipt/grant
 cross-account claim → deny
 outbox retry → no rights reapply
+raw secret/token/receipt in provider fixture → persistence/log leakage test FAIL CLOSED
+unknown/oversized verified payload field → drop/reject
+same opaque evidence replay → same versioned HMAC fingerprint
+one-byte-different evidence → different fingerprint
+missing/weak Commerce HMAC secret → fail before evidence persistence
 ```
 
 ---
@@ -492,16 +547,19 @@ outbox retry → no rights reapply
 ```text
 Architecture                                      = CLOSED
 Launch rail                                       = DECIDED: Web + one-off
+Commerce evidence minimization                    = DECIDED: P0-PR-01B
 Product Capability Set schema                    = NOT IMPLEMENTED / HOLD UNTIL P0-CM-03
 Purchase Intent v2 Capability pin                = NOT IMPLEMENTED / HOLD UNTIL P0-CM-03
+provider-neutral evidence serializer/fingerprint = NOT IMPLEMENTED / DESIGN MAY PROCEED UNDER P0-PR-01B
 provider-neutral verification runtime            = NOT IMPLEMENTED
-concrete provider adapter                         = BLOCKED BY P0-CM-02 + P0-CM-03 + P0-PR-01 SAFE SUBSET
+concrete provider adapter                         = BLOCKED BY P0-CM-02 + P0-CM-03
 verified receipt → grant/event/projection command= NOT IMPLEMENTED
 webhook/provider event runtime                    = NOT IMPLEMENTED
 refund/revoke/restore runtime                     = NOT IMPLEMENTED
 reconciliation runtime                            = NOT IMPLEMENTED
 provider sandbox E2E                              = NOT IMPLEMENTED
+production evidence persistence                   = BLOCKED BY P0-CM-02 + P0-CM-03 + P0-PR-01 PARENT
 production Commerce activation                    = NOT AUTHORIZED
 ```
 
-`COMMERCE_ENTITLEMENT_ARCHITECTURE_V1.md`의 provider-neutral semantics와 `COMMERCE_LAUNCH_RAIL_DECISION_V1.md`의 후속 P0 status를 함께 따른다.
+`COMMERCE_ENTITLEMENT_ARCHITECTURE_V1.md`, `COMMERCE_LAUNCH_RAIL_DECISION_V1.md`, `COMMERCE_EVIDENCE_DATA_MINIMIZATION_DECISION_V1.md`의 authority를 함께 따른다.
