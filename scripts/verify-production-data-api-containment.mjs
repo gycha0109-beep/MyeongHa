@@ -30,9 +30,10 @@ const requiredWorkflowFragments = [
   'test -n "${MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID:-}"',
   'actions/setup-node@v4',
   "node-version: '24'",
+  'Preflight governed Member canonical-subject path',
   'run: bash scripts/run-production-data-api-containment.sh',
   'https://myeongha.vercel.app/api/health',
-  'node scripts/verify-production-member-me.mjs',
+  'Verify governed Member canonical-subject path after transition',
   'if: always()',
   'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1',
   'retention-days: 14',
@@ -94,9 +95,17 @@ for (const preflightFragment of [
   }
 }
 
-const memberSmokeIndex = workflow.indexOf('node scripts/verify-production-member-me.mjs');
-if (memberSmokeIndex <= mutationStepIndex) {
-  throw new Error('Governed Member /api/me smoke must run after the Data API transition.');
+const memberSmokeMatches = [...workflow.matchAll(/run: node scripts\/verify-production-member-me\.mjs/g)];
+if (memberSmokeMatches.length !== 2) {
+  throw new Error(`Expected exactly two governed Member /api/me smokes, found ${memberSmokeMatches.length}.`);
+}
+const preMemberSmokeIndex = memberSmokeMatches[0]?.index ?? -1;
+const postMemberSmokeIndex = memberSmokeMatches[1]?.index ?? -1;
+if (preMemberSmokeIndex < 0 || preMemberSmokeIndex >= mutationStepIndex) {
+  throw new Error('Governed Member /api/me preflight must pass before the Data API transition.');
+}
+if (postMemberSmokeIndex <= mutationStepIndex) {
+  throw new Error('Governed Member /api/me post-transition smoke must run after the Data API transition.');
 }
 
 const patchCount = [...runner.matchAll(/-X PATCH/g)].length;
