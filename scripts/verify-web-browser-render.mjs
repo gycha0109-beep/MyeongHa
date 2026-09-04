@@ -136,9 +136,51 @@ async function artifact(client, suffix = '') {
   await writeFile(join(dir, `web-reading-browser-smoke${suffix}.json`), `${JSON.stringify(diagnostics, null, 2)}\n`);
 }
 
-await stat(join(root, 'hall.html'));
-await stat(join(root, 'reading.html'));
-await stat(join(root, 'reading-detail.html'));
+async function verifyDarkPage(client, origin, pathname, selector, { toggle = true, artifactSuffix = null } = {}) {
+  const nav = await client.send('Page.navigate', { url: `${origin}${pathname}` });
+  assert(!nav.errorText, `Dark theme navigation failed for ${pathname}: ${nav.errorText}`);
+  const cleanPath = pathname.split('?')[0];
+  await waitForPage(client, cleanPath, selector);
+  await sleep(120);
+  const selectorLiteral = JSON.stringify(selector);
+  const darkState = await client.evaluate(`(() => {
+    const rootStyle = getComputedStyle(document.documentElement);
+    const target = document.querySelector(${selectorLiteral});
+    const targetRect = target?.getBoundingClientRect();
+    const themeButton = document.querySelector('.product-theme-toggle');
+    const buttonRect = themeButton?.getBoundingClientRect();
+    return {
+      pathname: location.pathname,
+      theme: document.documentElement.dataset.theme ?? null,
+      colorScheme: document.documentElement.style.colorScheme,
+      storedTheme: localStorage.getItem('myeongha.productTheme.v1'),
+      paperBase: rootStyle.getPropertyValue('--mh-paper-base').trim(),
+      inkStrong: rootStyle.getPropertyValue('--mh-ink-strong').trim(),
+      styles: [...document.styleSheets].map((sheet) => sheet.href ? new URL(sheet.href).pathname : 'inline'),
+      targetVisible: Boolean(target && targetRect && targetRect.width > 0 && targetRect.height > 0 && getComputedStyle(target).display !== 'none'),
+      targetBackground: target ? getComputedStyle(target).backgroundColor : null,
+      toggleVisible: Boolean(themeButton && buttonRect && buttonRect.width > 0 && buttonRect.height > 0 && getComputedStyle(themeButton).display !== 'none'),
+      overflow: document.documentElement.scrollWidth - innerWidth,
+      viewportWidth: innerWidth,
+    };
+  })()`);
+  assert(darkState.pathname === cleanPath, `Unexpected dark theme pathname: ${darkState.pathname}`);
+  assert(darkState.theme === 'dark', `Dark theme did not persist on ${cleanPath}: ${darkState.theme}`);
+  assert(darkState.colorScheme === 'dark', `Dark color-scheme missing on ${cleanPath}: ${darkState.colorScheme}`);
+  assert(darkState.storedTheme === 'dark', `Dark theme preference missing on ${cleanPath}`);
+  assert(darkState.styles.includes('/product-theme.css'), `Dark theme stylesheet missing on ${cleanPath}`);
+  assert(darkState.paperBase === '#0b1419', `Dark paper token not active on ${cleanPath}: ${darkState.paperBase}`);
+  assert(darkState.inkStrong === '#f0e7d9', `Dark ink token not active on ${cleanPath}: ${darkState.inkStrong}`);
+  assert(darkState.targetVisible, `Dark theme target is not visible on ${cleanPath}: ${selector}`);
+  if (toggle) assert(darkState.toggleVisible, `Theme toggle is not visible on ${cleanPath}`);
+  assert(darkState.overflow <= 2, `Horizontal overflow on ${cleanPath}: ${darkState.overflow}px`);
+  if (artifactSuffix) await artifact(client, artifactSuffix);
+  return darkState;
+}
+
+for (const file of ['hall.html', 'reading.html', 'reading-detail.html', 'chat-hub.html', 'chat.html', 'records.html', 'my.html', 'product-theme.js', 'product-theme.css']) {
+  await stat(join(root, file));
+}
 const { server, origin } = await serve();
 const profile = await mkdtemp(join(tmpdir(), 'myeongha-browser-smoke-'));
 const chrome = spawn(chromeBin, [
@@ -293,7 +335,81 @@ try {
   const advanced = await client.evaluate(`(() => { document.querySelector('[data-reading-next]').click(); return document.querySelector('[data-reading-progress-label]').textContent.trim(); })()`);
   assert(advanced === '읽기 2 / 4', `Reading runtime did not advance: ${advanced}`);
   await artifact(client, '-reading-detail');
-  console.log(JSON.stringify({ status: 'MyeongHa_WEB_BROWSER_RENDER_PASS', home: hallState.elements, saju: sajuState.elements, mobile: mobileState, pathname: state.pathname, scope: state.scope, rendered: state.elements }));
+
+  await client.evaluate(`(() => { localStorage.setItem('myeongha.productTheme.v1', 'dark'); return true; })()`);
+  const darkHome = await verifyDarkPage(client, origin, '/hall.html', '.home-primary-grid', { artifactSuffix: '-dark-home' });
+
+  const themeToggleState = await client.evaluate(`(() => {
+    const button = document.querySelector('.product-theme-toggle');
+    button.click();
+    const afterLight = {
+      theme: document.documentElement.dataset.theme,
+      stored: localStorage.getItem('myeongha.productTheme.v1'),
+      pressed: button.getAttribute('aria-pressed'),
+    };
+    button.click();
+    return {
+      afterLight,
+      afterDark: {
+        theme: document.documentElement.dataset.theme,
+        stored: localStorage.getItem('myeongha.productTheme.v1'),
+        pressed: button.getAttribute('aria-pressed'),
+      },
+    };
+  })()`);
+  assert(themeToggleState.afterLight.theme === 'light' && themeToggleState.afterLight.stored === 'light' && themeToggleState.afterLight.pressed === 'false', 'Theme toggle did not switch to light mode');
+  assert(themeToggleState.afterDark.theme === 'dark' && themeToggleState.afterDark.stored === 'dark' && themeToggleState.afterDark.pressed === 'true', 'Theme toggle did not switch back to dark mode');
+
+  const darkSaju = await verifyDarkPage(client, origin, '/reading.html', '#saju-empty', { artifactSuffix: '-dark-saju' });
+  const darkSajuHidden = await client.evaluate(`(() => {
+    const el = document.querySelector('#saju-hub');
+    const r = el.getBoundingClientRect(); const s = getComputedStyle(el);
+    return { hidden: el.hidden, rendered: r.width > 0 && r.height > 0 && s.display !== 'none' && s.visibility !== 'hidden' };
+  })()`);
+  assert(darkSajuHidden.hidden === true && darkSajuHidden.rendered === false, 'Dark theme broke native hidden Saju layout protection');
+
+  const darkReading = await verifyDarkPage(client, origin, '/reading-detail.html?scope=year', '.reading-sheet', { artifactSuffix: '-dark-reading-detail' });
+  const darkChatHub = await verifyDarkPage(client, origin, '/chat-hub.html', '.conversation-primary', { artifactSuffix: '-dark-chat-hub' });
+  const darkChatRoom = await verifyDarkPage(client, origin, '/chat.html', '.conversation-chat-panel', { artifactSuffix: '-dark-chat-room' });
+  const darkRecords = await verifyDarkPage(client, origin, '/records.html', '.records-main');
+  const darkMy = await verifyDarkPage(client, origin, '/my.html', '.my-main');
+
+  await client.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+  const darkMobileHome = await verifyDarkPage(client, origin, '/hall.html', '.home-primary-grid', { artifactSuffix: '-dark-home-mobile' });
+  const darkMobileSaju = await verifyDarkPage(client, origin, '/reading.html', '#saju-empty', { artifactSuffix: '-dark-saju-mobile' });
+  const darkMobileChat = await verifyDarkPage(client, origin, '/chat.html', '.conversation-chat-panel', { toggle: false, artifactSuffix: '-dark-chat-room-mobile' });
+  const darkMobileChatState = await client.evaluate(`(() => ({
+    theme: document.documentElement.dataset.theme,
+    width: innerWidth,
+    overflow: document.documentElement.scrollWidth - innerWidth,
+    roomHeaderVisible: (() => { const el = document.querySelector('.conversation-room-header'); const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(el).display !== 'none'; })(),
+    chatPanelVisible: (() => { const el = document.querySelector('.conversation-chat-panel'); const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(el).display !== 'none'; })(),
+  }))()`);
+  assert(darkMobileChatState.theme === 'dark' && darkMobileChatState.width === 390, 'Dark mobile Conversation theme did not persist');
+  assert(darkMobileChatState.overflow <= 2, `Dark mobile Conversation horizontal overflow: ${darkMobileChatState.overflow}px`);
+  assert(darkMobileChatState.roomHeaderVisible && darkMobileChatState.chatPanelVisible, 'Dark mobile Conversation room lost required layout');
+
+  console.log(JSON.stringify({
+    status: 'MyeongHa_WEB_BROWSER_RENDER_PASS',
+    home: hallState.elements,
+    saju: sajuState.elements,
+    mobile: mobileState,
+    pathname: state.pathname,
+    scope: state.scope,
+    rendered: state.elements,
+    dark: {
+      home: darkHome,
+      saju: darkSaju,
+      reading: darkReading,
+      chatHub: darkChatHub,
+      chatRoom: darkChatRoom,
+      records: darkRecords,
+      my: darkMy,
+      mobileHome: darkMobileHome,
+      mobileSaju: darkMobileSaju,
+      mobileChat: darkMobileChat,
+    },
+  }));
 } catch (error) {
   if (client) { try { await artifact(client, '-failure'); } catch {} }
   if (chromeError.trim()) console.error(chromeError.trim());
