@@ -1,165 +1,225 @@
 # SRC-18 — Commerce Product → Entitlement Mapping Authority
 
-> Status: **OPEN / BLOCKING for verified purchase → entitlement grant application**  
+> Status: **RESOLVED BY `docs/architecture/COMMERCE_ENTITLEMENT_ARCHITECTURE_V1.md` / IMPLEMENTATION NOT STARTED**  
 > Domain: Commerce / Entitlement  
-> Source authority reviewed:
-> - `Usecase_re_reviewed_v2(1).md`
-> - `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`
-> - `Myeonghwa_Personalized_Interpretation_Architecture_v1.3_THIRD_REVIEW(1).md`
+> Resolution authority: 명하 결제·권한 아키텍처 v1  
+> Upstream source reviewed: `Usecase_re_reviewed_v2`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST`, UX Product Flow, current Commerce schema/runtime/tests
 
 ---
 
-## 1. Gap
+## 1. Historical gap
 
-Source authority defines the commerce persistence/provenance chain and the final entitlement authority, but it does **not** define the governed mapping that turns a verified purchased product into one or more entitlement grants.
+기존 source는 verified purchased Product를 concrete `entitlement_key` / `scope_key` / `grant_key`로 변환하는 규칙과 그 historical versioning authority를 정의하지 않았다.
 
-The missing authority includes, at minimum:
-
-- which `product_key` / `product_id` grants which `entitlement_key`;
-- whether the grant is global or resource-scoped and how any `scope_key` is resolved;
-- one-off vs subscription/bundle grant semantics where that changes grant identity or validity;
-- the deterministic `grant_key` derivation/source-instance rule for purchase/subscription sources;
-- whether one product may produce multiple grants and, if so, their governed ordering/atomicity;
-- what immutable/versioned artifact, table, code registry, or other authority owns that mapping;
-- what provenance/version/hash must be pinned so later configuration changes cannot reinterpret an already verified historical purchase.
-
-## 2. What source authority already fixes
-
-### ERD v0.6
-
-`product_offers` fixes an immutable provider/store mapping:
+따라서 이전 implementation pack은 다음을 임의 도입할 수 없었다.
 
 ```text
-product_id
-platform
-provider
-external_product_id
+ProductFulfillmentDefinition
+fulfillmentDefinitionVersion
+REQUEST_RESOURCE 같은 범용 scope resolver
+client-derived paid scope
+grantClass를 통한 미정 product semantics
 ```
 
-The ERD explicitly calls `(id, provider, external_product_id, product_id)` the purchase snapshot verification target and states that provider/platform/external-product/product mapping is immutable after creation.
+이 제한은 유효했다. 특히 과거 repository에서 source에 없는 fulfillment registry/version residue를 제거한 것은 올바른 fail-closed 조치였다.
 
-`purchase_intents` stores:
+이번 resolution은 그 과거 invented contract를 source-backed였다고 재해석하지 않는다. **후속 Commerce Architecture가 명시적인 새 domain authority를 채택하여 source silence를 닫는다.**
+
+---
+
+## 2. Adopted authority
+
+Commerce Architecture v1은 **immutable versioned relational Product Capability Set**을 채택한다.
 
 ```text
-product_offer_id
-request_hash
-offer_snapshot_jsonb   # immutable minimal mapping snapshot
-offer_snapshot_hash
+Product
+→ Product Capability Set(version/hash)
+→ Capability Item(s)
+→ Product Offer pins exactly one Capability Set
+→ Purchase Intent v2 pins the same set/version/hash
+→ verified receipt resolves historical Offer
+→ grant(s)
 ```
 
-and requires member ownership plus idempotency conflict detection.
+### 2.1 Product Capability Set
 
-`commerce_receipts` / `commerce_provider_events` preserve verified provider transaction provenance.
-
-`entitlement_grants` defines independent grant source instances with:
+Target authority:
 
 ```text
-entitlement_key
-scope_key
-grant_key
-grant_source_type
-valid_from / valid_until
+product_capability_sets
+- id
+- product_id
+- definition_version
+- definition_hash
+- created_at
+- retired_at nullable
 ```
 
-`entitlement_events.product_id` may record a nullable source product, and the source-defined apply skeleton is:
+Semantic content는 생성 후 immutable이다.
+
+`retired_at`은 신규 Offer 배정을 막기 위한 monotonic operational retirement이며 `NULL → timestamp`만 허용하고 되돌릴 수 없다. Retirement는 historical purchase 의미를 바꾸지 않는다.
+
+### 2.2 Capability Items
+
+Target authority:
 
 ```text
-verified receipt/provider event
-→ resolve subject + grant_key
-→ lock/upsert grant
-→ reject stale provider order
-→ append entitlement_event
-→ update grant projection
-→ recompute logical entitlement from ALL valid grants
-→ outbox
+product_capability_items
+- capability_set_id
+- item_key
+- entitlement_key
+- scope_mode          # global | fixed
+- fixed_scope_key     # fixed only
+- validity_mode       # unbounded | fixed_duration | provider_expiry
+- duration_seconds    # fixed_duration only
 ```
 
-However, the source never defines the rule that resolves the purchased `product_id` into the target entitlement key/scope/grant semantics.
+v1에서 `fixed` scope는 server-owned/global content identity에만 사용할 수 있다.
 
-### UC-26 / UC-27
-
-The use cases require:
+다음은 v1에서 금지한다.
 
 ```text
-Purchase Intent
-→ platform payment rail
-→ server verification
-→ entitlement issuance / restore
+client/request-derived arbitrary scope
+user-owned resource ID를 client가 entitlement scope로 주입
+REQUEST_RESOURCE 같은 범용 dynamic resolver
 ```
 
-and require the server, not client payment UI, to be final entitlement authority. They do not define a product-to-entitlement mapping registry or fulfillment-definition schema.
+사용자 생성 resource에 대한 paid scope가 필요해지면 별도 Product/Commerce architecture delta와 server-owned resolver가 필요하다.
 
-## 3. What the implementation pack must NOT invent
+### 2.3 Offer pin
 
-Until source authority resolves this gap, the implementation pack must not claim any of the following as source-backed authority:
+`product_offers`는 정확히 하나의 Capability Set을 pin한다.
 
-- `ProductFulfillmentDefinition` as a required source-controlled registry;
-- a `fulfillmentDefinitionVersion` field;
-- normalized grant-definition payloads inside `purchase_intents.offer_snapshot_jsonb`;
-- `GLOBAL | REQUEST_RESOURCE | FIXED` scope-resolver semantics;
-- `one_off | subscription | promo_compatible` grant-class semantics;
-- a required fulfillment-definition hash/version in Purchase Intent or release evidence;
-- receipt verification or entitlement apply logic that derives grant semantics from such an invented registry.
-
-Those may become valid **only after source authority explicitly adopts an equivalent contract**.
-
-## 4. Current safe implementation boundary
-
-The following remain source-complete and may be implemented independently:
-
-- Product / Product Offer relational persistence;
-- immutable provider/platform/external-product/product mapping;
-- Purchase Intent member-only ownership and idempotency;
-- Purchase Intent immutable **minimal offer mapping snapshot** and version-prefixed digest;
-- provider-account-link ownership/provider validation;
-- receipt/provider-event provenance and dedupe/integrity constraints already defined by the ERD;
-- current entitlement read projection from already-authoritative grants.
-
-The following is blocked by SRC-18:
+강제 관계:
 
 ```text
-verified receipt/provider event
-→ create/renew/restore a concrete entitlement grant for a purchased product
+product_offer.product_id
+= product_capability_set.product_id
 ```
 
-Provider-specific transaction verification/restore additionally remains subject to `OPEN-P0: P0-CM-01`.
+Provider/platform/external-product/product/capability-set mapping은 historical identity다. 기존 Offer/SKU를 새 rights 의미로 repoint하지 않는다.
 
-## 5. Required source resolution
-
-Source authority should choose and define one governed product→entitlement mapping model. The resolution must specify enough information to deterministically reproduce historical entitlement effects without reading mutable current configuration.
-
-Possible implementation shapes are **not decisions** and are listed only to make the missing authority explicit:
+Rights semantics가 바뀌면:
 
 ```text
-A. immutable versioned registry artifact
-B. relational product-entitlement mapping table/version
-C. source-controlled product policy keyed by product identity/version
-D. another explicitly governed equivalent
+new Capability Set
++ new Offer/provider product mapping
 ```
 
-Whichever model is chosen must define mapping identity/versioning, scope resolution, grant source identity, historical pinning/provenance, and compatibility with purchase/restore/provider-event flows.
+을 생성한다.
 
-## 6. Verification gate after resolution
+### 2.4 Purchase Intent pin
 
-At minimum:
+기존 `cmd_create_purchase_intent_v1`의 minimal Offer snapshot 의미는 유지한다.
 
-- verified purchase maps to the source-approved entitlement key/scope only;
-- same historical purchase is not reinterpreted after mapping changes;
-- cross-subject resource scope cannot be granted;
-- duplicate receipt/provider event creates one logical source effect;
-- one grant revoke does not remove access supplied by another valid grant;
-- restore reproduces missing authoritative provenance idempotently;
-- unknown/unsupported product mapping fails closed with no entitlement mutation.
-
-## 7. Relationship to P0-CM-01
-
-`P0-CM-01` decides the Web / Apple / Google commerce rail and product-type matrix. It does **not**, by itself, define the missing provider-independent product→entitlement mapping authority described here.
-
-Therefore:
+새 command/schema v2는 별도 immutable fields로 다음을 pin한다.
 
 ```text
-P0-CM-01 = provider/platform commerce rail decision
-SRC-18    = source-level purchased product → entitlement grant semantics
+capability_set_id
+capability_snapshot_jsonb
+capability_snapshot_hash
 ```
 
-Both must be resolved before a complete production purchase→grant pipeline can be claimed.
+Minimum snapshot:
+
+```text
+capabilitySetId
+definitionVersion
+definitionHash
+```
+
+기존 `offer_snapshot_jsonb`에 새 의미를 조용히 끼워 넣지 않는다.
+
+### 2.5 Grant source identity
+
+v1 one-off paid purchase grant source identity:
+
+```text
+grant_key = 'receipt:' + commerce_receipts.id
+```
+
+Raw external transaction ID를 internal grant key로 노출하지 않는다.
+
+한 verified purchase가 여러 Capability Item을 가지면 각 logical capability grant는 독립 row로 표현하되 **모든 mapped item effect는 한 authoritative DB transaction에서 all-or-neither**로 적용한다.
+
+Subscription grant source identity는 MVP scope가 아니므로 이 resolution이 정의하지 않는다.
+
+---
+
+## 3. Historical reproducibility
+
+Historical purchase는 mutable current catalog로 재해석하지 않는다.
+
+```text
+receipt
+→ immutable Product Offer
+→ immutable Capability Set id/version/hash
+→ immutable Capability Items
+```
+
+Restore도 같은 chain을 재사용한다.
+
+`products.metadata_jsonb`는 Product→Capability mapping authority가 아니다.
+
+Capability Set hash는 versioned canonical representation을 대상으로 service가 계산하고, DB는 pinned ID/version/hash parity와 relational mapping을 강제한다. Exact canonicalization implementation은 migration/command contract에서 고정하되 같은 version에서 변경할 수 없다.
+
+---
+
+## 4. Migration constraints
+
+Current schema에서 additive migration한다.
+
+```text
+expand nullable structures
+→ inspect existing offers/receipts
+→ backfill only when historical mapping is explicitly provable
+→ verify hashes/relationships
+→ activate command v2
+→ enforce non-null only for the activated commerce slice
+→ contract obsolete path only after evidence
+```
+
+기존 verified receipt가 존재한다면 현재 Product 의미를 근거 없이 historical Capability Set으로 추론해서 backfill하지 않는다. Mapping proof가 없으면 해당 row는 review/quarantine 대상이다.
+
+필수 relational enforcement:
+
+- Capability Set `(id, product_id)` unique target
+- Offer `(capability_set_id, product_id)` composite FK
+- Capability Set semantic fields immutable
+- retirement monotonic
+- Offer `capability_set_id` immutable once assigned
+- Capability Item semantic fields immutable
+- Purchase Intent v2 capability pin immutable
+
+---
+
+## 5. Verification gate
+
+- verified purchase maps only to pinned Capability Set
+- unknown/unmapped Offer → no grant
+- mismatched Product↔Capability Set → DENY
+- Capability Set version/hash mismatch → DENY
+- old purchase is not reinterpreted after new Capability Set release
+- same provider SKU/Offer cannot be repointed to new rights
+- client cannot inject entitlement key/scope
+- v1 dynamic request-derived paid scope → DENY
+- one Product with multiple items applies all-or-neither
+- restore resolves same historical receipt/Offer/Capability Set
+- duplicate receipt produces no duplicate logical grant
+
+---
+
+## 6. Remaining independent decisions
+
+This resolution does **not** decide:
+
+```text
+P0-CM-01 provider rail
+actual launch Product/SKU
+price
+subscription
+refund 후 generated artifact access policy
+P0-PR-01 evidence retention
+```
+
+These remain independent implementation/product gates, not SRC-18 blockers.
