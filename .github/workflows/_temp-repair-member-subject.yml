@@ -96,15 +96,12 @@ jobs:
         run: |
           set -euo pipefail
           psql "host=$POOL_HOST port=$POOL_PORT dbname=$POOL_DB user=$ADMIN_POOL_USER sslmode=require" \
-            -v ON_ERROR_STOP=1 \
-            -v auth_user_id="$TARGET_AUTH_USER_ID" \
-            -v guest_subject_id="$TARGET_GUEST_SUBJECT_ID" \
-            -v guest_session_id="$TARGET_GUEST_SESSION_ID" <<'SQL'
+            -v ON_ERROR_STOP=1 <<'SQL'
           do $$
           declare
-            v_auth_user_id uuid := :'auth_user_id'::uuid;
-            v_guest_subject_id uuid := :'guest_subject_id'::uuid;
-            v_guest_session_id uuid := :'guest_session_id'::uuid;
+            v_auth_user_id constant uuid := 'e03aed6f-ff5e-41b0-8de4-33c6127fc0e3'::uuid;
+            v_guest_subject_id constant uuid := '1ab74118-b6fb-474d-ad9d-fede590056f3'::uuid;
+            v_guest_session_id constant uuid := 'f6b8ca19-0858-44af-a47c-ff47dc5e6b0e'::uuid;
             v_user_created timestamptz;
             v_guest_created timestamptz;
             v_nearby_count integer;
@@ -164,11 +161,11 @@ jobs:
           select
             s.kind,
             s.status,
-            (s.auth_user_id = :'auth_user_id'::uuid) as auth_bound,
+            (s.auth_user_id = 'e03aed6f-ff5e-41b0-8de4-33c6127fc0e3'::uuid) as auth_bound,
             (gs.consumed_at is not null) as guest_session_consumed,
             (gs.claimed_by_subject_id = s.id) as guest_session_claimed
           from public.subjects s
           join public.guest_sessions gs on gs.subject_id = s.id
-          where s.id = :'guest_subject_id'::uuid
-            and gs.id = :'guest_session_id'::uuid;
+          where s.id = '1ab74118-b6fb-474d-ad9d-fede590056f3'::uuid
+            and gs.id = 'f6b8ca19-0858-44af-a47c-ff47dc5e6b0e'::uuid;
           SQL
