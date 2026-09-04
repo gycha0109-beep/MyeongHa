@@ -221,15 +221,18 @@ try {
     statusVisible: (() => { const el = document.querySelector('#my-status'); const r = el?.getBoundingClientRect(); return Boolean(r && r.width > 0 && r.height > 0 && !el.hidden); })(),
     routeHrefs: [...document.querySelectorAll('.my-route-card')].map((el) => el.getAttribute('href')),
     routeVisible: [...document.querySelectorAll('.my-route-card')].every((el) => { const r = el.getBoundingClientRect(); const s = getComputedStyle(el); return r.width > 0 && r.height > 70 && s.display !== 'none' && s.visibility !== 'hidden'; }),
+    birthRouteTitle: document.querySelector('#my-birth-route-title')?.textContent?.trim() ?? null,
     bodyText: document.body.innerText,
     overflow: document.documentElement.scrollWidth - innerWidth,
   }))()`);
   assert(guestEntryState.title === '마이 · 명하', `Unexpected My title: ${guestEntryState.title}`);
   assert(guestEntryState.contentHidden === true && guestEntryState.statusVisible, 'My session-required account state is not fail-closed');
   assert(guestEntryState.routeVisible && guestEntryState.routeHrefs.length === 4, 'My route foundation is not visibly rendered');
-  for (const href of ['reading.html', 'birth.html', 'records.html', 'chat-hub.html']) {
+  for (const href of ['reading.html', '#my-birth-title', 'records.html', 'chat-hub.html']) {
     assert(guestEntryState.routeHrefs.includes(href), `My route is missing: ${href}`);
   }
+  assert(!guestEntryState.routeHrefs.includes('birth.html'), 'My unknown Birth state exposed the create route');
+  assert(guestEntryState.birthRouteTitle === '현재 출생 정보 확인', `Unexpected fail-closed Birth route title: ${guestEntryState.birthRouteTitle}`);
   assert(guestEntryState.bodyText.includes('내 정보와 이어지는 곳'), 'My route section title missing');
   assert(guestEntryState.bodyText.includes('설정과 계정 경계'), 'My settings boundary section missing');
   assert(guestEntryState.overflow <= 2, `My desktop guest horizontal overflow: ${guestEntryState.overflow}px`);
@@ -260,6 +263,7 @@ try {
       displayName: document.querySelector('#my-display-name')?.textContent?.trim(),
       email: document.querySelector('#my-account-email')?.textContent?.trim(),
       action: document.querySelector('.my-auth-action')?.textContent?.trim(),
+      birthRouteHref: document.querySelector('#my-birth-route')?.getAttribute('href'),
       cardVisible: Boolean(card && card.width > 300 && card.height > 220),
       overflow: document.documentElement.scrollWidth - innerWidth,
     };
@@ -269,6 +273,7 @@ try {
   assert(memberState.displayName === '테스트 사용자', `Unexpected My display name: ${memberState.displayName}`);
   assert(memberState.email === 'member@example.com', `Unexpected My member email: ${memberState.email}`);
   assert(memberState.action === '로그아웃', `Unexpected My member action: ${memberState.action}`);
+  assert(memberState.birthRouteHref === '#my-birth-title', `My unavailable Birth read exposed create route: ${memberState.birthRouteHref}`);
   assert(memberState.cardVisible, 'My member identity card is not visibly rendered');
   assert(memberState.overflow <= 2, `My desktop member horizontal overflow: ${memberState.overflow}px`);
   await capture(client, 'desktop-dark-member');
@@ -313,11 +318,13 @@ try {
     email: document.querySelector('#my-account-email')?.textContent?.trim(),
     action: document.querySelector('.my-auth-action')?.textContent?.trim(),
     note: document.querySelector('#my-account-note')?.textContent?.trim(),
+    birthRouteHref: document.querySelector('#my-birth-route')?.getAttribute('href'),
   }))()`);
   assert(verifiedGuest.subjectKind === '게스트', 'My guest subject label missing');
   assert(verifiedGuest.email === '게스트 세션', 'My guest account identity missing');
   assert(verifiedGuest.action === '계정 연결', 'My guest account-connect action missing');
   assert(verifiedGuest.note?.includes('회원 기록으로 가정하지 않습니다.'), 'My guest/member authority boundary copy missing');
+  assert(verifiedGuest.birthRouteHref === '#my-birth-title', `My verified guest unavailable Birth read exposed create route: ${verifiedGuest.birthRouteHref}`);
 
   console.log('MyeongHa_WEB_MY_BROWSER_PASS');
 } catch (error) {
