@@ -43,7 +43,7 @@ jobs:
       - name: Verify conversation browser render
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
-        run: node scripts/verify-web-conversation-browser-render.mjs
+        run: node scripts/run-web-conversation-browser-smoke.mjs
       - name: Upload browser smoke diagnostics
         if: always()
         uses: actions/upload-artifact@v4
