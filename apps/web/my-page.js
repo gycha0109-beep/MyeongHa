@@ -105,7 +105,7 @@ async function boot() {
     renderProfile(payload);
   } catch (error) {
     if (error instanceof MyRuntimeError && error.code === 'WEB_MY_SESSION_REQUIRED') {
-      renderUnavailable('내 계정 정보를 보려면 현재 세션이 필요합니다. 아래의 사주·기록·대화 진입은 로그인 전에도 확인할 수 있습니다.', true);
+      renderUnavailable('내 정보를 보려면 현재 세션이 필요합니다. 아래의 사주·기록·대화 진입은 로그인 전에도 확인할 수 있습니다.', true);
       return;
     }
     renderUnavailable('현재 내 정보를 불러올 수 없습니다. 확인되지 않은 계정 정보를 대신 표시하지 않습니다.');
