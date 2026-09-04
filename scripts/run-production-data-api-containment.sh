@@ -145,6 +145,7 @@ else
     exit 1
   fi
 
+  [[ "$patch_http_status" == '200' ]]
   mutation_state='applied'
 fi
 
