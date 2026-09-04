@@ -1,5 +1,6 @@
 const MEMBER_SESSION_KEY = 'myeongha.memberSession.v1';
 const GUEST_TOKEN_KEY = 'myeongha.guestBearer.v1';
+const PENDING_GUEST_TOKEN_KEY = 'myeongha.pendingGuestBearer.v1';
 const AUTH_CHANGED_EVENT = 'myeongha:auth-changed';
 const REFRESH_SKEW_MS = 60_000;
 
@@ -13,6 +14,10 @@ export class ProductAuthError extends Error {
 
 function isRecord(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isJwtLike(value) {
+  return typeof value === 'string' && /^[^.\s]+\.[^.\s]+\.[^.\s]+$/u.test(value);
 }
 
 function readLocal(key) {
@@ -47,6 +52,14 @@ function readSession(key) {
   }
 }
 
+function writeSession(key, value) {
+  try {
+    sessionStorage.setItem(key, value);
+  } catch {
+    return;
+  }
+}
+
 function removeSession(key) {
   try {
     sessionStorage.removeItem(key);
@@ -57,6 +70,14 @@ function removeSession(key) {
 
 function emitAuthChanged() {
   globalThis.dispatchEvent?.(new CustomEvent(AUTH_CHANGED_EVENT));
+}
+
+function stageMemberBearerForLegacyProductClients(accessToken) {
+  const current = readSession(GUEST_TOKEN_KEY);
+  if (current && !isJwtLike(current) && !readSession(PENDING_GUEST_TOKEN_KEY)) {
+    writeSession(PENDING_GUEST_TOKEN_KEY, current);
+  }
+  writeSession(GUEST_TOKEN_KEY, accessToken);
 }
 
 function normalizeSession(value) {
@@ -85,6 +106,7 @@ function saveSession(session) {
   const normalized = normalizeSession(session);
   if (!normalized) throw new ProductAuthError('WEB_AUTH_MALFORMED_SESSION', '로그인 세션 응답이 올바르지 않습니다.');
   writeLocal(MEMBER_SESSION_KEY, JSON.stringify(normalized));
+  stageMemberBearerForLegacyProductClients(normalized.accessToken);
   emitAuthChanged();
   return normalized;
 }
@@ -143,8 +165,10 @@ export function readMemberSession() {
 }
 
 export function readGuestBearer() {
+  const pending = readSession(PENDING_GUEST_TOKEN_KEY);
+  if (typeof pending === 'string' && pending.length > 0 && !isJwtLike(pending)) return pending;
   const token = readSession(GUEST_TOKEN_KEY);
-  return typeof token === 'string' && token.length > 0 ? token : null;
+  return typeof token === 'string' && token.length > 0 && !isJwtLike(token) ? token : null;
 }
 
 export async function refreshMemberSession() {
@@ -158,6 +182,13 @@ export async function refreshMemberSession() {
     return saveSession(data.session);
   } catch (error) {
     removeLocal(MEMBER_SESSION_KEY);
+    const active = readSession(GUEST_TOKEN_KEY);
+    if (isJwtLike(active)) removeSession(GUEST_TOKEN_KEY);
+    const pending = readSession(PENDING_GUEST_TOKEN_KEY);
+    if (pending) {
+      writeSession(GUEST_TOKEN_KEY, pending);
+      removeSession(PENDING_GUEST_TOKEN_KEY);
+    }
     emitAuthChanged();
     throw error;
   }
@@ -176,9 +207,8 @@ export async function getActiveBearer() {
     const member = await getMemberAccessToken();
     if (member) return Object.freeze({ kind: 'member', token: member });
   } catch {
-    return readGuestBearer()
-      ? Object.freeze({ kind: 'guest', token: readGuestBearer() })
-      : null;
+    const guestAfterFailure = readGuestBearer();
+    return guestAfterFailure ? Object.freeze({ kind: 'guest', token: guestAfterFailure }) : null;
   }
   const guest = readGuestBearer();
   return guest ? Object.freeze({ kind: 'guest', token: guest }) : null;
@@ -219,15 +249,25 @@ export async function signOutMember() {
     }
   }
   removeLocal(MEMBER_SESSION_KEY);
+  const active = readSession(GUEST_TOKEN_KEY);
+  if (isJwtLike(active)) removeSession(GUEST_TOKEN_KEY);
+  const pending = readSession(PENDING_GUEST_TOKEN_KEY);
+  if (pending) {
+    writeSession(GUEST_TOKEN_KEY, pending);
+    removeSession(PENDING_GUEST_TOKEN_KEY);
+  }
   emitAuthChanged();
 }
 
 export function clearPromotedGuestBearer() {
-  removeSession(GUEST_TOKEN_KEY);
+  removeSession(PENDING_GUEST_TOKEN_KEY);
+  const active = readSession(GUEST_TOKEN_KEY);
+  if (active && !isJwtLike(active)) removeSession(GUEST_TOKEN_KEY);
 }
 
 export const PRODUCT_AUTH_STORAGE_V1 = Object.freeze({
   memberSession: MEMBER_SESSION_KEY,
   guestBearer: GUEST_TOKEN_KEY,
+  pendingGuestBearer: PENDING_GUEST_TOKEN_KEY,
   changedEvent: AUTH_CHANGED_EVENT,
 });
