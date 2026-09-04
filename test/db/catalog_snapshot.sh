@@ -76,3 +76,5 @@ if [[ "${actual}" != "${expected}" ]]; then
 fi
 
 echo "schema catalog snapshot PASS: tables=${table_count} sha256=${actual}"
+
+psql -v ON_ERROR_STOP=1 -f test/db/api_role_acl_negative.sql
