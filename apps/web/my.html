@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="명하 마이 — 현재 계정과 저장된 기록으로 이동하는 개인 영역입니다." />
+  <meta name="description" content="명하 마이 — 계정, 출생 정보, 저장된 기록으로 이어지는 개인 관리 화면입니다." />
   <title>마이 · 명하</title>
   <link rel="stylesheet" href="product.css" />
   <link rel="stylesheet" href="my.css" />
@@ -38,41 +38,101 @@
       <header class="my-head">
         <div>
           <div class="my-kicker">MY MyeongHa</div>
-          <h1 class="my-title">마이</h1>
+          <h1 class="my-title">내 명하를 관리합니다.</h1>
         </div>
-        <p class="my-lead">현재 계정에 저장된 프로필과 기록으로 이동합니다. 확인되지 않은 구독 상태나 알림 설정은 임의로 만들어 표시하지 않습니다.</p>
+        <p class="my-lead">계정과 원본 입력은 여기서 관리하고, 계산된 사주는 사주에서, 지나온 기록은 기록에서 확인합니다.</p>
       </header>
 
-      <div class="my-status" id="my-status" role="status">내 정보를 불러오는 중입니다…</div>
+      <section class="my-account-section" aria-labelledby="my-account-title">
+        <div class="my-section-head">
+          <div>
+            <span class="my-section-kicker">ACCOUNT</span>
+            <h2 id="my-account-title">현재 계정</h2>
+          </div>
+          <p>서버가 확인한 현재 subject와 프로필만 표시합니다.</p>
+        </div>
 
-      <div id="my-content" hidden>
-        <section class="my-layout" aria-label="내 계정 정보">
-          <article class="my-card">
-            <div class="my-profile-mark" aria-hidden="true">之</div>
-            <div class="my-profile-name" id="my-display-name">호칭 미설정</div>
-            <div class="my-profile-kind"><span id="my-subject-kind">현재 계정</span> · <span id="my-subject-status">—</span></div>
+        <div class="my-status" id="my-status" role="status">내 정보를 불러오는 중입니다…</div>
+
+        <div id="my-content" hidden>
+          <div class="my-overview-grid">
+            <article class="my-card my-identity-card">
+              <div class="my-profile-mark" aria-hidden="true">之</div>
+              <div class="my-profile-name" id="my-display-name">호칭 미설정</div>
+              <div class="my-profile-kind"><span id="my-subject-kind">현재 계정</span> · <span id="my-subject-status">—</span></div>
+              <div class="my-account-email-row">
+                <span>로그인 계정</span>
+                <strong id="my-account-email">—</strong>
+              </div>
+              <p class="my-account-note" id="my-account-note">현재 인증 상태를 확인하는 중입니다.</p>
+            </article>
+
+            <article class="my-card my-facts-card">
+              <div class="my-card-label">PROFILE</div>
+              <dl class="my-facts">
+                <div class="my-fact"><dt>언어</dt><dd id="my-locale">—</dd></div>
+                <div class="my-fact"><dt>시간대</dt><dd id="my-timezone">—</dd></div>
+                <div class="my-fact"><dt>온보딩 상태</dt><dd id="my-onboarding-state">—</dd></div>
+                <div class="my-fact"><dt>프로필 갱신</dt><dd id="my-profile-updated">—</dd></div>
+              </dl>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="my-section" aria-labelledby="my-paths-title">
+        <div class="my-section-head">
+          <div>
+            <span class="my-section-kicker">YOUR DATA</span>
+            <h2 id="my-paths-title">내 정보와 이어지는 곳</h2>
+          </div>
+          <p>같은 정보를 여러 화면에 복제하지 않고 각 화면의 역할로 이동합니다.</p>
+        </div>
+
+        <div class="my-route-grid">
+          <a class="my-route-card is-primary" href="reading.html">
+            <span class="my-route-index">01</span>
+            <span class="my-route-copy"><strong>내 사주</strong><span>계산된 명식과 오행 구조를 확인합니다.</span></span>
+            <span class="my-route-arrow" aria-hidden="true">→</span>
+          </a>
+          <a class="my-route-card" href="birth.html">
+            <span class="my-route-index">02</span>
+            <span class="my-route-copy"><strong>출생 정보 입력</strong><span>태어난 순간의 원본 입력을 추가합니다.</span></span>
+            <span class="my-route-arrow" aria-hidden="true">→</span>
+          </a>
+          <a class="my-route-card" href="records.html">
+            <span class="my-route-index">03</span>
+            <span class="my-route-copy"><strong>내 기록</strong><span>명식록 · 현세록 · 기억을 확인합니다.</span></span>
+            <span class="my-route-arrow" aria-hidden="true">→</span>
+          </a>
+          <a class="my-route-card" href="chat-hub.html">
+            <span class="my-route-index">04</span>
+            <span class="my-route-copy"><strong>대화 이어가기</strong><span>관계를 맺은 사람과 대화 화면으로 이동합니다.</span></span>
+            <span class="my-route-arrow" aria-hidden="true">→</span>
+          </a>
+        </div>
+      </section>
+
+      <section class="my-settings-section" aria-labelledby="my-settings-title">
+        <div class="my-section-head">
+          <div>
+            <span class="my-section-kicker">SETTINGS</span>
+            <h2 id="my-settings-title">설정과 계정 경계</h2>
+          </div>
+        </div>
+        <div class="my-setting-grid">
+          <article class="my-setting-card">
+            <strong>알림 · 이용 권한</strong>
+            <p>알림과 이용 권한 설정은 준비 중입니다. 확인 가능한 설정 API가 연결되기 전에는 구독이나 알림 상태를 임의로 만들어 표시하지 않습니다.</p>
+            <span class="my-setting-state">준비 중</span>
           </article>
-
-          <article class="my-card">
-            <dl class="my-facts">
-              <div class="my-fact"><dt>언어</dt><dd id="my-locale">—</dd></div>
-              <div class="my-fact"><dt>시간대</dt><dd id="my-timezone">—</dd></div>
-              <div class="my-fact"><dt>온보딩 상태</dt><dd id="my-onboarding-state">—</dd></div>
-              <div class="my-fact"><dt>프로필 갱신</dt><dd id="my-profile-updated">—</dd></div>
-            </dl>
+          <article class="my-setting-card my-boundary-card">
+            <strong>데이터 역할 분리</strong>
+            <p>마이는 계정과 입력 관리의 시작점입니다. 계산 결과는 사주, 이력은 기록, 관계와 대화는 대화 화면이 담당합니다.</p>
+            <span class="my-setting-state">제품 경계</span>
           </article>
-        </section>
-
-        <section class="my-link-grid" aria-label="내 기록 바로가기">
-          <a class="my-link-card" href="records.html"><span><strong>내 기록</strong><span>명식록 · 현세록 · 기억 확인</span></span><span aria-hidden="true">→</span></a>
-          <a class="my-link-card" href="birth.html"><span><strong>명식록 추가</strong><span>태어난 순간의 원본 입력 저장</span></span><span aria-hidden="true">→</span></a>
-        </section>
-
-        <section class="my-pending" aria-label="준비 중인 계정 기능">
-          <strong>알림 · 이용 권한</strong>
-          알림과 이용 권한 설정은 준비 중입니다. 확인 가능한 연결이 갖춰지기 전에는 현재 상태를 임의로 표시하지 않습니다.
-        </section>
-      </div>
+        </div>
+      </section>
     </div>
   </main>
 
