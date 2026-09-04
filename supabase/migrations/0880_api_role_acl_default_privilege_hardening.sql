@@ -59,12 +59,13 @@ BEGIN
 END
 $$;
 
--- PostgreSQL grants EXECUTE on newly-created functions to PUBLIC by default. Leaving
--- that grant would make anon/authenticated effective function executors even after the
--- explicit role-specific grants above are removed.
+-- PostgreSQL grants EXECUTE on newly-created functions to PUBLIC through the global
+-- function default. Per-schema default privileges are additive and cannot subtract that
+-- global grant, so this PUBLIC revoke must intentionally be global for postgres-created
+-- functions. Explicit function grants remain the runtime authority mechanism.
 revoke all privileges on all functions in schema public from public;
 
-alter default privileges for role postgres in schema public
+alter default privileges for role postgres
   revoke execute on functions from public;
 
 -- Production-safety assertions. A failed assertion aborts the migration instead of
