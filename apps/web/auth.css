@@ -96,6 +96,10 @@
   gap: 8px;
 }
 
+.auth-field[hidden] {
+  display: none !important;
+}
+
 .auth-field label {
   font-size: 13px;
   font-weight: 700;
