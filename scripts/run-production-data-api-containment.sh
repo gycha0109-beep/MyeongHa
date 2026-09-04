@@ -46,11 +46,11 @@ cleanup() {
 }
 trap cleanup EXIT
 
-sanitize_config() {
+try_sanitize_config() {
   local source_file="$1"
   local destination_file="$2"
 
-  jq -e '
+  if ! jq -e '
     if type != "object" or ((.db_schema // "") | type) != "string" then
       error("unexpected PostgREST config response")
     else
@@ -62,10 +62,23 @@ sanitize_config() {
         db_pool_acquisition_timeout: (.db_pool_acquisition_timeout // null)
       }
     end
-  ' "$source_file" > "$destination_file"
+  ' "$source_file" > "$destination_file"; then
+    rm -f "$destination_file"
+    return 1
+  fi
 
   if jq -e 'has("jwt_secret")' "$destination_file" >/dev/null; then
-    echo 'Sanitized PostgREST config must never contain jwt_secret.' >&2
+    rm -f "$destination_file"
+    return 1
+  fi
+}
+
+sanitize_config() {
+  local source_file="$1"
+  local destination_file="$2"
+
+  if ! try_sanitize_config "$source_file" "$destination_file"; then
+    echo 'Unable to sanitize PostgREST config response safely.' >&2
     exit 1
   fi
 }
@@ -83,10 +96,29 @@ write_patch_failure_evidence() {
   local http_status="$2"
   local safe_code='unspecified'
   local safe_message='unspecified'
+  local post_read_state='unavailable'
+  local observed_after_schema='unverified'
+  local state_change='unknown'
 
   if [[ -s "$patch_raw" ]] && jq -e 'type == "object"' "$patch_raw" >/dev/null 2>&1; then
     safe_code="$(jq -r '(.code // .error_code // "unspecified") | tostring' "$patch_raw" | tr -d '\r\n' | cut -c1-120)"
     safe_message="$(jq -r '(.message // "unspecified") | tostring' "$patch_raw" | tr -d '\r\n' | cut -c1-240)"
+  fi
+
+  if read_postgrest_config "$post_raw"; then
+    if try_sanitize_config "$post_raw" "$snapshot_dir/failure_post_config.json"; then
+      post_read_state='captured'
+      observed_after_schema="$(jq -r '.db_schema' "$snapshot_dir/failure_post_config.json")"
+      if [[ "$observed_after_schema" == "$before_schema" ]]; then
+        state_change='unchanged'
+      elif [[ "$observed_after_schema" == "$expected_after" ]]; then
+        state_change='expected_after_observed'
+      else
+        state_change='unexpected_drift'
+      fi
+    else
+      post_read_state='sanitize_failed'
+    fi
   fi
 
   {
@@ -98,6 +130,9 @@ write_patch_failure_evidence() {
     echo "patch_http_status=$http_status"
     echo "before_db_schema=$before_schema"
     echo "expected_after_db_schema=$expected_after"
+    echo "post_read_state=$post_read_state"
+    echo "observed_after_db_schema=$observed_after_schema"
+    echo "state_change=$state_change"
     echo "management_api_error_code=$safe_code"
     echo "management_api_error_message=$safe_message"
     echo 'mutation_scope=management_api_postgrest_db_schema_only'
@@ -106,7 +141,11 @@ write_patch_failure_evidence() {
 
   (
     cd "$snapshot_dir"
-    sha256sum pre_config.json containment_failure.txt > SHA256SUMS
+    failure_files=(pre_config.json containment_failure.txt)
+    if [[ -f failure_post_config.json ]]; then
+      failure_files+=(failure_post_config.json)
+    fi
+    sha256sum "${failure_files[@]}" > SHA256SUMS
     sha256sum --check SHA256SUMS
   )
 }
@@ -135,13 +174,13 @@ else
     --data-binary "@$request_body" \
     "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_ID/postgrest")"; then
     write_patch_failure_evidence 'transport_error' 'unavailable'
-    echo 'Data API containment PATCH transport failed before a valid HTTP response was received.' >&2
+    echo 'Data API containment PATCH transport failed; post-state read attempted and evidence captured.' >&2
     exit 1
   fi
 
   if [[ "$patch_http_status" != '200' ]]; then
     write_patch_failure_evidence 'management_api_rejected' "$patch_http_status"
-    echo "Data API containment PATCH rejected with HTTP $patch_http_status; see containment_failure.txt artifact evidence." >&2
+    echo "Data API containment PATCH rejected with HTTP $patch_http_status; post-state read attempted and evidence captured." >&2
     exit 1
   fi
 

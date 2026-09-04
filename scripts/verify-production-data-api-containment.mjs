@@ -86,6 +86,24 @@ const requiredRunnerFragments = [
   'sha256sum --check SHA256SUMS',
   'rm -f "$pre_raw" "$patch_raw" "$post_raw" "$request_body"',
   'has("jwt_secret")',
+  'try_sanitize_config()',
+  'write_patch_failure_evidence()',
+  'failure_post_config.json',
+  "post_read_state='unavailable'",
+  "observed_after_schema='unverified'",
+  "state_change='unknown'",
+  "post_read_state='captured'",
+  "state_change='unchanged'",
+  "state_change='expected_after_observed'",
+  "state_change='unexpected_drift'",
+  'echo "post_read_state=$post_read_state"',
+  'echo "observed_after_db_schema=$observed_after_schema"',
+  'echo "state_change=$state_change"',
+  'failure_files=(pre_config.json containment_failure.txt)',
+  'failure_files+=(failure_post_config.json)',
+  'sha256sum "${failure_files[@]}" > SHA256SUMS',
+  "write_patch_failure_evidence 'transport_error' 'unavailable'",
+  "write_patch_failure_evidence 'management_api_rejected' \"$patch_http_status\"",
 ];
 
 for (const fragment of requiredRunnerFragments) {
@@ -99,16 +117,16 @@ const requiredRuntimeSmokeFragments = [
   'const BOOTSTRAP_URL = `${PRODUCTION_ORIGIN}/api/session/bootstrap`;',
   'const MEMBER_ME_URL = `${PRODUCTION_ORIGIN}/api/me`;',
   "mode !== 'bootstrap' && mode !== 'verify'",
-  "fetchCanonical(BOOTSTRAP_URL",
+  'fetchCanonical(BOOTSTRAP_URL',
   "method: 'POST'",
-  "fetchCanonical(MEMBER_ME_URL",
+  'fetchCanonical(MEMBER_ME_URL',
   "method: 'GET'",
   "directives.includes('no-store')",
   "body.meta.apiContractVersion !== 'v0.9'",
   "body.data.kind !== 'guest'",
   "body.data.subjectKind !== 'guest'",
   "body.data.subjectStatus !== 'active'",
-  "JSON.stringify({ subjectId, bearerToken: bearer, expiresAt })",
+  'JSON.stringify({ subjectId, bearerToken: bearer, expiresAt })',
   'mode: 0o600',
   'await chmod(statePath, 0o600);',
   "JSON.parse(await readFile(statePath, 'utf8'))",
@@ -172,6 +190,11 @@ if (cleanupIndex <= postRuntimeSmokeIndex) {
 const patchCount = [...runner.matchAll(/-X PATCH/g)].length;
 if (patchCount !== 1) {
   throw new Error(`Expected exactly one Management API PATCH primitive, found ${patchCount}.`);
+}
+
+const postReadCalls = [...runner.matchAll(/read_postgrest_config \"\$post_raw\"/g)].length;
+if (postReadCalls !== 2) {
+  throw new Error(`Expected a post-state GET on both failure and success paths, found ${postReadCalls}.`);
 }
 
 const forbiddenRunnerFragments = [
