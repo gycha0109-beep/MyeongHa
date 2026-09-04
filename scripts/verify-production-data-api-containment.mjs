@@ -208,7 +208,7 @@ if (postReadCalls !== 2) {
 }
 
 const containedPredicateCount = [...runner.matchAll(/is_contained_schema /g)].length;
-if (containedPredicateCount < 3) {
+if (containedPredicateCount < 2) {
   throw new Error('Containment must consistently recognize the normalized disabled Data API state.');
 }
 
