@@ -14,18 +14,41 @@ umask 077
 [[ "$CONTAINMENT_MODE" == 'contain' || "$CONTAINMENT_MODE" == 'rollback' ]]
 
 baseline_schema='public,graphql_public'
-contained_schema='pg_pgrst_no_exposed_schemas'
+contained_schema_request='pg_pgrst_no_exposed_schemas'
+
+is_contained_schema() {
+  local schema="$1"
+  [[ -z "$schema" || "$schema" == "$contained_schema_request" ]]
+}
+
+is_expected_before_schema() {
+  local schema="$1"
+  if [[ "$CONTAINMENT_MODE" == 'contain' ]]; then
+    [[ "$schema" == "$baseline_schema" ]]
+  else
+    is_contained_schema "$schema"
+  fi
+}
+
+is_expected_after_schema() {
+  local schema="$1"
+  if [[ "$CONTAINMENT_MODE" == 'contain' ]]; then
+    is_contained_schema "$schema"
+  else
+    [[ "$schema" == "$baseline_schema" ]]
+  fi
+}
 
 case "$CONTAINMENT_MODE" in
   contain)
     [[ "$DISPATCH_CONFIRM" == 'DISABLE_PRODUCT_DATA_API' ]]
-    expected_before="$baseline_schema"
-    expected_after="$contained_schema"
+    patch_schema="$contained_schema_request"
+    expected_after_label='disabled'
     ;;
   rollback)
     [[ "$DISPATCH_CONFIRM" == 'RESTORE_PRODUCT_DATA_API' ]]
-    expected_before="$contained_schema"
-    expected_after="$baseline_schema"
+    patch_schema="$baseline_schema"
+    expected_after_label="$baseline_schema"
     ;;
 esac
 
@@ -111,7 +134,7 @@ write_patch_failure_evidence() {
       observed_after_schema="$(jq -r '.db_schema' "$snapshot_dir/failure_post_config.json")"
       if [[ "$observed_after_schema" == "$before_schema" ]]; then
         state_change='unchanged'
-      elif [[ "$observed_after_schema" == "$expected_after" ]]; then
+      elif is_expected_after_schema "$observed_after_schema"; then
         state_change='expected_after_observed'
       else
         state_change='unexpected_drift'
@@ -129,7 +152,7 @@ write_patch_failure_evidence() {
     echo "failure_kind=$failure_kind"
     echo "patch_http_status=$http_status"
     echo "before_db_schema=$before_schema"
-    echo "expected_after_db_schema=$expected_after"
+    echo "expected_after_db_schema=$expected_after_label"
     echo "post_read_state=$post_read_state"
     echo "observed_after_db_schema=$observed_after_schema"
     echo "state_change=$state_change"
@@ -157,13 +180,13 @@ before_schema="$(jq -r '.db_schema' "$snapshot_dir/pre_config.json")"
 mutation_state='not_required'
 patch_http_status='not_required'
 
-if [[ "$before_schema" == "$expected_after" ]]; then
+if is_expected_after_schema "$before_schema"; then
   mutation_state='idempotent_replay'
-elif [[ "$before_schema" != "$expected_before" ]]; then
+elif ! is_expected_before_schema "$before_schema"; then
   echo "Refusing Data API containment mutation because production db_schema drifted: $before_schema" >&2
   exit 1
 else
-  jq -n --arg db_schema "$expected_after" '{db_schema: $db_schema}' > "$request_body"
+  jq -n --arg db_schema "$patch_schema" '{db_schema: $db_schema}' > "$request_body"
 
   if ! patch_http_status="$(curl -sS \
     -o "$patch_raw" \
@@ -192,7 +215,10 @@ read_postgrest_config "$post_raw"
 sanitize_config "$post_raw" "$snapshot_dir/post_config.json"
 
 after_schema="$(jq -r '.db_schema' "$snapshot_dir/post_config.json")"
-[[ "$after_schema" == "$expected_after" ]]
+if ! is_expected_after_schema "$after_schema"; then
+  echo "Data API containment post-state did not match expected state: $after_schema" >&2
+  exit 1
+fi
 
 pre_non_schema="$(jq -S 'del(.db_schema)' "$snapshot_dir/pre_config.json")"
 post_non_schema="$(jq -S 'del(.db_schema)' "$snapshot_dir/post_config.json")"
@@ -210,6 +236,8 @@ fi
   echo "mode=$CONTAINMENT_MODE"
   echo "mutation_state=$mutation_state"
   echo "patch_http_status=$patch_http_status"
+  echo "request_db_schema=$patch_schema"
+  echo "expected_after_db_schema=$expected_after_label"
   echo "before_db_schema=$before_schema"
   echo "after_db_schema=$after_schema"
   echo 'mutation_scope=management_api_postgrest_db_schema_only'
