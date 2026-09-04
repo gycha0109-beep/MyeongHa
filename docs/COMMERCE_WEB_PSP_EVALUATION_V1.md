@@ -55,8 +55,8 @@ provider notification
 
 | Candidate | Role | Current technical fit | Primary issue before selection |
 |---|---|---|---|
-| Toss Payments direct | direct PG / PSP | **STRONG CANDIDATE** | merchant contract/onboarding facts and actual launch merchant eligibility remain unverified |
-| NHN KCP direct | direct PG / PSP | **VIABLE CANDIDATE** | more certificate/signature-specific integration surface; idempotency/retry semantics need deeper contract proof before selection |
+| Toss Payments direct | direct PG / PSP | **STRONG RUNTIME FIT / ONBOARDING CONFLICT OPEN** | current Toss website review guidance requires non-member purchase while MyeongHa Commerce v1 is Member-only; merchant contract facts also unverified |
+| NHN KCP direct | direct PG / PSP | **VIABLE CANDIDATE** | more certificate/signature-specific integration surface; idempotency/event retry semantics need deeper contract proof before selection |
 | PortOne V2 | payment orchestration layer over PGs | **CONDITIONAL / NOT DEFAULT V1** | introduces PortOne + underlying PG two-layer provenance not represented by current single-provider authority |
 | Stripe | direct global PSP | **CONDITIONAL ON MERCHANT ENTITY** | South Korea is not listed as a supported Stripe business account country as of this review; Korean payment methods are available to qualifying Stripe businesses in supported countries |
 
@@ -117,17 +117,51 @@ Toss exposes payment cancel/refund through the payment API, including full/parti
 
 Official docs distinguish test keys (`test_*`) from live keys (`live_*`). Production rights must continue to reject test/sandbox evidence independently of provider key selection.
 
-### 4.6 Merchant onboarding gate
+### 4.6 Merchant onboarding conflict
 
-Toss documents that production electronic-payment contracting includes business documentation and website review. The current MyeongHa repository does not establish the actual merchant applicant, business registration status, contract eligibility, settlement account, or approved payment methods.
+Toss's current payment-product contracting guide states that production contracting/review requires business documents and website review. The same guide currently lists the following homepage review conditions, among others:
+
+```text
+at least one actually sellable product
+non-member purchase must be possible
+business identity information in the site footer
+```
+
+This creates a material conflict with current MyeongHa Commerce authority:
+
+```text
+MyeongHa Commerce v1
+→ Guest purchase DENY
+→ active Member only before Purchase Intent
+
+Toss current website-review guidance
+→ non-member purchase must be possible
+```
+
+This conflict is **not** resolved by this evaluation.
+
+Before Toss can be selected, one of the following must be proven explicitly:
+
+```text
+A. Toss confirms an applicable review path/exception compatible with Member-only purchase
+OR
+B. MyeongHa product/Commerce authority is intentionally revised to allow a compliant non-member purchase flow
+```
+
+Option B is not a PSP implementation detail. It would reopen current Guest/Member purchase policy and requires explicit architecture/product review.
+
+The repository is also not currently website-review ready. The current `apps/web/index.html` landing page has no merchant-business footer, no linked refund/commerce terms surface, and no sellable paid Product checkout surface. This is direct current Web inventory, not a claim that such pages can never be added.
 
 Therefore:
 
 ```text
-Toss technical fit = strong
-Toss production eligibility = NOT YET PROVEN
+Toss runtime/technical fit = strong
+Toss current onboarding compatibility = UNRESOLVED
+Toss production eligibility = NOT PROVEN
 P0-CM-02 = still OPEN
 ```
+
+The earlier runtime-fit preference MUST NOT be interpreted as a provider recommendation until this onboarding conflict is resolved.
 
 ---
 
@@ -173,9 +207,10 @@ redelivery/retry contract
 stable event identity, if exposed
 exact duplicate approval/cancel retry behavior
 idempotency guarantees or required merchant-side compensation
+merchant onboarding/site-review requirements
 ```
 
-The currently reviewed KCP material does not justify assuming Toss-style idempotency semantics.
+The currently reviewed KCP material does not justify assuming Toss-style idempotency semantics or assuming that KCP onboarding is automatically compatible with current Member-only purchase.
 
 ### 5.5 Current verdict
 
@@ -184,7 +219,7 @@ KCP technical fit = viable
 reconciliation query = strong
 credential surface = heavier
 idempotency/event proof = requires deeper provider contract review
-production eligibility = NOT YET PROVEN
+production/onboarding eligibility = NOT YET PROVEN
 ```
 
 ---
@@ -297,41 +332,69 @@ merchant entity/country must be proven first
 | full/partial cancel support | yes | yes | yes | yes |
 | test/production separation | yes | yes | yes | yes |
 | fits current one-provider provenance without schema extension | **yes** | **yes** | **no / conditional** | yes, if merchant eligible |
+| current Member-only purchase known compatible with provider onboarding | **NO / conflict requires resolution** | not proven | underlying-PG dependent | merchant/entity dependent |
 | production merchant eligibility proven for MyeongHa | **no** | **no** | **no** | **no** |
 
-`yes` here means documentation evidence exists for the technical capability, not that MyeongHa is contractually enabled for production.
+`yes` here means documentation evidence exists for the technical capability, not that MyeongHa is contractually enabled for production. `not proven` is deliberately not treated as evidence of absence.
 
 ---
 
 ## 9. Current narrowing
 
-Based on architecture fit alone, without inventing merchant facts:
+Architecture/runtime fit alone narrows the field, but the Toss onboarding conflict prevents a truthful single technical winner.
 
 ```text
-Tier A — direct-provider shortlist
-1. Toss Payments
-2. NHN KCP
+Direct-provider shortlist
+- Toss Payments
+  runtime semantics fit strongly
+  BUT current non-member website-review requirement conflicts with Member-only Commerce
 
-Tier B — only if orchestration requirement appears
-3. PortOne V2
+- NHN KCP
+  viable direct-PG/reconciliation model
+  BUT idempotency/event/onboarding contract needs deeper proof
+
+Only if orchestration requirement appears
+- PortOne V2
 
 Conditional by merchant entity
-4. Stripe
+- Stripe
 ```
 
-Toss is the current **technical lead candidate**, not the selected provider, because:
+Therefore current decision state is:
 
-1. server confirmation/query/cancel surfaces map cleanly to current provider-neutral contract;
-2. documented POST idempotency complements MyeongHa retry handling;
-3. general webhook verification by authoritative payment re-query matches the existing webhook-as-hint invariant;
-4. test/live key separation is explicit;
-5. direct-provider identity avoids adding an orchestrator/processor provenance dimension.
+```text
+P0-CM-02 = OPEN-P0
+technical shortlist = Toss direct / KCP direct
+selection winner = NONE
+```
 
-This ranking MUST NOT be promoted to `P0-CM-02 DECIDED` until merchant/contract facts are supplied and verified.
+This is stronger than picking a provider prematurely because it exposes the actual selection constraints that can change rights and purchase lifecycle.
 
 ---
 
-## 10. Exact missing facts to close P0-CM-02
+## 10. Current Web merchant-review readiness
+
+Current repository inventory does **not** yet show a production payment-review surface.
+
+Direct inspection of `apps/web/index.html` shows a product landing/world/experience surface but no merchant footer and no paid checkout/product section.
+
+The current launch Product itself is separately blocked by `P0-CM-03`, so this is expected rather than a reason to fabricate placeholder commerce copy.
+
+Current status:
+
+```text
+merchant legal identity disclosure     = NOT IMPLEMENTED / merchant facts unknown
+sellable paid Product                  = BLOCKED BY P0-CM-03
+refund/cancellation customer policy    = OPEN PRODUCT/LEGAL DECISION
+payment terms/customer notice surface  = NOT IMPLEMENTED
+provider production contract           = NOT STARTED
+```
+
+Do not insert fake business registration information or a fake saleable Product merely to satisfy provider review.
+
+---
+
+## 11. Exact missing facts to close P0-CM-02
 
 The next decision requires evidence for:
 
@@ -357,27 +420,33 @@ M7. website/merchant review readiness
 
 M8. commercial acceptance
     provider contract/fees/settlement schedule/industry review
+
+M9. member-only purchase compatibility
+    provider confirms current Member-only purchase is acceptable
+    OR explicit product/Commerce authority revision is approved
 ```
 
-These are business facts, not values that can be inferred from the current codebase.
+These are business facts or provider-contract facts, not values that can be inferred from the current codebase.
 
 ---
 
-## 11. Selection rule
+## 12. Selection rule
 
 P0-CM-02 may close only when one candidate has both:
 
 ```text
 A. Commerce technical correctness proof
 AND
-B. actual merchant production eligibility proof
+B. actual merchant production eligibility/onboarding proof
 ```
 
 A provider cannot be selected solely because its SDK is easy, its brand is familiar, or it is common in Korea.
 
+If provider onboarding requires weakening an existing Commerce invariant such as Member-only purchase, the provider does not automatically win. The product/architecture conflict must be resolved explicitly first.
+
 ---
 
-## 12. Sources reviewed
+## 13. Sources reviewed
 
 Official provider material reviewed on 2026-09-05 includes:
 
