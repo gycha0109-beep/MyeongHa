@@ -9,6 +9,16 @@ const JSON_HEADERS = Object.freeze({
   Accept: 'application/json',
   'Content-Type': 'application/json',
 } as const);
+const MYEONGHA_PRODUCTION_WEB_ORIGIN = 'https://myeongha.vercel.app' as const;
+const ALLOWED_AUTH_NEXT_PAGES = new Set([
+  'hall.html',
+  'reading.html',
+  'reading-detail.html',
+  'chat-hub.html',
+  'chat.html',
+  'records.html',
+  'my.html',
+]);
 
 export type SupabaseAuthActionV1 = 'sign-in' | 'sign-up' | 'refresh' | 'sign-out';
 
@@ -91,6 +101,26 @@ function normalizeEmail(value: string): string | null {
   const email = value.trim().toLowerCase();
   if (email.length < 3 || email.length > 320 || !email.includes('@')) return null;
   return email;
+}
+
+function normalizeAuthNext(value: unknown): string {
+  if (typeof value !== 'string' || value.length === 0 || value.length > 2048) return 'hall.html';
+  try {
+    const resolved = new URL(value, `${MYEONGHA_PRODUCTION_WEB_ORIGIN}/auth.html`);
+    if (resolved.origin !== MYEONGHA_PRODUCTION_WEB_ORIGIN) return 'hall.html';
+    const page = resolved.pathname.split('/').pop() ?? '';
+    if (!ALLOWED_AUTH_NEXT_PAGES.has(page)) return 'hall.html';
+    return `${page}${resolved.search}${resolved.hash}`;
+  } catch {
+    return 'hall.html';
+  }
+}
+
+function signupRedirectPath(body: Record<string, unknown>): string {
+  const redirect = new URL('/auth.html', MYEONGHA_PRODUCTION_WEB_ORIGIN);
+  redirect.searchParams.set('confirmed', '1');
+  redirect.searchParams.set('next', normalizeAuthNext(body.next));
+  return `/auth/v1/signup?redirect_to=${encodeURIComponent(redirect.toString())}`;
 }
 
 function readUser(value: unknown): { id: string | null; email: string | null } {
@@ -232,7 +262,7 @@ export async function handleSupabaseAuthRequestV1(input: {
 
     const path = input.action === 'sign-in'
       ? '/auth/v1/token?grant_type=password'
-      : '/auth/v1/signup';
+      : signupRedirectPath(body);
     const upstream = await callSupabase(config, path, {
       method: 'POST',
       body: JSON.stringify({ email, password }),
