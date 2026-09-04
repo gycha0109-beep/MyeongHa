@@ -1,10 +1,11 @@
-# 명하 Commerce / Entitlement Implementation Specification v0.6
+# 명하 Commerce / Entitlement Implementation Specification v0.7
 
 > Product: **명하 (MyeongHa)**  
 > Date: **2026-09-05**  
 > Architecture Authority: `docs/architecture/COMMERCE_ENTITLEMENT_ARCHITECTURE_V1.md`  
-> Status: **DERIVED IMPLEMENTATION SPEC / ARCHITECTURE CLOSED / IMPLEMENTATION HOLD**  
-> Rule: 이 문서는 Architecture를 요약해 구현 경계를 연결하는 companion이다. 충돌 시 `COMMERCE_ENTITLEMENT_ARCHITECTURE_V1.md`가 우선한다.
+> Launch Rail Decision: `docs/COMMERCE_LAUNCH_RAIL_DECISION_V1.md`  
+> Status: **DERIVED IMPLEMENTATION SPEC / ARCHITECTURE CLOSED / LAUNCH RAIL DECIDED / IMPLEMENTATION HOLD**  
+> Rule: 이 문서는 Architecture와 이후 explicit P0 decision을 요약해 구현 경계를 연결하는 companion이다. Domain semantics 충돌 시 Architecture가 우선하고, Architecture 작성 뒤 결정된 P0 status는 최신 `docs/P0_DECISION_REGISTER.md`와 해당 decision record가 우선한다.
 
 ---
 
@@ -14,13 +15,14 @@
 Commerce Architecture                         = CLOSED
 SRC-18 Product → Capability authority         = RESOLVED BY ARCHITECTURE
 SRC-21 Grant apply / aggregate authority      = RESOLVED BY ARCHITECTURE
-P0-CM-01 provider rail                        = OPEN-P0
-launch paid Product / Capability catalog      = OPEN PRODUCT DECISION
+P0-CM-01 launch rail                          = DECIDED: Web + one-off only
+P0-CM-02 exact Web PSP                        = OPEN-P0
+P0-CM-03 launch paid Product / Capability     = OPEN-P0 / BLOCKED BY CURRENT SAJU AUTHORITY
 P0-PR-01 provider-evidence retention subset   = OPEN before real evidence persistence
 provider adapter / webhook / apply runtime    = NOT IMPLEMENTED
 ```
 
-따라서 이 문서는 provider SDK, webhook route, production schema mutation을 허가하지 않는다.
+따라서 Web-first rail shape는 결정됐지만 provider SDK, webhook route, production schema mutation, enabled paid catalog는 아직 허가되지 않는다.
 
 ---
 
@@ -365,13 +367,15 @@ Guest-owned purchase/receipt/grant를 만들지 않는다.
 
 **MVP 비범위**다.
 
-현재 architecture는 다음 compatibility invariant만 유지한다.
+`P0-CM-01`은 launch rail을 Web + one-off로 결정했으므로 subscription/bundle billing은 launch MVP에서 명시적으로 제외된다.
+
+현재 architecture는 future compatibility invariant만 유지한다.
 
 ```text
 cancel requested != immediate entitlement inactive
 ```
 
-실제 subscription을 선택하면 별도 provider/product decision이 lifecycle matrix를 확정한다.
+실제 subscription을 선택하면 `P0-CM-01` reopen 또는 동등한 explicit future rail decision이 lifecycle matrix를 확정한다.
 
 ---
 
@@ -430,21 +434,23 @@ Implementation hard requirements:
 
 ## 16. Current implementation gates
 
-### Architecture-resolved
+### Architecture / rail resolved
 
 ```text
-SRC-18 = CLOSED by Commerce Architecture v1
-SRC-21 = CLOSED by Commerce Architecture v1
+SRC-18   = CLOSED by Commerce Architecture v1
+SRC-21   = CLOSED by Commerce Architecture v1
+P0-CM-01 = DECIDED: Web + one-off launch MVP
 ```
 
-### Still OPEN before provider-specific implementation
+### Still OPEN before provider-specific or paid-catalog implementation
 
 ```text
-P0-CM-01
-→ actual Web / Apple / Google rail
+P0-CM-02
+→ exact Web payment provider / PSP
 
-OPEN PRODUCT
-→ launch Product / Capability catalog
+P0-CM-03
+→ launch paid Product / Capability catalog
+→ current Paid Deep/Detailed Reading candidate is upstream-blocked because Saju production interpretation authority remains BLOCKED
 
 P0-PR-01 subset
 → real provider evidence retention/legal handling
@@ -452,6 +458,8 @@ P0-PR-01 subset
 selected-provider ordering proof
 → safe comparator or equivalent fail-closed reconciliation
 ```
+
+`P0-CM-01` 결정은 exact PSP나 paid SKU를 승인하지 않는다.
 
 ---
 
@@ -483,10 +491,11 @@ outbox retry → no rights reapply
 
 ```text
 Architecture                                      = CLOSED
-Product Capability Set schema                    = NOT IMPLEMENTED
-Purchase Intent v2 Capability pin                = NOT IMPLEMENTED
+Launch rail                                       = DECIDED: Web + one-off
+Product Capability Set schema                    = NOT IMPLEMENTED / HOLD UNTIL P0-CM-03
+Purchase Intent v2 Capability pin                = NOT IMPLEMENTED / HOLD UNTIL P0-CM-03
 provider-neutral verification runtime            = NOT IMPLEMENTED
-concrete provider adapter                         = BLOCKED BY P0-CM-01
+concrete provider adapter                         = BLOCKED BY P0-CM-02 + P0-CM-03 + P0-PR-01 SAFE SUBSET
 verified receipt → grant/event/projection command= NOT IMPLEMENTED
 webhook/provider event runtime                    = NOT IMPLEMENTED
 refund/revoke/restore runtime                     = NOT IMPLEMENTED
@@ -495,4 +504,4 @@ provider sandbox E2E                              = NOT IMPLEMENTED
 production Commerce activation                    = NOT AUTHORIZED
 ```
 
-`COMMERCE_ENTITLEMENT_ARCHITECTURE_V1.md`의 implementation phases와 gates를 따른다.
+`COMMERCE_ENTITLEMENT_ARCHITECTURE_V1.md`의 provider-neutral semantics와 `COMMERCE_LAUNCH_RAIL_DECISION_V1.md`의 후속 P0 status를 함께 따른다.
