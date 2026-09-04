@@ -1,7 +1,7 @@
 import { readApiErrorCode, unwrapApiSuccessEnvelope, WebApiEnvelopeError } from './api-envelope.js';
 import { ensureActiveBearer } from './product-auth.js';
 
-const DEFAULT_CREATE_ENDPOINT = '/api/birth-profiles';
+const DEFAULT_ENDPOINT = '/api/birth-profiles';
 const DEFAULT_CURRENT_ENDPOINT = '/api/me/birth-profile';
 
 export class BirthRuntimeError extends Error {
@@ -47,7 +47,11 @@ function assertCurrentBirthProfile(payload) {
   if (payload.birthProfile === null) return null;
 
   const profile = payload.birthProfile;
-  if (!isRecord(profile) || profile.profileKind !== 'self' || profile.archivedAt !== null) {
+  if (
+    !isRecord(profile) ||
+    typeof profile.birthProfileId !== 'string' || profile.birthProfileId.trim().length === 0 ||
+    profile.profileKind !== 'self' || profile.archivedAt !== null
+  ) {
     throw new BirthRuntimeError('WEB_BIRTH_MALFORMED_CURRENT', 'Current Birth Profile API returned a non-current self profile.');
   }
   const revision = profile.currentRevision;
@@ -60,7 +64,7 @@ function assertCurrentBirthProfile(payload) {
   }
 
   return Object.freeze({
-    birthProfileId: typeof profile.birthProfileId === 'string' ? profile.birthProfileId : null,
+    birthProfileId: profile.birthProfileId,
     revisionId: revision.revisionId,
     revisionNo: revision.revisionNo,
   });
@@ -89,12 +93,17 @@ async function resolveAuthorizedBearer(resolveBearer) {
 }
 
 function authorizationHeaders(token, json = false) {
-  const headers = {
+  if (json) {
+    return {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    };
+  }
+  return {
     Accept: 'application/json',
     Authorization: `Bearer ${token}`,
   };
-  if (json) headers['Content-Type'] = 'application/json';
-  return headers;
 }
 
 async function parseSuccessEnvelope(response, malformedCode, malformedMessage) {
@@ -117,7 +126,7 @@ async function parseSuccessEnvelope(response, malformedCode, malformedMessage) {
 
 export function createBirthRuntimeClient(options = {}) {
   const fetchImpl = requireFetch(options.fetchImpl ?? globalThis.fetch);
-  const createEndpoint = options.createEndpoint ?? options.endpoint ?? DEFAULT_CREATE_ENDPOINT;
+  const createEndpoint = options.createEndpoint ?? options.endpoint ?? DEFAULT_ENDPOINT;
   const currentEndpoint = options.currentEndpoint ?? DEFAULT_CURRENT_ENDPOINT;
   const resolveBearer = options.resolveBearer ?? ensureActiveBearer;
 
@@ -186,5 +195,5 @@ export function createBirthRuntimeClient(options = {}) {
   });
 }
 
-export const BIRTH_RUNTIME_ENDPOINT_V1 = DEFAULT_CREATE_ENDPOINT;
+export const BIRTH_RUNTIME_ENDPOINT_V1 = DEFAULT_ENDPOINT;
 export const BIRTH_CURRENT_ENDPOINT_V1 = DEFAULT_CURRENT_ENDPOINT;
