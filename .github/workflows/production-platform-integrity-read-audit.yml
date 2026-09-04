@@ -80,8 +80,14 @@ jobs:
                     (.resolved_connection_string | type) == "string"
                     and (.resolved_connection_string | length) > 0
                     and (.resolved_connection_string
-                      | test("\\.pooler\\.supabase\\.com:5432/postgres(?:\\?|$)"))
+                      | test("\\.pooler\\.supabase\\.com:(5432|6543)/postgres(?:\\?|$)"))
                   )
+                )
+              | sort_by(
+                  if (.resolved_connection_string | test(":5432/postgres(?:\\?|$)"))
+                  then 0
+                  else 1
+                  end
                 )
               | first // empty
             ' "$pooler_file"
@@ -98,7 +104,7 @@ jobs:
 
           [[ "$admin_pool_user" == "postgres.$SUPABASE_PROJECT_ID" ]]
           [[ "$pool_host" == *.pooler.supabase.com ]]
-          [[ "$pool_port" == '5432' ]]
+          [[ "$pool_port" == '5432' || "$pool_port" == '6543' ]]
           [[ "$pool_db" == 'postgres' ]]
 
           echo "pool_host=$pool_host" >> "$GITHUB_OUTPUT"
