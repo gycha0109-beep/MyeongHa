@@ -12,6 +12,14 @@
     currentScript.after(stylesheet);
   }
 
+  if (currentScript && !document.querySelector('script[data-product-auth-ui]')) {
+    const authUi = document.createElement('script');
+    authUi.type = 'module';
+    authUi.src = 'product-auth-ui.js';
+    authUi.dataset.productAuthUi = 'true';
+    currentScript.after(authUi);
+  }
+
   const readStoredTheme = () => {
     try {
       const value = localStorage.getItem(STORAGE_KEY);

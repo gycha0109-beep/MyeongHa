@@ -32,6 +32,10 @@ jobs:
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
         run: node scripts/verify-web-browser-render.mjs
+      - name: Verify authentication browser render
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/run-web-auth-browser-smoke.mjs
       - name: Verify conversation browser render
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
@@ -43,5 +47,6 @@ jobs:
           name: web-reading-browser-smoke
           path: |
             artifacts/web-reading-browser-smoke*
+            artifacts/web-auth-browser-smoke*
             artifacts/web-conversation-browser-smoke*
           if-no-files-found: ignore

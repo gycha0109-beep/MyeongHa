@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="명하 로그인 — 게스트로 시작한 흐름을 유지하며 계정으로 이어갑니다." />
+  <title>로그인 · 명하</title>
+  <link rel="stylesheet" href="product.css" />
+  <link rel="stylesheet" href="auth.css" />
+  <script src="product-theme.js"></script>
+</head>
+<body class="product-page" data-page="auth">
+  <header class="product-header">
+    <div class="product-shell product-header-inner">
+      <a class="product-brand" href="hall.html" aria-label="명하 홈">
+        <span class="product-brand-name">명하</span>
+        <span class="product-brand-seal" aria-hidden="true">明河</span>
+        <span class="product-brand-sub">MyeongHa</span>
+      </a>
+      <nav class="product-nav" aria-label="주요 메뉴">
+        <a class="product-nav-link" href="hall.html">홈</a>
+        <a class="product-nav-link" href="reading.html">사주</a>
+        <a class="product-nav-link" href="chat-hub.html">대화</a>
+        <a class="product-nav-link" href="records.html">기록</a>
+        <a class="product-nav-link" href="my.html">마이</a>
+      </nav>
+      <div class="product-utilities">
+        <a class="product-profile" href="my.html" aria-label="마이 페이지">
+          <span class="product-profile-mark" aria-hidden="true">之</span>
+          <span>마이</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main class="auth-shell">
+    <div class="auth-layout">
+      <section class="auth-intro" aria-labelledby="auth-title">
+        <span class="auth-intro-kicker">YOUR MyeongHa</span>
+        <h1 id="auth-title">이어 보던 흐름을<br />내 계정으로 가져갑니다.</h1>
+        <p>명하는 로그인 전에도 사주 입력과 탐색을 시작할 수 있습니다. 계정을 연결하면 인증된 회원 세션으로 같은 제품 흐름을 이어갈 수 있습니다.</p>
+        <div class="auth-preserve-note">새 계정을 만드는 경우 현재 브라우저의 게스트 흐름을 보존한 채 계정 연결을 준비합니다. 기존 계정으로 로그인할 때는 서로 다른 사람의 기록을 임의로 합치지 않습니다.</div>
+      </section>
+
+      <section class="auth-card" aria-label="계정 인증">
+        <div class="auth-tabs" role="tablist" aria-label="인증 방식">
+          <button class="auth-tab" id="auth-tab-signin" type="button" role="tab" aria-selected="true" aria-controls="auth-form">로그인</button>
+          <button class="auth-tab" id="auth-tab-signup" type="button" role="tab" aria-selected="false" aria-controls="auth-form">회원가입</button>
+        </div>
+
+        <form class="auth-form" id="auth-form" novalidate>
+          <div class="auth-field">
+            <label for="auth-email">이메일</label>
+            <input id="auth-email" name="email" type="email" autocomplete="email" inputmode="email" maxlength="320" required />
+          </div>
+          <div class="auth-field">
+            <label for="auth-password">비밀번호</label>
+            <input id="auth-password" name="password" type="password" autocomplete="current-password" maxlength="1024" required />
+          </div>
+          <div class="auth-field" id="auth-confirm-field" hidden>
+            <label for="auth-password-confirm">비밀번호 확인</label>
+            <input id="auth-password-confirm" name="passwordConfirm" type="password" autocomplete="new-password" maxlength="1024" />
+          </div>
+          <button class="auth-submit" id="auth-submit" type="submit">로그인</button>
+          <p class="auth-status" id="auth-status" role="status" aria-live="polite"></p>
+        </form>
+        <p class="auth-footnote">인증 정보는 명하 서버가 Supabase Auth 경계로 전달하며, 제품 페이지는 서버가 검증한 회원 토큰으로 사용자 데이터를 요청합니다.</p>
+      </section>
+    </div>
+  </main>
+
+  <nav class="mobile-bottom-nav" aria-label="모바일 주요 메뉴">
+    <a class="mobile-nav-link" href="hall.html"><span class="mobile-nav-icon" aria-hidden="true">⌂</span><span>홈</span></a>
+    <a class="mobile-nav-link" href="reading.html"><span class="mobile-nav-icon" aria-hidden="true">✦</span><span>사주</span></a>
+    <a class="mobile-nav-link" href="chat-hub.html"><span class="mobile-nav-icon" aria-hidden="true">◌</span><span>대화</span></a>
+    <a class="mobile-nav-link" href="records.html"><span class="mobile-nav-icon" aria-hidden="true">▤</span><span>기록</span></a>
+    <a class="mobile-nav-link" href="my.html"><span class="mobile-nav-icon" aria-hidden="true">♙</span><span>마이</span></a>
+  </nav>
+  <script type="module" src="auth-page.js"></script>
+</body>
+</html>
