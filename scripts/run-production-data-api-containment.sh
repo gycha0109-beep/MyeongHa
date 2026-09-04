@@ -78,6 +78,39 @@ read_postgrest_config() {
     -o "$raw_file"
 }
 
+write_patch_failure_evidence() {
+  local failure_kind="$1"
+  local http_status="$2"
+  local safe_code='unspecified'
+  local safe_message='unspecified'
+
+  if [[ -s "$patch_raw" ]] && jq -e 'type == "object"' "$patch_raw" >/dev/null 2>&1; then
+    safe_code="$(jq -r '(.code // .error_code // "unspecified") | tostring' "$patch_raw" | tr -d '\r\n' | cut -c1-120)"
+    safe_message="$(jq -r '(.message // "unspecified") | tostring' "$patch_raw" | tr -d '\r\n' | cut -c1-240)"
+  fi
+
+  {
+    echo "project_ref=$SUPABASE_PROJECT_ID"
+    echo "github_sha=$GITHUB_SHA"
+    echo "github_run_id=$GITHUB_RUN_ID"
+    echo "mode=$CONTAINMENT_MODE"
+    echo "failure_kind=$failure_kind"
+    echo "patch_http_status=$http_status"
+    echo "before_db_schema=$before_schema"
+    echo "expected_after_db_schema=$expected_after"
+    echo "management_api_error_code=$safe_code"
+    echo "management_api_error_message=$safe_message"
+    echo 'mutation_scope=management_api_postgrest_db_schema_only'
+    echo "captured_at_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  } > "$snapshot_dir/containment_failure.txt"
+
+  (
+    cd "$snapshot_dir"
+    sha256sum pre_config.json containment_failure.txt > SHA256SUMS
+    sha256sum --check SHA256SUMS
+  )
+}
+
 read_postgrest_config "$pre_raw"
 sanitize_config "$pre_raw" "$snapshot_dir/pre_config.json"
 
@@ -93,14 +126,24 @@ elif [[ "$before_schema" != "$expected_before" ]]; then
 else
   jq -n --arg db_schema "$expected_after" '{db_schema: $db_schema}' > "$request_body"
 
-  patch_http_status="$(curl -sS \
+  if ! patch_http_status="$(curl -sS \
     -o "$patch_raw" \
     -w '%{http_code}' \
     -X PATCH \
     -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
     -H 'Content-Type: application/json' \
     --data-binary "@$request_body" \
-    "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_ID/postgrest")"
+    "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_ID/postgrest")"; then
+    write_patch_failure_evidence 'transport_error' 'unavailable'
+    echo 'Data API containment PATCH transport failed before a valid HTTP response was received.' >&2
+    exit 1
+  fi
+
+  if [[ "$patch_http_status" != '200' ]]; then
+    write_patch_failure_evidence 'management_api_rejected' "$patch_http_status"
+    echo "Data API containment PATCH rejected with HTTP $patch_http_status; see containment_failure.txt artifact evidence." >&2
+    exit 1
+  fi
 
   [[ "$patch_http_status" == '200' ]]
   mutation_state='applied'
