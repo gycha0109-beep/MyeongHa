@@ -29,12 +29,14 @@ grant execute on function public.qry_subject_profile_current_v1(uuid) to anon, a
 grant execute on function public.cmd_create_guest_session_runtime_v1(uuid, uuid, text, timestamptz) to anon, authenticated, service_role;
 grant execute on function public.qry_guest_bootstrap_current_v1(uuid) to anon, authenticated, service_role;
 grant execute on function public.qry_birth_profile_current_revision_v1(uuid, uuid) to anon, authenticated, service_role;
+grant execute on function public.qry_self_birth_profile_current_v1(uuid) to anon, authenticated, service_role;
 grant execute on function public.cmd_create_birth_profile_v1(uuid, uuid, uuid, text, text, date, time, boolean, boolean, text, text) to anon, authenticated, service_role;
 SQL
 
 # Reapply the hardening migrations after simulating Supabase's explicit default grants.
 "${psql_base[@]}" -f supabase/migrations/0840_runtime_function_api_role_acl_hardening.sql >/dev/null
 "${psql_base[@]}" -f supabase/migrations/0850_birth_profile_create_command_api_role_acl_hardening.sql >/dev/null
+"${psql_base[@]}" -f supabase/migrations/0890_self_birth_profile_runtime_acl.sql >/dev/null
 
 for role in anon authenticated service_role; do
   shape=$("${psql_base[@]}" -At -F '|' -c "select
@@ -46,8 +48,9 @@ for role in anon authenticated service_role; do
     has_function_privilege('$role','public.cmd_create_guest_session_runtime_v1(uuid,uuid,text,timestamptz)','EXECUTE'),
     has_function_privilege('$role','public.qry_guest_bootstrap_current_v1(uuid)','EXECUTE'),
     has_function_privilege('$role','public.qry_birth_profile_current_revision_v1(uuid,uuid)','EXECUTE'),
+    has_function_privilege('$role','public.qry_self_birth_profile_current_v1(uuid)','EXECUTE'),
     has_function_privilege('$role','public.cmd_create_birth_profile_v1(uuid,uuid,uuid,text,text,date,time,boolean,boolean,text,text)','EXECUTE');")
-  [[ "$shape" == 'f|f|f|f|f|f|f|f|f' ]] || fail "$role retained runtime/create function EXECUTE: $shape"
+  [[ "$shape" == 'f|f|f|f|f|f|f|f|f|f' ]] || fail "$role retained runtime/create function EXECUTE: $shape"
   pass "$role cannot execute production runtime or inactive Birth create functions"
 done
 
@@ -60,8 +63,9 @@ executor_shape=$("${psql_base[@]}" -At -F '|' -c "select
   has_function_privilege('myeongha_api_executor','public.cmd_create_guest_session_runtime_v1(uuid,uuid,text,timestamptz)','EXECUTE'),
   has_function_privilege('myeongha_api_executor','public.qry_guest_bootstrap_current_v1(uuid)','EXECUTE'),
   has_function_privilege('myeongha_api_executor','public.qry_birth_profile_current_revision_v1(uuid,uuid)','EXECUTE'),
+  has_function_privilege('myeongha_api_executor','public.qry_self_birth_profile_current_v1(uuid)','EXECUTE'),
   has_function_privilege('myeongha_api_executor','public.cmd_create_birth_profile_v1(uuid,uuid,uuid,text,text,date,time,boolean,boolean,text,text)','EXECUTE');")
-[[ "$executor_shape" == 't|t|t|t|t|t|t|t|f' ]] || fail "myeongha_api_executor runtime/create allowlist drifted: $executor_shape"
-pass "myeongha_api_executor retains read/runtime allowlist while Birth create remains inactive"
+[[ "$executor_shape" == 't|t|t|t|t|t|t|t|t|f' ]] || fail "myeongha_api_executor runtime/create allowlist drifted: $executor_shape"
+pass "myeongha_api_executor retains read/runtime allowlist including current self Birth locator while Birth create remains inactive"
 
 echo "Runtime function API role ACL hardening tests passed"
