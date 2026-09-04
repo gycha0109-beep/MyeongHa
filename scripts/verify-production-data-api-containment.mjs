@@ -3,12 +3,15 @@ import { readFile } from 'node:fs/promises';
 
 const workflowPath = '.github/workflows/production-data-api-containment.yml';
 const runnerPath = 'scripts/run-production-data-api-containment.sh';
+const directDbPath = 'scripts/verify-production-data-api-containment-direct-db.sh';
 
 execFileSync('bash', ['-n', runnerPath], { stdio: 'inherit' });
+execFileSync('bash', ['-n', directDbPath], { stdio: 'inherit' });
 
-const [workflow, runner] = await Promise.all([
+const [workflow, runner, directDb] = await Promise.all([
   readFile(workflowPath, 'utf8'),
   readFile(runnerPath, 'utf8'),
+  readFile(directDbPath, 'utf8'),
 ]);
 
 const requiredWorkflowFragments = [
@@ -21,19 +24,19 @@ const requiredWorkflowFragments = [
   'permissions:\n  contents: read',
   'cancel-in-progress: false',
   'SUPABASE_PROJECT_ID: cnsfpcdiyofqvhpcegfc',
+  'RUNTIME_DB_PRINCIPAL: myeongha_runtime',
+  'API_EXECUTION_ROLE: myeongha_api_executor',
   'environment: production',
   'SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}',
-  'MYEONGHA_PRODUCTION_MEMBER_BEARER: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_BEARER }}',
-  'MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID }}',
+  'SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}',
   'test -n "${SUPABASE_ACCESS_TOKEN:-}"',
-  'test -n "${MYEONGHA_PRODUCTION_MEMBER_BEARER:-}"',
-  'test -n "${MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID:-}"',
-  'actions/setup-node@v4',
-  "node-version: '24'",
-  'Preflight governed Member canonical-subject path',
+  'test -n "${SUPABASE_DB_PASSWORD:-}"',
+  'Install PostgreSQL client',
+  'Resolve governed production pooler endpoint',
+  'Preflight direct PostgreSQL execution authority',
   'run: bash scripts/run-production-data-api-containment.sh',
   'https://myeongha.vercel.app/api/health',
-  'Verify governed Member canonical-subject path after transition',
+  'Verify direct PostgreSQL execution authority after transition',
   'if: always()',
   'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1',
   'retention-days: 14',
@@ -42,6 +45,16 @@ const requiredWorkflowFragments = [
 for (const fragment of requiredWorkflowFragments) {
   if (!workflow.includes(fragment)) {
     throw new Error(`Missing production Data API containment workflow fragment: ${fragment}`);
+  }
+}
+
+for (const forbiddenWorkflowFragment of [
+  'MYEONGHA_PRODUCTION_MEMBER_BEARER',
+  'MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID',
+  'verify-production-member-me.mjs',
+]) {
+  if (workflow.includes(forbiddenWorkflowFragment)) {
+    throw new Error(`Containment must not depend on unprovisioned Member smoke material: ${forbiddenWorkflowFragment}`);
   }
 }
 
@@ -77,6 +90,28 @@ for (const fragment of requiredRunnerFragments) {
   }
 }
 
+const requiredDirectDbFragments = [
+  "[[ \"$SUPABASE_PROJECT_ID\" == 'cnsfpcdiyofqvhpcegfc' ]]",
+  "[[ \"$RUNTIME_DB_PRINCIPAL\" == 'myeongha_runtime' ]]",
+  "[[ \"$API_EXECUTION_ROLE\" == 'myeongha_api_executor' ]]",
+  'export PGSSLMODE=require',
+  'BEGIN READ ONLY;',
+  "pg_catalog.pg_has_role('$RUNTIME_DB_PRINCIPAL', '$API_EXECUTION_ROLE', 'MEMBER')",
+  'SET LOCAL ROLE $API_EXECUTION_ROLE;',
+  "current_setting('transaction_read_only') = 'on'",
+  'ROLLBACK;',
+  "[[ \"$role_state\" == *'READY'* ]]",
+  "[[ \"$role_state\" != *'BLOCKED'* ]]",
+  "[[ \"$execution_state\" == *'READY'* ]]",
+  "[[ \"$execution_state\" != *'BLOCKED'* ]]",
+];
+
+for (const fragment of requiredDirectDbFragments) {
+  if (!directDb.includes(fragment)) {
+    throw new Error(`Missing direct PostgreSQL containment smoke fragment: ${fragment}`);
+  }
+}
+
 for (const forbiddenTrigger of ['\npush:', '\npull_request:', '\nschedule:']) {
   if (workflow.includes(forbiddenTrigger)) {
     throw new Error(`Production Data API containment must remain manual-only: ${forbiddenTrigger}`);
@@ -86,8 +121,7 @@ for (const forbiddenTrigger of ['\npush:', '\npull_request:', '\nschedule:']) {
 const mutationStepIndex = workflow.indexOf('run: bash scripts/run-production-data-api-containment.sh');
 for (const preflightFragment of [
   'test -n "${SUPABASE_ACCESS_TOKEN:-}"',
-  'test -n "${MYEONGHA_PRODUCTION_MEMBER_BEARER:-}"',
-  'test -n "${MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID:-}"',
+  'test -n "${SUPABASE_DB_PASSWORD:-}"',
 ]) {
   const preflightIndex = workflow.indexOf(preflightFragment);
   if (preflightIndex < 0 || preflightIndex > mutationStepIndex) {
@@ -95,17 +129,19 @@ for (const preflightFragment of [
   }
 }
 
-const memberSmokeMatches = [...workflow.matchAll(/run: node scripts\/verify-production-member-me\.mjs/g)];
-if (memberSmokeMatches.length !== 2) {
-  throw new Error(`Expected exactly two governed Member /api/me smokes, found ${memberSmokeMatches.length}.`);
+const directDbSmokeMatches = [
+  ...workflow.matchAll(/run: bash scripts\/verify-production-data-api-containment-direct-db\.sh/g),
+];
+if (directDbSmokeMatches.length !== 2) {
+  throw new Error(`Expected exactly two direct PostgreSQL authority smokes, found ${directDbSmokeMatches.length}.`);
 }
-const preMemberSmokeIndex = memberSmokeMatches[0]?.index ?? -1;
-const postMemberSmokeIndex = memberSmokeMatches[1]?.index ?? -1;
-if (preMemberSmokeIndex < 0 || preMemberSmokeIndex >= mutationStepIndex) {
-  throw new Error('Governed Member /api/me preflight must pass before the Data API transition.');
+const preDirectDbSmokeIndex = directDbSmokeMatches[0]?.index ?? -1;
+const postDirectDbSmokeIndex = directDbSmokeMatches[1]?.index ?? -1;
+if (preDirectDbSmokeIndex < 0 || preDirectDbSmokeIndex >= mutationStepIndex) {
+  throw new Error('Direct PostgreSQL authority preflight must pass before the Data API transition.');
 }
-if (postMemberSmokeIndex <= mutationStepIndex) {
-  throw new Error('Governed Member /api/me post-transition smoke must run after the Data API transition.');
+if (postDirectDbSmokeIndex <= mutationStepIndex) {
+  throw new Error('Direct PostgreSQL authority post-transition smoke must run after the Data API transition.');
 }
 
 const patchCount = [...runner.matchAll(/-X PATCH/g)].length;
@@ -140,6 +176,41 @@ for (const fragment of forbiddenRunnerFragments) {
   if (lowerRunner.includes(fragment.toLowerCase())) {
     throw new Error(`Forbidden production containment mutation surface: ${fragment}`);
   }
+}
+
+const forbiddenDirectDbFragments = [
+  'alter ',
+  'create ',
+  'drop ',
+  'grant ',
+  'revoke ',
+  'insert ',
+  'update ',
+  'delete ',
+  'truncate ',
+  'copy ',
+  '-X PATCH',
+  '-X POST',
+  '-X PUT',
+  '-X DELETE',
+  'api.supabase.com',
+  'pg_authid',
+  'rolpassword',
+];
+
+const lowerDirectDb = directDb.toLowerCase();
+for (const fragment of forbiddenDirectDbFragments) {
+  if (lowerDirectDb.includes(fragment.toLowerCase())) {
+    throw new Error(`Forbidden direct PostgreSQL containment smoke mutation surface: ${fragment}`);
+  }
+}
+
+const beginReadOnlyCount = [...directDb.matchAll(/BEGIN READ ONLY;/g)].length;
+const rollbackCount = [...directDb.matchAll(/ROLLBACK;/g)].length;
+if (beginReadOnlyCount !== 2 || rollbackCount !== 2) {
+  throw new Error(
+    `Direct DB smoke must use exactly two explicit read-only transactions: begin=${beginReadOnlyCount}, rollback=${rollbackCount}.`,
+  );
 }
 
 const requestBodyMatch = runner.match(/jq -n --arg db_schema[^\n]+\n?/g) ?? [];
