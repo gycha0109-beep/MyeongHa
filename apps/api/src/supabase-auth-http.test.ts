@@ -52,14 +52,26 @@ describe('Supabase auth HTTP proxy', () => {
     expect(upstream).toHaveBeenCalledTimes(1);
   });
 
-  it('preserves verification-required signup without inventing a member session', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => Response.json({
-      id: '22222222-2222-4222-8222-222222222222',
-      email: 'new@example.com',
-    })));
+  it('preserves verification-required signup and binds confirmation to the governed auth page', async () => {
+    const upstream = vi.fn(async (input: string | URL | Request) => {
+      const url = new URL(String(input));
+      expect(url.pathname).toBe('/auth/v1/signup');
+      expect(url.searchParams.get('redirect_to')).toBe(
+        'https://myeongha.vercel.app/auth.html?confirmed=1&next=reading-detail.html%3Ftopic%3Dlove',
+      );
+      return Response.json({
+        id: '22222222-2222-4222-8222-222222222222',
+        email: 'new@example.com',
+      });
+    });
+    vi.stubGlobal('fetch', upstream);
 
     const response = await handleSupabaseAuthRequestV1({
-      request: request({ email: 'new@example.com', password: 'new-password' }),
+      request: request({
+        email: 'new@example.com',
+        password: 'new-password',
+        next: 'reading-detail.html?topic=love',
+      }),
       env,
       action: 'sign-up',
     });
@@ -70,6 +82,34 @@ describe('Supabase auth HTTP proxy', () => {
       status: 'verification_required',
       email: 'new@example.com',
     });
+    expect(upstream).toHaveBeenCalledTimes(1);
+  });
+
+  it('falls back to the Hall when signup tries to supply an off-origin confirmation destination', async () => {
+    const upstream = vi.fn(async (input: string | URL | Request) => {
+      const url = new URL(String(input));
+      expect(url.searchParams.get('redirect_to')).toBe(
+        'https://myeongha.vercel.app/auth.html?confirmed=1&next=hall.html',
+      );
+      return Response.json({
+        id: '22222222-2222-4222-8222-222222222222',
+        email: 'new@example.com',
+      });
+    });
+    vi.stubGlobal('fetch', upstream);
+
+    const response = await handleSupabaseAuthRequestV1({
+      request: request({
+        email: 'new@example.com',
+        password: 'new-password',
+        next: 'https://attacker.example/steal',
+      }),
+      env,
+      action: 'sign-up',
+    });
+
+    expect(response.status).toBe(200);
+    expect(upstream).toHaveBeenCalledTimes(1);
   });
 
   it('maps rejected password sign-in to a source-safe public error', async () => {
