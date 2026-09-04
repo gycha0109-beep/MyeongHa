@@ -40,6 +40,10 @@ jobs:
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
         run: node scripts/verify-web-my-browser.mjs
+      - name: Verify My Birth Profile browser render
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/verify-web-my-birth-browser.mjs
       - name: Verify conversation browser render
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
@@ -53,5 +57,6 @@ jobs:
             artifacts/web-reading-browser-smoke*
             artifacts/web-auth-browser-smoke*
             artifacts/web-my-browser-smoke*
+            artifacts/web-my-birth-browser-smoke*
             artifacts/web-conversation-browser-smoke*
           if-no-files-found: ignore
