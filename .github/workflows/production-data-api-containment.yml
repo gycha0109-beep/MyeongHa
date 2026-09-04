@@ -67,6 +67,9 @@ jobs:
         with:
           node-version: '24'
 
+      - name: Preflight governed Member canonical-subject path
+        run: node scripts/verify-production-member-me.mjs
+
       - name: Apply guarded Data API surface transition
         shell: bash
         run: bash scripts/run-production-data-api-containment.sh
@@ -95,7 +98,7 @@ jobs:
           [[ "$http_status" == '200' ]]
           jq -e 'type == "object" and .status == "ok" and length == 1' "$response_file" >/dev/null
 
-      - name: Verify governed Member canonical-subject path remains available
+      - name: Verify governed Member canonical-subject path after transition
         run: node scripts/verify-production-member-me.mjs
 
       - name: Upload containment evidence
