@@ -112,6 +112,10 @@ sanitize_config "$post_raw" "$snapshot_dir/post_config.json"
 after_schema="$(jq -r '.db_schema' "$snapshot_dir/post_config.json")"
 [[ "$after_schema" == "$expected_after" ]]
 
+pre_non_schema="$(jq -S 'del(.db_schema)' "$snapshot_dir/pre_config.json")"
+post_non_schema="$(jq -S 'del(.db_schema)' "$snapshot_dir/post_config.json")"
+[[ "$pre_non_schema" == "$post_non_schema" ]]
+
 if [[ "$CONTAINMENT_MODE" == 'contain' ]]; then
   [[ "$after_schema" != *'public'* ]]
   [[ "$after_schema" != *'graphql_public'* ]]
