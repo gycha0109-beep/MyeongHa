@@ -5,6 +5,18 @@ const outputRoot = resolve(
   process.cwd(),
   process.env.MYEONGHA_WEB_OUTPUT_DIR ?? 'public',
 );
+const apiRoot = resolve(process.cwd(), 'api');
+const VERCEL_SERVERLESS_FUNCTION_LIMIT = 12;
+const serverlessFunctionExtensions = new Set([
+  '.js',
+  '.mjs',
+  '.cjs',
+  '.ts',
+  '.mts',
+  '.cts',
+  '.jsx',
+  '.tsx',
+]);
 
 const requiredFiles = [
   'index.html',
@@ -26,6 +38,7 @@ const forbiddenBasenames = new Set([
 
 const localReferencePattern = /(?:href|src)=["']([^"']+)["']/g;
 const cssUrlPattern = /url\((?:["']?)([^"')]+)(?:["']?)\)/g;
+const apiTestFilePattern = /\.(?:test|spec)\.[^/\\]+$/u;
 
 async function assertExists(path) {
   try {
@@ -121,6 +134,23 @@ for (const file of deployedFiles) {
   }
 }
 
+const apiFiles = await collectFiles(apiRoot);
+const apiTestFiles = apiFiles.filter((file) => apiTestFilePattern.test(file));
+if (apiTestFiles.length > 0) {
+  throw new Error(
+    `Test/spec files must stay outside the Vercel API function root: ${apiTestFiles.join(', ')}`,
+  );
+}
+
+const serverlessFunctionFiles = apiFiles.filter((file) =>
+  serverlessFunctionExtensions.has(extname(file).toLowerCase()),
+);
+if (serverlessFunctionFiles.length > VERCEL_SERVERLESS_FUNCTION_LIMIT) {
+  throw new Error(
+    `Vercel production function budget exceeded: ${serverlessFunctionFiles.length}/${VERCEL_SERVERLESS_FUNCTION_LIMIT}. Keep tests and non-route modules outside api/ or intentionally change the deployment plan and this guard.`,
+  );
+}
+
 const vercelConfig = JSON.parse(await readFile(resolve('vercel.json'), 'utf8'));
 if (vercelConfig.buildCommand !== 'npm run build:web') {
   throw new Error('vercel.json buildCommand must remain npm run build:web.');
@@ -174,4 +204,6 @@ if (robotsHeader !== 'noindex, nofollow, noarchive') {
   throw new Error('Prototype deployment must remain noindex until the public-launch gate changes it.');
 }
 
-console.log(`MyeongHa deployment configuration verification passed for ${deployedFiles.length} static files.`);
+console.log(
+  `MyeongHa deployment configuration verification passed for ${deployedFiles.length} static files and ${serverlessFunctionFiles.length}/${VERCEL_SERVERLESS_FUNCTION_LIMIT} serverless functions.`,
+);

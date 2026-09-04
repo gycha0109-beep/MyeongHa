@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createCurrentSubjectBirthProfileVercelHandlerV1 } from './birth-profile.js';
+import { createCurrentSubjectBirthProfileVercelHandlerV1 } from '../../../api/me/birth-profile.js';
 
 function createHandler(seen: Array<{
   request: Request;
