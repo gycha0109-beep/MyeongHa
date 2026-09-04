@@ -1,4 +1,5 @@
 import { unwrapApiSuccessEnvelope, WebApiEnvelopeError } from './api-envelope.js';
+import { getActiveBearer } from './product-auth.js';
 
 const DEFAULT_PROFILE_ENDPOINT = '/api/me';
 
@@ -61,14 +62,23 @@ function assertProfile(payload) {
 export function createMyRuntimeClient(options = {}) {
   const fetchImpl = requireFetch(options.fetchImpl ?? globalThis.fetch);
   const profileEndpoint = options.profileEndpoint ?? DEFAULT_PROFILE_ENDPOINT;
+  const resolveBearer = options.resolveBearer ?? getActiveBearer;
 
   return Object.freeze({
     async readProfile() {
+      const activeBearer = await resolveBearer();
+      if (!activeBearer?.token) {
+        throw new MyRuntimeError('WEB_MY_SESSION_REQUIRED', 'A current session is required.');
+      }
+
       let response;
       try {
         response = await fetchImpl(profileEndpoint, {
           method: 'GET',
-          headers: { Accept: 'application/json' },
+          headers: {
+            Accept: 'application/json',
+            Authorization: `Bearer ${activeBearer.token}`,
+          },
           credentials: 'same-origin',
           cache: 'no-store',
         });
