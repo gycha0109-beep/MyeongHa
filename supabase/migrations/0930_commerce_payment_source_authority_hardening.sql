@@ -248,7 +248,8 @@ begin
         message = 'receipt resolved offer must equal the purchase intent offer';
     end if;
 
-    if intent_charge_terms_version is not null then
+    if new.verification_status = 'verified'
+       and intent_charge_terms_version is not null then
       if new.verified_amount_minor is null
          or new.verified_currency is null
          or new.verified_amount_minor is distinct from intent_expected_amount
