@@ -69,3 +69,50 @@ jobs:
             artifacts/web-birth-session-browser-smoke*
             artifacts/web-conversation-browser-smoke*
           if-no-files-found: ignore
+
+  dispatch-saju-redeploy-recovery:
+    if: >-
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main' &&
+      contains(github.event.head_commit.message, '[saju-redeploy-dispatch-v1]')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Dispatch governed Saju production redeploy recovery
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          umask 077
+          payload_file="$RUNNER_TEMP/saju-redeploy-dispatch.json"
+          cleanup() {
+            exit_code=$?
+            trap - EXIT
+            rm -f "$payload_file"
+            exit "$exit_code"
+          }
+          trap cleanup EXIT
+
+          test -n "${GH_TOKEN:-}"
+          jq -n '{ref: "main", inputs: {confirm: "REDEPLOY_SAJU_PRODUCTION"}}' > "$payload_file"
+
+          http_code="$(curl -sS \
+            -X POST \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'Accept: application/vnd.github+json' \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            --data-binary "@$payload_file" \
+            -o /dev/null \
+            -w '%{http_code}' \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/workflows/production-saju-redeploy-recovery.yml/dispatches")"
+
+          if [[ "$http_code" != '204' ]]; then
+            echo "Governed Saju recovery dispatch failed: HTTP $http_code" >&2
+            exit 1
+          fi
+
+          echo 'Governed Saju production redeploy recovery dispatch accepted.'
