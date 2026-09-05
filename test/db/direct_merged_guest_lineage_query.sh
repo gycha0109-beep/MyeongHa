@@ -58,7 +58,7 @@ shape=$("${psql_base[@]}" -At -F '|' -c "select p.provolatile, pg_get_function_r
 [[ "$shape" == 's|TABLE(guest_subject_id uuid)' ]] || fail "lineage query function shape mismatch: $shape"
 public_exec=$("${psql_base[@]}" -Atc "select case when has_function_privilege('public','public.qry_direct_merged_guest_subjects_v1(uuid)','EXECUTE') then '1' else '0' end;")
 [[ "$public_exec" == '0' ]] || fail "direct merged guest lineage query unexpectedly executable by PUBLIC"
-[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == '59' ]] || fail "public table catalog changed"
-pass "lineage query is STABLE, UUID-only, PUBLIC EXECUTE revoked, and table catalog remains 59"
+[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == '60' ]] || fail "public table catalog changed"
+pass "lineage query is STABLE, UUID-only, PUBLIC EXECUTE revoked, and table catalog remains 60"
 
 echo "Direct merged guest lineage projection tests passed"
