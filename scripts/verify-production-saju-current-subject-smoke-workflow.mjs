@@ -2,10 +2,12 @@ import { readFile } from 'node:fs/promises';
 
 const workflowPath = '.github/workflows/production-saju-current-subject-smoke.yml';
 const liveVerifierPath = 'scripts/verify-production-saju-current-subject.mjs';
+const sessionHelperPath = 'scripts/production-member-smoke-session.mjs';
 
-const [workflow, liveVerifier] = await Promise.all([
+const [workflow, liveVerifier, sessionHelper] = await Promise.all([
   readFile(workflowPath, 'utf8'),
   readFile(liveVerifierPath, 'utf8'),
+  readFile(sessionHelperPath, 'utf8'),
 ]);
 
 const requiredWorkflowFragments = [
@@ -16,11 +18,13 @@ const requiredWorkflowFragments = [
   'cancel-in-progress: false',
   'environment: production',
   'DISPATCH_CONFIRM: ${{ inputs.confirm }}',
-  'MYEONGHA_PRODUCTION_BIRTH_SMOKE_MEMBER_BEARER: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_BEARER }}',
-  'MYEONGHA_PRODUCTION_BIRTH_SMOKE_MEMBER_EXPECTED_SUBJECT_ID: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID }}',
+  'MYEONGHA_PRODUCTION_MEMBER_EMAIL: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_EMAIL }}',
+  'MYEONGHA_PRODUCTION_MEMBER_PASSWORD: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_PASSWORD }}',
+  'MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID }}',
   '[[ "$DISPATCH_CONFIRM" == \'VERIFY_SAJU_CURRENT_SUBJECT\' ]]',
-  'test -n "${MYEONGHA_PRODUCTION_BIRTH_SMOKE_MEMBER_BEARER:-}"',
-  'test -n "${MYEONGHA_PRODUCTION_BIRTH_SMOKE_MEMBER_EXPECTED_SUBJECT_ID:-}"',
+  'test -n "${MYEONGHA_PRODUCTION_MEMBER_EMAIL:-}"',
+  'test -n "${MYEONGHA_PRODUCTION_MEMBER_PASSWORD:-}"',
+  'test -n "${MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID:-}"',
   'uses: actions/checkout@v4',
   'uses: actions/setup-node@v4',
   "node-version: '24'",
@@ -37,6 +41,8 @@ const forbiddenWorkflowFragments = [
   '\npush:',
   '\npull_request:',
   '\nschedule:',
+  'MYEONGHA_PRODUCTION_MEMBER_BEARER',
+  'MYEONGHA_PRODUCTION_BIRTH_SMOKE_MEMBER_BEARER',
   'MYEONGHA_SAJU_SERVICE_ORIGIN',
   'MYEONGHA_SAJU_SERVICE_BEARER',
   'SAJU_PRODUCTION_SERVICE_BEARER',
@@ -70,13 +76,15 @@ if ((workflow.match(/workflow_dispatch:/g) ?? []).length !== 1) {
 }
 
 const requiredLiveVerifierFragments = [
+  "import { acquireProductionMemberSmokeSession } from './production-member-smoke-session.mjs';",
   "const PRODUCTION_ORIGIN = 'https://myeongha.vercel.app';",
   'const MEMBER_ME_URL = `${PRODUCTION_ORIGIN}/api/me`;',
   'const SAJU_CALCULATION_URL = `${PRODUCTION_ORIGIN}/api/me/saju/calculation`;',
-  "requireSecret('MYEONGHA_PRODUCTION_BIRTH_SMOKE_MEMBER_BEARER')",
-  "requireSecret('MYEONGHA_PRODUCTION_BIRTH_SMOKE_MEMBER_EXPECTED_SUBJECT_ID')",
+  "requireSecret('MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID')",
+  'await acquireProductionMemberSmokeSession()',
   "redirect: 'error'",
   'AbortSignal.timeout(REQUEST_TIMEOUT_MS)',
+  'Authorization: `Bearer ${accessToken}`',
   "memberData.subjectKind !== 'member'",
   'memberData.subjectId !== expectedSubjectId',
   "memberData.subjectStatus !== 'active'",
@@ -93,6 +101,8 @@ const requiredLiveVerifierFragments = [
   "'myeonghwa-production-calculation-policy-v1'",
   "'myeonghwa/production/civil-midnight-v1'",
   "requireNoStore(calculationResponse, 'Production current-subject Saju calculation')",
+  'JSON.stringify(memberBody).includes(accessToken)',
+  'JSON.stringify(calculationBody).includes(accessToken)',
 ];
 
 for (const fragment of requiredLiveVerifierFragments) {
@@ -102,6 +112,9 @@ for (const fragment of requiredLiveVerifierFragments) {
 }
 
 const forbiddenLiveVerifierFragments = [
+  'MYEONGHA_PRODUCTION_MEMBER_BEARER',
+  'MYEONGHA_PRODUCTION_BIRTH_SMOKE_MEMBER_BEARER',
+  'MYEONGHA_PRODUCTION_BIRTH_SMOKE_MEMBER_EXPECTED_SUBJECT_ID',
   'MYEONGHA_SAJU_SERVICE_ORIGIN',
   'MYEONGHA_SAJU_SERVICE_BEARER',
   'SAJU_PRODUCTION_SERVICE_BEARER',
@@ -114,8 +127,8 @@ const forbiddenLiveVerifierFragments = [
   "method: 'PATCH'",
   "method: 'PUT'",
   'api/session/bootstrap',
-  'console.log(bearer',
-  'console.error(bearer',
+  'console.log(accessToken',
+  'console.error(accessToken',
   'console.log(memberBody',
   'console.error(memberBody',
   'console.log(calculationBody',
@@ -128,4 +141,45 @@ for (const fragment of forbiddenLiveVerifierFragments) {
   }
 }
 
-console.log('MyeongHa production current-subject Saju smoke workflow contract verification passed.');
+const requiredSessionHelperFragments = [
+  "const PRODUCTION_ORIGIN = 'https://myeongha.vercel.app';",
+  'const SIGN_IN_URL = `${PRODUCTION_ORIGIN}/api/auth/sign-in`;',
+  "requireCredential('MYEONGHA_PRODUCTION_MEMBER_EMAIL')",
+  "requireCredential('MYEONGHA_PRODUCTION_MEMBER_PASSWORD', { trim: false })",
+  "method: 'POST'",
+  "'Content-Type': 'application/json'",
+  'body: JSON.stringify({ email, password })',
+  "redirect: 'error'",
+  'AbortSignal.timeout(REQUEST_TIMEOUT_MS)',
+  "response.status !== 200",
+  "body.data.status !== 'authenticated'",
+  'const accessToken = session.accessToken;',
+  "directives.includes('no-store')",
+  "contentType.toLowerCase().includes('application/json')",
+  'return Object.freeze({ accessToken });',
+];
+
+for (const fragment of requiredSessionHelperFragments) {
+  if (!sessionHelper.includes(fragment)) {
+    throw new Error(`Missing production Member fresh-session helper contract fragment: ${fragment}`);
+  }
+}
+
+const forbiddenSessionHelperFragments = [
+  'MYEONGHA_PRODUCTION_MEMBER_BEARER',
+  'refreshToken',
+  'localStorage',
+  'writeFile',
+  'appendFile',
+  'console.log(',
+  'console.error(',
+  'set -x',
+];
+
+for (const fragment of forbiddenSessionHelperFragments) {
+  if (sessionHelper.includes(fragment)) {
+    throw new Error(`Forbidden production Member fresh-session helper fragment: ${fragment}`);
+  }
+}
+
+console.log('MyeongHa production current-subject Saju fresh-session smoke workflow contract verification passed.');
