@@ -43,11 +43,19 @@ function requireNonEmptyString(name, value) {
   return value;
 }
 
-function requireNonNegativeInteger(name, value) {
-  if (!Number.isSafeInteger(value) || value < 0) {
-    throw new Error(`${name} must be a non-negative safe integer.`);
+function requireSafeInteger(name, value) {
+  if (!Number.isSafeInteger(value)) {
+    throw new Error(`${name} must be a safe integer.`);
   }
   return value;
+}
+
+function requireNonNegativeInteger(name, value) {
+  const integer = requireSafeInteger(name, value);
+  if (integer < 0) {
+    throw new Error(`${name} must be non-negative.`);
+  }
+  return integer;
 }
 
 function requireTimestamp(name, value) {
@@ -191,9 +199,10 @@ function validateRelationship(value, expectedCharacterId) {
   if (relationship.characterId !== expectedCharacterId) {
     throw new Error('Production Chat relationship does not match the canonical primary character.');
   }
-  for (const key of ['closeness', 'trust', 'friction', 'revision']) {
-    requireNonNegativeInteger(`Production Chat relationship ${key}`, relationship[key]);
+  for (const key of ['closeness', 'trust', 'friction']) {
+    requireSafeInteger(`Production Chat relationship ${key}`, relationship[key]);
   }
+  requireNonNegativeInteger('Production Chat relationship revision', relationship.revision);
   requireNonEmptyString('Production Chat relationship stage', relationship.relationshipStage);
   requireNonEmptyString('Production Chat relationship policy version', relationship.policyVersion);
   requireNullableTimestamp('Production Chat relationship last interaction', relationship.lastInteractionAt);
