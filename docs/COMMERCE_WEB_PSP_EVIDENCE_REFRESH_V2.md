@@ -112,6 +112,15 @@ The launch buyer scope is now explicitly Korea-first. This does not authorize an
 
 Launch presentment currency is fixed to KRW.
 
+Current official capability evidence is sufficient for the current domestic rail:
+
+```text
+Toss → KRW MID supports domestic-card payment
+KCP  → standard payment defines KRW as 410 (mobile) / WON (PC)
+```
+
+This proves KRW capability, not commercial acceptance for MyeongHa.
+
 ### M6 — domestic card + KakaoPay / NaverPay / PAYCO
 
 #### Toss Payments
@@ -266,7 +275,7 @@ KCP  = NOT PROVEN
 | Requirement | Toss direct | KCP direct |
 |---|---|---|
 | Korea-first launch fit | yes | yes |
-| KRW launch fit | yes for current domestic rail | yes for current domestic rail |
+| KRW launch fit | proven for current domestic rail | proven for current domestic rail |
 | domestic card | proven | proven |
 | KakaoPay | proven | proven; additional service/contract may apply |
 | NaverPay | proven | proven; additional service/contract may apply |
@@ -339,10 +348,12 @@ P0-CM-03 and P0-PR-01 remain independently open.
 - Payment-method policy: `https://docs.tosspayments.com/guides/v2/get-started/payment-methods`
 - Payment product FAQ / payment-method test coverage: `https://docs.tosspayments.com/resources/faq`
 - Payment/easy-pay enum codes: `https://docs.tosspayments.com/codes/enum-codes`
+- KRW MID / domestic-card currency rail: `https://docs.tosspayments.com/guides/v2/learn/foreign-payment`
 
 ### NHN KCP
 
 - Merchant signup/application guidance: `https://developer.kcp.co.kr/support/signup`
+- Standard payment / KRW currency codes: `https://developer.kcp.co.kr/guide/payment`
 - Partner easy-payment capability: `https://developer.kcp.co.kr/guide/directpay`
 - Easy-payment codes: `https://developer.kcp.co.kr/code/etc`
 
