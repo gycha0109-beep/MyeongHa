@@ -38,8 +38,11 @@ type Awaitable<T> = T | Promise<T>;
  * A production adapter may bind this to `qry_entitlements_v1`. This boundary
  * reads the stored projection only; it must not reconstruct grants, apply
  * entitlement events, resolve products to grants, or infer provider receipt
- * semantics while SRC-18/SRC-21/P0-CM-01 remain unresolved. PostgreSQL
- * execution identity remains outside this contract while P0-AUTH-01 is open.
+ * semantics. SRC-18/SRC-21 are architecture-resolved, P0-CM-01 is decided as
+ * Web + one-off launch MVP, and P0-AUTH-01 is decided as the dedicated
+ * non-BYPASSRLS API role plus transaction-scoped canonical subject context.
+ * Those decisions do not authorize provider-specific verification/apply
+ * runtime or production Commerce activation.
  */
 export interface EntitlementsReadAuthorityPortV1 {
   readCurrentEntitlements(input: {
