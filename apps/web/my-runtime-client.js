@@ -1,5 +1,5 @@
 import { unwrapApiSuccessEnvelope, WebApiEnvelopeError } from './api-envelope.js';
-import { getActiveBearer } from './product-auth.js';
+import { getActiveBearer, invalidateMemberSession } from './product-auth.js';
 
 const DEFAULT_PROFILE_ENDPOINT = '/api/me';
 const DEFAULT_BIRTH_PROFILE_ENDPOINT = '/api/me/birth-profile';
@@ -104,7 +104,15 @@ function assertBirthProfile(payload) {
   return payload;
 }
 
-async function readAuthorizedJson({ fetchImpl, endpoint, resolveBearer, failureCode, malformedCode, assertPayload }) {
+async function readAuthorizedJson({
+  fetchImpl,
+  endpoint,
+  resolveBearer,
+  failureCode,
+  malformedCode,
+  assertPayload,
+  invalidateRejectedMember = false,
+}) {
   const activeBearer = await resolveBearer();
   if (!activeBearer?.token) {
     throw new MyRuntimeError('WEB_MY_SESSION_REQUIRED', 'A current session is required.');
@@ -126,6 +134,9 @@ async function readAuthorizedJson({ fetchImpl, endpoint, resolveBearer, failureC
   }
 
   if (response.status === 401 || response.status === 403) {
+    if (invalidateRejectedMember && response.status === 401 && activeBearer.kind === 'member') {
+      invalidateMemberSession();
+    }
     throw new MyRuntimeError('WEB_MY_SESSION_REQUIRED', 'A current session is required.');
   }
   if (!response.ok) {
@@ -164,6 +175,7 @@ export function createMyRuntimeClient(options = {}) {
         failureCode: 'WEB_MY_PROFILE_REQUEST_FAILED',
         malformedCode: 'WEB_MY_MALFORMED_PROFILE',
         assertPayload: assertProfile,
+        invalidateRejectedMember: true,
       });
     },
     readBirthProfile() {
