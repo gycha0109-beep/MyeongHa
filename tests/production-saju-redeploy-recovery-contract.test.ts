@@ -25,11 +25,21 @@ describe('production Saju redeploy recovery workflow contract', () => {
   it('resolves and redeploys only the exact production GitHub revision', () => {
     expect(workflow).toContain('(.meta.githubCommitSha // "") == $sha');
     expect(workflow).toContain('and (.target // "") == "production"');
-    expect(workflow).toContain("'{deploymentId: $deployment_id, target: \"production\"}'");
-    expect(workflow).toContain('forceNew=1&skipAutoDetectionConfirmation=1&teamId=$VERCEL_TEAM_ID');
-    expect(workflow).toContain("-w '%{http_code}'");
-    expect(workflow).toContain('Vercel redeploy request failed: HTTP $http_code code=$error_code');
+    expect(workflow).toContain('VERCEL_TEAM_SLUG: johnny-self');
+    expect(workflow).toContain('VERCEL_CLI_VERSION: 59.11.7');
+    expect(workflow).toContain('npx --yes "vercel@$VERCEL_CLI_VERSION" redeploy "$SOURCE_DEPLOYMENT_ID"');
+    expect(workflow).toContain('--target=production');
+    expect(workflow).toContain('--scope "$VERCEL_TEAM_SLUG"');
+    expect(workflow).toContain('--no-wait');
+    expect(workflow).toContain('(.url // "") == $host');
+    expect(workflow).toContain('and (.meta.githubCommitSha // "") == $sha');
     expect(workflow).toContain('https://api.vercel.com/v13/deployments/$REDEPLOYMENT_ID?teamId=$VERCEL_TEAM_ID');
+  });
+
+  it('does not fall back to the rejected REST redeploy mutation', () => {
+    expect(workflow).not.toContain("'{deploymentId: $deployment_id, target: \\\"production\\\"}'");
+    expect(workflow).not.toContain('forceNew=1&skipAutoDetectionConfirmation=1&teamId=$VERCEL_TEAM_ID');
+    expect(workflow).not.toContain('Vercel redeploy request failed: HTTP $http_code code=$error_code');
   });
 
   it('fails closed on project, canonical alias, and runtime readiness', () => {
@@ -54,7 +64,8 @@ describe('production Saju redeploy recovery workflow contract', () => {
       'update subjects',
       'delete from',
       'echo "$VERCEL_TOKEN"',
-      'cat "$response_file"',
+      'cat "$stderr_file"',
+      'cat "$stdout_file"',
     ];
     for (const fragment of forbidden) {
       expect(workflow.toLowerCase()).not.toContain(fragment.toLowerCase());
