@@ -1,0 +1,25 @@
+name: Temporary Dispatch Production Member Reauthentication Smoke
+
+on:
+  push:
+    branches:
+      - ops/dispatch-production-member-reauth-20260905-1550
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Dispatch governed Production Member reauthentication continuity smoke
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api --method POST \
+            "/repos/${GITHUB_REPOSITORY}/actions/workflows/production-member-reauth-continuity-smoke.yml/dispatches" \
+            -f ref=main \
+            -F 'inputs[confirm]=VERIFY_MEMBER_REAUTH_CONTINUITY'
