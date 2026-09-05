@@ -215,7 +215,7 @@ requireExact(
 requireExact('calculation.kind', calculation.kind, 'saju_calculation_evidence');
 requireExact('calculation.semanticAuthority', calculation.semanticAuthority, 'calculation_only');
 requireExact('calculation.interpretationAuthorized', calculation.interpretationAuthorized, false);
-requireNonEmptyString('calculation.birthRevisionRef', calculation.birthRevisionRef);
+requireExact('calculation.birthRevisionRef', calculation.birthRevisionRef, currentRevision.revisionId);
 
 const source = requireRecord('calculation.source', calculation.source);
 requireExact(
@@ -310,5 +310,5 @@ if (
 }
 
 console.log(
-  'MyeongHa production current-subject Saju smoke passed: memberSignIn=200, freshSession=true, memberSubjectMatch=true, birthProfilePresent=true, calculation=200, authority=calculation_only, ingressContract=v1, cacheControl=no-store.',
+  'MyeongHa production current-subject Saju smoke passed: memberSignIn=200, freshSession=true, memberSubjectMatch=true, birthProfilePresent=true, birthRevisionMatch=true, calculation=200, authority=calculation_only, ingressContract=v1, cacheControl=no-store.',
 );
