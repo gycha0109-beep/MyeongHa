@@ -229,19 +229,15 @@ await assertMissing(
   'Memories must not consume a separate Vercel function while the Records dispatcher rewrite is active.',
 );
 
-const expectedChatRewrite = Object.freeze({
-  source: '^/api/chat/(?<threadId>[^/]+)$',
-  destination: '/api/me?__myeongha_chat_thread_id=$threadId',
-});
 const chatRewriteMatches = (vercelConfig.rewrites ?? []).filter(
-  (entry) => entry.source === expectedChatRewrite.source,
+  (entry) => entry.source === '/api/chat/:threadId',
 );
 if (
   chatRewriteMatches.length !== 1 ||
-  chatRewriteMatches[0]?.destination !== expectedChatRewrite.destination
+  chatRewriteMatches[0]?.destination !== '/api/me?__myeongha_chat_thread_id=:threadId'
 ) {
   throw new Error(
-    'Chat dynamic read route must use exactly one named capture rewrite to preserve the thread locator into the governed /api/me dispatcher.',
+    'Chat dynamic read route must have exactly one rewrite to the governed /api/me dispatcher.',
   );
 }
 await assertMissing(
