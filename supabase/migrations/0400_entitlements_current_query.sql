@@ -3,10 +3,14 @@
 -- API_CONTRACT §16 exposes current effective entitlement state. This query reads
 -- the provider-independent `entitlements` projection only; it never exposes or
 -- reconstructs provider receipts, account links, grants, or entitlement events.
--- P0-CM-01 therefore remains open and outside this read boundary.
+-- P0-CM-01 is decided as Web + one-off launch MVP, but provider-specific
+-- verification/apply runtime and Production Commerce activation remain outside
+-- this read boundary.
 --
--- P0-AUTH-01 remains unresolved. SECURITY INVOKER is retained and PUBLIC EXECUTE
--- is revoked until the API -> PostgreSQL execution identity is fixed.
+-- P0-AUTH-01 is decided as a dedicated non-BYPASSRLS API execution role plus
+-- transaction-scoped trusted canonical subject context. SECURITY INVOKER is
+-- retained and PUBLIC EXECUTE remains revoked; runtime grants are governed by
+-- the dedicated API-role ACL migrations.
 
 create or replace function public.qry_entitlements_v1(
   p_subject_id uuid
