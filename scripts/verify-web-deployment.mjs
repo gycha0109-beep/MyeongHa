@@ -229,6 +229,26 @@ await assertMissing(
   'Memories must not consume a separate Vercel function while the Records dispatcher rewrite is active.',
 );
 
+const chatRewriteMatches = (vercelConfig.rewrites ?? []).filter(
+  (entry) => entry.source === '/api/chat/:threadId',
+);
+if (
+  chatRewriteMatches.length !== 1 ||
+  chatRewriteMatches[0]?.destination !== '/api/me?__myeongha_chat_thread_id=:threadId'
+) {
+  throw new Error(
+    'Chat dynamic read route must have exactly one rewrite to the governed /api/me dispatcher.',
+  );
+}
+await assertMissing(
+  resolve('api/chat.ts'),
+  'Chat reads must not consume a separate Vercel function while the /api/me dispatcher rewrite is active.',
+);
+await assertMissing(
+  resolve('api/chat/[threadId].ts'),
+  'Bracket Chat read function must not coexist with the static dispatcher rewrite.',
+);
+
 const globalHeaders = (vercelConfig.headers ?? []).find(
   (entry) => entry.source === '/(.*)',
 )?.headers ?? [];
