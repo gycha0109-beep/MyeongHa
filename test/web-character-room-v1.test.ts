@@ -86,14 +86,17 @@ describe('MyeongHa immersive long-form Character Room', () => {
     ]);
 
     expect(apiContract).toContain('### `GET /api/chat/:threadId`');
+    expect(transport).toContain("import { getActiveBearer } from './product-auth.js'");
+    expect(transport).toContain('const activeBearer = await getActiveBearer()');
+    expect(transport).toContain('Authorization: `Bearer ${activeBearer.token}`');
     expect(transport).toContain("new URL(`/api/chat/${encodeURIComponent(threadId)}`, window.location.origin)");
     expect(transport).toContain("credentials: 'same-origin'");
     expect(transport).toContain("cache: 'no-store'");
     expect(transport).toContain("url.searchParams.set('afterSequenceNo', '0')");
-    expect(transport).toContain("url.searchParams.set('presentationKey', characterKey)");
+    expect(transport).not.toContain("url.searchParams.set('presentationKey'");
+    expect(transport).not.toContain('payload.presentationKey');
     expect(transport).toContain("import('./api-envelope.js')");
     expect(transport).toContain('unwrapApiSuccessEnvelope(envelope)');
-    expect(transport).toContain('payload.presentationKey !== characterKey');
     expect(transport).toContain('renderHistory(state.messages, state.characterId)');
     expect(transport).toContain('renderConversation(state.messages, state.characterId)');
     expect(transport).toContain("article.className = 'conversation-message'");
