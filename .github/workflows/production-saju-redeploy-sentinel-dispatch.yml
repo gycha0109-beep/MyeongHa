@@ -1,0 +1,82 @@
+name: Production Saju Redeploy Sentinel Dispatch
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type TRIGGER_SAJU_REDEPLOY_RECOVERY to dispatch the governed recovery workflow.'
+        required: true
+        type: string
+  push:
+    branches:
+      - main
+    paths:
+      - .github/production-saju-redeploy.trigger
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: production-saju-redeploy-sentinel-dispatch
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    name: dispatch-governed-saju-redeploy-recovery
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      DISPATCH_CONFIRM: ${{ inputs.confirm }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Verify governed trigger
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$GITHUB_EVENT_NAME" in
+            workflow_dispatch)
+              [[ "$DISPATCH_CONFIRM" == 'TRIGGER_SAJU_REDEPLOY_RECOVERY' ]]
+              ;;
+            push)
+              [[ "$GITHUB_REF" == 'refs/heads/main' ]]
+              ;;
+            *)
+              echo "Unsupported trigger: $GITHUB_EVENT_NAME" >&2
+              exit 1
+              ;;
+          esac
+          test -n "${GH_TOKEN:-}"
+
+      - name: Dispatch governed recovery workflow on main
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          payload_file="$RUNNER_TEMP/saju-redeploy-dispatch.json"
+          cleanup() {
+            exit_code=$?
+            trap - EXIT
+            rm -f "$payload_file"
+            exit "$exit_code"
+          }
+          trap cleanup EXIT
+
+          jq -n '{ref: "main", inputs: {confirm: "REDEPLOY_SAJU_PRODUCTION"}}' > "$payload_file"
+
+          http_code="$(curl -sS \
+            -X POST \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'Accept: application/vnd.github+json' \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            --data-binary "@$payload_file" \
+            -o /dev/null \
+            -w '%{http_code}' \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/workflows/production-saju-redeploy-recovery.yml/dispatches")"
+
+          if [[ "$http_code" != '204' ]]; then
+            echo "Recovery workflow dispatch failed: HTTP $http_code" >&2
+            exit 1
+          fi
+
+          echo 'Governed Saju production redeploy recovery was dispatched.'
