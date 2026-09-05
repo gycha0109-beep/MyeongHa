@@ -48,6 +48,15 @@ async function assertExists(path) {
   }
 }
 
+async function assertMissing(path, message) {
+  try {
+    await access(path);
+  } catch {
+    return;
+  }
+  throw new Error(message);
+}
+
 async function collectFiles(root, current = root, files = []) {
   const entries = await readdir(current, { withFileTypes: true });
   for (const entry of entries) {
@@ -185,14 +194,40 @@ if (
 }
 
 await assertExists(resolve('api/birth-profiles.ts'));
-try {
-  await access(resolve('api/birth-profiles/[id].ts'));
-  throw new Error('Bracket Birth Profile function must not coexist with the static dispatcher.');
-} catch (error) {
-  if (error instanceof Error && error.message.startsWith('Bracket Birth Profile')) {
-    throw error;
+await assertMissing(
+  resolve('api/birth-profiles/[id].ts'),
+  'Bracket Birth Profile function must not coexist with the static dispatcher.',
+);
+
+const expectedRecordsRewrites = Object.freeze([
+  Object.freeze({
+    source: '/api/life-record',
+    destination: '/api/me?__myeongha_records_read=life-record',
+  }),
+  Object.freeze({
+    source: '/api/memories',
+    destination: '/api/me?__myeongha_records_read=memories',
+  }),
+]);
+for (const expected of expectedRecordsRewrites) {
+  const matches = (vercelConfig.rewrites ?? []).filter(
+    (entry) => entry.source === expected.source,
+  );
+  if (matches.length !== 1 || matches[0]?.destination !== expected.destination) {
+    throw new Error(
+      `${expected.source} must have exactly one rewrite to the governed /api/me Records dispatcher.`,
+    );
   }
 }
+await assertExists(resolve('api/me.ts'));
+await assertMissing(
+  resolve('api/life-record.ts'),
+  'Life Record must not consume a separate Vercel function while the Records dispatcher rewrite is active.',
+);
+await assertMissing(
+  resolve('api/memories.ts'),
+  'Memories must not consume a separate Vercel function while the Records dispatcher rewrite is active.',
+);
 
 const globalHeaders = (vercelConfig.headers ?? []).find(
   (entry) => entry.source === '/(.*)',
