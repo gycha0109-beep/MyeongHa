@@ -26,13 +26,19 @@ function stableJson(value: unknown): string {
   return JSON.stringify(value);
 }
 
+function isSha256V1Hash(value: string): boolean {
+  return /^sha256:v1:[0-9a-f]{64}$/iu.test(value);
+}
+
 export function buildCharacterContentManifest(bundle: CharacterContentBundle): CharacterContentManifest {
   validateCharacterContentBundle(bundle);
-  if (bundle.assetManifestHash.trim().length === 0) {
-    throw new CharacterContentValidationError('assetManifestHash must not be empty');
+  if (!isSha256V1Hash(bundle.assetManifestHash)) {
+    throw new CharacterContentValidationError(
+      'assetManifestHash must use sha256:v1:<hex> convention',
+    );
   }
   const characterIds = bundle.characters.map((character) => character.characterId).sort();
-  const contentHash = `sha256:${createHash('sha256').update(stableJson(bundle)).digest('hex')}`;
+  const contentHash = `sha256:v1:${createHash('sha256').update(stableJson(bundle)).digest('hex')}`;
   return Object.freeze({
     bundleId: bundle.bundleId,
     contentVersion: bundle.contentVersion,

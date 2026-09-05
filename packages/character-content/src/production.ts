@@ -28,6 +28,10 @@ function isDevelopmentPlaceholder(
   return character.developmentPlaceholder === true;
 }
 
+function hasVersionedAssetManifestHash(bundle: CharacterContentBundle): boolean {
+  return /^sha256:v1:[0-9a-f]{64}$/iu.test(bundle.assetManifestHash);
+}
+
 /**
  * Production publication boundary for immutable Character canon.
  *
@@ -46,10 +50,10 @@ export function validateProductionCharacterContentBundle(
 ): CharacterContentBundle {
   validateCharacterContentBundle(bundle);
 
-  if (bundle.assetManifestHash.trim().length === 0) {
+  if (!hasVersionedAssetManifestHash(bundle)) {
     throw new ProductionCharacterContentValidationError(
       'ASSET_MANIFEST_HASH_REQUIRED',
-      'Production character content requires immutable asset manifest provenance.',
+      'Production character content requires sha256:v1 asset manifest provenance.',
     );
   }
 
