@@ -3,9 +3,9 @@
 > Product: **명하 (MyeongHa)**  
 > Date: **2026-09-05**  
 > Parent evaluation: `docs/COMMERCE_WEB_PSP_EVALUATION_V1.md`  
-> Current evidence refresh: `docs/COMMERCE_WEB_PSP_EVIDENCE_REFRESH_V1.md`  
+> Current evidence refresh: `docs/COMMERCE_WEB_PSP_EVIDENCE_REFRESH_V2.md`  
 > Parent architecture: `docs/architecture/COMMERCE_ENTITLEMENT_ARCHITECTURE_V1.md`  
-> Status: **P0-CM-02 INPUT CONTRACT / NO PROVIDER SELECTED / IMPLEMENTATION HOLD**
+> Status: **P0-CM-02 INPUT RECORDED / MERCHANT REGISTRATION BLOCKED / NO PROVIDER SELECTED / IMPLEMENTATION HOLD**
 
 ---
 
@@ -13,10 +13,11 @@
 
 `P0-CM-02`는 기술 문서만으로 닫을 수 없다. 실제 merchant/business facts와 provider onboarding evidence가 필요하다.
 
-이 문서는 다음만 고정한다.
+이 문서는 다음을 고정한다.
 
 ```text
 어떤 사실이 필요한가
+현재 operator-provided merchant facts는 무엇인가
 어떤 값은 저장소에 남겨도 되는가
 어떤 값은 저장소에 남기면 안 되는가
 누가/무엇이 각 사실을 확정할 수 있는가
@@ -197,10 +198,12 @@ NOT READY
 현재 저장소 authority상 이유:
 
 ```text
+merchant legal form = not_registered
 launch paid Product/Capability = P0-CM-03 OPEN / Saju upstream blocked
 merchant legal identity disclosure surface = not complete
 refund/cancellation customer policy = not closed
 payment terms/customer notice surface = not complete
+Toss current public homepage-review rule conflicts with Member-only purchase
 ```
 
 M7은 실제 Web inventory와 Product/Legal authority를 다시 확인해서 닫는다. 가짜 상품/가짜 사업자 정보로 provider review를 통과시키지 않는다.
@@ -226,10 +229,12 @@ required reserve/deposit/guarantee terms, if any, are acceptable
 
 Public pricing 또는 provider 신청 화면의 요율은 **MyeongHa가 그 조건을 수락했다는 증거가 아니다**.
 
+현재는 merchant registration이 완료되지 않아 actual contract/commercial acceptance 단계로 진행할 수 없다.
+
 저장소에는 필요하면 다음 정도만 기록한다.
 
 ```text
-commercial_terms = accepted | rejected | pending
+commercial_terms = accepted | rejected | pending | blocked
 verified_at = date
 provider = candidate
 ```
@@ -261,6 +266,15 @@ B. product/Commerce authority explicitly reopens and revises Member-only policy
 
 현재 B는 승인되지 않았다.
 
+Current provider evidence:
+
+```text
+Toss = CONFLICT UNDER CURRENT PUBLIC HOMEPAGE-REVIEW GUIDANCE
+KCP  = NOT PROVEN
+```
+
+Toss current official contracting guide states that non-members must be able to purchase during homepage review. This conflicts with the current Member-only invariant unless Toss confirms an applicable exception or MyeongHa explicitly reopens the policy.
+
 사용자 추측 또는 provider SDK 기능만으로 M9를 `confirmed` 처리하지 않는다.
 
 확정 주체:
@@ -274,42 +288,47 @@ OR explicit architecture/product decision
 
 ## 4. Current values at this revision
 
+Operator-provided values recorded on 2026-09-05:
+
 ```text
-M1 merchant legal form              = UNKNOWN
-M2 merchant registration country    = UNKNOWN
-M3 settlement account country       = UNKNOWN
-M4 launch buyer geography           = UNKNOWN
-M5 launch presentment currency      = UNKNOWN
-M6 required payment methods         = UNKNOWN
+M1 merchant legal form              = not_registered
+M2 merchant registration country    = not_applicable
+M3 settlement account country       = not_established
+M4 launch buyer geography           = korea_first
+M5 launch presentment currency      = KRW
+M6 required payment methods         = domestic_card + easy_pay(kakaopay, naverpay, payco)
 M7 website/review readiness         = NOT READY
-M8 commercial acceptance            = UNKNOWN
-M9 Member-only compatibility        = NOT PROVEN for Toss / NOT PROVEN for KCP
+M8 commercial acceptance            = BLOCKED / NOT YET ACCEPTED
+M9 Member-only compatibility        = TOSS CONFLICT / KCP NOT PROVEN
 ```
 
-Do not replace `UNKNOWN` with an inferred value. A known negative/absent state such as `not_registered`, `not_applicable`, or `not_established` must also not be collapsed back into `UNKNOWN`.
+Do not replace these values with inferred alternatives. If the operator later registers a merchant entity or establishes settlement/account facts, update the classification rather than preserving stale values.
 
 ---
 
-## 5. Minimal operator input needed
+## 5. Operator input status
 
-Repository/provider research cannot truthfully supply the following six inputs:
+The six initial operator inputs are now supplied.
 
 ```text
-I1 = M1 merchant legal form
-I2 = M2 merchant registration country
-I3 = M3 settlement account country
-I4 = M4 launch buyer geography
-I5 = M5 launch presentment currency
-I6 = M6 required payment methods
+I1 = M1 merchant legal form         = supplied
+I2 = M2 merchant registration       = supplied
+I3 = M3 settlement account country  = supplied
+I4 = M4 launch buyer geography      = supplied
+I5 = M5 presentment currency        = supplied
+I6 = M6 required payment methods    = supplied
 ```
 
-If M1 is `not_registered`, I2 may be `not_applicable`. If a PSP settlement account has not yet been selected, I3 may be `not_established`. These states are factual intake results, not provider eligibility conclusions.
+No registration number, account number, credential, or private contract text was requested or recorded.
 
-M8 may require an operator preference before contracting, but final closure requires actual provider commercial evidence.
+Residual facts are external/provider-gated rather than missing operator intake:
 
-M7 and M9 are not satisfied by operator declaration alone.
-
-No registration number, account number, credential, or private contract text should be requested for this intake.
+```text
+merchant registration completion
+provider commercial terms / settlement acceptance
+truthful website review readiness
+provider confirmation of Member-only compatibility
+```
 
 ---
 
@@ -327,7 +346,19 @@ A provider may be selected only when all of the following are true:
 7. Existing Commerce technical correctness requirements remain satisfied.
 ```
 
-If more than one candidate satisfies the mandatory gate, this intake contract does **not** auto-select between them. Final provider choice remains an explicit `P0-CM-02` decision using the then-current technical, merchant, onboarding and commercial evidence.
+Current gate result:
+
+```text
+1 = FAIL for production eligibility because M1=not_registered
+2 = PASS
+3 = capability fit proven for current Toss/KCP shortlist, contract activation still pending
+4 = FAIL
+5 = BLOCKED
+6 = FAIL / unresolved
+7 = preserved
+```
+
+If more than one candidate later satisfies the mandatory gate, this intake contract does **not** auto-select between them. Final provider choice remains an explicit `P0-CM-02` decision using then-current technical, merchant, onboarding and commercial evidence.
 
 ---
 
@@ -336,22 +367,26 @@ If more than one candidate satisfies the mandatory gate, this intake contract do
 ### Toss Payments direct
 
 ```text
-technical fit                   = STRONG
-webhook retry/transmission      = PROVEN
-POST idempotency                = PROVEN in current evaluation
-M9 Member-only compatibility    = NOT PROVEN
-merchant production eligibility = NOT PROVEN
+technical fit                    = STRONG
+M4/M5/M6 capability fit          = PROVEN for current Korea-first/KRW/card+easy-pay rail
+webhook retry/transmission       = PROVEN
+POST idempotency                 = PROVEN in current evaluation
+M9 Member-only compatibility     = CURRENT PUBLIC ONBOARDING CONFLICT
+merchant production eligibility  = NOT SATISFIED while not_registered
+selectable now                   = NO
 ```
 
 ### NHN KCP direct
 
 ```text
-technical fit                   = VIABLE
-reconciliation query            = STRONG
-webhook retry                   = PROVEN up to documented retry contract
-provider mutation idempotency   = NOT SUFFICIENTLY PROVEN
-M9 Member-only compatibility    = NOT PROVEN
-merchant production eligibility = NOT PROVEN
+technical fit                    = VIABLE
+M4/M5/M6 capability fit          = PROVEN; partner easy-pay activation may require extra contract
+reconciliation query             = STRONG
+webhook retry                    = PROVEN up to documented retry contract
+provider mutation idempotency    = NOT SUFFICIENTLY PROVEN
+M9 Member-only compatibility     = NOT PROVEN
+merchant production eligibility  = NOT SATISFIED while not_registered
+selectable now                   = NO
 ```
 
 No winner is selected by this document.
@@ -385,9 +420,9 @@ When enough evidence exists, a later decision revision should record only non-se
 P0-CM-02 = DECIDED
 provider = <selected provider>
 
-M1 = <legal-form classification or not_registered>
-M2 = <country code or not_applicable>
-M3 = <country code or not_established>
+M1 = <registered legal-form classification>
+M2 = <registration country code>
+M3 = <settlement account country>
 M4 = <buyer geography>
 M5 = <currency set>
 M6 = <required method set>
