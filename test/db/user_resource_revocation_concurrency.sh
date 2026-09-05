@@ -169,7 +169,7 @@ pass "concurrent duplicate device revoke -> one lifecycle mutation plus one repl
 share_public=$("${psql_base[@]}" -Atc "select has_function_privilege('public','public.cmd_revoke_share_artifact_v1(uuid,uuid)','EXECUTE');")
 device_public=$("${psql_base[@]}" -Atc "select has_function_privilege('public','public.cmd_revoke_device_installation_v1(uuid,uuid)','EXECUTE');")
 [[ "$share_public" == "f" && "$device_public" == "f" ]] || fail "revocation commands are executable by PUBLIC"
-[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == "59" ]] || fail "revocation slice changed public table catalog"
-pass "revocation commands PUBLIC EXECUTE remain revoked and public table catalog remains 59"
+[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == "60" ]] || fail "revocation slice changed public table catalog"
+pass "revocation commands PUBLIC EXECUTE remain revoked and public table catalog remains 60"
 
 echo "user resource revocation persistence/concurrency tests passed"
