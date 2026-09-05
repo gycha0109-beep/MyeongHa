@@ -1,0 +1,47 @@
+name: Production Records Current-Subject Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type VERIFY_RECORDS_CURRENT_SUBJECT to run the production Records current-subject smoke.'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-records-current-subject-smoke
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: verify-production-records-current-subject
+    runs-on: ubuntu-24.04
+    environment: production
+    env:
+      DISPATCH_CONFIRM: ${{ inputs.confirm }}
+      MYEONGHA_PRODUCTION_MEMBER_EMAIL: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_EMAIL }}
+      MYEONGHA_PRODUCTION_MEMBER_PASSWORD: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_PASSWORD }}
+      MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID }}
+    steps:
+      - name: Verify explicit dispatch and governed fresh-session credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$DISPATCH_CONFIRM" == 'VERIFY_RECORDS_CURRENT_SUBJECT' ]]
+          test -n "${MYEONGHA_PRODUCTION_MEMBER_EMAIL:-}"
+          test -n "${MYEONGHA_PRODUCTION_MEMBER_PASSWORD:-}"
+          test -n "${MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID:-}"
+
+      - name: Check out exact repository verifier
+        uses: actions/checkout@v4
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Verify production Records current-subject continuity
+        run: node scripts/verify-production-records-current-subject.mjs
