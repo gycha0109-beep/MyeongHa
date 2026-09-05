@@ -53,5 +53,7 @@ jobs:
         run: psql -1 -v ON_ERROR_STOP=1 -f test/db/commerce_entitlement_mutation_surface.sql
       - name: Verify commerce payment source authority hardening
         run: psql -1 -v ON_ERROR_STOP=1 -f test/db/commerce_payment_source_authority.sql
+      - name: Verify commerce trigger security hardening
+        run: psql -1 -v ON_ERROR_STOP=1 -f test/db/commerce_trigger_security_hardening.sql
       - name: Verify entitlement projection recompute concurrency
         run: bash test/db/entitlement_projection_recompute_concurrency.sh
