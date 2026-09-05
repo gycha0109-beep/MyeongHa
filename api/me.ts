@@ -12,6 +12,7 @@ const MEMORIES_ROUTE = '/api/memories' as const;
 const CHAT_ROUTE_PREFIX = '/api/chat/' as const;
 const RECORDS_ROUTE_PARAM = '__myeongha_records_read' as const;
 const CHAT_THREAD_PARAM = '__myeongha_chat_thread_id' as const;
+const VERCEL_DYNAMIC_CHAT_THREAD_PARAM = 'threadId' as const;
 const CHAT_CURSOR_PARAM = 'afterSequenceNo' as const;
 const VERCEL_SHARE_PARAM = '_vercel_share' as const;
 const NO_STORE_CACHE_CONTROL = 'no-store' as const;
@@ -76,6 +77,7 @@ function resolveDispatchTarget(request: Request): DispatchTarget | null {
   const knownKeys = new Set<string>([
     RECORDS_ROUTE_PARAM,
     CHAT_THREAD_PARAM,
+    VERCEL_DYNAMIC_CHAT_THREAD_PARAM,
     CHAT_CURSOR_PARAM,
     VERCEL_SHARE_PARAM,
   ]);
@@ -88,12 +90,26 @@ function resolveDispatchTarget(request: Request): DispatchTarget | null {
   if (recordsRoute === null) return null;
   const chatThreadId = getSingleNonEmptyParam(url.searchParams, CHAT_THREAD_PARAM);
   if (chatThreadId === null) return null;
+  const vercelDynamicThreadId = getSingleNonEmptyParam(
+    url.searchParams,
+    VERCEL_DYNAMIC_CHAT_THREAD_PARAM,
+  );
+  if (vercelDynamicThreadId === null) return null;
   const afterSequenceNo = getSingleNonEmptyParam(url.searchParams, CHAT_CURSOR_PARAM);
   if (afterSequenceNo === null) return null;
 
   if (recordsRoute !== undefined && chatThreadId !== undefined) return null;
+  if (recordsRoute !== undefined && vercelDynamicThreadId !== undefined) return null;
   if (recordsRoute !== undefined && afterSequenceNo !== undefined) return null;
+  if (chatThreadId === undefined && vercelDynamicThreadId !== undefined) return null;
   if (chatThreadId === undefined && afterSequenceNo !== undefined) return null;
+  if (
+    chatThreadId !== undefined &&
+    vercelDynamicThreadId !== undefined &&
+    vercelDynamicThreadId !== chatThreadId
+  ) {
+    return null;
+  }
 
   if (recordsRoute === undefined && chatThreadId === undefined) {
     return { kind: 'profile', route: PROFILE_ROUTE, runtime: getProfileRuntime() };
