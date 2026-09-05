@@ -44,6 +44,32 @@ describe('Production character roster read audit contract', () => {
     expect(script).toContain('rollback;');
   });
 
+  it('emits counts-only diagnostics before any zero-roster failure', () => {
+    const requiredLabels = [
+      'activeDefaultReleaseCount=%s',
+      'activeBundleCount=%s',
+      'characterTotalCount=%s',
+      'activeRuntimeCount=%s',
+      'enabledRuntimeCount=%s',
+      'candidateAvailabilityCount=%s',
+      'releaseWindowStartedCount=%s',
+      'notRetiredCount=%s',
+      'eligibleCharacterCount=%s',
+    ];
+    for (const label of requiredLabels) {
+      expect(script).toContain(label);
+    }
+
+    const diagnosticIndex = script.indexOf('Production character roster read diagnostic:');
+    const activeDefaultFailureIndex = script.indexOf('no active default content release');
+    const runtimeFailureIndex = script.indexOf('has no runtime catalog rows');
+    const eligibleFailureIndex = script.indexOf('none are currently eligible');
+    expect(diagnosticIndex).toBeGreaterThan(-1);
+    expect(diagnosticIndex).toBeLessThan(activeDefaultFailureIndex);
+    expect(diagnosticIndex).toBeLessThan(runtimeFailureIndex);
+    expect(diagnosticIndex).toBeLessThan(eligibleFailureIndex);
+  });
+
   it('contains no database mutation statement or migration command', () => {
     const combined = `${workflow}\n${script}`.toLowerCase();
     const forbidden = [
@@ -63,9 +89,12 @@ describe('Production character roster read audit contract', () => {
     }
   });
 
-  it('logs only product content identifiers and a sanitized result summary', () => {
+  it('logs only product content identifiers, aggregate counts, and sanitized result summaries', () => {
     expect(script).toContain('productionCharacterId=%s');
     expect(script).toContain('characterCount=%s');
+    expect(script).toContain('auditMode=explicit_read_only');
+    expect(script).not.toContain('subject_id');
+    expect(script).not.toContain('auth.users');
     expect(script).not.toContain('echo "$SUPABASE_DB_PASSWORD"');
     expect(script).not.toContain('echo "$PGPASSWORD"');
     expect(workflow).not.toContain('cat "$pooler_file"');
