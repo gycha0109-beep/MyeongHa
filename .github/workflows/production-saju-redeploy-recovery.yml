@@ -110,10 +110,13 @@ jobs:
             if [[ -s "$candidate_file" ]]; then
               source_state="$(jq -r '.state // .readyState // empty' "$candidate_file")"
               source_id="$(jq -r '.uid // .id // empty' "$candidate_file")"
+              source_host="$(jq -r '.url // empty' "$candidate_file")"
               test -n "$source_id"
+              test -n "$source_host"
               case "$source_state" in
                 READY)
                   echo "deployment_id=$source_id" >> "$GITHUB_OUTPUT"
+                  echo "deployment_url=https://$source_host" >> "$GITHUB_OUTPUT"
                   echo 'Exact main revision production deployment is READY.'
                   exit 0
                   ;;
@@ -132,7 +135,7 @@ jobs:
         id: redeploy
         shell: bash
         env:
-          SOURCE_DEPLOYMENT_ID: ${{ steps.source.outputs.deployment_id }}
+          SOURCE_DEPLOYMENT_URL: ${{ steps.source.outputs.deployment_url }}
         run: |
           set -euo pipefail
           umask 077
@@ -148,16 +151,27 @@ jobs:
           }
           trap cleanup EXIT
 
-          test -n "$SOURCE_DEPLOYMENT_ID"
+          test -n "$SOURCE_DEPLOYMENT_URL"
           test -n "$VERCEL_TEAM_SLUG"
 
-          if ! npx --yes "vercel@$VERCEL_CLI_VERSION" redeploy "$SOURCE_DEPLOYMENT_ID" \
+          if ! npx --yes "vercel@$VERCEL_CLI_VERSION" redeploy "$SOURCE_DEPLOYMENT_URL" \
             --target=production \
             --scope "$VERCEL_TEAM_SLUG" \
+            --non-interactive \
             --no-wait \
             --no-color \
             >"$stdout_file" 2>"$stderr_file"; then
-            echo 'Pinned Vercel CLI redeploy failed.' >&2
+            error_category='unknown'
+            if grep -Eiq 'unauthorized|forbidden|not authorized|authentication|token' "$stderr_file"; then
+              error_category='authentication'
+            elif grep -Eiq 'scope|team' "$stderr_file"; then
+              error_category='scope'
+            elif grep -Eiq 'interactive|prompt|confirm|tty' "$stderr_file"; then
+              error_category='interaction'
+            elif grep -Eiq 'deployment|redeploy' "$stderr_file"; then
+              error_category='deployment'
+            fi
+            echo "Pinned Vercel CLI redeploy failed: category=$error_category" >&2
             exit 1
           fi
 
