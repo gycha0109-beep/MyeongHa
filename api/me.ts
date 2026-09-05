@@ -73,7 +73,7 @@ function resolveDispatchTarget(request: Request): DispatchTarget | null {
   if (url.hash !== '' || url.pathname !== PROFILE_ROUTE) return null;
 
   const keys = [...new Set(url.searchParams.keys())];
-  const knownKeys = new Set([
+  const knownKeys = new Set<string>([
     RECORDS_ROUTE_PARAM,
     CHAT_THREAD_PARAM,
     CHAT_CURSOR_PARAM,
