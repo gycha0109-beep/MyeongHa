@@ -33,10 +33,18 @@ function requireSecret(name) {
 }
 
 function requireUuid(name, value) {
-  if (typeof value !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu.test(value)) {
+  if (
+    typeof value !== 'string' ||
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu.test(value)
+  ) {
     throw new Error(`${name} must be a UUID.`);
   }
   return value;
+}
+
+function requireNullableUuid(name, value) {
+  if (value === null) return null;
+  return requireUuid(name, value);
 }
 
 function requirePositiveInteger(name, value) {
@@ -51,11 +59,6 @@ function requireStoredString(name, value) {
     throw new Error(`${name} must be a non-empty string.`);
   }
   return value;
-}
-
-function requireNullableStoredString(name, value) {
-  if (value === null) return null;
-  return requireStoredString(name, value);
 }
 
 function requireTimestamp(name, value) {
@@ -146,7 +149,7 @@ function buildLifeRecordDigest(data, label) {
   const seenIds = new Set();
   const stableFacts = facts.map((value, index) => {
     const fact = requireRecord(`${label} fact ${index}`, value);
-    const lifeFactId = requireStoredString(`${label} fact identity`, fact.lifeFactId);
+    const lifeFactId = requireUuid(`${label} fact identity`, fact.lifeFactId);
     if (seenIds.has(lifeFactId)) throw new Error(`${label} returned duplicate Life Fact identities.`);
     seenIds.add(lifeFactId);
     if (fact.valueJsonb === undefined) throw new Error(`${label} fact value must be present.`);
@@ -159,9 +162,12 @@ function buildLifeRecordDigest(data, label) {
       validFrom: requireNullableTimestamp(`${label} fact valid-from`, fact.validFrom),
       validTo: requireNullableTimestamp(`${label} fact valid-to`, fact.validTo),
       sourceKind: requireStoredString(`${label} fact source kind`, fact.sourceKind),
-      sourceMessageId: requireNullableStoredString(`${label} fact source message`, fact.sourceMessageId),
-      sourceMergeActionId: requireNullableStoredString(`${label} fact source merge action`, fact.sourceMergeActionId),
-      supersedesFactId: requireNullableStoredString(`${label} superseded fact`, fact.supersedesFactId),
+      sourceMessageId: requireNullableUuid(`${label} fact source message`, fact.sourceMessageId),
+      sourceMergeActionId: requireNullableUuid(
+        `${label} fact source merge action`,
+        fact.sourceMergeActionId,
+      ),
+      supersedesFactId: requireNullableUuid(`${label} superseded fact`, fact.supersedesFactId),
       confirmedAt: requireTimestamp(`${label} fact confirmed-at`, fact.confirmedAt),
       revokedAt: requireNullableTimestamp(`${label} fact revoked-at`, fact.revokedAt),
       createdAt: requireTimestamp(`${label} fact created-at`, fact.createdAt),
@@ -177,7 +183,7 @@ function buildMemoriesDigest(data, label) {
   const seenIds = new Set();
   const stableMemories = memories.map((value, index) => {
     const memory = requireRecord(`${label} memory ${index}`, value);
-    const memoryItemId = requireStoredString(`${label} memory identity`, memory.memoryItemId);
+    const memoryItemId = requireUuid(`${label} memory identity`, memory.memoryItemId);
     if (seenIds.has(memoryItemId)) throw new Error(`${label} returned duplicate Memory Item identities.`);
     seenIds.add(memoryItemId);
     if (memory.contentJsonb === undefined) throw new Error(`${label} memory content must be present.`);
@@ -187,7 +193,7 @@ function buildMemoriesDigest(data, label) {
       memoryType: requireStoredString(`${label} memory type`, memory.memoryType),
       schemaVersion: requireStoredString(`${label} memory schema version`, memory.schemaVersion),
       contentJsonb: canonicalizeJson(memory.contentJsonb, `${label} memory content`),
-      createdByCharacterId: requireNullableStoredString(
+      createdByCharacterId: requireNullableUuid(
         `${label} memory creator character`,
         memory.createdByCharacterId,
       ),
