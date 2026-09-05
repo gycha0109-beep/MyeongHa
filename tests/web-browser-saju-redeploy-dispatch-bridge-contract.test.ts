@@ -2,37 +2,48 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-const workflow = readFileSync(
+const browserWorkflow = readFileSync(
   resolve(process.cwd(), '.github/workflows/web-browser-render-smoke.yml'),
   'utf8',
 );
+const sentinelWorkflow = readFileSync(
+  resolve(process.cwd(), '.github/workflows/production-saju-redeploy-sentinel-dispatch.yml'),
+  'utf8',
+);
 
-describe('existing-workflow Saju redeploy dispatch bridge contract', () => {
-  it('keeps the existing browser smoke on PR and main push', () => {
-    expect(workflow).toContain('name: Web Browser Render Smoke');
-    expect(workflow).toContain('pull_request:');
-    expect(workflow).toContain('push:');
-    expect(workflow).toContain('- main');
-    expect(workflow).toContain('web-browser-render:');
+const RECOVERY_DISPATCH_PATH =
+  'actions/workflows/production-saju-redeploy-recovery.yml/dispatches';
+
+describe('single Saju redeploy dispatcher authority contract', () => {
+  it('keeps the browser smoke limited to browser verification', () => {
+    expect(browserWorkflow).toContain('name: Web Browser Render Smoke');
+    expect(browserWorkflow).toContain('pull_request:');
+    expect(browserWorkflow).toContain('push:');
+    expect(browserWorkflow).toContain('- main');
+    expect(browserWorkflow).toContain('web-browser-render:');
+    expect(browserWorkflow).not.toContain('dispatch-saju-redeploy-recovery:');
+    expect(browserWorkflow).not.toContain('[saju-redeploy-dispatch-v1]');
+    expect(browserWorkflow).not.toContain(RECOVERY_DISPATCH_PATH);
   });
 
-  it('dispatches only from a marked main push', () => {
-    expect(workflow).toContain('dispatch-saju-redeploy-recovery:');
-    expect(workflow).toContain("github.event_name == 'push'");
-    expect(workflow).toContain("github.ref == 'refs/heads/main'");
-    expect(workflow).toContain("contains(github.event.head_commit.message, '[saju-redeploy-dispatch-v1]')");
-    expect(workflow).toContain('actions: write');
-    expect(workflow).toContain('contents: read');
+  it('does not grant actions write permission to the browser workflow', () => {
+    expect(browserWorkflow).toContain('permissions:\n  contents: read');
+    expect(browserWorkflow).not.toContain('actions: write');
   });
 
-  it('can only dispatch the governed recovery workflow on main with its confirmation', () => {
-    expect(workflow).toContain('actions/workflows/production-saju-redeploy-recovery.yml/dispatches');
-    expect(workflow).toContain('{ref: "main", inputs: {confirm: "REDEPLOY_SAJU_PRODUCTION"}}');
-    expect(workflow).toContain("[[ \"$http_code\" != '204' ]]");
-    expect(workflow).toContain('Governed Saju recovery dispatch failed: HTTP $http_code');
+  it('keeps the sentinel dispatcher as the sole governed dispatch authority', () => {
+    expect(sentinelWorkflow).toContain('name: Production Saju Redeploy Sentinel Dispatch');
+    expect(sentinelWorkflow).toContain('- .github/production-saju-redeploy.trigger');
+    expect(sentinelWorkflow).toContain('actions: write');
+    expect(sentinelWorkflow).toContain('contents: read');
+    expect(sentinelWorkflow).toContain(RECOVERY_DISPATCH_PATH);
+    expect(sentinelWorkflow).toContain(
+      '{ref: "main", inputs: {confirm: "REDEPLOY_SAJU_PRODUCTION"}}',
+    );
+    expect(sentinelWorkflow).toContain("[[ \"$http_code\" != '204' ]]");
   });
 
-  it('does not perform production mutation itself or expose the GitHub token', () => {
+  it('keeps the sentinel dispatcher free of production mutation and token output', () => {
     const forbidden = [
       'VERCEL_TOKEN',
       '/env?upsert=true',
@@ -48,16 +59,7 @@ describe('existing-workflow Saju redeploy dispatch bridge contract', () => {
       'cat "$payload_file"',
     ];
     for (const fragment of forbidden) {
-      expect(workflow.toLowerCase()).not.toContain(fragment.toLowerCase());
+      expect(sentinelWorkflow.toLowerCase()).not.toContain(fragment.toLowerCase());
     }
-  });
-
-  it('does not broaden repository-wide token permissions', () => {
-    const topPermissions = workflow.slice(
-      workflow.indexOf('permissions:'),
-      workflow.indexOf('\njobs:'),
-    );
-    expect(topPermissions).toContain('contents: read');
-    expect(topPermissions).not.toContain('actions: write');
   });
 });
