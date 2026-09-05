@@ -277,6 +277,13 @@ Toss current official contracting guide states that non-members must be able to 
 
 사용자 추측 또는 provider SDK 기능만으로 M9를 `confirmed` 처리하지 않는다.
 
+확정 주체:
+
+```text
+provider/contract confirmation
+OR explicit architecture/product decision
+```
+
 ---
 
 ## 4. Current values at this revision
