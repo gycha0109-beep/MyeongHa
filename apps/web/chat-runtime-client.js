@@ -1,3 +1,5 @@
+import { getActiveBearer } from './product-auth.js';
+
 const params = new URLSearchParams(window.location.search);
 const threadId = params.get('threadId');
 const room = window.MyeongHaCharacterRoom;
@@ -178,6 +180,11 @@ async function loadRoomState() {
   }
 
   try {
+    const activeBearer = await getActiveBearer();
+    if (!activeBearer) {
+      throw new Error('Character Room requires a current authenticated or guest session.');
+    }
+
     const url = new URL(`/api/chat/${encodeURIComponent(threadId)}`, window.location.origin);
     url.searchParams.set('afterSequenceNo', '0');
     url.searchParams.set('presentationKey', characterKey);
@@ -186,7 +193,10 @@ async function loadRoomState() {
       method: 'GET',
       credentials: 'same-origin',
       cache: 'no-store',
-      headers: { Accept: 'application/json' },
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${activeBearer.token}`,
+      },
     });
 
     if (!response.ok) {
