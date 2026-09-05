@@ -99,7 +99,7 @@ settings_public_exec=$("${psql_base[@]}" -Atc "select case when has_function_pri
 prefs_public_exec=$("${psql_base[@]}" -Atc "select case when has_function_privilege('public','public.qry_notification_preferences_v1(uuid)','EXECUTE') then '1' else '0' end;")
 [[ "$settings_public_exec" == "0" ]] || fail "notification settings query unexpectedly executable by PUBLIC"
 [[ "$prefs_public_exec" == "0" ]] || fail "notification preferences query unexpectedly executable by PUBLIC"
-[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == "59" ]] || fail "public table catalog changed"
-pass "notification preference query PUBLIC EXECUTE remains revoked and public table catalog remains 59"
+[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == "60" ]] || fail "public table catalog changed"
+pass "notification preference query PUBLIC EXECUTE remains revoked and public table catalog remains 60"
 
 echo "notification preference query tests passed"
