@@ -37,6 +37,10 @@
       "destination": "/api/me?__myeongha_records_read=memories"
     },
     {
+      "source": "/api/chat/:threadId",
+      "destination": "/api/me?__myeongha_chat_thread_id=:threadId"
+    },
+    {
       "source": "/api/birth-profiles/:id",
       "destination": "/api/birth-profiles?__myeongha_birth_profile_id=:id"
     }
