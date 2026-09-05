@@ -53,7 +53,7 @@ pass "active default release projection function is declared STABLE"
 
 public_exec=$("${psql_base[@]}" -Atc "select case when has_function_privilege('public','public.qry_active_default_content_release_v1()','EXECUTE') then '1' else '0' end;")
 [[ "$public_exec" == '0' ]] || fail "active default release projection unexpectedly executable by PUBLIC"
-[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == '59' ]] || fail "public table catalog changed"
-pass "active default release projection remains API-mediated and public table catalog remains 59"
+[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == '60' ]] || fail "public table catalog changed"
+pass "active default release projection remains API-mediated and public table catalog remains 60"
 
 echo "Active default content release projection tests passed"
