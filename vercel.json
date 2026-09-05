@@ -29,8 +29,8 @@
   ],
   "rewrites": [
     {
-      "source": "/api/chat/:threadId",
-      "destination": "/api/me?__myeongha_chat_thread_id=:threadId"
+      "source": "^/api/chat/(?<threadId>[^/]+)$",
+      "destination": "/api/me?__myeongha_chat_thread_id=$threadId"
     },
     {
       "source": "/api/life-record",
