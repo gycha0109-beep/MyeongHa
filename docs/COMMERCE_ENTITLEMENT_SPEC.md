@@ -1,11 +1,11 @@
-# 명하 Commerce / Entitlement Implementation Specification v0.11
+# 명하 Commerce / Entitlement Implementation Specification v0.12
 
 > Product: **명하 (MyeongHa)**  
 > Date: **2026-09-05**  
 > Architecture Authority: `docs/architecture/COMMERCE_ENTITLEMENT_ARCHITECTURE_V1.md`  
 > Launch Rail Decision: `docs/COMMERCE_LAUNCH_RAIL_DECISION_V1.md`  
 > Evidence Minimization Decision: `docs/COMMERCE_EVIDENCE_DATA_MINIMIZATION_DECISION_V1.md`  
-> Status: **DERIVED IMPLEMENTATION SPEC / ARCHITECTURE CLOSED / LAUNCH RAIL DECIDED / EVIDENCE MINIMIZATION DECIDED / FINGERPRINT PRIMITIVE IMPLEMENTED / EVIDENCE STRUCTURAL CONTRACT IMPLEMENTED / ENTITLEMENT EFFECT STRUCTURAL CONTRACT IMPLEMENTED / IMPLEMENTATION HOLD**  
+> Status: **DERIVED IMPLEMENTATION SPEC / ARCHITECTURE CLOSED / LAUNCH RAIL DECIDED / EVIDENCE MINIMIZATION DECIDED / FINGERPRINT PRIMITIVE IMPLEMENTED / EVIDENCE STRUCTURAL CONTRACT IMPLEMENTED / ENTITLEMENT EFFECT STRUCTURAL CONTRACT IMPLEMENTED / EFFECTIVE ENTITLEMENT PROJECTION RECOMPUTE IMPLEMENTED / IMPLEMENTATION HOLD**  
 > Rule: 이 문서는 Architecture와 이후 explicit P0 decision을 요약해 구현 경계를 연결하는 companion이다. Domain semantics 충돌 시 Architecture가 우선하고, Architecture 작성 뒤 결정된 P0 status는 최신 `docs/P0_DECISION_REGISTER.md`와 해당 decision record가 우선한다.
 
 ---
@@ -24,10 +24,11 @@ P0-PR-01B provider-evidence minimization      = DECIDED
 provider-neutral evidence fingerprint primitive = IMPLEMENTED / PURE HELPER / NOT WIRED TO PROD CONFIG
 provider-neutral evidence structural contract = IMPLEMENTED / PURE VALIDATOR / NO PROVIDER AUTHENTICITY
 provider-neutral entitlement effect contract  = IMPLEMENTED / PURE VALIDATOR / NO APPLY RUNTIME
-provider adapter / webhook / apply runtime    = NOT IMPLEMENTED
+effective entitlement projection recompute    = IMPLEMENTED / INTERNAL DB PRIMITIVE / PRODUCTION MIGRATION APPLIED
+provider adapter / webhook / verified apply runtime = NOT IMPLEMENTED
 ```
 
-따라서 Web-first rail shape와 provider-evidence 최소화 경계, provider-neutral fingerprint primitive, `VerifiedCommerceEvidenceV1` structural contract, `EntitlementEffectV1` structural/static-transition contract는 준비됐지만 provider authenticity verification, provider ordering, apply-time entitlement semantics, event dedupe generation, adjusted actor authentication, provider SDK, provider-specific canonical serializer, webhook route, production schema mutation, enabled paid catalog, production evidence persistence는 아직 허가되거나 구현되지 않았다.
+따라서 Web-first rail shape와 provider-evidence 최소화 경계, provider-neutral fingerprint primitive, `VerifiedCommerceEvidenceV1` structural contract, `EntitlementEffectV1` structural/static-transition contract, 그리고 Architecture §17의 provider-neutral Effective Entitlement aggregate/recompute primitive까지 구현됐다. 그러나 provider authenticity verification, provider ordering, verified Grant/Event apply transaction, event dedupe generation, adjusted actor authentication, provider SDK, provider-specific canonical serializer, webhook route, enabled paid catalog, production evidence persistence는 아직 허가되거나 구현되지 않았다.
 
 ---
 
@@ -93,9 +94,12 @@ entitlements
 ```text
 cmd_create_purchase_intent_v1
 qry_entitlements_v1
+internal_recompute_entitlement_projection_v1
 ```
 
 `cmd_create_purchase_intent_v1`은 현재 minimal Offer mapping만 pin하며 receipt/grant를 만들지 않는다.
+
+`internal_recompute_entitlement_projection_v1`은 API/client command가 아니라 이미-authoritative한 `entitlement_grants`를 한 logical entitlement projection으로 재계산하는 **내부 provider-neutral DB primitive**다. `PUBLIC`, `anon`, `authenticated`, `service_role`, `myeongha_api_executor`에는 EXECUTE를 부여하지 않는다.
 
 ### Provider-neutral security primitive
 
@@ -165,7 +169,33 @@ test/entitlement-effect.test.ts
 - unknown/source/actor/dedupe/provider-order/raw-provider field hitchhiking 방지
 - 새 frozen normalized object 반환
 
-이 validator는 timestamp grammar를 발명하거나 해석하지 않는다. `transaction_timestamp()` 기반 future-active 검사, historical interval 보존, renewal의 original `valid_from` 유지, provider ordering, semantic event dedupe key 생성, `adjusted` actor 인증, DB persistence, grant/event/projection mutation은 모두 apply/runtime 책임으로 남아 있으며 현재 구현되지 않았다.
+이 validator는 timestamp grammar를 발명하거나 해석하지 않는다. `transaction_timestamp()` 기반 future-active 검사, historical interval 보존, renewal의 original `valid_from` 유지, provider ordering, semantic event dedupe key 생성, `adjusted` actor 인증, DB persistence, grant/event mutation은 verified apply/runtime 책임으로 남아 있으며 현재 구현되지 않았다. Effective Entitlement aggregate recompute 자체는 아래 internal DB primitive로 별도 구현됐다.
+
+### Provider-neutral Effective Entitlement projection recompute
+
+```text
+supabase/migrations/0900_entitlement_projection_recompute_command.sql
+public.internal_recompute_entitlement_projection_v1(uuid, text, text)
+```
+
+현재 구현 범위:
+
+- one transaction-scoped `as_of = transaction_timestamp()`
+- Architecture §17 contributor predicate 그대로 적용
+- `count=0 → inactive / 0 / NULL`
+- current unbounded contributor가 하나라도 있으면 `active / NULL expiry`
+- 모든 current contributor가 finite이면 `MAX(valid_until)`
+- future-active Grant는 현재 contributor에서 제외
+- wall-clock expired Grant는 stored status가 `active`여도 contributor에서 제외
+- global/fixed scope logical identity 분리
+- authoritative Grant history가 전혀 없는 임의 key로 inactive projection 생성 금지
+- material tuple `(status, active_grant_count, effective_valid_until)`이 바뀔 때만 `revision + 1` / `updated_at` 변경
+- exact no-op은 `revision`과 `updated_at` 보존
+- 기존 logical projection은 projection row `FOR UPDATE`를 serialization point로 사용
+- 최초 projection 동시 생성은 `entitlements_logical_unique`가 winner를 결정하고 loser는 winner를 다시 lock한 뒤 fresh statement snapshot으로 aggregate 재계산
+- API-facing role EXECUTE 없음
+
+이 primitive는 provider evidence를 검증하지 않고, Grant/Event를 생성·변경하지 않으며, `event_dedupe_key`를 생성하지 않고, provider ordering을 판정하지 않고, outbox를 쓰지 않는다. 따라서 이것만으로 payment 또는 verified apply runtime이 존재한다고 판정하지 않는다.
 
 ### Missing runtime
 
@@ -357,7 +387,7 @@ Key transition:
 
 Provider reaffirmation이 material grant state를 바꾸지 않으면 entitlement event를 추가하지 않는다.
 
-현재 `apps/api/src/entitlement-effect.ts`는 이 section의 **provider-neutral structural/static-transition subset만** 구현한다. `effectiveAt`/validity fields는 structural validator에서 opaque non-empty string으로 유지되며 timestamp grammar나 ordering semantics를 해석하지 않는다. Future-active 판정, renewal interval 보존, no-op/material-state 판정, actor authentication, dedupe/conflict, CAS, persistence는 아직 apply runtime이 없으므로 구현되지 않았다.
+현재 `apps/api/src/entitlement-effect.ts`는 이 section의 **provider-neutral structural/static-transition subset만** 구현한다. `effectiveAt`/validity fields는 structural validator에서 opaque non-empty string으로 유지되며 timestamp grammar나 ordering semantics를 해석하지 않는다. Future-active **verified Grant apply** 판정, renewal interval 보존, Grant/Event material-state 판정, actor authentication, dedupe/conflict, provider ordering CAS, Grant/Event persistence는 아직 apply runtime이 없으므로 구현되지 않았다. Effective Entitlement projection의 material/no-op aggregate 판정은 Section 9의 internal recompute primitive로 구현됐다.
 
 ---
 
@@ -401,6 +431,8 @@ status='active'
 AND active_grant_count > 0
 AND (effective_valid_until IS NULL OR effective_valid_until > now())
 ```
+
+현재 이 aggregate/rebuild subset은 `internal_recompute_entitlement_projection_v1`으로 구현됐다. Existing projection은 row lock으로 동일 logical entitlement의 recompute를 직렬화하고, concurrent first insert는 logical unique constraint로 단일 projection을 확정한 뒤 loser가 winner를 lock/re-read/recompute한다. Grant 자체의 verified transition/event append/provider-order CAS/outbox는 이 primitive의 책임이 아니다.
 
 ---
 
@@ -496,6 +528,8 @@ verified evidence outside DB tx
 → provider event processed marker where applicable
 → commit
 ```
+
+Section 9의 recompute 단계만 provider-neutral internal primitive로 구현되어 있다. 나머지 verified apply transaction 전체는 아직 구현되지 않았다.
 
 Ledger/grant/projection/outbox partial commit은 허용하지 않는다.
 
@@ -595,7 +629,7 @@ selected-provider ordering proof
 → safe comparator or equivalent fail-closed reconciliation
 ```
 
-`P0-CM-01` 결정은 exact PSP나 paid SKU를 승인하지 않는다. `P0-PR-01B` 결정은 retention duration이나 production persistence activation을 승인하지 않는다.
+`P0-CM-01` 결정은 exact PSP나 paid SKU를 승인하지 않는다. `P0-PR-01B` 결정은 retention duration이나 production persistence activation을 승인하지 않는다. Effective Entitlement recompute primitive의 production migration 적용 역시 payment/provider activation을 승인하지 않는다.
 
 ---
 
@@ -630,7 +664,17 @@ The fingerprint-specific subset above is implemented by `test/production-commerc
 
 The provider-neutral evidence structural subset is implemented by `test/verified-commerce-evidence.test.ts`, including unknown/raw/client-authority field rejection, exact owner-binding vocabulary, malformed fingerprint rejection, non-plain input rejection, and validation-error non-leakage. 이 structural test는 provider authenticity 또는 provider-specific payload allowlist를 검증하지 않는다. Provider-specific canonicalization/payload allowlist/authenticity tests remain blocked until a concrete adapter schema exists.
 
-The provider-neutral Entitlement Effect structural subset is implemented by `test/entitlement-effect.test.ts`, including exact schema/event/status vocabulary, required/nullability rules, Architecture-authorized static event→target transitions, `adjusted` reason requirement, unknown/source/actor/dedupe/provider-order/raw-provider field rejection, non-plain input rejection, and validation-error non-leakage. 이 test는 timestamp semantics, future-active apply-time enforcement, renewal interval preservation, provider ordering, actor authentication, event dedupe/conflict generation, CAS, persistence 또는 effective-entitlement recompute를 검증하지 않는다.
+The provider-neutral Entitlement Effect structural subset is implemented by `test/entitlement-effect.test.ts`, including exact schema/event/status vocabulary, required/nullability rules, Architecture-authorized static event→target transitions, `adjusted` reason requirement, unknown/source/actor/dedupe/provider-order/raw-provider field rejection, non-plain input rejection, and validation-error non-leakage. 이 test는 timestamp semantics, future-active verified-apply enforcement, renewal interval preservation, provider ordering, actor authentication, event dedupe/conflict generation, CAS 또는 Grant/Event persistence를 검증하지 않는다.
+
+The provider-neutral Effective Entitlement aggregate/recompute subset is implemented by:
+
+```text
+test/db/entitlement_projection_recompute.sql
+test/db/entitlement_projection_recompute_concurrency.sh
+.github/workflows/db-commerce-entitlement-projection-recompute.yml
+```
+
+이 검증은 finite max-expiry, unbounded contributor, zero-current-contributor inactive, future-active exclusion, wall-clock expiry fail-closed, fixed/global scope isolation, exact no-op revision/update preservation, no-Grant-history projection manufacture rejection, API-facing EXECUTE denial, concurrent first insert single-row arbitration, 서로 다른 Grant의 concurrent mutation 후 projection serialization/final aggregate convergence를 실제 PostgreSQL에서 검증한다. Provider authenticity, verified Grant/Event apply, provider ordering, event dedupe generation, outbox atomicity는 이 workflow의 검증 범위가 아니다.
 
 ---
 
@@ -645,12 +689,14 @@ Purchase Intent v2 Capability pin                = NOT IMPLEMENTED / HOLD UNTIL 
 provider-neutral evidence fingerprint primitive = IMPLEMENTED / PURE HELPER / MERGED-MAIN CI GREEN
 provider-neutral evidence structural contract   = IMPLEMENTED / PURE VALIDATOR / MERGED-MAIN CI GREEN / NO AUTHENTICITY VERIFICATION
 provider-neutral entitlement effect contract    = IMPLEMENTED / PURE VALIDATOR / MERGED-MAIN CI GREEN / NO APPLY RUNTIME
+effective entitlement projection recompute      = IMPLEMENTED / INTERNAL DB / MERGED-MAIN CI GREEN / PRODUCTION MIGRATION GREEN
 provider-specific canonical evidence serializer = NOT IMPLEMENTED / BLOCKED BY P0-CM-02
 provider-neutral verification runtime            = NOT IMPLEMENTED
-provider ordering comparator/runtime              = NOT IMPLEMENTED / BLOCKED BY P0-CM-02
-entitlement apply-time semantics/runtime          = NOT IMPLEMENTED
-entitlement event dedupe/conflict generation      = NOT IMPLEMENTED
+provider ordering comparator/runtime             = NOT IMPLEMENTED / BLOCKED BY P0-CM-02
+verified Grant/Event apply transaction           = NOT IMPLEMENTED
+entitlement event dedupe/conflict generation     = NOT IMPLEMENTED
 adjusted-effect actor authentication              = NOT IMPLEMENTED
+outbox-on-rights-material-change                 = NOT IMPLEMENTED
 concrete provider adapter                         = BLOCKED BY P0-CM-02 + P0-CM-03
 verified receipt → grant/event/projection command= NOT IMPLEMENTED
 webhook/provider event runtime                    = NOT IMPLEMENTED
