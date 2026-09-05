@@ -1,11 +1,11 @@
-# 명하 Commerce / Entitlement Implementation Specification v0.10
+# 명하 Commerce / Entitlement Implementation Specification v0.11
 
 > Product: **명하 (MyeongHa)**  
 > Date: **2026-09-05**  
 > Architecture Authority: `docs/architecture/COMMERCE_ENTITLEMENT_ARCHITECTURE_V1.md`  
 > Launch Rail Decision: `docs/COMMERCE_LAUNCH_RAIL_DECISION_V1.md`  
 > Evidence Minimization Decision: `docs/COMMERCE_EVIDENCE_DATA_MINIMIZATION_DECISION_V1.md`  
-> Status: **DERIVED IMPLEMENTATION SPEC / ARCHITECTURE CLOSED / LAUNCH RAIL DECIDED / EVIDENCE MINIMIZATION DECIDED / FINGERPRINT PRIMITIVE IMPLEMENTED / EVIDENCE STRUCTURAL CONTRACT IMPLEMENTED / IMPLEMENTATION HOLD**  
+> Status: **DERIVED IMPLEMENTATION SPEC / ARCHITECTURE CLOSED / LAUNCH RAIL DECIDED / EVIDENCE MINIMIZATION DECIDED / FINGERPRINT PRIMITIVE IMPLEMENTED / EVIDENCE STRUCTURAL CONTRACT IMPLEMENTED / ENTITLEMENT EFFECT STRUCTURAL CONTRACT IMPLEMENTED / IMPLEMENTATION HOLD**  
 > Rule: 이 문서는 Architecture와 이후 explicit P0 decision을 요약해 구현 경계를 연결하는 companion이다. Domain semantics 충돌 시 Architecture가 우선하고, Architecture 작성 뒤 결정된 P0 status는 최신 `docs/P0_DECISION_REGISTER.md`와 해당 decision record가 우선한다.
 
 ---
@@ -23,10 +23,11 @@ P0-PR-01 parent retention/legal/backup        = OPEN-P0
 P0-PR-01B provider-evidence minimization      = DECIDED
 provider-neutral evidence fingerprint primitive = IMPLEMENTED / PURE HELPER / NOT WIRED TO PROD CONFIG
 provider-neutral evidence structural contract = IMPLEMENTED / PURE VALIDATOR / NO PROVIDER AUTHENTICITY
+provider-neutral entitlement effect contract  = IMPLEMENTED / PURE VALIDATOR / NO APPLY RUNTIME
 provider adapter / webhook / apply runtime    = NOT IMPLEMENTED
 ```
 
-따라서 Web-first rail shape와 provider-evidence 최소화 경계, provider-neutral fingerprint primitive, `VerifiedCommerceEvidenceV1` structural contract는 준비됐지만 provider authenticity verification, provider SDK, provider-specific canonical serializer, webhook route, production schema mutation, enabled paid catalog, production evidence persistence는 아직 허가되지 않는다.
+따라서 Web-first rail shape와 provider-evidence 최소화 경계, provider-neutral fingerprint primitive, `VerifiedCommerceEvidenceV1` structural contract, `EntitlementEffectV1` structural/static-transition contract는 준비됐지만 provider authenticity verification, provider ordering, apply-time entitlement semantics, event dedupe generation, adjusted actor authentication, provider SDK, provider-specific canonical serializer, webhook route, production schema mutation, enabled paid catalog, production evidence persistence는 아직 허가되거나 구현되지 않았다.
 
 ---
 
@@ -137,6 +138,34 @@ test/verified-commerce-evidence.test.ts
 - 새 frozen normalized object 반환
 
 이 validator는 **provider authenticity를 검증하지 않는다**. Raw provider payload를 파싱하거나 PSP signature/API를 확인하지 않으며 provider ordering을 추론하거나 DB에 저장하거나 entitlement를 변경하지 않는다.
+
+### Provider-neutral Entitlement Effect structural contract
+
+```text
+apps/api/src/entitlement-effect.ts
+test/entitlement-effect.test.ts
+```
+
+현재 구현 범위:
+
+- exact `entitlement-effect-v1` schema version
+- exact event vocabulary
+  - `granted | renewed | expired | revoked | restored | adjusted`
+- exact target status vocabulary
+  - `active | expired | revoked`
+- `effectiveAt`, `targetValidFrom` non-empty string structure
+- `targetValidUntil` explicit `string | null`
+- optional `reasonCode`가 존재할 경우 non-empty string
+- Architecture가 정적으로 고정한 event → target status 관계 fail-closed
+  - `granted | renewed | restored → active`
+  - `expired → expired`
+  - `revoked → revoked`
+  - `adjusted → active | expired | revoked`
+- `adjusted`는 structural boundary에서도 `reasonCode`를 요구
+- unknown/source/actor/dedupe/provider-order/raw-provider field hitchhiking 방지
+- 새 frozen normalized object 반환
+
+이 validator는 timestamp grammar를 발명하거나 해석하지 않는다. `transaction_timestamp()` 기반 future-active 검사, historical interval 보존, renewal의 original `valid_from` 유지, provider ordering, semantic event dedupe key 생성, `adjusted` actor 인증, DB persistence, grant/event/projection mutation은 모두 apply/runtime 책임으로 남아 있으며 현재 구현되지 않았다.
 
 ### Missing runtime
 
@@ -327,6 +356,8 @@ Key transition:
 - `adjusted`: authenticated system/admin + explicit reason only
 
 Provider reaffirmation이 material grant state를 바꾸지 않으면 entitlement event를 추가하지 않는다.
+
+현재 `apps/api/src/entitlement-effect.ts`는 이 section의 **provider-neutral structural/static-transition subset만** 구현한다. `effectiveAt`/validity fields는 structural validator에서 opaque non-empty string으로 유지되며 timestamp grammar나 ordering semantics를 해석하지 않는다. Future-active 판정, renewal interval 보존, no-op/material-state 판정, actor authentication, dedupe/conflict, CAS, persistence는 아직 apply runtime이 없으므로 구현되지 않았다.
 
 ---
 
@@ -597,7 +628,9 @@ missing/weak Commerce HMAC secret → fail before evidence persistence
 
 The fingerprint-specific subset above is implemented by `test/production-commerce-evidence-fingerprint.test.ts`.
 
-The provider-neutral structural subset is implemented by `test/verified-commerce-evidence.test.ts`, including unknown/raw/client-authority field rejection, exact owner-binding vocabulary, malformed fingerprint rejection, non-plain input rejection, and validation-error non-leakage. 이 structural test는 provider authenticity 또는 provider-specific payload allowlist를 검증하지 않는다. Provider-specific canonicalization/payload allowlist/authenticity tests remain blocked until a concrete adapter schema exists.
+The provider-neutral evidence structural subset is implemented by `test/verified-commerce-evidence.test.ts`, including unknown/raw/client-authority field rejection, exact owner-binding vocabulary, malformed fingerprint rejection, non-plain input rejection, and validation-error non-leakage. 이 structural test는 provider authenticity 또는 provider-specific payload allowlist를 검증하지 않는다. Provider-specific canonicalization/payload allowlist/authenticity tests remain blocked until a concrete adapter schema exists.
+
+The provider-neutral Entitlement Effect structural subset is implemented by `test/entitlement-effect.test.ts`, including exact schema/event/status vocabulary, required/nullability rules, Architecture-authorized static event→target transitions, `adjusted` reason requirement, unknown/source/actor/dedupe/provider-order/raw-provider field rejection, non-plain input rejection, and validation-error non-leakage. 이 test는 timestamp semantics, future-active apply-time enforcement, renewal interval preservation, provider ordering, actor authentication, event dedupe/conflict generation, CAS, persistence 또는 effective-entitlement recompute를 검증하지 않는다.
 
 ---
 
@@ -611,8 +644,13 @@ Product Capability Set schema                    = NOT IMPLEMENTED / HOLD UNTIL 
 Purchase Intent v2 Capability pin                = NOT IMPLEMENTED / HOLD UNTIL P0-CM-03
 provider-neutral evidence fingerprint primitive = IMPLEMENTED / PURE HELPER / MERGED-MAIN CI GREEN
 provider-neutral evidence structural contract   = IMPLEMENTED / PURE VALIDATOR / MERGED-MAIN CI GREEN / NO AUTHENTICITY VERIFICATION
+provider-neutral entitlement effect contract    = IMPLEMENTED / PURE VALIDATOR / MERGED-MAIN CI GREEN / NO APPLY RUNTIME
 provider-specific canonical evidence serializer = NOT IMPLEMENTED / BLOCKED BY P0-CM-02
 provider-neutral verification runtime            = NOT IMPLEMENTED
+provider ordering comparator/runtime              = NOT IMPLEMENTED / BLOCKED BY P0-CM-02
+entitlement apply-time semantics/runtime          = NOT IMPLEMENTED
+entitlement event dedupe/conflict generation      = NOT IMPLEMENTED
+adjusted-effect actor authentication              = NOT IMPLEMENTED
 concrete provider adapter                         = BLOCKED BY P0-CM-02 + P0-CM-03
 verified receipt → grant/event/projection command= NOT IMPLEMENTED
 webhook/provider event runtime                    = NOT IMPLEMENTED
