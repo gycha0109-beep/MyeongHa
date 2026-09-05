@@ -1,0 +1,77 @@
+name: Production Member Reauthentication Continuity Smoke Sentinel Dispatch
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type TRIGGER_MEMBER_REAUTH_CONTINUITY to dispatch the governed production Member reauthentication continuity smoke.'
+        required: true
+        type: string
+  push:
+    branches:
+      - main
+    paths:
+      - .github/production-member-reauth-continuity-smoke.trigger
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: production-member-reauth-continuity-smoke-sentinel-dispatch
+  cancel-in-progress: false
+
+jobs:
+  dispatch-governed-member-reauth-continuity:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Verify governed trigger
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DISPATCH_CONFIRM: ${{ inputs.confirm }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == 'workflow_dispatch' ]]; then
+            [[ "$DISPATCH_CONFIRM" == 'TRIGGER_MEMBER_REAUTH_CONTINUITY' ]]
+          else
+            [[ "$EVENT_NAME" == 'push' ]]
+            [[ "$GITHUB_REF" == 'refs/heads/main' ]]
+          fi
+
+      - name: Dispatch governed Production Member reauthentication continuity smoke
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          umask 077
+          payload_file="$RUNNER_TEMP/production-member-reauth-continuity-dispatch.json"
+          cleanup() {
+            exit_code=$?
+            trap - EXIT
+            rm -f "$payload_file"
+            exit "$exit_code"
+          }
+          trap cleanup EXIT
+
+          test -n "${GH_TOKEN:-}"
+          jq -n '{ref: "main", inputs: {confirm: "VERIFY_MEMBER_REAUTH_CONTINUITY"}}' > "$payload_file"
+
+          http_code="$(curl -sS \
+            -X POST \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'Accept: application/vnd.github+json' \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            --data-binary "@$payload_file" \
+            -o /dev/null \
+            -w '%{http_code}' \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/workflows/production-member-reauth-continuity-smoke.yml/dispatches")"
+
+          if [[ "$http_code" != '204' ]]; then
+            echo "Governed Production Member reauth continuity dispatch failed: HTTP $http_code" >&2
+            exit 1
+          fi
+
+          echo 'Governed Production Member reauthentication continuity smoke dispatch accepted.'
