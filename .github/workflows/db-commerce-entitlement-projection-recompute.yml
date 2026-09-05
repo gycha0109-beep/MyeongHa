@@ -47,5 +47,7 @@ jobs:
             echo "Applying ${migration}"
             psql -v ON_ERROR_STOP=1 -f "${migration}" >/dev/null
           done
-      - name: Verify entitlement projection recompute authority
+      - name: Verify entitlement projection recompute semantics
         run: psql -1 -v ON_ERROR_STOP=1 -f test/db/entitlement_projection_recompute.sql
+      - name: Verify entitlement projection recompute concurrency
+        run: bash test/db/entitlement_projection_recompute_concurrency.sh
