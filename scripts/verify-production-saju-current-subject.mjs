@@ -2,6 +2,7 @@ import { acquireProductionMemberSmokeSession } from './production-member-smoke-s
 
 const PRODUCTION_ORIGIN = 'https://myeongha.vercel.app';
 const MEMBER_ME_URL = `${PRODUCTION_ORIGIN}/api/me`;
+const BIRTH_PROFILE_URL = `${PRODUCTION_ORIGIN}/api/me/birth-profile`;
 const SAJU_CALCULATION_URL = `${PRODUCTION_ORIGIN}/api/me/saju/calculation`;
 const REQUEST_TIMEOUT_MS = 20_000;
 
@@ -23,6 +24,13 @@ function requireUuid(name, value) {
 function requireNonEmptyString(name, value) {
   if (typeof value !== 'string' || value.trim().length === 0) {
     throw new Error(`${name} must be a non-empty string.`);
+  }
+  return value;
+}
+
+function requirePositiveInteger(name, value) {
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value <= 0) {
+    throw new Error(`${name} must be a positive integer.`);
   }
   return value;
 }
@@ -123,6 +131,59 @@ if (memberData.subjectId !== expectedSubjectId) {
 }
 if (memberData.subjectStatus !== 'active') throw new Error('Production Saju smoke Member subject must be active.');
 
+const birthProfileResponse = await fetchCanonical(BIRTH_PROFILE_URL, {
+  method: 'GET',
+  headers: authorization,
+});
+requireNoStore(birthProfileResponse, 'Production Saju smoke current Birth Profile');
+requireJsonContentType(birthProfileResponse, 'Production Saju smoke current Birth Profile');
+if (birthProfileResponse.status !== 200) {
+  throw new Error(`Production Saju smoke current Birth Profile expected HTTP 200, received ${birthProfileResponse.status}.`);
+}
+const birthProfileBody = await readJsonWithoutLogging(
+  birthProfileResponse,
+  'Production Saju smoke current Birth Profile',
+);
+requireApiContract(birthProfileBody, 'Production Saju smoke current Birth Profile');
+if (birthProfileBody.ok !== true) {
+  throw new Error('Production Saju smoke current Birth Profile did not return ok=true.');
+}
+const birthProfileData = requireRecord(
+  'Production Saju smoke current Birth Profile data',
+  birthProfileBody.data,
+);
+const birthProfile = requireRecord(
+  'Production Saju smoke current Birth Profile',
+  birthProfileData.birthProfile,
+);
+requireUuid('Production Saju smoke Birth Profile id', birthProfile.birthProfileId);
+if (birthProfile.profileKind !== 'self') {
+  throw new Error('Production Saju smoke current Birth Profile must be the self profile.');
+}
+if (birthProfile.archivedAt !== null) {
+  throw new Error('Production Saju smoke current Birth Profile must not be archived.');
+}
+const currentRevision = requireRecord(
+  'Production Saju smoke current Birth Profile revision',
+  birthProfile.currentRevision,
+);
+requireUuid('Production Saju smoke current Birth revision id', currentRevision.revisionId);
+requirePositiveInteger('Production Saju smoke current Birth revision number', currentRevision.revisionNo);
+requireRecord('Production Saju smoke current Birth input', currentRevision.input);
+if (!Array.isArray(birthProfile.revisions) || birthProfile.revisions.length === 0) {
+  throw new Error('Production Saju smoke current Birth Profile must expose revision summaries.');
+}
+const matchingCurrentRevisions = birthProfile.revisions.filter(
+  (revision) =>
+    isRecord(revision) &&
+    revision.isCurrent === true &&
+    revision.revisionId === currentRevision.revisionId &&
+    revision.revisionNo === currentRevision.revisionNo,
+);
+if (matchingCurrentRevisions.length !== 1) {
+  throw new Error('Production Saju smoke current Birth Profile revision summary does not match the current revision.');
+}
+
 const calculationResponse = await fetchCanonical(SAJU_CALCULATION_URL, {
   method: 'POST',
   headers: authorization,
@@ -154,7 +215,7 @@ requireExact(
 requireExact('calculation.kind', calculation.kind, 'saju_calculation_evidence');
 requireExact('calculation.semanticAuthority', calculation.semanticAuthority, 'calculation_only');
 requireExact('calculation.interpretationAuthorized', calculation.interpretationAuthorized, false);
-requireNonEmptyString('calculation.birthRevisionRef', calculation.birthRevisionRef);
+requireExact('calculation.birthRevisionRef', calculation.birthRevisionRef, currentRevision.revisionId);
 
 const source = requireRecord('calculation.source', calculation.source);
 requireExact(
@@ -240,10 +301,14 @@ requireExact(
 requireNonEmptyString('calculation.snapshot.provenance.schema.id', provenance.schema.id);
 requireNonEmptyString('calculation.snapshot.provenance.schema.version', provenance.schema.version);
 
-if (JSON.stringify(memberBody).includes(accessToken) || JSON.stringify(calculationBody).includes(accessToken)) {
+if (
+  JSON.stringify(memberBody).includes(accessToken) ||
+  JSON.stringify(birthProfileBody).includes(accessToken) ||
+  JSON.stringify(calculationBody).includes(accessToken)
+) {
   throw new Error('Production current-subject Saju response reflected the fresh Member access token.');
 }
 
 console.log(
-  'MyeongHa production current-subject Saju smoke passed: freshSession=true, memberSubjectMatch=true, calculation=200, authority=calculation_only, ingressContract=v1, cacheControl=no-store.',
+  'MyeongHa production current-subject Saju smoke passed: memberSignIn=200, freshSession=true, memberSubjectMatch=true, birthProfilePresent=true, birthRevisionMatch=true, calculation=200, authority=calculation_only, ingressContract=v1, cacheControl=no-store.',
 );

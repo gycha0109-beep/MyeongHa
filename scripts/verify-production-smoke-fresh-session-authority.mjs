@@ -25,7 +25,9 @@ for (const required of [
   'MYEONGHA_PRODUCTION_MEMBER_PASSWORD',
   'MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID',
   '/api/auth/sign-in',
+  '/api/me/birth-profile',
   'acquireProductionMemberSmokeSession',
+  'birthProfilePresent=true',
 ]) {
   if (!joined.includes(required)) {
     throw new Error(`Fresh-session smoke authority is missing required fragment: ${required}`);
