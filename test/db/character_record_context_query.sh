@@ -69,7 +69,7 @@ expect_fail "unknown character context is denied" "character was not found" "sel
 expect_fail "deletion-pending subject context is denied" "character record context requires an active canonical subject" "select * from public.qry_character_record_context_v1('92000000-0000-0000-0000-000000000003','ctx-alpha');"
 
 [[ "$("${psql_base[@]}" -Atc "select case when has_function_privilege('public','public.qry_character_record_context_v1(uuid,text)','EXECUTE') then '1' else '0' end;")" == "0" ]] || fail "context query unexpectedly executable by PUBLIC"
-[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == "59" ]] || fail "public table catalog changed"
-pass "context query PUBLIC EXECUTE remains revoked and public table catalog remains 59"
+[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == "60" ]] || fail "public table catalog changed"
+pass "context query PUBLIC EXECUTE remains revoked and public table catalog remains 60"
 
 echo "character record context query tests passed"
