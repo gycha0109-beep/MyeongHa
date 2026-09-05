@@ -8,3 +8,15 @@ Rules:
 - bundle members must share the bundle content version;
 - deterministic manifests provide stable content hashes;
 - `developmentPlaceholder` characters are explicitly non-canonical and exist only to validate product structure before real character authoring.
+
+## Production publication boundary
+
+Production character artifacts must pass `validateProductionCharacterContentBundle` (or be built through `buildProductionCharacterContentManifest`).
+
+The boundary:
+- reuses the full generic authored-character validation;
+- requires at least 5 characters for the launch roster;
+- rejects every `developmentPlaceholder`;
+- never infers canonical `characterId` from web/UI presentation keys or runtime database rows.
+
+This package currently provides validation and deterministic immutable manifest construction only. Runtime database publication and release activation remain separate governed operations and must consume source-backed authored content.
