@@ -95,7 +95,7 @@ expect_fail "Memory list subject is required" "memory list subject is required" 
 
 public_exec=$("${psql_base[@]}" -Atc "select case when has_function_privilege('public','public.qry_memory_items_v1(uuid)','EXECUTE') then '1' else '0' end;")
 [[ "$public_exec" == "0" ]] || fail "Memory Item query unexpectedly executable by PUBLIC"
-[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == "59" ]] || fail "public table catalog changed"
-pass "Memory Item query PUBLIC EXECUTE remains revoked and public table catalog remains 59"
+[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == "60" ]] || fail "public table catalog changed"
+pass "Memory Item query PUBLIC EXECUTE remains revoked and public table catalog remains 60"
 
 echo "current Memory Item projection tests passed"

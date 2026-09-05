@@ -35,11 +35,12 @@ insert into auth.users(id) values
   ('00000000-0000-0000-0000-000000000802')
 on conflict do nothing;
 
-insert into public.subjects(id, kind, auth_user_id, status, created_at, updated_at)
+insert into public.subjects(id, kind, auth_user_id, status, merged_into_subject_id, created_at, updated_at)
 values
-  ('80000000-0000-0000-0000-000000000001', 'member', '00000000-0000-0000-0000-000000000801', 'active', now(), now()),
-  ('80000000-0000-0000-0000-000000000002', 'member', '00000000-0000-0000-0000-000000000802', 'active', now(), now()),
-  ('80000000-0000-0000-0000-000000000003', 'guest', null, 'active', now(), now());
+  ('80000000-0000-0000-0000-000000000001', 'member', '00000000-0000-0000-0000-000000000801', 'active', null, now(), now()),
+  ('80000000-0000-0000-0000-000000000002', 'member', '00000000-0000-0000-0000-000000000802', 'active', null, now(), now()),
+  ('80000000-0000-0000-0000-000000000003', 'guest', null, 'active', null, now(), now()),
+  ('80000000-0000-0000-0000-000000000004', 'guest', null, 'merged', '80000000-0000-0000-0000-000000000001', now(), now());
 
 insert into public.products(id, product_key, product_type, enabled, created_at)
 values
@@ -71,10 +72,33 @@ select pg_temp.assert_fails(
   'commerce_account_links_active_external_idx'
 );
 
+insert into public.purchase_intents(
+  id, subject_id, product_offer_id, idempotency_key, request_hash,
+  offer_snapshot_jsonb, offer_snapshot_hash, status, created_at, updated_at
+) values (
+  '81300000-0000-0000-0000-000000000003', '80000000-0000-0000-0000-000000000003',
+  '81100000-0000-0000-0000-000000000001', 'guest-buy', 'hmac-sha256:k2:req-guest',
+  '{}', 'sha256:v1:snap-guest', 'created', now(), now()
+);
+
+do $$
+begin
+  if not exists (
+    select 1
+    from public.purchase_intents
+    where id = '81300000-0000-0000-0000-000000000003'
+      and subject_id = '80000000-0000-0000-0000-000000000003'
+  ) then
+    raise exception 'FAIL active canonical Guest purchase owner was not accepted by shared DB invariant';
+  end if;
+  raise notice 'PASS active canonical Guest is an eligible shared Purchase Intent owner';
+end;
+$$;
+
 select pg_temp.assert_fails(
-  'guest purchase is denied',
-  $$insert into public.purchase_intents(id,subject_id,product_offer_id,idempotency_key,request_hash,offer_snapshot_jsonb,offer_snapshot_hash,status,created_at,updated_at) values ('81300000-0000-0000-0000-000000000003','80000000-0000-0000-0000-000000000003','81100000-0000-0000-0000-000000000001','guest-buy','hmac-sha256:k2:req-guest','{}','sha256:v1:snap-guest','created',now(),now())$$,
-  'ct_purchase_intent_member_only'
+  'merged Guest purchase owner is denied',
+  $$insert into public.purchase_intents(id,subject_id,product_offer_id,idempotency_key,request_hash,offer_snapshot_jsonb,offer_snapshot_hash,status,created_at,updated_at) values ('81300000-0000-0000-0000-000000000009','80000000-0000-0000-0000-000000000004','81100000-0000-0000-0000-000000000001','merged-guest-buy','hmac-sha256:k2:req-merged-guest','{}','sha256:v1:snap-merged-guest','created',now(),now())$$,
+  'ct_purchase_intent_active_canonical_subject'
 );
 
 select pg_temp.assert_fails(
@@ -290,12 +314,12 @@ begin
   from information_schema.tables
   where table_schema = 'public' and table_type = 'BASE TABLE';
 
-  if table_count <> 59 then
-    raise exception 'FAIL schema catalog table count: expected 59, got %', table_count;
+  if table_count <> 60 then
+    raise exception 'FAIL schema catalog table count: expected 60, got %', table_count;
   end if;
 
   raise notice 'PASS overlapping grants preserve access through remaining grant';
-  raise notice 'PASS executable public schema catalog = 59 tables';
+  raise notice 'PASS executable public schema catalog = 60 tables';
 end;
 $$;
 

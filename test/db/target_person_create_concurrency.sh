@@ -93,7 +93,7 @@ pass "independent concurrent Target Person creates both commit as complete autho
 
 public_exec=$("${psql_base[@]}" -Atc "select case when has_function_privilege('public','public.cmd_create_target_person_v1(uuid,uuid,uuid,uuid,text,text,text,date,time without time zone,boolean,boolean,text,text)','EXECUTE') then '1' else '0' end;")
 [[ "$public_exec" == '0' ]] || fail "Target Person create command unexpectedly executable by PUBLIC"
-[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == '59' ]] || fail "public table catalog changed"
-pass "Target Person create command PUBLIC EXECUTE remains revoked and public table catalog remains 59"
+[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == '60' ]] || fail "public table catalog changed"
+pass "Target Person create command PUBLIC EXECUTE remains revoked and public table catalog remains 60"
 
 echo "Target Person create persistence/concurrency tests passed"

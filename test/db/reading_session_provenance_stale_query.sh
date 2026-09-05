@@ -201,7 +201,7 @@ expect_fail "Reading Session id is required" "reading session id is required" "s
 
 public_exec=$("${psql_base[@]}" -Atc "select case when has_function_privilege('public','public.qry_reading_session_provenance_stale_v1(uuid,uuid)','EXECUTE') then '1' else '0' end;")
 [[ "$public_exec" == "0" ]] || fail "Reading Session provenance query unexpectedly executable by PUBLIC"
-[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == "59" ]] || fail "public table catalog changed"
-pass "Reading Session provenance query PUBLIC EXECUTE remains revoked and public table catalog remains 59"
+[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == "60" ]] || fail "public table catalog changed"
+pass "Reading Session provenance query PUBLIC EXECUTE remains revoked and public table catalog remains 60"
 
 echo "Reading Session provenance/stale query tests passed"

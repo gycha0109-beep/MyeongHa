@@ -93,7 +93,7 @@ pass "concurrent duplicate device revoke -> one mutation plus one authoritative 
 
 public_exec=$("${psql_base[@]}" -Atc "select case when has_function_privilege('public','public.cmd_revoke_device_installation_v1(uuid,uuid)','EXECUTE') then '1' else '0' end;")
 [[ "$public_exec" == '0' ]] || fail "device installation revoke command unexpectedly executable by PUBLIC"
-[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == '59' ]] || fail "public table catalog changed"
-pass "device installation revoke PUBLIC EXECUTE remains revoked and public table catalog remains 59"
+[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == '60' ]] || fail "public table catalog changed"
+pass "device installation revoke PUBLIC EXECUTE remains revoked and public table catalog remains 60"
 
 echo "Device installation revoke persistence/concurrency tests passed"

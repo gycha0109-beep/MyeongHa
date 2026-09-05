@@ -96,7 +96,7 @@ stable=$("${psql_base[@]}" -Atc "select provolatile from pg_proc where oid='publ
 [[ "$stable" == 's' ]] || fail "component projection is not STABLE: $stable"
 public_exec=$("${psql_base[@]}" -Atc "select case when has_function_privilege('public','public.qry_character_bundle_saju_runtime_components_v1(uuid,text)','EXECUTE') then '1' else '0' end;")
 [[ "$public_exec" == '0' ]] || fail "component projection unexpectedly executable by PUBLIC"
-[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == '59' ]] || fail "public table catalog changed"
-pass "component projection is STABLE, API-mediated, and public table catalog remains 59"
+[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == '60' ]] || fail "public table catalog changed"
+pass "component projection is STABLE, API-mediated, and public table catalog remains 60"
 
 echo "Character/Saju runtime component projection tests passed"

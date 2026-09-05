@@ -107,8 +107,8 @@ expect_fail "consumed promoted guest cannot bootstrap replay" "guest session is 
 
 public_exec=$("${psql_base[@]}" -Atc "select case when has_function_privilege('public','public.cmd_create_guest_session_v1(uuid,uuid,text,timestamptz)','EXECUTE') then '1' else '0' end;")
 [[ "$public_exec" == "0" ]] || fail "guest bootstrap command unexpectedly executable by PUBLIC"
-[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == "59" ]] || fail "public table catalog changed"
-pass "guest bootstrap command PUBLIC EXECUTE remains revoked and public table catalog remains 59"
+[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == "60" ]] || fail "public table catalog changed"
+pass "guest bootstrap command PUBLIC EXECUTE remains revoked and public table catalog remains 60"
 
 bash test/db/guest_bootstrap_runtime_authority.sh
 

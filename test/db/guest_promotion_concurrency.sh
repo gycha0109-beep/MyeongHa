@@ -152,7 +152,7 @@ pass "concurrent two-guest claim of one auth identity -> unique canonical member
 
 public_exec=$("${psql_base[@]}" -Atc "select has_function_privilege('public','public.cmd_promote_guest_v1(uuid,uuid,uuid)','EXECUTE');")
 [[ "$public_exec" == "f" ]] || fail "guest promotion command is executable by PUBLIC"
-[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == "59" ]] || fail "guest promotion slice changed public table catalog"
-pass "guest promotion command PUBLIC EXECUTE remains revoked and public table catalog remains 59"
+[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == "60" ]] || fail "guest promotion slice changed public table catalog"
+pass "guest promotion command PUBLIC EXECUTE remains revoked and public table catalog remains 60"
 
 echo "guest promotion persistence/concurrency tests passed"

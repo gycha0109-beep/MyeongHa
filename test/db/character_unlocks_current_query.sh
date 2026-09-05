@@ -109,7 +109,7 @@ volatility=$("${psql_base[@]}" -Atc "select provolatile from pg_proc where oid='
 [[ "$volatility" == "s" ]] || fail "character unlock query is not STABLE: $volatility"
 public_exec=$("${psql_base[@]}" -Atc "select case when has_function_privilege('public','public.qry_character_unlocks_v1(uuid)','EXECUTE') then '1' else '0' end;")
 [[ "$public_exec" == "0" ]] || fail "character unlock query unexpectedly executable by PUBLIC"
-[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == "59" ]] || fail "public table catalog changed"
-pass "character unlock query is STABLE, PUBLIC EXECUTE revoked, and public table catalog remains 59"
+[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == "60" ]] || fail "public table catalog changed"
+pass "character unlock query is STABLE, PUBLIC EXECUTE revoked, and public table catalog remains 60"
 
 echo "current Character Unlock projection query tests passed"

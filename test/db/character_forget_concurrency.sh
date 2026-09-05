@@ -124,7 +124,7 @@ pass "concurrent duplicate character forget -> one mutation plus one no-op repla
 
 public_exec=$("${psql_base[@]}" -Atc "select case when has_function_privilege('public','public.cmd_forget_character_records_v1(uuid,text)','EXECUTE') then '1' else '0' end;")
 [[ "$public_exec" == "0" ]] || fail "character forget command unexpectedly executable by PUBLIC"
-[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == "59" ]] || fail "public table catalog changed"
-pass "character forget command PUBLIC EXECUTE remains revoked and public table catalog remains 59"
+[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == "60" ]] || fail "public table catalog changed"
+pass "character forget command PUBLIC EXECUTE remains revoked and public table catalog remains 60"
 
 echo "character forget grant revocation persistence/concurrency tests passed"

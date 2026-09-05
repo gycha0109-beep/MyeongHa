@@ -180,7 +180,7 @@ expect_fail "new reading after deletion start is denied" "new AI/Saju capability
 
 expect_fail "new Saju transport attempt after deletion start is denied" "new AI/Saju capability work requires an active subject" "select * from public.cmd_prepare_reading_transport_attempt_v1('b2000000-0000-0000-0000-000000000001','b6100000-0000-0000-0000-000000000001','b6200000-0000-0000-0000-000000000001','test-transport','saju-public','engine-v1');"
 
-expect_fail "new purchase intent after deletion start is denied" "purchase intent requires an active member subject" "insert into public.purchase_intents(id,subject_id,product_offer_id,provider_account_link_id,idempotency_key,request_hash,offer_snapshot_jsonb,offer_snapshot_hash,status,created_at,updated_at) values ('b7500000-0000-0000-0000-000000000001','b2000000-0000-0000-0000-000000000001','b7400000-0000-0000-0000-000000000001',null,'post-delete-purchase','sha256:post-delete-purchase','{}','sha256:offer','created',clock_timestamp(),clock_timestamp());"
+expect_fail "new purchase intent after deletion start is denied" "purchase intent requires an active canonical Guest or Member subject" "insert into public.purchase_intents(id,subject_id,product_offer_id,provider_account_link_id,idempotency_key,request_hash,offer_snapshot_jsonb,offer_snapshot_hash,status,created_at,updated_at) values ('b7500000-0000-0000-0000-000000000001','b2000000-0000-0000-0000-000000000001','b7400000-0000-0000-0000-000000000001',null,'post-delete-purchase','sha256:post-delete-purchase','{}','sha256:offer','created',clock_timestamp(),clock_timestamp());"
 
 "${psql_base[@]}" <<'SQL'
 insert into public.device_installations(
@@ -247,7 +247,7 @@ expect_fail "deleted member cannot restart account deletion" "account deletion s
 
 public_exec=$("${psql_base[@]}" -Atc "select has_function_privilege('public','public.cmd_start_account_deletion_v1(uuid,uuid,text,uuid)','EXECUTE');")
 [[ "$public_exec" == "f" ]] || fail "account deletion command is executable by PUBLIC"
-[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == "59" ]] || fail "account deletion slice changed public table catalog"
-pass "account deletion command PUBLIC EXECUTE remains revoked and public table catalog remains 59"
+[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == "60" ]] || fail "account deletion slice changed public table catalog"
+pass "account deletion command PUBLIC EXECUTE remains revoked and public table catalog remains 60"
 
 echo "account deletion start persistence/concurrency tests passed"

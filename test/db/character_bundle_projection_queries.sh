@@ -113,7 +113,7 @@ pass "bundle projection functions are declared STABLE"
 public_catalog=$("${psql_base[@]}" -Atc "select case when has_function_privilege('public','public.qry_character_bundle_catalog_v1(uuid)','EXECUTE') then '1' else '0' end;")
 public_caps=$("${psql_base[@]}" -Atc "select case when has_function_privilege('public','public.qry_character_bundle_capabilities_v1(uuid,text)','EXECUTE') then '1' else '0' end;")
 [[ "$public_catalog" == '0' && "$public_caps" == '0' ]] || fail "bundle projection unexpectedly executable by PUBLIC"
-[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == '59' ]] || fail "public table catalog changed"
-pass "bundle projection remains API-mediated and public table catalog remains 59"
+[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == '60' ]] || fail "public table catalog changed"
+pass "bundle projection remains API-mediated and public table catalog remains 60"
 
 echo "Character bundle catalog/capability projection tests passed"

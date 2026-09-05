@@ -134,7 +134,7 @@ detail_public_exec=$("${psql_base[@]}" -Atc "select has_function_privilege('publ
 [[ "$list_public_exec" == 'f' && "$detail_public_exec" == 'f' ]] || fail "Target Person query unexpectedly grants PUBLIC EXECUTE"
 
 table_count=$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")
-[[ "$table_count" == '59' ]] || fail "public table catalog drifted: $table_count"
-pass "Target Person queries PUBLIC EXECUTE remain revoked and public table catalog remains 59"
+[[ "$table_count" == '60' ]] || fail "public table catalog drifted: $table_count"
+pass "Target Person queries PUBLIC EXECUTE remain revoked and public table catalog remains 60"
 
 echo "Target Person current projection query tests passed"

@@ -119,7 +119,7 @@ for signature in \
 done
 pass "identity resolver, context and current profile functions are not PUBLIC executable"
 
-[[ "$("${psql_quiet[@]}" -c "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == '59' ]] || fail "public table catalog changed"
+[[ "$("${psql_quiet[@]}" -c "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == '60' ]] || fail "public table catalog changed"
 pass "subject execution foundation adds no new product authority table"
 
 echo "current Subject/Profile execution-context and RLS tests passed"

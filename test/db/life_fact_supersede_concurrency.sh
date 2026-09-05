@@ -234,7 +234,7 @@ where n.nspname='public'
 public_exec="$("${PSQL[@]}" -Atc "select case when has_function_privilege('public','public.cmd_supersede_life_fact_v1(uuid,uuid,uuid,text,jsonb,timestamptz,timestamptz,text,uuid)','EXECUTE') then '1' else '0' end;")"
 [[ "${public_exec}" == '0' ]] || fail "Life Fact supersede unexpectedly executable by PUBLIC"
 
-[[ "$("${PSQL[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == '59' ]] || fail "public table catalog changed"
-echo "PASS Life Fact supersede is VOLATILE, SECURITY INVOKER, PUBLIC-denied, and preserves the 59-table baseline"
+[[ "$("${PSQL[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == '60' ]] || fail "public table catalog changed"
+echo "PASS Life Fact supersede is VOLATILE, SECURITY INVOKER, PUBLIC-denied, and preserves the 60-table baseline"
 
 echo "Life Fact supersede persistence/concurrency tests passed"

@@ -128,7 +128,7 @@ search_path=$("${psql_base[@]}" -Atc "select array_to_string(proconfig, ',') fro
 [[ "$search_path" == "search_path=public, pg_temp" ]] || fail "Life Fact grant revoke search_path mismatch: $search_path"
 public_exec=$("${psql_base[@]}" -Atc "select case when has_function_privilege('public','public.cmd_revoke_life_fact_character_grant_v1(uuid,uuid,text)','EXECUTE') then '1' else '0' end;")
 [[ "$public_exec" == "0" ]] || fail "Life Fact grant revoke unexpectedly executable by PUBLIC"
-[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == "59" ]] || fail "public table catalog changed"
-pass "Life Fact grant revoke command is INVOKER, explicit search_path, PUBLIC-revoked, and public table catalog remains 59"
+[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == "60" ]] || fail "public table catalog changed"
+pass "Life Fact grant revoke command is INVOKER, explicit search_path, PUBLIC-revoked, and public table catalog remains 60"
 
 echo "individual Life Fact grant revoke persistence/concurrency tests passed"

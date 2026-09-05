@@ -152,7 +152,7 @@ pass "public share reads are projection-only"
 
 public_exec=$("${psql_base[@]}" -Atc "select case when has_function_privilege('public','public.qry_public_share_artifact_v1(text)','EXECUTE') then '1' else '0' end;")
 [[ "$public_exec" == '0' ]] || fail "public Share query unexpectedly executable directly by PUBLIC database role"
-[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == '59' ]] || fail "public table catalog changed"
-pass "HTTP-public share read remains API-mediated at DB boundary and public table catalog remains 59"
+[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == '60' ]] || fail "public table catalog changed"
+pass "HTTP-public share read remains API-mediated at DB boundary and public table catalog remains 60"
 
 echo "public Share Artifact query tests passed"
