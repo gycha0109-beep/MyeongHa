@@ -1,0 +1,48 @@
+name: One-shot Account Delete Purchase Intent Contract Sync
+
+on:
+  push:
+    branches:
+      - feat/guest-purchase-intent-v2-main
+    paths:
+      - '.github/workflows/fix-account-delete-purchase-intent-contract.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/guest-purchase-intent-v2-main
+          fetch-depth: 0
+
+      - name: Sync exact purchase-intent denial contract and remove one-shot workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('test/db/account_deletion_start_concurrency.sh')
+          text = path.read_text(encoding='utf-8')
+          old = 'purchase intent requires an active member subject'
+          new = 'purchase intent requires an active canonical Guest or Member subject'
+          count = text.count(old)
+          if count != 1:
+              raise SystemExit(f'expected exactly one stale purchase-intent error contract, found {count}')
+          text = text.replace(old, new)
+          path.write_text(text, encoding='utf-8')
+          PY
+
+          rm .github/workflows/fix-account-delete-purchase-intent-contract.yml
+          git diff --check
+          git diff -- test/db/account_deletion_start_concurrency.sh .github/workflows/fix-account-delete-purchase-intent-contract.yml
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add test/db/account_deletion_start_concurrency.sh .github/workflows/fix-account-delete-purchase-intent-contract.yml
+          git commit -m 'test(db): sync purchase intent deletion denial contract'
+          git push origin HEAD:feat/guest-purchase-intent-v2-main
