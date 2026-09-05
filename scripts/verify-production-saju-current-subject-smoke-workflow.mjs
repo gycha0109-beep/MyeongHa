@@ -79,6 +79,7 @@ const requiredLiveVerifierFragments = [
   "import { acquireProductionMemberSmokeSession } from './production-member-smoke-session.mjs';",
   "const PRODUCTION_ORIGIN = 'https://myeongha.vercel.app';",
   'const MEMBER_ME_URL = `${PRODUCTION_ORIGIN}/api/me`;',
+  'const BIRTH_PROFILE_URL = `${PRODUCTION_ORIGIN}/api/me/birth-profile`;',
   'const SAJU_CALCULATION_URL = `${PRODUCTION_ORIGIN}/api/me/saju/calculation`;',
   "requireSecret('MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID')",
   'await acquireProductionMemberSmokeSession()',
@@ -88,6 +89,13 @@ const requiredLiveVerifierFragments = [
   "memberData.subjectKind !== 'member'",
   'memberData.subjectId !== expectedSubjectId',
   "memberData.subjectStatus !== 'active'",
+  'birthProfileResponse.status !== 200',
+  'birthProfileData.birthProfile',
+  "birthProfile.profileKind !== 'self'",
+  'birthProfile.archivedAt !== null',
+  'birthProfile.currentRevision',
+  'matchingCurrentRevisions.length !== 1',
+  "requireNoStore(birthProfileResponse, 'Production Saju smoke current Birth Profile')",
   "method: 'POST'",
   'calculationResponse.status !== 200',
   "'myeongha-saju-production-calculation-ingress-v1'",
@@ -102,7 +110,10 @@ const requiredLiveVerifierFragments = [
   "'myeonghwa/production/civil-midnight-v1'",
   "requireNoStore(calculationResponse, 'Production current-subject Saju calculation')",
   'JSON.stringify(memberBody).includes(accessToken)',
+  'JSON.stringify(birthProfileBody).includes(accessToken)',
   'JSON.stringify(calculationBody).includes(accessToken)',
+  'memberSignIn=200',
+  'birthProfilePresent=true',
 ];
 
 for (const fragment of requiredLiveVerifierFragments) {
@@ -131,6 +142,8 @@ const forbiddenLiveVerifierFragments = [
   'console.error(accessToken',
   'console.log(memberBody',
   'console.error(memberBody',
+  'console.log(birthProfileBody',
+  'console.error(birthProfileBody',
   'console.log(calculationBody',
   'console.error(calculationBody',
 ];
