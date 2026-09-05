@@ -36,9 +36,9 @@ P0-CM-02를 닫기 위해 **실제 비밀값이나 고위험 식별자**를 Git 
 예:
 
 ```text
-merchant legal form = individual_business | corporation | other
-merchant registration country = KR | ...
-settlement account country = KR | ...
+merchant legal form = not_registered | individual_business | corporation | other
+merchant registration country = not_applicable | KR | ...
+settlement account country = not_established | KR | ...
 launch buyer geography = korea_only | korea_first | international
 presentment currency = KRW | ...
 required payment methods = domestic_card, easy_pay, ...
@@ -68,11 +68,14 @@ provider API secret / client secret / bearer token
 허용값:
 
 ```text
+not_registered
 individual_business
 corporation
 other_eligible_entity
 unknown
 ```
+
+`not_registered`는 실제 merchant/operator가 현재 등록된 merchant/business entity가 없다고 명시한 상태다. `unknown`과 동일하지 않으며, provider eligibility를 자동 판정하지도 않는다.
 
 확정 주체:
 
@@ -87,11 +90,14 @@ actual merchant/operator
 허용값:
 
 ```text
+not_applicable
 ISO 3166-1 alpha-2 country code
 unknown
 ```
 
 예: `KR`
+
+`not_applicable`는 M1이 `not_registered`인 경우처럼 현재 등록 국가 자체가 없는 상태를 표현한다. 등록 여부를 모르는 상태는 `unknown`으로 남긴다.
 
 확정 주체:
 
@@ -104,11 +110,14 @@ actual merchant/operator
 허용값:
 
 ```text
+not_established
 ISO 3166-1 alpha-2 country code
 unknown
 ```
 
-저장소에는 **계좌 국가만** 기록한다. 은행명/계좌번호는 PSP 선택 authority에 필수값이 아니므로 저장하지 않는다.
+`not_established`는 PSP 정산에 사용할 계좌가 아직 정해지지 않은 상태다. 개인이 보유한 임의의 은행계좌 국가를 대신 기록하지 않는다.
+
+저장소에는 정산 계좌가 확정된 경우에도 **계좌 국가만** 기록한다. 은행명/계좌번호는 PSP 선택 authority에 필수값이 아니므로 저장하지 않는다.
 
 확정 주체:
 
@@ -277,7 +286,7 @@ M8 commercial acceptance            = UNKNOWN
 M9 Member-only compatibility        = NOT PROVEN for Toss / NOT PROVEN for KCP
 ```
 
-Do not replace `UNKNOWN` with an inferred value.
+Do not replace `UNKNOWN` with an inferred value. A known negative/absent state such as `not_registered`, `not_applicable`, or `not_established` must also not be collapsed back into `UNKNOWN`.
 
 ---
 
@@ -293,6 +302,8 @@ I4 = M4 launch buyer geography
 I5 = M5 launch presentment currency
 I6 = M6 required payment methods
 ```
+
+If M1 is `not_registered`, I2 may be `not_applicable`. If a PSP settlement account has not yet been selected, I3 may be `not_established`. These states are factual intake results, not provider eligibility conclusions.
 
 M8 may require an operator preference before contracting, but final closure requires actual provider commercial evidence.
 
@@ -374,9 +385,9 @@ When enough evidence exists, a later decision revision should record only non-se
 P0-CM-02 = DECIDED
 provider = <selected provider>
 
-M1 = <legal-form classification>
-M2 = <country code>
-M3 = <country code>
+M1 = <legal-form classification or not_registered>
+M2 = <country code or not_applicable>
+M3 = <country code or not_established>
 M4 = <buyer geography>
 M5 = <currency set>
 M6 = <required method set>
