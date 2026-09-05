@@ -1,9 +1,0 @@
-exit_code=3
---- tail ---
-INSERT 0 1
-INSERT 0 5
-INSERT 0 4
-INSERT 0 1
-ERROR:  VALUES lists must all be the same length
-LINE 5:   ('7c400000-0000-0000-0000-000000000002','7c200000-0000-000...
-           ^
