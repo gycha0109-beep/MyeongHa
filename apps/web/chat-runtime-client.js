@@ -1,8 +1,8 @@
+import { getActiveBearer } from './product-auth.js';
+
 const params = new URLSearchParams(window.location.search);
 const threadId = params.get('threadId');
 const room = window.MyeongHaCharacterRoom;
-const characterKey = room?.characterKey ?? document.body.dataset.character ?? 'baekheon';
-const characterName = room?.characterName ?? document.querySelector('[data-character-name]')?.textContent ?? '대리자';
 const apiEnvelopePromise = import('./api-envelope.js');
 
 const historyList = document.querySelector('[data-history-list]');
@@ -35,9 +35,6 @@ function assertRoomState(payload) {
   if (typeof payload.threadId !== 'string' || payload.threadId !== threadId) {
     throw new Error('Character Room runtime returned a different thread identity.');
   }
-  if (payload.presentationKey !== characterKey) {
-    throw new Error('Character Room runtime returned a different presentation identity.');
-  }
   if (typeof payload.characterId !== 'string' || payload.characterId.trim().length === 0) {
     throw new Error('Character Room runtime did not return an authoritative character identity.');
   }
@@ -53,7 +50,7 @@ function assertRoomState(payload) {
 function senderLabel(message, authoritativeCharacterId) {
   if (message.senderType === 'user') return '나';
   if (message.senderType === 'character') {
-    return message.characterId === authoritativeCharacterId ? characterName : '다른 대리자';
+    return message.characterId === authoritativeCharacterId ? '대리자' : '다른 대리자';
   }
   return '대화 기록';
 }
@@ -112,8 +109,8 @@ function createStreamMessage(message, authoritativeCharacterId) {
   const avatar = document.createElement('span');
   avatar.className = 'conversation-message-avatar';
   avatar.setAttribute('aria-hidden', 'true');
-  avatar.dataset.character = message.senderType === 'character' ? characterKey : 'user';
-  avatar.textContent = message.senderType === 'user' ? '나' : characterName.slice(0, 1);
+  avatar.dataset.character = message.senderType === 'character' ? 'runtime-character' : 'user';
+  avatar.textContent = message.senderType === 'user' ? '나' : '대';
 
   const body = document.createElement('div');
   body.className = 'conversation-message-body';
@@ -150,16 +147,10 @@ function renderRoomState(payload) {
   renderHistory(state.messages, state.characterId);
   renderConversation(state.messages, state.characterId);
 
-  const latest = state.latestCharacterMessage;
-  if (
-    latest &&
-    latest.redacted !== true &&
-    latest.characterId === state.characterId &&
-    typeof latest.bodyText === 'string' &&
-    latest.bodyText.trim().length > 0
-  ) {
-    room?.setDialogueText(latest.bodyText);
-  }
+  // The repository does not yet contain a governed presentationKey -> canonical
+  // characterId correspondence. Do not project an authoritative DB character's
+  // message into the current presentation room bubble until that authority exists.
+  // The owner-scoped stream remains visible with identity-neutral labels.
 
   // Life Thread / 이어지는 이야기 authority is intentionally not inferred from
   // chat messages. Until a verified continuation projection is supplied, the
@@ -178,15 +169,22 @@ async function loadRoomState() {
   }
 
   try {
+    const activeBearer = await getActiveBearer();
+    if (!activeBearer) {
+      throw new Error('Character Room read requires an active authenticated or guest bearer.');
+    }
+
     const url = new URL(`/api/chat/${encodeURIComponent(threadId)}`, window.location.origin);
     url.searchParams.set('afterSequenceNo', '0');
-    url.searchParams.set('presentationKey', characterKey);
 
     const response = await fetch(url, {
       method: 'GET',
       credentials: 'same-origin',
       cache: 'no-store',
-      headers: { Accept: 'application/json' },
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${activeBearer.token}`,
+      },
     });
 
     if (!response.ok) {
