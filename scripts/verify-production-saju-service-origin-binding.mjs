@@ -40,8 +40,10 @@ const requiredFragments = [
   'https://api.vercel.com/v6/deployments?projectId=$VERCEL_PROJECT_ID&target=production&limit=20&teamId=$VERCEL_TEAM_ID',
   '(.meta.githubCommitSha // "") == $sha',
   'echo "deployment_id=$source_id" >> "$GITHUB_OUTPUT"',
-  "'{deploymentId: $deployment_id}'",
-  'https://api.vercel.com/v13/deployments?teamId=$VERCEL_TEAM_ID',
+  "'{deploymentId: $deployment_id, target: \"production\"}'",
+  'forceNew=1&skipAutoDetectionConfirmation=1&teamId=$VERCEL_TEAM_ID',
+  "-w '%{http_code}'",
+  'Vercel redeploy request failed: HTTP $http_code code=$error_code',
   'https://api.vercel.com/v13/deployments/$REDEPLOYMENT_ID?teamId=$VERCEL_TEAM_ID',
   '(.projectId // "") == $project_id',
   'and (.target // "") == "production"',
@@ -82,6 +84,8 @@ const forbiddenFragments = [
   'alter role',
   'gcloud run deploy',
   'gcloud run services update',
+  "'{deploymentId: $deployment_id}'",
+  'https://api.vercel.com/v13/deployments?teamId=$VERCEL_TEAM_ID',
 ];
 
 for (const fragment of forbiddenFragments) {
@@ -112,7 +116,7 @@ if (originOccurrences !== 1) {
 
 const upsertIndex = workflow.indexOf('env?upsert=true&teamId=$VERCEL_TEAM_ID');
 const exactRevisionIndex = workflow.indexOf('(.meta.githubCommitSha // "") == $sha');
-const redeployIndex = workflow.indexOf('https://api.vercel.com/v13/deployments?teamId=$VERCEL_TEAM_ID');
+const redeployIndex = workflow.indexOf('forceNew=1&skipAutoDetectionConfirmation=1&teamId=$VERCEL_TEAM_ID');
 const readinessIndex = workflow.indexOf('https://$CANONICAL_PRODUCTION_HOST/api/readiness');
 if (
   upsertIndex < 0 ||
@@ -121,7 +125,7 @@ if (
   readinessIndex < redeployIndex
 ) {
   throw new Error(
-    'Saju origin workflow must bind first, resolve the exact-main deployment, redeploy it, then verify readiness.',
+    'Saju origin workflow must bind first, resolve the exact-main deployment, force a fresh redeploy, then verify readiness.',
   );
 }
 
