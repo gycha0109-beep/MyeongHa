@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   VERIFIED_COMMERCE_EVIDENCE_SCHEMA_VERSION_V1,
+  VERIFIED_COMMERCE_EVIDENCE_SCHEMA_VERSION_V2,
   requireVerifiedCommerceEvidenceV1,
+  requireVerifiedCommerceEvidenceV2,
 } from '../apps/api/src/verified-commerce-evidence.js';
 
 const FINGERPRINT = `hmac-sha256:k1:${'a'.repeat(64)}`;
@@ -21,6 +23,17 @@ function validEvidence(): Record<string, unknown> {
     },
     evidenceFingerprint: FINGERPRINT,
     verifierRevision: 'test-verifier-v1',
+  };
+}
+
+function validEvidenceV2(): Record<string, unknown> {
+  return {
+    ...validEvidence(),
+    schemaVersion: VERIFIED_COMMERCE_EVIDENCE_SCHEMA_VERSION_V2,
+    verifierRevision: 'test-verifier-v2',
+    verifiedAmountMinor: 12900,
+    verifiedCurrency: 'KRW',
+    verifiedAt: '2026-09-05T14:45:12.345Z',
   };
 }
 
@@ -213,6 +226,125 @@ describe('VerifiedCommerceEvidenceV1 structural contract', () => {
     try {
       requireVerifiedCommerceEvidenceV1({
         ...validEvidence(),
+        rawReceipt,
+      });
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(Error);
+    const message = thrown instanceof Error ? thrown.message : String(thrown);
+    expect(message).not.toContain(rawReceipt);
+  });
+});
+
+describe('VerifiedCommerceEvidenceV2 payment-source contract', () => {
+  it('accepts exact verified money and canonical server verification time', () => {
+    const input = validEvidenceV2();
+    const result = requireVerifiedCommerceEvidenceV2(input);
+
+    expect(result).toEqual(input);
+    expect(result).not.toBe(input);
+    expect(Object.isFrozen(result)).toBe(true);
+    expect(Object.isFrozen(result.ownerBinding)).toBe(true);
+    expect(result.verifiedAmountMinor).toBe(12900);
+    expect(result.verifiedCurrency).toBe('KRW');
+    expect(result.verifiedAt).toBe('2026-09-05T14:45:12.345Z');
+  });
+
+  it('keeps sandbox evidence structurally representable without granting production authority', () => {
+    const result = requireVerifiedCommerceEvidenceV2(validEvidenceV2());
+    expect(result.environment).toBe('sandbox');
+  });
+
+  it('keeps provider-native time/order provenance opaque for the future provider adapter', () => {
+    const result = requireVerifiedCommerceEvidenceV2({
+      ...validEvidenceV2(),
+      providerOccurredAt: 'provider-native-time-token',
+      providerOrderingKey: 'provider-native-order-token',
+      providerValidUntil: 'provider-native-valid-until-token',
+    });
+
+    expect(result.providerOccurredAt).toBe('provider-native-time-token');
+    expect(result.providerOrderingKey).toBe('provider-native-order-token');
+    expect(result.providerValidUntil).toBe('provider-native-valid-until-token');
+  });
+
+  it.each([0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1, '12900']) (
+    'rejects non-positive, fractional, unsafe, or non-number verifiedAmountMinor %s',
+    (verifiedAmountMinor) => {
+      expect(() =>
+        requireVerifiedCommerceEvidenceV2({
+          ...validEvidenceV2(),
+          verifiedAmountMinor,
+        }),
+      ).toThrow('positive safe integer');
+    },
+  );
+
+  it.each(['krw', 'KR', 'KRW ', 'KRW1', '₩']) (
+    'rejects non-canonical verifiedCurrency %s',
+    (verifiedCurrency) => {
+      expect(() =>
+        requireVerifiedCommerceEvidenceV2({
+          ...validEvidenceV2(),
+          verifiedCurrency,
+        }),
+      ).toThrow('three uppercase ASCII letters');
+    },
+  );
+
+  it.each([
+    '2026-09-05T14:45:12Z',
+    '2026-09-05T23:45:12.345+09:00',
+    '2026-09-05 14:45:12.345Z',
+    '2026-02-31T14:45:12.345Z',
+    'not-a-time',
+  ])('rejects non-canonical verifiedAt %s', (verifiedAt) => {
+    expect(() =>
+      requireVerifiedCommerceEvidenceV2({
+        ...validEvidenceV2(),
+        verifiedAt,
+      }),
+    ).toThrow('canonical UTC millisecond timestamp');
+  });
+
+  it('does not let v1 silently absorb v2 money/time fields', () => {
+    expect(() =>
+      requireVerifiedCommerceEvidenceV1({
+        ...validEvidence(),
+        verifiedAmountMinor: 12900,
+        verifiedCurrency: 'KRW',
+        verifiedAt: '2026-09-05T14:45:12.345Z',
+      }),
+    ).toThrow('unsupported fields');
+  });
+
+  it('rejects raw/client/payment-material hitchhiking in v2', () => {
+    for (const extraField of [
+      'subjectId',
+      'price',
+      'rawReceipt',
+      'authorization',
+      'paymentKey',
+      'providerResponse',
+    ]) {
+      expect(() =>
+        requireVerifiedCommerceEvidenceV2({
+          ...validEvidenceV2(),
+          [extraField]: 'sensitive-or-untrusted-value',
+        }),
+      ).toThrow('unsupported fields');
+    }
+  });
+
+  it('does not include rejected raw evidence values in v2 validation errors', () => {
+    const rawReceipt = 'raw-secret-v2-receipt-value';
+    let thrown: unknown;
+
+    try {
+      requireVerifiedCommerceEvidenceV2({
+        ...validEvidenceV2(),
         rawReceipt,
       });
     } catch (error) {
