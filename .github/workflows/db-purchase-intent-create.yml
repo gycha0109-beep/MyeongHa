@@ -59,5 +59,7 @@ jobs:
         run: bash test/db/purchase_intent_create_concurrency.sh
       - name: Run Guest Purchase Intent v2 charge-authority/concurrency tests
         run: bash test/db/purchase_intent_create_v2_concurrency.sh
+      - name: Run Purchase Intent charge amount safe-integer tests
+        run: bash test/db/purchase_intent_charge_amount_safe_integer.sh
       - name: Verify deterministic schema catalog snapshot
         run: bash test/db/catalog_snapshot.sh
