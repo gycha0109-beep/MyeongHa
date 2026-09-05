@@ -52,6 +52,20 @@ export interface CharacterCanonProfile {
   };
 }
 
+/**
+ * Versioned visual-authoring slots required by the Character C1/C2 contract.
+ * Values remain free-form authored canon; this schema does not decide the real roster.
+ */
+export interface CharacterVisualProfile {
+  readonly visualVersion: string;
+  readonly visualDirection: string;
+  readonly silhouette: string;
+  readonly palette: readonly string[];
+  readonly motifs: readonly string[];
+  readonly costumeDirection: string;
+  readonly prohibitedTropes: readonly string[];
+}
+
 export interface CharacterPersonaProfile {
   readonly communication: {
     readonly register: string;
@@ -181,6 +195,11 @@ export interface CharacterContentDefinition {
   readonly characterId: string;
   readonly contentVersion: string;
   readonly displayName: string;
+  /**
+   * Free-form source-authored gender canon. Optional for pre-C2 engineering fixtures;
+   * required by the Production publication boundary for real roster content.
+   */
+  readonly gender?: string;
   readonly deityProxyLabel: string;
   readonly shortDescriptor: string;
   readonly personalityTraits: readonly string[];
@@ -194,6 +213,7 @@ export interface CharacterContentDefinition {
   readonly animationCueIds: readonly string[];
 
   readonly canon?: CharacterCanonProfile;
+  readonly visual?: CharacterVisualProfile;
   readonly persona?: CharacterPersonaProfile;
   readonly behavior?: CharacterBehaviorPolicyContent;
   readonly sajuProfile?: CharacterSajuProfileContent;
