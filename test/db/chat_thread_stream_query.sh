@@ -289,7 +289,7 @@ pass "chat thread stream query is read-only"
 
 public_exec=$("${psql_base[@]}" -Atc "select case when has_function_privilege('public','public.qry_chat_thread_stream_v1(uuid,uuid,bigint)','EXECUTE') then '1' else '0' end;")
 [[ "$public_exec" == '0' ]] || fail "chat thread stream query unexpectedly executable by PUBLIC"
-[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == '59' ]] || fail "public table catalog changed"
-pass "chat stream read remains API-mediated and public table catalog remains 59"
+[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == '60' ]] || fail "public table catalog changed"
+pass "chat stream read remains API-mediated and public table catalog remains 60"
 
 echo "chat thread stream query tests passed"
