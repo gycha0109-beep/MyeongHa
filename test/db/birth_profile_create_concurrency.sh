@@ -172,7 +172,7 @@ pass "concurrent self-profile create -> one complete authority, one deterministi
 
 public_exec=$("${psql_base[@]}" -Atc "select case when has_function_privilege('public','public.cmd_create_birth_profile_v1(uuid,uuid,uuid,text,text,date,time without time zone,boolean,boolean,text,text)','EXECUTE') then '1' else '0' end;")
 [[ "$public_exec" == '0' ]] || fail "Birth create command unexpectedly executable by PUBLIC"
-[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == '59' ]] || fail "public table catalog changed"
-pass "Birth create command PUBLIC EXECUTE remains revoked and public table catalog remains 59"
+[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == '60' ]] || fail "public table catalog changed"
+pass "Birth create command PUBLIC EXECUTE remains revoked and public table catalog remains 60"
 
 echo "Birth Profile create persistence/concurrency tests passed"
