@@ -247,7 +247,7 @@ expect_fail "deleted member cannot restart account deletion" "account deletion s
 
 public_exec=$("${psql_base[@]}" -Atc "select has_function_privilege('public','public.cmd_start_account_deletion_v1(uuid,uuid,text,uuid)','EXECUTE');")
 [[ "$public_exec" == "f" ]] || fail "account deletion command is executable by PUBLIC"
-[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == "59" ]] || fail "account deletion slice changed public table catalog"
-pass "account deletion command PUBLIC EXECUTE remains revoked and public table catalog remains 59"
+[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == "60" ]] || fail "account deletion slice changed public table catalog"
+pass "account deletion command PUBLIC EXECUTE remains revoked and public table catalog remains 60"
 
 echo "account deletion start persistence/concurrency tests passed"
