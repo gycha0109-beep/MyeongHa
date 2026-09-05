@@ -180,7 +180,7 @@ expect_fail "new reading after deletion start is denied" "new AI/Saju capability
 
 expect_fail "new Saju transport attempt after deletion start is denied" "new AI/Saju capability work requires an active subject" "select * from public.cmd_prepare_reading_transport_attempt_v1('b2000000-0000-0000-0000-000000000001','b6100000-0000-0000-0000-000000000001','b6200000-0000-0000-0000-000000000001','test-transport','saju-public','engine-v1');"
 
-expect_fail "new purchase intent after deletion start is denied" "purchase intent requires an active member subject" "insert into public.purchase_intents(id,subject_id,product_offer_id,provider_account_link_id,idempotency_key,request_hash,offer_snapshot_jsonb,offer_snapshot_hash,status,created_at,updated_at) values ('b7500000-0000-0000-0000-000000000001','b2000000-0000-0000-0000-000000000001','b7400000-0000-0000-0000-000000000001',null,'post-delete-purchase','sha256:post-delete-purchase','{}','sha256:offer','created',clock_timestamp(),clock_timestamp());"
+expect_fail "new purchase intent after deletion start is denied" "purchase intent requires an active canonical Guest or Member subject" "insert into public.purchase_intents(id,subject_id,product_offer_id,provider_account_link_id,idempotency_key,request_hash,offer_snapshot_jsonb,offer_snapshot_hash,status,created_at,updated_at) values ('b7500000-0000-0000-0000-000000000001','b2000000-0000-0000-0000-000000000001','b7400000-0000-0000-0000-000000000001',null,'post-delete-purchase','sha256:post-delete-purchase','{}','sha256:offer','created',clock_timestamp(),clock_timestamp());"
 
 "${psql_base[@]}" <<'SQL'
 insert into public.device_installations(
