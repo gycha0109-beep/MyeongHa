@@ -22,39 +22,41 @@ describe('production Saju redeploy recovery workflow contract', () => {
     expect(workflow).not.toContain('schedule:');
   });
 
-  it('resolves and redeploys only the exact production GitHub revision', () => {
+  it('resolves only the exact production GitHub revision and governed project name', () => {
     expect(workflow).toContain('(.meta.githubCommitSha // "") == $sha');
     expect(workflow).toContain('and (.target // "") == "production"');
-    expect(workflow).toContain("source_host=\"$(jq -r '.url // empty' \"$candidate_file\")\"");
-    expect(workflow).toContain('echo "deployment_url=https://$source_host" >> "$GITHUB_OUTPUT"');
-    expect(workflow).toContain('VERCEL_TEAM_SLUG: johnny-self');
-    expect(workflow).toContain('VERCEL_CLI_VERSION: 59.11.7');
-    expect(workflow).toContain('npx --yes "vercel@$VERCEL_CLI_VERSION" redeploy "$SOURCE_DEPLOYMENT_URL"');
-    expect(workflow).toContain('--target=production');
-    expect(workflow).toContain('--scope "$VERCEL_TEAM_SLUG"');
-    expect(workflow).toContain('--non-interactive');
-    expect(workflow).toContain('--no-wait');
-    expect(workflow).toContain('(.url // "") == $host');
-    expect(workflow).toContain('and (.meta.githubCommitSha // "") == $sha');
-    expect(workflow).toContain('https://api.vercel.com/v13/deployments/$REDEPLOYMENT_ID?teamId=$VERCEL_TEAM_ID');
+    expect(workflow).toContain("source_name=\"$(jq -r '.name // empty' \"$candidate_file\")\"");
+    expect(workflow).toContain('[[ "$source_name" == "$VERCEL_PROJECT_NAME" ]]');
+    expect(workflow).toContain('echo "deployment_name=$source_name" >> "$GITHUB_OUTPUT"');
   });
 
-  it('fails with a bounded error category instead of printing CLI stderr', () => {
-    expect(workflow).toContain("error_category='unknown'");
-    expect(workflow).toContain("error_category='authentication'");
-    expect(workflow).toContain("error_category='scope'");
-    expect(workflow).toContain("error_category='interaction'");
-    expect(workflow).toContain("error_category='deployment'");
-    expect(workflow).toContain('Pinned Vercel CLI redeploy failed: category=$error_category');
-    expect(workflow).not.toContain('cat "$stderr_file"');
-    expect(workflow).not.toContain('tail -n 1 "$stderr_file"');
+  it('mirrors the authoritative Vercel CLI redeploy request shape with explicit team authority', () => {
+    expect(workflow).toContain('SOURCE_DEPLOYMENT_ID: ${{ steps.source.outputs.deployment_id }}');
+    expect(workflow).toContain('SOURCE_DEPLOYMENT_NAME: ${{ steps.source.outputs.deployment_name }}');
+    expect(workflow).toContain('deploymentId: $deployment_id');
+    expect(workflow).toContain('meta: {action: "redeploy"}');
+    expect(workflow).toContain('name: $name');
+    expect(workflow).toContain('target: "production"');
+    expect(workflow).toContain('https://api.vercel.com/v13/deployments?forceNew=1&teamId=$VERCEL_TEAM_ID');
+    expect(workflow).toContain("-w '%{http_code}'");
+    expect(workflow).toContain('Vercel CLI-equivalent redeploy failed: HTTP $http_code code=$error_code');
+    expect(workflow).toContain('Vercel CLI-equivalent production redeploy request accepted.');
   });
 
-  it('does not fall back to the rejected REST redeploy mutation or ID-only CLI invocation', () => {
+  it('rejects the previously incomplete REST and CLI fallback shapes', () => {
     expect(workflow).not.toContain("'{deploymentId: $deployment_id, target: \\\"production\\\"}'");
     expect(workflow).not.toContain('forceNew=1&skipAutoDetectionConfirmation=1&teamId=$VERCEL_TEAM_ID');
-    expect(workflow).not.toContain('Vercel redeploy request failed: HTTP $http_code code=$error_code');
-    expect(workflow).not.toContain('redeploy "$SOURCE_DEPLOYMENT_ID"');
+    expect(workflow).not.toContain('npx --yes "vercel@$VERCEL_CLI_VERSION"');
+    expect(workflow).not.toContain('SOURCE_DEPLOYMENT_URL');
+    expect(workflow).not.toContain('Pinned Vercel CLI redeploy failed');
+  });
+
+  it('verifies the redeployment is the exact production revision and a redeploy', () => {
+    expect(workflow).toContain('https://api.vercel.com/v13/deployments/$REDEPLOYMENT_ID?teamId=$VERCEL_TEAM_ID');
+    expect(workflow).toContain('(.projectId // "") == $project_id');
+    expect(workflow).toContain('and (.target // "") == "production"');
+    expect(workflow).toContain('and (.meta.githubCommitSha // "") == $sha');
+    expect(workflow).toContain('and (.meta.action // "") == "redeploy"');
   });
 
   it('fails closed on project, canonical alias, and runtime readiness', () => {
@@ -65,7 +67,7 @@ describe('production Saju redeploy recovery workflow contract', () => {
     expect(workflow).toContain('.capabilities.sajuCalculation == "ready"');
   });
 
-  it('does not mutate application data, bindings, aliases, or expose credentials', () => {
+  it('does not mutate application data, environment bindings, or aliases and does not expose credentials', () => {
     const forbidden = [
       'supabase',
       '/env?upsert=true',
@@ -79,8 +81,8 @@ describe('production Saju redeploy recovery workflow contract', () => {
       'update subjects',
       'delete from',
       'echo "$VERCEL_TOKEN"',
-      'cat "$stderr_file"',
-      'cat "$stdout_file"',
+      'cat "$response_file"',
+      'cat "$payload_file"',
     ];
     for (const fragment of forbidden) {
       expect(workflow.toLowerCase()).not.toContain(fragment.toLowerCase());
