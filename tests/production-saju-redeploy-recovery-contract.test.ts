@@ -44,7 +44,8 @@ describe('production Saju redeploy recovery workflow contract', () => {
     const forbidden = [
       'supabase',
       '/env?upsert=true',
-      '/aliases',
+      '-X DELETE',
+      '-X PATCH',
       'gcloud run deploy',
       'gcloud run services update',
       'alter table',
