@@ -32,7 +32,7 @@ export function buildWorldContentManifest(
     contentVersion: world.contentVersion,
     episodeIds: Object.freeze(world.episodes.map((episode) => episode.episodeId).sort()),
     relationCount: world.characterRelations.length,
-    contentHash: `sha256:${createHash('sha256').update(stableJson(world)).digest('hex')}`,
+    contentHash: `sha256:v1:${createHash('sha256').update(stableJson(world)).digest('hex')}`,
   });
 }
 
