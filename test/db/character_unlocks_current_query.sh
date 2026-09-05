@@ -57,7 +57,7 @@ insert into public.character_unlocks(
   id,subject_id,character_id,status,revision,source_world_event_id,unlocked_at,created_at,updated_at
 ) values
   ('7c400000-0000-0000-0000-000000000001','7c200000-0000-0000-0000-000000000001','unlock-alpha','unlocked',2,'7c300000-0000-0000-0000-000000000001',timestamptz '2026-08-25 09:00:00+00',timestamptz '2026-08-20 00:00:00+00',timestamptz '2026-08-25 09:00:00+00'),
-  ('7c400000-0000-0000-0000-000000000002','7c200000-0000-0000-0000-000000000001','unlock-beta','locked',0,null,null,timestamptz '2026-08-20 00:00:00+00',timestamptz '2026-08-20 00:00:00+00'),
+  ('7c400000-0000-0000-0000-000000000002','7c200000-0000-0000-0000-000000000001','unlock-beta','locked',0,null,null,timestamptz '2026-08-20 00:00:00+00',timestamptz '2026-08-20 00:00:00+00',timestamptz '2026-08-20 00:00:00+00'),
   ('7c400000-0000-0000-0000-000000000003','7c200000-0000-0000-0000-000000000001','unlock-retired','unlocked',1,null,timestamptz '2026-08-22 08:00:00+00',timestamptz '2026-08-21 00:00:00+00',timestamptz '2026-08-22 08:00:00+00'),
   ('7c400000-0000-0000-0000-000000000004','7c200000-0000-0000-0000-000000000002','unlock-alpha','unlocked',5,null,timestamptz '2026-08-23 08:00:00+00',timestamptz '2026-08-21 00:00:00+00',timestamptz '2026-08-23 08:00:00+00'),
   ('7c400000-0000-0000-0000-000000000005','7c200000-0000-0000-0000-000000000003','unlock-alpha','locked',0,null,null,timestamptz '2026-08-21 00:00:00+00',timestamptz '2026-08-21 00:00:00+00'),
@@ -109,7 +109,7 @@ volatility=$("${psql_base[@]}" -Atc "select provolatile from pg_proc where oid='
 [[ "$volatility" == "s" ]] || fail "character unlock query is not STABLE: $volatility"
 public_exec=$("${psql_base[@]}" -Atc "select case when has_function_privilege('public','public.qry_character_unlocks_v1(uuid)','EXECUTE') then '1' else '0' end;")
 [[ "$public_exec" == "0" ]] || fail "character unlock query unexpectedly executable by PUBLIC"
-[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == "59" ]] || fail "public table catalog changed"
-pass "character unlock query is STABLE, PUBLIC EXECUTE revoked, and public table catalog remains 59"
+[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == "60" ]] || fail "public table catalog changed"
+pass "character unlock query is STABLE, PUBLIC EXECUTE revoked, and public table catalog remains 60"
 
 echo "current Character Unlock projection query tests passed"
