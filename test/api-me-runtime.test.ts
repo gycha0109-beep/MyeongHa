@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import meEndpoint from '../api/me.js';
 
 const THREAD_ID = '93000000-0000-4000-8000-000000000001';
+const OTHER_THREAD_ID = '93000000-0000-4000-8000-000000000002';
 
 beforeAll(() => {
   process.env.MYEONGHA_DATABASE_URL =
@@ -97,6 +98,46 @@ describe('GET /api/me production route adapter', () => {
     });
   });
 
+  it('accepts Vercel dynamic Chat metadata only when it matches the private thread locator', async () => {
+    const response = await meEndpoint.fetch(
+      new Request(
+        `https://myeongha.example/api/me?__myeongha_chat_thread_id=${THREAD_ID}&threadId=${THREAD_ID}&afterSequenceNo=12`,
+        { method: 'GET' },
+      ),
+    );
+
+    expect(response.status).toBe(401);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(await response.json()).toMatchObject({
+      ok: false,
+      error: {
+        code: 'AUTH_REQUIRED',
+        messageKey: 'auth.required',
+        retryable: false,
+      },
+      meta: { apiContractVersion: 'v0.9' },
+    });
+  });
+
+  it.each([
+    `https://myeongha.example/api/chat/${THREAD_ID}?__myeongha_chat_thread_id=${THREAD_ID}`,
+    `https://myeongha.example/api/chat/${THREAD_ID}?__myeongha_chat_thread_id=${THREAD_ID}&threadId=${THREAD_ID}&afterSequenceNo=12`,
+  ])('accepts the Vercel-preserved public Chat source pathname when all thread evidence matches: %s', async (url) => {
+    const response = await meEndpoint.fetch(new Request(url, { method: 'GET' }));
+
+    expect(response.status).toBe(401);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(await response.json()).toMatchObject({
+      ok: false,
+      error: {
+        code: 'AUTH_REQUIRED',
+        messageKey: 'auth.required',
+        retryable: false,
+      },
+      meta: { apiContractVersion: 'v0.9' },
+    });
+  });
+
   it.each(['subjectId', 'characterId', 'presentationKey', 'unexpected']) (
     'rejects forwarded client Chat authority/unknown query parameter %s',
     async (key) => {
@@ -116,9 +157,18 @@ describe('GET /api/me production route adapter', () => {
   it.each([
     `https://myeongha.example/api/me?__myeongha_chat_thread_id=`,
     `https://myeongha.example/api/me?__myeongha_chat_thread_id=${THREAD_ID}&__myeongha_chat_thread_id=${THREAD_ID}`,
+    `https://myeongha.example/api/me?threadId=${THREAD_ID}`,
+    `https://myeongha.example/api/me?__myeongha_chat_thread_id=${THREAD_ID}&threadId=${OTHER_THREAD_ID}`,
+    `https://myeongha.example/api/me?__myeongha_chat_thread_id=${THREAD_ID}&threadId=${THREAD_ID}&threadId=${THREAD_ID}`,
+    `https://myeongha.example/api/chat/${THREAD_ID}`,
+    `https://myeongha.example/api/chat/${THREAD_ID}?__myeongha_chat_thread_id=${OTHER_THREAD_ID}`,
+    `https://myeongha.example/api/chat/${OTHER_THREAD_ID}?__myeongha_chat_thread_id=${THREAD_ID}&threadId=${THREAD_ID}`,
+    `https://myeongha.example/api/chat/${THREAD_ID}/extra?__myeongha_chat_thread_id=${THREAD_ID}`,
+    `https://myeongha.example/api/chat/not-a-uuid?__myeongha_chat_thread_id=${THREAD_ID}`,
     `https://myeongha.example/api/me?afterSequenceNo=1`,
     `https://myeongha.example/api/me?__myeongha_chat_thread_id=${THREAD_ID}&afterSequenceNo=-1`,
     `https://myeongha.example/api/me?__myeongha_records_read=memories&__myeongha_chat_thread_id=${THREAD_ID}`,
+    `https://myeongha.example/api/me?__myeongha_records_read=memories&threadId=${THREAD_ID}`,
   ])('fails closed for malformed or conflicting private Chat dispatcher input: %s', async (url) => {
     const response = await meEndpoint.fetch(new Request(url, { method: 'GET' }));
     expect(response.status).toBe(404);

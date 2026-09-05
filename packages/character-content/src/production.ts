@@ -9,7 +9,8 @@ export const MIN_PRODUCTION_CHARACTER_ROSTER = 5;
 
 export type ProductionCharacterContentValidationCode =
   | 'PRODUCTION_ROSTER_TOO_SMALL'
-  | 'DEVELOPMENT_PLACEHOLDER_FORBIDDEN';
+  | 'DEVELOPMENT_PLACEHOLDER_FORBIDDEN'
+  | 'ASSET_MANIFEST_HASH_REQUIRED';
 
 export class ProductionCharacterContentValidationError extends Error {
   constructor(
@@ -27,13 +28,18 @@ function isDevelopmentPlaceholder(
   return character.developmentPlaceholder === true;
 }
 
+function hasVersionedAssetManifestHash(bundle: CharacterContentBundle): boolean {
+  return /^sha256:v1:[0-9a-f]{64}$/iu.test(bundle.assetManifestHash);
+}
+
 /**
  * Production publication boundary for immutable Character canon.
  *
  * Generic bundle validation intentionally permits development placeholders so
  * engineering slices can exercise schemas and runtime contracts. Production
  * publication is stricter: the launch roster must contain at least five real
- * authored characters and no development placeholder may cross this boundary.
+ * authored characters, no development placeholder may cross this boundary, and
+ * immutable asset-manifest provenance must already be source-backed.
  *
  * Character identity/content is never inferred here from UI presentation keys
  * or runtime database rows. The supplied bundle must already be source-backed
@@ -43,6 +49,13 @@ export function validateProductionCharacterContentBundle(
   bundle: CharacterContentBundle,
 ): CharacterContentBundle {
   validateCharacterContentBundle(bundle);
+
+  if (!hasVersionedAssetManifestHash(bundle)) {
+    throw new ProductionCharacterContentValidationError(
+      'ASSET_MANIFEST_HASH_REQUIRED',
+      'Production character content requires sha256:v1 asset manifest provenance.',
+    );
+  }
 
   if (bundle.characters.length < MIN_PRODUCTION_CHARACTER_ROSTER) {
     throw new ProductionCharacterContentValidationError(

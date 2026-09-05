@@ -205,6 +205,8 @@ export interface CharacterContentDefinition {
 export interface CharacterContentBundle {
   readonly bundleId: string;
   readonly contentVersion: string;
+  /** Opaque immutable asset-manifest provenance required by the client ContentManifest contract. */
+  readonly assetManifestHash: string;
   readonly cueSchemaVersion: string;
   readonly minClientCapability: string;
   readonly characters: readonly CharacterContentDefinition[];

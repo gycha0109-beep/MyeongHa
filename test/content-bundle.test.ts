@@ -17,10 +17,29 @@ describe('immutable content bundle validation', () => {
     expect(characterManifestA).toEqual(characterManifestB);
     expect(worldManifestA).toEqual(worldManifestB);
     expect(characterManifestA.characterIds).toEqual(['john-doe-01','john-doe-02','john-doe-03','john-doe-04','john-doe-05']);
-    expect(characterManifestA.contentHash).toMatch(/^sha256:[a-f0-9]{64}$/u);
+    expect(characterManifestA.assetManifestHash).toBe(DEV_CHARACTER_CONTENT_BUNDLE.assetManifestHash);
+    expect(characterManifestA.contentHash).toMatch(/^sha256:v1:[a-f0-9]{64}$/u);
     expect(worldManifestA).toMatchObject({ bundleId: 'dev-content-bundle-0001', contentVersion: '0.0.1-dev', episodeIds: ['dev-first-contact'], relationCount: 1 });
-    expect(worldManifestA.contentHash).toMatch(/^sha256:[a-f0-9]{64}$/u);
+    expect(worldManifestA.contentHash).toMatch(/^sha256:v1:[a-f0-9]{64}$/u);
     expect(buildCoherentContentRelease(' dev-release-0001 ', characterManifestA, worldManifestA)).toMatchObject({ releaseId: 'dev-release-0001', bundleId: 'dev-content-bundle-0001', contentVersion: '0.0.1-dev' });
+  });
+
+  it('binds asset manifest provenance into the deterministic content hash', () => {
+    const original = buildCharacterContentManifest(DEV_CHARACTER_CONTENT_BUNDLE);
+    const changed = buildCharacterContentManifest({
+      ...DEV_CHARACTER_CONTENT_BUNDLE,
+      assetManifestHash: 'sha256:v1:9cedaf240137f47a2337b46142cc3af23d691b9fc8ff302dfc7de4d2149109f5',
+    });
+
+    expect(changed.assetManifestHash).not.toBe(original.assetManifestHash);
+    expect(changed.contentHash).not.toBe(original.contentHash);
+  });
+
+  it('rejects a manifest build without the versioned SHA-256 asset hash convention', () => {
+    expect(() => buildCharacterContentManifest({
+      ...DEV_CHARACTER_CONTENT_BUNDLE,
+      assetManifestHash: 'sha256:17e33bffe547ee0bda3f5ace949f367b9f446e3af0ff172e89224a2ac4001048',
+    })).toThrow(/assetManifestHash must use sha256:v1:<hex> convention/u);
   });
 
   it('rejects a world relation that points outside the same character bundle', () => {

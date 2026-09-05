@@ -16,8 +16,12 @@
 | Guest session TTL | DECIDED / BINDING PENDING | `P0-PR-01A` fixes Guest bearer/session authentication lifetime at 7 days = 604800 seconds. Parent `P0-PR-01` remains open for broader expired-Guest data deletion, backup, AI-trace, commerce/legal, and cleanup retention policy. |
 | Character compatibility verdict | BLOCKED | `SRC-15` remains unresolved. |
 | Subject-specific content rollout | BLOCKED | `SRC-16` remains unresolved. |
-| Character HTTP activation | HOLD | Do not claim subject-specific activation while SRC-15/SRC-16 are unresolved. |
-| Chat send/runtime activation | HOLD / FAIL-CLOSED | Do not invent compatibility or rollout fallback semantics. |
+| Canonical Character roster | BLOCKED / EMPTY IN PRODUCTION | `O-C1-05` remains OPEN for the actual initial five Character canon / gender / visual / names. Production roster audit run `33981084804` found `characterTotalCount=0`. No roster is inferred from UI presentation data. |
+| Character content release | BLOCKED / NO ACTIVE DEFAULT RELEASE | `SRC-27` remains OPEN / BLOCKING for production-authoritative content lifecycle mutation. Production roster audit run `33981084804` found `activeDefaultReleaseCount=0`, `activeBundleCount=0`, and `eligibleCharacterCount=0`. |
+| Character HTTP activation | HOLD | Do not claim canonical Character activation while `O-C1-05`, `SRC-15`, `SRC-16`, and `SRC-27` remain unresolved or blocking. |
+| Production Member Chat reusable thread | BLOCKED / NONE | Governed read-only Chat smoke run `33980518338` found `ownedThreadCount=0` and `eligibleThreadCount=0`. |
+| Chat thread creation authority | BLOCKED | `SRC-34` remains OPEN / BLOCKING; do not create a Production Character Chat thread merely to make E2E green. |
+| Chat send/runtime activation | HOLD / FAIL-CLOSED | No canonical Character send smoke is claimed while canonical content/release authority is absent and `SRC-34` blocks production-authoritative Character Chat thread creation/open semantics. |
 | Supabase production migration deployment | LIVE THROUGH 0820 | Production contains `0790_subject_execution_context`, `0800_production_api_login_principal`, `0810_guest_bootstrap_runtime_authority`, and `0820_guest_bootstrap_current_query` on project `cnsfpcdiyofqvhpcegfc`. `.github/workflows/supabase-production.yml` remains the governed migration deployment path. |
 
 ## Verification semantics
@@ -131,6 +135,50 @@ network connection
 
 `postgres`, `supabase_admin`, `service_role`, or another BYPASSRLS identity remains forbidden as the ordinary user runtime principal.
 
+## Live production Character / Chat evidence — 2026-09-06
+
+The governed Character roster and Member Chat discovery checks are read-only audits. They do not seed, publish, activate, create, or mutate Production data.
+
+Production Character roster audit (`33981084804`) observed only sanitized aggregate state:
+
+```text
+activeDefaultReleaseCount=0
+activeBundleCount=0
+characterTotalCount=0
+activeRuntimeCount=0
+enabledRuntimeCount=0
+candidateAvailabilityCount=0
+releaseWindowStartedCount=0
+notRetiredCount=0
+eligibleCharacterCount=0
+auditMode=explicit_read_only
+```
+
+Governed Production Member Chat discovery (`33980518338`) observed:
+
+```text
+ownedThreadCount=0
+activeThreadCount=0
+pinnedActiveThreadCount=0
+eligibleThreadCount=0
+auditMode=explicit_read_only
+```
+
+These zero states are readiness evidence, not permission to synthesize missing authority. In particular:
+
+```text
+O-C1-05
+→ actual initial five Character canon / gender / visual / names remain OPEN
+
+SRC-27
+→ content release lifecycle mutation authority remains OPEN / BLOCKING
+
+SRC-34
+→ Character Chat thread creation/open mutation authority remains OPEN / BLOCKING
+```
+
+No Production Character content, release, runtime catalog row, Chat thread, or Chat message was mutated to obtain these results.
+
 ## Production binding operations
 
 The already-completed one-time user-data credential workflow is:
@@ -191,8 +239,11 @@ Repository CI verifies that workflow's security contract, but does not execute i
 
 Authority blockers still open:
 
+- `O-C1-05`: actual initial five Character canon / gender / visual / names.
 - `SRC-15`: client capability / asset manifest compatibility decision authority.
 - `SRC-16`: subject-specific content rollout resolver authority.
+- `SRC-27`: production content bundle/release lifecycle mutation authority, including registration, activation/default-switch, and retirement semantics.
+- `SRC-34`: production-authoritative Character Chat thread creation/open semantics.
 - `P0-PR-01`: broader retention remains open for expired Guest data deletion, product-personal data retention, AI trace, backup, commerce/legal/accounting retention, and cleanup cadence. It no longer blocks the narrower Guest authentication-lifetime decision recorded in `P0-PR-01A`.
 
 Resolved architecture / production decisions:

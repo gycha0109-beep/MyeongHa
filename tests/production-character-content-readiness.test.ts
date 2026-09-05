@@ -163,6 +163,7 @@ function authoredCharacter(characterId: string): CharacterContentDefinition {
 const AUTHORED_PRODUCTION_TEST_BUNDLE = {
   bundleId: 'production-character-readiness-test-bundle',
   contentVersion: CONTENT_VERSION,
+  assetManifestHash: 'sha256:v1:4345e9deb0393f0beabfa4e22ae039a00a2860d6d240a7a90d0b420d29eb1ec1',
   cueSchemaVersion: 'cue-v1',
   minClientCapability: '1.0.0-test',
   characters: Array.from(
@@ -206,6 +207,23 @@ describe('Production Character content readiness', () => {
     }
   });
 
+  it('rejects Production publication without versioned immutable asset manifest provenance', () => {
+    const missingAssetProvenance = {
+      ...AUTHORED_PRODUCTION_TEST_BUNDLE,
+      assetManifestHash: '   ',
+    } satisfies CharacterContentBundle;
+
+    try {
+      validateProductionCharacterContentBundle(missingAssetProvenance);
+      throw new Error('expected Production validation to reject missing asset provenance');
+    } catch (error) {
+      expect(error).toBeInstanceOf(ProductionCharacterContentValidationError);
+      expect((error as ProductionCharacterContentValidationError).code).toBe(
+        'ASSET_MANIFEST_HASH_REQUIRED',
+      );
+    }
+  });
+
   it('builds a deterministic immutable manifest only after the Production boundary passes', () => {
     expect(
       validateProductionCharacterContentBundle(AUTHORED_PRODUCTION_TEST_BUNDLE),
@@ -219,6 +237,7 @@ describe('Production Character content readiness', () => {
     );
 
     expect(first).toEqual(second);
+    expect(first.assetManifestHash).toBe(AUTHORED_PRODUCTION_TEST_BUNDLE.assetManifestHash);
     expect(first.characterIds).toEqual([
       'test-character-1',
       'test-character-2',
@@ -226,6 +245,6 @@ describe('Production Character content readiness', () => {
       'test-character-4',
       'test-character-5',
     ]);
-    expect(first.contentHash).toMatch(/^sha256:[0-9a-f]{64}$/);
+    expect(first.contentHash).toMatch(/^sha256:v1:[0-9a-f]{64}$/);
   });
 });
