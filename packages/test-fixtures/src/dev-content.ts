@@ -13,6 +13,7 @@ const placeholderSpeech: CharacterSpeechProfile = {
 export const DEV_CHARACTER_CONTENT_BUNDLE = {
   bundleId: 'dev-content-bundle-0001',
   contentVersion: '0.0.1-dev',
+  assetManifestHash: 'dev-asset-manifest-placeholder-v1',
   cueSchemaVersion: 'cue-v1',
   minClientCapability: '0.0.1-dev',
   characters: [
