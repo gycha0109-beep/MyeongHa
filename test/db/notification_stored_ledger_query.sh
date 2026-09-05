@@ -92,7 +92,7 @@ search_path=$("${psql_base[@]}" -Atc "select array_to_string(proconfig, ',') fro
 [[ "$search_path" == "search_path=public, pg_temp" ]] || fail "notification stored ledger query search_path mismatch: $search_path"
 public_exec=$("${psql_base[@]}" -Atc "select case when has_function_privilege('public','public.qry_notification_stored_ledger_v1(uuid)','EXECUTE') then '1' else '0' end;")
 [[ "$public_exec" == "0" ]] || fail "notification stored ledger query unexpectedly executable by PUBLIC"
-[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == "59" ]] || fail "public table catalog changed"
-pass "notification stored ledger query is STABLE/INVOKER, explicit search_path, PUBLIC-revoked, and table catalog remains 59"
+[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == "60" ]] || fail "public table catalog changed"
+pass "notification stored ledger query is STABLE/INVOKER, explicit search_path, PUBLIC-revoked, and table catalog remains 60"
 
 echo "notification stored ledger projection tests passed"
