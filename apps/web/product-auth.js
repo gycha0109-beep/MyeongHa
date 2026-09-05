@@ -80,6 +80,18 @@ function stageMemberBearerForLegacyProductClients(accessToken) {
   writeSession(GUEST_TOKEN_KEY, accessToken);
 }
 
+function discardMemberSession() {
+  removeLocal(MEMBER_SESSION_KEY);
+  const active = readSession(GUEST_TOKEN_KEY);
+  if (isJwtLike(active)) removeSession(GUEST_TOKEN_KEY);
+  const pending = readSession(PENDING_GUEST_TOKEN_KEY);
+  if (pending) {
+    writeSession(GUEST_TOKEN_KEY, pending);
+    removeSession(PENDING_GUEST_TOKEN_KEY);
+  }
+  emitAuthChanged();
+}
+
 function normalizeSession(value) {
   if (!isRecord(value)) return null;
   if (
@@ -171,6 +183,10 @@ export function readGuestBearer() {
   return typeof token === 'string' && token.length > 0 && !isJwtLike(token) ? token : null;
 }
 
+export function invalidateMemberSession() {
+  discardMemberSession();
+}
+
 export async function refreshMemberSession() {
   const current = readMemberSession();
   if (!current) return null;
@@ -181,15 +197,7 @@ export async function refreshMemberSession() {
     }
     return saveSession(data.session);
   } catch (error) {
-    removeLocal(MEMBER_SESSION_KEY);
-    const active = readSession(GUEST_TOKEN_KEY);
-    if (isJwtLike(active)) removeSession(GUEST_TOKEN_KEY);
-    const pending = readSession(PENDING_GUEST_TOKEN_KEY);
-    if (pending) {
-      writeSession(GUEST_TOKEN_KEY, pending);
-      removeSession(PENDING_GUEST_TOKEN_KEY);
-    }
-    emitAuthChanged();
+    discardMemberSession();
     throw error;
   }
 }
@@ -270,15 +278,7 @@ export async function signOutMember() {
       // Local sign-out is still authoritative for this browser session.
     }
   }
-  removeLocal(MEMBER_SESSION_KEY);
-  const active = readSession(GUEST_TOKEN_KEY);
-  if (isJwtLike(active)) removeSession(GUEST_TOKEN_KEY);
-  const pending = readSession(PENDING_GUEST_TOKEN_KEY);
-  if (pending) {
-    writeSession(GUEST_TOKEN_KEY, pending);
-    removeSession(PENDING_GUEST_TOKEN_KEY);
-  }
-  emitAuthChanged();
+  discardMemberSession();
 }
 
 export function clearPromotedGuestBearer() {
