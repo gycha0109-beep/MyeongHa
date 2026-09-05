@@ -1,0 +1,77 @@
+name: Production Records Current-Subject Smoke Sentinel Dispatch
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type TRIGGER_RECORDS_CURRENT_SUBJECT to dispatch the governed production Records current-subject smoke.'
+        required: true
+        type: string
+  push:
+    branches:
+      - main
+    paths:
+      - .github/production-records-current-subject-smoke.trigger
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: production-records-current-subject-smoke-sentinel-dispatch
+  cancel-in-progress: false
+
+jobs:
+  dispatch-governed-records-current-subject:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Verify governed trigger
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DISPATCH_CONFIRM: ${{ inputs.confirm }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == 'workflow_dispatch' ]]; then
+            [[ "$DISPATCH_CONFIRM" == 'TRIGGER_RECORDS_CURRENT_SUBJECT' ]]
+          else
+            [[ "$EVENT_NAME" == 'push' ]]
+            [[ "$GITHUB_REF" == 'refs/heads/main' ]]
+          fi
+
+      - name: Dispatch governed Production Records current-subject smoke
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          umask 077
+          payload_file="$RUNNER_TEMP/production-records-current-subject-dispatch.json"
+          cleanup() {
+            exit_code=$?
+            trap - EXIT
+            rm -f "$payload_file"
+            exit "$exit_code"
+          }
+          trap cleanup EXIT
+
+          test -n "${GH_TOKEN:-}"
+          jq -n '{ref: "main", inputs: {confirm: "VERIFY_RECORDS_CURRENT_SUBJECT"}}' > "$payload_file"
+
+          http_code="$(curl -sS \
+            -X POST \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'Accept: application/vnd.github+json' \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            --data-binary "@$payload_file" \
+            -o /dev/null \
+            -w '%{http_code}' \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/workflows/production-records-current-subject-smoke.yml/dispatches")"
+
+          if [[ "$http_code" != '204' ]]; then
+            echo "Governed Production Records current-subject dispatch failed: HTTP $http_code" >&2
+            exit 1
+          fi
+
+          echo 'Governed Production Records current-subject smoke dispatch accepted.'
