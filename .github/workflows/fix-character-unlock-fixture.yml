@@ -1,0 +1,78 @@
+name: Fix Character Unlock Fixture
+
+on:
+  push:
+    branches:
+      - feat/guest-purchase-intent-v2-main
+    paths:
+      - .github/workflows/fix-character-unlock-fixture.yml
+
+permissions:
+  contents: write
+
+jobs:
+  fix-and-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: myeongha_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d myeongha_test"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: myeongha_test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply exact fixture repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('test/db/character_unlocks_current_query.sh')
+          text = path.read_text()
+          old = "('7c400000-0000-0000-0000-000000000002','7c200000-0000-0000-0000-000000000001','unlock-beta','locked',0,null,null,timestamptz '2026-08-20 00:00:00+00',timestamptz '2026-08-20 00:00:00+00',timestamptz '2026-08-20 00:00:00+00'),"
+          new = "('7c400000-0000-0000-0000-000000000002','7c200000-0000-0000-0000-000000000001','unlock-beta','locked',0,null,null,timestamptz '2026-08-20 00:00:00+00',timestamptz '2026-08-20 00:00:00+00'),"
+          count = text.count(old)
+          if count != 1:
+              raise SystemExit(f'expected exactly one stale fixture row, found {count}')
+          path.write_text(text.replace(old, new))
+          PY
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Bootstrap schema
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 -f test/db/bootstrap_supabase_auth_stub.sql
+          for migration in supabase/migrations/*.sql; do
+            psql -v ON_ERROR_STOP=1 -f "$migration" >/dev/null
+          done
+      - name: Verify Character Unlock current query
+        shell: bash
+        run: bash test/db/character_unlocks_current_query.sh
+      - name: Commit verified repair and remove diagnostics
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/character-unlock-diagnostic.txt
+          rm -f .github/workflows/diagnose-character-unlock.yml
+          rm -f .github/workflows/fix-character-unlock-fixture.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "test(db): repair character unlock fixture arity"
+          git push origin HEAD:feat/guest-purchase-intent-v2-main
