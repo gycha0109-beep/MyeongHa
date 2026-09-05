@@ -96,8 +96,14 @@ const requiredLiveVerifierFragments = [
   'birthProfile.currentRevision',
   'matchingCurrentRevisions.length !== 1',
   "requireNoStore(birthProfileResponse, 'Production Saju smoke current Birth Profile')",
+  'function buildStableEvidence({ calculation, source, snapshot, policy, pillars, completeness, provenance })',
+  'contentHash: source.contentHash',
+  'calculationHash: snapshot.calculationHash',
+  'function canonicalize(value)',
+  'function stableSerialize(value)',
+  'function validateCalculationBody(calculationBody, label)',
+  'async function requestCalculation(label)',
   "method: 'POST'",
-  'calculationResponse.status !== 200',
   "'myeongha-saju-production-calculation-ingress-v1'",
   "'saju_calculation_evidence'",
   "'calculation_only'",
@@ -109,19 +115,51 @@ const requiredLiveVerifierFragments = [
   "'docs/decisions/ADR-0006-production-calculation-default-v1.md'",
   "'myeonghwa-production-calculation-policy-v1'",
   "'myeonghwa/production/civil-midnight-v1'",
-  "requireNoStore(calculationResponse, 'Production current-subject Saju calculation')",
+  "const firstCalculation = await requestCalculation('Production current-subject Saju calculation first');",
+  "const repeatCalculation = await requestCalculation('Production current-subject Saju calculation repeat');",
+  'stableSerialize(firstCalculation.stableEvidence) !== stableSerialize(repeatCalculation.stableEvidence)',
   'JSON.stringify(memberBody).includes(accessToken)',
   'JSON.stringify(birthProfileBody).includes(accessToken)',
-  'JSON.stringify(calculationBody).includes(accessToken)',
+  'JSON.stringify(firstCalculation.body).includes(accessToken)',
+  'JSON.stringify(repeatCalculation.body).includes(accessToken)',
   'memberSignIn=200',
   'birthProfilePresent=true',
   'birthRevisionMatch=true',
+  'calculationFirst=200',
+  'calculationRepeat=200',
+  'deterministicRepeat=true',
 ];
 
 for (const fragment of requiredLiveVerifierFragments) {
   if (!liveVerifier.includes(fragment)) {
     throw new Error(`Missing production Saju live verifier contract fragment: ${fragment}`);
   }
+}
+
+if ((liveVerifier.match(/await requestCalculation\(/g) ?? []).length !== 2) {
+  throw new Error('Production Saju live verifier must execute exactly two governed calculation requests.');
+}
+
+const stableEvidenceStart = liveVerifier.indexOf('function buildStableEvidence');
+const stableEvidenceEnd = liveVerifier.indexOf('\nfunction canonicalize', stableEvidenceStart);
+if (stableEvidenceStart < 0 || stableEvidenceEnd <= stableEvidenceStart) {
+  throw new Error('Production Saju stable evidence projection boundary is missing.');
+}
+const stableEvidenceProjection = liveVerifier.slice(stableEvidenceStart, stableEvidenceEnd);
+for (const volatileFragment of ['requestId', 'serverTime', 'snapshotId', 'createdAt']) {
+  if (stableEvidenceProjection.includes(volatileFragment)) {
+    throw new Error(`Volatile field leaked into deterministic Saju evidence projection: ${volatileFragment}`);
+  }
+}
+
+const requestCalculationStart = liveVerifier.indexOf('async function requestCalculation(label)');
+const requestCalculationEnd = liveVerifier.indexOf('\nconst firstCalculation =', requestCalculationStart);
+if (requestCalculationStart < 0 || requestCalculationEnd <= requestCalculationStart) {
+  throw new Error('Production Saju calculation request boundary is missing.');
+}
+const calculationRequestContract = liveVerifier.slice(requestCalculationStart, requestCalculationEnd);
+if (calculationRequestContract.includes('body:')) {
+  throw new Error('Production current-subject Saju calculation request must not send a request body.');
 }
 
 const forbiddenLiveVerifierFragments = [
@@ -135,7 +173,6 @@ const forbiddenLiveVerifierFragments = [
   'process.env.MYEONGHA_PRODUCTION_ORIGIN',
   'process.env.VERCEL',
   'process.env.SUPABASE',
-  'body:',
   "method: 'DELETE'",
   "method: 'PATCH'",
   "method: 'PUT'",
@@ -146,8 +183,10 @@ const forbiddenLiveVerifierFragments = [
   'console.error(memberBody',
   'console.log(birthProfileBody',
   'console.error(birthProfileBody',
-  'console.log(calculationBody',
-  'console.error(calculationBody',
+  'console.log(firstCalculation',
+  'console.error(firstCalculation',
+  'console.log(repeatCalculation',
+  'console.error(repeatCalculation',
 ];
 
 for (const fragment of forbiddenLiveVerifierFragments) {
@@ -197,4 +236,4 @@ for (const fragment of forbiddenSessionHelperFragments) {
   }
 }
 
-console.log('MyeongHa production current-subject Saju fresh-session smoke workflow contract verification passed.');
+console.log('MyeongHa production current-subject Saju deterministic fresh-session smoke workflow contract verification passed.');
