@@ -1,3 +1,5 @@
+import { acquireProductionMemberSmokeSession } from './production-member-smoke-session.mjs';
+
 const PRODUCTION_ORIGIN = 'https://myeongha.vercel.app';
 const MEMBER_ME_URL = `${PRODUCTION_ORIGIN}/api/me`;
 const REQUEST_TIMEOUT_MS = 15_000;
@@ -55,7 +57,6 @@ async function fetchCanonical(init) {
   });
 }
 
-const bearer = requireSecret('MYEONGHA_PRODUCTION_MEMBER_BEARER');
 const expectedSubjectId = requireUuid(
   'MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID',
   requireSecret('MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID'),
@@ -78,10 +79,11 @@ if (
   throw new Error('Unauthenticated /api/me did not return AUTH_REQUIRED.');
 }
 
+const { accessToken } = await acquireProductionMemberSmokeSession();
 const authenticated = await fetchCanonical({
   method: 'GET',
   headers: {
-    Authorization: `Bearer ${bearer}`,
+    Authorization: `Bearer ${accessToken}`,
   },
 });
 requireNoStore(authenticated, 'Authenticated Member /api/me');
@@ -106,7 +108,10 @@ if (data.subjectId !== expectedSubjectId) {
 if (data.subjectStatus !== 'active' && data.subjectStatus !== 'deletion_pending') {
   throw new Error('Authenticated Member /api/me returned an unsupported subject status.');
 }
+if (JSON.stringify(authenticatedBody).includes(accessToken)) {
+  throw new Error('Authenticated Member /api/me reflected the fresh access token.');
+}
 
 console.log(
-  'MyeongHa production Member /api/me smoke passed: unauthenticated=401 AUTH_REQUIRED, authenticated=200 member, expectedSubjectMatch=true, cacheControl=no-store.',
+  'MyeongHa production Member /api/me smoke passed: freshSession=true, unauthenticated=401 AUTH_REQUIRED, authenticated=200 member, expectedSubjectMatch=true, cacheControl=no-store.',
 );
