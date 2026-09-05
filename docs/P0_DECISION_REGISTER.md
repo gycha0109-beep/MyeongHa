@@ -1,9 +1,9 @@
-# 명하 Production P0 Decision Register — Full Audit v0.8
+# 명하 Production P0 Decision Register — Full Audit v0.9
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.8**  
+> Pack Version: **v0.9**  
 > Date: **2026-09-05**  
-> Source Authority: `Usecase_re_reviewed_v2(1).md`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`, `Myeonghwa_Personalized_Interpretation_Architecture_v1.3_THIRD_REVIEW(1).md`, `docs/architecture/COMMERCE_ENTITLEMENT_ARCHITECTURE_V1.md`  
+> Source Authority: `Usecase_re_reviewed_v2(1).md`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`, `Myeonghwa_Personalized_Interpretation_Architecture_v1.3_THIRD_REVIEW(1).md`, `docs/architecture/COMMERCE_ENTITLEMENT_ARCHITECTURE_V1.md`, `docs/COMMERCE_GUEST_PURCHASE_OWNERSHIP_DECISION_V1.md`  
 > Rule: 본 문서는 위 source authority를 구현 수준으로 구체화한다. source가 결정하지 않은 사항은 임의 확정하지 않고 `OPEN-P0` 또는 `CANDIDATE`로 표시한다. Production 운영을 열기 위해 별도 security/operations decision을 확정할 경우 source requirement를 좁혀야 하며, 상위 미결정 retention/legal policy를 대신 결정한 것으로 간주하지 않는다.
 
 ---
@@ -20,6 +20,7 @@
 | `P0-CM-01` | Commerce launch rail | **DECIDED** | Web + one-off only for launch MVP; no subscription/bundle/native-store billing |
 | `P0-CM-02` | Web payment provider / PSP | **OPEN-P0** | merchant geography/legal entity, settlement/currency, verification, webhook/refund/reconciliation semantics를 만족하는 exact provider 선택 |
 | `P0-CM-03` | Launch paid Product / Capability catalog | **OPEN-P0** | Paid Deep/Detailed Reading은 후보일 뿐이며 current Saju production interpretation authority가 BLOCKED이므로 saleable SKU 확정 금지 |
+| `P0-CM-04` | Guest purchase ownership / continuity | **DECIDED** | active Guest 구매 허용; canonical `subjects.id` 소유; 새 Member promotion은 same-subject; 기존 Member merge 후 direct merged-Guest lineage로 권리 조합; historical Commerce owner rewrite 금지 |
 | `P0-AI-01` | AI provider/model/fallback | **OPEN-P0** | provider, model family, fallback, grounded-response validation implementation |
 | `P0-AGE-01` | Minimum age / character content policy | **OPEN-P0** | 최소 이용 연령, 미성년 허용 여부, 표현 강도/제한; content bundle policy-tag slot은 미리 두되 threshold/matrix는 미확정 |
 | `P0-PR-01` | Retention / backup / legal retention | **OPEN-P0** | 제품 개인정보, AI trace, 결제/회계 증적, backup retention/deletion |
@@ -156,6 +157,61 @@ reopen_triggers:
 record: docs/COMMERCE_LAUNCH_RAIL_DECISION_V1.md
 ```
 
+### P0-CM-04
+
+```yaml
+id: P0-CM-04
+status: DECIDED
+decided_at: 2026-09-05
+choice: active Guest purchase is allowed and Commerce ownership remains anchored to the server-resolved canonical subjects.id
+scope:
+  decides:
+    - active Guest and active Member are eligible Web one-off purchase owners
+    - Guest purchase evidence/grants may be owned by the exact Guest subject
+    - Guest may consume a server-verified paid capability before registration
+    - Guest to new-Member promotion preserves the exact subject_id and requires no Commerce owner rewrite
+    - after a verified existing-Member merge, current access may compose rights from the canonical Member plus direct merged-Guest lineage
+    - historical Receipt/Event/Grant owner subject_id is never rewritten merely because of promotion/merge
+    - Guest session expiry alone does not revoke a verified paid right
+  does_not_decide:
+    - exact Web PSP
+    - concrete paid SKU/capability
+    - generic cross-domain Guest to existing-Member merge algorithm
+    - provider-specific transaction recovery identifier/canonicalization
+    - legal/accounting retention duration
+rationale:
+  - MyeongHa already uses subjects.id as the canonical owner for Guest and Member resources.
+  - production Guest to new-Member promotion preserves the exact subject row, so Guest purchases naturally remain attached to the same owner after registration.
+  - historical immutable Guest lineage is already preserved for merged-Guest reads; Commerce should compose rights from verified lineage rather than reparent provenance.
+  - allowing Guest purchase removes an unnecessary conversion barrier and no longer forces the product to keep a Member-only purchase rule solely for MVP simplification.
+security_invariants:
+  - client cannot choose or override Commerce subject owner
+  - Guest purchase requires currently verified Guest authentication at Purchase Intent creation
+  - payment/entitlement authority still begins only from server-verified provider evidence
+  - unrelated subjects/accounts cannot claim Guest commerce evidence or rights
+  - direct merged-Guest lineage must be server-authoritative; email/phone/client lineage hints are insufficient
+  - one source grant revoke/refund never removes another independent active grant
+  - Guest bearer expiration is authentication expiry, not payment-right expiry
+implementation_impact:
+  - keep historical cmd_create_purchase_intent_v1 Member-only and add a new command/version for Guest-or-Member ownership
+  - add Guest-aware current entitlement access composition without rewriting historical Commerce rows
+  - add negative/replay/concurrency/refund tests for Guest purchase and promotion/merge continuity
+  - selected PSP must support server-side transaction recovery/correlation that does not rely on client redirect success
+independent_gates_preserved:
+  - P0-CM-02 exact Web PSP
+  - P0-CM-03 concrete launch paid Product/Capability
+  - P0-PR-01 parent legal/accounting/backup retention
+  - SRC-24 generic existing-Member Guest merge executor authority
+production_gate:
+  - Guest purchase runtime is not activated until Guest purchase intent, verified apply, and paid-right continuity paths are implemented and tested.
+  - existing-Member paid-right continuity must be verified before Production Guest purchase activation; this decision does not pretend the generic merge executor already exists.
+migration_impact:
+  - no PostgreSQL migration is authorized by this decision record itself
+  - implementation must be additive/versioned; do not rewrite historical migration 0660
+rollback_or_change_policy: removing Guest purchase, allowing client-selected ownership, reparenting historical Commerce provenance, or changing inherited-lineage rules requires a new explicit Commerce decision
+record: docs/COMMERCE_GUEST_PURCHASE_OWNERSHIP_DECISION_V1.md
+```
+
 ### P0-AUTH-01
 
 ```yaml
@@ -288,6 +344,8 @@ record: docs/COMMERCE_EVIDENCE_DATA_MINIMIZATION_DECISION_V1.md
 
 `P0-CM-02` exact Web PSP and `P0-CM-03` launch paid Product/Capability remain explicitly open. `P0-CM-03` is upstream-blocked by current Saju production interpretation authority and cannot be closed by inventing product semantics inside Commerce.
 
+`P0-CM-04` closes the product/ownership question of whether Guest may purchase. It **does not** close `P0-CM-02`, `P0-CM-03`, `SRC-24`, or authorize Production Commerce activation.
+
 `P0-PR-01` parent retention/legal decision also remains OPEN. `P0-PR-01B` closes only the Commerce evidence minimization/security subset and must not be interpreted as a legal/accounting retention period.
 
 Use the following template when another P0 becomes authoritative:
@@ -312,6 +370,9 @@ rollback_or_change_policy: ...
 - `P0-CM-01` Web-first 결정을 exact PSP 선택이나 concrete paid SKU 승인으로 확대 해석하는 것
 - `P0-CM-02` 결정 전 provider SDK/webhook/production credential을 도입하는 것
 - current Saju production interpretation authority가 BLOCKED인 상태에서 `P0-CM-03`을 Paid Deep/Detailed Reading production SKU로 임의 승격하는 것
+- `P0-CM-04` Guest purchase 허용을 unrelated subject/account의 purchase claim 허용으로 확대 해석하는 것
+- Guest→Member continuity를 이유로 historical receipt/event/grant `subject_id`를 rewrite하는 것
+- Guest session TTL 만료를 verified paid-right 만료/취소로 재해석하는 것
 - paid one-reading ownership을 기존 `global | fixed` Capability scope에 client resource ID로 몰래 삽입하는 것
 - `P0-PR-01A` Guest authentication TTL을 expired Guest data deletion/backup/legal retention 기간으로 재해석하는 것
 - `P0-PR-01B`를 legal/accounting/backup retention 기간 결정으로 재해석하는 것
