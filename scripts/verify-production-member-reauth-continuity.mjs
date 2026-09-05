@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { acquireProductionMemberSmokeSession } from './production-member-smoke-session.mjs';
 
 const PRODUCTION_ORIGIN = 'https://myeongha.vercel.app';
@@ -5,6 +6,8 @@ const SIGN_OUT_URL = `${PRODUCTION_ORIGIN}/api/auth/sign-out`;
 const MEMBER_ME_URL = `${PRODUCTION_ORIGIN}/api/me`;
 const BIRTH_PROFILE_URL = `${PRODUCTION_ORIGIN}/api/me/birth-profile`;
 const SAJU_CALCULATION_URL = `${PRODUCTION_ORIGIN}/api/me/saju/calculation`;
+const LIFE_RECORD_URL = `${PRODUCTION_ORIGIN}/api/life-record`;
+const MEMORIES_URL = `${PRODUCTION_ORIGIN}/api/memories`;
 const REQUEST_TIMEOUT_MS = 20_000;
 
 function isRecord(value) {
@@ -13,6 +16,11 @@ function isRecord(value) {
 
 function requireRecord(name, value) {
   if (!isRecord(value)) throw new Error(`${name} must be an object.`);
+  return value;
+}
+
+function requireArray(name, value) {
+  if (!Array.isArray(value)) throw new Error(`${name} must be an array.`);
   return value;
 }
 
@@ -36,6 +44,31 @@ function requirePositiveInteger(name, value) {
     throw new Error(`${name} must be a positive integer.`);
   }
   return value;
+}
+
+function requireStoredString(name, value) {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    throw new Error(`${name} must be a non-empty string.`);
+  }
+  return value;
+}
+
+function requireNullableStoredString(name, value) {
+  if (value === null) return null;
+  return requireStoredString(name, value);
+}
+
+function requireTimestamp(name, value) {
+  const stored = requireStoredString(name, value);
+  if (!Number.isFinite(Date.parse(stored))) {
+    throw new Error(`${name} must be a timestamp.`);
+  }
+  return stored;
+}
+
+function requireNullableTimestamp(name, value) {
+  if (value === null) return null;
+  return requireTimestamp(name, value);
 }
 
 function requireNoStore(response, label) {
@@ -86,6 +119,122 @@ function requireNoTokenReflection(token, values, label) {
       throw new Error(`${label} reflected a fresh Member access token.`);
     }
   }
+}
+
+function canonicalizeJson(value, label) {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return value;
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (Array.isArray(value)) {
+    return value.map((item, index) => canonicalizeJson(item, `${label}[${index}]`));
+  }
+  if (isRecord(value)) {
+    return Object.fromEntries(
+      Object.keys(value)
+        .sort()
+        .map((key) => [key, canonicalizeJson(value[key], `${label}.${key}`)]),
+    );
+  }
+  throw new Error(`${label} must be valid JSON data.`);
+}
+
+function digestCanonicalSnapshot(value) {
+  return createHash('sha256').update(JSON.stringify(value)).digest('hex');
+}
+
+function buildLifeRecordDigest(data, label) {
+  const facts = requireArray(`${label} facts`, data.facts);
+  const seenIds = new Set();
+  const stableFacts = facts.map((value, index) => {
+    const fact = requireRecord(`${label} fact ${index}`, value);
+    const lifeFactId = requireStoredString(`${label} fact identity`, fact.lifeFactId);
+    if (seenIds.has(lifeFactId)) throw new Error(`${label} returned duplicate Life Fact identities.`);
+    seenIds.add(lifeFactId);
+    if (fact.valueJsonb === undefined) throw new Error(`${label} fact value must be present.`);
+
+    return {
+      lifeFactId,
+      factType: requireStoredString(`${label} fact type`, fact.factType),
+      schemaVersion: requireStoredString(`${label} fact schema version`, fact.schemaVersion),
+      valueJsonb: canonicalizeJson(fact.valueJsonb, `${label} fact value`),
+      validFrom: requireNullableTimestamp(`${label} fact valid-from`, fact.validFrom),
+      validTo: requireNullableTimestamp(`${label} fact valid-to`, fact.validTo),
+      sourceKind: requireStoredString(`${label} fact source kind`, fact.sourceKind),
+      sourceMessageId: requireNullableStoredString(`${label} fact source message`, fact.sourceMessageId),
+      sourceMergeActionId: requireNullableStoredString(`${label} fact source merge action`, fact.sourceMergeActionId),
+      supersedesFactId: requireNullableStoredString(`${label} superseded fact`, fact.supersedesFactId),
+      confirmedAt: requireTimestamp(`${label} fact confirmed-at`, fact.confirmedAt),
+      revokedAt: requireNullableTimestamp(`${label} fact revoked-at`, fact.revokedAt),
+      createdAt: requireTimestamp(`${label} fact created-at`, fact.createdAt),
+    };
+  });
+
+  stableFacts.sort((left, right) => left.lifeFactId.localeCompare(right.lifeFactId));
+  return digestCanonicalSnapshot(stableFacts);
+}
+
+function buildMemoriesDigest(data, label) {
+  const memories = requireArray(`${label} memories`, data.memories);
+  const seenIds = new Set();
+  const stableMemories = memories.map((value, index) => {
+    const memory = requireRecord(`${label} memory ${index}`, value);
+    const memoryItemId = requireStoredString(`${label} memory identity`, memory.memoryItemId);
+    if (seenIds.has(memoryItemId)) throw new Error(`${label} returned duplicate Memory Item identities.`);
+    seenIds.add(memoryItemId);
+    if (memory.contentJsonb === undefined) throw new Error(`${label} memory content must be present.`);
+
+    return {
+      memoryItemId,
+      memoryType: requireStoredString(`${label} memory type`, memory.memoryType),
+      schemaVersion: requireStoredString(`${label} memory schema version`, memory.schemaVersion),
+      contentJsonb: canonicalizeJson(memory.contentJsonb, `${label} memory content`),
+      createdByCharacterId: requireNullableStoredString(
+        `${label} memory creator character`,
+        memory.createdByCharacterId,
+      ),
+      createdAt: requireTimestamp(`${label} memory created-at`, memory.createdAt),
+    };
+  });
+
+  stableMemories.sort((left, right) => left.memoryItemId.localeCompare(right.memoryItemId));
+  return digestCanonicalSnapshot(stableMemories);
+}
+
+async function readOwnerRecords(accessToken, label) {
+  const authorization = { Authorization: `Bearer ${accessToken}` };
+
+  const lifeRecordResponse = await fetchCanonical(LIFE_RECORD_URL, {
+    method: 'GET',
+    headers: authorization,
+  });
+  requireNoStore(lifeRecordResponse, `${label} Life Record`);
+  requireJsonContentType(lifeRecordResponse, `${label} Life Record`);
+  if (lifeRecordResponse.status !== 200) {
+    throw new Error(`${label} Life Record expected HTTP 200, received ${lifeRecordResponse.status}.`);
+  }
+  const lifeRecordBody = await readJsonWithoutLogging(lifeRecordResponse, `${label} Life Record`);
+  requireApiContract(lifeRecordBody, `${label} Life Record`);
+  if (lifeRecordBody.ok !== true) throw new Error(`${label} Life Record did not return ok=true.`);
+  const lifeRecordData = requireRecord(`${label} Life Record data`, lifeRecordBody.data);
+  const lifeRecordDigest = buildLifeRecordDigest(lifeRecordData, `${label} Life Record`);
+
+  const memoriesResponse = await fetchCanonical(MEMORIES_URL, {
+    method: 'GET',
+    headers: authorization,
+  });
+  requireNoStore(memoriesResponse, `${label} Memories`);
+  requireJsonContentType(memoriesResponse, `${label} Memories`);
+  if (memoriesResponse.status !== 200) {
+    throw new Error(`${label} Memories expected HTTP 200, received ${memoriesResponse.status}.`);
+  }
+  const memoriesBody = await readJsonWithoutLogging(memoriesResponse, `${label} Memories`);
+  requireApiContract(memoriesBody, `${label} Memories`);
+  if (memoriesBody.ok !== true) throw new Error(`${label} Memories did not return ok=true.`);
+  const memoriesData = requireRecord(`${label} Memories data`, memoriesBody.data);
+  const memoriesDigest = buildMemoriesDigest(memoriesData, `${label} Memories`);
+
+  requireNoTokenReflection(accessToken, [lifeRecordBody, memoriesBody], `${label} Records`);
+
+  return Object.freeze({ lifeRecordDigest, memoriesDigest });
 }
 
 async function verifyAuthenticatedContinuityPoint(accessToken, label, expectedSubjectId) {
@@ -159,6 +308,7 @@ async function verifyAuthenticatedContinuityPoint(accessToken, label, expectedSu
     throw new Error(`${label} Saju calculation did not use the current Birth revision.`);
   }
 
+  const records = await readOwnerRecords(accessToken, label);
   requireNoTokenReflection(accessToken, [memberBody, birthBody, calculationBody], label);
 
   return Object.freeze({
@@ -166,6 +316,8 @@ async function verifyAuthenticatedContinuityPoint(accessToken, label, expectedSu
     birthProfileId,
     revisionId,
     revisionNo,
+    lifeRecordDigest: records.lifeRecordDigest,
+    memoriesDigest: records.memoriesDigest,
   });
 }
 
@@ -224,7 +376,13 @@ if (
 ) {
   throw new Error('Production Member current Birth revision changed across sign-out and re-sign-in.');
 }
+if (afterReSignIn.lifeRecordDigest !== beforeSignOut.lifeRecordDigest) {
+  throw new Error('Production Member Life Record owner snapshot changed across sign-out and re-sign-in.');
+}
+if (afterReSignIn.memoriesDigest !== beforeSignOut.memoriesDigest) {
+  throw new Error('Production Member Memories owner snapshot changed across sign-out and re-sign-in.');
+}
 
 console.log(
-  'MyeongHa production Member reauthentication continuity smoke passed: firstSignIn=200, signOut=200, secondSignIn=200, memberSubjectPreserved=true, birthProfilePreserved=true, birthRevisionPreserved=true, calculationAfterReSignIn=200, authority=calculation_only, cacheControl=no-store.',
+  'MyeongHa production Member reauthentication continuity smoke passed: firstSignIn=200, lifeRecordBefore=200, memoriesBefore=200, signOut=200, secondSignIn=200, memberSubjectPreserved=true, birthProfilePreserved=true, birthRevisionPreserved=true, calculationAfterReSignIn=200, lifeRecordAfterReSignIn=200, memoriesAfterReSignIn=200, recordsPreserved=true, authority=calculation_only, cacheControl=no-store.',
 );
