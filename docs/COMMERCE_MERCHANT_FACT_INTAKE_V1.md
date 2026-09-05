@@ -316,7 +316,7 @@ A provider may be selected only when all of the following are true:
 7. Existing Commerce technical correctness requirements remain satisfied.
 ```
 
-If more than one candidate satisfies the mandatory gate, the decision should prefer the candidate that requires the fewest architecture deviations while preserving the strongest available retry/reconciliation/idempotency evidence. This is a tie-break rule, not authority to ignore commercial facts.
+If more than one candidate satisfies the mandatory gate, this intake contract does **not** auto-select between them. Final provider choice remains an explicit `P0-CM-02` decision using the then-current technical, merchant, onboarding and commercial evidence.
 
 ---
 
