@@ -96,7 +96,7 @@ public_exec=$("${psql_base[@]}" -Atc "select case when has_function_privilege('p
 [[ "$public_exec" == '0' ]] || fail "outbox completion command unexpectedly executable by PUBLIC"
 volatility=$("${psql_base[@]}" -Atc "select p.provolatile from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.oid='public.cmd_complete_outbox_event_v1(uuid,text)'::regprocedure;")
 [[ "$volatility" == 'v' ]] || fail "outbox completion command must be VOLATILE, got $volatility"
-[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == '59' ]] || fail "public table catalog changed"
-pass "outbox completion PUBLIC EXECUTE remains revoked, VOLATILE, and public table catalog remains 59"
+[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == '60' ]] || fail "public table catalog changed"
+pass "outbox completion PUBLIC EXECUTE remains revoked, VOLATILE, and public table catalog remains 60"
 
 echo "Outbox successful completion persistence/concurrency tests passed"
