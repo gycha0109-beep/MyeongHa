@@ -1,0 +1,81 @@
+name: CM-G3 Wire
+
+on:
+  push:
+    branches:
+      - feat/guest-effective-entitlements-v2
+    paths:
+      - .github/workflows/cm-g3-wire.yml
+
+permissions:
+  contents: write
+
+jobs:
+  wire:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Wire export and DB verifier
+        shell: python
+        run: |
+          from pathlib import Path
+
+          index = Path('apps/api/src/index.ts')
+          text = index.read_text()
+          needle = """export {
+            ENTITLEMENTS_READ_AUTHORITY_BINDING_V1,
+            EntitlementsReadAuthorityPortErrorV1,
+            getEntitlements,
+            type EntitlementCurrentAuthorityRowV1,
+            type EntitlementProjectionStatusV1,
+            type EntitlementReadItemV1,
+            type EntitlementsReadAuthorityFailureCodeV1,
+            type EntitlementsReadAuthorityPortV1,
+            type EntitlementsReadClockV1,
+            type EntitlementsReadResponseV1,
+            type GetEntitlementsInputV1,
+          } from './entitlements-read.js';
+          """
+          insertion = needle + """
+          export {
+            EFFECTIVE_ENTITLEMENTS_READ_AUTHORITY_BINDING_V2,
+            EffectiveEntitlementsReadAuthorityPortErrorV2,
+            getEffectiveEntitlements,
+            type EffectiveEntitlementAuthorityRowV2,
+            type EffectiveEntitlementReadItemV2,
+            type EffectiveEntitlementsReadAuthorityFailureCodeV2,
+            type EffectiveEntitlementsReadAuthorityPortV2,
+            type EffectiveEntitlementsReadClockV2,
+            type EffectiveEntitlementsReadResponseV2,
+            type GetEffectiveEntitlementsInputV2,
+          } from './effective-entitlements-read-v2.js';
+          """
+          if insertion not in text:
+              if text.count(needle) != 1:
+                  raise SystemExit(f'index exact-match count={text.count(needle)}')
+              text = text.replace(needle, insertion, 1)
+              index.write_text(text)
+
+          ci = Path('.github/workflows/ci.yml')
+          text = ci.read_text()
+          needle = """      - name: Run current entitlement projection read tests
+                run: bash test/db/entitlements_current_query.sh
+          """
+          insertion = needle + """      - name: Run Guest-aware effective entitlement v2 read tests
+                run: bash test/db/effective_entitlements_v2_query.sh
+          """
+          if insertion not in text:
+              if text.count(needle) != 1:
+                  raise SystemExit(f'ci exact-match count={text.count(needle)}')
+              text = text.replace(needle, insertion, 1)
+              ci.write_text(text)
+      - name: Commit wiring and remove one-shot workflow
+        run: |
+          rm .github/workflows/cm-g3-wire.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add apps/api/src/index.ts .github/workflows/ci.yml .github/workflows/cm-g3-wire.yml
+          git commit -m "chore(ci): wire effective entitlement v2 checks"
+          git push
