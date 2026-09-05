@@ -31,6 +31,7 @@ function authoredCharacter(characterId: string): CharacterContentDefinition {
     characterId,
     contentVersion: CONTENT_VERSION,
     displayName: `Test ${characterId}`,
+    gender: 'test-only authored gender',
     deityProxyLabel: 'authored representative',
     shortDescriptor: 'test-only fully authored production-boundary fixture',
     personalityTraits: ['deliberate'],
@@ -79,6 +80,15 @@ function authoredCharacter(characterId: string): CharacterContentDefinition {
         contradiction: 'seeks clarity while tolerating ambiguity',
         hiddenMotivation: 'protect user agency',
       },
+    },
+    visual: {
+      visualVersion: 'test-v1',
+      visualDirection: 'test-only visual direction',
+      silhouette: 'test-only distinct silhouette',
+      palette: ['test-neutral'],
+      motifs: ['test-motif'],
+      costumeDirection: 'test-only costume direction',
+      prohibitedTropes: ['test-cliche'],
     },
     persona: {
       communication: {
@@ -172,19 +182,26 @@ const AUTHORED_PRODUCTION_TEST_BUNDLE = {
   ),
 } satisfies CharacterContentBundle;
 
+function expectProductionFailureCode(
+  bundle: CharacterContentBundle,
+  expectedCode: ProductionCharacterContentValidationError['code'],
+): void {
+  try {
+    validateProductionCharacterContentBundle(bundle);
+    throw new Error(`expected Production validation to reject with ${expectedCode}`);
+  } catch (error) {
+    expect(error).toBeInstanceOf(ProductionCharacterContentValidationError);
+    expect((error as ProductionCharacterContentValidationError).code).toBe(expectedCode);
+  }
+}
+
 describe('Production Character content readiness', () => {
   it('rejects the development placeholder roster even when its count reaches the launch minimum', () => {
     expect(DEV_CHARACTER_CONTENT_BUNDLE.characters).toHaveLength(MIN_PRODUCTION_CHARACTER_ROSTER);
-
-    try {
-      validateProductionCharacterContentBundle(DEV_CHARACTER_CONTENT_BUNDLE);
-      throw new Error('expected Production validation to reject development placeholders');
-    } catch (error) {
-      expect(error).toBeInstanceOf(ProductionCharacterContentValidationError);
-      expect((error as ProductionCharacterContentValidationError).code).toBe(
-        'DEVELOPMENT_PLACEHOLDER_FORBIDDEN',
-      );
-    }
+    expectProductionFailureCode(
+      DEV_CHARACTER_CONTENT_BUNDLE,
+      'DEVELOPMENT_PLACEHOLDER_FORBIDDEN',
+    );
   });
 
   it('rejects a roster smaller than the source-backed Production launch minimum', () => {
@@ -196,15 +213,7 @@ describe('Production Character content readiness', () => {
       ),
     } satisfies CharacterContentBundle;
 
-    try {
-      validateProductionCharacterContentBundle(undersized);
-      throw new Error('expected Production validation to reject undersized roster');
-    } catch (error) {
-      expect(error).toBeInstanceOf(ProductionCharacterContentValidationError);
-      expect((error as ProductionCharacterContentValidationError).code).toBe(
-        'PRODUCTION_ROSTER_TOO_SMALL',
-      );
-    }
+    expectProductionFailureCode(undersized, 'PRODUCTION_ROSTER_TOO_SMALL');
   });
 
   it('rejects Production publication without versioned immutable asset manifest provenance', () => {
@@ -213,15 +222,40 @@ describe('Production Character content readiness', () => {
       assetManifestHash: '   ',
     } satisfies CharacterContentBundle;
 
-    try {
-      validateProductionCharacterContentBundle(missingAssetProvenance);
-      throw new Error('expected Production validation to reject missing asset provenance');
-    } catch (error) {
-      expect(error).toBeInstanceOf(ProductionCharacterContentValidationError);
-      expect((error as ProductionCharacterContentValidationError).code).toBe(
-        'ASSET_MANIFEST_HASH_REQUIRED',
-      );
-    }
+    expectProductionFailureCode(
+      missingAssetProvenance,
+      'ASSET_MANIFEST_HASH_REQUIRED',
+    );
+  });
+
+  it('rejects Production publication when real-roster gender canon is absent', () => {
+    const [first, ...rest] = AUTHORED_PRODUCTION_TEST_BUNDLE.characters;
+    if (first === undefined) throw new Error('test fixture requires a first character');
+    const { gender: _gender, ...withoutGender } = first;
+    const missingGender = {
+      ...AUTHORED_PRODUCTION_TEST_BUNDLE,
+      characters: [withoutGender, ...rest],
+    } satisfies CharacterContentBundle;
+
+    expectProductionFailureCode(
+      missingGender,
+      'CHARACTER_GENDER_CANON_REQUIRED',
+    );
+  });
+
+  it('rejects Production publication when real-roster visual canon is absent', () => {
+    const [first, ...rest] = AUTHORED_PRODUCTION_TEST_BUNDLE.characters;
+    if (first === undefined) throw new Error('test fixture requires a first character');
+    const { visual: _visual, ...withoutVisual } = first;
+    const missingVisual = {
+      ...AUTHORED_PRODUCTION_TEST_BUNDLE,
+      characters: [withoutVisual, ...rest],
+    } satisfies CharacterContentBundle;
+
+    expectProductionFailureCode(
+      missingVisual,
+      'CHARACTER_VISUAL_CANON_REQUIRED',
+    );
   });
 
   it('builds a deterministic immutable manifest only after the Production boundary passes', () => {
