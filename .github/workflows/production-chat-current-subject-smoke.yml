@@ -36,6 +36,9 @@ jobs:
       MYEONGHA_PRODUCTION_MEMBER_PASSWORD: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_PASSWORD }}
       MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID }}
     steps:
+      - name: Check out exact repository verifier
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
       - name: Verify governed invocation and credentials
         shell: bash
         run: |
@@ -53,9 +56,6 @@ jobs:
           test -n "${MYEONGHA_PRODUCTION_MEMBER_PASSWORD:-}"
           test -n "${MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID:-}"
           [[ "$SUPABASE_PROJECT_ID" == 'cnsfpcdiyofqvhpcegfc' ]]
-
-      - name: Check out exact repository verifier
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Set up Node 24
         uses: actions/setup-node@v4
