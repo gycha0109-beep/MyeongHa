@@ -1,0 +1,364 @@
+name: Production Saju Service Origin Binding
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type BIND_SAJU_ORIGIN to upsert the authoritative Saju production origin and redeploy production.'
+        required: true
+        type: string
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/production-saju-service-origin-binding.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-saju-service-origin-binding
+  cancel-in-progress: false
+
+env:
+  VERCEL_PROJECT_ID: prj_nXF0b5uv27Lyucz2SEBxzdCRXVsP
+  VERCEL_TEAM_ID: team_xuYA9OhCWlJETaYFOmeVodgS
+  VERCEL_PROJECT_NAME: myeongha
+  CANONICAL_PRODUCTION_HOST: myeongha.vercel.app
+  SAJU_SERVICE_ORIGIN_ENV_KEY: MYEONGHA_SAJU_SERVICE_ORIGIN
+  SAJU_SERVICE_ORIGIN: https://saju-production-anh2svf5aa-as.a.run.app
+
+jobs:
+  bind-redeploy:
+    name: bind-saju-origin-and-redeploy-production
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    environment: production
+    env:
+      DISPATCH_CONFIRM: ${{ inputs.confirm }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+    steps:
+      - name: Verify governed trigger and credential
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          case "$GITHUB_EVENT_NAME" in
+            workflow_dispatch)
+              [[ "$DISPATCH_CONFIRM" == 'BIND_SAJU_ORIGIN' ]]
+              ;;
+            push)
+              [[ "$GITHUB_REF" == 'refs/heads/main' ]]
+              ;;
+            *)
+              echo "Unsupported trigger: $GITHUB_EVENT_NAME" >&2
+              exit 1
+              ;;
+          esac
+
+          test -n "${VERCEL_TOKEN:-}"
+
+      - name: Validate authoritative Saju origin contract
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          SAJU_SERVICE_ORIGIN="$SAJU_SERVICE_ORIGIN" node --input-type=module - <<'NODE'
+          const value = process.env.SAJU_SERVICE_ORIGIN ?? '';
+          let parsed;
+          try {
+            parsed = new URL(value);
+          } catch {
+            console.error('SAJU_SERVICE_ORIGIN is not a valid URL.');
+            process.exit(1);
+          }
+
+          if (
+            parsed.protocol !== 'https:' ||
+            parsed.username !== '' ||
+            parsed.password !== '' ||
+            parsed.pathname !== '/' ||
+            parsed.search !== '' ||
+            parsed.hash !== '' ||
+            parsed.origin !== value
+          ) {
+            console.error('SAJU_SERVICE_ORIGIN must be an exact HTTPS origin.');
+            process.exit(1);
+          }
+          NODE
+
+      - name: Verify governed Vercel production project
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+
+          project_file="$RUNNER_TEMP/vercel-project.json"
+          trap 'rm -f "$project_file"' EXIT
+
+          curl -fsS \
+            -H "Authorization: Bearer $VERCEL_TOKEN" \
+            "https://api.vercel.com/v9/projects/$VERCEL_PROJECT_ID?teamId=$VERCEL_TEAM_ID" \
+            -o "$project_file"
+
+          jq -e \
+            --arg id "$VERCEL_PROJECT_ID" \
+            --arg name "$VERCEL_PROJECT_NAME" \
+            '.id == $id and .name == $name' \
+            "$project_file" >/dev/null
+
+      - name: Upsert and metadata-verify Saju origin in Vercel production
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+
+          payload_file="$RUNNER_TEMP/vercel-saju-origin.json"
+          response_file="$RUNNER_TEMP/vercel-saju-origin-response.json"
+          readback_file="$RUNNER_TEMP/vercel-saju-origin-readback.json"
+
+          cleanup() {
+            exit_code=$?
+            trap - EXIT
+            rm -f "$payload_file" "$response_file" "$readback_file"
+            exit "$exit_code"
+          }
+          trap cleanup EXIT
+
+          jq -n \
+            --arg key "$SAJU_SERVICE_ORIGIN_ENV_KEY" \
+            --arg origin "$SAJU_SERVICE_ORIGIN" \
+            '[
+              {
+                key: $key,
+                value: $origin,
+                type: "encrypted",
+                target: ["production"],
+                comment: "MyeongHa authoritative Saju Cloud Run production origin v1"
+              }
+            ]' > "$payload_file"
+
+          curl -fsS \
+            -X POST \
+            -H "Authorization: Bearer $VERCEL_TOKEN" \
+            -H 'Content-Type: application/json' \
+            --data-binary "@$payload_file" \
+            "https://api.vercel.com/v10/projects/$VERCEL_PROJECT_ID/env?upsert=true&teamId=$VERCEL_TEAM_ID" \
+            -o "$response_file"
+
+          jq -e '((.failed // []) | length) == 0' "$response_file" >/dev/null
+
+          curl -fsS \
+            -H "Authorization: Bearer $VERCEL_TOKEN" \
+            "https://api.vercel.com/v10/projects/$VERCEL_PROJECT_ID/env?teamId=$VERCEL_TEAM_ID" \
+            -o "$readback_file"
+
+          jq -e \
+            --arg key "$SAJU_SERVICE_ORIGIN_ENV_KEY" '
+              (.envs | type) == "array"
+              and ([.envs[]
+                | select(
+                    .key == $key
+                    and .type == "encrypted"
+                    and (.target | type) == "array"
+                    and (.target | index("production")) != null
+                  )] | length) == 1
+            ' "$readback_file" >/dev/null
+
+          echo 'Production Saju origin was upserted and metadata-verified.'
+
+      - name: Wait for this exact main revision production deployment
+        id: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+
+          deployments_file="$RUNNER_TEMP/vercel-deployments.json"
+          candidate_file="$RUNNER_TEMP/vercel-source-deployment.json"
+          cleanup() {
+            exit_code=$?
+            trap - EXIT
+            rm -f "$deployments_file" "$candidate_file"
+            exit "$exit_code"
+          }
+          trap cleanup EXIT
+
+          deadline=$((SECONDS + 600))
+          while (( SECONDS < deadline )); do
+            curl -fsS \
+              -H "Authorization: Bearer $VERCEL_TOKEN" \
+              "https://api.vercel.com/v6/deployments?projectId=$VERCEL_PROJECT_ID&target=production&limit=20&teamId=$VERCEL_TEAM_ID" \
+              -o "$deployments_file"
+
+            jq -ce \
+              --arg sha "$GITHUB_SHA" '
+                [.deployments[]
+                  | select(
+                      (.meta.githubCommitSha // "") == $sha
+                      and (.target // "") == "production"
+                    )]
+                | sort_by(.created // 0)
+                | last // empty
+              ' "$deployments_file" > "$candidate_file" || true
+
+            if [[ -s "$candidate_file" ]]; then
+              source_state="$(jq -r '.state // .readyState // empty' "$candidate_file")"
+              source_id="$(jq -r '.uid // .id // empty' "$candidate_file")"
+              test -n "$source_id"
+
+              case "$source_state" in
+                READY)
+                  echo "deployment_id=$source_id" >> "$GITHUB_OUTPUT"
+                  echo 'Exact main revision production deployment is READY.'
+                  exit 0
+                  ;;
+                ERROR|CANCELED)
+                  echo "Exact main revision production deployment entered terminal state: $source_state" >&2
+                  exit 1
+                  ;;
+              esac
+            fi
+
+            sleep 10
+          done
+
+          echo 'Timed out waiting for the exact main revision production deployment.' >&2
+          exit 1
+
+      - name: Redeploy exact main revision after origin binding
+        id: redeploy
+        shell: bash
+        env:
+          SOURCE_DEPLOYMENT_ID: ${{ steps.source.outputs.deployment_id }}
+        run: |
+          set -euo pipefail
+          umask 077
+
+          payload_file="$RUNNER_TEMP/vercel-redeploy.json"
+          response_file="$RUNNER_TEMP/vercel-redeploy-response.json"
+          cleanup() {
+            exit_code=$?
+            trap - EXIT
+            rm -f "$payload_file" "$response_file"
+            exit "$exit_code"
+          }
+          trap cleanup EXIT
+
+          test -n "$SOURCE_DEPLOYMENT_ID"
+          jq -n --arg deployment_id "$SOURCE_DEPLOYMENT_ID" \
+            '{deploymentId: $deployment_id}' > "$payload_file"
+
+          curl -fsS \
+            -X POST \
+            -H "Authorization: Bearer $VERCEL_TOKEN" \
+            -H 'Content-Type: application/json' \
+            --data-binary "@$payload_file" \
+            "https://api.vercel.com/v13/deployments?teamId=$VERCEL_TEAM_ID" \
+            -o "$response_file"
+
+          redeploy_id="$(jq -er '.id // .uid // empty' "$response_file")"
+          test -n "$redeploy_id"
+          echo "deployment_id=$redeploy_id" >> "$GITHUB_OUTPUT"
+          echo 'Production redeploy was created from the exact main revision.'
+
+      - name: Verify redeploy READY and exact revision
+        shell: bash
+        env:
+          REDEPLOYMENT_ID: ${{ steps.redeploy.outputs.deployment_id }}
+        run: |
+          set -euo pipefail
+          umask 077
+
+          deployment_file="$RUNNER_TEMP/vercel-redeployment.json"
+          cleanup() {
+            exit_code=$?
+            trap - EXIT
+            rm -f "$deployment_file"
+            exit "$exit_code"
+          }
+          trap cleanup EXIT
+
+          test -n "$REDEPLOYMENT_ID"
+          deadline=$((SECONDS + 600))
+          while (( SECONDS < deadline )); do
+            curl -fsS \
+              -H "Authorization: Bearer $VERCEL_TOKEN" \
+              "https://api.vercel.com/v13/deployments/$REDEPLOYMENT_ID?teamId=$VERCEL_TEAM_ID" \
+              -o "$deployment_file"
+
+            state="$(jq -r '.readyState // .state // .status // empty' "$deployment_file")"
+            case "$state" in
+              READY)
+                jq -e \
+                  --arg project_id "$VERCEL_PROJECT_ID" \
+                  --arg sha "$GITHUB_SHA" '
+                    (.projectId // "") == $project_id
+                    and (.target // "") == "production"
+                    and (.meta.githubCommitSha // "") == $sha
+                  ' "$deployment_file" >/dev/null
+                echo 'Redeployed production is READY on the exact main revision.'
+                exit 0
+                ;;
+              ERROR|CANCELED)
+                echo "Production redeploy entered terminal state: $state" >&2
+                exit 1
+                ;;
+            esac
+            sleep 10
+          done
+
+          echo 'Timed out waiting for production redeploy readiness.' >&2
+          exit 1
+
+      - name: Verify canonical alias and Saju readiness
+        shell: bash
+        env:
+          REDEPLOYMENT_ID: ${{ steps.redeploy.outputs.deployment_id }}
+        run: |
+          set -euo pipefail
+          umask 077
+
+          aliases_file="$RUNNER_TEMP/vercel-redeployment-aliases.json"
+          readiness_file="$RUNNER_TEMP/myeongha-readiness.json"
+          cleanup() {
+            exit_code=$?
+            trap - EXIT
+            rm -f "$aliases_file" "$readiness_file"
+            exit "$exit_code"
+          }
+          trap cleanup EXIT
+
+          deadline=$((SECONDS + 180))
+          while (( SECONDS < deadline )); do
+            curl -fsS \
+              -H "Authorization: Bearer $VERCEL_TOKEN" \
+              "https://api.vercel.com/v2/deployments/$REDEPLOYMENT_ID/aliases?teamId=$VERCEL_TEAM_ID" \
+              -o "$aliases_file"
+
+            if jq -e \
+              --arg alias "$CANONICAL_PRODUCTION_HOST" \
+              '(.aliases | type) == "array" and any(.aliases[]; .alias == $alias)' \
+              "$aliases_file" >/dev/null; then
+              break
+            fi
+            sleep 5
+          done
+
+          jq -e \
+            --arg alias "$CANONICAL_PRODUCTION_HOST" \
+            '(.aliases | type) == "array" and any(.aliases[]; .alias == $alias)' \
+            "$aliases_file" >/dev/null
+
+          curl -fsS \
+            -H 'Cache-Control: no-cache' \
+            "https://$CANONICAL_PRODUCTION_HOST/api/readiness" \
+            -o "$readiness_file"
+
+          jq -e '
+            .status == "ready"
+            and .capabilities.userData == "ready"
+            and .capabilities.sajuCalculation == "ready"
+          ' "$readiness_file" >/dev/null
+
+          echo 'Canonical production alias is attached and Saju runtime configuration is ready.'
