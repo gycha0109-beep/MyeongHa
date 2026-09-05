@@ -17,10 +17,29 @@ describe('immutable content bundle validation', () => {
     expect(characterManifestA).toEqual(characterManifestB);
     expect(worldManifestA).toEqual(worldManifestB);
     expect(characterManifestA.characterIds).toEqual(['john-doe-01','john-doe-02','john-doe-03','john-doe-04','john-doe-05']);
+    expect(characterManifestA.assetManifestHash).toBe(DEV_CHARACTER_CONTENT_BUNDLE.assetManifestHash);
     expect(characterManifestA.contentHash).toMatch(/^sha256:[a-f0-9]{64}$/u);
     expect(worldManifestA).toMatchObject({ bundleId: 'dev-content-bundle-0001', contentVersion: '0.0.1-dev', episodeIds: ['dev-first-contact'], relationCount: 1 });
     expect(worldManifestA.contentHash).toMatch(/^sha256:[a-f0-9]{64}$/u);
     expect(buildCoherentContentRelease(' dev-release-0001 ', characterManifestA, worldManifestA)).toMatchObject({ releaseId: 'dev-release-0001', bundleId: 'dev-content-bundle-0001', contentVersion: '0.0.1-dev' });
+  });
+
+  it('binds asset manifest provenance into the deterministic content hash', () => {
+    const original = buildCharacterContentManifest(DEV_CHARACTER_CONTENT_BUNDLE);
+    const changed = buildCharacterContentManifest({
+      ...DEV_CHARACTER_CONTENT_BUNDLE,
+      assetManifestHash: 'dev-asset-manifest-placeholder-v2',
+    });
+
+    expect(changed.assetManifestHash).toBe('dev-asset-manifest-placeholder-v2');
+    expect(changed.contentHash).not.toBe(original.contentHash);
+  });
+
+  it('rejects a manifest build without asset manifest provenance', () => {
+    expect(() => buildCharacterContentManifest({
+      ...DEV_CHARACTER_CONTENT_BUNDLE,
+      assetManifestHash: '   ',
+    })).toThrow(/assetManifestHash must not be empty/u);
   });
 
   it('rejects a world relation that points outside the same character bundle', () => {
