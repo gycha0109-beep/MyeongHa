@@ -247,15 +247,22 @@ jobs:
 
           test -n "$SOURCE_DEPLOYMENT_ID"
           jq -n --arg deployment_id "$SOURCE_DEPLOYMENT_ID" \
-            '{deploymentId: $deployment_id}' > "$payload_file"
+            '{deploymentId: $deployment_id, target: "production"}' > "$payload_file"
 
-          curl -fsS \
+          http_code="$(curl -sS \
             -X POST \
             -H "Authorization: Bearer $VERCEL_TOKEN" \
             -H 'Content-Type: application/json' \
             --data-binary "@$payload_file" \
-            "https://api.vercel.com/v13/deployments?teamId=$VERCEL_TEAM_ID" \
-            -o "$response_file"
+            -o "$response_file" \
+            -w '%{http_code}' \
+            "https://api.vercel.com/v13/deployments?forceNew=1&skipAutoDetectionConfirmation=1&teamId=$VERCEL_TEAM_ID")"
+
+          if [[ ! "$http_code" =~ ^2[0-9][0-9]$ ]]; then
+            error_code="$(jq -r '.error.code // "unknown"' "$response_file" 2>/dev/null || printf 'unknown')"
+            echo "Vercel redeploy request failed: HTTP $http_code code=$error_code" >&2
+            exit 1
+          fi
 
           redeploy_id="$(jq -er '.id // .uid // empty' "$response_file")"
           test -n "$redeploy_id"
