@@ -101,6 +101,7 @@ const requiredLiveVerifierFragments = [
   "'myeongha-saju-production-calculation-ingress-v1'",
   "'saju_calculation_evidence'",
   "'calculation_only'",
+  "requireExact('calculation.birthRevisionRef', calculation.birthRevisionRef, currentRevision.revisionId)",
   "'myeonghwa-production-calculation-http-v1'",
   "'myeonghwa-production-calculation-runtime-v1'",
   "'myeonghwa-production-civil-midnight-v1'",
@@ -114,6 +115,7 @@ const requiredLiveVerifierFragments = [
   'JSON.stringify(calculationBody).includes(accessToken)',
   'memberSignIn=200',
   'birthProfilePresent=true',
+  'birthRevisionMatch=true',
 ];
 
 for (const fragment of requiredLiveVerifierFragments) {
