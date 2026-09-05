@@ -49,6 +49,18 @@ for (const fragment of requiredWorkflowFragments) {
   }
 }
 
+const checkoutIndex = workflow.indexOf(
+  'uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4',
+);
+const triggerReadIndex = workflow.indexOf(
+  'trigger_value="$(tr -d \'\\r\' < .github/production-chat-current-subject-smoke.trigger)"',
+);
+if (checkoutIndex === -1 || triggerReadIndex === -1 || checkoutIndex > triggerReadIndex) {
+  throw new Error(
+    'Production Chat smoke must check out the governed trigger before reading it.',
+  );
+}
+
 for (const fragment of [
   '\npull_request:',
   '\nschedule:',
