@@ -70,6 +70,13 @@ if ((workflow.match(/workflow_dispatch:/g) ?? []).length !== 1) {
 if ((workflow.match(/\n  push:/g) ?? []).length !== 1) {
   throw new Error('Production Chat smoke must expose exactly one governed push trigger.');
 }
+
+const checkoutStepIndex = workflow.indexOf('- name: Check out exact repository verifier');
+const invocationGuardStepIndex = workflow.indexOf('- name: Verify governed invocation and credentials');
+if (checkoutStepIndex < 0 || invocationGuardStepIndex < 0 || checkoutStepIndex >= invocationGuardStepIndex) {
+  throw new Error('Production Chat push trigger guard must run only after repository checkout so the governed trigger file exists.');
+}
+
 if (!/^fire-[0-9]{4}-[0-9]{2}-[0-9]{2}-v[0-9]+\s*$/u.test(trigger)) {
   throw new Error('Production Chat smoke trigger must use the governed fire-date-version format.');
 }
