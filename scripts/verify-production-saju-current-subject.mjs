@@ -1,3 +1,5 @@
+import { acquireProductionMemberSmokeSession } from './production-member-smoke-session.mjs';
+
 const PRODUCTION_ORIGIN = 'https://myeongha.vercel.app';
 const MEMBER_ME_URL = `${PRODUCTION_ORIGIN}/api/me`;
 const SAJU_CALCULATION_URL = `${PRODUCTION_ORIGIN}/api/me/saju/calculation`;
@@ -95,12 +97,12 @@ function requirePillarState(name, value) {
   }
 }
 
-const bearer = requireSecret('MYEONGHA_PRODUCTION_BIRTH_SMOKE_MEMBER_BEARER');
 const expectedSubjectId = requireUuid(
-  'MYEONGHA_PRODUCTION_BIRTH_SMOKE_MEMBER_EXPECTED_SUBJECT_ID',
-  requireSecret('MYEONGHA_PRODUCTION_BIRTH_SMOKE_MEMBER_EXPECTED_SUBJECT_ID'),
+  'MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID',
+  requireSecret('MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID'),
 );
-const authorization = { Authorization: `Bearer ${bearer}` };
+const { accessToken } = await acquireProductionMemberSmokeSession();
+const authorization = { Authorization: `Bearer ${accessToken}` };
 
 const memberResponse = await fetchCanonical(MEMBER_ME_URL, {
   method: 'GET',
@@ -238,10 +240,10 @@ requireExact(
 requireNonEmptyString('calculation.snapshot.provenance.schema.id', provenance.schema.id);
 requireNonEmptyString('calculation.snapshot.provenance.schema.version', provenance.schema.version);
 
-if (JSON.stringify(calculationBody).includes(bearer)) {
-  throw new Error('Production current-subject Saju response reflected the Member credential.');
+if (JSON.stringify(memberBody).includes(accessToken) || JSON.stringify(calculationBody).includes(accessToken)) {
+  throw new Error('Production current-subject Saju response reflected the fresh Member access token.');
 }
 
 console.log(
-  'MyeongHa production current-subject Saju smoke passed: memberSubjectMatch=true, calculation=200, authority=calculation_only, ingressContract=v1, cacheControl=no-store.',
+  'MyeongHa production current-subject Saju smoke passed: freshSession=true, memberSubjectMatch=true, calculation=200, authority=calculation_only, ingressContract=v1, cacheControl=no-store.',
 );
