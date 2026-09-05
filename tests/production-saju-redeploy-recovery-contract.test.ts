@@ -25,7 +25,7 @@ describe('production Saju redeploy recovery workflow contract', () => {
   it('resolves and redeploys only the exact production GitHub revision', () => {
     expect(workflow).toContain('(.meta.githubCommitSha // "") == $sha');
     expect(workflow).toContain('and (.target // "") == "production"');
-    expect(workflow).toContain('source_host="$(jq -r \'\.url // empty\' "$candidate_file")"');
+    expect(workflow).toContain("source_host=\"$(jq -r '.url // empty' \"$candidate_file\")\"");
     expect(workflow).toContain('echo "deployment_url=https://$source_host" >> "$GITHUB_OUTPUT"');
     expect(workflow).toContain('VERCEL_TEAM_SLUG: johnny-self');
     expect(workflow).toContain('VERCEL_CLI_VERSION: 59.11.7');
