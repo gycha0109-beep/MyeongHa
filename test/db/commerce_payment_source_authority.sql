@@ -71,6 +71,29 @@ select pg_temp.assert_fails(
   'tr_purchase_intent_charge_terms_immutable'
 );
 
+-- A provider source may exist before semantic verification; the exact money equality
+-- becomes mandatory only when the receipt is promoted to verified authority.
+insert into public.commerce_receipts(
+  id, subject_id, purchase_intent_id, product_offer_id,
+  platform, provider, external_transaction_id,
+  receipt_fingerprint, verification_status, created_at,
+  environment, verifier_revision
+) values (
+  '93400000-0000-0000-0000-000000000008',
+  '93000000-0000-0000-0000-000000000001',
+  '93300000-0000-0000-0000-000000000001',
+  '93200000-0000-0000-0000-000000000001',
+  'web', 'testpay', 'tx-pending-before-money',
+  'hmac-sha256:k1:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd',
+  'pending', now(), 'sandbox', 'test-verifier-v1'
+);
+
+select pg_temp.assert_fails(
+  'pending receipt cannot become verified without matching monetary facts',
+  $$update public.commerce_receipts set verification_status='verified', verified_at=now() where id='93400000-0000-0000-0000-000000000008'$$,
+  'ct_commerce_receipt_charge_terms_mismatch'
+);
+
 select pg_temp.assert_fails(
   'verified receipt amount must match purchase intent charge terms',
   $$insert into public.commerce_receipts(id,subject_id,purchase_intent_id,product_offer_id,platform,provider,external_transaction_id,receipt_fingerprint,verification_status,verified_at,created_at,environment,verifier_revision,verified_amount_minor,verified_currency) values ('93400000-0000-0000-0000-000000000009','93000000-0000-0000-0000-000000000001','93300000-0000-0000-0000-000000000001','93200000-0000-0000-0000-000000000001','web','testpay','tx-wrong-amount','hmac-sha256:k1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','verified',now(),now(),'sandbox','test-verifier-v1',1,'KRW')$$,
@@ -94,17 +117,12 @@ insert into public.commerce_receipts(
 );
 
 insert into public.commerce_receipts(
-  id, subject_id, product_offer_id,
-  platform, provider, external_transaction_id,
-  receipt_fingerprint, verification_status, verified_at, created_at,
-  environment, verifier_revision
+  id, subject_id, product_offer_id, platform, provider, external_transaction_id,
+  receipt_fingerprint, verification_status, created_at
 ) values (
-  '93400000-0000-0000-0000-000000000002',
-  '93000000-0000-0000-0000-000000000001',
-  '93200000-0000-0000-0000-000000000001',
-  'web', 'testpay', 'tx-source-2',
-  'hmac-sha256:k1:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
-  'verified', now(), now(), 'sandbox', 'test-verifier-v1'
+  '93400000-0000-0000-0000-000000000002', '93000000-0000-0000-0000-000000000001',
+  '93200000-0000-0000-0000-000000000001', 'web', 'testpay', 'tx-source-2',
+  'hmac-sha256:k1:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc', 'pending', now()
 );
 
 select pg_temp.assert_fails(
