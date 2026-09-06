@@ -94,11 +94,15 @@ jobs:
       - name: Verify repaired migration history
         run: supabase migration list
 
+      # Parallel additive tracks can merge a lower-numbered migration after a higher
+      # version has already reached Production. --include-all applies only local
+      # migrations absent from remote history; the post-push migration list remains the
+      # authoritative reconciliation gate.
       - name: Preview pending production migrations
-        run: supabase db push --dry-run
+        run: supabase db push --include-all --dry-run
 
       - name: Apply pending production migrations
-        run: supabase db push
+        run: supabase db push --include-all
 
       - name: Verify production migration state
         run: supabase migration list
