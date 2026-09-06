@@ -60,6 +60,10 @@ jobs:
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
         run: node scripts/verify-web-auth-refresh-browser.mjs
+      - name: Verify cross-tab transient refresh Member retention
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/verify-web-auth-cross-tab-transient-refresh-browser.mjs
       - name: Verify Saju active bearer authority
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
@@ -102,6 +106,7 @@ jobs:
             artifacts/web-auth-cross-tab-session-expired-browser-smoke*
             artifacts/web-auth-rejection-browser-smoke*
             artifacts/web-auth-refresh-browser-smoke*
+            artifacts/web-auth-cross-tab-transient-refresh-browser-smoke*
             artifacts/web-saju-auth-browser-smoke*
             artifacts/web-records-auth-browser-smoke*
             artifacts/web-my-browser-smoke*
