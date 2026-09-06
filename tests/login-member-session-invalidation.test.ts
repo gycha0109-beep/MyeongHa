@@ -5,6 +5,7 @@ import {
   ensureActiveBearer,
   getActiveBearer,
   getMemberAccessToken,
+  invalidateGuestSession,
   readMemberSession,
   refreshMemberSession,
   signOutMember,
@@ -148,6 +149,20 @@ describe('Member session invalidation at the canonical current-subject boundary'
 
     expect(readMemberSession()).toBeNull();
     expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.guestBearer)).toBe('guest-before-member');
+    expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.pendingGuestBearer)).toBeNull();
+    expect(globalThis.dispatchEvent).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('Guest session invalidation authority', () => {
+  it('discards active and pending Guest credentials after canonical Guest rejection', () => {
+    sessionStorage.setItem(PRODUCT_AUTH_STORAGE_V1.guestBearer, 'expired-guest');
+    sessionStorage.setItem(PRODUCT_AUTH_STORAGE_V1.pendingGuestBearer, 'pending-guest');
+
+    invalidateGuestSession();
+
+    expect(readMemberSession()).toBeNull();
+    expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.guestBearer)).toBeNull();
     expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.pendingGuestBearer)).toBeNull();
     expect(globalThis.dispatchEvent).toHaveBeenCalledTimes(1);
   });

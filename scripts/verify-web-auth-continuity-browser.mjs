@@ -239,6 +239,11 @@ async function waitFor(client, expression, message, timeout = 8_000) {
 }
 
 async function submitSignIn(client) {
+  await waitFor(
+    client,
+    `document.readyState === 'complete' && location.pathname === '/auth.html' && Boolean(document.querySelector('#auth-form'))`,
+    'Auth form did not fully initialize before sign-in',
+  );
   await client.evaluate(`(() => {
     document.querySelector('#auth-email').value = ${JSON.stringify(testIdentity.email)};
     document.querySelector('#auth-password').value = ${JSON.stringify(testIdentity.password)};
