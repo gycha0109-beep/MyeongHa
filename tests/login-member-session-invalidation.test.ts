@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMyRuntimeClient } from '../apps/web/my-runtime-client.js';
 import {
   PRODUCT_AUTH_STORAGE_V1,
+  ensureActiveBearer,
+  getActiveBearer,
   getMemberAccessToken,
   readMemberSession,
   refreshMemberSession,
@@ -255,5 +257,72 @@ describe('Member session refresh failure authority', () => {
     expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.guestBearer)).toBe(refreshedSession.accessToken);
     expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.pendingGuestBearer)).toBe('guest-before-member');
     expect(globalThis.dispatchEvent).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('Recoverable Member identity must not downgrade to Guest', () => {
+  it('propagates transient refresh failure instead of returning the staged Guest bearer', async () => {
+    const expiredSession = Object.freeze({
+      ...memberSession,
+      expiresAt: new Date(Date.now() - 1_000).toISOString(),
+    });
+    seedMemberSession({ session: expiredSession });
+    const fetchMock = vi.fn(async () => authErrorResponse('AUTH_UPSTREAM_UNAVAILABLE', 503));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(getActiveBearer()).rejects.toMatchObject({ code: 'AUTH_UPSTREAM_UNAVAILABLE' });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(readMemberSession()).toMatchObject({
+      accessToken: expiredSession.accessToken,
+      refreshToken: expiredSession.refreshToken,
+    });
+    expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.guestBearer)).toBe(expiredSession.accessToken);
+    expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.pendingGuestBearer)).toBe('guest-before-member');
+    expect(globalThis.dispatchEvent).not.toHaveBeenCalled();
+  });
+
+  it('does not bootstrap a Guest while a recoverable Member session still exists', async () => {
+    const expiredSession = Object.freeze({
+      ...memberSession,
+      expiresAt: new Date(Date.now() - 1_000).toISOString(),
+    });
+    seedMemberSession({ session: expiredSession });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input) === '/api/auth/refresh') {
+        return authErrorResponse('AUTH_UPSTREAM_UNAVAILABLE', 503);
+      }
+      return Response.json({
+        ok: true,
+        data: { kind: 'guest', guestSession: { bearerToken: 'unexpected-guest' } },
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(ensureActiveBearer()).rejects.toMatchObject({ code: 'AUTH_UPSTREAM_UNAVAILABLE' });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(readMemberSession()).not.toBeNull();
+    expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.pendingGuestBearer)).toBe('guest-before-member');
+  });
+
+  it('allows Guest fallback only after authoritative SESSION_EXPIRED removes the Member session', async () => {
+    const expiredSession = Object.freeze({
+      ...memberSession,
+      expiresAt: new Date(Date.now() - 1_000).toISOString(),
+    });
+    seedMemberSession({ session: expiredSession });
+    const fetchMock = vi.fn(async () => authErrorResponse('SESSION_EXPIRED', 401));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(ensureActiveBearer()).resolves.toEqual({
+      kind: 'guest',
+      token: 'guest-before-member',
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(readMemberSession()).toBeNull();
+    expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.guestBearer)).toBe('guest-before-member');
+    expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.pendingGuestBearer)).toBeNull();
   });
 });
