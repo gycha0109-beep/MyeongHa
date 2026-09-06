@@ -1,12 +1,13 @@
-export type CharacterConceptV1NameStatus = 'working' | 'temporary';
+export type CharacterConceptV1NameStatus = 'launch-approved' | 'temporary';
 
 /**
  * Source-backed Character Concept V1 roster entry.
  *
  * This is intentionally not a CharacterContentDefinition. The source fixes the
- * current working roster and relationship-fantasy direction, but explicitly does
- * not establish final immutable names / detailed canon. No canonical characterId
- * is present here by design.
+ * current working roster and relationship-fantasy direction, while the Product
+ * Owner separately approves the current Launch official display names. That
+ * display-name approval does not establish detailed immutable Character canon.
+ * No canonical characterId is present here by design.
  */
 export interface CharacterConceptV1WorkingRosterEntry {
   readonly workingDisplayName: string;
@@ -22,7 +23,7 @@ const workingEntry = (
   workingDisplayName: string,
   relationshipFantasy: string,
   relationshipHook: string,
-  nameStatus: CharacterConceptV1NameStatus = 'working',
+  nameStatus: CharacterConceptV1NameStatus = 'launch-approved',
 ): CharacterConceptV1WorkingRosterEntry => ({
   workingDisplayName,
   nameStatus,
@@ -34,18 +35,20 @@ const workingEntry = (
 });
 
 /**
- * Exact current Character Concept V1 working roster.
+ * Exact current Character Concept V1 working roster with Product Owner-approved
+ * MVP Launch official display names.
  *
- * `working` is not immutable-name approval. `미라` is explicitly temporary in
- * source. The entire structure is Production-ineligible until separately governed
- * immutable Character authority exists.
+ * `launch-approved` applies only to Launch roster membership/display-name
+ * authority. It does not promote the working relationship-fantasy directions to
+ * immutable Character canon. All nine entries remain Production-ineligible until
+ * separately governed detailed Character authority exists.
  */
 export const CHARACTER_CONCEPT_V1_WORKING_ROSTER = [
   workingEntry('세연', 'First Companion / 정실감 / 소꿉친구적 순애', '돌아오면 얘가 있을 것 같다.'),
   workingEntry('여울', '호감 부정 / 질투 / 숨길 수 없는 관심', '신경 쓰는 게 너무 티 나는데 본인만 아니라고 우기는 여자.'),
   workingEntry('서린', '오래 기억해주는 사람 / 잔잔하고 깊은 관계', '이 사람은 내가 한 말을 정말 기억한다.'),
   workingEntry('라현', '성숙한 매혹 / 주도권 / 심리전', '이 사람한테 휘말리고 싶다.'),
-  workingEntry('미라', '잘생긴 여자 / 무심다정 / Friends-to-Lovers', '너무 자연스럽게 가까워서 사랑인지도 몰랐던 잘생긴 여자.', 'temporary'),
+  workingEntry('미라', '잘생긴 여자 / 무심다정 / Friends-to-Lovers', '너무 자연스럽게 가까워서 사랑인지도 몰랐던 잘생긴 여자.'),
   workingEntry('태겸', '냉미남 / 마찰 / 인정받는 관계', '저 인간한테 인정받고 싶다.'),
   workingEntry('윤호', '다정남 / 생활형 안정 / 안경 너드 미남', '누군가에게 편하게 기대고 싶다.'),
   workingEntry('도윤', '능글 / 아웃사이더 / 공범 / 선택적 특별취급', '왜 나한테만 이러지?'),
