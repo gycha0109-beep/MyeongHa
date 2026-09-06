@@ -12,6 +12,8 @@ const testIdentity = Object.freeze({
   id: '33333333-3333-4333-8333-333333333333',
   email: 'failed-login-member@example.com',
   password: 'browser-password-12345',
+  networkPassword: 'network-failure-password',
+  upstreamPassword: 'upstream-failure-password',
   wrongPassword: 'definitely-wrong-password',
 });
 const memberSession = Object.freeze({
@@ -34,6 +36,7 @@ const assert = (condition, message) => { if (!condition) throw new Error(message
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
 const requests = [];
 let apiRequestCount = 0;
+let networkTransportAttempts = 0;
 
 function successEnvelope(data) {
   apiRequestCount += 1;
@@ -41,7 +44,7 @@ function successEnvelope(data) {
     ok: true,
     data,
     meta: {
-      apiContractVersion: 'browser-auth-failed-login-guest-v1',
+      apiContractVersion: 'browser-auth-failed-login-guest-v2',
       requestId: `web-auth-failed-login-guest-${apiRequestCount}`,
       serverTime: '2026-09-07T00:00:00.000Z',
     },
@@ -54,7 +57,7 @@ function errorEnvelope(code, messageKey, retryable = false) {
     ok: false,
     error: { code, messageKey, retryable },
     meta: {
-      apiContractVersion: 'browser-auth-failed-login-guest-v1',
+      apiContractVersion: 'browser-auth-failed-login-guest-v2',
       requestId: `web-auth-failed-login-guest-${apiRequestCount}`,
       serverTime: '2026-09-07T00:00:00.000Z',
     },
@@ -82,9 +85,26 @@ async function serve() {
 
       if (pathname === '/api/auth/sign-in' && req.method === 'POST') {
         const body = await readJsonBody(req);
-        const validCredentials = body.email === testIdentity.email && body.password === testIdentity.password;
-        requests.push({ path: pathname, method: req.method, authorization, validCredentials });
-        if (!validCredentials) {
+        let outcome = 'invalid';
+        if (body.email === testIdentity.email && body.password === testIdentity.password) outcome = 'valid';
+        else if (body.email === testIdentity.email && body.password === testIdentity.networkPassword) outcome = 'network';
+        else if (body.email === testIdentity.email && body.password === testIdentity.upstreamPassword) outcome = 'upstream';
+
+        if (outcome === 'network') {
+          networkTransportAttempts += 1;
+          if (!requests.some((request) => request.path === pathname && request.outcome === 'network')) {
+            requests.push({ path: pathname, method: req.method, authorization, outcome });
+          }
+          req.socket.destroy();
+          return;
+        }
+
+        requests.push({ path: pathname, method: req.method, authorization, outcome });
+        if (outcome === 'upstream') {
+          sendJson(res, 503, errorEnvelope('AUTH_UPSTREAM_UNAVAILABLE', 'auth.upstream_unavailable', true));
+          return;
+        }
+        if (outcome === 'invalid') {
           sendJson(res, 401, errorEnvelope('INVALID_CREDENTIALS', 'auth.invalid_credentials'));
           return;
         }
@@ -225,6 +245,25 @@ async function submitSignIn(client, password) {
   })()`);
 }
 
+async function readAuthorityState(client) {
+  return client.evaluate(`(() => ({
+    pathname: location.pathname,
+    memberSession: localStorage.getItem('myeongha.memberSession.v1'),
+    activeBearer: sessionStorage.getItem('myeongha.guestBearer.v1'),
+    pendingGuest: sessionStorage.getItem('myeongha.pendingGuestBearer.v1'),
+    status: document.querySelector('#auth-status')?.textContent?.trim() ?? null,
+  }))()`);
+}
+
+function assertGuestPreserved(state, label) {
+  assert(state.pathname === '/auth.html', `${label} navigated away from auth`);
+  assert(state.memberSession === null, `${label} created a Member session`);
+  assert(state.activeBearer === guestBearer, `${label} changed the active Guest bearer`);
+  assert(state.pendingGuest === null, `${label} staged or consumed a pending Guest bearer`);
+  assert(!requests.some((request) => request.path === '/api/auth/promote-guest'), `${label} attempted Guest promotion`);
+  assert(!requests.some((request) => request.path === '/api/session/bootstrap'), `${label} attempted Guest bootstrap`);
+}
+
 for (const file of [
   'auth.html',
   'auth-page.js',
@@ -260,29 +299,32 @@ try {
     sessionStorage.removeItem('myeongha.pendingGuestBearer.v1');
   })()`);
 
+  await submitSignIn(client, testIdentity.networkPassword);
+  await waitFor(
+    client,
+    `document.querySelector('#auth-status')?.textContent?.trim() === '인증 서버에 연결할 수 없습니다. 잠시 뒤 다시 시도해 주세요.' && !document.querySelector('#auth-submit')?.disabled`,
+    'Network sign-in failure was not surfaced on the auth page',
+  );
+  const afterNetworkFailure = await readAuthorityState(client);
+  assertGuestPreserved(afterNetworkFailure, 'Network sign-in failure');
+
+  await submitSignIn(client, testIdentity.upstreamPassword);
+  await waitFor(
+    client,
+    `document.querySelector('#auth-status')?.textContent?.trim() === '인증 서버에 연결할 수 없습니다. 잠시 뒤 다시 시도해 주세요.' && !document.querySelector('#auth-submit')?.disabled`,
+    'Upstream sign-in failure was not surfaced on the auth page',
+  );
+  const afterUpstreamFailure = await readAuthorityState(client);
+  assertGuestPreserved(afterUpstreamFailure, 'Upstream sign-in failure');
+
   await submitSignIn(client, testIdentity.wrongPassword);
   await waitFor(
     client,
     `document.querySelector('#auth-status')?.textContent?.trim() === '이메일 또는 비밀번호를 확인해 주세요.' && !document.querySelector('#auth-submit')?.disabled`,
     'Invalid credentials were not surfaced on the auth page',
   );
-
-  const afterFailure = await client.evaluate(`(() => ({
-    pathname: location.pathname,
-    memberSession: localStorage.getItem('myeongha.memberSession.v1'),
-    activeBearer: sessionStorage.getItem('myeongha.guestBearer.v1'),
-    pendingGuest: sessionStorage.getItem('myeongha.pendingGuestBearer.v1'),
-    status: document.querySelector('#auth-status')?.textContent?.trim() ?? null,
-  }))()`);
-  assert(afterFailure.pathname === '/auth.html', 'Failed sign-in navigated away from auth');
-  assert(afterFailure.memberSession === null, 'Failed sign-in created a Member session');
-  assert(afterFailure.activeBearer === guestBearer, 'Failed sign-in changed the active Guest bearer');
-  assert(afterFailure.pendingGuest === null, 'Failed sign-in staged or consumed a pending Guest bearer');
-
-  const invalidSignIns = requests.filter((request) => request.path === '/api/auth/sign-in' && !request.validCredentials);
-  assert(invalidSignIns.length === 1, `Expected one invalid sign-in request, received ${invalidSignIns.length}`);
-  assert(!requests.some((request) => request.path === '/api/auth/promote-guest'), 'Failed sign-in attempted Guest promotion');
-  assert(!requests.some((request) => request.path === '/api/session/bootstrap'), 'Failed sign-in attempted Guest bootstrap');
+  const afterInvalidCredentials = await readAuthorityState(client);
+  assertGuestPreserved(afterInvalidCredentials, 'Invalid-credentials sign-in failure');
 
   await submitSignIn(client, testIdentity.password);
   await waitFor(
@@ -311,9 +353,12 @@ try {
 
   const signIns = requests.filter((request) => request.path === '/api/auth/sign-in');
   const promotions = requests.filter((request) => request.path === '/api/auth/promote-guest');
-  assert(signIns.length === 2, `Expected two sign-in requests, received ${signIns.length}`);
-  assert(signIns[0].validCredentials === false, 'First sign-in request was not the invalid-credentials case');
-  assert(signIns[1].validCredentials === true, 'Second sign-in request was not the healthy retry');
+  assert(networkTransportAttempts >= 1, 'Network failure did not exercise a transport-level sign-in attempt');
+  assert(signIns.length === 4, `Expected four logical sign-in outcomes, received ${signIns.length}`);
+  assert(signIns[0].outcome === 'network', 'First sign-in outcome was not the network-failure case');
+  assert(signIns[1].outcome === 'upstream', 'Second sign-in outcome was not the upstream-failure case');
+  assert(signIns[2].outcome === 'invalid', 'Third sign-in outcome was not the invalid-credentials case');
+  assert(signIns[3].outcome === 'valid', 'Fourth sign-in outcome was not the healthy retry');
   assert(promotions.length === 1, `Expected one Guest promotion after healthy retry, received ${promotions.length}`);
   assert(promotions[0].authorization === `Bearer ${memberSession.accessToken}`, 'Guest promotion did not authorize with the Member token');
   assert(promotions[0].promotedGuest === guestBearer, 'Guest promotion did not use the preserved Guest bearer');
@@ -321,8 +366,13 @@ try {
   const artifactDir = resolve(process.cwd(), 'artifacts');
   await mkdir(artifactDir, { recursive: true });
   await writeFile(join(artifactDir, 'web-auth-failed-login-guest-browser-smoke.json'), `${JSON.stringify({
-    invalidCredentialsPreservedGuest: afterFailure.activeBearer === guestBearer,
-    memberCreatedOnFailure: afterFailure.memberSession !== null,
+    networkTransportAttempts,
+    networkFailurePreservedGuest: afterNetworkFailure.activeBearer === guestBearer,
+    upstreamFailurePreservedGuest: afterUpstreamFailure.activeBearer === guestBearer,
+    invalidCredentialsPreservedGuest: afterInvalidCredentials.activeBearer === guestBearer,
+    memberCreatedOnNetworkFailure: afterNetworkFailure.memberSession !== null,
+    memberCreatedOnUpstreamFailure: afterUpstreamFailure.memberSession !== null,
+    memberCreatedOnInvalidCredentials: afterInvalidCredentials.memberSession !== null,
     guestPromotionRequests: promotions.length,
     finalAuthState: afterSuccess.state,
     finalMemberId: afterSuccess.userId,
