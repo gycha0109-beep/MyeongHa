@@ -12,6 +12,10 @@ const identity = Object.freeze({
   email: 'rejected-member@example.com',
   password: 'browser-password-12345',
 });
+const memberAccessToken = 'rejectheader.rejectpayload.rejectsignature';
+const memberRefreshToken = 'reject-refresh-token';
+const tabAGuestBearer = 'canonical-rejection-guest-a';
+const tabBGuestBearer = 'canonical-rejection-guest-b';
 const mime = new Map([
   ['.html', 'text/html; charset=utf-8'],
   ['.css', 'text/css; charset=utf-8'],
@@ -23,6 +27,7 @@ const mime = new Map([
 const requests = [];
 let rejectCurrentSubject = false;
 let requestNo = 0;
+let guestBootstrapRequests = 0;
 
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
@@ -30,7 +35,7 @@ const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
 function meta() {
   requestNo += 1;
   return {
-    apiContractVersion: 'browser-auth-rejection-v1',
+    apiContractVersion: 'browser-auth-rejection-v2',
     requestId: `web-auth-rejection-${requestNo}`,
     serverTime: '2026-09-06T00:00:00.000Z',
   };
@@ -59,8 +64,8 @@ async function readJsonBody(req) {
 
 function memberSession() {
   return {
-    accessToken: 'rejectheader.rejectpayload.rejectsignature',
-    refreshToken: 'reject-refresh-token',
+    accessToken: memberAccessToken,
+    refreshToken: memberRefreshToken,
     expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
     tokenType: 'bearer',
     user: { id: identity.id, email: identity.email },
@@ -87,7 +92,7 @@ async function serve() {
 
       if (pathname === '/api/me' && req.method === 'GET') {
         requests.push({ path: pathname, method: req.method, authorization, rejectCurrentSubject });
-        if (rejectCurrentSubject || authorization !== 'Bearer rejectheader.rejectpayload.rejectsignature') {
+        if (rejectCurrentSubject || authorization !== `Bearer ${memberAccessToken}`) {
           sendJson(res, 401, failure('AUTH_REQUIRED', 'auth.required'));
           return;
         }
@@ -107,7 +112,7 @@ async function serve() {
 
       if (pathname === '/api/me/birth-profile' && req.method === 'GET') {
         requests.push({ path: pathname, method: req.method, authorization, rejectCurrentSubject });
-        if (authorization !== 'Bearer rejectheader.rejectpayload.rejectsignature') {
+        if (authorization !== `Bearer ${memberAccessToken}`) {
           sendJson(res, 401, failure('AUTH_REQUIRED', 'auth.required'));
           return;
         }
@@ -115,7 +120,18 @@ async function serve() {
         return;
       }
 
+      if (pathname === '/api/session/bootstrap' && req.method === 'POST') {
+        guestBootstrapRequests += 1;
+        requests.push({ path: pathname, method: req.method, authorization, rejectCurrentSubject });
+        sendJson(res, 200, success({
+          kind: 'guest',
+          guestSession: { bearerToken: 'unexpected-canonical-rejection-bootstrap' },
+        }));
+        return;
+      }
+
       if (pathname.startsWith('/api/')) {
+        requests.push({ path: pathname, method: req.method, authorization, rejectCurrentSubject });
         sendJson(res, 404, failure('NOT_FOUND', 'not_found'));
         return;
       }
@@ -208,24 +224,50 @@ async function navigate(client, origin, pathname, selector, timeout = 10_000) {
   throw new Error(`Timed out waiting for ${cleanPath} ${selector}`);
 }
 
+async function authSnapshot(client) {
+  return client.evaluate(`(() => {
+    const member = JSON.parse(localStorage.getItem('myeongha.memberSession.v1') ?? 'null');
+    return {
+      pathname: location.pathname,
+      authState: document.querySelector('.product-profile')?.dataset.authState ?? null,
+      authLabel: document.querySelector('.product-profile')?.getAttribute('aria-label') ?? null,
+      memberAccessToken: member?.accessToken ?? null,
+      memberRefreshToken: member?.refreshToken ?? null,
+      memberUserId: member?.user?.id ?? null,
+      activeBearer: sessionStorage.getItem('myeongha.guestBearer.v1'),
+      pendingGuest: sessionStorage.getItem('myeongha.pendingGuestBearer.v1'),
+      myStatus: document.querySelector('#my-status')?.textContent?.trim() ?? null,
+      myActions: document.querySelector('.my-auth-actions')?.textContent?.trim() ?? null,
+    };
+  })()`);
+}
+
 async function waitFor(client, expression, message, timeout = 8_000) {
   const deadline = Date.now() + timeout;
   while (Date.now() < deadline) {
     if (await client.evaluate(expression)) return;
     await sleep(50);
   }
-  const diagnostics = await client.evaluate(`(() => ({
-    pathname: location.pathname,
-    authState: document.querySelector('.product-profile')?.dataset.authState ?? null,
-    myStatus: document.querySelector('#my-status')?.textContent?.trim() ?? null,
-    authActions: document.querySelector('.my-auth-actions')?.textContent?.trim() ?? null,
-    memberSession: localStorage.getItem('myeongha.memberSession.v1'),
-    activeBearer: sessionStorage.getItem('myeongha.guestBearer.v1'),
-  }))()`);
+  const diagnostics = await authSnapshot(client);
   throw new Error(`${message}; diagnostics=${JSON.stringify(diagnostics)}; requests=${JSON.stringify(requests)}`);
 }
 
+async function activeBearerSnapshot(client) {
+  return client.evaluate(`(async () => {
+    const auth = await import('/product-auth.js');
+    return {
+      active: await auth.getActiveBearer(),
+      ensured: await auth.ensureActiveBearer(),
+    };
+  })()`);
+}
+
 async function submitSignIn(client) {
+  await waitFor(
+    client,
+    `document.readyState === 'complete' && location.pathname === '/auth.html' && Boolean(document.querySelector('#auth-form'))`,
+    'Auth form did not fully initialize before sign-in',
+  );
   await client.evaluate(`(() => {
     document.querySelector('#auth-email').value = ${JSON.stringify(identity.email)};
     document.querySelector('#auth-password').value = ${JSON.stringify(identity.password)};
@@ -261,87 +303,126 @@ const chrome = spawn(chromeBin, [
 let chromeError = '';
 chrome.stderr.setEncoding('utf8');
 chrome.stderr.on('data', (chunk) => { chromeError += chunk; });
-let client;
+let tabA;
+let tabB;
 
 try {
-  client = await connectCdp(await devtoolsPort(profile, chrome));
+  const port = await devtoolsPort(profile, chrome);
 
-  await navigate(client, origin, '/auth.html?next=hall.html', '#auth-form');
-  await submitSignIn(client);
+  tabB = await connectCdp(port);
+  await navigate(tabB, origin, '/hall.html', '.product-profile');
+  await tabB.evaluate(`(() => {
+    localStorage.removeItem('myeongha.memberSession.v1');
+    sessionStorage.setItem('myeongha.guestBearer.v1', ${JSON.stringify(tabBGuestBearer)});
+    sessionStorage.removeItem('myeongha.pendingGuestBearer.v1');
+  })()`);
+  await navigate(tabB, origin, '/hall.html', '.product-profile');
   await waitFor(
-    client,
-    `location.pathname === '/hall.html' && document.querySelector('.product-profile')?.dataset.authState === 'member'`,
-    'Sign-in did not reach visible Member state',
+    tabB,
+    `document.querySelector('.product-profile')?.dataset.authState === 'guest'
+      && sessionStorage.getItem('myeongha.guestBearer.v1') === ${JSON.stringify(tabBGuestBearer)}`,
+    'Tab B did not begin with its intended Guest bearer',
+  );
+  const initialTabB = await authSnapshot(tabB);
+
+  tabA = await connectCdp(port);
+  await navigate(tabA, origin, '/hall.html', '.product-profile');
+  await tabA.evaluate(`(() => {
+    sessionStorage.setItem('myeongha.guestBearer.v1', ${JSON.stringify(tabAGuestBearer)});
+    sessionStorage.removeItem('myeongha.pendingGuestBearer.v1');
+  })()`);
+  await navigate(tabA, origin, '/auth.html?next=hall.html', '#auth-form');
+  await submitSignIn(tabA);
+  await waitFor(
+    tabA,
+    `location.pathname === '/hall.html'
+      && document.querySelector('.product-profile')?.dataset.authState === 'member'
+      && sessionStorage.getItem('myeongha.pendingGuestBearer.v1') === ${JSON.stringify(tabAGuestBearer)}`,
+    'Tab A sign-in did not reach visible Member state while preserving its Guest',
   );
 
-  await navigate(client, origin, '/my.html', '#my-account-email');
   await waitFor(
-    client,
+    tabB,
+    `(() => {
+      const member = JSON.parse(localStorage.getItem('myeongha.memberSession.v1') ?? 'null');
+      return document.querySelector('.product-profile')?.dataset.authState === 'member'
+        && member?.user?.id === ${JSON.stringify(identity.id)}
+        && sessionStorage.getItem('myeongha.guestBearer.v1') === ${JSON.stringify(memberAccessToken)}
+        && sessionStorage.getItem('myeongha.pendingGuestBearer.v1') === ${JSON.stringify(tabBGuestBearer)};
+    })()`,
+    'Tab B did not converge to Member before canonical rejection',
+  );
+
+  await navigate(tabA, origin, '/my.html', '#my-account-email');
+  await waitFor(
+    tabA,
     `document.querySelector('#my-account-email')?.textContent?.trim() === ${JSON.stringify(identity.email)} && Boolean(document.querySelector('.my-auth-actions button'))`,
     'Canonical Member profile did not render before rejection',
   );
 
-  const beforeRejection = await client.evaluate(`(() => ({
-    memberSession: JSON.parse(localStorage.getItem('myeongha.memberSession.v1') ?? 'null'),
-    activeBearer: sessionStorage.getItem('myeongha.guestBearer.v1'),
-  }))()`);
-  assert(beforeRejection.memberSession?.user?.id === identity.id, 'Pre-rejection Member identity was not stored');
-  assert(beforeRejection.activeBearer === 'rejectheader.rejectpayload.rejectsignature', 'Pre-rejection Member bearer was not active');
+  const beforeRejectionA = await authSnapshot(tabA);
+  const beforeRejectionB = await authSnapshot(tabB);
+  assert(beforeRejectionA.memberUserId === identity.id, 'Tab A pre-rejection Member identity was not stored');
+  assert(beforeRejectionB.memberUserId === identity.id, 'Tab B pre-rejection Member identity was not stored');
+  assert(beforeRejectionA.activeBearer === memberAccessToken, 'Tab A pre-rejection Member bearer was not active');
+  assert(beforeRejectionB.activeBearer === memberAccessToken, 'Tab B pre-rejection Member bearer was not active');
 
   rejectCurrentSubject = true;
-  await navigate(client, origin, '/my.html?canonical-rejection=1', '#my-status');
+  await navigate(tabA, origin, '/my.html?canonical-rejection=1', '#my-status');
   await waitFor(
-    client,
-    `!localStorage.getItem('myeongha.memberSession.v1') && document.querySelector('#my-status')?.textContent?.includes('현재 세션이 필요합니다.') && document.querySelector('.my-auth-actions a')?.textContent?.includes('로그인하기')`,
-    'Canonical /api/me 401 did not invalidate stale Member state and render login-required UI',
+    tabA,
+    `!localStorage.getItem('myeongha.memberSession.v1')
+      && document.querySelector('#my-status')?.textContent?.includes('현재 세션이 필요합니다.')
+      && document.querySelector('.my-auth-actions a')?.textContent?.includes('로그인하기')
+      && sessionStorage.getItem('myeongha.guestBearer.v1') === ${JSON.stringify(tabAGuestBearer)}
+      && sessionStorage.getItem('myeongha.pendingGuestBearer.v1') === null`,
+    'Canonical /api/me 401 did not invalidate Tab A and restore its Guest authority',
   );
 
-  const afterRejection = await client.evaluate(`(() => ({
-    memberSession: localStorage.getItem('myeongha.memberSession.v1'),
-    activeBearer: sessionStorage.getItem('myeongha.guestBearer.v1'),
-    pendingBearer: sessionStorage.getItem('myeongha.pendingGuestBearer.v1'),
-    status: document.querySelector('#my-status')?.textContent?.trim() ?? null,
-    loginHref: document.querySelector('.my-auth-actions a')?.getAttribute('href') ?? null,
-    logoutPresent: Boolean(document.querySelector('.my-auth-actions button')),
-  }))()`);
-  assert(afterRejection.memberSession === null, 'Canonical rejection left stale Member localStorage');
-  assert(afterRejection.activeBearer === null, 'Canonical rejection left stale Member bearer active');
-  assert(afterRejection.pendingBearer === null, 'Canonical rejection left an unexpected pending Guest bearer');
-  assert(afterRejection.loginHref === 'auth.html?next=my.html', `Unexpected post-rejection login href: ${afterRejection.loginHref}`);
-  assert(afterRejection.logoutPresent === false, 'Canonical rejection left a logout action for an invalidated Member');
-
-  await navigate(client, origin, '/hall.html', '.product-profile');
   await waitFor(
-    client,
-    `document.querySelector('.product-profile')?.dataset.authState === 'guest' && document.querySelector('.product-profile')?.getAttribute('aria-label') === '로그인'`,
-    'Hall retained stale Member presentation after canonical rejection',
+    tabB,
+    `document.querySelector('.product-profile')?.dataset.authState === 'guest'
+      && document.querySelector('.product-profile')?.getAttribute('aria-label') === '로그인'
+      && !localStorage.getItem('myeongha.memberSession.v1')
+      && sessionStorage.getItem('myeongha.guestBearer.v1') === ${JSON.stringify(tabBGuestBearer)}
+      && sessionStorage.getItem('myeongha.pendingGuestBearer.v1') === null`,
+    'Tab B did not scrub Member credentials and restore its own Guest after Tab A canonical rejection',
   );
 
-  const hallState = await client.evaluate(`(() => ({
-    authState: document.querySelector('.product-profile')?.dataset.authState ?? null,
-    href: document.querySelector('.product-profile')?.getAttribute('href') ?? null,
-    label: document.querySelector('.product-profile-mark + span')?.textContent?.trim() ?? null,
-  }))()`);
-  assert(hallState.authState === 'guest', 'Hall did not become Guest after canonical rejection');
-  assert(hallState.href?.startsWith('auth.html?next='), `Hall login href is invalid after rejection: ${hallState.href}`);
-  assert(hallState.label === '로그인', `Hall retained a stale Member label: ${hallState.label}`);
+  const afterRejectionA = await authSnapshot(tabA);
+  const afterRejectionB = await authSnapshot(tabB);
+  const bearerA = await activeBearerSnapshot(tabA);
+  const bearerB = await activeBearerSnapshot(tabB);
+
+  assert(afterRejectionA.memberAccessToken === null && afterRejectionA.memberRefreshToken === null && afterRejectionA.memberUserId === null, 'Tab A retained Member credentials after canonical rejection');
+  assert(afterRejectionB.memberAccessToken === null && afterRejectionB.memberRefreshToken === null && afterRejectionB.memberUserId === null, 'Tab B retained Member credentials after cross-tab canonical rejection');
+  assert(afterRejectionA.activeBearer === tabAGuestBearer && afterRejectionA.pendingGuest === null, 'Tab A did not restore its own Guest after canonical rejection');
+  assert(afterRejectionB.activeBearer === tabBGuestBearer && afterRejectionB.pendingGuest === null, 'Tab B did not restore its own Guest after canonical rejection');
+  assert(afterRejectionA.myStatus?.includes('현재 세션이 필요합니다.'), 'Tab A did not render login-required My state');
+  assert(bearerA.active?.kind === 'guest' && bearerA.active?.token === tabAGuestBearer, 'Tab A active bearer did not resolve restored Guest');
+  assert(bearerA.ensured?.kind === 'guest' && bearerA.ensured?.token === tabAGuestBearer, 'Tab A ensured bearer did not resolve restored Guest');
+  assert(bearerB.active?.kind === 'guest' && bearerB.active?.token === tabBGuestBearer, 'Tab B active bearer did not resolve restored Guest');
+  assert(bearerB.ensured?.kind === 'guest' && bearerB.ensured?.token === tabBGuestBearer, 'Tab B ensured bearer did not resolve restored Guest');
 
   const rejectionReads = requests.filter((request) => request.path === '/api/me' && request.rejectCurrentSubject);
   assert(rejectionReads.length >= 1, 'Verifier never exercised canonical /api/me rejection');
   assert(
-    rejectionReads.some((request) => request.authorization === 'Bearer rejectheader.rejectpayload.rejectsignature'),
+    rejectionReads.some((request) => request.authorization === `Bearer ${memberAccessToken}`),
     'Canonical rejection was not exercised against the stored Member bearer',
   );
+  assert(guestBootstrapRequests === 0, `Canonical rejection convergence unexpectedly bootstrapped ${guestBootstrapRequests} Guest session(s)`);
 
   const artifactDir = resolve(process.cwd(), 'artifacts');
   await mkdir(artifactDir, { recursive: true });
   await writeFile(join(artifactDir, 'web-auth-rejection-browser-smoke.json'), `${JSON.stringify({
+    status: 'MyeongHa_WEB_AUTH_REJECTION_BROWSER_PASS',
     canonicalRejectionReads: rejectionReads.length,
-    memberSessionCleared: afterRejection.memberSession === null,
-    memberBearerCleared: afterRejection.activeBearer === null,
-    myLoginRequiredRendered: afterRejection.status?.includes('현재 세션이 필요합니다.') ?? false,
-    finalHallAuthState: hallState.authState,
-    finalHallLabel: hallState.label,
+    initialTabB,
+    beforeRejectionA,
+    beforeRejectionB,
+    afterRejectionA,
+    afterRejectionB,
+    guestBootstrapRequests,
   }, null, 2)}\n`);
 
   console.log('MyeongHa_WEB_AUTH_REJECTION_BROWSER_PASS');
@@ -350,7 +431,8 @@ try {
   if (chromeError.trim()) console.error(chromeError.trim());
   process.exitCode = 1;
 } finally {
-  client?.close();
+  tabA?.close();
+  tabB?.close();
   chrome.kill('SIGTERM');
   await Promise.race([
     new Promise((done) => chrome.once('exit', done)),
