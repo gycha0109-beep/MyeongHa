@@ -51,7 +51,7 @@ jobs:
       - name: Verify cross-tab authoritative session expiry
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
-        run: node scripts/verify-web-auth-cross-tab-session-expired-browser.mjs
+        run: node scripts/run-web-auth-cross-tab-session-expired-browser-smoke.mjs
       - name: Verify canonical authentication rejection invalidation
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
@@ -68,6 +68,10 @@ jobs:
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
         run: node scripts/verify-web-auth-refresh-network-browser.mjs
+      - name: Verify malformed refresh Member retention
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/verify-web-auth-refresh-malformed-browser.mjs
       - name: Verify Saju active bearer authority
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
@@ -112,6 +116,7 @@ jobs:
             artifacts/web-auth-refresh-browser-smoke*
             artifacts/web-auth-cross-tab-transient-refresh-browser-smoke*
             artifacts/web-auth-refresh-network-browser-smoke*
+            artifacts/web-auth-refresh-malformed-browser-smoke*
             artifacts/web-saju-auth-browser-smoke*
             artifacts/web-records-auth-browser-smoke*
             artifacts/web-my-browser-smoke*
