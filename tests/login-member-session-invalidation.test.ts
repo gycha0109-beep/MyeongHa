@@ -2,7 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMyRuntimeClient } from '../apps/web/my-runtime-client.js';
 import {
   PRODUCT_AUTH_STORAGE_V1,
+  getMemberAccessToken,
   readMemberSession,
+  refreshMemberSession,
   signOutMember,
 } from '../apps/web/product-auth.js';
 
@@ -37,9 +39,21 @@ const memberSession = Object.freeze({
   },
 });
 
-function seedMemberSession({ withPendingGuest = true } = {}) {
-  localStorage.setItem(PRODUCT_AUTH_STORAGE_V1.memberSession, JSON.stringify(memberSession));
-  sessionStorage.setItem(PRODUCT_AUTH_STORAGE_V1.guestBearer, memberSession.accessToken);
+function seedMemberSession({
+  withPendingGuest = true,
+  session = memberSession,
+}: {
+  withPendingGuest?: boolean;
+  session?: {
+    accessToken: string;
+    refreshToken: string;
+    expiresAt: string;
+    tokenType: string;
+    user: { id: string; email: string };
+  };
+} = {}) {
+  localStorage.setItem(PRODUCT_AUTH_STORAGE_V1.memberSession, JSON.stringify(session));
+  sessionStorage.setItem(PRODUCT_AUTH_STORAGE_V1.guestBearer, session.accessToken);
   if (withPendingGuest) {
     sessionStorage.setItem(PRODUCT_AUTH_STORAGE_V1.pendingGuestBearer, 'guest-before-member');
   }
@@ -50,6 +64,17 @@ function createRejectedClient(status: number) {
     fetchImpl: async () => ({ status, ok: false }),
     resolveBearer: async () => ({ kind: 'member', token: memberSession.accessToken }),
   });
+}
+
+function authErrorResponse(code: string, status: number) {
+  return Response.json({
+    ok: false,
+    error: {
+      code,
+      messageKey: `auth.${code.toLowerCase()}`,
+      retryable: status >= 500,
+    },
+  }, { status });
 }
 
 beforeEach(() => {
@@ -122,6 +147,113 @@ describe('Member session invalidation at the canonical current-subject boundary'
     expect(readMemberSession()).toBeNull();
     expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.guestBearer)).toBe('guest-before-member');
     expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.pendingGuestBearer)).toBeNull();
+    expect(globalThis.dispatchEvent).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('Member session refresh failure authority', () => {
+  it('discards member credentials only when refresh returns authoritative SESSION_EXPIRED', async () => {
+    seedMemberSession();
+    vi.stubGlobal('fetch', vi.fn(async () => authErrorResponse('SESSION_EXPIRED', 401)));
+
+    await expect(refreshMemberSession()).rejects.toMatchObject({ code: 'SESSION_EXPIRED' });
+
+    expect(readMemberSession()).toBeNull();
+    expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.guestBearer)).toBe('guest-before-member');
+    expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.pendingGuestBearer)).toBeNull();
+    expect(globalThis.dispatchEvent).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves member credentials when refresh upstream is temporarily unavailable', async () => {
+    seedMemberSession();
+    vi.stubGlobal('fetch', vi.fn(async () => authErrorResponse('AUTH_UPSTREAM_UNAVAILABLE', 503)));
+
+    await expect(refreshMemberSession()).rejects.toMatchObject({ code: 'AUTH_UPSTREAM_UNAVAILABLE' });
+
+    expect(readMemberSession()).toMatchObject({
+      accessToken: memberSession.accessToken,
+      refreshToken: memberSession.refreshToken,
+    });
+    expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.guestBearer)).toBe(memberSession.accessToken);
+    expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.pendingGuestBearer)).toBe('guest-before-member');
+    expect(globalThis.dispatchEvent).not.toHaveBeenCalled();
+  });
+
+  it('preserves member credentials on a refresh network failure', async () => {
+    seedMemberSession();
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
+
+    await expect(refreshMemberSession()).rejects.toMatchObject({ code: 'WEB_AUTH_NETWORK_FAILED' });
+
+    expect(readMemberSession()).toMatchObject({
+      accessToken: memberSession.accessToken,
+      refreshToken: memberSession.refreshToken,
+    });
+    expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.guestBearer)).toBe(memberSession.accessToken);
+    expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.pendingGuestBearer)).toBe('guest-before-member');
+    expect(globalThis.dispatchEvent).not.toHaveBeenCalled();
+  });
+
+  it('continues using the still-valid access token when proactive refresh fails transiently', async () => {
+    const nearExpirySession = Object.freeze({
+      ...memberSession,
+      expiresAt: new Date(Date.now() + 30_000).toISOString(),
+    });
+    seedMemberSession({ session: nearExpirySession });
+    vi.stubGlobal('fetch', vi.fn(async () => authErrorResponse('AUTH_UPSTREAM_UNAVAILABLE', 503)));
+
+    await expect(getMemberAccessToken()).resolves.toBe(nearExpirySession.accessToken);
+
+    expect(readMemberSession()).toMatchObject({
+      accessToken: nearExpirySession.accessToken,
+      refreshToken: nearExpirySession.refreshToken,
+    });
+    expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.guestBearer)).toBe(nearExpirySession.accessToken);
+    expect(globalThis.dispatchEvent).not.toHaveBeenCalled();
+  });
+
+  it('stops using an actually expired access token after transient refresh failure without deleting the session', async () => {
+    const expiredSession = Object.freeze({
+      ...memberSession,
+      expiresAt: new Date(Date.now() - 1_000).toISOString(),
+    });
+    seedMemberSession({ session: expiredSession });
+    vi.stubGlobal('fetch', vi.fn(async () => authErrorResponse('AUTH_UPSTREAM_UNAVAILABLE', 503)));
+
+    await expect(getMemberAccessToken()).rejects.toMatchObject({ code: 'AUTH_UPSTREAM_UNAVAILABLE' });
+
+    expect(readMemberSession()).toMatchObject({
+      accessToken: expiredSession.accessToken,
+      refreshToken: expiredSession.refreshToken,
+    });
+    expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.guestBearer)).toBe(expiredSession.accessToken);
+    expect(globalThis.dispatchEvent).not.toHaveBeenCalled();
+  });
+
+  it('persists rotated credentials after a successful refresh', async () => {
+    seedMemberSession();
+    const refreshedSession = {
+      ...memberSession,
+      accessToken: 'newheader.newpayload.newsignature',
+      refreshToken: 'rotated-refresh-token',
+      expiresAt: '2099-01-02T00:00:00.000Z',
+    };
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({
+      ok: true,
+      data: { status: 'authenticated', session: refreshedSession },
+    })));
+
+    await expect(refreshMemberSession()).resolves.toMatchObject({
+      accessToken: refreshedSession.accessToken,
+      refreshToken: refreshedSession.refreshToken,
+    });
+
+    expect(readMemberSession()).toMatchObject({
+      accessToken: refreshedSession.accessToken,
+      refreshToken: refreshedSession.refreshToken,
+    });
+    expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.guestBearer)).toBe(refreshedSession.accessToken);
+    expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.pendingGuestBearer)).toBe('guest-before-member');
     expect(globalThis.dispatchEvent).toHaveBeenCalledTimes(1);
   });
 });
