@@ -16,6 +16,8 @@ const testIdentity = Object.freeze({
 });
 const memberAccessToken = 'cross.header.signature';
 const memberRefreshToken = 'cross-refresh-token';
+const rotatedMemberAccessToken = 'cross2.header2.signature2';
+const rotatedMemberRefreshToken = 'cross-refresh-token-rotated';
 const tabBGuestBearer = 'cross-tab-guest-b';
 const mime = new Map([
   ['.html', 'text/html; charset=utf-8'],
@@ -57,10 +59,10 @@ function errorEnvelope(code, messageKey, retryable = false) {
   };
 }
 
-function memberSession() {
+function memberSession({ accessToken = memberAccessToken, refreshToken = memberRefreshToken } = {}) {
   return {
-    accessToken: memberAccessToken,
-    refreshToken: memberRefreshToken,
+    accessToken,
+    refreshToken,
     expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
     tokenType: 'bearer',
     user: { id: testIdentity.id, email: testIdentity.email },
@@ -97,9 +99,26 @@ async function serve() {
         return;
       }
 
+      if (pathname === '/api/auth/refresh' && req.method === 'POST') {
+        const body = await readJsonBody(req);
+        requests.push({ path: pathname, method: req.method, authorization, refreshToken: body.refreshToken ?? null });
+        if (body.refreshToken !== memberRefreshToken) {
+          sendJson(res, 401, errorEnvelope('SESSION_EXPIRED', 'auth.session_expired'));
+          return;
+        }
+        sendJson(res, 200, successEnvelope({
+          status: 'authenticated',
+          session: memberSession({
+            accessToken: rotatedMemberAccessToken,
+            refreshToken: rotatedMemberRefreshToken,
+          }),
+        }));
+        return;
+      }
+
       if (pathname === '/api/auth/sign-out' && req.method === 'POST') {
         requests.push({ path: pathname, method: req.method, authorization });
-        if (authorization !== `Bearer ${memberAccessToken}`) {
+        if (authorization !== `Bearer ${rotatedMemberAccessToken}`) {
           sendJson(res, 401, errorEnvelope('AUTH_REQUIRED', 'auth.required'));
           return;
         }
@@ -109,7 +128,7 @@ async function serve() {
 
       if (pathname === '/api/me' && req.method === 'GET') {
         requests.push({ path: pathname, method: req.method, authorization });
-        if (authorization !== `Bearer ${memberAccessToken}`) {
+        if (authorization !== `Bearer ${rotatedMemberAccessToken}`) {
           sendJson(res, 401, errorEnvelope('AUTH_REQUIRED', 'auth.required'));
           return;
         }
@@ -129,7 +148,7 @@ async function serve() {
 
       if (pathname === '/api/me/birth-profile' && req.method === 'GET') {
         requests.push({ path: pathname, method: req.method, authorization });
-        if (authorization !== `Bearer ${memberAccessToken}`) {
+        if (authorization !== `Bearer ${rotatedMemberAccessToken}`) {
           sendJson(res, 401, errorEnvelope('AUTH_REQUIRED', 'auth.required'));
           return;
         }
@@ -272,6 +291,7 @@ async function authSnapshot(client) {
       authState: document.querySelector('.product-profile')?.dataset.authState ?? null,
       authLabel: document.querySelector('.product-profile')?.getAttribute('aria-label') ?? null,
       memberAccessToken: member?.accessToken ?? null,
+      memberRefreshToken: member?.refreshToken ?? null,
       memberUserId: member?.user?.id ?? null,
       activeBearer: sessionStorage.getItem('myeongha.guestBearer.v1'),
       pendingGuest: sessionStorage.getItem('myeongha.pendingGuestBearer.v1'),
@@ -379,6 +399,42 @@ try {
   assert(memberBearer.active?.kind === 'member' && memberBearer.active?.token === memberAccessToken, 'Tab B active bearer resolver did not converge to Member');
   assert(memberBearer.ensured?.kind === 'member' && memberBearer.ensured?.token === memberAccessToken, 'Tab B ensure bearer did not converge to Member');
 
+  const refreshedTabA = await tabA.evaluate(`(async () => {
+    const auth = await import('/product-auth.js');
+    const session = await auth.refreshMemberSession();
+    return {
+      accessToken: session.accessToken,
+      refreshToken: session.refreshToken,
+      userId: session.user?.id ?? null,
+    };
+  })()`);
+  assert(refreshedTabA.accessToken === rotatedMemberAccessToken, 'Tab A refresh did not rotate the Member access token');
+  assert(refreshedTabA.refreshToken === rotatedMemberRefreshToken, 'Tab A refresh did not rotate the Member refresh token');
+  assert(refreshedTabA.userId === testIdentity.id, 'Tab A refresh changed the Member identity');
+
+  await waitFor(
+    tabB,
+    `(() => {
+      const member = JSON.parse(localStorage.getItem('myeongha.memberSession.v1') ?? 'null');
+      return document.querySelector('.product-profile')?.dataset.authState === 'member'
+        && member?.accessToken === ${JSON.stringify(rotatedMemberAccessToken)}
+        && member?.refreshToken === ${JSON.stringify(rotatedMemberRefreshToken)}
+        && sessionStorage.getItem('myeongha.guestBearer.v1') === ${JSON.stringify(rotatedMemberAccessToken)}
+        && sessionStorage.getItem('myeongha.pendingGuestBearer.v1') === ${JSON.stringify(tabBGuestBearer)};
+    })()`,
+    'Tab B did not converge to the rotated Member credentials after Tab A refresh',
+  );
+  const rotatedTabB = await authSnapshot(tabB);
+  const rotatedBearer = await activeBearerSnapshot(tabB);
+  assert(rotatedTabB.authState === 'member' && rotatedTabB.authLabel === '마이 페이지', 'Tab B lost Member UI during cross-tab refresh rotation');
+  assert(rotatedTabB.memberUserId === testIdentity.id, 'Tab B refresh convergence changed the Member identity');
+  assert(rotatedTabB.memberAccessToken === rotatedMemberAccessToken, 'Tab B kept the stale Member access token after rotation');
+  assert(rotatedTabB.memberRefreshToken === rotatedMemberRefreshToken, 'Tab B kept the stale Member refresh token after rotation');
+  assert(rotatedTabB.activeBearer === rotatedMemberAccessToken, 'Tab B compatibility bearer did not rotate with the Member session');
+  assert(rotatedTabB.pendingGuest === tabBGuestBearer, 'Tab B consumed its staged Guest during Member token rotation');
+  assert(rotatedBearer.active?.kind === 'member' && rotatedBearer.active?.token === rotatedMemberAccessToken, 'Tab B active bearer resolver did not expose the rotated Member token');
+  assert(rotatedBearer.ensured?.kind === 'member' && rotatedBearer.ensured?.token === rotatedMemberAccessToken, 'Tab B ensure bearer did not expose the rotated Member token');
+
   await navigate(tabA, origin, '/my.html', '#my-account-email');
   await waitFor(
     tabA,
@@ -410,11 +466,16 @@ try {
   assert(guestBearer.ensured?.kind === 'guest' && guestBearer.ensured?.token === tabBGuestBearer, 'Tab B ensure bearer did not return the restored Guest');
 
   const signIns = requests.filter((request) => request.path === '/api/auth/sign-in');
+  const refreshes = requests.filter((request) => request.path === '/api/auth/refresh');
   const signOuts = requests.filter((request) => request.path === '/api/auth/sign-out');
+  const profileReads = requests.filter((request) => request.path === '/api/me');
   const bootstraps = requests.filter((request) => request.path === '/api/session/bootstrap');
   assert(signIns.length === 1, `Expected one sign-in request, received ${signIns.length}`);
+  assert(refreshes.length === 1, `Expected one refresh request, received ${refreshes.length}`);
+  assert(refreshes[0].refreshToken === memberRefreshToken, 'Cross-tab refresh did not use the original Member refresh credential');
   assert(signOuts.length === 1, `Expected one sign-out request, received ${signOuts.length}`);
-  assert(signOuts[0].authorization === `Bearer ${memberAccessToken}`, 'Cross-tab sign-out used the wrong Member bearer');
+  assert(signOuts[0].authorization === `Bearer ${rotatedMemberAccessToken}`, 'Cross-tab sign-out did not use the rotated Member bearer');
+  assert(profileReads.some((request) => request.authorization === `Bearer ${rotatedMemberAccessToken}`), 'My page did not use the rotated Member bearer after cross-tab refresh');
   assert(bootstraps.length === 0, `Cross-tab convergence unexpectedly bootstrapped ${bootstraps.length} Guest session(s)`);
 
   await mkdir(artifactDir, { recursive: true });
@@ -422,8 +483,10 @@ try {
     status: 'MyeongHa_WEB_AUTH_CROSS_TAB_BROWSER_PASS',
     initialTabB,
     memberTabB,
+    rotatedTabB,
     signedOutTabB,
     signInRequests: signIns.length,
+    refreshRequests: refreshes.length,
     signOutRequests: signOuts.length,
     guestBootstrapRequests: bootstraps.length,
     requests,
