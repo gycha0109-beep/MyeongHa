@@ -128,3 +128,9 @@ This document does not authorize:
 - `presentationKey` as a canonical DB Character id
 
 Production positive smoke requires real approved published Character content. Absence of eligible Production content is a blocker, not permission to insert arbitrary fixture rows.
+
+## 8. SRC-34 closure boundary
+
+Any earlier `SRC-34` OPEN-P0 statement about **Member single-Character thread open/create-or-reuse semantics** is superseded for this narrow path by the 2026-09-06 Product Owner decision, migration `0970`, and this HTTP authority.
+
+This closure does not extend to chat turn-send request semantics, Guest create/open, Character content publication, or UI `presentationKey → characterId` mapping. Those remain separately governed and must not be inferred from this closure.
