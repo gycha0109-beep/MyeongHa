@@ -2,7 +2,6 @@
 
 > Repository: `gycha0109-beep/MyeongHa`  
 > Status: **IN PROGRESS / GENERAL NATAL FIRST PASS / NOT PRODUCT AUTHORITY / P0-CM-03 OPEN / NO-BUILD**  
-> MyeongHa observed main: `11eba9c4afcae534777fddd784418624306a0baf`  
 > Saju observed main: `b7bc0d0b0c04a514ca849d57fca6ba3de03993c0`  
 > Product interpretation authority: `MyeongHa_Saju_Product_Interpretation_Architecture_v1.2_FINAL_REVIEWED(1).md`  
 > Current Saju production audit: `gycha0109-beep/Saju/docs/product/22-production-interpretation-authority-audit.md`
