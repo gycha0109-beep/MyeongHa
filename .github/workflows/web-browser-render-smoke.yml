@@ -44,6 +44,10 @@ jobs:
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
         run: node scripts/verify-web-auth-failed-login-guest-browser.mjs
+      - name: Verify Guest promotion failure retention
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/verify-web-auth-promotion-failure-browser.mjs
       - name: Verify cross-tab authentication convergence
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
@@ -114,6 +118,7 @@ jobs:
             artifacts/web-auth-browser-smoke*
             artifacts/web-auth-continuity-browser-smoke*
             artifacts/web-auth-failed-login-guest-browser-smoke*
+            artifacts/web-auth-promotion-failure-browser-smoke*
             artifacts/web-auth-cross-tab-browser-smoke*
             artifacts/web-auth-cross-tab-signout-failure-browser-smoke*
             artifacts/web-auth-cross-tab-session-expired-browser-smoke*
