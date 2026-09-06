@@ -44,6 +44,10 @@ jobs:
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
         run: node scripts/verify-web-auth-rejection-browser.mjs
+      - name: Verify Records active bearer binding
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/verify-web-records-auth-browser.mjs
       - name: Verify authentication confirmation handoff
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
@@ -74,6 +78,7 @@ jobs:
             artifacts/web-auth-browser-smoke*
             artifacts/web-auth-continuity-browser-smoke*
             artifacts/web-auth-rejection-browser-smoke*
+            artifacts/web-records-auth-browser-smoke*
             artifacts/web-my-browser-smoke*
             artifacts/web-my-birth-browser-smoke*
             artifacts/web-birth-session-browser-smoke*
