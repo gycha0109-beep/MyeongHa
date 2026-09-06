@@ -1,9 +1,9 @@
-# 명하 Character / World Content Specification v0.4 — Source Aligned
+# 명하 Character / World Content Specification v0.5 — Source Aligned
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.4**  
-> Date: **2026-08-28**  
-> Source Authority: `Usecase_re_reviewed_v2(1).md`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`, `Myeonghwa_Personalized_Interpretation_Architecture_v1.3_THIRD_REVIEW(1).md`  
+> Pack Version: **v0.5**  
+> Date: **2026-09-07**  
+> Source Authority: `Usecase_re_reviewed_v2(1).md`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`, `Myeonghwa_Personalized_Interpretation_Architecture_v1.3_THIRD_REVIEW(1).md`, `MyeongHa_Character_System_Architecture_C1_v0.1_SELF_REVIEWED(1).md`, `docs/source-authority-decisions/CHARACTER_LAUNCH_MVP_AUTHORITY_V1.md`  
 > Rule: 본 문서는 위 source authority를 구현 수준으로 구체화한다. source가 결정하지 않은 사항은 임의 확정하지 않고 `OPEN-P0`, `CANDIDATE`, 또는 numbered source-gap으로 표시한다.
 
 ---
@@ -56,7 +56,9 @@ interface CharacterDefinition {
 }
 ```
 
-UC-24는 character content에 `unlock 조건`이 포함되어야 한다고 요구한다. 다만 primary source는 그 조건의 positive executable schema/DSL을 정의하지 않는다. 따라서 실제 `unlockCondition` field shape/evaluator는 `SRC-23` 해결 전 위 interface의 source-backed field로 임의 확정하지 않는다.
+UC-24는 조건부 Character content에 `unlock 조건` 개념이 존재할 수 있음을 요구한다. 다만 primary source는 그 조건의 positive executable schema/DSL을 정의하지 않는다. 따라서 실제 `unlockCondition` field shape/evaluator는 `SRC-23` 해결 전 source-backed field로 임의 확정하지 않는다.
+
+2026-09-06 Product Owner 결정으로 승인된 **MVP Launch 9명은 예외적으로 조건부 unlock 대상이 아니다.** 이 9명은 정상 Member에게 처음부터 default available이며, `SRC-23` 미해결을 이유로 Launch 사용 가능성을 다시 잠그지 않는다. `SRC-23`은 향후 추가/조건부 Character에 적용된다.
 
 ## 4. Persona
 
@@ -122,6 +124,8 @@ interface CharacterRelation {
 
 LLM이 관계의 공식 과거사를 즉흥 생성하지 않는다.
 
+승인된 Launch 9명의 Character-to-Character relation graph는 아직 별도 detailed authoring 대상이다. 각 Character와 사용자 사이의 approved relationship-fantasy direction을 cross-Character canon으로 오인하지 않는다.
+
 ## 8. Episode Contract
 
 UC-25가 요구하는 Episode authoring 개념:
@@ -141,9 +145,9 @@ UC-25가 요구하는 Episode authoring 개념:
 
 따라서 `entry/unlock condition`, `relationship events`, `unlock reward` authoring slot을 Pack이 임의 JSON/DSL로 정의하거나 source-complete evaluator가 존재한다고 주장하지 않는다.
 
-## 9. Character Unlock / World Event Boundary — `SRC-23` OPEN
+## 9. Character Unlock / World Event Boundary — `SRC-23` OPEN FOR FUTURE CONDITIONAL CHARACTERS
 
-UC-14 fixes this product-level flow:
+UC-14 fixes this product-level flow for conditionally revealed Characters:
 
 ```text
 Unlock condition satisfied
@@ -176,15 +180,33 @@ season/operator reveal execution authority
 unlock-specific outbox/event contract
 ```
 
-Accordingly:
+Accordingly, for future conditional Characters:
 
 - stored `character_unlocks` projection may be read/rendered;
 - same-subject World Event FK proves provenance shape only;
 - `source_world_event_id` alone does not prove that event is authorized to unlock the selected character;
 - caller/LLM-supplied `character_id`, `unlock=true`, condition result, or reward target is not authority;
-- authoritative Character Unlock mutation remains blocked until `SRC-23`.
+- authoritative conditional Character Unlock mutation remains blocked until `SRC-23`.
 
-Relationship-stage-driven character unlock additionally requires `SRC-22`; episode-completion-driven unlock additionally requires `SRC-17` where the episode completion transition itself is not yet source-complete.
+Relationship-stage-driven conditional unlock additionally requires `SRC-22`; episode-completion-driven conditional unlock additionally requires `SRC-17` where the episode completion transition itself is not yet source-complete.
+
+### Launch nine boundary
+
+The approved MVP Launch roster is:
+
+```text
+세연 / 여울 / 서린 / 라현 / 미라 / 태겸 / 윤호 / 도윤 / 백헌
+```
+
+For these nine:
+
+```text
+normal Member
+→ default available from Launch
+→ no relationship/Reading/Episode/season/operator unlock condition required
+```
+
+Therefore `SRC-23` must not be used as a blocker for their Launch availability. It remains a blocker only for future conditional-unlock semantics outside this approved Launch-nine policy.
 
 ## 10. Asset / Cue Contract
 
@@ -204,9 +226,11 @@ characterIds
 
 - bundle = immutable canon artifact
 - release = rollout/activation operational policy
-- 기존 thread는 생성 당시 release/bundle pin 유지
-- default release 변경만으로 기존 캐릭터 persona가 변하지 않음
-- thread upgrade는 explicit content transition ledger
+- 모든 정상 Member는 MVP에서 동일한 current active default release를 resolve한다;
+- 기존 thread는 생성 당시 release/bundle pin 유지;
+- 새 default 활성화 시 previous default는 rollback용 active non-default로 유지한다;
+- default release 변경만으로 기존 캐릭터 persona가 변하지 않음;
+- thread upgrade는 explicit content transition ledger가 별도로 승인되지 않는 한 자동 수행하지 않는다.
 
 ### Operational disable caveat
 
@@ -214,7 +238,9 @@ characterIds
 
 ### Unlock condition caveat
 
-Default release/content bundle 변경만으로 기존 subject의 `character_unlocks` projection을 임의 재평가하거나 자동 rewrite하지 않는다. 조건 version 변경 시 locked/unlocked 사용자에 어떤 migration semantics를 적용할지는 `SRC-23` resolution이 필요하다.
+향후 conditional Character에 대해 default release/content bundle 변경만으로 기존 subject의 `character_unlocks` projection을 임의 재평가하거나 자동 rewrite하지 않는다. 조건 version 변경 시 locked/unlocked 사용자에 어떤 migration semantics를 적용할지는 `SRC-23` resolution이 필요하다.
+
+승인된 Launch 9명은 조건부 unlock 대상이 아니므로 이 caveat로 Launch availability를 변경하지 않는다.
 
 ## 11.1 Retired Bundle Artifact Retention
 
@@ -237,58 +263,103 @@ Artifact garbage collection은 최소 다음을 확인한 뒤에만 가능하다
 
 실제 장기 보존 기간은 `OPEN-P0: P0-PR-01`을 따른다.
 
-## 12. Initial Roster Requirement
+## 12. MVP Launch Roster Requirement
 
-출시 product 기준:
+Character C1의 architecture floor는 Launch core `>= 5`였다. 이후 Product Owner가 실제 MVP Launch roster를 **정확히 9명**으로 확정했다.
+
+Current Production Launch authority:
 
 ```text
-실제 사용 가능 5명 이상
-세계관상 7명 이상 존재 가능
-일부 unlock/locked/coming_soon
+Launch roster cardinality = exactly 9
+Launch official display names =
+  세연
+  여울
+  서린
+  라현
+  미라
+  태겸
+  윤호
+  도윤
+  백헌
+
+normal Member availability = all 9 immediately available
+A/B/cohort/percentage rollout = none for MVP Members
 ```
 
-Engineering Slice는 더 작은 dev subset을 사용할 수 있다.
+따라서 다음 과거 해석은 현재 Launch authority가 아니다.
+
+```text
+Production은 5명만 있으면 충분하다
+Launch 9명 중 일부는 locked/coming_soon이어야 한다
+미라는 temporary name이다
+```
+
+Engineering Slice는 더 작은 dev subset 또는 explicit `developmentPlaceholder`를 사용할 수 있지만, 그것을 Production Launch roster로 승격하면 안 된다.
+
+이 결정이 확정하지 않는 것:
+
+```text
+canonical characterId
+final gender / origin / apparent age / deity / visual canon
+상세 Canon / Persona / Behavior / SajuProfile / RelationshipBehavior
+Character-to-Character relation graph / shared history
+asset provenance
+SRC-35 differentiation PASS semantics
+```
 
 ## 13. Content Validation
 
 Publish 전에 source-complete 범위의 자동 검증:
 
-- stable IDs unique
-- referenced deity/character/episode 존재
-- relation target 존재
-- capability domain stable key 존재
-- asset references manifest 안에 존재
-- cue allowlist schema 적합
-- episode graph dangling node 없음 once the source-approved episode graph contract exists
-- profanity/persona fields schema 적합 where the authored schema defines them
-- content policy tags bounded registry 적합
-- bounded action/event/cue registry 적합 only for registries actually defined by source
-- minClientCapability valid
-- bundle artifact bytes의 digest가 declared content_hash와 일치
+- Production Launch roster cardinality가 정확히 9인지 확인;
+- Production Launch display-name set이 승인된 9개와 정확히 일치하는지 확인;
+- development placeholder가 Production boundary를 통과하지 않는지 확인;
+- stable IDs unique;
+- referenced deity/character/episode 존재;
+- relation target 존재;
+- capability domain stable key 존재;
+- asset references manifest 안에 존재;
+- cue allowlist schema 적합;
+- episode graph dangling node 없음 once the source-approved episode graph contract exists;
+- profanity/persona fields schema 적합 where the authored schema defines them;
+- content policy tags bounded registry 적합;
+- bounded action/event/cue registry 적합 only for registries actually defined by source;
+- minClientCapability valid;
+- bundle artifact bytes의 digest가 declared content_hash와 일치.
 
-`SRC-23` 해결 전 **`unlock condition schema 적합`을 source-complete validation gate로 두지 않는다.** Source가 condition concept을 요구하는 것과 executable schema를 제공하는 것은 별개다.
+Current `@myeongha/character-content` Production boundary additionally requires non-placeholder authored content including Canon/Persona/Behavior/SajuProfile/RelationshipBehavior, source-authored gender presence, versioned visual content, and versioned asset-manifest provenance.
 
-Episode graph/condition semantic validation은 `SRC-17`, relationship event policy validation은 `SRC-22`, Character Unlock eligibility/effect validation은 `SRC-23` resolution 이후 각각 source-approved contract로 추가한다.
+`SRC-35`가 OPEN인 동안 exact-nine membership/name validation이나 individual authored-content completeness를 **roster-level differentiation PASS**로 오인하지 않는다.
+
+`SRC-23` 해결 전 **future conditional Character의 `unlock condition schema 적합`**을 source-complete validation gate로 두지 않는다. Source가 condition concept을 요구하는 것과 executable schema를 제공하는 것은 별개다.
+
+Episode graph/condition semantic validation은 `SRC-17`, relationship event policy validation은 `SRC-22`, future Character Unlock eligibility/effect validation은 `SRC-23` resolution 이후 각각 source-approved contract로 추가한다.
 
 ## 14. Content Review
 
 기계 검증 외 human review 필요:
 
-- 캐릭터 말투가 서로 충분히 구분되는가
-- 역할이 메뉴 담당자처럼만 보이지 않는가
-- 강한 성격이 canon과 일관되는가
-- 다른 캐릭터를 언급할 때 관계 canon을 위반하지 않는가
-- Saju 영역과 character fiction이 혼동되지 않는가
-- unlock authoring concept이 UC-14/UC-24 의도와 일치하는가; 단 human review가 missing executable schema를 대체하지는 않는다.
+- 캐릭터 말투가 서로 충분히 구분되는가;
+- 역할이 메뉴 담당자처럼만 보이지 않는가;
+- 강한 성격이 canon과 일관되는가;
+- 다른 캐릭터를 언급할 때 관계 canon을 위반하지 않는가;
+- Saju 영역과 character fiction이 혼동되지 않는가;
+- 실제 flaw가 관계에 비용을 만들며 단순 미화된 trope로 끝나지 않는가;
+- 관계 progression이 친밀도 상승과 함께 성격을 소거하지 않는가;
+- future unlock authoring concept이 UC-14/UC-24 의도와 일치하는가. 단 human review가 missing executable schema를 대체하지는 않는다.
+
+이 일반 human review 목록 자체는 `SRC-35`의 최종 roster-level acceptance authority를 정의하지 않는다. `SRC-35`가 닫히기 전에는 reviewer의 임의 판단을 Production differentiation PASS로 자동 승격하지 않는다.
 
 ## 15. Publish Flow
 
 ```text
-Content PR
+Detailed Character authoring / source approval
+→ Content PR
 → source-complete schema validation
+→ exact-nine Launch membership/name validation
 → canon/reference validation
 → asset validation
-→ human review
+→ SRC-35-governed roster differentiation acceptance once resolved
 → immutable bundle build
 → hash/version
 → DB runtime catalog publish
@@ -297,4 +368,6 @@ Content PR
 
 Admin UI가 persona를 DB에서 직접 수정하는 방식은 금지한다.
 
-Character Unlock condition/effect evaluator는 content publish 자체와 별도 authority이며 `SRC-23` 해결 전 production mutation path로 승격하지 않는다.
+Launch roster/name authority만으로 아직 비어 있는 detailed Character content를 자동 생성하거나 immutable canon으로 승격하지 않는다.
+
+Character Unlock condition/effect evaluator는 content publish 자체와 별도 authority이며 `SRC-23` 해결 전 future conditional Character mutation path로 승격하지 않는다. 승인된 Launch 9명은 별도의 unlock 조건 없이 Member에게 default available하다.
