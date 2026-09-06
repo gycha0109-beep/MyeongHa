@@ -232,7 +232,8 @@ export async function getActiveBearer() {
   try {
     const member = await getMemberAccessToken();
     if (member) return Object.freeze({ kind: 'member', token: member });
-  } catch {
+  } catch (error) {
+    if (readMemberSession()) throw error;
     const guestAfterFailure = readGuestBearer();
     return guestAfterFailure ? Object.freeze({ kind: 'guest', token: guestAfterFailure }) : null;
   }
