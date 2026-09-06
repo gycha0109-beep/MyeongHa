@@ -51,7 +51,7 @@ jobs:
       - name: Verify cross-tab authoritative session expiry
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
-        run: node scripts/verify-web-auth-cross-tab-session-expired-browser.mjs
+        run: node scripts/run-web-auth-cross-tab-session-expired-browser-smoke.mjs
       - name: Verify canonical authentication rejection invalidation
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
