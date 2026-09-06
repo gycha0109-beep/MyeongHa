@@ -130,6 +130,67 @@ describe('Supabase auth HTTP proxy', () => {
     expect(JSON.stringify(payload)).not.toContain('upstream secret detail');
   });
 
+  it('maps a rejected refresh token to authoritative SESSION_EXPIRED 401', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json(
+      { msg: 'refresh token rejected upstream' },
+      { status: 401 },
+    )));
+
+    const response = await handleSupabaseAuthRequestV1({
+      request: request({ refreshToken: 'expired-refresh-token' }),
+      env,
+      action: 'refresh',
+    });
+    const payload = await response.json() as any;
+
+    expect(response.status).toBe(401);
+    expect(payload.error).toMatchObject({
+      code: 'SESSION_EXPIRED',
+      retryable: false,
+    });
+    expect(JSON.stringify(payload)).not.toContain('refresh token rejected upstream');
+  });
+
+  it('maps a refresh upstream outage to retryable AUTH_UPSTREAM_UNAVAILABLE 503', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json(
+      { msg: 'upstream unavailable detail' },
+      { status: 500 },
+    )));
+
+    const response = await handleSupabaseAuthRequestV1({
+      request: request({ refreshToken: 'still-valid-refresh-token' }),
+      env,
+      action: 'refresh',
+    });
+    const payload = await response.json() as any;
+
+    expect(response.status).toBe(503);
+    expect(payload.error).toMatchObject({
+      code: 'AUTH_UPSTREAM_UNAVAILABLE',
+      retryable: true,
+    });
+    expect(JSON.stringify(payload)).not.toContain('upstream unavailable detail');
+  });
+
+  it('maps a malformed successful refresh response to retryable AUTH_UPSTREAM_MALFORMED 502', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({
+      access_token: 'header.payload.signature',
+    })));
+
+    const response = await handleSupabaseAuthRequestV1({
+      request: request({ refreshToken: 'still-valid-refresh-token' }),
+      env,
+      action: 'refresh',
+    });
+    const payload = await response.json() as any;
+
+    expect(response.status).toBe(502);
+    expect(payload.error).toMatchObject({
+      code: 'AUTH_UPSTREAM_MALFORMED',
+      retryable: true,
+    });
+  });
+
   it('requires bearer authorization for sign-out before calling Supabase', async () => {
     const upstream = vi.fn();
     vi.stubGlobal('fetch', upstream);
