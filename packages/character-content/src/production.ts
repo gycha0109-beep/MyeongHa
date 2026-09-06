@@ -5,10 +5,38 @@ import {
 } from './release.js';
 import { validateCharacterContentBundle } from './validate.js';
 
-export const MIN_PRODUCTION_CHARACTER_ROSTER = 5;
+/**
+ * Product-owner-approved MVP Production Launch display-name authority.
+ *
+ * This fixes Launch membership and official display names only. It does not
+ * establish canonical characterId values or any still-open detailed Character
+ * canon/persona/behavior/visual/gender authority.
+ */
+export const MVP_PRODUCTION_LAUNCH_CHARACTER_DISPLAY_NAMES = [
+  '세연',
+  '여울',
+  '서린',
+  '라현',
+  '미라',
+  '태겸',
+  '윤호',
+  '도윤',
+  '백헌',
+] as const;
+
+export const MVP_PRODUCTION_LAUNCH_CHARACTER_ROSTER_SIZE =
+  MVP_PRODUCTION_LAUNCH_CHARACTER_DISPLAY_NAMES.length;
+
+/**
+ * @deprecated Current MVP Production authority is an exact nine-member roster,
+ * not a minimum-size rule. Kept as a compatibility alias for existing imports.
+ */
+export const MIN_PRODUCTION_CHARACTER_ROSTER =
+  MVP_PRODUCTION_LAUNCH_CHARACTER_ROSTER_SIZE;
 
 export type ProductionCharacterContentValidationCode =
-  | 'PRODUCTION_ROSTER_TOO_SMALL'
+  | 'PRODUCTION_ROSTER_COUNT_MISMATCH'
+  | 'PRODUCTION_ROSTER_NAME_MISMATCH'
   | 'DEVELOPMENT_PLACEHOLDER_FORBIDDEN'
   | 'ASSET_MANIFEST_HASH_REQUIRED'
   | 'CHARACTER_GENDER_CANON_REQUIRED'
@@ -58,14 +86,45 @@ function hasAuthoredVisual(character: CharacterContentDefinition): boolean {
 }
 
 /**
+ * Fail-closed validation for the Product Owner-approved MVP Launch identity
+ * boundary. Exact display names are governed here; canonical IDs and detailed
+ * Character content remain governed by their own source-backed authoring.
+ */
+export function validateMvpProductionLaunchRosterDisplayNames(
+  displayNames: readonly string[],
+): void {
+  if (displayNames.length !== MVP_PRODUCTION_LAUNCH_CHARACTER_ROSTER_SIZE) {
+    throw new ProductionCharacterContentValidationError(
+      'PRODUCTION_ROSTER_COUNT_MISMATCH',
+      `MVP Production Launch roster requires exactly ${MVP_PRODUCTION_LAUNCH_CHARACTER_ROSTER_SIZE} approved characters.`,
+    );
+  }
+
+  const approved = new Set<string>(MVP_PRODUCTION_LAUNCH_CHARACTER_DISPLAY_NAMES);
+  const actual = new Set(displayNames);
+  const missing = MVP_PRODUCTION_LAUNCH_CHARACTER_DISPLAY_NAMES.filter(
+    (displayName) => !actual.has(displayName),
+  );
+  const unexpected = displayNames.filter((displayName) => !approved.has(displayName));
+
+  if (actual.size !== displayNames.length || missing.length > 0 || unexpected.length > 0) {
+    throw new ProductionCharacterContentValidationError(
+      'PRODUCTION_ROSTER_NAME_MISMATCH',
+      `MVP Production Launch roster display names must exactly match the approved nine-name authority; missing=${missing.join(',') || 'none'}; unexpected=${unexpected.join(',') || 'none'}.`,
+    );
+  }
+}
+
+/**
  * Production publication boundary for immutable Character canon.
  *
  * Generic bundle validation intentionally permits development placeholders so
  * engineering slices can exercise schemas and runtime contracts. Production
- * publication is stricter: the launch roster must contain at least five real
- * authored characters, no development placeholder may cross this boundary,
- * canonical gender/visual authoring evidence must be present for every roster
- * member, and immutable asset-manifest provenance must already be source-backed.
+ * publication is stricter: the launch roster must exactly match the approved
+ * nine official display names, no development placeholder may cross this
+ * boundary, canonical gender/visual authoring evidence must be present for every
+ * roster member, and immutable asset-manifest provenance must already be
+ * source-backed.
  *
  * Character identity/content is never inferred here from UI presentation keys
  * or runtime database rows. The supplied bundle must already be source-backed
@@ -83,12 +142,9 @@ export function validateProductionCharacterContentBundle(
     );
   }
 
-  if (bundle.characters.length < MIN_PRODUCTION_CHARACTER_ROSTER) {
-    throw new ProductionCharacterContentValidationError(
-      'PRODUCTION_ROSTER_TOO_SMALL',
-      `Production character roster requires at least ${MIN_PRODUCTION_CHARACTER_ROSTER} authored characters.`,
-    );
-  }
+  validateMvpProductionLaunchRosterDisplayNames(
+    bundle.characters.map((character) => character.displayName),
+  );
 
   const placeholder = bundle.characters.find(isDevelopmentPlaceholder);
   if (placeholder !== undefined) {

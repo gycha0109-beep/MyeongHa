@@ -22,13 +22,11 @@ describe('Character Concept V1 working roster source boundary', () => {
     expect(new Set(CHARACTER_CONCEPT_V1_WORKING_ROSTER.map((entry) => entry.workingDisplayName)).size).toBe(9);
   });
 
-  it('keeps every display name non-immutable and Mira explicitly temporary', () => {
-    const mira = CHARACTER_CONCEPT_V1_WORKING_ROSTER.find((entry) => entry.workingDisplayName === '미라');
-    expect(mira?.nameStatus).toBe('temporary');
-
+  it('marks all nine official Launch display names approved without establishing immutable canon', () => {
     for (const entry of CHARACTER_CONCEPT_V1_WORKING_ROSTER) {
-      if (entry.workingDisplayName !== '미라') expect(entry.nameStatus).toBe('working');
+      expect(entry.nameStatus).toBe('launch-approved');
       expect(entry.immutableCanonStatus).toBe('not_established');
+      expect(entry.productionPublication).toBe('blocked');
     }
   });
 
