@@ -1,0 +1,76 @@
+name: Normalize Entitlement Restore Branch
+
+on:
+  push:
+    branches:
+      - feat/commerce-entitlement-restore-v1
+    paths:
+      - '.github/workflows/normalize-entitlement-restore-branch.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  normalize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/commerce-entitlement-restore-v1
+      - name: Normalize test boundary and API export
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          test = Path('test/db/entitlement_restore_v1.sql')
+          text = test.read_text()
+          old = """  if pg_catalog.has_table_privilege('myeongha_entitlement_restore_owner', 'public.commerce_receipts', 'SELECT')
+             or pg_catalog.has_table_privilege('myeongha_entitlement_restore_owner', 'public.commerce_provider_events', 'SELECT')
+             or pg_catalog.has_table_privilege('myeongha_entitlement_restore_owner', 'public.purchase_intents', 'SELECT') then
+            raise exception 'FAIL restore owner gained provider/purchase evidence read authority';
+          end if;
+"""
+          new = """  if pg_catalog.has_table_privilege(
+            'myeongha_entitlement_restore_owner',
+            'public.purchase_intents',
+            'SELECT'
+          ) then
+            raise exception 'FAIL restore owner gained Purchase Intent evidence read authority';
+          end if;
+"""
+          if text.count(old) != 1:
+              raise SystemExit(f'expected exactly one stale relation probe block, found {text.count(old)}')
+          test.write_text(text.replace(old, new))
+
+          index = Path('apps/api/src/index.ts')
+          text = index.read_text()
+          marker = "from './entitlement-restore-command.js';"
+          if marker not in text:
+              block = """
+
+export {
+  ENTITLEMENT_RESTORE_COMMAND_BINDING_V1,
+  EntitlementRestoreAuthorityPortErrorV1,
+  restoreEntitlements,
+  type EntitlementRestoreAuthorityFailureCodeV1,
+  type EntitlementRestoreAuthorityPortV1,
+  type EntitlementRestoreAuthorityResultV1,
+  type EntitlementRestoreResponseV1,
+  type RestoreEntitlementsInputV1,
+} from './entitlement-restore-command.js';
+"""
+              index.write_text(text.rstrip() + block + '\n')
+          PY
+      - name: Remove one-shot workflow
+        run: rm .github/workflows/normalize-entitlement-restore-branch.yml
+      - name: Commit normalized branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add test/db/entitlement_restore_v1.sql apps/api/src/index.ts .github/workflows/normalize-entitlement-restore-branch.yml
+          git commit -m 'test(commerce): normalize restore authority boundary'
+          git push origin HEAD:feat/commerce-entitlement-restore-v1
