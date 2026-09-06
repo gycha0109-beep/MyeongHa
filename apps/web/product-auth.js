@@ -92,6 +92,10 @@ function discardMemberSession() {
   emitAuthChanged();
 }
 
+function isAuthoritativeRefreshRejection(error) {
+  return error instanceof ProductAuthError && error.code === 'SESSION_EXPIRED';
+}
+
 function normalizeSession(value) {
   if (!isRecord(value)) return null;
   if (
@@ -197,7 +201,9 @@ export async function refreshMemberSession() {
     }
     return saveSession(data.session);
   } catch (error) {
-    discardMemberSession();
+    if (isAuthoritativeRefreshRejection(error)) {
+      discardMemberSession();
+    }
     throw error;
   }
 }
@@ -205,12 +211,21 @@ export async function refreshMemberSession() {
 export async function getMemberAccessToken() {
   const current = readMemberSession();
   if (!current) return null;
-  if (Date.parse(current.expiresAt) - Date.now() > REFRESH_SKEW_MS) {
+  const expiresAt = Date.parse(current.expiresAt);
+  if (expiresAt - Date.now() > REFRESH_SKEW_MS) {
     stageMemberBearerForLegacyProductClients(current.accessToken);
     return current.accessToken;
   }
-  const refreshed = await refreshMemberSession();
-  return refreshed?.accessToken ?? null;
+  try {
+    const refreshed = await refreshMemberSession();
+    return refreshed?.accessToken ?? null;
+  } catch (error) {
+    if (!isAuthoritativeRefreshRejection(error) && expiresAt > Date.now()) {
+      stageMemberBearerForLegacyProductClients(current.accessToken);
+      return current.accessToken;
+    }
+    throw error;
+  }
 }
 
 export async function getActiveBearer() {
