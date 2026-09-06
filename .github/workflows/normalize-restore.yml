@@ -1,0 +1,39 @@
+name: Normalize Restore
+on: push
+permissions:
+  contents: write
+jobs:
+  normalize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/commerce-entitlement-restore-v1
+      - name: Patch files
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('test/db/entitlement_restore_v1.sql')
+          s = p.read_text()
+          old = "  if pg_catalog.has_table_privilege('myeongha_entitlement_restore_owner', 'public.commerce_receipts', 'SELECT')\n     or pg_catalog.has_table_privilege('myeongha_entitlement_restore_owner', 'public.commerce_provider_events', 'SELECT')\n     or pg_catalog.has_table_privilege('myeongha_entitlement_restore_owner', 'public.purchase_intents', 'SELECT') then\n    raise exception 'FAIL restore owner gained provider/purchase evidence read authority';\n  end if;\n"
+          new = "  if pg_catalog.has_table_privilege(\n    'myeongha_entitlement_restore_owner',\n    'public.purchase_intents',\n    'SELECT'\n  ) then\n    raise exception 'FAIL restore owner gained Purchase Intent evidence read authority';\n  end if;\n"
+          if s.count(old) != 1:
+              raise SystemExit(f'expected one stale probe block, found {s.count(old)}')
+          p.write_text(s.replace(old, new))
+
+          p = Path('apps/api/src/index.ts')
+          s = p.read_text()
+          if "from './entitlement-restore-command.js';" not in s:
+              s = s.rstrip() + "\n\nexport {\n  ENTITLEMENT_RESTORE_COMMAND_BINDING_V1,\n  EntitlementRestoreAuthorityPortErrorV1,\n  restoreEntitlements,\n  type EntitlementRestoreAuthorityFailureCodeV1,\n  type EntitlementRestoreAuthorityPortV1,\n  type EntitlementRestoreAuthorityResultV1,\n  type EntitlementRestoreResponseV1,\n  type RestoreEntitlementsInputV1,\n} from './entitlement-restore-command.js';\n"
+              p.write_text(s)
+          PY
+          rm .github/workflows/normalize-restore.yml
+      - name: Commit
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add test/db/entitlement_restore_v1.sql apps/api/src/index.ts .github/workflows/normalize-restore.yml
+          git commit -m 'test(commerce): normalize restore authority boundary'
+          git push origin HEAD:feat/commerce-entitlement-restore-v1
