@@ -129,11 +129,18 @@ export async function restoreEntitlements(
     );
   }
 
-  const effective = await getEffectiveEntitlements({
-    resolvedSubjectId: subjectId,
-    authorityPort: input.effectiveEntitlementsReadAuthorityPort,
-    clock: input.clock,
-  });
+  const effective = await getEffectiveEntitlements(
+    input.clock === undefined
+      ? {
+          resolvedSubjectId: subjectId,
+          authorityPort: input.effectiveEntitlementsReadAuthorityPort,
+        }
+      : {
+          resolvedSubjectId: subjectId,
+          authorityPort: input.effectiveEntitlementsReadAuthorityPort,
+          clock: input.clock,
+        },
+  );
 
   return Object.freeze({
     restoreScope: 'server_entitlements_only',
