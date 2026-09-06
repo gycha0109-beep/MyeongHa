@@ -1,0 +1,59 @@
+name: Production Chat Open Boundary Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/verify-production-chat-open-boundary.mjs'
+      - '.github/workflows/production-chat-open-boundary-smoke.yml'
+      - '.github/production-chat-open-boundary-smoke.trigger'
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type VERIFY_CHAT_OPEN_BOUNDARY to run the non-mutating Production Chat open boundary smoke.'
+        required: true
+        type: string
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/production-chat-open-boundary-smoke.trigger'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-chat-open-boundary-smoke
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: verify-production-chat-open-boundary
+    runs-on: ubuntu-24.04
+    environment: production
+    env:
+      DISPATCH_CONFIRM: ${{ inputs.confirm }}
+    steps:
+      - name: Verify governed invocation
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == 'workflow_dispatch' ]]; then
+            [[ "$DISPATCH_CONFIRM" == 'VERIFY_CHAT_OPEN_BOUNDARY' ]]
+          elif [[ "${{ github.event_name }}" == 'push' ]]; then
+            [[ "${{ github.ref }}" == 'refs/heads/main' ]]
+            trigger_value="$(tr -d '\r' < .github/production-chat-open-boundary-smoke.trigger)"
+            [[ "$trigger_value" =~ ^fire-[0-9]{4}-[0-9]{2}-[0-9]{2}-v[0-9]+$ ]]
+          else
+            [[ "${{ github.event_name }}" == 'pull_request' ]]
+          fi
+
+      - name: Check out exact repository verifier
+        uses: actions/checkout@v4
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Verify Production Chat open boundary
+        run: node scripts/verify-production-chat-open-boundary.mjs
