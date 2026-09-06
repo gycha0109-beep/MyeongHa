@@ -250,7 +250,11 @@ try {
   client = await connectCdp(await devtoolsPort(profile, chrome));
   const navigation = await client.send('Page.navigate', { url: `${origin}/auth.html?next=records.html` });
   assert(!navigation.errorText, `Auth navigation failed: ${navigation.errorText}`);
-  await waitFor(client, `location.pathname === '/auth.html' && Boolean(document.querySelector('#auth-form'))`, 'Auth form did not render');
+  await waitFor(
+    client,
+    `document.readyState === 'complete' && location.pathname === '/auth.html' && Boolean(document.querySelector('#auth-form'))`,
+    'Auth form did not fully initialize',
+  );
 
   await client.evaluate(`(() => {
     document.querySelector('#auth-email').value = ${JSON.stringify(member.email)};
