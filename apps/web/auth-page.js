@@ -187,18 +187,23 @@ async function promoteGuestIfPresent(accessToken, memberEmail) {
   const guestBearer = readGuestBearer() ?? readConfirmationGuestHandoff(memberEmail);
   if (!guestBearer) return { status: 'none' };
 
-  const response = await fetch('/api/auth/promote-guest', {
-    method: 'POST',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${accessToken}`,
-      'X-MyeongHa-Guest-Bearer': guestBearer,
-    },
-    credentials: 'same-origin',
-    cache: 'no-store',
-    body: '{}',
-  });
+  let response;
+  try {
+    response = await fetch('/api/auth/promote-guest', {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+        'X-MyeongHa-Guest-Bearer': guestBearer,
+      },
+      credentials: 'same-origin',
+      cache: 'no-store',
+      body: '{}',
+    });
+  } catch {
+    return { status: 'preserved' };
+  }
 
   let payload = null;
   try {
