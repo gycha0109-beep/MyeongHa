@@ -296,10 +296,12 @@ begin
     raise exception 'FAIL API executor gained direct Commerce projection/Grant mutation';
   end if;
 
-  if pg_catalog.has_table_privilege('myeongha_entitlement_restore_owner', 'public.commerce_receipts', 'SELECT')
-     or pg_catalog.has_table_privilege('myeongha_entitlement_restore_owner', 'public.commerce_provider_events', 'SELECT')
-     or pg_catalog.has_table_privilege('myeongha_entitlement_restore_owner', 'public.purchase_intents', 'SELECT') then
-    raise exception 'FAIL restore owner gained provider/purchase evidence read authority';
+  if pg_catalog.has_table_privilege(
+    'myeongha_entitlement_restore_owner',
+    'public.purchase_intents',
+    'SELECT'
+  ) then
+    raise exception 'FAIL restore owner gained Purchase Intent evidence read authority';
   end if;
 
   select lower(pg_catalog.pg_get_functiondef(

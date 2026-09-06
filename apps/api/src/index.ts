@@ -494,3 +494,14 @@ export {
   type ReadingCreateAuthorityRowV1,
   type ReadingCreateIdPortV1,
 } from './reading-create-command.js';
+
+export {
+  ENTITLEMENT_RESTORE_COMMAND_BINDING_V1,
+  EntitlementRestoreAuthorityPortErrorV1,
+  restoreEntitlements,
+  type EntitlementRestoreAuthorityFailureCodeV1,
+  type EntitlementRestoreAuthorityPortV1,
+  type EntitlementRestoreAuthorityResultV1,
+  type EntitlementRestoreResponseV1,
+  type RestoreEntitlementsInputV1,
+} from './entitlement-restore-command.js';
