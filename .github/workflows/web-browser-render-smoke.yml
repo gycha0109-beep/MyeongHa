@@ -48,6 +48,10 @@ jobs:
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
         run: node scripts/verify-web-auth-cross-tab-signout-failure-browser.mjs
+      - name: Verify cross-tab authoritative session expiry
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/verify-web-auth-cross-tab-session-expired-browser.mjs
       - name: Verify canonical authentication rejection invalidation
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
@@ -95,6 +99,7 @@ jobs:
             artifacts/web-auth-continuity-browser-smoke*
             artifacts/web-auth-cross-tab-browser-smoke*
             artifacts/web-auth-cross-tab-signout-failure-browser-smoke*
+            artifacts/web-auth-cross-tab-session-expired-browser-smoke*
             artifacts/web-auth-rejection-browser-smoke*
             artifacts/web-auth-refresh-browser-smoke*
             artifacts/web-saju-auth-browser-smoke*
