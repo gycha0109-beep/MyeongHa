@@ -1,6 +1,7 @@
 import {
   PRODUCT_AUTH_STORAGE_V1,
   getMemberAccessToken,
+  invalidateMemberSession,
   readMemberSession,
 } from './product-auth.js';
 
@@ -46,7 +47,12 @@ async function reconcile() {
 
 window.addEventListener(PRODUCT_AUTH_STORAGE_V1.changedEvent, render);
 window.addEventListener('storage', (event) => {
-  if (event.key === PRODUCT_AUTH_STORAGE_V1.memberSession) render();
+  if (event.key !== PRODUCT_AUTH_STORAGE_V1.memberSession) return;
+  if (!readMemberSession()) {
+    invalidateMemberSession();
+    return;
+  }
+  void reconcile();
 });
 
 if (document.readyState === 'loading') {
