@@ -1,0 +1,70 @@
+name: DB Member Character Thread Open
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/migrations/**'
+      - 'test/db/member_character_thread_open_concurrency.sh'
+      - '.github/workflows/db-member-character-thread-open.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'supabase/migrations/**'
+      - 'test/db/member_character_thread_open_concurrency.sh'
+      - '.github/workflows/db-member-character-thread-open.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  member-character-thread-open:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17.6
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: myeongha_member_character_thread_open_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d myeongha_member_character_thread_open_test"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: myeongha_member_character_thread_open_test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Verify PostgreSQL 17 production parity
+        shell: bash
+        run: |
+          set -euo pipefail
+          version_num="$(psql -Atqc "show server_version_num")"
+          test "${version_num}" -ge 170000
+          test "${version_num}" -lt 180000
+      - name: Bootstrap Supabase auth test fixture
+        run: psql -v ON_ERROR_STOP=1 -f test/db/bootstrap_supabase_auth_stub.sql
+      - name: Apply migrations except Birth managed-principal runtime authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          for migration in supabase/migrations/*.sql; do
+            if [[ "${migration}" == *'/0860_birth_profile_create_runtime_authority.sql' ]]; then
+              echo "Skipping ${migration}; PostgreSQL 17 managed-principal parity is verified by DB Birth Profile Create Runtime Authority"
+              continue
+            fi
+            echo "Applying ${migration}"
+            psql -v ON_ERROR_STOP=1 -f "${migration}"
+          done
+      - name: Verify Member Character thread open authority
+        run: bash test/db/member_character_thread_open_concurrency.sh

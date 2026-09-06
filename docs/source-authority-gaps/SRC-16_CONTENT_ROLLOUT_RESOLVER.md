@@ -1,112 +1,84 @@
-# SRC-16 — Subject-Specific Content Rollout Resolver Authority
+# SRC-16 — Member Content Rollout Resolver Authority
 
-**Status: BLOCKING BEFORE SUBJECT-SPECIFIC CONTENT RELEASE RESOLUTION**
+> 상태: **CLOSED FOR MEMBER MVP / FUTURE COHORT ROLLOUT NOT AUTHORIZED**  
+> 관련 결정: `docs/source-authority-decisions/CHARACTER_LAUNCH_MVP_AUTHORITY_V1.md`
 
-## Source-backed requirement
+## 1. 기존 Gap
 
-ERD v0.6 defines `content_releases` as operational rollout authority for immutable content bundles and records:
+기존 source는 subject-specific rollout을 요구했지만 rollout JSON schema, bucket/hash, precedence, fallback, merge continuity를 정의하지 않아 Production resolver 구현이 BLOCKING이었다.
+
+## 2. 승인된 MVP 결정
+
+2026-09-06 제품 소유자 승인에 따라 MVP Member rollout은 subject-specific cohort를 사용하지 않는다.
 
 ```text
-release_key
-content_bundle_id
-status = draft | active | retired
-is_default
-rollout_jsonb
-rollout_policy_version
-rollout_seed
-activated_at
-retired_at
+모든 정상 Member
+→ current active default release
 ```
 
-It also fixes these invariants:
+MVP에는 다음이 존재하지 않는다.
 
 ```text
-- at most one active default release
-- content_bundle_id / rollout policy / rollout seed are immutable after activation
-- changing rollout creates a new release row
-- resolver is deterministic for a stable subject identity and active release set
-- activation maintains at least one valid active default release
-```
-
-The current bounded query:
-
-```text
-qry_active_default_content_release_v1()
-```
-
-is therefore allowed to expose the recorded active-default binding only.
-
-## Missing authority
-
-The source requires deterministic subject-specific rollout resolution, but it does not define the resolver protocol. In particular it does not specify:
-
-```text
-1. rollout_jsonb schema
-   - cohort predicates, percentages, allowlists, experiments, geographic/platform filters, or another structure
-
-2. stable subject identity input
-   - canonical subject UUID, member auth identity, guest identity, merged identity, or another stable key
-
-3. rollout hash / bucket algorithm
-   - hash function, normalization, seed concatenation, bucket range, and boundary semantics
-
-4. active release selection precedence
-   - behavior when multiple active non-default releases match the same subject
-   - tie-breaking order and whether release activation time or another priority participates
-
-5. fallback behavior
-   - whether a subject that matches no non-default release always receives the active default
-   - behavior when the active set is temporarily malformed
-
-6. merge / identity continuity semantics
-   - whether guest-to-member promotion must preserve an existing cohort assignment
-   - how previously pinned threads/turns relate to a newly resolved release
-
-7. persisted decision evidence
-   - whether a resolved rollout decision must record policy version, seed/bucket evidence, or only the final release/bundle pin
-```
-
-The statement “deterministic for a stable subject identity and active release set” is not sufficient authority to invent a hash function, parse arbitrary `rollout_jsonb`, or choose precedence among multiple matching releases.
-
-## Allowed implementation before resolution
-
-Source-backed behavior may include:
-
-```text
-- reading the single recorded active-default release binding
-- reading an explicitly pinned release/bundle pair already stored on a thread, turn, reading, or episode progress row
-- reproducing immutable bundle content by explicit content_bundle_id
-```
-
-These operations do not claim to resolve a subject into a rollout cohort.
-
-## Forbidden claims before resolution
-
-Until source authority defines the resolver contract, implementation must not claim authoritative completion of:
-
-```text
-resolveContentRelease(subject)
-subject cohort membership
-percentage rollout bucketing
+A/B test
+cohort
+percentage rollout
+allowlist rollout
+subject hash/bucket
+non-default subject matching
 experiment assignment
-non-default release precedence
-identity-stable rollout assignment across guest/member merge
+subject-specific precedence
 ```
 
-Hard-coded JSON keys, lexical release-key ordering, modulo bucketing, database row order, `activated_at` sorting, or an implementation-chosen hash function would be invented semantics and are prohibited.
+따라서 Member MVP resolver는 subject identity를 rollout 선택에 사용하지 않는다.
 
-## Source decision required
+## 3. 실행 권한
 
-Source authority must define a governed resolver contract covering at minimum:
+다음 동작은 이제 Member MVP에서 source-authorized다.
 
 ```text
-rollout policy schema + validation
-stable identity input
-hash/bucket algorithm and seed use
-matching and precedence rules
-active-default fallback rule
-merge/identity continuity rule
-required persisted decision evidence
+resolveMemberContentRelease(member)
+→ qry_active_default_content_release_v1()가 기록한 active default release/bundle
 ```
 
-Only after that decision may subject-specific rollout resolution become production authority.
+조건:
+
+1. active default release가 정확히 하나 존재해야 한다.
+2. 없거나 relational authority가 비정상이면 fail closed 한다.
+3. 이미 release/bundle을 pin한 thread/reading/episode는 global default 변경으로 자동 재바인딩하지 않는다.
+4. 최종 선택 evidence는 실제 pin된 `release_id + content_bundle_id`로 충분하다.
+5. cohort/bucket evidence는 MVP에서 생성하지 않는다.
+
+## 4. Guest 범위
+
+Guest rollout은 이번 결정 범위 밖이다.
+
+Member resolver 규칙을 Guest에 자동 복제하지 않는다.
+
+## 5. 향후 cohort rollout
+
+향후 A/B, percentage, allowlist, experiment rollout을 도입하려면 다음 권한이 새로 필요하다.
+
+```text
+rollout policy schema
+stable identity input
+hash/bucket algorithm
+matching/precedence
+fallback
+Guest→Member continuity
+persisted cohort evidence
+```
+
+현재 `rollout_jsonb`의 존재만으로 위 정책을 추론해서는 안 된다.
+
+## 6. Definition of Done — Member MVP
+
+Member MVP에서 아래를 만족하면 SRC-16은 CLOSED다.
+
+- 모든 Member가 동일 active default release를 resolve한다.
+- no active default → fail closed.
+- 여러 후보를 arbitrary order로 고르지 않는다.
+- subject hash/bucket을 사용하지 않는다.
+- 기존 pinned runtime object를 default 변경으로 재바인딩하지 않는다.
+- resolved release/bundle이 thread 등 durable owner object에 정확히 pin된다.
+
+이 문서는 **Member MVP 범위만 닫는다.** 향후 subject-specific rollout 기능 자체가 승인된 것은 아니다.
