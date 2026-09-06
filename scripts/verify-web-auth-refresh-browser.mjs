@@ -16,6 +16,7 @@ const member = Object.freeze({
 const nearExpiryToken = 'near.header.signature';
 const expiredToken = 'expired.header.signature';
 const rotatedToken = 'rotated.header.signature';
+const terminalExpiredToken = 'terminal.header.signature';
 const stagedGuest = 'refresh-staged-guest';
 const mime = new Map([
   ['.html', 'text/html; charset=utf-8'],
@@ -95,6 +96,10 @@ async function serve() {
         requests.push({ path: pathname, method: req.method, authorization, refreshToken: body.refreshToken ?? null, mode: refreshMode });
         if (refreshMode === 'success') {
           sendJson(res, 200, successEnvelope({ status: 'authenticated', session: rotatedSession() }));
+          return;
+        }
+        if (refreshMode === 'expired') {
+          sendJson(res, 401, errorEnvelope('SESSION_EXPIRED', 'auth.session_expired', false));
           return;
         }
         sendJson(res, 503, errorEnvelope('AUTH_UPSTREAM_UNAVAILABLE', 'auth.upstream_unavailable', true));
@@ -364,11 +369,42 @@ try {
   assert(recoveredState.pendingGuest === stagedGuest, 'Recovered refresh consumed the staged Guest bearer');
   assert(guestBootstrapRequests === 0, 'Refresh recovery unexpectedly bootstrapped a Guest');
 
+  refreshMode = 'expired';
+  await seedMember(client, {
+    token: terminalExpiredToken,
+    refreshToken: 'refresh-token-terminal',
+    expiresAt: new Date(Date.now() - 5_000).toISOString(),
+  });
+  const authoritativeRefreshBefore = refreshRequests;
+  await navigate(client, origin, '/hall.html', '.product-profile');
+  await waitFor(
+    client,
+    `document.querySelector('.product-profile')?.dataset.authState === 'guest' &&
+      document.querySelector('.product-profile')?.getAttribute('aria-label') === '로그인' &&
+      localStorage.getItem('myeongha.memberSession.v1') === null &&
+      sessionStorage.getItem('myeongha.guestBearer.v1') === ${JSON.stringify(stagedGuest)} &&
+      sessionStorage.getItem('myeongha.pendingGuestBearer.v1') === null`,
+    'Authoritative SESSION_EXPIRED did not transition the browser from Member to restored Guest authority',
+  );
+  const authoritativeBearer = await resolveBearer(client, 'getActiveBearer');
+  const authoritativeEnsure = await resolveBearer(client, 'ensureActiveBearer');
+  const authoritativeState = await authSnapshot(client);
+  assert(authoritativeBearer.ok && authoritativeBearer.value?.kind === 'guest' && authoritativeBearer.value?.token === stagedGuest, 'Authoritative SESSION_EXPIRED did not expose the restored pending Guest bearer');
+  assert(authoritativeEnsure.ok && authoritativeEnsure.value?.kind === 'guest' && authoritativeEnsure.value?.token === stagedGuest, 'Authoritative SESSION_EXPIRED triggered an unnecessary Guest bootstrap');
+  assert(authoritativeState.authState === 'guest' && authoritativeState.authLabel === '로그인', 'Authoritative SESSION_EXPIRED did not render Guest UI');
+  assert(authoritativeState.accessToken === null && authoritativeState.refreshToken === null, 'Authoritative SESSION_EXPIRED retained Member credentials');
+  assert(authoritativeState.userId === null && authoritativeState.email === null, 'Authoritative SESSION_EXPIRED retained Member identity metadata');
+  assert(authoritativeState.activeBearer === stagedGuest && authoritativeState.pendingGuest === null, 'Authoritative SESSION_EXPIRED did not restore pending Guest authority exactly once');
+  assert(refreshRequests > authoritativeRefreshBefore, 'Authoritative expiry scenario did not attempt Member refresh');
+  assert(requests.some((request) => request.path === '/api/auth/refresh' && request.refreshToken === 'refresh-token-terminal' && request.mode === 'expired'), 'Authoritative expiry scenario did not reject the intended Member refresh credential');
+  assert(guestBootstrapRequests === 0, 'Authoritative SESSION_EXPIRED bootstrapped a new Guest instead of restoring the staged Guest');
+
   const report = {
     status: 'MyeongHa_WEB_AUTH_REFRESH_BROWSER_PASS',
     nearExpiry: nearState,
     expired: expiredState,
     recovered: recoveredState,
+    authoritativeExpiry: authoritativeState,
     refreshRequests,
     guestBootstrapRequests,
     requests,
