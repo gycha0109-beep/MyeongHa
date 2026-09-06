@@ -202,6 +202,19 @@ async function stopChrome(process) {
   }
 }
 
+async function removeChromeProfile(profile) {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    try {
+      await rm(profile, { recursive: true, force: true, maxRetries: 2, retryDelay: 100 });
+      return;
+    } catch (error) {
+      if (!['ENOTEMPTY', 'EBUSY', 'EPERM'].includes(error?.code)) throw error;
+      await sleep(100 * (attempt + 1));
+    }
+  }
+  await rm(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }).catch(() => {});
+}
+
 async function connectCdp(port) {
   const response = await fetch(`http://127.0.0.1:${port}/json/new?about%3Ablank`, { method: 'PUT' });
   assert(response.ok, `Chrome target create failed: ${response.status}`);
@@ -449,5 +462,5 @@ try {
   tabB?.close();
   await stopChrome(chrome);
   await new Promise((done) => server.close(done));
-  await rm(profile, { recursive: true, force: true });
+  await removeChromeProfile(profile);
 }
