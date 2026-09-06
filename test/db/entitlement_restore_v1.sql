@@ -50,7 +50,6 @@ insert into public.subjects(
 ) values
   ('96400000-0000-0000-0000-000000000001', 'member', '00000000-0000-0000-0000-000000000964', 'active', null, transaction_timestamp(), transaction_timestamp()),
   ('96400000-0000-0000-0000-000000000002', 'guest', null, 'merged', '96400000-0000-0000-0000-000000000001', transaction_timestamp(), transaction_timestamp()),
-  ('96400000-0000-0000-0000-000000000003', 'guest', null, 'merged', '96400000-0000-0000-0000-000000000002', transaction_timestamp(), transaction_timestamp()),
   ('96400000-0000-0000-0000-000000000004', 'guest', null, 'active', null, transaction_timestamp(), transaction_timestamp()),
   ('96400000-0000-0000-0000-000000000005', 'member', '00000000-0000-0000-0000-000000000965', 'deletion_pending', null, transaction_timestamp(), transaction_timestamp());
 
@@ -62,8 +61,7 @@ insert into public.entitlement_grants(
   ('96410000-0000-0000-0000-000000000002', '96400000-0000-0000-0000-000000000001', 'premium.member-scoped', 'reading:member', 'system:member-scoped', 'system', 'active', transaction_timestamp() - interval '1 day', null, 0, transaction_timestamp(), transaction_timestamp()),
   ('96410000-0000-0000-0000-000000000003', '96400000-0000-0000-0000-000000000001', 'premium.expired', null, 'system:expired', 'system', 'active', transaction_timestamp() - interval '10 days', transaction_timestamp() - interval '1 day', 0, transaction_timestamp(), transaction_timestamp()),
   ('96410000-0000-0000-0000-000000000004', '96400000-0000-0000-0000-000000000002', 'premium.shared', null, 'system:direct-shared', 'system', 'active', transaction_timestamp() - interval '1 day', null, 0, transaction_timestamp(), transaction_timestamp()),
-  ('96410000-0000-0000-0000-000000000005', '96400000-0000-0000-0000-000000000002', 'premium.direct-only', null, 'system:direct-only', 'system', 'active', transaction_timestamp() - interval '1 day', transaction_timestamp() + interval '60 days', 0, transaction_timestamp(), transaction_timestamp()),
-  ('96410000-0000-0000-0000-000000000006', '96400000-0000-0000-0000-000000000003', 'premium.recursive-only', null, 'system:recursive-only', 'system', 'active', transaction_timestamp() - interval '1 day', null, 0, transaction_timestamp(), transaction_timestamp());
+  ('96410000-0000-0000-0000-000000000005', '96400000-0000-0000-0000-000000000002', 'premium.direct-only', null, 'system:direct-only', 'system', 'active', transaction_timestamp() - interval '1 day', transaction_timestamp() + interval '60 days', 0, transaction_timestamp(), transaction_timestamp());
 
 -- Seed one deliberately stale projection. Restore must rebuild it from Grant authority,
 -- while missing direct-Guest projections must be materialized without ownership rewrite.
@@ -85,7 +83,7 @@ insert into public.entitlements(
 
 -- Exercise the actual API-facing wrapper under the ordinary runtime role and trusted
 -- transaction subject context. Five logical Grant streams are in scope: three Member
--- streams plus two direct-Guest streams. The recursive Guest stream is out of scope.
+-- streams plus two direct-Guest streams. Recursive merge ancestry is schema-invalid and is not inferred.
 select pg_catalog.set_config(
   'myeongha.subject_id',
   '96400000-0000-0000-0000-000000000001',
@@ -137,7 +135,6 @@ declare
   v_member_status text;
   v_member_count integer;
   v_direct_owner uuid;
-  v_recursive_count integer;
   v_expired_status text;
   v_effective_count integer;
   v_shared_until timestamptz;
@@ -162,14 +159,6 @@ begin
 
   if v_direct_owner is distinct from '96400000-0000-0000-0000-000000000002'::uuid then
     raise exception 'FAIL direct Guest projection ownership was rewritten: owner=%', v_direct_owner;
-  end if;
-
-  select count(*)::integer into v_recursive_count
-  from public.entitlements e
-  where e.subject_id = '96400000-0000-0000-0000-000000000003';
-
-  if v_recursive_count <> 0 then
-    raise exception 'FAIL recursive merged Guest was recomputed: count=%', v_recursive_count;
   end if;
 
   select e.status into v_expired_status
@@ -197,7 +186,7 @@ begin
     raise exception 'FAIL duplicate shared entitlement did not collapse to unbounded effective access';
   end if;
 
-  raise notice 'PASS restore preserves direct Guest ownership, excludes recursion/expiry, and yields effective union';
+  raise notice 'PASS restore preserves direct Guest ownership, excludes expiry, and yields effective union';
 end;
 $$;
 
