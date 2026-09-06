@@ -25,6 +25,7 @@ const assert = (condition, message) => { if (!condition) throw new Error(message
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
 const requests = [];
 let signInCount = 0;
+let apiRequestCount = 0;
 
 function sessionFor(loginNo) {
   return {
@@ -33,6 +34,32 @@ function sessionFor(loginNo) {
     expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
     tokenType: 'bearer',
     user: { id: testIdentity.id, email: testIdentity.email },
+  };
+}
+
+function successEnvelope(data) {
+  apiRequestCount += 1;
+  return {
+    ok: true,
+    data,
+    meta: {
+      apiContractVersion: 'browser-auth-continuity-v1',
+      requestId: `web-auth-continuity-${apiRequestCount}`,
+      serverTime: '2026-09-06T00:00:00.000Z',
+    },
+  };
+}
+
+function errorEnvelope(code, messageKey, retryable = false) {
+  apiRequestCount += 1;
+  return {
+    ok: false,
+    error: { code, messageKey, retryable },
+    meta: {
+      apiContractVersion: 'browser-auth-continuity-v1',
+      requestId: `web-auth-continuity-${apiRequestCount}`,
+      serverTime: '2026-09-06T00:00:00.000Z',
+    },
   };
 }
 
@@ -59,70 +86,52 @@ async function serve() {
         const body = await readJsonBody(req);
         requests.push({ path: pathname, method: req.method, authorization });
         if (body.email !== testIdentity.email || body.password !== testIdentity.password) {
-          sendJson(res, 401, {
-            ok: false,
-            error: { code: 'INVALID_CREDENTIALS', messageKey: 'auth.invalid_credentials', retryable: false },
-          });
+          sendJson(res, 401, errorEnvelope('INVALID_CREDENTIALS', 'auth.invalid_credentials'));
           return;
         }
         signInCount += 1;
-        sendJson(res, 200, {
-          ok: true,
-          data: { status: 'authenticated', session: sessionFor(signInCount) },
-        });
+        sendJson(res, 200, successEnvelope({ status: 'authenticated', session: sessionFor(signInCount) }));
         return;
       }
 
       if (pathname === '/api/auth/sign-out' && req.method === 'POST') {
         requests.push({ path: pathname, method: req.method, authorization });
-        sendJson(res, 200, { ok: true, data: { status: 'signed_out' } });
+        sendJson(res, 200, successEnvelope({ status: 'signed_out' }));
         return;
       }
 
       if (pathname === '/api/me' && req.method === 'GET') {
         requests.push({ path: pathname, method: req.method, authorization });
         if (!authorization?.startsWith('Bearer header')) {
-          sendJson(res, 401, {
-            ok: false,
-            error: { code: 'AUTH_REQUIRED', messageKey: 'auth.required', retryable: false },
-          });
+          sendJson(res, 401, errorEnvelope('AUTH_REQUIRED', 'auth.required'));
           return;
         }
-        sendJson(res, 200, {
-          ok: true,
-          data: {
-            subjectKind: 'member',
-            subjectStatus: 'active',
-            profile: {
-              displayName: '브라우저 회원',
-              locale: 'ko-KR',
-              timezone: 'Asia/Seoul',
-              onboardingState: 'completed',
-              updatedAt: '2026-09-06T00:00:00.000Z',
-            },
+        sendJson(res, 200, successEnvelope({
+          subjectKind: 'member',
+          subjectStatus: 'active',
+          profile: {
+            displayName: '브라우저 회원',
+            locale: 'ko-KR',
+            timezone: 'Asia/Seoul',
+            onboardingState: 'completed',
+            updatedAt: '2026-09-06T00:00:00.000Z',
           },
-        });
+        }));
         return;
       }
 
       if (pathname === '/api/me/birth-profile' && req.method === 'GET') {
         requests.push({ path: pathname, method: req.method, authorization });
         if (!authorization?.startsWith('Bearer header')) {
-          sendJson(res, 401, {
-            ok: false,
-            error: { code: 'AUTH_REQUIRED', messageKey: 'auth.required', retryable: false },
-          });
+          sendJson(res, 401, errorEnvelope('AUTH_REQUIRED', 'auth.required'));
           return;
         }
-        sendJson(res, 200, { ok: true, data: { birthProfile: null } });
+        sendJson(res, 200, successEnvelope({ birthProfile: null }));
         return;
       }
 
       if (pathname.startsWith('/api/')) {
-        sendJson(res, 404, {
-          ok: false,
-          error: { code: 'NOT_FOUND', messageKey: 'not_found', retryable: false },
-        });
+        sendJson(res, 404, errorEnvelope('NOT_FOUND', 'not_found'));
         return;
       }
 
@@ -220,7 +229,13 @@ async function waitFor(client, expression, message, timeout = 8_000) {
     if (await client.evaluate(expression)) return;
     await sleep(50);
   }
-  throw new Error(message);
+  const diagnostics = await client.evaluate(`(() => ({
+    pathname: location.pathname,
+    status: document.querySelector('#my-status')?.textContent?.trim() ?? null,
+    accountEmail: document.querySelector('#my-account-email')?.textContent?.trim() ?? null,
+    authAction: document.querySelector('.my-auth-actions')?.textContent?.trim() ?? null,
+  }))()`);
+  throw new Error(`${message}; diagnostics=${JSON.stringify(diagnostics)}; requests=${JSON.stringify(requests)}`);
 }
 
 async function submitSignIn(client) {
