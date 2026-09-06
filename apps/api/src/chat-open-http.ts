@@ -1,3 +1,4 @@
+import { ApiCommandError } from './api-error.js';
 import type { IdentityEvidenceVerificationPortV1 } from './current-subject-profile-http.js';
 import {
   executePostgresSubjectTransactionV1,
@@ -192,6 +193,16 @@ function mapCommandRow(
 }
 
 function mapCommandError(error: unknown, requestId: string): Response | null {
+  if (error instanceof ApiCommandError && error.code === 'AUTH_REQUIRED') {
+    return jsonError({
+      status: 401,
+      code: 'AUTH_REQUIRED',
+      messageKey: 'auth.required',
+      retryable: false,
+      requestId,
+    });
+  }
+
   const constraint = postgresConstraint(error);
 
   if (
