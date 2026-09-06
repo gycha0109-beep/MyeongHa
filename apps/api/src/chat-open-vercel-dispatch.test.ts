@@ -18,15 +18,34 @@ function openRequest(url = 'https://myeongha.vercel.app/api/me?__myeongha_chat_o
 }
 
 describe('POST /api/chat Vercel dispatch', () => {
-  it('resolves the exact rewrite marker to canonical chat open without runtime initialization', () => {
+  it('resolves the rewrite marker on the canonical destination pathname', () => {
     expect(resolveMeDispatchTargetForTestV1(openRequest())).toEqual({
       kind: 'chat-open',
       route: '/api/chat',
     });
   });
 
+  it('resolves the rewrite marker when Vercel preserves the original /api/chat pathname', () => {
+    const request = openRequest(
+      'https://myeongha.vercel.app/api/chat?__myeongha_chat_open=1',
+    );
+
+    expect(resolveMeDispatchTargetForTestV1(request)).toEqual({
+      kind: 'chat-open',
+      route: '/api/chat',
+    });
+  });
+
+  it('fails closed for an original /api/chat pathname without the rewrite marker', () => {
+    expect(
+      resolveMeDispatchTargetForTestV1(openRequest('https://myeongha.vercel.app/api/chat')),
+    ).toBeNull();
+  });
+
   it('preserves method, authorization and request body while stripping rewrite metadata', async () => {
-    const request = openRequest();
+    const request = openRequest(
+      'https://myeongha.vercel.app/api/chat?__myeongha_chat_open=1',
+    );
     const target = resolveMeDispatchTargetForTestV1(request);
     expect(target).not.toBeNull();
 
@@ -47,6 +66,7 @@ describe('POST /api/chat Vercel dispatch', () => {
     `https://myeongha.vercel.app/api/me?__myeongha_chat_open=1&afterSequenceNo=1`,
     `https://myeongha.vercel.app/api/me?__myeongha_chat_open=1&__myeongha_records_read=life-record`,
     `https://myeongha.vercel.app/api/me?__myeongha_chat_open=1&subjectId=client-owned`,
+    `https://myeongha.vercel.app/api/chat?__myeongha_chat_open=1&subjectId=client-owned`,
   ])('fails closed for mixed or unsupported rewrite authority: %s', (url) => {
     expect(resolveMeDispatchTargetForTestV1(openRequest(url))).toBeNull();
   });
