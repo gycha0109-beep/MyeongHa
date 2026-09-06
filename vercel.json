@@ -29,6 +29,10 @@
   ],
   "rewrites": [
     {
+      "source": "/api/chat",
+      "destination": "/api/me?__myeongha_chat_open=1"
+    },
+    {
       "source": "/api/chat/:threadId",
       "destination": "/api/me?__myeongha_chat_thread_id=:threadId"
     },
