@@ -23,6 +23,6 @@ describe('Saju birth input web contract', () => {
     const script = await readFile(new URL('../apps/web/saju-hub.js', import.meta.url), 'utf8');
     expect(script).toContain("setState('error', '출생정보는 등록되어 있지만 현재 사주 계산 서비스를 사용할 수 없습니다.");
     expect(script).toContain("if (profileCreated && error?.operation === 'saju-calculation')");
-    expect(script).toContain("clearGuestBirthSession();\n      setState('empty', '이전 세션의 생년월일 형식이 올바르지 않아 입력 상태를 초기화했습니다.");
+    expect(script).toContain("clearBirthSession();\n      setState('empty', '이전 세션의 생년월일 형식이 올바르지 않아 입력 상태를 초기화했습니다.");
   });
 });

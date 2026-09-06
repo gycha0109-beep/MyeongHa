@@ -92,6 +92,14 @@ function discardMemberSession() {
   emitAuthChanged();
 }
 
+function discardGuestSession() {
+  const active = readSession(GUEST_TOKEN_KEY);
+  if (active && !isJwtLike(active)) removeSession(GUEST_TOKEN_KEY);
+  const pending = readSession(PENDING_GUEST_TOKEN_KEY);
+  if (pending && !isJwtLike(pending)) removeSession(PENDING_GUEST_TOKEN_KEY);
+  emitAuthChanged();
+}
+
 function isAuthoritativeRefreshRejection(error) {
   return error instanceof ProductAuthError && error.code === 'SESSION_EXPIRED';
 }
@@ -189,6 +197,10 @@ export function readGuestBearer() {
 
 export function invalidateMemberSession() {
   discardMemberSession();
+}
+
+export function invalidateGuestSession() {
+  discardGuestSession();
 }
 
 export async function refreshMemberSession() {

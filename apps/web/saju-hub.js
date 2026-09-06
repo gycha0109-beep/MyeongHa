@@ -1,6 +1,6 @@
-const GUEST_TOKEN_KEY = 'myeongha.guestBearer.v1';
+import { ensureActiveBearer, getActiveBearer, invalidateGuestSession, invalidateMemberSession } from './product-auth.js';
+
 const BIRTH_PROFILE_ID_KEY = 'myeongha.guestBirthProfileId.v1';
-const SESSION_BOOTSTRAP_ENDPOINT = '/api/session/bootstrap';
 const BIRTH_PROFILE_ENDPOINT = '/api/birth-profiles';
 const SAJU_CALCULATION_ENDPOINT = '/api/me/saju/calculation';
 const STORED_BIRTH_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/u;
@@ -42,9 +42,17 @@ function removeSessionValue(key) {
   }
 }
 
-function clearGuestBirthSession() {
-  removeSessionValue(GUEST_TOKEN_KEY);
+function clearBirthSession() {
   removeSessionValue(BIRTH_PROFILE_ID_KEY);
+}
+
+function handleUnauthorized(activeBearer) {
+  if (activeBearer?.kind === 'member') {
+    invalidateMemberSession();
+  } else if (activeBearer?.kind === 'guest') {
+    invalidateGuestSession();
+  }
+  clearBirthSession();
 }
 
 function bearerHeaders(token, includeJson = false) {
@@ -81,34 +89,6 @@ function requestError(operation, status, code, message) {
   error.status = status;
   error.code = code;
   return error;
-}
-
-async function bootstrapGuest(existingToken = null) {
-  const response = await fetch(SESSION_BOOTSTRAP_ENDPOINT, {
-    method: 'POST',
-    headers: bearerHeaders(existingToken, true),
-    credentials: 'same-origin',
-    cache: 'no-store',
-    body: '{}',
-  });
-  const payload = await readJson(response);
-  if (!response.ok) {
-    throw requestError('guest-bootstrap', response.status, readPublicErrorCode(payload), `Guest bootstrap failed with status ${response.status}.`);
-  }
-  const data = unwrapSuccess(payload);
-
-  if (data?.kind === 'member') return existingToken;
-  if (data?.kind !== 'guest' || !data.guestSession || typeof data.guestSession !== 'object') {
-    throw new Error('Guest bootstrap response is malformed.');
-  }
-
-  const freshToken = data.guestSession.bearerToken;
-  if (typeof freshToken === 'string' && freshToken.length > 0) {
-    writeSessionValue(GUEST_TOKEN_KEY, freshToken);
-    return freshToken;
-  }
-  if (existingToken) return existingToken;
-  throw new Error('Guest bootstrap did not return a usable credential.');
 }
 
 async function createBirthProfile(token, request) {
@@ -409,12 +389,19 @@ function showCalculationUnavailable() {
 }
 
 async function loadExistingSaju() {
-  const token = readSessionValue(GUEST_TOKEN_KEY);
-  if (!token) {
+  let activeBearer;
+  try {
+    activeBearer = await getActiveBearer();
+  } catch {
+    setState('error', '현재 등록된 출생정보를 확인하지 못했습니다. 잠시 후 새로고침해 주세요.');
+    return;
+  }
+  if (!activeBearer) {
     setState('empty');
     return;
   }
 
+  const { token } = activeBearer;
   const birthProfileId = readSessionValue(BIRTH_PROFILE_ID_KEY);
   setState('loading', '현재 세션의 명식을 확인하는 중입니다…');
 
@@ -423,7 +410,7 @@ async function loadExistingSaju() {
     if (birthProfileId && profile === null) removeSessionValue(BIRTH_PROFILE_ID_KEY);
 
     if (profile && !storedProfileHasSupportedBirthDate(profile)) {
-      clearGuestBirthSession();
+      clearBirthSession();
       setState('empty', '이전 세션의 생년월일 형식이 올바르지 않아 입력 상태를 초기화했습니다. 네 자리 연도로 다시 입력해 주세요.');
       return;
     }
@@ -436,7 +423,7 @@ async function loadExistingSaju() {
     renderCalculation(calculation, profile);
   } catch (error) {
     if (error?.status === 401) {
-      clearGuestBirthSession();
+      handleUnauthorized(activeBearer);
       setState('empty');
       return;
     }
@@ -464,17 +451,23 @@ async function submitBirthProfile(event) {
   button.disabled = true;
   label.textContent = '명식을 계산하는 중…';
   let profileCreated = false;
+  let activeBearer = null;
 
   try {
     const request = buildBirthRequest();
-    const existingToken = readSessionValue(GUEST_TOKEN_KEY);
-    const token = await bootstrapGuest(existingToken);
+    activeBearer = await ensureActiveBearer();
+    const token = activeBearer.token;
     const receipt = await createBirthProfile(token, request);
     profileCreated = true;
     const calculation = await calculateSaju(token);
     const profile = await readBirthProfile(token, receipt.birthProfileId);
     renderCalculation(calculation, profile);
   } catch (error) {
+    if (error?.status === 401) {
+      handleUnauthorized(activeBearer);
+      setFormError('현재 세션을 확인할 수 없습니다. 다시 시도해 주세요.');
+      return;
+    }
     if (profileCreated && error?.operation === 'saju-calculation') {
       showCalculationUnavailable();
       return;
