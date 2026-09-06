@@ -73,7 +73,7 @@ function isUuid(value: string): boolean {
 }
 
 function getChatPathThreadId(pathname: string): string | null | undefined {
-  if (pathname === PROFILE_ROUTE) return undefined;
+  if (pathname === PROFILE_ROUTE || pathname === CHAT_OPEN_ROUTE) return undefined;
   if (!pathname.startsWith(CHAT_ROUTE_PREFIX)) return null;
 
   const rawSegment = pathname.slice(CHAT_ROUTE_PREFIX.length);
@@ -125,6 +125,8 @@ function resolveDispatchTarget(request: Request): DispatchTarget | null {
   if (chatOpen !== undefined && chatOpen !== '1') return null;
 
   const hasChatOpen = chatOpen === '1';
+  const isChatOpenSourcePath = url.pathname === CHAT_OPEN_ROUTE;
+  if (isChatOpenSourcePath && !hasChatOpen) return null;
   if (hasChatOpen && recordsRoute !== undefined) return null;
   if (hasChatOpen && chatThreadId !== undefined) return null;
   if (hasChatOpen && vercelDynamicThreadId !== undefined) return null;
