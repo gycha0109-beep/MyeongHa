@@ -151,6 +151,20 @@ async function devtoolsPort(profile, process) {
   throw new Error('Chrome DevTools port timeout');
 }
 
+async function stopChrome(process) {
+  if (process.exitCode !== null) return;
+  const exited = new Promise((done) => {
+    process.once('exit', done);
+    if (process.exitCode !== null) done();
+  });
+  process.kill('SIGTERM');
+  await Promise.race([exited, sleep(3_000)]);
+  if (process.exitCode === null) {
+    process.kill('SIGKILL');
+    await exited;
+  }
+}
+
 async function connectCdp(port) {
   const response = await fetch(`http://127.0.0.1:${port}/json/new?about%3Ablank`, { method: 'PUT' });
   assert(response.ok, `Chrome target create failed: ${response.status}`);
@@ -376,7 +390,7 @@ try {
   throw error;
 } finally {
   client?.close();
-  chrome.kill('SIGTERM');
+  await stopChrome(chrome);
   server.close();
   await rm(profile, { recursive: true, force: true });
 }
