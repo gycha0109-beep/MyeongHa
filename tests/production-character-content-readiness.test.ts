@@ -5,7 +5,8 @@ import type {
 } from '../packages/character-content/src/index.js';
 import {
   buildProductionCharacterContentManifest,
-  MIN_PRODUCTION_CHARACTER_ROSTER,
+  MVP_PRODUCTION_LAUNCH_CHARACTER_DISPLAY_NAMES,
+  MVP_PRODUCTION_LAUNCH_CHARACTER_ROSTER_SIZE,
   ProductionCharacterContentValidationError,
   validateProductionCharacterContentBundle,
 } from '../packages/character-content/src/index.js';
@@ -26,11 +27,14 @@ function relationshipMode() {
   } as const;
 }
 
-function authoredCharacter(characterId: string): CharacterContentDefinition {
+function authoredCharacter(
+  characterId: string,
+  displayName: string,
+): CharacterContentDefinition {
   return {
     characterId,
     contentVersion: CONTENT_VERSION,
-    displayName: `Test ${characterId}`,
+    displayName,
     gender: 'test-only authored gender',
     deityProxyLabel: 'authored representative',
     shortDescriptor: 'test-only fully authored production-boundary fixture',
@@ -176,10 +180,24 @@ const AUTHORED_PRODUCTION_TEST_BUNDLE = {
   assetManifestHash: 'sha256:v1:4345e9deb0393f0beabfa4e22ae039a00a2860d6d240a7a90d0b420d29eb1ec1',
   cueSchemaVersion: 'cue-v1',
   minClientCapability: '1.0.0-test',
-  characters: Array.from(
-    { length: MIN_PRODUCTION_CHARACTER_ROSTER },
-    (_, index) => authoredCharacter(`test-character-${index + 1}`),
+  characters: MVP_PRODUCTION_LAUNCH_CHARACTER_DISPLAY_NAMES.map((displayName, index) =>
+    authoredCharacter(`test-character-${index + 1}`, displayName),
   ),
+} satisfies CharacterContentBundle;
+
+const DEVELOPMENT_PLACEHOLDER_LAUNCH_BUNDLE = {
+  ...DEV_CHARACTER_CONTENT_BUNDLE,
+  characters: MVP_PRODUCTION_LAUNCH_CHARACTER_DISPLAY_NAMES.map((displayName, index) => {
+    const template = DEV_CHARACTER_CONTENT_BUNDLE.characters[
+      index % DEV_CHARACTER_CONTENT_BUNDLE.characters.length
+    ];
+    if (template === undefined) throw new Error('development fixture requires a Character');
+    return {
+      ...template,
+      characterId: `development-placeholder-${index + 1}`,
+      displayName,
+    };
+  }),
 } satisfies CharacterContentBundle;
 
 function expectProductionFailureCode(
@@ -196,24 +214,26 @@ function expectProductionFailureCode(
 }
 
 describe('Production Character content readiness', () => {
-  it('rejects the development placeholder roster even when its count reaches the launch minimum', () => {
-    expect(DEV_CHARACTER_CONTENT_BUNDLE.characters).toHaveLength(MIN_PRODUCTION_CHARACTER_ROSTER);
+  it('rejects development placeholders even when the exact approved launch identity roster is present', () => {
+    expect(DEVELOPMENT_PLACEHOLDER_LAUNCH_BUNDLE.characters).toHaveLength(
+      MVP_PRODUCTION_LAUNCH_CHARACTER_ROSTER_SIZE,
+    );
     expectProductionFailureCode(
-      DEV_CHARACTER_CONTENT_BUNDLE,
+      DEVELOPMENT_PLACEHOLDER_LAUNCH_BUNDLE,
       'DEVELOPMENT_PLACEHOLDER_FORBIDDEN',
     );
   });
 
-  it('rejects a roster smaller than the source-backed Production launch minimum', () => {
-    const undersized = {
-      ...DEV_CHARACTER_CONTENT_BUNDLE,
-      characters: DEV_CHARACTER_CONTENT_BUNDLE.characters.slice(
+  it('rejects a roster whose cardinality differs from the exact approved Production launch roster', () => {
+    const wrongCardinality = {
+      ...AUTHORED_PRODUCTION_TEST_BUNDLE,
+      characters: AUTHORED_PRODUCTION_TEST_BUNDLE.characters.slice(
         0,
-        MIN_PRODUCTION_CHARACTER_ROSTER - 1,
+        MVP_PRODUCTION_LAUNCH_CHARACTER_ROSTER_SIZE - 1,
       ),
     } satisfies CharacterContentBundle;
 
-    expectProductionFailureCode(undersized, 'PRODUCTION_ROSTER_TOO_SMALL');
+    expectProductionFailureCode(wrongCardinality, 'PRODUCTION_ROSTER_COUNT_MISMATCH');
   });
 
   it('rejects Production publication without versioned immutable asset manifest provenance', () => {
@@ -272,13 +292,11 @@ describe('Production Character content readiness', () => {
 
     expect(first).toEqual(second);
     expect(first.assetManifestHash).toBe(AUTHORED_PRODUCTION_TEST_BUNDLE.assetManifestHash);
-    expect(first.characterIds).toEqual([
-      'test-character-1',
-      'test-character-2',
-      'test-character-3',
-      'test-character-4',
-      'test-character-5',
-    ]);
+    expect(first.characterIds).toEqual(
+      MVP_PRODUCTION_LAUNCH_CHARACTER_DISPLAY_NAMES.map(
+        (_, index) => `test-character-${index + 1}`,
+      ),
+    );
     expect(first.contentHash).toMatch(/^sha256:v1:[0-9a-f]{64}$/);
   });
 });
