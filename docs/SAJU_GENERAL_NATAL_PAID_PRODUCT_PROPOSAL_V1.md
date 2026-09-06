@@ -4,7 +4,6 @@
 > Status: **PRODUCT PROPOSAL / DESIGNABLE / NOT SALEABLE / P0-CM-03 OPEN / NO-BUILD**  
 > Candidate internal key: `saju_general_natal_deep_v1`  
 > Inventory companion: `docs/SAJU_PRODUCT_INTERPRETATION_INVENTORY_V1.md`  
-> MyeongHa observed main: `11eba9c4afcae534777fddd784418624306a0baf`  
 > Saju observed main: `b7bc0d0b0c04a514ca849d57fca6ba3de03993c0`  
 > Saju reading profile: `myeonghwa-reading-profile-general-natal-v1@1.0.0`
 
