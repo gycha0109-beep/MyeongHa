@@ -33,6 +33,9 @@ jobs:
     env:
       DISPATCH_CONFIRM: ${{ inputs.confirm }}
     steps:
+      - name: Check out exact repository verifier
+        uses: actions/checkout@v4
+
       - name: Verify governed invocation
         shell: bash
         run: |
@@ -46,9 +49,6 @@ jobs:
           else
             [[ "${{ github.event_name }}" == 'pull_request' ]]
           fi
-
-      - name: Check out exact repository verifier
-        uses: actions/checkout@v4
 
       - name: Set up Node 24
         uses: actions/setup-node@v4
