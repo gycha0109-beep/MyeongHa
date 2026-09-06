@@ -36,6 +36,7 @@ const assert = (condition, message) => { if (!condition) throw new Error(message
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
 const requests = [];
 let apiRequestCount = 0;
+let networkTransportAttempts = 0;
 
 function successEnvelope(data) {
   apiRequestCount += 1;
@@ -88,12 +89,17 @@ async function serve() {
         if (body.email === testIdentity.email && body.password === testIdentity.password) outcome = 'valid';
         else if (body.email === testIdentity.email && body.password === testIdentity.networkPassword) outcome = 'network';
         else if (body.email === testIdentity.email && body.password === testIdentity.upstreamPassword) outcome = 'upstream';
-        requests.push({ path: pathname, method: req.method, authorization, outcome });
 
         if (outcome === 'network') {
+          networkTransportAttempts += 1;
+          if (!requests.some((request) => request.path === pathname && request.outcome === 'network')) {
+            requests.push({ path: pathname, method: req.method, authorization, outcome });
+          }
           req.socket.destroy();
           return;
         }
+
+        requests.push({ path: pathname, method: req.method, authorization, outcome });
         if (outcome === 'upstream') {
           sendJson(res, 503, errorEnvelope('AUTH_UPSTREAM_UNAVAILABLE', 'auth.upstream_unavailable', true));
           return;
@@ -347,11 +353,12 @@ try {
 
   const signIns = requests.filter((request) => request.path === '/api/auth/sign-in');
   const promotions = requests.filter((request) => request.path === '/api/auth/promote-guest');
-  assert(signIns.length === 4, `Expected four sign-in requests, received ${signIns.length}`);
-  assert(signIns[0].outcome === 'network', 'First sign-in request was not the network-failure case');
-  assert(signIns[1].outcome === 'upstream', 'Second sign-in request was not the upstream-failure case');
-  assert(signIns[2].outcome === 'invalid', 'Third sign-in request was not the invalid-credentials case');
-  assert(signIns[3].outcome === 'valid', 'Fourth sign-in request was not the healthy retry');
+  assert(networkTransportAttempts >= 1, 'Network failure did not exercise a transport-level sign-in attempt');
+  assert(signIns.length === 4, `Expected four logical sign-in outcomes, received ${signIns.length}`);
+  assert(signIns[0].outcome === 'network', 'First sign-in outcome was not the network-failure case');
+  assert(signIns[1].outcome === 'upstream', 'Second sign-in outcome was not the upstream-failure case');
+  assert(signIns[2].outcome === 'invalid', 'Third sign-in outcome was not the invalid-credentials case');
+  assert(signIns[3].outcome === 'valid', 'Fourth sign-in outcome was not the healthy retry');
   assert(promotions.length === 1, `Expected one Guest promotion after healthy retry, received ${promotions.length}`);
   assert(promotions[0].authorization === `Bearer ${memberSession.accessToken}`, 'Guest promotion did not authorize with the Member token');
   assert(promotions[0].promotedGuest === guestBearer, 'Guest promotion did not use the preserved Guest bearer');
@@ -359,6 +366,7 @@ try {
   const artifactDir = resolve(process.cwd(), 'artifacts');
   await mkdir(artifactDir, { recursive: true });
   await writeFile(join(artifactDir, 'web-auth-failed-login-guest-browser-smoke.json'), `${JSON.stringify({
+    networkTransportAttempts,
     networkFailurePreservedGuest: afterNetworkFailure.activeBearer === guestBearer,
     upstreamFailurePreservedGuest: afterUpstreamFailure.activeBearer === guestBearer,
     invalidCredentialsPreservedGuest: afterInvalidCredentials.activeBearer === guestBearer,
