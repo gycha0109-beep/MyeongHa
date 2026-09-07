@@ -112,6 +112,10 @@ jobs:
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
         run: node scripts/verify-web-records-auth-browser.mjs
+      - name: Verify Chat active bearer rejection
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/run-web-chat-auth-browser-smoke.mjs
       - name: Verify authentication confirmation handoff
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
@@ -159,6 +163,7 @@ jobs:
             artifacts/web-auth-refresh-malformed-browser-smoke*
             artifacts/web-saju-auth-browser-smoke*
             artifacts/web-records-auth-browser-smoke*
+            artifacts/web-chat-auth-browser-smoke*
             artifacts/web-my-browser-smoke*
             artifacts/web-my-birth-browser-smoke*
             artifacts/web-birth-session-browser-smoke*
