@@ -3,6 +3,7 @@ const GUEST_TOKEN_KEY = 'myeongha.guestBearer.v1';
 const PENDING_GUEST_TOKEN_KEY = 'myeongha.pendingGuestBearer.v1';
 const AUTH_CHANGED_EVENT = 'myeongha:auth-changed';
 const REFRESH_SKEW_MS = 60_000;
+let guestBootstrapInFlight = null;
 
 export class ProductAuthError extends Error {
   constructor(code, message, cause) {
@@ -268,16 +269,27 @@ export async function ensureGuestBearer() {
   const existing = readGuestBearer();
   if (existing) return existing;
 
-  const data = await postJson('/api/session/bootstrap', {});
-  const guestSession = isRecord(data) && isRecord(data.guestSession) ? data.guestSession : null;
-  const token = normalizeGuestBearer(guestSession?.bearerToken);
-  if (!isRecord(data) || data.kind !== 'guest' || !token) {
-    throw new ProductAuthError('WEB_AUTH_GUEST_PREPARE_FAILED', '게스트 세션을 준비하지 못했습니다.');
-  }
+  const request = guestBootstrapInFlight ??= (async () => {
+    const data = await postJson('/api/session/bootstrap', {});
+    const guestSession = isRecord(data) && isRecord(data.guestSession) ? data.guestSession : null;
+    const token = normalizeGuestBearer(guestSession?.bearerToken);
+    if (!isRecord(data) || data.kind !== 'guest' || !token) {
+      throw new ProductAuthError('WEB_AUTH_GUEST_PREPARE_FAILED', '게스트 세션을 준비하지 못했습니다.');
+    }
 
-  writeSession(GUEST_TOKEN_KEY, token);
-  emitAuthChanged();
-  return token;
+    const racedExisting = readGuestBearer();
+    if (racedExisting) return racedExisting;
+
+    writeSession(GUEST_TOKEN_KEY, token);
+    emitAuthChanged();
+    return token;
+  })();
+
+  try {
+    return await request;
+  } finally {
+    if (guestBootstrapInFlight === request) guestBootstrapInFlight = null;
+  }
 }
 
 export function invalidateMemberSession(expectedAccessToken = null) {
