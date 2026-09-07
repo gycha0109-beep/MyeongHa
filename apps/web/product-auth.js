@@ -195,6 +195,25 @@ export function readGuestBearer() {
   return typeof token === 'string' && token.length > 0 && !isJwtLike(token) ? token : null;
 }
 
+export async function ensureGuestBearer() {
+  const existing = readGuestBearer();
+  if (existing) return existing;
+
+  const data = await postJson('/api/session/bootstrap', {});
+  const guestSession = isRecord(data) && isRecord(data.guestSession) ? data.guestSession : null;
+  const token = guestSession?.bearerToken;
+  if (
+    !isRecord(data) || data.kind !== 'guest' ||
+    typeof token !== 'string' || token.length === 0 || isJwtLike(token)
+  ) {
+    throw new ProductAuthError('WEB_AUTH_GUEST_PREPARE_FAILED', '게스트 세션을 준비하지 못했습니다.');
+  }
+
+  writeSession(GUEST_TOKEN_KEY, token);
+  emitAuthChanged();
+  return token;
+}
+
 export function invalidateMemberSession() {
   discardMemberSession();
 }
@@ -256,19 +275,7 @@ export async function getActiveBearer() {
 export async function ensureActiveBearer() {
   const active = await getActiveBearer();
   if (active) return active;
-
-  const data = await postJson('/api/session/bootstrap', {});
-  const guestSession = isRecord(data) && isRecord(data.guestSession) ? data.guestSession : null;
-  const token = guestSession?.bearerToken;
-  if (
-    !isRecord(data) || data.kind !== 'guest' ||
-    typeof token !== 'string' || token.length === 0 || isJwtLike(token)
-  ) {
-    throw new ProductAuthError('WEB_AUTH_GUEST_PREPARE_FAILED', '게스트 세션을 준비하지 못했습니다.');
-  }
-
-  writeSession(GUEST_TOKEN_KEY, token);
-  emitAuthChanged();
+  const token = await ensureGuestBearer();
   return Object.freeze({ kind: 'guest', token });
 }
 
