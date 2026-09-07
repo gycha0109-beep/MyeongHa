@@ -44,6 +44,16 @@ describe('web Birth session guard', () => {
     expect(authSource).toContain('writeSession(GUEST_TOKEN_KEY, token)');
   });
 
+  it('invalidates the rejected active bearer only on authoritative 401, not 403', () => {
+    expect(clientSource).toContain("import { ensureActiveBearer, invalidateGuestSession, invalidateMemberSession } from './product-auth.js';");
+    expect(clientSource).toContain('function invalidateRejectedBearer(activeBearer)');
+    expect(clientSource).toContain("if (activeBearer.kind === 'member')");
+    expect(clientSource).toContain('invalidateMemberSession();');
+    expect(clientSource).toContain("if (activeBearer.kind === 'guest') invalidateGuestSession();");
+    expect(clientSource).toContain('if (response.status === 401) {\n    invalidateRejectedBearer(activeBearer);');
+    expect(clientSource).toContain('if (response.status === 403) {\n    throw new BirthRuntimeError');
+  });
+
   it('uses the same resolved bearer for authoritative current read and create', async () => {
     const calls = [];
     const fetchImpl = async (url, init) => {
@@ -85,6 +95,12 @@ describe('web Birth session guard', () => {
       resolveBearer: guestBearer,
     });
     await expect(unauthorized.readCurrentBirthProfile()).rejects.toMatchObject({ code: 'WEB_BIRTH_SESSION_REQUIRED' });
+
+    const forbidden = createBirthRuntimeClient({
+      fetchImpl: async () => jsonResponse(403, { ok: false }),
+      resolveBearer: guestBearer,
+    });
+    await expect(forbidden.readCurrentBirthProfile()).rejects.toMatchObject({ code: 'WEB_BIRTH_SESSION_REQUIRED' });
 
     const malformed = createBirthRuntimeClient({
       fetchImpl: async () => jsonResponse(200, envelope({ unexpected: true })),
