@@ -2,7 +2,7 @@
 
 > Repository: `gycha0109-beep/MyeongHa`  
 > Status: **GENERAL NATAL EXACT INVENTORY / NOT PRODUCT AUTHORITY / P0-CM-03 OPEN / NO-BUILD**  
-> MyeongHa observed main: `be32fd57b7c3c90486d9c7ae532e798997f99eac`  
+> MyeongHa observed main: `ac47522c65e2c1b492591c69453232a19d3e898c`  
 > Saju observed main: `9cd79b11b5e79016fb7c8b266c95c53286587f48`  
 > General Natal authority sync inputs: Saju PR `#332` + PR `#335` + PR `#339`  
 > Product interpretation authority: `MyeongHa_Saju_Product_Interpretation_Architecture_v1.2_FINAL_REVIEWED(1).md`  
@@ -63,7 +63,7 @@ Production Payment                         = HOLD
 Decision                                   = NO_BUILD
 ```
 
-The observed repository heads moved after the previous inventory baseline. The MyeongHa delta through `be32fd57...` is authentication/test work and does not change General Natal semantics. The Saju delta is materially relevant: PR `#339` adds a strict research T3 source-condition normalizer with registered claim contracts and exact-condition tests. It deliberately remains research-only and fail-closed because the canonical upstream source-condition resolver is still absent.
+The observed repository heads moved after the previous inventory baseline. The MyeongHa delta through `ac47522c...` is authentication/test work and does not change General Natal semantics. The Saju delta is materially relevant: PR `#339` adds a strict research T3 source-condition normalizer with registered claim contracts and exact-condition tests. It deliberately remains research-only and fail-closed because the canonical upstream source-condition resolver is still absent.
 
 ---
 
@@ -245,9 +245,9 @@ derivedFacts.generalNatalSourceConditions.shiShenGeQualified
 The output schema is deliberately non-consumer-facing:
 
 ```text
-sourceConditionPreserved   = true
+sourceConditionPreserved    = true
 rawTenGodPresenceSufficient = false
-consumerMeaningAuthorized  = false
+consumerMeaningAuthorized   = false
 ```
 
 The producer emits only when the corresponding source-condition fact is explicitly `resolved` and all rule-specific qualifiers are satisfied. It does not infer pattern establishment from raw pillars or `derivedFacts.tenGods`.
