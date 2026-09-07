@@ -119,12 +119,12 @@ export function createProductionGuestPromotionRuntimeV1(input: {
 
       const guestBearer = request.headers.get(GUEST_HEADER);
       if (!guestBearer || guestBearer.length > 4096 || /\s/u.test(guestBearer)) {
-        return failure('AUTH_REQUIRED', 401, requestId);
+        return failure('GUEST_AUTH_REQUIRED', 401, requestId);
       }
 
       const memberEvidence = await verifier.verifyRequestIdentity(request);
       if (memberEvidence === null || memberEvidence.kind !== 'member') {
-        return failure('AUTH_REQUIRED', 401, requestId);
+        return failure('MEMBER_AUTH_REQUIRED', 401, requestId);
       }
 
       const guestRequest = new Request(request.url, {
@@ -132,7 +132,7 @@ export function createProductionGuestPromotionRuntimeV1(input: {
       });
       const guestEvidence = await verifier.verifyRequestIdentity(guestRequest);
       if (guestEvidence === null || guestEvidence.kind !== 'guest') {
-        return failure('AUTH_REQUIRED', 401, requestId);
+        return failure('GUEST_AUTH_REQUIRED', 401, requestId);
       }
 
       try {
