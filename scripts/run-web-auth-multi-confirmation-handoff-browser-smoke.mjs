@@ -61,6 +61,13 @@ await runBrowserGate({
   label: 'MyeongHa auth concurrent confirmation handoff browser smoke',
 });
 
+await runBrowserGate({
+  script: 'scripts/verify-web-auth-rejected-bearer-browser.mjs',
+  marker: 'MyeongHa_WEB_AUTH_REJECTED_BEARER_BROWSER_PASS',
+  cleanupPrefix: '/tmp/myeongha-auth-rejected-bearer-browser-',
+  label: 'MyeongHa auth rejected bearer browser smoke',
+});
+
 try {
   await copyFile(
     'artifacts/web-auth-concurrent-confirmation-handoff-browser-smoke.json',
