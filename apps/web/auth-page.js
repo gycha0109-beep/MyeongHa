@@ -10,6 +10,7 @@ import {
 
 const BIRTH_PROFILE_ID_KEY = 'myeongha.guestBirthProfileId.v1';
 const CONFIRMATION_GUEST_HANDOFF_KEY = 'myeongha.pendingGuestConfirmation.v1';
+const CONFIRMATION_GUEST_HANDOFF_VERSION = 2;
 const CONFIRMATION_GUEST_HANDOFF_TTL_MS = 24 * 60 * 60 * 1000;
 const ALLOWED_NEXT = new Set([
   'hall.html',
@@ -112,15 +113,15 @@ function clearConfirmationGuestHandoff() {
   }
 }
 
-function stageConfirmationGuestHandoff(email) {
-  const guestBearer = readGuestBearer();
-  const normalizedEmail = normalizeEmail(email);
-  if (!guestBearer || !normalizedEmail) return false;
+function writeConfirmationGuestHandoffs(entries) {
+  if (entries.length === 0) {
+    clearConfirmationGuestHandoff();
+    return true;
+  }
   try {
     localStorage.setItem(CONFIRMATION_GUEST_HANDOFF_KEY, JSON.stringify({
-      guestBearer,
-      email: normalizedEmail,
-      expiresAt: new Date(Date.now() + CONFIRMATION_GUEST_HANDOFF_TTL_MS).toISOString(),
+      version: CONFIRMATION_GUEST_HANDOFF_VERSION,
+      entries,
     }));
     return true;
   } catch {
@@ -128,40 +129,88 @@ function stageConfirmationGuestHandoff(email) {
   }
 }
 
-function readConfirmationGuestHandoff(memberEmail) {
+function normalizeConfirmationGuestHandoff(value, now = Date.now()) {
+  const email = normalizeEmail(value?.email);
+  const guestBearer = typeof value?.guestBearer === 'string' ? value.guestBearer : '';
+  const expiresAtMs = typeof value?.expiresAt === 'string' ? Date.parse(value.expiresAt) : Number.NaN;
+  if (!email || !guestBearer || guestBearer.includes('.') || Number.isNaN(expiresAtMs) || expiresAtMs <= now) {
+    return null;
+  }
+  return Object.freeze({
+    guestBearer,
+    email,
+    expiresAt: new Date(expiresAtMs).toISOString(),
+  });
+}
+
+function readConfirmationGuestHandoffs() {
   let raw = null;
   try {
     raw = localStorage.getItem(CONFIRMATION_GUEST_HANDOFF_KEY);
   } catch {
-    return null;
+    return [];
   }
-  if (!raw) return null;
+  if (!raw) return [];
 
-  let value = null;
+  let stored = null;
   try {
-    value = JSON.parse(raw);
+    stored = JSON.parse(raw);
   } catch {
     clearConfirmationGuestHandoff();
-    return null;
+    return [];
   }
 
-  const expectedEmail = normalizeEmail(memberEmail);
-  const handoffEmail = normalizeEmail(value?.email);
-  const guestBearer = typeof value?.guestBearer === 'string' ? value.guestBearer : '';
-  const expiresAt = typeof value?.expiresAt === 'string' ? Date.parse(value.expiresAt) : Number.NaN;
-  if (!handoffEmail || !guestBearer || guestBearer.includes('.') || Number.isNaN(expiresAt) || expiresAt <= Date.now()) {
-    clearConfirmationGuestHandoff();
-    return null;
+  const candidates = stored?.version === CONFIRMATION_GUEST_HANDOFF_VERSION && Array.isArray(stored.entries)
+    ? stored.entries
+    : [stored];
+  const deduped = new Map();
+  for (const candidate of candidates) {
+    const normalized = normalizeConfirmationGuestHandoff(candidate);
+    if (!normalized) continue;
+    const key = `${normalized.email}\u0000${normalized.guestBearer}`;
+    const previous = deduped.get(key);
+    if (!previous || Date.parse(previous.expiresAt) < Date.parse(normalized.expiresAt)) {
+      deduped.set(key, normalized);
+    }
   }
-  if (!expectedEmail || expectedEmail !== handoffEmail) return null;
-  return guestBearer;
+
+  const entries = [...deduped.values()];
+  writeConfirmationGuestHandoffs(entries);
+  return entries;
+}
+
+function stageConfirmationGuestHandoff(email) {
+  const guestBearer = readGuestBearer();
+  const normalizedEmail = normalizeEmail(email);
+  if (!guestBearer || !normalizedEmail) return false;
+  const next = readConfirmationGuestHandoffs().filter((entry) => !(
+    entry.email === normalizedEmail && entry.guestBearer === guestBearer
+  ));
+  next.push(Object.freeze({
+    guestBearer,
+    email: normalizedEmail,
+    expiresAt: new Date(Date.now() + CONFIRMATION_GUEST_HANDOFF_TTL_MS).toISOString(),
+  }));
+  return writeConfirmationGuestHandoffs(next);
+}
+
+function readConfirmationGuestHandoff(memberEmail) {
+  const expectedEmail = normalizeEmail(memberEmail);
+  if (!expectedEmail) return null;
+  const matches = readConfirmationGuestHandoffs().filter((entry) => entry.email === expectedEmail);
+  if (matches.length !== 1) return null;
+  return matches[0].guestBearer;
 }
 
 function clearConfirmationGuestHandoffIfMatches(memberEmail, promotedGuestBearer) {
-  const confirmationGuestBearer = readConfirmationGuestHandoff(memberEmail);
-  if (!confirmationGuestBearer || confirmationGuestBearer !== promotedGuestBearer) return false;
-  clearConfirmationGuestHandoff();
-  return true;
+  const expectedEmail = normalizeEmail(memberEmail);
+  if (!expectedEmail || !promotedGuestBearer) return false;
+  const current = readConfirmationGuestHandoffs();
+  const next = current.filter((entry) => !(
+    entry.email === expectedEmail && entry.guestBearer === promotedGuestBearer
+  ));
+  if (next.length === current.length) return false;
+  return writeConfirmationGuestHandoffs(next);
 }
 
 async function promoteGuestIfPresent(accessToken, memberEmail) {
