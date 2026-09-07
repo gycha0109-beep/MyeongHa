@@ -2,6 +2,8 @@ import {
   ProductAuthError,
   clearPromotedGuestBearer,
   ensureGuestBearer,
+  invalidateGuestSession,
+  invalidateMemberSession,
   normalizeGuestBearer,
   readGuestBearer,
   readMemberSession,
@@ -395,6 +397,19 @@ async function promoteGuestIfPresent(accessToken, memberEmail) {
   }
 
   const code = readPublicErrorCode(payload);
+  if (response.status === 401) {
+    if (code === 'MEMBER_AUTH_REQUIRED') {
+      const currentMember = readMemberSession();
+      if (currentMember?.accessToken === accessToken) invalidateMemberSession();
+      return { status: 'member-rejected' };
+    }
+    if (code === 'GUEST_AUTH_REQUIRED') {
+      if (readGuestBearer() === guestBearer) invalidateGuestSession();
+      await clearConfirmationGuestHandoffIfMatches(memberEmail, guestBearer);
+      return { status: 'guest-rejected' };
+    }
+    return { status: 'auth-rejected' };
+  }
   if (response.status === 409 && code === 'GUEST_MERGE_REQUIRED') {
     return { status: 'merge-required' };
   }
@@ -422,8 +437,18 @@ function authErrorMessage(error) {
 
 async function finishAuthenticated(session) {
   const promotion = await promoteGuestIfPresent(session.accessToken, session.user?.email);
+  if (promotion.status === 'member-rejected') {
+    setStatus('로그인 세션이 서버에서 거부되었습니다. 다시 로그인해 주세요.', 'error');
+    return;
+  }
+  if (promotion.status === 'auth-rejected') {
+    setStatus('로그인 상태를 확인하지 못했습니다. 다시 로그인해 주세요.', 'error');
+    return;
+  }
   if (promotion.status === 'merge-required') {
     setStatus('로그인되었습니다. 이 브라우저의 별도 게스트 기록은 기존 계정에 임의로 합치지 않고 그대로 보존했습니다.', 'success');
+  } else if (promotion.status === 'guest-rejected') {
+    setStatus('로그인되었습니다. 더 이상 유효하지 않은 게스트 연결 정보는 해제했습니다.', 'success');
   } else if (promotion.status === 'preserved') {
     setStatus('로그인되었습니다. 게스트 기록 연결은 완료되지 않아 현재 브라우저에 그대로 보존했습니다.', 'success');
   } else if (promotion.status === 'promoted') {
