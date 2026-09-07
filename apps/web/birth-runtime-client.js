@@ -108,10 +108,10 @@ function authorizationHeaders(token, json = false) {
 
 function invalidateRejectedBearer(activeBearer) {
   if (activeBearer.kind === 'member') {
-    invalidateMemberSession();
+    invalidateMemberSession(activeBearer.token);
     return;
   }
-  if (activeBearer.kind === 'guest') invalidateGuestSession();
+  if (activeBearer.kind === 'guest') invalidateGuestSession(activeBearer.token);
 }
 
 function rejectSessionStatus(response, activeBearer) {

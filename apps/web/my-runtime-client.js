@@ -106,10 +106,10 @@ function assertBirthProfile(payload) {
 
 function invalidateRejectedBearer(activeBearer) {
   if (activeBearer.kind === 'member') {
-    invalidateMemberSession();
+    invalidateMemberSession(activeBearer.token);
     return;
   }
-  if (activeBearer.kind === 'guest') invalidateGuestSession();
+  if (activeBearer.kind === 'guest') invalidateGuestSession(activeBearer.token);
 }
 
 async function readAuthorizedJson({

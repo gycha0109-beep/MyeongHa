@@ -44,12 +44,14 @@ describe('web Birth session guard', () => {
     expect(authSource).toContain('writeSession(GUEST_TOKEN_KEY, token)');
   });
 
-  it('invalidates the rejected active bearer only on authoritative 401, not 403', () => {
+  it('invalidates only the exact rejected active bearer on authoritative 401, not 403', () => {
     expect(clientSource).toContain("import { ensureActiveBearer, invalidateGuestSession, invalidateMemberSession } from './product-auth.js';");
     expect(clientSource).toContain('function invalidateRejectedBearer(activeBearer)');
     expect(clientSource).toContain("if (activeBearer.kind === 'member')");
-    expect(clientSource).toContain('invalidateMemberSession();');
-    expect(clientSource).toContain("if (activeBearer.kind === 'guest') invalidateGuestSession();");
+    expect(clientSource).toContain('invalidateMemberSession(activeBearer.token);');
+    expect(clientSource).toContain("if (activeBearer.kind === 'guest') invalidateGuestSession(activeBearer.token);");
+    expect(clientSource).not.toContain('invalidateMemberSession();');
+    expect(clientSource).not.toContain('invalidateGuestSession();');
     expect(clientSource).toContain('if (response.status === 401) {\n    invalidateRejectedBearer(activeBearer);');
     expect(clientSource).toContain('if (response.status === 403) {\n    throw new BirthRuntimeError');
   });

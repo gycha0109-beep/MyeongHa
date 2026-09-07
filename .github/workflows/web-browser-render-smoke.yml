@@ -88,6 +88,10 @@ jobs:
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
         run: node scripts/verify-web-auth-rejection-browser.mjs
+      - name: Verify exact rejected bearer race
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/verify-web-auth-exact-rejection-race-browser.mjs
       - name: Verify transient refresh Member retention
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
@@ -157,6 +161,7 @@ jobs:
             artifacts/web-auth-cross-tab-signout-failure-browser-smoke*
             artifacts/web-auth-cross-tab-session-expired-browser-smoke*
             artifacts/web-auth-rejection-browser-smoke*
+            artifacts/web-auth-exact-rejection-race-browser-smoke*
             artifacts/web-auth-refresh-browser-smoke*
             artifacts/web-auth-cross-tab-transient-refresh-browser-smoke*
             artifacts/web-auth-refresh-network-browser-smoke*
