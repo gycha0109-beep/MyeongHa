@@ -315,11 +315,19 @@ async function submitSignIn(client) {
     `document.readyState === 'complete' && location.pathname === '/auth.html' && Boolean(document.querySelector('#auth-form'))`,
     'Auth form did not fully initialize before sign-in',
   );
-  await client.evaluate(`(() => {
-    document.querySelector('#auth-email').value = ${JSON.stringify(testIdentity.email)};
-    document.querySelector('#auth-password').value = ${JSON.stringify(testIdentity.password)};
-    document.querySelector('#auth-form').requestSubmit();
+  const scheduled = await client.evaluate(`(() => {
+    const email = document.querySelector('#auth-email');
+    const password = document.querySelector('#auth-password');
+    const form = document.querySelector('#auth-form');
+    if (!(email instanceof HTMLInputElement) || !(password instanceof HTMLInputElement) || !(form instanceof HTMLFormElement)) {
+      return false;
+    }
+    email.value = ${JSON.stringify(testIdentity.email)};
+    password.value = ${JSON.stringify(testIdentity.password)};
+    setTimeout(() => form.requestSubmit(), 0);
+    return true;
   })()`);
+  assert(scheduled === true, 'Auth sign-in navigation trigger was not scheduled');
 }
 
 for (const file of [
@@ -441,7 +449,13 @@ try {
     `document.querySelector('#my-account-email')?.textContent?.trim() === ${JSON.stringify(testIdentity.email)} && Boolean(document.querySelector('.my-auth-actions button'))`,
     'Tab A My page did not expose the Member logout action',
   );
-  await tabA.evaluate(`document.querySelector('.my-auth-actions button')?.click()`);
+  const signOutScheduled = await tabA.evaluate(`(() => {
+    const button = document.querySelector('.my-auth-actions button');
+    if (!(button instanceof HTMLButtonElement)) return false;
+    setTimeout(() => button.click(), 0);
+    return true;
+  })()`);
+  assert(signOutScheduled === true, 'Auth sign-out navigation trigger was not scheduled');
   await waitFor(
     tabA,
     `location.pathname === '/auth.html' && !localStorage.getItem('myeongha.memberSession.v1')`,
