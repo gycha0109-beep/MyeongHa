@@ -67,7 +67,7 @@ jobs:
       - name: Verify cross-tab authentication convergence
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
-        run: node scripts/verify-web-auth-cross-tab-browser.mjs
+        run: node scripts/run-web-auth-cross-tab-browser-smoke.mjs
       - name: Verify cross-tab failed sign-out convergence
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
