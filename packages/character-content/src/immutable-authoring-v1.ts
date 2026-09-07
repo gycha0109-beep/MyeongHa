@@ -373,11 +373,3 @@ export const CHARACTER_IMMUTABLE_AUTHORING_V1 = [
     },
   },
 ] as const satisfies readonly CharacterImmutableAuthoringV1Definition[];
-
-export const CHARACTER_IMMUTABLE_AUTHORING_V1_BY_ID = Object.freeze(
-  Object.fromEntries(
-    CHARACTER_IMMUTABLE_AUTHORING_V1.map((entry) => [entry.characterId, entry]),
-  ),
-) as Readonly<
-  Record<CharacterImmutableAuthoringV1CharacterId, CharacterImmutableAuthoringV1Definition>
->;
