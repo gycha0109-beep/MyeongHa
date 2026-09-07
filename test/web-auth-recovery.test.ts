@@ -21,18 +21,24 @@ describe('web auth recovery boundary', () => {
     expect(authPage).not.toContain('이미 로그인되어 있습니다. 잠시 후 이전 화면으로 이동합니다.');
   });
 
-  it('preserves bounded multi-entry signup Guest handoffs and only resolves one exact email candidate', () => {
+  it('serializes bounded multi-entry signup Guest handoff mutations across browser tabs', () => {
     expect(authPage).toContain("const CONFIRMATION_GUEST_HANDOFF_KEY = 'myeongha.pendingGuestConfirmation.v1'");
     expect(authPage).toContain('const CONFIRMATION_GUEST_HANDOFF_VERSION = 2');
+    expect(authPage).toContain("const CONFIRMATION_GUEST_HANDOFF_LOCK_NAME = 'myeongha.pendingGuestConfirmation.v1.lock'");
     expect(authPage).toContain('CONFIRMATION_GUEST_HANDOFF_TTL_MS');
-    expect(authPage).toContain('stageConfirmationGuestHandoff(result.email)');
-    expect(authPage).toContain('readConfirmationGuestHandoff(memberEmail)');
+    expect(authPage).toContain('globalThis.navigator?.locks');
+    expect(authPage).toContain("locks.request(CONFIRMATION_GUEST_HANDOFF_LOCK_NAME, { mode: 'exclusive' }");
+    expect(authPage).toContain('async function stageConfirmationGuestHandoff(email)');
+    expect(authPage).toContain('if (!locks) return false');
+    expect(authPage).toContain('if (!await stageConfirmationGuestHandoff(result.email))');
+    expect(authPage).toContain('async function readConfirmationGuestHandoff(memberEmail)');
+    expect(authPage).toContain('async function clearConfirmationGuestHandoffIfMatches(memberEmail, promotedGuestBearer)');
+    expect(authPage).toContain('await clearConfirmationGuestHandoffIfMatches(memberEmail, guestBearer)');
     expect(authPage).toContain('Array.isArray(stored.entries)');
     expect(authPage).toContain('entry.email === expectedEmail');
     expect(authPage).toContain('if (matches.length !== 1) return null');
     expect(authPage).toContain('entry.guestBearer === promotedGuestBearer');
     expect(authPage).toContain("'X-MyeongHa-Guest-Bearer': guestBearer");
-    expect(authPage).toContain('writeConfirmationGuestHandoffs(next)');
     expect(authPage).not.toContain('subjectId');
     expect(authPage).not.toContain('authUserId');
   });
