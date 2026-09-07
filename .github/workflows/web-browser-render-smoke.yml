@@ -51,7 +51,7 @@ jobs:
       - name: Verify signup confirmation Guest handoff continuity
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
-        run: node scripts/verify-web-auth-confirmation-handoff-browser.mjs
+        run: node scripts/run-web-auth-confirmation-handoff-browser-smoke.mjs
       - name: Verify cross-tab authentication convergence
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
