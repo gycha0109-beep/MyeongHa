@@ -107,7 +107,7 @@ function isAuthoritativeRefreshRejection(error) {
 function normalizeSession(value) {
   if (!isRecord(value)) return null;
   if (
-    typeof value.accessToken !== 'string' || value.accessToken.length === 0 ||
+    !isJwtLike(value.accessToken) ||
     typeof value.refreshToken !== 'string' || value.refreshToken.length === 0 ||
     typeof value.expiresAt !== 'string' || Number.isNaN(Date.parse(value.expiresAt))
   ) {
@@ -180,10 +180,13 @@ export function readMemberSession() {
   if (!raw) return null;
   try {
     const normalized = normalizeSession(JSON.parse(raw));
-    if (!normalized) removeLocal(MEMBER_SESSION_KEY);
+    if (!normalized) {
+      discardMemberSession();
+      return null;
+    }
     return normalized;
   } catch {
-    removeLocal(MEMBER_SESSION_KEY);
+    discardMemberSession();
     return null;
   }
 }
