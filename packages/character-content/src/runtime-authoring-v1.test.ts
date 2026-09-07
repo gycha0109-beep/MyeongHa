@@ -4,6 +4,7 @@ import {
   RELATIONSHIP_EVENT_CANDIDATES,
   SAJU_DOMAINS,
 } from '../../contracts/src/index.js';
+import type { CharacterRelationshipBehaviorContent } from './schema.js';
 import {
   CHARACTER_RUNTIME_AUTHORING_V1,
   CHARACTER_RUNTIME_AUTHORING_V1_CHARACTER_IDS,
@@ -117,12 +118,13 @@ describe('Character runtime authoring v1 authority', () => {
       expect(character.behavior.rules.every((rule) => triggerKeys.has(rule.triggerKey))).toBe(true);
 
       for (const rule of character.relationshipBehavior.rules) {
-        expect(Object.prototype.hasOwnProperty.call(rule.when, 'stageKeys')).toBe(false);
+        const when: CharacterRelationshipBehaviorContent['rules'][number]['when'] = rule.when;
+        expect(Object.prototype.hasOwnProperty.call(when, 'stageKeys')).toBe(false);
         expect(
-          rule.when.recentEventKeys?.every((eventKey) => relationshipEvents.has(eventKey)) ?? true,
+          when.recentEventKeys?.every((eventKey) => relationshipEvents.has(eventKey)) ?? true,
         ).toBe(true);
         expect(
-          [rule.when.trustBands, rule.when.closenessBands, rule.when.frictionBands]
+          [when.trustBands, when.closenessBands, when.frictionBands]
             .filter((bands): bands is readonly ('low' | 'medium' | 'high')[] => bands !== undefined)
             .flat()
             .every((band) => ['low', 'medium', 'high'].includes(band)),
