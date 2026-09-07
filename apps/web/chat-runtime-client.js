@@ -1,4 +1,4 @@
-import { getActiveBearer } from './product-auth.js';
+import { getActiveBearer, invalidateGuestSession, invalidateMemberSession } from './product-auth.js';
 
 const params = new URLSearchParams(window.location.search);
 const threadId = params.get('threadId');
@@ -159,6 +159,14 @@ function renderRoomState(payload) {
   if (contextTitle) contextTitle.textContent = '';
 }
 
+function invalidateRejectedBearer(activeBearer) {
+  if (activeBearer?.kind === 'member') {
+    invalidateMemberSession();
+    return;
+  }
+  if (activeBearer?.kind === 'guest') invalidateGuestSession();
+}
+
 async function loadRoomState() {
   if (!threadId) {
     if (historyEmpty) {
@@ -187,6 +195,10 @@ async function loadRoomState() {
       },
     });
 
+    if (response.status === 401) {
+      invalidateRejectedBearer(activeBearer);
+      throw new Error('Character Room read requires a current session.');
+    }
     if (!response.ok) {
       throw new Error(`Character Room read failed with ${response.status}.`);
     }
