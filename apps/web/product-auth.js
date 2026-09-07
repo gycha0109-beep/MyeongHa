@@ -96,7 +96,27 @@ function stageMemberBearerForLegacyProductClients(accessToken) {
   writeSession(GUEST_TOKEN_KEY, accessToken);
 }
 
-function discardMemberSession() {
+function sameMemberSessionGeneration(left, right) {
+  return Boolean(
+    left &&
+    right &&
+    left.accessToken === right.accessToken &&
+    left.refreshToken === right.refreshToken
+  );
+}
+
+function discardMemberSession(expectedAccessToken = null, expectedRefreshToken = null) {
+  if (expectedAccessToken !== null) {
+    const current = readMemberSession();
+    if (
+      !current ||
+      current.accessToken !== expectedAccessToken ||
+      (expectedRefreshToken !== null && current.refreshToken !== expectedRefreshToken)
+    ) {
+      return false;
+    }
+  }
+
   removeLocal(MEMBER_SESSION_KEY);
   const active = readSession(GUEST_TOKEN_KEY);
   if (isJwtLike(active) || (active !== null && !normalizeGuestBearer(active))) {
@@ -111,14 +131,33 @@ function discardMemberSession() {
     removeSession(PENDING_GUEST_TOKEN_KEY);
   }
   emitAuthChanged();
+  return true;
 }
 
-function discardGuestSession() {
+function discardGuestSession(expectedBearer = null) {
+  if (expectedBearer !== null) {
+    const normalized = normalizeGuestBearer(expectedBearer);
+    if (!normalized) return false;
+
+    let changed = false;
+    if (readSession(GUEST_TOKEN_KEY) === normalized) {
+      removeSession(GUEST_TOKEN_KEY);
+      changed = true;
+    }
+    if (readSession(PENDING_GUEST_TOKEN_KEY) === normalized) {
+      removeSession(PENDING_GUEST_TOKEN_KEY);
+      changed = true;
+    }
+    if (changed) emitAuthChanged();
+    return changed;
+  }
+
   const active = readSession(GUEST_TOKEN_KEY);
   if (active && !isJwtLike(active)) removeSession(GUEST_TOKEN_KEY);
   const pending = readSession(PENDING_GUEST_TOKEN_KEY);
   if (pending && !isJwtLike(pending)) removeSession(PENDING_GUEST_TOKEN_KEY);
   emitAuthChanged();
+  return true;
 }
 
 function isAuthoritativeRefreshRejection(error) {
@@ -241,12 +280,12 @@ export async function ensureGuestBearer() {
   return token;
 }
 
-export function invalidateMemberSession() {
-  discardMemberSession();
+export function invalidateMemberSession(expectedAccessToken = null) {
+  return discardMemberSession(expectedAccessToken);
 }
 
-export function invalidateGuestSession() {
-  discardGuestSession();
+export function invalidateGuestSession(expectedBearer = null) {
+  return discardGuestSession(expectedBearer);
 }
 
 export async function refreshMemberSession() {
@@ -257,10 +296,15 @@ export async function refreshMemberSession() {
     if (!isRecord(data) || data.status !== 'authenticated') {
       throw new ProductAuthError('WEB_AUTH_MALFORMED_SESSION', '갱신된 세션 응답이 올바르지 않습니다.');
     }
+
+    const latest = readMemberSession();
+    if (!sameMemberSessionGeneration(latest, current)) {
+      return latest;
+    }
     return saveSession(data.session);
   } catch (error) {
     if (isAuthoritativeRefreshRejection(error)) {
-      discardMemberSession();
+      discardMemberSession(current.accessToken, current.refreshToken);
     }
     throw error;
   }
@@ -278,7 +322,11 @@ export async function getMemberAccessToken() {
     const refreshed = await refreshMemberSession();
     return refreshed?.accessToken ?? null;
   } catch (error) {
-    if (!isAuthoritativeRefreshRejection(error) && expiresAt > Date.now()) {
+    const latest = readMemberSession();
+    if (latest && !sameMemberSessionGeneration(latest, current)) {
+      return getMemberAccessToken();
+    }
+    if (!isAuthoritativeRefreshRejection(error) && latest && expiresAt > Date.now()) {
       stageMemberBearerForLegacyProductClients(current.accessToken);
       return current.accessToken;
     }
