@@ -205,6 +205,20 @@ async function connectCdp(port) {
   return { send, evaluate, close: () => ws.close() };
 }
 
+function isNavigationContextRace(error) {
+  return error instanceof Error
+    && error.message === 'Runtime.evaluate: Inspected target navigated or closed';
+}
+
+async function evaluateAcrossExpectedNavigation(client, expression) {
+  try {
+    return { completed: true, value: await client.evaluate(expression) };
+  } catch (error) {
+    if (!isNavigationContextRace(error)) throw error;
+    return { completed: false, value: undefined };
+  }
+}
+
 async function navigate(client, origin, pathname, selector, timeout = 10_000) {
   const result = await client.send('Page.navigate', { url: `${origin}${pathname}` });
   assert(!result.errorText, `Navigation failed for ${pathname}: ${result.errorText}`);
@@ -212,11 +226,16 @@ async function navigate(client, origin, pathname, selector, timeout = 10_000) {
   const selectorLiteral = JSON.stringify(selector);
   const deadline = Date.now() + timeout;
   while (Date.now() < deadline) {
-    const state = await client.evaluate(`(() => ({
+    const evaluation = await evaluateAcrossExpectedNavigation(client, `(() => ({
       pathname: location.pathname,
       readyState: document.readyState,
       found: Boolean(document.querySelector(${selectorLiteral})),
     }))()`);
+    if (!evaluation.completed) {
+      await sleep(50);
+      continue;
+    }
+    const state = evaluation.value;
     if (state?.pathname === cleanPath && state.readyState === 'complete' && state.found) return;
     await sleep(50);
   }
@@ -226,7 +245,8 @@ async function navigate(client, origin, pathname, selector, timeout = 10_000) {
 async function waitFor(client, expression, message, timeout = 8_000) {
   const deadline = Date.now() + timeout;
   while (Date.now() < deadline) {
-    if (await client.evaluate(expression)) return;
+    const evaluation = await evaluateAcrossExpectedNavigation(client, expression);
+    if (evaluation.completed && evaluation.value) return;
     await sleep(50);
   }
   const diagnostics = await client.evaluate(`(() => ({
@@ -244,7 +264,7 @@ async function submitSignIn(client) {
     `document.readyState === 'complete' && location.pathname === '/auth.html' && Boolean(document.querySelector('#auth-form'))`,
     'Auth form did not fully initialize before sign-in',
   );
-  await client.evaluate(`(() => {
+  await evaluateAcrossExpectedNavigation(client, `(() => {
     document.querySelector('#auth-email').value = ${JSON.stringify(testIdentity.email)};
     document.querySelector('#auth-password').value = ${JSON.stringify(testIdentity.password)};
     document.querySelector('#auth-form').requestSubmit();
@@ -313,7 +333,7 @@ try {
     `document.querySelector('#my-account-email')?.textContent?.trim() === ${JSON.stringify(testIdentity.email)} && Boolean(document.querySelector('.my-auth-actions button'))`,
     'My page did not resolve the signed-in Member account and logout action',
   );
-  await client.evaluate(`document.querySelector('.my-auth-actions button')?.click()`);
+  await evaluateAcrossExpectedNavigation(client, `document.querySelector('.my-auth-actions button')?.click()`);
   await waitFor(
     client,
     `location.pathname === '/auth.html' && !localStorage.getItem('myeongha.memberSession.v1')`,
@@ -332,7 +352,7 @@ try {
     `document.querySelector('.product-profile')?.dataset.authState === 'guest'`,
     'Signed-out hall did not render Guest state',
   );
-  await client.evaluate(`document.querySelector('.product-profile')?.click()`);
+  await evaluateAcrossExpectedNavigation(client, `document.querySelector('.product-profile')?.click()`);
   await waitFor(client, `location.pathname === '/auth.html' && Boolean(document.querySelector('#auth-form'))`, 'Guest login action did not navigate to auth');
 
   await submitSignIn(client);
