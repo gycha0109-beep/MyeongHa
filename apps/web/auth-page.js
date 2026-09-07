@@ -1,7 +1,7 @@
 import {
-  PRODUCT_AUTH_STORAGE_V1,
   ProductAuthError,
   clearPromotedGuestBearer,
+  ensureGuestBearer,
   readGuestBearer,
   readMemberSession,
   signInWithPassword,
@@ -164,32 +164,6 @@ function clearConfirmationGuestHandoffIfMatches(memberEmail, promotedGuestBearer
   return true;
 }
 
-async function ensureGuestForNewAccount() {
-  if (readGuestBearer()) return;
-  const response = await fetch('/api/session/bootstrap', {
-    method: 'POST',
-    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-    credentials: 'same-origin',
-    cache: 'no-store',
-    body: '{}',
-  });
-  let payload = null;
-  try {
-    payload = await response.json();
-  } catch {
-    payload = null;
-  }
-  if (!response.ok || !payload || payload.ok !== true || !payload.data) {
-    throw new ProductAuthError('WEB_AUTH_GUEST_PREPARE_FAILED', '게스트 흐름을 계정 연결용으로 준비하지 못했습니다.');
-  }
-  const data = payload.data;
-  const token = data?.guestSession?.bearerToken;
-  if (data.kind !== 'guest' || typeof token !== 'string' || token.length === 0) {
-    throw new ProductAuthError('WEB_AUTH_GUEST_PREPARE_FAILED', '계정 연결용 게스트 세션을 확인하지 못했습니다.');
-  }
-  sessionStorage.setItem(PRODUCT_AUTH_STORAGE_V1.guestBearer, token);
-}
-
 async function promoteGuestIfPresent(accessToken, memberEmail) {
   const guestBearer = readGuestBearer() ?? readConfirmationGuestHandoff(memberEmail);
   if (!guestBearer) return { status: 'none' };
@@ -285,7 +259,7 @@ async function onSubmit(event) {
   setStatus('');
   try {
     if (mode === 'sign-up') {
-      await ensureGuestForNewAccount();
+      await ensureGuestBearer();
       const result = await signUpWithPassword(email, password, nextHref());
       if (result.status === 'verification_required') {
         if (!stageConfirmationGuestHandoff(result.email)) {
