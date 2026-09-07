@@ -2,9 +2,16 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-const source = readFileSync(join(process.cwd(), 'apps', 'web', 'chat-runtime-client.js'), 'utf8');
+const webRoot = join(process.cwd(), 'apps', 'web');
+const source = readFileSync(join(webRoot, 'chat-runtime-client.js'), 'utf8');
+const chatHtml = readFileSync(join(webRoot, 'chat.html'), 'utf8');
 
 describe('Chat authoritative bearer rejection boundary', () => {
+  it('loads the Chat auth runtime as an executable ES module', () => {
+    expect(chatHtml).toContain('<script type="module" src="chat-runtime-client.js"></script>');
+    expect(chatHtml).not.toContain('<script src="chat-runtime-client.js" defer></script>');
+  });
+
   it('binds the current Member or Guest bearer to the room read request', () => {
     expect(source).toContain("import { getActiveBearer, invalidateGuestSession, invalidateMemberSession } from './product-auth.js'");
     expect(source).toContain('const activeBearer = await getActiveBearer()');
