@@ -249,13 +249,24 @@ async function submitSignIn(client) {
 }
 
 async function readAuthority(client) {
-  return client.evaluate(`(() => ({
-    pathname: location.pathname,
-    member: JSON.parse(localStorage.getItem(${JSON.stringify(memberKey)}) ?? 'null'),
-    handoff: JSON.parse(localStorage.getItem(${JSON.stringify(handoffKey)}) ?? 'null'),
-    active: sessionStorage.getItem(${JSON.stringify(activeBearerKey)}),
-    pending: sessionStorage.getItem(${JSON.stringify(pendingGuestKey)}),
-  }))()`);
+  return client.evaluate(`(() => {
+    const storedHandoff = JSON.parse(localStorage.getItem(${JSON.stringify(handoffKey)}) ?? 'null');
+    const handoffs = storedHandoff?.version === 2 && Array.isArray(storedHandoff.entries)
+      ? storedHandoff.entries
+      : storedHandoff ? [storedHandoff] : [];
+    const handoff = handoffs.find((entry) => (
+      entry?.guestBearer === ${JSON.stringify(guestA)}
+      && String(entry?.email ?? '').trim().toLowerCase() === ${JSON.stringify(identity.email)}
+    )) ?? null;
+    return {
+      pathname: location.pathname,
+      member: JSON.parse(localStorage.getItem(${JSON.stringify(memberKey)}) ?? 'null'),
+      handoff,
+      handoffCount: handoffs.length,
+      active: sessionStorage.getItem(${JSON.stringify(activeBearerKey)}),
+      pending: sessionStorage.getItem(${JSON.stringify(pendingGuestKey)}),
+    };
+  })()`);
 }
 
 for (const file of ['auth.html', 'auth-page.js', 'product-auth.js', 'product-auth-ui.js', 'hall.html']) {
