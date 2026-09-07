@@ -25,9 +25,15 @@ describe('web auth recovery boundary', () => {
     expect(authPage).toContain("const CONFIRMATION_GUEST_HANDOFF_KEY = 'myeongha.pendingGuestConfirmation.v1'");
     expect(authPage).toContain('const CONFIRMATION_GUEST_HANDOFF_VERSION = 2');
     expect(authPage).toContain("const CONFIRMATION_GUEST_HANDOFF_LOCK_NAME = 'myeongha.pendingGuestConfirmation.v1.lock'");
+    expect(authPage).toContain("const CONFIRMATION_GUEST_HANDOFF_JOURNAL_MARKER_KEY = 'myeongha.pendingGuestConfirmation.journal.v1'");
+    expect(authPage).toContain("const CONFIRMATION_GUEST_HANDOFF_ENTRY_PREFIX = 'myeongha.pendingGuestConfirmation.entry.v1.'");
     expect(authPage).toContain('CONFIRMATION_GUEST_HANDOFF_TTL_MS');
     expect(authPage).toContain('globalThis.navigator?.locks');
     expect(authPage).toContain("locks.request(CONFIRMATION_GUEST_HANDOFF_LOCK_NAME, { mode: 'exclusive' }");
+    expect(authPage).toContain('writeConfirmationGuestHandoffJournalEntry(entry)');
+    expect(authPage).toContain('ensureConfirmationGuestHandoffJournalInitialized()');
+    expect(authPage).toContain('readConfirmationGuestHandoffJournalCandidates()');
+    expect(authPage).toContain('removeConfirmationGuestHandoffJournalMatches(expectedEmail, promotedGuestBearer)');
     expect(authPage).toContain('async function stageConfirmationGuestHandoff(email)');
     expect(authPage).toContain('if (!locks) return false');
     expect(authPage).toContain('if (!await stageConfirmationGuestHandoff(result.email))');
@@ -37,7 +43,6 @@ describe('web auth recovery boundary', () => {
     expect(authPage).toContain('Array.isArray(stored.entries)');
     expect(authPage).toContain('entry.email === expectedEmail');
     expect(authPage).toContain('if (matches.length !== 1) return null');
-    expect(authPage).toContain('entry.guestBearer === promotedGuestBearer');
     expect(authPage).toContain("'X-MyeongHa-Guest-Bearer': guestBearer");
     expect(authPage).not.toContain('subjectId');
     expect(authPage).not.toContain('authUserId');

@@ -55,10 +55,17 @@ await runBrowserGate({
 });
 
 await runBrowserGate({
-  script: 'scripts/verify-web-auth-concurrent-confirmation-handoff-browser.mjs',
+  script: 'scripts/verify-web-auth-concurrent-confirmation-journal-browser.mjs',
   marker: 'MyeongHa_WEB_AUTH_CONCURRENT_CONFIRMATION_HANDOFF_BROWSER_PASS',
-  cleanupPrefix: '/tmp/myeongha-auth-concurrent-confirmation-handoff-browser-',
-  label: 'MyeongHa auth concurrent confirmation handoff browser smoke',
+  cleanupPrefix: '/tmp/myeongha-auth-concurrent-confirmation-journal-browser-',
+  label: 'MyeongHa auth concurrent confirmation journal browser smoke',
+});
+
+await runBrowserGate({
+  script: 'scripts/verify-web-auth-rejected-bearer-browser.mjs',
+  marker: 'MyeongHa_WEB_AUTH_REJECTED_BEARER_BROWSER_PASS',
+  cleanupPrefix: '/tmp/myeongha-auth-rejected-bearer-browser-',
+  label: 'MyeongHa auth rejected bearer browser smoke',
 });
 
 try {

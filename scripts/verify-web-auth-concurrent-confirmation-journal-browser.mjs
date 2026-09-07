@@ -14,9 +14,12 @@ const memberKey = 'myeongha.memberSession.v1';
 const activeBearerKey = 'myeongha.guestBearer.v1';
 const pendingGuestKey = 'myeongha.pendingGuestBearer.v1';
 const password = 'browser-password-12345';
-const email = 'confirmation-handoff@example.com';
-const guestA = 'guest-confirmation-a';
-const guestB = 'guest-confirmation-b';
+const emailA = 'concurrent-journal-a@example.com';
+const emailB = 'concurrent-journal-b@example.com';
+const guestA = 'guest-concurrent-journal-a';
+const guestB = 'guest-concurrent-journal-b';
+const memberA = 'concurrent-a.member.signature';
+const memberB = 'concurrent-b.member.signature';
 const mime = new Map([
   ['.html', 'text/html; charset=utf-8'],
   ['.css', 'text/css; charset=utf-8'],
@@ -29,11 +32,19 @@ const mime = new Map([
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
 const requests = [];
-let scenario = 'idle';
+const signUpWaiters = [];
 let requestNo = 0;
 
-function memberToken() {
-  return `${scenario}.member.signature`;
+function memberTokenFor(email) {
+  if (email === emailA) return memberA;
+  if (email === emailB) return memberB;
+  throw new Error(`Unexpected member email ${email}`);
+}
+
+function expectedGuestForMemberAuthorization(authorization) {
+  if (authorization === `Bearer ${memberA}`) return { email: emailA, guestBearer: guestA };
+  if (authorization === `Bearer ${memberB}`) return { email: emailB, guestBearer: guestB };
+  return null;
 }
 
 function envelope(data) {
@@ -42,21 +53,8 @@ function envelope(data) {
     ok: true,
     data,
     meta: {
-      apiContractVersion: 'auth-confirmation-handoff-journal-browser-v1',
-      requestId: `auth-confirmation-handoff-${requestNo}`,
-      serverTime: '2026-09-08T00:00:00.000Z',
-    },
-  };
-}
-
-function errorEnvelope(code) {
-  requestNo += 1;
-  return {
-    ok: false,
-    error: { code, messageKey: 'auth.guest_merge_required', retryable: false },
-    meta: {
-      apiContractVersion: 'auth-confirmation-handoff-journal-browser-v1',
-      requestId: `auth-confirmation-handoff-${requestNo}`,
+      apiContractVersion: 'auth-concurrent-confirmation-journal-browser-v1',
+      requestId: `concurrent-confirmation-journal-${requestNo}`,
       serverTime: '2026-09-08T00:00:00.000Z',
     },
   };
@@ -75,6 +73,14 @@ async function readJsonBody(req) {
   return raw ? JSON.parse(raw) : {};
 }
 
+function releaseConcurrentSignupsIfReady() {
+  if (signUpWaiters.length !== 2) return;
+  const waiters = signUpWaiters.splice(0, signUpWaiters.length);
+  for (const waiter of waiters) {
+    sendJson(waiter.res, 200, envelope({ status: 'verification_required', email: waiter.email }));
+  }
+}
+
 async function serve() {
   const server = createServer(async (req, res) => {
     try {
@@ -83,45 +89,44 @@ async function serve() {
 
       if (pathname === '/api/auth/sign-up' && req.method === 'POST') {
         const body = await readJsonBody(req);
-        assert(body.email === email && body.password === password, 'Unexpected sign-up payload');
-        requests.push({ scenario, path: pathname, email: body.email });
-        sendJson(res, 200, envelope({ status: 'verification_required', email }));
+        assert(body.password === password, 'Unexpected sign-up password');
+        assert(body.email === emailA || body.email === emailB, `Unexpected sign-up email ${body.email}`);
+        requests.push({ path: pathname, email: body.email });
+        signUpWaiters.push({ res, email: body.email });
+        releaseConcurrentSignupsIfReady();
         return;
       }
 
       if (pathname === '/api/auth/sign-in' && req.method === 'POST') {
         const body = await readJsonBody(req);
-        assert(body.email === email && body.password === password, 'Unexpected sign-in payload');
-        requests.push({ scenario, path: pathname, email: body.email });
+        assert(body.password === password, 'Unexpected sign-in password');
+        assert(body.email === emailA || body.email === emailB, `Unexpected sign-in email ${body.email}`);
+        requests.push({ path: pathname, email: body.email });
         sendJson(res, 200, envelope({
           status: 'authenticated',
           session: {
-            accessToken: memberToken(),
-            refreshToken: `refresh-${scenario}`,
+            accessToken: memberTokenFor(body.email),
+            refreshToken: `refresh-${body.email}`,
             expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
             tokenType: 'bearer',
-            user: { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', email },
+            user: { id: body.email === emailA ? 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' : 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', email: body.email },
           },
         }));
         return;
       }
 
       if (pathname === '/api/auth/promote-guest' && req.method === 'POST') {
+        const expected = expectedGuestForMemberAuthorization(req.headers.authorization ?? null);
+        assert(expected, `Unexpected Member authorization ${req.headers.authorization ?? null}`);
         const promotedGuest = req.headers['x-myeongha-guest-bearer'] ?? null;
-        const expectedGuest = scenario === 'collision' ? guestB : guestA;
-        assert(req.headers.authorization === `Bearer ${memberToken()}`, `${scenario}: unexpected Member bearer`);
-        assert(promotedGuest === expectedGuest, `${scenario}: promoted ${promotedGuest} instead of ${expectedGuest}`);
-        requests.push({ scenario, path: pathname, promotedGuest });
-        if (scenario === 'merge-required') {
-          sendJson(res, 409, errorEnvelope('GUEST_MERGE_REQUIRED'));
-        } else {
-          sendJson(res, 200, envelope({ status: 'promoted' }));
-        }
+        assert(promotedGuest === expected.guestBearer, `${expected.email} promoted ${promotedGuest} instead of ${expected.guestBearer}`);
+        requests.push({ path: pathname, email: expected.email, promotedGuest });
+        sendJson(res, 200, envelope({ status: 'promoted' }));
         return;
       }
 
       if (pathname === '/api/session/bootstrap' && req.method === 'POST') {
-        throw new Error(`${scenario}: unexpected Guest bootstrap`);
+        throw new Error('Concurrent journal scenario unexpectedly bootstrapped a Guest');
       }
 
       if (pathname.startsWith('/api/')) {
@@ -233,67 +238,74 @@ async function waitFor(client, expression, message) {
       .map((key) => localStorage.getItem(key)),
     member: localStorage.getItem(${JSON.stringify(memberKey)}),
     active: sessionStorage.getItem(${JSON.stringify(activeBearerKey)}),
-    pending: sessionStorage.getItem(${JSON.stringify(pendingGuestKey)}),
   }))()`);
   throw new Error(`${message}; diagnostics=${JSON.stringify(diagnostics)}; requests=${JSON.stringify(requests)}`);
 }
 
-async function resetScenario(client, origin) {
+function journalCountExpression(expected) {
+  return `(() => Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index)).filter((key) => key?.startsWith(${JSON.stringify(entryPrefix)})).length === ${expected})()`;
+}
+
+async function readJournalEntries(client) {
+  return client.evaluate(`(() => Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index))
+    .filter((key) => key?.startsWith(${JSON.stringify(entryPrefix)}))
+    .map((key) => JSON.parse(localStorage.getItem(key))))()`);
+}
+
+function assertJournalEntries(entries, expected) {
+  assert(entries.length === expected.length, `Expected ${expected.length} journal entries, got ${entries.length}`);
+  for (const [email, guestBearer] of expected) {
+    assert(entries.some((entry) => entry.email === email && entry.guestBearer === guestBearer && Date.parse(entry.expiresAt) > Date.now()), `Missing journal entry ${email}/${guestBearer}`);
+  }
+}
+
+async function prepareGuestTab(client, origin, guestBearer, { clearShared = false } = {}) {
   await navigate(client, origin, '/auth.html?next=hall.html', '#auth-form');
   await client.evaluate(`(() => {
+    ${clearShared ? `
     localStorage.removeItem(${JSON.stringify(handoffKey)});
     localStorage.removeItem(${JSON.stringify(journalMarkerKey)});
-    localStorage.removeItem(${JSON.stringify(memberKey)});
     for (const key of Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index))) {
       if (key?.startsWith(${JSON.stringify(entryPrefix)})) localStorage.removeItem(key);
     }
-    sessionStorage.removeItem(${JSON.stringify(activeBearerKey)});
+    ` : ''}
+    localStorage.removeItem(${JSON.stringify(memberKey)});
+    sessionStorage.setItem(${JSON.stringify(activeBearerKey)}, ${JSON.stringify(guestBearer)});
     sessionStorage.removeItem(${JSON.stringify(pendingGuestKey)});
   })()`);
 }
 
-async function stageGuestA(client, origin) {
-  await resetScenario(client, origin);
-  await client.evaluate(`sessionStorage.setItem(${JSON.stringify(activeBearerKey)}, ${JSON.stringify(guestA)})`);
-  await client.evaluate(`(() => {
+async function scheduleSignUp(client, email) {
+  const scheduled = await client.evaluate(`(() => {
     document.querySelector('#auth-tab-signup').click();
     document.querySelector('#auth-email').value = ${JSON.stringify(email)};
     document.querySelector('#auth-password').value = ${JSON.stringify(password)};
     document.querySelector('#auth-password-confirm').value = ${JSON.stringify(password)};
-    document.querySelector('#auth-form').requestSubmit();
+    setTimeout(() => document.querySelector('#auth-form').requestSubmit(), 0);
+    return true;
   })()`);
-  await waitFor(client, `document.querySelector('#auth-status')?.textContent?.includes('확인 메일을 보냈습니다') === true`, `${scenario}: Guest A signup did not stage confirmation handoff`);
-  await waitFor(client, `localStorage.getItem(${JSON.stringify(journalMarkerKey)}) === '1'`, `${scenario}: journal marker missing`);
+  assert(scheduled, `Failed to schedule signup ${email}`);
 }
 
-async function signIn(client, origin) {
+async function scheduleSignIn(client, email) {
   await navigate(client, origin, '/auth.html?next=hall.html', '#auth-form');
   await client.evaluate(`(() => {
     document.querySelector('#auth-tab-signin').click();
     document.querySelector('#auth-email').value = ${JSON.stringify(email)};
     document.querySelector('#auth-password').value = ${JSON.stringify(password)};
-    document.querySelector('#auth-form').requestSubmit();
+    setTimeout(() => document.querySelector('#auth-form').requestSubmit(), 0);
   })()`);
-  await waitFor(client, `location.pathname === '/hall.html'`, `${scenario}: Member login did not finish`);
-}
-
-async function readAuthority(client) {
-  return client.evaluate(`(() => ({
-    member: JSON.parse(localStorage.getItem(${JSON.stringify(memberKey)}) ?? 'null'),
-    active: sessionStorage.getItem(${JSON.stringify(activeBearerKey)}),
-    pending: sessionStorage.getItem(${JSON.stringify(pendingGuestKey)}),
-    journal: Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index))
-      .filter((key) => key?.startsWith(${JSON.stringify(entryPrefix)}))
-      .map((key) => JSON.parse(localStorage.getItem(key))),
-  }))()`);
+  await waitFor(client, `location.pathname === '/hall.html'`, `Member login did not finish for ${email}`);
 }
 
 for (const file of ['auth.html', 'auth-page.js', 'product-auth.js', 'hall.html']) await stat(join(root, file));
 const authPageSource = await readFile(join(root, 'auth-page.js'), 'utf8');
-assert(authPageSource.includes('CONFIRMATION_GUEST_HANDOFF_ENTRY_PREFIX'), 'auth-page.js does not use journal handoffs');
+assert(authPageSource.includes('CONFIRMATION_GUEST_HANDOFF_ENTRY_PREFIX'), 'auth-page.js does not use conflict-free journal entries');
+assert(authPageSource.includes('CONFIRMATION_GUEST_HANDOFF_JOURNAL_MARKER_KEY'), 'auth-page.js does not mark journal authority');
+assert(authPageSource.includes('writeConfirmationGuestHandoffJournalEntry(entry)'), 'verification-required signup does not journal its own handoff');
 
 const { server, origin } = await serve();
-const profile = await mkdtemp(join(tmpdir(), 'myeongha-auth-confirmation-handoff-browser-'));
+const profile = await mkdtemp(join(tmpdir(), 'myeongha-auth-concurrent-confirmation-journal-browser-'));
 const chrome = spawn(chromeBin, [
   '--headless=new',
   '--no-sandbox',
@@ -306,60 +318,62 @@ const chrome = spawn(chromeBin, [
 let chromeError = '';
 chrome.stderr.setEncoding('utf8');
 chrome.stderr.on('data', (chunk) => { chromeError += chunk; });
-let client;
+let tabA;
+let tabB;
 
 try {
-  client = await connectCdp(await devtoolsPort(profile, chrome));
+  const port = await devtoolsPort(profile, chrome);
+  tabA = await connectCdp(port);
+  tabB = await connectCdp(port);
 
-  scenario = 'collision';
-  await stageGuestA(client, origin);
-  await client.evaluate(`sessionStorage.setItem(${JSON.stringify(activeBearerKey)}, ${JSON.stringify(guestB)})`);
-  await signIn(client, origin);
-  const collision = await readAuthority(client);
-  assert(collision.member?.accessToken === 'collision.member.signature', 'Collision lost Member session');
-  assert(collision.active === 'collision.member.signature', 'Collision did not keep Member bearer active');
-  assert(collision.pending === null, 'Collision did not consume current Guest B');
-  assert(collision.journal.length === 1 && collision.journal[0].guestBearer === guestA, 'Collision deleted unrelated confirmation Guest A');
+  await prepareGuestTab(tabA, origin, guestA, { clearShared: true });
+  await prepareGuestTab(tabB, origin, guestB);
 
-  scenario = 'exact';
-  await stageGuestA(client, origin);
-  await client.evaluate(`sessionStorage.removeItem(${JSON.stringify(activeBearerKey)}); sessionStorage.removeItem(${JSON.stringify(pendingGuestKey)});`);
-  await signIn(client, origin);
-  const exact = await readAuthority(client);
-  assert(exact.member?.accessToken === 'exact.member.signature', 'Exact lost Member session');
-  assert(exact.active === 'exact.member.signature', 'Exact did not keep Member bearer active');
-  assert(exact.journal.length === 0, 'Exact promoted confirmation Guest A was not cleared');
+  await Promise.all([scheduleSignUp(tabA, emailA), scheduleSignUp(tabB, emailB)]);
+  await Promise.all([
+    waitFor(tabA, `document.querySelector('#auth-status')?.textContent?.includes('확인 메일을 보냈습니다') === true`, 'Tab A verification-required signup did not finish'),
+    waitFor(tabB, `document.querySelector('#auth-status')?.textContent?.includes('확인 메일을 보냈습니다') === true`, 'Tab B verification-required signup did not finish'),
+  ]);
+  assert(requests.filter((request) => request.path === '/api/auth/sign-up').length === 2, 'Did not observe two concurrent sign-up requests');
+  assert(signUpWaiters.length === 0, 'Concurrent sign-up barrier did not release both responses');
 
-  scenario = 'merge-required';
-  await stageGuestA(client, origin);
-  await client.evaluate(`sessionStorage.removeItem(${JSON.stringify(activeBearerKey)}); sessionStorage.removeItem(${JSON.stringify(pendingGuestKey)});`);
-  await signIn(client, origin);
-  const mergeRequired = await readAuthority(client);
-  assert(mergeRequired.member?.accessToken === 'merge-required.member.signature', 'Merge-required lost Member session');
-  assert(mergeRequired.active === 'merge-required.member.signature', 'Merge-required did not keep Member bearer active');
-  assert(mergeRequired.journal.length === 1 && mergeRequired.journal[0].guestBearer === guestA, 'Merge-required deleted the Guest merge candidate');
+  await waitFor(tabA, journalCountExpression(2), 'Tab A did not converge to two independent journal entries');
+  await waitFor(tabB, journalCountExpression(2), 'Tab B did not converge to two independent journal entries');
+  assertJournalEntries(await readJournalEntries(tabA), [[emailA, guestA], [emailB, guestB]]);
+
+  await tabA.evaluate(`sessionStorage.removeItem(${JSON.stringify(activeBearerKey)}); sessionStorage.removeItem(${JSON.stringify(pendingGuestKey)}); localStorage.removeItem(${JSON.stringify(memberKey)});`);
+  await scheduleSignIn(tabA, emailA);
+  await waitFor(tabA, journalCountExpression(1), 'Member A did not consume exactly one journal entry');
+  assertJournalEntries(await readJournalEntries(tabA), [[emailB, guestB]]);
+
+  await tabB.evaluate(`sessionStorage.removeItem(${JSON.stringify(activeBearerKey)}); sessionStorage.removeItem(${JSON.stringify(pendingGuestKey)}); localStorage.removeItem(${JSON.stringify(memberKey)});`);
+  await scheduleSignIn(tabB, emailB);
+  await waitFor(tabB, journalCountExpression(0), 'Member B did not consume the final journal entry');
+  await waitFor(tabB, `localStorage.getItem(${JSON.stringify(handoffKey)}) === null`, 'Compatibility aggregate was not cleared after final exact promotion');
 
   const promotions = requests.filter((request) => request.path === '/api/auth/promote-guest');
-  assert(promotions.length === 3, `Expected three promotion attempts, got ${promotions.length}`);
-  assert(promotions[0].scenario === 'collision' && promotions[0].promotedGuest === guestB, 'Collision did not prioritize current Guest B');
-  assert(promotions[1].scenario === 'exact' && promotions[1].promotedGuest === guestA, 'Exact did not promote Guest A');
-  assert(promotions[2].scenario === 'merge-required' && promotions[2].promotedGuest === guestA, 'Merge-required did not attempt exact Guest A');
+  assert(promotions.length === 2, `Expected two exact promotions, got ${promotions.length}`);
+  assert(promotions[0].email === emailA && promotions[0].promotedGuest === guestA, 'Member A did not consume Guest A');
+  assert(promotions[1].email === emailB && promotions[1].promotedGuest === guestB, 'Member B did not consume Guest B');
 
   await mkdir(join(process.cwd(), 'artifacts'), { recursive: true });
-  await writeFile(join(process.cwd(), 'artifacts', 'web-auth-confirmation-handoff-browser-smoke.json'), `${JSON.stringify({
+  await writeFile(join(process.cwd(), 'artifacts', 'web-auth-concurrent-confirmation-handoff-browser-smoke.json'), `${JSON.stringify({
     status: 'PASS',
-    collision: { unrelatedHandoffPreserved: true, promotedGuest: guestB },
-    exact: { consumedHandoffCleared: true, promotedGuest: guestA },
-    mergeRequired: { handoffPreserved: true, promotedGuest: guestA },
+    conflictFreeJournalEntriesPreserved: true,
+    memberAConsumedOnlyGuestA: true,
+    memberBConsumedOnlyGuestB: true,
+    compatibilityAggregateCleared: true,
+    promotions,
     requests,
   }, null, 2)}\n`, 'utf8');
-  console.log('MyeongHa_WEB_AUTH_CONFIRMATION_HANDOFF_BROWSER_PASS');
+  console.log('MyeongHa_WEB_AUTH_CONCURRENT_CONFIRMATION_HANDOFF_BROWSER_PASS');
 } catch (error) {
   console.error(error);
   if (chromeError.trim()) console.error(chromeError.trim());
   process.exitCode = 1;
 } finally {
-  client?.close();
+  tabA?.close();
+  tabB?.close();
   chrome.kill('SIGTERM');
   await Promise.race([new Promise((done) => chrome.once('exit', done)), sleep(1_000)]);
   await new Promise((done) => server.close(done));

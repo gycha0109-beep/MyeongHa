@@ -1,5 +1,5 @@
 import { unwrapApiSuccessEnvelope, WebApiEnvelopeError } from './api-envelope.js';
-import { ensureActiveBearer, invalidateMemberSession } from './product-auth.js';
+import { ensureActiveBearer, invalidateGuestSession, invalidateMemberSession } from './product-auth.js';
 
 const DEFAULT_ENDPOINTS = Object.freeze({
   profile: '/api/me',
@@ -49,7 +49,15 @@ async function resolveAuthorizedBearer(resolveBearer) {
   return bearer;
 }
 
-async function readJson(fetchImpl, endpoint, bearer, { invalidateRejectedMember = false } = {}) {
+function invalidateRejectedBearer(bearer) {
+  if (bearer.kind === 'member') {
+    invalidateMemberSession();
+    return;
+  }
+  if (bearer.kind === 'guest') invalidateGuestSession();
+}
+
+async function readJson(fetchImpl, endpoint, bearer) {
   let response;
   try {
     response = await fetchImpl(endpoint, {
@@ -65,10 +73,11 @@ async function readJson(fetchImpl, endpoint, bearer, { invalidateRejectedMember 
     throw new RecordsRuntimeError('WEB_RECORDS_REQUEST_FAILED', 'Records API request failed.', error);
   }
 
-  if (response.status === 401 || response.status === 403) {
-    if (invalidateRejectedMember && response.status === 401 && bearer.kind === 'member') {
-      invalidateMemberSession();
-    }
+  if (response.status === 401) {
+    invalidateRejectedBearer(bearer);
+    throw new RecordsRuntimeError('WEB_RECORDS_SESSION_REQUIRED', 'A current session is required.');
+  }
+  if (response.status === 403) {
     throw new RecordsRuntimeError('WEB_RECORDS_SESSION_REQUIRED', 'A current session is required.');
   }
   if (!response.ok) {
@@ -97,18 +106,18 @@ export function createRecordsRuntimeClient(options = {}) {
   const resolveBearer = options.resolveBearer ?? ensureActiveBearer;
   const endpoints = Object.freeze({ ...DEFAULT_ENDPOINTS, ...(options.endpoints ?? {}) });
 
-  async function readEndpoint(endpoint, readOptions) {
+  async function readEndpoint(endpoint) {
     const bearer = await resolveAuthorizedBearer(resolveBearer);
-    return readJson(fetchImpl, endpoint, bearer, readOptions);
+    return readJson(fetchImpl, endpoint, bearer);
   }
 
   return Object.freeze({
-    readProfile: () => readEndpoint(endpoints.profile, { invalidateRejectedMember: true }),
+    readProfile: () => readEndpoint(endpoints.profile),
     readLifeFacts: () => readEndpoint(endpoints.lifeFacts),
     readMemories: () => readEndpoint(endpoints.memories),
     async readRecords() {
       const bearer = await resolveAuthorizedBearer(resolveBearer);
-      const profile = await readJson(fetchImpl, endpoints.profile, bearer, { invalidateRejectedMember: true });
+      const profile = await readJson(fetchImpl, endpoints.profile, bearer);
       const [lifeFacts, memories] = await Promise.all([
         readJson(fetchImpl, endpoints.lifeFacts, bearer),
         readJson(fetchImpl, endpoints.memories, bearer),

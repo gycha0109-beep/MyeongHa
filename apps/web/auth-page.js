@@ -13,6 +13,8 @@ const BIRTH_PROFILE_ID_KEY = 'myeongha.guestBirthProfileId.v1';
 const CONFIRMATION_GUEST_HANDOFF_KEY = 'myeongha.pendingGuestConfirmation.v1';
 const CONFIRMATION_GUEST_HANDOFF_VERSION = 2;
 const CONFIRMATION_GUEST_HANDOFF_LOCK_NAME = 'myeongha.pendingGuestConfirmation.v1.lock';
+const CONFIRMATION_GUEST_HANDOFF_JOURNAL_MARKER_KEY = 'myeongha.pendingGuestConfirmation.journal.v1';
+const CONFIRMATION_GUEST_HANDOFF_ENTRY_PREFIX = 'myeongha.pendingGuestConfirmation.entry.v1.';
 const CONFIRMATION_GUEST_HANDOFF_TTL_MS = 24 * 60 * 60 * 1000;
 const ALLOWED_NEXT = new Set([
   'hall.html',
@@ -150,7 +152,21 @@ function normalizeConfirmationGuestHandoff(value, now = Date.now()) {
   });
 }
 
-function readConfirmationGuestHandoffs() {
+function dedupeConfirmationGuestHandoffs(candidates) {
+  const deduped = new Map();
+  for (const candidate of candidates) {
+    const normalized = normalizeConfirmationGuestHandoff(candidate);
+    if (!normalized) continue;
+    const key = `${normalized.email}\u0000${normalized.guestBearer}`;
+    const previous = deduped.get(key);
+    if (!previous || Date.parse(previous.expiresAt) < Date.parse(normalized.expiresAt)) {
+      deduped.set(key, normalized);
+    }
+  }
+  return [...deduped.values()];
+}
+
+function readLegacyConfirmationGuestHandoffCandidates() {
   let raw = null;
   try {
     raw = localStorage.getItem(CONFIRMATION_GUEST_HANDOFF_KEY);
@@ -167,21 +183,107 @@ function readConfirmationGuestHandoffs() {
     return [];
   }
 
-  const candidates = stored?.version === CONFIRMATION_GUEST_HANDOFF_VERSION && Array.isArray(stored.entries)
+  return stored?.version === CONFIRMATION_GUEST_HANDOFF_VERSION && Array.isArray(stored.entries)
     ? stored.entries
     : [stored];
-  const deduped = new Map();
-  for (const candidate of candidates) {
-    const normalized = normalizeConfirmationGuestHandoff(candidate);
-    if (!normalized) continue;
-    const key = `${normalized.email}\u0000${normalized.guestBearer}`;
-    const previous = deduped.get(key);
-    if (!previous || Date.parse(previous.expiresAt) < Date.parse(normalized.expiresAt)) {
-      deduped.set(key, normalized);
+}
+
+function hasConfirmationGuestHandoffJournal() {
+  try {
+    return localStorage.getItem(CONFIRMATION_GUEST_HANDOFF_JOURNAL_MARKER_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function confirmationGuestHandoffJournalKeys() {
+  const keys = [];
+  try {
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index);
+      if (key?.startsWith(CONFIRMATION_GUEST_HANDOFF_ENTRY_PREFIX)) keys.push(key);
+    }
+  } catch {
+    return [];
+  }
+  return keys;
+}
+
+function readConfirmationGuestHandoffJournalCandidates() {
+  const entries = [];
+  for (const key of confirmationGuestHandoffJournalKeys()) {
+    try {
+      const raw = localStorage.getItem(key);
+      const normalized = raw ? normalizeConfirmationGuestHandoff(JSON.parse(raw)) : null;
+      if (!normalized) {
+        localStorage.removeItem(key);
+        continue;
+      }
+      entries.push(normalized);
+    } catch {
+      try {
+        localStorage.removeItem(key);
+      } catch {}
     }
   }
+  return entries;
+}
 
-  const entries = [...deduped.values()];
+function writeConfirmationGuestHandoffJournalEntry(entry) {
+  const suffix = globalThis.crypto?.randomUUID?.()
+    ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+  try {
+    localStorage.setItem(`${CONFIRMATION_GUEST_HANDOFF_ENTRY_PREFIX}${suffix}`, JSON.stringify(entry));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function removeConfirmationGuestHandoffJournalMatches(expectedEmail, promotedGuestBearer) {
+  let removed = false;
+  for (const key of confirmationGuestHandoffJournalKeys()) {
+    try {
+      const raw = localStorage.getItem(key);
+      const normalized = raw ? normalizeConfirmationGuestHandoff(JSON.parse(raw)) : null;
+      if (!normalized) {
+        localStorage.removeItem(key);
+        continue;
+      }
+      if (normalized.email === expectedEmail && normalized.guestBearer === promotedGuestBearer) {
+        localStorage.removeItem(key);
+        removed = true;
+      }
+    } catch {
+      try {
+        localStorage.removeItem(key);
+      } catch {}
+    }
+  }
+  return removed;
+}
+
+function ensureConfirmationGuestHandoffJournalInitialized() {
+  if (hasConfirmationGuestHandoffJournal()) return true;
+
+  const legacyEntries = dedupeConfirmationGuestHandoffs(readLegacyConfirmationGuestHandoffCandidates());
+  for (const entry of legacyEntries) {
+    if (!writeConfirmationGuestHandoffJournalEntry(entry)) return false;
+  }
+
+  try {
+    localStorage.setItem(CONFIRMATION_GUEST_HANDOFF_JOURNAL_MARKER_KEY, '1');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function readConfirmationGuestHandoffs() {
+  const source = hasConfirmationGuestHandoffJournal()
+    ? readConfirmationGuestHandoffJournalCandidates()
+    : readLegacyConfirmationGuestHandoffCandidates();
+  const entries = dedupeConfirmationGuestHandoffs(source);
   writeConfirmationGuestHandoffs(entries);
   return entries;
 }
@@ -195,15 +297,17 @@ async function stageConfirmationGuestHandoff(email) {
   if (!locks) return false;
   try {
     return await locks.request(CONFIRMATION_GUEST_HANDOFF_LOCK_NAME, { mode: 'exclusive' }, () => {
-      const next = readConfirmationGuestHandoffs().filter((entry) => !(
-        entry.email === normalizedEmail && entry.guestBearer === guestBearer
-      ));
-      next.push(Object.freeze({
+      if (!ensureConfirmationGuestHandoffJournalInitialized()) return false;
+      const entry = Object.freeze({
         guestBearer,
         email: normalizedEmail,
         expiresAt: new Date(Date.now() + CONFIRMATION_GUEST_HANDOFF_TTL_MS).toISOString(),
-      }));
-      return writeConfirmationGuestHandoffs(next);
+      });
+      if (!writeConfirmationGuestHandoffJournalEntry(entry)) return false;
+      const entries = readConfirmationGuestHandoffs();
+      return entries.some((candidate) => (
+        candidate.email === normalizedEmail && candidate.guestBearer === guestBearer
+      ));
     });
   } catch {
     return false;
@@ -222,7 +326,10 @@ async function readConfirmationGuestHandoff(memberEmail) {
   const locks = confirmationGuestHandoffLocks();
   if (!locks) return readExact();
   try {
-    return await locks.request(CONFIRMATION_GUEST_HANDOFF_LOCK_NAME, { mode: 'exclusive' }, readExact);
+    return await locks.request(CONFIRMATION_GUEST_HANDOFF_LOCK_NAME, { mode: 'exclusive' }, () => {
+      if (!ensureConfirmationGuestHandoffJournalInitialized()) return null;
+      return readExact();
+    });
   } catch {
     return null;
   }
@@ -232,12 +339,15 @@ async function clearConfirmationGuestHandoffIfMatches(memberEmail, promotedGuest
   const expectedEmail = normalizeEmail(memberEmail);
   if (!expectedEmail || !promotedGuestBearer) return false;
   const clearExact = () => {
+    if (!ensureConfirmationGuestHandoffJournalInitialized()) return false;
     const current = readConfirmationGuestHandoffs();
     const next = current.filter((entry) => !(
       entry.email === expectedEmail && entry.guestBearer === promotedGuestBearer
     ));
     if (next.length === current.length) return false;
-    return writeConfirmationGuestHandoffs(next);
+    removeConfirmationGuestHandoffJournalMatches(expectedEmail, promotedGuestBearer);
+    writeConfirmationGuestHandoffs(next);
+    return true;
   };
 
   const locks = confirmationGuestHandoffLocks();
