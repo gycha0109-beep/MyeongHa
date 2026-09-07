@@ -242,20 +242,27 @@ try {
     'Verification-required sign-up did not finish',
   );
 
-  const authority = await client.evaluate(`(() => ({
-    guest: sessionStorage.getItem(${JSON.stringify(guestBearerKey)}),
-    handoff: JSON.parse(localStorage.getItem(${JSON.stringify(handoffKey)}) ?? 'null'),
-    member: localStorage.getItem('myeongha.memberSession.v1'),
-    status: document.querySelector('#auth-status')?.textContent?.trim() ?? null,
-  }))()`);
+  const authority = await client.evaluate(`(() => {
+    const handoff = JSON.parse(localStorage.getItem(${JSON.stringify(handoffKey)}) ?? 'null');
+    return {
+      guest: sessionStorage.getItem(${JSON.stringify(guestBearerKey)}),
+      handoff,
+      handoffEntry: Array.isArray(handoff?.entries)
+        ? handoff.entries.find((entry) => entry.email === ${JSON.stringify(email)}) ?? null
+        : handoff,
+      member: localStorage.getItem('myeongha.memberSession.v1'),
+      status: document.querySelector('#auth-status')?.textContent?.trim() ?? null,
+    };
+  })()`);
 
   assert(requests.length === 2, `Expected bootstrap then sign-up, got ${JSON.stringify(requests)}`);
   assert(requests[0]?.path === '/api/session/bootstrap', 'Sign-up did not bootstrap Guest before account creation');
   assert(requests[1]?.path === '/api/auth/sign-up', 'Sign-up request did not follow Guest bootstrap');
   assert(authority.guest === guestToken, 'Centralized Guest bootstrap bearer was not stored');
-  assert(authority.handoff?.guestBearer === guestToken, 'Confirmation handoff did not preserve the bootstrapped Guest lineage');
-  assert(authority.handoff?.email === email, 'Confirmation handoff was not bound to the sign-up email');
-  assert(Date.parse(authority.handoff?.expiresAt ?? '') > Date.now(), 'Confirmation handoff expiration is not in the future');
+  assert(authority.handoff?.version === 2, 'Confirmation handoff did not use the v2 multi-entry store');
+  assert(authority.handoffEntry?.guestBearer === guestToken, 'Confirmation handoff did not preserve the bootstrapped Guest lineage');
+  assert(authority.handoffEntry?.email === email, 'Confirmation handoff was not bound to the sign-up email');
+  assert(Date.parse(authority.handoffEntry?.expiresAt ?? '') > Date.now(), 'Confirmation handoff expiration is not in the future');
   assert(authority.member === null, 'Verification-required sign-up incorrectly created a Member session');
 
   await mkdir(join(process.cwd(), 'artifacts'), { recursive: true });
@@ -264,6 +271,7 @@ try {
     credentialAuthority: 'product-auth.js',
     guestBootstrapPreserved: true,
     confirmationHandoffPreserved: true,
+    confirmationHandoffSchema: 2,
     requests,
   }, null, 2)}\n`, 'utf8');
 

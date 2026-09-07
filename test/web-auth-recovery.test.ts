@@ -21,14 +21,18 @@ describe('web auth recovery boundary', () => {
     expect(authPage).not.toContain('이미 로그인되어 있습니다. 잠시 후 이전 화면으로 이동합니다.');
   });
 
-  it('preserves only the exact signup Guest bearer across email-confirmation tabs with bounded email matching', () => {
+  it('preserves bounded multi-entry signup Guest handoffs and only resolves one exact email candidate', () => {
     expect(authPage).toContain("const CONFIRMATION_GUEST_HANDOFF_KEY = 'myeongha.pendingGuestConfirmation.v1'");
+    expect(authPage).toContain('const CONFIRMATION_GUEST_HANDOFF_VERSION = 2');
     expect(authPage).toContain('CONFIRMATION_GUEST_HANDOFF_TTL_MS');
     expect(authPage).toContain('stageConfirmationGuestHandoff(result.email)');
     expect(authPage).toContain('readConfirmationGuestHandoff(memberEmail)');
-    expect(authPage).toContain('expectedEmail !== handoffEmail');
+    expect(authPage).toContain('Array.isArray(stored.entries)');
+    expect(authPage).toContain('entry.email === expectedEmail');
+    expect(authPage).toContain('if (matches.length !== 1) return null');
+    expect(authPage).toContain('entry.guestBearer === promotedGuestBearer');
     expect(authPage).toContain("'X-MyeongHa-Guest-Bearer': guestBearer");
-    expect(authPage).toContain('clearConfirmationGuestHandoff()');
+    expect(authPage).toContain('writeConfirmationGuestHandoffs(next)');
     expect(authPage).not.toContain('subjectId');
     expect(authPage).not.toContain('authUserId');
   });

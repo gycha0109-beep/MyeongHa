@@ -56,6 +56,10 @@ jobs:
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
         run: node scripts/run-web-auth-confirmation-handoff-browser-smoke.mjs
+      - name: Verify multiple signup confirmation Guest handoffs
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/run-web-auth-multi-confirmation-handoff-browser-smoke.mjs
       - name: Verify cross-tab authentication convergence
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
@@ -129,6 +133,7 @@ jobs:
             artifacts/web-auth-failed-login-guest-browser-smoke*
             artifacts/web-auth-promotion-failure-browser-smoke*
             artifacts/web-auth-confirmation-handoff-browser-smoke*
+            artifacts/web-auth-multi-confirmation-handoff-browser-smoke*
             artifacts/web-auth-cross-tab-browser-smoke*
             artifacts/web-auth-cross-tab-signout-failure-browser-smoke*
             artifacts/web-auth-cross-tab-session-expired-browser-smoke*
