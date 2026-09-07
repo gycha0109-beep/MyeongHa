@@ -48,9 +48,9 @@ function clearBirthSession() {
 
 function handleUnauthorized(activeBearer) {
   if (activeBearer?.kind === 'member') {
-    invalidateMemberSession();
+    invalidateMemberSession(activeBearer.token);
   } else if (activeBearer?.kind === 'guest') {
-    invalidateGuestSession();
+    invalidateGuestSession(activeBearer.token);
   }
   clearBirthSession();
 }
