@@ -122,9 +122,17 @@ async function serve() {
           res.end(envelope({ unexpected: true }));
           return;
         }
-        if (authorization === 'Bearer unauthorized-guest-bearer') {
+        if (
+          authorization === 'Bearer unauthorized-guest-bearer' ||
+          authorization === 'Bearer rejected.header.signature'
+        ) {
           res.statusCode = 401;
           res.end(JSON.stringify({ ok: false, error: { code: 'UNAUTHORIZED' } }));
+          return;
+        }
+        if (authorization === 'Bearer forbidden.header.signature') {
+          res.statusCode = 403;
+          res.end(JSON.stringify({ ok: false, error: { code: 'FORBIDDEN' } }));
           return;
         }
         if (
@@ -366,7 +374,36 @@ try {
   assert(requests.bootstrap === 0, 'refreshed member unexpectedly bootstrapped a guest session');
   assert(requests.lastCurrentAuthorization === 'Bearer refreshed.header.signature', 'refreshed member current read used the wrong bearer');
 
-  // Unauthorized and malformed current reads both lock create UI and never POST.
+  // Authoritative Member 401 invalidates the stored Member session and compatibility bearer.
+  await primeStorage(client, origin, `localStorage.setItem('myeongha.memberSession.v1', JSON.stringify({
+    accessToken: 'rejected.header.signature',
+    refreshToken: 'rejected-refresh-token',
+    expiresAt: '2099-01-01T00:00:00.000Z',
+    tokenType: 'bearer',
+    user: { id: '11111111-1111-4111-8111-111111111111', email: 'member@example.com' }
+  }));`);
+  resetRequests();
+  await openBirth(client, origin);
+  await waitFor(client, `document.querySelector('#birth-status')?.innerText.includes('새 명식록 생성을 허용하지 않습니다.')`, 'rejected Member did not fail closed');
+  assert(requests.lastCurrentAuthorization === 'Bearer rejected.header.signature', 'rejected Member current read used the wrong bearer');
+  assert(await client.evaluate(`localStorage.getItem('myeongha.memberSession.v1') === null`), 'Birth 401 retained the rejected Member session');
+  assert(await client.evaluate(`sessionStorage.getItem('myeongha.guestBearer.v1') === null`), 'Birth 401 retained the rejected Member compatibility bearer');
+
+  // Member 403 fails closed but preserves the valid browser Member session for authorization-level denial.
+  await primeStorage(client, origin, `localStorage.setItem('myeongha.memberSession.v1', JSON.stringify({
+    accessToken: 'forbidden.header.signature',
+    refreshToken: 'forbidden-refresh-token',
+    expiresAt: '2099-01-01T00:00:00.000Z',
+    tokenType: 'bearer',
+    user: { id: '11111111-1111-4111-8111-111111111111', email: 'member@example.com' }
+  }));`);
+  resetRequests();
+  await openBirth(client, origin);
+  await waitFor(client, `document.querySelector('#birth-status')?.innerText.includes('새 명식록 생성을 허용하지 않습니다.')`, 'forbidden Member did not fail closed');
+  assert(requests.lastCurrentAuthorization === 'Bearer forbidden.header.signature', 'forbidden Member current read used the wrong bearer');
+  assert(await client.evaluate(`JSON.parse(localStorage.getItem('myeongha.memberSession.v1') ?? 'null')?.accessToken === 'forbidden.header.signature'`), 'Birth 403 invalidated the Member session');
+
+  // Unauthorized and malformed Guest current reads both lock create UI and never POST; 401 also clears the rejected Guest bearer.
   for (const [bearer, expectedText] of [
     ['unauthorized-guest-bearer', '새 명식록 생성을 허용하지 않습니다.'],
     ['malformed-guest-bearer', '중복 생성을 막기 위해 새 명식록 입력을 잠갔습니다.'],
@@ -377,6 +414,9 @@ try {
     await waitFor(client, `document.querySelector('#birth-status')?.innerText.includes(${JSON.stringify(expectedText)})`, `${bearer} did not fail closed`);
     assert(await client.evaluate(`document.querySelector('#birth-form')?.hidden === true`), `${bearer} exposed create form`);
     assert(requests.create === 0, `${bearer} issued create POST`);
+    if (bearer === 'unauthorized-guest-bearer') {
+      assert(await client.evaluate(`sessionStorage.getItem('myeongha.guestBearer.v1') === null`), 'Birth 401 retained the rejected Guest bearer');
+    }
   }
 
   // Mobile 390px: authoritative empty state opens a bounded form and action.

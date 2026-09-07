@@ -1,5 +1,5 @@
 import { readApiErrorCode, unwrapApiSuccessEnvelope, WebApiEnvelopeError } from './api-envelope.js';
-import { ensureActiveBearer } from './product-auth.js';
+import { ensureActiveBearer, invalidateGuestSession, invalidateMemberSession } from './product-auth.js';
 
 const DEFAULT_ENDPOINT = '/api/birth-profiles';
 const DEFAULT_CURRENT_ENDPOINT = '/api/me/birth-profile';
@@ -106,6 +106,24 @@ function authorizationHeaders(token, json = false) {
   };
 }
 
+function invalidateRejectedBearer(activeBearer) {
+  if (activeBearer.kind === 'member') {
+    invalidateMemberSession();
+    return;
+  }
+  if (activeBearer.kind === 'guest') invalidateGuestSession();
+}
+
+function rejectSessionStatus(response, activeBearer) {
+  if (response.status === 401) {
+    invalidateRejectedBearer(activeBearer);
+    throw new BirthRuntimeError('WEB_BIRTH_SESSION_REQUIRED', 'A current session is required.');
+  }
+  if (response.status === 403) {
+    throw new BirthRuntimeError('WEB_BIRTH_SESSION_REQUIRED', 'A current session is required.');
+  }
+}
+
 async function parseSuccessEnvelope(response, malformedCode, malformedMessage) {
   let envelope;
   try {
@@ -145,9 +163,7 @@ export function createBirthRuntimeClient(options = {}) {
         throw new BirthRuntimeError('WEB_BIRTH_CURRENT_REQUEST_FAILED', 'Current Birth Profile API request failed.', error);
       }
 
-      if (response.status === 401 || response.status === 403) {
-        throw new BirthRuntimeError('WEB_BIRTH_SESSION_REQUIRED', 'A current session is required.');
-      }
+      rejectSessionStatus(response, activeBearer);
       if (!response.ok) {
         throw new BirthRuntimeError('WEB_BIRTH_CURRENT_REQUEST_FAILED', `Current Birth Profile API request failed with status ${response.status}.`);
       }
@@ -172,9 +188,7 @@ export function createBirthRuntimeClient(options = {}) {
         throw new BirthRuntimeError('WEB_BIRTH_REQUEST_FAILED', 'Birth Profile API request failed.', error);
       }
 
-      if (response.status === 401 || response.status === 403) {
-        throw new BirthRuntimeError('WEB_BIRTH_SESSION_REQUIRED', 'A current session is required.');
-      }
+      rejectSessionStatus(response, activeBearer);
 
       if (!response.ok) {
         const payload = await readErrorPayload(response);
