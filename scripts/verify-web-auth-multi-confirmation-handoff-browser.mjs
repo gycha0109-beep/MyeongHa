@@ -8,6 +8,8 @@ import { spawn } from 'node:child_process';
 const root = resolve(process.cwd(), process.env.MYEONGHA_WEB_OUTPUT_DIR ?? 'public');
 const chromeBin = process.env.CHROME_BIN ?? process.env.CHROME_PATH ?? 'chrome';
 const handoffKey = 'myeongha.pendingGuestConfirmation.v1';
+const journalMarkerKey = 'myeongha.pendingGuestConfirmation.journal.v1';
+const entryPrefix = 'myeongha.pendingGuestConfirmation.entry.v1.';
 const memberKey = 'myeongha.memberSession.v1';
 const activeBearerKey = 'myeongha.guestBearer.v1';
 const pendingGuestKey = 'myeongha.pendingGuestBearer.v1';
@@ -33,41 +35,23 @@ const mime = new Map([
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
 const requests = [];
-const bootstrapQueue = [guestA, guestB];
-let apiRequestCount = 0;
-let scenario = 'signup';
-let lastSignInEmail = null;
+let scenario = 'idle';
+let requestNo = 0;
 
-function identityFor(email) {
+function memberTokenFor(email) {
   const key = email.replace(/[^a-z0-9]/giu, '-').slice(0, 20);
-  return {
-    id: `browser-${key}`,
-    email,
-    accessToken: `multi-${key}.member.signature`,
-    refreshToken: `refresh-${key}`,
-  };
-}
-
-function sessionFor(email) {
-  const identity = identityFor(email);
-  return {
-    accessToken: identity.accessToken,
-    refreshToken: identity.refreshToken,
-    expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
-    tokenType: 'bearer',
-    user: { id: identity.id, email: identity.email },
-  };
+  return `multi-${key}.member.signature`;
 }
 
 function envelope(data) {
-  apiRequestCount += 1;
+  requestNo += 1;
   return {
     ok: true,
     data,
     meta: {
-      apiContractVersion: 'browser-auth-multi-confirmation-handoff-v1',
-      requestId: `web-auth-multi-confirmation-handoff-${apiRequestCount}`,
-      serverTime: '2026-09-07T06:30:00.000Z',
+      apiContractVersion: 'auth-multi-confirmation-journal-browser-v1',
+      requestId: `auth-multi-confirmation-${requestNo}`,
+      serverTime: '2026-09-08T00:00:00.000Z',
     },
   };
 }
@@ -75,6 +59,7 @@ function envelope(data) {
 function sendJson(res, status, payload) {
   res.statusCode = status;
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-store');
   res.end(JSON.stringify(payload));
 }
 
@@ -97,25 +82,10 @@ async function serve() {
       const url = new URL(req.url ?? '/', 'http://127.0.0.1');
       const pathname = decodeURIComponent(url.pathname);
 
-      if (pathname === '/api/session/bootstrap' && req.method === 'POST') {
-        const token = bootstrapQueue.shift();
-        assert(token, 'Unexpected extra Guest bootstrap');
-        await readJsonBody(req);
-        requests.push({ scenario, path: pathname, guestBearer: token });
-        sendJson(res, 200, envelope({
-          kind: 'guest',
-          guestSession: {
-            bearerToken: token,
-            expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
-          },
-        }));
-        return;
-      }
-
       if (pathname === '/api/auth/sign-up' && req.method === 'POST') {
         const body = await readJsonBody(req);
         assert(body.password === password, 'Unexpected sign-up password');
-        assert(body.email === emailA || body.email === emailB, `Unexpected sign-up email: ${body.email}`);
+        assert([emailA, emailB, ambiguousEmail].includes(body.email), `Unexpected sign-up email ${body.email}`);
         requests.push({ scenario, path: pathname, email: body.email });
         sendJson(res, 200, envelope({ status: 'verification_required', email: body.email }));
         return;
@@ -124,25 +94,39 @@ async function serve() {
       if (pathname === '/api/auth/sign-in' && req.method === 'POST') {
         const body = await readJsonBody(req);
         assert(body.password === password, 'Unexpected sign-in password');
-        assert([emailA, emailB, emailC, ambiguousEmail].includes(body.email), `Unexpected sign-in email: ${body.email}`);
-        lastSignInEmail = body.email;
+        assert([emailA, emailB, emailC, ambiguousEmail].includes(body.email), `Unexpected sign-in email ${body.email}`);
         requests.push({ scenario, path: pathname, email: body.email });
-        sendJson(res, 200, envelope({ status: 'authenticated', session: sessionFor(body.email) }));
+        sendJson(res, 200, envelope({
+          status: 'authenticated',
+          session: {
+            accessToken: memberTokenFor(body.email),
+            refreshToken: `refresh-${body.email}`,
+            expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+            tokenType: 'bearer',
+            user: {
+              id: body.email === emailA ? 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+                : body.email === emailB ? 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
+                  : body.email === emailC ? 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
+                    : 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+              email: body.email,
+            },
+          },
+        }));
         return;
       }
 
       if (pathname === '/api/auth/promote-guest' && req.method === 'POST') {
-        const promotedGuest = req.headers['x-myeongha-guest-bearer'] ?? null;
         const expectedGuest = expectedPromotionGuest();
         assert(expectedGuest, `${scenario}: promotion must not be attempted`);
+        const promotedGuest = req.headers['x-myeongha-guest-bearer'] ?? null;
         assert(promotedGuest === expectedGuest, `${scenario}: promoted ${promotedGuest} instead of ${expectedGuest}`);
-        assert(
-          req.headers.authorization === `Bearer ${sessionFor(lastSignInEmail).accessToken}`,
-          `${scenario}: promotion used unexpected Member bearer`,
-        );
-        requests.push({ scenario, path: pathname, email: lastSignInEmail, promotedGuest });
+        requests.push({ scenario, path: pathname, promotedGuest });
         sendJson(res, 200, envelope({ status: 'promoted' }));
         return;
+      }
+
+      if (pathname === '/api/session/bootstrap' && req.method === 'POST') {
+        throw new Error(`${scenario}: unexpected Guest bootstrap`);
       }
 
       if (pathname.startsWith('/api/')) {
@@ -168,7 +152,7 @@ async function serve() {
     server.listen(0, '127.0.0.1', done);
   });
   const address = server.address();
-  assert(address && typeof address === 'object', 'browser smoke server address unavailable');
+  assert(address && typeof address === 'object', 'browser server address unavailable');
   return { server, origin: `http://127.0.0.1:${address.port}` };
 }
 
@@ -220,26 +204,26 @@ async function connectCdp(port) {
   return { send, evaluate, close: () => ws.close() };
 }
 
-async function navigate(client, origin, pathname, selector, timeout = 10_000) {
+async function navigate(client, origin, pathname, selector) {
   const result = await client.send('Page.navigate', { url: `${origin}${pathname}` });
   assert(!result.errorText, `Navigation failed for ${pathname}: ${result.errorText}`);
-  const cleanPath = pathname.split(/[?#]/)[0];
+  const cleanPath = pathname.split(/[?#]/u)[0];
   const selectorLiteral = JSON.stringify(selector);
-  const deadline = Date.now() + timeout;
+  const deadline = Date.now() + 10_000;
   while (Date.now() < deadline) {
-    const state = await client.evaluate(`(() => ({
-      pathname: location.pathname,
-      readyState: document.readyState,
+    const ready = await client.evaluate(`(() => ({
+      path: location.pathname,
+      ready: document.readyState,
       found: Boolean(document.querySelector(${selectorLiteral})),
     }))()`);
-    if (state?.pathname === cleanPath && state.readyState === 'complete' && state.found) return;
+    if (ready?.path === cleanPath && ready.ready === 'complete' && ready.found) return;
     await sleep(50);
   }
   throw new Error(`Timed out waiting for ${cleanPath} ${selector}`);
 }
 
-async function waitFor(client, expression, message, timeout = 10_000) {
-  const deadline = Date.now() + timeout;
+async function waitFor(client, expression, message) {
+  const deadline = Date.now() + 10_000;
   while (Date.now() < deadline) {
     if (await client.evaluate(expression)) return;
     await sleep(50);
@@ -247,23 +231,43 @@ async function waitFor(client, expression, message, timeout = 10_000) {
   const diagnostics = await client.evaluate(`(() => ({
     pathname: location.pathname,
     status: document.querySelector('#auth-status')?.textContent?.trim() ?? null,
-    handoff: localStorage.getItem(${JSON.stringify(handoffKey)}),
+    aggregate: localStorage.getItem(${JSON.stringify(handoffKey)}),
+    marker: localStorage.getItem(${JSON.stringify(journalMarkerKey)}),
+    journal: Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index))
+      .filter((key) => key?.startsWith(${JSON.stringify(entryPrefix)}))
+      .map((key) => localStorage.getItem(key)),
     member: localStorage.getItem(${JSON.stringify(memberKey)}),
     active: sessionStorage.getItem(${JSON.stringify(activeBearerKey)}),
-    pending: sessionStorage.getItem(${JSON.stringify(pendingGuestKey)}),
   }))()`);
   throw new Error(`${message}; diagnostics=${JSON.stringify(diagnostics)}; requests=${JSON.stringify(requests)}`);
 }
 
-async function clearSessionAuth(client, { member = false } = {}) {
+async function resetShared(client, origin) {
+  await navigate(client, origin, '/auth.html?next=hall.html', '#auth-form');
   await client.evaluate(`(() => {
+    localStorage.removeItem(${JSON.stringify(handoffKey)});
+    localStorage.removeItem(${JSON.stringify(journalMarkerKey)});
+    localStorage.removeItem(${JSON.stringify(memberKey)});
+    for (const key of Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index))) {
+      if (key?.startsWith(${JSON.stringify(entryPrefix)})) localStorage.removeItem(key);
+    }
     sessionStorage.removeItem(${JSON.stringify(activeBearerKey)});
     sessionStorage.removeItem(${JSON.stringify(pendingGuestKey)});
-    ${member ? `localStorage.removeItem(${JSON.stringify(memberKey)});` : ''}
   })()`);
 }
 
-async function submitSignUp(client, email) {
+async function clearSession(client) {
+  await client.evaluate(`(() => {
+    localStorage.removeItem(${JSON.stringify(memberKey)});
+    sessionStorage.removeItem(${JSON.stringify(activeBearerKey)});
+    sessionStorage.removeItem(${JSON.stringify(pendingGuestKey)});
+  })()`);
+}
+
+async function stageHandoff(client, origin, email, guestBearer) {
+  await clearSession(client);
+  await navigate(client, origin, '/auth.html?next=hall.html', '#auth-form');
+  await client.evaluate(`sessionStorage.setItem(${JSON.stringify(activeBearerKey)}, ${JSON.stringify(guestBearer)})`);
   await client.evaluate(`(() => {
     document.querySelector('#auth-tab-signup').click();
     document.querySelector('#auth-email').value = ${JSON.stringify(email)};
@@ -271,45 +275,36 @@ async function submitSignUp(client, email) {
     document.querySelector('#auth-password-confirm').value = ${JSON.stringify(password)};
     document.querySelector('#auth-form').requestSubmit();
   })()`);
-  await waitFor(
-    client,
-    `document.querySelector('#auth-status')?.textContent?.includes('확인 메일을 보냈습니다') === true`,
-    `Verification-required signup did not finish for ${email}`,
-  );
+  await waitFor(client, `document.querySelector('#auth-status')?.textContent?.includes('확인 메일을 보냈습니다') === true`, `${scenario}: signup did not stage ${email}`);
 }
 
-async function submitSignIn(client, email) {
+async function signIn(client, origin, email) {
+  await navigate(client, origin, '/auth.html?next=hall.html', '#auth-form');
   await client.evaluate(`(() => {
     document.querySelector('#auth-tab-signin').click();
     document.querySelector('#auth-email').value = ${JSON.stringify(email)};
     document.querySelector('#auth-password').value = ${JSON.stringify(password)};
     document.querySelector('#auth-form').requestSubmit();
   })()`);
-  await waitFor(client, `location.pathname === '/hall.html'`, `Member login did not finish for ${email}`);
+  await waitFor(client, `location.pathname === '/hall.html'`, `${scenario}: Member login did not finish for ${email}`);
 }
 
-async function readHandoffStore(client) {
-  return client.evaluate(`JSON.parse(localStorage.getItem(${JSON.stringify(handoffKey)}) ?? 'null')`);
+async function readJournal(client) {
+  return client.evaluate(`(() => Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index))
+    .filter((key) => key?.startsWith(${JSON.stringify(entryPrefix)}))
+    .map((key) => JSON.parse(localStorage.getItem(key))))()`);
 }
 
-function assertV2Entries(store, expected) {
-  assert(store?.version === 2, `Expected v2 confirmation handoff store, got ${JSON.stringify(store)}`);
-  assert(Array.isArray(store.entries), 'Confirmation handoff v2 entries are missing');
-  assert(store.entries.length === expected.length, `Expected ${expected.length} handoffs, got ${store.entries.length}`);
+function assertEntries(entries, expected) {
+  assert(entries.length === expected.length, `Expected ${expected.length} handoffs, got ${entries.length}`);
   for (const [email, guestBearer] of expected) {
-    assert(
-      store.entries.some((entry) => entry.email === email && entry.guestBearer === guestBearer && Date.parse(entry.expiresAt) > Date.now()),
-      `Missing preserved handoff ${email}/${guestBearer}`,
-    );
+    assert(entries.some((entry) => entry.email === email && entry.guestBearer === guestBearer && Date.parse(entry.expiresAt) > Date.now()), `Missing handoff ${email}/${guestBearer}`);
   }
 }
 
-for (const file of ['auth.html', 'auth-page.js', 'product-auth.js', 'hall.html']) {
-  await stat(join(root, file));
-}
-
+for (const file of ['auth.html', 'auth-page.js', 'product-auth.js', 'hall.html']) await stat(join(root, file));
 const authPageSource = await readFile(join(root, 'auth-page.js'), 'utf8');
-assert(authPageSource.includes('CONFIRMATION_GUEST_HANDOFF_VERSION = 2'), 'auth-page.js does not use the multi-handoff storage schema');
+assert(authPageSource.includes('CONFIRMATION_GUEST_HANDOFF_ENTRY_PREFIX'), 'auth-page.js does not use journal handoffs');
 assert(authPageSource.includes('matches.length !== 1'), 'auth-page.js does not fail closed on ambiguous same-email handoffs');
 
 const { server, origin } = await serve();
@@ -331,90 +326,74 @@ let client;
 try {
   client = await connectCdp(await devtoolsPort(profile, chrome));
 
-  await navigate(client, origin, '/auth.html?next=hall.html', '#auth-form');
-  await client.evaluate(`(() => {
-    localStorage.removeItem(${JSON.stringify(handoffKey)});
-    localStorage.removeItem(${JSON.stringify(memberKey)});
-    sessionStorage.removeItem(${JSON.stringify(activeBearerKey)});
-    sessionStorage.removeItem(${JSON.stringify(pendingGuestKey)});
-  })()`);
-
+  await resetShared(client, origin);
   scenario = 'signup-a';
-  await submitSignUp(client, emailA);
-  assertV2Entries(await readHandoffStore(client), [[emailA, guestA]]);
+  await stageHandoff(client, origin, emailA, guestA);
+  assertEntries(await readJournal(client), [[emailA, guestA]]);
 
-  await clearSessionAuth(client, { member: true });
-  await navigate(client, origin, '/auth.html?next=hall.html', '#auth-form');
   scenario = 'signup-b';
-  await submitSignUp(client, emailB);
-  assertV2Entries(await readHandoffStore(client), [[emailA, guestA], [emailB, guestB]]);
+  await stageHandoff(client, origin, emailB, guestB);
+  assertEntries(await readJournal(client), [[emailA, guestA], [emailB, guestB]]);
 
-  await clearSessionAuth(client, { member: true });
-  await navigate(client, origin, '/auth.html?next=hall.html', '#auth-form');
+  await clearSession(client);
   scenario = 'promote-a';
-  await submitSignIn(client, emailA);
-  assertV2Entries(await readHandoffStore(client), [[emailB, guestB]]);
+  await signIn(client, origin, emailA);
+  assertEntries(await readJournal(client), [[emailB, guestB]]);
 
-  await navigate(client, origin, '/auth.html?next=hall.html', '#auth-form');
   scenario = 'unrelated-c';
   const promotionCountBeforeUnrelated = requests.filter((request) => request.path === '/api/auth/promote-guest').length;
-  await submitSignIn(client, emailC);
-  assert(
-    requests.filter((request) => request.path === '/api/auth/promote-guest').length === promotionCountBeforeUnrelated,
-    'Different-email Member login attempted an unrelated Guest promotion',
-  );
-  assertV2Entries(await readHandoffStore(client), [[emailB, guestB]]);
+  await signIn(client, origin, emailC);
+  assert(requests.filter((request) => request.path === '/api/auth/promote-guest').length === promotionCountBeforeUnrelated, 'Different-email Member login attempted an unrelated Guest promotion');
+  assertEntries(await readJournal(client), [[emailB, guestB]]);
 
-  await navigate(client, origin, '/auth.html?next=hall.html', '#auth-form');
   scenario = 'promote-b';
-  await submitSignIn(client, emailB);
-  assert(await readHandoffStore(client) === null, 'Final consumed confirmation handoff store was not cleared');
+  await signIn(client, origin, emailB);
+  assertEntries(await readJournal(client), []);
 
-  await navigate(client, origin, '/auth.html?next=hall.html', '#auth-form');
-  await clearSessionAuth(client, { member: true });
-  await client.evaluate(`localStorage.setItem(${JSON.stringify(handoffKey)}, JSON.stringify({
-    version: 2,
-    entries: [
-      { guestBearer: ${JSON.stringify(guestAmbiguousX)}, email: ${JSON.stringify(ambiguousEmail)}, expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString() },
-      { guestBearer: ${JSON.stringify(guestAmbiguousY)}, email: ${JSON.stringify(ambiguousEmail)}, expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString() },
-    ],
-  }))`);
+  await resetShared(client, origin);
+  scenario = 'ambiguous-x';
+  await stageHandoff(client, origin, ambiguousEmail, guestAmbiguousX);
+  scenario = 'ambiguous-y';
+  await stageHandoff(client, origin, ambiguousEmail, guestAmbiguousY);
+  assertEntries(await readJournal(client), [[ambiguousEmail, guestAmbiguousX], [ambiguousEmail, guestAmbiguousY]]);
+
+  await clearSession(client);
   scenario = 'ambiguous';
   const promotionCountBeforeAmbiguous = requests.filter((request) => request.path === '/api/auth/promote-guest').length;
-  await submitSignIn(client, ambiguousEmail);
-  assert(
-    requests.filter((request) => request.path === '/api/auth/promote-guest').length === promotionCountBeforeAmbiguous,
-    'Ambiguous same-email handoffs were arbitrarily promoted',
-  );
-  assertV2Entries(await readHandoffStore(client), [
-    [ambiguousEmail, guestAmbiguousX],
-    [ambiguousEmail, guestAmbiguousY],
-  ]);
+  await signIn(client, origin, ambiguousEmail);
+  assert(requests.filter((request) => request.path === '/api/auth/promote-guest').length === promotionCountBeforeAmbiguous, 'Ambiguous same-email handoffs were arbitrarily promoted');
+  assertEntries(await readJournal(client), [[ambiguousEmail, guestAmbiguousX], [ambiguousEmail, guestAmbiguousY]]);
 
-  await navigate(client, origin, '/auth.html?next=hall.html', '#auth-form');
-  await clearSessionAuth(client, { member: true });
-  await client.evaluate(`localStorage.setItem(${JSON.stringify(handoffKey)}, JSON.stringify({
-    version: 2,
-    entries: [
-      { guestBearer: ${JSON.stringify(guestPrune)}, email: ${JSON.stringify(emailB)}, expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString() },
-      { guestBearer: 'guest-expired', email: ${JSON.stringify(emailC)}, expiresAt: new Date(Date.now() - 1000).toISOString() },
-      { guestBearer: 'malformed.jwt.token', email: ${JSON.stringify(emailC)}, expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString() },
-    ],
-  }))`);
+  await resetShared(client, origin);
+  scenario = 'prune-stage';
+  await stageHandoff(client, origin, emailB, guestPrune);
+  await client.evaluate(`(() => {
+    localStorage.setItem(${JSON.stringify(`${entryPrefix}expired`)}, JSON.stringify({
+      guestBearer: 'guest-expired',
+      email: ${JSON.stringify(emailC)},
+      expiresAt: new Date(Date.now() - 1000).toISOString(),
+    }));
+    localStorage.setItem(${JSON.stringify(`${entryPrefix}malformed`)}, JSON.stringify({
+      guestBearer: 'malformed.jwt.token',
+      email: ${JSON.stringify(emailC)},
+      expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+    }));
+  })()`);
+  await clearSession(client);
   scenario = 'prune';
-  await submitSignIn(client, emailB);
-  assert(await readHandoffStore(client) === null, 'Expired/malformed handoffs were not pruned after valid promotion');
+  await signIn(client, origin, emailB);
+  assertEntries(await readJournal(client), []);
 
   const promotions = requests.filter((request) => request.path === '/api/auth/promote-guest');
   assert(promotions.length === 3, `Expected exactly three authoritative promotions, got ${promotions.length}`);
   assert(promotions[0].scenario === 'promote-a' && promotions[0].promotedGuest === guestA, 'Email A did not promote Guest A');
   assert(promotions[1].scenario === 'promote-b' && promotions[1].promotedGuest === guestB, 'Email B did not promote Guest B');
-  assert(promotions[2].scenario === 'prune' && promotions[2].promotedGuest === guestPrune, 'Valid handoff was not selected after pruning invalid entries');
+  assert(promotions[2].scenario === 'prune' && promotions[2].promotedGuest === guestPrune, 'Valid handoff was not selected after pruning invalid journal entries');
 
   await mkdir(join(process.cwd(), 'artifacts'), { recursive: true });
   await writeFile(join(process.cwd(), 'artifacts', 'web-auth-multi-confirmation-handoff-browser-smoke.json'), `${JSON.stringify({
     status: 'PASS',
-    simultaneousDifferentEmailHandoffsPreserved: true,
+    sequentialDifferentEmailHandoffsPreserved: true,
     exactConsumedHandoffOnlyCleared: true,
     unrelatedMemberLoginPreservedHandoffs: true,
     ambiguousSameEmailFailClosed: true,
@@ -422,7 +401,6 @@ try {
     promotions,
     requests,
   }, null, 2)}\n`, 'utf8');
-
   console.log('MyeongHa_WEB_AUTH_MULTI_CONFIRMATION_HANDOFF_BROWSER_PASS');
 } catch (error) {
   console.error(error);
@@ -431,6 +409,7 @@ try {
 } finally {
   client?.close();
   chrome.kill('SIGTERM');
-  server.close();
-  await rm(profile, { recursive: true, force: true });
+  await Promise.race([new Promise((done) => chrome.once('exit', done)), sleep(1_000)]);
+  await new Promise((done) => server.close(done));
+  await rm(profile, { recursive: true, force: true }).catch(() => {});
 }
