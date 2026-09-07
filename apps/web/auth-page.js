@@ -157,6 +157,13 @@ function readConfirmationGuestHandoff(memberEmail) {
   return guestBearer;
 }
 
+function clearConfirmationGuestHandoffIfMatches(memberEmail, promotedGuestBearer) {
+  const confirmationGuestBearer = readConfirmationGuestHandoff(memberEmail);
+  if (!confirmationGuestBearer || confirmationGuestBearer !== promotedGuestBearer) return false;
+  clearConfirmationGuestHandoff();
+  return true;
+}
+
 async function ensureGuestForNewAccount() {
   if (readGuestBearer()) return;
   const response = await fetch('/api/session/bootstrap', {
@@ -214,13 +221,12 @@ async function promoteGuestIfPresent(accessToken, memberEmail) {
 
   if (response.ok && payload?.ok === true) {
     clearPromotedGuestBearer();
-    clearConfirmationGuestHandoff();
+    clearConfirmationGuestHandoffIfMatches(memberEmail, guestBearer);
     return { status: 'promoted' };
   }
 
   const code = readPublicErrorCode(payload);
   if (response.status === 409 && code === 'GUEST_MERGE_REQUIRED') {
-    clearConfirmationGuestHandoff();
     return { status: 'merge-required' };
   }
   return { status: 'preserved' };
