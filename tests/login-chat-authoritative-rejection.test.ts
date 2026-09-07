@@ -18,12 +18,14 @@ describe('Chat authoritative bearer rejection boundary', () => {
     expect(source).toContain('Authorization: `Bearer ${activeBearer.token}`');
   });
 
-  it('invalidates exactly the bearer rejected by an authoritative 401', () => {
+  it('invalidates only the exact bearer token rejected by an authoritative 401', () => {
     expect(source).toContain("if (activeBearer?.kind === 'member')");
-    expect(source).toContain('invalidateMemberSession()');
-    expect(source).toContain("if (activeBearer?.kind === 'guest') invalidateGuestSession()");
+    expect(source).toContain('invalidateMemberSession(activeBearer.token)');
+    expect(source).toContain("if (activeBearer?.kind === 'guest') invalidateGuestSession(activeBearer.token)");
     expect(source).toContain('if (response.status === 401)');
     expect(source).toContain('invalidateRejectedBearer(activeBearer)');
+    expect(source).not.toContain('invalidateMemberSession()');
+    expect(source).not.toContain('invalidateGuestSession()');
   });
 
   it('does not reinterpret 403 or other non-401 failures as credential invalidation', () => {
