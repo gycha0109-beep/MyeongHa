@@ -34,10 +34,13 @@ function jsonResponse(status, payload) {
 const guestBearer = async () => ({ kind: 'guest', token: 'opaque-guest-token' });
 
 describe('web Birth session guard', () => {
-  it('keeps active bearer bootstrap server-owned and rejects JWT-like guest tokens', () => {
+  it('keeps active bearer bootstrap server-owned and rejects invalid Guest tokens', () => {
     expect(authSource).toContain('export async function ensureActiveBearer()');
     expect(authSource).toContain("postJson('/api/session/bootstrap', {})");
-    expect(authSource).toContain('isJwtLike(token)');
+    expect(authSource).toContain('export function normalizeGuestBearer(value)');
+    expect(authSource).toContain('/\\s/u.test(value)');
+    expect(authSource).toContain('isJwtLike(value)');
+    expect(authSource).toContain('const token = normalizeGuestBearer(guestSession?.bearerToken);');
     expect(authSource).toContain('writeSession(GUEST_TOKEN_KEY, token)');
   });
 

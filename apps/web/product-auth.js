@@ -20,6 +20,19 @@ function isJwtLike(value) {
   return typeof value === 'string' && /^[^.\s]+\.[^.\s]+\.[^.\s]+$/u.test(value);
 }
 
+export function normalizeGuestBearer(value) {
+  if (
+    typeof value !== 'string' ||
+    value.length === 0 ||
+    value.length > 4096 ||
+    /\s/u.test(value) ||
+    isJwtLike(value)
+  ) {
+    return null;
+  }
+  return value;
+}
+
 function readLocal(key) {
   try {
     return localStorage.getItem(key);
@@ -73,8 +86,11 @@ function emitAuthChanged() {
 }
 
 function stageMemberBearerForLegacyProductClients(accessToken) {
-  const current = readSession(GUEST_TOKEN_KEY);
-  if (current && !isJwtLike(current) && !readSession(PENDING_GUEST_TOKEN_KEY)) {
+  const current = normalizeGuestBearer(readSession(GUEST_TOKEN_KEY));
+  const pendingRaw = readSession(PENDING_GUEST_TOKEN_KEY);
+  const pending = normalizeGuestBearer(pendingRaw);
+  if (pendingRaw !== null && !pending) removeSession(PENDING_GUEST_TOKEN_KEY);
+  if (current && !pending) {
     writeSession(PENDING_GUEST_TOKEN_KEY, current);
   }
   writeSession(GUEST_TOKEN_KEY, accessToken);
@@ -83,10 +99,15 @@ function stageMemberBearerForLegacyProductClients(accessToken) {
 function discardMemberSession() {
   removeLocal(MEMBER_SESSION_KEY);
   const active = readSession(GUEST_TOKEN_KEY);
-  if (isJwtLike(active)) removeSession(GUEST_TOKEN_KEY);
-  const pending = readSession(PENDING_GUEST_TOKEN_KEY);
+  if (isJwtLike(active) || (active !== null && !normalizeGuestBearer(active))) {
+    removeSession(GUEST_TOKEN_KEY);
+  }
+  const pendingRaw = readSession(PENDING_GUEST_TOKEN_KEY);
+  const pending = normalizeGuestBearer(pendingRaw);
   if (pending) {
     writeSession(GUEST_TOKEN_KEY, pending);
+    removeSession(PENDING_GUEST_TOKEN_KEY);
+  } else if (pendingRaw !== null) {
     removeSession(PENDING_GUEST_TOKEN_KEY);
   }
   emitAuthChanged();
@@ -192,10 +213,16 @@ export function readMemberSession() {
 }
 
 export function readGuestBearer() {
-  const pending = readSession(PENDING_GUEST_TOKEN_KEY);
-  if (typeof pending === 'string' && pending.length > 0 && !isJwtLike(pending)) return pending;
-  const token = readSession(GUEST_TOKEN_KEY);
-  return typeof token === 'string' && token.length > 0 && !isJwtLike(token) ? token : null;
+  const pendingRaw = readSession(PENDING_GUEST_TOKEN_KEY);
+  const pending = normalizeGuestBearer(pendingRaw);
+  if (pending) return pending;
+  if (pendingRaw !== null) removeSession(PENDING_GUEST_TOKEN_KEY);
+
+  const tokenRaw = readSession(GUEST_TOKEN_KEY);
+  const token = normalizeGuestBearer(tokenRaw);
+  if (token) return token;
+  if (tokenRaw !== null && !isJwtLike(tokenRaw)) removeSession(GUEST_TOKEN_KEY);
+  return null;
 }
 
 export async function ensureGuestBearer() {
@@ -204,11 +231,8 @@ export async function ensureGuestBearer() {
 
   const data = await postJson('/api/session/bootstrap', {});
   const guestSession = isRecord(data) && isRecord(data.guestSession) ? data.guestSession : null;
-  const token = guestSession?.bearerToken;
-  if (
-    !isRecord(data) || data.kind !== 'guest' ||
-    typeof token !== 'string' || token.length === 0 || isJwtLike(token)
-  ) {
+  const token = normalizeGuestBearer(guestSession?.bearerToken);
+  if (!isRecord(data) || data.kind !== 'guest' || !token) {
     throw new ProductAuthError('WEB_AUTH_GUEST_PREPARE_FAILED', '게스트 세션을 준비하지 못했습니다.');
   }
 

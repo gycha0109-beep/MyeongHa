@@ -2,6 +2,7 @@ import {
   ProductAuthError,
   clearPromotedGuestBearer,
   ensureGuestBearer,
+  normalizeGuestBearer,
   readGuestBearer,
   readMemberSession,
   signInWithPassword,
@@ -131,7 +132,7 @@ function writeConfirmationGuestHandoffs(entries) {
 
 function normalizeConfirmationGuestHandoff(value, now = Date.now()) {
   const email = normalizeEmail(value?.email);
-  const guestBearer = typeof value?.guestBearer === 'string' ? value.guestBearer : '';
+  const guestBearer = normalizeGuestBearer(value?.guestBearer);
   const expiresAtMs = typeof value?.expiresAt === 'string' ? Date.parse(value.expiresAt) : Number.NaN;
   if (!email || !guestBearer || guestBearer.includes('.') || Number.isNaN(expiresAtMs) || expiresAtMs <= now) {
     return null;
