@@ -51,10 +51,10 @@ async function resolveAuthorizedBearer(resolveBearer) {
 
 function invalidateRejectedBearer(bearer) {
   if (bearer.kind === 'member') {
-    invalidateMemberSession();
+    invalidateMemberSession(bearer.token);
     return;
   }
-  if (bearer.kind === 'guest') invalidateGuestSession();
+  if (bearer.kind === 'guest') invalidateGuestSession(bearer.token);
 }
 
 async function readJson(fetchImpl, endpoint, bearer) {
