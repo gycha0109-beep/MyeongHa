@@ -18,9 +18,11 @@ describe('web Guest promotion rejection contract', () => {
 
   it('invalidates only the exact rejected credential while preserving recoverable failures', () => {
     expect(authPage).toContain("if (code === 'MEMBER_AUTH_REQUIRED')");
-    expect(authPage).toContain('if (currentMember?.accessToken === accessToken) invalidateMemberSession()');
+    expect(authPage).toContain('invalidateMemberSession(accessToken)');
+    expect(authPage).not.toContain('invalidateMemberSession()');
     expect(authPage).toContain("if (code === 'GUEST_AUTH_REQUIRED')");
-    expect(authPage).toContain('if (readGuestBearer() === guestBearer) invalidateGuestSession()');
+    expect(authPage).toContain('invalidateGuestSession(guestBearer)');
+    expect(authPage).not.toContain('invalidateGuestSession()');
     expect(authPage).toContain('await clearConfirmationGuestHandoffIfMatches(memberEmail, guestBearer)');
     expect(authPage).toContain("return { status: 'auth-rejected' }");
     expect(authPage).toContain("return { status: 'preserved' }");
