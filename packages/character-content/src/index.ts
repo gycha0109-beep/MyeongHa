@@ -5,3 +5,4 @@ export * from './production.js';
 export * from './face-presentation.js';
 export * from './face-followup.js';
 export * from './working-roster.js';
+export * from './runtime-authoring-v1.js';
