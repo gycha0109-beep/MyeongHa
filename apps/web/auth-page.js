@@ -399,12 +399,11 @@ async function promoteGuestIfPresent(accessToken, memberEmail) {
   const code = readPublicErrorCode(payload);
   if (response.status === 401) {
     if (code === 'MEMBER_AUTH_REQUIRED') {
-      const currentMember = readMemberSession();
-      if (currentMember?.accessToken === accessToken) invalidateMemberSession();
+      invalidateMemberSession(accessToken);
       return { status: 'member-rejected' };
     }
     if (code === 'GUEST_AUTH_REQUIRED') {
-      if (readGuestBearer() === guestBearer) invalidateGuestSession();
+      invalidateGuestSession(guestBearer);
       await clearConfirmationGuestHandoffIfMatches(memberEmail, guestBearer);
       return { status: 'guest-rejected' };
     }
