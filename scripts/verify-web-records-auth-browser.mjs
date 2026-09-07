@@ -11,7 +11,7 @@ const member = Object.freeze({
   id: '11111111-1111-4111-8111-111111111111',
   email: 'records-member@example.com',
   password: 'records-password-12345',
-  accessToken: 'records.header.payload.signature',
+  accessToken: 'records.payload.signature',
 });
 const mime = new Map([
   ['.html', 'text/html; charset=utf-8'],
