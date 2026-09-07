@@ -12,6 +12,7 @@ import {
 const BIRTH_PROFILE_ID_KEY = 'myeongha.guestBirthProfileId.v1';
 const CONFIRMATION_GUEST_HANDOFF_KEY = 'myeongha.pendingGuestConfirmation.v1';
 const CONFIRMATION_GUEST_HANDOFF_VERSION = 2;
+const CONFIRMATION_GUEST_HANDOFF_LOCK_NAME = 'myeongha.pendingGuestConfirmation.v1.lock';
 const CONFIRMATION_GUEST_HANDOFF_TTL_MS = 24 * 60 * 60 * 1000;
 const ALLOWED_NEXT = new Set([
   'hall.html',
@@ -106,6 +107,11 @@ function normalizeEmail(value) {
   return typeof value === 'string' ? value.trim().toLowerCase() : '';
 }
 
+function confirmationGuestHandoffLocks() {
+  const locks = globalThis.navigator?.locks;
+  return locks && typeof locks.request === 'function' ? locks : null;
+}
+
 function clearConfirmationGuestHandoff() {
   try {
     localStorage.removeItem(CONFIRMATION_GUEST_HANDOFF_KEY);
@@ -180,42 +186,71 @@ function readConfirmationGuestHandoffs() {
   return entries;
 }
 
-function stageConfirmationGuestHandoff(email) {
+async function stageConfirmationGuestHandoff(email) {
   const guestBearer = readGuestBearer();
   const normalizedEmail = normalizeEmail(email);
   if (!guestBearer || !normalizedEmail) return false;
-  const next = readConfirmationGuestHandoffs().filter((entry) => !(
-    entry.email === normalizedEmail && entry.guestBearer === guestBearer
-  ));
-  next.push(Object.freeze({
-    guestBearer,
-    email: normalizedEmail,
-    expiresAt: new Date(Date.now() + CONFIRMATION_GUEST_HANDOFF_TTL_MS).toISOString(),
-  }));
-  return writeConfirmationGuestHandoffs(next);
+
+  const locks = confirmationGuestHandoffLocks();
+  if (!locks) return false;
+  try {
+    return await locks.request(CONFIRMATION_GUEST_HANDOFF_LOCK_NAME, { mode: 'exclusive' }, () => {
+      const next = readConfirmationGuestHandoffs().filter((entry) => !(
+        entry.email === normalizedEmail && entry.guestBearer === guestBearer
+      ));
+      next.push(Object.freeze({
+        guestBearer,
+        email: normalizedEmail,
+        expiresAt: new Date(Date.now() + CONFIRMATION_GUEST_HANDOFF_TTL_MS).toISOString(),
+      }));
+      return writeConfirmationGuestHandoffs(next);
+    });
+  } catch {
+    return false;
+  }
 }
 
-function readConfirmationGuestHandoff(memberEmail) {
+async function readConfirmationGuestHandoff(memberEmail) {
   const expectedEmail = normalizeEmail(memberEmail);
   if (!expectedEmail) return null;
-  const matches = readConfirmationGuestHandoffs().filter((entry) => entry.email === expectedEmail);
-  if (matches.length !== 1) return null;
-  return matches[0].guestBearer;
+  const readExact = () => {
+    const matches = readConfirmationGuestHandoffs().filter((entry) => entry.email === expectedEmail);
+    if (matches.length !== 1) return null;
+    return matches[0].guestBearer;
+  };
+
+  const locks = confirmationGuestHandoffLocks();
+  if (!locks) return readExact();
+  try {
+    return await locks.request(CONFIRMATION_GUEST_HANDOFF_LOCK_NAME, { mode: 'exclusive' }, readExact);
+  } catch {
+    return null;
+  }
 }
 
-function clearConfirmationGuestHandoffIfMatches(memberEmail, promotedGuestBearer) {
+async function clearConfirmationGuestHandoffIfMatches(memberEmail, promotedGuestBearer) {
   const expectedEmail = normalizeEmail(memberEmail);
   if (!expectedEmail || !promotedGuestBearer) return false;
-  const current = readConfirmationGuestHandoffs();
-  const next = current.filter((entry) => !(
-    entry.email === expectedEmail && entry.guestBearer === promotedGuestBearer
-  ));
-  if (next.length === current.length) return false;
-  return writeConfirmationGuestHandoffs(next);
+  const clearExact = () => {
+    const current = readConfirmationGuestHandoffs();
+    const next = current.filter((entry) => !(
+      entry.email === expectedEmail && entry.guestBearer === promotedGuestBearer
+    ));
+    if (next.length === current.length) return false;
+    return writeConfirmationGuestHandoffs(next);
+  };
+
+  const locks = confirmationGuestHandoffLocks();
+  if (!locks) return clearExact();
+  try {
+    return await locks.request(CONFIRMATION_GUEST_HANDOFF_LOCK_NAME, { mode: 'exclusive' }, clearExact);
+  } catch {
+    return false;
+  }
 }
 
 async function promoteGuestIfPresent(accessToken, memberEmail) {
-  const guestBearer = readGuestBearer() ?? readConfirmationGuestHandoff(memberEmail);
+  const guestBearer = readGuestBearer() ?? await readConfirmationGuestHandoff(memberEmail);
   if (!guestBearer) return { status: 'none' };
 
   let response;
@@ -245,7 +280,7 @@ async function promoteGuestIfPresent(accessToken, memberEmail) {
 
   if (response.ok && payload?.ok === true) {
     clearPromotedGuestBearer();
-    clearConfirmationGuestHandoffIfMatches(memberEmail, guestBearer);
+    await clearConfirmationGuestHandoffIfMatches(memberEmail, guestBearer);
     return { status: 'promoted' };
   }
 
@@ -312,7 +347,7 @@ async function onSubmit(event) {
       await ensureGuestBearer();
       const result = await signUpWithPassword(email, password, nextHref());
       if (result.status === 'verification_required') {
-        if (!stageConfirmationGuestHandoff(result.email)) {
+        if (!await stageConfirmationGuestHandoff(result.email)) {
           setStatus('확인 메일은 전송됐지만 현재 게스트 흐름의 계정 연결 정보를 안전하게 보존하지 못했습니다. 이 탭을 닫지 말고 이메일 확인 후 돌아와 주세요.', 'error');
           return;
         }
