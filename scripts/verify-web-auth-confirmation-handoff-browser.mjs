@@ -8,16 +8,15 @@ import { spawn } from 'node:child_process';
 const root = resolve(process.cwd(), process.env.MYEONGHA_WEB_OUTPUT_DIR ?? 'public');
 const chromeBin = process.env.CHROME_BIN ?? process.env.CHROME_PATH ?? 'chrome';
 const handoffKey = 'myeongha.pendingGuestConfirmation.v1';
+const journalMarkerKey = 'myeongha.pendingGuestConfirmation.journal.v1';
+const entryPrefix = 'myeongha.pendingGuestConfirmation.entry.v1.';
 const memberKey = 'myeongha.memberSession.v1';
 const activeBearerKey = 'myeongha.guestBearer.v1';
 const pendingGuestKey = 'myeongha.pendingGuestBearer.v1';
-const guestA = 'guest-confirmation-handoff-a';
-const guestB = 'guest-current-tab-b';
-const identity = Object.freeze({
-  id: '55555555-5555-4555-8555-555555555555',
-  email: 'confirmation-handoff@example.com',
-  password: 'browser-password-12345',
-});
+const password = 'browser-password-12345';
+const email = 'confirmation-handoff@example.com';
+const guestA = 'guest-confirmation-a';
+const guestB = 'guest-confirmation-b';
 const mime = new Map([
   ['.html', 'text/html; charset=utf-8'],
   ['.css', 'text/css; charset=utf-8'],
@@ -30,42 +29,35 @@ const mime = new Map([
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
 const requests = [];
-let scenario = 'collision';
-let apiRequestCount = 0;
-let signInCount = 0;
+let scenario = 'idle';
+let requestNo = 0;
 
-function sessionFor(attempt) {
-  return {
-    accessToken: `confirmation${attempt}.member.signature`,
-    refreshToken: `confirmation-refresh-${attempt}`,
-    expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
-    tokenType: 'bearer',
-    user: { id: identity.id, email: identity.email },
-  };
+function memberToken() {
+  return `${scenario}.member.signature`;
 }
 
 function envelope(data) {
-  apiRequestCount += 1;
+  requestNo += 1;
   return {
     ok: true,
     data,
     meta: {
-      apiContractVersion: 'browser-auth-confirmation-handoff-v1',
-      requestId: `web-auth-confirmation-handoff-${apiRequestCount}`,
-      serverTime: '2026-09-07T00:00:00.000Z',
+      apiContractVersion: 'auth-confirmation-handoff-journal-browser-v1',
+      requestId: `auth-confirmation-handoff-${requestNo}`,
+      serverTime: '2026-09-08T00:00:00.000Z',
     },
   };
 }
 
-function errorEnvelope(code, messageKey) {
-  apiRequestCount += 1;
+function errorEnvelope(code) {
+  requestNo += 1;
   return {
     ok: false,
-    error: { code, messageKey, retryable: false },
+    error: { code, messageKey: 'auth.guest_merge_required', retryable: false },
     meta: {
-      apiContractVersion: 'browser-auth-confirmation-handoff-v1',
-      requestId: `web-auth-confirmation-handoff-${apiRequestCount}`,
-      serverTime: '2026-09-07T00:00:00.000Z',
+      apiContractVersion: 'auth-confirmation-handoff-journal-browser-v1',
+      requestId: `auth-confirmation-handoff-${requestNo}`,
+      serverTime: '2026-09-08T00:00:00.000Z',
     },
   };
 }
@@ -73,6 +65,7 @@ function errorEnvelope(code, messageKey) {
 function sendJson(res, status, payload) {
   res.statusCode = status;
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-store');
   res.end(JSON.stringify(payload));
 }
 
@@ -87,39 +80,56 @@ async function serve() {
     try {
       const url = new URL(req.url ?? '/', 'http://127.0.0.1');
       const pathname = decodeURIComponent(url.pathname);
-      const authorization = req.headers.authorization ?? null;
+
+      if (pathname === '/api/auth/sign-up' && req.method === 'POST') {
+        const body = await readJsonBody(req);
+        assert(body.email === email && body.password === password, 'Unexpected sign-up payload');
+        requests.push({ scenario, path: pathname, email: body.email });
+        sendJson(res, 200, envelope({ status: 'verification_required', email }));
+        return;
+      }
 
       if (pathname === '/api/auth/sign-in' && req.method === 'POST') {
         const body = await readJsonBody(req);
-        assert(body.email === identity.email && body.password === identity.password, 'Unexpected sign-in credentials');
-        signInCount += 1;
-        const session = sessionFor(signInCount);
-        requests.push({ scenario, path: pathname, authorization });
-        sendJson(res, 200, envelope({ status: 'authenticated', session }));
+        assert(body.email === email && body.password === password, 'Unexpected sign-in payload');
+        requests.push({ scenario, path: pathname, email: body.email });
+        sendJson(res, 200, envelope({
+          status: 'authenticated',
+          session: {
+            accessToken: memberToken(),
+            refreshToken: `refresh-${scenario}`,
+            expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+            tokenType: 'bearer',
+            user: { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', email },
+          },
+        }));
         return;
       }
 
       if (pathname === '/api/auth/promote-guest' && req.method === 'POST') {
-        const expectedMember = sessionFor(signInCount);
         const promotedGuest = req.headers['x-myeongha-guest-bearer'] ?? null;
         const expectedGuest = scenario === 'collision' ? guestB : guestA;
-        assert(authorization === `Bearer ${expectedMember.accessToken}`, `${scenario}: promotion used unexpected Member bearer`);
-        assert(promotedGuest === expectedGuest, `${scenario}: promotion used ${promotedGuest} instead of ${expectedGuest}`);
-        requests.push({ scenario, path: pathname, authorization, promotedGuest });
+        assert(req.headers.authorization === `Bearer ${memberToken()}`, `${scenario}: unexpected Member bearer`);
+        assert(promotedGuest === expectedGuest, `${scenario}: promoted ${promotedGuest} instead of ${expectedGuest}`);
+        requests.push({ scenario, path: pathname, promotedGuest });
         if (scenario === 'merge-required') {
-          sendJson(res, 409, errorEnvelope('GUEST_MERGE_REQUIRED', 'auth.guest_merge_required'));
-          return;
+          sendJson(res, 409, errorEnvelope('GUEST_MERGE_REQUIRED'));
+        } else {
+          sendJson(res, 200, envelope({ status: 'promoted' }));
         }
-        sendJson(res, 200, envelope({ status: 'promoted' }));
         return;
+      }
+
+      if (pathname === '/api/session/bootstrap' && req.method === 'POST') {
+        throw new Error(`${scenario}: unexpected Guest bootstrap`);
       }
 
       if (pathname.startsWith('/api/')) {
-        sendJson(res, 404, errorEnvelope('NOT_FOUND', 'not_found'));
+        sendJson(res, 404, { ok: false, error: { code: 'NOT_FOUND' } });
         return;
       }
 
-      const staticPath = pathname === '/' ? '/hall.html' : pathname;
+      const staticPath = pathname === '/' ? '/auth.html' : pathname;
       const relative = normalize(staticPath).replace(/^[/\\]+/, '');
       const file = resolve(root, relative);
       assert(file.startsWith(`${root}/`), 'request escaped static root');
@@ -137,7 +147,7 @@ async function serve() {
     server.listen(0, '127.0.0.1', done);
   });
   const address = server.address();
-  assert(address && typeof address === 'object', 'browser smoke server address unavailable');
+  assert(address && typeof address === 'object', 'browser server address unavailable');
   return { server, origin: `http://127.0.0.1:${address.port}` };
 }
 
@@ -189,26 +199,26 @@ async function connectCdp(port) {
   return { send, evaluate, close: () => ws.close() };
 }
 
-async function navigate(client, origin, pathname, selector, timeout = 10_000) {
+async function navigate(client, origin, pathname, selector) {
   const result = await client.send('Page.navigate', { url: `${origin}${pathname}` });
   assert(!result.errorText, `Navigation failed for ${pathname}: ${result.errorText}`);
-  const cleanPath = pathname.split(/[?#]/)[0];
+  const cleanPath = pathname.split(/[?#]/u)[0];
   const selectorLiteral = JSON.stringify(selector);
-  const deadline = Date.now() + timeout;
+  const deadline = Date.now() + 10_000;
   while (Date.now() < deadline) {
-    const state = await client.evaluate(`(() => ({
-      pathname: location.pathname,
-      readyState: document.readyState,
+    const ready = await client.evaluate(`(() => ({
+      path: location.pathname,
+      ready: document.readyState,
       found: Boolean(document.querySelector(${selectorLiteral})),
     }))()`);
-    if (state?.pathname === cleanPath && state.readyState === 'complete' && state.found) return;
+    if (ready?.path === cleanPath && ready.ready === 'complete' && ready.found) return;
     await sleep(50);
   }
   throw new Error(`Timed out waiting for ${cleanPath} ${selector}`);
 }
 
-async function waitFor(client, expression, message, timeout = 10_000) {
-  const deadline = Date.now() + timeout;
+async function waitFor(client, expression, message) {
+  const deadline = Date.now() + 10_000;
   while (Date.now() < deadline) {
     if (await client.evaluate(expression)) return;
     await sleep(50);
@@ -216,62 +226,71 @@ async function waitFor(client, expression, message, timeout = 10_000) {
   const diagnostics = await client.evaluate(`(() => ({
     pathname: location.pathname,
     status: document.querySelector('#auth-status')?.textContent?.trim() ?? null,
+    aggregate: localStorage.getItem(${JSON.stringify(handoffKey)}),
+    marker: localStorage.getItem(${JSON.stringify(journalMarkerKey)}),
+    journal: Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index))
+      .filter((key) => key?.startsWith(${JSON.stringify(entryPrefix)}))
+      .map((key) => localStorage.getItem(key)),
     member: localStorage.getItem(${JSON.stringify(memberKey)}),
-    handoff: localStorage.getItem(${JSON.stringify(handoffKey)}),
     active: sessionStorage.getItem(${JSON.stringify(activeBearerKey)}),
     pending: sessionStorage.getItem(${JSON.stringify(pendingGuestKey)}),
   }))()`);
   throw new Error(`${message}; diagnostics=${JSON.stringify(diagnostics)}; requests=${JSON.stringify(requests)}`);
 }
 
-async function prepareScenario(client, origin, nextScenario, pendingGuest = null) {
-  scenario = nextScenario;
+async function resetScenario(client, origin) {
   await navigate(client, origin, '/auth.html?next=hall.html', '#auth-form');
   await client.evaluate(`(() => {
+    localStorage.removeItem(${JSON.stringify(handoffKey)});
+    localStorage.removeItem(${JSON.stringify(journalMarkerKey)});
     localStorage.removeItem(${JSON.stringify(memberKey)});
-    localStorage.setItem(${JSON.stringify(handoffKey)}, JSON.stringify({
-      guestBearer: ${JSON.stringify(guestA)},
-      email: ${JSON.stringify(identity.email)},
-      expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
-    }));
+    for (const key of Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index))) {
+      if (key?.startsWith(${JSON.stringify(entryPrefix)})) localStorage.removeItem(key);
+    }
     sessionStorage.removeItem(${JSON.stringify(activeBearerKey)});
     sessionStorage.removeItem(${JSON.stringify(pendingGuestKey)});
-    ${pendingGuest ? `sessionStorage.setItem(${JSON.stringify(pendingGuestKey)}, ${JSON.stringify(pendingGuest)});` : ''}
   })()`);
 }
 
-async function submitSignIn(client) {
+async function stageGuestA(client, origin) {
+  await resetScenario(client, origin);
+  await client.evaluate(`sessionStorage.setItem(${JSON.stringify(activeBearerKey)}, ${JSON.stringify(guestA)})`);
   await client.evaluate(`(() => {
-    document.querySelector('#auth-email').value = ${JSON.stringify(identity.email)};
-    document.querySelector('#auth-password').value = ${JSON.stringify(identity.password)};
+    document.querySelector('#auth-tab-signup').click();
+    document.querySelector('#auth-email').value = ${JSON.stringify(email)};
+    document.querySelector('#auth-password').value = ${JSON.stringify(password)};
+    document.querySelector('#auth-password-confirm').value = ${JSON.stringify(password)};
     document.querySelector('#auth-form').requestSubmit();
   })()`);
+  await waitFor(client, `document.querySelector('#auth-status')?.textContent?.includes('확인 메일을 보냈습니다') === true`, `${scenario}: Guest A signup did not stage confirmation handoff`);
+  await waitFor(client, `localStorage.getItem(${JSON.stringify(journalMarkerKey)}) === '1'`, `${scenario}: journal marker missing`);
+}
+
+async function signIn(client, origin) {
+  await navigate(client, origin, '/auth.html?next=hall.html', '#auth-form');
+  await client.evaluate(`(() => {
+    document.querySelector('#auth-tab-signin').click();
+    document.querySelector('#auth-email').value = ${JSON.stringify(email)};
+    document.querySelector('#auth-password').value = ${JSON.stringify(password)};
+    document.querySelector('#auth-form').requestSubmit();
+  })()`);
+  await waitFor(client, `location.pathname === '/hall.html'`, `${scenario}: Member login did not finish`);
 }
 
 async function readAuthority(client) {
-  return client.evaluate(`(() => {
-    const storedHandoff = JSON.parse(localStorage.getItem(${JSON.stringify(handoffKey)}) ?? 'null');
-    const handoffs = storedHandoff?.version === 2 && Array.isArray(storedHandoff.entries)
-      ? storedHandoff.entries
-      : storedHandoff ? [storedHandoff] : [];
-    const handoff = handoffs.find((entry) => (
-      entry?.guestBearer === ${JSON.stringify(guestA)}
-      && String(entry?.email ?? '').trim().toLowerCase() === ${JSON.stringify(identity.email)}
-    )) ?? null;
-    return {
-      pathname: location.pathname,
-      member: JSON.parse(localStorage.getItem(${JSON.stringify(memberKey)}) ?? 'null'),
-      handoff,
-      handoffCount: handoffs.length,
-      active: sessionStorage.getItem(${JSON.stringify(activeBearerKey)}),
-      pending: sessionStorage.getItem(${JSON.stringify(pendingGuestKey)}),
-    };
-  })()`);
+  return client.evaluate(`(() => ({
+    member: JSON.parse(localStorage.getItem(${JSON.stringify(memberKey)}) ?? 'null'),
+    active: sessionStorage.getItem(${JSON.stringify(activeBearerKey)}),
+    pending: sessionStorage.getItem(${JSON.stringify(pendingGuestKey)}),
+    journal: Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index))
+      .filter((key) => key?.startsWith(${JSON.stringify(entryPrefix)}))
+      .map((key) => JSON.parse(localStorage.getItem(key))),
+  }))()`);
 }
 
-for (const file of ['auth.html', 'auth-page.js', 'product-auth.js', 'product-auth-ui.js', 'hall.html']) {
-  await stat(join(root, file));
-}
+for (const file of ['auth.html', 'auth-page.js', 'product-auth.js', 'hall.html']) await stat(join(root, file));
+const authPageSource = await readFile(join(root, 'auth-page.js'), 'utf8');
+assert(authPageSource.includes('CONFIRMATION_GUEST_HANDOFF_ENTRY_PREFIX'), 'auth-page.js does not use journal handoffs');
 
 const { server, origin } = await serve();
 const profile = await mkdtemp(join(tmpdir(), 'myeongha-auth-confirmation-handoff-browser-'));
@@ -292,36 +311,39 @@ let client;
 try {
   client = await connectCdp(await devtoolsPort(profile, chrome));
 
-  await prepareScenario(client, origin, 'collision', guestB);
-  await submitSignIn(client);
-  await waitFor(client, `location.pathname === '/hall.html'`, 'Collision scenario did not finish Member login');
+  scenario = 'collision';
+  await stageGuestA(client, origin);
+  await client.evaluate(`sessionStorage.setItem(${JSON.stringify(activeBearerKey)}, ${JSON.stringify(guestB)})`);
+  await signIn(client, origin);
   const collision = await readAuthority(client);
-  assert(collision.member?.user?.id === identity.id, 'Collision scenario lost Member identity');
-  assert(collision.pending === null, 'Collision scenario did not consume current-tab Guest B');
-  assert(collision.handoff?.guestBearer === guestA, 'Collision scenario deleted unrelated confirmation Guest A');
-  assert(collision.active === sessionFor(1).accessToken, 'Collision scenario did not keep Member bearer active');
+  assert(collision.member?.accessToken === 'collision.member.signature', 'Collision lost Member session');
+  assert(collision.active === 'collision.member.signature', 'Collision did not keep Member bearer active');
+  assert(collision.pending === null, 'Collision did not consume current Guest B');
+  assert(collision.journal.length === 1 && collision.journal[0].guestBearer === guestA, 'Collision deleted unrelated confirmation Guest A');
 
-  await prepareScenario(client, origin, 'exact');
-  await submitSignIn(client);
-  await waitFor(client, `location.pathname === '/hall.html'`, 'Exact handoff scenario did not finish Member login');
+  scenario = 'exact';
+  await stageGuestA(client, origin);
+  await client.evaluate(`sessionStorage.removeItem(${JSON.stringify(activeBearerKey)}); sessionStorage.removeItem(${JSON.stringify(pendingGuestKey)});`);
+  await signIn(client, origin);
   const exact = await readAuthority(client);
-  assert(exact.member?.user?.id === identity.id, 'Exact handoff scenario lost Member identity');
-  assert(exact.handoff === null, 'Exact promoted confirmation Guest A was not cleared');
-  assert(exact.active === sessionFor(2).accessToken, 'Exact handoff scenario did not keep Member bearer active');
+  assert(exact.member?.accessToken === 'exact.member.signature', 'Exact lost Member session');
+  assert(exact.active === 'exact.member.signature', 'Exact did not keep Member bearer active');
+  assert(exact.journal.length === 0, 'Exact promoted confirmation Guest A was not cleared');
 
-  await prepareScenario(client, origin, 'merge-required');
-  await submitSignIn(client);
-  await waitFor(client, `location.pathname === '/hall.html'`, 'Merge-required scenario did not finish Member login');
+  scenario = 'merge-required';
+  await stageGuestA(client, origin);
+  await client.evaluate(`sessionStorage.removeItem(${JSON.stringify(activeBearerKey)}); sessionStorage.removeItem(${JSON.stringify(pendingGuestKey)});`);
+  await signIn(client, origin);
   const mergeRequired = await readAuthority(client);
-  assert(mergeRequired.member?.user?.id === identity.id, 'Merge-required scenario lost Member identity');
-  assert(mergeRequired.handoff?.guestBearer === guestA, 'Merge-required scenario deleted the Guest merge candidate');
-  assert(mergeRequired.active === sessionFor(3).accessToken, 'Merge-required scenario did not keep Member bearer active');
+  assert(mergeRequired.member?.accessToken === 'merge-required.member.signature', 'Merge-required lost Member session');
+  assert(mergeRequired.active === 'merge-required.member.signature', 'Merge-required did not keep Member bearer active');
+  assert(mergeRequired.journal.length === 1 && mergeRequired.journal[0].guestBearer === guestA, 'Merge-required deleted the Guest merge candidate');
 
   const promotions = requests.filter((request) => request.path === '/api/auth/promote-guest');
   assert(promotions.length === 3, `Expected three promotion attempts, got ${promotions.length}`);
-  assert(promotions[0].scenario === 'collision' && promotions[0].promotedGuest === guestB, 'Collision did not prioritize current-tab Guest B');
-  assert(promotions[1].scenario === 'exact' && promotions[1].promotedGuest === guestA, 'Exact handoff Guest A was not promoted');
-  assert(promotions[2].scenario === 'merge-required' && promotions[2].promotedGuest === guestA, 'Merge-required did not preserve exact Guest A identity');
+  assert(promotions[0].scenario === 'collision' && promotions[0].promotedGuest === guestB, 'Collision did not prioritize current Guest B');
+  assert(promotions[1].scenario === 'exact' && promotions[1].promotedGuest === guestA, 'Exact did not promote Guest A');
+  assert(promotions[2].scenario === 'merge-required' && promotions[2].promotedGuest === guestA, 'Merge-required did not attempt exact Guest A');
 
   await mkdir(join(process.cwd(), 'artifacts'), { recursive: true });
   await writeFile(join(process.cwd(), 'artifacts', 'web-auth-confirmation-handoff-browser-smoke.json'), `${JSON.stringify({
@@ -331,7 +353,6 @@ try {
     mergeRequired: { handoffPreserved: true, promotedGuest: guestA },
     requests,
   }, null, 2)}\n`, 'utf8');
-
   console.log('MyeongHa_WEB_AUTH_CONFIRMATION_HANDOFF_BROWSER_PASS');
 } catch (error) {
   console.error(error);
@@ -340,6 +361,7 @@ try {
 } finally {
   client?.close();
   chrome.kill('SIGTERM');
-  server.close();
-  await rm(profile, { recursive: true, force: true });
+  await Promise.race([new Promise((done) => chrome.once('exit', done)), sleep(1_000)]);
+  await new Promise((done) => server.close(done));
+  await rm(profile, { recursive: true, force: true }).catch(() => {});
 }
