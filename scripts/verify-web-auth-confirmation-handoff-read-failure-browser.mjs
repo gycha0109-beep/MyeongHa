@@ -290,6 +290,7 @@ try {
 
   assert(await client.evaluate(scheduleSignInExpression()) === true, 'Failed to schedule recovery sign-in');
   await waitFor(client, `location.pathname === '/hall.html'`, 'Recovered handoff did not promote and redirect');
+  await client.evaluate(`globalThis.__myeonghaFailConfirmationHandoffRead = false`);
 
   assert(requests.filter((request) => request.path === '/api/auth/sign-in').length === 2, 'Recovery sign-in transport count mismatch');
   assert(requests.filter((request) => request.path === '/api/auth/promote-guest').length === 1, 'Recovered handoff did not promote exactly once');
