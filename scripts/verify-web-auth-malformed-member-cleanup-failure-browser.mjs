@@ -7,11 +7,21 @@ import { spawn } from 'node:child_process';
 
 const root = resolve(process.cwd(), process.env.MYEONGHA_WEB_OUTPUT_DIR ?? 'public');
 const chromeBin = process.env.CHROME_BIN ?? process.env.CHROME_PATH ?? 'chrome';
+const artifactDir = resolve(process.cwd(), 'artifacts');
+const artifactPath = join(artifactDir, 'web-auth-malformed-member-cleanup-failure-browser-smoke.json');
 const memberKey = 'myeongha.memberSession.v1';
 const activeBearerKey = 'myeongha.guestBearer.v1';
 const pendingGuestKey = 'myeongha.pendingGuestBearer.v1';
-const stagedGuest = 'guest-before-malformed-member-browser';
+const changedEvent = 'myeongha:auth-changed';
+const stagedGuest = 'guest-before-malformed-cleanup-failure';
 const staleMemberJwt = 'stale.member.signature';
+const malformedMemberRaw = JSON.stringify({
+  accessToken: 'opaque-member-token',
+  refreshToken: 'refresh-token',
+  expiresAt: '2099-01-01T00:00:00.000Z',
+  tokenType: 'bearer',
+  user: { id: '11111111-1111-4111-8111-111111111111', email: 'member@example.com' },
+});
 const mime = new Map([
   ['.html', 'text/html; charset=utf-8'],
   ['.css', 'text/css; charset=utf-8'],
@@ -19,8 +29,6 @@ const mime = new Map([
   ['.svg', 'image/svg+xml'],
   ['.png', 'image/png'],
   ['.webp', 'image/webp'],
-  ['.jpg', 'image/jpeg'],
-  ['.jpeg', 'image/jpeg'],
 ]);
 
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
@@ -54,7 +62,7 @@ async function serve() {
     server.listen(0, '127.0.0.1', done);
   });
   const address = server.address();
-  assert(address && typeof address === 'object', 'browser smoke server address unavailable');
+  assert(address && typeof address === 'object', 'browser server address unavailable');
   return { server, origin: `http://127.0.0.1:${address.port}` };
 }
 
@@ -92,7 +100,7 @@ async function removeChromeProfile(profile) {
       && error?.code === 'ENOTEMPTY'
       && String(error?.path ?? '').startsWith(profile);
     if (!narrowCleanupRace) throw error;
-    console.log('MyeongHa malformed stored Member browser assertions passed; ignoring ephemeral Chrome profile cleanup ENOTEMPTY race.');
+    console.log('MyeongHa malformed Member cleanup failure assertions passed; ignoring ephemeral Chrome profile cleanup ENOTEMPTY race.');
   }
 }
 
@@ -127,7 +135,6 @@ async function connectCdp(port) {
     assert(!result.exceptionDetails, `Runtime.evaluate failed: ${result.exceptionDetails?.text ?? 'unknown'}`);
     return result.result?.value;
   };
-
   await Promise.all([send('Page.enable'), send('Runtime.enable')]);
   return { send, evaluate, close: () => ws.close() };
 }
@@ -158,66 +165,15 @@ async function navigate(client, origin, pathname, selector, timeout = 10_000) {
   throw new Error(`Timed out waiting for ${cleanPath} ${selector}`);
 }
 
-async function waitFor(client, expression, message, timeout = 10_000) {
-  const deadline = Date.now() + timeout;
-  while (Date.now() < deadline) {
-    try {
-      if (await client.evaluate(expression)) return;
-    } catch (error) {
-      if (!isExpectedNavigationRace(error)) throw error;
-    }
-    await sleep(50);
-  }
-  const diagnostics = await client.evaluate(`(() => ({
-    state: document.querySelector('.product-profile')?.dataset.authState ?? null,
-    href: document.querySelector('.product-profile')?.getAttribute('href') ?? null,
-    member: localStorage.getItem(${JSON.stringify(memberKey)}),
-    active: sessionStorage.getItem(${JSON.stringify(activeBearerKey)}),
-    pending: sessionStorage.getItem(${JSON.stringify(pendingGuestKey)}),
-  }))()`);
-  throw new Error(`${message}; diagnostics=${JSON.stringify(diagnostics)}`);
-}
-
-async function readAuthority(client) {
-  return client.evaluate(`(() => ({
-    state: document.querySelector('.product-profile')?.dataset.authState ?? null,
-    href: document.querySelector('.product-profile')?.getAttribute('href') ?? null,
-    label: document.querySelector('.product-profile')?.innerText ?? null,
-    member: localStorage.getItem(${JSON.stringify(memberKey)}),
-    active: sessionStorage.getItem(${JSON.stringify(activeBearerKey)}),
-    pending: sessionStorage.getItem(${JSON.stringify(pendingGuestKey)}),
-  }))()`);
-}
-
-async function seedAndReload(client, origin, memberRaw, activeBearer) {
-  await client.evaluate(`(() => {
-    localStorage.setItem(${JSON.stringify(memberKey)}, ${JSON.stringify(memberRaw)});
-    sessionStorage.setItem(${JSON.stringify(activeBearerKey)}, ${JSON.stringify(activeBearer)});
-    sessionStorage.setItem(${JSON.stringify(pendingGuestKey)}, ${JSON.stringify(stagedGuest)});
-  })()`);
-  await navigate(client, origin, '/hall.html', '.product-profile');
-  await waitFor(
-    client,
-    `document.querySelector('.product-profile')?.dataset.authState === 'guest'
-      && localStorage.getItem(${JSON.stringify(memberKey)}) === null
-      && sessionStorage.getItem(${JSON.stringify(activeBearerKey)}) === ${JSON.stringify(stagedGuest)}
-      && sessionStorage.getItem(${JSON.stringify(pendingGuestKey)}) === null`,
-    'Malformed persisted Member authority did not reconcile to Guest',
-  );
-  return readAuthority(client);
-}
-
 for (const file of ['hall.html', 'product-auth.js', 'product-auth-ui.js']) {
   await stat(join(root, file));
 }
 const productAuthSource = await readFile(join(root, 'product-auth.js'), 'utf8');
-assert(productAuthSource.includes('!isJwtLike(value.accessToken)'), 'Member session normalization does not enforce JWT-like access-token classification');
-assert(productAuthSource.includes('parsed = JSON.parse(raw);'), 'Malformed stored Member parsing is not isolated from cleanup');
-assert(productAuthSource.includes('const normalized = normalizeSession(parsed);'), 'Malformed stored Member normalization does not follow the parse boundary');
-assert(productAuthSource.includes('if (!normalized) {\n    discardMemberSession();\n    return null;\n  }'), 'Malformed stored Member session is not reconciled through one discardMemberSession cleanup');
+assert(productAuthSource.includes('parsed = JSON.parse(raw);'), 'readMemberSession does not isolate JSON parsing from cleanup');
+assert(productAuthSource.includes('const normalized = normalizeSession(parsed);'), 'readMemberSession does not normalize after parse boundary');
 
 const { server, origin } = await serve();
-const profile = await mkdtemp(join(tmpdir(), 'myeongha-auth-malformed-stored-member-browser-'));
+const profile = await mkdtemp(join(tmpdir(), 'myeongha-auth-malformed-member-cleanup-failure-browser-'));
 const chrome = spawn(chromeBin, [
   '--headless=new',
   '--no-sandbox',
@@ -236,39 +192,85 @@ try {
   client = await connectCdp(await devtoolsPort(profile, chrome));
   await navigate(client, origin, '/hall.html', '.product-profile');
 
-  const corruptJson = await seedAndReload(client, origin, '{not-json', staleMemberJwt);
-  assert(corruptJson.state === 'guest', 'Corrupt JSON scenario did not render Guest authority');
-  assert(corruptJson.href?.startsWith('auth.html?next='), 'Corrupt JSON scenario did not render login destination');
-  assert(corruptJson.label?.includes('로그인'), 'Corrupt JSON scenario did not render login label');
-  assert(corruptJson.member === null, 'Corrupt JSON scenario kept malformed Member record');
-  assert(corruptJson.active === stagedGuest, 'Corrupt JSON scenario did not restore pending Guest');
-  assert(corruptJson.pending === null, 'Corrupt JSON scenario kept pending Guest staged');
+  const failedCleanup = await client.evaluate(`(async () => {
+    const auth = await import('/product-auth.js');
+    localStorage.setItem(${JSON.stringify(memberKey)}, ${JSON.stringify(malformedMemberRaw)});
+    sessionStorage.setItem(${JSON.stringify(activeBearerKey)}, ${JSON.stringify(staleMemberJwt)});
+    sessionStorage.setItem(${JSON.stringify(pendingGuestKey)}, ${JSON.stringify(stagedGuest)});
+    globalThis.__myeonghaMalformedCleanupEvents = 0;
+    addEventListener(${JSON.stringify(changedEvent)}, () => { globalThis.__myeonghaMalformedCleanupEvents += 1; });
 
-  const opaqueMember = JSON.stringify({
-    accessToken: 'opaque-member-token',
-    refreshToken: 'refresh-token',
-    expiresAt: '2099-01-01T00:00:00.000Z',
-    tokenType: 'bearer',
-    user: { id: '11111111-1111-4111-8111-111111111111', email: 'member@example.com' },
-  });
-  const invalidClassification = await seedAndReload(client, origin, opaqueMember, 'opaque-member-token');
-  assert(invalidClassification.state === 'guest', 'Opaque Member scenario did not render Guest authority');
-  assert(invalidClassification.member === null, 'Opaque Member scenario kept malformed Member record');
-  assert(invalidClassification.active === stagedGuest, 'Opaque Member scenario did not restore pending Guest');
-  assert(invalidClassification.pending === null, 'Opaque Member scenario kept pending Guest staged');
+    const nativeSetItem = Storage.prototype.setItem;
+    const failValues = new Set([${JSON.stringify(stagedGuest)}, ${JSON.stringify(staleMemberJwt)}]);
+    Storage.prototype.setItem = function(key, value) {
+      const normalized = String(value);
+      if (this === sessionStorage && key === ${JSON.stringify(activeBearerKey)} && failValues.delete(normalized)) {
+        throw new Error('forced one-shot malformed cleanup compatibility failure');
+      }
+      return nativeSetItem.call(this, key, value);
+    };
 
-  await mkdir(join(process.cwd(), 'artifacts'), { recursive: true });
-  await writeFile(join(process.cwd(), 'artifacts', 'web-auth-malformed-stored-member-browser-smoke.json'), `${JSON.stringify({
-    status: 'PASS',
-    corruptJson,
-    invalidClassification,
+    let failure = null;
+    try {
+      auth.readMemberSession();
+    } catch (error) {
+      failure = { name: error?.name ?? null, code: error?.code ?? null };
+    }
+    Storage.prototype.setItem = nativeSetItem;
+
+    return {
+      failure,
+      member: localStorage.getItem(${JSON.stringify(memberKey)}),
+      active: sessionStorage.getItem(${JSON.stringify(activeBearerKey)}),
+      pending: sessionStorage.getItem(${JSON.stringify(pendingGuestKey)}),
+      guest: auth.readGuestBearer(),
+      events: globalThis.__myeonghaMalformedCleanupEvents,
+      remainingFaults: failValues.size,
+    };
+  })()`);
+
+  assert(failedCleanup.failure?.name === 'ProductAuthError', 'Malformed cleanup hard failure was not propagated as ProductAuthError');
+  assert(failedCleanup.failure?.code === 'WEB_AUTH_MEMBER_COMPAT_DISCARD_ROLLBACK_FAILED', `Unexpected malformed cleanup error code: ${failedCleanup.failure?.code}`);
+  assert(failedCleanup.member === null, 'Malformed Member raw authority was incorrectly restored');
+  assert(failedCleanup.active === null, 'Failed compatibility rollback unexpectedly created an active bearer');
+  assert(failedCleanup.pending === stagedGuest, 'Pending Guest lineage was lost during malformed cleanup failure');
+  assert(failedCleanup.guest === stagedGuest, 'Pending Guest did not remain the fallback Guest authority');
+  assert(failedCleanup.events === 0, `Failed malformed cleanup emitted ${failedCleanup.events} auth event(s)`);
+  assert(failedCleanup.remainingFaults === 0, 'One-shot failure sequence did not exercise both transition and rollback writes');
+
+  const recovered = await client.evaluate(`(async () => {
+    const auth = await import('/product-auth.js');
+    const healed = auth.invalidateMemberSession();
+    return {
+      healed,
+      member: localStorage.getItem(${JSON.stringify(memberKey)}),
+      active: sessionStorage.getItem(${JSON.stringify(activeBearerKey)}),
+      pending: sessionStorage.getItem(${JSON.stringify(pendingGuestKey)}),
+      guest: auth.readGuestBearer(),
+      events: globalThis.__myeonghaMalformedCleanupEvents,
+    };
+  })()`);
+  assert(recovered.healed === true, 'Healthy retry did not canonicalize compatibility state');
+  assert(recovered.member === null, 'Recovery recreated malformed Member authority');
+  assert(recovered.active === stagedGuest && recovered.pending === null, 'Recovery did not canonicalize pending Guest to active Guest');
+  assert(recovered.guest === stagedGuest, 'Recovered Guest authority is incorrect');
+  assert(recovered.events === 1, `Recovery expected one auth event, received ${recovered.events}`);
+
+  await mkdir(artifactDir, { recursive: true });
+  await writeFile(artifactPath, `${JSON.stringify({
+    status: 'MyeongHa_WEB_AUTH_MALFORMED_MEMBER_CLEANUP_FAILURE_BROWSER_PASS',
+    failedCleanup,
+    recovered,
   }, null, 2)}\n`, 'utf8');
-
   functionalPass = true;
-  console.log('MyeongHa_WEB_AUTH_MALFORMED_STORED_MEMBER_BROWSER_PASS');
+  console.log('MyeongHa_WEB_AUTH_MALFORMED_MEMBER_CLEANUP_FAILURE_BROWSER_PASS');
 } catch (error) {
-  console.error(error);
-  if (chromeError.trim()) console.error(chromeError.trim());
+  await mkdir(artifactDir, { recursive: true });
+  await writeFile(artifactPath, `${JSON.stringify({
+    status: 'MyeongHa_WEB_AUTH_MALFORMED_MEMBER_CLEANUP_FAILURE_BROWSER_FAIL',
+    error: error instanceof Error ? error.message : String(error),
+    chromeError,
+  }, null, 2)}\n`, 'utf8');
   throw error;
 } finally {
   client?.close();

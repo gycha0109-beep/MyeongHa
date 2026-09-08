@@ -40,6 +40,10 @@ jobs:
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
         run: node scripts/verify-web-auth-malformed-stored-member-browser.mjs
+      - name: Verify malformed Member cleanup failure authority
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/verify-web-auth-malformed-member-cleanup-failure-browser.mjs
       - name: Verify signup Guest bootstrap auth authority
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
@@ -173,6 +177,7 @@ jobs:
             artifacts/web-reading-browser-smoke*
             artifacts/web-auth-browser-smoke*
             artifacts/web-auth-malformed-stored-member-browser-smoke*
+            artifacts/web-auth-malformed-member-cleanup-failure-browser-smoke*
             artifacts/web-auth-signup-guest-bootstrap-browser-smoke*
             artifacts/web-auth-guest-bootstrap-singleflight-browser-smoke*
             artifacts/web-auth-guest-persistence-failure-browser-smoke*
