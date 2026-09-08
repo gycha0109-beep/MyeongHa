@@ -64,6 +64,10 @@ jobs:
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
         run: node scripts/verify-web-auth-promotion-failure-browser.mjs
+      - name: Verify Guest removal failure authority
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/verify-web-auth-guest-removal-failure-browser.mjs
       - name: Verify signup confirmation Guest handoff continuity
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
@@ -167,6 +171,7 @@ jobs:
             artifacts/web-auth-continuity-browser-smoke*
             artifacts/web-auth-failed-login-guest-browser-smoke*
             artifacts/web-auth-promotion-failure-browser-smoke*
+            artifacts/web-auth-guest-removal-failure-browser-smoke*
             artifacts/web-auth-confirmation-handoff-browser-smoke*
             artifacts/web-auth-guest-bearer-canonicalization-browser-smoke*
             artifacts/web-auth-confirmation-relogin-browser-smoke*
