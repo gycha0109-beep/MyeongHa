@@ -47,10 +47,13 @@ describe('Production Character publication material guard', () => {
   });
 
   it('fails closed while renderer emotion IDs are absent', () => {
-    expectMaterialError(
-      materialFixture({ emotionIds: undefined }),
-      'CHARACTER_EMOTION_IDS_REQUIRED',
-    );
+    const withoutEmotionIds: ProductionCharacterPublicationMaterials = {
+      characterId: 'character-under-test',
+      assetRefs: ['fixture://character/concept-art'],
+      animationCueIds: ['idle'],
+    };
+
+    expectMaterialError(withoutEmotionIds, 'CHARACTER_EMOTION_IDS_REQUIRED');
     expectMaterialError(
       materialFixture({ emotionIds: [] }),
       'CHARACTER_EMOTION_IDS_REQUIRED',
