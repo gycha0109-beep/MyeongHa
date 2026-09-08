@@ -1,0 +1,56 @@
+name: Production Member Chat Open Reuse Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type VERIFY_MEMBER_CHAT_OPEN_REUSE to perform the governed Production Member Chat open/reuse smoke.'
+        required: true
+        type: string
+      character_id:
+        description: 'Canonical launch Character ID to open in Production.'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-member-chat-open-reuse-smoke
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: verify-production-member-chat-open-reuse
+    runs-on: ubuntu-24.04
+    environment: production
+    env:
+      DISPATCH_CONFIRM: ${{ inputs.confirm }}
+      MYEONGHA_PRODUCTION_CHAT_OPEN_CHARACTER_ID: ${{ inputs.character_id }}
+      MYEONGHA_PRODUCTION_MEMBER_EMAIL: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_EMAIL }}
+      MYEONGHA_PRODUCTION_MEMBER_PASSWORD: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_PASSWORD }}
+      MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID }}
+    steps:
+      - name: Verify explicit dispatch, canonical Character, and Production Member credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$DISPATCH_CONFIRM" == 'VERIFY_MEMBER_CHAT_OPEN_REUSE' ]]
+          case "$MYEONGHA_PRODUCTION_CHAT_OPEN_CHARACTER_ID" in
+            seyeon|yeoul|seorin|rahyeon|mira|taegyeom|yunho|doyun|baekheon) ;;
+            *) echo 'Production Member Chat open/reuse smoke requires an approved canonical Launch Character ID.' >&2; exit 1 ;;
+          esac
+          test -n "${MYEONGHA_PRODUCTION_MEMBER_EMAIL:-}"
+          test -n "${MYEONGHA_PRODUCTION_MEMBER_PASSWORD:-}"
+          test -n "${MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID:-}"
+
+      - name: Check out exact repository verifier
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Verify Production Member Chat open, same-Character reuse, and re-auth continuity
+        run: node scripts/verify-production-member-chat-open-reuse.mjs
