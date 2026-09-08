@@ -183,10 +183,6 @@ export function validateMvpProductionLaunchRosterDisplayNames(
 export function validateProductionCharacterContentBundle(
   bundle: CharacterContentBundle,
 ): CharacterContentBundle {
-  for (const character of bundle.characters) {
-    validateProductionCharacterPublicationMaterials(character);
-  }
-
   validateCharacterContentBundle(bundle);
 
   if (!hasVersionedAssetManifestHash(bundle)) {
@@ -226,6 +222,10 @@ export function validateProductionCharacterContentBundle(
       'CHARACTER_VISUAL_CANON_REQUIRED',
       `Production character content requires source-authored visual canon: ${missingVisual.characterId}`,
     );
+  }
+
+  for (const character of bundle.characters) {
+    validateProductionCharacterPublicationMaterials(character);
   }
 
   return bundle;
