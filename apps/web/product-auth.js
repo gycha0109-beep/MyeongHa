@@ -131,6 +131,13 @@ function memberCompatibilityRollbackFailure() {
   );
 }
 
+function memberCompatibilityDiscardRollbackFailure() {
+  return new ProductAuthError(
+    'WEB_AUTH_MEMBER_COMPAT_DISCARD_ROLLBACK_FAILED',
+    '로그인 세션 제거 실패 후 브라우저 호환 상태를 안전하게 복원하지 못했습니다.',
+  );
+}
+
 function emitAuthChanged() {
   globalThis.dispatchEvent?.(new CustomEvent(AUTH_CHANGED_EVENT));
 }
@@ -164,6 +171,41 @@ function sameMemberSessionGeneration(left, right) {
   );
 }
 
+function normalizedStoredMemberSession(raw) {
+  if (!raw) return null;
+  try {
+    return normalizeSession(JSON.parse(raw));
+  } catch {
+    return null;
+  }
+}
+
+function discardMemberCompatibilityState() {
+  const snapshot = [
+    [GUEST_TOKEN_KEY, readSession(GUEST_TOKEN_KEY)],
+    [PENDING_GUEST_TOKEN_KEY, readSession(PENDING_GUEST_TOKEN_KEY)],
+  ];
+  const fail = () => Object.freeze({ ok: false, rolledBack: restoreSessionSnapshot(snapshot) });
+  const active = snapshot[0][1];
+  if (
+    (isJwtLike(active) || (active !== null && !normalizeGuestBearer(active))) &&
+    !removeSession(GUEST_TOKEN_KEY)
+  ) {
+    return fail();
+  }
+
+  const pendingRaw = snapshot[1][1];
+  const pending = normalizeGuestBearer(pendingRaw);
+  if (pending) {
+    if (!writeSession(GUEST_TOKEN_KEY, pending)) return fail();
+    if (!removeSession(PENDING_GUEST_TOKEN_KEY)) return fail();
+  } else if (pendingRaw !== null && !removeSession(PENDING_GUEST_TOKEN_KEY)) {
+    return fail();
+  }
+
+  return Object.freeze({ ok: true, rolledBack: true });
+}
+
 function discardMemberSession(expectedAccessToken = null, expectedRefreshToken = null) {
   if (expectedAccessToken !== null) {
     const current = readMemberSession();
@@ -176,19 +218,25 @@ function discardMemberSession(expectedAccessToken = null, expectedRefreshToken =
     }
   }
 
+  const memberRaw = readLocal(MEMBER_SESSION_KEY);
+  const restorableMemberRaw = normalizedStoredMemberSession(memberRaw) ? memberRaw : null;
   if (!removeLocal(MEMBER_SESSION_KEY)) return false;
-  const active = readSession(GUEST_TOKEN_KEY);
-  if (isJwtLike(active) || (active !== null && !normalizeGuestBearer(active))) {
-    removeSession(GUEST_TOKEN_KEY);
+
+  const compatibility = discardMemberCompatibilityState();
+  if (!compatibility.ok) {
+    if (restorableMemberRaw !== null) {
+      const memberRolledBack = writeLocal(MEMBER_SESSION_KEY, restorableMemberRaw);
+      if (!memberRolledBack || !compatibility.rolledBack) {
+        throw memberCompatibilityDiscardRollbackFailure();
+      }
+      return false;
+    }
+
+    if (!compatibility.rolledBack) throw memberCompatibilityDiscardRollbackFailure();
+    emitAuthChanged();
+    return false;
   }
-  const pendingRaw = readSession(PENDING_GUEST_TOKEN_KEY);
-  const pending = normalizeGuestBearer(pendingRaw);
-  if (pending) {
-    writeSession(GUEST_TOKEN_KEY, pending);
-    removeSession(PENDING_GUEST_TOKEN_KEY);
-  } else if (pendingRaw !== null) {
-    removeSession(PENDING_GUEST_TOKEN_KEY);
-  }
+
   emitAuthChanged();
   return true;
 }
