@@ -101,10 +101,33 @@ function removeSessionEntries(entries) {
   return false;
 }
 
+function restoreSessionSnapshot(entries) {
+  let restoredAll = true;
+  for (const [key, value] of entries) {
+    const restored = value === null ? removeSession(key) : writeSession(key, value);
+    if (!restored) restoredAll = false;
+  }
+  return restoredAll;
+}
+
 function guestClearFailure() {
   return new ProductAuthError(
     'WEB_AUTH_GUEST_CLEAR_FAILED',
     '게스트 세션을 브라우저에서 안전하게 제거하지 못했습니다.',
+  );
+}
+
+function memberCompatibilityFailure() {
+  return new ProductAuthError(
+    'WEB_AUTH_MEMBER_COMPAT_PERSIST_FAILED',
+    '로그인 세션의 브라우저 호환 상태를 안전하게 저장하지 못했습니다.',
+  );
+}
+
+function memberCompatibilityRollbackFailure() {
+  return new ProductAuthError(
+    'WEB_AUTH_MEMBER_COMPAT_ROLLBACK_FAILED',
+    '로그인 세션 저장 실패 후 브라우저 호환 상태를 안전하게 복원하지 못했습니다.',
   );
 }
 
@@ -113,14 +136,23 @@ function emitAuthChanged() {
 }
 
 function stageMemberBearerForLegacyProductClients(accessToken) {
-  const current = normalizeGuestBearer(readSession(GUEST_TOKEN_KEY));
-  const pendingRaw = readSession(PENDING_GUEST_TOKEN_KEY);
+  const snapshot = [
+    [GUEST_TOKEN_KEY, readSession(GUEST_TOKEN_KEY)],
+    [PENDING_GUEST_TOKEN_KEY, readSession(PENDING_GUEST_TOKEN_KEY)],
+  ];
+  const current = normalizeGuestBearer(snapshot[0][1]);
+  const pendingRaw = snapshot[1][1];
   const pending = normalizeGuestBearer(pendingRaw);
-  if (pendingRaw !== null && !pending) removeSession(PENDING_GUEST_TOKEN_KEY);
-  if (current && !pending) {
-    writeSession(PENDING_GUEST_TOKEN_KEY, current);
-  }
-  writeSession(GUEST_TOKEN_KEY, accessToken);
+  const fail = () => {
+    restoreSessionSnapshot(snapshot);
+    throw memberCompatibilityFailure();
+  };
+
+  if (pendingRaw !== null && !pending && !removeSession(PENDING_GUEST_TOKEN_KEY)) fail();
+  if (current && !pending && !writeSession(PENDING_GUEST_TOKEN_KEY, current)) fail();
+  if (!writeSession(GUEST_TOKEN_KEY, accessToken)) fail();
+
+  return () => restoreSessionSnapshot(snapshot);
 }
 
 function sameMemberSessionGeneration(left, right) {
@@ -219,10 +251,11 @@ function saveSession(session) {
   const normalized = normalizeSession(session);
   if (!normalized) throw new ProductAuthError('WEB_AUTH_MALFORMED_SESSION', '로그인 세션 응답이 올바르지 않습니다.');
   const serialized = JSON.stringify(normalized);
+  const rollbackCompatibility = stageMemberBearerForLegacyProductClients(normalized.accessToken);
   if (!writeLocal(MEMBER_SESSION_KEY, serialized)) {
+    if (!rollbackCompatibility()) throw memberCompatibilityRollbackFailure();
     throw new ProductAuthError('WEB_AUTH_MEMBER_PERSIST_FAILED', '로그인 세션을 브라우저에 안전하게 저장하지 못했습니다.');
   }
-  stageMemberBearerForLegacyProductClients(normalized.accessToken);
   emitAuthChanged();
   return normalized;
 }
