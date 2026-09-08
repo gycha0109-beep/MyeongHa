@@ -2,20 +2,26 @@
 
 > This document describes executable production/runtime state separately from repository-local build, test, and deployment-configuration checks.
 >
-> Guest/auth Production evidence refreshed: **2026-09-08**.
+> Guest/auth and Member/Birth/Records Production evidence refreshed: **2026-09-08**.
 
 ## Current status
 
 | Area | State | Notes |
 |---|---|---|
 | Static Web | DEPLOYED | Vercel builds the static `public/` output through `npm run build:web`. |
-| Executable `/api` runtime | ACTIVE | `GET /api/health`, protected `GET /api/me`, and POST-only `/api/session/bootstrap` are deployed as root Vercel Functions on the canonical production host. |
+| Executable `/api` runtime | ACTIVE | `GET /api/health`, protected identity/user-data routes, POST-only `/api/session/bootstrap`, Birth Profile routes, Life Record/Memories reads, and current-subject Saju calculation are deployed as root Vercel Functions on the canonical production host. |
 | Browser → API | `/api/me` ACTIVE / GUEST BOOTSTRAP ACTIVE | `GET /api/me` is production-active and rejects missing identity with `401 AUTH_REQUIRED`. The Guest bootstrap root route is production-active; a fresh GET on 2026-09-08 returned `405` with `Allow: POST` and `Cache-Control: no-store`. |
-| Canonical Subject Resolution | DB + APPLICATION + MEMBER/GUEST REQUEST VERIFIERS ACTIVE FOR `/api/me` | P0-AUTH-01 defines trusted Member/Guest evidence → canonical `subjects.id`; Member JWT verification, Guest HMAC fingerprinting, and production composition roots are implemented. |
+| Canonical Subject Resolution | MEMBER + GUEST PRODUCTION VERIFIED | P0-AUTH-01 defines trusted Member/Guest evidence → canonical `subjects.id`. Guest positive smoke run `33670492068` and Member reauthentication continuity run `33967953083` both exercised the production identity boundary. |
 | API → PostgreSQL execution identity | PRODUCTION BOUND | `myeongha_runtime` is the governed production LOGIN principal, remains NOINHERIT / NOBYPASSRLS / non-privileged, and can enter the NOLOGIN `myeongha_api_executor` execution role. Its runtime credential was assigned together with the consuming Vercel production binding. |
-| Production user-data config | BOUND FOR `/api/me` AND GUEST BOOTSTRAP | Vercel production has the governed DB/Supabase/Guest-fingerprint settings required by the current user-data runtime. `MYEONGHA_GUEST_SESSION_TTL_SECONDS=604800` was bound and read back successfully in governed run `33666141919`. |
-| Guest bootstrap HTTP composition | ACTIVE / PRODUCTION VERIFIED | PR #334 activated the thin root route. Production smoke run `33670492068` then proved fresh Guest issuance, same-subject `/api/me`, same-session bearer reuse without bearer re-emission, invalid credential fail-closed behavior, and health regression. |
+| Production user-data config | BOUND FOR ACTIVE USER-DATA ROUTES | Vercel production has the governed DB/Supabase/Guest-fingerprint settings required by the current user-data runtime. `MYEONGHA_GUEST_SESSION_TTL_SECONDS=604800` was bound and read back successfully in governed run `33666141919`. |
+| Guest bootstrap HTTP composition | ACTIVE / PRODUCTION VERIFIED | PR #334 activated the thin root route. Production smoke run `33670492068` proved fresh Guest issuance, same-subject `/api/me`, same-session bearer reuse without bearer re-emission, invalid credential fail-closed behavior, and health regression. |
 | Guest session TTL | DECIDED / PRODUCTION BOUND | `P0-PR-01A` fixes Guest bearer/session authentication lifetime at 7 days = 604800 seconds, and that exact value is bound in Production. Parent `P0-PR-01` remains open for broader expired-Guest data deletion, backup, AI-trace, commerce/legal, and cleanup retention policy. |
+| Member own-subject continuity | ACTIVE / PRODUCTION VERIFIED | Governed run `33967953083` verified fresh Member sign-in, exact canonical subject, sign-out, fresh re-sign-in, and preserved owner state. |
+| Current self Birth Profile read | ACTIVE / PRODUCTION VERIFIED | Run `33949315382` returned the authenticated Member's current self Birth Profile and exact current revision; run `33967953083` proved the same profile/revision survived sign-out and re-sign-in. |
+| Birth Profile create route | ACTIVE / NEGATIVE BOUNDARY VERIFIED | PR #370 activated canonical `POST /api/birth-profiles`. Production boundary run `33741484222` proved unauthenticated POST fails `401 AUTH_REQUIRED`, root GET stays `404`, and dynamic POST stays `405 Allow: GET`. This run is non-mutating and is not claimed as a positive create-write smoke. |
+| Current-subject Saju calculation | ACTIVE / CALCULATION-ONLY PRODUCTION VERIFIED | Run `33949315382` proved Member authentication, current Birth revision binding, two successful deterministic calculation calls, `semanticAuthority=calculation_only`, and `interpretationAuthorized=false`. |
+| Life Record read | ACTIVE / PRODUCTION VERIFIED | Run `33967953083` read the owner Life Record before and after Member reauthentication, canonicalized the facts, and required the SHA-256 snapshot digest to remain identical. |
+| Memories read | ACTIVE / PRODUCTION VERIFIED | Run `33967953083` read owner Memories before and after Member reauthentication, canonicalized the items, and required the SHA-256 snapshot digest to remain identical. |
 | Character compatibility verdict | BLOCKED | `SRC-15` remains unresolved. |
 | Subject-specific content rollout | BLOCKED | `SRC-16` remains unresolved. |
 | Canonical Character roster | BLOCKED / EMPTY IN PRODUCTION | `O-C1-05` remains OPEN for the actual initial five Character canon / gender / visual / names. Production roster audit run `33981084804` found `characterTotalCount=0`. No roster is inferred from UI presentation data. |
@@ -36,9 +42,9 @@ Remote production evidence currently includes:
 
 ```text
 latest inspected Production deployment
-→ dpl_757Za7arQoiEnfBeGRZkSSdkPsYR
+→ dpl_AqRorhffFD6HER41DsQHUQVYvjAc
 → READY
-→ Git SHA 583b086936f539a69fe1d21471c1e1738b2efc9d
+→ Git SHA 9771fa47a0527f3c0e1dd981b841c6c0a75e54a6
 
 GET https://myeongha.vercel.app/api/health
 → 200
@@ -87,7 +93,7 @@ GET /api/health
 → 200
 ```
 
-The raw Guest bearer remained runner-local and was not emitted to the job log. Later auth/browser hardening through #592 preserves fail-closed client-side Guest/Member credential cleanup behavior; current main `583b086936f539a69fe1d21471c1e1738b2efc9d` is deployed READY.
+The raw Guest bearer remained runner-local and was not emitted to the job log. Later auth/browser hardening through #592 preserves fail-closed client-side Guest/Member credential cleanup behavior.
 
 Guest bootstrap activation history is therefore:
 
@@ -112,6 +118,101 @@ PR #334
 Production Guest positive smoke
 → run 33670492068 SUCCESS
 ```
+
+## Live Production Member / Birth / Records evidence — 2026-09-05
+
+The governed production workflows use a protected Production environment and fresh Member sessions. They do not print raw access tokens.
+
+### Current self Birth and calculation continuity
+
+Production Saju Current Subject Smoke run `33949315382` completed successfully. Its verifier requires:
+
+```text
+fresh Member sign-in
+→ /api/me 200
+→ subjectKind = member
+→ exact expected canonical subject_id
+
+GET /api/me/birth-profile
+→ 200
+→ profileKind = self
+→ not archived
+→ current revision present
+→ exactly one matching current revision summary
+
+POST /api/me/saju/calculation (first)
+→ 200
+→ birthRevisionRef = current Birth revision id
+→ semanticAuthority = calculation_only
+→ interpretationAuthorized = false
+
+POST /api/me/saju/calculation (repeat)
+→ 200
+→ stable calculation evidence identical within the same fresh Member session
+```
+
+This proves the current Member Birth read and calculation binding. It does **not** authorize General Natal interpretation or widen the calculation-only authority.
+
+### Member reauthentication + Records continuity
+
+Production Member Reauthentication Continuity Smoke run `33967953083` completed successfully. Before sign-out and after a fresh re-sign-in, its verifier requires all of the following:
+
+```text
+/api/me
+→ 200
+→ same exact canonical Member subject
+
+/api/me/birth-profile
+→ 200
+→ same self Birth Profile id
+→ same current revision id
+→ same revision number
+
+/api/me/saju/calculation
+→ 200
+→ exact current Birth revision used
+→ calculation_only authority preserved
+
+/api/life-record
+→ 200
+→ owner facts canonicalized
+→ SHA-256 snapshot digest unchanged across reauthentication
+
+/api/memories
+→ 200
+→ owner memories canonicalized
+→ SHA-256 snapshot digest unchanged across reauthentication
+
+/api/auth/sign-out
+→ 200
+→ signedOut = true
+
+fresh re-sign-in
+→ succeeds
+→ canonical subject/Birth/Records continuity preserved
+```
+
+The verifier also rejects duplicate Life Fact/Memory identities and rejects any response that reflects the fresh access token.
+
+### Birth create boundary
+
+Production Birth Profile Create Boundary Smoke run `33741484222` also completed successfully, but it is deliberately non-mutating:
+
+```text
+unauthenticated POST /api/birth-profiles
+→ 401 AUTH_REQUIRED
+→ API contract v0.9
+→ Cache-Control: no-store
+
+GET /api/birth-profiles root
+→ 404
+
+POST /api/birth-profiles/:id
+→ 405
+→ Allow: GET
+```
+
+Therefore the root create route is active and fail-closed at its unauthenticated boundary. This specific run must not be cited as proof that a new Production Birth row was positively created.
 
 ## Production Request identity verification
 
@@ -275,13 +376,22 @@ requires GitHub production environment
 
 The workflow transports the already-decided value. It is not the authority that chose seven days. Production binding and exact single-environment read-back succeeded in run `33666141919`; route activation then proceeded separately through merged PR #334.
 
-A guarded Member own-subject positive-smoke workflow is also prepared:
+Governed positive Member continuity evidence is no longer merely prepared. The following Production runs are successful:
 
 ```text
-.github/workflows/production-member-me-smoke.yml
+Production Saju Current Subject Smoke
+→ run 33949315382 SUCCESS
+→ current Member self Birth + exact current revision + calculation-only continuity
+
+Production Member Reauthentication Continuity Smoke
+→ run 33967953083 SUCCESS
+→ sign-out/re-sign-in canonical subject continuity
+→ Birth Profile/revision continuity
+→ Life Record continuity
+→ Memories continuity
 ```
 
-Repository CI verifies that workflow's security contract, but this Guest-status refresh does not infer a Member positive-smoke result from Guest evidence. Member Production evidence remains independently governed.
+These runs use production-safe credentials through the protected GitHub Production environment. They do not authorize cross-subject access, new interpretation semantics, or broader retention policy.
 
 ## Authority blockers and implementation gates
 
@@ -299,7 +409,7 @@ Resolved architecture / production decisions:
 - `P0-AUTH-01`: **DECIDED** — non-BYPASSRLS API execution role + transaction-scoped trusted canonical `subject_id` context.
 - `P0-PR-01A`: **DECIDED / PRODUCTION BOUND** — Guest bearer/session authentication lifetime = 7 days = 604800 seconds for newly issued credentials.
 
-Completed Integration Spine foundations for the first user-data slice:
+Completed Integration Spine foundations for the user-data slice include:
 
 - DB Member/Guest subject-context resolver functions.
 - `SubjectIdentityResolver` trusted-evidence boundary.
@@ -308,25 +418,23 @@ Completed Integration Spine foundations for the first user-data slice:
 - concrete Supabase Member bearer verifier using `GET /auth/v1/user`; only the verified Auth user UUID becomes Member evidence.
 - concrete versioned Guest bearer HMAC fingerprint verifier shared with Guest bootstrap storage.
 - production request classifier preventing Member→Guest fallback.
-- source-safe `GET /api/me` application/HTTP boundary with 401/405/fail-closed tests.
-- production `/api/me` composition root using the concrete request verifier and PostgreSQL pool.
-- active root `api/me.ts` Vercel Function.
-- `Cache-Control: no-store` on `/api/me` application responses.
-- production user-data configuration parser contract with secret-redacted diagnostics.
+- active root `api/me.ts` Vercel Function and `Cache-Control: no-store` application responses.
 - production `myeongha_runtime` login principal and live Vercel user-data bindings.
-- Guest bootstrap DB create/current-query authorities through migration 0820.
-- Guest bootstrap production DB runtime, opaque credential issuer, source-safe POST HTTP boundary, and production HTTP composition root.
+- Guest bootstrap DB create/current-query authorities and active HTTP route.
 - successful TTL-only Production binding/read-back at `604800` seconds in run `33666141919`.
-- root Guest bootstrap route activation through merged PR #334 (`ca503767d89553dd31026b3a995bee788e304adf`).
-- Production Guest positive smoke run `33670492068`: fresh issuance, same-subject `/api/me`, same-session reuse without bearer re-emission, invalid credential fail-closed, health 200.
-- subsequent browser auth hardening through current main `583b086936f539a69fe1d21471c1e1738b2efc9d`, deployed READY as `dpl_757Za7arQoiEnfBeGRZkSSdkPsYR`.
+- Production Guest issuance/reuse smoke run `33670492068`.
+- active canonical Birth Profile create/read route surface with non-mutating production boundary smoke `33741484222`.
+- Production Member current self Birth/read + exact current-revision Saju binding run `33949315382`.
+- Production Member sign-out/re-sign-in subject/Birth/Life Record/Memories continuity run `33967953083`.
+- browser regression coverage on PR #593 exact head, including Records active bearer binding, My Birth Profile render, and Birth session/duplicate-create guard.
 
-Remaining identity/runtime follow-ups are independent of the now-complete Guest route activation:
+Remaining identity/user-data follow-ups are independent of the already-proven Member/Birth/Records continuity:
 
 - keep `/api/health` regression at 200.
 - preserve Production Guest issuance/reuse and fail-closed credential behavior after future auth/runtime changes.
-- verify Member own-subject Production behavior only with a production-safe Member identity and its dedicated evidence path; do not infer it from Guest smoke evidence.
+- preserve Member canonical subject, current Birth revision, Life Record, and Memories continuity after future auth/DB changes.
 - preserve cross-subject negative authorization evidence on every newly activated user-data surface.
+- do not treat the non-mutating Birth create boundary smoke as positive create-write evidence; add a governed positive create/update smoke only if product fixtures and cleanup/retention policy permit it.
 - keep broader retention/deletion/backup decisions under `P0-PR-01` independent from the already-bound Guest authentication TTL.
 
 ## Canonical identity boundary
