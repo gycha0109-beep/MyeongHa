@@ -88,6 +88,10 @@ jobs:
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
         run: node scripts/verify-web-auth-malformed-guest-cleanup-failure-browser.mjs
+      - name: Verify auth storage read failure authority
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/verify-web-auth-storage-read-failure-browser.mjs
       - name: Verify confirmation Guest handoff sign-out re-login lineage
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
@@ -193,6 +197,7 @@ jobs:
             artifacts/web-auth-confirmation-handoff-browser-smoke*
             artifacts/web-auth-guest-bearer-canonicalization-browser-smoke*
             artifacts/web-auth-malformed-guest-cleanup-failure-browser-smoke*
+            artifacts/web-auth-storage-read-failure-browser-smoke*
             artifacts/web-auth-confirmation-relogin-browser-smoke*
             artifacts/web-auth-multi-confirmation-handoff-browser-smoke*
             artifacts/web-auth-cross-tab-browser-smoke*
