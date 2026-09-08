@@ -57,9 +57,9 @@ function authoredCharacter(
         capabilityVersion: 'test-v1',
       },
     ],
-    assetRefs: [],
+    assetRefs: [`fixture://character/${characterId}/concept-art`],
     emotionIds: ['neutral'],
-    animationCueIds: [],
+    animationCueIds: ['idle'],
     canon: {
       worldRole: 'test representative',
       origin: 'test fixture only',
@@ -275,6 +275,34 @@ describe('Production Character content readiness', () => {
     expectProductionFailureCode(
       missingVisual,
       'CHARACTER_VISUAL_CANON_REQUIRED',
+    );
+  });
+
+  it('rejects Production publication while concrete asset refs are absent', () => {
+    const [first, ...rest] = AUTHORED_PRODUCTION_TEST_BUNDLE.characters;
+    if (first === undefined) throw new Error('test fixture requires a first character');
+    const missingAssetRefs = {
+      ...AUTHORED_PRODUCTION_TEST_BUNDLE,
+      characters: [{ ...first, assetRefs: [] }, ...rest],
+    } satisfies CharacterContentBundle;
+
+    expectProductionFailureCode(
+      missingAssetRefs,
+      'CHARACTER_ASSET_REFS_REQUIRED',
+    );
+  });
+
+  it('rejects Production publication while animation cue IDs are absent', () => {
+    const [first, ...rest] = AUTHORED_PRODUCTION_TEST_BUNDLE.characters;
+    if (first === undefined) throw new Error('test fixture requires a first character');
+    const missingAnimationCueIds = {
+      ...AUTHORED_PRODUCTION_TEST_BUNDLE,
+      characters: [{ ...first, animationCueIds: [] }, ...rest],
+    } satisfies CharacterContentBundle;
+
+    expectProductionFailureCode(
+      missingAnimationCueIds,
+      'CHARACTER_ANIMATION_CUE_IDS_REQUIRED',
     );
   });
 
