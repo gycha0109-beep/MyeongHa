@@ -372,12 +372,12 @@ export function readGuestBearer() {
   const pendingRaw = readSession(PENDING_GUEST_TOKEN_KEY);
   const pending = normalizeGuestBearer(pendingRaw);
   if (pending) return pending;
-  if (pendingRaw !== null) removeSession(PENDING_GUEST_TOKEN_KEY);
+  if (pendingRaw !== null && !removeSession(PENDING_GUEST_TOKEN_KEY)) throw guestClearFailure();
 
   const tokenRaw = readSession(GUEST_TOKEN_KEY);
   const token = normalizeGuestBearer(tokenRaw);
   if (token) return token;
-  if (tokenRaw !== null && !isJwtLike(tokenRaw)) removeSession(GUEST_TOKEN_KEY);
+  if (tokenRaw !== null && !isJwtLike(tokenRaw) && !removeSession(GUEST_TOKEN_KEY)) throw guestClearFailure();
   return null;
 }
 
