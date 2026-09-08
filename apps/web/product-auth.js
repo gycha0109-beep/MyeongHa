@@ -72,8 +72,9 @@ function writeSession(key, value) {
   try {
     sessionStorage.setItem(key, value);
   } catch {
-    return;
+    return readSession(key) === value;
   }
+  return readSession(key) === value;
 }
 
 function removeSession(key) {
@@ -287,7 +288,12 @@ export async function ensureGuestBearer() {
     if (racedExisting) return racedExisting;
     if (readMemberSession()) return null;
 
-    writeSession(GUEST_TOKEN_KEY, token);
+    if (!writeSession(GUEST_TOKEN_KEY, token)) {
+      const convergedGuest = readGuestBearer();
+      if (convergedGuest) return convergedGuest;
+      if (readMemberSession()) return null;
+      throw new ProductAuthError('WEB_AUTH_GUEST_PERSIST_FAILED', '게스트 세션을 브라우저에 안전하게 저장하지 못했습니다.');
+    }
     emitAuthChanged();
     return token;
   })();

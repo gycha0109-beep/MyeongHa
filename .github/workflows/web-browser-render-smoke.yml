@@ -48,6 +48,10 @@ jobs:
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
         run: node scripts/run-web-auth-guest-bootstrap-singleflight-browser-smoke.mjs
+      - name: Verify Guest bootstrap persistence failure
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/verify-web-auth-guest-persistence-failure-browser.mjs
       - name: Verify authentication re-login continuity
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
@@ -159,6 +163,7 @@ jobs:
             artifacts/web-auth-malformed-stored-member-browser-smoke*
             artifacts/web-auth-signup-guest-bootstrap-browser-smoke*
             artifacts/web-auth-guest-bootstrap-singleflight-browser-smoke*
+            artifacts/web-auth-guest-persistence-failure-browser-smoke*
             artifacts/web-auth-continuity-browser-smoke*
             artifacts/web-auth-failed-login-guest-browser-smoke*
             artifacts/web-auth-promotion-failure-browser-smoke*
