@@ -25,6 +25,7 @@ const mime = new Map([
 
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
+let functionalPass = false;
 
 async function serve() {
   const server = createServer(async (req, res) => {
@@ -69,6 +70,32 @@ async function devtoolsPort(profile, process) {
   throw new Error('Chrome DevTools port timeout');
 }
 
+async function stopChrome(process) {
+  if (process.exitCode !== null) return;
+  const exited = new Promise((done) => {
+    process.once('exit', done);
+    if (process.exitCode !== null) done();
+  });
+  process.kill('SIGTERM');
+  await Promise.race([exited, sleep(3_000)]);
+  if (process.exitCode === null) {
+    process.kill('SIGKILL');
+    await exited;
+  }
+}
+
+async function removeChromeProfile(profile) {
+  try {
+    await rm(profile, { recursive: true, force: true, maxRetries: 8, retryDelay: 150 });
+  } catch (error) {
+    const narrowCleanupRace = functionalPass
+      && error?.code === 'ENOTEMPTY'
+      && String(error?.path ?? '').startsWith(profile);
+    if (!narrowCleanupRace) throw error;
+    console.log('MyeongHa malformed stored Member browser assertions passed; ignoring ephemeral Chrome profile cleanup ENOTEMPTY race.');
+  }
+}
+
 async function connectCdp(port) {
   const response = await fetch(`http://127.0.0.1:${port}/json/new?about%3Ablank`, { method: 'PUT' });
   assert(response.ok, `Chrome target create failed: ${response.status}`);
@@ -105,6 +132,10 @@ async function connectCdp(port) {
   return { send, evaluate, close: () => ws.close() };
 }
 
+function isExpectedNavigationRace(error) {
+  return error instanceof Error && error.message === 'Runtime.evaluate: Inspected target navigated or closed';
+}
+
 async function navigate(client, origin, pathname, selector, timeout = 10_000) {
   const result = await client.send('Page.navigate', { url: `${origin}${pathname}` });
   assert(!result.errorText, `Navigation failed for ${pathname}: ${result.errorText}`);
@@ -112,12 +143,16 @@ async function navigate(client, origin, pathname, selector, timeout = 10_000) {
   const selectorLiteral = JSON.stringify(selector);
   const deadline = Date.now() + timeout;
   while (Date.now() < deadline) {
-    const state = await client.evaluate(`(() => ({
-      pathname: location.pathname,
-      readyState: document.readyState,
-      found: Boolean(document.querySelector(${selectorLiteral})),
-    }))()`);
-    if (state?.pathname === cleanPath && state.readyState === 'complete' && state.found) return;
+    try {
+      const state = await client.evaluate(`(() => ({
+        pathname: location.pathname,
+        readyState: document.readyState,
+        found: Boolean(document.querySelector(${selectorLiteral})),
+      }))()`);
+      if (state?.pathname === cleanPath && state.readyState === 'complete' && state.found) return;
+    } catch (error) {
+      if (!isExpectedNavigationRace(error)) throw error;
+    }
     await sleep(50);
   }
   throw new Error(`Timed out waiting for ${cleanPath} ${selector}`);
@@ -126,7 +161,11 @@ async function navigate(client, origin, pathname, selector, timeout = 10_000) {
 async function waitFor(client, expression, message, timeout = 10_000) {
   const deadline = Date.now() + timeout;
   while (Date.now() < deadline) {
-    if (await client.evaluate(expression)) return;
+    try {
+      if (await client.evaluate(expression)) return;
+    } catch (error) {
+      if (!isExpectedNavigationRace(error)) throw error;
+    }
     await sleep(50);
   }
   const diagnostics = await client.evaluate(`(() => ({
@@ -173,7 +212,9 @@ for (const file of ['hall.html', 'product-auth.js', 'product-auth-ui.js']) {
 }
 const productAuthSource = await readFile(join(root, 'product-auth.js'), 'utf8');
 assert(productAuthSource.includes('!isJwtLike(value.accessToken)'), 'Member session normalization does not enforce JWT-like access-token classification');
-assert(productAuthSource.includes('discardMemberSession();\n      return null;'), 'Malformed stored Member session is not reconciled through discardMemberSession');
+assert(productAuthSource.includes('parsed = JSON.parse(raw);'), 'Malformed stored Member parsing is not isolated from cleanup');
+assert(productAuthSource.includes('const normalized = normalizeSession(parsed);'), 'Malformed stored Member normalization does not follow the parse boundary');
+assert(productAuthSource.includes('if (!normalized) {\n    discardMemberSession();\n    return null;\n  }'), 'Malformed stored Member session is not reconciled through one discardMemberSession cleanup');
 
 const { server, origin } = await serve();
 const profile = await mkdtemp(join(tmpdir(), 'myeongha-auth-malformed-stored-member-browser-'));
@@ -223,22 +264,15 @@ try {
     invalidClassification,
   }, null, 2)}\n`, 'utf8');
 
+  functionalPass = true;
   console.log('MyeongHa_WEB_AUTH_MALFORMED_STORED_MEMBER_BROWSER_PASS');
 } catch (error) {
   console.error(error);
   if (chromeError.trim()) console.error(chromeError.trim());
-  process.exitCode = 1;
+  throw error;
 } finally {
   client?.close();
-  server.close();
-  if (chrome.exitCode === null) {
-    chrome.kill('SIGTERM');
-    await Promise.race([
-      new Promise((done) => chrome.once('exit', done)),
-      sleep(2_000),
-    ]);
-  }
-  try {
-    await rm(profile, { recursive: true, force: true });
-  } catch {}
+  await stopChrome(chrome);
+  await new Promise((done) => server.close(done));
+  await removeChromeProfile(profile);
 }
