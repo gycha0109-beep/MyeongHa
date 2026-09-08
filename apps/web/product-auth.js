@@ -37,8 +37,12 @@ export function normalizeGuestBearer(value) {
 function readLocal(key) {
   try {
     return localStorage.getItem(key);
-  } catch {
-    return null;
+  } catch (error) {
+    throw new ProductAuthError(
+      'WEB_AUTH_MEMBER_READ_FAILED',
+      '로그인 세션을 브라우저에서 안전하게 읽지 못했습니다.',
+      error,
+    );
   }
 }
 
@@ -63,8 +67,12 @@ function removeLocal(key) {
 function readSession(key) {
   try {
     return sessionStorage.getItem(key);
-  } catch {
-    return null;
+  } catch (error) {
+    throw new ProductAuthError(
+      'WEB_AUTH_SESSION_READ_FAILED',
+      '브라우저 세션 상태를 안전하게 읽지 못했습니다.',
+      error,
+    );
   }
 }
 

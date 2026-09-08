@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createBirthRuntimeClient } from '../apps/web/birth-runtime-client.js';
 
 const root = process.cwd();
@@ -11,6 +11,24 @@ const pageSource = readFileSync(join(webRoot, 'birth-page.js'), 'utf8');
 const birthHtml = readFileSync(join(webRoot, 'birth.html'), 'utf8');
 const myHtml = readFileSync(join(webRoot, 'my.html'), 'utf8');
 const myPage = readFileSync(join(webRoot, 'my-page.js'), 'utf8');
+
+class EmptyStorage {
+  getItem() {
+    return null;
+  }
+
+  setItem() {}
+
+  removeItem() {}
+}
+
+beforeEach(() => {
+  vi.stubGlobal('sessionStorage', new EmptyStorage());
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 function envelope(data) {
   return {
