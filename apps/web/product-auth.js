@@ -54,8 +54,9 @@ function writeLocal(key, value) {
 function removeLocal(key) {
   try {
     localStorage.removeItem(key);
+    return localStorage.getItem(key) === null;
   } catch {
-    return;
+    return false;
   }
 }
 
@@ -119,7 +120,7 @@ function discardMemberSession(expectedAccessToken = null, expectedRefreshToken =
     }
   }
 
-  removeLocal(MEMBER_SESSION_KEY);
+  if (!removeLocal(MEMBER_SESSION_KEY)) return false;
   const active = readSession(GUEST_TOKEN_KEY);
   if (isJwtLike(active) || (active !== null && !normalizeGuestBearer(active))) {
     removeSession(GUEST_TOKEN_KEY);
@@ -408,10 +409,12 @@ export async function signOutMember() {
     try {
       await postJson('/api/auth/sign-out', {}, current.accessToken);
     } catch {
-      // Local sign-out is still authoritative for this browser session.
+      // Local sign-out is still authoritative for this browser session when local authority can be cleared.
     }
   }
-  discardMemberSession();
+  if (!discardMemberSession(current?.accessToken ?? null, current?.refreshToken ?? null)) {
+    throw new ProductAuthError('WEB_AUTH_MEMBER_CLEAR_FAILED', '로그인 세션을 브라우저에서 안전하게 제거하지 못했습니다.');
+  }
 }
 
 export function clearPromotedGuestBearer() {
