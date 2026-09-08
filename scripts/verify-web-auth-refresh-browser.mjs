@@ -428,5 +428,10 @@ try {
   client?.close();
   await stopChrome(chrome);
   server.close();
-  await rm(profile, { recursive: true, force: true });
+  await rm(profile, {
+    recursive: true,
+    force: true,
+    maxRetries: 12,
+    retryDelay: 100,
+  });
 }
