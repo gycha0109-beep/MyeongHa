@@ -46,8 +46,9 @@ function writeLocal(key, value) {
   try {
     localStorage.setItem(key, value);
   } catch {
-    return;
+    return readLocal(key) === value;
   }
+  return readLocal(key) === value;
 }
 
 function removeLocal(key) {
@@ -190,7 +191,10 @@ function normalizeSession(value) {
 function saveSession(session) {
   const normalized = normalizeSession(session);
   if (!normalized) throw new ProductAuthError('WEB_AUTH_MALFORMED_SESSION', '로그인 세션 응답이 올바르지 않습니다.');
-  writeLocal(MEMBER_SESSION_KEY, JSON.stringify(normalized));
+  const serialized = JSON.stringify(normalized);
+  if (!writeLocal(MEMBER_SESSION_KEY, serialized)) {
+    throw new ProductAuthError('WEB_AUTH_MEMBER_PERSIST_FAILED', '로그인 세션을 브라우저에 안전하게 저장하지 못했습니다.');
+  }
   stageMemberBearerForLegacyProductClients(normalized.accessToken);
   emitAuthChanged();
   return normalized;
