@@ -80,9 +80,32 @@ function writeSession(key, value) {
 function removeSession(key) {
   try {
     sessionStorage.removeItem(key);
+    return sessionStorage.getItem(key) === null;
   } catch {
-    return;
+    return false;
   }
+}
+
+function removeSessionEntries(entries) {
+  if (entries.length === 0) return true;
+
+  let removedAll = true;
+  for (const [key] of entries) {
+    if (!removeSession(key)) removedAll = false;
+  }
+  if (removedAll) return true;
+
+  for (const [key, value] of entries) {
+    if (readSession(key) === null) writeSession(key, value);
+  }
+  return false;
+}
+
+function guestClearFailure() {
+  return new ProductAuthError(
+    'WEB_AUTH_GUEST_CLEAR_FAILED',
+    '게스트 세션을 브라우저에서 안전하게 제거하지 못했습니다.',
+  );
 }
 
 function emitAuthChanged() {
@@ -139,27 +162,29 @@ function discardMemberSession(expectedAccessToken = null, expectedRefreshToken =
 }
 
 function discardGuestSession(expectedBearer = null) {
+  const targets = [];
+
   if (expectedBearer !== null) {
     const normalized = normalizeGuestBearer(expectedBearer);
     if (!normalized) return false;
 
-    let changed = false;
     if (readSession(GUEST_TOKEN_KEY) === normalized) {
-      removeSession(GUEST_TOKEN_KEY);
-      changed = true;
+      targets.push([GUEST_TOKEN_KEY, normalized]);
     }
     if (readSession(PENDING_GUEST_TOKEN_KEY) === normalized) {
-      removeSession(PENDING_GUEST_TOKEN_KEY);
-      changed = true;
+      targets.push([PENDING_GUEST_TOKEN_KEY, normalized]);
     }
-    if (changed) emitAuthChanged();
-    return changed;
+    if (targets.length === 0) return false;
+    if (!removeSessionEntries(targets)) throw guestClearFailure();
+    emitAuthChanged();
+    return true;
   }
 
   const active = readSession(GUEST_TOKEN_KEY);
-  if (active && !isJwtLike(active)) removeSession(GUEST_TOKEN_KEY);
+  if (active && !isJwtLike(active)) targets.push([GUEST_TOKEN_KEY, active]);
   const pending = readSession(PENDING_GUEST_TOKEN_KEY);
-  if (pending && !isJwtLike(pending)) removeSession(PENDING_GUEST_TOKEN_KEY);
+  if (pending && !isJwtLike(pending)) targets.push([PENDING_GUEST_TOKEN_KEY, pending]);
+  if (!removeSessionEntries(targets)) throw guestClearFailure();
   emitAuthChanged();
   return true;
 }
@@ -424,9 +449,13 @@ export async function signOutMember() {
 }
 
 export function clearPromotedGuestBearer() {
-  removeSession(PENDING_GUEST_TOKEN_KEY);
+  const targets = [];
+  const pending = readSession(PENDING_GUEST_TOKEN_KEY);
+  if (pending !== null) targets.push([PENDING_GUEST_TOKEN_KEY, pending]);
   const active = readSession(GUEST_TOKEN_KEY);
-  if (active && !isJwtLike(active)) removeSession(GUEST_TOKEN_KEY);
+  if (active && !isJwtLike(active)) targets.push([GUEST_TOKEN_KEY, active]);
+  if (!removeSessionEntries(targets)) throw guestClearFailure();
+  return true;
 }
 
 export const PRODUCT_AUTH_STORAGE_V1 = Object.freeze({
