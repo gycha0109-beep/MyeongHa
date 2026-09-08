@@ -34,5 +34,18 @@ BEGIN
       NOREPLICATION
       NOBYPASSRLS;
   END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'service_role'
+  ) THEN
+    CREATE ROLE service_role
+      NOLOGIN
+      NOSUPERUSER
+      NOCREATEDB
+      NOCREATEROLE
+      INHERIT
+      NOREPLICATION
+      NOBYPASSRLS;
+  END IF;
 END
 $$;
