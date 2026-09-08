@@ -124,12 +124,30 @@ function confirmationGuestHandoffReadFailure(error) {
   );
 }
 
+function confirmationGuestHandoffClearFailure(error) {
+  return new ProductAuthError(
+    'WEB_AUTH_CONFIRMATION_HANDOFF_CLEAR_FAILED',
+    '게스트 계정 연결 기록을 브라우저에서 안전하게 제거하지 못했습니다.',
+    error,
+  );
+}
+
 function readConfirmationGuestHandoffLocal(key) {
   try {
     return localStorage.getItem(key);
   } catch (error) {
     throw confirmationGuestHandoffReadFailure(error);
   }
+}
+
+function removeConfirmationGuestHandoffLocal(key) {
+  try {
+    localStorage.removeItem(key);
+    if (localStorage.getItem(key) === null) return true;
+  } catch (error) {
+    throw confirmationGuestHandoffClearFailure(error);
+  }
+  throw confirmationGuestHandoffClearFailure();
 }
 
 function clearConfirmationGuestHandoff() {
@@ -263,10 +281,8 @@ function removeConfirmationGuestHandoffJournalMatches(expectedEmail, promotedGue
       continue;
     }
     if (normalized.email === expectedEmail && normalized.guestBearer === promotedGuestBearer) {
-      try {
-        localStorage.removeItem(key);
-        removed = true;
-      } catch {}
+      removeConfirmationGuestHandoffLocal(key);
+      removed = true;
     }
   }
   return removed;
@@ -356,8 +372,8 @@ async function clearConfirmationGuestHandoffIfMatches(memberEmail, promotedGuest
     const next = current.filter((entry) => !(
       entry.email === expectedEmail && entry.guestBearer === promotedGuestBearer
     ));
-    if (next.length === current.length) return false;
-    removeConfirmationGuestHandoffJournalMatches(expectedEmail, promotedGuestBearer);
+    if (next.length === current.length) return true;
+    if (!removeConfirmationGuestHandoffJournalMatches(expectedEmail, promotedGuestBearer)) return false;
     writeConfirmationGuestHandoffs(next);
     return true;
   };
@@ -366,7 +382,13 @@ async function clearConfirmationGuestHandoffIfMatches(memberEmail, promotedGuest
   if (!locks) return clearExact();
   try {
     return await locks.request(CONFIRMATION_GUEST_HANDOFF_LOCK_NAME, { mode: 'exclusive' }, clearExact);
-  } catch {
+  } catch (error) {
+    if (error instanceof ProductAuthError && (
+      error.code === 'WEB_AUTH_CONFIRMATION_HANDOFF_READ_FAILED' ||
+      error.code === 'WEB_AUTH_CONFIRMATION_HANDOFF_CLEAR_FAILED'
+    )) {
+      throw error;
+    }
     return false;
   }
 }
@@ -402,7 +424,9 @@ async function promoteGuestIfPresent(accessToken, memberEmail) {
 
   if (response.ok && payload?.ok === true) {
     clearPromotedGuestBearer();
-    await clearConfirmationGuestHandoffIfMatches(memberEmail, guestBearer);
+    if (!await clearConfirmationGuestHandoffIfMatches(memberEmail, guestBearer)) {
+      throw confirmationGuestHandoffClearFailure();
+    }
     return { status: 'promoted' };
   }
 
@@ -414,7 +438,9 @@ async function promoteGuestIfPresent(accessToken, memberEmail) {
     }
     if (code === 'GUEST_AUTH_REQUIRED') {
       invalidateGuestSession(guestBearer);
-      await clearConfirmationGuestHandoffIfMatches(memberEmail, guestBearer);
+      if (!await clearConfirmationGuestHandoffIfMatches(memberEmail, guestBearer)) {
+        throw confirmationGuestHandoffClearFailure();
+      }
       return { status: 'guest-rejected' };
     }
     return { status: 'auth-rejected' };
@@ -441,6 +467,8 @@ function authErrorMessage(error) {
       return '현재 게스트 흐름을 안전하게 보존하지 못해 회원가입을 중단했습니다. 다시 시도해 주세요.';
     case 'WEB_AUTH_CONFIRMATION_HANDOFF_READ_FAILED':
       return '저장된 게스트 계정 연결 기록을 확인하지 못했습니다. 브라우저 저장소 접근을 복구한 뒤 다시 로그인해 주세요.';
+    case 'WEB_AUTH_CONFIRMATION_HANDOFF_CLEAR_FAILED':
+      return '게스트 계정 연결 기록을 정리하지 못했습니다. 브라우저 저장소 접근을 복구한 뒤 다시 로그인해 주세요.';
     default:
       return '인증을 완료하지 못했습니다. 입력을 확인하고 다시 시도해 주세요.';
   }
