@@ -48,6 +48,19 @@ describe('web auth recovery boundary', () => {
     expect(authPage).not.toContain('authUserId');
   });
 
+  it('treats confirmation handoff journal read failure as unknown authority instead of absence or malformed cleanup', () => {
+    expect(authPage).toContain("'WEB_AUTH_CONFIRMATION_HANDOFF_READ_FAILED'");
+    expect(authPage).toContain('function readConfirmationGuestHandoffLocal(key)');
+    expect(authPage).toContain('throw confirmationGuestHandoffReadFailure(error)');
+    expect(authPage).toContain('const raw = readConfirmationGuestHandoffLocal(key)');
+    expect(authPage).toContain("error.code === 'WEB_AUTH_CONFIRMATION_HANDOFF_READ_FAILED'");
+    expect(authPage).toContain('throw error;');
+    expect(authPage).toContain('브라우저 저장소 접근을 복구한 뒤 다시 로그인해 주세요.');
+    expect(authPage).not.toContain("function hasConfirmationGuestHandoffJournal() {\n  try {\n    return localStorage.getItem(CONFIRMATION_GUEST_HANDOFF_JOURNAL_MARKER_KEY) === '1';\n  } catch {\n    return false;\n  }\n}");
+    expect(authPage).not.toContain("const raw = localStorage.getItem(key);\n      const normalized = raw ? normalizeConfirmationGuestHandoff(JSON.parse(raw)) : null;");
+    expect(authPage).not.toContain("catch {\n      try {\n        localStorage.removeItem(key);\n      } catch {}\n    }");
+  });
+
   it('keeps existing-member plus separate-Guest promotion fail closed', () => {
     expect(authPage).toContain("response.status === 409 && code === 'GUEST_MERGE_REQUIRED'");
     expect(authPage).toContain("return { status: 'merge-required' }");
