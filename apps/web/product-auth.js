@@ -268,6 +268,7 @@ export function readGuestBearer() {
 export async function ensureGuestBearer() {
   const existing = readGuestBearer();
   if (existing) return existing;
+  if (readMemberSession()) return null;
 
   const request = guestBootstrapInFlight ??= (async () => {
     const data = await postJson('/api/session/bootstrap', {});
@@ -279,6 +280,7 @@ export async function ensureGuestBearer() {
 
     const racedExisting = readGuestBearer();
     if (racedExisting) return racedExisting;
+    if (readMemberSession()) return null;
 
     writeSession(GUEST_TOKEN_KEY, token);
     emitAuthChanged();
@@ -362,8 +364,13 @@ export async function getActiveBearer() {
 export async function ensureActiveBearer() {
   const active = await getActiveBearer();
   if (active) return active;
+
   const token = await ensureGuestBearer();
-  return Object.freeze({ kind: 'guest', token });
+  const converged = await getActiveBearer();
+  if (converged) return converged;
+  if (token) return Object.freeze({ kind: 'guest', token });
+
+  return ensureActiveBearer();
 }
 
 export async function signInWithPassword(email, password) {
