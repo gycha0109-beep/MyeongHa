@@ -139,13 +139,17 @@ describe('Member compatibility discard authority', () => {
     session.failSets.add(`${PRODUCT_AUTH_STORAGE_V1.guestBearer}:${PENDING_GUEST}`);
     local.failSets.add(PRODUCT_AUTH_STORAGE_V1.memberSession);
 
-    expect(() => invalidateMemberSession(MEMBER_ACCESS)).toThrowError(
-      expect.objectContaining({
-        name: 'ProductAuthError',
-        code: 'WEB_AUTH_MEMBER_COMPAT_DISCARD_ROLLBACK_FAILED',
-      } satisfies Partial<ProductAuthError>),
-    );
+    let failure: unknown = null;
+    try {
+      invalidateMemberSession(MEMBER_ACCESS);
+    } catch (error) {
+      failure = error;
+    }
 
+    expect(failure).toMatchObject({
+      name: 'ProductAuthError',
+      code: 'WEB_AUTH_MEMBER_COMPAT_DISCARD_ROLLBACK_FAILED',
+    } satisfies Partial<ProductAuthError>);
     expect(readMemberSession()).toBeNull();
     expect(session.getItem(PRODUCT_AUTH_STORAGE_V1.guestBearer)).toBe(MEMBER_ACCESS);
     expect(session.getItem(PRODUCT_AUTH_STORAGE_V1.pendingGuestBearer)).toBe(PENDING_GUEST);
