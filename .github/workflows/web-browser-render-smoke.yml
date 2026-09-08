@@ -47,7 +47,7 @@ jobs:
       - name: Verify Guest bootstrap single-flight
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
-        run: node scripts/verify-web-auth-guest-bootstrap-singleflight-browser.mjs
+        run: node scripts/run-web-auth-guest-bootstrap-singleflight-browser-smoke.mjs
       - name: Verify authentication re-login continuity
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}

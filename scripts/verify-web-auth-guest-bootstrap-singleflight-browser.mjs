@@ -213,6 +213,7 @@ assert(productAuthSource.includes('guestBootstrapInFlight ??='), 'product-auth.j
 assert(productAuthSource.includes('const racedExisting = readGuestBearer();'), 'product-auth.js does not preserve newer Guest authority before bootstrap write');
 assert(productAuthSource.includes('if (readMemberSession()) return null;'), 'product-auth.js does not let Member authority suppress a late Guest bootstrap write');
 assert(productAuthSource.includes('const converged = await getActiveBearer();'), 'product-auth.js does not re-resolve active identity after Guest bootstrap');
+assert(productAuthSource.includes('WEB_AUTH_MEMBER_PERSIST_FAILED'), 'product-auth.js does not reject unpersisted Member sessions');
 
 const { server, origin } = await serve();
 const profile = await mkdtemp(join(tmpdir(), 'myeongha-auth-guest-bootstrap-singleflight-browser-'));
@@ -315,6 +316,49 @@ try {
   assert(memberWins.pending === null, `Late Guest bootstrap unexpectedly created pending Guest state: ${memberWins.pending}`);
   assert(memberWins.changedEvents === 1, `Late Guest bootstrap emitted an extra auth change: ${memberWins.changedEvents}`);
 
+  const persistenceFailure = await client.evaluate(`(async () => {
+    sessionStorage.removeItem('myeongha.guestBearer.v1');
+    sessionStorage.removeItem('myeongha.pendingGuestBearer.v1');
+    localStorage.removeItem('myeongha.memberSession.v1');
+    sessionStorage.setItem('myeongha.guestBearer.v1', 'guest-browser-before-persist-failure');
+    let changedEvents = 0;
+    addEventListener('myeongha:auth-changed', () => { changedEvents += 1; });
+    const auth = await import('/product-auth.js?persistence=' + Date.now());
+    const nativeSetItem = Storage.prototype.setItem;
+    Storage.prototype.setItem = function(key, value) {
+      if (this === localStorage && key === auth.PRODUCT_AUTH_STORAGE_V1.memberSession) {
+        throw new DOMException('Member persistence blocked', 'QuotaExceededError');
+      }
+      return nativeSetItem.call(this, key, value);
+    };
+    let errorCode = null;
+    try {
+      await auth.signInWithPassword('member@example.com', 'password');
+    } catch (error) {
+      errorCode = error?.code ?? error?.name ?? String(error);
+    } finally {
+      Storage.prototype.setItem = nativeSetItem;
+    }
+    return {
+      errorCode,
+      member: auth.readMemberSession()?.accessToken ?? null,
+      guest: auth.readGuestBearer(),
+      stored: sessionStorage.getItem(auth.PRODUCT_AUTH_STORAGE_V1.guestBearer),
+      pending: sessionStorage.getItem(auth.PRODUCT_AUTH_STORAGE_V1.pendingGuestBearer),
+      changedEvents,
+      readyState: document.readyState,
+    };
+  })()`);
+
+  assert(signInCount === 2, `Persistence-failure scenario should issue one additional sign-in request, got ${signInCount}`);
+  assert(persistenceFailure.readyState === 'complete', `Persistence-failure harness was not complete: ${persistenceFailure.readyState}`);
+  assert(persistenceFailure.errorCode === 'WEB_AUTH_MEMBER_PERSIST_FAILED', `Unexpected persistence failure code: ${persistenceFailure.errorCode}`);
+  assert(persistenceFailure.member === null, `Unpersisted Member was exposed as authoritative: ${persistenceFailure.member}`);
+  assert(persistenceFailure.guest === 'guest-browser-before-persist-failure', `Guest lineage was not preserved: ${persistenceFailure.guest}`);
+  assert(persistenceFailure.stored === 'guest-browser-before-persist-failure', `Compatibility bearer changed after failed Member persistence: ${persistenceFailure.stored}`);
+  assert(persistenceFailure.pending === null, `Failed Member persistence created pending Guest state: ${persistenceFailure.pending}`);
+  assert(persistenceFailure.changedEvents === 0, `Failed Member persistence emitted auth-changed: ${persistenceFailure.changedEvents}`);
+
   await mkdir(join(process.cwd(), 'artifacts'), { recursive: true });
   await writeFile(join(process.cwd(), 'artifacts', 'web-auth-guest-bootstrap-singleflight-browser-smoke.json'), `${JSON.stringify({
     status: 'PASS',
@@ -323,11 +367,13 @@ try {
     convergedBearer: authority.first,
     changedEvents: authority.changedEvents,
     memberWins,
+    persistenceFailure,
     requests,
   }, null, 2)}\n`, 'utf8');
 
   console.log('MyeongHa_WEB_AUTH_GUEST_BOOTSTRAP_SINGLEFLIGHT_BROWSER_PASS');
   console.log('MyeongHa_WEB_AUTH_MEMBER_WINS_GUEST_BOOTSTRAP_BROWSER_PASS');
+  console.log('MyeongHa_WEB_AUTH_MEMBER_PERSISTENCE_FAILURE_BROWSER_PASS');
 } catch (error) {
   console.error(error);
   if (chromeError.trim()) console.error(chromeError.trim());
