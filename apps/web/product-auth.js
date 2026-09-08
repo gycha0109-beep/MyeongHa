@@ -351,17 +351,21 @@ async function postJson(endpoint, body, authorization = null) {
 export function readMemberSession() {
   const raw = readLocal(MEMBER_SESSION_KEY);
   if (!raw) return null;
+
+  let parsed;
   try {
-    const normalized = normalizeSession(JSON.parse(raw));
-    if (!normalized) {
-      discardMemberSession();
-      return null;
-    }
-    return normalized;
+    parsed = JSON.parse(raw);
   } catch {
     discardMemberSession();
     return null;
   }
+
+  const normalized = normalizeSession(parsed);
+  if (!normalized) {
+    discardMemberSession();
+    return null;
+  }
+  return normalized;
 }
 
 export function readGuestBearer() {
