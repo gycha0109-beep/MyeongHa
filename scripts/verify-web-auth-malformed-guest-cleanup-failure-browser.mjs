@@ -217,12 +217,15 @@ try {
     } catch (error) {
       failure = { name: error?.name ?? null, code: error?.code ?? null };
     }
+    const pendingAfterFailure = sessionStorage.getItem(${JSON.stringify(pendingGuestKey)});
+    const activeAfterFailure = sessionStorage.getItem(${JSON.stringify(activeBearerKey)});
     Storage.prototype.removeItem = nativeRemoveItem;
 
     const recoveredGuest = auth.readGuestBearer();
     return {
       failure,
-      pendingAfterFailure: '   ',
+      pendingAfterFailure,
+      activeAfterFailure,
       recoveredGuest,
       pending: sessionStorage.getItem(${JSON.stringify(pendingGuestKey)}),
       active: sessionStorage.getItem(${JSON.stringify(activeBearerKey)}),
@@ -232,6 +235,8 @@ try {
 
   assert(readFailure.failure?.name === 'ProductAuthError', 'Malformed pending cleanup did not throw ProductAuthError');
   assert(readFailure.failure?.code === 'WEB_AUTH_GUEST_CLEAR_FAILED', `Unexpected pending cleanup error: ${readFailure.failure?.code}`);
+  assert(readFailure.pendingAfterFailure === '   ', 'Failed malformed pending cleanup did not preserve the malformed value');
+  assert(readFailure.activeAfterFailure === validExistingGuest, 'Failed malformed pending cleanup disturbed valid active Guest');
   assert(readFailure.recoveredGuest === validExistingGuest, 'Healthy retry did not recover the existing valid Guest');
   assert(readFailure.pending === null, 'Healthy retry did not remove malformed pending Guest');
   assert(readFailure.active === validExistingGuest, 'Healthy retry disturbed valid active Guest');
