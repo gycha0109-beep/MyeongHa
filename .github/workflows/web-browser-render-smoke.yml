@@ -84,6 +84,10 @@ jobs:
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
         run: node scripts/verify-web-auth-cross-tab-signout-failure-browser.mjs
+      - name: Verify Member removal failure authority
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/verify-web-auth-member-removal-failure-browser.mjs
       - name: Verify cross-tab authoritative session expiry
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
@@ -164,6 +168,7 @@ jobs:
             artifacts/web-auth-multi-confirmation-handoff-browser-smoke*
             artifacts/web-auth-cross-tab-browser-smoke*
             artifacts/web-auth-cross-tab-signout-failure-browser-smoke*
+            artifacts/web-auth-member-removal-failure-browser-smoke*
             artifacts/web-auth-cross-tab-session-expired-browser-smoke*
             artifacts/web-auth-rejection-browser-smoke*
             artifacts/web-auth-exact-rejection-race-browser-smoke*
