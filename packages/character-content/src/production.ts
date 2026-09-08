@@ -40,7 +40,10 @@ export type ProductionCharacterContentValidationCode =
   | 'DEVELOPMENT_PLACEHOLDER_FORBIDDEN'
   | 'ASSET_MANIFEST_HASH_REQUIRED'
   | 'CHARACTER_GENDER_CANON_REQUIRED'
-  | 'CHARACTER_VISUAL_CANON_REQUIRED';
+  | 'CHARACTER_VISUAL_CANON_REQUIRED'
+  | 'CHARACTER_ASSET_REFS_REQUIRED'
+  | 'CHARACTER_EMOTION_IDS_REQUIRED'
+  | 'CHARACTER_ANIMATION_CUE_IDS_REQUIRED';
 
 export class ProductionCharacterContentValidationError extends Error {
   constructor(
@@ -50,6 +53,53 @@ export class ProductionCharacterContentValidationError extends Error {
     super(message);
     this.name = 'ProductionCharacterContentValidationError';
   }
+}
+
+export type ProductionCharacterPublicationMaterials = Pick<
+  CharacterContentDefinition,
+  'characterId' | 'assetRefs' | 'emotionIds' | 'animationCueIds'
+>;
+
+function hasConcreteValues(values: readonly string[] | undefined): boolean {
+  return (
+    values !== undefined &&
+    values.length > 0 &&
+    values.every((value) => value.trim().length > 0)
+  );
+}
+
+/**
+ * Fail closed on missing concrete renderer/publication material.
+ *
+ * This deliberately does not invent asset references, emotion IDs, or animation
+ * cue IDs. An absent concept-art/renderer package remains absent until those
+ * concrete source-backed values are supplied by the publication input.
+ */
+export function validateProductionCharacterPublicationMaterials(
+  character: ProductionCharacterPublicationMaterials,
+): ProductionCharacterPublicationMaterials {
+  if (!hasConcreteValues(character.assetRefs)) {
+    throw new ProductionCharacterContentValidationError(
+      'CHARACTER_ASSET_REFS_REQUIRED',
+      `Production character content requires concrete asset refs: ${character.characterId}`,
+    );
+  }
+
+  if (!hasConcreteValues(character.emotionIds)) {
+    throw new ProductionCharacterContentValidationError(
+      'CHARACTER_EMOTION_IDS_REQUIRED',
+      `Production character content requires concrete emotion IDs: ${character.characterId}`,
+    );
+  }
+
+  if (!hasConcreteValues(character.animationCueIds)) {
+    throw new ProductionCharacterContentValidationError(
+      'CHARACTER_ANIMATION_CUE_IDS_REQUIRED',
+      `Production character content requires concrete animation cue IDs: ${character.characterId}`,
+    );
+  }
+
+  return character;
 }
 
 function isDevelopmentPlaceholder(
@@ -123,8 +173,8 @@ export function validateMvpProductionLaunchRosterDisplayNames(
  * publication is stricter: the launch roster must exactly match the approved
  * nine official display names, no development placeholder may cross this
  * boundary, canonical gender/visual authoring evidence must be present for every
- * roster member, and immutable asset-manifest provenance must already be
- * source-backed.
+ * roster member, concrete renderer assets/cues must be supplied, and immutable
+ * asset-manifest provenance must already be source-backed.
  *
  * Character identity/content is never inferred here from UI presentation keys
  * or runtime database rows. The supplied bundle must already be source-backed
@@ -133,6 +183,10 @@ export function validateMvpProductionLaunchRosterDisplayNames(
 export function validateProductionCharacterContentBundle(
   bundle: CharacterContentBundle,
 ): CharacterContentBundle {
+  for (const character of bundle.characters) {
+    validateProductionCharacterPublicationMaterials(character);
+  }
+
   validateCharacterContentBundle(bundle);
 
   if (!hasVersionedAssetManifestHash(bundle)) {
