@@ -1,0 +1,239 @@
+name: Production PostgreSQL Logical Backup
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 03:17 KST. The non-round minute reduces fleet-wide scheduler contention.
+    - cron: '17 18 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-postgres-backup
+  cancel-in-progress: false
+
+env:
+  SUPABASE_PROJECT_ID: cnsfpcdiyofqvhpcegfc
+  SUPABASE_CLI_VERSION: '2.117.0'
+  BACKUP_RETENTION_DAYS: '30'
+
+jobs:
+  backup:
+    name: encrypted-logical-backup
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: production
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE: ${{ secrets.MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE }}
+    steps:
+      - name: Checkout exact repository state
+        uses: actions/checkout@v4
+
+      - name: Fail closed unless recovery credentials are provisioned
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${SUPABASE_ACCESS_TOKEN:-}"
+          test -n "${SUPABASE_DB_PASSWORD:-}"
+          test -n "${MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE:-}"
+          if [ "${#MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE}" -lt 32 ]; then
+            echo 'MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE must be at least 32 characters.' >&2
+            exit 1
+          fi
+          echo "::add-mask::$SUPABASE_DB_PASSWORD"
+          echo "::add-mask::$MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE"
+
+      - name: Verify Docker and pinned Supabase CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker info >/dev/null
+          cli_version="$(npx --yes "supabase@$SUPABASE_CLI_VERSION" --version)"
+          [[ "$cli_version" == "$SUPABASE_CLI_VERSION" ]]
+
+      - name: Resolve governed production session-pooler endpoint
+        id: database
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          pooler_file="$RUNNER_TEMP/supabase-pooler.json"
+          trap 'rm -f "$pooler_file"' EXIT
+
+          curl -fsS \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_ID/config/database/pooler" \
+            -o "$pooler_file"
+
+          pooler_record="$({
+            jq -ce '\''
+              (if type == "array" then . elif (.data? | type) == "array" then .data else [.] end)
+              | map(
+                  select((.database_type // "") == "PRIMARY")
+                  | . + { resolved_connection_string: (.connection_string // .connectionString // "") }
+                )
+              | map(
+                  select(
+                    (.resolved_connection_string | type) == "string"
+                    and (.resolved_connection_string | length) > 0
+                    and (.resolved_connection_string | test("\\.pooler\\.supabase\\.com:5432/postgres(?:\\?|$)"))
+                  )
+                )
+              | first // empty
+            '\'' "$pooler_file"
+          })"
+          test -n "$pooler_record"
+
+          connection_string="$(jq -r '.resolved_connection_string // empty' <<<"$pooler_record")"
+          admin_pool_user="$(sed -E 's#^[a-zA-Z0-9+.-]+://([^:]+):.*#\1#' <<<"$connection_string")"
+          pool_host="$(sed -E 's#^[^@]+@([^:/]+):([0-9]+)/.*#\1#' <<<"$connection_string")"
+          pool_port="$(sed -E 's#^[^@]+@([^:/]+):([0-9]+)/.*#\2#' <<<"$connection_string")"
+          pool_db="$(sed -E 's#^[^@]+@[^/]+/([^?]+).*$#\1#' <<<"$connection_string")"
+
+          [[ "$admin_pool_user" == "postgres.$SUPABASE_PROJECT_ID" ]]
+          [[ "$pool_host" == *.pooler.supabase.com ]]
+          [[ "$pool_port" == '5432' ]]
+          [[ "$pool_db" == 'postgres' ]]
+
+          echo "admin_pool_user=$admin_pool_user" >> "$GITHUB_OUTPUT"
+          echo "pool_host=$pool_host" >> "$GITHUB_OUTPUT"
+          echo "pool_port=$pool_port" >> "$GITHUB_OUTPUT"
+          echo "pool_db=$pool_db" >> "$GITHUB_OUTPUT"
+
+      - name: Export Supabase-compatible logical backup
+        id: dump
+        shell: bash
+        env:
+          ADMIN_POOL_USER: ${{ steps.database.outputs.admin_pool_user }}
+          POOL_HOST: ${{ steps.database.outputs.pool_host }}
+          POOL_PORT: ${{ steps.database.outputs.pool_port }}
+          POOL_DB: ${{ steps.database.outputs.pool_db }}
+        run: |
+          set -euo pipefail
+          umask 077
+          backup_dir="$RUNNER_TEMP/myeongha-postgres-backup"
+          rm -rf "$backup_dir"
+          mkdir -p "$backup_dir"
+
+          cleanup() {
+            exit_code=$?
+            trap - EXIT
+            rm -rf "$backup_dir"
+            exit "$exit_code"
+          }
+          trap cleanup EXIT
+
+          encoded_password="$(python3 - <<'PY'
+          import os
+          import urllib.parse
+          print(urllib.parse.quote(os.environ['SUPABASE_DB_PASSWORD'], safe=''))
+          PY
+          )"
+          db_url="postgresql://${ADMIN_POOL_USER}:${encoded_password}@${POOL_HOST}:${POOL_PORT}/${POOL_DB}?sslmode=require"
+          echo "::add-mask::$db_url"
+
+          started_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          backup_stamp="$(date -u +'%Y%m%dT%H%M%SZ')"
+
+          npx --yes "supabase@$SUPABASE_CLI_VERSION" db dump \
+            --db-url "$db_url" \
+            -f "$backup_dir/roles.sql" \
+            --role-only
+          npx --yes "supabase@$SUPABASE_CLI_VERSION" db dump \
+            --db-url "$db_url" \
+            -f "$backup_dir/schema.sql"
+          npx --yes "supabase@$SUPABASE_CLI_VERSION" db dump \
+            --db-url "$db_url" \
+            -f "$backup_dir/data.sql" \
+            --use-copy \
+            --data-only \
+            -x 'storage.buckets_vectors' \
+            -x 'storage.vector_indexes'
+
+          test -s "$backup_dir/roles.sql"
+          test -s "$backup_dir/schema.sql"
+          test -s "$backup_dir/data.sql"
+
+          sha256sum \
+            "$backup_dir/roles.sql" \
+            "$backup_dir/schema.sql" \
+            "$backup_dir/data.sql" \
+            > "$backup_dir/plaintext-sha256.txt"
+
+          completed_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          jq -n \
+            --arg schema_version 'myeongha-postgres-logical-backup-v1' \
+            --arg project_ref "$SUPABASE_PROJECT_ID" \
+            --arg source_sha "$GITHUB_SHA" \
+            --arg cli_version "$SUPABASE_CLI_VERSION" \
+            --arg started_at "$started_at" \
+            --arg completed_at "$completed_at" \
+            '{
+              schema_version: $schema_version,
+              project_ref: $project_ref,
+              source_sha: $source_sha,
+              supabase_cli_version: $cli_version,
+              started_at_utc: $started_at,
+              completed_at_utc: $completed_at
+            }' > "$backup_dir/manifest.json"
+
+          plaintext_archive="$RUNNER_TEMP/myeongha-postgres-${backup_stamp}.tar.gz"
+          encrypted_archive="${plaintext_archive}.enc"
+          tar -C "$backup_dir" -czf "$plaintext_archive" \
+            roles.sql schema.sql data.sql plaintext-sha256.txt manifest.json
+
+          openssl enc -aes-256-cbc -salt -pbkdf2 -iter 200000 \
+            -in "$plaintext_archive" \
+            -out "$encrypted_archive" \
+            -pass env:MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE
+          rm -f "$plaintext_archive"
+
+          encrypted_sha256="$(sha256sum "$encrypted_archive" | awk '{print $1}')"
+          printf '%s  %s\n' "$encrypted_sha256" "$(basename "$encrypted_archive")" \
+            > "${encrypted_archive}.sha256"
+
+          public_manifest="$RUNNER_TEMP/myeongha-postgres-${backup_stamp}.manifest.json"
+          jq -n \
+            --arg schema_version 'myeongha-postgres-backup-artifact-v1' \
+            --arg project_ref "$SUPABASE_PROJECT_ID" \
+            --arg source_sha "$GITHUB_SHA" \
+            --arg created_at "$completed_at" \
+            --arg encrypted_sha256 "$encrypted_sha256" \
+            --arg archive_name "$(basename "$encrypted_archive")" \
+            '{
+              schema_version: $schema_version,
+              project_ref: $project_ref,
+              source_sha: $source_sha,
+              created_at_utc: $created_at,
+              encrypted_sha256: $encrypted_sha256,
+              archive_name: $archive_name
+            }' > "$public_manifest"
+
+          echo "archive=$encrypted_archive" >> "$GITHUB_OUTPUT"
+          echo "checksum=${encrypted_archive}.sha256" >> "$GITHUB_OUTPUT"
+          echo "manifest=$public_manifest" >> "$GITHUB_OUTPUT"
+          echo "artifact_name=myeongha-postgres-${backup_stamp}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload encrypted off-provider backup artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.dump.outputs.artifact_name }}
+          path: |
+            ${{ steps.dump.outputs.archive }}
+            ${{ steps.dump.outputs.checksum }}
+            ${{ steps.dump.outputs.manifest }}
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+
+      - name: Record backup success evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "backup_status=success"
+          echo "project_ref=$SUPABASE_PROJECT_ID"
+          echo "retention_days=$BACKUP_RETENTION_DAYS"
+          echo "source_sha=$GITHUB_SHA"
