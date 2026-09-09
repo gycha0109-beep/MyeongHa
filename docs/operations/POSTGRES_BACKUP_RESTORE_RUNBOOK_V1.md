@@ -27,6 +27,7 @@ provider retention              = NOT RELIED UPON ON CURRENT FREE PLAN
 PITR                            = NOT AVAILABLE UNDER THE CURRENT FREE-PLAN OPERATING BASELINE
 application-owned logical dump  = IMPLEMENTED BY REPOSITORY WORKFLOW
 successful production dump      = NOT YET EVIDENCED
+isolated restore drill path     = IMPLEMENTED / NOT YET EXECUTED
 isolated restore                = NOT YET EVIDENCED
 RPO                             = OPEN DECISION
 RTO                             = OPEN DECISION
@@ -130,6 +131,32 @@ target PostgreSQL version
 restore operator
 restore_start_utc
 ```
+
+### 5.1 Repository-isolated restore drill workflow
+
+The repository now provides an executable, **manual-only** restore portability path:
+
+```text
+.github/workflows/postgres-isolated-restore-drill.yml
+```
+
+Its target is **GitHub Actions loopback PostgreSQL 17.6**. The workflow does not accept a remote restore database URL. The restore harness hardcodes only:
+
+```text
+postgresql://postgres:restore-drill@127.0.0.1:5432/postgres
+```
+
+The workflow requires:
+
+- a numeric successful backup workflow run ID;
+- a canonical synthetic incident/reference UTC timestamp;
+- the protected backup passphrase from the `production` environment.
+
+Before any decryption, it verifies that the selected source run is exactly the repository's successful `Production PostgreSQL Logical Backup` workflow on `main`, and that exactly one non-expired governed backup artifact exists. It then downloads that exact artifact, verifies ciphertext and plaintext checksums plus both manifests, restores only into the loopback PostgreSQL service container, runs baseline structural/authorization checks, and uploads only a JSON evidence artifact.
+
+Decrypted SQL/data files are not uploaded.
+
+This workflow is **implementation and future drill machinery only** until it is run against an actual successful production backup artifact. A successful loopback restore may evidence restore portability, basic structure, and baseline role safety; it does not by itself establish that a recovered state is safe to serve. In particular, privacy reconciliation is not exercised by the workflow, and full RTO remains open until the post-backup deletion/revocation reconciliation procedure is exercised and verified.
 
 ## 6. Download, verify, and decrypt
 
@@ -269,6 +296,8 @@ achieved recovery duration
 achieved data-loss window
 = incident/reference time - selected backup completed_at_utc
 ```
+
+The loopback restore workflow records an isolated restore/validation duration and a synthetic data-loss-window candidate. Those are diagnostic drill metrics, not a full achieved RTO, because privacy/deletion reconciliation is deliberately not automated in that workflow.
 
 Only after business-approved RPO/RTO values are recorded may the measured values be labeled PASS/FAIL against those objectives.
 

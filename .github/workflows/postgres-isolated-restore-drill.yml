@@ -1,0 +1,186 @@
+name: PostgreSQL Isolated Restore Drill
+
+on:
+  workflow_dispatch:
+    inputs:
+      backup_run_id:
+        description: Successful Production PostgreSQL Logical Backup workflow run ID
+        required: true
+        type: string
+      incident_reference_utc:
+        description: Synthetic incident/reference time in canonical UTC YYYY-MM-DDTHH:MM:SSZ
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: postgres-isolated-restore-drill
+  cancel-in-progress: false
+
+jobs:
+  restore-drill:
+    name: isolated-postgres-17-restore
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: production
+    services:
+      postgres:
+        image: postgres:17.6
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: restore-drill
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      EXPECTED_PROJECT_REF: cnsfpcdiyofqvhpcegfc
+      MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE: ${{ secrets.MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE }}
+
+    steps:
+      - name: Checkout exact repository state
+        uses: actions/checkout@v4
+
+      - name: Validate drill input and source backup authority
+        id: source
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BACKUP_RUN_ID: ${{ inputs.backup_run_id }}
+          INCIDENT_REFERENCE_UTC: ${{ inputs.incident_reference_utc }}
+        run: |
+          set -euo pipefail
+          [[ "$BACKUP_RUN_ID" =~ ^[0-9]+$ ]]
+          incident_roundtrip="$(date -u -d "$INCIDENT_REFERENCE_UTC" +'%Y-%m-%dT%H:%M:%SZ')"
+          [[ "$incident_roundtrip" == "$INCIDENT_REFERENCE_UTC" ]]
+
+          run_json="$RUNNER_TEMP/backup-run.json"
+          artifact_json="$RUNNER_TEMP/backup-artifacts.json"
+          curl -fsSL \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'Accept: application/vnd.github+json' \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/runs/$BACKUP_RUN_ID" \
+            -o "$run_json"
+
+          jq -e '
+            .name == "Production PostgreSQL Logical Backup"
+            and .path == ".github/workflows/production-postgres-backup.yml"
+            and .conclusion == "success"
+            and .head_branch == "main"
+            and (.event == "schedule" or .event == "workflow_dispatch")
+            and .repository.full_name == env.GITHUB_REPOSITORY
+          ' "$run_json" >/dev/null
+
+          source_sha="$(jq -er '.head_sha' "$run_json")"
+          [[ "$source_sha" =~ ^[0-9a-f]{40}$ ]]
+
+          curl -fsSL \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'Accept: application/vnd.github+json' \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/runs/$BACKUP_RUN_ID/artifacts?per_page=100" \
+            -o "$artifact_json"
+
+          governed_artifacts="$(jq -c '[.artifacts[] | select((.name | test("^myeongha-postgres-[0-9]{8}T[0-9]{6}Z$")) and (.expired == false))]' "$artifact_json")"
+          [[ "$(jq 'length' <<<"$governed_artifacts")" == '1' ]]
+
+          artifact_id="$(jq -er '.[0].id' <<<"$governed_artifacts")"
+          artifact_name="$(jq -er '.[0].name' <<<"$governed_artifacts")"
+          artifact_expires_at="$(jq -er '.[0].expires_at' <<<"$governed_artifacts")"
+          [[ "$artifact_id" =~ ^[0-9]+$ ]]
+          [[ "$artifact_name" =~ ^myeongha-postgres-[0-9]{8}T[0-9]{6}Z$ ]]
+
+          echo "source_sha=$source_sha" >> "$GITHUB_OUTPUT"
+          echo "artifact_id=$artifact_id" >> "$GITHUB_OUTPUT"
+          echo "artifact_name=$artifact_name" >> "$GITHUB_OUTPUT"
+          echo "artifact_expires_at=$artifact_expires_at" >> "$GITHUB_OUTPUT"
+
+      - name: Download exact governed backup artifact
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.backup_run_id }}
+          artifact-ids: ${{ steps.source.outputs.artifact_id }}
+          merge-multiple: true
+          path: ${{ runner.temp }}/backup-artifact
+
+      - name: Install PostgreSQL client and jq
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client jq
+
+      - name: Restore encrypted backup into isolated PostgreSQL
+        shell: bash
+        env:
+          BACKUP_ARTIFACT_DIR: ${{ runner.temp }}/backup-artifact
+          EXPECTED_SOURCE_SHA: ${{ steps.source.outputs.source_sha }}
+          RESTORE_EVIDENCE_PATH: ${{ runner.temp }}/restore-evidence/restore-evidence.json
+        run: |
+          set -euo pipefail
+          bash scripts/run-postgres-isolated-restore-drill.sh
+
+      - name: Add drill timing and source-artifact evidence
+        shell: bash
+        env:
+          BACKUP_ARTIFACT_DIR: ${{ runner.temp }}/backup-artifact
+          RESTORE_EVIDENCE_PATH: ${{ runner.temp }}/restore-evidence/restore-evidence.json
+          BACKUP_RUN_ID: ${{ inputs.backup_run_id }}
+          INCIDENT_REFERENCE_UTC: ${{ inputs.incident_reference_utc }}
+          SOURCE_ARTIFACT_NAME: ${{ steps.source.outputs.artifact_name }}
+          SOURCE_ARTIFACT_EXPIRES_AT: ${{ steps.source.outputs.artifact_expires_at }}
+        run: |
+          set -euo pipefail
+          public_manifest="$(find "$BACKUP_ARTIFACT_DIR" -maxdepth 1 -type f -name '*.manifest.json' -print -quit)"
+          test -n "$public_manifest"
+          backup_completed_at="$(jq -er '.created_at_utc' "$public_manifest")"
+          backup_epoch="$(date -u -d "$backup_completed_at" +%s)"
+          incident_epoch="$(date -u -d "$INCIDENT_REFERENCE_UTC" +%s)"
+          (( incident_epoch >= backup_epoch ))
+          data_loss_window_seconds=$((incident_epoch - backup_epoch))
+
+          tmp_json="$RUNNER_TEMP/restore-evidence.tmp.json"
+          jq \
+            --arg backup_run_id "$BACKUP_RUN_ID" \
+            --arg backup_completed_at_utc "$backup_completed_at" \
+            --arg incident_reference_utc "$INCIDENT_REFERENCE_UTC" \
+            --arg source_artifact_name "$SOURCE_ARTIFACT_NAME" \
+            --arg source_artifact_expires_at "$SOURCE_ARTIFACT_EXPIRES_AT" \
+            --argjson synthetic_data_loss_window_seconds "$data_loss_window_seconds" \
+            '. + {
+              backup_workflow_run_id: $backup_run_id,
+              backup_completed_at_utc: $backup_completed_at_utc,
+              incident_reference_utc: $incident_reference_utc,
+              synthetic_data_loss_window_seconds: $synthetic_data_loss_window_seconds,
+              source_artifact_name: $source_artifact_name,
+              source_artifact_expires_at: $source_artifact_expires_at
+            }' \
+            "$RESTORE_EVIDENCE_PATH" > "$tmp_json"
+          mv "$tmp_json" "$RESTORE_EVIDENCE_PATH"
+          chmod 600 "$RESTORE_EVIDENCE_PATH"
+
+      - name: Upload restore drill evidence only
+        uses: actions/upload-artifact@v4
+        with:
+          name: postgres-isolated-restore-drill-${{ github.run_id }}
+          path: ${{ runner.temp }}/restore-evidence/restore-evidence.json
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+
+      - name: Record restore drill boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo 'restore_target=github-actions-loopback-postgres'
+          echo 'isolated_restore=success'
+          echo 'privacy_reconciliation=not_exercised_by_this_workflow'
+          echo 'dr_ready=false'
