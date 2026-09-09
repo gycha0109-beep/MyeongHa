@@ -232,6 +232,11 @@ async function connectCdp(port) {
   return { send, evaluate, close: () => ws.close() };
 }
 
+function isExpectedNavigationContextRace(error) {
+  return error instanceof Error
+    && /Inspected target navigated or closed|Execution context was destroyed/u.test(error.message);
+}
+
 async function navigate(client, origin, pathname, selector, timeout = 10_000) {
   const result = await client.send('Page.navigate', { url: `${origin}${pathname}` });
   assert(!result.errorText, `Navigation failed for ${pathname}: ${result.errorText}`);
@@ -239,12 +244,16 @@ async function navigate(client, origin, pathname, selector, timeout = 10_000) {
   const selectorLiteral = JSON.stringify(selector);
   const deadline = Date.now() + timeout;
   while (Date.now() < deadline) {
-    const state = await client.evaluate(`(() => ({
-      pathname: location.pathname,
-      readyState: document.readyState,
-      found: Boolean(document.querySelector(${selectorLiteral})),
-    }))()`);
-    if (state?.pathname === cleanPath && state.readyState === 'complete' && state.found) return;
+    try {
+      const state = await client.evaluate(`(() => ({
+        pathname: location.pathname,
+        readyState: document.readyState,
+        found: Boolean(document.querySelector(${selectorLiteral})),
+      }))()`);
+      if (state?.pathname === cleanPath && state.readyState === 'complete' && state.found) return;
+    } catch (error) {
+      if (!isExpectedNavigationContextRace(error)) throw error;
+    }
     await sleep(50);
   }
   throw new Error(`Timed out waiting for ${cleanPath} ${selector}`);
@@ -279,6 +288,29 @@ async function authSnapshot(client) {
       pendingGuest: sessionStorage.getItem('myeongha.pendingGuestBearer.v1'),
     };
   })()`);
+}
+
+async function waitForHealthyRefreshRecovery(client, timeout = 10_000) {
+  const deadline = Date.now() + timeout;
+  let lastState = null;
+  while (Date.now() < deadline) {
+    try {
+      lastState = await authSnapshot(client);
+      if (
+        lastState?.accessToken === rotatedToken
+        && lastState.activeBearer === rotatedToken
+        && lastState.userId === member.id
+        && lastState.email === member.email
+        && lastState.pendingGuest === stagedGuest
+      ) {
+        return lastState;
+      }
+    } catch (error) {
+      if (!isExpectedNavigationContextRace(error)) throw error;
+    }
+    await sleep(50);
+  }
+  throw new Error(`Timed out waiting for healthy malformed-refresh recovery convergence: ${JSON.stringify(lastState)}`);
 }
 
 async function resolveBearer(client, fn) {
@@ -355,9 +387,11 @@ try {
   });
 
   mode = 'success';
+  const recoveryRefreshBefore = refreshRequests;
   await navigate(client, origin, '/hall.html', '.product-profile');
-  const recovered = await authSnapshot(client);
+  const recovered = await waitForHealthyRefreshRecovery(client);
   const recoveredBearer = await resolveBearer(client, 'getActiveBearer');
+  assert(refreshRequests > recoveryRefreshBefore, 'Healthy recovery did not attempt refresh after malformed failures');
   assert(recovered.accessToken === rotatedToken && recovered.activeBearer === rotatedToken, 'Healthy refresh did not rotate Member credentials after malformed failures');
   assert(recovered.userId === member.id && recovered.email === member.email, 'Healthy refresh changed Member identity after malformed failures');
   assert(recovered.pendingGuest === stagedGuest, 'Healthy refresh consumed staged Guest after malformed failures');
