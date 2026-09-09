@@ -69,7 +69,7 @@ jobs:
             -o "$pooler_file"
 
           pooler_record="$({
-            jq -ce '\''
+            jq -ce '
               (if type == "array" then . elif (.data? | type) == "array" then .data else [.] end)
               | map(
                   select((.database_type // "") == "PRIMARY")
@@ -83,7 +83,7 @@ jobs:
                   )
                 )
               | first // empty
-            '\'' "$pooler_file"
+            ' "$pooler_file"
           })"
           test -n "$pooler_record"
 
