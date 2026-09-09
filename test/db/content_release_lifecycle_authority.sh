@@ -30,6 +30,10 @@ expect_failure_stdin() {
 role_shape="$(query "select rolcanlogin::int||'|'||rolsuper::int||'|'||rolinherit::int||'|'||rolbypassrls::int from pg_roles where rolname='myeongha_content_operator';")"
 [[ "$role_shape" == '0|0|0|0' ]] || fail "content operator role shape mismatch: $role_shape"
 
+postgres_owner_membership="$(query "select pg_has_role('postgres','myeongha_content_publication_owner','MEMBER')::int;")"
+[[ "$postgres_owner_membership" == '1' ]] || fail "postgres cannot assume content publication owner during migration deployment"
+pass "postgres deployment principal can assume content publication owner"
+
 for fn in \
   "public.cmd_publish_character_content_bundle_v1(uuid,text,text,text,text,text,text,text,jsonb,jsonb,jsonb,jsonb)" \
   "public.cmd_create_content_release_v1(uuid,text,uuid,jsonb,text,text)" \
