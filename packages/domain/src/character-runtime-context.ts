@@ -3,12 +3,14 @@ import type {
   RelationshipEventCandidate,
   SajuDomain,
 } from '../../contracts/src/index.js';
-import type {
-  CharacterCapabilityContent,
-  CharacterContentDefinition,
-  CharacterRelationshipBehaviorContent,
-  CharacterRelationshipMode,
-  RelationshipStateBand,
+import {
+  resolveCharacterVoiceAuthorityV1,
+  type CharacterCapabilityContent,
+  type CharacterContentDefinition,
+  type CharacterRelationshipBehaviorContent,
+  type CharacterRelationshipMode,
+  type CharacterVoiceAuthorityV1,
+  type RelationshipStateBand,
 } from '../../character-content/src/index.js';
 import type { CharacterRelationDefinition } from '../../world-content/src/index.js';
 import type { RelationshipState } from './relationship-engine.js';
@@ -215,6 +217,8 @@ export interface CharacterRuntimeContextV1 {
   readonly characterId: string;
   readonly contentBundleId: string;
   readonly contentVersion: string;
+  readonly speech: CharacterContentDefinition['speech'];
+  readonly voiceAuthority: CharacterVoiceAuthorityV1;
   readonly canon: NonNullable<CharacterContentDefinition['canon']>;
   readonly persona: NonNullable<CharacterContentDefinition['persona']>;
   readonly behavior: NonNullable<CharacterContentDefinition['behavior']>;
@@ -333,11 +337,25 @@ export function assembleCharacterRuntimeContext(input: {
     });
   }
 
+  const voiceAuthority = Object.freeze(
+    resolveCharacterVoiceAuthorityV1(
+      {
+        characterId,
+        contentVersion: input.character.contentVersion,
+        speech: input.character.speech,
+        persona: input.character.persona,
+      },
+      saju === null ? 'general_chat' : 'saju_product',
+    ),
+  );
+
   return Object.freeze({
     schemaVersion: 'v1',
     characterId,
     contentBundleId,
     contentVersion: input.character.contentVersion,
+    speech: input.character.speech,
+    voiceAuthority,
     canon: input.character.canon,
     persona: input.character.persona,
     behavior: input.character.behavior,

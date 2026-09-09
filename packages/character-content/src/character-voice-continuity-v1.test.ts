@@ -1,0 +1,159 @@
+import { describe, expect, it } from 'vitest';
+
+import {
+  CHARACTER_RUNTIME_AUTHORING_V1,
+} from './runtime-authoring-v1.js';
+import {
+  CHARACTER_SAJU_VOICE_CONTINUITY_POLICY_V1,
+  CHARACTER_VOICE_AUTHORITY_SOURCE_V1,
+  resolveCharacterVoiceAuthorityV1,
+  validateCharacterVoiceContinuityV1,
+} from './character-voice-continuity-v1.js';
+
+describe('Character/Saju voice continuity v1', () => {
+  it('resolves general chat and Saju products to the exact same published voice objects', () => {
+    for (const definition of CHARACTER_RUNTIME_AUTHORING_V1) {
+      const published = {
+        characterId: definition.characterId,
+        contentVersion: `test-published-${definition.characterId}-v1`,
+        speech: definition.speech,
+        persona: definition.persona,
+      };
+      const general = resolveCharacterVoiceAuthorityV1(published, 'general_chat');
+      const saju = resolveCharacterVoiceAuthorityV1(published, 'saju_product');
+
+      expect(general.source).toBe(CHARACTER_VOICE_AUTHORITY_SOURCE_V1);
+      expect(saju.source).toBe(CHARACTER_VOICE_AUTHORITY_SOURCE_V1);
+      expect(saju.contentVersion).toBe(published.contentVersion);
+      expect(saju.speech).toBe(general.speech);
+      expect(saju.communication).toBe(general.communication);
+    }
+  });
+
+  it('forbids a product-specific Saju voice while preserving semantic and visual channel boundaries', () => {
+    expect(CHARACTER_SAJU_VOICE_CONTINUITY_POLICY_V1).toEqual({
+      voiceAuthority: 'shared_published_character_content',
+      sajuSpecificVoiceOverride: 'forbidden',
+      protectedSemanticPayload: 'immutable',
+      unauthorizedRealityInference: 'forbidden',
+      stageDirectionInSpeech: 'forbidden',
+      visualReactionChannel: 'emotion_animation_cue_only',
+    });
+  });
+
+  it('fails closed when the rendered voice authority does not match the selected Character', () => {
+    const result = validateCharacterVoiceContinuityV1({
+      characterId: 'doyun',
+      characterContentVersion: 'doyun-v7',
+      surface: 'saju_product',
+      voiceAuthorityCharacterId: 'yeoul',
+      voiceAuthorityContentVersion: 'doyun-v7',
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.violations.map((violation) => violation.code)).toContain(
+      'VOICE_AUTHORITY_MISMATCH',
+    );
+  });
+
+  it('fails closed when the voice comes from a stale published content version', () => {
+    const result = validateCharacterVoiceContinuityV1({
+      characterId: 'doyun',
+      characterContentVersion: 'doyun-v7',
+      surface: 'saju_product',
+      voiceAuthorityCharacterId: 'doyun',
+      voiceAuthorityContentVersion: 'doyun-v6',
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.violations.map((violation) => violation.code)).toEqual([
+      'VOICE_CONTENT_VERSION_MISMATCH',
+    ]);
+  });
+
+  it('fails closed when a Saju product requests a separate Character voice override', () => {
+    const result = validateCharacterVoiceContinuityV1({
+      characterId: 'doyun',
+      characterContentVersion: 'doyun-v7',
+      surface: 'saju_product',
+      voiceAuthorityCharacterId: 'doyun',
+      voiceAuthorityContentVersion: 'doyun-v7',
+      sajuVoiceOverrideRequested: true,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.violations.map((violation) => violation.code)).toEqual([
+      'SAJU_VOICE_OVERRIDE_FORBIDDEN',
+    ]);
+  });
+
+  it('rejects reality-specific business wording when no user context authorizes it', () => {
+    const result = validateCharacterVoiceContinuityV1({
+      characterId: 'doyun',
+      characterContentVersion: 'doyun-v7',
+      surface: 'saju_product',
+      voiceAuthorityCharacterId: 'doyun',
+      voiceAuthorityContentVersion: 'doyun-v7',
+      introducedRealityFactKeys: [
+        'business.metric.click',
+        'business.metric.inquiry',
+        'business.metric.payment',
+      ],
+      authorizedRealityFactKeys: [],
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.violations).toEqual([
+      expect.objectContaining({ code: 'UNAUTHORIZED_REALITY_FACT', value: 'business.metric.click' }),
+      expect.objectContaining({ code: 'UNAUTHORIZED_REALITY_FACT', value: 'business.metric.inquiry' }),
+      expect.objectContaining({ code: 'UNAUTHORIZED_REALITY_FACT', value: 'business.metric.payment' }),
+    ]);
+  });
+
+  it('allows reality-specific wording only when the same fact keys are explicitly authorized', () => {
+    const result = validateCharacterVoiceContinuityV1({
+      characterId: 'doyun',
+      characterContentVersion: 'doyun-v7',
+      surface: 'saju_product',
+      voiceAuthorityCharacterId: 'doyun',
+      voiceAuthorityContentVersion: 'doyun-v7',
+      introducedRealityFactKeys: ['business.metric.click'],
+      authorizedRealityFactKeys: ['business.metric.click'],
+    });
+
+    expect(result).toEqual({ ok: true, violations: [] });
+  });
+
+  it('rejects prose stage directions so pose and expression stay in visual runtime cues', () => {
+    const result = validateCharacterVoiceContinuityV1({
+      characterId: 'doyun',
+      characterContentVersion: 'doyun-v7',
+      surface: 'saju_product',
+      voiceAuthorityCharacterId: 'doyun',
+      voiceAuthorityContentVersion: 'doyun-v7',
+      proseStageDirections: ['팔짱을 낀다', '피식 웃는다'],
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.violations).toEqual([
+      expect.objectContaining({ code: 'STAGE_DIRECTION_IN_SPEECH', value: '팔짱을 낀다' }),
+      expect.objectContaining({ code: 'STAGE_DIRECTION_IN_SPEECH', value: '피식 웃는다' }),
+    ]);
+  });
+
+  it('passes a clean Saju render contract without inventing product voice or reality facts', () => {
+    const result = validateCharacterVoiceContinuityV1({
+      characterId: 'yeoul',
+      characterContentVersion: 'yeoul-v3',
+      surface: 'saju_product',
+      voiceAuthorityCharacterId: 'yeoul',
+      voiceAuthorityContentVersion: 'yeoul-v3',
+      sajuVoiceOverrideRequested: false,
+      introducedRealityFactKeys: [],
+      authorizedRealityFactKeys: [],
+      proseStageDirections: [],
+    });
+
+    expect(result).toEqual({ ok: true, violations: [] });
+  });
+});

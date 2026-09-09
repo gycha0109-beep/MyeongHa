@@ -1,4 +1,7 @@
-import type { CharacterSajuSafeFramingEntryV1 } from '../../character-content/src/index.js';
+import {
+  CHARACTER_VOICE_AUTHORITY_SOURCE_V1,
+  type CharacterSajuSafeFramingEntryV1,
+} from '../../character-content/src/index.js';
 import {
   CharacterOutputGuardError,
   guardCharacterRendererOutput,
@@ -59,16 +62,60 @@ function resolveFraming(
   return entry.text;
 }
 
+/**
+ * Saju rendering must consume the exact published Character voice objects assembled
+ * for the active turn. Any stale, cross-Character, cloned, or surface-swapped authority
+ * fails closed before provider output is accepted.
+ */
+export function assertCharacterSajuVoiceRuntimeInvariantV1(
+  context: CharacterRuntimeContextV1,
+): void {
+  if (context.saju === null) {
+    throw new CharacterOutputGuardError(
+      'Saju voice runtime invariant requires a Saju-bearing runtime context.',
+    );
+  }
+
+  const authority = context.voiceAuthority;
+  if (authority.source !== CHARACTER_VOICE_AUTHORITY_SOURCE_V1) {
+    throw new CharacterOutputGuardError(
+      'Saju renderer voice authority must come from published Character content.',
+    );
+  }
+  if (authority.surface !== 'saju_product') {
+    throw new CharacterOutputGuardError(
+      'Saju renderer voice authority surface must be saju_product.',
+    );
+  }
+  if (authority.characterId !== context.characterId) {
+    throw new CharacterOutputGuardError(
+      'Saju renderer voice authority does not match the active Character.',
+    );
+  }
+  if (authority.contentVersion !== context.contentVersion) {
+    throw new CharacterOutputGuardError(
+      'Saju renderer voice authority does not match the active Character content version.',
+    );
+  }
+  if (authority.speech !== context.speech) {
+    throw new CharacterOutputGuardError(
+      'Saju renderer must use the exact published Character speech object for the turn.',
+    );
+  }
+  if (authority.communication !== context.persona.communication) {
+    throw new CharacterOutputGuardError(
+      'Saju renderer must use the exact published Character communication object for the turn.',
+    );
+  }
+}
+
 export function guardCharacterSajuSafeRendererOutput(input: {
   readonly rawOutput: unknown;
   readonly context: CharacterRuntimeContextV1;
   readonly allowedSuggestedActionKeys: readonly string[];
 }): CharacterDialogueEnvelopeV1 {
-  if (input.context.saju === null) {
-    throw new CharacterOutputGuardError(
-      'Saju-safe renderer mode requires a Saju-bearing runtime context.',
-    );
-  }
+  assertCharacterSajuVoiceRuntimeInvariantV1(input.context);
+
   const catalog = input.context.sajuProfile.safeFraming;
   if (catalog === undefined || catalog.schemaVersion !== 'v1') {
     throw new CharacterOutputGuardError(
