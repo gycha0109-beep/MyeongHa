@@ -38,6 +38,15 @@ owner_schema_create="$(query "select has_schema_privilege('myeongha_content_publ
 [[ "$owner_schema_create" == '0' ]] || fail "content publication owner retained public schema CREATE after deployment"
 pass "content publication owner does not retain public schema CREATE"
 
+migration_file="supabase/migrations/0980_content_release_lifecycle_authority.sql"
+grant_create_line="$(grep -nF 'grant create on schema public to myeongha_content_publication_owner;' "$migration_file" | cut -d: -f1)"
+revoke_create_line="$(grep -nF 'revoke create on schema public from myeongha_content_publication_owner;' "$migration_file" | cut -d: -f1)"
+mapfile -t owner_lines < <(grep -nF 'owner to myeongha_content_publication_owner;' "$migration_file" | cut -d: -f1)
+[[ -n "$grant_create_line" && -n "$revoke_create_line" ]] || fail "deployment-scoped schema CREATE grant/revoke is missing"
+[[ "${#owner_lines[@]}" == '5' ]] || fail "expected five content publication owner reassignments, got ${#owner_lines[@]}"
+[[ "$grant_create_line" -lt "${owner_lines[0]}" && "${owner_lines[4]}" -lt "$revoke_create_line" ]] || fail "schema CREATE grant/revoke does not bracket all owner reassignments"
+pass "schema CREATE authority is scoped strictly around owner reassignment"
+
 for fn in \
   "public.cmd_publish_character_content_bundle_v1(uuid,text,text,text,text,text,text,text,jsonb,jsonb,jsonb,jsonb)" \
   "public.cmd_create_content_release_v1(uuid,text,uuid,jsonb,text,text)" \
