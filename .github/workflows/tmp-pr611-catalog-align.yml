@@ -1,0 +1,160 @@
+name: TEMP PR611 Catalog Align
+
+on:
+  push:
+    branches:
+      - feat/commerce-capability-authority-20260909
+    paths:
+      - '.github/workflows/tmp-pr611-catalog-align.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  align:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: myeongha_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d myeongha_test"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: myeongha_test
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/commerce-capability-authority-20260909
+          fetch-depth: 0
+      - name: Align public table-count guards only
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          root = Path('test/db')
+          changed = []
+          old_patterns = [
+              ("== '60'", "== '62'"),
+              ('== "60"', '== "62"'),
+              ('-eq 60', '-eq 62'),
+              ('<> 60', '<> 62'),
+              ('remains 60', 'remains 62'),
+          ]
+
+          for path in sorted(root.iterdir()):
+              if not path.is_file() or path.suffix not in {'.sh', '.sql'}:
+                  continue
+              text = path.read_text()
+              if 'public table catalog changed' not in text and 'table catalog remains 60' not in text:
+                  continue
+
+              lines = text.splitlines(keepends=True)
+              touched = False
+              marker_indexes = [
+                  i for i, line in enumerate(lines)
+                  if 'public table catalog changed' in line or 'table catalog remains 60' in line
+              ]
+              for i in marker_indexes:
+                  lo = max(0, i - 8)
+                  hi = min(len(lines), i + 3)
+                  for j in range(lo, hi):
+                      line = lines[j]
+                      new_line = line
+                      for old, new in old_patterns:
+                          new_line = new_line.replace(old, new)
+                      if new_line != line:
+                          lines[j] = new_line
+                          touched = True
+
+              new_text = ''.join(lines)
+              if touched:
+                  path.write_text(new_text)
+                  changed.append(str(path))
+
+          if not changed:
+              raise SystemExit('no stale public table-count guard was changed')
+
+          # Fail closed: every known catalog-change marker must now have a 62-count
+          # assertion in its nearby context and no legacy equality-to-60 pattern.
+          for path in sorted(root.iterdir()):
+              if not path.is_file() or path.suffix not in {'.sh', '.sql'}:
+                  continue
+              text = path.read_text()
+              if 'public table catalog changed' not in text:
+                  continue
+              lines = text.splitlines()
+              for i, line in enumerate(lines):
+                  if 'public table catalog changed' not in line:
+                      continue
+                  ctx = '\n'.join(lines[max(0, i - 8):min(len(lines), i + 3)])
+                  legacy = ["== '60'", '== "60"', '-eq 60', '<> 60']
+                  if any(token in ctx for token in legacy):
+                      raise SystemExit(f'legacy table-count guard remains near {path}:{i+1}\n{ctx}')
+                  if not any(token in ctx for token in ["== '62'", '== "62"', '-eq 62', '<> 62']):
+                      raise SystemExit(f'no explicit 62 table-count guard near {path}:{i+1}\n{ctx}')
+
+          print('UPDATED_TABLE_COUNT_GUARDS=' + str(len(changed)))
+          for path in changed:
+              print('UPDATED ' + path)
+          PY
+
+          echo '--- remaining literal catalog-60 references ---'
+          grep -R -n -E "public table catalog changed|table catalog remains 6[02]" test/db | tail -n 200 || true
+
+      - name: Bootstrap Supabase auth test fixture
+        run: psql -v ON_ERROR_STOP=1 -f test/db/bootstrap_supabase_auth_stub.sql
+
+      - name: Apply clean migrations
+        shell: bash
+        run: |
+          set -euo pipefail
+          for migration in supabase/migrations/*.sql; do
+            echo "Applying ${migration}"
+            psql -v ON_ERROR_STOP=1 -f "${migration}" >/dev/null
+          done
+
+      - name: Measure and pin deterministic catalog hash
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%064d\n' 0 > /tmp/catalog.expected.sha256
+          set +e
+          output="$(bash test/db/catalog_snapshot.sh /tmp/catalog.expected.sha256 2>&1)"
+          rc=$?
+          set -e
+          printf '%s\n' "$output"
+          test "$rc" -eq 4
+          actual="$(printf '%s\n' "$output" | sed -n 's/^actual=//p' | tail -n 1)"
+          test "${#actual}" -eq 64
+          printf '%s\n' "$actual" > test/db/catalog.expected.sha256
+          echo "MEASURED_CATALOG_SHA256=$actual"
+          bash test/db/catalog_snapshot.sh
+
+      - name: Remove temporary workflow and commit alignment
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm .github/workflows/tmp-pr611-catalog-align.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add test/db
+          git diff --cached --stat
+          git diff --cached --check
+          git commit -m "test(db): align catalog guards for capability tables"
+          git push origin HEAD:feat/commerce-capability-authority-20260909
