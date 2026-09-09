@@ -46,6 +46,35 @@ function readLocal(key) {
   }
 }
 
+function reconcileLocalRollback(key, previous, expectedCurrent) {
+  let observed;
+  try {
+    observed = readLocal(key);
+  } catch {
+    return false;
+  }
+
+  if (observed === previous) return true;
+  if (observed !== expectedCurrent) {
+    // Another tab replaced this operation's value. Preserve the newer shared authority.
+    return true;
+  }
+
+  try {
+    if (previous === null) localStorage.removeItem(key);
+    else localStorage.setItem(key, previous);
+  } catch {
+    // A rollback mutation may throw after restoring. Reconciliation below remains authoritative.
+  }
+
+  try {
+    observed = readLocal(key);
+    return observed === previous || observed !== expectedCurrent;
+  } catch {
+    return false;
+  }
+}
+
 function writeLocal(key, value) {
   const previous = readLocal(key);
   try {
@@ -58,28 +87,14 @@ function writeLocal(key, value) {
   try {
     observed = readLocal(key);
   } catch (error) {
-    if (!restoreLocalSnapshot(key, previous)) throw memberWriteRollbackFailure(error);
+    if (!reconcileLocalRollback(key, previous, value)) throw memberWriteRollbackFailure(error);
     throw error;
   }
 
   if (observed === value) return true;
   if (observed === previous) return false;
-  if (!restoreLocalSnapshot(key, previous)) throw memberWriteRollbackFailure();
+  // A different observed value may be a newer cross-tab Member authority. Preserve it.
   return false;
-}
-
-function restoreLocalSnapshot(key, value) {
-  try {
-    if (value === null) localStorage.removeItem(key);
-    else localStorage.setItem(key, value);
-  } catch {
-    // A rollback mutation may throw after restoring. Exact read-back remains authoritative.
-  }
-  try {
-    return readLocal(key) === value;
-  } catch {
-    return false;
-  }
 }
 
 function removeLocal(key) {
@@ -87,7 +102,7 @@ function removeLocal(key) {
   try {
     localStorage.removeItem(key);
   } catch (error) {
-    if (!restoreLocalSnapshot(key, previous)) {
+    if (!reconcileLocalRollback(key, previous, null)) {
       throw new ProductAuthError(
         'WEB_AUTH_MEMBER_CLEAR_ROLLBACK_FAILED',
         '로그인 세션 제거 실패 후 브라우저 상태를 안전하게 복원하지 못했습니다.',
@@ -97,11 +112,11 @@ function removeLocal(key) {
     return false;
   }
 
-  let removed;
+  let observed;
   try {
-    removed = readLocal(key) === null;
+    observed = readLocal(key);
   } catch (error) {
-    if (!restoreLocalSnapshot(key, previous)) {
+    if (!reconcileLocalRollback(key, previous, null)) {
       throw new ProductAuthError(
         'WEB_AUTH_MEMBER_CLEAR_ROLLBACK_FAILED',
         '로그인 세션 제거 확인 실패 후 브라우저 상태를 안전하게 복원하지 못했습니다.',
@@ -111,13 +126,8 @@ function removeLocal(key) {
     throw error;
   }
 
-  if (removed) return true;
-  if (!restoreLocalSnapshot(key, previous)) {
-    throw new ProductAuthError(
-      'WEB_AUTH_MEMBER_CLEAR_ROLLBACK_FAILED',
-      '로그인 세션 제거 실패 후 브라우저 상태를 안전하게 복원하지 못했습니다.',
-    );
-  }
+  if (observed === null) return true;
+  // Preserve either the unchanged previous value or a newer cross-tab replacement.
   return false;
 }
 
@@ -396,7 +406,7 @@ function discardMemberSession(expectedAccessToken = null, expectedRefreshToken =
   const compatibility = discardMemberCompatibilityState();
   if (!compatibility.ok) {
     if (restorableMemberRaw !== null) {
-      const memberRolledBack = writeLocal(MEMBER_SESSION_KEY, restorableMemberRaw);
+      const memberRolledBack = reconcileLocalRollback(MEMBER_SESSION_KEY, restorableMemberRaw, null);
       if (!memberRolledBack || !compatibility.rolledBack) {
         throw memberCompatibilityDiscardRollbackFailure();
       }

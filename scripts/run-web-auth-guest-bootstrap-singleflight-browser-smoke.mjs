@@ -81,3 +81,37 @@ if (!rollbackStdout.includes('MyeongHa_WEB_AUTH_STORAGE_ROLLBACK_READBACK_BROWSE
   console.error(rollbackStderr);
   throw new Error('Rollback read-back browser verifier exited successfully without its PASS marker');
 }
+
+const replacementChild = spawn(process.execPath, ['scripts/verify-web-auth-member-rollback-replacement-browser.mjs'], {
+  env: process.env,
+  stdio: ['ignore', 'pipe', 'pipe'],
+});
+let replacementStdout = '';
+let replacementStderr = '';
+replacementChild.stdout.setEncoding('utf8');
+replacementChild.stderr.setEncoding('utf8');
+replacementChild.stdout.on('data', (chunk) => {
+  replacementStdout += chunk;
+  process.stdout.write(chunk);
+});
+replacementChild.stderr.on('data', (chunk) => {
+  replacementStderr += chunk;
+  process.stderr.write(chunk);
+});
+
+const replacementExitCode = await new Promise((resolve, reject) => {
+  replacementChild.once('error', reject);
+  replacementChild.once('exit', (code, signal) => {
+    if (signal) {
+      reject(new Error(`Member rollback replacement browser smoke terminated by signal ${signal}`));
+      return;
+    }
+    resolve(code ?? 1);
+  });
+});
+
+if (replacementExitCode !== 0) process.exit(replacementExitCode);
+if (!replacementStdout.includes('MyeongHa_WEB_AUTH_MEMBER_ROLLBACK_REPLACEMENT_BROWSER_PASS')) {
+  console.error(replacementStderr);
+  throw new Error('Member rollback replacement verifier exited successfully without its PASS marker');
+}
