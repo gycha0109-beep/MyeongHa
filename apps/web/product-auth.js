@@ -175,6 +175,29 @@ function removeSession(key) {
   return false;
 }
 
+function restoreRemovedSessionEntries(entries) {
+  for (const [key, value] of entries) {
+    let observed;
+    try {
+      observed = readSession(key);
+    } catch (error) {
+      if (!restoreSessionSnapshot(entries)) throw sessionClearRollbackFailure(error);
+      throw error;
+    }
+    if (observed !== null) continue;
+
+    let restored;
+    try {
+      restored = writeSession(key, value);
+    } catch (error) {
+      if (!restoreSessionSnapshot(entries)) throw sessionClearRollbackFailure(error);
+      throw error;
+    }
+    if (!restored) return false;
+  }
+  return true;
+}
+
 function removeSessionEntries(entries) {
   if (entries.length === 0) return true;
 
@@ -191,8 +214,11 @@ function removeSessionEntries(entries) {
   }
   if (removedAll) return true;
 
-  if (!restoreSessionSnapshot(entries)) throw sessionClearRollbackFailure(operationError);
-  if (operationError) throw operationError;
+  if (operationError) {
+    if (!restoreSessionSnapshot(entries)) throw sessionClearRollbackFailure(operationError);
+    throw operationError;
+  }
+  if (!restoreRemovedSessionEntries(entries)) return false;
   return false;
 }
 
