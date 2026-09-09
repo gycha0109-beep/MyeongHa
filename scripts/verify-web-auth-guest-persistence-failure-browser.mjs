@@ -24,8 +24,9 @@ let functionalPass = false;
 
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
-const isNavigationContextError = (error) =>
-  error instanceof Error && error.message === 'Runtime.evaluate: Inspected target navigated or closed';
+const isExpectedNavigationContextRace = (error) =>
+  error instanceof Error
+  && /Inspected target navigated or closed|Execution context was destroyed/u.test(error.message);
 
 function sendJson(res, status, payload) {
   res.statusCode = status;
@@ -60,11 +61,6 @@ async function serve() {
               expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
             },
           },
-          meta: {
-            apiContractVersion: 'browser-auth-guest-persistence-failure-v1',
-            requestId: `guest-persistence-${bootstrapCount}`,
-            serverTime: new Date().toISOString(),
-          },
         });
         return;
       }
@@ -78,7 +74,7 @@ async function serve() {
       if (pathname === '/') {
         res.statusCode = 200;
         res.setHeader('Content-Type', 'text/html; charset=utf-8');
-        res.end('<!doctype html><html><body><main id="ready">Guest persistence failure harness</main></body></html>');
+        res.end('<!doctype html><html><body><main id="ready">Guest storage verification rollback harness</main></body></html>');
         return;
       }
 
@@ -164,11 +160,11 @@ async function navigate(client, origin, timeout = 10_000) {
       }))()`);
       if (state?.pathname === '/' && state.readyState === 'complete' && state.found) return;
     } catch (error) {
-      if (!isNavigationContextError(error)) throw error;
+      if (!isExpectedNavigationContextRace(error)) throw error;
     }
     await sleep(50);
   }
-  throw new Error('Timed out waiting for Guest persistence browser harness');
+  throw new Error('Timed out waiting for Guest storage rollback browser harness');
 }
 
 async function stopChrome(chrome) {
@@ -190,15 +186,15 @@ async function removeChromeProfile(profile) {
       && error?.code === 'ENOTEMPTY'
       && String(error?.path ?? '').startsWith(profile);
     if (!narrowCleanupRace) throw error;
-    console.log('MyeongHa Guest persistence browser assertions passed; ignoring ephemeral Chrome profile cleanup ENOTEMPTY race.');
+    console.log('MyeongHa Guest storage rollback browser assertions passed; ignoring ephemeral Chrome profile cleanup ENOTEMPTY race.');
   }
 }
 
 await stat(join(root, 'product-auth.js'));
 const productAuthSource = await readFile(join(root, 'product-auth.js'), 'utf8');
-assert(productAuthSource.includes('WEB_AUTH_GUEST_PERSIST_FAILED'), 'product-auth.js does not reject unpersisted Guest bootstrap credentials');
-assert(productAuthSource.includes('return readSession(key) === value;'), 'product-auth.js does not verify sessionStorage write read-back');
-assert(productAuthSource.includes('const convergedGuest = readGuestBearer();'), 'product-auth.js does not re-resolve Guest authority after failed bootstrap persistence');
+assert(productAuthSource.includes('WEB_AUTH_SESSION_WRITE_ROLLBACK_FAILED'), 'product-auth.js does not expose Guest write rollback authority');
+assert(productAuthSource.includes('WEB_AUTH_SESSION_CLEAR_ROLLBACK_FAILED'), 'product-auth.js does not expose Guest clear rollback authority');
+assert(productAuthSource.includes('restoreSessionValueSnapshot'), 'product-auth.js does not restore exact sessionStorage snapshots');
 
 const { server, origin } = await serve();
 const profile = await mkdtemp(join(tmpdir(), 'myeongha-auth-guest-persistence-failure-browser-'));
@@ -220,83 +216,140 @@ try {
   client = await connectCdp(await devtoolsPort(profile, chrome));
   await navigate(client, origin);
 
-  const failed = await client.evaluate(`(async () => {
+  const writeReadFailure = await client.evaluate(`(async () => {
     sessionStorage.removeItem(${JSON.stringify(guestTokenKey)});
     sessionStorage.removeItem(${JSON.stringify(pendingGuestTokenKey)});
     localStorage.removeItem(${JSON.stringify(memberSessionKey)});
     let changedEvents = 0;
     addEventListener(${JSON.stringify(authChangedEvent)}, () => { changedEvents += 1; });
-    const auth = await import('/product-auth.js?guestpersist=' + Date.now());
+    const auth = await import('/product-auth.js?guestrollback=' + Date.now());
     const nativeSetItem = Storage.prototype.setItem;
+    const nativeGetItem = Storage.prototype.getItem;
+    let armWrite = true;
+    let failNextRead = false;
     Storage.prototype.setItem = function(key, value) {
-      if (this === sessionStorage && key === auth.PRODUCT_AUTH_STORAGE_V1.guestBearer) {
-        throw new DOMException('Guest persistence blocked', 'QuotaExceededError');
+      const result = nativeSetItem.call(this, key, value);
+      if (this === sessionStorage && key === auth.PRODUCT_AUTH_STORAGE_V1.guestBearer && armWrite) {
+        armWrite = false;
+        failNextRead = true;
       }
-      return nativeSetItem.call(this, key, value);
+      return result;
+    };
+    Storage.prototype.getItem = function(key) {
+      if (this === sessionStorage && key === auth.PRODUCT_AUTH_STORAGE_V1.guestBearer && failNextRead) {
+        failNextRead = false;
+        throw new DOMException('Guest write verification read blocked', 'InvalidStateError');
+      }
+      return nativeGetItem.call(this, key);
     };
     let errorCode = null;
     try {
-      await auth.ensureActiveBearer();
+      await auth.ensureGuestBearer();
     } catch (error) {
       errorCode = error?.code ?? error?.name ?? String(error);
     } finally {
       Storage.prototype.setItem = nativeSetItem;
+      Storage.prototype.getItem = nativeGetItem;
     }
     return {
       errorCode,
       stored: sessionStorage.getItem(auth.PRODUCT_AUTH_STORAGE_V1.guestBearer),
       pending: sessionStorage.getItem(auth.PRODUCT_AUTH_STORAGE_V1.pendingGuestBearer),
-      guest: auth.readGuestBearer(),
-      member: auth.readMemberSession()?.accessToken ?? null,
+      member: localStorage.getItem(auth.PRODUCT_AUTH_STORAGE_V1.memberSession),
       changedEvents,
       readyState: document.readyState,
     };
   })()`);
 
-  assert(failed.readyState === 'complete', `Browser harness was not complete: ${failed.readyState}`);
-  assert(bootstrapCount === 1, `Persistence failure should issue exactly one bootstrap request, got ${bootstrapCount}`);
-  assert(failed.errorCode === 'WEB_AUTH_GUEST_PERSIST_FAILED', `Unexpected Guest persistence failure code: ${failed.errorCode}`);
-  assert(failed.stored === null, `Unpersisted Guest bearer escaped into storage: ${failed.stored}`);
-  assert(failed.pending === null, `Guest persistence failure created pending Guest state: ${failed.pending}`);
-  assert(failed.guest === null, `Unpersisted Guest became readable authority: ${failed.guest}`);
-  assert(failed.member === null, `Guest persistence failure unexpectedly created Member authority: ${failed.member}`);
-  assert(failed.changedEvents === 0, `Guest persistence failure emitted auth-changed: ${failed.changedEvents}`);
+  assert(writeReadFailure.readyState === 'complete', `Browser harness was not complete: ${writeReadFailure.readyState}`);
+  assert(bootstrapCount === 1, `Write/read failure should issue exactly one bootstrap request, got ${bootstrapCount}`);
+  assert(writeReadFailure.errorCode === 'WEB_AUTH_SESSION_READ_FAILED', `Unexpected Guest verification-read failure code: ${writeReadFailure.errorCode}`);
+  assert(writeReadFailure.stored === null, `Verification-read failure left a partial Guest bearer: ${writeReadFailure.stored}`);
+  assert(writeReadFailure.pending === null, `Verification-read failure created pending Guest state: ${writeReadFailure.pending}`);
+  assert(writeReadFailure.member === null, 'Guest verification-read failure unexpectedly created Member authority');
+  assert(writeReadFailure.changedEvents === 0, `Guest verification-read failure emitted auth-changed: ${writeReadFailure.changedEvents}`);
 
   const recovered = await client.evaluate(`(async () => {
-    const auth = await import('/product-auth.js?guestpersist=' + Date.now());
+    const auth = await import('/product-auth.js?guestrollback=' + Date.now());
     let changedEvents = 0;
     addEventListener(${JSON.stringify(authChangedEvent)}, () => { changedEvents += 1; });
-    const first = await auth.ensureActiveBearer();
-    const second = await auth.ensureActiveBearer();
+    const first = await auth.ensureGuestBearer();
+    const second = await auth.ensureGuestBearer();
     return {
       first,
       second,
       stored: sessionStorage.getItem(auth.PRODUCT_AUTH_STORAGE_V1.guestBearer),
-      pending: sessionStorage.getItem(auth.PRODUCT_AUTH_STORAGE_V1.pendingGuestBearer),
-      guest: auth.readGuestBearer(),
-      member: auth.readMemberSession()?.accessToken ?? null,
       changedEvents,
       readyState: document.readyState,
     };
   })()`);
 
   assert(recovered.readyState === 'complete', `Recovery harness was not complete: ${recovered.readyState}`);
-  assert(bootstrapCount === 2, `Recovery should issue one fresh bootstrap after the failed flight, got ${bootstrapCount}`);
-  assert(recovered.first?.kind === 'guest', `Recovery did not return Guest authority: ${JSON.stringify(recovered.first)}`);
-  assert(recovered.first?.token === 'guest-browser-persist-2', `Recovery reused the unstored Guest credential: ${JSON.stringify(recovered.first)}`);
-  assert(recovered.second?.token === recovered.first.token, 'Second active bearer did not reuse the persisted Guest authority');
-  assert(recovered.stored === recovered.first.token, 'Recovered Guest bearer was not persisted');
-  assert(recovered.guest === recovered.first.token, 'Recovered Guest bearer was not readable');
-  assert(recovered.pending === null, 'Recovery unexpectedly created pending Guest state');
-  assert(recovered.member === null, 'Recovery unexpectedly created Member authority');
-  assert(recovered.changedEvents === 1, `Expected one auth-changed event for persisted recovery, got ${recovered.changedEvents}`);
-  assert(requests.length === 2, `Unexpected API requests during Guest persistence verification: ${JSON.stringify(requests)}`);
+  assert(bootstrapCount === 2, `Recovery should issue one fresh bootstrap after rollback, got ${bootstrapCount}`);
+  assert(recovered.first === 'guest-browser-persist-2', `Recovery returned unexpected Guest bearer: ${recovered.first}`);
+  assert(recovered.second === recovered.first, 'Second Guest read did not reuse persisted recovery authority');
+  assert(recovered.stored === recovered.first, 'Recovered Guest bearer was not persisted');
+  assert(recovered.changedEvents === 1, `Expected one auth-changed event for recovery, got ${recovered.changedEvents}`);
+
+  const removalReadFailure = await client.evaluate(`(() => {
+    const nativeRemoveItem = Storage.prototype.removeItem;
+    const nativeGetItem = Storage.prototype.getItem;
+    let armRemoval = true;
+    let failNextRead = false;
+    Storage.prototype.removeItem = function(key) {
+      const result = nativeRemoveItem.call(this, key);
+      if (this === sessionStorage && key === ${JSON.stringify(guestTokenKey)} && armRemoval) {
+        armRemoval = false;
+        failNextRead = true;
+      }
+      return result;
+    };
+    Storage.prototype.getItem = function(key) {
+      if (this === sessionStorage && key === ${JSON.stringify(guestTokenKey)} && failNextRead) {
+        failNextRead = false;
+        throw new DOMException('Guest removal verification read blocked', 'InvalidStateError');
+      }
+      return nativeGetItem.call(this, key);
+    };
+    return import('/product-auth.js?guestrollback=' + Date.now()).then((auth) => {
+      let changedEvents = 0;
+      addEventListener(${JSON.stringify(authChangedEvent)}, () => { changedEvents += 1; });
+      let errorCode = null;
+      try {
+        auth.invalidateGuestSession(${JSON.stringify('guest-browser-persist-2')});
+      } catch (error) {
+        errorCode = error?.code ?? error?.name ?? String(error);
+      } finally {
+        Storage.prototype.removeItem = nativeRemoveItem;
+        Storage.prototype.getItem = nativeGetItem;
+      }
+      return {
+        errorCode,
+        stored: sessionStorage.getItem(auth.PRODUCT_AUTH_STORAGE_V1.guestBearer),
+        pending: sessionStorage.getItem(auth.PRODUCT_AUTH_STORAGE_V1.pendingGuestBearer),
+        changedEvents,
+        retryCleared: auth.invalidateGuestSession(${JSON.stringify('guest-browser-persist-2')}),
+        afterRetry: sessionStorage.getItem(auth.PRODUCT_AUTH_STORAGE_V1.guestBearer),
+        readyState: document.readyState,
+      };
+    });
+  })()`);
+
+  assert(removalReadFailure.readyState === 'complete', `Removal harness was not complete: ${removalReadFailure.readyState}`);
+  assert(removalReadFailure.errorCode === 'WEB_AUTH_SESSION_READ_FAILED', `Unexpected Guest removal verification-read code: ${removalReadFailure.errorCode}`);
+  assert(removalReadFailure.stored === 'guest-browser-persist-2', `Removal verification-read failure lost Guest authority: ${removalReadFailure.stored}`);
+  assert(removalReadFailure.pending === null, `Removal verification-read failure changed pending Guest state: ${removalReadFailure.pending}`);
+  assert(removalReadFailure.changedEvents === 0, `Failed Guest removal emitted auth-changed: ${removalReadFailure.changedEvents}`);
+  assert(removalReadFailure.retryCleared === true, 'Guest removal did not recover after verification fault was removed');
+  assert(removalReadFailure.afterRetry === null, `Recovered Guest removal left bearer: ${removalReadFailure.afterRetry}`);
+  assert(requests.length === 2, `Unexpected API requests during Guest rollback verification: ${JSON.stringify(requests)}`);
 
   await mkdir(artifactDir, { recursive: true });
   await writeFile(artifactPath, `${JSON.stringify({
     status: 'MyeongHa_WEB_AUTH_GUEST_PERSISTENCE_FAILURE_BROWSER_PASS',
-    failed,
+    writeReadFailure,
     recovered,
+    removalReadFailure,
     bootstrapRequests: bootstrapCount,
     requests,
   }, null, 2)}\n`, 'utf8');
