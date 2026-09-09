@@ -1042,6 +1042,10 @@ begin
 end;
 $$;
 
+-- PostgreSQL requires a new function owner to have CREATE on the containing
+-- schema at ALTER ... OWNER time. Keep that privilege deployment-scoped only.
+grant create on schema public to myeongha_content_publication_owner;
+
 alter function public.cmd_publish_character_content_bundle_v1(
   uuid, text, text, text, text, text, text, text, jsonb, jsonb, jsonb, jsonb
 ) owner to myeongha_content_publication_owner;
@@ -1054,6 +1058,9 @@ alter function public.cmd_retire_content_release_v1(uuid)
   owner to myeongha_content_publication_owner;
 alter function public.cmd_retire_content_bundle_v1(uuid)
   owner to myeongha_content_publication_owner;
+
+-- The owner role must not retain object-creation authority after deployment.
+revoke create on schema public from myeongha_content_publication_owner;
 
 revoke all on function public.cmd_publish_character_content_bundle_v1(
   uuid, text, text, text, text, text, text, text, jsonb, jsonb, jsonb, jsonb
