@@ -47,12 +47,25 @@ function readLocal(key) {
 }
 
 function writeLocal(key, value) {
+  const previous = readLocal(key);
   try {
     localStorage.setItem(key, value);
   } catch {
-    return readLocal(key) === value;
+    // A browser storage write may throw after mutating. Verification below remains authoritative.
   }
-  return readLocal(key) === value;
+
+  let observed;
+  try {
+    observed = readLocal(key);
+  } catch (error) {
+    if (!restoreLocalSnapshot(key, previous)) throw memberWriteRollbackFailure(error);
+    throw error;
+  }
+
+  if (observed === value) return true;
+  if (observed === previous) return false;
+  if (!restoreLocalSnapshot(key, previous)) throw memberWriteRollbackFailure();
+  return false;
 }
 
 function restoreLocalSnapshot(key, value) {
@@ -146,8 +159,12 @@ function removeSessionEntries(entries) {
 function restoreSessionSnapshot(entries) {
   let restoredAll = true;
   for (const [key, value] of entries) {
-    const restored = value === null ? removeSession(key) : writeSession(key, value);
-    if (!restored) restoredAll = false;
+    try {
+      const restored = value === null ? removeSession(key) : writeSession(key, value);
+      if (!restored) restoredAll = false;
+    } catch {
+      restoredAll = false;
+    }
   }
   return restoredAll;
 }
@@ -159,6 +176,14 @@ function guestClearFailure() {
   );
 }
 
+function memberWriteRollbackFailure(cause) {
+  return new ProductAuthError(
+    'WEB_AUTH_MEMBER_WRITE_ROLLBACK_FAILED',
+    '로그인 세션 저장 확인 실패 후 브라우저 상태를 안전하게 복원하지 못했습니다.',
+    cause,
+  );
+}
+
 function memberCompatibilityFailure() {
   return new ProductAuthError(
     'WEB_AUTH_MEMBER_COMPAT_PERSIST_FAILED',
@@ -166,10 +191,11 @@ function memberCompatibilityFailure() {
   );
 }
 
-function memberCompatibilityRollbackFailure() {
+function memberCompatibilityRollbackFailure(cause) {
   return new ProductAuthError(
     'WEB_AUTH_MEMBER_COMPAT_ROLLBACK_FAILED',
     '로그인 세션 저장 실패 후 브라우저 호환 상태를 안전하게 복원하지 못했습니다.',
+    cause,
   );
 }
 
@@ -192,14 +218,21 @@ function stageMemberBearerForLegacyProductClients(accessToken) {
   const current = normalizeGuestBearer(snapshot[0][1]);
   const pendingRaw = snapshot[1][1];
   const pending = normalizeGuestBearer(pendingRaw);
-  const fail = () => {
-    restoreSessionSnapshot(snapshot);
-    throw memberCompatibilityFailure();
-  };
 
-  if (pendingRaw !== null && !pending && !removeSession(PENDING_GUEST_TOKEN_KEY)) fail();
-  if (current && !pending && !writeSession(PENDING_GUEST_TOKEN_KEY, current)) fail();
-  if (!writeSession(GUEST_TOKEN_KEY, accessToken)) fail();
+  try {
+    if (pendingRaw !== null && !pending && !removeSession(PENDING_GUEST_TOKEN_KEY)) {
+      throw memberCompatibilityFailure();
+    }
+    if (current && !pending && !writeSession(PENDING_GUEST_TOKEN_KEY, current)) {
+      throw memberCompatibilityFailure();
+    }
+    if (!writeSession(GUEST_TOKEN_KEY, accessToken)) {
+      throw memberCompatibilityFailure();
+    }
+  } catch (error) {
+    if (!restoreSessionSnapshot(snapshot)) throw memberCompatibilityRollbackFailure(error);
+    throw error;
+  }
 
   return () => restoreSessionSnapshot(snapshot);
 }
@@ -342,7 +375,16 @@ function saveSession(session) {
   if (!normalized) throw new ProductAuthError('WEB_AUTH_MALFORMED_SESSION', '로그인 세션 응답이 올바르지 않습니다.');
   const serialized = JSON.stringify(normalized);
   const rollbackCompatibility = stageMemberBearerForLegacyProductClients(normalized.accessToken);
-  if (!writeLocal(MEMBER_SESSION_KEY, serialized)) {
+
+  let persisted;
+  try {
+    persisted = writeLocal(MEMBER_SESSION_KEY, serialized);
+  } catch (error) {
+    if (!rollbackCompatibility()) throw memberCompatibilityRollbackFailure(error);
+    throw error;
+  }
+
+  if (!persisted) {
     if (!rollbackCompatibility()) throw memberCompatibilityRollbackFailure();
     throw new ProductAuthError('WEB_AUTH_MEMBER_PERSIST_FAILED', '로그인 세션을 브라우저에 안전하게 저장하지 못했습니다.');
   }
