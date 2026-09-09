@@ -55,6 +55,8 @@ jobs:
             echo "Applying ${migration}"
             psql -v ON_ERROR_STOP=1 -f "$migration" >/dev/null
           done
+      - name: Verify Product Capability Set authority foundation
+        run: psql -v ON_ERROR_STOP=1 -f test/db/commerce_product_capability_authority.sql
       - name: Run historical Purchase Intent v1 persistence/concurrency tests
         run: bash test/db/purchase_intent_create_concurrency.sh
       - name: Run Guest Purchase Intent v2 charge-authority/concurrency tests
