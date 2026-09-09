@@ -123,36 +123,76 @@ function readSession(key) {
   }
 }
 
-function writeSession(key, value) {
+function restoreSessionValueSnapshot(key, value) {
   try {
-    sessionStorage.setItem(key, value);
-  } catch {
-    return readSession(key) === value;
-  }
-  return readSession(key) === value;
-}
-
-function removeSession(key) {
-  try {
-    sessionStorage.removeItem(key);
-    return sessionStorage.getItem(key) === null;
+    if (value === null) sessionStorage.removeItem(key);
+    else sessionStorage.setItem(key, value);
+    return true;
   } catch {
     return false;
   }
+}
+
+function writeSession(key, value) {
+  const previous = readSession(key);
+  try {
+    sessionStorage.setItem(key, value);
+  } catch {
+    // A browser storage write may throw after mutating. Verification below remains authoritative.
+  }
+
+  let observed;
+  try {
+    observed = readSession(key);
+  } catch (error) {
+    if (!restoreSessionValueSnapshot(key, previous)) throw sessionWriteRollbackFailure(error);
+    throw error;
+  }
+
+  if (observed === value) return true;
+  // A different observed value may be a newer same-tab Guest authority. Preserve it.
+  return false;
+}
+
+function removeSession(key) {
+  const previous = readSession(key);
+  try {
+    sessionStorage.removeItem(key);
+  } catch {
+    // A browser storage removal may throw after mutating. Verification below remains authoritative.
+  }
+
+  let observed;
+  try {
+    observed = readSession(key);
+  } catch (error) {
+    if (!restoreSessionValueSnapshot(key, previous)) throw sessionClearRollbackFailure(error);
+    throw error;
+  }
+
+  if (observed === null) return true;
+  // Preserve an observed replacement instead of clobbering a newer same-tab authority.
+  return false;
 }
 
 function removeSessionEntries(entries) {
   if (entries.length === 0) return true;
 
   let removedAll = true;
+  let operationError = null;
   for (const [key] of entries) {
-    if (!removeSession(key)) removedAll = false;
+    try {
+      if (!removeSession(key)) removedAll = false;
+    } catch (error) {
+      removedAll = false;
+      operationError = error;
+      break;
+    }
   }
   if (removedAll) return true;
 
-  for (const [key, value] of entries) {
-    if (readSession(key) === null) writeSession(key, value);
-  }
+  if (!restoreSessionSnapshot(entries)) throw sessionClearRollbackFailure(operationError);
+  if (operationError) throw operationError;
   return false;
 }
 
@@ -173,6 +213,22 @@ function guestClearFailure() {
   return new ProductAuthError(
     'WEB_AUTH_GUEST_CLEAR_FAILED',
     '게스트 세션을 브라우저에서 안전하게 제거하지 못했습니다.',
+  );
+}
+
+function sessionWriteRollbackFailure(cause) {
+  return new ProductAuthError(
+    'WEB_AUTH_SESSION_WRITE_ROLLBACK_FAILED',
+    '게스트 세션 저장 확인 실패 후 브라우저 상태를 안전하게 복원하지 못했습니다.',
+    cause,
+  );
+}
+
+function sessionClearRollbackFailure(cause) {
+  return new ProductAuthError(
+    'WEB_AUTH_SESSION_CLEAR_ROLLBACK_FAILED',
+    '게스트 세션 제거 확인 실패 후 브라우저 상태를 안전하게 복원하지 못했습니다.',
+    cause,
   );
 }
 
