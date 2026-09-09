@@ -3,22 +3,21 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="명하 홈 — 사주 주제, 기록, 캐릭터 대화로 이어지는 시작 화면입니다." />
+  <meta name="description" content="명하 홈 — 오늘의 흐름, 사주 읽기, 캐릭터 대화를 한 화면에서 이어갑니다." />
   <title>홈 · 명하</title>
   <link rel="stylesheet" href="product.css" />
-  <link rel="stylesheet" href="home-v2.css" />
-  <link rel="stylesheet" href="home-v3.css" />
-  <link rel="stylesheet" href="home-showcase-v4.css" />
-  <link rel="stylesheet" href="home-assets-v5.css" />
+  <link rel="stylesheet" href="golden-master.css" />
+  <link rel="stylesheet" href="product-theme.css" data-product-theme="true" />
+  <link rel="stylesheet" href="golden-master-lock.css" data-golden-master-lock="true" />
   <script src="product-theme.js"></script>
 </head>
-<body class="product-page" data-page="home">
+<body class="product-page gm-page" data-page="home">
   <header class="product-header">
-    <div class="product-shell product-header-inner">
+    <div class="product-header-inner">
       <a class="product-brand" href="hall.html" aria-label="명하 홈">
         <span class="product-brand-name">명하</span>
         <span class="product-brand-seal" aria-hidden="true">明河</span>
-        <span class="product-brand-sub">MyeongHa</span>
+        <span class="product-brand-sub">오늘도, 당신의 이야기가 빛나기를</span>
       </a>
 
       <nav class="product-nav" aria-label="주요 메뉴">
@@ -40,122 +39,88 @@
     </div>
   </header>
 
-  <main class="product-main">
-    <div class="product-shell">
-      <section class="home-intro" aria-labelledby="home-title">
-        <h1 id="home-title">오늘은 무엇을 읽어볼까요?<span class="home-title-ornament" aria-hidden="true">✦</span></h1>
+  <main class="gm-home-main">
+    <div class="gm-shell">
+      <header class="gm-home-head">
+        <h1 class="gm-greeting">좋은 저녁이에요, <span class="gm-highlight" id="home-greeting-name">당신</span></h1>
+        <p class="gm-lede">오늘도 명하에 이야기가 쌓이고 있어요.</p>
+      </header>
+
+      <section class="gm-home-hero" aria-labelledby="home-character-title">
+        <div class="gm-hero-copy">
+          <span class="gm-hero-label">오늘 이야기할 사람 · 캐릭터 선택</span>
+          <h2 class="gm-hero-title" id="home-character-title">누구와 이야기를 시작해 볼까요?</h2>
+          <p>마음에 맞는 사람을 고른 뒤, 지금 가장 마음에 걸리는 이야기를 편하게 꺼내보세요.</p>
+          <a class="gm-primary-button" href="chat-hub.html">대화로 가기 →</a>
+        </div>
+        <blockquote class="gm-hero-quote">“당신에게 맞는 거리와 말투의 사람을 골라보세요.”</blockquote>
       </section>
 
-      <section class="home-primary-grid" aria-label="오늘의 흐름과 이어지는 기록">
-        <article class="home-today">
-          <div class="home-orbit-art" aria-hidden="true"></div>
-          <div class="home-today-copy">
-            <span class="home-kicker" id="home-current-date">오늘 · 오늘의 흐름</span>
-            <h2>오늘의 흐름을<br />직접 펼쳐보세요.</h2>
-            <p>오늘의 흐름은 사주 화면에서 직접 펼쳐볼 수 있습니다.</p>
-            <div class="home-rule" aria-hidden="true"></div>
-            <a class="home-primary-action" href="reading-detail.html?scope=year">
-              <span>오늘 읽어보기</span>
-              <span class="home-arrow" aria-hidden="true">→</span>
-            </a>
-          </div>
-        </article>
-
-        <aside class="paper-card home-thread" aria-labelledby="thread-title">
-          <div class="home-card-head">
-            <h2 id="thread-title">이어지는 이야기 <span class="home-title-ornament" aria-hidden="true">✦</span></h2>
-            <a class="home-text-link" href="records.html">전체 보기 →</a>
-          </div>
-
-          <div class="home-thread-body">
-            <h3 class="home-thread-title">지나온 이야기는 기록에서 다시 확인할 수 있습니다.</h3>
-            <div class="home-thread-step">확인된 기록은 기록 화면에 그대로 남습니다.</div>
-            <div class="home-thread-step is-open">지금은 저장된 사실을 이야기로 추측해 이어 붙이지 않습니다.</div>
-            <div class="home-thread-step is-future">이어질 이야기가 생기면 이곳에서 다시 확인할 수 있습니다.</div>
-            <div class="home-thread-foot">
-              <span>확인된 기록을 기준으로 보기</span>
-              <a class="home-inline-action" href="records.html">내 기록 열기 →</a>
-            </div>
-          </div>
-        </aside>
-      </section>
-
-      <section class="home-section" aria-labelledby="topics-title">
-        <div class="home-section-head">
-          <h2 class="home-section-title" id="topics-title">무엇을 보고 싶으세요?<span class="home-title-ornament" aria-hidden="true">✦</span></h2>
+      <section class="gm-section" aria-labelledby="home-month-title">
+        <div class="gm-section-head">
+          <h2 class="gm-section-title" id="home-month-title">이번 달, 이런 흐름을 보세요</h2>
+          <a class="gm-inline-link" href="reading-detail.html?scope=month">이달의 운세 전체보기 <span aria-hidden="true">›</span></a>
         </div>
 
-        <div class="home-topic-grid">
-          <a class="home-topic" href="reading-detail.html?topic=love" data-motif="花">
-            <span>
-              <span class="home-topic-title">연애</span>
-              <span class="home-topic-copy">마음과 인연의 흐름</span>
-            </span>
-            <span class="home-topic-arrow" aria-hidden="true">→</span>
+        <a class="gm-card gm-month-card" href="reading-detail.html?scope=month">
+          <span class="gm-month-art" aria-hidden="true"></span>
+          <span class="gm-month-copy">
+            <span class="gm-month-eyebrow" id="home-current-date">이번 달의 흐름</span>
+            <strong class="gm-card-title">이번 달의 흐름을 명식과 함께 살펴보세요.</strong>
+            <span class="gm-month-support">오늘의 흐름은 사주 화면에서 직접 펼쳐볼 수 있습니다.</span>
+            <span class="gm-inline-link">자세히 보기 <span aria-hidden="true">›</span></span>
+          </span>
+        </a>
+      </section>
+
+      <section class="gm-section" aria-labelledby="home-products-title">
+        <div class="gm-section-head">
+          <h2 class="gm-section-title" id="home-products-title">내 사주에서 더 볼 수 있는 것</h2>
+          <a class="gm-inline-link" href="reading.html">더보기 <span aria-hidden="true">›</span></a>
+        </div>
+
+        <div class="gm-home-products">
+          <a class="gm-card gm-product-card" href="reading-detail.html?topic=temperament&scope=original">
+            <span class="gm-icon" aria-hidden="true">✦</span>
+            <span><strong>전체 사주</strong><small>나라는 사람을 더 깊이</small></span>
+            <span class="gm-chevron" aria-hidden="true">›</span>
           </a>
-          <a class="home-topic" href="reading-detail.html?topic=career" data-motif="山">
-            <span>
-              <span class="home-topic-title">직업</span>
-              <span class="home-topic-copy">일과 진로의 방향</span>
-            </span>
-            <span class="home-topic-arrow" aria-hidden="true">→</span>
+          <a class="gm-card gm-product-card" href="reading-detail.html?topic=career">
+            <span class="gm-icon" aria-hidden="true">⌁</span>
+            <span><strong>직업 · 커리어</strong><small>일과 선택을 더 깊이</small></span>
+            <span class="gm-chevron" aria-hidden="true">›</span>
           </a>
-          <a class="home-topic" href="reading-detail.html?topic=money" data-motif="財">
-            <span>
-              <span class="home-topic-title">금전</span>
-              <span class="home-topic-copy">재물과 재정의 흐름</span>
-            </span>
-            <span class="home-topic-arrow" aria-hidden="true">→</span>
+          <a class="gm-card gm-product-card" href="reading-detail.html?topic=money">
+            <span class="gm-icon" aria-hidden="true">財</span>
+            <span><strong>재물</strong><small>재물과 자원의 흐름</small></span>
+            <span class="gm-chevron" aria-hidden="true">›</span>
           </a>
-          <a class="home-topic" href="reading-detail.html?scope=year" data-motif="命">
-            <span>
-              <span class="home-topic-title">올해 흐름</span>
-              <span class="home-topic-copy">한 해의 흐름과 중요한 시기</span>
-            </span>
-            <span class="home-topic-arrow" aria-hidden="true">→</span>
+          <a class="gm-card gm-product-card" href="reading-detail.html?topic=love">
+            <span class="gm-icon is-rose" aria-hidden="true">緣</span>
+            <span><strong>연애 · 관계</strong><small>관계에서 반복되는 방식</small></span>
+            <span class="gm-chevron" aria-hidden="true">›</span>
           </a>
         </div>
       </section>
 
-      <section class="home-section" aria-labelledby="person-title">
-        <div class="home-section-head">
-          <h2 class="home-section-title" id="person-title">오늘 이야기할 사람<span class="home-title-ornament" aria-hidden="true">✦</span></h2>
-          <a class="home-text-link" href="chat-hub.html">대화로 가기 →</a>
+      <section class="gm-section" aria-labelledby="home-recent-title">
+        <div class="gm-section-head">
+          <h2 class="gm-section-title" id="home-recent-title">최근 이야기</h2>
+          <a class="gm-inline-link" href="chat-hub.html">전체보기 <span aria-hidden="true">›</span></a>
         </div>
 
-        <article class="paper-card home-person">
-          <div class="home-person-avatar" aria-hidden="true">明</div>
-          <div class="home-person-copy">
-            <div class="home-person-name-row">
-              <h3 class="home-person-name">이야기 상대를 골라보세요.</h3>
-              <span class="home-person-tag">캐릭터 선택</span>
-            </div>
-            <p class="home-person-message">지금 만날 수 있는 캐릭터를 대화 화면에서 확인할 수 있습니다.</p>
-            <div class="home-person-context">확인된 선택이 있을 때만 이 자리에서 이어서 보여드립니다.</div>
+        <article class="gm-card gm-recent-card">
+          <span class="gm-recent-avatar" aria-hidden="true">明</span>
+          <div class="gm-recent-copy">
+            <div class="gm-recent-title-row"><strong>이어갈 대화</strong><span class="gm-chip">대화 기록</span></div>
+            <p>지금은 저장된 사실을 이야기로 추측해 이어 붙이지 않습니다.</p>
           </div>
-          <a class="home-person-action" href="chat-hub.html">
-            <span>이야기하기</span>
-            <span aria-hidden="true">→</span>
-          </a>
+          <span class="gm-recent-time">아직 없음</span>
+          <a class="gm-recent-button" href="chat-hub.html"><span>대화 보기</span><span aria-hidden="true">→</span></a>
         </article>
       </section>
     </div>
   </main>
-
-  <footer class="product-footer">
-    <div class="product-shell product-footer-inner">
-      <div class="product-footer-links">
-        <a href="#">서비스 안내</a>
-        <a href="#">이용약관</a>
-        <a href="#">개인정보처리방침</a>
-        <a href="#">고객지원</a>
-      </div>
-      <div class="product-footer-copy">
-        <span>© 2026 MyeongHa. All rights reserved.</span>
-        <span class="product-footer-seal" aria-hidden="true">明河</span>
-      </div>
-    </div>
-  </footer>
 
   <nav class="mobile-bottom-nav" aria-label="모바일 주요 메뉴">
     <a class="mobile-nav-link" href="hall.html" aria-current="page"><span class="mobile-nav-icon" aria-hidden="true">⌂</span><span>홈</span></a>

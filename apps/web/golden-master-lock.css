@@ -1,0 +1,176 @@
+/* Golden Master lock layer.
+   Loaded after the shared theme stylesheet so the approved Home/Saju geometry
+   cannot be accidentally changed by legacy page/theme selectors. */
+
+body.gm-page .product-theme-toggle {
+  width: 36px;
+  min-height: 36px;
+  flex-basis: 36px;
+  border: 0;
+  color: #60445b;
+  background: transparent;
+}
+
+body.gm-page .product-theme-toggle:hover {
+  border: 0;
+  background: rgba(113, 54, 82, .055);
+}
+
+body.gm-page .product-theme-toggle-mark {
+  font-size: 20px;
+}
+
+/* Home has no authoritative browser-side mapping for a recommended Character.
+   Preserve the approved hero geometry with identity-neutral approved artwork. */
+body.gm-page[data-page="home"] .gm-home-hero {
+  background:
+    linear-gradient(90deg, rgba(52, 31, 47, .99) 0%, rgba(73, 42, 60, .94) 44%, rgba(69, 42, 58, .68) 68%, rgba(41, 26, 40, .3) 100%),
+    url("home-v5-orbit.webp") right 18% center / 58% auto no-repeat,
+    #35202f !important;
+}
+
+body.gm-page[data-page="home"] .gm-recent-avatar {
+  display: grid;
+  place-items: center;
+  color: #8a4963;
+  background: #f1e4e7;
+  font-family: var(--mh-serif);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+body.gm-page .gm-month-copy .gm-card-title {
+  position: relative;
+  z-index: 1;
+  display: block;
+  margin-top: 7px;
+  color: var(--gm-ink);
+  font-family: var(--mh-serif);
+  font-size: 22px;
+  line-height: 1.45;
+  letter-spacing: -.025em;
+}
+
+body.gm-page .gm-month-support {
+  position: relative;
+  z-index: 1;
+  display: block;
+  margin-top: 5px;
+  color: #82767b;
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+body.gm-page .gm-month-copy .gm-inline-link {
+  position: relative;
+  z-index: 1;
+}
+
+body.gm-page .gm-product-card,
+body.gm-page .gm-saju-reading-card,
+body.gm-page .gm-flow-card,
+body.gm-page .gm-relation-card,
+body.gm-page .gm-question-card,
+body.gm-page .gm-recent-card {
+  color: var(--gm-ink);
+}
+
+body.gm-page .gm-relation-card strong,
+body.gm-page .gm-question-card strong {
+  display: block;
+  font-family: var(--mh-serif);
+  font-size: 17px;
+}
+
+body.gm-page .gm-relation-card small,
+body.gm-page .gm-question-card small {
+  display: block;
+  margin-top: 4px;
+  color: #8f8188;
+  font-size: 11px;
+}
+
+/* saju-hub.js does not currently provide per-reading completion/continuation
+   state. Keep the approved card geometry, but never expose static fake state. */
+body.gm-page .gm-saju-reading-card > .gm-chip {
+  display: none;
+}
+
+body.gm-page .gm-saju-hero {
+  overflow: visible;
+  isolation: isolate;
+}
+
+body.gm-page .gm-chart-details {
+  position: relative;
+  z-index: 20;
+}
+
+body.gm-page .gm-chart-panel {
+  z-index: 60;
+}
+
+body.gm-page .gm-card,
+body.gm-page .gm-saju-hero,
+body.gm-page .gm-home-hero {
+  transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease;
+}
+
+/* Keep the Golden Master structure intact in dark mode while allowing the
+   product theme to change surfaces and text colors. */
+html[data-theme="dark"] body.gm-page .gm-greeting,
+html[data-theme="dark"] body.gm-page .gm-page-title,
+html[data-theme="dark"] body.gm-page .gm-section-title,
+html[data-theme="dark"] body.gm-page .gm-card,
+html[data-theme="dark"] body.gm-page .gm-relation-card,
+html[data-theme="dark"] body.gm-page .gm-question-card,
+html[data-theme="dark"] body.gm-page .gm-product-card,
+html[data-theme="dark"] body.gm-page .gm-saju-reading-card,
+html[data-theme="dark"] body.gm-page .gm-flow-card,
+html[data-theme="dark"] body.gm-page .gm-recent-card {
+  color: var(--mh-ink-strong);
+}
+
+html[data-theme="dark"] body.gm-page .gm-card,
+html[data-theme="dark"] body.gm-page .gm-relation-card,
+html[data-theme="dark"] body.gm-page .gm-question-card,
+html[data-theme="dark"] body.gm-page .gm-product-card,
+html[data-theme="dark"] body.gm-page .gm-saju-reading-card,
+html[data-theme="dark"] body.gm-page .gm-flow-card,
+html[data-theme="dark"] body.gm-page .gm-recent-card {
+  border-color: var(--mh-line);
+  background: rgba(17, 28, 34, .88);
+  box-shadow: var(--mh-shadow);
+}
+
+html[data-theme="dark"] body.gm-page .gm-lede,
+html[data-theme="dark"] body.gm-page .gm-section-support,
+html[data-theme="dark"] body.gm-page .gm-product-card small,
+html[data-theme="dark"] body.gm-page .gm-saju-reading-card small,
+html[data-theme="dark"] body.gm-page .gm-flow-copy p,
+html[data-theme="dark"] body.gm-page .gm-relation-card small,
+html[data-theme="dark"] body.gm-page .gm-question-card small,
+html[data-theme="dark"] body.gm-page .gm-recent-copy p,
+html[data-theme="dark"] body.gm-page .gm-recent-time,
+html[data-theme="dark"] body.gm-page .gm-month-support {
+  color: var(--mh-ink-muted);
+}
+
+html[data-theme="dark"] body.gm-page .gm-month-copy .gm-card-title {
+  color: var(--mh-ink-strong);
+}
+
+html[data-theme="dark"] body.gm-page .gm-chart-panel {
+  color: var(--mh-ink-strong);
+  border-color: var(--mh-line);
+  background: rgba(17, 28, 34, .985);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.gm-page .gm-card,
+  body.gm-page .gm-saju-hero,
+  body.gm-page .gm-home-hero,
+  body.gm-page .product-theme-toggle {
+    transition: none;
+  }
+}

@@ -2,7 +2,8 @@ import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 
 const hallPath = new URL('../apps/web/hall.html', import.meta.url);
-const cssPath = new URL('../apps/web/home-assets-v5.css', import.meta.url);
+const goldenPath = new URL('../apps/web/golden-master.css', import.meta.url);
+const lockPath = new URL('../apps/web/golden-master-lock.css', import.meta.url);
 const assets = [
   'home-v5-orbit.webp',
   'home-v5-mountain.webp',
@@ -11,30 +12,31 @@ const assets = [
   'home-v5-plum-corner.webp',
 ];
 
-describe('Home approved illustration assets v5', () => {
-  it('loads the approved-art presentation layer after showcase v4', async () => {
+describe('Home approved illustration assets — Golden Master', () => {
+  it('loads the Golden Master presentation layer after the shared product system', async () => {
     const html = await readFile(hallPath, 'utf8');
-    const v4Index = html.indexOf('home-showcase-v4.css');
-    const v5Index = html.indexOf('home-assets-v5.css');
+    const productIndex = html.indexOf('product.css');
+    const goldenIndex = html.indexOf('golden-master.css');
 
-    expect(v4Index).toBeGreaterThan(-1);
-    expect(v5Index).toBeGreaterThan(v4Index);
+    expect(productIndex).toBeGreaterThan(-1);
+    expect(goldenIndex).toBeGreaterThan(productIndex);
+    expect(html).not.toContain('home-showcase-v4.css');
+    expect(html).not.toContain('home-assets-v5.css');
   });
 
-  it('binds direct approved illustration assets instead of the rejected sprite', async () => {
-    const css = await readFile(cssPath, 'utf8');
+  it('uses approved artwork without assigning a browser-inferred Character identity', async () => {
+    const [golden, lock] = await Promise.all([
+      readFile(goldenPath, 'utf8'),
+      readFile(lockPath, 'utf8'),
+    ]);
 
-    for (const asset of assets) {
-      expect(css).toContain(asset);
-    }
-    expect(css).not.toContain('home-v5-art-sprite.webp');
-    expect(css).not.toContain('home-v5-plum.webp');
-    for (const motif of ['花', '山', '財', '命']) {
-      expect(css).toContain(`.home-topic[data-motif="${motif}"]::before`);
-    }
+    expect(golden).toContain('home-v5-plum-corner.webp');
+    expect(golden).toContain('home-v5-compass.webp');
+    expect(lock).toContain('home-v5-orbit.webp');
+    expect(lock).toContain('identity-neutral approved artwork');
   });
 
-  it('ships independently decodable WebP artwork files', async () => {
+  it('ships independently decodable approved WebP artwork files', async () => {
     for (const asset of assets) {
       const bytes = await readFile(new URL(`../apps/web/${asset}`, import.meta.url));
       expect(bytes.byteLength).toBeGreaterThan(1_000);
@@ -50,5 +52,7 @@ describe('Home approved illustration assets v5', () => {
     expect(html).not.toContain('퇴사를 고민했던 이야기');
     expect(html).not.toContain('세연');
     expect(html).not.toContain('chat.html?character=');
+    expect(html).toContain('오늘 이야기할 사람');
+    expect(html).toContain('캐릭터 선택');
   });
 });

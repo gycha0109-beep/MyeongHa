@@ -20,6 +20,19 @@
     currentScript.after(authUi);
   }
 
+  if (
+    currentScript
+    && document.querySelector('link[href="golden-master.css"]')
+    && !document.querySelector('link[data-golden-master-lock]')
+  ) {
+    const lock = document.createElement('link');
+    lock.rel = 'stylesheet';
+    lock.href = 'golden-master-lock.css';
+    lock.dataset.goldenMasterLock = 'true';
+    const themeStylesheet = document.querySelector('link[data-product-theme]');
+    (themeStylesheet ?? currentScript).after(lock);
+  }
+
   const readStoredTheme = () => {
     try {
       const value = localStorage.getItem(STORAGE_KEY);
