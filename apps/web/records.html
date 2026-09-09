@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="명하 기록 — 현세록, 명식록, 대리자 기억을 한곳에서 확인합니다." />
+  <meta name="description" content="명하 기록 — 현세록, 사주 기록, 명식록, 대리자 기억을 한곳에서 확인합니다." />
   <title>기록 · 명하</title>
   <link rel="stylesheet" href="product.css" />
   <link rel="stylesheet" href="records-v2.css" />
@@ -41,7 +41,7 @@
           <div class="records-kicker">MY RECORDS</div>
           <h1 class="records-title">기록</h1>
         </div>
-        <p class="records-lead">내가 남긴 삶의 사실과 태어난 순간의 기록, 대리자가 기억하고 있는 내용을 서로 섞지 않고 확인합니다.</p>
+        <p class="records-lead">내가 남긴 삶의 사실, 사주에서 읽어낸 결과, 태어난 순간의 기록, 대리자가 기억하고 있는 내용을 서로 섞지 않고 확인합니다.</p>
       </header>
 
       <div id="records-status" class="records-status" role="status">기록을 불러오는 중입니다…</div>
@@ -61,6 +61,7 @@
 
         <div class="records-tabs" role="tablist" aria-label="기록 종류">
           <button class="records-tab" type="button" role="tab" aria-selected="true" aria-controls="life-records" id="life-records-tab">현세록</button>
+          <button class="records-tab" type="button" role="tab" aria-selected="false" aria-controls="saju-records" id="saju-records-tab">사주 기록</button>
           <button class="records-tab" type="button" role="tab" aria-selected="false" aria-controls="birth-records" id="birth-records-tab">명식록</button>
           <button class="records-tab" type="button" role="tab" aria-selected="false" aria-controls="memory-records" id="memory-records-tab">대리자 기억</button>
         </div>
@@ -74,6 +75,14 @@
             <div class="ledger-row ledger-head"><div>확인일</div><div>기록</div><div>상태</div></div>
             <div id="life-records-list"></div>
           </div>
+        </section>
+
+        <section id="saju-records" class="records-tab-panel" role="tabpanel" aria-labelledby="saju-records-tab" hidden>
+          <div class="records-panel-head records-panel records-saju-head">
+            <div><span class="records-kicker">SAJU</span><h2>사주 기록</h2></div>
+            <p>사주 풀이 결과는 삶의 사실과 분리해 보관합니다. 현재는 실제 Reading 저장 경로를 연결하기 전 개발 샘플만 격리해 표시합니다.</p>
+          </div>
+          <div id="saju-records-list" class="records-reading-grid"></div>
         </section>
 
         <section id="birth-records" class="records-tab-panel" role="tabpanel" aria-labelledby="birth-records-tab" hidden>
