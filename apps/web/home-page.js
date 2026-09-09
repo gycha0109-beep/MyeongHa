@@ -4,14 +4,14 @@ function byId(id) {
   return element;
 }
 
-function renderCalendarDate() {
+function renderMonthLabel() {
   const formatted = new Intl.DateTimeFormat('ko-KR', {
+    year: 'numeric',
     month: 'long',
-    day: 'numeric',
   }).format(new Date());
-  byId('home-current-date').textContent = `${formatted} · 오늘의 흐름`;
+  byId('home-current-date').textContent = `${formatted}의 흐름`;
 }
 
 // Header authentication state is owned exclusively by product-auth-ui.js.
-// Home must not rewrite the shared profile label/ARIA state after auth reconciliation.
-renderCalendarDate();
+// Home keeps a static greeting fallback and only formats browser calendar data.
+renderMonthLabel();
