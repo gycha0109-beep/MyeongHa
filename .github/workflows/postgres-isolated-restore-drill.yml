@@ -108,6 +108,7 @@ jobs:
           repository: ${{ github.repository }}
           run-id: ${{ inputs.backup_run_id }}
           artifact-ids: ${{ steps.source.outputs.artifact_id }}
+          merge-multiple: true
           path: ${{ runner.temp }}/backup-artifact
 
       - name: Install PostgreSQL client and jq
