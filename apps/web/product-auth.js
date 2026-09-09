@@ -55,13 +55,47 @@ function writeLocal(key, value) {
   return readLocal(key) === value;
 }
 
-function removeLocal(key) {
+function restoreLocalSnapshot(key, value) {
   try {
-    localStorage.removeItem(key);
-    return localStorage.getItem(key) === null;
+    if (value === null) localStorage.removeItem(key);
+    else localStorage.setItem(key, value);
+    return true;
   } catch {
     return false;
   }
+}
+
+function removeLocal(key) {
+  const previous = readLocal(key);
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    restoreLocalSnapshot(key, previous);
+    return false;
+  }
+
+  let removed;
+  try {
+    removed = readLocal(key) === null;
+  } catch (error) {
+    if (!restoreLocalSnapshot(key, previous)) {
+      throw new ProductAuthError(
+        'WEB_AUTH_MEMBER_CLEAR_ROLLBACK_FAILED',
+        '로그인 세션 제거 확인 실패 후 브라우저 상태를 안전하게 복원하지 못했습니다.',
+        error,
+      );
+    }
+    throw error;
+  }
+
+  if (removed) return true;
+  if (!restoreLocalSnapshot(key, previous)) {
+    throw new ProductAuthError(
+      'WEB_AUTH_MEMBER_CLEAR_ROLLBACK_FAILED',
+      '로그인 세션 제거 실패 후 브라우저 상태를 안전하게 복원하지 못했습니다.',
+    );
+  }
+  return false;
 }
 
 function readSession(key) {
