@@ -22,6 +22,12 @@ const memberSession = Object.freeze({
     email: 'compat-member@example.com',
   },
 });
+const rotatedMemberSession = Object.freeze({
+  ...memberSession,
+  accessToken: 'compat.rotated.signature',
+  refreshToken: 'compat-refresh-token-rotated',
+  expiresAt: '2099-01-02T00:00:00.000Z',
+});
 const mime = new Map([
   ['.html', 'text/html; charset=utf-8'],
   ['.css', 'text/css; charset=utf-8'],
@@ -54,14 +60,15 @@ async function serve() {
         const body = await readJsonBody(req);
         assert(body.email === memberSession.user.email, 'unexpected sign-in email');
         signInCount += 1;
+        const session = signInCount >= 4 ? rotatedMemberSession : memberSession;
         res.statusCode = 200;
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
-        res.end(JSON.stringify(envelope({ status: 'authenticated', session: memberSession })));
+        res.end(JSON.stringify(envelope({ status: 'authenticated', session })));
         return;
       }
       if (pathname === '/api/auth/sign-out' && req.method === 'POST') {
         signOutCount += 1;
-        assert(req.headers.authorization === `Bearer ${memberSession.accessToken}`, 'sign-out used wrong Member bearer');
+        assert(req.headers.authorization === `Bearer ${rotatedMemberSession.accessToken}`, 'sign-out used wrong Member bearer');
         res.statusCode = 200;
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
         res.end(JSON.stringify(envelope({ status: 'signed_out' })));
@@ -186,7 +193,9 @@ try {
     const authEvent = ${JSON.stringify(authEvent)};
     const guestBearer = ${JSON.stringify(guestBearer)};
     const memberToken = ${JSON.stringify(memberSession.accessToken)};
+    const rotatedToken = ${JSON.stringify(rotatedMemberSession.accessToken)};
     const nativeSetItem = Storage.prototype.setItem;
+    const nativeGetItem = Storage.prototype.getItem;
     let eventCount = 0;
     addEventListener(authEvent, () => { eventCount += 1; });
     localStorage.removeItem(memberKey);
@@ -195,6 +204,11 @@ try {
 
     let failPending = true;
     let failActive = false;
+    let failPendingVerificationRead = false;
+    let failMemberVerificationRead = false;
+    let armedPendingVerificationRead = false;
+    let armedMemberVerificationRead = false;
+
     Storage.prototype.setItem = function(key, value) {
       if (this === sessionStorage && failPending && key === pendingKey) {
         throw new Error('forced pending Guest preservation failure');
@@ -202,7 +216,27 @@ try {
       if (this === sessionStorage && failActive && key === activeKey) {
         throw new Error('forced Member compatibility active write failure');
       }
-      return nativeSetItem.call(this, key, value);
+      const written = nativeSetItem.call(this, key, value);
+      if (this === sessionStorage && failPendingVerificationRead && key === pendingKey) {
+        failPendingVerificationRead = false;
+        armedPendingVerificationRead = true;
+      }
+      if (this === localStorage && failMemberVerificationRead && key === memberKey) {
+        failMemberVerificationRead = false;
+        armedMemberVerificationRead = true;
+      }
+      return written;
+    };
+    Storage.prototype.getItem = function(key) {
+      if (this === sessionStorage && armedPendingVerificationRead && key === pendingKey) {
+        armedPendingVerificationRead = false;
+        throw new Error('forced pending Guest verification read failure');
+      }
+      if (this === localStorage && armedMemberVerificationRead && key === memberKey) {
+        armedMemberVerificationRead = false;
+        throw new Error('forced Member verification read failure');
+      }
+      return nativeGetItem.call(this, key);
     };
 
     let firstCode = null;
@@ -220,8 +254,46 @@ try {
     };
 
     failPending = false;
+    failPendingVerificationRead = true;
+    let stagingReadCode = null;
+    try {
+      await auth.signInWithPassword(${JSON.stringify(memberSession.user.email)}, 'password');
+    } catch (error) {
+      stagingReadCode = error?.code ?? null;
+    }
+    const afterFailedStagingRead = {
+      stagingReadCode,
+      member: localStorage.getItem(memberKey),
+      active: sessionStorage.getItem(activeKey),
+      pending: sessionStorage.getItem(pendingKey),
+      eventCount,
+    };
+
     await auth.signInWithPassword(${JSON.stringify(memberSession.user.email)}, 'password');
     const afterRecoveredSignIn = {
+      member: JSON.parse(localStorage.getItem(memberKey) ?? 'null')?.accessToken ?? null,
+      active: sessionStorage.getItem(activeKey),
+      pending: sessionStorage.getItem(pendingKey),
+      eventCount,
+    };
+
+    failMemberVerificationRead = true;
+    let memberReadCode = null;
+    try {
+      await auth.signInWithPassword(${JSON.stringify(memberSession.user.email)}, 'password');
+    } catch (error) {
+      memberReadCode = error?.code ?? null;
+    }
+    const afterFailedMemberRead = {
+      memberReadCode,
+      member: JSON.parse(localStorage.getItem(memberKey) ?? 'null')?.accessToken ?? null,
+      active: sessionStorage.getItem(activeKey),
+      pending: sessionStorage.getItem(pendingKey),
+      eventCount,
+    };
+
+    await auth.signInWithPassword(${JSON.stringify(memberSession.user.email)}, 'password');
+    const afterRecoveredMemberWrite = {
       member: JSON.parse(localStorage.getItem(memberKey) ?? 'null')?.accessToken ?? null,
       active: sessionStorage.getItem(activeKey),
       pending: sessionStorage.getItem(pendingKey),
@@ -262,13 +334,18 @@ try {
       eventCount,
     };
     Storage.prototype.setItem = nativeSetItem;
+    Storage.prototype.getItem = nativeGetItem;
     return {
       afterFailedSignIn,
+      afterFailedStagingRead,
       afterRecoveredSignIn,
+      afterFailedMemberRead,
+      afterRecoveredMemberWrite,
       afterFailedReconcile,
       afterRecoveredReconcile,
       afterSignOut,
       memberToken,
+      rotatedToken,
     };
   })()`);
 
@@ -278,25 +355,43 @@ try {
   assert(result.afterFailedSignIn.pending === null, 'failed compatibility staging created pending Guest state');
   assert(result.afterFailedSignIn.eventCount === 0, 'failed compatibility staging emitted auth change');
 
+  assert(result.afterFailedStagingRead.stagingReadCode === 'WEB_AUTH_SESSION_READ_FAILED', 'session write verification read failure did not fail closed');
+  assert(result.afterFailedStagingRead.member === null, 'session verification read failure established durable Member authority');
+  assert(result.afterFailedStagingRead.active === guestBearer, 'session verification read failure lost active Guest');
+  assert(result.afterFailedStagingRead.pending === null, 'session verification read failure retained staged pending Guest');
+  assert(result.afterFailedStagingRead.eventCount === 0, 'session verification read failure emitted auth change');
+
   assert(result.afterRecoveredSignIn.member === memberSession.accessToken, 'recovered sign-in did not persist Member');
   assert(result.afterRecoveredSignIn.active === memberSession.accessToken, 'recovered sign-in did not stage Member compatibility bearer');
   assert(result.afterRecoveredSignIn.pending === guestBearer, 'recovered sign-in did not preserve Guest as pending');
   assert(result.afterRecoveredSignIn.eventCount === 1, 'recovered sign-in emitted unexpected auth event count');
 
+  assert(result.afterFailedMemberRead.memberReadCode === 'WEB_AUTH_MEMBER_READ_FAILED', 'Member write verification read failure did not surface Member read authority failure');
+  assert(result.afterFailedMemberRead.member === memberSession.accessToken, 'Member write verification read failure did not restore previous durable Member generation');
+  assert(result.afterFailedMemberRead.active === memberSession.accessToken, 'Member write verification read failure did not restore previous compatibility bearer');
+  assert(result.afterFailedMemberRead.pending === guestBearer, 'Member write verification read failure changed pending Guest lineage');
+  assert(result.afterFailedMemberRead.eventCount === 1, 'Member write verification read failure emitted auth change');
+
+  assert(result.afterRecoveredMemberWrite.member === rotatedMemberSession.accessToken, 'recovered Member write did not persist rotated Member generation');
+  assert(result.afterRecoveredMemberWrite.active === rotatedMemberSession.accessToken, 'recovered Member write did not rotate compatibility bearer');
+  assert(result.afterRecoveredMemberWrite.pending === guestBearer, 'recovered Member write changed pending Guest lineage');
+  assert(result.afterRecoveredMemberWrite.eventCount === 2, 'recovered Member write emitted unexpected auth event count');
+
   assert(result.afterFailedReconcile.reconcileCode === 'WEB_AUTH_MEMBER_COMPAT_PERSIST_FAILED', 'failed reconcile did not fail closed');
-  assert(result.afterFailedReconcile.member === memberSession.accessToken, 'failed reconcile changed durable Member generation');
+  assert(result.afterFailedReconcile.member === rotatedMemberSession.accessToken, 'failed reconcile changed durable Member generation');
   assert(result.afterFailedReconcile.active === 'stale.member.signature', 'failed reconcile did not restore stale compatibility snapshot');
   assert(result.afterFailedReconcile.pending === guestBearer, 'failed reconcile changed pending Guest');
-  assert(result.afterFailedReconcile.eventCount === 1, 'failed reconcile emitted auth change');
+  assert(result.afterFailedReconcile.eventCount === 2, 'failed reconcile emitted auth change');
 
-  assert(result.afterRecoveredReconcile.recoveredToken === memberSession.accessToken, 'reconcile recovery returned wrong Member token');
-  assert(result.afterRecoveredReconcile.active === memberSession.accessToken, 'reconcile recovery did not repair active compatibility bearer');
+  assert(result.afterRecoveredReconcile.recoveredToken === rotatedMemberSession.accessToken, 'reconcile recovery returned wrong Member token');
+  assert(result.afterRecoveredReconcile.active === rotatedMemberSession.accessToken, 'reconcile recovery did not repair active compatibility bearer');
   assert(result.afterRecoveredReconcile.pending === guestBearer, 'reconcile recovery changed pending Guest');
 
   assert(result.afterSignOut.member === null, 'sign-out retained Member local authority');
   assert(result.afterSignOut.active === guestBearer, 'sign-out did not restore pre-login Guest');
   assert(result.afterSignOut.pending === null, 'sign-out retained duplicate pending Guest');
-  assert(signInCount === 2, `expected two sign-ins, got ${signInCount}`);
+  assert(result.afterSignOut.eventCount === 3, 'sign-out emitted unexpected auth event count');
+  assert(signInCount === 5, `expected five sign-ins, got ${signInCount}`);
   assert(signOutCount === 1, `expected one sign-out, got ${signOutCount}`);
 
   const artifactDir = resolve(process.cwd(), 'artifacts');

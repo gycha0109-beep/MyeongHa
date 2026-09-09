@@ -11,9 +11,15 @@ import {
 
 class FaultingStorage {
   private readonly values = new Map<string, string>();
+  private armedVerificationReadFailureKey: string | null = null;
   failMemberWrites = false;
+  verificationReadFailureAfterWriteKey: string | null = null;
 
   getItem(key: string) {
+    if (this.armedVerificationReadFailureKey === key) {
+      this.armedVerificationReadFailureKey = null;
+      throw new Error(`verification read blocked: ${key}`);
+    }
     return this.values.get(key) ?? null;
   }
 
@@ -22,6 +28,10 @@ class FaultingStorage {
       throw new Error('member persistence blocked');
     }
     this.values.set(key, String(value));
+    if (this.verificationReadFailureAfterWriteKey === key) {
+      this.verificationReadFailureAfterWriteKey = null;
+      this.armedVerificationReadFailureKey = key;
+    }
   }
 
   removeItem(key: string) {
@@ -127,6 +137,60 @@ describe('Member session persistence authority', () => {
 
     expect(readMemberSession()?.accessToken).toBe(OLD_ACCESS);
     expect(session.getItem(PRODUCT_AUTH_STORAGE_V1.guestBearer)).toBe(OLD_ACCESS);
+    expect(globalThis.dispatchEvent).not.toHaveBeenCalled();
+  });
+
+  it('rolls back a newly written Member and staged Guest lineage when Member verification read fails after the write', async () => {
+    session.setItem(PRODUCT_AUTH_STORAGE_V1.guestBearer, 'guest-before-read-fault');
+    local.verificationReadFailureAfterWriteKey = PRODUCT_AUTH_STORAGE_V1.memberSession;
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(authenticatedResponse())));
+
+    await expect(signInWithPassword('member@example.com', 'password')).rejects.toMatchObject({
+      name: 'ProductAuthError',
+      code: 'WEB_AUTH_MEMBER_READ_FAILED',
+    } satisfies Partial<ProductAuthError>);
+
+    expect(readMemberSession()).toBeNull();
+    expect(readGuestBearer()).toBe('guest-before-read-fault');
+    expect(session.getItem(PRODUCT_AUTH_STORAGE_V1.guestBearer)).toBe('guest-before-read-fault');
+    expect(session.getItem(PRODUCT_AUTH_STORAGE_V1.pendingGuestBearer)).toBeNull();
+    expect(globalThis.dispatchEvent).not.toHaveBeenCalled();
+  });
+
+  it('restores the previous Member generation when refresh write succeeds but its verification read fails', async () => {
+    local.setItem(PRODUCT_AUTH_STORAGE_V1.memberSession, JSON.stringify(OLD_SESSION));
+    session.setItem(PRODUCT_AUTH_STORAGE_V1.guestBearer, OLD_ACCESS);
+    local.verificationReadFailureAfterWriteKey = PRODUCT_AUTH_STORAGE_V1.memberSession;
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(authenticatedResponse(MEMBER_SESSION))));
+
+    await expect(refreshMemberSession()).rejects.toMatchObject({
+      name: 'ProductAuthError',
+      code: 'WEB_AUTH_MEMBER_READ_FAILED',
+    } satisfies Partial<ProductAuthError>);
+
+    expect(readMemberSession()).toMatchObject({
+      accessToken: OLD_ACCESS,
+      refreshToken: OLD_SESSION.refreshToken,
+    });
+    expect(session.getItem(PRODUCT_AUTH_STORAGE_V1.guestBearer)).toBe(OLD_ACCESS);
+    expect(session.getItem(PRODUCT_AUTH_STORAGE_V1.pendingGuestBearer)).toBeNull();
+    expect(globalThis.dispatchEvent).not.toHaveBeenCalled();
+  });
+
+  it('rolls back Member compatibility staging when a sessionStorage write succeeds but verification read fails', async () => {
+    session.setItem(PRODUCT_AUTH_STORAGE_V1.guestBearer, 'guest-before-compat-read-fault');
+    session.verificationReadFailureAfterWriteKey = PRODUCT_AUTH_STORAGE_V1.pendingGuestBearer;
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(authenticatedResponse())));
+
+    await expect(signInWithPassword('member@example.com', 'password')).rejects.toMatchObject({
+      name: 'ProductAuthError',
+      code: 'WEB_AUTH_SESSION_READ_FAILED',
+    } satisfies Partial<ProductAuthError>);
+
+    expect(readMemberSession()).toBeNull();
+    expect(readGuestBearer()).toBe('guest-before-compat-read-fault');
+    expect(session.getItem(PRODUCT_AUTH_STORAGE_V1.guestBearer)).toBe('guest-before-compat-read-fault');
+    expect(session.getItem(PRODUCT_AUTH_STORAGE_V1.pendingGuestBearer)).toBeNull();
     expect(globalThis.dispatchEvent).not.toHaveBeenCalled();
   });
 });
