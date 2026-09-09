@@ -12,8 +12,14 @@ import {
 class FaultingStorage {
   private readonly values = new Map<string, string>();
   failMemberRemovals = false;
+  failNextMemberReadAfterRemoval = false;
+  private memberReadFaultPending = false;
 
   getItem(key: string) {
+    if (this.memberReadFaultPending && key === PRODUCT_AUTH_STORAGE_V1.memberSession) {
+      this.memberReadFaultPending = false;
+      throw new Error('member verification read blocked');
+    }
     return this.values.get(key) ?? null;
   }
 
@@ -26,10 +32,15 @@ class FaultingStorage {
       throw new Error('member removal blocked');
     }
     this.values.delete(key);
+    if (this.failNextMemberReadAfterRemoval && key === PRODUCT_AUTH_STORAGE_V1.memberSession) {
+      this.failNextMemberReadAfterRemoval = false;
+      this.memberReadFaultPending = true;
+    }
   }
 
   clear() {
     this.values.clear();
+    this.memberReadFaultPending = false;
   }
 }
 
@@ -117,6 +128,21 @@ describe('Member session removal authority', () => {
     local.failMemberRemovals = true;
 
     expect(invalidateMemberSession(MEMBER_ACCESS)).toBe(false);
+
+    expect(readMemberSession()?.accessToken).toBe(MEMBER_ACCESS);
+    expect(session.getItem(PRODUCT_AUTH_STORAGE_V1.guestBearer)).toBe(MEMBER_ACCESS);
+    expect(session.getItem(PRODUCT_AUTH_STORAGE_V1.pendingGuestBearer)).toBe(PENDING_GUEST);
+    expect(globalThis.dispatchEvent).not.toHaveBeenCalled();
+  });
+
+  it('rolls back a successful Member removal when the verification read fails', () => {
+    seedMemberWithPendingGuest();
+    local.failNextMemberReadAfterRemoval = true;
+
+    expect(() => invalidateMemberSession(MEMBER_ACCESS)).toThrowError(expect.objectContaining({
+      name: 'ProductAuthError',
+      code: 'WEB_AUTH_MEMBER_READ_FAILED',
+    }));
 
     expect(readMemberSession()?.accessToken).toBe(MEMBER_ACCESS);
     expect(session.getItem(PRODUCT_AUTH_STORAGE_V1.guestBearer)).toBe(MEMBER_ACCESS);

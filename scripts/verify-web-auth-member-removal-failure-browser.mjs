@@ -336,6 +336,7 @@ try {
     globalThis.__myeonghaMemberClearEvents = 0;
     addEventListener(${JSON.stringify(authChangedEvent)}, () => { globalThis.__myeonghaMemberClearEvents += 1; });
     const originalRemoveItem = Storage.prototype.removeItem;
+    globalThis.__myeonghaMemberClearOriginalRemoveItem = originalRemoveItem;
     Storage.prototype.removeItem = function(key) {
       if (this === localStorage && key === ${JSON.stringify(memberSessionKey)}) {
         throw new Error('forced Member localStorage removal failure');
@@ -380,6 +381,47 @@ try {
   assert(afterRefreshFailure.pendingGuest === pendingGuestBearer, 'SESSION_EXPIRED removal failure mutated pending Guest state');
   assert(afterRefreshFailure.authEvents === 0, 'SESSION_EXPIRED removal failure emitted auth-changed');
 
+  const verificationReadError = await client.evaluate(`(async () => {
+    const originalRemoveItem = globalThis.__myeonghaMemberClearOriginalRemoveItem;
+    const originalGetItem = Storage.prototype.getItem;
+    let failNextMemberRead = false;
+    Storage.prototype.removeItem = function(key) {
+      const result = originalRemoveItem.call(this, key);
+      if (this === localStorage && key === ${JSON.stringify(memberSessionKey)}) {
+        failNextMemberRead = true;
+      }
+      return result;
+    };
+    Storage.prototype.getItem = function(key) {
+      if (this === localStorage && key === ${JSON.stringify(memberSessionKey)} && failNextMemberRead) {
+        failNextMemberRead = false;
+        throw new Error('forced Member verification read failure after removal');
+      }
+      return originalGetItem.call(this, key);
+    };
+
+    const auth = await import('/product-auth.js');
+    let captured = null;
+    try {
+      auth.invalidateMemberSession(${JSON.stringify(memberAccessToken)});
+    } catch (error) {
+      captured = { name: error?.name ?? null, code: error?.code ?? null };
+    } finally {
+      Storage.prototype.removeItem = originalRemoveItem;
+      Storage.prototype.getItem = originalGetItem;
+    }
+    return captured;
+  })()`);
+  assert(
+    verificationReadError?.name === 'ProductAuthError' && verificationReadError?.code === 'WEB_AUTH_MEMBER_READ_FAILED',
+    'Member removal verification read failure did not fail closed with WEB_AUTH_MEMBER_READ_FAILED',
+  );
+  const afterVerificationReadFailure = await client.evaluate(snapshotExpression());
+  assert(afterVerificationReadFailure.memberAccessToken === memberAccessToken, 'Verification read failure did not restore Member authority');
+  assert(afterVerificationReadFailure.activeBearer === memberAccessToken, 'Verification read failure mutated the active compatibility bearer');
+  assert(afterVerificationReadFailure.pendingGuest === pendingGuestBearer, 'Verification read failure mutated pending Guest lineage');
+  assert(afterVerificationReadFailure.authEvents === 0, 'Verification read failure emitted auth-changed despite rollback');
+
   const signOuts = requests.filter((request) => request.path === '/api/auth/sign-out');
   const refreshes = requests.filter((request) => request.path === '/api/auth/refresh');
   const bootstraps = requests.filter((request) => request.path === '/api/session/bootstrap');
@@ -394,6 +436,8 @@ try {
     afterSignOutFailure,
     afterExactInvalidation,
     afterRefreshFailure,
+    verificationReadError,
+    afterVerificationReadFailure,
     signOutRequests: signOuts.length,
     refreshRequests: refreshes.length,
     guestBootstrapRequests: bootstraps.length,
