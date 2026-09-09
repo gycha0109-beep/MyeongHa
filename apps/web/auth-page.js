@@ -258,9 +258,11 @@ function readConfirmationGuestHandoffJournalCandidates() {
 function writeConfirmationGuestHandoffJournalEntry(entry) {
   const suffix = globalThis.crypto?.randomUUID?.()
     ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+  const key = `${CONFIRMATION_GUEST_HANDOFF_ENTRY_PREFIX}${suffix}`;
+  const raw = JSON.stringify(entry);
   try {
-    localStorage.setItem(`${CONFIRMATION_GUEST_HANDOFF_ENTRY_PREFIX}${suffix}`, JSON.stringify(entry));
-    return true;
+    localStorage.setItem(key, raw);
+    return localStorage.getItem(key) === raw;
   } catch {
     return false;
   }
@@ -298,7 +300,7 @@ function ensureConfirmationGuestHandoffJournalInitialized() {
 
   try {
     localStorage.setItem(CONFIRMATION_GUEST_HANDOFF_JOURNAL_MARKER_KEY, '1');
-    return true;
+    return localStorage.getItem(CONFIRMATION_GUEST_HANDOFF_JOURNAL_MARKER_KEY) === '1';
   } catch {
     return false;
   }
