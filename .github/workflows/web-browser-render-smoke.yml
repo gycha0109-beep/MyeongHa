@@ -32,6 +32,10 @@ jobs:
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
         run: node scripts/verify-web-browser-render.mjs
+      - name: Verify shared Home Saju header browser contract
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/verify-golden-master-header-browser.mjs
       - name: Verify authentication browser render
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
@@ -183,6 +187,7 @@ jobs:
           name: web-reading-browser-smoke
           path: |
             artifacts/web-reading-browser-smoke*
+            artifacts/web-golden-master-header-browser-smoke*
             artifacts/web-auth-browser-smoke*
             artifacts/web-auth-malformed-stored-member-browser-smoke*
             artifacts/web-auth-malformed-member-cleanup-failure-browser-smoke*
