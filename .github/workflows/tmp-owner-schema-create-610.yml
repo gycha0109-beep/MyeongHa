@@ -1,0 +1,58 @@
+name: Temporary Owner Schema Create Patch
+
+on:
+  push:
+    branches:
+      - ops/supabase-owner-schema-create-610
+    paths:
+      - .github/workflows/tmp-owner-schema-create-610.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ops/supabase-owner-schema-create-610
+      - name: Patch migration and regression gate
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          migration = Path('supabase/migrations/0980_content_release_lifecycle_authority.sql')
+          text = migration.read_text()
+          owner_anchor = """alter function public.cmd_publish_character_content_bundle_v1(\n  uuid, text, text, text, text, text, text, text, jsonb, jsonb, jsonb, jsonb\n) owner to myeongha_content_publication_owner;\n"""
+          owner_replacement = """-- PostgreSQL requires a new function owner to have CREATE on the containing\n-- schema at ALTER ... OWNER time. Keep that privilege deployment-scoped only.\ngrant create on schema public to myeongha_content_publication_owner;\n\n""" + owner_anchor
+          if text.count(owner_anchor) != 1:
+              raise SystemExit('owner anchor mismatch')
+          text = text.replace(owner_anchor, owner_replacement, 1)
+
+          revoke_anchor = """alter function public.cmd_retire_content_bundle_v1(uuid)\n  owner to myeongha_content_publication_owner;\n\nrevoke all on function public.cmd_publish_character_content_bundle_v1(\n"""
+          revoke_replacement = """alter function public.cmd_retire_content_bundle_v1(uuid)\n  owner to myeongha_content_publication_owner;\n\n-- The owner role must not retain object-creation authority after deployment.\nrevoke create on schema public from myeongha_content_publication_owner;\n\nrevoke all on function public.cmd_publish_character_content_bundle_v1(\n"""
+          if text.count(revoke_anchor) != 1:
+              raise SystemExit('revoke anchor mismatch')
+          text = text.replace(revoke_anchor, revoke_replacement, 1)
+          migration.write_text(text)
+
+          test = Path('test/db/content_release_lifecycle_authority.sh')
+          text = test.read_text()
+          test_anchor = """[[ \"$postgres_owner_membership\" == '1' ]] || fail \"postgres cannot assume content publication owner during migration deployment\"\npass \"postgres deployment principal can assume content publication owner\"\n\n"""
+          test_replacement = test_anchor + """owner_schema_create=\"$(query \"select has_schema_privilege('myeongha_content_publication_owner','public','CREATE')::int;\")\"\n[[ \"$owner_schema_create\" == '0' ]] || fail \"content publication owner retained public schema CREATE after deployment\"\npass \"content publication owner does not retain public schema CREATE\"\n\n"""
+          if text.count(test_anchor) != 1:
+              raise SystemExit('test anchor mismatch')
+          text = text.replace(test_anchor, test_replacement, 1)
+          test.write_text(text)
+          PY
+      - name: Commit patch and remove temporary workflow
+        shell: bash
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git rm .github/workflows/tmp-owner-schema-create-610.yml
+          git add supabase/migrations/0980_content_release_lifecycle_authority.sql test/db/content_release_lifecycle_authority.sh
+          git commit -m "fix(db): scope schema create to owner reassignment"
+          git push origin HEAD:ops/supabase-owner-schema-create-610
