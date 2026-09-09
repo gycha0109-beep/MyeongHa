@@ -29,6 +29,7 @@ class MemoryStorage {
 class VerificationFaultStorage extends MemoryStorage {
   failReadAfterNextGuestWrite = false;
   failReadAfterNextRemovalKey: string | null = null;
+  replacementAfterNextRemoval: { key: string; value: string } | null = null;
   private failNextReadKey: string | null = null;
 
   override getItem(key: string) {
@@ -52,6 +53,10 @@ class VerificationFaultStorage extends MemoryStorage {
 
   override removeItem(key: string) {
     super.removeItem(key);
+    if (this.replacementAfterNextRemoval?.key === key) {
+      this.values.set(key, this.replacementAfterNextRemoval.value);
+      this.replacementAfterNextRemoval = null;
+    }
     if (this.failReadAfterNextRemovalKey === key) {
       this.failReadAfterNextRemovalKey = null;
       this.failNextReadKey = key;
@@ -144,5 +149,19 @@ describe('Guest session verification-read rollback authority', () => {
     expect(clearPromotedGuestBearer()).toBe(true);
     expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.guestBearer)).toBeNull();
     expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.pendingGuestBearer)).toBeNull();
+  });
+
+  it('does not overwrite a newer Guest authority observed after a removal attempt', () => {
+    sessionStorage.setItem(PRODUCT_AUTH_STORAGE_V1.guestBearer, 'guest-removal-old-authority');
+    session.replacementAfterNextRemoval = {
+      key: PRODUCT_AUTH_STORAGE_V1.guestBearer,
+      value: 'guest-removal-newer-authority',
+    };
+
+    expect(() => invalidateGuestSession('guest-removal-old-authority')).toThrowError(expect.objectContaining({
+      code: 'WEB_AUTH_GUEST_CLEAR_FAILED',
+    }));
+    expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.guestBearer)).toBe('guest-removal-newer-authority');
+    expect(globalThis.dispatchEvent).not.toHaveBeenCalled();
   });
 });
