@@ -58,6 +58,8 @@ type DispatchTarget =
   | { readonly kind: 'chat-open'; readonly route: typeof CHAT_OPEN_ROUTE }
   | { readonly kind: 'chat-read'; readonly route: string; readonly afterSequenceNo?: string };
 
+type RecordsDispatchValue = 'life-record' | 'memories';
+
 function getSingleNonEmptyParam(
   searchParams: URLSearchParams,
   key: string,
@@ -72,8 +74,21 @@ function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(value);
 }
 
+function getRecordsDispatchValueForSourcePath(pathname: string): RecordsDispatchValue | undefined {
+  if (pathname === LIFE_RECORD_ROUTE) return 'life-record';
+  if (pathname === MEMORIES_ROUTE) return 'memories';
+  return undefined;
+}
+
 function getChatPathThreadId(pathname: string): string | null | undefined {
-  if (pathname === PROFILE_ROUTE || pathname === CHAT_OPEN_ROUTE) return undefined;
+  if (
+    pathname === PROFILE_ROUTE ||
+    pathname === CHAT_OPEN_ROUTE ||
+    pathname === LIFE_RECORD_ROUTE ||
+    pathname === MEMORIES_ROUTE
+  ) {
+    return undefined;
+  }
   if (!pathname.startsWith(CHAT_ROUTE_PREFIX)) return null;
 
   const rawSegment = pathname.slice(CHAT_ROUTE_PREFIX.length);
@@ -110,6 +125,16 @@ function resolveDispatchTarget(request: Request): DispatchTarget | null {
 
   const recordsRoute = getSingleNonEmptyParam(url.searchParams, RECORDS_ROUTE_PARAM);
   if (recordsRoute === null) return null;
+  const recordsSourceRoute = getRecordsDispatchValueForSourcePath(url.pathname);
+  if (recordsSourceRoute !== undefined && recordsRoute !== recordsSourceRoute) return null;
+  if (
+    recordsRoute !== undefined &&
+    url.pathname !== PROFILE_ROUTE &&
+    recordsSourceRoute === undefined
+  ) {
+    return null;
+  }
+
   const chatOpen = getSingleNonEmptyParam(url.searchParams, CHAT_OPEN_PARAM);
   if (chatOpen === null) return null;
   const chatThreadId = getSingleNonEmptyParam(url.searchParams, CHAT_THREAD_PARAM);
@@ -160,6 +185,7 @@ function resolveDispatchTarget(request: Request): DispatchTarget | null {
   }
 
   if (recordsRoute === undefined && chatThreadId === undefined) {
+    if (url.pathname !== PROFILE_ROUTE) return null;
     return { kind: 'profile', route: PROFILE_ROUTE };
   }
 
