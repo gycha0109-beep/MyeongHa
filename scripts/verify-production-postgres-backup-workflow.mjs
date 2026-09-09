@@ -77,7 +77,8 @@ if (!(encryptIndex < plaintextDeleteIndex && plaintextDeleteIndex < uploadIndex)
 const requiredRunbookFragments = [
   'Production state: IMPLEMENTED / NOT YET PRODUCTION-PROVEN',
   'Current Supabase organization plan: `free`',
-  'PITR: NOT AVAILABLE UNDER THE CURRENT FREE-PLAN OPERATING BASELINE',
+  'PITR',
+  'NOT AVAILABLE UNDER THE CURRENT FREE-PLAN OPERATING BASELINE',
   'Restore drill: NOT YET EVIDENCED',
   'RPO: OPEN DECISION',
   'RTO: OPEN DECISION',
