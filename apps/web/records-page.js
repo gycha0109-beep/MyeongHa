@@ -1,5 +1,8 @@
 import { createRecordsRuntimeClient, RecordsRuntimeError } from './records-runtime-client.js';
 
+const SAMPLE_SAJU_FACT_TYPE = 'sample_saju_reading_result';
+const SAMPLE_SAJU_SCHEMA_VERSION = 'sample.v1';
+
 function byId(id) {
   const element = document.getElementById(id);
   if (!element) throw new Error(`Missing records page element: ${id}`);
@@ -37,6 +40,26 @@ function requireArray(payload, key) {
     throw new RecordsRuntimeError('WEB_RECORDS_MALFORMED_RESPONSE', `Records payload is missing ${key}.`);
   }
   return payload[key];
+}
+
+function isPlainObject(value) {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isSampleSajuReadingFact(fact) {
+  return fact?.factType === SAMPLE_SAJU_FACT_TYPE
+    && fact?.schemaVersion === SAMPLE_SAJU_SCHEMA_VERSION
+    && isPlainObject(fact?.valueJsonb)
+    && fact.valueJsonb.sample === true;
+}
+
+function asNonEmptyString(value) {
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
+}
+
+function asStringArray(value) {
+  if (!Array.isArray(value)) return [];
+  return value.map(asNonEmptyString).filter(Boolean);
 }
 
 function setupTabs() {
@@ -81,7 +104,7 @@ function renderBirthProfileUnavailable() {
 function renderLifeFacts(payload) {
   const target = byId('life-records-list');
   clear(target);
-  const facts = requireArray(payload, 'facts');
+  const facts = requireArray(payload, 'facts').filter((fact) => !isSampleSajuReadingFact(fact));
   if (facts.length === 0) {
     target.append(textElement('p', 'muted records-empty', '아직 남아 있는 현세록이 없습니다.'));
     return;
@@ -97,6 +120,76 @@ function renderLifeFacts(payload) {
     row.append(detail);
     row.append(textElement('div', '', fact.revokedAt ? '철회됨' : '기록됨'));
     target.append(row);
+  }
+}
+
+function renderSajuReadingSamples(payload) {
+  const target = byId('saju-records-list');
+  clear(target);
+  const sampleFacts = requireArray(payload, 'facts').filter(isSampleSajuReadingFact);
+
+  if (sampleFacts.length === 0) {
+    const empty = document.createElement('article');
+    empty.className = 'records-reading-empty';
+    empty.append(textElement('h3', '', '아직 저장된 사주 풀이가 없습니다.'));
+    empty.append(textElement('p', 'muted', '실제 Reading 저장·조회 경로가 Records에 연결되면 이곳에서 풀이 이력을 확인할 수 있습니다.'));
+    target.append(empty);
+    return;
+  }
+
+  for (const fact of sampleFacts) {
+    const value = fact.valueJsonb;
+    const title = asNonEmptyString(value.title) ?? '사주 풀이';
+    const period = asNonEmptyString(value.period);
+    const summary = asNonEmptyString(value.summary) ?? '샘플 풀이 요약이 없습니다.';
+    const keywords = asStringArray(value.keywords);
+    const highlights = asStringArray(value.highlights);
+
+    const card = document.createElement('article');
+    card.className = 'records-reading-card records-reading-card--sample';
+
+    const top = document.createElement('div');
+    top.className = 'records-reading-top';
+    const identity = document.createElement('div');
+    identity.className = 'records-reading-identity';
+    identity.append(textElement('span', 'records-reading-icon', '職'));
+    const heading = document.createElement('div');
+    const eyebrow = document.createElement('div');
+    eyebrow.className = 'records-reading-eyebrow';
+    eyebrow.append(textElement('span', 'records-reading-badge', '개발 샘플'));
+    if (period) eyebrow.append(textElement('span', 'records-reading-period', period));
+    heading.append(eyebrow, textElement('h3', 'records-reading-title', title));
+    identity.append(heading);
+    top.append(identity);
+    top.append(textElement('span', 'records-reading-date', formatTimestamp(fact.confirmedAt)));
+    card.append(top);
+
+    card.append(textElement('p', 'records-reading-summary', summary));
+
+    if (keywords.length > 0) {
+      const chips = document.createElement('div');
+      chips.className = 'records-reading-keywords';
+      for (const keyword of keywords) chips.append(textElement('span', 'records-reading-chip', keyword));
+      card.append(chips);
+    }
+
+    if (highlights.length > 0) {
+      const list = document.createElement('ul');
+      list.className = 'records-reading-highlights';
+      for (const highlight of highlights) list.append(textElement('li', '', highlight));
+      card.append(list);
+    }
+
+    const footer = document.createElement('div');
+    footer.className = 'records-reading-footer';
+    footer.append(textElement('span', 'fine', '실제 Reading 저장 경로 연결 전 UI fixture'));
+    const link = document.createElement('a');
+    link.href = 'reading.html';
+    link.textContent = '사주 페이지에서 보기 →';
+    footer.append(link);
+    card.append(footer);
+
+    target.append(card);
   }
 }
 
@@ -149,6 +242,7 @@ async function boot() {
     renderProfile(records.profile);
     renderBirthProfileUnavailable();
     renderLifeFacts(records.lifeFacts);
+    renderSajuReadingSamples(records.lifeFacts);
     renderMemories(records.memories);
     setReady();
   } catch (error) {
