@@ -166,6 +166,235 @@ html[data-theme="dark"] body.gm-page .gm-chart-panel {
   background: rgba(17, 28, 34, .985);
 }
 
+/* Home and Saju must use the same global product header as Chat/Records/My.
+   The Golden Master owns page content geometry, not global navigation/auth UI. */
+body.gm-page .product-theme-toggle {
+  width: 44px;
+  min-height: 44px;
+  flex-basis: 44px;
+  border: 1px solid var(--mh-line);
+  color: var(--mh-ink);
+  background: rgba(255, 255, 255, .18);
+}
+
+body.gm-page .product-theme-toggle:hover {
+  border-color: var(--mh-brass);
+  background: rgba(255, 255, 255, .18);
+}
+
+body.gm-page .product-theme-toggle-mark {
+  font-size: 19px;
+}
+
+@media (min-width: 768px) {
+  body.gm-page .product-header {
+    min-height: 0;
+    z-index: 40;
+    background: rgba(248, 241, 232, .93);
+    border-bottom: 1px solid var(--mh-line);
+  }
+
+  body.gm-page .product-header::after {
+    content: "◇";
+    display: block;
+    position: absolute;
+    left: 50%;
+    bottom: -9px;
+    transform: translateX(-50%);
+    width: 24px;
+    text-align: center;
+    color: var(--mh-brass-strong);
+    background: var(--mh-paper-base);
+    font-family: var(--mh-serif);
+    font-size: 14px;
+  }
+
+  body.gm-page .product-header-inner {
+    width: min(var(--mh-max), calc(100% - 64px));
+    margin: 0 auto;
+    min-height: 92px;
+    gap: 24px;
+    align-items: center;
+  }
+
+  body.gm-page .product-brand {
+    display: inline-grid;
+    grid-template-columns: auto auto;
+    grid-template-rows: auto auto;
+    justify-content: start;
+    align-items: center;
+    column-gap: 10px;
+    row-gap: 0;
+    min-width: 0;
+  }
+
+  body.gm-page .product-brand-name {
+    color: inherit;
+    font-family: var(--mh-serif);
+    font-size: 31px;
+    line-height: 1;
+    letter-spacing: .12em;
+    font-weight: 700;
+  }
+
+  body.gm-page .product-brand-seal {
+    display: grid;
+  }
+
+  body.gm-page .product-brand-sub {
+    margin-top: 7px;
+    color: var(--mh-ink-muted);
+    font-family: var(--mh-sans);
+    font-size: 10px;
+    letter-spacing: .12em;
+    white-space: nowrap;
+  }
+
+  body.gm-page .product-nav {
+    height: 92px;
+    gap: clamp(28px, 4vw, 64px);
+  }
+
+  body.gm-page .product-nav-link {
+    min-width: 40px;
+    color: var(--mh-ink);
+    font-family: var(--mh-serif);
+    font-size: 17px;
+    letter-spacing: .04em;
+  }
+
+  body.gm-page .product-nav-link[aria-current="page"] {
+    color: var(--mh-night-900);
+    font-weight: 700;
+  }
+
+  body.gm-page .product-nav-link[aria-current="page"]::before {
+    content: "◇";
+    display: block;
+    position: absolute;
+    left: 50%;
+    bottom: 1px;
+    transform: translateX(-50%);
+    color: var(--mh-brass-strong);
+    font-size: 11px;
+    background: #f8f1e8;
+    z-index: 1;
+  }
+
+  body.gm-page .product-nav-link[aria-current="page"]::after {
+    left: 2px;
+    right: 2px;
+    bottom: 8px;
+    height: 2px;
+    background: var(--mh-night-900);
+  }
+
+  body.gm-page .product-utilities {
+    gap: 14px;
+  }
+
+  body.gm-page .product-profile {
+    display: inline-flex;
+  }
+
+  body.gm-page .product-icon-button {
+    width: 44px;
+    min-height: 44px;
+    border: 1px solid var(--mh-line);
+    background: rgba(255, 255, 255, .18);
+  }
+
+  body.gm-page .product-icon-button::before {
+    top: 11px;
+  }
+
+  body.gm-page .product-icon-button::after {
+    top: 26px;
+  }
+}
+
+@media (min-width: 1100px) {
+  body.gm-page .product-header-inner {
+    grid-template-columns: 220px minmax(420px, 1fr) 220px;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1099px) {
+  body.gm-page .product-header-inner {
+    grid-template-columns: 190px 1fr 160px;
+  }
+
+  body.gm-page .product-nav {
+    gap: 24px;
+  }
+}
+
+@media (max-width: 767px) {
+  body.gm-page .product-header {
+    position: relative;
+    min-height: 0;
+  }
+
+  body.gm-page .product-header-inner {
+    width: min(100% - 28px, 640px);
+    margin: 0 auto;
+    min-height: 86px;
+    grid-template-columns: 1fr auto;
+    gap: 12px;
+  }
+
+  body.gm-page .product-brand {
+    display: inline-grid;
+    grid-template-columns: auto auto;
+    grid-template-rows: auto auto;
+    justify-content: start;
+    align-items: center;
+    column-gap: 10px;
+    row-gap: 0;
+  }
+
+  body.gm-page .product-brand-name {
+    color: inherit;
+    font-family: var(--mh-serif);
+    font-size: 28px;
+    line-height: 1;
+    letter-spacing: .12em;
+    font-weight: 700;
+  }
+
+  body.gm-page .product-brand-seal {
+    display: grid;
+  }
+
+  body.gm-page .product-brand-sub {
+    margin-top: 7px;
+    color: var(--mh-ink-muted);
+    font-family: var(--mh-sans);
+    font-size: 10px;
+    letter-spacing: .12em;
+    white-space: nowrap;
+  }
+
+  body.gm-page .product-nav {
+    display: none;
+  }
+
+  body.gm-page .product-profile {
+    display: none;
+  }
+
+  body.gm-page .product-utilities {
+    grid-column: 2;
+    grid-row: 1;
+  }
+}
+
+@media (max-width: 420px) {
+  body.gm-page .product-brand-seal {
+    display: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   body.gm-page .gm-card,
   body.gm-page .gm-saju-hero,
