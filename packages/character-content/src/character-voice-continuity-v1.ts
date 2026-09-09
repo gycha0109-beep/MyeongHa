@@ -1,8 +1,7 @@
-import {
-  CHARACTER_RUNTIME_AUTHORING_V1,
-  type CharacterRuntimeAuthoringV1CharacterId,
-  type CharacterRuntimeAuthoringV1Definition,
-} from './runtime-authoring-v1.js';
+import type {
+  CharacterContentDefinition,
+  CharacterPersonaProfile,
+} from './schema.js';
 
 export const CHARACTER_CONVERSATION_SURFACES_V1 = [
   'general_chat',
@@ -12,10 +11,10 @@ export const CHARACTER_CONVERSATION_SURFACES_V1 = [
 export type CharacterConversationSurfaceV1 =
   (typeof CHARACTER_CONVERSATION_SURFACES_V1)[number];
 
-export const CHARACTER_VOICE_AUTHORITY_VERSION_V1 = 'runtime-authoring-v1' as const;
+export const CHARACTER_VOICE_AUTHORITY_SOURCE_V1 = 'published_character_content' as const;
 
 export const CHARACTER_SAJU_VOICE_CONTINUITY_POLICY_V1 = {
-  voiceAuthority: 'shared_runtime_authoring',
+  voiceAuthority: 'shared_published_character_content',
   sajuSpecificVoiceOverride: 'forbidden',
   protectedSemanticPayload: 'immutable',
   unauthorizedRealityInference: 'forbidden',
@@ -23,16 +22,22 @@ export const CHARACTER_SAJU_VOICE_CONTINUITY_POLICY_V1 = {
   visualReactionChannel: 'emotion_animation_cue_only',
 } as const;
 
+export type CharacterVoiceSourceV1 = Omit<CharacterContentDefinition, 'persona'> & {
+  readonly persona: CharacterPersonaProfile;
+};
+
 export interface CharacterVoiceAuthorityV1 {
-  readonly characterId: CharacterRuntimeAuthoringV1CharacterId;
+  readonly characterId: string;
   readonly surface: CharacterConversationSurfaceV1;
-  readonly sourceVersion: typeof CHARACTER_VOICE_AUTHORITY_VERSION_V1;
-  readonly speech: CharacterRuntimeAuthoringV1Definition['speech'];
-  readonly communication: CharacterRuntimeAuthoringV1Definition['persona']['communication'];
+  readonly source: typeof CHARACTER_VOICE_AUTHORITY_SOURCE_V1;
+  readonly contentVersion: string;
+  readonly speech: CharacterContentDefinition['speech'];
+  readonly communication: CharacterPersonaProfile['communication'];
 }
 
 export const CHARACTER_VOICE_CONTINUITY_VIOLATION_CODES_V1 = [
   'VOICE_AUTHORITY_MISMATCH',
+  'VOICE_CONTENT_VERSION_MISMATCH',
   'SAJU_VOICE_OVERRIDE_FORBIDDEN',
   'UNAUTHORIZED_REALITY_FACT',
   'STAGE_DIRECTION_IN_SPEECH',
@@ -42,10 +47,11 @@ export type CharacterVoiceContinuityViolationCodeV1 =
   (typeof CHARACTER_VOICE_CONTINUITY_VIOLATION_CODES_V1)[number];
 
 export interface CharacterVoiceContinuityEvidenceV1 {
-  readonly characterId: CharacterRuntimeAuthoringV1CharacterId;
+  readonly characterId: string;
+  readonly characterContentVersion: string;
   readonly surface: CharacterConversationSurfaceV1;
-  readonly voiceAuthorityCharacterId: CharacterRuntimeAuthoringV1CharacterId;
-  readonly voiceAuthorityVersion: typeof CHARACTER_VOICE_AUTHORITY_VERSION_V1;
+  readonly voiceAuthorityCharacterId: string;
+  readonly voiceAuthorityContentVersion: string;
   readonly sajuVoiceOverrideRequested?: boolean;
   readonly introducedRealityFactKeys?: readonly string[];
   readonly authorizedRealityFactKeys?: readonly string[];
@@ -63,37 +69,22 @@ export interface CharacterVoiceContinuityValidationResultV1 {
   readonly violations: readonly CharacterVoiceContinuityViolationV1[];
 }
 
-function getRuntimeAuthoringDefinition(
-  characterId: CharacterRuntimeAuthoringV1CharacterId,
-): CharacterRuntimeAuthoringV1Definition {
-  const definition = CHARACTER_RUNTIME_AUTHORING_V1.find(
-    (candidate) => candidate.characterId === characterId,
-  );
-
-  if (definition === undefined) {
-    throw new Error(`Missing runtime authoring authority for character: ${characterId}`);
-  }
-
-  return definition;
-}
-
 /**
- * General chat and Saju products deliberately resolve the same authored speech and
+ * General chat and Saju products deliberately resolve the same published speech and
  * communication objects. A product surface may add grounded content constraints,
  * but it never receives a separate Character voice authority.
  */
 export function resolveCharacterVoiceAuthorityV1(
-  characterId: CharacterRuntimeAuthoringV1CharacterId,
+  character: CharacterVoiceSourceV1,
   surface: CharacterConversationSurfaceV1,
 ): CharacterVoiceAuthorityV1 {
-  const definition = getRuntimeAuthoringDefinition(characterId);
-
   return {
-    characterId,
+    characterId: character.characterId,
     surface,
-    sourceVersion: CHARACTER_VOICE_AUTHORITY_VERSION_V1,
-    speech: definition.speech,
-    communication: definition.persona.communication,
+    source: CHARACTER_VOICE_AUTHORITY_SOURCE_V1,
+    contentVersion: character.contentVersion,
+    speech: character.speech,
+    communication: character.persona.communication,
   };
 }
 
@@ -109,14 +100,19 @@ export function validateCharacterVoiceContinuityV1(
 ): CharacterVoiceContinuityValidationResultV1 {
   const violations: CharacterVoiceContinuityViolationV1[] = [];
 
-  if (
-    evidence.voiceAuthorityCharacterId !== evidence.characterId ||
-    evidence.voiceAuthorityVersion !== CHARACTER_VOICE_AUTHORITY_VERSION_V1
-  ) {
+  if (evidence.voiceAuthorityCharacterId !== evidence.characterId) {
     violations.push({
       code: 'VOICE_AUTHORITY_MISMATCH',
-      detail: 'The rendered response must use the selected Character runtime authoring authority.',
-      value: `${evidence.voiceAuthorityCharacterId}@${evidence.voiceAuthorityVersion}`,
+      detail: 'The rendered response must use the selected published Character voice authority.',
+      value: evidence.voiceAuthorityCharacterId,
+    });
+  }
+
+  if (evidence.voiceAuthorityContentVersion !== evidence.characterContentVersion) {
+    violations.push({
+      code: 'VOICE_CONTENT_VERSION_MISMATCH',
+      detail: 'The rendered response must use the same published Character content version loaded for the turn.',
+      value: `${evidence.voiceAuthorityContentVersion} != ${evidence.characterContentVersion}`,
     });
   }
 
