@@ -116,6 +116,40 @@ function confirmationGuestHandoffLocks() {
   return locks && typeof locks.request === 'function' ? locks : null;
 }
 
+function confirmationGuestHandoffReadFailure(error) {
+  return new ProductAuthError(
+    'WEB_AUTH_CONFIRMATION_HANDOFF_READ_FAILED',
+    '게스트 계정 연결 기록을 브라우저에서 안전하게 읽지 못했습니다.',
+    error,
+  );
+}
+
+function confirmationGuestHandoffClearFailure(error) {
+  return new ProductAuthError(
+    'WEB_AUTH_CONFIRMATION_HANDOFF_CLEAR_FAILED',
+    '게스트 계정 연결 기록을 브라우저에서 안전하게 제거하지 못했습니다.',
+    error,
+  );
+}
+
+function readConfirmationGuestHandoffLocal(key) {
+  try {
+    return localStorage.getItem(key);
+  } catch (error) {
+    throw confirmationGuestHandoffReadFailure(error);
+  }
+}
+
+function removeConfirmationGuestHandoffLocal(key) {
+  try {
+    localStorage.removeItem(key);
+    if (localStorage.getItem(key) === null) return true;
+  } catch (error) {
+    throw confirmationGuestHandoffClearFailure(error);
+  }
+  throw confirmationGuestHandoffClearFailure();
+}
+
 function clearConfirmationGuestHandoff() {
   try {
     localStorage.removeItem(CONFIRMATION_GUEST_HANDOFF_KEY);
@@ -169,12 +203,7 @@ function dedupeConfirmationGuestHandoffs(candidates) {
 }
 
 function readLegacyConfirmationGuestHandoffCandidates() {
-  let raw = null;
-  try {
-    raw = localStorage.getItem(CONFIRMATION_GUEST_HANDOFF_KEY);
-  } catch {
-    return [];
-  }
+  const raw = readConfirmationGuestHandoffLocal(CONFIRMATION_GUEST_HANDOFF_KEY);
   if (!raw) return [];
 
   let stored = null;
@@ -191,11 +220,7 @@ function readLegacyConfirmationGuestHandoffCandidates() {
 }
 
 function hasConfirmationGuestHandoffJournal() {
-  try {
-    return localStorage.getItem(CONFIRMATION_GUEST_HANDOFF_JOURNAL_MARKER_KEY) === '1';
-  } catch {
-    return false;
-  }
+  return readConfirmationGuestHandoffLocal(CONFIRMATION_GUEST_HANDOFF_JOURNAL_MARKER_KEY) === '1';
 }
 
 function confirmationGuestHandoffJournalKeys() {
@@ -205,8 +230,8 @@ function confirmationGuestHandoffJournalKeys() {
       const key = localStorage.key(index);
       if (key?.startsWith(CONFIRMATION_GUEST_HANDOFF_ENTRY_PREFIX)) keys.push(key);
     }
-  } catch {
-    return [];
+  } catch (error) {
+    throw confirmationGuestHandoffReadFailure(error);
   }
   return keys;
 }
@@ -214,19 +239,18 @@ function confirmationGuestHandoffJournalKeys() {
 function readConfirmationGuestHandoffJournalCandidates() {
   const entries = [];
   for (const key of confirmationGuestHandoffJournalKeys()) {
+    const raw = readConfirmationGuestHandoffLocal(key);
+    let normalized = null;
     try {
-      const raw = localStorage.getItem(key);
-      const normalized = raw ? normalizeConfirmationGuestHandoff(JSON.parse(raw)) : null;
-      if (!normalized) {
-        localStorage.removeItem(key);
-        continue;
-      }
-      entries.push(normalized);
-    } catch {
+      normalized = raw ? normalizeConfirmationGuestHandoff(JSON.parse(raw)) : null;
+    } catch {}
+    if (!normalized) {
       try {
         localStorage.removeItem(key);
       } catch {}
+      continue;
     }
+    entries.push(normalized);
   }
   return entries;
 }
@@ -234,9 +258,11 @@ function readConfirmationGuestHandoffJournalCandidates() {
 function writeConfirmationGuestHandoffJournalEntry(entry) {
   const suffix = globalThis.crypto?.randomUUID?.()
     ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+  const key = `${CONFIRMATION_GUEST_HANDOFF_ENTRY_PREFIX}${suffix}`;
+  const raw = JSON.stringify(entry);
   try {
-    localStorage.setItem(`${CONFIRMATION_GUEST_HANDOFF_ENTRY_PREFIX}${suffix}`, JSON.stringify(entry));
-    return true;
+    localStorage.setItem(key, raw);
+    return localStorage.getItem(key) === raw;
   } catch {
     return false;
   }
@@ -245,21 +271,20 @@ function writeConfirmationGuestHandoffJournalEntry(entry) {
 function removeConfirmationGuestHandoffJournalMatches(expectedEmail, promotedGuestBearer) {
   let removed = false;
   for (const key of confirmationGuestHandoffJournalKeys()) {
+    const raw = readConfirmationGuestHandoffLocal(key);
+    let normalized = null;
     try {
-      const raw = localStorage.getItem(key);
-      const normalized = raw ? normalizeConfirmationGuestHandoff(JSON.parse(raw)) : null;
-      if (!normalized) {
-        localStorage.removeItem(key);
-        continue;
-      }
-      if (normalized.email === expectedEmail && normalized.guestBearer === promotedGuestBearer) {
-        localStorage.removeItem(key);
-        removed = true;
-      }
-    } catch {
+      normalized = raw ? normalizeConfirmationGuestHandoff(JSON.parse(raw)) : null;
+    } catch {}
+    if (!normalized) {
       try {
         localStorage.removeItem(key);
       } catch {}
+      continue;
+    }
+    if (normalized.email === expectedEmail && normalized.guestBearer === promotedGuestBearer) {
+      removeConfirmationGuestHandoffLocal(key);
+      removed = true;
     }
   }
   return removed;
@@ -275,7 +300,7 @@ function ensureConfirmationGuestHandoffJournalInitialized() {
 
   try {
     localStorage.setItem(CONFIRMATION_GUEST_HANDOFF_JOURNAL_MARKER_KEY, '1');
-    return true;
+    return localStorage.getItem(CONFIRMATION_GUEST_HANDOFF_JOURNAL_MARKER_KEY) === '1';
   } catch {
     return false;
   }
@@ -332,7 +357,10 @@ async function readConfirmationGuestHandoff(memberEmail) {
       if (!ensureConfirmationGuestHandoffJournalInitialized()) return null;
       return readExact();
     });
-  } catch {
+  } catch (error) {
+    if (error instanceof ProductAuthError && error.code === 'WEB_AUTH_CONFIRMATION_HANDOFF_READ_FAILED') {
+      throw error;
+    }
     return null;
   }
 }
@@ -346,8 +374,8 @@ async function clearConfirmationGuestHandoffIfMatches(memberEmail, promotedGuest
     const next = current.filter((entry) => !(
       entry.email === expectedEmail && entry.guestBearer === promotedGuestBearer
     ));
-    if (next.length === current.length) return false;
-    removeConfirmationGuestHandoffJournalMatches(expectedEmail, promotedGuestBearer);
+    if (next.length === current.length) return true;
+    if (!removeConfirmationGuestHandoffJournalMatches(expectedEmail, promotedGuestBearer)) return false;
     writeConfirmationGuestHandoffs(next);
     return true;
   };
@@ -356,7 +384,13 @@ async function clearConfirmationGuestHandoffIfMatches(memberEmail, promotedGuest
   if (!locks) return clearExact();
   try {
     return await locks.request(CONFIRMATION_GUEST_HANDOFF_LOCK_NAME, { mode: 'exclusive' }, clearExact);
-  } catch {
+  } catch (error) {
+    if (error instanceof ProductAuthError && (
+      error.code === 'WEB_AUTH_CONFIRMATION_HANDOFF_READ_FAILED' ||
+      error.code === 'WEB_AUTH_CONFIRMATION_HANDOFF_CLEAR_FAILED'
+    )) {
+      throw error;
+    }
     return false;
   }
 }
@@ -392,7 +426,9 @@ async function promoteGuestIfPresent(accessToken, memberEmail) {
 
   if (response.ok && payload?.ok === true) {
     clearPromotedGuestBearer();
-    await clearConfirmationGuestHandoffIfMatches(memberEmail, guestBearer);
+    if (!await clearConfirmationGuestHandoffIfMatches(memberEmail, guestBearer)) {
+      throw confirmationGuestHandoffClearFailure();
+    }
     return { status: 'promoted' };
   }
 
@@ -404,7 +440,9 @@ async function promoteGuestIfPresent(accessToken, memberEmail) {
     }
     if (code === 'GUEST_AUTH_REQUIRED') {
       invalidateGuestSession(guestBearer);
-      await clearConfirmationGuestHandoffIfMatches(memberEmail, guestBearer);
+      if (!await clearConfirmationGuestHandoffIfMatches(memberEmail, guestBearer)) {
+        throw confirmationGuestHandoffClearFailure();
+      }
       return { status: 'guest-rejected' };
     }
     return { status: 'auth-rejected' };
@@ -429,6 +467,10 @@ function authErrorMessage(error) {
       return '인증 서버에 연결할 수 없습니다. 잠시 뒤 다시 시도해 주세요.';
     case 'WEB_AUTH_GUEST_PREPARE_FAILED':
       return '현재 게스트 흐름을 안전하게 보존하지 못해 회원가입을 중단했습니다. 다시 시도해 주세요.';
+    case 'WEB_AUTH_CONFIRMATION_HANDOFF_READ_FAILED':
+      return '저장된 게스트 계정 연결 기록을 확인하지 못했습니다. 브라우저 저장소 접근을 복구한 뒤 다시 로그인해 주세요.';
+    case 'WEB_AUTH_CONFIRMATION_HANDOFF_CLEAR_FAILED':
+      return '게스트 계정 연결 기록을 정리하지 못했습니다. 브라우저 저장소 접근을 복구한 뒤 다시 로그인해 주세요.';
     default:
       return '인증을 완료하지 못했습니다. 입력을 확인하고 다시 시도해 주세요.';
   }
