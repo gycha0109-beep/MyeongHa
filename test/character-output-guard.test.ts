@@ -178,7 +178,7 @@ function runtimeContext(withSaju = true): CharacterRuntimeContextV1 {
           },
         }
       : null,
-  } as CharacterRuntimeContextV1;
+  } as unknown as CharacterRuntimeContextV1;
 }
 
 function validDraft(): Record<string, unknown> {
