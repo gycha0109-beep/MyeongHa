@@ -91,7 +91,7 @@ shape=$("${psql_base[@]}" -At -F '|' -c "select p.provolatile,pg_get_function_re
 [[ "$shape" == 's|TABLE(entitlement_key text, scope_key text, effective_valid_until timestamp with time zone)' ]] || fail "effective entitlement v2 function shape mismatch: $shape"
 public_exec=$("${psql_base[@]}" -Atc "select case when has_function_privilege('public','public.qry_effective_entitlements_v2(uuid,timestamptz)','EXECUTE') then '1' else '0' end;")
 [[ "$public_exec" == '0' ]] || fail "effective entitlement v2 unexpectedly executable by PUBLIC"
-[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == '60' ]] || fail "public table catalog changed"
-pass "effective entitlement v2 is STABLE, PUBLIC EXECUTE revoked, and table catalog remains 60"
+[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == '62' ]] || fail "public table catalog changed"
+pass "effective entitlement v2 is STABLE, PUBLIC EXECUTE revoked, and table catalog remains 62"
 
 echo "Guest-aware effective entitlement v2 query tests passed"

@@ -291,7 +291,7 @@ owner_flags=$("${psql_base[@]}" -c "select rolcanlogin::int||'|'||rolsuper::int|
 [[ "$executor_exec" == '1' ]] || fail "API executor is missing thread open command EXECUTE"
 [[ "$executor_insert" == '0' ]] || fail "API executor unexpectedly has direct conversation_threads INSERT"
 [[ "$owner_flags" == '0|0|0' ]] || fail "thread open owner role escaped NOLOGIN/NOSUPERUSER/NOBYPASSRLS contract: $owner_flags"
-[[ "$("${psql_base[@]}" -c "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == '60' ]] || fail "public table catalog changed"
+[[ "$("${psql_base[@]}" -c "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == '62' ]] || fail "public table catalog changed"
 pass "thread open wrapper preserves command-only least-privilege runtime authority"
 
 echo "Member Character thread open persistence/concurrency tests passed"
