@@ -22,7 +22,10 @@ export const CHARACTER_SAJU_VOICE_CONTINUITY_POLICY_V1 = {
   visualReactionChannel: 'emotion_animation_cue_only',
 } as const;
 
-export type CharacterVoiceSourceV1 = Omit<CharacterContentDefinition, 'persona'> & {
+export type CharacterVoiceSourceV1 = Pick<
+  CharacterContentDefinition,
+  'characterId' | 'contentVersion' | 'speech'
+> & {
   readonly persona: CharacterPersonaProfile;
 };
 
