@@ -53,6 +53,10 @@ BEGIN
 END
 $$;
 
+-- Supabase CLI applies migrations as postgres. When functions are reassigned to a
+-- custom NOLOGIN owner role, postgres must be a member so ALTER ... OWNER can SET ROLE.
+grant myeongha_content_publication_owner to postgres;
+
 grant usage on schema public to myeongha_content_publication_owner;
 grant usage on schema public to myeongha_content_operator;
 
