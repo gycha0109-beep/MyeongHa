@@ -1,23 +1,30 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  CHARACTER_RUNTIME_AUTHORING_V1_CHARACTER_IDS,
+  CHARACTER_RUNTIME_AUTHORING_V1,
 } from './runtime-authoring-v1.js';
 import {
   CHARACTER_SAJU_VOICE_CONTINUITY_POLICY_V1,
-  CHARACTER_VOICE_AUTHORITY_VERSION_V1,
+  CHARACTER_VOICE_AUTHORITY_SOURCE_V1,
   resolveCharacterVoiceAuthorityV1,
   validateCharacterVoiceContinuityV1,
 } from './character-voice-continuity-v1.js';
 
 describe('Character/Saju voice continuity v1', () => {
-  it('resolves general chat and Saju products to the exact same authored voice objects', () => {
-    for (const characterId of CHARACTER_RUNTIME_AUTHORING_V1_CHARACTER_IDS) {
-      const general = resolveCharacterVoiceAuthorityV1(characterId, 'general_chat');
-      const saju = resolveCharacterVoiceAuthorityV1(characterId, 'saju_product');
+  it('resolves general chat and Saju products to the exact same published voice objects', () => {
+    for (const definition of CHARACTER_RUNTIME_AUTHORING_V1) {
+      const published = {
+        characterId: definition.characterId,
+        contentVersion: `test-published-${definition.characterId}-v1`,
+        speech: definition.speech,
+        persona: definition.persona,
+      };
+      const general = resolveCharacterVoiceAuthorityV1(published, 'general_chat');
+      const saju = resolveCharacterVoiceAuthorityV1(published, 'saju_product');
 
-      expect(general.sourceVersion).toBe(CHARACTER_VOICE_AUTHORITY_VERSION_V1);
-      expect(saju.sourceVersion).toBe(CHARACTER_VOICE_AUTHORITY_VERSION_V1);
+      expect(general.source).toBe(CHARACTER_VOICE_AUTHORITY_SOURCE_V1);
+      expect(saju.source).toBe(CHARACTER_VOICE_AUTHORITY_SOURCE_V1);
+      expect(saju.contentVersion).toBe(published.contentVersion);
       expect(saju.speech).toBe(general.speech);
       expect(saju.communication).toBe(general.communication);
     }
@@ -25,7 +32,7 @@ describe('Character/Saju voice continuity v1', () => {
 
   it('forbids a product-specific Saju voice while preserving semantic and visual channel boundaries', () => {
     expect(CHARACTER_SAJU_VOICE_CONTINUITY_POLICY_V1).toEqual({
-      voiceAuthority: 'shared_runtime_authoring',
+      voiceAuthority: 'shared_published_character_content',
       sajuSpecificVoiceOverride: 'forbidden',
       protectedSemanticPayload: 'immutable',
       unauthorizedRealityInference: 'forbidden',
@@ -37,9 +44,10 @@ describe('Character/Saju voice continuity v1', () => {
   it('fails closed when the rendered voice authority does not match the selected Character', () => {
     const result = validateCharacterVoiceContinuityV1({
       characterId: 'doyun',
+      characterContentVersion: 'doyun-v7',
       surface: 'saju_product',
       voiceAuthorityCharacterId: 'yeoul',
-      voiceAuthorityVersion: CHARACTER_VOICE_AUTHORITY_VERSION_V1,
+      voiceAuthorityContentVersion: 'doyun-v7',
     });
 
     expect(result.ok).toBe(false);
@@ -48,12 +56,28 @@ describe('Character/Saju voice continuity v1', () => {
     );
   });
 
+  it('fails closed when the voice comes from a stale published content version', () => {
+    const result = validateCharacterVoiceContinuityV1({
+      characterId: 'doyun',
+      characterContentVersion: 'doyun-v7',
+      surface: 'saju_product',
+      voiceAuthorityCharacterId: 'doyun',
+      voiceAuthorityContentVersion: 'doyun-v6',
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.violations.map((violation) => violation.code)).toEqual([
+      'VOICE_CONTENT_VERSION_MISMATCH',
+    ]);
+  });
+
   it('fails closed when a Saju product requests a separate Character voice override', () => {
     const result = validateCharacterVoiceContinuityV1({
       characterId: 'doyun',
+      characterContentVersion: 'doyun-v7',
       surface: 'saju_product',
       voiceAuthorityCharacterId: 'doyun',
-      voiceAuthorityVersion: CHARACTER_VOICE_AUTHORITY_VERSION_V1,
+      voiceAuthorityContentVersion: 'doyun-v7',
       sajuVoiceOverrideRequested: true,
     });
 
@@ -66,9 +90,10 @@ describe('Character/Saju voice continuity v1', () => {
   it('rejects reality-specific business wording when no user context authorizes it', () => {
     const result = validateCharacterVoiceContinuityV1({
       characterId: 'doyun',
+      characterContentVersion: 'doyun-v7',
       surface: 'saju_product',
       voiceAuthorityCharacterId: 'doyun',
-      voiceAuthorityVersion: CHARACTER_VOICE_AUTHORITY_VERSION_V1,
+      voiceAuthorityContentVersion: 'doyun-v7',
       introducedRealityFactKeys: [
         'business.metric.click',
         'business.metric.inquiry',
@@ -88,9 +113,10 @@ describe('Character/Saju voice continuity v1', () => {
   it('allows reality-specific wording only when the same fact keys are explicitly authorized', () => {
     const result = validateCharacterVoiceContinuityV1({
       characterId: 'doyun',
+      characterContentVersion: 'doyun-v7',
       surface: 'saju_product',
       voiceAuthorityCharacterId: 'doyun',
-      voiceAuthorityVersion: CHARACTER_VOICE_AUTHORITY_VERSION_V1,
+      voiceAuthorityContentVersion: 'doyun-v7',
       introducedRealityFactKeys: ['business.metric.click'],
       authorizedRealityFactKeys: ['business.metric.click'],
     });
@@ -101,9 +127,10 @@ describe('Character/Saju voice continuity v1', () => {
   it('rejects prose stage directions so pose and expression stay in visual runtime cues', () => {
     const result = validateCharacterVoiceContinuityV1({
       characterId: 'doyun',
+      characterContentVersion: 'doyun-v7',
       surface: 'saju_product',
       voiceAuthorityCharacterId: 'doyun',
-      voiceAuthorityVersion: CHARACTER_VOICE_AUTHORITY_VERSION_V1,
+      voiceAuthorityContentVersion: 'doyun-v7',
       proseStageDirections: ['팔짱을 낀다', '피식 웃는다'],
     });
 
@@ -117,9 +144,10 @@ describe('Character/Saju voice continuity v1', () => {
   it('passes a clean Saju render contract without inventing product voice or reality facts', () => {
     const result = validateCharacterVoiceContinuityV1({
       characterId: 'yeoul',
+      characterContentVersion: 'yeoul-v3',
       surface: 'saju_product',
       voiceAuthorityCharacterId: 'yeoul',
-      voiceAuthorityVersion: CHARACTER_VOICE_AUTHORITY_VERSION_V1,
+      voiceAuthorityContentVersion: 'yeoul-v3',
       sajuVoiceOverrideRequested: false,
       introducedRealityFactKeys: [],
       authorizedRealityFactKeys: [],
