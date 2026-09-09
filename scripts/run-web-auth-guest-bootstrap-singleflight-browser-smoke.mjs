@@ -30,8 +30,6 @@ const exitCode = await new Promise((resolve, reject) => {
   });
 });
 
-if (exitCode === 0) process.exit(0);
-
 const requiredMarkers = [
   'MyeongHa_WEB_AUTH_GUEST_BOOTSTRAP_SINGLEFLIGHT_BROWSER_PASS',
   'MyeongHa_WEB_AUTH_MEMBER_WINS_GUEST_BOOTSTRAP_BROWSER_PASS',
@@ -42,9 +40,44 @@ const cleanupRace =
   stderr.includes('ENOTEMPTY: directory not empty, rmdir') &&
   stderr.includes('/tmp/myeongha-auth-guest-bootstrap-singleflight-browser-');
 
-if (functionalPass && cleanupRace) {
-  console.warn('MyeongHa Guest bootstrap/Member persistence browser assertions passed; ignoring ephemeral Chrome profile cleanup ENOTEMPTY race.');
-  process.exit(0);
+if (exitCode !== 0) {
+  if (functionalPass && cleanupRace) {
+    console.warn('MyeongHa Guest bootstrap/Member persistence browser assertions passed; ignoring ephemeral Chrome profile cleanup ENOTEMPTY race.');
+  } else {
+    process.exit(exitCode);
+  }
 }
 
-process.exit(exitCode);
+const rollbackChild = spawn(process.execPath, ['scripts/verify-web-auth-storage-rollback-readback-browser.mjs'], {
+  env: process.env,
+  stdio: ['ignore', 'pipe', 'pipe'],
+});
+let rollbackStdout = '';
+let rollbackStderr = '';
+rollbackChild.stdout.setEncoding('utf8');
+rollbackChild.stderr.setEncoding('utf8');
+rollbackChild.stdout.on('data', (chunk) => {
+  rollbackStdout += chunk;
+  process.stdout.write(chunk);
+});
+rollbackChild.stderr.on('data', (chunk) => {
+  rollbackStderr += chunk;
+  process.stderr.write(chunk);
+});
+
+const rollbackExitCode = await new Promise((resolve, reject) => {
+  rollbackChild.once('error', reject);
+  rollbackChild.once('exit', (code, signal) => {
+    if (signal) {
+      reject(new Error(`Storage rollback read-back browser smoke terminated by signal ${signal}`));
+      return;
+    }
+    resolve(code ?? 1);
+  });
+});
+
+if (rollbackExitCode !== 0) process.exit(rollbackExitCode);
+if (!rollbackStdout.includes('MyeongHa_WEB_AUTH_STORAGE_ROLLBACK_READBACK_BROWSER_PASS')) {
+  console.error(rollbackStderr);
+  throw new Error('Rollback read-back browser verifier exited successfully without its PASS marker');
+}

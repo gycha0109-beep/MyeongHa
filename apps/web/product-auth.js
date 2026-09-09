@@ -72,7 +72,11 @@ function restoreLocalSnapshot(key, value) {
   try {
     if (value === null) localStorage.removeItem(key);
     else localStorage.setItem(key, value);
-    return true;
+  } catch {
+    // A rollback mutation may throw after restoring. Exact read-back remains authoritative.
+  }
+  try {
+    return readLocal(key) === value;
   } catch {
     return false;
   }
@@ -82,8 +86,14 @@ function removeLocal(key) {
   const previous = readLocal(key);
   try {
     localStorage.removeItem(key);
-  } catch {
-    restoreLocalSnapshot(key, previous);
+  } catch (error) {
+    if (!restoreLocalSnapshot(key, previous)) {
+      throw new ProductAuthError(
+        'WEB_AUTH_MEMBER_CLEAR_ROLLBACK_FAILED',
+        '로그인 세션 제거 실패 후 브라우저 상태를 안전하게 복원하지 못했습니다.',
+        error,
+      );
+    }
     return false;
   }
 
@@ -127,7 +137,11 @@ function restoreSessionValueSnapshot(key, value) {
   try {
     if (value === null) sessionStorage.removeItem(key);
     else sessionStorage.setItem(key, value);
-    return true;
+  } catch {
+    // A rollback mutation may throw after restoring. Exact read-back remains authoritative.
+  }
+  try {
+    return readSession(key) === value;
   } catch {
     return false;
   }
