@@ -34,6 +34,10 @@ postgres_owner_membership="$(query "select pg_has_role('postgres','myeongha_cont
 [[ "$postgres_owner_membership" == '1' ]] || fail "postgres cannot assume content publication owner during migration deployment"
 pass "postgres deployment principal can assume content publication owner"
 
+owner_schema_create="$(query "select has_schema_privilege('myeongha_content_publication_owner','public','CREATE')::int;")"
+[[ "$owner_schema_create" == '0' ]] || fail "content publication owner retained public schema CREATE after deployment"
+pass "content publication owner does not retain public schema CREATE"
+
 for fn in \
   "public.cmd_publish_character_content_bundle_v1(uuid,text,text,text,text,text,text,text,jsonb,jsonb,jsonb,jsonb)" \
   "public.cmd_create_content_release_v1(uuid,text,uuid,jsonb,text,text)" \
