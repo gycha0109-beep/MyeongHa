@@ -1,4 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
+import { handleCurrentSubjectSajuCalculationRequestV1 } from '../../../apps/api/src/current-subject-saju-calculation-http.js';
+import type { PostgresSubjectPoolV1 } from '../../../apps/api/src/postgres-subject-execution.js';
+import type { SajuProductionCalculationHttpAdapterV1 } from '../../../apps/api/src/saju-production-calculation-http-adapter.js';
 import { createCurrentSubjectSajuCalculationRouteV1 } from './calculation.js';
 
 function streamRequest(stream: ReadableStream<Uint8Array>): Request {
@@ -24,28 +27,29 @@ describe('current-subject Saju calculation public route body bound', () => {
         cancelled = true;
       },
     });
-    const handleRequest = vi.fn(async (input: { request: Request }) => {
-      expect(input.request.headers.get('content-length')).toBeNull();
-      expect(input.request.headers.get('transfer-encoding')).toBeNull();
-      expect(new Uint8Array(await input.request.arrayBuffer())).toEqual(new Uint8Array([1]));
-      return Response.json(
-        {
-          ok: false,
-          error: {
-            code: 'INVALID_REQUEST',
-            messageKey: 'request.body_not_allowed',
-            retryable: false,
-          },
-        },
-        { status: 400 },
-      );
-    });
+    const verifyRequestIdentity = vi.fn();
+    const handleRequest = vi.fn(async (input: { request: Request; requestId: string; serverTime: string }) =>
+      handleCurrentSubjectSajuCalculationRequestV1({
+        request: input.request,
+        requestId: input.requestId,
+        serverTime: input.serverTime,
+        identityEvidenceVerifier: { verifyRequestIdentity },
+        pool: { connect: vi.fn() } as unknown as PostgresSubjectPoolV1,
+        sajuAdapter: { calculate: vi.fn() } as unknown as SajuProductionCalculationHttpAdapterV1,
+      }));
     const route = createCurrentSubjectSajuCalculationRouteV1({ handleRequest });
 
     const response = await route.fetch(streamRequest(incoming));
+    const payload = await response.json() as any;
 
     expect(response.status).toBe(400);
+    expect(payload.error).toMatchObject({
+      code: 'INVALID_REQUEST',
+      messageKey: 'request.body_not_allowed',
+      retryable: false,
+    });
     expect(cancelled).toBe(true);
+    expect(verifyRequestIdentity).not.toHaveBeenCalled();
     expect(handleRequest).toHaveBeenCalledTimes(1);
   });
 
