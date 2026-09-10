@@ -1,4 +1,9 @@
 import type { IdentityEvidenceVerificationPortV1 } from './current-subject-profile-http.js';
+import {
+  fetchSupabaseAuthWithDeadlineV1,
+  requireSupabaseAuthUpstreamTimeoutMsV1,
+  type SupabaseAuthUpstreamFetchV1,
+} from './supabase-auth-upstream-deadline.js';
 import type { VerifiedSubjectIdentityEvidenceV1 } from './subject-identity-resolver.js';
 
 const AUTHORIZATION_HEADER = 'authorization';
@@ -12,15 +17,13 @@ export const SUPABASE_MEMBER_IDENTITY_VERIFIER_BINDINGS_V1 = Object.freeze({
   authUserPath: AUTH_USER_PATH,
 } as const);
 
-export type SupabaseMemberVerifierFetchV1 = (
-  input: string | URL | Request,
-  init?: RequestInit,
-) => Promise<Response>;
+export type SupabaseMemberVerifierFetchV1 = SupabaseAuthUpstreamFetchV1;
 
 export interface SupabaseMemberIdentityVerifierOptionsV1 {
   readonly supabaseOrigin: string;
   readonly supabaseApiKey: string;
   readonly fetchImpl?: SupabaseMemberVerifierFetchV1;
+  readonly timeoutMs?: number;
 }
 
 export class SupabaseMemberIdentityVerifierErrorV1 extends Error {
@@ -85,6 +88,18 @@ function requireApiKey(value: unknown): string {
   return value.trim();
 }
 
+function requireTimeoutMs(value: number | undefined): number {
+  try {
+    return requireSupabaseAuthUpstreamTimeoutMsV1(value);
+  } catch (error) {
+    throw new SupabaseMemberIdentityVerifierErrorV1(
+      'SUPABASE_MEMBER_VERIFIER_CONFIG_INVALID',
+      'Supabase Member verifier timeout is invalid.',
+      { cause: error },
+    );
+  }
+}
+
 function readBearerToken(request: Request): string | null {
   const authorization = request.headers.get(AUTHORIZATION_HEADER);
   if (authorization === null) return null;
@@ -124,12 +139,14 @@ export class SupabaseMemberIdentityEvidenceVerifierV1
   private readonly authUserUrl: string;
   private readonly supabaseApiKey: string;
   private readonly fetchImpl: SupabaseMemberVerifierFetchV1;
+  private readonly timeoutMs: number;
 
   constructor(options: SupabaseMemberIdentityVerifierOptionsV1) {
     const origin = requireHttpsOrigin(options.supabaseOrigin);
     this.authUserUrl = `${origin}${AUTH_USER_PATH}`;
     this.supabaseApiKey = requireApiKey(options.supabaseApiKey);
     this.fetchImpl = options.fetchImpl ?? globalThis.fetch;
+    this.timeoutMs = requireTimeoutMs(options.timeoutMs);
 
     if (typeof this.fetchImpl !== 'function') {
       throw new SupabaseMemberIdentityVerifierErrorV1(
@@ -147,15 +164,20 @@ export class SupabaseMemberIdentityEvidenceVerifierV1
 
     let response: Response;
     try {
-      response = await this.fetchImpl(this.authUserUrl, {
-        method: 'GET',
-        headers: {
-          [ACCEPT_HEADER]: JSON_MEDIA_TYPE,
-          [API_KEY_HEADER]: this.supabaseApiKey,
-          [AUTHORIZATION_HEADER]: `Bearer ${token}`,
+      response = await fetchSupabaseAuthWithDeadlineV1(
+        this.fetchImpl,
+        this.authUserUrl,
+        {
+          method: 'GET',
+          headers: {
+            [ACCEPT_HEADER]: JSON_MEDIA_TYPE,
+            [API_KEY_HEADER]: this.supabaseApiKey,
+            [AUTHORIZATION_HEADER]: `Bearer ${token}`,
+          },
+          cache: 'no-store',
         },
-        cache: 'no-store',
-      });
+        this.timeoutMs,
+      );
     } catch (error) {
       throw new SupabaseMemberIdentityVerifierErrorV1(
         'SUPABASE_MEMBER_VERIFIER_UPSTREAM_FAILED',
