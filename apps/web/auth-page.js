@@ -141,13 +141,19 @@ function readConfirmationGuestHandoffLocal(key) {
 }
 
 function removeConfirmationGuestHandoffLocal(key) {
+  let removalError = null;
   try {
     localStorage.removeItem(key);
+  } catch (error) {
+    removalError = error;
+  }
+
+  try {
     if (localStorage.getItem(key) === null) return true;
   } catch (error) {
     throw confirmationGuestHandoffClearFailure(error);
   }
-  throw confirmationGuestHandoffClearFailure();
+  throw confirmationGuestHandoffClearFailure(removalError);
 }
 
 function clearConfirmationGuestHandoff() {

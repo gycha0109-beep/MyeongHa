@@ -5,9 +5,9 @@ import { describe, expect, it } from 'vitest';
 const source = readFileSync(join(process.cwd(), 'apps', 'web', 'auth-page.js'), 'utf8');
 
 describe('confirmation handoff removal authority', () => {
-  it('verifies authoritative journal removal by direct read-back', () => {
+  it('verifies authoritative journal removal by direct read-back even when removeItem throws', () => {
     expect(source).toContain("'WEB_AUTH_CONFIRMATION_HANDOFF_CLEAR_FAILED'");
-    expect(source).toMatch(/function removeConfirmationGuestHandoffLocal\(key\)[\s\S]*localStorage\.removeItem\(key\);[\s\S]*localStorage\.getItem\(key\) === null/);
+    expect(source).toMatch(/function removeConfirmationGuestHandoffLocal\(key\)[\s\S]*let removalError = null;[\s\S]*localStorage\.removeItem\(key\);[\s\S]*removalError = error;[\s\S]*localStorage\.getItem\(key\) === null\) return true;[\s\S]*confirmationGuestHandoffClearFailure\(removalError\)/);
     expect(source).toContain('removeConfirmationGuestHandoffLocal(key);');
   });
 
