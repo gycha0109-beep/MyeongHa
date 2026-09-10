@@ -10,10 +10,12 @@ const chromeBin = process.env.CHROME_BIN ?? process.env.CHROME_PATH ?? 'chrome';
 const artifactDir = resolve(process.cwd(), 'artifacts');
 const artifactPath = join(artifactDir, 'web-auth-refresh-commit-lock-browser-smoke.json');
 const lockName = 'myeongha.memberSession.v1.refresh.lock';
-const member = Object.freeze({
+const identity = Object.freeze({
   id: '88888888-8888-4888-8888-888888888888',
-  email: 'refresh-commit-lock@example.com',
+  email: 'member-mutation-lock@example.com',
+  password: 'browser-password-12345',
 });
+const member = Object.freeze({ id: identity.id, email: identity.email });
 const original = Object.freeze({
   accessToken: 'old.header.signature',
   refreshToken: 'refresh-old',
@@ -28,14 +30,14 @@ const staleRefresh = Object.freeze({
   tokenType: 'bearer',
   user: member,
 });
-const newer = Object.freeze({
-  accessToken: 'newer.header.signature',
-  refreshToken: 'refresh-newer',
+const newerLogin = Object.freeze({
+  accessToken: 'newlogin.header.signature',
+  refreshToken: 'refresh-new-login',
   expiresAt: '2099-01-03T00:00:00.000Z',
   tokenType: 'bearer',
   user: member,
 });
-const stagedGuest = 'refresh-lock-staged-guest';
+const stagedGuest = 'member-mutation-lock-staged-guest';
 const mime = new Map([
   ['.html', 'text/html; charset=utf-8'],
   ['.js', 'text/javascript; charset=utf-8'],
@@ -44,6 +46,8 @@ const mime = new Map([
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
 let refreshRequests = 0;
+let signInRequests = 0;
+let signOutRequests = 0;
 const requests = [];
 
 function sendJson(res, status, payload) {
@@ -71,14 +75,36 @@ async function serve() {
         sendJson(res, 200, {
           ok: true,
           data: { status: 'authenticated', session: staleRefresh },
-          meta: { requestId: `refresh-lock-${refreshRequests}` },
+          meta: { requestId: `member-mutation-refresh-${refreshRequests}` },
+        });
+        return;
+      }
+      if (pathname === '/api/auth/sign-in' && req.method === 'POST') {
+        const body = await readJsonBody(req);
+        signInRequests += 1;
+        requests.push({ path: pathname, email: body.email ?? null });
+        assert(body.email === identity.email && body.password === identity.password, 'unexpected sign-in credentials');
+        sendJson(res, 200, {
+          ok: true,
+          data: { status: 'authenticated', session: newerLogin },
+          meta: { requestId: `member-mutation-sign-in-${signInRequests}` },
+        });
+        return;
+      }
+      if (pathname === '/api/auth/sign-out' && req.method === 'POST') {
+        signOutRequests += 1;
+        requests.push({ path: pathname, authorization: req.headers.authorization ?? null });
+        sendJson(res, 200, {
+          ok: true,
+          data: { status: 'signed_out' },
+          meta: { requestId: `member-mutation-sign-out-${signOutRequests}` },
         });
         return;
       }
       if (pathname === '/race.html') {
         res.statusCode = 200;
         res.setHeader('Content-Type', 'text/html; charset=utf-8');
-        res.end('<!doctype html><html><body>refresh lock race</body></html>');
+        res.end('<!doctype html><html><body>member mutation lock race</body></html>');
         return;
       }
       const relative = normalize(pathname).replace(/^[/\\]+/, '');
@@ -127,6 +153,19 @@ async function stopChrome(process) {
   }
 }
 
+async function removeChromeProfile(profile) {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    try {
+      await rm(profile, { recursive: true, force: true, maxRetries: 2, retryDelay: 100 });
+      return;
+    } catch (error) {
+      if (!['ENOTEMPTY', 'EBUSY', 'EPERM'].includes(error?.code)) throw error;
+      await sleep(100 * (attempt + 1));
+    }
+  }
+  await rm(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }).catch(() => {});
+}
+
 async function connectCdp(port) {
   const response = await fetch(`http://127.0.0.1:${port}/json/new?about%3Ablank`, { method: 'PUT' });
   assert(response.ok, `Chrome target create failed: ${response.status}`);
@@ -169,9 +208,43 @@ async function waitFor(client, expression, message, timeout = 8_000) {
   throw new Error(message);
 }
 
+async function seed(client, session = original) {
+  await client.evaluate(`(() => {
+    localStorage.setItem('myeongha.memberSession.v1', ${JSON.stringify(JSON.stringify(session))});
+    sessionStorage.setItem('myeongha.guestBearer.v1', ${JSON.stringify(session.accessToken)});
+    sessionStorage.setItem('myeongha.pendingGuestBearer.v1', ${JSON.stringify(stagedGuest)});
+  })()`);
+}
+
+async function holdLock(client, label) {
+  await client.evaluate(`(() => {
+    const state = { held: false, release: null };
+    state.gate = new Promise((resolve) => { state.release = resolve; });
+    window[${JSON.stringify(`__lock_${label}`)}] = state;
+    void navigator.locks.request(${JSON.stringify(lockName)}, { mode: 'exclusive' }, async () => {
+      state.held = true;
+      await state.gate;
+    });
+  })()`);
+  await waitFor(client, `window[${JSON.stringify(`__lock_${label}`)}]?.held === true`, `${label}: external Member mutation lock was not acquired`);
+  return () => client.evaluate(`window[${JSON.stringify(`__lock_${label}`)}].release()`);
+}
+
+async function storedState(client) {
+  return client.evaluate(`(() => {
+    const stored = JSON.parse(localStorage.getItem('myeongha.memberSession.v1') ?? 'null');
+    return {
+      storedAccessToken: stored?.accessToken ?? null,
+      storedRefreshToken: stored?.refreshToken ?? null,
+      activeBearer: sessionStorage.getItem('myeongha.guestBearer.v1'),
+      pendingGuest: sessionStorage.getItem('myeongha.pendingGuestBearer.v1'),
+    };
+  })()`);
+}
+
 await stat(join(root, 'product-auth.js'));
 const { server, origin } = await serve();
-const profile = await mkdtemp(join(tmpdir(), 'myeongha-auth-refresh-commit-lock-browser-'));
+const profile = await mkdtemp(join(tmpdir(), 'myeongha-auth-member-mutation-lock-browser-'));
 const chrome = spawn(chromeBin, [
   '--headless=new',
   '--no-sandbox',
@@ -193,83 +266,140 @@ try {
   const supportsLocks = await client.evaluate(`Boolean(navigator.locks && typeof navigator.locks.request === 'function')`);
   assert(supportsLocks, 'Chrome Web Locks API unavailable');
 
+  await seed(client);
+  const releaseDirect = await holdLock(client, 'direct');
   await client.evaluate(`(() => {
-    localStorage.setItem('myeongha.memberSession.v1', ${JSON.stringify(JSON.stringify(original))});
-    sessionStorage.setItem('myeongha.guestBearer.v1', ${JSON.stringify(original.accessToken)});
-    sessionStorage.setItem('myeongha.pendingGuestBearer.v1', ${JSON.stringify(stagedGuest)});
-    window.__releaseRefreshCommitLock = null;
-    window.__refreshCommitLockHeld = false;
-    window.__refreshCommitLockHold = new Promise((resolve) => { window.__releaseRefreshCommitLock = resolve; });
-    void navigator.locks.request(${JSON.stringify(lockName)}, { mode: 'exclusive' }, async () => {
-      window.__refreshCommitLockHeld = true;
-      await window.__refreshCommitLockHold;
-    });
-  })()`);
-  await waitFor(client, `window.__refreshCommitLockHeld === true`, 'external refresh commit lock was not acquired');
-
-  await client.evaluate(`(() => {
-    window.__refreshRace = { done: false, value: null, error: null };
+    window.__directRefresh = { done: false, value: null, error: null };
     void import('/product-auth.js').then((auth) => auth.refreshMemberSession()).then(
-      (value) => { window.__refreshRace = { done: true, value, error: null }; },
-      (error) => { window.__refreshRace = { done: true, value: null, error: { code: error?.code ?? null, message: error?.message ?? null } }; },
+      (value) => { window.__directRefresh = { done: true, value, error: null }; },
+      (error) => { window.__directRefresh = { done: true, value: null, error: { code: error?.code ?? null, message: error?.message ?? null } }; },
     );
   })()`);
-  const requestDeadline = Date.now() + 5_000;
-  while (refreshRequests < 1 && Date.now() < requestDeadline) await sleep(20);
-  assert(refreshRequests === 1, `refresh request count mismatch while lock held: ${refreshRequests}`);
-  await sleep(150);
-
-  const blocked = await client.evaluate(`(() => ({
-    done: window.__refreshRace?.done === true,
+  while (refreshRequests < 1) await sleep(20);
+  await sleep(100);
+  let state = await client.evaluate(`(() => ({
+    done: window.__directRefresh?.done === true,
     accessToken: JSON.parse(localStorage.getItem('myeongha.memberSession.v1') ?? 'null')?.accessToken ?? null,
   }))()`);
-  assert(blocked.done === false, 'successful refresh committed while the Member refresh lock was externally held');
-  assert(blocked.accessToken === original.accessToken, 'Member authority changed before the refresh commit lock was released');
+  assert(state.done === false, 'successful refresh committed while the Member mutation lock was externally held');
+  assert(state.accessToken === original.accessToken, 'Member authority changed before direct-race lock release');
+  await client.evaluate(`(() => {
+    localStorage.setItem('myeongha.memberSession.v1', ${JSON.stringify(JSON.stringify(newerLogin))});
+    sessionStorage.setItem('myeongha.guestBearer.v1', ${JSON.stringify(newerLogin.accessToken)});
+    sessionStorage.setItem('myeongha.pendingGuestBearer.v1', ${JSON.stringify(stagedGuest)});
+  })()`);
+  await releaseDirect();
+  await waitFor(client, `window.__directRefresh?.done === true`, 'direct replacement refresh did not settle');
+  const directState = await storedState(client);
+  const directResult = await client.evaluate(`window.__directRefresh`);
+  assert(directResult.error === null && directResult.value?.accessToken === newerLogin.accessToken, 'stale refresh did not converge to direct newer Member replacement');
+  assert(directState.storedAccessToken === newerLogin.accessToken, 'stale refresh overwrote direct newer Member replacement');
+  console.log('MyeongHa_WEB_AUTH_REFRESH_COMMIT_LOCK_BROWSER_PASS blocked=true preserved_newer=true refresh_requests=1');
+
+  await seed(client);
+  const releaseSignIn = await holdLock(client, 'signin');
+  await client.evaluate(`(() => {
+    window.__signInRace = { done: false, value: null, error: null };
+    void import('/product-auth.js').then((auth) => auth.signInWithPassword(
+      ${JSON.stringify(identity.email)},
+      ${JSON.stringify(identity.password)},
+    )).then(
+      (value) => { window.__signInRace = { done: true, value, error: null }; },
+      (error) => { window.__signInRace = { done: true, value: null, error: { code: error?.code ?? null, message: error?.message ?? null } }; },
+    );
+  })()`);
+  while (signInRequests < 1) await sleep(20);
+  await sleep(100);
+  state = await client.evaluate(`(() => ({
+    done: window.__signInRace?.done === true,
+    accessToken: JSON.parse(localStorage.getItem('myeongha.memberSession.v1') ?? 'null')?.accessToken ?? null,
+  }))()`);
+  assert(state.done === false, 'sign-in committed outside the shared Member mutation lock');
+  assert(state.accessToken === original.accessToken, 'sign-in changed Member authority while the shared lock was held');
 
   await client.evaluate(`(() => {
-    localStorage.setItem('myeongha.memberSession.v1', ${JSON.stringify(JSON.stringify(newer))});
-    sessionStorage.setItem('myeongha.guestBearer.v1', ${JSON.stringify(newer.accessToken)});
-    sessionStorage.setItem('myeongha.pendingGuestBearer.v1', ${JSON.stringify(stagedGuest)});
-    window.__releaseRefreshCommitLock();
+    window.__signInRefresh = { done: false, value: null, error: null };
+    void import('/product-auth.js').then((auth) => auth.refreshMemberSession()).then(
+      (value) => { window.__signInRefresh = { done: true, value, error: null }; },
+      (error) => { window.__signInRefresh = { done: true, value: null, error: { code: error?.code ?? null, message: error?.message ?? null } }; },
+    );
   })()`);
-  await waitFor(client, `window.__refreshRace?.done === true`, 'refresh did not settle after lock release');
+  while (refreshRequests < 2) await sleep(20);
+  await releaseSignIn();
+  await waitFor(client, `window.__signInRace?.done === true && window.__signInRefresh?.done === true`, 'sign-in/refresh race did not settle after lock release');
+  const signInState = await storedState(client);
+  const signInRace = await client.evaluate(`({ signIn: window.__signInRace, refresh: window.__signInRefresh })`);
+  assert(signInRace.signIn.error === null && signInRace.signIn.value?.accessToken === newerLogin.accessToken, 'serialized sign-in failed');
+  assert(signInRace.refresh.error === null && signInRace.refresh.value?.accessToken === newerLogin.accessToken, 'stale refresh did not converge after serialized sign-in');
+  assert(signInState.storedAccessToken === newerLogin.accessToken && signInState.storedRefreshToken === newerLogin.refreshToken, 'stale refresh overwrote the newer sign-in generation');
+  assert(signInState.activeBearer === newerLogin.accessToken && signInState.pendingGuest === stagedGuest, 'serialized sign-in compatibility authority mismatch');
+  console.log('Member mutation lock sign-in precedence: PASS');
 
-  const finalState = await client.evaluate(`(() => {
-    const stored = JSON.parse(localStorage.getItem('myeongha.memberSession.v1') ?? 'null');
-    return {
-      resultToken: window.__refreshRace?.value?.accessToken ?? null,
-      error: window.__refreshRace?.error ?? null,
-      storedAccessToken: stored?.accessToken ?? null,
-      storedRefreshToken: stored?.refreshToken ?? null,
-      activeBearer: sessionStorage.getItem('myeongha.guestBearer.v1'),
-      pendingGuest: sessionStorage.getItem('myeongha.pendingGuestBearer.v1'),
-    };
+  await seed(client);
+  const releaseSignOut = await holdLock(client, 'signout');
+  await client.evaluate(`(() => {
+    window.__signOutRace = { done: false, error: null };
+    void import('/product-auth.js').then((auth) => auth.signOutMember()).then(
+      () => { window.__signOutRace = { done: true, error: null }; },
+      (error) => { window.__signOutRace = { done: true, error: { code: error?.code ?? null, message: error?.message ?? null } }; },
+    );
   })()`);
-  assert(finalState.error === null, `refresh failed after lock release: ${JSON.stringify(finalState.error)}`);
-  assert(finalState.resultToken === newer.accessToken, 'stale refresh did not converge to the newer Member generation');
-  assert(finalState.storedAccessToken === newer.accessToken && finalState.storedRefreshToken === newer.refreshToken, 'stale refresh overwrote newer stored Member authority');
-  assert(finalState.activeBearer === newer.accessToken, 'stale refresh overwrote newer compatibility bearer authority');
-  assert(finalState.pendingGuest === stagedGuest, 'stale refresh consumed the pending Guest authority');
-  assert(requests[0]?.refreshToken === original.refreshToken, 'refresh did not use the original Member generation');
+  await sleep(150);
+  state = await client.evaluate(`(() => ({
+    done: window.__signOutRace?.done === true,
+    accessToken: JSON.parse(localStorage.getItem('myeongha.memberSession.v1') ?? 'null')?.accessToken ?? null,
+  }))()`);
+  assert(state.done === false, 'sign-out completed outside the shared Member mutation lock');
+  assert(signOutRequests === 0, 'sign-out remote request escaped the shared Member mutation lock');
+  assert(state.accessToken === original.accessToken, 'sign-out changed Member authority while the shared lock was held');
+
+  await client.evaluate(`(() => {
+    window.__signOutRefresh = { done: false, value: null, error: null };
+    void import('/product-auth.js').then((auth) => auth.refreshMemberSession()).then(
+      (value) => { window.__signOutRefresh = { done: true, value, error: null }; },
+      (error) => { window.__signOutRefresh = { done: true, value: null, error: { code: error?.code ?? null, message: error?.message ?? null } }; },
+    );
+  })()`);
+  while (refreshRequests < 3) await sleep(20);
+  await releaseSignOut();
+  await waitFor(client, `window.__signOutRace?.done === true && window.__signOutRefresh?.done === true`, 'sign-out/refresh race did not settle after lock release');
+  const signOutState = await storedState(client);
+  const signOutRace = await client.evaluate(`({ signOut: window.__signOutRace, refresh: window.__signOutRefresh })`);
+  assert(signOutRace.signOut.error === null, `serialized sign-out failed: ${JSON.stringify(signOutRace.signOut.error)}`);
+  assert(signOutRace.refresh.error === null && signOutRace.refresh.value === null, 'stale refresh did not converge to signed-out authority');
+  assert(signOutState.storedAccessToken === null && signOutState.storedRefreshToken === null, 'stale refresh resurrected Member authority after sign-out');
+  assert(signOutState.activeBearer === stagedGuest && signOutState.pendingGuest === null, 'sign-out did not restore staged Guest authority');
+  assert(signOutRequests === 1, `expected one serialized sign-out request, received ${signOutRequests}`);
+  assert(requests.find((request) => request.path === '/api/auth/sign-out')?.authorization === `Bearer ${original.accessToken}`, 'sign-out did not use the locked canonical Member bearer');
+  console.log('Member mutation lock sign-out precedence: PASS');
 
   const report = {
-    status: 'MyeongHa_WEB_AUTH_REFRESH_COMMIT_LOCK_BROWSER_PASS',
+    status: 'MyeongHa_WEB_AUTH_MEMBER_MUTATION_LOCK_BROWSER_PASS',
+    compatibilityStatus: 'MyeongHa_WEB_AUTH_REFRESH_COMMIT_LOCK_BROWSER_PASS',
     lockName,
-    blockedBeforeRelease: true,
-    preservedNewerGeneration: true,
+    legacyNamespaceRetained: true,
+    directReplacementPreserved: true,
+    signInSerialized: true,
+    signOutNoResurrection: true,
     refreshRequests,
+    signInRequests,
+    signOutRequests,
     requests,
-    finalState,
+    directState,
+    signInState,
+    signOutState,
   };
   await mkdir(artifactDir, { recursive: true });
   await writeFile(artifactPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
-  console.log(`MyeongHa_WEB_AUTH_REFRESH_COMMIT_LOCK_BROWSER_PASS blocked=true preserved_newer=true refresh_requests=${refreshRequests}`);
+  console.log(`MyeongHa_WEB_AUTH_MEMBER_MUTATION_LOCK_BROWSER_PASS signin_serialized=true signout_no_resurrection=true direct_replacement=true refresh_requests=${refreshRequests}`);
 } catch (error) {
   await mkdir(artifactDir, { recursive: true });
   await writeFile(artifactPath, `${JSON.stringify({
-    status: 'MyeongHa_WEB_AUTH_REFRESH_COMMIT_LOCK_BROWSER_FAIL',
+    status: 'MyeongHa_WEB_AUTH_MEMBER_MUTATION_LOCK_BROWSER_FAIL',
     error: error instanceof Error ? error.message : String(error),
     refreshRequests,
+    signInRequests,
+    signOutRequests,
     requests,
     chromeError,
   }, null, 2)}\n`, 'utf8');
@@ -278,5 +408,5 @@ try {
   client?.close();
   await stopChrome(chrome);
   await new Promise((done) => server.close(done));
-  await rm(profile, { recursive: true, force: true, maxRetries: 12, retryDelay: 100 });
+  await removeChromeProfile(profile);
 }

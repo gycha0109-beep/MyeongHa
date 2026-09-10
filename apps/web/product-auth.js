@@ -3,7 +3,8 @@ const GUEST_TOKEN_KEY = 'myeongha.guestBearer.v1';
 const PENDING_GUEST_TOKEN_KEY = 'myeongha.pendingGuestBearer.v1';
 const AUTH_CHANGED_EVENT = 'myeongha:auth-changed';
 const REFRESH_SKEW_MS = 60_000;
-const MEMBER_REFRESH_COMMIT_LOCK_NAME = 'myeongha.memberSession.v1.refresh.lock';
+// Keep the existing lock namespace so already-open older tabs still serialize with the expanded authority.
+const MEMBER_MUTATION_LOCK_NAME = 'myeongha.memberSession.v1.refresh.lock';
 let guestBootstrapInFlight = null;
 
 export class ProductAuthError extends Error {
@@ -356,22 +357,25 @@ function sameMemberSessionGeneration(left, right) {
   );
 }
 
-function memberRefreshCommitLocks() {
+function memberMutationLocks() {
   const browserWindow = globalThis.window;
   if (!browserWindow || browserWindow !== globalThis) return null;
   const locks = browserWindow.navigator?.locks;
   return locks && typeof locks.request === 'function' ? locks : null;
 }
 
+async function withMemberMutationLock(commit) {
+  const locks = memberMutationLocks();
+  if (!locks) return commit();
+  return locks.request(MEMBER_MUTATION_LOCK_NAME, { mode: 'exclusive' }, commit);
+}
+
 async function commitRefreshedMemberSession(current, session) {
-  const commit = () => {
+  return withMemberMutationLock(() => {
     const latest = readMemberSession();
     if (!sameMemberSessionGeneration(latest, current)) return latest;
     return saveSession(session);
-  };
-  const locks = memberRefreshCommitLocks();
-  if (!locks) return commit();
-  return locks.request(MEMBER_REFRESH_COMMIT_LOCK_NAME, { mode: 'exclusive' }, commit);
+  });
 }
 
 function normalizedStoredMemberSession(raw) {
@@ -424,19 +428,20 @@ function discardMemberCompatibilityState() {
 }
 
 function discardMemberSession(expectedAccessToken = null, expectedRefreshToken = null, expectedMemberRaw = undefined) {
-  if (expectedAccessToken !== null) {
-    const current = readMemberSession();
-    if (
-      !current ||
-      current.accessToken !== expectedAccessToken ||
-      (expectedRefreshToken !== null && current.refreshToken !== expectedRefreshToken)
-    ) {
-      return false;
-    }
+  const memberRaw = expectedMemberRaw === undefined ? readLocal(MEMBER_SESSION_KEY) : expectedMemberRaw;
+  const storedMember = normalizedStoredMemberSession(memberRaw);
+  if (
+    expectedAccessToken !== null &&
+    (
+      !storedMember ||
+      storedMember.accessToken !== expectedAccessToken ||
+      (expectedRefreshToken !== null && storedMember.refreshToken !== expectedRefreshToken)
+    )
+  ) {
+    return false;
   }
 
-  const memberRaw = expectedMemberRaw === undefined ? readLocal(MEMBER_SESSION_KEY) : expectedMemberRaw;
-  const restorableMemberRaw = normalizedStoredMemberSession(memberRaw) ? memberRaw : null;
+  const restorableMemberRaw = storedMember ? memberRaw : null;
   if (!removeLocal(MEMBER_SESSION_KEY, memberRaw)) return false;
 
   const compatibility = discardMemberCompatibilityState();
@@ -735,7 +740,7 @@ export async function signInWithPassword(email, password) {
   if (!isRecord(data) || data.status !== 'authenticated') {
     throw new ProductAuthError('WEB_AUTH_MALFORMED_SESSION', '로그인 응답이 올바르지 않습니다.');
   }
-  return saveSession(data.session);
+  return withMemberMutationLock(() => saveSession(data.session));
 }
 
 export async function signUpWithPassword(email, password, next = 'hall.html') {
@@ -744,7 +749,8 @@ export async function signUpWithPassword(email, password, next = 'hall.html') {
     throw new ProductAuthError('WEB_AUTH_MALFORMED_RESPONSE', '회원가입 응답이 올바르지 않습니다.');
   }
   if (data.status === 'authenticated') {
-    return Object.freeze({ status: 'authenticated', session: saveSession(data.session) });
+    const session = await withMemberMutationLock(() => saveSession(data.session));
+    return Object.freeze({ status: 'authenticated', session });
   }
   if (data.status === 'verification_required') {
     return Object.freeze({
@@ -756,17 +762,19 @@ export async function signUpWithPassword(email, password, next = 'hall.html') {
 }
 
 export async function signOutMember() {
-  const current = readMemberSession();
-  if (current) {
-    try {
-      await postJson('/api/auth/sign-out', {}, current.accessToken);
-    } catch {
-      // Local sign-out is still authoritative for this browser session when local authority can be cleared.
+  return withMemberMutationLock(async () => {
+    const current = readMemberSession();
+    if (current) {
+      try {
+        await postJson('/api/auth/sign-out', {}, current.accessToken);
+      } catch {
+        // Local sign-out is still authoritative for this browser session when local authority can be cleared.
+      }
     }
-  }
-  if (!discardMemberSession(current?.accessToken ?? null, current?.refreshToken ?? null)) {
-    throw new ProductAuthError('WEB_AUTH_MEMBER_CLEAR_FAILED', '로그인 세션을 브라우저에서 안전하게 제거하지 못했습니다.');
-  }
+    if (!discardMemberSession(current?.accessToken ?? null, current?.refreshToken ?? null)) {
+      throw new ProductAuthError('WEB_AUTH_MEMBER_CLEAR_FAILED', '로그인 세션을 브라우저에서 안전하게 제거하지 못했습니다.');
+    }
+  });
 }
 
 export function clearPromotedGuestBearer() {
