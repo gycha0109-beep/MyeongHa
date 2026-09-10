@@ -280,7 +280,12 @@ function writeConfirmationGuestHandoffJournalEntry(entry) {
     ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
   const key = `${CONFIRMATION_GUEST_HANDOFF_ENTRY_PREFIX}${suffix}`;
   const raw = JSON.stringify(entry);
-  return writeConfirmationGuestHandoffLocal(key, raw);
+  if (!writeConfirmationGuestHandoffLocal(key, raw)) return false;
+  try {
+    return localStorage.getItem(key) === raw;
+  } catch {
+    return false;
+  }
 }
 
 function removeConfirmationGuestHandoffJournalMatches(expectedEmail, promotedGuestBearer) {
@@ -349,10 +354,14 @@ async function stageConfirmationGuestHandoff(email) {
         expiresAt: new Date(Date.now() + CONFIRMATION_GUEST_HANDOFF_TTL_MS).toISOString(),
       });
       if (!writeConfirmationGuestHandoffJournalEntry(entry)) return false;
-      const entries = readConfirmationGuestHandoffs();
-      return entries.some((candidate) => (
-        candidate.email === normalizedEmail && candidate.guestBearer === guestBearer
-      ));
+      try {
+        readConfirmationGuestHandoffs();
+      } catch (error) {
+        if (!(error instanceof ProductAuthError && error.code === 'WEB_AUTH_CONFIRMATION_HANDOFF_READ_FAILED')) {
+          throw error;
+        }
+      }
+      return true;
     });
   } catch {
     return false;
