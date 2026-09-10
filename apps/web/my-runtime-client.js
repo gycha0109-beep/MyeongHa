@@ -5,10 +5,11 @@ const DEFAULT_PROFILE_ENDPOINT = '/api/me';
 const DEFAULT_BIRTH_PROFILE_ENDPOINT = '/api/me/birth-profile';
 
 export class MyRuntimeError extends Error {
-  constructor(code, message, cause) {
+  constructor(code, message, cause, status = null) {
     super(message, cause ? { cause } : undefined);
     this.name = 'MyRuntimeError';
     this.code = code;
+    this.status = status;
   }
 }
 
@@ -142,10 +143,10 @@ async function readAuthorizedJson({
 
   if (response.status === 401) {
     invalidateRejectedBearer(activeBearer);
-    throw new MyRuntimeError('WEB_MY_SESSION_REQUIRED', 'A current session is required.');
+    throw new MyRuntimeError('WEB_MY_SESSION_REQUIRED', 'A current session is required.', undefined, 401);
   }
   if (response.status === 403) {
-    throw new MyRuntimeError('WEB_MY_SESSION_REQUIRED', 'A current session is required.');
+    throw new MyRuntimeError('WEB_MY_SESSION_REQUIRED', 'A current session is required.', undefined, 403);
   }
   if (!response.ok) {
     throw new MyRuntimeError(failureCode, `My API request failed with status ${response.status}.`);
