@@ -4,6 +4,7 @@ import {
   invalidateMemberSession,
   readMemberSession,
 } from './product-auth.js';
+import { shouldReloadSajuForMemberSessionStorageChange } from './product-auth-surface.js';
 
 function safeNextHref() {
   const url = new URL(location.href);
@@ -48,6 +49,14 @@ async function reconcile() {
 window.addEventListener(PRODUCT_AUTH_STORAGE_V1.changedEvent, render);
 window.addEventListener('storage', (event) => {
   if (event.key !== PRODUCT_AUTH_STORAGE_V1.memberSession) return;
+  if (shouldReloadSajuForMemberSessionStorageChange({
+    pathname: window.location.pathname,
+    oldValue: event.oldValue,
+    newValue: event.newValue,
+  })) {
+    window.location.reload();
+    return;
+  }
   if (!readMemberSession()) {
     invalidateMemberSession();
     return;
