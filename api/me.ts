@@ -4,10 +4,12 @@ import { createProductionCurrentSubjectProfileRuntimeV1 } from '../apps/api/src/
 import {
   createProductionLifeRecordReadRuntimeV1,
   createProductionMemoryItemsReadRuntimeV1,
+  createProductionReadingHistoryReadRuntimeV1,
 } from '../apps/api/src/production-records-read-runtime.js';
 
 const PROFILE_ROUTE = '/api/me' as const;
 const LIFE_RECORD_ROUTE = '/api/life-record' as const;
+const READINGS_ROUTE = '/api/readings' as const;
 const MEMORIES_ROUTE = '/api/memories' as const;
 const CHAT_OPEN_ROUTE = '/api/chat' as const;
 const CHAT_ROUTE_PREFIX = '/api/chat/' as const;
@@ -24,6 +26,9 @@ let profileRuntime:
   | undefined;
 let lifeRecordRuntime:
   | ReturnType<typeof createProductionLifeRecordReadRuntimeV1>
+  | undefined;
+let readingsRuntime:
+  | ReturnType<typeof createProductionReadingHistoryReadRuntimeV1>
   | undefined;
 let memoriesRuntime:
   | ReturnType<typeof createProductionMemoryItemsReadRuntimeV1>
@@ -42,6 +47,11 @@ function getLifeRecordRuntime(): ReturnType<typeof createProductionLifeRecordRea
   return lifeRecordRuntime;
 }
 
+function getReadingsRuntime(): ReturnType<typeof createProductionReadingHistoryReadRuntimeV1> {
+  readingsRuntime ??= createProductionReadingHistoryReadRuntimeV1({ env: process.env });
+  return readingsRuntime;
+}
+
 function getMemoriesRuntime(): ReturnType<typeof createProductionMemoryItemsReadRuntimeV1> {
   memoriesRuntime ??= createProductionMemoryItemsReadRuntimeV1({ env: process.env });
   return memoriesRuntime;
@@ -54,11 +64,14 @@ function getChatRuntime(): ReturnType<typeof createProductionChatReadRuntimeV1> 
 
 type DispatchTarget =
   | { readonly kind: 'profile'; readonly route: typeof PROFILE_ROUTE }
-  | { readonly kind: 'records'; readonly route: typeof LIFE_RECORD_ROUTE | typeof MEMORIES_ROUTE }
+  | {
+      readonly kind: 'records';
+      readonly route: typeof LIFE_RECORD_ROUTE | typeof READINGS_ROUTE | typeof MEMORIES_ROUTE;
+    }
   | { readonly kind: 'chat-open'; readonly route: typeof CHAT_OPEN_ROUTE }
   | { readonly kind: 'chat-read'; readonly route: string; readonly afterSequenceNo?: string };
 
-type RecordsDispatchValue = 'life-record' | 'memories';
+type RecordsDispatchValue = 'life-record' | 'readings' | 'memories';
 
 function getSingleNonEmptyParam(
   searchParams: URLSearchParams,
@@ -76,6 +89,7 @@ function isUuid(value: string): boolean {
 
 function getRecordsDispatchValueForSourcePath(pathname: string): RecordsDispatchValue | undefined {
   if (pathname === LIFE_RECORD_ROUTE) return 'life-record';
+  if (pathname === READINGS_ROUTE) return 'readings';
   if (pathname === MEMORIES_ROUTE) return 'memories';
   return undefined;
 }
@@ -85,6 +99,7 @@ function getChatPathThreadId(pathname: string): string | null | undefined {
     pathname === PROFILE_ROUTE ||
     pathname === CHAT_OPEN_ROUTE ||
     pathname === LIFE_RECORD_ROUTE ||
+    pathname === READINGS_ROUTE ||
     pathname === MEMORIES_ROUTE
   ) {
     return undefined;
@@ -192,6 +207,9 @@ function resolveDispatchTarget(request: Request): DispatchTarget | null {
   if (recordsRoute === 'life-record') {
     return { kind: 'records', route: LIFE_RECORD_ROUTE };
   }
+  if (recordsRoute === 'readings') {
+    return { kind: 'records', route: READINGS_ROUTE };
+  }
   if (recordsRoute === 'memories') {
     return { kind: 'records', route: MEMORIES_ROUTE };
   }
@@ -247,9 +265,9 @@ function runtimeForTarget(target: DispatchTarget) {
     case 'profile':
       return getProfileRuntime();
     case 'records':
-      return target.route === LIFE_RECORD_ROUTE
-        ? getLifeRecordRuntime()
-        : getMemoriesRuntime();
+      if (target.route === LIFE_RECORD_ROUTE) return getLifeRecordRuntime();
+      if (target.route === READINGS_ROUTE) return getReadingsRuntime();
+      return getMemoriesRuntime();
     case 'chat-open':
     case 'chat-read':
       return getChatRuntime();

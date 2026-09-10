@@ -205,6 +205,10 @@ const expectedRecordsRewrites = Object.freeze([
     destination: '/api/me?__myeongha_records_read=life-record',
   }),
   Object.freeze({
+    source: '/api/readings',
+    destination: '/api/me?__myeongha_records_read=readings',
+  }),
+  Object.freeze({
     source: '/api/memories',
     destination: '/api/me?__myeongha_records_read=memories',
   }),
@@ -223,6 +227,10 @@ await assertExists(resolve('api/me.ts'));
 await assertMissing(
   resolve('api/life-record.ts'),
   'Life Record must not consume a separate Vercel function while the Records dispatcher rewrite is active.',
+);
+await assertMissing(
+  resolve('api/readings.ts'),
+  'Reading History must not consume a separate Vercel function while the Records dispatcher rewrite is active.',
 );
 await assertMissing(
   resolve('api/memories.ts'),

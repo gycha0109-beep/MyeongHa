@@ -4,6 +4,7 @@ import { ensureActiveBearer, invalidateGuestSession, invalidateMemberSession } f
 const DEFAULT_ENDPOINTS = Object.freeze({
   profile: '/api/me',
   lifeFacts: '/api/life-record',
+  readings: '/api/readings',
   memories: '/api/memories',
 });
 
@@ -114,15 +115,17 @@ export function createRecordsRuntimeClient(options = {}) {
   return Object.freeze({
     readProfile: () => readEndpoint(endpoints.profile),
     readLifeFacts: () => readEndpoint(endpoints.lifeFacts),
+    readReadings: () => readEndpoint(endpoints.readings),
     readMemories: () => readEndpoint(endpoints.memories),
     async readRecords() {
       const bearer = await resolveAuthorizedBearer(resolveBearer);
       const profile = await readJson(fetchImpl, endpoints.profile, bearer);
-      const [lifeFacts, memories] = await Promise.all([
+      const [lifeFacts, readings, memories] = await Promise.all([
         readJson(fetchImpl, endpoints.lifeFacts, bearer),
+        readJson(fetchImpl, endpoints.readings, bearer),
         readJson(fetchImpl, endpoints.memories, bearer),
       ]);
-      return Object.freeze({ profile, lifeFacts, memories });
+      return Object.freeze({ profile, lifeFacts, readings, memories });
     },
   });
 }

@@ -3,6 +3,16 @@ import { createRecordsRuntimeClient, RecordsRuntimeError } from './records-runti
 const SAMPLE_SAJU_FACT_TYPE = 'sample_saju_reading_result';
 const SAMPLE_SAJU_SCHEMA_VERSION = 'sample.v1';
 
+const SAJU_DOMAIN_PRESENTATION = Object.freeze({
+  general: Object.freeze({ icon: '命', title: '전체 사주' }),
+  career: Object.freeze({ icon: '職', title: '직업 · 커리어' }),
+  wealth: Object.freeze({ icon: '財', title: '재물' }),
+  relationship: Object.freeze({ icon: '緣', title: '관계' }),
+  compatibility: Object.freeze({ icon: '合', title: '궁합' }),
+  annual: Object.freeze({ icon: '年', title: '연운' }),
+  monthly: Object.freeze({ icon: '月', title: '월운' }),
+});
+
 function byId(id) {
   const element = document.getElementById(id);
   if (!element) throw new Error(`Missing records page element: ${id}`);
@@ -123,16 +133,65 @@ function renderLifeFacts(payload) {
   }
 }
 
-function renderSajuReadingSamples(payload) {
-  const target = byId('saju-records-list');
-  clear(target);
-  const sampleFacts = requireArray(payload, 'facts').filter(isSampleSajuReadingFact);
+function readingPresentation(sajuDomain) {
+  return SAJU_DOMAIN_PRESENTATION[sajuDomain] ?? Object.freeze({ icon: '命', title: '사주 풀이' });
+}
+
+function productResponseStateLabel(value) {
+  if (value === 'complete') return '완료';
+  if (value === 'clarification_required') return '추가 확인 필요';
+  return '저장됨';
+}
+
+function appendReadingFooter(card, leftText) {
+  const footer = document.createElement('div');
+  footer.className = 'records-reading-footer';
+  footer.append(textElement('span', 'fine', leftText));
+  const link = document.createElement('a');
+  link.href = 'reading.html';
+  link.textContent = '사주 페이지에서 보기 →';
+  footer.append(link);
+  card.append(footer);
+}
+
+function renderPersistedReading(target, reading) {
+  const presentation = readingPresentation(reading.sajuDomain);
+  const card = document.createElement('article');
+  card.className = 'records-reading-card records-reading-card--persisted';
+
+  const top = document.createElement('div');
+  top.className = 'records-reading-top';
+  const identity = document.createElement('div');
+  identity.className = 'records-reading-identity';
+  identity.append(textElement('span', 'records-reading-icon', presentation.icon));
+  const heading = document.createElement('div');
+  const eyebrow = document.createElement('div');
+  eyebrow.className = 'records-reading-eyebrow';
+  eyebrow.append(textElement('span', 'records-reading-badge', '저장된 풀이'));
+  eyebrow.append(textElement('span', 'records-reading-period', productResponseStateLabel(reading.productResponseState)));
+  heading.append(eyebrow, textElement('h3', 'records-reading-title', presentation.title));
+  identity.append(heading);
+  top.append(identity);
+  top.append(textElement('span', 'records-reading-date', formatTimestamp(reading.completedAt)));
+  card.append(top);
+
+  card.append(textElement(
+    'p',
+    'records-reading-summary',
+    '완료된 사주 풀이 기록입니다. 저장된 풀이의 세부 내용은 검증된 Reading 표시 계약이 연결되는 범위에서만 보여드립니다.',
+  ));
+  appendReadingFooter(card, `Reading contract · ${String(reading.readingContractVersion ?? '—')}`);
+  target.append(card);
+}
+
+function renderSajuReadingSamples(target, lifeFactsPayload) {
+  const sampleFacts = requireArray(lifeFactsPayload, 'facts').filter(isSampleSajuReadingFact);
 
   if (sampleFacts.length === 0) {
     const empty = document.createElement('article');
     empty.className = 'records-reading-empty';
     empty.append(textElement('h3', '', '아직 저장된 사주 풀이가 없습니다.'));
-    empty.append(textElement('p', 'muted', '실제 Reading 저장·조회 경로가 Records에 연결되면 이곳에서 풀이 이력을 확인할 수 있습니다.'));
+    empty.append(textElement('p', 'muted', '완료된 사주 풀이가 저장되면 이곳에서 풀이 이력을 확인할 수 있습니다.'));
     target.append(empty);
     return;
   }
@@ -180,17 +239,20 @@ function renderSajuReadingSamples(payload) {
       card.append(list);
     }
 
-    const footer = document.createElement('div');
-    footer.className = 'records-reading-footer';
-    footer.append(textElement('span', 'fine', '실제 Reading 저장 경로 연결 전 UI fixture'));
-    const link = document.createElement('a');
-    link.href = 'reading.html';
-    link.textContent = '사주 페이지에서 보기 →';
-    footer.append(link);
-    card.append(footer);
-
+    appendReadingFooter(card, '실제 Reading이 없을 때만 보이는 UI fixture');
     target.append(card);
   }
+}
+
+function renderSajuReadings(readingPayload, lifeFactsPayload) {
+  const target = byId('saju-records-list');
+  clear(target);
+  const readings = requireArray(readingPayload, 'readings');
+  if (readings.length > 0) {
+    for (const reading of readings) renderPersistedReading(target, reading);
+    return;
+  }
+  renderSajuReadingSamples(target, lifeFactsPayload);
 }
 
 function renderMemories(payload) {
@@ -242,7 +304,7 @@ async function boot() {
     renderProfile(records.profile);
     renderBirthProfileUnavailable();
     renderLifeFacts(records.lifeFacts);
-    renderSajuReadingSamples(records.lifeFacts);
+    renderSajuReadings(records.readings, records.lifeFacts);
     renderMemories(records.memories);
     setReady();
   } catch (error) {
