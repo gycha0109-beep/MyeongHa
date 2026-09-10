@@ -5,19 +5,36 @@ import { describe, expect, it } from 'vitest';
 const webRoot = resolve(process.cwd(), 'apps/web');
 const readWeb = (name: string) => readFileSync(resolve(webRoot, name), 'utf8');
 
-describe('Records Saju sample surface', () => {
+describe('Records Saju history surface', () => {
   const html = readWeb('records.html');
   const page = readWeb('records-page.js');
+  const client = readWeb('records-runtime-client.js');
   const css = readWeb('records-v2.css');
 
   it('keeps Saju reading records separate from Life Facts and other record domains', () => {
     expect(html).toContain('aria-controls="saju-records"');
     expect(html).toContain('id="saju-records-list"');
     expect(html).toContain('>사주 기록<');
-    expect(html).toContain('사주 풀이 결과는 삶의 사실과 분리해 보관합니다.');
+    expect(html).toContain('완료되어 저장된 사주 풀이 이력을 삶의 사실과 분리해 확인합니다.');
     expect(html).toContain('>현세록<');
     expect(html).toContain('>명식록<');
     expect(html).toContain('>대리자 기억<');
+  });
+
+  it('loads persisted Reading History with the same Records bearer', () => {
+    expect(client).toContain("readings: '/api/readings'");
+    expect(client).toContain('readReadings: () => readEndpoint(endpoints.readings)');
+    expect(client).toContain('const [lifeFacts, readings, memories] = await Promise.all([');
+    expect(client).toContain('return Object.freeze({ profile, lifeFacts, readings, memories });');
+  });
+
+  it('renders persisted Reading history before the explicit sample fixture fallback', () => {
+    expect(page).toContain("requireArray(readingPayload, 'readings')");
+    expect(page).toContain('if (readings.length > 0)');
+    expect(page).toContain('for (const reading of readings) renderPersistedReading(target, reading);');
+    expect(page).toContain("records-reading-card records-reading-card--persisted");
+    expect(page).toContain("records-reading-badge', '저장된 풀이'");
+    expect(page).toContain('renderSajuReadingSamples(target, lifeFactsPayload)');
   });
 
   it('recognizes only the explicit sample fixture contract and removes it from the Life Fact ledger', () => {
@@ -25,14 +42,15 @@ describe('Records Saju sample surface', () => {
     expect(page).toContain("const SAMPLE_SAJU_SCHEMA_VERSION = 'sample.v1';");
     expect(page).toContain('fact.valueJsonb.sample === true');
     expect(page).toContain("requireArray(payload, 'facts').filter((fact) => !isSampleSajuReadingFact(fact))");
-    expect(page).toContain("requireArray(payload, 'facts').filter(isSampleSajuReadingFact)");
+    expect(page).toContain("requireArray(lifeFactsPayload, 'facts').filter(isSampleSajuReadingFact)");
   });
 
-  it('renders the fixture as an honest product card instead of raw JSON or a fake score', () => {
+  it('keeps the fallback honest and never invents snapshot semantics or a score', () => {
     expect(page).toContain("records-reading-card records-reading-card--sample");
     expect(page).toContain("records-reading-badge', '개발 샘플'");
-    expect(page).toContain('실제 Reading 저장 경로 연결 전 UI fixture');
+    expect(page).toContain('실제 Reading이 없을 때만 보이는 UI fixture');
     expect(page).toContain("link.href = 'reading.html';");
+    expect(page).not.toContain('responseSnapshotJsonb');
     expect(page).not.toContain('value.score');
     expect(page).not.toContain('점수');
     expect(css).toContain('.records-reading-card');

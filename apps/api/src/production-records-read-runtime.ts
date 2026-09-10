@@ -4,6 +4,7 @@ import {
   parseProductionUserDataRuntimeConfigV1,
   type ProductionUserDataRuntimeEnvV1,
 } from './production-user-data-runtime-config.js';
+import { handleReadingHistoryRequestV1 } from './reading-history-http.js';
 import {
   handleLifeRecordReadRequestV1,
   handleMemoryItemsReadRequestV1,
@@ -69,6 +70,13 @@ export function createProductionLifeRecordReadRuntimeV1(
   input: CreateProductionRecordsReadRuntimeInputV1,
 ): ProductionRecordsReadRuntimeV1 {
   return createRuntime(input, handleLifeRecordReadRequestV1);
+}
+
+/** Production composition root for owner-scoped GET /api/readings. */
+export function createProductionReadingHistoryReadRuntimeV1(
+  input: CreateProductionRecordsReadRuntimeInputV1,
+): ProductionRecordsReadRuntimeV1 {
+  return createRuntime(input, handleReadingHistoryRequestV1);
 }
 
 /** Production composition root for owner-scoped GET /api/memories. */

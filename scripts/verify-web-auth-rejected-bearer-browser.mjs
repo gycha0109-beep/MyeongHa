@@ -130,6 +130,16 @@ async function serve() {
         return;
       }
 
+      if (pathname === '/api/readings' && req.method === 'GET') {
+        requests.push({ scenario, path: pathname, authorization });
+        if (!kind) {
+          sendJson(res, 401, errorEnvelope());
+          return;
+        }
+        sendJson(res, 200, envelope({ readings: [] }));
+        return;
+      }
+
       if (pathname === '/api/memories' && req.method === 'GET') {
         requests.push({ scenario, path: pathname, authorization });
         if (!kind || (scenario === 'records-guest-401' && kind === 'guest')) {

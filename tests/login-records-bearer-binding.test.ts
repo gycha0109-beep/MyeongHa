@@ -71,6 +71,7 @@ function recordsFetch(calls: Array<{ endpoint: string; authorization: string | n
       });
     }
     if (endpoint === '/api/life-record') return successEnvelope({ facts: [] });
+    if (endpoint === '/api/readings') return successEnvelope({ readings: [] });
     if (endpoint === '/api/memories') return successEnvelope({ memories: [] });
     return Response.json({ ok: false }, { status: 404 });
   });
@@ -102,13 +103,21 @@ describe('Records active bearer binding', () => {
     await expect(client.readRecords()).resolves.toMatchObject({
       profile: { subjectKind: 'member' },
       lifeFacts: { facts: [] },
+      readings: { readings: [] },
       memories: { memories: [] },
     });
 
     expect(resolveBearer).toHaveBeenCalledTimes(1);
-    expect(calls).toHaveLength(3);
+    expect(calls).toHaveLength(4);
+    expect(calls.map((call) => call.endpoint)).toEqual([
+      '/api/me',
+      '/api/life-record',
+      '/api/readings',
+      '/api/memories',
+    ]);
     expect(calls[0]).toEqual({ endpoint: '/api/me', authorization: `Bearer ${memberSession.accessToken}` });
     expect(calls.slice(1).map((call) => call.authorization)).toEqual([
+      `Bearer ${memberSession.accessToken}`,
       `Bearer ${memberSession.accessToken}`,
       `Bearer ${memberSession.accessToken}`,
     ]);
@@ -123,7 +132,7 @@ describe('Records active bearer binding', () => {
 
     await client.readRecords();
 
-    expect(calls).toHaveLength(3);
+    expect(calls).toHaveLength(4);
     expect(calls.every((call) => call.authorization === 'Bearer opaque-guest-session')).toBe(true);
   });
 

@@ -41,6 +41,10 @@
       "destination": "/api/me?__myeongha_records_read=life-record"
     },
     {
+      "source": "/api/readings",
+      "destination": "/api/me?__myeongha_records_read=readings"
+    },
+    {
       "source": "/api/memories",
       "destination": "/api/me?__myeongha_records_read=memories"
     },

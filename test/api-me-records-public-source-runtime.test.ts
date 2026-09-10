@@ -15,6 +15,7 @@ beforeAll(() => {
 describe('GET Records public source path dispatch', () => {
   it.each([
     ['life-record', '/api/life-record'],
+    ['readings', '/api/readings'],
     ['memories', '/api/memories'],
   ] as const)(
     'accepts the Vercel-preserved %s source pathname when the private rewrite marker matches',
@@ -44,9 +45,11 @@ describe('GET Records public source path dispatch', () => {
 
   it.each([
     'https://myeongha.example/api/life-record',
+    'https://myeongha.example/api/readings',
     'https://myeongha.example/api/memories',
     'https://myeongha.example/api/life-record?__myeongha_records_read=memories',
-    'https://myeongha.example/api/memories?__myeongha_records_read=life-record',
+    'https://myeongha.example/api/readings?__myeongha_records_read=life-record',
+    'https://myeongha.example/api/memories?__myeongha_records_read=readings',
     'https://myeongha.example/api/chat?__myeongha_records_read=life-record',
   ])('fails closed for missing, mismatched, or foreign Records source evidence: %s', async (url) => {
     const response = await meEndpoint.fetch(new Request(url, { method: 'GET' }));
