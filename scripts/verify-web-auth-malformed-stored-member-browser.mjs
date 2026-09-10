@@ -12,6 +12,17 @@ const activeBearerKey = 'myeongha.guestBearer.v1';
 const pendingGuestKey = 'myeongha.pendingGuestBearer.v1';
 const stagedGuest = 'guest-before-malformed-member-browser';
 const staleMemberJwt = 'stale.member.signature';
+const replacement = Object.freeze({
+  accessToken: 'fresh.member.signature',
+  refreshToken: 'fresh-refresh-token',
+  expiresAt: '2099-01-01T00:00:00.000Z',
+  tokenType: 'bearer',
+  user: Object.freeze({
+    id: '22222222-2222-4222-8222-222222222222',
+    email: 'fresh@example.com',
+  }),
+});
+const replacementRaw = JSON.stringify(replacement);
 const mime = new Map([
   ['.html', 'text/html; charset=utf-8'],
   ['.css', 'text/css; charset=utf-8'],
@@ -25,6 +36,9 @@ const mime = new Map([
 
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
+const isExpectedNavigationRace = (error) =>
+  error instanceof Error
+  && /Inspected target navigated or closed|Execution context was destroyed/u.test(error.message);
 let functionalPass = false;
 
 async function serve() {
@@ -132,14 +146,10 @@ async function connectCdp(port) {
   return { send, evaluate, close: () => ws.close() };
 }
 
-function isExpectedNavigationRace(error) {
-  return error instanceof Error && error.message === 'Runtime.evaluate: Inspected target navigated or closed';
-}
-
 async function navigate(client, origin, pathname, selector, timeout = 10_000) {
   const result = await client.send('Page.navigate', { url: `${origin}${pathname}` });
   assert(!result.errorText, `Navigation failed for ${pathname}: ${result.errorText}`);
-  const cleanPath = pathname.split(/[?#]/)[0];
+  const cleanPath = pathname.split(/[?#]/u)[0];
   const selectorLiteral = JSON.stringify(selector);
   const deadline = Date.now() + timeout;
   while (Date.now() < deadline) {
@@ -168,14 +178,7 @@ async function waitFor(client, expression, message, timeout = 10_000) {
     }
     await sleep(50);
   }
-  const diagnostics = await client.evaluate(`(() => ({
-    state: document.querySelector('.product-profile')?.dataset.authState ?? null,
-    href: document.querySelector('.product-profile')?.getAttribute('href') ?? null,
-    member: localStorage.getItem(${JSON.stringify(memberKey)}),
-    active: sessionStorage.getItem(${JSON.stringify(activeBearerKey)}),
-    pending: sessionStorage.getItem(${JSON.stringify(pendingGuestKey)}),
-  }))()`);
-  throw new Error(`${message}; diagnostics=${JSON.stringify(diagnostics)}`);
+  throw new Error(message);
 }
 
 async function readAuthority(client) {
@@ -186,6 +189,7 @@ async function readAuthority(client) {
     member: localStorage.getItem(${JSON.stringify(memberKey)}),
     active: sessionStorage.getItem(${JSON.stringify(activeBearerKey)}),
     pending: sessionStorage.getItem(${JSON.stringify(pendingGuestKey)}),
+    readyState: document.readyState,
   }))()`);
 }
 
@@ -207,14 +211,60 @@ async function seedAndReload(client, origin, memberRaw, activeBearer) {
   return readAuthority(client);
 }
 
+async function runReplacementRace(client, staleRaw, staleActive, nonce) {
+  return client.evaluate(`(async () => {
+    const memberKey = ${JSON.stringify(memberKey)};
+    const activeKey = ${JSON.stringify(activeBearerKey)};
+    const pendingKey = ${JSON.stringify(pendingGuestKey)};
+    const replacementRaw = ${JSON.stringify(replacementRaw)};
+    localStorage.setItem(memberKey, ${JSON.stringify(staleRaw)});
+    sessionStorage.setItem(activeKey, ${JSON.stringify(staleActive)});
+    sessionStorage.setItem(pendingKey, ${JSON.stringify(stagedGuest)});
+
+    const nativeGetItem = Storage.prototype.getItem;
+    const nativeSetItem = Storage.prototype.setItem;
+    let replacementInjected = false;
+    Storage.prototype.getItem = function(key) {
+      if (this === localStorage && key === memberKey && !replacementInjected) {
+        replacementInjected = true;
+        const stale = nativeGetItem.call(this, key);
+        nativeSetItem.call(this, key, replacementRaw);
+        return stale;
+      }
+      return nativeGetItem.call(this, key);
+    };
+
+    let resolved;
+    try {
+      const auth = await import('/product-auth.js?malformedReplacement=${nonce}-' + Date.now());
+      resolved = auth.readMemberSession();
+    } finally {
+      Storage.prototype.getItem = nativeGetItem;
+    }
+
+    const authority = await import('/product-auth.js?malformedReplacementFinal=${nonce}-' + Date.now());
+    const active = await authority.getActiveBearer();
+    return {
+      replacementInjected,
+      resolvedAccess: resolved?.accessToken ?? null,
+      resolvedRefresh: resolved?.refreshToken ?? null,
+      resolvedEmail: resolved?.user?.email ?? null,
+      stored: localStorage.getItem(memberKey),
+      active,
+      compatibilityActive: sessionStorage.getItem(activeKey),
+      pending: sessionStorage.getItem(pendingKey),
+      readyState: document.readyState,
+    };
+  })()`);
+}
+
 for (const file of ['hall.html', 'product-auth.js', 'product-auth-ui.js']) {
   await stat(join(root, file));
 }
 const productAuthSource = await readFile(join(root, 'product-auth.js'), 'utf8');
-assert(productAuthSource.includes('!isJwtLike(value.accessToken)'), 'Member session normalization does not enforce JWT-like access-token classification');
-assert(productAuthSource.includes('parsed = JSON.parse(raw);'), 'Malformed stored Member parsing is not isolated from cleanup');
-assert(productAuthSource.includes('const normalized = normalizeSession(parsed);'), 'Malformed stored Member normalization does not follow the parse boundary');
-assert(productAuthSource.includes('if (!normalized) {\n    discardMemberSession();\n    return null;\n  }'), 'Malformed stored Member session is not reconciled through one discardMemberSession cleanup');
+assert(productAuthSource.includes('reconcileMalformedStoredMember(raw)'), 'Malformed stored Member cleanup lacks exact-raw reconciliation');
+assert(productAuthSource.includes('discardMemberSession(null, null, raw)'), 'Malformed stored Member cleanup does not pass the observed raw ownership token');
+assert(productAuthSource.includes('removeLocal(MEMBER_SESSION_KEY, memberRaw)'), 'Member removal does not re-check the exact raw before deletion');
 
 const { server, origin } = await serve();
 const profile = await mkdtemp(join(tmpdir(), 'myeongha-auth-malformed-stored-member-browser-'));
@@ -237,6 +287,7 @@ try {
   await navigate(client, origin, '/hall.html', '.product-profile');
 
   const corruptJson = await seedAndReload(client, origin, '{not-json', staleMemberJwt);
+  assert(corruptJson.readyState === 'complete', `Corrupt JSON browser state not complete: ${corruptJson.readyState}`);
   assert(corruptJson.state === 'guest', 'Corrupt JSON scenario did not render Guest authority');
   assert(corruptJson.href?.startsWith('auth.html?next='), 'Corrupt JSON scenario did not render login destination');
   assert(corruptJson.label?.includes('로그인'), 'Corrupt JSON scenario did not render login label');
@@ -257,14 +308,31 @@ try {
   assert(invalidClassification.active === stagedGuest, 'Opaque Member scenario did not restore pending Guest');
   assert(invalidClassification.pending === null, 'Opaque Member scenario kept pending Guest staged');
 
+  const corruptReplacement = await runReplacementRace(client, '{not-json', staleMemberJwt, 'parse');
+  const invalidReplacement = await runReplacementRace(client, opaqueMember, 'opaque-member-token', 'normalize');
+  for (const [label, result] of [['parse', corruptReplacement], ['normalize', invalidReplacement]]) {
+    assert(result.readyState === 'complete', `${label} replacement race browser state not complete: ${result.readyState}`);
+    assert(result.replacementInjected === true, `${label} replacement race did not inject newer Member`);
+    assert(result.resolvedAccess === replacement.accessToken, `${label} stale cleanup did not resolve newer Member access token: ${result.resolvedAccess}`);
+    assert(result.resolvedRefresh === replacement.refreshToken, `${label} stale cleanup did not resolve newer Member refresh token`);
+    assert(result.resolvedEmail === replacement.user.email, `${label} stale cleanup did not resolve newer Member identity`);
+    assert(result.stored === replacementRaw, `${label} stale cleanup deleted or altered newer Member authority`);
+    assert(result.active?.kind === 'member' && result.active?.token === replacement.accessToken, `${label} active bearer downgraded from newer Member`);
+    assert(result.compatibilityActive === replacement.accessToken, `${label} compatibility bearer did not converge to newer Member`);
+    assert(result.pending === stagedGuest, `${label} stale cleanup mutated pending Guest lineage`);
+  }
+
   await mkdir(join(process.cwd(), 'artifacts'), { recursive: true });
   await writeFile(join(process.cwd(), 'artifacts', 'web-auth-malformed-stored-member-browser-smoke.json'), `${JSON.stringify({
     status: 'PASS',
     corruptJson,
     invalidClassification,
+    corruptReplacement,
+    invalidReplacement,
   }, null, 2)}\n`, 'utf8');
 
   functionalPass = true;
+  console.log('MyeongHa_WEB_AUTH_MALFORMED_MEMBER_REPLACEMENT_BROWSER_PASS');
   console.log('MyeongHa_WEB_AUTH_MALFORMED_STORED_MEMBER_BROWSER_PASS');
 } catch (error) {
   console.error(error);
