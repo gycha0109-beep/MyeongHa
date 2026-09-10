@@ -55,10 +55,11 @@ describe('Supabase Auth upstream deadline', () => {
       { method: 'GET' },
       25,
     );
+    const rejection = expect(pending).rejects.toMatchObject({ name: 'AbortError' });
 
     await vi.advanceTimersByTimeAsync(25);
+    await rejection;
 
-    await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
     expect(observedSignal?.aborted).toBe(true);
   });
 
