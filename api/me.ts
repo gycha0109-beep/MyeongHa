@@ -230,10 +230,10 @@ export function resolveMeDispatchTargetForTestV1(request: Request): DispatchTarg
   return target === null ? null : Object.freeze({ ...target });
 }
 
-export async function toCanonicalMeRequestForTestV1(
+export function toCanonicalMeRequestForTestV1(
   request: Request,
   targetInput?: DispatchTarget,
-): Promise<Request> {
+): Request {
   const target = targetInput ?? resolveDispatchTarget(request);
   if (target === null) throw new Error('Cannot canonicalize an unresolved /api/me dispatch target.');
 
@@ -244,13 +244,13 @@ export async function toCanonicalMeRequestForTestV1(
 
   const body = request.method === 'GET' || request.method === 'HEAD'
     ? undefined
-    : await request.arrayBuffer();
+    : request.body ?? undefined;
 
   return new Request(url, {
     method: request.method,
     headers: request.headers,
-    ...(body === undefined ? {} : { body }),
-  });
+    ...(body === undefined ? {} : { body, duplex: 'half' as const }),
+  } as RequestInit & { duplex?: 'half' });
 }
 
 function routeNotFound(): Response {
@@ -280,7 +280,7 @@ export default {
     if (target === null) return routeNotFound();
 
     return runtimeForTarget(target).handleRequest({
-      request: await toCanonicalMeRequestForTestV1(request, target),
+      request: toCanonicalMeRequestForTestV1(request, target),
       requestId: randomUUID(),
       serverTime: new Date().toISOString(),
     });
