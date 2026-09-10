@@ -141,11 +141,13 @@ function readConfirmationGuestHandoffLocal(key) {
 }
 
 function writeConfirmationGuestHandoffLocal(key, value) {
-  const raw = value;
   try {
-    localStorage.setItem(key, raw);
+    localStorage.setItem(key, value);
   } catch {}
   try {
+    const verified = localStorage.getItem(key) === value;
+    if (!verified) return false;
+    const raw = value;
     return localStorage.getItem(key) === raw;
   } catch {
     return false;
