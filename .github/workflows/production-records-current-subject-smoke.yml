@@ -13,6 +13,9 @@ on:
     paths:
       - '.github/workflows/production-records-current-subject-smoke.yml'
       - 'scripts/verify-production-reading-history-current-subject.mjs'
+      - 'scripts/wait-production-records-sample-boundary.mjs'
+      - 'scripts/verify-production-records-browser.mjs'
+      - 'apps/web/records-page.js'
 
 permissions:
   contents: read
@@ -54,3 +57,18 @@ jobs:
 
       - name: Verify production Reading History current-subject continuity
         run: node scripts/verify-production-reading-history-current-subject.mjs
+
+      - name: Wait for Production Records sample-boundary deployment
+        run: node scripts/wait-production-records-sample-boundary.mjs
+
+      - name: Set up Chrome for Production Records browser smoke
+        id: chrome
+        uses: browser-actions/setup-chrome@48ad923757ca74d66703209fe939badbdf80f2f4
+        with:
+          chrome-version: stable
+          install-dependencies: true
+
+      - name: Verify production Records browser empty-state boundary
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/verify-production-records-browser.mjs
