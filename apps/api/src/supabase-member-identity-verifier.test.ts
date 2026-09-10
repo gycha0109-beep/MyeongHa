@@ -61,12 +61,14 @@ describe('Supabase Member identity verifier deadline', () => {
     });
 
     const pending = verifier.verifyRequestIdentity(memberRequest());
-    await vi.advanceTimersByTimeAsync(25);
-
-    await expect(pending).rejects.toMatchObject({
+    const rejection = expect(pending).rejects.toMatchObject({
       name: 'SupabaseMemberIdentityVerifierErrorV1',
       code: 'SUPABASE_MEMBER_VERIFIER_UPSTREAM_FAILED',
     });
+
+    await vi.advanceTimersByTimeAsync(25);
+    await rejection;
+
     expect(observedSignal?.aborted).toBe(true);
   });
 
