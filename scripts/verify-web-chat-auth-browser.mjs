@@ -11,6 +11,21 @@ const activeBearerKey = 'myeongha.guestBearer.v1';
 const pendingGuestKey = 'myeongha.pendingGuestBearer.v1';
 const memberToken = 'member.chat.signature';
 const memberEmail = 'chat-member@example.com';
+const memberA = Object.freeze({
+  id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  email: 'chat-owner-a@example.com',
+  tokenPrefix: 'chat-owner-a',
+  refreshPrefix: 'chat-owner-a-refresh',
+});
+const memberB = Object.freeze({
+  id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+  email: 'chat-owner-b@example.com',
+  tokenPrefix: 'chat-owner-b',
+  refreshPrefix: 'chat-owner-b-refresh',
+});
+const members = [memberA, memberB];
+const signInCounts = new Map();
+const signInRequests = [];
 const mime = new Map([
   ['.html', 'text/html; charset=utf-8'],
   ['.css', 'text/css; charset=utf-8'],
@@ -27,6 +42,8 @@ const responses = new Map([
   ['member-500', 500],
 ]);
 const requests = [];
+let envelopeNo = 0;
+let chatLoads = 0;
 
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
 const sleep = (ms) => new Promise((resolvePromise) => setTimeout(resolvePromise, ms));
@@ -36,16 +53,109 @@ function jsonError(status) {
   return JSON.stringify({ ok: false, error: { code, message: code } });
 }
 
+function envelope(data) {
+  envelopeNo += 1;
+  return {
+    ok: true,
+    data,
+    meta: {
+      apiContractVersion: 'chat-member-replacement-v1',
+      requestId: `chat-member-replacement-${envelopeNo}`,
+      serverTime: '2026-09-11T12:00:00.000Z',
+    },
+  };
+}
+
+async function readJsonBody(request) {
+  let raw = '';
+  for await (const chunk of request) raw += chunk;
+  return raw ? JSON.parse(raw) : {};
+}
+
+function nextSession(member) {
+  const generation = (signInCounts.get(member.id) ?? 0) + 1;
+  signInCounts.set(member.id, generation);
+  return {
+    accessToken: `${member.tokenPrefix}-${generation}.payload.signature`,
+    refreshToken: `${member.refreshPrefix}-${generation}`,
+    expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+    tokenType: 'bearer',
+    user: { id: member.id, email: member.email },
+  };
+}
+
+function memberForAuthorization(value) {
+  return members.find((member) => typeof value === 'string' && value.startsWith(`Bearer ${member.tokenPrefix}-`)) ?? null;
+}
+
+function ownerThreadState() {
+  return {
+    threadId: 'owner-thread',
+    characterId: '11111111-1111-4111-8111-111111111111',
+    lastSequenceNo: 2,
+    messages: [
+      {
+        sequenceNo: 1,
+        senderType: 'user',
+        characterId: null,
+        bodyText: 'Member A private owner message',
+        redacted: false,
+        createdAt: '2026-09-11T01:00:00.000Z',
+      },
+      {
+        sequenceNo: 2,
+        senderType: 'character',
+        characterId: '11111111-1111-4111-8111-111111111111',
+        bodyText: 'Member A private character reply',
+        redacted: false,
+        createdAt: '2026-09-11T01:01:00.000Z',
+      },
+    ],
+  };
+}
+
 async function serve() {
   const server = createServer(async (request, response) => {
     const url = new URL(request.url ?? '/', 'http://localhost');
+
+    if (url.pathname === '/api/auth/sign-in' && request.method === 'POST') {
+      const input = await readJsonBody(request);
+      const member = members.find((candidate) => candidate.email === input.email) ?? null;
+      signInRequests.push({ email: input.email ?? null, member: member?.email ?? null });
+      if (!member) {
+        response.writeHead(401, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+        response.end(jsonError(401));
+        return;
+      }
+      response.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+      response.end(JSON.stringify(envelope({ status: 'authenticated', session: nextSession(member) })));
+      return;
+    }
+
     if (url.pathname.startsWith('/api/chat/')) {
       const threadId = decodeURIComponent(url.pathname.slice('/api/chat/'.length));
+      const authorization = request.headers.authorization ?? null;
+      if (threadId === 'owner-thread') {
+        const member = memberForAuthorization(authorization);
+        const status = member?.id === memberA.id ? 200 : 403;
+        requests.push({
+          threadId,
+          method: request.method,
+          authorization,
+          afterSequenceNo: url.searchParams.get('afterSequenceNo'),
+          status,
+          member: member?.email ?? null,
+        });
+        response.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+        response.end(status === 200 ? JSON.stringify(envelope(ownerThreadState())) : jsonError(status));
+        return;
+      }
+
       const status = responses.get(threadId) ?? 404;
       requests.push({
         threadId,
         method: request.method,
-        authorization: request.headers.authorization ?? null,
+        authorization,
         afterSequenceNo: url.searchParams.get('afterSequenceNo'),
         status,
       });
@@ -61,6 +171,7 @@ async function serve() {
         response.writeHead(403).end('Forbidden');
         return;
       }
+      if (relative === 'chat.html') chatLoads += 1;
       const body = await readFile(filePath);
       response.writeHead(200, {
         'content-type': mime.get(extname(filePath).toLowerCase()) ?? 'application/octet-stream',
@@ -142,13 +253,20 @@ async function navigate(client, url) {
   throw new Error(`Timed out waiting for ${expectedPath}`);
 }
 
-async function waitForRuntimeFailure(client) {
+async function waitFor(client, expression, message) {
   for (let attempt = 0; attempt < 200; attempt += 1) {
-    const text = await client.evaluate(`document.querySelector('[data-compose-status]')?.textContent ?? ''`);
-    if (text.includes('현재 대화 기록 연결을 사용할 수 없습니다.')) return;
+    if (await client.evaluate(expression)) return;
     await sleep(50);
   }
-  throw new Error('Chat runtime did not expose its API failure state');
+  throw new Error(`${message}; requests=${JSON.stringify(requests)}`);
+}
+
+async function waitForRuntimeFailure(client) {
+  await waitFor(
+    client,
+    `document.querySelector('[data-compose-status]')?.textContent?.includes('현재 대화 기록 연결을 사용할 수 없습니다.') === true`,
+    'Chat runtime did not expose its API failure state',
+  );
 }
 
 async function resetAuthority(client, kind, guestToken = null) {
@@ -165,9 +283,18 @@ async function resetAuthority(client, kind, guestToken = null) {
         tokenType: 'bearer',
         user: { id: 'chat-auth-user', email: ${JSON.stringify(memberEmail)} },
       }));
-    } else {
+    } else if (${JSON.stringify(guestToken)} !== null) {
       sessionStorage.setItem(${JSON.stringify(activeBearerKey)}, ${JSON.stringify(guestToken)});
     }
+  })()`);
+}
+
+async function clearAuthority(client) {
+  await navigate(client, `${origin}/hall.html`);
+  await client.evaluate(`(() => {
+    localStorage.removeItem(${JSON.stringify(memberKey)});
+    sessionStorage.removeItem(${JSON.stringify(activeBearerKey)});
+    sessionStorage.removeItem(${JSON.stringify(pendingGuestKey)});
   })()`);
 }
 
@@ -179,6 +306,10 @@ async function authority(client) {
   }))()`);
 }
 
+async function signIn(client, member) {
+  return client.evaluate(`import('./product-auth.js').then(({ signInWithPassword }) => signInWithPassword(${JSON.stringify(member.email)}, 'test-only'))`);
+}
+
 async function runScenario(client, { threadId, kind, guestToken = null }) {
   await resetAuthority(client, kind, guestToken);
   await navigate(client, `${origin}/chat.html?character=seyeon&threadId=${encodeURIComponent(threadId)}`);
@@ -186,7 +317,7 @@ async function runScenario(client, { threadId, kind, guestToken = null }) {
   return authority(client);
 }
 
-for (const file of ['chat.html', 'chat-runtime-client.js', 'product-auth.js', 'api-envelope.js']) {
+for (const file of ['chat.html', 'chat-runtime-client.js', 'product-auth.js', 'product-auth-surface.js', 'api-envelope.js']) {
   await stat(join(root, file));
 }
 const chatHtml = await readFile(join(root, 'chat.html'), 'utf8');
@@ -202,9 +333,11 @@ let chromeError = '';
 chrome.stderr.setEncoding('utf8');
 chrome.stderr.on('data', (chunk) => { chromeError += chunk; });
 let client;
+let replacementClient;
 
 try {
-  client = await connectCdp(await devtoolsPort(profile, chrome));
+  const port = await devtoolsPort(profile, chrome);
+  client = await connectCdp(port);
 
   const member401 = await runScenario(client, { threadId: 'member-401', kind: 'member' });
   assert(member401.member === null, 'Chat Member 401 retained the rejected Member session');
@@ -234,13 +367,62 @@ try {
     ['guest-403', `Bearer ${guest403Token}`],
     ['member-500', `Bearer ${memberToken}`],
   ]);
-  for (const [threadId, authorization] of expectedAuth) {
-    const request = requests.find((candidate) => candidate.threadId === threadId);
-    assert(request, `Missing Chat request for ${threadId}`);
-    assert(request.method === 'GET', `Chat ${threadId} did not use GET`);
-    assert(request.authorization === authorization, `Chat ${threadId} used the wrong Authorization bearer`);
-    assert(request.afterSequenceNo === '0', `Chat ${threadId} lost its sequence cursor`);
+  for (const [scenarioThreadId, authorization] of expectedAuth) {
+    const request = requests.find((candidate) => candidate.threadId === scenarioThreadId);
+    assert(request, `Missing Chat request for ${scenarioThreadId}`);
+    assert(request.method === 'GET', `Chat ${scenarioThreadId} did not use GET`);
+    assert(request.authorization === authorization, `Chat ${scenarioThreadId} used the wrong Authorization bearer`);
+    assert(request.afterSequenceNo === '0', `Chat ${scenarioThreadId} lost its sequence cursor`);
   }
+
+  await clearAuthority(client);
+  const firstASession = await signIn(client, memberA);
+  assert(firstASession?.user?.id === memberA.id, 'Member A sign-in did not return Member A');
+  await navigate(client, `${origin}/chat.html?character=seyeon&threadId=owner-thread`);
+  await waitFor(
+    client,
+    `document.body.textContent.includes('Member A private owner message') && document.body.textContent.includes('Member A private character reply')`,
+    'Member A owner-scoped Chat stream did not render',
+  );
+  const initialChatLoads = chatLoads;
+  assert(initialChatLoads >= 1, 'initial Chat page load was not observed');
+
+  replacementClient = await connectCdp(port);
+  await navigate(replacementClient, `${origin}/hall.html`);
+  const secondASession = await signIn(replacementClient, memberA);
+  assert(secondASession?.user?.id === memberA.id, 'same-Member sign-in did not remain Member A');
+  assert(secondASession?.accessToken !== firstASession.accessToken, 'same-Member sign-in did not rotate the token');
+  await waitFor(
+    client,
+    `JSON.parse(localStorage.getItem(${JSON.stringify(memberKey)}) ?? 'null')?.accessToken === ${JSON.stringify(secondASession.accessToken)}`,
+    'same-Member rotated session did not converge into the Chat tab',
+  );
+  await sleep(500);
+  const sameMemberPreserved = chatLoads === initialChatLoads && await client.evaluate(`document.body.textContent.includes('Member A private owner message')`);
+  assert(sameMemberPreserved, `same-Member token rotation disturbed Chat owner state; before=${initialChatLoads} after=${chatLoads}`);
+
+  const loadsBeforeReplacement = chatLoads;
+  const bSession = await signIn(replacementClient, memberB);
+  assert(bSession?.user?.id === memberB.id, 'Member B sign-in did not return Member B');
+  await waitFor(
+    client,
+    `JSON.parse(localStorage.getItem(${JSON.stringify(memberKey)}) ?? 'null')?.user?.id === ${JSON.stringify(memberB.id)}`,
+    'Member B did not become canonical in the Chat tab',
+  );
+  await waitFor(
+    client,
+    `document.querySelector('[data-compose-status]')?.textContent?.includes('현재 대화 기록 연결을 사용할 수 없습니다.') === true`,
+    'Chat did not re-evaluate the A thread under Member B authority',
+  );
+  assert(chatLoads === loadsBeforeReplacement + 1, `Member replacement Chat reload count mismatch: before=${loadsBeforeReplacement} after=${chatLoads}`);
+  const staleOwnerCleared = await client.evaluate(`!document.body.textContent.includes('Member A private owner message') && !document.body.textContent.includes('Member A private character reply')`);
+  assert(staleOwnerCleared, 'Member A owner-scoped Chat messages remained visible after Member B became canonical');
+
+  const ownerThreadRequests = requests.filter((entry) => entry.threadId === 'owner-thread');
+  assert(ownerThreadRequests.length === 2, `unexpected owner-thread read count: ${ownerThreadRequests.length}`);
+  assert(ownerThreadRequests[0].member === memberA.email && ownerThreadRequests[0].status === 200, 'initial owner-thread read did not use Member A authority');
+  assert(ownerThreadRequests[1].member === memberB.email && ownerThreadRequests[1].status === 403, 'replacement owner-thread read was not rejected under Member B authority');
+  assert(ownerThreadRequests[1].authorization === `Bearer ${bSession.accessToken}`, 'replacement owner-thread read did not use Member B canonical token');
 
   await mkdir('artifacts', { recursive: true });
   await writeFile('artifacts/web-chat-auth-browser-smoke.json', `${JSON.stringify({
@@ -250,14 +432,26 @@ try {
     member403: { memberPreserved: true },
     guest403: { guestPreserved: true },
     member500: { memberPreserved: true },
+    memberReplacement: {
+      sameMemberPreserved,
+      tokenRotated: secondASession.accessToken !== firstASession.accessToken,
+      subjectReload: chatLoads === loadsBeforeReplacement + 1,
+      staleOwnerCleared,
+      memberBRejected: ownerThreadRequests[1].status === 403,
+      chatLoads,
+      signInRequests,
+      ownerThreadRequests,
+    },
     requests,
   }, null, 2)}\n`, 'utf8');
   console.log('MyeongHa_WEB_CHAT_AUTH_REJECTION_BROWSER_PASS');
+  console.log('MyeongHa_WEB_CHAT_MEMBER_SUBJECT_REPLACEMENT_BROWSER_PASS same_member_preserved=true token_rotated=true subject_reload=true stale_owner_cleared=true member_b_rejected=true');
 } catch (error) {
   console.error(error);
   if (chromeError.trim()) console.error(chromeError.trim());
   process.exitCode = 1;
 } finally {
+  replacementClient?.close();
   client?.close();
   chrome.kill('SIGTERM');
   await Promise.race([

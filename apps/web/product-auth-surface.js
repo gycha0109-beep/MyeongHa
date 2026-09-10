@@ -34,3 +34,8 @@ export function shouldReloadBirthForMemberSessionStorageChange({ pathname, oldVa
   if (pageBasename(pathname) !== 'birth.html') return false;
   return shouldReloadForMemberSubjectChange({ oldValue, newValue });
 }
+
+export function shouldReloadChatForMemberSessionStorageChange({ pathname, oldValue, newValue }) {
+  if (pageBasename(pathname) !== 'chat.html') return false;
+  return shouldReloadForMemberSubjectChange({ oldValue, newValue });
+}
