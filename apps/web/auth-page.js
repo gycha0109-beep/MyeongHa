@@ -140,6 +140,17 @@ function readConfirmationGuestHandoffLocal(key) {
   }
 }
 
+function writeConfirmationGuestHandoffLocal(key, value) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {}
+  try {
+    return localStorage.getItem(key) === value;
+  } catch {
+    return false;
+  }
+}
+
 function removeConfirmationGuestHandoffLocal(key) {
   let removalError = null;
   try {
@@ -266,12 +277,7 @@ function writeConfirmationGuestHandoffJournalEntry(entry) {
     ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
   const key = `${CONFIRMATION_GUEST_HANDOFF_ENTRY_PREFIX}${suffix}`;
   const raw = JSON.stringify(entry);
-  try {
-    localStorage.setItem(key, raw);
-    return localStorage.getItem(key) === raw;
-  } catch {
-    return false;
-  }
+  return writeConfirmationGuestHandoffLocal(key, raw);
 }
 
 function removeConfirmationGuestHandoffJournalMatches(expectedEmail, promotedGuestBearer) {
@@ -304,12 +310,7 @@ function ensureConfirmationGuestHandoffJournalInitialized() {
     if (!writeConfirmationGuestHandoffJournalEntry(entry)) return false;
   }
 
-  try {
-    localStorage.setItem(CONFIRMATION_GUEST_HANDOFF_JOURNAL_MARKER_KEY, '1');
-    return localStorage.getItem(CONFIRMATION_GUEST_HANDOFF_JOURNAL_MARKER_KEY) === '1';
-  } catch {
-    return false;
-  }
+  return writeConfirmationGuestHandoffLocal(CONFIRMATION_GUEST_HANDOFF_JOURNAL_MARKER_KEY, '1');
 }
 
 function readConfirmationGuestHandoffs() {
