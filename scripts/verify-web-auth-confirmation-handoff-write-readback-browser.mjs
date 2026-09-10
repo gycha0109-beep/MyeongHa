@@ -17,6 +17,7 @@ const legacyEmail = 'legacy-write-readback@example.com';
 const legacyGuest = 'guest-confirmation-write-readback-legacy';
 const currentGuest = 'guest-confirmation-write-readback-current';
 const marker = 'MyeongHa_WEB_AUTH_CONFIRMATION_HANDOFF_WRITE_READBACK_BROWSER_PASS';
+const postCommitMarker = 'MyeongHa_WEB_AUTH_CONFIRMATION_HANDOFF_POST_COMMIT_READ_FAILURE_BROWSER_PASS';
 const mime = new Map([
   ['.html', 'text/html; charset=utf-8'],
   ['.css', 'text/css; charset=utf-8'],
@@ -181,9 +182,14 @@ for (const file of ['auth.html', 'auth-page.js', 'product-auth.js']) await stat(
 const authPageSource = await readFile(join(root, 'auth-page.js'), 'utf8');
 assert(
   authPageSource.includes('function writeConfirmationGuestHandoffLocal(key, value)')
-    && authPageSource.includes('return writeConfirmationGuestHandoffLocal(key, raw);')
-    && authPageSource.includes("return writeConfirmationGuestHandoffLocal(CONFIRMATION_GUEST_HANDOFF_JOURNAL_MARKER_KEY, '1');"),
+    && authPageSource.includes('writeConfirmationGuestHandoffLocal(key, raw)')
+    && authPageSource.includes("writeConfirmationGuestHandoffLocal(CONFIRMATION_GUEST_HANDOFF_JOURNAL_MARKER_KEY, '1')"),
   'auth-page.js does not route authoritative journal writes through post-mutation readback',
+);
+assert(
+  authPageSource.includes("error.code === 'WEB_AUTH_CONFIRMATION_HANDOFF_READ_FAILED'")
+    && authPageSource.includes('readConfirmationGuestHandoffs();'),
+  'auth-page.js does not distinguish optional post-commit compatibility reread failure',
 );
 
 const { server, origin } = await serve();
@@ -207,8 +213,10 @@ try {
   await client.send('Page.addScriptToEvaluateOnNewDocument', {
     source: `(() => {
       const originalSetItem = Storage.prototype.setItem;
+      const originalGetItem = Storage.prototype.getItem;
       globalThis.__myeonghaJournalEntryPostMutationThrows = 0;
       globalThis.__myeonghaJournalMarkerPostMutationThrows = 0;
+      globalThis.__myeonghaPostCommitReadFailures = 0;
       Storage.prototype.setItem = function(key, value) {
         if (this === localStorage && String(key).startsWith(${JSON.stringify(entryPrefix)})) {
           originalSetItem.call(this, key, value);
@@ -221,6 +229,19 @@ try {
           throw new Error('confirmation handoff marker write threw after mutation');
         }
         return originalSetItem.call(this, key, value);
+      };
+      Storage.prototype.getItem = function(key) {
+        if (
+          this === localStorage
+          && key === ${JSON.stringify(markerKey)}
+          && globalThis.__myeonghaJournalEntryPostMutationThrows >= 2
+          && globalThis.__myeonghaJournalMarkerPostMutationThrows >= 1
+          && globalThis.__myeonghaPostCommitReadFailures === 0
+        ) {
+          globalThis.__myeonghaPostCommitReadFailures += 1;
+          throw new Error('confirmation handoff post-commit compatibility reread blocked');
+        }
+        return originalGetItem.call(this, key);
       };
     })();`,
   });
@@ -247,7 +268,7 @@ try {
   await waitFor(
     client,
     `document.querySelector('#auth-status')?.textContent?.includes('확인 메일을 보냈습니다.') === true && document.querySelector('#auth-submit')?.disabled === false`,
-    'Post-mutation journal write errors did not converge to successful handoff staging',
+    'Verified durable handoff did not remain staged after post-commit compatibility reread failure',
   );
 
   assert(requests.filter((request) => request.path === '/api/auth/sign-up').length === 1, 'Sign-up transport count mismatch');
@@ -262,19 +283,21 @@ try {
       active: sessionStorage.getItem(${JSON.stringify(activeBearerKey)}),
       entryThrows: globalThis.__myeonghaJournalEntryPostMutationThrows,
       markerThrows: globalThis.__myeonghaJournalMarkerPostMutationThrows,
+      postCommitReadFailures: globalThis.__myeonghaPostCommitReadFailures,
     };
   })()`);
 
   assert(authority.marker === '1', 'Journal authority marker was not preserved after post-mutation write error');
   assert(authority.entryThrows === 2, `Expected two post-mutation journal entry throws, got ${authority.entryThrows}`);
   assert(authority.markerThrows === 1, `Expected one post-mutation marker throw, got ${authority.markerThrows}`);
+  assert(authority.postCommitReadFailures === 1, `Expected one post-commit reread failure, got ${authority.postCommitReadFailures}`);
   assert(authority.entries.length === 2, `Journal entry count mismatch: ${JSON.stringify(authority.entries)}`);
   assert(authority.entries.some((entry) => entry.email === legacyEmail && entry.guestBearer === legacyGuest), 'Legacy handoff was lost');
   assert(authority.entries.some((entry) => entry.email === currentEmail && entry.guestBearer === currentGuest), 'Current signup handoff was lost');
-  assert(authority.aggregate?.version === 2 && authority.aggregate.entries?.length === 2, 'Compatibility aggregate did not reflect journal authority');
   assert(authority.active === currentGuest, 'Current Guest authority changed during handoff staging');
 
-  console.log(`${marker} entry_writes=${authority.entryThrows} marker_writes=${authority.markerThrows} staged=true`);
+  console.log(`${postCommitMarker} staged=true durable=true read_failures=${authority.postCommitReadFailures}`);
+  console.log(`${marker} entry_writes=${authority.entryThrows} marker_writes=${authority.markerThrows} post_commit_read_failures=${authority.postCommitReadFailures} staged=true`);
 } catch (error) {
   if (chromeError) process.stderr.write(chromeError);
   throw error;
