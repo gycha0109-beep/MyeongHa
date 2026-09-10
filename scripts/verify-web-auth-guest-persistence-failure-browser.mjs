@@ -194,7 +194,8 @@ await stat(join(root, 'product-auth.js'));
 const productAuthSource = await readFile(join(root, 'product-auth.js'), 'utf8');
 assert(productAuthSource.includes('WEB_AUTH_SESSION_WRITE_ROLLBACK_FAILED'), 'product-auth.js does not expose Guest write rollback authority');
 assert(productAuthSource.includes('WEB_AUTH_SESSION_CLEAR_ROLLBACK_FAILED'), 'product-auth.js does not expose Guest clear rollback authority');
-assert(productAuthSource.includes('restoreSessionValueSnapshot'), 'product-auth.js does not restore exact sessionStorage snapshots');
+assert(productAuthSource.includes('reconcileSessionRollback'), 'product-auth.js does not expose ownership-aware sessionStorage rollback reconciliation');
+assert(productAuthSource.includes('observed !== expectedCurrent'), 'product-auth.js does not preserve newer sessionStorage replacement authority');
 
 const { server, origin } = await serve();
 const profile = await mkdtemp(join(tmpdir(), 'myeongha-auth-guest-persistence-failure-browser-'));
