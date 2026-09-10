@@ -83,6 +83,13 @@ await runBrowserGate({
 });
 
 await runBrowserGate({
+  script: 'scripts/verify-web-auth-confirmation-handoff-write-readback-browser.mjs',
+  marker: 'MyeongHa_WEB_AUTH_CONFIRMATION_HANDOFF_WRITE_READBACK_BROWSER_PASS',
+  cleanupPrefix: '/tmp/myeongha-auth-confirmation-handoff-write-readback-browser-',
+  label: 'MyeongHa auth confirmation handoff write readback browser smoke',
+});
+
+await runBrowserGate({
   script: 'scripts/verify-web-auth-rejected-bearer-browser.mjs',
   marker: 'MyeongHa_WEB_AUTH_REJECTED_BEARER_BROWSER_PASS',
   cleanupPrefix: '/tmp/myeongha-auth-rejected-bearer-browser-',
