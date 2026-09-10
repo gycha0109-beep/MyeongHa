@@ -639,18 +639,20 @@ export async function ensureGuestBearer() {
       throw new ProductAuthError('WEB_AUTH_GUEST_PREPARE_FAILED', '게스트 세션을 준비하지 못했습니다.');
     }
 
-    const racedExisting = readGuestBearer();
-    if (racedExisting) return racedExisting;
-    if (readMemberSession()) return null;
-
-    if (!writeSession(GUEST_TOKEN_KEY, token)) {
-      const convergedGuest = readGuestBearer();
-      if (convergedGuest) return convergedGuest;
+    return withMemberMutationLock(() => {
+      const racedExisting = readGuestBearer();
+      if (racedExisting) return racedExisting;
       if (readMemberSession()) return null;
-      throw new ProductAuthError('WEB_AUTH_GUEST_PERSIST_FAILED', '게스트 세션을 브라우저에 안전하게 저장하지 못했습니다.');
-    }
-    emitAuthChanged();
-    return token;
+
+      if (!writeSession(GUEST_TOKEN_KEY, token)) {
+        const convergedGuest = readGuestBearer();
+        if (convergedGuest) return convergedGuest;
+        if (readMemberSession()) return null;
+        throw new ProductAuthError('WEB_AUTH_GUEST_PERSIST_FAILED', '게스트 세션을 브라우저에 안전하게 저장하지 못했습니다.');
+      }
+      emitAuthChanged();
+      return token;
+    });
   })();
 
   try {
@@ -736,20 +738,22 @@ export async function ensureActiveBearer() {
 }
 
 export async function signInWithPassword(email, password) {
-  const data = await postJson('/api/auth/sign-in', { email, password });
-  if (!isRecord(data) || data.status !== 'authenticated') {
-    throw new ProductAuthError('WEB_AUTH_MALFORMED_SESSION', '로그인 응답이 올바르지 않습니다.');
-  }
-  return withMemberMutationLock(() => saveSession(data.session));
+  return withMemberMutationLock(async () => {
+    const data = await postJson('/api/auth/sign-in', { email, password });
+    if (!isRecord(data) || data.status !== 'authenticated') {
+      throw new ProductAuthError('WEB_AUTH_MALFORMED_SESSION', '로그인 응답이 올바르지 않습니다.');
+    }
+    return saveSession(data.session);
+  });
 }
 
-export async function signUpWithPassword(email, password, next = 'hall.html') {
+async function completePasswordSignUp(email, password, next, commitAuthenticatedSession) {
   const data = await postJson('/api/auth/sign-up', { email, password, next });
   if (!isRecord(data)) {
     throw new ProductAuthError('WEB_AUTH_MALFORMED_RESPONSE', '회원가입 응답이 올바르지 않습니다.');
   }
   if (data.status === 'authenticated') {
-    const session = await withMemberMutationLock(() => saveSession(data.session));
+    const session = await commitAuthenticatedSession(data.session);
     return Object.freeze({ status: 'authenticated', session });
   }
   if (data.status === 'verification_required') {
@@ -759,6 +763,25 @@ export async function signUpWithPassword(email, password, next = 'hall.html') {
     });
   }
   throw new ProductAuthError('WEB_AUTH_MALFORMED_RESPONSE', '회원가입 상태를 확인할 수 없습니다.');
+}
+
+export async function signUpWithPassword(email, password, next = 'hall.html') {
+  const guestAtStart = readGuestBearer();
+  if (guestAtStart) {
+    return completePasswordSignUp(
+      email,
+      password,
+      next,
+      (session) => withMemberMutationLock(() => saveSession(session)),
+    );
+  }
+
+  return withMemberMutationLock(() => completePasswordSignUp(
+    email,
+    password,
+    next,
+    (session) => saveSession(session),
+  ));
 }
 
 export async function signOutMember() {

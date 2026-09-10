@@ -9,6 +9,7 @@ const root = resolve(process.cwd(), process.env.MYEONGHA_WEB_OUTPUT_DIR ?? 'publ
 const chromeBin = process.env.CHROME_BIN ?? process.env.CHROME_PATH ?? 'chrome';
 const MEMBER_ACCESS = 'member.browser.payload';
 const requests = [];
+const responseOrder = [];
 let bootstrapCount = 0;
 let signInCount = 0;
 
@@ -44,9 +45,17 @@ async function serve() {
         const body = await readJsonBody(req);
         assert(body && typeof body === 'object' && !Array.isArray(body), 'Guest bootstrap body was not an object');
         bootstrapCount += 1;
-        requests.push({ path: pathname, method: req.method, ordinal: bootstrapCount });
-        const token = `guest-browser-single-flight-${bootstrapCount}`;
-        await sleep(200);
+        const ordinal = bootstrapCount;
+        requests.push({ path: pathname, method: req.method, ordinal });
+        const token = `guest-browser-single-flight-${ordinal}`;
+        if (ordinal === 2) {
+          const deadline = Date.now() + 5_000;
+          while (signInCount < 1 && Date.now() < deadline) await sleep(10);
+          assert(signInCount >= 1, 'Member-wins Guest bootstrap was not overlapped by a sign-in request');
+        } else {
+          await sleep(50);
+        }
+        responseOrder.push(`bootstrap-${ordinal}`);
         sendJson(res, 200, {
           ok: true,
           data: {
@@ -58,7 +67,7 @@ async function serve() {
           },
           meta: {
             apiContractVersion: 'browser-auth-guest-bootstrap-singleflight-v1',
-            requestId: `guest-bootstrap-singleflight-${bootstrapCount}`,
+            requestId: `guest-bootstrap-singleflight-${ordinal}`,
             serverTime: new Date().toISOString(),
           },
         });
@@ -69,7 +78,10 @@ async function serve() {
         const body = await readJsonBody(req);
         assert(body?.email === 'member@example.com', `Unexpected sign-in email: ${body?.email}`);
         signInCount += 1;
-        requests.push({ path: pathname, method: req.method, ordinal: signInCount });
+        const ordinal = signInCount;
+        requests.push({ path: pathname, method: req.method, ordinal });
+        if (ordinal === 1) await sleep(150);
+        responseOrder.push(`sign-in-${ordinal}`);
         sendJson(res, 200, {
           ok: true,
           data: {
@@ -87,7 +99,7 @@ async function serve() {
           },
           meta: {
             apiContractVersion: 'browser-auth-member-wins-v1',
-            requestId: `member-wins-sign-in-${signInCount}`,
+            requestId: `member-wins-sign-in-${ordinal}`,
             serverTime: new Date().toISOString(),
           },
         });
@@ -210,8 +222,11 @@ await stat(join(root, 'product-auth.js'));
 const productAuthSource = await readFile(join(root, 'product-auth.js'), 'utf8');
 assert(productAuthSource.includes('let guestBootstrapInFlight = null;'), 'product-auth.js does not declare Guest bootstrap single-flight state');
 assert(productAuthSource.includes('guestBootstrapInFlight ??='), 'product-auth.js does not share concurrent Guest bootstrap requests');
-assert(productAuthSource.includes('const racedExisting = readGuestBearer();'), 'product-auth.js does not preserve newer Guest authority before bootstrap write');
-assert(productAuthSource.includes('if (readMemberSession()) return null;'), 'product-auth.js does not let Member authority suppress a late Guest bootstrap write');
+assert(productAuthSource.includes('return withMemberMutationLock(() => {\n      const racedExisting = readGuestBearer();'), 'Guest bootstrap commit does not serialize with Member mutation authority');
+assert(productAuthSource.includes('export async function signInWithPassword(email, password) {\n  return withMemberMutationLock(async () => {'), 'sign-in request does not hold Member mutation authority from request start');
+assert(productAuthSource.includes('const guestAtStart = readGuestBearer();'), 'sign-up does not distinguish existing Guest lineage from a not-yet-created Guest');
+assert(productAuthSource.includes('return withMemberMutationLock(() => completePasswordSignUp('), 'sign-up without Guest lineage does not hold Member mutation authority from request start');
+assert(productAuthSource.includes('(session) => withMemberMutationLock(() => saveSession(session))'), 'Guest-lineage sign-up does not serialize an authenticated Member commit');
 assert(productAuthSource.includes('const converged = await getActiveBearer();'), 'product-auth.js does not re-resolve active identity after Guest bootstrap');
 assert(productAuthSource.includes('WEB_AUTH_MEMBER_PERSIST_FAILED'), 'product-auth.js does not reject unpersisted Member sessions');
 
@@ -306,6 +321,7 @@ try {
 
   assert(bootstrapCount === 2, `Member-wins scenario should add exactly one bootstrap request, got ${bootstrapCount}`);
   assert(signInCount === 1, `Member-wins scenario should issue exactly one sign-in request, got ${signInCount}`);
+  assert(responseOrder.indexOf('bootstrap-2') < responseOrder.indexOf('sign-in-1'), `Member-wins scenario did not force Guest response before Member response: ${JSON.stringify(responseOrder)}`);
   assert(memberWins.readyState === 'complete', `Member-wins harness was not complete: ${memberWins.readyState}`);
   assert(memberWins.signedIn === MEMBER_ACCESS, `Unexpected signed-in Member bearer: ${memberWins.signedIn}`);
   assert(memberWins.active?.kind === 'member', `Late Guest bootstrap won active identity: ${JSON.stringify(memberWins.active)}`);
@@ -366,12 +382,14 @@ try {
     signInRequests: signInCount,
     convergedBearer: authority.first,
     changedEvents: authority.changedEvents,
+    responseOrder,
     memberWins,
     persistenceFailure,
     requests,
   }, null, 2)}\n`, 'utf8');
 
   console.log('MyeongHa_WEB_AUTH_GUEST_BOOTSTRAP_SINGLEFLIGHT_BROWSER_PASS');
+  console.log(`MyeongHa_WEB_AUTH_GUEST_BOOTSTRAP_MEMBER_MUTATION_RACE_BROWSER_PASS guest_response_first=${responseOrder.indexOf('bootstrap-2') < responseOrder.indexOf('sign-in-1')} member_preserved=${memberWins.member === MEMBER_ACCESS}`);
   console.log('MyeongHa_WEB_AUTH_MEMBER_WINS_GUEST_BOOTSTRAP_BROWSER_PASS');
   console.log('MyeongHa_WEB_AUTH_MEMBER_PERSISTENCE_FAILURE_BROWSER_PASS');
 } catch (error) {
