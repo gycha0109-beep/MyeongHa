@@ -3,6 +3,7 @@ import {
   PRODUCTION_USER_DATA_RUNTIME_ENV_V1,
   type ProductionUserDataRuntimeEnvV1,
 } from './production-user-data-runtime-config.js';
+import { fetchSupabaseAuthWithDeadlineV1 } from './supabase-auth-upstream-deadline.js';
 
 const NO_STORE = 'no-store' as const;
 const JSON_HEADERS = Object.freeze({
@@ -173,17 +174,21 @@ function normalizeSession(payload: unknown): AuthSessionV1 | null {
 async function callSupabase(
   config: AuthProxyConfigV1,
   path: string,
-  init: RequestInit,
+  init: Omit<RequestInit, 'signal'>,
 ): Promise<{ response: Response; payload: unknown }> {
-  const upstream = await fetch(`${config.supabaseOrigin}${path}`, {
-    ...init,
-    headers: {
-      ...JSON_HEADERS,
-      apikey: config.supabaseApiKey,
-      ...(init.headers ?? {}),
+  const upstream = await fetchSupabaseAuthWithDeadlineV1(
+    globalThis.fetch,
+    `${config.supabaseOrigin}${path}`,
+    {
+      ...init,
+      headers: {
+        ...JSON_HEADERS,
+        apikey: config.supabaseApiKey,
+        ...(init.headers ?? {}),
+      },
+      cache: 'no-store',
     },
-    cache: 'no-store',
-  });
+  );
   let payload: unknown = null;
   try {
     payload = await upstream.json();
