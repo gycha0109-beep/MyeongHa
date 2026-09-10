@@ -306,6 +306,13 @@ function memberCompatibilityDiscardRollbackFailure() {
   );
 }
 
+function memberMutationSupersededFailure() {
+  return new ProductAuthError(
+    'WEB_AUTH_MEMBER_MUTATION_SUPERSEDED',
+    '다른 탭에서 로그인 상태가 변경되어 이전 회원가입 응답을 현재 브라우저 세션에 적용하지 않았습니다.',
+  );
+}
+
 function emitAuthChanged() {
   globalThis.dispatchEvent?.(new CustomEvent(AUTH_CHANGED_EVENT));
 }
@@ -355,6 +362,11 @@ function sameMemberSessionGeneration(left, right) {
     left.accessToken === right.accessToken &&
     left.refreshToken === right.refreshToken
   );
+}
+
+function sameOptionalMemberSessionGeneration(left, right) {
+  if (!left || !right) return left === right;
+  return sameMemberSessionGeneration(left, right);
 }
 
 function memberMutationLocks() {
@@ -768,11 +780,18 @@ async function completePasswordSignUp(email, password, next, commitAuthenticated
 export async function signUpWithPassword(email, password, next = 'hall.html') {
   const guestAtStart = readGuestBearer();
   if (guestAtStart) {
+    const memberAtStart = readMemberSession();
     return completePasswordSignUp(
       email,
       password,
       next,
-      (session) => withMemberMutationLock(() => saveSession(session)),
+      (session) => withMemberMutationLock(() => {
+        const latest = readMemberSession();
+        if (!sameOptionalMemberSessionGeneration(latest, memberAtStart)) {
+          throw memberMutationSupersededFailure();
+        }
+        return saveSession(session);
+      }),
     );
   }
 

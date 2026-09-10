@@ -226,7 +226,10 @@ assert(productAuthSource.includes('return withMemberMutationLock(() => {\n      
 assert(productAuthSource.includes('export async function signInWithPassword(email, password) {\n  return withMemberMutationLock(async () => {'), 'sign-in request does not hold Member mutation authority from request start');
 assert(productAuthSource.includes('const guestAtStart = readGuestBearer();'), 'sign-up does not distinguish existing Guest lineage from a not-yet-created Guest');
 assert(productAuthSource.includes('return withMemberMutationLock(() => completePasswordSignUp('), 'sign-up without Guest lineage does not hold Member mutation authority from request start');
-assert(productAuthSource.includes('(session) => withMemberMutationLock(() => saveSession(session))'), 'Guest-lineage sign-up does not serialize an authenticated Member commit');
+assert(productAuthSource.includes('const memberAtStart = readMemberSession();'), 'Guest-lineage sign-up does not snapshot Member generation at request start');
+assert(productAuthSource.includes('(session) => withMemberMutationLock(() => {'), 'Guest-lineage sign-up does not serialize an authenticated Member commit');
+assert(productAuthSource.includes('if (!sameOptionalMemberSessionGeneration(latest, memberAtStart)) {'), 'Guest-lineage sign-up does not reject a stale authenticated response after Member replacement');
+assert(productAuthSource.includes('throw memberMutationSupersededFailure();'), 'Guest-lineage sign-up does not fail closed when Member authority is superseded');
 assert(productAuthSource.includes('const converged = await getActiveBearer();'), 'product-auth.js does not re-resolve active identity after Guest bootstrap');
 assert(productAuthSource.includes('WEB_AUTH_MEMBER_PERSIST_FAILED'), 'product-auth.js does not reject unpersisted Member sessions');
 

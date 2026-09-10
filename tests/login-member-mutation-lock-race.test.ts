@@ -109,6 +109,12 @@ function authenticated(session: ReturnType<typeof memberSession>) {
   }, { status: 200 });
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => { resolve = done; });
+  return { promise, resolve };
+}
+
 beforeEach(() => {
   vi.stubGlobal('localStorage', new MemoryStorage());
   vi.stubGlobal('sessionStorage', new MemoryStorage());
@@ -177,6 +183,74 @@ describe('Member mutation lock authority', () => {
       session: { accessToken: signupSession.accessToken },
     });
     expect(readMemberSession()).toMatchObject({ accessToken: signupSession.accessToken });
+  });
+
+  it('rejects a stale Guest-lineage authenticated sign-up after a newer sign-in commits', async () => {
+    sessionStorage.setItem(PRODUCT_AUTH_STORAGE_V1.guestBearer, stagedGuest);
+    const locks = new QueueLockManager();
+    vi.stubGlobal('window', globalThis);
+    vi.stubGlobal('navigator', { locks });
+    const signUpResponse = deferred<Response>();
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      if (String(input) === '/api/auth/sign-up') return signUpResponse.promise;
+      if (String(input) === '/api/auth/sign-in') return Promise.resolve(authenticated(newerLogin));
+      throw new Error(`unexpected request: ${String(input)}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const signUp = signUpWithPassword('signup-race@example.com', 'password');
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/auth/sign-up', expect.any(Object)));
+    expect(locks.requestedNames).toEqual([]);
+
+    await expect(signInWithPassword(member.email, 'password')).resolves.toMatchObject({
+      accessToken: newerLogin.accessToken,
+    });
+    expect(readMemberSession()).toMatchObject({ accessToken: newerLogin.accessToken });
+    expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.guestBearer)).toBe(newerLogin.accessToken);
+    expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.pendingGuestBearer)).toBe(stagedGuest);
+
+    signUpResponse.resolve(authenticated(signupSession));
+
+    await expect(signUp).rejects.toMatchObject({ code: 'WEB_AUTH_MEMBER_MUTATION_SUPERSEDED' });
+    expect(readMemberSession()).toMatchObject({
+      accessToken: newerLogin.accessToken,
+      refreshToken: newerLogin.refreshToken,
+    });
+    expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.guestBearer)).toBe(newerLogin.accessToken);
+    expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.pendingGuestBearer)).toBe(stagedGuest);
+    expect(globalThis.dispatchEvent).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not resurrect Member authority from a stale authenticated sign-up after sign-out wins', async () => {
+    seed();
+    const locks = new QueueLockManager();
+    vi.stubGlobal('window', globalThis);
+    vi.stubGlobal('navigator', { locks });
+    const signUpResponse = deferred<Response>();
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      if (String(input) === '/api/auth/sign-up') return signUpResponse.promise;
+      if (String(input) === '/api/auth/sign-out') {
+        return Promise.resolve(Response.json({ ok: true, data: { status: 'signed_out' } }, { status: 200 }));
+      }
+      throw new Error(`unexpected request: ${String(input)}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const signUp = signUpWithPassword('signup-race@example.com', 'password');
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/auth/sign-up', expect.any(Object)));
+
+    await expect(signOutMember()).resolves.toBeUndefined();
+    expect(readMemberSession()).toBeNull();
+    expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.guestBearer)).toBe(stagedGuest);
+    expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.pendingGuestBearer)).toBeNull();
+
+    signUpResponse.resolve(authenticated(signupSession));
+
+    await expect(signUp).rejects.toMatchObject({ code: 'WEB_AUTH_MEMBER_MUTATION_SUPERSEDED' });
+    expect(readMemberSession()).toBeNull();
+    expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.guestBearer)).toBe(stagedGuest);
+    expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.pendingGuestBearer)).toBeNull();
+    expect(globalThis.dispatchEvent).toHaveBeenCalledTimes(1);
   });
 
   it('makes local sign-out win ahead of an already-returned stale refresh response without resurrection', async () => {

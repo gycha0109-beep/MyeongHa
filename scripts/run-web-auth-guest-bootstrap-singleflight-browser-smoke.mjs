@@ -149,3 +149,37 @@ if (!guestReplacementStdout.includes('MyeongHa_WEB_AUTH_GUEST_ROLLBACK_REPLACEME
   console.error(guestReplacementStderr);
   throw new Error('Guest rollback replacement verifier exited successfully without its PASS marker');
 }
+
+const staleSignupChild = spawn(process.execPath, ['scripts/verify-web-auth-authenticated-signup-stale-member-browser.mjs'], {
+  env: process.env,
+  stdio: ['ignore', 'pipe', 'pipe'],
+});
+let staleSignupStdout = '';
+let staleSignupStderr = '';
+staleSignupChild.stdout.setEncoding('utf8');
+staleSignupChild.stderr.setEncoding('utf8');
+staleSignupChild.stdout.on('data', (chunk) => {
+  staleSignupStdout += chunk;
+  process.stdout.write(chunk);
+});
+staleSignupChild.stderr.on('data', (chunk) => {
+  staleSignupStderr += chunk;
+  process.stderr.write(chunk);
+});
+
+const staleSignupExitCode = await new Promise((resolve, reject) => {
+  staleSignupChild.once('error', reject);
+  staleSignupChild.once('exit', (code, signal) => {
+    if (signal) {
+      reject(new Error(`Stale authenticated signup browser smoke terminated by signal ${signal}`));
+      return;
+    }
+    resolve(code ?? 1);
+  });
+});
+
+if (staleSignupExitCode !== 0) process.exit(staleSignupExitCode);
+if (!staleSignupStdout.includes('MyeongHa_WEB_AUTH_AUTHENTICATED_SIGNUP_STALE_MEMBER_BROWSER_PASS')) {
+  console.error(staleSignupStderr);
+  throw new Error('Stale authenticated signup verifier exited successfully without its PASS marker');
+}
