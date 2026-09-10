@@ -27,9 +27,30 @@ function setBirthRoute(mode) {
   copy.textContent = '현재 저장된 원본 입력을 이 화면에서 확인합니다. 수정 기능은 아직 열지 않습니다.';
 }
 
+function clearOwnerScopedState() {
+  for (const id of [
+    'my-display-name',
+    'my-subject-kind',
+    'my-subject-status',
+    'my-locale',
+    'my-timezone',
+    'my-onboarding-state',
+    'my-profile-updated',
+    'my-account-email',
+    'my-account-note',
+    'my-birth-date',
+    'my-birth-time',
+    'my-birth-calendar',
+    'my-birth-sex',
+    'my-birth-revision',
+  ]) byId(id).textContent = '';
+  document.querySelector('.my-identity-card .my-auth-actions')?.remove();
+}
+
 function renderUnavailable(message, login = false) {
   byId('my-content').hidden = true;
   byId('my-birth-content').hidden = true;
+  clearOwnerScopedState();
   setBirthRoute('current');
   const status = byId('my-status');
   status.hidden = false;
@@ -228,7 +249,12 @@ async function boot() {
     renderBirthProfile(await client.readBirthProfile());
   } catch (error) {
     if (error instanceof MyRuntimeError && error.code === 'WEB_MY_SESSION_REQUIRED') {
-      renderBirthUnavailable('현재 세션이 만료되어 출생 정보를 확인할 수 없습니다.');
+      if (error.status !== 403) {
+        renderUnavailable('현재 세션 권한이 더 이상 유효하지 않아 내 정보를 표시하지 않습니다.', true);
+      }
+      renderBirthUnavailable(error.status === 403
+        ? '현재 세션 권한으로 출생 정보를 확인할 수 없습니다.'
+        : '현재 세션 권한이 더 이상 유효하지 않아 출생 정보를 표시하지 않습니다.');
       return;
     }
     renderBirthUnavailable('현재 출생 정보를 불러올 수 없습니다. 확인되지 않은 값을 대신 표시하지 않습니다.');

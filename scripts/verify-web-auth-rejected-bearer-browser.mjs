@@ -322,8 +322,8 @@ try {
   await navigate(client, origin, '/my.html?case=birth401', '#my-status');
   await waitFor(
     client,
-    `document.querySelector('#my-birth-status')?.textContent?.includes('세션이 만료') === true && localStorage.getItem(${JSON.stringify(memberKey)}) === null`,
-    'My Birth authoritative 401 did not invalidate the rejected Member',
+    `document.querySelector('#my-status')?.textContent?.includes('더 이상 유효하지 않아') === true && document.querySelector('#my-content')?.hidden === true && document.querySelector('#my-display-name')?.textContent === '' && localStorage.getItem(${JSON.stringify(memberKey)}) === null`,
+    'My Birth authoritative 401 did not invalidate the rejected Member and fail-close owner state',
   );
 
   scenario = 'my-birth-403';
@@ -331,8 +331,8 @@ try {
   await navigate(client, origin, '/my.html?case=birth403', '#my-status');
   await waitFor(
     client,
-    `document.querySelector('#my-birth-status')?.textContent?.includes('세션이 만료') === true && localStorage.getItem(${JSON.stringify(memberKey)}) !== null && sessionStorage.getItem(${JSON.stringify(activeBearerKey)}) === ${JSON.stringify(memberToken)}`,
-    'My Birth 403 incorrectly invalidated the Member',
+    `document.querySelector('#my-birth-status')?.textContent?.includes('현재 세션 권한으로') === true && document.querySelector('#my-content')?.hidden === false && localStorage.getItem(${JSON.stringify(memberKey)}) !== null && sessionStorage.getItem(${JSON.stringify(activeBearerKey)}) === ${JSON.stringify(memberToken)}`,
+    'My Birth 403 did not preserve the authorized Member profile and credential',
   );
 
   scenario = 'my-guest-profile-401';
@@ -375,6 +375,7 @@ try {
   await writeFile(join(process.cwd(), 'artifacts', 'web-auth-rejected-bearer-browser-smoke.json'), `${JSON.stringify({
     status: 'PASS',
     myBirthMember401Invalidated: true,
+    myBirthMember401OwnerStateCleared: true,
     myBirthMember403Preserved: true,
     myProfileGuest401Invalidated: true,
     recordsLedgerMember401Invalidated: true,
