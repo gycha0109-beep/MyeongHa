@@ -7,6 +7,7 @@ import {
   type GuestBootstrapIdentityResolverPortV1,
   type GuestBootstrapTokenFingerprintPortV1,
 } from './guest-bootstrap-command.js';
+import { readGuestBootstrapRequestBodyV1 } from './guest-bootstrap-request-body.js';
 
 const POST_METHOD = 'POST' as const;
 const API_CONTRACT_VERSION = 'v0.9' as const;
@@ -55,20 +56,6 @@ function methodNotAllowed(): Response {
     status: 405,
     headers: responseHeaders({ Allow: POST_METHOD }),
   });
-}
-
-async function readRequestBody(request: Request): Promise<unknown> {
-  const text = await request.text();
-  if (text.trim().length === 0) return undefined;
-
-  try {
-    return JSON.parse(text) as unknown;
-  } catch {
-    throw new ApiCommandError(
-      'INVALID_REQUEST',
-      'Session bootstrap request body must be empty or valid JSON.',
-    );
-  }
 }
 
 function errorResponse(input: {
@@ -139,7 +126,7 @@ export async function handleGuestBootstrapRequestV1(
   const serverTime = requireServerTime(input.serverTime);
 
   try {
-    const requestBody = await readRequestBody(input.request);
+    const requestBody = await readGuestBootstrapRequestBodyV1(input.request);
     const data = await bootstrapSession({
       request: requestBody,
       identityResolverPort: input.identityResolverPort,
