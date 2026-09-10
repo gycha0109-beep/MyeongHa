@@ -196,7 +196,9 @@ function writeSession(key, value) {
 }
 
 function removeSession(key, previousOverride = undefined) {
-  const previous = previousOverride === undefined ? readSession(key) : previousOverride;
+  const observedBefore = readSession(key);
+  if (previousOverride !== undefined && observedBefore !== previousOverride) return false;
+  const previous = observedBefore;
   try {
     sessionStorage.removeItem(key);
   } catch {
@@ -583,12 +585,20 @@ export function readGuestBearer() {
   const pendingRaw = readSession(PENDING_GUEST_TOKEN_KEY);
   const pending = normalizeGuestBearer(pendingRaw);
   if (pending) return pending;
-  if (pendingRaw !== null && !removeSession(PENDING_GUEST_TOKEN_KEY)) throw guestClearFailure();
+  if (pendingRaw !== null && !removeSession(PENDING_GUEST_TOKEN_KEY, pendingRaw)) {
+    const replacement = normalizeGuestBearer(readSession(PENDING_GUEST_TOKEN_KEY));
+    if (replacement) return replacement;
+    throw guestClearFailure();
+  }
 
   const tokenRaw = readSession(GUEST_TOKEN_KEY);
   const token = normalizeGuestBearer(tokenRaw);
   if (token) return token;
-  if (tokenRaw !== null && !isJwtLike(tokenRaw) && !removeSession(GUEST_TOKEN_KEY)) throw guestClearFailure();
+  if (tokenRaw !== null && !isJwtLike(tokenRaw) && !removeSession(GUEST_TOKEN_KEY, tokenRaw)) {
+    const replacement = normalizeGuestBearer(readSession(GUEST_TOKEN_KEY));
+    if (replacement) return replacement;
+    throw guestClearFailure();
+  }
   return null;
 }
 
