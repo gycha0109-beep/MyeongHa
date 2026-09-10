@@ -10,9 +10,16 @@ import {
 class MemoryStorage {
   private readonly values = new Map<string, string>();
   readonly failSetOnce = new Set<string>();
+  readonly replaceAfterReadOnce = new Map<string, string>();
 
   getItem(key: string) {
-    return this.values.get(key) ?? null;
+    const current = this.values.get(key) ?? null;
+    const replacement = this.replaceAfterReadOnce.get(key);
+    if (replacement !== undefined) {
+      this.replaceAfterReadOnce.delete(key);
+      this.values.set(key, replacement);
+    }
+    return current;
   }
 
   setItem(key: string, value: string) {
@@ -31,6 +38,14 @@ class MemoryStorage {
 
 const stagedGuest = 'guest-before-malformed-member';
 const staleMemberJwt = 'stale.member.signature';
+const replacementSession = {
+  accessToken: 'fresh.member.signature',
+  refreshToken: 'fresh-refresh-token',
+  expiresAt: '2099-01-01T00:00:00.000Z',
+  tokenType: 'bearer',
+  user: { id: '22222222-2222-4222-8222-222222222222', email: 'fresh@example.com' },
+};
+const replacementRaw = JSON.stringify(replacementSession);
 let local: MemoryStorage;
 let session: MemoryStorage;
 
@@ -82,6 +97,39 @@ describe('Malformed persisted Member reconciliation', () => {
     expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.guestBearer)).toBe(stagedGuest);
     expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.pendingGuestBearer)).toBeNull();
     expect(readGuestBearer()).toBe(stagedGuest);
+  });
+
+  it('preserves a newer valid Member that replaces corrupt JSON after the stale read', () => {
+    seedBrowserAuthority('{not-json', staleMemberJwt);
+    local.replaceAfterReadOnce.set(PRODUCT_AUTH_STORAGE_V1.memberSession, replacementRaw);
+
+    const resolved = readMemberSession();
+
+    expect(resolved).toMatchObject(replacementSession);
+    expect(localStorage.getItem(PRODUCT_AUTH_STORAGE_V1.memberSession)).toBe(replacementRaw);
+    expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.guestBearer)).toBe(staleMemberJwt);
+    expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.pendingGuestBearer)).toBe(stagedGuest);
+    expect(globalThis.dispatchEvent).not.toHaveBeenCalled();
+  });
+
+  it('preserves a newer valid Member that replaces invalid-classification JSON after the stale read', () => {
+    const invalidRaw = JSON.stringify({
+      accessToken: 'opaque-member-token',
+      refreshToken: 'refresh-token',
+      expiresAt: '2099-01-01T00:00:00.000Z',
+      tokenType: 'bearer',
+      user: { id: '11111111-1111-4111-8111-111111111111', email: 'member@example.com' },
+    });
+    seedBrowserAuthority(invalidRaw, 'opaque-member-token');
+    local.replaceAfterReadOnce.set(PRODUCT_AUTH_STORAGE_V1.memberSession, replacementRaw);
+
+    const resolved = readMemberSession();
+
+    expect(resolved).toMatchObject(replacementSession);
+    expect(localStorage.getItem(PRODUCT_AUTH_STORAGE_V1.memberSession)).toBe(replacementRaw);
+    expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.guestBearer)).toBe('opaque-member-token');
+    expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.pendingGuestBearer)).toBe(stagedGuest);
+    expect(globalThis.dispatchEvent).not.toHaveBeenCalled();
   });
 
   it('propagates a malformed Member cleanup rollback failure without running a second discard', () => {

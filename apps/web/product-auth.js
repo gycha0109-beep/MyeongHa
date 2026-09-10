@@ -97,8 +97,10 @@ function writeLocal(key, value) {
   return false;
 }
 
-function removeLocal(key) {
-  const previous = readLocal(key);
+function removeLocal(key, previousOverride = undefined) {
+  const observedBefore = readLocal(key);
+  if (previousOverride !== undefined && observedBefore !== previousOverride) return false;
+  const previous = observedBefore;
   try {
     localStorage.removeItem(key);
   } catch (error) {
@@ -400,7 +402,7 @@ function discardMemberCompatibilityState() {
   return Object.freeze({ ok: true, rolledBack: true });
 }
 
-function discardMemberSession(expectedAccessToken = null, expectedRefreshToken = null) {
+function discardMemberSession(expectedAccessToken = null, expectedRefreshToken = null, expectedMemberRaw = undefined) {
   if (expectedAccessToken !== null) {
     const current = readMemberSession();
     if (
@@ -412,9 +414,9 @@ function discardMemberSession(expectedAccessToken = null, expectedRefreshToken =
     }
   }
 
-  const memberRaw = readLocal(MEMBER_SESSION_KEY);
+  const memberRaw = expectedMemberRaw === undefined ? readLocal(MEMBER_SESSION_KEY) : expectedMemberRaw;
   const restorableMemberRaw = normalizedStoredMemberSession(memberRaw) ? memberRaw : null;
-  if (!removeLocal(MEMBER_SESSION_KEY)) return false;
+  if (!removeLocal(MEMBER_SESSION_KEY, memberRaw)) return false;
 
   const compatibility = discardMemberCompatibilityState();
   if (!compatibility.ok) {
@@ -551,6 +553,14 @@ async function postJson(endpoint, body, authorization = null) {
   return readEnvelope(response);
 }
 
+function reconcileMalformedStoredMember(raw) {
+  if (discardMemberSession(null, null, raw)) return null;
+
+  const latestRaw = readLocal(MEMBER_SESSION_KEY);
+  if (latestRaw === null || latestRaw === raw) return null;
+  return readMemberSession();
+}
+
 export function readMemberSession() {
   const raw = readLocal(MEMBER_SESSION_KEY);
   if (!raw) return null;
@@ -559,14 +569,12 @@ export function readMemberSession() {
   try {
     parsed = JSON.parse(raw);
   } catch {
-    discardMemberSession();
-    return null;
+    return reconcileMalformedStoredMember(raw);
   }
 
   const normalized = normalizeSession(parsed);
   if (!normalized) {
-    discardMemberSession();
-    return null;
+    return reconcileMalformedStoredMember(raw);
   }
   return normalized;
 }
