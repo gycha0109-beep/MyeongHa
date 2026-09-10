@@ -64,7 +64,7 @@ function reconcileLocalRollback(key, previous, expectedCurrent) {
     if (previous === null) localStorage.removeItem(key);
     else localStorage.setItem(key, previous);
   } catch {
-    // A rollback mutation may throw after restoring. Reconciliation below remains authoritative.
+    // A rollback mutation may throw after restoring. Exact read-back remains authoritative.
   }
 
   try {
@@ -143,15 +143,30 @@ function readSession(key) {
   }
 }
 
-function restoreSessionValueSnapshot(key, value) {
+function reconcileSessionRollback(key, previous, expectedCurrent) {
+  let observed;
   try {
-    if (value === null) sessionStorage.removeItem(key);
-    else sessionStorage.setItem(key, value);
+    observed = readSession(key);
+  } catch {
+    return false;
+  }
+
+  if (observed === previous) return true;
+  if (observed !== expectedCurrent) {
+    // Same-tab work replaced this operation's value. Preserve the newer Guest authority.
+    return true;
+  }
+
+  try {
+    if (previous === null) sessionStorage.removeItem(key);
+    else sessionStorage.setItem(key, previous);
   } catch {
     // A rollback mutation may throw after restoring. Exact read-back remains authoritative.
   }
+
   try {
-    return readSession(key) === value;
+    observed = readSession(key);
+    return observed === previous || observed !== expectedCurrent;
   } catch {
     return false;
   }
@@ -169,7 +184,7 @@ function writeSession(key, value) {
   try {
     observed = readSession(key);
   } catch (error) {
-    if (!restoreSessionValueSnapshot(key, previous)) throw sessionWriteRollbackFailure(error);
+    if (!reconcileSessionRollback(key, previous, value)) throw sessionWriteRollbackFailure(error);
     throw error;
   }
 
@@ -178,8 +193,8 @@ function writeSession(key, value) {
   return false;
 }
 
-function removeSession(key) {
-  const previous = readSession(key);
+function removeSession(key, previousOverride = undefined) {
+  const previous = previousOverride === undefined ? readSession(key) : previousOverride;
   try {
     sessionStorage.removeItem(key);
   } catch {
@@ -190,7 +205,7 @@ function removeSession(key) {
   try {
     observed = readSession(key);
   } catch (error) {
-    if (!restoreSessionValueSnapshot(key, previous)) throw sessionClearRollbackFailure(error);
+    if (!reconcileSessionRollback(key, previous, null)) throw sessionClearRollbackFailure(error);
     throw error;
   }
 
@@ -199,59 +214,32 @@ function removeSession(key) {
   return false;
 }
 
-function restoreRemovedSessionEntries(entries) {
-  for (const [key, value] of entries) {
-    let observed;
-    try {
-      observed = readSession(key);
-    } catch (error) {
-      if (!restoreSessionSnapshot(entries)) throw sessionClearRollbackFailure(error);
-      throw error;
-    }
-    if (observed !== null) continue;
+function removeSessionEntries(entries) {
+  if (entries.length === 0) return true;
 
-    let restored;
+  const rollbackExpected = new Map();
+  for (const [key, value] of entries) {
+    rollbackExpected.set(key, null);
     try {
-      restored = writeSession(key, value);
+      if (removeSession(key, value)) continue;
+      rollbackExpected.delete(key);
+      return restoreSessionSnapshot(entries, rollbackExpected) && false;
     } catch (error) {
-      if (!restoreSessionSnapshot(entries)) throw sessionClearRollbackFailure(error);
+      if (!restoreSessionSnapshot(entries, rollbackExpected)) throw sessionClearRollbackFailure(error);
       throw error;
     }
-    if (!restored) return false;
   }
   return true;
 }
 
-function removeSessionEntries(entries) {
-  if (entries.length === 0) return true;
+function restoreSessionSnapshot(entries, expectedByKey) {
+  if (!(expectedByKey instanceof Map)) return false;
 
-  let removedAll = true;
-  let operationError = null;
-  for (const [key] of entries) {
-    try {
-      if (!removeSession(key)) removedAll = false;
-    } catch (error) {
-      removedAll = false;
-      operationError = error;
-      break;
-    }
-  }
-  if (removedAll) return true;
-
-  if (operationError) {
-    if (!restoreSessionSnapshot(entries)) throw sessionClearRollbackFailure(operationError);
-    throw operationError;
-  }
-  if (!restoreRemovedSessionEntries(entries)) return false;
-  return false;
-}
-
-function restoreSessionSnapshot(entries) {
   let restoredAll = true;
   for (const [key, value] of entries) {
+    if (!expectedByKey.has(key)) continue;
     try {
-      const restored = value === null ? removeSession(key) : writeSession(key, value);
-      if (!restored) restoredAll = false;
+      if (!reconcileSessionRollback(key, value, expectedByKey.get(key))) restoredAll = false;
     } catch {
       restoredAll = false;
     }
@@ -321,26 +309,37 @@ function stageMemberBearerForLegacyProductClients(accessToken) {
     [GUEST_TOKEN_KEY, readSession(GUEST_TOKEN_KEY)],
     [PENDING_GUEST_TOKEN_KEY, readSession(PENDING_GUEST_TOKEN_KEY)],
   ];
+  const rollbackExpected = new Map();
   const current = normalizeGuestBearer(snapshot[0][1]);
   const pendingRaw = snapshot[1][1];
   const pending = normalizeGuestBearer(pendingRaw);
+  const writeOwned = (key, value) => {
+    const written = writeSession(key, value);
+    if (written) rollbackExpected.set(key, value);
+    return written;
+  };
+  const removeOwned = (key) => {
+    const removed = removeSession(key);
+    if (removed) rollbackExpected.set(key, null);
+    return removed;
+  };
 
   try {
-    if (pendingRaw !== null && !pending && !removeSession(PENDING_GUEST_TOKEN_KEY)) {
+    if (pendingRaw !== null && !pending && !removeOwned(PENDING_GUEST_TOKEN_KEY)) {
       throw memberCompatibilityFailure();
     }
-    if (current && !pending && !writeSession(PENDING_GUEST_TOKEN_KEY, current)) {
+    if (current && !pending && !writeOwned(PENDING_GUEST_TOKEN_KEY, current)) {
       throw memberCompatibilityFailure();
     }
-    if (!writeSession(GUEST_TOKEN_KEY, accessToken)) {
+    if (!writeOwned(GUEST_TOKEN_KEY, accessToken)) {
       throw memberCompatibilityFailure();
     }
   } catch (error) {
-    if (!restoreSessionSnapshot(snapshot)) throw memberCompatibilityRollbackFailure(error);
+    if (!restoreSessionSnapshot(snapshot, rollbackExpected)) throw memberCompatibilityRollbackFailure(error);
     throw error;
   }
 
-  return () => restoreSessionSnapshot(snapshot);
+  return () => restoreSessionSnapshot(snapshot, rollbackExpected);
 }
 
 function sameMemberSessionGeneration(left, right) {
@@ -366,11 +365,25 @@ function discardMemberCompatibilityState() {
     [GUEST_TOKEN_KEY, readSession(GUEST_TOKEN_KEY)],
     [PENDING_GUEST_TOKEN_KEY, readSession(PENDING_GUEST_TOKEN_KEY)],
   ];
-  const fail = () => Object.freeze({ ok: false, rolledBack: restoreSessionSnapshot(snapshot) });
+  const rollbackExpected = new Map();
+  const writeOwned = (key, value) => {
+    const written = writeSession(key, value);
+    if (written) rollbackExpected.set(key, value);
+    return written;
+  };
+  const removeOwned = (key) => {
+    const removed = removeSession(key);
+    if (removed) rollbackExpected.set(key, null);
+    return removed;
+  };
+  const fail = () => Object.freeze({
+    ok: false,
+    rolledBack: restoreSessionSnapshot(snapshot, rollbackExpected),
+  });
   const active = snapshot[0][1];
   if (
     (isJwtLike(active) || (active !== null && !normalizeGuestBearer(active))) &&
-    !removeSession(GUEST_TOKEN_KEY)
+    !removeOwned(GUEST_TOKEN_KEY)
   ) {
     return fail();
   }
@@ -378,9 +391,9 @@ function discardMemberCompatibilityState() {
   const pendingRaw = snapshot[1][1];
   const pending = normalizeGuestBearer(pendingRaw);
   if (pending) {
-    if (!writeSession(GUEST_TOKEN_KEY, pending)) return fail();
-    if (!removeSession(PENDING_GUEST_TOKEN_KEY)) return fail();
-  } else if (pendingRaw !== null && !removeSession(PENDING_GUEST_TOKEN_KEY)) {
+    if (!writeOwned(GUEST_TOKEN_KEY, pending)) return fail();
+    if (!removeOwned(PENDING_GUEST_TOKEN_KEY)) return fail();
+  } else if (pendingRaw !== null && !removeOwned(PENDING_GUEST_TOKEN_KEY)) {
     return fail();
   }
 
