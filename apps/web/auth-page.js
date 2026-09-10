@@ -141,11 +141,12 @@ function readConfirmationGuestHandoffLocal(key) {
 }
 
 function writeConfirmationGuestHandoffLocal(key, value) {
+  const raw = value;
   try {
-    localStorage.setItem(key, value);
+    localStorage.setItem(key, raw);
   } catch {}
   try {
-    return localStorage.getItem(key) === value;
+    return localStorage.getItem(key) === raw;
   } catch {
     return false;
   }
@@ -310,7 +311,15 @@ function ensureConfirmationGuestHandoffJournalInitialized() {
     if (!writeConfirmationGuestHandoffJournalEntry(entry)) return false;
   }
 
-  return writeConfirmationGuestHandoffLocal(CONFIRMATION_GUEST_HANDOFF_JOURNAL_MARKER_KEY, '1');
+  function writeMarker() {
+    return writeConfirmationGuestHandoffLocal(CONFIRMATION_GUEST_HANDOFF_JOURNAL_MARKER_KEY, '1');
+  }
+  if (!writeMarker()) return false;
+  try {
+    return localStorage.getItem(CONFIRMATION_GUEST_HANDOFF_JOURNAL_MARKER_KEY) === '1';
+  } catch {
+    return false;
+  }
 }
 
 function readConfirmationGuestHandoffs() {
