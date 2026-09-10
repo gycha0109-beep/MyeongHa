@@ -132,6 +132,14 @@ function confirmationGuestHandoffClearFailure(error) {
   );
 }
 
+function confirmationGuestHandoffClearRollbackFailure(error) {
+  return new ProductAuthError(
+    'WEB_AUTH_CONFIRMATION_HANDOFF_CLEAR_ROLLBACK_FAILED',
+    '게스트 계정 연결 기록 제거 확인 실패 후 브라우저 상태를 안전하게 복원하지 못했습니다.',
+    error,
+  );
+}
+
 function readConfirmationGuestHandoffLocal(key) {
   try {
     return localStorage.getItem(key);
@@ -140,13 +148,60 @@ function readConfirmationGuestHandoffLocal(key) {
   }
 }
 
+function reconcileConfirmationGuestHandoffRemoval(key, previousRaw) {
+  let observed;
+  try {
+    observed = localStorage.getItem(key);
+  } catch {
+    return false;
+  }
+
+  if (observed === previousRaw) return true;
+  if (observed !== null) return true;
+
+  try {
+    if (previousRaw !== null) localStorage.setItem(key, previousRaw);
+  } catch {
+    // A rollback write may throw after restoring. Exact read-back remains authoritative.
+  }
+
+  try {
+    observed = localStorage.getItem(key);
+    return observed === previousRaw || observed !== null;
+  } catch {
+    return false;
+  }
+}
+
 function removeConfirmationGuestHandoffLocal(key) {
+  const previousRaw = readConfirmationGuestHandoffLocal(key);
+  if (previousRaw === null) return true;
+
+  let mutationError = null;
   try {
     localStorage.removeItem(key);
-    if (localStorage.getItem(key) === null) return true;
   } catch (error) {
+    mutationError = error;
+  }
+
+  let observed;
+  try {
+    observed = localStorage.getItem(key);
+  } catch (error) {
+    if (!reconcileConfirmationGuestHandoffRemoval(key, previousRaw)) {
+      throw confirmationGuestHandoffClearRollbackFailure(error);
+    }
     throw confirmationGuestHandoffClearFailure(error);
   }
+
+  if (mutationError) {
+    if (!reconcileConfirmationGuestHandoffRemoval(key, previousRaw)) {
+      throw confirmationGuestHandoffClearRollbackFailure(mutationError);
+    }
+    throw confirmationGuestHandoffClearFailure(mutationError);
+  }
+
+  if (observed === null || observed !== previousRaw) return true;
   throw confirmationGuestHandoffClearFailure();
 }
 
@@ -387,7 +442,8 @@ async function clearConfirmationGuestHandoffIfMatches(memberEmail, promotedGuest
   } catch (error) {
     if (error instanceof ProductAuthError && (
       error.code === 'WEB_AUTH_CONFIRMATION_HANDOFF_READ_FAILED' ||
-      error.code === 'WEB_AUTH_CONFIRMATION_HANDOFF_CLEAR_FAILED'
+      error.code === 'WEB_AUTH_CONFIRMATION_HANDOFF_CLEAR_FAILED' ||
+      error.code === 'WEB_AUTH_CONFIRMATION_HANDOFF_CLEAR_ROLLBACK_FAILED'
     )) {
       throw error;
     }
@@ -470,6 +526,7 @@ function authErrorMessage(error) {
     case 'WEB_AUTH_CONFIRMATION_HANDOFF_READ_FAILED':
       return '저장된 게스트 계정 연결 기록을 확인하지 못했습니다. 브라우저 저장소 접근을 복구한 뒤 다시 로그인해 주세요.';
     case 'WEB_AUTH_CONFIRMATION_HANDOFF_CLEAR_FAILED':
+    case 'WEB_AUTH_CONFIRMATION_HANDOFF_CLEAR_ROLLBACK_FAILED':
       return '게스트 계정 연결 기록을 정리하지 못했습니다. 브라우저 저장소 접근을 복구한 뒤 다시 로그인해 주세요.';
     default:
       return '인증을 완료하지 못했습니다. 입력을 확인하고 다시 시도해 주세요.';
