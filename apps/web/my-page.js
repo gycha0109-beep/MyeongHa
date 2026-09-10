@@ -1,5 +1,6 @@
 import { createMyRuntimeClient, MyRuntimeError } from './my-runtime-client.js';
-import { readMemberSession, signOutMember } from './product-auth.js';
+import { PRODUCT_AUTH_STORAGE_V1, readMemberSession, signOutMember } from './product-auth.js';
+import { shouldReloadMyForMemberSessionStorageChange } from './product-auth-surface.js';
 
 function byId(id) {
   const element = document.getElementById(id);
@@ -233,5 +234,15 @@ async function boot() {
     renderBirthUnavailable('현재 출생 정보를 불러올 수 없습니다. 확인되지 않은 값을 대신 표시하지 않습니다.');
   }
 }
+
+window.addEventListener('storage', (event) => {
+  if (event.key !== PRODUCT_AUTH_STORAGE_V1.memberSession) return;
+  if (!shouldReloadMyForMemberSessionStorageChange({
+    pathname: window.location.pathname,
+    oldValue: event.oldValue,
+    newValue: event.newValue,
+  })) return;
+  window.location.reload();
+});
 
 void boot();
