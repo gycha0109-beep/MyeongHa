@@ -179,7 +179,9 @@ jobs:
       - name: Verify Birth session and duplicate-create guard
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
-        run: node scripts/run-web-birth-session-browser-smoke-v2.mjs
+        run: |
+          node scripts/run-web-birth-session-browser-smoke-v2.mjs
+          node scripts/verify-web-birth-member-replacement-browser.mjs
       - name: Verify conversation browser render
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}

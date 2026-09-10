@@ -29,3 +29,8 @@ export function shouldReloadMyForMemberSessionStorageChange({ pathname, oldValue
   if (pageBasename(pathname) !== 'my.html') return false;
   return shouldReloadForMemberSubjectChange({ oldValue, newValue });
 }
+
+export function shouldReloadBirthForMemberSessionStorageChange({ pathname, oldValue, newValue }) {
+  if (pageBasename(pathname) !== 'birth.html') return false;
+  return shouldReloadForMemberSubjectChange({ oldValue, newValue });
+}
