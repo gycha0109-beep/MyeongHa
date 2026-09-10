@@ -12,6 +12,8 @@ const activeBearerKey = 'myeongha.guestBearer.v1';
 const pendingGuestKey = 'myeongha.pendingGuestBearer.v1';
 const changedEvent = 'myeongha:auth-changed';
 const validExistingGuest = 'guest-valid-before-malformed-cleanup';
+const newerPendingGuest = 'guest-newer-pending-after-stale-read';
+const newerActiveGuest = 'guest-newer-active-after-stale-read';
 const bootstrappedGuest = `myeongha_guest_v1_${'B'.repeat(43)}`;
 
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
@@ -167,13 +169,19 @@ async function navigate(client, origin, pathname, timeout = 10_000) {
 await stat(join(root, 'product-auth.js'));
 const productAuthSource = await readFile(join(root, 'product-auth.js'), 'utf8');
 assert(
-  productAuthSource.includes('pendingRaw !== null && !removeSession(PENDING_GUEST_TOKEN_KEY)')
-    && productAuthSource.includes('throw guestClearFailure();'),
-  'readGuestBearer does not fail closed on malformed pending Guest cleanup',
+  productAuthSource.includes('const observedBefore = readSession(key);')
+    && productAuthSource.includes('previousOverride !== undefined && observedBefore !== previousOverride'),
+  'sessionStorage removal does not compare current Guest authority before deleting an expected generation',
 );
 assert(
-  productAuthSource.includes('tokenRaw !== null && !isJwtLike(tokenRaw) && !removeSession(GUEST_TOKEN_KEY)'),
-  'readGuestBearer does not fail closed on malformed active Guest cleanup',
+  productAuthSource.includes('removeSession(PENDING_GUEST_TOKEN_KEY, pendingRaw)')
+    && productAuthSource.includes('const replacement = normalizeGuestBearer(readSession(PENDING_GUEST_TOKEN_KEY));'),
+  'readGuestBearer does not reconcile a malformed pending Guest against a newer replacement',
+);
+assert(
+  productAuthSource.includes('removeSession(GUEST_TOKEN_KEY, tokenRaw)')
+    && productAuthSource.includes('const replacement = normalizeGuestBearer(readSession(GUEST_TOKEN_KEY));'),
+  'readGuestBearer does not reconcile a malformed active Guest against a newer replacement',
 );
 
 const { server, origin } = await serve();
@@ -196,12 +204,70 @@ try {
   client = await connectCdp(await devtoolsPort(profile, chrome));
   await navigate(client, origin, '/probe.html');
 
+  const replacementRace = await client.evaluate(`(async () => {
+    const auth = await import('/product-auth.js');
+    const nativeGetItem = Storage.prototype.getItem;
+    const nativeSetItem = Storage.prototype.setItem;
+    const nativeRemoveItem = Storage.prototype.removeItem;
+    globalThis.__myeonghaMalformedGuestEvents = 0;
+    addEventListener(${JSON.stringify(changedEvent)}, () => { globalThis.__myeonghaMalformedGuestEvents += 1; });
+
+    sessionStorage.removeItem(${JSON.stringify(pendingGuestKey)});
+    sessionStorage.removeItem(${JSON.stringify(activeBearerKey)});
+    sessionStorage.setItem(${JSON.stringify(pendingGuestKey)}, '   ');
+    sessionStorage.setItem(${JSON.stringify(activeBearerKey)}, ${JSON.stringify(validExistingGuest)});
+    let replacePendingOnce = true;
+    Storage.prototype.getItem = function(key) {
+      const value = nativeGetItem.call(this, key);
+      if (this === sessionStorage && key === ${JSON.stringify(pendingGuestKey)} && replacePendingOnce) {
+        replacePendingOnce = false;
+        nativeSetItem.call(this, key, ${JSON.stringify(newerPendingGuest)});
+      }
+      return value;
+    };
+    const pendingResolved = auth.readGuestBearer();
+    Storage.prototype.getItem = nativeGetItem;
+    const pendingAfter = sessionStorage.getItem(${JSON.stringify(pendingGuestKey)});
+    const activeAfterPending = sessionStorage.getItem(${JSON.stringify(activeBearerKey)});
+
+    nativeRemoveItem.call(sessionStorage, ${JSON.stringify(pendingGuestKey)});
+    nativeSetItem.call(sessionStorage, ${JSON.stringify(activeBearerKey)}, '   ');
+    let replaceActiveOnce = true;
+    Storage.prototype.getItem = function(key) {
+      const value = nativeGetItem.call(this, key);
+      if (this === sessionStorage && key === ${JSON.stringify(activeBearerKey)} && replaceActiveOnce) {
+        replaceActiveOnce = false;
+        nativeSetItem.call(this, key, ${JSON.stringify(newerActiveGuest)});
+      }
+      return value;
+    };
+    const activeResolved = auth.readGuestBearer();
+    Storage.prototype.getItem = nativeGetItem;
+
+    return {
+      pendingResolved,
+      pendingAfter,
+      activeAfterPending,
+      activeResolved,
+      pendingAfterActive: sessionStorage.getItem(${JSON.stringify(pendingGuestKey)}),
+      activeAfter: sessionStorage.getItem(${JSON.stringify(activeBearerKey)}),
+      events: globalThis.__myeonghaMalformedGuestEvents,
+    };
+  })()`);
+
+  assert(replacementRace.pendingResolved === newerPendingGuest, 'Malformed pending Guest cleanup did not converge on newer pending replacement');
+  assert(replacementRace.pendingAfter === newerPendingGuest, 'Malformed pending Guest cleanup deleted newer pending replacement');
+  assert(replacementRace.activeAfterPending === validExistingGuest, 'Malformed pending Guest cleanup disturbed active Guest authority');
+  assert(replacementRace.activeResolved === newerActiveGuest, 'Malformed active Guest cleanup did not converge on newer active replacement');
+  assert(replacementRace.pendingAfterActive === null, 'Malformed active Guest cleanup unexpectedly created pending Guest authority');
+  assert(replacementRace.activeAfter === newerActiveGuest, 'Malformed active Guest cleanup deleted newer active replacement');
+  assert(replacementRace.events === 0, `Malformed Guest replacement reconciliation emitted ${replacementRace.events} auth event(s)`);
+  console.log('Malformed stored Guest cleanup preserves a newer replacement: PASS');
+
   const readFailure = await client.evaluate(`(async () => {
     const auth = await import('/product-auth.js');
     sessionStorage.setItem(${JSON.stringify(pendingGuestKey)}, '   ');
     sessionStorage.setItem(${JSON.stringify(activeBearerKey)}, ${JSON.stringify(validExistingGuest)});
-    globalThis.__myeonghaMalformedGuestEvents = 0;
-    addEventListener(${JSON.stringify(changedEvent)}, () => { globalThis.__myeonghaMalformedGuestEvents += 1; });
 
     const nativeRemoveItem = Storage.prototype.removeItem;
     Storage.prototype.removeItem = function(key) {
@@ -298,6 +364,7 @@ try {
   await mkdir(artifactDir, { recursive: true });
   await writeFile(artifactPath, `${JSON.stringify({
     status: 'MyeongHa_WEB_AUTH_MALFORMED_GUEST_CLEANUP_FAILURE_BROWSER_PASS',
+    replacementRace,
     readFailure,
     bootstrapFailure,
     recoveredBootstrap,
