@@ -1,5 +1,10 @@
 import { unwrapApiSuccessEnvelope, WebApiEnvelopeError } from './api-envelope.js';
-import { ensureActiveBearer, invalidateGuestSession, invalidateMemberSession } from './product-auth.js';
+import {
+  PRODUCT_AUTH_STORAGE_V1,
+  ensureActiveBearer,
+  invalidateGuestSession,
+  invalidateMemberSession,
+} from './product-auth.js';
 
 const DEFAULT_ENDPOINTS = Object.freeze({
   profile: '/api/me',
@@ -7,6 +12,13 @@ const DEFAULT_ENDPOINTS = Object.freeze({
   readings: '/api/readings',
   memories: '/api/memories',
 });
+const AUTHORITY_READ_ATTEMPTS = 2;
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (event) => {
+    if (event.key === PRODUCT_AUTH_STORAGE_V1.memberSession) window.location.reload();
+  });
+}
 
 export class RecordsRuntimeError extends Error {
   constructor(code, message, cause) {
@@ -48,6 +60,17 @@ async function resolveAuthorizedBearer(resolveBearer) {
   }
 
   return bearer;
+}
+
+function sameAuthorizedBearer(left, right) {
+  return left.kind === right.kind && left.token === right.token;
+}
+
+function sessionChangedFailure() {
+  return new RecordsRuntimeError(
+    'WEB_RECORDS_SESSION_CHANGED',
+    'The active Records session changed while records were being read.',
+  );
 }
 
 function invalidateRejectedBearer(bearer) {
@@ -107,9 +130,18 @@ export function createRecordsRuntimeClient(options = {}) {
   const resolveBearer = options.resolveBearer ?? ensureActiveBearer;
   const endpoints = Object.freeze({ ...DEFAULT_ENDPOINTS, ...(options.endpoints ?? {}) });
 
+  async function readStable(readSnapshot) {
+    for (let attempt = 0; attempt < AUTHORITY_READ_ATTEMPTS; attempt += 1) {
+      const bearer = await resolveAuthorizedBearer(resolveBearer);
+      const snapshot = await readSnapshot(bearer);
+      const latest = await resolveAuthorizedBearer(resolveBearer);
+      if (sameAuthorizedBearer(latest, bearer)) return snapshot;
+    }
+    throw sessionChangedFailure();
+  }
+
   async function readEndpoint(endpoint) {
-    const bearer = await resolveAuthorizedBearer(resolveBearer);
-    return readJson(fetchImpl, endpoint, bearer);
+    return readStable((bearer) => readJson(fetchImpl, endpoint, bearer));
   }
 
   return Object.freeze({
@@ -117,15 +149,16 @@ export function createRecordsRuntimeClient(options = {}) {
     readLifeFacts: () => readEndpoint(endpoints.lifeFacts),
     readReadings: () => readEndpoint(endpoints.readings),
     readMemories: () => readEndpoint(endpoints.memories),
-    async readRecords() {
-      const bearer = await resolveAuthorizedBearer(resolveBearer);
-      const profile = await readJson(fetchImpl, endpoints.profile, bearer);
-      const [lifeFacts, readings, memories] = await Promise.all([
-        readJson(fetchImpl, endpoints.lifeFacts, bearer),
-        readJson(fetchImpl, endpoints.readings, bearer),
-        readJson(fetchImpl, endpoints.memories, bearer),
-      ]);
-      return Object.freeze({ profile, lifeFacts, readings, memories });
+    readRecords() {
+      return readStable(async (bearer) => {
+        const profile = await readJson(fetchImpl, endpoints.profile, bearer);
+        const [lifeFacts, readings, memories] = await Promise.all([
+          readJson(fetchImpl, endpoints.lifeFacts, bearer),
+          readJson(fetchImpl, endpoints.readings, bearer),
+          readJson(fetchImpl, endpoints.memories, bearer),
+        ]);
+        return Object.freeze({ profile, lifeFacts, readings, memories });
+      });
     },
   });
 }
