@@ -1,4 +1,6 @@
 import { getActiveBearer, invalidateGuestSession, invalidateMemberSession } from './product-auth.js';
+import { PRODUCT_AUTH_STORAGE_V1 } from './product-auth.js';
+import { shouldReloadChatForMemberSessionStorageChange } from './product-auth-surface.js';
 
 const params = new URLSearchParams(window.location.search);
 const threadId = params.get('threadId');
@@ -159,6 +161,18 @@ function renderRoomState(payload) {
   if (contextTitle) contextTitle.textContent = '';
 }
 
+function clearOwnerScopedRoomStateForAuthorityChange() {
+  historyList?.replaceChildren();
+  if (historyEmpty) {
+    historyEmpty.hidden = false;
+    historyEmpty.textContent = '현재 계정의 대화 권한을 다시 확인하는 중입니다.';
+  }
+  chatStream?.replaceChildren();
+  if (contextPill) contextPill.hidden = true;
+  if (contextTitle) contextTitle.textContent = '';
+  setComposeStatus('현재 계정의 대화 권한을 다시 확인하는 중입니다.');
+}
+
 function invalidateRejectedBearer(activeBearer) {
   if (activeBearer?.kind === 'member') {
     invalidateMemberSession(activeBearer.token);
@@ -235,4 +249,14 @@ function submitTurn(event) {
 }
 
 document.addEventListener('myeongha:chat-submit', submitTurn);
+window.addEventListener('storage', (event) => {
+  if (event.key !== PRODUCT_AUTH_STORAGE_V1.memberSession) return;
+  if (!shouldReloadChatForMemberSessionStorageChange({
+    pathname: window.location.pathname,
+    oldValue: event.oldValue,
+    newValue: event.newValue,
+  })) return;
+  clearOwnerScopedRoomStateForAuthorityChange();
+  window.location.reload();
+});
 void loadRoomState();
