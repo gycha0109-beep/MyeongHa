@@ -2,6 +2,7 @@ import { createRecordsRuntimeClient, RecordsRuntimeError } from './records-runti
 
 const SAMPLE_SAJU_FACT_TYPE = 'sample_saju_reading_result';
 const SAMPLE_SAJU_SCHEMA_VERSION = 'sample.v1';
+const DEVELOPMENT_SAMPLE_HOSTS = Object.freeze(new Set(['localhost', '127.0.0.1', '::1', '[::1]']));
 
 const SAJU_DOMAIN_PRESENTATION = Object.freeze({
   general: Object.freeze({ icon: '命', title: '전체 사주' }),
@@ -61,6 +62,10 @@ function isSampleSajuReadingFact(fact) {
     && fact?.schemaVersion === SAMPLE_SAJU_SCHEMA_VERSION
     && isPlainObject(fact?.valueJsonb)
     && fact.valueJsonb.sample === true;
+}
+
+function allowsDevelopmentSajuSamples() {
+  return DEVELOPMENT_SAMPLE_HOSTS.has(window.location.hostname.toLowerCase());
 }
 
 function asNonEmptyString(value) {
@@ -184,15 +189,19 @@ function renderPersistedReading(target, reading) {
   target.append(card);
 }
 
+function renderSajuReadingEmpty(target) {
+  const empty = document.createElement('article');
+  empty.className = 'records-reading-empty';
+  empty.append(textElement('h3', '', '아직 저장된 사주 풀이가 없습니다.'));
+  empty.append(textElement('p', 'muted', '완료된 사주 풀이가 저장되면 이곳에서 풀이 이력을 확인할 수 있습니다.'));
+  target.append(empty);
+}
+
 function renderSajuReadingSamples(target, lifeFactsPayload) {
   const sampleFacts = requireArray(lifeFactsPayload, 'facts').filter(isSampleSajuReadingFact);
 
   if (sampleFacts.length === 0) {
-    const empty = document.createElement('article');
-    empty.className = 'records-reading-empty';
-    empty.append(textElement('h3', '', '아직 저장된 사주 풀이가 없습니다.'));
-    empty.append(textElement('p', 'muted', '완료된 사주 풀이가 저장되면 이곳에서 풀이 이력을 확인할 수 있습니다.'));
-    target.append(empty);
+    renderSajuReadingEmpty(target);
     return;
   }
 
@@ -252,7 +261,11 @@ function renderSajuReadings(readingPayload, lifeFactsPayload) {
     for (const reading of readings) renderPersistedReading(target, reading);
     return;
   }
-  renderSajuReadingSamples(target, lifeFactsPayload);
+  if (allowsDevelopmentSajuSamples()) {
+    renderSajuReadingSamples(target, lifeFactsPayload);
+    return;
+  }
+  renderSajuReadingEmpty(target);
 }
 
 function renderMemories(payload) {

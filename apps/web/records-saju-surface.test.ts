@@ -28,13 +28,15 @@ describe('Records Saju history surface', () => {
     expect(client).toContain('return Object.freeze({ profile, lifeFacts, readings, memories });');
   });
 
-  it('renders persisted Reading history before the explicit sample fixture fallback', () => {
+  it('renders persisted Reading history before any development-only sample fallback', () => {
     expect(page).toContain("requireArray(readingPayload, 'readings')");
     expect(page).toContain('if (readings.length > 0)');
     expect(page).toContain('for (const reading of readings) renderPersistedReading(target, reading);');
     expect(page).toContain("records-reading-card records-reading-card--persisted");
     expect(page).toContain("records-reading-badge', '저장된 풀이'");
+    expect(page).toContain('if (allowsDevelopmentSajuSamples())');
     expect(page).toContain('renderSajuReadingSamples(target, lifeFactsPayload)');
+    expect(page).toContain('renderSajuReadingEmpty(target);');
   });
 
   it('recognizes only the explicit sample fixture contract and removes it from the Life Fact ledger', () => {
@@ -45,10 +47,19 @@ describe('Records Saju history surface', () => {
     expect(page).toContain("requireArray(lifeFactsPayload, 'facts').filter(isSampleSajuReadingFact)");
   });
 
+  it('allows sample cards only on explicit loopback development hosts', () => {
+    expect(page).toContain("new Set(['localhost', '127.0.0.1', '::1', '[::1]'])");
+    expect(page).toContain('DEVELOPMENT_SAMPLE_HOSTS.has(window.location.hostname.toLowerCase())');
+    expect(page).not.toContain('myeongha.vercel.app');
+    expect(page).not.toContain('.vercel.app');
+  });
+
   it('keeps the fallback honest and never invents snapshot semantics or a score', () => {
     expect(page).toContain("records-reading-card records-reading-card--sample");
     expect(page).toContain("records-reading-badge', '개발 샘플'");
     expect(page).toContain('실제 Reading이 없을 때만 보이는 UI fixture');
+    expect(page).toContain("empty.className = 'records-reading-empty'");
+    expect(page).toContain('아직 저장된 사주 풀이가 없습니다.');
     expect(page).toContain("link.href = 'reading.html';");
     expect(page).not.toContain('responseSnapshotJsonb');
     expect(page).not.toContain('value.score');
