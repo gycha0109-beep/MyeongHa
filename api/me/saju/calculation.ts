@@ -33,6 +33,11 @@ function internalServerErrorNoStore(): Response {
   });
 }
 
+function reportRouteFailure(): Response {
+  console.error('MyeongHa Saju calculation route failed.');
+  return internalServerErrorNoStore();
+}
+
 async function toBodyPresenceBoundRequest(request: Request): Promise<Request> {
   if (request.method !== 'POST') return request;
 
@@ -69,8 +74,7 @@ export function createCurrentSubjectSajuCalculationRouteV1(
         });
         return withNoStore(response);
       } catch {
-        console.error('MyeongHa Saju calculation route failed.');
-        return internalServerErrorNoStore();
+        return reportRouteFailure();
       }
     },
   };
@@ -78,6 +82,10 @@ export function createCurrentSubjectSajuCalculationRouteV1(
 
 export default {
   async fetch(request: Request): Promise<Response> {
-    return createCurrentSubjectSajuCalculationRouteV1(getRuntime()).fetch(request);
+    try {
+      return await createCurrentSubjectSajuCalculationRouteV1(getRuntime()).fetch(request);
+    } catch {
+      return reportRouteFailure();
+    }
   },
 };
