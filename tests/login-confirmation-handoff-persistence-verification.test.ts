@@ -10,15 +10,19 @@ describe('confirmation handoff persistence verification', () => {
   });
 
   it('writes each authoritative journal entry through the read-back helper', () => {
-    expect(source).toMatch(/function writeConfirmationGuestHandoffJournalEntry\(entry\)[\s\S]*const key = `\$\{CONFIRMATION_GUEST_HANDOFF_ENTRY_PREFIX\}\$\{suffix\}`;[\s\S]*const raw = JSON\.stringify\(entry\);[\s\S]*return writeConfirmationGuestHandoffLocal\(key, raw\);/);
+    expect(source).toMatch(/function writeConfirmationGuestHandoffJournalEntry\(entry\)[\s\S]*const key = `\$\{CONFIRMATION_GUEST_HANDOFF_ENTRY_PREFIX\}\$\{suffix\}`;[\s\S]*const raw = JSON\.stringify\(entry\);[\s\S]*writeConfirmationGuestHandoffLocal\(key, raw\)/);
   });
 
   it('verifies the journal marker before switching authority from the legacy aggregate', () => {
-    expect(source).toMatch(/ensureConfirmationGuestHandoffJournalInitialized\(\)[\s\S]*for \(const entry of legacyEntries\)[\s\S]*if \(!writeConfirmationGuestHandoffJournalEntry\(entry\)\) return false;[\s\S]*return writeConfirmationGuestHandoffLocal\(CONFIRMATION_GUEST_HANDOFF_JOURNAL_MARKER_KEY, '1'\);/);
+    expect(source).toMatch(/ensureConfirmationGuestHandoffJournalInitialized\(\)[\s\S]*for \(const entry of legacyEntries\)[\s\S]*if \(!writeConfirmationGuestHandoffJournalEntry\(entry\)\) return false;[\s\S]*writeConfirmationGuestHandoffLocal\(CONFIRMATION_GUEST_HANDOFF_JOURNAL_MARKER_KEY, '1'\)/);
   });
 
   it('does not stage the current signup handoff after an unverified legacy migration', () => {
     expect(source).toMatch(/locks\.request\(CONFIRMATION_GUEST_HANDOFF_LOCK_NAME, \{ mode: 'exclusive' \}, \(\) => \{[\s\S]*if \(!ensureConfirmationGuestHandoffJournalInitialized\(\)\) return false;[\s\S]*writeConfirmationGuestHandoffJournalEntry\(entry\)/);
+  });
+
+  it('keeps a verified durable signup handoff authoritative when only the post-commit reread fails', () => {
+    expect(source).toMatch(/if \(!writeConfirmationGuestHandoffJournalEntry\(entry\)\) return false;[\s\S]*try \{[\s\S]*readConfirmationGuestHandoffs\(\);[\s\S]*WEB_AUTH_CONFIRMATION_HANDOFF_READ_FAILED[\s\S]*return true;/);
   });
 
   it('does not invent canonical Subject identity while migrating browser handoffs', () => {
