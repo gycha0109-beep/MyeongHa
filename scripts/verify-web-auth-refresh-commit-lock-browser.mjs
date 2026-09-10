@@ -127,6 +127,15 @@ async function serve() {
   return { server, origin: `http://127.0.0.1:${address.port}` };
 }
 
+async function waitUntil(predicate, message, timeout = 8_000) {
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    if (predicate()) return;
+    await sleep(20);
+  }
+  throw new Error(message);
+}
+
 async function devtoolsPort(profile, process) {
   for (let index = 0; index < 100; index += 1) {
     assert(process.exitCode === null, `Chrome exited early (${process.exitCode})`);
@@ -243,6 +252,10 @@ async function storedState(client) {
 }
 
 await stat(join(root, 'product-auth.js'));
+const productAuthSource = await readFile(join(root, 'product-auth.js'), 'utf8');
+assert(productAuthSource.includes('export async function signInWithPassword(email, password) {\n  return withMemberMutationLock(async () => {'), 'sign-in request-start lock contract missing');
+assert(productAuthSource.includes('return withMemberMutationLock(() => {\n      const racedExisting = readGuestBearer();'), 'Guest bootstrap commit lock contract missing');
+
 const { server, origin } = await serve();
 const profile = await mkdtemp(join(tmpdir(), 'myeongha-auth-member-mutation-lock-browser-'));
 const chrome = spawn(chromeBin, [
@@ -275,7 +288,7 @@ try {
       (error) => { window.__directRefresh = { done: true, value: null, error: { code: error?.code ?? null, message: error?.message ?? null } }; },
     );
   })()`);
-  while (refreshRequests < 1) await sleep(20);
+  await waitUntil(() => refreshRequests >= 1, 'direct refresh request did not start');
   await sleep(100);
   let state = await client.evaluate(`(() => ({
     done: window.__directRefresh?.done === true,
@@ -308,15 +321,6 @@ try {
       (error) => { window.__signInRace = { done: true, value: null, error: { code: error?.code ?? null, message: error?.message ?? null } }; },
     );
   })()`);
-  while (signInRequests < 1) await sleep(20);
-  await sleep(100);
-  state = await client.evaluate(`(() => ({
-    done: window.__signInRace?.done === true,
-    accessToken: JSON.parse(localStorage.getItem('myeongha.memberSession.v1') ?? 'null')?.accessToken ?? null,
-  }))()`);
-  assert(state.done === false, 'sign-in committed outside the shared Member mutation lock');
-  assert(state.accessToken === original.accessToken, 'sign-in changed Member authority while the shared lock was held');
-
   await client.evaluate(`(() => {
     window.__signInRefresh = { done: false, value: null, error: null };
     void import('/product-auth.js').then((auth) => auth.refreshMemberSession()).then(
@@ -324,16 +328,26 @@ try {
       (error) => { window.__signInRefresh = { done: true, value: null, error: { code: error?.code ?? null, message: error?.message ?? null } }; },
     );
   })()`);
-  while (refreshRequests < 2) await sleep(20);
+  await waitUntil(() => refreshRequests >= 2, 'refresh did not start while sign-in was queued');
+  await sleep(100);
+  state = await client.evaluate(`(() => ({
+    signInDone: window.__signInRace?.done === true,
+    refreshDone: window.__signInRefresh?.done === true,
+    accessToken: JSON.parse(localStorage.getItem('myeongha.memberSession.v1') ?? 'null')?.accessToken ?? null,
+  }))()`);
+  assert(signInRequests === 0, 'sign-in remote request escaped the shared Member mutation lock');
+  assert(state.signInDone === false && state.refreshDone === false, 'sign-in/refresh race settled before lock release');
+  assert(state.accessToken === original.accessToken, 'sign-in/refresh changed Member authority while the shared lock was held');
   await releaseSignIn();
   await waitFor(client, `window.__signInRace?.done === true && window.__signInRefresh?.done === true`, 'sign-in/refresh race did not settle after lock release');
   const signInState = await storedState(client);
   const signInRace = await client.evaluate(`({ signIn: window.__signInRace, refresh: window.__signInRefresh })`);
+  assert(signInRequests === 1, `expected one serialized sign-in request, received ${signInRequests}`);
   assert(signInRace.signIn.error === null && signInRace.signIn.value?.accessToken === newerLogin.accessToken, 'serialized sign-in failed');
   assert(signInRace.refresh.error === null && signInRace.refresh.value?.accessToken === newerLogin.accessToken, 'stale refresh did not converge after serialized sign-in');
   assert(signInState.storedAccessToken === newerLogin.accessToken && signInState.storedRefreshToken === newerLogin.refreshToken, 'stale refresh overwrote the newer sign-in generation');
   assert(signInState.activeBearer === newerLogin.accessToken && signInState.pendingGuest === stagedGuest, 'serialized sign-in compatibility authority mismatch');
-  console.log('Member mutation lock sign-in precedence: PASS');
+  console.log('Member mutation lock sign-in request-start precedence: PASS');
 
   await seed(client);
   const releaseSignOut = await holdLock(client, 'signout');
@@ -343,24 +357,22 @@ try {
       () => { window.__signOutRace = { done: true, error: null }; },
       (error) => { window.__signOutRace = { done: true, error: { code: error?.code ?? null, message: error?.message ?? null } }; },
     );
-  })()`);
-  await sleep(150);
-  state = await client.evaluate(`(() => ({
-    done: window.__signOutRace?.done === true,
-    accessToken: JSON.parse(localStorage.getItem('myeongha.memberSession.v1') ?? 'null')?.accessToken ?? null,
-  }))()`);
-  assert(state.done === false, 'sign-out completed outside the shared Member mutation lock');
-  assert(signOutRequests === 0, 'sign-out remote request escaped the shared Member mutation lock');
-  assert(state.accessToken === original.accessToken, 'sign-out changed Member authority while the shared lock was held');
-
-  await client.evaluate(`(() => {
     window.__signOutRefresh = { done: false, value: null, error: null };
     void import('/product-auth.js').then((auth) => auth.refreshMemberSession()).then(
       (value) => { window.__signOutRefresh = { done: true, value, error: null }; },
       (error) => { window.__signOutRefresh = { done: true, value: null, error: { code: error?.code ?? null, message: error?.message ?? null } }; },
     );
   })()`);
-  while (refreshRequests < 3) await sleep(20);
+  await waitUntil(() => refreshRequests >= 3, 'refresh did not start while sign-out was queued');
+  await sleep(100);
+  state = await client.evaluate(`(() => ({
+    signOutDone: window.__signOutRace?.done === true,
+    refreshDone: window.__signOutRefresh?.done === true,
+    accessToken: JSON.parse(localStorage.getItem('myeongha.memberSession.v1') ?? 'null')?.accessToken ?? null,
+  }))()`);
+  assert(signOutRequests === 0, 'sign-out remote request escaped the shared Member mutation lock');
+  assert(state.signOutDone === false && state.refreshDone === false, 'sign-out/refresh race settled before lock release');
+  assert(state.accessToken === original.accessToken, 'sign-out/refresh changed Member authority while the shared lock was held');
   await releaseSignOut();
   await waitFor(client, `window.__signOutRace?.done === true && window.__signOutRefresh?.done === true`, 'sign-out/refresh race did not settle after lock release');
   const signOutState = await storedState(client);
@@ -371,7 +383,7 @@ try {
   assert(signOutState.activeBearer === stagedGuest && signOutState.pendingGuest === null, 'sign-out did not restore staged Guest authority');
   assert(signOutRequests === 1, `expected one serialized sign-out request, received ${signOutRequests}`);
   assert(requests.find((request) => request.path === '/api/auth/sign-out')?.authorization === `Bearer ${original.accessToken}`, 'sign-out did not use the locked canonical Member bearer');
-  console.log('Member mutation lock sign-out precedence: PASS');
+  console.log('Member mutation lock sign-out request-start precedence: PASS');
 
   const report = {
     status: 'MyeongHa_WEB_AUTH_MEMBER_MUTATION_LOCK_BROWSER_PASS',
@@ -379,7 +391,8 @@ try {
     lockName,
     legacyNamespaceRetained: true,
     directReplacementPreserved: true,
-    signInSerialized: true,
+    signInRequestStartSerialized: true,
+    signOutRequestStartSerialized: true,
     signOutNoResurrection: true,
     refreshRequests,
     signInRequests,
@@ -391,7 +404,7 @@ try {
   };
   await mkdir(artifactDir, { recursive: true });
   await writeFile(artifactPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
-  console.log(`MyeongHa_WEB_AUTH_MEMBER_MUTATION_LOCK_BROWSER_PASS signin_serialized=true signout_no_resurrection=true direct_replacement=true refresh_requests=${refreshRequests}`);
+  console.log(`MyeongHa_WEB_AUTH_MEMBER_MUTATION_LOCK_BROWSER_PASS signin_request_start=true signout_request_start=true signout_no_resurrection=true direct_replacement=true refresh_requests=${refreshRequests}`);
 } catch (error) {
   await mkdir(artifactDir, { recursive: true });
   await writeFile(artifactPath, `${JSON.stringify({
