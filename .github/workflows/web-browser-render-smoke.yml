@@ -135,7 +135,9 @@ jobs:
       - name: Verify transient refresh Member retention
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
-        run: node scripts/verify-web-auth-refresh-browser.mjs
+        run: |
+          node scripts/verify-web-auth-refresh-browser.mjs
+          node scripts/verify-web-auth-refresh-commit-lock-browser.mjs
       - name: Verify cross-tab transient refresh Member retention
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
@@ -213,6 +215,7 @@ jobs:
             artifacts/web-auth-rejection-browser-smoke*
             artifacts/web-auth-exact-rejection-race-browser-smoke*
             artifacts/web-auth-refresh-browser-smoke*
+            artifacts/web-auth-refresh-commit-lock-browser-smoke*
             artifacts/web-auth-cross-tab-transient-refresh-browser-smoke*
             artifacts/web-auth-refresh-network-browser-smoke*
             artifacts/web-auth-refresh-malformed-browser-smoke*

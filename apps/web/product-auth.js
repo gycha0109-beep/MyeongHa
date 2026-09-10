@@ -3,6 +3,7 @@ const GUEST_TOKEN_KEY = 'myeongha.guestBearer.v1';
 const PENDING_GUEST_TOKEN_KEY = 'myeongha.pendingGuestBearer.v1';
 const AUTH_CHANGED_EVENT = 'myeongha:auth-changed';
 const REFRESH_SKEW_MS = 60_000;
+const MEMBER_REFRESH_COMMIT_LOCK_NAME = 'myeongha.memberSession.v1.refresh.lock';
 let guestBootstrapInFlight = null;
 
 export class ProductAuthError extends Error {
@@ -355,6 +356,24 @@ function sameMemberSessionGeneration(left, right) {
   );
 }
 
+function memberRefreshCommitLocks() {
+  const browserWindow = globalThis.window;
+  if (!browserWindow || browserWindow !== globalThis) return null;
+  const locks = browserWindow.navigator?.locks;
+  return locks && typeof locks.request === 'function' ? locks : null;
+}
+
+async function commitRefreshedMemberSession(current, session) {
+  const commit = () => {
+    const latest = readMemberSession();
+    if (!sameMemberSessionGeneration(latest, current)) return latest;
+    return saveSession(session);
+  };
+  const locks = memberRefreshCommitLocks();
+  if (!locks) return commit();
+  return locks.request(MEMBER_REFRESH_COMMIT_LOCK_NAME, { mode: 'exclusive' }, commit);
+}
+
 function normalizedStoredMemberSession(raw) {
   if (!raw) return null;
   try {
@@ -653,11 +672,7 @@ export async function refreshMemberSession() {
       throw new ProductAuthError('WEB_AUTH_MALFORMED_SESSION', '갱신된 세션 응답이 올바르지 않습니다.');
     }
 
-    const latest = readMemberSession();
-    if (!sameMemberSessionGeneration(latest, current)) {
-      return latest;
-    }
-    return saveSession(data.session);
+    return await commitRefreshedMemberSession(current, data.session);
   } catch (error) {
     if (isAuthoritativeRefreshRejection(error)) {
       discardMemberSession(current.accessToken, current.refreshToken);
