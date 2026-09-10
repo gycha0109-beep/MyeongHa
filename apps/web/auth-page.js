@@ -18,6 +18,8 @@ const CONFIRMATION_GUEST_HANDOFF_LOCK_NAME = 'myeongha.pendingGuestConfirmation.
 const CONFIRMATION_GUEST_HANDOFF_JOURNAL_MARKER_KEY = 'myeongha.pendingGuestConfirmation.journal.v1';
 const CONFIRMATION_GUEST_HANDOFF_ENTRY_PREFIX = 'myeongha.pendingGuestConfirmation.entry.v1.';
 const CONFIRMATION_GUEST_HANDOFF_TTL_MS = 24 * 60 * 60 * 1000;
+// Keep the same mixed-version namespace used by product-auth.js so promotion cannot cross a newer Member mutation.
+const MEMBER_MUTATION_LOCK_NAME = 'myeongha.memberSession.v1.refresh.lock';
 const ALLOWED_NEXT = new Set([
   'hall.html',
   'reading.html',
@@ -114,6 +116,31 @@ function normalizeEmail(value) {
 function confirmationGuestHandoffLocks() {
   const locks = globalThis.navigator?.locks;
   return locks && typeof locks.request === 'function' ? locks : null;
+}
+
+function memberPromotionLocks() {
+  const browserWindow = globalThis.window;
+  if (!browserWindow || browserWindow !== globalThis) return null;
+  const locks = browserWindow.navigator?.locks;
+  return locks && typeof locks.request === 'function' ? locks : null;
+}
+
+async function withCanonicalMemberPromotionAuthority(expectedSession, operation) {
+  const run = () => {
+    const current = readMemberSession();
+    if (
+      !current ||
+      current.accessToken !== expectedSession?.accessToken ||
+      current.refreshToken !== expectedSession?.refreshToken
+    ) {
+      return Object.freeze({ status: 'superseded' });
+    }
+    return operation();
+  };
+
+  const locks = memberPromotionLocks();
+  if (!locks) return run();
+  return locks.request(MEMBER_MUTATION_LOCK_NAME, { mode: 'exclusive' }, run);
 }
 
 function confirmationGuestHandoffReadFailure(error) {
@@ -504,7 +531,14 @@ function authErrorMessage(error) {
 }
 
 async function finishAuthenticated(session) {
-  const promotion = await promoteGuestIfPresent(session.accessToken, session.user?.email);
+  const promotion = await withCanonicalMemberPromotionAuthority(
+    session,
+    () => promoteGuestIfPresent(session.accessToken, session.user?.email),
+  );
+  if (promotion.status === 'superseded') {
+    setStatus('다른 탭에서 로그인 상태가 변경되어 이전 계정 연결 흐름을 중단했습니다. 현재 로그인 상태를 확인해 주세요.', 'error');
+    return;
+  }
   if (promotion.status === 'member-rejected') {
     setStatus('로그인 세션이 서버에서 거부되었습니다. 다시 로그인해 주세요.', 'error');
     return;

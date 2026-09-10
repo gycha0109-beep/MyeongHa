@@ -34,4 +34,15 @@ describe('web Guest promotion rejection contract', () => {
     expect(authPage).toContain('로그인 세션이 서버에서 거부되었습니다. 다시 로그인해 주세요.');
     expect(authPage).toContain('로그인 상태를 확인하지 못했습니다. 다시 로그인해 주세요.');
   });
+
+  it('binds Guest promotion to the exact canonical Member generation under the shared mutation lock', () => {
+    expect(authPage).toContain("const MEMBER_MUTATION_LOCK_NAME = 'myeongha.memberSession.v1.refresh.lock'");
+    expect(authPage).toContain('async function withCanonicalMemberPromotionAuthority(expectedSession, operation)');
+    expect(authPage).toContain('current.accessToken !== expectedSession?.accessToken');
+    expect(authPage).toContain('current.refreshToken !== expectedSession?.refreshToken');
+    expect(authPage).toContain("return Object.freeze({ status: 'superseded' })");
+    expect(authPage).toContain("locks.request(MEMBER_MUTATION_LOCK_NAME, { mode: 'exclusive' }, run)");
+    expect(authPage).toContain('const promotion = await withCanonicalMemberPromotionAuthority(');
+    expect(authPage).toContain("if (promotion.status === 'superseded')");
+  });
 });
