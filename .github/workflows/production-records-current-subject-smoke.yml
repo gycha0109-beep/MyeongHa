@@ -7,6 +7,12 @@ on:
         description: 'Type VERIFY_RECORDS_CURRENT_SUBJECT to run the production Records current-subject smoke.'
         required: true
         type: string
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/production-records-current-subject-smoke.yml'
+      - 'scripts/verify-production-reading-history-current-subject.mjs'
 
 permissions:
   contents: read
@@ -21,7 +27,7 @@ jobs:
     runs-on: ubuntu-24.04
     environment: production
     env:
-      DISPATCH_CONFIRM: ${{ inputs.confirm }}
+      DISPATCH_CONFIRM: ${{ github.event_name == 'push' && 'VERIFY_RECORDS_CURRENT_SUBJECT' || inputs.confirm }}
       MYEONGHA_PRODUCTION_MEMBER_EMAIL: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_EMAIL }}
       MYEONGHA_PRODUCTION_MEMBER_PASSWORD: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_PASSWORD }}
       MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID }}
@@ -45,3 +51,6 @@ jobs:
 
       - name: Verify production Records current-subject continuity
         run: node scripts/verify-production-records-current-subject.mjs
+
+      - name: Verify production Reading History current-subject continuity
+        run: node scripts/verify-production-reading-history-current-subject.mjs

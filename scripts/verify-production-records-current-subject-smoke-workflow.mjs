@@ -2,22 +2,30 @@ import { readFile } from 'node:fs/promises';
 
 const workflowPath = '.github/workflows/production-records-current-subject-smoke.yml';
 const liveVerifierPath = 'scripts/verify-production-records-current-subject.mjs';
+const readingVerifierPath = 'scripts/verify-production-reading-history-current-subject.mjs';
 const sessionHelperPath = 'scripts/production-member-smoke-session.mjs';
 
-const [workflow, liveVerifier, sessionHelper] = await Promise.all([
+const [workflow, liveVerifier, readingVerifier, sessionHelper] = await Promise.all([
   readFile(workflowPath, 'utf8'),
   readFile(liveVerifierPath, 'utf8'),
+  readFile(readingVerifierPath, 'utf8'),
   readFile(sessionHelperPath, 'utf8'),
 ]);
 
 const requiredWorkflowFragments = [
   'workflow_dispatch:',
   "description: 'Type VERIFY_RECORDS_CURRENT_SUBJECT to run the production Records current-subject smoke.'",
+  'push:',
+  'branches:',
+  '- main',
+  'paths:',
+  "- '.github/workflows/production-records-current-subject-smoke.yml'",
+  "- 'scripts/verify-production-reading-history-current-subject.mjs'",
   'permissions:',
   'contents: read',
   'cancel-in-progress: false',
   'environment: production',
-  'DISPATCH_CONFIRM: ${{ inputs.confirm }}',
+  "DISPATCH_CONFIRM: ${{ github.event_name == 'push' && 'VERIFY_RECORDS_CURRENT_SUBJECT' || inputs.confirm }}",
   'MYEONGHA_PRODUCTION_MEMBER_EMAIL: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_EMAIL }}',
   'MYEONGHA_PRODUCTION_MEMBER_PASSWORD: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_PASSWORD }}',
   'MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID }}',
@@ -26,6 +34,7 @@ const requiredWorkflowFragments = [
   'uses: actions/setup-node@v4',
   "node-version: '24'",
   'run: node scripts/verify-production-records-current-subject.mjs',
+  'run: node scripts/verify-production-reading-history-current-subject.mjs',
 ];
 
 for (const fragment of requiredWorkflowFragments) {
@@ -35,7 +44,6 @@ for (const fragment of requiredWorkflowFragments) {
 }
 
 const forbiddenWorkflowFragments = [
-  '\npush:',
   '\npull_request:',
   '\nschedule:',
   'MYEONGHA_PRODUCTION_MEMBER_BEARER',
@@ -61,6 +69,9 @@ for (const fragment of forbiddenWorkflowFragments) {
 
 if ((workflow.match(/workflow_dispatch:/g) ?? []).length !== 1) {
   throw new Error('Production Records smoke must expose exactly one workflow_dispatch trigger.');
+}
+if ((workflow.match(/\n  push:/g) ?? []).length !== 1) {
+  throw new Error('Production Records smoke must expose exactly one narrowly scoped main-push trigger.');
 }
 
 const requiredLiveVerifierFragments = [
@@ -130,6 +141,60 @@ for (const fragment of forbiddenLiveVerifierFragments) {
   }
 }
 
+const requiredReadingVerifierFragments = [
+  "import { acquireProductionMemberSmokeSession } from './production-member-smoke-session.mjs';",
+  "const PRODUCTION_ORIGIN = 'https://myeongha.vercel.app';",
+  'const MEMBER_ME_URL = `${PRODUCTION_ORIGIN}/api/me`;',
+  'const READINGS_URL = `${PRODUCTION_ORIGIN}/api/readings`;',
+  "requireSecret('MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID')",
+  'await verifyUnauthenticatedFailClosed()',
+  'await acquireProductionMemberSmokeSession()',
+  'Authorization: `Bearer ${session.accessToken}`',
+  'memberData.subjectId !== expectedSubjectId',
+  "requireExactKeys('Production Reading History data', value, ['readings'])",
+  "requireArray('Production Reading History readings', value.readings)",
+  'requireExactKeys(`Production Reading History item ${index}`, rawReading, READING_KEYS)',
+  'requireNoForbiddenKeys(readingsBody)',
+  'readingsResponse.status !== 200',
+  'readingsUnauthenticated=401',
+  'readings=200',
+  'exactProjection=true',
+  'sensitiveFieldsAbsent=true',
+  'cacheControl=no-store',
+];
+
+for (const fragment of requiredReadingVerifierFragments) {
+  if (!readingVerifier.includes(fragment)) {
+    throw new Error(`Missing production Reading History live verifier contract fragment: ${fragment}`);
+  }
+}
+
+const forbiddenReadingVerifierFragments = [
+  'MYEONGHA_PRODUCTION_MEMBER_BEARER',
+  'MYEONGHA_PRODUCTION_BIRTH_SMOKE_MEMBER_BEARER',
+  'process.env.MYEONGHA_PRODUCTION_ORIGIN',
+  'process.env.VERCEL',
+  'process.env.SUPABASE',
+  "method: 'POST'",
+  "method: 'DELETE'",
+  "method: 'PATCH'",
+  "method: 'PUT'",
+  'console.log(session.accessToken',
+  'console.error(session.accessToken',
+  'console.log(readingsBody',
+  'console.error(readingsBody',
+  'writeFile',
+  'appendFile',
+  'localStorage',
+  'refreshToken',
+];
+
+for (const fragment of forbiddenReadingVerifierFragments) {
+  if (readingVerifier.includes(fragment)) {
+    throw new Error(`Forbidden production Reading History live verifier fragment: ${fragment}`);
+  }
+}
+
 const requiredSessionHelperFragments = [
   "const PRODUCTION_ORIGIN = 'https://myeongha.vercel.app';",
   'const SIGN_IN_URL = `${PRODUCTION_ORIGIN}/api/auth/sign-in`;',
@@ -155,4 +220,4 @@ for (const fragment of ['MYEONGHA_PRODUCTION_MEMBER_BEARER', 'refreshToken', 'lo
   }
 }
 
-console.log('MyeongHa production Records current-subject deterministic fresh-session smoke workflow contract verification passed.');
+console.log('MyeongHa production Records + Reading History current-subject deterministic fresh-session smoke workflow contract verification passed.');
