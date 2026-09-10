@@ -1,4 +1,6 @@
 import { BirthRuntimeError, createBirthRuntimeClient } from './birth-runtime-client.js';
+import { PRODUCT_AUTH_STORAGE_V1 } from './product-auth.js';
+import { shouldReloadBirthForMemberSessionStorageChange } from './product-auth-surface.js';
 
 const client = createBirthRuntimeClient();
 
@@ -189,6 +191,15 @@ for (const input of document.querySelectorAll('input[name="calendar"]')) {
   input.addEventListener('change', syncLeapMonth);
 }
 byId('birth-form').addEventListener('submit', submitBirthProfile);
+window.addEventListener('storage', (event) => {
+  if (event.key !== PRODUCT_AUTH_STORAGE_V1.memberSession) return;
+  if (!shouldReloadBirthForMemberSessionStorageChange({
+    pathname: '/birth.html',
+    oldValue: event.oldValue,
+    newValue: event.newValue,
+  })) return;
+  window.history.go(0);
+});
 
 syncTimeKnown();
 syncLeapMonth();
