@@ -278,6 +278,17 @@ export function toCanonicalMeRequestForTestV1(
   } as RequestInit & { duplex?: 'half' });
 }
 
+function cancelUnusedRequestBodyBestEffort(request: Request): void {
+  const body = request.body;
+  if (body === null || request.bodyUsed) return;
+
+  try {
+    void body.cancel().catch(() => undefined);
+  } catch {
+    // The dispatcher result must not depend on best-effort disposal of an unused body.
+  }
+}
+
 function routeNotFound(): Response {
   return new Response(null, {
     status: 404,
@@ -302,7 +313,10 @@ function runtimeForTarget(target: DispatchTarget) {
 export default {
   async fetch(request: Request): Promise<Response> {
     const target = resolveDispatchTarget(request);
-    if (target === null) return routeNotFound();
+    if (target === null) {
+      cancelUnusedRequestBodyBestEffort(request);
+      return routeNotFound();
+    }
 
     return runtimeForTarget(target).handleRequest({
       request: toCanonicalMeRequestForTestV1(request, target),
