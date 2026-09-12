@@ -31,6 +31,17 @@ export interface CreateProductionChatReadRuntimeInputV1 {
   readonly createUuid?: () => string;
 }
 
+function cancelUnusedRequestBodyBestEffort(request: Request): void {
+  const body = request.body;
+  if (body === null || request.bodyUsed) return;
+
+  try {
+    void body.cancel().catch(() => undefined);
+  } catch {
+    // Method rejection is authoritative; best-effort cleanup must never replace it.
+  }
+}
+
 /** Production composition root for owner-scoped Chat read and Member thread open. */
 export function createProductionChatReadRuntimeV1(
   input: CreateProductionChatReadRuntimeInputV1,
@@ -49,26 +60,29 @@ export function createProductionChatReadRuntimeV1(
   const createUuid = input.createUuid ?? randomUUID;
 
   return Object.freeze({
-    handleRequest(requestInput: ProductionChatReadRequestV1) {
+    async handleRequest(requestInput: ProductionChatReadRequestV1) {
       const url = new URL(requestInput.request.url);
-      if (url.pathname === '/api/chat') {
-        return handleChatOpenRequestV1({
-          request: requestInput.request,
-          requestId: requestInput.requestId,
-          serverTime: requestInput.serverTime,
-          identityEvidenceVerifier,
-          pool: poolLease.pool,
-          createUuid,
-        });
-      }
+      const response = url.pathname === '/api/chat'
+        ? await handleChatOpenRequestV1({
+            request: requestInput.request,
+            requestId: requestInput.requestId,
+            serverTime: requestInput.serverTime,
+            identityEvidenceVerifier,
+            pool: poolLease.pool,
+            createUuid,
+          })
+        : await handleChatReadRequestV1({
+            request: requestInput.request,
+            requestId: requestInput.requestId,
+            serverTime: requestInput.serverTime,
+            identityEvidenceVerifier,
+            pool: poolLease.pool,
+          });
 
-      return handleChatReadRequestV1({
-        request: requestInput.request,
-        requestId: requestInput.requestId,
-        serverTime: requestInput.serverTime,
-        identityEvidenceVerifier,
-        pool: poolLease.pool,
-      });
+      if (response.status === 405) {
+        cancelUnusedRequestBodyBestEffort(requestInput.request);
+      }
+      return response;
     },
     close() {
       return poolLease.close();
