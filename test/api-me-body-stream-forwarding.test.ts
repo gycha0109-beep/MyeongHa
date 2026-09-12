@@ -21,6 +21,28 @@ function streamRequest(stream: ReadableStream<Uint8Array>): Request {
   } as RequestInit & { duplex: 'half' });
 }
 
+function unresolvedStreamRequest(cancel: () => void | PromiseLike<void>): Readonly<{
+  request: Request;
+  cancelCalls: () => number;
+}> {
+  let calls = 0;
+  const stream = new ReadableStream<Uint8Array>({
+    cancel() {
+      calls += 1;
+      return cancel();
+    },
+  });
+
+  return Object.freeze({
+    request: new Request('https://myeongha.example/api/me?debug=1', {
+      method: 'POST',
+      body: stream,
+      duplex: 'half',
+    } as RequestInit & { duplex: 'half' }),
+    cancelCalls: () => calls,
+  });
+}
+
 describe('/api/me dispatcher body stream forwarding', () => {
   it('returns Chat-open AUTH_REQUIRED without consuming or draining a non-closing body', async () => {
     const incoming = new ReadableStream<Uint8Array>({
@@ -77,5 +99,28 @@ describe('/api/me dispatcher body stream forwarding', () => {
 
     expect(canonical.url).toBe('https://myeongha.internal/api/chat');
     expect(canonical.body).toBeNull();
+  });
+
+  it('cancels an unused unresolved-dispatch body without waiting for cancellation to settle', async () => {
+    const source = unresolvedStreamRequest(() => new Promise<void>(() => undefined));
+
+    const response = await meEndpoint.fetch(source.request);
+
+    expect(response.status).toBe(404);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(source.cancelCalls()).toBe(1);
+  });
+
+  it('keeps dispatcher 404 authoritative when unused-body cancellation rejects', async () => {
+    const source = unresolvedStreamRequest(() =>
+      Promise.reject(new Error('synthetic cancellation failure')),
+    );
+
+    const response = await meEndpoint.fetch(source.request);
+    await Promise.resolve();
+
+    expect(response.status).toBe(404);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(source.cancelCalls()).toBe(1);
   });
 });
