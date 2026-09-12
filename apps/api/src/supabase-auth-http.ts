@@ -6,6 +6,7 @@ import {
 import { fetchSupabaseAuthWithDeadlineV1 } from './supabase-auth-upstream-deadline.js';
 
 const NO_STORE = 'no-store' as const;
+const MAX_AUTH_BODY_BYTES = 16_384;
 const JSON_HEADERS = Object.freeze({
   Accept: 'application/json',
   'Content-Type': 'application/json',
@@ -77,9 +78,37 @@ function parseConfig(env: ProductionUserDataRuntimeEnvV1): AuthProxyConfigV1 {
 
 async function readObjectBody(request: Request): Promise<Record<string, unknown> | null> {
   const length = Number(request.headers.get('content-length') ?? '0');
-  if (Number.isFinite(length) && length > 16_384) return null;
+  if (Number.isFinite(length) && length > MAX_AUTH_BODY_BYTES) return null;
+
+  const stream = request.body;
+  if (stream === null) return null;
+
+  const reader = stream.getReader();
+  const buffer = new Uint8Array(MAX_AUTH_BODY_BYTES);
+  let totalBytes = 0;
+
   try {
-    const value: unknown = await request.json();
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value === undefined || value.byteLength === 0) continue;
+      if (value.byteLength > MAX_AUTH_BODY_BYTES - totalBytes) {
+        void reader.cancel().catch(() => undefined);
+        return null;
+      }
+      buffer.set(value, totalBytes);
+      totalBytes += value.byteLength;
+    }
+  } catch {
+    return null;
+  } finally {
+    reader.releaseLock();
+  }
+
+  try {
+    const value: unknown = JSON.parse(
+      new TextDecoder().decode(buffer.subarray(0, totalBytes)),
+    );
     return value !== null && typeof value === 'object' && !Array.isArray(value)
       ? (value as Record<string, unknown>)
       : null;
