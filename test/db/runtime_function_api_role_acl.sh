@@ -78,4 +78,11 @@ executor_shape=$("${psql_base[@]}" -At -F '|' -c "select
 [[ "$executor_shape" == 't|t|t|t|t|t|t|t|t|f|t|t|t' ]] || fail "myeongha_api_executor runtime/create/Chat allowlist drifted: $executor_shape"
 pass "myeongha_api_executor retains governed runtime and Chat owner-read allowlist while Birth create remains inactive"
 
+reading_transport_shape=$("${psql_base[@]}" -At -F '|' -c "select
+  has_function_privilege('myeongha_api_executor','public.cmd_prepare_reading_transport_attempt_v1(uuid,uuid,uuid,text,text,text)','EXECUTE'),
+  has_function_privilege('myeongha_api_executor','public.cmd_finalize_reading_transport_failure_v1(uuid,uuid,uuid,boolean,text,text)','EXECUTE'),
+  has_function_privilege('myeongha_api_executor','public.cmd_finalize_reading_transport_success_v1(uuid,uuid,uuid,uuid,text,text,text,text,text,text,text,jsonb,jsonb,jsonb,jsonb,text)','EXECUTE');")
+[[ "$reading_transport_shape" == 'f|f|f' ]] || fail "myeongha_api_executor unexpectedly gained Reading transport EXECUTE: $reading_transport_shape"
+pass "myeongha_api_executor keeps Reading transport prepare/finalize authority fail-closed"
+
 echo "Runtime function API role ACL hardening tests passed"
