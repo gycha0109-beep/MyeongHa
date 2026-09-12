@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { createNodePostgresSubjectPoolV1 } from '../apps/api/src/node-postgres-subject-pool.js';
 import { createProductionChatReadRuntimeV1 } from '../apps/api/src/production-chat-read-runtime.js';
 import { createProductionCurrentSubjectProfileRuntimeV1 } from '../apps/api/src/production-current-subject-profile-runtime.js';
 import {
@@ -6,6 +7,7 @@ import {
   createProductionMemoryItemsReadRuntimeV1,
   createProductionReadingHistoryReadRuntimeV1,
 } from '../apps/api/src/production-records-read-runtime.js';
+import { parseProductionUserDataRuntimeConfigV1 } from '../apps/api/src/production-user-data-runtime-config.js';
 
 const PROFILE_ROUTE = '/api/me' as const;
 const LIFE_RECORD_ROUTE = '/api/life-record' as const;
@@ -21,6 +23,7 @@ const CHAT_CURSOR_PARAM = 'afterSequenceNo' as const;
 const VERCEL_SHARE_PARAM = '_vercel_share' as const;
 const NO_STORE_CACHE_CONTROL = 'no-store' as const;
 
+let sharedPostgresPool: ReturnType<typeof createNodePostgresSubjectPoolV1> | undefined;
 let profileRuntime:
   | ReturnType<typeof createProductionCurrentSubjectProfileRuntimeV1>
   | undefined;
@@ -37,28 +40,50 @@ let chatRuntime:
   | ReturnType<typeof createProductionChatReadRuntimeV1>
   | undefined;
 
+function getSharedPostgresPool(): ReturnType<typeof createNodePostgresSubjectPoolV1> {
+  sharedPostgresPool ??= createNodePostgresSubjectPoolV1(
+    parseProductionUserDataRuntimeConfigV1(process.env),
+  );
+  return sharedPostgresPool;
+}
+
 function getProfileRuntime(): ReturnType<typeof createProductionCurrentSubjectProfileRuntimeV1> {
-  profileRuntime ??= createProductionCurrentSubjectProfileRuntimeV1({ env: process.env });
+  profileRuntime ??= createProductionCurrentSubjectProfileRuntimeV1({
+    env: process.env,
+    pool: getSharedPostgresPool(),
+  });
   return profileRuntime;
 }
 
 function getLifeRecordRuntime(): ReturnType<typeof createProductionLifeRecordReadRuntimeV1> {
-  lifeRecordRuntime ??= createProductionLifeRecordReadRuntimeV1({ env: process.env });
+  lifeRecordRuntime ??= createProductionLifeRecordReadRuntimeV1({
+    env: process.env,
+    pool: getSharedPostgresPool(),
+  });
   return lifeRecordRuntime;
 }
 
 function getReadingsRuntime(): ReturnType<typeof createProductionReadingHistoryReadRuntimeV1> {
-  readingsRuntime ??= createProductionReadingHistoryReadRuntimeV1({ env: process.env });
+  readingsRuntime ??= createProductionReadingHistoryReadRuntimeV1({
+    env: process.env,
+    pool: getSharedPostgresPool(),
+  });
   return readingsRuntime;
 }
 
 function getMemoriesRuntime(): ReturnType<typeof createProductionMemoryItemsReadRuntimeV1> {
-  memoriesRuntime ??= createProductionMemoryItemsReadRuntimeV1({ env: process.env });
+  memoriesRuntime ??= createProductionMemoryItemsReadRuntimeV1({
+    env: process.env,
+    pool: getSharedPostgresPool(),
+  });
   return memoriesRuntime;
 }
 
 function getChatRuntime(): ReturnType<typeof createProductionChatReadRuntimeV1> {
-  chatRuntime ??= createProductionChatReadRuntimeV1({ env: process.env });
+  chatRuntime ??= createProductionChatReadRuntimeV1({
+    env: process.env,
+    pool: getSharedPostgresPool(),
+  });
   return chatRuntime;
 }
 
