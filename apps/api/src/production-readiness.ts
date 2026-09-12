@@ -10,12 +10,14 @@ import {
 
 export type ProductionReadinessStatusV1 = 'ready' | 'degraded' | 'unready';
 export type ProductionCapabilityReadinessV1 = 'ready' | 'degraded' | 'unready';
+export type SajuProductReadingProductionReadinessV1 = 'blocked_by_authority';
 
 export interface ProductionReadinessReportV1 {
   readonly status: ProductionReadinessStatusV1;
   readonly capabilities: Readonly<{
     userData: ProductionCapabilityReadinessV1;
     sajuCalculation: ProductionCapabilityReadinessV1;
+    sajuProductReading: SajuProductReadingProductionReadinessV1;
   }>;
 }
 
@@ -49,6 +51,11 @@ function hasValidSajuConfig(env: ProductionSajuRuntimeEnvV1): boolean {
  * This deliberately does not contact PostgreSQL, Supabase Auth, Saju, or any other
  * network dependency. Dependency availability is measured separately so a health
  * probe cannot amplify an upstream outage.
+ *
+ * ProductReadingResponse v2 admission is source-owned and ready, but the Saju
+ * Production Interpretation Authority and public Production Reading runtime remain
+ * blocked. Keep Product Reading explicitly fail-closed here without making that
+ * semantic-authority hold degrade otherwise healthy calculation/user-data runtime.
  */
 export function evaluateProductionReadinessV1(
   env: ProductionSajuRuntimeEnvV1,
@@ -67,6 +74,7 @@ export function evaluateProductionReadinessV1(
     capabilities: Object.freeze({
       userData: userDataReady ? 'ready' : 'unready',
       sajuCalculation: sajuReady ? 'ready' : 'degraded',
+      sajuProductReading: 'blocked_by_authority',
     }),
   });
 }
