@@ -280,17 +280,36 @@ function serializeParsedCreateBody(body: unknown): string | undefined {
   }
 }
 
+function createLazySerializedCreateBody(
+  body: unknown,
+): ReadableStream<Uint8Array> | undefined {
+  if (body === undefined) return undefined;
+
+  return new ReadableStream<Uint8Array>(
+    {
+      pull(controller) {
+        const serialized = serializeParsedCreateBody(body);
+        if (serialized !== undefined && serialized.length > 0) {
+          controller.enqueue(new TextEncoder().encode(serialized));
+        }
+        controller.close();
+      },
+    },
+    { highWaterMark: 0 },
+  );
+}
+
 function toCanonicalCreateRequest(request: VercelNodeRequestLike): Request {
   const headers = toWebHeaders(request.headers);
   headers.delete('content-length');
   headers.delete('transfer-encoding');
-  const body = serializeParsedCreateBody(request.body);
+  const body = createLazySerializedCreateBody(request.body);
 
   return new Request(`https://myeongha.internal${ROUTE_PATH}`, {
     method: 'POST',
     headers,
-    ...(body === undefined ? {} : { body }),
-  });
+    ...(body === undefined ? {} : { body, duplex: 'half' as const }),
+  } as RequestInit & { duplex?: 'half' });
 }
 
 async function writeWebResponse(
