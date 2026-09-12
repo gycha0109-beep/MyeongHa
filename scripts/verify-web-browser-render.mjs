@@ -207,7 +207,7 @@ async function verifyDarkPage(client, origin, pathname, selector, { toggle = tru
 }
 
 for (const file of [
-  'hall.html', 'reading.html', 'reading-detail.html', 'chat-hub.html', 'chat.html',
+  'hall.html', 'reading.html', 'reading-detail.html', 'reading-detail-route.js', 'chat-hub.html', 'chat.html',
   'records.html', 'my.html', 'product-theme.js', 'product-theme.css',
   'golden-master.css', 'golden-master-lock.css',
 ]) {
@@ -326,31 +326,75 @@ try {
   await artifact(client, '-saju-mobile');
 
   await client.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
-  await navigate(client, origin, '/reading-detail.html?scope=year', '.reading-stage');
-  const readingState = await client.evaluate(`(() => ({
-    pathname: location.pathname,
-    bodyText: document.body.innerText,
-    scope: document.querySelector('[data-reading-scope]')?.textContent?.trim() ?? '',
-    progress: document.querySelector('[data-reading-progress-label]')?.textContent?.trim() ?? '',
-    title: document.querySelector('[data-reading-step-title]')?.textContent?.trim() ?? '',
-    hubHref: document.querySelector('.reading-back-to-hub')?.getAttribute('href') ?? '',
-    stage: Boolean(document.querySelector('.reading-stage')?.getBoundingClientRect().width),
-    scene: Boolean(document.querySelector('.reader-scene')?.getBoundingClientRect().width),
-    identity: Boolean(document.querySelector('.reader-identity')?.getBoundingClientRect().width),
-    sheet: Boolean(document.querySelector('.reading-sheet')?.getBoundingClientRect().width),
-    actions: Boolean(document.querySelector('.reading-sheet-actions')?.getBoundingClientRect().width),
-    overflow: document.documentElement.scrollWidth - innerWidth,
-  }))()`);
-  assert(readingState.stage && readingState.scene && readingState.identity && readingState.sheet && readingState.actions, 'Reading detail lost required layout');
-  assert(/^\d{4}년 · 올해$/.test(readingState.scope), `Unexpected scope: ${readingState.scope}`);
-  assert(readingState.progress === '읽기 1 / 4', `Unexpected progress: ${readingState.progress}`);
-  assert(readingState.title === '지금 읽히는 흐름', `Unexpected Reading title: ${readingState.title}`);
+  await navigate(client, origin, '/reading-detail.html?scope=year', '.reading-route-state');
+  await waitForVisible(client, '.reading-route-state');
+  const readingState = await client.evaluate(`(() => {
+    const visible = (selector) => {
+      const el = document.querySelector(selector); if (!el || el.hidden) return false;
+      const r = el.getBoundingClientRect(); const s = getComputedStyle(el);
+      return r.width > 0 && r.height > 0 && s.display !== 'none' && s.visibility !== 'hidden' && Number(s.opacity) > 0;
+    };
+    const stage = document.querySelector('[data-reading-stage]');
+    const stageStyle = stage ? getComputedStyle(stage) : null;
+    return {
+      pathname: location.pathname,
+      bodyText: document.body.innerText,
+      topic: document.body.dataset.readingTopicKey ?? '',
+      scope: document.body.dataset.readingScopeKey ?? '',
+      routeState: document.body.dataset.readingRouteState ?? '',
+      productTitle: document.querySelector('[data-reading-product-title]')?.textContent?.trim() ?? '',
+      stateTitle: document.querySelector('[data-reading-state-title]')?.textContent?.trim() ?? '',
+      stateCopy: document.querySelector('[data-reading-state-copy]')?.textContent?.trim() ?? '',
+      hubHref: document.querySelector('.reading-back-to-hub')?.getAttribute('href') ?? '',
+      routeVisible: visible('.reading-route-state'),
+      stageHidden: stage?.hidden === true,
+      stageRendered: Boolean(stage && stage.getBoundingClientRect().width > 0 && stageStyle?.display !== 'none'),
+      overflow: document.documentElement.scrollWidth - innerWidth,
+    };
+  })()`);
+  assert(readingState.routeVisible, 'Reading authority-blocked route state is not visible');
+  assert(readingState.topic === 'general' && readingState.scope === 'year', `Unexpected yearly Reading route: ${readingState.topic}/${readingState.scope}`);
+  assert(readingState.routeState === 'blocked_by_authority', `Unexpected Reading authority state: ${readingState.routeState}`);
+  assert(readingState.stageHidden && !readingState.stageRendered, 'Blocked Reading placeholder stage must remain hidden');
+  assert(readingState.stateTitle.includes('올해 읽기는 아직 준비 중입니다.'), `Unexpected yearly blocked title: ${readingState.stateTitle}`);
+  assert(readingState.stateCopy.includes('다른 주제의 풀이로 대신 보여드리지 않습니다.'), 'Blocked Reading must disclose no cross-topic substitution');
   assert(readingState.hubHref === 'reading.html', `Reading detail does not return to Saju hub: ${readingState.hubHref}`);
-  assert(readingState.bodyText.includes('내 명식 보기') && readingState.bodyText.includes('다음 읽기'), 'Reading actions missing');
+  assert(!readingState.bodyText.includes('다음 읽기') && !readingState.bodyText.includes('내 명식 보기'), 'Blocked Reading leaked dormant result actions');
   assert(readingState.overflow <= 2, `Reading detail horizontal overflow: ${readingState.overflow}px`);
-  const advanced = await client.evaluate(`(() => { document.querySelector('[data-reading-next]').click(); return document.querySelector('[data-reading-progress-label]').textContent.trim(); })()`);
-  assert(advanced === '읽기 2 / 4', `Reading runtime did not advance: ${advanced}`);
   await artifact(client, '-reading-detail');
+
+  await navigate(client, origin, '/reading-detail.html?topic=career', '.reading-route-state');
+  const careerReading = await client.evaluate(`(() => ({
+    topic: document.body.dataset.readingTopicKey ?? '',
+    scope: document.body.dataset.readingScopeKey ?? '',
+    routeState: document.body.dataset.readingRouteState ?? '',
+    title: document.querySelector('[data-reading-state-title]')?.textContent?.trim() ?? '',
+    productTitle: document.querySelector('[data-reading-product-title]')?.textContent?.trim() ?? '',
+  }))()`);
+  assert(careerReading.topic === 'career' && careerReading.scope === 'original', `Career route collapsed: ${JSON.stringify(careerReading)}`);
+  assert(careerReading.routeState === 'blocked_by_authority' && careerReading.title.includes('직업 · 커리어'), 'Career blocked surface lost route identity');
+
+  await navigate(client, origin, '/reading-detail.html?topic=money', '.reading-route-state');
+  const moneyReading = await client.evaluate(`(() => ({
+    topic: document.body.dataset.readingTopicKey ?? '',
+    scope: document.body.dataset.readingScopeKey ?? '',
+    routeState: document.body.dataset.readingRouteState ?? '',
+    title: document.querySelector('[data-reading-state-title]')?.textContent?.trim() ?? '',
+  }))()`);
+  assert(moneyReading.topic === 'money' && moneyReading.scope === 'original', `Money route collapsed: ${JSON.stringify(moneyReading)}`);
+  assert(moneyReading.routeState === 'blocked_by_authority' && moneyReading.title.includes('재물'), 'Money blocked surface lost route identity');
+
+  await navigate(client, origin, '/reading-detail.html?topic=unknown-reading', '.reading-route-state');
+  const invalidReading = await client.evaluate(`(() => ({
+    topic: document.body.dataset.readingTopicKey ?? '',
+    scope: document.body.dataset.readingScopeKey ?? '',
+    routeState: document.body.dataset.readingRouteState ?? '',
+    title: document.querySelector('[data-reading-state-title]')?.textContent?.trim() ?? '',
+    copy: document.querySelector('[data-reading-state-copy]')?.textContent?.trim() ?? '',
+  }))()`);
+  assert(invalidReading.routeState === 'invalid', `Unknown Reading did not fail closed: ${JSON.stringify(invalidReading)}`);
+  assert(!invalidReading.topic && !invalidReading.scope, 'Invalid Reading retained semantic route identity');
+  assert(invalidReading.copy.includes('자동 대체하지 않았습니다.'), 'Invalid Reading did not disclose fallback refusal');
 
   await client.evaluate(`(() => { localStorage.setItem('myeongha.productTheme.v1', 'dark'); return true; })()`);
   const darkHome = await verifyDarkPage(client, origin, '/hall.html', '.gm-home-hero', { artifactSuffix: '-dark-home' });
@@ -367,7 +411,7 @@ try {
   assert(toggleState.dark.theme === 'dark' && toggleState.dark.stored === 'dark' && toggleState.dark.pressed === 'true', 'Theme toggle did not switch back to dark');
 
   const darkSaju = await verifyDarkPage(client, origin, '/reading.html', '#saju-empty', { artifactSuffix: '-dark-saju' });
-  const darkReading = await verifyDarkPage(client, origin, '/reading-detail.html?scope=year', '.reading-sheet', { artifactSuffix: '-dark-reading-detail' });
+  const darkReading = await verifyDarkPage(client, origin, '/reading-detail.html?scope=year', '.reading-route-state', { artifactSuffix: '-dark-reading-detail' });
   const darkChatHub = await verifyDarkPage(client, origin, '/chat-hub.html', '.conversation-primary', { artifactSuffix: '-dark-chat-hub' });
   const darkChatRoom = await verifyDarkPage(client, origin, '/chat.html', '.conversation-chat-panel', { artifactSuffix: '-dark-chat-room' });
   const darkRecords = await verifyDarkPage(client, origin, '/records.html', '.records-main');
@@ -394,6 +438,7 @@ try {
     saju: sajuState,
     mobileSaju,
     reading: readingState,
+    readingRoutes: { career: careerReading, money: moneyReading, invalid: invalidReading },
     dark: { home: darkHome, saju: darkSaju, reading: darkReading, chatHub: darkChatHub, chatRoom: darkChatRoom, records: darkRecords, my: darkMy, mobileHome: darkMobileHome, mobileSaju: darkMobileSaju, mobileChat: darkMobileChat },
   }));
 } catch (error) {

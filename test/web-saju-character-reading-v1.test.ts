@@ -22,7 +22,7 @@ describe('MyeongHa character-led Saju Reading v1', () => {
     expect(html).not.toContain('DEMO');
   });
 
-  it('renders Reading authority before character expression and never labels character copy as engine truth', async () => {
+  it('keeps Reading authority ahead of character expression in the dormant result scaffold', async () => {
     const html = await readFile(readingHtmlPath, 'utf8');
 
     const flow = html.indexOf('data-reading-step-title');
@@ -32,8 +32,8 @@ describe('MyeongHa character-led Saju Reading v1', () => {
     expect(flow).toBeGreaterThan(-1);
     expect(structure).toBeGreaterThan(flow);
     expect(character).toBeGreaterThan(structure);
-    expect(html).toContain('사주 의미는 검증된 Reading을 따르며, 캐릭터는 표현과 후속 질문만 담당합니다.');
-    expect(html).toContain('Saju Engine이 확정한 구조적 근거와 적용 범위');
+    expect(html).toContain('사주 의미는 검증된 Reading을 따르며, 캐릭터가 새로운 해석을 만들지 않습니다.');
+    expect(html).toContain('확정된 구조적 근거와 적용 범위만 표시합니다.');
   });
 
   it('supports the fixed nine-character roster without coupling layout geometry to one reader', async () => {
@@ -56,30 +56,34 @@ describe('MyeongHa character-led Saju Reading v1', () => {
     expect(runtime).toContain('data-reader-hanja');
   });
 
-  it('keeps reading scope state separate from the rendered scope hook so runtime cannot replace the document body', async () => {
+  it('keeps normalized route identity in dataset state without replacing the document body', async () => {
     const runtime = await readFile(readingRuntimePath, 'utf8');
 
-    expect(runtime).toContain('root.dataset.readingScopeKey = requestedScope');
-    expect(runtime).not.toContain('root.dataset.readingScope = requestedScope');
-    expect(runtime).toContain("document.querySelectorAll('.reading-scope[data-reading-scope]')");
-    expect(runtime).not.toContain("document.querySelectorAll('[data-reading-scope]')");
+    expect(runtime).toContain('root.dataset.readingTopicKey = route.topic');
+    expect(runtime).toContain('root.dataset.readingScopeKey = route.scope');
+    expect(runtime).not.toContain('root.dataset.readingScope =');
+    expect(runtime).toContain("document.querySelectorAll('[data-reading-scope]')");
+    expect(runtime).not.toContain("params.get('scope') || 'year'");
   });
 
-  it('keeps the reading as a fixed four-step progression with on-demand chart access', async () => {
+  it('keeps the four-step result scaffold dormant while public Product Reading is authority-blocked', async () => {
     const [html, runtime] = await Promise.all([
       readFile(readingHtmlPath, 'utf8'),
       readFile(readingRuntimePath, 'utf8'),
     ]);
 
     expect((html.match(/data-reading-progress-dot/g) ?? []).length).toBe(4);
-    expect(html).toContain('data-reading-next');
+    expect(html).toMatch(/<section class="reading-stage" data-reading-stage hidden/);
+    expect(html).toContain('data-reading-route-state');
+    expect(html).toContain('data-reading-next disabled');
     expect(html).toContain('data-reading-prev');
     expect(html).toContain('data-chart-open');
     expect(html).toContain('data-chart-dialog');
     expect(html).toContain('내 명식 보기');
-    expect(runtime).toContain("eyebrow: '읽기 1 / 4'");
-    expect(runtime).toContain("eyebrow: '읽기 4 / 4'");
-    expect(runtime).toContain("window.location.href = `chat.html?character=${encodeURIComponent(readerKey)}&from=reading`");
+    expect(runtime).toContain("root.dataset.readingRouteState = route.valid ? 'blocked_by_authority' : 'invalid';");
+    expect(runtime).toContain('if (stage) stage.hidden = true;');
+    expect(runtime).not.toContain('const readingSteps =');
+    expect(runtime).not.toContain('window.location.href = `chat.html?character=');
   });
 
   it('treats birth chart content as server-backed placeholder data rather than invented client claims', async () => {

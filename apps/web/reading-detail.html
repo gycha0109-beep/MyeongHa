@@ -41,7 +41,15 @@
 
   <main class="reading-main">
     <a class="reading-back-to-hub" href="reading.html">← 내 사주로 돌아가기</a>
-    <section class="reading-stage" aria-label="캐릭터와 함께 읽는 사주">
+
+    <section class="reading-route-state" data-reading-route-state aria-live="polite">
+      <span class="reading-route-kicker" data-reading-product-title>사주 읽기</span>
+      <h1 data-reading-state-title>읽기를 확인하는 중입니다.</h1>
+      <p data-reading-state-copy>요청한 주제와 범위를 확인하고 있습니다.</p>
+      <a class="reading-route-action" href="reading.html">다른 사주 읽기 보기 <span aria-hidden="true">→</span></a>
+    </section>
+
+    <section class="reading-stage" data-reading-stage hidden aria-label="캐릭터와 함께 읽는 사주">
       <div class="reader-scene" data-reader-portrait role="img" aria-label="백헌 사주 읽기 장면">
         <div class="reader-scene-art" aria-hidden="true">
           <span class="reader-orbit"></span>
@@ -60,13 +68,13 @@
 
         <div class="reader-dialogue" aria-label="함께 읽는 사람의 말">
           <span class="reader-dialogue-mark" aria-hidden="true">明</span>
-          <p data-reader-step-line data-reader-line>결과를 보고, 그 선택의 귀결까지 함께 보겠습니다.</p>
+          <p data-reader-step-line>검증된 Reading이 준비되면 이 자리에서 함께 읽겠습니다.</p>
         </div>
       </div>
 
       <article class="reading-sheet" aria-live="polite">
         <header class="reading-sheet-head">
-          <span class="reading-scope" data-reading-scope>2026년 · 올해</span>
+          <span class="reading-scope" data-reading-scope>원국</span>
           <div class="reading-progress" aria-label="읽기 진행 상태">
             <span data-reading-progress-label>읽기 1 / 4</span>
             <div class="reading-progress-track" aria-hidden="true">
@@ -83,7 +91,7 @@
             <span class="reading-block-icon" aria-hidden="true">✿</span>
             <div>
               <h2 data-reading-step-title>지금 읽히는 흐름</h2>
-              <p data-reading-step-body>검증된 Saju Reading의 핵심 흐름 요약이 이 영역에 표시됩니다.</p>
+              <p data-reading-step-body>검증된 Product Reading 응답이 연결된 뒤 이 영역에 표시됩니다.</p>
             </div>
           </section>
 
@@ -91,7 +99,7 @@
             <span class="reading-block-icon" aria-hidden="true">✿</span>
             <div>
               <h2 data-reading-structure-title>이 흐름을 만드는 구조</h2>
-              <p data-reading-structure-body>Saju Engine이 확정한 구조적 근거와 적용 범위가 표시됩니다.</p>
+              <p data-reading-structure-body>확정된 구조적 근거와 적용 범위만 표시합니다.</p>
             </div>
           </section>
 
@@ -99,8 +107,8 @@
             <span class="reading-block-icon" aria-hidden="true">✿</span>
             <div>
               <h2><span data-reader-name>백헌</span>의 한 마디</h2>
-              <p data-reader-line>결과를 보고, 그 선택의 귀결까지 함께 보겠습니다.</p>
-              <span class="reading-authority-note">사주 의미는 검증된 Reading을 따르며, 캐릭터는 표현과 후속 질문만 담당합니다.</span>
+              <p>캐릭터는 검증된 Reading의 표현과 후속 질문만 담당합니다.</p>
+              <span class="reading-authority-note">사주 의미는 검증된 Reading을 따르며, 캐릭터가 새로운 해석을 만들지 않습니다.</span>
             </div>
           </section>
         </div>
@@ -108,7 +116,7 @@
         <footer class="reading-sheet-actions">
           <button class="reading-icon-action" type="button" data-reading-prev aria-label="이전 읽기" disabled>←</button>
           <button class="reading-secondary-action" type="button" data-chart-open>내 명식 보기</button>
-          <button class="reading-primary-action" type="button" data-reading-next>
+          <button class="reading-primary-action" type="button" data-reading-next disabled>
             <span>다음 읽기</span>
             <span aria-hidden="true">→</span>
           </button>
@@ -144,6 +152,6 @@
     <a class="mobile-nav-link" href="my.html"><span class="mobile-nav-icon" aria-hidden="true">♙</span><span>마이</span></a>
   </nav>
 
-  <script src="reading-character.js" defer></script>
+  <script type="module" src="reading-character.js"></script>
 </body>
 </html>
