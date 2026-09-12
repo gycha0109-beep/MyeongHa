@@ -22,6 +22,7 @@ function streamRequest(input: {
   readonly body: string;
   readonly headers?: Readonly<Record<string, string>>;
   readonly keepOpen?: boolean;
+  readonly cancelError?: Error;
 }): {
   readonly request: Request;
   readonly wasCancelled: () => boolean;
@@ -37,6 +38,7 @@ function streamRequest(input: {
     },
     cancel() {
       cancelled = true;
+      if (input.cancelError !== undefined) throw input.cancelError;
     },
   });
 
@@ -109,6 +111,33 @@ describe('Supabase auth actual request-body byte limit', () => {
 
     expect(input.request.headers.get('content-length')).toBe('10');
     await expectInvalidRequest(input.request, vi.fn());
+  });
+
+  it('cancels a non-closing body when Content-Length already proves oversize', async () => {
+    const upstream = vi.fn();
+    const input = streamRequest({
+      body: '{"email":"person@example.com"}',
+      headers: { 'Content-Length': String(MAX_AUTH_BODY_BYTES + 1) },
+      keepOpen: true,
+    });
+
+    await expectInvalidRequest(input.request, upstream);
+
+    expect(input.wasCancelled()).toBe(true);
+  });
+
+  it('keeps the declared-oversize mapping when request-body cancellation rejects', async () => {
+    const upstream = vi.fn();
+    const input = streamRequest({
+      body: '{"email":"person@example.com"}',
+      headers: { 'Content-Length': String(MAX_AUTH_BODY_BYTES + 1) },
+      keepOpen: true,
+      cancelError: new Error('cancel failed'),
+    });
+
+    await expectInvalidRequest(input.request, upstream);
+
+    expect(input.wasCancelled()).toBe(true);
   });
 
   it('allows an exact 16,384-byte body through the size layer', async () => {
