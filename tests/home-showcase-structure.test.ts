@@ -12,8 +12,8 @@ describe('Home Golden Master showcase structure', () => {
       '좋은 저녁이에요',
       '오늘 이야기할 사람',
       '캐릭터 선택',
-      '이번 달, 이런 흐름을 보세요',
-      '내 사주에서 더 볼 수 있는 것',
+      '이번 달 사주 읽기',
+      '사주 읽기 주제',
       '전체 사주',
       '직업 · 커리어',
       '재물',
@@ -23,6 +23,11 @@ describe('Home Golden Master showcase structure', () => {
       expect(html).toContain(label);
     }
 
+    expect(html).toContain('제공 상태 확인');
+    expect(html).toContain('읽기 확인');
+    expect(html).toContain('전체 주제 보기');
+    expect(html).not.toContain('이달의 운세 전체보기');
+    expect(html).not.toContain('오늘의 흐름은 사주 화면에서 직접 펼쳐볼 수 있습니다.');
     expect(html).toContain('golden-master.css');
     expect(html).toContain('href="chat-hub.html">대화로 가기 →</a>');
   });
