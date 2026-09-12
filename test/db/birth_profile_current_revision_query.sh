@@ -123,7 +123,7 @@ public_exec=$("${psql_base[@]}" -Atc "select has_function_privilege('public','pu
 [[ "$public_exec" == 'f' ]] || fail "Birth Profile query unexpectedly grants PUBLIC EXECUTE"
 
 table_count=$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")
-[[ "$table_count" == '62' ]] || fail "public table catalog drifted: $table_count"
-pass "Birth Profile query PUBLIC EXECUTE remains revoked and public table catalog remains 62"
+[[ "$table_count" == '63' ]] || fail "public table catalog drifted: $table_count"
+pass "Birth Profile query PUBLIC EXECUTE remains revoked and public table catalog remains 63"
 
 echo "Birth Profile current/revision summary query tests passed"

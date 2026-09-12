@@ -120,7 +120,7 @@ for role in anon authenticated service_role myeongha_api_executor; do
     [[ "$allowed" == '0' ]] || fail "lifecycle history unexpectedly executable by $role"
   fi
 done
-[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == '62' ]] || fail "public table catalog changed"
-pass "lifecycle history is STABLE, SECURITY INVOKER, DB-only, and table catalog remains 62"
+[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == '63' ]] || fail "public table catalog changed"
+pass "lifecycle history is STABLE, SECURITY INVOKER, DB-only, and table catalog remains 63"
 
 echo "Privacy-safe Entitlement lifecycle history v1 query tests passed"
