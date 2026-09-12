@@ -85,4 +85,9 @@ reading_transport_shape=$("${psql_base[@]}" -At -F '|' -c "select
 [[ "$reading_transport_shape" == 'f|f|f' ]] || fail "myeongha_api_executor unexpectedly gained Reading transport EXECUTE: $reading_transport_shape"
 pass "myeongha_api_executor keeps Reading transport prepare/finalize authority fail-closed"
 
+reading_clarification_shape=$("${psql_base[@]}" -At -c "select
+  has_function_privilege('myeongha_api_executor','public.cmd_append_reading_clarification_v1(uuid,uuid,uuid,uuid,text,text,text,jsonb)','EXECUTE');")
+[[ "$reading_clarification_shape" == 'f' ]] || fail "myeongha_api_executor unexpectedly gained Reading clarification append EXECUTE: $reading_clarification_shape"
+pass "myeongha_api_executor keeps Reading clarification append authority fail-closed"
+
 echo "Runtime function API role ACL hardening tests passed"
