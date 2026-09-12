@@ -112,6 +112,11 @@ function readBearerToken(request: Request): string | null {
   return token === undefined || token.length === 0 ? null : token;
 }
 
+function cancelUnusedResponseBody(response: Response): void {
+  if (response.body === null) return;
+  void response.body.cancel().catch(() => undefined);
+}
+
 function requireUserId(payload: unknown): string {
   if (payload === null || typeof payload !== 'object' || Array.isArray(payload)) {
     throw new SupabaseMemberIdentityVerifierErrorV1(
@@ -190,10 +195,12 @@ export class SupabaseMemberIdentityEvidenceVerifierV1
     try {
       const response = deadline.response;
       if (response.status === 401 || response.status === 403) {
+        cancelUnusedResponseBody(response);
         return null;
       }
 
       if (!response.ok) {
+        cancelUnusedResponseBody(response);
         throw new SupabaseMemberIdentityVerifierErrorV1(
           'SUPABASE_MEMBER_VERIFIER_UPSTREAM_FAILED',
           `Supabase Auth user verification failed with status ${response.status}.`,

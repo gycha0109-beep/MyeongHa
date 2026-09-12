@@ -13,6 +13,47 @@ function memberRequest(): Request {
   });
 }
 
+function nonClosingResponse(status: number): {
+  readonly response: Response;
+  readonly wasCancelled: () => boolean;
+} {
+  let cancelled = false;
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(new TextEncoder().encode('{"message":"upstream"}'));
+    },
+    cancel() {
+      cancelled = true;
+      return new Promise<void>(() => undefined);
+    },
+  });
+
+  return {
+    response: new Response(body, {
+      status,
+      headers: { 'Content-Type': 'application/json' },
+    }),
+    wasCancelled: () => cancelled,
+  };
+}
+
+async function settlesPromptly<T>(promise: Promise<T>): Promise<T> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_resolve, reject) => {
+        timeout = setTimeout(
+          () => reject(new Error('Member verifier waited for response-body cancellation.')),
+          250,
+        );
+      }),
+    ]);
+  } finally {
+    if (timeout !== undefined) clearTimeout(timeout);
+  }
+}
+
 afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
@@ -41,6 +82,46 @@ describe('Supabase Member identity verifier deadline', () => {
       kind: 'member',
       verifiedAuthUserId: '11111111-1111-4111-8111-111111111111',
     });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([401, 403])(
+    'cancels an unused non-closing %i response body without delaying unauthenticated resolution',
+    async (status) => {
+      const upstream = nonClosingResponse(status);
+      const fetchImpl = vi.fn(async () => upstream.response);
+      const verifier = new SupabaseMemberIdentityEvidenceVerifierV1({
+        supabaseOrigin,
+        supabaseApiKey,
+        fetchImpl,
+        timeoutMs: 1_000,
+      });
+
+      await expect(
+        settlesPromptly(verifier.verifyRequestIdentity(memberRequest())),
+      ).resolves.toBeNull();
+      expect(upstream.wasCancelled()).toBe(true);
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it('cancels an unused non-closing non-OK response body without delaying upstream failure', async () => {
+    const upstream = nonClosingResponse(503);
+    const fetchImpl = vi.fn(async () => upstream.response);
+    const verifier = new SupabaseMemberIdentityEvidenceVerifierV1({
+      supabaseOrigin,
+      supabaseApiKey,
+      fetchImpl,
+      timeoutMs: 1_000,
+    });
+
+    await expect(
+      settlesPromptly(verifier.verifyRequestIdentity(memberRequest())),
+    ).rejects.toMatchObject({
+      name: 'SupabaseMemberIdentityVerifierErrorV1',
+      code: 'SUPABASE_MEMBER_VERIFIER_UPSTREAM_FAILED',
+    });
+    expect(upstream.wasCancelled()).toBe(true);
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
