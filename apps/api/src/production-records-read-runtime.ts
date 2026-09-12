@@ -69,14 +69,18 @@ function createRuntime(
   });
 
   return Object.freeze({
-    handleRequest(requestInput: ProductionRecordsReadRequestV1) {
-      return handler({
+    async handleRequest(requestInput: ProductionRecordsReadRequestV1) {
+      const response = await handler({
         request: requestInput.request,
         requestId: requestInput.requestId,
         serverTime: requestInput.serverTime,
         identityEvidenceVerifier,
         pool: poolLease.pool,
       });
+      if (response.status === 405) {
+        cancelUnusedRequestBodyBestEffort(requestInput.request);
+      }
+      return response;
     },
     close() {
       return poolLease.close();
