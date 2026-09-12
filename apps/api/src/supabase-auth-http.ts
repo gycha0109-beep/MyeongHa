@@ -200,6 +200,11 @@ function normalizeSession(payload: unknown): AuthSessionV1 | null {
   });
 }
 
+function cancelUnusedResponseBody(response: Response): void {
+  if (response.body === null) return;
+  void response.body.cancel().catch(() => undefined);
+}
+
 async function callSupabase(
   config: AuthProxyConfigV1,
   path: string,
@@ -220,6 +225,11 @@ async function callSupabase(
   );
 
   try {
+    if (!deadline.response.ok) {
+      cancelUnusedResponseBody(deadline.response);
+      return { response: deadline.response, payload: null };
+    }
+
     let payload: unknown = null;
     try {
       payload = await deadline.response.json();
