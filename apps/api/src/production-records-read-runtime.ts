@@ -41,6 +41,17 @@ type RecordsReadHandlerV1 = (input: {
   readonly pool: PostgresSubjectPoolV1;
 }) => Promise<Response>;
 
+function cancelUnusedRequestBodyBestEffort(request: Request): void {
+  const body = request.body;
+  if (body === null || request.bodyUsed) return;
+
+  try {
+    void body.cancel().catch(() => undefined);
+  } catch {
+    // Method rejection is authoritative; best-effort cleanup must never replace it.
+  }
+}
+
 function createRuntime(
   input: CreateProductionRecordsReadRuntimeInputV1,
   handler: RecordsReadHandlerV1,
@@ -125,6 +136,7 @@ export function createProductionReadingHistoryReadRuntimeV1(
           idPort,
         });
       }
+      cancelUnusedRequestBodyBestEffort(requestInput.request);
       return Promise.resolve(new Response(null, {
         status: 405,
         headers: {
