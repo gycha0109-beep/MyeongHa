@@ -12,16 +12,25 @@ const ENV = Object.freeze({
     'test-guest-fingerprint-secret-material-at-least-thirty-two-bytes',
 });
 
-function nonClosingRequest(headers?: HeadersInit): Request {
+type NonClosingRequestInput = Readonly<{
+  method?: string;
+  headers?: HeadersInit;
+  cancel?: () => void | PromiseLike<void>;
+}>;
+
+function nonClosingRequest(input: NonClosingRequestInput = {}): Request {
   const body = new ReadableStream<Uint8Array>({
     start(controller) {
       controller.enqueue(new TextEncoder().encode('{"unexpected":'));
     },
+    cancel() {
+      return input.cancel?.();
+    },
   });
 
   return new Request('https://myeongha.example/api/auth/promote-guest', {
-    method: 'POST',
-    headers,
+    method: input.method ?? 'POST',
+    headers: input.headers,
     body,
     duplex: 'half',
   } as RequestInit & { duplex: 'half' });
@@ -60,6 +69,62 @@ async function expectAuthFailure(input: {
 }
 
 describe('Production Guest promotion auth-before-body boundary', () => {
+  it('returns method rejection without waiting for unused body cancellation to settle', async () => {
+    let cancelCalled = false;
+    const request = nonClosingRequest({
+      method: 'PUT',
+      cancel() {
+        cancelCalled = true;
+        return new Promise<void>(() => undefined);
+      },
+    });
+    const runtime = createProductionGuestPromotionRuntimeV1({ env: ENV });
+
+    try {
+      const response = await runtime.handleRequest({
+        request,
+        requestId: 'req-guest-promotion-method-rejection-non-settling-cancel',
+        serverTime: '2026-09-12T00:00:00.000Z',
+      });
+
+      expect(response.status).toBe(405);
+      expect(response.headers.get('allow')).toBe('POST');
+      expect(response.headers.get('cache-control')).toBe('no-store');
+      expect(await response.text()).toBe('');
+      expect(cancelCalled).toBe(true);
+    } finally {
+      await runtime.close();
+    }
+  });
+
+  it('preserves method rejection when unused body cancellation rejects', async () => {
+    let cancelCalled = false;
+    const request = nonClosingRequest({
+      method: 'PUT',
+      cancel() {
+        cancelCalled = true;
+        return Promise.reject(new Error('synthetic cancellation failure'));
+      },
+    });
+    const runtime = createProductionGuestPromotionRuntimeV1({ env: ENV });
+
+    try {
+      const response = await runtime.handleRequest({
+        request,
+        requestId: 'req-guest-promotion-method-rejection-rejected-cancel',
+        serverTime: '2026-09-12T00:00:00.000Z',
+      });
+
+      expect(response.status).toBe(405);
+      expect(response.headers.get('allow')).toBe('POST');
+      expect(response.headers.get('cache-control')).toBe('no-store');
+      expect(await response.text()).toBe('');
+      expect(cancelCalled).toBe(true);
+    } finally {
+      await runtime.close();
+    }
+  });
+
   it('returns GUEST_AUTH_REQUIRED without consuming a non-closing request body', async () => {
     await expectAuthFailure({
       request: nonClosingRequest(),
@@ -70,7 +135,9 @@ describe('Production Guest promotion auth-before-body boundary', () => {
   it('returns MEMBER_AUTH_REQUIRED without consuming a non-closing request body', async () => {
     await expectAuthFailure({
       request: nonClosingRequest({
-        'x-myeongha-guest-bearer': 'guest-bearer-present-for-auth-order-regression',
+        headers: {
+          'x-myeongha-guest-bearer': 'guest-bearer-present-for-auth-order-regression',
+        },
       }),
       code: 'MEMBER_AUTH_REQUIRED',
     });
