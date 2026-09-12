@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { createNodePostgresSubjectPoolV1 } from './node-postgres-subject-pool.js';
+import type { PostgresSubjectPoolV1 } from './postgres-subject-execution.js';
+import { createProductionPostgresSubjectPoolLeaseV1 } from './production-postgres-subject-pool-lease.js';
 import { createProductionRequestIdentityVerifierV1 } from './production-request-identity-verifier.js';
 import {
   parseProductionUserDataRuntimeConfigV1,
@@ -26,6 +27,8 @@ export interface ProductionRecordsReadRuntimeV1 {
 
 export interface CreateProductionRecordsReadRuntimeInputV1 {
   readonly env: ProductionUserDataRuntimeEnvV1;
+  /** Server-side shared-pool injection only. Never derived from the client request. */
+  readonly pool?: PostgresSubjectPoolV1;
   /** Server-side test/runtime injection only. Never derived from the client request. */
   readonly memberFetchImpl?: SupabaseMemberVerifierFetchV1;
 }
@@ -35,7 +38,7 @@ type RecordsReadHandlerV1 = (input: {
   readonly requestId: string;
   readonly serverTime: string;
   readonly identityEvidenceVerifier: ReturnType<typeof createProductionRequestIdentityVerifierV1>;
-  readonly pool: ReturnType<typeof createNodePostgresSubjectPoolV1>;
+  readonly pool: PostgresSubjectPoolV1;
 }) => Promise<Response>;
 
 function createRuntime(
@@ -43,7 +46,10 @@ function createRuntime(
   handler: RecordsReadHandlerV1,
 ): ProductionRecordsReadRuntimeV1 {
   const config = parseProductionUserDataRuntimeConfigV1(input.env);
-  const pool = createNodePostgresSubjectPoolV1(config);
+  const poolLease = createProductionPostgresSubjectPoolLeaseV1({
+    config,
+    ...(input.pool === undefined ? {} : { pool: input.pool }),
+  });
   const identityEvidenceVerifier = createProductionRequestIdentityVerifierV1({
     config,
     ...(input.memberFetchImpl === undefined
@@ -58,11 +64,11 @@ function createRuntime(
         requestId: requestInput.requestId,
         serverTime: requestInput.serverTime,
         identityEvidenceVerifier,
-        pool,
+        pool: poolLease.pool,
       });
     },
     close() {
-      return pool.close();
+      return poolLease.close();
     },
   });
 }
@@ -83,7 +89,10 @@ export function createProductionReadingHistoryReadRuntimeV1(
   input: CreateProductionRecordsReadRuntimeInputV1,
 ): ProductionRecordsReadRuntimeV1 {
   const config = parseProductionUserDataRuntimeConfigV1(input.env);
-  const pool = createNodePostgresSubjectPoolV1(config);
+  const poolLease = createProductionPostgresSubjectPoolLeaseV1({
+    config,
+    ...(input.pool === undefined ? {} : { pool: input.pool }),
+  });
   const identityEvidenceVerifier = createProductionRequestIdentityVerifierV1({
     config,
     ...(input.memberFetchImpl === undefined
@@ -103,7 +112,7 @@ export function createProductionReadingHistoryReadRuntimeV1(
           requestId: requestInput.requestId,
           serverTime: requestInput.serverTime,
           identityEvidenceVerifier,
-          pool,
+          pool: poolLease.pool,
         });
       }
       if (requestInput.request.method === 'POST') {
@@ -112,7 +121,7 @@ export function createProductionReadingHistoryReadRuntimeV1(
           requestId: requestInput.requestId,
           serverTime: requestInput.serverTime,
           identityEvidenceVerifier,
-          pool,
+          pool: poolLease.pool,
           idPort,
         });
       }
@@ -125,7 +134,7 @@ export function createProductionReadingHistoryReadRuntimeV1(
       }));
     },
     close() {
-      return pool.close();
+      return poolLease.close();
     },
   });
 }

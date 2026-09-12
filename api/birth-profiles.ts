@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
+import { createNodePostgresSubjectPoolV1 } from '../apps/api/src/node-postgres-subject-pool.js';
 import { createProductionBirthProfileCreateRuntimeV1 } from '../apps/api/src/production-birth-profile-create-runtime.js';
 import { createProductionBirthProfileReadRuntimeV1 } from '../apps/api/src/production-birth-profile-read-runtime.js';
+import { parseProductionUserDataRuntimeConfigV1 } from '../apps/api/src/production-user-data-runtime-config.js';
 
 const ROUTE_PATH = '/api/birth-profiles' as const;
 const ROUTE_PREFIX = '/api/birth-profiles/' as const;
@@ -52,6 +54,7 @@ export interface CreateBirthProfilesVercelHandlerInputV1 {
   readonly getCreateRuntime: () => BirthProfileVercelRuntimePortV1;
 }
 
+let sharedPostgresPool: ReturnType<typeof createNodePostgresSubjectPoolV1> | undefined;
 let readRuntime:
   | ReturnType<typeof createProductionBirthProfileReadRuntimeV1>
   | undefined;
@@ -59,13 +62,26 @@ let createRuntime:
   | ReturnType<typeof createProductionBirthProfileCreateRuntimeV1>
   | undefined;
 
+function getSharedPostgresPool(): ReturnType<typeof createNodePostgresSubjectPoolV1> {
+  sharedPostgresPool ??= createNodePostgresSubjectPoolV1(
+    parseProductionUserDataRuntimeConfigV1(process.env),
+  );
+  return sharedPostgresPool;
+}
+
 function getProductionReadRuntime(): ReturnType<typeof createProductionBirthProfileReadRuntimeV1> {
-  readRuntime ??= createProductionBirthProfileReadRuntimeV1({ env: process.env });
+  readRuntime ??= createProductionBirthProfileReadRuntimeV1({
+    env: process.env,
+    pool: getSharedPostgresPool(),
+  });
   return readRuntime;
 }
 
 function getProductionCreateRuntime(): ReturnType<typeof createProductionBirthProfileCreateRuntimeV1> {
-  createRuntime ??= createProductionBirthProfileCreateRuntimeV1({ env: process.env });
+  createRuntime ??= createProductionBirthProfileCreateRuntimeV1({
+    env: process.env,
+    pool: getSharedPostgresPool(),
+  });
   return createRuntime;
 }
 
