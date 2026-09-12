@@ -274,8 +274,9 @@ try {
   assert(hallState.bodyText.includes('오늘 이야기할 사람') && hallState.bodyText.includes('캐릭터 선택'), 'Home Character chooser missing');
   assert(hallState.heroHref === 'chat-hub.html', `Home global conversation entry must route through the hub: ${hallState.heroHref}`);
   assert(!hallState.bodyText.includes('세연') && !hallState.bodyText.includes('연화'), 'Home must not infer a named Character mapping');
-  assert(hallState.bodyText.includes('이번 달, 이런 흐름을 보세요') && hallState.bodyText.includes('오늘의 흐름은 사주 화면에서 직접 펼쳐볼 수 있습니다.'), 'Home monthly flow entry missing');
-  assert(hallState.bodyText.includes('내 사주에서 더 볼 수 있는 것') && hallState.bodyText.includes('전체 사주') && hallState.bodyText.includes('직업 · 커리어') && hallState.bodyText.includes('재물') && hallState.bodyText.includes('연애 · 관계'), 'Home four-card Saju row missing');
+  assert(hallState.bodyText.includes('이번 달 사주 읽기') && hallState.bodyText.includes('검증된 Reading이 제공 가능한지 상세 화면에서 확인할 수 있습니다.'), 'Home monthly Reading readiness entry missing');
+  assert(!hallState.bodyText.includes('이달의 운세 전체보기') && !hallState.bodyText.includes('오늘의 흐름은 사주 화면에서 직접 펼쳐볼 수 있습니다.'), 'Home must not claim blocked monthly Reading availability');
+  assert(hallState.bodyText.includes('사주 읽기 주제') && hallState.bodyText.includes('전체 사주') && hallState.bodyText.includes('직업 · 커리어') && hallState.bodyText.includes('재물') && hallState.bodyText.includes('연애 · 관계'), 'Home four-card Saju row missing');
   assert(hallState.bodyText.includes('최근 이야기') && hallState.bodyText.includes('지금은 저장된 사실을 이야기로 추측해 이어 붙이지 않습니다.'), 'Home recent-story fail-closed state missing');
   await artifact(client, '-home');
 
