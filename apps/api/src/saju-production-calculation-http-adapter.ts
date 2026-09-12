@@ -40,6 +40,9 @@ export interface SajuProductionCalculationHttpResponseV1 {
   readonly headers: Readonly<{
     get(name: string): string | null;
   }>;
+  readonly body?: Readonly<{
+    cancel(reason?: unknown): Promise<void>;
+  }> | null;
   text(): Promise<string>;
 }
 
@@ -311,8 +314,22 @@ async function fetchWithTimeout(input: {
   }
 }
 
-function assertSuccessfulStatus(status: number): void {
+function cancelUnusedResponseBody(
+  response: SajuProductionCalculationHttpResponseV1,
+): void {
+  try {
+    const body = response.body;
+    if (body === undefined || body === null) return;
+    void body.cancel().catch(() => undefined);
+  } catch {
+    return;
+  }
+}
+
+function assertSuccessfulStatus(response: SajuProductionCalculationHttpResponseV1): void {
+  const { status } = response;
   if (status === 200) return;
+  cancelUnusedResponseBody(response);
   if (status >= 400 && status <= 499) {
     throw new SajuProductionCalculationHttpAdapterErrorV1(
       'HTTP_4XX',
@@ -340,6 +357,7 @@ function assertJsonContentType(response: SajuProductionCalculationHttpResponseV1
     contentType === null ||
     !/^application\/json(?:\s*;|$)/iu.test(contentType.trim())
   ) {
+    cancelUnusedResponseBody(response);
     throw new SajuProductionCalculationHttpAdapterErrorV1(
       'INVALID_CONTENT_TYPE',
       'Saju calculation service returned a non-JSON success response.',
@@ -397,7 +415,7 @@ export function createSajuProductionCalculationHttpAdapterV1(
 
       try {
         const { response } = lease;
-        assertSuccessfulStatus(response.status);
+        assertSuccessfulStatus(response);
         assertJsonContentType(response);
         const payload = await parseJsonResponse(response, lease.deadline, lease.didTimeout);
 
