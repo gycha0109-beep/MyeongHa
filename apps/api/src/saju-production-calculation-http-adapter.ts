@@ -79,6 +79,13 @@ export interface SajuProductionCalculationRequestV1 {
   }>;
 }
 
+interface SajuProductionCalculationHttpDeadlineLeaseV1 {
+  readonly response: SajuProductionCalculationHttpResponseV1;
+  readonly deadline: Promise<never>;
+  readonly didTimeout: () => boolean;
+  readonly release: () => void;
+}
+
 function invalidBirthRevision(message: string): never {
   throw new SajuProductionCalculationHttpAdapterErrorV1(
     'INVALID_BIRTH_REVISION',
@@ -230,32 +237,42 @@ const defaultFetch: SajuProductionCalculationHttpFetchV1 = async (url, init) =>
     signal: init.signal,
   });
 
+function timeoutError(): SajuProductionCalculationHttpAdapterErrorV1 {
+  return new SajuProductionCalculationHttpAdapterErrorV1(
+    'TIMEOUT',
+    'Saju calculation request timed out.',
+  );
+}
+
 async function fetchWithTimeout(input: {
   readonly fetchImpl: SajuProductionCalculationHttpFetchV1;
   readonly url: string;
   readonly request: SajuProductionCalculationRequestV1;
   readonly bearerToken: string;
   readonly timeoutMs: number;
-}): Promise<SajuProductionCalculationHttpResponseV1> {
+}): Promise<SajuProductionCalculationHttpDeadlineLeaseV1> {
   const controller = new AbortController();
   let timedOut = false;
+  let released = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
 
-  const timeout = new Promise<never>((_, reject) => {
+  const deadline = new Promise<never>((_, reject) => {
     timer = setTimeout(() => {
       timedOut = true;
+      const error = timeoutError();
+      reject(error);
       controller.abort();
-      reject(
-        new SajuProductionCalculationHttpAdapterErrorV1(
-          'TIMEOUT',
-          'Saju calculation request timed out.',
-        ),
-      );
     }, input.timeoutMs);
   });
 
+  const release = (): void => {
+    if (released) return;
+    released = true;
+    if (timer !== undefined) clearTimeout(timer);
+  };
+
   try {
-    return await Promise.race([
+    const response = await Promise.race([
       input.fetchImpl(input.url, {
         method: 'POST',
         headers: Object.freeze({
@@ -267,9 +284,17 @@ async function fetchWithTimeout(input: {
         redirect: 'manual',
         signal: controller.signal,
       }),
-      timeout,
+      deadline,
     ]);
+
+    return Object.freeze({
+      response,
+      deadline,
+      didTimeout: () => timedOut,
+      release,
+    });
   } catch (error) {
+    release();
     if (
       error instanceof SajuProductionCalculationHttpAdapterErrorV1 &&
       error.code === 'TIMEOUT'
@@ -277,17 +302,12 @@ async function fetchWithTimeout(input: {
       throw error;
     }
     if (timedOut) {
-      throw new SajuProductionCalculationHttpAdapterErrorV1(
-        'TIMEOUT',
-        'Saju calculation request timed out.',
-      );
+      throw timeoutError();
     }
     throw new SajuProductionCalculationHttpAdapterErrorV1(
       'NETWORK_FAILURE',
       'Saju calculation transport failed before an HTTP response was accepted.',
     );
-  } finally {
-    if (timer !== undefined) clearTimeout(timer);
   }
 }
 
@@ -330,11 +350,19 @@ function assertJsonContentType(response: SajuProductionCalculationHttpResponseV1
 
 async function parseJsonResponse(
   response: SajuProductionCalculationHttpResponseV1,
+  deadline: Promise<never>,
+  didTimeout: () => boolean,
 ): Promise<unknown> {
   let text: string;
   try {
-    text = await response.text();
-  } catch {
+    text = await Promise.race([response.text(), deadline]);
+  } catch (error) {
+    if (
+      didTimeout() ||
+      (error instanceof SajuProductionCalculationHttpAdapterErrorV1 && error.code === 'TIMEOUT')
+    ) {
+      throw timeoutError();
+    }
     throw new SajuProductionCalculationHttpAdapterErrorV1(
       'NETWORK_FAILURE',
       'Saju calculation response body could not be read.',
@@ -365,26 +393,32 @@ export function createSajuProductionCalculationHttpAdapterV1(
       birthRevision: SajuBirthRevisionBindingV1,
     ): Promise<SajuProductionCalculationIngressArtifactV1> {
       const request = buildSajuProductionCalculationRequestV1(birthRevision);
-      const response = await fetchWithTimeout({ fetchImpl, url, request, bearerToken, timeoutMs });
-      assertSuccessfulStatus(response.status);
-      assertJsonContentType(response);
-      const payload = await parseJsonResponse(response);
+      const lease = await fetchWithTimeout({ fetchImpl, url, request, bearerToken, timeoutMs });
 
       try {
-        return ingestAuthorizedSajuProductionCalculationV1({
-          response: payload,
-          birthRevision,
-        });
-      } catch (error) {
-        if (error instanceof SajuProductionCalculationIngressErrorV1) {
-          throw new SajuProductionCalculationHttpAdapterErrorV1(
-            'INGRESS_REJECTED',
-            'Saju calculation response failed the MyeongHa production ingress boundary.',
-            response.status,
-            error.code,
-          );
+        const { response } = lease;
+        assertSuccessfulStatus(response.status);
+        assertJsonContentType(response);
+        const payload = await parseJsonResponse(response, lease.deadline, lease.didTimeout);
+
+        try {
+          return ingestAuthorizedSajuProductionCalculationV1({
+            response: payload,
+            birthRevision,
+          });
+        } catch (error) {
+          if (error instanceof SajuProductionCalculationIngressErrorV1) {
+            throw new SajuProductionCalculationHttpAdapterErrorV1(
+              'INGRESS_REJECTED',
+              'Saju calculation response failed the MyeongHa production ingress boundary.',
+              response.status,
+              error.code,
+            );
+          }
+          throw error;
         }
-        throw error;
+      } finally {
+        lease.release();
       }
     },
   });
