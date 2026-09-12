@@ -60,9 +60,10 @@ export interface ReadingCreateIdPortV1 {
  *
  * The verified DB command pins the current immutable self Birth revision, checks the
  * operational Saju domain, creates one Reading Session plus logical Reading attempt 1,
- * and leaves execution pending. It creates no transport execution attempt and performs
- * no Saju call. P0-AUTH-01 therefore remains outside this slice and no PostgreSQL adapter
- * is selected here.
+ * and leaves execution pending. Production now binds this port through the governed
+ * PostgreSQL subject-execution path and dedicated Reading-create runtime authority.
+ * That generic execution identity and create adapter do not admit SRC-08 target-Birth /
+ * compatibility input, Product Reading transport, finalization, refs, or grounding.
  */
 export interface ReadingCreateAuthorityPortV1 {
   createReadingSession(input: {
