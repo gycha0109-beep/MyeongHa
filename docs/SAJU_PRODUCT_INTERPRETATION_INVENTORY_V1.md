@@ -1,14 +1,75 @@
 # 명하 Saju Product Interpretation Inventory V1
 
 > Repository: `gycha0109-beep/MyeongHa`  
-> Status: **GENERAL NATAL EXACT INVENTORY / NOT PRODUCT AUTHORITY / P0-CM-03 OPEN / NO-BUILD**  
-> MyeongHa observed main: `ac47522c65e2c1b492591c69453232a19d3e898c`  
-> Saju observed main: `9cd79b11b5e79016fb7c8b266c95c53286587f48`  
+> Status: **CROSS-DOMAIN AUTHORITY INVENTORY / NOT PRODUCT AUTHORITY / NO PRODUCTION SKU READY**  
+> MyeongHa observed main: `cbc52fe7e5b61cb8cf2d4381efc4d0f9c5af42d2`  
+> Saju observed main: `27479502607207cd3af2dc3b21118d81fa163d42`  
+> Cross-domain readiness authority: `docs/SAJU_PRODUCT_VERTICAL_SLICE_READINESS_AUDIT_20260913.md`  
 > General Natal authority sync inputs: Saju PR `#332` + PR `#335` + PR `#339`  
 > Product interpretation authority: `MyeongHa_Saju_Product_Interpretation_Architecture_v1.2_FINAL_REVIEWED(1).md`  
 > Saju production audit: `gycha0109-beep/Saju/docs/product/22-production-interpretation-authority-audit.md`  
 > Source-conditioned topology authority: `gycha0109-beep/Saju/docs/research/general-natal-t8-source-conditioned-topology-20260907.md`  
 > Source-conditioned lower-tier producer: `gycha0109-beep/Saju/src/research/general-natal-source-conditioned-lower-tier-producer.ts`
+
+---
+
+## 0. Cross-domain readiness ledger
+
+This top-level ledger consolidates the current product-readiness boundary while retaining the existing General Natal deep-dive below as supporting detail.
+
+```text
+Reading Profile / selector exists
+!= InterpretationClaim exists
+!= governed producer exists
+!= production interpretation authority exists
+!= MyeongHa product runtime is saleable
+!= Commerce is authorized
+```
+
+The three readiness dimensions remain separate:
+
+```text
+SAJU_SEMANTIC_READY
+= exact interpretation semantics have governed production authority
+
+MYEONGHA_PRODUCT_READY
+= a production consumer/runtime can consume that governed authority fail-closed
+
+COMMERCE_READY
+= the product may honestly be represented as saleable and connected to price/payment/entitlement
+```
+
+| Surface | Selector / profile | Source producer / claim surface | MyeongHa provider / runtime | SAJU_SEMANTIC_READY | MYEONGHA_PRODUCT_READY | COMMERCE_READY | Primary blocker | Evidence path |
+|---|---|---|---|---|---|---|---|---|
+| **General Natal (T8)** | `general -> general-natal`; T8 `category=general` selection contract exists | General-Natal research candidates exist; PR `#339` adds a strict research-only T3 source-condition producer, but canonical resolver + reviewed production T8 chain remain incomplete | Generic Reading/ProductHost infrastructure exists; reachability is not semantic authority | **NO** | **NO** | **NO** | `SAJU_AUTHORITY_DEPENDENCY`; P0-CM-03 open | this document §§1–11; `docs/SAJU_PRODUCT_VERTICAL_SLICE_READINESS_AUDIT_20260913.md` §§3–4; `Saju/src/research/general-natal-source-conditioned-lower-tier-producer.ts` |
+| **Career Natal (T8)** | Career T8 selector/profile exists | `Saju/src/research/career-natal-reading-candidate.ts`; research-only (`secondary_only`, `fixture_matrix`, `contested`, `unreviewed`) | Research path exists; no production product guarantee follows from reachability | **NO** | **NO** | **NO** | `SAJU_AUTHORITY_DEPENDENCY`; historical Career T8 gaps remain open | readiness audit §§3,5 |
+| **Wealth Natal (T8)** | Wealth T8 selector/profile exists | `Saju/src/research/wealth-natal-reading-candidate.ts`; research-only and cumulatively dependent on unresolved General/Career research authority | Research path exists; no production product guarantee established | **NO** | **NO** | **NO** | `SAJU_AUTHORITY_DEPENDENCY` | readiness audit §§3,6 |
+| **Relationship (T8)** | Relationship-General and Relationship-Spouse selectors/profiles exist | General: `Saju/src/research/relationship-natal-reading-candidate.ts` research-only. Spouse: governed ledger remains `2/5 CLOSED`, `3/5 OPEN`, `spouseT8ProducerReady=false` | Selection/research paths exist; no production Relationship product guarantee established | **NO** | **NO** | **NO** | `SAJU_AUTHORITY_DEPENDENCY`; Spouse production HOLD | readiness audit §§3,7–8; current Saju Spouse-T8 ledger |
+| **T9 Annual / Monthly** | Domain annual/monthly composition requires domain Natal T8 + period T9 evidence | Career/Wealth/Relationship-General annual/monthly research candidates and E2E research paths exist; no production promotion | Research path exists; no independently saleable period product established | **NO** | **NO** | **NO** | production-authorized Natal T8 foundation absent; T9 research cannot bypass it | readiness audit §§3,9 |
+| **T10 Compatibility** | Compatibility Reading profile selects T10 evidence | No admitted production T10 interpretation producer identified; `SRC-08` unresolved | target Birth and `domain=compatibility` fail closed with `CAPABILITY_UNAVAILABLE` before trusted Reading ID allocation/persistence | **NO** | **NO** | **NO** | `CAPABILITY_UNAVAILABLE` + unresolved `SRC-08` | readiness audit §10; MyeongHa PR `#688` |
+| **T11 Question-Specific** | `question_specific` selects T11 / `QUESTION_SPECIFIC_CLAIM_REQUIRED` | No dedicated governed production T11 producer established by the audited Saju tree | No production Question-Specific product path established | **NO** | **NO** | **NO** | `SAJU_PRODUCT_BINDING_MISSING`; selector presence is selection-only authority | readiness audit §§11,13 |
+| **Life-stage / Daewoon** | `life_stage` selects T9 `life_stage` evidence | No dedicated governed life-stage/Daewoon interpretation producer established; calculation-level luck-cycle capability is a separate authority surface | No production Daewoon interpretation product path established | **NO** | **NO** | **NO** | `SAJU_PRODUCT_BINDING_MISSING`; calculation/helper capability cannot act as interpretation guarantor | readiness audit §§12–13 |
+
+For Career, Wealth, and Relationship-General annual/monthly products:
+
+```text
+period product completeness
+= production-authorized domain Natal T8
++ production-authorized period T9
+```
+
+Current research coverage does not satisfy that equation.
+
+The inherited readiness decision remains:
+
+```text
+NEXT_PRODUCTION_SKU       = NONE
+DOWNSTREAM_SKU_ACTIVATION = BLOCKED
+MISSING_AUTHORITY_OWNER   = SAJU
+COMMERCE                  = HOLD
+```
+
+The Saju drift after the `#723` readiness audit consists of non-promotional Relationship/Spouse evidence work and does not change this verdict.
 
 ---
 
