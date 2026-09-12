@@ -115,7 +115,6 @@ export function createProductionGuestPromotionRuntimeV1(input: {
           headers: { Allow: 'POST', 'Cache-Control': 'no-store' },
         });
       }
-      if (!(await readEmptyBody(request))) return failure('INVALID_REQUEST', 400, requestId);
 
       const guestBearer = request.headers.get(GUEST_HEADER);
       if (!guestBearer || guestBearer.length > 4096 || /\s/u.test(guestBearer)) {
@@ -134,6 +133,8 @@ export function createProductionGuestPromotionRuntimeV1(input: {
       if (guestEvidence === null || guestEvidence.kind !== 'guest') {
         return failure('GUEST_AUTH_REQUIRED', 401, requestId);
       }
+
+      if (!(await readEmptyBody(request))) return failure('INVALID_REQUEST', 400, requestId);
 
       try {
         const result = await executePostgresSubjectTransactionV1({
