@@ -1,3 +1,4 @@
+import { isGuestPromotionEmptyRequestBodyV1 } from './guest-promotion-request-body.js';
 import { createNodePostgresSubjectPoolV1 } from './node-postgres-subject-pool.js';
 import { executePostgresSubjectTransactionV1 } from './postgres-subject-execution.js';
 import { createProductionRequestIdentityVerifierV1 } from './production-request-identity-verifier.js';
@@ -78,18 +79,6 @@ function requireUuidText(name: string, value: unknown): string {
   return value;
 }
 
-async function readEmptyBody(request: Request): Promise<boolean> {
-  const text = await request.text();
-  if (text.trim().length === 0) return true;
-  try {
-    const value: unknown = JSON.parse(text);
-    return value !== null && typeof value === 'object' && !Array.isArray(value)
-      && Object.keys(value as Record<string, unknown>).length === 0;
-  } catch {
-    return false;
-  }
-}
-
 export interface ProductionGuestPromotionRuntimeV1 {
   handleRequest(input: {
     readonly request: Request;
@@ -134,7 +123,9 @@ export function createProductionGuestPromotionRuntimeV1(input: {
         return failure('GUEST_AUTH_REQUIRED', 401, requestId);
       }
 
-      if (!(await readEmptyBody(request))) return failure('INVALID_REQUEST', 400, requestId);
+      if (!(await isGuestPromotionEmptyRequestBodyV1(request))) {
+        return failure('INVALID_REQUEST', 400, requestId);
+      }
 
       try {
         const result = await executePostgresSubjectTransactionV1({
@@ -163,7 +154,11 @@ export function createProductionGuestPromotionRuntimeV1(input: {
             if (subjectId !== resolvedSubject.subjectId) {
               throw new Error('Guest promotion changed the canonical subject id.');
             }
-            if (row.subjectKind !== 'member' || row.subjectStatus !== 'active' || typeof row.replayed !== 'boolean') {
+            if (
+              row.subjectKind !== 'member' ||
+              row.subjectStatus !== 'active' ||
+              typeof row.replayed !== 'boolean'
+            ) {
               throw new Error('Guest promotion authority returned an invalid member state.');
             }
             return Object.freeze({
