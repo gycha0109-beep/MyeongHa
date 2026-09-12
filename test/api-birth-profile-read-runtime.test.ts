@@ -1,3 +1,4 @@
+import { EventEmitter } from 'node:events';
 import { beforeAll, describe, expect, it } from 'vitest';
 import birthProfileEndpoint, {
   createBirthProfilesVercelHandlerV1,
@@ -12,6 +13,7 @@ const TEST_SHARE_TOKEN = 'test-vercel-share-token';
 
 type Endpoint = typeof birthProfileEndpoint;
 type EndpointRequest = Parameters<Endpoint>[0];
+type EndpointResponse = Parameters<Endpoint>[1];
 
 type CapturedResponse = {
   status: number;
@@ -37,19 +39,25 @@ async function invokeEndpoint(
   endpoint: Endpoint = birthProfileEndpoint,
 ): Promise<CapturedResponse> {
   const headers = new Map<string, string>();
+  const decoder = new TextDecoder();
   let body = '';
 
-  const response = {
+  const response = Object.assign(new EventEmitter(), {
     statusCode: 200,
     setHeader(name: string, value: string) {
       headers.set(name.toLowerCase(), value);
     },
-    end(chunk?: Uint8Array) {
-      if (chunk !== undefined) body = new TextDecoder().decode(chunk);
+    write(chunk: Uint8Array) {
+      body += decoder.decode(chunk, { stream: true });
+      return true;
     },
-  };
+    end(chunk?: Uint8Array) {
+      if (chunk !== undefined) body += decoder.decode(chunk, { stream: true });
+      body += decoder.decode();
+    },
+  });
 
-  await endpoint(request, response);
+  await endpoint(request, response as unknown as EndpointResponse);
 
   return {
     status: response.statusCode,
