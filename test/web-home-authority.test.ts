@@ -41,7 +41,8 @@ describe('web Home authority boundary', () => {
   it('uses the browser calendar for the date but does not invent a daily interpretation', () => {
     expect(page).toContain("new Intl.DateTimeFormat('ko-KR'");
     expect(page).toContain('new Date()');
-    expect(html).toContain('오늘의 흐름은 사주 화면에서 직접 펼쳐볼 수 있습니다.');
+    expect(html).toContain('검증된 Reading이 제공 가능한지 상세 화면에서 확인할 수 있습니다.');
+    expect(html).not.toContain('오늘의 흐름은 사주 화면에서 직접 펼쳐볼 수 있습니다.');
     expect(html).not.toContain('좋은 흐름을 만듭니다');
   });
 
