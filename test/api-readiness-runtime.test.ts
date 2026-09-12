@@ -19,7 +19,7 @@ function configuredEnv(): Record<string, string> {
 }
 
 describe('GET /api/readiness', () => {
-  it('reports ready when core user-data and Saju configuration are valid', async () => {
+  it('reports operational ready while Product Reading remains authority-blocked', async () => {
     const response = createProductionReadinessResponseV1(configuredEnv());
 
     expect(response.status).toBe(200);
@@ -29,6 +29,7 @@ describe('GET /api/readiness', () => {
       capabilities: {
         userData: 'ready',
         sajuCalculation: 'ready',
+        sajuProductReading: 'blocked_by_authority',
       },
     });
   });
@@ -46,6 +47,7 @@ describe('GET /api/readiness', () => {
       capabilities: {
         userData: 'ready',
         sajuCalculation: 'degraded',
+        sajuProductReading: 'blocked_by_authority',
       },
     });
   });
@@ -64,6 +66,7 @@ describe('GET /api/readiness', () => {
       capabilities: {
         userData: 'unready',
         sajuCalculation: 'ready',
+        sajuProductReading: 'blocked_by_authority',
       },
     });
     expect(body).not.toContain('MYEONGHA_DATABASE_URL');
