@@ -3,6 +3,7 @@ import {
   fetchSupabaseAuthWithDeadlineV1,
   requireSupabaseAuthUpstreamTimeoutMsV1,
   type SupabaseAuthUpstreamFetchV1,
+  type SupabaseAuthUpstreamDeadlineLeaseV1,
 } from './supabase-auth-upstream-deadline.js';
 import type { VerifiedSubjectIdentityEvidenceV1 } from './subject-identity-resolver.js';
 
@@ -162,9 +163,9 @@ export class SupabaseMemberIdentityEvidenceVerifierV1
     const token = readBearerToken(request);
     if (token === null) return null;
 
-    let response: Response;
+    let deadline: SupabaseAuthUpstreamDeadlineLeaseV1;
     try {
-      response = await fetchSupabaseAuthWithDeadlineV1(
+      deadline = await fetchSupabaseAuthWithDeadlineV1(
         this.fetchImpl,
         this.authUserUrl,
         {
@@ -186,31 +187,43 @@ export class SupabaseMemberIdentityEvidenceVerifierV1
       );
     }
 
-    if (response.status === 401 || response.status === 403) {
-      return null;
-    }
-
-    if (!response.ok) {
-      throw new SupabaseMemberIdentityVerifierErrorV1(
-        'SUPABASE_MEMBER_VERIFIER_UPSTREAM_FAILED',
-        `Supabase Auth user verification failed with status ${response.status}.`,
-      );
-    }
-
-    let payload: unknown;
     try {
-      payload = await response.json();
-    } catch (error) {
-      throw new SupabaseMemberIdentityVerifierErrorV1(
-        'SUPABASE_MEMBER_VERIFIER_RESPONSE_INVALID',
-        'Supabase Auth returned invalid JSON.',
-        { cause: error },
-      );
-    }
+      const response = deadline.response;
+      if (response.status === 401 || response.status === 403) {
+        return null;
+      }
 
-    return Object.freeze({
-      kind: 'member',
-      verifiedAuthUserId: requireUserId(payload),
-    });
+      if (!response.ok) {
+        throw new SupabaseMemberIdentityVerifierErrorV1(
+          'SUPABASE_MEMBER_VERIFIER_UPSTREAM_FAILED',
+          `Supabase Auth user verification failed with status ${response.status}.`,
+        );
+      }
+
+      let payload: unknown;
+      try {
+        payload = await response.json();
+      } catch (error) {
+        if (deadline.signal.aborted) {
+          throw new SupabaseMemberIdentityVerifierErrorV1(
+            'SUPABASE_MEMBER_VERIFIER_UPSTREAM_FAILED',
+            'Supabase Auth user verification response exceeded the application deadline.',
+            { cause: error },
+          );
+        }
+        throw new SupabaseMemberIdentityVerifierErrorV1(
+          'SUPABASE_MEMBER_VERIFIER_RESPONSE_INVALID',
+          'Supabase Auth returned invalid JSON.',
+          { cause: error },
+        );
+      }
+
+      return Object.freeze({
+        kind: 'member',
+        verifiedAuthUserId: requireUserId(payload),
+      });
+    } finally {
+      deadline.release();
+    }
   }
 }

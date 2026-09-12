@@ -19,7 +19,7 @@ describe('Supabase Auth upstream deadline', () => {
     );
   });
 
-  it('passes an AbortSignal and clears its timer after a normal response', async () => {
+  it('passes an AbortSignal and releases its timer only after the caller is done', async () => {
     const clearTimeoutSpy = vi.spyOn(globalThis, 'clearTimeout');
     const fetchImpl = vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
       expect(init?.signal).toBeInstanceOf(AbortSignal);
@@ -27,16 +27,55 @@ describe('Supabase Auth upstream deadline', () => {
       return Response.json({ ok: true });
     });
 
-    const response = await fetchSupabaseAuthWithDeadlineV1(
+    const deadline = await fetchSupabaseAuthWithDeadlineV1(
       fetchImpl,
       'https://example.supabase.co/auth/v1/user',
       { method: 'GET' },
       25,
     );
 
-    expect(response.ok).toBe(true);
+    expect(deadline.response.ok).toBe(true);
     expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(clearTimeoutSpy).not.toHaveBeenCalled();
+
+    await expect(deadline.response.json()).resolves.toEqual({ ok: true });
+    expect(clearTimeoutSpy).not.toHaveBeenCalled();
+
+    deadline.release();
+    deadline.release();
     expect(clearTimeoutSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the deadline active after headers while a response body is still streaming', async () => {
+    vi.useFakeTimers();
+    let observedSignal: AbortSignal | undefined;
+    const fetchImpl = vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
+      observedSignal = init?.signal ?? undefined;
+      return new Response(new ReadableStream<Uint8Array>({
+        start(controller) {
+          init?.signal?.addEventListener('abort', () => controller.error(init.signal?.reason), {
+            once: true,
+          });
+        },
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    });
+
+    const deadline = await fetchSupabaseAuthWithDeadlineV1(
+      fetchImpl,
+      'https://example.supabase.co/auth/v1/user',
+      { method: 'GET' },
+      25,
+    );
+    const bodyRead = expect(deadline.response.json()).rejects.toBeDefined();
+
+    await vi.advanceTimersByTimeAsync(25);
+    await bodyRead;
+
+    expect(observedSignal?.aborted).toBe(true);
+    deadline.release();
   });
 
   it('aborts a stalled upstream request at the application deadline', async () => {
