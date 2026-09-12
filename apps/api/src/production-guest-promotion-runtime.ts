@@ -79,6 +79,17 @@ function requireUuidText(name: string, value: unknown): string {
   return value;
 }
 
+function cancelUnusedRequestBodyBestEffort(request: Request): void {
+  const body = request.body;
+  if (body === null || request.bodyUsed) return;
+
+  try {
+    void body.cancel().catch(() => undefined);
+  } catch {
+    // Method rejection is authoritative; best-effort cleanup must never replace it.
+  }
+}
+
 export interface ProductionGuestPromotionRuntimeV1 {
   handleRequest(input: {
     readonly request: Request;
@@ -99,6 +110,7 @@ export function createProductionGuestPromotionRuntimeV1(input: {
     async handleRequest(requestInput: PromotionRequestInputV1): Promise<Response> {
       const { request, requestId, serverTime } = requestInput;
       if (request.method !== 'POST') {
+        cancelUnusedRequestBodyBestEffort(request);
         return new Response(null, {
           status: 405,
           headers: { Allow: 'POST', 'Cache-Control': 'no-store' },
