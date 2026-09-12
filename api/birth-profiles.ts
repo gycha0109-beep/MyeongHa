@@ -35,10 +35,9 @@ interface VercelNodeRequestLike {
   readonly body?: unknown;
 }
 
-interface VercelNodeResponseLike {
+interface VercelNodeResponseLike extends NodeJS.WritableStream {
   statusCode: number;
   setHeader(name: string, value: string): void;
-  end(body?: Uint8Array): void;
 }
 
 interface BirthProfileVercelRuntimePortV1 {
@@ -328,17 +327,73 @@ function toCanonicalCreateRequest(request: VercelNodeRequestLike): Request {
   } as RequestInit & { duplex?: 'half' });
 }
 
+function waitForResponseDrain(target: VercelNodeResponseLike): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const cleanup = (): void => {
+      target.removeListener('drain', onDrain);
+      target.removeListener('error', onError);
+      target.removeListener('close', onClose);
+    };
+    const onDrain = (): void => {
+      cleanup();
+      resolve();
+    };
+    const onError = (error: Error): void => {
+      cleanup();
+      reject(error);
+    };
+    const onClose = (): void => {
+      cleanup();
+      reject(new Error('Vercel response closed before pending data drained.'));
+    };
+
+    target.once('drain', onDrain);
+    target.once('error', onError);
+    target.once('close', onClose);
+  });
+}
+
 async function writeWebResponse(
   source: Response,
   target: VercelNodeResponseLike,
 ): Promise<void> {
-  target.statusCode = source.status;
-  for (const [name, value] of source.headers.entries()) {
-    target.setHeader(name, value);
-  }
+  let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
+  let sourceCompleted = source.body === null;
 
-  const body = new Uint8Array(await source.arrayBuffer());
-  target.end(body.length === 0 ? undefined : body);
+  try {
+    target.statusCode = source.status;
+    for (const [name, value] of source.headers.entries()) {
+      target.setHeader(name, value);
+    }
+
+    if (source.body === null) {
+      target.end();
+      return;
+    }
+
+    reader = source.body.getReader();
+    while (true) {
+      const chunk = await reader.read();
+      if (chunk.done) {
+        sourceCompleted = true;
+        target.end();
+        return;
+      }
+      if (chunk.value.byteLength === 0) continue;
+      if (!target.write(chunk.value)) {
+        await waitForResponseDrain(target);
+      }
+    }
+  } finally {
+    if (!sourceCompleted) {
+      try {
+        if (reader === undefined) await source.body?.cancel();
+        else await reader.cancel();
+      } catch {
+      }
+    }
+    reader?.releaseLock();
+  }
 }
 
 async function writeRouteNotFound(
