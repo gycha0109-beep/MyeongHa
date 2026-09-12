@@ -314,12 +314,12 @@ begin
   from information_schema.tables
   where table_schema = 'public' and table_type = 'BASE TABLE';
 
-  if table_count <> 62 then
-    raise exception 'FAIL schema catalog table count: expected 62, got %', table_count;
+  if table_count <> 63 then
+    raise exception 'FAIL schema catalog table count: expected 63, got %', table_count;
   end if;
 
   raise notice 'PASS overlapping grants preserve access through remaining grant';
-  raise notice 'PASS executable public schema catalog = 62 tables';
+  raise notice 'PASS executable public schema catalog = 63 tables';
 end;
 $$;
 

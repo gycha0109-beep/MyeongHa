@@ -118,7 +118,7 @@ pass "concurrent first profile materialization -> one row plus one revision conf
 
 public_exec=$("${psql_base[@]}" -Atc "select case when has_function_privilege('public','public.cmd_patch_profile_v1(uuid,timestamp with time zone,jsonb)','EXECUTE') then '1' else '0' end;")
 [[ "$public_exec" == '0' ]] || fail "profile patch command unexpectedly executable by PUBLIC"
-[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == '62' ]] || fail "public table catalog changed"
-pass "profile patch PUBLIC EXECUTE remains revoked and public table catalog remains 62"
+[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == '63' ]] || fail "public table catalog changed"
+pass "profile patch PUBLIC EXECUTE remains revoked and public table catalog remains 63"
 
 echo "Profile patch persistence/concurrency tests passed."

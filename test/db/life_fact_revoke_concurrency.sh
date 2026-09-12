@@ -104,7 +104,7 @@ pass "concurrent duplicate Life Fact revoke -> one mutation plus one authoritati
 
 public_exec=$("${psql_base[@]}" -Atc "select case when has_function_privilege('public','public.cmd_revoke_life_fact_v1(uuid,uuid)','EXECUTE') then '1' else '0' end;")
 [[ "$public_exec" == "0" ]] || fail "Life Fact revoke command unexpectedly executable by PUBLIC"
-[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == "62" ]] || fail "public table catalog changed"
-pass "Life Fact revoke command PUBLIC EXECUTE remains revoked and public table catalog remains 62"
+[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == "63" ]] || fail "public table catalog changed"
+pass "Life Fact revoke command PUBLIC EXECUTE remains revoked and public table catalog remains 63"
 
 echo "Life Fact revoke persistence/concurrency tests passed"

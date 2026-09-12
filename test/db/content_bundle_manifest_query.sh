@@ -79,7 +79,7 @@ pass "content manifest projection function is declared STABLE"
 
 public_exec=$("${psql_base[@]}" -Atc "select case when has_function_privilege('public','public.qry_content_bundle_manifest_v1(uuid)','EXECUTE') then '1' else '0' end;")
 [[ "$public_exec" == '0' ]] || fail "content manifest projection unexpectedly executable by PUBLIC"
-[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == '62' ]] || fail "public table catalog changed"
-pass "content manifest projection remains API-mediated and public table catalog remains 62"
+[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == '63' ]] || fail "public table catalog changed"
+pass "content manifest projection remains API-mediated and public table catalog remains 63"
 
 echo "Content bundle manifest projection tests passed"

@@ -141,7 +141,7 @@ for fn in 'public.qry_notification_deliveries_v1(uuid,uuid)' 'public.qry_notific
   public_exec=$("${psql_base[@]}" -Atc "select case when has_function_privilege('public','$fn','EXECUTE') then '1' else '0' end;")
   [[ "$public_exec" == "0" ]] || fail "$fn unexpectedly executable by PUBLIC"
 done
-[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == "62" ]] || fail "public table catalog changed"
-pass "notification delivery authority queries are STABLE/INVOKER, explicit search_path, PUBLIC-revoked, and table catalog remains 62"
+[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == "63" ]] || fail "public table catalog changed"
+pass "notification delivery authority queries are STABLE/INVOKER, explicit search_path, PUBLIC-revoked, and table catalog remains 63"
 
 echo "notification delivery authority projection tests passed"

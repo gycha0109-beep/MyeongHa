@@ -110,7 +110,7 @@ expect_fail "history subject identity is required" "purchase intent history subj
 
 public_exec=$("${psql_base[@]}" -Atc "select case when has_function_privilege('public','public.qry_purchase_intent_history_v2(uuid)','EXECUTE') then '1' else '0' end;")
 [[ "$public_exec" == '0' ]] || fail "purchase history v2 unexpectedly executable by PUBLIC"
-[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == '62' ]] || fail "public table catalog changed"
-pass "purchase history v2 is STABLE, SECURITY INVOKER, PUBLIC EXECUTE revoked, and table catalog remains 62"
+[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == '63' ]] || fail "public table catalog changed"
+pass "purchase history v2 is STABLE, SECURITY INVOKER, PUBLIC EXECUTE revoked, and table catalog remains 63"
 
 echo "Privacy-safe Guest-aware Purchase Intent history v2 query tests passed"
