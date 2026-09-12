@@ -37,6 +37,17 @@ function withNoStore(response: Response): Response {
   });
 }
 
+function cancelUnusedRequestBodyBestEffort(request: Request): void {
+  const body = request.body;
+  if (body === null || request.bodyUsed) return;
+
+  try {
+    void body.cancel().catch(() => undefined);
+  } catch {
+    // The route result must not depend on best-effort disposal of an unused body.
+  }
+}
+
 function routeNotFoundNoStore(): Response {
   return new Response(null, {
     status: 404,
@@ -90,6 +101,7 @@ export function createCurrentSubjectBirthProfileVercelHandlerV1(
   return Object.freeze({
     async fetch(request: Request): Promise<Response> {
       const canonicalRequest = toCanonicalRuntimeRequest(request);
+      cancelUnusedRequestBodyBestEffort(request);
       if (canonicalRequest === null) return routeNotFoundNoStore();
 
       try {
