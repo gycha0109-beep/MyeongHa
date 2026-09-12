@@ -77,10 +77,13 @@ function parseConfig(env: ProductionUserDataRuntimeEnvV1): AuthProxyConfigV1 {
 }
 
 async function readObjectBody(request: Request): Promise<Record<string, unknown> | null> {
-  const length = Number(request.headers.get('content-length') ?? '0');
-  if (Number.isFinite(length) && length > MAX_AUTH_BODY_BYTES) return null;
-
   const stream = request.body;
+  const length = Number(request.headers.get('content-length') ?? '0');
+  if (Number.isFinite(length) && length > MAX_AUTH_BODY_BYTES) {
+    if (stream !== null) void stream.cancel().catch(() => undefined);
+    return null;
+  }
+
   if (stream === null) return null;
 
   const reader = stream.getReader();
