@@ -1,12 +1,52 @@
 # MyeongHa Saju Product Vertical-Slice Readiness Audit — 2026-09-13
 
 > Repository: `gycha0109-beep/MyeongHa`  
-> Issue: `#722`  
-> MyeongHa audit base: `9485546252cd3c70511275a52af2dea97bc75b1b`  
-> Saju authority main: `532ae28db30d4c37ae1cc16b3035f1691fe22726`  
+> Original audit issue: `#722`  
+> Fresh authority sync issue: `#726`  
+> Original MyeongHa audit base: `9485546252cd3c70511275a52af2dea97bc75b1b`  
+> Fresh MyeongHa sync base: `837a8dfcbb5ddb05a9d60f00d668c2a48fef0e01`  
+> Saju authority main: `63b0b5b4bc8add5e8417ddc448d1f365ee2dc0f9`  
 > Status: **NO PRODUCTION-AUTHORIZED SAJU VERTICAL SLICE IDENTIFIED / UPSTREAM AUTHORITY WORK REQUIRED**
 
-Fresh-Saju drift note:
+## Fresh authority sync — Issue #726
+
+The original audit pinned Saju `532ae28db30d4c37ae1cc16b3035f1691fe22726`. A fresh comparison through current Saju `main` records:
+
+```text
+prior audited Saju main                         = 532ae28db30d4c37ae1cc16b3035f1691fe22726
+fresh Saju main                                 = 63b0b5b4bc8add5e8417ddc448d1f365ee2dc0f9
+ahead_by                                        = 6
+Product Reading production-authority promotion = NONE
+NEXT_PRODUCTION_SKU                             = NONE
+DOWNSTREAM_SKU_ACTIVATION                       = BLOCKED
+```
+
+The six-commit drift consists of FR171 Face Reading C2PA witness-admission readiness work plus Relationship/Spouse T8 Choi Misook 2023 RISS/TLS access-boundary research. The spouse addition remains an acquisition/access-boundary artifact whose recorded next action is continued single-source public-fulltext discovery without TLS-validation bypass or cross-source stitching. It does **not** admit a role-neutral spouse selector, production InterpretationClaim producer, or production promotion.
+
+Fresh Saju runtime inspection also re-confirms that consumer request semantics remain owned upstream:
+
+```text
+ConsumerReadingRequestInput
+-> deterministic frozen grammar
+-> ReadingRequest / ReadingIntent
+-> DomainReadingProfile
+-> selection-only profile authorization
+-> governed evidence selection
+-> fail-closed coverage
+```
+
+Accordingly:
+
+```text
+parallel semantic Product Mapper in MyeongHa = FORBIDDEN
+SKU-name semantic inference                   = FORBIDDEN
+missing-claim synthesis downstream            = FORBIDDEN
+profile existence as production proof         = FORBIDDEN
+```
+
+This sync changes the authority anchor, not the readiness verdict.
+
+Previous Fresh-Saju drift note from the original audit:
 
 ```text
 previous audited Saju semantic anchor = 80502139f16ca93255a8e5dd3f70e6a11ea66103
@@ -15,7 +55,7 @@ net changed files                    = 4 Face Reading / FR170 files only
 Saju product-interpretation semantic diff affecting this audit = 0
 ```
 
-The `8050213... -> 532ae28...` compare contains only FR170 C2PA external trust-root provisioning workflow/package/research files. The General Natal #473 result and the Career/Wealth/Relationship/product-reading authority surfaces audited below are unchanged by that drift.
+The `8050213... -> 532ae28...` compare contained only FR170 C2PA external trust-root provisioning workflow/package/research files. The General Natal #473 result and the Career/Wealth/Relationship/product-reading authority surfaces audited below were unchanged by that drift. The subsequent `532ae28... -> 63b0b5b...` sync likewise contains no Product Reading production-authority promotion.
 
 ---
 
@@ -259,6 +299,8 @@ Production = HOLD
 ```
 
 Recent acquisition/discovery work remains deliberately non-promotional. Direct-body compatibility evidence may be positive for dyadic methods while still being negative or insufficient for the required single-native, role-neutral spouse selector.
+
+The Choi Misook 2023 RISS/Kongju dCollection addition at fresh Saju `main` records a TLS/public-fulltext access boundary only. It does not close any of the three open Spouse T8 authority gaps and does not change `spouseT8ProducerReady=false` or `Production = HOLD`.
 
 No cross-source semantic stitching is authorized to manufacture the missing selector.
 
