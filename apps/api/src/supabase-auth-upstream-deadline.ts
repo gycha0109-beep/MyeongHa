@@ -6,6 +6,12 @@ export type SupabaseAuthUpstreamFetchV1 = (
   init?: RequestInit,
 ) => Promise<Response>;
 
+export interface SupabaseAuthUpstreamDeadlineLeaseV1 {
+  readonly response: Response;
+  readonly signal: AbortSignal;
+  readonly release: () => void;
+}
+
 export class SupabaseAuthUpstreamDeadlineConfigErrorV1 extends Error {
   constructor(message: string) {
     super(message);
@@ -33,17 +39,30 @@ export async function fetchSupabaseAuthWithDeadlineV1(
   input: string | URL | Request,
   init: Omit<RequestInit, 'signal'>,
   timeoutMs: number = SUPABASE_AUTH_UPSTREAM_DEFAULT_TIMEOUT_MS_V1,
-): Promise<Response> {
+): Promise<SupabaseAuthUpstreamDeadlineLeaseV1> {
   const resolvedTimeoutMs = requireSupabaseAuthUpstreamTimeoutMsV1(timeoutMs);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), resolvedTimeoutMs);
+  let released = false;
+
+  const release = (): void => {
+    if (released) return;
+    released = true;
+    clearTimeout(timeout);
+  };
 
   try {
-    return await fetchImpl(input, {
+    const response = await fetchImpl(input, {
       ...init,
       signal: controller.signal,
     });
-  } finally {
-    clearTimeout(timeout);
+    return Object.freeze({
+      response,
+      signal: controller.signal,
+      release,
+    });
+  } catch (error) {
+    release();
+    throw error;
   }
 }

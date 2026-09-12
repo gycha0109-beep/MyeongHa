@@ -205,7 +205,7 @@ async function callSupabase(
   path: string,
   init: Omit<RequestInit, 'signal'>,
 ): Promise<{ response: Response; payload: unknown }> {
-  const upstream = await fetchSupabaseAuthWithDeadlineV1(
+  const deadline = await fetchSupabaseAuthWithDeadlineV1(
     globalThis.fetch,
     `${config.supabaseOrigin}${path}`,
     {
@@ -218,13 +218,19 @@ async function callSupabase(
       cache: 'no-store',
     },
   );
-  let payload: unknown = null;
+
   try {
-    payload = await upstream.json();
-  } catch {
-    payload = null;
+    let payload: unknown = null;
+    try {
+      payload = await deadline.response.json();
+    } catch (error) {
+      if (deadline.signal.aborted) throw error;
+      payload = null;
+    }
+    return { response: deadline.response, payload };
+  } finally {
+    deadline.release();
   }
-  return { response: upstream, payload };
 }
 
 function upstreamError(action: SupabaseAuthActionV1, status: number): Response {
