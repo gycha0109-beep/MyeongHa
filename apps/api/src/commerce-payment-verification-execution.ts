@@ -45,8 +45,8 @@ export interface CommercePaymentVerificationContextV1 {
   readonly expectedCurrency: string;
 }
 
-export interface CommercePaymentVerificationAdapterRequestV1
-  extends CommercePaymentVerificationContextV1 {}
+export type CommercePaymentVerificationAdapterRequestV1 =
+  CommercePaymentVerificationContextV1;
 
 export interface CommercePaymentVerificationAdapterResultV1 {
   readonly providerRequestId: string;
