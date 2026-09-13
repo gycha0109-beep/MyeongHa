@@ -10,7 +10,7 @@ export async function hasRequestBodyWithoutDrainingV1(request: Request): Promise
     }
   } finally {
     try {
-      await reader.cancel();
+      void reader.cancel().catch(() => undefined);
     } catch {
     } finally {
       reader.releaseLock();
