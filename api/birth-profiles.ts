@@ -387,8 +387,12 @@ async function writeWebResponse(
   } finally {
     if (!sourceCompleted) {
       try {
-        if (reader === undefined) await source.body?.cancel();
-        else await reader.cancel();
+        if (reader === undefined) {
+          const body = source.body;
+          if (body !== null) void body.cancel().catch(() => undefined);
+        } else {
+          void reader.cancel().catch(() => undefined);
+        }
       } catch {
       }
     }
