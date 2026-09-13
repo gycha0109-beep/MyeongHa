@@ -274,6 +274,9 @@ export async function handleSupabaseAuthRequestV1(input: {
   readonly action: SupabaseAuthActionV1;
 }): Promise<Response> {
   if (input.request.method !== 'POST') {
+    try {
+      cancelUnusedRequestBody(input.request);
+    } catch {}
     return new Response(null, {
       status: 405,
       headers: { Allow: 'POST', 'Cache-Control': NO_STORE },
