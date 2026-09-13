@@ -27,6 +27,17 @@ export interface CreateProductionCurrentSubjectProfileRuntimeInputV1 {
   readonly memberFetchImpl?: SupabaseMemberVerifierFetchV1;
 }
 
+function cancelUnusedRequestBodyBestEffort(request: Request): void {
+  const body = request.body;
+  if (body === null || request.bodyUsed) return;
+
+  try {
+    void body.cancel().catch(() => undefined);
+  } catch {
+    // Method rejection is authoritative; best-effort cleanup must never replace it.
+  }
+}
+
 /**
  * Production composition root for GET /api/me.
  *
@@ -50,14 +61,19 @@ export function createProductionCurrentSubjectProfileRuntimeV1(
   });
 
   return Object.freeze({
-    handleRequest(requestInput: ProductionCurrentSubjectProfileRequestV1) {
-      return handleCurrentSubjectProfileRequestV1({
+    async handleRequest(requestInput: ProductionCurrentSubjectProfileRequestV1) {
+      const response = await handleCurrentSubjectProfileRequestV1({
         request: requestInput.request,
         requestId: requestInput.requestId,
         serverTime: requestInput.serverTime,
         identityEvidenceVerifier,
         pool: poolLease.pool,
       });
+
+      if (response.status === 405) {
+        cancelUnusedRequestBodyBestEffort(requestInput.request);
+      }
+      return response;
     },
     close() {
       return poolLease.close();
