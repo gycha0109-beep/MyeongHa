@@ -31,6 +31,17 @@ export interface CreateProductionCurrentSubjectSajuCalculationRuntimeInputV1 {
   readonly sajuFetchImpl?: SajuProductionCalculationHttpFetchV1;
 }
 
+function cancelUnusedRequestBodyBestEffort(request: Request): void {
+  const body = request.body;
+  if (body === null || request.bodyUsed) return;
+
+  try {
+    void body.cancel().catch(() => undefined);
+  } catch {
+    // Method rejection is authoritative; best-effort cleanup must never replace it.
+  }
+}
+
 /**
  * Production composition root for current-subject Saju calculation-only execution.
  *
@@ -57,8 +68,8 @@ export function createProductionCurrentSubjectSajuCalculationRuntimeV1(
   });
 
   return Object.freeze({
-    handleRequest(requestInput: ProductionCurrentSubjectSajuCalculationRequestV1) {
-      return handleCurrentSubjectSajuCalculationRequestV1({
+    async handleRequest(requestInput: ProductionCurrentSubjectSajuCalculationRequestV1) {
+      const response = await handleCurrentSubjectSajuCalculationRequestV1({
         request: requestInput.request,
         requestId: requestInput.requestId,
         serverTime: requestInput.serverTime,
@@ -66,6 +77,11 @@ export function createProductionCurrentSubjectSajuCalculationRuntimeV1(
         pool,
         sajuAdapter,
       });
+
+      if (response.status === 405) {
+        cancelUnusedRequestBodyBestEffort(requestInput.request);
+      }
+      return response;
     },
     close() {
       return pool.close();
