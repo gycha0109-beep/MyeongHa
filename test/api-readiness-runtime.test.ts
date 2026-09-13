@@ -18,6 +18,30 @@ function configuredEnv(): Record<string, string> {
   };
 }
 
+function requestWithCancellation(
+  cancel: () => void | PromiseLike<void>,
+): Readonly<{
+  request: Request;
+  cancelCalls: () => number;
+}> {
+  let calls = 0;
+  const stream = new ReadableStream<Uint8Array>({
+    cancel() {
+      calls += 1;
+      return cancel();
+    },
+  });
+
+  return Object.freeze({
+    request: new Request('https://myeongha.example/api/readiness', {
+      method: 'PUT',
+      body: stream,
+      duplex: 'half',
+    } as RequestInit & { duplex: 'half' }),
+    cancelCalls: () => calls,
+  });
+}
+
 describe('GET /api/readiness', () => {
   it('reports operational ready while Product Reading remains authority-blocked', async () => {
     const response = createProductionReadinessResponseV1(configuredEnv());
@@ -76,13 +100,41 @@ describe('GET /api/readiness', () => {
     expect(body).not.toContain(env.MYEONGHA_SAJU_SERVICE_BEARER);
   });
 
-  it('rejects non-GET methods without evaluating production configuration', () => {
-    const response = readinessEndpoint.fetch(
-      new Request('https://myeongha.example/api/readiness', { method: 'POST' }),
-    );
+  it('returns 405 without waiting for unused-body cancellation to settle', () => {
+    const source = requestWithCancellation(() => new Promise<void>(() => undefined));
+
+    const response = readinessEndpoint.fetch(source.request);
 
     expect(response.status).toBe(405);
     expect(response.headers.get('allow')).toBe('GET');
     expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(source.cancelCalls()).toBe(1);
+  });
+
+  it('keeps 405 authoritative when unused-body cancellation rejects', async () => {
+    const source = requestWithCancellation(() =>
+      Promise.reject(new Error('synthetic cancellation failure')),
+    );
+
+    const response = readinessEndpoint.fetch(source.request);
+    await Promise.resolve();
+
+    expect(response.status).toBe(405);
+    expect(response.headers.get('allow')).toBe('GET');
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(source.cancelCalls()).toBe(1);
+  });
+
+  it('keeps bodyless method rejection harmless without evaluating production configuration', () => {
+    const request = new Request('https://myeongha.example/api/readiness', {
+      method: 'POST',
+    });
+
+    const response = readinessEndpoint.fetch(request);
+
+    expect(response.status).toBe(405);
+    expect(response.headers.get('allow')).toBe('GET');
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(request.body).toBeNull();
   });
 });
