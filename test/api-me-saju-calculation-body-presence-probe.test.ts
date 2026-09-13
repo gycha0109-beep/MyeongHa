@@ -16,30 +16,38 @@ function streamRequest(stream: ReadableStream<Uint8Array>): Request {
   } as RequestInit & { duplex: 'half' });
 }
 
+function rejectingBodyRuntime() {
+  const verifyRequestIdentity = vi.fn();
+  const handleRequest = vi.fn(async (input: { request: Request; requestId: string; serverTime: string }) =>
+    handleCurrentSubjectSajuCalculationRequestV1({
+      request: input.request,
+      requestId: input.requestId,
+      serverTime: input.serverTime,
+      identityEvidenceVerifier: { verifyRequestIdentity },
+      pool: { connect: vi.fn() } as unknown as PostgresSubjectPoolV1,
+      sajuAdapter: { calculate: vi.fn() } as unknown as SajuProductionCalculationHttpAdapterV1,
+    }));
+
+  return { verifyRequestIdentity, handleRequest };
+}
+
 describe('current-subject Saju calculation public route body bound', () => {
-  it('rejects a non-closing incoming body after one-byte evidence without draining it', async () => {
-    let cancelled = false;
+  it('rejects after one-byte evidence without waiting for cancellation settlement', async () => {
+    let cancelCalls = 0;
     const incoming = new ReadableStream<Uint8Array>({
       start(controller) {
         controller.enqueue(new Uint8Array([123]));
       },
       cancel() {
-        cancelled = true;
+        cancelCalls += 1;
+        return new Promise<void>(() => undefined);
       },
     });
-    const verifyRequestIdentity = vi.fn();
-    const handleRequest = vi.fn(async (input: { request: Request; requestId: string; serverTime: string }) =>
-      handleCurrentSubjectSajuCalculationRequestV1({
-        request: input.request,
-        requestId: input.requestId,
-        serverTime: input.serverTime,
-        identityEvidenceVerifier: { verifyRequestIdentity },
-        pool: { connect: vi.fn() } as unknown as PostgresSubjectPoolV1,
-        sajuAdapter: { calculate: vi.fn() } as unknown as SajuProductionCalculationHttpAdapterV1,
-      }));
+    const request = streamRequest(incoming);
+    const { verifyRequestIdentity, handleRequest } = rejectingBodyRuntime();
     const route = createCurrentSubjectSajuCalculationRouteV1({ handleRequest });
 
-    const response = await route.fetch(streamRequest(incoming));
+    const response = await route.fetch(request);
     const payload = await response.json() as any;
 
     expect(response.status).toBe(400);
@@ -48,7 +56,39 @@ describe('current-subject Saju calculation public route body bound', () => {
       messageKey: 'request.body_not_allowed',
       retryable: false,
     });
-    expect(cancelled).toBe(true);
+    expect(cancelCalls).toBe(1);
+    expect(request.body?.locked).toBe(false);
+    expect(verifyRequestIdentity).not.toHaveBeenCalled();
+    expect(handleRequest).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps body rejection authoritative when cancellation rejects', async () => {
+    let cancelCalls = 0;
+    const incoming = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new Uint8Array([123]));
+      },
+      cancel() {
+        cancelCalls += 1;
+        return Promise.reject(new Error('synthetic cancellation failure'));
+      },
+    });
+    const request = streamRequest(incoming);
+    const { verifyRequestIdentity, handleRequest } = rejectingBodyRuntime();
+    const route = createCurrentSubjectSajuCalculationRouteV1({ handleRequest });
+
+    const response = await route.fetch(request);
+    await Promise.resolve();
+    const payload = await response.json() as any;
+
+    expect(response.status).toBe(400);
+    expect(payload.error).toMatchObject({
+      code: 'INVALID_REQUEST',
+      messageKey: 'request.body_not_allowed',
+      retryable: false,
+    });
+    expect(cancelCalls).toBe(1);
+    expect(request.body?.locked).toBe(false);
     expect(verifyRequestIdentity).not.toHaveBeenCalled();
     expect(handleRequest).toHaveBeenCalledTimes(1);
   });
