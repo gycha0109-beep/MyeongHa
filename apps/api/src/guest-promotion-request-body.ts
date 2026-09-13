@@ -60,7 +60,7 @@ export async function isGuestPromotionEmptyRequestBodyV1(
     return state === 'leading' || state === 'trailing';
   } finally {
     try {
-      await reader.cancel();
+      void reader.cancel().catch(() => undefined);
     } catch {
     } finally {
       reader.releaseLock();
