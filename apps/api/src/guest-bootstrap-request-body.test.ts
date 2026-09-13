@@ -20,6 +20,15 @@ function streamPost(stream: ReadableStream<Uint8Array>): Request {
   } as RequestInit & { duplex: 'half' });
 }
 
+function bootstrapPorts() {
+  return {
+    resolveExistingBootstrapIdentity: vi.fn(),
+    issueGuestBootstrapCredential: vi.fn(),
+    fingerprintGuestBearerToken: vi.fn(),
+    createGuestSession: vi.fn(),
+  };
+}
+
 describe('readGuestBootstrapRequestBodyV1', () => {
   it.each([
     ['', undefined],
@@ -49,29 +58,34 @@ describe('readGuestBootstrapRequestBodyV1', () => {
 });
 
 describe('handleGuestBootstrapRequestV1 streaming body boundary', () => {
-  it('rejects and cancels a provably invalid non-closing stream before bootstrap work', async () => {
-    let cancelled = false;
+  it('rejects a provably invalid stream without waiting for cancellation settlement', async () => {
+    let cancelCalls = 0;
     const stream = new ReadableStream<Uint8Array>({
       start(controller) {
         controller.enqueue(new TextEncoder().encode('['));
       },
       cancel() {
-        cancelled = true;
+        cancelCalls += 1;
+        return new Promise<void>(() => undefined);
       },
     });
-    const resolveExistingBootstrapIdentity = vi.fn();
-    const issueGuestBootstrapCredential = vi.fn();
-    const fingerprintGuestBearerToken = vi.fn();
-    const createGuestSession = vi.fn();
+    const request = streamPost(stream);
+    const ports = bootstrapPorts();
 
     const response = await handleGuestBootstrapRequestV1({
-      request: streamPost(stream),
-      requestId: 'req-655-streaming-invalid',
-      serverTime: '2026-09-11T00:00:00.000Z',
-      identityResolverPort: { resolveExistingBootstrapIdentity },
-      credentialIssuerPort: { issueGuestBootstrapCredential },
-      tokenFingerprintPort: { fingerprintGuestBearerToken },
-      authorityPort: { createGuestSession },
+      request,
+      requestId: 'req-761-streaming-invalid-pending-cancel',
+      serverTime: '2026-09-13T00:00:00.000Z',
+      identityResolverPort: {
+        resolveExistingBootstrapIdentity: ports.resolveExistingBootstrapIdentity,
+      },
+      credentialIssuerPort: {
+        issueGuestBootstrapCredential: ports.issueGuestBootstrapCredential,
+      },
+      tokenFingerprintPort: {
+        fingerprintGuestBearerToken: ports.fingerprintGuestBearerToken,
+      },
+      authorityPort: { createGuestSession: ports.createGuestSession },
     });
 
     expect(response.status).toBe(400);
@@ -83,11 +97,59 @@ describe('handleGuestBootstrapRequestV1 streaming body boundary', () => {
         retryable: false,
       },
     });
-    expect(response.headers.get('cache-control')).toBe('no-store');
-    expect(cancelled).toBe(true);
-    expect(resolveExistingBootstrapIdentity).not.toHaveBeenCalled();
-    expect(issueGuestBootstrapCredential).not.toHaveBeenCalled();
-    expect(fingerprintGuestBearerToken).not.toHaveBeenCalled();
-    expect(createGuestSession).not.toHaveBeenCalled();
+    expect(cancelCalls).toBe(1);
+    expect(request.body?.locked).toBe(false);
+    expect(ports.resolveExistingBootstrapIdentity).not.toHaveBeenCalled();
+    expect(ports.issueGuestBootstrapCredential).not.toHaveBeenCalled();
+    expect(ports.fingerprintGuestBearerToken).not.toHaveBeenCalled();
+    expect(ports.createGuestSession).not.toHaveBeenCalled();
+  });
+
+  it('keeps invalid-body rejection authoritative when cancellation rejects', async () => {
+    let cancelCalls = 0;
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('['));
+      },
+      cancel() {
+        cancelCalls += 1;
+        return Promise.reject(new Error('synthetic cancellation failure'));
+      },
+    });
+    const request = streamPost(stream);
+    const ports = bootstrapPorts();
+
+    const response = await handleGuestBootstrapRequestV1({
+      request,
+      requestId: 'req-761-streaming-invalid-rejected-cancel',
+      serverTime: '2026-09-13T00:00:00.000Z',
+      identityResolverPort: {
+        resolveExistingBootstrapIdentity: ports.resolveExistingBootstrapIdentity,
+      },
+      credentialIssuerPort: {
+        issueGuestBootstrapCredential: ports.issueGuestBootstrapCredential,
+      },
+      tokenFingerprintPort: {
+        fingerprintGuestBearerToken: ports.fingerprintGuestBearerToken,
+      },
+      authorityPort: { createGuestSession: ports.createGuestSession },
+    });
+    await Promise.resolve();
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: false,
+      error: {
+        code: 'INVALID_REQUEST',
+        messageKey: 'request.invalid',
+        retryable: false,
+      },
+    });
+    expect(cancelCalls).toBe(1);
+    expect(request.body?.locked).toBe(false);
+    expect(ports.resolveExistingBootstrapIdentity).not.toHaveBeenCalled();
+    expect(ports.issueGuestBootstrapCredential).not.toHaveBeenCalled();
+    expect(ports.fingerprintGuestBearerToken).not.toHaveBeenCalled();
+    expect(ports.createGuestSession).not.toHaveBeenCalled();
   });
 });
