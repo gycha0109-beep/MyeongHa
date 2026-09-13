@@ -110,12 +110,32 @@ describe('Guest promotion streaming request-body validation', () => {
     expect(input.stream.locked).toBe(false);
   });
 
-  it('does not let cancellation failure replace an already-decided invalid result', async () => {
+  it('rejects a provably invalid stream without waiting for cancellation settlement', async () => {
+    let cancelCalls = 0;
     const input = streamRequest(['['], {
-      cancel: () => Promise.reject(new Error('cancel failed')),
+      cancel() {
+        cancelCalls += 1;
+        return new Promise<void>(() => undefined);
+      },
     });
 
     await expect(isGuestPromotionEmptyRequestBodyV1(input.request)).resolves.toBe(false);
+    expect(cancelCalls).toBe(1);
+    expect(input.stream.locked).toBe(false);
+  });
+
+  it('does not let cancellation failure replace an already-decided invalid result', async () => {
+    let cancelCalls = 0;
+    const input = streamRequest(['['], {
+      cancel() {
+        cancelCalls += 1;
+        return Promise.reject(new Error('cancel failed'));
+      },
+    });
+
+    await expect(isGuestPromotionEmptyRequestBodyV1(input.request)).resolves.toBe(false);
+    await Promise.resolve();
+    expect(cancelCalls).toBe(1);
     expect(input.stream.locked).toBe(false);
   });
 });
