@@ -131,7 +131,9 @@ run_transition 'd1010000-0000-0000-0000-000000000001' 'd1060000-0000-0000-0000-0
 "${psql_base[@]}" <<'SQL'
 set session_replication_role = replica;
 update public.purchase_intents
-set expected_amount_minor=null
+set expected_amount_minor=null,
+    expected_currency=null,
+    charge_terms_version=null
 where id='d1050000-0000-0000-0000-000000000003';
 set session_replication_role = origin;
 SQL
