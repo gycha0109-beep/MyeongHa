@@ -28,6 +28,17 @@ export interface CreateProductionGuestBootstrapHttpRuntimeInputV1 {
   readonly memberFetchImpl?: SupabaseMemberVerifierFetchV1;
 }
 
+function cancelUnusedRequestBodyBestEffort(request: Request): void {
+  const body = request.body;
+  if (body === null || request.bodyUsed) return;
+
+  try {
+    void body.cancel().catch(() => undefined);
+  } catch {
+    // Method rejection is authoritative; best-effort cleanup must never replace it.
+  }
+}
+
 /**
  * Production composition root for the Guest bootstrap HTTP boundary.
  *
@@ -47,7 +58,7 @@ export function createProductionGuestBootstrapHttpRuntimeV1(
   });
 
   return Object.freeze({
-    handleRequest(requestInput: ProductionGuestBootstrapHttpRequestV1) {
+    async handleRequest(requestInput: ProductionGuestBootstrapHttpRequestV1) {
       const runtimePorts = createProductionGuestBootstrapRuntimePortsV1({
         request: requestInput.request,
         config,
@@ -57,7 +68,7 @@ export function createProductionGuestBootstrapHttpRuntimeV1(
           : { memberFetchImpl: input.memberFetchImpl }),
       });
 
-      return handleGuestBootstrapRequestV1({
+      const response = await handleGuestBootstrapRequestV1({
         request: requestInput.request,
         requestId: requestInput.requestId,
         serverTime: requestInput.serverTime,
@@ -66,6 +77,11 @@ export function createProductionGuestBootstrapHttpRuntimeV1(
         tokenFingerprintPort: runtimePorts.tokenFingerprintPort,
         authorityPort: runtimePorts.authorityPort,
       });
+
+      if (response.status === 405) {
+        cancelUnusedRequestBodyBestEffort(requestInput.request);
+      }
+      return response;
     },
     close() {
       return pool.close();
