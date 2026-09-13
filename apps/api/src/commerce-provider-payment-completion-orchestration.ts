@@ -32,7 +32,7 @@ export interface AuthenticatedCommerceProviderPaymentCompletionV1 {
   readonly replayed: boolean;
 }
 
-const AUTHENTICATED_INGRESS_KEYS = new Set([
+const AUTHENTICATED_INGRESS_KEYS: ReadonlySet<string> = new Set([
   'provider',
   'environment',
   'providerRequestId',
