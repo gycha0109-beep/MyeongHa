@@ -66,7 +66,7 @@ export async function readGuestBootstrapRequestBodyV1(
     return EMPTY_OBJECT;
   } finally {
     try {
-      await reader.cancel();
+      void reader.cancel().catch(() => undefined);
     } catch {
     } finally {
       reader.releaseLock();
