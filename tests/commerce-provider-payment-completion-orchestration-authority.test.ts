@@ -16,7 +16,7 @@ const orchestration = readFileSync(
 describe('authenticated provider payment completion orchestration authority', () => {
   it('accepts only provider-owned lookup identity from the authenticated ingress boundary', () => {
     expect(orchestration).toMatch(
-      /AUTHENTICATED_INGRESS_KEYS = new Set\(\[\s*'provider',\s*'environment',\s*'providerRequestId',\s*'providerTransactionId',\s*\]/,
+      /AUTHENTICATED_INGRESS_KEYS:\s*ReadonlySet<string>\s*=\s*new Set\(\[\s*'provider',\s*'environment',\s*'providerRequestId',\s*'providerTransactionId',\s*\]/,
     );
     expect(orchestration).not.toContain('subjectId');
     expect(orchestration).not.toContain('purchaseIntentId: input.authenticatedIngress');
@@ -25,13 +25,18 @@ describe('authenticated provider payment completion orchestration authority', ()
   });
 
   it('composes context resolution, provider verification, and verified evidence persistence in order', () => {
-    const resolveIndex = orchestration.indexOf(
-      'loadCommerceProviderPaymentVerificationContextV1({',
-    );
-    const verifyIndex = orchestration.indexOf(
-      'executeCommercePaymentVerificationV1({',
-    );
-    const persistIndex = orchestration.indexOf('persistVerifiedPaymentEvidenceV1({');
+    const mainBody = orchestration.match(
+      /export async function executeAuthenticatedCommerceProviderPaymentCompletionV1[\s\S]*$/u,
+    )?.[0];
+
+    expect(mainBody).toBeDefined();
+    if (mainBody === undefined) {
+      throw new Error('Authenticated provider payment completion entrypoint is missing.');
+    }
+
+    const resolveIndex = mainBody.indexOf('resolveVerificationContext({');
+    const verifyIndex = mainBody.indexOf('executeCommercePaymentVerificationV1({');
+    const persistIndex = mainBody.indexOf('persistVerificationResult({');
 
     expect(resolveIndex).toBeGreaterThan(-1);
     expect(verifyIndex).toBeGreaterThan(resolveIndex);
