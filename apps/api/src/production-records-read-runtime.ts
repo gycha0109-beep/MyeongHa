@@ -48,7 +48,7 @@ function cancelUnusedRequestBodyBestEffort(request: Request): void {
   try {
     void body.cancel().catch(() => undefined);
   } catch {
-    // Method rejection is authoritative; best-effort cleanup must never replace it.
+    // The terminal response is authoritative; best-effort cleanup must never replace it.
   }
 }
 
@@ -120,7 +120,7 @@ export function createProductionReadingHistoryReadRuntimeV1(
   });
 
   return Object.freeze({
-    handleRequest(requestInput: ProductionRecordsReadRequestV1) {
+    async handleRequest(requestInput: ProductionRecordsReadRequestV1) {
       if (requestInput.request.method === 'GET') {
         return handleReadingHistoryRequestV1({
           request: requestInput.request,
@@ -131,7 +131,7 @@ export function createProductionReadingHistoryReadRuntimeV1(
         });
       }
       if (requestInput.request.method === 'POST') {
-        return handleReadingCreateRequestV1({
+        const response = await handleReadingCreateRequestV1({
           request: requestInput.request,
           requestId: requestInput.requestId,
           serverTime: requestInput.serverTime,
@@ -139,15 +139,19 @@ export function createProductionReadingHistoryReadRuntimeV1(
           pool: poolLease.pool,
           idPort,
         });
+        if (response.status === 401) {
+          cancelUnusedRequestBodyBestEffort(requestInput.request);
+        }
+        return response;
       }
       cancelUnusedRequestBodyBestEffort(requestInput.request);
-      return Promise.resolve(new Response(null, {
+      return new Response(null, {
         status: 405,
         headers: {
           Allow: 'GET, POST',
           'Cache-Control': 'no-store',
         },
-      }));
+      });
     },
     close() {
       return poolLease.close();
