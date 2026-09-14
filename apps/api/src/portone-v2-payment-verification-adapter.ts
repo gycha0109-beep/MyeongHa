@@ -1,0 +1,573 @@
+import {
+  PRODUCTION_COMMERCE_EVIDENCE_FINGERPRINT_BINDING_V1,
+  fingerprintProductionCommerceEvidenceV1,
+  requireProductionCommerceEvidenceHmacK1SecretV1,
+} from './production-commerce-evidence-fingerprint.js';
+import type {
+  CommercePaymentVerificationAdapterRequestV1,
+  CommercePaymentVerificationAdapterResultV1,
+  CommercePaymentVerificationAdapterV1,
+} from './commerce-payment-verification-execution.js';
+
+export const PORTONE_V2_PAYMENT_API_ORIGIN_V1 = 'https://api.portone.io' as const;
+export const PORTONE_V2_PAYMENT_VERIFIER_REVISION_V1 =
+  'portone-v2-payment-lookup-v1' as const;
+export const PORTONE_V2_PAYMENT_HTTP_DEFAULT_TIMEOUT_MS_V1 = 5_000 as const;
+export const PORTONE_V2_PAYMENT_HTTP_MAX_TIMEOUT_MS_V1 = 30_000 as const;
+export const PORTONE_V2_PAYMENT_HTTP_MAX_RESPONSE_BYTES_V1 = 65_536 as const;
+
+export type PortOneV2PaymentVerificationAdapterFailureCodeV1 =
+  | 'INVALID_CONFIGURATION'
+  | 'INVALID_REQUEST'
+  | 'TIMEOUT'
+  | 'NETWORK_FAILURE'
+  | 'HTTP_4XX'
+  | 'HTTP_5XX'
+  | 'HTTP_UNEXPECTED_STATUS'
+  | 'INVALID_CONTENT_TYPE'
+  | 'RESPONSE_TOO_LARGE'
+  | 'INVALID_JSON'
+  | 'INVALID_PAYMENT';
+
+export class PortOneV2PaymentVerificationAdapterErrorV1 extends Error {
+  constructor(
+    readonly code: PortOneV2PaymentVerificationAdapterFailureCodeV1,
+    message: string,
+    readonly httpStatus: number | null = null,
+  ) {
+    super(message);
+    this.name = 'PortOneV2PaymentVerificationAdapterErrorV1';
+  }
+}
+
+export interface PortOneV2PaymentHttpResponseV1 {
+  readonly status: number;
+  readonly headers: Readonly<{
+    get(name: string): string | null;
+  }>;
+  readonly body?: Readonly<{
+    cancel(reason?: unknown): Promise<void>;
+  }> | null;
+  text(): Promise<string>;
+}
+
+export interface PortOneV2PaymentHttpRequestInitV1 {
+  readonly method: 'GET';
+  readonly headers: Readonly<Record<string, string>>;
+  readonly redirect: 'error';
+  readonly signal: AbortSignal;
+}
+
+export type PortOneV2PaymentHttpFetchV1 = (
+  url: string,
+  init: PortOneV2PaymentHttpRequestInitV1,
+) => Promise<PortOneV2PaymentHttpResponseV1>;
+
+export interface PortOneV2PaymentVerificationAdapterConfigV1 {
+  readonly apiSecret: string;
+  readonly evidenceHmacSecret: string;
+  readonly timeoutMs?: number;
+  readonly fetchImpl?: PortOneV2PaymentHttpFetchV1;
+  readonly now?: () => Date;
+}
+
+interface PortOneV2PaymentHttpDeadlineLeaseV1 {
+  readonly response: PortOneV2PaymentHttpResponseV1;
+  readonly deadline: Promise<never>;
+  readonly didTimeout: () => boolean;
+  readonly release: () => void;
+}
+
+interface NormalizedPortOneV2PaidPaymentV1 {
+  readonly paymentId: string;
+  readonly transactionId: string;
+  readonly externalProductId: string;
+  readonly environment: 'sandbox' | 'production';
+  readonly currency: string;
+  readonly amountMinor: number;
+  readonly paidAt: string;
+}
+
+const CURRENCY = /^[A-Z]{3}$/u;
+const MAX_PROVIDER_ID_LENGTH = 512;
+
+function fail(
+  code: PortOneV2PaymentVerificationAdapterFailureCodeV1,
+  message: string,
+  httpStatus: number | null = null,
+): never {
+  throw new PortOneV2PaymentVerificationAdapterErrorV1(
+    code,
+    message,
+    httpStatus,
+  );
+}
+
+function plainRecord(value: unknown, label: string): Record<string, unknown> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return fail('INVALID_PAYMENT', `${label} is invalid.`);
+  }
+  const prototype = Object.getPrototypeOf(value) as unknown;
+  if (prototype !== Object.prototype && prototype !== null) {
+    return fail('INVALID_PAYMENT', `${label} is invalid.`);
+  }
+  return value as Record<string, unknown>;
+}
+
+function boundedIdentity(
+  value: unknown,
+  label: string,
+  maxLength = MAX_PROVIDER_ID_LENGTH,
+): string {
+  if (
+    typeof value !== 'string' ||
+    value.length === 0 ||
+    value.trim() !== value ||
+    value.length > maxLength
+  ) {
+    return fail('INVALID_PAYMENT', `${label} is invalid.`);
+  }
+  return value;
+}
+
+function resolveApiSecret(value: string): string {
+  if (
+    typeof value !== 'string' ||
+    value.trim().length === 0 ||
+    value.length > 4_096
+  ) {
+    throw new PortOneV2PaymentVerificationAdapterErrorV1(
+      'INVALID_CONFIGURATION',
+      'PortOne V2 API credential is invalid.',
+    );
+  }
+  return value;
+}
+
+function resolveEvidenceHmacSecret(value: string): string {
+  try {
+    return requireProductionCommerceEvidenceHmacK1SecretV1(value);
+  } catch {
+    throw new PortOneV2PaymentVerificationAdapterErrorV1(
+      'INVALID_CONFIGURATION',
+      'Commerce evidence fingerprint credential is invalid.',
+    );
+  }
+}
+
+function resolveTimeoutMs(value: number | undefined): number {
+  const timeoutMs = value ?? PORTONE_V2_PAYMENT_HTTP_DEFAULT_TIMEOUT_MS_V1;
+  if (
+    !Number.isInteger(timeoutMs) ||
+    timeoutMs < 1 ||
+    timeoutMs > PORTONE_V2_PAYMENT_HTTP_MAX_TIMEOUT_MS_V1
+  ) {
+    throw new PortOneV2PaymentVerificationAdapterErrorV1(
+      'INVALID_CONFIGURATION',
+      `PortOne V2 timeoutMs must be an integer between 1 and ${String(PORTONE_V2_PAYMENT_HTTP_MAX_TIMEOUT_MS_V1)}.`,
+    );
+  }
+  return timeoutMs;
+}
+
+function resolvePaymentId(request: CommercePaymentVerificationAdapterRequestV1): string {
+  if (request.provider !== 'portone_v2') {
+    return fail(
+      'INVALID_REQUEST',
+      'PortOne V2 adapter requires the canonical portone_v2 provider.',
+    );
+  }
+  try {
+    return boundedIdentity(request.providerRequestId, 'PortOne V2 paymentId');
+  } catch (error) {
+    if (error instanceof PortOneV2PaymentVerificationAdapterErrorV1) {
+      throw new PortOneV2PaymentVerificationAdapterErrorV1(
+        'INVALID_REQUEST',
+        'PortOne V2 paymentId is invalid.',
+      );
+    }
+    throw error;
+  }
+}
+
+function paymentUrl(paymentId: string): string {
+  return `${PORTONE_V2_PAYMENT_API_ORIGIN_V1}/payments/${encodeURIComponent(paymentId)}`;
+}
+
+const defaultFetch: PortOneV2PaymentHttpFetchV1 = async (url, init) =>
+  fetch(url, {
+    method: init.method,
+    headers: init.headers,
+    redirect: init.redirect,
+    signal: init.signal,
+  });
+
+function timeoutError(): PortOneV2PaymentVerificationAdapterErrorV1 {
+  return new PortOneV2PaymentVerificationAdapterErrorV1(
+    'TIMEOUT',
+    'PortOne V2 payment lookup timed out.',
+  );
+}
+
+async function fetchWithTimeout(input: {
+  readonly fetchImpl: PortOneV2PaymentHttpFetchV1;
+  readonly url: string;
+  readonly apiSecret: string;
+  readonly timeoutMs: number;
+}): Promise<PortOneV2PaymentHttpDeadlineLeaseV1> {
+  const controller = new AbortController();
+  let timedOut = false;
+  let released = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      timedOut = true;
+      const error = timeoutError();
+      reject(error);
+      controller.abort();
+    }, input.timeoutMs);
+  });
+
+  const release = (): void => {
+    if (released) return;
+    released = true;
+    if (timer !== undefined) clearTimeout(timer);
+  };
+
+  try {
+    const response = await Promise.race([
+      input.fetchImpl(input.url, {
+        method: 'GET',
+        headers: Object.freeze({
+          accept: 'application/json',
+          authorization: `PortOne ${input.apiSecret}`,
+        }),
+        redirect: 'error',
+        signal: controller.signal,
+      }),
+      deadline,
+    ]);
+
+    return Object.freeze({
+      response,
+      deadline,
+      didTimeout: () => timedOut,
+      release,
+    });
+  } catch (error) {
+    release();
+    if (
+      error instanceof PortOneV2PaymentVerificationAdapterErrorV1 &&
+      error.code === 'TIMEOUT'
+    ) {
+      throw error;
+    }
+    if (timedOut) throw timeoutError();
+    throw new PortOneV2PaymentVerificationAdapterErrorV1(
+      'NETWORK_FAILURE',
+      'PortOne V2 payment lookup failed before an HTTP response was accepted.',
+    );
+  }
+}
+
+function cancelUnusedResponseBody(response: PortOneV2PaymentHttpResponseV1): void {
+  try {
+    const body = response.body;
+    if (body === undefined || body === null) return;
+    void body.cancel().catch(() => undefined);
+  } catch {
+    return;
+  }
+}
+
+function assertSuccessfulStatus(response: PortOneV2PaymentHttpResponseV1): void {
+  if (response.status === 200) return;
+  cancelUnusedResponseBody(response);
+  if (response.status >= 400 && response.status <= 499) {
+    return fail(
+      'HTTP_4XX',
+      'PortOne V2 payment lookup was rejected.',
+      response.status,
+    );
+  }
+  if (response.status >= 500 && response.status <= 599) {
+    return fail(
+      'HTTP_5XX',
+      'PortOne V2 payment lookup failed upstream.',
+      response.status,
+    );
+  }
+  return fail(
+    'HTTP_UNEXPECTED_STATUS',
+    'PortOne V2 payment lookup returned an unsupported HTTP status.',
+    response.status,
+  );
+}
+
+function assertJsonContentType(response: PortOneV2PaymentHttpResponseV1): void {
+  const contentType = response.headers.get('content-type');
+  if (
+    contentType === null ||
+    !/^application\/json(?:\s*;|$)/iu.test(contentType.trim())
+  ) {
+    cancelUnusedResponseBody(response);
+    return fail(
+      'INVALID_CONTENT_TYPE',
+      'PortOne V2 payment lookup returned a non-JSON success response.',
+      response.status,
+    );
+  }
+}
+
+function assertDeclaredBodyBound(response: PortOneV2PaymentHttpResponseV1): void {
+  const contentLength = response.headers.get('content-length');
+  if (contentLength === null) return;
+  if (!/^[0-9]+$/u.test(contentLength.trim())) {
+    cancelUnusedResponseBody(response);
+    return fail(
+      'RESPONSE_TOO_LARGE',
+      'PortOne V2 payment response body size could not be bounded.',
+      response.status,
+    );
+  }
+  if (Number(contentLength) > PORTONE_V2_PAYMENT_HTTP_MAX_RESPONSE_BYTES_V1) {
+    cancelUnusedResponseBody(response);
+    return fail(
+      'RESPONSE_TOO_LARGE',
+      'PortOne V2 payment response body exceeded the configured bound.',
+      response.status,
+    );
+  }
+}
+
+async function parseJsonResponse(
+  response: PortOneV2PaymentHttpResponseV1,
+  deadline: Promise<never>,
+  didTimeout: () => boolean,
+): Promise<unknown> {
+  let text: string;
+  try {
+    text = await Promise.race([response.text(), deadline]);
+  } catch (error) {
+    if (
+      didTimeout() ||
+      (error instanceof PortOneV2PaymentVerificationAdapterErrorV1 &&
+        error.code === 'TIMEOUT')
+    ) {
+      throw timeoutError();
+    }
+    throw new PortOneV2PaymentVerificationAdapterErrorV1(
+      'NETWORK_FAILURE',
+      'PortOne V2 payment response body could not be read.',
+      response.status,
+    );
+  }
+
+  if (Buffer.byteLength(text, 'utf8') > PORTONE_V2_PAYMENT_HTTP_MAX_RESPONSE_BYTES_V1) {
+    return fail(
+      'RESPONSE_TOO_LARGE',
+      'PortOne V2 payment response body exceeded the configured bound.',
+      response.status,
+    );
+  }
+
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return fail(
+      'INVALID_JSON',
+      'PortOne V2 payment lookup returned malformed JSON.',
+      response.status,
+    );
+  }
+}
+
+function requireEnvironment(selectedChannel: unknown): 'sandbox' | 'production' {
+  const channel = plainRecord(selectedChannel, 'PortOne V2 selectedChannel');
+  if (channel.type === 'TEST') return 'sandbox';
+  if (channel.type === 'LIVE') return 'production';
+  return fail('INVALID_PAYMENT', 'PortOne V2 selectedChannel type is invalid.');
+}
+
+function requireAmountMinor(amount: unknown): number {
+  const record = plainRecord(amount, 'PortOne V2 amount');
+  const total = record.total;
+  if (
+    typeof total !== 'number' ||
+    !Number.isSafeInteger(total) ||
+    total <= 0
+  ) {
+    return fail('INVALID_PAYMENT', 'PortOne V2 amount.total is invalid.');
+  }
+  return total;
+}
+
+function requireExternalProductId(products: unknown): string {
+  if (!Array.isArray(products) || products.length !== 1) {
+    return fail(
+      'INVALID_PAYMENT',
+      'PortOne V2 payment must contain exactly one authoritative product.',
+    );
+  }
+  const product = plainRecord(products[0], 'PortOne V2 payment product');
+  return boundedIdentity(product.id, 'PortOne V2 payment product id');
+}
+
+function requireCurrency(value: unknown): string {
+  if (typeof value !== 'string' || !CURRENCY.test(value)) {
+    return fail('INVALID_PAYMENT', 'PortOne V2 payment currency is invalid.');
+  }
+  return value;
+}
+
+function requirePaidAt(value: unknown): string {
+  if (
+    typeof value !== 'string' ||
+    value.length === 0 ||
+    value.length > 128 ||
+    !Number.isFinite(Date.parse(value))
+  ) {
+    return fail('INVALID_PAYMENT', 'PortOne V2 payment paidAt is invalid.');
+  }
+  return value;
+}
+
+function normalizePaidPayment(
+  value: unknown,
+  expectedPaymentId: string,
+): NormalizedPortOneV2PaidPaymentV1 {
+  const payment = plainRecord(value, 'PortOne V2 payment');
+  if (payment.status !== 'PAID') {
+    return fail(
+      'INVALID_PAYMENT',
+      'PortOne V2 payment is not in the authoritative PAID state.',
+    );
+  }
+
+  const paymentId = boundedIdentity(payment.id, 'PortOne V2 payment id');
+  if (paymentId !== expectedPaymentId) {
+    return fail('INVALID_PAYMENT', 'PortOne V2 payment identity mismatch.');
+  }
+
+  return Object.freeze({
+    paymentId,
+    transactionId: boundedIdentity(
+      payment.transactionId,
+      'PortOne V2 transaction id',
+    ),
+    externalProductId: requireExternalProductId(payment.products),
+    environment: requireEnvironment(payment.selectedChannel),
+    currency: requireCurrency(payment.currency),
+    amountMinor: requireAmountMinor(payment.amount),
+    paidAt: requirePaidAt(payment.paidAt),
+  });
+}
+
+function requireVerifiedAt(now: () => Date): string {
+  const value = now();
+  if (!(value instanceof Date) || !Number.isFinite(value.getTime())) {
+    throw new PortOneV2PaymentVerificationAdapterErrorV1(
+      'INVALID_CONFIGURATION',
+      'PortOne V2 verification clock is invalid.',
+    );
+  }
+  return value.toISOString();
+}
+
+function fingerprintEvidence(input: {
+  readonly request: CommercePaymentVerificationAdapterRequestV1;
+  readonly payment: NormalizedPortOneV2PaidPaymentV1;
+  readonly evidenceHmacSecret: string;
+}): string {
+  const canonicalEvidence = JSON.stringify({
+    schemaVersion: 'myeongha.portone-v2.payment-evidence-fingerprint.v1',
+    provider: 'portone_v2',
+    platform: input.request.platform,
+    environment: input.payment.environment,
+    paymentId: input.payment.paymentId,
+    transactionId: input.payment.transactionId,
+    externalProductId: input.payment.externalProductId,
+    currentState: 'active',
+    amountMinor: input.payment.amountMinor,
+    currency: input.payment.currency,
+    paidAt: input.payment.paidAt,
+    purchaseIntentId: input.request.purchaseIntentId,
+  });
+
+  return fingerprintProductionCommerceEvidenceV1({
+    domain:
+      PRODUCTION_COMMERCE_EVIDENCE_FINGERPRINT_BINDING_V1.domains
+        .receiptEvidence,
+    canonicalEvidenceBytes: Buffer.from(canonicalEvidence, 'utf8'),
+    secret: input.evidenceHmacSecret,
+  });
+}
+
+export function createPortOneV2PaymentVerificationAdapterV1(
+  config: PortOneV2PaymentVerificationAdapterConfigV1,
+): CommercePaymentVerificationAdapterV1 {
+  const apiSecret = resolveApiSecret(config.apiSecret);
+  const evidenceHmacSecret = resolveEvidenceHmacSecret(config.evidenceHmacSecret);
+  const timeoutMs = resolveTimeoutMs(config.timeoutMs);
+  const fetchImpl = config.fetchImpl ?? defaultFetch;
+  const now = config.now ?? (() => new Date());
+
+  return Object.freeze({
+    async verify(
+      request: CommercePaymentVerificationAdapterRequestV1,
+    ): Promise<CommercePaymentVerificationAdapterResultV1> {
+      const paymentId = resolvePaymentId(request);
+      const lease = await fetchWithTimeout({
+        fetchImpl,
+        url: paymentUrl(paymentId),
+        apiSecret,
+        timeoutMs,
+      });
+
+      try {
+        const { response } = lease;
+        assertSuccessfulStatus(response);
+        assertJsonContentType(response);
+        assertDeclaredBodyBound(response);
+        const rawPayment = await parseJsonResponse(
+          response,
+          lease.deadline,
+          lease.didTimeout,
+        );
+        const payment = normalizePaidPayment(rawPayment, paymentId);
+        const verifiedAt = requireVerifiedAt(now);
+        const evidenceFingerprint = fingerprintEvidence({
+          request,
+          payment,
+          evidenceHmacSecret,
+        });
+
+        return Object.freeze({
+          providerRequestId: paymentId,
+          evidence: Object.freeze({
+            schemaVersion: 'commerce-evidence-v2',
+            provider: 'portone_v2',
+            platform: request.platform,
+            environment: payment.environment,
+            externalTransactionId: payment.transactionId,
+            externalProductId: payment.externalProductId,
+            providerOccurredAt: payment.paidAt,
+            currentState: 'active',
+            ownerBinding: Object.freeze({
+              kind: 'purchase_intent',
+              purchaseIntentId: request.purchaseIntentId,
+            }),
+            evidenceFingerprint,
+            verifierRevision: PORTONE_V2_PAYMENT_VERIFIER_REVISION_V1,
+            verifiedAmountMinor: payment.amountMinor,
+            verifiedCurrency: payment.currency,
+            verifiedAt,
+          }),
+        });
+      } finally {
+        lease.release();
+      }
+    },
+  });
+}
