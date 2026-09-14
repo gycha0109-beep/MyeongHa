@@ -61,31 +61,35 @@ function createAdapter(response: PortOneV2PaymentHttpResponseV1) {
   });
 }
 
+async function expectGovernedReaderAcquisitionFailure(
+  cancelImpl: () => Promise<void>,
+): Promise<void> {
+  const { response, cancel, getReader, text } = throwingReaderResponse(cancelImpl);
+  const adapter = createAdapter(response);
+  const verification = adapter.verify(request);
+
+  await expect(verification).rejects.toMatchObject({
+    name: 'PortOneV2PaymentVerificationAdapterErrorV1',
+    code: 'NETWORK_FAILURE',
+    message: 'PortOne V2 payment response body could not be read.',
+    httpStatus: 200,
+  });
+  await expect(verification).rejects.not.toThrow(/reader-acquisition-internal-detail/u);
+  expect(getReader).toHaveBeenCalledTimes(1);
+  expect(cancel).toHaveBeenCalledTimes(1);
+  expect(text).not.toHaveBeenCalled();
+}
+
 describe('PortOne V2 payment response reader acquisition', () => {
-  it.each([
-    [
-      'cleanup rejection',
-      () => Promise.reject(new Error('cleanup-rejection-internal-detail')),
-    ],
-    ['cleanup non-settlement', () => new Promise<void>(() => undefined)],
-  ])(
-    'maps synchronous getReader failure to the governed transport error despite %s',
-    async (_label, cancelImpl) => {
-      const { response, cancel, getReader, text } = throwingReaderResponse(cancelImpl);
-      const adapter = createAdapter(response);
+  it('preserves the governed transport error when best-effort cleanup rejects', async () => {
+    await expectGovernedReaderAcquisitionFailure(() =>
+      Promise.reject(new Error('cleanup-rejection-internal-detail')),
+    );
+  });
 
-      const verification = adapter.verify(request);
-
-      await expect(verification).rejects.toMatchObject({
-        name: 'PortOneV2PaymentVerificationAdapterErrorV1',
-        code: 'NETWORK_FAILURE',
-        message: 'PortOne V2 payment response body could not be read.',
-        httpStatus: 200,
-      });
-      await expect(verification).rejects.not.toThrow(/reader-acquisition-internal-detail/u);
-      expect(getReader).toHaveBeenCalledTimes(1);
-      expect(cancel).toHaveBeenCalledTimes(1);
-      expect(text).not.toHaveBeenCalled();
-    },
-  );
+  it('does not await best-effort cleanup that never settles', async () => {
+    await expectGovernedReaderAcquisitionFailure(
+      () => new Promise<void>(() => undefined),
+    );
+  });
 });
