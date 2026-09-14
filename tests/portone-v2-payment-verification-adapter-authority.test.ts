@@ -60,13 +60,16 @@ describe('PortOne V2 payment verification adapter authority', () => {
     expect(adapter).not.toMatch(/grant/iu);
   });
 
-  it('bounds provider transport and never exposes upstream error bodies', () => {
+  it('bounds provider transport without any whole-body response fallback', () => {
     expect(adapter).toContain('PORTONE_V2_PAYMENT_HTTP_MAX_RESPONSE_BYTES_V1');
     expect(adapter).toContain('PORTONE_V2_PAYMENT_HTTP_DEFAULT_TIMEOUT_MS_V1');
     expect(adapter).toContain('controller.abort()');
     expect(adapter).toContain('assertDeclaredBodyBound(response)');
+    expect(adapter).toContain('getResponseBodyReader(response)');
+    expect(adapter).toContain("'NETWORK_FAILURE'");
+    expect(adapter).toContain('cancelUnusedResponseBody(response)');
     expect(adapter).toContain("Buffer.byteLength(text, 'utf8')");
-    expect(adapter).not.toContain('await response.text()');
+    expect(adapter).not.toContain('response.text()');
     expect(adapter).not.toMatch(/provider.*body.*message/iu);
   });
 });

@@ -387,64 +387,64 @@ async function parseJsonResponse(
   deadline: Promise<never>,
   didTimeout: () => boolean,
 ): Promise<unknown> {
-  let text: string;
   const reader = getResponseBodyReader(response);
-
   if (reader === null) {
-    try {
-      text = await Promise.race([response.text(), deadline]);
-    } catch (error) {
-      return mapBodyReadFailure(error, response, didTimeout);
-    }
-  } else {
-    const chunks: Uint8Array[] = [];
-    let receivedBytes = 0;
-    let completed = false;
+    cancelUnusedResponseBody(response);
+    throw new PortOneV2PaymentVerificationAdapterErrorV1(
+      'NETWORK_FAILURE',
+      'PortOne V2 payment response body could not be read.',
+      response.status,
+    );
+  }
 
-    try {
-      while (true) {
-        let result: Readonly<{ done: boolean; value?: Uint8Array }>;
-        try {
-          result = await Promise.race([reader.read(), deadline]);
-        } catch (error) {
-          return mapBodyReadFailure(error, response, didTimeout);
-        }
+  const chunks: Uint8Array[] = [];
+  let receivedBytes = 0;
+  let completed = false;
+  let text: string;
 
-        if (result.done) {
-          completed = true;
-          break;
-        }
-
-        const chunk = result.value;
-        if (!(chunk instanceof Uint8Array)) {
-          throw new PortOneV2PaymentVerificationAdapterErrorV1(
-            'NETWORK_FAILURE',
-            'PortOne V2 payment response body could not be read.',
-            response.status,
-          );
-        }
-
-        receivedBytes += chunk.byteLength;
-        if (receivedBytes > PORTONE_V2_PAYMENT_HTTP_MAX_RESPONSE_BYTES_V1) {
-          return fail(
-            'RESPONSE_TOO_LARGE',
-            'PortOne V2 payment response body exceeded the configured bound.',
-            response.status,
-          );
-        }
-        chunks.push(chunk);
+  try {
+    while (true) {
+      let result: Readonly<{ done: boolean; value?: Uint8Array }>;
+      try {
+        result = await Promise.race([reader.read(), deadline]);
+      } catch (error) {
+        return mapBodyReadFailure(error, response, didTimeout);
       }
 
-      text = Buffer.concat(chunks, receivedBytes).toString('utf8');
-    } finally {
-      if (!completed) {
-        try {
-          void reader.cancel().catch(() => undefined);
-        } catch {
-        }
+      if (result.done) {
+        completed = true;
+        break;
       }
-      reader.releaseLock();
+
+      const chunk = result.value;
+      if (!(chunk instanceof Uint8Array)) {
+        throw new PortOneV2PaymentVerificationAdapterErrorV1(
+          'NETWORK_FAILURE',
+          'PortOne V2 payment response body could not be read.',
+          response.status,
+        );
+      }
+
+      receivedBytes += chunk.byteLength;
+      if (receivedBytes > PORTONE_V2_PAYMENT_HTTP_MAX_RESPONSE_BYTES_V1) {
+        return fail(
+          'RESPONSE_TOO_LARGE',
+          'PortOne V2 payment response body exceeded the configured bound.',
+          response.status,
+        );
+      }
+      chunks.push(chunk);
     }
+
+    text = Buffer.concat(chunks, receivedBytes).toString('utf8');
+  } finally {
+    if (!completed) {
+      try {
+        void reader.cancel().catch(() => undefined);
+      } catch {
+      }
+    }
+    reader.releaseLock();
   }
 
   if (Buffer.byteLength(text, 'utf8') > PORTONE_V2_PAYMENT_HTTP_MAX_RESPONSE_BYTES_V1) {

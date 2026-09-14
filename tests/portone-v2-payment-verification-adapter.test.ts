@@ -61,6 +61,22 @@ function responseFor(
     headers.set('content-length', options.contentLength);
   }
 
+  const bytes = new TextEncoder().encode(rawText);
+  let sent = false;
+  const body = new ReadableStream<Uint8Array>(
+    {
+      pull(controller) {
+        if (!sent) {
+          sent = true;
+          if (bytes.byteLength > 0) controller.enqueue(bytes);
+        }
+        controller.close();
+      },
+      cancel,
+    },
+    { highWaterMark: 0 },
+  );
+
   return {
     status: options.status ?? 200,
     headers: {
@@ -68,7 +84,7 @@ function responseFor(
         return headers.get(name.toLowerCase()) ?? null;
       },
     },
-    body: { cancel },
+    body,
     text,
   };
 }
@@ -299,6 +315,34 @@ describe('PortOne V2 server payment verification adapter', () => {
       createWithResponse({}, { rawText: oversized }).adapter.verify(request),
       'RESPONSE_TOO_LARGE',
     );
+  });
+
+  it('fails closed without whole-body fallback when an injected response has no reader', async () => {
+    const rawText = JSON.stringify(paidPayment());
+    const text = vi.fn(async () => rawText);
+    const cancel = vi.fn(async () => undefined);
+    const response: PortOneV2PaymentHttpResponseV1 = {
+      status: 200,
+      headers: {
+        get(name: string) {
+          return name.toLowerCase() === 'content-type'
+            ? 'application/json; charset=utf-8'
+            : null;
+        },
+      },
+      body: { cancel },
+      text,
+    };
+    const fetchImpl: PortOneV2PaymentHttpFetchV1 = async () => response;
+    const adapter = createPortOneV2PaymentVerificationAdapterV1({
+      apiSecret: API_SECRET,
+      evidenceHmacSecret: EVIDENCE_HMAC_SECRET,
+      fetchImpl,
+    });
+
+    await expectAdapterCode(adapter.verify(request), 'NETWORK_FAILURE');
+    expect(text).not.toHaveBeenCalled();
+    expect(cancel).toHaveBeenCalledTimes(1);
   });
 
   it('times out and aborts provider I/O', async () => {
