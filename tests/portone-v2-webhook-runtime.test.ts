@@ -221,8 +221,8 @@ describe('PortOne V2 webhook runtime composition', () => {
       method: 'GET',
       redirect: 'error',
       headers: {
-        Accept: 'application/json',
-        Authorization: `PortOne ${API_SECRET}`,
+        accept: 'application/json',
+        authorization: `PortOne ${API_SECRET}`,
       },
     });
   });
