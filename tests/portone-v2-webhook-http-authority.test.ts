@@ -16,7 +16,7 @@ describe('PortOne V2 webhook HTTP static authority', () => {
 
   it('reads raw bytes incrementally without parsing or reserializing provider JSON', () => {
     expect(source).toContain('const body = request.body;');
-    expect(source).toContain('const reader = body.getReader();');
+    expect(source).toContain('reader = body.getReader();');
     expect(source).toContain('const chunk = await reader.read();');
     expect(source).toContain('reader.releaseLock();');
     expect(source).not.toContain('request.arrayBuffer()');
