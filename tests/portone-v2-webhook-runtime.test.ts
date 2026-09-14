@@ -122,6 +122,7 @@ function paymentFetch() {
     amount: { total: 1000 },
     paidAt: '2026-09-14T07:09:59.000Z',
   });
+  const paymentBytes = new TextEncoder().encode(payment);
 
   const fetchImpl = vi.fn<PortOneV2PaymentHttpFetchV1>(async () => ({
     status: 200,
@@ -129,12 +130,20 @@ function paymentFetch() {
       get(name: string) {
         if (name.toLowerCase() === 'content-type') return 'application/json';
         if (name.toLowerCase() === 'content-length') {
-          return String(Buffer.byteLength(payment, 'utf8'));
+          return String(paymentBytes.byteLength);
         }
         return null;
       },
     },
-    body: null,
+    body: new ReadableStream<Uint8Array>(
+      {
+        start(controller) {
+          controller.enqueue(paymentBytes);
+          controller.close();
+        },
+      },
+      { highWaterMark: 0 },
+    ),
     text: async () => payment,
   }));
 
