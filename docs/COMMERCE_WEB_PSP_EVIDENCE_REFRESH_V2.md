@@ -1,47 +1,36 @@
 # 명하 Commerce Web PSP Evidence Refresh v2
 
-> Product: **명하 (MyeongHa)**  
-> Date: **2026-09-05**  
-> Repository baseline: `db6a819955f19dc23a91f658884d06000765b3e0`  
-> Parent evaluation: `docs/COMMERCE_WEB_PSP_EVALUATION_V1.md`  
-> Supersedes current-evidence claims in: `docs/COMMERCE_WEB_PSP_EVIDENCE_REFRESH_V1.md`  
-> Merchant intake: `docs/COMMERCE_MERCHANT_FACT_INTAKE_V1.md`  
-> Status: **P0-CM-02 CURRENT-EVIDENCE REFRESH / MERCHANT REGISTRATION BLOCKED / NO PROVIDER SELECTED / IMPLEMENTATION HOLD**
+> Original evidence date: **2026-09-05**  
+> Authority reconciliation: **2026-09-14**  
+> Current governing decision: `docs/COMMERCE_WEB_PSP_DECISION_V1.md`  
+> Merchant readiness: `docs/COMMERCE_MERCHANT_FACT_INTAKE_V1.md`  
+> Status: **P0-CM-02 DECIDED / PORTONE V2 / HISTORICAL DIRECT-PROVIDER EVIDENCE RETAINED / LIVE ACTIVATION HOLD**
 
----
+## 1. Authority correction
 
-## 1. Purpose and authority boundary
+이 문서의 2026-09-05 Toss Payments direct / NHN KCP direct 비교는 P0-CM-02가 열려 있었을 때의 evidence snapshot이다.
 
-이 문서는 2026-09-05 현재 다시 확인한 공식 provider 문서와 실제 operator-provided merchant facts를 결합해 `P0-CM-02`의 현재 상태를 재판정한다.
-
-이 문서는 다음을 승인하지 않는다.
+현재 authority는 다음과 같다.
 
 ```text
-provider selection
-provider SDK
-webhook route
-production credential
-production schema mutation
-production evidence persistence
-paid Product activation
-money → rights apply runtime
+P0-CM-02 exact Web PSP = DECIDED
+selected provider      = PortOne V2
+provider key           = portone_v2
 ```
 
-Current decision:
+따라서 과거의 아래 상태를 현재 결론으로 사용하지 않는다.
 
 ```text
-P0-CM-02 exact Web PSP = OPEN-P0
-selection winner       = NONE
-blocking class         = MERCHANT REGISTRATION + REVIEW/CONTRACT GATES
+P0-CM-02 = OPEN-P0
+selection winner = NONE
+Toss/KCP 중 production PSP를 선택해야 함
 ```
 
-Provider operational facts가 v1 refresh와 충돌하면 이 v2의 2026-09-05 재검증 결과를 사용한다. Architecture/domain semantics는 계속 `COMMERCE_ENTITLEMENT_ARCHITECTURE_V1.md`가 우선한다.
+PortOne 결정은 downstream PG/channel 계약, merchant eligibility, settlement, live activation까지 자동 승인하지 않는다.
 
----
+## 2. Operator facts preserved
 
-## 2. Operator facts now fixed
-
-Operator-provided non-secret launch facts:
+2026-09-05 operator facts는 이후 명시적 변경 evidence가 없으므로 그대로 유지한다.
 
 ```text
 M1 merchant legal form           = not_registered
@@ -52,309 +41,138 @@ M5 presentment currency          = KRW
 M6 required payment methods      = domestic_card + easy_pay(kakaopay, naverpay, payco)
 ```
 
-No registration number, account number, credential or private contract material is recorded.
+## 3. Guest-purchase compatibility supersession
 
----
+2026-09-05 evidence는 당시 Member-only purchase invariant를 기준으로 Toss/KCP compatibility를 비교했다.
 
-## 3. Immediate consequence of M1-M3
+그 product-policy premise는 이후 P0-CM-04로 supersede되었다.
 
-### Toss Payments direct
-
-Current official Toss contracting documentation requires merchant documents aligned to a registered business form:
+현재:
 
 ```text
-individual business → business registration certificate
-corporation          → business registration certificate + corporate documents
+active Guest OR active Member purchase owner = AUTHORIZED BY P0-CM-04
+Guest purchase policy compatibility           = RESOLVED
+Guest purchase Production runtime              = NOT IMPLIED
 ```
 
-The same current guide requires document/homepage/card-company review before production use.
+따라서 과거 Toss Member-only conflict와 KCP Member-only unproven 상태는 current PortOne live-activation blocker가 아니다.
 
-Therefore under the actual current fact:
+## 4. Current PortOne integration evidence
+
+2026-09-14 공식 PortOne V2 문서 재검증 결과:
 
 ```text
-M1 = not_registered
+server API host                 = api.portone.io
+Store ID                        = PortOne store identifier used by checkout
+channelKey                      = configured PG channel identifier
+server-side payment lookup      = required completion authority
+webhook configuration           = TEST/LIVE mode separated
+V2 server authentication        = console-managed, server-side only
 ```
 
-Toss production merchant eligibility is **not satisfied**. Test integration capability does not change this production-contract result.
+이 evidence는 repository integration design과 provider capability를 뒷받침한다.
 
-### NHN KCP direct
-
-Current official KCP signup guidance requires the contracting shop representative to match the representative stated on the business registration certificate. KCP's application/status surfaces are also keyed to business-registration-aligned merchant data.
-
-Therefore under:
+다음은 증명하지 않는다.
 
 ```text
-M1 = not_registered
+MyeongHa live merchant eligibility
+actual PortOne account/store control
+exact downstream LIVE PG/channel contract
+KRW settlement acceptance
+M6 methods enabled on the actual LIVE channel
+Production provider binding complete
+LIVE webhook registration complete
+saleable SKU authority
+Production route activation
 ```
 
-KCP production merchant eligibility is also **not satisfied**.
+## 5. Current live-readiness matrix
 
-### Decision consequence
+| Gate | Current state |
+|---|---|
+| P0-CM-02 provider selection | **DECIDED / PortOne V2** |
+| merchant legal form | **BLOCKED — not_registered** |
+| merchant registration country | **BLOCKED — not_applicable** |
+| settlement account country | **BLOCKED — not_established** |
+| launch geography | `korea_first` |
+| presentment currency | `KRW` |
+| required methods | domestic card + KakaoPay/NaverPay/PAYCO |
+| truthful website/review readiness | **NOT READY** |
+| commercial acceptance | **BLOCKED / NOT ACCEPTED** |
+| Guest purchase policy compatibility | **RESOLVED BY P0-CM-04** |
+| PortOne account/store control | **UNVERIFIED** |
+| downstream LIVE PG/channel | **UNBOUND** |
+| settlement support | **UNPROVEN** |
+| required methods on actual LIVE channel | **UNPROVEN** |
+| Production provider binding | **NOT ESTABLISHED** |
+| LIVE webhook binding | **NOT ESTABLISHED** |
+| governed Production deployment | **BLOCKED — #680 OPEN** |
+| saleable Product/Capability | **BLOCKED — P0-CM-03 OPEN-P0** |
+| Production payment/webhook route | **NOT AUTHORIZED** |
+
+Overall:
 
 ```text
-merchant registration not complete
-→ neither Toss nor KCP can be admitted as production PSP for MyeongHa now
-→ P0-CM-02 remains OPEN
-→ provider-specific production implementation remains HOLD
+Production payment activation = HOLD
 ```
 
-This is a production-selection block, not a ban on local/test-only technical experiments.
+## 6. Historical Toss/KCP evidence
 
----
-
-## 4. M4-M6 capability fit
-
-### M4 — korea_first
-
-The launch buyer scope is now explicitly Korea-first. This does not authorize an international PSP requirement for launch and does not silently change future international expansion scope.
-
-### M5 — KRW
-
-Launch presentment currency is fixed to KRW.
-
-Current official capability evidence is sufficient for the current domestic rail:
+PR #453에서 재검증한 내용은 historical provenance로 유지한다.
 
 ```text
-Toss → KRW MID supports domestic-card payment
-KCP  → standard payment defines KRW as 410 (mobile) / WON (PC)
+Toss direct technical/capability research = historical evidence
+KCP direct technical/capability research  = historical evidence
 ```
 
-This proves KRW capability, not commercial acceptance for MyeongHa.
+이 historical evidence를 이용해 P0-CM-02를 다시 열거나 현재 provider winner를 재선정하지 않는다.
 
-### M6 — domestic card + KakaoPay / NaverPay / PAYCO
+PortOne 내부 downstream PG/channel selection/contract는 별도 commercial/operational evidence로 다룬다.
 
-#### Toss Payments
+## 7. Implementation consequence
 
-Current official Toss payment-product and payment-method documentation proves support for:
+Repository는 이미 PortOne-specific verification/webhook/runtime composition을 보유한다. 하지만 다음은 별도다.
 
 ```text
-domestic card
-easy pay
-- KakaoPay
-- NaverPay
-- PAYCO
+repository implementation complete ≠ live merchant ready
+repository webhook runtime complete ≠ LIVE webhook registered
+PortOne selected ≠ downstream PG/channel contracted
+PortOne selected ≠ saleable Product authorized
+PortOne selected ≠ Production route activated
 ```
 
-Current Toss FAQ also exposes card, NaverPay, KakaoPay and PAYCO in pre-contract test coverage. Production activation remains subject to contract/admin configuration and applicable review.
-
-Verdict:
+독립 gate를 유지한다.
 
 ```text
-M6 technical capability fit = PROVEN
-M6 commercial availability for MyeongHa = NOT YET CONTRACTED
+#680 = OPEN
+P0-CM-03 = OPEN-P0
+P0-PR-01 = OPEN
 ```
 
-#### NHN KCP
+## 8. Explicit non-goals
 
-Current KCP official material proves:
+이 evidence reconciliation은 다음을 수행하거나 승인하지 않는다.
 
 ```text
-credit card support
-PAYCO easy payment
-partner easy-payment support for KakaoPay and NaverPay
+PortOne console mutation
+live merchant activation
+LIVE channel binding
+Production provider binding
+LIVE webhook registration
+Production route activation
+Production Supabase mutation
+paid SKU enablement
+Entitlement mutation
+refund/reversal/dispute/reconciliation implementation
 ```
 
-KCP explicitly states that partner easy-payment services may require additional service application/contract by payment service.
+## 9. Revalidated PortOne sources — 2026-09-14
 
-Verdict:
+- `https://developers.portone.io/api/rest-v2`
+- `https://developers.portone.io/opi/ko/integration/ready/readme`
+- `https://developers.portone.io/opi/ko/console/guide/channel-manage`
+- `https://developers.portone.io/opi/ko/integration/start/v2/checkout`
+- `https://developers.portone.io/opi/ko/integration/webhook/readme-v2`
+- `https://developers.portone.io/opi/ko/integration/pg/v2/readme`
 
-```text
-M6 technical capability fit = PROVEN
-M6 exact commercial activation = REQUIRES CONTRACT / ADDITIONAL SERVICE APPROVAL
-```
-
-Therefore M6 no longer differentiates Toss from KCP at the architecture-selection level.
-
----
-
-## 5. Toss Member-only conflict is re-proven
-
-Evidence refresh v1 stated that the current Toss search did not reproduce a mandatory non-member-purchase review rule.
-
-That current-state claim is superseded.
-
-The current official Toss `payment-products` contracting guide now explicitly states in its homepage-review requirements that the merchant site must allow non-member purchase.
-
-MyeongHa Commerce v1 invariant remains:
-
-```text
-Guest purchase = DENY
-Purchase Intent = active Member only
-```
-
-Therefore the current public onboarding evidence produces this state:
-
-```text
-Toss homepage review requires non-member purchase = CURRENT OFFICIAL PUBLIC GUIDANCE
-MyeongHa allows non-member purchase               = NO
-current public onboarding compatibility           = CONFLICT
-```
-
-Safe interpretation:
-
-```text
-Toss M9 = CONFLICT UNDER CURRENT PUBLIC GUIDANCE
-```
-
-This conflict can only be removed by one of the already-authorized paths:
-
-```text
-A. Toss explicitly confirms a merchant-specific exception compatible with Member-only purchase
-OR
-B. MyeongHa product/Commerce authority explicitly reopens and changes the Member-only policy
-```
-
-B is not authorized by this evidence refresh.
-
----
-
-## 6. NHN KCP Member-only status remains unresolved
-
-Current KCP signup/technical material reviewed here does not prove a requirement equivalent to Toss's current non-member-purchase review rule.
-
-It also does not prove that KCP contract/review will accept MyeongHa's Member-only checkout policy.
-
-Therefore:
-
-```text
-KCP M9 = NOT PROVEN
-```
-
-Absence of a public conflict statement is not provider confirmation.
-
----
-
-## 7. M7-M9 current state
-
-### M7 Website / merchant review readiness
-
-```text
-M7 = NOT READY
-```
-
-Reasons:
-
-```text
-merchant registration = not_registered
-launch paid Product/Capability = P0-CM-03 OPEN
-truthful merchant identity disclosure surface = not complete
-refund/cancellation customer policy = not closed
-payment terms/customer notice surface = not complete
-Toss-specific non-member review rule conflicts with current Member-only invariant
-```
-
-No fabricated product or merchant identity may be added only to pass provider review.
-
-### M8 Commercial acceptance
-
-```text
-M8 = BLOCKED / NOT YET EVALUABLE TO ACCEPTANCE
-```
-
-Reason:
-
-```text
-merchant is not yet contract-eligible
-fees/settlement cycle/provider category review have not been accepted by the actual merchant
-M3 settlement account = not_established
-```
-
-Public pricing or signup UI is not equivalent to accepted commercial terms.
-
-### M9 Member-only compatibility
-
-```text
-Toss = CONFLICT UNDER CURRENT PUBLIC HOMEPAGE-REVIEW GUIDANCE
-KCP  = NOT PROVEN
-```
-
----
-
-## 8. Current candidate matrix
-
-| Requirement | Toss direct | KCP direct |
-|---|---|---|
-| Korea-first launch fit | yes | yes |
-| KRW launch fit | proven for current domestic rail | proven for current domestic rail |
-| domestic card | proven | proven |
-| KakaoPay | proven | proven; additional service/contract may apply |
-| NaverPay | proven | proven; additional service/contract may apply |
-| PAYCO | proven | proven |
-| server authoritative approval/lookup | proven in prior authority | proven in prior authority |
-| documented webhook retry | proven | proven |
-| provider mutation idempotency | stronger current evidence | not sufficiently proven |
-| current merchant production eligibility with `not_registered` | **not satisfied** | **not satisfied** |
-| Member-only onboarding compatibility | **current public conflict** | **not proven** |
-| M8 commercial acceptance | blocked | blocked |
-| selectable as production PSP now | **NO** | **NO** |
-
-No winner is selected.
-
----
-
-## 9. P0-CM-02 state machine from here
-
-Current:
-
-```text
-P0-CM-02
-→ OPEN / MERCHANT REGISTRATION BLOCKED
-```
-
-Minimum next external facts after merchant registration:
-
-```text
-1. merchant legal form changes from not_registered to actual registered form
-2. registration country becomes actual country code
-3. settlement account country is established for the provider contract
-4. truthful website review surface becomes ready
-5. commercial terms are reviewed and accepted
-6. Member-only compatibility is confirmed
-   - Toss: exception required unless public review rule changes or policy is reopened
-   - KCP: provider/contract confirmation required
-```
-
-Only after those gates may a final provider-selection decision be recorded.
-
----
-
-## 10. Implementation consequence
-
-Remain HOLD:
-
-```text
-Toss production SDK/runtime binding
-KCP production SDK/runtime binding
-provider-specific canonical evidence serializer
-provider-specific verifier/comparator
-webhook route
-production provider credentials
-production receipt/event persistence
-provider ordering implementation
-money → rights apply runtime
-```
-
-Provider-neutral contracts already implemented remain valid and do not imply payment readiness.
-
-P0-CM-03 and P0-PR-01 remain independently open.
-
----
-
-## 11. Official sources revalidated on 2026-09-05
-
-### Toss Payments
-
-- Payment products / contract and homepage-review requirements: `https://docs.tosspayments.com/guides/v2/get-started/payment-products`
-- Payment-method policy: `https://docs.tosspayments.com/guides/v2/get-started/payment-methods`
-- Payment product FAQ / payment-method test coverage: `https://docs.tosspayments.com/resources/faq`
-- Payment/easy-pay enum codes: `https://docs.tosspayments.com/codes/enum-codes`
-- KRW MID / domestic-card currency rail: `https://docs.tosspayments.com/guides/v2/learn/foreign-payment`
-
-### NHN KCP
-
-- Merchant signup/application guidance: `https://developer.kcp.co.kr/support/signup`
-- Standard payment / KRW currency codes: `https://developer.kcp.co.kr/guide/payment`
-- Partner easy-payment capability: `https://developer.kcp.co.kr/guide/directpay`
-- Easy-payment codes: `https://developer.kcp.co.kr/code/etc`
-
-Provider operational evidence must be revalidated again immediately before production contracting or implementation.
+Current live activation authority는 `COMMERCE_WEB_PSP_DECISION_V1.md`, `P0_DECISION_REGISTER.md`, `COMMERCE_GUEST_PURCHASE_OWNERSHIP_DECISION_V1.md`, `COMMERCE_MERCHANT_FACT_INTAKE_V1.md`을 함께 읽어 판정한다.
