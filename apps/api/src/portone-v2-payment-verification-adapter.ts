@@ -387,7 +387,14 @@ async function parseJsonResponse(
   deadline: Promise<never>,
   didTimeout: () => boolean,
 ): Promise<unknown> {
-  const reader = getResponseBodyReader(response);
+  let reader: PortOneV2PaymentBodyReaderV1 | null;
+  try {
+    reader = getResponseBodyReader(response);
+  } catch (error) {
+    cancelUnusedResponseBody(response);
+    return mapBodyReadFailure(error, response, didTimeout);
+  }
+
   if (reader === null) {
     cancelUnusedResponseBody(response);
     throw new PortOneV2PaymentVerificationAdapterErrorV1(
