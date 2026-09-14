@@ -36,7 +36,7 @@ describe('PortOne V2 payment verification adapter authority', () => {
     expect(adapter).toContain('products.length !== 1');
     expect(adapter).toContain("boundedIdentity(product.id, 'PortOne V2 payment product id')");
     expect(adapter).toContain('const total = record.total');
-    expect(adapter).toContain('amountMinor: payment.amountMinor');
+    expect(adapter).toContain('verifiedAmountMinor: payment.amountMinor');
     expect(adapter).toContain('verifiedCurrency: payment.currency');
     expect(adapter).not.toContain('externalProductId: request.expectedExternalProductId');
     expect(adapter).not.toContain('verifiedAmountMinor: request.expectedAmountMinor');
