@@ -2,8 +2,8 @@
 
 > Product: **명하 (Myeongha)**  
 > Pack Version: **v0.9**  
-> Date: **2026-09-05**  
-> Source Authority: `Usecase_re_reviewed_v2(1).md`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`, `Myeonghwa_Personalized_Interpretation_Architecture_v1.3_THIRD_REVIEW(1).md`, `docs/architecture/COMMERCE_ENTITLEMENT_ARCHITECTURE_V1.md`, `docs/COMMERCE_GUEST_PURCHASE_OWNERSHIP_DECISION_V1.md`  
+> Date: **2026-09-14**  
+> Source Authority: `Usecase_re_reviewed_v2(1).md`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`, `Myeonghwa_Personalized_Interpretation_Architecture_v1.3_THIRD_REVIEW(1).md`, `docs/architecture/COMMERCE_ENTITLEMENT_ARCHITECTURE_V1.md`, `docs/COMMERCE_GUEST_PURCHASE_OWNERSHIP_DECISION_V1.md`, `docs/COMMERCE_WEB_PSP_DECISION_V1.md`  
 > Rule: 본 문서는 위 source authority를 구현 수준으로 구체화한다. source가 결정하지 않은 사항은 임의 확정하지 않고 `OPEN-P0` 또는 `CANDIDATE`로 표시한다. Production 운영을 열기 위해 별도 security/operations decision을 확정할 경우 source requirement를 좁혀야 하며, 상위 미결정 retention/legal policy를 대신 결정한 것으로 간주하지 않는다.
 
 ---
@@ -18,7 +18,7 @@
 |---|---|---|---|
 | `P0-SA-01` | Saju transport | **DECIDED** | authenticated internal HTTP service; calculation-only V1; no `/api/readings` activation |
 | `P0-CM-01` | Commerce launch rail | **DECIDED** | Web + one-off only for launch MVP; no subscription/bundle/native-store billing |
-| `P0-CM-02` | Web payment provider / PSP | **OPEN-P0** | merchant geography/legal entity, settlement/currency, verification, webhook/refund/reconciliation semantics를 만족하는 exact provider 선택 |
+| `P0-CM-02` | Web payment provider / PSP | **DECIDED** | PortOne V2; canonical provider key `portone_v2`; server lookup authority at `api.portone.io`; live merchant/credential/Production activation remains separately gated |
 | `P0-CM-03` | Launch paid Product / Capability catalog | **OPEN-P0** | Paid Deep/Detailed Reading은 후보일 뿐이며 current Saju production interpretation authority가 BLOCKED이므로 saleable SKU 확정 금지 |
 | `P0-CM-04` | Guest purchase ownership / continuity | **DECIDED** | active Guest 구매 허용; canonical `subjects.id` 소유; 새 Member promotion은 same-subject; 기존 Member merge 후 direct merged-Guest lineage로 권리 조합; historical Commerce owner rewrite 금지 |
 | `P0-AI-01` | AI provider/model/fallback | **OPEN-P0** | provider, model family, fallback, grounded-response validation implementation |
@@ -155,6 +155,62 @@ reopen_triggers:
   - approved launch distribution plan is incompatible with Web-first payment
   - material current store/provider policy requires a different compliant launch rail
 record: docs/COMMERCE_LAUNCH_RAIL_DECISION_V1.md
+```
+
+### P0-CM-02
+
+```yaml
+id: P0-CM-02
+status: DECIDED
+decided_at: 2026-09-14
+choice: PortOne V2 as the launch Web one-off payment orchestration/provider boundary
+canonical_provider_key: portone_v2
+server_api_authority: https://api.portone.io
+completion_authority: server-side PortOne V2 payment lookup by merchant-generated paymentId
+authentication:
+  api: V2 API Secret in server-only Authorization header
+  webhook: PortOne V2 webhook secret verification
+scope:
+  decides:
+    - launch Web PSP/orchestration vendor is PortOne V2
+    - canonical provider key is portone_v2
+    - browser redirect/callback is transport hint only
+    - server payment lookup is canonical completion verification path
+    - provider status, amount, currency, identity, and environment must be verified before downstream evidence promotion
+    - concrete PortOne adapter implementation may proceed only through existing provider-neutral Commerce authority boundaries
+  does_not_decide:
+    - merchant/legal entity eligibility
+    - exact downstream PG/channel contract
+    - settlement account or launch currency
+    - live API/webhook credential provisioning
+    - Production endpoint activation
+    - launch paid Product/Capability catalog
+    - legal/accounting/backup retention duration
+    - refund/reversal execution or reconciliation worker implementation
+provider_mapping_gates:
+  - exact PortOne status to VerifiedCommerceEvidenceV2 state mapping must be explicit and fail-closed
+  - paymentId to provider_request_id mapping must be proven
+  - provider transactionId to provider_transaction_id mapping must be proven when authoritative/present
+  - sandbox/production must come from provider-owned configuration/data, not request origin or caller input
+  - externalProductId must be an authoritative round-trip identity; never fabricate it from caller input
+  - amount/currency must exactly match immutable Purchase Intent v2 authority
+  - raw provider payloads/secrets must be minimized/redacted before persistence or logging
+  - HTTP deadline, redirect policy, body bounds, schema validation, error redaction, retry and idempotency behavior must be defined
+  - no provider network await may occur inside an open internal Commerce PostgreSQL transaction
+historical_identifier_collision:
+  issue_610: historically used textual P0-CM-02 for immutable Product Capability Set authority foundation
+  rule: preserve #610 as historical provenance; canonical Decision Register P0-CM-02 is the Web PSP decision and is now PortOne V2
+independent_gates_preserved:
+  - P0-CM-03 launch paid Product/Capability remains OPEN-P0 and upstream-blocked
+  - P0-PR-01 parent retention/legal policy remains OPEN
+  - Issue #680 Production Supabase deployment authorization remains independently blocking Production migration/application
+  - live merchant/PG/channel/credential readiness requires separate operational proof
+migration_impact:
+  - no PostgreSQL migration required
+  - current provider columns remain provider-neutral text with independent sandbox/production environment authority
+  - no Production mutation is authorized by this decision
+rollback_or_change_policy: replacing PortOne V2, adding an equal launch provider, weakening server lookup into browser success authority, collapsing sandbox/production, or treating provider selection as live merchant/Production approval requires a new explicit decision/review
+record: docs/COMMERCE_WEB_PSP_DECISION_V1.md
 ```
 
 ### P0-CM-04
@@ -342,9 +398,11 @@ record: docs/COMMERCE_EVIDENCE_DATA_MINIMIZATION_DECISION_V1.md
 
 ### Remaining open decisions
 
-`P0-CM-02` exact Web PSP and `P0-CM-03` launch paid Product/Capability remain explicitly open. `P0-CM-03` is upstream-blocked by current Saju production interpretation authority and cannot be closed by inventing product semantics inside Commerce.
+`P0-CM-02` exact Web PSP is now **DECIDED: PortOne V2**. This closes provider selection only; live merchant/PG/channel/credential readiness and Production activation remain independent gates.
 
-`P0-CM-04` closes the product/ownership question of whether Guest may purchase. It **does not** close `P0-CM-02`, `P0-CM-03`, `SRC-24`, or authorize Production Commerce activation.
+`P0-CM-03` launch paid Product/Capability remains explicitly open and is upstream-blocked by current Saju production interpretation authority. It cannot be closed by inventing product semantics inside Commerce.
+
+`P0-CM-04` closes the product/ownership question of whether Guest may purchase. Its historical `does_not_decide` list records the boundary at the time that decision was made; the later `P0-CM-02` record now supplies the PSP decision without rewriting `P0-CM-04` history.
 
 `P0-PR-01` parent retention/legal decision also remains OPEN. `P0-PR-01B` closes only the Commerce evidence minimization/security subset and must not be interpreted as a legal/accounting retention period.
 
@@ -368,7 +426,8 @@ rollback_or_change_policy: ...
 - provider 이름을 business/domain model key로 사용하는 것
 - 미결정 retention을 전제로 destructive migration을 작성하는 것
 - `P0-CM-01` Web-first 결정을 exact PSP 선택이나 concrete paid SKU 승인으로 확대 해석하는 것
-- `P0-CM-02` 결정 전 provider SDK/webhook/production credential을 도입하는 것
+- `P0-CM-02` PortOne V2 결정을 live merchant/PG contract/credential/Production activation 승인으로 확대 해석하는 것
+- browser redirect/callback/Payment Attempt operational state를 verified payment success authority로 사용하는 것
 - current Saju production interpretation authority가 BLOCKED인 상태에서 `P0-CM-03`을 Paid Deep/Detailed Reading production SKU로 임의 승격하는 것
 - `P0-CM-04` Guest purchase 허용을 unrelated subject/account의 purchase claim 허용으로 확대 해석하는 것
 - Guest→Member continuity를 이유로 historical receipt/event/grant `subject_id`를 rewrite하는 것
