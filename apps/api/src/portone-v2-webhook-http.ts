@@ -96,21 +96,30 @@ function hasAcceptableContentLength(request: Request): boolean {
 async function readBoundedRawBody(request: Request): Promise<Uint8Array | null> {
   if (!hasAcceptableContentLength(request)) return null;
 
-  let buffer: ArrayBuffer;
+  const body = request.body;
+  if (body === null) return null;
+
+  const reader = body.getReader();
+  const chunks: Uint8Array[] = [];
+  let receivedBytes = 0;
+
   try {
-    buffer = await request.arrayBuffer();
+    while (true) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+
+      receivedBytes += chunk.value.byteLength;
+      if (receivedBytes > PORTONE_V2_WEBHOOK_MAX_BODY_BYTES_V1) return null;
+      chunks.push(chunk.value);
+    }
   } catch {
     return null;
+  } finally {
+    reader.releaseLock();
   }
 
-  const rawBody = new Uint8Array(buffer);
-  if (
-    rawBody.byteLength === 0 ||
-    rawBody.byteLength > PORTONE_V2_WEBHOOK_MAX_BODY_BYTES_V1
-  ) {
-    return null;
-  }
-  return rawBody;
+  if (receivedBytes === 0) return null;
+  return Buffer.concat(chunks, receivedBytes);
 }
 
 function requestHeaders(request: Request): Readonly<Record<string, string>> {
