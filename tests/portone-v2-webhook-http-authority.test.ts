@@ -14,8 +14,12 @@ describe('PortOne V2 webhook HTTP static authority', () => {
     expect(source).toContain("return noStoreResponse(405, { Allow: POST_METHOD });");
   });
 
-  it('reads raw bytes once without parsing or reserializing provider JSON', () => {
-    expect(source.match(/request\.arrayBuffer\(\)/gu)).toHaveLength(1);
+  it('reads raw bytes incrementally without parsing or reserializing provider JSON', () => {
+    expect(source).toContain('const body = request.body;');
+    expect(source).toContain('const reader = body.getReader();');
+    expect(source).toContain('const chunk = await reader.read();');
+    expect(source).toContain('reader.releaseLock();');
+    expect(source).not.toContain('request.arrayBuffer()');
     expect(source).not.toContain('request.json()');
     expect(source).not.toContain('request.text()');
     expect(source).not.toContain('JSON.stringify');
@@ -44,7 +48,7 @@ describe('PortOne V2 webhook HTTP static authority', () => {
     expect(source).not.toContain('transactionId');
   });
 
-  it('adds no deployment, secret binding, entitlement, refund, or persistence authority', () => {
+  it('adds no deployment, secret binding, entitlement, refund, persistence, or stream-disposal authority', () => {
     expect(source).not.toContain('process.env');
     expect(source).not.toContain('PORTONE_WEBHOOK_SECRET');
     expect(source).not.toContain('createServer');

@@ -61,6 +61,24 @@ function webhookRequest(input: {
   });
 }
 
+function unreadableWebhookRequest(): Request {
+  const stream = new ReadableStream<Uint8Array>(
+    {
+      pull() {
+        throw new Error('RAW_BODY_SECRET');
+      },
+    },
+    { highWaterMark: 0 },
+  );
+  const init = {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: stream,
+    duplex: 'half',
+  } as RequestInit & { duplex: 'half' };
+  return new Request(ROUTE, init);
+}
+
 function config(webhookSecrets: readonly string[] = [SECRET]) {
   return {
     environment: 'sandbox' as const,
@@ -174,7 +192,6 @@ describe('PortOne V2 webhook HTTP transport', () => {
 
   it('returns 404/405 before reading the request body or touching Commerce work', async () => {
     const wrongRoute = webhookRequest({ url: `${ROUTE}/wrong` });
-    const wrongRouteRead = vi.spyOn(wrongRoute, 'arrayBuffer');
     const wrongRoutePool = rejectingPool();
     const wrongRouteAdapter = unusedAdapter();
     const notFound = await handlePortOneV2WebhookRequestV1({
@@ -185,12 +202,11 @@ describe('PortOne V2 webhook HTTP transport', () => {
     });
     expect(notFound.status).toBe(404);
     expect(notFound.headers.get('cache-control')).toBe('no-store');
-    expect(wrongRouteRead).not.toHaveBeenCalled();
+    expect(wrongRoute.bodyUsed).toBe(false);
     expect(wrongRoutePool.connect).not.toHaveBeenCalled();
     expect(wrongRouteAdapter.verify).not.toHaveBeenCalled();
 
     const wrongMethod = webhookRequest({ method: 'PUT' });
-    const wrongMethodRead = vi.spyOn(wrongMethod, 'arrayBuffer');
     const methodPool = rejectingPool();
     const methodAdapter = unusedAdapter();
     const methodNotAllowed = await handlePortOneV2WebhookRequestV1({
@@ -201,7 +217,7 @@ describe('PortOne V2 webhook HTTP transport', () => {
     });
     expect(methodNotAllowed.status).toBe(405);
     expect(methodNotAllowed.headers.get('allow')).toBe('POST');
-    expect(wrongMethodRead).not.toHaveBeenCalled();
+    expect(wrongMethod.bodyUsed).toBe(false);
     expect(methodPool.connect).not.toHaveBeenCalled();
     expect(methodAdapter.verify).not.toHaveBeenCalled();
   });
@@ -209,7 +225,6 @@ describe('PortOne V2 webhook HTTP transport', () => {
   it('preserves exact raw bytes and returns an empty 204 for authenticated ignored events', async () => {
     const rawBody = payload('Future.NewEvent');
     const request = webhookRequest({ rawBody });
-    const read = vi.spyOn(request, 'arrayBuffer');
     const pool = rejectingPool();
     const adapter = unusedAdapter();
     const response = await handlePortOneV2WebhookRequestV1({
@@ -221,7 +236,8 @@ describe('PortOne V2 webhook HTTP transport', () => {
     expect(response.status).toBe(204);
     expect(await response.text()).toBe('');
     expect(response.headers.get('cache-control')).toBe('no-store');
-    expect(read).toHaveBeenCalledTimes(1);
+    expect(request.bodyUsed).toBe(true);
+    expect(request.body?.locked).toBe(false);
     expect(pool.connect).not.toHaveBeenCalled();
     expect(adapter.verify).not.toHaveBeenCalled();
   });
@@ -232,14 +248,13 @@ describe('PortOne V2 webhook HTTP transport', () => {
         'content-length': String(PORTONE_V2_WEBHOOK_MAX_BODY_BYTES_V1 + 1),
       },
     });
-    const preflightRead = vi.spyOn(preflight, 'arrayBuffer');
     expect((await handlePortOneV2WebhookRequestV1({
       request: preflight,
       pool: rejectingPool(),
       config: config(),
       verificationAdapter: unusedAdapter(),
     })).status).toBe(400);
-    expect(preflightRead).not.toHaveBeenCalled();
+    expect(preflight.bodyUsed).toBe(false);
 
     const malformedLength = webhookRequest({ extraHeaders: { 'content-length': '01' } });
     expect((await handlePortOneV2WebhookRequestV1({
@@ -248,15 +263,17 @@ describe('PortOne V2 webhook HTTP transport', () => {
       config: config(),
       verificationAdapter: unusedAdapter(),
     })).status).toBe(400);
+    expect(malformedLength.bodyUsed).toBe(false);
 
-    const unreadable = webhookRequest();
-    vi.spyOn(unreadable, 'arrayBuffer').mockRejectedValue(new Error('RAW_BODY_SECRET'));
+    const unreadable = unreadableWebhookRequest();
     expect((await handlePortOneV2WebhookRequestV1({
       request: unreadable,
       pool: rejectingPool(),
       config: config(),
       verificationAdapter: unusedAdapter(),
     })).status).toBe(400);
+    expect(unreadable.bodyUsed).toBe(true);
+    expect(unreadable.body?.locked).toBe(false);
 
     const oversized = 'x'.repeat(PORTONE_V2_WEBHOOK_MAX_BODY_BYTES_V1 + 1);
     const oversizedRequest = webhookRequest({ rawBody: oversized });
