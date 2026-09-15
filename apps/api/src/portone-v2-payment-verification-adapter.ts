@@ -289,6 +289,22 @@ function cancelUnusedResponseBody(response: PortOneV2PaymentHttpResponseV1): voi
   }
 }
 
+function readResponseHeader(
+  response: PortOneV2PaymentHttpResponseV1,
+  name: string,
+): string | null {
+  try {
+    return response.headers.get(name);
+  } catch {
+    cancelUnusedResponseBody(response);
+    return fail(
+      'NETWORK_FAILURE',
+      'PortOne V2 payment response headers could not be read.',
+      response.status,
+    );
+  }
+}
+
 function assertSuccessfulStatus(response: PortOneV2PaymentHttpResponseV1): void {
   if (response.status === 200) return;
   cancelUnusedResponseBody(response);
@@ -314,7 +330,7 @@ function assertSuccessfulStatus(response: PortOneV2PaymentHttpResponseV1): void 
 }
 
 function assertJsonContentType(response: PortOneV2PaymentHttpResponseV1): void {
-  const contentType = response.headers.get('content-type');
+  const contentType = readResponseHeader(response, 'content-type');
   if (
     contentType === null ||
     !/^application\/json(?:\s*;|$)/iu.test(contentType.trim())
@@ -329,7 +345,7 @@ function assertJsonContentType(response: PortOneV2PaymentHttpResponseV1): void {
 }
 
 function assertDeclaredBodyBound(response: PortOneV2PaymentHttpResponseV1): void {
-  const contentLength = response.headers.get('content-length');
+  const contentLength = readResponseHeader(response, 'content-length');
   if (contentLength === null) return;
   if (!/^[0-9]+$/u.test(contentLength.trim())) {
     cancelUnusedResponseBody(response);
