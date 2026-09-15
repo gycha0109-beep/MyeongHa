@@ -121,7 +121,10 @@ async function readBoundedRawBody(request: Request): Promise<Uint8Array | null> 
   } catch {
     return null;
   } finally {
-    reader.releaseLock();
+    try {
+      reader.releaseLock();
+    } catch {
+    }
   }
 
   if (receivedBytes === 0) return null;
