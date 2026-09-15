@@ -7,7 +7,7 @@ const root = process.cwd();
 const webRoot = join(root, 'apps', 'web');
 const authSource = readFileSync(join(webRoot, 'product-auth.js'), 'utf8');
 const clientSource = readFileSync(join(webRoot, 'birth-runtime-client.js'), 'utf8');
-const pageSource = readFileSync(join(webRoot, 'birth-page.js'), 'utf8');
+const pageSource = readFileSync(join(webRoot, 'src', 'birth', 'BirthPage.tsx'), 'utf8');
 const birthHtml = readFileSync(join(webRoot, 'birth.html'), 'utf8');
 const myHtml = readFileSync(join(webRoot, 'my.html'), 'utf8');
 const myPage = readFileSync(join(webRoot, 'src', 'my', 'MyPage.tsx'), 'utf8');
@@ -155,13 +155,13 @@ describe('web Birth session guard', () => {
   });
 
   it('preflights again at submit and never exposes edit semantics for an existing Birth profile', () => {
-    expect(pageSource).toContain('const current = await client.readCurrentBirthProfile();');
+    expect(pageSource).toContain('const current = await client.readCurrentBirthProfile()');
     expect(pageSource).toContain('if (current) {');
-    expect(pageSource).toContain('showExisting(current);');
-    expect(pageSource).toContain('const receipt = await client.createBirthProfile(request);');
-    expect(birthHtml).toContain('이미 저장된 출생 정보가 있습니다.');
-    expect(birthHtml).toContain('두 번째 본인 Birth Profile을 만들지 않습니다.');
-    expect(birthHtml).not.toContain('수정 저장');
+    expect(pageSource).toContain("setView({ kind: 'existing', current });");
+    expect(pageSource).toContain('const receipt = await client.createBirthProfile(request)');
+    expect(pageSource).toContain('이미 저장된 출생 정보가 있습니다.');
+    expect(pageSource).toContain('두 번째 본인 Birth Profile을 만들지 않습니다.');
+    expect(pageSource).not.toContain('수정 저장');
     expect(clientSource).toContain("const DEFAULT_CURRENT_ENDPOINT = '/api/me/birth-profile'");
     expect(clientSource).not.toContain('subjectId');
     expect(clientSource).not.toContain('authUserId');
