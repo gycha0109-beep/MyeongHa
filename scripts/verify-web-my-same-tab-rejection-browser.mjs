@@ -2,7 +2,7 @@ import { createReadStream } from 'node:fs';
 import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
-import { extname, join, normalize, resolve } from 'node:path';
+import { extname, join, normalize, resolve, sep } from 'node:path';
 import { spawn } from 'node:child_process';
 
 const root = resolve(process.cwd(), process.env.MYEONGHA_WEB_OUTPUT_DIR ?? 'public');
@@ -79,7 +79,7 @@ async function serve() {
 
       const staticPath = path === '/' ? '/my.html' : path;
       const file = resolve(root, normalize(staticPath).replace(/^[/\\]+/, ''));
-      assert(file.startsWith(`${root}/`), 'request escaped static root');
+      assert(file.startsWith(`${root}${sep}`), 'request escaped static root');
       assert((await stat(file)).isFile(), 'not a file');
       res.setHeader('Content-Type', mime.get(extname(file).toLowerCase()) ?? 'application/octet-stream');
       createReadStream(file).pipe(res);
@@ -159,7 +159,7 @@ async function navigate(client, origin) {
   await waitFor(client, `location.pathname === '/my.html' && document.readyState === 'complete'`, 'My page navigation failed');
 }
 
-for (const file of ['my.html', 'my-page.js', 'my-runtime-client.js', 'product-auth.js', 'product-auth-surface.js']) {
+for (const file of ['my.html', 'my-runtime-client.js', 'product-auth.js', 'product-auth-surface.js']) {
   await stat(join(root, file));
 }
 

@@ -33,138 +33,7 @@
     </div>
   </header>
 
-  <main class="my-main">
-    <div class="product-shell">
-      <header class="my-head">
-        <div>
-          <div class="my-kicker">MY MyeongHa</div>
-          <h1 class="my-title">내 명하를 관리합니다.</h1>
-        </div>
-        <p class="my-lead">계정과 원본 입력은 여기서 관리하고, 계산된 사주는 사주에서, 지나온 기록은 기록에서 확인합니다.</p>
-      </header>
-
-      <section class="my-account-section" aria-labelledby="my-account-title">
-        <div class="my-section-head">
-          <div>
-            <span class="my-section-kicker">ACCOUNT</span>
-            <h2 id="my-account-title">현재 계정</h2>
-          </div>
-          <p>서버가 확인한 현재 subject와 프로필만 표시합니다.</p>
-        </div>
-
-        <div class="my-status" id="my-status" role="status">내 정보를 불러오는 중입니다…</div>
-
-        <div id="my-content" hidden>
-          <div class="my-overview-grid">
-            <article class="my-card my-identity-card">
-              <div class="my-profile-mark" aria-hidden="true">之</div>
-              <div class="my-profile-name" id="my-display-name">호칭 미설정</div>
-              <div class="my-profile-kind"><span id="my-subject-kind">현재 계정</span> · <span id="my-subject-status">—</span></div>
-              <div class="my-account-email-row">
-                <span>로그인 계정</span>
-                <strong id="my-account-email">—</strong>
-              </div>
-              <p class="my-account-note" id="my-account-note">현재 인증 상태를 확인하는 중입니다.</p>
-            </article>
-
-            <article class="my-card my-facts-card">
-              <div class="my-card-label">PROFILE</div>
-              <dl class="my-facts">
-                <div class="my-fact"><dt>언어</dt><dd id="my-locale">—</dd></div>
-                <div class="my-fact"><dt>시간대</dt><dd id="my-timezone">—</dd></div>
-                <div class="my-fact"><dt>온보딩 상태</dt><dd id="my-onboarding-state">—</dd></div>
-                <div class="my-fact"><dt>프로필 갱신</dt><dd id="my-profile-updated">—</dd></div>
-              </dl>
-            </article>
-          </div>
-        </div>
-      </section>
-
-      <section class="my-birth-section" aria-labelledby="my-birth-title">
-        <div class="my-section-head">
-          <div>
-            <span class="my-section-kicker">BIRTH INPUT</span>
-            <h2 id="my-birth-title">출생 정보</h2>
-          </div>
-          <p>현재 subject에 연결된 본인 출생 원본 입력만 표시합니다. 계산 결과는 사주 화면에서 확인합니다.</p>
-        </div>
-        <div class="my-status my-birth-status" id="my-birth-status" role="status">출생 정보를 확인하는 중입니다…</div>
-        <article class="my-birth-card" id="my-birth-content" hidden>
-          <div class="my-birth-heading">
-            <div>
-              <span class="my-card-label">CURRENT INPUT</span>
-              <strong>현재 저장된 출생 정보</strong>
-            </div>
-            <span class="my-setting-state" id="my-birth-revision">현재 입력</span>
-          </div>
-          <dl class="my-birth-facts">
-            <div><dt>생년월일</dt><dd id="my-birth-date">—</dd></div>
-            <div><dt>태어난 시간</dt><dd id="my-birth-time">—</dd></div>
-            <div><dt>달력</dt><dd id="my-birth-calendar">—</dd></div>
-            <div><dt>성별</dt><dd id="my-birth-sex">—</dd></div>
-          </dl>
-          <div class="my-birth-footer">
-            <p>현재는 저장된 원본 입력을 확인할 수 있습니다. 안전한 revision 수정 경로가 제품에 연결되기 전에는 기존 값을 임의로 덮어쓰지 않습니다.</p>
-            <a class="my-auth-action" href="reading.html">사주에서 계산 결과 보기 →</a>
-          </div>
-        </article>
-      </section>
-
-      <section class="my-section" aria-labelledby="my-paths-title">
-        <div class="my-section-head">
-          <div>
-            <span class="my-section-kicker">YOUR DATA</span>
-            <h2 id="my-paths-title">내 정보와 이어지는 곳</h2>
-          </div>
-          <p>같은 정보를 여러 화면에 복제하지 않고 각 화면의 역할로 이동합니다.</p>
-        </div>
-
-        <div class="my-route-grid">
-          <a class="my-route-card is-primary" href="reading.html">
-            <span class="my-route-index">01</span>
-            <span class="my-route-copy"><strong>내 사주</strong><span>계산된 명식과 오행 구조를 확인합니다.</span></span>
-            <span class="my-route-arrow" aria-hidden="true">→</span>
-          </a>
-          <a class="my-route-card" id="my-birth-route" href="#my-birth-title">
-            <span class="my-route-index">02</span>
-            <span class="my-route-copy"><strong id="my-birth-route-title">현재 출생 정보 확인</strong><span id="my-birth-route-copy">현재 저장 상태를 먼저 확인합니다. 새 입력 가능 여부는 서버 조회 후 열립니다.</span></span>
-            <span class="my-route-arrow" aria-hidden="true">→</span>
-          </a>
-          <a class="my-route-card" href="records.html">
-            <span class="my-route-index">03</span>
-            <span class="my-route-copy"><strong>내 기록</strong><span>명식록 · 현세록 · 기억을 확인합니다.</span></span>
-            <span class="my-route-arrow" aria-hidden="true">→</span>
-          </a>
-          <a class="my-route-card" href="chat-hub.html">
-            <span class="my-route-index">04</span>
-            <span class="my-route-copy"><strong>대화 이어가기</strong><span>관계를 맺은 사람과 대화 화면으로 이동합니다.</span></span>
-            <span class="my-route-arrow" aria-hidden="true">→</span>
-          </a>
-        </div>
-      </section>
-
-      <section class="my-settings-section" aria-labelledby="my-settings-title">
-        <div class="my-section-head">
-          <div>
-            <span class="my-section-kicker">SETTINGS</span>
-            <h2 id="my-settings-title">설정과 계정 경계</h2>
-          </div>
-        </div>
-        <div class="my-setting-grid">
-          <article class="my-setting-card">
-            <strong>알림 · 이용 권한</strong>
-            <p>알림과 이용 권한 설정은 준비 중입니다. 확인 가능한 설정 API가 연결되기 전에는 구독이나 알림 상태를 임의로 만들어 표시하지 않습니다.</p>
-            <span class="my-setting-state">준비 중</span>
-          </article>
-          <article class="my-setting-card my-boundary-card">
-            <strong>데이터 역할 분리</strong>
-            <p>마이는 계정과 입력 관리의 시작점입니다. 계산 결과는 사주, 이력은 기록, 관계와 대화는 대화 화면이 담당합니다.</p>
-            <span class="my-setting-state">제품 경계</span>
-          </article>
-        </div>
-      </section>
-    </div>
-  </main>
+  <main class="my-main" id="my-react-root"></main>
 
   <nav class="mobile-bottom-nav" aria-label="모바일 주요 메뉴">
     <a class="mobile-nav-link" href="hall.html"><span class="mobile-nav-icon" aria-hidden="true">⌂</span><span>홈</span></a>
@@ -173,6 +42,6 @@
     <a class="mobile-nav-link" href="records.html"><span class="mobile-nav-icon" aria-hidden="true">▤</span><span>기록</span></a>
     <a class="mobile-nav-link" href="my.html" aria-current="page"><span class="mobile-nav-icon" aria-hidden="true">♙</span><span>마이</span></a>
   </nav>
-  <script type="module" src="my-page.js"></script>
+  <script type="module" src="/src/my/main.tsx"></script>
 </body>
 </html>

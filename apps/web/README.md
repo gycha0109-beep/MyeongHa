@@ -12,7 +12,7 @@ npm run dev
 
 Then open `http://localhost:4173`.
 
-`npm run build:web` produces the Vercel static artifact in `public/`. Hall is the first React entry; the remaining pages continue to use their existing ES module entry points until each page is migrated.
+`npm run build:web` produces the Vercel static artifact in `public/`. Hall and My are React entries; the remaining pages continue to use their existing ES module entry points until each page is migrated.
 
 ## Implemented UI flow
 

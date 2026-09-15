@@ -6,7 +6,7 @@ const root = process.cwd();
 const webRoot = join(root, 'apps', 'web');
 const authPage = readFileSync(join(webRoot, 'auth-page.js'), 'utf8');
 const authCss = readFileSync(join(webRoot, 'auth.css'), 'utf8');
-const myPage = readFileSync(join(webRoot, 'my-page.js'), 'utf8');
+const myPage = readFileSync(join(webRoot, 'src', 'my', 'MyPage.tsx'), 'utf8');
 
 describe('web auth recovery boundary', () => {
   it('keeps signup-only password confirmation visually hidden during sign-in', () => {
@@ -68,9 +68,9 @@ describe('web auth recovery boundary', () => {
   });
 
   it('exposes logout/session-clear recovery when My receives AUTH_REQUIRED with a stored member session', () => {
-    expect(myPage).toContain('const hasStoredMemberSession = Boolean(readMemberSession())');
-    expect(myPage).toContain("link.textContent = hasStoredMemberSession ? '다시 로그인 →' : '로그인하기 →'");
-    expect(myPage).toContain("button.textContent = '로그아웃'");
+    expect(myPage).toContain('hasStoredMemberSession: Boolean(readMemberSession())');
+    expect(myPage).toContain("subjectKind === 'member' || hasStoredMemberSession ? '다시 로그인 →' : '로그인하기 →'");
+    expect(myPage).toContain("signingOut ? '로그아웃 중…' : '로그아웃'");
     expect(myPage).toContain('await signOutMember()');
     expect(myPage).toContain('내 정보를 보려면 현재 세션이 필요합니다.');
   });

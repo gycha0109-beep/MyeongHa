@@ -7,7 +7,7 @@ const webRoot = join(root, 'apps', 'web');
 const myHtml = readFileSync(join(webRoot, 'my.html'), 'utf8');
 const myCss = readFileSync(join(webRoot, 'my.css'), 'utf8');
 const client = readFileSync(join(webRoot, 'my-runtime-client.js'), 'utf8');
-const page = readFileSync(join(webRoot, 'my-page.js'), 'utf8');
+const page = readFileSync(join(webRoot, 'src', 'my', 'MyPage.tsx'), 'utf8');
 const hall = readFileSync(join(webRoot, 'hall.html'), 'utf8');
 const homePage = readFileSync(join(webRoot, 'src', 'home', 'HomePage.tsx'), 'utf8');
 const productAuthUi = readFileSync(join(webRoot, 'product-auth-ui.js'), 'utf8');
@@ -20,7 +20,7 @@ describe('web My profile authority boundary', () => {
     expect(myHtml).toContain('<title>마이 · 명하</title>');
     expect(myHtml).toContain('href="product.css"');
     expect(myHtml).toContain('href="my.css"');
-    expect(myHtml).toContain('src="my-page.js"');
+    expect(myHtml).toContain('src="/src/my/main.tsx"');
     expect(myHtml).toContain('href="my.html" aria-current="page">마이</a>');
     expect(hall).toContain('class="product-nav-link" href="my.html">마이</a>');
     expect(hall).toContain('class="mobile-nav-link" href="my.html"');
@@ -67,25 +67,25 @@ describe('web My profile authority boundary', () => {
     ]) {
       expect(page).toContain(field);
     }
-    expect(page).toContain('textContent');
+    expect(page).not.toContain('dangerouslySetInnerHTML');
     expect(page).not.toContain('innerHTML');
     expect(page).not.toContain('insertAdjacentHTML');
   });
 
   it('does not fabricate plan, entitlement, or notification values', () => {
-    expect(myHtml).toContain('알림과 이용 권한 설정은 준비 중입니다.');
-    expect(myHtml).not.toContain('프리미엄');
-    expect(myHtml).not.toContain('구독 중');
-    expect(myHtml).not.toContain('알림 켜짐');
-    expect(myHtml).not.toContain('HTTP surface');
-    expect(myHtml).not.toContain('authority');
-    expect(myHtml).not.toContain('contract');
+    expect(page).toContain('알림과 이용 권한 설정은 준비 중입니다.');
+    expect(page).not.toContain('프리미엄');
+    expect(page).not.toContain('구독 중');
+    expect(page).not.toContain('알림 켜짐');
+    expect(page).not.toContain('HTTP surface');
+    expect(page).not.toContain('authority');
+    expect(page).not.toContain('contract');
   });
 
   it('keeps My styles self-contained rather than borrowing Home-only classes', () => {
-    expect(myHtml).toContain('class="my-kicker"');
+    expect(page).toContain('className="my-kicker"');
     expect(myCss).toContain('.my-kicker');
-    expect(myHtml).not.toContain('class="home-kicker"');
+    expect(page).not.toContain('className="home-kicker"');
   });
 
   it('aligns Home, Saju hub, and Reading detail profile affordances with the My destination', () => {
