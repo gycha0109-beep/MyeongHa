@@ -46,11 +46,20 @@ full character paraphrase는 별도 validated semantic-preservation gate가 생�
 
 ## SRC-04 — API/RLS Database Execution Identity
 
-**Status: OPEN-P0 `P0-AUTH-01`**
+**Status: RESOLVED AT REPOSITORY DECISION LEVEL — `P0-AUTH-01` DECIDED**
 
-Use Case는 RLS 또는 동등한 authorization을 요구하지만 Shared API가 PostgreSQL에 어떤 identity/role로 접속하는지는 source가 결정하지 않는다.
+Use Case는 RLS 또는 동등한 authorization을 요구하지만 Shared API가 PostgreSQL에 어떤 identity/role로 접속하는지는 source가 결정하지 않았다. 이 source-level authority gap은 historical provenance로 남는다.
 
-이 결정 없이는 `RLS default deny`를 실제 SQL policy로 완성할 수 없다.
+후속 repository-owned Production decision `P0-AUTH-01`이 implementation-critical execution authority를 다음과 같이 확정했다.
+
+```text
+API execution role = non-BYPASSRLS
+trusted subject context = transaction-scoped canonical subjects.id
+```
+
+따라서 `SRC-04`는 더 이상 `OPEN-P0`가 아니다. 현재 API→PostgreSQL subject execution은 위 결정과 그에 따른 RLS/transaction boundary를 따라야 하며, 다른 execution identity 모델로 변경하려면 새 explicit decision/review가 필요하다.
+
+이 상태 변경은 원 source 문서가 누락된 detail을 나중에 제공했다는 뜻이 아니다. 원 source의 미결정은 보존하되, repository decision register가 Production 구현에 필요한 authority를 별도로 닫았음을 기록한다.
 
 ## SRC-05 — Memory Proposal Staging vs `session-only` / `reject` Privacy
 
