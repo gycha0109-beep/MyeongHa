@@ -31,22 +31,32 @@ export function createPortOneV2WebhookRuntimeV1(
   input: CreatePortOneV2WebhookRuntimeInputV1,
 ): PortOneV2WebhookRuntimeV1 {
   const config = input.config;
-  const verificationAdapter = createPortOneV2PaymentVerificationAdapterV1({
+  const configSnapshot = Object.freeze({
+    environment: config.environment,
+    webhookSecrets: Object.freeze([...config.webhookSecrets]),
     apiSecret: config.apiSecret,
     evidenceHmacSecret: config.evidenceHmacSecret,
-    ...(config.paymentTimeoutMs === undefined
+    timeoutMs: config.paymentTimeoutMs,
+    fetchImpl: config.paymentFetchImpl,
+    now: config.now,
+  });
+
+  const verificationAdapter = createPortOneV2PaymentVerificationAdapterV1({
+    apiSecret: configSnapshot.apiSecret,
+    evidenceHmacSecret: configSnapshot.evidenceHmacSecret,
+    ...(configSnapshot.timeoutMs === undefined
       ? {}
-      : { timeoutMs: config.paymentTimeoutMs }),
-    ...(config.paymentFetchImpl === undefined
+      : { timeoutMs: configSnapshot.timeoutMs }),
+    ...(configSnapshot.fetchImpl === undefined
       ? {}
-      : { fetchImpl: config.paymentFetchImpl }),
-    ...(config.now === undefined ? {} : { now: config.now }),
+      : { fetchImpl: configSnapshot.fetchImpl }),
+    ...(configSnapshot.now === undefined ? {} : { now: configSnapshot.now }),
   });
 
   const webhookConfig: PortOneV2WebhookPaymentCompletionConfigV1 = Object.freeze({
-    environment: config.environment,
-    webhookSecrets: Object.freeze([...config.webhookSecrets]),
-    ...(config.now === undefined ? {} : { now: config.now }),
+    environment: configSnapshot.environment,
+    webhookSecrets: configSnapshot.webhookSecrets,
+    ...(configSnapshot.now === undefined ? {} : { now: configSnapshot.now }),
   });
   const pool = input.pool;
 
