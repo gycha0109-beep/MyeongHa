@@ -1,4 +1,4 @@
-import { Pool, type PoolClient } from 'pg';
+import { Pool, type PoolClient, type PoolConfig } from 'pg';
 import type {
   PostgresQueryResultV1,
   PostgresSubjectConnectionV1,
@@ -13,6 +13,7 @@ export const NODE_POSTGRES_SUBJECT_POOL_DEFAULTS_V1 = Object.freeze({
   maxConnectionsPerRuntime: 4,
   connectionTimeoutMs: 5_000,
   idleTimeoutMs: 10_000,
+  statementTimeoutMs: 5_000,
 } as const);
 
 const VERIFY_LOGIN_PRINCIPAL_SQL = `
@@ -96,6 +97,20 @@ export function normalizeNodePostgresConnectionStringV1(
   return url.toString();
 }
 
+export function buildNodePostgresPoolConfigV1(
+  connectionString: string,
+): PoolConfig {
+  return Object.freeze({
+    connectionString: normalizeNodePostgresConnectionStringV1(connectionString),
+    max: NODE_POSTGRES_SUBJECT_POOL_DEFAULTS_V1.maxConnectionsPerRuntime,
+    connectionTimeoutMillis:
+      NODE_POSTGRES_SUBJECT_POOL_DEFAULTS_V1.connectionTimeoutMs,
+    idleTimeoutMillis: NODE_POSTGRES_SUBJECT_POOL_DEFAULTS_V1.idleTimeoutMs,
+    statement_timeout: NODE_POSTGRES_SUBJECT_POOL_DEFAULTS_V1.statementTimeoutMs,
+    allowExitOnIdle: true,
+  });
+}
+
 class PgDriverClientV1 implements NodePostgresDriverClientV1 {
   constructor(private readonly client: PoolClient) {}
 
@@ -122,14 +137,7 @@ class PgDriverPoolV1 implements NodePostgresDriverPoolV1 {
   private readonly pool: Pool;
 
   constructor(connectionString: string) {
-    this.pool = new Pool({
-      connectionString: normalizeNodePostgresConnectionStringV1(connectionString),
-      max: NODE_POSTGRES_SUBJECT_POOL_DEFAULTS_V1.maxConnectionsPerRuntime,
-      connectionTimeoutMillis:
-        NODE_POSTGRES_SUBJECT_POOL_DEFAULTS_V1.connectionTimeoutMs,
-      idleTimeoutMillis: NODE_POSTGRES_SUBJECT_POOL_DEFAULTS_V1.idleTimeoutMs,
-      allowExitOnIdle: true,
-    });
+    this.pool = new Pool(buildNodePostgresPoolConfigV1(connectionString));
 
     this.pool.on('error', (error) => {
       const code = (error as Error & { code?: unknown }).code;
@@ -217,7 +225,8 @@ class NodePostgresSubjectConnectionV1 implements PostgresSubjectConnectionV1 {
  *
  * Every checked-out connection is verified before it is exposed to the existing
  * transaction adapter. This prevents a drifted network credential from silently
- * becoming the user-data execution baseline.
+ * becoming the user-data execution baseline. The concrete driver pool also
+ * applies the governed server-side per-statement deadline to every client.
  */
 export class NodePostgresSubjectPoolV1 implements PostgresSubjectPoolV1 {
   constructor(
