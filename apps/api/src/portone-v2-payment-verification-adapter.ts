@@ -515,15 +515,16 @@ function requireCurrency(value: unknown): string {
 }
 
 function requirePaidAt(value: unknown): string {
+  const occurredAtMs = typeof value === 'string' ? Date.parse(value) : Number.NaN;
   if (
     typeof value !== 'string' ||
     value.length === 0 ||
     value.length > 128 ||
-    !Number.isFinite(Date.parse(value))
+    !Number.isFinite(occurredAtMs)
   ) {
     return fail('INVALID_PAYMENT', 'PortOne V2 payment paidAt is invalid.');
   }
-  return value;
+  return new Date(occurredAtMs).toISOString();
 }
 
 function normalizePaidPayment(
