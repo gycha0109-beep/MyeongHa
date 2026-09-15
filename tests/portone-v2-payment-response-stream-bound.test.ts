@@ -29,7 +29,7 @@ function paidPayment() {
     currency: 'KRW',
     amount: { total: 1000 },
     products: [{ id: 'product-1', name: 'Deep Reading', quantity: 1, amount: 1000 }],
-    selectedChannel: { type: 'TEST' },
+    channel: { type: 'TEST' },
     paidAt: '2026-09-14T05:00:00.000Z',
   };
 }

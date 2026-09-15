@@ -117,7 +117,7 @@ function paymentFetch() {
     id: 'payment-1',
     transactionId: 'transaction-1',
     products: [{ id: 'external-product-1' }],
-    selectedChannel: { type: 'TEST' },
+    channel: { type: 'TEST' },
     currency: 'KRW',
     amount: { total: 1000 },
     paidAt: '2026-09-14T07:09:59.000Z',

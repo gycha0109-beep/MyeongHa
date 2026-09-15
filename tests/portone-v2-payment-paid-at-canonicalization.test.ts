@@ -25,7 +25,7 @@ function paidPayment(paidAt: string) {
     currency: 'KRW',
     amount: { total: 1000 },
     products: [{ id: 'product-1', name: 'Deep Reading', quantity: 1, amount: 1000 }],
-    selectedChannel: { type: 'TEST' },
+    channel: { type: 'TEST' },
     paidAt,
   };
 }

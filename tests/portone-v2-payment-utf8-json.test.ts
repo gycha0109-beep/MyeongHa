@@ -58,7 +58,7 @@ function validPayment(note: string) {
     currency: 'KRW',
     amount: { total: 1000 },
     products: [{ id: 'product-1', name: 'Deep Reading', quantity: 1, amount: 1000 }],
-    selectedChannel: { type: 'TEST' },
+    channel: { type: 'TEST' },
     paidAt: '2026-09-14T05:00:00Z',
   };
 }
@@ -79,7 +79,7 @@ describe('PortOne V2 payment JSON UTF-8 boundary', () => {
     const prefix = new TextEncoder().encode('{"note":"');
     const malformed = Uint8Array.from([0xc3, 0x28]);
     const suffix = new TextEncoder().encode(
-      '","status":"PAID","id":"payment-utf8-1","transactionId":"transaction-utf8-1","currency":"KRW","amount":{"total":1000},"products":[{"id":"product-1","name":"Deep Reading","quantity":1,"amount":1000}],"selectedChannel":{"type":"TEST"},"paidAt":"2026-09-14T05:00:00Z"}',
+      '","status":"PAID","id":"payment-utf8-1","transactionId":"transaction-utf8-1","currency":"KRW","amount":{"total":1000},"products":[{"id":"product-1","name":"Deep Reading","quantity":1,"amount":1000}],"channel":{"type":"TEST"},"paidAt":"2026-09-14T05:00:00Z"}',
     );
     const bytes = new Uint8Array(prefix.length + malformed.length + suffix.length);
     bytes.set(prefix, 0);

@@ -116,7 +116,7 @@ describe('PortOne V2 payment response reader release cleanup', () => {
       currency: 'KRW',
       amount: { total: 1000 },
       products: [{ id: 'product-1', name: 'Deep Reading', quantity: 1, amount: 1000 }],
-      selectedChannel: { type: 'TEST' },
+      channel: { type: 'TEST' },
       paidAt: '2026-09-14T23:59:00.000Z',
     });
     const chunks: Array<Readonly<{ done: boolean; value?: Uint8Array }>> = [
