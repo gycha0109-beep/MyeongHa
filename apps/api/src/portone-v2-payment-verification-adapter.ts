@@ -810,14 +810,42 @@ function fingerprintEvidence(input: {
   });
 }
 
+type PortOneV2PaymentVerificationAdapterConfigSnapshotV1 = Readonly<{
+  apiSecret: string;
+  evidenceHmacSecret: string;
+  timeoutMs: number | undefined;
+  fetchImpl: PortOneV2PaymentHttpFetchV1 | undefined;
+  now: (() => Date) | undefined;
+}>;
+
+function snapshotVerificationConfig(
+  config: PortOneV2PaymentVerificationAdapterConfigV1,
+): PortOneV2PaymentVerificationAdapterConfigSnapshotV1 {
+  try {
+    return Object.freeze({
+      apiSecret: config.apiSecret,
+      evidenceHmacSecret: config.evidenceHmacSecret,
+      timeoutMs: config.timeoutMs,
+      fetchImpl: config.fetchImpl,
+      now: config.now,
+    });
+  } catch {
+    throw new PortOneV2PaymentVerificationAdapterErrorV1(
+      'INVALID_CONFIGURATION',
+      'PortOne V2 verification configuration could not be read.',
+    );
+  }
+}
+
 export function createPortOneV2PaymentVerificationAdapterV1(
   config: PortOneV2PaymentVerificationAdapterConfigV1,
 ): CommercePaymentVerificationAdapterV1 {
-  const apiSecret = resolveApiSecret(config.apiSecret);
-  const evidenceHmacSecret = resolveEvidenceHmacSecret(config.evidenceHmacSecret);
-  const timeoutMs = resolveTimeoutMs(config.timeoutMs);
-  const fetchImpl = config.fetchImpl ?? defaultFetch;
-  const now = config.now ?? (() => new Date());
+  const snapshot = snapshotVerificationConfig(config);
+  const apiSecret = resolveApiSecret(snapshot.apiSecret);
+  const evidenceHmacSecret = resolveEvidenceHmacSecret(snapshot.evidenceHmacSecret);
+  const timeoutMs = resolveTimeoutMs(snapshot.timeoutMs);
+  const fetchImpl = snapshot.fetchImpl ?? defaultFetch;
+  const now = snapshot.now ?? (() => new Date());
 
   return Object.freeze({
     async verify(
