@@ -100,36 +100,57 @@ describe('PortOne V2 paidAt canonicalization', () => {
     ).toBe(1);
   });
 
-  it('preserves meaningful provider precision beyond milliseconds while normalizing equivalent representations', async () => {
-    const variants = [
-      '2026-09-14T05:00:00.123400Z',
-      '2026-09-14T14:00:00.1234+09:00',
-    ];
-
-    const results = [];
-    for (const paidAt of variants) {
-      results.push(await verifyPaidAt(paidAt));
-    }
-
-    expect(
-      results.map((result) => result.evidence.providerOccurredAt),
-    ).toEqual([
-      '2026-09-14T05:00:00.1234Z',
-      '2026-09-14T05:00:00.1234Z',
-    ]);
-    expect(
-      new Set(results.map((result) => result.evidence.evidenceFingerprint)).size,
-    ).toBe(1);
-  });
-
-  it('keeps distinct sub-millisecond provider instants distinct in normalized evidence and fingerprints', async () => {
-    const first = await verifyPaidAt('2026-09-14T05:00:00.0001Z');
-    const second = await verifyPaidAt('2026-09-14T05:00:00.0002Z');
+  it('preserves meaningful provider precision beyond milliseconds while removing redundant zeros', async () => {
+    const first = await verifyPaidAt('2026-09-14T05:00:00.0001000Z');
+    const equivalent = await verifyPaidAt('2026-09-14T14:00:00.0001+09:00');
+    const distinct = await verifyPaidAt('2026-09-14T05:00:00.0002Z');
 
     expect(first.evidence.providerOccurredAt).toBe('2026-09-14T05:00:00.0001Z');
-    expect(second.evidence.providerOccurredAt).toBe('2026-09-14T05:00:00.0002Z');
-    expect(first.evidence.evidenceFingerprint).not.toBe(
-      second.evidence.evidenceFingerprint,
+    expect(equivalent.evidence.providerOccurredAt).toBe(
+      '2026-09-14T05:00:00.0001Z',
+    );
+    expect(first.evidence.evidenceFingerprint).toBe(
+      equivalent.evidence.evidenceFingerprint,
+    );
+    expect(distinct.evidence.providerOccurredAt).toBe('2026-09-14T05:00:00.0002Z');
+    expect(distinct.evidence.evidenceFingerprint).not.toBe(
+      first.evidence.evidenceFingerprint,
+    );
+  });
+
+  it('rejects JavaScript date-parser extensions outside the PortOne RFC 3339 date-time schema', async () => {
+    const invalidValues = [
+      '2026-09-14',
+      '09/14/2026',
+      '2026-09-14 05:00:00Z',
+      '2026-09-14T05:00:00',
+      '2026-02-30T05:00:00Z',
+      '2026-09-14T24:00:00Z',
+      '2026-09-14T05:00:00+24:00',
+      '2026-09-14T05:00:00+09:60',
+      '2026-09-14T05:00:60Z',
+    ];
+
+    for (const paidAt of invalidValues) {
+      await expect(verifyPaidAt(paidAt)).rejects.toMatchObject({
+        name: 'PortOneV2PaymentVerificationAdapterErrorV1',
+        code: 'INVALID_PAYMENT',
+      });
+    }
+  });
+
+  it('preserves valid RFC 3339 leap-second precision at the UTC boundary', async () => {
+    const direct = await verifyPaidAt('2016-12-31T23:59:60.123400Z');
+    const offset = await verifyPaidAt('2017-01-01T08:59:60.1234+09:00');
+
+    expect(direct.evidence.providerOccurredAt).toBe(
+      '2016-12-31T23:59:60.1234Z',
+    );
+    expect(offset.evidence.providerOccurredAt).toBe(
+      '2016-12-31T23:59:60.1234Z',
+    );
+    expect(direct.evidence.evidenceFingerprint).toBe(
+      offset.evidence.evidenceFingerprint,
     );
   });
 });
