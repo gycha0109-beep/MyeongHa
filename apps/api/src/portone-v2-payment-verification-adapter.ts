@@ -95,6 +95,8 @@ interface PortOneV2PaymentBodyReaderV1 {
 }
 
 const CURRENCY = /^[A-Z]{3}$/u;
+const RFC3339_TIME_FRACTION =
+  /T\d{2}:\d{2}:\d{2}(?:\.(\d+))?(?:Z|[+-]\d{2}:\d{2})$/iu;
 const MAX_PROVIDER_ID_LENGTH = 512;
 
 function fail(
@@ -524,7 +526,17 @@ function requirePaidAt(value: unknown): string {
   ) {
     return fail('INVALID_PAYMENT', 'PortOne V2 payment paidAt is invalid.');
   }
-  return new Date(occurredAtMs).toISOString();
+
+  const canonicalMilliseconds = new Date(occurredAtMs).toISOString();
+  const fractionalDigits = RFC3339_TIME_FRACTION.exec(value)?.[1];
+  if (fractionalDigits === undefined || fractionalDigits.length <= 3) {
+    return canonicalMilliseconds;
+  }
+
+  const meaningfulFraction = fractionalDigits.replace(/0+$/u, '');
+  if (meaningfulFraction.length <= 3) return canonicalMilliseconds;
+
+  return `${canonicalMilliseconds.slice(0, -1)}${meaningfulFraction.slice(3)}Z`;
 }
 
 function normalizePaidPayment(

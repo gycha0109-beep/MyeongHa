@@ -99,4 +99,37 @@ describe('PortOne V2 paidAt canonicalization', () => {
       new Set(results.map((result) => result.evidence.evidenceFingerprint)).size,
     ).toBe(1);
   });
+
+  it('preserves meaningful provider precision beyond milliseconds while normalizing equivalent representations', async () => {
+    const variants = [
+      '2026-09-14T05:00:00.123400Z',
+      '2026-09-14T14:00:00.1234+09:00',
+    ];
+
+    const results = [];
+    for (const paidAt of variants) {
+      results.push(await verifyPaidAt(paidAt));
+    }
+
+    expect(
+      results.map((result) => result.evidence.providerOccurredAt),
+    ).toEqual([
+      '2026-09-14T05:00:00.1234Z',
+      '2026-09-14T05:00:00.1234Z',
+    ]);
+    expect(
+      new Set(results.map((result) => result.evidence.evidenceFingerprint)).size,
+    ).toBe(1);
+  });
+
+  it('keeps distinct sub-millisecond provider instants distinct in normalized evidence and fingerprints', async () => {
+    const first = await verifyPaidAt('2026-09-14T05:00:00.0001Z');
+    const second = await verifyPaidAt('2026-09-14T05:00:00.0002Z');
+
+    expect(first.evidence.providerOccurredAt).toBe('2026-09-14T05:00:00.0001Z');
+    expect(second.evidence.providerOccurredAt).toBe('2026-09-14T05:00:00.0002Z');
+    expect(first.evidence.evidenceFingerprint).not.toBe(
+      second.evidence.evidenceFingerprint,
+    );
+  });
 });
