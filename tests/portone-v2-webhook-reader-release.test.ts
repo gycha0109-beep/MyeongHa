@@ -112,4 +112,44 @@ describe('PortOne V2 webhook request reader release cleanup', () => {
     expect(read).toHaveBeenCalledTimes(1);
     expect(releaseLock).toHaveBeenCalledTimes(1);
   });
+
+  it('rejects a malformed non-Uint8Array chunk before Buffer.concat or Commerce work', async () => {
+    const read = vi
+      .fn<InjectedReaderV1['read']>()
+      .mockResolvedValueOnce({
+        done: false,
+        value: { byteLength: 1 } as unknown as Uint8Array,
+      })
+      .mockResolvedValueOnce({ done: true });
+    const releaseLock = vi.fn();
+    const h = harness();
+
+    await expectSafeInvalidWebhook(
+      requestWithReader({ read, releaseLock }),
+      h,
+    );
+
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(releaseLock).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects a malformed done shape before reading another chunk or Commerce work', async () => {
+    const read = vi
+      .fn<InjectedReaderV1['read']>()
+      .mockResolvedValueOnce({
+        done: 0 as unknown as boolean,
+        value: new Uint8Array([123]),
+      })
+      .mockResolvedValueOnce({ done: true });
+    const releaseLock = vi.fn();
+    const h = harness();
+
+    await expectSafeInvalidWebhook(
+      requestWithReader({ read, releaseLock }),
+      h,
+    );
+
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(releaseLock).toHaveBeenCalledTimes(1);
+  });
 });

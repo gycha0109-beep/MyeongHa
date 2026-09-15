@@ -112,9 +112,13 @@ async function readBoundedRawBody(request: Request): Promise<Uint8Array | null> 
   try {
     while (true) {
       const chunk = await reader.read();
+      if (typeof chunk.done !== 'boolean') return null;
       if (chunk.done) break;
+      if (!(chunk.value instanceof Uint8Array)) return null;
 
-      receivedBytes += chunk.value.byteLength;
+      const byteLength = chunk.value.byteLength;
+      if (!Number.isSafeInteger(byteLength) || byteLength < 0) return null;
+      receivedBytes += byteLength;
       if (receivedBytes > PORTONE_V2_WEBHOOK_MAX_BODY_BYTES_V1) return null;
       chunks.push(chunk.value);
     }
