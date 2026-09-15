@@ -289,9 +289,22 @@ function cancelUnusedResponseBody(response: PortOneV2PaymentHttpResponseV1): voi
   }
 }
 
+function readResponseStatus(response: PortOneV2PaymentHttpResponseV1): number {
+  try {
+    return response.status;
+  } catch {
+    cancelUnusedResponseBody(response);
+    return fail(
+      'NETWORK_FAILURE',
+      'PortOne V2 payment response status could not be read.',
+    );
+  }
+}
+
 function readResponseHeader(
   response: PortOneV2PaymentHttpResponseV1,
   name: string,
+  status: number,
 ): string | null {
   try {
     return response.headers.get(name);
@@ -300,37 +313,43 @@ function readResponseHeader(
     return fail(
       'NETWORK_FAILURE',
       'PortOne V2 payment response headers could not be read.',
-      response.status,
+      status,
     );
   }
 }
 
-function assertSuccessfulStatus(response: PortOneV2PaymentHttpResponseV1): void {
-  if (response.status === 200) return;
+function assertSuccessfulStatus(
+  response: PortOneV2PaymentHttpResponseV1,
+  status: number,
+): void {
+  if (status === 200) return;
   cancelUnusedResponseBody(response);
-  if (response.status >= 400 && response.status <= 499) {
+  if (status >= 400 && status <= 499) {
     return fail(
       'HTTP_4XX',
       'PortOne V2 payment lookup was rejected.',
-      response.status,
+      status,
     );
   }
-  if (response.status >= 500 && response.status <= 599) {
+  if (status >= 500 && status <= 599) {
     return fail(
       'HTTP_5XX',
       'PortOne V2 payment lookup failed upstream.',
-      response.status,
+      status,
     );
   }
   return fail(
     'HTTP_UNEXPECTED_STATUS',
     'PortOne V2 payment lookup returned an unsupported HTTP status.',
-    response.status,
+    status,
   );
 }
 
-function assertJsonContentType(response: PortOneV2PaymentHttpResponseV1): void {
-  const contentType = readResponseHeader(response, 'content-type');
+function assertJsonContentType(
+  response: PortOneV2PaymentHttpResponseV1,
+  status: number,
+): void {
+  const contentType = readResponseHeader(response, 'content-type', status);
   if (
     contentType === null ||
     !/^application\/json(?:\s*;|$)/iu.test(contentType.trim())
@@ -339,20 +358,23 @@ function assertJsonContentType(response: PortOneV2PaymentHttpResponseV1): void {
     return fail(
       'INVALID_CONTENT_TYPE',
       'PortOne V2 payment lookup returned a non-JSON success response.',
-      response.status,
+      status,
     );
   }
 }
 
-function assertDeclaredBodyBound(response: PortOneV2PaymentHttpResponseV1): void {
-  const contentLength = readResponseHeader(response, 'content-length');
+function assertDeclaredBodyBound(
+  response: PortOneV2PaymentHttpResponseV1,
+  status: number,
+): void {
+  const contentLength = readResponseHeader(response, 'content-length', status);
   if (contentLength === null) return;
   if (!/^[0-9]+$/u.test(contentLength.trim())) {
     cancelUnusedResponseBody(response);
     return fail(
       'RESPONSE_TOO_LARGE',
       'PortOne V2 payment response body size could not be bounded.',
-      response.status,
+      status,
     );
   }
   if (Number(contentLength) > PORTONE_V2_PAYMENT_HTTP_MAX_RESPONSE_BYTES_V1) {
@@ -360,7 +382,7 @@ function assertDeclaredBodyBound(response: PortOneV2PaymentHttpResponseV1): void
     return fail(
       'RESPONSE_TOO_LARGE',
       'PortOne V2 payment response body exceeded the configured bound.',
-      response.status,
+      status,
     );
   }
 }
@@ -383,7 +405,7 @@ function getResponseBodyReader(
 
 function mapBodyReadFailure(
   error: unknown,
-  response: PortOneV2PaymentHttpResponseV1,
+  status: number,
   didTimeout: () => boolean,
 ): never {
   if (
@@ -396,12 +418,13 @@ function mapBodyReadFailure(
   throw new PortOneV2PaymentVerificationAdapterErrorV1(
     'NETWORK_FAILURE',
     'PortOne V2 payment response body could not be read.',
-    response.status,
+    status,
   );
 }
 
 async function parseJsonResponse(
   response: PortOneV2PaymentHttpResponseV1,
+  status: number,
   deadline: Promise<never>,
   didTimeout: () => boolean,
 ): Promise<unknown> {
@@ -410,7 +433,7 @@ async function parseJsonResponse(
     reader = getResponseBodyReader(response);
   } catch (error) {
     cancelUnusedResponseBody(response);
-    return mapBodyReadFailure(error, response, didTimeout);
+    return mapBodyReadFailure(error, status, didTimeout);
   }
 
   if (reader === null) {
@@ -418,7 +441,7 @@ async function parseJsonResponse(
     throw new PortOneV2PaymentVerificationAdapterErrorV1(
       'NETWORK_FAILURE',
       'PortOne V2 payment response body could not be read.',
-      response.status,
+      status,
     );
   }
 
@@ -433,7 +456,7 @@ async function parseJsonResponse(
       try {
         result = await Promise.race([reader.read(), deadline]);
       } catch (error) {
-        return mapBodyReadFailure(error, response, didTimeout);
+        return mapBodyReadFailure(error, status, didTimeout);
       }
 
       if (result.done) {
@@ -446,7 +469,7 @@ async function parseJsonResponse(
         throw new PortOneV2PaymentVerificationAdapterErrorV1(
           'NETWORK_FAILURE',
           'PortOne V2 payment response body could not be read.',
-          response.status,
+          status,
         );
       }
 
@@ -455,7 +478,7 @@ async function parseJsonResponse(
         return fail(
           'RESPONSE_TOO_LARGE',
           'PortOne V2 payment response body exceeded the configured bound.',
-          response.status,
+          status,
         );
       }
       chunks.push(chunk);
@@ -470,7 +493,7 @@ async function parseJsonResponse(
       return fail(
         'INVALID_JSON',
         'PortOne V2 payment lookup returned malformed JSON.',
-        response.status,
+        status,
       );
     }
   } finally {
@@ -490,7 +513,7 @@ async function parseJsonResponse(
     return fail(
       'RESPONSE_TOO_LARGE',
       'PortOne V2 payment response body exceeded the configured bound.',
-      response.status,
+      status,
     );
   }
 
@@ -500,7 +523,7 @@ async function parseJsonResponse(
     return fail(
       'INVALID_JSON',
       'PortOne V2 payment lookup returned malformed JSON.',
-      response.status,
+      status,
     );
   }
 }
@@ -765,11 +788,13 @@ export function createPortOneV2PaymentVerificationAdapterV1(
 
       try {
         const { response } = lease;
-        assertSuccessfulStatus(response);
-        assertJsonContentType(response);
-        assertDeclaredBodyBound(response);
+        const status = readResponseStatus(response);
+        assertSuccessfulStatus(response, status);
+        assertJsonContentType(response, status);
+        assertDeclaredBodyBound(response, status);
         const rawPayment = await parseJsonResponse(
           response,
+          status,
           lease.deadline,
           lease.didTimeout,
         );
