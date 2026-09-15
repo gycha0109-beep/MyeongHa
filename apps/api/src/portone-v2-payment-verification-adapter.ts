@@ -451,7 +451,10 @@ async function parseJsonResponse(
       } catch {
       }
     }
-    reader.releaseLock();
+    try {
+      reader.releaseLock();
+    } catch {
+    }
   }
 
   if (Buffer.byteLength(text, 'utf8') > PORTONE_V2_PAYMENT_HTTP_MAX_RESPONSE_BYTES_V1) {
