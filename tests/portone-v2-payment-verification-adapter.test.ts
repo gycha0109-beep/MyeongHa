@@ -33,7 +33,7 @@ function paidPayment(overrides: Record<string, unknown> = {}) {
     currency: 'KRW',
     amount: { total: 1000, taxFree: 0, vat: 91 },
     products: [{ id: 'product-1', name: 'Deep Reading', quantity: 1, amount: 1000 }],
-    selectedChannel: { type: 'TEST', id: 'channel-id', key: 'channel-key' },
+    channel: { type: 'TEST', id: 'channel-id', key: 'channel-key' },
     paidAt: '2026-09-14T05:00:00.000Z',
     customer: { id: 'customer-must-not-leak', email: 'private@example.com' },
     method: { type: 'CARD', approvalNumber: 'must-not-leak' },
@@ -192,7 +192,7 @@ describe('PortOne V2 server payment verification adapter', () => {
     expect((sandbox.evidence as { environment: string }).environment).toBe('sandbox');
 
     const production = await createWithResponse(
-      paidPayment({ selectedChannel: { type: 'LIVE' } }),
+      paidPayment({ channel: { type: 'LIVE' } }),
     ).adapter.verify({ ...request, environment: 'production' });
     expect((production.evidence as { environment: string }).environment).toBe('production');
   });
@@ -224,7 +224,16 @@ describe('PortOne V2 server payment verification adapter', () => {
 
   it('requires provider-owned environment and exactly one authoritative product', async () => {
     await expectAdapterCode(
-      createWithResponse(paidPayment({ selectedChannel: { type: 'UNKNOWN' } })).adapter.verify(request),
+      createWithResponse(paidPayment({ channel: { type: 'UNKNOWN' } })).adapter.verify(request),
+      'INVALID_PAYMENT',
+    );
+    await expectAdapterCode(
+      createWithResponse(
+        paidPayment({
+          channel: undefined,
+          selectedChannel: { type: 'TEST' },
+        }),
+      ).adapter.verify(request),
       'INVALID_PAYMENT',
     );
     await expectAdapterCode(
