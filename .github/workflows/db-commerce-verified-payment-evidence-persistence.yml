@@ -10,6 +10,7 @@ on:
       - 'tests/commerce-verified-payment-evidence-persistence.test.ts'
       - 'tests/commerce-verified-payment-evidence-persistence-authority.test.ts'
       - 'test/db/commerce_verified_payment_evidence_persistence.sh'
+      - 'test/db/commerce_verified_payment_replay_timestamp.sh'
       - 'test/db/catalog.expected.sha256'
       - '.github/workflows/db-commerce-verified-payment-evidence-persistence.yml'
   push:
@@ -23,6 +24,7 @@ on:
       - 'tests/commerce-verified-payment-evidence-persistence.test.ts'
       - 'tests/commerce-verified-payment-evidence-persistence-authority.test.ts'
       - 'test/db/commerce_verified_payment_evidence_persistence.sh'
+      - 'test/db/commerce_verified_payment_replay_timestamp.sh'
       - 'test/db/catalog.expected.sha256'
       - '.github/workflows/db-commerce-verified-payment-evidence-persistence.yml'
 
@@ -68,5 +70,7 @@ jobs:
           done
       - name: Run Commerce verified payment evidence persistence tests
         run: bash test/db/commerce_verified_payment_evidence_persistence.sh
+      - name: Run fresh verification timestamp replay tests
+        run: bash test/db/commerce_verified_payment_replay_timestamp.sh
       - name: Verify deterministic schema catalog snapshot
         run: bash test/db/catalog_snapshot.sh
