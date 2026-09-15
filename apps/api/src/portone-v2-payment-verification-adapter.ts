@@ -489,11 +489,11 @@ async function parseJsonResponse(
   }
 }
 
-function requireEnvironment(selectedChannel: unknown): 'sandbox' | 'production' {
-  const channel = plainRecord(selectedChannel, 'PortOne V2 selectedChannel');
+function requireEnvironment(channelValue: unknown): 'sandbox' | 'production' {
+  const channel = plainRecord(channelValue, 'PortOne V2 channel');
   if (channel.type === 'TEST') return 'sandbox';
   if (channel.type === 'LIVE') return 'production';
-  return fail('INVALID_PAYMENT', 'PortOne V2 selectedChannel type is invalid.');
+  return fail('INVALID_PAYMENT', 'PortOne V2 channel type is invalid.');
 }
 
 function requireAmountMinor(amount: unknown): number {
@@ -679,7 +679,7 @@ function normalizePaidPayment(
       'PortOne V2 transaction id',
     ),
     externalProductId: requireExternalProductId(payment.products),
-    environment: requireEnvironment(payment.selectedChannel),
+    environment: requireEnvironment(payment.channel),
     currency: requireCurrency(payment.currency),
     amountMinor: requireAmountMinor(payment.amount),
     paidAt: requirePaidAt(payment.paidAt),
