@@ -180,8 +180,13 @@ function requireWebhookId(headers: Readonly<Record<string, string>>): string {
 }
 
 function resolveClock(now: (() => Date) | undefined): Date {
-  const value = (now ?? (() => new Date()))();
-  if (!(value instanceof Date) || !Number.isFinite(value.getTime())) {
+  let value: Date;
+  try {
+    value = (now ?? (() => new Date()))();
+    if (!(value instanceof Date) || !Number.isFinite(value.getTime())) {
+      throw new TypeError('invalid PortOne V2 webhook verification clock');
+    }
+  } catch {
     return fail('INVALID_CONFIGURATION', 'PortOne V2 webhook verification clock is invalid.');
   }
   return value;
