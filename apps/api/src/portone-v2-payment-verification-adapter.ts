@@ -291,7 +291,11 @@ function cancelUnusedResponseBody(response: PortOneV2PaymentHttpResponseV1): voi
 
 function readResponseStatus(response: PortOneV2PaymentHttpResponseV1): number {
   try {
-    return response.status;
+    const status: unknown = response.status;
+    if (typeof status !== 'number' || !Number.isSafeInteger(status)) {
+      throw new TypeError('PortOne V2 payment response status is invalid.');
+    }
+    return status;
   } catch {
     cancelUnusedResponseBody(response);
     return fail(
