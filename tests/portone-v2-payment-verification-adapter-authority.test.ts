@@ -64,7 +64,8 @@ describe('PortOne V2 payment verification adapter authority', () => {
     expect(adapter).toContain('PORTONE_V2_PAYMENT_HTTP_MAX_RESPONSE_BYTES_V1');
     expect(adapter).toContain('PORTONE_V2_PAYMENT_HTTP_DEFAULT_TIMEOUT_MS_V1');
     expect(adapter).toContain('controller.abort()');
-    expect(adapter).toContain('assertDeclaredBodyBound(response)');
+    expect(adapter).toContain('const status = readResponseStatus(response)');
+    expect(adapter).toContain('assertDeclaredBodyBound(response, status)');
     expect(adapter).toContain('getResponseBodyReader(response)');
     expect(adapter).toContain("'NETWORK_FAILURE'");
     expect(adapter).toContain('cancelUnusedResponseBody(response)');
