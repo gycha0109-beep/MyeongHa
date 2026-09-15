@@ -502,7 +502,7 @@ function requireAmountMinor(amount: unknown): number {
   if (
     typeof total !== 'number' ||
     !Number.isSafeInteger(total) ||
-    total < 0
+    total <= 0
   ) {
     return fail('INVALID_PAYMENT', 'PortOne V2 amount.total is invalid.');
   }
