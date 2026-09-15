@@ -289,6 +289,32 @@ function cancelUnusedResponseBody(response: PortOneV2PaymentHttpResponseV1): voi
   }
 }
 
+function snapshotResponseStatus(
+  response: PortOneV2PaymentHttpResponseV1,
+): PortOneV2PaymentHttpResponseV1 {
+  let status: number;
+  try {
+    status = response.status;
+  } catch {
+    cancelUnusedResponseBody(response);
+    return fail(
+      'NETWORK_FAILURE',
+      'PortOne V2 payment response status could not be read.',
+    );
+  }
+
+  return Object.freeze({
+    status,
+    get headers() {
+      return response.headers;
+    },
+    get body() {
+      return response.body;
+    },
+    text: () => response.text(),
+  });
+}
+
 function readResponseHeader(
   response: PortOneV2PaymentHttpResponseV1,
   name: string,
@@ -764,7 +790,7 @@ export function createPortOneV2PaymentVerificationAdapterV1(
       });
 
       try {
-        const { response } = lease;
+        const response = snapshotResponseStatus(lease.response);
         assertSuccessfulStatus(response);
         assertJsonContentType(response);
         assertDeclaredBodyBound(response);
