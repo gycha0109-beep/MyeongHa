@@ -95,8 +95,8 @@ interface PortOneV2PaymentBodyReaderV1 {
 }
 
 const CURRENCY = /^[A-Z]{3}$/u;
-const RFC3339_TIME_FRACTION =
-  /T\d{2}:\d{2}:\d{2}(?:\.(\d+))?(?:Z|[+-]\d{2}:\d{2})$/iu;
+const RFC3339_DATE_TIME =
+  /^(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})[Tt](?<hour>\d{2}):(?<minute>\d{2}):(?<second>\d{2})(?:\.(?<fraction>\d+))?(?<zone>[Zz]|(?<offsetSign>[+-])(?<offsetHour>\d{2}):(?<offsetMinute>\d{2}))$/u;
 const MAX_PROVIDER_ID_LENGTH = 512;
 
 function fail(
@@ -516,27 +516,132 @@ function requireCurrency(value: unknown): string {
   return value;
 }
 
+function isLeapYear(year: number): boolean {
+  return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+}
+
+function daysInMonth(year: number, month: number): number {
+  const days = [
+    31,
+    isLeapYear(year) ? 29 : 28,
+    31,
+    30,
+    31,
+    30,
+    31,
+    31,
+    30,
+    31,
+    30,
+    31,
+  ];
+  return days[month - 1] ?? 0;
+}
+
+function canonicalFraction(fraction: string): string {
+  if (fraction.length <= 3) return fraction.padEnd(3, '0');
+  const trimmed = fraction.replace(/0+$/u, '');
+  return trimmed.length < 3 ? trimmed.padEnd(3, '0') : trimmed;
+}
+
 function requirePaidAt(value: unknown): string {
-  const occurredAtMs = typeof value === 'string' ? Date.parse(value) : Number.NaN;
+  if (typeof value !== 'string' || value.length === 0 || value.length > 128) {
+    return fail('INVALID_PAYMENT', 'PortOne V2 payment paidAt is invalid.');
+  }
+
+  const match = RFC3339_DATE_TIME.exec(value);
+  const groups = match?.groups;
+  if (groups === undefined) {
+    return fail('INVALID_PAYMENT', 'PortOne V2 payment paidAt is invalid.');
+  }
+
+  const year = Number(groups.year);
+  const month = Number(groups.month);
+  const day = Number(groups.day);
+  const hour = Number(groups.hour);
+  const minute = Number(groups.minute);
+  const second = Number(groups.second);
   if (
-    typeof value !== 'string' ||
-    value.length === 0 ||
-    value.length > 128 ||
-    !Number.isFinite(occurredAtMs)
+    !Number.isInteger(year) ||
+    !Number.isInteger(month) ||
+    !Number.isInteger(day) ||
+    !Number.isInteger(hour) ||
+    !Number.isInteger(minute) ||
+    !Number.isInteger(second) ||
+    month < 1 ||
+    month > 12 ||
+    day < 1 ||
+    day > daysInMonth(year, month) ||
+    hour < 0 ||
+    hour > 23 ||
+    minute < 0 ||
+    minute > 59 ||
+    second < 0 ||
+    second > 60
   ) {
     return fail('INVALID_PAYMENT', 'PortOne V2 payment paidAt is invalid.');
   }
 
-  const canonicalMilliseconds = new Date(occurredAtMs).toISOString();
-  const fractionalDigits = RFC3339_TIME_FRACTION.exec(value)?.[1];
-  if (fractionalDigits === undefined || fractionalDigits.length <= 3) {
-    return canonicalMilliseconds;
+  const zone = groups.zone;
+  if (zone === undefined) {
+    return fail('INVALID_PAYMENT', 'PortOne V2 payment paidAt is invalid.');
   }
 
-  const meaningfulFraction = fractionalDigits.replace(/0+$/u, '');
-  if (meaningfulFraction.length <= 3) return canonicalMilliseconds;
+  let offsetMinutes = 0;
+  if (!/^z$/iu.test(zone)) {
+    const offsetHour = Number(groups.offsetHour);
+    const offsetMinute = Number(groups.offsetMinute);
+    const offsetSign = groups.offsetSign;
+    if (
+      (offsetSign !== '+' && offsetSign !== '-') ||
+      !Number.isInteger(offsetHour) ||
+      !Number.isInteger(offsetMinute) ||
+      offsetHour < 0 ||
+      offsetHour > 23 ||
+      offsetMinute < 0 ||
+      offsetMinute > 59
+    ) {
+      return fail('INVALID_PAYMENT', 'PortOne V2 payment paidAt is invalid.');
+    }
+    offsetMinutes =
+      (offsetSign === '+' ? 1 : -1) * (offsetHour * 60 + offsetMinute);
+  }
 
-  return `${canonicalMilliseconds.slice(0, -1)}${meaningfulFraction.slice(3)}Z`;
+  const localSecond = second === 60 ? 59 : second;
+  const local = new Date(0);
+  local.setUTCFullYear(year, month - 1, day);
+  local.setUTCHours(hour, minute, localSecond, 0);
+  const occurredAtMs = local.getTime() - offsetMinutes * 60_000;
+  if (!Number.isFinite(occurredAtMs)) {
+    return fail('INVALID_PAYMENT', 'PortOne V2 payment paidAt is invalid.');
+  }
+
+  const utc = new Date(occurredAtMs);
+  const iso = utc.toISOString();
+  if (!/^\d{4}-/u.test(iso)) {
+    return fail('INVALID_PAYMENT', 'PortOne V2 payment paidAt is invalid.');
+  }
+
+  let canonicalWholeSecond: string;
+  if (second === 60) {
+    const utcMonth = utc.getUTCMonth() + 1;
+    const utcDay = utc.getUTCDate();
+    if (
+      utc.getUTCHours() !== 23 ||
+      utc.getUTCMinutes() !== 59 ||
+      !(
+        (utcMonth === 6 && utcDay === 30) ||
+        (utcMonth === 12 && utcDay === 31)
+      )
+    ) {
+      return fail('INVALID_PAYMENT', 'PortOne V2 payment paidAt is invalid.');
+    }
+    canonicalWholeSecond = `${iso.slice(0, 17)}60`;
+  } else {
+    canonicalWholeSecond = iso.slice(0, 19);
+  }
+
+  return `${canonicalWholeSecond}.${canonicalFraction(groups.fraction ?? '')}Z`;
 }
 
 function normalizePaidPayment(
