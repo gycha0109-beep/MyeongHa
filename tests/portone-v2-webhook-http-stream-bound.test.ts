@@ -131,6 +131,48 @@ describe('PortOne V2 webhook HTTP streaming body bound', () => {
     expect(JSON.stringify(await response.json())).not.toContain('RAW_BODY_SECRET');
   });
 
+  it('maps reader acquisition failure from an already locked request body to the existing safe 400', async () => {
+    const stream = new ReadableStream<Uint8Array>(
+      {
+        pull(controller) {
+          controller.enqueue(new TextEncoder().encode('{}'));
+          controller.close();
+        },
+      },
+      { highWaterMark: 0 },
+    );
+    const request = requestFromStream(stream);
+    const heldReader = request.body?.getReader();
+    const counters = {
+      pool: { calls: 0 },
+      adapter: { calls: 0 },
+    };
+
+    expect(heldReader).toBeDefined();
+    expect(request.body?.locked).toBe(true);
+
+    try {
+      const response = await handle(request, counters);
+
+      expect(response.status).toBe(400);
+      expect(response.headers.get('cache-control')).toBe('no-store');
+      expect(await response.json()).toMatchObject({
+        ok: false,
+        error: {
+          code: 'INVALID_WEBHOOK',
+          retryable: false,
+        },
+      });
+      expect(counters.pool.calls).toBe(0);
+      expect(counters.adapter.calls).toBe(0);
+      expect(request.body?.locked).toBe(true);
+    } finally {
+      heldReader?.releaseLock();
+    }
+
+    expect(request.body?.locked).toBe(false);
+  });
+
   it('keeps declared oversize rejection before request-body acquisition', async () => {
     let pullCalls = 0;
     const stream = new ReadableStream<Uint8Array>(

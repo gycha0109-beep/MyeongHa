@@ -99,7 +99,13 @@ async function readBoundedRawBody(request: Request): Promise<Uint8Array | null> 
   const body = request.body;
   if (body === null) return null;
 
-  const reader = body.getReader();
+  let reader: ReadableStreamDefaultReader<Uint8Array>;
+  try {
+    reader = body.getReader();
+  } catch {
+    return null;
+  }
+
   const chunks: Uint8Array[] = [];
   let receivedBytes = 0;
 
