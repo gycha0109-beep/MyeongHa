@@ -307,7 +307,11 @@ function readResponseHeader(
   status: number,
 ): string | null {
   try {
-    return response.headers.get(name);
+    const value: unknown = response.headers.get(name);
+    if (value !== null && typeof value !== 'string') {
+      throw new TypeError('PortOne V2 payment response header value is invalid.');
+    }
+    return value;
   } catch {
     cancelUnusedResponseBody(response);
     return fail(
