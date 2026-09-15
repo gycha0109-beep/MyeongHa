@@ -5,12 +5,13 @@ import { describe, expect, it } from 'vitest';
 const root = process.cwd();
 const webRoot = join(root, 'apps', 'web');
 const authPage = readFileSync(join(webRoot, 'auth-page.js'), 'utf8');
+const authView = readFileSync(join(webRoot, 'src', 'auth', 'AuthPage.tsx'), 'utf8');
 const authCss = readFileSync(join(webRoot, 'auth.css'), 'utf8');
 const myPage = readFileSync(join(webRoot, 'src', 'my', 'MyPage.tsx'), 'utf8');
 
 describe('web auth recovery boundary', () => {
   it('keeps signup-only password confirmation visually hidden during sign-in', () => {
-    expect(authPage).toContain("byId('auth-confirm-field').hidden = mode !== 'sign-up'");
+    expect(authView).toContain('id="auth-confirm-field" hidden={!signingUp}');
     expect(authCss).toContain('.auth-field[hidden]');
     expect(authCss).toMatch(/\.auth-field\[hidden\]\s*\{[^}]*display:\s*none\s*!important/);
   });

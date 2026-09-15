@@ -31,12 +31,8 @@ const ALLOWED_NEXT = new Set([
 ]);
 
 let mode = 'sign-in';
-
-function byId(id) {
-  const element = document.getElementById(id);
-  if (!element) throw new Error(`Missing auth element: ${id}`);
-  return element;
-}
+let busy = false;
+let ui = null;
 
 function nextHref() {
   const raw = new URLSearchParams(location.search).get('next');
@@ -53,29 +49,17 @@ function nextHref() {
 }
 
 function setStatus(message, kind = '') {
-  const status = byId('auth-status');
-  status.textContent = message;
-  status.className = `auth-status${kind ? ` is-${kind}` : ''}`;
+  ui?.setStatus(message, kind);
 }
 
-function setBusy(busy) {
-  const submit = byId('auth-submit');
-  submit.disabled = busy;
-  submit.textContent = busy
-    ? mode === 'sign-up' ? '계정을 만드는 중…' : '로그인하는 중…'
-    : mode === 'sign-up' ? '회원가입' : '로그인';
+function setBusy(nextBusy) {
+  busy = nextBusy;
+  ui?.setBusy(nextBusy, mode);
 }
 
 function selectMode(nextMode) {
   mode = nextMode === 'sign-up' ? 'sign-up' : 'sign-in';
-  const signInTab = byId('auth-tab-signin');
-  const signUpTab = byId('auth-tab-signup');
-  signInTab.setAttribute('aria-selected', String(mode === 'sign-in'));
-  signUpTab.setAttribute('aria-selected', String(mode === 'sign-up'));
-  byId('auth-confirm-field').hidden = mode !== 'sign-up';
-  const password = byId('auth-password');
-  password.setAttribute('autocomplete', mode === 'sign-up' ? 'new-password' : 'current-password');
-  byId('auth-password-confirm').required = mode === 'sign-up';
+  ui?.setMode(mode);
   setStatus('');
   setBusy(false);
 }
@@ -561,13 +545,10 @@ async function finishAuthenticated(session) {
   setTimeout(() => location.assign(nextHref()), 500);
 }
 
-async function onSubmit(event) {
-  event.preventDefault();
-  if (byId('auth-submit').disabled) return;
+async function submitAuth({ email: rawEmail, password, confirmation }) {
+  if (busy) return;
 
-  const email = byId('auth-email').value.trim();
-  const password = byId('auth-password').value;
-  const confirmation = byId('auth-password-confirm').value;
+  const email = rawEmail.trim();
   if (!email || !password) {
     setStatus('이메일과 비밀번호를 입력해 주세요.', 'error');
     return;
@@ -604,11 +585,23 @@ async function onSubmit(event) {
   }
 }
 
-byId('auth-tab-signin').addEventListener('click', () => selectMode('sign-in'));
-byId('auth-tab-signup').addEventListener('click', () => selectMode('sign-up'));
-byId('auth-form').addEventListener('submit', (event) => void onSubmit(event));
+export function createAuthPageController(adapter) {
+  ui = adapter;
+  mode = 'sign-in';
+  busy = false;
+  ui.setMode(mode);
+  ui.setBusy(false, mode);
 
-const confirmationReturn = consumeConfirmationReturn();
-if (readMemberSession() && !confirmationReturn) {
-  setStatus('현재 브라우저에 이전 로그인 세션이 있습니다. 계정 상태가 맞지 않으면 아래에서 다시 로그인해 세션을 갱신할 수 있습니다.');
+  const confirmationReturn = consumeConfirmationReturn();
+  if (readMemberSession() && !confirmationReturn) {
+    setStatus('현재 브라우저에 이전 로그인 세션이 있습니다. 계정 상태가 맞지 않으면 아래에서 다시 로그인해 세션을 갱신할 수 있습니다.');
+  }
+
+  return Object.freeze({
+    selectMode,
+    submit: submitAuth,
+    dispose() {
+      if (ui === adapter) ui = null;
+    },
+  });
 }
