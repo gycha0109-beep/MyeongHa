@@ -164,7 +164,7 @@ Release / Observability
 예:
 
 ```text
-OPEN-P0: P0-SA-01
+OPEN-P0: P0-AI-01
 ```
 
 이 표기가 있는 분기는 interface/adapter를 유지하고 특정 provider/rail에 hard-code하지 않는다.
