@@ -445,7 +445,18 @@ async function parseJsonResponse(
       chunks.push(chunk);
     }
 
-    text = Buffer.concat(chunks, receivedBytes).toString('utf8');
+    try {
+      text = new TextDecoder('utf-8', {
+        fatal: true,
+        ignoreBOM: true,
+      }).decode(Buffer.concat(chunks, receivedBytes));
+    } catch {
+      return fail(
+        'INVALID_JSON',
+        'PortOne V2 payment lookup returned malformed JSON.',
+        response.status,
+      );
+    }
   } finally {
     if (!completed) {
       try {
