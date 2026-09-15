@@ -237,13 +237,12 @@ function decodeWebhookSecret(value: string): Buffer {
     typeof value !== 'string' ||
     value.length === 0 ||
     value.length > MAX_SECRET_SERIALIZED_LENGTH ||
-    value.trim() !== value
+    value.trim() !== value ||
+    !value.startsWith(STANDARD_WEBHOOK_SECRET_PREFIX)
   ) {
     return fail('INVALID_CONFIGURATION', 'PortOne V2 webhook credential is invalid.');
   }
-  const serialized = value.startsWith(STANDARD_WEBHOOK_SECRET_PREFIX)
-    ? value.slice(STANDARD_WEBHOOK_SECRET_PREFIX.length)
-    : value;
+  const serialized = value.slice(STANDARD_WEBHOOK_SECRET_PREFIX.length);
   const decoded = strictBase64(serialized);
   if (decoded.length < 24 || decoded.length > 64) {
     return fail('INVALID_CONFIGURATION', 'PortOne V2 webhook credential is invalid.');
