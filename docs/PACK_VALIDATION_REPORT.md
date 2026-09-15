@@ -1,8 +1,8 @@
-# 명하 Spec Pack — Source Authority Validation Report v0.12
+# 명하 Spec Pack — Source Authority Validation Report v0.13
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.12 Source Alignment**  
-> Date: **2026-08-31**  
+> Pack Version: **v0.13 Decision Reconciliation**  
+> Date: **2026-09-16**  
 > Source Authority: `Usecase_re_reviewed_v2(1).md`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`, `Myeonghwa_Personalized_Interpretation_Architecture_v1.3_THIRD_REVIEW(1).md`  
 > Saju Public Contract Audit Pin: `gycha0109-beep/Saju@7102dc8fe8483c0875f6a093a4fd585b0df51f8b`
 
@@ -41,7 +41,7 @@ Source끼리 직접 충돌하거나 source가 구현 필수 authority를 제공�
 - ERD public base tables: **59**.
 - DDL/catalog tests continue to assert the 59-table baseline.
 - API/DB mutation surfaces remain command-oriented rather than raw CRUD wrappers.
-- P0-AUTH-01 unresolved 동안 DB functions use `SECURITY INVOKER` and PUBLIC EXECUTE remains revoked for newly exposed command/query surfaces.
+- `P0-AUTH-01`은 **DECIDED**다. ordinary user HTTP execution은 dedicated non-BYPASSRLS API execution role + transaction-scoped trusted canonical `subject_id` context를 사용하며, user-facing query/command는 RLS/object authorization을 계속 통과해야 한다.
 - Content/canon projections remain explicit bundle-pinned where source does not authorize hidden current selection.
 - Existing source-safe Share public-read/revoke and Device Installation revoke boundaries remain valid even though their inverse create/register workflows are source-blocked.
 - Existing `entitlements` projection/read schema remains valid as a storage/read envelope even though source does not yet define the complete event→grant→aggregate recompute algorithm.
@@ -55,9 +55,9 @@ Machine validation values recorded in older reports are historical snapshots; th
 
 ### 4.1 Existing corrections retained
 
-The Pack continues to preserve explicit blockers rather than converting ambiguity into invented behavior. Examples include:
+The Pack continues to preserve explicit blockers and closed decision boundaries rather than converting ambiguity into invented behavior. Examples include:
 
-- API/RLS database identity → `P0-AUTH-01`
+- API/RLS database identity → `P0-AUTH-01` **DECIDED**; retained as a closed execution boundary, not a current blocker
 - memory proposal staging/privacy → `SRC-05`
 - Birth/Target deletion vs Reading provenance → `SRC-06`
 - Saju target-birth adapter → `SRC-08`
@@ -105,7 +105,9 @@ Current baseline:
 Purchase Intent minimal offer mapping snapshot = IMPLEMENTABLE
 verified provider provenance persistence        = schema/provenance boundary implementable
 purchased product → concrete grant target       = BLOCKED by SRC-18
-provider-specific commerce rail                 = additionally OPEN-P0 P0-CM-01
+launch Web one-off rail                          = DECIDED by P0-CM-01
+launch Web PSP                                   = DECIDED by P0-CM-02 (PortOne V2)
+live merchant/credential/PG/channel/Production activation = SEPARATELY GATED
 ```
 
 ### 4.3 Device Installation register lifecycle separated — `SRC-19`
@@ -701,32 +703,36 @@ If an implementation uses versioned config, immutable artifacts, registries, or 
 
 Those tests must **not** be cited as evidence that Primary Source defines the artifact/interface/storage/hash contract or that the underlying semantic blocker has been resolved. In particular, implementation-artifact tests do not close `SRC-18`, `SRC-22`, `SRC-25`, `SRC-32`, or `P0-AGE-01` by themselves.
 
-## 7. OPEN-P0 Register
+## 7. Current P0 Decision Snapshot
 
-Current production decisions include:
+`P0_DECISION_REGISTER.md` is authoritative for live status. The entries below are the P0s referenced by this report, not a replacement decision register.
 
-| ID | Decision |
-|---|---|
-| `P0-SA-01` | Saju transport |
-| `P0-CM-01` | Web / Apple / Google commerce rail matrix |
-| `P0-AI-01` | AI provider/model/fallback/validation implementation |
-| `P0-AGE-01` | minimum age / character content policy |
-| `P0-PR-01` | retention / backup / legal retention |
-| `P0-AUTH-01` | API→PostgreSQL execution identity / RLS enforcement model |
+| ID | Status | Current Decision / Required Resolution |
+|---|---|---|
+| `P0-SA-01` | **DECIDED** | authenticated internal HTTP calculation-only service; no `/api/readings` activation |
+| `P0-CM-01` | **DECIDED** | Web + one-off only for launch MVP |
+| `P0-CM-02` | **DECIDED** | PortOne V2 launch Web PSP; live merchant/credential/Production activation remains separate |
+| `P0-CM-03` | **OPEN-P0** | launch paid Product / Capability catalog |
+| `P0-AI-01` | **OPEN-P0** | AI provider/model/fallback/grounded validation implementation |
+| `P0-AGE-01` | **OPEN-P0** | minimum age / character content policy |
+| `P0-PR-01` | **OPEN-P0** | retention / backup / legal retention |
+| `P0-AUTH-01` | **DECIDED** | non-BYPASSRLS API execution role + transaction-scoped trusted canonical `subject_id` context |
 
-Saju blockers compose independently:
+Saju boundaries compose independently:
 
 ```text
-P0-SA-01 = which real Saju repository/transport deployment path is used
+P0-SA-01 = DECIDED transport topology: authenticated internal HTTP calculation-only V1
 SRC-08    = what public host/request contract can be called, including target/compatibility capability
 SRC-33    = how ProductReadingResponse / clarification bodies become validated authoritative product data
 SRC-09    = what grounding/evidence guard metadata is available after a valid Product response exists
 ```
 
-Commerce blockers are independent layers:
+Commerce boundaries compose independently:
 
 ```text
-P0-CM-01 = which provider/platform rail is used
+P0-CM-01 = DECIDED launch rail: Web + one-off
+P0-CM-02 = DECIDED launch Web PSP: PortOne V2
+P0-CM-03 = OPEN-P0 launch paid Product / Capability catalog
 SRC-18    = what entitlement/grant target a purchased product maps to
 SRC-21    = how an authoritative event mutates a grant and recomputes logical entitlement
 ```
@@ -748,7 +754,7 @@ SRC-23 = additionally required if Character Unlock projection is transformed
 SRC-17 = additionally required where Episode transition/effect semantics are transformed
 ```
 
-Source-gap decisions `SRC-08`, `SRC-09`, `SRC-19`, `SRC-20`, `SRC-22`, `SRC-23`, `SRC-24`, `SRC-30`, and `SRC-33` are independent of infrastructure/provider P0 choices.
+Source-gap decisions `SRC-08`, `SRC-09`, `SRC-19`, `SRC-20`, `SRC-22`, `SRC-23`, `SRC-24`, `SRC-30`, and `SRC-33` are independent of decided infrastructure/provider P0 choices.
 
 ## 8. Promotion Gate
 
@@ -770,7 +776,7 @@ Specific promotion boundaries:
 
 ```text
 real Saju transport integration
-→ P0-SA-01 + SRC-08 resolution + exact host/request conformance evidence
+→ decided P0-SA-01 transport + SRC-08 resolution + exact host/request conformance evidence
 
 Saju Product response semantic finalization
 → SRC-33 resolution + positive/negative/versioned validator evidence
@@ -784,8 +790,8 @@ Character Saju grounding from Product response
 provider-independent entitlement event apply/recompute
 → SRC-21 resolution + transition/aggregation/concurrency evidence
 
-full purchase→entitlement path
-→ P0-CM-01 + SRC-18 + SRC-21 resolution + provider/restore evidence
+full launch purchase→entitlement path
+→ decided P0-CM-01/P0-CM-02 rail/provider + P0-CM-03 resolution + SRC-18 + SRC-21 resolution + live provider/restore evidence
 
 Device Installation register/re-register
 → SRC-19 resolution + concurrency/rotation evidence
