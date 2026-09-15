@@ -767,14 +767,18 @@ function normalizePaidPayment(
 }
 
 function requireVerifiedAt(now: () => Date): string {
-  const value = now();
-  if (!(value instanceof Date) || !Number.isFinite(value.getTime())) {
+  try {
+    const value = now();
+    if (!(value instanceof Date) || !Number.isFinite(value.getTime())) {
+      throw new TypeError('PortOne V2 verification clock is invalid.');
+    }
+    return value.toISOString();
+  } catch {
     throw new PortOneV2PaymentVerificationAdapterErrorV1(
       'INVALID_CONFIGURATION',
       'PortOne V2 verification clock is invalid.',
     );
   }
-  return value.toISOString();
 }
 
 function fingerprintEvidence(input: {
