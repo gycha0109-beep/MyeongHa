@@ -19,7 +19,11 @@ function expectInOrder(source: string, labels: readonly string[]) {
 
 describe('Web Golden Master', () => {
   it('pins the approved Home hierarchy and four-card Saju row', async () => {
-    const home = await readWebFile('hall.html');
+    const [html, page] = await Promise.all([
+      readWebFile('hall.html'),
+      readWebFile('src/home/HomePage.tsx'),
+    ]);
+    const home = `${html}\n${page}`;
 
     expect(home).toContain('class="product-page gm-page"');
     expect(home).toContain('href="golden-master.css"');
@@ -34,7 +38,7 @@ describe('Web Golden Master', () => {
       '최근 이야기',
     ]);
 
-    const productSection = home.match(/<div class="gm-home-products">([\s\S]*?)<\/div>\s*<\/section>/u)?.[1] ?? '';
+    const productSection = home.match(/<div className="gm-home-products">([\s\S]*?)<\/div>\s*<\/section>/u)?.[1] ?? '';
     expect(productSection.match(/gm-product-card/gu)).toHaveLength(4);
     expectInOrder(productSection, ['전체 사주', '직업 · 커리어', '재물', '연애 · 관계']);
 

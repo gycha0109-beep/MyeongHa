@@ -12,10 +12,12 @@
     "packages/*"
   ],
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "dev": "npm run dev -w @myeongha/web",
+    "start": "npm run build:web && npm run preview -w @myeongha/web",
+    "typecheck": "tsc -p tsconfig.json --noEmit && npm run typecheck -w @myeongha/web",
     "test": "vitest run",
     "build": "tsc -p tsconfig.build.json",
-    "build:web": "node scripts/build-web-static.mjs",
+    "build:web": "node scripts/build-web-static.mjs && npm run build -w @myeongha/web",
     "verify:deployment-config": "node scripts/verify-web-deployment.mjs",
     "verify:supabase-deployment-config": "node scripts/verify-supabase-deployment.mjs",
     "verify:production-user-data-bindings": "node scripts/verify-production-user-data-bindings.mjs",
@@ -53,6 +55,6 @@
     "@types/node": "24.13.3",
     "@types/pg": "8.23.1",
     "typescript": "6.0.2",
-    "vitest": "4.1.10"
+    "vitest": "4.1.11"
   }
 }

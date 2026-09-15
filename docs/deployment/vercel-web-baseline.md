@@ -38,13 +38,15 @@ All other branches are disabled by default because the repository has high branc
 
 ## Build isolation
 
-`scripts/build-web-static.mjs` copies only public web asset types from `apps/web` into `public/`.
+`scripts/build-web-static.mjs` first copies the legacy public web asset set from `apps/web` into `public/`. Vite then builds the multi-page HTML entries and React/TypeScript entry points into the same static artifact. Existing `.html` routes remain stable during the incremental migration.
 
 Development-only files such as these must not be published:
 
 - `apps/web/package.json`
 - `apps/web/README.md`
-- `apps/web/dev-server.mjs`
+- `apps/web/vite.config.ts`
+- `apps/web/tsconfig.json`
+- `apps/web/src/`
 - source maps
 - dotfiles / environment files
 

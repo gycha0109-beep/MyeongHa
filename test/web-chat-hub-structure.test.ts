@@ -7,6 +7,7 @@ const hubV2CssPath = new URL('../apps/web/conversation-v2.css', import.meta.url)
 const hubJsPath = new URL('../apps/web/chat-hub.js', import.meta.url);
 const roomHtmlPath = new URL('../apps/web/chat.html', import.meta.url);
 const homeHtmlPath = new URL('../apps/web/hall.html', import.meta.url);
+const homePagePath = new URL('../apps/web/src/home/HomePage.tsx', import.meta.url);
 const readingHtmlPath = new URL('../apps/web/reading.html', import.meta.url);
 const recordsHtmlPath = new URL('../apps/web/records.html', import.meta.url);
 
@@ -73,12 +74,14 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
   });
 
   it('keeps character rooms as focused destinations and routes global conversation entries through the hub', async () => {
-    const [room, home, reading, records] = await Promise.all([
+    const [room, homeHtml, homePage, reading, records] = await Promise.all([
       readFile(roomHtmlPath, 'utf8'),
       readFile(homeHtmlPath, 'utf8'),
+      readFile(homePagePath, 'utf8'),
       readFile(readingHtmlPath, 'utf8'),
       readFile(recordsHtmlPath, 'utf8'),
     ]);
+    const home = `${homeHtml}\n${homePage}`;
 
     expect(room).toContain('class="product-page character-room character-room-v2"');
     expect(room).toContain('href="chat-hub.html" aria-label="대화 허브로 돌아가기"');

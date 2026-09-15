@@ -17,17 +17,18 @@
 
 ## Foundation status
 
-첫 구현 단계는 framework-neutral contract/domain foundation입니다.
+공유 contract/domain foundation은 framework-neutral하게 유지하며, Web UI는 기존 화면과 URL을 보존하는 React/TypeScript/Vite 다중 페이지 구조로 단계 전환 중입니다.
 
 - Node 24 / npm 11
 - strict TypeScript
+- React 19 / Vite 8 Web UI
 - bounded shared contracts
 - immutable versioned registry primitives
 - fail-closed capability gate
 - explicit character-grant snapshot helper
 - API boundary skeleton
 
-Web/Mobile framework와 production database migration은 authority gap을 우회해 먼저 확정하지 않습니다.
+Mobile framework와 production database migration은 authority gap을 우회해 먼저 확정하지 않습니다.
 
 ## Runtime status
 

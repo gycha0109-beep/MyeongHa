@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 
 const hallPath = new URL('../apps/web/hall.html', import.meta.url);
+const homePagePath = new URL('../apps/web/src/home/HomePage.tsx', import.meta.url);
 const productCssPath = new URL('../apps/web/product.css', import.meta.url);
 const goldenCssPath = new URL('../apps/web/golden-master.css', import.meta.url);
 const landscapePath = new URL('../apps/web/home-landscape.svg', import.meta.url);
@@ -21,34 +22,37 @@ describe('MyeongHa product Home — Golden Master', () => {
   });
 
   it('preserves the approved Golden Master Home hierarchy without sidebars', async () => {
-    const html = await readFile(hallPath, 'utf8');
+    const [html, page] = await Promise.all([readFile(hallPath, 'utf8'), readFile(homePagePath, 'utf8')]);
+    const homeSource = `${html}\n${page}`;
 
-    const greeting = html.indexOf('class="gm-home-head"');
-    const character = html.indexOf('class="gm-home-hero"');
-    const month = html.indexOf('id="home-month-title"');
-    const products = html.indexOf('id="home-products-title"');
-    const recent = html.indexOf('id="home-recent-title"');
+    const greeting = homeSource.indexOf('className="gm-home-head"');
+    const character = homeSource.indexOf('className="gm-home-hero"');
+    const month = homeSource.indexOf('id="home-month-title"');
+    const products = homeSource.indexOf('id="home-products-title"');
+    const recent = homeSource.indexOf('id="home-recent-title"');
 
     expect(greeting).toBeGreaterThan(-1);
     expect(character).toBeGreaterThan(greeting);
     expect(month).toBeGreaterThan(character);
     expect(products).toBeGreaterThan(month);
     expect(recent).toBeGreaterThan(products);
-    expect(html).not.toContain('home-sidebar');
-    expect(html).not.toContain('gm-sidebar');
+    expect(homeSource).not.toContain('home-sidebar');
+    expect(homeSource).not.toContain('gm-sidebar');
   });
 
   it('loads the base product system plus the approved Golden Master refinement layer', async () => {
-    const [html, productCss, goldenCss] = await Promise.all([
+    const [html, page, productCss, goldenCss] = await Promise.all([
       readFile(hallPath, 'utf8'),
+      readFile(homePagePath, 'utf8'),
       readFile(productCssPath, 'utf8'),
       readFile(goldenCssPath, 'utf8'),
     ]);
+    const homeSource = `${html}\n${page}`;
 
     expect(html).toContain('href="product.css"');
     expect(html).toContain('href="golden-master.css"');
-    expect(html).not.toContain('John Doe');
-    expect(html).not.toContain('DEMO');
+    expect(homeSource).not.toContain('John Doe');
+    expect(homeSource).not.toContain('DEMO');
 
     for (const token of [
       '--mh-paper-base',
@@ -78,14 +82,15 @@ describe('MyeongHa product Home — Golden Master', () => {
   });
 
   it('keeps Saju, records, and Character surfaces separate without hardcoding a recommended Character', async () => {
-    const html = await readFile(hallPath, 'utf8');
+    const [html, page] = await Promise.all([readFile(hallPath, 'utf8'), readFile(homePagePath, 'utf8')]);
+    const homeSource = `${html}\n${page}`;
 
-    expect(html).toContain('href="reading.html"');
-    expect(html).toContain('href="records.html"');
-    expect(html).toContain('href="chat-hub.html">대화로 가기 →</a>');
-    expect(html).toContain('오늘 이야기할 사람');
-    expect(html).toContain('캐릭터 선택');
-    expect(html).not.toContain('href="chat.html?character=');
-    expect(html).not.toContain('세연');
+    expect(homeSource).toContain('href="reading.html"');
+    expect(homeSource).toContain('href="records.html"');
+    expect(homeSource).toContain('href="chat-hub.html">대화로 가기 →</a>');
+    expect(homeSource).toContain('오늘 이야기할 사람');
+    expect(homeSource).toContain('캐릭터 선택');
+    expect(homeSource).not.toContain('href="chat.html?character=');
+    expect(homeSource).not.toContain('세연');
   });
 });

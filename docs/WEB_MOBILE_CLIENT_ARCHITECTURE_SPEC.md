@@ -35,6 +35,8 @@ packages/
 
 구체 build tooling은 구현 시 선택 가능하지만 공통 HTTP/domain contract를 client별로 재정의하지 않는다.
 
+현재 Web 구현은 기존 `.html` route와 별도 root API 경계를 유지하는 React/TypeScript/Vite 다중 페이지 구조로 단계 전환한다. 페이지별 전환이 완료될 때까지 기존 ES module 화면과 React 진입점이 함께 존재할 수 있지만, 같은 UI 영역을 두 구현이 동시에 소유하지 않는다. Mobile framework는 이 선택으로 확정하지 않는다.
+
 ## 3. Web Responsibility
 
 - 광고/검색 유입
