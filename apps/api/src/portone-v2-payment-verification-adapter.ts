@@ -422,6 +422,47 @@ function mapBodyReadFailure(
   );
 }
 
+type PortOneV2PaymentBodyReadResultSnapshotV1 =
+  | Readonly<{ done: true }>
+  | Readonly<{
+      done: false;
+      value: Uint8Array;
+      byteLength: number;
+    }>;
+
+function snapshotBodyReadResult(
+  result: Readonly<{ done: boolean; value?: Uint8Array }>,
+  status: number,
+  didTimeout: () => boolean,
+): PortOneV2PaymentBodyReadResultSnapshotV1 {
+  try {
+    const done = result.done;
+    if (typeof done !== 'boolean') {
+      throw new TypeError('PortOne V2 payment response body read result is invalid.');
+    }
+    if (done) {
+      return Object.freeze({ done: true });
+    }
+
+    const value = result.value;
+    if (!(value instanceof Uint8Array)) {
+      throw new TypeError('PortOne V2 payment response body chunk is invalid.');
+    }
+    const byteLength = value.byteLength;
+    if (!Number.isSafeInteger(byteLength) || byteLength < 0) {
+      throw new TypeError('PortOne V2 payment response body chunk length is invalid.');
+    }
+
+    return Object.freeze({
+      done: false,
+      value,
+      byteLength,
+    });
+  } catch (error) {
+    return mapBodyReadFailure(error, status, didTimeout);
+  }
+}
+
 async function parseJsonResponse(
   response: PortOneV2PaymentHttpResponseV1,
   status: number,
@@ -452,28 +493,20 @@ async function parseJsonResponse(
 
   try {
     while (true) {
-      let result: Readonly<{ done: boolean; value?: Uint8Array }>;
+      let rawResult: Readonly<{ done: boolean; value?: Uint8Array }>;
       try {
-        result = await Promise.race([reader.read(), deadline]);
+        rawResult = await Promise.race([reader.read(), deadline]);
       } catch (error) {
         return mapBodyReadFailure(error, status, didTimeout);
       }
 
+      const result = snapshotBodyReadResult(rawResult, status, didTimeout);
       if (result.done) {
         completed = true;
         break;
       }
 
-      const chunk = result.value;
-      if (!(chunk instanceof Uint8Array)) {
-        throw new PortOneV2PaymentVerificationAdapterErrorV1(
-          'NETWORK_FAILURE',
-          'PortOne V2 payment response body could not be read.',
-          status,
-        );
-      }
-
-      receivedBytes += chunk.byteLength;
+      receivedBytes += result.byteLength;
       if (receivedBytes > PORTONE_V2_PAYMENT_HTTP_MAX_RESPONSE_BYTES_V1) {
         return fail(
           'RESPONSE_TOO_LARGE',
@@ -481,7 +514,7 @@ async function parseJsonResponse(
           status,
         );
       }
-      chunks.push(chunk);
+      chunks.push(result.value);
     }
 
     try {
