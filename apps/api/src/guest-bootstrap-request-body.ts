@@ -1,4 +1,5 @@
 import { ApiCommandError } from './api-error.js';
+import { createIngressRequestBodyCompletionDeadlineLeaseV1 } from './ingress-request-body-deadline.js';
 
 const EMPTY_REQUEST = undefined;
 const EMPTY_OBJECT = Object.freeze({});
@@ -26,6 +27,7 @@ export async function readGuestBootstrapRequestBodyV1(
   if (request.body === null) return EMPTY_REQUEST;
 
   const reader = request.body.getReader();
+  const deadline = createIngressRequestBodyCompletionDeadlineLeaseV1();
   const decoder = new TextDecoder();
   let state: ParserState = 'leading';
   let leadingJsonWhitespaceOnly = true;
@@ -55,7 +57,7 @@ export async function readGuestBootstrapRequestBodyV1(
 
   try {
     while (true) {
-      const chunk = await reader.read();
+      const chunk = await deadline.waitFor(reader.read());
       if (chunk.done) break;
       consume(decoder.decode(chunk.value, { stream: true }));
     }
@@ -65,6 +67,7 @@ export async function readGuestBootstrapRequestBodyV1(
     if (state === 'object') invalidRequestBody();
     return EMPTY_OBJECT;
   } finally {
+    deadline.release();
     try {
       void reader.cancel().catch(() => undefined);
     } catch {
