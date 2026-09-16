@@ -34,7 +34,7 @@ jobs:
       DISPATCH_CONFIRM: ${{ inputs.confirm }}
     steps:
       - name: Check out exact repository verifier
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Verify governed invocation
         shell: bash
@@ -51,9 +51,10 @@ jobs:
           fi
 
       - name: Set up Node 24
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '24'
+          package-manager-cache: false
 
       - name: Verify Production Chat open boundary
         run: node scripts/verify-production-chat-open-boundary.mjs

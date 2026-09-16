@@ -25,6 +25,7 @@ const requiredWorkflowFragments = [
   'SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}',
   'SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}',
   '[[ "$DISPATCH_CONFIRM" == \'READ_ONLY_CATALOG\' ]]',
+  'uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1',
   'https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_ID/config/database/pooler',
   'select((.database_type // "") == "PRIMARY")',
   'test("\\\\.pooler\\\\.supabase\\\\.com:(5432|6543)/postgres(?:\\\\?|$)")',
@@ -129,6 +130,7 @@ for (const fragment of requiredDataApiFragments) {
 
 const combined = `${workflow}\n${auditScript}\n${dataApiAuditScript}`;
 const forbiddenFragments = [
+  'actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4',
   '\npush:',
   '\npull_request:',
   '\nschedule:',

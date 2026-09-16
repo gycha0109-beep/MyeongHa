@@ -23,6 +23,15 @@ describe('Production character roster read audit contract', () => {
     expect(workflow).not.toContain('schedule:');
   });
 
+  it('pins checkout to the Node 24-backed v7.0.1 action runtime', () => {
+    expect(workflow).toContain(
+      'uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1',
+    );
+    expect(workflow).not.toContain(
+      'actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4',
+    );
+  });
+
   it('uses the governed Production database credentials without mutation permissions', () => {
     expect(workflow).toContain('environment: production');
     expect(workflow).toContain('SUPABASE_PROJECT_ID: cnsfpcdiyofqvhpcegfc');
