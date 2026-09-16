@@ -1,3 +1,5 @@
+import { createIngressRequestBodyCompletionDeadlineLeaseV1 } from './ingress-request-body-deadline.js';
+
 type ParserState = 'leading' | 'object' | 'trailing';
 
 function isJsonWhitespace(value: string): boolean {
@@ -14,6 +16,9 @@ function isJsTrimWhitespace(value: string): boolean {
  * The established contract accepts an omitted/empty/JS-trim-whitespace-only
  * body or exactly one JSON empty object. JSON objects retain JSON's narrower
  * whitespace grammar, matching the previous JSON.parse() behavior.
+ *
+ * Once body reading starts, the governed V1 ingress body-completion deadline is
+ * absolute across the complete parse. Receiving a chunk never resets it.
  */
 export async function isGuestPromotionEmptyRequestBodyV1(
   request: Request,
@@ -22,6 +27,7 @@ export async function isGuestPromotionEmptyRequestBodyV1(
 
   const reader = request.body.getReader();
   const decoder = new TextDecoder();
+  const deadline = createIngressRequestBodyCompletionDeadlineLeaseV1();
   let state: ParserState = 'leading';
   let leadingJsonWhitespaceOnly = true;
 
@@ -51,7 +57,7 @@ export async function isGuestPromotionEmptyRequestBodyV1(
 
   try {
     while (true) {
-      const chunk = await reader.read();
+      const chunk = await deadline.waitFor(reader.read());
       if (chunk.done) break;
       if (!consume(decoder.decode(chunk.value, { stream: true }))) return false;
     }
@@ -59,6 +65,7 @@ export async function isGuestPromotionEmptyRequestBodyV1(
     if (!consume(decoder.decode())) return false;
     return state === 'leading' || state === 'trailing';
   } finally {
+    deadline.release();
     try {
       void reader.cancel().catch(() => undefined);
     } catch {
