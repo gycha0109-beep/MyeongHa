@@ -321,7 +321,7 @@ for (const file of ['chat.html', 'chat-runtime-client.js', 'product-auth.js', 'p
   await stat(join(root, file));
 }
 const chatHtml = await readFile(join(root, 'chat.html'), 'utf8');
-assert(chatHtml.includes('<script type="module" src="chat-runtime-client.js"></script>'), 'Chat runtime is not loaded as an ES module');
+assert(/<script type="module"[^>]+src="\/assets\/chat-[^"]+\.js"><\/script>/u.test(chatHtml), 'Built Chat React entry is not loaded as an ES module');
 
 const { server, origin } = await serve();
 const profile = await mkdtemp(join(tmpdir(), 'myeongha-chat-auth-browser-'));

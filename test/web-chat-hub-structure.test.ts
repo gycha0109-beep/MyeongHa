@@ -7,6 +7,7 @@ const hubCssPath = new URL('../apps/web/chat-hub.css', import.meta.url);
 const hubV2CssPath = new URL('../apps/web/conversation-v2.css', import.meta.url);
 const hubJsPath = new URL('../apps/web/chat-hub.js', import.meta.url);
 const roomHtmlPath = new URL('../apps/web/chat.html', import.meta.url);
+const roomPagePath = new URL('../apps/web/src/chat/ChatPage.tsx', import.meta.url);
 const homeHtmlPath = new URL('../apps/web/hall.html', import.meta.url);
 const homePagePath = new URL('../apps/web/src/home/HomePage.tsx', import.meta.url);
 const readingHtmlPath = new URL('../apps/web/reading.html', import.meta.url);
@@ -78,13 +79,15 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
   });
 
   it('keeps character rooms as focused destinations and routes global conversation entries through the hub', async () => {
-    const [room, homeHtml, homePage, reading, records] = await Promise.all([
+    const [roomHtml, roomPage, homeHtml, homePage, reading, records] = await Promise.all([
       readFile(roomHtmlPath, 'utf8'),
+      readFile(roomPagePath, 'utf8'),
       readFile(homeHtmlPath, 'utf8'),
       readFile(homePagePath, 'utf8'),
       readFile(readingHtmlPath, 'utf8'),
       readFile(recordsHtmlPath, 'utf8'),
     ]);
+    const room = `${roomHtml}\n${roomPage}`;
     const home = `${homeHtml}\n${homePage}`;
 
     expect(room).toContain('class="product-page character-room character-room-v2"');

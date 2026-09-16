@@ -2,6 +2,7 @@ import { readFile, stat } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 
 const chatHtmlPath = new URL('../apps/web/chat.html', import.meta.url);
+const chatPagePath = new URL('../apps/web/src/chat/ChatPage.tsx', import.meta.url);
 const chatCssPath = new URL('../apps/web/chat-room.css', import.meta.url);
 const chatRuntimeCssPath = new URL('../apps/web/chat-runtime.css', import.meta.url);
 const conversationCssPath = new URL('../apps/web/conversation-v2.css', import.meta.url);
@@ -13,36 +14,44 @@ const apiContractPath = new URL('../docs/API_CONTRACT.md', import.meta.url);
 
 describe('MyeongHa immersive long-form Character Room', () => {
   it('combines an immersive character scene with a practical conversation stream', async () => {
-    const html = await readFile(chatHtmlPath, 'utf8');
+    const [html, page] = await Promise.all([
+      readFile(chatHtmlPath, 'utf8'),
+      readFile(chatPagePath, 'utf8'),
+    ]);
+    const source = `${html}\n${page}`;
 
     expect(html).toContain('href="product.css"');
     expect(html).toContain('href="chat-room.css"');
     expect(html).toContain('href="chat-runtime.css"');
     expect(html).toContain('href="conversation-v2.css"');
-    expect(html).toContain('class="character-room-stage conversation-room-stage"');
-    expect(html).toContain('class="conversation-scene-column"');
-    expect(html).toContain('class="character-dialogue-panel conversation-chat-panel"');
-    expect(html).toContain('class="conversation-message-stream" data-chat-stream');
-    expect(html).toContain('class="character-composer conversation-composer"');
-    expect(html).toContain('src="chat-character.js"');
-    expect(html).toContain('src="chat-runtime-client.js"');
-    expect(html).not.toContain('John Doe');
-    expect(html).not.toContain('DEMO');
-    expect(html).not.toContain('mobile-bottom-nav');
+    expect(html).toContain('src="/src/chat/main.tsx"');
+    expect(source).toContain('className="character-room-stage conversation-room-stage"');
+    expect(source).toContain('className="conversation-scene-column"');
+    expect(source).toContain('className="character-dialogue-panel conversation-chat-panel"');
+    expect(source).toContain('className="conversation-message-stream" data-chat-stream');
+    expect(source).toContain('className="character-composer conversation-composer"');
+    expect(page).toContain("import('../../chat-character.js')");
+    expect(page).toContain("import('../../chat-runtime-client.js')");
+    expect(await readFile(chatCssPath, 'utf8')).toContain('.character-composer .sr-only');
+    expect(source).not.toContain('John Doe');
+    expect(source).not.toContain('DEMO');
+    expect(source).not.toContain('mobile-bottom-nav');
   });
 
   it('does not ship fabricated Life Thread or past-conversation claims in static room data', async () => {
-    const [html, presentation] = await Promise.all([
+    const [html, page, presentation] = await Promise.all([
       readFile(chatHtmlPath, 'utf8'),
+      readFile(chatPagePath, 'utf8'),
       readFile(characterPresentationPath, 'utf8'),
     ]);
+    const source = `${html}\n${page}`;
 
-    expect(html).toContain('data-context-pill hidden');
-    expect(html).toContain('data-thread-bar hidden');
-    expect(html).toContain('data-history-list></div>');
-    expect(html).toContain('data-history-empty');
-    expect(html).not.toContain('퇴사를 고민했던 이야기');
-    expect(html).not.toContain('남기로 결정했다고 이야기했습니다');
+    expect(source).toContain('data-context-pill hidden');
+    expect(source).toContain('data-thread-bar hidden');
+    expect(source).toContain('data-history-list />');
+    expect(source).toContain('data-history-empty');
+    expect(source).not.toContain('퇴사를 고민했던 이야기');
+    expect(source).not.toContain('남기로 결정했다고 이야기했습니다');
 
     expect(presentation).not.toContain('context:');
     expect(presentation).not.toContain('history:');
