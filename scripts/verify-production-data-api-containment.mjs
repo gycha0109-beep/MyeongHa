@@ -23,8 +23,11 @@ const requiredWorkflowFragments = [
   'environment: production',
   'SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}',
   'test -n "${SUPABASE_ACCESS_TOKEN:-}"',
+  'uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1',
   'Set up Node 24 for governed runtime smoke',
+  'uses: actions/setup-node@v7',
   "node-version: '24'",
+  'package-manager-cache: false',
   'Bootstrap and preflight governed Guest canonical-subject path',
   'CONTAINMENT_RUNTIME_SMOKE_MODE: bootstrap',
   'RUNTIME_SMOKE_STATE_PATH: ${{ runner.temp }}/myeongha-data-api-containment-runtime-smoke.json',
@@ -47,6 +50,8 @@ for (const fragment of requiredWorkflowFragments) {
 }
 
 for (const forbiddenWorkflowFragment of [
+  'actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4',
+  'uses: actions/setup-node@v4',
   'MYEONGHA_PRODUCTION_MEMBER_BEARER',
   'MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID',
   'SUPABASE_DB_PASSWORD',
