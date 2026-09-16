@@ -115,7 +115,10 @@ async function readObjectBody(request: Request): Promise<Record<string, unknown>
       void reader.cancel().catch(() => undefined);
     } catch {
     } finally {
-      reader.releaseLock();
+      try {
+        reader.releaseLock();
+      } catch {
+      }
     }
   }
 

@@ -32,7 +32,10 @@ export async function readChatOpenJsonRequestBodyV1(request: Request): Promise<u
       void reader.cancel().catch(() => undefined);
     } catch {
     } finally {
-      reader.releaseLock();
+      try {
+        reader.releaseLock();
+      } catch {
+      }
     }
   }
 }
