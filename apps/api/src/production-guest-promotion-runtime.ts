@@ -1,4 +1,5 @@
 import { isGuestPromotionEmptyRequestBodyV1 } from './guest-promotion-request-body.js';
+import { IngressRequestBodyCompletionDeadlineExceededV1 } from './ingress-request-body-deadline.js';
 import { createNodePostgresSubjectPoolV1 } from './node-postgres-subject-pool.js';
 import { executePostgresSubjectTransactionV1 } from './postgres-subject-execution.js';
 import { createProductionRequestIdentityVerifierV1 } from './production-request-identity-verifier.js';
@@ -135,7 +136,16 @@ export function createProductionGuestPromotionRuntimeV1(input: {
         return failure('GUEST_AUTH_REQUIRED', 401, requestId);
       }
 
-      if (!(await isGuestPromotionEmptyRequestBodyV1(request))) {
+      let requestBodyValid: boolean;
+      try {
+        requestBodyValid = await isGuestPromotionEmptyRequestBodyV1(request);
+      } catch (error) {
+        if (error instanceof IngressRequestBodyCompletionDeadlineExceededV1) {
+          return failure('REQUEST_BODY_TIMEOUT', 408, requestId);
+        }
+        throw error;
+      }
+      if (!requestBodyValid) {
         return failure('INVALID_REQUEST', 400, requestId);
       }
 
