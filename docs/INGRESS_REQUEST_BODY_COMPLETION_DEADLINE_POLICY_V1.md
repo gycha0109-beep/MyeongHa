@@ -4,8 +4,8 @@
 > Decision date: 2026-09-16 KST  
 > Status: **DECIDED / V1**  
 > Scope: synchronous Production request-body consumers that explicitly opt into this policy  
-> Initial binding: authenticated Guest promotion request-body validation  
-> Tracked by: #715
+> Current bindings: authenticated Guest promotion request-body validation; public Guest bootstrap request-body validation  
+> Tracked by: #715, #684
 
 ---
 
@@ -26,6 +26,11 @@ Content-Length as completion      = forbidden
 The initial V1 binding is `POST /api/auth/promote-guest` after Guest + Member
 authentication has succeeded and immediately before the Guest promotion body
 parser obtains/awaits the request stream.
+
+As of #684, `POST /api/session/bootstrap` explicitly opts into the same V1
+completion deadline immediately before its streaming request-body parser begins
+reading. This second binding does not broaden the policy into a blanket route
+default.
 
 The 3,000 ms value is a **new repository-owned Operations decision**. It is not
 inherited from or numerically derived from:
@@ -49,8 +54,9 @@ inheritance rule.
 V1 governs body acquisition for synchronous API control requests, not file
 uploads or long-lived streaming products. The initial Guest promotion grammar
 is intentionally tiny: omitted/empty/whitespace-only or one JSON empty object.
-Nearby candidate consumers (#682, #684, #696) are likewise synchronous control
-request boundaries rather than upload transports.
+The Guest bootstrap grammar covered by #684 is likewise a synchronous control
+request boundary with the same tiny accepted body shapes. Nearby candidate
+consumers (#682, #696) remain independently unbound.
 
 V1 selects 3,000 ms because:
 
@@ -92,12 +98,28 @@ This preserves #664/#665 and #708. A 401 authentication rejection occurs before
 body access, leaves the body untouched, and therefore does not create this
 body-completion timer.
 
+For Guest bootstrap the ordering is:
+
+```text
+method validation
+→ trusted request metadata validation
+→ create one 3,000 ms body-completion deadline
+→ incrementally validate request body
+→ EOF / terminal invalidity / deadline expiry
+→ only a valid completed body may proceed to bootstrap identity/credential/DB work
+```
+
+Guest bootstrap remains intentionally public and unauthenticated at this
+boundary. The deadline changes only how long the application may wait for a
+terminal body decision; it does not add authentication or alter bootstrap
+identity authority.
+
 ---
 
-## 4. Guest promotion public failure semantics
+## 4. Covered public failure semantics
 
-If authenticated Guest promotion body validation has not reached EOF or another
-terminal parser decision before the absolute deadline, V1 requires:
+If a covered request-body validation has not reached EOF or another terminal
+parser decision before the absolute deadline, V1 requires:
 
 ```text
 HTTP status   = 408 Request Timeout
@@ -112,9 +134,22 @@ This is a transport-completion failure. It is not `INVALID_REQUEST`, an auth
 failure, a database failure, or proof that retry is safe. V1 therefore does not
 add automatic retry behavior.
 
-A body that becomes provably invalid before the deadline keeps the existing
-`400 INVALID_REQUEST` semantics. A complete valid body before the deadline
-keeps existing Guest promotion behavior.
+A body that becomes provably invalid before the deadline keeps the endpoint's
+existing `400 INVALID_REQUEST` semantics. A complete valid body before the
+deadline keeps the endpoint's existing success behavior.
+
+For Guest bootstrap specifically, #684 preserves the existing accepted grammar:
+
+```text
+omitted / empty body
+JS-trim whitespace-only body
+{}
+{} with JSON trailing whitespace
+```
+
+Malformed JSON, non-empty objects, arrays, primitives, invalid leading/trailing
+characters, and incomplete objects remain `400 INVALID_REQUEST` when terminal
+invalidity is known before expiry.
 
 ---
 
@@ -142,10 +177,11 @@ contract for Guest promotion 401 authentication rejection.
 
 V1 is shared infrastructure but **not a blanket route default**.
 
-Current binding:
+Current bindings:
 
 ```text
 #715 / POST /api/auth/promote-guest = covered
+#684 / POST /api/session/bootstrap  = covered
 ```
 
 Known candidate follow-ups remain independently open until their own code,
@@ -154,7 +190,6 @@ are completed:
 
 ```text
 #682 Saju body-presence probe       = not yet bound
-#684 Guest bootstrap parser         = not yet bound
 #696 Supabase Auth request reader   = not yet bound
 ```
 
@@ -205,6 +240,21 @@ The #715 implementation MUST deterministically prove:
   `request.bodyUsed === false`;
 - Production runtime maps expiry to exactly `408 REQUEST_BODY_TIMEOUT` before
   PostgreSQL promotion work.
+
+The #684 binding MUST additionally prove for `POST /api/session/bootstrap`:
+
+- non-closing accepted whitespace, `{}`, and repeated zero-length chunks expire
+  against the same absolute 3,000 ms lease;
+- a later valid chunk does not reset that lease;
+- delayed trailing non-whitespace remains `INVALID_REQUEST` if it arrives before
+  expiry;
+- valid EOF and existing accepted/rejected body grammar remain unchanged;
+- timeout cancellation is best-effort and reader lock release is deterministic;
+- a never-settling cancellation Promise cannot delay the 408 response;
+- bootstrap identity resolution, credential issuance, token fingerprinting, and
+  durable Guest session creation do not start on timeout;
+- HTTP failure is exactly `408 REQUEST_BODY_TIMEOUT`,
+  `auth.request_body_timeout`, `retryable=false`, `Cache-Control: no-store`.
 
 Production closure requires exact-head CI, fresh-main merge preflight,
 expected-head squash merge, exact merged-SHA CI, and exact-SHA Vercel Production
