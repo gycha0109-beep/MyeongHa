@@ -12,7 +12,7 @@ npm run dev
 
 Then open `http://localhost:4173`.
 
-`npm run build:web` produces the Vercel static artifact in `public/`. Hall, Auth, Birth, and My are React entries; the remaining pages continue to use their existing ES module entry points until each page is migrated. Auth keeps its existing session and Guest-promotion orchestration behind a small controller interface while React owns the form DOM.
+`npm run build:web` produces the Vercel static artifact in `public/`. Hall, Auth, Birth, Reading, and My are React entries; the remaining pages continue to use their existing ES module entry points until each page is migrated. Auth keeps its existing session and Guest-promotion orchestration behind a small controller interface while React owns the form DOM. Reading keeps the existing Saju session and calculation controller behind the React-owned page DOM during the staged migration.
 
 ## Implemented UI flow
 

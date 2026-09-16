@@ -90,7 +90,7 @@ describe('Reading detail product-route identity', () => {
 });
 
 describe('Reading hub/detail fail-closed regression', () => {
-  const hub = readWeb('reading.html');
+  const hub = `${readWeb('reading.html')}\n${readWeb('src/reading/ReadingPage.tsx')}`;
   const detail = readWeb('reading-detail.html');
   const detailRuntime = readWeb('reading-character.js');
 
@@ -109,7 +109,7 @@ describe('Reading hub/detail fail-closed regression', () => {
       'reading-detail.html?topic=compatibility',
       'reading-detail.html?topic=question-specific',
     ]) {
-      expect(hub).toContain(`href="${href}"`);
+      expect(hub).toContain(href);
     }
   });
 

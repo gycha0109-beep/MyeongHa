@@ -1,7 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-const html = readFileSync(new URL('./reading.html', import.meta.url), 'utf8');
+const html = [
+  readFileSync(new URL('./reading.html', import.meta.url), 'utf8'),
+  readFileSync(new URL('./src/reading/ReadingPage.tsx', import.meta.url), 'utf8'),
+].join('\n');
 
 describe('Saju hub Reading readiness presentation', () => {
   it('does not hardcode Product Reading completion or resume claims while runtime authority is blocked', () => {

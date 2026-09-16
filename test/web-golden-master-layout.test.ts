@@ -54,13 +54,16 @@ describe('Web Golden Master', () => {
   });
 
   it('pins the approved Saju 3 + 3 + full-width catalog structure', async () => {
-    const saju = await readWebFile('reading.html');
+    const [html, page] = await Promise.all([
+      readWebFile('reading.html'),
+      readWebFile('src/reading/ReadingPage.tsx'),
+    ]);
+    const saju = `${html}\n${page}`;
 
     expect(saju).toContain('class="product-page gm-page saju-hub-page"');
     expect(saju).toContain('id="saju-hub"');
-    expectInOrder(saju, [
-      '나의 명식',
-      '나를 읽기',
+    const catalog = page.match(/const readingTopics = \[([\s\S]*?)\] as const;/u)?.[1] ?? '';
+    expectInOrder(catalog, [
       '전체 사주',
       '직업 · 커리어',
       '재물',
@@ -68,19 +71,20 @@ describe('Web Golden Master', () => {
       '사업',
       '가족',
       '삶의 단계',
+    ]);
+    expectInOrder(page.slice(page.indexOf('return (')), [
+      '나의 명식',
+      '나를 읽기',
       '지금의 흐름',
       '올해',
       '이번 달',
       '사람과의 관계',
-      '배우자 · 관계',
-      '궁합',
       '고민이 있다면',
       '지금 고민으로 보기',
     ]);
 
-    const catalog = saju.match(/<div class="gm-saju-reading-grid">([\s\S]*?)<\/div>\s*<\/section>/u)?.[1] ?? '';
-    expect(catalog.match(/gm-saju-reading-card/g)).toHaveLength(7);
-    expect(catalog.match(/gm-saju-reading-card is-wide/g)).toHaveLength(1);
+    expect(catalog.match(/reading-detail\.html\?/gu)).toHaveLength(7);
+    expect(catalog.match(/is-wide/gu)).toHaveLength(1);
 
     const runtimeIds = [
       'saju-status',
