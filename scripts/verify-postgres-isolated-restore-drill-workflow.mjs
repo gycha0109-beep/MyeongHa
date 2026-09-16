@@ -19,6 +19,7 @@ const requiredWorkflowFragments = [
   'contents: read',
   'cancel-in-progress: false',
   'environment: production',
+  'uses: actions/checkout@v7',
   'image: postgres:17.6',
   'POSTGRES_PASSWORD: restore-drill',
   'EXPECTED_PROJECT_REF: cnsfpcdiyofqvhpcegfc',
@@ -30,12 +31,13 @@ const requiredWorkflowFragments = [
   '(.event == "schedule" or .event == "workflow_dispatch")',
   '.expired == false',
   '^myeongha-postgres-[0-9]{8}T[0-9]{6}Z$',
-  'uses: actions/download-artifact@v4',
+  'uses: actions/download-artifact@v7',
   'run-id: ${{ inputs.backup_run_id }}',
   'artifact-ids: ${{ steps.source.outputs.artifact_id }}',
   'merge-multiple: true',
   'bash scripts/run-postgres-isolated-restore-drill.sh',
   'Upload restore drill evidence only',
+  'uses: actions/upload-artifact@v7',
   'path: ${{ runner.temp }}/restore-evidence/restore-evidence.json',
   'retention-days: 30',
   "echo 'privacy_reconciliation=not_exercised_by_this_workflow'",
@@ -49,6 +51,9 @@ for (const fragment of requiredWorkflowFragments) {
 }
 
 const forbiddenWorkflowFragments = [
+  'uses: actions/checkout@v4',
+  'uses: actions/download-artifact@v4',
+  'uses: actions/upload-artifact@v4',
   '\n  push:',
   '\n  schedule:',
   'SUPABASE_DB_PASSWORD',
