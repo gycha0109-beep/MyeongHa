@@ -2,7 +2,7 @@ import { createReadStream } from 'node:fs';
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
-import { extname, join, normalize, resolve } from 'node:path';
+import { extname, join, normalize, resolve, sep } from 'node:path';
 import { spawn } from 'node:child_process';
 
 const root = resolve(process.cwd(), process.env.MYEONGHA_WEB_OUTPUT_DIR ?? 'public');
@@ -77,7 +77,7 @@ async function serve() {
       const pathname = decodeURIComponent(url.pathname === '/' ? '/my.html' : url.pathname);
       const relative = normalize(pathname).replace(/^[/\\]+/, '');
       const file = resolve(root, relative);
-      assert(file.startsWith(`${root}/`), 'request escaped static root');
+      assert(file.startsWith(`${root}${sep}`), 'request escaped static root');
       assert((await stat(file)).isFile(), 'not a file');
       res.setHeader('Content-Type', mime.get(extname(file).toLowerCase()) ?? 'application/octet-stream');
       createReadStream(file).pipe(res);
@@ -186,7 +186,7 @@ async function capture(client, suffix) {
   await writeFile(join(dir, `web-my-browser-smoke-${suffix}.json`), `${JSON.stringify(diagnostics, null, 2)}\n`);
 }
 
-for (const file of ['my.html', 'my.css', 'my-page.js', 'my-runtime-client.js', 'product-auth.js', 'product-theme.js']) {
+for (const file of ['my.html', 'my.css', 'my-runtime-client.js', 'product-auth.js', 'product-theme.js']) {
   await stat(join(root, file));
 }
 

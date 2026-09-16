@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="description" content="명하 홈 — 오늘의 흐름, 사주 읽기, 캐릭터 대화를 한 화면에서 이어갑니다." />
   <title>홈 · 명하</title>
-  <link rel="stylesheet" href="product.css" />
-  <link rel="stylesheet" href="golden-master.css" />
-  <link rel="stylesheet" href="product-theme.css" data-product-theme="true" />
-  <link rel="stylesheet" href="golden-master-lock.css" data-golden-master-lock="true" />
+  <link rel="stylesheet" href="product.css" vite-ignore />
+  <link rel="stylesheet" href="golden-master.css" vite-ignore />
+  <link rel="stylesheet" href="product-theme.css" data-product-theme="true" vite-ignore />
+  <link rel="stylesheet" href="golden-master-lock.css" data-golden-master-lock="true" vite-ignore />
   <script src="product-theme.js"></script>
 </head>
 <body class="product-page gm-page" data-page="home">
@@ -39,88 +39,7 @@
     </div>
   </header>
 
-  <main class="gm-home-main">
-    <div class="gm-shell">
-      <header class="gm-home-head">
-        <h1 class="gm-greeting">좋은 저녁이에요, <span class="gm-highlight" id="home-greeting-name">당신</span></h1>
-        <p class="gm-lede">오늘도 명하에 이야기가 쌓이고 있어요.</p>
-      </header>
-
-      <section class="gm-home-hero" aria-labelledby="home-character-title">
-        <div class="gm-hero-copy">
-          <span class="gm-hero-label">오늘 이야기할 사람 · 캐릭터 선택</span>
-          <h2 class="gm-hero-title" id="home-character-title">누구와 이야기를 시작해 볼까요?</h2>
-          <p>마음에 맞는 사람을 고른 뒤, 지금 가장 마음에 걸리는 이야기를 편하게 꺼내보세요.</p>
-          <a class="gm-primary-button" href="chat-hub.html">대화로 가기 →</a>
-        </div>
-        <blockquote class="gm-hero-quote">“당신에게 맞는 거리와 말투의 사람을 골라보세요.”</blockquote>
-      </section>
-
-      <section class="gm-section" aria-labelledby="home-month-title">
-        <div class="gm-section-head">
-          <h2 class="gm-section-title" id="home-month-title">이번 달 사주 읽기</h2>
-          <a class="gm-inline-link" href="reading-detail.html?scope=month">제공 상태 확인 <span aria-hidden="true">›</span></a>
-        </div>
-
-        <a class="gm-card gm-month-card" href="reading-detail.html?scope=month">
-          <span class="gm-month-art" aria-hidden="true"></span>
-          <span class="gm-month-copy">
-            <span class="gm-month-eyebrow" id="home-current-date">이번 달 읽기</span>
-            <strong class="gm-card-title">이번 달 읽기 주제와 제공 상태를 확인해보세요.</strong>
-            <span class="gm-month-support">검증된 Reading이 제공 가능한지 상세 화면에서 확인할 수 있습니다.</span>
-            <span class="gm-inline-link">읽기 확인 <span aria-hidden="true">›</span></span>
-          </span>
-        </a>
-      </section>
-
-      <section class="gm-section" aria-labelledby="home-products-title">
-        <div class="gm-section-head">
-          <h2 class="gm-section-title" id="home-products-title">사주 읽기 주제</h2>
-          <a class="gm-inline-link" href="reading.html">전체 주제 보기 <span aria-hidden="true">›</span></a>
-        </div>
-
-        <div class="gm-home-products">
-          <a class="gm-card gm-product-card" href="reading-detail.html?topic=temperament&scope=original">
-            <span class="gm-icon" aria-hidden="true">✦</span>
-            <span><strong>전체 사주</strong><small>나라는 사람을 더 깊이</small></span>
-            <span class="gm-chevron" aria-hidden="true">›</span>
-          </a>
-          <a class="gm-card gm-product-card" href="reading-detail.html?topic=career">
-            <span class="gm-icon" aria-hidden="true">⌁</span>
-            <span><strong>직업 · 커리어</strong><small>일과 선택을 더 깊이</small></span>
-            <span class="gm-chevron" aria-hidden="true">›</span>
-          </a>
-          <a class="gm-card gm-product-card" href="reading-detail.html?topic=money">
-            <span class="gm-icon" aria-hidden="true">財</span>
-            <span><strong>재물</strong><small>재물과 자원의 흐름</small></span>
-            <span class="gm-chevron" aria-hidden="true">›</span>
-          </a>
-          <a class="gm-card gm-product-card" href="reading-detail.html?topic=love">
-            <span class="gm-icon is-rose" aria-hidden="true">緣</span>
-            <span><strong>연애 · 관계</strong><small>관계에서 반복되는 방식</small></span>
-            <span class="gm-chevron" aria-hidden="true">›</span>
-          </a>
-        </div>
-      </section>
-
-      <section class="gm-section" aria-labelledby="home-recent-title">
-        <div class="gm-section-head">
-          <h2 class="gm-section-title" id="home-recent-title">최근 이야기</h2>
-          <a class="gm-inline-link" href="chat-hub.html">전체보기 <span aria-hidden="true">›</span></a>
-        </div>
-
-        <article class="gm-card gm-recent-card">
-          <span class="gm-recent-avatar" aria-hidden="true">明</span>
-          <div class="gm-recent-copy">
-            <div class="gm-recent-title-row"><strong>이어갈 대화</strong><span class="gm-chip">대화 기록</span></div>
-            <p>지금은 저장된 사실을 이야기로 추측해 이어 붙이지 않습니다.</p>
-          </div>
-          <span class="gm-recent-time">아직 없음</span>
-          <a class="gm-recent-button" href="chat-hub.html"><span>대화 보기</span><span aria-hidden="true">→</span></a>
-        </article>
-      </section>
-    </div>
-  </main>
+  <main class="gm-home-main" id="home-react-root"></main>
 
   <nav class="mobile-bottom-nav" aria-label="모바일 주요 메뉴">
     <a class="mobile-nav-link" href="hall.html" aria-current="page"><span class="mobile-nav-icon" aria-hidden="true">⌂</span><span>홈</span></a>
@@ -129,6 +48,6 @@
     <a class="mobile-nav-link" href="records.html"><span class="mobile-nav-icon" aria-hidden="true">▤</span><span>기록</span></a>
     <a class="mobile-nav-link" href="my.html"><span class="mobile-nav-icon" aria-hidden="true">♙</span><span>마이</span></a>
   </nav>
-  <script type="module" src="home-page.js"></script>
+  <script type="module" src="/src/home/main.tsx"></script>
 </body>
 </html>

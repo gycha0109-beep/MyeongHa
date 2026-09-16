@@ -4,74 +4,12 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>태어난 순간의 기록 · 명하</title>
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css" vite-ignore />
 </head>
 <body data-page="birth">
   <header class="topbar"><div class="shell topbar-inner"><a class="brand" href="index.html"><span class="brand-seal">命河</span><span>명하</span></a><nav class="topnav"><a href="records.html">기록</a><button class="theme-toggle" data-theme-toggle type="button">☼</button></nav></div></header>
-  <main class="world-frame"><section class="page"><div class="shell birth-wrap">
-    <a class="backlink" href="records.html">← 기록으로 돌아가기</a>
-    <div class="birth-intro">
-      <div class="eyebrow">BIRTH PROFILE</div>
-      <h1 class="display display-lg">태어난 순간의 기록을 엽니다.</h1>
-      <p class="lead">명식 계산에 필요한 원본 입력만 저장합니다. Birth Profile과 첫 revision의 식별자는 서버가 생성하며, 브라우저에서는 지정하지 않습니다.</p>
-    </div>
-
-    <div class="panel" id="birth-status" role="status" style="padding:18px;margin-bottom:20px">현재 저장된 출생 정보를 확인하는 중입니다…</div>
-
-    <article class="panel birth-panel" id="birth-existing" hidden>
-      <div class="eyebrow">CURRENT BIRTH PROFILE</div>
-      <h2 style="margin:8px 0 10px">이미 저장된 출생 정보가 있습니다.</h2>
-      <p class="lead" style="font-size:1rem">현재 production에는 기존 입력을 수정하는 PATCH transport가 연결되어 있지 않습니다. 이 화면에서는 두 번째 본인 Birth Profile을 만들지 않습니다.</p>
-      <p class="fine" id="birth-existing-revision"></p>
-      <div class="birth-submit" style="gap:10px;flex-wrap:wrap">
-        <a class="button button-primary" href="my.html#my-birth-title">My에서 확인하기 →</a>
-        <a class="button button-secondary" href="reading.html">사주에서 결과 보기 →</a>
-      </div>
-    </article>
-
-    <form class="panel birth-panel" id="birth-form" novalidate hidden>
-      <div class="form-row">
-        <label class="form-label" for="birth-date">생년월일</label>
-        <div><input class="input" id="birth-date" type="date" required /><div class="fine">선택한 달력 기준의 날짜를 입력합니다.</div></div>
-      </div>
-
-      <div class="form-row">
-        <label class="form-label" for="birth-time">태어난 시각</label>
-        <div>
-          <div class="field-grid two">
-            <input class="input" id="birth-time" type="time" step="60" required />
-            <label style="display:flex;align-items:center;gap:8px;color:var(--text-soft)"><input id="birth-time-unknown" type="checkbox" /> 시각 모름</label>
-          </div>
-          <div class="fine">시각을 모르면 별도 추정값을 만들지 않고 null로 저장합니다.</div>
-        </div>
-      </div>
-
-      <div class="form-row">
-        <span class="form-label">달력 기준</span>
-        <div>
-          <div class="choice-line"><label><input type="radio" name="calendar" value="solar" checked /> 양력 (Solar)</label><label><input type="radio" name="calendar" value="lunar" /> 음력 (Lunar)</label></div>
-          <label id="birth-leap-wrap" style="display:flex;align-items:center;gap:8px;margin-top:12px;color:var(--text-soft)" hidden><input id="birth-leap-month" type="checkbox" /> 윤달</label>
-        </div>
-      </div>
-
-      <div class="form-row">
-        <label class="form-label" for="birth-sex">성별 입력</label>
-        <div>
-          <select class="select" id="birth-sex">
-            <option value="">선택하지 않음</option>
-            <option value="male">남성</option>
-            <option value="female">여성</option>
-            <option value="unspecified">미지정</option>
-          </select>
-          <div class="fine">선택하지 않으면 null로 전송합니다.</div>
-        </div>
-      </div>
-
-      <div class="birth-submit"><button class="button button-primary" id="birth-submit-button" type="submit">명식록 저장하기 →</button></div>
-      <p class="fine" style="text-align:center">현재 create contract가 허용하지 않는 출생지·클라이언트 ID·해시 값은 전송하지 않습니다.</p>
-    </form>
-  </div></section></main>
+  <main class="world-frame" id="birth-react-root"></main>
   <script src="app.js" defer></script>
-  <script type="module" src="birth-page.js"></script>
+  <script type="module" src="/src/birth/main.tsx"></script>
 </body>
 </html>

@@ -90,8 +90,8 @@ describe('Reading detail product-route identity', () => {
 });
 
 describe('Reading hub/detail fail-closed regression', () => {
-  const hub = readWeb('reading.html');
-  const detail = readWeb('reading-detail.html');
+  const hub = `${readWeb('reading.html')}\n${readWeb('src/reading/ReadingPage.tsx')}`;
+  const detail = `${readWeb('reading-detail.html')}\n${readWeb('src/reading-detail/ReadingDetailPage.tsx')}`;
   const detailRuntime = readWeb('reading-character.js');
 
   it('keeps every current hub product route explicit', () => {
@@ -109,14 +109,14 @@ describe('Reading hub/detail fail-closed regression', () => {
       'reading-detail.html?topic=compatibility',
       'reading-detail.html?topic=question-specific',
     ]) {
-      expect(hub).toContain(`href="${href}"`);
+      expect(hub).toContain(href);
     }
   });
 
   it('does not expose the generic placeholder stage while public Product Reading is blocked', () => {
     expect(detail).toContain('data-reading-route-state');
-    expect(detail).toMatch(/<section class="reading-stage" data-reading-stage hidden/);
-    expect(detail).toContain('<script type="module" src="reading-character.js"></script>');
+    expect(detail).toMatch(/<section className="reading-stage" data-reading-stage hidden/);
+    expect(detail).toContain('src="/src/reading-detail/main.tsx"');
     expect(detailRuntime).toContain("root.dataset.readingRouteState = route.valid ? 'blocked_by_authority' : 'invalid';");
     expect(detailRuntime).toContain('다른 주제의 풀이로 대신 보여드리지 않습니다.');
   });

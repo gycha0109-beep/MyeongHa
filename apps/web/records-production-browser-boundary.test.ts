@@ -21,7 +21,10 @@ describe('Records Production browser boundary', () => {
   });
 
   it('waits for the changed Records boundary before running the Production browser smoke', () => {
+    expect(waiter).toContain("const PRODUCTION_RECORDS_PAGE = 'https://myeongha.vercel.app/records.html';");
     expect(waiter).toContain("const PRODUCTION_RECORDS_SCRIPT = 'https://myeongha.vercel.app/records-page.js';");
+    expect(waiter).toContain("'id=\"records-react-root\"'");
+    expect(waiter).toContain("'/assets/records-'");
     expect(waiter).toContain("const DEVELOPMENT_SAMPLE_HOSTS = Object.freeze(new Set(['localhost', '127.0.0.1', '::1', '[::1]']));");
     expect(waiter).toContain("'if (allowsDevelopmentSajuSamples())'");
     expect(waiter).toContain("'renderSajuReadingEmpty(target);'");
@@ -32,6 +35,8 @@ describe('Records Production browser boundary', () => {
 
   it('runs the real Production browser smoke when the Records surface boundary changes', () => {
     expect(workflow).toContain("- 'apps/web/records-page.js'");
+    expect(workflow).toContain("- 'apps/web/records.html'");
+    expect(workflow).toContain("- 'apps/web/src/records/**'");
     expect(workflow).toContain("- 'scripts/wait-production-records-sample-boundary.mjs'");
     expect(workflow).toContain("- 'scripts/verify-production-records-browser.mjs'");
     expect(workflow).toContain('run: node scripts/wait-production-records-sample-boundary.mjs');

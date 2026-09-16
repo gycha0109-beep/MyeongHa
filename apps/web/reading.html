@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="description" content="명하 사주 — 내 명식과 지금 볼 수 있는 사주 읽기를 한 화면에서 탐색합니다." />
   <title>사주 · 명하</title>
-  <link rel="stylesheet" href="product.css" />
-  <link rel="stylesheet" href="saju-hub.css" />
-  <link rel="stylesheet" href="saju-birth-input.css" />
-  <link rel="stylesheet" href="golden-master.css" />
+  <link rel="stylesheet" href="product.css" vite-ignore />
+  <link rel="stylesheet" href="saju-hub.css" vite-ignore />
+  <link rel="stylesheet" href="saju-birth-input.css" vite-ignore />
+  <link rel="stylesheet" href="golden-master.css" vite-ignore />
   <script src="product-theme.js"></script>
 </head>
 <body class="product-page gm-page saju-hub-page" data-page="saju">
@@ -19,7 +19,6 @@
         <span class="product-brand-seal" aria-hidden="true">明河</span>
         <span class="product-brand-sub">MyeongHa</span>
       </a>
-
       <nav class="product-nav" aria-label="주요 메뉴">
         <a class="product-nav-link" href="hall.html">홈</a>
         <a class="product-nav-link" href="reading.html" aria-current="page">사주</a>
@@ -27,7 +26,6 @@
         <a class="product-nav-link" href="records.html">기록</a>
         <a class="product-nav-link" href="my.html">마이</a>
       </nav>
-
       <div class="product-utilities">
         <button class="product-icon-button" type="button" aria-label="알림"></button>
         <a class="product-profile" href="my.html" aria-label="내 프로필">
@@ -38,205 +36,7 @@
       </div>
     </div>
   </header>
-
-  <main class="gm-saju-main">
-    <div class="gm-shell">
-      <header class="gm-saju-head">
-        <h1 class="gm-page-title">사주</h1>
-        <p class="gm-lede">내 명식과 사주 읽기 주제를 한곳에 모아봤어요.</p>
-      </header>
-
-      <div class="saju-status" id="saju-status" role="status">내 사주를 확인하는 중입니다…</div>
-
-      <section class="saju-empty" id="saju-empty" hidden aria-labelledby="saju-empty-title">
-        <div class="saju-empty-art" aria-hidden="true">
-          <span class="saju-empty-orbit"></span>
-          <span class="saju-empty-mark">命</span>
-        </div>
-        <div class="saju-empty-card">
-          <span class="saju-section-kicker">처음 시작하기</span>
-          <h2 id="saju-empty-title">아직 등록된 사주가 없습니다.</h2>
-          <p>태어난 정보를 입력하면 명하가 현재 세션의 자기 명식을 계산합니다. 로그인하지 않아도 먼저 확인할 수 있습니다.</p>
-
-          <form class="saju-birth-form" id="saju-birth-form" novalidate>
-            <div class="saju-form-grid">
-              <label class="saju-field">
-                <span>생년월일</span>
-                <div class="saju-date-fields" role="group" aria-label="생년월일">
-                  <input id="saju-birth-year" class="saju-date-part saju-date-year" type="text" inputmode="numeric" autocomplete="bday-year" maxlength="4" pattern="[0-9]{4}" placeholder="YYYY" aria-label="출생 연도" required />
-                  <span class="saju-date-separator" aria-hidden="true">.</span>
-                  <input id="saju-birth-month" class="saju-date-part" type="text" inputmode="numeric" autocomplete="bday-month" maxlength="2" pattern="[0-9]{1,2}" placeholder="MM" aria-label="출생 월" required />
-                  <span class="saju-date-separator" aria-hidden="true">.</span>
-                  <input id="saju-birth-day" class="saju-date-part" type="text" inputmode="numeric" autocomplete="bday-day" maxlength="2" pattern="[0-9]{1,2}" placeholder="DD" aria-label="출생 일" required />
-                </div>
-              </label>
-              <label class="saju-field">
-                <span>출생시간</span>
-                <input id="saju-birth-time" type="time" step="60" required />
-              </label>
-            </div>
-
-            <div class="saju-form-options">
-              <label><input id="saju-time-unknown" type="checkbox" /> 출생시간을 모릅니다</label>
-              <div class="saju-calendar-options" role="group" aria-label="달력 기준">
-                <label><input type="radio" name="saju-calendar" value="solar" checked /> 양력</label>
-                <label><input type="radio" name="saju-calendar" value="lunar" /> 음력</label>
-                <label id="saju-leap-wrap" hidden><input id="saju-leap-month" type="checkbox" /> 윤달</label>
-              </div>
-            </div>
-
-            <label class="saju-field saju-field-select">
-              <span>성별 입력 <small>선택 사항</small></span>
-              <select id="saju-birth-sex">
-                <option value="">선택하지 않음</option>
-                <option value="male">남성</option>
-                <option value="female">여성</option>
-                <option value="unspecified">미지정</option>
-              </select>
-            </label>
-
-            <div class="saju-form-error" id="saju-form-error" hidden role="alert"></div>
-            <button class="saju-primary-button" id="saju-create-button" type="submit">
-              <span>내 사주 만들기</span><span aria-hidden="true">→</span>
-            </button>
-            <p class="saju-guest-note"><span aria-hidden="true">◇</span> 게스트로 먼저 볼 수 있으며, 저장·동기화가 필요할 때 계정 연결을 사용합니다.</p>
-          </form>
-        </div>
-      </section>
-
-      <section id="saju-hub" hidden aria-label="계산된 내 사주">
-        <article class="gm-saju-hero" aria-labelledby="gm-saju-profile-title">
-          <div class="gm-saju-hero-copy">
-            <h2 class="gm-saju-title" id="gm-saju-profile-title">나의 명식</h2>
-            <p class="gm-saju-summary" id="saju-birth-summary">현재 자기 Birth Profile과 연결된 계산 결과입니다.</p>
-            <details class="gm-chart-details">
-              <summary>기본 정보 보기 →</summary>
-              <div class="gm-chart-panel">
-                <div class="saju-pillar-grid" id="saju-pillar-grid" aria-label="사주 네 기둥"></div>
-                <div class="saju-chart-summary">
-                  <div class="saju-day-master">
-                    <span>일간</span>
-                    <strong id="saju-day-master">—</strong>
-                    <small id="saju-day-master-meta">계산 결과 확인 중</small>
-                  </div>
-                  <div class="saju-elements">
-                    <span class="saju-summary-label">오행 분포</span>
-                    <div class="saju-element-bars" id="saju-element-bars"></div>
-                  </div>
-                  <div class="saju-structure-note">
-                    <span class="saju-summary-label">계산 상태</span>
-                    <strong id="saju-completeness-title">—</strong>
-                    <p id="saju-completeness-copy">확정된 계산 사실만 표시합니다.</p>
-                  </div>
-                </div>
-                <p class="saju-authority-note">이 영역은 계산된 명식 사실만 보여줍니다. 의미 해석은 별도 Reading에서 제공합니다.</p>
-              </div>
-            </details>
-          </div>
-          <blockquote class="gm-saju-quote">“지금의 내가,<br />더 좋은 내일을 만듭니다.”</blockquote>
-        </article>
-
-        <section class="gm-section" aria-labelledby="gm-reading-title">
-          <div class="gm-section-head">
-            <div>
-              <h2 class="gm-section-title" id="gm-reading-title">나를 읽기 <span class="gm-section-support">나를 더 깊이 이해하는 시간</span></h2>
-            </div>
-            <a class="gm-inline-link" href="reading-detail.html?topic=temperament&scope=original">전체 보기 <span aria-hidden="true">›</span></a>
-          </div>
-
-          <div class="gm-saju-reading-grid">
-            <a class="gm-card gm-saju-reading-card" href="reading-detail.html?topic=temperament&scope=original">
-              <span class="gm-icon" aria-hidden="true">✦</span>
-              <span><strong>전체 사주</strong><small>나라는 사람을 더 깊이</small></span>
-              <span class="gm-chevron" aria-hidden="true">›</span>
-            </a>
-            <a class="gm-card gm-saju-reading-card" href="reading-detail.html?topic=career">
-              <span class="gm-icon" aria-hidden="true">⌁</span>
-              <span><strong>직업 · 커리어</strong><small>지금의 길, 더 나은 길로</small></span>
-              <span class="gm-chevron" aria-hidden="true">›</span>
-            </a>
-            <a class="gm-card gm-saju-reading-card" href="reading-detail.html?topic=money">
-              <span class="gm-icon" aria-hidden="true">財</span>
-              <span><strong>재물</strong><small>흐르는 기회를 잡는 법</small></span>
-              <span class="gm-chevron" aria-hidden="true">›</span>
-            </a>
-            <a class="gm-card gm-saju-reading-card" href="reading-detail.html?topic=love">
-              <span class="gm-icon is-rose" aria-hidden="true">緣</span>
-              <span><strong>연애 · 관계</strong><small>더 좋은 인연이 있는 곳</small></span>
-              <span class="gm-chevron" aria-hidden="true">›</span>
-            </a>
-            <a class="gm-card gm-saju-reading-card" href="reading-detail.html?topic=business">
-              <span class="gm-icon" aria-hidden="true">業</span>
-              <span><strong>사업</strong><small>시작과 확장의 흐름</small></span>
-              <span class="gm-chevron" aria-hidden="true">›</span>
-            </a>
-            <a class="gm-card gm-saju-reading-card" href="reading-detail.html?topic=family">
-              <span class="gm-icon" aria-hidden="true">家</span>
-              <span><strong>가족</strong><small>함께하는 마음의 길</small></span>
-              <span class="gm-chevron" aria-hidden="true">›</span>
-            </a>
-            <a class="gm-card gm-saju-reading-card is-wide" href="reading-detail.html?topic=life-stage">
-              <span class="gm-icon" aria-hidden="true">葉</span>
-              <span><strong>삶의 단계</strong><small>지금의 시기를 지나, 다음으로</small></span>
-              <span class="gm-chevron" aria-hidden="true">›</span>
-            </a>
-          </div>
-        </section>
-
-        <section class="gm-section" aria-labelledby="gm-flow-title">
-          <div class="gm-section-head">
-            <h2 class="gm-section-title" id="gm-flow-title">지금의 흐름</h2>
-            <span class="gm-section-support">지금, 놓치지 말아야 할 시간</span>
-          </div>
-          <div class="gm-saju-flow-grid">
-            <a class="gm-card gm-flow-card" href="reading-detail.html?scope=year">
-              <span class="gm-flow-thumb" aria-hidden="true"></span>
-              <span class="gm-flow-copy">
-                <strong>올해</strong>
-                <p id="saju-flow-year">올해의 흐름</p>
-                <p>지금의 흐름을 한눈에, 주요 키워드와 변화의 시기를 읽어보세요.</p>
-              </span>
-              <span class="gm-chevron" aria-hidden="true">›</span>
-            </a>
-            <a class="gm-card gm-flow-card" href="reading-detail.html?scope=month">
-              <span class="gm-flow-thumb" aria-hidden="true"></span>
-              <span class="gm-flow-copy">
-                <strong>이번 달</strong>
-                <p>이번 달의 기운과 흐름, 놓치지 말아야 할 순간을 짚어봅니다.</p>
-              </span>
-              <span class="gm-chevron" aria-hidden="true">›</span>
-            </a>
-          </div>
-        </section>
-
-        <section class="gm-section" aria-labelledby="gm-relation-title">
-          <div class="gm-section-head"><h2 class="gm-section-title" id="gm-relation-title">사람과의 관계</h2></div>
-          <div class="gm-relationship-grid">
-            <a class="gm-card gm-relation-card" href="reading-detail.html?topic=spouse">
-              <span class="gm-icon is-rose" aria-hidden="true">♡</span>
-              <span><strong>배우자 · 관계</strong><small>소중한 인연의 흐름을 알아보세요.</small></span>
-              <span class="gm-chevron" aria-hidden="true">›</span>
-            </a>
-            <a class="gm-card gm-relation-card" href="reading-detail.html?topic=compatibility">
-              <span class="gm-icon" aria-hidden="true">∞</span>
-              <span><strong>궁합</strong><small>함께할 때 더욱 빛나는 이야기</small></span>
-              <span class="gm-chevron" aria-hidden="true">›</span>
-            </a>
-          </div>
-        </section>
-
-        <section class="gm-section" aria-labelledby="gm-question-title">
-          <div class="gm-section-head"><h2 class="gm-section-title" id="gm-question-title">고민이 있다면</h2></div>
-          <a class="gm-card gm-question-card" href="reading-detail.html?topic=question-specific">
-            <span class="gm-icon" aria-hidden="true">…</span>
-            <span class="gm-question-copy"><strong>지금 고민으로 보기</strong><small>지금 마음에 있는 질문을 바탕으로, 사주가 전하는 범위 안에서 읽어보세요.</small></span>
-            <span class="gm-chevron" aria-hidden="true">›</span>
-          </a>
-        </section>
-      </section>
-    </div>
-  </main>
-
+  <main class="gm-saju-main" id="reading-react-root"></main>
   <nav class="mobile-bottom-nav" aria-label="모바일 주요 메뉴">
     <a class="mobile-nav-link" href="hall.html"><span class="mobile-nav-icon" aria-hidden="true">⌂</span><span>홈</span></a>
     <a class="mobile-nav-link" href="reading.html" aria-current="page"><span class="mobile-nav-icon" aria-hidden="true">✦</span><span>사주</span></a>
@@ -244,7 +44,6 @@
     <a class="mobile-nav-link" href="records.html"><span class="mobile-nav-icon" aria-hidden="true">▤</span><span>기록</span></a>
     <a class="mobile-nav-link" href="my.html"><span class="mobile-nav-icon" aria-hidden="true">♙</span><span>마이</span></a>
   </nav>
-
-  <script type="module" src="saju-hub.js"></script>
+  <script type="module" src="/src/reading/main.tsx"></script>
 </body>
 </html>

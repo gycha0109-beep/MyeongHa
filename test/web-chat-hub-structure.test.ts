@@ -2,43 +2,49 @@ import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 
 const hubHtmlPath = new URL('../apps/web/chat-hub.html', import.meta.url);
+const hubPagePath = new URL('../apps/web/src/chat-hub/ChatHubPage.tsx', import.meta.url);
 const hubCssPath = new URL('../apps/web/chat-hub.css', import.meta.url);
 const hubV2CssPath = new URL('../apps/web/conversation-v2.css', import.meta.url);
 const hubJsPath = new URL('../apps/web/chat-hub.js', import.meta.url);
 const roomHtmlPath = new URL('../apps/web/chat.html', import.meta.url);
+const roomPagePath = new URL('../apps/web/src/chat/ChatPage.tsx', import.meta.url);
 const homeHtmlPath = new URL('../apps/web/hall.html', import.meta.url);
+const homePagePath = new URL('../apps/web/src/home/HomePage.tsx', import.meta.url);
 const readingHtmlPath = new URL('../apps/web/reading.html', import.meta.url);
 const recordsHtmlPath = new URL('../apps/web/records.html', import.meta.url);
 
 describe('MyeongHa conversation hub relationship-first IA', () => {
   it('puts ongoing relationships before character discovery', async () => {
-    const html = await readFile(hubHtmlPath, 'utf8');
+    const [html, page] = await Promise.all([readFile(hubHtmlPath, 'utf8'), readFile(hubPagePath, 'utf8')]);
+    const source = `${html}\n${page}`;
 
-    const primary = html.indexOf('class="chat-hub-primary conversation-primary"');
-    const myConversations = html.indexOf('내 대화');
-    const incoming = html.indexOf('나에게 온 이야기');
-    const discoverySection = html.indexOf('id="people"');
+    const primary = source.indexOf('className="chat-hub-primary conversation-primary"');
+    const myConversations = source.indexOf('내 대화');
+    const incoming = source.indexOf('나에게 온 이야기');
+    const discoverySection = source.indexOf('id="people"');
 
     expect(primary).toBeGreaterThan(-1);
     expect(myConversations).toBeGreaterThan(primary);
     expect(incoming).toBeGreaterThan(myConversations);
     expect(discoverySection).toBeGreaterThan(incoming);
-    expect(html).toContain('누구와 이야기를 이어갈까요?');
-    expect(html).toContain('지금 이어갈 사람');
-    expect(html).toContain('data-incoming-section hidden');
-    expect(html).not.toContain('<h2 id="recent-title">최근 대화</h2>');
+    expect(source).toContain('누구와 이야기를 이어갈까요?');
+    expect(source).toContain('지금 이어갈 사람');
+    expect(source).toContain('data-incoming-section hidden');
+    expect(source).not.toContain('<h2 id="recent-title">최근 대화</h2>');
   });
 
   it('fails closed instead of fabricating a relationship, recent thread, or incoming story', async () => {
-    const [html, js] = await Promise.all([
+    const [html, page, js] = await Promise.all([
       readFile(hubHtmlPath, 'utf8'),
+      readFile(hubPagePath, 'utf8'),
       readFile(hubJsPath, 'utf8'),
     ]);
+    const source = `${html}\n${page}`;
 
-    expect(html).toContain('아직 이어지고 있는 대화가 없습니다.');
-    expect(html).toContain('아직 이어지고 있는 관계가 없습니다.');
-    expect(html).not.toContain('퇴사를 고민했던 이야기');
-    expect(html).not.toContain('지난번 당신');
+    expect(source).toContain('아직 이어지고 있는 대화가 없습니다.');
+    expect(source).toContain('아직 이어지고 있는 관계가 없습니다.');
+    expect(source).not.toContain('퇴사를 고민했던 이야기');
+    expect(source).not.toContain('지난번 당신');
     expect(js).toContain('setContinuation(null)');
     expect(js).toContain('setRecent([])');
     expect(js).toContain('setIncoming([])');
@@ -73,12 +79,16 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
   });
 
   it('keeps character rooms as focused destinations and routes global conversation entries through the hub', async () => {
-    const [room, home, reading, records] = await Promise.all([
+    const [roomHtml, roomPage, homeHtml, homePage, reading, records] = await Promise.all([
       readFile(roomHtmlPath, 'utf8'),
+      readFile(roomPagePath, 'utf8'),
       readFile(homeHtmlPath, 'utf8'),
+      readFile(homePagePath, 'utf8'),
       readFile(readingHtmlPath, 'utf8'),
       readFile(recordsHtmlPath, 'utf8'),
     ]);
+    const room = `${roomHtml}\n${roomPage}`;
+    const home = `${homeHtml}\n${homePage}`;
 
     expect(room).toContain('class="product-page character-room character-room-v2"');
     expect(room).toContain('href="chat-hub.html" aria-label="대화 허브로 돌아가기"');

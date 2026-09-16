@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 
 const hallPath = new URL('../apps/web/hall.html', import.meta.url);
+const homePagePath = new URL('../apps/web/src/home/HomePage.tsx', import.meta.url);
 const goldenPath = new URL('../apps/web/golden-master.css', import.meta.url);
 const lockPath = new URL('../apps/web/golden-master-lock.css', import.meta.url);
 const assets = [
@@ -46,13 +47,14 @@ describe('Home approved illustration assets — Golden Master', () => {
   });
 
   it('does not use artwork integration to fabricate personalized authority', async () => {
-    const html = await readFile(hallPath, 'utf8');
+    const [html, page] = await Promise.all([readFile(hallPath, 'utf8'), readFile(homePagePath, 'utf8')]);
+    const homeSource = `${html}\n${page}`;
 
-    expect(html).not.toContain('오늘은 움직이기보다');
-    expect(html).not.toContain('퇴사를 고민했던 이야기');
-    expect(html).not.toContain('세연');
-    expect(html).not.toContain('chat.html?character=');
-    expect(html).toContain('오늘 이야기할 사람');
-    expect(html).toContain('캐릭터 선택');
+    expect(homeSource).not.toContain('오늘은 움직이기보다');
+    expect(homeSource).not.toContain('퇴사를 고민했던 이야기');
+    expect(homeSource).not.toContain('세연');
+    expect(homeSource).not.toContain('chat.html?character=');
+    expect(homeSource).toContain('오늘 이야기할 사람');
+    expect(homeSource).toContain('캐릭터 선택');
   });
 });

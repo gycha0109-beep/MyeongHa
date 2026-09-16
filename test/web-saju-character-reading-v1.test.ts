@@ -2,28 +2,34 @@ import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 
 const readingHtmlPath = new URL('../apps/web/reading-detail.html', import.meta.url);
+const readingPagePath = new URL('../apps/web/src/reading-detail/ReadingDetailPage.tsx', import.meta.url);
 const readingCssPath = new URL('../apps/web/reading-v3.css', import.meta.url);
 const readingScenesCssPath = new URL('../apps/web/reading-scenes.css', import.meta.url);
 const readingRuntimePath = new URL('../apps/web/reading-character.js', import.meta.url);
 const baekheonScenePath = new URL('../apps/web/baekheon-reading-scene.jpg', import.meta.url);
 
+async function readReadingMarkup() {
+  const [html, page] = await Promise.all([readFile(readingHtmlPath, 'utf8'), readFile(readingPagePath, 'utf8')]);
+  return `${html}\n${page}`;
+}
+
 describe('MyeongHa character-led Saju Reading v1', () => {
   it('uses the approved product shell and keeps Saju as the active destination', async () => {
-    const html = await readFile(readingHtmlPath, 'utf8');
+    const html = await readReadingMarkup();
 
     expect(html).toContain('href="product.css"');
     expect(html).toContain('href="reading-v3.css"');
     expect(html).toContain('href="reading-scenes.css"');
     expect(html).toContain('href="reading.html" aria-current="page"');
-    expect(html).toContain('class="reading-stage"');
-    expect(html).toContain('class="reader-scene"');
-    expect(html).toContain('class="reading-sheet"');
+    expect(html).toContain('className="reading-stage"');
+    expect(html).toContain('className="reader-scene"');
+    expect(html).toContain('className="reading-sheet"');
     expect(html).not.toContain('John Doe');
     expect(html).not.toContain('DEMO');
   });
 
   it('keeps Reading authority ahead of character expression in the dormant result scaffold', async () => {
-    const html = await readFile(readingHtmlPath, 'utf8');
+    const html = await readReadingMarkup();
 
     const flow = html.indexOf('data-reading-step-title');
     const structure = html.indexOf('data-reading-structure-title');
@@ -68,12 +74,12 @@ describe('MyeongHa character-led Saju Reading v1', () => {
 
   it('keeps the four-step result scaffold dormant while public Product Reading is authority-blocked', async () => {
     const [html, runtime] = await Promise.all([
-      readFile(readingHtmlPath, 'utf8'),
+      readReadingMarkup(),
       readFile(readingRuntimePath, 'utf8'),
     ]);
 
     expect((html.match(/data-reading-progress-dot/g) ?? []).length).toBe(4);
-    expect(html).toMatch(/<section class="reading-stage" data-reading-stage hidden/);
+    expect(html).toMatch(/<section className="reading-stage" data-reading-stage hidden/);
     expect(html).toContain('data-reading-route-state');
     expect(html).toContain('data-reading-next disabled');
     expect(html).toContain('data-reading-prev');
@@ -87,7 +93,7 @@ describe('MyeongHa character-led Saju Reading v1', () => {
   });
 
   it('treats birth chart content as server-backed placeholder data rather than invented client claims', async () => {
-    const html = await readFile(readingHtmlPath, 'utf8');
+    const html = await readReadingMarkup();
 
     expect(html).toContain('서버에서 확인된 Birth Profile revision과 Saju Engine 계산 결과만');
     expect(html).toContain('年柱');

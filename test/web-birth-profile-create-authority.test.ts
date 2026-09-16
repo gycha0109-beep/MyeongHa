@@ -6,16 +6,16 @@ const root = process.cwd();
 const webRoot = join(root, 'apps', 'web');
 const html = readFileSync(join(webRoot, 'birth.html'), 'utf8');
 const client = readFileSync(join(webRoot, 'birth-runtime-client.js'), 'utf8');
-const page = readFileSync(join(webRoot, 'birth-page.js'), 'utf8');
+const page = readFileSync(join(webRoot, 'src', 'birth', 'BirthPage.tsx'), 'utf8');
 const server = readFileSync(join(root, 'apps', 'api', 'src', 'birth-profile-create-command.ts'), 'utf8');
 
 describe('web Birth Profile create authority boundary', () => {
   it('removes the old demo identity and fabricated location defaults', () => {
-    expect(html).not.toContain('John Doe 03');
-    expect(html).not.toContain('UI DEMO');
-    expect(html).not.toContain('대한민국</option>');
-    expect(html).not.toContain('서울특별시</option>');
-    expect(html).not.toContain('서버로 전송하거나 저장하지 않습니다');
+    expect(page).not.toContain('John Doe 03');
+    expect(page).not.toContain('UI DEMO');
+    expect(page).not.toContain('대한민국</option>');
+    expect(page).not.toContain('서울특별시</option>');
+    expect(page).not.toContain('서버로 전송하거나 저장하지 않습니다');
   });
 
   it('binds to the canonical Birth Profile create endpoint with same-origin credentials', () => {
@@ -45,19 +45,19 @@ describe('web Birth Profile create authority boundary', () => {
   });
 
   it('preserves unknown birth time as null instead of inventing a time', () => {
-    expect(html).toContain('id="birth-time" type="time"');
-    expect(html).toContain('id="birth-time-unknown"');
-    expect(page).toContain('const timeKnown = !byId(\'birth-time-unknown\').checked');
-    expect(page).toContain("const birthTime = timeKnown ? byId('birth-time').value : null");
-    expect(page).toContain("if (unknown.checked) time.value = ''");
+    expect(page).toContain('id="birth-time" name="birthTime" type="time"');
+    expect(page).toContain('id="birth-time-unknown" name="timeUnknown"');
+    expect(page).toContain("const timeKnown = !data.has('timeUnknown')");
+    expect(page).toContain("const birthTime = timeKnown ? String(data.get('birthTime') ?? '') : null");
+    expect(page).toContain('disabled={timeUnknown}');
   });
 
   it('keeps lunar leap-month and sex values explicit without hidden defaults', () => {
-    expect(html).toContain('value="solar"');
-    expect(html).toContain('value="lunar"');
-    expect(html).toContain('id="birth-leap-month"');
-    expect(html).toContain('<option value="">선택하지 않음</option>');
-    expect(page).toContain("calendarType === 'lunar' ? byId('birth-leap-month').checked : false");
+    expect(page).toContain('value="solar"');
+    expect(page).toContain('value="lunar"');
+    expect(page).toContain('id="birth-leap-month"');
+    expect(page).toContain('<option value="">선택하지 않음</option>');
+    expect(page).toContain("calendarType === 'lunar' ? data.has('isLeapMonth') : false");
     expect(page).toContain("? sexValue : null");
   });
 
@@ -78,7 +78,7 @@ describe('web Birth Profile create authority boundary', () => {
   });
 
   it('renders server outcomes with text APIs rather than HTML injection', () => {
-    expect(page).toContain('textContent');
+    expect(page).not.toContain('dangerouslySetInnerHTML');
     expect(page).not.toContain('innerHTML');
     expect(page).not.toContain('insertAdjacentHTML');
   });

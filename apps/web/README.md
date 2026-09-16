@@ -1,18 +1,18 @@
 # @myeongha/web
 
-Framework-neutral MyeongHa web UI v0.1 prototype.
-
-The repository foundation intentionally deferred framework selection. This first UI implementation therefore uses dependency-free HTML/CSS/ES modules so the current interaction architecture can be reviewed without prematurely selecting React/Next/Vite.
+MyeongHa web UI. Existing multi-page URLs are being migrated incrementally to React and TypeScript with Vite while the current HTML, CSS, authentication, and API contracts remain active.
 
 ## Run
 
 From the repository root:
 
 ```bash
-npm run dev -w @myeongha/web
+npm run dev
 ```
 
 Then open `http://localhost:4173`.
+
+`npm run build:web` produces the Vercel static artifact in `public/`. Every user-facing HTML page now has a React entry while the established CSS, authentication, API, and route contracts remain active. Auth keeps its existing session and Guest-promotion orchestration behind a small controller interface while React owns the form DOM. Reading, Conversation, and Records keep their existing session, API, and route-authority controllers behind React-owned page DOM.
 
 ## Implemented UI flow
 

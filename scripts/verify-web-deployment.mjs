@@ -76,6 +76,7 @@ function shouldSkipReference(reference) {
   return (
     reference.length === 0 ||
     reference.startsWith('#') ||
+    reference.toLowerCase().startsWith('%23') ||
     reference.startsWith('http://') ||
     reference.startsWith('https://') ||
     reference.startsWith('mailto:') ||
