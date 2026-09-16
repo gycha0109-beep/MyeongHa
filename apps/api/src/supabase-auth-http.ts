@@ -3,6 +3,10 @@ import {
   PRODUCTION_USER_DATA_RUNTIME_ENV_V1,
   type ProductionUserDataRuntimeEnvV1,
 } from './production-user-data-runtime-config.js';
+import {
+  createIngressRequestBodyCompletionDeadlineLeaseV1,
+  IngressRequestBodyCompletionDeadlineExceededV1,
+} from './ingress-request-body-deadline.js';
 import { fetchSupabaseAuthWithDeadlineV1 } from './supabase-auth-upstream-deadline.js';
 
 const NO_STORE = 'no-store' as const;
@@ -87,25 +91,32 @@ async function readObjectBody(request: Request): Promise<Record<string, unknown>
   if (stream === null) return null;
 
   const reader = stream.getReader();
+  const deadline = createIngressRequestBodyCompletionDeadlineLeaseV1();
   const buffer = new Uint8Array(MAX_AUTH_BODY_BYTES);
   let totalBytes = 0;
 
   try {
     for (;;) {
-      const { done, value } = await reader.read();
+      const { done, value } = await deadline.waitFor(reader.read());
       if (done) break;
       if (value === undefined || value.byteLength === 0) continue;
       if (value.byteLength > MAX_AUTH_BODY_BYTES - totalBytes) {
-        void reader.cancel().catch(() => undefined);
         return null;
       }
       buffer.set(value, totalBytes);
       totalBytes += value.byteLength;
     }
-  } catch {
+  } catch (error) {
+    if (error instanceof IngressRequestBodyCompletionDeadlineExceededV1) throw error;
     return null;
   } finally {
-    reader.releaseLock();
+    deadline.release();
+    try {
+      void reader.cancel().catch(() => undefined);
+    } catch {
+    } finally {
+      reader.releaseLock();
+    }
   }
 
   try {
@@ -352,7 +363,10 @@ export async function handleSupabaseAuthRequestV1(input: {
     }
 
     return errorResponse('AUTH_UPSTREAM_MALFORMED', 502);
-  } catch {
+  } catch (error) {
+    if (error instanceof IngressRequestBodyCompletionDeadlineExceededV1) {
+      return errorResponse('REQUEST_BODY_TIMEOUT', 408);
+    }
     return errorResponse('AUTH_UPSTREAM_UNAVAILABLE', 503);
   }
 }

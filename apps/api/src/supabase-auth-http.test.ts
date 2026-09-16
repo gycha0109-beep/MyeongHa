@@ -1,10 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { INGRESS_REQUEST_BODY_COMPLETION_DEADLINE_MS_V1 } from './ingress-request-body-deadline.js';
 import { handleSupabaseAuthRequestV1 } from './supabase-auth-http.js';
 
 const env = {
   MYEONGHA_SUPABASE_URL: 'https://cnsfpcdiyofqvhpcegfc.supabase.co',
   MYEONGHA_SUPABASE_API_KEY: 'test-publishable-key-that-is-long-enough',
 };
+const encoder = new TextEncoder();
 
 function request(body: unknown): Request {
   return new Request('https://myeongha.example/api/auth/sign-in', {
@@ -14,7 +16,31 @@ function request(body: unknown): Request {
   });
 }
 
+function streamRequest(stream: ReadableStream<Uint8Array>): Request {
+  return new Request('https://myeongha.example/api/auth/sign-in', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: stream,
+    duplex: 'half',
+  } as RequestInit & { duplex: 'half' });
+}
+
+function nonClosingStream(input: {
+  readonly chunks: readonly Uint8Array[];
+  readonly onCancel?: () => void | Promise<void>;
+}): ReadableStream<Uint8Array> {
+  return new ReadableStream<Uint8Array>({
+    start(controller) {
+      for (const chunk of input.chunks) controller.enqueue(chunk);
+    },
+    cancel() {
+      return input.onCancel?.();
+    },
+  });
+}
+
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -50,6 +76,125 @@ describe('Supabase auth HTTP proxy', () => {
     expect(JSON.stringify(payload)).not.toContain(env.MYEONGHA_SUPABASE_API_KEY);
     expect(JSON.stringify(payload)).not.toContain('secret-password');
     expect(upstream).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['non-closing empty stream', []],
+    ['repeated zero-length chunks', [new Uint8Array(0), new Uint8Array(0)]],
+    [
+      'valid JSON body without EOF',
+      [encoder.encode('{"email":"person@example.com","password":"secret-password"}')],
+    ],
+  ] as const)('times out a %s at the governed absolute ingress deadline', async (_name, chunks) => {
+    vi.useFakeTimers();
+    let cancelCalls = 0;
+    const upstream = vi.fn();
+    vi.stubGlobal('fetch', upstream);
+    const authRequest = streamRequest(nonClosingStream({
+      chunks,
+      onCancel() {
+        cancelCalls += 1;
+      },
+    }));
+
+    const responsePromise = handleSupabaseAuthRequestV1({
+      request: authRequest,
+      env,
+      action: 'sign-in',
+    });
+    await vi.advanceTimersByTimeAsync(INGRESS_REQUEST_BODY_COMPLETION_DEADLINE_MS_V1);
+    const response = await responsePromise;
+    const payload = await response.json() as any;
+
+    expect(response.status).toBe(408);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(payload.error).toEqual({
+      code: 'REQUEST_BODY_TIMEOUT',
+      messageKey: 'auth.request_body_timeout',
+      retryable: false,
+    });
+    expect(cancelCalls).toBe(1);
+    expect(authRequest.body?.locked).toBe(false);
+    expect(upstream).not.toHaveBeenCalled();
+  });
+
+  it('does not reset the absolute ingress deadline when later chunks arrive', async () => {
+    vi.useFakeTimers();
+    let controller: ReadableStreamDefaultController<Uint8Array> | undefined;
+    const upstream = vi.fn();
+    vi.stubGlobal('fetch', upstream);
+    const authRequest = streamRequest(new ReadableStream<Uint8Array>({
+      start(value) {
+        controller = value;
+        value.enqueue(encoder.encode('{"email":"person@example.com",'));
+      },
+    }));
+
+    const responsePromise = handleSupabaseAuthRequestV1({
+      request: authRequest,
+      env,
+      action: 'sign-in',
+    });
+    await vi.advanceTimersByTimeAsync(2_500);
+    controller?.enqueue(encoder.encode('"password":"secret-password"}'));
+    await vi.advanceTimersByTimeAsync(500);
+    const response = await responsePromise;
+
+    expect(response.status).toBe(408);
+    expect(authRequest.body?.locked).toBe(false);
+    expect(upstream).not.toHaveBeenCalled();
+  });
+
+  it('accepts a valid streamed JSON body that reaches EOF before the deadline', async () => {
+    const upstream = vi.fn(async () => Response.json({
+      access_token: 'header.payload.signature',
+      refresh_token: 'refresh-token',
+      expires_in: 3600,
+      user: { id: '11111111-1111-4111-8111-111111111111', email: 'person@example.com' },
+    }));
+    vi.stubGlobal('fetch', upstream);
+    const authRequest = streamRequest(new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(encoder.encode('{"email":"person@example.com",'));
+        controller.enqueue(encoder.encode('"password":"secret-password"}'));
+        controller.close();
+      },
+    }));
+
+    const response = await handleSupabaseAuthRequestV1({
+      request: authRequest,
+      env,
+      action: 'sign-in',
+    });
+
+    expect(response.status).toBe(200);
+    expect(authRequest.body?.locked).toBe(false);
+    expect(upstream).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves the 16,384-byte actual-body ceiling and rejects overflow before upstream Auth work', async () => {
+    let cancelCalls = 0;
+    const upstream = vi.fn();
+    vi.stubGlobal('fetch', upstream);
+    const authRequest = streamRequest(nonClosingStream({
+      chunks: [new Uint8Array(16_385)],
+      onCancel() {
+        cancelCalls += 1;
+      },
+    }));
+
+    const response = await handleSupabaseAuthRequestV1({
+      request: authRequest,
+      env,
+      action: 'sign-in',
+    });
+    const payload = await response.json() as any;
+
+    expect(response.status).toBe(400);
+    expect(payload.error.code).toBe('INVALID_REQUEST');
+    expect(cancelCalls).toBe(1);
+    expect(authRequest.body?.locked).toBe(false);
+    expect(upstream).not.toHaveBeenCalled();
   });
 
   it('preserves verification-required signup and binds confirmation to the governed auth page', async () => {

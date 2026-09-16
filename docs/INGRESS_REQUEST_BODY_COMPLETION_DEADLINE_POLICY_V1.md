@@ -4,8 +4,8 @@
 > Decision date: 2026-09-16 KST  
 > Status: **DECIDED / V1**  
 > Scope: synchronous Production request-body consumers that explicitly opt into this policy  
-> Current bindings: authenticated Guest promotion request-body validation; public Guest bootstrap request-body validation  
-> Tracked by: #715, #684
+> Current bindings: authenticated Guest promotion request-body validation; public Guest bootstrap request-body validation; Supabase Auth sign-in/sign-up/refresh request-body validation  
+> Tracked by: #715, #684, #696
 
 ---
 
@@ -32,6 +32,13 @@ completion deadline immediately before its streaming request-body parser begins
 reading. This second binding does not broaden the policy into a blanket route
 default.
 
+As of #696, the public Supabase Auth proxy explicitly opts `sign-in`, `sign-up`,
+and `refresh` request-body validation into the same V1 completion deadline.
+The deadline starts immediately before the first application-owned Auth body
+read, preserves the existing 16,384-byte actual-body ceiling and JSON/object
+validation semantics, and does not apply to `sign-out`, which does not consume
+an Auth JSON request body.
+
 The 3,000 ms value is a **new repository-owned Operations decision**. It is not
 inherited from or numerically derived from:
 
@@ -55,8 +62,10 @@ V1 governs body acquisition for synchronous API control requests, not file
 uploads or long-lived streaming products. The initial Guest promotion grammar
 is intentionally tiny: omitted/empty/whitespace-only or one JSON empty object.
 The Guest bootstrap grammar covered by #684 is likewise a synchronous control
-request boundary with the same tiny accepted body shapes. Nearby candidate
-consumers (#682, #696) remain independently unbound.
+request boundary with the same tiny accepted body shapes. Supabase Auth
+sign-in/sign-up/refresh bodies covered by #696 are also bounded synchronous
+control requests and retain their independent 16,384-byte maximum. The nearby
+Saju body-presence candidate (#682) remains independently unbound.
 
 V1 selects 3,000 ms because:
 
@@ -114,6 +123,22 @@ boundary. The deadline changes only how long the application may wait for a
 terminal body decision; it does not add authentication or alter bootstrap
 identity authority.
 
+For Supabase Auth `sign-in`, `sign-up`, and `refresh` the ordering is:
+
+```text
+method validation
+→ governed Production Auth configuration validation
+→ create one 3,000 ms body-completion deadline
+→ incrementally consume at most 16,384 actual body bytes
+→ EOF / terminal invalidity / deadline expiry
+→ validate JSON object and action-specific fields
+→ only a valid completed body may start Supabase Auth upstream work
+```
+
+The deadline does not replace the existing byte ceiling and does not start the
+separately governed Supabase Auth upstream deadline early. `sign-out` retains
+its bearer-header path and does not opt into request-body completion timing.
+
 ---
 
 ## 4. Covered public failure semantics
@@ -151,6 +176,18 @@ Malformed JSON, non-empty objects, arrays, primitives, invalid leading/trailing
 characters, and incomplete objects remain `400 INVALID_REQUEST` when terminal
 invalidity is known before expiry.
 
+For Supabase Auth specifically, #696 preserves:
+
+```text
+actual body bytes > 16,384                    → 400 INVALID_REQUEST
+malformed / non-object JSON                   → 400 INVALID_REQUEST
+valid complete action body                    → existing Auth behavior
+body not complete by the absolute deadline    → 408 REQUEST_BODY_TIMEOUT
+```
+
+A body-completion timeout occurs before any Supabase Auth upstream request is
+started and is not mapped to `AUTH_UPSTREAM_UNAVAILABLE`.
+
 ---
 
 ## 5. Reader cleanup
@@ -180,22 +217,22 @@ V1 is shared infrastructure but **not a blanket route default**.
 Current bindings:
 
 ```text
-#715 / POST /api/auth/promote-guest = covered
-#684 / POST /api/session/bootstrap  = covered
+#715 / POST /api/auth/promote-guest                    = covered
+#684 / POST /api/session/bootstrap                     = covered
+#696 / Supabase Auth sign-in/sign-up/refresh body read = covered
 ```
 
-Known candidate follow-ups remain independently open until their own code,
+Known candidate follow-up remains independently open until its own code,
 failure mapping, regressions, exact-head CI, merge, and Production verification
 are completed:
 
 ```text
-#682 Saju body-presence probe       = not yet bound
-#696 Supabase Auth request reader   = not yet bound
+#682 Saju body-presence probe = not yet bound
 ```
 
-Those issues may adopt this V1 duration only through an explicit implementation
-that preserves each boundary's existing ordering and public error contract.
-This policy document alone does not close them.
+That issue may adopt this V1 duration only through an explicit implementation
+that preserves its existing ordering and public error contract. This policy
+document alone does not close it.
 
 ---
 
@@ -218,58 +255,3 @@ Supabase Production deployment authorization (#680)
 Commerce / PortOne activation
 P0-CM-03
 ```
-
----
-
-## 8. Verification requirements
-
-The #715 implementation MUST deterministically prove:
-
-- non-closing `{}` expires at 3,000 ms;
-- non-closing accepted whitespace expires at 3,000 ms;
-- repeated zero-length chunks do not prevent expiry;
-- chunks arriving before expiry do not reset the absolute deadline;
-- valid EOF retains existing accepted semantics;
-- JSON trailing whitespace remains accepted when EOF arrives in time;
-- delayed trailing non-whitespace remains `INVALID_REQUEST` when it arrives
-  before expiry;
-- already-provably-invalid streams still reject without waiting for EOF;
-- timeout cancellation is requested and reader lock cleanup is deterministic;
-- rejecting or never-settling cancellation cannot replace/delay the timeout;
-- Guest/Member auth rejection remains before body access and retains
-  `request.bodyUsed === false`;
-- Production runtime maps expiry to exactly `408 REQUEST_BODY_TIMEOUT` before
-  PostgreSQL promotion work.
-
-The #684 binding MUST additionally prove for `POST /api/session/bootstrap`:
-
-- non-closing accepted whitespace, `{}`, and repeated zero-length chunks expire
-  against the same absolute 3,000 ms lease;
-- a later valid chunk does not reset that lease;
-- delayed trailing non-whitespace remains `INVALID_REQUEST` if it arrives before
-  expiry;
-- valid EOF and existing accepted/rejected body grammar remain unchanged;
-- timeout cancellation is best-effort and reader lock release is deterministic;
-- a never-settling cancellation Promise cannot delay the 408 response;
-- bootstrap identity resolution, credential issuance, token fingerprinting, and
-  durable Guest session creation do not start on timeout;
-- HTTP failure is exactly `408 REQUEST_BODY_TIMEOUT`,
-  `auth.request_body_timeout`, `retryable=false`, `Cache-Control: no-store`.
-
-Production closure requires exact-head CI, fresh-main merge preflight,
-expected-head squash merge, exact merged-SHA CI, and exact-SHA Vercel Production
-verification.
-
----
-
-## 9. Reopen triggers
-
-Re-review V1 when any of the following occurs:
-
-- legitimate Production clients materially approach or exceed the 3,000 ms
-  body-completion budget;
-- a covered body grammar/payload class materially expands;
-- an upload or long-lived streaming request class is proposed;
-- hosting/runtime request-stream semantics materially change;
-- client-disconnect authority changes how pending body reads are terminated;
-- evidence supports route-specific rather than shared completion budgets.
