@@ -1,5 +1,7 @@
 import { ApiCommandError } from './api-error.js';
+import { readChatOpenJsonRequestBodyV1 } from './chat-open-request-body.js';
 import type { IdentityEvidenceVerificationPortV1 } from './current-subject-profile-http.js';
+import { IngressRequestBodyCompletionDeadlineExceededV1 } from './ingress-request-body-deadline.js';
 import {
   executePostgresSubjectTransactionV1,
   type PostgresSubjectPoolV1,
@@ -284,8 +286,17 @@ export async function handleChatOpenRequestV1(
 
   let body: unknown;
   try {
-    body = await input.request.json();
-  } catch {
+    body = await readChatOpenJsonRequestBodyV1(input.request);
+  } catch (error) {
+    if (error instanceof IngressRequestBodyCompletionDeadlineExceededV1) {
+      return jsonError({
+        status: 408,
+        code: 'REQUEST_BODY_TIMEOUT',
+        messageKey: 'auth.request_body_timeout',
+        retryable: false,
+        requestId,
+      });
+    }
     return jsonError({
       status: 400,
       code: 'INVALID_REQUEST',
