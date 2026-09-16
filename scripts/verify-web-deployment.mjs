@@ -168,6 +168,15 @@ if (vercelConfig.buildCommand !== 'npm run build:web') {
 if (vercelConfig.outputDirectory !== 'public') {
   throw new Error('vercel.json outputDirectory must remain public.');
 }
+if (
+  !Array.isArray(vercelConfig.regions) ||
+  vercelConfig.regions.length !== 1 ||
+  vercelConfig.regions[0] !== 'sin1'
+) {
+  throw new Error(
+    'Vercel Functions must remain pinned to the single governed Production region sin1.',
+  );
+}
 if (vercelConfig.git?.deploymentEnabled?.['**'] !== false) {
   throw new Error('Automatic Vercel deployments must default to disabled for non-main branches.');
 }
