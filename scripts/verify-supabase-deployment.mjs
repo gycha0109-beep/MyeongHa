@@ -24,7 +24,8 @@ const requiredWorkflowFragments = [
   "- 'scripts/run-production-platform-integrity-read-audit.sh'",
   "- 'scripts/run-production-platform-integrity-data-api-surface-audit.sh'",
   `SUPABASE_PROJECT_ID: ${expectedProjectRef}`,
-  'supabase/setup-cli@v3.0.0',
+  'uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1',
+  'uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520 # v3.0.0',
   'version: 2.116.0',
   "grep -q '20260830072444'",
   'supabase migration repair 20260830072444 --status reverted',
@@ -44,6 +45,17 @@ const requiredWorkflowFragments = [
 for (const fragment of requiredWorkflowFragments) {
   if (!workflow.includes(fragment)) {
     throw new Error(`Missing Supabase deployment contract fragment: ${fragment}`);
+  }
+}
+
+const forbiddenWorkflowFragments = [
+  'uses: actions/checkout@v7.0.1',
+  'uses: supabase/setup-cli@v3.0.0',
+];
+
+for (const fragment of forbiddenWorkflowFragments) {
+  if (workflow.includes(fragment)) {
+    throw new Error(`Supabase production workflow contains a forbidden movable action reference: ${fragment}`);
   }
 }
 
