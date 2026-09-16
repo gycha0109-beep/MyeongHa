@@ -11,6 +11,7 @@ do $$
 declare
   v_table text;
   v_privilege text;
+  v_role text;
 begin
   foreach v_table in array array[
     'entitlement_grants',
@@ -47,8 +48,25 @@ begin
       'FAIL myeongha_api_executor unexpectedly has EXECUTE on internal entitlement projection recompute';
   end if;
 
+  for v_role in
+    select r.rolname
+    from pg_catalog.pg_roles r
+    where r.rolname in ('anon', 'authenticated', 'service_role', 'myeongha_api_executor')
+  loop
+    if pg_catalog.has_function_privilege(
+      v_role,
+      'public.internal_apply_entitlement_effect_v1(text,uuid,uuid,text,bigint,text,text,timestamptz,text,timestamptz,timestamptz,text)'::pg_catalog.regprocedure,
+      'EXECUTE'
+    ) then
+      raise exception
+        'FAIL % unexpectedly has EXECUTE on internal EntitlementEffect apply',
+        v_role;
+    end if;
+  end loop;
+
   raise notice 'PASS ordinary API role has no direct entitlement Grant/Event/projection mutation authority';
   raise notice 'PASS ordinary API role cannot execute internal entitlement projection recompute';
+  raise notice 'PASS client/API roles cannot execute internal EntitlementEffect apply';
 end;
 $$;
 
