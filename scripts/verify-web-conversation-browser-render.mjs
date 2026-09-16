@@ -1,7 +1,8 @@
 import { createServer } from 'node:http';
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { extname, join, normalize } from 'node:path';
+import { extname, join, resolve, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 
 const chromeBin = process.env.CHROME_BIN;
@@ -27,13 +28,13 @@ function contentType(pathname) {
 }
 
 async function startStaticServer() {
-  const root = normalize(publicDir.pathname);
+  const root = resolve(fileURLToPath(publicDir));
   const server = createServer(async (req, res) => {
     try {
       const rawPath = decodeURIComponent(new URL(req.url ?? '/', 'http://localhost').pathname);
       const relative = rawPath === '/' ? 'hall.html' : rawPath.replace(/^\/+/, '');
-      const path = normalize(join(root, relative));
-      if (!path.startsWith(root)) {
+      const path = resolve(root, relative);
+      if (!path.startsWith(`${root}${sep}`)) {
         res.writeHead(403).end('Forbidden');
         return;
       }
@@ -195,9 +196,30 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
+async function waitFor(page, expression, message, timeout = 10_000) {
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    if (await page.evaluate(expression)) return;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  const diagnostics = await page.evaluate(`(() => ({
+    readyState: document.readyState,
+    bodyText: document.body?.innerText?.slice(0, 240) ?? '',
+    rootChildren: document.querySelector('#chat-hub-react-root')?.children.length ?? null,
+    controllerReady: Boolean(window.MyeongHaChatHub),
+    resources: performance.getEntriesByType('resource').map((entry) => entry.name),
+  }))()`);
+  throw new Error(`${message}; diagnostics=${JSON.stringify(diagnostics)}`);
+}
+
 async function verifyHub(page, origin, suffix, width, height, mobile) {
   await page.viewport(width, height, mobile);
   await page.navigate(`${origin}/chat-hub.html`);
+  await waitFor(
+    page,
+    `Boolean(document.querySelector('.conversation-primary') && document.querySelector('.chat-person-art[data-character="seyeon"]') && document.querySelector('.chat-person-art[data-character="baekheon"]'))`,
+    `${suffix}: conversation hub React/controller mount did not finish`,
+  );
 
   const state = await page.evaluate(`(() => ({
     title: document.title,
@@ -219,7 +241,7 @@ async function verifyHub(page, origin, suffix, width, height, mobile) {
   assert(state.incomingHidden, `${suffix}: incoming stories must stay hidden without runtime authority`);
   assert(state.seyeonCardBg.includes('seyeon-chat.webp'), `${suffix}: approved Se-yeon asset is not rendered`);
   assert(!state.baekheonCardBg.includes('seyeon-chat.webp'), `${suffix}: Se-yeon asset leaked onto Baekheon placeholder`);
-  await page.screenshot(new URL(`../artifacts/${artifactPrefix}-${suffix}.png`, import.meta.url).pathname);
+  await page.screenshot(fileURLToPath(new URL(`../artifacts/${artifactPrefix}-${suffix}.png`, import.meta.url)));
   return state;
 }
 
@@ -254,7 +276,7 @@ async function verifyRoom(page, origin, suffix, width, height, mobile) {
   assert(state.contextHidden && state.threadHidden, `${suffix}: unverified continuation context became visible`);
   assert(['auto', 'scroll'].includes(state.streamOverflow), `${suffix}: conversation stream is not scrollable`);
   if (mobile) assert(state.globalHeaderDisplay === 'none', `${suffix}: desktop product header should be hidden in mobile room`);
-  await page.screenshot(new URL(`../artifacts/${artifactPrefix}-${suffix}.png`, import.meta.url).pathname);
+  await page.screenshot(fileURLToPath(new URL(`../artifacts/${artifactPrefix}-${suffix}.png`, import.meta.url)));
 
   await page.navigate(`${origin}/chat.html?character=baekheon`);
   const baekheonScene = await page.evaluate(`getComputedStyle(document.querySelector('.conversation-room-scene')).backgroundImage`);
