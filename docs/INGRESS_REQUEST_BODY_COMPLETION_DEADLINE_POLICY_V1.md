@@ -4,8 +4,8 @@
 > Decision date: 2026-09-16 KST  
 > Status: **DECIDED / V1**  
 > Scope: synchronous Production request-body consumers that explicitly opt into this policy  
-> Current bindings: authenticated Guest promotion request-body validation; public Guest bootstrap request-body validation; Supabase Auth sign-in/sign-up/refresh request-body validation; Saju calculation body-presence probe  
-> Tracked by: #715, #684, #696, #682
+> Current bindings: authenticated Guest promotion request-body validation; public Guest bootstrap request-body validation; Supabase Auth sign-in/sign-up/refresh request-body validation; Saju calculation body-presence probe; authenticated Chat open request-body JSON read  
+> Tracked by: #715, #684, #696, #682, #875
 
 ---
 
@@ -46,6 +46,13 @@ presence without draining the remainder, while a stream that emits no
 non-empty byte must reach EOF before the absolute deadline to be accepted as
 bodyless.
 
+As of #875, authenticated `POST /api/chat` explicitly opts its Chat-open JSON
+request-body read into the same V1 completion deadline after identity
+verification succeeds and before any PostgreSQL transaction starts. This
+binding preserves authentication-before-body ordering, existing JSON/shape
+validation, and the separate unresolved request byte/field authority in #699.
+It does not create or imply a Chat-specific byte ceiling.
+
 The 3,000 ms value is a **new repository-owned Operations decision**. It is not
 inherited from or numerically derived from:
 
@@ -74,7 +81,10 @@ sign-in/sign-up/refresh bodies covered by #696 are also bounded synchronous
 control requests and retain their independent 16,384-byte maximum. The Saju
 calculation boundary covered by #682 is stricter still: the authoritative
 request body is empty, so the probe only needs either the first non-empty byte
-or EOF to reach a terminal presence decision.
+or EOF to reach a terminal presence decision. Authenticated Chat open covered
+by #875 is also a synchronous control request whose body must complete before
+its governed PostgreSQL command path begins; #875 reuses only the completion
+budget and leaves request byte/field ceilings to #699.
 
 V1 selects 3,000 ms because:
 
@@ -163,6 +173,23 @@ The Saju probe remains deliberately **pre-auth**. #682 does not move body
 rejection after identity verification and does not drain the rest of a body
 after non-emptiness has already been proven.
 
+For authenticated Chat open the ordering is:
+
+```text
+route / method validation
+→ identity verification
+→ create one 3,000 ms body-completion deadline
+→ read through actual EOF and parse JSON
+→ validate the canonical Character-only request shape
+→ only a valid completed body may enter the PostgreSQL subject transaction
+```
+
+A Chat authentication rejection therefore occurs before body ownership and
+leaves the request body untouched. Receiving a valid JSON prefix does not end
+the completion lease: actual EOF is still required before parsing may authorize
+PostgreSQL work. The lease does not add or imply a request byte/field limit;
+that remains an explicit #699 non-decision.
+
 ---
 
 ## 4. Covered public failure semantics
@@ -225,6 +252,21 @@ outbound work. The public timeout response retains the Saju route's current API
 contract metadata (`apiContractVersion` and generated `requestId`) while using
 the V1 error code/message key above.
 
+For authenticated Chat open specifically, #875 preserves:
+
+```text
+authentication rejection before body access   → existing 401 AUTH_REQUIRED
+complete malformed / invalid Chat body         → existing 400 INVALID_REQUEST
+valid complete Character-only body             → existing Chat-open command path
+body not complete by the absolute deadline     → 408 REQUEST_BODY_TIMEOUT
+```
+
+The Chat timeout occurs before
+`executePostgresSubjectTransactionV1`, so no PostgreSQL subject transaction or
+Chat-open command starts for a non-completing body. The public timeout response
+retains the Chat route's existing API contract metadata and the common V1
+request-body timeout error contract.
+
 ---
 
 ## 5. Reader cleanup
@@ -243,7 +285,8 @@ Deadline expiry must therefore terminate application waiting even if the
 underlying stream's cancellation Promise rejects or never settles.
 
 This cleanup rule does not alter the separately governed untouched-body
-contract for Guest promotion 401 authentication rejection.
+contract for Guest promotion 401 authentication rejection or authenticated Chat
+open authentication rejection.
 
 ---
 
@@ -258,6 +301,7 @@ Current bindings:
 #684 / POST /api/session/bootstrap                     = covered
 #696 / Supabase Auth sign-in/sign-up/refresh body read = covered
 #682 / POST /api/me/saju/calculation body-presence     = covered
+#875 / POST /api/chat authenticated JSON body          = covered
 ```
 
 No other endpoint inherits this duration merely because it also consumes a
