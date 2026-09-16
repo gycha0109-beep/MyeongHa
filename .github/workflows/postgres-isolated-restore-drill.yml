@@ -46,7 +46,7 @@ jobs:
 
     steps:
       - name: Checkout exact repository state
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Validate drill input and source backup authority
         id: source
@@ -102,7 +102,7 @@ jobs:
           echo "artifact_expires_at=$artifact_expires_at" >> "$GITHUB_OUTPUT"
 
       - name: Download exact governed backup artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           github-token: ${{ github.token }}
           repository: ${{ github.repository }}
@@ -168,7 +168,7 @@ jobs:
           chmod 600 "$RESTORE_EVIDENCE_PATH"
 
       - name: Upload restore drill evidence only
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: postgres-isolated-restore-drill-${{ github.run_id }}
           path: ${{ runner.temp }}/restore-evidence/restore-evidence.json
