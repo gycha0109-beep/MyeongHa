@@ -72,7 +72,10 @@ export async function readGuestBootstrapRequestBodyV1(
       void reader.cancel().catch(() => undefined);
     } catch {
     } finally {
-      reader.releaseLock();
+      try {
+        reader.releaseLock();
+      } catch {
+      }
     }
   }
 }
