@@ -1,11 +1,13 @@
-# 명하 Commerce / Entitlement Implementation Specification v0.12
+# 명하 Commerce / Entitlement Implementation Specification v0.13
 
 > Product: **명하 (MyeongHa)**  
-> Date: **2026-09-05**  
+> Date: **2026-09-16**  
 > Architecture Authority: `docs/architecture/COMMERCE_ENTITLEMENT_ARCHITECTURE_V1.md`  
 > Launch Rail Decision: `docs/COMMERCE_LAUNCH_RAIL_DECISION_V1.md`  
+> Web PSP Decision: `docs/COMMERCE_WEB_PSP_DECISION_V1.md`  
+> Guest Purchase Ownership Decision: `docs/COMMERCE_GUEST_PURCHASE_OWNERSHIP_DECISION_V1.md`  
 > Evidence Minimization Decision: `docs/COMMERCE_EVIDENCE_DATA_MINIMIZATION_DECISION_V1.md`  
-> Status: **DERIVED IMPLEMENTATION SPEC / ARCHITECTURE CLOSED / LAUNCH RAIL DECIDED / EVIDENCE MINIMIZATION DECIDED / FINGERPRINT PRIMITIVE IMPLEMENTED / EVIDENCE STRUCTURAL CONTRACT IMPLEMENTED / ENTITLEMENT EFFECT STRUCTURAL CONTRACT IMPLEMENTED / EFFECTIVE ENTITLEMENT PROJECTION RECOMPUTE IMPLEMENTED / IMPLEMENTATION HOLD**  
+> Status: **DERIVED IMPLEMENTATION SPEC / ARCHITECTURE CLOSED / LAUNCH RAIL DECIDED / WEB PSP DECIDED / GUEST PURCHASE OWNERSHIP DECIDED / PORTONE V2 VERIFICATION+WEBHOOK FOUNDATION IMPLEMENTED / IMPLEMENTATION HOLD**  
 > Rule: 이 문서는 Architecture와 이후 explicit P0 decision을 요약해 구현 경계를 연결하는 companion이다. Domain semantics 충돌 시 Architecture가 우선하고, Architecture 작성 뒤 결정된 P0 status는 최신 `docs/P0_DECISION_REGISTER.md`와 해당 decision record가 우선한다.
 
 ---
@@ -17,18 +19,23 @@ Commerce Architecture                         = CLOSED
 SRC-18 Product → Capability authority         = RESOLVED BY ARCHITECTURE
 SRC-21 Grant apply / aggregate authority      = RESOLVED BY ARCHITECTURE
 P0-CM-01 launch rail                          = DECIDED: Web + one-off only
-P0-CM-02 exact Web PSP                        = OPEN-P0
+P0-CM-02 exact Web PSP                        = DECIDED: PortOne V2 / portone_v2
 P0-CM-03 launch paid Product / Capability     = OPEN-P0 / BLOCKED BY CURRENT SAJU AUTHORITY
+P0-CM-04 Guest purchase ownership             = DECIDED: Guest + Member / canonical subjects.id
 P0-PR-01 parent retention/legal/backup        = OPEN-P0
 P0-PR-01B provider-evidence minimization      = DECIDED
-provider-neutral evidence fingerprint primitive = IMPLEMENTED / PURE HELPER / NOT WIRED TO PROD CONFIG
-provider-neutral evidence structural contract = IMPLEMENTED / PURE VALIDATOR / NO PROVIDER AUTHENTICITY
-provider-neutral entitlement effect contract  = IMPLEMENTED / PURE VALIDATOR / NO APPLY RUNTIME
-effective entitlement projection recompute    = IMPLEMENTED / INTERNAL DB PRIMITIVE / PRODUCTION MIGRATION APPLIED
-provider adapter / webhook / verified apply runtime = NOT IMPLEMENTED
+Product Capability Set foundation             = IMPLEMENTED / ADDITIVE DB AUTHORITY / NO SALEABLE CATALOG SEEDED
+provider-neutral evidence fingerprint primitive = IMPLEMENTED / PURE HELPER
+provider-neutral evidence structural contract = IMPLEMENTED / PURE VALIDATOR / NO PROVIDER AUTHENTICITY BY ITSELF
+provider-neutral entitlement effect contract  = IMPLEMENTED / PURE VALIDATOR / NO VERIFIED GRANT/EVENT APPLY BY ITSELF
+effective entitlement projection recompute    = IMPLEMENTED / INTERNAL DB PRIMITIVE
+PortOne V2 server payment verification        = IMPLEMENTED / REPOSITORY-LOCAL / NO LIVE CREDENTIAL CLAIM
+PortOne V2 webhook auth/HTTP/runtime foundation = IMPLEMENTED / PUBLIC PRODUCTION ROUTE HOLD
+verified payment evidence persistence         = IMPLEMENTED / REPOSITORY-LOCAL / PRODUCTION DEPLOYMENT SUBJECT TO #680
+verified Entitlement Grant/Event apply        = NOT ACTIVATED / P0-CM-03 + LIVE READINESS GATES
 ```
 
-따라서 Web-first rail shape와 provider-evidence 최소화 경계, provider-neutral fingerprint primitive, `VerifiedCommerceEvidenceV1` structural contract, `EntitlementEffectV1` structural/static-transition contract, 그리고 Architecture §17의 provider-neutral Effective Entitlement aggregate/recompute primitive까지 구현됐다. 그러나 provider authenticity verification, provider ordering, verified Grant/Event apply transaction, event dedupe generation, adjusted actor authentication, provider SDK, provider-specific canonical serializer, webhook route, enabled paid catalog, production evidence persistence는 아직 허가되거나 구현되지 않았다.
+따라서 Web-first one-off rail, PortOne V2 provider 선택, Guest/Member Commerce ownership, Product Capability foundation, provider-evidence 최소화/structural primitives, Effective Entitlement aggregate/recompute, PortOne V2 server payment verification과 webhook authentication/HTTP/runtime foundation, verified payment evidence persistence까지 repository-local 구현이 진행됐다. 그러나 이것은 saleable Product/SKU, live merchant/PG/channel/credential readiness, public Production webhook activation, verified Entitlement Grant/Event fulfillment activation, refund/reversal/dispute/reconciliation, 또는 Production Commerce readiness를 의미하지 않는다. `P0-CM-03`, `P0-PR-01`, #680 및 live activation gates는 계속 독립적으로 fail-closed다.
 
 ---
 
@@ -38,7 +45,7 @@ provider adapter / webhook / verified apply runtime = NOT IMPLEMENTED
 MyeongHa Product
 → immutable Product Capability Set(version/hash)
 → Product Offer(provider/platform/external product + pinned Capability Set)
-→ Member-owned Purchase Intent
+→ server-resolved subjects.id-owned Purchase Intent (Guest or Member)
 → server-side provider verification
 → minimized verified Receipt / Provider Event provenance
 → Entitlement Effect v1
@@ -69,6 +76,8 @@ raw provider SDK object → persistence authority
 ```text
 products
 product_offers
+product_capability_sets
+product_capability_items
 commerce_account_links
 purchase_intents
 commerce_receipts
@@ -81,7 +90,8 @@ entitlements
 ### Hardening
 
 - Product Offer provider/platform/product mapping immutability
-- Member-only Purchase Intent
+- Product Capability Set / Capability Item immutable historical meaning foundation
+- Guest/Member Purchase Intent v2 ownership + immutable charge authority
 - provider-account owner/provider consistency
 - receipt owner/provider/Offer consistency
 - provider transaction/event dedupe
@@ -97,7 +107,7 @@ qry_entitlements_v1
 internal_recompute_entitlement_projection_v1
 ```
 
-`cmd_create_purchase_intent_v1`은 현재 minimal Offer mapping만 pin하며 receipt/grant를 만들지 않는다.
+`cmd_create_purchase_intent_v1`은 historical v1 minimal Offer mapping path다. Current Guest/Member Purchase Intent v2 authority는 기존 v1의 historical semantics를 재해석하지 않고 additive command/runtime boundaries로 확장되며, saleable charge terms나 launch catalog를 스스로 활성화하지 않는다.
 
 `internal_recompute_entitlement_projection_v1`은 API/client command가 아니라 이미-authoritative한 `entitlement_grants`를 한 logical entitlement projection으로 재계산하는 **내부 provider-neutral DB primitive**다. `PUBLIC`, `anon`, `authenticated`, `service_role`, `myeongha_api_executor`에는 EXECUTE를 부여하지 않는다.
 
@@ -197,15 +207,29 @@ public.internal_recompute_entitlement_projection_v1(uuid, text, text)
 
 이 primitive는 provider evidence를 검증하지 않고, Grant/Event를 생성·변경하지 않으며, `event_dedupe_key`를 생성하지 않고, provider ordering을 판정하지 않고, outbox를 쓰지 않는다. 따라서 이것만으로 payment 또는 verified apply runtime이 존재한다고 판정하지 않는다.
 
-### Missing runtime
+### PortOne V2 repository-local foundation
+
+Current `P0-CM-02` authority selects PortOne V2 and canonical provider key `portone_v2`. Repository-local implementation includes:
 
 ```text
-provider-specific canonical evidence serializer
-provider authenticity verification adapter
-public Commerce payment handoff route
-provider webhook/server-notification route
-verified receipt → grant/event/projection apply command
-reconciliation runtime
+apps/api/src/portone-v2-payment-verification-adapter.ts
+apps/api/src/portone-v2-webhook-payment-completion.ts
+apps/api/src/portone-v2-webhook-http.ts
+apps/api/src/portone-v2-webhook-runtime.ts
+```
+
+이 foundation은 server-side PortOne payment lookup, provider-owned payment fact normalization, webhook authentication, bounded HTTP handling, runtime composition, 그리고 verified payment evidence persistence path를 구성한다. Browser callback/redirect는 payment completion authority가 아니다. Public Production webhook route는 의도적으로 활성화되지 않았고 live merchant/PG/channel/API/webhook credential readiness도 별도 gate다.
+
+### Remaining runtime / activation gates
+
+```text
+saleable Product/Capability catalog and charge terms (P0-CM-03)
+verified receipt → Entitlement Grant/Event/projection fulfillment activation
+provider lifecycle ordering/reconciliation beyond the implemented paid-payment completion slice
+refund/reversal/dispute execution
+live merchant/PG/channel/API/webhook credential binding
+public Production checkout/handoff activation
+public Production PortOne webhook route activation
 ```
 
 ---
@@ -243,7 +267,7 @@ v1에서는 client/request-derived dynamic scope를 허용하지 않는다.
 
 ### Historical pinning
 
-Target:
+Implemented foundation:
 
 ```text
 product_offers.capability_set_id
@@ -253,7 +277,7 @@ FK(capability_set_id, product_id)
 
 Offer가 pin한 Capability Set은 historical meaning이다. Existing provider SKU/Offer를 새 rights 의미로 repoint하지 않는다.
 
-Purchase Intent v2는 기존 v1 Offer snapshot 의미를 변경하지 않고 별도 필드로 다음을 pin한다.
+Purchase Intent v2의 **Capability Set pin**은 launch Product/Capability가 정해지기 전 활성화하지 않는다. Activation 시 기존 v1 Offer snapshot 의미를 변경하지 않고 별도 immutable fields로 다음을 pin한다.
 
 ```text
 capability_set_id
@@ -281,7 +305,7 @@ One Product가 여러 Capability Item을 부여하면 **all-or-neither**로 appl
 
 ## 5. Purchase Intent
 
-Current v1 safe baseline:
+Historical v1 safe baseline (retained compatibility path):
 
 ```text
 active Member only
@@ -293,9 +317,11 @@ same idempotency key + same canonical request → replay
 same key + conflicting request → conflict
 ```
 
+Current v2 ownership authority additionally permits active Guest and active Member Purchase Intents through canonical server-resolved `subjects.id`, with immutable charge authority and Guest→Member continuity governed by `P0-CM-04`. This does not seed or enable saleable charge terms; `P0-CM-03` remains required before launch catalog activation.
+
 Client가 보낸 가격/통화/Product key/entitlement key/scope/subject ID는 authority가 아니다.
 
-Target v2는 Section 4의 Capability Set pin을 추가하며 v1 replay/ownership semantics를 약화하지 않는다.
+Capability Set pin activation은 Section 4의 immutable historical mapping을 사용하며 current launch Product/Capability authority가 없는 상태에서 arbitrary mapping을 만들지 않는다.
 
 ---
 
@@ -303,7 +329,7 @@ Target v2는 Section 4의 Capability Set pin을 추가하며 v1 replay/ownership
 
 Client callback은 transport hint다.
 
-Provider-specific verifier는 DB rights transaction 밖에서 applicable facts를 검증하고 provider-neutral `VerifiedCommerceEvidenceV1`으로 normalize한다.
+Provider-specific verifier는 DB rights transaction 밖에서 applicable facts를 검증하고 provider-neutral verified Commerce evidence로 normalize한다.
 
 Minimum semantic fields:
 
@@ -324,7 +350,9 @@ Sandbox evidence는 production grant를 만들 수 없다.
 
 Raw provider secret/bearer/receipt object는 normalized evidence contract에 포함시키지 않는다.
 
-`apps/api/src/verified-commerce-evidence.ts`는 위 normalized shape의 **structural validation만** 수행한다. Provider signature/API response authenticity, semantic state truth, provider ordering truth를 증명하는 verifier가 아니므로 이 contract를 통과했다는 사실만으로 verified payment 또는 entitlement grant를 인정하지 않는다.
+`apps/api/src/verified-commerce-evidence.ts`는 provider-neutral normalized shape의 **structural validation만** 수행한다. 이 validator 자체는 Provider signature/API response authenticity, semantic state truth, provider ordering truth를 증명하지 않는다.
+
+`P0-CM-02`가 선택한 PortOne V2의 repository-local payment verification adapter는 merchant-generated paymentId에 대해 server-side `api.portone.io` lookup을 수행하고, verified payment facts를 기존 provider-neutral Commerce boundaries로 투영한다. 이 concrete verifier의 존재만으로 live credential/PG/channel readiness, public endpoint activation, 또는 Entitlement fulfillment가 승인되는 것은 아니다.
 
 ---
 
@@ -332,7 +360,7 @@ Raw provider secret/bearer/receipt object는 normalized evidence contract에 포
 
 `received_at` 또는 raw string lexical order를 semantic ordering으로 사용하지 않는다.
 
-Selected provider adapter는 verified evidence와 persisted grant ordering provenance에 대해 다음을 판정해야 한다.
+Selected provider adapter/lifecycle runtime은 verified evidence와 persisted grant ordering provenance에 대해 다음을 판정해야 한다.
 
 ```text
 NEWER
@@ -351,7 +379,7 @@ read revision/order
 → mismatch: re-read/recompare
 ```
 
-`STALE`/`INCOMPARABLE`은 rights mutation 없이 reconciliation 대상으로 남긴다.
+`STALE`/`INCOMPARABLE`은 rights mutation 없이 reconciliation 대상으로 남긴다. PortOne V2 paid-payment completion foundation이 구현됐다는 사실은 refund/reversal/dispute를 포함한 전체 provider lifecycle ordering/reconciliation 구현 완료를 의미하지 않는다.
 
 ---
 
@@ -451,13 +479,13 @@ Restore:
 
 ```text
 verified Member
-→ provider re-verification/restore
-→ same historical receipt lineage
-→ immutable Offer + Capability Set
-→ idempotent missing grant/effect recovery
+→ provider re-verification/restore or provider-independent historical entitlement recovery where already authorized
+→ same historical receipt/grant lineage
+→ immutable Offer + Capability Set where historically pinned
+→ idempotent missing effective-right recovery within the implemented restore boundary
 ```
 
-Restore는 arbitrary admin grant 생성 기능이 아니다.
+Restore는 arbitrary admin grant 생성 기능이 아니다. Existing provider-independent server entitlement restore and direct merged-Guest lineage support do not authorize a new saleable SKU or unimplemented PortOne refund/reversal lifecycle.
 
 Refund 후 이미 생성된 Reading/content artifact의 열람/삭제는 Product/UX OPEN DECISION이다.
 
@@ -465,16 +493,22 @@ Refund 후 이미 생성된 Reading/content artifact의 열람/삭제는 Product
 
 ## 11. Guest / Member
 
-v1 Guest purchase는 금지한다.
+`P0-CM-04`는 **DECIDED**다.
 
 ```text
-Guest
-→ promotion completes
-→ canonical active Member
-→ Purchase Intent
+active Guest 또는 active Member
+→ server resolves canonical subjects.id owner
+→ Purchase Intent / historical Commerce ownership
+
+new Member promotion
+→ same subject continuity
+
+existing Member merge
+→ historical Commerce owner rewrite 금지
+→ current rights는 direct merged-Guest lineage로 조합
 ```
 
-Guest-owned purchase/receipt/grant를 만들지 않는다.
+Raw client owner/subject identity는 authority가 아니다. Guest/Member ownership authority는 saleable Product/SKU를 만들지 않으며 `P0-CM-03`은 계속 OPEN-P0다.
 
 ---
 
@@ -508,7 +542,7 @@ Reconciliation 대상:
 - support-triggered provider re-verification
 - periodic provider reconciliation where supported
 
-Provider call은 DB mutation transaction 밖에서 수행하고 결과는 동일 authoritative apply command를 재사용한다.
+PortOne server lookup/webhook foundation과 replay-safe verified payment persistence가 존재하더라도 complete reconciliation worker/lifecycle은 별도 구현 gate다. Provider call은 DB mutation transaction 밖에서 수행하고 authoritative persistence/apply boundary를 재사용해야 한다.
 
 ---
 
@@ -529,7 +563,7 @@ verified evidence outside DB tx
 → commit
 ```
 
-Section 9의 recompute 단계만 provider-neutral internal primitive로 구현되어 있다. 나머지 verified apply transaction 전체는 아직 구현되지 않았다.
+Section 9의 recompute 단계와 verified payment evidence persistence foundation은 구현되어 있지만, verified payment에서 Product Capability Item(s)을 concrete Entitlement Grant/Event로 all-or-neither fulfillment하는 전체 transaction은 `P0-CM-03` 및 activation gates 전에는 활성화하지 않는다.
 
 Ledger/grant/projection/outbox partial commit은 허용하지 않는다.
 
@@ -575,7 +609,7 @@ Runtime primitive:
 apps/api/src/production-commerce-evidence-fingerprint.ts
 ```
 
-이 primitive는 세 domain과 HMAC format/secret minimum을 fail-closed로 고정하지만, 실제 provider canonical bytes는 `P0-CM-02` 이후 adapter contract가 소유한다. Production env secret wiring과 DB evidence persistence는 아직 활성화하지 않는다.
+이 primitive는 세 domain과 HMAC format/secret minimum을 fail-closed로 고정한다. `P0-CM-02`는 이미 PortOne V2를 selected provider로 결정했으며 provider-specific canonical/verified evidence behavior는 PortOne adapter/runtime과 해당 테스트가 소유한다. Production env secret/live credential binding은 별도 activation gate다.
 
 ### `verified_payload_jsonb`
 
@@ -593,29 +627,28 @@ Provider-specific allowlist와 canonical fingerprint input은 selected adapter i
 
 Provider transaction/event/product reference는 **non-secret이며** idempotency/reconciliation에 필요한 경우 first-class column으로 저장할 수 있다.
 
-Support는 Member→Intent→Offer/Capability Set→receipt/event→grant→entitlement event→effective entitlement chain을 raw bearer 없이 재구축 가능해야 한다.
+Support는 canonical subject(Guest/Member)→Intent→Offer/Capability Set→receipt/event→grant→entitlement event→effective entitlement chain을 raw bearer 없이 재구축 가능해야 한다.
 
-Selected provider가 raw bearer-like receipt/token의 durable storage를 필수로 요구하면 별도 provider-specific security/retention decision 없이는 `P0-CM-02`를 닫을 수 없다.
+PortOne V2 또는 future provider가 raw bearer-like receipt/token의 durable storage를 필수로 요구하면 current evidence-minimization authority를 우회하지 않는다. 별도 provider-specific security/retention decision 또는 decision reopen 없이 raw durable storage를 추가할 수 없다.
 
 ---
 
 ## 16. Current implementation gates
 
-### Architecture / rail / evidence-minimization resolved
+### Architecture / rail / provider / ownership / evidence-minimization resolved
 
 ```text
 SRC-18      = CLOSED by Commerce Architecture v1
 SRC-21      = CLOSED by Commerce Architecture v1
 P0-CM-01    = DECIDED: Web + one-off launch MVP
+P0-CM-02    = DECIDED: PortOne V2 / portone_v2
+P0-CM-04    = DECIDED: Guest + Member canonical subjects.id ownership
 P0-PR-01B   = DECIDED: Commerce evidence minimization/security baseline
 ```
 
-### Still OPEN before provider-specific / paid-catalog / production activation
+### Still OPEN before paid-catalog / Production activation
 
 ```text
-P0-CM-02
-→ exact Web payment provider / PSP
-
 P0-CM-03
 → launch paid Product / Capability catalog
 → current Paid Deep/Detailed Reading candidate is upstream-blocked because Saju production interpretation authority remains BLOCKED
@@ -625,11 +658,20 @@ P0-PR-01 parent
 → backup retention/deletion
 → account-deletion Commerce retention/tombstone/pseudonymization lifecycle
 
-selected-provider ordering proof
-→ safe comparator or equivalent fail-closed reconciliation
+live PortOne merchant/PG/channel/API/webhook credential readiness
+→ operational proof required before Production activation
+
+#680 Production Supabase deployment authorization
+→ governed Production migration path remains blocked until project authorization is restored
+
+public PortOne webhook route
+→ intentional Production HOLD / 404 NOT_FOUND
+
+full provider lifecycle ordering/reconciliation proof
+→ paid-payment completion foundation does not imply refund/reversal/dispute lifecycle completion
 ```
 
-`P0-CM-01` 결정은 exact PSP나 paid SKU를 승인하지 않는다. `P0-PR-01B` 결정은 retention duration이나 production persistence activation을 승인하지 않는다. Effective Entitlement recompute primitive의 production migration 적용 역시 payment/provider activation을 승인하지 않는다.
+`P0-CM-01`과 `P0-CM-02` 결정은 Web one-off + PortOne V2 선택을 고정하지만 saleable SKU, price/currency, live merchant/PG/channel/credentials 또는 Production activation을 승인하지 않는다. `P0-CM-04`는 ownership만 결정하며 saleability를 만들지 않는다. `P0-PR-01B` 결정은 retention duration을 승인하지 않는다. Effective Entitlement recompute 또는 repository-local payment/webhook foundation 역시 Production activation을 승인하지 않는다.
 
 ---
 
@@ -662,7 +704,9 @@ missing/weak Commerce HMAC secret → fail before evidence persistence
 
 The fingerprint-specific subset above is implemented by `test/production-commerce-evidence-fingerprint.test.ts`.
 
-The provider-neutral evidence structural subset is implemented by `test/verified-commerce-evidence.test.ts`, including unknown/raw/client-authority field rejection, exact owner-binding vocabulary, malformed fingerprint rejection, non-plain input rejection, and validation-error non-leakage. 이 structural test는 provider authenticity 또는 provider-specific payload allowlist를 검증하지 않는다. Provider-specific canonicalization/payload allowlist/authenticity tests remain blocked until a concrete adapter schema exists.
+The provider-neutral evidence structural subset is implemented by `test/verified-commerce-evidence.test.ts`, including unknown/raw/client-authority field rejection, exact owner-binding vocabulary, malformed fingerprint rejection, non-plain input rejection, and validation-error non-leakage. 이 structural test 자체는 provider authenticity를 검증하지 않는다.
+
+PortOne V2-specific server payment verification, webhook authentication/HTTP/runtime composition, bounded transport/error handling, and verified payment persistence/replay regressions exist as repository-local provider implementation evidence. 이 evidence는 live merchant/API/webhook credential provisioning, public Production webhook activation, saleable catalog, verified Entitlement fulfillment, full provider lifecycle reconciliation 또는 Production readiness 증거가 아니다.
 
 The provider-neutral Entitlement Effect structural subset is implemented by `test/entitlement-effect.test.ts`, including exact schema/event/status vocabulary, required/nullability rules, Architecture-authorized static event→target transitions, `adjusted` reason requirement, unknown/source/actor/dedupe/provider-order/raw-provider field rejection, non-plain input rejection, and validation-error non-leakage. 이 test는 timestamp semantics, future-active verified-apply enforcement, renewal interval preservation, provider ordering, actor authentication, event dedupe/conflict generation, CAS 또는 Grant/Event persistence를 검증하지 않는다.
 
@@ -683,28 +727,30 @@ test/db/entitlement_projection_recompute_concurrency.sh
 ```text
 Architecture                                      = CLOSED
 Launch rail                                       = DECIDED: Web + one-off
+Web PSP                                           = DECIDED: PortOne V2 / portone_v2
+Guest purchase ownership                         = DECIDED: Guest + Member / canonical subjects.id
 Commerce evidence minimization                    = DECIDED: P0-PR-01B
-Product Capability Set schema                    = NOT IMPLEMENTED / HOLD UNTIL P0-CM-03
-Purchase Intent v2 Capability pin                = NOT IMPLEMENTED / HOLD UNTIL P0-CM-03
+Product Capability Set schema                    = IMPLEMENTED / FOUNDATION / NO SALEABLE CATALOG SEEDED
+Purchase Intent v2 Guest/Member ownership        = IMPLEMENTED / MERGED-MAIN / NO SALEABLE CHARGE TERMS IMPLIED
+Purchase Intent v2 Capability pin                = NOT ACTIVATED / HOLD UNTIL P0-CM-03 CATALOG AUTHORITY
 provider-neutral evidence fingerprint primitive = IMPLEMENTED / PURE HELPER / MERGED-MAIN CI GREEN
-provider-neutral evidence structural contract   = IMPLEMENTED / PURE VALIDATOR / MERGED-MAIN CI GREEN / NO AUTHENTICITY VERIFICATION
-provider-neutral entitlement effect contract    = IMPLEMENTED / PURE VALIDATOR / MERGED-MAIN CI GREEN / NO APPLY RUNTIME
-effective entitlement projection recompute      = IMPLEMENTED / INTERNAL DB / MERGED-MAIN CI GREEN / PRODUCTION MIGRATION GREEN
-provider-specific canonical evidence serializer = NOT IMPLEMENTED / BLOCKED BY P0-CM-02
-provider-neutral verification runtime            = NOT IMPLEMENTED
-provider ordering comparator/runtime             = NOT IMPLEMENTED / BLOCKED BY P0-CM-02
-verified Grant/Event apply transaction           = NOT IMPLEMENTED
-entitlement event dedupe/conflict generation     = NOT IMPLEMENTED
+provider-neutral evidence structural contract   = IMPLEMENTED / PURE VALIDATOR / MERGED-MAIN CI GREEN / NO AUTHENTICITY BY ITSELF
+provider-neutral entitlement effect contract    = IMPLEMENTED / PURE VALIDATOR / MERGED-MAIN CI GREEN / NO VERIFIED GRANT/EVENT APPLY BY ITSELF
+effective entitlement projection recompute      = IMPLEMENTED / INTERNAL DB / MERGED-MAIN CI GREEN
+PortOne V2 payment verification adapter          = IMPLEMENTED / SERVER-SIDE LOOKUP / REPOSITORY-LOCAL
+PortOne V2 webhook auth/HTTP/runtime foundation  = IMPLEMENTED / REPOSITORY-LOCAL / PUBLIC PRODUCTION ROUTE HOLD
+verified payment evidence persistence/replay     = IMPLEMENTED / REPOSITORY-LOCAL / PRODUCTION DEPLOYMENT SUBJECT TO #680
+full provider ordering/reconciliation lifecycle  = NOT IMPLEMENTED / PAID-PAYMENT SLICE DOES NOT COVER REFUND/REVERSAL/DISPUTE
+verified Grant/Event fulfillment transaction     = NOT ACTIVATED / P0-CM-03 + LIVE READINESS GATES
+entitlement event dedupe/conflict generation     = NOT COMPLETE FOR FULL LIFECYCLE
 adjusted-effect actor authentication              = NOT IMPLEMENTED
 outbox-on-rights-material-change                 = NOT IMPLEMENTED
-concrete provider adapter                         = BLOCKED BY P0-CM-02 + P0-CM-03
-verified receipt → grant/event/projection command= NOT IMPLEMENTED
-webhook/provider event runtime                    = NOT IMPLEMENTED
-refund/revoke/restore runtime                     = NOT IMPLEMENTED
-reconciliation runtime                            = NOT IMPLEMENTED
-provider sandbox E2E                              = NOT IMPLEMENTED
-production evidence persistence                   = BLOCKED BY P0-CM-02 + P0-CM-03 + P0-PR-01 PARENT
+server entitlement restore v1                    = IMPLEMENTED / PROVIDER-INDEPENDENT HISTORICAL-RIGHTS BOUNDARY
+provider refund/reversal/dispute runtime          = NOT IMPLEMENTED
+production evidence deployment                    = HOLD / #680 + LIVE READINESS
+public PortOne webhook route                     = HOLD / 404 NOT_FOUND
+saleable Product/Capability catalog              = HOLD / P0-CM-03 OPEN-P0
 production Commerce activation                    = NOT AUTHORIZED
 ```
 
-`COMMERCE_ENTITLEMENT_ARCHITECTURE_V1.md`, `COMMERCE_LAUNCH_RAIL_DECISION_V1.md`, `COMMERCE_EVIDENCE_DATA_MINIMIZATION_DECISION_V1.md`의 authority를 함께 따른다.
+`COMMERCE_ENTITLEMENT_ARCHITECTURE_V1.md`, `COMMERCE_LAUNCH_RAIL_DECISION_V1.md`, `COMMERCE_WEB_PSP_DECISION_V1.md`, `COMMERCE_GUEST_PURCHASE_OWNERSHIP_DECISION_V1.md`, `COMMERCE_EVIDENCE_DATA_MINIMIZATION_DECISION_V1.md`의 authority를 함께 따른다.
