@@ -5,10 +5,12 @@ import { describe, expect, it } from 'vitest';
 const webRoot = join(process.cwd(), 'apps', 'web');
 const source = readFileSync(join(webRoot, 'chat-runtime-client.js'), 'utf8');
 const chatHtml = readFileSync(join(webRoot, 'chat.html'), 'utf8');
+const chatPage = readFileSync(join(webRoot, 'src', 'chat', 'ChatPage.tsx'), 'utf8');
 
 describe('Chat authoritative bearer rejection boundary', () => {
   it('loads the Chat auth runtime as an executable ES module', () => {
-    expect(chatHtml).toContain('<script type="module" src="chat-runtime-client.js"></script>');
+    expect(chatHtml).toContain('<script type="module" src="/src/chat/main.tsx"></script>');
+    expect(chatPage).toContain("import('../../chat-runtime-client.js')");
     expect(chatHtml).not.toContain('<script src="chat-runtime-client.js" defer></script>');
   });
 
