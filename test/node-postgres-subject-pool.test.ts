@@ -7,6 +7,7 @@ import {
 import {
   NODE_POSTGRES_SUBJECT_POOL_DEFAULTS_V1,
   NodePostgresSubjectPoolErrorV1,
+  buildNodePostgresPoolConfigV1,
   createNodePostgresSubjectPoolFromDriverV1,
   createNodePostgresSubjectPoolV1,
   type NodePostgresDriverClientV1,
@@ -84,12 +85,29 @@ function createFixture() {
 }
 
 describe('node-postgres subject pool adapter', () => {
-  it('uses conservative bounded pool defaults for a serverless runtime', () => {
+  it('uses conservative bounded pool and statement defaults for a serverless runtime', () => {
     expect(NODE_POSTGRES_SUBJECT_POOL_DEFAULTS_V1).toEqual({
       maxConnectionsPerRuntime: 4,
       connectionTimeoutMs: 5_000,
       idleTimeoutMs: 10_000,
+      statementTimeoutMs: 5_000,
     });
+  });
+
+  it('wires the governed statement deadline into the concrete node-postgres client config', () => {
+    const config = buildNodePostgresPoolConfigV1(
+      'postgresql://myeongha_runtime:password@db.example.internal/postgres?sslmode=require',
+    );
+
+    expect(config).toMatchObject({
+      max: 4,
+      connectionTimeoutMillis: 5_000,
+      idleTimeoutMillis: 10_000,
+      statement_timeout: 5_000,
+      allowExitOnIdle: true,
+    });
+    expect(config.connectionString).toContain('sslmode=require');
+    expect(config.connectionString).toContain('uselibpqcompat=true');
   });
 
   it('verifies current_user and execution-role membership before exposing a connection', async () => {

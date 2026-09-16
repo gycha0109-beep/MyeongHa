@@ -46,6 +46,12 @@ export interface PortOneV2WebhookPaymentCompletionConfigV1 {
   readonly now?: () => Date;
 }
 
+type PortOneV2WebhookPaymentCompletionConfigSnapshotV1 = Readonly<{
+  environment: 'sandbox' | 'production';
+  webhookSecrets: readonly string[];
+  now: (() => Date) | undefined;
+}>;
+
 export interface AuthenticatedPortOneV2PaidWebhookV1 {
   readonly kind: 'payment_completion';
   readonly providerWebhookId: string;
@@ -87,6 +93,23 @@ function fail(
   message: string,
 ): never {
   throw new PortOneV2WebhookPaymentCompletionErrorV1(code, message);
+}
+
+function snapshotWebhookConfig(
+  config: PortOneV2WebhookPaymentCompletionConfigV1,
+): PortOneV2WebhookPaymentCompletionConfigSnapshotV1 {
+  try {
+    return Object.freeze({
+      environment: config.environment,
+      webhookSecrets: config.webhookSecrets,
+      now: config.now,
+    });
+  } catch {
+    return fail(
+      'INVALID_CONFIGURATION',
+      'PortOne V2 webhook configuration could not be read.',
+    );
+  }
 }
 
 function plainRecord(value: unknown, label: string): Record<string, unknown> {
@@ -180,8 +203,13 @@ function requireWebhookId(headers: Readonly<Record<string, string>>): string {
 }
 
 function resolveClock(now: (() => Date) | undefined): Date {
-  const value = (now ?? (() => new Date()))();
-  if (!(value instanceof Date) || !Number.isFinite(value.getTime())) {
+  let value: Date;
+  try {
+    value = (now ?? (() => new Date()))();
+    if (!(value instanceof Date) || !Number.isFinite(value.getTime())) {
+      throw new TypeError('invalid PortOne V2 webhook verification clock');
+    }
+  } catch {
     return fail('INVALID_CONFIGURATION', 'PortOne V2 webhook verification clock is invalid.');
   }
   return value;
@@ -383,9 +411,10 @@ export function authenticatePortOneV2WebhookPaymentCompletionV1(input: {
   readonly request: PortOneV2WebhookRequestV1;
   readonly config: PortOneV2WebhookPaymentCompletionConfigV1;
 }): AuthenticatedPortOneV2WebhookDecisionV1 {
+  const config = snapshotWebhookConfig(input.config);
   if (
-    input.config.environment !== 'sandbox' &&
-    input.config.environment !== 'production'
+    config.environment !== 'sandbox' &&
+    config.environment !== 'production'
   ) {
     return fail('INVALID_CONFIGURATION', 'PortOne V2 webhook environment is invalid.');
   }
@@ -394,10 +423,10 @@ export function authenticatePortOneV2WebhookPaymentCompletionV1(input: {
   const headers = normalizeHeaders(input.request.headers);
   requireContentType(headers);
   const webhookId = requireWebhookId(headers);
-  const now = resolveClock(input.config.now);
+  const now = resolveClock(config.now);
   const timestamp = requireTimestamp(headers, now);
   const signatures = requireV1Signatures(headers);
-  const secrets = resolveWebhookSecrets(input.config.webhookSecrets);
+  const secrets = resolveWebhookSecrets(config.webhookSecrets);
   verifySignature({ webhookId, timestamp, rawBody, secrets, signatures });
 
   const payload = parseVerifiedPayload(rawBody);
@@ -413,7 +442,7 @@ export function authenticatePortOneV2WebhookPaymentCompletionV1(input: {
   return Object.freeze({
     kind: 'payment_completion',
     providerWebhookId: webhookId,
-    authenticatedIngress: paidIngress(payload, input.config.environment),
+    authenticatedIngress: paidIngress(payload, config.environment),
   });
 }
 

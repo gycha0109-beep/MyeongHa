@@ -1,8 +1,8 @@
-# 명하 Spec Pack — Source Authority Validation Report v0.12
+# 명하 Spec Pack — Source Authority Validation Report v0.13
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.12 Source Alignment**  
-> Date: **2026-08-31**  
+> Pack Version: **v0.13 Decision Reconciliation**  
+> Date: **2026-09-16**  
 > Source Authority: `Usecase_re_reviewed_v2(1).md`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`, `Myeonghwa_Personalized_Interpretation_Architecture_v1.3_THIRD_REVIEW(1).md`  
 > Saju Public Contract Audit Pin: `gycha0109-beep/Saju@7102dc8fe8483c0875f6a093a4fd585b0df51f8b`
 
@@ -41,10 +41,10 @@ Source끼리 직접 충돌하거나 source가 구현 필수 authority를 제공�
 - ERD public base tables: **59**.
 - DDL/catalog tests continue to assert the 59-table baseline.
 - API/DB mutation surfaces remain command-oriented rather than raw CRUD wrappers.
-- P0-AUTH-01 unresolved 동안 DB functions use `SECURITY INVOKER` and PUBLIC EXECUTE remains revoked for newly exposed command/query surfaces.
+- `P0-AUTH-01`은 **DECIDED**다. ordinary user HTTP execution은 dedicated non-BYPASSRLS API execution role + transaction-scoped trusted canonical `subject_id` context를 사용하며, user-facing query/command는 RLS/object authorization을 계속 통과해야 한다.
 - Content/canon projections remain explicit bundle-pinned where source does not authorize hidden current selection.
 - Existing source-safe Share public-read/revoke and Device Installation revoke boundaries remain valid even though their inverse create/register workflows are source-blocked.
-- Existing `entitlements` projection/read schema remains valid as a storage/read envelope even though source does not yet define the complete event→grant→aggregate recompute algorithm.
+- Existing `entitlements` projection/read schema remains valid as a storage/read envelope. The later Commerce Architecture resolves the `SRC-21` event→grant→aggregate domain authority; verified apply/runtime completion and Production evidence remain separate implementation gates.
 - Existing relationship state/event schema remains valid as a current-projection/append-only-ledger envelope even though source does not yet define the executable score/stage policy evaluator.
 - Existing `world_events` and `character_unlocks` schema remain valid as append-only world provenance/current unlock projection envelopes even though source does not yet define the executable Character Unlock condition/effect evaluator.
 - Existing `subject_merge_jobs` / `subject_merge_actions`, merge-job current read, and direct merged guest lineage remain valid relational/read envelopes even though source does not yet define the executable conflict/resolution/domain-action merge policy.
@@ -55,9 +55,9 @@ Machine validation values recorded in older reports are historical snapshots; th
 
 ### 4.1 Existing corrections retained
 
-The Pack continues to preserve explicit blockers rather than converting ambiguity into invented behavior. Examples include:
+The Pack continues to preserve explicit blockers and closed decision boundaries rather than converting ambiguity into invented behavior. Examples include:
 
-- API/RLS database identity → `P0-AUTH-01`
+- API/RLS database identity → `P0-AUTH-01` **DECIDED**; retained as a closed execution boundary, not a current blocker
 - memory proposal staging/privacy → `SRC-05`
 - Birth/Target deletion vs Reading provenance → `SRC-06`
 - Saju target-birth adapter → `SRC-08`
@@ -97,15 +97,18 @@ Entitlement grant/event/projection structures
 Entitlement transaction skeleton after a grant target is known
 ```
 
-Primary source does **not** define the mapping from a purchased product to the concrete entitlement key/scope/grant semantics. This is `SRC-18`.
+Primary source does **not** define the mapping from a purchased product to the concrete entitlement key/scope/grant semantics. This historical gap was registered as `SRC-18`. The later repository-owned `docs/architecture/COMMERCE_ENTITLEMENT_ARCHITECTURE_V1.md` explicitly resolves that gap with immutable versioned Product Capability Set authority; the original source omission remains historical provenance rather than a current blocker.
 
 Current baseline:
 
 ```text
 Purchase Intent minimal offer mapping snapshot = IMPLEMENTABLE
 verified provider provenance persistence        = schema/provenance boundary implementable
-purchased product → concrete grant target       = BLOCKED by SRC-18
-provider-specific commerce rail                 = additionally OPEN-P0 P0-CM-01
+purchased product → concrete grant target       = AUTHORITY RESOLVED BY COMMERCE ARCHITECTURE / IMPLEMENTATION-VERIFICATION REMAINS
+launch Web one-off rail                          = DECIDED by P0-CM-01
+launch Web PSP                                   = DECIDED by P0-CM-02 (PortOne V2)
+launch paid Product / Capability catalog         = OPEN-P0 P0-CM-03
+live merchant/credential/PG/channel/Production activation = SEPARATELY GATED
 ```
 
 ### 4.3 Device Installation register lifecycle separated — `SRC-19`
@@ -218,16 +221,16 @@ logical entitlement create/update/revision rules
 outbox event contract for the recompute
 ```
 
-The existing commerce negative test does not prove these semantics. It directly updates `entitlement_grants` and `entitlements` to simulate one overlapping-grant outcome, so it verifies relational representability rather than a source-authoritative recompute command.
+The existing commerce negative test did not prove those semantics. It directly updated `entitlement_grants` and `entitlements` to simulate one overlapping-grant outcome, so it verified relational representability rather than a source-authoritative recompute command.
 
-Therefore:
+Therefore the historical gap split was:
 
 ```text
 SRC-18 = purchased Product → entitlement/grant target mapping
 SRC-21 = already-targeted event → grant transition → logical entitlement aggregation
 ```
 
-One does not close the other.
+One did not close the other. Both historical gaps are now resolved at domain-authority level by `docs/architecture/COMMERCE_ENTITLEMENT_ARCHITECTURE_V1.md`; their implementation/runtime completion remains independently verifiable.
 
 Current baseline:
 
@@ -235,11 +238,13 @@ Current baseline:
 entitlement grant/event/projection relational envelope = SOURCE-COMPLETE
 verified-source relational provenance constraints       = SOURCE-COMPLETE
 current stored entitlement read                         = SOURCE-COMPLETE
-production event-apply/recompute mutation               = BLOCKED by SRC-21
-purchase-derived event-apply additionally               = BLOCKED by SRC-18
+event→grant→aggregate domain authority                   = RESOLVED BY COMMERCE ARCHITECTURE
+provider-neutral projection recompute primitive          = IMPLEMENTED / INTERNAL DB PRIMITIVE
+verified receipt/event → grant/event apply runtime       = IMPLEMENTATION / PRODUCTION GATE
+purchase-derived mapping/application                     = RESOLVED AUTHORITY / IMPLEMENTATION + P0-CM-03 + LIVE READINESS GATES
 ```
 
-The Pack must not infer `max(valid_until)`, treat NULL expiry as unbounded without source approval, ignore future `valid_from`, compare opaque provider ordering keys lexically, or invent event payload transition semantics.
+Before the Commerce Architecture resolution, the Pack correctly did not infer `max(valid_until)`, treat NULL expiry as unbounded without source approval, ignore future `valid_from`, compare opaque provider ordering keys lexically, or invent event payload transition semantics. Current implementations must conform to the adopted Commerce Architecture and its companion contracts rather than invent alternate semantics.
 
 ### 4.6 Relationship policy/evaluator overreach removed — `SRC-22`
 
@@ -501,7 +506,7 @@ ContentPolicyTagRegistry
 
 Implementation may still use versioned config, immutable artifacts, content hashes, registries, or policy objects for deterministic selection, reproducibility, rollout safety, and auditability. When source has not defined the artifact identity/schema/hash itself, those mechanisms are **implementation contracts**, not evidence that Primary Source supplied the product semantics represented inside them.
 
-This distinction does not create a new source gap and does not close an existing one. Missing semantic authority remains governed by the existing decisions, including `SRC-18` commerce mapping, `SRC-22` relationship evaluator/policy content, `SRC-25` personal-record positive registry/schema content, `SRC-32` notification scheduler policy, and `P0-AGE-01` age/content policy.
+This distinction does not create a new source gap and does not close an existing one. `SRC-18` is no longer part of the live missing-authority set because the later Commerce Architecture resolves it. Remaining missing semantic authority continues to be governed by decisions such as `SRC-22` relationship evaluator/policy content, `SRC-25` personal-record positive registry/schema content, `SRC-32` notification scheduler policy, and `P0-AGE-01` age/content policy.
 
 Current baseline:
 
@@ -509,7 +514,7 @@ Current baseline:
 source-defined bounded/versioned behavior requirement = AUTHORITATIVE
 implementation registry/config/hash mechanism          = ALLOWED IMPLEMENTATION DETAIL
 artifact/interface identity as Primary Source contract = NOT CLAIMED unless source defines it
-existing semantic gaps / P0                            = remain independently OPEN
+existing unresolved semantic gaps / P0                 = remain independently OPEN
 ```
 
 ### 4.11 Saju Product response / clarification validation authority separated — `SRC-33`
@@ -656,9 +661,9 @@ It must **not** claim the following as source-complete:
 - relationship policy content-hash provenance;
 - authoritative concurrent score/stage apply.
 
-### Commerce with `SRC-18` and `SRC-21` open
+### Commerce after `SRC-18` / `SRC-21` authority resolution
 
-Source-complete verification may assert:
+Current verification may assert the already-implemented structural boundaries:
 
 - guest/deletion-pending purchase deny;
 - active-member Purchase Intent creation;
@@ -673,13 +678,12 @@ Source-complete verification may assert:
 - current stored entitlement projection read;
 - overlapping-grant relational shape can be represented.
 
-It must **not** claim the following as source-complete:
+The Commerce Architecture now supplies the domain authority for Product Capability mapping and event→grant→logical-entitlement aggregation. Tests may claim conformance to those semantics only for corresponding implemented slices. In particular:
 
-- purchased product → entitlement key/scope/grant mapping before `SRC-18`;
-- event type → exact grant mutation before `SRC-21`;
-- provider-order stale comparison before `SRC-21`;
-- `active_grant_count` / `effective_valid_until` recompute before `SRC-21`;
-- restore → concrete missing grant reconstruction before both applicable gaps are resolved.
+- Product Capability Set / Offer / Purchase Intent historical pinning requires concrete implementation and verification before it is called complete;
+- verified receipt/provider event → grant/event apply still requires provider-authenticity, ordering, idempotency, concurrency, failure and persistence evidence;
+- the internal projection recompute primitive may be verified against the Architecture contributor/aggregate/revision rules without implying that verified apply runtime exists;
+- restore requires implemented provider verification/reconciliation and live Production readiness; launch catalog selection `P0-CM-03` is not a universal historical-restore semantic prerequisite.
 
 ### Device with `SRC-19` open
 
@@ -699,36 +703,40 @@ It must **not** claim publisher failure finalization/classification, failed-even
 
 If an implementation uses versioned config, immutable artifacts, registries, or content hashes, tests may prove deterministic selection, immutability, version/hash integrity, rollout compatibility, and reproducible readback for those implementation mechanisms.
 
-Those tests must **not** be cited as evidence that Primary Source defines the artifact/interface/storage/hash contract or that the underlying semantic blocker has been resolved. In particular, implementation-artifact tests do not close `SRC-18`, `SRC-22`, `SRC-25`, `SRC-32`, or `P0-AGE-01` by themselves.
+Those tests must **not** be cited as evidence that Primary Source defines the artifact/interface/storage/hash contract. Implementation-artifact tests alone did not resolve historical `SRC-18`; that authority was resolved by the later Commerce Architecture. They likewise do not close still-open `SRC-22`, `SRC-25`, `SRC-32`, or `P0-AGE-01` by themselves.
 
-## 7. OPEN-P0 Register
+## 7. Current P0 Decision Snapshot
 
-Current production decisions include:
+`P0_DECISION_REGISTER.md` is authoritative for live status. The entries below are the P0s referenced by this report, not a replacement decision register.
 
-| ID | Decision |
-|---|---|
-| `P0-SA-01` | Saju transport |
-| `P0-CM-01` | Web / Apple / Google commerce rail matrix |
-| `P0-AI-01` | AI provider/model/fallback/validation implementation |
-| `P0-AGE-01` | minimum age / character content policy |
-| `P0-PR-01` | retention / backup / legal retention |
-| `P0-AUTH-01` | API→PostgreSQL execution identity / RLS enforcement model |
+| ID | Status | Current Decision / Required Resolution |
+|---|---|---|
+| `P0-SA-01` | **DECIDED** | authenticated internal HTTP calculation-only service; no `/api/readings` activation |
+| `P0-CM-01` | **DECIDED** | Web + one-off only for launch MVP |
+| `P0-CM-02` | **DECIDED** | PortOne V2 launch Web PSP; live merchant/credential/Production activation remains separate |
+| `P0-CM-03` | **OPEN-P0** | launch paid Product / Capability catalog |
+| `P0-AI-01` | **OPEN-P0** | AI provider/model/fallback/grounded validation implementation |
+| `P0-AGE-01` | **OPEN-P0** | minimum age / character content policy |
+| `P0-PR-01` | **OPEN-P0** | retention / backup / legal retention |
+| `P0-AUTH-01` | **DECIDED** | non-BYPASSRLS API execution role + transaction-scoped trusted canonical `subject_id` context |
 
-Saju blockers compose independently:
+Saju boundaries compose independently:
 
 ```text
-P0-SA-01 = which real Saju repository/transport deployment path is used
+P0-SA-01 = DECIDED transport topology: authenticated internal HTTP calculation-only V1
 SRC-08    = what public host/request contract can be called, including target/compatibility capability
 SRC-33    = how ProductReadingResponse / clarification bodies become validated authoritative product data
 SRC-09    = what grounding/evidence guard metadata is available after a valid Product response exists
 ```
 
-Commerce blockers are independent layers:
+Commerce boundaries compose independently:
 
 ```text
-P0-CM-01 = which provider/platform rail is used
-SRC-18    = what entitlement/grant target a purchased product maps to
-SRC-21    = how an authoritative event mutates a grant and recomputes logical entitlement
+P0-CM-01 = DECIDED launch rail: Web + one-off
+P0-CM-02 = DECIDED launch Web PSP: PortOne V2
+P0-CM-03 = OPEN-P0 launch paid Product / Capability catalog
+SRC-18    = RESOLVED BY COMMERCE_ENTITLEMENT_ARCHITECTURE_V1; purchased Product → entitlement/grant target authority
+SRC-21    = RESOLVED BY COMMERCE_ENTITLEMENT_ARCHITECTURE_V1; authoritative event → grant transition → logical entitlement aggregate authority
 ```
 
 World/relationship blockers compose independently:
@@ -748,7 +756,7 @@ SRC-23 = additionally required if Character Unlock projection is transformed
 SRC-17 = additionally required where Episode transition/effect semantics are transformed
 ```
 
-Source-gap decisions `SRC-08`, `SRC-09`, `SRC-19`, `SRC-20`, `SRC-22`, `SRC-23`, `SRC-24`, `SRC-30`, and `SRC-33` are independent of infrastructure/provider P0 choices.
+Source-gap decisions `SRC-08`, `SRC-09`, `SRC-19`, `SRC-20`, `SRC-22`, `SRC-23`, `SRC-24`, `SRC-30`, and `SRC-33` are independent of decided infrastructure/provider P0 choices.
 
 ## 8. Promotion Gate
 
@@ -770,7 +778,7 @@ Specific promotion boundaries:
 
 ```text
 real Saju transport integration
-→ P0-SA-01 + SRC-08 resolution + exact host/request conformance evidence
+→ decided P0-SA-01 transport + SRC-08 resolution + exact host/request conformance evidence
 
 Saju Product response semantic finalization
 → SRC-33 resolution + positive/negative/versioned validator evidence
@@ -782,10 +790,10 @@ Character Saju grounding from Product response
 → SRC-33 + SRC-09 resolution + protected-context/Output-Guard evidence
 
 provider-independent entitlement event apply/recompute
-→ SRC-21 resolution + transition/aggregation/concurrency evidence
+→ conformance to resolved SRC-21 / Commerce Architecture authority + transition/aggregation/concurrency implementation evidence
 
-full purchase→entitlement path
-→ P0-CM-01 + SRC-18 + SRC-21 resolution + provider/restore evidence
+full launch purchase→entitlement path
+→ decided P0-CM-01/P0-CM-02 rail/provider + P0-CM-03 resolution + conformance to resolved SRC-18/SRC-21 Commerce authority + live provider/restore/Production evidence
 
 Device Installation register/re-register
 → SRC-19 resolution + concurrency/rotation evidence
@@ -826,4 +834,4 @@ FINAL PRODUCTION BASELINE = BLOCKED WHERE SOURCE/P0 REMAINS OPEN
 
 ### Final statement
 
-> Pack은 source authority를 구현 가능하게 구체화하는 문서이지 source에 없는 product semantics를 발명하는 authority가 아니다. Saju에서는 `SRC-08` host/request conformance, `SRC-33` ProductResponse/clarification positive validation, `SRC-09` downstream grounding/evidence authority를 서로 다른 blocker로 유지하며, transport 성공이나 exported type/fixture conformance를 product-semantic validation으로 승격하지 않는다. 현재 commerce는 `SRC-18` Product→grant mapping과 `SRC-21` event→grant→logical-entitlement aggregation을 독립적으로 fail-closed 처리한다. `SRC-19`는 Device Installation registration lifecycle, `SRC-20`은 Share Artifact create/public projection lifecycle, `SRC-22`는 Relationship Event의 event→score/stage/anti-farming policy evaluator, `SRC-23`은 Character Unlock의 condition/World Event→target/effect evaluator, `SRC-24`는 existing-Member Guest merge의 conflict/resolution/domain-action/retry-resume policy, `SRC-30`은 transactional outbox publisher failure/retry/dead-letter/replay policy를 각각 차단한다. 이미 source-complete한 Reading Session/attempt persistence, transport-attempt persistence, lower-level prevalidated clarification persistence, Purchase Intent, current stored Entitlement read, Device revoke, Share public-read/revoke, Relationship ledger/current-read, World Event/Character Unlock relational current-read, merge-job current read, direct merged guest history, 그리고 outbox enqueue/dedupe·pending claim·expired-processing lease reclaim·successful completion 경계는 이 blocker들과 독립적으로 유지한다. `UsagePolicyV1`, analytics registry storage/hash, experiment-assignment registry, content-policy-tag registry 같은 구현 artifact는 source가 그 artifact identity/schema/hash를 직접 정의하지 않은 경우 implementation reproducibility mechanism으로만 취급하며 source authority의 증거로 승격하지 않는다.
+> Pack은 source authority를 구현 가능하게 구체화하는 문서이지 source에 없는 product semantics를 발명하는 authority가 아니다. Saju에서는 `SRC-08` host/request conformance, `SRC-33` ProductResponse/clarification positive validation, `SRC-09` downstream grounding/evidence authority를 서로 다른 blocker로 유지하며, transport 성공이나 exported type/fixture conformance를 product-semantic validation으로 승격하지 않는다. Commerce에서는 historical `SRC-18` Product→grant mapping과 `SRC-21` event→grant→logical-entitlement aggregation의 domain authority가 후속 Commerce Architecture로 해소됐으며, 그 사실은 Product Capability pinning, verified provider apply, ordering, grant/event mutation, aggregate recompute, reconciliation 또는 live Production activation이 완료됐다는 뜻이 아니다. 구현되지 않았거나 검증되지 않은 Commerce runtime은 계속 fail-closed로 유지하고, launch saleability는 별도로 OPEN `P0-CM-03`과 live merchant/credential/PG/channel/Production readiness를 요구한다. `SRC-19`는 Device Installation registration lifecycle, `SRC-20`은 Share Artifact create/public projection lifecycle, `SRC-22`는 Relationship Event의 event→score/stage/anti-farming policy evaluator, `SRC-23`은 Character Unlock의 condition/World Event→target/effect evaluator, `SRC-24`는 existing-Member Guest merge의 conflict/resolution/domain-action/retry-resume policy, `SRC-30`은 transactional outbox publisher failure/retry/dead-letter/replay policy를 각각 차단한다. 이미 source-complete한 Reading Session/attempt persistence, transport-attempt persistence, lower-level prevalidated clarification persistence, Purchase Intent, current stored Entitlement read, Device revoke, Share public-read/revoke, Relationship ledger/current-read, World Event/Character Unlock relational current-read, merge-job current read, direct merged guest history, 그리고 outbox enqueue/dedupe·pending claim·expired-processing lease reclaim·successful completion 경계는 이 blocker들과 독립적으로 유지한다. `UsagePolicyV1`, analytics registry storage/hash, experiment-assignment registry, content-policy-tag registry 같은 구현 artifact는 source가 그 artifact identity/schema/hash를 직접 정의하지 않은 경우 implementation reproducibility mechanism으로만 취급하며 source authority의 증거로 승격하지 않는다.

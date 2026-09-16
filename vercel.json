@@ -10,6 +10,14 @@
       "main": true
     }
   },
+  "functions": {
+    "api/health.ts": {
+      "supportsCancellation": true
+    },
+    "api/readiness.ts": {
+      "supportsCancellation": true
+    }
+  },
   "redirects": [
     {
       "source": "/:path*",
