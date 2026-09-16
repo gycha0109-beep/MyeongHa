@@ -19,7 +19,6 @@
         <span class="product-brand-seal" aria-hidden="true">明河</span>
         <span class="product-brand-sub">MyeongHa</span>
       </a>
-
       <nav class="product-nav" aria-label="주요 메뉴">
         <a class="product-nav-link" href="hall.html">홈</a>
         <a class="product-nav-link" href="reading.html" aria-current="page">사주</a>
@@ -27,7 +26,6 @@
         <a class="product-nav-link" href="records.html">기록</a>
         <a class="product-nav-link" href="my.html">마이</a>
       </nav>
-
       <div class="product-utilities">
         <button class="product-icon-button" type="button" aria-label="알림"></button>
         <a class="product-profile" href="my.html" aria-label="내 프로필">
@@ -39,91 +37,7 @@
     </div>
   </header>
 
-  <main class="reading-main">
-    <a class="reading-back-to-hub" href="reading.html">← 내 사주로 돌아가기</a>
-
-    <section class="reading-route-state" data-reading-route-state aria-live="polite">
-      <span class="reading-route-kicker" data-reading-product-title>사주 읽기</span>
-      <h1 data-reading-state-title>읽기를 확인하는 중입니다.</h1>
-      <p data-reading-state-copy>요청한 주제와 범위를 확인하고 있습니다.</p>
-      <a class="reading-route-action" href="reading.html">다른 사주 읽기 보기 <span aria-hidden="true">→</span></a>
-    </section>
-
-    <section class="reading-stage" data-reading-stage hidden aria-label="캐릭터와 함께 읽는 사주">
-      <div class="reader-scene" data-reader-portrait role="img" aria-label="백헌 사주 읽기 장면">
-        <div class="reader-scene-art" aria-hidden="true">
-          <span class="reader-orbit"></span>
-          <span class="reader-lamp"></span>
-          <span class="reader-silhouette"></span>
-        </div>
-
-        <div class="reader-identity">
-          <span class="reader-title-badge" data-reader-title>충추원의 장</span>
-          <div class="reader-name-line">
-            <h1 data-reader-name>백헌</h1>
-            <span class="reader-name-hanja" data-reader-hanja aria-hidden="true">白憲</span>
-          </div>
-          <p data-reader-intro>당신의 사주를 바탕으로 지금의 흐름부터 하나씩 살펴보겠습니다.</p>
-        </div>
-
-        <div class="reader-dialogue" aria-label="함께 읽는 사람의 말">
-          <span class="reader-dialogue-mark" aria-hidden="true">明</span>
-          <p data-reader-step-line>검증된 Reading이 준비되면 이 자리에서 함께 읽겠습니다.</p>
-        </div>
-      </div>
-
-      <article class="reading-sheet" aria-live="polite">
-        <header class="reading-sheet-head">
-          <span class="reading-scope" data-reading-scope>원국</span>
-          <div class="reading-progress" aria-label="읽기 진행 상태">
-            <span data-reading-progress-label>읽기 1 / 4</span>
-            <div class="reading-progress-track" aria-hidden="true">
-              <span class="reading-progress-dot is-active" data-reading-progress-dot></span>
-              <span class="reading-progress-dot" data-reading-progress-dot></span>
-              <span class="reading-progress-dot" data-reading-progress-dot></span>
-              <span class="reading-progress-dot" data-reading-progress-dot></span>
-            </div>
-          </div>
-        </header>
-
-        <div class="reading-sheet-body">
-          <section class="reading-block reading-block-primary">
-            <span class="reading-block-icon" aria-hidden="true">✿</span>
-            <div>
-              <h2 data-reading-step-title>지금 읽히는 흐름</h2>
-              <p data-reading-step-body>검증된 Product Reading 응답이 연결된 뒤 이 영역에 표시됩니다.</p>
-            </div>
-          </section>
-
-          <section class="reading-block">
-            <span class="reading-block-icon" aria-hidden="true">✿</span>
-            <div>
-              <h2 data-reading-structure-title>이 흐름을 만드는 구조</h2>
-              <p data-reading-structure-body>확정된 구조적 근거와 적용 범위만 표시합니다.</p>
-            </div>
-          </section>
-
-          <section class="reading-block reading-character-block">
-            <span class="reading-block-icon" aria-hidden="true">✿</span>
-            <div>
-              <h2><span data-reader-name>백헌</span>의 한 마디</h2>
-              <p>캐릭터는 검증된 Reading의 표현과 후속 질문만 담당합니다.</p>
-              <span class="reading-authority-note">사주 의미는 검증된 Reading을 따르며, 캐릭터가 새로운 해석을 만들지 않습니다.</span>
-            </div>
-          </section>
-        </div>
-
-        <footer class="reading-sheet-actions">
-          <button class="reading-icon-action" type="button" data-reading-prev aria-label="이전 읽기" disabled>←</button>
-          <button class="reading-secondary-action" type="button" data-chart-open>내 명식 보기</button>
-          <button class="reading-primary-action" type="button" data-reading-next disabled>
-            <span>다음 읽기</span>
-            <span aria-hidden="true">→</span>
-          </button>
-        </footer>
-      </article>
-    </section>
-  </main>
+  <main class="reading-main" id="reading-detail-react-root"></main>
 
   <dialog class="reading-chart-dialog" data-chart-dialog aria-labelledby="chart-title">
     <div class="reading-chart-dialog-head">
@@ -152,6 +66,6 @@
     <a class="mobile-nav-link" href="my.html"><span class="mobile-nav-icon" aria-hidden="true">♙</span><span>마이</span></a>
   </nav>
 
-  <script type="module" src="reading-character.js"></script>
+  <script type="module" src="/src/reading-detail/main.tsx"></script>
 </body>
 </html>
