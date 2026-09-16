@@ -13,7 +13,7 @@ const requiredWorkflowFragments = [
   'workflow_dispatch:',
   "cron: '17 18 * * *'",
   'environment: production',
-  'uses: actions/checkout@v7',
+  'uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7',
   'cancel-in-progress: false',
   'SUPABASE_PROJECT_ID: cnsfpcdiyofqvhpcegfc',
   "SUPABASE_CLI_VERSION: '2.117.0'",
@@ -41,7 +41,7 @@ const requiredWorkflowFragments = [
   'sha256sum',
   'openssl enc -aes-256-cbc -salt -pbkdf2 -iter 200000',
   'rm -f "$plaintext_archive"',
-  'uses: actions/upload-artifact@v7',
+  'uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7',
   'retention-days: 30',
   'compression-level: 0',
   'backup_status=success',
@@ -54,6 +54,8 @@ for (const fragment of requiredWorkflowFragments) {
 }
 
 const forbiddenWorkflowFragments = [
+  'uses: actions/checkout@v7',
+  'uses: actions/upload-artifact@v7',
   'uses: actions/checkout@v4',
   'uses: actions/upload-artifact@v4',
   'service_role',
@@ -77,7 +79,7 @@ for (const fragment of forbiddenWorkflowFragments) {
 
 const encryptIndex = workflow.indexOf('openssl enc -aes-256-cbc -salt -pbkdf2 -iter 200000');
 const plaintextDeleteIndex = workflow.indexOf('rm -f "$plaintext_archive"');
-const uploadIndex = workflow.indexOf('uses: actions/upload-artifact@v7');
+const uploadIndex = workflow.indexOf('uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7');
 if (encryptIndex < 0 || plaintextDeleteIndex < 0 || uploadIndex < 0) {
   throw new Error('Backup encryption/upload ordering markers are missing.');
 }
