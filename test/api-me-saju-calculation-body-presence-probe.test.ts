@@ -1,5 +1,6 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { handleCurrentSubjectSajuCalculationRequestV1 } from '../apps/api/src/current-subject-saju-calculation-http.js';
+import { INGRESS_REQUEST_BODY_COMPLETION_DEADLINE_MS_V1 } from '../apps/api/src/ingress-request-body-deadline.js';
 import type { PostgresSubjectPoolV1 } from '../apps/api/src/postgres-subject-execution.js';
 import type { SajuProductionCalculationHttpAdapterV1 } from '../apps/api/src/saju-production-calculation-http-adapter.js';
 import { createCurrentSubjectSajuCalculationRouteV1 } from '../api/me/saju/calculation.js';
@@ -31,7 +32,78 @@ function rejectingBodyRuntime() {
   return { verifyRequestIdentity, handleRequest };
 }
 
+afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+});
+
 describe('current-subject Saju calculation public route body bound', () => {
+  it('times out a stream that never emits before identity or runtime work', async () => {
+    vi.useFakeTimers();
+    let cancelCalls = 0;
+    const incoming = new ReadableStream<Uint8Array>({
+      cancel() {
+        cancelCalls += 1;
+        return new Promise<void>(() => undefined);
+      },
+    });
+    const request = streamRequest(incoming);
+    const { verifyRequestIdentity, handleRequest } = rejectingBodyRuntime();
+    const route = createCurrentSubjectSajuCalculationRouteV1({ handleRequest });
+
+    const responsePromise = route.fetch(request);
+    await vi.advanceTimersByTimeAsync(INGRESS_REQUEST_BODY_COMPLETION_DEADLINE_MS_V1);
+    const response = await responsePromise;
+    const payload = await response.json() as any;
+
+    expect(response.status).toBe(408);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(payload.error).toEqual({
+      code: 'REQUEST_BODY_TIMEOUT',
+      messageKey: 'auth.request_body_timeout',
+      retryable: false,
+    });
+    expect(payload.meta.apiContractVersion).toBe('v0.9');
+    expect(typeof payload.meta.requestId).toBe('string');
+    expect(payload.meta.requestId.length).toBeGreaterThan(0);
+    expect(cancelCalls).toBe(1);
+    expect(request.body?.locked).toBe(false);
+    expect(verifyRequestIdentity).not.toHaveBeenCalled();
+    expect(handleRequest).not.toHaveBeenCalled();
+  });
+
+  it('times out repeated zero-length chunks without resetting the absolute deadline', async () => {
+    vi.useFakeTimers();
+    let cancelCalls = 0;
+    let controller: ReadableStreamDefaultController<Uint8Array> | undefined;
+    const incoming = new ReadableStream<Uint8Array>({
+      start(value) {
+        controller = value;
+        value.enqueue(new Uint8Array(0));
+      },
+      cancel() {
+        cancelCalls += 1;
+      },
+    });
+    const request = streamRequest(incoming);
+    const { verifyRequestIdentity, handleRequest } = rejectingBodyRuntime();
+    const route = createCurrentSubjectSajuCalculationRouteV1({ handleRequest });
+
+    const responsePromise = route.fetch(request);
+    await vi.advanceTimersByTimeAsync(2_500);
+    controller?.enqueue(new Uint8Array(0));
+    await vi.advanceTimersByTimeAsync(500);
+    const response = await responsePromise;
+    const payload = await response.json() as any;
+
+    expect(response.status).toBe(408);
+    expect(payload.error.code).toBe('REQUEST_BODY_TIMEOUT');
+    expect(cancelCalls).toBe(1);
+    expect(request.body?.locked).toBe(false);
+    expect(verifyRequestIdentity).not.toHaveBeenCalled();
+    expect(handleRequest).not.toHaveBeenCalled();
+  });
+
   it('rejects after one-byte evidence without waiting for cancellation settlement', async () => {
     let cancelCalls = 0;
     const incoming = new ReadableStream<Uint8Array>({
