@@ -30,12 +30,13 @@ jobs:
           [[ "$DISPATCH_CONFIRM" == 'VERIFY_BIRTH_CREATE_BOUNDARY' ]]
 
       - name: Check out exact repository verifier
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Node 24
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '24'
+          package-manager-cache: false
 
       - name: Verify production Birth create boundary
         run: node scripts/verify-production-birth-profile-create-boundary.mjs

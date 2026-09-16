@@ -17,9 +17,10 @@ const requiredWorkflowFragments = [
   'environment: production',
   'DISPATCH_CONFIRM: ${{ inputs.confirm }}',
   '[[ "$DISPATCH_CONFIRM" == \'VERIFY_BIRTH_CREATE_BOUNDARY\' ]]',
-  'uses: actions/checkout@v4',
-  'uses: actions/setup-node@v4',
+  'uses: actions/checkout@v7',
+  'uses: actions/setup-node@v7',
   "node-version: '24'",
+  'package-manager-cache: false',
   'run: node scripts/verify-production-birth-profile-create-boundary.mjs',
 ];
 
@@ -30,6 +31,8 @@ for (const fragment of requiredWorkflowFragments) {
 }
 
 const forbiddenWorkflowFragments = [
+  'uses: actions/checkout@v4',
+  'uses: actions/setup-node@v4',
   '\npush:',
   '\npull_request:',
   '\nschedule:',

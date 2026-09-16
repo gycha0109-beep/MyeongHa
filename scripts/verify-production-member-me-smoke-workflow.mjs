@@ -25,9 +25,10 @@ const requiredWorkflowFragments = [
   'test -n "${MYEONGHA_PRODUCTION_MEMBER_EMAIL:-}"',
   'test -n "${MYEONGHA_PRODUCTION_MEMBER_PASSWORD:-}"',
   'test -n "${MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID:-}"',
-  'uses: actions/checkout@v4',
-  'uses: actions/setup-node@v4',
+  'uses: actions/checkout@v7',
+  'uses: actions/setup-node@v7',
   "node-version: '24'",
+  'package-manager-cache: false',
   'run: node scripts/verify-production-member-me.mjs',
 ];
 
@@ -38,6 +39,8 @@ for (const fragment of requiredWorkflowFragments) {
 }
 
 const forbiddenWorkflowFragments = [
+  'uses: actions/checkout@v4',
+  'uses: actions/setup-node@v4',
   '\npush:',
   '\npull_request:',
   '\nschedule:',
