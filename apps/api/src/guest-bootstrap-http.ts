@@ -8,6 +8,7 @@ import {
   type GuestBootstrapTokenFingerprintPortV1,
 } from './guest-bootstrap-command.js';
 import { readGuestBootstrapRequestBodyV1 } from './guest-bootstrap-request-body.js';
+import { IngressRequestBodyCompletionDeadlineExceededV1 } from './ingress-request-body-deadline.js';
 
 const POST_METHOD = 'POST' as const;
 const API_CONTRACT_VERSION = 'v0.9' as const;
@@ -60,8 +61,8 @@ function methodNotAllowed(): Response {
 
 function errorResponse(input: {
   readonly status: number;
-  readonly code: 'INVALID_REQUEST' | 'AUTH_REQUIRED';
-  readonly messageKey: 'request.invalid' | 'auth.required';
+  readonly code: 'INVALID_REQUEST' | 'AUTH_REQUIRED' | 'REQUEST_BODY_TIMEOUT';
+  readonly messageKey: 'request.invalid' | 'auth.required' | 'auth.request_body_timeout';
   readonly requestId: string;
 }): Response {
   return Response.json(
@@ -136,6 +137,14 @@ export async function handleGuestBootstrapRequestV1(
     });
     return successResponse(data, requestId, serverTime);
   } catch (error) {
+    if (error instanceof IngressRequestBodyCompletionDeadlineExceededV1) {
+      return errorResponse({
+        status: 408,
+        code: 'REQUEST_BODY_TIMEOUT',
+        messageKey: 'auth.request_body_timeout',
+        requestId,
+      });
+    }
     if (error instanceof ApiCommandError) {
       if (error.code === 'INVALID_REQUEST') {
         return errorResponse({
