@@ -15,7 +15,9 @@ on:
       - 'scripts/verify-production-reading-history-current-subject.mjs'
       - 'scripts/wait-production-records-sample-boundary.mjs'
       - 'scripts/verify-production-records-browser.mjs'
+      - 'apps/web/records.html'
       - 'apps/web/records-page.js'
+      - 'apps/web/src/records/**'
 
 permissions:
   contents: read

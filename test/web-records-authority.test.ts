@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const webRoot = join(process.cwd(), 'apps', 'web');
-const html = readFileSync(join(webRoot, 'records.html'), 'utf8');
+const html = `${readFileSync(join(webRoot, 'records.html'), 'utf8')}\n${readFileSync(join(webRoot, 'src', 'records', 'RecordsPage.tsx'), 'utf8')}`;
 const client = readFileSync(join(webRoot, 'records-runtime-client.js'), 'utf8');
 const page = readFileSync(join(webRoot, 'records-page.js'), 'utf8');
 

@@ -16,12 +16,14 @@ describe('Records v2 product surface', () => {
   });
 
   it('preserves existing read runtime mount points and adds keyboard-capable tabs', async () => {
-    const [html, js] = await Promise.all([
+    const [html, component, js] = await Promise.all([
       readFile(web('records.html'), 'utf8'),
+      readFile(web('src/records/RecordsPage.tsx'), 'utf8'),
       readFile(web('records-page.js'), 'utf8'),
     ]);
+    const markup = `${html}\n${component}`;
     for (const id of ['records-status', 'records-content', 'records-display-name', 'records-subject-kind', 'life-records-list', 'birth-records-list', 'memory-records-list']) {
-      expect(html).toContain(`id="${id}"`);
+      expect(markup).toContain(`id="${id}"`);
     }
     expect(js).toContain('createRecordsRuntimeClient().readRecords()');
     expect(js).toContain('renderBirthProfileUnavailable()');

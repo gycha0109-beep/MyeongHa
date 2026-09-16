@@ -6,7 +6,7 @@ const webRoot = resolve(process.cwd(), 'apps/web');
 const readWeb = (name: string) => readFileSync(resolve(webRoot, name), 'utf8');
 
 describe('Records Saju history surface', () => {
-  const html = readWeb('records.html');
+  const html = `${readWeb('records.html')}\n${readWeb('src/records/RecordsPage.tsx')}`;
   const page = readWeb('records-page.js');
   const client = readWeb('records-runtime-client.js');
   const css = readWeb('records-v2.css');
