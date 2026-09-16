@@ -46,7 +46,7 @@ function invoke(input: {
     requestId: 'req-chat-open-body-deadline',
     serverTime: '2026-09-16T12:00:00.000Z',
     identityEvidenceVerifier: {
-      verifyRequestIdentity: vi.fn(async () =>
+      verifyRequestIdentity: vi.fn(async (_request: Request): Promise<VerifiedSubjectIdentityEvidenceV1 | null> =>
         input.evidence === undefined
           ? { kind: 'member', verifiedAuthUserId: AUTH_USER_ID }
           : input.evidence),
