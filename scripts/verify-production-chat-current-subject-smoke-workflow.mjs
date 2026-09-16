@@ -35,9 +35,10 @@ const requiredWorkflowFragments = [
   '[[ "${{ github.ref }}" == \'refs/heads/main\' ]]',
   'trigger_value="$(tr -d \'\\r\' < .github/production-chat-current-subject-smoke.trigger)"',
   '[[ "$trigger_value" =~ ^fire-[0-9]{4}-[0-9]{2}-[0-9]{2}-v[0-9]+$ ]]',
-  'uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4',
-  'uses: actions/setup-node@v4',
+  'uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1',
+  'uses: actions/setup-node@v7',
   "node-version: '24'",
+  'package-manager-cache: false',
   'sudo apt-get install -y postgresql-client',
   'https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_ID/config/database/pooler',
   'run: bash scripts/run-production-member-chat-read-smoke.sh',
@@ -50,6 +51,8 @@ for (const fragment of requiredWorkflowFragments) {
 }
 
 for (const fragment of [
+  'uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4',
+  'uses: actions/setup-node@v4',
   '\npull_request:',
   '\nschedule:',
   'MYEONGHA_PRODUCTION_MEMBER_BEARER',

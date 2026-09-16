@@ -26,9 +26,10 @@ const requiredWorkflowFragments = [
   'MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID }}',
   '[[ "$DISPATCH_CONFIRM" == \'VERIFY_MEMBER_CHAT_OPEN_REUSE\' ]]',
   'seyeon|yeoul|seorin|rahyeon|mira|taegyeom|yunho|doyun|baekheon)',
-  'uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4',
-  'uses: actions/setup-node@v4',
+  'uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1',
+  'uses: actions/setup-node@v7',
   "node-version: '24'",
+  'package-manager-cache: false',
   'run: node scripts/verify-production-member-chat-open-reuse.mjs',
 ];
 for (const fragment of requiredWorkflowFragments) {
@@ -38,6 +39,8 @@ for (const fragment of requiredWorkflowFragments) {
 }
 
 for (const fragment of [
+  'uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4',
+  'uses: actions/setup-node@v4',
   '\npush:',
   '\nschedule:',
   'pull_request:',

@@ -22,9 +22,10 @@ const requiredWorkflowFragments = [
   'actions/workflows/production-birth-profile-guest-create-read-smoke.yml/runs?event=workflow_dispatch&status=success&per_page=1',
   "--jq '.total_count'",
   '[[ "$prior_successes" == \'0\' ]]',
-  'uses: actions/checkout@v4',
-  'uses: actions/setup-node@v4',
+  'uses: actions/checkout@v7',
+  'uses: actions/setup-node@v7',
   "node-version: '24'",
+  'package-manager-cache: false',
   'run: node scripts/verify-production-birth-profile-guest-create-read.mjs',
 ];
 
@@ -35,6 +36,8 @@ for (const fragment of requiredWorkflowFragments) {
 }
 
 const forbiddenWorkflowFragments = [
+  'uses: actions/checkout@v4',
+  'uses: actions/setup-node@v4',
   '\npush:',
   '\npull_request:',
   '\nschedule:',
