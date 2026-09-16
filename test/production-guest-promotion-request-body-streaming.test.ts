@@ -1,5 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { isGuestPromotionEmptyRequestBodyV1 } from '../apps/api/src/guest-promotion-request-body.js';
+import {
+  INGRESS_REQUEST_BODY_COMPLETION_DEADLINE_MS_V1,
+  IngressRequestBodyCompletionDeadlineExceededV1,
+} from '../apps/api/src/ingress-request-body-deadline.js';
 
 const encoder = new TextEncoder();
 
@@ -24,6 +28,10 @@ function streamRequest(
   } as RequestInit & { duplex: 'half' });
   return { request, stream };
 }
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 describe('Guest promotion streaming request-body validation', () => {
   it('accepts omitted, explicit-empty, and JS-trim-whitespace-only bodies', async () => {
@@ -134,6 +142,125 @@ describe('Guest promotion streaming request-body validation', () => {
     });
 
     await expect(isGuestPromotionEmptyRequestBodyV1(input.request)).resolves.toBe(false);
+    await Promise.resolve();
+    expect(cancelCalls).toBe(1);
+    expect(input.stream.locked).toBe(false);
+  });
+
+  it.each([
+    ['complete empty object', ['{}']],
+    ['accepted whitespace prefix', [' \t\n']],
+    ['zero-length chunks', ['', '', '']],
+  ] as const)('expires a non-closing %s at the governed absolute deadline', async (_name, chunks) => {
+    vi.useFakeTimers();
+    let cancelCalls = 0;
+    const input = streamRequest(chunks, {
+      cancel() {
+        cancelCalls += 1;
+      },
+    });
+
+    const result = isGuestPromotionEmptyRequestBodyV1(input.request);
+    await vi.advanceTimersByTimeAsync(INGRESS_REQUEST_BODY_COMPLETION_DEADLINE_MS_V1);
+
+    await expect(result).rejects.toBeInstanceOf(
+      IngressRequestBodyCompletionDeadlineExceededV1,
+    );
+    expect(cancelCalls).toBe(1);
+    expect(input.stream.locked).toBe(false);
+  });
+
+  it('uses one absolute deadline that incoming chunks cannot reset', async () => {
+    vi.useFakeTimers();
+    let cancelCalls = 0;
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        setTimeout(() => controller.enqueue(encoder.encode('{')), 1_000);
+        setTimeout(() => controller.enqueue(encoder.encode('}')), 2_000);
+        setTimeout(() => controller.enqueue(encoder.encode(' ')), 2_900);
+      },
+      cancel() {
+        cancelCalls += 1;
+      },
+    });
+    const request = new Request('https://myeongha.example/api/auth/promote-guest', {
+      method: 'POST',
+      body: stream,
+      duplex: 'half',
+    } as RequestInit & { duplex: 'half' });
+
+    const result = isGuestPromotionEmptyRequestBodyV1(request);
+    await vi.advanceTimersByTimeAsync(INGRESS_REQUEST_BODY_COMPLETION_DEADLINE_MS_V1);
+
+    await expect(result).rejects.toBeInstanceOf(
+      IngressRequestBodyCompletionDeadlineExceededV1,
+    );
+    expect(cancelCalls).toBe(1);
+    expect(stream.locked).toBe(false);
+  });
+
+  it('rejects delayed trailing non-whitespace before the completion deadline', async () => {
+    vi.useFakeTimers();
+    let cancelCalls = 0;
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(encoder.encode('{}'));
+        setTimeout(() => controller.enqueue(encoder.encode('x')), 1_000);
+      },
+      cancel() {
+        cancelCalls += 1;
+      },
+    });
+    const request = new Request('https://myeongha.example/api/auth/promote-guest', {
+      method: 'POST',
+      body: stream,
+      duplex: 'half',
+    } as RequestInit & { duplex: 'half' });
+
+    const result = isGuestPromotionEmptyRequestBodyV1(request);
+    await vi.advanceTimersByTimeAsync(1_000);
+
+    await expect(result).resolves.toBe(false);
+    expect(cancelCalls).toBe(1);
+    expect(stream.locked).toBe(false);
+  });
+
+  it('does not await non-settling cancellation after the deadline fires', async () => {
+    vi.useFakeTimers();
+    let cancelCalls = 0;
+    const input = streamRequest(['{}'], {
+      cancel() {
+        cancelCalls += 1;
+        return new Promise<void>(() => undefined);
+      },
+    });
+
+    const result = isGuestPromotionEmptyRequestBodyV1(input.request);
+    await vi.advanceTimersByTimeAsync(INGRESS_REQUEST_BODY_COMPLETION_DEADLINE_MS_V1);
+
+    await expect(result).rejects.toBeInstanceOf(
+      IngressRequestBodyCompletionDeadlineExceededV1,
+    );
+    expect(cancelCalls).toBe(1);
+    expect(input.stream.locked).toBe(false);
+  });
+
+  it('does not let cancellation rejection replace the deadline error', async () => {
+    vi.useFakeTimers();
+    let cancelCalls = 0;
+    const input = streamRequest(['{}'], {
+      cancel() {
+        cancelCalls += 1;
+        return Promise.reject(new Error('cancel failed'));
+      },
+    });
+
+    const result = isGuestPromotionEmptyRequestBodyV1(input.request);
+    await vi.advanceTimersByTimeAsync(INGRESS_REQUEST_BODY_COMPLETION_DEADLINE_MS_V1);
+
+    await expect(result).rejects.toBeInstanceOf(
+      IngressRequestBodyCompletionDeadlineExceededV1,
+    );
     await Promise.resolve();
     expect(cancelCalls).toBe(1);
     expect(input.stream.locked).toBe(false);
