@@ -1,3 +1,4 @@
+import { performance } from 'node:perf_hooks';
 import { acquireProductionMemberSmokeSession } from './production-member-smoke-session.mjs';
 
 const PRODUCTION_ORIGIN = 'https://myeongha.vercel.app';
@@ -94,6 +95,10 @@ async function fetchCanonical(url, init) {
   });
 }
 
+function elapsedMillisecondsSince(startedAt) {
+  return Math.round(performance.now() - startedAt);
+}
+
 function requireApiContract(value, label) {
   const meta = requireRecord(`${label} meta`, value.meta);
   if (meta.apiContractVersion !== 'v0.9') {
@@ -164,7 +169,9 @@ const expectedSubjectId = requireUuid(
 );
 const { accessToken } = await acquireProductionMemberSmokeSession();
 const authorization = { Authorization: `Bearer ${accessToken}` };
+const measurementObservedAtUtc = new Date().toISOString();
 
+const memberStartedAt = performance.now();
 const memberResponse = await fetchCanonical(MEMBER_ME_URL, {
   method: 'GET',
   headers: authorization,
@@ -175,6 +182,7 @@ if (memberResponse.status !== 200) {
   throw new Error(`Production Saju smoke Member /api/me expected HTTP 200, received ${memberResponse.status}.`);
 }
 const memberBody = await readJsonWithoutLogging(memberResponse, 'Production Saju smoke Member /api/me');
+const memberRoundTripMs = elapsedMillisecondsSince(memberStartedAt);
 requireApiContract(memberBody, 'Production Saju smoke Member /api/me');
 const memberData = requireRecord('Production Saju smoke Member data', memberBody.data);
 if (memberBody.ok !== true) throw new Error('Production Saju smoke Member /api/me did not return ok=true.');
@@ -184,6 +192,7 @@ if (memberData.subjectId !== expectedSubjectId) {
 }
 if (memberData.subjectStatus !== 'active') throw new Error('Production Saju smoke Member subject must be active.');
 
+const birthProfileStartedAt = performance.now();
 const birthProfileResponse = await fetchCanonical(BIRTH_PROFILE_URL, {
   method: 'GET',
   headers: authorization,
@@ -197,6 +206,7 @@ const birthProfileBody = await readJsonWithoutLogging(
   birthProfileResponse,
   'Production Saju smoke current Birth Profile',
 );
+const birthProfileRoundTripMs = elapsedMillisecondsSince(birthProfileStartedAt);
 requireApiContract(birthProfileBody, 'Production Saju smoke current Birth Profile');
 if (birthProfileBody.ok !== true) {
   throw new Error('Production Saju smoke current Birth Profile did not return ok=true.');
@@ -352,6 +362,7 @@ function validateCalculationBody(calculationBody, label) {
 }
 
 async function requestCalculation(label) {
+  const startedAt = performance.now();
   const response = await fetchCanonical(SAJU_CALCULATION_URL, {
     method: 'POST',
     headers: authorization,
@@ -362,7 +373,11 @@ async function requestCalculation(label) {
     throw new Error(`${label} expected HTTP 200, received ${response.status}.`);
   }
   const body = await readJsonWithoutLogging(response, label);
-  return validateCalculationBody(body, label);
+  const validated = validateCalculationBody(body, label);
+  return Object.freeze({
+    ...validated,
+    roundTripMs: elapsedMillisecondsSince(startedAt),
+  });
 }
 
 const firstCalculation = await requestCalculation('Production current-subject Saju calculation first');
@@ -382,5 +397,5 @@ if (
 }
 
 console.log(
-  'MyeongHa production current-subject Saju smoke passed: memberSignIn=200, freshSession=true, memberSubjectMatch=true, birthProfilePresent=true, birthRevisionMatch=true, calculationFirst=200, calculationRepeat=200, deterministicRepeat=true, authority=calculation_only, ingressContract=v1, cacheControl=no-store.',
+  `MyeongHa production current-subject Saju smoke passed: memberSignIn=200, freshSession=true, memberSubjectMatch=true, birthProfilePresent=true, birthRevisionMatch=true, calculationFirst=200, calculationRepeat=200, deterministicRepeat=true, authority=calculation_only, ingressContract=v1, cacheControl=no-store, measurementObservedAtUtc=${measurementObservedAtUtc}, memberRoundTripMs=${memberRoundTripMs}, birthProfileRoundTripMs=${birthProfileRoundTripMs}, calculationFirstRoundTripMs=${firstCalculation.roundTripMs}, calculationRepeatRoundTripMs=${repeatCalculation.roundTripMs}, timingThresholdApplied=false.`,
 );

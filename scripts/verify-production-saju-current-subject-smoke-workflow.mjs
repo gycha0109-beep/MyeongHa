@@ -76,6 +76,7 @@ if ((workflow.match(/workflow_dispatch:/g) ?? []).length !== 1) {
 }
 
 const requiredLiveVerifierFragments = [
+  "import { performance } from 'node:perf_hooks';",
   "import { acquireProductionMemberSmokeSession } from './production-member-smoke-session.mjs';",
   "const PRODUCTION_ORIGIN = 'https://myeongha.vercel.app';",
   'const MEMBER_ME_URL = `${PRODUCTION_ORIGIN}/api/me`;',
@@ -86,6 +87,13 @@ const requiredLiveVerifierFragments = [
   "redirect: 'error'",
   'AbortSignal.timeout(REQUEST_TIMEOUT_MS)',
   'Authorization: `Bearer ${accessToken}`',
+  'function elapsedMillisecondsSince(startedAt)',
+  'return Math.round(performance.now() - startedAt);',
+  'const measurementObservedAtUtc = new Date().toISOString();',
+  'const memberStartedAt = performance.now();',
+  'const memberRoundTripMs = elapsedMillisecondsSince(memberStartedAt);',
+  'const birthProfileStartedAt = performance.now();',
+  'const birthProfileRoundTripMs = elapsedMillisecondsSince(birthProfileStartedAt);',
   "memberData.subjectKind !== 'member'",
   'memberData.subjectId !== expectedSubjectId',
   "memberData.subjectStatus !== 'active'",
@@ -103,6 +111,8 @@ const requiredLiveVerifierFragments = [
   'function stableSerialize(value)',
   'function validateCalculationBody(calculationBody, label)',
   'async function requestCalculation(label)',
+  'const startedAt = performance.now();',
+  'roundTripMs: elapsedMillisecondsSince(startedAt)',
   "method: 'POST'",
   "'myeongha-saju-production-calculation-ingress-v1'",
   "'saju_calculation_evidence'",
@@ -128,11 +138,34 @@ const requiredLiveVerifierFragments = [
   'calculationFirst=200',
   'calculationRepeat=200',
   'deterministicRepeat=true',
+  'measurementObservedAtUtc=${measurementObservedAtUtc}',
+  'memberRoundTripMs=${memberRoundTripMs}',
+  'birthProfileRoundTripMs=${birthProfileRoundTripMs}',
+  'calculationFirstRoundTripMs=${firstCalculation.roundTripMs}',
+  'calculationRepeatRoundTripMs=${repeatCalculation.roundTripMs}',
+  'timingThresholdApplied=false',
 ];
 
 for (const fragment of requiredLiveVerifierFragments) {
   if (!liveVerifier.includes(fragment)) {
     throw new Error(`Missing production Saju live verifier contract fragment: ${fragment}`);
+  }
+}
+
+const forbiddenTimingAuthorityFragments = [
+  'LATENCY_THRESHOLD_MS',
+  'MAX_LATENCY_MS',
+  'P95_LATENCY',
+  'P99_LATENCY',
+  'roundTripMs >',
+  'roundTripMs >=',
+  'roundTripMs <',
+  'roundTripMs <=',
+];
+
+for (const fragment of forbiddenTimingAuthorityFragments) {
+  if (liveVerifier.includes(fragment)) {
+    throw new Error(`Production Saju smoke timing observation must not introduce pass/fail latency authority: ${fragment}`);
   }
 }
 
