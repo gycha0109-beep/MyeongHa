@@ -4,8 +4,8 @@
 > Decision date: 2026-09-16 KST  
 > Status: **DECIDED / V1**  
 > Scope: synchronous Production request-body consumers that explicitly opt into this policy  
-> Current bindings: authenticated Guest promotion request-body validation; public Guest bootstrap request-body validation; Supabase Auth sign-in/sign-up/refresh request-body validation  
-> Tracked by: #715, #684, #696
+> Current bindings: authenticated Guest promotion request-body validation; public Guest bootstrap request-body validation; Supabase Auth sign-in/sign-up/refresh request-body validation; Saju calculation body-presence probe  
+> Tracked by: #715, #684, #696, #682
 
 ---
 
@@ -39,6 +39,13 @@ read, preserves the existing 16,384-byte actual-body ceiling and JSON/object
 validation semantics, and does not apply to `sign-out`, which does not consume
 an Auth JSON request body.
 
+As of #682, `POST /api/me/saju/calculation` explicitly opts its pre-auth
+body-presence probe into the same V1 completion deadline. The route remains
+bodyless: a first non-empty byte is still sufficient to prove forbidden body
+presence without draining the remainder, while a stream that emits no
+non-empty byte must reach EOF before the absolute deadline to be accepted as
+bodyless.
+
 The 3,000 ms value is a **new repository-owned Operations decision**. It is not
 inherited from or numerically derived from:
 
@@ -64,8 +71,10 @@ is intentionally tiny: omitted/empty/whitespace-only or one JSON empty object.
 The Guest bootstrap grammar covered by #684 is likewise a synchronous control
 request boundary with the same tiny accepted body shapes. Supabase Auth
 sign-in/sign-up/refresh bodies covered by #696 are also bounded synchronous
-control requests and retain their independent 16,384-byte maximum. The nearby
-Saju body-presence candidate (#682) remains independently unbound.
+control requests and retain their independent 16,384-byte maximum. The Saju
+calculation boundary covered by #682 is stricter still: the authoritative
+request body is empty, so the probe only needs either the first non-empty byte
+or EOF to reach a terminal presence decision.
 
 V1 selects 3,000 ms because:
 
@@ -139,6 +148,21 @@ The deadline does not replace the existing byte ceiling and does not start the
 separately governed Supabase Auth upstream deadline early. `sign-out` retains
 its bearer-header path and does not opt into request-body completion timing.
 
+For current-subject Saju calculation the ordering is:
+
+```text
+method validation
+→ create one 3,000 ms body-presence deadline
+→ read only until first non-empty byte, EOF, or deadline expiry
+→ non-empty byte: canonical one-byte body witness
+→ EOF without non-empty bytes: canonical bodyless request
+→ only a terminal body-presence decision may proceed to identity verification
+```
+
+The Saju probe remains deliberately **pre-auth**. #682 does not move body
+rejection after identity verification and does not drain the rest of a body
+after non-emptiness has already been proven.
+
 ---
 
 ## 4. Covered public failure semantics
@@ -188,6 +212,19 @@ body not complete by the absolute deadline    → 408 REQUEST_BODY_TIMEOUT
 A body-completion timeout occurs before any Supabase Auth upstream request is
 started and is not mapped to `AUTH_UPSTREAM_UNAVAILABLE`.
 
+For Saju calculation specifically, #682 preserves:
+
+```text
+first non-empty byte                          → 400 INVALID_REQUEST / request.body_not_allowed
+actual EOF without a non-empty byte           → existing bodyless identity path
+no terminal presence decision by deadline     → 408 REQUEST_BODY_TIMEOUT
+```
+
+The timeout occurs before identity verification, PostgreSQL access, or Saju
+outbound work. The public timeout response retains the Saju route's current API
+contract metadata (`apiContractVersion` and generated `requestId`) while using
+the V1 error code/message key above.
+
 ---
 
 ## 5. Reader cleanup
@@ -220,19 +257,13 @@ Current bindings:
 #715 / POST /api/auth/promote-guest                    = covered
 #684 / POST /api/session/bootstrap                     = covered
 #696 / Supabase Auth sign-in/sign-up/refresh body read = covered
+#682 / POST /api/me/saju/calculation body-presence     = covered
 ```
 
-Known candidate follow-up remains independently open until its own code,
-failure mapping, regressions, exact-head CI, merge, and Production verification
-are completed:
-
-```text
-#682 Saju body-presence probe = not yet bound
-```
-
-That issue may adopt this V1 duration only through an explicit implementation
-that preserves its existing ordering and public error contract. This policy
-document alone does not close it.
+No other endpoint inherits this duration merely because it also consumes a
+request stream. Any additional binding requires an explicit reviewed change
+that preserves that boundary's ordering, grammar, failure mapping, cleanup,
+and deterministic regressions.
 
 ---
 

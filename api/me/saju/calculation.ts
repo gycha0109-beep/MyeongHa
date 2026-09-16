@@ -1,4 +1,6 @@
 import { randomUUID } from 'node:crypto';
+import { CURRENT_SUBJECT_SAJU_CALCULATION_HTTP_BINDINGS_V1 } from '../../../apps/api/src/current-subject-saju-calculation-http.js';
+import { IngressRequestBodyCompletionDeadlineExceededV1 } from '../../../apps/api/src/ingress-request-body-deadline.js';
 import { createProductionCurrentSubjectSajuCalculationRuntimeV1 } from '../../../apps/api/src/production-current-subject-saju-calculation-runtime.js';
 import { hasRequestBodyWithoutDrainingV1 } from '../../../apps/api/src/request-body-presence-probe.js';
 
@@ -21,6 +23,27 @@ function withNoStore(response: Response): Response {
     statusText: response.statusText,
     headers,
   });
+}
+
+function requestBodyTimeoutNoStore(requestId: string): Response {
+  return Response.json(
+    {
+      ok: false,
+      error: {
+        code: 'REQUEST_BODY_TIMEOUT',
+        messageKey: 'auth.request_body_timeout',
+        retryable: false,
+      },
+      meta: {
+        apiContractVersion: CURRENT_SUBJECT_SAJU_CALCULATION_HTTP_BINDINGS_V1.apiContractVersion,
+        requestId,
+      },
+    },
+    {
+      status: 408,
+      headers: { 'Cache-Control': NO_STORE_CACHE_CONTROL },
+    },
+  );
 }
 
 function internalServerErrorNoStore(): Response {
@@ -66,14 +89,18 @@ export function createCurrentSubjectSajuCalculationRouteV1(
 ): { fetch(request: Request): Promise<Response> } {
   return {
     async fetch(request: Request): Promise<Response> {
+      const requestId = randomUUID();
       try {
         const response = await runtimePort.handleRequest({
           request: await toBodyPresenceBoundRequest(request),
-          requestId: randomUUID(),
+          requestId,
           serverTime: new Date().toISOString(),
         });
         return withNoStore(response);
-      } catch {
+      } catch (error) {
+        if (error instanceof IngressRequestBodyCompletionDeadlineExceededV1) {
+          return requestBodyTimeoutNoStore(requestId);
+        }
         return reportRouteFailure();
       }
     },
