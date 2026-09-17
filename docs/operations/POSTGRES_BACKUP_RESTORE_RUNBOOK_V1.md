@@ -29,7 +29,7 @@ PITR                            = NOT AVAILABLE UNDER THE CURRENT FREE-PLAN OPER
 application-owned logical dump  = IMPLEMENTED BY REPOSITORY WORKFLOW
 successful production dump      = EVIDENCED — run 35260191079
 isolated restore drill path     = IMPLEMENTED / EXECUTED
-isolated restore                = NOT YET EVIDENCED — latest run 35264061319 failed before schema/data restore
+isolated restore                = NOT YET EVIDENCED — latest run 35265689965 reached roles restore, then stopped on an absent provider-managed role
 RPO                             = OPEN DECISION
 RTO                             = OPEN DECISION
 ```
@@ -175,7 +175,7 @@ The repository provides an executable, **manual-only** restore portability path:
 .github/workflows/postgres-isolated-restore-drill.yml
 ```
 
-Its target is **GitHub Actions loopback Supabase PostgreSQL 17.6.1.166**. The service image is pinned to the same Supabase PostgreSQL release family as the production project so the isolated target contains the Supabase platform role and extension baseline required by a Supabase CLI logical dump. The workflow does not accept a remote restore database URL. The restore harness hardcodes only:
+Its target is **GitHub Actions loopback Supabase PostgreSQL 17.6.1.166**. The service image is pinned to the same Supabase PostgreSQL release family as the production project so the isolated target contains the closest repository-controlled Supabase platform role and extension baseline available for this portability drill. The workflow does not accept a remote restore database URL. The restore harness hardcodes only:
 
 ```text
 postgresql://postgres:restore-drill@127.0.0.1:5432/postgres
@@ -195,7 +195,20 @@ Runtime evidence as of 2026-09-18 KST:
 
 - run `35261643085` proved source-run/artifact authority but failed before SQL restore because historical plaintext checksum entries contained producer-runner absolute paths; PR `#934` normalized historical entries and made future backup checksums portable;
 - run `35264061319` proved ciphertext and all three plaintext dump checksums pass, then failed when `roles.sql` attempted `ALTER ROLE "anon"` against a vanilla `postgres:17.6` service that lacked the Supabase platform-role baseline;
-- the current restore workflow therefore uses the production-compatible Supabase PostgreSQL `17.6.1.166` service image rather than manually fabricating reserved Supabase roles.
+- PR `#936` moved the drill to the production-family Supabase PostgreSQL `17.6.1.166` image;
+- run `35265689965` proved that image initializes successfully, backup authority and all checksums still pass, and all declared `myeongha_*` role creation reached execution. It then stopped at `GRANT SET ON PARAMETER "log_min_messages" TO "supabase_realtime_admin"` because that hosted provider-managed `supabase_*` role is absent from this self-hosted image revision.
+
+The role portability boundary is therefore explicit:
+
+- every role created by the governed role dump for this application must be a `myeongha_*` application role and must exist after role restore;
+- application roles must remain non-superuser and non-BYPASSRLS;
+- the drill **must not fabricate missing provider-managed roles** merely to make a dump replay green;
+- a statement may be tolerated only when PostgreSQL reports the exact error shape `role "supabase_*" does not exist` for a provider-managed `supabase_*` role that is absent from the isolated target baseline;
+- every other role restore SQL error is fatal;
+- absent provider-managed role names are recorded in restore evidence;
+- schema and data restore remain fully fail-closed with `ON_ERROR_STOP=1`.
+
+This boundary treats the isolated target's provider-managed role baseline as authoritative for provider internals while requiring MyeongHa-owned authorization state to restore exactly. If schema/data restore later proves dependent on an absent provider-managed role, that remains a blocking compatibility gap and must not be silently bypassed.
 
 Until a subsequent run reaches successful schema/data restore and validation, isolated restore remains NOT EVIDENCED.
 
@@ -223,18 +236,15 @@ Do not upload decrypted dump files back into GitHub Actions artifacts.
 
 ## 7. Isolated restore procedure
 
-Follow the current Supabase backup/restore guidance for the target environment. For the logical archive produced by this workflow, the baseline restore shape is:
+Follow the current Supabase backup/restore guidance for the target environment. The repository harness performs the logical restore in three governed phases:
 
-```bash
-psql \
-  --single-transaction \
-  --variable ON_ERROR_STOP=1 \
-  --file roles.sql \
-  --file schema.sql \
-  --command 'SET session_replication_role = replica' \
-  --file data.sql \
-  --dbname "$RESTORE_DATABASE_URL"
+```text
+roles.sql  -> restore MyeongHa application roles; classify only absent supabase_* provider roles as target-baseline differences
+schema.sql -> single transaction, ON_ERROR_STOP=1
+data.sql   -> single transaction, session_replication_role=replica, ON_ERROR_STOP=1
 ```
+
+The provider-managed role exception is deliberately narrower than ignoring role-dump failures: unknown role creation, any non-`supabase_*` missing role, privilege errors, syntax errors, connection errors, schema errors, and data errors remain fatal.
 
 Before executing:
 
@@ -246,7 +256,7 @@ Before executing:
 After restore:
 
 - reset passwords for any restored custom LOGIN roles as required by Supabase guidance;
-- recreate provider-level settings that are outside the logical database dump only when needed for the drill;
+- recreate provider-level settings that are outside the logical database dump only when needed for an explicitly approved recovery target, not merely to force this portability drill green;
 - do not copy production provider secrets into the isolated drill unless an explicit test requires them.
 
 ## 8. Integrity verification
