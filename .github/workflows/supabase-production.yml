@@ -4,12 +4,6 @@ on:
   push:
     branches:
       - main
-    paths:
-      - 'supabase/migrations/**'
-      - '.github/workflows/supabase-production.yml'
-      - 'scripts/run-production-platform-integrity-postdeploy-verify.sh'
-      - 'scripts/run-production-platform-integrity-read-audit.sh'
-      - 'scripts/run-production-platform-integrity-data-api-surface-audit.sh'
   workflow_dispatch:
 
 permissions:
@@ -23,8 +17,64 @@ env:
   SUPABASE_PROJECT_ID: cnsfpcdiyofqvhpcegfc
 
 jobs:
+  change-gate:
+    name: detect-production-db-relevance
+    runs-on: ubuntu-24.04
+    outputs:
+      requires_deploy: ${{ steps.relevance.outputs.requires_deploy }}
+    steps:
+      - name: Checkout deployment surface
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Determine governed Production DB relevance
+        id: relevance
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+          CURRENT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          requires_deploy=false
+          reason='no governed Production DB deployment-surface change detected'
+
+          if [[ "$EVENT_NAME" == 'workflow_dispatch' ]]; then
+            requires_deploy=true
+            reason='workflow_dispatch forces governed Production verification'
+          elif [[ -z "${BEFORE_SHA:-}" || "$BEFORE_SHA" =~ ^0+$ ]]; then
+            requires_deploy=true
+            reason='push before SHA is unavailable; fail closed'
+          elif ! git cat-file -e "${BEFORE_SHA}^{commit}" 2>/dev/null; then
+            requires_deploy=true
+            reason='push before SHA is not present in checkout; fail closed'
+          else
+            changed_files="$(git diff --name-only "$BEFORE_SHA" "$CURRENT_SHA")"
+            printf '%s\n' "$changed_files"
+
+            if grep -Eq '^(supabase/migrations/|[.]github/workflows/supabase-production[.]yml$|scripts/run-production-platform-integrity-postdeploy-verify[.]sh$|scripts/run-production-platform-integrity-read-audit[.]sh$|scripts/run-production-platform-integrity-data-api-surface-audit[.]sh$)' <<<"$changed_files"; then
+              requires_deploy=true
+              reason='governed Production DB deployment-surface change detected'
+            fi
+          fi
+
+          echo "requires_deploy=$requires_deploy" >> "$GITHUB_OUTPUT"
+          {
+            echo '### Supabase Production change gate'
+            echo
+            echo "- event: $EVENT_NAME"
+            echo "- current_sha: $CURRENT_SHA"
+            echo "- before_sha: ${BEFORE_SHA:-absent}"
+            echo "- requires_deploy: $requires_deploy"
+            echo "- reason: $reason"
+          } >> "$GITHUB_STEP_SUMMARY"
+
   deploy:
     name: deploy-migrations
+    needs: change-gate
+    if: ${{ needs.change-gate.outputs.requires_deploy == 'true' }}
     runs-on: ubuntu-24.04
     environment: production
     env:
