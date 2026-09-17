@@ -9,7 +9,8 @@ export const PRIVACY_RECONCILIATION_PLAN_SCHEMA_V1 =
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const SHA256_RE = /^sha256:[0-9a-f]{64}$/i;\nconst RECONCILIATION_DO_DELIMITER = '$myeongha_privacy_reconcile
+const SHA256_RE = /^sha256:[0-9a-f]{64}$/i;
+const RECONCILIATION_DO_DELIMITER = '$myeongha_privacy_reconcile$';
 
 function sqlLiteral(value) {
   return `'${String(value).replaceAll("'", "''")}'`;
@@ -128,6 +129,9 @@ function requireString(value, field, maxLength = 256) {
   }
   if (value.length > maxLength) fail(`${field} exceeds ${maxLength} characters`);
   if (value.includes('\u0000')) fail(`${field} must not contain a NUL byte`);
+  if (value.includes(RECONCILIATION_DO_DELIMITER)) {
+    fail(`${field} contains a reserved reconciliation SQL delimiter`);
+  }
   return value;
 }
 
