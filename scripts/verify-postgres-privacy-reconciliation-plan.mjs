@@ -213,6 +213,34 @@ mustReject(
   /unsupported fields: retentionDays/,
 );
 
+mustReject(
+  manifest([
+    {
+      ...events[0],
+      sequence: 1,
+      characterId: 'bad-$myeongha_privacy_reconcile$-delimiter',
+    },
+  ]),
+  /reserved reconciliation SQL delimiter/,
+);
+mustReject(
+  manifest([
+    {
+      ...events[7],
+      sequence: 1,
+    },
+    {
+      ...events[7],
+      eventId: '20000000-0000-4000-8000-000000000099',
+      deletionJobId: '80000000-0000-4000-8000-000000000099',
+      outboxEventId: '90000000-0000-4000-8000-000000000099',
+      requestDedupeKey: 'second-account-start',
+      sequence: 2,
+    },
+  ]),
+  /multiple ACCOUNT_DELETION_STARTED events for subject/,
+);
+
 console.log(
   'PostgreSQL privacy reconciliation replay plan verification passed: authoritative revocation/start commands only; finalization and commerce retention fail closed.',
 );
