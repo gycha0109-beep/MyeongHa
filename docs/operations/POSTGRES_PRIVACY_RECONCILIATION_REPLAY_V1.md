@@ -78,7 +78,7 @@ Those decisions remain under `P0-PR-01` / issue #964.
 
 This compiler does **not** establish where the post-backup manifest is stored.
 
-`sourceAuthority` and `sourceDigest` bind the input presented to the compiler, but the repository still lacks an owner-approved authority proving that this source survives primary PostgreSQL loss. Therefore:
+`sourceAuthority` and `sourceDigest` carry the upstream source declaration presented to the compiler. The compiler validates their presence and digest shape, but does not independently prove source storage or recompute an external source digest. The repository still lacks an owner-approved authority proving that this source survives primary PostgreSQL loss. Therefore:
 
 ```text
 durable privacy ledger source = NOT PROVEN
