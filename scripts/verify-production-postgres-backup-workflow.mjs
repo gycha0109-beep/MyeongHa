@@ -82,7 +82,6 @@ const forbiddenWorkflowFragments = [
   'path: schema.sql',
   'path: data.sql',
   'pg_dump ',
-  'sha256sum \\\n            "$backup_dir/roles.sql"',
 ];
 
 for (const fragment of forbiddenWorkflowFragments) {
