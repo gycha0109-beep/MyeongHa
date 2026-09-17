@@ -94,7 +94,10 @@ assert.equal(first.report.eventCount, 8);
 assert.equal(first.report.drReady, false);
 assert.equal(first.report.accountDeletionFinalization, 'blocked-by-P0-PR-01-and-issue-964');
 assert.equal(first.report.commerceRetentionDecision, 'blocked-by-P0-PR-01-and-issue-964');
-assert.equal(first.report.replayIdempotency, 'transactional-terminal-state-validated');\nassert.equal(first.report.outputContainsIdentifiers, false);\nassert.equal(first.report.outputContainsRowPayloads, false);\nassert.equal(Object.hasOwn(first.report, 'manifestId'), false);
+assert.equal(first.report.replayIdempotency, 'transactional-terminal-state-validated');
+assert.equal(first.report.outputContainsIdentifiers, false);
+assert.equal(first.report.outputContainsRowPayloads, false);
+assert.equal(Object.hasOwn(first.report, 'manifestId'), false);
 
 const commands = [
   'public.cmd_revoke_share_artifact_v1',
@@ -116,7 +119,12 @@ assert.ok(
   'sequence order must be authoritative even when the input array is shuffled',
 );
 assert.match(first.sql, /restore-replay-''authority/);
-assert.match(first.sql, /baek''heon/);\nassert.match(first.sql, /v_subject_status = 'deletion_pending'/);\nassert.match(first.sql, /account deletion start replay did not establish all required revocation postconditions/);\nassert.match(first.sql, /not exists \(select 1 from public\.notifications/);
+assert.match(first.sql, /baek''heon/);
+assert.match(first.sql, /v_subject_status = 'deletion_pending'/);
+assert.match(first.sql, /account deletion start replay did not establish all required revocation postconditions/);
+assert.match(first.sql, /not exists \(select 1 from public\.notifications/);
+assert.match(first.sql, /public\.outbox_events/);
+assert.match(first.sql, /for update;/);
 assert.doesNotMatch(first.sql, /\bdelete\s+from\b/i);
 assert.doesNotMatch(first.sql, /\btruncate\b/i);
 assert.doesNotMatch(first.sql, /\bupdate\s+public\./i);
