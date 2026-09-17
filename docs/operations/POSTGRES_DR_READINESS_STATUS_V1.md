@@ -62,3 +62,27 @@ Promotion requires all of the following authority changes to be reviewed togethe
 5. The #389 closure contract is updated with the exact evidence and only then may DR readiness be reconsidered.
 
 `scripts/verify-postgres-dr-readiness-authority.mjs` fail-closes repository CI while the canonical authority remains in the current OPEN state.
+
+
+## Privacy reconciliation replay foundation
+
+A policy-neutral replay planner now exists at:
+
+```text
+scripts/build-postgres-privacy-reconciliation-plan.mjs
+```
+
+It can deterministically compile post-backup account-deletion-start and revocation events into existing idempotent PostgreSQL command calls. Direct destructive DML, account deletion finalization, and commerce retention decisions are outside the planner and fail closed.
+
+This advances recovery mechanics but does not remove the promotion blockers:
+
+```text
+revocation replay plan mechanics   = implemented
+durable post-backup source authority = not proven
+destructive account finalization   = blocked by P0-PR-01 / #964
+commerce legal retention           = blocked by P0-PR-01 / #964
+privacy reconciliation drill       = not yet executed against restored DB
+DR Ready                           = false
+```
+
+The planner output report is identifier-free; the executable SQL contains required resource identifiers and must remain an ephemeral operator artifact rather than uploaded DR evidence.
