@@ -62,11 +62,22 @@ begin
         'FAIL % unexpectedly has EXECUTE on internal EntitlementEffect apply',
         v_role;
     end if;
+
+    if pg_catalog.has_function_privilege(
+      v_role,
+      'public.internal_apply_verified_receipt_capability_effects_v1(uuid,text[],timestamptz[],timestamptz[],timestamptz[],text[])'::pg_catalog.regprocedure,
+      'EXECUTE'
+    ) then
+      raise exception
+        'FAIL % unexpectedly has EXECUTE on internal verified Receipt Capability batch apply',
+        v_role;
+    end if;
   end loop;
 
   raise notice 'PASS ordinary API role has no direct entitlement Grant/Event/projection mutation authority';
   raise notice 'PASS ordinary API role cannot execute internal entitlement projection recompute';
   raise notice 'PASS client/API roles cannot execute internal EntitlementEffect apply';
+  raise notice 'PASS PUBLIC/client/API inheritance cannot execute internal verified Receipt Capability batch apply';
 end;
 $$;
 
