@@ -3,12 +3,11 @@
 > Scope: non-character production operations only  
 > Issue: `#389` — authoritative persistent-data recovery  
 > Evidence date: 2026-09-18 KST  
-> Path B repository update: 2026-09-18 KST  
 > Production state: BACKUP PRODUCTION-PROVEN / RESTORE NOT YET PASSED
 
 ## 1. Current production authority
 
-Fresh control-plane evidence at the time this runbook was introduced:
+Current production authority:
 
 - Supabase project ref: `cnsfpcdiyofqvhpcegfc`
 - Project state: `ACTIVE_HEALTHY`
@@ -16,11 +15,7 @@ Fresh control-plane evidence at the time this runbook was introduced:
 - PostgreSQL: `17.6.1.166` / engine 17
 - Current Supabase organization plan: `free`
 
-Current Supabase backup documentation states that automatic daily backups are provided to Pro, Team, and Enterprise projects and recommends regular `supabase db dump` exports plus off-site retention for Free projects.
-
-Therefore this repository does **not** treat provider health, an assumed dashboard backup, or an undocumented platform snapshot as recovery evidence.
-
-Current operating classification:
+The repository does not treat provider health, an assumed dashboard backup, or an undocumented platform snapshot as recovery evidence. Current operating classification:
 
 ```text
 provider automatic daily backup = NOT RELIED UPON ON CURRENT FREE PLAN
@@ -29,12 +24,12 @@ PITR                            = NOT AVAILABLE UNDER THE CURRENT FREE-PLAN OPER
 application-owned logical dump  = IMPLEMENTED BY REPOSITORY WORKFLOW
 successful production dump      = EVIDENCED — run 35260191079
 isolated restore drill path     = IMPLEMENTED / EXECUTED
-isolated restore                = NOT YET EVIDENCED — latest run 35268484039 reached schema restore, then stopped on application-owner replay authority
+isolated restore                = NOT YET EVIDENCED — run 35271689987 reached provider-managed data replay and exposed Auth schema-version skew
 RPO                             = OPEN DECISION
 RTO                             = OPEN DECISION
 ```
 
-Restore drill: EXECUTED / NOT YET PASSED
+Restore drill: EXECUTED / NOT YET PASSED.
 
 ## 2. Backup contract
 
@@ -49,56 +44,44 @@ Triggers:
 - scheduled daily at `18:17 UTC` (`03:17 KST`)
 - explicit `workflow_dispatch`
 
-The schedule is a backup frequency, **not an approved RPO**.
+The schedule is a backup frequency, not an approved RPO.
 
-The workflow supports two governed endpoint-resolution modes:
+Endpoint resolution has two governed modes:
 
-1. **explicit Session Pooler path — preferred when provisioned**
-   - reads `SUPABASE_PRODUCTION_SESSION_POOLER_HOST` from the protected GitHub `production` environment;
-   - accepts only a bare `*.pooler.supabase.com` hostname;
-   - derives `postgres.<project-ref>` / port `5432` / database `postgres` inside the workflow;
-   - keeps `SUPABASE_DB_PASSWORD` as the only database password authority;
-   - does not require the Supabase Management API merely to discover the endpoint;
-2. **Management API fallback**
-   - when the explicit host secret is absent, requires `SUPABASE_ACCESS_TOKEN`;
-   - resolves the production PRIMARY session-pooler connection metadata from the Supabase Management API;
-   - validates the returned user/host/port/database tuple before use.
+1. preferred explicit Session Pooler host from protected `SUPABASE_PRODUCTION_SESSION_POOLER_HOST`;
+2. Supabase Management API fallback when the explicit host is absent.
 
-The exact Session Pooler host must come from an operator-controlled Supabase Connect surface or another directly verified provider source. The repository must never guess a pooler cluster hostname from region or project ref.
+The workflow validates the resolved user/host/port/database tuple and never guesses a pooler hostname. `SUPABASE_DB_PASSWORD` remains the database-password authority.
 
-After endpoint resolution, the workflow:
+The backup workflow:
 
-1. uses the production database administrator credential only inside the protected GitHub `production` environment;
-2. runs a pinned stable Supabase CLI version;
-3. constructs the credential-bearing database URL only in runner memory, percent-encodes the password, and masks the complete URL before use;
-4. exports `roles.sql`, `schema.sql`, and `data.sql` using Supabase-supported dump commands;
-5. records SHA-256 checksums of plaintext dump files inside the protected archive;
-6. creates a manifest containing project ref, exact repository SHA, CLI version, and UTC timestamps;
-7. encrypts the archive before upload using AES-256-CBC + PBKDF2;
-8. deletes the plaintext archive before artifact publication;
-9. uploads only the encrypted archive, its encrypted checksum, and a non-sensitive manifest;
+1. uses production credentials only inside the protected GitHub `production` environment;
+2. uses pinned Supabase CLI `2.117.0`;
+3. constructs and masks the credential-bearing URL only in runner memory;
+4. exports `roles.sql`, `schema.sql`, and `data.sql` using the Supabase CLI backup recipe;
+5. records SHA-256 checksums of plaintext dump members;
+6. records project ref, exact source SHA, CLI version, and UTC timestamps;
+7. encrypts the archive with AES-256-CBC + PBKDF2 before upload;
+8. deletes the plaintext archive before publication;
+9. uploads only the encrypted archive, encrypted checksum, and non-sensitive public manifest;
 10. retains the GitHub Actions artifact for 30 days.
 
-The GitHub artifact is **off-Supabase** and therefore protects against a Supabase-only failure. It is not treated as a fully independent administrative/security domain from the source repository. A separate object-storage/account boundary may be required later if repository-account compromise or deletion is within the approved disaster model.
+The GitHub artifact is off-Supabase. It protects against a Supabase-only failure, but is not a separate administrative/security domain from the repository account.
 
 ## 3. Required credentials
 
-Primary production database inputs:
+Primary database inputs:
 
 ```text
 SUPABASE_DB_PASSWORD
 SUPABASE_PRODUCTION_SESSION_POOLER_HOST
 ```
 
-`SUPABASE_PRODUCTION_SESSION_POOLER_HOST` is the preferred Path B endpoint input. It contains only the exact Session Pooler host, not a scheme, username, password, port, path, query, fragment, or complete connection string.
-
-Management API fallback input:
+Management API fallback:
 
 ```text
 SUPABASE_ACCESS_TOKEN
 ```
-
-The access token is required only when the explicit Session Pooler host is absent. A configured explicit host therefore allows backup/database operations to avoid Management API endpoint-discovery authorization while preserving the existing fallback path.
 
 Backup-only secret:
 
@@ -106,28 +89,18 @@ Backup-only secret:
 MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE
 ```
 
-Pooler-host rules:
+Rules:
 
-- store only as a protected GitHub `production` environment secret;
-- value must be a bare hostname ending in `.pooler.supabase.com`;
-- do not include `postgresql://`, credentials, `:5432`, `/postgres`, query parameters, fragments, or whitespace;
-- do not infer or fabricate the pooler cluster index;
-- do not place the real host in repository files, issue comments, public logs, or client/runtime configuration;
-- changing the provider-side pooler endpoint requires updating the environment secret before the next governed run.
+- pooler host must be a bare `*.pooler.supabase.com` hostname from an operator-verified Supabase surface;
+- never commit or log the real host, password, access token, or passphrase;
+- backup passphrase must be at least 32 characters and must not reuse the database password;
+- recovery operators need a break-glass path to the passphrase that does not depend on the database being healthy.
 
-Backup-passphrase rules:
-
-- minimum 32 characters;
-- store only as a protected GitHub production environment secret;
-- do not reuse the database password;
-- do not place it in repository files, issue comments, logs, artifacts, or Vercel client/runtime configuration;
-- recovery operators must have a documented break-glass path to the passphrase that does not depend on the database being healthy.
-
-The required production endpoint and backup secret are now production-proven by successful backup run `35260191079`. That evidence does not by itself close `#389`; isolated restore, privacy reconciliation, and approved RPO/RTO evidence remain required.
+The credentials and endpoint path are production-proven by successful backup run `35260191079`.
 
 ## 4. Backup success evidence
 
-A backup point is admissible for a drill only when all of the following are available from one workflow run:
+A backup point is admissible only when one successful workflow run provides:
 
 ```text
 workflow run ID
@@ -139,166 +112,164 @@ manifest project_ref == cnsfpcdiyofqvhpcegfc
 workflow conclusion == success
 ```
 
-A repository workflow definition without such a successful run is implementation evidence, not backup evidence.
+Governed source backup for the current drill series:
 
-Backup failure observability for v1 is the scheduled GitHub Actions workflow conclusion. A failed or missing scheduled run must be treated as a production operations alert until a dedicated alerting sink is approved.
+```text
+run ID        35260191079
+artifact ID   10513872847
+artifact      myeongha-postgres-20260917T184004Z
+source SHA    ef61941313ee3a870076847c5dfb5c1b05ba4159
+ZIP digest    sha256:601fbbac6149d960789e9500e8299f73ab3b0659a8201d4c60fa94ff73a7b9f8
+retention     30 days
+```
+
+Backup failure observability for v1 is the scheduled GitHub Actions workflow conclusion. A failed or missing scheduled run remains an operations alert until a dedicated alerting sink is approved.
 
 ## 5. Restore target rule
 
-For a recovery drill, never restore directly over the serving production project.
+Never restore a drill directly over serving production.
 
-Use an isolated target that is explicitly designated for recovery testing. Preferred order:
+Preferred target order:
 
-1. isolated Supabase recovery project with compatible PostgreSQL/Supabase capabilities; or
-2. an explicitly approved isolated Supabase-compatible/self-hosted target when the purpose is portability validation.
+1. isolated Supabase recovery project with compatible capabilities;
+2. explicitly approved Supabase-compatible/self-hosted target for portability validation.
 
-Creating a paid project/branch or other billable resource requires the normal cost approval flow before creation.
+Billable recovery projects or branches require normal cost approval before creation.
 
-Before restore, record:
-
-```text
-drill_id
-source backup workflow run ID
-source backup UTC point
-source exact SHA
-target project/database identifier
-target PostgreSQL version
-restore operator
-restore_start_utc
-```
-
-### 5.1 Repository-isolated restore drill workflow
-
-The repository provides an executable, **manual-only** restore portability path:
+The repository manual drill is:
 
 ```text
 .github/workflows/postgres-isolated-restore-drill.yml
 ```
 
-Its target is **GitHub Actions loopback Supabase PostgreSQL 17.6.1.166**. The service image is pinned to the same Supabase PostgreSQL release family as the production project so the isolated target contains the closest repository-controlled Supabase platform role and extension baseline available for this portability drill. The workflow does not accept a remote restore database URL. The restore harness hardcodes two loopback-only connections:
+It is **manual-only** and targets **GitHub Actions loopback Supabase PostgreSQL 17.6.1.166**. It does not accept a remote restore database URL.
+
+Fixed loopback connections:
 
 ```text
-postgresql://supabase_admin:restore-drill@127.0.0.1:5432/postgres  # privileged logical replay only
+postgresql://supabase_admin:restore-drill@127.0.0.1:5432/postgres  # privileged replay only
 postgresql://postgres:restore-drill@127.0.0.1:5432/postgres        # post-restore validation
 ```
 
-The `supabase_admin` connection is an ephemeral credential created inside the isolated service container from the fixed drill password. It is not a production credential or production endpoint. The harness first verifies that this exact loopback principal is `supabase_admin` and is superuser before using it for roles/schema/data replay. Final structural, ownership, and authorization checks use the ordinary loopback `postgres` principal.
+The drill never receives the production database password, production pooler host, or production access token. It receives only the protected backup decryption passphrase after GitHub has validated the selected backup run and exact artifact authority.
 
-The workflow requires:
+## 6. Restore drill runtime history
 
-- a numeric successful backup workflow run ID;
-- a canonical synthetic incident/reference UTC timestamp;
-- the protected backup passphrase from the `production` environment.
+Observed evidence:
 
-Before any decryption, it verifies that the selected source run is exactly the repository's successful `Production PostgreSQL Logical Backup` workflow on `main`, and that exactly one non-expired governed backup artifact exists. It then downloads that exact artifact, verifies ciphertext and plaintext checksums plus both manifests, restores only into the loopback Supabase PostgreSQL service container, runs baseline structural/ownership/authorization checks, and uploads only a JSON evidence artifact.
+- `35261643085`: source-run/artifact authority passed; historical plaintext checksum entries used producer-runner absolute paths. PR `#934` normalized the three governed dump members by basename and changed future checksums to relative paths.
+- `35264061319`: ciphertext and all plaintext checksums passed; vanilla PostgreSQL lacked the Supabase `anon` role baseline. PR `#936` moved the drill to Supabase PostgreSQL `17.6.1.166`.
+- `35265689965`: Supabase image initialized and MyeongHa role creation progressed; hosted-only `supabase_realtime_admin` was absent. PR `#940` made provider-managed role replay fail-closed and provider-aware without fabricating roles.
+- `35268484039`: role boundary passed; schema replay reached MyeongHa owner assignment and failed because demoted `postgres` could not `SET ROLE` to the dumped application owner. PR `#946` separated loopback `supabase_admin` replay from ordinary `postgres` validation.
+- `35270505668`: privileged replay progressed through the new owner boundary, then two MyeongHa role-membership statements failed only because the dump preserved `GRANTED BY "postgres"` provenance. PR `#950` normalizes only exact `myeongha_* -> myeongha_*` grantor provenance and verifies the resulting membership plus `INHERIT` state through `pg_auth_members`.
+- `35271689987`: #950 role replay passed and `schema.sql` completed. `data.sql` then failed on the first incompatible hosted-Auth COPY shape: the source `auth.audit_log_entries` COPY contained `ip_address`, while the pinned loopback provider baseline did not have that target column. Archive integrity, source authority, role handling, and application schema replay had already passed.
 
-Decrypted SQL/data files are not uploaded.
+The last failure is a provider schema-version mismatch, not corruption of the governed backup and not a MyeongHa application-schema failure.
 
-Runtime evidence as of 2026-09-18 KST:
+Current Supabase self-hosted restore guidance explicitly warns that platform projects may run newer Auth/Storage schema revisions than a self-hosted target. It lists missing provider tables/columns in `data.sql` as a known restore incompatibility and recommends excluding the incompatible COPY block before the final single-transaction restore.
 
-- run `35261643085` proved source-run/artifact authority but failed before SQL restore because historical plaintext checksum entries contained producer-runner absolute paths; PR `#934` normalized historical entries and made future backup checksums portable;
-- run `35264061319` proved ciphertext and all three plaintext dump checksums pass, then failed when `roles.sql` attempted `ALTER ROLE "anon"` against a vanilla `postgres:17.6` service that lacked the Supabase platform-role baseline;
-- PR `#936` moved the drill to the production-family Supabase PostgreSQL `17.6.1.166` image;
-- run `35265689965` proved that image initializes successfully, backup authority and all checksums still pass, and all declared `myeongha_*` role creation reached execution. It then stopped at `GRANT SET ON PARAMETER "log_min_messages" TO "supabase_realtime_admin"` because that hosted provider-managed `supabase_*` role is absent from this self-hosted image revision;
-- PR `#940` made role replay provider-aware without fabricating absent `supabase_*` roles;
-- run `35268484039` proved the #940 boundary works: the absent `supabase_realtime_admin` difference was classified and tolerated, all governed checksums passed, all declared MyeongHa roles were restored, and schema replay began. It then stopped at `ALTER FUNCTION ... OWNER TO "myeongha_content_publication_owner"` because this Supabase image deliberately demotes `postgres` from superuser and that restore connection could not `SET ROLE` to the application owner.
+## 7. Role, schema, and provider-data portability boundary
 
-The role and restore-principal boundary is therefore explicit:
+### 7.1 Roles
 
-- every role created by the governed role dump for this application must be a `myeongha_*` application role and must exist after role restore;
-- application roles must remain non-superuser and non-BYPASSRLS;
-- the drill **must not fabricate missing provider-managed roles** merely to make a dump replay green;
-- a statement may be tolerated only when PostgreSQL reports the exact error shape `role "supabase_*" does not exist` for a provider-managed `supabase_*` role that is absent from the isolated target baseline;
-- every other role restore SQL error is fatal;
-- absent provider-managed role names are recorded in restore evidence;
-- privileged replay is allowed only through the fixed loopback `supabase_admin` created by the isolated Supabase service image;
-- schema and data restore remain fully fail-closed with `ON_ERROR_STOP=1`;
-- post-restore verification is performed through the ordinary loopback `postgres` principal and verifies a representative application-owner binding.
+- every role created by the governed role dump for this application must be a `myeongha_*` application role;
+- application roles must restore exactly once and remain non-superuser/non-BYPASSRLS;
+- the drill **must not fabricate missing provider-managed roles**;
+- only the exact missing-role error shape for an absent provider-managed `supabase_*` role may be classified as a target-baseline difference;
+- every other role replay error is fatal;
+- only exact MyeongHa-to-MyeongHa membership statements may have hosted `GRANTED BY "postgres"` provenance removed, and the resulting membership/INHERIT state is verified afterwards.
 
-This boundary treats the isolated target's provider-managed role baseline as authoritative for provider internals while requiring MyeongHa-owned authorization and object ownership state to restore exactly. The privileged replay principal exists only to reproduce the logical dump's owner metadata and `session_replication_role` behavior; it is not evidence that serving application traffic may use a privileged principal.
+### 7.2 Schema
 
-Until a subsequent run reaches successful schema/data restore and validation, isolated restore remains NOT EVIDENCED.
+`schema.sql` is replayed under the fixed loopback `supabase_admin` principal with `--single-transaction` and `ON_ERROR_STOP=1`. MyeongHa object ownership is then validated through ordinary loopback `postgres`.
 
-A successful loopback restore may evidence restore portability, basic structure, ownership, and baseline role safety; it does not by itself establish that a recovered state is safe to serve. In particular, privacy reconciliation is not exercised by the workflow, and full RTO remains open until the post-backup deletion/revocation reconciliation procedure is exercised and verified.
+### 7.3 Data
 
-## 6. Download, verify, and decrypt
+The original `data.sql` is always decrypted and checksum-verified **before any portability transformation**. The original file is never modified or uploaded.
 
-After downloading the chosen artifact to the controlled recovery environment:
+After schema replay, the harness snapshots the isolated target column catalog and creates an ephemeral `data.portable.sql`:
 
-```bash
-sha256sum -c myeongha-postgres-*.tar.gz.enc.sha256
+- application-owned `public` COPY blocks are fail-closed: a missing target relation, missing source column, or required unbacked target column is fatal;
+- a provider-managed COPY block is replayed when its COPY column shape is compatible with the isolated target;
+- only an incompatible provider-managed COPY block may be omitted from the loopback portability replay;
+- every omission is recorded as schema/table metadata and reason in JSON evidence; no row contents are emitted;
+- the transformation is generic and must not hardcode a specific Auth/Storage table or column discovered by a previous failure;
+- compatible provider data continues to replay, including `auth.users`;
+- `auth.users` is mandatory for this drill because `public.subjects.auth_user_id` has a foreign key to it;
+- after data replay, `subjects.auth_user_id` must have zero dangling references to `auth.users`;
+- final data replay remains `--single-transaction`, `ON_ERROR_STOP=1`, with `session_replication_role=replica`.
 
-openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 \
-  -in myeongha-postgres-*.tar.gz.enc \
-  -out myeongha-postgres-restore.tar.gz \
-  -pass env:MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE
-
-tar -xzf myeongha-postgres-restore.tar.gz
-sha256sum -c plaintext-sha256.txt
-```
-
-Stop immediately on any checksum/decryption mismatch.
-
-Do not upload decrypted dump files back into GitHub Actions artifacts.
-
-## 7. Isolated restore procedure
-
-Follow the current Supabase backup/restore guidance for the target environment. The repository harness performs the logical restore in three governed phases using the validated loopback `supabase_admin` replay principal:
+A successful run that omitted any incompatible provider-managed COPY block must record:
 
 ```text
-roles.sql  -> restore MyeongHa application roles; classify only absent supabase_* provider roles as target-baseline differences
-schema.sql -> single transaction, ON_ERROR_STOP=1; preserve dumped application object owners
-data.sql   -> single transaction, session_replication_role=replica, ON_ERROR_STOP=1
+provider_managed_data_full_restore = false
 ```
 
-The provider-managed role exception is deliberately narrower than ignoring role-dump failures: unknown role creation, any non-`supabase_*` missing role, privilege errors, syntax errors, connection errors, schema errors, and data errors remain fatal. After replay, structural, representative owner, and authorization checks are performed through the ordinary loopback `postgres` principal.
+Such a run may prove application-data portability and application-critical Auth identity continuity, but it is **not** evidence of full provider-managed Auth/Storage data recovery. The encrypted source artifact still contains the original provider data; the omission applies only to this self-hosted loopback validation path.
 
-Before executing:
+This distinction prevents a green portability drill from being mislabeled as full Supabase-platform DR.
 
-- enable required non-default extensions on the isolated target;
-- confirm target version compatibility;
-- ensure the target contains no production-serving traffic;
-- review any Supabase-managed schema/version differences called out by current Supabase guidance.
+## 8. Download, verify, and decrypt
 
-After restore:
+Controlled recovery environments must verify ciphertext before decrypting and verify all governed plaintext members before replay. Historical absolute producer paths are normalized only to the approved basenames:
 
-- reset passwords for any restored custom LOGIN roles as required by Supabase guidance;
-- recreate provider-level settings that are outside the logical database dump only when needed for an explicitly approved recovery target, not merely to force this portability drill green;
-- do not copy production provider secrets into the isolated drill unless an explicit test requires them.
+```text
+roles.sql
+schema.sql
+data.sql
+```
 
-## 8. Integrity verification
+Stop on any checksum/decryption/member mismatch. Decrypted SQL/data files and the ephemeral portable replay file must never be uploaded as Actions artifacts.
 
-The drill is not successful when `psql` merely exits zero.
+## 9. Integrity verification
+
+A drill is not successful merely because `psql` exits zero.
 
 At minimum verify:
 
-1. expected application schemas/tables/functions exist;
-2. migrations/authority functions required by the current production SHA are present;
-3. representative critical row counts are internally consistent;
-4. foreign-key / ownership relationships used by current product authority remain valid;
-5. no unexpected orphan ownership rows are introduced;
-6. restored data can be read through the same governed database authority path used by the application;
-7. authentication/account data required by the chosen restore target is verified explicitly rather than assumed from the dump format.
+1. required application tables/functions exist;
+2. representative application object ownership is restored;
+3. application roles and role memberships remain within the governed authorization model;
+4. `auth.users` was included in compatible provider replay;
+5. `subjects.auth_user_id` has zero dangling references;
+6. provider-managed COPY omissions, if any, are recorded explicitly;
+7. no user-owned row contents are emitted to GitHub logs or evidence artifacts.
 
-Record exact queries and summarized counts in the drill evidence. Do not publish user-owned row contents in GitHub logs or issue comments.
+Current baseline required tables:
 
-## 9. Authorization verification
+```text
+subjects
+birth_profiles
+products
+product_offers
+data_deletion_jobs
+```
 
-Before a restored state is considered usable, run negative and positive authorization checks against the isolated target:
+Current representative owner check:
 
+```text
+public.cmd_activate_content_release_v1(uuid,boolean)
+owner == myeongha_content_publication_owner
+```
+
+## 10. Authorization verification
+
+Before a restored state can be considered usable, verify at minimum:
+
+- the production API execution role remains non-superuser and non-BYPASSRLS;
+- MyeongHa application roles were restored exactly as governed;
+- application membership/INHERIT edges normalized for grantor portability still match the source authority;
+- application object ownership required by current runtime authority is intact;
 - arbitrary client-supplied subject identifiers cannot become owner authority;
-- one subject cannot read another subject's protected rows;
-- the production API execution role model remains non-superuser and non-BYPASSRLS where applicable;
-- current owner resolution and relevant command/query authorities still fail closed;
-- any temporary recovery credential is removed after the drill.
+- one subject cannot read another subject's protected rows.
 
-A data restore without authorization verification does not satisfy `#389`.
+The loopback workflow currently verifies only the database-level baseline subset. Broader serving-path authorization and privacy reconciliation remain separate closure gates.
 
-## 10. Privacy / deletion reconciliation before any recovered state can serve
+## 11. Privacy / deletion reconciliation before serving
 
-A historical backup can contain data that was deleted or access that was revoked after the backup point. Therefore a restored state must never be promoted to serving production immediately after database restore.
+A historical backup can contain data deleted or access revoked after the backup point. A restored state must never be promoted directly to serving production.
 
-Recovery reconciliation must account for the authoritative deletion/access history that is newer than the backup point, including the applicable current implementation of:
+Recovery reconciliation must account for authoritative post-cutoff deletion/revocation state, including the applicable implementation of:
 
 ```text
 data_deletion_jobs / deletion tombstones or successor authority
@@ -306,23 +277,21 @@ revoked share artifacts
 revoked memory / record access grants
 device installation and notification revocation state
 account lifecycle / merged/deleted subject state
-commerce records that must be retained only under their governing legal/product policy
+commerce records retained only under governing legal/product policy
 ```
 
 Procedure:
 
-1. establish the backup cutoff timestamp;
-2. establish the authoritative post-cutoff deletion/revocation ledger available outside or after the recovered snapshot;
-3. replay or reconcile those deletions/revocations against the isolated restored state;
-4. verify affected records/access are absent or disabled;
+1. establish backup cutoff timestamp;
+2. establish an authoritative post-cutoff deletion/revocation ledger;
+3. replay/reconcile deletions and revocations against the isolated state;
+4. verify affected records/access remain absent or disabled;
 5. separately verify legally retained commerce records are retained only as permitted;
-6. only after reconciliation may a recovered state be considered for serving traffic.
+6. only then consider a recovered state for serving traffic.
 
-If no independent post-cutoff deletion/revocation evidence exists, record that as a blocking recovery gap rather than silently serving the historical state.
+If no independent post-cutoff evidence exists, record that as a blocking gap. **privacy reconciliation is not exercised by the workflow**.
 
-## 11. RPO / RTO evidence
-
-Architecture does not derive business objectives from whichever provider feature happens to exist.
+## 12. RPO / RTO evidence
 
 Current decision state:
 
@@ -331,12 +300,12 @@ RPO: OPEN DECISION
 RTO: OPEN DECISION
 ```
 
-The daily workflow provides a nominal maximum interval between successful scheduled backup attempts of 24 hours, but this is **not** an approved RPO and does not account for a failed run.
+Daily backup frequency is not an approved RPO.
 
-Each drill must record:
+Each completed drill must record:
 
 ```text
-incident/reference time (synthetic for drill)
+incident/reference time
 selected backup completed_at_utc
 restore_start_utc
 restore_database_complete_utc
@@ -347,7 +316,7 @@ achieved recovery duration
 achieved data-loss window
 ```
 
-Definitions for evidence reporting:
+Definitions:
 
 ```text
 achieved recovery duration
@@ -357,21 +326,21 @@ achieved data-loss window
 = incident/reference time - selected backup completed_at_utc
 ```
 
-The loopback restore workflow records an isolated restore/validation duration and a synthetic data-loss-window candidate. Those are diagnostic drill metrics, not a full achieved RTO, because privacy/deletion reconciliation is deliberately not automated in that workflow.
+The loopback workflow may record an isolated restore/validation duration and data-loss-window candidate. Those are diagnostic metrics, not a full achieved RTO, because privacy/deletion reconciliation is deliberately outside this workflow.
 
-Only after business-approved RPO/RTO values are recorded may the measured values be labeled PASS/FAIL against those objectives.
+Only business-approved RPO/RTO values may be compared as PASS/FAIL.
 
-## 12. #389 closure gate
+## 13. #389 closure gate
 
 Do not close `#389` until all are evidenced:
 
-- [x] backup encryption secret provisioned through the production control plane
+- [x] backup encryption secret provisioned through production control plane
 - [x] exact Production Session Pooler endpoint path provisioned or Management API fallback authorization restored
-- [x] at least one actual production logical backup run succeeded
-- [x] actual backup schedule and 30-day artifact retention evidenced from runtime
-- [x] current provider plan / automatic backup / PITR state recorded
+- [x] actual production logical backup succeeded
+- [x] backup schedule and 30-day artifact retention evidenced
+- [x] provider plan / automatic backup / PITR state recorded
 - [x] backup failure observability verified
-- [x] exact backup point selected for a drill
+- [x] exact backup point selected
 - [ ] isolated restore completed
 - [ ] integrity verification passed
 - [ ] authorization verification passed
@@ -381,7 +350,7 @@ Do not close `#389` until all are evidenced:
 - [ ] RPO approved and compared with achieved evidence
 - [ ] RTO approved and compared with achieved evidence
 
-Until then:
+Until all closure gates are satisfied:
 
 ```text
 DR Ready = FALSE / NOT EVIDENCED

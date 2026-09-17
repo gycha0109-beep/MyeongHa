@@ -110,11 +110,11 @@ const requiredRunbookFragments = [
   'RPO: OPEN DECISION',
   'RTO: OPEN DECISION',
   'SUPABASE_PRODUCTION_SESSION_POOLER_HOST',
-  'exact Session Pooler host',
+  'preferred explicit Session Pooler host',
   'Management API fallback',
   'MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE',
   'data_deletion_jobs',
-  'never restore directly over the serving production project',
+  'Never restore a drill directly over serving production.',
   'achieved recovery duration',
   'achieved data-loss window',
 ];
