@@ -17,8 +17,14 @@ if [[ ! "$EXPECTED_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
 fi
 
 # Safety invariant: this harness has no remote restore target input.
-# It can only connect to the ephemeral PostgreSQL service exposed on loopback.
+# Both connections are fixed to the ephemeral Supabase PostgreSQL service on loopback.
+# supabase_admin is used only for privileged logical replay; ordinary postgres is used
+# for post-restore validation so evidence does not depend on a superuser reader.
 readonly RESTORE_DATABASE_URL='postgresql://postgres:restore-drill@127.0.0.1:5432/postgres'
+readonly RESTORE_ADMIN_DATABASE_URL='postgresql://supabase_admin:restore-drill@127.0.0.1:5432/postgres'
+
+[[ "$(psql "$RESTORE_ADMIN_DATABASE_URL" -At --set ON_ERROR_STOP=1 -c \
+  "select current_user = 'supabase_admin' and rolsuper from pg_roles where rolname = current_user;")" == 't' ]]
 
 shopt -s nullglob
 archives=("$BACKUP_ARTIFACT_DIR"/*.tar.gz.enc)
@@ -134,7 +140,7 @@ fi
 roles_stdout="$work_dir/roles-restore.stdout"
 roles_stderr="$work_dir/roles-restore.stderr"
 set +e
-psql "$RESTORE_DATABASE_URL" --set ON_ERROR_STOP=0 --set VERBOSITY=terse \
+psql "$RESTORE_ADMIN_DATABASE_URL" --set ON_ERROR_STOP=0 --set VERBOSITY=terse \
   --file "$work_dir/roles.sql" >"$roles_stdout" 2>"$roles_stderr"
 roles_psql_status=$?
 set -e
@@ -181,15 +187,19 @@ if [[ ${#provider_managed_roles_absent[@]} -gt 0 ]]; then
   printf 'Provider-managed roles absent from isolated target and not fabricated: %s\n' "${provider_managed_roles_absent[*]}"
 fi
 
-psql "$RESTORE_DATABASE_URL" --single-transaction --set ON_ERROR_STOP=1 --file "$work_dir/schema.sql"
-psql "$RESTORE_DATABASE_URL" --single-transaction --set ON_ERROR_STOP=1 \
+psql "$RESTORE_ADMIN_DATABASE_URL" --single-transaction --set ON_ERROR_STOP=1 --file "$work_dir/schema.sql"
+psql "$RESTORE_ADMIN_DATABASE_URL" --single-transaction --set ON_ERROR_STOP=1 \
   --command 'SET session_replication_role = replica' --file "$work_dir/data.sql"
 
-# Baseline structural and authorization checks. No user-owned row contents are emitted.
+# Baseline structural and authorization checks run through the ordinary postgres
+# principal rather than the privileged replay principal. No user-owned row contents
+# are emitted.
 for table_name in subjects birth_profiles products product_offers data_deletion_jobs; do
   [[ "$(psql "$RESTORE_DATABASE_URL" -At --set ON_ERROR_STOP=1 -c "select to_regclass('public.${table_name}') is not null;")" == 't' ]]
 done
 [[ "$(psql "$RESTORE_DATABASE_URL" -At --set ON_ERROR_STOP=1 -c "select count(*) from pg_roles where rolname='myeongha_api_executor' and not rolsuper and not rolbypassrls;")" == '1' ]]
+[[ "$(psql "$RESTORE_DATABASE_URL" -At --set ON_ERROR_STOP=1 -c \
+  "select r.rolname from pg_proc p join pg_roles r on r.oid = p.proowner where p.oid = to_regprocedure('public.cmd_activate_content_release_v1(uuid,boolean)');")" == 'myeongha_content_publication_owner' ]]
 
 restore_completed_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
 restore_completed_epoch="$(date -u +%s)"
@@ -212,12 +222,15 @@ jq -n \
     source_sha: $source_sha,
     project_ref: $project_ref,
     restore_target: "github-actions-loopback-supabase-postgres",
+    restore_execution_principal: "supabase_admin-loopback-only",
+    post_restore_validation_principal: "postgres-loopback-only",
     restore_server_version: $restore_server_version,
     restore_started_at_utc: $restore_started_at_utc,
     restore_completed_at_utc: $restore_completed_at_utc,
     isolated_restore_validation_duration_seconds: $isolated_restore_validation_duration_seconds,
     archive_integrity: "pass",
     application_role_restore: "pass",
+    application_owner_restore: "pass",
     provider_managed_role_policy: "target-baseline-authoritative-no-fabrication",
     provider_managed_roles_absent_from_target: $provider_managed_roles_absent_from_target,
     required_tables: "pass",
