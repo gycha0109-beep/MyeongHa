@@ -128,7 +128,7 @@ for (const fragment of forbiddenHarnessFragments) {
 
 const requiredRunbookFragments = [
   '.github/workflows/postgres-isolated-restore-drill.yml',
-  'GitHub Actions loopback PostgreSQL 17.6',
+  'GitHub Actions loopback Supabase PostgreSQL 17.6.1.166',
   'manual-only',
   'does not accept a remote restore database URL',
   'privacy reconciliation is not exercised by the workflow',
