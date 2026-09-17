@@ -22,24 +22,24 @@ concurrency:
 
 jobs:
   restore-drill:
-    name: isolated-postgres-17-restore
+    name: isolated-supabase-postgres-17-restore
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     environment: production
     services:
       postgres:
-        image: postgres:17.6
+        image: ghcr.io/supabase/postgres:17.6.1.166
         env:
-          POSTGRES_USER: postgres
           POSTGRES_PASSWORD: restore-drill
           POSTGRES_DB: postgres
         ports:
           - 5432:5432
         options: >-
           --health-cmd "pg_isready -U postgres -d postgres"
-          --health-interval 10s
+          --health-interval 5s
           --health-timeout 5s
-          --health-retries 5
+          --health-retries 12
+          --health-start-period 30s
     env:
       EXPECTED_PROJECT_REF: cnsfpcdiyofqvhpcegfc
       MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE: ${{ secrets.MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE }}
@@ -180,7 +180,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          echo 'restore_target=github-actions-loopback-postgres'
+          echo 'restore_target=github-actions-loopback-supabase-postgres'
           echo 'isolated_restore=success'
           echo 'privacy_reconciliation=not_exercised_by_this_workflow'
           echo 'dr_ready=false'

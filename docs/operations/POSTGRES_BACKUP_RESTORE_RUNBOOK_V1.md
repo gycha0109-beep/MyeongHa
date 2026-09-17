@@ -2,9 +2,9 @@
 
 > Scope: non-character production operations only  
 > Issue: `#389` — authoritative persistent-data recovery  
-> Evidence date: 2026-09-09 KST  
+> Evidence date: 2026-09-18 KST  
 > Path B repository update: 2026-09-18 KST  
-> Production state: IMPLEMENTED / NOT YET PRODUCTION-PROVEN
+> Production state: BACKUP PRODUCTION-PROVEN / RESTORE NOT YET PASSED
 
 ## 1. Current production authority
 
@@ -27,14 +27,14 @@ provider automatic daily backup = NOT RELIED UPON ON CURRENT FREE PLAN
 provider retention              = NOT RELIED UPON ON CURRENT FREE PLAN
 PITR                            = NOT AVAILABLE UNDER THE CURRENT FREE-PLAN OPERATING BASELINE
 application-owned logical dump  = IMPLEMENTED BY REPOSITORY WORKFLOW
-successful production dump      = NOT YET EVIDENCED
-isolated restore drill path     = IMPLEMENTED / NOT YET EXECUTED
-isolated restore                = NOT YET EVIDENCED
+successful production dump      = EVIDENCED — run 35260191079
+isolated restore drill path     = IMPLEMENTED / EXECUTED
+isolated restore                = NOT YET EVIDENCED — latest run 35264061319 failed before schema/data restore
 RPO                             = OPEN DECISION
 RTO                             = OPEN DECISION
 ```
 
-Restore drill: NOT YET EVIDENCED
+Restore drill: EXECUTED / NOT YET PASSED
 
 ## 2. Backup contract
 
@@ -123,7 +123,7 @@ Backup-passphrase rules:
 - do not place it in repository files, issue comments, logs, artifacts, or Vercel client/runtime configuration;
 - recovery operators must have a documented break-glass path to the passphrase that does not depend on the database being healthy.
 
-Until the required production endpoint path and backup secret are provisioned and an actual scheduled/manual run succeeds, `#389` cannot claim a verified backup schedule.
+The required production endpoint and backup secret are now production-proven by successful backup run `35260191079`. That evidence does not by itself close `#389`; isolated restore, privacy reconciliation, and approved RPO/RTO evidence remain required.
 
 ## 4. Backup success evidence
 
@@ -169,13 +169,13 @@ restore_start_utc
 
 ### 5.1 Repository-isolated restore drill workflow
 
-The repository now provides an executable, **manual-only** restore portability path:
+The repository provides an executable, **manual-only** restore portability path:
 
 ```text
 .github/workflows/postgres-isolated-restore-drill.yml
 ```
 
-Its target is **GitHub Actions loopback PostgreSQL 17.6**. The workflow does not accept a remote restore database URL. The restore harness hardcodes only:
+Its target is **GitHub Actions loopback Supabase PostgreSQL 17.6.1.166**. The service image is pinned to the same Supabase PostgreSQL release family as the production project so the isolated target contains the Supabase platform role and extension baseline required by a Supabase CLI logical dump. The workflow does not accept a remote restore database URL. The restore harness hardcodes only:
 
 ```text
 postgresql://postgres:restore-drill@127.0.0.1:5432/postgres
@@ -187,11 +187,19 @@ The workflow requires:
 - a canonical synthetic incident/reference UTC timestamp;
 - the protected backup passphrase from the `production` environment.
 
-Before any decryption, it verifies that the selected source run is exactly the repository's successful `Production PostgreSQL Logical Backup` workflow on `main`, and that exactly one non-expired governed backup artifact exists. It then downloads that exact artifact, verifies ciphertext and plaintext checksums plus both manifests, restores only into the loopback PostgreSQL service container, runs baseline structural/authorization checks, and uploads only a JSON evidence artifact.
+Before any decryption, it verifies that the selected source run is exactly the repository's successful `Production PostgreSQL Logical Backup` workflow on `main`, and that exactly one non-expired governed backup artifact exists. It then downloads that exact artifact, verifies ciphertext and plaintext checksums plus both manifests, restores only into the loopback Supabase PostgreSQL service container, runs baseline structural/authorization checks, and uploads only a JSON evidence artifact.
 
 Decrypted SQL/data files are not uploaded.
 
-This workflow is **implementation and future drill machinery only** until it is run against an actual successful production backup artifact. A successful loopback restore may evidence restore portability, basic structure, and baseline role safety; it does not by itself establish that a recovered state is safe to serve. In particular, privacy reconciliation is not exercised by the workflow, and full RTO remains open until the post-backup deletion/revocation reconciliation procedure is exercised and verified.
+Runtime evidence as of 2026-09-18 KST:
+
+- run `35261643085` proved source-run/artifact authority but failed before SQL restore because historical plaintext checksum entries contained producer-runner absolute paths; PR `#934` normalized historical entries and made future backup checksums portable;
+- run `35264061319` proved ciphertext and all three plaintext dump checksums pass, then failed when `roles.sql` attempted `ALTER ROLE "anon"` against a vanilla `postgres:17.6` service that lacked the Supabase platform-role baseline;
+- the current restore workflow therefore uses the production-compatible Supabase PostgreSQL `17.6.1.166` service image rather than manually fabricating reserved Supabase roles.
+
+Until a subsequent run reaches successful schema/data restore and validation, isolated restore remains NOT EVIDENCED.
+
+A successful loopback restore may evidence restore portability, basic structure, and baseline role safety; it does not by itself establish that a recovered state is safe to serve. In particular, privacy reconciliation is not exercised by the workflow, and full RTO remains open until the post-backup deletion/revocation reconciliation procedure is exercised and verified.
 
 ## 6. Download, verify, and decrypt
 
@@ -340,13 +348,13 @@ Only after business-approved RPO/RTO values are recorded may the measured values
 
 Do not close `#389` until all are evidenced:
 
-- [ ] backup encryption secret provisioned through the production control plane
-- [ ] exact Production Session Pooler endpoint path provisioned or Management API fallback authorization restored
-- [ ] at least one actual production logical backup run succeeded
-- [ ] actual backup schedule and 30-day artifact retention evidenced from runtime
-- [ ] current provider plan / automatic backup / PITR state recorded
-- [ ] backup failure observability verified
-- [ ] exact backup point selected for a drill
+- [x] backup encryption secret provisioned through the production control plane
+- [x] exact Production Session Pooler endpoint path provisioned or Management API fallback authorization restored
+- [x] at least one actual production logical backup run succeeded
+- [x] actual backup schedule and 30-day artifact retention evidenced from runtime
+- [x] current provider plan / automatic backup / PITR state recorded
+- [x] backup failure observability verified
+- [x] exact backup point selected for a drill
 - [ ] isolated restore completed
 - [ ] integrity verification passed
 - [ ] authorization verification passed

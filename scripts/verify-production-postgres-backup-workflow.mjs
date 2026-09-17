@@ -101,11 +101,12 @@ if (!(encryptIndex < plaintextDeleteIndex && plaintextDeleteIndex < uploadIndex)
 }
 
 const requiredRunbookFragments = [
-  'Production state: IMPLEMENTED / NOT YET PRODUCTION-PROVEN',
+  'Production state: BACKUP PRODUCTION-PROVEN / RESTORE NOT YET PASSED',
   'Current Supabase organization plan: `free`',
   'PITR',
   'NOT AVAILABLE UNDER THE CURRENT FREE-PLAN OPERATING BASELINE',
-  'Restore drill: NOT YET EVIDENCED',
+  'Restore drill: EXECUTED / NOT YET PASSED',
+  'successful production dump      = EVIDENCED — run 35260191079',
   'RPO: OPEN DECISION',
   'RTO: OPEN DECISION',
   'SUPABASE_PRODUCTION_SESSION_POOLER_HOST',
