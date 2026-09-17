@@ -39,6 +39,7 @@ const EVENT_SPECS = Object.freeze({
       return [
         `exists (select 1 from public.subjects s where s.id = ${uuid(event.subjectId)} and s.status = 'deletion_pending')`,
         `exists (select 1 from public.data_deletion_jobs dj where dj.id = ${uuid(event.deletionJobId)} and dj.subject_id = ${uuid(event.subjectId)} and dj.scope = 'account' and dj.request_dedupe_key = ${text(event.requestDedupeKey)} and dj.status = 'running')`,
+        `exists (select 1 from public.outbox_events oe where oe.id = ${uuid(event.outboxEventId)} and oe.aggregate_type = 'data_deletion_job' and oe.aggregate_id = ${text(event.deletionJobId)} and oe.event_type = 'ACCOUNT_DELETION_STARTED' and oe.dedupe_key = 'account-delete-start-v1')`,
         `not exists (select 1 from public.share_artifacts sa where sa.subject_id = ${uuid(event.subjectId)} and sa.status = 'active')`,
         `not exists (select 1 from public.device_installations di where di.subject_id = ${uuid(event.subjectId)} and di.revoked_at is null)`,
         `not exists (select 1 from public.notifications n where n.subject_id = ${uuid(event.subjectId)} and n.status in ('queued', 'ready'))`,
@@ -182,7 +183,7 @@ function deletionAwareReplay(event, spec) {
     'declare',
     '  v_subject_status text;',
     'begin',
-    `  select s.status into v_subject_status from public.subjects s where s.id = ${uuid(event.subjectId)};`,
+    `  select s.status into v_subject_status from public.subjects s where s.id = ${uuid(event.subjectId)} for update;`,
     "  if v_subject_status = 'active' then",
     `    perform 1 from ${call};`,
     "  elsif v_subject_status = 'deletion_pending' then",
