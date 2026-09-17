@@ -24,7 +24,7 @@ PITR                            = NOT AVAILABLE UNDER THE CURRENT FREE-PLAN OPER
 application-owned logical dump  = IMPLEMENTED BY REPOSITORY WORKFLOW
 successful production dump      = EVIDENCED — run 35260191079
 isolated restore drill path     = IMPLEMENTED / EXECUTED
-isolated restore                = NOT YET EVIDENCED — run 35271689987 reached provider-managed data replay and exposed Auth schema-version skew
+isolated restore                = NOT YET EVIDENCED — run 35276773643 reached post-schema provider replay preparation and exposed auth.users column-version skew
 RPO                             = OPEN DECISION
 RTO                             = OPEN DECISION
 ```
@@ -163,10 +163,11 @@ Observed evidence:
 - `35268484039`: role boundary passed; schema replay reached MyeongHa owner assignment and failed because demoted `postgres` could not `SET ROLE` to the dumped application owner. PR `#946` separated loopback `supabase_admin` replay from ordinary `postgres` validation.
 - `35270505668`: privileged replay progressed through the new owner boundary, then two MyeongHa role-membership statements failed only because the dump preserved `GRANTED BY "postgres"` provenance. PR `#950` normalizes only exact `myeongha_* -> myeongha_*` grantor provenance and verifies the resulting membership plus `INHERIT` state through `pg_auth_members`.
 - `35271689987`: #950 role replay passed and `schema.sql` completed. `data.sql` then failed on the first incompatible hosted-Auth COPY shape: the source `auth.audit_log_entries` COPY contained `ip_address`, while the pinned loopback provider baseline did not have that target column. Archive integrity, source authority, role handling, and application schema replay had already passed.
+- `35276773643`: #956 again passed source authority, checksums, provider-aware roles, application memberships, and strict schema replay. Its generic provider-data builder then classified `auth.users` itself as incompatible because the hosted source carries newer Auth columns than the pinned PostgreSQL bootstrap target. The subsequent mandatory `auth.users` replay assertion exited before SQL data replay. This exposed a harness-policy defect: provider tables with source-only columns were being skipped wholesale instead of preserving target-compatible identity columns.
 
-The last failure is a provider schema-version mismatch, not corruption of the governed backup and not a MyeongHa application-schema failure.
+The latest failure is a provider schema-version mismatch handled too coarsely by the loopback portability harness, not corruption of the governed backup and not a MyeongHa application-schema failure.
 
-Current Supabase self-hosted restore guidance explicitly warns that platform projects may run newer Auth/Storage schema revisions than a self-hosted target. It lists missing provider tables/columns in `data.sql` as a known restore incompatibility and recommends excluding the incompatible COPY block before the final single-transaction restore.
+Current Supabase self-hosted restore guidance explicitly warns that platform projects may run newer Auth/Storage schema revisions than a self-hosted target. It lists missing provider tables/columns in `data.sql` as a known restore incompatibility and recommends excluding incompatible provider data before the final single-transaction restore. For MyeongHa, `auth.users` cannot simply be omitted because application subjects reference Auth user IDs, so the loopback portability path additionally preserves target-compatible Auth identity columns through controlled column projection.
 
 ## 7. Role, schema, and provider-data portability boundary
 
@@ -189,23 +190,26 @@ The original `data.sql` is always decrypted and checksum-verified **before any p
 
 After schema replay, the harness snapshots the isolated target column catalog and creates an ephemeral `data.portable.sql`:
 
-- application-owned `public` COPY blocks are fail-closed: a missing target relation, missing source column, or required unbacked target column is fatal;
-- a provider-managed COPY block is replayed when its COPY column shape is compatible with the isolated target;
-- only an incompatible provider-managed COPY block may be omitted from the loopback portability replay;
-- every omission is recorded as schema/table metadata and reason in JSON evidence; no row contents are emitted;
+- application-owned `public` COPY blocks are fail-closed: any source/target column incompatibility, generated-column conflict, missing target relation, or required unbacked target column is fatal;
+- a provider-managed COPY block with an exact compatible shape is replayed unchanged;
+- when a provider-managed source COPY has columns absent from the target, **column projection** may retain only columns that exist and are copyable on the target;
+- projection is permitted only when every target-side required non-default/non-generated column is backed by the source and at least one copyable shared column remains;
+- each projected COPY row must still contain exactly the source header's field count before any field is selected; malformed COPY rows fail closed;
+- a provider-managed COPY block is skipped only when its target relation is absent, it has no copyable shared columns, or the target requires a source-unbacked column that cannot default/generate itself;
+- every projection and omission is recorded as schema/table/column-shape metadata in JSON evidence; no row contents are emitted;
 - the transformation is generic and must not hardcode a specific Auth/Storage table or column discovered by a previous failure;
-- compatible provider data continues to replay, including `auth.users`;
-- `auth.users` is mandatory for this drill because `public.subjects.auth_user_id` has a foreign key to it;
+- `auth.users` is mandatory for this drill and its `id` column must be retained in replay even when newer hosted Auth columns require projection;
+- this `auth.users` result proves application-critical **identity continuity** only; it does not claim full Auth-service semantic equivalence on an older loopback provider schema;
 - after data replay, `subjects.auth_user_id` must have zero dangling references to `auth.users`;
 - final data replay remains `--single-transaction`, `ON_ERROR_STOP=1`, with `session_replication_role=replica`.
 
-A successful run that omitted any incompatible provider-managed COPY block must record:
+A successful run that projected or skipped any provider-managed COPY data must record:
 
 ```text
 provider_managed_data_full_restore = false
 ```
 
-Such a run may prove application-data portability and application-critical Auth identity continuity, but it is **not** evidence of full provider-managed Auth/Storage data recovery. The encrypted source artifact still contains the original provider data; the omission applies only to this self-hosted loopback validation path.
+Such a run may prove application-data portability and application-critical Auth identity continuity, but it is **not** evidence of full provider-managed Auth/Storage data recovery. The encrypted source artifact still contains every original provider column and row; projection/omission applies only to this self-hosted loopback validation path.
 
 This distinction prevents a green portability drill from being mislabeled as full Supabase-platform DR.
 
@@ -230,10 +234,11 @@ At minimum verify:
 1. required application tables/functions exist;
 2. representative application object ownership is restored;
 3. application roles and role memberships remain within the governed authorization model;
-4. `auth.users` was included in compatible provider replay;
+4. `auth.users` was replayed and its `id` column was retained for identity continuity;
 5. `subjects.auth_user_id` has zero dangling references;
-6. provider-managed COPY omissions, if any, are recorded explicitly;
-7. no user-owned row contents are emitted to GitHub logs or evidence artifacts.
+6. provider-managed COPY projections and omissions, if any, are recorded explicitly;
+7. any provider projection/omission forces `provider_managed_data_full_restore=false`;
+8. no user-owned row contents are emitted to GitHub logs or evidence artifacts.
 
 Current baseline required tables:
 
