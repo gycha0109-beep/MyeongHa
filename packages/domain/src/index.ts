@@ -90,6 +90,23 @@ export {
 } from './character-saju-perspective.js';
 
 export {
+  CHARACTER_GROUNDING_REALIZATION_POLICIES_V1,
+  CHARACTER_INSIGHT_SELECTION_SCHEMA_VERSION_V1,
+  CharacterInsightSelectionErrorV1,
+  admitCharacterSajuGroundingBundleViewV1,
+  hashCharacterSajuGroundingBundleMaterialV1,
+  selectCharacterInsightsV1,
+  type CharacterGroundingAmbiguityViewV1,
+  type CharacterGroundingDisclosureViewV1,
+  type CharacterGroundingRealizationPolicyRefV1,
+  type CharacterGroundingUnitViewV1,
+  type CharacterInsightSelectionV1,
+  type CharacterSajuGroundingBundleViewV1,
+  type CharacterSelectionReasonCodeV1,
+  type CharacterSelectionReasonV1,
+} from './character-saju-insight-selector.js';
+
+export {
   CharacterOutputGuardError,
   guardCharacterRendererOutput,
   type CharacterDialogueEnvelopeV1,
