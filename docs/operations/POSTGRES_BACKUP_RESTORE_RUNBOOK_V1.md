@@ -29,7 +29,7 @@ PITR                            = NOT AVAILABLE UNDER THE CURRENT FREE-PLAN OPER
 application-owned logical dump  = IMPLEMENTED BY REPOSITORY WORKFLOW
 successful production dump      = EVIDENCED — run 35260191079
 isolated restore drill path     = IMPLEMENTED / EXECUTED
-isolated restore                = NOT YET EVIDENCED — latest run 35265689965 reached roles restore, then stopped on an absent provider-managed role
+isolated restore                = NOT YET EVIDENCED — latest run 35268484039 reached schema restore, then stopped on application-owner replay authority
 RPO                             = OPEN DECISION
 RTO                             = OPEN DECISION
 ```
@@ -175,11 +175,14 @@ The repository provides an executable, **manual-only** restore portability path:
 .github/workflows/postgres-isolated-restore-drill.yml
 ```
 
-Its target is **GitHub Actions loopback Supabase PostgreSQL 17.6.1.166**. The service image is pinned to the same Supabase PostgreSQL release family as the production project so the isolated target contains the closest repository-controlled Supabase platform role and extension baseline available for this portability drill. The workflow does not accept a remote restore database URL. The restore harness hardcodes only:
+Its target is **GitHub Actions loopback Supabase PostgreSQL 17.6.1.166**. The service image is pinned to the same Supabase PostgreSQL release family as the production project so the isolated target contains the closest repository-controlled Supabase platform role and extension baseline available for this portability drill. The workflow does not accept a remote restore database URL. The restore harness hardcodes two loopback-only connections:
 
 ```text
-postgresql://postgres:restore-drill@127.0.0.1:5432/postgres
+postgresql://supabase_admin:restore-drill@127.0.0.1:5432/postgres  # privileged logical replay only
+postgresql://postgres:restore-drill@127.0.0.1:5432/postgres        # post-restore validation
 ```
+
+The `supabase_admin` connection is an ephemeral credential created inside the isolated service container from the fixed drill password. It is not a production credential or production endpoint. The harness first verifies that this exact loopback principal is `supabase_admin` and is superuser before using it for roles/schema/data replay. Final structural, ownership, and authorization checks use the ordinary loopback `postgres` principal.
 
 The workflow requires:
 
@@ -187,7 +190,7 @@ The workflow requires:
 - a canonical synthetic incident/reference UTC timestamp;
 - the protected backup passphrase from the `production` environment.
 
-Before any decryption, it verifies that the selected source run is exactly the repository's successful `Production PostgreSQL Logical Backup` workflow on `main`, and that exactly one non-expired governed backup artifact exists. It then downloads that exact artifact, verifies ciphertext and plaintext checksums plus both manifests, restores only into the loopback Supabase PostgreSQL service container, runs baseline structural/authorization checks, and uploads only a JSON evidence artifact.
+Before any decryption, it verifies that the selected source run is exactly the repository's successful `Production PostgreSQL Logical Backup` workflow on `main`, and that exactly one non-expired governed backup artifact exists. It then downloads that exact artifact, verifies ciphertext and plaintext checksums plus both manifests, restores only into the loopback Supabase PostgreSQL service container, runs baseline structural/ownership/authorization checks, and uploads only a JSON evidence artifact.
 
 Decrypted SQL/data files are not uploaded.
 
@@ -196,9 +199,11 @@ Runtime evidence as of 2026-09-18 KST:
 - run `35261643085` proved source-run/artifact authority but failed before SQL restore because historical plaintext checksum entries contained producer-runner absolute paths; PR `#934` normalized historical entries and made future backup checksums portable;
 - run `35264061319` proved ciphertext and all three plaintext dump checksums pass, then failed when `roles.sql` attempted `ALTER ROLE "anon"` against a vanilla `postgres:17.6` service that lacked the Supabase platform-role baseline;
 - PR `#936` moved the drill to the production-family Supabase PostgreSQL `17.6.1.166` image;
-- run `35265689965` proved that image initializes successfully, backup authority and all checksums still pass, and all declared `myeongha_*` role creation reached execution. It then stopped at `GRANT SET ON PARAMETER "log_min_messages" TO "supabase_realtime_admin"` because that hosted provider-managed `supabase_*` role is absent from this self-hosted image revision.
+- run `35265689965` proved that image initializes successfully, backup authority and all checksums still pass, and all declared `myeongha_*` role creation reached execution. It then stopped at `GRANT SET ON PARAMETER "log_min_messages" TO "supabase_realtime_admin"` because that hosted provider-managed `supabase_*` role is absent from this self-hosted image revision;
+- PR `#940` made role replay provider-aware without fabricating absent `supabase_*` roles;
+- run `35268484039` proved the #940 boundary works: the absent `supabase_realtime_admin` difference was classified and tolerated, all governed checksums passed, all declared MyeongHa roles were restored, and schema replay began. It then stopped at `ALTER FUNCTION ... OWNER TO "myeongha_content_publication_owner"` because this Supabase image deliberately demotes `postgres` from superuser and that restore connection could not `SET ROLE` to the application owner.
 
-The role portability boundary is therefore explicit:
+The role and restore-principal boundary is therefore explicit:
 
 - every role created by the governed role dump for this application must be a `myeongha_*` application role and must exist after role restore;
 - application roles must remain non-superuser and non-BYPASSRLS;
@@ -206,13 +211,15 @@ The role portability boundary is therefore explicit:
 - a statement may be tolerated only when PostgreSQL reports the exact error shape `role "supabase_*" does not exist` for a provider-managed `supabase_*` role that is absent from the isolated target baseline;
 - every other role restore SQL error is fatal;
 - absent provider-managed role names are recorded in restore evidence;
-- schema and data restore remain fully fail-closed with `ON_ERROR_STOP=1`.
+- privileged replay is allowed only through the fixed loopback `supabase_admin` created by the isolated Supabase service image;
+- schema and data restore remain fully fail-closed with `ON_ERROR_STOP=1`;
+- post-restore verification is performed through the ordinary loopback `postgres` principal and verifies a representative application-owner binding.
 
-This boundary treats the isolated target's provider-managed role baseline as authoritative for provider internals while requiring MyeongHa-owned authorization state to restore exactly. If schema/data restore later proves dependent on an absent provider-managed role, that remains a blocking compatibility gap and must not be silently bypassed.
+This boundary treats the isolated target's provider-managed role baseline as authoritative for provider internals while requiring MyeongHa-owned authorization and object ownership state to restore exactly. The privileged replay principal exists only to reproduce the logical dump's owner metadata and `session_replication_role` behavior; it is not evidence that serving application traffic may use a privileged principal.
 
 Until a subsequent run reaches successful schema/data restore and validation, isolated restore remains NOT EVIDENCED.
 
-A successful loopback restore may evidence restore portability, basic structure, and baseline role safety; it does not by itself establish that a recovered state is safe to serve. In particular, privacy reconciliation is not exercised by the workflow, and full RTO remains open until the post-backup deletion/revocation reconciliation procedure is exercised and verified.
+A successful loopback restore may evidence restore portability, basic structure, ownership, and baseline role safety; it does not by itself establish that a recovered state is safe to serve. In particular, privacy reconciliation is not exercised by the workflow, and full RTO remains open until the post-backup deletion/revocation reconciliation procedure is exercised and verified.
 
 ## 6. Download, verify, and decrypt
 
@@ -236,15 +243,15 @@ Do not upload decrypted dump files back into GitHub Actions artifacts.
 
 ## 7. Isolated restore procedure
 
-Follow the current Supabase backup/restore guidance for the target environment. The repository harness performs the logical restore in three governed phases:
+Follow the current Supabase backup/restore guidance for the target environment. The repository harness performs the logical restore in three governed phases using the validated loopback `supabase_admin` replay principal:
 
 ```text
 roles.sql  -> restore MyeongHa application roles; classify only absent supabase_* provider roles as target-baseline differences
-schema.sql -> single transaction, ON_ERROR_STOP=1
+schema.sql -> single transaction, ON_ERROR_STOP=1; preserve dumped application object owners
 data.sql   -> single transaction, session_replication_role=replica, ON_ERROR_STOP=1
 ```
 
-The provider-managed role exception is deliberately narrower than ignoring role-dump failures: unknown role creation, any non-`supabase_*` missing role, privilege errors, syntax errors, connection errors, schema errors, and data errors remain fatal.
+The provider-managed role exception is deliberately narrower than ignoring role-dump failures: unknown role creation, any non-`supabase_*` missing role, privilege errors, syntax errors, connection errors, schema errors, and data errors remain fatal. After replay, structural, representative owner, and authorization checks are performed through the ordinary loopback `postgres` principal.
 
 Before executing:
 
