@@ -48,7 +48,8 @@ const requiredWorkflowFragments = [
   "-x 'storage.buckets_vectors'",
   "-x 'storage.vector_indexes'",
   'echo "::add-mask::$db_url"',
-  'sha256sum',
+  'cd "$backup_dir"',
+  'sha256sum roles.sql schema.sql data.sql > plaintext-sha256.txt',
   'openssl enc -aes-256-cbc -salt -pbkdf2 -iter 200000',
   'rm -f "$plaintext_archive"',
   'uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7',
@@ -81,6 +82,7 @@ const forbiddenWorkflowFragments = [
   'path: schema.sql',
   'path: data.sql',
   'pg_dump ',
+  'sha256sum \\\n            "$backup_dir/roles.sql"',
 ];
 
 for (const fragment of forbiddenWorkflowFragments) {
