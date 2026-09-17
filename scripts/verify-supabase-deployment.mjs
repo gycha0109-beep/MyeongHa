@@ -27,11 +27,24 @@ const requiredWorkflowFragments = [
   'uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1',
   'uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520 # v3.0.0',
   'version: 2.116.0',
+  'SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}',
+  'SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}',
+  'SUPABASE_PRODUCTION_SESSION_POOLER_HOST: ${{ secrets.SUPABASE_PRODUCTION_SESSION_POOLER_HOST }}',
+  'SUPABASE_PRODUCTION_SESSION_POOLER_HOST must be a bare *.pooler.supabase.com hostname.',
+  'SUPABASE_ACCESS_TOKEN is not configured and no explicit Session Pooler host is available',
+  'Prepare explicit Session Pooler DB URL',
+  "if: ${{ env.SUPABASE_PRODUCTION_SESSION_POOLER_HOST != '' }}",
+  'db_url="postgresql://postgres.${SUPABASE_PROJECT_ID}:${encoded_password}@${host}:5432/postgres?sslmode=require"',
+  'echo "::add-mask::$db_url"',
+  "printf 'SUPABASE_PRODUCTION_DB_URL=%s\\n' \"$db_url\" >> \"$GITHUB_ENV\"",
+  "if: ${{ env.SUPABASE_PRODUCTION_SESSION_POOLER_HOST == '' }}",
+  'supabase link --project-ref "$SUPABASE_PROJECT_ID"',
+  'db_args+=(--db-url "$SUPABASE_PRODUCTION_DB_URL")',
   "grep -q '20260830072444'",
-  'supabase migration repair 20260830072444 --status reverted',
-  'supabase migration repair 0010 --status applied',
-  'supabase db push --include-all --dry-run',
-  'supabase db push --include-all',
+  'supabase migration repair 20260830072444 --status reverted "${db_args[@]}"',
+  'supabase migration repair 0010 --status applied "${db_args[@]}"',
+  'supabase db push --include-all --dry-run "${db_args[@]}"',
+  'supabase db push --include-all "${db_args[@]}"',
   'cancel-in-progress: false',
   'sudo apt-get install -y postgresql-client',
   'run: bash scripts/run-production-platform-integrity-postdeploy-verify.sh',
@@ -51,35 +64,36 @@ for (const fragment of requiredWorkflowFragments) {
 const forbiddenWorkflowFragments = [
   'uses: actions/checkout@v7.0.1',
   'uses: supabase/setup-cli@v3.0.0',
+  '--include-seed',
+  'sslmode=disable',
+  'SUPABASE_DB_PASSWORD: postgres',
+  'echo "$SUPABASE_ACCESS_TOKEN"',
+  'echo "$SUPABASE_DB_PASSWORD"',
+  'echo "$SUPABASE_PRODUCTION_DB_URL"',
 ];
 
 for (const fragment of forbiddenWorkflowFragments) {
   if (workflow.includes(fragment)) {
-    throw new Error(`Supabase production workflow contains a forbidden movable action reference: ${fragment}`);
+    throw new Error(`Supabase production workflow contains a forbidden fragment: ${fragment}`);
   }
-}
-
-if (!workflow.includes('SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}')) {
-  throw new Error('Supabase production workflow must source SUPABASE_ACCESS_TOKEN from GitHub secrets.');
-}
-
-if (!workflow.includes('SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}')) {
-  throw new Error('Supabase production workflow must source SUPABASE_DB_PASSWORD from GitHub secrets.');
-}
-
-if (workflow.includes('--include-seed')) {
-  throw new Error('Production Supabase deployment must not include seed data.');
 }
 
 const requiredPostdeployFragments = [
   `[[ "$SUPABASE_PROJECT_ID" == '${expectedProjectRef}' ]]`,
+  'if [[ -n "${SUPABASE_PRODUCTION_SESSION_POOLER_HOST:-}" ]]; then',
+  '[[ "$SUPABASE_PRODUCTION_SESSION_POOLER_HOST" =~ ^[a-z0-9-]+([.][a-z0-9-]+)*[.]pooler[.]supabase[.]com$ ]]',
+  'ADMIN_POOL_USER="postgres.$SUPABASE_PROJECT_ID"',
+  'POOL_HOST="$SUPABASE_PRODUCTION_SESSION_POOLER_HOST"',
+  "POOL_PORT='5432'",
+  "POOL_DB='postgres'",
+  'SUPABASE_ACCESS_TOKEN is required when no explicit Session Pooler host is configured',
   'https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_ID/config/database/pooler',
   'select((.database_type // "") == "PRIMARY")',
   'test("\\\\.pooler\\\\.supabase\\\\.com:(5432|6543)/postgres(?:\\\\?|$)")',
   'sort_by(',
   'test(":5432/postgres(?:\\\\?|$)")',
   '[[ "$ADMIN_POOL_USER" == "postgres.$SUPABASE_PROJECT_ID" ]]',
-  '[[ "$POOL_HOST" == *.pooler.supabase.com ]]',
+  '[[ "$POOL_HOST" =~ ^[a-z0-9-]+([.][a-z0-9-]+)*[.]pooler[.]supabase[.]com$ ]]',
   '[[ "$POOL_PORT" == \'5432\' || "$POOL_PORT" == \'6543\' ]]',
   '[[ "$POOL_DB" == \'postgres\' ]]',
   'bash scripts/run-production-platform-integrity-read-audit.sh',
@@ -104,6 +118,8 @@ const forbiddenPostdeployFragments = [
   'api-keys?reveal=true',
   'sslmode=disable',
   'PGSSLMODE=disable',
+  'echo "$SUPABASE_ACCESS_TOKEN"',
+  'echo "$SUPABASE_DB_PASSWORD"',
 ];
 
 for (const fragment of forbiddenPostdeployFragments) {
@@ -138,4 +154,4 @@ if (!migrationFiles.includes('0010_auth_owner.sql')) {
   throw new Error('Expected baseline migration 0010_auth_owner.sql is missing.');
 }
 
-console.log(`MyeongHa Supabase deployment configuration + post-deploy integrity verification passed for ${migrationFiles.length} migration files.`);
+console.log(`MyeongHa Supabase deployment configuration + explicit Session Pooler / fallback post-deploy verification passed for ${migrationFiles.length} migration files.`);
