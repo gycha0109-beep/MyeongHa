@@ -35,7 +35,7 @@ requireRegex(
   /^\|\s*`P0-PR-01`\s*\|[^|\n]*\|\s*\*\*OPEN-P0\*\*\s*\|/m,
   'the P0-PR-01 decision-register row itself must remain OPEN-P0 while retention/legal authority is unresolved',
 );
-requireFragment('privacy', 'actual legal/accounting/backup retention');
+requireFragment('privacy', '실제 legal/accounting/backup retention');
 requireFragment('privacy', '`OPEN-P0: P0-PR-01`');
 requireRegex(
   'sourceGaps',
