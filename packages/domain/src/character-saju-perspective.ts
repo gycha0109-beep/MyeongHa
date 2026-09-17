@@ -358,6 +358,12 @@ export function admitCharacterPerspectiveProfileV1(input: {
 
   assertRecord(input.candidate.selection, 'selection');
   assertOnlyKeys(input.candidate.selection, SELECTION_KEYS, 'selection');
+  const avoidSameAxisRepetition = input.candidate.selection.avoidSameAxisRepetition;
+  if (typeof avoidSameAxisRepetition !== 'boolean') {
+    throw new CharacterPerspectiveAdmissionErrorV1(
+      'selection.avoidSameAxisRepetition must be boolean.',
+    );
+  }
   const selection = Object.freeze({
     maxPrimaryUnits: requireBoundedInteger(
       input.candidate.selection.maxPrimaryUnits,
@@ -375,13 +381,8 @@ export function admitCharacterPerspectiveProfileV1(input: {
       input.candidate.selection.maxLimitationUnits,
       'selection.maxLimitationUnits',
     ),
-    avoidSameAxisRepetition: input.candidate.selection.avoidSameAxisRepetition,
+    avoidSameAxisRepetition,
   });
-  if (typeof selection.avoidSameAxisRepetition !== 'boolean') {
-    throw new CharacterPerspectiveAdmissionErrorV1(
-      'selection.avoidSameAxisRepetition must be boolean.',
-    );
-  }
   const selectionTotal =
     selection.maxPrimaryUnits +
     selection.maxSupportingUnits +
