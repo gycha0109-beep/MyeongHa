@@ -32,11 +32,11 @@ requireFragment('operations', 'RTO = OPEN DECISION');
 requireFragment('operations', 'no `DR Ready` claim is allowed');
 requireRegex(
   'decisions',
-  /P0-PR-01[\s\S]{0,800}OPEN-P0|OPEN-P0[\s\S]{0,800}P0-PR-01/,
-  'P0-PR-01 must remain paired with OPEN-P0 while retention/legal authority is unresolved',
+  /^\|\s*`P0-PR-01`\s*\|[^|\n]*\|\s*\*\*OPEN-P0\*\*\s*\|/m,
+  'the P0-PR-01 decision-register row itself must remain OPEN-P0 while retention/legal authority is unresolved',
 );
-requireFragment('privacy', 'P0-PR-01');
-requireFragment('privacy', 'OPEN-P0');
+requireFragment('privacy', 'actual legal/accounting/backup retention');
+requireFragment('privacy', '`OPEN-P0: P0-PR-01`');
 requireRegex(
   'sourceGaps',
   /SRC-06[\s\S]{0,2000}BLOCKING BEFORE FINAL DELETION DDL BASELINE/,
