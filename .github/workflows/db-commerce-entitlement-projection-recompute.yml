@@ -51,6 +51,10 @@ jobs:
         run: psql -1 -v ON_ERROR_STOP=1 -f test/db/entitlement_projection_recompute.sql
       - name: Verify entitlement effect apply semantics
         run: psql -1 -v ON_ERROR_STOP=1 -f test/db/entitlement_effect_apply_v1.sql
+      - name: Verify verified Receipt Capability batch fulfillment semantics
+        run: psql -1 -v ON_ERROR_STOP=1 -f test/db/verified_receipt_capability_fulfillment_batch_v1.sql
+      - name: Verify verified Receipt Capability batch hardening
+        run: psql -1 -v ON_ERROR_STOP=1 -f test/db/verified_receipt_capability_fulfillment_batch_hardening.sql
       - name: Verify entitlement mutation surface remains internal
         run: psql -1 -v ON_ERROR_STOP=1 -f test/db/commerce_entitlement_mutation_surface.sql
       - name: Verify commerce payment source authority hardening
