@@ -110,6 +110,34 @@ function makeContext(
     sajuProfile: {
       profileVersion: 'fixture-saju-profile-v1',
       followUpQuestionStrategies,
+      safeFraming: {
+        schemaVersion: 'v1',
+        catalogVersion: 'fixture-safe-framing-v1',
+        before: [
+          {
+            key: 'fixture_record_transition',
+            text: 'fixture record transition',
+            purpose: 'record_transition',
+          },
+          {
+            key: 'fixture_current_life_question',
+            text: 'fixture current-life question',
+            purpose: 'current_life_question',
+          },
+        ],
+        after: [
+          {
+            key: 'fixture_uncertainty_transition',
+            text: 'fixture uncertainty transition',
+            purpose: 'uncertainty_transition',
+          },
+          {
+            key: 'fixture_relationship_transition',
+            text: 'fixture relationship transition',
+            purpose: 'relationship_transition',
+          },
+        ],
+      },
     },
     relationship: {
       schemaVersion: 'v1',
