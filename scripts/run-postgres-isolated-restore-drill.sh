@@ -240,17 +240,39 @@ node scripts/build-postgres-portable-data-replay.mjs \
   --target-catalog "$target_copy_catalog" \
   --report "$portable_data_report"
 
-[[ "$(jq -er '.schema_version' "$portable_data_report")" == 'myeongha-postgres-portable-data-replay-v1' ]]
-[[ "$(jq -er '.application_schema_policy' "$portable_data_report")" == 'public-fail-closed' ]]
-[[ "$(jq -er '.provider_schema_policy' "$portable_data_report")" == 'target-compatible-copy-only' ]]
-[[ "$(jq -er '.source_copy_blocks > 0' "$portable_data_report")" == 'true' ]]
-[[ "$(jq -er '.replayed_copy_blocks > 0' "$portable_data_report")" == 'true' ]]
-[[ "$(jq -er '[.replayed_application_relations[] | select(. == "public.subjects")] | length == 1' "$portable_data_report")" == 'true' ]]
-[[ "$(jq -er '[.replayed_provider_relations[] | select(. == "auth.users")] | length == 1' "$portable_data_report")" == 'true' ]]
+require_report_contract() {
+  local expression="$1"
+  local expected="$2"
+  local message="$3"
+  local actual
+  if ! actual="$(jq -er "$expression" "$portable_data_report")"; then
+    echo "Portable data replay report assertion failed: $message" >&2
+    exit 1
+  fi
+  if [[ "$actual" != "$expected" ]]; then
+    echo "Portable data replay report assertion failed: $message (expected=$expected actual=$actual)" >&2
+    exit 1
+  fi
+}
 
+require_report_contract '.schema_version' 'myeongha-postgres-portable-data-replay-v2' 'unexpected report schema version'
+require_report_contract '.application_schema_policy' 'public-fail-closed' 'application schema policy changed'
+require_report_contract '.provider_schema_policy' 'target-compatible-column-projection' 'provider schema policy changed'
+require_report_contract '.source_copy_blocks > 0' 'true' 'source dump contained no COPY blocks'
+require_report_contract '.replayed_copy_blocks > 0' 'true' 'portable replay contained no COPY blocks'
+require_report_contract '[.replayed_application_relations[] | select(. == "public.subjects")] | length == 1' 'true' 'public.subjects was not replayed exactly once'
+require_report_contract '[.replayed_provider_relations[] | select(. == "auth.users")] | length == 1' 'true' 'auth.users was not replayed exactly once'
+require_report_contract '[.replayed_provider_copy_blocks[] | select(.schema == "auth" and .table == "users" and (.replayed_columns | index("id") != null))] | length == 1' 'true' 'auth.users.id was not retained in portable replay'
+
+auth_users_restore_mode="$(jq -er '[.replayed_provider_copy_blocks[] | select(.schema == "auth" and .table == "users")] | if length == 1 then .[0].mode else error("auth.users replay mode is ambiguous") end' "$portable_data_report")"
+provider_managed_data_blocks_projected="$(jq -r '.projected_provider_copy_blocks | length' "$portable_data_report")"
 provider_managed_data_blocks_skipped="$(jq -r '.skipped_provider_copy_blocks | length' "$portable_data_report")"
+if (( provider_managed_data_blocks_projected > 0 )); then
+  echo 'Provider-managed COPY blocks projected to columns supported by the isolated target:'
+  jq -r '.projected_provider_copy_blocks[] | "- \(.schema).\(.table): dropped source columns = \(.dropped_source_columns | join(","))"' "$portable_data_report"
+fi
 if (( provider_managed_data_blocks_skipped > 0 )); then
-  echo 'Provider-managed COPY blocks skipped because the isolated target schema is older or missing those provider relations:'
+  echo 'Provider-managed COPY blocks skipped because the isolated target relation cannot safely accept them:'
   jq -r '.skipped_provider_copy_blocks[] | "- \(.schema).\(.table): \(.reason)"' "$portable_data_report"
 fi
 
@@ -272,11 +294,12 @@ duration_seconds=$((restore_completed_epoch - restore_started_epoch))
 server_version="$(psql "$RESTORE_DATABASE_URL" -At --set ON_ERROR_STOP=1 -c 'show server_version;')"
 provider_managed_roles_absent_json="$(printf '%s\n' "${provider_managed_roles_absent[@]}" | jq -Rsc 'split("\n") | map(select(length > 0))')"
 normalized_application_membership_grantor_count="${#normalized_application_memberships[@]}"
+provider_managed_data_projections_json="$(jq -c '.projected_provider_copy_blocks' "$portable_data_report")"
 provider_managed_data_skips_json="$(jq -c '.skipped_provider_copy_blocks' "$portable_data_report")"
 source_data_copy_blocks="$(jq -r '.source_copy_blocks' "$portable_data_report")"
 replayed_data_copy_blocks="$(jq -r '.replayed_copy_blocks' "$portable_data_report")"
 provider_managed_data_full_restore='true'
-if (( provider_managed_data_blocks_skipped > 0 )); then
+if (( provider_managed_data_blocks_projected > 0 || provider_managed_data_blocks_skipped > 0 )); then
   provider_managed_data_full_restore='false'
 fi
 
@@ -288,11 +311,14 @@ jq -n \
   --arg restore_server_version "$server_version" \
   --arg restore_started_at_utc "$restore_started_at" \
   --arg restore_completed_at_utc "$restore_completed_at" \
+  --arg auth_users_restore_mode "$auth_users_restore_mode" \
   --argjson isolated_restore_validation_duration_seconds "$duration_seconds" \
   --argjson provider_managed_roles_absent_from_target "$provider_managed_roles_absent_json" \
   --argjson normalized_application_membership_grantor_count "$normalized_application_membership_grantor_count" \
   --argjson source_data_copy_blocks "$source_data_copy_blocks" \
   --argjson replayed_data_copy_blocks "$replayed_data_copy_blocks" \
+  --argjson provider_managed_data_blocks_projected "$provider_managed_data_blocks_projected" \
+  --argjson provider_managed_data_projections "$provider_managed_data_projections_json" \
   --argjson provider_managed_data_blocks_skipped "$provider_managed_data_blocks_skipped" \
   --argjson provider_managed_data_skips "$provider_managed_data_skips_json" \
   --argjson provider_managed_data_full_restore "$provider_managed_data_full_restore" \
@@ -314,13 +340,16 @@ jq -n \
     application_owner_restore: "pass",
     provider_managed_role_policy: "target-baseline-authoritative-no-fabrication",
     provider_managed_roles_absent_from_target: $provider_managed_roles_absent_from_target,
-    provider_managed_data_policy: "target-compatible-copy-only-after-checksum",
+    provider_managed_data_policy: "target-compatible-column-projection-after-checksum",
     source_data_copy_blocks: $source_data_copy_blocks,
     replayed_data_copy_blocks: $replayed_data_copy_blocks,
+    provider_managed_data_blocks_projected: $provider_managed_data_blocks_projected,
+    provider_managed_data_projections: $provider_managed_data_projections,
     provider_managed_data_blocks_skipped: $provider_managed_data_blocks_skipped,
     provider_managed_data_skips: $provider_managed_data_skips,
     provider_managed_data_full_restore: $provider_managed_data_full_restore,
-    auth_users_restore: "pass",
+    auth_users_restore: "identity-continuity-pass",
+    auth_users_restore_mode: $auth_users_restore_mode,
     subject_auth_user_referential_integrity: "pass",
     required_tables: "pass",
     authorization_baseline: "pass",
