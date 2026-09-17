@@ -136,7 +136,10 @@ function relationshipRef(
   });
 }
 
-function purposeForUnit(unit: CharacterGroundingUnitViewV1, position: number): CharacterReadingSemanticPurposeV1 {
+function purposeForUnit(
+  unit: CharacterGroundingUnitViewV1,
+  position: number,
+): CharacterReadingSemanticPurposeV1 {
   if (position === 0) return 'lead';
   switch (unit.narrativeRole) {
     case 'primary':
@@ -157,6 +160,19 @@ function firstAuthoredQuestionStrategy(
     if (strategy.length > 0) return strategy;
   }
   return null;
+}
+
+function hasSafeFramingPurpose(
+  context: CharacterRuntimeContextWithGroundingV1,
+  collection: 'before' | 'after',
+  purpose:
+    | 'record_transition'
+    | 'current_life_question'
+    | 'uncertainty_transition'
+    | 'relationship_transition',
+): boolean {
+  const catalog = context.sajuProfile.safeFraming;
+  return catalog?.[collection].some((entry) => entry.purpose === purpose) ?? false;
 }
 
 function selectedUnitsInPlanOrder(input: {
@@ -200,6 +216,26 @@ function protectedDisclosureRefs(input: {
   return Object.freeze(input.disclosureOrder.filter((ref) => required.has(ref)));
 }
 
+function shouldScheduleReaction(input: {
+  readonly context: CharacterRuntimeContextWithGroundingV1;
+  readonly selectedUnits: readonly CharacterGroundingUnitViewV1[];
+}): boolean {
+  const hasUncertainty = input.selectedUnits.some(
+    (unit) => unit.narrativeRole === 'limitation' || unit.ambiguityRef !== undefined,
+  );
+  if (
+    hasUncertainty &&
+    hasSafeFramingPurpose(input.context, 'after', 'uncertainty_transition')
+  ) {
+    return true;
+  }
+  const domain = input.context.saju?.domain;
+  return (
+    (domain === 'relationship' || domain === 'compatibility') &&
+    hasSafeFramingPurpose(input.context, 'after', 'relationship_transition')
+  );
+}
+
 function planBeats(input: {
   readonly context: CharacterRuntimeContextWithGroundingV1;
   readonly selectedUnits: readonly CharacterGroundingUnitViewV1[];
@@ -218,7 +254,10 @@ function planBeats(input: {
     beats.push(Object.freeze({ kind: 'protected_disclosure' as const, disclosureRef }));
   }
 
-  if (orderedUnitRefs.length > 0) {
+  if (
+    orderedUnitRefs.length > 0 &&
+    shouldScheduleReaction({ context: input.context, selectedUnits: input.selectedUnits })
+  ) {
     beats.push(
       Object.freeze({
         kind: 'character_reaction' as const,
@@ -228,7 +267,11 @@ function planBeats(input: {
   }
 
   const questionStrategy = firstAuthoredQuestionStrategy(input.context);
-  if (questionStrategy !== null && orderedUnitRefs.length > 0) {
+  if (
+    questionStrategy !== null &&
+    orderedUnitRefs.length > 0 &&
+    hasSafeFramingPurpose(input.context, 'before', 'current_life_question')
+  ) {
     beats.push(
       Object.freeze({
         kind: 'follow_up_question' as const,
