@@ -186,11 +186,10 @@ jobs:
           test -s "$backup_dir/schema.sql"
           test -s "$backup_dir/data.sql"
 
-          sha256sum \
-            "$backup_dir/roles.sql" \
-            "$backup_dir/schema.sql" \
-            "$backup_dir/data.sql" \
-            > "$backup_dir/plaintext-sha256.txt"
+          (
+            cd "$backup_dir"
+            sha256sum roles.sql schema.sql data.sql > plaintext-sha256.txt
+          )
 
           completed_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
           jq -n \
