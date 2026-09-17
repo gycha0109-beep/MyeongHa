@@ -59,6 +59,18 @@ export {
 } from './character-runtime-context.js';
 
 export {
+  SAJU_CHARACTER_GROUNDING_PROJECTION_VERSION_V1,
+  SAJU_CHARACTER_GROUNDING_SCHEMA_VERSION_V1,
+  SAJU_GROUNDING_AXIS_REGISTRY_VERSION_V1,
+  CharacterSajuGroundingAdmissionErrorV1,
+  admitCharacterRuntimeSajuGroundingV1,
+  admitCharacterSajuGroundingRefV1,
+  type CharacterRuntimeContextWithGroundingV1,
+  type CharacterSajuGroundingRefV1,
+  type CharacterSajuRuntimeContextWithGroundingV1,
+} from './character-saju-grounding-admission.js';
+
+export {
   CharacterOutputGuardError,
   guardCharacterRendererOutput,
   type CharacterDialogueEnvelopeV1,
