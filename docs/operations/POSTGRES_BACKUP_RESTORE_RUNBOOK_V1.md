@@ -3,7 +3,6 @@
 > Scope: non-character production operations only  
 > Issue: `#389` — authoritative persistent-data recovery  
 > Evidence date: 2026-09-09 KST  
-> Path B repository update: 2026-09-18 KST  
 > Production state: IMPLEMENTED / NOT YET PRODUCTION-PROVEN
 
 ## 1. Current production authority
@@ -51,26 +50,11 @@ Triggers:
 
 The schedule is a backup frequency, **not an approved RPO**.
 
-The workflow supports two governed endpoint-resolution modes:
+The workflow:
 
-1. **explicit Session Pooler path — preferred when provisioned**
-   - reads `SUPABASE_PRODUCTION_SESSION_POOLER_HOST` from the protected GitHub `production` environment;
-   - accepts only a bare `*.pooler.supabase.com` hostname;
-   - derives `postgres.<project-ref>` / port `5432` / database `postgres` inside the workflow;
-   - keeps `SUPABASE_DB_PASSWORD` as the only database password authority;
-   - does not require the Supabase Management API merely to discover the endpoint;
-2. **Management API fallback**
-   - when the explicit host secret is absent, requires `SUPABASE_ACCESS_TOKEN`;
-   - resolves the production PRIMARY session-pooler connection metadata from the Supabase Management API;
-   - validates the returned user/host/port/database tuple before use.
-
-The exact Session Pooler host must come from an operator-controlled Supabase Connect surface or another directly verified provider source. The repository must never guess a pooler cluster hostname from region or project ref.
-
-After endpoint resolution, the workflow:
-
-1. uses the production database administrator credential only inside the protected GitHub `production` environment;
-2. runs a pinned stable Supabase CLI version;
-3. constructs the credential-bearing database URL only in runner memory, percent-encodes the password, and masks the complete URL before use;
+1. resolves the exact production PRIMARY session-pooler endpoint from the Supabase Management API;
+2. uses the production database administrator credential only inside the protected GitHub `production` environment;
+3. runs a pinned stable Supabase CLI version;
 4. exports `roles.sql`, `schema.sql`, and `data.sql` using Supabase-supported dump commands;
 5. records SHA-256 checksums of plaintext dump files inside the protected archive;
 6. creates a manifest containing project ref, exact repository SHA, CLI version, and UTC timestamps;
@@ -83,39 +67,20 @@ The GitHub artifact is **off-Supabase** and therefore protects against a Supabas
 
 ## 3. Required credentials
 
-Primary production database inputs:
-
-```text
-SUPABASE_DB_PASSWORD
-SUPABASE_PRODUCTION_SESSION_POOLER_HOST
-```
-
-`SUPABASE_PRODUCTION_SESSION_POOLER_HOST` is the preferred Path B endpoint input. It contains only the exact Session Pooler host, not a scheme, username, password, port, path, query, fragment, or complete connection string.
-
-Management API fallback input:
+Existing production recovery inputs:
 
 ```text
 SUPABASE_ACCESS_TOKEN
+SUPABASE_DB_PASSWORD
 ```
 
-The access token is required only when the explicit Session Pooler host is absent. A configured explicit host therefore allows backup/database operations to avoid Management API endpoint-discovery authorization while preserving the existing fallback path.
-
-Backup-only secret:
+New backup-only secret:
 
 ```text
 MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE
 ```
 
-Pooler-host rules:
-
-- store only as a protected GitHub `production` environment secret;
-- value must be a bare hostname ending in `.pooler.supabase.com`;
-- do not include `postgresql://`, credentials, `:5432`, `/postgres`, query parameters, fragments, or whitespace;
-- do not infer or fabricate the pooler cluster index;
-- do not place the real host in repository files, issue comments, public logs, or client/runtime configuration;
-- changing the provider-side pooler endpoint requires updating the environment secret before the next governed run.
-
-Backup-passphrase rules:
+Rules:
 
 - minimum 32 characters;
 - store only as a protected GitHub production environment secret;
@@ -123,7 +88,7 @@ Backup-passphrase rules:
 - do not place it in repository files, issue comments, logs, artifacts, or Vercel client/runtime configuration;
 - recovery operators must have a documented break-glass path to the passphrase that does not depend on the database being healthy.
 
-Until the required production endpoint path and backup secret are provisioned and an actual scheduled/manual run succeeds, `#389` cannot claim a verified backup schedule.
+Until this secret exists and an actual scheduled/manual run succeeds, `#389` cannot claim a verified backup schedule.
 
 ## 4. Backup success evidence
 
@@ -341,7 +306,6 @@ Only after business-approved RPO/RTO values are recorded may the measured values
 Do not close `#389` until all are evidenced:
 
 - [ ] backup encryption secret provisioned through the production control plane
-- [ ] exact Production Session Pooler endpoint path provisioned or Management API fallback authorization restored
 - [ ] at least one actual production logical backup run succeeded
 - [ ] actual backup schedule and 30-day artifact retention evidenced from runtime
 - [ ] current provider plan / automatic backup / PITR state recorded

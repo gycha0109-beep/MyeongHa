@@ -30,7 +30,6 @@ jobs:
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-      SUPABASE_PRODUCTION_SESSION_POOLER_HOST: ${{ secrets.SUPABASE_PRODUCTION_SESSION_POOLER_HOST }}
 
     steps:
       - name: Checkout
@@ -44,53 +43,19 @@ jobs:
       - name: Verify deployment credentials
         shell: bash
         run: |
-          set -euo pipefail
+          test -n "$SUPABASE_ACCESS_TOKEN" || { echo 'SUPABASE_ACCESS_TOKEN is not configured'; exit 1; }
           test -n "$SUPABASE_DB_PASSWORD" || { echo 'SUPABASE_DB_PASSWORD is not configured'; exit 1; }
           test "$SUPABASE_PROJECT_ID" = 'cnsfpcdiyofqvhpcegfc'
 
-          if [[ -n "${SUPABASE_PRODUCTION_SESSION_POOLER_HOST:-}" ]]; then
-            if [[ ! "$SUPABASE_PRODUCTION_SESSION_POOLER_HOST" =~ ^[a-z0-9-]+([.][a-z0-9-]+)*[.]pooler[.]supabase[.]com$ ]]; then
-              echo 'SUPABASE_PRODUCTION_SESSION_POOLER_HOST must be a bare *.pooler.supabase.com hostname.'
-              exit 1
-            fi
-          else
-            test -n "$SUPABASE_ACCESS_TOKEN" || { echo 'SUPABASE_ACCESS_TOKEN is not configured and no explicit Session Pooler host is available'; exit 1; }
-          fi
-
-      - name: Prepare explicit Session Pooler DB URL
-        if: ${{ env.SUPABASE_PRODUCTION_SESSION_POOLER_HOST != '' }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          host="$SUPABASE_PRODUCTION_SESSION_POOLER_HOST"
-          [[ "$host" =~ ^[a-z0-9-]+([.][a-z0-9-]+)*[.]pooler[.]supabase[.]com$ ]]
-
-          encoded_password="$(python3 - <<'PY'
-          import os
-          import urllib.parse
-          print(urllib.parse.quote(os.environ['SUPABASE_DB_PASSWORD'], safe=''))
-          PY
-          )"
-          db_url="postgresql://postgres.${SUPABASE_PROJECT_ID}:${encoded_password}@${host}:5432/postgres?sslmode=require"
-          echo "::add-mask::$db_url"
-          printf 'SUPABASE_PRODUCTION_DB_URL=%s\n' "$db_url" >> "$GITHUB_ENV"
-
       - name: Link production project
-        if: ${{ env.SUPABASE_PRODUCTION_SESSION_POOLER_HOST == '' }}
         run: supabase link --project-ref "$SUPABASE_PROJECT_ID"
 
       - name: Detect known migration history repairs
         id: migration-history
         shell: bash
         run: |
-          set -euo pipefail
-          db_args=()
-          if [[ -n "${SUPABASE_PRODUCTION_DB_URL:-}" ]]; then
-            db_args+=(--db-url "$SUPABASE_PRODUCTION_DB_URL")
-          fi
-
           set +e
-          supabase migration list "${db_args[@]}" 2>&1 | tee /tmp/myeongha-migration-state.txt
+          supabase migration list 2>&1 | tee /tmp/myeongha-migration-state.txt
           list_status=${PIPESTATUS[0]}
           set -e
 
@@ -118,68 +83,29 @@ jobs:
         if: ${{ steps.migration-history.outputs.legacy_repair == 'true' }}
         shell: bash
         run: |
-          set -euo pipefail
-          db_args=()
-          if [[ -n "${SUPABASE_PRODUCTION_DB_URL:-}" ]]; then
-            db_args+=(--db-url "$SUPABASE_PRODUCTION_DB_URL")
-          fi
-          supabase migration repair 20260830072444 --status reverted "${db_args[@]}"
-          supabase migration repair 0010 --status applied "${db_args[@]}"
+          supabase migration repair 20260830072444 --status reverted
+          supabase migration repair 0010 --status applied
 
       - name: Repair duplicate 0830 connector migration history
         if: ${{ steps.migration-history.outputs.duplicate_0830_repair == 'true' }}
         shell: bash
-        run: |
-          set -euo pipefail
-          db_args=()
-          if [[ -n "${SUPABASE_PRODUCTION_DB_URL:-}" ]]; then
-            db_args+=(--db-url "$SUPABASE_PRODUCTION_DB_URL")
-          fi
-          supabase migration repair 20260902193252 --status reverted "${db_args[@]}"
+        run: supabase migration repair 20260902193252 --status reverted
 
       - name: Verify repaired migration history
-        shell: bash
-        run: |
-          set -euo pipefail
-          db_args=()
-          if [[ -n "${SUPABASE_PRODUCTION_DB_URL:-}" ]]; then
-            db_args+=(--db-url "$SUPABASE_PRODUCTION_DB_URL")
-          fi
-          supabase migration list "${db_args[@]}"
+        run: supabase migration list
 
       # Parallel additive tracks can merge a lower-numbered migration after a higher
       # version has already reached Production. --include-all applies only local
       # migrations absent from remote history; the post-push migration list remains the
       # authoritative reconciliation gate.
       - name: Preview pending production migrations
-        shell: bash
-        run: |
-          set -euo pipefail
-          db_args=()
-          if [[ -n "${SUPABASE_PRODUCTION_DB_URL:-}" ]]; then
-            db_args+=(--db-url "$SUPABASE_PRODUCTION_DB_URL")
-          fi
-          supabase db push --include-all --dry-run "${db_args[@]}"
+        run: supabase db push --include-all --dry-run
 
       - name: Apply pending production migrations
-        shell: bash
-        run: |
-          set -euo pipefail
-          db_args=()
-          if [[ -n "${SUPABASE_PRODUCTION_DB_URL:-}" ]]; then
-            db_args+=(--db-url "$SUPABASE_PRODUCTION_DB_URL")
-          fi
-          supabase db push --include-all "${db_args[@]}"
+        run: supabase db push --include-all
 
       - name: Verify production migration state
-        shell: bash
-        run: |
-          set -euo pipefail
-          db_args=()
-          if [[ -n "${SUPABASE_PRODUCTION_DB_URL:-}" ]]; then
-            db_args+=(--db-url "$SUPABASE_PRODUCTION_DB_URL")
-          fi
-          supabase migration list "${db_args[@]}"
+        run: supabase migration list
 
       - name: Install PostgreSQL client for read-only post-deploy verification
         shell: bash
