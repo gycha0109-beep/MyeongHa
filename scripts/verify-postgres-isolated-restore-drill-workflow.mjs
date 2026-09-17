@@ -85,6 +85,11 @@ const requiredHarnessFragments = [
   'sha256sum -c',
   'openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000',
   "printf '%s\\n' data.sql manifest.json plaintext-sha256.txt roles.sql schema.sql",
+  'normalized_plaintext_checksum="$work_dir/plaintext-sha256.normalized.txt"',
+  'declare -A seen_plaintext_checksum_names=()',
+  'checksum_name="${checksum_path##*/}"',
+  'roles.sql|schema.sql|data.sql',
+  'sha256sum -c "$(basename "$normalized_plaintext_checksum")"',
   "--command 'SET session_replication_role = replica'",
   'subjects birth_profiles products product_offers data_deletion_jobs',
   "rolname='myeongha_api_executor' and not rolsuper and not rolbypassrls",
@@ -106,6 +111,7 @@ const forbiddenHarnessFragments = [
   'api.supabase.com',
   'myeongha.vercel.app',
   'gcloud ',
+  'sha256sum -c plaintext-sha256.txt',
 ];
 
 for (const fragment of forbiddenHarnessFragments) {

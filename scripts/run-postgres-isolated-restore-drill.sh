@@ -63,9 +63,41 @@ cmp -s "$work_dir/listing.txt" "$work_dir/expected.txt"
 
 tar -xzf "$work_dir/restore.tar.gz" -C "$work_dir"
 rm -f "$work_dir/restore.tar.gz"
+
+# Historical governed artifacts recorded the producing runner's absolute paths
+# in plaintext-sha256.txt. Accept only the three governed dump members and
+# normalize their paths to local basenames before integrity verification.
+normalized_plaintext_checksum="$work_dir/plaintext-sha256.normalized.txt"
+declare -A seen_plaintext_checksum_names=()
+checksum_count=0
+while read -r checksum_hash checksum_path checksum_extra; do
+  [[ -n "$checksum_hash" ]]
+  [[ -n "$checksum_path" ]]
+  [[ -z "${checksum_extra:-}" ]]
+  [[ "$checksum_hash" =~ ^[0-9a-f]{64}$ ]]
+
+  checksum_name="${checksum_path##*/}"
+  case "$checksum_name" in
+    roles.sql|schema.sql|data.sql) ;;
+    *)
+      echo "Unexpected plaintext checksum member: $checksum_name" >&2
+      exit 1
+      ;;
+  esac
+
+  if [[ -n "${seen_plaintext_checksum_names[$checksum_name]:-}" ]]; then
+    echo "Duplicate plaintext checksum member: $checksum_name" >&2
+    exit 1
+  fi
+  seen_plaintext_checksum_names[$checksum_name]=1
+  checksum_count=$((checksum_count + 1))
+  printf '%s  %s\n' "$checksum_hash" "$checksum_name" >> "$normalized_plaintext_checksum"
+done < "$work_dir/plaintext-sha256.txt"
+[[ "$checksum_count" -eq 3 ]]
+
 (
   cd "$work_dir"
-  sha256sum -c plaintext-sha256.txt
+  sha256sum -c "$(basename "$normalized_plaintext_checksum")"
 )
 
 [[ "$(jq -er '.schema_version' "$work_dir/manifest.json")" == 'myeongha-postgres-logical-backup-v1' ]]
