@@ -15,7 +15,7 @@ bad_manifest="$tmp_dir/privacy-bad-manifest.json"
 bad_plan="$tmp_dir/privacy-bad-plan.sql"
 bad_report="$tmp_dir/privacy-bad-report.json"
 
-"\${psql_base[@]}" <<'SQL'
+"${psql_base[@]}" <<'SQL'
 insert into auth.users(id) values
   ('a1000000-0000-0000-0000-000000000001'),
   ('a1000000-0000-0000-0000-000000000002')
@@ -117,9 +117,9 @@ node scripts/build-postgres-privacy-reconciliation-plan.mjs \
   --output "$plan" \
   --report "$report"
 
-"\${psql_base[@]}" -f "$plan" >/dev/null
+"${psql_base[@]}" -f "$plan" >/dev/null
 
-state=$("\${psql_base[@]}" -Atc "
+state=$("${psql_base[@]}" -Atc "
 select
   (select status from public.subjects where id='a2000000-0000-0000-0000-000000000001')||'|'||
   (select case when revoked_at is not null then '1' else '0' end from public.memory_items where id='a3000000-0000-0000-0000-000000000001')||'|'||
@@ -131,24 +131,24 @@ select
 [[ "$state" == "deletion_pending|1|1|1|1|1" ]] || fail "first replay state mismatch: $state"
 pass "first replay establishes revocation and account-deletion-start state"
 
-before=$("\${psql_base[@]}" -Atc "
+before=$("${psql_base[@]}" -Atc "
 select
   (select revoked_at::text from public.memory_items where id='a3000000-0000-0000-0000-000000000001')||'|'||
   (select revoked_at::text from public.life_facts where id='a4000000-0000-0000-0000-000000000001')||'|'||
   (select revoked_at::text from public.device_installations where id='a5000000-0000-0000-0000-000000000001');
 ")
 
-"\${psql_base[@]}" -f "$plan" >/dev/null
+"${psql_base[@]}" -f "$plan" >/dev/null
 
-after=$("\${psql_base[@]}" -Atc "
+after=$("${psql_base[@]}" -Atc "
 select
   (select revoked_at::text from public.memory_items where id='a3000000-0000-0000-0000-000000000001')||'|'||
   (select revoked_at::text from public.life_facts where id='a4000000-0000-0000-0000-000000000001')||'|'||
   (select revoked_at::text from public.device_installations where id='a5000000-0000-0000-0000-000000000001');
 ")
 [[ "$after" == "$before" ]] || fail "second replay rewrote terminal timestamps"
-[[ "$("\${psql_base[@]}" -Atc "select count(*) from public.data_deletion_jobs where id='a6000000-0000-0000-0000-000000000001';")" == "1" ]] || fail "second replay duplicated deletion job"
-[[ "$("\${psql_base[@]}" -Atc "select count(*) from public.outbox_events where id='a7000000-0000-0000-0000-000000000001';")" == "1" ]] || fail "second replay duplicated outbox event"
+[[ "$("${psql_base[@]}" -Atc "select count(*) from public.data_deletion_jobs where id='a6000000-0000-0000-0000-000000000001';")" == "1" ]] || fail "second replay duplicated deletion job"
+[[ "$("${psql_base[@]}" -Atc "select count(*) from public.outbox_events where id='a7000000-0000-0000-0000-000000000001';")" == "1" ]] || fail "second replay duplicated outbox event"
 pass "second identical replay is idempotent after subject becomes deletion_pending"
 
 node - "$report" <<'NODE'
@@ -213,7 +213,7 @@ node scripts/build-postgres-privacy-reconciliation-plan.mjs \
   --report "$bad_report"
 
 set +e
-bad_output=$("\${psql_base[@]}" -f "$bad_plan" 2>&1)
+bad_output=$("${psql_base[@]}" -f "$bad_plan" 2>&1)
 bad_rc=$?
 set -e
 [[ $bad_rc -ne 0 ]] || fail "missing terminal revoke state unexpectedly passed"
@@ -221,7 +221,7 @@ set -e
   echo "$bad_output" >&2
   fail "missing terminal revoke state failed for an unexpected reason"
 }
-[[ "$("\${psql_base[@]}" -Atc "select count(*) from public.memory_items where id='a3000000-0000-0000-0000-000000000002' and revoked_at is null;")" == "1" ]] || fail "failed replay mutated missing terminal state fixture"
+[[ "$("${psql_base[@]}" -Atc "select count(*) from public.memory_items where id='a3000000-0000-0000-0000-000000000002' and revoked_at is null;")" == "1" ]] || fail "failed replay mutated missing terminal state fixture"
 pass "deletion-pending replay fails closed when a required terminal revoke is absent"
 
 echo "PostgreSQL privacy reconciliation replay plan DB drill passed"
