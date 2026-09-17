@@ -131,6 +131,16 @@ export {
 } from './character-saju-bounded-renderer.js';
 
 export {
+  CHARACTER_SAJU_SEMANTIC_GUARD_FAILURE_CODES_V1,
+  CHARACTER_SAJU_SEMANTIC_GUARD_VERSION_V1,
+  guardCharacterSajuSemanticPreservationV1,
+  type CharacterSajuSemanticGuardDecisionV1,
+  type CharacterSajuSemanticGuardEvidenceV1,
+  type CharacterSajuSemanticGuardFailureCodeV1,
+  type CharacterSajuSemanticGuardFailureV1,
+} from './character-saju-semantic-guard.js';
+
+export {
   CharacterOutputGuardError,
   guardCharacterRendererOutput,
   type CharacterDialogueEnvelopeV1,
