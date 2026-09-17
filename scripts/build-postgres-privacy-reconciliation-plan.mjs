@@ -8,7 +8,7 @@ export const PRIVACY_RECONCILIATION_PLAN_SCHEMA_V1 =
   'myeongha-postgres-privacy-reconciliation-plan-v1';
 
 const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SHA256_RE = /^sha256:[0-9a-f]{64}$/i;
 
 const EVENT_SPECS = Object.freeze({
@@ -270,15 +270,19 @@ export function buildPrivacyReconciliationPlan(rawManifest) {
 
 function parseCliArgs(argv) {
   const values = {};
+  const allowed = new Set(['input', 'output', 'report']);
   for (let index = 0; index < argv.length; index += 1) {
     const key = argv[index];
     if (!key?.startsWith('--')) fail(`unexpected CLI argument: ${key ?? ''}`);
+    const name = key.slice(2);
+    if (!allowed.has(name)) fail(`unsupported CLI argument: ${key}`);
+    if (values[name] !== undefined) fail(`duplicate CLI argument: ${key}`);
     const value = argv[index + 1];
     if (value === undefined || value.startsWith('--')) fail(`missing value for ${key}`);
-    values[key.slice(2)] = value;
+    values[name] = value;
     index += 1;
   }
-  for (const required of ['input', 'output', 'report']) {
+  for (const required of allowed) {
     if (!values[required]) fail(`--${required} is required`);
   }
   return values;
