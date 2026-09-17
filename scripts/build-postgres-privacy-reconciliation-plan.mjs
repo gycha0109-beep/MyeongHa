@@ -11,84 +11,100 @@ const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SHA256_RE = /^sha256:[0-9a-f]{64}$/i;
 
+function sqlLiteral(value) {
+  return `'${String(value).replaceAll("'", "''")}'`;
+}
+
+function uuid(value) {
+  return `${sqlLiteral(value)}::uuid`;
+}
+
+function text(value) {
+  return `${sqlLiteral(value)}::text`;
+}
+
 const EVENT_SPECS = Object.freeze({
   ACCOUNT_DELETION_STARTED: {
     keys: ['deletionJobId', 'outboxEventId', 'requestDedupeKey', 'subjectId'],
-    sql(event) {
-      return commandCount(
-        'public.cmd_start_account_deletion_v1',
-        [
-          uuid(event.subjectId),
-          uuid(event.deletionJobId),
-          text(event.requestDedupeKey),
-          uuid(event.outboxEventId),
-        ],
-      );
+    call(event) {
+      return `public.cmd_start_account_deletion_v1(${[
+        uuid(event.subjectId),
+        uuid(event.deletionJobId),
+        text(event.requestDedupeKey),
+        uuid(event.outboxEventId),
+      ].join(', ')})`;
+    },
+    terminal(event) {
+      return [
+        `exists (select 1 from public.subjects s where s.id = ${uuid(event.subjectId)} and s.status = 'deletion_pending')`,
+        `exists (select 1 from public.data_deletion_jobs dj where dj.id = ${uuid(event.deletionJobId)} and dj.subject_id = ${uuid(event.subjectId)} and dj.scope = 'account' and dj.request_dedupe_key = ${text(event.requestDedupeKey)} and dj.status = 'running')`,
+        `not exists (select 1 from public.share_artifacts sa where sa.subject_id = ${uuid(event.subjectId)} and sa.status = 'active')`,
+        `not exists (select 1 from public.device_installations di where di.subject_id = ${uuid(event.subjectId)} and di.revoked_at is null)`,
+        `not exists (select 1 from public.notifications n where n.subject_id = ${uuid(event.subjectId)} and n.status in ('queued', 'ready'))`,
+      ].join(' and ');
     },
   },
   SHARE_ARTIFACT_REVOKED: {
     keys: ['shareArtifactId', 'subjectId'],
-    sql(event) {
-      return commandCount('public.cmd_revoke_share_artifact_v1', [
-        uuid(event.subjectId),
-        uuid(event.shareArtifactId),
-      ]);
+    call(event) {
+      return `public.cmd_revoke_share_artifact_v1(${uuid(event.subjectId)}, ${uuid(event.shareArtifactId)})`;
+    },
+    terminal(event) {
+      return `exists (select 1 from public.share_artifacts sa where sa.id = ${uuid(event.shareArtifactId)} and sa.subject_id = ${uuid(event.subjectId)} and sa.status in ('revoked', 'expired'))`;
     },
   },
   DEVICE_INSTALLATION_REVOKED: {
     keys: ['installationId', 'subjectId'],
-    sql(event) {
-      return commandCount('public.cmd_revoke_device_installation_v1', [
-        uuid(event.subjectId),
-        uuid(event.installationId),
-      ]);
+    call(event) {
+      return `public.cmd_revoke_device_installation_v1(${uuid(event.subjectId)}, ${uuid(event.installationId)})`;
+    },
+    terminal(event) {
+      return `exists (select 1 from public.device_installations di where di.id = ${uuid(event.installationId)} and di.subject_id = ${uuid(event.subjectId)} and di.revoked_at is not null)`;
     },
   },
   MEMORY_ITEM_REVOKED: {
     keys: ['memoryItemId', 'subjectId'],
-    sql(event) {
-      return commandCount('public.cmd_revoke_memory_item_v1', [
-        uuid(event.subjectId),
-        uuid(event.memoryItemId),
-      ]);
+    call(event) {
+      return `public.cmd_revoke_memory_item_v1(${uuid(event.subjectId)}, ${uuid(event.memoryItemId)})`;
+    },
+    terminal(event) {
+      return `exists (select 1 from public.memory_items mi where mi.id = ${uuid(event.memoryItemId)} and mi.subject_id = ${uuid(event.subjectId)} and mi.revoked_at is not null)`;
     },
   },
   LIFE_FACT_REVOKED: {
     keys: ['lifeFactId', 'subjectId'],
-    sql(event) {
-      return commandCount('public.cmd_revoke_life_fact_v1', [
-        uuid(event.subjectId),
-        uuid(event.lifeFactId),
-      ]);
+    call(event) {
+      return `public.cmd_revoke_life_fact_v1(${uuid(event.subjectId)}, ${uuid(event.lifeFactId)})`;
+    },
+    terminal(event) {
+      return `exists (select 1 from public.life_facts lf where lf.id = ${uuid(event.lifeFactId)} and lf.subject_id = ${uuid(event.subjectId)} and lf.revoked_at is not null)`;
     },
   },
   MEMORY_CHARACTER_GRANT_REVOKED: {
     keys: ['characterId', 'memoryItemId', 'subjectId'],
-    sql(event) {
-      return commandCount('public.cmd_revoke_memory_character_grant_v1', [
-        uuid(event.subjectId),
-        uuid(event.memoryItemId),
-        text(event.characterId),
-      ]);
+    call(event) {
+      return `public.cmd_revoke_memory_character_grant_v1(${uuid(event.subjectId)}, ${uuid(event.memoryItemId)}, ${text(event.characterId)})`;
+    },
+    terminal(event) {
+      return `exists (select 1 from public.record_access_grants g where g.subject_id = ${uuid(event.subjectId)} and g.memory_item_id = ${uuid(event.memoryItemId)} and g.grantee_character_id = ${text(event.characterId)} and g.revoked_at is not null)`;
     },
   },
   LIFE_FACT_CHARACTER_GRANT_REVOKED: {
     keys: ['characterId', 'lifeFactId', 'subjectId'],
-    sql(event) {
-      return commandCount('public.cmd_revoke_life_fact_character_grant_v1', [
-        uuid(event.subjectId),
-        uuid(event.lifeFactId),
-        text(event.characterId),
-      ]);
+    call(event) {
+      return `public.cmd_revoke_life_fact_character_grant_v1(${uuid(event.subjectId)}, ${uuid(event.lifeFactId)}, ${text(event.characterId)})`;
+    },
+    terminal(event) {
+      return `exists (select 1 from public.record_access_grants g where g.subject_id = ${uuid(event.subjectId)} and g.life_fact_id = ${uuid(event.lifeFactId)} and g.grantee_character_id = ${text(event.characterId)} and g.revoked_at is not null)`;
     },
   },
   CHARACTER_RECORDS_FORGOTTEN: {
     keys: ['characterId', 'subjectId'],
-    sql(event) {
-      return commandCount('public.cmd_forget_character_records_v1', [
-        uuid(event.subjectId),
-        text(event.characterId),
-      ]);
+    call(event) {
+      return `public.cmd_forget_character_records_v1(${uuid(event.subjectId)}, ${text(event.characterId)})`;
+    },
+    terminal(event) {
+      return `not exists (select 1 from public.record_access_grants g where g.subject_id = ${uuid(event.subjectId)} and g.grantee_character_id = ${text(event.characterId)} and g.revoked_at is null)`;
     },
   },
 });
@@ -111,6 +127,7 @@ function requireString(value, field, maxLength = 256) {
     fail(`${field} must be a non-empty string`);
   }
   if (value.length > maxLength) fail(`${field} exceeds ${maxLength} characters`);
+  if (value.includes('\u0000')) fail(`${field} must not contain a NUL byte`);
   return value;
 }
 
@@ -138,20 +155,43 @@ function assertExactKeys(record, allowedKeys, field) {
   if (unknown.length > 0) fail(`${field} contains unsupported fields: ${unknown.join(', ')}`);
 }
 
-function sqlLiteral(value) {
-  return `'${String(value).replaceAll("'", "''")}'`;
+function commandCount(call) {
+  return `select count(*) as applied_event_row_count from ${call};`;
 }
 
-function uuid(value) {
-  return `${sqlLiteral(value)}::uuid`;
+function terminalValidation(predicate, message) {
+  return [
+    'do $myeongha_privacy_reconcile$',
+    'begin',
+    `  if not (${predicate}) then`,
+    `    raise exception using errcode = '23514', message = ${sqlLiteral(message)};`,
+    '  end if;',
+    'end',
+    '$myeongha_privacy_reconcile$;',
+  ].join('\n');
 }
 
-function text(value) {
-  return `${sqlLiteral(value)}::text`;
-}
-
-function commandCount(name, args) {
-  return `select count(*) as applied_event_row_count from ${name}(\n  ${args.join(',\n  ')}\n);`;
+function deletionAwareReplay(event, spec) {
+  const call = spec.call(event);
+  return [
+    'do $myeongha_privacy_reconcile$',
+    'declare',
+    '  v_subject_status text;',
+    'begin',
+    `  select s.status into v_subject_status from public.subjects s where s.id = ${uuid(event.subjectId)};`,
+    "  if v_subject_status = 'active' then",
+    `    perform 1 from ${call};`,
+    "  elsif v_subject_status = 'deletion_pending' then",
+    `    if not (${spec.terminal(event)}) then`,
+    "      raise exception using errcode = '23514', message = 'privacy reconciliation terminal state is missing for deletion-pending subject';",
+    '    end if;',
+    '  else',
+    "    raise exception using errcode = '23514', message = 'privacy reconciliation requires active or deletion-pending subject';",
+    '  end if;',
+    'end',
+    '$myeongha_privacy_reconcile$;',
+    'select 1::bigint as applied_event_row_count;',
+  ].join('\n');
 }
 
 function normalizeEvent(rawEvent, index, backupCompletedAt, incidentReferenceUtc) {
@@ -204,7 +244,7 @@ export function buildPrivacyReconciliationPlan(rawManifest) {
     fail(`schema must equal ${PRIVACY_RECONCILIATION_MANIFEST_SCHEMA_V1}`);
   }
 
-  const manifestId = requireUuid(manifest.manifestId, 'manifestId');
+  requireUuid(manifest.manifestId, 'manifestId');
   const backupRunId = requirePositiveInteger(manifest.backupRunId, 'backupRunId');
   const backupCompletedAt = requireInstant(manifest.backupCompletedAt, 'backupCompletedAt');
   const incidentReferenceUtc = requireInstant(manifest.incidentReferenceUtc, 'incidentReferenceUtc');
@@ -234,11 +274,32 @@ export function buildPrivacyReconciliationPlan(rawManifest) {
 
   events.sort((left, right) => left.sequence - right.sequence);
 
+  const deletionSubjects = new Set(
+    events
+      .filter((event) => event.type === 'ACCOUNT_DELETION_STARTED')
+      .map((event) => event.subjectId),
+  );
+
   const eventTypeCounts = {};
   const statements = [];
   for (const event of events) {
     eventTypeCounts[event.type] = (eventTypeCounts[event.type] ?? 0) + 1;
-    statements.push(EVENT_SPECS[event.type].sql(event));
+    const spec = EVENT_SPECS[event.type];
+    if (event.type === 'ACCOUNT_DELETION_STARTED') {
+      statements.push(commandCount(spec.call(event)));
+      statements.push(
+        terminalValidation(
+          spec.terminal(event),
+          'account deletion start replay did not establish all required revocation postconditions',
+        ),
+      );
+      continue;
+    }
+    if (deletionSubjects.has(event.subjectId)) {
+      statements.push(deletionAwareReplay(event, spec));
+      continue;
+    }
+    statements.push(commandCount(spec.call(event)));
   }
 
   const sql = [
@@ -253,14 +314,15 @@ export function buildPrivacyReconciliationPlan(rawManifest) {
   const report = {
     schema: PRIVACY_RECONCILIATION_PLAN_SCHEMA_V1,
     manifestSchema: PRIVACY_RECONCILIATION_MANIFEST_SCHEMA_V1,
-    manifestId,
     backupRunId,
     eventCount: events.length,
     eventTypeCounts,
     privacyReconciliationScope: 'revocation-and-account-deletion-start-only',
+    replayIdempotency: 'transactional-terminal-state-validated',
     accountDeletionFinalization: 'blocked-by-P0-PR-01-and-issue-964',
     commerceRetentionDecision: 'blocked-by-P0-PR-01-and-issue-964',
     durableSourceAuthority: 'supplied-manifest-only-not-proven',
+    outputContainsIdentifiers: false,
     outputContainsRowPayloads: false,
     drReady: false,
   };
