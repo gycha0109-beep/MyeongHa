@@ -17,12 +17,25 @@ const [workflow, postdeployVerify, config, migrationFiles] = await Promise.all([
 ]);
 
 const requiredWorkflowFragments = [
-  "branches:\n      - main",
-  "paths:\n      - 'supabase/migrations/**'",
-  "- '.github/workflows/supabase-production.yml'",
-  "- 'scripts/run-production-platform-integrity-postdeploy-verify.sh'",
-  "- 'scripts/run-production-platform-integrity-read-audit.sh'",
-  "- 'scripts/run-production-platform-integrity-data-api-surface-audit.sh'",
+  "push:\n    branches:\n      - main\n  workflow_dispatch:",
+  'change-gate:',
+  'name: detect-production-db-relevance',
+  'fetch-depth: 0',
+  'requires_deploy: ${{ steps.relevance.outputs.requires_deploy }}',
+  'EVENT_NAME: ${{ github.event_name }}',
+  'BEFORE_SHA: ${{ github.event.before }}',
+  'CURRENT_SHA: ${{ github.sha }}',
+  "if [[ \"$EVENT_NAME\" == 'workflow_dispatch' ]]; then",
+  "reason='workflow_dispatch forces governed Production verification'",
+  '"$BEFORE_SHA" =~ ^0+$',
+  "reason='push before SHA is unavailable; fail closed'",
+  'git cat-file -e "${BEFORE_SHA}^{commit}"',
+  "reason='push before SHA is not present in checkout; fail closed'",
+  'git diff --name-only "$BEFORE_SHA" "$CURRENT_SHA"',
+  "'^(supabase/migrations/|[.]github/workflows/supabase-production[.]yml$|scripts/run-production-platform-integrity-postdeploy-verify[.]sh$|scripts/run-production-platform-integrity-read-audit[.]sh$|scripts/run-production-platform-integrity-data-api-surface-audit[.]sh$)'",
+  'echo "requires_deploy=$requires_deploy" >> "$GITHUB_OUTPUT"',
+  'needs: change-gate',
+  "if: ${{ needs.change-gate.outputs.requires_deploy == 'true' }}",
   `SUPABASE_PROJECT_ID: ${expectedProjectRef}`,
   'uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1',
   'uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520 # v3.0.0',
@@ -62,6 +75,7 @@ for (const fragment of requiredWorkflowFragments) {
 }
 
 const forbiddenWorkflowFragments = [
+  "    paths:\n      - 'supabase/migrations/**'",
   'uses: actions/checkout@v7.0.1',
   'uses: supabase/setup-cli@v3.0.0',
   '--include-seed',
@@ -154,4 +168,4 @@ if (!migrationFiles.includes('0010_auth_owner.sql')) {
   throw new Error('Expected baseline migration 0010_auth_owner.sql is missing.');
 }
 
-console.log(`MyeongHa Supabase deployment configuration + explicit Session Pooler / fallback post-deploy verification passed for ${migrationFiles.length} migration files.`);
+console.log(`MyeongHa Supabase deployment configuration + auditable main-push gate + explicit Session Pooler / fallback post-deploy verification passed for ${migrationFiles.length} migration files.`);
