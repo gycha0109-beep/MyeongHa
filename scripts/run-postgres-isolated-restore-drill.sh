@@ -137,11 +137,41 @@ if [[ ${#application_roles[@]} -eq 0 ]]; then
   exit 1
 fi
 
+# PostgreSQL role dumps may preserve the original grantor with GRANTED BY.
+# Hosted Production used postgres as grantor for application-to-application
+# membership edges, while the isolated Supabase image intentionally gives that
+# postgres role a different ADMIN-option graph. Grantor identity is provenance,
+# not serving authority. Normalize only the exact MyeongHa-to-MyeongHa membership
+# shape after checksum verification, then verify the resulting membership graph.
+mapfile -t normalized_application_memberships < <(
+  sed -nE 's/^[[:space:]]*GRANT[[:space:]]+"(myeongha_[a-z0-9_]+)"[[:space:]]+TO[[:space:]]+"(myeongha_[a-z0-9_]+)"[[:space:]]+WITH[[:space:]]+INHERIT[[:space:]]+(TRUE|FALSE)[[:space:]]+GRANTED[[:space:]]+BY[[:space:]]+"postgres";[[:space:]]*$/\1|\2|\3/p' "$work_dir/roles.sql"
+)
+
+unexpected_postgres_grantor_lines="$(
+  grep -E 'GRANTED[[:space:]]+BY[[:space:]]+"postgres";[[:space:]]*$' "$work_dir/roles.sql" \
+    | grep -Ev '^[[:space:]]*GRANT[[:space:]]+"myeongha_[a-z0-9_]+"[[:space:]]+TO[[:space:]]+"myeongha_[a-z0-9_]+"[[:space:]]+WITH[[:space:]]+INHERIT[[:space:]]+(TRUE|FALSE)[[:space:]]+GRANTED[[:space:]]+BY[[:space:]]+"postgres";[[:space:]]*$' \
+    || true
+)"
+if [[ -n "$unexpected_postgres_grantor_lines" ]]; then
+  echo 'roles.sql contains an unsupported postgres grantor-provenance statement.' >&2
+  printf '%s\n' "$unexpected_postgres_grantor_lines" >&2
+  exit 1
+fi
+
+portable_roles="$work_dir/roles.portable.sql"
+sed -E 's/^([[:space:]]*GRANT[[:space:]]+"myeongha_[a-z0-9_]+"[[:space:]]+TO[[:space:]]+"myeongha_[a-z0-9_]+"[[:space:]]+WITH[[:space:]]+INHERIT[[:space:]]+(TRUE|FALSE))[[:space:]]+GRANTED[[:space:]]+BY[[:space:]]+"postgres";[[:space:]]*$/\1;/' \
+  "$work_dir/roles.sql" > "$portable_roles"
+
+if grep -Eq 'GRANTED[[:space:]]+BY[[:space:]]+"postgres";[[:space:]]*$' "$portable_roles"; then
+  echo 'Portable roles replay still contains postgres grantor provenance.' >&2
+  exit 1
+fi
+
 roles_stdout="$work_dir/roles-restore.stdout"
 roles_stderr="$work_dir/roles-restore.stderr"
 set +e
 psql "$RESTORE_ADMIN_DATABASE_URL" --set ON_ERROR_STOP=0 --set VERBOSITY=terse \
-  --file "$work_dir/roles.sql" >"$roles_stdout" 2>"$roles_stderr"
+  --file "$portable_roles" >"$roles_stdout" 2>"$roles_stderr"
 roles_psql_status=$?
 set -e
 if [[ "$roles_psql_status" -ne 0 ]]; then
@@ -179,6 +209,20 @@ for role_name in "${application_roles[@]}"; do
   fi
 done
 
+for membership_edge in "${normalized_application_memberships[@]}"; do
+  IFS='|' read -r granted_role member_role inherit_value <<< "$membership_edge"
+  expected_inherit='false'
+  if [[ "$inherit_value" == 'TRUE' ]]; then
+    expected_inherit='true'
+  fi
+  membership_count="$(psql "$RESTORE_DATABASE_URL" -At --set ON_ERROR_STOP=1 -c \
+    "select count(*) from pg_auth_members am join pg_roles granted_role on granted_role.oid = am.roleid join pg_roles member_role on member_role.oid = am.member where granted_role.rolname='${granted_role}' and member_role.rolname='${member_role}' and am.inherit_option = ${expected_inherit};")"
+  if [[ "$membership_count" != '1' ]]; then
+    echo "Application role membership was not restored exactly once: $membership_edge" >&2
+    exit 1
+  fi
+done
+
 unsafe_application_roles="$(psql "$RESTORE_DATABASE_URL" -At --set ON_ERROR_STOP=1 -c \
   "select count(*) from pg_roles where rolname like 'myeongha\\_%' escape '\\' and (rolsuper or rolbypassrls);")"
 [[ "$unsafe_application_roles" == '0' ]]
@@ -206,6 +250,7 @@ restore_completed_epoch="$(date -u +%s)"
 duration_seconds=$((restore_completed_epoch - restore_started_epoch))
 server_version="$(psql "$RESTORE_DATABASE_URL" -At --set ON_ERROR_STOP=1 -c 'show server_version;')"
 provider_managed_roles_absent_json="$(printf '%s\n' "${provider_managed_roles_absent[@]}" | jq -Rsc 'split("\n") | map(select(length > 0))')"
+normalized_application_membership_grantor_count="${#normalized_application_memberships[@]}"
 
 mkdir -p "$(dirname "$RESTORE_EVIDENCE_PATH")"
 jq -n \
@@ -217,6 +262,7 @@ jq -n \
   --arg restore_completed_at_utc "$restore_completed_at" \
   --argjson isolated_restore_validation_duration_seconds "$duration_seconds" \
   --argjson provider_managed_roles_absent_from_target "$provider_managed_roles_absent_json" \
+  --argjson normalized_application_membership_grantor_count "$normalized_application_membership_grantor_count" \
   '{
     schema_version: $schema_version,
     source_sha: $source_sha,
@@ -230,6 +276,8 @@ jq -n \
     isolated_restore_validation_duration_seconds: $isolated_restore_validation_duration_seconds,
     archive_integrity: "pass",
     application_role_restore: "pass",
+    application_role_membership_restore: "pass",
+    normalized_application_membership_grantor_count: $normalized_application_membership_grantor_count,
     application_owner_restore: "pass",
     provider_managed_role_policy: "target-baseline-authoritative-no-fabrication",
     provider_managed_roles_absent_from_target: $provider_managed_roles_absent_from_target,
