@@ -121,7 +121,7 @@ function compareSemanticSegment(input: {
     failures.push(failure('STRUCTURE_MISMATCH', 'Semantic segment sourceUnitRefs do not match the deterministic reading plan.', { segmentIndex: input.index }));
   }
   if (input.raw.text !== input.expected.text) {
-    failures.push(failure('EXACT_CORE_TEXT_MISMATCH', 'Exact-core semantic text must equal the source canonicalMeaning exactly.', { segmentIndex: input.index, unitRef: input.expected.sourceUnitRefs[0] }));
+    failures.push(failure('EXACT_CORE_TEXT_MISMATCH', 'Exact-core semantic text must equal the source canonicalMeaning exactly.', { segmentIndex: input.index, unitRef: input.expected.sourceUnitRefs[0]! }));
   }
   if (input.raw.purpose !== input.expected.purpose) {
     failures.push(failure('STRUCTURE_MISMATCH', 'Semantic segment purpose does not match the reading plan.', { segmentIndex: input.index }));
@@ -196,7 +196,7 @@ function compareSegments(input: {
     const missing = expectedSegments.slice(rawSegments.length);
     for (const segment of missing) {
       if (segment.kind === 'semantic_realization') {
-        failures.push(failure('MISSING_SELECTED_UNIT', 'Character output omitted a selected semantic unit.', { unitRef: segment.sourceUnitRefs[0] }));
+        failures.push(failure('MISSING_SELECTED_UNIT', 'Character output omitted a selected semantic unit.', { unitRef: segment.sourceUnitRefs[0]! }));
       } else if (segment.kind === 'protected_disclosure') {
         failures.push(failure('PROTECTED_DISCLOSURE_MISSING', 'Character output omitted a required protected disclosure.', { disclosureRef: segment.disclosureRef }));
       } else {
