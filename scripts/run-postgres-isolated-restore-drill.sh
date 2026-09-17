@@ -16,10 +16,6 @@ if [[ ! "$EXPECTED_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
   exit 1
 fi
 
-# Safety invariant: this harness has no remote restore target input.
-# Both connections are fixed to the ephemeral Supabase PostgreSQL service on loopback.
-# supabase_admin is used only for privileged logical replay; ordinary postgres is used
-# for post-restore validation so evidence does not depend on a superuser reader.
 readonly RESTORE_DATABASE_URL='postgresql://postgres:restore-drill@127.0.0.1:5432/postgres'
 readonly RESTORE_ADMIN_DATABASE_URL='postgresql://supabase_admin:restore-drill@127.0.0.1:5432/postgres'
 
@@ -70,9 +66,6 @@ cmp -s "$work_dir/listing.txt" "$work_dir/expected.txt"
 tar -xzf "$work_dir/restore.tar.gz" -C "$work_dir"
 rm -f "$work_dir/restore.tar.gz"
 
-# Historical governed artifacts recorded the producing runner's absolute paths
-# in plaintext-sha256.txt. Accept only the three governed dump members and
-# normalize their paths to local basenames before integrity verification.
 normalized_plaintext_checksum="$work_dir/plaintext-sha256.normalized.txt"
 declare -A seen_plaintext_checksum_names=()
 checksum_count=0
@@ -113,10 +106,6 @@ done < "$work_dir/plaintext-sha256.txt"
 restore_started_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
 restore_started_epoch="$(date -u +%s)"
 
-# The Supabase CLI role dump can contain provider-managed role settings that
-# exist in hosted Production but are intentionally not recreated by every
-# self-hosted image revision. Never fabricate those roles in the drill target.
-# Application-owned role creation remains fail-closed and must use myeongha_*.
 unexpected_role_creations="$(
   grep -Ei '^[[:space:]]*CREATE[[:space:]]+(ROLE|USER)[[:space:]]+' "$work_dir/roles.sql" \
     | grep -Eiv '^[[:space:]]*CREATE[[:space:]]+(ROLE|USER)[[:space:]]+"myeongha_[a-z0-9_]+"' \
@@ -137,12 +126,6 @@ if [[ ${#application_roles[@]} -eq 0 ]]; then
   exit 1
 fi
 
-# PostgreSQL role dumps may preserve the original grantor with GRANTED BY.
-# Hosted Production used postgres as grantor for application-to-application
-# membership edges, while the isolated Supabase image intentionally gives that
-# postgres role a different ADMIN-option graph. Grantor identity is provenance,
-# not serving authority. Normalize only the exact MyeongHa-to-MyeongHa membership
-# shape after checksum verification, then verify the resulting membership graph.
 mapfile -t normalized_application_memberships < <(
   sed -nE 's/^[[:space:]]*GRANT[[:space:]]+"(myeongha_[a-z0-9_]+)"[[:space:]]+TO[[:space:]]+"(myeongha_[a-z0-9_]+)"[[:space:]]+WITH[[:space:]]+INHERIT[[:space:]]+(TRUE|FALSE)[[:space:]]+GRANTED[[:space:]]+BY[[:space:]]+"postgres";[[:space:]]*$/\1|\2|\3/p' "$work_dir/roles.sql"
 )
@@ -180,8 +163,6 @@ if [[ "$roles_psql_status" -ne 0 ]]; then
   exit "$roles_psql_status"
 fi
 
-# Continue past SQL errors only to classify them. The sole tolerated SQL error
-# is a missing provider-managed supabase_* role. Every other ERROR remains fatal.
 unexpected_role_errors="$(
   grep -E 'ERROR:' "$roles_stderr" \
     | grep -Ev 'ERROR:[[:space:]]+role "supabase_[a-z0-9_]+" does not exist$' \
@@ -232,18 +213,58 @@ if [[ ${#provider_managed_roles_absent[@]} -gt 0 ]]; then
 fi
 
 psql "$RESTORE_ADMIN_DATABASE_URL" --single-transaction --set ON_ERROR_STOP=1 --file "$work_dir/schema.sql"
-psql "$RESTORE_ADMIN_DATABASE_URL" --single-transaction --set ON_ERROR_STOP=1 \
-  --command 'SET session_replication_role = replica' --file "$work_dir/data.sql"
 
-# Baseline structural and authorization checks run through the ordinary postgres
-# principal rather than the privileged replay principal. No user-owned row contents
-# are emitted.
+target_copy_catalog="$work_dir/target-copy-catalog.json"
+psql "$RESTORE_DATABASE_URL" -At --set ON_ERROR_STOP=1 -c "
+  select coalesce(json_agg(row_to_json(c) order by c.table_schema, c.table_name, c.ordinal_position), '[]'::json)::text
+  from (
+    select
+      table_schema,
+      table_name,
+      column_name,
+      ordinal_position,
+      (is_nullable = 'NO') as not_null,
+      (column_default is not null) as has_default,
+      (is_identity = 'YES') as is_identity,
+      (is_generated <> 'NEVER') as is_generated
+    from information_schema.columns
+    where table_schema not in ('pg_catalog', 'information_schema')
+  ) c;
+" > "$target_copy_catalog"
+
+portable_data="$work_dir/data.portable.sql"
+portable_data_report="$work_dir/data.portable.report.json"
+node scripts/build-postgres-portable-data-replay.mjs \
+  --input "$work_dir/data.sql" \
+  --output "$portable_data" \
+  --target-catalog "$target_copy_catalog" \
+  --report "$portable_data_report"
+
+[[ "$(jq -er '.schema_version' "$portable_data_report")" == 'myeongha-postgres-portable-data-replay-v1' ]]
+[[ "$(jq -er '.application_schema_policy' "$portable_data_report")" == 'public-fail-closed' ]]
+[[ "$(jq -er '.provider_schema_policy' "$portable_data_report")" == 'target-compatible-copy-only' ]]
+[[ "$(jq -er '.source_copy_blocks > 0' "$portable_data_report")" == 'true' ]]
+[[ "$(jq -er '.replayed_copy_blocks > 0' "$portable_data_report")" == 'true' ]]
+[[ "$(jq -er '[.replayed_application_relations[] | select(. == "public.subjects")] | length == 1' "$portable_data_report")" == 'true' ]]
+[[ "$(jq -er '[.replayed_provider_relations[] | select(. == "auth.users")] | length == 1' "$portable_data_report")" == 'true' ]]
+
+provider_managed_data_blocks_skipped="$(jq -r '.skipped_provider_copy_blocks | length' "$portable_data_report")"
+if (( provider_managed_data_blocks_skipped > 0 )); then
+  echo 'Provider-managed COPY blocks skipped because the isolated target schema is older or missing those provider relations:'
+  jq -r '.skipped_provider_copy_blocks[] | "- \(.schema).\(.table): \(.reason)"' "$portable_data_report"
+fi
+
+psql "$RESTORE_ADMIN_DATABASE_URL" --single-transaction --set ON_ERROR_STOP=1 \
+  --command 'SET session_replication_role = replica' --file "$portable_data"
+
 for table_name in subjects birth_profiles products product_offers data_deletion_jobs; do
   [[ "$(psql "$RESTORE_DATABASE_URL" -At --set ON_ERROR_STOP=1 -c "select to_regclass('public.${table_name}') is not null;")" == 't' ]]
 done
 [[ "$(psql "$RESTORE_DATABASE_URL" -At --set ON_ERROR_STOP=1 -c "select count(*) from pg_roles where rolname='myeongha_api_executor' and not rolsuper and not rolbypassrls;")" == '1' ]]
 [[ "$(psql "$RESTORE_DATABASE_URL" -At --set ON_ERROR_STOP=1 -c \
   "select r.rolname from pg_proc p join pg_roles r on r.oid = p.proowner where p.oid = to_regprocedure('public.cmd_activate_content_release_v1(uuid,boolean)');")" == 'myeongha_content_publication_owner' ]]
+[[ "$(psql "$RESTORE_DATABASE_URL" -At --set ON_ERROR_STOP=1 -c \
+  "select count(*) from public.subjects s left join auth.users u on u.id = s.auth_user_id where s.auth_user_id is not null and u.id is null;")" == '0' ]]
 
 restore_completed_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
 restore_completed_epoch="$(date -u +%s)"
@@ -251,6 +272,13 @@ duration_seconds=$((restore_completed_epoch - restore_started_epoch))
 server_version="$(psql "$RESTORE_DATABASE_URL" -At --set ON_ERROR_STOP=1 -c 'show server_version;')"
 provider_managed_roles_absent_json="$(printf '%s\n' "${provider_managed_roles_absent[@]}" | jq -Rsc 'split("\n") | map(select(length > 0))')"
 normalized_application_membership_grantor_count="${#normalized_application_memberships[@]}"
+provider_managed_data_skips_json="$(jq -c '.skipped_provider_copy_blocks' "$portable_data_report")"
+source_data_copy_blocks="$(jq -r '.source_copy_blocks' "$portable_data_report")"
+replayed_data_copy_blocks="$(jq -r '.replayed_copy_blocks' "$portable_data_report")"
+provider_managed_data_full_restore='true'
+if (( provider_managed_data_blocks_skipped > 0 )); then
+  provider_managed_data_full_restore='false'
+fi
 
 mkdir -p "$(dirname "$RESTORE_EVIDENCE_PATH")"
 jq -n \
@@ -263,6 +291,11 @@ jq -n \
   --argjson isolated_restore_validation_duration_seconds "$duration_seconds" \
   --argjson provider_managed_roles_absent_from_target "$provider_managed_roles_absent_json" \
   --argjson normalized_application_membership_grantor_count "$normalized_application_membership_grantor_count" \
+  --argjson source_data_copy_blocks "$source_data_copy_blocks" \
+  --argjson replayed_data_copy_blocks "$replayed_data_copy_blocks" \
+  --argjson provider_managed_data_blocks_skipped "$provider_managed_data_blocks_skipped" \
+  --argjson provider_managed_data_skips "$provider_managed_data_skips_json" \
+  --argjson provider_managed_data_full_restore "$provider_managed_data_full_restore" \
   '{
     schema_version: $schema_version,
     source_sha: $source_sha,
@@ -281,6 +314,14 @@ jq -n \
     application_owner_restore: "pass",
     provider_managed_role_policy: "target-baseline-authoritative-no-fabrication",
     provider_managed_roles_absent_from_target: $provider_managed_roles_absent_from_target,
+    provider_managed_data_policy: "target-compatible-copy-only-after-checksum",
+    source_data_copy_blocks: $source_data_copy_blocks,
+    replayed_data_copy_blocks: $replayed_data_copy_blocks,
+    provider_managed_data_blocks_skipped: $provider_managed_data_blocks_skipped,
+    provider_managed_data_skips: $provider_managed_data_skips,
+    provider_managed_data_full_restore: $provider_managed_data_full_restore,
+    auth_users_restore: "pass",
+    subject_auth_user_referential_integrity: "pass",
     required_tables: "pass",
     authorization_baseline: "pass",
     privacy_reconciliation: "not_exercised_by_this_workflow",
