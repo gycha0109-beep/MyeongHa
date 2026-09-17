@@ -59,7 +59,23 @@ Only existing DB command authority is used:
 | `LIFE_FACT_CHARACTER_GRANT_REVOKED` | `cmd_revoke_life_fact_character_grant_v1` |
 | `CHARACTER_RECORDS_FORGOTTEN` | `cmd_forget_character_records_v1` |
 
-The generated SQL does not issue direct `DELETE`, `TRUNCATE`, `UPDATE public.*`, or `INSERT INTO` statements. It calls the governed idempotent command surfaces and returns only row counts from those calls.
+The generated SQL does not issue direct `DELETE`, `TRUNCATE`, `UPDATE public.*`, or `INSERT INTO` statements. It mutates state only through the governed command surfaces. Read-only terminal-state checks are added around deletion-pending subjects so the complete transaction can be replayed safely after a prior successful run.
+
+## Replay idempotency
+
+The entire plan runs in one transaction.
+
+For a subject that also has an `ACCOUNT_DELETION_STARTED` event, earlier standalone revoke commands can only run while that subject is active. After the first successful replay, the subject becomes `deletion_pending`. A second replay therefore validates the already-established terminal revoke state instead of trying to invoke an active-subject-only command again.
+
+The account-deletion-start replay also validates its current v1 postconditions after the idempotent command call:
+
+- subject is `deletion_pending`
+- the exact account deletion job is `running`
+- no active Share Artifact remains
+- no unrevoked Device Installation remains
+- no queued/ready Notification remains
+
+A missing terminal state aborts the transaction.
 
 ## Deliberately blocked
 
