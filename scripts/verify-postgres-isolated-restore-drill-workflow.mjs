@@ -121,10 +121,15 @@ const requiredHarnessFragments = [
   '--input "$work_dir/data.sql"',
   '--target-catalog "$target_copy_catalog"',
   '--report "$portable_data_report"',
-  'target-compatible-copy-only',
+  'require_report_contract',
+  'target-compatible-column-projection',
   'public.subjects',
   'auth.users',
-  'Provider-managed COPY blocks skipped because the isolated target schema is older or missing those provider relations:',
+  'auth.users.id was not retained in portable replay',
+  'Provider-managed COPY blocks projected to columns supported by the isolated target:',
+  'Provider-managed COPY blocks skipped because the isolated target relation cannot safely accept them:',
+  'provider_managed_data_blocks_projected',
+  'provider_managed_data_projections',
   'psql "$RESTORE_ADMIN_DATABASE_URL" --single-transaction --set ON_ERROR_STOP=1',
   "--command 'SET session_replication_role = replica' --file \"$portable_data\"",
   'subjects birth_profiles products product_offers data_deletion_jobs',
@@ -142,9 +147,10 @@ const requiredHarnessFragments = [
   'application_owner_restore: "pass"',
   'provider_managed_role_policy: "target-baseline-authoritative-no-fabrication"',
   'provider_managed_roles_absent_from_target',
-  'provider_managed_data_policy: "target-compatible-copy-only-after-checksum"',
+  'provider_managed_data_policy: "target-compatible-column-projection-after-checksum"',
   'provider_managed_data_full_restore',
-  'auth_users_restore: "pass"',
+  'auth_users_restore: "identity-continuity-pass"',
+  'auth_users_restore_mode',
   'subject_auth_user_referential_integrity: "pass"',
   'restore_target: "github-actions-loopback-supabase-postgres"',
   'privacy_reconciliation: "not_exercised_by_this_workflow"',
@@ -176,16 +182,21 @@ for (const fragment of forbiddenHarnessFragments) {
 }
 
 const requiredPortableReplayFragments = [
-  'myeongha-postgres-portable-data-replay-v1',
+  'myeongha-postgres-portable-data-replay-v2',
   "application_schema_policy: 'public-fail-closed'",
-  "provider_schema_policy: 'target-compatible-copy-only'",
+  "provider_schema_policy: 'target-compatible-column-projection'",
   "if (line.startsWith('COPY '))",
   'Application COPY target mismatch',
   'target_relation_missing',
-  'source_columns_missing_from_target',
+  'source_columns_projected_to_target',
   'target_requires_unbacked_columns',
+  'no_copyable_shared_columns',
+  'projectCopyRow',
+  'COPY row field count mismatch',
   'COPY block missing terminator',
+  'projected_provider_copy_blocks',
   'skipped_provider_copy_blocks',
+  'replayed_provider_copy_blocks',
   'replayed_provider_relations',
   'replayed_application_relations',
 ];
@@ -206,8 +217,10 @@ const requiredRunbookFragments = [
   'provider-managed `supabase_*` role',
   'must not fabricate missing provider-managed roles',
   'provider-managed COPY',
+  'column projection',
   '`auth.users`',
   '`subjects.auth_user_id`',
+  'identity continuity',
   'privacy reconciliation is not exercised by the workflow',
   'DR Ready = FALSE / NOT EVIDENCED',
 ];
@@ -226,6 +239,8 @@ try {
     { table_schema: 'auth', table_name: 'audit_events', column_name: 'id', ordinal_position: 1, not_null: true, has_default: false, is_identity: false, is_generated: false },
     { table_schema: 'auth', table_name: 'users', column_name: 'id', ordinal_position: 1, not_null: true, has_default: false, is_identity: false, is_generated: false },
     { table_schema: 'auth', table_name: 'users', column_name: 'email', ordinal_position: 2, not_null: false, has_default: false, is_identity: false, is_generated: false },
+    { table_schema: 'auth', table_name: 'required_target', column_name: 'id', ordinal_position: 1, not_null: true, has_default: false, is_identity: false, is_generated: false },
+    { table_schema: 'auth', table_name: 'required_target', column_name: 'target_only_required', ordinal_position: 2, not_null: true, has_default: false, is_identity: false, is_generated: false },
     { table_schema: 'public', table_name: 'subjects', column_name: 'id', ordinal_position: 1, not_null: true, has_default: false, is_identity: false, is_generated: false },
     { table_schema: 'public', table_name: 'subjects', column_name: 'auth_user_id', ordinal_position: 2, not_null: false, has_default: false, is_identity: false, is_generated: false },
   ];
@@ -235,8 +250,11 @@ try {
     'COPY "auth"."audit_events" ("id", "new_provider_column") FROM stdin;',
     'audit-row\tnew-value',
     '\\.',
-    'COPY "auth"."users" ("id", "email") FROM stdin;',
-    'user-id\tuser@example.invalid',
+    'COPY "auth"."users" ("id", "email", "new_auth_column") FROM stdin;',
+    'user-id\tuser@example.invalid\tnew-auth-value',
+    '\\.',
+    'COPY "auth"."required_target" ("id") FROM stdin;',
+    'required-row',
     '\\.',
     'COPY "public"."subjects" ("id", "auth_user_id") FROM stdin;',
     'subject-id\tuser-id',
@@ -246,10 +264,16 @@ try {
 
   const report = await transformPortableDataReplay({ inputPath, outputPath, targetCatalogPath, reportPath });
   const output = await readFile(outputPath, 'utf8');
-  if (output.includes('audit-row') || output.includes('new_provider_column')) throw new Error('Provider-incompatible COPY block was not removed.');
-  if (!output.includes('COPY "auth"."users"') || !output.includes('user@example.invalid')) throw new Error('Compatible auth.users COPY block was not preserved.');
+  if (!output.includes('COPY "auth"."audit_events" ("id") FROM stdin;') || !output.includes('audit-row')) throw new Error('Provider column projection did not preserve compatible audit data.');
+  if (output.includes('new_provider_column') || output.includes('new-value')) throw new Error('Provider projection retained a source-only audit column.');
+  if (!output.includes('COPY "auth"."users" ("id", "email") FROM stdin;') || !output.includes('user-id\tuser@example.invalid')) throw new Error('Projected auth.users COPY did not preserve identity columns.');
+  if (output.includes('new_auth_column') || output.includes('new-auth-value')) throw new Error('Projected auth.users COPY retained a source-only column.');
+  if (output.includes('required-row') || output.includes('COPY "auth"."required_target"')) throw new Error('Provider block with unbacked required target columns was not skipped.');
   if (!output.includes('COPY "public"."subjects"') || !output.includes('subject-id')) throw new Error('Application COPY block was not preserved.');
-  if (report.skipped_provider_copy_blocks.length !== 1 || report.skipped_provider_copy_blocks[0].table !== 'audit_events') throw new Error('Provider mismatch report is incorrect.');
+  if (report.projected_provider_copy_blocks.length !== 2) throw new Error('Provider projection report count is incorrect.');
+  if (report.skipped_provider_copy_blocks.length !== 1 || report.skipped_provider_copy_blocks[0].table !== 'required_target') throw new Error('Provider skip report is incorrect.');
+  const authUsersReplay = report.replayed_provider_copy_blocks.filter((block) => block.schema === 'auth' && block.table === 'users');
+  if (authUsersReplay.length !== 1 || authUsersReplay[0].mode !== 'project' || !authUsersReplay[0].replayed_columns.includes('id')) throw new Error('auth.users identity-continuity projection evidence is missing.');
   if (!report.replayed_provider_relations.includes('auth.users')) throw new Error('auth.users compatibility evidence is missing.');
 
   const badCatalogPath = join(tempRoot, 'bad-target-catalog.json');
