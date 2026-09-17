@@ -71,6 +71,7 @@ The account-deletion-start replay also validates its current v1 postconditions a
 
 - subject is `deletion_pending`
 - the exact account deletion job is `running`
+- the exact `ACCOUNT_DELETION_STARTED` outbox provenance row exists
 - no active Share Artifact remains
 - no unrevoked Device Installation remains
 - no queued/ready Notification remains
