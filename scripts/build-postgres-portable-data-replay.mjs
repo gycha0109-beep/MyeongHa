@@ -69,6 +69,14 @@ function parseCopyHeader(line) {
   };
 }
 
+function quoteIdentifier(value) {
+  return `"${value.replaceAll('"', '""')}"`;
+}
+
+function buildCopyHeader(copy, columns) {
+  return `COPY ${quoteIdentifier(copy.schema)}.${quoteIdentifier(copy.table)} (${columns.map(quoteIdentifier).join(', ')}) FROM stdin;`;
+}
+
 function buildCatalog(records) {
   if (!Array.isArray(records)) throw new Error('Target catalog must be a JSON array.');
   const catalog = new Map();
@@ -95,20 +103,79 @@ function assessCompatibility(copy, catalog) {
   const key = `${copy.schema}\u0000${copy.table}`;
   const targetColumns = catalog.get(key);
   if (!targetColumns) {
-    return { compatible: false, reason: 'target_relation_missing', missingColumns: [], requiredTargetColumns: [] };
+    return {
+      mode: 'skip',
+      reason: 'target_relation_missing',
+      unsupportedSourceColumns: [],
+      requiredTargetColumns: [],
+      replayColumns: [],
+      replayColumnIndexes: [],
+    };
   }
+
   const sourceColumns = new Set(copy.columns);
-  const missingColumns = copy.columns.filter((column) => !targetColumns.has(column));
+  const unsupportedSourceColumns = copy.columns.filter((column) => {
+    const metadata = targetColumns.get(column);
+    return !metadata || metadata.isGenerated;
+  });
   const requiredTargetColumns = [...targetColumns.entries()]
     .filter(([column, metadata]) => !sourceColumns.has(column) && metadata.notNull && !metadata.hasDefault && !metadata.isIdentity && !metadata.isGenerated)
     .map(([column]) => column)
     .sort();
+  const replayColumnIndexes = copy.columns
+    .map((column, index) => ({ column, index, metadata: targetColumns.get(column) }))
+    .filter(({ metadata }) => metadata && !metadata.isGenerated)
+    .map(({ index }) => index);
+  const replayColumns = replayColumnIndexes.map((index) => copy.columns[index]);
+
+  if (requiredTargetColumns.length > 0) {
+    return {
+      mode: 'skip',
+      reason: 'target_requires_unbacked_columns',
+      unsupportedSourceColumns,
+      requiredTargetColumns,
+      replayColumns,
+      replayColumnIndexes,
+    };
+  }
+  if (replayColumns.length === 0) {
+    return {
+      mode: 'skip',
+      reason: 'no_copyable_shared_columns',
+      unsupportedSourceColumns,
+      requiredTargetColumns,
+      replayColumns,
+      replayColumnIndexes,
+    };
+  }
+  if (unsupportedSourceColumns.length > 0) {
+    return {
+      mode: 'project',
+      reason: 'source_columns_projected_to_target',
+      unsupportedSourceColumns,
+      requiredTargetColumns,
+      replayColumns,
+      replayColumnIndexes,
+    };
+  }
   return {
-    compatible: missingColumns.length === 0 && requiredTargetColumns.length === 0,
-    reason: missingColumns.length > 0 ? 'source_columns_missing_from_target' : requiredTargetColumns.length > 0 ? 'target_requires_unbacked_columns' : 'compatible',
-    missingColumns,
+    mode: 'exact',
+    reason: 'compatible',
+    unsupportedSourceColumns,
     requiredTargetColumns,
+    replayColumns,
+    replayColumnIndexes,
   };
+}
+
+function projectCopyRow(line, copyBlock) {
+  const fields = line.split('\t');
+  if (fields.length !== copyBlock.sourceColumnCount) {
+    throw new Error(
+      `COPY row field count mismatch for ${copyBlock.relation}: expected ${copyBlock.sourceColumnCount}, got ${fields.length}`,
+    );
+  }
+  return copyBlock.replayColumnIndexes.map((index) => fields[index]).join('\t');
 }
 
 export async function transformPortableDataReplay({ inputPath, outputPath, targetCatalogPath, reportPath }) {
@@ -117,6 +184,8 @@ export async function transformPortableDataReplay({ inputPath, outputPath, targe
   const output = createWriteStream(outputPath, { encoding: 'utf8', mode: 0o600 });
   const reader = createInterface({ input, crlfDelay: Infinity });
   const skipped = [];
+  const projected = [];
+  const replayedProviderBlocks = [];
   const replayedProvider = new Set();
   const replayedApplication = new Set();
   let copyBlock = null;
@@ -130,7 +199,7 @@ export async function transformPortableDataReplay({ inputPath, outputPath, targe
           if (copyBlock.replay) output.write('\\.\n');
           copyBlock = null;
         } else if (copyBlock.replay) {
-          output.write(`${line}\n`);
+          output.write(`${copyBlock.mode === 'project' ? projectCopyRow(line, copyBlock) : line}\n`);
         }
         continue;
       }
@@ -146,27 +215,55 @@ export async function transformPortableDataReplay({ inputPath, outputPath, targe
       const applicationOwned = copy.schema === 'public';
       const relation = `${copy.schema}.${copy.table}`;
 
-      if (!compatibility.compatible && applicationOwned) {
+      if (applicationOwned && compatibility.mode !== 'exact') {
         throw new Error(`Application COPY target mismatch for ${relation}: ${compatibility.reason}`);
       }
 
-      if (!compatibility.compatible) {
+      if (compatibility.mode === 'skip') {
         skipped.push({
           schema: copy.schema,
           table: copy.table,
           reason: compatibility.reason,
-          missing_columns: compatibility.missingColumns,
+          unsupported_source_columns: compatibility.unsupportedSourceColumns,
           required_target_columns: compatibility.requiredTargetColumns,
         });
-        copyBlock = { replay: false, relation };
+        copyBlock = { replay: false, mode: 'skip', relation };
         continue;
       }
 
-      output.write(`${line}\n`);
-      copyBlock = { replay: true, relation };
+      if (compatibility.mode === 'project') {
+        projected.push({
+          schema: copy.schema,
+          table: copy.table,
+          reason: compatibility.reason,
+          dropped_source_columns: compatibility.unsupportedSourceColumns,
+          replayed_columns: compatibility.replayColumns,
+        });
+        output.write(`${buildCopyHeader(copy, compatibility.replayColumns)}\n`);
+      } else {
+        output.write(`${line}\n`);
+      }
+
+      copyBlock = {
+        replay: true,
+        mode: compatibility.mode,
+        relation,
+        sourceColumnCount: copy.columns.length,
+        replayColumnIndexes: compatibility.replayColumnIndexes,
+      };
       replayedCopyBlocks += 1;
-      if (applicationOwned) replayedApplication.add(relation);
-      else replayedProvider.add(relation);
+      if (applicationOwned) {
+        replayedApplication.add(relation);
+      } else {
+        replayedProvider.add(relation);
+        replayedProviderBlocks.push({
+          schema: copy.schema,
+          table: copy.table,
+          mode: compatibility.mode,
+          replayed_columns: compatibility.replayColumns,
+          dropped_source_columns: compatibility.unsupportedSourceColumns,
+        });
+      }
     }
 
     if (copyBlock) throw new Error(`COPY block missing terminator: ${copyBlock.relation}`);
@@ -179,13 +276,15 @@ export async function transformPortableDataReplay({ inputPath, outputPath, targe
   }
 
   const report = {
-    schema_version: 'myeongha-postgres-portable-data-replay-v1',
+    schema_version: 'myeongha-postgres-portable-data-replay-v2',
     application_schema_policy: 'public-fail-closed',
-    provider_schema_policy: 'target-compatible-copy-only',
+    provider_schema_policy: 'target-compatible-column-projection',
     source_copy_blocks: sourceCopyBlocks,
     replayed_copy_blocks: replayedCopyBlocks,
     replayed_application_relations: [...replayedApplication].sort(),
     replayed_provider_relations: [...replayedProvider].sort(),
+    replayed_provider_copy_blocks: replayedProviderBlocks,
+    projected_provider_copy_blocks: projected,
     skipped_provider_copy_blocks: skipped,
   };
   await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, { mode: 0o600 });
