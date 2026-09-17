@@ -96,10 +96,20 @@ const requiredHarnessFragments = [
   'checksum_name="${checksum_path##*/}"',
   'roles.sql|schema.sql|data.sql',
   'sha256sum -c "$(basename "$normalized_plaintext_checksum")"',
+  "grep -Eiv '^[[:space:]]*CREATE[[:space:]]+(ROLE|USER)[[:space:]]+\"myeongha_[a-z0-9_]+\"'",
+  '--set ON_ERROR_STOP=0 --set VERBOSITY=terse',
+  'ERROR:[[:space:]]+role "supabase_[a-z0-9_]+" does not exist$',
+  'provider_managed_roles_absent',
+  'roles.sql contains a non-MyeongHa role creation; refusing to fabricate platform or unknown roles.',
+  "rolname like 'myeongha\\\\_%' escape '\\\\' and (rolsuper or rolbypassrls)",
   "--command 'SET session_replication_role = replica'",
   'subjects birth_profiles products product_offers data_deletion_jobs',
   "rolname='myeongha_api_executor' and not rolsuper and not rolbypassrls",
   'myeongha-postgres-isolated-restore-drill-v1',
+  'application_role_restore: "pass"',
+  'provider_managed_role_policy: "target-baseline-authoritative-no-fabrication"',
+  'provider_managed_roles_absent_from_target',
+  'restore_target: "github-actions-loopback-supabase-postgres"',
   'privacy_reconciliation: "not_exercised_by_this_workflow"',
   'dr_ready: false',
 ];
@@ -118,6 +128,8 @@ const forbiddenHarnessFragments = [
   'myeongha.vercel.app',
   'gcloud ',
   'sha256sum -c plaintext-sha256.txt',
+  'CREATE ROLE "supabase_realtime_admin"',
+  'CREATE USER supabase_realtime_admin',
 ];
 
 for (const fragment of forbiddenHarnessFragments) {
@@ -131,6 +143,8 @@ const requiredRunbookFragments = [
   'GitHub Actions loopback Supabase PostgreSQL 17.6.1.166',
   'manual-only',
   'does not accept a remote restore database URL',
+  'provider-managed `supabase_*` role',
+  'must not fabricate missing provider-managed roles',
   'privacy reconciliation is not exercised by the workflow',
   'DR Ready = FALSE / NOT EVIDENCED',
 ];

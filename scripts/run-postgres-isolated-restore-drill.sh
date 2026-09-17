@@ -107,7 +107,80 @@ done < "$work_dir/plaintext-sha256.txt"
 restore_started_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
 restore_started_epoch="$(date -u +%s)"
 
-psql "$RESTORE_DATABASE_URL" --set ON_ERROR_STOP=1 --file "$work_dir/roles.sql"
+# The Supabase CLI role dump can contain provider-managed role settings that
+# exist in hosted Production but are intentionally not recreated by every
+# self-hosted image revision. Never fabricate those roles in the drill target.
+# Application-owned role creation remains fail-closed and must use myeongha_*.
+unexpected_role_creations="$(
+  grep -Ei '^[[:space:]]*CREATE[[:space:]]+(ROLE|USER)[[:space:]]+' "$work_dir/roles.sql" \
+    | grep -Eiv '^[[:space:]]*CREATE[[:space:]]+(ROLE|USER)[[:space:]]+"myeongha_[a-z0-9_]+"' \
+    || true
+)"
+if [[ -n "$unexpected_role_creations" ]]; then
+  echo 'roles.sql contains a non-MyeongHa role creation; refusing to fabricate platform or unknown roles.' >&2
+  printf '%s\n' "$unexpected_role_creations" >&2
+  exit 1
+fi
+
+mapfile -t application_roles < <(
+  sed -nE 's/^[[:space:]]*CREATE[[:space:]]+(ROLE|USER)[[:space:]]+"(myeongha_[a-z0-9_]+)".*/\2/p' "$work_dir/roles.sql" \
+    | sort -u
+)
+if [[ ${#application_roles[@]} -eq 0 ]]; then
+  echo 'roles.sql did not declare any MyeongHa application roles.' >&2
+  exit 1
+fi
+
+roles_stdout="$work_dir/roles-restore.stdout"
+roles_stderr="$work_dir/roles-restore.stderr"
+set +e
+psql "$RESTORE_DATABASE_URL" --set ON_ERROR_STOP=0 --set VERBOSITY=terse \
+  --file "$work_dir/roles.sql" >"$roles_stdout" 2>"$roles_stderr"
+roles_psql_status=$?
+set -e
+if [[ "$roles_psql_status" -ne 0 ]]; then
+  echo 'psql could not complete the role restore stream.' >&2
+  cat "$roles_stderr" >&2
+  exit "$roles_psql_status"
+fi
+
+# Continue past SQL errors only to classify them. The sole tolerated SQL error
+# is a missing provider-managed supabase_* role. Every other ERROR remains fatal.
+unexpected_role_errors="$(
+  grep -E 'ERROR:' "$roles_stderr" \
+    | grep -Ev 'ERROR:[[:space:]]+role "supabase_[a-z0-9_]+" does not exist$' \
+    || true
+)"
+if [[ -n "$unexpected_role_errors" ]]; then
+  echo 'Unexpected roles.sql restore error.' >&2
+  printf '%s\n' "$unexpected_role_errors" >&2
+  exit 1
+fi
+
+mapfile -t provider_managed_roles_absent < <(
+  grep -Eo 'role "supabase_[a-z0-9_]+" does not exist' "$roles_stderr" \
+    | sed -E 's/^role "([a-z0-9_]+)" does not exist$/\1/' \
+    | sort -u \
+    || true
+)
+
+for role_name in "${application_roles[@]}"; do
+  role_count="$(psql "$RESTORE_DATABASE_URL" -At --set ON_ERROR_STOP=1 \
+    -c "select count(*) from pg_roles where rolname='${role_name}';")"
+  if [[ "$role_count" != '1' ]]; then
+    echo "Application role was not restored exactly once: $role_name" >&2
+    exit 1
+  fi
+done
+
+unsafe_application_roles="$(psql "$RESTORE_DATABASE_URL" -At --set ON_ERROR_STOP=1 -c \
+  "select count(*) from pg_roles where rolname like 'myeongha\\_%' escape '\\' and (rolsuper or rolbypassrls);")"
+[[ "$unsafe_application_roles" == '0' ]]
+
+if [[ ${#provider_managed_roles_absent[@]} -gt 0 ]]; then
+  printf 'Provider-managed roles absent from isolated target and not fabricated: %s\n' "${provider_managed_roles_absent[*]}"
+fi
+
 psql "$RESTORE_DATABASE_URL" --single-transaction --set ON_ERROR_STOP=1 --file "$work_dir/schema.sql"
 psql "$RESTORE_DATABASE_URL" --single-transaction --set ON_ERROR_STOP=1 \
   --command 'SET session_replication_role = replica' --file "$work_dir/data.sql"
@@ -122,6 +195,7 @@ restore_completed_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
 restore_completed_epoch="$(date -u +%s)"
 duration_seconds=$((restore_completed_epoch - restore_started_epoch))
 server_version="$(psql "$RESTORE_DATABASE_URL" -At --set ON_ERROR_STOP=1 -c 'show server_version;')"
+provider_managed_roles_absent_json="$(printf '%s\n' "${provider_managed_roles_absent[@]}" | jq -Rsc 'split("\n") | map(select(length > 0))')"
 
 mkdir -p "$(dirname "$RESTORE_EVIDENCE_PATH")"
 jq -n \
@@ -132,16 +206,20 @@ jq -n \
   --arg restore_started_at_utc "$restore_started_at" \
   --arg restore_completed_at_utc "$restore_completed_at" \
   --argjson isolated_restore_validation_duration_seconds "$duration_seconds" \
+  --argjson provider_managed_roles_absent_from_target "$provider_managed_roles_absent_json" \
   '{
     schema_version: $schema_version,
     source_sha: $source_sha,
     project_ref: $project_ref,
-    restore_target: "github-actions-loopback-postgres",
+    restore_target: "github-actions-loopback-supabase-postgres",
     restore_server_version: $restore_server_version,
     restore_started_at_utc: $restore_started_at_utc,
     restore_completed_at_utc: $restore_completed_at_utc,
     isolated_restore_validation_duration_seconds: $isolated_restore_validation_duration_seconds,
     archive_integrity: "pass",
+    application_role_restore: "pass",
+    provider_managed_role_policy: "target-baseline-authoritative-no-fabrication",
+    provider_managed_roles_absent_from_target: $provider_managed_roles_absent_from_target,
     required_tables: "pass",
     authorization_baseline: "pass",
     privacy_reconciliation: "not_exercised_by_this_workflow",
