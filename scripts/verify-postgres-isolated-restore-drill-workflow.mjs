@@ -84,6 +84,8 @@ for (const fragment of forbiddenWorkflowFragments) {
 
 const requiredHarnessFragments = [
   "readonly RESTORE_DATABASE_URL='postgresql://postgres:restore-drill@127.0.0.1:5432/postgres'",
+  "readonly RESTORE_ADMIN_DATABASE_URL='postgresql://supabase_admin:restore-drill@127.0.0.1:5432/postgres'",
+  "select current_user = 'supabase_admin' and rolsuper from pg_roles where rolname = current_user;",
   'EXPECTED_PROJECT_REF',
   'EXPECTED_SOURCE_SHA',
   'myeongha-postgres-backup-artifact-v1',
@@ -97,16 +99,23 @@ const requiredHarnessFragments = [
   'roles.sql|schema.sql|data.sql',
   'sha256sum -c "$(basename "$normalized_plaintext_checksum")"',
   "grep -Eiv '^[[:space:]]*CREATE[[:space:]]+(ROLE|USER)[[:space:]]+\"myeongha_[a-z0-9_]+\"'",
-  '--set ON_ERROR_STOP=0 --set VERBOSITY=terse',
+  'psql "$RESTORE_ADMIN_DATABASE_URL" --set ON_ERROR_STOP=0 --set VERBOSITY=terse',
   'ERROR:[[:space:]]+role "supabase_[a-z0-9_]+" does not exist$',
   'provider_managed_roles_absent',
   'roles.sql contains a non-MyeongHa role creation; refusing to fabricate platform or unknown roles.',
   "rolname like 'myeongha\\\\_%' escape '\\\\' and (rolsuper or rolbypassrls)",
+  'psql "$RESTORE_ADMIN_DATABASE_URL" --single-transaction --set ON_ERROR_STOP=1 --file "$work_dir/schema.sql"',
+  'psql "$RESTORE_ADMIN_DATABASE_URL" --single-transaction --set ON_ERROR_STOP=1',
   "--command 'SET session_replication_role = replica'",
   'subjects birth_profiles products product_offers data_deletion_jobs',
   "rolname='myeongha_api_executor' and not rolsuper and not rolbypassrls",
+  "to_regprocedure('public.cmd_activate_content_release_v1(uuid,boolean)')",
+  "== 'myeongha_content_publication_owner'",
   'myeongha-postgres-isolated-restore-drill-v1',
+  'restore_execution_principal: "supabase_admin-loopback-only"',
+  'post_restore_validation_principal: "postgres-loopback-only"',
   'application_role_restore: "pass"',
+  'application_owner_restore: "pass"',
   'provider_managed_role_policy: "target-baseline-authoritative-no-fabrication"',
   'provider_managed_roles_absent_from_target',
   'restore_target: "github-actions-loopback-supabase-postgres"',
@@ -130,6 +139,7 @@ const forbiddenHarnessFragments = [
   'sha256sum -c plaintext-sha256.txt',
   'CREATE ROLE "supabase_realtime_admin"',
   'CREATE USER supabase_realtime_admin',
+  'psql "$RESTORE_DATABASE_URL" --single-transaction --set ON_ERROR_STOP=1 --file "$work_dir/schema.sql"',
 ];
 
 for (const fragment of forbiddenHarnessFragments) {
