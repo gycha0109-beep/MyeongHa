@@ -8,6 +8,12 @@
 
 ```yaml
 backup_run_id: 35260191079
+latest_proven_backup_source_sha: ef61941313ee3a870076847c5dfb5c1b05ba4159
+production_schema_latest_deployed_migration: 1120
+production_schema_deploy_run_id: 35324012524
+production_schema_deploy_head_sha: eddc1c331b6a8c0f47f54c150acd2f6cc5c7c0c2
+backup_schema_freshness: STALE_AFTER_PRODUCTION_MIGRATION_1120
+backup_refresh_required: true
 restore_run_id: 35325070718
 restore_result: SUCCESS
 restore_target: github-actions-loopback-supabase-postgres
@@ -35,6 +41,8 @@ dr_ready: false
 
 Manual restore run `35325070718` completed successfully from main head `eddc1c331b6a8c0f47f54c150acd2f6cc5c7c0c2`. It proved the governed logical backup can still be decrypted, integrity-checked, replayed into the isolated Supabase PostgreSQL target, and validated at the application database authorization/integrity boundary after the self-contained evidence-envelope and restored-DB synthetic replay integrations were merged. It does not establish full Supabase provider-service recovery or serving-production readiness.
 
+Backup freshness is a separate gate. The proven backup source SHA `ef61941313ee3a870076847c5dfb5c1b05ba4159` predates migration `1120_paid_general_natal_product_candidate.sql`. Production deployment run `35324012524` applied migration `1120` successfully at head `eddc1c331b6a8c0f47f54c150acd2f6cc5c7c0c2`. Therefore run `35325070718` proves portability and replay mechanics for the selected governed backup, but it does **not** prove that the latest production schema is captured by the current backup set. A fresh production backup after migration `1120`, followed by a restore drill from that new backup, is required to close this schema-freshness gap.
+
 Artifact `10538807602` (`postgres-isolated-restore-drill-35325070718`) contains both `restore-evidence.json` and `privacy-reconciliation-evidence.json`. The restore evidence records envelope version `myeongha-postgres-isolated-restore-evidence-envelope-v1`, exact backup/source bindings, 4-second restore/validation, 3 projected provider COPY blocks, 27 skipped provider COPY blocks, `provider_managed_data_full_restore=false`, Auth identity continuity PASS, and `dr_ready=false`. The privacy evidence records four synthetic replay events, identical second-replay idempotency PASS, negative terminal-state fail-closed PASS, `authoritative_post_backup_source=false`, and `dr_ready=false`.
 
 The 4-second value is the measured isolated restore/validation diagnostic from run `35325070718`. The 58-second value is GitHub workflow dispatch-to-completion elapsed time for that manual drill. The 82-second value is the synthetic data-loss-window diagnostic for the selected incident reference. None is an approved RTO or RPO, and the 58-second workflow elapsed time is not a full achieved recovery duration because authoritative privacy/legal-retention reconciliation remains outside the run.
@@ -55,6 +63,7 @@ Therefore restore success must remain classified as mechanics evidence only:
 
 ```text
 backup proven                      = yes
+backup current-schema freshness    = no — refresh required after migration 1120
 isolated application restore       = yes
 application integrity/auth baseline= yes
 self-contained evidence envelope   = implemented / CI-verified
