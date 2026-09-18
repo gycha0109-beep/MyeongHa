@@ -105,7 +105,7 @@ const requiredRunbookFragments = [
   'Current Supabase organization plan: `free`',
   'PITR',
   'NOT AVAILABLE UNDER THE CURRENT FREE-PLAN OPERATING BASELINE',
-  'successful production dump         = EVIDENCED — run 35260191079',
+  'successful production dump         = EVIDENCED — latest run 35329018925',
   'RPO: OPEN DECISION',
   'RTO: OPEN DECISION',
   'SUPABASE_PRODUCTION_SESSION_POOLER_HOST',
