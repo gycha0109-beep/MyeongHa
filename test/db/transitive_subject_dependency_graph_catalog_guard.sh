@@ -129,8 +129,18 @@ edge_count="$(printf '%s\n' "$actual" | sed '/^$/d' | wc -l | tr -d ' ')"
 direct_count="$(printf '%s\n' "$actual" | awk -F '|' '$1 == "1" { count += 1 } END { print count + 0 }')"
 max_depth="$(printf '%s\n' "$actual" | awk -F '|' 'BEGIN { max = 0 } $1 + 0 > max { max = $1 + 0 } END { print max }')"
 
+[[ "$edge_count" == "106" ]] || {
+  echo "Expected exactly 106 current reachable FK edges, found $edge_count." >&2
+  exit 1
+}
+
 [[ "$direct_count" == "30" ]] || {
   echo "Direct depth-1 edge count must stay consistent with #1063: expected=30 actual=$direct_count." >&2
+  exit 1
+}
+
+[[ "$max_depth" == "4" ]] || {
+  echo "Expected canonical reachable max depth 4, found $max_depth." >&2
   exit 1
 }
 
