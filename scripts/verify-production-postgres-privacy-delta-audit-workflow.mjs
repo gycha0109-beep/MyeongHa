@@ -149,7 +149,26 @@ for (const fragment of requiredSchemaFragments) {
 }
 
 const requiredStatusFragments = [
-  'authoritative_post_backup_delta_audit_for_current_backup: NOT_EXECUTED',
+  'authoritative_post_backup_delta_audit_for_current_backup: SUCCESSFUL_COUNT_ONLY_OBSERVATION',
+  'post_backup_privacy_delta_count_audit_workflow: RUNTIME_PROVEN',
+  'post_backup_privacy_delta_count_audit_last_run_id: 35353128407',
+  'post_backup_privacy_delta_count_audit_last_run_result: SUCCESS',
+  'post_backup_privacy_delta_count_audit_runtime_head_sha: 532a92e061506bfac8f9485e84ebbab8d756f1db',
+  'post_backup_privacy_delta_count_audit_artifact_id: 10550013004',
+  'post_backup_privacy_delta_count_audit_artifact_name: postgres-privacy-delta-count-audit-35353128407',
+  'post_backup_privacy_delta_count_audit_artifact_expires_at: 2026-10-18T13:56:23Z',
+  'post_backup_privacy_delta_count_audit_artifact_digest: sha256:87010c5c12b2ac319f1b6ef71b0829ab713c13a70189d294a8af720e9a2d6374',
+  'post_backup_privacy_delta_count_audit_backup_completed_at_utc: 2026-09-18T09:23:19Z',
+  'post_backup_privacy_delta_count_audit_completed_at_utc: 2026-09-18T13:56:22Z',
+  'privacy_delta_audit_data_deletion_jobs_requested_at: 0',
+  'privacy_delta_audit_share_artifacts_revoked_at: 0',
+  'privacy_delta_audit_device_installations_revoked_at: 0',
+  'privacy_delta_audit_life_facts_revoked_at: 0',
+  'privacy_delta_audit_memory_items_revoked_at: 0',
+  'privacy_delta_audit_record_access_grants_revoked_at: 0',
+  'privacy_delta_audit_subjects_non_active_updated_at: 0',
+  'privacy_delta_audit_observed_delta_total: 0',
+  'privacy_delta_audit_observed_deltas: false',
   'authoritative_post_backup_source: false',
   'privacy_reconciliation: BLOCKED_BY_P0_PR_01_AND_ISSUE_964',
   'rpo_authority: OPEN_DECISION',
@@ -159,7 +178,7 @@ const requiredStatusFragments = [
 
 for (const fragment of requiredStatusFragments) {
   if (!status.includes(fragment)) {
-    throw new Error(`DR status authority changed unexpectedly while count-only audit remains unexecuted: ${fragment}`);
+    throw new Error(`DR status authority changed unexpectedly after current count-only audit evidence was recorded: ${fragment}`);
   }
 }
 
