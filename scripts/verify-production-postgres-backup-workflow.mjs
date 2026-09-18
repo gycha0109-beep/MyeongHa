@@ -105,7 +105,7 @@ const requiredRunbookFragments = [
   'Current Supabase organization plan: `free`',
   'PITR',
   'NOT AVAILABLE UNDER THE CURRENT FREE-PLAN OPERATING BASELINE',
-  'successful production dump         = EVIDENCED — run 35260191079',
+  'successful production dump         = EVIDENCED — latest run 35329018925',
   'RPO: OPEN DECISION',
   'RTO: OPEN DECISION',
   'SUPABASE_PRODUCTION_SESSION_POOLER_HOST',
@@ -114,6 +114,8 @@ const requiredRunbookFragments = [
   'MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE',
   'data_deletion_jobs',
   'Never restore a drill directly over serving production.',
+  'backup schema freshness             = CURRENT THROUGH DEPLOYED MIGRATION 1120',
+  'current-schema restore              = EVIDENCED — run 35331742188',
   'achieved recovery duration',
   'achieved data-loss window',
 ];
