@@ -145,7 +145,6 @@ create trigger tr_standard_reading_product_spec_immutable
 -- a Product/Offer/Capability matrix.
 create table public.purchase_intent_reader_selections (
   purchase_intent_id uuid primary key,
-  subject_id uuid not null,
   product_id uuid not null,
   reader_character_id text not null,
   reader_content_bundle_id uuid not null,
@@ -153,9 +152,9 @@ create table public.purchase_intent_reader_selections (
   selection_snapshot_jsonb jsonb not null,
   selection_hash text not null,
   created_at timestamptz not null default now(),
-  constraint purchase_intent_reader_selections_intent_subject_fk
-    foreign key (purchase_intent_id, subject_id)
-    references public.purchase_intents(id, subject_id),
+  constraint purchase_intent_reader_selections_intent_fk
+    foreign key (purchase_intent_id)
+    references public.purchase_intents(id),
   constraint purchase_intent_reader_selections_product_spec_fk
     foreign key (product_id)
     references public.standard_reading_product_specs(product_id),
@@ -165,7 +164,6 @@ create table public.purchase_intent_reader_selections (
   constraint purchase_intent_reader_selections_identity_unique
     unique (
       purchase_intent_id,
-      subject_id,
       product_id,
       reader_character_id,
       reader_content_bundle_id
@@ -200,8 +198,7 @@ begin
     into v_purchase_product_id, v_purchase_capability_set_id
   from public.purchase_intents pi
   join public.product_offers po on po.id = pi.product_offer_id
-  where pi.id = new.purchase_intent_id
-    and pi.subject_id = new.subject_id;
+  where pi.id = new.purchase_intent_id;
 
   if not found or v_purchase_product_id is distinct from new.product_id then
     raise exception using
@@ -312,8 +309,8 @@ create trigger tr_purchase_intent_reader_selection_append_only
   before update or delete on public.purchase_intent_reader_selections
   for each row execute function public.tr_purchase_intent_reader_selection_append_only();
 
-create index purchase_intent_reader_selections_subject_created_idx
-  on public.purchase_intent_reader_selections(subject_id, created_at desc);
+create index purchase_intent_reader_selections_product_created_idx
+  on public.purchase_intent_reader_selections(product_id, created_at desc);
 
 -- New first Standard Product: Topic is the SKU, Reader is selected later.
 insert into public.products(
