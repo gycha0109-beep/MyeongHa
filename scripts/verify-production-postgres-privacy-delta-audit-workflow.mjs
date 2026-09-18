@@ -43,6 +43,8 @@ const requiredWorkflowFragments = [
   "where current_setting('transaction_read_only') = 'on';",
   'rollback;',
   'Explicit READ ONLY transaction could not complete.',
+  `printf '%s\\n' "$sql" | psql "$db_url" -X -qAt`,
+  '-v "cutoff=$BACKUP_COMPLETED_AT_UTC" > "$counts_path"',
   '[[ -s "$counts_path" ]]',
   "'data_deletion_jobs_requested_at'",
   'from public.data_deletion_jobs where requested_at > :\'cutoff\'::timestamptz',
@@ -95,6 +97,7 @@ const forbiddenWorkflowFragments = [
   'future_safe_privacy_reconciliation: true',
   'dr_ready: true',
   '-c default_transaction_read_only=on',
+  '-c "$sql"',
 ];
 
 for (const fragment of forbiddenWorkflowFragments) {
