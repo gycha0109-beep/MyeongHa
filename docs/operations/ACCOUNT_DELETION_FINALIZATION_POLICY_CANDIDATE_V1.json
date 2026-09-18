@@ -1,0 +1,67 @@
+{
+  "schema": "myeongha-account-deletion-finalization-policy-candidate-v1",
+  "decisionId": "P0-PR-01",
+  "decisionStatus": "OPEN-P0",
+  "policyAuthority": "NOT_APPROVED",
+  "executionAuthorized": false,
+  "destructiveFinalization": {
+    "subjectRecordAction": "UNDECIDED",
+    "authMappingAction": "UNDECIDED",
+    "authProviderUserAction": "UNDECIDED",
+    "profileAction": "UNDECIDED",
+    "guestSessionAction": "UNDECIDED",
+    "mergeProvenanceAction": "UNDECIDED",
+    "personalizationGraphAction": "UNDECIDED",
+    "shareDeviceNotificationAction": "UNDECIDED",
+    "backupRetentionHandling": "UNDECIDED"
+  },
+  "commerceRetentionClasses": [
+    {
+      "classKey": "commerce_account_provider_binding",
+      "tables": [
+        "commerce_account_links"
+      ],
+      "disposition": "UNDECIDED",
+      "retentionDurationDays": null,
+      "authorityReference": null
+    },
+    {
+      "classKey": "commerce_purchase_payment_provenance",
+      "tables": [
+        "purchase_intents",
+        "commerce_payment_attempts"
+      ],
+      "disposition": "UNDECIDED",
+      "retentionDurationDays": null,
+      "authorityReference": null
+    },
+    {
+      "classKey": "commerce_verified_provider_evidence",
+      "tables": [
+        "commerce_receipts",
+        "commerce_provider_events"
+      ],
+      "disposition": "UNDECIDED",
+      "retentionDurationDays": null,
+      "authorityReference": null
+    },
+    {
+      "classKey": "commerce_entitlement_history_projection",
+      "tables": [
+        "entitlement_grants",
+        "entitlement_events",
+        "entitlements"
+      ],
+      "disposition": "UNDECIDED",
+      "retentionDurationDays": null,
+      "authorityReference": null
+    }
+  ],
+  "approvedRetentionPolicyVersion": null,
+  "approvedBy": null,
+  "approvedAt": null,
+  "authoritativePostBackupSource": false,
+  "authoritativePrivacyReconciliation": false,
+  "futureSafePrivacyReconciliation": false,
+  "drReady": false
+}
