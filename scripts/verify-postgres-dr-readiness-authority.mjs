@@ -108,7 +108,7 @@ const requiredStatusFragments = [
   'provider_managed_data_blocks_skipped: 27',
   'synthetic_privacy_replay_event_count: 4',
   'authoritative_post_backup_source: false',
-  'post_backup_privacy_delta_count: 0',
+  'authoritative_post_backup_delta_audit_for_current_backup: NOT_EXECUTED',
   'privacy_reconciliation: BLOCKED_BY_P0_PR_01_AND_ISSUE_964',
   'rpo_authority: OPEN_DECISION',
   'rto_authority: OPEN_DECISION',
@@ -138,6 +138,7 @@ for (const staleRuntimeFragment of [
   'backup_run_id: 35260191079',
   'restore_run_id: 35325070718',
   'synthetic_data_loss_window_seconds: 82',
+  'post_backup_privacy_delta_count: 0',
 ]) {
   if (files.readinessStatus.includes(staleRuntimeFragment)) {
     throw new Error(`${paths.readinessStatus} contains stale runtime evidence after current-schema restore run 35331742188: ${staleRuntimeFragment}`);
