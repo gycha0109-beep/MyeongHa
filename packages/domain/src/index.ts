@@ -191,6 +191,24 @@ export {
 } from './character-saju-sp2-evaluation.js';
 
 export {
+  CHARACTER_SAJU_SP2_CONTROLLED_ROLLOUT_VERSION_V1,
+  CHARACTER_SAJU_SP2_READING_ARTIFACT_SCHEMA_VERSION_V1,
+  CHARACTER_SAJU_SP2_ROLLOUT_FAILURE_CODES_V1,
+  CHARACTER_SAJU_SP2_ROLLOUT_POLICY_SCHEMA_VERSION_V1,
+  authorizeCharacterSajuSp2ControlledRolloutV1,
+  type CharacterSajuSp2ControlledRevealV1,
+  type CharacterSajuSp2ControlledRolloutDecisionV1,
+  type CharacterSajuSp2ControlledSemanticSegmentV1,
+  type CharacterSajuSp2ReadingArtifactCandidateV1,
+  type CharacterSajuSp2RolloutEvidenceRefV1,
+  type CharacterSajuSp2RolloutFailureCodeV1,
+  type CharacterSajuSp2RolloutFailureV1,
+  type CharacterSajuSp2RolloutModeV1,
+  type CharacterSajuSp2RolloutPolicyV1,
+} from './character-saju-sp2-rollout.js';
+
+export {
+  CHARACTER_OUTPUT_GUARD_VERSION_V1,
   CharacterOutputGuardError,
   guardCharacterRendererOutput,
   type CharacterDialogueEnvelopeV1,
