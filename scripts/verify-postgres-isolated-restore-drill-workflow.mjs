@@ -54,7 +54,7 @@ const requiredWorkflowFragments = [
   'PRIVACY_RECONCILIATION_EVIDENCE_PATH: ${{ runner.temp }}/restore-evidence/privacy-reconciliation-evidence.json',
   'PGHOST: 127.0.0.1',
   'PGPORT: 5432',
-  'PGUSER: postgres',
+  'PGUSER: supabase_admin',
   'PGPASSWORD: restore-drill',
   'PGDATABASE: postgres',
   'export PRIVACY_RECONCILIATION_BACKUP_COMPLETED_AT_UTC',
