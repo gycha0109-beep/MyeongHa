@@ -107,6 +107,20 @@ export {
 } from './character-saju-insight-selector.js';
 
 export {
+  CHARACTER_READING_PLAN_DECISION_SCHEMA_VERSION_V1,
+  CHARACTER_READING_PLAN_SCHEMA_VERSION_V1,
+  CharacterReadingPlanErrorV1,
+  buildCharacterReadingPlanDecisionV1,
+  type CharacterReadingBeatV1,
+  type CharacterReadingPerspectiveRefV1,
+  type CharacterReadingPlanDecisionV1,
+  type CharacterReadingPlanV1,
+  type CharacterReadingProtectedFallbackV1,
+  type CharacterReadingRelationshipProjectionRefV1,
+  type CharacterReadingSemanticPurposeV1,
+} from './character-saju-reading-plan.js';
+
+export {
   CharacterOutputGuardError,
   guardCharacterRendererOutput,
   type CharacterDialogueEnvelopeV1,
