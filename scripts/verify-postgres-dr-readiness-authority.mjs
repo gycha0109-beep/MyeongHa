@@ -74,7 +74,7 @@ for (const staleFragment of [
   'isolated restore                = NOT YET EVIDENCED',
 ]) {
   if (files.restoreRunbook.includes(staleFragment)) {
-    throw new Error(`${paths.restoreRunbook} contains stale restore-state evidence after successful run 35280075274: ${staleFragment}`);
+    throw new Error(`${paths.restoreRunbook} contains stale restore-state evidence after latest successful runtime-proof run 35325070718: ${staleFragment}`);
   }
 }
 
