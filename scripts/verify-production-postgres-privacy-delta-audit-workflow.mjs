@@ -156,6 +156,8 @@ const requiredStatusFragments = [
   'post_backup_privacy_delta_count_audit_runtime_head_sha: 532a92e061506bfac8f9485e84ebbab8d756f1db',
   'post_backup_privacy_delta_count_audit_artifact_id: 10550013004',
   'post_backup_privacy_delta_count_audit_artifact_name: postgres-privacy-delta-count-audit-35353128407',
+  'post_backup_privacy_delta_count_audit_artifact_expires_at: 2026-10-18T13:56:23Z',
+  'post_backup_privacy_delta_count_audit_artifact_digest: sha256:87010c5c12b2ac319f1b6ef71b0829ab713c13a70189d294a8af720e9a2d6374',
   'post_backup_privacy_delta_count_audit_backup_completed_at_utc: 2026-09-18T09:23:19Z',
   'post_backup_privacy_delta_count_audit_completed_at_utc: 2026-09-18T13:56:22Z',
   'privacy_delta_audit_data_deletion_jobs_requested_at: 0',
