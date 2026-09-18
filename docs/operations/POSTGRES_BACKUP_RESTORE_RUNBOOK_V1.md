@@ -3,7 +3,7 @@
 > Scope: non-character production operations only  
 > Issue: `#389` — authoritative persistent-data recovery  
 > Evidence date: 2026-09-18 KST  
-> Production state: BACKUP PRODUCTION-PROVEN / BACKUP SCHEMA FRESHNESS STALE / ISOLATED APPLICATION RESTORE EVIDENCED / DR NOT READY
+> Production state: BACKUP PRODUCTION-PROVEN / CURRENT-SCHEMA BACKUP+RESTORE EVIDENCED / DR NOT READY
 
 ## 1. Current production authority
 
@@ -22,14 +22,14 @@ provider automatic daily backup = NOT RELIED UPON ON CURRENT FREE PLAN
 provider retention              = NOT RELIED UPON ON CURRENT FREE PLAN
 PITR                            = NOT AVAILABLE UNDER THE CURRENT FREE-PLAN OPERATING BASELINE
 application-owned logical dump     = IMPLEMENTED BY REPOSITORY WORKFLOW
-successful production dump         = EVIDENCED — run 35260191079
-backup schema freshness             = STALE AFTER PRODUCTION MIGRATION 1120
-fresh current-schema backup         = REQUIRED
+successful production dump         = EVIDENCED — latest run 35329018925
+backup schema freshness             = CURRENT THROUGH DEPLOYED MIGRATION 1120
+current-schema restore              = EVIDENCED — run 35331742188
 isolated restore drill path        = IMPLEMENTED / EXECUTED
-isolated application restore       = EVIDENCED — latest run 35325070718
-application integrity/auth baseline= PASS — latest run 35325070718
-restore evidence envelope runtime  = PROVEN — run 35325070718
-restored-DB synthetic replay       = PROVEN — run 35325070718 / NON-AUTHORITATIVE
+isolated application restore       = EVIDENCED — latest run 35331742188
+application integrity/auth baseline= PASS — latest run 35331742188
+restore evidence envelope runtime  = PROVEN — run 35331742188
+restored-DB synthetic replay       = PROVEN — run 35331742188 / NON-AUTHORITATIVE
 provider-managed full restore      = NOT PROVEN — provider projection/omission occurred
 privacy reconciliation            = BLOCKED BY P0-PR-01 / #964
 RPO                                = OPEN DECISION
@@ -103,7 +103,7 @@ Rules:
 - backup passphrase must be at least 32 characters and must not reuse the database password;
 - recovery operators need a break-glass path to the passphrase that does not depend on the database being healthy.
 
-The credentials and endpoint path are production-proven by successful backup run `35260191079`.
+The credentials and endpoint path are production-proven by successful backup runs `35260191079` and latest run `35329018925`.
 
 ## 4. Backup success evidence
 
@@ -122,30 +122,31 @@ workflow conclusion == success
 Governed source backup for the current drill series:
 
 ```text
-run ID        35260191079
-artifact ID   10513872847
-artifact      myeongha-postgres-20260917T184004Z
-source SHA    ef61941313ee3a870076847c5dfb5c1b05ba4159
-ZIP digest    sha256:601fbbac6149d960789e9500e8299f73ab3b0659a8201d4c60fa94ff73a7b9f8
+run ID        35329018925
+artifact ID   10540625562
+artifact      myeongha-postgres-20260918T092042Z
+source SHA    e1a6500968f7722666cae2038fd49ddf3f9d3540
+encrypted SHA sha256:96c40cb4c61f71d56a97dd9af34a2c31eb4674809a501f435b2634c12043a394
+expires       2026-10-18T09:23:19Z
 retention     30 days
 ```
 
 ### 4.1 Current backup freshness boundary
 
-The governed backup above was produced from source SHA `ef61941313ee3a870076847c5dfb5c1b05ba4159`. After that backup, migration `supabase/migrations/1120_paid_general_natal_product_candidate.sql` was added and production deployment run `35324012524` applied migration `1120` successfully on head `eddc1c331b6a8c0f47f54c150acd2f6cc5c7c0c2`.
+Production deployment run `35324012524` applied migration `1120_paid_general_natal_product_candidate.sql` successfully on head `eddc1c331b6a8c0f47f54c150acd2f6cc5c7c0c2`. Fresh production backup run `35329018925` was then captured from source SHA `e1a6500968f7722666cae2038fd49ddf3f9d3540`. Restore run `35331742188` selected that exact governed backup and completed successfully on main head `f736381f21171a1480292988e97c61ca68a5e62b`.
 
-Therefore the current evidence is intentionally split:
+A repository comparison from the backup source SHA to the restore head contains zero `supabase/migrations/` changes. Therefore:
 
 ```text
-selected backup portability         = PROVEN
-restore mechanics                    = PROVEN — run 35325070718
-latest production schema in backup   = NOT PROVEN
-backup schema freshness              = STALE AFTER MIGRATION 1120
-fresh backup after migration 1120    = REQUIRED
-fresh restore from that backup       = REQUIRED
+selected current-schema backup       = PROVEN — run 35329018925
+latest deployed migration captured   = 1120
+backup schema freshness              = CURRENT THROUGH MIGRATION 1120
+fresh restore from that backup       = PROVEN — run 35331742188
+provider-managed full restore        = NOT PROVEN
+DR Ready                             = false
 ```
 
-Do not use run `35325070718` to claim current-production-schema recoverability. Its value is that the selected governed backup and recovery machinery are operational. Current-schema recovery requires a new production backup taken after migration `1120` is present in production, followed by a restore drill selecting that new backup.
+This freshness proof is point-in-time evidence. A later production migration invalidates the freshness claim until another governed backup and restore drill cover the new migration frontier.
 
 Backup failure observability for v1 is the scheduled GitHub Actions workflow conclusion. A failed or missing scheduled run remains an operations alert until a dedicated alerting sink is approved.
 
@@ -196,7 +197,7 @@ dr_ready = false
 
 The envelope builder rejects project/source mismatches, inconsistent restore duration, an incident reference before the selected backup point, invalid artifact metadata, or attempts to overwrite preexisting source/timing evidence. These fields strengthen operator-independent evidence; they do not approve an RPO/RTO or make the isolated portability drill a full provider-service recovery.
 
-Runtime evidence status: manual run `35325070718` executed from main head `eddc1c331b6a8c0f47f54c150acd2f6cc5c7c0c2` and successfully produced the self-contained envelope. Artifact `10538807602` contains the resulting `restore-evidence.json` and is retained until `2026-10-18T08:35:28Z`. Envelope runtime is therefore proven for this run while DR readiness remains blocked by the independent privacy/legal-retention and RPO/RTO gates.
+Runtime evidence status: manual run `35331742188` executed from current main head `f736381f21171a1480292988e97c61ca68a5e62b` against fresh backup run `35329018925` and successfully produced the self-contained envelope. Artifact `10541321355` contains the resulting `restore-evidence.json` and `privacy-reconciliation-evidence.json` and is retained until `2026-10-18T09:52:36Z`. Envelope runtime and current-schema restore portability are proven for this run while DR readiness remains blocked by the independent privacy/legal-retention, provider-service, and RPO/RTO gates.
 
 ## 6. Restore drill runtime history
 
@@ -211,6 +212,7 @@ Observed evidence:
 - `35276773643`: #956 again passed source authority, checksums, provider-aware roles, application memberships, and strict schema replay. Its generic provider-data builder then classified `auth.users` itself as incompatible because the hosted source carries newer Auth columns than the pinned PostgreSQL bootstrap target. The subsequent mandatory `auth.users` replay assertion exited before SQL data replay. This exposed a harness-policy defect: provider tables with source-only columns were being skipped wholesale instead of preserving target-compatible identity columns.
 - `35280075274`: first successful isolated restore. Governed backup/artifact/checksum authority passed; application roles, memberships, representative ownership, required tables, authorization baseline, `auth.users` identity continuity, and `subjects.auth_user_id -> auth.users.id` referential integrity all passed. Three provider COPY blocks (`auth.audit_log_entries`, `auth.users`, `auth.refresh_tokens`) were projected to target-supported columns and 27 provider COPY blocks were skipped because the pinned loopback target lacked those hosted relations. Therefore `provider_managed_data_full_restore=false` remained explicit. Restore/validation diagnostic was 3 seconds and the synthetic data-loss-window diagnostic was 82 seconds.
 - `35325070718`: current runtime-proof drill from main head `eddc1c331b6a8c0f47f54c150acd2f6cc5c7c0c2`. Restore/validation completed in 4 seconds. The self-contained evidence envelope was generated successfully; artifact `10538807602` contains `restore-evidence.json` and `privacy-reconciliation-evidence.json`. Provider portability remained explicit at 3 projected and 27 skipped COPY blocks with `provider_managed_data_full_restore=false`. The restored database then passed a four-event synthetic privacy replay, identical second replay idempotency, and a negative terminal-state fail-closed case. That replay remains non-authoritative because `authoritative_post_backup_source=false`.
+- `35331742188`: latest current-schema restore drill from main head `f736381f21171a1480292988e97c61ca68a5e62b` against fresh backup run `35329018925`. Restore/validation completed in 2 seconds. Backup source SHA `e1a6500968f7722666cae2038fd49ddf3f9d3540` already includes deployed migration `1120`, and there were zero subsequent migration-file changes through the restore head. Artifact `10541321355` contains both evidence JSON files. Provider portability remained 3 projected / 27 skipped with `provider_managed_data_full_restore=false`. The restored database again passed four-event synthetic replay, identical replay idempotency, and the negative terminal-state fail-closed guard.
 
 The latest drill is successful for MyeongHa application-data portability and application-critical Auth identity continuity. It is not evidence of full hosted Supabase Auth/Storage recovery equivalence, and it does not satisfy privacy/legal-retention or approved RPO/RTO closure gates.
 
@@ -304,7 +306,7 @@ public.cmd_activate_content_release_v1(uuid,boolean)
 owner == myeongha_content_publication_owner
 ```
 
-Run `35325070718` satisfied this database-level integrity baseline for selected backup `35260191079`. The evidence remains scoped to the isolated loopback target, does not cover migration `1120` in the backup itself, and does not claim full provider-service recovery.
+Run `35331742188` satisfied this database-level integrity baseline for fresh backup `35329018925`, including the current application schema through deployed migration `1120`. The evidence remains scoped to the isolated loopback target and does not claim full provider-service recovery.
 
 ## 10. Authorization verification
 
@@ -317,7 +319,7 @@ Before a restored state can be considered usable, verify at minimum:
 - arbitrary client-supplied subject identifiers cannot become owner authority;
 - one subject cannot read another subject's protected rows.
 
-Run `35325070718` passed the loopback database-level authorization baseline for selected backup `35260191079`. Broader serving-path authorization, current-schema backup freshness, privacy/legal-retention reconciliation, and full provider-managed Auth/Storage equivalence remain separate gates.
+Run `35331742188` passed the loopback database-level authorization baseline for fresh backup `35329018925`. Broader serving-path authorization, privacy/legal-retention reconciliation, and full provider-managed Auth/Storage equivalence remain separate gates.
 
 ## 11. Privacy / deletion reconciliation before serving
 
@@ -349,7 +351,7 @@ Repository mechanics now include the policy-neutral replay planner `scripts/buil
 
 The manual restore workflow is also wired to run `scripts/run-postgres-privacy-reconciliation-synthetic-drill.sh` against the disposable restored loopback database. That step uses collision-guarded synthetic rows, exercises four non-zero revocation/account-deletion-start events, verifies identical replay idempotency, and verifies a missing terminal revoke state aborts fail-closed. It writes only sanitized `privacy-reconciliation-evidence.json`; synthetic identifiers and row payloads are not uploaded.
 
-This restored-DB step is explicitly non-authoritative: `synthetic_fixture=true`, `authoritative_post_backup_source=false`, and `dr_ready=false`. Run `35325070718` runtime-proved these mechanics against the restored schema: four synthetic events replayed successfully, an identical second replay was idempotent, and a missing terminal revoke state failed closed. The durable post-backup source, destructive finalization, and commerce-retention decisions remain unresolved.
+This restored-DB step is explicitly non-authoritative: `synthetic_fixture=true`, `authoritative_post_backup_source=false`, and `dr_ready=false`. Latest run `35331742188` runtime-proved these mechanics against the fresh current-schema restore: four synthetic events replayed successfully, an identical second replay was idempotent, and a missing terminal revoke state failed closed. The durable post-backup source, destructive finalization, and commerce-retention decisions remain unresolved.
 
 ## 12. RPO / RTO evidence
 
@@ -386,16 +388,17 @@ achieved data-loss window
 = incident/reference time - selected backup completed_at_utc
 ```
 
-Latest run `35325070718` recorded:
-- run head: `eddc1c331b6a8c0f47f54c150acd2f6cc5c7c0c2`
-- restore validation start: `2026-09-18T08:35:24Z`
-- restore validation complete: `2026-09-18T08:35:28Z`
-- isolated restore/validation diagnostic: `4s`
-- workflow dispatch-to-completion elapsed: `58s`
-- selected backup completed: `2026-09-17T18:42:39Z`
-- synthetic incident/reference time: `2026-09-17T18:44:01Z`
-- synthetic data-loss-window diagnostic: `82s`
-- evidence artifact: `10538807602`, expires `2026-10-18T08:35:28Z`
+Latest run `35331742188` recorded:
+- run head: `f736381f21171a1480292988e97c61ca68a5e62b`
+- restore validation start: `2026-09-18T09:52:33Z`
+- restore validation complete: `2026-09-18T09:52:35Z`
+- isolated restore/validation diagnostic: `2s`
+- workflow dispatch-to-completion elapsed: `52s`
+- selected backup run: `35329018925`
+- selected backup completed: `2026-09-18T09:23:19Z`
+- synthetic incident/reference time: `2026-09-18T09:23:23Z`
+- synthetic data-loss-window diagnostic: `4s`
+- evidence artifact: `10541321355`, expires `2026-10-18T09:52:36Z`
 
 These are diagnostic metrics, not a full achieved RTO or an approved RPO/RTO comparison. The manual workflow now exercises synthetic restored-DB privacy replay mechanics, but authoritative post-backup privacy reconciliation, destructive finalization, and commerce legal-retention remain outside the run.
 
@@ -412,15 +415,15 @@ Do not close `#389` until all are evidenced:
 - [x] provider plan / automatic backup / PITR state recorded
 - [x] backup failure observability verified
 - [x] exact backup point selected
-- [ ] current production schema captured by a governed backup after migration `1120`
-- [ ] restore drill completed from that current-schema backup
-- [x] isolated restore mechanics completed — run `35325070718` against governed backup `35260191079`
-- [x] integrity verification passed for selected backup — run `35325070718`
-- [x] authorization verification passed at the governed database-level baseline for selected backup — run `35325070718`
-- [x] restored-DB synthetic privacy replay mechanics exercised — run `35325070718` (non-authoritative)
+- [x] current production schema captured by governed backup `35329018925` after migration `1120`
+- [x] restore drill completed from that current-schema backup — run `35331742188`
+- [x] isolated restore mechanics completed — run `35331742188` against governed backup `35329018925`
+- [x] integrity verification passed for current-schema backup — run `35331742188`
+- [x] authorization verification passed at the governed database-level baseline — run `35331742188`
+- [x] restored-DB synthetic privacy replay mechanics exercised — run `35331742188` (non-authoritative)
 - [ ] authoritative privacy/deletion/legal-retention reconciliation exercised
-- [ ] achieved recovery duration measured across the full recovery procedure
-- [x] synthetic drill data-loss window measured — `82s` (diagnostic, not approved RPO)
+- [ ] achieved recovery duration measured across the full authoritative recovery procedure
+- [x] synthetic drill data-loss window measured — `4s` (diagnostic, not approved RPO)
 - [ ] RPO approved and compared with achieved evidence
 - [ ] RTO approved and compared with achieved evidence
 
