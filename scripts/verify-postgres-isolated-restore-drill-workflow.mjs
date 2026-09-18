@@ -8,13 +8,15 @@ const workflowPath = '.github/workflows/postgres-isolated-restore-drill.yml';
 const harnessPath = 'scripts/run-postgres-isolated-restore-drill.sh';
 const portableDataReplayPath = 'scripts/build-postgres-portable-data-replay.mjs';
 const restoreEvidenceEnvelopePath = 'scripts/build-postgres-restore-evidence-envelope.mjs';
+const privacySyntheticDrillPath = 'scripts/run-postgres-privacy-reconciliation-synthetic-drill.sh';
 const runbookPath = 'docs/operations/POSTGRES_BACKUP_RESTORE_RUNBOOK_V1.md';
 
-const [workflow, harness, portableDataReplay, restoreEvidenceEnvelope, runbook] = await Promise.all([
+const [workflow, harness, portableDataReplay, restoreEvidenceEnvelope, privacySyntheticDrill, runbook] = await Promise.all([
   readFile(workflowPath, 'utf8'),
   readFile(harnessPath, 'utf8'),
   readFile(portableDataReplayPath, 'utf8'),
   readFile(restoreEvidenceEnvelopePath, 'utf8'),
+  readFile(privacySyntheticDrillPath, 'utf8'),
   readFile(runbookPath, 'utf8'),
 ]);
 
@@ -47,6 +49,16 @@ const requiredWorkflowFragments = [
   'artifact-ids: ${{ steps.source.outputs.artifact_id }}',
   'merge-multiple: true',
   'bash scripts/run-postgres-isolated-restore-drill.sh',
+  'Exercise synthetic privacy reconciliation on restored database',
+  'PRIVACY_RECONCILIATION_BACKUP_RUN_ID: ${{ inputs.backup_run_id }}',
+  'PRIVACY_RECONCILIATION_EVIDENCE_PATH: ${{ runner.temp }}/restore-evidence/privacy-reconciliation-evidence.json',
+  'PGHOST: 127.0.0.1',
+  'PGPORT: 5432',
+  'PGUSER: postgres',
+  'PGPASSWORD: restore-drill',
+  'PGDATABASE: postgres',
+  'export PRIVACY_RECONCILIATION_BACKUP_COMPLETED_AT_UTC',
+  'bash scripts/run-postgres-privacy-reconciliation-synthetic-drill.sh',
   'Build self-contained restore evidence envelope',
   'mapfile -t public_manifests',
   'node scripts/build-postgres-restore-evidence-envelope.mjs',
@@ -58,10 +70,13 @@ const requiredWorkflowFragments = [
   '--source-artifact-expires-at "$SOURCE_ARTIFACT_EXPIRES_AT"',
   'Upload restore drill evidence only',
   'uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7',
-  'path: ${{ runner.temp }}/restore-evidence/restore-evidence.json',
+  '${{ runner.temp }}/restore-evidence/restore-evidence.json',
+  '${{ runner.temp }}/restore-evidence/privacy-reconciliation-evidence.json',
   'retention-days: 30',
   "echo 'restore_target=github-actions-loopback-supabase-postgres'",
+  "echo 'synthetic_privacy_reconciliation_mechanics=exercised_on_restored_db'",
   "echo 'privacy_reconciliation=not_exercised_by_this_workflow'",
+  "echo 'authoritative_privacy_reconciliation=not_exercised'",
   "echo 'dr_ready=false'",
 ];
 
@@ -237,9 +252,55 @@ for (const fragment of [
   }
 }
 
+
+const requiredPrivacySyntheticDrillFragments = [
+  'PRIVACY_RECONCILIATION_BACKUP_RUN_ID',
+  'PRIVACY_RECONCILIATION_BACKUP_COMPLETED_AT_UTC',
+  'PRIVACY_RECONCILIATION_EVIDENCE_PATH',
+  'synthetic privacy replay fixture collides with existing restored data',
+  'sourceAuthority": "synthetic-db-drill"',
+  'node scripts/build-postgres-privacy-reconciliation-plan.mjs',
+  'first replay establishes revocation and account-deletion-start state',
+  'second identical replay is idempotent after subject becomes deletion_pending',
+  'deletion-pending replay fails closed when a required terminal revoke is absent',
+  'myeongha-postgres-restored-db-privacy-reconciliation-synthetic-v1',
+  "execution_target: 'isolated-restored-postgres'",
+  'synthetic_fixture: true',
+  'authoritative_post_backup_source: false',
+  "replay_result: 'pass'",
+  "second_identical_replay: 'idempotent-pass'",
+  "negative_terminal_state_guard: 'fail-closed-pass'",
+  'output_contains_identifiers: false',
+  'output_contains_row_payloads: false',
+  'dr_ready: false',
+];
+
+for (const fragment of requiredPrivacySyntheticDrillFragments) {
+  if (!privacySyntheticDrill.includes(fragment)) {
+    throw new Error(`Missing restored-db privacy synthetic drill contract fragment: ${fragment}`);
+  }
+}
+
+for (const fragment of [
+  'SUPABASE_DB_PASSWORD',
+  'SUPABASE_ACCESS_TOKEN',
+  'MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE',
+  'pooler.supabase.com',
+  'api.supabase.com',
+  'myeongha.vercel.app',
+  'service_role',
+]) {
+  if (privacySyntheticDrill.includes(fragment)) {
+    throw new Error(`Restored-db privacy synthetic drill must remain production-secret independent: ${fragment}`);
+  }
+}
+
 const requiredRunbookFragments = [
   '.github/workflows/postgres-isolated-restore-drill.yml',
   'scripts/build-postgres-restore-evidence-envelope.mjs',
+  'scripts/run-postgres-privacy-reconciliation-synthetic-drill.sh',
+  'synthetic_fixture=true',
+  'authoritative_post_backup_source=false',
   'self-contained enough to re-establish the governed source',
   'GitHub Actions loopback Supabase PostgreSQL 17.6.1.166',
   'manual-only',
