@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 
 const paths = {
   operations: 'docs/architecture/PRODUCTION_OPERATIONS_ARCHITECTURE_V1.md',
@@ -14,6 +14,22 @@ const entries = await Promise.all(
   Object.entries(paths).map(async ([key, path]) => [key, await readFile(path, 'utf8')]),
 );
 const files = Object.fromEntries(entries);
+const migrationFiles = await readdir('supabase/migrations');
+const migrationNumbers = migrationFiles
+  .map((name) => name.match(/^(\\d+)_.*\\.sql$/))
+  .filter(Boolean)
+  .map((match) => Number(match[1]))
+  .filter(Number.isSafeInteger);
+if (migrationNumbers.length === 0) {
+  throw new Error('No numbered SQL migrations found under supabase/migrations');
+}
+const repositoryMigrationFrontier = Math.max(...migrationNumbers);
+if (repositoryMigrationFrontier !== 1120) {
+  throw new Error(
+    `PostgreSQL DR freshness evidence covers migration 1120, but repository migration frontier is ${repositoryMigrationFrontier}. ` +
+    'Downgrade backup freshness to stale and capture/restore a new governed production backup before claiming current-schema recovery.',
+  );
+}
 
 function requireFragment(key, fragment) {
   if (!files[key].includes(fragment)) {
@@ -145,4 +161,6 @@ for (const staleRuntimeFragment of [
   }
 }
 
-console.log('PostgreSQL DR readiness authority guard PASS: restore mechanics are evidenced, but OPEN retention/privacy and RPO/RTO authority keeps dr_ready=false.');
+console.log(
+  `PostgreSQL DR readiness authority guard PASS: current-schema backup/restore is evidenced through migration ${repositoryMigrationFrontier}, while OPEN retention/privacy and RPO/RTO authority keeps dr_ready=false.`,
+);
