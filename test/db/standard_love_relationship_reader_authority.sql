@@ -347,7 +347,6 @@ insert into public.purchase_intents(
 
 insert into public.purchase_intent_reader_selections(
   purchase_intent_id,
-  subject_id,
   product_id,
   reader_character_id,
   reader_content_bundle_id,
@@ -357,7 +356,6 @@ insert into public.purchase_intent_reader_selections(
   created_at
 ) values (
   '11392300-0000-0000-0000-000000000001',
-  '11390000-0000-0000-0000-000000000001',
   '11392000-0000-0000-0000-000000000001',
   'test-standard-reader',
   '11391000-0000-0000-0000-000000000001',
@@ -380,7 +378,7 @@ select pg_temp.assert_true(
 select pg_temp.assert_fails(
   'Reader selection cannot claim a different Product than Purchase Intent',
   $$insert into public.purchase_intent_reader_selections(
-      purchase_intent_id, subject_id, product_id,
+      purchase_intent_id, product_id,
       reader_character_id, reader_content_bundle_id,
       selection_contract_version, selection_snapshot_jsonb, selection_hash, created_at
     ) values (
@@ -400,12 +398,11 @@ select pg_temp.assert_fails(
 select pg_temp.assert_fails(
   'coming-soon Reader cannot be selected for a new purchase',
   $$insert into public.purchase_intent_reader_selections(
-      purchase_intent_id, subject_id, product_id,
+      purchase_intent_id, product_id,
       reader_character_id, reader_content_bundle_id,
       selection_contract_version, selection_snapshot_jsonb, selection_hash, created_at
     ) values (
       '11392300-0000-0000-0000-000000000002',
-      '11390000-0000-0000-0000-000000000001',
       '11392000-0000-0000-0000-000000000001',
       'test-coming-soon-reader',
       '11391000-0000-0000-0000-000000000001',
@@ -420,12 +417,11 @@ select pg_temp.assert_fails(
 select pg_temp.assert_fails(
   'Reader selection snapshot cannot omit Product/Reader authority',
   $$insert into public.purchase_intent_reader_selections(
-      purchase_intent_id, subject_id, product_id,
+      purchase_intent_id, product_id,
       reader_character_id, reader_content_bundle_id,
       selection_contract_version, selection_snapshot_jsonb, selection_hash, created_at
     ) values (
       '11392300-0000-0000-0000-000000000003',
-      '11390000-0000-0000-0000-000000000001',
       '11392000-0000-0000-0000-000000000001',
       'test-standard-reader',
       '11391000-0000-0000-0000-000000000001',
