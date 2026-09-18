@@ -37,6 +37,8 @@ provider_managed_data_blocks_projected: 3
 provider_managed_data_blocks_skipped: 27
 synthetic_privacy_replay_event_count: 4
 authoritative_post_backup_source: false
+production_privacy_delta_count_audit: IMPLEMENTED_CI_VERIFIED
+production_privacy_delta_count_audit_runtime: PENDING_MANUAL_RUN_FOR_BACKUP_35329018925
 authoritative_post_backup_delta_audit_for_current_backup: NOT_EXECUTED
 privacy_reconciliation: BLOCKED_BY_P0_PR_01_AND_ISSUE_964
 rpo_authority: OPEN_DECISION
@@ -50,7 +52,9 @@ Artifact `10541321355` (`postgres-isolated-restore-drill-35331742188`) contains 
 
 The 2-second value is the measured isolated restore/validation diagnostic from run `35331742188`. The 52-second value is GitHub workflow dispatch-to-completion elapsed time for that manual drill. The 4-second value is the synthetic data-loss-window diagnostic for the selected incident reference. None is an approved RTO or RPO, and the 52-second workflow elapsed time is not a full achieved recovery duration because authoritative privacy/legal-retention reconciliation remains outside the run.
 
-An earlier count-only production audit against the prior governed backup interval found zero recorded privacy-state deltas on the timestamp-authoritative surfaces checked at that time. That historical zero is **not** carried forward to backup `35329018925`. No authoritative post-backup delta audit/source has been established for the current backup, so authoritative privacy reconciliation remains blocked.
+An earlier count-only production audit against the prior governed backup interval found zero recorded privacy-state deltas on the timestamp-authoritative surfaces checked at that time. That historical zero is **not** carried forward to backup `35329018925`.
+
+A manual production count-only audit workflow now exists at `.github/workflows/production-postgres-privacy-delta-audit.yml`. It is implementation/CI evidence only until executed for backup `35329018925`. The workflow reads the primary production database only, derives the cutoff from the selected governed backup manifest, emits aggregate counts without identifiers or row payloads, and explicitly records `durable_post_backup_source_authority=false`, `privacy_reconciliation_exercised=false`, and `dr_ready=false`. Even after runtime execution, this primary-DB observation does not establish a durable post-backup authority that survives loss of the primary database. Authoritative privacy reconciliation therefore remains blocked.
 
 ## Promotion blockers
 
@@ -75,7 +79,8 @@ self-contained evidence envelope   = implemented / CI-verified
 envelope runtime evidence          = proven — run 35331742188
 restored-DB synthetic privacy replay= implemented / CI-verified
 restored-DB synthetic replay runtime= proven — run 35331742188
-privacy delta observed in interval = 0
+production privacy delta count audit = implemented / CI-verified / runtime pending
+current-backup observed delta count   = not yet measured
 future-safe privacy reconciliation = blocked
 approved RPO                       = no
 approved RTO                       = no
