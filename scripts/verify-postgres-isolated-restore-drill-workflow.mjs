@@ -221,12 +221,25 @@ const requiredRunbookFragments = [
   '`auth.users`',
   '`subjects.auth_user_id`',
   'identity continuity',
+  '35280075274',
+  'Restore drill: PASSED for MyeongHa application-data portability and application-critical Auth identity continuity',
+  'provider_managed_data_full_restore=false',
   'privacy reconciliation is not exercised by the workflow',
   'DR Ready = FALSE / NOT EVIDENCED',
 ];
 
 for (const fragment of requiredRunbookFragments) {
   if (!runbook.includes(fragment)) throw new Error(`Missing restore-drill runbook contract fragment: ${fragment}`);
+}
+
+for (const staleFragment of [
+  'RESTORE NOT YET PASSED',
+  'Restore drill: EXECUTED / NOT YET PASSED',
+  'isolated restore                = NOT YET EVIDENCED',
+]) {
+  if (runbook.includes(staleFragment)) {
+    throw new Error(`Restore-drill runbook contains stale pre-success evidence: ${staleFragment}`);
+  }
 }
 
 const tempRoot = await mkdtemp(join(tmpdir(), 'myeongha-portable-data-replay-'));
