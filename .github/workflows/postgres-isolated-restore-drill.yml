@@ -128,7 +128,7 @@ jobs:
           set -euo pipefail
           bash scripts/run-postgres-isolated-restore-drill.sh
 
-      - name: Add drill timing and source-artifact evidence
+      - name: Build self-contained restore evidence envelope
         shell: bash
         env:
           BACKUP_ARTIFACT_DIR: ${{ runner.temp }}/backup-artifact
@@ -139,32 +139,21 @@ jobs:
           SOURCE_ARTIFACT_EXPIRES_AT: ${{ steps.source.outputs.artifact_expires_at }}
         run: |
           set -euo pipefail
-          public_manifest="$(find "$BACKUP_ARTIFACT_DIR" -maxdepth 1 -type f -name '*.manifest.json' -print -quit)"
-          test -n "$public_manifest"
-          backup_completed_at="$(jq -er '.created_at_utc' "$public_manifest")"
-          backup_epoch="$(date -u -d "$backup_completed_at" +%s)"
-          incident_epoch="$(date -u -d "$INCIDENT_REFERENCE_UTC" +%s)"
-          (( incident_epoch >= backup_epoch ))
-          data_loss_window_seconds=$((incident_epoch - backup_epoch))
+          mapfile -t public_manifests < <(
+            find "$BACKUP_ARTIFACT_DIR" -maxdepth 1 -type f -name '*.manifest.json' -print
+          )
+          [[ "${#public_manifests[@]}" -eq 1 ]]
 
-          tmp_json="$RUNNER_TEMP/restore-evidence.tmp.json"
-          jq \
-            --arg backup_run_id "$BACKUP_RUN_ID" \
-            --arg backup_completed_at_utc "$backup_completed_at" \
-            --arg incident_reference_utc "$INCIDENT_REFERENCE_UTC" \
-            --arg source_artifact_name "$SOURCE_ARTIFACT_NAME" \
-            --arg source_artifact_expires_at "$SOURCE_ARTIFACT_EXPIRES_AT" \
-            --argjson synthetic_data_loss_window_seconds "$data_loss_window_seconds" \
-            '. + {
-              backup_workflow_run_id: $backup_run_id,
-              backup_completed_at_utc: $backup_completed_at_utc,
-              incident_reference_utc: $incident_reference_utc,
-              synthetic_data_loss_window_seconds: $synthetic_data_loss_window_seconds,
-              source_artifact_name: $source_artifact_name,
-              source_artifact_expires_at: $source_artifact_expires_at
-            }' \
-            "$RESTORE_EVIDENCE_PATH" > "$tmp_json"
-          mv "$tmp_json" "$RESTORE_EVIDENCE_PATH"
+          node scripts/build-postgres-restore-evidence-envelope.mjs \
+            --restore-evidence "$RESTORE_EVIDENCE_PATH" \
+            --backup-manifest "${public_manifests[0]}" \
+            --output "$RESTORE_EVIDENCE_PATH.enveloped" \
+            --backup-run-id "$BACKUP_RUN_ID" \
+            --incident-reference-utc "$INCIDENT_REFERENCE_UTC" \
+            --source-artifact-name "$SOURCE_ARTIFACT_NAME" \
+            --source-artifact-expires-at "$SOURCE_ARTIFACT_EXPIRES_AT"
+
+          mv "$RESTORE_EVIDENCE_PATH.enveloped" "$RESTORE_EVIDENCE_PATH"
           chmod 600 "$RESTORE_EVIDENCE_PATH"
 
       - name: Upload restore drill evidence only
