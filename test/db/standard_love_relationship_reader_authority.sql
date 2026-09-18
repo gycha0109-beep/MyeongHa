@@ -383,7 +383,6 @@ select pg_temp.assert_fails(
       selection_contract_version, selection_snapshot_jsonb, selection_hash, created_at
     ) values (
       '11392300-0000-0000-0000-000000000002',
-      '11390000-0000-0000-0000-000000000001',
       '11300000-0000-0000-0000-000000000001',
       'test-standard-reader',
       '11391000-0000-0000-0000-000000000001',
