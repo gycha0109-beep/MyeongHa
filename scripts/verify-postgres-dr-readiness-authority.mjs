@@ -49,6 +49,7 @@ requireFragment('restoreRunbook', 'isolated application restore       = EVIDENCE
 requireFragment('restoreRunbook', 'application integrity/auth baseline= PASS — run 35280075274');
 requireFragment('restoreRunbook', 'provider-managed full restore      = NOT PROVEN');
 requireFragment('restoreRunbook', 'Restore drill: PASSED for MyeongHa application-data portability and application-critical Auth identity continuity');
+requireFragment('restoreRunbook', 'A fresh manual restore drill from current `main` is still required before the envelope itself may be classified as runtime-proven.');
 requireFragment('restoreRunbook', '- [x] isolated restore completed — run `35280075274`');
 requireFragment('restoreRunbook', '- [x] integrity verification passed — run `35280075274`');
 requireFragment('restoreRunbook', '- [x] authorization verification passed at the governed database-level baseline — run `35280075274`');
@@ -70,6 +71,8 @@ for (const staleFragment of [
 const requiredStatusFragments = [
   'restore_run_id: 35280075274',
   'restore_result: SUCCESS',
+  'restore_evidence_envelope: IMPLEMENTED_CI_VERIFIED',
+  'restore_evidence_envelope_runtime: PENDING_CURRENT_MAIN_MANUAL_DRILL',
   'isolated_restore_validation_duration_seconds: 3',
   'synthetic_data_loss_window_seconds: 82',
   'post_backup_privacy_delta_count: 0',
@@ -81,6 +84,7 @@ const requiredStatusFragments = [
 for (const fragment of requiredStatusFragments) requireFragment('readinessStatus', fragment);
 
 const forbiddenReadyFragments = [
+  'restore_evidence_envelope_runtime: PROVEN',
   'dr_ready: true',
   '"dr_ready": true',
   'DR Ready = TRUE',
