@@ -174,7 +174,7 @@ NODE
 pass "production ledger builder accepts non-zero replay-supported fixture without authority promotion"
 
 manifest_sha256="$(sha256sum "$manifest" | awk '{print $1}')"
-roundtrip_passphrase='myeongha-ci-only-nonzero-ledger-roundtrip-passphrase-v1'
+roundtrip_passphrase="$(openssl rand -hex 32)"
 openssl enc -aes-256-cbc -salt -pbkdf2 -iter 200000 \
   -pass "pass:$roundtrip_passphrase" \
   -in "$manifest" \
