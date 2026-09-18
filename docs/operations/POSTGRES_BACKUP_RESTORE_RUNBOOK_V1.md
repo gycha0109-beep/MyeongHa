@@ -304,7 +304,7 @@ public.cmd_activate_content_release_v1(uuid,boolean)
 owner == myeongha_content_publication_owner
 ```
 
-Run `35280075274` satisfied this database-level integrity baseline. The evidence remains scoped to the isolated loopback target and does not claim full provider-service recovery.
+Run `35325070718` satisfied this database-level integrity baseline for selected backup `35260191079`. The evidence remains scoped to the isolated loopback target, does not cover migration `1120` in the backup itself, and does not claim full provider-service recovery.
 
 ## 10. Authorization verification
 
@@ -317,7 +317,7 @@ Before a restored state can be considered usable, verify at minimum:
 - arbitrary client-supplied subject identifiers cannot become owner authority;
 - one subject cannot read another subject's protected rows.
 
-Run `35280075274` passed the loopback database-level authorization baseline. Broader serving-path authorization, privacy/legal-retention reconciliation, and full provider-managed Auth/Storage equivalence remain separate gates.
+Run `35325070718` passed the loopback database-level authorization baseline for selected backup `35260191079`. Broader serving-path authorization, current-schema backup freshness, privacy/legal-retention reconciliation, and full provider-managed Auth/Storage equivalence remain separate gates.
 
 ## 11. Privacy / deletion reconciliation before serving
 
