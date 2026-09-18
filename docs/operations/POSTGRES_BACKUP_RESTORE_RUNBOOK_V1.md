@@ -353,6 +353,38 @@ The manual restore workflow is also wired to run `scripts/run-postgres-privacy-r
 
 This restored-DB step is explicitly non-authoritative: `synthetic_fixture=true`, `authoritative_post_backup_source=false`, and `dr_ready=false`. Latest run `35331742188` runtime-proved these mechanics against the fresh current-schema restore: four synthetic events replayed successfully, an identical second replay was idempotent, and a missing terminal revoke state failed closed. The durable post-backup source, destructive finalization, and commerce-retention decisions remain unresolved.
 
+### 11.1 Production count-only privacy delta audit
+
+Workflow:
+
+```text
+.github/workflows/production-postgres-privacy-delta-audit.yml
+```
+
+Current classification:
+
+```text
+production privacy delta count audit = IMPLEMENTED / CI-VERIFIED / RUNTIME PENDING
+source authority                     = primary production DB observation only
+durable post-backup source authority = NOT PROVEN
+privacy reconciliation exercised     = false
+DR Ready                             = false
+```
+
+The manual audit selects an exact successful governed production backup run, derives the backup cutoff from that artifact's public manifest, and counts only timestamp-authoritative changes in the interval `(backup_completed_at, incident_reference_utc]` across:
+
+- account deletion jobs requested;
+- share artifact revocations;
+- device installation revocations;
+- Life Fact revocations;
+- Memory Item revocations;
+- record-access-grant revocations;
+- non-active Subject transitions.
+
+The uploaded JSON contains only aggregate counts and provenance metadata. It contains no resource identifiers and no row payloads. It does not decrypt or upload backup SQL/data.
+
+This is a **primary production DB observation only**. It can establish whether currently queryable production state contains timestamp-authoritative deltas in the selected interval, but it **does not establish a durable post-backup authority** that survives loss of the primary production database. Zero observed deltas would not resolve #964 / P0-PR-01, and non-zero observed deltas would identify reconciliation work without authorizing destructive finalization or commerce-retention semantics.
+
 ## 12. RPO / RTO evidence
 
 Current decision state:
@@ -421,6 +453,7 @@ Do not close `#389` until all are evidenced:
 - [x] integrity verification passed for current-schema backup — run `35331742188`
 - [x] authorization verification passed at the governed database-level baseline — run `35331742188`
 - [x] restored-DB synthetic privacy replay mechanics exercised — run `35331742188` (non-authoritative)
+- [ ] current-backup production privacy delta count audit runtime-executed
 - [ ] authoritative privacy/deletion/legal-retention reconciliation exercised
 - [ ] achieved recovery duration measured across the full authoritative recovery procedure
 - [x] synthetic drill data-loss window measured — `4s` (diagnostic, not approved RPO)

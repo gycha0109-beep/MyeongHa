@@ -73,6 +73,10 @@ requireFragment('restoreRunbook', 'scripts/run-postgres-privacy-reconciliation-s
 requireFragment('restoreRunbook', 'authoritative_post_backup_source=false');
 requireFragment('restoreRunbook', 'Artifact `10541321355` contains the resulting `restore-evidence.json`');
 requireFragment('restoreRunbook', 'Latest run `35331742188` runtime-proved these mechanics against the fresh current-schema restore');
+requireFragment('restoreRunbook', '.github/workflows/production-postgres-privacy-delta-audit.yml');
+requireFragment('restoreRunbook', 'production privacy delta count audit = IMPLEMENTED / CI-VERIFIED / RUNTIME PENDING');
+requireFragment('restoreRunbook', 'primary production DB observation only');
+requireFragment('restoreRunbook', 'does not establish a durable post-backup authority');
 requireFragment('restoreRunbook', '- [x] current production schema captured by governed backup `35329018925` after migration `1120`');
 requireFragment('restoreRunbook', '- [x] restore drill completed from that current-schema backup — run `35331742188`');
 requireFragment('restoreRunbook', '- [x] isolated restore mechanics completed — run `35331742188` against governed backup `35329018925`');
@@ -124,6 +128,8 @@ const requiredStatusFragments = [
   'provider_managed_data_blocks_skipped: 27',
   'synthetic_privacy_replay_event_count: 4',
   'authoritative_post_backup_source: false',
+  'production_privacy_delta_count_audit: IMPLEMENTED_CI_VERIFIED',
+  'production_privacy_delta_count_audit_runtime: PENDING_MANUAL_RUN_FOR_BACKUP_35329018925',
   'authoritative_post_backup_delta_audit_for_current_backup: NOT_EXECUTED',
   'privacy_reconciliation: BLOCKED_BY_P0_PR_01_AND_ISSUE_964',
   'rpo_authority: OPEN_DECISION',
@@ -137,6 +143,7 @@ const forbiddenReadyFragments = [
   'backup_refresh_required: true',
   'restore_evidence_envelope_runtime: PENDING_CURRENT_MAIN_MANUAL_DRILL',
   'restored_db_synthetic_privacy_replay_runtime: PENDING_CURRENT_MAIN_MANUAL_DRILL',
+  'production_privacy_delta_count_audit_runtime: PROVEN',
   'dr_ready: true',
   '"dr_ready": true',
   'DR Ready = TRUE',
