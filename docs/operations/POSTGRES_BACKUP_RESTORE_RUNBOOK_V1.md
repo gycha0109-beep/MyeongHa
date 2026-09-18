@@ -3,7 +3,7 @@
 > Scope: non-character production operations only  
 > Issue: `#389` — authoritative persistent-data recovery  
 > Evidence date: 2026-09-18 KST  
-> Production state: CURRENT-SCHEMA BACKUP PROVEN / CURRENT-SCHEMA RESTORE PENDING / DR NOT READY
+> Production state: BACKUP PRODUCTION-PROVEN / CURRENT-SCHEMA BACKUP PROVEN / CURRENT-SCHEMA RESTORE PENDING / DR NOT READY
 
 ## 1. Current production authority
 
