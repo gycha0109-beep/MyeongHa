@@ -38,6 +38,8 @@ provider_managed_data_blocks_skipped: 27
 synthetic_privacy_replay_event_count: 4
 authoritative_post_backup_source: false
 authoritative_post_backup_delta_audit_for_current_backup: NOT_EXECUTED
+post_backup_privacy_delta_count_audit_workflow: IMPLEMENTED_NOT_EXECUTED
+privacy_delta_audit_query_mode: READ_ONLY_COUNT_ONLY
 privacy_reconciliation: BLOCKED_BY_P0_PR_01_AND_ISSUE_964
 rpo_authority: OPEN_DECISION
 rto_authority: OPEN_DECISION
@@ -51,6 +53,8 @@ Artifact `10541321355` (`postgres-isolated-restore-drill-35331742188`) contains 
 The 2-second value is the measured isolated restore/validation diagnostic from run `35331742188`. The 52-second value is GitHub workflow dispatch-to-completion elapsed time for that manual drill. The 4-second value is the synthetic data-loss-window diagnostic for the selected incident reference. None is an approved RTO or RPO, and the 52-second workflow elapsed time is not a full achieved recovery duration because authoritative privacy/legal-retention reconciliation remains outside the run.
 
 An earlier count-only production audit against the prior governed backup interval found zero recorded privacy-state deltas on the timestamp-authoritative surfaces checked at that time. That historical zero is **not** carried forward to backup `35329018925`. No authoritative post-backup delta audit/source has been established for the current backup, so authoritative privacy reconciliation remains blocked.
+
+A manual runtime path now exists at `.github/workflows/production-postgres-privacy-delta-audit.yml`. It accepts a governed successful backup run, resolves the exact public backup manifest completion point, forces the production PostgreSQL session into `default_transaction_read_only=on`, and emits only aggregate counts for the seven currently timestamp-authoritative surfaces. The workflow deliberately records `authoritative_post_backup_source=false`, `authoritative_privacy_reconciliation=false`, `future_safe_privacy_reconciliation=false`, and `dr_ready=false`. Until a run against backup `35329018925` is executed and inspected, the current-backup audit authority remains `NOT_EXECUTED`; even a zero result would remain an observation of current primary-DB state rather than a durable recovery source.
 
 ## Promotion blockers
 
@@ -75,7 +79,8 @@ self-contained evidence envelope   = implemented / CI-verified
 envelope runtime evidence          = proven — run 35331742188
 restored-DB synthetic privacy replay= implemented / CI-verified
 restored-DB synthetic replay runtime= proven — run 35331742188
-privacy delta observed in interval = 0
+current-backup privacy delta audit = not executed
+count-only audit workflow          = implemented / not yet runtime-executed
 future-safe privacy reconciliation = blocked
 approved RPO                       = no
 approved RTO                       = no
