@@ -280,6 +280,18 @@ insert into public.product_offers(
   '11392100-0000-0000-0000-000000000001'
 );
 
+insert into public.product_offer_charge_terms(
+  id, product_offer_id, terms_version, amount_minor, currency, created_at, retired_at
+) values (
+  '11392210-0000-0000-0000-000000000001',
+  '11392200-0000-0000-0000-000000000001',
+  'test-v1',
+  1,
+  'KRW',
+  now(),
+  null
+);
+
 insert into public.purchase_intents(
   id, subject_id, product_offer_id, provider_account_link_id,
   idempotency_key, request_hash, offer_snapshot_jsonb, offer_snapshot_hash,
@@ -432,6 +444,105 @@ select pg_temp.assert_fails(
   'ct_reader_selection_snapshot_mismatch'
 );
 
+select pg_catalog.set_config(
+  'myeongha.subject_id',
+  '11390000-0000-0000-0000-000000000001',
+  false
+);
+
+select pg_temp.assert_true(
+  'atomic v4 command creates Purchase Intent and Reader selection together',
+  (
+    select result.purchase_intent_id = '11392300-0000-0000-0000-000000000004'::uuid
+       and result.status = 'created'
+       and result.reader_character_id = 'test-standard-reader'
+       and result.reader_content_bundle_id = '11391000-0000-0000-0000-000000000001'::uuid
+       and result.replayed = false
+    from public.cmd_create_standard_reading_purchase_intent_v4(
+      '11390000-0000-0000-0000-000000000001',
+      '11392300-0000-0000-0000-000000000004',
+      '11392200-0000-0000-0000-000000000001',
+      null,
+      'reader-atomic-v4',
+      'sha256:v1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      '{"productOfferId":"11392200-0000-0000-0000-000000000001","productId":"11392000-0000-0000-0000-000000000001","platform":"web","provider":"portone_v2","externalProductId":"test-standard-reader-product-v1"}'::jsonb,
+      'sha256:v1:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      '{"capabilitySetId":"11392100-0000-0000-0000-000000000001","definitionVersion":"v1","definitionHash":"sha256:test:reader-capability"}'::jsonb,
+      'sha256:v1:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
+      '11392000-0000-0000-0000-000000000001',
+      'test-standard-reader',
+      '11391000-0000-0000-0000-000000000001',
+      'standard-reading-reader-selection-v1',
+      '{"schemaVersion":"standard-reading-reader-selection-v1","productId":"11392000-0000-0000-0000-000000000001","topicKey":"test_reader_topic","specVersion":"v1","readerCharacterId":"test-standard-reader","readerContentBundleId":"11391000-0000-0000-0000-000000000001"}'::jsonb,
+      'sha256:v1:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd'
+    ) result
+  )
+);
+
+select pg_temp.assert_true(
+  'atomic v4 command persisted exact immutable Reader provenance',
+  (
+    select pirs.product_id = '11392000-0000-0000-0000-000000000001'::uuid
+       and pirs.reader_character_id = 'test-standard-reader'
+       and pirs.reader_content_bundle_id = '11391000-0000-0000-0000-000000000001'::uuid
+       and pirs.selection_contract_version = 'standard-reading-reader-selection-v1'
+       and pirs.selection_hash = 'sha256:v1:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd'
+    from public.purchase_intent_reader_selections pirs
+    where pirs.purchase_intent_id = '11392300-0000-0000-0000-000000000004'
+  )
+);
+
+select pg_temp.assert_true(
+  'atomic v4 exact replay converges on the same Reader-bound Purchase Intent',
+  (
+    select result.purchase_intent_id = '11392300-0000-0000-0000-000000000004'::uuid
+       and result.reader_character_id = 'test-standard-reader'
+       and result.replayed = true
+    from public.cmd_create_standard_reading_purchase_intent_v4(
+      '11390000-0000-0000-0000-000000000001',
+      '11392300-0000-0000-0000-000000000099',
+      '11392200-0000-0000-0000-000000000001',
+      null,
+      'reader-atomic-v4',
+      'sha256:v1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      '{"productOfferId":"11392200-0000-0000-0000-000000000001","productId":"11392000-0000-0000-0000-000000000001","platform":"web","provider":"portone_v2","externalProductId":"test-standard-reader-product-v1"}'::jsonb,
+      'sha256:v1:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      '{"capabilitySetId":"11392100-0000-0000-0000-000000000001","definitionVersion":"v1","definitionHash":"sha256:test:reader-capability"}'::jsonb,
+      'sha256:v1:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
+      '11392000-0000-0000-0000-000000000001',
+      'test-standard-reader',
+      '11391000-0000-0000-0000-000000000001',
+      'standard-reading-reader-selection-v1',
+      '{"schemaVersion":"standard-reading-reader-selection-v1","productId":"11392000-0000-0000-0000-000000000001","topicKey":"test_reader_topic","specVersion":"v1","readerCharacterId":"test-standard-reader","readerContentBundleId":"11391000-0000-0000-0000-000000000001"}'::jsonb,
+      'sha256:v1:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd'
+    ) result
+  )
+);
+
+select pg_temp.assert_fails(
+  'atomic v4 replay cannot switch Reader provenance',
+  $select *
+    from public.cmd_create_standard_reading_purchase_intent_v4(
+      '11390000-0000-0000-0000-000000000001',
+      '11392300-0000-0000-0000-000000000098',
+      '11392200-0000-0000-0000-000000000001',
+      null,
+      'reader-atomic-v4',
+      'sha256:v1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      '{"productOfferId":"11392200-0000-0000-0000-000000000001","productId":"11392000-0000-0000-0000-000000000001","platform":"web","provider":"portone_v2","externalProductId":"test-standard-reader-product-v1"}'::jsonb,
+      'sha256:v1:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      '{"capabilitySetId":"11392100-0000-0000-0000-000000000001","definitionVersion":"v1","definitionHash":"sha256:test:reader-capability"}'::jsonb,
+      'sha256:v1:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
+      '11392000-0000-0000-0000-000000000001',
+      'test-coming-soon-reader',
+      '11391000-0000-0000-0000-000000000001',
+      'standard-reading-reader-selection-v1',
+      '{"schemaVersion":"standard-reading-reader-selection-v1","productId":"11392000-0000-0000-0000-000000000001","topicKey":"test_reader_topic","specVersion":"v1","readerCharacterId":"test-coming-soon-reader","readerContentBundleId":"11391000-0000-0000-0000-000000000001"}'::jsonb,
+      'sha256:v1:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee'
+    )$,
+  'cmd_standard_reading_purchase_v4_replay_selection_conflict'
+);
+
 select pg_temp.assert_fails(
   'Reader selection provenance cannot mutate',
   $$update public.purchase_intent_reader_selections
@@ -445,6 +556,15 @@ select pg_temp.assert_fails(
   $$delete from public.purchase_intent_reader_selections
     where purchase_intent_id = '11392300-0000-0000-0000-000000000001'$$,
   'tr_purchase_intent_reader_selection_append_only'
+);
+
+select pg_temp.assert_true(
+  'ordinary API executor cannot execute inactive Standard Reading purchase v4 authority',
+  not pg_catalog.has_function_privilege(
+    'myeongha_api_executor',
+    'public.cmd_create_standard_reading_purchase_intent_v4(uuid,uuid,uuid,uuid,text,text,jsonb,text,jsonb,text,uuid,text,uuid,text,jsonb,text)'::regprocedure,
+    'EXECUTE'
+  )
 );
 
 select pg_temp.assert_true(
