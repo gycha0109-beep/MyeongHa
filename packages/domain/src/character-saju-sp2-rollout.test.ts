@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   CHARACTER_OUTPUT_GUARD_VERSION_V1,
-  hashProtectedSajuTextV1,
 } from './character-output-guard.js';
+import { hashProtectedSajuTextV1 } from './character-runtime-context.js';
 import {
   SAJU_CHARACTER_GROUNDING_PROJECTION_VERSION_V1,
   SAJU_CHARACTER_GROUNDING_SCHEMA_VERSION_V1,
