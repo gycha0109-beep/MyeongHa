@@ -38,9 +38,12 @@ const requiredWorkflowFragments = [
   '.project_ref == $project_ref',
   '.source_sha == $source_sha',
   'backup_completed_at_utc=$cutoff_utc',
-  "export PGOPTIONS='-c default_transaction_read_only=on",
-  `readonly_state="$(psql "$db_url" -X -qAt -v ON_ERROR_STOP=1 -c 'show transaction_read_only')"`,
-  '[[ "$readonly_state" == \'on\' ]]',
+  "export PGOPTIONS='-c statement_timeout=30000",
+  'begin transaction read only;',
+  "where current_setting('transaction_read_only') = 'on';",
+  'rollback;',
+  'Explicit READ ONLY transaction could not complete.',
+  '[[ -s "$counts_path" ]]',
   "'data_deletion_jobs_requested_at'",
   'from public.data_deletion_jobs where requested_at > :\'cutoff\'::timestamptz',
   "'share_artifacts_revoked_at'",
@@ -91,6 +94,7 @@ const forbiddenWorkflowFragments = [
   'authoritative_privacy_reconciliation: true',
   'future_safe_privacy_reconciliation: true',
   'dr_ready: true',
+  '-c default_transaction_read_only=on',
 ];
 
 for (const fragment of forbiddenWorkflowFragments) {

@@ -167,9 +167,7 @@ jobs:
           db_url="postgresql://${admin_pool_user}:${encoded_password}@${SUPABASE_PRODUCTION_SESSION_POOLER_HOST}:5432/postgres?sslmode=require"
           echo "::add-mask::$db_url"
 
-          export PGOPTIONS='-c default_transaction_read_only=on -c statement_timeout=30000 -c lock_timeout=5000 -c idle_in_transaction_session_timeout=30000'
-          readonly_state="$(psql "$db_url" -X -qAt -v ON_ERROR_STOP=1 -c 'show transaction_read_only')"
-          [[ "$readonly_state" == 'on' ]]
+          export PGOPTIONS='-c statement_timeout=30000 -c lock_timeout=5000 -c idle_in_transaction_session_timeout=30000'
 
           counts_path="$RUNNER_TEMP/privacy-delta-counts.json"
           evidence_dir="$RUNNER_TEMP/privacy-delta-audit-evidence"
@@ -177,6 +175,7 @@ jobs:
           mkdir -p "$evidence_dir"
 
           sql="$(cat <<'SQL'
+          begin transaction read only;
           select jsonb_build_object(
             'data_deletion_jobs_requested_at', (select count(*)::bigint from public.data_deletion_jobs where requested_at > :'cutoff'::timestamptz),
             'share_artifacts_revoked_at', (select count(*)::bigint from public.share_artifacts where revoked_at > :'cutoff'::timestamptz),
@@ -185,11 +184,18 @@ jobs:
             'memory_items_revoked_at', (select count(*)::bigint from public.memory_items where revoked_at > :'cutoff'::timestamptz),
             'record_access_grants_revoked_at', (select count(*)::bigint from public.record_access_grants where revoked_at > :'cutoff'::timestamptz),
             'subjects_non_active_updated_at', (select count(*)::bigint from public.subjects where status <> 'active' and updated_at > :'cutoff'::timestamptz)
-          )::text;
+          )::text
+          where current_setting('transaction_read_only') = 'on';
+          rollback;
           SQL
           )"
 
-          psql "$db_url" -X -qAt             -v ON_ERROR_STOP=1             -v "cutoff=$BACKUP_COMPLETED_AT_UTC"             -c "$sql" > "$counts_path"
+          if ! psql "$db_url" -X -qAt             -v ON_ERROR_STOP=1             -v "cutoff=$BACKUP_COMPLETED_AT_UTC"             -c "$sql" > "$counts_path"; then
+            echo '::error title=Production privacy delta count query failed::Explicit READ ONLY transaction could not complete.'
+            exit 1
+          fi
+
+          [[ -s "$counts_path" ]]
 
           jq -e '
             type == "object"
