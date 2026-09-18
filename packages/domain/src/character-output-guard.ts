@@ -10,6 +10,8 @@ import {
   type ProtectedSajuTextRefV1,
 } from './character-runtime-context.js';
 
+export const CHARACTER_OUTPUT_GUARD_VERSION_V1 = 'myeongha-character-output-guard-v1' as const;
+
 export type CharacterMemoryProposalKindV1 = 'life_fact' | 'memory';
 
 export interface CharacterMemoryProposalDraftV1 {
