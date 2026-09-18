@@ -520,8 +520,50 @@ select pg_temp.assert_true(
 );
 
 select pg_temp.assert_fails(
+  'atomic v4 invalid Reader rolls back the new Purchase Intent',
+  $$select *
+    from public.cmd_create_standard_reading_purchase_intent_v4(
+      '11390000-0000-0000-0000-000000000001',
+      '11392300-0000-0000-0000-000000000005',
+      '11392200-0000-0000-0000-000000000001',
+      null,
+      'reader-atomic-v4-invalid',
+      'sha256:v1:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff',
+      '{"productOfferId":"11392200-0000-0000-0000-000000000001","productId":"11392000-0000-0000-0000-000000000001","platform":"web","provider":"portone_v2","externalProductId":"test-standard-reader-product-v1"}'::jsonb,
+      'sha256:v1:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      '{"capabilitySetId":"11392100-0000-0000-0000-000000000001","definitionVersion":"v1","definitionHash":"sha256:test:reader-capability"}'::jsonb,
+      'sha256:v1:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
+      '11392000-0000-0000-0000-000000000001',
+      'test-coming-soon-reader',
+      '11391000-0000-0000-0000-000000000001',
+      'standard-reading-reader-selection-v1',
+      '{"schemaVersion":"standard-reading-reader-selection-v1","productId":"11392000-0000-0000-0000-000000000001","topicKey":"test_reader_topic","specVersion":"v1","readerCharacterId":"test-coming-soon-reader","readerContentBundleId":"11391000-0000-0000-0000-000000000001"}'::jsonb,
+      'sha256:v1:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee'
+    )$$,
+  'ct_reader_selection_reader_unavailable'
+);
+
+select pg_temp.assert_true(
+  'atomic v4 Reader failure leaves no partial Purchase Intent or selection',
+  not exists (
+    select 1
+    from public.purchase_intents pi
+    where pi.id = '11392300-0000-0000-0000-000000000005'
+       or (
+         pi.subject_id = '11390000-0000-0000-0000-000000000001'
+         and pi.idempotency_key = 'reader-atomic-v4-invalid'
+       )
+  )
+  and not exists (
+    select 1
+    from public.purchase_intent_reader_selections pirs
+    where pirs.purchase_intent_id = '11392300-0000-0000-0000-000000000005'
+  )
+);
+
+select pg_temp.assert_fails(
   'atomic v4 replay cannot switch Reader provenance',
-  $select *
+  $$select *
     from public.cmd_create_standard_reading_purchase_intent_v4(
       '11390000-0000-0000-0000-000000000001',
       '11392300-0000-0000-0000-000000000098',
@@ -539,7 +581,7 @@ select pg_temp.assert_fails(
       'standard-reading-reader-selection-v1',
       '{"schemaVersion":"standard-reading-reader-selection-v1","productId":"11392000-0000-0000-0000-000000000001","topicKey":"test_reader_topic","specVersion":"v1","readerCharacterId":"test-coming-soon-reader","readerContentBundleId":"11391000-0000-0000-0000-000000000001"}'::jsonb,
       'sha256:v1:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee'
-    )$,
+    )$$,
   'cmd_standard_reading_purchase_v4_replay_selection_conflict'
 );
 
