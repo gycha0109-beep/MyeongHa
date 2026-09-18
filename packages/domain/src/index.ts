@@ -71,6 +71,25 @@ export {
 } from './character-saju-grounding-admission.js';
 
 export {
+  CHARACTER_PERSPECTIVE_NARRATIVE_ROLES_V1,
+  CHARACTER_PERSPECTIVE_SCHEMA_VERSION_V1,
+  SAJU_GROUNDING_AXIS_KEYS_V1,
+  CharacterPerspectiveAdmissionErrorV1,
+  admitCharacterPerspectiveProfileV1,
+  type CharacterPerspectiveAdviceStyleV1,
+  type CharacterPerspectiveAxisBindingV1,
+  type CharacterPerspectiveContradictionHandlingV1,
+  type CharacterPerspectiveDeliveryAuthorityV1,
+  type CharacterPerspectiveGroundingAxisKeyV1,
+  type CharacterPerspectiveInterpretationBehaviorV1,
+  type CharacterPerspectiveNarrativeRoleV1,
+  type CharacterPerspectiveProfileV1,
+  type CharacterPerspectiveSelectionPolicyV1,
+  type CharacterPerspectiveSourceV1,
+  type CharacterPerspectiveUncertaintyHandlingV1,
+} from './character-saju-perspective.js';
+
+export {
   CharacterOutputGuardError,
   guardCharacterRendererOutput,
   type CharacterDialogueEnvelopeV1,
