@@ -39,7 +39,7 @@ const requiredWorkflowFragments = [
   '.source_sha == $source_sha',
   'backup_completed_at_utc=$cutoff_utc',
   "export PGOPTIONS='-c default_transaction_read_only=on",
-  "readonly_state="$(psql "$db_url" -X -qAt -v ON_ERROR_STOP=1 -c 'show transaction_read_only')"",
+  `readonly_state="$(psql "$db_url" -X -qAt -v ON_ERROR_STOP=1 -c 'show transaction_read_only')"`,
   '[[ "$readonly_state" == \'on\' ]]',
   "'data_deletion_jobs_requested_at'",
   'from public.data_deletion_jobs where requested_at > :\'cutoff\'::timestamptz',
@@ -99,7 +99,7 @@ for (const fragment of forbiddenWorkflowFragments) {
   }
 }
 
-const sqlStart = workflow.indexOf("          sql="$(cat <<'SQL'");
+const sqlStart = workflow.indexOf(`          sql="$(cat <<'SQL'`);
 const sqlEnd = workflow.indexOf('          SQL\n          )"', sqlStart);
 if (sqlStart < 0 || sqlEnd < 0) {
   throw new Error('Count-only SQL heredoc could not be located.');
