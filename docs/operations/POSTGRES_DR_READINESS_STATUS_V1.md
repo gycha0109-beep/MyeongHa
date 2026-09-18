@@ -8,15 +8,24 @@
 
 ```yaml
 backup_run_id: 35260191079
-restore_run_id: 35280075274
+restore_run_id: 35325070718
 restore_result: SUCCESS
 restore_target: github-actions-loopback-supabase-postgres
+restore_runtime_head_sha: eddc1c331b6a8c0f47f54c150acd2f6cc5c7c0c2
+restore_evidence_artifact_id: 10538807602
+restore_evidence_artifact_expires_at: 2026-10-18T08:35:28Z
 restore_evidence_envelope: IMPLEMENTED_CI_VERIFIED
-restore_evidence_envelope_runtime: PENDING_CURRENT_MAIN_MANUAL_DRILL
+restore_evidence_envelope_runtime: PROVEN_ON_RUN_35325070718
 restored_db_synthetic_privacy_replay: IMPLEMENTED_CI_VERIFIED
-restored_db_synthetic_privacy_replay_runtime: PENDING_CURRENT_MAIN_MANUAL_DRILL
-isolated_restore_validation_duration_seconds: 3
+restored_db_synthetic_privacy_replay_runtime: PROVEN_ON_RUN_35325070718
+isolated_restore_validation_duration_seconds: 4
+manual_drill_workflow_elapsed_seconds: 58
 synthetic_data_loss_window_seconds: 82
+provider_managed_data_full_restore: false
+provider_managed_data_blocks_projected: 3
+provider_managed_data_blocks_skipped: 27
+synthetic_privacy_replay_event_count: 4
+authoritative_post_backup_source: false
 post_backup_privacy_delta_count: 0
 privacy_reconciliation: BLOCKED_BY_P0_PR_01_AND_ISSUE_964
 rpo_authority: OPEN_DECISION
@@ -24,11 +33,11 @@ rto_authority: OPEN_DECISION
 dr_ready: false
 ```
 
-The successful restore run proves the governed logical backup can be decrypted, integrity-checked, replayed into the isolated Supabase PostgreSQL target, and validated at the application database authorization/integrity boundary. It does not establish full Supabase provider-service recovery or serving-production readiness.
+Manual restore run `35325070718` completed successfully from main head `eddc1c331b6a8c0f47f54c150acd2f6cc5c7c0c2`. It proved the governed logical backup can still be decrypted, integrity-checked, replayed into the isolated Supabase PostgreSQL target, and validated at the application database authorization/integrity boundary after the self-contained evidence-envelope and restored-DB synthetic replay integrations were merged. It does not establish full Supabase provider-service recovery or serving-production readiness.
 
-The self-contained restore evidence envelope introduced after that successful drill is implemented and CI-verified, but has not yet been exercised by a fresh manual restore drill from current `main`. The historical successful restore remains valid application-restore evidence; it is not runtime proof of the newer envelope implementation.
+Artifact `10538807602` (`postgres-isolated-restore-drill-35325070718`) contains both `restore-evidence.json` and `privacy-reconciliation-evidence.json`. The restore evidence records envelope version `myeongha-postgres-isolated-restore-evidence-envelope-v1`, exact backup/source bindings, 4-second restore/validation, 3 projected provider COPY blocks, 27 skipped provider COPY blocks, `provider_managed_data_full_restore=false`, Auth identity continuity PASS, and `dr_ready=false`. The privacy evidence records four synthetic replay events, identical second-replay idempotency PASS, negative terminal-state fail-closed PASS, `authoritative_post_backup_source=false`, and `dr_ready=false`.
 
-The 3-second value is the measured isolated restore/validation diagnostic from run `35280075274`. The 82-second value is the synthetic data-loss-window diagnostic for the selected incident reference. Neither value is an approved RTO or RPO.
+The 4-second value is the measured isolated restore/validation diagnostic from run `35325070718`. The 58-second value is GitHub workflow dispatch-to-completion elapsed time for that manual drill. The 82-second value is the synthetic data-loss-window diagnostic for the selected incident reference. None is an approved RTO or RPO, and the 58-second workflow elapsed time is not a full achieved recovery duration because authoritative privacy/legal-retention reconciliation remains outside the run.
 
 A count-only production audit against the governed backup completion point found zero post-backup privacy state deltas on the timestamp-authoritative surfaces checked for this tested interval. Zero observed deltas means there was nothing to replay for that interval; it does not prove the future-safe deletion/revocation/legal-retention reconciliation procedure.
 
@@ -49,9 +58,9 @@ backup proven                      = yes
 isolated application restore       = yes
 application integrity/auth baseline= yes
 self-contained evidence envelope   = implemented / CI-verified
-envelope runtime on current main   = pending manual drill
+envelope runtime evidence          = proven — run 35325070718
 restored-DB synthetic privacy replay= implemented / CI-verified
-restored-DB synthetic replay runtime= pending manual drill
+restored-DB synthetic replay runtime= proven — run 35325070718
 privacy delta observed in interval = 0
 future-safe privacy reconciliation = blocked
 approved RPO                       = no
@@ -88,7 +97,7 @@ This advances recovery mechanics but does not remove the promotion blockers:
 
 ```text
 revocation replay plan mechanics   = implemented
-restored-DB synthetic replay path  = implemented / CI-verified / runtime pending
+restored-DB synthetic replay path  = runtime-proven — run 35325070718
 durable post-backup source authority = not proven
 destructive account finalization   = blocked by P0-PR-01 / #964
 commerce legal retention           = blocked by P0-PR-01 / #964
