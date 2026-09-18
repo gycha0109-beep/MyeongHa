@@ -90,6 +90,13 @@ export {
 } from './character-saju-perspective.js';
 
 export {
+  CHARACTER_SAJU_FIRST_SLICE_CHARACTER_IDS_V1,
+  CHARACTER_SAJU_FIRST_SLICE_PERSPECTIVE_VERSION_V1,
+  resolveCharacterSajuFirstSlicePerspectiveV1,
+  type CharacterSajuFirstSliceCharacterIdV1,
+} from './character-saju-perspective-registry.js';
+
+export {
   CHARACTER_GROUNDING_REALIZATION_POLICIES_V1,
   CHARACTER_INSIGHT_SELECTION_SCHEMA_VERSION_V1,
   CharacterInsightSelectionErrorV1,
