@@ -44,9 +44,28 @@ requireRegex(
 );
 requireFragment('restoreHarness', 'privacy_reconciliation: "not_exercised_by_this_workflow"');
 requireFragment('restoreHarness', 'dr_ready: false');
+requireFragment('restoreRunbook', 'Production state: BACKUP PRODUCTION-PROVEN / ISOLATED APPLICATION RESTORE EVIDENCED / DR NOT READY');
+requireFragment('restoreRunbook', 'isolated application restore       = EVIDENCED — run 35280075274');
+requireFragment('restoreRunbook', 'application integrity/auth baseline= PASS — run 35280075274');
+requireFragment('restoreRunbook', 'provider-managed full restore      = NOT PROVEN');
+requireFragment('restoreRunbook', 'Restore drill: PASSED for MyeongHa application-data portability and application-critical Auth identity continuity');
+requireFragment('restoreRunbook', '- [x] isolated restore completed — run `35280075274`');
+requireFragment('restoreRunbook', '- [x] integrity verification passed — run `35280075274`');
+requireFragment('restoreRunbook', '- [x] authorization verification passed at the governed database-level baseline — run `35280075274`');
+requireFragment('restoreRunbook', '- [x] synthetic drill data-loss window measured — `82s` (diagnostic, not approved RPO)');
 requireFragment('restoreRunbook', 'RPO: OPEN DECISION');
 requireFragment('restoreRunbook', 'RTO: OPEN DECISION');
 requireFragment('restoreRunbook', 'DR Ready = FALSE / NOT EVIDENCED');
+
+for (const staleFragment of [
+  'RESTORE NOT YET PASSED',
+  'Restore drill: EXECUTED / NOT YET PASSED',
+  'isolated restore                = NOT YET EVIDENCED',
+]) {
+  if (files.restoreRunbook.includes(staleFragment)) {
+    throw new Error(`${paths.restoreRunbook} contains stale restore-state evidence after successful run 35280075274: ${staleFragment}`);
+  }
+}
 
 const requiredStatusFragments = [
   'restore_run_id: 35280075274',
