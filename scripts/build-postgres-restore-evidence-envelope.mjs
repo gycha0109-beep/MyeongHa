@@ -95,6 +95,9 @@ export function buildRestoreEvidenceEnvelope(input) {
   if (incidentReference.epochSeconds < backupCompleted.epochSeconds) {
     fail('incidentReferenceUtc cannot precede the selected backup completion point');
   }
+  if (incidentReference.epochSeconds > restoreStarted.epochSeconds) {
+    fail('incidentReferenceUtc cannot be later than the restore start time');
+  }
   const syntheticDataLossWindowSeconds =
     incidentReference.epochSeconds - backupCompleted.epochSeconds;
 
@@ -118,8 +121,8 @@ export function buildRestoreEvidenceEnvelope(input) {
     fail('backupManifest.encrypted_sha256 must be 64 lowercase hex characters');
   }
   const archiveName = requireString(backupManifest.archive_name, 'backupManifest.archive_name');
-  if (!archiveName.endsWith('.tar.gz.enc')) {
-    fail('backupManifest.archive_name must identify an encrypted tar archive');
+  if (archiveName !== `${sourceArtifactName}.tar.gz.enc`) {
+    fail('backupManifest.archive_name must match the selected governed artifact name');
   }
 
   for (const key of [
