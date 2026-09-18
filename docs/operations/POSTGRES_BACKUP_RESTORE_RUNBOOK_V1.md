@@ -3,7 +3,7 @@
 > Scope: non-character production operations only  
 > Issue: `#389` — authoritative persistent-data recovery  
 > Evidence date: 2026-09-18 KST  
-> Production state: BACKUP PRODUCTION-PROVEN / BACKUP SCHEMA FRESHNESS STALE / ISOLATED APPLICATION RESTORE EVIDENCED / DR NOT READY
+> Production state: CURRENT-SCHEMA BACKUP PROVEN / CURRENT-SCHEMA RESTORE PENDING / DR NOT READY
 
 ## 1. Current production authority
 
@@ -22,11 +22,12 @@ provider automatic daily backup = NOT RELIED UPON ON CURRENT FREE PLAN
 provider retention              = NOT RELIED UPON ON CURRENT FREE PLAN
 PITR                            = NOT AVAILABLE UNDER THE CURRENT FREE-PLAN OPERATING BASELINE
 application-owned logical dump     = IMPLEMENTED BY REPOSITORY WORKFLOW
-successful production dump         = EVIDENCED — run 35260191079
-backup schema freshness             = STALE AFTER PRODUCTION MIGRATION 1120
-fresh current-schema backup         = REQUIRED
-isolated restore drill path        = IMPLEMENTED / EXECUTED
-isolated application restore       = EVIDENCED — latest run 35325070718
+successful production dump         = EVIDENCED — latest run 35329018925
+backup schema freshness             = CURRENT-SCHEMA BACKUP PROVEN
+fresh current-schema backup         = PROVEN — run 35329018925
+fresh current-schema restore        = PENDING MANUAL DRILL
+isolated restore drill path         = IMPLEMENTED / EXECUTED
+isolated application restore       = EVIDENCED — run 35325070718 against historical backup 35260191079
 application integrity/auth baseline= PASS — latest run 35325070718
 restore evidence envelope runtime  = PROVEN — run 35325070718
 restored-DB synthetic replay       = PROVEN — run 35325070718 / NON-AUTHORITATIVE
@@ -103,7 +104,7 @@ Rules:
 - backup passphrase must be at least 32 characters and must not reuse the database password;
 - recovery operators need a break-glass path to the passphrase that does not depend on the database being healthy.
 
-The credentials and endpoint path are production-proven by successful backup run `35260191079`.
+The credentials and endpoint path are production-proven by successful backup runs `35260191079` and `35329018925`.
 
 ## 4. Backup success evidence
 
@@ -119,33 +120,49 @@ manifest project_ref == cnsfpcdiyofqvhpcegfc
 workflow conclusion == success
 ```
 
-Governed source backup for the current drill series:
+Governed source backup for the next current-schema restore drill:
 
 ```text
-run ID        35260191079
-artifact ID   10513872847
-artifact      myeongha-postgres-20260917T184004Z
-source SHA    ef61941313ee3a870076847c5dfb5c1b05ba4159
-ZIP digest    sha256:601fbbac6149d960789e9500e8299f73ab3b0659a8201d4c60fa94ff73a7b9f8
-retention     30 days
+run ID          35329018925
+artifact ID     10540625562
+artifact        myeongha-postgres-20260918T092042Z
+source SHA      e1a6500968f7722666cae2038fd49ddf3f9d3540
+manifest time   2026-09-18T09:23:19Z
+workflow end    2026-09-18T09:23:23Z
+encrypted SHA   96c40cb4c61f71d56a97dd9af34a2c31eb4674809a501f435b2634c12043a394
+expires         2026-10-18T09:23:19Z
+retention       30 days
 ```
+
+Historical restore-proven backup `35260191079` remains valid evidence for the restore machinery exercised by run `35325070718`, but it is no longer the selected current-schema backup.
 
 ### 4.1 Current backup freshness boundary
 
-The governed backup above was produced from source SHA `ef61941313ee3a870076847c5dfb5c1b05ba4159`. After that backup, migration `supabase/migrations/1120_paid_general_natal_product_candidate.sql` was added and production deployment run `35324012524` applied migration `1120` successfully on head `eddc1c331b6a8c0f47f54c150acd2f6cc5c7c0c2`.
+Migration `supabase/migrations/1120_paid_general_natal_product_candidate.sql` was applied successfully by production deployment run `35324012524` on head `eddc1c331b6a8c0f47f54c150acd2f6cc5c7c0c2`. Production backup run `35329018925` then completed successfully from source SHA `e1a6500968f7722666cae2038fd49ddf3f9d3540`, which contains migration `1120`.
 
-Therefore the current evidence is intentionally split:
+The backup manifest and ciphertext evidence were re-read directly:
 
 ```text
-selected backup portability         = PROVEN
-restore mechanics                    = PROVEN — run 35325070718
-latest production schema in backup   = NOT PROVEN
-backup schema freshness              = STALE AFTER MIGRATION 1120
-fresh backup after migration 1120    = REQUIRED
-fresh restore from that backup       = REQUIRED
+manifest schema                    = myeongha-postgres-backup-artifact-v1
+project ref                        = cnsfpcdiyofqvhpcegfc
+source SHA                         = e1a6500968f7722666cae2038fd49ddf3f9d3540
+manifest created                   = 2026-09-18T09:23:19Z
+artifact ID                        = 10540625562
+artifact name                      = myeongha-postgres-20260918T092042Z
+encrypted SHA-256                  = 96c40cb4c61f71d56a97dd9af34a2c31eb4674809a501f435b2634c12043a394
+artifact expiry                    = 2026-10-18T09:23:19Z
 ```
 
-Do not use run `35325070718` to claim current-production-schema recoverability. Its value is that the selected governed backup and recovery machinery are operational. Current-schema recovery requires a new production backup taken after migration `1120` is present in production, followed by a restore drill selecting that new backup.
+Between backup source SHA `e1a6500968f7722666cae2038fd49ddf3f9d3540` and current main `57927c49030218e00d1c8371de8cc58fec3865ce`, only DR documentation/guard files changed; no `supabase/migrations/*` file changed. Therefore:
+
+```text
+latest production schema in backup = PROVEN
+backup schema freshness            = CURRENT-SCHEMA BACKUP PROVEN
+fresh backup after migration 1120  = PROVEN — run 35329018925
+fresh restore from that backup     = PENDING MANUAL DRILL
+```
+
+Do not yet claim current-production-schema recoverability. The backup capture gate is closed; the remaining freshness gate is a restore drill selecting backup run `35329018925`.
 
 Backup failure observability for v1 is the scheduled GitHub Actions workflow conclusion. A failed or missing scheduled run remains an operations alert until a dedicated alerting sink is approved.
 
@@ -412,8 +429,8 @@ Do not close `#389` until all are evidenced:
 - [x] provider plan / automatic backup / PITR state recorded
 - [x] backup failure observability verified
 - [x] exact backup point selected
-- [ ] current production schema captured by a governed backup after migration `1120`
-- [ ] restore drill completed from that current-schema backup
+- [x] current production schema captured by a governed backup after migration `1120` — run `35329018925`
+- [ ] restore drill completed from current-schema backup `35329018925`
 - [x] isolated restore mechanics completed — run `35325070718` against governed backup `35260191079`
 - [x] integrity verification passed for selected backup — run `35325070718`
 - [x] authorization verification passed at the governed database-level baseline for selected backup — run `35325070718`
