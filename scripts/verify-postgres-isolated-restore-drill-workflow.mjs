@@ -464,4 +464,41 @@ if (!preBackupIncidentRejected) {
   throw new Error('Restore evidence envelope accepted an incident reference before the backup completion point.');
 }
 
+let postRestoreIncidentRejected = false;
+try {
+  buildRestoreEvidenceEnvelope({
+    restoreEvidence: restoreEvidenceFixture,
+    backupManifest: backupManifestFixture,
+    backupRunId: '35260191079',
+    incidentReferenceUtc: '2026-09-17T22:04:41Z',
+    sourceArtifactName: 'myeongha-postgres-20260917T184004Z',
+    sourceArtifactExpiresAt: '2026-10-17T18:40:04Z',
+  });
+} catch (error) {
+  postRestoreIncidentRejected = String(error).includes('later than the restore start');
+}
+if (!postRestoreIncidentRejected) {
+  throw new Error('Restore evidence envelope accepted an incident reference after restore start.');
+}
+
+let artifactArchiveMismatchRejected = false;
+try {
+  buildRestoreEvidenceEnvelope({
+    restoreEvidence: restoreEvidenceFixture,
+    backupManifest: {
+      ...backupManifestFixture,
+      archive_name: 'myeongha-postgres-20260917T184005Z.tar.gz.enc',
+    },
+    backupRunId: '35260191079',
+    incidentReferenceUtc: '2026-09-17T18:44:01Z',
+    sourceArtifactName: 'myeongha-postgres-20260917T184004Z',
+    sourceArtifactExpiresAt: '2026-10-17T18:40:04Z',
+  });
+} catch (error) {
+  artifactArchiveMismatchRejected = String(error).includes('selected governed artifact name');
+}
+if (!artifactArchiveMismatchRejected) {
+  throw new Error('Restore evidence envelope accepted a mismatched artifact/archive binding.');
+}
+
 console.log('MyeongHa isolated PostgreSQL restore drill workflow contract verification passed.');
