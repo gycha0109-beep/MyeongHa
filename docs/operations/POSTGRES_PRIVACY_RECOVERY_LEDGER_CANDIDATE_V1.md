@@ -108,6 +108,49 @@ Artifact retention is 30 days as an operational mechanism. It does not decide le
 
 Repeated construction from identical source rows and metadata must produce an identical manifest.
 
+## Runtime proof — run 35361080803
+
+The candidate transport has now completed one governed Production runtime from main SHA `c8899478dba523f2ccfe1f6f00cda14a952a0273`.
+
+```text
+workflow run                      = 35361080803 / SUCCESS
+event                             = workflow_dispatch
+head branch                       = main
+governed backup run               = 35329018925
+backup source SHA                 = e1a6500968f7722666cae2038fd49ddf3f9d3540
+backup artifact                   = myeongha-postgres-20260918T092042Z
+backup cutoff                     = 2026-09-18T09:23:19.000Z
+candidate captured_at             = 2026-09-18T15:13:38.000Z
+candidate artifact ID             = 10553934875
+candidate artifact                = myeongha-privacy-ledger-20260918T151342Z
+candidate artifact expiry         = 2026-10-18T15:13:42Z
+GitHub artifact digest            = sha256:dfa03b55d90011ea9b5ce52ec166fb6eb789a91874bafcc8341cd6e4c68543b0
+encrypted archive SHA-256         = 91e2ea2fd615385d86d9864d7670b3139752a090fbe49884a8743258ccd938b5
+source digest                     = sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
+replay-supported event count      = 0
+replay planner accepted           = true
+unsupported delta guard           = PASS / zero unsupported deltas
+candidate source authority        = true
+authoritative post-backup source  = false
+authoritative reconciliation      = false
+future-safe reconciliation        = false
+DR Ready                          = false
+```
+
+All workflow stages passed, including governed backup/cutoff validation, explicit read-only export, unsupported-state fail-close validation, deterministic existing-planner validation, encryption, and artifact upload.
+
+Artifact inspection found exactly three uploaded files:
+
+```text
+myeongha-privacy-ledger-20260918T151342Z.tar.gz.enc
+myeongha-privacy-ledger-20260918T151342Z.tar.gz.enc.sha256
+myeongha-privacy-ledger-20260918T151342Z.manifest.json
+```
+
+No plaintext reconciliation manifest or identifier-bearing source file was uploaded. The encrypted archive SHA-256 matched the uploaded checksum exactly.
+
+The public manifest is identifier-free and records all seven replay-supported event-type counts as zero for this interval. This runtime therefore proves **zero-event candidate transport mechanics**, not non-zero replay survivability and not authoritative recovery semantics.
+
 ## What this does not decide
 
 #1058 does not authorize or define:
@@ -129,7 +172,7 @@ A future authority promotion requires, at minimum:
 
 1. owner-approved deletion/finalization and legal-retention decisions;
 2. explicit review of whether this off-DB artifact mechanism is accepted as authoritative and whether its cadence/retention/security domain satisfy approved recovery objectives;
-3. runtime evidence that non-zero replay-supported events survive primary DB loss and replay idempotently;
+3. runtime evidence that non-zero replay-supported events survive primary DB loss and replay idempotently — current run `35361080803` proves only the zero-event export/encryption path;
 4. explicit treatment of any currently unsupported privacy/lifecycle transitions;
 5. restored-state verification that deleted/revoked access does not resurrect while only policy-approved Commerce evidence remains;
 6. approved RPO/RTO comparison.
