@@ -325,6 +325,10 @@ If no independent post-cutoff evidence exists, record that as a blocking gap. **
 
 Repository mechanics now include the policy-neutral replay planner `scripts/build-postgres-privacy-reconciliation-plan.mjs` and an isolated DB replay regression. That foundation replays only already-authorized revocation/account-deletion-start commands. It does not establish a durable post-backup privacy ledger source, destructive account-deletion finalization, or commerce legal-retention policy; those remain blocked by `P0-PR-01` / issue `#964`.
 
+The manual restore workflow is also wired to run `scripts/run-postgres-privacy-reconciliation-synthetic-drill.sh` against the disposable restored loopback database. That step uses collision-guarded synthetic rows, exercises four non-zero revocation/account-deletion-start events, verifies identical replay idempotency, and verifies a missing terminal revoke state aborts fail-closed. It writes only sanitized `privacy-reconciliation-evidence.json`; synthetic identifiers and row payloads are not uploaded.
+
+This restored-DB step is explicitly non-authoritative: `synthetic_fixture=true`, `authoritative_post_backup_source=false`, and `dr_ready=false`. It proves replay mechanics against the restored schema only. The durable post-backup source, destructive finalization, and commerce-retention decisions remain unresolved. A fresh current-`main` manual restore drill is still required before this restored-DB integration may be classified as runtime-proven.
+
 ## 12. RPO / RTO evidence
 
 Current decision state:

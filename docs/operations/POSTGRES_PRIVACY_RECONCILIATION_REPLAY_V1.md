@@ -91,6 +91,29 @@ The following remain outside this foundation and must fail closed:
 
 Those decisions remain under `P0-PR-01` / issue #964.
 
+## Restored-database synthetic integration
+
+The same replay drill used by DB CI is now exposed through:
+
+```text
+scripts/run-postgres-privacy-reconciliation-synthetic-drill.sh
+```
+
+The isolated restore workflow invokes that script **after** the governed backup has been restored and validated. It creates collision-guarded synthetic fixtures only inside the disposable loopback database, compiles a four-event non-zero replay plan (Memory revoke, Life Fact revoke, Device Installation revoke, and account-deletion start), executes it, executes the identical plan a second time to prove idempotency, and verifies a separate malformed terminal-state case fails closed.
+
+The uploaded synthetic evidence is identifier-free and explicitly records:
+
+```text
+synthetic_fixture = true
+authoritative_post_backup_source = false
+replay_result = pass
+second_identical_replay = idempotent-pass
+negative_terminal_state_guard = fail-closed-pass
+dr_ready = false
+```
+
+This is a **mechanics exercise only**. It does not turn `synthetic-db-drill` into durable privacy authority and does not satisfy account-finalization or commerce-retention policy. Until a fresh current-`main` manual restore run executes this integration, the restored-DB integration itself remains implementation/CI evidence rather than runtime evidence.
+
 ## Durable-source limitation
 
 This compiler does **not** establish where the post-backup manifest is stored.

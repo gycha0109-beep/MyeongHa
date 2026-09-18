@@ -13,6 +13,8 @@ restore_result: SUCCESS
 restore_target: github-actions-loopback-supabase-postgres
 restore_evidence_envelope: IMPLEMENTED_CI_VERIFIED
 restore_evidence_envelope_runtime: PENDING_CURRENT_MAIN_MANUAL_DRILL
+restored_db_synthetic_privacy_replay: IMPLEMENTED_CI_VERIFIED
+restored_db_synthetic_privacy_replay_runtime: PENDING_CURRENT_MAIN_MANUAL_DRILL
 isolated_restore_validation_duration_seconds: 3
 synthetic_data_loss_window_seconds: 82
 post_backup_privacy_delta_count: 0
@@ -48,6 +50,8 @@ isolated application restore       = yes
 application integrity/auth baseline= yes
 self-contained evidence envelope   = implemented / CI-verified
 envelope runtime on current main   = pending manual drill
+restored-DB synthetic privacy replay= implemented / CI-verified
+restored-DB synthetic replay runtime= pending manual drill
 privacy delta observed in interval = 0
 future-safe privacy reconciliation = blocked
 approved RPO                       = no
@@ -84,10 +88,11 @@ This advances recovery mechanics but does not remove the promotion blockers:
 
 ```text
 revocation replay plan mechanics   = implemented
+restored-DB synthetic replay path  = implemented / CI-verified / runtime pending
 durable post-backup source authority = not proven
 destructive account finalization   = blocked by P0-PR-01 / #964
 commerce legal retention           = blocked by P0-PR-01 / #964
-privacy reconciliation drill       = not yet executed against restored DB
+authoritative privacy reconciliation= not yet executed against restored DB
 DR Ready                           = false
 ```
 

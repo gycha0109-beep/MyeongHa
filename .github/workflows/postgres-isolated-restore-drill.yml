@@ -128,6 +128,30 @@ jobs:
           set -euo pipefail
           bash scripts/run-postgres-isolated-restore-drill.sh
 
+      - name: Exercise synthetic privacy reconciliation on restored database
+        shell: bash
+        env:
+          BACKUP_ARTIFACT_DIR: ${{ runner.temp }}/backup-artifact
+          PRIVACY_RECONCILIATION_BACKUP_RUN_ID: ${{ inputs.backup_run_id }}
+          PRIVACY_RECONCILIATION_EVIDENCE_PATH: ${{ runner.temp }}/restore-evidence/privacy-reconciliation-evidence.json
+          PGHOST: 127.0.0.1
+          PGPORT: 5432
+          PGUSER: supabase_admin
+          PGPASSWORD: restore-drill
+          PGDATABASE: postgres
+        run: |
+          set -euo pipefail
+          mapfile -t public_manifests < <(
+            find "$BACKUP_ARTIFACT_DIR" -maxdepth 1 -type f -name '*.manifest.json' -print
+          )
+          [[ "${#public_manifests[@]}" -eq 1 ]]
+          export PRIVACY_RECONCILIATION_BACKUP_COMPLETED_AT_UTC
+          PRIVACY_RECONCILIATION_BACKUP_COMPLETED_AT_UTC="$(
+            jq -er '.created_at_utc' "${public_manifests[0]}"
+          )"
+
+          bash scripts/run-postgres-privacy-reconciliation-synthetic-drill.sh
+
       - name: Build self-contained restore evidence envelope
         shell: bash
         env:
@@ -160,7 +184,9 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: postgres-isolated-restore-drill-${{ github.run_id }}
-          path: ${{ runner.temp }}/restore-evidence/restore-evidence.json
+          path: |
+            ${{ runner.temp }}/restore-evidence/restore-evidence.json
+            ${{ runner.temp }}/restore-evidence/privacy-reconciliation-evidence.json
           if-no-files-found: error
           retention-days: 30
           compression-level: 0
@@ -171,5 +197,7 @@ jobs:
           set -euo pipefail
           echo 'restore_target=github-actions-loopback-supabase-postgres'
           echo 'isolated_restore=success'
+          echo 'synthetic_privacy_reconciliation_mechanics=exercised_on_restored_db'
           echo 'privacy_reconciliation=not_exercised_by_this_workflow'
+          echo 'authoritative_privacy_reconciliation=not_exercised'
           echo 'dr_ready=false'
