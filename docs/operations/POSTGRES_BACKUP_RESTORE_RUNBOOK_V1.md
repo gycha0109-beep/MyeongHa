@@ -156,6 +156,25 @@ postgresql://postgres:restore-drill@127.0.0.1:5432/postgres        # post-restor
 
 The drill never receives the production database password, production pooler host, or production access token. It receives only the protected backup decryption passphrase after GitHub has validated the selected backup run and exact artifact authority.
 
+Before upload, `scripts/build-postgres-restore-evidence-envelope.mjs` binds the harness result to the selected backup artifact and drill timing. The uploaded JSON is self-contained enough to re-establish the governed source without reconstructing GitHub job context manually. It includes and validates:
+
+```text
+evidence envelope version
+backup workflow run id
+backup completion timestamp
+incident/reference timestamp
+derived synthetic data-loss-window seconds
+source artifact name + expiry
+encrypted archive name + SHA-256
+exact backup/source Git SHA + project ref
+restore start/completion + measured isolated restore duration
+provider portability boundary
+privacy_reconciliation = not_exercised_by_this_workflow
+dr_ready = false
+```
+
+The envelope builder rejects project/source mismatches, inconsistent restore duration, an incident reference before the selected backup point, invalid artifact metadata, or attempts to overwrite preexisting source/timing evidence. These fields strengthen operator-independent evidence; they do not approve an RPO/RTO or make the isolated portability drill a full provider-service recovery.
+
 ## 6. Restore drill runtime history
 
 Observed evidence:
