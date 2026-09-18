@@ -121,6 +121,16 @@ export {
 } from './character-saju-reading-plan.js';
 
 export {
+  CHARACTER_SAJU_BOUNDED_RENDERER_VERSION_V1,
+  CHARACTER_SAJU_UTTERANCE_SCHEMA_VERSION_V1,
+  CharacterSajuBoundedRendererErrorV1,
+  renderCharacterSajuBoundedExactCoreV1,
+  type CharacterSajuBoundedRenderDecisionV1,
+  type CharacterSajuUtteranceSegmentV1,
+  type CharacterSajuUtteranceV1,
+} from './character-saju-bounded-renderer.js';
+
+export {
   CharacterOutputGuardError,
   guardCharacterRendererOutput,
   type CharacterDialogueEnvelopeV1,
@@ -131,6 +141,7 @@ export {
 } from './character-output-guard.js';
 
 export {
+  assertCharacterSajuVoiceRuntimeInvariantV1,
   guardCharacterSajuSafeRendererOutput,
   type CharacterSajuSafeRendererDraftV1,
 } from './character-saju-safe-renderer.js';
