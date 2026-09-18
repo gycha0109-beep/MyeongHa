@@ -112,7 +112,7 @@ negative_terminal_state_guard = fail-closed-pass
 dr_ready = false
 ```
 
-This is a **mechanics exercise only**. It does not turn `synthetic-db-drill` into durable privacy authority and does not satisfy account-finalization or commerce-retention policy. Until a fresh current-`main` manual restore run executes this integration, the restored-DB integration itself remains implementation/CI evidence rather than runtime evidence.
+This is a **mechanics exercise only**. It does not turn `synthetic-db-drill` into durable privacy authority and does not satisfy account-finalization or commerce-retention policy. Manual restore run `35325070718` runtime-proved the integration from main head `eddc1c331b6a8c0f47f54c150acd2f6cc5c7c0c2`: all four synthetic event types replayed, the identical second replay was idempotent, the negative terminal-state case failed closed, and the sanitized evidence recorded `authoritative_post_backup_source=false` and `dr_ready=false`.
 
 ## Durable-source limitation
 
