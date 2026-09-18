@@ -110,7 +110,6 @@ A Reader selection preserves:
 
 ```text
 purchase_intent_id
-subject_id
 product_id
 reader_character_id
 reader_content_bundle_id
@@ -120,7 +119,7 @@ selection_hash
 created_at
 ```
 
-The selection is append-only.
+The selection is append-only. Subject ownership is not duplicated on this row; canonical ownership is derived from the referenced Purchase Intent.
 
 It must match:
 
