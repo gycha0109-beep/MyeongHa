@@ -1,4 +1,8 @@
 import {
+  parseProductionCharacterSajuSp2RolloutConfigV1,
+  ProductionCharacterSajuSp2RolloutConfigErrorV1,
+} from './production-character-saju-sp2-rollout-config.js';
+import {
   parseProductionSajuRuntimeConfigV1,
   ProductionSajuRuntimeConfigErrorV1,
   type ProductionSajuRuntimeEnvV1,
@@ -11,6 +15,10 @@ import {
 export type ProductionReadinessStatusV1 = 'ready' | 'degraded' | 'unready';
 export type ProductionCapabilityReadinessV1 = 'ready' | 'degraded' | 'unready';
 export type SajuProductReadingProductionReadinessV1 = 'blocked_by_authority';
+export type CharacterSajuSp2ProductionReadinessV1 =
+  | 'disabled'
+  | 'blocked_by_product_reading_authority'
+  | 'misconfigured';
 
 export interface ProductionReadinessReportV1 {
   readonly status: ProductionReadinessStatusV1;
@@ -18,6 +26,7 @@ export interface ProductionReadinessReportV1 {
     userData: ProductionCapabilityReadinessV1;
     sajuCalculation: ProductionCapabilityReadinessV1;
     sajuProductReading: SajuProductReadingProductionReadinessV1;
+    characterSajuSp2: CharacterSajuSp2ProductionReadinessV1;
   }>;
 }
 
@@ -45,6 +54,22 @@ function hasValidSajuConfig(env: ProductionSajuRuntimeEnvV1): boolean {
   }
 }
 
+function characterSajuSp2Readiness(
+  env: ProductionSajuRuntimeEnvV1,
+): CharacterSajuSp2ProductionReadinessV1 {
+  try {
+    const config = parseProductionCharacterSajuSp2RolloutConfigV1(env);
+    return config.mode === 'off'
+      ? 'disabled'
+      : 'blocked_by_product_reading_authority';
+  } catch (error) {
+    if (error instanceof ProductionCharacterSajuSp2RolloutConfigErrorV1) {
+      return 'misconfigured';
+    }
+    throw error;
+  }
+}
+
 /**
  * Local production configuration preflight only.
  *
@@ -62,12 +87,13 @@ export function evaluateProductionReadinessV1(
 ): ProductionReadinessReportV1 {
   const userDataReady = hasValidUserDataConfig(env);
   const sajuReady = hasValidSajuConfig(env);
+  const characterSajuSp2 = characterSajuSp2Readiness(env);
 
   const status: ProductionReadinessStatusV1 = !userDataReady
     ? 'unready'
-    : sajuReady
-      ? 'ready'
-      : 'degraded';
+    : !sajuReady || characterSajuSp2 === 'misconfigured'
+      ? 'degraded'
+      : 'ready';
 
   return Object.freeze({
     status,
@@ -75,6 +101,7 @@ export function evaluateProductionReadinessV1(
       userData: userDataReady ? 'ready' : 'unready',
       sajuCalculation: sajuReady ? 'ready' : 'degraded',
       sajuProductReading: 'blocked_by_authority',
+      characterSajuSp2,
     }),
   });
 }

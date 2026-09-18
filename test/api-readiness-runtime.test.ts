@@ -54,8 +54,63 @@ describe('GET /api/readiness', () => {
         userData: 'ready',
         sajuCalculation: 'ready',
         sajuProductReading: 'blocked_by_authority',
+        characterSajuSp2: 'disabled',
       },
     });
+  });
+
+  it('reports an enabled SP-2 policy as blocked while Product Reading authority remains unavailable', async () => {
+    const env = configuredEnv();
+    Object.assign(env, {
+      MYEONGHA_CHARACTER_SAJU_SP2_MODE: 'controlled_reveal',
+      MYEONGHA_CHARACTER_SAJU_SP2_POLICY_VERSION: 'sp2-internal-beta-v1',
+      MYEONGHA_CHARACTER_SAJU_SP2_ALLOWED_CHARACTER_IDS: 'taegyeom',
+      MYEONGHA_CHARACTER_SAJU_SP2_ALLOWED_DOMAINS: 'general',
+      MYEONGHA_CHARACTER_SAJU_SP2_ALLOWED_EVALUATOR_VERSIONS:
+        'semantic-evaluator-v1',
+      MYEONGHA_CHARACTER_SAJU_SP2_ALLOWED_COHORT_KEYS: 'internal_beta',
+      MYEONGHA_CHARACTER_SAJU_SP2_MIN_ALLOWED_EXAMPLES: '12',
+      MYEONGHA_CHARACTER_SAJU_SP2_MIN_FORBIDDEN_EXAMPLES: '24',
+    });
+
+    const response = createProductionReadinessResponseV1(env);
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      status: 'ready',
+      capabilities: {
+        userData: 'ready',
+        sajuCalculation: 'ready',
+        sajuProductReading: 'blocked_by_authority',
+        characterSajuSp2: 'blocked_by_product_reading_authority',
+      },
+    });
+  });
+
+  it('degrades readiness for a malformed SP-2 enable attempt without exposing rollout details', async () => {
+    const env = configuredEnv();
+    env.MYEONGHA_CHARACTER_SAJU_SP2_MODE = 'controlled_reveal';
+    env.MYEONGHA_CHARACTER_SAJU_SP2_POLICY_VERSION = 'sensitive-policy-version';
+    env.MYEONGHA_CHARACTER_SAJU_SP2_ALLOWED_CHARACTER_IDS = 'taegyeom';
+
+    const response = createProductionReadinessResponseV1(env);
+    const body = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(JSON.parse(body)).toEqual({
+      status: 'degraded',
+      capabilities: {
+        userData: 'ready',
+        sajuCalculation: 'ready',
+        sajuProductReading: 'blocked_by_authority',
+        characterSajuSp2: 'misconfigured',
+      },
+    });
+    expect(body).not.toContain('sensitive-policy-version');
+    expect(body).not.toContain('taegyeom');
+    expect(body).not.toContain(
+      'MYEONGHA_CHARACTER_SAJU_SP2_ALLOWED_EVALUATOR_VERSIONS',
+    );
   });
 
   it('keeps the product available but marks Saju degraded when only Saju configuration is invalid', async () => {
@@ -72,6 +127,7 @@ describe('GET /api/readiness', () => {
         userData: 'ready',
         sajuCalculation: 'degraded',
         sajuProductReading: 'blocked_by_authority',
+        characterSajuSp2: 'disabled',
       },
     });
   });
@@ -91,6 +147,7 @@ describe('GET /api/readiness', () => {
         userData: 'unready',
         sajuCalculation: 'ready',
         sajuProductReading: 'blocked_by_authority',
+        characterSajuSp2: 'disabled',
       },
     });
     expect(body).not.toContain('MYEONGHA_DATABASE_URL');
