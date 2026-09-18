@@ -86,9 +86,9 @@ describe('production Character Saju SP-2 rollout config v1', () => {
     },
   );
 
-  it.each([[''], ['on'], ['public'], ['CONTROLLED_REVEAL']])(
+  it.each(['', 'on', 'public', 'CONTROLLED_REVEAL'])(
     'rejects unsupported rollout mode %s',
-    ([mode]) => {
+    (mode) => {
       expect(() =>
         parseProductionCharacterSajuSp2RolloutConfigV1({
           [PRODUCTION_CHARACTER_SAJU_SP2_ROLLOUT_ENV_V1.mode]: mode,
