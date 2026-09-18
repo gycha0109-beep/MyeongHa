@@ -39,9 +39,9 @@ synthetic_privacy_replay_event_count: 4
 authoritative_post_backup_source: false
 authoritative_post_backup_delta_audit_for_current_backup: NOT_EXECUTED
 post_backup_privacy_delta_count_audit_workflow: IMPLEMENTED_RUNTIME_ATTEMPT_FAILED_BEFORE_EVIDENCE
-post_backup_privacy_delta_count_audit_last_run_id: 35347028765
+post_backup_privacy_delta_count_audit_last_run_id: 35349036742
 post_backup_privacy_delta_count_audit_last_run_result: FAILURE_BEFORE_COUNT_EVIDENCE
-post_backup_privacy_delta_count_audit_failure_stage: READ_ONLY_SESSION_ASSERTION
+post_backup_privacy_delta_count_audit_failure_stage: PSQL_VARIABLE_SUBSTITUTION_COMMAND_MODE
 privacy_delta_audit_query_mode: READ_ONLY_COUNT_ONLY
 privacy_reconciliation: BLOCKED_BY_P0_PR_01_AND_ISSUE_964
 rpo_authority: OPEN_DECISION
@@ -57,7 +57,7 @@ The 2-second value is the measured isolated restore/validation diagnostic from r
 
 An earlier count-only production audit against the prior governed backup interval found zero recorded privacy-state deltas on the timestamp-authoritative surfaces checked at that time. That historical zero is **not** carried forward to backup `35329018925`. No authoritative post-backup delta audit/source has been established for the current backup, so authoritative privacy reconciliation remains blocked.
 
-A manual runtime path now exists at `.github/workflows/production-postgres-privacy-delta-audit.yml`. Run `35347028765` validated the production credentials, exact governed backup run `35329018925`, artifact `10540625562`, manifest source SHA, and backup completion point `2026-09-18T09:23:19Z`, but it failed before count evidence was produced while asserting session-level `default_transaction_read_only=on` through the Supabase pooler. No count result from that run is admissible. The workflow is being hardened to execute the count query inside an explicit `BEGIN TRANSACTION READ ONLY` transaction on the same database connection, with the query itself requiring `transaction_read_only=on`. It still deliberately records `authoritative_post_backup_source=false`, `authoritative_privacy_reconciliation=false`, `future_safe_privacy_reconciliation=false`, and `dr_ready=false`. Until a successful run against backup `35329018925` is executed and inspected, the current-backup audit authority remains `NOT_EXECUTED`; even a zero result would remain an observation of current primary-DB state rather than a durable recovery source.
+A manual runtime path now exists at `.github/workflows/production-postgres-privacy-delta-audit.yml`. Run `35347028765` validated the production credentials, exact governed backup run `35329018925`, artifact `10540625562`, manifest source SHA, and backup completion point `2026-09-18T09:23:19Z`, but failed before count evidence while relying on a pooler startup read-only assertion. Run `35349036742` then exercised the hardened explicit `BEGIN TRANSACTION READ ONLY` path on main SHA `af576e9a48abb89757d8ce3794806480e132ffc5`; the same governed backup/provenance checks passed, but the count SQL failed before evidence because `psql -c "$sql"` did not perform psql variable substitution for `:'cutoff'`, leaving the colon expression to reach PostgreSQL and produce a syntax error. No count result from either run is admissible. The workflow is being corrected to send the SQL through psql stdin, where psql variable substitution is applied, while retaining the same-connection explicit read-only transaction and fail-closed output validation. It still deliberately records `authoritative_post_backup_source=false`, `authoritative_privacy_reconciliation=false`, `future_safe_privacy_reconciliation=false`, and `dr_ready=false`. Until a successful run against backup `35329018925` is executed and inspected, the current-backup audit authority remains `NOT_EXECUTED`; even a zero result would remain an observation of current primary-DB state rather than a durable recovery source.
 
 ## Promotion blockers
 
@@ -82,8 +82,8 @@ self-contained evidence envelope   = implemented / CI-verified
 envelope runtime evidence          = proven — run 35331742188
 restored-DB synthetic privacy replay= implemented / CI-verified
 restored-DB synthetic replay runtime= proven — run 35331742188
-current-backup privacy delta audit = not executed — run 35347028765 failed before count evidence
-count-only audit workflow          = implemented / read-only transaction hardening required
+current-backup privacy delta audit = not executed — runs 35347028765 and 35349036742 failed before count evidence
+count-only audit workflow          = implemented / psql stdin variable-substitution hardening required
 future-safe privacy reconciliation = blocked
 approved RPO                       = no
 approved RTO                       = no
