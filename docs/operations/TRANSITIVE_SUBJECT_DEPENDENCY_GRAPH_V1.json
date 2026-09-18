@@ -1,0 +1,1587 @@
+{
+  "schema": "myeongha-transitive-subject-dependency-graph-v1",
+  "decisionId": "P0-PR-01",
+  "decisionStatus": "OPEN-P0",
+  "graphAuthority": "SCHEMA_DISCOVERED_POLICY_NEUTRAL",
+  "executionAuthorized": false,
+  "discovery": {
+    "edgeCount": 106,
+    "distinctReachableTableCount": 47,
+    "maxDepth": 4,
+    "depthCounts": {
+      "1": 30,
+      "2": 33,
+      "3": 40,
+      "4": 3
+    },
+    "directDepthOneEdgeCount": 30
+  },
+  "edges": [
+    {
+      "minDepth": 1,
+      "parentTable": "subjects",
+      "childTable": "ai_execution_logs",
+      "constraintName": "ai_execution_logs_subject_fk",
+      "childColumns": [
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 1,
+      "parentTable": "subjects",
+      "childTable": "birth_profiles",
+      "constraintName": "birth_profiles_subject_fk",
+      "childColumns": [
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 1,
+      "parentTable": "subjects",
+      "childTable": "character_unlocks",
+      "constraintName": "character_unlocks_subject_fk",
+      "childColumns": [
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 1,
+      "parentTable": "subjects",
+      "childTable": "commerce_account_links",
+      "constraintName": "commerce_account_links_subject_fk",
+      "childColumns": [
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 1,
+      "parentTable": "subjects",
+      "childTable": "commerce_receipts",
+      "constraintName": "commerce_receipts_subject_fk",
+      "childColumns": [
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 1,
+      "parentTable": "subjects",
+      "childTable": "conversation_threads",
+      "constraintName": "conversation_threads_subject_fk",
+      "childColumns": [
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 1,
+      "parentTable": "subjects",
+      "childTable": "data_deletion_jobs",
+      "constraintName": "data_deletion_jobs_subject_fk",
+      "childColumns": [
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 1,
+      "parentTable": "subjects",
+      "childTable": "device_installations",
+      "constraintName": "device_installations_subject_fk",
+      "childColumns": [
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 1,
+      "parentTable": "subjects",
+      "childTable": "entitlement_grants",
+      "constraintName": "entitlement_grants_subject_fk",
+      "childColumns": [
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 1,
+      "parentTable": "subjects",
+      "childTable": "entitlements",
+      "constraintName": "entitlements_subject_fk",
+      "childColumns": [
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 1,
+      "parentTable": "subjects",
+      "childTable": "guest_sessions",
+      "constraintName": "guest_sessions_claimed_by_fk",
+      "childColumns": [
+        "claimed_by_subject_id"
+      ],
+      "parentColumns": [
+        "id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 1,
+      "parentTable": "subjects",
+      "childTable": "guest_sessions",
+      "constraintName": "guest_sessions_subject_fk",
+      "childColumns": [
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 1,
+      "parentTable": "subjects",
+      "childTable": "life_facts",
+      "constraintName": "life_facts_subject_fk",
+      "childColumns": [
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 1,
+      "parentTable": "subjects",
+      "childTable": "memory_items",
+      "constraintName": "memory_items_subject_fk",
+      "childColumns": [
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 1,
+      "parentTable": "subjects",
+      "childTable": "memory_proposals",
+      "constraintName": "memory_proposals_subject_fk",
+      "childColumns": [
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 1,
+      "parentTable": "subjects",
+      "childTable": "notification_preferences",
+      "constraintName": "notification_preferences_subject_fk",
+      "childColumns": [
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 1,
+      "parentTable": "subjects",
+      "childTable": "notification_settings",
+      "constraintName": "notification_settings_subject_fk",
+      "childColumns": [
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 1,
+      "parentTable": "subjects",
+      "childTable": "notifications",
+      "constraintName": "notifications_subject_fk",
+      "childColumns": [
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 1,
+      "parentTable": "subjects",
+      "childTable": "profiles",
+      "constraintName": "profiles_subject_id_fkey",
+      "childColumns": [
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 1,
+      "parentTable": "subjects",
+      "childTable": "purchase_intents",
+      "constraintName": "purchase_intents_subject_fk",
+      "childColumns": [
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 1,
+      "parentTable": "subjects",
+      "childTable": "reading_sessions",
+      "constraintName": "reading_sessions_subject_fk",
+      "childColumns": [
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 1,
+      "parentTable": "subjects",
+      "childTable": "record_access_grants",
+      "constraintName": "record_access_grants_subject_fk",
+      "childColumns": [
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 1,
+      "parentTable": "subjects",
+      "childTable": "share_artifacts",
+      "constraintName": "share_artifacts_subject_fk",
+      "childColumns": [
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 1,
+      "parentTable": "subjects",
+      "childTable": "subject_merge_jobs",
+      "constraintName": "subject_merge_jobs_guest_subject_fk",
+      "childColumns": [
+        "guest_subject_id"
+      ],
+      "parentColumns": [
+        "id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 1,
+      "parentTable": "subjects",
+      "childTable": "subject_merge_jobs",
+      "constraintName": "subject_merge_jobs_member_subject_fk",
+      "childColumns": [
+        "member_subject_id"
+      ],
+      "parentColumns": [
+        "id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 1,
+      "parentTable": "subjects",
+      "childTable": "subjects",
+      "constraintName": "subjects_merged_into_fk",
+      "childColumns": [
+        "merged_into_subject_id"
+      ],
+      "parentColumns": [
+        "id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 1,
+      "parentTable": "subjects",
+      "childTable": "target_person_profiles",
+      "constraintName": "target_person_profiles_subject_fk",
+      "childColumns": [
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 1,
+      "parentTable": "subjects",
+      "childTable": "user_character_states",
+      "constraintName": "user_character_states_subject_fk",
+      "childColumns": [
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 1,
+      "parentTable": "subjects",
+      "childTable": "user_episode_progress",
+      "constraintName": "user_episode_progress_subject_fk",
+      "childColumns": [
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 1,
+      "parentTable": "subjects",
+      "childTable": "world_events",
+      "constraintName": "world_events_subject_fk",
+      "childColumns": [
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 2,
+      "parentTable": "ai_execution_logs",
+      "childTable": "ai_execution_groundings",
+      "constraintName": "ai_execution_groundings_execution_subject_fk",
+      "childColumns": [
+        "ai_execution_log_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 2,
+      "parentTable": "ai_execution_logs",
+      "childTable": "chat_turn_attempts",
+      "constraintName": "chat_turn_attempts_generation_ai_execution_fk",
+      "childColumns": [
+        "generation_ai_execution_log_id",
+        "id",
+        "turn_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "turn_attempt_id",
+        "turn_id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 2,
+      "parentTable": "ai_execution_logs",
+      "childTable": "chat_turn_attempts",
+      "constraintName": "chat_turn_attempts_validation_ai_execution_fk",
+      "childColumns": [
+        "validation_ai_execution_log_id",
+        "id",
+        "turn_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "turn_attempt_id",
+        "turn_id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 2,
+      "parentTable": "birth_profiles",
+      "childTable": "birth_profile_revisions",
+      "constraintName": "birth_profile_revisions_profile_subject_fk",
+      "childColumns": [
+        "birth_profile_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 2,
+      "parentTable": "birth_profiles",
+      "childTable": "target_person_profiles",
+      "constraintName": "target_person_profiles_birth_subject_fk",
+      "childColumns": [
+        "birth_profile_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 2,
+      "parentTable": "commerce_account_links",
+      "childTable": "commerce_provider_events",
+      "constraintName": "commerce_provider_events_account_subject_provider_fk",
+      "childColumns": [
+        "resolved_account_link_id",
+        "resolved_subject_id",
+        "provider"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id",
+        "provider"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 2,
+      "parentTable": "commerce_account_links",
+      "childTable": "commerce_receipts",
+      "constraintName": "commerce_receipts_account_subject_provider_fk",
+      "childColumns": [
+        "provider_account_link_id",
+        "subject_id",
+        "provider"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id",
+        "provider"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 2,
+      "parentTable": "commerce_account_links",
+      "childTable": "purchase_intents",
+      "constraintName": "purchase_intents_account_subject_fk",
+      "childColumns": [
+        "provider_account_link_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 2,
+      "parentTable": "commerce_receipts",
+      "childTable": "commerce_provider_events",
+      "constraintName": "commerce_provider_events_receipt_subject_fk",
+      "childColumns": [
+        "resolved_receipt_id",
+        "resolved_subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 2,
+      "parentTable": "commerce_receipts",
+      "childTable": "entitlement_events",
+      "constraintName": "entitlement_events_receipt_subject_fk",
+      "childColumns": [
+        "source_receipt_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 2,
+      "parentTable": "commerce_receipts",
+      "childTable": "entitlement_grants",
+      "constraintName": "entitlement_grants_source_receipt_subject_fk",
+      "childColumns": [
+        "source_receipt_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 2,
+      "parentTable": "conversation_threads",
+      "childTable": "chat_turns",
+      "constraintName": "chat_turns_thread_subject_fk",
+      "childColumns": [
+        "thread_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 2,
+      "parentTable": "conversation_threads",
+      "childTable": "conversation_messages",
+      "constraintName": "conversation_messages_thread_subject_fk",
+      "childColumns": [
+        "thread_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 2,
+      "parentTable": "conversation_threads",
+      "childTable": "conversation_thread_characters",
+      "constraintName": "conversation_thread_characters_thread_id_fkey",
+      "childColumns": [
+        "thread_id"
+      ],
+      "parentColumns": [
+        "id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 2,
+      "parentTable": "conversation_threads",
+      "childTable": "conversation_thread_content_transitions",
+      "constraintName": "thread_content_transitions_thread_subject_fk",
+      "childColumns": [
+        "thread_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 2,
+      "parentTable": "device_installations",
+      "childTable": "notification_deliveries",
+      "constraintName": "notification_deliveries_installation_subject_fk",
+      "childColumns": [
+        "installation_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 2,
+      "parentTable": "entitlement_grants",
+      "childTable": "entitlement_events",
+      "constraintName": "entitlement_events_grant_scope_fk",
+      "childColumns": [
+        "grant_id",
+        "subject_id",
+        "entitlement_key",
+        "scope_key_norm"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id",
+        "entitlement_key",
+        "scope_key_norm"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 2,
+      "parentTable": "guest_sessions",
+      "childTable": "subject_merge_jobs",
+      "constraintName": "subject_merge_jobs_session_guest_fk",
+      "childColumns": [
+        "guest_session_id",
+        "guest_subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 2,
+      "parentTable": "life_facts",
+      "childTable": "life_facts",
+      "constraintName": "life_facts_supersedes_subject_fk",
+      "childColumns": [
+        "supersedes_fact_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 2,
+      "parentTable": "life_facts",
+      "childTable": "memory_proposals",
+      "constraintName": "memory_proposals_accepted_life_fact_subject_fk",
+      "childColumns": [
+        "accepted_life_fact_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 2,
+      "parentTable": "life_facts",
+      "childTable": "record_access_grants",
+      "constraintName": "record_access_grants_life_fact_subject_fk",
+      "childColumns": [
+        "life_fact_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 2,
+      "parentTable": "memory_items",
+      "childTable": "memory_proposals",
+      "constraintName": "memory_proposals_accepted_memory_subject_fk",
+      "childColumns": [
+        "accepted_memory_item_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 2,
+      "parentTable": "memory_items",
+      "childTable": "record_access_grants",
+      "constraintName": "record_access_grants_memory_subject_fk",
+      "childColumns": [
+        "memory_item_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 2,
+      "parentTable": "notifications",
+      "childTable": "notification_deliveries",
+      "constraintName": "notification_deliveries_notification_subject_fk",
+      "childColumns": [
+        "notification_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 2,
+      "parentTable": "purchase_intents",
+      "childTable": "commerce_payment_attempts",
+      "constraintName": "commerce_payment_attempts_purchase_subject_fk",
+      "childColumns": [
+        "purchase_intent_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 2,
+      "parentTable": "purchase_intents",
+      "childTable": "commerce_receipts",
+      "constraintName": "commerce_receipts_purchase_subject_fk",
+      "childColumns": [
+        "purchase_intent_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 2,
+      "parentTable": "reading_sessions",
+      "childTable": "readings",
+      "constraintName": "readings_session_subject_domain_fk",
+      "childColumns": [
+        "reading_session_id",
+        "subject_id",
+        "saju_domain"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id",
+        "saju_domain"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 2,
+      "parentTable": "subject_merge_jobs",
+      "childTable": "subject_merge_actions",
+      "constraintName": "subject_merge_actions_merge_job_fk",
+      "childColumns": [
+        "merge_job_id"
+      ],
+      "parentColumns": [
+        "id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 2,
+      "parentTable": "user_character_states",
+      "childTable": "relationship_events",
+      "constraintName": "relationship_events_state_fk",
+      "childColumns": [
+        "subject_id",
+        "character_id"
+      ],
+      "parentColumns": [
+        "subject_id",
+        "character_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 2,
+      "parentTable": "user_episode_progress",
+      "childTable": "episode_progress_events",
+      "constraintName": "episode_progress_events_progress_fk",
+      "childColumns": [
+        "progress_id",
+        "subject_id",
+        "episode_id",
+        "content_bundle_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id",
+        "episode_id",
+        "content_bundle_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 2,
+      "parentTable": "world_events",
+      "childTable": "character_unlocks",
+      "constraintName": "character_unlocks_source_world_subject_fk",
+      "childColumns": [
+        "source_world_event_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 2,
+      "parentTable": "world_events",
+      "childTable": "notifications",
+      "constraintName": "notifications_source_world_subject_fk",
+      "childColumns": [
+        "source_world_event_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 2,
+      "parentTable": "world_events",
+      "childTable": "relationship_events",
+      "constraintName": "relationship_events_source_world_subject_fk",
+      "childColumns": [
+        "source_world_event_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "birth_profile_revisions",
+      "childTable": "birth_profiles",
+      "constraintName": "birth_profiles_current_revision_fk",
+      "childColumns": [
+        "current_revision_id",
+        "id"
+      ],
+      "parentColumns": [
+        "id",
+        "birth_profile_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "birth_profile_revisions",
+      "childTable": "reading_sessions",
+      "constraintName": "reading_sessions_source_birth_subject_fk",
+      "childColumns": [
+        "source_birth_revision_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "birth_profile_revisions",
+      "childTable": "reading_sessions",
+      "constraintName": "reading_sessions_target_birth_subject_fk",
+      "childColumns": [
+        "target_birth_revision_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "chat_turn_attempts",
+      "childTable": "ai_execution_logs",
+      "constraintName": "ai_execution_logs_turn_attempt_fk",
+      "childColumns": [
+        "turn_attempt_id",
+        "turn_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "turn_id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "chat_turn_attempts",
+      "childTable": "chat_turns",
+      "constraintName": "chat_turns_committed_attempt_fk",
+      "childColumns": [
+        "committed_attempt_id",
+        "id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "turn_id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "chat_turns",
+      "childTable": "ai_execution_logs",
+      "constraintName": "ai_execution_logs_turn_bundle_fk",
+      "childColumns": [
+        "turn_id",
+        "content_bundle_id"
+      ],
+      "parentColumns": [
+        "id",
+        "resolved_content_bundle_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "chat_turns",
+      "childTable": "ai_execution_logs",
+      "constraintName": "ai_execution_logs_turn_subject_fk",
+      "childColumns": [
+        "turn_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "chat_turns",
+      "childTable": "chat_turn_attempts",
+      "constraintName": "chat_turn_attempts_generated_turn_bundle_fk",
+      "childColumns": [
+        "turn_id",
+        "generated_character_content_bundle_id"
+      ],
+      "parentColumns": [
+        "id",
+        "resolved_content_bundle_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "chat_turns",
+      "childTable": "chat_turn_attempts",
+      "constraintName": "chat_turn_attempts_turn_subject_fk",
+      "childColumns": [
+        "turn_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "chat_turns",
+      "childTable": "conversation_messages",
+      "constraintName": "conversation_messages_turn_bundle_fk",
+      "childColumns": [
+        "turn_id",
+        "character_content_bundle_id"
+      ],
+      "parentColumns": [
+        "id",
+        "resolved_content_bundle_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "chat_turns",
+      "childTable": "conversation_messages",
+      "constraintName": "conversation_messages_turn_thread_subject_fk",
+      "childColumns": [
+        "turn_id",
+        "thread_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "thread_id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "chat_turns",
+      "childTable": "episode_progress_events",
+      "constraintName": "episode_progress_events_source_turn_bundle_fk",
+      "childColumns": [
+        "source_turn_id",
+        "content_bundle_id"
+      ],
+      "parentColumns": [
+        "id",
+        "resolved_content_bundle_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "chat_turns",
+      "childTable": "episode_progress_events",
+      "constraintName": "episode_progress_events_source_turn_subject_fk",
+      "childColumns": [
+        "source_turn_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "chat_turns",
+      "childTable": "memory_items",
+      "constraintName": "memory_items_source_turn_subject_fk",
+      "childColumns": [
+        "source_turn_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "chat_turns",
+      "childTable": "memory_proposals",
+      "constraintName": "memory_proposals_source_turn_subject_fk",
+      "childColumns": [
+        "source_turn_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "chat_turns",
+      "childTable": "readings",
+      "constraintName": "readings_source_turn_bundle_fk",
+      "childColumns": [
+        "source_turn_id",
+        "requested_character_content_bundle_id"
+      ],
+      "parentColumns": [
+        "id",
+        "resolved_content_bundle_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "chat_turns",
+      "childTable": "readings",
+      "constraintName": "readings_source_turn_subject_fk",
+      "childColumns": [
+        "source_turn_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "chat_turns",
+      "childTable": "relationship_events",
+      "constraintName": "relationship_events_source_turn_subject_fk",
+      "childColumns": [
+        "source_turn_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "chat_turns",
+      "childTable": "world_events",
+      "constraintName": "world_events_source_turn_bundle_fk",
+      "childColumns": [
+        "source_turn_id",
+        "content_bundle_id"
+      ],
+      "parentColumns": [
+        "id",
+        "resolved_content_bundle_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "chat_turns",
+      "childTable": "world_events",
+      "constraintName": "world_events_source_turn_subject_fk",
+      "childColumns": [
+        "source_turn_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "commerce_provider_events",
+      "childTable": "entitlement_events",
+      "constraintName": "entitlement_events_provider_event_subject_fk",
+      "childColumns": [
+        "source_provider_event_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "resolved_subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "conversation_messages",
+      "childTable": "chat_turn_attempts",
+      "constraintName": "chat_turn_attempts_committed_message_fk",
+      "childColumns": [
+        "committed_message_id",
+        "turn_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "turn_id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "conversation_messages",
+      "childTable": "life_facts",
+      "constraintName": "life_facts_source_message_subject_fk",
+      "childColumns": [
+        "source_message_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "conversation_messages",
+      "childTable": "memory_items",
+      "constraintName": "memory_items_source_message_subject_fk",
+      "childColumns": [
+        "source_message_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "conversation_messages",
+      "childTable": "memory_items",
+      "constraintName": "memory_items_source_message_turn_subject_fk",
+      "childColumns": [
+        "source_message_id",
+        "source_turn_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "turn_id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "conversation_messages",
+      "childTable": "memory_proposals",
+      "constraintName": "memory_proposals_source_message_subject_fk",
+      "childColumns": [
+        "source_message_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "conversation_messages",
+      "childTable": "memory_proposals",
+      "constraintName": "memory_proposals_source_message_turn_subject_fk",
+      "childColumns": [
+        "source_message_id",
+        "source_turn_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "turn_id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "conversation_thread_characters",
+      "childTable": "conversation_messages",
+      "constraintName": "conversation_messages_participation_bundle_fk",
+      "childColumns": [
+        "thread_character_id",
+        "thread_id",
+        "character_content_bundle_id"
+      ],
+      "parentColumns": [
+        "id",
+        "thread_id",
+        "content_bundle_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "conversation_thread_characters",
+      "childTable": "conversation_messages",
+      "constraintName": "conversation_messages_participation_fk",
+      "childColumns": [
+        "thread_character_id",
+        "thread_id"
+      ],
+      "parentColumns": [
+        "id",
+        "thread_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "conversation_thread_characters",
+      "childTable": "readings",
+      "constraintName": "readings_requested_thread_character_fk",
+      "childColumns": [
+        "requested_thread_character_id"
+      ],
+      "parentColumns": [
+        "id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "notification_deliveries",
+      "childTable": "notification_delivery_attempts",
+      "constraintName": "notification_delivery_attempts_delivery_subject_fk",
+      "childColumns": [
+        "delivery_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "readings",
+      "childTable": "reading_execution_attempts",
+      "constraintName": "reading_execution_attempts_reading_subject_fk",
+      "childColumns": [
+        "reading_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "readings",
+      "childTable": "reading_groundings",
+      "constraintName": "reading_groundings_reading_subject_fk",
+      "childColumns": [
+        "reading_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "readings",
+      "childTable": "reading_refs",
+      "constraintName": "reading_refs_reading_subject_fk",
+      "childColumns": [
+        "reading_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "readings",
+      "childTable": "reading_sessions",
+      "constraintName": "reading_sessions_current_reading_fk",
+      "childColumns": [
+        "current_reading_id",
+        "id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "reading_session_id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "readings",
+      "childTable": "readings",
+      "constraintName": "readings_parent_session_subject_fk",
+      "childColumns": [
+        "parent_reading_id",
+        "reading_session_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "reading_session_id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "readings",
+      "childTable": "share_artifacts",
+      "constraintName": "share_artifacts_reading_subject_fk",
+      "childColumns": [
+        "reading_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "subject_merge_actions",
+      "childTable": "life_facts",
+      "constraintName": "life_facts_source_merge_action_fk",
+      "childColumns": [
+        "source_merge_action_id"
+      ],
+      "parentColumns": [
+        "id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "subject_merge_actions",
+      "childTable": "memory_items",
+      "constraintName": "memory_items_source_merge_action_fk",
+      "childColumns": [
+        "source_merge_action_id"
+      ],
+      "parentColumns": [
+        "id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "subject_merge_actions",
+      "childTable": "relationship_events",
+      "constraintName": "relationship_events_source_merge_action_fk",
+      "childColumns": [
+        "source_merge_action_id"
+      ],
+      "parentColumns": [
+        "id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 4,
+      "parentTable": "reading_execution_attempts",
+      "childTable": "reading_refs",
+      "constraintName": "reading_refs_execution_attempt_fk",
+      "childColumns": [
+        "execution_attempt_id",
+        "reading_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "reading_id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 4,
+      "parentTable": "reading_execution_attempts",
+      "childTable": "readings",
+      "constraintName": "readings_committed_execution_attempt_fk",
+      "childColumns": [
+        "committed_execution_attempt_id",
+        "id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "reading_id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 4,
+      "parentTable": "reading_groundings",
+      "childTable": "ai_execution_groundings",
+      "constraintName": "ai_execution_groundings_grounding_subject_fk",
+      "childColumns": [
+        "grounding_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    }
+  ],
+  "authoritativePostBackupSource": false,
+  "authoritativePrivacyReconciliation": false,
+  "futureSafePrivacyReconciliation": false,
+  "drReady": false
+}

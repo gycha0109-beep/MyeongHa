@@ -1,0 +1,159 @@
+import { readFile } from 'node:fs/promises';
+
+const graphPath = 'docs/operations/TRANSITIVE_SUBJECT_DEPENDENCY_GRAPH_V1.json';
+const directPath = 'docs/operations/SUBJECT_OWNED_DATA_GRAPH_INVENTORY_V1.json';
+const docPath = 'docs/operations/TRANSITIVE_SUBJECT_DEPENDENCY_GRAPH_V1.md';
+const decisionPath = 'docs/P0_DECISION_REGISTER.md';
+const drStatusPath = 'docs/operations/POSTGRES_DR_READINESS_STATUS_V1.md';
+
+const [graphText, directText, doc, decisions, drStatus] = await Promise.all([
+  readFile(graphPath, 'utf8'),
+  readFile(directPath, 'utf8'),
+  readFile(docPath, 'utf8'),
+  readFile(decisionPath, 'utf8'),
+  readFile(drStatusPath, 'utf8'),
+]);
+
+const graph = JSON.parse(graphText);
+const direct = JSON.parse(directText);
+
+function fail(message) {
+  throw new Error('Transitive Subject dependency graph rejected: ' + message);
+}
+
+if (graph.schema !== 'myeongha-transitive-subject-dependency-graph-v1') fail('schema mismatch');
+if (graph.decisionId !== 'P0-PR-01' || graph.decisionStatus !== 'OPEN-P0') {
+  fail('P0-PR-01 must remain OPEN-P0');
+}
+if (graph.graphAuthority !== 'SCHEMA_DISCOVERED_POLICY_NEUTRAL') {
+  fail('graph authority must remain policy-neutral');
+}
+for (const [field, expected] of [
+  ['executionAuthorized', false],
+  ['authoritativePostBackupSource', false],
+  ['authoritativePrivacyReconciliation', false],
+  ['futureSafePrivacyReconciliation', false],
+  ['drReady', false],
+]) {
+  if (graph[field] !== expected) fail(field + ' must remain false');
+}
+
+if (!Array.isArray(graph.edges) || graph.edges.length !== 106) {
+  fail('expected exactly 106 reachable FK edges');
+}
+
+const expectedDepthCounts = { '1': 30, '2': 33, '3': 40, '4': 3 };
+if (
+  graph.discovery?.edgeCount !== 106 ||
+  graph.discovery?.distinctReachableTableCount !== 47 ||
+  graph.discovery?.maxDepth !== 4 ||
+  graph.discovery?.directDepthOneEdgeCount !== 30 ||
+  JSON.stringify(graph.discovery?.depthCounts) !== JSON.stringify(expectedDepthCounts)
+) {
+  fail('discovery summary drifted');
+}
+
+const edgeKeys = [];
+const liveDepthCounts = {};
+const reachableTables = new Set();
+
+for (const edge of graph.edges) {
+  if (!edge || typeof edge !== 'object') fail('edge must be an object');
+  if (!Number.isInteger(edge.minDepth) || edge.minDepth < 1 || edge.minDepth > 4) {
+    fail('edge minDepth outside canonical range');
+  }
+  for (const field of ['parentTable', 'childTable', 'constraintName']) {
+    if (typeof edge[field] !== 'string' || edge[field].trim() === '') {
+      fail('edge has invalid ' + field);
+    }
+  }
+  for (const field of ['childColumns', 'parentColumns']) {
+    if (!Array.isArray(edge[field]) || edge[field].length === 0) {
+      fail('edge has invalid ' + field);
+    }
+    if (edge[field].some((column) => typeof column !== 'string' || column.trim() === '')) {
+      fail('edge contains invalid column name');
+    }
+  }
+  if (edge.childColumns.length !== edge.parentColumns.length) {
+    fail('FK child/parent column cardinality mismatch: ' + edge.constraintName);
+  }
+  if (edge.disposition !== 'UNDECIDED') {
+    fail('all transitive edge dispositions must remain UNDECIDED');
+  }
+
+  edgeKeys.push([
+    edge.minDepth,
+    edge.parentTable,
+    edge.childTable,
+    edge.constraintName,
+    edge.childColumns.join(','),
+    edge.parentColumns.join(','),
+  ].join('|'));
+  liveDepthCounts[String(edge.minDepth)] = (liveDepthCounts[String(edge.minDepth)] ?? 0) + 1;
+  reachableTables.add(edge.parentTable);
+  reachableTables.add(edge.childTable);
+}
+
+if (new Set(edgeKeys).size !== 106) fail('duplicate canonical FK edge');
+if (reachableTables.size !== 47) fail('expected exactly 47 reachable tables');
+if (JSON.stringify(liveDepthCounts) !== JSON.stringify(expectedDepthCounts)) {
+  fail('live edge depth counts drifted');
+}
+
+if (direct.schema !== 'myeongha-subject-owned-data-graph-inventory-v1') {
+  fail('direct Subject inventory schema mismatch');
+}
+const directKeys = direct.references
+  .map((entry) => entry.table + '|' + entry.column)
+  .sort();
+const depthOneKeys = graph.edges
+  .filter((edge) => edge.minDepth === 1)
+  .map((edge) => {
+    if (edge.parentTable !== 'subjects' || edge.parentColumns.join(',') !== 'id') {
+      fail('depth-1 edge must point directly to subjects(id)');
+    }
+    if (edge.childColumns.length !== 1) {
+      fail('depth-1 direct Subject edge must have one child column');
+    }
+    return edge.childTable + '|' + edge.childColumns[0];
+  })
+  .sort();
+
+if (JSON.stringify(depthOneKeys) !== JSON.stringify(directKeys)) {
+  fail('depth-1 transitive graph does not exactly match #1063 direct Subject inventory');
+}
+
+if (!/^\|\s*`P0-PR-01`\s*\|[^|\n]*\|\s*\*\*OPEN-P0\*\*\s*\|/m.test(decisions)) {
+  fail('decision register no longer records P0-PR-01 as OPEN-P0');
+}
+
+for (const fragment of [
+  'SCHEMA-DISCOVERED TRANSITIVE COVERAGE / POLICY NEUTRAL / EXECUTION NOT AUTHORIZED',
+  'reachable FK edges         = 106',
+  'distinct reachable tables  = 47',
+  'maximum minimum depth      = 4',
+  'depth 1 = 30',
+  'depth 2 = 33',
+  'depth 3 = 40',
+  'depth 4 = 3',
+  'disposition = UNDECIDED',
+]) {
+  if (!doc.includes(fragment)) fail('documentation boundary missing: ' + fragment);
+}
+
+for (const fragment of [
+  'authoritative_post_backup_source: false',
+  'privacy_reconciliation: BLOCKED_BY_P0_PR_01_AND_ISSUE_964',
+  'rpo_authority: OPEN_DECISION',
+  'rto_authority: OPEN_DECISION',
+  'dr_ready: false',
+]) {
+  if (!drStatus.includes(fragment)) {
+    fail('DR authority drifted while P0-PR-01 remains open: ' + fragment);
+  }
+}
+
+console.log(
+  'Transitive Subject dependency graph PASS: 106 reachable FK edges across 47 tables, depths 30/33/40/3, exact depth-1 parity with #1063, all dispositions UNDECIDED.',
+);
