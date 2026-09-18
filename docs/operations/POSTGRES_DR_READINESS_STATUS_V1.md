@@ -37,7 +37,7 @@ provider_managed_data_blocks_projected: 3
 provider_managed_data_blocks_skipped: 27
 synthetic_privacy_replay_event_count: 4
 authoritative_post_backup_source: false
-post_backup_privacy_delta_count: 0
+authoritative_post_backup_delta_audit_for_current_backup: NOT_EXECUTED
 privacy_reconciliation: BLOCKED_BY_P0_PR_01_AND_ISSUE_964
 rpo_authority: OPEN_DECISION
 rto_authority: OPEN_DECISION
@@ -50,7 +50,7 @@ Artifact `10541321355` (`postgres-isolated-restore-drill-35331742188`) contains 
 
 The 2-second value is the measured isolated restore/validation diagnostic from run `35331742188`. The 52-second value is GitHub workflow dispatch-to-completion elapsed time for that manual drill. The 4-second value is the synthetic data-loss-window diagnostic for the selected incident reference. None is an approved RTO or RPO, and the 52-second workflow elapsed time is not a full achieved recovery duration because authoritative privacy/legal-retention reconciliation remains outside the run.
 
-A count-only production audit against the governed backup completion point found zero post-backup privacy state deltas on the timestamp-authoritative surfaces checked for this tested interval. Zero observed deltas means there was nothing to replay for that interval; it does not prove the future-safe deletion/revocation/legal-retention reconciliation procedure.
+An earlier count-only production audit against the prior governed backup interval found zero recorded privacy-state deltas on the timestamp-authoritative surfaces checked at that time. That historical zero is **not** carried forward to backup `35329018925`. No authoritative post-backup delta audit/source has been established for the current backup, so authoritative privacy reconciliation remains blocked.
 
 ## Promotion blockers
 
