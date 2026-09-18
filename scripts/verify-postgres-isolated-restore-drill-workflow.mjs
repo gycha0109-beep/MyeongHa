@@ -7,12 +7,14 @@ import { buildRestoreEvidenceEnvelope } from './build-postgres-restore-evidence-
 const workflowPath = '.github/workflows/postgres-isolated-restore-drill.yml';
 const harnessPath = 'scripts/run-postgres-isolated-restore-drill.sh';
 const portableDataReplayPath = 'scripts/build-postgres-portable-data-replay.mjs';
+const restoreEvidenceEnvelopePath = 'scripts/build-postgres-restore-evidence-envelope.mjs';
 const runbookPath = 'docs/operations/POSTGRES_BACKUP_RESTORE_RUNBOOK_V1.md';
 
-const [workflow, harness, portableDataReplay, runbook] = await Promise.all([
+const [workflow, harness, portableDataReplay, restoreEvidenceEnvelope, runbook] = await Promise.all([
   readFile(workflowPath, 'utf8'),
   readFile(harnessPath, 'utf8'),
   readFile(portableDataReplayPath, 'utf8'),
+  readFile(restoreEvidenceEnvelopePath, 'utf8'),
   readFile(runbookPath, 'utf8'),
 ]);
 
@@ -222,8 +224,23 @@ for (const fragment of ['SUPABASE_DB_PASSWORD', 'SUPABASE_ACCESS_TOKEN', 'pooler
   if (portableDataReplay.includes(fragment)) throw new Error(`Portable data replay must remain generic; forbidden fragment: ${fragment}`);
 }
 
+for (const fragment of [
+  'SUPABASE_DB_PASSWORD',
+  'SUPABASE_ACCESS_TOKEN',
+  'MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE',
+  'pooler.supabase.com',
+  'postgresql://',
+  'service_role',
+]) {
+  if (restoreEvidenceEnvelope.includes(fragment)) {
+    throw new Error(`Restore evidence envelope must remain secret/connection independent; forbidden fragment: ${fragment}`);
+  }
+}
+
 const requiredRunbookFragments = [
   '.github/workflows/postgres-isolated-restore-drill.yml',
+  'scripts/build-postgres-restore-evidence-envelope.mjs',
+  'self-contained enough to re-establish the governed source',
   'GitHub Actions loopback Supabase PostgreSQL 17.6.1.166',
   'manual-only',
   'does not accept a remote restore database URL',
