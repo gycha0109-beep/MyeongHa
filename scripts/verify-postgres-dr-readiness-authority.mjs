@@ -44,7 +44,9 @@ requireRegex(
 );
 requireFragment('restoreHarness', 'privacy_reconciliation: "not_exercised_by_this_workflow"');
 requireFragment('restoreHarness', 'dr_ready: false');
-requireFragment('restoreRunbook', 'Production state: BACKUP PRODUCTION-PROVEN / ISOLATED APPLICATION RESTORE EVIDENCED / DR NOT READY');
+requireFragment('restoreRunbook', 'Production state: BACKUP PRODUCTION-PROVEN / BACKUP SCHEMA FRESHNESS STALE / ISOLATED APPLICATION RESTORE EVIDENCED / DR NOT READY');
+requireFragment('restoreRunbook', 'backup schema freshness             = STALE AFTER PRODUCTION MIGRATION 1120');
+requireFragment('restoreRunbook', 'fresh current-schema backup         = REQUIRED');
 requireFragment('restoreRunbook', 'isolated application restore       = EVIDENCED — latest run 35325070718');
 requireFragment('restoreRunbook', 'application integrity/auth baseline= PASS — latest run 35325070718');
 requireFragment('restoreRunbook', 'restore evidence envelope runtime  = PROVEN — run 35325070718');
@@ -55,9 +57,11 @@ requireFragment('restoreRunbook', 'scripts/run-postgres-privacy-reconciliation-s
 requireFragment('restoreRunbook', 'authoritative_post_backup_source=false');
 requireFragment('restoreRunbook', 'Artifact `10538807602` contains the resulting `restore-evidence.json`');
 requireFragment('restoreRunbook', 'Run `35325070718` runtime-proved these mechanics against the restored schema');
-requireFragment('restoreRunbook', '- [x] isolated restore completed — latest run `35325070718`');
-requireFragment('restoreRunbook', '- [x] integrity verification passed — latest run `35325070718`');
-requireFragment('restoreRunbook', '- [x] authorization verification passed at the governed database-level baseline — latest run `35325070718`');
+requireFragment('restoreRunbook', '- [ ] current production schema captured by a governed backup after migration `1120`');
+requireFragment('restoreRunbook', '- [ ] restore drill completed from that current-schema backup');
+requireFragment('restoreRunbook', '- [x] isolated restore mechanics completed — run `35325070718` against governed backup `35260191079`');
+requireFragment('restoreRunbook', '- [x] integrity verification passed for selected backup — run `35325070718`');
+requireFragment('restoreRunbook', '- [x] authorization verification passed at the governed database-level baseline for selected backup — run `35325070718`');
 requireFragment('restoreRunbook', '- [x] restored-DB synthetic privacy replay mechanics exercised — run `35325070718` (non-authoritative)');
 requireFragment('restoreRunbook', '- [x] synthetic drill data-loss window measured — `82s` (diagnostic, not approved RPO)');
 requireFragment('restoreRunbook', 'RPO: OPEN DECISION');
@@ -75,6 +79,12 @@ for (const staleFragment of [
 }
 
 const requiredStatusFragments = [
+  'latest_proven_backup_source_sha: ef61941313ee3a870076847c5dfb5c1b05ba4159',
+  'production_schema_latest_deployed_migration: 1120',
+  'production_schema_deploy_run_id: 35324012524',
+  'production_schema_deploy_head_sha: eddc1c331b6a8c0f47f54c150acd2f6cc5c7c0c2',
+  'backup_schema_freshness: STALE_AFTER_PRODUCTION_MIGRATION_1120',
+  'backup_refresh_required: true',
   'restore_run_id: 35325070718',
   'restore_result: SUCCESS',
   'restore_runtime_head_sha: eddc1c331b6a8c0f47f54c150acd2f6cc5c7c0c2',
@@ -101,6 +111,8 @@ const requiredStatusFragments = [
 for (const fragment of requiredStatusFragments) requireFragment('readinessStatus', fragment);
 
 const forbiddenReadyFragments = [
+  'backup_schema_freshness: CURRENT',
+  'backup_refresh_required: false',
   'restore_evidence_envelope_runtime: PENDING_CURRENT_MAIN_MANUAL_DRILL',
   'restored_db_synthetic_privacy_replay_runtime: PENDING_CURRENT_MAIN_MANUAL_DRILL',
   'dr_ready: true',
