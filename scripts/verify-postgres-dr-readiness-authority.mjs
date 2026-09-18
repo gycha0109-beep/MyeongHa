@@ -44,7 +44,7 @@ requireRegex(
 );
 requireFragment('restoreHarness', 'privacy_reconciliation: "not_exercised_by_this_workflow"');
 requireFragment('restoreHarness', 'dr_ready: false');
-requireFragment('restoreRunbook', 'Production state: CURRENT-SCHEMA BACKUP PROVEN / CURRENT-SCHEMA RESTORE PENDING / DR NOT READY');
+requireFragment('restoreRunbook', 'Production state: BACKUP PRODUCTION-PROVEN / CURRENT-SCHEMA BACKUP PROVEN / CURRENT-SCHEMA RESTORE PENDING / DR NOT READY');
 requireFragment('restoreRunbook', 'backup schema freshness             = CURRENT-SCHEMA BACKUP PROVEN');
 requireFragment('restoreRunbook', 'fresh current-schema backup         = PROVEN — run 35329018925');
 requireFragment('restoreRunbook', 'fresh current-schema restore        = PENDING MANUAL DRILL');
