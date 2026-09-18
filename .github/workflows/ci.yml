@@ -49,6 +49,10 @@ jobs:
       PGDATABASE: myeongha_test
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
       - name: Install PostgreSQL client
         run: sudo apt-get update && sudo apt-get install -y postgresql-client
       - name: Bootstrap Supabase auth test fixture
@@ -190,6 +194,19 @@ jobs:
         run: bash test/db/notification_delivery_attempt_concurrency.sh
       - name: Run account deletion start persistence/concurrency tests
         run: bash test/db/account_deletion_start_concurrency.sh
+      - name: Run privacy reconciliation replay plan DB drill
+        shell: bash
+        run: |
+          set -euo pipefail
+          replay_db=myeongha_privacy_reconciliation_replay_test
+          createdb "$replay_db"
+          trap 'dropdb --if-exists "$replay_db"' EXIT
+          PGDATABASE="$replay_db" psql -v ON_ERROR_STOP=1 -f test/db/bootstrap_supabase_auth_stub.sql
+          for migration in supabase/migrations/*.sql; do
+            echo "Applying ${migration} to isolated privacy reconciliation replay DB"
+            PGDATABASE="$replay_db" psql -v ON_ERROR_STOP=1 -f "$migration" >/dev/null
+          done
+          PGDATABASE="$replay_db" bash test/db/privacy_reconciliation_replay.sh
       - name: Run guest promotion persistence/concurrency tests
         run: bash test/db/guest_promotion_concurrency.sh
       - name: Run user resource revocation persistence/concurrency tests
