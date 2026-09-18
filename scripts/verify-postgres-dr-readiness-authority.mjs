@@ -48,7 +48,7 @@ requireFragment('restoreRunbook', 'Production state: BACKUP PRODUCTION-PROVEN / 
 requireFragment('restoreRunbook', 'backup schema freshness             = CURRENT-SCHEMA BACKUP PROVEN');
 requireFragment('restoreRunbook', 'fresh current-schema backup         = PROVEN — run 35329018925');
 requireFragment('restoreRunbook', 'fresh current-schema restore        = PENDING MANUAL DRILL');
-requireFragment('restoreRunbook', 'isolated application restore       = EVIDENCED — latest run 35325070718');
+requireFragment('restoreRunbook', 'isolated application restore       = EVIDENCED — run 35325070718 against historical backup 35260191079');
 requireFragment('restoreRunbook', 'application integrity/auth baseline= PASS — latest run 35325070718');
 requireFragment('restoreRunbook', 'restore evidence envelope runtime  = PROVEN — run 35325070718');
 requireFragment('restoreRunbook', 'restored-DB synthetic replay       = PROVEN — run 35325070718 / NON-AUTHORITATIVE');
