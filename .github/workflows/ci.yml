@@ -79,6 +79,8 @@ jobs:
         run: psql -1 -v ON_ERROR_STOP=1 -f test/db/commerce_negative.sql
       - name: Verify account deletion Commerce retention inventory
         run: bash test/db/account_deletion_policy_catalog_guard.sh
+      - name: Verify subject-owned data graph inventory
+        run: bash test/db/subject_owned_data_graph_catalog_guard.sh
       - name: Run Outbox claim/reclaim persistence/concurrency tests
         run: bash test/db/outbox_claim_concurrency.sh
       - name: Run chat receive persistence/concurrency tests

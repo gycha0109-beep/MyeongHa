@@ -1,0 +1,223 @@
+{
+  "schema": "myeongha-subject-owned-data-graph-inventory-v1",
+  "decisionId": "P0-PR-01",
+  "decisionStatus": "OPEN-P0",
+  "inventoryAuthority": "SCHEMA_DISCOVERED_POLICY_NEUTRAL",
+  "executionAuthorized": false,
+  "references": [
+    {
+      "table": "ai_execution_logs",
+      "column": "subject_id",
+      "domain": "ai_execution",
+      "relationRole": "owner",
+      "disposition": "UNDECIDED"
+    },
+    {
+      "table": "birth_profiles",
+      "column": "subject_id",
+      "domain": "birth_and_target",
+      "relationRole": "owner",
+      "disposition": "UNDECIDED"
+    },
+    {
+      "table": "character_unlocks",
+      "column": "subject_id",
+      "domain": "character_world",
+      "relationRole": "owner",
+      "disposition": "UNDECIDED"
+    },
+    {
+      "table": "commerce_account_links",
+      "column": "subject_id",
+      "domain": "commerce",
+      "relationRole": "owner",
+      "disposition": "UNDECIDED"
+    },
+    {
+      "table": "commerce_receipts",
+      "column": "subject_id",
+      "domain": "commerce",
+      "relationRole": "owner",
+      "disposition": "UNDECIDED"
+    },
+    {
+      "table": "conversation_threads",
+      "column": "subject_id",
+      "domain": "conversation",
+      "relationRole": "owner",
+      "disposition": "UNDECIDED"
+    },
+    {
+      "table": "data_deletion_jobs",
+      "column": "subject_id",
+      "domain": "privacy_operations",
+      "relationRole": "owner",
+      "disposition": "UNDECIDED"
+    },
+    {
+      "table": "device_installations",
+      "column": "subject_id",
+      "domain": "notification_and_device",
+      "relationRole": "owner",
+      "disposition": "UNDECIDED"
+    },
+    {
+      "table": "entitlement_grants",
+      "column": "subject_id",
+      "domain": "commerce",
+      "relationRole": "owner",
+      "disposition": "UNDECIDED"
+    },
+    {
+      "table": "entitlements",
+      "column": "subject_id",
+      "domain": "commerce",
+      "relationRole": "owner",
+      "disposition": "UNDECIDED"
+    },
+    {
+      "table": "guest_sessions",
+      "column": "claimed_by_subject_id",
+      "domain": "identity_and_merge",
+      "relationRole": "claim_target",
+      "disposition": "UNDECIDED"
+    },
+    {
+      "table": "guest_sessions",
+      "column": "subject_id",
+      "domain": "identity_and_merge",
+      "relationRole": "owner",
+      "disposition": "UNDECIDED"
+    },
+    {
+      "table": "life_facts",
+      "column": "subject_id",
+      "domain": "personal_record",
+      "relationRole": "owner",
+      "disposition": "UNDECIDED"
+    },
+    {
+      "table": "memory_items",
+      "column": "subject_id",
+      "domain": "personal_record",
+      "relationRole": "owner",
+      "disposition": "UNDECIDED"
+    },
+    {
+      "table": "memory_proposals",
+      "column": "subject_id",
+      "domain": "personal_record",
+      "relationRole": "owner",
+      "disposition": "UNDECIDED"
+    },
+    {
+      "table": "notification_preferences",
+      "column": "subject_id",
+      "domain": "notification_and_device",
+      "relationRole": "owner",
+      "disposition": "UNDECIDED"
+    },
+    {
+      "table": "notification_settings",
+      "column": "subject_id",
+      "domain": "notification_and_device",
+      "relationRole": "owner",
+      "disposition": "UNDECIDED"
+    },
+    {
+      "table": "notifications",
+      "column": "subject_id",
+      "domain": "notification_and_device",
+      "relationRole": "owner",
+      "disposition": "UNDECIDED"
+    },
+    {
+      "table": "profiles",
+      "column": "subject_id",
+      "domain": "identity_and_merge",
+      "relationRole": "owner",
+      "disposition": "UNDECIDED"
+    },
+    {
+      "table": "purchase_intents",
+      "column": "subject_id",
+      "domain": "commerce",
+      "relationRole": "owner",
+      "disposition": "UNDECIDED"
+    },
+    {
+      "table": "reading_sessions",
+      "column": "subject_id",
+      "domain": "readings",
+      "relationRole": "owner",
+      "disposition": "UNDECIDED"
+    },
+    {
+      "table": "record_access_grants",
+      "column": "subject_id",
+      "domain": "personal_record",
+      "relationRole": "owner",
+      "disposition": "UNDECIDED"
+    },
+    {
+      "table": "share_artifacts",
+      "column": "subject_id",
+      "domain": "sharing",
+      "relationRole": "owner",
+      "disposition": "UNDECIDED"
+    },
+    {
+      "table": "subject_merge_jobs",
+      "column": "guest_subject_id",
+      "domain": "identity_and_merge",
+      "relationRole": "merge_source",
+      "disposition": "UNDECIDED"
+    },
+    {
+      "table": "subject_merge_jobs",
+      "column": "member_subject_id",
+      "domain": "identity_and_merge",
+      "relationRole": "merge_target",
+      "disposition": "UNDECIDED"
+    },
+    {
+      "table": "subjects",
+      "column": "merged_into_subject_id",
+      "domain": "identity_and_merge",
+      "relationRole": "merge_target_pointer",
+      "disposition": "UNDECIDED"
+    },
+    {
+      "table": "target_person_profiles",
+      "column": "subject_id",
+      "domain": "birth_and_target",
+      "relationRole": "owner",
+      "disposition": "UNDECIDED"
+    },
+    {
+      "table": "user_character_states",
+      "column": "subject_id",
+      "domain": "character_world",
+      "relationRole": "owner",
+      "disposition": "UNDECIDED"
+    },
+    {
+      "table": "user_episode_progress",
+      "column": "subject_id",
+      "domain": "character_world",
+      "relationRole": "owner",
+      "disposition": "UNDECIDED"
+    },
+    {
+      "table": "world_events",
+      "column": "subject_id",
+      "domain": "character_world",
+      "relationRole": "owner",
+      "disposition": "UNDECIDED"
+    }
+  ],
+  "authoritativePostBackupSource": false,
+  "authoritativePrivacyReconciliation": false,
+  "futureSafePrivacyReconciliation": false,
+  "drReady": false
+}
