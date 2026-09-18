@@ -1,6 +1,6 @@
 # Transitive Subject Dependency Graph v1
 
-> Tracking: #1065 / parent #964 / DR parent #389  
+> Tracking: #1065 / schema sync #1068 / parent #964 / DR parent #389  
 > Decision authority: `P0-PR-01 = OPEN-P0`  
 > Status: **SCHEMA-DISCOVERED TRANSITIVE COVERAGE / POLICY NEUTRAL / EXECUTION NOT AUTHORIZED**
 
@@ -37,12 +37,12 @@ The initial #1066 discovery run intentionally used an empty inventory and emitte
 ## Current graph
 
 ```text
-reachable FK edges         = 106
-distinct reachable tables  = 47
+reachable FK edges         = 107
+distinct reachable tables  = 48
 maximum minimum depth      = 4
 
 depth 1 = 30
-depth 2 = 33
+depth 2 = 34
 depth 3 = 40
 depth 4 = 3
 ```
@@ -56,7 +56,7 @@ Depth greater than 1 represents relational dependencies reachable through direct
 The discovered graph includes, among others:
 
 - `subjects → conversation_threads → chat_turns / conversation_messages`;
-- `subjects → purchase_intents → commerce_payment_attempts`;
+- `subjects → purchase_intents → commerce_payment_attempts / purchase_intent_reader_selections`;
 - `subjects → commerce_receipts → commerce_provider_events / entitlement_events / entitlement_grants`;
 - `subjects → reading_sessions → readings → reading_execution_attempts / reading_groundings / reading_refs`;
 - `subjects → notifications / device_installations → notification_deliveries → notification_delivery_attempts`;
@@ -77,7 +77,7 @@ The guard reconstructs the same recursive graph against the fully migrated CI da
 It also requires:
 
 ```text
-edge count       = 106
+edge count       = 107
 depth-1 count    = 30
 max depth        = 4
 recursion bound  = 20 (must never be reached)
