@@ -51,7 +51,7 @@ for (const fragment of [
   'executionAuthorized                = false',
   'The live migrated table set must exactly equal the policy candidate inventory.',
   'no class has a disposition, duration, or legal authority yet',
-  'no destructive',
+  'This work adds **no**:',
 ]) {
   if (!doc.includes(fragment)) {
     throw new Error('Account deletion policy candidate documentation is missing boundary: ' + fragment);
