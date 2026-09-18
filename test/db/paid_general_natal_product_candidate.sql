@@ -42,12 +42,12 @@ end;
 $assert_fails$;
 
 select pg_temp.assert_true(
-  'General Natal Deep V1 Product exists but is disabled',
+  'Historical General Natal Deep V1 Product remains but is disabled and retired',
   (
     select p.product_key = 'saju.general_natal.deep.v1'
        and p.product_type = 'reading'
        and p.enabled = false
-       and p.retired_at is null
+       and p.retired_at is not null
     from public.products p
     where p.id = '11200000-0000-0000-0000-000000000001'
   )
@@ -69,12 +69,12 @@ select pg_temp.assert_true(
 );
 
 select pg_temp.assert_true(
-  'Capability Set V1 belongs to the Product and pins canonical definition hash',
+  'Historical Capability Set V1 preserves meaning and is retired',
   (
     select pcs.product_id = '11200000-0000-0000-0000-000000000001'::uuid
        and pcs.definition_version = 'v1'
        and pcs.definition_hash = 'sha256:f2843708cb1d42e1e1e08d9cad0a4117ac6438f01c62a11f193e0fb79ea3fcf4'
-       and pcs.retired_at is null
+       and pcs.retired_at is not null
     from public.product_capability_sets pcs
     where pcs.id = '11201000-0000-0000-0000-000000000001'
   )
@@ -96,7 +96,7 @@ select pg_temp.assert_true(
 );
 
 select pg_temp.assert_true(
-  'Web PortOne V2 Offer is pinned but disabled',
+  'Historical Web PortOne V2 Offer remains pinned, disabled, and retired',
   (
     select po.product_id = '11200000-0000-0000-0000-000000000001'::uuid
        and po.platform = 'web'
@@ -104,7 +104,7 @@ select pg_temp.assert_true(
        and po.external_product_id = 'myeongha-saju-general-natal-deep-v1'
        and po.capability_set_id = '11201000-0000-0000-0000-000000000001'::uuid
        and po.enabled = false
-       and po.retired_at is null
+       and po.retired_at is not null
        and po.currency = 'KRW'
        and po.display_price_minor = 9900
     from public.product_offers po
@@ -113,12 +113,12 @@ select pg_temp.assert_true(
 );
 
 select pg_temp.assert_true(
-  'Authoritative charge terms pin KRW 9,900 V1',
+  'Historical charge terms preserve KRW 9,900 V1 and are retired',
   (
     select pct.terms_version = 'krw-9900-v1'
        and pct.amount_minor = 9900
        and pct.currency = 'KRW'
-       and pct.retired_at is null
+       and pct.retired_at is not null
     from public.product_offer_charge_terms pct
     where pct.id = '11203000-0000-0000-0000-000000000001'
       and pct.product_offer_id = '11202000-0000-0000-0000-000000000001'
@@ -162,28 +162,28 @@ select pg_temp.assert_fails(
 );
 
 select pg_temp.assert_true(
-  'Inactive catalog seed creates no Purchase Intent',
+  'Retired historical catalog creates no Purchase Intent',
   (select count(*) = 0 from public.purchase_intents)
 );
 
 select pg_temp.assert_true(
-  'Inactive catalog seed creates no Receipt',
+  'Retired historical catalog creates no Receipt',
   (select count(*) = 0 from public.commerce_receipts)
 );
 
 select pg_temp.assert_true(
-  'Inactive catalog seed creates no Entitlement Grant',
+  'Retired historical catalog creates no Entitlement Grant',
   (select count(*) = 0 from public.entitlement_grants)
 );
 
 select pg_temp.assert_true(
-  'Inactive catalog seed creates no Entitlement Event',
+  'Retired historical catalog creates no Entitlement Event',
   (select count(*) = 0 from public.entitlement_events)
 );
 
 select pg_temp.assert_true(
-  'Inactive catalog seed creates no Effective Entitlement',
+  'Retired historical catalog creates no Effective Entitlement',
   (select count(*) = 0 from public.entitlements)
 );
 
-select 'paid General Natal Product candidate authority passed' as result;
+select 'historical General Natal Product retirement authority passed' as result;
