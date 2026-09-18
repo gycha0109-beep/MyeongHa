@@ -1,0 +1,12 @@
+{
+  "schema": "myeongha-transitive-subject-dependency-graph-v1",
+  "decisionId": "P0-PR-01",
+  "decisionStatus": "OPEN-P0",
+  "graphAuthority": "SCHEMA_DISCOVERED_POLICY_NEUTRAL",
+  "executionAuthorized": false,
+  "edges": [],
+  "authoritativePostBackupSource": false,
+  "authoritativePrivacyReconciliation": false,
+  "futureSafePrivacyReconciliation": false,
+  "drReady": false
+}
