@@ -356,7 +356,7 @@ returns table (
 language plpgsql
 security definer
 set search_path = pg_catalog, public
-as $
+as $$
 #variable_conflict use_column
 declare
   v_intent record;
@@ -466,7 +466,7 @@ begin
     p_reader_selection_hash,
     v_intent.replayed;
 end;
-$;
+$$;
 
 revoke execute on function public.cmd_create_standard_reading_purchase_intent_v4(
   uuid, uuid, uuid, uuid, text, text, jsonb, text, jsonb, text,
