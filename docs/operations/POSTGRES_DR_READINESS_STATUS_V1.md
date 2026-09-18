@@ -37,12 +37,27 @@ provider_managed_data_blocks_projected: 3
 provider_managed_data_blocks_skipped: 27
 synthetic_privacy_replay_event_count: 4
 authoritative_post_backup_source: false
-authoritative_post_backup_delta_audit_for_current_backup: NOT_EXECUTED
-post_backup_privacy_delta_count_audit_workflow: IMPLEMENTED_RUNTIME_ATTEMPT_FAILED_BEFORE_EVIDENCE
-post_backup_privacy_delta_count_audit_last_run_id: 35349036742
-post_backup_privacy_delta_count_audit_last_run_result: FAILURE_BEFORE_COUNT_EVIDENCE
-post_backup_privacy_delta_count_audit_failure_stage: PSQL_VARIABLE_SUBSTITUTION_COMMAND_MODE
+authoritative_post_backup_delta_audit_for_current_backup: SUCCESSFUL_COUNT_ONLY_OBSERVATION
+post_backup_privacy_delta_count_audit_workflow: RUNTIME_PROVEN
+post_backup_privacy_delta_count_audit_last_run_id: 35353128407
+post_backup_privacy_delta_count_audit_last_run_result: SUCCESS
+post_backup_privacy_delta_count_audit_runtime_head_sha: 532a92e061506bfac8f9485e84ebbab8d756f1db
+post_backup_privacy_delta_count_audit_artifact_id: 10550013004
+post_backup_privacy_delta_count_audit_artifact_name: postgres-privacy-delta-count-audit-35353128407
+post_backup_privacy_delta_count_audit_artifact_expires_at: 2026-10-18T13:56:23Z
+post_backup_privacy_delta_count_audit_artifact_digest: sha256:87010c5c12b2ac319f1b6ef71b0829ab713c13a70189d294a8af720e9a2d6374
+post_backup_privacy_delta_count_audit_backup_completed_at_utc: 2026-09-18T09:23:19Z
+post_backup_privacy_delta_count_audit_completed_at_utc: 2026-09-18T13:56:22Z
 privacy_delta_audit_query_mode: READ_ONLY_COUNT_ONLY
+privacy_delta_audit_data_deletion_jobs_requested_at: 0
+privacy_delta_audit_share_artifacts_revoked_at: 0
+privacy_delta_audit_device_installations_revoked_at: 0
+privacy_delta_audit_life_facts_revoked_at: 0
+privacy_delta_audit_memory_items_revoked_at: 0
+privacy_delta_audit_record_access_grants_revoked_at: 0
+privacy_delta_audit_subjects_non_active_updated_at: 0
+privacy_delta_audit_observed_delta_total: 0
+privacy_delta_audit_observed_deltas: false
 privacy_reconciliation: BLOCKED_BY_P0_PR_01_AND_ISSUE_964
 rpo_authority: OPEN_DECISION
 rto_authority: OPEN_DECISION
@@ -55,9 +70,9 @@ Artifact `10541321355` (`postgres-isolated-restore-drill-35331742188`) contains 
 
 The 2-second value is the measured isolated restore/validation diagnostic from run `35331742188`. The 52-second value is GitHub workflow dispatch-to-completion elapsed time for that manual drill. The 4-second value is the synthetic data-loss-window diagnostic for the selected incident reference. None is an approved RTO or RPO, and the 52-second workflow elapsed time is not a full achieved recovery duration because authoritative privacy/legal-retention reconciliation remains outside the run.
 
-An earlier count-only production audit against the prior governed backup interval found zero recorded privacy-state deltas on the timestamp-authoritative surfaces checked at that time. That historical zero is **not** carried forward to backup `35329018925`. No authoritative post-backup delta audit/source has been established for the current backup, so authoritative privacy reconciliation remains blocked.
+A successful count-only production audit has now been executed against current governed backup `35329018925`. Run `35353128407` queried the seven timestamp-authoritative surfaces after cutoff `2026-09-18T09:23:19Z` and observed zero recorded deltas on every surface: `data_deletion_jobs.requested_at=0`, `share_artifacts.revoked_at=0`, `device_installations.revoked_at=0`, `life_facts.revoked_at=0`, `memory_items.revoked_at=0`, `record_access_grants.revoked_at=0`, and non-active `subjects.updated_at=0`. The observed delta total is `0` and `observed_deltas=false`. This is a read-only count observation of the current primary database, not a durable post-backup privacy authority, so authoritative privacy reconciliation remains blocked.
 
-A manual runtime path now exists at `.github/workflows/production-postgres-privacy-delta-audit.yml`. Run `35347028765` validated the production credentials, exact governed backup run `35329018925`, artifact `10540625562`, manifest source SHA, and backup completion point `2026-09-18T09:23:19Z`, but failed before count evidence while relying on a pooler startup read-only assertion. Run `35349036742` then exercised the hardened explicit `BEGIN TRANSACTION READ ONLY` path on main SHA `af576e9a48abb89757d8ce3794806480e132ffc5`; the same governed backup/provenance checks passed, but the count SQL failed before evidence because `psql -c "$sql"` did not perform psql variable substitution for `:'cutoff'`, leaving the colon expression to reach PostgreSQL and produce a syntax error. No count result from either run is admissible. The workflow is being corrected to send the SQL through psql stdin, where psql variable substitution is applied, while retaining the same-connection explicit read-only transaction and fail-closed output validation. It still deliberately records `authoritative_post_backup_source=false`, `authoritative_privacy_reconciliation=false`, `future_safe_privacy_reconciliation=false`, and `dr_ready=false`. Until a successful run against backup `35329018925` is executed and inspected, the current-backup audit authority remains `NOT_EXECUTED`; even a zero result would remain an observation of current primary-DB state rather than a durable recovery source.
+The manual runtime path at `.github/workflows/production-postgres-privacy-delta-audit.yml` is now runtime-proven. Run `35347028765` failed before count evidence while relying on a pooler startup read-only assertion. Run `35349036742` then reached the explicit `BEGIN TRANSACTION READ ONLY` path but failed before evidence because `psql -c "$sql"` did not perform psql variable substitution for `:'cutoff'`. Run `35353128407`, from exact main SHA `532a92e061506bfac8f9485e84ebbab8d756f1db`, used the corrected stdin execution path and completed successfully: governed backup/provenance validation PASS, read-only count query PASS, and evidence upload PASS. Artifact `10550013004` (`postgres-privacy-delta-count-audit-35353128407`, expiring `2026-10-18T13:56:23Z`) records schema `myeongha-postgres-privacy-delta-count-audit-v1`, `query_mode=read_only_count_only`, the seven zero counts, `observed_delta_total=0`, `observed_deltas=false`, `authoritative_post_backup_source=false`, `authoritative_privacy_reconciliation=false`, `future_safe_privacy_reconciliation=false`, and `dr_ready=false`.
 
 ## Promotion blockers
 
@@ -82,8 +97,8 @@ self-contained evidence envelope   = implemented / CI-verified
 envelope runtime evidence          = proven — run 35331742188
 restored-DB synthetic privacy replay= implemented / CI-verified
 restored-DB synthetic replay runtime= proven — run 35331742188
-current-backup privacy delta audit = not executed — runs 35347028765 and 35349036742 failed before count evidence
-count-only audit workflow          = implemented / psql stdin variable-substitution hardening required
+current-backup privacy delta audit = successful count-only observation — run 35353128407; seven checked surfaces all zero
+count-only audit workflow          = runtime-proven — run 35353128407
 future-safe privacy reconciliation = blocked
 approved RPO                       = no
 approved RTO                       = no
