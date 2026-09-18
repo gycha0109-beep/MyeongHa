@@ -3,7 +3,7 @@
 > Scope: non-character production operations only  
 > Issue: `#389` — authoritative persistent-data recovery  
 > Evidence date: 2026-09-18 KST  
-> Production state: BACKUP PRODUCTION-PROVEN / RESTORE NOT YET PASSED
+> Production state: BACKUP PRODUCTION-PROVEN / ISOLATED APPLICATION RESTORE EVIDENCED / DR NOT READY
 
 ## 1. Current production authority
 
@@ -21,15 +21,18 @@ The repository does not treat provider health, an assumed dashboard backup, or a
 provider automatic daily backup = NOT RELIED UPON ON CURRENT FREE PLAN
 provider retention              = NOT RELIED UPON ON CURRENT FREE PLAN
 PITR                            = NOT AVAILABLE UNDER THE CURRENT FREE-PLAN OPERATING BASELINE
-application-owned logical dump  = IMPLEMENTED BY REPOSITORY WORKFLOW
-successful production dump      = EVIDENCED — run 35260191079
-isolated restore drill path     = IMPLEMENTED / EXECUTED
-isolated restore                = NOT YET EVIDENCED — run 35276773643 reached post-schema provider replay preparation and exposed auth.users column-version skew
-RPO                             = OPEN DECISION
-RTO                             = OPEN DECISION
+application-owned logical dump     = IMPLEMENTED BY REPOSITORY WORKFLOW
+successful production dump         = EVIDENCED — run 35260191079
+isolated restore drill path        = IMPLEMENTED / EXECUTED
+isolated application restore       = EVIDENCED — run 35280075274
+application integrity/auth baseline= PASS — run 35280075274
+provider-managed full restore      = NOT PROVEN — provider projection/omission occurred
+privacy reconciliation            = BLOCKED BY P0-PR-01 / #964
+RPO                                = OPEN DECISION
+RTO                                = OPEN DECISION
 ```
 
-Restore drill: EXECUTED / NOT YET PASSED.
+Restore drill: PASSED for MyeongHa application-data portability and application-critical Auth identity continuity; full hosted provider-managed Auth/Storage recovery and DR readiness remain NOT EVIDENCED.
 
 ## 2. Backup contract
 
@@ -164,8 +167,9 @@ Observed evidence:
 - `35270505668`: privileged replay progressed through the new owner boundary, then two MyeongHa role-membership statements failed only because the dump preserved `GRANTED BY "postgres"` provenance. PR `#950` normalizes only exact `myeongha_* -> myeongha_*` grantor provenance and verifies the resulting membership plus `INHERIT` state through `pg_auth_members`.
 - `35271689987`: #950 role replay passed and `schema.sql` completed. `data.sql` then failed on the first incompatible hosted-Auth COPY shape: the source `auth.audit_log_entries` COPY contained `ip_address`, while the pinned loopback provider baseline did not have that target column. Archive integrity, source authority, role handling, and application schema replay had already passed.
 - `35276773643`: #956 again passed source authority, checksums, provider-aware roles, application memberships, and strict schema replay. Its generic provider-data builder then classified `auth.users` itself as incompatible because the hosted source carries newer Auth columns than the pinned PostgreSQL bootstrap target. The subsequent mandatory `auth.users` replay assertion exited before SQL data replay. This exposed a harness-policy defect: provider tables with source-only columns were being skipped wholesale instead of preserving target-compatible identity columns.
+- `35280075274`: first successful isolated restore. Governed backup/artifact/checksum authority passed; application roles, memberships, representative ownership, required tables, authorization baseline, `auth.users` identity continuity, and `subjects.auth_user_id -> auth.users.id` referential integrity all passed. Three provider COPY blocks (`auth.audit_log_entries`, `auth.users`, `auth.refresh_tokens`) were projected to target-supported columns and 27 provider COPY blocks were skipped because the pinned loopback target lacked those hosted relations. Therefore `provider_managed_data_full_restore=false` remained explicit. Restore/validation diagnostic was 3 seconds and the synthetic data-loss-window diagnostic was 82 seconds.
 
-The latest failure is a provider schema-version mismatch handled too coarsely by the loopback portability harness, not corruption of the governed backup and not a MyeongHa application-schema failure.
+The latest drill is successful for MyeongHa application-data portability and application-critical Auth identity continuity. It is not evidence of full hosted Supabase Auth/Storage recovery equivalence, and it does not satisfy privacy/legal-retention or approved RPO/RTO closure gates.
 
 Current Supabase self-hosted restore guidance explicitly warns that platform projects may run newer Auth/Storage schema revisions than a self-hosted target. It lists missing provider tables/columns in `data.sql` as a known restore incompatibility and recommends excluding incompatible provider data before the final single-transaction restore. For MyeongHa, `auth.users` cannot simply be omitted because application subjects reference Auth user IDs, so the loopback portability path additionally preserves target-compatible Auth identity columns through controlled column projection.
 
@@ -257,6 +261,8 @@ public.cmd_activate_content_release_v1(uuid,boolean)
 owner == myeongha_content_publication_owner
 ```
 
+Run `35280075274` satisfied this database-level integrity baseline. The evidence remains scoped to the isolated loopback target and does not claim full provider-service recovery.
+
 ## 10. Authorization verification
 
 Before a restored state can be considered usable, verify at minimum:
@@ -268,7 +274,7 @@ Before a restored state can be considered usable, verify at minimum:
 - arbitrary client-supplied subject identifiers cannot become owner authority;
 - one subject cannot read another subject's protected rows.
 
-The loopback workflow currently verifies only the database-level baseline subset. Broader serving-path authorization and privacy reconciliation remain separate closure gates.
+Run `35280075274` passed the loopback database-level authorization baseline. Broader serving-path authorization, privacy/legal-retention reconciliation, and full provider-managed Auth/Storage equivalence remain separate gates.
 
 ## 11. Privacy / deletion reconciliation before serving
 
@@ -295,6 +301,8 @@ Procedure:
 6. only then consider a recovered state for serving traffic.
 
 If no independent post-cutoff evidence exists, record that as a blocking gap. **privacy reconciliation is not exercised by the workflow**.
+
+Repository mechanics now include the policy-neutral replay planner `scripts/build-postgres-privacy-reconciliation-plan.mjs` and an isolated DB replay regression. That foundation replays only already-authorized revocation/account-deletion-start commands. It does not establish a durable post-backup privacy ledger source, destructive account-deletion finalization, or commerce legal-retention policy; those remain blocked by `P0-PR-01` / issue `#964`.
 
 ## 12. RPO / RTO evidence
 
@@ -331,7 +339,15 @@ achieved data-loss window
 = incident/reference time - selected backup completed_at_utc
 ```
 
-The loopback workflow may record an isolated restore/validation duration and data-loss-window candidate. Those are diagnostic metrics, not a full achieved RTO, because privacy/deletion reconciliation is deliberately outside this workflow.
+Run `35280075274` recorded:
+- restore validation start: `2026-09-17T22:04:40Z`
+- restore validation complete: `2026-09-17T22:04:43Z`
+- isolated restore/validation diagnostic: `3s`
+- selected backup completed: `2026-09-17T18:42:39Z`
+- synthetic incident/reference time: `2026-09-17T18:44:01Z`
+- synthetic data-loss-window diagnostic: `82s`
+
+These are diagnostic metrics, not a full achieved RTO or an approved RPO/RTO comparison, because privacy/deletion reconciliation is deliberately outside this workflow.
 
 Only business-approved RPO/RTO values may be compared as PASS/FAIL.
 
@@ -346,12 +362,12 @@ Do not close `#389` until all are evidenced:
 - [x] provider plan / automatic backup / PITR state recorded
 - [x] backup failure observability verified
 - [x] exact backup point selected
-- [ ] isolated restore completed
-- [ ] integrity verification passed
-- [ ] authorization verification passed
+- [x] isolated restore completed — run `35280075274`
+- [x] integrity verification passed — run `35280075274`
+- [x] authorization verification passed at the governed database-level baseline — run `35280075274`
 - [ ] privacy/deletion/legal-retention reconciliation exercised
-- [ ] achieved recovery duration measured
-- [ ] achieved data-loss window measured
+- [ ] achieved recovery duration measured across the full recovery procedure
+- [x] synthetic drill data-loss window measured — `82s` (diagnostic, not approved RPO)
 - [ ] RPO approved and compared with achieved evidence
 - [ ] RTO approved and compared with achieved evidence
 
