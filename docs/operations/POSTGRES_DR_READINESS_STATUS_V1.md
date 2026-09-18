@@ -51,6 +51,11 @@ A count-only production audit against the governed backup completion point found
 
 ## Promotion blockers
 
+Recovery freshness also remains open before policy authority is considered:
+
+- the latest proven backup source predates production migration `1120`;
+- a fresh governed backup after migration `1120` and a restore drill selecting that backup are required for current-production-schema recovery evidence.
+
 Canonical authority remains unresolved in the existing source documents:
 
 - `docs/architecture/PRODUCTION_OPERATIONS_ARCHITECTURE_V1.md`: `RPO = OPEN DECISION`, `RTO = OPEN DECISION`, and no DR Ready claim before approved objectives plus achieved evidence.
