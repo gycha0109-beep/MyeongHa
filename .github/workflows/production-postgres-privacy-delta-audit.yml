@@ -190,7 +190,7 @@ jobs:
           SQL
           )"
 
-          if ! psql "$db_url" -X -qAt             -v ON_ERROR_STOP=1             -v "cutoff=$BACKUP_COMPLETED_AT_UTC"             -c "$sql" > "$counts_path"; then
+          if ! printf '%s\n' "$sql" | psql "$db_url" -X -qAt             -v ON_ERROR_STOP=1             -v "cutoff=$BACKUP_COMPLETED_AT_UTC" > "$counts_path"; then
             echo '::error title=Production privacy delta count query failed::Explicit READ ONLY transaction could not complete.'
             exit 1
           fi
