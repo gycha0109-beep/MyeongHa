@@ -51,4 +51,8 @@ if [[ "$actual" != "$expected" ]]; then
 fi
 
 count="$(printf '%s\n' "$actual" | sed '/^$/d' | wc -l | tr -d ' ')"
+[[ "$count" == "30" ]] || {
+  echo "Expected exactly 30 current direct subject FK mappings, found $count." >&2
+  exit 1
+}
 echo "Subject-owned data graph catalog guard PASS: ${count} direct subject FK mappings are classified."
