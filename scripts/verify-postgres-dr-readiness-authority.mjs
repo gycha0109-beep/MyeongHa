@@ -16,7 +16,7 @@ const entries = await Promise.all(
 const files = Object.fromEntries(entries);
 const migrationFiles = await readdir('supabase/migrations');
 const migrationNumbers = migrationFiles
-  .map((name) => name.match(/^(\\d+)_.*\\.sql$/))
+  .map((name) => name.match(/^(\d+)_.*\.sql$/))
   .filter(Boolean)
   .map((match) => Number(match[1]))
   .filter(Number.isSafeInteger);
