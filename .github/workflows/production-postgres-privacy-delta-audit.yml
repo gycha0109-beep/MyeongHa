@@ -176,15 +176,18 @@ jobs:
           evidence_path="$evidence_dir/privacy-delta-count-audit.json"
           mkdir -p "$evidence_dir"
 
-          sql='select jsonb_build_object(
-            ''data_deletion_jobs_requested_at'', (select count(*)::bigint from public.data_deletion_jobs where requested_at > :''cutoff''::timestamptz),
-            ''share_artifacts_revoked_at'', (select count(*)::bigint from public.share_artifacts where revoked_at > :''cutoff''::timestamptz),
-            ''device_installations_revoked_at'', (select count(*)::bigint from public.device_installations where revoked_at > :''cutoff''::timestamptz),
-            ''life_facts_revoked_at'', (select count(*)::bigint from public.life_facts where revoked_at > :''cutoff''::timestamptz),
-            ''memory_items_revoked_at'', (select count(*)::bigint from public.memory_items where revoked_at > :''cutoff''::timestamptz),
-            ''record_access_grants_revoked_at'', (select count(*)::bigint from public.record_access_grants where revoked_at > :''cutoff''::timestamptz),
-            ''subjects_non_active_updated_at'', (select count(*)::bigint from public.subjects where status <> ''active'' and updated_at > :''cutoff''::timestamptz)
-          )::text;'
+          sql="$(cat <<'SQL'
+          select jsonb_build_object(
+            'data_deletion_jobs_requested_at', (select count(*)::bigint from public.data_deletion_jobs where requested_at > :'cutoff'::timestamptz),
+            'share_artifacts_revoked_at', (select count(*)::bigint from public.share_artifacts where revoked_at > :'cutoff'::timestamptz),
+            'device_installations_revoked_at', (select count(*)::bigint from public.device_installations where revoked_at > :'cutoff'::timestamptz),
+            'life_facts_revoked_at', (select count(*)::bigint from public.life_facts where revoked_at > :'cutoff'::timestamptz),
+            'memory_items_revoked_at', (select count(*)::bigint from public.memory_items where revoked_at > :'cutoff'::timestamptz),
+            'record_access_grants_revoked_at', (select count(*)::bigint from public.record_access_grants where revoked_at > :'cutoff'::timestamptz),
+            'subjects_non_active_updated_at', (select count(*)::bigint from public.subjects where status <> 'active' and updated_at > :'cutoff'::timestamptz)
+          )::text;
+          SQL
+          )"
 
           psql "$db_url" -X -qAt             -v ON_ERROR_STOP=1             -v "cutoff=$BACKUP_COMPLETED_AT_UTC"             -c "$sql" > "$counts_path"
 
