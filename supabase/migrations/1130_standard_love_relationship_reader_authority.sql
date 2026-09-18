@@ -170,8 +170,8 @@ create table public.purchase_intent_reader_selections (
       reader_character_id,
       reader_content_bundle_id
     ),
-  constraint purchase_intent_reader_selections_contract_nonempty
-    check (btrim(selection_contract_version) <> ''),
+  constraint purchase_intent_reader_selections_contract_version_check
+    check (selection_contract_version = 'standard-reading-reader-selection-v1'),
   constraint purchase_intent_reader_selections_hash_nonempty
     check (btrim(selection_hash) <> '')
 );
