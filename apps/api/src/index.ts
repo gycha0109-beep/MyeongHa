@@ -42,6 +42,18 @@ export {
 } from './character-chat-orchestration.js';
 
 export {
+  CHARACTER_SAJU_SP2_COMMIT_SCHEMA_VERSION_V1,
+  CharacterSajuSp2RolloutOrchestrationError,
+  InMemoryCharacterSajuSp2CommitPortV1,
+  commitAndRevealCharacterSajuSp2ControlledRolloutV1,
+  type CharacterSajuSp2CommitPortV1,
+  type CharacterSajuSp2CommitReceiptV1,
+  type CharacterSajuSp2CommittedArtifactV1,
+  type CharacterSajuSp2RolloutOrchestrationResultV1,
+  type CharacterSajuSp2RolloutOrchestrationStateV1,
+} from './character-saju-sp2-rollout-orchestration.js';
+
+export {
   getCurrentSubjectProfile,
   patchCurrentSubjectProfile,
   SUBJECT_PROFILE_AUTHORITY_BINDINGS_V1,
