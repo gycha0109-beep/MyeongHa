@@ -351,7 +351,7 @@ insert into public.product_capability_sets(
   '11301000-0000-0000-0000-000000000001',
   '11300000-0000-0000-0000-000000000001',
   'v1',
-  'sha256:v1:pending-canonical-recompute-standard-love-relationship-reader-unit-v1',
+  'sha256:2ac901096369a6ea38cd180dff9fcd078efdfccbfca17117d6c282d116f76524',
   now()
 );
 
