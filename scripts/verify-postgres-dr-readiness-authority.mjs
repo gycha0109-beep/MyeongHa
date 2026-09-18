@@ -45,17 +45,20 @@ requireRegex(
 requireFragment('restoreHarness', 'privacy_reconciliation: "not_exercised_by_this_workflow"');
 requireFragment('restoreHarness', 'dr_ready: false');
 requireFragment('restoreRunbook', 'Production state: BACKUP PRODUCTION-PROVEN / ISOLATED APPLICATION RESTORE EVIDENCED / DR NOT READY');
-requireFragment('restoreRunbook', 'isolated application restore       = EVIDENCED — run 35280075274');
-requireFragment('restoreRunbook', 'application integrity/auth baseline= PASS — run 35280075274');
+requireFragment('restoreRunbook', 'isolated application restore       = EVIDENCED — latest run 35325070718');
+requireFragment('restoreRunbook', 'application integrity/auth baseline= PASS — latest run 35325070718');
+requireFragment('restoreRunbook', 'restore evidence envelope runtime  = PROVEN — run 35325070718');
+requireFragment('restoreRunbook', 'restored-DB synthetic replay       = PROVEN — run 35325070718 / NON-AUTHORITATIVE');
 requireFragment('restoreRunbook', 'provider-managed full restore      = NOT PROVEN');
 requireFragment('restoreRunbook', 'Restore drill: PASSED for MyeongHa application-data portability and application-critical Auth identity continuity');
-requireFragment('restoreRunbook', 'A fresh manual restore drill from current `main` is still required before the envelope itself may be classified as runtime-proven.');
 requireFragment('restoreRunbook', 'scripts/run-postgres-privacy-reconciliation-synthetic-drill.sh');
 requireFragment('restoreRunbook', 'authoritative_post_backup_source=false');
-requireFragment('restoreRunbook', 'A fresh current-`main` manual restore drill is still required before this restored-DB integration may be classified as runtime-proven.');
-requireFragment('restoreRunbook', '- [x] isolated restore completed — run `35280075274`');
-requireFragment('restoreRunbook', '- [x] integrity verification passed — run `35280075274`');
-requireFragment('restoreRunbook', '- [x] authorization verification passed at the governed database-level baseline — run `35280075274`');
+requireFragment('restoreRunbook', 'Artifact `10538807602` contains the resulting `restore-evidence.json`');
+requireFragment('restoreRunbook', 'Run `35325070718` runtime-proved these mechanics against the restored schema');
+requireFragment('restoreRunbook', '- [x] isolated restore completed — latest run `35325070718`');
+requireFragment('restoreRunbook', '- [x] integrity verification passed — latest run `35325070718`');
+requireFragment('restoreRunbook', '- [x] authorization verification passed at the governed database-level baseline — latest run `35325070718`');
+requireFragment('restoreRunbook', '- [x] restored-DB synthetic privacy replay mechanics exercised — run `35325070718` (non-authoritative)');
 requireFragment('restoreRunbook', '- [x] synthetic drill data-loss window measured — `82s` (diagnostic, not approved RPO)');
 requireFragment('restoreRunbook', 'RPO: OPEN DECISION');
 requireFragment('restoreRunbook', 'RTO: OPEN DECISION');
@@ -72,13 +75,17 @@ for (const staleFragment of [
 }
 
 const requiredStatusFragments = [
-  'restore_run_id: 35280075274',
+  'restore_run_id: 35325070718',
   'restore_result: SUCCESS',
+  'restore_runtime_head_sha: eddc1c331b6a8c0f47f54c150acd2f6cc5c7c0c2',
+  'restore_evidence_artifact_id: 10538807602',
+  'restore_evidence_artifact_expires_at: 2026-10-18T08:35:28Z',
   'restore_evidence_envelope: IMPLEMENTED_CI_VERIFIED',
-  'restore_evidence_envelope_runtime: PENDING_CURRENT_MAIN_MANUAL_DRILL',
+  'restore_evidence_envelope_runtime: PROVEN_ON_RUN_35325070718',
   'restored_db_synthetic_privacy_replay: IMPLEMENTED_CI_VERIFIED',
-  'restored_db_synthetic_privacy_replay_runtime: PENDING_CURRENT_MAIN_MANUAL_DRILL',
-  'isolated_restore_validation_duration_seconds: 3',
+  'restored_db_synthetic_privacy_replay_runtime: PROVEN_ON_RUN_35325070718',
+  'isolated_restore_validation_duration_seconds: 4',
+  'manual_drill_workflow_elapsed_seconds: 58',
   'synthetic_data_loss_window_seconds: 82',
   'post_backup_privacy_delta_count: 0',
   'privacy_reconciliation: BLOCKED_BY_P0_PR_01_AND_ISSUE_964',
@@ -89,8 +96,8 @@ const requiredStatusFragments = [
 for (const fragment of requiredStatusFragments) requireFragment('readinessStatus', fragment);
 
 const forbiddenReadyFragments = [
-  'restore_evidence_envelope_runtime: PROVEN',
-  'restored_db_synthetic_privacy_replay_runtime: PROVEN',
+  'restore_evidence_envelope_runtime: PENDING_CURRENT_MAIN_MANUAL_DRILL',
+  'restored_db_synthetic_privacy_replay_runtime: PENDING_CURRENT_MAIN_MANUAL_DRILL',
   'dr_ready: true',
   '"dr_ready": true',
   'DR Ready = TRUE',
