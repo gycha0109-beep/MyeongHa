@@ -1,0 +1,9 @@
+{
+  "schema": "myeongha-subject-owned-data-graph-inventory-v1",
+  "decisionId": "P0-PR-01",
+  "decisionStatus": "OPEN-P0",
+  "executionAuthorized": false,
+  "references": [],
+  "authoritativePostBackupSource": false,
+  "drReady": false
+}
