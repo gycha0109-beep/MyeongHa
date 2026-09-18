@@ -21,6 +21,11 @@ restored_db_synthetic_privacy_replay_runtime: PROVEN_ON_RUN_35325070718
 isolated_restore_validation_duration_seconds: 4
 manual_drill_workflow_elapsed_seconds: 58
 synthetic_data_loss_window_seconds: 82
+provider_managed_data_full_restore: false
+provider_managed_data_blocks_projected: 3
+provider_managed_data_blocks_skipped: 27
+synthetic_privacy_replay_event_count: 4
+authoritative_post_backup_source: false
 post_backup_privacy_delta_count: 0
 privacy_reconciliation: BLOCKED_BY_P0_PR_01_AND_ISSUE_964
 rpo_authority: OPEN_DECISION
