@@ -24,8 +24,10 @@ PITR                            = NOT AVAILABLE UNDER THE CURRENT FREE-PLAN OPER
 application-owned logical dump     = IMPLEMENTED BY REPOSITORY WORKFLOW
 successful production dump         = EVIDENCED — run 35260191079
 isolated restore drill path        = IMPLEMENTED / EXECUTED
-isolated application restore       = EVIDENCED — run 35280075274
-application integrity/auth baseline= PASS — run 35280075274
+isolated application restore       = EVIDENCED — latest run 35325070718
+application integrity/auth baseline= PASS — latest run 35325070718
+restore evidence envelope runtime  = PROVEN — run 35325070718
+restored-DB synthetic replay       = PROVEN — run 35325070718 / NON-AUTHORITATIVE
 provider-managed full restore      = NOT PROVEN — provider projection/omission occurred
 privacy reconciliation            = BLOCKED BY P0-PR-01 / #964
 RPO                                = OPEN DECISION
@@ -175,7 +177,7 @@ dr_ready = false
 
 The envelope builder rejects project/source mismatches, inconsistent restore duration, an incident reference before the selected backup point, invalid artifact metadata, or attempts to overwrite preexisting source/timing evidence. These fields strengthen operator-independent evidence; they do not approve an RPO/RTO or make the isolated portability drill a full provider-service recovery.
 
-Runtime evidence status: the envelope builder is implemented and CI-verified on current repository code, but the successful restore run `35280075274` predates this builder. A fresh manual restore drill from current `main` is still required before the envelope itself may be classified as runtime-proven.
+Runtime evidence status: manual run `35325070718` executed from main head `eddc1c331b6a8c0f47f54c150acd2f6cc5c7c0c2` and successfully produced the self-contained envelope. Artifact `10538807602` contains the resulting `restore-evidence.json` and is retained until `2026-10-18T08:35:28Z`. Envelope runtime is therefore proven for this run while DR readiness remains blocked by the independent privacy/legal-retention and RPO/RTO gates.
 
 ## 6. Restore drill runtime history
 
@@ -189,6 +191,7 @@ Observed evidence:
 - `35271689987`: #950 role replay passed and `schema.sql` completed. `data.sql` then failed on the first incompatible hosted-Auth COPY shape: the source `auth.audit_log_entries` COPY contained `ip_address`, while the pinned loopback provider baseline did not have that target column. Archive integrity, source authority, role handling, and application schema replay had already passed.
 - `35276773643`: #956 again passed source authority, checksums, provider-aware roles, application memberships, and strict schema replay. Its generic provider-data builder then classified `auth.users` itself as incompatible because the hosted source carries newer Auth columns than the pinned PostgreSQL bootstrap target. The subsequent mandatory `auth.users` replay assertion exited before SQL data replay. This exposed a harness-policy defect: provider tables with source-only columns were being skipped wholesale instead of preserving target-compatible identity columns.
 - `35280075274`: first successful isolated restore. Governed backup/artifact/checksum authority passed; application roles, memberships, representative ownership, required tables, authorization baseline, `auth.users` identity continuity, and `subjects.auth_user_id -> auth.users.id` referential integrity all passed. Three provider COPY blocks (`auth.audit_log_entries`, `auth.users`, `auth.refresh_tokens`) were projected to target-supported columns and 27 provider COPY blocks were skipped because the pinned loopback target lacked those hosted relations. Therefore `provider_managed_data_full_restore=false` remained explicit. Restore/validation diagnostic was 3 seconds and the synthetic data-loss-window diagnostic was 82 seconds.
+- `35325070718`: current runtime-proof drill from main head `eddc1c331b6a8c0f47f54c150acd2f6cc5c7c0c2`. Restore/validation completed in 4 seconds. The self-contained evidence envelope was generated successfully; artifact `10538807602` contains `restore-evidence.json` and `privacy-reconciliation-evidence.json`. Provider portability remained explicit at 3 projected and 27 skipped COPY blocks with `provider_managed_data_full_restore=false`. The restored database then passed a four-event synthetic privacy replay, identical second replay idempotency, and a negative terminal-state fail-closed case. That replay remains non-authoritative because `authoritative_post_backup_source=false`.
 
 The latest drill is successful for MyeongHa application-data portability and application-critical Auth identity continuity. It is not evidence of full hosted Supabase Auth/Storage recovery equivalence, and it does not satisfy privacy/legal-retention or approved RPO/RTO closure gates.
 
@@ -327,7 +330,7 @@ Repository mechanics now include the policy-neutral replay planner `scripts/buil
 
 The manual restore workflow is also wired to run `scripts/run-postgres-privacy-reconciliation-synthetic-drill.sh` against the disposable restored loopback database. That step uses collision-guarded synthetic rows, exercises four non-zero revocation/account-deletion-start events, verifies identical replay idempotency, and verifies a missing terminal revoke state aborts fail-closed. It writes only sanitized `privacy-reconciliation-evidence.json`; synthetic identifiers and row payloads are not uploaded.
 
-This restored-DB step is explicitly non-authoritative: `synthetic_fixture=true`, `authoritative_post_backup_source=false`, and `dr_ready=false`. It proves replay mechanics against the restored schema only. The durable post-backup source, destructive finalization, and commerce-retention decisions remain unresolved. A fresh current-`main` manual restore drill is still required before this restored-DB integration may be classified as runtime-proven.
+This restored-DB step is explicitly non-authoritative: `synthetic_fixture=true`, `authoritative_post_backup_source=false`, and `dr_ready=false`. Run `35325070718` runtime-proved these mechanics against the restored schema: four synthetic events replayed successfully, an identical second replay was idempotent, and a missing terminal revoke state failed closed. The durable post-backup source, destructive finalization, and commerce-retention decisions remain unresolved.
 
 ## 12. RPO / RTO evidence
 
@@ -364,15 +367,18 @@ achieved data-loss window
 = incident/reference time - selected backup completed_at_utc
 ```
 
-Run `35280075274` recorded:
-- restore validation start: `2026-09-17T22:04:40Z`
-- restore validation complete: `2026-09-17T22:04:43Z`
-- isolated restore/validation diagnostic: `3s`
+Latest run `35325070718` recorded:
+- run head: `eddc1c331b6a8c0f47f54c150acd2f6cc5c7c0c2`
+- restore validation start: `2026-09-18T08:35:24Z`
+- restore validation complete: `2026-09-18T08:35:28Z`
+- isolated restore/validation diagnostic: `4s`
+- workflow dispatch-to-completion elapsed: `58s`
 - selected backup completed: `2026-09-17T18:42:39Z`
 - synthetic incident/reference time: `2026-09-17T18:44:01Z`
 - synthetic data-loss-window diagnostic: `82s`
+- evidence artifact: `10538807602`, expires `2026-10-18T08:35:28Z`
 
-These are diagnostic metrics, not a full achieved RTO or an approved RPO/RTO comparison, because privacy/deletion reconciliation is deliberately outside this workflow.
+These are diagnostic metrics, not a full achieved RTO or an approved RPO/RTO comparison. The manual workflow now exercises synthetic restored-DB privacy replay mechanics, but authoritative post-backup privacy reconciliation, destructive finalization, and commerce legal-retention remain outside the run.
 
 Only business-approved RPO/RTO values may be compared as PASS/FAIL.
 
@@ -387,10 +393,11 @@ Do not close `#389` until all are evidenced:
 - [x] provider plan / automatic backup / PITR state recorded
 - [x] backup failure observability verified
 - [x] exact backup point selected
-- [x] isolated restore completed — run `35280075274`
-- [x] integrity verification passed — run `35280075274`
-- [x] authorization verification passed at the governed database-level baseline — run `35280075274`
-- [ ] privacy/deletion/legal-retention reconciliation exercised
+- [x] isolated restore completed — latest run `35325070718`
+- [x] integrity verification passed — latest run `35325070718`
+- [x] authorization verification passed at the governed database-level baseline — latest run `35325070718`
+- [x] restored-DB synthetic privacy replay mechanics exercised — run `35325070718` (non-authoritative)
+- [ ] authoritative privacy/deletion/legal-retention reconciliation exercised
 - [ ] achieved recovery duration measured across the full recovery procedure
 - [x] synthetic drill data-loss window measured — `82s` (diagnostic, not approved RPO)
 - [ ] RPO approved and compared with achieved evidence
