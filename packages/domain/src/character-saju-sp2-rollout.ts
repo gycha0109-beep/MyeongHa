@@ -10,6 +10,7 @@ import {
 import type { CharacterRuntimeContextWithGroundingV1 } from './character-saju-grounding-admission.js';
 import {
   admitCharacterSajuGroundingBundleViewV1,
+  type CharacterGroundingAmbiguityViewV1,
   type CharacterGroundingDisclosureViewV1,
   type CharacterSajuGroundingBundleViewV1,
 } from './character-saju-insight-selector.js';
@@ -70,6 +71,7 @@ export interface CharacterSajuSp2ControlledRevealV1 {
   readonly framingBefore: string | null;
   readonly semanticRealization: CharacterSajuSp2ControlledSemanticSegmentV1;
   readonly protectedSajuDisclosures: readonly CharacterGroundingDisclosureViewV1[];
+  readonly groundingAmbiguity: CharacterGroundingAmbiguityViewV1 | null;
   readonly calculationAmbiguity: readonly string[];
   readonly framingAfter: string | null;
   readonly emotion: string;
@@ -453,19 +455,40 @@ function findAuthoritativeSourceUnit(input: {
   }
 }
 
-function disclosureViewsFromEnvelope(
-  envelope: CharacterDialogueEnvelopeV1,
-): readonly CharacterGroundingDisclosureViewV1[] {
-  return Object.freeze(
-    envelope.protectedSajuDisclosures.map((item, index) =>
-      Object.freeze({
-        disclosureRef: item.segmentId,
-        type: 'scope_limitation' as const,
-        text: item.text,
-        sourceDisclosureIndex: index,
-      }),
-    ),
+function requiredDisclosureViews(input: {
+  readonly grounding: CharacterSajuGroundingBundleViewV1;
+  readonly sourceUnit: CharacterSajuGroundingBundleViewV1['units'][number];
+}): readonly CharacterGroundingDisclosureViewV1[] {
+  const byRef = new Map(
+    input.grounding.disclosures.map((item) => [item.disclosureRef, item]),
   );
+  return Object.freeze(
+    input.sourceUnit.requiredDisclosureRefs.map((disclosureRef) => {
+      const disclosure = byRef.get(disclosureRef);
+      if (disclosure === undefined) {
+        throw new TypeError(
+          'Admitted SP-2 source unit is missing a required grounding disclosure.',
+        );
+      }
+      return Object.freeze({ ...disclosure });
+    }),
+  );
+}
+
+function groundingAmbiguityView(input: {
+  readonly grounding: CharacterSajuGroundingBundleViewV1;
+  readonly sourceUnit: CharacterSajuGroundingBundleViewV1['units'][number];
+}): CharacterGroundingAmbiguityViewV1 | null {
+  if (input.sourceUnit.ambiguityRef === undefined) return null;
+  const ambiguity = input.grounding.ambiguities.find(
+    (item) => item.ambiguityRef === input.sourceUnit.ambiguityRef,
+  );
+  if (ambiguity === undefined) {
+    throw new TypeError(
+      'Admitted SP-2 source unit is missing its required grounding ambiguity.',
+    );
+  }
+  return Object.freeze({ ...ambiguity });
 }
 
 function artifactId(
@@ -636,7 +659,14 @@ export function authorizeCharacterSajuSp2ControlledRolloutV1(input: {
       text: decision.candidate.text,
       sourceUnitRefs: Object.freeze([...decision.candidate.sourceUnitRefs]),
     }),
-    protectedSajuDisclosures: disclosureViewsFromEnvelope(envelope),
+    protectedSajuDisclosures: requiredDisclosureViews({
+      grounding: source.grounding,
+      sourceUnit: source.sourceUnit,
+    }),
+    groundingAmbiguity: groundingAmbiguityView({
+      grounding: source.grounding,
+      sourceUnit: source.sourceUnit,
+    }),
     calculationAmbiguity: Object.freeze([...envelope.calculationAmbiguity]),
     framingAfter: envelope.framingAfter,
     emotion: envelope.emotion,
