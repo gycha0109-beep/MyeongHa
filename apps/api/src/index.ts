@@ -54,6 +54,27 @@ export {
 } from './character-saju-sp2-rollout-orchestration.js';
 
 export {
+  PRODUCTION_CHARACTER_SAJU_SP2_OFF_POLICY_VERSION_V1,
+  PRODUCTION_CHARACTER_SAJU_SP2_ROLLOUT_ENV_V1,
+  ProductionCharacterSajuSp2RolloutConfigErrorV1,
+  parseProductionCharacterSajuSp2RolloutConfigV1,
+  summarizeProductionCharacterSajuSp2RolloutConfigV1,
+  type ProductionCharacterSajuSp2RolloutConfigSummaryV1,
+  type ProductionCharacterSajuSp2RolloutConfigV1,
+  type ProductionCharacterSajuSp2RolloutEnvV1,
+} from './production-character-saju-sp2-rollout-config.js';
+
+export {
+  PRODUCTION_CHARACTER_SAJU_SP2_TELEMETRY_SCHEMA_VERSION_V1,
+  InMemoryProductionCharacterSajuSp2TelemetrySinkV1,
+  ProductionCharacterSajuSp2TelemetryErrorV1,
+  commitAndRevealProductionCharacterSajuSp2V1,
+  type ProductionCharacterSajuSp2TelemetryEventTypeV1,
+  type ProductionCharacterSajuSp2TelemetryEventV1,
+  type ProductionCharacterSajuSp2TelemetrySinkV1,
+} from './production-character-saju-sp2-telemetry.js';
+
+export {
   getCurrentSubjectProfile,
   patchCurrentSubjectProfile,
   SUBJECT_PROFILE_AUTHORITY_BINDINGS_V1,
