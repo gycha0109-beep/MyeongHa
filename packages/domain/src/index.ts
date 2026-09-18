@@ -148,6 +148,26 @@ export {
 } from './character-saju-semantic-guard.js';
 
 export {
+  CHARACTER_SAJU_COUNCIL_DIRECTOR_VERSION_V1,
+  CHARACTER_SAJU_COUNCIL_FAILURE_CODES_V1,
+  CHARACTER_SAJU_COUNCIL_MAX_PARTICIPANTS_V1,
+  CHARACTER_SAJU_COUNCIL_MAX_TURNS_V1,
+  CHARACTER_SAJU_COUNCIL_MIN_PARTICIPANTS_V1,
+  CHARACTER_SAJU_COUNCIL_MIN_TURNS_V1,
+  CHARACTER_SAJU_COUNCIL_SCHEMA_VERSION_V1,
+  CharacterSajuCouncilErrorV1,
+  directCharacterSajuCouncilV1,
+  guardCharacterSajuCouncilConsistencyV1,
+  type CharacterSajuCouncilConsistencyEvidenceV1,
+  type CharacterSajuCouncilDecisionV1,
+  type CharacterSajuCouncilFailureCodeV1,
+  type CharacterSajuCouncilFailureV1,
+  type CharacterSajuCouncilParticipantV1,
+  type CharacterSajuCouncilTranscriptV1,
+  type CharacterSajuCouncilTurnV1,
+} from './character-saju-council.js';
+
+export {
   CharacterOutputGuardError,
   guardCharacterRendererOutput,
   type CharacterDialogueEnvelopeV1,
