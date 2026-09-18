@@ -463,12 +463,23 @@ export function directCharacterSajuCouncilV1(input: {
   const prepared: PreparedCouncilParticipantV1[] = [];
   for (let inputIndex = 0; inputIndex < input.participants.length; inputIndex += 1) {
     const participant = input.participants[inputIndex]!;
-    const rendered = renderCharacterSajuBoundedExactCoreV1({
-      context: participant.context,
-      grounding,
-      perspective: participant.perspective,
-      requestedDomain: input.requestedDomain,
-    });
+    let rendered;
+    try {
+      rendered = renderCharacterSajuBoundedExactCoreV1({
+        context: participant.context,
+        grounding,
+        perspective: participant.perspective,
+        requestedDomain: input.requestedDomain,
+      });
+    } catch {
+      return Object.freeze({
+        mode: 'protected_fallback' as const,
+        validationState: 'fallback_used' as const,
+        reason: 'participant_protected_fallback' as const,
+        failures: Object.freeze([]),
+        failedCharacterId: participant.context.characterId,
+      });
+    }
     if (rendered.mode === 'protected_fallback') {
       return Object.freeze({
         mode: 'protected_fallback' as const,
