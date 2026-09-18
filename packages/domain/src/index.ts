@@ -168,6 +168,29 @@ export {
 } from './character-saju-council.js';
 
 export {
+  CHARACTER_SAJU_SP2_CANDIDATE_SCHEMA_VERSION_V1,
+  CHARACTER_SAJU_SP2_EVALUATION_SCHEMA_VERSION_V1,
+  CHARACTER_SAJU_SP2_EVALUATOR_VERDICT_SCHEMA_VERSION_V1,
+  MEANING_PRESERVATION_FAILURE_CLASSES_V1,
+  CharacterSajuSp2EvaluationErrorV1,
+  evaluateCharacterSajuSp2CorpusV1,
+  guardCharacterSajuSp2EvaluationCandidateV1,
+  hashCharacterSajuSp2CandidateV1,
+  type CharacterSajuEvalCaseV1,
+  type CharacterSajuEvalForbiddenExampleV1,
+  type CharacterSajuSp2CandidateV1,
+  type CharacterSajuSp2CorpusEvaluationV1,
+  type CharacterSajuSp2CorpusExampleResultV1,
+  type CharacterSajuSp2CorpusMetricsV1,
+  type CharacterSajuSp2EvaluatorV1,
+  type CharacterSajuSp2EvaluatorVerdictV1,
+  type CharacterSajuSp2GateDecisionV1,
+  type CharacterSajuSp2GateFailureCodeV1,
+  type CharacterSajuSp2GateFailureV1,
+  type MeaningPreservationFailureClassV1,
+} from './character-saju-sp2-evaluation.js';
+
+export {
   CharacterOutputGuardError,
   guardCharacterRendererOutput,
   type CharacterDialogueEnvelopeV1,
