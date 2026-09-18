@@ -175,6 +175,8 @@ dr_ready = false
 
 The envelope builder rejects project/source mismatches, inconsistent restore duration, an incident reference before the selected backup point, invalid artifact metadata, or attempts to overwrite preexisting source/timing evidence. These fields strengthen operator-independent evidence; they do not approve an RPO/RTO or make the isolated portability drill a full provider-service recovery.
 
+Runtime evidence status: the envelope builder is implemented and CI-verified on current repository code, but the successful restore run `35280075274` predates this builder. A fresh manual restore drill from current `main` is still required before the envelope itself may be classified as runtime-proven.
+
 ## 6. Restore drill runtime history
 
 Observed evidence:
