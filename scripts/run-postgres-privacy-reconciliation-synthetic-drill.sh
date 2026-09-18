@@ -21,7 +21,11 @@ trap 'rm -rf "$tmp_dir"' EXIT
 fail() { echo "FAIL $*" >&2; exit 1; }
 pass() { echo "PASS $*"; }
 
+raw_source="$tmp_dir/privacy-raw-source.json"
 manifest="$tmp_dir/privacy-manifest.json"
+ledger_summary="$tmp_dir/privacy-ledger-summary.json"
+encrypted_manifest="$tmp_dir/privacy-manifest.json.enc"
+decrypted_manifest="$tmp_dir/privacy-manifest.decrypted.json"
 plan="$tmp_dir/privacy-plan.sql"
 report="$tmp_dir/privacy-report.json"
 bad_manifest="$tmp_dir/privacy-bad-manifest.json"
@@ -106,43 +110,28 @@ insert into public.data_deletion_jobs(
 );
 SQL
 
-cat > "$manifest" <<JSON
+cat > "$raw_source" <<JSON
 {
-  "schema": "myeongha-postgres-privacy-reconciliation-manifest-v1",
-  "manifestId": "aa000000-0000-0000-0000-000000000001",
-  "backupRunId": $privacy_backup_run_id,
-  "backupCompletedAt": "$privacy_backup_completed_at",
-  "incidentReferenceUtc": "$incident_reference_at",
-  "sourceAuthority": "synthetic-db-drill",
-  "sourceDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   "events": [
     {
-      "eventId": "ab000000-0000-0000-0000-000000000001",
-      "sequence": 10,
       "occurredAt": "$event_1_at",
       "type": "MEMORY_ITEM_REVOKED",
       "subjectId": "a2000000-0000-0000-0000-000000000001",
       "memoryItemId": "a3000000-0000-0000-0000-000000000001"
     },
     {
-      "eventId": "ab000000-0000-0000-0000-000000000002",
-      "sequence": 20,
       "occurredAt": "$event_2_at",
       "type": "LIFE_FACT_REVOKED",
       "subjectId": "a2000000-0000-0000-0000-000000000001",
       "lifeFactId": "a4000000-0000-0000-0000-000000000001"
     },
     {
-      "eventId": "ab000000-0000-0000-0000-000000000003",
-      "sequence": 30,
       "occurredAt": "$event_3_at",
       "type": "DEVICE_INSTALLATION_REVOKED",
       "subjectId": "a2000000-0000-0000-0000-000000000001",
       "installationId": "a5000000-0000-0000-0000-000000000001"
     },
     {
-      "eventId": "ab000000-0000-0000-0000-000000000004",
-      "sequence": 40,
       "occurredAt": "$event_4_at",
       "type": "ACCOUNT_DELETION_STARTED",
       "subjectId": "a2000000-0000-0000-0000-000000000001",
@@ -150,12 +139,73 @@ cat > "$manifest" <<JSON
       "requestDedupeKey": "privacy-replay-good-account",
       "outboxEventId": "a7000000-0000-0000-0000-000000000001"
     }
-  ]
+  ],
+  "unsupported": {
+    "accountDeletionWithoutExactOutboxCount": 0,
+    "nonAccountDeletionJobCount": 0,
+    "unsupportedSubjectLifecycleCount": 0
+  }
 }
 JSON
 
+node scripts/build-postgres-privacy-recovery-ledger-manifest.mjs \
+  --input "$raw_source" \
+  --backup-run-id "$privacy_backup_run_id" \
+  --backup-completed-at "$privacy_backup_completed_at" \
+  --captured-at "$incident_reference_at" \
+  --manifest "$manifest" \
+  --summary "$ledger_summary"
+
+node - "$ledger_summary" <<'NODE'
+import { readFile } from 'node:fs/promises';
+
+const summary = JSON.parse(await readFile(process.argv[2], 'utf8'));
+if (summary.eventCount !== 4) throw new Error('non-zero ledger fixture eventCount mismatch');
+if (summary.replayPlannerAccepted !== true) throw new Error('ledger replay planner did not accept non-zero fixture');
+for (const field of [
+  'authoritativePostBackupSource',
+  'authoritativePrivacyReconciliation',
+  'futureSafePrivacyReconciliation',
+  'drReady',
+]) {
+  if (summary[field] !== false) throw new Error(field + ' must remain false');
+}
+NODE
+pass "production ledger builder accepts non-zero replay-supported fixture without authority promotion"
+
+manifest_sha256="$(sha256sum "$manifest" | awk '{print $1}')"
+roundtrip_passphrase='myeongha-ci-only-nonzero-ledger-roundtrip-passphrase-v1'
+openssl enc -aes-256-cbc -salt -pbkdf2 -iter 200000 \
+  -pass "pass:$roundtrip_passphrase" \
+  -in "$manifest" \
+  -out "$encrypted_manifest"
+
+for identifier in \
+  'a2000000-0000-0000-0000-000000000001' \
+  'a3000000-0000-0000-0000-000000000001' \
+  'a4000000-0000-0000-0000-000000000001' \
+  'a5000000-0000-0000-0000-000000000001' \
+  'a6000000-0000-0000-0000-000000000001' \
+  'a7000000-0000-0000-0000-000000000001' \
+  'privacy-replay-good-account'; do
+  if grep -aFq "$identifier" "$encrypted_manifest"; then
+    fail "encrypted privacy ledger exposed plaintext fixture identifier"
+  fi
+done
+pass "encrypted non-zero ledger contains no plaintext fixture identifiers"
+
+openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 \
+  -pass "pass:$roundtrip_passphrase" \
+  -in "$encrypted_manifest" \
+  -out "$decrypted_manifest"
+
+decrypted_sha256="$(sha256sum "$decrypted_manifest" | awk '{print $1}')"
+[[ "$decrypted_sha256" == "$manifest_sha256" ]] || fail "encrypted ledger roundtrip digest mismatch"
+cmp -s "$manifest" "$decrypted_manifest" || fail "encrypted ledger roundtrip bytes mismatch"
+pass "non-zero encrypted ledger decrypts byte-for-byte to the planner manifest"
+
 node scripts/build-postgres-privacy-reconciliation-plan.mjs \
-  --input "$manifest" \
+  --input "$decrypted_manifest" \
   --output "$plan" \
   --report "$report"
 
