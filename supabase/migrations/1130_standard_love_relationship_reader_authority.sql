@@ -312,6 +312,157 @@ create trigger tr_purchase_intent_reader_selection_append_only
 create index purchase_intent_reader_selections_product_created_idx
   on public.purchase_intent_reader_selections(product_id, created_at desc);
 
+-- Atomic future-facing authority: Purchase Intent v3 + Reader selection must commit
+-- together. The caller-provided request hash is trusted-server material and MUST
+-- include Reader identity in the v4 application contract. This DB wrapper validates
+-- replay convergence but remains ungranted while the Product is not saleable.
+create or replace function public.cmd_create_standard_reading_purchase_intent_v4(
+  p_subject_id uuid,
+  p_purchase_intent_id uuid,
+  p_product_offer_id uuid,
+  p_provider_account_link_id uuid,
+  p_idempotency_key text,
+  p_request_hash text,
+  p_offer_snapshot_jsonb jsonb,
+  p_offer_snapshot_hash text,
+  p_capability_snapshot_jsonb jsonb,
+  p_capability_snapshot_hash text,
+  p_product_id uuid,
+  p_reader_character_id text,
+  p_reader_content_bundle_id uuid,
+  p_reader_selection_contract_version text,
+  p_reader_selection_snapshot_jsonb jsonb,
+  p_reader_selection_hash text
+)
+returns table (
+  purchase_intent_id uuid,
+  product_offer_id uuid,
+  status text,
+  expected_amount_minor bigint,
+  expected_currency text,
+  charge_terms_version text,
+  capability_set_id uuid,
+  reader_character_id text,
+  reader_content_bundle_id uuid,
+  reader_selection_snapshot_jsonb jsonb,
+  reader_selection_hash text,
+  replayed boolean
+)
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $
+#variable_conflict use_column
+declare
+  v_intent record;
+  v_existing_selection public.purchase_intent_reader_selections%rowtype;
+begin
+  if p_product_id is null
+     or p_reader_character_id is null
+     or btrim(p_reader_character_id) = ''
+     or p_reader_content_bundle_id is null
+     or p_reader_selection_contract_version is null
+     or p_reader_selection_snapshot_jsonb is null
+     or p_reader_selection_hash is null
+     or btrim(p_reader_selection_hash) = '' then
+    raise exception using
+      errcode = '23514',
+      constraint = 'cmd_standard_reading_purchase_v4_reader_required',
+      message = 'Standard Reading Purchase Intent v4 requires complete server-owned Reader selection provenance';
+  end if;
+
+  select *
+    into strict v_intent
+  from public.cmd_create_purchase_intent_v3(
+    p_subject_id,
+    p_purchase_intent_id,
+    p_product_offer_id,
+    p_provider_account_link_id,
+    p_idempotency_key,
+    p_request_hash,
+    p_offer_snapshot_jsonb,
+    p_offer_snapshot_hash,
+    p_capability_snapshot_jsonb,
+    p_capability_snapshot_hash
+  );
+
+  if v_intent.replayed then
+    select pirs.*
+      into v_existing_selection
+    from public.purchase_intent_reader_selections pirs
+    where pirs.purchase_intent_id = v_intent.purchase_intent_id;
+
+    if not found then
+      raise exception using
+        errcode = '23514',
+        constraint = 'cmd_standard_reading_purchase_v4_replay_selection_missing',
+        message = 'replayed Standard Reading Purchase Intent has no immutable Reader selection provenance';
+    end if;
+
+    if row(
+      v_existing_selection.product_id,
+      v_existing_selection.reader_character_id,
+      v_existing_selection.reader_content_bundle_id,
+      v_existing_selection.selection_contract_version,
+      v_existing_selection.selection_snapshot_jsonb,
+      v_existing_selection.selection_hash
+    ) is distinct from row(
+      p_product_id,
+      p_reader_character_id,
+      p_reader_content_bundle_id,
+      p_reader_selection_contract_version,
+      p_reader_selection_snapshot_jsonb,
+      p_reader_selection_hash
+    ) then
+      raise exception using
+        errcode = '23514',
+        constraint = 'cmd_standard_reading_purchase_v4_replay_selection_conflict',
+        message = 'replayed Standard Reading Purchase Intent Reader selection does not match stored provenance';
+    end if;
+  else
+    insert into public.purchase_intent_reader_selections(
+      purchase_intent_id,
+      product_id,
+      reader_character_id,
+      reader_content_bundle_id,
+      selection_contract_version,
+      selection_snapshot_jsonb,
+      selection_hash,
+      created_at
+    ) values (
+      v_intent.purchase_intent_id,
+      p_product_id,
+      p_reader_character_id,
+      p_reader_content_bundle_id,
+      p_reader_selection_contract_version,
+      p_reader_selection_snapshot_jsonb,
+      p_reader_selection_hash,
+      clock_timestamp()
+    );
+  end if;
+
+  return query
+  select
+    v_intent.purchase_intent_id,
+    v_intent.product_offer_id,
+    v_intent.status,
+    v_intent.expected_amount_minor,
+    v_intent.expected_currency,
+    v_intent.charge_terms_version,
+    v_intent.capability_set_id,
+    p_reader_character_id,
+    p_reader_content_bundle_id,
+    p_reader_selection_snapshot_jsonb,
+    p_reader_selection_hash,
+    v_intent.replayed;
+end;
+$;
+
+revoke execute on function public.cmd_create_standard_reading_purchase_intent_v4(
+  uuid, uuid, uuid, uuid, text, text, jsonb, text, jsonb, text,
+  uuid, text, uuid, text, jsonb, text
+) from public;
+
 -- New first Standard Product: Topic is the SKU, Reader is selected later.
 insert into public.products(
   id,
@@ -414,6 +565,10 @@ BEGIN
     );
     EXECUTE pg_catalog.format(
       'revoke all on table public.purchase_intent_reader_selections from %I',
+      v_role
+    );
+    EXECUTE pg_catalog.format(
+      'revoke execute on function public.cmd_create_standard_reading_purchase_intent_v4(uuid,uuid,uuid,uuid,text,text,jsonb,text,jsonb,text,uuid,text,uuid,text,jsonb,text) from %I',
       v_role
     );
   END LOOP;
