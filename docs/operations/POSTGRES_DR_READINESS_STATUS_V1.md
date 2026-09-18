@@ -58,6 +58,24 @@ privacy_delta_audit_record_access_grants_revoked_at: 0
 privacy_delta_audit_subjects_non_active_updated_at: 0
 privacy_delta_audit_observed_delta_total: 0
 privacy_delta_audit_observed_deltas: false
+privacy_recovery_ledger_candidate_workflow: RUNTIME_PROVEN
+privacy_recovery_ledger_candidate_run_id: 35361080803
+privacy_recovery_ledger_candidate_result: SUCCESS
+privacy_recovery_ledger_candidate_runtime_head_sha: c8899478dba523f2ccfe1f6f00cda14a952a0273
+privacy_recovery_ledger_candidate_backup_run_id: 35329018925
+privacy_recovery_ledger_candidate_backup_completed_at_utc: 2026-09-18T09:23:19.000Z
+privacy_recovery_ledger_candidate_captured_at_utc: 2026-09-18T15:13:38.000Z
+privacy_recovery_ledger_candidate_artifact_id: 10553934875
+privacy_recovery_ledger_candidate_artifact_name: myeongha-privacy-ledger-20260918T151342Z
+privacy_recovery_ledger_candidate_artifact_expires_at: 2026-10-18T15:13:42Z
+privacy_recovery_ledger_candidate_artifact_digest: sha256:dfa03b55d90011ea9b5ce52ec166fb6eb789a91874bafcc8341cd6e4c68543b0
+privacy_recovery_ledger_candidate_encrypted_sha256: 91e2ea2fd615385d86d9864d7670b3139752a090fbe49884a8743258ccd938b5
+privacy_recovery_ledger_candidate_source_digest: sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
+privacy_recovery_ledger_candidate_event_count: 0
+privacy_recovery_ledger_candidate_replay_planner_accepted: true
+privacy_recovery_ledger_candidate_unsupported_delta_guard: PASS_ZERO_UNSUPPORTED
+privacy_recovery_ledger_candidate_artifact_plaintext_identifier_payload_uploaded: false
+privacy_recovery_ledger_candidate_source_authority: CANDIDATE_NON_AUTHORITATIVE
 privacy_reconciliation: BLOCKED_BY_P0_PR_01_AND_ISSUE_964
 rpo_authority: OPEN_DECISION
 rto_authority: OPEN_DECISION
@@ -73,6 +91,8 @@ The 2-second value is the measured isolated restore/validation diagnostic from r
 A successful count-only production audit has now been executed against current governed backup `35329018925`. Run `35353128407` queried the seven timestamp-authoritative surfaces after cutoff `2026-09-18T09:23:19Z` and observed zero recorded deltas on every surface: `data_deletion_jobs.requested_at=0`, `share_artifacts.revoked_at=0`, `device_installations.revoked_at=0`, `life_facts.revoked_at=0`, `memory_items.revoked_at=0`, `record_access_grants.revoked_at=0`, and non-active `subjects.updated_at=0`. The observed delta total is `0` and `observed_deltas=false`. This is a read-only count observation of the current primary database, not a durable post-backup privacy authority, so authoritative privacy reconciliation remains blocked.
 
 The manual runtime path at `.github/workflows/production-postgres-privacy-delta-audit.yml` is now runtime-proven. Run `35347028765` failed before count evidence while relying on a pooler startup read-only assertion. Run `35349036742` then reached the explicit `BEGIN TRANSACTION READ ONLY` path but failed before evidence because `psql -c "$sql"` did not perform psql variable substitution for `:'cutoff'`. Run `35353128407`, from exact main SHA `532a92e061506bfac8f9485e84ebbab8d756f1db`, used the corrected stdin execution path and completed successfully: governed backup/provenance validation PASS, read-only count query PASS, and evidence upload PASS. Artifact `10550013004` (`postgres-privacy-delta-count-audit-35353128407`, expiring `2026-10-18T13:56:23Z`) records schema `myeongha-postgres-privacy-delta-count-audit-v1`, `query_mode=read_only_count_only`, the seven zero counts, `observed_delta_total=0`, `observed_deltas=false`, `authoritative_post_backup_source=false`, `authoritative_privacy_reconciliation=false`, `future_safe_privacy_reconciliation=false`, and `dr_ready=false`.
+
+The encrypted off-primary-DB privacy recovery ledger candidate is also runtime-proven as transport mechanics. Manual run `35361080803` executed from exact main SHA `c8899478dba523f2ccfe1f6f00cda14a952a0273` against governed backup `35329018925` and cutoff `2026-09-18T09:23:19.000Z`. Backup provenance validation, the explicit read-only export, unsupported-delta fail-closed guard, deterministic replay-planner validation, encryption, and artifact upload all passed. Artifact `10553934875` (`myeongha-privacy-ledger-20260918T151342Z`, expiring `2026-10-18T15:13:42Z`) contains exactly an encrypted archive, its SHA-256 file, and an identifier-free public manifest. The encrypted archive SHA-256 `91e2ea2fd615385d86d9864d7670b3139752a090fbe49884a8743258ccd938b5` matches the uploaded checksum. The public manifest records `eventCount=0`, all seven replay-supported event-type counts as zero, `replayPlannerAccepted=true`, `candidateSourceAuthority=true`, `authoritativePostBackupSource=false`, `authoritativePrivacyReconciliation=false`, `futureSafePrivacyReconciliation=false`, and `drReady=false`. This proves the candidate export/encryption/off-DB transport path for the observed zero-event interval only; it does not promote the candidate into the durable authoritative privacy source required by P0-PR-01 / #964.
 
 ## Promotion blockers
 
@@ -99,6 +119,7 @@ restored-DB synthetic privacy replay= implemented / CI-verified
 restored-DB synthetic replay runtime= proven — run 35331742188
 current-backup privacy delta audit = successful count-only observation — run 35353128407; seven checked surfaces all zero
 count-only audit workflow          = runtime-proven — run 35353128407
+off-DB privacy ledger candidate    = runtime-proven transport — run 35361080803; observed event count 0; non-authoritative
 future-safe privacy reconciliation = blocked
 approved RPO                       = no
 approved RTO                       = no
@@ -135,6 +156,7 @@ This advances recovery mechanics but does not remove the promotion blockers:
 ```text
 revocation replay plan mechanics   = implemented
 restored-DB synthetic replay path  = runtime-proven — latest run 35331742188
+off-DB candidate transport mechanics = runtime-proven — run 35361080803 / event count 0 / non-authoritative
 durable post-backup source authority = not proven
 destructive account finalization   = blocked by P0-PR-01 / #964
 commerce legal retention           = blocked by P0-PR-01 / #964
