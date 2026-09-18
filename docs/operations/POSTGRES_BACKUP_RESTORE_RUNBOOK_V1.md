@@ -3,7 +3,7 @@
 > Scope: non-character production operations only  
 > Issue: `#389` — authoritative persistent-data recovery  
 > Evidence date: 2026-09-18 KST  
-> Production state: BACKUP PRODUCTION-PROVEN / ISOLATED APPLICATION RESTORE EVIDENCED / DR NOT READY
+> Production state: BACKUP PRODUCTION-PROVEN / BACKUP SCHEMA FRESHNESS STALE / ISOLATED APPLICATION RESTORE EVIDENCED / DR NOT READY
 
 ## 1. Current production authority
 
@@ -23,6 +23,8 @@ provider retention              = NOT RELIED UPON ON CURRENT FREE PLAN
 PITR                            = NOT AVAILABLE UNDER THE CURRENT FREE-PLAN OPERATING BASELINE
 application-owned logical dump     = IMPLEMENTED BY REPOSITORY WORKFLOW
 successful production dump         = EVIDENCED — run 35260191079
+backup schema freshness             = STALE AFTER PRODUCTION MIGRATION 1120
+fresh current-schema backup         = REQUIRED
 isolated restore drill path        = IMPLEMENTED / EXECUTED
 isolated application restore       = EVIDENCED — latest run 35325070718
 application integrity/auth baseline= PASS — latest run 35325070718
@@ -127,6 +129,23 @@ source SHA    ef61941313ee3a870076847c5dfb5c1b05ba4159
 ZIP digest    sha256:601fbbac6149d960789e9500e8299f73ab3b0659a8201d4c60fa94ff73a7b9f8
 retention     30 days
 ```
+
+### 4.1 Current backup freshness boundary
+
+The governed backup above was produced from source SHA `ef61941313ee3a870076847c5dfb5c1b05ba4159`. After that backup, migration `supabase/migrations/1120_paid_general_natal_product_candidate.sql` was added and production deployment run `35324012524` applied migration `1120` successfully on head `eddc1c331b6a8c0f47f54c150acd2f6cc5c7c0c2`.
+
+Therefore the current evidence is intentionally split:
+
+```text
+selected backup portability         = PROVEN
+restore mechanics                    = PROVEN — run 35325070718
+latest production schema in backup   = NOT PROVEN
+backup schema freshness              = STALE AFTER MIGRATION 1120
+fresh backup after migration 1120    = REQUIRED
+fresh restore from that backup       = REQUIRED
+```
+
+Do not use run `35325070718` to claim current-production-schema recoverability. Its value is that the selected governed backup and recovery machinery are operational. Current-schema recovery requires a new production backup taken after migration `1120` is present in production, followed by a restore drill selecting that new backup.
 
 Backup failure observability for v1 is the scheduled GitHub Actions workflow conclusion. A failed or missing scheduled run remains an operations alert until a dedicated alerting sink is approved.
 
@@ -393,9 +412,11 @@ Do not close `#389` until all are evidenced:
 - [x] provider plan / automatic backup / PITR state recorded
 - [x] backup failure observability verified
 - [x] exact backup point selected
-- [x] isolated restore completed — latest run `35325070718`
-- [x] integrity verification passed — latest run `35325070718`
-- [x] authorization verification passed at the governed database-level baseline — latest run `35325070718`
+- [ ] current production schema captured by a governed backup after migration `1120`
+- [ ] restore drill completed from that current-schema backup
+- [x] isolated restore mechanics completed — run `35325070718` against governed backup `35260191079`
+- [x] integrity verification passed for selected backup — run `35325070718`
+- [x] authorization verification passed at the governed database-level baseline for selected backup — run `35325070718`
 - [x] restored-DB synthetic privacy replay mechanics exercised — run `35325070718` (non-authoritative)
 - [ ] authoritative privacy/deletion/legal-retention reconciliation exercised
 - [ ] achieved recovery duration measured across the full recovery procedure
