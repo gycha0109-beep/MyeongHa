@@ -2,16 +2,19 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { transformPortableDataReplay } from './build-postgres-portable-data-replay.mjs';
+import { buildRestoreEvidenceEnvelope } from './build-postgres-restore-evidence-envelope.mjs';
 
 const workflowPath = '.github/workflows/postgres-isolated-restore-drill.yml';
 const harnessPath = 'scripts/run-postgres-isolated-restore-drill.sh';
 const portableDataReplayPath = 'scripts/build-postgres-portable-data-replay.mjs';
+const restoreEvidenceEnvelopePath = 'scripts/build-postgres-restore-evidence-envelope.mjs';
 const runbookPath = 'docs/operations/POSTGRES_BACKUP_RESTORE_RUNBOOK_V1.md';
 
-const [workflow, harness, portableDataReplay, runbook] = await Promise.all([
+const [workflow, harness, portableDataReplay, restoreEvidenceEnvelope, runbook] = await Promise.all([
   readFile(workflowPath, 'utf8'),
   readFile(harnessPath, 'utf8'),
   readFile(portableDataReplayPath, 'utf8'),
+  readFile(restoreEvidenceEnvelopePath, 'utf8'),
   readFile(runbookPath, 'utf8'),
 ]);
 
@@ -44,6 +47,15 @@ const requiredWorkflowFragments = [
   'artifact-ids: ${{ steps.source.outputs.artifact_id }}',
   'merge-multiple: true',
   'bash scripts/run-postgres-isolated-restore-drill.sh',
+  'Build self-contained restore evidence envelope',
+  'mapfile -t public_manifests',
+  'node scripts/build-postgres-restore-evidence-envelope.mjs',
+  '--restore-evidence "$RESTORE_EVIDENCE_PATH"',
+  '--backup-manifest "${public_manifests[0]}"',
+  '--backup-run-id "$BACKUP_RUN_ID"',
+  '--incident-reference-utc "$INCIDENT_REFERENCE_UTC"',
+  '--source-artifact-name "$SOURCE_ARTIFACT_NAME"',
+  '--source-artifact-expires-at "$SOURCE_ARTIFACT_EXPIRES_AT"',
   'Upload restore drill evidence only',
   'uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7',
   'path: ${{ runner.temp }}/restore-evidence/restore-evidence.json',
@@ -77,6 +89,9 @@ const forbiddenWorkflowFragments = [
   'path: roles.sql',
   'path: schema.sql',
   'path: data.sql',
+  '--arg backup_run_id "$BACKUP_RUN_ID"',
+  'data_loss_window_seconds=$((incident_epoch - backup_epoch))',
+  'tmp_json="$RUNNER_TEMP/restore-evidence.tmp.json"',
 ];
 
 for (const fragment of forbiddenWorkflowFragments) {
@@ -209,8 +224,23 @@ for (const fragment of ['SUPABASE_DB_PASSWORD', 'SUPABASE_ACCESS_TOKEN', 'pooler
   if (portableDataReplay.includes(fragment)) throw new Error(`Portable data replay must remain generic; forbidden fragment: ${fragment}`);
 }
 
+for (const fragment of [
+  'SUPABASE_DB_PASSWORD',
+  'SUPABASE_ACCESS_TOKEN',
+  'MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE',
+  'pooler.supabase.com',
+  'postgresql://',
+  'service_role',
+]) {
+  if (restoreEvidenceEnvelope.includes(fragment)) {
+    throw new Error(`Restore evidence envelope must remain secret/connection independent; forbidden fragment: ${fragment}`);
+  }
+}
+
 const requiredRunbookFragments = [
   '.github/workflows/postgres-isolated-restore-drill.yml',
+  'scripts/build-postgres-restore-evidence-envelope.mjs',
+  'self-contained enough to re-establish the governed source',
   'GitHub Actions loopback Supabase PostgreSQL 17.6.1.166',
   'manual-only',
   'does not accept a remote restore database URL',
@@ -304,6 +334,171 @@ try {
   if (!applicationMismatchRejected) throw new Error('Application-owned COPY mismatch did not fail closed.');
 } finally {
   await rm(tempRoot, { recursive: true, force: true });
+}
+
+
+const restoreEvidenceFixture = {
+  schema_version: 'myeongha-postgres-isolated-restore-drill-v1',
+  source_sha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  project_ref: 'cnsfpcdiyofqvhpcegfc',
+  restore_target: 'github-actions-loopback-supabase-postgres',
+  restore_execution_principal: 'supabase_admin-loopback-only',
+  post_restore_validation_principal: 'postgres-loopback-only',
+  restore_server_version: '17.6',
+  restore_started_at_utc: '2026-09-17T22:04:40Z',
+  restore_completed_at_utc: '2026-09-17T22:04:43Z',
+  isolated_restore_validation_duration_seconds: 3,
+  archive_integrity: 'pass',
+  application_role_restore: 'pass',
+  application_role_membership_restore: 'pass',
+  application_owner_restore: 'pass',
+  provider_managed_data_full_restore: false,
+  auth_users_restore: 'identity-continuity-pass',
+  subject_auth_user_referential_integrity: 'pass',
+  required_tables: 'pass',
+  authorization_baseline: 'pass',
+  privacy_reconciliation: 'not_exercised_by_this_workflow',
+  dr_ready: false,
+};
+
+const backupManifestFixture = {
+  schema_version: 'myeongha-postgres-backup-artifact-v1',
+  project_ref: 'cnsfpcdiyofqvhpcegfc',
+  source_sha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  created_at_utc: '2026-09-17T18:42:39Z',
+  encrypted_sha256: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+  archive_name: 'myeongha-postgres-20260917T184004Z.tar.gz.enc',
+};
+
+const envelope = buildRestoreEvidenceEnvelope({
+  restoreEvidence: restoreEvidenceFixture,
+  backupManifest: backupManifestFixture,
+  backupRunId: '35260191079',
+  incidentReferenceUtc: '2026-09-17T18:44:01Z',
+  sourceArtifactName: 'myeongha-postgres-20260917T184004Z',
+  sourceArtifactExpiresAt: '2026-10-17T18:40:04Z',
+});
+if (envelope.evidence_envelope_version !== 'myeongha-postgres-isolated-restore-evidence-envelope-v1') {
+  throw new Error('Restore evidence envelope version is missing.');
+}
+if (envelope.backup_workflow_run_id !== '35260191079') {
+  throw new Error('Restore evidence envelope did not retain the governed backup run id.');
+}
+if (envelope.backup_completed_at_utc !== '2026-09-17T18:42:39Z') {
+  throw new Error('Restore evidence envelope did not bind the selected backup completion point.');
+}
+if (envelope.synthetic_data_loss_window_seconds !== 82) {
+  throw new Error('Restore evidence envelope did not derive the synthetic data-loss window.');
+}
+if (envelope.source_archive_name !== backupManifestFixture.archive_name) {
+  throw new Error('Restore evidence envelope did not retain the encrypted archive name.');
+}
+if (envelope.source_encrypted_sha256 !== backupManifestFixture.encrypted_sha256) {
+  throw new Error('Restore evidence envelope did not retain the encrypted archive digest.');
+}
+if (envelope.dr_ready !== false || envelope.privacy_reconciliation !== 'not_exercised_by_this_workflow') {
+  throw new Error('Restore evidence envelope weakened the DR/privacy boundary.');
+}
+
+let sourceMismatchRejected = false;
+try {
+  buildRestoreEvidenceEnvelope({
+    restoreEvidence: restoreEvidenceFixture,
+    backupManifest: { ...backupManifestFixture, source_sha: 'cccccccccccccccccccccccccccccccccccccccc' },
+    backupRunId: '35260191079',
+    incidentReferenceUtc: '2026-09-17T18:44:01Z',
+    sourceArtifactName: 'myeongha-postgres-20260917T184004Z',
+    sourceArtifactExpiresAt: '2026-10-17T18:40:04Z',
+  });
+} catch (error) {
+  sourceMismatchRejected = String(error).includes('backupManifest.source_sha');
+}
+if (!sourceMismatchRejected) throw new Error('Restore evidence envelope accepted a source SHA mismatch.');
+
+let preexistingEnrichmentRejected = false;
+try {
+  buildRestoreEvidenceEnvelope({
+    restoreEvidence: { ...restoreEvidenceFixture, backup_workflow_run_id: '1' },
+    backupManifest: backupManifestFixture,
+    backupRunId: '35260191079',
+    incidentReferenceUtc: '2026-09-17T18:44:01Z',
+    sourceArtifactName: 'myeongha-postgres-20260917T184004Z',
+    sourceArtifactExpiresAt: '2026-10-17T18:40:04Z',
+  });
+} catch (error) {
+  preexistingEnrichmentRejected = String(error).includes('refusing overwrite');
+}
+if (!preexistingEnrichmentRejected) {
+  throw new Error('Restore evidence envelope allowed preexisting enrichment fields to be overwritten.');
+}
+
+let badDurationRejected = false;
+try {
+  buildRestoreEvidenceEnvelope({
+    restoreEvidence: { ...restoreEvidenceFixture, isolated_restore_validation_duration_seconds: 2 },
+    backupManifest: backupManifestFixture,
+    backupRunId: '35260191079',
+    incidentReferenceUtc: '2026-09-17T18:44:01Z',
+    sourceArtifactName: 'myeongha-postgres-20260917T184004Z',
+    sourceArtifactExpiresAt: '2026-10-17T18:40:04Z',
+  });
+} catch (error) {
+  badDurationRejected = String(error).includes('restore duration');
+}
+if (!badDurationRejected) throw new Error('Restore evidence envelope accepted inconsistent timing evidence.');
+
+let preBackupIncidentRejected = false;
+try {
+  buildRestoreEvidenceEnvelope({
+    restoreEvidence: restoreEvidenceFixture,
+    backupManifest: backupManifestFixture,
+    backupRunId: '35260191079',
+    incidentReferenceUtc: '2026-09-17T18:42:38Z',
+    sourceArtifactName: 'myeongha-postgres-20260917T184004Z',
+    sourceArtifactExpiresAt: '2026-10-17T18:40:04Z',
+  });
+} catch (error) {
+  preBackupIncidentRejected = String(error).includes('cannot precede');
+}
+if (!preBackupIncidentRejected) {
+  throw new Error('Restore evidence envelope accepted an incident reference before the backup completion point.');
+}
+
+let postRestoreIncidentRejected = false;
+try {
+  buildRestoreEvidenceEnvelope({
+    restoreEvidence: restoreEvidenceFixture,
+    backupManifest: backupManifestFixture,
+    backupRunId: '35260191079',
+    incidentReferenceUtc: '2026-09-17T22:04:41Z',
+    sourceArtifactName: 'myeongha-postgres-20260917T184004Z',
+    sourceArtifactExpiresAt: '2026-10-17T18:40:04Z',
+  });
+} catch (error) {
+  postRestoreIncidentRejected = String(error).includes('later than the restore start');
+}
+if (!postRestoreIncidentRejected) {
+  throw new Error('Restore evidence envelope accepted an incident reference after restore start.');
+}
+
+let artifactArchiveMismatchRejected = false;
+try {
+  buildRestoreEvidenceEnvelope({
+    restoreEvidence: restoreEvidenceFixture,
+    backupManifest: {
+      ...backupManifestFixture,
+      archive_name: 'myeongha-postgres-20260917T184005Z.tar.gz.enc',
+    },
+    backupRunId: '35260191079',
+    incidentReferenceUtc: '2026-09-17T18:44:01Z',
+    sourceArtifactName: 'myeongha-postgres-20260917T184004Z',
+    sourceArtifactExpiresAt: '2026-10-17T18:40:04Z',
+  });
+} catch (error) {
+  artifactArchiveMismatchRejected = String(error).includes('selected governed artifact name');
+}
+if (!artifactArchiveMismatchRejected) {
+  throw new Error('Restore evidence envelope accepted a mismatched artifact/archive binding.');
 }
 
 console.log('MyeongHa isolated PostgreSQL restore drill workflow contract verification passed.');
