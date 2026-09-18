@@ -261,7 +261,7 @@ Before sale activation:
 
 1. Saju production-authorized `relationship + natal/general` interpretation authority.
 2. Public Product Reading execution/finalization/grounding path.
-3. Atomic Purchase Intent v4-style command that persists Reader selection with the intent.
+3. Application runtime adapter + user-specific Reader eligibility/access resolution over the existing fail-closed `cmd_create_standard_reading_purchase_intent_v4` atomic DB authority.
 4. Verified Payment → purchase-backed Grant fulfillment for the exact Capability Set.
 5. Reader-bound unit → Reading artifact binding with retry-safe generation.
 6. Owner-scoped immutable artifact reread.
