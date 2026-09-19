@@ -44,12 +44,12 @@ function expectThrow(label, fn, pattern) {
 
 const report = evaluateAccountDeletionDispositionContract(contract, graph);
 for (const [field, expected] of [
-  ['graphEdgeCount', 106],
-  ['graphReachableTableCount', 47],
-  ['coveredEdgeCount', 106],
-  ['coveredTableCount', 47],
-  ['unresolvedTableCount', 47],
-  ['unresolvedEdgeCount', 106],
+  ['graphEdgeCount', 107],
+  ['graphReachableTableCount', 48],
+  ['coveredEdgeCount', 107],
+  ['coveredTableCount', 48],
+  ['unresolvedTableCount', 48],
+  ['unresolvedEdgeCount', 107],
   ['dependencyConflictCount', 0],
   ['explicitConflictResolutionCount', 0],
   ['policyReady', false],
@@ -73,8 +73,8 @@ if (!/^\|\s*`P0-PR-01`\s*\|[^|\n]*\|\s*\*\*OPEN-P0\*\*\s*\|/m.test(decisions)) {
 }
 
 for (const fragment of [
-  'reachable FK edges          = 106',
-  'reachable tables            = 47',
+  'reachable FK edges          = 107',
+  'reachable tables            = 48',
   'all table dispositions      = UNDECIDED',
   'executionPlanAllowed = false',
   'destructiveSqlAllowed = false',
@@ -133,7 +133,7 @@ if (!testOnlyReport.policyReady || !testOnlyReport.executionPlanAllowed) {
   fail('test-only complete approved fixture should prove the positive plan gate path');
 }
 const testOnlyPlan = buildAccountDeletionExecutionPlan(testOnlyApproved, graph);
-if (testOnlyPlan.stepCount !== 47) fail('test-only plan must cover all 47 reachable tables');
+if (testOnlyPlan.stepCount !== 48) fail('test-only plan must cover all 48 reachable tables');
 if (testOnlyPlan.destructiveSqlGenerated !== false || testOnlyPlan.sql !== null) {
   fail('v1 execution plan must remain structured and non-SQL');
 }
@@ -159,5 +159,5 @@ expectThrow(
 );
 
 console.log(
-  'Account deletion disposition execution gate PASS: 47/47 tables and 106/106 edges are covered, canonical policy remains fully unresolved/unauthorized, conflict drift fails closed, and SQL generation remains absent.',
+  'Account deletion disposition execution gate PASS: 48/48 tables and 107/107 edges are covered, canonical policy remains fully unresolved/unauthorized, conflict drift fails closed, and SQL generation remains absent.',
 );

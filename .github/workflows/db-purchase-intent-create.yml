@@ -59,6 +59,8 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f test/db/commerce_product_capability_authority.sql
       - name: Verify inert General Natal paid Product authority
         run: psql -v ON_ERROR_STOP=1 -f test/db/paid_general_natal_product_candidate.sql
+      - name: Verify Standard Love Relationship Reader authority
+        run: psql -v ON_ERROR_STOP=1 -f test/db/standard_love_relationship_reader_authority.sql
       - name: Run historical Purchase Intent v1 persistence/concurrency tests
         run: bash test/db/purchase_intent_create_concurrency.sh
       - name: Run Guest Purchase Intent v2 charge-authority/concurrency tests

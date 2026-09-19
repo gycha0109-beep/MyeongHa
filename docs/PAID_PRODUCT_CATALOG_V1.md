@@ -1,5 +1,9 @@
 # MyeongHa Paid Product Catalog V1 — General Natal Deep Reading
 
+> **SUPERSEDED / HISTORICAL CANDIDATE — DO NOT USE AS CURRENT PRODUCT AUTHORITY**  
+> Commerce v2 current first Standard Product authority is `docs/STANDARD_LOVE_RELATIONSHIP_PRODUCT_V1.md` (`standard.love_relationship`).  
+> Migration `1120_paid_general_natal_product_candidate.sql` remains immutable history; migration `1130_standard_love_relationship_reader_authority.sql` forward-retires this candidate.
+
 > Repository: `gycha0109-beep/MyeongHa`
 > Tracking: #1027
 > Status: **PRODUCT AUTHORITY DEFINED / NOT SALEABLE / ACTIVATION HOLD**

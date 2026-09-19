@@ -38,14 +38,14 @@ for (const [field, expected] of [
   if (graph[field] !== expected) fail(field + ' must remain false');
 }
 
-if (!Array.isArray(graph.edges) || graph.edges.length !== 106) {
+if (!Array.isArray(graph.edges) || graph.edges.length !== 107) {
   fail('expected exactly 106 reachable FK edges');
 }
 
-const expectedDepthCounts = { '1': 30, '2': 33, '3': 40, '4': 3 };
+const expectedDepthCounts = { '1': 30, '2': 34, '3': 40, '4': 3 };
 if (
-  graph.discovery?.edgeCount !== 106 ||
-  graph.discovery?.distinctReachableTableCount !== 47 ||
+  graph.discovery?.edgeCount !== 107 ||
+  graph.discovery?.distinctReachableTableCount !== 48 ||
   graph.discovery?.maxDepth !== 4 ||
   graph.discovery?.directDepthOneEdgeCount !== 30 ||
   JSON.stringify(graph.discovery?.depthCounts) !== JSON.stringify(expectedDepthCounts)
@@ -95,8 +95,8 @@ for (const edge of graph.edges) {
   reachableTables.add(edge.childTable);
 }
 
-if (new Set(edgeKeys).size !== 106) fail('duplicate canonical FK edge');
-if (reachableTables.size !== 47) fail('expected exactly 47 reachable tables');
+if (new Set(edgeKeys).size !== 107) fail('duplicate canonical FK edge');
+if (reachableTables.size !== 48) fail('expected exactly 47 reachable tables');
 if (JSON.stringify(liveDepthCounts) !== JSON.stringify(expectedDepthCounts)) {
   fail('live edge depth counts drifted');
 }
@@ -130,11 +130,11 @@ if (!/^\|\s*`P0-PR-01`\s*\|[^|\n]*\|\s*\*\*OPEN-P0\*\*\s*\|/m.test(decisions)) {
 
 for (const fragment of [
   'SCHEMA-DISCOVERED TRANSITIVE COVERAGE / POLICY NEUTRAL / EXECUTION NOT AUTHORIZED',
-  'reachable FK edges         = 106',
-  'distinct reachable tables  = 47',
+  'reachable FK edges         = 107',
+  'distinct reachable tables  = 48',
   'maximum minimum depth      = 4',
   'depth 1 = 30',
-  'depth 2 = 33',
+  'depth 2 = 34',
   'depth 3 = 40',
   'depth 4 = 3',
   'disposition = UNDECIDED',
@@ -155,5 +155,5 @@ for (const fragment of [
 }
 
 console.log(
-  'Transitive Subject dependency graph PASS: 106 reachable FK edges across 47 tables, depths 30/33/40/3, exact depth-1 parity with #1063, all dispositions UNDECIDED.',
+  'Transitive Subject dependency graph PASS: 107 reachable FK edges across 48 tables, depths 30/34/40/3, exact depth-1 parity with #1063, all dispositions UNDECIDED.',
 );

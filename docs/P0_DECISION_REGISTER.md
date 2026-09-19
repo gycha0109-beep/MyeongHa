@@ -1,8 +1,8 @@
 # 명하 Production P0 Decision Register — Full Audit v0.9
 
 > Product: **명하 (Myeongha)**  
-> Pack Version: **v0.10**  
-> Date: **2026-09-18**  
+> Pack Version: **v0.11**  
+> Date: **2026-09-19**  
 > Source Authority: `Usecase_re_reviewed_v2(1).md`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`, `Myeonghwa_Personalized_Interpretation_Architecture_v1.3_THIRD_REVIEW(1).md`, `docs/architecture/COMMERCE_ENTITLEMENT_ARCHITECTURE_V1.md`, `docs/COMMERCE_GUEST_PURCHASE_OWNERSHIP_DECISION_V1.md`, `docs/COMMERCE_WEB_PSP_DECISION_V1.md`  
 > Rule: 본 문서는 위 source authority를 구현 수준으로 구체화한다. source가 결정하지 않은 사항은 임의 확정하지 않고 `OPEN-P0` 또는 `CANDIDATE`로 표시한다. Production 운영을 열기 위해 별도 security/operations decision을 확정할 경우 source requirement를 좁혀야 하며, 상위 미결정 retention/legal policy를 대신 결정한 것으로 간주하지 않는다.
 
@@ -19,7 +19,7 @@
 | `P0-SA-01` | Saju transport | **DECIDED** | authenticated internal HTTP service; calculation-only V1; no `/api/readings` activation |
 | `P0-CM-01` | Commerce launch rail | **DECIDED** | Web + one-off only for launch MVP; no subscription/bundle/native-store billing |
 | `P0-CM-02` | Web payment provider / PSP | **DECIDED** | PortOne V2; canonical provider key `portone_v2`; server lookup authority at `api.portone.io`; live merchant/credential/Production activation remains separately gated |
-| `P0-CM-03` | Launch paid Product / Capability catalog | **OPEN-P0** | inactive candidate authority defined: `saju.general_natal.deep.v1`, KRW 9,900, `reading.saju.general_natal.deep.v1`; current Saju production interpretation authority is still BLOCKED, so Product/Offer remain disabled and sale activation is forbidden |
+| `P0-CM-03` | Launch paid Product / Capability catalog | **OPEN-P0** | Commerce v2 first inactive Product authority = `standard.love_relationship`; Reader is selected separately and pinned sparsely per Purchase Intent; price/Offer remain unresolved and disabled; stale `saju.general_natal.deep.v1` candidate is retired |
 | `P0-CM-04` | Guest purchase ownership / continuity | **DECIDED** | active Guest 구매 허용; canonical `subjects.id` 소유; 새 Member promotion은 same-subject; 기존 Member merge 후 direct merged-Guest lineage로 권리 조합; historical Commerce owner rewrite 금지 |
 | `P0-AI-01` | AI provider/model/fallback | **OPEN-P0** | provider, model family, fallback, grounded-response validation implementation |
 | `P0-AGE-01` | Minimum age / character content policy | **OPEN-P0** | 최소 이용 연령, 미성년 허용 여부, 표현 강도/제한; content bundle policy-tag slot은 미리 두되 threshold/matrix는 미확정 |
@@ -213,55 +213,71 @@ rollback_or_change_policy: replacing PortOne V2, adding an equal launch provider
 record: docs/COMMERCE_WEB_PSP_DECISION_V1.md
 ```
 
-### P0-CM-03 — inactive candidate authority / activation HOLD
+### P0-CM-03 — Commerce v2 first Standard Product / activation HOLD
 
 ```yaml
 id: P0-CM-03
 status: OPEN-P0
-candidate_defined_at: 2026-09-18
-candidate:
-  product_key: saju.general_natal.deep.v1
-  consumer_name: 명하 정밀 원국 리포트
+candidate_updated_at: 2026-09-19
+current_candidate:
+  product_key: standard.love_relationship
+  consumer_name: 연애·관계
   product_type: reading
-  reading_scope: general + natal only
-  purchase_type: one_off
-  price:
-    amount_minor: 9900
-    currency: KRW
-    terms_version: krw-9900-v1
+  enabled: false
+  reading_intent:
+    domain: relationship
+    period: natal
+    variant: general
+  reader_selection:
+    mode: required
+    product_reader_separation: true
+    purchase_unit: topic_reader_reading
+    persistence: purchase_intent_reader_selections
   capability:
-    entitlement_key: reading.saju.general_natal.deep.v1
-    scope_mode: global
-    validity_mode: unbounded
-  rail:
-    platform: web
-    provider: portone_v2
+    capability_set_version: v1
+    entitlement_key: reading.standard.love_relationship.unit.v1
+    meaning: one purchased Reader-bound Standard Reading unit
+  price_authority:
+    status: unresolved
+    working_candidate_only: approximately_KRW_8900
+    offer_created: false
+    charge_terms_created: false
+stale_candidate:
+  product_key: saju.general_natal.deep.v1
+  historical_price: KRW_9900
+  disposition: forward_retired
+  historical_migration_rewritten: false
 catalog_activation:
   product_enabled: false
-  offer_enabled: false
+  saleable_offer_exists: false
+  checkout_activation: forbidden
 upstream_gate:
-  evidence: gycha0109-beep/Saju docs/product/22-production-interpretation-authority-audit.md
-  current_state: PRODUCTION INTERPRETATION AUTHORITY = BLOCKED
-  smallest_honest_path: general natal first
-open_before_sale:
-  - real Saju production-authorized general+natal interpretation pack
-  - public production Reading runtime beyond calculation-only P0-SA-01
-  - Product-to-Reading execution binding and entitlement-gated artifact reread
-  - exact Product Capability fulfillment E2E
-  - PortOne TEST/Sandbox checkout E2E
-  - duplicate-purchase prevention for active same-version entitlement
-  - refund/revoke paid-artifact access verification
+  repository: gycha0109-beep/Saju
+  evidence: docs/product/22-production-interpretation-authority-audit.md
+  fresh_state: PRODUCTION_INTERPRETATION_AUTHORITY_BLOCKED
+  public_reading_runtime: BLOCKED
+activation_requires:
+  - production-authorized relationship + natal/general interpretation authority
+  - public Product Reading transport/finalization/grounding admission
+  - atomic Purchase Intent + Reader selection command/runtime
+  - verified payment -> purchase-backed grant -> Reader-bound Reading unit fulfillment
+  - entitlement-gated Reading creation and immutable artifact binding
+  - reread/reference authorization for owned Reading artifacts
+  - exact price/Offer/charge-terms Product Owner decision
+  - PortOne sandbox E2E for the exact enabled Offer
 invariants:
-  - Commerce must not invent or strengthen Saju semantics
-  - free canonical calculation facts remain outside paid entitlement
-  - same-version active entitlement must not require another purchase for regeneration/retry
-  - browser/provider client result is never entitlement authority
-  - disabled candidate catalog is not a saleable SKU
-record: docs/PAID_PRODUCT_CATALOG_V1.md
-tracking: issue #1027
+  - Product is the Topic; Reader is not encoded into Product/Offer SKU identity
+  - all normal eligible Characters may use the same Standard Topic contract
+  - Reader lens must not change Saju source truth
+  - unpaid or PLUS-only access cannot create this paid Reading
+  - existing Reading reference does not authorize another Reader to regenerate it
+  - Commerce must not invent missing Saju claims
+  - historical migrations are never rewritten to erase stale candidates
+record: docs/STANDARD_LOVE_RELATIONSHIP_PRODUCT_V1.md
+tracking: issue #1068
 ```
 
-This record defines the first Product candidate's immutable commercial/capability shape so later Commerce work does not invent it ad hoc. It deliberately does **not** close P0-CM-03: the launch-sale decision remains blocked by upstream Saju interpretation authority and the paid-artifact activation gates above.
+This record supersedes the previous inactive General Natal candidate as the current Product direction. It still deliberately leaves **sale activation, exact price authority, Offer creation, and Product Reading runtime blocked**. Migration `1120_paid_general_natal_product_candidate.sql` remains immutable history; the supersession is forward-only in migration `1130_standard_love_relationship_reader_authority.sql`.
 
 ### P0-CM-04
 
@@ -450,7 +466,7 @@ record: docs/COMMERCE_EVIDENCE_DATA_MINIMIZATION_DECISION_V1.md
 
 `P0-CM-02` exact Web PSP is now **DECIDED: PortOne V2**. This closes provider selection only; live merchant/PG/channel/credential readiness and Production activation remain independent gates.
 
-`P0-CM-03` remains explicitly open for **sale activation**, but the first inactive Product candidate is now pinned by `docs/PAID_PRODUCT_CATALOG_V1.md`: `saju.general_natal.deep.v1`, KRW 9,900, permanent `reading.saju.general_natal.deep.v1` access. The Product and Offer remain disabled while current Saju production interpretation authority is BLOCKED; defining this fail-closed catalog must not be misread as an enabled Production SKU.
+`P0-CM-03` remains explicitly open for **sale activation**. The current Commerce v2 first Product authority is `standard.love_relationship`, with Reader identity selected separately and stored as sparse Purchase Intent provenance. The former `saju.general_natal.deep.v1` / KRW 9,900 candidate is historical and forward-retired. No current saleable Offer or authoritative price exists; the approximately KRW 8,900 figure remains a working candidate only. Current Saju relationship Product Reading authority remains blocked, so Product activation must stay fail-closed.
 
 `P0-CM-04` closes the product/ownership question of whether Guest may purchase. Its historical `does_not_decide` list records the boundary at the time that decision was made; the later `P0-CM-02` record now supplies the PSP decision without rewriting `P0-CM-04` history.
 

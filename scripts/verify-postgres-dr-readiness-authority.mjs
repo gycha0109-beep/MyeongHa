@@ -24,10 +24,34 @@ if (migrationNumbers.length === 0) {
   throw new Error('No numbered SQL migrations found under supabase/migrations');
 }
 const repositoryMigrationFrontier = Math.max(...migrationNumbers);
-if (repositoryMigrationFrontier !== 1120) {
+const productionMigrationMatch = files.readinessStatus.match(
+  /^production_schema_latest_deployed_migration:\s*(\d+)\s*$/m,
+);
+if (!productionMigrationMatch) {
   throw new Error(
-    `PostgreSQL DR freshness evidence covers migration 1120, but repository migration frontier is ${repositoryMigrationFrontier}. ` +
-    'Downgrade backup freshness to stale and capture/restore a new governed production backup before claiming current-schema recovery.',
+    `${paths.readinessStatus} is missing production_schema_latest_deployed_migration authority`,
+  );
+}
+const productionMigrationFrontier = Number(productionMigrationMatch[1]);
+if (!Number.isSafeInteger(productionMigrationFrontier)) {
+  throw new Error('Production migration frontier is not a safe integer');
+}
+if (repositoryMigrationFrontier < productionMigrationFrontier) {
+  throw new Error(
+    `Repository migration frontier ${repositoryMigrationFrontier} is behind deployed production migration ${productionMigrationFrontier}.`,
+  );
+}
+if (repositoryMigrationFrontier > productionMigrationFrontier) {
+  const eventName = process.env.GITHUB_EVENT_NAME ?? 'local';
+  if (eventName !== 'pull_request') {
+    throw new Error(
+      `PostgreSQL DR evidence covers deployed migration ${productionMigrationFrontier}, but repository migration frontier is ${repositoryMigrationFrontier}. ` +
+      'After merge/deployment, capture and restore a new governed production backup before claiming current-production-schema recovery.',
+    );
+  }
+  console.log(
+    `PostgreSQL DR pre-deploy guard: PR candidate migration frontier ${repositoryMigrationFrontier} is ahead of deployed production ${productionMigrationFrontier}; ` +
+    'existing backup/restore evidence remains authoritative only for the deployed production frontier and does not cover the candidate schema.',
   );
 }
 
@@ -184,6 +208,11 @@ for (const staleRuntimeFragment of [
   }
 }
 
+const candidateFrontierNote =
+  repositoryMigrationFrontier > productionMigrationFrontier
+    ? ` Repository candidate migration ${repositoryMigrationFrontier} is pending deployment and is not covered by that recovery evidence.`
+    : '';
+
 console.log(
-  `PostgreSQL DR readiness authority guard PASS: current-schema backup/restore is evidenced through migration ${repositoryMigrationFrontier}, while OPEN retention/privacy and RPO/RTO authority keeps dr_ready=false.`,
+  `PostgreSQL DR readiness authority guard PASS: production backup/restore is evidenced through deployed migration ${productionMigrationFrontier}, while OPEN retention/privacy and RPO/RTO authority keeps dr_ready=false.${candidateFrontierNote}`,
 );

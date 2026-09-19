@@ -6,8 +6,8 @@
   "executionAuthorized": false,
   "graphRef": {
     "schema": "myeongha-transitive-subject-dependency-graph-v1",
-    "edgeCount": 106,
-    "distinctReachableTableCount": 47,
+    "edgeCount": 107,
+    "distinctReachableTableCount": 48,
     "maxDepth": 4
   },
   "tableDispositions": [
@@ -193,6 +193,12 @@
     },
     {
       "table": "profiles",
+      "disposition": "UNDECIDED",
+      "authorityReference": null,
+      "retentionDurationDays": null
+    },
+    {
+      "table": "purchase_intent_reader_selections",
       "disposition": "UNDECIDED",
       "authorityReference": null,
       "retentionDurationDays": null

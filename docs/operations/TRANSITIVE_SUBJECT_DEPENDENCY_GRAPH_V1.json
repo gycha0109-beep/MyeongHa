@@ -5,12 +5,12 @@
   "graphAuthority": "SCHEMA_DISCOVERED_POLICY_NEUTRAL",
   "executionAuthorized": false,
   "discovery": {
-    "edgeCount": 106,
-    "distinctReachableTableCount": 47,
+    "edgeCount": 107,
+    "distinctReachableTableCount": 48,
     "maxDepth": 4,
     "depthCounts": {
       "1": 30,
-      "2": 33,
+      "2": 34,
       "3": 40,
       "4": 3
     },
@@ -808,6 +808,19 @@
       "parentColumns": [
         "id",
         "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 2,
+      "parentTable": "purchase_intents",
+      "childTable": "purchase_intent_reader_selections",
+      "constraintName": "purchase_intent_reader_selections_intent_fk",
+      "childColumns": [
+        "purchase_intent_id"
+      ],
+      "parentColumns": [
+        "id"
       ],
       "disposition": "UNDECIDED"
     },
