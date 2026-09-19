@@ -173,8 +173,7 @@ select pg_temp.assert_unit_true(
       '11603100-0000-0000-0000-000000000001',
       'sha256:v1:1111111111111111111111111111111111111111111111111111111111111111',
       'standard-reading-unit-request-v1',
-      '{"schemaVersion":"standard-reading-unit-request-v1","purchaseIntentId":"11392300-0000-0000-0000-000000000001","sourceBirthProfileId":"11601000-0000-0000-0000-000000000001"}'::jsonb,
-      '11601000-0000-0000-0000-000000000001'
+      '{"schemaVersion":"standard-reading-unit-request-v1","purchaseIntentId":"11392300-0000-0000-0000-000000000001"}'::jsonb
     ) result
   )
 );
@@ -235,8 +234,7 @@ select pg_temp.assert_unit_true(
       '11603100-0000-0000-0000-000000000099',
       'sha256:v1:1111111111111111111111111111111111111111111111111111111111111111',
       'standard-reading-unit-request-v1',
-      '{"schemaVersion":"standard-reading-unit-request-v1","purchaseIntentId":"11392300-0000-0000-0000-000000000001","sourceBirthProfileId":"11601000-0000-0000-0000-000000000001"}'::jsonb,
-      '11601000-0000-0000-0000-000000000001'
+      '{"schemaVersion":"standard-reading-unit-request-v1","purchaseIntentId":"11392300-0000-0000-0000-000000000001"}'::jsonb
     ) result
   )
 );
@@ -262,8 +260,7 @@ select pg_temp.assert_unit_fails(
     '11603100-0000-0000-0000-000000000098',
     'sha256:v1:2222222222222222222222222222222222222222222222222222222222222222',
     'standard-reading-unit-request-v1',
-    '{"schemaVersion":"standard-reading-unit-request-v1","purchaseIntentId":"11392300-0000-0000-0000-000000000001","sourceBirthProfileId":"11601000-0000-0000-0000-000000000099"}'::jsonb,
-    '11601000-0000-0000-0000-000000000099'
+    '{"schemaVersion":"standard-reading-unit-request-v1","purchaseIntentId":"11392300-0000-0000-0000-000000000001"}'::jsonb
   )$$,
   'cmd_standard_reading_unit_binding_conflict'
 );
@@ -277,8 +274,7 @@ select pg_temp.assert_unit_fails(
     '11603100-0000-0000-0000-000000000002',
     'sha256:v1:3333333333333333333333333333333333333333333333333333333333333333',
     'standard-reading-unit-request-v1',
-    '{"schemaVersion":"standard-reading-unit-request-v1","purchaseIntentId":"11392300-0000-0000-0000-000000000002","sourceBirthProfileId":"11601000-0000-0000-0000-000000000001"}'::jsonb,
-    '11601000-0000-0000-0000-000000000001'
+    '{"schemaVersion":"standard-reading-unit-request-v1","purchaseIntentId":"11392300-0000-0000-0000-000000000002"}'::jsonb
   )$$,
   'cmd_standard_reading_unit_entitlement_unavailable'
 );
@@ -291,16 +287,15 @@ select pg_catalog.set_config(
 
 select pg_temp.assert_unit_fails(
   'cross-subject execution context cannot consume another owner purchase unit',
-  $select * from public.cmd_bind_standard_reading_unit_v1(
+  $$select * from public.cmd_bind_standard_reading_unit_v1(
       '11390000-0000-0000-0000-000000000001',
       '11392300-0000-0000-0000-000000000002',
       '11603000-0000-0000-0000-000000000003',
       '11603100-0000-0000-0000-000000000003',
       'sha256:v1:4444444444444444444444444444444444444444444444444444444444444444',
       'standard-reading-unit-request-v1',
-      '{"schemaVersion":"standard-reading-unit-request-v1","purchaseIntentId":"11392300-0000-0000-0000-000000000002","sourceBirthProfileId":"11601000-0000-0000-0000-000000000001"}'::jsonb,
-      '11601000-0000-0000-0000-000000000001'
-    )$,
+      '{"schemaVersion":"standard-reading-unit-request-v1","purchaseIntentId":"11392300-0000-0000-0000-000000000002"}'::jsonb
+    )$$,
   'subject execution context mismatch'
 );
 
@@ -322,22 +317,22 @@ select pg_temp.assert_unit_true(
   'new consumption command remains unactivated for ordinary runtime roles',
   not has_function_privilege(
     'myeongha_api_executor',
-    'public.cmd_bind_standard_reading_unit_v1(uuid,uuid,uuid,uuid,text,text,jsonb,uuid)',
+    'public.cmd_bind_standard_reading_unit_v1(uuid,uuid,uuid,uuid,text,text,jsonb)',
     'EXECUTE'
   )
   and not has_function_privilege(
     'anon',
-    'public.cmd_bind_standard_reading_unit_v1(uuid,uuid,uuid,uuid,text,text,jsonb,uuid)',
+    'public.cmd_bind_standard_reading_unit_v1(uuid,uuid,uuid,uuid,text,text,jsonb)',
     'EXECUTE'
   )
   and not has_function_privilege(
     'authenticated',
-    'public.cmd_bind_standard_reading_unit_v1(uuid,uuid,uuid,uuid,text,text,jsonb,uuid)',
+    'public.cmd_bind_standard_reading_unit_v1(uuid,uuid,uuid,uuid,text,text,jsonb)',
     'EXECUTE'
   )
   and not has_function_privilege(
     'service_role',
-    'public.cmd_bind_standard_reading_unit_v1(uuid,uuid,uuid,uuid,text,text,jsonb,uuid)',
+    'public.cmd_bind_standard_reading_unit_v1(uuid,uuid,uuid,uuid,text,text,jsonb)',
     'EXECUTE'
   )
 );
