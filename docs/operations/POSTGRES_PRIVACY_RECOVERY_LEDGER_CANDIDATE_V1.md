@@ -151,6 +151,49 @@ No plaintext reconciliation manifest or identifier-bearing source file was uploa
 
 The public manifest is identifier-free and records all seven replay-supported event-type counts as zero for this interval. This runtime therefore proves **zero-event candidate transport mechanics**, not non-zero replay survivability and not authoritative recovery semantics.
 
+## Synthetic non-zero transport-to-replay proof
+
+The repository DB drill now exercises the candidate transport with a **non-zero synthetic fixture** before replay:
+
+```text
+4 replay-supported synthetic events
+→ production ledger manifest builder
+→ AES-256-CBC / PBKDF2 / 200000 iterations
+→ ephemeral CI-only 256-bit random passphrase
+→ encrypted manifest
+→ plaintext-identifier absence check on ciphertext
+→ decrypt
+→ byte-for-byte + SHA-256 parity check
+→ existing reconciliation planner
+→ migrated PostgreSQL command replay
+→ second identical replay idempotency check
+→ negative deletion-pending terminal-state fail-close check
+```
+
+The four synthetic events are:
+
+```text
+MEMORY_ITEM_REVOKED
+LIFE_FACT_REVOKED
+DEVICE_INSTALLATION_REVOKED
+ACCOUNT_DELETION_STARTED
+```
+
+This closes a mechanics gap between the previously separate ledger-builder/encryption tests and restored-DB replay tests: a non-zero manifest produced by the production builder must now survive encryption/decryption unchanged and drive the existing DB replay path.
+
+It is **synthetic CI evidence only**. It does not change the production runtime statement above: run `35361080803` observed zero replay-supported events. It also does not prove that a future production non-zero artifact has survived a primary-DB-loss incident.
+
+Authority remains:
+
+```text
+P0-PR-01 = OPEN-P0
+executionAuthorized = false
+authoritative_post_backup_source = false
+authoritative_privacy_reconciliation = false
+future_safe_privacy_reconciliation = false
+dr_ready = false
+```
+
 ## What this does not decide
 
 #1058 does not authorize or define:

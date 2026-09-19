@@ -1,0 +1,309 @@
+{
+  "schema": "myeongha-account-deletion-disposition-input-candidate-v1",
+  "decisionId": "P0-PR-01",
+  "decisionStatus": "OPEN-P0",
+  "policyAuthority": "NOT_APPROVED",
+  "executionAuthorized": false,
+  "graphRef": {
+    "schema": "myeongha-transitive-subject-dependency-graph-v1",
+    "edgeCount": 107,
+    "distinctReachableTableCount": 48,
+    "maxDepth": 4
+  },
+  "tableDispositions": [
+    {
+      "table": "ai_execution_groundings",
+      "disposition": "UNDECIDED",
+      "authorityReference": null,
+      "retentionDurationDays": null
+    },
+    {
+      "table": "ai_execution_logs",
+      "disposition": "UNDECIDED",
+      "authorityReference": null,
+      "retentionDurationDays": null
+    },
+    {
+      "table": "birth_profile_revisions",
+      "disposition": "UNDECIDED",
+      "authorityReference": null,
+      "retentionDurationDays": null
+    },
+    {
+      "table": "birth_profiles",
+      "disposition": "UNDECIDED",
+      "authorityReference": null,
+      "retentionDurationDays": null
+    },
+    {
+      "table": "character_unlocks",
+      "disposition": "UNDECIDED",
+      "authorityReference": null,
+      "retentionDurationDays": null
+    },
+    {
+      "table": "chat_turn_attempts",
+      "disposition": "UNDECIDED",
+      "authorityReference": null,
+      "retentionDurationDays": null
+    },
+    {
+      "table": "chat_turns",
+      "disposition": "UNDECIDED",
+      "authorityReference": null,
+      "retentionDurationDays": null
+    },
+    {
+      "table": "commerce_account_links",
+      "disposition": "UNDECIDED",
+      "authorityReference": null,
+      "retentionDurationDays": null
+    },
+    {
+      "table": "commerce_payment_attempts",
+      "disposition": "UNDECIDED",
+      "authorityReference": null,
+      "retentionDurationDays": null
+    },
+    {
+      "table": "commerce_provider_events",
+      "disposition": "UNDECIDED",
+      "authorityReference": null,
+      "retentionDurationDays": null
+    },
+    {
+      "table": "commerce_receipts",
+      "disposition": "UNDECIDED",
+      "authorityReference": null,
+      "retentionDurationDays": null
+    },
+    {
+      "table": "conversation_messages",
+      "disposition": "UNDECIDED",
+      "authorityReference": null,
+      "retentionDurationDays": null
+    },
+    {
+      "table": "conversation_thread_characters",
+      "disposition": "UNDECIDED",
+      "authorityReference": null,
+      "retentionDurationDays": null
+    },
+    {
+      "table": "conversation_thread_content_transitions",
+      "disposition": "UNDECIDED",
+      "authorityReference": null,
+      "retentionDurationDays": null
+    },
+    {
+      "table": "conversation_threads",
+      "disposition": "UNDECIDED",
+      "authorityReference": null,
+      "retentionDurationDays": null
+    },
+    {
+      "table": "data_deletion_jobs",
+      "disposition": "UNDECIDED",
+      "authorityReference": null,
+      "retentionDurationDays": null
+    },
+    {
+      "table": "device_installations",
+      "disposition": "UNDECIDED",
+      "authorityReference": null,
+      "retentionDurationDays": null
+    },
+    {
+      "table": "entitlement_events",
+      "disposition": "UNDECIDED",
+      "authorityReference": null,
+      "retentionDurationDays": null
+    },
+    {
+      "table": "entitlement_grants",
+      "disposition": "UNDECIDED",
+      "authorityReference": null,
+      "retentionDurationDays": null
+    },
+    {
+      "table": "entitlements",
+      "disposition": "UNDECIDED",
+      "authorityReference": null,
+      "retentionDurationDays": null
+    },
+    {
+      "table": "episode_progress_events",
+      "disposition": "UNDECIDED",
+      "authorityReference": null,
+      "retentionDurationDays": null
+    },
+    {
+      "table": "guest_sessions",
+      "disposition": "UNDECIDED",
+      "authorityReference": null,
+      "retentionDurationDays": null
+    },
+    {
+      "table": "life_facts",
+      "disposition": "UNDECIDED",
+      "authorityReference": null,
+      "retentionDurationDays": null
+    },
+    {
+      "table": "memory_items",
+      "disposition": "UNDECIDED",
+      "authorityReference": null,
+      "retentionDurationDays": null
+    },
+    {
+      "table": "memory_proposals",
+      "disposition": "UNDECIDED",
+      "authorityReference": null,
+      "retentionDurationDays": null
+    },
+    {
+      "table": "notification_deliveries",
+      "disposition": "UNDECIDED",
+      "authorityReference": null,
+      "retentionDurationDays": null
+    },
+    {
+      "table": "notification_delivery_attempts",
+      "disposition": "UNDECIDED",
+      "authorityReference": null,
+      "retentionDurationDays": null
+    },
+    {
+      "table": "notification_preferences",
+      "disposition": "UNDECIDED",
+      "authorityReference": null,
+      "retentionDurationDays": null
+    },
+    {
+      "table": "notification_settings",
+      "disposition": "UNDECIDED",
+      "authorityReference": null,
+      "retentionDurationDays": null
+    },
+    {
+      "table": "notifications",
+      "disposition": "UNDECIDED",
+      "authorityReference": null,
+      "retentionDurationDays": null
+    },
+    {
+      "table": "profiles",
+      "disposition": "UNDECIDED",
+      "authorityReference": null,
+      "retentionDurationDays": null
+    },
+    {
+      "table": "purchase_intent_reader_selections",
+      "disposition": "UNDECIDED",
+      "authorityReference": null,
+      "retentionDurationDays": null
+    },
+    {
+      "table": "purchase_intents",
+      "disposition": "UNDECIDED",
+      "authorityReference": null,
+      "retentionDurationDays": null
+    },
+    {
+      "table": "reading_execution_attempts",
+      "disposition": "UNDECIDED",
+      "authorityReference": null,
+      "retentionDurationDays": null
+    },
+    {
+      "table": "reading_groundings",
+      "disposition": "UNDECIDED",
+      "authorityReference": null,
+      "retentionDurationDays": null
+    },
+    {
+      "table": "reading_refs",
+      "disposition": "UNDECIDED",
+      "authorityReference": null,
+      "retentionDurationDays": null
+    },
+    {
+      "table": "reading_sessions",
+      "disposition": "UNDECIDED",
+      "authorityReference": null,
+      "retentionDurationDays": null
+    },
+    {
+      "table": "readings",
+      "disposition": "UNDECIDED",
+      "authorityReference": null,
+      "retentionDurationDays": null
+    },
+    {
+      "table": "record_access_grants",
+      "disposition": "UNDECIDED",
+      "authorityReference": null,
+      "retentionDurationDays": null
+    },
+    {
+      "table": "relationship_events",
+      "disposition": "UNDECIDED",
+      "authorityReference": null,
+      "retentionDurationDays": null
+    },
+    {
+      "table": "share_artifacts",
+      "disposition": "UNDECIDED",
+      "authorityReference": null,
+      "retentionDurationDays": null
+    },
+    {
+      "table": "subject_merge_actions",
+      "disposition": "UNDECIDED",
+      "authorityReference": null,
+      "retentionDurationDays": null
+    },
+    {
+      "table": "subject_merge_jobs",
+      "disposition": "UNDECIDED",
+      "authorityReference": null,
+      "retentionDurationDays": null
+    },
+    {
+      "table": "subjects",
+      "disposition": "UNDECIDED",
+      "authorityReference": null,
+      "retentionDurationDays": null
+    },
+    {
+      "table": "target_person_profiles",
+      "disposition": "UNDECIDED",
+      "authorityReference": null,
+      "retentionDurationDays": null
+    },
+    {
+      "table": "user_character_states",
+      "disposition": "UNDECIDED",
+      "authorityReference": null,
+      "retentionDurationDays": null
+    },
+    {
+      "table": "user_episode_progress",
+      "disposition": "UNDECIDED",
+      "authorityReference": null,
+      "retentionDurationDays": null
+    },
+    {
+      "table": "world_events",
+      "disposition": "UNDECIDED",
+      "authorityReference": null,
+      "retentionDurationDays": null
+    }
+  ],
+  "edgeConflictResolutions": [],
+  "approvedPolicyVersion": null,
+  "approvedBy": null,
+  "approvedAt": null,
+  "authoritativePrivacyReconciliation": false,
+  "drReady": false
+}
