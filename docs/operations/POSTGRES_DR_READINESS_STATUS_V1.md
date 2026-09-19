@@ -76,7 +76,7 @@ privacy_recovery_ledger_candidate_replay_planner_accepted: true
 privacy_recovery_ledger_candidate_unsupported_delta_guard: PASS_ZERO_UNSUPPORTED
 privacy_recovery_ledger_candidate_artifact_plaintext_identifier_payload_uploaded: false
 privacy_recovery_ledger_candidate_source_authority: CANDIDATE_NON_AUTHORITATIVE
-privacy_reconciliation: BLOCKED_BY_P0_PR_01_AND_ISSUE_964
+privacy_reconciliation: BLOCKED_BY_FINALIZER_AND_AUTHORITATIVE_NONZERO_RECOVERY_PROOF
 rpo_authority: OPEN_DECISION
 rto_authority: OPEN_DECISION
 dr_ready: false
@@ -96,15 +96,15 @@ The encrypted off-primary-DB privacy recovery ledger candidate is also runtime-p
 
 ## Promotion blockers
 
-Current-schema recovery freshness is now evidenced through deployed migration `1120` by backup run `35329018925` and restore run `35331742188`. This removes the schema-freshness blocker only; it does not resolve the independent privacy/legal-retention, provider-service, or RPO/RTO gates.
+Current-schema recovery freshness is evidenced through deployed migration `1120` by backup run `35329018925` and restore run `35331742188`. `P0-PR-01` is now DECIDED as of 2026-09-19, so privacy/legal-retention policy is no longer the blocker. DR remains blocked by the not-yet-implemented destructive finalizer, lack of authoritative non-zero recovered-state reconciliation, provider-service gaps, and OPEN RPO/RTO authority.
 
 Canonical authority remains unresolved in the existing source documents:
 
 - `docs/architecture/PRODUCTION_OPERATIONS_ARCHITECTURE_V1.md`: `RPO = OPEN DECISION`, `RTO = OPEN DECISION`, and no DR Ready claim before approved objectives plus achieved evidence.
-- `docs/P0_DECISION_REGISTER.md`: parent `P0-PR-01` retention / backup / legal-retention authority remains `OPEN-P0`.
+- `docs/P0_DECISION_REGISTER.md`: parent `P0-PR-01` is `DECIDED`; its approved 35 DELETE / 4 ANONYMIZE / 8 RETAIN(P5Y) baseline and P30D backup handling are recorded.
 - `docs/AUTH_RLS_PRIVACY_SPEC.md`: account deletion must keep personalization erase separate from legally retained commerce data, but the legal/accounting/backup retention duration and final Commerce tombstone/pseudonymization/destructive schedule remain under `P0-PR-01`.
 - `docs/SOURCE_AUTHORITY_GAPS.md`: `SRC-06` remains blocking before the final standalone Birth/Target deletion DDL baseline.
-- GitHub issue `#964`: account-deletion finalization and legal-retention authority remains the explicit policy blocker for future-safe recovery reconciliation.
+- GitHub issue `#964`: product-owner policy authority is resolved; implementation/closure now depends on the approved finalizer contract being realized and verified.
 
 Therefore restore success must remain classified as mechanics evidence only:
 
@@ -120,7 +120,7 @@ restored-DB synthetic replay runtime= proven — run 35331742188
 current-backup privacy delta audit = successful count-only observation — run 35353128407; seven checked surfaces all zero
 count-only audit workflow          = runtime-proven — run 35353128407
 off-DB privacy ledger candidate    = runtime-proven transport — run 35361080803; observed event count 0; non-authoritative
-future-safe privacy reconciliation = blocked
+future-safe privacy reconciliation = blocked pending finalizer + authoritative non-zero recovery proof
 approved RPO                       = no
 approved RTO                       = no
 DR Ready                           = false
@@ -132,8 +132,8 @@ Do not flip `dr_ready` to true merely because another restore succeeds or becaus
 
 Promotion requires all of the following authority changes to be reviewed together:
 
-1. `P0-PR-01` resolves the deletion/legal-retention/backup-retention authority needed by recovery reconciliation.
-2. The applicable deletion/revocation reconciliation procedure is exercised against an isolated recovered state with non-zero or intentionally constructed authoritative deltas.
+1. The approved `P0-PR-01` finalization policy is implemented as an idempotent, FK-safe destructive finalizer and hosted Auth cleanup path.
+2. The applicable deletion/revocation/finalization reconciliation procedure is exercised against an isolated recovered state with non-zero or intentionally constructed authoritative deltas.
 3. Numeric RPO and RTO objectives are explicitly approved by the owning product/business authority.
 4. Achieved evidence is compared against those approved objectives.
 5. The #389 closure contract is updated with the exact evidence and only then may DR readiness be reconsidered.
@@ -158,8 +158,8 @@ revocation replay plan mechanics   = implemented
 restored-DB synthetic replay path  = runtime-proven — latest run 35331742188
 off-DB candidate transport mechanics = runtime-proven — run 35361080803 / event count 0 / non-authoritative
 durable post-backup source authority = not proven
-destructive account finalization   = blocked by P0-PR-01 / #964
-commerce legal retention           = blocked by P0-PR-01 / #964
+destructive account finalization   = policy decided / runtime not yet implemented
+commerce legal retention           = decided — approved 8-table P5Y baseline
 authoritative privacy reconciliation= not yet executed against restored DB
 DR Ready                           = false
 ```
