@@ -4,14 +4,20 @@ on:
   pull_request:
     paths:
       - 'supabase/migrations/**'
-      - 'test/db/**'
+      - 'test/db/bootstrap_supabase_auth_stub.sql'
+      - 'test/db/guest_bootstrap_runtime_authority.sh'
+      - 'test/db/guest_bootstrap_current_query.sh'
+      - 'test/db/catalog_snapshot.sh'
       - '.github/workflows/db-guest-bootstrap-runtime.yml'
   push:
     branches:
       - main
     paths:
       - 'supabase/migrations/**'
-      - 'test/db/**'
+      - 'test/db/bootstrap_supabase_auth_stub.sql'
+      - 'test/db/guest_bootstrap_runtime_authority.sh'
+      - 'test/db/guest_bootstrap_current_query.sh'
+      - 'test/db/catalog_snapshot.sh'
       - '.github/workflows/db-guest-bootstrap-runtime.yml'
 
 permissions:

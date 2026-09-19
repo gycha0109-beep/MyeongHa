@@ -4,14 +4,16 @@ on:
   pull_request:
     paths:
       - 'supabase/migrations/**'
-      - 'test/db/**'
+      - 'test/db/bootstrap_supabase_auth_stub.sql'
+      - 'test/db/reading_history_authority_query.sql'
       - '.github/workflows/db-reading-history.yml'
   push:
     branches:
       - main
     paths:
       - 'supabase/migrations/**'
-      - 'test/db/**'
+      - 'test/db/bootstrap_supabase_auth_stub.sql'
+      - 'test/db/reading_history_authority_query.sql'
       - '.github/workflows/db-reading-history.yml'
 
 permissions:

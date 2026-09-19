@@ -4,14 +4,18 @@ on:
   pull_request:
     paths:
       - 'supabase/migrations/**'
-      - 'test/db/**'
+      - 'test/db/bootstrap_supabase_auth_stub.sql'
+      - 'test/db/outbox_success_completion_concurrency.sh'
+      - 'test/db/catalog_snapshot.sh'
       - '.github/workflows/db-outbox-success-completion.yml'
   push:
     branches:
       - main
     paths:
       - 'supabase/migrations/**'
-      - 'test/db/**'
+      - 'test/db/bootstrap_supabase_auth_stub.sql'
+      - 'test/db/outbox_success_completion_concurrency.sh'
+      - 'test/db/catalog_snapshot.sh'
       - '.github/workflows/db-outbox-success-completion.yml'
 
 permissions:

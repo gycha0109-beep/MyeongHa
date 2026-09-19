@@ -4,14 +4,30 @@ on:
   pull_request:
     paths:
       - 'supabase/migrations/**'
-      - 'test/db/**'
+      - 'test/db/bootstrap_supabase_auth_stub.sql'
+      - 'test/db/entitlement_projection_recompute.sql'
+      - 'test/db/entitlement_effect_apply_v1.sql'
+      - 'test/db/verified_receipt_capability_fulfillment_batch_v1.sql'
+      - 'test/db/verified_receipt_capability_fulfillment_batch_hardening.sql'
+      - 'test/db/commerce_entitlement_mutation_surface.sql'
+      - 'test/db/commerce_payment_source_authority.sql'
+      - 'test/db/commerce_trigger_security_hardening.sql'
+      - 'test/db/entitlement_projection_recompute_concurrency.sh'
       - '.github/workflows/db-commerce-entitlement-projection-recompute.yml'
   push:
     branches:
       - main
     paths:
       - 'supabase/migrations/**'
-      - 'test/db/**'
+      - 'test/db/bootstrap_supabase_auth_stub.sql'
+      - 'test/db/entitlement_projection_recompute.sql'
+      - 'test/db/entitlement_effect_apply_v1.sql'
+      - 'test/db/verified_receipt_capability_fulfillment_batch_v1.sql'
+      - 'test/db/verified_receipt_capability_fulfillment_batch_hardening.sql'
+      - 'test/db/commerce_entitlement_mutation_surface.sql'
+      - 'test/db/commerce_payment_source_authority.sql'
+      - 'test/db/commerce_trigger_security_hardening.sql'
+      - 'test/db/entitlement_projection_recompute_concurrency.sh'
       - '.github/workflows/db-commerce-entitlement-projection-recompute.yml'
 
 permissions:

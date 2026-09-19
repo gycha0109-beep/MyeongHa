@@ -4,14 +4,18 @@ on:
   pull_request:
     paths:
       - 'supabase/migrations/**'
-      - 'test/db/**'
+      - 'test/db/bootstrap_supabase_auth_stub.sql'
+      - 'test/db/episode_progress_bundle_query.sh'
+      - 'test/db/catalog_snapshot.sh'
       - '.github/workflows/db-episode-progress-bundle.yml'
   push:
     branches:
       - main
     paths:
       - 'supabase/migrations/**'
-      - 'test/db/**'
+      - 'test/db/bootstrap_supabase_auth_stub.sql'
+      - 'test/db/episode_progress_bundle_query.sh'
+      - 'test/db/catalog_snapshot.sh'
       - '.github/workflows/db-episode-progress-bundle.yml'
 
 permissions:

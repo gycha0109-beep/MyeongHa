@@ -4,14 +4,16 @@ on:
   pull_request:
     paths:
       - 'supabase/migrations/**'
-      - 'test/db/**'
+      - 'test/db/bootstrap_supabase_auth_stub.sql'
+      - 'test/db/self_birth_profile_current_query.sh'
       - '.github/workflows/db-self-birth-profile-current.yml'
   push:
     branches:
       - main
     paths:
       - 'supabase/migrations/**'
-      - 'test/db/**'
+      - 'test/db/bootstrap_supabase_auth_stub.sql'
+      - 'test/db/self_birth_profile_current_query.sh'
       - '.github/workflows/db-self-birth-profile-current.yml'
 
 permissions:
