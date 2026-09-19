@@ -17,7 +17,6 @@ const SUBJECT_ID = 'd1089100-0000-0000-0000-000000000001';
 const PURCHASE_INTENT_ID = 'd1089100-0000-0000-0000-000000000002';
 const SESSION_ID = 'd1089100-0000-0000-0000-000000000003';
 const READING_ID = 'd1089100-0000-0000-0000-000000000004';
-const SOURCE_PROFILE_ID = 'd1089100-0000-0000-0000-000000000005';
 const SOURCE_REVISION_ID = 'd1089100-0000-0000-0000-000000000006';
 const GRANT_ID = 'd1089100-0000-0000-0000-000000000007';
 const PRODUCT_ID = '11300000-0000-0000-0000-000000000001';
@@ -28,7 +27,6 @@ type AuthorityInput = Parameters<StandardReadingUnitBindAuthorityPortV1['bindUni
 const SNAPSHOT = Object.freeze({
   schemaVersion: STANDARD_READING_UNIT_REQUEST_CONTRACT_VERSION_V1,
   purchaseIntentId: PURCHASE_INTENT_ID,
-  sourceBirthProfileId: SOURCE_PROFILE_ID,
 });
 
 const INPUT: AuthorityInput = Object.freeze({
@@ -39,7 +37,6 @@ const INPUT: AuthorityInput = Object.freeze({
   requestHash: 'sha256:v1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
   requestContractVersion: STANDARD_READING_UNIT_REQUEST_CONTRACT_VERSION_V1,
   requestSnapshotJsonb: SNAPSHOT,
-  sourceBirthProfileId: SOURCE_PROFILE_ID,
 });
 
 class FakeClient implements PostgresTransactionQueryV1 {
@@ -71,7 +68,7 @@ class FakeClient implements PostgresTransactionQueryV1 {
 }
 
 describe('PostgreSQL Standard Reading unit bind v1 adapter', () => {
-  it('binds the exact 8-parameter fail-closed DB command', async () => {
+  it('binds the exact 7-parameter fail-closed DB command', async () => {
     const client = new FakeClient();
     const port = createPostgresStandardReadingUnitBindAuthorityPortV1(client);
     const rows = await port.bindUnit(INPUT);
@@ -91,7 +88,6 @@ describe('PostgreSQL Standard Reading unit bind v1 adapter', () => {
       INPUT.requestHash,
       STANDARD_READING_UNIT_REQUEST_CONTRACT_VERSION_V1,
       JSON.stringify(SNAPSHOT),
-      SOURCE_PROFILE_ID,
     ]);
     expect(rows).toEqual([{
       purchaseIntentId: PURCHASE_INTENT_ID,
