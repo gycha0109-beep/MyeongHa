@@ -234,7 +234,7 @@ if [[ "$delete_cycle_count" != "19" ]]; then
   echo "FAIL expected 19 DELETE-subgraph cycle edges, found $delete_cycle_count" >&2
   exit 1
 fi
-if [[ "$detach_shape_count" != "1" ]] || ! grep -q '^DETACH_SHAPE|subject_merge_jobs|guest_session_id|NOT_NULL|' "$catalog_file"; then
+if [[ "$detach_shape_count" != "1" ]] || ! grep -q '^DETACH_SHAPE|subject_merge_jobs|guest_session_id|NULLABLE|' "$catalog_file"; then
   echo "FAIL guest-session detach shape drifted" >&2
   exit 1
 fi
