@@ -35,7 +35,7 @@ export function ReadingDetailPage() {
 
           <div className="reader-dialogue" aria-label="함께 읽는 사람의 말">
             <span className="reader-dialogue-mark" aria-hidden="true">明</span>
-            <p data-reader-step-line>검증된 Reading이 준비되면 이 자리에서 함께 읽겠습니다.</p>
+            <p data-reader-step-line>사주 읽기의 핵심부터 차례대로 짚겠습니다.</p>
           </div>
         </div>
 
@@ -74,8 +74,8 @@ export function ReadingDetailPage() {
               <span className="reading-block-icon" aria-hidden="true">✿</span>
               <div>
                 <h2><span data-reader-name>백헌</span>의 한 마디</h2>
-                <p>캐릭터는 검증된 Reading의 표현과 후속 질문만 담당합니다.</p>
-                <span className="reading-authority-note">사주 의미는 검증된 Reading을 따르며, 캐릭터가 새로운 해석을 만들지 않습니다.</span>
+                <p data-reader-comment>이 해석에서 실제로 확인해 볼 지점을 함께 짚겠습니다.</p>
+                <span className="reading-authority-note" data-reading-authority-note>Preview · 현재 검증 중인 원국 해석입니다.</span>
               </div>
             </section>
           </div>
