@@ -254,7 +254,7 @@ export function createSupabaseAuthAdminUserDeletionAdapterV1(
   const fetchImpl = config.fetchImpl ?? defaultFetch;
 
   return Object.freeze({
-    async deleteUser(input): Promise<SupabaseAuthAdminUserDeletionResultV1> {
+    async deleteUser(input: { readonly authUserId: string }): Promise<SupabaseAuthAdminUserDeletionResultV1> {
       const authUserId = requireAuthUserId(input.authUserId);
       const response = await deleteWithTimeout({
         url: `${supabaseOrigin}/auth/v1/admin/users/${encodeURIComponent(authUserId)}`,
