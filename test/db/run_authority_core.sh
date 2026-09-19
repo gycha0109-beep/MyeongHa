@@ -23,6 +23,8 @@ run_isolated_case() {
   )
 }
 
+bash test/db/verify_no_schema_cardinality_hardcoding.sh
+
 psql -v ON_ERROR_STOP=1 -f test/db/authority_core_negative.sql
 psql -1 -v ON_ERROR_STOP=1 -f test/db/record_world_negative.sql
 psql -1 -v ON_ERROR_STOP=1 -f test/db/reading_ops_negative.sql
