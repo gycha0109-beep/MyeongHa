@@ -257,7 +257,6 @@ BEGIN
     SELECT r.rolname
     FROM pg_catalog.pg_roles r
     WHERE r.rolname IN (
-      'public',
       'anon',
       'authenticated',
       'service_role',
