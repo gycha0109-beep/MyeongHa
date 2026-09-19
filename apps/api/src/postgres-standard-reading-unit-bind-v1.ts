@@ -121,6 +121,7 @@ function mapPostgresError(error: unknown): never {
       return fail('ENTITLEMENT_UNAVAILABLE', 'Purchase-backed active entitlement Grant is unavailable.');
     case 'cmd_standard_reading_unit_entitlement_ambiguous':
       return fail('ENTITLEMENT_AMBIGUOUS', 'Purchase-backed entitlement Grant is ambiguous.');
+    case 'cmd_standard_reading_unit_source_profile_unavailable':
     case 'cmd_reading_create_source_profile_not_found':
       return fail('SOURCE_PROFILE_NOT_FOUND', 'Source Birth Profile was not found.');
     case 'cmd_reading_create_source_profile_not_ready':
