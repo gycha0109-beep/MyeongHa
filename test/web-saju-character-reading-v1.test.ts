@@ -28,7 +28,7 @@ describe('MyeongHa character-led Saju Reading v1', () => {
     expect(html).not.toContain('DEMO');
   });
 
-  it('keeps Reading authority ahead of character expression in the dormant result scaffold', async () => {
+  it('keeps grounded Reading content ahead of character expression without leaking internal authority copy', async () => {
     const html = await readReadingMarkup();
 
     const flow = html.indexOf('data-reading-step-title');
@@ -38,8 +38,10 @@ describe('MyeongHa character-led Saju Reading v1', () => {
     expect(flow).toBeGreaterThan(-1);
     expect(structure).toBeGreaterThan(flow);
     expect(character).toBeGreaterThan(structure);
-    expect(html).toContain('사주 의미는 검증된 Reading을 따르며, 캐릭터가 새로운 해석을 만들지 않습니다.');
-    expect(html).toContain('확정된 구조적 근거와 적용 범위만 표시합니다.');
+    expect(html).toContain('data-reader-comment');
+    expect(html).toContain('data-reading-authority-note');
+    expect(html).not.toContain('캐릭터는 검증된 Reading의 표현과 후속 질문만 담당합니다.');
+    expect(html).not.toContain('사주 의미는 검증된 Reading을 따르며, 캐릭터가 새로운 해석을 만들지 않습니다.');
   });
 
   it('supports the fixed nine-character roster without coupling layout geometry to one reader', async () => {
@@ -88,20 +90,35 @@ describe('MyeongHa character-led Saju Reading v1', () => {
     expect(html).toContain('내 명식 보기');
     expect(runtime).toContain("? (previewEligible ? 'preview_loading' : 'blocked_by_authority')");
     expect(runtime).toContain("const SAJU_PREVIEW_READING_ENDPOINT = '/api/me/saju/preview-reading';");
-    expect(runtime).toContain('activatePreviewReading(steps);');
+    expect(runtime).toContain('activatePreviewReading(preview);');
+    expect(runtime).toContain("const PREVIEW_NOTICE_SECTION_TITLE = '프리뷰 안내';");
+    expect(runtime).toContain("const STRUCTURE_PREFIX = '근거 구조:';");
+    expect(runtime).toContain("'이 해석의 사주 근거'");
+    expect(runtime).toContain('readerCommentForStep(step)');
+    expect(runtime).not.toContain('const lead = firstSentence(step.primary)');
+    expect(runtime).not.toContain('function firstSentence(text)');
     expect(runtime).toContain('if (stage) stage.hidden = true;');
     expect(runtime).not.toContain('const readingSteps =');
     expect(runtime).not.toContain('window.location.href = `chat.html?character=');
   });
 
-  it('treats birth chart content as server-backed placeholder data rather than invented client claims', async () => {
-    const html = await readReadingMarkup();
+  it('renders the admitted calculation summary instead of shipping a fake chart placeholder', async () => {
+    const [html, runtime] = await Promise.all([
+      readReadingMarkup(),
+      readFile(readingRuntimePath, 'utf8'),
+    ]);
 
-    expect(html).toContain('서버에서 확인된 Birth Profile revision과 Saju Engine 계산 결과만');
-    expect(html).toContain('年柱');
-    expect(html).toContain('月柱');
-    expect(html).toContain('日柱');
-    expect(html).toContain('時柱');
+    expect(html).toContain('data-chart-pillar-year');
+    expect(html).toContain('data-chart-pillar-month');
+    expect(html).toContain('data-chart-pillar-day');
+    expect(html).toContain('data-chart-pillar-hour');
+    expect(html).toContain('data-chart-five-elements');
+    expect(html).toContain('data-chart-ten-gods');
+    expect(html).not.toContain('年柱');
+    expect(html).not.toContain('실제 서비스에서는');
+    expect(runtime).toContain('reading.calculationSummary');
+    expect(runtime).toContain('renderCalculationSummary(preview.calculationSummary)');
+    expect(runtime).toContain('displayFactValue(fact)');
   });
 
   it('provides desktop immersion and a mobile stacked reading adaptation', async () => {
