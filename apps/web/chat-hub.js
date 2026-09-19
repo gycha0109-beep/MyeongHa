@@ -65,15 +65,15 @@ const people = Object.freeze([
 ]);
 
 const portraitArt = Object.freeze({
-  seyeon: Object.freeze({ src: 'assets/characters/seyeon-portrait.webp', position: '54% 24%', scale: 2.05, origin: '54% 24%' }),
-  baekheon: Object.freeze({ src: 'assets/characters/baekheon-portrait.webp', position: '52% 22%', scale: 2.05, origin: '52% 22%' }),
-  yeoul: Object.freeze({ src: 'assets/characters/yeoul-portrait.webp', position: '52% 24%', scale: 2.10, origin: '52% 24%' }),
-  seorin: Object.freeze({ src: 'assets/characters/seorin-portrait.webp', position: '52% 22%', scale: 2.05, origin: '52% 22%' }),
-  rahyeon: Object.freeze({ src: 'assets/characters/rahyeon-portrait.webp', position: '56% 24%', scale: 2.00, origin: '56% 24%' }),
-  mira: Object.freeze({ src: 'assets/characters/mira-portrait.webp', position: '67% 26%', scale: 2.00, origin: '67% 26%' }),
-  taegyeom: Object.freeze({ src: 'assets/characters/taegyeom-portrait.webp', position: '51% 21%', scale: 2.15, origin: '51% 21%' }),
-  yunho: Object.freeze({ src: 'assets/characters/yunho-portrait.webp', position: '51% 22%', scale: 2.00, origin: '51% 22%' }),
-  doyoon: Object.freeze({ src: 'assets/characters/doyoon-portrait.webp', position: '50% 20%', scale: 2.00, origin: '50% 20%' }),
+  seyeon: Object.freeze({ src: 'assets/characters/seyeon-portrait.webp' }),
+  baekheon: Object.freeze({ src: 'assets/characters/baekheon-portrait.webp' }),
+  yeoul: Object.freeze({ src: 'assets/characters/yeoul-portrait.webp' }),
+  seorin: Object.freeze({ src: 'assets/characters/seorin-portrait.webp' }),
+  rahyeon: Object.freeze({ src: 'assets/characters/rahyeon-portrait.webp' }),
+  mira: Object.freeze({ src: 'assets/characters/mira-portrait.webp' }),
+  taegyeom: Object.freeze({ src: 'assets/characters/taegyeom-portrait.webp' }),
+  yunho: Object.freeze({ src: 'assets/characters/yunho-portrait.webp' }),
+  doyoon: Object.freeze({ src: 'assets/characters/doyoon-portrait.webp' }),
 });
 
 const peopleGrid = document.querySelector('[data-people-grid]');
@@ -144,9 +144,6 @@ function createPersonCard(person) {
     image.decoding = 'async';
     image.loading = 'lazy';
     image.draggable = false;
-    image.style.setProperty('--portrait-position', portrait.position);
-    image.style.setProperty('--portrait-scale', String(portrait.scale));
-    image.style.setProperty('--portrait-origin', portrait.origin);
     art.append(image);
   }
 
