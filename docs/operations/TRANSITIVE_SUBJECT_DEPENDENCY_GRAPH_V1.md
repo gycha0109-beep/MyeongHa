@@ -38,13 +38,13 @@ The initial #1066 discovery run intentionally used an empty inventory and emitte
 ## Current graph
 
 ```text
-reachable FK edges         = 107
-distinct reachable tables  = 48
+reachable FK edges         = 113
+distinct reachable tables  = 49
 maximum minimum depth      = 4
 
 depth 1 = 30
-depth 2 = 34
-depth 3 = 40
+depth 2 = 38
+depth 3 = 42
 depth 4 = 3
 ```
 
@@ -78,7 +78,7 @@ The guard reconstructs the same recursive graph against the fully migrated CI da
 It also requires:
 
 ```text
-edge count       = 107
+edge count       = 113
 depth-1 count    = 30
 max depth        = 4
 recursion bound  = 20 (must never be reached)
