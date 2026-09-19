@@ -375,7 +375,37 @@ begin
   end if;
 
   select eg.id
-    into strict v_entitlement_grant_id
+    into v_entitlement_grant_id
+  from public.entitlement_grants eg
+  join public.commerce_receipts cr
+    on cr.id = eg.source_receipt_id
+   and cr.subject_id = eg.subject_id
+  where eg.subject_id = p_subject_id
+    and eg.entitlement_key = v_entitlement_key
+    and eg.scope_key_norm = v_scope_key_norm
+    and eg.grant_source_type = 'purchase'
+    and eg.status = 'active'
+    and eg.valid_from <= v_now
+    and (eg.valid_until is null or v_now < eg.valid_until)
+    and cr.purchase_intent_id = p_purchase_intent_id
+    and cr.product_offer_id = v_product_offer_id
+    and cr.verification_status = 'verified'
+    and cr.environment = 'production'
+  order by eg.id
+  limit 1
+  for update of eg;
+
+  if not found then
+    raise exception using
+      errcode = 'P0001',
+      constraint = 'cmd_standard_reading_unit_entitlement_unavailable',
+      message = 'purchase-backed Entitlement Grant became unavailable before Standard Reading unit binding';
+  end if;
+
+  -- Re-read the qualifying set after acquiring the selected Grant row lock. A concurrent
+  -- revoke/update that won before this lock is therefore observed before Reading creation.
+  select count(*)::integer
+    into v_grant_count
   from public.entitlement_grants eg
   join public.commerce_receipts cr
     on cr.id = eg.source_receipt_id
@@ -391,6 +421,20 @@ begin
     and cr.product_offer_id = v_product_offer_id
     and cr.verification_status = 'verified'
     and cr.environment = 'production';
+
+  if v_grant_count = 0 then
+    raise exception using
+      errcode = 'P0001',
+      constraint = 'cmd_standard_reading_unit_entitlement_unavailable',
+      message = 'purchase-backed Entitlement Grant became unavailable before Standard Reading unit binding';
+  end if;
+
+  if v_grant_count <> 1 then
+    raise exception using
+      errcode = 'P0001',
+      constraint = 'cmd_standard_reading_unit_entitlement_ambiguous',
+      message = 'Standard Reading purchase resolves to multiple active purchase-backed Entitlement Grants';
+  end if;
 
   select *
     into strict v_core
