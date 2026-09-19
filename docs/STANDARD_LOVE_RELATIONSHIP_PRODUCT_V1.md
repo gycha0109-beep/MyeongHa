@@ -2,7 +2,7 @@
 
 > Repository: `gycha0109-beep/MyeongHa`  
 > Tracking: #1068  
-> Status: **PRODUCT AUTHORITY DEFINED / PRICE UNRESOLVED / NOT SALEABLE / SAJU HOLD**  
+> Status: **PRODUCT AUTHORITY DEFINED / LIST PRICE DECIDED / NOT SALEABLE / SAJU HOLD**  
 > Product key: `standard.love_relationship`  
 > Topic: **연애·관계**  
 > Reader: **구매/생성 시 선택한 Character**  
@@ -130,7 +130,7 @@ It must match:
 
 The ordinary API executor has no direct insert/update/delete authority on this table.
 
-User-specific unlock/access checks for globally `unlockable` Characters remain a future server-command/runtime responsibility; the persistence table does not infer them from client input.
+User-specific unlock/access checks for globally `unlockable` Characters are resolved at runtime only from the already-stored current Character Unlock projection. The application resolver checks that projection before purchase, and migration 1150 adds a DB constraint trigger so future v4 command activation cannot bypass the same stored-unlock requirement. Neither layer evaluates or mutates unlock conditions, and the persistence table does not infer them from client input.
 
 ## 5. Capability meaning
 
@@ -177,15 +177,16 @@ This preserves repeated purchases for different Readers without creating per-Rea
 
 ## 6. Price / Offer state
 
-Current Product pricing figures are working candidates only.
+Product Owner decision on 2026-09-19 fixes the Standard Reading list price:
 
 ```text
-Standard Reading ≈ KRW 8,900
+Standard Reading list price = KRW 8,900
+currency                    = KRW
 ```
 
-is **not** current charge authority.
+This is **Product price authority**, not yet sale/charge authority. It does not by itself create an Offer, immutable Charge Terms, checkout eligibility, or payment authority.
 
-Therefore migration 1130 intentionally creates:
+Therefore migration 1130 remains unchanged and intentionally creates:
 
 ```text
 Product          = yes, disabled
@@ -198,7 +199,7 @@ Payment          = no
 Entitlement      = no
 ```
 
-A future price decision must create a new immutable Offer/Charge Terms authority without rewriting this history.
+A future sale-activation slice must materialize the decided KRW 8,900 price into a new immutable Offer/Charge Terms authority without rewriting migration 1130. Until that separate authority exists, clients and payment code must not treat KRW 8,900 as executable charge terms.
 
 ## 7. Historical candidate supersession
 
@@ -261,13 +262,13 @@ Before sale activation:
 
 1. Saju production-authorized `relationship + natal/general` interpretation authority.
 2. Public Product Reading execution/finalization/grounding path.
-3. Application runtime adapter + user-specific Reader eligibility/access resolution over the existing fail-closed `cmd_create_standard_reading_purchase_intent_v4` atomic DB authority.
+3. Application runtime adapter + user-specific Reader eligibility/access resolution over the existing fail-closed `cmd_create_standard_reading_purchase_intent_v4` atomic DB authority. **Application contract/resolver and production Reader read data-source are implemented fail-closed in #1075; v4 purchase-command EXECUTE grant and public route remain HOLD.**
 4. Verified Payment → purchase-backed Grant fulfillment for the exact Capability Set.
 5. Reader-bound unit → Reading artifact binding with retry-safe generation.
 6. Owner-scoped immutable artifact reread.
 7. Existing Reading reference path for Character chat without granting a new Reading.
 8. Different Reader full re-analysis requiring a new Reader-bound purchase unit.
-9. Exact Product price/Offer/charge-term decision.
+9. Offer/charge-term materialization for the decided KRW 8,900 Product price.
 10. PortOne Sandbox E2E and refund/revoke behavior tests.
 
 ## 10. Hard invariants
@@ -291,8 +292,12 @@ Character private memory != global memory
 CURRENT_FIRST_STANDARD_PRODUCT = standard.love_relationship
 PRODUCT_READER_SEPARATION      = DEFINED
 SPARSE_READER_SELECTION_SCHEMA = DEFINED
-PRICE_AUTHORITY                = UNRESOLVED
+LIST_PRICE_KRW                 = 8900
+PRICE_AUTHORITY                = DECIDED_PRODUCT_OWNER
 SALEABLE_OFFER                 = NO
 SAJU_RELATIONSHIP_AUTHORITY    = BLOCKED
+READER_PURCHASE_APP_ADAPTER   = IMPLEMENTED_FAIL_CLOSED
+READER_PRODUCTION_DATA_SOURCE = IMPLEMENTED_FAIL_CLOSED
+PUBLIC_PURCHASE_ROUTE          = NO
 PRODUCTION_ACTIVATION          = HOLD
 ```

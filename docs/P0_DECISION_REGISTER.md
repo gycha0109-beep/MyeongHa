@@ -19,7 +19,7 @@
 | `P0-SA-01` | Saju transport | **DECIDED** | authenticated internal HTTP service; calculation-only V1; no `/api/readings` activation |
 | `P0-CM-01` | Commerce launch rail | **DECIDED** | Web + one-off only for launch MVP; no subscription/bundle/native-store billing |
 | `P0-CM-02` | Web payment provider / PSP | **DECIDED** | PortOne V2; canonical provider key `portone_v2`; server lookup authority at `api.portone.io`; live merchant/credential/Production activation remains separately gated |
-| `P0-CM-03` | Launch paid Product / Capability catalog | **OPEN-P0** | Commerce v2 first inactive Product authority = `standard.love_relationship`; Reader is selected separately and pinned sparsely per Purchase Intent; price/Offer remain unresolved and disabled; stale `saju.general_natal.deep.v1` candidate is retired |
+| `P0-CM-03` | Launch paid Product / Capability catalog | **OPEN-P0** | Commerce v2 first inactive Product authority = `standard.love_relationship`; Reader is selected separately and pinned sparsely per Purchase Intent; Product Owner list price = KRW 8,900; Offer/Charge Terms and sale activation remain unresolved/disabled; stale `saju.general_natal.deep.v1` candidate is retired |
 | `P0-CM-04` | Guest purchase ownership / continuity | **DECIDED** | active Guest 구매 허용; canonical `subjects.id` 소유; 새 Member promotion은 same-subject; 기존 Member merge 후 direct merged-Guest lineage로 권리 조합; historical Commerce owner rewrite 금지 |
 | `P0-AI-01` | AI provider/model/fallback | **OPEN-P0** | provider, model family, fallback, grounded-response validation implementation |
 | `P0-AGE-01` | Minimum age / character content policy | **OPEN-P0** | 최소 이용 연령, 미성년 허용 여부, 표현 강도/제한; content bundle policy-tag slot은 미리 두되 threshold/matrix는 미확정 |
@@ -238,10 +238,13 @@ current_candidate:
     entitlement_key: reading.standard.love_relationship.unit.v1
     meaning: one purchased Reader-bound Standard Reading unit
   price_authority:
-    status: unresolved
-    working_candidate_only: approximately_KRW_8900
+    status: decided_product_owner
+    decided_at: 2026-09-19
+    currency: KRW
+    list_price_minor: 8900
     offer_created: false
     charge_terms_created: false
+    executable_charge_authority: false
 stale_candidate:
   product_key: saju.general_natal.deep.v1
   historical_price: KRW_9900
@@ -263,7 +266,7 @@ activation_requires:
   - verified payment -> purchase-backed grant -> Reader-bound Reading unit fulfillment
   - entitlement-gated Reading creation and immutable artifact binding
   - reread/reference authorization for owned Reading artifacts
-  - exact price/Offer/charge-terms Product Owner decision
+  - Offer/charge-terms materialization for the decided KRW 8,900 Product price
   - PortOne sandbox E2E for the exact enabled Offer
 invariants:
   - Product is the Topic; Reader is not encoded into Product/Offer SKU identity
@@ -526,7 +529,7 @@ record: docs/COMMERCE_EVIDENCE_DATA_MINIMIZATION_DECISION_V1.md
 
 `P0-CM-02` exact Web PSP is now **DECIDED: PortOne V2**. This closes provider selection only; live merchant/PG/channel/credential readiness and Production activation remain independent gates.
 
-`P0-CM-03` remains explicitly open for **sale activation**. The current Commerce v2 first Product authority is `standard.love_relationship`, with Reader identity selected separately and stored as sparse Purchase Intent provenance. The former `saju.general_natal.deep.v1` / KRW 9,900 candidate is historical and forward-retired. No current saleable Offer or authoritative price exists; the approximately KRW 8,900 figure remains a working candidate only. Current Saju relationship Product Reading authority remains blocked, so Product activation must stay fail-closed.
+`P0-CM-03` remains explicitly open for **sale activation**. The current Commerce v2 first Product authority is `standard.love_relationship`, with Reader identity selected separately and stored as sparse Purchase Intent provenance. The former `saju.general_natal.deep.v1` / KRW 9,900 candidate is historical and forward-retired. Product Owner list price is now **DECIDED: KRW 8,900**. No current saleable Offer or immutable Charge Terms exists, so the decided list price is not executable charge authority. Current Saju relationship Product Reading authority remains blocked, so Product activation must stay fail-closed.
 
 `P0-CM-04` closes the product/ownership question of whether Guest may purchase. Its historical `does_not_decide` list records the boundary at the time that decision was made; the later `P0-CM-02` record now supplies the PSP decision without rewriting `P0-CM-04` history.
 
