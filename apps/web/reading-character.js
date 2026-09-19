@@ -74,6 +74,8 @@ const engineRequest = route.valid ? resolveSajuButtonEngineRequest(route) : null
 const currentYear = new Date().getFullYear();
 const SAJU_PREVIEW_READING_ENDPOINT = '/api/me/saju/preview-reading';
 const PREVIEW_READING_TEXTS = new Set(['전체 사주', '직업운', '재물운', '연애운', '사업운']);
+const PREVIEW_NOTICE_SECTION_TITLE = '프리뷰 안내';
+const STRUCTURE_PREFIX = '근거 구조:';
 const previewEligible = engineRequest?.state === 'ready' && PREVIEW_READING_TEXTS.has(engineRequest.readingText);
 
 const root = document.body;
@@ -243,6 +245,7 @@ function previewStepsFromPayload(payload) {
   const reading = response.reading;
   if (!reading || typeof reading !== 'object' || !Array.isArray(reading.sections)) return null;
 
+  const notices = [];
   const steps = reading.sections.flatMap((section) => {
     if (!section || typeof section !== 'object' || section.state === 'unavailable') return [];
     const title = typeof section.title === 'string' && section.title.trim()
@@ -252,21 +255,40 @@ function previewStepsFromPayload(payload) {
       ? section.blocks.flatMap(blockTexts).filter(Boolean)
       : [];
     if (texts.length === 0) return [];
-    return [{ title, texts }];
+
+    if (title === PREVIEW_NOTICE_SECTION_TITLE) {
+      notices.push(...texts);
+      return [];
+    }
+
+    const structure = texts.filter((text) => text.startsWith(STRUCTURE_PREFIX));
+    const interpretation = texts.filter((text) => !text.startsWith(STRUCTURE_PREFIX));
+    if (interpretation.length === 0) return [];
+
+    return [{
+      title,
+      primary: interpretation[0],
+      supporting: interpretation.slice(1),
+      structure,
+    }];
   });
 
-  const disclosures = Array.isArray(reading.disclosures)
-    ? reading.disclosures
-        .filter((item) => item && typeof item === 'object' && typeof item.text === 'string' && item.text.trim())
-        .map((item) => item.text.trim())
-    : [];
-  if (disclosures.length > 0) {
-    const previewNotice = steps.find((step) => step.title === '프리뷰 안내');
-    if (previewNotice) previewNotice.texts.push(...disclosures);
-    else steps.push({ title: '프리뷰 안내', texts: disclosures });
+  if (Array.isArray(reading.disclosures)) {
+    for (const item of reading.disclosures) {
+      if (!item || typeof item !== 'object' || typeof item.text !== 'string' || !item.text.trim()) continue;
+      if (item.type === 'scope_limitation') {
+        notices.push(item.text.trim());
+      } else if (steps.length > 0) {
+        steps[0].supporting.push(item.text.trim());
+      }
+    }
   }
 
-  return steps.length > 0 ? steps : null;
+  if (steps.length === 0) return null;
+  return {
+    steps,
+    notice: notices.find((text) => typeof text === 'string' && text.trim()) ?? '',
+  };
 }
 
 function renderProgressDots(stepCount, activeIndex) {
@@ -281,7 +303,31 @@ function renderProgressDots(stepCount, activeIndex) {
   }
 }
 
-function activatePreviewReading(steps) {
+function firstSentence(text) {
+  if (typeof text !== 'string') return '';
+  const normalized = text.trim();
+  const periodIndex = normalized.indexOf('.');
+  return periodIndex >= 0 ? normalized.slice(0, periodIndex + 1) : normalized;
+}
+
+function readerCommentForStep(step) {
+  const lead = firstSentence(step.primary);
+  const suffixByReader = {
+    baekheon: '이 대목은 말보다 실제 선택과 행동에서 반복되는지 보십시오.',
+    seyeon: '좋고 나쁨으로 자르기보다, 언제 이 흐름이 편하게 살아나는지 같이 볼게요.',
+    yeoul: '핵심은 이 흐름이 실제 선택에서 어떻게 튀어나오는지입니다.',
+    seorin: '지금의 선택뿐 아니라 예전에도 비슷한 패턴이 반복됐는지 떠올려 보세요.',
+    rahyeon: '겉으로 드러난 모습보다, 이 흐름 때문에 실제로 흔들리는 순간을 보는 편이 정확합니다.',
+    mira: '과장할 필요는 없습니다. 실제 생활에서 반복되는지만 확인하면 됩니다.',
+    taegyeom: '좋은 말로 포장하지 않겠습니다. 이 구조가 실제 행동에서 확인되는지가 기준입니다.',
+    yunho: '한 번의 사건보다 반복되는 선택의 순서를 보면 이 구조가 더 분명해집니다.',
+    doyoon: '복잡하게 외우지 마세요. 실제로 자주 나오는 선택 패턴인지 보면 됩니다.',
+  };
+  return [lead, suffixByReader[readerKey]].filter(Boolean).join(' ');
+}
+
+function activatePreviewReading(preview) {
+  const { steps } = preview;
   let activeIndex = 0;
   const progressLabel = document.querySelector('[data-reading-progress-label]');
   const stepTitle = document.querySelector('[data-reading-step-title]');
@@ -289,6 +335,8 @@ function activatePreviewReading(steps) {
   const structureTitle = document.querySelector('[data-reading-structure-title]');
   const structureBody = document.querySelector('[data-reading-structure-body]');
   const readerLine = document.querySelector('[data-reader-step-line]');
+  const readerComment = document.querySelector('[data-reader-comment]');
+  const authorityNote = document.querySelector('[data-reading-authority-note]');
   const previousButton = document.querySelector('[data-reading-prev]');
   const nextButton = document.querySelector('[data-reading-next]');
   const nextLabel = nextButton?.querySelector('span:first-child');
@@ -296,17 +344,28 @@ function activatePreviewReading(steps) {
   function renderStep() {
     const step = steps[activeIndex];
     if (!step) return;
+    const structureParts = [...step.structure, ...step.supporting];
+
     if (progressLabel) progressLabel.textContent = `읽기 ${activeIndex + 1} / ${steps.length}`;
     if (stepTitle) stepTitle.textContent = step.title;
-    if (stepBody) stepBody.textContent = step.texts[0] ?? '';
-    if (structureTitle) structureTitle.textContent = step.texts.length > 1 ? '함께 볼 포인트' : '읽기 범위';
-    if (structureBody) {
-      structureBody.textContent = step.texts.length > 1
-        ? step.texts.slice(1).join('\n')
-        : '현재 검증된 Preview Reading 범위 안에서만 표시하고 있습니다.';
+    if (stepBody) stepBody.textContent = step.primary;
+    if (structureTitle) {
+      structureTitle.textContent = step.structure.length > 0
+        ? '이 해석의 사주 근거'
+        : step.supporting.length > 0
+          ? '함께 볼 포인트'
+          : '이 해석을 읽는 기준';
     }
-    if (readerLine) {
-      readerLine.textContent = '검증된 Preview Reading의 의미를 바꾸지 않고 그대로 함께 읽겠습니다.';
+    if (structureBody) {
+      structureBody.textContent = structureParts.length > 0
+        ? structureParts.join('\n\n')
+        : '원국에서 확인된 해석 축을 바탕으로 읽는 항목입니다.';
+    }
+    if (readerLine) readerLine.textContent = `${step.title}부터 핵심을 짚겠습니다.`;
+    if (readerComment) readerComment.textContent = readerCommentForStep(step);
+    if (authorityNote) {
+      authorityNote.textContent = 'Preview · 연구 검증 중인 원국 해석이며 확정적 미래 예측은 포함하지 않습니다.';
+      if (preview.notice) authorityNote.title = preview.notice;
     }
     if (previousButton) previousButton.disabled = activeIndex === 0;
     if (nextButton) nextButton.disabled = activeIndex >= steps.length - 1;
@@ -395,15 +454,15 @@ async function loadPreviewReading() {
       return;
     }
 
-    const steps = previewStepsFromPayload(payload);
-    if (!steps) {
+    const preview = previewStepsFromPayload(payload);
+    if (!preview) {
       renderPreviewFailure(
         '현재 이 사주 프리뷰를 표시할 수 없습니다.',
         '검증된 Reading 응답이 표시 가능한 상태가 아닙니다. 다른 풀이로 대신 보여드리지 않습니다.',
       );
       return;
     }
-    activatePreviewReading(steps);
+    activatePreviewReading(preview);
   } catch {
     renderPreviewFailure(
       '사주 프리뷰를 잠시 불러올 수 없습니다.',
