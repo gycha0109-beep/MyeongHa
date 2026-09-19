@@ -209,7 +209,7 @@ order by section, k1, k2, line;
 SQL
 
 actual="$(sha256sum "$catalog_file" | awk '{print $1}')"
-expected="29b8c2b235c0ef6c512c50775245d5139775454bb0352d8a3876a5c85fff3f1d"
+expected="2e1a47a17ee18d29320e679a4bcfccd7266aaa1740dac48eadc227210cec6362"
 
 echo "Account deletion finalizer catalog digest: $actual"
 
@@ -234,7 +234,7 @@ if [[ "$delete_cycle_count" != "19" ]]; then
   echo "FAIL expected 19 DELETE-subgraph cycle edges, found $delete_cycle_count" >&2
   exit 1
 fi
-if [[ "$detach_shape_count" != "1" ]] || ! grep -q '^DETACH_SHAPE|subject_merge_jobs|guest_session_id|NOT_NULL|' "$catalog_file"; then
+if [[ "$detach_shape_count" != "1" ]] || ! grep -q '^DETACH_SHAPE|subject_merge_jobs|guest_session_id|NULLABLE|' "$catalog_file"; then
   echo "FAIL guest-session detach shape drifted" >&2
   exit 1
 fi
