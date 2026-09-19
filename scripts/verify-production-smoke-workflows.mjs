@@ -34,7 +34,12 @@ const contracts = [
     file: 'production-birth-profile-authenticated-create-read-smoke.yml',
     confirm: 'VERIFY_BIRTH_AUTHENTICATED_CREATE_READ',
     commands: ['node scripts/verify-production-birth-profile-authenticated-create-read.mjs'],
+    actionsRead: true,
     required: [
+      'GH_TOKEN: ${{ github.token }}',
+      'prior_successes=',
+      "actions/workflows/production-birth-profile-authenticated-create-read-smoke.yml/runs?event=workflow_dispatch&status=success&per_page=1",
+      "[[ \"$prior_successes\" == '0' ]]",
       'MYEONGHA_PRODUCTION_BIRTH_SMOKE_MEMBER_BEARER: ${{ secrets.MYEONGHA_PRODUCTION_BIRTH_SMOKE_MEMBER_BEARER }}',
       'MYEONGHA_PRODUCTION_BIRTH_SMOKE_MEMBER_EXPECTED_SUBJECT_ID: ${{ secrets.MYEONGHA_PRODUCTION_BIRTH_SMOKE_MEMBER_EXPECTED_SUBJECT_ID }}',
     ],
