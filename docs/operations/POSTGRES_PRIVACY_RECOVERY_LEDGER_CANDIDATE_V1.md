@@ -2,7 +2,8 @@
 
 > Tracking: #1058 / parent #964 / DR parent #389  
 > Status: **CANDIDATE TRANSPORT MECHANICS / NOT AUTHORITATIVE**  
-> P0 authority: `P0-PR-01 = OPEN-P0`  
+> Historical P0 authority at candidate proof time: `P0-PR-01 = OPEN-P0`  
+> Current P0 authority: `P0-PR-01 = DECIDED` as of 2026-09-19; this candidate remains non-authoritative recovery transport evidence.
 > DR authority: `dr_ready=false`
 
 ## Purpose
@@ -207,7 +208,7 @@ dr_ready = false
 - production serving from a restored database;
 - full Supabase Auth/Storage provider recovery equivalence.
 
-Those remain under P0-PR-01 / #964 / #389.
+The recovery-source/finalizer proof gaps remain tracked under the privacy/DR implementation work and #389; the retention/disposition policy itself is now DECIDED.
 
 ## Promotion path
 
