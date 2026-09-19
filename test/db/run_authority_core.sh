@@ -56,6 +56,7 @@ bash test/db/reading_clarification_concurrency.sh
 bash test/db/notification_delivery_attempt_concurrency.sh
 bash test/db/account_deletion_start_concurrency.sh
 bash test/db/account_deletion_finalization_preflight.sh
+bash test/db/account_deletion_finalizer_catalog_guard.sh
 
 run_isolated_case myeongha_privacy_reconciliation_replay_test bash test/db/privacy_reconciliation_replay.sh
 
@@ -74,6 +75,7 @@ bash test/db/notification_delivery_authority_queries.sh
 bash test/db/relationship_current_query.sh
 bash test/db/character_unlocks_current_query.sh
 run_isolated_case myeongha_standard_reader_runtime_test bash test/db/standard_reading_reader_runtime_query.sh
+run_isolated_case myeongha_standard_reading_unit_binding_test bash test/db/standard_reading_unit_binding.sh
 bash test/db/entitlements_current_query.sh
 bash test/db/data_deletion_job_query.sh
 bash test/db/notification_preferences_query.sh
