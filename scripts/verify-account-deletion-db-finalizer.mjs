@@ -61,6 +61,7 @@ for (const fragment of [
   "internal_account_deletion_finalization_preflight_v1",
   "myeongha.account_deletion_finalizer_subject_id",
   "internal_account_deletion_finalizer_context_matches_v1",
+  "grant execute on function public.internal_account_deletion_finalizer_context_matches_v1(uuid) to public",
   "security definer",
   "account_deletion_finalizer_replay_lease_mismatch",
   "alter column guest_session_id drop not null",
