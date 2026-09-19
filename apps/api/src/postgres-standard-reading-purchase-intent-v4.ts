@@ -1,7 +1,4 @@
-import {
-  PurchaseIntentCreateAuthorityPortErrorV3,
-  type PurchaseIntentCreateAuthorityRowV3,
-} from './purchase-intent-create-command-v3.js';
+import { PurchaseIntentCreateAuthorityPortErrorV3 } from './purchase-intent-create-command-v3.js';
 import {
   STANDARD_READING_PURCHASE_INTENT_CREATE_AUTHORITY_BINDING_V4,
   StandardReadingPurchaseIntentAuthorityPortErrorV4,

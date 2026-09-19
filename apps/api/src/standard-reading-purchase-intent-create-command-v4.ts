@@ -13,6 +13,7 @@ import type {
   PurchaseIntentIdPortV1,
   PurchaseIntentOfferSnapshotPortV1,
   PurchaseIntentOfferSnapshotV1,
+  PurchaseIntentStatusV1,
 } from './purchase-intent-create-command.js';
 
 export const STANDARD_READING_PURCHASE_INTENT_CREATE_AUTHORITY_BINDING_V4 =
@@ -113,7 +114,7 @@ export interface CreateStandardReadingPurchaseIntentInputV4 {
 
 export interface CreateStandardReadingPurchaseIntentResponseV4 {
   readonly purchaseIntentId: string;
-  readonly status: 'created' | 'pending' | 'verified' | 'failed' | 'cancelled' | 'refunded';
+  readonly status: PurchaseIntentStatusV1;
 }
 
 function requireResolvedSubjectId(value: string | undefined): string {
@@ -300,7 +301,6 @@ export async function createStandardReadingPurchaseIntentV4(
   const readerSelectionHash = hashCanonical(readerSelectionSnapshot);
   const v4RequestHash = hashCanonical({
     productOfferId: request.productOfferId,
-    idempotencyKey: request.idempotencyKey,
     readerCharacterId: request.readerCharacterId,
   });
 
