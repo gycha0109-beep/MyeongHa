@@ -705,6 +705,73 @@
 .chat-person-card[data-character="yunho"] { --person-accent: #78624c; --person-surface: #dfd0bb; }
 .chat-person-card[data-character="doyoon"] { --person-accent: #7a6859; --person-surface: #dcccbf; }
 
+
+/*
+ * Canonical representative-art mapping.
+ * Presentation keys are intentionally mapped 1:1 to the finalized character artwork;
+ * keep these selectors aligned with the roster in chat-hub.js.
+ */
+.chat-person-art[data-character] {
+  place-items: stretch;
+  background-color: var(--person-surface);
+  background-repeat: no-repeat;
+  background-size: cover;
+  box-shadow:
+    inset -18px 0 28px rgba(9, 18, 24, .13),
+    inset 0 -26px 34px rgba(9, 18, 24, .08);
+}
+
+.chat-person-art[data-character]::before,
+.chat-person-art[data-character]::after,
+.chat-person-art[data-character] .chat-person-initial {
+  display: none;
+}
+
+.chat-person-art[data-character="seyeon"] {
+  background-image: url("assets/characters/seyeon-portrait.webp");
+  background-position: center 18%;
+}
+
+.chat-person-art[data-character="baekheon"] {
+  background-image: url("assets/characters/baekheon-portrait.webp");
+  background-position: center 16%;
+}
+
+.chat-person-art[data-character="yeoul"] {
+  background-image: url("assets/characters/yeoul-portrait.webp");
+  background-position: center 16%;
+}
+
+.chat-person-art[data-character="seorin"] {
+  background-image: url("assets/characters/seorin-portrait.webp");
+  background-position: center 17%;
+}
+
+.chat-person-art[data-character="rahyeon"] {
+  background-image: url("assets/characters/rahyeon-portrait.webp");
+  background-position: center 16%;
+}
+
+.chat-person-art[data-character="mira"] {
+  background-image: url("assets/characters/mira-portrait.webp");
+  background-position: center 16%;
+}
+
+.chat-person-art[data-character="taegyeom"] {
+  background-image: url("assets/characters/taegyeom-portrait.webp");
+  background-position: center 15%;
+}
+
+.chat-person-art[data-character="yunho"] {
+  background-image: url("assets/characters/yunho-portrait.webp");
+  background-position: center 17%;
+}
+
+.chat-person-art[data-character="doyoon"] {
+  background-image: url("assets/characters/doyoon-portrait.webp");
+  background-position: center 16%;
+}
+
 .chat-search-empty {
   margin: 25px 0 8px;
   padding: 26px;
