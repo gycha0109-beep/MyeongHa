@@ -12,6 +12,7 @@ on:
       - '!scripts/verify-postgres-*.mjs'
       - '!scripts/run-postgres-*.sh'
       - '!scripts/build-postgres-*.mjs'
+      - '!scripts/operations/**'
       - 'package.json'
       - 'package-lock.json'
       - 'tsconfig*.json'
