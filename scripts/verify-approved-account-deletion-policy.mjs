@@ -8,7 +8,7 @@ import {
 const authorityReference =
   'https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582';
 const expectedGraphFingerprint =
-  '3daa7e616da04dabc30a4d8807a842b31bff580f804305eefc17ec7f746bd030';
+  'b118816bec5cc0291509a120b4121cb75abde087156dc8742b6d11aae6b3c325';
 
 const [policyText, dispositionText, graphText, decisions, drStatus] = await Promise.all([
   readFile('docs/operations/ACCOUNT_DELETION_FINALIZATION_POLICY_V1.json', 'utf8'),
@@ -117,14 +117,14 @@ if (disposition.graphRef.fingerprintSha256 !== expectedGraphFingerprint) {
 
 const report = evaluateAccountDeletionDispositionContract(disposition, graph);
 for (const [field, expected] of [
-  ['graphEdgeCount', 107],
-  ['graphReachableTableCount', 48],
-  ['coveredEdgeCount', 107],
-  ['coveredTableCount', 48],
+  ['graphEdgeCount', 113],
+  ['graphReachableTableCount', 49],
+  ['coveredEdgeCount', 113],
+  ['coveredTableCount', 49],
   ['unresolvedTableCount', 0],
   ['unresolvedEdgeCount', 0],
   ['dependencyConflictCount', 0],
-  ['explicitConflictResolutionCount', 30],
+  ['explicitConflictResolutionCount', 32],
   ['policyReady', true],
   ['executionAuthorized', true],
   ['executionPlanAllowed', true],
@@ -150,8 +150,8 @@ for (const entry of disposition.tableDispositions) {
     fail('non-retained table must not carry retention duration: ' + entry.table);
   }
 }
-if (!sameJson(counts, { DELETE: 35, ANONYMIZE: 4, RETAIN: 9 })) {
-  fail('approved 35/4/9 disposition split drifted: ' + JSON.stringify(counts));
+if (!sameJson(counts, { DELETE: 36, ANONYMIZE: 4, RETAIN: 9 })) {
+  fail('approved 36/4/9 disposition split drifted: ' + JSON.stringify(counts));
 }
 
 for (const resolution of disposition.edgeConflictResolutions) {
@@ -162,13 +162,14 @@ for (const resolution of disposition.edgeConflictResolutions) {
     'DELETE_CHILD_BEFORE_PARENT_ANONYMIZATION_V1',
     'RETAIN_CHILD_LINK_TO_ANONYMIZED_PARENT_TOMBSTONE_V1',
     'DETACH_OR_REWRITE_CHILD_REFERENCE_BEFORE_PARENT_DELETE_V1',
+    'DELETE_CHILD_KEEP_RETAINED_PARENT_V1',
   ].includes(resolution.executionStrategyRef)) {
     fail('unknown mixed-edge strategy: ' + resolution.executionStrategyRef);
   }
 }
 
 const plan = buildAccountDeletionExecutionPlan(disposition, graph);
-if (plan.stepCount !== 48 || plan.destructiveSqlGenerated !== false || plan.sql !== null) {
+if (plan.stepCount !== 49 || plan.destructiveSqlGenerated !== false || plan.sql !== null) {
   fail('approved structured plan must cover 48 tables and remain non-SQL');
 }
 if (plan.graphFingerprintSha256 !== expectedGraphFingerprint) {
@@ -204,5 +205,5 @@ for (const fragment of [
 }
 
 console.log(
-  'Approved account deletion policy PASS: P0-PR-01 is DECIDED, 48/48 tables map to DELETE 35 / ANONYMIZE 4 / RETAIN 9, 30 mixed FK edges are explicitly planned, retained Commerce uses calendar P5Y, structured plan generation is allowed, and destructive SQL / privacy reconciliation / DR promotion remain blocked.',
+  'Approved account deletion policy PASS: P0-PR-01 is DECIDED, 49/49 tables map to DELETE 36 / ANONYMIZE 4 / RETAIN 9, 32 mixed FK edges are explicitly planned, retained Commerce uses calendar P5Y, structured plan generation is allowed, and destructive SQL / privacy reconciliation / DR promotion remain blocked.',
 );

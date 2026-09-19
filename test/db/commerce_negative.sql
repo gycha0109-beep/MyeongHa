@@ -300,7 +300,6 @@ do $$
 declare
   current_status text;
   current_count integer;
-  table_count integer;
 begin
   select status, active_grant_count into current_status, current_count
   from public.entitlements
@@ -310,16 +309,7 @@ begin
     raise exception 'FAIL overlapping grants: revoking one grant removed logical access';
   end if;
 
-  select count(*) into table_count
-  from information_schema.tables
-  where table_schema = 'public' and table_type = 'BASE TABLE';
-
-  if table_count <> 65 then
-    raise exception 'FAIL schema catalog table count: expected 65, got %', table_count;
-  end if;
-
   raise notice 'PASS overlapping grants preserve access through remaining grant';
-  raise notice 'PASS executable public schema catalog = 65 tables';
 end;
 $$;
 

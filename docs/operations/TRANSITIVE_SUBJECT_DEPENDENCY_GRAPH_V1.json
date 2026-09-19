@@ -5,13 +5,13 @@
   "graphAuthority": "SCHEMA_DISCOVERED_POLICY_NEUTRAL",
   "executionAuthorized": false,
   "discovery": {
-    "edgeCount": 107,
-    "distinctReachableTableCount": 48,
+    "edgeCount": 113,
+    "distinctReachableTableCount": 49,
     "maxDepth": 4,
     "depthCounts": {
       "1": 30,
-      "2": 34,
-      "3": 40,
+      "2": 38,
+      "3": 42,
       "4": 3
     },
     "directDepthOneEdgeCount": 30
@@ -478,6 +478,21 @@
     {
       "minDepth": 2,
       "parentTable": "birth_profiles",
+      "childTable": "standard_reading_unit_bindings",
+      "constraintName": "standard_reading_unit_bindings_source_profile_subject_fk",
+      "childColumns": [
+        "source_birth_profile_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 2,
+      "parentTable": "birth_profiles",
       "childTable": "target_person_profiles",
       "constraintName": "target_person_profiles_birth_subject_fk",
       "childColumns": [
@@ -678,6 +693,19 @@
     },
     {
       "minDepth": 2,
+      "parentTable": "entitlement_grants",
+      "childTable": "standard_reading_unit_bindings",
+      "constraintName": "standard_reading_unit_bindings_grant_fk",
+      "childColumns": [
+        "entitlement_grant_id"
+      ],
+      "parentColumns": [
+        "id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 2,
       "parentTable": "guest_sessions",
       "childTable": "subject_merge_jobs",
       "constraintName": "subject_merge_jobs_session_guest_fk",
@@ -826,6 +854,21 @@
     },
     {
       "minDepth": 2,
+      "parentTable": "purchase_intents",
+      "childTable": "standard_reading_unit_bindings",
+      "constraintName": "standard_reading_unit_bindings_purchase_subject_fk",
+      "childColumns": [
+        "purchase_intent_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 2,
       "parentTable": "reading_sessions",
       "childTable": "readings",
       "constraintName": "readings_session_subject_domain_fk",
@@ -838,6 +881,21 @@
         "id",
         "subject_id",
         "saju_domain"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 2,
+      "parentTable": "reading_sessions",
+      "childTable": "standard_reading_unit_bindings",
+      "constraintName": "standard_reading_unit_bindings_session_subject_fk",
+      "childColumns": [
+        "reading_session_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
       ],
       "disposition": "UNDECIDED"
     },
@@ -970,6 +1028,21 @@
       "constraintName": "reading_sessions_target_birth_subject_fk",
       "childColumns": [
         "target_birth_revision_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "birth_profile_revisions",
+      "childTable": "standard_reading_unit_bindings",
+      "constraintName": "standard_reading_unit_bindings_source_revision_subject_fk",
+      "childColumns": [
+        "source_birth_revision_id",
         "subject_id"
       ],
       "parentColumns": [
@@ -1500,6 +1573,23 @@
       ],
       "parentColumns": [
         "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "readings",
+      "childTable": "standard_reading_unit_bindings",
+      "constraintName": "standard_reading_unit_bindings_reading_session_subject_fk",
+      "childColumns": [
+        "reading_id",
+        "reading_session_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "reading_session_id",
         "subject_id"
       ],
       "disposition": "UNDECIDED"

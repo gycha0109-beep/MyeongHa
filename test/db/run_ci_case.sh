@@ -3,6 +3,8 @@ set -euo pipefail
 
 case_name="${1:?db CI case name is required}"
 
+bash test/db/verify_no_schema_cardinality_hardcoding.sh
+
 apply_standard_migrations() {
   psql -v ON_ERROR_STOP=1 -f test/db/bootstrap_supabase_auth_stub.sql
   for migration in supabase/migrations/*.sql; do

@@ -2,7 +2,7 @@
 
 > Tracking: #1084 / parent #964  
 > Catalog authority: fully migrated PostgreSQL schema  
-> Approved policy: **DELETE 35 / ANONYMIZE 4 / RETAIN P5Y 9**  
+> Approved policy: **DELETE 36 / ANONYMIZE 4 / RETAIN P5Y 9**  
 > Destructive runtime authority: **false**
 
 ## Purpose
@@ -12,7 +12,7 @@ This artifact records the catalog blockers that the account-deletion DB finalize
 The executable authority is `test/db/account_deletion_finalizer_catalog_guard.sh`. It derives the surface from `pg_catalog` after all migrations are applied and pins the complete deterministic digest:
 
 ```text
-9d833aa0b580dd90d0744586d33ae5bb6587dafb01d640d8edc2abac0bc92324
+29b8c2b235c0ef6c512c50775245d5139775454bb0352d8a3876a5c85fff3f1d
 ```
 
 Any FK, DELETE-trigger, anonymization-column, or guest-session detach-shape drift changes that digest and fails CI.
@@ -43,7 +43,7 @@ The destructive finalizer therefore cannot be implemented as unrestricted ordina
 
 ## DELETE-subgraph cycles
 
-The migrated catalog currently contains 19 FK edges participating in cycles inside the 35-table DELETE subgraph.
+The migrated catalog currently contains 19 FK edges participating in cycles inside the 36-table DELETE subgraph.
 
 They reduce to these cycle families:
 

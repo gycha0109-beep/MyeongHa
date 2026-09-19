@@ -23,6 +23,8 @@ run_isolated_case() {
   )
 }
 
+bash test/db/verify_no_schema_cardinality_hardcoding.sh
+
 psql -v ON_ERROR_STOP=1 -f test/db/authority_core_negative.sql
 psql -1 -v ON_ERROR_STOP=1 -f test/db/record_world_negative.sql
 psql -1 -v ON_ERROR_STOP=1 -f test/db/reading_ops_negative.sql
@@ -75,6 +77,7 @@ bash test/db/notification_delivery_authority_queries.sh
 bash test/db/relationship_current_query.sh
 bash test/db/character_unlocks_current_query.sh
 run_isolated_case myeongha_standard_reader_runtime_test bash test/db/standard_reading_reader_runtime_query.sh
+run_isolated_case myeongha_standard_reading_unit_binding_test bash test/db/standard_reading_unit_binding.sh
 bash test/db/entitlements_current_query.sh
 bash test/db/data_deletion_job_query.sh
 bash test/db/notification_preferences_query.sh
