@@ -322,7 +322,7 @@ export async function createStandardReadingPurchaseIntentV4(
   });
 
   const v3AuthorityAdapter: PurchaseIntentCreateAuthorityPortV3 = Object.freeze({
-    async createPurchaseIntent(authorityInput) {
+    async createPurchaseIntent(authorityInput: Parameters<PurchaseIntentCreateAuthorityPortV3['createPurchaseIntent']>[0]) {
       try {
         const rows = await input.authorityPort.createPurchaseIntent({
           ...authorityInput,
