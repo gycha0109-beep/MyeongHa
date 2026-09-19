@@ -2,7 +2,7 @@
 
 > Tracking: #1084 / parent #964  
 > Catalog authority: fully migrated PostgreSQL schema  
-> Approved policy: **DELETE 35 / ANONYMIZE 4 / RETAIN P5Y 9**  
+> Approved policy: **DELETE 36 / ANONYMIZE 4 / RETAIN P5Y 9**  
 > Destructive runtime authority: **false**
 
 ## Purpose
@@ -43,7 +43,7 @@ The destructive finalizer therefore cannot be implemented as unrestricted ordina
 
 ## DELETE-subgraph cycles
 
-The migrated catalog currently contains 19 FK edges participating in cycles inside the 35-table DELETE subgraph.
+The migrated catalog currently contains 19 FK edges participating in cycles inside the 36-table DELETE subgraph.
 
 They reduce to these cycle families:
 
