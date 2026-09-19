@@ -11,6 +11,7 @@ import {
 } from './saju-production-reading-http-adapter.js';
 import type { SajuProductionCalculationHttpFetchV1 } from './saju-production-calculation-http-adapter.js';
 import type { SupabaseMemberVerifierFetchV1 } from './supabase-member-identity-verifier.js';
+import type { PostgresSubjectPoolV1 } from './postgres-subject-execution.js';
 
 export interface ProductionCurrentSubjectSajuPreviewReadingRequestV1 {
   readonly request: Request;
@@ -25,6 +26,7 @@ export interface ProductionCurrentSubjectSajuPreviewReadingRuntimeV1 {
 
 export interface CreateProductionCurrentSubjectSajuPreviewReadingRuntimeInputV1 {
   readonly env: ProductionSajuRuntimeEnvV1;
+  readonly pool?: PostgresSubjectPoolV1;
   readonly memberFetchImpl?: SupabaseMemberVerifierFetchV1;
   readonly sajuFetchImpl?: SajuProductionCalculationHttpFetchV1;
 }
@@ -34,7 +36,8 @@ export function createProductionCurrentSubjectSajuPreviewReadingRuntimeV1(
 ): ProductionCurrentSubjectSajuPreviewReadingRuntimeV1 {
   const userDataConfig = parseProductionUserDataRuntimeConfigV1(input.env);
   const sajuConfig = parseProductionSajuRuntimeConfigV1(input.env);
-  const pool = createNodePostgresSubjectPoolV1(userDataConfig);
+  const ownsPool = input.pool === undefined;
+  const pool = input.pool ?? createNodePostgresSubjectPoolV1(userDataConfig);
   const identityEvidenceVerifier = createProductionRequestIdentityVerifierV1({
     config: userDataConfig,
     ...(input.memberFetchImpl === undefined
@@ -59,7 +62,7 @@ export function createProductionCurrentSubjectSajuPreviewReadingRuntimeV1(
       });
     },
     close() {
-      return pool.close();
+      return ownsPool ? pool.close() : Promise.resolve();
     },
   });
 }
