@@ -48,7 +48,7 @@ Retained Commerce data is restricted to legal/accounting/dispute evidence use. T
 
 ## Dependency strategies
 
-The schema-discovered graph contains 106 reachable FK edges and 47 reachable tables. The approved 35/4/8 split creates 30 mixed-disposition edges. Each exact edge is explicitly covered in `ACCOUNT_DELETION_DISPOSITION_POLICY_V1.json`.
+The schema-discovered graph contains 106 reachable FK edges and 47 reachable tables. The approved policy is bound to semantic graph SHA-256 `79c84d42419686e6ba7aabae81ceb9395ddaa346176443315a804b3d62ec03fd`, so same-count FK identity drift also fails closed. The approved 35/4/8 split creates 30 mixed-disposition edges. Each exact edge is explicitly covered in `ACCOUNT_DELETION_DISPOSITION_POLICY_V1.json`.
 
 Strategy references mean:
 
