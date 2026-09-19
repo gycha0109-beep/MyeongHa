@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 
 const workflowPath = '.github/workflows/production-postgres-privacy-delta-audit.yml';
+const runnerPath = 'scripts/operations/audit-production-postgres-privacy-delta.sh';
 const statusPath = 'docs/operations/POSTGRES_DR_READINESS_STATUS_V1.md';
 
 const schemaPaths = [
@@ -11,13 +12,12 @@ const schemaPaths = [
   'supabase/migrations/0180_data_deletion_jobs.sql',
 ];
 
-const [workflow, status, ...schemas] = await Promise.all([
+const [workflow, runner, status, ...schemas] = await Promise.all([
   readFile(workflowPath, 'utf8'),
+  readFile(runnerPath, 'utf8'),
   readFile(statusPath, 'utf8'),
   ...schemaPaths.map((path) => readFile(path, 'utf8')),
-]);
-
-const requiredWorkflowFragments = [
+]);\nconst contract = workflow + '\\n' + runner;\n\nconst requiredWorkflowFragments = [
   'name: Production PostgreSQL Privacy Delta Count Audit',
   'workflow_dispatch:',
   'backup_run_id:',
@@ -71,7 +71,7 @@ const requiredWorkflowFragments = [
 ];
 
 for (const fragment of requiredWorkflowFragments) {
-  if (!workflow.includes(fragment)) {
+  if (!contract.includes(fragment)) {
     throw new Error(`Missing privacy delta audit workflow contract fragment: ${fragment}`);
   }
 }
@@ -101,18 +101,18 @@ const forbiddenWorkflowFragments = [
 ];
 
 for (const fragment of forbiddenWorkflowFragments) {
-  if (workflow.toLowerCase().includes(fragment.toLowerCase())) {
+  if (contract.toLowerCase().includes(fragment.toLowerCase())) {
     throw new Error(`Forbidden privacy delta audit workflow fragment: ${fragment}`);
   }
 }
 
-const sqlStart = workflow.indexOf(`          sql="$(cat <<'SQL'`);
-const sqlEnd = workflow.indexOf('          SQL\n          )"', sqlStart);
+const sqlStart = runner.indexOf(`sql="$(cat <<'SQL'`);
+const sqlEnd = runner.indexOf('SQL\n)"', sqlStart);
 if (sqlStart < 0 || sqlEnd < 0) {
   throw new Error('Count-only SQL heredoc could not be located.');
 }
 
-const sql = workflow.slice(sqlStart, sqlEnd);
+const sql = runner.slice(sqlStart, sqlEnd);
 const countMatches = sql.match(/count\(\*\)::bigint/gi) ?? [];
 if (countMatches.length !== 7) {
   throw new Error(`Expected exactly seven count-only privacy queries; found ${countMatches.length}.`);
