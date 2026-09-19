@@ -1,4 +1,5 @@
 // Public helper EXECUTE remains closed; immutable-trigger exceptions are owner-bound inline.
+// Synced with main authority frontier 0b92c8d13727a002a493e093ce50f16c27bb10f2.
 import { readFile } from 'node:fs/promises';
 
 function fail(message) {
