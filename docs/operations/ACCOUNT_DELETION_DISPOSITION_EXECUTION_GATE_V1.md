@@ -1,8 +1,9 @@
 # Account Deletion Disposition Execution Gate v1
 
 > Tracking: #1071 / parent #964 / DR parent #389  
-> Decision authority: `P0-PR-01 = OPEN-P0`  
-> Status: **POLICY-NEUTRAL EXECUTION GATE / EXECUTION NOT AUTHORIZED**
+> Historical input authority: `P0-PR-01 = OPEN-P0` candidate  
+> Current decision authority: `P0-PR-01 = DECIDED` via `ACCOUNT_DELETION_FINALIZATION_POLICY_V1.json`  
+> Status: **HISTORICAL POLICY-NEUTRAL GATE / APPROVED SUCCESSOR EXISTS**
 
 ## Purpose
 
@@ -14,7 +15,7 @@ Canonical candidate:
 docs/operations/ACCOUNT_DELETION_DISPOSITION_INPUT_CANDIDATE_V1.json
 ```
 
-Current canonical state:
+Historical pre-approval candidate state:
 
 ```text
 reachable FK edges          = 107
@@ -60,7 +61,7 @@ This is intentionally conservative. The gate does not infer cascade/nulling/pseu
 
 ## Authorization invariant
 
-While `P0-PR-01` is `OPEN-P0`:
+For the preserved historical candidate where `P0-PR-01` was `OPEN-P0`:
 
 ```text
 executionAuthorized must be false
@@ -85,4 +86,4 @@ This work adds no:
 - authoritative privacy reconciliation promotion;
 - RPO/RTO value.
 
-Those remain owner/legal/business authority decisions under #964 / P0-PR-01.
+Those were intentionally absent from this historical candidate. The approved successor is `ACCOUNT_DELETION_DISPOSITION_POLICY_V1.json`; destructive runtime implementation, authoritative recovery reconciliation, and RPO/RTO remain separate work.

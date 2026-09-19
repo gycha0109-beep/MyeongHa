@@ -1,5 +1,7 @@
 # Account Deletion Finalization Policy Candidate v1
 
+> Historical note (2026-09-19): this file is the immutable pre-approval candidate. `P0-PR-01` is now DECIDED; current authority is `ACCOUNT_DELETION_FINALIZATION_POLICY_V1.json` / `.md`. The OPEN-P0 text below is preserved as candidate-state evidence.
+
 > Tracking: #1061 / parent #964 / DR parent #389  
 > Decision authority: `P0-PR-01 = OPEN-P0`  
 > Status: **POLICY CONTRACT ONLY / EXECUTION NOT AUTHORIZED**

@@ -76,7 +76,7 @@ privacy_recovery_ledger_candidate_replay_planner_accepted: true
 privacy_recovery_ledger_candidate_unsupported_delta_guard: PASS_ZERO_UNSUPPORTED
 privacy_recovery_ledger_candidate_artifact_plaintext_identifier_payload_uploaded: false
 privacy_recovery_ledger_candidate_source_authority: CANDIDATE_NON_AUTHORITATIVE
-privacy_reconciliation: BLOCKED_BY_P0_PR_01_AND_ISSUE_964
+privacy_reconciliation: BLOCKED_BY_FINALIZER_AND_AUTHORITATIVE_NONZERO_RECOVERY_PROOF
 rpo_authority: OPEN_DECISION
 rto_authority: OPEN_DECISION
 dr_ready: false
@@ -92,19 +92,19 @@ A successful count-only production audit has now been executed against current g
 
 The manual runtime path at `.github/workflows/production-postgres-privacy-delta-audit.yml` is now runtime-proven. Run `35347028765` failed before count evidence while relying on a pooler startup read-only assertion. Run `35349036742` then reached the explicit `BEGIN TRANSACTION READ ONLY` path but failed before evidence because `psql -c "$sql"` did not perform psql variable substitution for `:'cutoff'`. Run `35353128407`, from exact main SHA `532a92e061506bfac8f9485e84ebbab8d756f1db`, used the corrected stdin execution path and completed successfully: governed backup/provenance validation PASS, read-only count query PASS, and evidence upload PASS. Artifact `10550013004` (`postgres-privacy-delta-count-audit-35353128407`, expiring `2026-10-18T13:56:23Z`) records schema `myeongha-postgres-privacy-delta-count-audit-v1`, `query_mode=read_only_count_only`, the seven zero counts, `observed_delta_total=0`, `observed_deltas=false`, `authoritative_post_backup_source=false`, `authoritative_privacy_reconciliation=false`, `future_safe_privacy_reconciliation=false`, and `dr_ready=false`.
 
-The encrypted off-primary-DB privacy recovery ledger candidate is also runtime-proven as transport mechanics. Manual run `35361080803` executed from exact main SHA `c8899478dba523f2ccfe1f6f00cda14a952a0273` against governed backup `35329018925` and cutoff `2026-09-18T09:23:19.000Z`. Backup provenance validation, the explicit read-only export, unsupported-delta fail-closed guard, deterministic replay-planner validation, encryption, and artifact upload all passed. Artifact `10553934875` (`myeongha-privacy-ledger-20260918T151342Z`, expiring `2026-10-18T15:13:42Z`) contains exactly an encrypted archive, its SHA-256 file, and an identifier-free public manifest. The encrypted archive SHA-256 `91e2ea2fd615385d86d9864d7670b3139752a090fbe49884a8743258ccd938b5` matches the uploaded checksum. The public manifest records `eventCount=0`, all seven replay-supported event-type counts as zero, `replayPlannerAccepted=true`, `candidateSourceAuthority=true`, `authoritativePostBackupSource=false`, `authoritativePrivacyReconciliation=false`, `futureSafePrivacyReconciliation=false`, and `drReady=false`. This proves the candidate export/encryption/off-DB transport path for the observed zero-event interval only; it does not promote the candidate into the durable authoritative privacy source required by P0-PR-01 / #964.
+The encrypted off-primary-DB privacy recovery ledger candidate is also runtime-proven as transport mechanics. Manual run `35361080803` executed from exact main SHA `c8899478dba523f2ccfe1f6f00cda14a952a0273` against governed backup `35329018925` and cutoff `2026-09-18T09:23:19.000Z`. Backup provenance validation, the explicit read-only export, unsupported-delta fail-closed guard, deterministic replay-planner validation, encryption, and artifact upload all passed. Artifact `10553934875` (`myeongha-privacy-ledger-20260918T151342Z`, expiring `2026-10-18T15:13:42Z`) contains exactly an encrypted archive, its SHA-256 file, and an identifier-free public manifest. The encrypted archive SHA-256 `91e2ea2fd615385d86d9864d7670b3139752a090fbe49884a8743258ccd938b5` matches the uploaded checksum. The public manifest records `eventCount=0`, all seven replay-supported event-type counts as zero, `replayPlannerAccepted=true`, `candidateSourceAuthority=true`, `authoritativePostBackupSource=false`, `authoritativePrivacyReconciliation=false`, `futureSafePrivacyReconciliation=false`, and `drReady=false`. This proves the candidate export/encryption/off-DB transport path for the observed zero-event interval only; it does not promote the candidate into the durable authoritative privacy source required for recovered-state privacy reconciliation.
 
 ## Promotion blockers
 
-Current-schema recovery freshness is now evidenced through deployed migration `1120` by backup run `35329018925` and restore run `35331742188`. This removes the schema-freshness blocker only; it does not resolve the independent privacy/legal-retention, provider-service, or RPO/RTO gates.
+Current-schema recovery freshness is evidenced through deployed migration `1120` by backup run `35329018925` and restore run `35331742188`. `P0-PR-01` is now DECIDED as of 2026-09-19, so privacy/legal-retention policy is no longer the blocker. DR remains blocked by the not-yet-implemented destructive finalizer, lack of authoritative non-zero recovered-state reconciliation, provider-service gaps, and OPEN RPO/RTO authority.
 
 Canonical authority remains unresolved in the existing source documents:
 
 - `docs/architecture/PRODUCTION_OPERATIONS_ARCHITECTURE_V1.md`: `RPO = OPEN DECISION`, `RTO = OPEN DECISION`, and no DR Ready claim before approved objectives plus achieved evidence.
-- `docs/P0_DECISION_REGISTER.md`: parent `P0-PR-01` retention / backup / legal-retention authority remains `OPEN-P0`.
-- `docs/AUTH_RLS_PRIVACY_SPEC.md`: account deletion must keep personalization erase separate from legally retained commerce data, but the legal/accounting/backup retention duration and final Commerce tombstone/pseudonymization/destructive schedule remain under `P0-PR-01`.
+- `docs/P0_DECISION_REGISTER.md`: parent `P0-PR-01` is `DECIDED`; its approved 35 DELETE / 4 ANONYMIZE / 9 RETAIN(P5Y) baseline and P30D backup handling are recorded.
+- `docs/AUTH_RLS_PRIVACY_SPEC.md`: account deletion keeps personalization erase separate from the approved nine-table `P5Y` Commerce retention baseline; destructive runtime execution remains gated until the finalizer is implemented and verified.
 - `docs/SOURCE_AUTHORITY_GAPS.md`: `SRC-06` remains blocking before the final standalone Birth/Target deletion DDL baseline.
-- GitHub issue `#964`: account-deletion finalization and legal-retention authority remains the explicit policy blocker for future-safe recovery reconciliation.
+- GitHub issue `#964`: product-owner policy authority is resolved; implementation/closure now depends on the approved finalizer contract being realized and verified.
 
 Therefore restore success must remain classified as mechanics evidence only:
 
@@ -120,7 +120,7 @@ restored-DB synthetic replay runtime= proven — run 35331742188
 current-backup privacy delta audit = successful count-only observation — run 35353128407; seven checked surfaces all zero
 count-only audit workflow          = runtime-proven — run 35353128407
 off-DB privacy ledger candidate    = runtime-proven transport — run 35361080803; observed event count 0; non-authoritative
-future-safe privacy reconciliation = blocked
+future-safe privacy reconciliation = blocked pending finalizer + authoritative non-zero recovery proof
 approved RPO                       = no
 approved RTO                       = no
 DR Ready                           = false
@@ -132,8 +132,8 @@ Do not flip `dr_ready` to true merely because another restore succeeds or becaus
 
 Promotion requires all of the following authority changes to be reviewed together:
 
-1. `P0-PR-01` resolves the deletion/legal-retention/backup-retention authority needed by recovery reconciliation.
-2. The applicable deletion/revocation reconciliation procedure is exercised against an isolated recovered state with non-zero or intentionally constructed authoritative deltas.
+1. The approved `P0-PR-01` finalization policy is implemented as an idempotent, FK-safe destructive finalizer and hosted Auth cleanup path.
+2. The applicable deletion/revocation/finalization reconciliation procedure is exercised against an isolated recovered state with non-zero or intentionally constructed authoritative deltas.
 3. Numeric RPO and RTO objectives are explicitly approved by the owning product/business authority.
 4. Achieved evidence is compared against those approved objectives.
 5. The #389 closure contract is updated with the exact evidence and only then may DR readiness be reconsidered.
@@ -158,8 +158,8 @@ revocation replay plan mechanics   = implemented
 restored-DB synthetic replay path  = runtime-proven — latest run 35331742188
 off-DB candidate transport mechanics = runtime-proven — run 35361080803 / event count 0 / non-authoritative
 durable post-backup source authority = not proven
-destructive account finalization   = blocked by P0-PR-01 / #964
-commerce legal retention           = blocked by P0-PR-01 / #964
+destructive account finalization   = policy decided / runtime not yet implemented
+commerce legal retention           = decided — approved 9-table P5Y baseline
 authoritative privacy reconciliation= not yet executed against restored DB
 DR Ready                           = false
 ```

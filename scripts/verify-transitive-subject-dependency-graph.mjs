@@ -23,7 +23,7 @@ function fail(message) {
 
 if (graph.schema !== 'myeongha-transitive-subject-dependency-graph-v1') fail('schema mismatch');
 if (graph.decisionId !== 'P0-PR-01' || graph.decisionStatus !== 'OPEN-P0') {
-  fail('P0-PR-01 must remain OPEN-P0');
+  fail('historical schema-discovery graph must remain OPEN-P0 and policy-neutral');
 }
 if (graph.graphAuthority !== 'SCHEMA_DISCOVERED_POLICY_NEUTRAL') {
   fail('graph authority must remain policy-neutral');
@@ -96,7 +96,7 @@ for (const edge of graph.edges) {
 }
 
 if (new Set(edgeKeys).size !== 107) fail('duplicate canonical FK edge');
-if (reachableTables.size !== 48) fail('expected exactly 47 reachable tables');
+if (reachableTables.size !== 48) fail('expected exactly 48 reachable tables');
 if (JSON.stringify(liveDepthCounts) !== JSON.stringify(expectedDepthCounts)) {
   fail('live edge depth counts drifted');
 }
@@ -124,8 +124,8 @@ if (JSON.stringify(depthOneKeys) !== JSON.stringify(directKeys)) {
   fail('depth-1 transitive graph does not exactly match #1063 direct Subject inventory');
 }
 
-if (!/^\|\s*`P0-PR-01`\s*\|[^|\n]*\|\s*\*\*OPEN-P0\*\*\s*\|/m.test(decisions)) {
-  fail('decision register no longer records P0-PR-01 as OPEN-P0');
+if (!/^\|\s*`P0-PR-01`\s*\|[^|\n]*\|\s*\*\*DECIDED\*\*\s*\|/m.test(decisions)) {
+  fail('decision register must record P0-PR-01 as DECIDED while this graph remains policy-neutral');
 }
 
 for (const fragment of [
@@ -144,16 +144,16 @@ for (const fragment of [
 
 for (const fragment of [
   'authoritative_post_backup_source: false',
-  'privacy_reconciliation: BLOCKED_BY_P0_PR_01_AND_ISSUE_964',
+  'privacy_reconciliation: BLOCKED_BY_FINALIZER_AND_AUTHORITATIVE_NONZERO_RECOVERY_PROOF',
   'rpo_authority: OPEN_DECISION',
   'rto_authority: OPEN_DECISION',
   'dr_ready: false',
 ]) {
   if (!drStatus.includes(fragment)) {
-    fail('DR authority drifted while P0-PR-01 remains open: ' + fragment);
+    fail('DR authority drifted after P0-PR-01 approval: ' + fragment);
   }
 }
 
 console.log(
-  'Transitive Subject dependency graph PASS: 107 reachable FK edges across 48 tables, depths 30/34/40/3, exact depth-1 parity with #1063, all dispositions UNDECIDED.',
+  'Transitive Subject dependency graph historical coverage PASS: 107 reachable FK edges across 48 tables, depths 30/34/40/3, exact depth-1 parity with #1063; schema graph stays policy-neutral while approved dispositions live separately.',
 );
