@@ -283,10 +283,15 @@ select pg_temp.assert_unit_fails(
   'cmd_standard_reading_unit_entitlement_unavailable'
 );
 
+select pg_catalog.set_config(
+  'myeongha.subject_id',
+  '11609900-0000-0000-0000-000000000099',
+  false
+);
+
 select pg_temp.assert_unit_fails(
   'cross-subject execution context cannot consume another owner purchase unit',
-  $$select set_config('myeongha.subject_id','11609900-0000-0000-0000-000000000099',false);
-    select * from public.cmd_bind_standard_reading_unit_v1(
+  $select * from public.cmd_bind_standard_reading_unit_v1(
       '11390000-0000-0000-0000-000000000001',
       '11392300-0000-0000-0000-000000000002',
       '11603000-0000-0000-0000-000000000003',
@@ -295,7 +300,7 @@ select pg_temp.assert_unit_fails(
       'standard-reading-unit-request-v1',
       '{"schemaVersion":"standard-reading-unit-request-v1","purchaseIntentId":"11392300-0000-0000-0000-000000000002","sourceBirthProfileId":"11601000-0000-0000-0000-000000000001"}'::jsonb,
       '11601000-0000-0000-0000-000000000001'
-    )$$,
+    )$,
   'subject execution context mismatch'
 );
 
@@ -366,4 +371,4 @@ select pg_temp.assert_unit_true(
   )
 );
 
-raise notice 'Standard Reading unit binding SQL authority tests passed';
+\echo 'Standard Reading unit binding SQL authority tests passed'
