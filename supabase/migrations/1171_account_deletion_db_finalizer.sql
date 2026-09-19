@@ -29,52 +29,32 @@ alter table public.subject_merge_jobs
 
 -- Preserve ordinary Chat immutability while allowing only the transaction-local account
 -- finalizer to clear cycle-forming references on the target Subject.
-create or replace function public.internal_account_deletion_finalizer_context_matches_v1(
-  p_subject_id uuid
-)
-returns boolean
-language plpgsql
-stable
-security invoker
-set search_path = pg_catalog, public
-as $finalizer_guard$
-declare
-  v_finalizer_owner name;
-begin
-  select r.rolname
-    into v_finalizer_owner
-  from pg_catalog.pg_proc p
-  join pg_catalog.pg_roles r on r.oid = p.proowner
-  where p.oid = pg_catalog.to_regprocedure(
-    'public.internal_finalize_account_deletion_db_v1(uuid,uuid,text)'
-  );
-
-  if v_finalizer_owner is null or current_user is distinct from v_finalizer_owner then
-    return false;
-  end if;
-
-  return coalesce(
-    nullif(current_setting('myeongha.account_deletion_finalizer_subject_id', true), '')::uuid = p_subject_id,
-    false
-  );
-end;
-$finalizer_guard$;
-
--- Default function privileges are hardened in this repository, so make the read-only
--- predicate explicitly callable by trigger invokers. It returns true only when current_user
--- is the SECURITY DEFINER finalizer owner and the transaction-local Subject GUC matches.
-grant execute on function public.internal_account_deletion_finalizer_context_matches_v1(uuid) to public;
-
--- The predicate is intentionally callable: trigger functions execute as their caller and
--- need to evaluate it during ordinary DML. It exposes no mutation authority; only the
--- SECURITY DEFINER finalizer owner can ever receive true.
+-- Immutable-trigger exceptions are evaluated inline rather than through a callable helper.
+-- This preserves ordinary trigger execution without reopening EXECUTE on any public helper.
+-- The exception requires both the SECURITY DEFINER finalizer owner as current_user and
+-- the exact transaction-local Subject GUC set inside that finalizer.
 
 create or replace function public.tr_chat_turn_attempt_progression_guard()
 returns trigger
 language plpgsql
 as $$
 begin
-  if public.internal_account_deletion_finalizer_context_matches_v1(old.subject_id) then
+  if (
+    current_user = (
+      select pg_catalog.pg_get_userbyid(p.proowner)
+      from pg_catalog.pg_proc p
+      where p.oid = pg_catalog.to_regprocedure(
+        'public.internal_finalize_account_deletion_db_v1(uuid,uuid,text)'
+      )
+    )
+    and coalesce(
+      nullif(
+        pg_catalog.current_setting('myeongha.account_deletion_finalizer_subject_id', true),
+        ''
+      )::uuid = old.subject_id,
+      false
+    )
+  ) then
     return new;
   end if;
 
@@ -182,7 +162,22 @@ returns trigger
 language plpgsql
 as $$
 begin
-  if public.internal_account_deletion_finalizer_context_matches_v1(old.subject_id) then
+  if (
+    current_user = (
+      select pg_catalog.pg_get_userbyid(p.proowner)
+      from pg_catalog.pg_proc p
+      where p.oid = pg_catalog.to_regprocedure(
+        'public.internal_finalize_account_deletion_db_v1(uuid,uuid,text)'
+      )
+    )
+    and coalesce(
+      nullif(
+        pg_catalog.current_setting('myeongha.account_deletion_finalizer_subject_id', true),
+        ''
+      )::uuid = old.subject_id,
+      false
+    )
+  ) then
     return new;
   end if;
 
@@ -212,7 +207,22 @@ language plpgsql
 as $$
 begin
   if tg_op = 'DELETE'
-     and public.internal_account_deletion_finalizer_context_matches_v1(old.subject_id) then
+     and (
+    current_user = (
+      select pg_catalog.pg_get_userbyid(p.proowner)
+      from pg_catalog.pg_proc p
+      where p.oid = pg_catalog.to_regprocedure(
+        'public.internal_finalize_account_deletion_db_v1(uuid,uuid,text)'
+      )
+    )
+    and coalesce(
+      nullif(
+        pg_catalog.current_setting('myeongha.account_deletion_finalizer_subject_id', true),
+        ''
+      )::uuid = old.subject_id,
+      false
+    )
+  ) then
     return old;
   end if;
 
@@ -229,7 +239,22 @@ language plpgsql
 as $$
 begin
   if tg_op = 'DELETE'
-     and public.internal_account_deletion_finalizer_context_matches_v1(old.subject_id) then
+     and (
+    current_user = (
+      select pg_catalog.pg_get_userbyid(p.proowner)
+      from pg_catalog.pg_proc p
+      where p.oid = pg_catalog.to_regprocedure(
+        'public.internal_finalize_account_deletion_db_v1(uuid,uuid,text)'
+      )
+    )
+    and coalesce(
+      nullif(
+        pg_catalog.current_setting('myeongha.account_deletion_finalizer_subject_id', true),
+        ''
+      )::uuid = old.subject_id,
+      false
+    )
+  ) then
     return old;
   end if;
 
@@ -249,7 +274,22 @@ language plpgsql
 as $$
 begin
   if tg_op = 'DELETE'
-     and public.internal_account_deletion_finalizer_context_matches_v1(old.subject_id) then
+     and (
+    current_user = (
+      select pg_catalog.pg_get_userbyid(p.proowner)
+      from pg_catalog.pg_proc p
+      where p.oid = pg_catalog.to_regprocedure(
+        'public.internal_finalize_account_deletion_db_v1(uuid,uuid,text)'
+      )
+    )
+    and coalesce(
+      nullif(
+        pg_catalog.current_setting('myeongha.account_deletion_finalizer_subject_id', true),
+        ''
+      )::uuid = old.subject_id,
+      false
+    )
+  ) then
     return old;
   end if;
 
@@ -266,7 +306,22 @@ language plpgsql
 as $$
 begin
   if tg_op = 'DELETE'
-     and public.internal_account_deletion_finalizer_context_matches_v1(old.subject_id) then
+     and (
+    current_user = (
+      select pg_catalog.pg_get_userbyid(p.proowner)
+      from pg_catalog.pg_proc p
+      where p.oid = pg_catalog.to_regprocedure(
+        'public.internal_finalize_account_deletion_db_v1(uuid,uuid,text)'
+      )
+    )
+    and coalesce(
+      nullif(
+        pg_catalog.current_setting('myeongha.account_deletion_finalizer_subject_id', true),
+        ''
+      )::uuid = old.subject_id,
+      false
+    )
+  ) then
     return old;
   end if;
 
@@ -282,7 +337,22 @@ returns trigger
 language plpgsql
 as $job_guard$
 begin
-  if public.internal_account_deletion_finalizer_context_matches_v1(old.subject_id) then
+  if (
+    current_user = (
+      select pg_catalog.pg_get_userbyid(p.proowner)
+      from pg_catalog.pg_proc p
+      where p.oid = pg_catalog.to_regprocedure(
+        'public.internal_finalize_account_deletion_db_v1(uuid,uuid,text)'
+      )
+    )
+    and coalesce(
+      nullif(
+        pg_catalog.current_setting('myeongha.account_deletion_finalizer_subject_id', true),
+        ''
+      )::uuid = old.subject_id,
+      false
+    )
+  ) then
     return new;
   end if;
 
@@ -311,7 +381,22 @@ language plpgsql
 as $$
 begin
   if tg_op = 'DELETE'
-     and public.internal_account_deletion_finalizer_context_matches_v1(old.subject_id) then
+     and (
+    current_user = (
+      select pg_catalog.pg_get_userbyid(p.proowner)
+      from pg_catalog.pg_proc p
+      where p.oid = pg_catalog.to_regprocedure(
+        'public.internal_finalize_account_deletion_db_v1(uuid,uuid,text)'
+      )
+    )
+    and coalesce(
+      nullif(
+        pg_catalog.current_setting('myeongha.account_deletion_finalizer_subject_id', true),
+        ''
+      )::uuid = old.subject_id,
+      false
+    )
+  ) then
     return old;
   end if;
 

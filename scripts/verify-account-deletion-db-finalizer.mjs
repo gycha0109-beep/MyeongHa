@@ -60,8 +60,8 @@ for (const fragment of [
   "finalization_policy_version = 'account-deletion-finalization-v1'",
   "internal_account_deletion_finalization_preflight_v1",
   "myeongha.account_deletion_finalizer_subject_id",
-  "internal_account_deletion_finalizer_context_matches_v1",
-  "grant execute on function public.internal_account_deletion_finalizer_context_matches_v1(uuid) to public",
+  "pg_catalog.pg_get_userbyid",
+  "pg_catalog.current_setting('myeongha.account_deletion_finalizer_subject_id', true)",
   "security definer",
   "account_deletion_finalizer_replay_lease_mismatch",
   "alter column guest_session_id drop not null",
@@ -84,11 +84,12 @@ if (/set\s+auth_user_id\s*=\s*null/i.test(migration)) {
 if (!/create\s+or\s+replace\s+function\s+public\.internal_finalize_account_deletion_db_v1[\s\S]*?language\s+plpgsql\s+security\s+definer/i.test(migration)) {
   fail('DB finalizer must be SECURITY DEFINER so trigger exceptions are owner-bound');
 }
-if (!/v_finalizer_owner[\s\S]*?current_user\s+is\s+distinct\s+from\s+v_finalizer_owner/i.test(migration)) {
-  fail('trigger exception must reject caller-controlled GUCs outside finalizer owner context');
+const ownerBoundGuardCount = (migration.match(/current_user\\s*=\\s*\\([\\s\\S]*?pg_catalog\\.to_regprocedure\\(\\s*'public\\.internal_finalize_account_deletion_db_v1\\(uuid,uuid,text\\)'[\\s\\S]*?pg_catalog\\.current_setting\\('myeongha\\.account_deletion_finalizer_subject_id', true\\)/gi) || []).length;
+if (ownerBoundGuardCount !== 8) {
+  fail('expected 8 inline owner-bound immutable-trigger guards, found ' + ownerBoundGuardCount);
 }
-if (/revoke\s+all\s+on\s+function\s+public\.internal_account_deletion_finalizer_context_matches_v1\(uuid\)\s+from\s+public/i.test(migration)) {
-  fail('trigger predicate must remain callable during ordinary invoker DML');
+if (/internal_account_deletion_finalizer_context_matches_v1/i.test(migration)) {
+  fail('callable public finalizer guard helper must not exist');
 }
 if (finalPolicy.destructiveRuntimeAuthorized !== false) {
   fail('destructiveRuntimeAuthorized must remain false');
