@@ -79,6 +79,7 @@ bash test/db/relationship_current_query.sh
 bash test/db/character_unlocks_current_query.sh
 run_isolated_case myeongha_standard_reader_runtime_test bash test/db/standard_reading_reader_runtime_query.sh
 run_isolated_case myeongha_standard_reading_unit_binding_test bash test/db/standard_reading_unit_binding.sh
+run_isolated_case myeongha_standard_reading_artifact_reread_test bash test/db/standard_reading_artifact_reread.sh
 bash test/db/entitlements_current_query.sh
 bash test/db/data_deletion_job_query.sh
 bash test/db/notification_preferences_query.sh

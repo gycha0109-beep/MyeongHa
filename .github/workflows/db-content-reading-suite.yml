@@ -12,6 +12,8 @@ on:
       - 'test/db/episode_progress_bundle_query.sh'
       - 'test/db/outbox_success_completion_concurrency.sh'
       - 'test/db/reading_history_authority_query.sql'
+      - 'test/db/standard_reading_artifact_reread.sql'
+      - 'test/db/standard_reading_artifact_reread.sh'
       - 'test/db/catalog_snapshot.sh'
       - 'test/db/catalog.expected.sha256'
       - '.github/workflows/db-content-reading-suite.yml'
@@ -28,6 +30,8 @@ on:
       - 'test/db/episode_progress_bundle_query.sh'
       - 'test/db/outbox_success_completion_concurrency.sh'
       - 'test/db/reading_history_authority_query.sql'
+      - 'test/db/standard_reading_artifact_reread.sql'
+      - 'test/db/standard_reading_artifact_reread.sh'
       - 'test/db/catalog_snapshot.sh'
       - 'test/db/catalog.expected.sha256'
       - '.github/workflows/db-content-reading-suite.yml'
@@ -50,6 +54,7 @@ jobs:
           - episode-progress-bundle
           - outbox-success-completion
           - reading-history
+          - standard-reading-artifact-reread
     services:
       postgres:
         image: postgres:15
