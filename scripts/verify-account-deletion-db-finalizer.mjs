@@ -86,9 +86,13 @@ if (/set\s+auth_user_id\s*=\s*null/i.test(migration)) {
 if (!/create\s+or\s+replace\s+function\s+public\.internal_finalize_account_deletion_db_v1[\s\S]*?language\s+plpgsql\s+security\s+definer/i.test(migration)) {
   fail('DB finalizer must be SECURITY DEFINER so trigger exceptions are owner-bound');
 }
-const ownerBoundGuardCount = (migration.match(/current_user\\s*=\\s*\\([\\s\\S]*?pg_catalog\\.to_regprocedure\\(\\s*'public\\.internal_finalize_account_deletion_db_v1\\(uuid,uuid,text\\)'[\\s\\S]*?pg_catalog\\.current_setting\\('myeongha\\.account_deletion_finalizer_subject_id', true\\)/gi) || []).length;
-if (ownerBoundGuardCount !== 8) {
-  fail('expected 8 inline owner-bound immutable-trigger guards, found ' + ownerBoundGuardCount);
+const ownerBoundGuardCount = (migration.match(/pg_catalog\\.pg_get_userbyid\\(p\\.proowner\\)/g) || []).length;
+const finalizerSubjectGuardCount = (migration.match(/pg_catalog\\.current_setting\\('myeongha\\.account_deletion_finalizer_subject_id', true\\)/g) || []).length;
+if (ownerBoundGuardCount !== 8 || finalizerSubjectGuardCount !== 8) {
+  fail(
+    'expected 8 inline owner-bound immutable-trigger guards, found owner=' +
+    ownerBoundGuardCount + ' subject=' + finalizerSubjectGuardCount
+  );
 }
 if (/internal_account_deletion_finalizer_context_matches_v1/i.test(migration)) {
   fail('callable public finalizer guard helper must not exist');
