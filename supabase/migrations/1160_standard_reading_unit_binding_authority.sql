@@ -77,14 +77,14 @@ create or replace function public.tr_standard_reading_unit_binding_update_immuta
 returns trigger
 language plpgsql
 set search_path = pg_catalog, public
-as $
+as $$
 begin
   raise exception using
     errcode = '23514',
     constraint = 'tr_standard_reading_unit_binding_update_immutable',
     message = 'Standard Reading purchase-unit binding cannot be rewritten';
 end;
-$;
+$$;
 
 -- Runtime provenance is append-only because ordinary roles have no DML authority and
 -- UPDATE is rejected at the table boundary. DELETE intentionally remains available to a
