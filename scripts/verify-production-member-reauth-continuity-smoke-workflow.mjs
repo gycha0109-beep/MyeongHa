@@ -13,11 +13,16 @@ const [workflow, liveVerifier, sessionHelper] = await Promise.all([
 const requiredWorkflowFragments = [
   'workflow_dispatch:',
   "description: 'Type VERIFY_MEMBER_REAUTH_CONTINUITY to run the production Member sign-out and re-sign-in continuity smoke.'",
+  'push:',
+  'branches:',
+  '- main',
+  'paths:',
+  "- '.github/production-member-reauth-continuity-smoke.trigger'",
   'permissions:',
   'contents: read',
   'cancel-in-progress: false',
   'environment: production',
-  'DISPATCH_CONFIRM: ${{ inputs.confirm }}',
+  "DISPATCH_CONFIRM: ${{ github.event_name == 'push' && 'VERIFY_MEMBER_REAUTH_CONTINUITY' || inputs.confirm }}",
   'MYEONGHA_PRODUCTION_MEMBER_EMAIL: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_EMAIL }}',
   'MYEONGHA_PRODUCTION_MEMBER_PASSWORD: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_PASSWORD }}',
   'MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID }}',
@@ -43,7 +48,6 @@ const forbiddenWorkflowFragments = [
   'uses: actions/setup-node@v4',
   'uses: actions/checkout@v7',
   'uses: actions/setup-node@v7',
-  '\npush:',
   '\npull_request:',
   '\nschedule:',
   'MYEONGHA_PRODUCTION_MEMBER_BEARER',
@@ -75,6 +79,9 @@ for (const fragment of forbiddenWorkflowFragments) {
 
 if ((workflow.match(/workflow_dispatch:/g) ?? []).length !== 1) {
   throw new Error('Production Member reauthentication smoke must expose exactly one workflow_dispatch trigger.');
+}
+if ((workflow.match(/\n  push:/g) ?? []).length !== 1) {
+  throw new Error('Production Member reauthentication smoke must expose exactly one narrowly scoped main-push trigger.');
 }
 
 const requiredLiveVerifierFragments = [

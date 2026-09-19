@@ -13,11 +13,16 @@ const [workflow, liveVerifier, sessionHelper] = await Promise.all([
 const requiredWorkflowFragments = [
   'workflow_dispatch:',
   "description: 'Type VERIFY_SAJU_CURRENT_SUBJECT to run the production current-subject Saju calculation smoke.'",
+  'push:',
+  'branches:',
+  '- main',
+  'paths:',
+  "- '.github/production-saju-current-subject-smoke.trigger'",
   'permissions:',
   'contents: read',
   'cancel-in-progress: false',
   'environment: production',
-  'DISPATCH_CONFIRM: ${{ inputs.confirm }}',
+  "DISPATCH_CONFIRM: ${{ github.event_name == 'push' && 'VERIFY_SAJU_CURRENT_SUBJECT' || inputs.confirm }}",
   'MYEONGHA_PRODUCTION_MEMBER_EMAIL: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_EMAIL }}',
   'MYEONGHA_PRODUCTION_MEMBER_PASSWORD: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_PASSWORD }}',
   'MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID }}',
@@ -43,7 +48,6 @@ const forbiddenWorkflowFragments = [
   'uses: actions/setup-node@v4',
   'uses: actions/checkout@v7',
   'uses: actions/setup-node@v7',
-  '\npush:',
   '\npull_request:',
   '\nschedule:',
   'MYEONGHA_PRODUCTION_MEMBER_BEARER',
@@ -78,6 +82,9 @@ for (const fragment of forbiddenWorkflowFragments) {
 
 if ((workflow.match(/workflow_dispatch:/g) ?? []).length !== 1) {
   throw new Error('Production Saju smoke must expose exactly one workflow_dispatch trigger.');
+}
+if ((workflow.match(/\n  push:/g) ?? []).length !== 1) {
+  throw new Error('Production Saju smoke must expose exactly one narrowly scoped main-push trigger.');
 }
 
 const requiredLiveVerifierFragments = [
