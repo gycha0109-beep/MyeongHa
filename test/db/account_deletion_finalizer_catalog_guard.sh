@@ -175,7 +175,7 @@ from (
 
   select 20, f.parent_table, f.conname,
          'FK|'||f.conname||'|'||f.parent_table||'|'||f.child_table||'|'||
-         f.confdeltype||'|'||f.constraint_def
+         f.confdeltype::text||'|'||f.constraint_def
   from fk f
 
   union all
