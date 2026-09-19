@@ -47,14 +47,24 @@
       </div>
       <button type="button" data-chart-close aria-label="명식 닫기">×</button>
     </div>
-    <div class="reading-chart-placeholder" aria-label="서버에서 확인된 명식 정보 자리">
-      <div class="reading-pillars">
-        <span><small>년</small><strong>年柱</strong></span>
-        <span><small>월</small><strong>月柱</strong></span>
-        <span><small>일</small><strong>日柱</strong></span>
-        <span><small>시</small><strong>時柱</strong></span>
+    <div class="reading-chart-placeholder" aria-label="사주 계산 근거">
+      <div class="reading-pillars" aria-label="사주 네 기둥">
+        <span><small>년주</small><strong data-chart-pillar-year>—</strong></span>
+        <span><small>월주</small><strong data-chart-pillar-month>—</strong></span>
+        <span><small>일주</small><strong data-chart-pillar-day>—</strong></span>
+        <span><small>시주</small><strong data-chart-pillar-hour>—</strong></span>
       </div>
-      <p>실제 서비스에서는 서버에서 확인된 Birth Profile revision과 Saju Engine 계산 결과만 이 영역에 표시됩니다.</p>
+      <section class="reading-chart-evidence">
+        <div>
+          <h3>오행</h3>
+          <div class="reading-chart-facts" data-chart-five-elements></div>
+        </div>
+        <div>
+          <h3>십성</h3>
+          <div class="reading-chart-facts" data-chart-ten-gods></div>
+        </div>
+      </section>
+      <p class="reading-chart-caption">이 화면은 현재 Reading에 사용된 계산 결과를 그대로 보여줍니다.</p>
     </div>
   </dialog>
 
