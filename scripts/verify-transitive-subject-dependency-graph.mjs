@@ -124,7 +124,7 @@ if (JSON.stringify(depthOneKeys) !== JSON.stringify(directKeys)) {
   fail('depth-1 transitive graph does not exactly match #1063 direct Subject inventory');
 }
 
-if (!/^\|\s*`P0-PR-01`\s*\|[^|\n]*\|\s*\*\*OPEN-P0\*\*\s*\|/m.test(decisions)) {
+if (!/^\|\s*`P0-PR-01`\s*\|[^|\n]*\|\s*\*\*DECIDED\*\*\s*\|/m.test(decisions)) {
   fail('decision register must record P0-PR-01 as DECIDED while this graph remains policy-neutral');
 }
 
