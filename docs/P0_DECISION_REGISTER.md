@@ -202,7 +202,7 @@ historical_identifier_collision:
   rule: preserve #610 as historical provenance; canonical Decision Register P0-CM-02 is the Web PSP decision and is now PortOne V2
 independent_gates_preserved:
   - P0-CM-03 launch paid Product/Capability remains OPEN-P0 and upstream-blocked
-  - P0-PR-01 parent retention/legal policy remains OPEN
+  - P0-PR-01 was still OPEN when P0-CM-02 was decided; it is now DECIDED by the 2026-09-19 account-deletion/retention policy
   - Issue #680 Production Supabase deployment authorization remains independently blocking Production migration/application
   - live merchant/PG/channel/credential readiness requires separate operational proof
 migration_impact:
@@ -306,7 +306,7 @@ implementation_impact:
 independent_gates_preserved:
   - P0-CM-02 exact Web PSP
   - P0-CM-03 concrete launch paid Product/Capability
-  - P0-PR-01 parent legal/accounting/backup retention
+  - P0-PR-01 parent legal/accounting/backup retention (now supplied by the 2026-09-19 DECIDED parent policy)
   - SRC-24 generic existing-Member Guest merge executor authority
 production_gate:
   - Guest purchase runtime is not activated until Guest purchase intent, verified apply, and paid-right continuity paths are implemented and tested.
@@ -447,7 +447,7 @@ rationale:
   - primary source requires a finite Guest Session TTL and forbids indefinite Guest retention but does not define the period.
   - seven days supports short-term D1/D7 continuation without carrying a browser/mobile bearer through a D30-style long-retention window.
   - a finite seven-day bearer lifetime limits credential exposure while preserving a practical no-login resume window.
-  - authentication expiry remains separable from the still-open product/privacy/legal retention policy.
+  - authentication expiry remains separable from the parent product/privacy/legal retention policy; that parent was later DECIDED on 2026-09-19.
 security_invariants:
   - server owns issued_at/expires_at and clients cannot request or extend TTL
   - raw Guest bearer is never stored in PostgreSQL
@@ -457,7 +457,7 @@ activation:
   - bind exactly 604800 through the dedicated production Guest TTL workflow
   - expose Guest bootstrap network route only after binding evidence
   - verify issuance -> Guest /api/me own-subject success
-  - keep parent P0-PR-01 OPEN
+  - preserve parent P0-PR-01 as an independent decision; it was OPEN at this decision time and is now DECIDED as of 2026-09-19
 change_policy: changing Guest authentication TTL requires a new explicit decision record; environment changes must not silently lengthen it
 record: docs/GUEST_SESSION_SECURITY_TTL_DECISION_V1.md
 ```
@@ -479,9 +479,9 @@ scope:
     - raw provider account identity is fingerprinted rather than stored as ordinary Commerce account authority
     - provider requiring durable raw bearer-like receipt/token storage needs an explicit provider-specific security/retention decision before P0-CM-02 can close
   does_not_decide:
-    - legal/accounting Commerce evidence retention duration
-    - backup retention duration
-    - account deletion commerce tombstone/pseudonymization/destructive schedule
+    - legal/accounting Commerce evidence retention duration (not decided by P0-PR-01B; later supplied by parent P0-PR-01 as P5Y)
+    - backup retention duration (not decided by P0-PR-01B; later supplied by parent P0-PR-01 as P30D existing lifecycle)
+    - account deletion commerce tombstone/pseudonymization/destructive schedule (not decided by P0-PR-01B; later supplied by parent P0-PR-01)
     - merchant tax/accounting record requirements
     - exact provider-specific canonical evidence bytes
 fingerprint_binding:
@@ -501,7 +501,7 @@ rationale:
 implementation_effect:
   - provider-neutral fingerprint/serializer validators and leakage-negative tests may be implemented after this decision
   - no provider SDK, production credential, webhook, paid catalog, or production evidence persistence is authorized by this decision alone
-  - parent P0-PR-01 remains OPEN
+  - parent P0-PR-01 remains independent of this minimization decision; it is now DECIDED as of 2026-09-19
 record: docs/COMMERCE_EVIDENCE_DATA_MINIMIZATION_DECISION_V1.md
 ```
 
