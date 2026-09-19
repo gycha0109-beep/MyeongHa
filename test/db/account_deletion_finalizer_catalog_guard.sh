@@ -8,7 +8,7 @@ psql -X -qAt -v ON_ERROR_STOP=1 >"$catalog_file" <<'SQL'
 create temp table _ad_policy(
   table_name text primary key,
   disposition text not null
-) on commit drop;
+);
 
 insert into _ad_policy(table_name, disposition) values
   ('ai_execution_groundings','DELETE'),
