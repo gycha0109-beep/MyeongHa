@@ -34,6 +34,21 @@ function sameJson(left, right) {
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
+function clone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function expectThrow(label, fn, pattern) {
+  try {
+    fn();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!pattern.test(message)) fail(label + ' threw unexpected error: ' + message);
+    return;
+  }
+  fail(label + ' did not fail closed');
+}
+
 const expectedFinalization = {
   subjectRecordAction: 'ANONYMIZE',
   authMappingAction: 'DELETE',
@@ -56,6 +71,7 @@ for (const [field, expected] of [
   ['approvedBy', 'PRODUCT_OWNER'],
   ['approvedAt', '2026-09-19'],
   ['authorityReference', authorityReference],
+  ['subjectGraphFingerprintSha256', disposition.graphRef.fingerprintSha256],
   ['destructiveRuntimeAuthorized', false],
   ['structuredDispositionPlanningAuthorized', true],
   ['backupRetentionPeriod', 'P30D'],
@@ -162,8 +178,19 @@ for (const step of plan.steps) {
   }
 }
 if (!sameJson(planCounts, counts)) fail('plan disposition counts differ from approved contract');
+if (plan.graphFingerprintSha256 !== disposition.graphRef.fingerprintSha256) {
+  fail('structured plan lost the approved graph fingerprint');
+}
 
-if (!/^\|\s*\`P0-PR-01\`\s*\|[^|\n]*\|\s*\*\*DECIDED\*\*\s*\|/m.test(decisions)) {
+const driftedGraph = clone(graph);
+driftedGraph.edges[0].constraintName += '_same-count-drift';
+expectThrow(
+  'same-count graph identity drift',
+  () => evaluateAccountDeletionDispositionContract(disposition, driftedGraph),
+  /fingerprintSha256 does not match the canonical graph/,
+);
+
+if (!/^\|\s*`P0-PR-01`\s*\|[^|\n]*\|\s*\*\*DECIDED\*\*\s*\|/m.test(decisions)) {
   fail('P0-PR-01 must be DECIDED in the decision register');
 }
 for (const fragment of [
