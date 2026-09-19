@@ -112,9 +112,20 @@ BEGIN
 END
 $$;
 
-grant myeongha_system_executor to myeongha_worker_runtime with admin false;
-grant myeongha_system_executor to myeongha_worker_runtime with inherit false;
-grant myeongha_system_executor to myeongha_worker_runtime with set true;
+grant myeongha_system_executor to myeongha_worker_runtime;
+revoke admin option for myeongha_system_executor from myeongha_worker_runtime;
+
+-- PostgreSQL 16+ stores INHERIT/SET as per-membership options. PostgreSQL 15 does not
+-- understand that GRANT syntax, so pin those options only where the catalog supports them.
+-- The worker role itself is NOINHERIT on every supported version.
+DO $
+BEGIN
+  IF pg_catalog.current_setting('server_version_num')::integer >= 160000 THEN
+    EXECUTE 'grant myeongha_system_executor to myeongha_worker_runtime with inherit false';
+    EXECUTE 'grant myeongha_system_executor to myeongha_worker_runtime with set true';
+  END IF;
+END
+$;
 
 -- Fail closed if ordinary API identities ever acquire the system worker role.
 DO $$
