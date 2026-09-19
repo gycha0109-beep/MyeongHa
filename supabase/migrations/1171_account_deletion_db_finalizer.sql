@@ -60,6 +60,11 @@ begin
 end;
 $finalizer_guard$;
 
+-- Default function privileges are hardened in this repository, so make the read-only
+-- predicate explicitly callable by trigger invokers. It returns true only when current_user
+-- is the SECURITY DEFINER finalizer owner and the transaction-local Subject GUC matches.
+grant execute on function public.internal_account_deletion_finalizer_context_matches_v1(uuid) to public;
+
 -- The predicate is intentionally callable: trigger functions execute as their caller and
 -- need to evaluate it during ordinary DML. It exposes no mutation authority; only the
 -- SECURITY DEFINER finalizer owner can ever receive true.
