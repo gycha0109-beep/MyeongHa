@@ -67,5 +67,6 @@
   "authoritativePostBackupSource": false,
   "authoritativePrivacyReconciliation": false,
   "futureSafePrivacyReconciliation": false,
-  "drReady": false
+  "drReady": false,
+  "subjectGraphFingerprintSha256": "79c84d42419686e6ba7aabae81ceb9395ddaa346176443315a804b3d62ec03fd"
 }
