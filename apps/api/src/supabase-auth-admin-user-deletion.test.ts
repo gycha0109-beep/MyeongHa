@@ -201,14 +201,15 @@ describe('Supabase Auth Admin account-deletion adapter', () => {
     });
 
     const pending = adapter.deleteUser({ authUserId: AUTH_USER_ID });
-    await vi.advanceTimersByTimeAsync(
-      SUPABASE_AUTH_ADMIN_USER_DELETE_DEFAULT_TIMEOUT_MS_V1,
-    );
-
-    await expect(pending).rejects.toMatchObject({
+    const rejection = expect(pending).rejects.toMatchObject({
       code: 'TIMEOUT',
       retryable: true,
     } satisfies Partial<SupabaseAuthAdminUserDeletionErrorV1>);
+
+    await vi.advanceTimersByTimeAsync(
+      SUPABASE_AUTH_ADMIN_USER_DELETE_DEFAULT_TIMEOUT_MS_V1,
+    );
+    await rejection;
     expect(observedSignal).toBeInstanceOf(AbortSignal);
     expect(observedSignal?.aborted).toBe(true);
   });
