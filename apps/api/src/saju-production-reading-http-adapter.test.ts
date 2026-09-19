@@ -1,9 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   buildSajuProductionReadingRequestV1,
+  createSajuPreviewReadingHttpAdapterV1,
   createSajuProductionReadingHttpAdapterV1,
   SAJU_PRODUCT_READING_RESPONSE_ADMISSION_HEADER_V1,
   SAJU_PRODUCT_READING_RESPONSE_ADMISSION_VERSION_V1,
+  SAJU_PREVIEW_READING_LIFECYCLE_V1,
+  SAJU_READING_LIFECYCLE_HEADER_V1,
   SajuProductionReadingHttpAdapterErrorV1,
 } from './saju-production-reading-http-adapter.js';
 
@@ -22,6 +25,7 @@ function jsonResponse(
   body: unknown,
   admissionVersion: string | null =
     SAJU_PRODUCT_READING_RESPONSE_ADMISSION_VERSION_V1,
+  lifecycle: string | null = null,
 ): {
   status: number;
   headers: { get(name: string): string | null };
@@ -39,6 +43,7 @@ function jsonResponse(
         if (normalized === SAJU_PRODUCT_READING_RESPONSE_ADMISSION_HEADER_V1) {
           return admissionVersion;
         }
+        if (normalized === SAJU_READING_LIFECYCLE_HEADER_V1) return lifecycle;
         return null;
       },
     },
@@ -113,6 +118,45 @@ describe('Saju Product Reading HTTP adapter', () => {
     expect(calls[0]?.init.redirect).toBe('manual');
     expect(calls[0]?.init.headers.authorization).toBe('Bearer service-credential');
     expect(JSON.parse(calls[0]?.init.body)).toEqual(request);
+  });
+
+  it('uses the Preview endpoint and requires the exact Preview lifecycle attestation', async () => {
+    const calls: Array<{ url: string; init: any }> = [];
+    const payload = {
+      responseVersion: SAJU_PRODUCT_READING_RESPONSE_ADMISSION_VERSION_V1,
+      state: 'delivered',
+    };
+    const fetchImpl = vi.fn(async (url: string, init: any) => {
+      calls.push({ url, init });
+      return jsonResponse(
+        200,
+        payload,
+        SAJU_PRODUCT_READING_RESPONSE_ADMISSION_VERSION_V1,
+        SAJU_PREVIEW_READING_LIFECYCLE_V1,
+      );
+    });
+    const adapter = createSajuPreviewReadingHttpAdapterV1({
+      baseUrl: 'https://saju.example.test',
+      bearerToken: 'service-credential',
+      fetchImpl,
+    });
+    const request = buildSajuProductionReadingRequestV1({
+      birthRevision: BIRTH_REVISION,
+      readingText: '전체 사주',
+    });
+
+    await expect(adapter.requestReading(request)).resolves.toEqual(payload);
+    expect(calls[0]?.url).toBe('https://saju.example.test/api/preview/readings');
+
+    const missingLifecycle = createSajuPreviewReadingHttpAdapterV1({
+      baseUrl: 'https://saju.example.test',
+      bearerToken: 'service-credential',
+      fetchImpl: async () => jsonResponse(200, payload),
+    });
+    await expect(missingLifecycle.requestReading(request)).rejects.toMatchObject({
+      code: 'RESPONSE_LIFECYCLE_ATTESTATION_REJECTED',
+      httpStatus: 200,
+    });
   });
 
   it('rejects HTTP 200 when the source admission attestation is missing', async () => {

@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { createNodePostgresSubjectPoolV1 } from '../apps/api/src/node-postgres-subject-pool.js';
 import { createProductionChatReadRuntimeV1 } from '../apps/api/src/production-chat-read-runtime.js';
 import { createProductionCurrentSubjectProfileRuntimeV1 } from '../apps/api/src/production-current-subject-profile-runtime.js';
+import { createProductionCurrentSubjectSajuPreviewReadingRuntimeV1 } from '../apps/api/src/production-current-subject-saju-preview-reading-runtime.js';
 import { createProductionTargetPersonReadRuntimeV1 } from '../apps/api/src/production-target-person-read-runtime.js';
 import {
   createProductionLifeRecordReadRuntimeV1,
@@ -18,6 +19,7 @@ const CHAT_OPEN_ROUTE = '/api/chat' as const;
 const CHAT_ROUTE_PREFIX = '/api/chat/' as const;
 const TARGET_PERSONS_ROUTE = '/api/target-persons' as const;
 const TARGET_PERSON_ROUTE_PREFIX = '/api/target-persons/' as const;
+const SAJU_PREVIEW_READING_ROUTE = '/api/me/saju/preview-reading' as const;
 const RECORDS_ROUTE_PARAM = '__myeongha_records_read' as const;
 const CHAT_OPEN_PARAM = '__myeongha_chat_open' as const;
 const CHAT_THREAD_PARAM = '__myeongha_chat_thread_id' as const;
@@ -25,6 +27,7 @@ const VERCEL_DYNAMIC_CHAT_THREAD_PARAM = 'threadId' as const;
 const CHAT_CURSOR_PARAM = 'afterSequenceNo' as const;
 const TARGET_PERSON_READ_PARAM = '__myeongha_target_person_read' as const;
 const TARGET_PERSON_ID_PARAM = '__myeongha_target_person_id' as const;
+const SAJU_PREVIEW_READING_PARAM = '__myeongha_saju_preview_reading' as const;
 const VERCEL_DYNAMIC_TARGET_PERSON_PARAM = 'id' as const;
 const VERCEL_SHARE_PARAM = '_vercel_share' as const;
 const NO_STORE_CACHE_CONTROL = 'no-store' as const;
@@ -47,6 +50,9 @@ let chatRuntime:
   | undefined;
 let targetPersonRuntime:
   | ReturnType<typeof createProductionTargetPersonReadRuntimeV1>
+  | undefined;
+let sajuPreviewReadingRuntime:
+  | ReturnType<typeof createProductionCurrentSubjectSajuPreviewReadingRuntimeV1>
   | undefined;
 
 function getSharedPostgresPool(): ReturnType<typeof createNodePostgresSubjectPoolV1> {
@@ -104,8 +110,17 @@ function getTargetPersonRuntime(): ReturnType<typeof createProductionTargetPerso
   return targetPersonRuntime;
 }
 
+function getSajuPreviewReadingRuntime(): ReturnType<typeof createProductionCurrentSubjectSajuPreviewReadingRuntimeV1> {
+  sajuPreviewReadingRuntime ??= createProductionCurrentSubjectSajuPreviewReadingRuntimeV1({
+    env: process.env,
+    pool: getSharedPostgresPool(),
+  });
+  return sajuPreviewReadingRuntime;
+}
+
 type DispatchTarget =
   | { readonly kind: 'profile'; readonly route: typeof PROFILE_ROUTE }
+  | { readonly kind: 'saju-preview-reading'; readonly route: typeof SAJU_PREVIEW_READING_ROUTE }
   | {
       readonly kind: 'records';
       readonly route: typeof LIFE_RECORD_ROUTE | typeof READINGS_ROUTE | typeof MEMORIES_ROUTE;
@@ -153,6 +168,7 @@ function getChatPathThreadId(pathname: string): string | null | undefined {
     pathname === READINGS_ROUTE ||
     pathname === MEMORIES_ROUTE ||
     pathname === TARGET_PERSONS_ROUTE ||
+    pathname === SAJU_PREVIEW_READING_ROUTE ||
     pathname.startsWith(TARGET_PERSON_ROUTE_PREFIX)
   ) {
     return undefined;
@@ -203,6 +219,7 @@ function resolveDispatchTarget(request: Request): DispatchTarget | null {
     CHAT_CURSOR_PARAM,
     TARGET_PERSON_READ_PARAM,
     TARGET_PERSON_ID_PARAM,
+    SAJU_PREVIEW_READING_PARAM,
     VERCEL_DYNAMIC_TARGET_PERSON_PARAM,
     VERCEL_SHARE_PARAM,
   ]);
@@ -235,6 +252,14 @@ function resolveDispatchTarget(request: Request): DispatchTarget | null {
   const afterSequenceNo = getSingleNonEmptyParam(url.searchParams, CHAT_CURSOR_PARAM);
   if (afterSequenceNo === null) return null;
 
+  const sajuPreviewReading = getSingleNonEmptyParam(
+    url.searchParams,
+    SAJU_PREVIEW_READING_PARAM,
+  );
+  if (sajuPreviewReading === null || (sajuPreviewReading !== undefined && sajuPreviewReading !== '1')) {
+    return null;
+  }
+
   const targetPersonRead = getSingleNonEmptyParam(
     url.searchParams,
     TARGET_PERSON_READ_PARAM,
@@ -257,6 +282,16 @@ function resolveDispatchTarget(request: Request): DispatchTarget | null {
 
   if (chatOpen !== undefined && chatOpen !== '1') return null;
 
+  const isSajuPreviewSourcePath = url.pathname === SAJU_PREVIEW_READING_ROUTE;
+  if (isSajuPreviewSourcePath && sajuPreviewReading !== '1') return null;
+  if (
+    sajuPreviewReading === '1' &&
+    url.pathname !== PROFILE_ROUTE &&
+    !isSajuPreviewSourcePath
+  ) {
+    return null;
+  }
+
   const hasChatOpen = chatOpen === '1';
   const isChatOpenSourcePath = url.pathname === CHAT_OPEN_ROUTE;
   if (isChatOpenSourcePath && !hasChatOpen) return null;
@@ -265,6 +300,25 @@ function resolveDispatchTarget(request: Request): DispatchTarget | null {
   if (hasChatOpen && vercelDynamicThreadId !== undefined) return null;
   if (hasChatOpen && pathThreadId !== undefined) return null;
   if (hasChatOpen && afterSequenceNo !== undefined) return null;
+
+  if (sajuPreviewReading === '1') {
+    if (
+      recordsRoute !== undefined ||
+      hasChatOpen ||
+      chatThreadId !== undefined ||
+      vercelDynamicThreadId !== undefined ||
+      pathThreadId !== undefined ||
+      afterSequenceNo !== undefined ||
+      targetPersonRead !== undefined ||
+      targetPersonId !== undefined ||
+      vercelDynamicTargetPersonId !== undefined ||
+      targetPersonPathValue !== undefined
+    ) {
+      return null;
+    }
+    return { kind: 'saju-preview-reading', route: SAJU_PREVIEW_READING_ROUTE };
+  }
+  if (isSajuPreviewSourcePath) return null;
 
   if (targetPersonRead !== undefined) {
     if (
@@ -426,6 +480,8 @@ function runtimeForTarget(target: DispatchTarget) {
   switch (target.kind) {
     case 'profile':
       return getProfileRuntime();
+    case 'saju-preview-reading':
+      return getSajuPreviewReadingRuntime();
     case 'records':
       if (target.route === LIFE_RECORD_ROUTE) return getLifeRecordRuntime();
       if (target.route === READINGS_ROUTE) return getReadingsRuntime();

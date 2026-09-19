@@ -373,7 +373,7 @@ try {
     productTitle: document.querySelector('[data-reading-product-title]')?.textContent?.trim() ?? '',
   }))()`);
   assert(careerReading.topic === 'career' && careerReading.scope === 'original', `Career route collapsed: ${JSON.stringify(careerReading)}`);
-  assert(careerReading.routeState === 'blocked_by_authority' && careerReading.title.includes('직업 · 커리어'), 'Career blocked surface lost route identity');
+  assert(careerReading.routeState === 'preview_requires_profile' && careerReading.title.includes('직업 · 커리어'), 'Career Preview profile gate lost route identity');
 
   await navigate(client, origin, '/reading-detail.html?topic=money', '.reading-route-state');
   const moneyReading = await client.evaluate(`(() => ({
@@ -383,7 +383,7 @@ try {
     title: document.querySelector('[data-reading-state-title]')?.textContent?.trim() ?? '',
   }))()`);
   assert(moneyReading.topic === 'money' && moneyReading.scope === 'original', `Money route collapsed: ${JSON.stringify(moneyReading)}`);
-  assert(moneyReading.routeState === 'blocked_by_authority' && moneyReading.title.includes('재물'), 'Money blocked surface lost route identity');
+  assert(moneyReading.routeState === 'preview_requires_profile' && moneyReading.title.includes('재물'), 'Money Preview profile gate lost route identity');
 
   await navigate(client, origin, '/reading-detail.html?topic=unknown-reading', '.reading-route-state');
   const invalidReading = await client.evaluate(`(() => ({

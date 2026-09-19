@@ -113,11 +113,13 @@ describe('Reading hub/detail fail-closed regression', () => {
     }
   });
 
-  it('does not expose the generic placeholder stage while public Product Reading is blocked', () => {
+  it('keeps the result stage hidden until an admitted Preview Reading is delivered', () => {
     expect(detail).toContain('data-reading-route-state');
     expect(detail).toMatch(/<section className="reading-stage" data-reading-stage hidden/);
     expect(detail).toContain('src="/src/reading-detail/main.tsx"');
-    expect(detailRuntime).toContain("root.dataset.readingRouteState = route.valid ? 'blocked_by_authority' : 'invalid';");
+    expect(detailRuntime).toContain("const PREVIEW_READING_TEXTS = new Set(['전체 사주', '직업운', '재물운', '연애운', '사업운']);");
+    expect(detailRuntime).toContain("? (previewEligible ? 'preview_loading' : 'blocked_by_authority')");
+    expect(detailRuntime).toContain('void loadPreviewReading();');
     expect(detailRuntime).toContain('다른 주제의 풀이로 대신 보여드리지 않습니다.');
   });
 

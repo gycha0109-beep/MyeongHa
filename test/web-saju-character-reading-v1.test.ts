@@ -72,7 +72,7 @@ describe('MyeongHa character-led Saju Reading v1', () => {
     expect(runtime).not.toContain("params.get('scope') || 'year'");
   });
 
-  it('keeps the four-step result scaffold dormant while public Product Reading is authority-blocked', async () => {
+  it('keeps the result scaffold dormant until an admitted Preview Reading is delivered', async () => {
     const [html, runtime] = await Promise.all([
       readReadingMarkup(),
       readFile(readingRuntimePath, 'utf8'),
@@ -86,7 +86,9 @@ describe('MyeongHa character-led Saju Reading v1', () => {
     expect(html).toContain('data-chart-open');
     expect(html).toContain('data-chart-dialog');
     expect(html).toContain('내 명식 보기');
-    expect(runtime).toContain("root.dataset.readingRouteState = route.valid ? 'blocked_by_authority' : 'invalid';");
+    expect(runtime).toContain("? (previewEligible ? 'preview_loading' : 'blocked_by_authority')");
+    expect(runtime).toContain("const SAJU_PREVIEW_READING_ENDPOINT = '/api/me/saju/preview-reading';");
+    expect(runtime).toContain('activatePreviewReading(steps);');
     expect(runtime).toContain('if (stage) stage.hidden = true;');
     expect(runtime).not.toContain('const readingSteps =');
     expect(runtime).not.toContain('window.location.href = `chat.html?character=');
