@@ -13,11 +13,11 @@ const recoveryWorkflow = readFileSync(
 
 describe('direct Saju redeploy authority contract', () => {
   it('keeps the browser smoke limited to browser verification', () => {
-    expect(browserWorkflow).toContain('name: Web Browser Render Smoke');
+    expect(browserWorkflow).toContain('name: Web Browser Smoke');
     expect(browserWorkflow).toContain('pull_request:');
     expect(browserWorkflow).toContain('push:');
     expect(browserWorkflow).toContain('- main');
-    expect(browserWorkflow).toContain('web-browser-render:');
+    expect(browserWorkflow).toContain('web-browser-smoke:');
     expect(browserWorkflow).not.toContain('production-saju-redeploy.trigger');
     expect(browserWorkflow).not.toContain('VERCEL_TOKEN');
     expect(browserWorkflow).not.toContain('actions: write');

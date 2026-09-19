@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const wrapper = readFileSync('scripts/run-web-auth-guest-bootstrap-singleflight-browser-smoke.mjs', 'utf8');
-const workflow = readFileSync('.github/workflows/web-browser-render-smoke.yml', 'utf8');
+const workflow = readFileSync('.github/workflows/web-browser-auth-regression.yml', 'utf8');
 
 describe('Guest bootstrap browser cleanup wrapper', () => {
   it('requires every functional auth marker before cleanup ENOTEMPTY can be ignored', () => {
@@ -19,7 +19,7 @@ describe('Guest bootstrap browser cleanup wrapper', () => {
     expect(wrapper).toContain('process.exit(exitCode);');
   });
 
-  it('routes the Browser workflow through the narrow wrapper rather than the raw verifier', () => {
+  it('routes the Auth Regression workflow through the narrow wrapper rather than the raw verifier', () => {
     expect(workflow).toContain('run: node scripts/run-web-auth-guest-bootstrap-singleflight-browser-smoke.mjs');
     expect(workflow).not.toContain('run: node scripts/verify-web-auth-guest-bootstrap-singleflight-browser.mjs');
   });

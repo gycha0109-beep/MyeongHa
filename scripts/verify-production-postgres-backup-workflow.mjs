@@ -1,12 +1,15 @@
 import { readFile } from 'node:fs/promises';
 
 const workflowPath = '.github/workflows/production-postgres-backup.yml';
+const runnerPath = 'scripts/operations/export-production-postgres-backup.sh';
 const runbookPath = 'docs/operations/POSTGRES_BACKUP_RESTORE_RUNBOOK_V1.md';
 
-const [workflow, runbook] = await Promise.all([
+const [workflow, runner, runbook] = await Promise.all([
   readFile(workflowPath, 'utf8'),
+  readFile(runnerPath, 'utf8'),
   readFile(runbookPath, 'utf8'),
 ]);
+const contract = workflow + '\n' + runner;
 
 const requiredWorkflowFragments = [
   'name: Production PostgreSQL Logical Backup',
@@ -59,7 +62,7 @@ const requiredWorkflowFragments = [
 ];
 
 for (const fragment of requiredWorkflowFragments) {
-  if (!workflow.includes(fragment)) {
+  if (!contract.includes(fragment)) {
     throw new Error(`Missing production backup workflow contract fragment: ${fragment}`);
   }
 }
@@ -85,19 +88,20 @@ const forbiddenWorkflowFragments = [
 ];
 
 for (const fragment of forbiddenWorkflowFragments) {
-  if (workflow.includes(fragment)) {
+  if (contract.includes(fragment)) {
     throw new Error(`Forbidden production backup workflow fragment: ${fragment}`);
   }
 }
 
-const encryptIndex = workflow.indexOf('openssl enc -aes-256-cbc -salt -pbkdf2 -iter 200000');
-const plaintextDeleteIndex = workflow.indexOf('rm -f "$plaintext_archive"');
+const encryptIndex = runner.indexOf('openssl enc -aes-256-cbc -salt -pbkdf2 -iter 200000');
+const plaintextDeleteIndex = runner.indexOf('rm -f "$plaintext_archive"');
+const runnerStepIndex = workflow.indexOf('run: bash scripts/operations/export-production-postgres-backup.sh');
 const uploadIndex = workflow.indexOf('uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7');
-if (encryptIndex < 0 || plaintextDeleteIndex < 0 || uploadIndex < 0) {
+if (encryptIndex < 0 || plaintextDeleteIndex < 0 || runnerStepIndex < 0 || uploadIndex < 0) {
   throw new Error('Backup encryption/upload ordering markers are missing.');
 }
-if (!(encryptIndex < plaintextDeleteIndex && plaintextDeleteIndex < uploadIndex)) {
-  throw new Error('Plaintext backup must be encrypted and removed before artifact upload.');
+if (!(encryptIndex < plaintextDeleteIndex && runnerStepIndex < uploadIndex)) {
+  throw new Error('Plaintext backup must be encrypted and removed by the runner before artifact upload.');
 }
 
 const requiredRunbookFragments = [

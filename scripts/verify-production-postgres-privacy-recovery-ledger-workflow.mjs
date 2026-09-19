@@ -7,18 +7,22 @@ import {
 } from './build-postgres-privacy-recovery-ledger-manifest.mjs';
 
 const workflowPath = '.github/workflows/production-postgres-privacy-recovery-ledger.yml';
+const runnerPath = 'scripts/operations/export-production-postgres-privacy-recovery-ledger.sh';
 const builderPath = 'scripts/build-postgres-privacy-recovery-ledger-manifest.mjs';
 const decisionPath = 'docs/P0_DECISION_REGISTER.md';
 const statusPath = 'docs/operations/POSTGRES_DR_READINESS_STATUS_V1.md';
 const candidateDocPath = 'docs/operations/POSTGRES_PRIVACY_RECOVERY_LEDGER_CANDIDATE_V1.md';
 
-const [workflow, builder, decisions, status, candidateDoc] = await Promise.all([
+const [workflow, runner, builder, decisions, status, candidateDoc] = await Promise.all([
   readFile(workflowPath, 'utf8'),
+  readFile(runnerPath, 'utf8'),
   readFile(builderPath, 'utf8'),
   readFile(decisionPath, 'utf8'),
   readFile(statusPath, 'utf8'),
   readFile(candidateDocPath, 'utf8'),
 ]);
+const contract = workflow + '\
+' + runner;
 
 const requiredWorkflowFragments = [
   'name: Production PostgreSQL Privacy Recovery Ledger Candidate',
@@ -59,7 +63,7 @@ const requiredWorkflowFragments = [
 ];
 
 for (const fragment of requiredWorkflowFragments) {
-  if (!workflow.includes(fragment)) {
+  if (!contract.includes(fragment)) {
     throw new Error('Missing privacy recovery ledger workflow contract fragment: ' + fragment);
   }
 }
@@ -79,7 +83,7 @@ const forbiddenWorkflowFragments = [
 ];
 
 for (const fragment of forbiddenWorkflowFragments) {
-  if (workflow.toLowerCase().includes(fragment.toLowerCase())) {
+  if (contract.toLowerCase().includes(fragment.toLowerCase())) {
     throw new Error('Forbidden privacy recovery ledger workflow fragment: ' + fragment);
   }
 }

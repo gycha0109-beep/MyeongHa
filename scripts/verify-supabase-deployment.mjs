@@ -3,18 +3,23 @@ import { readFile, readdir } from 'node:fs/promises';
 
 const expectedProjectRef = 'cnsfpcdiyofqvhpcegfc';
 const workflowPath = '.github/workflows/supabase-production.yml';
+const migrationRunnerPath = 'scripts/operations/run-supabase-production-migrations.sh';
 const postdeployVerifyPath = 'scripts/run-production-platform-integrity-postdeploy-verify.sh';
 const configPath = 'supabase/config.toml';
 const migrationDir = 'supabase/migrations';
 
+execFileSync('bash', ['-n', migrationRunnerPath], { stdio: 'inherit' });
 execFileSync('bash', ['-n', postdeployVerifyPath], { stdio: 'inherit' });
 
-const [workflow, postdeployVerify, config, migrationFiles] = await Promise.all([
+const [workflow, migrationRunner, postdeployVerify, config, migrationFiles] = await Promise.all([
   readFile(workflowPath, 'utf8'),
+  readFile(migrationRunnerPath, 'utf8'),
   readFile(postdeployVerifyPath, 'utf8'),
   readFile(configPath, 'utf8'),
   readdir(migrationDir),
 ]);
+
+const deploymentContract = workflow + '\n' + migrationRunner;
 
 const requiredWorkflowFragments = [
   "push:\n    branches:\n      - main\n  workflow_dispatch:",
@@ -32,7 +37,7 @@ const requiredWorkflowFragments = [
   'git cat-file -e "${BEFORE_SHA}^{commit}"',
   "reason='push before SHA is not present in checkout; fail closed'",
   'git diff --name-only "$BEFORE_SHA" "$CURRENT_SHA"',
-  "'^(supabase/migrations/|[.]github/workflows/supabase-production[.]yml$|scripts/run-production-platform-integrity-postdeploy-verify[.]sh$|scripts/run-production-platform-integrity-read-audit[.]sh$|scripts/run-production-platform-integrity-data-api-surface-audit[.]sh$)'",
+  "'^(supabase/migrations/|[.]github/workflows/supabase-production[.]yml$|scripts/run-production-platform-integrity-postdeploy-verify[.]sh$|scripts/run-production-platform-integrity-read-audit[.]sh$|scripts/run-production-platform-integrity-data-api-surface-audit[.]sh$|scripts/operations/run-supabase-production-migrations[.]sh$)'",
   'echo "requires_deploy=$requires_deploy" >> "$GITHUB_OUTPUT"',
   'needs: change-gate',
   "if: ${{ needs.change-gate.outputs.requires_deploy == 'true' }}",
@@ -45,14 +50,11 @@ const requiredWorkflowFragments = [
   'SUPABASE_PRODUCTION_SESSION_POOLER_HOST: ${{ secrets.SUPABASE_PRODUCTION_SESSION_POOLER_HOST }}',
   'SUPABASE_PRODUCTION_SESSION_POOLER_HOST must be a bare *.pooler.supabase.com hostname.',
   'SUPABASE_ACCESS_TOKEN is not configured and no explicit Session Pooler host is available',
-  'Prepare explicit Session Pooler DB URL',
-  "if: ${{ env.SUPABASE_PRODUCTION_SESSION_POOLER_HOST != '' }}",
+  'run: bash scripts/operations/run-supabase-production-migrations.sh',
   'db_url="postgresql://postgres.${SUPABASE_PROJECT_ID}:${encoded_password}@${host}:5432/postgres?sslmode=require"',
   'echo "::add-mask::$db_url"',
-  "printf 'SUPABASE_PRODUCTION_DB_URL=%s\\n' \"$db_url\" >> \"$GITHUB_ENV\"",
-  "if: ${{ env.SUPABASE_PRODUCTION_SESSION_POOLER_HOST == '' }}",
   'supabase link --project-ref "$SUPABASE_PROJECT_ID"',
-  'db_args+=(--db-url "$SUPABASE_PRODUCTION_DB_URL")',
+  'db_args+=(--db-url "$db_url")',
   "grep -q '20260830072444'",
   'supabase migration repair 20260830072444 --status reverted "${db_args[@]}"',
   'supabase migration repair 0010 --status applied "${db_args[@]}"',
@@ -69,7 +71,7 @@ const requiredWorkflowFragments = [
 ];
 
 for (const fragment of requiredWorkflowFragments) {
-  if (!workflow.includes(fragment)) {
+  if (!deploymentContract.includes(fragment)) {
     throw new Error(`Missing Supabase deployment contract fragment: ${fragment}`);
   }
 }
@@ -87,7 +89,7 @@ const forbiddenWorkflowFragments = [
 ];
 
 for (const fragment of forbiddenWorkflowFragments) {
-  if (workflow.includes(fragment)) {
+  if (deploymentContract.includes(fragment)) {
     throw new Error(`Supabase production workflow contains a forbidden fragment: ${fragment}`);
   }
 }

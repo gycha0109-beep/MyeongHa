@@ -55,52 +55,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           BACKUP_RUN_ID: ${{ inputs.backup_run_id }}
           INCIDENT_REFERENCE_UTC: ${{ inputs.incident_reference_utc }}
-        run: |
-          set -euo pipefail
-          [[ "$BACKUP_RUN_ID" =~ ^[0-9]+$ ]]
-          incident_roundtrip="$(date -u -d "$INCIDENT_REFERENCE_UTC" +'%Y-%m-%dT%H:%M:%SZ')"
-          [[ "$incident_roundtrip" == "$INCIDENT_REFERENCE_UTC" ]]
-
-          run_json="$RUNNER_TEMP/backup-run.json"
-          artifact_json="$RUNNER_TEMP/backup-artifacts.json"
-          curl -fsSL \
-            -H "Authorization: Bearer $GH_TOKEN" \
-            -H 'Accept: application/vnd.github+json' \
-            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/runs/$BACKUP_RUN_ID" \
-            -o "$run_json"
-
-          jq -e '
-            .name == "Production PostgreSQL Logical Backup"
-            and .path == ".github/workflows/production-postgres-backup.yml"
-            and .conclusion == "success"
-            and .head_branch == "main"
-            and (.event == "schedule" or .event == "workflow_dispatch")
-            and .repository.full_name == env.GITHUB_REPOSITORY
-          ' "$run_json" >/dev/null
-
-          source_sha="$(jq -er '.head_sha' "$run_json")"
-          [[ "$source_sha" =~ ^[0-9a-f]{40}$ ]]
-
-          curl -fsSL \
-            -H "Authorization: Bearer $GH_TOKEN" \
-            -H 'Accept: application/vnd.github+json' \
-            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/runs/$BACKUP_RUN_ID/artifacts?per_page=100" \
-            -o "$artifact_json"
-
-          governed_artifacts="$(jq -c '[.artifacts[] | select((.name | test("^myeongha-postgres-[0-9]{8}T[0-9]{6}Z$")) and (.expired == false))]' "$artifact_json")"
-          [[ "$(jq 'length' <<<"$governed_artifacts")" == '1' ]]
-
-          artifact_id="$(jq -er '.[0].id' <<<"$governed_artifacts")"
-          artifact_name="$(jq -er '.[0].name' <<<"$governed_artifacts")"
-          artifact_expires_at="$(jq -er '.[0].expires_at' <<<"$governed_artifacts")"
-          [[ "$artifact_id" =~ ^[0-9]+$ ]]
-          [[ "$artifact_name" =~ ^myeongha-postgres-[0-9]{8}T[0-9]{6}Z$ ]]
-
-          echo "source_sha=$source_sha" >> "$GITHUB_OUTPUT"
-          echo "artifact_id=$artifact_id" >> "$GITHUB_OUTPUT"
-          echo "artifact_name=$artifact_name" >> "$GITHUB_OUTPUT"
-          echo "artifact_expires_at=$artifact_expires_at" >> "$GITHUB_OUTPUT"
-
+        run: bash scripts/operations/resolve-postgres-restore-source.sh
       - name: Download exact governed backup artifact
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
@@ -124,9 +79,7 @@ jobs:
           BACKUP_ARTIFACT_DIR: ${{ runner.temp }}/backup-artifact
           EXPECTED_SOURCE_SHA: ${{ steps.source.outputs.source_sha }}
           RESTORE_EVIDENCE_PATH: ${{ runner.temp }}/restore-evidence/restore-evidence.json
-        run: |
-          set -euo pipefail
-          bash scripts/run-postgres-isolated-restore-drill.sh
+        run: bash scripts/run-postgres-isolated-restore-drill.sh
 
       - name: Exercise synthetic privacy reconciliation on restored database
         shell: bash
@@ -139,19 +92,7 @@ jobs:
           PGUSER: supabase_admin
           PGPASSWORD: restore-drill
           PGDATABASE: postgres
-        run: |
-          set -euo pipefail
-          mapfile -t public_manifests < <(
-            find "$BACKUP_ARTIFACT_DIR" -maxdepth 1 -type f -name '*.manifest.json' -print
-          )
-          [[ "${#public_manifests[@]}" -eq 1 ]]
-          export PRIVACY_RECONCILIATION_BACKUP_COMPLETED_AT_UTC
-          PRIVACY_RECONCILIATION_BACKUP_COMPLETED_AT_UTC="$(
-            jq -er '.created_at_utc' "${public_manifests[0]}"
-          )"
-
-          bash scripts/run-postgres-privacy-reconciliation-synthetic-drill.sh
-
+        run: bash scripts/operations/run-restored-postgres-privacy-drill.sh
       - name: Build self-contained restore evidence envelope
         shell: bash
         env:
@@ -161,25 +102,7 @@ jobs:
           INCIDENT_REFERENCE_UTC: ${{ inputs.incident_reference_utc }}
           SOURCE_ARTIFACT_NAME: ${{ steps.source.outputs.artifact_name }}
           SOURCE_ARTIFACT_EXPIRES_AT: ${{ steps.source.outputs.artifact_expires_at }}
-        run: |
-          set -euo pipefail
-          mapfile -t public_manifests < <(
-            find "$BACKUP_ARTIFACT_DIR" -maxdepth 1 -type f -name '*.manifest.json' -print
-          )
-          [[ "${#public_manifests[@]}" -eq 1 ]]
-
-          node scripts/build-postgres-restore-evidence-envelope.mjs \
-            --restore-evidence "$RESTORE_EVIDENCE_PATH" \
-            --backup-manifest "${public_manifests[0]}" \
-            --output "$RESTORE_EVIDENCE_PATH.enveloped" \
-            --backup-run-id "$BACKUP_RUN_ID" \
-            --incident-reference-utc "$INCIDENT_REFERENCE_UTC" \
-            --source-artifact-name "$SOURCE_ARTIFACT_NAME" \
-            --source-artifact-expires-at "$SOURCE_ARTIFACT_EXPIRES_AT"
-
-          mv "$RESTORE_EVIDENCE_PATH.enveloped" "$RESTORE_EVIDENCE_PATH"
-          chmod 600 "$RESTORE_EVIDENCE_PATH"
-
+        run: bash scripts/operations/build-postgres-restore-evidence.sh
       - name: Upload restore drill evidence only
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:

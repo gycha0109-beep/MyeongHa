@@ -9,6 +9,7 @@ on:
         type: string
 
 permissions:
+  actions: read
   contents: read
 
 concurrency:
@@ -22,6 +23,7 @@ jobs:
     environment: production
     env:
       DISPATCH_CONFIRM: ${{ inputs.confirm }}
+      GH_TOKEN: ${{ github.token }}
       MYEONGHA_PRODUCTION_BIRTH_SMOKE_MEMBER_BEARER: ${{ secrets.MYEONGHA_PRODUCTION_BIRTH_SMOKE_MEMBER_BEARER }}
       MYEONGHA_PRODUCTION_BIRTH_SMOKE_MEMBER_EXPECTED_SUBJECT_ID: ${{ secrets.MYEONGHA_PRODUCTION_BIRTH_SMOKE_MEMBER_EXPECTED_SUBJECT_ID }}
     steps:
@@ -30,6 +32,12 @@ jobs:
         run: |
           set -euo pipefail
           [[ "$DISPATCH_CONFIRM" == 'VERIFY_BIRTH_AUTHENTICATED_CREATE_READ' ]]
+
+          prior_successes="$(
+            gh api               "repos/${GITHUB_REPOSITORY}/actions/workflows/production-birth-profile-authenticated-create-read-smoke.yml/runs?event=workflow_dispatch&status=success&per_page=1"               --jq '.total_count'
+          )"
+          [[ "$prior_successes" == '0' ]]
+
           test -n "${MYEONGHA_PRODUCTION_BIRTH_SMOKE_MEMBER_BEARER:-}"
           test -n "${MYEONGHA_PRODUCTION_BIRTH_SMOKE_MEMBER_EXPECTED_SUBJECT_ID:-}"
 
