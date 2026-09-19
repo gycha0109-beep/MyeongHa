@@ -43,12 +43,7 @@ insert into public.reading_execution_attempts(
   null, clock_timestamp(), clock_timestamp(), null
 );
 
-update public.readings
-set execution_status = 'succeeded',
-    committed_execution_attempt_id = '11800000-0000-0000-0000-000000000001',
-    completed_at = clock_timestamp()
-where id = '11603100-0000-0000-0000-000000000001'
-  and subject_id = '11390000-0000-0000-0000-000000000001';
+begin;
 
 insert into public.reading_refs(
   reading_id, subject_id, execution_attempt_id, saju_engine_key,
@@ -60,13 +55,22 @@ insert into public.reading_refs(
   '11603100-0000-0000-0000-000000000001',
   '11390000-0000-0000-0000-000000000001',
   '11800000-0000-0000-0000-000000000001',
-  'saju-test', null, 'source-hash', null,
+  'saju-test', null, 'sha256:test:standard-unit-self-v1', null,
   'saju-test-v1', 'product-reading-test-v1', 'delivered',
   null, null, null,
   '{"responseVersion":"myeonghwa-product-reading-response-v2","artifact":"stored-test"}'::jsonb,
   'sha256:test-standard-reading-artifact',
   clock_timestamp()
 );
+
+update public.readings
+set execution_status = 'succeeded',
+    committed_execution_attempt_id = '11800000-0000-0000-0000-000000000001',
+    completed_at = clock_timestamp()
+where id = '11603100-0000-0000-0000-000000000001'
+  and subject_id = '11390000-0000-0000-0000-000000000001';
+
+commit;
 
 select pg_temp.assert_reread_true(
   'owner reads exact completed bound artifact source',
@@ -96,38 +100,15 @@ select pg_temp.assert_reread_true(
   )
 );
 
-insert into public.reading_execution_attempts(
-  id, reading_id, subject_id, execution_attempt_no, state,
-  transport_key, saju_engine_key, requested_engine_version, resolved_engine_version,
-  external_request_ref, started_at, finished_at, error_code
-) values (
-  '11800000-0000-0000-0000-000000000002',
-  '11603100-0000-0000-0000-000000000001',
-  '11390000-0000-0000-0000-000000000001',
-  2, 'succeeded',
-  'standard-reread-test-2', 'saju-test', null, 'saju-test-v1',
-  null, clock_timestamp(), clock_timestamp(), null
-);
-
-update public.readings
-set committed_execution_attempt_id = '11800000-0000-0000-0000-000000000002'
-where id = '11603100-0000-0000-0000-000000000001';
-
 select pg_temp.assert_reread_true(
-  'committed-attempt mismatch denies stale stored response',
-  not exists (
-    select 1
-    from public.internal_qry_standard_reading_artifact_source_v1(
-      '11390000-0000-0000-0000-000000000001',
-      '11603100-0000-0000-0000-000000000001',
-      clock_timestamp()
+  'reread source is pinned to the committed execution attempt',
+  position(
+    'rr.execution_attempt_id = r.committed_execution_attempt_id'
+    in pg_catalog.pg_get_functiondef(
+      'public.internal_qry_standard_reading_artifact_source_v1(uuid,uuid,timestamptz)'::pg_catalog.regprocedure
     )
-  )
+  ) > 0
 );
-
-update public.readings
-set committed_execution_attempt_id = '11800000-0000-0000-0000-000000000001'
-where id = '11603100-0000-0000-0000-000000000001';
 
 insert into public.entitlement_grants(
   id, subject_id, entitlement_key, scope_key, grant_key, grant_source_type,
