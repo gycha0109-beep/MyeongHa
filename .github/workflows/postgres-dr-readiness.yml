@@ -1,0 +1,47 @@
+name: PostgreSQL DR Readiness Authority
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'supabase/migrations/**'
+      - 'docs/architecture/PRODUCTION_OPERATIONS_ARCHITECTURE_V1.md'
+      - 'docs/P0_DECISION_REGISTER.md'
+      - 'docs/AUTH_RLS_PRIVACY_SPEC.md'
+      - 'docs/SOURCE_AUTHORITY_GAPS.md'
+      - 'docs/operations/POSTGRES_BACKUP_RESTORE_RUNBOOK_V1.md'
+      - 'docs/operations/POSTGRES_DR_READINESS_STATUS_V1.md'
+      - 'scripts/run-postgres-isolated-restore-drill.sh'
+      - 'scripts/verify-postgres-dr-readiness-authority.mjs'
+      - '.github/workflows/postgres-dr-readiness.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'supabase/migrations/**'
+      - 'docs/architecture/PRODUCTION_OPERATIONS_ARCHITECTURE_V1.md'
+      - 'docs/P0_DECISION_REGISTER.md'
+      - 'docs/AUTH_RLS_PRIVACY_SPEC.md'
+      - 'docs/SOURCE_AUTHORITY_GAPS.md'
+      - 'docs/operations/POSTGRES_BACKUP_RESTORE_RUNBOOK_V1.md'
+      - 'docs/operations/POSTGRES_DR_READINESS_STATUS_V1.md'
+      - 'scripts/run-postgres-isolated-restore-drill.sh'
+      - 'scripts/verify-postgres-dr-readiness-authority.mjs'
+      - '.github/workflows/postgres-dr-readiness.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: verify-postgres-dr-readiness-authority
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Verify PostgreSQL DR readiness authority
+        run: node scripts/verify-postgres-dr-readiness-authority.mjs

@@ -2,9 +2,29 @@ name: Web Browser Render Smoke
 
 on:
   pull_request:
+    paths:
+      - 'api/**'
+      - 'apps/web/**'
+      - 'packages/**'
+      - 'scripts/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig*.json'
+      - 'vercel.json'
+      - '.github/workflows/web-browser-render-smoke.yml'
   push:
     branches:
       - main
+    paths:
+      - 'api/**'
+      - 'apps/web/**'
+      - 'packages/**'
+      - 'scripts/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig*.json'
+      - 'vercel.json'
+      - '.github/workflows/web-browser-render-smoke.yml'
 
 permissions:
   contents: read
