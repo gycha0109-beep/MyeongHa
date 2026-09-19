@@ -8,7 +8,8 @@
     "schema": "myeongha-transitive-subject-dependency-graph-v1",
     "edgeCount": 106,
     "distinctReachableTableCount": 47,
-    "maxDepth": 4
+    "maxDepth": 4,
+    "fingerprintSha256": "79c84d42419686e6ba7aabae81ceb9395ddaa346176443315a804b3d62ec03fd"
   },
   "tableDispositions": [
     {
