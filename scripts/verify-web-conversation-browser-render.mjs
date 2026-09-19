@@ -221,26 +221,92 @@ async function verifyHub(page, origin, suffix, width, height, mobile) {
     `${suffix}: conversation hub React/controller mount did not finish`,
   );
 
-  const state = await page.evaluate(`(() => ({
-    title: document.title,
-    text: document.body.innerText,
-    intro: Boolean(document.querySelector('.conversation-hub-intro')),
-    primary: Boolean(document.querySelector('.conversation-primary')),
-    featured: Boolean(document.querySelector('.conversation-featured')),
-    threads: Boolean(document.querySelector('.conversation-thread-panel')),
-    discovery: Boolean(document.querySelector('.conversation-people')),
-    seyeonCardBg: getComputedStyle(document.querySelector('.chat-person-art[data-character="seyeon"]')).backgroundImage,
-    baekheonCardBg: getComputedStyle(document.querySelector('.chat-person-art[data-character="baekheon"]')).backgroundImage,
-    incomingHidden: document.querySelector('[data-incoming-section]')?.hidden === true,
-  }))()`);
+  const state = await page.evaluate(`(() => {
+    const expectedPortraits = {
+      seyeon: 'seyeon-portrait.webp',
+      baekheon: 'baekheon-portrait.webp',
+      yeoul: 'yeoul-portrait.webp',
+      seorin: 'seorin-portrait.webp',
+      rahyeon: 'rahyeon-portrait.webp',
+      mira: 'mira-portrait.webp',
+      taegyeom: 'taegyeom-portrait.webp',
+      yunho: 'yunho-portrait.webp',
+      doyoon: 'doyoon-portrait.webp',
+    };
+    const portraits = Object.entries(expectedPortraits).map(([key, filename]) => {
+      const art = document.querySelector('.chat-person-art[data-character="' + key + '"]');
+      const image = art?.querySelector('.chat-person-art-image');
+      const artRect = art?.getBoundingClientRect();
+      const imageRect = image?.getBoundingClientRect();
+      const style = image ? getComputedStyle(image) : null;
+      return {
+        key,
+        filename,
+        present: image instanceof HTMLImageElement,
+        src: image instanceof HTMLImageElement ? image.currentSrc || image.src : '',
+        complete: image instanceof HTMLImageElement ? image.complete : false,
+        naturalWidth: image instanceof HTMLImageElement ? image.naturalWidth : 0,
+        naturalHeight: image instanceof HTMLImageElement ? image.naturalHeight : 0,
+        artWidth: artRect?.width ?? 0,
+        artHeight: artRect?.height ?? 0,
+        imageWidth: imageRect?.width ?? 0,
+        imageHeight: imageRect?.height ?? 0,
+        objectFit: style?.objectFit ?? '',
+        transform: style?.transform ?? '',
+        overflow: art ? getComputedStyle(art).overflow : '',
+      };
+    });
+
+    const root = document.documentElement;
+    const previousTheme = root.dataset.theme;
+    root.dataset.theme = 'dark';
+    const firstTag = document.querySelector('.chat-person-tag');
+    const darkTagStyle = firstTag ? getComputedStyle(firstTag) : null;
+    const darkTag = {
+      color: darkTagStyle?.color ?? '',
+      backgroundColor: darkTagStyle?.backgroundColor ?? '',
+      borderColor: darkTagStyle?.borderColor ?? '',
+      fontWeight: darkTagStyle?.fontWeight ?? '',
+    };
+    if (previousTheme) root.dataset.theme = previousTheme;
+    else delete root.dataset.theme;
+
+    return {
+      title: document.title,
+      text: document.body.innerText,
+      intro: Boolean(document.querySelector('.conversation-hub-intro')),
+      primary: Boolean(document.querySelector('.conversation-primary')),
+      featured: Boolean(document.querySelector('.conversation-featured')),
+      threads: Boolean(document.querySelector('.conversation-thread-panel')),
+      discovery: Boolean(document.querySelector('.conversation-people')),
+      portraits,
+      darkTag,
+      incomingHidden: document.querySelector('[data-incoming-section]')?.hidden === true,
+    };
+  })()`);
 
   assert(state.intro && state.primary && state.featured && state.threads && state.discovery, `${suffix}: conversation hub surfaces missing`);
   assert(state.text.includes('누구와 이야기를 이어갈까요?'), `${suffix}: relationship-first subtitle missing`);
   assert(state.text.includes('내 대화'), `${suffix}: 내 대화 heading missing`);
   assert(state.text.includes('다른 사람 만나기'), `${suffix}: discovery entry missing`);
   assert(state.incomingHidden, `${suffix}: incoming stories must stay hidden without runtime authority`);
-  assert(state.seyeonCardBg.includes('seyeon-chat.webp'), `${suffix}: approved Se-yeon asset is not rendered`);
-  assert(!state.baekheonCardBg.includes('seyeon-chat.webp'), `${suffix}: Se-yeon asset leaked onto Baekheon placeholder`);
+  assert(state.portraits.length === 9, `${suffix}: expected nine finalized portrait cards`);
+  for (const portrait of state.portraits) {
+    assert(portrait.present, `${suffix}: ${portrait.key} portrait image element missing`);
+    assert(portrait.src.includes('/assets/characters/' + portrait.filename), `${suffix}: ${portrait.key} portrait mapping drifted`);
+    assert(portrait.complete && portrait.naturalWidth > 0 && portrait.naturalHeight > 0, `${suffix}: ${portrait.key} portrait did not decode`);
+    assert(portrait.objectFit === 'cover', `${suffix}: ${portrait.key} portrait must cover its rail`);
+    assert(portrait.overflow === 'hidden', `${suffix}: ${portrait.key} portrait rail must clip crop overflow`);
+    assert(portrait.artWidth > 0 && portrait.artHeight > 0 && portrait.imageWidth >= portrait.artWidth && portrait.imageHeight >= portrait.artHeight, `${suffix}: ${portrait.key} portrait does not fill its rail`);
+    assert(portrait.transform !== 'none', `${suffix}: ${portrait.key} portrait crop zoom is missing`);
+    const scale = portrait.transform.startsWith('matrix(')
+      ? Number.parseFloat(portrait.transform.slice(7).split(',')[0] ?? '0')
+      : 0;
+    assert(scale >= 1.95, `${suffix}: ${portrait.key} portrait crop is too distant`);
+  }
+  assert(state.darkTag.color === 'rgb(243, 231, 213)', `${suffix}: dark trait-chip text contrast regressed`);
+  assert(state.darkTag.backgroundColor !== 'rgba(0, 0, 0, 0)', `${suffix}: dark trait-chip background contrast regressed`);
+  assert(Number.parseInt(state.darkTag.fontWeight, 10) >= 600, `${suffix}: trait-chip weight regressed`);
   await page.screenshot(fileURLToPath(new URL(`../artifacts/${artifactPrefix}-${suffix}.png`, import.meta.url)));
   return state;
 }

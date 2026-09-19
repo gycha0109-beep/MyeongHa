@@ -65,17 +65,27 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
     expect(js).not.toContain('characterId:');
   });
 
-  it('uses the approved Se-yeon image only for Se-yeon presentation hooks', async () => {
-    const css = await readFile(hubV2CssPath, 'utf8');
+  it('keeps legacy Se-yeon scene art out of cards and pins all nine canonical card portraits', async () => {
+    const [v2Css, hubCss, js] = await Promise.all([
+      readFile(hubV2CssPath, 'utf8'),
+      readFile(hubCssPath, 'utf8'),
+      readFile(hubJsPath, 'utf8'),
+    ]);
 
-    expect(css).toContain('.chat-person-art[data-character="seyeon"]');
-    expect(css).toContain('.chat-incoming-art[data-character="seyeon"]');
-    expect(css).toContain('.chat-recent-avatar[data-character="seyeon"]');
-    expect(css).toContain('url("seyeon-chat.webp")');
+    expect(v2Css).not.toContain('.chat-person-art[data-character="seyeon"]');
+    expect(v2Css).toContain('.chat-incoming-art[data-character="seyeon"]');
+    expect(v2Css).toContain('.chat-recent-avatar[data-character="seyeon"]');
+    expect(v2Css).toContain('url("seyeon-chat.webp")');
 
-    for (const key of ['baekheon', 'yeoul', 'seorin', 'rahyeon', 'mira', 'taegyeom', 'yunho', 'doyoon']) {
-      expect(css).not.toContain(`[data-character="${key}"] {\n  background-image: url("seyeon-chat.webp")`);
+    for (const key of ['seyeon', 'baekheon', 'yeoul', 'seorin', 'rahyeon', 'mira', 'taegyeom', 'yunho', 'doyoon']) {
+      expect(js).toContain(`${key}: Object.freeze({ src: 'assets/characters/${key}-portrait.webp'`);
     }
+
+    expect(js).toContain("image.className = 'chat-person-art-image'");
+    expect(hubCss).toContain('background-image: none !important');
+    expect(hubCss).toContain('.chat-person-art-image');
+    expect(hubCss).toContain('--portrait-scale');
+    expect(hubCss).toContain('html[data-theme="dark"] body.chat-hub-page .chat-person-tag');
   });
 
   it('keeps character rooms as focused destinations and routes global conversation entries through the hub', async () => {

@@ -262,7 +262,6 @@
 
 .conversation-featured-active .chat-continuation-scene[data-character="seyeon"],
 .chat-incoming-art[data-character="seyeon"],
-.chat-person-art[data-character="seyeon"],
 .chat-recent-avatar[data-character="seyeon"] {
   background-image: url("seyeon-chat.webp");
   background-repeat: no-repeat;
@@ -282,7 +281,6 @@
 }
 
 .conversation-featured-active .chat-continuation-scene[data-character="seyeon"] > span,
-.chat-person-art[data-character="seyeon"] .chat-person-initial,
 .chat-incoming-art[data-character="seyeon"] > span,
 .chat-recent-avatar[data-character="seyeon"] {
   color: transparent;
