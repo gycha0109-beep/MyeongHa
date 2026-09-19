@@ -538,3 +538,26 @@ export {
   type EntitlementRestoreResponseV1,
   type RestoreEntitlementsInputV1,
 } from './entitlement-restore-command.js';
+
+export {
+  PRODUCTION_ACCOUNT_DELETION_AUTH_ADMIN_ENV_V1,
+  ProductionAccountDeletionAuthAdminConfigErrorV1,
+  parseProductionAccountDeletionAuthAdminConfigV1,
+  summarizeProductionAccountDeletionAuthAdminConfigV1,
+  type ProductionAccountDeletionAuthAdminConfigSummaryV1,
+  type ProductionAccountDeletionAuthAdminConfigV1,
+  type ProductionAccountDeletionAuthAdminEnvV1,
+} from './production-account-deletion-auth-admin-config.js';
+
+export {
+  SUPABASE_AUTH_ADMIN_USER_DELETE_DEFAULT_TIMEOUT_MS_V1,
+  SUPABASE_AUTH_ADMIN_USER_DELETE_MAX_TIMEOUT_MS_V1,
+  SupabaseAuthAdminUserDeletionErrorV1,
+  createSupabaseAuthAdminUserDeletionAdapterV1,
+  type SupabaseAuthAdminUserDeletionAdapterConfigV1,
+  type SupabaseAuthAdminUserDeletionFailureCodeV1,
+  type SupabaseAuthAdminUserDeletionFetchV1,
+  type SupabaseAuthAdminUserDeletionOutcomeV1,
+  type SupabaseAuthAdminUserDeletionPortV1,
+  type SupabaseAuthAdminUserDeletionResultV1,
+} from './supabase-auth-admin-user-deletion.js';
