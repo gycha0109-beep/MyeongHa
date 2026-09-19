@@ -123,6 +123,70 @@ $$;
 comment on function public.qry_standard_reading_reader_unlock_v4(uuid, text) is
   'Executor-only read of one already-stored current Character Unlock projection for Standard Reading Reader eligibility. Absence remains absence; no unlock condition is evaluated or mutated.';
 
+
+-- Defense in depth for future purchase-command activation: an `unlockable` Reader
+-- must already have an authoritative current `unlocked` projection for the
+-- Purchase Intent owner. This trigger consumes stored state only; it never
+-- evaluates or mutates unlock conditions.
+create or replace function public.ct_validate_standard_reading_reader_unlock_v4()
+returns trigger
+language plpgsql
+set search_path = pg_catalog, public
+as $
+declare
+  v_subject_id uuid;
+  v_catalog_availability text;
+begin
+  select pi.subject_id, crc.availability
+    into v_subject_id, v_catalog_availability
+  from public.purchase_intents pi
+  join public.character_runtime_catalog crc
+    on crc.character_id = new.reader_character_id
+   and crc.content_bundle_id = new.reader_content_bundle_id
+  where pi.id = new.purchase_intent_id;
+
+  if not found then
+    raise exception using
+      errcode = '23514',
+      constraint = 'ct_reader_selection_unlock_authority_missing',
+      message = 'Reader selection unlock authority could not resolve Purchase Intent owner and Reader catalog state';
+  end if;
+
+  if v_catalog_availability = 'available' then
+    return new;
+  end if;
+
+  if v_catalog_availability is distinct from 'unlockable' then
+    raise exception using
+      errcode = '23514',
+      constraint = 'ct_reader_selection_unlock_catalog_ineligible',
+      message = 'Reader selection unlock authority accepts only available or unlockable Readers';
+  end if;
+
+  if not exists (
+    select 1
+    from public.character_unlocks cu
+    where cu.subject_id = v_subject_id
+      and cu.character_id = new.reader_character_id
+      and cu.status = 'unlocked'
+  ) then
+    raise exception using
+      errcode = '23514',
+      constraint = 'ct_reader_selection_unlock_required',
+      message = 'unlockable Reader requires an already-stored unlocked projection for the Purchase Intent owner';
+  end if;
+
+  return new;
+end;
+$;
+
+drop trigger if exists ct_purchase_intent_reader_unlock_v4
+  on public.purchase_intent_reader_selections;
+create constraint trigger ct_purchase_intent_reader_unlock_v4
+  after insert on public.purchase_intent_reader_selections
+  deferrable initially immediate
+  for each row execute function public.ct_validate_standard_reading_reader_unlock_v4();
+
 revoke all on function public.qry_standard_reading_reader_catalog_v4(uuid, text)
   from public;
 revoke all on function public.qry_standard_reading_reader_unlock_v4(uuid, text)
