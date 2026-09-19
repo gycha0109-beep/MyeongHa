@@ -48,11 +48,11 @@ requireFragment('operations', 'RTO = OPEN DECISION');
 requireFragment('operations', 'no `DR Ready` claim is allowed');
 requireRegex(
   'decisions',
-  /^\|\s*`P0-PR-01`\s*\|[^|\n]*\|\s*\*\*OPEN-P0\*\*\s*\|/m,
-  'the P0-PR-01 decision-register row itself must remain OPEN-P0 while retention/legal authority is unresolved',
+  /^\|\s*`P0-PR-01`\s*\|[^|\n]*\|\s*\*\*DECIDED\*\*\s*\|/m,
+  'P0-PR-01 must remain DECIDED after the product-owner-approved deletion/retention policy',
 );
-requireFragment('privacy', '실제 legal/accounting/backup retention');
-requireFragment('privacy', '`OPEN-P0: P0-PR-01`');
+requireFragment('privacy', '`P0-PR-01`은 2026-09-19 **DECIDED**다');
+requireFragment('privacy', 'calendar `P5Y` RETAIN');
 requireRegex(
   'sourceGaps',
   /SRC-06[\s\S]{0,2000}BLOCKING BEFORE FINAL DELETION DDL BASELINE/,
@@ -148,7 +148,7 @@ const requiredStatusFragments = [
   'privacy_recovery_ledger_candidate_unsupported_delta_guard: PASS_ZERO_UNSUPPORTED',
   'privacy_recovery_ledger_candidate_artifact_plaintext_identifier_payload_uploaded: false',
   'privacy_recovery_ledger_candidate_source_authority: CANDIDATE_NON_AUTHORITATIVE',
-  'privacy_reconciliation: BLOCKED_BY_P0_PR_01_AND_ISSUE_964',
+  'privacy_reconciliation: BLOCKED_BY_FINALIZER_AND_AUTHORITATIVE_NONZERO_RECOVERY_PROOF',
   'rpo_authority: OPEN_DECISION',
   'rto_authority: OPEN_DECISION',
   'dr_ready: false',
@@ -168,7 +168,7 @@ const forbiddenReadyFragments = [
 for (const [key, text] of Object.entries(files)) {
   for (const fragment of forbiddenReadyFragments) {
     if (text.includes(fragment)) {
-      throw new Error(`${paths[key]} contains forbidden DR-ready promotion while canonical authority remains open: ${fragment}`);
+      throw new Error(`${paths[key]} contains forbidden DR-ready promotion while DR authority remains incomplete: ${fragment}`);
     }
   }
 }
@@ -185,5 +185,5 @@ for (const staleRuntimeFragment of [
 }
 
 console.log(
-  `PostgreSQL DR readiness authority guard PASS: current-schema backup/restore is evidenced through migration ${repositoryMigrationFrontier}, while OPEN retention/privacy and RPO/RTO authority keeps dr_ready=false.`,
+  `PostgreSQL DR readiness authority guard PASS: current-schema backup/restore is evidenced through migration ${repositoryMigrationFrontier}; P0-PR-01 policy is decided, while finalizer/recovery proof and OPEN RPO/RTO authority keep dr_ready=false.`,
 );
