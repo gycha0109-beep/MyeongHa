@@ -2,7 +2,7 @@
 
 > Product: **명하 (Myeongha)**  
 > Pack Version: **v0.10**  
-> Date: **2026-09-18**  
+> Date: **2026-09-19**  
 > Source Authority: `Usecase_re_reviewed_v2(1).md`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`, `Myeonghwa_Personalized_Interpretation_Architecture_v1.3_THIRD_REVIEW(1).md`, `docs/architecture/COMMERCE_ENTITLEMENT_ARCHITECTURE_V1.md`, `docs/COMMERCE_GUEST_PURCHASE_OWNERSHIP_DECISION_V1.md`, `docs/COMMERCE_WEB_PSP_DECISION_V1.md`  
 > Rule: 본 문서는 위 source authority를 구현 수준으로 구체화한다. source가 결정하지 않은 사항은 임의 확정하지 않고 `OPEN-P0` 또는 `CANDIDATE`로 표시한다. Production 운영을 열기 위해 별도 security/operations decision을 확정할 경우 source requirement를 좁혀야 하며, 상위 미결정 retention/legal policy를 대신 결정한 것으로 간주하지 않는다.
 
@@ -23,7 +23,7 @@
 | `P0-CM-04` | Guest purchase ownership / continuity | **DECIDED** | active Guest 구매 허용; canonical `subjects.id` 소유; 새 Member promotion은 same-subject; 기존 Member merge 후 direct merged-Guest lineage로 권리 조합; historical Commerce owner rewrite 금지 |
 | `P0-AI-01` | AI provider/model/fallback | **OPEN-P0** | provider, model family, fallback, grounded-response validation implementation |
 | `P0-AGE-01` | Minimum age / character content policy | **OPEN-P0** | 최소 이용 연령, 미성년 허용 여부, 표현 강도/제한; content bundle policy-tag slot은 미리 두되 threshold/matrix는 미확정 |
-| `P0-PR-01` | Retention / backup / legal retention | **OPEN-P0** | 제품 개인정보, AI trace, 결제/회계 증적, backup retention/deletion |
+| `P0-PR-01` | Retention / backup / legal retention | **DECIDED** | service/personalization DELETE; structural tombstone ANONYMIZE; 8 Commerce evidence/history tables RETAIN P5Y; existing encrypted backup lifecycle P30D + restore reconciliation before serviceability |
 | `P0-PR-01A` | Guest bearer/session authentication TTL | **DECIDED** | 7 days / 604800 seconds for newly issued Guest credentials; does not decide expired-Guest data deletion or parent retention policy |
 | `P0-PR-01B` | Commerce provider-evidence data minimization | **DECIDED** | no raw secret/bearer/receipt/PCI storage; versioned keyed fingerprints + allowlisted bounded verified payload; parent retention duration remains OPEN |
 | `P0-AUTH-01` | API→PostgreSQL execution identity / RLS enforcement model | **DECIDED** | non-BYPASSRLS API execution role + transaction-scoped trusted canonical `subject_id` context |
@@ -366,6 +366,65 @@ migration_impact:
 rollback_or_change_policy: execution-model changes require a new explicit decision record and migration; never silently fall back to user-JWT delegation or privileged ordinary CRUD
 ```
 
+### P0-PR-01
+
+```yaml
+id: P0-PR-01
+status: DECIDED
+decided_at: 2026-09-19
+choice:
+  service_personalization: DELETE
+  structural_tombstones:
+    disposition: ANONYMIZE
+    tables:
+      - subjects
+      - data_deletion_jobs
+      - subject_merge_jobs
+      - subject_merge_actions
+  commerce_evidence_history:
+    disposition: RETAIN
+    period: P5Y
+    tables:
+      - commerce_account_links
+      - purchase_intents
+      - commerce_payment_attempts
+      - commerce_receipts
+      - commerce_provider_events
+      - entitlement_grants
+      - entitlement_events
+      - entitlements
+  auth_mapping: DELETE
+  hosted_auth_user: DELETE
+  backup:
+    existing_encrypted_lifecycle: P30D
+    per-account_historical_blob_rewrite: false
+    restored_environment_serviceability: privacy deletion replay/reconciliation required first
+authority:
+  type: PRODUCT_OWNER_APPROVED
+  record: https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582
+scope:
+  decides:
+    - account-finalization disposition baseline for all 47 currently reachable Subject tables
+    - calendar five-year retention for the eight approved Commerce evidence/history tables
+    - Auth mapping/provider-user deletion
+    - existing 30-day encrypted backup lifecycle handling
+  does_not_decide:
+    - that a destructive runtime finalizer is already implemented
+    - authoritative post-backup privacy source
+    - authoritative non-zero recovered-state reconciliation
+    - numeric RPO or RTO
+    - DR Ready
+implementation_state:
+  structured_disposition_plan: AUTHORIZED
+  destructive_runtime_finalizer: NOT_YET_IMPLEMENTED
+  destructive_sql_generation: NOT_AUTHORIZED_BY_POLICY_ARTIFACT
+  authoritative_privacy_reconciliation: false
+  dr_ready: false
+record: docs/operations/ACCOUNT_DELETION_FINALIZATION_POLICY_V1.md
+machine_policy: docs/operations/ACCOUNT_DELETION_FINALIZATION_POLICY_V1.json
+machine_dispositions: docs/operations/ACCOUNT_DELETION_DISPOSITION_POLICY_V1.json
+```
+
 ### P0-PR-01A
 
 ```yaml
@@ -454,7 +513,7 @@ record: docs/COMMERCE_EVIDENCE_DATA_MINIMIZATION_DECISION_V1.md
 
 `P0-CM-04` closes the product/ownership question of whether Guest may purchase. Its historical `does_not_decide` list records the boundary at the time that decision was made; the later `P0-CM-02` record now supplies the PSP decision without rewriting `P0-CM-04` history.
 
-`P0-PR-01` parent retention/legal decision also remains OPEN. `P0-PR-01B` closes only the Commerce evidence minimization/security subset and must not be interpreted as a legal/accounting retention period.
+`P0-PR-01` is now **DECIDED** by product-owner approval on 2026-09-19. The approved baseline is DELETE for service/personalization data, ANONYMIZE for the four structural tombstones, RETAIN `P5Y` for the eight enumerated Commerce evidence/history tables, and the existing encrypted backup lifecycle `P30D` with privacy reconciliation required before a restored environment is serviceable. This decision does not claim that the destructive runtime finalizer, authoritative recovery reconciliation, RPO/RTO, or DR Ready are already proven. `P0-PR-01B` remains the independent Commerce evidence minimization/security boundary.
 
 Use the following template when another P0 becomes authoritative:
 
