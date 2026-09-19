@@ -130,7 +130,7 @@ It must match:
 
 The ordinary API executor has no direct insert/update/delete authority on this table.
 
-User-specific unlock/access checks for globally `unlockable` Characters are resolved at runtime only from the already-stored current Character Unlock projection. The application resolver checks that projection before purchase, and migration 1140 adds a DB constraint trigger so future v4 command activation cannot bypass the same stored-unlock requirement. Neither layer evaluates or mutates unlock conditions, and the persistence table does not infer them from client input.
+User-specific unlock/access checks for globally `unlockable` Characters are resolved at runtime only from the already-stored current Character Unlock projection. The application resolver checks that projection before purchase, and migration 1150 adds a DB constraint trigger so future v4 command activation cannot bypass the same stored-unlock requirement. Neither layer evaluates or mutates unlock conditions, and the persistence table does not infer them from client input.
 
 ## 5. Capability meaning
 

@@ -55,6 +55,7 @@ bash test/db/reading_transport_finalize_concurrency.sh
 bash test/db/reading_clarification_concurrency.sh
 bash test/db/notification_delivery_attempt_concurrency.sh
 bash test/db/account_deletion_start_concurrency.sh
+bash test/db/account_deletion_finalization_preflight.sh
 
 run_isolated_case myeongha_privacy_reconciliation_replay_test bash test/db/privacy_reconciliation_replay.sh
 

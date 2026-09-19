@@ -1,4 +1,5 @@
 import { resolveReadingDetailRoute } from './reading-detail-route.js';
+import { resolveSajuButtonEngineRequest } from './reading-saju-engine-request.js';
 
 const readerCatalog = {
   baekheon: {
@@ -68,6 +69,7 @@ const normalizedReader = aliases.get(requestedReader) || requestedReader.toLower
 const readerKey = readerCatalog[normalizedReader] ? normalizedReader : 'baekheon';
 const reader = readerCatalog[readerKey];
 const route = resolveReadingDetailRoute(params);
+const engineRequest = route.valid ? resolveSajuButtonEngineRequest(route) : null;
 const currentYear = new Date().getFullYear();
 
 const root = document.body;
@@ -79,6 +81,13 @@ const stateCopy = document.querySelector('[data-reading-state-copy]');
 
 root.dataset.reader = readerKey;
 root.dataset.readingRouteState = route.valid ? 'blocked_by_authority' : 'invalid';
+if (engineRequest) {
+  root.dataset.readingEngineRequestState = engineRequest.state;
+  if ('domain' in engineRequest) root.dataset.readingEngineDomain = engineRequest.domain;
+} else {
+  delete root.dataset.readingEngineRequestState;
+  delete root.dataset.readingEngineDomain;
+}
 
 if (route.valid) {
   root.dataset.readingTopicKey = route.topic;
@@ -122,7 +131,18 @@ function renderAuthorityBlockedRoute() {
   if (productTitle) productTitle.textContent = route.topic === 'general' ? scope : `${route.label} · ${scope}`;
   if (stateTitle) stateTitle.textContent = `${route.label} 읽기는 아직 준비 중입니다.`;
   if (stateCopy) {
-    stateCopy.textContent = '현재 제공 가능한 검증된 사주 읽기 범위가 열리지 않아 이 결과를 실행하지 않습니다. 다른 주제의 풀이로 대신 보여드리지 않습니다.';
+    if (engineRequest?.state === 'requires_input') {
+      const inputCopy = {
+        family_scope: '가족 읽기는 부모운 또는 자녀운을 먼저 선택해야 합니다.',
+        target_person: '궁합은 상대의 명식 참조가 먼저 필요합니다.',
+        question: '고민 읽기는 실제 질문을 먼저 입력해야 합니다.',
+      };
+      stateCopy.textContent = `${inputCopy[engineRequest.input] ?? '추가 입력이 필요합니다.'} 현재 Production Product Reading 실행 권한이 열리기 전에는 요청을 전송하지 않습니다.`;
+    } else if (engineRequest?.state === 'ready') {
+      stateCopy.textContent = `이 버튼은 Saju Engine의 ${engineRequest.adapterVersion} 요청 문법까지 정확히 매핑되어 있습니다. 다만 현재 Production Product Reading runtime이 authority-blocked 상태라 실제 해석 요청은 전송하지 않습니다. 다른 주제의 풀이로 대신 보여드리지 않습니다.`;
+    } else {
+      stateCopy.textContent = '현재 제공 가능한 검증된 사주 읽기 범위가 열리지 않아 이 결과를 실행하지 않습니다. 다른 주제의 풀이로 대신 보여드리지 않습니다.';
+    }
   }
   document.querySelectorAll('[data-reading-scope]').forEach((element) => { element.textContent = scope; });
   document.title = `${route.label} · 사주 해석 · 명하`;
