@@ -347,6 +347,20 @@ describe('Standard Reading Purchase Intent v4 Reader authority adapter', () => {
     expect(first.authorityPort.calls[0]?.requestHash).not.toBe(
       second.authorityPort.calls[0]?.requestHash,
     );
+
+    const third = createPorts();
+    await createStandardReadingPurchaseIntentV4({
+      resolvedSubjectId: SUBJECT_ID,
+      request: {
+        productOfferId: OFFER_ID,
+        idempotencyKey: 'different-idempotency-key-v4',
+        readerCharacterId: READER_ID,
+      },
+      ...third,
+    });
+    expect(first.authorityPort.calls[0]?.requestHash).toBe(
+      third.authorityPort.calls[0]?.requestHash,
+    );
   });
 
   it('rejects any Reader Character, bundle, snapshot, or hash drift returned by DB authority', async () => {
