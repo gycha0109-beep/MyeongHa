@@ -345,7 +345,7 @@ async function loadPreviewReading() {
 
   if (!activeBearer) {
     renderPreviewFailure(
-      '먼저 내 사주를 준비해 주세요.',
+      `${route.label} 프리뷰를 보려면 내 사주가 필요합니다.`,
       '사주 페이지에서 출생정보를 등록한 뒤 이 읽기를 다시 열어 주세요.',
       'preview_requires_profile',
     );
@@ -377,7 +377,7 @@ async function loadPreviewReading() {
     }
     if (response.status === 404 || publicErrorCode(payload) === 'NOT_FOUND') {
       renderPreviewFailure(
-        '먼저 내 사주를 준비해 주세요.',
+        `${route.label} 프리뷰를 보려면 내 사주가 필요합니다.`,
         '현재 Birth Profile을 찾지 못했습니다. 사주 페이지에서 출생정보를 확인해 주세요.',
         'preview_requires_profile',
       );
