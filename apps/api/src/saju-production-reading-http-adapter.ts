@@ -6,6 +6,9 @@ import {
 } from './saju-production-calculation-http-adapter.js';
 
 export const SAJU_PRODUCTION_READING_HTTP_PATH_V1 = '/api/readings' as const;
+export const SAJU_PREVIEW_READING_HTTP_PATH_V1 = '/api/preview/readings' as const;
+export const SAJU_READING_LIFECYCLE_HEADER_V1 = 'x-myeonghwa-reading-lifecycle' as const;
+export const SAJU_PREVIEW_READING_LIFECYCLE_V1 = 'preview' as const;
 export const SAJU_PRODUCTION_READING_HTTP_DEFAULT_TIMEOUT_MS_V1 = 15_000 as const;
 export const SAJU_PRODUCTION_READING_HTTP_MAX_TIMEOUT_MS_V1 = 60_000 as const;
 export const SAJU_PRODUCT_READING_RESPONSE_ADMISSION_HEADER_V1 =
@@ -24,6 +27,7 @@ export type SajuProductionReadingHttpAdapterFailureCodeV1 =
   | 'INVALID_CONTENT_TYPE'
   | 'INVALID_JSON'
   | 'RESPONSE_ADMISSION_ATTESTATION_REJECTED'
+  | 'RESPONSE_LIFECYCLE_ATTESTATION_REJECTED'
   | 'RESPONSE_ADMISSION_REJECTED';
 
 export class SajuProductionReadingHttpAdapterErrorV1 extends Error {
@@ -87,7 +91,7 @@ function failConfiguration(message: string): never {
   );
 }
 
-function resolveEndpoint(baseUrl: string): string {
+function resolveEndpoint(baseUrl: string, path: string): string {
   let parsed: URL;
   try {
     parsed = new URL(baseUrl);
@@ -113,7 +117,7 @@ function resolveEndpoint(baseUrl: string): string {
     );
   }
 
-  return new URL(SAJU_PRODUCTION_READING_HTTP_PATH_V1, parsed).toString();
+  return new URL(path, parsed).toString();
 }
 
 function resolveBearerToken(value: string): string {
@@ -326,6 +330,22 @@ function assertSourceAdmissionAttestation(
   }
 }
 
+function assertLifecycleAttestation(
+  response: SajuProductionCalculationHttpResponseV1,
+  expectedLifecycle: string | undefined,
+): void {
+  if (expectedLifecycle === undefined) return;
+  const lifecycle = response.headers.get(SAJU_READING_LIFECYCLE_HEADER_V1);
+  if (lifecycle !== expectedLifecycle) {
+    cancelUnusedResponseBody(response);
+    throw new SajuProductionReadingHttpAdapterErrorV1(
+      'RESPONSE_LIFECYCLE_ATTESTATION_REJECTED',
+      'Saju reading response lifecycle attestation did not match the requested lifecycle.',
+      response.status,
+    );
+  }
+}
+
 function assertAttestedEnvelopeVersion(payload: unknown): void {
   if (
     typeof payload !== 'object' ||
@@ -376,10 +396,12 @@ async function parseJsonResponse(
   }
 }
 
-export function createSajuProductionReadingHttpAdapterV1<AdmittedResponse>(
+function createSajuReadingHttpAdapterV1<AdmittedResponse>(
   config: SajuProductionReadingHttpAdapterConfigV1<AdmittedResponse>,
+  endpointPath: string,
+  expectedLifecycle?: string,
 ): SajuProductionReadingHttpAdapterV1<AdmittedResponse> {
-  const url = resolveEndpoint(config.baseUrl);
+  const url = resolveEndpoint(config.baseUrl, endpointPath);
   const bearerToken = resolveBearerToken(config.bearerToken);
   const timeoutMs = resolveTimeoutMs(config.timeoutMs);
   const fetchImpl = config.fetchImpl ?? defaultFetch;
@@ -410,6 +432,7 @@ export function createSajuProductionReadingHttpAdapterV1<AdmittedResponse>(
         assertSuccessfulStatus(response);
         assertJsonContentType(response);
         assertSourceAdmissionAttestation(response);
+        assertLifecycleAttestation(response, expectedLifecycle);
         const payload = await parseJsonResponse(
           response,
           lease.deadline,
@@ -435,4 +458,23 @@ export function createSajuProductionReadingHttpAdapterV1<AdmittedResponse>(
       }
     },
   });
+}
+
+export function createSajuProductionReadingHttpAdapterV1<AdmittedResponse>(
+  config: SajuProductionReadingHttpAdapterConfigV1<AdmittedResponse>,
+): SajuProductionReadingHttpAdapterV1<AdmittedResponse> {
+  return createSajuReadingHttpAdapterV1(
+    config,
+    SAJU_PRODUCTION_READING_HTTP_PATH_V1,
+  );
+}
+
+export function createSajuPreviewReadingHttpAdapterV1<AdmittedResponse>(
+  config: SajuProductionReadingHttpAdapterConfigV1<AdmittedResponse>,
+): SajuProductionReadingHttpAdapterV1<AdmittedResponse> {
+  return createSajuReadingHttpAdapterV1(
+    config,
+    SAJU_PREVIEW_READING_HTTP_PATH_V1,
+    SAJU_PREVIEW_READING_LIFECYCLE_V1,
+  );
 }
