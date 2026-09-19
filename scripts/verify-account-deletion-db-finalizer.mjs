@@ -1,3 +1,4 @@
+// Public helper EXECUTE remains closed; immutable-trigger exceptions are owner-bound inline.
 import { readFile } from 'node:fs/promises';
 
 function fail(message) {
