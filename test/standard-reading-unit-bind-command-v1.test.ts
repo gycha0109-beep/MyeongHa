@@ -74,7 +74,6 @@ function ports() {
 function request() {
   return {
     purchaseIntentId: PURCHASE_INTENT_ID,
-    sourceBirthProfileId: SOURCE_PROFILE_ID,
   } as const;
 }
 
@@ -82,7 +81,6 @@ function expectedSnapshot() {
   return {
     schemaVersion: STANDARD_READING_UNIT_REQUEST_CONTRACT_VERSION_V1,
     purchaseIntentId: PURCHASE_INTENT_ID,
-    sourceBirthProfileId: SOURCE_PROFILE_ID,
   } as const;
 }
 
@@ -141,7 +139,6 @@ describe('Standard Reading purchase-unit bind command v1', () => {
       requestHash: expectedHash(snapshot),
       requestContractVersion: STANDARD_READING_UNIT_REQUEST_CONTRACT_VERSION_V1,
       requestSnapshotJsonb: snapshot,
-      sourceBirthProfileId: SOURCE_PROFILE_ID,
     }]);
   });
 
@@ -150,6 +147,7 @@ describe('Standard Reading purchase-unit bind command v1', () => {
       { readerCharacterId: 'rahyeon' },
       { readerContentBundleId: BUNDLE_ID },
       { productId: PRODUCT_ID },
+      { sourceBirthProfileId: SOURCE_PROFILE_ID },
       { entitlementGrantId: GRANT_ID },
       { readingId: READING_ID },
       { sajuDomain: 'general' },
@@ -208,7 +206,7 @@ describe('Standard Reading purchase-unit bind command v1', () => {
       },
       {
         resolvedSubjectId: SUBJECT_ID,
-        request: { ...request(), sourceBirthProfileId: null },
+        request: { purchaseIntentId: 7 },
         code: 'INVALID_REQUEST',
       },
     ] as const;
