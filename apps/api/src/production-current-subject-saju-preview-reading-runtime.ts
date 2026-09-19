@@ -1,5 +1,4 @@
 import { handleCurrentSubjectSajuPreviewReadingRequestV1 } from './current-subject-saju-preview-reading-http.js';
-import { createNodePostgresSubjectPoolV1 } from './node-postgres-subject-pool.js';
 import { createProductionRequestIdentityVerifierV1 } from './production-request-identity-verifier.js';
 import {
   parseProductionSajuRuntimeConfigV1,
@@ -12,6 +11,7 @@ import {
 import type { SajuProductionCalculationHttpFetchV1 } from './saju-production-calculation-http-adapter.js';
 import type { SupabaseMemberVerifierFetchV1 } from './supabase-member-identity-verifier.js';
 import type { PostgresSubjectPoolV1 } from './postgres-subject-execution.js';
+import { createProductionPostgresSubjectPoolLeaseV1 } from './production-postgres-subject-pool-lease.js';
 
 export interface ProductionCurrentSubjectSajuPreviewReadingRequestV1 {
   readonly request: Request;
@@ -36,8 +36,10 @@ export function createProductionCurrentSubjectSajuPreviewReadingRuntimeV1(
 ): ProductionCurrentSubjectSajuPreviewReadingRuntimeV1 {
   const userDataConfig = parseProductionUserDataRuntimeConfigV1(input.env);
   const sajuConfig = parseProductionSajuRuntimeConfigV1(input.env);
-  const ownsPool = input.pool === undefined;
-  const pool = input.pool ?? createNodePostgresSubjectPoolV1(userDataConfig);
+  const poolLease = createProductionPostgresSubjectPoolLeaseV1({
+    config: userDataConfig,
+    ...(input.pool === undefined ? {} : { pool: input.pool }),
+  });
   const identityEvidenceVerifier = createProductionRequestIdentityVerifierV1({
     config: userDataConfig,
     ...(input.memberFetchImpl === undefined
@@ -57,12 +59,12 @@ export function createProductionCurrentSubjectSajuPreviewReadingRuntimeV1(
         requestId: requestInput.requestId,
         serverTime: requestInput.serverTime,
         identityEvidenceVerifier,
-        pool,
+        pool: poolLease.pool,
         sajuAdapter,
       });
     },
     close() {
-      return ownsPool ? pool.close() : Promise.resolve();
+      return poolLease.close();
     },
   });
 }
