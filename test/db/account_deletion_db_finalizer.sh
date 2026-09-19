@@ -69,7 +69,7 @@ pass "ordinary immutable DELETEs remain rejected"
 # table plus setting the finalizer GUC cannot activate the exception outside the
 # SECURITY DEFINER finalizer owner context.
 "${psql_base[@]}" <<SQL
-create role finalizer_guc_attacker nologin;
+create role finalizer_guc_attacker nologin bypassrls;
 grant usage on schema public to finalizer_guc_attacker;
 grant select on public.birth_profile_revisions to finalizer_guc_attacker;
 grant delete on public.birth_profile_revisions to finalizer_guc_attacker;
