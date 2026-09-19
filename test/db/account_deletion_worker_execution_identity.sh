@@ -32,7 +32,16 @@ select
   pg_catalog.pg_has_role('myeongha_api_executor','myeongha_system_executor','MEMBER')::int,
   pg_catalog.pg_has_role('myeongha_system_executor','myeongha_api_executor','MEMBER')::int;")"
 [[ "$membership" == "1|0|0|0" ]] || fail "worker role membership mismatch: $membership"
-pass "P0-AUTH-01 worker identity is separate from ordinary API execution"
+
+membership_options="$("${psql_base[@]}" -At -F '|' -c "
+select m.admin_option::int,m.inherit_option::int,m.set_option::int
+from pg_catalog.pg_auth_members m
+join pg_catalog.pg_roles granted on granted.oid=m.roleid
+join pg_catalog.pg_roles member on member.oid=m.member
+where granted.rolname='myeongha_system_executor'
+  and member.rolname='myeongha_worker_runtime';")"
+[[ "$membership_options" == "0|0|1" ]] || fail "worker role membership options drifted: $membership_options"
+pass "P0-AUTH-01 worker identity is separate from ordinary API execution with explicit NOINHERIT/SET ROLE membership"
 
 subject_id="fd200000-0000-0000-0000-000000000001"
 auth_id="fd100000-0000-0000-0000-000000000001"

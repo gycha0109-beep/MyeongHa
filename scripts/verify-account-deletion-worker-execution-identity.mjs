@@ -15,6 +15,7 @@ for (const fragment of [
   'myeongha:system-execution-role:v1',
   'myeongha:production-worker-login-principal:v1',
   'grant myeongha_system_executor to myeongha_worker_runtime',
+  'with admin false, inherit false, set true',
   'internal_claim_account_deletion_outbox_v1',
   "event_type is distinct from 'ACCOUNT_DELETION_STARTED'",
   "event_schema_version is distinct from 'v1'",

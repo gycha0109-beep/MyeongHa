@@ -112,7 +112,8 @@ BEGIN
 END
 $$;
 
-grant myeongha_system_executor to myeongha_worker_runtime;
+grant myeongha_system_executor to myeongha_worker_runtime
+  with admin false, inherit false, set true;
 
 -- Fail closed if ordinary API identities ever acquire the system worker role.
 DO $$
