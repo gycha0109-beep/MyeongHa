@@ -73,13 +73,12 @@ SQL
 generic_exec="$("${psql_base[@]}" -Atc "select has_function_privilege('myeongha_system_executor','public.cmd_claim_outbox_event_v1(uuid,text,timestamptz)','EXECUTE')::int;")"
 [[ "$generic_exec" == "0" ]] || fail "system executor gained generic outbox claim authority"
 
-table_privs="$("${psql_base[@]}" -At -F '|' -c "
-select
-  has_table_privilege('myeongha_system_executor','public.outbox_events','SELECT')::int,
-  has_table_privilege('myeongha_system_executor','public.outbox_events','UPDATE')::int,
-  has_table_privilege('myeongha_system_executor','public.data_deletion_jobs','UPDATE')::int,
-  has_table_privilege('myeongha_system_executor','public.subjects','UPDATE')::int;")"
-[[ "$table_privs" == "0|0|0|0" ]] || fail "system executor gained direct table CRUD: $table_privs"
+table_priv_count="$("${psql_base[@]}" -Atc "
+select count(*)
+from unnest(array['public.outbox_events','public.data_deletion_jobs','public.subjects']) as t(table_name)
+cross join unnest(array['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER']) as p(privilege_name)
+where has_table_privilege('myeongha_system_executor', t.table_name, p.privilege_name);")"
+[[ "$table_priv_count" == "0" ]] || fail "system executor gained direct lifecycle table privileges: $table_priv_count"
 pass "system executor has no generic outbox claim or direct lifecycle table CRUD"
 
 worker_grants="$("${psql_base[@]}" -At -F '|' -c "
@@ -90,23 +89,52 @@ select
   has_function_privilege('myeongha_system_executor','public.internal_complete_account_deletion_v1(uuid,uuid,text)','EXECUTE')::int;")"
 [[ "$worker_grants" == "1|1|1|1" ]] || fail "worker lifecycle grants mismatch: $worker_grants"
 
-ordinary_grants="$("${psql_base[@]}" -At -F '|' -c "
-select
-  has_function_privilege('myeongha_api_executor','public.internal_claim_account_deletion_outbox_v1(uuid,text,timestamptz)','EXECUTE')::int,
-  has_function_privilege('myeongha_runtime','public.internal_claim_account_deletion_outbox_v1(uuid,text,timestamptz)','EXECUTE')::int,
-  has_function_privilege('anon','public.internal_claim_account_deletion_outbox_v1(uuid,text,timestamptz)','EXECUTE')::int,
-  has_function_privilege('authenticated','public.internal_claim_account_deletion_outbox_v1(uuid,text,timestamptz)','EXECUTE')::int,
-  has_function_privilege('service_role','public.internal_claim_account_deletion_outbox_v1(uuid,text,timestamptz)','EXECUTE')::int;")"
-[[ "$ordinary_grants" == "0|0|0|0|0" ]] || fail "worker-only claim leaked: $ordinary_grants"
-pass "worker-only lifecycle functions are isolated from ordinary/API/platform roles"
+system_function_count="$("${psql_base[@]}" -Atc "
+select count(*)
+from pg_catalog.pg_proc p
+join pg_catalog.pg_namespace n on n.oid=p.pronamespace
+where n.nspname='public'
+  and pg_catalog.has_function_privilege('myeongha_system_executor',p.oid,'EXECUTE');")"
+[[ "$system_function_count" == "4" ]] || fail "system executor effective public-function allowlist drifted: $system_function_count"
+
+for role in myeongha_api_executor myeongha_runtime myeongha_worker_runtime anon authenticated service_role; do
+  worker_exec_count="$("${psql_base[@]}" -Atc "
+  select count(*)
+  from unnest(array[
+    'public.internal_claim_account_deletion_outbox_v1(uuid,text,timestamptz)',
+    'public.internal_account_deletion_resume_state_v1(uuid,uuid,text)',
+    'public.internal_finalize_account_deletion_db_v1(uuid,uuid,text)',
+    'public.internal_complete_account_deletion_v1(uuid,uuid,text)'
+  ]) as f(signature)
+  where has_function_privilege('$role',f.signature,'EXECUTE');")"
+  [[ "$worker_exec_count" == "0" ]] || fail "$role inherited worker-only function authority: $worker_exec_count"
+done
+pass "worker-only lifecycle functions are isolated from ordinary/API/platform roles and worker login requires SET ROLE"
+
+expect_fail \
+  "worker login cannot execute worker capability before SET ROLE" \
+  "permission denied for function internal_claim_account_deletion_outbox_v1" \
+  "set session authorization myeongha_worker_runtime; select * from public.internal_claim_account_deletion_outbox_v1('$outbox_id','$lock_owner',clock_timestamp()+interval '10 minutes');"
+
+expect_fail \
+  "ordinary runtime cannot enter system executor" \
+  "permission denied to set role" \
+  "set session authorization myeongha_runtime; set role myeongha_system_executor;"
+
+expect_fail \
+  "ordinary API executor cannot enter system executor" \
+  "permission denied to set role" \
+  "set session authorization myeongha_api_executor; set role myeongha_system_executor;"
 
 claim="$("${psql_base[@]}" -At -F '|' -c "
+set session authorization myeongha_worker_runtime;
 set role myeongha_system_executor;
 select outbox_event_id,subject_id,deletion_job_id,reclaimed::int
 from public.internal_claim_account_deletion_outbox_v1(
   '$outbox_id','$lock_owner',clock_timestamp()+interval '10 minutes'
 );
-reset role;")"
+reset role;
+reset session authorization;")"
 claim="$(printf '%s\n' "$claim" | grep -E '^[0-9a-f-]+\|' | tail -n1)"
 [[ "$claim" == "$outbox_id|$subject_id|$job_id|0" ]] || fail "account deletion claim wrapper mismatch: $claim"
 
