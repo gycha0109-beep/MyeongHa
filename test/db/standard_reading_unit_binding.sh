@@ -4,7 +4,7 @@ set -euo pipefail
 psql -X -v ON_ERROR_STOP=1 -f test/db/standard_reading_unit_binding.sql
 
 REQUEST_HASH_4='sha256:v1:5555555555555555555555555555555555555555555555555555555555555555'
-SNAPSHOT_4='{"schemaVersion":"standard-reading-unit-request-v1","purchaseIntentId":"11392300-0000-0000-0000-000000000004","sourceBirthProfileId":"11601000-0000-0000-0000-000000000001"}'
+SNAPSHOT_4='{"schemaVersion":"standard-reading-unit-request-v1","purchaseIntentId":"11392300-0000-0000-0000-000000000004"}'
 
 tmp1=$(mktemp)
 tmp2=$(mktemp)
@@ -29,8 +29,7 @@ from public.cmd_bind_standard_reading_unit_v1(
   '11603100-0000-0000-0000-000000000004',
   '$REQUEST_HASH_4',
   'standard-reading-unit-request-v1',
-  '$SNAPSHOT_4'::jsonb,
-  '11601000-0000-0000-0000-000000000001'
+  '$SNAPSHOT_4'::jsonb
 ) result;
 select pg_sleep(0.4);
 commit;
@@ -56,8 +55,7 @@ from public.cmd_bind_standard_reading_unit_v1(
   '11603100-0000-0000-0000-000000000005',
   '$REQUEST_HASH_4',
   'standard-reading-unit-request-v1',
-  '$SNAPSHOT_4'::jsonb,
-  '11601000-0000-0000-0000-000000000001'
+  '$SNAPSHOT_4'::jsonb
 ) result;
 commit;
 SQL
