@@ -1,4 +1,4 @@
-name: Web Browser Render Smoke
+name: Web Browser Smoke
 
 on:
   pull_request:
@@ -26,6 +26,12 @@ on:
       - 'apps/web/**'
       - 'packages/**'
       - 'scripts/**'
+      - '!scripts/verify-production-*.mjs'
+      - '!scripts/run-production-*.sh'
+      - '!scripts/verify-postgres-*.mjs'
+      - '!scripts/run-postgres-*.sh'
+      - '!scripts/build-postgres-*.mjs'
+      - '!scripts/operations/**'
       - 'package.json'
       - 'package-lock.json'
       - 'tsconfig*.json'
@@ -36,7 +42,7 @@ permissions:
   contents: read
 
 jobs:
-  web-browser-render:
+  web-browser-smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -67,118 +73,6 @@ jobs:
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
         run: node scripts/run-web-auth-browser-smoke.mjs
-      - name: Verify malformed stored Member reconciliation
-        env:
-          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
-        run: node scripts/verify-web-auth-malformed-stored-member-browser.mjs
-      - name: Verify malformed Member cleanup failure authority
-        env:
-          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
-        run: node scripts/verify-web-auth-malformed-member-cleanup-failure-browser.mjs
-      - name: Verify signup Guest bootstrap auth authority
-        env:
-          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
-        run: node scripts/run-web-auth-signup-guest-bootstrap-browser-smoke.mjs
-      - name: Verify Guest bootstrap single-flight
-        env:
-          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
-        run: node scripts/run-web-auth-guest-bootstrap-singleflight-browser-smoke.mjs
-      - name: Verify Guest bootstrap persistence failure
-        env:
-          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
-        run: node scripts/verify-web-auth-guest-persistence-failure-browser.mjs
-      - name: Verify Member compatibility staging failure
-        env:
-          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
-        run: node scripts/verify-web-auth-member-compat-staging-failure-browser.mjs
-      - name: Verify authentication re-login continuity
-        env:
-          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
-        run: node scripts/verify-web-auth-continuity-browser.mjs
-      - name: Verify failed sign-in Guest retention
-        env:
-          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
-        run: node scripts/verify-web-auth-failed-login-guest-browser.mjs
-      - name: Verify Guest promotion failure retention
-        env:
-          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
-        run: |
-          node scripts/verify-web-auth-promotion-failure-browser.mjs
-          node scripts/verify-web-auth-promotion-member-generation-browser.mjs
-      - name: Verify Guest removal failure authority
-        env:
-          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
-        run: node scripts/verify-web-auth-guest-removal-failure-browser.mjs
-      - name: Verify signup confirmation Guest handoff continuity
-        env:
-          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
-        run: node scripts/run-web-auth-confirmation-handoff-browser-smoke.mjs
-      - name: Verify Guest bearer canonicalization
-        env:
-          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
-        run: node scripts/run-web-auth-guest-bearer-canonicalization-browser-smoke.mjs
-      - name: Verify malformed Guest cleanup failure authority
-        env:
-          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
-        run: node scripts/verify-web-auth-malformed-guest-cleanup-failure-browser.mjs
-      - name: Verify auth storage read failure authority
-        env:
-          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
-        run: node scripts/verify-web-auth-storage-read-failure-browser.mjs
-      - name: Verify confirmation Guest handoff sign-out re-login lineage
-        env:
-          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
-        run: node scripts/run-web-auth-confirmation-relogin-browser-smoke.mjs
-      - name: Verify multiple signup confirmation Guest handoffs
-        env:
-          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
-        run: node scripts/run-web-auth-multi-confirmation-handoff-browser-smoke.mjs
-      - name: Verify cross-tab authentication convergence
-        env:
-          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
-        run: node scripts/run-web-auth-cross-tab-browser-smoke.mjs
-      - name: Verify cross-tab failed sign-out convergence
-        env:
-          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
-        run: node scripts/verify-web-auth-cross-tab-signout-failure-browser.mjs
-      - name: Verify Member removal failure authority
-        env:
-          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
-        run: node scripts/verify-web-auth-member-removal-failure-browser.mjs
-      - name: Verify Member discard compatibility failure authority
-        env:
-          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
-        run: node scripts/verify-web-auth-member-compat-discard-failure-browser.mjs
-      - name: Verify cross-tab authoritative session expiry
-        env:
-          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
-        run: node scripts/run-web-auth-cross-tab-session-expired-browser-smoke.mjs
-      - name: Verify canonical authentication rejection invalidation
-        env:
-          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
-        run: node scripts/verify-web-auth-rejection-browser.mjs
-      - name: Verify exact rejected bearer race
-        env:
-          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
-        run: node scripts/verify-web-auth-exact-rejection-race-browser.mjs
-      - name: Verify transient refresh Member retention
-        env:
-          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
-        run: |
-          node scripts/verify-web-auth-refresh-browser.mjs
-          node scripts/verify-web-auth-refresh-commit-lock-browser.mjs
-      - name: Verify cross-tab transient refresh Member retention
-        env:
-          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
-        run: node scripts/verify-web-auth-cross-tab-transient-refresh-browser.mjs
-      - name: Verify refresh transport failure Member retention
-        env:
-          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
-        run: node scripts/verify-web-auth-refresh-network-browser.mjs
-      - name: Verify malformed refresh Member retention
-        env:
-          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
-        run: node scripts/verify-web-auth-refresh-malformed-browser.mjs
       - name: Verify Saju active bearer authority
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
@@ -217,40 +111,12 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: web-reading-browser-smoke
+          name: web-browser-smoke
           path: |
             artifacts/web-reading-browser-smoke*
             artifacts/web-golden-master-header-browser-smoke*
             artifacts/web-auth-browser-smoke*
-            artifacts/web-auth-malformed-stored-member-browser-smoke*
-            artifacts/web-auth-malformed-member-cleanup-failure-browser-smoke*
-            artifacts/web-auth-signup-guest-bootstrap-browser-smoke*
-            artifacts/web-auth-guest-bootstrap-singleflight-browser-smoke*
-            artifacts/web-auth-guest-persistence-failure-browser-smoke*
-            artifacts/web-auth-member-compat-staging-failure-browser-smoke*
-            artifacts/web-auth-continuity-browser-smoke*
-            artifacts/web-auth-failed-login-guest-browser-smoke*
-            artifacts/web-auth-promotion-failure-browser-smoke*
-            artifacts/web-auth-promotion-member-generation-browser-smoke*
-            artifacts/web-auth-guest-removal-failure-browser-smoke*
-            artifacts/web-auth-confirmation-handoff-browser-smoke*
-            artifacts/web-auth-guest-bearer-canonicalization-browser-smoke*
-            artifacts/web-auth-malformed-guest-cleanup-failure-browser-smoke*
-            artifacts/web-auth-storage-read-failure-browser-smoke*
-            artifacts/web-auth-confirmation-relogin-browser-smoke*
-            artifacts/web-auth-multi-confirmation-handoff-browser-smoke*
-            artifacts/web-auth-cross-tab-browser-smoke*
-            artifacts/web-auth-cross-tab-signout-failure-browser-smoke*
-            artifacts/web-auth-member-removal-failure-browser-smoke*
-            artifacts/web-auth-member-compat-discard-failure-browser-smoke*
-            artifacts/web-auth-cross-tab-session-expired-browser-smoke*
-            artifacts/web-auth-rejection-browser-smoke*
-            artifacts/web-auth-exact-rejection-race-browser-smoke*
-            artifacts/web-auth-refresh-browser-smoke*
-            artifacts/web-auth-refresh-commit-lock-browser-smoke*
-            artifacts/web-auth-cross-tab-transient-refresh-browser-smoke*
-            artifacts/web-auth-refresh-network-browser-smoke*
-            artifacts/web-auth-refresh-malformed-browser-smoke*
+            artifacts/web-auth-confirmation-browser-smoke*
             artifacts/web-saju-auth-browser-smoke*
             artifacts/web-records-auth-browser-smoke*
             artifacts/web-chat-auth-browser-smoke*

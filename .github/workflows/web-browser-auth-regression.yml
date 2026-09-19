@@ -1,0 +1,181 @@
+name: Web Auth Browser Regression
+
+on:
+  pull_request:
+    paths:
+      - 'api/auth/**'
+      - 'api/session/**'
+      - 'apps/api/src/supabase-auth-*.ts'
+      - 'apps/api/src/supabase-member-identity-verifier*.ts'
+      - 'apps/api/src/guest-*.ts'
+      - 'apps/api/src/production-guest-*.ts'
+      - 'apps/web/auth*'
+      - 'apps/web/product-auth*.js'
+      - 'apps/web/src/auth/**'
+      - 'packages/**'
+      - 'scripts/*web-auth*'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/web-browser-auth-regression.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'api/auth/**'
+      - 'api/session/**'
+      - 'apps/api/src/supabase-auth-*.ts'
+      - 'apps/api/src/supabase-member-identity-verifier*.ts'
+      - 'apps/api/src/guest-*.ts'
+      - 'apps/api/src/production-guest-*.ts'
+      - 'apps/web/auth*'
+      - 'apps/web/product-auth*.js'
+      - 'apps/web/src/auth/**'
+      - 'packages/**'
+      - 'scripts/*web-auth*'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/web-browser-auth-regression.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  auth-browser-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Install dependencies
+        run: npm install --ignore-scripts
+      - name: Build static web
+        run: npm run build:web
+      - name: Set up Chrome for Testing
+        id: chrome
+        uses: browser-actions/setup-chrome@48ad923757ca74d66703209fe939badbdf80f2f4
+        with:
+          chrome-version: stable
+          install-dependencies: true
+      - name: Verify malformed stored Member reconciliation
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/verify-web-auth-malformed-stored-member-browser.mjs
+      - name: Verify malformed Member cleanup failure authority
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/verify-web-auth-malformed-member-cleanup-failure-browser.mjs
+      - name: Verify signup Guest bootstrap auth authority
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/run-web-auth-signup-guest-bootstrap-browser-smoke.mjs
+      - name: Verify Guest bootstrap single-flight
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/run-web-auth-guest-bootstrap-singleflight-browser-smoke.mjs
+      - name: Verify Guest bootstrap persistence failure
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/verify-web-auth-guest-persistence-failure-browser.mjs
+      - name: Verify Member compatibility staging failure
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/verify-web-auth-member-compat-staging-failure-browser.mjs
+      - name: Verify authentication re-login continuity
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/verify-web-auth-continuity-browser.mjs
+      - name: Verify failed sign-in Guest retention
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/verify-web-auth-failed-login-guest-browser.mjs
+      - name: Verify Guest promotion failure retention
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: |
+          node scripts/verify-web-auth-promotion-failure-browser.mjs
+          node scripts/verify-web-auth-promotion-member-generation-browser.mjs
+      - name: Verify Guest removal failure authority
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/verify-web-auth-guest-removal-failure-browser.mjs
+      - name: Verify signup confirmation Guest handoff continuity
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/run-web-auth-confirmation-handoff-browser-smoke.mjs
+      - name: Verify Guest bearer canonicalization
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/run-web-auth-guest-bearer-canonicalization-browser-smoke.mjs
+      - name: Verify malformed Guest cleanup failure authority
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/verify-web-auth-malformed-guest-cleanup-failure-browser.mjs
+      - name: Verify auth storage read failure authority
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/verify-web-auth-storage-read-failure-browser.mjs
+      - name: Verify confirmation Guest handoff sign-out re-login lineage
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/run-web-auth-confirmation-relogin-browser-smoke.mjs
+      - name: Verify multiple signup confirmation Guest handoffs
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/run-web-auth-multi-confirmation-handoff-browser-smoke.mjs
+      - name: Verify cross-tab authentication convergence
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/run-web-auth-cross-tab-browser-smoke.mjs
+      - name: Verify cross-tab failed sign-out convergence
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/verify-web-auth-cross-tab-signout-failure-browser.mjs
+      - name: Verify Member removal failure authority
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/verify-web-auth-member-removal-failure-browser.mjs
+      - name: Verify Member discard compatibility failure authority
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/verify-web-auth-member-compat-discard-failure-browser.mjs
+      - name: Verify cross-tab authoritative session expiry
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/run-web-auth-cross-tab-session-expired-browser-smoke.mjs
+      - name: Verify canonical authentication rejection invalidation
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/verify-web-auth-rejection-browser.mjs
+      - name: Verify exact rejected bearer race
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/verify-web-auth-exact-rejection-race-browser.mjs
+      - name: Verify transient refresh Member retention
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: |
+          node scripts/verify-web-auth-refresh-browser.mjs
+          node scripts/verify-web-auth-refresh-commit-lock-browser.mjs
+      - name: Verify cross-tab transient refresh Member retention
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/verify-web-auth-cross-tab-transient-refresh-browser.mjs
+      - name: Verify refresh transport failure Member retention
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/verify-web-auth-refresh-network-browser.mjs
+      - name: Verify malformed refresh Member retention
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/verify-web-auth-refresh-malformed-browser.mjs
+      - name: Upload auth regression diagnostics
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: web-auth-browser-regression
+          path: |
+            artifacts/web-auth-*
+          if-no-files-found: ignore
