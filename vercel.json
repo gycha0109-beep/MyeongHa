@@ -2,7 +2,9 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "npm run build:web",
   "outputDirectory": "public",
-  "regions": ["sin1"],
+  "regions": [
+    "sin1"
+  ],
   "cleanUrls": false,
   "trailingSlash": false,
   "git": {
@@ -60,6 +62,14 @@
     {
       "source": "/api/birth-profiles/:id",
       "destination": "/api/birth-profiles?__myeongha_birth_profile_id=:id"
+    },
+    {
+      "source": "/api/target-persons",
+      "destination": "/api/me?__myeongha_target_person_read=list"
+    },
+    {
+      "source": "/api/target-persons/:id",
+      "destination": "/api/me?__myeongha_target_person_read=detail&__myeongha_target_person_id=:id"
     }
   ],
   "headers": [
