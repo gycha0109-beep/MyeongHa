@@ -541,7 +541,47 @@ body.reading-page {
 
 .reading-pillars small { color: var(--mh-ink-muted); }
 .reading-pillars strong { font-size: 22px; }
-.reading-chart-placeholder p {
+
+.reading-chart-evidence {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 22px;
+  margin-top: 24px;
+}
+
+.reading-chart-evidence h3 {
+  margin: 0 0 10px;
+  font-family: var(--mh-serif);
+  font-size: 15px;
+}
+
+.reading-chart-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.reading-chart-fact {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1px solid rgba(145, 105, 64, .20);
+  background: rgba(255, 255, 255, .26);
+}
+
+.reading-chart-fact small,
+.reading-chart-empty {
+  color: var(--mh-ink-muted);
+  font-size: 11px;
+}
+
+.reading-chart-fact strong {
+  font-family: var(--mh-serif);
+  font-size: 13px;
+}
+
+.reading-chart-placeholder .reading-chart-caption {
   margin: 21px 0 0;
   color: var(--mh-ink-muted);
   line-height: 1.8;
@@ -664,4 +704,5 @@ body[data-reader="doyoon"] { --reader-accent: #8a7967; --reader-night: #272521; 
   .reading-primary-action { gap: 15px; }
   .reading-pillars { gap: 6px; }
   .reading-pillars span { min-height: 86px; }
+  .reading-chart-evidence { grid-template-columns: 1fr; gap: 16px; }
 }

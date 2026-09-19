@@ -288,6 +288,10 @@ function previewStepsFromPayload(payload) {
   return {
     steps,
     notice: notices.find((text) => typeof text === 'string' && text.trim()) ?? '',
+    calculationSummary:
+      reading.calculationSummary && typeof reading.calculationSummary === 'object'
+        ? reading.calculationSummary
+        : null,
   };
 }
 
@@ -303,27 +307,64 @@ function renderProgressDots(stepCount, activeIndex) {
   }
 }
 
-function firstSentence(text) {
-  if (typeof text !== 'string') return '';
-  const normalized = text.trim();
-  const periodIndex = normalized.indexOf('.');
-  return periodIndex >= 0 ? normalized.slice(0, periodIndex + 1) : normalized;
-}
-
 function readerCommentForStep(step) {
-  const lead = firstSentence(step.primary);
   const suffixByReader = {
-    baekheon: '이 대목은 말보다 실제 선택과 행동에서 반복되는지 보십시오.',
+    baekheon: '말보다 실제 선택과 행동에서 이 흐름이 반복되는지 보십시오.',
     seyeon: '좋고 나쁨으로 자르기보다, 언제 이 흐름이 편하게 살아나는지 같이 볼게요.',
-    yeoul: '핵심은 이 흐름이 실제 선택에서 어떻게 튀어나오는지입니다.',
-    seorin: '지금의 선택뿐 아니라 예전에도 비슷한 패턴이 반복됐는지 떠올려 보세요.',
+    yeoul: '실제 선택에서 이 흐름이 어떤 순간에 튀어나오는지 보는 게 핵심이에요.',
+    seorin: '지금뿐 아니라 예전에도 비슷한 선택 패턴이 반복됐는지 떠올려 보세요.',
     rahyeon: '겉으로 드러난 모습보다, 이 흐름 때문에 실제로 흔들리는 순간을 보는 편이 정확합니다.',
     mira: '과장할 필요는 없습니다. 실제 생활에서 반복되는지만 확인하면 됩니다.',
     taegyeom: '좋은 말로 포장하지 않겠습니다. 이 구조가 실제 행동에서 확인되는지가 기준입니다.',
     yunho: '한 번의 사건보다 반복되는 선택의 순서를 보면 이 구조가 더 분명해집니다.',
     doyoon: '복잡하게 외우지 마세요. 실제로 자주 나오는 선택 패턴인지 보면 됩니다.',
   };
-  return [lead, suffixByReader[readerKey]].filter(Boolean).join(' ');
+  return suffixByReader[readerKey] ?? '실제 생활에서 이 흐름이 반복되는지 확인해 보세요.';
+}
+
+function displayFactValue(fact) {
+  if (!fact || typeof fact !== 'object') return '확인 중';
+  if (fact.status !== 'resolved') return fact.status === 'ambiguous' ? '경계값' : '확인 불가';
+  return typeof fact.value === 'string' && fact.value.trim() ? fact.value.trim() : '확인됨';
+}
+
+function renderFactList(container, facts) {
+  if (!container) return;
+  container.replaceChildren();
+  if (!Array.isArray(facts) || facts.length === 0) {
+    const empty = document.createElement('span');
+    empty.className = 'reading-chart-empty';
+    empty.textContent = '표시할 계산 근거가 없습니다.';
+    container.append(empty);
+    return;
+  }
+  for (const fact of facts) {
+    if (!fact || typeof fact !== 'object') continue;
+    const item = document.createElement('span');
+    item.className = 'reading-chart-fact';
+    const label = document.createElement('small');
+    label.textContent = typeof fact.label === 'string' ? fact.label : '근거';
+    const value = document.createElement('strong');
+    value.textContent = displayFactValue(fact);
+    item.append(label, value);
+    container.append(item);
+  }
+}
+
+function renderCalculationSummary(summary) {
+  if (!summary || typeof summary !== 'object') return;
+  const pillars = summary.pillars && typeof summary.pillars === 'object' ? summary.pillars : {};
+  for (const [key, selector] of Object.entries({
+    year: '[data-chart-pillar-year]',
+    month: '[data-chart-pillar-month]',
+    day: '[data-chart-pillar-day]',
+    hour: '[data-chart-pillar-hour]',
+  })) {
+    const node = document.querySelector(selector);
+    if (node) node.textContent = displayFactValue(pillars[key]);
+  }
+  renderFactList(document.querySelector('[data-chart-five-elements]'), summary.fiveElements);
+  renderFactList(document.querySelector('[data-chart-ten-gods]'), summary.tenGods);
 }
 
 function activatePreviewReading(preview) {
@@ -387,6 +428,7 @@ function activatePreviewReading(preview) {
   root.dataset.readingRouteState = 'preview';
   if (routeState) routeState.hidden = true;
   if (stage) stage.hidden = false;
+  renderCalculationSummary(preview.calculationSummary);
   renderStep();
 }
 

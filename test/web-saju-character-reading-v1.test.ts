@@ -95,19 +95,30 @@ describe('MyeongHa character-led Saju Reading v1', () => {
     expect(runtime).toContain("const STRUCTURE_PREFIX = '근거 구조:';");
     expect(runtime).toContain("'이 해석의 사주 근거'");
     expect(runtime).toContain('readerCommentForStep(step)');
+    expect(runtime).not.toContain('const lead = firstSentence(step.primary)');
+    expect(runtime).not.toContain('function firstSentence(text)');
     expect(runtime).toContain('if (stage) stage.hidden = true;');
     expect(runtime).not.toContain('const readingSteps =');
     expect(runtime).not.toContain('window.location.href = `chat.html?character=');
   });
 
-  it('treats birth chart content as server-backed placeholder data rather than invented client claims', async () => {
-    const html = await readReadingMarkup();
+  it('renders the admitted calculation summary instead of shipping a fake chart placeholder', async () => {
+    const [html, runtime] = await Promise.all([
+      readReadingMarkup(),
+      readFile(readingRuntimePath, 'utf8'),
+    ]);
 
-    expect(html).toContain('서버에서 확인된 Birth Profile revision과 Saju Engine 계산 결과만');
-    expect(html).toContain('年柱');
-    expect(html).toContain('月柱');
-    expect(html).toContain('日柱');
-    expect(html).toContain('時柱');
+    expect(html).toContain('data-chart-pillar-year');
+    expect(html).toContain('data-chart-pillar-month');
+    expect(html).toContain('data-chart-pillar-day');
+    expect(html).toContain('data-chart-pillar-hour');
+    expect(html).toContain('data-chart-five-elements');
+    expect(html).toContain('data-chart-ten-gods');
+    expect(html).not.toContain('年柱');
+    expect(html).not.toContain('실제 서비스에서는');
+    expect(runtime).toContain('reading.calculationSummary');
+    expect(runtime).toContain('renderCalculationSummary(preview.calculationSummary)');
+    expect(runtime).toContain('displayFactValue(fact)');
   });
 
   it('provides desktop immersion and a mobile stacked reading adaptation', async () => {
