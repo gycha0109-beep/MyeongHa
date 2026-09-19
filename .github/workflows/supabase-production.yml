@@ -54,7 +54,7 @@ jobs:
             changed_files="$(git diff --name-only "$BEFORE_SHA" "$CURRENT_SHA")"
             printf '%s\n' "$changed_files"
 
-            if grep -Eq '^(supabase/migrations/|[.]github/workflows/supabase-production[.]yml$|scripts/run-production-platform-integrity-postdeploy-verify[.]sh$|scripts/run-production-platform-integrity-read-audit[.]sh$|scripts/run-production-platform-integrity-data-api-surface-audit[.]sh$)' <<<"$changed_files"; then
+            if grep -Eq '^(supabase/migrations/|[.]github/workflows/supabase-production[.]yml$|scripts/run-production-platform-integrity-postdeploy-verify[.]sh$|scripts/run-production-platform-integrity-read-audit[.]sh$|scripts/run-production-platform-integrity-data-api-surface-audit[.]sh$|scripts/operations/run-supabase-production-migrations[.]sh$)' <<<"$changed_files"; then
               requires_deploy=true
               reason='governed Production DB deployment-surface change detected'
             fi

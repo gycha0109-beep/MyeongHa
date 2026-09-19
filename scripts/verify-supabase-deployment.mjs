@@ -19,6 +19,8 @@ const [workflow, migrationRunner, postdeployVerify, config, migrationFiles] = aw
   readdir(migrationDir),
 ]);
 
+const deploymentContract = workflow + '\n' + migrationRunner;
+
 const requiredWorkflowFragments = [
   "push:\n    branches:\n      - main\n  workflow_dispatch:",
   'change-gate:',
@@ -35,7 +37,7 @@ const requiredWorkflowFragments = [
   'git cat-file -e "${BEFORE_SHA}^{commit}"',
   "reason='push before SHA is not present in checkout; fail closed'",
   'git diff --name-only "$BEFORE_SHA" "$CURRENT_SHA"',
-  "'^(supabase/migrations/|[.]github/workflows/supabase-production[.]yml$|scripts/run-production-platform-integrity-postdeploy-verify[.]sh$|scripts/run-production-platform-integrity-read-audit[.]sh$|scripts/run-production-platform-integrity-data-api-surface-audit[.]sh$)'",
+  "'^(supabase/migrations/|[.]github/workflows/supabase-production[.]yml$|scripts/run-production-platform-integrity-postdeploy-verify[.]sh$|scripts/run-production-platform-integrity-read-audit[.]sh$|scripts/run-production-platform-integrity-data-api-surface-audit[.]sh$|scripts/operations/run-supabase-production-migrations[.]sh$)'",
   'echo "requires_deploy=$requires_deploy" >> "$GITHUB_OUTPUT"',
   'needs: change-gate',
   "if: ${{ needs.change-gate.outputs.requires_deploy == 'true' }}",
@@ -52,7 +54,7 @@ const requiredWorkflowFragments = [
   'db_url="postgresql://postgres.${SUPABASE_PROJECT_ID}:${encoded_password}@${host}:5432/postgres?sslmode=require"',
   'echo "::add-mask::$db_url"',
   'supabase link --project-ref "$SUPABASE_PROJECT_ID"',
-  'db_args+=(--db-url "$SUPABASE_PRODUCTION_DB_URL")',
+  'db_args+=(--db-url "$db_url")',
   "grep -q '20260830072444'",
   'supabase migration repair 20260830072444 --status reverted "${db_args[@]}"',
   'supabase migration repair 0010 --status applied "${db_args[@]}"',
