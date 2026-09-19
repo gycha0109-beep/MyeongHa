@@ -1,0 +1,561 @@
+{
+  "schema": "myeongha-account-deletion-disposition-policy-v1",
+  "decisionId": "P0-PR-01",
+  "decisionStatus": "DECIDED",
+  "policyAuthority": "APPROVED",
+  "executionAuthorized": true,
+  "graphRef": {
+    "schema": "myeongha-transitive-subject-dependency-graph-v1",
+    "edgeCount": 106,
+    "distinctReachableTableCount": 47,
+    "maxDepth": 4
+  },
+  "tableDispositions": [
+    {
+      "table": "ai_execution_groundings",
+      "disposition": "DELETE",
+      "authorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "retentionDurationDays": null,
+      "retentionPeriod": null
+    },
+    {
+      "table": "ai_execution_logs",
+      "disposition": "DELETE",
+      "authorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "retentionDurationDays": null,
+      "retentionPeriod": null
+    },
+    {
+      "table": "birth_profile_revisions",
+      "disposition": "DELETE",
+      "authorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "retentionDurationDays": null,
+      "retentionPeriod": null
+    },
+    {
+      "table": "birth_profiles",
+      "disposition": "DELETE",
+      "authorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "retentionDurationDays": null,
+      "retentionPeriod": null
+    },
+    {
+      "table": "character_unlocks",
+      "disposition": "DELETE",
+      "authorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "retentionDurationDays": null,
+      "retentionPeriod": null
+    },
+    {
+      "table": "chat_turn_attempts",
+      "disposition": "DELETE",
+      "authorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "retentionDurationDays": null,
+      "retentionPeriod": null
+    },
+    {
+      "table": "chat_turns",
+      "disposition": "DELETE",
+      "authorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "retentionDurationDays": null,
+      "retentionPeriod": null
+    },
+    {
+      "table": "commerce_account_links",
+      "disposition": "RETAIN",
+      "authorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "retentionDurationDays": null,
+      "retentionPeriod": "P5Y"
+    },
+    {
+      "table": "commerce_payment_attempts",
+      "disposition": "RETAIN",
+      "authorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "retentionDurationDays": null,
+      "retentionPeriod": "P5Y"
+    },
+    {
+      "table": "commerce_provider_events",
+      "disposition": "RETAIN",
+      "authorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "retentionDurationDays": null,
+      "retentionPeriod": "P5Y"
+    },
+    {
+      "table": "commerce_receipts",
+      "disposition": "RETAIN",
+      "authorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "retentionDurationDays": null,
+      "retentionPeriod": "P5Y"
+    },
+    {
+      "table": "conversation_messages",
+      "disposition": "DELETE",
+      "authorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "retentionDurationDays": null,
+      "retentionPeriod": null
+    },
+    {
+      "table": "conversation_thread_characters",
+      "disposition": "DELETE",
+      "authorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "retentionDurationDays": null,
+      "retentionPeriod": null
+    },
+    {
+      "table": "conversation_thread_content_transitions",
+      "disposition": "DELETE",
+      "authorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "retentionDurationDays": null,
+      "retentionPeriod": null
+    },
+    {
+      "table": "conversation_threads",
+      "disposition": "DELETE",
+      "authorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "retentionDurationDays": null,
+      "retentionPeriod": null
+    },
+    {
+      "table": "data_deletion_jobs",
+      "disposition": "ANONYMIZE",
+      "authorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "retentionDurationDays": null,
+      "retentionPeriod": null
+    },
+    {
+      "table": "device_installations",
+      "disposition": "DELETE",
+      "authorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "retentionDurationDays": null,
+      "retentionPeriod": null
+    },
+    {
+      "table": "entitlement_events",
+      "disposition": "RETAIN",
+      "authorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "retentionDurationDays": null,
+      "retentionPeriod": "P5Y"
+    },
+    {
+      "table": "entitlement_grants",
+      "disposition": "RETAIN",
+      "authorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "retentionDurationDays": null,
+      "retentionPeriod": "P5Y"
+    },
+    {
+      "table": "entitlements",
+      "disposition": "RETAIN",
+      "authorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "retentionDurationDays": null,
+      "retentionPeriod": "P5Y"
+    },
+    {
+      "table": "episode_progress_events",
+      "disposition": "DELETE",
+      "authorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "retentionDurationDays": null,
+      "retentionPeriod": null
+    },
+    {
+      "table": "guest_sessions",
+      "disposition": "DELETE",
+      "authorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "retentionDurationDays": null,
+      "retentionPeriod": null
+    },
+    {
+      "table": "life_facts",
+      "disposition": "DELETE",
+      "authorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "retentionDurationDays": null,
+      "retentionPeriod": null
+    },
+    {
+      "table": "memory_items",
+      "disposition": "DELETE",
+      "authorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "retentionDurationDays": null,
+      "retentionPeriod": null
+    },
+    {
+      "table": "memory_proposals",
+      "disposition": "DELETE",
+      "authorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "retentionDurationDays": null,
+      "retentionPeriod": null
+    },
+    {
+      "table": "notification_deliveries",
+      "disposition": "DELETE",
+      "authorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "retentionDurationDays": null,
+      "retentionPeriod": null
+    },
+    {
+      "table": "notification_delivery_attempts",
+      "disposition": "DELETE",
+      "authorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "retentionDurationDays": null,
+      "retentionPeriod": null
+    },
+    {
+      "table": "notification_preferences",
+      "disposition": "DELETE",
+      "authorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "retentionDurationDays": null,
+      "retentionPeriod": null
+    },
+    {
+      "table": "notification_settings",
+      "disposition": "DELETE",
+      "authorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "retentionDurationDays": null,
+      "retentionPeriod": null
+    },
+    {
+      "table": "notifications",
+      "disposition": "DELETE",
+      "authorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "retentionDurationDays": null,
+      "retentionPeriod": null
+    },
+    {
+      "table": "profiles",
+      "disposition": "DELETE",
+      "authorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "retentionDurationDays": null,
+      "retentionPeriod": null
+    },
+    {
+      "table": "purchase_intents",
+      "disposition": "RETAIN",
+      "authorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "retentionDurationDays": null,
+      "retentionPeriod": "P5Y"
+    },
+    {
+      "table": "reading_execution_attempts",
+      "disposition": "DELETE",
+      "authorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "retentionDurationDays": null,
+      "retentionPeriod": null
+    },
+    {
+      "table": "reading_groundings",
+      "disposition": "DELETE",
+      "authorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "retentionDurationDays": null,
+      "retentionPeriod": null
+    },
+    {
+      "table": "reading_refs",
+      "disposition": "DELETE",
+      "authorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "retentionDurationDays": null,
+      "retentionPeriod": null
+    },
+    {
+      "table": "reading_sessions",
+      "disposition": "DELETE",
+      "authorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "retentionDurationDays": null,
+      "retentionPeriod": null
+    },
+    {
+      "table": "readings",
+      "disposition": "DELETE",
+      "authorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "retentionDurationDays": null,
+      "retentionPeriod": null
+    },
+    {
+      "table": "record_access_grants",
+      "disposition": "DELETE",
+      "authorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "retentionDurationDays": null,
+      "retentionPeriod": null
+    },
+    {
+      "table": "relationship_events",
+      "disposition": "DELETE",
+      "authorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "retentionDurationDays": null,
+      "retentionPeriod": null
+    },
+    {
+      "table": "share_artifacts",
+      "disposition": "DELETE",
+      "authorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "retentionDurationDays": null,
+      "retentionPeriod": null
+    },
+    {
+      "table": "subject_merge_actions",
+      "disposition": "ANONYMIZE",
+      "authorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "retentionDurationDays": null,
+      "retentionPeriod": null
+    },
+    {
+      "table": "subject_merge_jobs",
+      "disposition": "ANONYMIZE",
+      "authorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "retentionDurationDays": null,
+      "retentionPeriod": null
+    },
+    {
+      "table": "subjects",
+      "disposition": "ANONYMIZE",
+      "authorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "retentionDurationDays": null,
+      "retentionPeriod": null
+    },
+    {
+      "table": "target_person_profiles",
+      "disposition": "DELETE",
+      "authorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "retentionDurationDays": null,
+      "retentionPeriod": null
+    },
+    {
+      "table": "user_character_states",
+      "disposition": "DELETE",
+      "authorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "retentionDurationDays": null,
+      "retentionPeriod": null
+    },
+    {
+      "table": "user_episode_progress",
+      "disposition": "DELETE",
+      "authorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "retentionDurationDays": null,
+      "retentionPeriod": null
+    },
+    {
+      "table": "world_events",
+      "disposition": "DELETE",
+      "authorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "retentionDurationDays": null,
+      "retentionPeriod": null
+    }
+  ],
+  "edgeConflictResolutions": [
+    {
+      "parentTable": "subjects",
+      "childTable": "ai_execution_logs",
+      "constraintName": "ai_execution_logs_subject_fk",
+      "policyAuthorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "executionStrategyRef": "DELETE_CHILD_BEFORE_PARENT_ANONYMIZATION_V1"
+    },
+    {
+      "parentTable": "subjects",
+      "childTable": "birth_profiles",
+      "constraintName": "birth_profiles_subject_fk",
+      "policyAuthorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "executionStrategyRef": "DELETE_CHILD_BEFORE_PARENT_ANONYMIZATION_V1"
+    },
+    {
+      "parentTable": "subjects",
+      "childTable": "character_unlocks",
+      "constraintName": "character_unlocks_subject_fk",
+      "policyAuthorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "executionStrategyRef": "DELETE_CHILD_BEFORE_PARENT_ANONYMIZATION_V1"
+    },
+    {
+      "parentTable": "subjects",
+      "childTable": "commerce_account_links",
+      "constraintName": "commerce_account_links_subject_fk",
+      "policyAuthorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "executionStrategyRef": "RETAIN_CHILD_LINK_TO_ANONYMIZED_PARENT_TOMBSTONE_V1"
+    },
+    {
+      "parentTable": "subjects",
+      "childTable": "commerce_receipts",
+      "constraintName": "commerce_receipts_subject_fk",
+      "policyAuthorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "executionStrategyRef": "RETAIN_CHILD_LINK_TO_ANONYMIZED_PARENT_TOMBSTONE_V1"
+    },
+    {
+      "parentTable": "subjects",
+      "childTable": "conversation_threads",
+      "constraintName": "conversation_threads_subject_fk",
+      "policyAuthorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "executionStrategyRef": "DELETE_CHILD_BEFORE_PARENT_ANONYMIZATION_V1"
+    },
+    {
+      "parentTable": "subjects",
+      "childTable": "device_installations",
+      "constraintName": "device_installations_subject_fk",
+      "policyAuthorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "executionStrategyRef": "DELETE_CHILD_BEFORE_PARENT_ANONYMIZATION_V1"
+    },
+    {
+      "parentTable": "subjects",
+      "childTable": "entitlement_grants",
+      "constraintName": "entitlement_grants_subject_fk",
+      "policyAuthorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "executionStrategyRef": "RETAIN_CHILD_LINK_TO_ANONYMIZED_PARENT_TOMBSTONE_V1"
+    },
+    {
+      "parentTable": "subjects",
+      "childTable": "entitlements",
+      "constraintName": "entitlements_subject_fk",
+      "policyAuthorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "executionStrategyRef": "RETAIN_CHILD_LINK_TO_ANONYMIZED_PARENT_TOMBSTONE_V1"
+    },
+    {
+      "parentTable": "subjects",
+      "childTable": "guest_sessions",
+      "constraintName": "guest_sessions_claimed_by_fk",
+      "policyAuthorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "executionStrategyRef": "DELETE_CHILD_BEFORE_PARENT_ANONYMIZATION_V1"
+    },
+    {
+      "parentTable": "subjects",
+      "childTable": "guest_sessions",
+      "constraintName": "guest_sessions_subject_fk",
+      "policyAuthorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "executionStrategyRef": "DELETE_CHILD_BEFORE_PARENT_ANONYMIZATION_V1"
+    },
+    {
+      "parentTable": "subjects",
+      "childTable": "life_facts",
+      "constraintName": "life_facts_subject_fk",
+      "policyAuthorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "executionStrategyRef": "DELETE_CHILD_BEFORE_PARENT_ANONYMIZATION_V1"
+    },
+    {
+      "parentTable": "subjects",
+      "childTable": "memory_items",
+      "constraintName": "memory_items_subject_fk",
+      "policyAuthorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "executionStrategyRef": "DELETE_CHILD_BEFORE_PARENT_ANONYMIZATION_V1"
+    },
+    {
+      "parentTable": "subjects",
+      "childTable": "memory_proposals",
+      "constraintName": "memory_proposals_subject_fk",
+      "policyAuthorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "executionStrategyRef": "DELETE_CHILD_BEFORE_PARENT_ANONYMIZATION_V1"
+    },
+    {
+      "parentTable": "subjects",
+      "childTable": "notification_preferences",
+      "constraintName": "notification_preferences_subject_fk",
+      "policyAuthorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "executionStrategyRef": "DELETE_CHILD_BEFORE_PARENT_ANONYMIZATION_V1"
+    },
+    {
+      "parentTable": "subjects",
+      "childTable": "notification_settings",
+      "constraintName": "notification_settings_subject_fk",
+      "policyAuthorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "executionStrategyRef": "DELETE_CHILD_BEFORE_PARENT_ANONYMIZATION_V1"
+    },
+    {
+      "parentTable": "subjects",
+      "childTable": "notifications",
+      "constraintName": "notifications_subject_fk",
+      "policyAuthorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "executionStrategyRef": "DELETE_CHILD_BEFORE_PARENT_ANONYMIZATION_V1"
+    },
+    {
+      "parentTable": "subjects",
+      "childTable": "profiles",
+      "constraintName": "profiles_subject_id_fkey",
+      "policyAuthorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "executionStrategyRef": "DELETE_CHILD_BEFORE_PARENT_ANONYMIZATION_V1"
+    },
+    {
+      "parentTable": "subjects",
+      "childTable": "purchase_intents",
+      "constraintName": "purchase_intents_subject_fk",
+      "policyAuthorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "executionStrategyRef": "RETAIN_CHILD_LINK_TO_ANONYMIZED_PARENT_TOMBSTONE_V1"
+    },
+    {
+      "parentTable": "subjects",
+      "childTable": "reading_sessions",
+      "constraintName": "reading_sessions_subject_fk",
+      "policyAuthorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "executionStrategyRef": "DELETE_CHILD_BEFORE_PARENT_ANONYMIZATION_V1"
+    },
+    {
+      "parentTable": "subjects",
+      "childTable": "record_access_grants",
+      "constraintName": "record_access_grants_subject_fk",
+      "policyAuthorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "executionStrategyRef": "DELETE_CHILD_BEFORE_PARENT_ANONYMIZATION_V1"
+    },
+    {
+      "parentTable": "subjects",
+      "childTable": "share_artifacts",
+      "constraintName": "share_artifacts_subject_fk",
+      "policyAuthorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "executionStrategyRef": "DELETE_CHILD_BEFORE_PARENT_ANONYMIZATION_V1"
+    },
+    {
+      "parentTable": "subjects",
+      "childTable": "target_person_profiles",
+      "constraintName": "target_person_profiles_subject_fk",
+      "policyAuthorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "executionStrategyRef": "DELETE_CHILD_BEFORE_PARENT_ANONYMIZATION_V1"
+    },
+    {
+      "parentTable": "subjects",
+      "childTable": "user_character_states",
+      "constraintName": "user_character_states_subject_fk",
+      "policyAuthorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "executionStrategyRef": "DELETE_CHILD_BEFORE_PARENT_ANONYMIZATION_V1"
+    },
+    {
+      "parentTable": "subjects",
+      "childTable": "user_episode_progress",
+      "constraintName": "user_episode_progress_subject_fk",
+      "policyAuthorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "executionStrategyRef": "DELETE_CHILD_BEFORE_PARENT_ANONYMIZATION_V1"
+    },
+    {
+      "parentTable": "subjects",
+      "childTable": "world_events",
+      "constraintName": "world_events_subject_fk",
+      "policyAuthorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "executionStrategyRef": "DELETE_CHILD_BEFORE_PARENT_ANONYMIZATION_V1"
+    },
+    {
+      "parentTable": "guest_sessions",
+      "childTable": "subject_merge_jobs",
+      "constraintName": "subject_merge_jobs_session_guest_fk",
+      "policyAuthorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "executionStrategyRef": "DETACH_OR_REWRITE_CHILD_REFERENCE_BEFORE_PARENT_DELETE_V1"
+    },
+    {
+      "parentTable": "subject_merge_actions",
+      "childTable": "life_facts",
+      "constraintName": "life_facts_source_merge_action_fk",
+      "policyAuthorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "executionStrategyRef": "DELETE_CHILD_BEFORE_PARENT_ANONYMIZATION_V1"
+    },
+    {
+      "parentTable": "subject_merge_actions",
+      "childTable": "memory_items",
+      "constraintName": "memory_items_source_merge_action_fk",
+      "policyAuthorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "executionStrategyRef": "DELETE_CHILD_BEFORE_PARENT_ANONYMIZATION_V1"
+    },
+    {
+      "parentTable": "subject_merge_actions",
+      "childTable": "relationship_events",
+      "constraintName": "relationship_events_source_merge_action_fk",
+      "policyAuthorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "executionStrategyRef": "DELETE_CHILD_BEFORE_PARENT_ANONYMIZATION_V1"
+    }
+  ],
+  "approvedPolicyVersion": "account-deletion-finalization-v1",
+  "approvedBy": "PRODUCT_OWNER",
+  "approvedAt": "2026-09-19",
+  "authoritativePrivacyReconciliation": false,
+  "drReady": false
+}
