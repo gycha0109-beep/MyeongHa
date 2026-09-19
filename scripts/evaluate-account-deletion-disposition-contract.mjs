@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -33,6 +34,28 @@ function isNonEmptyString(value) {
 
 function edgeKey(edge) {
   return [edge.parentTable, edge.childTable, edge.constraintName].join('|');
+}
+
+function graphFingerprintSha256(graph) {
+  const semantic = {
+    schema: graph.schema,
+    discovery: {
+      edgeCount: graph.discovery.edgeCount,
+      distinctReachableTableCount: graph.discovery.distinctReachableTableCount,
+      maxDepth: graph.discovery.maxDepth,
+    },
+    edges: [...graph.edges]
+      .map((edge) => ({
+        parentTable: edge.parentTable,
+        parentColumns: edge.parentColumns,
+        childTable: edge.childTable,
+        childColumns: edge.childColumns,
+        constraintName: edge.constraintName,
+        minDepth: edge.minDepth,
+      }))
+      .sort((left, right) => edgeKey(left).localeCompare(edgeKey(right))),
+  };
+  return createHash('sha256').update(JSON.stringify(semantic)).digest('hex');
 }
 
 export function evaluateAccountDeletionDispositionContract(contract, graph) {
@@ -83,6 +106,9 @@ export function evaluateAccountDeletionDispositionContract(contract, graph) {
     edgeCount: graph.discovery.edgeCount,
     distinctReachableTableCount: graph.discovery.distinctReachableTableCount,
     maxDepth: graph.discovery.maxDepth,
+    ...(contract.schema === ACCOUNT_DELETION_DISPOSITION_POLICY_SCHEMA_V1
+      ? { fingerprintSha256: graphFingerprintSha256(graph) }
+      : {}),
   };
   for (const [field, expected] of Object.entries(expectedGraphRef)) {
     if (contract.graphRef[field] !== expected) fail('graphRef ' + field + ' does not match the canonical graph');
@@ -269,6 +295,7 @@ export function buildAccountDeletionExecutionPlan(contract, graph) {
     decisionId: 'P0-PR-01',
     approvedPolicyVersion: contract.approvedPolicyVersion,
     executionAuthorized: true,
+    graphFingerprintSha256: contract.graphRef.fingerprintSha256 ?? null,
     stepCount: steps.length,
     steps,
     destructiveSqlGenerated: false,
