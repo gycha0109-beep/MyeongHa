@@ -17,7 +17,11 @@ const [workflow, runner, status, ...schemas] = await Promise.all([
   readFile(runnerPath, 'utf8'),
   readFile(statusPath, 'utf8'),
   ...schemaPaths.map((path) => readFile(path, 'utf8')),
-]);\nconst contract = workflow + '\\n' + runner;\n\nconst requiredWorkflowFragments = [
+]);
+const contract = workflow + '\
+' + runner;
+
+const requiredWorkflowFragments = [
   'name: Production PostgreSQL Privacy Delta Count Audit',
   'workflow_dispatch:',
   'backup_run_id:',

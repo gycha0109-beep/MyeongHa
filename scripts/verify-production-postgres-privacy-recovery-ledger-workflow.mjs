@@ -20,7 +20,11 @@ const [workflow, runner, builder, decisions, status, candidateDoc] = await Promi
   readFile(decisionPath, 'utf8'),
   readFile(statusPath, 'utf8'),
   readFile(candidateDocPath, 'utf8'),
-]);\nconst contract = workflow + '\\n' + runner;\n\nconst requiredWorkflowFragments = [
+]);
+const contract = workflow + '\
+' + runner;
+
+const requiredWorkflowFragments = [
   'name: Production PostgreSQL Privacy Recovery Ledger Candidate',
   'workflow_dispatch:',
   'schedule:',
