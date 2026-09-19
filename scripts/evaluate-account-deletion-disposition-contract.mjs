@@ -1,9 +1,12 @@
+import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 export const ACCOUNT_DELETION_DISPOSITION_SCHEMA_V1 =
   'myeongha-account-deletion-disposition-input-candidate-v1';
+export const ACCOUNT_DELETION_DISPOSITION_POLICY_SCHEMA_V1 =
+  'myeongha-account-deletion-disposition-policy-v1';
 export const TRANSITIVE_SUBJECT_GRAPH_SCHEMA_V1 =
   'myeongha-transitive-subject-dependency-graph-v1';
 
@@ -31,6 +34,28 @@ function isNonEmptyString(value) {
 
 function edgeKey(edge) {
   return [edge.parentTable, edge.childTable, edge.constraintName].join('|');
+}
+
+function graphFingerprintSha256(graph) {
+  const semantic = {
+    schema: graph.schema,
+    discovery: {
+      edgeCount: graph.discovery.edgeCount,
+      distinctReachableTableCount: graph.discovery.distinctReachableTableCount,
+      maxDepth: graph.discovery.maxDepth,
+    },
+    edges: [...graph.edges]
+      .map((edge) => ({
+        parentTable: edge.parentTable,
+        parentColumns: edge.parentColumns,
+        childTable: edge.childTable,
+        childColumns: edge.childColumns,
+        constraintName: edge.constraintName,
+        minDepth: edge.minDepth,
+      }))
+      .sort((left, right) => edgeKey(left).localeCompare(edgeKey(right))),
+  };
+  return createHash('sha256').update(JSON.stringify(semantic)).digest('hex');
 }
 
 export function evaluateAccountDeletionDispositionContract(contract, graph) {
@@ -66,7 +91,10 @@ export function evaluateAccountDeletionDispositionContract(contract, graph) {
   }
   if (graph.discovery.maxDepth !== actualMaxDepth) fail('graph maxDepth metadata drifted');
 
-  if (contract.schema !== ACCOUNT_DELETION_DISPOSITION_SCHEMA_V1) fail('contract schema mismatch');
+  if (
+    contract.schema !== ACCOUNT_DELETION_DISPOSITION_SCHEMA_V1 &&
+    contract.schema !== ACCOUNT_DELETION_DISPOSITION_POLICY_SCHEMA_V1
+  ) fail('contract schema mismatch');
   if (contract.decisionId !== 'P0-PR-01') fail('decisionId must be P0-PR-01');
   if (!['OPEN-P0', 'DECIDED'].includes(contract.decisionStatus)) fail('unsupported decisionStatus');
   if (!['NOT_APPROVED', 'APPROVED'].includes(contract.policyAuthority)) fail('unsupported policyAuthority');
@@ -78,6 +106,9 @@ export function evaluateAccountDeletionDispositionContract(contract, graph) {
     edgeCount: graph.discovery.edgeCount,
     distinctReachableTableCount: graph.discovery.distinctReachableTableCount,
     maxDepth: graph.discovery.maxDepth,
+    ...(contract.schema === ACCOUNT_DELETION_DISPOSITION_POLICY_SCHEMA_V1
+      ? { fingerprintSha256: graphFingerprintSha256(graph) }
+      : {}),
   };
   for (const [field, expected] of Object.entries(expectedGraphRef)) {
     if (contract.graphRef[field] !== expected) fail('graphRef ' + field + ' does not match the canonical graph');
@@ -94,19 +125,29 @@ export function evaluateAccountDeletionDispositionContract(contract, graph) {
     if (!ALLOWED_DISPOSITIONS.has(entry.disposition)) {
       fail('unsupported disposition for ' + entry.table + ': ' + String(entry.disposition));
     }
+    const retentionDurationDays = entry.retentionDurationDays ?? null;
+    const retentionPeriod = entry.retentionPeriod ?? null;
     if (entry.disposition === 'UNDECIDED') {
       if (entry.authorityReference !== null) fail('UNDECIDED authorityReference must be null: ' + entry.table);
-      if (entry.retentionDurationDays !== null) fail('UNDECIDED retentionDurationDays must be null: ' + entry.table);
+      if (retentionDurationDays !== null) fail('UNDECIDED retentionDurationDays must be null: ' + entry.table);
+      if (retentionPeriod !== null) fail('UNDECIDED retentionPeriod must be null: ' + entry.table);
     } else {
       if (!isNonEmptyString(entry.authorityReference)) {
         fail('resolved disposition requires authorityReference: ' + entry.table);
       }
       if (entry.disposition === 'RETAIN') {
-        if (!Number.isSafeInteger(entry.retentionDurationDays) || entry.retentionDurationDays <= 0) {
-          fail('RETAIN requires positive retentionDurationDays: ' + entry.table);
+        const hasDays = Number.isSafeInteger(retentionDurationDays) && retentionDurationDays > 0;
+        const hasPeriod = typeof retentionPeriod === 'string' && /^P(?=\d)(?:\d+Y)?(?:\d+M)?(?:\d+D)?$/.test(retentionPeriod);
+        if (hasDays === hasPeriod) {
+          fail('RETAIN requires exactly one positive retentionDurationDays or ISO calendar retentionPeriod: ' + entry.table);
         }
-      } else if (entry.retentionDurationDays !== null) {
-        fail(entry.disposition + ' retentionDurationDays must be null: ' + entry.table);
+      } else {
+        if (retentionDurationDays !== null) {
+          fail(entry.disposition + ' retentionDurationDays must be null: ' + entry.table);
+        }
+        if (retentionPeriod !== null) {
+          fail(entry.disposition + ' retentionPeriod must be null: ' + entry.table);
+        }
       }
     }
     dispositionByTable.set(entry.table, entry);
@@ -242,7 +283,8 @@ export function buildAccountDeletionExecutionPlan(contract, graph) {
       disposition: entry.disposition,
       maxDependencyDepth: depthByTable.get(entry.table) ?? 0,
       authorityReference: entry.authorityReference,
-      retentionDurationDays: entry.retentionDurationDays,
+      retentionDurationDays: entry.retentionDurationDays ?? null,
+      retentionPeriod: entry.retentionPeriod ?? null,
     }))
     .sort((left, right) =>
       right.maxDependencyDepth - left.maxDependencyDepth || left.table.localeCompare(right.table),
@@ -253,6 +295,7 @@ export function buildAccountDeletionExecutionPlan(contract, graph) {
     decisionId: 'P0-PR-01',
     approvedPolicyVersion: contract.approvedPolicyVersion,
     executionAuthorized: true,
+    graphFingerprintSha256: contract.graphRef.fingerprintSha256 ?? null,
     stepCount: steps.length,
     steps,
     destructiveSqlGenerated: false,
