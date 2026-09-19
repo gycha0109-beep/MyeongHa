@@ -143,9 +143,9 @@ function renderAuthorityBlockedRoute() {
         target_person: '궁합은 상대의 명식 참조가 먼저 필요합니다.',
         question: '고민 읽기는 실제 질문을 먼저 입력해야 합니다.',
       };
-      stateCopy.textContent = `${inputCopy[engineRequest.input] ?? '추가 입력이 필요합니다.'} 현재 Production Product Reading 실행 권한이 열리기 전에는 요청을 전송하지 않습니다.`;
+      stateCopy.textContent = `${inputCopy[engineRequest.input] ?? '추가 입력이 필요합니다.'} 현재 Preview 실행 범위에 포함되지 않은 요청은 전송하지 않습니다.`;
     } else if (engineRequest?.state === 'ready') {
-      stateCopy.textContent = `이 버튼은 Saju Engine의 ${engineRequest.adapterVersion} 요청 문법까지 정확히 매핑되어 있습니다. 다만 현재 Production Product Reading runtime이 authority-blocked 상태라 실제 해석 요청은 전송하지 않습니다. 다른 주제의 풀이로 대신 보여드리지 않습니다.`;
+      stateCopy.textContent = `이 버튼은 Saju Engine의 ${engineRequest.adapterVersion} 요청 문법까지 정확히 매핑되어 있습니다. 다만 현재 가승인된 Preview 범위에는 포함되지 않아 실제 해석 요청은 전송하지 않습니다. 다른 주제의 풀이로 대신 보여드리지 않습니다.`;
     } else {
       stateCopy.textContent = '현재 제공 가능한 검증된 사주 읽기 범위가 열리지 않아 이 결과를 실행하지 않습니다. 다른 주제의 풀이로 대신 보여드리지 않습니다.';
     }
