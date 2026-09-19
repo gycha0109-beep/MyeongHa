@@ -568,7 +568,7 @@
   position: relative;
   min-height: 216px;
   display: grid;
-  grid-template-columns: 112px minmax(0, 1fr);
+  grid-template-columns: 124px minmax(0, 1fr);
   overflow: hidden;
   border: 1px solid rgba(128, 92, 55, .20);
   border-radius: 12px;
@@ -670,11 +670,18 @@
   align-items: center;
   min-height: 22px;
   padding: 0 8px;
-  border: 1px solid color-mix(in srgb, var(--person-accent) 24%, transparent);
+  border: 1px solid color-mix(in srgb, var(--mh-brass-strong) 38%, var(--person-accent));
   border-radius: 999px;
-  color: color-mix(in srgb, var(--person-accent) 84%, #4c4540);
-  background: rgba(255,255,255,.16);
+  color: color-mix(in srgb, var(--mh-ink) 92%, var(--mh-brass-strong));
+  background: color-mix(in srgb, var(--person-accent) 10%, var(--chat-paper-strong));
   font-size: 9px;
+  font-weight: 600;
+}
+
+html[data-theme="dark"] body.chat-hub-page .chat-person-tag {
+  color: #f3e7d5;
+  border-color: rgba(205, 164, 103, .34);
+  background: rgba(196, 154, 92, .11);
 }
 
 .chat-person-action {
@@ -708,68 +715,48 @@
 
 /*
  * Canonical representative-art mapping.
- * Presentation keys are intentionally mapped 1:1 to the finalized character artwork;
- * keep these selectors aligned with the roster in chat-hub.js.
+ * Card artwork is rendered as an <img> so legacy background-image rules cannot
+ * override the finalized 1:1 character mapping. Per-character crop metadata
+ * lives in chat-hub.js; the canonical portrait files remain unchanged.
  */
 .chat-person-art[data-character] {
-  place-items: stretch;
+  place-items: center;
+  background-image: none !important;
   background-color: var(--person-surface);
-  background-repeat: no-repeat;
-  background-size: cover;
   box-shadow:
     inset -18px 0 28px rgba(9, 18, 24, .13),
     inset 0 -26px 34px rgba(9, 18, 24, .08);
 }
 
 .chat-person-art[data-character]::before,
-.chat-person-art[data-character]::after,
-.chat-person-art[data-character] .chat-person-initial {
+.chat-person-art[data-character]::after {
   display: none;
 }
 
-.chat-person-art[data-character="seyeon"] {
-  background-image: url("assets/characters/seyeon-portrait.webp");
-  background-position: center 18%;
+.chat-person-art[data-character] .chat-person-initial {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  color: color-mix(in srgb, var(--person-accent) 72%, var(--mh-ink));
+  font-size: 15px;
 }
 
-.chat-person-art[data-character="baekheon"] {
-  background-image: url("assets/characters/baekheon-portrait.webp");
-  background-position: center 16%;
-}
-
-.chat-person-art[data-character="yeoul"] {
-  background-image: url("assets/characters/yeoul-portrait.webp");
-  background-position: center 16%;
-}
-
-.chat-person-art[data-character="seorin"] {
-  background-image: url("assets/characters/seorin-portrait.webp");
-  background-position: center 17%;
-}
-
-.chat-person-art[data-character="rahyeon"] {
-  background-image: url("assets/characters/rahyeon-portrait.webp");
-  background-position: center 16%;
-}
-
-.chat-person-art[data-character="mira"] {
-  background-image: url("assets/characters/mira-portrait.webp");
-  background-position: center 16%;
-}
-
-.chat-person-art[data-character="taegyeom"] {
-  background-image: url("assets/characters/taegyeom-portrait.webp");
-  background-position: center 15%;
-}
-
-.chat-person-art[data-character="yunho"] {
-  background-image: url("assets/characters/yunho-portrait.webp");
-  background-position: center 17%;
-}
-
-.chat-person-art[data-character="doyoon"] {
-  background-image: url("assets/characters/doyoon-portrait.webp");
-  background-position: center 16%;
+.chat-person-art-image {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  object-fit: cover;
+  object-position: var(--portrait-position, 50% 22%);
+  transform: scale(var(--portrait-scale, 1.5));
+  transform-origin: var(--portrait-origin, 50% 22%);
+  pointer-events: none;
+  user-select: none;
 }
 
 .chat-search-empty {
@@ -959,7 +946,7 @@
 
   .chat-person-card {
     min-height: 185px;
-    grid-template-columns: 94px minmax(0, 1fr);
+    grid-template-columns: 106px minmax(0, 1fr);
   }
 
   .chat-person-copy {
