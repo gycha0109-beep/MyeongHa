@@ -96,7 +96,7 @@ function mapUnlockRows(
   return Object.freeze({ status });
 }
 
-class PostgresStandardReadingReaderSelectionPortsV4
+class PostgresStandardReadingReaderSelectionPortsImplV4
 implements StandardReadingReaderCatalogPortV4, StandardReadingCharacterUnlockProjectionPortV4 {
   constructor(private readonly client: PostgresTransactionQueryV1) {}
 
@@ -131,7 +131,7 @@ export type PostgresStandardReadingReaderSelectionPortsV4 = Readonly<{
 export function createPostgresStandardReadingReaderSelectionPortsV4(
   client: PostgresTransactionQueryV1,
 ): PostgresStandardReadingReaderSelectionPortsV4 {
-  const ports = new PostgresStandardReadingReaderSelectionPortsV4(client);
+  const ports = new PostgresStandardReadingReaderSelectionPortsImplV4(client);
   return Object.freeze({
     catalogPort: ports,
     unlockProjectionPort: ports,
