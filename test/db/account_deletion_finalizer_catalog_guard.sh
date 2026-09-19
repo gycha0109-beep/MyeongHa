@@ -208,7 +208,7 @@ order by section, k1, k2, line;
 SQL
 
 actual="$(sha256sum "$catalog_file" | awk '{print $1}')"
-expected="__PIN_AFTER_FIRST_CI__"
+expected="9d833aa0b580dd90d0744586d33ae5bb6587dafb01d640d8edc2abac0bc92324"
 
 echo "Account deletion finalizer catalog digest: $actual"
 
@@ -220,6 +220,23 @@ grep '^DELETE_CYCLE|' "$catalog_file" || true
 
 echo "Guest-session detach shape:"
 grep '^DETACH_SHAPE|' "$catalog_file" || true
+
+delete_trigger_count="$(grep -c '^DELETE_TRIGGER|' "$catalog_file" || true)"
+delete_cycle_count="$(grep -c '^DELETE_CYCLE|' "$catalog_file" || true)"
+detach_shape_count="$(grep -c '^DETACH_SHAPE|' "$catalog_file" || true)"
+
+if [[ "$delete_trigger_count" != "6" ]]; then
+  echo "FAIL expected 6 DELETE-trigger catalog rows, found $delete_trigger_count" >&2
+  exit 1
+fi
+if [[ "$delete_cycle_count" != "19" ]]; then
+  echo "FAIL expected 19 DELETE-subgraph cycle edges, found $delete_cycle_count" >&2
+  exit 1
+fi
+if [[ "$detach_shape_count" != "1" ]] || ! grep -q '^DETACH_SHAPE|subject_merge_jobs|guest_session_id|NOT_NULL|' "$catalog_file"; then
+  echo "FAIL guest-session detach shape drifted" >&2
+  exit 1
+fi
 
 if [[ "$actual" != "$expected" ]]; then
   echo "FAIL account deletion finalizer catalog digest mismatch expected=$expected actual=$actual" >&2
