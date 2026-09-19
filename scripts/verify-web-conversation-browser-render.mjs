@@ -299,6 +299,8 @@ async function verifyHub(page, origin, suffix, width, height, mobile) {
     assert(portrait.overflow === 'hidden', `${suffix}: ${portrait.key} portrait rail must clip crop overflow`);
     assert(portrait.artWidth > 0 && portrait.artHeight > 0 && portrait.imageWidth >= portrait.artWidth && portrait.imageHeight >= portrait.artHeight, `${suffix}: ${portrait.key} portrait does not fill its rail`);
     assert(portrait.transform !== 'none', `${suffix}: ${portrait.key} portrait crop zoom is missing`);
+    const scale = Number.parseFloat(portrait.transform.match(/^matrix\\(([^,]+)/)?.[1] ?? '0');
+    assert(scale >= 1.95, `${suffix}: ${portrait.key} portrait crop is too distant`);
   }
   assert(state.darkTag.color === 'rgb(243, 231, 213)', `${suffix}: dark trait-chip text contrast regressed`);
   assert(state.darkTag.backgroundColor !== 'rgba(0, 0, 0, 0)', `${suffix}: dark trait-chip background contrast regressed`);
