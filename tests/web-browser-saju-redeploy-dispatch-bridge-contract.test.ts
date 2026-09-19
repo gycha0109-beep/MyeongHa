@@ -6,60 +6,38 @@ const browserWorkflow = readFileSync(
   resolve(process.cwd(), '.github/workflows/web-browser-render-smoke.yml'),
   'utf8',
 );
-const sentinelWorkflow = readFileSync(
-  resolve(process.cwd(), '.github/workflows/production-saju-redeploy-sentinel-dispatch.yml'),
+const recoveryWorkflow = readFileSync(
+  resolve(process.cwd(), '.github/workflows/production-saju-redeploy-recovery.yml'),
   'utf8',
 );
 
-const RECOVERY_DISPATCH_PATH =
-  'actions/workflows/production-saju-redeploy-recovery.yml/dispatches';
-
-describe('single Saju redeploy dispatcher authority contract', () => {
+describe('direct Saju redeploy authority contract', () => {
   it('keeps the browser smoke limited to browser verification', () => {
-    expect(browserWorkflow).toContain('name: Web Browser Render Smoke');
+    expect(browserWorkflow).toContain('name: Web Browser Smoke');
     expect(browserWorkflow).toContain('pull_request:');
     expect(browserWorkflow).toContain('push:');
     expect(browserWorkflow).toContain('- main');
-    expect(browserWorkflow).toContain('web-browser-render:');
-    expect(browserWorkflow).not.toContain('dispatch-saju-redeploy-recovery:');
-    expect(browserWorkflow).not.toContain('[saju-redeploy-dispatch-v1]');
-    expect(browserWorkflow).not.toContain(RECOVERY_DISPATCH_PATH);
-  });
-
-  it('does not grant actions write permission to the browser workflow', () => {
-    expect(browserWorkflow).toContain('permissions:\n  contents: read');
+    expect(browserWorkflow).toContain('web-browser-smoke:');
+    expect(browserWorkflow).not.toContain('production-saju-redeploy.trigger');
+    expect(browserWorkflow).not.toContain('VERCEL_TOKEN');
     expect(browserWorkflow).not.toContain('actions: write');
   });
 
-  it('keeps the sentinel dispatcher as the sole governed dispatch authority', () => {
-    expect(sentinelWorkflow).toContain('name: Production Saju Redeploy Sentinel Dispatch');
-    expect(sentinelWorkflow).toContain('- .github/production-saju-redeploy.trigger');
-    expect(sentinelWorkflow).toContain('actions: write');
-    expect(sentinelWorkflow).toContain('contents: read');
-    expect(sentinelWorkflow).toContain(RECOVERY_DISPATCH_PATH);
-    expect(sentinelWorkflow).toContain(
-      '{ref: "main", inputs: {confirm: "REDEPLOY_SAJU_PRODUCTION"}}',
-    );
-    expect(sentinelWorkflow).toContain("[[ \"$http_code\" != '204' ]]");
+  it('routes the governed trigger directly to the recovery workflow', () => {
+    expect(recoveryWorkflow).toContain('name: Production Saju Redeploy Recovery');
+    expect(recoveryWorkflow).toContain('workflow_dispatch:');
+    expect(recoveryWorkflow).toContain('REDEPLOY_SAJU_PRODUCTION');
+    expect(recoveryWorkflow).toContain('push:');
+    expect(recoveryWorkflow).toContain('- main');
+    expect(recoveryWorkflow).toContain('- .github/production-saju-redeploy.trigger');
+    expect(recoveryWorkflow).not.toContain('actions: write');
+    expect(recoveryWorkflow).not.toContain('/dispatches');
   });
 
-  it('keeps the sentinel dispatcher free of production mutation and token output', () => {
-    const forbidden = [
-      'VERCEL_TOKEN',
-      '/env?upsert=true',
-      'supabase',
-      'gcloud run deploy',
-      'gcloud run services update',
-      'alter table',
-      'alter role',
-      'insert into',
-      'update subjects',
-      'delete from',
-      'echo "$GH_TOKEN"',
-      'cat "$payload_file"',
-    ];
-    for (const fragment of forbidden) {
-      expect(sentinelWorkflow.toLowerCase()).not.toContain(fragment.toLowerCase());
-    }
+  it('keeps production mutation authority inside the governed production environment', () => {
+    expect(recoveryWorkflow).toContain('environment: production');
+    expect(recoveryWorkflow).toContain('VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}');
+    expect(recoveryWorkflow).toContain('production-saju-redeploy-recovery');
+    expect(recoveryWorkflow).toContain('cancel-in-progress: false');
   });
 });
