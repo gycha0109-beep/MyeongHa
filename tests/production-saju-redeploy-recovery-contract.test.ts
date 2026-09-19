@@ -15,7 +15,8 @@ describe('production Saju redeploy recovery workflow contract', () => {
     expect(workflow).toContain("[[ \"$DISPATCH_CONFIRM\" == 'REDEPLOY_SAJU_PRODUCTION' ]]");
     expect(workflow).toContain('push:');
     expect(workflow).toContain('- main');
-    expect(workflow).toContain('- .github/workflows/production-saju-redeploy-recovery.yml');
+    expect(workflow).toContain('- .github/production-saju-redeploy.trigger');
+    expect(workflow).not.toContain('- .github/workflows/production-saju-redeploy-recovery.yml');
     expect(workflow).toContain("[[ \"$GITHUB_REF\" == 'refs/heads/main' ]]");
     expect(workflow).toContain('environment: production');
     expect(workflow).not.toContain('pull_request:');

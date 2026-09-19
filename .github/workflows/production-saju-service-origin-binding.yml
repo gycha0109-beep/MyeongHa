@@ -7,12 +7,6 @@ on:
         description: 'Type BIND_SAJU_ORIGIN to upsert the authoritative Saju production origin and redeploy production.'
         required: true
         type: string
-  push:
-    branches:
-      - main
-    paths:
-      - .github/workflows/production-saju-service-origin-binding.yml
-
 permissions:
   contents: read
 
@@ -43,19 +37,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          case "$GITHUB_EVENT_NAME" in
-            workflow_dispatch)
-              [[ "$DISPATCH_CONFIRM" == 'BIND_SAJU_ORIGIN' ]]
-              ;;
-            push)
-              [[ "$GITHUB_REF" == 'refs/heads/main' ]]
-              ;;
-            *)
-              echo "Unsupported trigger: $GITHUB_EVENT_NAME" >&2
-              exit 1
-              ;;
-          esac
-
+          [[ "$GITHUB_EVENT_NAME" == 'workflow_dispatch' ]]
+          [[ "$DISPATCH_CONFIRM" == 'BIND_SAJU_ORIGIN' ]]
           test -n "${VERCEL_TOKEN:-}"
 
       - name: Validate authoritative Saju origin contract

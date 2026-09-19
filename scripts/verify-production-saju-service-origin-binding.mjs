@@ -7,10 +7,6 @@ const requiredFragments = [
   'name: Production Saju Service Origin Binding',
   'workflow_dispatch:',
   "description: 'Type BIND_SAJU_ORIGIN to upsert the authoritative Saju production origin and redeploy production.'",
-  'push:',
-  'branches:',
-  '- main',
-  '- .github/workflows/production-saju-service-origin-binding.yml',
   'environment: production',
   'concurrency:',
   'group: production-saju-service-origin-binding',
@@ -23,7 +19,6 @@ const requiredFragments = [
   'SAJU_SERVICE_ORIGIN: https://saju-production-anh2svf5aa-as.a.run.app',
   'VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}',
   '[[ "$DISPATCH_CONFIRM" == \'BIND_SAJU_ORIGIN\' ]]',
-  '[[ "$GITHUB_REF" == \'refs/heads/main\' ]]',
   "parsed.protocol !== 'https:'",
   "parsed.pathname !== '/'",
   'parsed.search !==',
@@ -62,6 +57,7 @@ for (const fragment of requiredFragments) {
 }
 
 const forbiddenFragments = [
+  '\npush:',
   '\npull_request:',
   '\nschedule:',
   'decrypt=true',
@@ -127,12 +123,6 @@ if (
   throw new Error(
     'Saju origin workflow must bind first, resolve the exact-main deployment, force a fresh redeploy, then verify readiness.',
   );
-}
-
-const pushIndex = workflow.indexOf('push:');
-const pushPathIndex = workflow.indexOf('- .github/workflows/production-saju-service-origin-binding.yml');
-if (pushIndex < 0 || pushPathIndex < pushIndex) {
-  throw new Error('Automatic production execution must be scoped to the binding workflow path on main.');
 }
 
 const dispatchGuardIndex = workflow.indexOf("[[ \"$DISPATCH_CONFIRM\" == 'BIND_SAJU_ORIGIN' ]]");

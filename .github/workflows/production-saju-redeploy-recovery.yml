@@ -12,7 +12,6 @@ on:
       - main
     paths:
       - .github/production-saju-redeploy.trigger
-      - .github/workflows/production-saju-redeploy-recovery.yml
 
 permissions:
   contents: read
