@@ -44,13 +44,27 @@ export function evaluateAccountDeletionDispositionContract(contract, graph) {
   if (graph.executionAuthorized !== false) fail('graph must not authorize execution');
   if (!isRecord(graph.discovery) || !Array.isArray(graph.edges)) fail('graph shape is invalid');
 
+  const edgeKeys = new Set();
+  let actualMaxDepth = 0;
+  for (const edge of graph.edges) {
+    if (!isRecord(edge)) fail('graph edge must be an object');
+    if (!isNonEmptyString(edge.parentTable) || !isNonEmptyString(edge.childTable) || !isNonEmptyString(edge.constraintName)) {
+      fail('graph edge identity is invalid');
+    }
+    if (!Number.isSafeInteger(edge.minDepth) || edge.minDepth < 1) fail('graph edge minDepth is invalid');
+    const key = edgeKey(edge);
+    if (edgeKeys.has(key)) fail('graph contains duplicate edge identity: ' + key);
+    edgeKeys.add(key);
+    actualMaxDepth = Math.max(actualMaxDepth, edge.minDepth);
+  }
+
   const edgeCount = graph.edges.length;
-  const expectedTables = sortedUnique(graph.edges.map((edge) => edge?.childTable));
-  if (expectedTables.some((table) => !isNonEmptyString(table))) fail('graph contains invalid child table');
+  const expectedTables = sortedUnique(graph.edges.map((edge) => edge.childTable));
   if (graph.discovery.edgeCount !== edgeCount) fail('graph edge count metadata drifted');
   if (graph.discovery.distinctReachableTableCount !== expectedTables.length) {
     fail('graph reachable table count metadata drifted');
   }
+  if (graph.discovery.maxDepth !== actualMaxDepth) fail('graph maxDepth metadata drifted');
 
   if (contract.schema !== ACCOUNT_DELETION_DISPOSITION_SCHEMA_V1) fail('contract schema mismatch');
   if (contract.decisionId !== 'P0-PR-01') fail('decisionId must be P0-PR-01');
@@ -65,7 +79,11 @@ export function evaluateAccountDeletionDispositionContract(contract, graph) {
     distinctReachableTableCount: graph.discovery.distinctReachableTableCount,
     maxDepth: graph.discovery.maxDepth,
   };
-  if (!sameJson(contract.graphRef, expectedGraphRef)) fail('graphRef does not match the canonical graph');
+  for (const [field, expected] of Object.entries(expectedGraphRef)) {
+    if (contract.graphRef[field] !== expected) fail('graphRef ' + field + ' does not match the canonical graph');
+  }
+  const graphRefKeys = Object.keys(contract.graphRef).sort();
+  if (!sameJson(graphRefKeys, Object.keys(expectedGraphRef).sort())) fail('graphRef contains unexpected fields');
 
   if (!Array.isArray(contract.tableDispositions)) fail('tableDispositions must be an array');
   const dispositionByTable = new Map();
