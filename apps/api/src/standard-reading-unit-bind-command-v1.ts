@@ -11,7 +11,6 @@ type Awaitable<T> = T | Promise<T>;
 
 export interface StandardReadingUnitRequestV1 {
   readonly purchaseIntentId: string;
-  readonly sourceBirthProfileId: string;
 }
 
 export interface StandardReadingUnitBindAuthorityRowV1 {
@@ -72,9 +71,7 @@ export interface StandardReadingUnitBindAuthorityPortV1 {
     readonly requestSnapshotJsonb: Readonly<{
       readonly schemaVersion: typeof STANDARD_READING_UNIT_REQUEST_CONTRACT_VERSION_V1;
       readonly purchaseIntentId: string;
-      readonly sourceBirthProfileId: string;
     }>;
-    readonly sourceBirthProfileId: string;
   }): Awaitable<readonly StandardReadingUnitBindAuthorityRowV1[]>;
 }
 
@@ -120,7 +117,7 @@ function parseRequest(value: unknown): StandardReadingUnitRequestV1 {
     throw new ApiCommandError('INVALID_REQUEST', 'Standard Reading unit request must be an object.');
   }
   const record = value as Record<string, unknown>;
-  const allowed = new Set(['purchaseIntentId', 'sourceBirthProfileId']);
+  const allowed = new Set(['purchaseIntentId']);
   const unexpected = Object.keys(record).filter((key) => !allowed.has(key));
   if (unexpected.length > 0) {
     throw new ApiCommandError(
@@ -130,7 +127,6 @@ function parseRequest(value: unknown): StandardReadingUnitRequestV1 {
   }
   return Object.freeze({
     purchaseIntentId: requireNonBlank('purchaseIntentId', record.purchaseIntentId),
-    sourceBirthProfileId: requireNonBlank('sourceBirthProfileId', record.sourceBirthProfileId),
   });
 }
 
@@ -258,7 +254,6 @@ export async function bindStandardReadingUnitV1(
   const requestSnapshotJsonb = Object.freeze({
     schemaVersion: STANDARD_READING_UNIT_REQUEST_CONTRACT_VERSION_V1,
     purchaseIntentId: request.purchaseIntentId,
-    sourceBirthProfileId: request.sourceBirthProfileId,
   });
   const requestHash = hashCanonical(requestSnapshotJsonb);
 
@@ -271,7 +266,6 @@ export async function bindStandardReadingUnitV1(
       requestHash,
       requestContractVersion: STANDARD_READING_UNIT_REQUEST_CONTRACT_VERSION_V1,
       requestSnapshotJsonb,
-      sourceBirthProfileId: request.sourceBirthProfileId,
     });
     return assembleResponse(request, readingSessionId, readingId, rows);
   } catch (error) {
