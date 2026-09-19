@@ -264,7 +264,7 @@ Before sale activation:
 2. Public Product Reading execution/finalization/grounding path.
 3. Application runtime adapter + user-specific Reader eligibility/access resolution over the existing fail-closed `cmd_create_standard_reading_purchase_intent_v4` atomic DB authority. **Application contract/resolver and production Reader read data-source are implemented fail-closed in #1075; v4 purchase-command EXECUTE grant and public route remain HOLD.**
 4. Verified Payment → purchase-backed Grant fulfillment for the exact Capability Set.
-5. Reader-bound unit → Reading artifact binding with retry-safe generation.
+5. Reader-bound unit → Reading artifact binding with retry-safe generation. **PR #1090 implements a fail-closed candidate that accepts only `purchaseIntentId`, resolves the current self Birth Profile server-side, and binds one verified purchase-backed Grant to one pending Reading; command EXECUTE, public generation, transport/finalization, and Saju interpretation authority remain HOLD.**
 6. Owner-scoped immutable artifact reread.
 7. Existing Reading reference path for Character chat without granting a new Reading.
 8. Different Reader full re-analysis requiring a new Reader-bound purchase unit.
@@ -298,6 +298,7 @@ SALEABLE_OFFER                 = NO
 SAJU_RELATIONSHIP_AUTHORITY    = BLOCKED
 READER_PURCHASE_APP_ADAPTER   = IMPLEMENTED_FAIL_CLOSED
 READER_PRODUCTION_DATA_SOURCE = IMPLEMENTED_FAIL_CLOSED
+READER_UNIT_BINDING            = PR_CANDIDATE_FAIL_CLOSED
 PUBLIC_PURCHASE_ROUTE          = NO
 PRODUCTION_ACTIVATION          = HOLD
 ```
