@@ -561,3 +561,19 @@ export {
   type SupabaseAuthAdminUserDeletionPortV1,
   type SupabaseAuthAdminUserDeletionResultV1,
 } from './supabase-auth-admin-user-deletion.js';
+
+export {
+  ACCOUNT_DELETION_WORKER_ORCHESTRATION_BINDINGS_V1,
+  AccountDeletionWorkerOrchestrationErrorV1,
+  runClaimedAccountDeletionWorkerV1,
+  type AccountDeletionWorkerCompletionPortV1,
+  type AccountDeletionWorkerCompletionResultV1,
+  type AccountDeletionWorkerDbFinalizerPortV1,
+  type AccountDeletionWorkerDbFinalizerResultV1,
+  type AccountDeletionWorkerOrchestrationFailureCodeV1,
+  type AccountDeletionWorkerResumePhaseV1,
+  type AccountDeletionWorkerResumeStatePortV1,
+  type AccountDeletionWorkerResumeStateV1,
+  type RunClaimedAccountDeletionWorkerInputV1,
+  type RunClaimedAccountDeletionWorkerResultV1,
+} from './account-deletion-worker-orchestration.js';
