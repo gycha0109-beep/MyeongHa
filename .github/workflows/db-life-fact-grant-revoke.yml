@@ -2,9 +2,17 @@ name: DB Life Fact Grant Revoke
 
 on:
   pull_request:
+    paths:
+      - 'supabase/migrations/**'
+      - 'test/db/**'
+      - '.github/workflows/db-life-fact-grant-revoke.yml'
   push:
     branches:
       - main
+    paths:
+      - 'supabase/migrations/**'
+      - 'test/db/**'
+      - '.github/workflows/db-life-fact-grant-revoke.yml'
 
 permissions:
   contents: read

@@ -2,9 +2,17 @@ name: DB Character Saju Runtime Components
 
 on:
   pull_request:
+    paths:
+      - 'supabase/migrations/**'
+      - 'test/db/**'
+      - '.github/workflows/db-character-saju-runtime-components.yml'
   push:
     branches:
       - main
+    paths:
+      - 'supabase/migrations/**'
+      - 'test/db/**'
+      - '.github/workflows/db-character-saju-runtime-components.yml'
 
 permissions:
   contents: read

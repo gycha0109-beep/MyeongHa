@@ -2,9 +2,17 @@ name: DB Notification Delivery Authority
 
 on:
   pull_request:
+    paths:
+      - 'supabase/migrations/**'
+      - 'test/db/**'
+      - '.github/workflows/db-notification-delivery-authority.yml'
   push:
     branches:
       - main
+    paths:
+      - 'supabase/migrations/**'
+      - 'test/db/**'
+      - '.github/workflows/db-notification-delivery-authority.yml'
 
 permissions:
   contents: read

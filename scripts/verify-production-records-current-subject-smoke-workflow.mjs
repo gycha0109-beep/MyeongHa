@@ -19,6 +19,7 @@ const requiredWorkflowFragments = [
   'branches:',
   '- main',
   'paths:',
+  "- '.github/production-records-current-subject-smoke.trigger'",
   "- '.github/workflows/production-records-current-subject-smoke.yml'",
   "- 'scripts/verify-production-reading-history-current-subject.mjs'",
   'permissions:',

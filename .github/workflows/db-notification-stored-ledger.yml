@@ -2,9 +2,17 @@ name: DB Notification Stored Ledger
 
 on:
   pull_request:
+    paths:
+      - 'supabase/migrations/**'
+      - 'test/db/**'
+      - '.github/workflows/db-notification-stored-ledger.yml'
   push:
     branches:
       - main
+    paths:
+      - 'supabase/migrations/**'
+      - 'test/db/**'
+      - '.github/workflows/db-notification-stored-ledger.yml'
 
 permissions:
   contents: read

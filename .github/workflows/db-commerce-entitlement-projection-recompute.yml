@@ -2,9 +2,17 @@ name: DB Commerce Entitlement Projection Recompute
 
 on:
   pull_request:
+    paths:
+      - 'supabase/migrations/**'
+      - 'test/db/**'
+      - '.github/workflows/db-commerce-entitlement-projection-recompute.yml'
   push:
     branches:
       - main
+    paths:
+      - 'supabase/migrations/**'
+      - 'test/db/**'
+      - '.github/workflows/db-commerce-entitlement-projection-recompute.yml'
 
 permissions:
   contents: read

@@ -2,9 +2,17 @@ name: DB Chat Thread Runtime Binding
 
 on:
   pull_request:
+    paths:
+      - 'supabase/migrations/**'
+      - 'test/db/**'
+      - '.github/workflows/db-chat-thread-runtime-binding.yml'
   push:
     branches:
       - main
+    paths:
+      - 'supabase/migrations/**'
+      - 'test/db/**'
+      - '.github/workflows/db-chat-thread-runtime-binding.yml'
 
 permissions:
   contents: read

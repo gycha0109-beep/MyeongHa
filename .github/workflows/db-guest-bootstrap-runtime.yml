@@ -2,9 +2,17 @@ name: DB Guest Bootstrap Runtime
 
 on:
   pull_request:
+    paths:
+      - 'supabase/migrations/**'
+      - 'test/db/**'
+      - '.github/workflows/db-guest-bootstrap-runtime.yml'
   push:
     branches:
       - main
+    paths:
+      - 'supabase/migrations/**'
+      - 'test/db/**'
+      - '.github/workflows/db-guest-bootstrap-runtime.yml'
 
 permissions:
   contents: read

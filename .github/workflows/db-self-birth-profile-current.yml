@@ -2,9 +2,17 @@ name: DB Current Self Birth Profile Locator
 
 on:
   pull_request:
+    paths:
+      - 'supabase/migrations/**'
+      - 'test/db/**'
+      - '.github/workflows/db-self-birth-profile-current.yml'
   push:
     branches:
       - main
+    paths:
+      - 'supabase/migrations/**'
+      - 'test/db/**'
+      - '.github/workflows/db-self-birth-profile-current.yml'
 
 permissions:
   contents: read

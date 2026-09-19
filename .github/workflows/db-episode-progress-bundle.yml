@@ -2,9 +2,17 @@ name: DB Episode Progress Bundle
 
 on:
   pull_request:
+    paths:
+      - 'supabase/migrations/**'
+      - 'test/db/**'
+      - '.github/workflows/db-episode-progress-bundle.yml'
   push:
     branches:
       - main
+    paths:
+      - 'supabase/migrations/**'
+      - 'test/db/**'
+      - '.github/workflows/db-episode-progress-bundle.yml'
 
 permissions:
   contents: read
