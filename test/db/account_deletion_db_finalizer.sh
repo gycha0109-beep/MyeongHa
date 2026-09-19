@@ -76,7 +76,7 @@ grant delete on public.birth_profile_revisions to finalizer_guc_attacker;
 SQL
 guc_attack_log="$(mktemp)"
 set +e
-"${psql_base[@]}" -c "set role finalizer_guc_attacker; select pg_catalog.set_config('myeongha.account_deletion_finalizer_subject_id','$subject_id',true); delete from public.birth_profile_revisions where id='$attacker_revision_id';" >/dev/null 2>"$guc_attack_log"
+"${psql_base[@]}" -c "set role finalizer_guc_attacker; select pg_catalog.set_config('myeongha.account_deletion_finalizer_subject_id','$subject_id',true); delete from public.birth_profile_revisions where id='$attacker_revision_id';" >"$guc_attack_log" 2>&1
 guc_attack_rc=$?
 set -e
 grep -q 'birth profile revisions are append-only' "$guc_attack_log" || {
