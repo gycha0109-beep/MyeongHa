@@ -84,7 +84,7 @@ const recentAll = document.querySelector('[data-recent-all]');
 const incomingSection = document.querySelector('[data-incoming-section]');
 const incomingList = document.querySelector('[data-incoming-list]');
 
-const PAGE_SIZE = 6;
+const PAGE_SIZE = 9;
 let visibleCount = PAGE_SIZE;
 let searchTerm = '';
 
