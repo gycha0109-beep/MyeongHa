@@ -16,7 +16,7 @@ for (const fragment of [
   "'auth_deletion_required'",
   "'completion_ack_required'",
   "'completed'",
-  "finalization_policy_version is distinct from 'account-deletion-finalization-v1'",
+  "v_policy_version is distinct from 'account-deletion-finalization-v1'",
   "auth_user_id is not null",
   "auth_user_id is null",
   "cmd_complete_outbox_event_v1",
