@@ -315,7 +315,7 @@ select pg_temp.assert_unit_fails(
   $$update public.standard_reading_unit_bindings
     set reader_selection_hash = 'sha256:mutated'
     where purchase_intent_id = '11392300-0000-0000-0000-000000000001'$$,
-  'tr_standard_reading_unit_binding_append_only'
+  'tr_standard_reading_unit_binding_update_immutable'
 );
 
 select pg_temp.assert_unit_true(
