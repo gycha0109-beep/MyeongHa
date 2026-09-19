@@ -132,7 +132,7 @@ create or replace function public.ct_validate_standard_reading_reader_unlock_v4(
 returns trigger
 language plpgsql
 set search_path = pg_catalog, public
-as $
+as $$
 declare
   v_subject_id uuid;
   v_catalog_availability text;
@@ -178,7 +178,7 @@ begin
 
   return new;
 end;
-$;
+$$;
 
 drop trigger if exists ct_purchase_intent_reader_unlock_v4
   on public.purchase_intent_reader_selections;
