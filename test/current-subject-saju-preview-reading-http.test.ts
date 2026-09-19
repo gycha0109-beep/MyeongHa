@@ -194,7 +194,7 @@ describe('current-subject Saju Preview Reading HTTP boundary v1', () => {
       birth: {
         calendarType: 'solar',
         date: '2001-07-14',
-        time: '15:20:00',
+        time: '15:20',
         sex: 'female',
       },
       reading: { text: '재물운' },
