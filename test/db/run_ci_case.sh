@@ -144,6 +144,11 @@ case "$case_name" in
     apply_standard_migrations
     psql -1 -v ON_ERROR_STOP=1 -f test/db/reading_history_authority_query.sql
     ;;
+  standard-reading-artifact-reread)
+    apply_standard_migrations
+    bash test/db/standard_reading_artifact_reread.sh
+    catalog_snapshot
+    ;;
   records-production-read-authority)
     apply_standard_migrations
     bash test/db/records_read_runtime_authority.sh
