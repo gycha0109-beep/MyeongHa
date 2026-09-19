@@ -330,7 +330,7 @@ export function buildPrivacyReconciliationPlan(rawManifest) {
     privacyReconciliationScope: 'revocation-and-account-deletion-start-only',
     replayIdempotency: 'transactional-terminal-state-validated',
     accountDeletionFinalization: 'policy-decided-runtime-not-implemented',
-    commerceRetentionDecision: 'decided-p5y-eight-table-baseline',
+    commerceRetentionDecision: 'decided-p5y-nine-table-baseline',
     durableSourceAuthority: 'supplied-manifest-only-not-proven',
     outputContainsIdentifiers: false,
     outputContainsRowPayloads: false,
