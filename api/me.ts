@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { createNodePostgresSubjectPoolV1 } from '../apps/api/src/node-postgres-subject-pool.js';
 import { createProductionChatReadRuntimeV1 } from '../apps/api/src/production-chat-read-runtime.js';
 import { createProductionCurrentSubjectProfileRuntimeV1 } from '../apps/api/src/production-current-subject-profile-runtime.js';
+import { createProductionTargetPersonReadRuntimeV1 } from '../apps/api/src/production-target-person-read-runtime.js';
 import {
   createProductionLifeRecordReadRuntimeV1,
   createProductionMemoryItemsReadRuntimeV1,
@@ -15,11 +16,16 @@ const READINGS_ROUTE = '/api/readings' as const;
 const MEMORIES_ROUTE = '/api/memories' as const;
 const CHAT_OPEN_ROUTE = '/api/chat' as const;
 const CHAT_ROUTE_PREFIX = '/api/chat/' as const;
+const TARGET_PERSONS_ROUTE = '/api/target-persons' as const;
+const TARGET_PERSON_ROUTE_PREFIX = '/api/target-persons/' as const;
 const RECORDS_ROUTE_PARAM = '__myeongha_records_read' as const;
 const CHAT_OPEN_PARAM = '__myeongha_chat_open' as const;
 const CHAT_THREAD_PARAM = '__myeongha_chat_thread_id' as const;
 const VERCEL_DYNAMIC_CHAT_THREAD_PARAM = 'threadId' as const;
 const CHAT_CURSOR_PARAM = 'afterSequenceNo' as const;
+const TARGET_PERSON_READ_PARAM = '__myeongha_target_person_read' as const;
+const TARGET_PERSON_ID_PARAM = '__myeongha_target_person_id' as const;
+const VERCEL_DYNAMIC_TARGET_PERSON_PARAM = 'id' as const;
 const VERCEL_SHARE_PARAM = '_vercel_share' as const;
 const NO_STORE_CACHE_CONTROL = 'no-store' as const;
 
@@ -38,6 +44,9 @@ let memoriesRuntime:
   | undefined;
 let chatRuntime:
   | ReturnType<typeof createProductionChatReadRuntimeV1>
+  | undefined;
+let targetPersonRuntime:
+  | ReturnType<typeof createProductionTargetPersonReadRuntimeV1>
   | undefined;
 
 function getSharedPostgresPool(): ReturnType<typeof createNodePostgresSubjectPoolV1> {
@@ -87,6 +96,14 @@ function getChatRuntime(): ReturnType<typeof createProductionChatReadRuntimeV1> 
   return chatRuntime;
 }
 
+function getTargetPersonRuntime(): ReturnType<typeof createProductionTargetPersonReadRuntimeV1> {
+  targetPersonRuntime ??= createProductionTargetPersonReadRuntimeV1({
+    env: process.env,
+    pool: getSharedPostgresPool(),
+  });
+  return targetPersonRuntime;
+}
+
 type DispatchTarget =
   | { readonly kind: 'profile'; readonly route: typeof PROFILE_ROUTE }
   | {
@@ -94,7 +111,16 @@ type DispatchTarget =
       readonly route: typeof LIFE_RECORD_ROUTE | typeof READINGS_ROUTE | typeof MEMORIES_ROUTE;
     }
   | { readonly kind: 'chat-open'; readonly route: typeof CHAT_OPEN_ROUTE }
-  | { readonly kind: 'chat-read'; readonly route: string; readonly afterSequenceNo?: string };
+  | { readonly kind: 'chat-read'; readonly route: string; readonly afterSequenceNo?: string }
+  | {
+      readonly kind: 'target-person-list';
+      readonly route: typeof TARGET_PERSONS_ROUTE;
+    }
+  | {
+      readonly kind: 'target-person-detail';
+      readonly route: string;
+      readonly targetPersonId: string;
+    };
 
 type RecordsDispatchValue = 'life-record' | 'readings' | 'memories';
 
@@ -125,7 +151,9 @@ function getChatPathThreadId(pathname: string): string | null | undefined {
     pathname === CHAT_OPEN_ROUTE ||
     pathname === LIFE_RECORD_ROUTE ||
     pathname === READINGS_ROUTE ||
-    pathname === MEMORIES_ROUTE
+    pathname === MEMORIES_ROUTE ||
+    pathname === TARGET_PERSONS_ROUTE ||
+    pathname.startsWith(TARGET_PERSON_ROUTE_PREFIX)
   ) {
     return undefined;
   }
@@ -142,12 +170,29 @@ function getChatPathThreadId(pathname: string): string | null | undefined {
   }
 }
 
+function getTargetPersonPathValue(pathname: string): 'list' | string | null | undefined {
+  if (pathname === TARGET_PERSONS_ROUTE) return 'list';
+  if (!pathname.startsWith(TARGET_PERSON_ROUTE_PREFIX)) return undefined;
+
+  const rawSegment = pathname.slice(TARGET_PERSON_ROUTE_PREFIX.length);
+  if (rawSegment.length === 0 || rawSegment.includes('/')) return null;
+
+  try {
+    const targetPersonId = decodeURIComponent(rawSegment);
+    return isUuid(targetPersonId) ? targetPersonId : null;
+  } catch {
+    return null;
+  }
+}
+
 function resolveDispatchTarget(request: Request): DispatchTarget | null {
   const url = new URL(request.url);
   if (url.hash !== '') return null;
 
   const pathThreadId = getChatPathThreadId(url.pathname);
   if (pathThreadId === null) return null;
+  const targetPersonPathValue = getTargetPersonPathValue(url.pathname);
+  if (targetPersonPathValue === null) return null;
 
   const keys = [...new Set(url.searchParams.keys())];
   const knownKeys = new Set<string>([
@@ -156,6 +201,9 @@ function resolveDispatchTarget(request: Request): DispatchTarget | null {
     CHAT_THREAD_PARAM,
     VERCEL_DYNAMIC_CHAT_THREAD_PARAM,
     CHAT_CURSOR_PARAM,
+    TARGET_PERSON_READ_PARAM,
+    TARGET_PERSON_ID_PARAM,
+    VERCEL_DYNAMIC_TARGET_PERSON_PARAM,
     VERCEL_SHARE_PARAM,
   ]);
   if (keys.some((key) => !knownKeys.has(key))) return null;
@@ -187,6 +235,26 @@ function resolveDispatchTarget(request: Request): DispatchTarget | null {
   const afterSequenceNo = getSingleNonEmptyParam(url.searchParams, CHAT_CURSOR_PARAM);
   if (afterSequenceNo === null) return null;
 
+  const targetPersonRead = getSingleNonEmptyParam(
+    url.searchParams,
+    TARGET_PERSON_READ_PARAM,
+  );
+  if (targetPersonRead === null) return null;
+  const targetPersonId = getSingleNonEmptyParam(url.searchParams, TARGET_PERSON_ID_PARAM);
+  if (targetPersonId === null) return null;
+  const vercelDynamicTargetPersonId = getSingleNonEmptyParam(
+    url.searchParams,
+    VERCEL_DYNAMIC_TARGET_PERSON_PARAM,
+  );
+  if (vercelDynamicTargetPersonId === null) return null;
+  if (
+    targetPersonRead !== undefined &&
+    targetPersonRead !== 'list' &&
+    targetPersonRead !== 'detail'
+  ) {
+    return null;
+  }
+
   if (chatOpen !== undefined && chatOpen !== '1') return null;
 
   const hasChatOpen = chatOpen === '1';
@@ -197,6 +265,64 @@ function resolveDispatchTarget(request: Request): DispatchTarget | null {
   if (hasChatOpen && vercelDynamicThreadId !== undefined) return null;
   if (hasChatOpen && pathThreadId !== undefined) return null;
   if (hasChatOpen && afterSequenceNo !== undefined) return null;
+
+  if (targetPersonRead !== undefined) {
+    if (
+      recordsRoute !== undefined ||
+      hasChatOpen ||
+      chatThreadId !== undefined ||
+      vercelDynamicThreadId !== undefined ||
+      pathThreadId !== undefined ||
+      afterSequenceNo !== undefined
+    ) {
+      return null;
+    }
+
+    if (targetPersonRead === 'list') {
+      if (targetPersonId !== undefined || vercelDynamicTargetPersonId !== undefined) return null;
+      if (
+        targetPersonPathValue !== undefined &&
+        targetPersonPathValue !== 'list'
+      ) {
+        return null;
+      }
+      if (
+        url.pathname !== PROFILE_ROUTE &&
+        targetPersonPathValue !== 'list'
+      ) {
+        return null;
+      }
+      return { kind: 'target-person-list', route: TARGET_PERSONS_ROUTE };
+    }
+
+    if (targetPersonId === undefined || !isUuid(targetPersonId)) return null;
+    if (
+      vercelDynamicTargetPersonId !== undefined &&
+      vercelDynamicTargetPersonId !== targetPersonId
+    ) {
+      return null;
+    }
+    if (
+      targetPersonPathValue !== undefined &&
+      targetPersonPathValue !== targetPersonId
+    ) {
+      return null;
+    }
+    if (
+      url.pathname !== PROFILE_ROUTE &&
+      targetPersonPathValue !== targetPersonId
+    ) {
+      return null;
+    }
+    return {
+      kind: 'target-person-detail',
+      route: `${TARGET_PERSON_ROUTE_PREFIX}${targetPersonId}`,
+      targetPersonId,
+    };
+  }
+
+  if (targetPersonId !== undefined || vercelDynamicTargetPersonId !== undefined) return null;
+  if (targetPersonPathValue !== undefined) return null;
 
   if (recordsRoute !== undefined && chatThreadId !== undefined) return null;
   if (recordsRoute !== undefined && vercelDynamicThreadId !== undefined) return null;
@@ -307,6 +433,9 @@ function runtimeForTarget(target: DispatchTarget) {
     case 'chat-open':
     case 'chat-read':
       return getChatRuntime();
+    case 'target-person-list':
+    case 'target-person-detail':
+      return getTargetPersonRuntime();
   }
 }
 
