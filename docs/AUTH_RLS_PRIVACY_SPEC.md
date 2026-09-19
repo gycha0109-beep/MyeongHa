@@ -309,7 +309,7 @@ Deletion graph:
 - birth/target/life fact/memory/conversation/reading personalization artifacts
 - AI raw trace가 별도 restricted store에 있으면 동일 deletion/retention policy 대상
 
-법적 commerce retention은 product personalization과 분리한다. `P0-PR-01`은 2026-09-19 **DECIDED**다: 일반 service/personalization 데이터는 DELETE, `subjects`/`data_deletion_jobs`/`subject_merge_jobs`/`subject_merge_actions`는 ANONYMIZE, 열거된 8개 Commerce evidence/history 테이블은 calendar `P5Y` RETAIN, 기존 암호화 backup lifecycle은 `P30D`를 유지하고 restore 후 privacy deletion reconciliation을 serviceability보다 먼저 수행한다. Exact authority는 `docs/operations/ACCOUNT_DELETION_FINALIZATION_POLICY_V1.md`다.
+법적 commerce retention은 product personalization과 분리한다. `P0-PR-01`은 2026-09-19 **DECIDED**다: 일반 service/personalization 데이터는 DELETE, `subjects`/`data_deletion_jobs`/`subject_merge_jobs`/`subject_merge_actions`는 ANONYMIZE, 열거된 9개 Commerce evidence/history 테이블은 calendar `P5Y` RETAIN, 기존 암호화 backup lifecycle은 `P30D`를 유지하고 restore 후 privacy deletion reconciliation을 serviceability보다 먼저 수행한다. Exact authority는 `docs/operations/ACCOUNT_DELETION_FINALIZATION_POLICY_V1.md`다.
 
 `P0-PR-01B`는 Commerce evidence의 **저장 최소화/security shape**를 계속 별도로 지배한다. `P0-PR-01`의 RETAIN 결정은 raw provider payload 전체 보관 권한이 아니다.
 
@@ -357,4 +357,4 @@ Canonical member가 deletion lifecycle에 들어간 동안 새로운 Guest merge
 - unknown/oversized provider verified-payload field → drop/reject
 - same Commerce opaque evidence replay → same versioned keyed HMAC fingerprint
 - missing/weak Commerce fingerprint secret → evidence persistence fail-closed
-- parent `P0-PR-01` OPEN 상태 → destructive Commerce retention/deletion scheduler 비활성
+- parent `P0-PR-01`은 DECIDED이나 destructive runtime finalizer 미구현 상태 → destructive Commerce retention/deletion scheduler 비활성
