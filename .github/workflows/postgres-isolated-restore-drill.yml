@@ -79,9 +79,7 @@ jobs:
           BACKUP_ARTIFACT_DIR: ${{ runner.temp }}/backup-artifact
           EXPECTED_SOURCE_SHA: ${{ steps.source.outputs.source_sha }}
           RESTORE_EVIDENCE_PATH: ${{ runner.temp }}/restore-evidence/restore-evidence.json
-        run: |
-          set -euo pipefail
-          bash scripts/run-postgres-isolated-restore-drill.sh
+        run: bash scripts/run-postgres-isolated-restore-drill.sh
 
       - name: Exercise synthetic privacy reconciliation on restored database
         shell: bash
