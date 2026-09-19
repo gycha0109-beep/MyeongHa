@@ -298,11 +298,7 @@ async function verifyHub(page, origin, suffix, width, height, mobile) {
     assert(portrait.objectFit === 'cover', `${suffix}: ${portrait.key} portrait must cover its rail`);
     assert(portrait.overflow === 'hidden', `${suffix}: ${portrait.key} portrait rail must clip crop overflow`);
     assert(portrait.artWidth > 0 && portrait.artHeight > 0 && portrait.imageWidth >= portrait.artWidth && portrait.imageHeight >= portrait.artHeight, `${suffix}: ${portrait.key} portrait does not fill its rail`);
-    assert(portrait.transform !== 'none', `${suffix}: ${portrait.key} portrait crop zoom is missing`);
-    const scale = portrait.transform.startsWith('matrix(')
-      ? Number.parseFloat(portrait.transform.slice(7).split(',')[0] ?? '0')
-      : 0;
-    assert(scale >= 1.95, `${suffix}: ${portrait.key} portrait crop is too distant`);
+    assert(portrait.transform === 'none', `${suffix}: ${portrait.key} portrait must not apply a second zoom over the finalized crop`);
   }
   assert(state.darkTag.color === 'rgb(243, 231, 213)', `${suffix}: dark trait-chip text contrast regressed`);
   assert(state.darkTag.backgroundColor !== 'rgba(0, 0, 0, 0)', `${suffix}: dark trait-chip background contrast regressed`);
