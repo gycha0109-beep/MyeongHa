@@ -274,5 +274,5 @@ if (!unsupportedRejected) {
 }
 
 console.log(
-  'MyeongHa encrypted PostgreSQL privacy recovery ledger candidate verification passed; P0-PR-01 and DR authority remain open.',
+  'MyeongHa encrypted PostgreSQL privacy recovery ledger candidate verification passed; P0-PR-01 is decided while authoritative recovery and DR gates remain incomplete.',
 );
