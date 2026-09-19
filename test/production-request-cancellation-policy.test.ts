@@ -21,7 +21,6 @@ const FUNCTION_POLICY = Object.freeze({
   'api/me.ts': 'continue_to_terminal_outcome',
   'api/me/birth-profile.ts': 'not_yet_authorized_for_cancellation',
   'api/me/saju/calculation.ts': 'not_yet_authorized_for_cancellation',
-  'api/me/saju/preview-reading.ts': 'not_yet_authorized_for_cancellation',
   'api/readiness.ts': 'cancel_on_disconnect',
   'api/session/bootstrap.ts': 'continue_to_terminal_outcome',
 } satisfies Readonly<Record<string, CancellationClass>>);
@@ -84,9 +83,6 @@ describe('Production request cancellation policy V1', () => {
       'not_yet_authorized_for_cancellation',
     );
     expect(FUNCTION_POLICY['api/me/saju/calculation.ts']).toBe(
-      'not_yet_authorized_for_cancellation',
-    );
-    expect(FUNCTION_POLICY['api/me/saju/preview-reading.ts']).toBe(
       'not_yet_authorized_for_cancellation',
     );
   });
