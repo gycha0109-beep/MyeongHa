@@ -340,7 +340,7 @@ function unavailableResponse(requestId: string): Response {
   });
 }
 
-async function readBoundCurrentBirthProfile(input: {
+export async function readBoundCurrentBirthProfileV1(input: {
   readonly pool: PostgresSubjectPoolV1;
   readonly verifiedEvidence: NonNullable<
     Awaited<ReturnType<IdentityEvidenceVerificationPortV1['verifyRequestIdentity']>>
@@ -426,7 +426,7 @@ export async function handleCurrentSubjectSajuCalculationRequestV1(
   }
 
   try {
-    const profile = await readBoundCurrentBirthProfile({
+    const profile = await readBoundCurrentBirthProfileV1({
       pool: input.pool,
       verifiedEvidence,
     });
