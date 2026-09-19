@@ -12,7 +12,7 @@ This artifact records the catalog blockers that the account-deletion DB finalize
 The executable authority is `test/db/account_deletion_finalizer_catalog_guard.sh`. It derives the surface from `pg_catalog` after all migrations are applied and pins the complete deterministic digest:
 
 ```text
-29b8c2b235c0ef6c512c50775245d5139775454bb0352d8a3876a5c85fff3f1d
+2e1a47a17ee18d29320e679a4bcfccd7266aaa1740dac48eadc227210cec6362
 ```
 
 Any FK, DELETE-trigger, anonymization-column, or guest-session detach-shape drift changes that digest and fails CI.
@@ -74,7 +74,7 @@ The finalizer must break nullable back-pointers / committed pointers before orde
 Current catalog shape:
 
 ```text
-subject_merge_jobs.guest_session_id = NOT NULL
+subject_merge_jobs.guest_session_id = NULLABLE
 
 FOREIGN KEY (guest_session_id, guest_subject_id)
 REFERENCES guest_sessions(id, subject_id)
@@ -87,20 +87,19 @@ guest_sessions      -> DELETE
 subject_merge_jobs  -> ANONYMIZE
 ```
 
-Therefore the finalizer cannot delete the guest session while preserving the current merge-job row unless the merge-job reference is detached or rewritten first. The approved conflict strategy remains:
+Migration 1171 resolves this blocker by making `guest_session_id` nullable; the DB finalizer detaches the merge-job reference before deleting the guest session. The approved conflict strategy remains:
 
 ```text
 DETACH_OR_REWRITE_CHILD_REFERENCE_BEFORE_PARENT_DELETE_V1
 ```
 
-No detach schema mutation is introduced by this guard.
+The catalog guard now pins the resolved nullable detach shape so later schema drift fails closed.
 
 ## Authority boundary
 
-This slice does **not** add or promote:
+Migration 1171 adds the DB finalizer implementation but keeps runtime invocation closed. This slice does **not** promote:
 
-- destructive DELETE / ANONYMIZE execution;
-- a finalizer function or worker;
+- EXECUTE for PUBLIC, anon, authenticated, service_role, or myeongha_api_executor;
 - hosted Auth deletion;
 - account-deletion job completion;
 - `destructiveRuntimeAuthorized=true`;
