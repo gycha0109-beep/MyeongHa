@@ -242,7 +242,18 @@ jobs:
       - name: Run current Character Unlock projection read tests
         run: bash test/db/character_unlocks_current_query.sh
       - name: Run Standard Reading Reader runtime data-source tests
-        run: bash test/db/standard_reading_reader_runtime_query.sh
+        shell: bash
+        run: |
+          set -euo pipefail
+          reader_db=myeongha_standard_reader_runtime_test
+          createdb "$reader_db"
+          trap 'dropdb --if-exists "$reader_db"' EXIT
+          PGDATABASE="$reader_db" psql -v ON_ERROR_STOP=1 -f test/db/bootstrap_supabase_auth_stub.sql
+          for migration in supabase/migrations/*.sql; do
+            echo "Applying ${migration} to isolated Standard Reader runtime DB"
+            PGDATABASE="$reader_db" psql -v ON_ERROR_STOP=1 -f "$migration" >/dev/null
+          done
+          PGDATABASE="$reader_db" bash test/db/standard_reading_reader_runtime_query.sh
       - name: Run current entitlement projection read tests
         run: bash test/db/entitlements_current_query.sh
       - name: Run data deletion job status read tests

@@ -87,16 +87,28 @@ pass "catalog projection preserves locked state for application fail-closed reso
 [[ "$("${psql_base[@]}" -Atc "select count(*) from public.qry_standard_reading_reader_catalog_v4('11300000-0000-0000-0000-000000000099','std-reader-available');")" == '0' ]] || fail "unknown Product resolved a Reader"
 pass "Reader catalog fails closed for future/retired/unknown authority"
 
-"${psql_base[@]}" -Atc "select pg_catalog.set_config('myeongha.subject_id','d1140000-0000-0000-0000-000000000001',false);" >/dev/null
-unlocked=$("${psql_base[@]}" -Atc "select status from public.qry_standard_reading_reader_unlock_v4('d1140000-0000-0000-0000-000000000001','std-reader-unlockable');")
+unlocked=$(psql -X -v ON_ERROR_STOP=1 -Atq <<'SQL'
+set myeongha.subject_id = 'd1140000-0000-0000-0000-000000000001';
+select status from public.qry_standard_reading_reader_unlock_v4('d1140000-0000-0000-0000-000000000001','std-reader-unlockable');
+SQL
+)
 [[ "$unlocked" == 'unlocked' ]] || fail "stored unlocked projection mismatch: $unlocked"
-locked_projection=$("${psql_base[@]}" -Atc "select status from public.qry_standard_reading_reader_unlock_v4('d1140000-0000-0000-0000-000000000001','std-reader-locked');")
+locked_projection=$(psql -X -v ON_ERROR_STOP=1 -Atq <<'SQL'
+set myeongha.subject_id = 'd1140000-0000-0000-0000-000000000001';
+select status from public.qry_standard_reading_reader_unlock_v4('d1140000-0000-0000-0000-000000000001','std-reader-locked');
+SQL
+)
 [[ "$locked_projection" == 'locked' ]] || fail "stored locked projection mismatch: $locked_projection"
-[[ "$("${psql_base[@]}" -Atc "select count(*) from public.qry_standard_reading_reader_unlock_v4('d1140000-0000-0000-0000-000000000001','std-reader-available');")" == '0' ]] || fail "missing unlock projection was fabricated"
+missing_projection=$(psql -X -v ON_ERROR_STOP=1 -Atq <<'SQL'
+set myeongha.subject_id = 'd1140000-0000-0000-0000-000000000001';
+select count(*) from public.qry_standard_reading_reader_unlock_v4('d1140000-0000-0000-0000-000000000001','std-reader-available');
+SQL
+)
+[[ "$missing_projection" == '0' ]] || fail "missing unlock projection was fabricated"
 pass "Reader unlock resolver returns only already-stored owner projection"
 
-expect_fail "cross-subject Reader unlock lookup denied" "subject execution context mismatch" "select * from public.qry_standard_reading_reader_unlock_v4('d1140000-0000-0000-0000-000000000002','std-reader-unlockable');"
-expect_fail "deletion-pending Reader unlock lookup denied" "subject execution context mismatch" "select * from public.qry_standard_reading_reader_unlock_v4('d1140000-0000-0000-0000-000000000003','std-reader-unlockable');"
+expect_fail "cross-subject Reader unlock lookup denied" "subject execution context mismatch" "set myeongha.subject_id = 'd1140000-0000-0000-0000-000000000001'; select * from public.qry_standard_reading_reader_unlock_v4('d1140000-0000-0000-0000-000000000002','std-reader-unlockable');"
+expect_fail "deletion-pending Reader unlock lookup denied" "requires an active canonical subject" "set myeongha.subject_id = 'd1140000-0000-0000-0000-000000000003'; select * from public.qry_standard_reading_reader_unlock_v4('d1140000-0000-0000-0000-000000000003','std-reader-unlockable');"
 
 for fn in 'public.qry_standard_reading_reader_catalog_v4(uuid,text)' 'public.qry_standard_reading_reader_unlock_v4(uuid,text)'; do
   [[ "$("${psql_base[@]}" -Atc "select case when has_function_privilege('public','$fn','EXECUTE') then '1' else '0' end;")" == '0' ]] || fail "$fn unexpectedly executable by PUBLIC"
