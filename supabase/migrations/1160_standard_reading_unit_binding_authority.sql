@@ -73,22 +73,26 @@ create table public.standard_reading_unit_bindings (
     check (request_hash ~ '^sha256:v1:[0-9a-f]{64}$')
 );
 
-create or replace function public.tr_standard_reading_unit_binding_append_only()
+create or replace function public.tr_standard_reading_unit_binding_update_immutable()
 returns trigger
 language plpgsql
 set search_path = pg_catalog, public
-as $$
+as $
 begin
   raise exception using
     errcode = '23514',
-    constraint = 'tr_standard_reading_unit_binding_append_only',
-    message = 'Standard Reading purchase-unit binding is immutable';
+    constraint = 'tr_standard_reading_unit_binding_update_immutable',
+    message = 'Standard Reading purchase-unit binding cannot be rewritten';
 end;
-$$;
+$;
 
-create trigger tr_standard_reading_unit_binding_append_only
-  before update or delete on public.standard_reading_unit_bindings
-  for each row execute function public.tr_standard_reading_unit_binding_append_only();
+-- Runtime provenance is append-only because ordinary roles have no DML authority and
+-- UPDATE is rejected at the table boundary. DELETE intentionally remains available to a
+-- future privileged account-deletion finalizer; personal Reading/Birth linkage must not
+-- become undeletable merely because purchase consumption provenance is immutable in use.
+create trigger tr_standard_reading_unit_binding_update_immutable
+  before update on public.standard_reading_unit_bindings
+  for each row execute function public.tr_standard_reading_unit_binding_update_immutable();
 
 create index standard_reading_unit_bindings_subject_created_idx
   on public.standard_reading_unit_bindings(subject_id, created_at desc);
