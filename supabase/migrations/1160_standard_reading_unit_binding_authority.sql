@@ -104,8 +104,7 @@ create or replace function public.cmd_bind_standard_reading_unit_v1(
   p_reading_id uuid,
   p_request_hash text,
   p_request_contract_version text,
-  p_request_snapshot_jsonb jsonb,
-  p_source_birth_profile_id uuid
+  p_request_snapshot_jsonb jsonb
 )
 returns table (
   purchase_intent_id uuid,
@@ -155,6 +154,7 @@ declare
 
   v_grant_count integer;
   v_entitlement_grant_id uuid;
+  v_source_birth_profile_id uuid;
 
   v_expected_request_snapshot jsonb;
   v_core record;
@@ -162,12 +162,11 @@ begin
   if p_subject_id is null
      or p_purchase_intent_id is null
      or p_reading_session_id is null
-     or p_reading_id is null
-     or p_source_birth_profile_id is null then
+     or p_reading_id is null then
     raise exception using
       errcode = '23514',
       constraint = 'cmd_standard_reading_unit_ids_required',
-      message = 'Standard Reading unit binding requires subject, purchase, Reading, and source profile identities';
+      message = 'Standard Reading unit binding requires subject, purchase, and Reading identities';
   end if;
 
   perform public.assert_myeongha_subject_context_v1(p_subject_id);
@@ -189,8 +188,7 @@ begin
 
   v_expected_request_snapshot := pg_catalog.jsonb_build_object(
     'schemaVersion', 'standard-reading-unit-request-v1',
-    'purchaseIntentId', p_purchase_intent_id::text,
-    'sourceBirthProfileId', p_source_birth_profile_id::text
+    'purchaseIntentId', p_purchase_intent_id::text
   );
 
   if p_request_snapshot_jsonb is distinct from v_expected_request_snapshot then
@@ -241,8 +239,7 @@ begin
   if found then
     if v_existing.subject_id is distinct from p_subject_id
        or v_existing.request_hash is distinct from p_request_hash
-       or v_existing.request_contract_version is distinct from p_request_contract_version
-       or v_existing.source_birth_profile_id is distinct from p_source_birth_profile_id then
+       or v_existing.request_contract_version is distinct from p_request_contract_version then
       raise exception using
         errcode = '23505',
         constraint = 'cmd_standard_reading_unit_binding_conflict',
@@ -440,6 +437,20 @@ begin
       message = 'Standard Reading purchase resolves to multiple active purchase-backed Entitlement Grants';
   end if;
 
+  select bp.id
+    into v_source_birth_profile_id
+  from public.birth_profiles bp
+  where bp.subject_id = p_subject_id
+    and bp.profile_kind = 'self'
+    and bp.archived_at is null;
+
+  if not found then
+    raise exception using
+      errcode = 'P0001',
+      constraint = 'cmd_standard_reading_unit_source_profile_unavailable',
+      message = 'current self Birth Profile is unavailable for Standard Reading unit binding';
+  end if;
+
   select *
     into strict v_core
   from public.cmd_create_reading_session_v1(
@@ -451,7 +462,7 @@ begin
     p_request_contract_version,
     p_request_snapshot_jsonb,
     v_saju_domain,
-    p_source_birth_profile_id,
+    v_source_birth_profile_id,
     null,
     null,
     null,
@@ -495,7 +506,7 @@ begin
     v_reader_character_id,
     v_reader_content_bundle_id,
     v_reader_selection_hash,
-    p_source_birth_profile_id,
+    v_source_birth_profile_id,
     v_core.source_birth_revision_id,
     v_core.reading_session_id,
     v_core.reading_id,
@@ -525,13 +536,13 @@ end;
 $$;
 
 comment on function public.cmd_bind_standard_reading_unit_v1(
-  uuid, uuid, uuid, uuid, text, text, jsonb, uuid
+  uuid, uuid, uuid, uuid, text, text, jsonb
 ) is
   'Fail-closed unactivated authority that consumes one verified Reader-bound Standard Reading purchase-backed Grant into exactly one pending Reading. No transport/finalization/grounding authority is included.';
 
 revoke all on table public.standard_reading_unit_bindings from public;
 revoke all on function public.cmd_bind_standard_reading_unit_v1(
-  uuid, uuid, uuid, uuid, text, text, jsonb, uuid
+  uuid, uuid, uuid, uuid, text, text, jsonb
 ) from public;
 
 DO $$
@@ -548,7 +559,7 @@ BEGIN
       v_role
     );
     EXECUTE pg_catalog.format(
-      'revoke execute on function public.cmd_bind_standard_reading_unit_v1(uuid,uuid,uuid,uuid,text,text,jsonb,uuid) from %I',
+      'revoke execute on function public.cmd_bind_standard_reading_unit_v1(uuid,uuid,uuid,uuid,text,text,jsonb) from %I',
       v_role
     );
   END LOOP;
