@@ -40,6 +40,10 @@
   ],
   "rewrites": [
     {
+      "source": "/api/me/saju/preview-reading",
+      "destination": "/api/me?__myeongha_saju_preview_reading=1"
+    },
+    {
       "source": "/api/chat",
       "destination": "/api/me?__myeongha_chat_open=1"
     },
