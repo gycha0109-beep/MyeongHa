@@ -34,7 +34,7 @@ raw guest token
 → object authorization
 ```
 
-Supabase anon direct row CRUD를 guest persistence mechanism으로 사용하지 않는다. Guest bearer/session authentication TTL은 `P0-PR-01A`로 **DECIDED: 7 days / 604800 seconds**다. Expired Guest product-data deletion, backup, legal retention은 parent `P0-PR-01`로 계속 OPEN이다.
+Supabase anon direct row CRUD를 guest persistence mechanism으로 사용하지 않는다. Guest bearer/session authentication TTL은 `P0-PR-01A`로 **DECIDED: 7 days / 604800 seconds**다. Expired Guest product-data deletion은 parent `P0-PR-01`의 승인된 account-deletion disposition을 따른다. Guest bearer/session authentication TTL 자체는 `P0-PR-01A`의 7일 결정을 유지한다.
 
 ## 4. New Signup Promotion
 
@@ -309,11 +309,11 @@ Deletion graph:
 - birth/target/life fact/memory/conversation/reading personalization artifacts
 - AI raw trace가 별도 restricted store에 있으면 동일 deletion/retention policy 대상
 
-법적 commerce retention은 product personalization과 분리. 실제 legal/accounting/backup retention 기간과 account-deletion Commerce tombstone/pseudonymization/destructive schedule은 `OPEN-P0: P0-PR-01`이다.
+법적 commerce retention은 product personalization과 분리한다. `P0-PR-01`은 2026-09-19 **DECIDED**다: 일반 service/personalization 데이터는 DELETE, `subjects`/`data_deletion_jobs`/`subject_merge_jobs`/`subject_merge_actions`는 ANONYMIZE, 열거된 9개 Commerce evidence/history 테이블은 calendar `P5Y` RETAIN, 기존 암호화 backup lifecycle은 `P30D`를 유지하고 restore 후 privacy deletion reconciliation을 serviceability보다 먼저 수행한다. Exact authority는 `docs/operations/ACCOUNT_DELETION_FINALIZATION_POLICY_V1.md`다.
 
-`P0-PR-01B`는 Commerce evidence의 **저장 최소화/security shape**만 결정한다. 이를 legal retention 기간으로 해석하지 않는다. 반대로 legal retention 미결정을 이유로 raw provider payload 전체를 보존하지도 않는다.
+`P0-PR-01B`는 Commerce evidence의 **저장 최소화/security shape**를 계속 별도로 지배한다. `P0-PR-01`의 RETAIN 결정은 raw provider payload 전체 보관 권한이 아니다.
 
-`P0-PR-01` 결정 전 Commerce history cascade-delete/destructive scheduler, indefinite-retention default, raw provider payload archival을 활성화하지 않는다.
+승인된 policy는 structured disposition plan 생성만 허용한다. 실제 destructive finalizer, hosted Auth deletion runtime, authoritative non-zero recovery reconciliation은 별도 구현·검증 전까지 활성화하지 않는다.
 
 Standalone Birth/Target privacy deletion과 historical Reading provenance 충돌은 `SRC-06`이 authority다.
 
@@ -357,4 +357,4 @@ Canonical member가 deletion lifecycle에 들어간 동안 새로운 Guest merge
 - unknown/oversized provider verified-payload field → drop/reject
 - same Commerce opaque evidence replay → same versioned keyed HMAC fingerprint
 - missing/weak Commerce fingerprint secret → evidence persistence fail-closed
-- parent `P0-PR-01` OPEN 상태 → destructive Commerce retention/deletion scheduler 비활성
+- parent `P0-PR-01`은 DECIDED이나 destructive runtime finalizer 미구현 상태 → destructive Commerce retention/deletion scheduler 비활성

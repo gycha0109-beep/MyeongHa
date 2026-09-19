@@ -68,8 +68,8 @@ if (parentPolicy.decisionId !== 'P0-PR-01' || parentPolicy.decisionStatus !== 'O
 if (parentPolicy.policyAuthority !== 'NOT_APPROVED' || parentPolicy.executionAuthorized !== false) {
   fail('parent deletion policy must remain non-approved and unauthorized');
 }
-if (!/^\|\s*`P0-PR-01`\s*\|[^|\n]*\|\s*\*\*OPEN-P0\*\*\s*\|/m.test(decisions)) {
-  fail('P0-PR-01 must remain OPEN-P0 in the decision register');
+if (!/^\|\s*`P0-PR-01`\s*\|[^|\n]*\|\s*\*\*DECIDED\*\*\s*\|/m.test(decisions)) {
+  fail('P0-PR-01 must be DECIDED in the decision register while the historical candidate remains OPEN-P0');
 }
 
 for (const fragment of [
@@ -159,5 +159,5 @@ expectThrow(
 );
 
 console.log(
-  'Account deletion disposition execution gate PASS: 48/48 tables and 107/107 edges are covered, canonical policy remains fully unresolved/unauthorized, conflict drift fails closed, and SQL generation remains absent.',
+  'Account deletion disposition historical gate PASS: 48/48 tables and 107/107 edges remain covered by the immutable pre-approval candidate, conflict drift fails closed, and SQL generation remains absent.',
 );

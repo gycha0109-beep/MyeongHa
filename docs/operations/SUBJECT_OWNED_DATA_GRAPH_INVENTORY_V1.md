@@ -1,7 +1,8 @@
 # Subject-Owned Data Graph Inventory v1
 
 > Tracking: #1063 / parent #964 / DR parent #389  
-> Decision authority: `P0-PR-01 = OPEN-P0`  
+> Historical schema-discovery state: `P0-PR-01 = OPEN-P0` / dispositions `UNDECIDED`  
+> Current decision authority: `P0-PR-01 = DECIDED` via `ACCOUNT_DELETION_FINALIZATION_POLICY_V1.json` and `ACCOUNT_DELETION_DISPOSITION_POLICY_V1.json`  
 > Status: **SCHEMA-DISCOVERED COVERAGE / POLICY NEUTRAL / EXECUTION NOT AUTHORIZED**
 
 ## Purpose
@@ -126,6 +127,6 @@ This inventory adds no:
 
 ## Next authority step
 
-The owner-approved P0-PR-01 decision must assign actual dispositions and retention authority. Only then may a separate implementation map the approved policy onto these schema edges and the transitive dependency graph.
+The owner-approved P0-PR-01 decision is now supplied by the separately versioned approved policy/disposition artifacts. This inventory intentionally remains schema-discovered and `UNDECIDED`; it must not be rewritten into policy authority. Runtime destructive finalization remains separately unimplemented.
 
 Until that decision exists, this inventory is coverage evidence only.

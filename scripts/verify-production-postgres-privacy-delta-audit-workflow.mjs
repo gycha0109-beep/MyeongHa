@@ -170,7 +170,7 @@ const requiredStatusFragments = [
   'privacy_delta_audit_observed_delta_total: 0',
   'privacy_delta_audit_observed_deltas: false',
   'authoritative_post_backup_source: false',
-  'privacy_reconciliation: BLOCKED_BY_P0_PR_01_AND_ISSUE_964',
+  'privacy_reconciliation: BLOCKED_BY_FINALIZER_AND_AUTHORITATIVE_NONZERO_RECOVERY_PROOF',
   'rpo_authority: OPEN_DECISION',
   'rto_authority: OPEN_DECISION',
   'dr_ready: false',

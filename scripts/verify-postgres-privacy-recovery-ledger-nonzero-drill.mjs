@@ -84,14 +84,14 @@ if (
   fail('account deletion policy candidate authority drifted');
 }
 
-if (!/^\|\s*`P0-PR-01`\s*\|[^|\n]*\|\s*\*\*OPEN-P0\*\*\s*\|/m.test(decisions)) {
-  fail('P0-PR-01 must remain OPEN-P0');
+if (!/^\|\s*`P0-PR-01`\s*\|[^|\n]*\|\s*\*\*DECIDED\*\*\s*\|/m.test(decisions)) {
+  fail('P0-PR-01 must remain DECIDED while the historical policy candidate stays OPEN-P0');
 }
 
 for (const fragment of [
   'authoritative_post_backup_source: false',
   'privacy_recovery_ledger_candidate_event_count: 0',
-  'privacy_reconciliation: BLOCKED_BY_P0_PR_01_AND_ISSUE_964',
+  'privacy_reconciliation: BLOCKED_BY_FINALIZER_AND_AUTHORITATIVE_NONZERO_RECOVERY_PROOF',
   'rpo_authority: OPEN_DECISION',
   'rto_authority: OPEN_DECISION',
   'dr_ready: false',

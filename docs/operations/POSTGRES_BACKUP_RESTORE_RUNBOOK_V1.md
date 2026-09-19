@@ -31,7 +31,7 @@ application integrity/auth baseline= PASS — latest run 35331742188
 restore evidence envelope runtime  = PROVEN — run 35331742188
 restored-DB synthetic replay       = PROVEN — run 35331742188 / NON-AUTHORITATIVE
 provider-managed full restore      = NOT PROVEN — provider projection/omission occurred
-privacy reconciliation            = BLOCKED BY P0-PR-01 / #964
+privacy reconciliation            = BLOCKED BY FINALIZER + AUTHORITATIVE NON-ZERO RECOVERY PROOF
 RPO                                = OPEN DECISION
 RTO                                = OPEN DECISION
 ```
@@ -347,11 +347,11 @@ Procedure:
 
 If no independent post-cutoff evidence exists, record that as a blocking gap. **privacy reconciliation is not exercised by the workflow**.
 
-Repository mechanics now include the policy-neutral replay planner `scripts/build-postgres-privacy-reconciliation-plan.mjs` and an isolated DB replay regression. That foundation replays only already-authorized revocation/account-deletion-start commands. It does not establish a durable post-backup privacy ledger source, destructive account-deletion finalization, or commerce legal-retention policy; those remain blocked by `P0-PR-01` / issue `#964`.
+Repository mechanics now include the policy-neutral replay planner `scripts/build-postgres-privacy-reconciliation-plan.mjs` and an isolated DB replay regression. That foundation replays only already-authorized revocation/account-deletion-start commands. It does not establish a durable authoritative post-backup privacy source or destructive account-deletion finalization. `P0-PR-01` policy is now DECIDED; finalizer implementation and authoritative recovered-state reconciliation remain separate gates.
 
 The manual restore workflow is also wired to run `scripts/run-postgres-privacy-reconciliation-synthetic-drill.sh` against the disposable restored loopback database. That step uses collision-guarded synthetic rows, exercises four non-zero revocation/account-deletion-start events, verifies identical replay idempotency, and verifies a missing terminal revoke state aborts fail-closed. It writes only sanitized `privacy-reconciliation-evidence.json`; synthetic identifiers and row payloads are not uploaded.
 
-This restored-DB step is explicitly non-authoritative: `synthetic_fixture=true`, `authoritative_post_backup_source=false`, and `dr_ready=false`. Latest run `35331742188` runtime-proved these mechanics against the fresh current-schema restore: four synthetic events replayed successfully, an identical second replay was idempotent, and a missing terminal revoke state failed closed. The durable post-backup source, destructive finalization, and commerce-retention decisions remain unresolved.
+This restored-DB step is explicitly non-authoritative: `synthetic_fixture=true`, `authoritative_post_backup_source=false`, and `dr_ready=false`. Latest run `35331742188` runtime-proved these mechanics against the fresh current-schema restore: four synthetic events replayed successfully, an identical second replay was idempotent, and a missing terminal revoke state failed closed. The durable authoritative post-backup source and destructive finalization remain unresolved. Commerce retention policy is DECIDED as the approved `P5Y` baseline.
 
 ## 12. RPO / RTO evidence
 

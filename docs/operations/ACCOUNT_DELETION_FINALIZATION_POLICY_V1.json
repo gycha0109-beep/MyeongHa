@@ -1,0 +1,73 @@
+{
+  "schema": "myeongha-account-deletion-finalization-policy-v1",
+  "decisionId": "P0-PR-01",
+  "decisionStatus": "DECIDED",
+  "policyAuthority": "PRODUCT_OWNER_APPROVED",
+  "policyVersion": "account-deletion-finalization-v1",
+  "approvedBy": "PRODUCT_OWNER",
+  "approvedAt": "2026-09-19",
+  "authorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+  "subjectGraphFingerprintSha256": "3daa7e616da04dabc30a4d8807a842b31bff580f804305eefc17ec7f746bd030",
+  "destructiveRuntimeAuthorized": false,
+  "structuredDispositionPlanningAuthorized": true,
+  "destructiveFinalization": {
+    "subjectRecordAction": "ANONYMIZE",
+    "authMappingAction": "DELETE",
+    "authProviderUserAction": "DELETE",
+    "profileAction": "DELETE",
+    "guestSessionAction": "DELETE",
+    "mergeProvenanceAction": "ANONYMIZE",
+    "personalizationGraphAction": "DELETE",
+    "shareDeviceNotificationAction": "DELETE",
+    "backupRetentionHandling": "KEEP_EXISTING_30_DAY_LIFECYCLE_AND_RECONCILE_BEFORE_SERVICEABILITY"
+  },
+  "backupRetentionPeriod": "P30D",
+  "commerceRetentionClasses": [
+    {
+      "classKey": "commerce_account_provider_binding",
+      "tables": [
+        "commerce_account_links"
+      ],
+      "disposition": "RETAIN",
+      "retentionPeriod": "P5Y",
+      "authorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582"
+    },
+    {
+      "classKey": "commerce_purchase_payment_provenance",
+      "tables": [
+        "purchase_intents",
+        "purchase_intent_reader_selections",
+        "commerce_payment_attempts"
+      ],
+      "disposition": "RETAIN",
+      "retentionPeriod": "P5Y",
+      "authorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582"
+    },
+    {
+      "classKey": "commerce_verified_provider_evidence",
+      "tables": [
+        "commerce_receipts",
+        "commerce_provider_events"
+      ],
+      "disposition": "RETAIN",
+      "retentionPeriod": "P5Y",
+      "authorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582"
+    },
+    {
+      "classKey": "commerce_entitlement_history_projection",
+      "tables": [
+        "entitlement_grants",
+        "entitlement_events",
+        "entitlements"
+      ],
+      "disposition": "RETAIN",
+      "retentionPeriod": "P5Y",
+      "authorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582"
+    }
+  ],
+  "retainedCommerceUsage": "LEGAL_ACCOUNTING_DISPUTE_EVIDENCE_ONLY",
+  "authoritativePostBackupSource": false,
+  "authoritativePrivacyReconciliation": false,
+  "futureSafePrivacyReconciliation": false,
+  "drReady": false
+}

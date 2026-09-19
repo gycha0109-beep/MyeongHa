@@ -22,7 +22,7 @@ if (inventory.schema !== 'myeongha-subject-owned-data-graph-inventory-v1') {
   fail('schema mismatch');
 }
 if (inventory.decisionId !== 'P0-PR-01' || inventory.decisionStatus !== 'OPEN-P0') {
-  fail('P0-PR-01 must remain OPEN-P0');
+  fail('historical schema-discovery inventory must remain OPEN-P0 and policy-neutral');
 }
 if (inventory.inventoryAuthority !== 'SCHEMA_DISCOVERED_POLICY_NEUTRAL') {
   fail('inventory authority must remain policy-neutral');
@@ -78,7 +78,7 @@ for (const entry of inventory.references) {
   if (!allowedDomains.has(entry.domain)) fail('unknown domain: ' + entry.domain);
   if (!allowedRoles.has(entry.relationRole)) fail('unknown relationRole: ' + entry.relationRole);
   if (entry.disposition !== 'UNDECIDED') {
-    fail('all dispositions must remain UNDECIDED while P0-PR-01 is OPEN');
+    fail('all schema-discovery dispositions must remain UNDECIDED; approved policy lives in the separate disposition policy artifact');
   }
   keys.push(entry.table + '|' + entry.column);
   if (entry.relationRole === 'owner') ownerCount += 1;
@@ -103,8 +103,8 @@ for (const required of [
   if (!keys.includes(required)) fail('required identity/merge edge missing: ' + required);
 }
 
-if (!/^\|\s*`P0-PR-01`\s*\|[^|\n]*\|\s*\*\*OPEN-P0\*\*\s*\|/m.test(decisions)) {
-  fail('decision register no longer records P0-PR-01 as OPEN-P0');
+if (!/^\|\s*`P0-PR-01`\s*\|[^|\n]*\|\s*\*\*DECIDED\*\*\s*\|/m.test(decisions)) {
+  fail('decision register must record P0-PR-01 as DECIDED while this inventory remains policy-neutral');
 }
 
 for (const fragment of [
@@ -121,16 +121,16 @@ for (const fragment of [
 
 for (const fragment of [
   'authoritative_post_backup_source: false',
-  'privacy_reconciliation: BLOCKED_BY_P0_PR_01_AND_ISSUE_964',
+  'privacy_reconciliation: BLOCKED_BY_FINALIZER_AND_AUTHORITATIVE_NONZERO_RECOVERY_PROOF',
   'rpo_authority: OPEN_DECISION',
   'rto_authority: OPEN_DECISION',
   'dr_ready: false',
 ]) {
   if (!drStatus.includes(fragment)) {
-    fail('DR authority drifted while P0-PR-01 remains open: ' + fragment);
+    fail('DR authority drifted after P0-PR-01 approval: ' + fragment);
   }
 }
 
 console.log(
-  'Subject-owned data graph inventory PASS: 30 direct subject FK mappings across 28 tables are classified; 26 owner and 4 lineage/claim edges remain policy-neutral and UNDECIDED.',
+  'Subject-owned data graph historical inventory PASS: 30 direct subject FK mappings across 28 tables remain schema-discovered/policy-neutral; current P0-PR-01 authority is supplied separately by the approved disposition policy.',
 );

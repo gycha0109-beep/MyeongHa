@@ -101,8 +101,8 @@ for (const fragment of requiredBuilderFragments) {
   }
 }
 
-if (!/^\|\s*.P0-PR-01.\s*\|[^|\n]*\|\s*\*\*OPEN-P0\*\*\s*\|/m.test(decisions)) {
-  throw new Error('P0-PR-01 must remain OPEN-P0 while privacy/legal retention authority is unresolved.');
+if (!/^\|\s*.P0-PR-01.\s*\|[^|\n]*\|\s*\*\*DECIDED\*\*\s*\|/m.test(decisions)) {
+  throw new Error('P0-PR-01 must remain DECIDED after product-owner approval.');
 }
 
 for (const fragment of [
@@ -125,7 +125,7 @@ for (const fragment of [
   'privacy_recovery_ledger_candidate_unsupported_delta_guard: PASS_ZERO_UNSUPPORTED',
   'privacy_recovery_ledger_candidate_artifact_plaintext_identifier_payload_uploaded: false',
   'privacy_recovery_ledger_candidate_source_authority: CANDIDATE_NON_AUTHORITATIVE',
-  'privacy_reconciliation: BLOCKED_BY_P0_PR_01_AND_ISSUE_964',
+  'privacy_reconciliation: BLOCKED_BY_FINALIZER_AND_AUTHORITATIVE_NONZERO_RECOVERY_PROOF',
   'rpo_authority: OPEN_DECISION',
   'rto_authority: OPEN_DECISION',
   'dr_ready: false',
@@ -274,5 +274,5 @@ if (!unsupportedRejected) {
 }
 
 console.log(
-  'MyeongHa encrypted PostgreSQL privacy recovery ledger candidate verification passed; P0-PR-01 and DR authority remain open.',
+  'MyeongHa encrypted PostgreSQL privacy recovery ledger candidate verification passed; P0-PR-01 is decided while authoritative recovery and DR gates remain incomplete.',
 );

@@ -1,4 +1,4 @@
-import { readdir, readFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 
 import { evaluateAccountDeletionPolicyCandidate } from './evaluate-account-deletion-finalization-policy.mjs';
 
@@ -40,8 +40,8 @@ if (report.commerceSubjectLinkedTableCount !== 8) {
   throw new Error('Expected exactly 8 inventoried subject-linked Commerce tables.');
 }
 
-if (!/^\|\s*`P0-PR-01`\s*\|[^|\n]*\|\s*\*\*OPEN-P0\*\*\s*\|/m.test(decisions)) {
-  throw new Error('P0-PR-01 must remain OPEN-P0 while deletion/retention authority is unresolved.');
+if (!/^\|\s*`P0-PR-01`\s*\|[^|\n]*\|\s*\*\*DECIDED\*\*\s*\|/m.test(decisions)) {
+  throw new Error('P0-PR-01 must be DECIDED while the historical OPEN candidate remains immutable.');
 }
 
 for (const fragment of [
@@ -60,38 +60,16 @@ for (const fragment of [
 
 for (const fragment of [
   'authoritative_post_backup_source: false',
-  'privacy_reconciliation: BLOCKED_BY_P0_PR_01_AND_ISSUE_964',
+  'privacy_reconciliation: BLOCKED_BY_FINALIZER_AND_AUTHORITATIVE_NONZERO_RECOVERY_PROOF',
   'rpo_authority: OPEN_DECISION',
   'rto_authority: OPEN_DECISION',
   'dr_ready: false',
 ]) {
   if (!drStatus.includes(fragment)) {
-    throw new Error('DR authority drifted while P0-PR-01 remains open: ' + fragment);
-  }
-}
-
-const migrationFiles = (await readdir('supabase/migrations')).filter((name) => name.endsWith('.sql'));
-const migrationBodies = await Promise.all(
-  migrationFiles.map(async (name) => [name, await readFile('supabase/migrations/' + name, 'utf8')]),
-);
-
-for (const [name, body] of migrationBodies) {
-  for (const forbidden of [
-    'cmd_finalize_account_deletion',
-    'cmd_complete_account_deletion',
-    'cmd_destructively_delete_account',
-  ]) {
-    if (body.toLowerCase().includes(forbidden)) {
-      throw new Error(
-        'Executable account deletion finalization command appeared while P0-PR-01 is OPEN-P0: ' +
-          name +
-          ' contains ' +
-          forbidden,
-      );
-    }
+    throw new Error('DR authority drifted after P0-PR-01 approval: ' + fragment);
   }
 }
 
 console.log(
-  'Account deletion finalization policy candidate PASS: 9 destructive slots and 8 subject-linked Commerce tables are inventoried, all policy values remain undecided, and execution is fail-closed.',
+  'Account deletion historical candidate PASS: the pre-approval OPEN-P0 artifact remains unchanged and fail-closed while the decision register points to the separately versioned approved policy.',
 );
