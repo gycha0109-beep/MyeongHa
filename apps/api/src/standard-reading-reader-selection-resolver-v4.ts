@@ -87,7 +87,7 @@ export function createStandardReadingReaderSelectionResolverV4(input: {
   readonly unlockProjectionPort: StandardReadingCharacterUnlockProjectionPortV4;
 }): StandardReadingReaderSelectionPortV4 {
   return Object.freeze({
-    async resolveEligibleReaderSelection(request) {
+    async resolveEligibleReaderSelection(request: Parameters<StandardReadingReaderSelectionPortV4['resolveEligibleReaderSelection']>[0]) {
       const row = await input.catalogPort.resolveReaderCatalog({
         productId: request.productId,
         readerCharacterId: request.readerCharacterId,
