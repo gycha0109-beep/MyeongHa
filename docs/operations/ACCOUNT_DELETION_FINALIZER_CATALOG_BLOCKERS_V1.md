@@ -12,7 +12,7 @@ This artifact records the catalog blockers that the account-deletion DB finalize
 The executable authority is `test/db/account_deletion_finalizer_catalog_guard.sh`. It derives the surface from `pg_catalog` after all migrations are applied and pins the complete deterministic digest:
 
 ```text
-PENDING_EXACT_HEAD_REFRESH
+2e1a47a17ee18d29320e679a4bcfccd7266aaa1740dac48eadc227210cec6362
 ```
 
 Any FK, DELETE-trigger, anonymization-column, or guest-session detach-shape drift changes that digest and fails CI.
