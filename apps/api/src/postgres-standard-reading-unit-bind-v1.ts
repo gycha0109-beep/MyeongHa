@@ -44,8 +44,7 @@ from public.cmd_bind_standard_reading_unit_v1(
   $4::uuid,
   $5::text,
   $6::text,
-  $7::jsonb,
-  $8::uuid
+  $7::jsonb
 )
 `.trim();
 
@@ -168,7 +167,6 @@ implements StandardReadingUnitBindAuthorityPortV1 {
         input.requestHash,
         input.requestContractVersion,
         JSON.stringify(input.requestSnapshotJsonb),
-        input.sourceBirthProfileId,
       ]);
       return mapRows(result.rows);
     } catch (error) {
