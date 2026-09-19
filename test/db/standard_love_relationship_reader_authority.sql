@@ -418,7 +418,7 @@ select pg_temp.assert_fails(
 
 select pg_temp.assert_fails(
   'coming-soon Reader cannot be selected for a new purchase',
-  $insert into public.purchase_intent_reader_selections(
+  $$insert into public.purchase_intent_reader_selections(
       purchase_intent_id, product_id,
       reader_character_id, reader_content_bundle_id,
       selection_contract_version, selection_snapshot_jsonb, selection_hash, created_at
@@ -431,13 +431,13 @@ select pg_temp.assert_fails(
       '{"schemaVersion":"standard-reading-reader-selection-v1","productId":"11392000-0000-0000-0000-000000000001","topicKey":"test_reader_topic","specVersion":"v1","readerCharacterId":"test-coming-soon-reader","readerContentBundleId":"11391000-0000-0000-0000-000000000001"}'::jsonb,
       'sha256:test:coming-soon',
       now()
-    )$,
+    )$$,
   'ct_reader_selection_reader_unavailable'
 );
 
 select pg_temp.assert_fails(
   'unlockable Reader cannot bypass missing stored unlock projection',
-  $insert into public.purchase_intent_reader_selections(
+  $$insert into public.purchase_intent_reader_selections(
       purchase_intent_id, product_id,
       reader_character_id, reader_content_bundle_id,
       selection_contract_version, selection_snapshot_jsonb, selection_hash, created_at
@@ -450,7 +450,7 @@ select pg_temp.assert_fails(
       '{"schemaVersion":"standard-reading-reader-selection-v1","productId":"11392000-0000-0000-0000-000000000001","topicKey":"test_reader_topic","specVersion":"v1","readerCharacterId":"test-unlockable-reader","readerContentBundleId":"11391000-0000-0000-0000-000000000001"}'::jsonb,
       'sha256:test:unlockable-denied',
       now()
-    )$,
+    )$$,
   'ct_reader_selection_unlock_required'
 );
 
