@@ -118,7 +118,10 @@ done
 pass "Reader read functions are executor-only while v4 purchase execution remains revoked"
 
 before=$("${psql_base[@]}" -Atc "select md5(coalesce(string_agg(subject_id::text||'|'||character_id||'|'||status||'|'||revision::text,E'\n' order by subject_id,character_id),'')) from public.character_unlocks;")
-"${psql_base[@]}" -Atc "select status from public.qry_standard_reading_reader_unlock_v4('d1140000-0000-0000-0000-000000000001','std-reader-unlockable');" >/dev/null
+psql -X -v ON_ERROR_STOP=1 -Atq >/dev/null <<'SQL'
+set myeongha.subject_id = 'd1140000-0000-0000-0000-000000000001';
+select status from public.qry_standard_reading_reader_unlock_v4('d1140000-0000-0000-0000-000000000001','std-reader-unlockable');
+SQL
 after=$("${psql_base[@]}" -Atc "select md5(coalesce(string_agg(subject_id::text||'|'||character_id||'|'||status||'|'||revision::text,E'\n' order by subject_id,character_id),'')) from public.character_unlocks;")
 [[ "$before" == "$after" ]] || fail "Reader data-source lookup mutated Character Unlock authority"
 pass "Reader data-source is projection-only"

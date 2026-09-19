@@ -130,7 +130,7 @@ It must match:
 
 The ordinary API executor has no direct insert/update/delete authority on this table.
 
-User-specific unlock/access checks for globally `unlockable` Characters remain a future server-command/runtime responsibility; the persistence table does not infer them from client input.
+User-specific unlock/access checks for globally `unlockable` Characters are resolved at runtime only from the already-stored current Character Unlock projection. The runtime does not evaluate or mutate unlock conditions, and the persistence table does not infer them from client input.
 
 ## 5. Capability meaning
 
@@ -262,7 +262,7 @@ Before sale activation:
 
 1. Saju production-authorized `relationship + natal/general` interpretation authority.
 2. Public Product Reading execution/finalization/grounding path.
-3. Application runtime adapter + user-specific Reader eligibility/access resolution over the existing fail-closed `cmd_create_standard_reading_purchase_intent_v4` atomic DB authority. **Application contract/resolver implemented fail-closed in #1075; production Reader data-source composition, DB EXECUTE grant, and public route remain HOLD.**
+3. Application runtime adapter + user-specific Reader eligibility/access resolution over the existing fail-closed `cmd_create_standard_reading_purchase_intent_v4` atomic DB authority. **Application contract/resolver and production Reader read data-source are implemented fail-closed in #1075; v4 purchase-command EXECUTE grant and public route remain HOLD.**
 4. Verified Payment → purchase-backed Grant fulfillment for the exact Capability Set.
 5. Reader-bound unit → Reading artifact binding with retry-safe generation.
 6. Owner-scoped immutable artifact reread.
