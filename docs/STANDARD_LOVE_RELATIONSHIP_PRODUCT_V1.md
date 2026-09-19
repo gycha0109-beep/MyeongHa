@@ -261,7 +261,7 @@ Before sale activation:
 
 1. Saju production-authorized `relationship + natal/general` interpretation authority.
 2. Public Product Reading execution/finalization/grounding path.
-3. Application runtime adapter + user-specific Reader eligibility/access resolution over the existing fail-closed `cmd_create_standard_reading_purchase_intent_v4` atomic DB authority.
+3. Application runtime adapter + user-specific Reader eligibility/access resolution over the existing fail-closed `cmd_create_standard_reading_purchase_intent_v4` atomic DB authority. **Application contract/resolver implemented fail-closed in #1075; production Reader data-source composition, DB EXECUTE grant, and public route remain HOLD.**
 4. Verified Payment → purchase-backed Grant fulfillment for the exact Capability Set.
 5. Reader-bound unit → Reading artifact binding with retry-safe generation.
 6. Owner-scoped immutable artifact reread.
@@ -294,5 +294,7 @@ SPARSE_READER_SELECTION_SCHEMA = DEFINED
 PRICE_AUTHORITY                = UNRESOLVED
 SALEABLE_OFFER                 = NO
 SAJU_RELATIONSHIP_AUTHORITY    = BLOCKED
+READER_PURCHASE_APP_ADAPTER   = IMPLEMENTED_FAIL_CLOSED
+PUBLIC_PURCHASE_ROUTE          = NO
 PRODUCTION_ACTIVATION          = HOLD
 ```
