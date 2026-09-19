@@ -1,7 +1,8 @@
 # Transitive Subject Dependency Graph v1
 
 > Tracking: #1065 / schema sync #1068 / parent #964 / DR parent #389  
-> Decision authority: `P0-PR-01 = OPEN-P0`  
+> Historical schema-discovery state: `P0-PR-01 = OPEN-P0` / edge dispositions `UNDECIDED`  
+> Current decision authority: `P0-PR-01 = DECIDED` via the separately versioned approved policy/disposition artifacts  
 > Status: **SCHEMA-DISCOVERED TRANSITIVE COVERAGE / POLICY NEUTRAL / EXECUTION NOT AUTHORIZED**
 
 ## Purpose
@@ -133,7 +134,7 @@ It is schema coverage evidence only.
 
 ## Remaining authority work
 
-P0-PR-01 still needs owner-approved dispositions and retention authority. A future finalization implementation must then map those approved decisions across both:
+P0-PR-01 now has owner-approved dispositions and retention authority in `ACCOUNT_DELETION_DISPOSITION_POLICY_V1.json`. This schema graph remains policy-neutral discovery evidence. A future destructive finalization implementation must map the approved decisions across both:
 
 1. direct Subject relationships from #1063; and
 2. all transitive dependency edges in this graph.
