@@ -43,6 +43,13 @@ insert into public.reading_execution_attempts(
   null, clock_timestamp(), clock_timestamp(), null
 );
 
+update public.readings
+set execution_status = 'succeeded',
+    committed_execution_attempt_id = '11800000-0000-0000-0000-000000000001',
+    completed_at = clock_timestamp()
+where id = '11603100-0000-0000-0000-000000000001'
+  and subject_id = '11390000-0000-0000-0000-000000000001';
+
 insert into public.reading_refs(
   reading_id, subject_id, execution_attempt_id, saju_engine_key,
   external_reading_ref, source_birth_input_hash, target_birth_input_hash,
@@ -60,13 +67,6 @@ insert into public.reading_refs(
   'sha256:test-standard-reading-artifact',
   clock_timestamp()
 );
-
-update public.readings
-set execution_status = 'succeeded',
-    committed_execution_attempt_id = '11800000-0000-0000-0000-000000000001',
-    completed_at = clock_timestamp()
-where id = '11603100-0000-0000-0000-000000000001'
-  and subject_id = '11390000-0000-0000-0000-000000000001';
 
 select pg_temp.assert_reread_true(
   'owner reads exact completed bound artifact source',
