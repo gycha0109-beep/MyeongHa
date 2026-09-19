@@ -25,7 +25,7 @@
 | `P0-AGE-01` | Minimum age / character content policy | **OPEN-P0** | 최소 이용 연령, 미성년 허용 여부, 표현 강도/제한; content bundle policy-tag slot은 미리 두되 threshold/matrix는 미확정 |
 | `P0-PR-01` | Retention / backup / legal retention | **DECIDED** | service/personalization DELETE; 4 structural tombstones ANONYMIZE; 9 Commerce evidence/history tables RETAIN `P5Y`; existing encrypted backup lifecycle `P30D` + restore reconciliation before serviceability |
 | `P0-PR-01A` | Guest bearer/session authentication TTL | **DECIDED** | 7 days / 604800 seconds for newly issued Guest credentials; does not decide expired-Guest data deletion or parent retention policy |
-| `P0-PR-01B` | Commerce provider-evidence data minimization | **DECIDED** | no raw secret/bearer/receipt/PCI storage; versioned keyed fingerprints + allowlisted bounded verified payload; parent retention duration remains OPEN |
+| `P0-PR-01B` | Commerce provider-evidence data minimization | **DECIDED** | no raw secret/bearer/receipt/PCI storage; versioned keyed fingerprints + allowlisted bounded verified payload; parent `P0-PR-01` now supplies the separate `P5Y` retention baseline |
 | `P0-AUTH-01` | API→PostgreSQL execution identity / RLS enforcement model | **DECIDED** | non-BYPASSRLS API execution role + transaction-scoped trusted canonical `subject_id` context |
 
 ## 3. 상태 규칙
