@@ -166,7 +166,7 @@ select pg_temp.assert_reread_true(
 
 update public.entitlement_grants g
 set status = 'active',
-    valid_until = clock_timestamp() - interval '1 second',
+    valid_until = greatest(g.valid_from, clock_timestamp()) + interval '1 minute',
     revision = revision + 1,
     last_effective_at = clock_timestamp(),
     updated_at = clock_timestamp()
@@ -181,7 +181,7 @@ select pg_temp.assert_reread_true(
     from public.internal_qry_standard_reading_artifact_source_v1(
       '11390000-0000-0000-0000-000000000001',
       '11603100-0000-0000-0000-000000000001',
-      clock_timestamp()
+      clock_timestamp() + interval '2 minutes'
     )
   )
 );
