@@ -57,7 +57,7 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
   it('keeps discovery searchable and pageable without inventing canonical character authority', async () => {
     const js = await readFile(hubJsPath, 'utf8');
 
-    expect(js).toContain('const PAGE_SIZE = 6');
+    expect(js).toContain('const PAGE_SIZE = 9');
     expect(js).toContain('data-people-search');
     expect(js).toContain('visibleCount + PAGE_SIZE');
     expect(js).toContain('safePresentationKey');
