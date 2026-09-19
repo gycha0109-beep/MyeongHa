@@ -205,6 +205,13 @@ select pg_temp.assert_reread_true(
   )
 );
 
+insert into public.subjects(
+  id, kind, auth_user_id, status, merged_into_subject_id, created_at, updated_at
+) values (
+  '11390000-0000-0000-0000-000000000002',
+  'guest', null, 'active', null, clock_timestamp(), clock_timestamp()
+);
+
 select pg_catalog.set_config(
   'myeongha.subject_id',
   '11390000-0000-0000-0000-000000000002',
