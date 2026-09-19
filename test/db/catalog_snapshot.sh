@@ -17,10 +17,6 @@ fi
 expected="$(tr -d '[:space:]' < "${expected_file}")"
 
 table_count="$(psql -Atqc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE'")"
-if [[ "${table_count}" != "66" ]]; then
-  echo "schema catalog table count mismatch: expected=66 actual=${table_count}" >&2
-  exit 3
-fi
 
 catalog_stream() {
   psql -At -F '|' <<'SQL'

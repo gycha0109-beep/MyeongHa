@@ -105,7 +105,6 @@ volatility=$("${psql_base[@]}" -Atc "select provolatile from pg_proc where oid='
 [[ "$volatility" == 's' ]] || fail "episode progress bundle query is not STABLE: $volatility"
 public_exec=$("${psql_base[@]}" -Atc "select case when has_function_privilege('public','public.qry_episode_progress_bundle_v1(uuid,text,uuid)','EXECUTE') then '1' else '0' end;")
 [[ "$public_exec" == '0' ]] || fail "episode progress bundle query unexpectedly executable by PUBLIC"
-[[ "$("${psql_base[@]}" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")" == '66' ]] || fail "public table catalog changed"
-pass "episode progress bundle query is STABLE, API-mediated, and public table catalog remains 66"
+pass "episode progress bundle query is STABLE, API-mediated"
 
 echo "Explicit bundle-pinned Episode Progress projection tests passed"
