@@ -94,14 +94,21 @@ requireMatch(
   /\/v1\/projects\/\$\{PROJECT_REF\}\/api-keys\?reveal=true/u,
   'Canary may reveal API keys only for the exact governed project ref.',
 );
+const managementFallbackMatch = canary.match(
+  /async function resolveAdminSecret\(\) \{([\s\S]*?)\n\}\n\nasync function createDisposableHostedUser/u,
+);
+if (managementFallbackMatch === null) {
+  throw new Error('Canary must retain a bounded Management API key-resolution function.');
+}
+const managementFallback = managementFallbackMatch[1];
 requireMatch(
-  canary,
+  managementFallback,
   /method:\s*'GET'/u,
   'Canary Management API fallback must be read-only.',
 );
 rejectMatch(
-  canary,
-  /MANAGEMENT_API_ORIGIN}[\s\S]{0,250}method:\s*'(POST|PUT|PATCH|DELETE)'/u,
+  managementFallback,
+  /method:\s*'(POST|PUT|PATCH|DELETE)'/u,
   'Canary must not create, rotate, update, or delete Supabase project API keys.',
 );
 requireMatch(
