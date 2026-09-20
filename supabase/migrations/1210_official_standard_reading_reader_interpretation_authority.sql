@@ -125,6 +125,9 @@ create table public.standard_reading_reader_interpretations (
   constraint standard_reading_reader_interpretation_official_fk
     foreign key (official_reading_id)
     references public.standard_reading_official_bindings(reading_id),
+  constraint standard_reading_reader_interpretation_official_subject_fk
+    foreign key (official_reading_id, subject_id)
+    references public.standard_reading_official_bindings(reading_id, subject_id),
   constraint standard_reading_reader_interpretation_reader_bundle_fk
     foreign key (reader_character_id, initial_reader_content_bundle_id)
     references public.character_runtime_catalog(character_id, content_bundle_id),
@@ -912,6 +915,20 @@ begin
   perform public.assert_myeongha_subject_context_v1(p_subject_id);
 
   return query
+  with source_subjects(subject_id) as (
+    select p_subject_id
+    union all
+    select s.id
+    from public.subjects s
+    join public.subjects canonical
+      on canonical.id = p_subject_id
+     and canonical.kind = 'member'
+     and canonical.status = 'active'
+     and canonical.merged_into_subject_id is null
+    where s.kind = 'guest'
+      and s.status = 'merged'
+      and s.merged_into_subject_id = p_subject_id
+  )
   select
     o.reading_id,
     o.product_id,
@@ -922,6 +939,8 @@ begin
     rr.response_hash,
     r.completed_at
   from public.standard_reading_official_bindings o
+  join source_subjects src
+    on src.subject_id = o.subject_id
   join public.readings r
     on r.id = o.reading_id
    and r.reading_session_id = o.reading_session_id
@@ -933,8 +952,7 @@ begin
     on rr.reading_id = r.id
    and rr.subject_id = r.subject_id
    and rr.execution_attempt_id = r.committed_execution_attempt_id
-  where o.subject_id = p_subject_id
-    and o.reading_id = p_reading_id
+  where o.reading_id = p_reading_id
     and rr.response_snapshot_jsonb is not null
     and btrim(rr.reading_contract_version) <> ''
     and btrim(rr.product_response_state) <> ''
