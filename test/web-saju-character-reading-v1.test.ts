@@ -62,7 +62,7 @@ describe('MyeongHa character-led Saju Reading v1', () => {
     expect(runtime).toContain("params.get('character') || params.get('reader')");
     expect(runtime).toContain('root.dataset.reader = readerKey');
     expect(runtime).toContain("root.dataset.readerSelection = params.has('reader') || params.has('character') ? 'explicit' : 'default';");
-    expect(runtime).toContain("root.dataset.readerPresentation = readerKey === 'baekheon' ? 'representative-demo' : 'wired-preview';");
+    expect(runtime).toContain("root.dataset.readerPresentation = 'reading-scene-v1';");
     expect(runtime).toContain('data-reader-hanja');
   });
 
@@ -101,7 +101,12 @@ describe('MyeongHa character-led Saju Reading v1', () => {
     expect(runtime).not.toContain('function firstSentence(text)');
     expect(runtime).toContain('if (stage) stage.hidden = true;');
     expect(runtime).not.toContain('const readingSteps =');
-    expect(runtime).not.toContain('window.location.href = `chat.html?character=');
+    expect(runtime).toContain("sessionStorage.setItem('myeongha.readingHandoff.v1'");
+    expect(runtime).toContain("handoffUrl(`chat.html?character=${encodeURIComponent(readerKey)}`)");
+    expect(runtime).toContain("handoffUrl('records.html')");
+    expect(html).toContain('data-reading-completion');
+    expect(html).toContain('data-reading-chat-link');
+    expect(html).toContain('data-reading-records-link');
   });
 
   it('renders the admitted calculation summary instead of shipping a fake chart placeholder', async () => {
@@ -132,15 +137,20 @@ describe('MyeongHa character-led Saju Reading v1', () => {
     expect(css).toContain('@media (max-width: 767px)');
   });
 
-  it('ships Baekheon with an actual reading scene while leaving other characters asset-safe', async () => {
+  it('ships all nine Readers with a dedicated animated Reading Scene presentation', async () => {
     const [sceneCss, baekheonScene] = await Promise.all([
       readFile(readingScenesCssPath, 'utf8'),
       readFile(baekheonScenePath),
     ]);
 
-    expect(sceneCss).toContain('body[data-reader="baekheon"] .reader-scene-art');
-    expect(sceneCss).toContain('url("assets/characters/rooms/baekheon-room.webp")');
-    expect(sceneCss).toContain('other readers keep the shared');
+    for (const key of ['baekheon', 'seyeon', 'yeoul', 'seorin', 'rahyeon', 'mira', 'taegyeom', 'yunho', 'doyoon']) {
+      expect(sceneCss).toContain(`body[data-reader="${key}"]`);
+      expect(sceneCss).toContain(`url("assets/characters/rooms/${key}-room.webp")`);
+    }
+    expect(sceneCss).toContain('body[data-reading-experience="entering"] .reader-scene-art');
+    expect(sceneCss).toContain('body[data-reading-experience="reading"] .reader-scene-art');
+    expect(sceneCss).toContain('body[data-reading-experience="complete"] .reader-scene-art');
+    expect(sceneCss).toContain('@media (prefers-reduced-motion: reduce)');
     expect(baekheonScene.byteLength).toBeGreaterThan(10_000);
   });
 });

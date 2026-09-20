@@ -24,6 +24,12 @@ export function ReadingDetailPage() {
             <span className="reader-silhouette" />
           </div>
 
+          <div className="reader-reading-intro" data-reading-scene-intro aria-hidden="true">
+            <span className="reader-reading-intro-kicker">READING SESSION</span>
+            <strong><span data-reader-name>백헌</span>이 명식을 살펴보고 있습니다.</strong>
+            <span className="reader-reading-intro-line" />
+          </div>
+
           <div className="reader-identity">
             <span className="reader-title-badge" data-reader-title>충추원의 장</span>
             <div className="reader-name-line">
@@ -87,6 +93,23 @@ export function ReadingDetailPage() {
               <span>다음 읽기</span><span aria-hidden="true">→</span>
             </button>
           </footer>
+
+          <section className="reading-completion" data-reading-completion hidden aria-live="polite">
+            <span className="reading-completion-kicker">READING COMPLETE</span>
+            <h2><span data-reader-name>백헌</span>이 이번 사주 읽기를 마쳤습니다.</h2>
+            <p>읽은 내용을 바탕으로 이야기를 이어가거나, 기록에서 사주 결과를 다시 확인할 수 있습니다.</p>
+            <div className="reading-completion-actions">
+              <a className="reading-completion-primary" data-reading-chat-link href="chat.html?character=baekheon">
+                <span data-reader-name>백헌</span>과 이어서 대화
+                <span aria-hidden="true">→</span>
+              </a>
+              <a className="reading-completion-secondary" data-reading-records-link href="records.html">
+                기록에서 사주 보기
+                <span aria-hidden="true">↗</span>
+              </a>
+            </div>
+            <button className="reading-completion-replay" type="button" data-reading-replay>처음부터 다시 읽기</button>
+          </section>
         </article>
       </section>
     </>
