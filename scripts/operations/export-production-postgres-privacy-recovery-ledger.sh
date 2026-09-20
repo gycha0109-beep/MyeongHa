@@ -192,10 +192,15 @@ unsupported as (
         and s.updated_at > :'cutoff'::timestamptz
         and s.updated_at <= :'captured'::timestamptz
         and not (
-          s.status = 'deletion_pending'
+          s.status in ('deletion_pending', 'deleted')
           and exists (
             select 1
             from public.data_deletion_jobs dj
+            join public.outbox_events oe
+              on oe.aggregate_type = 'data_deletion_job'
+             and oe.aggregate_id = dj.id::text
+             and oe.event_type = 'ACCOUNT_DELETION_STARTED'
+             and oe.event_schema_version = 'v1'
             where dj.subject_id = s.id
               and dj.scope = 'account'
               and dj.requested_at > :'cutoff'::timestamptz
@@ -249,7 +254,7 @@ jq -e '
 
 unsupported_total="$(jq '[.unsupported[]] | add' "$raw_source")"
 if [[ "$unsupported_total" -ne 0 ]]; then
-  echo "::error title=Privacy recovery ledger candidate incomplete::Unsupported post-backup privacy/lifecycle deltas were observed; fail closed rather than exporting a partial ledger."
+  echo "::error title=Privacy recovery ledger incomplete::Unsupported post-backup privacy/lifecycle deltas were observed; fail closed rather than exporting a partial ledger."
   jq -r '.unsupported | to_entries[] | "- \(.key): \(.value)"' "$raw_source" >> "$GITHUB_STEP_SUMMARY"
   exit 1
 fi
@@ -263,8 +268,11 @@ node scripts/build-postgres-privacy-recovery-ledger-manifest.mjs \
   --summary "$summary"
 
 jq -e '
-  .candidateSourceAuthority == true
-  and .authoritativePostBackupSource == false
+  .sourceAuthorityClass == "AUTHORITATIVE_CAPTURED_WINDOW_V1"
+  and .authoritativeCoverageThrough == .capturedAt
+  and .serviceabilityCoverageRule == "incident_reference_must_not_exceed_authoritative_coverage_through"
+  and .candidateSourceAuthority == false
+  and .authoritativePostBackupSource == true
   and .authoritativePrivacyReconciliation == false
   and .futureSafePrivacyReconciliation == false
   and .drReady == false
@@ -329,14 +337,14 @@ echo "event_count=$(jq -r '.eventCount' "$public_manifest")" >> "$GITHUB_OUTPUT"
 echo "captured_at_utc=$captured_at_utc" >> "$GITHUB_OUTPUT"
 
 {
-  echo '### PostgreSQL privacy recovery ledger candidate'
+  echo '### PostgreSQL privacy recovery ledger authority'
   echo
   printf -- '- backup run: `%s`\n' "$BACKUP_RUN_ID"
   printf -- '- backup cutoff: `%s`\n' "$BACKUP_COMPLETED_AT_UTC"
   printf -- '- captured at: `%s`\n' "$captured_at_utc"
   printf -- '- replay-supported event count: `%s`\n' "$(jq -r '.eventCount' "$public_manifest")"
   echo
-  echo 'This encrypted artifact is a candidate recovery transport only. It is not an authoritative post-backup source, does not decide deletion/legal retention, does not approve RPO/RTO, and does not make DR Ready true.'
+  echo 'This encrypted artifact is authoritative only for the exact governed backup cutoff through captured-at window recorded above. Recovery must fail closed when its incident reference is later than captured-at. Snapshot cadence is operational mechanics, not an approved RPO. Authoritative reconciliation, RPO/RTO, and DR Ready remain separately gated.'
 } >> "$GITHUB_STEP_SUMMARY"
 
 trap - EXIT
