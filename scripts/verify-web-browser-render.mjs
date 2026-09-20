@@ -357,6 +357,47 @@ try {
   assert(selectedReaderRoute.readerDataset === 'baekheon' && selectedReaderRoute.selectionDataset === 'explicit', `Reading runtime did not consume explicit Reader selection: ${JSON.stringify(selectedReaderRoute)}`);
   assert(selectedReaderRoute.presentationDataset === 'reading-scene-v1' && selectedReaderRoute.readerName === '백헌', `Reader Reading Scene v1 did not activate: ${JSON.stringify(selectedReaderRoute)}`);
 
+  await client.evaluate(`(() => {
+    sessionStorage.setItem('myeongha.readingHandoff.v1', JSON.stringify({
+      reader: 'baekheon',
+      topic: 'temperament',
+      scope: 'original',
+      readingText: '전체 사주',
+    }));
+    return true;
+  })()`);
+  await navigate(client, origin, '/chat.html?character=baekheon&from=reading&reader=baekheon&topic=temperament&scope=original', '.character-room-v2');
+  const readingChatHandoff = await client.evaluate(`(() => {
+    const contextPill = document.querySelector('[data-context-pill]');
+    const threadBar = document.querySelector('[data-thread-bar]');
+    return {
+      entry: document.body.dataset.chatEntry ?? '',
+      character: document.body.dataset.character ?? '',
+      contextVisible: contextPill instanceof HTMLElement && !contextPill.hidden,
+      threadVisible: threadBar instanceof HTMLElement && !threadBar.hidden,
+      contextTitle: document.querySelector('[data-context-title]')?.textContent?.trim() ?? '',
+      threadTitle: document.querySelector('[data-thread-bar-title]')?.textContent?.trim() ?? '',
+      dialogue: document.querySelector('[data-dialogue-line]')?.textContent?.trim() ?? '',
+    };
+  })()`);
+  assert(readingChatHandoff.entry === 'reading-handoff' && readingChatHandoff.character === 'baekheon', `Reading handoff did not bind to selected Reader chat: ${JSON.stringify(readingChatHandoff)}`);
+  assert(readingChatHandoff.contextVisible && readingChatHandoff.threadVisible, `Reading handoff context surfaces stayed hidden: ${JSON.stringify(readingChatHandoff)}`);
+  assert(readingChatHandoff.contextTitle.includes('전체 사주') && readingChatHandoff.threadTitle === '전체 사주', `Reading handoff title missing: ${JSON.stringify(readingChatHandoff)}`);
+  assert(readingChatHandoff.dialogue.includes('읽기에서 이어왔군요.'), `Reader chat did not acknowledge Reading handoff: ${readingChatHandoff.dialogue}`);
+
+  await navigate(client, origin, '/records.html?tab=saju&from=reading&reader=baekheon&topic=temperament&scope=original', '#saju-records');
+  const readingRecordsHandoff = await client.evaluate(`(() => {
+    const tab = document.querySelector('#saju-records-tab');
+    const panel = document.querySelector('#saju-records');
+    return {
+      entry: document.body.dataset.recordsEntry ?? '',
+      selected: tab?.getAttribute('aria-selected') ?? '',
+      panelHidden: panel instanceof HTMLElement ? panel.hidden : true,
+    };
+  })()`);
+  assert(readingRecordsHandoff.entry === 'reading-handoff', `Records did not mark Reading handoff entry: ${JSON.stringify(readingRecordsHandoff)}`);
+  assert(readingRecordsHandoff.selected === 'true' && readingRecordsHandoff.panelHidden === false, `Reading handoff did not open Saju records tab: ${JSON.stringify(readingRecordsHandoff)}`);
+
   await navigate(client, origin, '/reading.html', '#saju-empty');
   await waitForVisible(client, '#saju-empty');
 
