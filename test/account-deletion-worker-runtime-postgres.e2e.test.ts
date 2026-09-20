@@ -37,45 +37,57 @@ suite('account deletion concrete worker PostgreSQL E2E', () => {
   beforeAll(async () => {
     await admin.query(`alter role myeongha_worker_runtime password '${WORKER_PASSWORD}'`);
 
+    await admin.query('insert into auth.users(id) values ($1::uuid)', [AUTH_ID]);
+
     await admin.query(
-      `
-insert into auth.users(id) values ($1::uuid);
-insert into public.subjects(id,kind,auth_user_id,status,merged_into_subject_id,created_at,updated_at)
-values
-  ($2::uuid,'member',$1::uuid,'active',null,clock_timestamp(),clock_timestamp()),
-  ($3::uuid,'guest',null,'active',null,clock_timestamp(),clock_timestamp());
-insert into public.profiles(subject_id,display_name,locale,timezone,onboarding_state,created_at,updated_at)
-values ($2::uuid,'PII E2E','ko','Asia/Seoul','done',clock_timestamp(),clock_timestamp());
-insert into public.guest_sessions(id,subject_id,token_hash,expires_at,consumed_at,claimed_by_subject_id,created_at)
-values ($4::uuid,$3::uuid,'sha256:worker-e2e',clock_timestamp()+interval '1 day',clock_timestamp(),$2::uuid,clock_timestamp()-interval '1 second');
-insert into public.subject_merge_jobs(id,guest_subject_id,member_subject_id,guest_session_id,policy_version,status,conflicts_jsonb,resolution_jsonb,idempotency_key,created_at,completed_at)
-values ($5::uuid,$3::uuid,$2::uuid,$4::uuid,'test','completed','{"pii":"secret"}'::jsonb,'{"pii":"secret"}'::jsonb,'secret-e2e',clock_timestamp(),clock_timestamp());
-insert into public.subject_merge_actions(id,merge_job_id,action_dedupe_key,domain_key,resource_type,source_resource_id,action_type,target_resource_id,status,created_at,completed_at)
-values ($6::uuid,$5::uuid,'secret-action-e2e','memory','memory_item','secret-source','import_new','secret-target','applied',clock_timestamp(),clock_timestamp());
-insert into public.commerce_account_links(id,subject_id,provider,external_account_fingerprint,status,verified_at,revoked_at,created_at)
-values ($7::uuid,$2::uuid,'test-provider','sha256:retain-e2e','active',clock_timestamp(),null,clock_timestamp());
-select * from public.cmd_start_account_deletion_v1($2::uuid,$8::uuid,'runtime-e2e-start',$9::uuid);
-insert into public.outbox_events(
-  id,aggregate_type,aggregate_id,event_type,event_schema_version,dedupe_key,payload_jsonb,
-  status,attempt_count,available_at,created_at
-) values (
-  $10::uuid,'data_deletion_job',$8::uuid::text,'WRONG_EVENT','v1','account-delete-start-v1',
-  jsonb_build_object('deletionJobId',$8::uuid,'subjectId',$2::uuid,'scope','account'),
-  'pending',0,clock_timestamp(),clock_timestamp()
-);
-`,
-      [
-        AUTH_ID,
-        SUBJECT_ID,
-        GUEST_SUBJECT_ID,
-        GUEST_SESSION_ID,
-        MERGE_JOB_ID,
-        MERGE_ACTION_ID,
-        COMMERCE_LINK_ID,
-        JOB_ID,
-        OUTBOX_ID,
-        WRONG_OUTBOX_ID,
-      ],
+      `insert into public.subjects(id,kind,auth_user_id,status,merged_into_subject_id,created_at,updated_at)
+       values ($1::uuid,'member',$2::uuid,'active',null,clock_timestamp(),clock_timestamp())`,
+      [SUBJECT_ID, AUTH_ID],
+    );
+    await admin.query(
+      `insert into public.subjects(id,kind,auth_user_id,status,merged_into_subject_id,created_at,updated_at)
+       values ($1::uuid,'guest',null,'active',null,clock_timestamp(),clock_timestamp())`,
+      [GUEST_SUBJECT_ID],
+    );
+    await admin.query(
+      `insert into public.profiles(subject_id,display_name,locale,timezone,onboarding_state,created_at,updated_at)
+       values ($1::uuid,'PII E2E','ko','Asia/Seoul','done',clock_timestamp(),clock_timestamp())`,
+      [SUBJECT_ID],
+    );
+    await admin.query(
+      `insert into public.guest_sessions(id,subject_id,token_hash,expires_at,consumed_at,claimed_by_subject_id,created_at)
+       values ($1::uuid,$2::uuid,'sha256:worker-e2e',clock_timestamp()+interval '1 day',clock_timestamp(),$3::uuid,clock_timestamp()-interval '1 second')`,
+      [GUEST_SESSION_ID, GUEST_SUBJECT_ID, SUBJECT_ID],
+    );
+    await admin.query(
+      `insert into public.subject_merge_jobs(id,guest_subject_id,member_subject_id,guest_session_id,policy_version,status,conflicts_jsonb,resolution_jsonb,idempotency_key,created_at,completed_at)
+       values ($1::uuid,$2::uuid,$3::uuid,$4::uuid,'test','completed','{"pii":"secret"}'::jsonb,'{"pii":"secret"}'::jsonb,'secret-e2e',clock_timestamp(),clock_timestamp())`,
+      [MERGE_JOB_ID, GUEST_SUBJECT_ID, SUBJECT_ID, GUEST_SESSION_ID],
+    );
+    await admin.query(
+      `insert into public.subject_merge_actions(id,merge_job_id,action_dedupe_key,domain_key,resource_type,source_resource_id,action_type,target_resource_id,status,created_at,completed_at)
+       values ($1::uuid,$2::uuid,'secret-action-e2e','memory','memory_item','secret-source','import_new','secret-target','applied',clock_timestamp(),clock_timestamp())`,
+      [MERGE_ACTION_ID, MERGE_JOB_ID],
+    );
+    await admin.query(
+      `insert into public.commerce_account_links(id,subject_id,provider,external_account_fingerprint,status,verified_at,revoked_at,created_at)
+       values ($1::uuid,$2::uuid,'test-provider','sha256:retain-e2e','active',clock_timestamp(),null,clock_timestamp())`,
+      [COMMERCE_LINK_ID, SUBJECT_ID],
+    );
+    await admin.query(
+      `select * from public.cmd_start_account_deletion_v1($1::uuid,$2::uuid,$3::text,$4::uuid)`,
+      [SUBJECT_ID, JOB_ID, 'runtime-e2e-start', OUTBOX_ID],
+    );
+    await admin.query(
+      `insert into public.outbox_events(
+         id,aggregate_type,aggregate_id,event_type,event_schema_version,dedupe_key,payload_jsonb,
+         status,attempt_count,available_at,created_at
+       ) values (
+         $1::uuid,'data_deletion_job',$2::uuid::text,'WRONG_EVENT','v1','account-delete-start-v1',
+         jsonb_build_object('deletionJobId',$2::uuid,'subjectId',$3::uuid,'scope','account'),
+         'pending',0,clock_timestamp(),clock_timestamp()
+       )`,
+      [WRONG_OUTBOX_ID, JOB_ID, SUBJECT_ID],
     );
 
     const workerUrl =
