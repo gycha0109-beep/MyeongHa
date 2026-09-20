@@ -54,3 +54,10 @@ admission guard and does not expose a public Chat send route.
 
 The next activation step must resolve the existing upstream Production Saju
 semantic/public-Chat authority gate rather than bypass it.
+
+
+## Relationship to Reader Interpretation Preview
+
+This slice does not merge or promote PR #1137. It completes the Mode A exact-text
+Official Reading path needed for safe Reader follow-up context. Character-specific
+semantic realization remains a separate reviewed/approved path.
