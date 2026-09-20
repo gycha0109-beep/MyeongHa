@@ -71,7 +71,7 @@ source authority contract                = DECIDED
 captured-window coverage validator       = IMPLEMENTED
 encrypted off-DB transport mechanics     = RUNTIME-PROVEN historically
 non-zero encrypted roundtrip/replay      = CI-PROVEN
-promoted authoritative workflow runtime  = PROVEN — run 35531005587 / artifact 10610943814
+promoted authoritative workflow runtime  = PROVEN — run 35539838537 / artifact 10614412005
 synthetic recovered-state finalization   = IMPLEMENTED / PENDING FRESH RESTORE-DRILL EXECUTION
 authoritative destructive reconciliation = NOT YET PROVEN WITH PRODUCTION NON-ZERO LEDGER
 future-safe reconciliation               = false
@@ -87,7 +87,7 @@ this authority contract existed.
 
 ## Next closure slice
 
-#964 still requires runtime evidence from the isolated recovered-state drill implemented by #1140. The drill must execute against a fresh governed backup containing the current finalizer/worker frontier and prove the captured-window coverage gate, idempotent replay, DB finalizer, synthetic Auth-ACK boundary, completion ACK, non-resurrection representatives, P5Y Commerce retention, and identifier-free evidence. Production non-zero ledger evidence remains a separate authority requirement before authoritative privacy reconciliation can become true.
+#964 still requires runtime evidence from the isolated recovered-state drill implemented by #1140. Current-frontier governed backup `35536655149` now exists; the drill must execute against that backup and prove the captured-window coverage gate, idempotent replay, DB finalizer, synthetic Auth-ACK boundary, completion ACK, non-resurrection representatives, P5Y Commerce retention, and identifier-free evidence. Production non-zero ledger evidence remains a separate authority requirement before authoritative privacy reconciliation can become true.
 
 ## Non-claims
 
