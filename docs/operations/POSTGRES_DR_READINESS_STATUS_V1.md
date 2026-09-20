@@ -63,7 +63,7 @@ rto_authority: OPEN_DECISION
 dr_ready: false
 ```
 
-The latest governed backup is run `35467974194`, source SHA `89aeedfb18a865b9e1fb62e39d710006427837d9`, artifact `10592011138` (`myeongha-postgres-20260919T203800Z`). Its exact completion cutoff is `2026-09-19T20:40:17Z`. The backup remains valid governed evidence for its captured schema, but it proves migration frontier `1120` while the repository frontier is now `1230`. The DR authority gate therefore correctly classifies current-schema backup freshness as stale and requires a fresh governed backup before a current-frontier restore can be claimed.
+The latest governed backup is run `35467974194`, source SHA `89aeedfb18a865b9e1fb62e39d710006427837d9`, artifact `10592011138` (`myeongha-postgres-20260919T203800Z`). Its exact completion cutoff is `2026-09-19T20:40:17Z`. The backup remains valid governed evidence for its captured schema, but it proves migration frontier `1120` while production and the repository are now at migration `1230`. The DR authority gate therefore correctly classifies current-schema backup freshness as stale and requires a fresh governed backup before a current-frontier restore can be claimed.
 
 The latest isolated restore runtime evidence remains run `35331742188` against the older governed backup frontier. Artifact `10541321355` proves application-data portability, projected provider COPY handling, Auth identity continuity for the supported loopback scope, and the earlier synthetic replay mechanics. Its 2-second isolated restore/validation, 52-second workflow elapsed time, and 4-second synthetic loss window remain diagnostics only. None is an approved RTO or RPO, and none represents a full achieved recovery duration.
 
@@ -87,7 +87,7 @@ Therefore restore success must remain classified as mechanics evidence only:
 
 ```text
 latest governed backup             = yes — run 35467974194
-backup current-schema freshness    = no — proven frontier 1120; repository frontier 1230
+backup current-schema freshness    = no — proven frontier 1120; deployed/repository frontier 1230
 isolated application restore       = yes — run 35331742188, older frontier
 application integrity/auth baseline= yes — run 35331742188, supported loopback scope
 self-contained evidence envelope   = runtime-proven on older frontier
