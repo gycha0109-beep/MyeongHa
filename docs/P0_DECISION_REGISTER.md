@@ -419,26 +419,35 @@ choice:
     existing_encrypted_lifecycle: P30D
     per_account_historical_blob_rewrite: false
     restored_environment_serviceability: privacy deletion replay/reconciliation required first
+  recovery_privacy_source:
+    source: encrypted_off_primary_db_privacy_recovery_ledger
+    authority_class: AUTHORITATIVE_CAPTURED_WINDOW_V1
+    coverage: backup_completed_at < event <= captured_at
+    serviceability_guard: incident_reference_utc <= authoritative_coverage_through
+    snapshot_cadence_is_rpo: false
+    record: docs/operations/POSTGRES_PRIVACY_RECOVERY_LEDGER_AUTHORITY_V1.md
 authority:
   type: PRODUCT_OWNER_APPROVED
   record: https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582
 scope:
   decides:
-    - account-finalization disposition baseline for all 48 currently reachable Subject tables
+    - account-finalization disposition baseline for all 52 currently reachable Subject tables
     - calendar five-year retention for the nine approved Commerce evidence/history tables
     - Auth mapping/provider-user deletion
     - existing 30-day encrypted backup lifecycle handling
+    - bounded captured-window post-backup privacy source authority
   does_not_decide:
-    - that a destructive runtime finalizer is already implemented
-    - authoritative post-backup privacy source
-    - authoritative non-zero recovered-state reconciliation
+    - incident coverage beyond the latest authoritative ledger captured_at
+    - authoritative non-zero recovered-state finalization proof
     - numeric RPO or RTO
     - DR Ready
 implementation_state:
   structured_disposition_plan: AUTHORIZED
-  destructive_runtime_finalizer: NOT_YET_IMPLEMENTED
-  destructive_sql_generation: NOT_AUTHORIZED_BY_POLICY_ARTIFACT
+  destructive_runtime_finalizer: IMPLEMENTED_AND_PROVIDER_PROVEN
+  destructive_sql_generation: INTERNAL_GOVERNED_FINALIZER_ONLY
+  authoritative_post_backup_source: BOUNDED_CAPTURED_WINDOW_AUTHORITY
   authoritative_privacy_reconciliation: false
+  future_safe_privacy_reconciliation: false
   dr_ready: false
 record: docs/operations/ACCOUNT_DELETION_FINALIZATION_POLICY_V1.md
 machine_policy: docs/operations/ACCOUNT_DELETION_FINALIZATION_POLICY_V1.json

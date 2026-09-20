@@ -1,4 +1,4 @@
-name: Production PostgreSQL Privacy Recovery Ledger Candidate
+name: Production PostgreSQL Privacy Recovery Ledger
 
 on:
   workflow_dispatch:
@@ -17,7 +17,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: production-postgres-privacy-recovery-ledger-candidate
+  group: production-postgres-privacy-recovery-ledger
   cancel-in-progress: false
 
 env:
@@ -26,7 +26,7 @@ env:
 
 jobs:
   snapshot:
-    name: encrypted-off-db-privacy-recovery-ledger-candidate
+    name: encrypted-off-db-privacy-recovery-ledger
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     environment: production
@@ -50,18 +50,18 @@ jobs:
 
           if (( ${#missing[@]} > 0 )); then
             for secret_name in "${missing[@]}"; do
-              echo "::error title=Privacy ledger candidate credential missing::Missing Actions secret: $secret_name"
+              echo "::error title=Privacy ledger credential missing::Missing Actions secret: $secret_name"
             done
             exit 1
           fi
 
           if [[ ! "$SUPABASE_PRODUCTION_SESSION_POOLER_HOST" =~ ^[a-z0-9-]+([.][a-z0-9-]+)*[.]pooler[.]supabase[.]com$ ]]; then
-            echo '::error title=Privacy ledger candidate pooler host invalid::SUPABASE_PRODUCTION_SESSION_POOLER_HOST must be a bare *.pooler.supabase.com hostname.'
+            echo '::error title=Privacy ledger pooler host invalid::SUPABASE_PRODUCTION_SESSION_POOLER_HOST must be a bare *.pooler.supabase.com hostname.'
             exit 1
           fi
 
           if [ "${#MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE}" -lt 32 ]; then
-            echo '::error title=Privacy ledger candidate encryption root invalid::MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE must be at least 32 characters.'
+            echo '::error title=Privacy ledger encryption root invalid::MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE must be at least 32 characters.'
             exit 1
           fi
 
@@ -197,7 +197,7 @@ jobs:
           BACKUP_SOURCE_SHA: ${{ steps.source.outputs.backup_source_sha }}
           BACKUP_ARTIFACT_NAME: ${{ steps.source.outputs.backup_artifact_name }}
         run: bash scripts/operations/export-production-postgres-privacy-recovery-ledger.sh
-      - name: Upload encrypted privacy recovery ledger candidate
+      - name: Upload encrypted privacy recovery ledger
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: ${{ steps.export.outputs.artifact_name }}

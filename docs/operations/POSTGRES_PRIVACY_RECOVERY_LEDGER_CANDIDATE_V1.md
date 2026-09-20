@@ -1,3 +1,5 @@
+> **Historical candidate record.** This document preserves the pre-promotion evidence and non-authoritative state of runs such as `35361080803`. The current bounded captured-window source authority is defined separately in `POSTGRES_PRIVACY_RECOVERY_LEDGER_AUTHORITY_V1.md`; historical artifacts produced before that authority remain non-authoritative.
+
 # PostgreSQL Privacy Recovery Ledger Candidate v1
 
 > Tracking: #1058 / parent #964 / DR parent #389  

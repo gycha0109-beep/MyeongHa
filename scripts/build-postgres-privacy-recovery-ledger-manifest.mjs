@@ -9,7 +9,7 @@ import {
 } from './build-postgres-privacy-reconciliation-plan.mjs';
 
 export const PRIVACY_RECOVERY_LEDGER_SOURCE_AUTHORITY_V1 =
-  'myeongha-production-postgres-privacy-ledger-candidate-v1';
+  'myeongha-production-postgres-privacy-ledger-v1';
 export const PRIVACY_RECOVERY_LEDGER_SUMMARY_SCHEMA_V1 =
   'myeongha-postgres-privacy-recovery-ledger-summary-v1';
 
@@ -191,8 +191,12 @@ export function buildPrivacyRecoveryLedgerManifest({
     eventTypeCounts,
     replayPlannerAccepted: report.schema === 'myeongha-postgres-privacy-reconciliation-plan-v1',
     privacyReconciliationScope: report.privacyReconciliationScope,
-    candidateSourceAuthority: true,
-    authoritativePostBackupSource: false,
+    sourceAuthorityClass: 'AUTHORITATIVE_CAPTURED_WINDOW_V1',
+    authoritativeCoverageThrough: normalizedCapturedAt.text,
+    serviceabilityCoverageRule:
+      'incident_reference_must_not_exceed_authoritative_coverage_through',
+    candidateSourceAuthority: false,
+    authoritativePostBackupSource: true,
     authoritativePrivacyReconciliation: false,
     futureSafePrivacyReconciliation: false,
     drReady: false,
