@@ -588,6 +588,107 @@ body.reading-page {
   font-size: 12px;
 }
 
+
+.reading-sheet[data-reading-completed="true"] .reading-sheet-head,
+.reading-sheet[data-reading-completed="true"] .reading-sheet-body,
+.reading-sheet[data-reading-completed="true"] .reading-sheet-actions {
+  display: none;
+}
+
+.reading-completion {
+  flex: 1;
+  min-height: 620px;
+  place-content: center;
+  padding: 58px clamp(30px, 6vw, 76px);
+  text-align: center;
+}
+
+.reading-completion:not([hidden]) {
+  display: grid;
+}
+
+.reading-completion-kicker {
+  color: var(--reader-accent);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .22em;
+}
+
+.reading-completion h2 {
+  max-width: 560px;
+  margin: 18px auto 0;
+  font-family: var(--mh-serif);
+  font-size: clamp(28px, 3vw, 42px);
+  line-height: 1.35;
+  font-weight: 600;
+}
+
+.reading-completion > p {
+  max-width: 520px;
+  margin: 20px auto 0;
+  color: var(--mh-ink-muted);
+  font-family: var(--mh-serif);
+  font-size: 14px;
+  line-height: 1.9;
+}
+
+.reading-completion-actions {
+  width: min(520px, 100%);
+  margin: 36px auto 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.reading-completion-primary,
+.reading-completion-secondary {
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 0 18px;
+  border-radius: 8px;
+  font-family: var(--mh-serif);
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.reading-completion-primary {
+  color: #efdabc;
+  border: 1px solid var(--reader-accent);
+  background: var(--reader-night);
+  box-shadow: inset 0 0 0 4px rgba(181, 142, 88, .06);
+}
+
+.reading-completion-secondary {
+  color: var(--mh-ink-strong);
+  border: 1px solid rgba(155, 113, 67, .42);
+  background: rgba(255, 250, 244, .34);
+}
+
+.reading-completion-replay {
+  justify-self: center;
+  margin-top: 22px;
+  padding: 8px 4px;
+  border: 0;
+  border-bottom: 1px solid rgba(145, 105, 64, .30);
+  color: var(--mh-ink-muted);
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--mh-serif);
+  font-size: 12px;
+}
+
+.reading-sheet[data-reading-completed="true"] .reading-completion {
+  animation: reading-completion-arrive .45s ease both;
+}
+
+@keyframes reading-completion-arrive {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 /* Character atmosphere. Geometry remains shared; only air, light, accents and pacing surfaces vary. */
 body[data-reader="baekheon"] {
   --reader-accent: #b18a56;
@@ -705,4 +806,7 @@ body[data-reader="doyoon"] { --reader-accent: #8a7967; --reader-night: #272521; 
   .reading-pillars { gap: 6px; }
   .reading-pillars span { min-height: 86px; }
   .reading-chart-evidence { grid-template-columns: 1fr; gap: 16px; }
+  .reading-completion { min-height: 440px; padding: 42px 22px 96px; }
+  .reading-completion-actions { grid-template-columns: 1fr; margin-top: 28px; }
+  .reading-completion-primary, .reading-completion-secondary { min-height: 52px; font-size: 13px; }
 }

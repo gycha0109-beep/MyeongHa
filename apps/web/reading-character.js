@@ -87,7 +87,7 @@ const stateCopy = document.querySelector('[data-reading-state-copy]');
 
 root.dataset.reader = readerKey;
 root.dataset.readerSelection = params.has('reader') || params.has('character') ? 'explicit' : 'default';
-root.dataset.readerPresentation = readerKey === 'baekheon' ? 'representative-demo' : 'wired-preview';
+root.dataset.readerPresentation = 'reading-scene-v1';
 root.dataset.readingRouteState = route.valid
   ? (previewEligible ? 'preview_loading' : 'blocked_by_authority')
   : 'invalid';
@@ -383,6 +383,49 @@ function activatePreviewReading(preview) {
   const previousButton = document.querySelector('[data-reading-prev]');
   const nextButton = document.querySelector('[data-reading-next]');
   const nextLabel = nextButton?.querySelector('span:first-child');
+  const readingSheet = document.querySelector('.reading-sheet');
+  const completion = document.querySelector('[data-reading-completion]');
+  const chatLink = document.querySelector('[data-reading-chat-link]');
+  const recordsLink = document.querySelector('[data-reading-records-link]');
+  const replayButton = document.querySelector('[data-reading-replay]');
+  let completed = false;
+
+  function handoffUrl(path) {
+    const next = new URL(path, window.location.href);
+    next.searchParams.set('from', 'reading');
+    next.searchParams.set('reader', readerKey);
+    next.searchParams.set('topic', route.topic);
+    next.searchParams.set('scope', route.scope);
+    return `${next.pathname.replace(/^\//, '')}${next.search}`;
+  }
+
+  function completeReadingExperience() {
+    completed = true;
+    root.dataset.readingExperience = 'complete';
+    if (readingSheet) readingSheet.dataset.readingCompleted = 'true';
+    if (completion) completion.hidden = false;
+    if (chatLink) chatLink.setAttribute('href', handoffUrl(`chat.html?character=${encodeURIComponent(readerKey)}`));
+    if (recordsLink) recordsLink.setAttribute('href', handoffUrl('records.html'));
+    try {
+      sessionStorage.setItem('myeongha.readingHandoff.v1', JSON.stringify({
+        reader: readerKey,
+        topic: route.topic,
+        scope: route.scope,
+        readingText: engineRequest?.readingText ?? null,
+      }));
+    } catch {
+      // Navigation still works when storage is unavailable.
+    }
+  }
+
+  function replayReadingExperience() {
+    completed = false;
+    activeIndex = 0;
+    root.dataset.readingExperience = 'reading';
+    if (readingSheet) delete readingSheet.dataset.readingCompleted;
+    if (completion) completion.hidden = true;
+    renderStep();
+  }
 
   function renderStep() {
     const step = steps[activeIndex];
@@ -411,8 +454,8 @@ function activatePreviewReading(preview) {
       if (preview.notice) authorityNote.title = preview.notice;
     }
     if (previousButton) previousButton.disabled = activeIndex === 0;
-    if (nextButton) nextButton.disabled = activeIndex >= steps.length - 1;
-    if (nextLabel) nextLabel.textContent = activeIndex >= steps.length - 1 ? '읽기 완료' : '다음 읽기';
+    if (nextButton) nextButton.disabled = false;
+    if (nextLabel) nextLabel.textContent = activeIndex >= steps.length - 1 ? '읽기 마치기' : '다음 읽기';
     renderProgressDots(steps.length, activeIndex);
   }
 
@@ -422,16 +465,29 @@ function activatePreviewReading(preview) {
     renderStep();
   });
   nextButton?.addEventListener('click', () => {
-    if (activeIndex >= steps.length - 1) return;
+    if (completed) return;
+    if (activeIndex >= steps.length - 1) {
+      completeReadingExperience();
+      return;
+    }
     activeIndex += 1;
     renderStep();
   });
+  replayButton?.addEventListener('click', replayReadingExperience);
 
   root.dataset.readingRouteState = 'preview';
+  root.dataset.readingExperience = 'entering';
   if (routeState) routeState.hidden = true;
   if (stage) stage.hidden = false;
   renderCalculationSummary(preview.calculationSummary);
   renderStep();
+
+  const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
+  window.setTimeout(() => {
+    if (!completed && root.dataset.readingExperience === 'entering') {
+      root.dataset.readingExperience = 'reading';
+    }
+  }, reducedMotion ? 0 : 1550);
 }
 
 async function loadPreviewReading() {

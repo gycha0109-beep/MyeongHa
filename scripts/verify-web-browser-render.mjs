@@ -323,13 +323,13 @@ try {
       triggerFound: true,
       open: dialog instanceof HTMLDialogElement && dialog.open,
       optionCount: dialog?.querySelectorAll('[data-reader-key]').length ?? 0,
-      demoBadge: dialog?.querySelector('[data-reader-key="baekheon"] [data-reader-demo-badge]')?.textContent?.trim() ?? '',
+      note: dialog?.querySelector('.reading-reader-picker-note')?.textContent?.trim() ?? '',
       target: dialog?.querySelector('[data-reader-picker-target]')?.textContent?.trim() ?? '',
     };
   })()`);
   assert(pickerOpen.triggerFound && pickerOpen.open, 'Saju Reading entry did not open the Reader picker');
   assert(pickerOpen.optionCount === 9, `Saju Reader picker must expose nine Readers, got ${pickerOpen.optionCount}`);
-  assert(pickerOpen.demoBadge === '대표 시연', `Baekheon representative demo badge missing: ${pickerOpen.demoBadge}`);
+  assert(pickerOpen.note.includes('9명의 Reader 모두 전용 Reading Scene까지 연결'), `Reader Scene readiness note missing: ${pickerOpen.note}`);
   await artifact(client, '-saju-reader-picker');
 
   await client.evaluate(`(() => {
@@ -355,7 +355,7 @@ try {
   assert(selectedReaderRoute.topic === 'temperament' && selectedReaderRoute.scope === 'original', `Reader picker lost Reading route identity: ${JSON.stringify(selectedReaderRoute)}`);
   assert(selectedReaderRoute.reader === 'baekheon', `Reader picker did not bind Baekheon into the URL: ${JSON.stringify(selectedReaderRoute)}`);
   assert(selectedReaderRoute.readerDataset === 'baekheon' && selectedReaderRoute.selectionDataset === 'explicit', `Reading runtime did not consume explicit Reader selection: ${JSON.stringify(selectedReaderRoute)}`);
-  assert(selectedReaderRoute.presentationDataset === 'representative-demo' && selectedReaderRoute.readerName === '백헌', `Baekheon representative demo did not activate: ${JSON.stringify(selectedReaderRoute)}`);
+  assert(selectedReaderRoute.presentationDataset === 'reading-scene-v1' && selectedReaderRoute.readerName === '백헌', `Reader Reading Scene v1 did not activate: ${JSON.stringify(selectedReaderRoute)}`);
 
   await navigate(client, origin, '/reading.html', '#saju-empty');
   await waitForVisible(client, '#saju-empty');
