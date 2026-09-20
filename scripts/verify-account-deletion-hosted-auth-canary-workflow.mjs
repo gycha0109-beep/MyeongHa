@@ -3,10 +3,13 @@ import { readFile } from 'node:fs/promises';
 const workflowPath =
   '.github/workflows/account-deletion-hosted-auth-canary.yml';
 const canaryPath = 'scripts/run-account-deletion-hosted-auth-canary.mjs';
+const deletionAdapterPath =
+  'apps/api/src/supabase-auth-admin-user-deletion.ts';
 
-const [workflow, canary] = await Promise.all([
+const [workflow, canary, deletionAdapter] = await Promise.all([
   readFile(workflowPath, 'utf8'),
   readFile(canaryPath, 'utf8'),
+  readFile(deletionAdapterPath, 'utf8'),
 ]);
 
 function requireMatch(text, pattern, message) {
@@ -65,6 +68,16 @@ requireMatch(
 );
 requireMatch(
   canary,
+  /createSupabaseAuthAdminCredentialHeadersV1/u,
+  'Canary creation and deletion must share the governed provider credential-header policy.',
+);
+requireMatch(
+  canary,
+  /ADMIN_SECRET_MISSING/u,
+  'Canary must fail closed with a bounded missing-secret diagnostic.',
+);
+requireMatch(
+  canary,
   /\/auth\/v1\/admin\/users/u,
   'Canary must create its disposable user through the hosted Auth Admin endpoint.',
 );
@@ -104,6 +117,22 @@ rejectMatch(
   'Canary must not log identifiers or privileged credentials.',
 );
 
+requireMatch(
+  deletionAdapter,
+  /adminSecret\.startsWith\('sb_secret_'\)/u,
+  'Auth Admin adapter must distinguish current Supabase secret keys from legacy service_role credentials.',
+);
+requireMatch(
+  deletionAdapter,
+  /return Object\.freeze\(\{\s*apikey:\s*adminSecret,\s*\}\);/u,
+  'Current Supabase secret keys must use apikey-only provider authentication.',
+);
+requireMatch(
+  deletionAdapter,
+  /authorization:\s*`Bearer \$\{adminSecret\}`/u,
+  'Legacy service_role credentials must preserve the Bearer provider contract.',
+);
+
 console.log(
-  'MYEONGHA_HOSTED_AUTH_DELETE_CANARY_WORKFLOW_GOVERNANCE_PASS manual_only=true provider_only=true no_db_credentials=true',
+  'MYEONGHA_HOSTED_AUTH_DELETE_CANARY_WORKFLOW_GOVERNANCE_PASS manual_only=true provider_only=true no_db_credentials=true credential_modes_pinned=true',
 );
