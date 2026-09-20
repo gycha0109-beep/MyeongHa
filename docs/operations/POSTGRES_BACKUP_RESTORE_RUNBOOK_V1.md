@@ -2,8 +2,8 @@
 
 > Scope: non-character production operations only  
 > Issue: `#389` — authoritative persistent-data recovery  
-> Evidence date: 2026-09-18 KST  
-> Production state: BACKUP PRODUCTION-PROVEN / CURRENT-SCHEMA BACKUP+RESTORE EVIDENCED / DR NOT READY
+> Evidence date: 2026-09-21 KST  
+> Production state: BACKUP PRODUCTION-PROVEN / CURRENT-FRONTIER BACKUP+RESTORE REFRESH REQUIRED / DR NOT READY
 
 ## 1. Current production authority
 
@@ -22,16 +22,19 @@ provider automatic daily backup = NOT RELIED UPON ON CURRENT FREE PLAN
 provider retention              = NOT RELIED UPON ON CURRENT FREE PLAN
 PITR                            = NOT AVAILABLE UNDER THE CURRENT FREE-PLAN OPERATING BASELINE
 application-owned logical dump     = IMPLEMENTED BY REPOSITORY WORKFLOW
-successful production dump         = EVIDENCED — latest run 35329018925
-backup schema freshness             = CURRENT THROUGH DEPLOYED MIGRATION 1120
-current-schema restore              = EVIDENCED — run 35331742188
-isolated restore drill path        = IMPLEMENTED / EXECUTED
-isolated application restore       = EVIDENCED — latest run 35331742188
-application integrity/auth baseline= PASS — latest run 35331742188
-restore evidence envelope runtime  = PROVEN — run 35331742188
-restored-DB synthetic replay       = PROVEN — run 35331742188 / NON-AUTHORITATIVE
-provider-managed full restore      = NOT PROVEN — provider projection/omission occurred
-privacy reconciliation            = BLOCKED BY FINALIZER + AUTHORITATIVE NON-ZERO RECOVERY PROOF
+successful production dump         = EVIDENCED — latest run 35467974194
+backup schema freshness             = STALE — backup frontier 1120 / deployed frontier 1230
+current-schema restore              = REFRESH REQUIRED
+isolated restore drill path         = IMPLEMENTED / EXECUTED ON FRONTIER 1120
+isolated application restore        = EVIDENCED — run 35331742188 / frontier 1120
+application integrity/auth baseline = PASS — run 35331742188 / frontier 1120
+restore evidence envelope runtime   = PROVEN — run 35331742188 / frontier 1120
+bounded privacy source authority    = RUNTIME-PROVEN — run 35531005587
+recovered finalization mechanics    = IMPLEMENTED / POST-MERGE CI GREEN
+recovered finalization on fresh restore = PENDING CURRENT-FRONTIER BACKUP
+provider-managed full restore       = NOT PROVEN — provider projection/omission occurred
+authoritative privacy reconciliation= NOT YET PROVEN
+future-safe privacy reconciliation  = false
 RPO                                = OPEN DECISION
 RTO                                = OPEN DECISION
 ```
@@ -133,20 +136,22 @@ retention     30 days
 
 ### 4.1 Current backup freshness boundary
 
-Production deployment run `35324012524` applied migration `1120_paid_general_natal_product_candidate.sql` successfully on head `eddc1c331b6a8c0f47f54c150acd2f6cc5c7c0c2`. Fresh production backup run `35329018925` was then captured from source SHA `e1a6500968f7722666cae2038fd49ddf3f9d3540`. Restore run `35331742188` selected that exact governed backup and completed successfully on main head `f736381f21171a1480292988e97c61ca68a5e62b`.
+Production deployment run `35522337472` applied migrations `1220_official_standard_reading_reader_interpretation_authority.sql` and `1230_account_deletion_finalizer_reader_access_sync.sql` successfully on head `217698890a49c525ab043ac902037f2029227fa4`. Production is therefore deployed through migration `1230`.
 
-A repository comparison from the backup source SHA to the restore head contains zero `supabase/migrations/` changes. Therefore:
+The latest governed backup is run `35467974194`, source SHA `89aeedfb18a865b9e1fb62e39d710006427837d9`, artifact `10592011138` (`myeongha-postgres-20260919T203800Z`), completed at `2026-09-19T20:40:17Z`. It predates the production deployment of migrations `1220` and `1230`; the latest restore run `35331742188` likewise proves only the older frontier through `1120`.
 
 ```text
-selected current-schema backup       = PROVEN — run 35329018925
-latest deployed migration captured   = 1120
-backup schema freshness              = CURRENT THROUGH MIGRATION 1120
-fresh restore from that backup       = PROVEN — run 35331742188
-provider-managed full restore        = NOT PROVEN
-DR Ready                             = false
+latest governed backup                = PROVEN — run 35467974194
+latest backup migration frontier      = 1120
+latest deployed production migration  = 1230
+backup schema freshness               = STALE / REFRESH REQUIRED
+latest successful isolated restore    = PROVEN — run 35331742188 / frontier 1120
+current-frontier restore              = NOT YET EVIDENCED
+provider-managed full restore         = NOT PROVEN
+DR Ready                              = false
 ```
 
-This freshness proof is point-in-time evidence. A later production migration invalidates the freshness claim until another governed backup and restore drill cover the new migration frontier.
+A fresh governed backup after deployed migration `1230`, followed by the isolated restore drill, is required before current-production-schema recovery can be claimed.
 
 Backup failure observability for v1 is the scheduled GitHub Actions workflow conclusion. A failed or missing scheduled run remains an operations alert until a dedicated alerting sink is approved.
 
@@ -197,7 +202,7 @@ dr_ready = false
 
 The envelope builder rejects project/source mismatches, inconsistent restore duration, an incident reference before the selected backup point, invalid artifact metadata, or attempts to overwrite preexisting source/timing evidence. These fields strengthen operator-independent evidence; they do not approve an RPO/RTO or make the isolated portability drill a full provider-service recovery.
 
-Runtime evidence status: manual run `35331742188` executed from current main head `f736381f21171a1480292988e97c61ca68a5e62b` against fresh backup run `35329018925` and successfully produced the self-contained envelope. Artifact `10541321355` contains the resulting `restore-evidence.json` and `privacy-reconciliation-evidence.json` and is retained until `2026-10-18T09:52:36Z`. Envelope runtime and current-schema restore portability are proven for this run while DR readiness remains blocked by the independent privacy/legal-retention, provider-service, and RPO/RTO gates.
+Runtime evidence status: manual run `35331742188` successfully produced the self-contained envelope for the migration-`1120` recovery frontier. Artifact `10541321355` contains `restore-evidence.json` and `privacy-reconciliation-evidence.json` and is retained until `2026-10-18T09:52:36Z`. That run remains valid portability evidence for its captured frontier, but it is no longer current-schema recovery evidence after production advanced to migration `1230`.
 
 ## 6. Restore drill runtime history
 
@@ -212,9 +217,9 @@ Observed evidence:
 - `35276773643`: #956 again passed source authority, checksums, provider-aware roles, application memberships, and strict schema replay. Its generic provider-data builder then classified `auth.users` itself as incompatible because the hosted source carries newer Auth columns than the pinned PostgreSQL bootstrap target. The subsequent mandatory `auth.users` replay assertion exited before SQL data replay. This exposed a harness-policy defect: provider tables with source-only columns were being skipped wholesale instead of preserving target-compatible identity columns.
 - `35280075274`: first successful isolated restore. Governed backup/artifact/checksum authority passed; application roles, memberships, representative ownership, required tables, authorization baseline, `auth.users` identity continuity, and `subjects.auth_user_id -> auth.users.id` referential integrity all passed. Three provider COPY blocks (`auth.audit_log_entries`, `auth.users`, `auth.refresh_tokens`) were projected to target-supported columns and 27 provider COPY blocks were skipped because the pinned loopback target lacked those hosted relations. Therefore `provider_managed_data_full_restore=false` remained explicit. Restore/validation diagnostic was 3 seconds and the synthetic data-loss-window diagnostic was 82 seconds.
 - `35325070718`: current runtime-proof drill from main head `eddc1c331b6a8c0f47f54c150acd2f6cc5c7c0c2`. Restore/validation completed in 4 seconds. The self-contained evidence envelope was generated successfully; artifact `10538807602` contains `restore-evidence.json` and `privacy-reconciliation-evidence.json`. Provider portability remained explicit at 3 projected and 27 skipped COPY blocks with `provider_managed_data_full_restore=false`. The restored database then passed a four-event synthetic privacy replay, identical second replay idempotency, and a negative terminal-state fail-closed case. That replay remains non-authoritative because `authoritative_post_backup_source=false`.
-- `35331742188`: latest current-schema restore drill from main head `f736381f21171a1480292988e97c61ca68a5e62b` against fresh backup run `35329018925`. Restore/validation completed in 2 seconds. Backup source SHA `e1a6500968f7722666cae2038fd49ddf3f9d3540` already includes deployed migration `1120`, and there were zero subsequent migration-file changes through the restore head. Artifact `10541321355` contains both evidence JSON files. Provider portability remained 3 projected / 27 skipped with `provider_managed_data_full_restore=false`. The restored database again passed four-event synthetic replay, identical replay idempotency, and the negative terminal-state fail-closed guard.
+- `35331742188`: latest successful isolated restore runtime evidence, covering migration frontier `1120`. Restore/validation completed in 2 seconds. Artifact `10541321355` contains both evidence JSON files. Provider portability remained 3 projected / 27 skipped with `provider_managed_data_full_restore=false`. The restored database passed the then-current four-event synthetic replay, identical replay idempotency, and the negative terminal-state fail-closed guard. Production has since advanced to migration `1230`, so this run is no longer current-frontier evidence.
 
-The latest drill is successful for MyeongHa application-data portability and application-critical Auth identity continuity. It is not evidence of full hosted Supabase Auth/Storage recovery equivalence, and it does not satisfy privacy/legal-retention or approved RPO/RTO closure gates.
+The latest completed drill remains successful evidence for MyeongHa application-data portability and application-critical Auth identity continuity at frontier `1120`. It is not evidence of full hosted Supabase Auth/Storage recovery equivalence, does not cover deployed migration `1230`, and does not satisfy authoritative privacy reconciliation or approved RPO/RTO closure gates.
 
 Current Supabase self-hosted restore guidance explicitly warns that platform projects may run newer Auth/Storage schema revisions than a self-hosted target. It lists missing provider tables/columns in `data.sql` as a known restore incompatibility and recommends excluding incompatible provider data before the final single-transaction restore. For MyeongHa, `auth.users` cannot simply be omitted because application subjects reference Auth user IDs, so the loopback portability path additionally preserves target-compatible Auth identity columns through controlled column projection.
 
@@ -345,13 +350,13 @@ Procedure:
 5. separately verify legally retained commerce records are retained only as permitted;
 6. only then consider a recovered state for serving traffic.
 
-If no independent post-cutoff evidence exists, record that as a blocking gap. **privacy reconciliation is not exercised by the workflow**.
+If no independent post-cutoff evidence exists for the applicable incident window, record that as a blocking gap. A source artifact outside its bounded coverage window must not be stretched into future-safe authority.
 
-Repository mechanics now include the policy-neutral replay planner `scripts/build-postgres-privacy-reconciliation-plan.mjs` and an isolated DB replay regression. That foundation replays only already-authorized revocation/account-deletion-start commands. It does not establish a durable authoritative post-backup privacy source or destructive account-deletion finalization. `P0-PR-01` policy is now DECIDED; finalizer implementation and authoritative recovered-state reconciliation remain separate gates.
+The `Production PostgreSQL Privacy Recovery Ledger` encrypted off-primary-DB workflow is now runtime-proven as `AUTHORITATIVE_CAPTURED_WINDOW_V1`. Scheduled run `35531005587` bound itself to governed backup run `35467974194`, used exact backup cutoff `2026-09-19T20:40:17Z`, executed the read-only export path, and uploaded encrypted artifact `10610943814` with P30D retention. This establishes bounded post-backup source authority only for the captured window; it does not make future incident gaps authoritative.
 
-The manual restore workflow is also wired to run `scripts/run-postgres-privacy-reconciliation-synthetic-drill.sh` against the disposable restored loopback database. That step uses collision-guarded synthetic rows, exercises four non-zero revocation/account-deletion-start events, verifies identical replay idempotency, and verifies a missing terminal revoke state aborts fail-closed. It writes only sanitized `privacy-reconciliation-evidence.json`; synthetic identifiers and row payloads are not uploaded.
+Repository mechanics include the policy-neutral replay planner plus the separately governed account-deletion worker/finalizer authority. The restored-state orchestration continues to invoke `scripts/run-postgres-privacy-reconciliation-synthetic-drill.sh` for the collision-guarded synthetic replay/finalization mechanics. The merged recovered-state drill now validates ledger coverage, performs encrypted roundtrip and idempotent revocation/account-deletion-start replay, claims the exact deletion outbox event, executes the DB finalizer, simulates only the isolated Auth-provider ACK boundary, executes completion ACK, proves completion replay convergence, checks representative personalization/access state cannot resurrect, and checks approved P5Y Commerce evidence survives only in revoked form.
 
-This restored-DB step is explicitly non-authoritative: `synthetic_fixture=true`, `authoritative_post_backup_source=false`, and `dr_ready=false`. Latest run `35331742188` runtime-proved these mechanics against the fresh current-schema restore: four synthetic events replayed successfully, an identical second replay was idempotent, and a missing terminal revoke state failed closed. The durable authoritative post-backup source and destructive finalization remain unresolved. Commerce retention policy is DECIDED as the approved `P5Y` baseline.
+These expanded mechanics are merged and post-merge CI is green, but they have not yet executed inside the isolated restore workflow against a fresh governed backup containing deployed migration `1230`. Therefore `authoritative_privacy_reconciliation=false`, `future_safe_privacy_reconciliation=false`, and `dr_ready=false`.
 
 ## 12. RPO / RTO evidence
 
@@ -400,7 +405,7 @@ Latest run `35331742188` recorded:
 - synthetic data-loss-window diagnostic: `4s`
 - evidence artifact: `10541321355`, expires `2026-10-18T09:52:36Z`
 
-These are diagnostic metrics, not a full achieved RTO or an approved RPO/RTO comparison. The manual workflow now exercises synthetic restored-DB privacy replay mechanics, but authoritative post-backup privacy reconciliation, destructive finalization, and commerce legal-retention remain outside the run.
+These are diagnostic metrics from the older migration-`1120` drill, not a full achieved RTO or an approved RPO/RTO comparison. Destructive finalization mechanics and bounded source authority are now implemented separately, but the full current-frontier recovery procedure has not yet executed end-to-end on a fresh governed restore.
 
 Only business-approved RPO/RTO values may be compared as PASS/FAIL.
 
@@ -414,14 +419,15 @@ Do not close `#389` until all are evidenced:
 - [x] backup schedule and 30-day artifact retention evidenced
 - [x] provider plan / automatic backup / PITR state recorded
 - [x] backup failure observability verified
-- [x] exact backup point selected
-- [x] current production schema captured by governed backup `35329018925` after migration `1120`
-- [x] restore drill completed from that current-schema backup — run `35331742188`
-- [x] isolated restore mechanics completed — run `35331742188` against governed backup `35329018925`
-- [x] integrity verification passed for current-schema backup — run `35331742188`
-- [x] authorization verification passed at the governed database-level baseline — run `35331742188`
-- [x] restored-DB synthetic privacy replay mechanics exercised — run `35331742188` (non-authoritative)
-- [ ] authoritative privacy/deletion/legal-retention reconciliation exercised
+- [x] exact backup point selection mechanics proven
+- [x] historical isolated restore mechanics completed — run `35331742188` / migration frontier `1120`
+- [x] historical integrity and database-level authorization baseline passed — run `35331742188`
+- [x] bounded captured-window privacy source authority runtime-proven — run `35531005587`
+- [x] account-deletion finalizer and recovered-state finalization mechanics implemented / post-merge CI green
+- [ ] fresh governed backup captured after deployed migration `1230`
+- [ ] isolated restore completed from that current-frontier backup
+- [ ] recovered-state finalization drill executed on that fresh governed restore
+- [ ] authoritative privacy/deletion/legal-retention reconciliation exercised for the applicable recovery window
 - [ ] achieved recovery duration measured across the full authoritative recovery procedure
 - [x] synthetic drill data-loss window measured — `4s` (diagnostic, not approved RPO)
 - [ ] RPO approved and compared with achieved evidence
