@@ -93,9 +93,11 @@ if (!/^\|\s*`P0-PR-01`\s*\|[^|\n]*\|\s*\*\*DECIDED\*\*\s*\|/m.test(decisions)) {
 }
 
 for (const fragment of [
-  'authoritative_post_backup_source: false',
-  'privacy_recovery_ledger_candidate_event_count: 0',
-  'privacy_reconciliation: BLOCKED_BY_FINALIZER_AND_AUTHORITATIVE_NONZERO_RECOVERY_PROOF',
+  'privacy_recovery_ledger_authority_class: AUTHORITATIVE_CAPTURED_WINDOW_V1',
+  'authoritative_post_backup_source: true_bounded_captured_window_only',
+  'authoritative_privacy_reconciliation: false',
+  'future_safe_privacy_reconciliation: false',
+  'privacy_reconciliation: BLOCKED_BY_FRESH_RESTORE_RUNTIME_AND_APPLICABLE_AUTHORITATIVE_DELTA_PROOF',
   'rpo_authority: OPEN_DECISION',
   'rto_authority: OPEN_DECISION',
   'dr_ready: false',
