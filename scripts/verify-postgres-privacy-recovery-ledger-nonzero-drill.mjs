@@ -1,14 +1,14 @@
 import { readFile } from 'node:fs/promises';
 
 const drillPath = 'scripts/run-postgres-privacy-reconciliation-synthetic-drill.sh';
-const candidateDocPath = 'docs/operations/POSTGRES_PRIVACY_RECOVERY_LEDGER_CANDIDATE_V1.md';
+const authorityDocPath = 'docs/operations/POSTGRES_PRIVACY_RECOVERY_LEDGER_AUTHORITY_V1.md';
 const policyPath = 'docs/operations/ACCOUNT_DELETION_FINALIZATION_POLICY_CANDIDATE_V1.json';
 const decisionPath = 'docs/P0_DECISION_REGISTER.md';
 const statusPath = 'docs/operations/POSTGRES_DR_READINESS_STATUS_V1.md';
 
-const [drill, candidateDoc, policyText, decisions, status] = await Promise.all([
+const [drill, authorityDoc, policyText, decisions, status] = await Promise.all([
   readFile(drillPath, 'utf8'),
-  readFile(candidateDocPath, 'utf8'),
+  readFile(authorityDocPath, 'utf8'),
   readFile(policyPath, 'utf8'),
   readFile(decisionPath, 'utf8'),
   readFile(statusPath, 'utf8'),
@@ -37,6 +37,17 @@ for (const fragment of [
   '--input "$decrypted_manifest"',
   'second identical replay is idempotent after subject becomes deletion_pending',
   'deletion-pending replay fails closed when a required terminal revoke is absent',
+  'validate-postgres-privacy-recovery-ledger-coverage.mjs',
+  'set local role myeongha_system_executor',
+  'internal_claim_account_deletion_outbox_v1',
+  'internal_finalize_account_deletion_db_v1',
+  'internal_complete_account_deletion_v1',
+  'recovered database executes governed account-deletion finalizer',
+  'recovered state cannot resurrect personalization/access while approved Commerce evidence remains revoked',
+  'recovered account deletion completion converges idempotently',
+  "recovered_state_finalization: 'synthetic-isolated-pass'",
+  "personalization_access_resurrection_guard: 'pass'",
+  "commerce_p5y_retention_guard: 'pass'",
 ]) {
   if (!drill.includes(fragment)) fail('drill contract missing: ' + fragment);
 }
@@ -55,20 +66,13 @@ if (/roundtrip_passphrase=['"][^$]/.test(drill)) {
 }
 
 for (const fragment of [
-  'Synthetic non-zero transport-to-replay proof',
-  '4 replay-supported synthetic events',
-  'production ledger manifest builder',
-  'byte-for-byte + SHA-256 parity check',
-  'synthetic CI evidence only',
-  'run `35361080803` observed zero replay-supported events',
-  'P0-PR-01 = OPEN-P0',
-  'executionAuthorized = false',
-  'authoritative_post_backup_source = false',
-  'authoritative_privacy_reconciliation = false',
-  'future_safe_privacy_reconciliation = false',
-  'dr_ready = false',
+  'AUTHORITATIVE_CAPTURED_WINDOW_V1',
+  'incident_reference_utc <= authoritative_coverage_through',
+  'authoritative destructive reconciliation = NOT YET PROVEN',
+  'future-safe reconciliation               = false',
+  'DR Ready                                 = false',
 ]) {
-  if (!candidateDoc.includes(fragment)) fail('candidate documentation boundary missing: ' + fragment);
+  if (!authorityDoc.includes(fragment)) fail('authority documentation boundary missing: ' + fragment);
 }
 
 if (
@@ -100,5 +104,5 @@ for (const fragment of [
 }
 
 console.log(
-  'Non-zero privacy ledger roundtrip drill contract PASS: synthetic builder -> encryption -> decryption -> DB replay is guarded while production event count remains 0 and all authority stays false.',
+  'Non-zero privacy ledger recovery drill contract PASS: captured-window coverage -> encrypted roundtrip -> replay -> recovered DB finalization is guarded while authoritative reconciliation and DR Ready remain false.',
 );
