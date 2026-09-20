@@ -15,7 +15,6 @@ const readers = Object.freeze([
     title: '충추원의 장',
     tone: '구조와 선택을 단정하게 짚습니다.',
     portrait: 'assets/characters/baekheon-portrait-v2.webp',
-    representativeDemo: true,
   }),
   Object.freeze({
     key: 'yeoul',
@@ -126,7 +125,6 @@ function createPicker() {
   for (const reader of readers) {
     const button = document.createElement('button');
     button.className = 'reading-reader-option';
-    if (reader.representativeDemo) button.classList.add('is-demo');
     button.type = 'button';
     button.dataset.readerKey = reader.key;
     button.setAttribute('role', 'listitem');
@@ -156,12 +154,6 @@ function createPicker() {
 
     heading.append(name, readerTitle);
 
-    if (reader.representativeDemo) {
-      const badge = document.createElement('em');
-      badge.textContent = '대표 시연';
-      badge.dataset.readerDemoBadge = '';
-      heading.append(badge);
-    }
 
     const tone = document.createElement('span');
     tone.className = 'reading-reader-option-tone';
@@ -178,7 +170,7 @@ function createPicker() {
 
   const note = document.createElement('p');
   note.className = 'reading-reader-picker-note';
-  note.textContent = '현재 대표 시연은 백헌의 장면까지 연결되어 있습니다. 다른 Reader도 선택값·이름·말투 연결까지 준비되어 있으며, 전용 장면과 챗봇 응답은 후속 연결됩니다.';
+  note.textContent = '9명의 Reader 모두 전용 Reading Scene까지 연결되어 있습니다. Reading이 끝난 뒤에는 선택한 Reader와 대화를 이어가거나 기록에서 결과를 다시 볼 수 있습니다. 챗봇 응답 연결은 후속 단계입니다.';
 
   panel.append(close, intro, grid, note);
   dialog.append(panel);
@@ -233,8 +225,8 @@ function openPicker(anchor) {
     return;
   }
 
-  const representative = dialog.querySelector('[data-reader-key="baekheon"]');
-  if (representative instanceof HTMLButtonElement) representative.focus();
+  const firstReader = dialog.querySelector('[data-reader-key]');
+  if (firstReader instanceof HTMLButtonElement) firstReader.focus();
 }
 
 document.addEventListener('click', (event) => {
