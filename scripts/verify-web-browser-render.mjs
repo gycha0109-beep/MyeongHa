@@ -385,6 +385,30 @@ try {
   assert(readingChatHandoff.contextTitle.includes('전체 사주') && readingChatHandoff.threadTitle === '전체 사주', `Reading handoff title missing: ${JSON.stringify(readingChatHandoff)}`);
   assert(readingChatHandoff.dialogue.includes('읽기에서 이어왔군요.'), `Reader chat did not acknowledge Reading handoff: ${readingChatHandoff.dialogue}`);
 
+  await navigate(client, origin, '/chat.html?character=seyeon&from=reading&reader=baekheon&topic=temperament&scope=original', '.character-room-v2');
+  const crossReaderHandoff = await client.evaluate(`(() => ({
+    entry: document.body.dataset.chatEntry ?? '',
+    character: document.body.dataset.character ?? '',
+    contextHidden: document.querySelector('[data-context-pill]')?.hidden ?? false,
+    threadHidden: document.querySelector('[data-thread-bar]')?.hidden ?? false,
+    dialogue: document.querySelector('[data-dialogue-line]')?.textContent?.trim() ?? '',
+  }))()`);
+  assert(crossReaderHandoff.character === 'seyeon' && crossReaderHandoff.entry === '', `Reading handoff leaked across Readers: ${JSON.stringify(crossReaderHandoff)}`);
+  assert(crossReaderHandoff.contextHidden && crossReaderHandoff.threadHidden, `Cross-Reader handoff exposed Reading context: ${JSON.stringify(crossReaderHandoff)}`);
+  assert(!crossReaderHandoff.dialogue.includes('읽기에서 이어왔군요.'), `Cross-Reader handoff reused Reading dialogue: ${crossReaderHandoff.dialogue}`);
+
+  await navigate(client, origin, '/chat.html?character=baekheon&from=reading&reader=baekheon&topic=money&scope=original', '.character-room-v2');
+  const crossTopicHandoff = await client.evaluate(`(() => ({
+    entry: document.body.dataset.chatEntry ?? '',
+    character: document.body.dataset.character ?? '',
+    contextHidden: document.querySelector('[data-context-pill]')?.hidden ?? false,
+    threadHidden: document.querySelector('[data-thread-bar]')?.hidden ?? false,
+    dialogue: document.querySelector('[data-dialogue-line]')?.textContent?.trim() ?? '',
+  }))()`);
+  assert(crossTopicHandoff.character === 'baekheon' && crossTopicHandoff.entry === '', `Reading handoff leaked across topics: ${JSON.stringify(crossTopicHandoff)}`);
+  assert(crossTopicHandoff.contextHidden && crossTopicHandoff.threadHidden, `Cross-topic handoff exposed Reading context: ${JSON.stringify(crossTopicHandoff)}`);
+  assert(!crossTopicHandoff.dialogue.includes('읽기에서 이어왔군요.'), `Cross-topic handoff reused Reading dialogue: ${crossTopicHandoff.dialogue}`);
+
   await navigate(client, origin, '/records.html?tab=saju&from=reading&reader=baekheon&topic=temperament&scope=original', '#saju-records');
   const readingRecordsHandoff = await client.evaluate(`(() => {
     const tab = document.querySelector('#saju-records-tab');
