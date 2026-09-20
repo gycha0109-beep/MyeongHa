@@ -118,7 +118,9 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
     const home = `${homeHtml}\n${homePage}`;
 
     expect(room).toContain('class="product-page character-room character-room-v2"');
-    expect(room).toContain('href="chat-hub.html" aria-label="대화 허브로 돌아가기"');
+    expect(room).toContain('href="chat-hub.html" aria-current="page"');
+    expect(room).not.toContain('conversation-room-header');
+    expect(room).not.toContain('대화로 돌아가기');
     expect(home).toContain('href="chat-hub.html">대화</a>');
     expect(home).toContain('href="chat-hub.html">대화로 가기 →</a>');
     expect(reading).toContain('href="chat-hub.html">대화</a>');
