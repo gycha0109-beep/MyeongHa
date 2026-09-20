@@ -12,29 +12,6 @@ export function ChatPage() {
 
   return (
     <>
-      <header className="character-room-header conversation-room-header">
-        <a className="character-room-back" href="chat-hub.html" aria-label="대화 허브로 돌아가기">
-          <span aria-hidden="true">‹</span>
-          <span>대화로 돌아가기</span>
-        </a>
-
-        <div className="character-room-identity" aria-live="polite">
-          <strong data-character-name>백헌</strong>
-          <span className="character-room-dot" aria-hidden="true">·</span>
-          <span data-character-title>충추원의 장</span>
-          <span className="character-room-seal" aria-hidden="true">明河</span>
-        </div>
-
-        <div className="character-room-actions">
-          <button className="character-room-history-button" type="button" data-history-open>
-            <span className="character-room-clock" aria-hidden="true" />
-            <span>지난 대화</span>
-          </button>
-          <a className="conversation-record-link" href="records.html">기록 보기</a>
-          <button className="character-room-menu-button" type="button" aria-label="대화 메뉴" data-menu-toggle>•••</button>
-        </div>
-      </header>
-
       <main className="character-room-stage conversation-room-stage" aria-label="캐릭터 대화 공간">
         <section className="conversation-scene-column" aria-label="캐릭터 공간">
           <div className="character-room-scene conversation-room-scene" data-character-scene role="img" aria-label="백헌의 대화 공간">

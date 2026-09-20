@@ -426,12 +426,17 @@ try {
     theme: document.documentElement.dataset.theme,
     width: innerWidth,
     overflow: document.documentElement.scrollWidth - innerWidth,
-    roomHeaderVisible: (() => { const el = document.querySelector('.conversation-room-header'); const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(el).display !== 'none'; })(),
-    chatPanelVisible: (() => { const el = document.querySelector('.conversation-chat-panel'); const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(el).display !== 'none'; })(),
+    roomHeaderAbsent: document.querySelector('.conversation-room-header') === null,
+    chatPanelVisible: (() => {
+      const el = document.querySelector('.conversation-chat-panel');
+      if (!el) return false;
+      const r = el.getBoundingClientRect();
+      return r.width > 0 && r.height > 0 && getComputedStyle(el).display !== 'none';
+    })(),
   }))()`);
   assert(mobileChatState.theme === 'dark' && mobileChatState.width === 390, 'Dark mobile Conversation theme did not persist');
   assert(mobileChatState.overflow <= 2, `Dark mobile Conversation horizontal overflow: ${mobileChatState.overflow}px`);
-  assert(mobileChatState.roomHeaderVisible && mobileChatState.chatPanelVisible, 'Dark mobile Conversation room lost required layout');
+  assert(mobileChatState.roomHeaderAbsent && mobileChatState.chatPanelVisible, 'Dark mobile Conversation room kept duplicate subheader or lost the chat panel');
 
   console.log(JSON.stringify({
     status: 'MyeongHa_WEB_BROWSER_RENDER_PASS',

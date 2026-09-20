@@ -1184,3 +1184,81 @@
     font-size: 16px;
   }
 }
+
+
+/* Canonical character-room art.
+ * These web-optimized derivatives preserve the uploaded representative image composition.
+ * The room owns the crop via background-size: cover; no generated/recomposed art is used.
+ */
+.character-room-v2[data-character="seyeon"] {
+  --conversation-room-art: url("assets/characters/rooms/seyeon-room.webp");
+  --conversation-room-position: center 38%;
+  --conversation-room-mobile-position: center 24%;
+}
+.character-room-v2[data-character="yeoul"] {
+  --conversation-room-art: url("assets/characters/rooms/yeoul-room.webp");
+  --conversation-room-position: center 34%;
+  --conversation-room-mobile-position: center 22%;
+}
+.character-room-v2[data-character="seorin"] {
+  --conversation-room-art: url("assets/characters/rooms/seorin-room.webp");
+  --conversation-room-position: center 34%;
+  --conversation-room-mobile-position: center 22%;
+}
+.character-room-v2[data-character="mira"] {
+  --conversation-room-art: url("assets/characters/rooms/mira-room.webp");
+  --conversation-room-position: center 36%;
+  --conversation-room-mobile-position: center 23%;
+}
+.character-room-v2[data-character="baekheon"] {
+  --conversation-room-art: url("assets/characters/rooms/baekheon-room.webp");
+  --conversation-room-position: center 32%;
+  --conversation-room-mobile-position: center 21%;
+}
+.character-room-v2[data-character="taegyeom"] {
+  --conversation-room-art: url("assets/characters/rooms/taegyeom-room.webp");
+  --conversation-room-position: center 30%;
+  --conversation-room-mobile-position: center 20%;
+}
+.character-room-v2[data-character="doyoon"] {
+  --conversation-room-art: url("assets/characters/rooms/doyoon-room.webp");
+  --conversation-room-position: center 34%;
+  --conversation-room-mobile-position: center 22%;
+}
+.character-room-v2[data-character="yunho"] {
+  --conversation-room-art: url("assets/characters/rooms/yunho-room.webp");
+  --conversation-room-position: center 34%;
+  --conversation-room-mobile-position: center 22%;
+}
+.character-room-v2[data-character="rahyeon"] {
+  --conversation-room-art: url("assets/characters/rooms/rahyeon-room.webp");
+  --conversation-room-position: center 33%;
+  --conversation-room-mobile-position: center 22%;
+}
+
+.character-room-v2[data-character] .conversation-room-scene {
+  background-image:
+    linear-gradient(180deg, rgba(8, 12, 16, .02) 54%, rgba(8, 12, 16, .28) 100%),
+    var(--conversation-room-art);
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: var(--conversation-room-position, center center);
+}
+
+.character-room-v2[data-character] .conversation-room-scene .character-room-scene-decoration {
+  display: none;
+}
+
+.character-room-v2[data-character] [data-character-avatar] {
+  background-image: var(--conversation-room-art);
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: center 18%;
+  color: transparent;
+}
+
+@media (max-width: 900px) {
+  body.character-room.character-room-v2[data-character] .conversation-room-scene {
+    background-position: var(--conversation-room-mobile-position, center 22%) !important;
+  }
+}

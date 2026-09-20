@@ -78,7 +78,7 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
     expect(v2Css).toContain('url("seyeon-chat.webp")');
 
     for (const key of ['seyeon', 'baekheon', 'yeoul', 'seorin', 'rahyeon', 'mira', 'taegyeom', 'yunho', 'doyoon']) {
-      expect(js).toContain(`${key}: Object.freeze({ src: 'assets/characters/${key}-portrait.webp'`);
+      expect(js).toContain(`${key}: Object.freeze({ src: 'assets/characters/${key}-portrait-v2.webp'`);
     }
 
     expect(js).toContain("image.className = 'chat-person-art-image'");
@@ -90,6 +90,19 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
     expect(js).not.toContain('portrait.scale');
     expect(js).not.toContain('portrait.origin');
     expect(hubCss).toContain('html[data-theme="dark"] body.chat-hub-page .chat-person-tag');
+  });
+
+  it('maps all nine canonical characters to representative room art', async () => {
+    const v2Css = await readFile(hubV2CssPath, 'utf8');
+
+    for (const key of ['seyeon', 'baekheon', 'yeoul', 'seorin', 'rahyeon', 'mira', 'taegyeom', 'yunho', 'doyoon']) {
+      expect(v2Css).toContain(`.character-room-v2[data-character="${key}"]`);
+      expect(v2Css).toContain(`assets/characters/rooms/${key}-room.webp`);
+    }
+
+    expect(v2Css).toContain('var(--conversation-room-art)');
+    expect(v2Css).toContain('.conversation-room-scene .character-room-scene-decoration');
+    expect(v2Css).toContain('[data-character-avatar]');
   });
 
   it('keeps character rooms as focused destinations and routes global conversation entries through the hub', async () => {
@@ -105,7 +118,9 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
     const home = `${homeHtml}\n${homePage}`;
 
     expect(room).toContain('class="product-page character-room character-room-v2"');
-    expect(room).toContain('href="chat-hub.html" aria-label="대화 허브로 돌아가기"');
+    expect(room).toContain('href="chat-hub.html" aria-current="page"');
+    expect(room).not.toContain('conversation-room-header');
+    expect(room).not.toContain('대화로 돌아가기');
     expect(home).toContain('href="chat-hub.html">대화</a>');
     expect(home).toContain('href="chat-hub.html">대화로 가기 →</a>');
     expect(reading).toContain('href="chat-hub.html">대화</a>');
