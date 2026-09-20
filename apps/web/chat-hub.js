@@ -65,15 +65,15 @@ const people = Object.freeze([
 ]);
 
 const portraitArt = Object.freeze({
-  seyeon: Object.freeze({ src: 'assets/characters/seyeon-portrait.webp' }),
-  baekheon: Object.freeze({ src: 'assets/characters/baekheon-portrait.webp' }),
-  yeoul: Object.freeze({ src: 'assets/characters/yeoul-portrait.webp' }),
-  seorin: Object.freeze({ src: 'assets/characters/seorin-portrait.webp' }),
-  rahyeon: Object.freeze({ src: 'assets/characters/rahyeon-portrait.webp' }),
-  mira: Object.freeze({ src: 'assets/characters/mira-portrait.webp' }),
-  taegyeom: Object.freeze({ src: 'assets/characters/taegyeom-portrait.webp' }),
-  yunho: Object.freeze({ src: 'assets/characters/yunho-portrait.webp' }),
-  doyoon: Object.freeze({ src: 'assets/characters/doyoon-portrait.webp' }),
+  seyeon: Object.freeze({ src: 'assets/characters/seyeon-portrait-v2.webp' }),
+  baekheon: Object.freeze({ src: 'assets/characters/baekheon-portrait-v2.webp' }),
+  yeoul: Object.freeze({ src: 'assets/characters/yeoul-portrait-v2.webp' }),
+  seorin: Object.freeze({ src: 'assets/characters/seorin-portrait-v2.webp' }),
+  rahyeon: Object.freeze({ src: 'assets/characters/rahyeon-portrait-v2.webp' }),
+  mira: Object.freeze({ src: 'assets/characters/mira-portrait-v2.webp' }),
+  taegyeom: Object.freeze({ src: 'assets/characters/taegyeom-portrait-v2.webp' }),
+  yunho: Object.freeze({ src: 'assets/characters/yunho-portrait-v2.webp' }),
+  doyoon: Object.freeze({ src: 'assets/characters/doyoon-portrait-v2.webp' }),
 });
 
 const peopleGrid = document.querySelector('[data-people-grid]');

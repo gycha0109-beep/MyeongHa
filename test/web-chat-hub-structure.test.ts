@@ -78,7 +78,7 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
     expect(v2Css).toContain('url("seyeon-chat.webp")');
 
     for (const key of ['seyeon', 'baekheon', 'yeoul', 'seorin', 'rahyeon', 'mira', 'taegyeom', 'yunho', 'doyoon']) {
-      expect(js).toContain(`${key}: Object.freeze({ src: 'assets/characters/${key}-portrait.webp'`);
+      expect(js).toContain(`${key}: Object.freeze({ src: 'assets/characters/${key}-portrait-v2.webp'`);
     }
 
     expect(js).toContain("image.className = 'chat-person-art-image'");

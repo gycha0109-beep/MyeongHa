@@ -223,15 +223,15 @@ async function verifyHub(page, origin, suffix, width, height, mobile) {
 
   const state = await page.evaluate(`(() => {
     const expectedPortraits = {
-      seyeon: 'seyeon-portrait.webp',
-      baekheon: 'baekheon-portrait.webp',
-      yeoul: 'yeoul-portrait.webp',
-      seorin: 'seorin-portrait.webp',
-      rahyeon: 'rahyeon-portrait.webp',
-      mira: 'mira-portrait.webp',
-      taegyeom: 'taegyeom-portrait.webp',
-      yunho: 'yunho-portrait.webp',
-      doyoon: 'doyoon-portrait.webp',
+      seyeon: 'seyeon-portrait-v2.webp',
+      baekheon: 'baekheon-portrait-v2.webp',
+      yeoul: 'yeoul-portrait-v2.webp',
+      seorin: 'seorin-portrait-v2.webp',
+      rahyeon: 'rahyeon-portrait-v2.webp',
+      mira: 'mira-portrait-v2.webp',
+      taegyeom: 'taegyeom-portrait-v2.webp',
+      yunho: 'yunho-portrait-v2.webp',
+      doyoon: 'doyoon-portrait-v2.webp',
     };
     const portraits = Object.entries(expectedPortraits).map(([key, filename]) => {
       const art = document.querySelector('.chat-person-art[data-character="' + key + '"]');
