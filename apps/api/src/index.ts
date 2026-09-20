@@ -634,3 +634,10 @@ export {
 export {
   createPostgresCharacterStandardReadingKnowledgePortsV1,
 } from './postgres-character-standard-reading-knowledge.js';
+
+export {
+  OFFICIAL_READING_PRODUCT_RESPONSE_VERSION_V1,
+  CharacterStandardReadingProtectedContextErrorV1,
+  projectOfficialStandardReadingToProtectedCharacterSajuContextV1,
+  type CharacterStandardReadingProtectedSajuContextV1,
+} from './character-standard-reading-protected-context.js';
