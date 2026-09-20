@@ -24,6 +24,13 @@ function requireRunId(value) {
   return value;
 }
 
+function requireAdminSecret(value) {
+  if (typeof value !== 'string' || value.length === 0) {
+    throw new CanaryFailure('ADMIN_SECRET_MISSING');
+  }
+  return value;
+}
+
 function requireUuid(value) {
   if (
     typeof value !== 'string' ||
@@ -85,7 +92,12 @@ async function fetchWithTimeout(url, init) {
   }
 }
 
-async function createDisposableHostedUser({ origin, secret, runId }) {
+async function createDisposableHostedUser({
+  origin,
+  secret,
+  runId,
+  createCredentialHeaders,
+}) {
   const syntheticEmail =
     `myeongha-auth-canary-${runId}-${randomUUID()}@example.com`;
 
@@ -94,8 +106,7 @@ async function createDisposableHostedUser({ origin, secret, runId }) {
     headers: Object.freeze({
       accept: 'application/json',
       'content-type': 'application/json',
-      authorization: `Bearer ${secret}`,
-      apikey: secret,
+      ...createCredentialHeaders(secret),
     }),
     body: JSON.stringify({
       email: syntheticEmail,
@@ -127,6 +138,7 @@ async function main() {
     'CONFIRMATION_REQUIRED',
   );
   const runId = requireRunId(process.env.GITHUB_RUN_ID);
+  requireAdminSecret(process.env.MYEONGHA_SUPABASE_AUTH_ADMIN_SECRET);
 
   const {
     parseProductionAccountDeletionAuthAdminConfigV1,
@@ -135,12 +147,19 @@ async function main() {
     '../dist/apps/api/src/production-account-deletion-auth-admin-config.js'
   );
   const {
+    createSupabaseAuthAdminCredentialHeadersV1,
     createSupabaseAuthAdminUserDeletionAdapterV1,
   } = await import(
     '../dist/apps/api/src/supabase-auth-admin-user-deletion.js'
   );
 
-  const config = parseProductionAccountDeletionAuthAdminConfigV1(process.env);
+  let config;
+  try {
+    config = parseProductionAccountDeletionAuthAdminConfigV1(process.env);
+  } catch {
+    throw new CanaryFailure('AUTH_ADMIN_CONFIG_INVALID');
+  }
+
   const summary = summarizeProductionAccountDeletionAuthAdminConfigV1(config);
   if (
     summary.supabaseProjectRef !== 'cnsfpcdiyofqvhpcegfc' ||
@@ -161,6 +180,7 @@ async function main() {
       origin: config.supabaseOrigin,
       secret: config.adminSecret,
       runId,
+      createCredentialHeaders: createSupabaseAuthAdminCredentialHeadersV1,
     });
 
     const first = await deletion.deleteUser({ authUserId: createdUserId });
