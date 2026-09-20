@@ -1,126 +1,99 @@
 # PostgreSQL DR Readiness Status v1
 
 > Issue: #389  
-> Evidence date: 2026-09-18 KST  
+> Evidence date: 2026-09-21 KST  
 > Purpose: record measured restore evidence separately from unresolved privacy/legal-retention and RPO/RTO authority.
 
 ## Current evidence
 
 ```yaml
-backup_run_id: 35329018925
-latest_proven_backup_source_sha: e1a6500968f7722666cae2038fd49ddf3f9d3540
-backup_artifact_id: 10540625562
-backup_artifact_name: myeongha-postgres-20260918T092042Z
-backup_artifact_expires_at: 2026-10-18T09:23:19Z
-backup_encrypted_sha256: 96c40cb4c61f71d56a97dd9af34a2c31eb4674809a501f435b2634c12043a394
-production_schema_latest_deployed_migration: 1120
-production_schema_deploy_run_id: 35324012524
-production_schema_deploy_head_sha: eddc1c331b6a8c0f47f54c150acd2f6cc5c7c0c2
-backup_schema_freshness: CURRENT_FOR_DEPLOYED_MIGRATION_1120
-backup_refresh_required: false
-backup_to_restore_head_migration_delta_count: 0
-restore_run_id: 35331742188
-restore_result: SUCCESS
-restore_target: github-actions-loopback-supabase-postgres
-restore_runtime_head_sha: f736381f21171a1480292988e97c61ca68a5e62b
-restore_evidence_artifact_id: 10541321355
-restore_evidence_artifact_expires_at: 2026-10-18T09:52:36Z
-restore_evidence_envelope: IMPLEMENTED_CI_VERIFIED
+latest_governed_backup_run_id: 35467974194
+latest_governed_backup_source_sha: 89aeedfb18a865b9e1fb62e39d710006427837d9
+latest_governed_backup_artifact_id: 10592011138
+latest_governed_backup_artifact_name: myeongha-postgres-20260919T203800Z
+latest_governed_backup_artifact_expires_at: 2026-10-19T20:40:17Z
+latest_governed_backup_artifact_digest: sha256:8c81e2d2e5702010fd70bda2bed6518f060a69c9a98aad47c1f95686df5ec8b7
+latest_governed_backup_completed_at_utc: 2026-09-19T20:40:17Z
+latest_proven_backup_migration_frontier: 1120
+current_repository_migration_frontier: 1230
+backup_schema_freshness: STALE_FOR_CURRENT_REPOSITORY_FRONTIER_1230
+backup_refresh_required: true
+
+latest_isolated_restore_run_id: 35331742188
+latest_isolated_restore_result: SUCCESS
+latest_isolated_restore_target: github-actions-loopback-supabase-postgres
+latest_isolated_restore_runtime_head_sha: f736381f21171a1480292988e97c61ca68a5e62b
+latest_isolated_restore_evidence_artifact_id: 10541321355
+latest_isolated_restore_evidence_artifact_expires_at: 2026-10-18T09:52:36Z
+latest_isolated_restore_backup_migration_frontier: 1120
 restore_evidence_envelope_runtime: PROVEN_ON_RUN_35331742188
-restored_db_synthetic_privacy_replay: IMPLEMENTED_CI_VERIFIED
-restored_db_synthetic_privacy_replay_runtime: PROVEN_ON_RUN_35331742188
 isolated_restore_validation_duration_seconds: 2
 manual_drill_workflow_elapsed_seconds: 52
 synthetic_data_loss_window_seconds: 4
 provider_managed_data_full_restore: false
 provider_managed_data_blocks_projected: 3
 provider_managed_data_blocks_skipped: 27
-synthetic_privacy_replay_event_count: 4
-authoritative_post_backup_source: false
-authoritative_post_backup_delta_audit_for_current_backup: SUCCESSFUL_COUNT_ONLY_OBSERVATION
-post_backup_privacy_delta_count_audit_workflow: RUNTIME_PROVEN
-post_backup_privacy_delta_count_audit_last_run_id: 35353128407
-post_backup_privacy_delta_count_audit_last_run_result: SUCCESS
-post_backup_privacy_delta_count_audit_runtime_head_sha: 532a92e061506bfac8f9485e84ebbab8d756f1db
-post_backup_privacy_delta_count_audit_artifact_id: 10550013004
-post_backup_privacy_delta_count_audit_artifact_name: postgres-privacy-delta-count-audit-35353128407
-post_backup_privacy_delta_count_audit_artifact_expires_at: 2026-10-18T13:56:23Z
-post_backup_privacy_delta_count_audit_artifact_digest: sha256:87010c5c12b2ac319f1b6ef71b0829ab713c13a70189d294a8af720e9a2d6374
-post_backup_privacy_delta_count_audit_backup_completed_at_utc: 2026-09-18T09:23:19Z
-post_backup_privacy_delta_count_audit_completed_at_utc: 2026-09-18T13:56:22Z
-privacy_delta_audit_query_mode: READ_ONLY_COUNT_ONLY
-privacy_delta_audit_data_deletion_jobs_requested_at: 0
-privacy_delta_audit_share_artifacts_revoked_at: 0
-privacy_delta_audit_device_installations_revoked_at: 0
-privacy_delta_audit_life_facts_revoked_at: 0
-privacy_delta_audit_memory_items_revoked_at: 0
-privacy_delta_audit_record_access_grants_revoked_at: 0
-privacy_delta_audit_subjects_non_active_updated_at: 0
-privacy_delta_audit_observed_delta_total: 0
-privacy_delta_audit_observed_deltas: false
-privacy_recovery_ledger_candidate_workflow: RUNTIME_PROVEN
-privacy_recovery_ledger_candidate_run_id: 35361080803
-privacy_recovery_ledger_candidate_result: SUCCESS
-privacy_recovery_ledger_candidate_runtime_head_sha: c8899478dba523f2ccfe1f6f00cda14a952a0273
-privacy_recovery_ledger_candidate_backup_run_id: 35329018925
-privacy_recovery_ledger_candidate_backup_completed_at_utc: 2026-09-18T09:23:19.000Z
-privacy_recovery_ledger_candidate_captured_at_utc: 2026-09-18T15:13:38.000Z
-privacy_recovery_ledger_candidate_artifact_id: 10553934875
-privacy_recovery_ledger_candidate_artifact_name: myeongha-privacy-ledger-20260918T151342Z
-privacy_recovery_ledger_candidate_artifact_expires_at: 2026-10-18T15:13:42Z
-privacy_recovery_ledger_candidate_artifact_digest: sha256:dfa03b55d90011ea9b5ce52ec166fb6eb789a91874bafcc8341cd6e4c68543b0
-privacy_recovery_ledger_candidate_encrypted_sha256: 91e2ea2fd615385d86d9864d7670b3139752a090fbe49884a8743258ccd938b5
-privacy_recovery_ledger_candidate_source_digest: sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
-privacy_recovery_ledger_candidate_event_count: 0
-privacy_recovery_ledger_candidate_replay_planner_accepted: true
-privacy_recovery_ledger_candidate_unsupported_delta_guard: PASS_ZERO_UNSUPPORTED
-privacy_recovery_ledger_candidate_artifact_plaintext_identifier_payload_uploaded: false
-privacy_recovery_ledger_candidate_source_authority: CANDIDATE_NON_AUTHORITATIVE
-privacy_reconciliation: BLOCKED_BY_FINALIZER_AND_AUTHORITATIVE_NONZERO_RECOVERY_PROOF
+
+privacy_recovery_ledger_workflow: RUNTIME_PROVEN
+privacy_recovery_ledger_run_id: 35531005587
+privacy_recovery_ledger_result: SUCCESS
+privacy_recovery_ledger_runtime_head_sha: 931de80941683b6cdca45f3181b0a6234f153fed
+privacy_recovery_ledger_backup_run_id: 35467974194
+privacy_recovery_ledger_backup_completed_at_utc: 2026-09-19T20:40:17Z
+privacy_recovery_ledger_artifact_id: 10610943814
+privacy_recovery_ledger_artifact_name: myeongha-privacy-ledger-20260920T190310Z
+privacy_recovery_ledger_artifact_expires_at: 2026-10-20T19:03:10Z
+privacy_recovery_ledger_artifact_digest: sha256:cf7628d62153e0bfc2c0977f03f3b5f5f9de52d69740248a789d648eb80b3d99
+privacy_recovery_ledger_authority_class: AUTHORITATIVE_CAPTURED_WINDOW_V1
+privacy_recovery_ledger_scope: governed_backup_completion_lt_event_lte_captured_at
+privacy_recovery_ledger_retention: P30D
+authoritative_post_backup_source: true_bounded_captured_window_only
+
+account_deletion_finalizer_runtime: IMPLEMENTED_AND_PROVIDER_MECHANICS_SEPARATELY_PROVEN
+recovered_state_finalization_drill: IMPLEMENTED_MERGED_POST_MERGE_CI_GREEN
+recovered_state_finalization_restored_backup_runtime: PENDING_FRESH_CURRENT_FRONTIER_BACKUP
+authoritative_privacy_reconciliation: false
+future_safe_privacy_reconciliation: false
+privacy_reconciliation: BLOCKED_BY_FRESH_RESTORE_RUNTIME_AND_APPLICABLE_AUTHORITATIVE_DELTA_PROOF
 rpo_authority: OPEN_DECISION
 rto_authority: OPEN_DECISION
 dr_ready: false
 ```
 
-Manual restore run `35331742188` completed successfully from current main head `f736381f21171a1480292988e97c61ca68a5e62b` using fresh production backup run `35329018925`. The backup source SHA is `e1a6500968f7722666cae2038fd49ddf3f9d3540`, taken after production migration `1120` was deployed. A fresh comparison from that backup source to the restore head found **zero** changes under `supabase/migrations/`. Current-production-schema backup freshness and restore portability are therefore proven through deployed migration `1120`.
+The latest governed backup is run `35467974194`, source SHA `89aeedfb18a865b9e1fb62e39d710006427837d9`, artifact `10592011138` (`myeongha-postgres-20260919T203800Z`). Its exact completion cutoff is `2026-09-19T20:40:17Z`. The backup remains valid governed evidence for its captured schema, but it proves migration frontier `1120` while the repository frontier is now `1230`. The DR authority gate therefore correctly classifies current-schema backup freshness as stale and requires a fresh governed backup before a current-frontier restore can be claimed.
 
-Artifact `10541321355` (`postgres-isolated-restore-drill-35331742188`) contains both `restore-evidence.json` and `privacy-reconciliation-evidence.json`. The restore evidence records envelope version `myeongha-postgres-isolated-restore-evidence-envelope-v1`, exact backup/source bindings, 2-second restore/validation, 3 projected provider COPY blocks, 27 skipped provider COPY blocks, `provider_managed_data_full_restore=false`, Auth identity continuity PASS, and `dr_ready=false`. The privacy evidence records four synthetic replay events, identical second-replay idempotency PASS, negative terminal-state fail-closed PASS, `authoritative_post_backup_source=false`, and `dr_ready=false`.
+The latest isolated restore runtime evidence remains run `35331742188` against the older governed backup frontier. Artifact `10541321355` proves application-data portability, projected provider COPY handling, Auth identity continuity for the supported loopback scope, and the earlier synthetic replay mechanics. Its 2-second isolated restore/validation, 52-second workflow elapsed time, and 4-second synthetic loss window remain diagnostics only. None is an approved RTO or RPO, and none represents a full achieved recovery duration.
 
-The 2-second value is the measured isolated restore/validation diagnostic from run `35331742188`. The 52-second value is GitHub workflow dispatch-to-completion elapsed time for that manual drill. The 4-second value is the synthetic data-loss-window diagnostic for the selected incident reference. None is an approved RTO or RPO, and the 52-second workflow elapsed time is not a full achieved recovery duration because authoritative privacy/legal-retention reconciliation remains outside the run.
+The promoted encrypted off-primary-DB privacy recovery ledger now has post-merge scheduled runtime proof. Production PostgreSQL Privacy Recovery Ledger run `35531005587` completed successfully from repository SHA `931de80941683b6cdca45f3181b0a6234f153fed`, bound itself to governed backup run `35467974194` and cutoff `2026-09-19T20:40:17Z`, executed the read-only export path, and uploaded encrypted artifact `10610943814` (`myeongha-privacy-ledger-20260920T190310Z`) with P30D retention. This closes the former candidate-only source gap: the ledger is authoritative for its exact captured window under `AUTHORITATIVE_CAPTURED_WINDOW_V1`. It is not an unbounded/future-safe source; an incident reference later than the ledger coverage point remains fail-closed.
 
-A successful count-only production audit has now been executed against current governed backup `35329018925`. Run `35353128407` queried the seven timestamp-authoritative surfaces after cutoff `2026-09-18T09:23:19Z` and observed zero recorded deltas on every surface: `data_deletion_jobs.requested_at=0`, `share_artifacts.revoked_at=0`, `device_installations.revoked_at=0`, `life_facts.revoked_at=0`, `memory_items.revoked_at=0`, `record_access_grants.revoked_at=0`, and non-active `subjects.updated_at=0`. The observed delta total is `0` and `observed_deltas=false`. This is a read-only count observation of the current primary database, not a durable post-backup privacy authority, so authoritative privacy reconciliation remains blocked.
-
-The manual runtime path at `.github/workflows/production-postgres-privacy-delta-audit.yml` is now runtime-proven. Run `35347028765` failed before count evidence while relying on a pooler startup read-only assertion. Run `35349036742` then reached the explicit `BEGIN TRANSACTION READ ONLY` path but failed before evidence because `psql -c "$sql"` did not perform psql variable substitution for `:'cutoff'`. Run `35353128407`, from exact main SHA `532a92e061506bfac8f9485e84ebbab8d756f1db`, used the corrected stdin execution path and completed successfully: governed backup/provenance validation PASS, read-only count query PASS, and evidence upload PASS. Artifact `10550013004` (`postgres-privacy-delta-count-audit-35353128407`, expiring `2026-10-18T13:56:23Z`) records schema `myeongha-postgres-privacy-delta-count-audit-v1`, `query_mode=read_only_count_only`, the seven zero counts, `observed_delta_total=0`, `observed_deltas=false`, `authoritative_post_backup_source=false`, `authoritative_privacy_reconciliation=false`, `future_safe_privacy_reconciliation=false`, and `dr_ready=false`.
-
-The encrypted off-primary-DB privacy recovery ledger candidate is also runtime-proven as transport mechanics. Manual run `35361080803` executed from exact main SHA `c8899478dba523f2ccfe1f6f00cda14a952a0273` against governed backup `35329018925` and cutoff `2026-09-18T09:23:19.000Z`. Backup provenance validation, the explicit read-only export, unsupported-delta fail-closed guard, deterministic replay-planner validation, encryption, and artifact upload all passed. Artifact `10553934875` (`myeongha-privacy-ledger-20260918T151342Z`, expiring `2026-10-18T15:13:42Z`) contains exactly an encrypted archive, its SHA-256 file, and an identifier-free public manifest. The encrypted archive SHA-256 `91e2ea2fd615385d86d9864d7670b3139752a090fbe49884a8743258ccd938b5` matches the uploaded checksum. The public manifest records `eventCount=0`, all seven replay-supported event-type counts as zero, `replayPlannerAccepted=true`, `candidateSourceAuthority=true`, `authoritativePostBackupSource=false`, `authoritativePrivacyReconciliation=false`, `futureSafePrivacyReconciliation=false`, and `drReady=false`. This proves the candidate export/encryption/off-DB transport path for the observed zero-event interval only; it does not promote the candidate into the durable authoritative privacy source required for recovered-state privacy reconciliation.
+The governed account-deletion finalizer, hosted Auth deletion adapter/canary path, completion authority, worker identity, and recovered-state synthetic finalization mechanics are now implemented. PRs #1141 and #1143 extend the recovery drill through exact worker claim, DB finalizer, isolated synthetic Auth ACK, completion ACK, idempotent completion replay, non-resurrection representatives, and revoked P5Y Commerce retention. Post-merge CI on main `00580651fa79c6361a03d09f207b6c27678d2714` is green. However, those finalization mechanics have not yet been exercised by the isolated restore workflow against a fresh governed backup containing the current recovery/finalizer frontier. Therefore authoritative privacy reconciliation remains false.
 
 ## Promotion blockers
 
-Current-schema recovery freshness is evidenced through deployed migration `1120` by backup run `35329018925` and restore run `35331742188`. `P0-PR-01` is now DECIDED as of 2026-09-19, so privacy/legal-retention policy is no longer the blocker. DR remains blocked by the not-yet-implemented destructive finalizer, lack of authoritative non-zero recovered-state reconciliation, provider-service gaps, and OPEN RPO/RTO authority.
+The privacy/legal-retention policy and bounded captured-window source authority are no longer open decisions. The destructive finalizer mechanics are also implemented. DR remains blocked because the latest governed backup/restore evidence is stale relative to repository migration frontier `1230`, the merged recovered-state finalization drill still needs runtime execution against a fresh governed recovered state, provider-service gaps remain outside full restore equivalence, and numeric RPO/RTO authority is still OPEN.
 
 Canonical authority remains unresolved in the existing source documents:
 
 - `docs/architecture/PRODUCTION_OPERATIONS_ARCHITECTURE_V1.md`: `RPO = OPEN DECISION`, `RTO = OPEN DECISION`, and no DR Ready claim before approved objectives plus achieved evidence.
-- `docs/P0_DECISION_REGISTER.md`: parent `P0-PR-01` is `DECIDED`; its approved 35 DELETE / 4 ANONYMIZE / 9 RETAIN(P5Y) baseline and P30D backup handling are recorded.
-- `docs/AUTH_RLS_PRIVACY_SPEC.md`: account deletion keeps personalization erase separate from the approved nine-table `P5Y` Commerce retention baseline; destructive runtime execution remains gated until the finalizer is implemented and verified.
+- `docs/P0_DECISION_REGISTER.md`: parent `P0-PR-01` is `DECIDED`; the current reachable policy baseline is 39 DELETE / 4 ANONYMIZE / 9 RETAIN(P5Y), with P30D encrypted backup handling and bounded captured-window privacy recovery source authority.
+- `docs/AUTH_RLS_PRIVACY_SPEC.md`: account deletion keeps personalization erase separate from the approved nine-table `P5Y` Commerce retention baseline; destructive runtime finalization is implemented, while recovered-state authoritative execution evidence remains separately gated.
 - `docs/SOURCE_AUTHORITY_GAPS.md`: `SRC-06` remains blocking before the final standalone Birth/Target deletion DDL baseline.
-- GitHub issue `#964`: product-owner policy authority is resolved; implementation/closure now depends on the approved finalizer contract being realized and verified.
+- GitHub issue `#964`: product-owner policy authority and bounded source authority are resolved; closure now depends on fresh recovered-state runtime evidence and the remaining reconciliation boundary.
 
 Therefore restore success must remain classified as mechanics evidence only:
 
 ```text
-backup proven                      = yes — run 35329018925
-backup current-schema freshness    = yes — through deployed migration 1120
-isolated application restore       = yes — run 35331742188
-application integrity/auth baseline= yes — run 35331742188
-self-contained evidence envelope   = implemented / CI-verified
-envelope runtime evidence          = proven — run 35331742188
-restored-DB synthetic privacy replay= implemented / CI-verified
-restored-DB synthetic replay runtime= proven — run 35331742188
-current-backup privacy delta audit = successful count-only observation — run 35353128407; seven checked surfaces all zero
-count-only audit workflow          = runtime-proven — run 35353128407
-off-DB privacy ledger candidate    = runtime-proven transport — run 35361080803; observed event count 0; non-authoritative
-future-safe privacy reconciliation = blocked pending finalizer + authoritative non-zero recovery proof
+latest governed backup             = yes — run 35467974194
+backup current-schema freshness    = no — proven frontier 1120; repository frontier 1230
+isolated application restore       = yes — run 35331742188, older frontier
+application integrity/auth baseline= yes — run 35331742188, supported loopback scope
+self-contained evidence envelope   = runtime-proven on older frontier
+bounded privacy source authority   = yes — run 35531005587 / AUTHORITATIVE_CAPTURED_WINDOW_V1
+account-deletion finalizer runtime = implemented
+recovered finalization mechanics   = implemented / post-merge CI green
+recovered finalization on fresh governed restore = pending
+authoritative privacy reconciliation= false
+future-safe privacy reconciliation = false
 approved RPO                       = no
 approved RTO                       = no
 DR Ready                           = false
@@ -149,19 +122,20 @@ A policy-neutral replay planner now exists at:
 scripts/build-postgres-privacy-reconciliation-plan.mjs
 ```
 
-It can deterministically compile post-backup account-deletion-start and revocation events into existing idempotent PostgreSQL command calls. Direct destructive DML, account deletion finalization, and commerce retention decisions are outside the planner and fail closed.
+It can deterministically compile post-backup account-deletion-start and revocation events into existing idempotent PostgreSQL command calls. Direct destructive DML remains outside the planner. Account-deletion finalization is executed by the separately governed worker/finalizer authority, and Commerce retention remains governed by the approved P5Y policy rather than by planner inference.
 
 This advances recovery mechanics but does not remove the promotion blockers:
 
 ```text
-revocation replay plan mechanics   = implemented
-restored-DB synthetic replay path  = runtime-proven — latest run 35331742188
-off-DB candidate transport mechanics = runtime-proven — run 35361080803 / event count 0 / non-authoritative
-durable post-backup source authority = not proven
-destructive account finalization   = policy decided / runtime not yet implemented
-commerce legal retention           = decided — approved 9-table P5Y baseline
-authoritative privacy reconciliation= not yet executed against restored DB
-DR Ready                           = false
+revocation replay plan mechanics     = implemented
+bounded post-backup source authority = runtime-proven — run 35531005587
+destructive account finalization     = implemented under governed worker authority
+recovered-state finalization drill   = implemented / post-merge CI green
+fresh governed restore execution     = pending current-frontier backup
+commerce legal retention             = decided — approved 9-table P5Y baseline
+authoritative privacy reconciliation = not yet proven on fresh recovered state
+future-safe privacy reconciliation   = false
+DR Ready                             = false
 ```
 
 The planner output report is identifier-free; the executable SQL contains required resource identifiers and must remain an ephemeral operator artifact rather than uploaded DR evidence.
