@@ -81,7 +81,7 @@ jobs:
           RESTORE_EVIDENCE_PATH: ${{ runner.temp }}/restore-evidence/restore-evidence.json
         run: bash scripts/run-postgres-isolated-restore-drill.sh
 
-      - name: Exercise synthetic privacy reconciliation on restored database
+      - name: Exercise synthetic privacy reconciliation and finalization on restored database
         shell: bash
         env:
           BACKUP_ARTIFACT_DIR: ${{ runner.temp }}/backup-artifact
@@ -120,7 +120,8 @@ jobs:
           set -euo pipefail
           echo 'restore_target=github-actions-loopback-supabase-postgres'
           echo 'isolated_restore=success'
-          echo 'synthetic_privacy_reconciliation_mechanics=exercised_on_restored_db'
-          echo 'privacy_reconciliation=not_exercised_by_this_workflow'
-          echo 'authoritative_privacy_reconciliation=not_exercised'
+          echo 'synthetic_privacy_reconciliation_mechanics=replay_and_finalization_exercised_on_restored_db'
+          echo 'privacy_reconciliation=synthetic_captured_window_authority_mechanics_only'
+          echo 'hosted_auth_provider_ack=synthetic_only_real_provider_proven_separately'
+          echo 'authoritative_privacy_reconciliation=not_yet_proven_with_production_nonzero_ledger'
           echo 'dr_ready=false'

@@ -28,9 +28,18 @@ encrypted_manifest="$tmp_dir/privacy-manifest.json.enc"
 decrypted_manifest="$tmp_dir/privacy-manifest.decrypted.json"
 plan="$tmp_dir/privacy-plan.sql"
 report="$tmp_dir/privacy-report.json"
+coverage_report="$tmp_dir/privacy-coverage-report.json"
 bad_manifest="$tmp_dir/privacy-bad-manifest.json"
 bad_plan="$tmp_dir/privacy-bad-plan.sql"
 bad_report="$tmp_dir/privacy-bad-report.json"
+recovery_lock_owner="privacy-recovery-finalizer-v1"
+profile_id="a8000000-0000-0000-0000-000000000001"
+revision_id="a8100000-0000-0000-0000-000000000001"
+reading_session_id="a8200000-0000-0000-0000-000000000001"
+reading_id="a8300000-0000-0000-0000-000000000001"
+share_id="a8400000-0000-0000-0000-000000000001"
+notification_id="a8500000-0000-0000-0000-000000000001"
+commerce_link_id="a8600000-0000-0000-0000-000000000001"
 
 collision_count="$("${psql_base[@]}" -Atc "
 select
@@ -56,7 +65,14 @@ select
     'a7000000-0000-0000-0000-000000000001',
     'a7000000-0000-0000-0000-000000000002'
   )) +
-  (select count(*) from public.characters where character_id='privacy-replay-character');
+  (select count(*) from public.characters where character_id='privacy-replay-character') +
+  (select count(*) from public.birth_profiles where id='a8000000-0000-0000-0000-000000000001') +
+  (select count(*) from public.birth_profile_revisions where id='a8100000-0000-0000-0000-000000000001') +
+  (select count(*) from public.reading_sessions where id='a8200000-0000-0000-0000-000000000001') +
+  (select count(*) from public.readings where id='a8300000-0000-0000-0000-000000000001') +
+  (select count(*) from public.share_artifacts where id='a8400000-0000-0000-0000-000000000001') +
+  (select count(*) from public.notifications where id='a8500000-0000-0000-0000-000000000001') +
+  (select count(*) from public.commerce_account_links where id='a8600000-0000-0000-0000-000000000001');
 ")"
 [[ "$collision_count" == "0" ]] || fail "synthetic privacy replay fixture collides with existing restored data"
 pass "synthetic privacy replay fixture identifiers are absent from target"
@@ -99,6 +115,42 @@ insert into public.device_installations(
   'privacy-replay-device','ciphertext','key-v1','privacy-replay-fingerprint','1.0.0','0.0.1-dev',
   clock_timestamp(),null,clock_timestamp()
 );
+
+insert into public.profiles(subject_id,display_name,locale,timezone,onboarding_state,created_at,updated_at)
+values ('a2000000-0000-0000-0000-000000000001','RESTORED PII','ko','Asia/Seoul','done',clock_timestamp(),clock_timestamp());
+
+insert into public.birth_profiles(id,subject_id,profile_kind,label,current_revision_id,archived_at,created_at,updated_at)
+values ('a8000000-0000-0000-0000-000000000001','a2000000-0000-0000-0000-000000000001','self','RESTORED BIRTH',null,null,clock_timestamp(),clock_timestamp());
+
+insert into public.birth_profile_revisions(id,birth_profile_id,subject_id,revision_no,calendar_type,birth_date,birth_time,time_known,is_leap_month,sex,input_hash,created_at)
+values ('a8100000-0000-0000-0000-000000000001','a8000000-0000-0000-0000-000000000001','a2000000-0000-0000-0000-000000000001',1,'solar','1990-01-01','12:00',true,false,'male','sha256:privacy-recovery-birth',clock_timestamp());
+
+update public.birth_profiles set current_revision_id='a8100000-0000-0000-0000-000000000001' where id='a8000000-0000-0000-0000-000000000001';
+
+insert into public.saju_domain_runtime(saju_domain,availability,capability_version,required_engine_version,updated_at)
+values ('general','available','privacy-recovery-v1',null,clock_timestamp())
+on conflict (saju_domain) do update
+set availability=excluded.availability,
+    capability_version=excluded.capability_version,
+    required_engine_version=excluded.required_engine_version,
+    updated_at=excluded.updated_at;
+
+insert into public.reading_sessions(id,subject_id,saju_domain,domain_capability_version,source_birth_revision_id,target_birth_revision_id,state,next_attempt_no,current_reading_id,created_at,updated_at)
+values ('a8200000-0000-0000-0000-000000000001','a2000000-0000-0000-0000-000000000001','general','privacy-recovery-v1','a8100000-0000-0000-0000-000000000001',null,'active',2,null,clock_timestamp(),clock_timestamp());
+
+insert into public.readings(id,reading_session_id,subject_id,saju_domain,attempt_no,parent_reading_id,source_turn_id,requested_thread_character_id,requested_character_id,requested_character_content_bundle_id,execution_status,request_idempotency_key,request_hash,request_contract_version,request_snapshot_jsonb,next_execution_attempt_no,committed_execution_attempt_id,created_at,completed_at)
+values ('a8300000-0000-0000-0000-000000000001','a8200000-0000-0000-0000-000000000001','a2000000-0000-0000-0000-000000000001','general',1,null,null,null,null,null,'pending','privacy-recovery-reading','sha256:privacy-recovery-reading','reading-request-v1','{}'::jsonb,1,null,clock_timestamp(),null);
+
+update public.reading_sessions set current_reading_id='a8300000-0000-0000-0000-000000000001' where id='a8200000-0000-0000-0000-000000000001';
+
+insert into public.share_artifacts(id,subject_id,reading_id,public_token_hash,artifact_version,snapshot_jsonb,snapshot_hash,status,expires_at,revoked_at,created_at)
+values ('a8400000-0000-0000-0000-000000000001','a2000000-0000-0000-0000-000000000001','a8300000-0000-0000-0000-000000000001','sha256:privacy-recovery-share','share-v1','{"synthetic":true}'::jsonb,'sha256:privacy-recovery-snapshot','active',null,null,clock_timestamp());
+
+insert into public.notifications(id,subject_id,category,character_id,content_bundle_id,source_world_event_id,template_key,payload_jsonb,dedupe_key,status,scheduled_at,read_at,created_at)
+values ('a8500000-0000-0000-0000-000000000001','a2000000-0000-0000-0000-000000000001','service_notice',null,null,null,'privacy-recovery','{"synthetic":true}'::jsonb,'privacy-recovery-notification','ready',clock_timestamp(),null,clock_timestamp());
+
+insert into public.commerce_account_links(id,subject_id,provider,external_account_fingerprint,status,verified_at,revoked_at,created_at)
+values ('a8600000-0000-0000-0000-000000000001','a2000000-0000-0000-0000-000000000001','privacy-recovery','sha256:privacy-recovery-commerce','active',clock_timestamp(),null,clock_timestamp());
 
 insert into public.data_deletion_jobs(
   id,subject_id,scope,target_resource_type,target_resource_id,request_dedupe_key,status,
@@ -155,6 +207,13 @@ node scripts/build-postgres-privacy-recovery-ledger-manifest.mjs \
   --captured-at "$incident_reference_at" \
   --manifest "$manifest" \
   --summary "$ledger_summary"
+
+node scripts/validate-postgres-privacy-recovery-ledger-coverage.mjs \
+  --input "$ledger_summary" \
+  --incident-reference-at "$incident_reference_at" \
+  --output "$coverage_report"
+jq -e '.coverageStatus == "covered" and .recoveryServiceabilityGate == "pass" and .drReady == false' "$coverage_report" >/dev/null
+pass "captured-window authority covers the synthetic recovery incident reference"
 
 node - "$ledger_summary" <<'NODE'
 import { readFile } from 'node:fs/promises';
@@ -250,6 +309,138 @@ select
 [[ "$("${psql_base[@]}" -Atc "select count(*) from public.data_deletion_jobs where id='a6000000-0000-0000-0000-000000000001';")" == "1" ]] || fail "second replay duplicated deletion job"
 [[ "$("${psql_base[@]}" -Atc "select count(*) from public.outbox_events where id='a7000000-0000-0000-0000-000000000001';")" == "1" ]] || fail "second replay duplicated outbox event"
 pass "second identical replay is idempotent after subject becomes deletion_pending"
+
+claim_state="$("${psql_base[@]}" -Atc "
+begin;
+set local role myeongha_system_executor;
+select subject_id::text||'|'||deletion_job_id::text||'|'||(reclaimed::int)
+from public.internal_claim_account_deletion_outbox_v1(
+  'a7000000-0000-0000-0000-000000000001',
+  '$recovery_lock_owner',
+  clock_timestamp()+interval '10 minutes'
+);
+commit;
+")"
+[[ "$claim_state" == "a2000000-0000-0000-0000-000000000001|a6000000-0000-0000-0000-000000000001|0" ]] || fail "recovered account deletion claim mismatch: $claim_state"
+
+resume_phase="$("${psql_base[@]}" -Atc "
+begin;
+set local role myeongha_system_executor;
+select phase from public.internal_account_deletion_resume_state_v1(
+  'a2000000-0000-0000-0000-000000000001',
+  'a6000000-0000-0000-0000-000000000001',
+  '$recovery_lock_owner'
+);
+commit;
+")"
+[[ "$resume_phase" == "db_finalization_required" ]] || fail "recovered account deletion pre-finalizer phase mismatch: $resume_phase"
+
+finalizer_state="$("${psql_base[@]}" -Atc "
+begin;
+set local role myeongha_system_executor;
+select (finalized::int)||'|'||(replayed::int)||'|'||(auth_mapping_present::int)
+from public.internal_finalize_account_deletion_db_v1(
+  'a2000000-0000-0000-0000-000000000001',
+  'a6000000-0000-0000-0000-000000000001',
+  '$recovery_lock_owner'
+);
+commit;
+")"
+[[ "$finalizer_state" == "1|0|1" ]] || fail "recovered DB finalizer mismatch: $finalizer_state"
+pass "recovered database executes governed account-deletion finalizer"
+
+post_db_phase="$("${psql_base[@]}" -Atc "
+begin;
+set local role myeongha_system_executor;
+select phase from public.internal_account_deletion_resume_state_v1(
+  'a2000000-0000-0000-0000-000000000001',
+  'a6000000-0000-0000-0000-000000000001',
+  '$recovery_lock_owner'
+);
+commit;
+")"
+[[ "$post_db_phase" == "auth_deletion_required" ]] || fail "recovered post-DB phase mismatch: $post_db_phase"
+
+# Hosted Auth deletion mechanics are separately proven by hosted canary 35522208400.
+# This isolated drill only simulates provider ACK by removing its synthetic restored auth row.
+"${psql_base[@]}" -c "delete from auth.users where id='a1000000-0000-0000-0000-000000000001';" >/dev/null
+
+post_auth_phase="$("${psql_base[@]}" -Atc "
+begin;
+set local role myeongha_system_executor;
+select phase from public.internal_account_deletion_resume_state_v1(
+  'a2000000-0000-0000-0000-000000000001',
+  'a6000000-0000-0000-0000-000000000001',
+  '$recovery_lock_owner'
+);
+commit;
+")"
+[[ "$post_auth_phase" == "completion_ack_required" ]] || fail "recovered post-Auth phase mismatch: $post_auth_phase"
+
+completion_state="$("${psql_base[@]}" -Atc "
+begin;
+set local role myeongha_system_executor;
+select (completed::int)||'|'||(replayed::int)
+from public.internal_complete_account_deletion_v1(
+  'a2000000-0000-0000-0000-000000000001',
+  'a6000000-0000-0000-0000-000000000001',
+  '$recovery_lock_owner'
+);
+commit;
+")"
+[[ "$completion_state" == "1|0" ]] || fail "recovered completion ACK mismatch: $completion_state"
+
+terminal_state="$("${psql_base[@]}" -Atc "
+select
+  (select status from public.subjects where id='a2000000-0000-0000-0000-000000000001')||'|'||
+  (select case when auth_user_id is null then 'NOAUTH' else 'AUTH' end from public.subjects where id='a2000000-0000-0000-0000-000000000001')||'|'||
+  (select count(*) from auth.users where id='a1000000-0000-0000-0000-000000000001')||'|'||
+  (select count(*) from public.profiles where subject_id='a2000000-0000-0000-0000-000000000001')||'|'||
+  (select count(*) from public.readings where subject_id='a2000000-0000-0000-0000-000000000001')||'|'||
+  (select count(*) from public.share_artifacts where subject_id='a2000000-0000-0000-0000-000000000001')||'|'||
+  (select count(*) from public.device_installations where subject_id='a2000000-0000-0000-0000-000000000001')||'|'||
+  (select count(*) from public.notifications where subject_id='a2000000-0000-0000-0000-000000000001')||'|'||
+  (select count(*) from public.memory_items where subject_id='a2000000-0000-0000-0000-000000000001')||'|'||
+  (select count(*) from public.life_facts where subject_id='a2000000-0000-0000-0000-000000000001')||'|'||
+  (select status from public.data_deletion_jobs where id='a6000000-0000-0000-0000-000000000001')||'|'||
+  (select status from public.outbox_events where id='a7000000-0000-0000-0000-000000000001');
+")"
+[[ "$terminal_state" == "deleted|NOAUTH|0|0|0|0|0|0|0|0|completed|processed" ]] || fail "recovered terminal privacy state mismatch: $terminal_state"
+
+commerce_state="$("${psql_base[@]}" -Atc "
+select count(*)||'|'||status||'|'||case when revoked_at is null then 'NO' else 'YES' end
+from public.commerce_account_links
+where id='a8600000-0000-0000-0000-000000000001'
+group by status,revoked_at;
+")"
+[[ "$commerce_state" == "1|revoked|YES" ]] || fail "recovered Commerce retention mismatch: $commerce_state"
+pass "recovered state cannot resurrect personalization/access while approved Commerce evidence remains revoked"
+
+completed_phase="$("${psql_base[@]}" -Atc "
+begin;
+set local role myeongha_system_executor;
+select phase from public.internal_account_deletion_resume_state_v1(
+  'a2000000-0000-0000-0000-000000000001',
+  'a6000000-0000-0000-0000-000000000001',
+  '$recovery_lock_owner'
+);
+commit;
+")"
+[[ "$completed_phase" == "completed" ]] || fail "recovered completed phase mismatch: $completed_phase"
+
+completion_replay="$("${psql_base[@]}" -Atc "
+begin;
+set local role myeongha_system_executor;
+select (completed::int)||'|'||(replayed::int)
+from public.internal_complete_account_deletion_v1(
+  'a2000000-0000-0000-0000-000000000001',
+  'a6000000-0000-0000-0000-000000000001',
+  '$recovery_lock_owner'
+);
+commit;
+")"
+[[ "$completion_replay" == "1|1" ]] || fail "recovered completion replay mismatch: $completion_replay"
+pass "recovered account deletion completion converges idempotently"
 
 node - "$report" <<'NODE'
 import { readFile } from 'node:fs/promises';
@@ -354,6 +545,10 @@ const evidence = {
   authoritative_source_scope: 'captured-window-only',
   authoritative_privacy_reconciliation: false,
   future_safe_privacy_reconciliation: false,
+  recovered_state_finalization: 'synthetic-isolated-pass',
+  hosted_auth_provider_ack: 'synthetic-row-removal-only-hosted-canary-35522208400-separate',
+  personalization_access_resurrection_guard: 'pass',
+  commerce_p5y_retention_guard: 'pass',
   replay_event_count: report.eventCount,
   event_type_counts: report.eventTypeCounts,
   replay_result: 'pass',
