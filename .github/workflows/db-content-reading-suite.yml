@@ -81,7 +81,7 @@ jobs:
       PGDATABASE: myeongha_test
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Install PostgreSQL client
-        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Verify PostgreSQL client
+        run: psql --version
       - name: Run DB regression case
         run: bash test/db/run_ci_case.sh "${{ matrix.case }}"
