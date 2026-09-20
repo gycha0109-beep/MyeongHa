@@ -155,7 +155,10 @@ for (const fragment of [
 
 for (const fragment of [
   'synthetic_fixture: true',
-  'authoritative_post_backup_source: false',
+  'authoritative_post_backup_source: true',
+  "authoritative_source_scope: 'captured-window-only'",
+  'authoritative_privacy_reconciliation: false',
+  'future_safe_privacy_reconciliation: false',
   "replay_result: 'pass'",
   "second_identical_replay: 'idempotent-pass'",
   "negative_terminal_state_guard: 'fail-closed-pass'",
