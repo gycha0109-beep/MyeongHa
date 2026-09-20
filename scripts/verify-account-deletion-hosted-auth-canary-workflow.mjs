@@ -3,12 +3,15 @@ import { readFile } from 'node:fs/promises';
 const workflowPath =
   '.github/workflows/account-deletion-hosted-auth-canary.yml';
 const canaryPath = 'scripts/run-account-deletion-hosted-auth-canary.mjs';
+const keySelectionPath =
+  'scripts/account-deletion-hosted-auth-canary-key-selection.mjs';
 const deletionAdapterPath =
   'apps/api/src/supabase-auth-admin-user-deletion.ts';
 
-const [workflow, canary, deletionAdapter] = await Promise.all([
+const [workflow, canary, keySelection, deletionAdapter] = await Promise.all([
   readFile(workflowPath, 'utf8'),
   readFile(canaryPath, 'utf8'),
+  readFile(keySelectionPath, 'utf8'),
   readFile(deletionAdapterPath, 'utf8'),
 ]);
 
@@ -43,7 +46,12 @@ requireMatch(
 requireMatch(
   workflow,
   /MYEONGHA_SUPABASE_AUTH_ADMIN_SECRET:\s*\$\{\{\s*secrets\.MYEONGHA_SUPABASE_AUTH_ADMIN_SECRET\s*\}\}/u,
-  'Hosted Auth canary must receive the privileged Auth secret only from GitHub secrets.',
+  'Hosted Auth canary explicit Auth secret must come only from GitHub secrets.',
+);
+requireMatch(
+  workflow,
+  /SUPABASE_ACCESS_TOKEN:\s*\$\{\{\s*secrets\.SUPABASE_ACCESS_TOKEN\s*\}\}/u,
+  'Hosted Auth canary Management fallback must use the governed GitHub production Supabase access token.',
 );
 requireMatch(
   workflow,
@@ -68,13 +76,45 @@ requireMatch(
 );
 requireMatch(
   canary,
+  /account-deletion-hosted-auth-canary-key-selection\.mjs/u,
+  'Canary must use the fail-closed Management API key selector.',
+);
+requireMatch(
+  canary,
   /createSupabaseAuthAdminCredentialHeadersV1/u,
   'Canary creation and deletion must share the governed provider credential-header policy.',
 );
 requireMatch(
   canary,
-  /ADMIN_SECRET_MISSING/u,
-  'Canary must fail closed with a bounded missing-secret diagnostic.',
+  /https:\/\/api\.supabase\.com/u,
+  'Canary Management fallback must pin the official Supabase Management API origin.',
+);
+requireMatch(
+  canary,
+  /\/v1\/projects\/\$\{PROJECT_REF\}\/api-keys\?reveal=true/u,
+  'Canary may reveal API keys only for the exact governed project ref.',
+);
+const managementFallbackMatch = canary.match(
+  /async function resolveAdminSecret\(\) \{([\s\S]*?)\n\}\n\nasync function createDisposableHostedUser/u,
+);
+if (managementFallbackMatch === null) {
+  throw new Error('Canary must retain a bounded Management API key-resolution function.');
+}
+const managementFallback = managementFallbackMatch[1];
+requireMatch(
+  managementFallback,
+  /method:\s*'GET'/u,
+  'Canary Management API fallback must be read-only.',
+);
+rejectMatch(
+  managementFallback,
+  /method:\s*'(POST|PUT|PATCH|DELETE)'/u,
+  'Canary must not create, rotate, update, or delete Supabase project API keys.',
+);
+requireMatch(
+  canary,
+  /MANAGEMENT_ACCESS_TOKEN_MISSING_OR_INVALID/u,
+  'Canary must fail closed when the governed Management token is unavailable.',
 );
 requireMatch(
   canary,
@@ -113,8 +153,24 @@ rejectMatch(
 );
 rejectMatch(
   canary,
-  /console\.(log|error)\([^\n]*(syntheticEmail|createdUserId|authUserId|adminSecret)/u,
+  /console\.(log|error)\([^\n]*(syntheticEmail|createdUserId|authUserId|adminSecret|managementAccessToken|SUPABASE_ACCESS_TOKEN)/u,
   'Canary must not log identifiers or privileged credentials.',
+);
+
+requireMatch(
+  keySelection,
+  /entry\.type === 'secret'/u,
+  'Hosted Auth canary must prefer current Supabase secret keys.',
+);
+requireMatch(
+  keySelection,
+  /entry\.name === 'service_role'/u,
+  'Hosted Auth canary may fall back only to the legacy service_role key.',
+);
+requireMatch(
+  keySelection,
+  /MANAGEMENT_API_SECRET_KEY_AMBIGUOUS/u,
+  'Multiple unnamed current secret keys must fail closed.',
 );
 
 requireMatch(
@@ -129,10 +185,10 @@ requireMatch(
 );
 requireMatch(
   deletionAdapter,
-  /authorization:\s*`Bearer \$\{adminSecret\}`/u,
+  /authorization:[^\n]*Bearer/u,
   'Legacy service_role credentials must preserve the Bearer provider contract.',
 );
 
 console.log(
-  'MYEONGHA_HOSTED_AUTH_DELETE_CANARY_WORKFLOW_GOVERNANCE_PASS manual_only=true provider_only=true no_db_credentials=true credential_modes_pinned=true',
+  'MYEONGHA_HOSTED_AUTH_DELETE_CANARY_WORKFLOW_GOVERNANCE_PASS manual_only=true provider_only=true no_db_credentials=true credential_modes_pinned=true management_fallback_read_only=true',
 );
