@@ -10,15 +10,31 @@ apply_migrations() {
   done
 }
 
+isolated_template_db="myeongha_authority_core_template"
+
+cleanup_isolated_template() {
+  dropdb --if-exists "$isolated_template_db" >/dev/null 2>&1 || true
+}
+trap cleanup_isolated_template EXIT
+
+ensure_isolated_template() {
+  if psql -Atqc "select 1 from pg_database where datname = '${isolated_template_db}'" | grep -qx '1'; then
+    return
+  fi
+
+  createdb "$isolated_template_db"
+  apply_migrations "$isolated_template_db"
+}
+
 run_isolated_case() {
   local db="$1"
   shift
   (
     set -euo pipefail
+    ensure_isolated_template
     dropdb --if-exists "$db" >/dev/null 2>&1 || true
-    createdb "$db"
+    createdb --template="$isolated_template_db" "$db"
     trap 'dropdb --if-exists "$db" >/dev/null 2>&1 || true' EXIT
-    apply_migrations "$db"
     PGDATABASE="$db" "$@"
   )
 }
