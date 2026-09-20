@@ -312,6 +312,54 @@ try {
   assert(sajuState.overflow <= 2, `Saju horizontal overflow: ${sajuState.overflow}px`);
   await artifact(client, '-saju');
 
+  await sleep(180);
+  const pickerOpen = await client.evaluate(`(() => {
+    const anchor = [...document.querySelectorAll('a[href^="reading-detail.html"]')]
+      .find((item) => item.getAttribute('href')?.includes('topic=temperament'));
+    if (!(anchor instanceof HTMLAnchorElement)) return { triggerFound: false };
+    anchor.click();
+    const dialog = document.querySelector('[data-reading-reader-picker]');
+    return {
+      triggerFound: true,
+      open: dialog instanceof HTMLDialogElement && dialog.open,
+      optionCount: dialog?.querySelectorAll('[data-reader-key]').length ?? 0,
+      demoBadge: dialog?.querySelector('[data-reader-key="baekheon"] [data-reader-demo-badge]')?.textContent?.trim() ?? '',
+      target: dialog?.querySelector('[data-reader-picker-target]')?.textContent?.trim() ?? '',
+    };
+  })()`);
+  assert(pickerOpen.triggerFound && pickerOpen.open, 'Saju Reading entry did not open the Reader picker');
+  assert(pickerOpen.optionCount === 9, `Saju Reader picker must expose nine Readers, got ${pickerOpen.optionCount}`);
+  assert(pickerOpen.demoBadge === '대표 시연', `Baekheon representative demo badge missing: ${pickerOpen.demoBadge}`);
+  await artifact(client, '-saju-reader-picker');
+
+  await client.evaluate(`(() => {
+    const button = document.querySelector('[data-reader-key="baekheon"]');
+    if (!(button instanceof HTMLButtonElement)) throw new Error('Baekheon Reader option missing');
+    button.click();
+    return true;
+  })()`);
+  await waitForPage(client, '/reading-detail.html', '.reading-route-state');
+  const selectedReaderRoute = await client.evaluate(`(() => {
+    const params = new URLSearchParams(location.search);
+    return {
+      pathname: location.pathname,
+      topic: params.get('topic'),
+      scope: params.get('scope'),
+      reader: params.get('reader'),
+      readerDataset: document.body.dataset.reader ?? '',
+      selectionDataset: document.body.dataset.readerSelection ?? '',
+      presentationDataset: document.body.dataset.readerPresentation ?? '',
+      readerName: document.querySelector('[data-reader-name]')?.textContent?.trim() ?? '',
+    };
+  })()`);
+  assert(selectedReaderRoute.topic === 'temperament' && selectedReaderRoute.scope === 'original', `Reader picker lost Reading route identity: ${JSON.stringify(selectedReaderRoute)}`);
+  assert(selectedReaderRoute.reader === 'baekheon', `Reader picker did not bind Baekheon into the URL: ${JSON.stringify(selectedReaderRoute)}`);
+  assert(selectedReaderRoute.readerDataset === 'baekheon' && selectedReaderRoute.selectionDataset === 'explicit', `Reading runtime did not consume explicit Reader selection: ${JSON.stringify(selectedReaderRoute)}`);
+  assert(selectedReaderRoute.presentationDataset === 'representative-demo' && selectedReaderRoute.readerName === '백헌', `Baekheon representative demo did not activate: ${JSON.stringify(selectedReaderRoute)}`);
+
+  await navigate(client, origin, '/reading.html', '#saju-empty');
+  await waitForVisible(client, '#saju-empty');
+
   await client.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
   await sleep(150);
   const mobileSaju = await client.evaluate(`(() => {

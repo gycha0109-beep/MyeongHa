@@ -6,7 +6,7 @@ const readingPagePath = new URL('../apps/web/src/reading-detail/ReadingDetailPag
 const readingCssPath = new URL('../apps/web/reading-v3.css', import.meta.url);
 const readingScenesCssPath = new URL('../apps/web/reading-scenes.css', import.meta.url);
 const readingRuntimePath = new URL('../apps/web/reading-character.js', import.meta.url);
-const baekheonScenePath = new URL('../apps/web/baekheon-reading-scene.jpg', import.meta.url);
+const baekheonScenePath = new URL('../apps/web/assets/characters/rooms/baekheon-room.webp', import.meta.url);
 
 async function readReadingMarkup() {
   const [html, page] = await Promise.all([readFile(readingHtmlPath, 'utf8'), readFile(readingPagePath, 'utf8')]);
@@ -61,6 +61,8 @@ describe('MyeongHa character-led Saju Reading v1', () => {
 
     expect(runtime).toContain("params.get('character') || params.get('reader')");
     expect(runtime).toContain('root.dataset.reader = readerKey');
+    expect(runtime).toContain("root.dataset.readerSelection = params.has('reader') || params.has('character') ? 'explicit' : 'default';");
+    expect(runtime).toContain("root.dataset.readerPresentation = readerKey === 'baekheon' ? 'representative-demo' : 'wired-preview';");
     expect(runtime).toContain('data-reader-hanja');
   });
 
@@ -137,7 +139,7 @@ describe('MyeongHa character-led Saju Reading v1', () => {
     ]);
 
     expect(sceneCss).toContain('body[data-reader="baekheon"] .reader-scene-art');
-    expect(sceneCss).toContain('url("baekheon-reading-scene.jpg")');
+    expect(sceneCss).toContain('url("assets/characters/rooms/baekheon-room.webp")');
     expect(sceneCss).toContain('other readers keep the shared');
     expect(baekheonScene.byteLength).toBeGreaterThan(10_000);
   });
