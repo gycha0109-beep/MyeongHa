@@ -95,6 +95,8 @@ create table public.standard_reading_official_bindings (
     check (btrim(domain_capability_version) <> ''),
   constraint standard_reading_official_binding_contract
     check (authority_contract_version = 'official-standard-reading-binding-v1'),
+  constraint standard_reading_official_binding_reading_subject_unique
+    unique (reading_id, subject_id),
   constraint standard_reading_official_identity_unique
     unique (
       subject_id,
@@ -176,8 +178,6 @@ create table public.standard_reading_reader_access_grants (
 comment on table public.standard_reading_reader_access_grants is
 'Purchase-backed per-Reader access authority. Refund/revoke/expiry is evaluated against this exact Entitlement Grant; aggregate entitlement is insufficient.';
 
-create unique index standard_reading_official_reading_subject_unique
-  on public.standard_reading_official_bindings(reading_id, subject_id);
 
 create index standard_reading_reader_access_subject_reader_idx
   on public.standard_reading_reader_access_grants(subject_id, reader_character_id, created_at desc);
