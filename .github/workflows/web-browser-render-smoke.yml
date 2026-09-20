@@ -3,20 +3,6 @@ name: Web Browser Smoke
 on:
   pull_request:
     paths:
-      - 'api/**'
-      - 'apps/web/**'
-      - 'packages/**'
-      - 'scripts/**'
-      - '!scripts/verify-production-*.mjs'
-      - '!scripts/run-production-*.sh'
-      - '!scripts/verify-postgres-*.mjs'
-      - '!scripts/run-postgres-*.sh'
-      - '!scripts/build-postgres-*.mjs'
-      - '!scripts/operations/**'
-      - 'package.json'
-      - 'package-lock.json'
-      - 'tsconfig*.json'
-      - 'vercel.json'
       - '.github/workflows/web-browser-render-smoke.yml'
   push:
     branches:
