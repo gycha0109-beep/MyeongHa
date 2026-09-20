@@ -310,6 +310,138 @@ select
 [[ "$("${psql_base[@]}" -Atc "select count(*) from public.outbox_events where id='a7000000-0000-0000-0000-000000000001';")" == "1" ]] || fail "second replay duplicated outbox event"
 pass "second identical replay is idempotent after subject becomes deletion_pending"
 
+claim_state="$("${psql_base[@]}" -Atc "
+begin;
+set local role myeongha_system_executor;
+select subject_id::text||'|'||deletion_job_id::text||'|'||(reclaimed::int)
+from public.internal_claim_account_deletion_outbox_v1(
+  'a7000000-0000-0000-0000-000000000001',
+  '$recovery_lock_owner',
+  clock_timestamp()+interval '10 minutes'
+);
+commit;
+")"
+[[ "$claim_state" == "a2000000-0000-0000-0000-000000000001|a6000000-0000-0000-0000-000000000001|0" ]] || fail "recovered account deletion claim mismatch: $claim_state"
+
+resume_phase="$("${psql_base[@]}" -Atc "
+begin;
+set local role myeongha_system_executor;
+select phase from public.internal_account_deletion_resume_state_v1(
+  'a2000000-0000-0000-0000-000000000001',
+  'a6000000-0000-0000-0000-000000000001',
+  '$recovery_lock_owner'
+);
+commit;
+")"
+[[ "$resume_phase" == "db_finalization_required" ]] || fail "recovered account deletion pre-finalizer phase mismatch: $resume_phase"
+
+finalizer_state="$("${psql_base[@]}" -Atc "
+begin;
+set local role myeongha_system_executor;
+select (finalized::int)||'|'||(replayed::int)||'|'||(auth_mapping_present::int)
+from public.internal_finalize_account_deletion_db_v1(
+  'a2000000-0000-0000-0000-000000000001',
+  'a6000000-0000-0000-0000-000000000001',
+  '$recovery_lock_owner'
+);
+commit;
+")"
+[[ "$finalizer_state" == "1|0|1" ]] || fail "recovered DB finalizer mismatch: $finalizer_state"
+pass "recovered database executes governed account-deletion finalizer"
+
+post_db_phase="$("${psql_base[@]}" -Atc "
+begin;
+set local role myeongha_system_executor;
+select phase from public.internal_account_deletion_resume_state_v1(
+  'a2000000-0000-0000-0000-000000000001',
+  'a6000000-0000-0000-0000-000000000001',
+  '$recovery_lock_owner'
+);
+commit;
+")"
+[[ "$post_db_phase" == "auth_deletion_required" ]] || fail "recovered post-DB phase mismatch: $post_db_phase"
+
+# Hosted Auth deletion mechanics are separately proven by hosted canary 35522208400.
+# This isolated drill only simulates provider ACK by removing its synthetic restored auth row.
+"${psql_base[@]}" -c "delete from auth.users where id='a1000000-0000-0000-0000-000000000001';" >/dev/null
+
+post_auth_phase="$("${psql_base[@]}" -Atc "
+begin;
+set local role myeongha_system_executor;
+select phase from public.internal_account_deletion_resume_state_v1(
+  'a2000000-0000-0000-0000-000000000001',
+  'a6000000-0000-0000-0000-000000000001',
+  '$recovery_lock_owner'
+);
+commit;
+")"
+[[ "$post_auth_phase" == "completion_ack_required" ]] || fail "recovered post-Auth phase mismatch: $post_auth_phase"
+
+completion_state="$("${psql_base[@]}" -Atc "
+begin;
+set local role myeongha_system_executor;
+select (completed::int)||'|'||(replayed::int)
+from public.internal_complete_account_deletion_v1(
+  'a2000000-0000-0000-0000-000000000001',
+  'a6000000-0000-0000-0000-000000000001',
+  '$recovery_lock_owner'
+);
+commit;
+")"
+[[ "$completion_state" == "1|0" ]] || fail "recovered completion ACK mismatch: $completion_state"
+
+terminal_state="$("${psql_base[@]}" -Atc "
+select
+  (select status from public.subjects where id='a2000000-0000-0000-0000-000000000001')||'|'||
+  (select case when auth_user_id is null then 'NOAUTH' else 'AUTH' end from public.subjects where id='a2000000-0000-0000-0000-000000000001')||'|'||
+  (select count(*) from auth.users where id='a1000000-0000-0000-0000-000000000001')||'|'||
+  (select count(*) from public.profiles where subject_id='a2000000-0000-0000-0000-000000000001')||'|'||
+  (select count(*) from public.readings where subject_id='a2000000-0000-0000-0000-000000000001')||'|'||
+  (select count(*) from public.share_artifacts where subject_id='a2000000-0000-0000-0000-000000000001')||'|'||
+  (select count(*) from public.device_installations where subject_id='a2000000-0000-0000-0000-000000000001')||'|'||
+  (select count(*) from public.notifications where subject_id='a2000000-0000-0000-0000-000000000001')||'|'||
+  (select count(*) from public.memory_items where subject_id='a2000000-0000-0000-0000-000000000001')||'|'||
+  (select count(*) from public.life_facts where subject_id='a2000000-0000-0000-0000-000000000001')||'|'||
+  (select status from public.data_deletion_jobs where id='a6000000-0000-0000-0000-000000000001')||'|'||
+  (select status from public.outbox_events where id='a7000000-0000-0000-0000-000000000001');
+")"
+[[ "$terminal_state" == "deleted|NOAUTH|0|0|0|0|0|0|0|0|completed|processed" ]] || fail "recovered terminal privacy state mismatch: $terminal_state"
+
+commerce_state="$("${psql_base[@]}" -Atc "
+select count(*)||'|'||status||'|'||case when revoked_at is null then 'NO' else 'YES' end
+from public.commerce_account_links
+where id='$commerce_link_id'
+group by status,revoked_at;
+")"
+[[ "$commerce_state" == "1|revoked|YES" ]] || fail "recovered Commerce retention mismatch: $commerce_state"
+pass "recovered state cannot resurrect personalization/access while approved Commerce evidence remains revoked"
+
+completed_phase="$("${psql_base[@]}" -Atc "
+begin;
+set local role myeongha_system_executor;
+select phase from public.internal_account_deletion_resume_state_v1(
+  'a2000000-0000-0000-0000-000000000001',
+  'a6000000-0000-0000-0000-000000000001',
+  '$recovery_lock_owner'
+);
+commit;
+")"
+[[ "$completed_phase" == "completed" ]] || fail "recovered completed phase mismatch: $completed_phase"
+
+completion_replay="$("${psql_base[@]}" -Atc "
+begin;
+set local role myeongha_system_executor;
+select (completed::int)||'|'||(replayed::int)
+from public.internal_complete_account_deletion_v1(
+  'a2000000-0000-0000-0000-000000000001',
+  'a6000000-0000-0000-0000-000000000001',
+  '$recovery_lock_owner'
+);
+commit;
+")"
+[[ "$completion_replay" == "1|1" ]] || fail "recovered completion replay mismatch: $completion_replay"
+pass "recovered account deletion completion converges idempotently"
+
 node - "$report" <<'NODE'
 import { readFile } from 'node:fs/promises';
 
@@ -413,6 +545,10 @@ const evidence = {
   authoritative_source_scope: 'captured-window-only',
   authoritative_privacy_reconciliation: false,
   future_safe_privacy_reconciliation: false,
+  recovered_state_finalization: 'synthetic-isolated-pass',
+  hosted_auth_provider_ack: 'synthetic-row-removal-only-hosted-canary-35522208400-separate',
+  personalization_access_resurrection_guard: 'pass',
+  commerce_p5y_retention_guard: 'pass',
   replay_event_count: report.eventCount,
   event_type_counts: report.eventTypeCounts,
   replay_result: 'pass',
