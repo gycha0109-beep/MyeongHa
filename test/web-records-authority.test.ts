@@ -64,6 +64,14 @@ describe('web records authority boundary', () => {
     expect(page).not.toContain('insertAdjacentHTML');
   });
 
+  it('opens the Saju records tab for an explicit Reading completion handoff', () => {
+    expect(page).toContain("const requestedTab = params.get('tab');");
+    expect(page).toContain("const fromReading = params.get('from') === 'reading';");
+    expect(page).toContain("requestedTab === 'saju' || fromReading");
+    expect(page).toContain("tab.id === 'saju-records-tab'");
+    expect(page).toContain("document.body.dataset.recordsEntry = fromReading ? 'reading-handoff' : 'saju-deeplink';");
+  });
+
   it('keeps memory grants separate instead of inventing an aggregate grant API', () => {
     expect(html).toContain('캐릭터마다 실제로 볼 수 있는 기억 범위는 서로 다를 수 있습니다.');
     expect(client).not.toContain('access-grants');

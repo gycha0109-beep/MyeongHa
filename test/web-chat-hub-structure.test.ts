@@ -8,6 +8,7 @@ const hubV2CssPath = new URL('../apps/web/conversation-v2.css', import.meta.url)
 const hubJsPath = new URL('../apps/web/chat-hub.js', import.meta.url);
 const roomHtmlPath = new URL('../apps/web/chat.html', import.meta.url);
 const roomPagePath = new URL('../apps/web/src/chat/ChatPage.tsx', import.meta.url);
+const roomRuntimePath = new URL('../apps/web/chat-character.js', import.meta.url);
 const homeHtmlPath = new URL('../apps/web/hall.html', import.meta.url);
 const homePagePath = new URL('../apps/web/src/home/HomePage.tsx', import.meta.url);
 const readingHtmlPath = new URL('../apps/web/reading.html', import.meta.url);
@@ -125,6 +126,20 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
     expect(home).toContain('href="chat-hub.html">대화로 가기 →</a>');
     expect(reading).toContain('href="chat-hub.html">대화</a>');
     expect(records).toContain('href="chat-hub.html">대화</a>');
+  });
+
+  it('accepts a validated Saju Reading handoff without pretending unrelated chat context', async () => {
+    const runtime = await readFile(roomRuntimePath, 'utf8');
+
+    expect(runtime).toContain("const READING_HANDOFF_STORAGE_KEY = 'myeongha.readingHandoff.v1';");
+    expect(runtime).toContain("params.get('from') !== 'reading'");
+    expect(runtime).toContain("if (stored.reader !== characterKey) return null;");
+    expect(runtime).toContain("if (queryTopic && stored.topic !== queryTopic) return null;");
+    expect(runtime).toContain("root.dataset.chatEntry = 'reading-handoff'");
+    expect(runtime).toContain("document.querySelector('[data-context-pill]')");
+    expect(runtime).toContain("document.querySelector('[data-thread-bar]')");
+    expect(runtime).toContain('readingHandoff,');
+    expect(runtime).toContain('읽기에서 이어왔군요.');
   });
 
   it('keeps My as the fifth active destination instead of falling back to Records', async () => {

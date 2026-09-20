@@ -405,7 +405,7 @@ function activatePreviewReading(preview) {
     if (readingSheet) readingSheet.dataset.readingCompleted = 'true';
     if (completion) completion.hidden = false;
     if (chatLink) chatLink.setAttribute('href', handoffUrl(`chat.html?character=${encodeURIComponent(readerKey)}`));
-    if (recordsLink) recordsLink.setAttribute('href', handoffUrl('records.html'));
+    if (recordsLink) recordsLink.setAttribute('href', handoffUrl('records.html?tab=saju'));
     try {
       sessionStorage.setItem('myeongha.readingHandoff.v1', JSON.stringify({
         reader: readerKey,
