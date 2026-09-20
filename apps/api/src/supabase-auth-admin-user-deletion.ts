@@ -98,6 +98,21 @@ function resolveAdminSecret(value: string): string {
   return value;
 }
 
+export function createSupabaseAuthAdminCredentialHeadersV1(
+  value: string,
+): Readonly<Record<string, string>> {
+  const adminSecret = resolveAdminSecret(value);
+  if (adminSecret.startsWith('sb_secret_')) {
+    return Object.freeze({
+      apikey: adminSecret,
+    });
+  }
+  return Object.freeze({
+    authorization: `Bearer ${adminSecret}`,
+    apikey: adminSecret,
+  });
+}
+
 function resolveTimeoutMs(value: number | undefined): number {
   const timeoutMs = value ?? SUPABASE_AUTH_ADMIN_USER_DELETE_DEFAULT_TIMEOUT_MS_V1;
   if (
@@ -205,14 +220,16 @@ async function deleteWithTimeout(input: {
   });
 
   try {
+    const credentialHeaders = createSupabaseAuthAdminCredentialHeadersV1(
+      input.adminSecret,
+    );
     return await Promise.race([
       input.fetchImpl(input.url, {
         method: 'DELETE',
         headers: Object.freeze({
           accept: 'application/json',
           'content-type': 'application/json',
-          authorization: `Bearer ${input.adminSecret}`,
-          apikey: input.adminSecret,
+          ...credentialHeaders,
         }),
         body: JSON.stringify({ should_soft_delete: false }),
         redirect: 'error',
