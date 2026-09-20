@@ -66,13 +66,13 @@ select
     'a7000000-0000-0000-0000-000000000002'
   )) +
   (select count(*) from public.characters where character_id='privacy-replay-character') +
-  (select count(*) from public.birth_profiles where id='$profile_id') +
-  (select count(*) from public.birth_profile_revisions where id='$revision_id') +
-  (select count(*) from public.reading_sessions where id='$reading_session_id') +
-  (select count(*) from public.readings where id='$reading_id') +
-  (select count(*) from public.share_artifacts where id='$share_id') +
-  (select count(*) from public.notifications where id='$notification_id') +
-  (select count(*) from public.commerce_account_links where id='$commerce_link_id');
+  (select count(*) from public.birth_profiles where id='a8000000-0000-0000-0000-000000000001') +
+  (select count(*) from public.birth_profile_revisions where id='a8100000-0000-0000-0000-000000000001') +
+  (select count(*) from public.reading_sessions where id='a8200000-0000-0000-0000-000000000001') +
+  (select count(*) from public.readings where id='a8300000-0000-0000-0000-000000000001') +
+  (select count(*) from public.share_artifacts where id='a8400000-0000-0000-0000-000000000001') +
+  (select count(*) from public.notifications where id='a8500000-0000-0000-0000-000000000001') +
+  (select count(*) from public.commerce_account_links where id='a8600000-0000-0000-0000-000000000001');
 ")"
 [[ "$collision_count" == "0" ]] || fail "synthetic privacy replay fixture collides with existing restored data"
 pass "synthetic privacy replay fixture identifiers are absent from target"
@@ -120,12 +120,12 @@ insert into public.profiles(subject_id,display_name,locale,timezone,onboarding_s
 values ('a2000000-0000-0000-0000-000000000001','RESTORED PII','ko','Asia/Seoul','done',clock_timestamp(),clock_timestamp());
 
 insert into public.birth_profiles(id,subject_id,profile_kind,label,current_revision_id,archived_at,created_at,updated_at)
-values ('$profile_id','a2000000-0000-0000-0000-000000000001','self','RESTORED BIRTH',null,null,clock_timestamp(),clock_timestamp());
+values ('a8000000-0000-0000-0000-000000000001','a2000000-0000-0000-0000-000000000001','self','RESTORED BIRTH',null,null,clock_timestamp(),clock_timestamp());
 
 insert into public.birth_profile_revisions(id,birth_profile_id,subject_id,revision_no,calendar_type,birth_date,birth_time,time_known,is_leap_month,sex,input_hash,created_at)
-values ('$revision_id','$profile_id','a2000000-0000-0000-0000-000000000001',1,'solar','1990-01-01','12:00',true,false,'male','sha256:privacy-recovery-birth',clock_timestamp());
+values ('a8100000-0000-0000-0000-000000000001','a8000000-0000-0000-0000-000000000001','a2000000-0000-0000-0000-000000000001',1,'solar','1990-01-01','12:00',true,false,'male','sha256:privacy-recovery-birth',clock_timestamp());
 
-update public.birth_profiles set current_revision_id='$revision_id' where id='$profile_id';
+update public.birth_profiles set current_revision_id='a8100000-0000-0000-0000-000000000001' where id='a8000000-0000-0000-0000-000000000001';
 
 insert into public.saju_domain_runtime(saju_domain,availability,capability_version,required_engine_version,updated_at)
 values ('general','available','privacy-recovery-v1',null,clock_timestamp())
@@ -136,21 +136,21 @@ set availability=excluded.availability,
     updated_at=excluded.updated_at;
 
 insert into public.reading_sessions(id,subject_id,saju_domain,domain_capability_version,source_birth_revision_id,target_birth_revision_id,state,next_attempt_no,current_reading_id,created_at,updated_at)
-values ('$reading_session_id','a2000000-0000-0000-0000-000000000001','general','privacy-recovery-v1','$revision_id',null,'active',2,null,clock_timestamp(),clock_timestamp());
+values ('a8200000-0000-0000-0000-000000000001','a2000000-0000-0000-0000-000000000001','general','privacy-recovery-v1','a8100000-0000-0000-0000-000000000001',null,'active',2,null,clock_timestamp(),clock_timestamp());
 
 insert into public.readings(id,reading_session_id,subject_id,saju_domain,attempt_no,parent_reading_id,source_turn_id,requested_thread_character_id,requested_character_id,requested_character_content_bundle_id,execution_status,request_idempotency_key,request_hash,request_contract_version,request_snapshot_jsonb,next_execution_attempt_no,committed_execution_attempt_id,created_at,completed_at)
-values ('$reading_id','$reading_session_id','a2000000-0000-0000-0000-000000000001','general',1,null,null,null,null,null,'pending','privacy-recovery-reading','sha256:privacy-recovery-reading','reading-request-v1','{}'::jsonb,1,null,clock_timestamp(),null);
+values ('a8300000-0000-0000-0000-000000000001','a8200000-0000-0000-0000-000000000001','a2000000-0000-0000-0000-000000000001','general',1,null,null,null,null,null,'pending','privacy-recovery-reading','sha256:privacy-recovery-reading','reading-request-v1','{}'::jsonb,1,null,clock_timestamp(),null);
 
-update public.reading_sessions set current_reading_id='$reading_id' where id='$reading_session_id';
+update public.reading_sessions set current_reading_id='a8300000-0000-0000-0000-000000000001' where id='a8200000-0000-0000-0000-000000000001';
 
 insert into public.share_artifacts(id,subject_id,reading_id,public_token_hash,artifact_version,snapshot_jsonb,snapshot_hash,status,expires_at,revoked_at,created_at)
-values ('$share_id','a2000000-0000-0000-0000-000000000001','$reading_id','sha256:privacy-recovery-share','share-v1','{"synthetic":true}'::jsonb,'sha256:privacy-recovery-snapshot','active',null,null,clock_timestamp());
+values ('a8400000-0000-0000-0000-000000000001','a2000000-0000-0000-0000-000000000001','a8300000-0000-0000-0000-000000000001','sha256:privacy-recovery-share','share-v1','{"synthetic":true}'::jsonb,'sha256:privacy-recovery-snapshot','active',null,null,clock_timestamp());
 
 insert into public.notifications(id,subject_id,category,character_id,content_bundle_id,source_world_event_id,template_key,payload_jsonb,dedupe_key,status,scheduled_at,read_at,created_at)
-values ('$notification_id','a2000000-0000-0000-0000-000000000001','service_notice',null,null,null,'privacy-recovery','{"synthetic":true}'::jsonb,'privacy-recovery-notification','ready',clock_timestamp(),null,clock_timestamp());
+values ('a8500000-0000-0000-0000-000000000001','a2000000-0000-0000-0000-000000000001','service_notice',null,null,null,'privacy-recovery','{"synthetic":true}'::jsonb,'privacy-recovery-notification','ready',clock_timestamp(),null,clock_timestamp());
 
 insert into public.commerce_account_links(id,subject_id,provider,external_account_fingerprint,status,verified_at,revoked_at,created_at)
-values ('$commerce_link_id','a2000000-0000-0000-0000-000000000001','privacy-recovery','sha256:privacy-recovery-commerce','active',clock_timestamp(),null,clock_timestamp());
+values ('a8600000-0000-0000-0000-000000000001','a2000000-0000-0000-0000-000000000001','privacy-recovery','sha256:privacy-recovery-commerce','active',clock_timestamp(),null,clock_timestamp());
 
 insert into public.data_deletion_jobs(
   id,subject_id,scope,target_resource_type,target_resource_id,request_dedupe_key,status,
@@ -410,7 +410,7 @@ select
 commerce_state="$("${psql_base[@]}" -Atc "
 select count(*)||'|'||status||'|'||case when revoked_at is null then 'NO' else 'YES' end
 from public.commerce_account_links
-where id='$commerce_link_id'
+where id='a8600000-0000-0000-0000-000000000001'
 group by status,revoked_at;
 ")"
 [[ "$commerce_state" == "1|revoked|YES" ]] || fail "recovered Commerce retention mismatch: $commerce_state"
