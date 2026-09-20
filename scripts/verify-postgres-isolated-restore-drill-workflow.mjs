@@ -66,12 +66,17 @@ for (const fragment of [
   'uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7',
   'artifact-ids: ${{ steps.source.outputs.artifact_id }}',
   'run: bash scripts/run-postgres-isolated-restore-drill.sh',
+  'Exercise synthetic privacy reconciliation and finalization on restored database',
   'run: bash scripts/operations/run-restored-postgres-privacy-drill.sh',
   'run: bash scripts/operations/build-postgres-restore-evidence.sh',
   'uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7',
   '${{ runner.temp }}/restore-evidence/restore-evidence.json',
   '${{ runner.temp }}/restore-evidence/privacy-reconciliation-evidence.json',
   'retention-days: 30',
+  "echo 'synthetic_privacy_reconciliation_mechanics=replay_and_finalization_exercised_on_restored_db'",
+  "echo 'privacy_reconciliation=synthetic_captured_window_authority_mechanics_only'",
+  "echo 'hosted_auth_provider_ack=synthetic_only_real_provider_proven_separately'",
+  "echo 'authoritative_privacy_reconciliation=not_yet_proven_with_production_nonzero_ledger'",
   "echo 'dr_ready=false'",
 ]) {
   if (!workflow.includes(fragment)) {
