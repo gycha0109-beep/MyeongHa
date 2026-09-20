@@ -66,7 +66,9 @@ export async function prepareCharacterStandardReadingChatContextV1(
   assertNoCallerSajuContext(input.contextInput);
 
   const source = await resolveCharacterStandardReadingKnowledgeV1({
-    resolvedSubjectId: input.resolvedSubjectId,
+    ...(input.resolvedSubjectId === undefined
+      ? {}
+      : { resolvedSubjectId: input.resolvedSubjectId }),
     readerCharacterId: input.readerCharacterId,
     readingId: input.readingId,
     effectiveAt: input.effectiveAt,
