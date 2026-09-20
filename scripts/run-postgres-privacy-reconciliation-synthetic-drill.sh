@@ -162,8 +162,16 @@ import { readFile } from 'node:fs/promises';
 const summary = JSON.parse(await readFile(process.argv[2], 'utf8'));
 if (summary.eventCount !== 4) throw new Error('non-zero ledger fixture eventCount mismatch');
 if (summary.replayPlannerAccepted !== true) throw new Error('ledger replay planner did not accept non-zero fixture');
+if (summary.sourceAuthorityClass !== 'AUTHORITATIVE_CAPTURED_WINDOW_V1') {
+  throw new Error('ledger source authority class mismatch');
+}
+if (summary.authoritativeCoverageThrough !== summary.capturedAt) {
+  throw new Error('ledger coverage-through must equal capturedAt');
+}
+if (summary.candidateSourceAuthority !== false || summary.authoritativePostBackupSource !== true) {
+  throw new Error('ledger captured-window source authority flags mismatch');
+}
 for (const field of [
-  'authoritativePostBackupSource',
   'authoritativePrivacyReconciliation',
   'futureSafePrivacyReconciliation',
   'drReady',
@@ -171,7 +179,7 @@ for (const field of [
   if (summary[field] !== false) throw new Error(field + ' must remain false');
 }
 NODE
-pass "production ledger builder accepts non-zero replay-supported fixture without authority promotion"
+pass "production ledger builder accepts non-zero fixture as bounded captured-window source authority"
 
 manifest_sha256="$(sha256sum "$manifest" | awk '{print $1}')"
 roundtrip_passphrase="$(openssl rand -hex 32)"
@@ -342,7 +350,10 @@ const evidence = {
   backup_completed_at_utc: backupCompletedAtUtc,
   execution_target: 'isolated-restored-postgres',
   synthetic_fixture: true,
-  authoritative_post_backup_source: false,
+  authoritative_post_backup_source: true,
+  authoritative_source_scope: 'captured-window-only',
+  authoritative_privacy_reconciliation: false,
+  future_safe_privacy_reconciliation: false,
   replay_event_count: report.eventCount,
   event_type_counts: report.eventTypeCounts,
   replay_result: 'pass',
