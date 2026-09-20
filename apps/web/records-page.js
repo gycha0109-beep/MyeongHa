@@ -98,6 +98,17 @@ function setupTabs() {
       activate(next);
     });
   });
+
+  const params = new URLSearchParams(window.location.search);
+  const requestedTab = params.get('tab');
+  const fromReading = params.get('from') === 'reading';
+  if (requestedTab === 'saju' || fromReading) {
+    const sajuTab = tabs.find((tab) => tab.id === 'saju-records-tab');
+    if (sajuTab) {
+      activate(sajuTab);
+      document.body.dataset.recordsEntry = fromReading ? 'reading-handoff' : 'saju-deeplink';
+    }
+  }
 }
 
 function renderProfile(payload) {
