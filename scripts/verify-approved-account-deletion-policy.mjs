@@ -8,7 +8,7 @@ import {
 const authorityReference =
   'https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582';
 const expectedGraphFingerprint =
-  'b118816bec5cc0291509a120b4121cb75abde087156dc8742b6d11aae6b3c325';
+  '092b21034cd6c44f6f90561f1296059e1e163866d33d6f700f305cfc71ac2002';
 
 const [policyText, dispositionText, graphText, decisions, drStatus] = await Promise.all([
   readFile('docs/operations/ACCOUNT_DELETION_FINALIZATION_POLICY_V1.json', 'utf8'),
@@ -117,14 +117,14 @@ if (disposition.graphRef.fingerprintSha256 !== expectedGraphFingerprint) {
 
 const report = evaluateAccountDeletionDispositionContract(disposition, graph);
 for (const [field, expected] of [
-  ['graphEdgeCount', 113],
-  ['graphReachableTableCount', 49],
-  ['coveredEdgeCount', 113],
-  ['coveredTableCount', 49],
+  ['graphEdgeCount', 125],
+  ['graphReachableTableCount', 52],
+  ['coveredEdgeCount', 125],
+  ['coveredTableCount', 52],
   ['unresolvedTableCount', 0],
   ['unresolvedEdgeCount', 0],
   ['dependencyConflictCount', 0],
-  ['explicitConflictResolutionCount', 32],
+  ['explicitConflictResolutionCount', 36],
   ['policyReady', true],
   ['executionAuthorized', true],
   ['executionPlanAllowed', true],
@@ -150,8 +150,8 @@ for (const entry of disposition.tableDispositions) {
     fail('non-retained table must not carry retention duration: ' + entry.table);
   }
 }
-if (!sameJson(counts, { DELETE: 36, ANONYMIZE: 4, RETAIN: 9 })) {
-  fail('approved 36/4/9 disposition split drifted: ' + JSON.stringify(counts));
+if (!sameJson(counts, { DELETE: 39, ANONYMIZE: 4, RETAIN: 9 })) {
+  fail('approved 39/4/9 disposition split drifted: ' + JSON.stringify(counts));
 }
 
 for (const resolution of disposition.edgeConflictResolutions) {
@@ -169,8 +169,8 @@ for (const resolution of disposition.edgeConflictResolutions) {
 }
 
 const plan = buildAccountDeletionExecutionPlan(disposition, graph);
-if (plan.stepCount !== 49 || plan.destructiveSqlGenerated !== false || plan.sql !== null) {
-  fail('approved structured plan must cover 48 tables and remain non-SQL');
+if (plan.stepCount !== 52 || plan.destructiveSqlGenerated !== false || plan.sql !== null) {
+  fail('approved structured plan must cover 52 tables and remain non-SQL');
 }
 if (plan.graphFingerprintSha256 !== expectedGraphFingerprint) {
   fail('structured plan lost the approved graph fingerprint');
@@ -205,5 +205,5 @@ for (const fragment of [
 }
 
 console.log(
-  'Approved account deletion policy PASS: P0-PR-01 is DECIDED, 49/49 tables map to DELETE 36 / ANONYMIZE 4 / RETAIN 9, 32 mixed FK edges are explicitly planned, retained Commerce uses calendar P5Y, structured plan generation is allowed, and destructive SQL / privacy reconciliation / DR promotion remain blocked.',
+  'Approved account deletion policy PASS: P0-PR-01 is DECIDED, 52/52 tables map to DELETE 39 / ANONYMIZE 4 / RETAIN 9, 36 mixed FK edges are explicitly planned, retained Commerce uses calendar P5Y, structured plan generation is allowed, and destructive SQL / privacy reconciliation / DR promotion remain blocked.',
 );

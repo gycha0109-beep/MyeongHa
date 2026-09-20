@@ -18,8 +18,8 @@ docs/operations/ACCOUNT_DELETION_DISPOSITION_INPUT_CANDIDATE_V1.json
 Historical pre-approval candidate state:
 
 ```text
-reachable FK edges          = 113
-reachable tables            = 49
+reachable FK edges          = 125
+reachable tables            = 52
 max minimum depth           = 4
 all table dispositions      = UNDECIDED
 P0-PR-01                    = OPEN-P0
@@ -48,9 +48,9 @@ These names are slots for an owner-approved policy. Their presence in this contr
 
 Therefore:
 
-- every one of the 49 reachable tables must have exactly one disposition entry;
+- every one of the 52 reachable tables must have exactly one disposition entry;
 - unknown, duplicate, or omitted tables fail closed;
-- every one of the 113 reachable FK edges must map to a covered child table;
+- every one of the 125 reachable FK edges must map to a covered child table;
 - graph identity/count drift fails closed.
 
 ## Dependency conflict invariant
