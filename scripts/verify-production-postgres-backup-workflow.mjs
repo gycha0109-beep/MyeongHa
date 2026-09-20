@@ -105,7 +105,7 @@ if (!(encryptIndex < plaintextDeleteIndex && runnerStepIndex < uploadIndex)) {
 }
 
 const requiredRunbookFragments = [
-  'BACKUP PRODUCTION-PROVEN',
+  'CURRENT-FRONTIER BACKUP PROVEN',
   'Current Supabase organization plan: `free`',
   'PITR',
   'NOT AVAILABLE UNDER THE CURRENT FREE-PLAN OPERATING BASELINE',
