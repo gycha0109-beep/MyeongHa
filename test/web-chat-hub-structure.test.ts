@@ -84,7 +84,11 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
     expect(js).toContain("image.className = 'chat-person-art-image'");
     expect(hubCss).toContain('background-image: none !important');
     expect(hubCss).toContain('.chat-person-art-image');
-    expect(hubCss).toContain('--portrait-scale');
+    expect(hubCss).not.toContain('--portrait-scale');
+    expect(hubCss).not.toContain('transform: scale(var(--portrait-scale');
+    expect(js).not.toContain('portrait.position');
+    expect(js).not.toContain('portrait.scale');
+    expect(js).not.toContain('portrait.origin');
     expect(hubCss).toContain('html[data-theme="dark"] body.chat-hub-page .chat-person-tag');
   });
 

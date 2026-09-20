@@ -716,8 +716,8 @@ html[data-theme="dark"] body.chat-hub-page .chat-person-tag {
 /*
  * Canonical representative-art mapping.
  * Card artwork is rendered as an <img> so legacy background-image rules cannot
- * override the finalized 1:1 character mapping. Per-character crop metadata
- * lives in chat-hub.js; the canonical portrait files remain unchanged.
+ * override the finalized 1:1 character mapping. Final crop composition lives
+ * in the portrait assets themselves; the hub must not re-crop or zoom them.
  */
 .chat-person-art[data-character] {
   place-items: center;
@@ -752,9 +752,7 @@ html[data-theme="dark"] body.chat-hub-page .chat-person-tag {
   height: 100%;
   max-width: none;
   object-fit: cover;
-  object-position: var(--portrait-position, 50% 22%);
-  transform: scale(var(--portrait-scale, 1.5));
-  transform-origin: var(--portrait-origin, 50% 22%);
+  object-position: 50% 50%;
   pointer-events: none;
   user-select: none;
 }
