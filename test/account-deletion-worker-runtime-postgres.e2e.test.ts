@@ -20,6 +20,7 @@ const JOB_ID = 'fe800000-0000-4000-8000-000000000001';
 const OUTBOX_ID = 'fe810000-0000-4000-8000-000000000001';
 const WRONG_OUTBOX_ID = 'fe810000-0000-4000-8000-000000000002';
 const WRONG_JOB_ID = 'fe800000-0000-4000-8000-000000000002';
+const WRONG_SUBJECT_ID = 'fe200000-0000-4000-8000-000000000099';
 const LOCK_OWNER = 'account-deletion-runtime-e2e';
 const WORKER_PASSWORD = 'worker-e2e-secret';
 
@@ -88,7 +89,7 @@ suite('account deletion concrete worker PostgreSQL E2E', () => {
          jsonb_build_object('deletionJobId',$2::uuid,'subjectId',$3::uuid,'scope','account'),
          'pending',0,clock_timestamp(),clock_timestamp()
        )`,
-      [WRONG_OUTBOX_ID, WRONG_JOB_ID, SUBJECT_ID],
+      [WRONG_OUTBOX_ID, WRONG_JOB_ID, WRONG_SUBJECT_ID],
     );
 
     const workerUrl =
