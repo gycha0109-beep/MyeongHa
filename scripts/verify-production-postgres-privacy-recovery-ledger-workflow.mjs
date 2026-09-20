@@ -126,7 +126,7 @@ for (const fragment of [
   'authoritative post-backup privacy source **only for its explicit captured window**',
   'incident_reference_utc <= authoritative_coverage_through',
   'hourly capture cadence is operational mechanics only',
-  'promoted authoritative workflow runtime  = PENDING POST-MERGE CAPTURE',
+  'promoted authoritative workflow runtime  = PROVEN — run 35531005587 / artifact 10610943814',
   'DR Ready                                 = false',
 ]) {
   requireFragment('authority', fragment);
@@ -141,7 +141,11 @@ for (const fragment of [
 }
 
 for (const fragment of [
-  'authoritative_post_backup_source: false',
+  'privacy_recovery_ledger_run_id: 35531005587',
+  'privacy_recovery_ledger_authority_class: AUTHORITATIVE_CAPTURED_WINDOW_V1',
+  'authoritative_post_backup_source: true_bounded_captured_window_only',
+  'authoritative_privacy_reconciliation: false',
+  'future_safe_privacy_reconciliation: false',
   'rpo_authority: OPEN_DECISION',
   'rto_authority: OPEN_DECISION',
   'dr_ready: false',
