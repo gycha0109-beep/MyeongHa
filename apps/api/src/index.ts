@@ -616,3 +616,21 @@ export {
   type RunAccountDeletionOutboxEventInputV1,
   type RunAccountDeletionOutboxEventResultV1,
 } from './production-account-deletion-worker-runtime.js';
+
+export {
+  CHARACTER_STANDARD_READING_ACCESS_AUTHORITY_BINDING_V1,
+  CHARACTER_STANDARD_READING_ARTIFACT_SOURCE_AUTHORITY_BINDING_V1,
+  CharacterStandardReadingKnowledgeAuthorityPortErrorV1,
+  resolveCharacterStandardReadingKnowledgeV1,
+  type CharacterStandardReadingAccessAuthorityPortV1,
+  type CharacterStandardReadingAccessAuthorityRowV1,
+  type CharacterStandardReadingArtifactAuthorityPortV1,
+  type CharacterStandardReadingArtifactAuthorityRowV1,
+  type CharacterStandardReadingKnowledgeAuthorityFailureCodeV1,
+  type CharacterStandardReadingKnowledgeSourceV1,
+  type ResolveCharacterStandardReadingKnowledgeInputV1,
+} from './character-standard-reading-knowledge.js';
+
+export {
+  createPostgresCharacterStandardReadingKnowledgePortsV1,
+} from './postgres-character-standard-reading-knowledge.js';
