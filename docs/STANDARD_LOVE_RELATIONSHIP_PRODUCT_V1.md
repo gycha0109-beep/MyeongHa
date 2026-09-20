@@ -5,7 +5,7 @@
 > Status: **PRODUCT AUTHORITY DEFINED / LIST PRICE DECIDED / NOT SALEABLE / SAJU HOLD**  
 > Product key: `standard.love_relationship`  
 > Topic: **연애·관계**  
-> Reader: **구매/생성 시 선택한 Character**  
+> Reader: **구매 시 선택한 Character; 공식 Reading identity와 분리**  
 > Supersedes as current Product direction: `saju.general_natal.deep.v1` / KRW 9,900 historical inactive candidate
 
 ## 1. Decision
@@ -67,15 +67,15 @@ reading_variant = general
 
 This mapping is Product request authority only. It does not create Saju claims.
 
-## 3. Product / Reader separation
+## 3. Product / Official Reading / Reader separation
 
-The relational authority is stored in:
+The relational Product request authority remains stored in:
 
 ```text
 standard_reading_product_specs
 ```
 
-The current Product pins:
+The historical v1 Product spec still pins:
 
 ```text
 product_id            = 11300000-0000-0000-0000-000000000001
@@ -85,24 +85,40 @@ reader_selection_mode = required
 purchase_unit_mode    = topic_reader_reading
 ```
 
-A future Purchase Intent pins Reader identity sparsely in:
+That immutable field is preserved as historical provenance. It is **not** the current target Reading identity model.
+
+Migration `1210_official_standard_reading_reader_interpretation_authority.sql` overlays the current delivery policy:
 
 ```text
-purchase_intent_reader_selections
+reading_identity_mode       = official_subject_product_scope_birth_authority
+reader_interpretation_mode  = per_reader_purchase_grant
 ```
 
-Therefore:
+The target runtime is:
 
 ```text
 one Topic Product
 +
-one selected Reader
-+
-one Purchase Intent
-→ one Reader-bound paid Reading unit
+one exact reusable official Reading
+├─ Reader A Interpretation / Access
+├─ Reader B Interpretation / Access
+└─ Reader C Interpretation / Access
 ```
 
-No unused Topic × Reader matrix rows are pre-created.
+The official Reading is Reader-independent. Its reusable identity is pinned to:
+
+```text
+subject
+Product / topic
+Reading scope (domain / period / variant)
+immutable source Birth revision
+Product spec version
+domain capability version
+```
+
+Reader identity remains sparse purchase provenance in `purchase_intent_reader_selections`; it does not become part of the official Reading Source Truth.
+
+Historical `standard_reading_unit_bindings` and `cmd_bind_standard_reading_unit_v1` from #1090 remain immutable legacy lineage. New runtime work must use the v2 official-Reading authority rather than create another Reader-bound Reading.
 
 ## 4. Reader selection provenance
 
@@ -134,14 +150,12 @@ User-specific unlock/access checks for globally `unlockable` Characters are reso
 
 ## 5. Capability meaning
 
-The current Product Capability Set is defined before price/Offer activation:
+The current Product Capability Set remains the existing inactive pre-sale authority:
 
 ```text
 Capability Set:
   id: 11301000-0000-0000-0000-000000000001
   definition_version: v1
-  definition_hash:
-    sha256:2ac901096369a6ea38cd180dff9fcd078efdfccbfca17117d6c282d116f76524
 
 Capability Item:
   item_key: love-relationship-reader-reading-unit
@@ -150,30 +164,36 @@ Capability Item:
   validity_mode: unbounded
 ```
 
-Canonical hash material:
+The existing Capability identity is not silently redefined into Saju semantic authority.
 
-```json
-{"definitionVersion":"v1","items":[{"durationSeconds":null,"entitlementKey":"reading.standard.love_relationship.unit.v1","fixedScopeKey":null,"itemKey":"love-relationship-reader-reading-unit","scopeMode":"global","validityMode":"unbounded"}],"productKey":"standard.love_relationship"}
+For the v2 target model, an **exact purchase-backed Entitlement Grant** is consumed as Reader-access provenance:
+
+```text
+first eligible purchase
+→ create one official Reading if no exact reusable official Reading exists
+→ grant selected Reader Interpretation / Access
+
+additional eligible Reader purchase
+→ reuse committed official Reading
+→ create only selected Reader Interpretation / Access
+→ official Reading count does not increase
 ```
 
 Important:
 
-> The aggregate entitlement key alone is not permission to generate arbitrary Readers.
+> Aggregate entitlement alone is never sufficient for Reader Knowledge.
 
-The intended future generation authority is:
+Current access requires:
 
 ```text
-purchase-backed active grant
+exact official Reading
 +
-matching Purchase Intent Reader selection
+exact selected Reader
 +
-unconsumed/retry-eligible Reading unit
-+
-authorized Saju relationship Reading runtime
-→ create/bind Reading
+exact purchase-backed active Grant
 ```
 
-This preserves repeated purchases for different Readers without creating per-Reader SKUs.
+Refund/revoke/expiry of Reader A's exact Grant closes Reader A access only. It does not delete the official Reading and does not revoke Reader B.
 
 ## 6. Price / Offer state
 
@@ -262,45 +282,63 @@ Before sale activation:
 
 1. Saju production-authorized `relationship + natal/general` interpretation authority.
 2. Public Product Reading execution/finalization/grounding path.
-3. Application runtime adapter + user-specific Reader eligibility/access resolution over the existing fail-closed `cmd_create_standard_reading_purchase_intent_v4` atomic DB authority. **Application contract/resolver and production Reader read data-source are implemented fail-closed in #1075; v4 purchase-command EXECUTE grant and public route remain HOLD.**
-4. Verified Payment → purchase-backed Grant fulfillment for the exact Capability Set.
-5. Reader-bound unit → Reading artifact binding with retry-safe generation. **Merged PR #1090 implements the fail-closed binding: it accepts only `purchaseIntentId`, resolves the current self Birth Profile server-side, and binds one verified purchase-backed Grant to one pending Reading; command EXECUTE, public generation, transport/finalization, and Saju interpretation authority remain HOLD.**
-6. Owner-scoped immutable artifact reread. **#1098 adds an internal exact-purchase-Grant-gated stored-artifact source projection; raw ProductReadingResponse JSON remains unavailable to ordinary runtime roles until a consumer-safe source-authorized projection exists.**
-7. Existing Reading reference path for Character chat without granting a new Reading.
-8. Different Reader full re-analysis requiring a new Reader-bound purchase unit.
-9. Offer/charge-term materialization for the decided KRW 8,900 Product price.
-10. PortOne Sandbox E2E and refund/revoke behavior tests.
+3. Purchase runtime and Reader eligibility remain fail-closed as implemented in #1075; public purchase activation remains HOLD.
+4. Verified Payment → purchase-backed Grant fulfillment for the exact authorized Capability.
+5. **Official Reading + Reader Interpretation binding.** Migration 1210 and the v2 application/DB adapter implement the PR candidate: the first purchase may create one Reader-independent pending Reading; later Reader purchases reuse only a committed exact official Source Truth.
+6. **Reader-scoped artifact source.** #1099 v1 remains legacy internal provenance. New `internal_qry_standard_reading_artifact_source_v2` requires exact Reader access and exact active purchase Grant. Raw ProductReadingResponse remains unavailable to ordinary runtime roles.
+7. **Character Reader Knowledge.** `internal_qry_character_standard_reading_access_v1` returns only metadata for official Readings opened to that exact Character; it does not expose raw ProductReadingResponse.
+8. Additional Reader Interpretation UX/Commerce materialization after Product/Offer authority explicitly distinguishes initial Reading purchase from lower-priced additional Reader access. No price/Offer is activated by this document.
+9. Offer/charge-term materialization for the separately decided first-Reading list price only when Commerce activation authority permits it.
+10. PortOne Sandbox E2E and independent refund/revoke tests.
 
 ## 10. Hard invariants
 
 ```text
 Browser/SDK result != payment truth
 Verified Payment != Entitlement
-Entitlement aggregate != arbitrary Reader generation permission
+Entitlement aggregate != Reader Knowledge
 Entitlement != Saju semantic authority
 Product layer != Saju claim generator
 Product != Reader
+Official Reading = Saju Source Truth artifact
+Reader Interpretation = presentation / explanation artifact
 Reader personality != Source Truth
-Chat subscription != unpaid Reading entitlement
-Existing Reading reference != permission to generate a new Reader Reading
-Character private memory != global memory
+Additional Reader purchase != new official Reading generation
+Reader A access != Reader B access
+Reader refund/revoke != official Reading deletion
+Character Chat may read only official Readings opened to that exact Character
+Raw ProductReadingResponse != ordinary runtime payload
+Historical #1090/#1099 provenance != permission to revive Reader-bound Reading identity
+Character private memory != official Reading authority
 ```
 
 ## 11. Current verdict
 
 ```text
-CURRENT_FIRST_STANDARD_PRODUCT = standard.love_relationship
-PRODUCT_READER_SEPARATION      = DEFINED
-SPARSE_READER_SELECTION_SCHEMA = DEFINED
-LIST_PRICE_KRW                 = 8900
-PRICE_AUTHORITY                = DECIDED_PRODUCT_OWNER
-SALEABLE_OFFER                 = NO
-SAJU_RELATIONSHIP_AUTHORITY    = BLOCKED
-READER_PURCHASE_APP_ADAPTER   = IMPLEMENTED_FAIL_CLOSED
-READER_PRODUCTION_DATA_SOURCE = IMPLEMENTED_FAIL_CLOSED
-READER_UNIT_BINDING            = IMPLEMENTED_FAIL_CLOSED
-ARTIFACT_REREAD_SOURCE         = INTERNAL_FAIL_CLOSED
-PUBLIC_ARTIFACT_REREAD          = NO
-PUBLIC_PURCHASE_ROUTE          = NO
-PRODUCTION_ACTIVATION          = HOLD
+CURRENT_FIRST_STANDARD_PRODUCT       = standard.love_relationship
+PRODUCT_READER_SEPARATION            = DEFINED
+SPARSE_READER_SELECTION_SCHEMA       = DEFINED
+OFFICIAL_READING_IDENTITY            = PR_CANDIDATE_FAIL_CLOSED
+READER_INTERPRETATION_IDENTITY       = PR_CANDIDATE_FAIL_CLOSED
+READER_ACCESS_GRANT_AUTHORITY        = PR_CANDIDATE_FAIL_CLOSED
+CHARACTER_READER_KNOWLEDGE_SOURCE    = INTERNAL_PR_CANDIDATE_FAIL_CLOSED
+LEGACY_READER_BOUND_BINDING_1090     = PRESERVED_IMMUTABLE
+LEGACY_ARTIFACT_SOURCE_1099          = PRESERVED_INTERNAL
+LIST_PRICE_KRW                       = 8900
+PRICE_AUTHORITY                      = DECIDED_PRODUCT_OWNER
+ADDITIONAL_READER_PRICE_AUTHORITY    = NOT_MATERIALIZED
+SALEABLE_OFFER                       = NO
+SAJU_RELATIONSHIP_AUTHORITY          = BLOCKED
+PUBLIC_ARTIFACT_REREAD               = NO
+PUBLIC_PURCHASE_ROUTE                = NO
+PRODUCTION_ACTIVATION                = HOLD
 ```
+
+
+## Initial vs Additional Reader Offer authority
+
+- `standard_reading_offer_roles` is the server-owned authority that classifies an exact Product Offer as `initial_reading` or `additional_reader_interpretation`.
+- `initial_reading` may create the exact reusable Official Reading only when that identity does not already exist.
+- `additional_reader_interpretation` may never create an Official Reading. It requires an already committed reusable Official Reading and adds only the exact Reader interpretation/access provenance.
+- The role is not inferred from client input, Reader identity, aggregate entitlement, or whether a Reading happens to exist. The Offer-role row is immutable provenance.
+- This authority does not activate any real Offer, KRW price, payment rail, or Production Saju transport; those remain HOLD/out of scope.

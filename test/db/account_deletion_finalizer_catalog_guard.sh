@@ -52,6 +52,9 @@ insert into _ad_policy(table_name, disposition) values
   ('record_access_grants','DELETE'),
   ('relationship_events','DELETE'),
   ('share_artifacts','DELETE'),
+  ('standard_reading_official_bindings','DELETE'),
+  ('standard_reading_reader_access_grants','DELETE'),
+  ('standard_reading_reader_interpretations','DELETE'),
   ('standard_reading_unit_bindings','DELETE'),
   ('subject_merge_actions','ANONYMIZE'),
   ('subject_merge_jobs','ANONYMIZE'),
@@ -78,10 +81,10 @@ begin
     raise exception 'account deletion policy tables missing from migrated catalog: %', v_missing;
   end if;
 
-  if (select count(*) from _ad_policy where disposition='DELETE') <> 36
+  if (select count(*) from _ad_policy where disposition='DELETE') <> 39
      or (select count(*) from _ad_policy where disposition='ANONYMIZE') <> 4
      or (select count(*) from _ad_policy where disposition='RETAIN') <> 9
-     or (select count(*) from _ad_policy) <> 49 then
+     or (select count(*) from _ad_policy) <> 52 then
     raise exception 'account deletion policy cardinality drifted';
   end if;
 end
@@ -209,7 +212,7 @@ order by section, k1, k2, line;
 SQL
 
 actual="$(sha256sum "$catalog_file" | awk '{print $1}')"
-expected="2e1a47a17ee18d29320e679a4bcfccd7266aaa1740dac48eadc227210cec6362"
+expected="1414f1a8764d7d3f48127b3282594cbd78c43f3cd9f96d2a44b35daf3e7ffe97"
 
 echo "Account deletion finalizer catalog digest: $actual"
 

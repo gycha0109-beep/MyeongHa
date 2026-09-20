@@ -6,8 +6,8 @@
   "executionAuthorized": false,
   "graphRef": {
     "schema": "myeongha-transitive-subject-dependency-graph-v1",
-    "edgeCount": 113,
-    "distinctReachableTableCount": 49,
+    "edgeCount": 125,
+    "distinctReachableTableCount": 52,
     "maxDepth": 4
   },
   "tableDispositions": [
@@ -253,6 +253,24 @@
     },
     {
       "table": "share_artifacts",
+      "disposition": "UNDECIDED",
+      "authorityReference": null,
+      "retentionDurationDays": null
+    },
+    {
+      "table": "standard_reading_official_bindings",
+      "disposition": "UNDECIDED",
+      "authorityReference": null,
+      "retentionDurationDays": null
+    },
+    {
+      "table": "standard_reading_reader_access_grants",
+      "disposition": "UNDECIDED",
+      "authorityReference": null,
+      "retentionDurationDays": null
+    },
+    {
+      "table": "standard_reading_reader_interpretations",
       "disposition": "UNDECIDED",
       "authorityReference": null,
       "retentionDurationDays": null

@@ -5,14 +5,14 @@
   "graphAuthority": "SCHEMA_DISCOVERED_POLICY_NEUTRAL",
   "executionAuthorized": false,
   "discovery": {
-    "edgeCount": 113,
-    "distinctReachableTableCount": 49,
+    "edgeCount": 125,
+    "distinctReachableTableCount": 52,
     "maxDepth": 4,
     "depthCounts": {
       "1": 30,
-      "2": 38,
-      "3": 42,
-      "4": 3
+      "2": 44,
+      "3": 47,
+      "4": 4
     },
     "directDepthOneEdgeCount": 30
   },
@@ -478,6 +478,21 @@
     {
       "minDepth": 2,
       "parentTable": "birth_profiles",
+      "childTable": "standard_reading_official_bindings",
+      "constraintName": "standard_reading_official_binding_profile_subject_fk",
+      "childColumns": [
+        "source_birth_profile_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 2,
+      "parentTable": "birth_profiles",
       "childTable": "standard_reading_unit_bindings",
       "constraintName": "standard_reading_unit_bindings_source_profile_subject_fk",
       "childColumns": [
@@ -694,6 +709,32 @@
     {
       "minDepth": 2,
       "parentTable": "entitlement_grants",
+      "childTable": "standard_reading_official_bindings",
+      "constraintName": "standard_reading_official_binding_grant_fk",
+      "childColumns": [
+        "generation_entitlement_grant_id"
+      ],
+      "parentColumns": [
+        "id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 2,
+      "parentTable": "entitlement_grants",
+      "childTable": "standard_reading_reader_access_grants",
+      "constraintName": "standard_reading_reader_access_entitlement_fk",
+      "childColumns": [
+        "entitlement_grant_id"
+      ],
+      "parentColumns": [
+        "id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 2,
+      "parentTable": "entitlement_grants",
       "childTable": "standard_reading_unit_bindings",
       "constraintName": "standard_reading_unit_bindings_grant_fk",
       "childColumns": [
@@ -855,6 +896,36 @@
     {
       "minDepth": 2,
       "parentTable": "purchase_intents",
+      "childTable": "standard_reading_official_bindings",
+      "constraintName": "standard_reading_official_binding_purchase_subject_fk",
+      "childColumns": [
+        "generation_purchase_intent_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 2,
+      "parentTable": "purchase_intents",
+      "childTable": "standard_reading_reader_access_grants",
+      "constraintName": "standard_reading_reader_access_purchase_subject_fk",
+      "childColumns": [
+        "purchase_intent_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 2,
+      "parentTable": "purchase_intents",
       "childTable": "standard_reading_unit_bindings",
       "constraintName": "standard_reading_unit_bindings_purchase_subject_fk",
       "childColumns": [
@@ -881,6 +952,21 @@
         "id",
         "subject_id",
         "saju_domain"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 2,
+      "parentTable": "reading_sessions",
+      "childTable": "standard_reading_official_bindings",
+      "constraintName": "standard_reading_official_binding_session_subject_fk",
+      "childColumns": [
+        "reading_session_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
       ],
       "disposition": "UNDECIDED"
     },
@@ -1028,6 +1114,21 @@
       "constraintName": "reading_sessions_target_birth_subject_fk",
       "childColumns": [
         "target_birth_revision_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "birth_profile_revisions",
+      "childTable": "standard_reading_official_bindings",
+      "constraintName": "standard_reading_official_binding_revision_subject_fk",
+      "childColumns": [
+        "source_birth_revision_id",
         "subject_id"
       ],
       "parentColumns": [
@@ -1580,6 +1681,23 @@
     {
       "minDepth": 3,
       "parentTable": "readings",
+      "childTable": "standard_reading_official_bindings",
+      "constraintName": "standard_reading_official_binding_reading_session_subject_fk",
+      "childColumns": [
+        "reading_id",
+        "reading_session_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "reading_session_id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "readings",
       "childTable": "standard_reading_unit_bindings",
       "constraintName": "standard_reading_unit_bindings_reading_session_subject_fk",
       "childColumns": [
@@ -1590,6 +1708,49 @@
       "parentColumns": [
         "id",
         "reading_session_id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "standard_reading_official_bindings",
+      "childTable": "standard_reading_reader_access_grants",
+      "constraintName": "standard_reading_reader_access_official_subject_fk",
+      "childColumns": [
+        "official_reading_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "reading_id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "standard_reading_official_bindings",
+      "childTable": "standard_reading_reader_interpretations",
+      "constraintName": "standard_reading_reader_interpretation_official_fk",
+      "childColumns": [
+        "official_reading_id"
+      ],
+      "parentColumns": [
+        "reading_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "standard_reading_official_bindings",
+      "childTable": "standard_reading_reader_interpretations",
+      "constraintName": "standard_reading_reader_interpretation_official_subject_fk",
+      "childColumns": [
+        "official_reading_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "reading_id",
         "subject_id"
       ],
       "disposition": "UNDECIDED"
@@ -1679,6 +1840,21 @@
       "parentColumns": [
         "id",
         "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 4,
+      "parentTable": "standard_reading_reader_interpretations",
+      "childTable": "standard_reading_reader_access_grants",
+      "constraintName": "standard_reading_reader_access_interpretation_fk",
+      "childColumns": [
+        "official_reading_id",
+        "reader_character_id"
+      ],
+      "parentColumns": [
+        "official_reading_id",
+        "reader_character_id"
       ],
       "disposition": "UNDECIDED"
     }

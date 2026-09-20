@@ -38,14 +38,14 @@ for (const [field, expected] of [
   if (graph[field] !== expected) fail(field + ' must remain false');
 }
 
-if (!Array.isArray(graph.edges) || graph.edges.length !== 113) {
-  fail('expected exactly 113 reachable FK edges');
+if (!Array.isArray(graph.edges) || graph.edges.length !== 125) {
+  fail('expected exactly 125 reachable FK edges');
 }
 
-const expectedDepthCounts = { '1': 30, '2': 38, '3': 42, '4': 3 };
+const expectedDepthCounts = { '1': 30, '2': 44, '3': 47, '4': 4 };
 if (
-  graph.discovery?.edgeCount !== 113 ||
-  graph.discovery?.distinctReachableTableCount !== 49 ||
+  graph.discovery?.edgeCount !== 125 ||
+  graph.discovery?.distinctReachableTableCount !== 52 ||
   graph.discovery?.maxDepth !== 4 ||
   graph.discovery?.directDepthOneEdgeCount !== 30 ||
   JSON.stringify(graph.discovery?.depthCounts) !== JSON.stringify(expectedDepthCounts)
@@ -95,8 +95,8 @@ for (const edge of graph.edges) {
   reachableTables.add(edge.childTable);
 }
 
-if (new Set(edgeKeys).size !== 113) fail('duplicate canonical FK edge');
-if (reachableTables.size !== 49) fail('expected exactly 49 reachable tables');
+if (new Set(edgeKeys).size !== 125) fail('duplicate canonical FK edge');
+if (reachableTables.size !== 52) fail('expected exactly 52 reachable tables');
 if (JSON.stringify(liveDepthCounts) !== JSON.stringify(expectedDepthCounts)) {
   fail('live edge depth counts drifted');
 }
@@ -130,13 +130,13 @@ if (!/^\|\s*`P0-PR-01`\s*\|[^|\n]*\|\s*\*\*DECIDED\*\*\s*\|/m.test(decisions)) {
 
 for (const fragment of [
   'SCHEMA-DISCOVERED TRANSITIVE COVERAGE / POLICY NEUTRAL / EXECUTION NOT AUTHORIZED',
-  'reachable FK edges         = 113',
-  'distinct reachable tables  = 49',
+  'reachable FK edges         = 125',
+  'distinct reachable tables  = 52',
   'maximum minimum depth      = 4',
   'depth 1 = 30',
-  'depth 2 = 38',
-  'depth 3 = 42',
-  'depth 4 = 3',
+  'depth 2 = 44',
+  'depth 3 = 47',
+  'depth 4 = 4',
   'disposition = UNDECIDED',
 ]) {
   if (!doc.includes(fragment)) fail('documentation boundary missing: ' + fragment);
@@ -155,5 +155,5 @@ for (const fragment of [
 }
 
 console.log(
-  'Transitive Subject dependency graph historical coverage PASS: 113 reachable FK edges across 49 tables, depths 30/38/42/3, exact depth-1 parity with #1063; schema graph stays policy-neutral while approved dispositions live separately.',
+  'Transitive Subject dependency graph historical coverage PASS: 125 reachable FK edges across 52 tables, depths 30/44/47/4, exact depth-1 parity with #1063; schema graph stays policy-neutral while approved dispositions live separately.',
 );

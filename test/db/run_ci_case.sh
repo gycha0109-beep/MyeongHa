@@ -149,6 +149,11 @@ case "$case_name" in
     bash test/db/standard_reading_artifact_reread.sh
     catalog_snapshot
     ;;
+  official-standard-reading-reader-interpretation)
+    apply_standard_migrations
+    bash test/db/official_standard_reading_reader_interpretation.sh
+    catalog_snapshot
+    ;;
   records-production-read-authority)
     apply_standard_migrations
     bash test/db/records_read_runtime_authority.sh

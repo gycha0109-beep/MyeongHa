@@ -14,6 +14,8 @@ on:
       - 'test/db/reading_history_authority_query.sql'
       - 'test/db/standard_reading_artifact_reread.sql'
       - 'test/db/standard_reading_artifact_reread.sh'
+      - 'test/db/official_standard_reading_reader_interpretation.sql'
+      - 'test/db/official_standard_reading_reader_interpretation.sh'
       - 'test/db/catalog_snapshot.sh'
       - 'test/db/catalog.expected.sha256'
       - '.github/workflows/db-content-reading-suite.yml'
@@ -32,6 +34,8 @@ on:
       - 'test/db/reading_history_authority_query.sql'
       - 'test/db/standard_reading_artifact_reread.sql'
       - 'test/db/standard_reading_artifact_reread.sh'
+      - 'test/db/official_standard_reading_reader_interpretation.sql'
+      - 'test/db/official_standard_reading_reader_interpretation.sh'
       - 'test/db/catalog_snapshot.sh'
       - 'test/db/catalog.expected.sha256'
       - '.github/workflows/db-content-reading-suite.yml'
@@ -59,6 +63,7 @@ jobs:
           - outbox-success-completion
           - reading-history
           - standard-reading-artifact-reread
+          - official-standard-reading-reader-interpretation
     services:
       postgres:
         image: postgres:15
