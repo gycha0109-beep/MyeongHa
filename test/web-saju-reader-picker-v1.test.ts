@@ -24,12 +24,11 @@ describe('MyeongHa Saju Reader picker', () => {
     expect(runtime).toContain("next.searchParams.set('reader', readerKey);");
     expect(runtime).toContain("window.location.assign(next.href);");
     expect(runtime).toContain("dialog.showModal()");
-    expect(runtime).toContain("reader.representativeDemo");
+    expect(runtime).toContain("9명의 Reader 모두 전용 Reading Scene까지 연결되어 있습니다.");
     expect(css).toContain('.reading-reader-picker-grid');
-    expect(css).toContain('.reading-reader-option.is-demo');
   });
 
-  it('offers the canonical nine Readers and keeps Baekheon as the representative visual demo', async () => {
+  it('offers the canonical nine Readers with Reading Scene v1 available for every Reader', async () => {
     const runtime = await readFile(pickerRuntimePath, 'utf8');
     const keys = ['seyeon', 'baekheon', 'yeoul', 'seorin', 'rahyeon', 'mira', 'taegyeom', 'yunho', 'doyoon'];
     const names = ['세연', '백헌', '여울', '서린', '라현', '미라', '태겸', '윤호', '도윤'];
@@ -40,8 +39,9 @@ describe('MyeongHa Saju Reader picker', () => {
     }
     for (const name of names) expect(runtime).toContain(`name: '${name}'`);
 
-    expect(runtime).toContain('representativeDemo: true');
-    expect(runtime).toContain('현재 대표 시연은 백헌의 장면까지 연결되어 있습니다.');
-    expect(runtime).toContain('전용 장면과 챗봇 응답은 후속 연결됩니다.');
+    expect(runtime).not.toContain('representativeDemo: true');
+    expect(runtime).toContain('9명의 Reader 모두 전용 Reading Scene까지 연결되어 있습니다.');
+    expect(runtime).toContain('Reading이 끝난 뒤에는 선택한 Reader와 대화를 이어가거나 기록에서 결과를 다시 볼 수 있습니다.');
+    expect(runtime).toContain('챗봇 응답 연결은 후속 단계입니다.');
   });
 });
