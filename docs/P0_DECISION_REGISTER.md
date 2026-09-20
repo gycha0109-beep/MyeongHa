@@ -431,7 +431,7 @@ authority:
   record: https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582
 scope:
   decides:
-    - account-finalization disposition baseline for all 49 currently reachable Subject tables
+    - account-finalization disposition baseline for all 52 currently reachable Subject tables
     - calendar five-year retention for the nine approved Commerce evidence/history tables
     - Auth mapping/provider-user deletion
     - existing 30-day encrypted backup lifecycle handling
