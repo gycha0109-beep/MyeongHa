@@ -385,10 +385,10 @@ try {
   assert(readingChatHandoff.contextTitle.includes('전체 사주') && readingChatHandoff.threadTitle === '전체 사주', `Reading handoff title missing: ${JSON.stringify(readingChatHandoff)}`);
   assert(readingChatHandoff.dialogue.includes('읽기에서 이어왔군요.'), `Reader chat did not acknowledge Reading handoff: ${readingChatHandoff.dialogue}`);
 
-  await navigate(client, origin, '/records.html?tab=saju&from=reading&reader=baekheon&topic=temperament&scope=original', '#saju-records-panel');
+  await navigate(client, origin, '/records.html?tab=saju&from=reading&reader=baekheon&topic=temperament&scope=original', '#saju-records');
   const readingRecordsHandoff = await client.evaluate(`(() => {
     const tab = document.querySelector('#saju-records-tab');
-    const panel = document.querySelector('#saju-records-panel');
+    const panel = document.querySelector('#saju-records');
     return {
       entry: document.body.dataset.recordsEntry ?? '',
       selected: tab?.getAttribute('aria-selected') ?? '',
