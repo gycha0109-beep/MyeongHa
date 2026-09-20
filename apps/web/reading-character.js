@@ -12,49 +12,49 @@ const readerCatalog = {
   seyeon: {
     name: '세연',
     hanja: '',
-    title: '',
+    title: '무녀',
     intro: '복잡하게 시작하지 않을게요. 지금 가장 크게 읽히는 흐름부터 같이 봐요.',
   },
   yeoul: {
     name: '여울',
     hanja: '',
-    title: '',
+    title: '설계관 기록관',
     intro: '돌려 말하지 않을게요. 지금 필요한 흐름부터 바로 짚겠습니다.',
   },
   seorin: {
     name: '서린',
     hanja: '',
-    title: '',
+    title: '기억 서고지기',
     intro: '지금의 흐름이 예전의 어떤 기록과 이어지는지 천천히 살펴볼게요.',
   },
   rahyeon: {
     name: '라현',
     hanja: '',
-    title: '',
+    title: '대리자',
     intro: '표면적인 답보다, 당신이 실제로 흔들리는 지점부터 읽어보죠.',
   },
   mira: {
     name: '미라',
     hanja: '',
-    title: '',
+    title: '대리자',
     intro: '과하게 의미 붙이지 말고, 지금 쓸 수 있는 정보부터 보죠.',
   },
   taegyeom: {
     name: '태겸',
     hanja: '',
-    title: '',
+    title: '대리자',
     intro: '근거 없는 낙관은 빼겠습니다. 확인되는 구조부터 보죠.',
   },
   yunho: {
     name: '윤호',
     hanja: '',
-    title: '',
+    title: '대리자',
     intro: '급하게 결론부터 내리지 않고, 구조와 시기를 차례대로 읽어보겠습니다.',
   },
   doyoon: {
     name: '도윤',
     hanja: '',
-    title: '',
+    title: '대리자',
     intro: '일단 재미없는 설명부터 길게 하진 않을게요. 지금 걸리는 부분부터 보죠.',
   },
 };
@@ -86,6 +86,8 @@ const stateTitle = document.querySelector('[data-reading-state-title]');
 const stateCopy = document.querySelector('[data-reading-state-copy]');
 
 root.dataset.reader = readerKey;
+root.dataset.readerSelection = params.has('reader') || params.has('character') ? 'explicit' : 'default';
+root.dataset.readerPresentation = readerKey === 'baekheon' ? 'representative-demo' : 'wired-preview';
 root.dataset.readingRouteState = route.valid
   ? (previewEligible ? 'preview_loading' : 'blocked_by_authority')
   : 'invalid';
