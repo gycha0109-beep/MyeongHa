@@ -146,7 +146,11 @@ export function createPostgresAccountDeletionWorkerPortsV1(input: {
   readonly pool: PostgresSubjectPoolV1;
 }): PostgresAccountDeletionWorkerPortsV1 {
   const claimPort: AccountDeletionWorkerClaimPortV1 = Object.freeze({
-    async claimEvent(claimInput) {
+    async claimEvent(claimInput: {
+      readonly outboxEventId: string;
+      readonly lockOwner: string;
+      readonly leaseExpiresAt: string;
+    }) {
       return executePostgresAccountDeletionWorkerTransactionV1({
         pool: input.pool,
         execute: async (client) => {
@@ -173,7 +177,11 @@ export function createPostgresAccountDeletionWorkerPortsV1(input: {
   });
 
   const resumeStatePort: AccountDeletionWorkerResumeStatePortV1 = Object.freeze({
-    async readResumeState(resumeInput): Promise<AccountDeletionWorkerResumeStateV1> {
+    async readResumeState(resumeInput: {
+      readonly subjectId: string;
+      readonly deletionJobId: string;
+      readonly lockOwner: string;
+    }): Promise<AccountDeletionWorkerResumeStateV1> {
       return executePostgresAccountDeletionWorkerTransactionV1({
         pool: input.pool,
         execute: async (client) => {
@@ -210,7 +218,11 @@ export function createPostgresAccountDeletionWorkerPortsV1(input: {
   });
 
   const dbFinalizerPort: AccountDeletionWorkerDbFinalizerPortV1 = Object.freeze({
-    async finalizeDatabase(finalizeInput) {
+    async finalizeDatabase(finalizeInput: {
+      readonly subjectId: string;
+      readonly deletionJobId: string;
+      readonly lockOwner: string;
+    }) {
       return executePostgresAccountDeletionWorkerTransactionV1({
         pool: input.pool,
         execute: async (client) => {
@@ -238,7 +250,11 @@ export function createPostgresAccountDeletionWorkerPortsV1(input: {
   });
 
   const completionPort: AccountDeletionWorkerCompletionPortV1 = Object.freeze({
-    async completeDeletion(completeInput) {
+    async completeDeletion(completeInput: {
+      readonly subjectId: string;
+      readonly deletionJobId: string;
+      readonly lockOwner: string;
+    }) {
       return executePostgresAccountDeletionWorkerTransactionV1({
         pool: input.pool,
         execute: async (client) => {

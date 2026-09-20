@@ -47,7 +47,7 @@ export function createAccountDeletionWorkerRuntimeV1(input: {
   readonly authDeletionPort: SupabaseAuthAdminUserDeletionPortV1;
 }): AccountDeletionWorkerRuntimeV1 {
   return Object.freeze({
-    async run(runInput) {
+    async run(runInput: RunAccountDeletionOutboxEventInputV1) {
       const claim = await input.ports.claimPort.claimEvent(runInput);
 
       const worker = await runClaimedAccountDeletionWorkerV1({
