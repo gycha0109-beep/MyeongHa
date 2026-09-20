@@ -1,0 +1,322 @@
+name: Web PR Domain Gates
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  route:
+    name: route-web-pr-gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      chat: ${{ steps.route.outputs.chat }}
+      saju: ${{ steps.route.outputs.saju }}
+      records: ${{ steps.route.outputs.records }}
+      profile: ${{ steps.route.outputs.profile }}
+      full: ${{ steps.route.outputs.full }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Resolve changed web surfaces
+        id: route
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --name-only "$BASE_SHA" "$HEAD_SHA" > "$RUNNER_TEMP/myeongha-pr-changed-files.txt"
+          echo "Changed files:"
+          cat "$RUNNER_TEMP/myeongha-pr-changed-files.txt"
+          node scripts/ci/pr-gate-router.mjs < "$RUNNER_TEMP/myeongha-pr-changed-files.txt" | tee "$RUNNER_TEMP/myeongha-pr-gates.txt"
+          cat "$RUNNER_TEMP/myeongha-pr-gates.txt" >> "$GITHUB_OUTPUT"
+
+  chat-browser:
+    name: web-pr-chat
+    needs: route
+    if: needs.route.outputs.chat == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Build static web
+        run: npm run build:web
+      - name: Set up Chrome for Testing
+        id: chrome
+        uses: browser-actions/setup-chrome@48ad923757ca74d66703209fe939badbdf80f2f4
+        with:
+          chrome-version: stable
+          install-dependencies: true
+      - name: Verify Chat auth boundary
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/run-web-chat-auth-browser-smoke.mjs
+      - name: Verify Conversation UI
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/run-web-conversation-browser-smoke.mjs
+      - name: Upload Chat diagnostics
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: web-pr-chat
+          path: |
+            artifacts/web-chat-*
+            artifacts/web-conversation-*
+          if-no-files-found: ignore
+
+  saju-browser:
+    name: web-pr-saju-reading
+    needs: route
+    if: needs.route.outputs.saju == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Build static web
+        run: npm run build:web
+      - name: Set up Chrome for Testing
+        id: chrome
+        uses: browser-actions/setup-chrome@48ad923757ca74d66703209fe939badbdf80f2f4
+        with:
+          chrome-version: stable
+          install-dependencies: true
+      - name: Verify Saju auth boundary
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/verify-web-saju-auth-browser.mjs
+      - name: Verify shared Home and Saju header
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/verify-golden-master-header-browser.mjs
+      - name: Upload Saju diagnostics
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: web-pr-saju-reading
+          path: |
+            artifacts/web-saju-*
+            artifacts/web-golden-master-header-*
+          if-no-files-found: ignore
+
+  records-browser:
+    name: web-pr-records
+    needs: route
+    if: needs.route.outputs.records == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Build static web
+        run: npm run build:web
+      - name: Set up Chrome for Testing
+        id: chrome
+        uses: browser-actions/setup-chrome@48ad923757ca74d66703209fe939badbdf80f2f4
+        with:
+          chrome-version: stable
+          install-dependencies: true
+      - name: Verify Records auth boundary
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/verify-web-records-auth-browser.mjs
+      - name: Upload Records diagnostics
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: web-pr-records
+          path: |
+            artifacts/web-records-*
+          if-no-files-found: ignore
+
+  profile-browser:
+    name: web-pr-my-birth
+    needs: route
+    if: needs.route.outputs.profile == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Build static web
+        run: npm run build:web
+      - name: Set up Chrome for Testing
+        id: chrome
+        uses: browser-actions/setup-chrome@48ad923757ca74d66703209fe939badbdf80f2f4
+        with:
+          chrome-version: stable
+          install-dependencies: true
+      - name: Verify My surface
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/verify-web-my-browser.mjs
+      - name: Verify My Birth surface
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/verify-web-my-birth-browser.mjs
+      - name: Verify Birth session and replacement guard
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: |
+          node scripts/run-web-birth-session-browser-smoke-v2.mjs
+          node scripts/verify-web-birth-member-replacement-browser.mjs
+      - name: Upload Profile diagnostics
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: web-pr-my-birth
+          path: |
+            artifacts/web-my-*
+            artifacts/web-birth-*
+          if-no-files-found: ignore
+
+  full-browser:
+    name: web-pr-full-browser
+    needs: route
+    if: needs.route.outputs.full == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Build static web
+        run: npm run build:web
+      - name: Set up Chrome for Testing
+        id: chrome
+        uses: browser-actions/setup-chrome@48ad923757ca74d66703209fe939badbdf80f2f4
+        with:
+          chrome-version: stable
+          install-dependencies: true
+      - name: Verify Hall to Saju browser render
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/verify-web-browser-render.mjs
+      - name: Verify shared Home Saju header browser contract
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/verify-golden-master-header-browser.mjs
+      - name: Verify authentication browser render
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/run-web-auth-browser-smoke.mjs
+      - name: Verify Saju active bearer authority
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/verify-web-saju-auth-browser.mjs
+      - name: Verify Records active bearer binding
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/verify-web-records-auth-browser.mjs
+      - name: Verify Chat active bearer rejection
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/run-web-chat-auth-browser-smoke.mjs
+      - name: Verify authentication confirmation handoff
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/run-web-auth-confirmation-browser-smoke.mjs
+      - name: Verify My browser render
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/verify-web-my-browser.mjs
+      - name: Verify My Birth Profile browser render
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/verify-web-my-birth-browser.mjs
+      - name: Verify Birth session and duplicate-create guard
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: |
+          node scripts/run-web-birth-session-browser-smoke-v2.mjs
+          node scripts/verify-web-birth-member-replacement-browser.mjs
+      - name: Verify conversation browser render
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/run-web-conversation-browser-smoke.mjs
+      - name: Upload browser smoke diagnostics
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: web-pr-full-browser
+          path: |
+            artifacts/web-reading-browser-smoke*
+            artifacts/web-golden-master-header-browser-smoke*
+            artifacts/web-auth-browser-smoke*
+            artifacts/web-auth-confirmation-browser-smoke*
+            artifacts/web-saju-auth-browser-smoke*
+            artifacts/web-records-auth-browser-smoke*
+            artifacts/web-chat-auth-browser-smoke*
+            artifacts/web-my-browser-smoke*
+            artifacts/web-my-birth-browser-smoke*
+            artifacts/web-birth-session-browser-smoke*
+            artifacts/web-conversation-browser-smoke*
+          if-no-files-found: ignore
+
+  verify:
+    name: Web PR Verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    if: ${{ always() && !cancelled() }}
+    needs:
+      - route
+      - chat-browser
+      - saju-browser
+      - records-browser
+      - profile-browser
+      - full-browser
+    steps:
+      - name: Require router and every selected browser gate
+        env:
+          ROUTE_RESULT: ${{ needs.route.result }}
+          CHAT_RESULT: ${{ needs.chat-browser.result }}
+          SAJU_RESULT: ${{ needs.saju-browser.result }}
+          RECORDS_RESULT: ${{ needs.records-browser.result }}
+          PROFILE_RESULT: ${{ needs.profile-browser.result }}
+          FULL_RESULT: ${{ needs.full-browser.result }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$ROUTE_RESULT" = "success"
+          for result in "$CHAT_RESULT" "$SAJU_RESULT" "$RECORDS_RESULT" "$PROFILE_RESULT" "$FULL_RESULT"; do
+            test "$result" = "success" || test "$result" = "skipped"
+          done
