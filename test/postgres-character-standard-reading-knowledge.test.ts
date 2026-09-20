@@ -9,7 +9,7 @@ describe('PostgreSQL Character Standard Reading Reader Knowledge adapter', () =>
     const calls: { text: string; values?: readonly unknown[] }[] = [];
     const client: PostgresTransactionQueryV1 = {
       async query<Row>(text: string, values?: readonly unknown[]) {
-        calls.push({ text, values });
+        calls.push(values === undefined ? { text } : { text, values });
         if (text.includes('internal_qry_character_standard_reading_access_v1')) {
           return {
             rows: [{
