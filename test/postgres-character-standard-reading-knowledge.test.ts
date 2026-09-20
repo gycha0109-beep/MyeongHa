@@ -26,7 +26,7 @@ describe('PostgreSQL Character Standard Reading Reader Knowledge adapter', () =>
               readingContractVersion: 'product-reading-response-v1',
               sajuEngineVersion: 'saju-engine-v1',
               responseHash: 'sha256:v1:official-reading-hash',
-            }] as Row[],
+            }] as unknown as Row[],
           };
         }
         return {
@@ -39,7 +39,7 @@ describe('PostgreSQL Character Standard Reading Reader Knowledge adapter', () =>
             responseSnapshotJsonb: { schemaVersion: 'product-reading-response-v1' },
             responseHash: 'sha256:v1:official-reading-hash',
             completedAt: '2026-09-20T23:00:00.000Z',
-          }] as Row[],
+          }] as unknown as Row[],
         };
       },
     };
