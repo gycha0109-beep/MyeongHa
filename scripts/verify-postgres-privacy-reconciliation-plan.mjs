@@ -92,7 +92,10 @@ const second = buildPrivacyReconciliationPlan(manifest(events));
 assert.deepEqual(first, second, 'plan generation must be deterministic');
 assert.equal(first.report.eventCount, 8);
 assert.equal(first.report.drReady, false);
-assert.equal(first.report.accountDeletionFinalization, 'policy-decided-runtime-not-implemented');
+assert.equal(
+  first.report.accountDeletionFinalization,
+  'runtime-implemented-finalization-executed-separately',
+);
 assert.equal(first.report.commerceRetentionDecision, 'decided-p5y-nine-table-baseline');
 assert.equal(first.report.replayIdempotency, 'transactional-terminal-state-validated');
 assert.equal(first.report.outputContainsIdentifiers, false);
@@ -250,5 +253,5 @@ mustReject(
 );
 
 console.log(
-  'PostgreSQL privacy reconciliation replay plan verification passed: revocation/start replay remains bounded; finalization runtime is not implemented, while Commerce retention policy is decided P5Y.',
+  'PostgreSQL privacy reconciliation replay plan verification passed: revocation/start replay remains bounded; finalization runtime and captured-window authority are exercised by separate guarded recovery stages.',
 );
