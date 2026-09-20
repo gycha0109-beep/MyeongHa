@@ -634,3 +634,13 @@ export {
 export {
   createPostgresCharacterStandardReadingKnowledgePortsV1,
 } from './postgres-character-standard-reading-knowledge.js';
+
+export {
+  CharacterStandardReadingGroundingBridgeErrorV1,
+  attachCharacterStandardReadingGroundingV1,
+  projectCharacterStandardReadingGroundingV1,
+  type AttachCharacterStandardReadingGroundingInputV1,
+  type CharacterStandardReadingGroundingProjectionV1,
+  type ProjectCharacterStandardReadingGroundingInputV1,
+  type SajuCharacterGroundingProjectionPortV1,
+} from './character-standard-reading-grounding.js';
