@@ -92,6 +92,19 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
     expect(hubCss).toContain('html[data-theme="dark"] body.chat-hub-page .chat-person-tag');
   });
 
+  it('maps all nine canonical characters to representative room art', async () => {
+    const v2Css = await readFile(hubV2CssPath, 'utf8');
+
+    for (const key of ['seyeon', 'baekheon', 'yeoul', 'seorin', 'rahyeon', 'mira', 'taegyeom', 'yunho', 'doyoon']) {
+      expect(v2Css).toContain(`.character-room-v2[data-character="${key}"]`);
+      expect(v2Css).toContain(`assets/characters/rooms/${key}-room.webp`);
+    }
+
+    expect(v2Css).toContain('var(--conversation-room-art)');
+    expect(v2Css).toContain('.conversation-room-scene .character-room-scene-decoration');
+    expect(v2Css).toContain('[data-character-avatar]');
+  });
+
   it('keeps character rooms as focused destinations and routes global conversation entries through the hub', async () => {
     const [roomHtml, roomPage, homeHtml, homePage, reading, records] = await Promise.all([
       readFile(roomHtmlPath, 'utf8'),
