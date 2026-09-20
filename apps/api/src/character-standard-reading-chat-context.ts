@@ -2,6 +2,10 @@ import type {
   CharacterRuntimeContextAssemblyInputV1,
 } from './character-chat-orchestration.js';
 import {
+  assembleCharacterRuntimeContextFromServerAuthorizedSajuV1,
+  type CharacterRuntimeContextV1,
+} from '../../../packages/domain/src/character-runtime-context.js';
+import {
   resolveCharacterStandardReadingKnowledgeV1,
   type CharacterStandardReadingAccessAuthorityPortV1,
   type CharacterStandardReadingArtifactAuthorityPortV1,
@@ -37,6 +41,8 @@ export class CharacterStandardReadingChatContextErrorV1 extends Error {
     this.name = 'CharacterStandardReadingChatContextErrorV1';
   }
 }
+
+const preparedOfficialReadingChatPlansV1 = new WeakSet<object>();
 
 function assertNoCallerSajuContext(
   input: CharacterStandardReadingChatBaseContextInputV1,
@@ -95,11 +101,48 @@ export async function prepareCharacterStandardReadingChatContextV1(
   const saju =
     projectOfficialStandardReadingToProtectedCharacterSajuContextV1(source);
 
-  return Object.freeze({
+  const plan = Object.freeze({
     source,
     contextInput: Object.freeze({
       ...input.contextInput,
       saju,
     }),
   });
+
+  preparedOfficialReadingChatPlansV1.add(plan);
+  return plan;
+}
+
+/**
+ * Production-safe assembly seam for a plan minted by the server-only Official
+ * Reading authority composer above. Structural lookalikes are rejected.
+ *
+ * This does not expose a public Chat send route; it only proves that Production
+ * runtime assembly can consume the exact server-retrieved protected Reading
+ * without weakening the direct Saju injection guard.
+ */
+export function assemblePreparedCharacterStandardReadingRuntimeContextV1(
+  plan: CharacterStandardReadingChatContextPlanV1,
+): CharacterRuntimeContextV1 {
+  if (!preparedOfficialReadingChatPlansV1.has(plan)) {
+    throw new CharacterStandardReadingChatContextErrorV1(
+      'Official Reading runtime context plan was not minted by server authority.',
+    );
+  }
+
+  const saju = plan.contextInput.saju;
+  if (
+    saju === undefined ||
+    saju.readingRef !== plan.source.readingId ||
+    saju.domain !== plan.source.sajuDomain ||
+    plan.contextInput.character.characterId !== plan.source.readerCharacterId
+  ) {
+    throw new CharacterStandardReadingChatContextErrorV1(
+      'Official Reading runtime context plan provenance is inconsistent.',
+    );
+  }
+
+  return assembleCharacterRuntimeContextFromServerAuthorizedSajuV1(
+    plan.contextInput,
+  );
 }

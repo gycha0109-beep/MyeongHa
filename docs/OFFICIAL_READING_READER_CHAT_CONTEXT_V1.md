@@ -1,6 +1,6 @@
 # Official Reading → Reader Chat Context v1
 
-> Status: **IMPLEMENTED SERVER COMPOSITION / PUBLIC CHAT EXECUTION STILL GATED**  
+> Status: **IMPLEMENTED SERVER COMPOSITION + PRODUCTION RUNTIME ADMISSION / PUBLIC CHAT SEND STILL GATED**  
 > Date: 2026-09-21  
 > Depends on: #1142, #1147
 
@@ -46,14 +46,21 @@ This boundary does not use:
 - Preview output;
 - Character-authored Saju semantics.
 
+## Production runtime admission
+
+The server-only composer now mints an in-process authority plan. Only that exact
+plan object may enter the Official Reading Production runtime assembly seam.
+Structural lookalikes are rejected.
+
+The ordinary `assembleCharacterRuntimeContext` path remains fail-closed for
+direct Saju injection in Production, so this does not turn client-carried Saju
+data into authority.
+
 ## Remaining gate
 
-This slice intentionally returns a Character runtime **context-assembly input**.
-It does not weaken `assembleCharacterRuntimeContext`'s current Production Saju
-admission guard and does not expose a public Chat send route.
-
-The next activation step must resolve the existing upstream Production Saju
-semantic/public-Chat authority gate rather than bypass it.
+No public Chat send route is activated by this slice. The next integration must
+bind the server-resolved Chat thread/subject/Reader/Reading identities to this
+admitted runtime path and keep existing output/commit/reveal guards intact.
 
 
 ## Relationship to Reader Interpretation Preview

@@ -645,6 +645,7 @@ export {
 
 export {
   CharacterStandardReadingChatContextErrorV1,
+  assemblePreparedCharacterStandardReadingRuntimeContextV1,
   prepareCharacterStandardReadingChatContextV1,
   type CharacterStandardReadingChatBaseContextInputV1,
   type CharacterStandardReadingChatContextPlanV1,

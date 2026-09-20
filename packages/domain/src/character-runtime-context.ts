@@ -272,7 +272,7 @@ function assertGrantScope(
   }
 }
 
-export function assembleCharacterRuntimeContext(input: {
+function assembleCharacterRuntimeContextCore(input: {
   readonly character: CharacterContentDefinition;
   readonly contentBundleId: string;
   readonly relationshipState: RelationshipState;
@@ -284,7 +284,6 @@ export function assembleCharacterRuntimeContext(input: {
   readonly recentMessages: readonly string[];
   readonly saju?: Omit<CharacterSajuRuntimeContextV1, 'capability'>;
 }): CharacterRuntimeContextV1 {
-  assertDirectSajuContextAdmissionBoundary(input.saju);
   requireAuthoredCharacter(input.character);
   const characterId = input.character.characterId;
   const contentBundleId = input.contentBundleId.trim();
@@ -371,4 +370,31 @@ export function assembleCharacterRuntimeContext(input: {
     recentMessages: Object.freeze([...input.recentMessages]),
     saju,
   });
+}
+
+
+export function assembleCharacterRuntimeContext(
+  input: Parameters<typeof assembleCharacterRuntimeContextCore>[0],
+): CharacterRuntimeContextV1 {
+  assertDirectSajuContextAdmissionBoundary(input.saju);
+  return assembleCharacterRuntimeContextCore(input);
+}
+
+/**
+ * @internal Server-authority seam for an already admitted Saju context.
+ *
+ * This function is intentionally not exported from the domain package root.
+ * Callers must independently prove server-side source authority before use.
+ * Public/direct callers continue through assembleCharacterRuntimeContext and
+ * remain blocked in Production.
+ */
+export function assembleCharacterRuntimeContextFromServerAuthorizedSajuV1(
+  input: Parameters<typeof assembleCharacterRuntimeContextCore>[0],
+): CharacterRuntimeContextV1 {
+  if (input.saju === undefined) {
+    throw new TypeError(
+      'Server-authorized Saju runtime assembly requires an admitted Saju context.',
+    );
+  }
+  return assembleCharacterRuntimeContextCore(input);
 }

@@ -1,9 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   CharacterStandardReadingChatContextErrorV1,
+  assemblePreparedCharacterStandardReadingRuntimeContextV1,
   prepareCharacterStandardReadingChatContextV1,
   type CharacterRuntimeContextAssemblyInputV1,
 } from '../apps/api/src/index.js';
+import { assembleCharacterRuntimeContext } from '../packages/domain/src/index.js';
 import type {
   CharacterStandardReadingAccessAuthorityPortV1,
   CharacterStandardReadingArtifactAuthorityPortV1,
@@ -205,5 +207,55 @@ describe('Official Reading -> Reader Chat context composition', () => {
         contextInput,
       }),
     ).rejects.toThrow(/does not authorize the Official Reading domain/u);
+  });
+
+  it('assembles the server-minted Official Reading plan in Production without opening direct Saju injection', async () => {
+    const previousNodeEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+
+    try {
+      const plan = await prepareCharacterStandardReadingChatContextV1({
+        resolvedSubjectId: SUBJECT_ID,
+        readerCharacterId: 'baekheon',
+        readingId: READING_ID,
+        effectiveAt: '2026-09-21T00:01:00.000Z',
+        ...ports(),
+        contextInput: baseContext(),
+      });
+
+      expect(() => assembleCharacterRuntimeContext(plan.contextInput)).toThrow(
+        /Direct Saju context assembly is blocked outside development\/test fixtures/u,
+      );
+
+      const context =
+        assemblePreparedCharacterStandardReadingRuntimeContextV1(plan);
+      expect(context.characterId).toBe('baekheon');
+      expect(context.saju?.readingRef).toBe(READING_ID);
+      expect(context.saju?.protectedSegments.map((segment) => segment.text)).toEqual([
+        '공식 직업 Reading의 핵심 내용입니다.',
+      ]);
+    } finally {
+      if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = previousNodeEnv;
+    }
+  });
+
+  it('rejects a structural lookalike instead of treating a caller-forged plan as server authority', async () => {
+    const plan = await prepareCharacterStandardReadingChatContextV1({
+      resolvedSubjectId: SUBJECT_ID,
+      readerCharacterId: 'baekheon',
+      readingId: READING_ID,
+      effectiveAt: '2026-09-21T00:01:00.000Z',
+      ...ports(),
+      contextInput: baseContext(),
+    });
+    const forgedPlan = Object.freeze({
+      source: plan.source,
+      contextInput: plan.contextInput,
+    });
+
+    expect(() =>
+      assemblePreparedCharacterStandardReadingRuntimeContextV1(forgedPlan),
+    ).toThrow(/was not minted by server authority/u);
   });
 });
