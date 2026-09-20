@@ -334,7 +334,7 @@ async function verifyRoom(page, origin, suffix, width, height, mobile) {
 
   assert(state.character === 'seyeon', `${suffix}: character identity did not bind to Se-yeon`);
   assert(state.scene && state.panel && state.stream && state.composer, `${suffix}: room surfaces missing`);
-  assert(state.sceneBg.includes('seyeon-chat.webp'), `${suffix}: approved Se-yeon scene asset is not rendered`);
+  assert(state.sceneBg.includes('assets/characters/rooms/seyeon-room.webp'), `${suffix}: approved Se-yeon room scene asset is not rendered`);
   assert(state.contextHidden && state.threadHidden, `${suffix}: unverified continuation context became visible`);
   assert(['auto', 'scroll'].includes(state.streamOverflow), `${suffix}: conversation stream is not scrollable`);
   if (mobile) assert(state.globalHeaderDisplay === 'none', `${suffix}: desktop product header should be hidden in mobile room`);
@@ -342,7 +342,7 @@ async function verifyRoom(page, origin, suffix, width, height, mobile) {
 
   await page.navigate(`${origin}/chat.html?character=baekheon`);
   const baekheonScene = await page.evaluate(`getComputedStyle(document.querySelector('.conversation-room-scene')).backgroundImage`);
-  assert(!baekheonScene.includes('seyeon-chat.webp'), `${suffix}: Se-yeon scene leaked onto Baekheon placeholder`);
+  assert(!baekheonScene.includes('assets/characters/rooms/seyeon-room.webp'), `${suffix}: Se-yeon room scene leaked onto Baekheon room`);
   return state;
 }
 
