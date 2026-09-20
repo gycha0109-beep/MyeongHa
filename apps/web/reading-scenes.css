@@ -1,21 +1,191 @@
-body[data-reader="baekheon"] .reader-scene-art {
-  background:
-    linear-gradient(90deg, rgba(5, 8, 10, .58) 0%, rgba(8, 10, 12, .18) 48%, rgba(6, 8, 10, .46) 100%),
-    linear-gradient(180deg, rgba(8, 10, 12, .08) 0%, rgba(8, 10, 12, .16) 64%, rgba(7, 8, 9, .58) 100%),
-    url("assets/characters/rooms/baekheon-room.webp") center 32% / cover no-repeat;
+/*
+ * Reader Reading Scene v1
+ *
+ * This is deliberately a Reading presentation layer, not the ordinary chat-room
+ * layout. The current canonical room artwork is used as source art while the
+ * Reading surface applies its own cinematic framing, entrance transition and
+ * step pacing. A future Live2D/sprite renderer can replace this art layer
+ * without changing Saju Reading authority or Reader routing.
+ */
+
+body[data-reader="baekheon"] {
+  --reader-reading-art: url("assets/characters/rooms/baekheon-room.webp");
+  --reader-reading-position: center 30%;
+}
+body[data-reader="seyeon"] {
+  --reader-reading-art: url("assets/characters/rooms/seyeon-room.webp");
+  --reader-reading-position: center 30%;
+}
+body[data-reader="yeoul"] {
+  --reader-reading-art: url("assets/characters/rooms/yeoul-room.webp");
+  --reader-reading-position: center 28%;
+}
+body[data-reader="seorin"] {
+  --reader-reading-art: url("assets/characters/rooms/seorin-room.webp");
+  --reader-reading-position: center 30%;
+}
+body[data-reader="rahyeon"] {
+  --reader-reading-art: url("assets/characters/rooms/rahyeon-room.webp");
+  --reader-reading-position: center 27%;
+}
+body[data-reader="mira"] {
+  --reader-reading-art: url("assets/characters/rooms/mira-room.webp");
+  --reader-reading-position: center 27%;
+}
+body[data-reader="taegyeom"] {
+  --reader-reading-art: url("assets/characters/rooms/taegyeom-room.webp");
+  --reader-reading-position: center 25%;
+}
+body[data-reader="yunho"] {
+  --reader-reading-art: url("assets/characters/rooms/yunho-room.webp");
+  --reader-reading-position: center 27%;
+}
+body[data-reader="doyoon"] {
+  --reader-reading-art: url("assets/characters/rooms/doyoon-room.webp");
+  --reader-reading-position: center 27%;
 }
 
-body[data-reader="baekheon"] .reader-silhouette {
+body[data-reader] .reader-scene-art {
+  background:
+    linear-gradient(90deg, rgba(5, 8, 10, .64) 0%, rgba(8, 10, 12, .16) 47%, rgba(6, 8, 10, .48) 100%),
+    linear-gradient(180deg, rgba(8, 10, 12, .05) 0%, rgba(8, 10, 12, .13) 60%, rgba(7, 8, 9, .64) 100%),
+    var(--reader-reading-art) var(--reader-reading-position, center 28%) / cover no-repeat;
+  transform: scale(1.015);
+  transform-origin: 50% 42%;
+  will-change: transform, filter;
+}
+
+body[data-reader] .reader-silhouette {
   opacity: 0;
 }
 
-body[data-reader="baekheon"] .reader-orbit {
+body[data-reader] .reader-orbit {
+  opacity: .18;
+  mix-blend-mode: screen;
+}
+
+body[data-reader] .reader-lamp {
   opacity: .24;
 }
 
-body[data-reader="baekheon"] .reader-lamp {
-  opacity: .32;
+body[data-reading-experience="entering"] .reader-scene-art {
+  animation: reader-scene-enter 1.35s cubic-bezier(.2,.72,.22,1) both;
 }
 
-/* Until an approved scene asset is assigned, other readers keep the shared
-   geometry and their own atmosphere palette from reading-v3.css. */
+body[data-reading-experience="reading"] .reader-scene-art {
+  animation: reader-scene-breathe 13s ease-in-out infinite alternate;
+}
+
+body[data-reading-experience="complete"] .reader-scene-art {
+  transform: scale(1.035);
+  filter: saturate(.88) brightness(.78);
+  transition: transform 1.2s ease, filter 1.2s ease;
+}
+
+.reader-reading-intro {
+  position: absolute;
+  z-index: 6;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 10px;
+  padding: 32px;
+  text-align: center;
+  color: #f3e8d8;
+  background:
+    radial-gradient(circle at 50% 44%, rgba(178, 137, 82, .13), transparent 22rem),
+    rgba(5, 8, 10, .58);
+  backdrop-filter: blur(4px);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.reader-reading-intro-kicker {
+  color: #cba56e;
+  font-size: 10px;
+  letter-spacing: .22em;
+}
+
+.reader-reading-intro strong {
+  font-family: var(--mh-serif);
+  font-size: clamp(18px, 2vw, 27px);
+  font-weight: 500;
+  letter-spacing: .01em;
+}
+
+.reader-reading-intro-line {
+  position: relative;
+  width: min(230px, 56vw);
+  height: 1px;
+  margin-top: 8px;
+  overflow: hidden;
+  background: rgba(214, 183, 139, .18);
+}
+
+.reader-reading-intro-line::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, #c99c5e 22% 78%, transparent);
+  transform: translateX(-105%);
+}
+
+body[data-reading-experience="entering"] .reader-reading-intro {
+  visibility: visible;
+  animation: reader-intro-veil 1.55s ease both;
+}
+
+body[data-reading-experience="entering"] .reader-reading-intro-line::after {
+  animation: reader-intro-scan 1.15s .12s ease-out both;
+}
+
+body[data-reading-experience="entering"] .reader-identity,
+body[data-reading-experience="entering"] .reader-dialogue,
+body[data-reading-experience="entering"] .reading-sheet {
+  animation: reader-content-arrive .72s .78s ease both;
+}
+
+@keyframes reader-scene-enter {
+  0% { transform: scale(1.09); filter: blur(8px) brightness(.58); }
+  55% { filter: blur(1px) brightness(.82); }
+  100% { transform: scale(1.015); filter: blur(0) brightness(1); }
+}
+
+@keyframes reader-scene-breathe {
+  from { transform: scale(1.015) translate3d(0, 0, 0); }
+  to { transform: scale(1.045) translate3d(-.35%, -.25%, 0); }
+}
+
+@keyframes reader-intro-veil {
+  0% { opacity: 0; }
+  16%, 58% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes reader-intro-scan {
+  from { transform: translateX(-105%); }
+  to { transform: translateX(105%); }
+}
+
+@keyframes reader-content-arrive {
+  from { opacity: 0; transform: translateY(9px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body[data-reading-experience] .reader-scene-art,
+  body[data-reading-experience] .reader-reading-intro,
+  body[data-reading-experience] .reader-reading-intro-line::after,
+  body[data-reading-experience] .reader-identity,
+  body[data-reading-experience] .reader-dialogue,
+  body[data-reading-experience] .reading-sheet {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .reader-reading-intro {
+    display: none;
+  }
+}
