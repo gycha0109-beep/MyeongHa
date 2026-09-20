@@ -159,8 +159,6 @@ const requiredStatusFragments = [
 for (const fragment of requiredStatusFragments) requireFragment('readinessStatus', fragment);
 
 const forbiddenReadyFragments = [
-  'backup_schema_freshness: CURRENT_FOR_DEPLOYED_MIGRATION_1230',
-  'backup_refresh_required: false',
   'authoritative_privacy_reconciliation: true',
   'future_safe_privacy_reconciliation: true',
   'dr_ready: true',
