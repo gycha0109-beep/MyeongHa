@@ -4,6 +4,7 @@ import {
   summarizeProductionAccountDeletionAuthAdminConfigV1,
 } from './production-account-deletion-auth-admin-config.js';
 import {
+  createSupabaseAuthAdminCredentialHeadersV1,
   createSupabaseAuthAdminUserDeletionAdapterV1,
   SupabaseAuthAdminUserDeletionErrorV1,
   SUPABASE_AUTH_ADMIN_USER_DELETE_DEFAULT_TIMEOUT_MS_V1,
@@ -13,6 +14,7 @@ import {
 const ORIGIN = 'https://cnsfpcdiyofqvhpcegfc.supabase.co';
 const AUTH_USER_ID = '715ed5db-f090-4b8c-a067-640ecee36aa0';
 const ADMIN_SECRET = `sb_secret_${'a'.repeat(48)}`;
+const LEGACY_SERVICE_ROLE = `eyJ${'c'.repeat(96)}`;
 const PUBLIC_KEY = `sb_publishable_${'b'.repeat(48)}`;
 
 afterEach(() => {
@@ -69,6 +71,21 @@ describe('production account-deletion Auth Admin config', () => {
 });
 
 describe('Supabase Auth Admin account-deletion adapter', () => {
+  it('uses apikey-only authentication for current sb_secret credentials', () => {
+    expect(createSupabaseAuthAdminCredentialHeadersV1(ADMIN_SECRET)).toEqual({
+      apikey: ADMIN_SECRET,
+    });
+  });
+
+  it('preserves Bearer + apikey authentication for legacy service_role JWT credentials', () => {
+    expect(
+      createSupabaseAuthAdminCredentialHeadersV1(LEGACY_SERVICE_ROLE),
+    ).toEqual({
+      authorization: `Bearer ${LEGACY_SERVICE_ROLE}`,
+      apikey: LEGACY_SERVICE_ROLE,
+    });
+  });
+
   it('performs an exact server-side hard delete without returning provider payload', async () => {
     const calls: Array<{
       url: string;
@@ -115,9 +132,27 @@ describe('Supabase Auth Admin account-deletion adapter', () => {
     );
 
     const headers = call?.init.headers as Record<string, string>;
-    expect(headers.authorization).toBe(`Bearer ${ADMIN_SECRET}`);
+    expect(headers.authorization).toBeUndefined();
     expect(headers.apikey).toBe(ADMIN_SECRET);
     expect(headers['content-type']).toBe('application/json');
+  });
+
+  it('sends legacy service_role credentials with the legacy Bearer contract', async () => {
+    let headers: Record<string, string> | undefined;
+    const adapter = createSupabaseAuthAdminUserDeletionAdapterV1({
+      supabaseOrigin: ORIGIN,
+      adminSecret: LEGACY_SERVICE_ROLE,
+      fetchImpl: async (_url, init) => {
+        headers = init.headers as Record<string, string>;
+        return new Response(null, { status: 200 });
+      },
+    });
+
+    await expect(
+      adapter.deleteUser({ authUserId: AUTH_USER_ID }),
+    ).resolves.toEqual({ outcome: 'deleted' });
+    expect(headers?.authorization).toBe(`Bearer ${LEGACY_SERVICE_ROLE}`);
+    expect(headers?.apikey).toBe(LEGACY_SERVICE_ROLE);
   });
 
   it('treats an already-absent Auth user as idempotent terminal success', async () => {
