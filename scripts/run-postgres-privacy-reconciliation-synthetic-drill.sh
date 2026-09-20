@@ -310,7 +310,7 @@ select
 [[ "$("${psql_base[@]}" -Atc "select count(*) from public.outbox_events where id='a7000000-0000-0000-0000-000000000001';")" == "1" ]] || fail "second replay duplicated outbox event"
 pass "second identical replay is idempotent after subject becomes deletion_pending"
 
-claim_state="$("${psql_base[@]}" -Atc "
+claim_state="$("${psql_base[@]}" -Atqc "
 begin;
 set local role myeongha_system_executor;
 select subject_id::text||'|'||deletion_job_id::text||'|'||(reclaimed::int)
@@ -323,7 +323,7 @@ commit;
 ")"
 [[ "$claim_state" == "a2000000-0000-0000-0000-000000000001|a6000000-0000-0000-0000-000000000001|0" ]] || fail "recovered account deletion claim mismatch: $claim_state"
 
-resume_phase="$("${psql_base[@]}" -Atc "
+resume_phase="$("${psql_base[@]}" -Atqc "
 begin;
 set local role myeongha_system_executor;
 select phase from public.internal_account_deletion_resume_state_v1(
@@ -335,7 +335,7 @@ commit;
 ")"
 [[ "$resume_phase" == "db_finalization_required" ]] || fail "recovered account deletion pre-finalizer phase mismatch: $resume_phase"
 
-finalizer_state="$("${psql_base[@]}" -Atc "
+finalizer_state="$("${psql_base[@]}" -Atqc "
 begin;
 set local role myeongha_system_executor;
 select (finalized::int)||'|'||(replayed::int)||'|'||(auth_mapping_present::int)
@@ -349,7 +349,7 @@ commit;
 [[ "$finalizer_state" == "1|0|1" ]] || fail "recovered DB finalizer mismatch: $finalizer_state"
 pass "recovered database executes governed account-deletion finalizer"
 
-post_db_phase="$("${psql_base[@]}" -Atc "
+post_db_phase="$("${psql_base[@]}" -Atqc "
 begin;
 set local role myeongha_system_executor;
 select phase from public.internal_account_deletion_resume_state_v1(
@@ -365,7 +365,7 @@ commit;
 # This isolated drill only simulates provider ACK by removing its synthetic restored auth row.
 "${psql_base[@]}" -c "delete from auth.users where id='a1000000-0000-0000-0000-000000000001';" >/dev/null
 
-post_auth_phase="$("${psql_base[@]}" -Atc "
+post_auth_phase="$("${psql_base[@]}" -Atqc "
 begin;
 set local role myeongha_system_executor;
 select phase from public.internal_account_deletion_resume_state_v1(
@@ -377,7 +377,7 @@ commit;
 ")"
 [[ "$post_auth_phase" == "completion_ack_required" ]] || fail "recovered post-Auth phase mismatch: $post_auth_phase"
 
-completion_state="$("${psql_base[@]}" -Atc "
+completion_state="$("${psql_base[@]}" -Atqc "
 begin;
 set local role myeongha_system_executor;
 select (completed::int)||'|'||(replayed::int)
@@ -416,7 +416,7 @@ group by status,revoked_at;
 [[ "$commerce_state" == "1|revoked|YES" ]] || fail "recovered Commerce retention mismatch: $commerce_state"
 pass "recovered state cannot resurrect personalization/access while approved Commerce evidence remains revoked"
 
-completed_phase="$("${psql_base[@]}" -Atc "
+completed_phase="$("${psql_base[@]}" -Atqc "
 begin;
 set local role myeongha_system_executor;
 select phase from public.internal_account_deletion_resume_state_v1(
@@ -428,7 +428,7 @@ commit;
 ")"
 [[ "$completed_phase" == "completed" ]] || fail "recovered completed phase mismatch: $completed_phase"
 
-completion_replay="$("${psql_base[@]}" -Atc "
+completion_replay="$("${psql_base[@]}" -Atqc "
 begin;
 set local role myeongha_system_executor;
 select (completed::int)||'|'||(replayed::int)
