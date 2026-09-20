@@ -1,6 +1,12 @@
 import { randomUUID } from 'node:crypto';
+import {
+  HostedAuthCanaryKeySelectionError,
+  selectHostedAuthCanaryAdminKey,
+} from './account-deletion-hosted-auth-canary-key-selection.mjs';
 
 const CONFIRMATION = 'DELETE_SYNTHETIC_AUTH_USER_ONLY';
+const PROJECT_REF = 'cnsfpcdiyofqvhpcegfc';
+const MANAGEMENT_API_ORIGIN = 'https://api.supabase.com';
 const MAX_RESPONSE_BYTES = 65_536;
 const REQUEST_TIMEOUT_MS = 10_000;
 
@@ -24,9 +30,14 @@ function requireRunId(value) {
   return value;
 }
 
-function requireAdminSecret(value) {
-  if (typeof value !== 'string' || value.length === 0) {
-    throw new CanaryFailure('ADMIN_SECRET_MISSING');
+function requireManagementAccessToken(value) {
+  if (
+    typeof value !== 'string' ||
+    value.length < 16 ||
+    value.length > 4_096 ||
+    /\s/u.test(value)
+  ) {
+    throw new CanaryFailure('MANAGEMENT_ACCESS_TOKEN_MISSING_OR_INVALID');
   }
   return value;
 }
@@ -75,7 +86,11 @@ async function readBoundedJson(response) {
   }
 }
 
-async function fetchWithTimeout(url, init) {
+async function fetchWithTimeout(
+  url,
+  init,
+  transportFailureCode = 'PROVIDER_TRANSPORT_FAILURE',
+) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
@@ -86,9 +101,50 @@ async function fetchWithTimeout(url, init) {
       cache: 'no-store',
     });
   } catch {
-    throw new CanaryFailure('PROVIDER_TRANSPORT_FAILURE');
+    throw new CanaryFailure(transportFailureCode);
   } finally {
     clearTimeout(timer);
+  }
+}
+
+async function resolveAdminSecret() {
+  const explicit = process.env.MYEONGHA_SUPABASE_AUTH_ADMIN_SECRET;
+  if (typeof explicit === 'string' && explicit.length > 0) {
+    return explicit;
+  }
+
+  const managementAccessToken = requireManagementAccessToken(
+    process.env.SUPABASE_ACCESS_TOKEN,
+  );
+  const response = await fetchWithTimeout(
+    `${MANAGEMENT_API_ORIGIN}/v1/projects/${PROJECT_REF}/api-keys?reveal=true`,
+    {
+      method: 'GET',
+      headers: Object.freeze({
+        accept: 'application/json',
+        authorization: `Bearer ${managementAccessToken}`,
+      }),
+    },
+    'MANAGEMENT_API_TRANSPORT_FAILURE',
+  );
+
+  if (!response.ok) {
+    try {
+      void response.body?.cancel();
+    } catch {
+      // Best-effort body cancellation only. Never print the response body.
+    }
+    throw new CanaryFailure(`MANAGEMENT_API_REJECTED_${response.status}`);
+  }
+
+  const payload = await readBoundedJson(response);
+  try {
+    return selectHostedAuthCanaryAdminKey(payload);
+  } catch (error) {
+    if (error instanceof HostedAuthCanaryKeySelectionError) {
+      throw new CanaryFailure(error.code);
+    }
+    throw new CanaryFailure('MANAGEMENT_API_KEY_SELECTION_FAILED');
   }
 }
 
@@ -138,7 +194,7 @@ async function main() {
     'CONFIRMATION_REQUIRED',
   );
   const runId = requireRunId(process.env.GITHUB_RUN_ID);
-  requireAdminSecret(process.env.MYEONGHA_SUPABASE_AUTH_ADMIN_SECRET);
+  const adminSecret = await resolveAdminSecret();
 
   const {
     parseProductionAccountDeletionAuthAdminConfigV1,
@@ -155,14 +211,17 @@ async function main() {
 
   let config;
   try {
-    config = parseProductionAccountDeletionAuthAdminConfigV1(process.env);
+    config = parseProductionAccountDeletionAuthAdminConfigV1({
+      ...process.env,
+      MYEONGHA_SUPABASE_AUTH_ADMIN_SECRET: adminSecret,
+    });
   } catch {
     throw new CanaryFailure('AUTH_ADMIN_CONFIG_INVALID');
   }
 
   const summary = summarizeProductionAccountDeletionAuthAdminConfigV1(config);
   if (
-    summary.supabaseProjectRef !== 'cnsfpcdiyofqvhpcegfc' ||
+    summary.supabaseProjectRef !== PROJECT_REF ||
     summary.adminSecretConfigured !== true
   ) {
     throw new CanaryFailure('GOVERNED_PROJECT_MISMATCH');
