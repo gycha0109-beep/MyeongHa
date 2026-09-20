@@ -105,11 +105,11 @@ if (!(encryptIndex < plaintextDeleteIndex && runnerStepIndex < uploadIndex)) {
 }
 
 const requiredRunbookFragments = [
-  'BACKUP PRODUCTION-PROVEN',
+  'CURRENT-FRONTIER BACKUP PROVEN',
   'Current Supabase organization plan: `free`',
   'PITR',
   'NOT AVAILABLE UNDER THE CURRENT FREE-PLAN OPERATING BASELINE',
-  'successful production dump         = EVIDENCED — latest run 35467974194',
+  'successful production dump         = EVIDENCED — latest run 35536655149',
   'RPO: OPEN DECISION',
   'RTO: OPEN DECISION',
   'SUPABASE_PRODUCTION_SESSION_POOLER_HOST',
@@ -118,8 +118,8 @@ const requiredRunbookFragments = [
   'MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE',
   'data_deletion_jobs',
   'Never restore a drill directly over serving production.',
-  'backup schema freshness             = STALE — backup frontier 1120 / deployed frontier 1230',
-  'current-schema restore              = REFRESH REQUIRED',
+  'backup schema freshness             = CURRENT — backup frontier 1230 / deployed frontier 1230',
+  'current-schema restore              = PENDING ISOLATED RESTORE',
   'achieved recovery duration',
   'achieved data-loss window',
 ];

@@ -84,12 +84,12 @@ requireRegex(
 );
 requireFragment('restoreHarness', 'privacy_reconciliation: "not_exercised_by_this_workflow"');
 requireFragment('restoreHarness', 'dr_ready: false');
-requireFragment('restoreRunbook', 'Production state: BACKUP PRODUCTION-PROVEN / CURRENT-FRONTIER BACKUP+RESTORE REFRESH REQUIRED / DR NOT READY');
-requireFragment('restoreRunbook', 'backup schema freshness             = STALE — backup frontier 1120 / deployed frontier 1230');
-requireFragment('restoreRunbook', 'current-schema restore              = REFRESH REQUIRED');
-requireFragment('restoreRunbook', 'bounded privacy source authority    = RUNTIME-PROVEN — run 35531005587');
+requireFragment('restoreRunbook', 'Production state: CURRENT-FRONTIER BACKUP PROVEN / RESTORE REFRESH REQUIRED / DR NOT READY');
+requireFragment('restoreRunbook', 'backup schema freshness             = CURRENT — backup frontier 1230 / deployed frontier 1230');
+requireFragment('restoreRunbook', 'current-schema restore              = PENDING ISOLATED RESTORE');
+requireFragment('restoreRunbook', 'bounded privacy source authority    = RUNTIME-PROVEN — run 35539838537');
 requireFragment('restoreRunbook', 'recovered finalization mechanics    = IMPLEMENTED / POST-MERGE CI GREEN');
-requireFragment('restoreRunbook', 'recovered finalization on fresh restore = PENDING CURRENT-FRONTIER BACKUP');
+requireFragment('restoreRunbook', 'recovered finalization on fresh restore = PENDING ISOLATED RESTORE');
 requireFragment('restoreRunbook', 'authoritative privacy reconciliation= NOT YET PROVEN');
 requireFragment('restoreRunbook', 'future-safe privacy reconciliation  = false');
 requireFragment('restoreRunbook', 'provider-managed full restore       = NOT PROVEN');
@@ -97,10 +97,10 @@ requireFragment('restoreRunbook', 'Restore drill: PASSED for MyeongHa applicatio
 requireFragment('restoreRunbook', 'scripts/run-postgres-privacy-reconciliation-synthetic-drill.sh');
 requireFragment('restoreRunbook', 'AUTHORITATIVE_CAPTURED_WINDOW_V1');
 requireFragment('restoreRunbook', 'Production PostgreSQL Privacy Recovery Ledger');
-requireFragment('restoreRunbook', '35531005587');
-requireFragment('restoreRunbook', '- [x] bounded captured-window privacy source authority runtime-proven — run `35531005587`');
+requireFragment('restoreRunbook', '35539838537');
+requireFragment('restoreRunbook', '- [x] bounded captured-window privacy source authority runtime-proven — run `35539838537`');
 requireFragment('restoreRunbook', '- [x] account-deletion finalizer and recovered-state finalization mechanics implemented / post-merge CI green');
-requireFragment('restoreRunbook', '- [ ] fresh governed backup captured after deployed migration `1230`');
+requireFragment('restoreRunbook', '- [x] fresh governed backup captured after deployed migration `1230` — run `35536655149` / artifact `10612622254`');
 requireFragment('restoreRunbook', '- [ ] isolated restore completed from that current-frontier backup');
 requireFragment('restoreRunbook', '- [ ] recovered-state finalization drill executed on that fresh governed restore');
 requireFragment('restoreRunbook', '- [x] synthetic drill data-loss window measured — `4s` (diagnostic, not approved RPO)');
@@ -119,39 +119,37 @@ for (const staleFragment of [
 }
 
 const requiredStatusFragments = [
-  'latest_governed_backup_run_id: 35467974194',
-  'latest_governed_backup_source_sha: 89aeedfb18a865b9e1fb62e39d710006427837d9',
-  'latest_governed_backup_artifact_id: 10592011138',
-  'latest_governed_backup_artifact_name: myeongha-postgres-20260919T203800Z',
-  'latest_governed_backup_completed_at_utc: 2026-09-19T20:40:17Z',
-  'latest_proven_backup_migration_frontier: 1120',
+  'latest_governed_backup_run_id: 35536655149',
+  'latest_governed_backup_source_sha: 00580651fa79c6361a03d09f207b6c27678d2714',
+  'latest_governed_backup_artifact_id: 10612622254',
+  'latest_governed_backup_artifact_name: myeongha-postgres-20260920T204732Z',
+  'latest_governed_backup_completed_at_utc: 2026-09-20T20:50:05Z',
+  'latest_proven_backup_migration_frontier: 1230',
   'production_schema_latest_deployed_migration: 1230',
   'production_schema_deploy_run_id: 35522337472',
   'production_schema_deploy_head_sha: 217698890a49c525ab043ac902037f2029227fa4',
   'current_repository_migration_frontier: 1230',
-  'backup_schema_freshness: STALE_FOR_CURRENT_REPOSITORY_FRONTIER_1230',
-  'backup_refresh_required: true',
   'latest_isolated_restore_run_id: 35331742188',
   'latest_isolated_restore_result: SUCCESS',
   'latest_isolated_restore_backup_migration_frontier: 1120',
   'restore_evidence_envelope_runtime: PROVEN_ON_RUN_35331742188',
   'provider_managed_data_full_restore: false',
   'privacy_recovery_ledger_workflow: RUNTIME_PROVEN',
-  'privacy_recovery_ledger_run_id: 35531005587',
+  'privacy_recovery_ledger_run_id: 35539838537',
   'privacy_recovery_ledger_result: SUCCESS',
-  'privacy_recovery_ledger_runtime_head_sha: 931de80941683b6cdca45f3181b0a6234f153fed',
-  'privacy_recovery_ledger_backup_run_id: 35467974194',
-  'privacy_recovery_ledger_backup_completed_at_utc: 2026-09-19T20:40:17Z',
-  'privacy_recovery_ledger_artifact_id: 10610943814',
-  'privacy_recovery_ledger_artifact_name: myeongha-privacy-ledger-20260920T190310Z',
-  'privacy_recovery_ledger_artifact_expires_at: 2026-10-20T19:03:10Z',
-  'privacy_recovery_ledger_artifact_digest: sha256:cf7628d62153e0bfc2c0977f03f3b5f5f9de52d69740248a789d648eb80b3d99',
+  'privacy_recovery_ledger_runtime_head_sha: 5bb5de08ef211f78565d06c1f9c4ff0c0ec8a956',
+  'privacy_recovery_ledger_backup_run_id: 35536655149',
+  'privacy_recovery_ledger_backup_completed_at_utc: 2026-09-20T20:50:05Z',
+  'privacy_recovery_ledger_artifact_id: 10614412005',
+  'privacy_recovery_ledger_artifact_name: myeongha-privacy-ledger-20260920T214938Z',
+  'privacy_recovery_ledger_artifact_expires_at: 2026-10-20T21:49:39Z',
+  'privacy_recovery_ledger_artifact_digest: sha256:c048023ae254a8aa176a4c0c23f0853c699f902711bfefe350200ab4718f70ef',
   'privacy_recovery_ledger_authority_class: AUTHORITATIVE_CAPTURED_WINDOW_V1',
   'privacy_recovery_ledger_retention: P30D',
   'authoritative_post_backup_source: true_bounded_captured_window_only',
   'account_deletion_finalizer_runtime: IMPLEMENTED_AND_PROVIDER_MECHANICS_SEPARATELY_PROVEN',
   'recovered_state_finalization_drill: IMPLEMENTED_MERGED_POST_MERGE_CI_GREEN',
-  'recovered_state_finalization_restored_backup_runtime: PENDING_FRESH_CURRENT_FRONTIER_BACKUP',
+  'recovered_state_finalization_restored_backup_runtime: PENDING_CURRENT_FRONTIER_ISOLATED_RESTORE',
   'authoritative_privacy_reconciliation: false',
   'future_safe_privacy_reconciliation: false',
   'rpo_authority: OPEN_DECISION',
@@ -161,8 +159,6 @@ const requiredStatusFragments = [
 for (const fragment of requiredStatusFragments) requireFragment('readinessStatus', fragment);
 
 const forbiddenReadyFragments = [
-  'backup_schema_freshness: CURRENT_FOR_DEPLOYED_MIGRATION_1230',
-  'backup_refresh_required: false',
   'authoritative_privacy_reconciliation: true',
   'future_safe_privacy_reconciliation: true',
   'dr_ready: true',
