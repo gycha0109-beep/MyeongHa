@@ -14,7 +14,7 @@ event_3_at="$(date -u -d "@$((backup_epoch + 3))" +'%Y-%m-%dT%H:%M:%S.000Z')"
 event_4_at="$(date -u -d "@$((backup_epoch + 4))" +'%Y-%m-%dT%H:%M:%S.000Z')"
 incident_reference_at="$(date -u -d "@$((backup_epoch + 5))" +'%Y-%m-%dT%H:%M:%S.000Z')"
 
-psql_base=(psql -X -v ON_ERROR_STOP=1)
+psql_base=(psql -X -q -v ON_ERROR_STOP=1)
 tmp_dir=$(mktemp -d)
 trap 'rm -rf "$tmp_dir"' EXIT
 
