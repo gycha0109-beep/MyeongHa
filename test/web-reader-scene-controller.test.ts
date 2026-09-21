@@ -2,13 +2,17 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { ReaderRuntimeClientErrorV1 } from '../apps/web/reader-runtime-client.js';
 import { createReaderSceneControllerV1 } from '../apps/web/reader-scene-controller.js';
+import type { ReaderSceneInterpretationV1 } from '../apps/web/reader-scene-contract.js';
 
-function scene(readerCharacterId = 'baekheon') {
+function scene(
+  readerCharacterId = 'baekheon',
+  officialReadingId = 'reading-1',
+): ReaderSceneInterpretationV1 {
   return Object.freeze({
     schemaVersion: 'myeongha-reader-interpretation-preview-http-v1',
     lifecycle: 'preview',
     mode: 'reader_interpretation',
-    officialReadingId: 'reading-1',
+    officialReadingId,
     readerCharacterId,
     domain: 'general_natal',
     interpretationHash: 'sha256:v1:reader-result',
@@ -48,7 +52,7 @@ describe('web Reader Scene controller', () => {
       presentationHint: 'baekheon',
     });
 
-    expect(states[0].state).toBe('loading');
+    expect(states[0]!.state).toBe('loading');
     expect(result).toMatchObject({
       state: 'ready',
       readerCharacterId: 'taegyeom',
@@ -112,10 +116,7 @@ describe('web Reader Scene controller', () => {
       officialReadingId: 'reading-2',
     });
 
-    second.resolve({
-      ...scene('taegyeom'),
-      officialReadingId: 'reading-2',
-    });
+    second.resolve(scene('taegyeom', 'reading-2'));
     await secondLoad;
 
     first.resolve(scene('baekheon'));
