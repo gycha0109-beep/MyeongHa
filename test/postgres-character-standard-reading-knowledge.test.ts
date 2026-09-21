@@ -10,12 +10,15 @@ describe('PostgreSQL Character Standard Reading Reader Knowledge adapter', () =>
     const client: PostgresTransactionQueryV1 = {
       async query<Row>(text: string, values?: readonly unknown[]) {
         calls.push(values === undefined ? { text } : { text, values });
-        if (text.includes('qry_character_standard_reading_access_runtime_v1')) {
+        if (text.includes('qry_character_standard_reading_access_runtime_v2')) {
           return {
             rows: [{
+              subjectId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
               readingId: '11111111-1111-4111-8111-111111111111',
               readingSessionId: '22222222-2222-4222-8222-222222222222',
               productId: '33333333-3333-4333-8333-333333333333',
+              readerCharacterId: 'baekheon',
+              readerContentBundleId: '55555555-5555-4555-8555-555555555555',
               topicKey: 'general',
               sajuDomain: 'general',
               readingPeriod: 'original',
@@ -58,7 +61,7 @@ describe('PostgreSQL Character Standard Reading Reader Knowledge adapter', () =>
     });
 
     expect(calls).toHaveLength(2);
-    expect(calls[0]?.text).toContain('qry_character_standard_reading_access_runtime_v1');
+    expect(calls[0]?.text).toContain('qry_character_standard_reading_access_runtime_v2');
     expect(calls[0]?.values).toEqual([
       'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
       'baekheon',

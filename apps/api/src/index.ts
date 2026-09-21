@@ -667,6 +667,13 @@ export {
 } from './character-standard-reading-chat-turn-context.js';
 
 export {
+  CharacterStandardReadingServerRuntimeAuthorityErrorV1,
+  prepareCharacterStandardReadingServerRuntimeV1,
+  type CharacterStandardReadingServerContextInputV1,
+  type PrepareCharacterStandardReadingServerRuntimeInputV1,
+} from './character-standard-reading-server-runtime-authority.js';
+
+export {
   CharacterStandardReadingChatTurnPreflightErrorV1,
   prepareCharacterStandardReadingChatTurnPreflightV1,
   type CharacterStandardReadingChatTurnPreflightV1,
@@ -677,3 +684,47 @@ export {
 export {
   createPostgresChatThreadRuntimeBindingAuthorityPortV1,
 } from './postgres-chat-thread-runtime-binding.js';
+
+export {
+  READER_INTERPRETATION_PREVIEW_CONTRACT_VERSION_V1,
+  READER_INTERPRETATION_PREVIEW_SCHEMA_VERSION_V1,
+  ReaderInterpretationPreviewRuntimeErrorV1,
+  runThreadBoundReaderInterpretationPreviewV1,
+  type OfficialReadingCharacterGroundingProjectionInputV1,
+  type OfficialReadingCharacterGroundingProjectionPortV1,
+  type ReaderInterpretationPreviewEnvelopeV1,
+  type RunThreadBoundReaderInterpretationPreviewInputV1,
+} from './reader-interpretation-preview-runtime-v1.js';
+
+export {
+  SajuCharacterGroundingProjectionAdapterErrorV1,
+  createSajuCharacterGroundingProjectionAdapterV1,
+  type SajuCharacterGroundingBuilderInputV1,
+  type SajuCharacterGroundingBuilderPortV1,
+} from './saju-character-grounding-projection-adapter.js';
+
+export {
+  SAJU_CHARACTER_GROUNDING_ADMISSION_HEADER_V1,
+  SAJU_CHARACTER_GROUNDING_ADMISSION_VERSION_V1,
+  SAJU_CHARACTER_GROUNDING_HTTP_DEFAULT_TIMEOUT_MS_V1,
+  SAJU_CHARACTER_GROUNDING_HTTP_MAX_TIMEOUT_MS_V1,
+  SAJU_CHARACTER_GROUNDING_HTTP_PATH_V1,
+  SajuCharacterGroundingHttpAdapterErrorV1,
+  createProductionSajuCharacterGroundingProjectionPortV1,
+  createSajuCharacterGroundingHttpAdapterV1,
+  type SajuCharacterGroundingHttpAdapterConfigV1,
+  type SajuCharacterGroundingHttpAdapterFailureCodeV1,
+} from './saju-character-grounding-http-adapter.js';
+
+export {
+  READER_INTERPRETATION_PREVIEW_HTTP_PATH_V1,
+  READER_INTERPRETATION_PREVIEW_HTTP_SCHEMA_VERSION_V1,
+  ReaderInterpretationPreviewHttpErrorV1,
+  parseReaderInterpretationPreviewHttpRequestV1,
+  projectReaderInterpretationPreviewHttpResponseV1,
+  runReaderInterpretationPreviewHttpV1,
+  type ReaderInterpretationPreviewContextAuthorityPortV1,
+  type ReaderInterpretationPreviewHttpRequestV1,
+  type ReaderInterpretationPreviewHttpResponseV1,
+} from './reader-interpretation-preview-http.js';
+

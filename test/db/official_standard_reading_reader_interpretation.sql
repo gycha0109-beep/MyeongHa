@@ -455,6 +455,41 @@ select pg_temp.assert_v2_true(
 );
 
 select pg_temp.assert_v2_true(
+  'bundle-aware Reader Knowledge returns exact server-owned Reader and content bundle',
+  exists (
+    select 1
+    from public.qry_character_standard_reading_access_runtime_v2(
+      '11390000-0000-0000-0000-000000000001',
+      'test-standard-reader',
+      clock_timestamp()
+    ) q
+    where q.subject_id = '11390000-0000-0000-0000-000000000001'
+      and q.reading_id = '12103100-0000-0000-0000-000000000001'
+      and q.reader_character_id = 'test-standard-reader'
+      and q.reader_content_bundle_id = '11391000-0000-0000-0000-000000000001'
+      and q.response_hash = 'sha256:test-official-reading-artifact'
+  )
+  and exists (
+    select 1
+    from public.qry_character_standard_reading_access_runtime_v2(
+      '11390000-0000-0000-0000-000000000001',
+      'test-unlockable-reader',
+      clock_timestamp()
+    ) q
+    where q.reader_character_id = 'test-unlockable-reader'
+      and q.reader_content_bundle_id = '11391000-0000-0000-0000-000000000001'
+  )
+  and not exists (
+    select 1
+    from public.qry_character_standard_reading_access_runtime_v2(
+      '11390000-0000-0000-0000-000000000001',
+      'test-coming-soon-reader',
+      clock_timestamp()
+    )
+  )
+);
+
+select pg_temp.assert_v2_true(
   'different Readers consume the same official Source Truth hash',
   (
     select count(distinct q.response_hash) = 1
@@ -581,8 +616,13 @@ select pg_catalog.set_config(
 );
 
 select pg_temp.assert_v2_true(
-  'new v2 mutation/raw source remain unactivated for ordinary runtime roles',
-  not has_function_privilege(
+  'Production Reader Knowledge exposes only the narrow bundle-aware wrapper',
+  has_function_privilege(
+    'myeongha_api_executor',
+    'public.qry_character_standard_reading_access_runtime_v2(uuid,text,timestamptz)',
+    'EXECUTE'
+  )
+  and not has_function_privilege(
     'myeongha_api_executor',
     'public.cmd_bind_standard_reading_access_v2(uuid,uuid,uuid,uuid,text,text,jsonb)',
     'EXECUTE'
@@ -590,6 +630,11 @@ select pg_temp.assert_v2_true(
   and not has_function_privilege(
     'myeongha_api_executor',
     'public.internal_qry_standard_reading_artifact_source_v2(uuid,uuid,text,timestamptz)',
+    'EXECUTE'
+  )
+  and not has_function_privilege(
+    'myeongha_api_executor',
+    'public.internal_qry_character_standard_reading_access_v2(uuid,text,timestamptz)',
     'EXECUTE'
   )
   and not has_table_privilege(

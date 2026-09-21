@@ -1,6 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { CharacterContentDefinition } from '../packages/character-content/src/index.js';
 import {
+  SAJU_CHARACTER_GROUNDING_PROJECTION_VERSION_V1,
+  SAJU_CHARACTER_GROUNDING_SCHEMA_VERSION_V1,
+  SAJU_GROUNDING_AXIS_REGISTRY_VERSION_V1,
+  hashCharacterSajuGroundingBundleMaterialV1,
+  type CharacterSajuGroundingBundleViewV1,
+} from '../packages/domain/src/index.js';
+import {
   DEV_CHARACTER_CONTENT_BUNDLE,
   DEV_WORLD_CONTENT_BUNDLE,
 } from '../packages/test-fixtures/src/index.js';
@@ -14,6 +21,7 @@ import {
   prepareCharacterStandardReadingChatTurnPreflightV1,
   prepareCharacterStandardReadingThreadRuntimeV1,
   prepareChatReceiveCommand,
+  runThreadBoundReaderInterpretationPreviewV1,
   type CharacterStandardReadingChatBaseContextInputV1,
   type CharacterStandardReadingChatTurnServerContextInputV1,
 } from '../apps/api/src/index.js';
@@ -118,7 +126,7 @@ function authoredCharacter(characterId = 'baekheon'): CharacterContentDefinition
     },
     sajuProfile: {
       profileVersion: 'saju-profile-v1',
-      attentionAxes: ['continuity'],
+      attentionAxes: ['long_cycle', 'accumulated_consequence', 'endurance'],
       followUpQuestionStrategies: ['chronology'],
       framingStyle: 'record_first',
       uncertaintyResponseStyle: 'preserve',
@@ -192,7 +200,10 @@ function serverContextInput(): CharacterStandardReadingChatTurnServerContextInpu
   return context;
 }
 
-function authorities(participants: readonly string[] = ['baekheon']) {
+function authorities(
+  participants: readonly string[] = ['baekheon'],
+  readerContentBundleId = BUNDLE_ID,
+) {
   const threadBindingAuthorityPort: ChatThreadRuntimeBindingReadAuthorityPortV1 = {
     readRuntimeBinding: vi.fn(async () => [{
       threadId: THREAD_ID,
@@ -205,9 +216,12 @@ function authorities(participants: readonly string[] = ['baekheon']) {
   };
   const accessAuthorityPort: CharacterStandardReadingAccessAuthorityPortV1 = {
     readAccessibleReadings: vi.fn(async () => [{
+      subjectId: SUBJECT_ID,
       readingId: READING_ID,
       readingSessionId: '44444444-4444-4444-8444-444444444444',
       productId: PRODUCT_ID,
+      readerCharacterId: 'baekheon',
+      readerContentBundleId,
       topicKey: 'career',
       sajuDomain: 'career',
       readingPeriod: 'original',
@@ -336,6 +350,7 @@ function compatibleReceiveRuntime(
   return {
     assertPinnedClientCompatible: vi.fn(() => entry),
     resolveForNewThread: vi.fn(() => entry),
+    resolvePinned: vi.fn(() => entry),
   } as unknown as ContentReleaseRuntime;
 }
 
@@ -357,6 +372,63 @@ function existingThreadReceivePlan(
       participantCharacterIds: ['baekheon'],
     },
   });
+}
+
+function previewGrounding(): CharacterSajuGroundingBundleViewV1 {
+  const withoutHash = {
+    schemaVersion: SAJU_CHARACTER_GROUNDING_SCHEMA_VERSION_V1,
+    groundingProjectionVersion: SAJU_CHARACTER_GROUNDING_PROJECTION_VERSION_V1,
+    axisRegistryVersion: SAJU_GROUNDING_AXIS_REGISTRY_VERSION_V1,
+    readingRef: READING_ID,
+    productResponseVersion: 'myeonghwa-product-reading-response-v2',
+    engineVersion: 'saju-engine-v1',
+    readingDomain: 'career' as const,
+    sourceResponseHash: 'a'.repeat(64),
+    units: [
+      {
+        unitId: `grounding_unit_${'1'.repeat(24)}`,
+        domain: 'career' as const,
+        axis: 'timing' as const,
+        narrativeRole: 'primary' as const,
+        semanticKey: 'career:timing',
+        canonicalMeaning: '긴 시간축에서 반복되는 직업 흐름을 먼저 확인합니다.',
+        sourceBlockRefs: ['sections.0.blocks.0'],
+        requiredCompanionUnitRefs: [],
+        requiredDisclosureRefs: [],
+        realizationPolicyRef: 'bounded_semantic_paraphrase_v1' as const,
+      },
+      {
+        unitId: `grounding_unit_${'2'.repeat(24)}`,
+        domain: 'career' as const,
+        axis: 'tension' as const,
+        narrativeRole: 'tension' as const,
+        semanticKey: 'career:tension',
+        canonicalMeaning: '누적된 부담이 선택에 함께 작동할 수 있습니다.',
+        sourceBlockRefs: ['sections.0.blocks.0'],
+        requiredCompanionUnitRefs: [],
+        requiredDisclosureRefs: [],
+        realizationPolicyRef: 'bounded_semantic_paraphrase_v1' as const,
+      },
+      {
+        unitId: `grounding_unit_${'3'.repeat(24)}`,
+        domain: 'career' as const,
+        axis: 'strength' as const,
+        narrativeRole: 'supporting' as const,
+        semanticKey: 'career:strength',
+        canonicalMeaning: '지속 가능한 힘이 직업 선택의 한 축입니다.',
+        sourceBlockRefs: ['sections.0.blocks.0'],
+        requiredCompanionUnitRefs: [],
+        requiredDisclosureRefs: [],
+        realizationPolicyRef: 'bounded_semantic_paraphrase_v1' as const,
+      },
+    ],
+    disclosures: [],
+    ambiguities: [],
+  };
+  return {
+    ...withoutHash,
+    groundingHash: hashCharacterSajuGroundingBundleMaterialV1(withoutHash),
+  };
 }
 
 describe('thread-bound Official Reading Reader runtime', () => {
@@ -426,6 +498,151 @@ describe('thread-bound Official Reading Reader runtime', () => {
     ).rejects.toThrow(/does not match the active thread Reader/u);
 
     expect(authority.accessAuthorityPort.readAccessibleReadings).not.toHaveBeenCalled();
+  });
+
+  it('runs Reader Interpretation with Reader identity derived from the owner-authorized thread', async () => {
+    const authority = authorities();
+    const bundle = previewGrounding();
+    const groundingProjectionPort = {
+      projectGrounding: vi.fn(async () => bundle),
+    };
+
+    const result = await runThreadBoundReaderInterpretationPreviewV1({
+      resolvedSubjectId: SUBJECT_ID,
+      threadId: THREAD_ID,
+      officialReadingId: READING_ID,
+      effectiveAt: '2026-09-21T00:01:00.000Z',
+      ...authority,
+      contentReleaseRuntime: compatibleReceiveRuntime(),
+      contextInput: serverContextInput(),
+      groundingProjectionPort,
+    });
+
+    expect(result.readerCharacterId).toBe('baekheon');
+    expect(result.readerContentBundleId).toBe(BUNDLE_ID);
+    expect(result.officialReadingId).toBe(READING_ID);
+    expect(result.sourceResponseHash).toBe(bundle.sourceResponseHash);
+    expect(groundingProjectionPort.projectGrounding).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects caller-supplied same-id Character profile authority before Preview grounding', async () => {
+    const authority = authorities();
+    const groundingProjectionPort = {
+      projectGrounding: vi.fn(async () => previewGrounding()),
+    };
+    const forgedContext = {
+      ...serverContextInput(),
+      character: {
+        ...authoredCharacter('baekheon'),
+        sajuProfile: {
+          ...authoredCharacter('baekheon').sajuProfile!,
+          attentionAxes: ['short_term_signal'],
+        },
+      },
+      contentBundleId: BUNDLE_ID,
+      relationshipState: {
+        closeness: 999,
+        trust: 999,
+        friction: 0,
+        stage: 'caller-forged',
+        revision: 999,
+        policyVersion: 'caller-forged',
+      },
+      grantedMemories: [{
+        memoryItemId: 'caller-memory',
+        memoryType: 'caller-memory',
+        schemaVersion: 'v1',
+        content: { forged: true },
+        grantId: 'caller-grant',
+        granteeCharacterId: 'baekheon',
+      }],
+    } as unknown as CharacterStandardReadingChatTurnServerContextInputV1;
+
+    await expect(
+      runThreadBoundReaderInterpretationPreviewV1({
+        resolvedSubjectId: SUBJECT_ID,
+        threadId: THREAD_ID,
+        officialReadingId: READING_ID,
+        effectiveAt: '2026-09-21T00:01:00.000Z',
+        ...authority,
+        contentReleaseRuntime: compatibleReceiveRuntime(),
+        contextInput: forgedContext,
+        groundingProjectionPort,
+      }),
+    ).rejects.toMatchObject({
+      code: 'AUTHORITY_CONFLICT',
+    });
+
+    expect(groundingProjectionPort.projectGrounding).not.toHaveBeenCalled();
+    expect(authority.relationshipAuthorityPort.readCurrentRelationship).not.toHaveBeenCalled();
+    expect(authority.memoryItemsAuthorityPort.readCurrentItems).not.toHaveBeenCalled();
+  });
+
+  it('rejects Preview when exact Reader access bundle differs from the pinned release', async () => {
+    const authority = authorities(
+      ['baekheon'],
+      '99999999-9999-4999-8999-999999999999',
+    );
+    const groundingProjectionPort = {
+      projectGrounding: vi.fn(async () => previewGrounding()),
+    };
+
+    await expect(
+      runThreadBoundReaderInterpretationPreviewV1({
+        resolvedSubjectId: SUBJECT_ID,
+        threadId: THREAD_ID,
+        officialReadingId: READING_ID,
+        effectiveAt: '2026-09-21T00:01:00.000Z',
+        ...authority,
+        contentReleaseRuntime: compatibleReceiveRuntime(),
+        contextInput: serverContextInput(),
+        groundingProjectionPort,
+      }),
+    ).rejects.toThrow(/content bundle does not match/u);
+
+    expect(groundingProjectionPort.projectGrounding).not.toHaveBeenCalled();
+  });
+
+  it('rejects revoked Reader access on the hardened Preview path before grounding', async () => {
+    const authority = authorities();
+    authority.accessAuthorityPort.readAccessibleReadings = vi.fn(async () => []);
+    const groundingProjectionPort = {
+      projectGrounding: vi.fn(async () => previewGrounding()),
+    };
+
+    await expect(
+      runThreadBoundReaderInterpretationPreviewV1({
+        resolvedSubjectId: SUBJECT_ID,
+        threadId: THREAD_ID,
+        officialReadingId: READING_ID,
+        effectiveAt: '2026-09-21T00:01:00.000Z',
+        ...authority,
+        contentReleaseRuntime: compatibleReceiveRuntime(),
+        contextInput: serverContextInput(),
+        groundingProjectionPort,
+      }),
+    ).rejects.toThrow();
+
+    expect(groundingProjectionPort.projectGrounding).not.toHaveBeenCalled();
+    expect(authority.artifactAuthorityPort.readArtifactSource).not.toHaveBeenCalled();
+  });
+
+  it('rejects thread-valid context when exact Reader access points at another content bundle', async () => {
+    const authority = authorities(
+      ['baekheon'],
+      '99999999-9999-4999-8999-999999999999',
+    );
+
+    await expect(
+      prepareCharacterStandardReadingThreadRuntimeV1({
+        resolvedSubjectId: SUBJECT_ID,
+        threadId: THREAD_ID,
+        readingId: READING_ID,
+        effectiveAt: '2026-09-21T00:01:00.000Z',
+        ...authority,
+        contextInput: contextInput(),
+      }),
+    ).rejects.toThrow(/content bundle does not match/u);
   });
 
   it('rejects a stale/different content bundle before Official Reading lookup', async () => {

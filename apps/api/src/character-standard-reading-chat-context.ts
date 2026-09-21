@@ -87,6 +87,11 @@ export async function prepareCharacterStandardReadingChatContextV1(
       'Official Reading Reader does not match the active Character context.',
     );
   }
+  if (input.contextInput.contentBundleId !== source.readerContentBundleId) {
+    throw new CharacterStandardReadingChatContextErrorV1(
+      'Official Reading Reader content bundle does not match the active Character context.',
+    );
+  }
 
   if (
     !input.contextInput.character.capabilities.some(

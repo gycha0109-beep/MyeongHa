@@ -46,9 +46,12 @@ function ports() {
   const accessAuthorityPort: CharacterStandardReadingAccessAuthorityPortV1 = {
     readAccessibleReadings: vi.fn(async () => [
       {
+        subjectId: SUBJECT_ID,
         readingId: READING_ID,
         readingSessionId: '44444444-4444-4444-8444-444444444444',
         productId: PRODUCT_ID,
+        readerCharacterId: 'baekheon',
+        readerContentBundleId: 'bundle-v1',
         topicKey: 'career',
         sajuDomain: 'career',
         readingPeriod: 'original',
@@ -274,6 +277,29 @@ describe('Official Reading -> Reader Chat context composition', () => {
         contextInput: baseContext('seyeon'),
       }),
     ).rejects.toThrow(/Reader does not match the active Character context/u);
+  });
+
+  it('rejects a different Reader content bundle even when Character id matches', async () => {
+    const authority = ports();
+    const original = authority.accessAuthorityPort.readAccessibleReadings;
+    authority.accessAuthorityPort.readAccessibleReadings = vi.fn(async (input) => {
+      const rows = await original(input);
+      return rows.map((row) => ({
+        ...row,
+        readerContentBundleId: 'bundle-other',
+      }));
+    });
+
+    await expect(
+      prepareCharacterStandardReadingChatContextV1({
+        resolvedSubjectId: SUBJECT_ID,
+        readerCharacterId: 'baekheon',
+        readingId: READING_ID,
+        effectiveAt: '2026-09-21T00:01:00.000Z',
+        ...authority,
+        contextInput: baseContext(),
+      }),
+    ).rejects.toThrow(/content bundle does not match/u);
   });
 
   it('rejects any caller-supplied Saju context before authority lookup', async () => {

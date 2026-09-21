@@ -9,14 +9,19 @@ import {
 const EFFECTIVE_AT = '2026-09-21T00:00:00.000Z';
 
 function accessRow(overrides: Partial<{
+  subjectId: string;
   readingId: string;
   readerCharacterId: string;
+  readerContentBundleId: string;
 }> = {}) {
-  void overrides.readerCharacterId;
   return {
+    subjectId: overrides.subjectId ?? 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
     readingId: overrides.readingId ?? '11111111-1111-4111-8111-111111111111',
     readingSessionId: '22222222-2222-4222-8222-222222222222',
     productId: '33333333-3333-4333-8333-333333333333',
+    readerCharacterId: overrides.readerCharacterId ?? 'baekheon',
+    readerContentBundleId:
+      overrides.readerContentBundleId ?? '55555555-5555-4555-8555-555555555555',
     topicKey: 'general',
     sajuDomain: 'general',
     readingPeriod: 'original',
@@ -94,6 +99,7 @@ describe('Character Standard Reading Reader Knowledge source', () => {
     expect(result).toMatchObject({
       readingId: '11111111-1111-4111-8111-111111111111',
       readerCharacterId: 'baekheon',
+      readerContentBundleId: '55555555-5555-4555-8555-555555555555',
       topicKey: 'general',
       sajuDomain: 'general',
       readingPeriod: 'original',
@@ -125,6 +131,22 @@ describe('Character Standard Reading Reader Knowledge source', () => {
       code: 'NOT_FOUND',
     } satisfies Partial<ApiCommandError>);
     expect(authorityPorts.artifactAuthorityPort.readArtifactSource).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when metadata authority returns a different Reader or subject', async () => {
+    await expect(
+      resolveWith(ports({ accessRows: [accessRow({ readerCharacterId: 'seyeon' })] })),
+    ).rejects.toThrow(/metadata and artifact authorities disagree/u);
+
+    await expect(
+      resolveWith(
+        ports({
+          accessRows: [
+            accessRow({ subjectId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' }),
+          ],
+        }),
+      ),
+    ).rejects.toThrow(/metadata and artifact authorities disagree/u);
   });
 
   it('fails closed when a different Reader is returned by raw source authority', async () => {
