@@ -79,8 +79,16 @@ describe('Reader Interpretation Preview HTTP seam', () => {
         rendererVersion: 'myeongha-character-saju-bounded-renderer-v1',
         characterId: 'baekheon',
         requestedDomain: 'career',
-        renderedUnitIds: [],
-        segments: [],
+        utteranceId: 'private-utterance-id',
+        readingRef: 'private-reading-ref',
+        readingPlanRef: 'private-reading-plan-ref',
+        renderedUnitIds: ['private-unit-1'],
+        segments: [{
+          kind: 'character_reaction',
+          text: '장기 흐름은 참고하되 지금의 선택 가능성은 남겨 두겠습니다.',
+          sourceUnitRefs: ['private-unit-1'],
+          framingKey: 'private-framing-key',
+        }],
       },
     } as unknown as ReaderInterpretationPreviewEnvelopeV1;
 
@@ -99,6 +107,22 @@ describe('Reader Interpretation Preview HTTP seam', () => {
     expect(response).not.toHaveProperty('sourceResponseHash');
     expect(response).not.toHaveProperty('groundingHash');
     expect(response).not.toHaveProperty('responseSnapshotJsonb');
+    expect(response).toMatchObject({
+      utterance: {
+        characterId: 'baekheon',
+        requestedDomain: 'career',
+        segments: [{
+          kind: 'character_reaction',
+          text: '장기 흐름은 참고하되 지금의 선택 가능성은 남겨 두겠습니다.',
+        }],
+      },
+    });
+    expect(JSON.stringify(response)).not.toContain('private-utterance-id');
+    expect(JSON.stringify(response)).not.toContain('private-reading-ref');
+    expect(JSON.stringify(response)).not.toContain('private-reading-plan-ref');
+    expect(JSON.stringify(response)).not.toContain('private-unit-1');
+    expect(JSON.stringify(response)).not.toContain('private-framing-key');
+    expect(JSON.stringify(response)).not.toContain('sourceUnitRefs');
   });
 
   it('rejects unauthenticated requests before resolving server Character context', async () => {
