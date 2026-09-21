@@ -31,6 +31,9 @@ import type {
 import type {
   MemoryGrantsReadAuthorityPortV1,
 } from '../apps/api/src/memory-grants-read.js';
+import type {
+  ReaderContextNonMemoryReadAuthorityPortV1,
+} from '../apps/api/src/reader-context-non-memory-read.js';
 
 const SUBJECT_ID = 'subject-internal-reader-preview-1';
 const SUBJECT_HASH = createHash('sha256').update(SUBJECT_ID, 'utf8').digest('hex');
@@ -78,6 +81,11 @@ function blockedRuntimePorts() {
     memoryGrantsAuthorityPort: {
       readActiveGrants: vi.fn(),
     } as unknown as MemoryGrantsReadAuthorityPortV1,
+    nonMemoryContextAuthorityPort: {
+      readGrantedLifeFacts: vi.fn(),
+      readRelationshipEvents: vi.fn(),
+      readRecentMessages: vi.fn(),
+    } as unknown as ReaderContextNonMemoryReadAuthorityPortV1,
     groundingProjectionPort: {
       projectGrounding: vi.fn(),
     },
