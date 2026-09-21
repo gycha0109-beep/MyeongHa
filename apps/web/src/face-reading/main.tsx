@@ -2,22 +2,11 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { PhysiognomyPage } from './PhysiognomyPage.js';
 import { createPhysiognomyPageApiFE032 } from './page-api-fe032.js';
+import { loadFacePreviewEngineFE033 } from './engine-loader-fe033.js';
 
-declare global {
-  interface Window {
-    __MHA_FACE_PREVIEW_ENGINE_LOADER_FE032__?: () => Promise<unknown>;
-  }
-}
-
-const loadEngineModule = async (): Promise<unknown> => {
-  const loader = window.__MHA_FACE_PREVIEW_ENGINE_LOADER_FE032__;
-  if (typeof loader !== 'function') {
-    throw new Error('FACE_PREVIEW_ENGINE_DELIVERY_UNAVAILABLE');
-  }
-  return loader();
-};
-
-const api = createPhysiognomyPageApiFE032({ loadEngineModule });
+const api = createPhysiognomyPageApiFE032({
+  loadEngineModule: loadFacePreviewEngineFE033,
+});
 const root = document.getElementById('face-reading-react-root');
 
 if (root === null) {

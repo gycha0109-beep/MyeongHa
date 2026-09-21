@@ -1,0 +1,42 @@
+name: FE033 Face Preview Engine Delivery
+
+on:
+  pull_request:
+    paths:
+      - 'apps/web/package.json'
+      - 'packages/face-reading/**'
+      - 'package-lock.json'
+      - 'apps/web/src/face-reading/engine-loader-fe033.ts'
+      - 'apps/web/src/face-reading/engine-loader-fe033.test.ts'
+      - 'apps/web/src/face-reading/main.tsx'
+      - 'scripts/verify-face-preview-engine-delivery-fe033.mjs'
+      - 'docs/face-engine/fe033-face-preview-engine-delivery.md'
+      - '.github/workflows/fe033-face-preview-engine-delivery.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify-fe033-engine-delivery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Verify producer package and public import
+        run: node scripts/verify-face-preview-engine-delivery-fe033.mjs
+      - name: Verify FE033 loader
+        run: npx vitest run apps/web/src/face-reading/engine-loader-fe033.test.ts
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Production web build
+        run: npm run build:web
+      - name: Verify physiognomy output
+        run: |
+          test -f public/face-reading.html
+          test -n "$(find public/assets -maxdepth 1 -name 'preview-engine-*.js' -print -quit)"
+          test -n "$(find public/assets -maxdepth 1 -name 'vision_bundle-*.js' -print -quit)"
