@@ -1,0 +1,100 @@
+name: Reader Grounding Cross-Service E2E
+
+on:
+  pull_request:
+    paths:
+      - 'apps/api/src/reader-interpretation-preview-runtime-v1.ts'
+      - 'apps/api/src/saju-character-grounding-http-adapter.ts'
+      - 'test/saju-character-grounding-cross-service.e2e.test.ts'
+      - '.github/workflows/reader-grounding-cross-service-e2e.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/api/src/reader-interpretation-preview-runtime-v1.ts'
+      - 'apps/api/src/saju-character-grounding-http-adapter.ts'
+      - 'test/saju-character-grounding-cross-service.e2e.test.ts'
+      - '.github/workflows/reader-grounding-cross-service-e2e.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cross-service:
+    name: MyeongHa ↔ Saju grounding
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - name: Checkout MyeongHa
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Checkout pinned Saju grounding authority
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: gycha0109-beep/Saju
+          ref: b17896099a4919124dfa67ed6f0ada265e460501
+          path: .cross-service/saju
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install MyeongHa dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Build pinned Saju host
+        working-directory: .cross-service/saju
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund --workspaces=false
+          npm run build
+
+      - name: Start authenticated Saju host
+        env:
+          SAJU_PRODUCTION_SERVICE_BEARER: cross-service-e2e-secret
+          SAJU_PRODUCTION_HOST: 127.0.0.1
+          PORT: '18081'
+        shell: bash
+        run: |
+          set -euo pipefail
+          node .cross-service/saju/dist/production-calculation-server.js >"$RUNNER_TEMP/saju-grounding.log" 2>&1 &
+          echo "$!" >"$RUNNER_TEMP/saju-grounding.pid"
+          for _ in $(seq 1 30); do
+            if curl --silent --fail http://127.0.0.1:18081/health >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/saju-grounding.log" >&2
+          exit 1
+
+      - name: Run cross-service Reader grounding E2E
+        env:
+          MYEONGHA_RUN_SAJU_GROUNDING_CROSS_SERVICE_E2E: '1'
+          MYEONGHA_SAJU_CROSS_SERVICE_ORIGIN: http://127.0.0.1:18081
+          MYEONGHA_SAJU_CROSS_SERVICE_BEARER: cross-service-e2e-secret
+        run: npx vitest run test/saju-character-grounding-cross-service.e2e.test.ts
+
+      - name: Verify bearer is not reflected
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          log="$RUNNER_TEMP/saju-grounding.log"
+          if [[ -f "$log" ]] && grep -Fq 'cross-service-e2e-secret' "$log"; then
+            echo 'Saju host reflected the cross-service bearer in logs.' >&2
+            exit 1
+          fi
+
+      - name: Stop Saju host
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f "$RUNNER_TEMP/saju-grounding.pid" ]]; then
+            kill "$(cat "$RUNNER_TEMP/saju-grounding.pid")" 2>/dev/null || true
+          fi
