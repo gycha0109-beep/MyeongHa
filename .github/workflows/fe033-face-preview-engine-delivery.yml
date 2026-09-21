@@ -38,4 +38,5 @@ jobs:
       - name: Verify physiognomy output
         run: |
           test -f public/face-reading.html
-          grep -R -q "MHA-FACE-PREVIEW-ENGINE-DELIVERY-FE033-v1" public/assets
+          test -n "$(find public/assets -maxdepth 1 -name 'preview-engine-*.js' -print -quit)"
+          test -n "$(find public/assets -maxdepth 1 -name 'vision_bundle-*.js' -print -quit)"
