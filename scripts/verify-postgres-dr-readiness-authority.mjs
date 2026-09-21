@@ -84,12 +84,12 @@ requireRegex(
 );
 requireFragment('restoreHarness', 'privacy_reconciliation: "not_exercised_by_this_workflow"');
 requireFragment('restoreHarness', 'dr_ready: false');
-requireFragment('restoreRunbook', 'Production state: CURRENT-FRONTIER BACKUP PROVEN / RESTORE REFRESH REQUIRED / DR NOT READY');
+requireFragment('restoreRunbook', 'Production state: CURRENT-FRONTIER BACKUP+RESTORE PROVEN / DR NOT READY');
 requireFragment('restoreRunbook', 'backup schema freshness             = CURRENT — backup frontier 1230 / deployed frontier 1230');
-requireFragment('restoreRunbook', 'current-schema restore              = PENDING ISOLATED RESTORE');
+requireFragment('restoreRunbook', 'current-schema restore              = EVIDENCED — run 35546262378 / frontier 1230');
 requireFragment('restoreRunbook', 'bounded privacy source authority    = RUNTIME-PROVEN — run 35539838537');
 requireFragment('restoreRunbook', 'recovered finalization mechanics    = IMPLEMENTED / POST-MERGE CI GREEN');
-requireFragment('restoreRunbook', 'recovered finalization on fresh restore = PENDING ISOLATED RESTORE');
+requireFragment('restoreRunbook', 'recovered finalization on fresh restore = PROVEN — run 35546262378');
 requireFragment('restoreRunbook', 'authoritative privacy reconciliation= NOT YET PROVEN');
 requireFragment('restoreRunbook', 'future-safe privacy reconciliation  = false');
 requireFragment('restoreRunbook', 'provider-managed full restore       = NOT PROVEN');
@@ -101,8 +101,8 @@ requireFragment('restoreRunbook', '35539838537');
 requireFragment('restoreRunbook', '- [x] bounded captured-window privacy source authority runtime-proven — run `35539838537`');
 requireFragment('restoreRunbook', '- [x] account-deletion finalizer and recovered-state finalization mechanics implemented / post-merge CI green');
 requireFragment('restoreRunbook', '- [x] fresh governed backup captured after deployed migration `1230` — run `35536655149` / artifact `10612622254`');
-requireFragment('restoreRunbook', '- [ ] isolated restore completed from that current-frontier backup');
-requireFragment('restoreRunbook', '- [ ] recovered-state finalization drill executed on that fresh governed restore');
+requireFragment('restoreRunbook', '- [x] isolated restore completed from that current-frontier backup — run `35546262378`');
+requireFragment('restoreRunbook', '- [x] recovered-state finalization drill executed on that fresh governed restore — run `35546262378`');
 requireFragment('restoreRunbook', '- [x] synthetic drill data-loss window measured — `4s` (diagnostic, not approved RPO)');
 requireFragment('restoreRunbook', 'RPO: OPEN DECISION');
 requireFragment('restoreRunbook', 'RTO: OPEN DECISION');
@@ -114,7 +114,7 @@ for (const staleFragment of [
   'isolated restore                = NOT YET EVIDENCED',
 ]) {
   if (files.restoreRunbook.includes(staleFragment)) {
-    throw new Error(`${paths.restoreRunbook} contains stale restore-state evidence after latest successful runtime-proof run 35331742188: ${staleFragment}`);
+    throw new Error(`${paths.restoreRunbook} contains stale restore-state evidence after latest successful runtime-proof run 35546262378: ${staleFragment}`);
   }
 }
 
@@ -129,10 +129,15 @@ const requiredStatusFragments = [
   'production_schema_deploy_run_id: 35522337472',
   'production_schema_deploy_head_sha: 217698890a49c525ab043ac902037f2029227fa4',
   'current_repository_migration_frontier: 1230',
-  'latest_isolated_restore_run_id: 35331742188',
+  'latest_isolated_restore_run_id: 35546262378',
   'latest_isolated_restore_result: SUCCESS',
-  'latest_isolated_restore_backup_migration_frontier: 1120',
-  'restore_evidence_envelope_runtime: PROVEN_ON_RUN_35331742188',
+  'latest_isolated_restore_backup_run_id: 35536655149',
+  'latest_isolated_restore_incident_reference_utc: 2026-09-20T20:50:09Z',
+  'latest_isolated_restore_evidence_artifact_id: 10615818654',
+  'latest_isolated_restore_evidence_artifact_expires_at: 2026-10-21T00:01:09Z',
+  'latest_isolated_restore_evidence_artifact_digest: sha256:31ef8410a2f2c3760311df80c3b077836644ed6035d5e5d58813d28a6bff3bfc',
+  'latest_isolated_restore_backup_migration_frontier: 1230',
+  'restore_evidence_envelope_runtime: PROVEN_ON_RUN_35546262378',
   'provider_managed_data_full_restore: false',
   'privacy_recovery_ledger_workflow: RUNTIME_PROVEN',
   'privacy_recovery_ledger_run_id: 35539838537',
@@ -149,7 +154,8 @@ const requiredStatusFragments = [
   'authoritative_post_backup_source: true_bounded_captured_window_only',
   'account_deletion_finalizer_runtime: IMPLEMENTED_AND_PROVIDER_MECHANICS_SEPARATELY_PROVEN',
   'recovered_state_finalization_drill: IMPLEMENTED_MERGED_POST_MERGE_CI_GREEN',
-  'recovered_state_finalization_restored_backup_runtime: PENDING_CURRENT_FRONTIER_ISOLATED_RESTORE',
+  'recovered_state_finalization_restored_backup_runtime: PROVEN_ON_RUN_35546262378',
+  'privacy_reconciliation: BLOCKED_BY_PRODUCTION_NONZERO_AUTHORITATIVE_DELTA_PROOF',
   'authoritative_privacy_reconciliation: false',
   'future_safe_privacy_reconciliation: false',
   'rpo_authority: OPEN_DECISION',
@@ -181,7 +187,7 @@ for (const staleRuntimeFragment of [
   'post_backup_privacy_delta_count: 0',
 ]) {
   if (files.readinessStatus.includes(staleRuntimeFragment)) {
-    throw new Error(`${paths.readinessStatus} contains stale runtime evidence after current-schema restore run 35331742188: ${staleRuntimeFragment}`);
+    throw new Error(`${paths.readinessStatus} contains stale runtime evidence after current-schema restore run 35546262378: ${staleRuntimeFragment}`);
   }
 }
 
