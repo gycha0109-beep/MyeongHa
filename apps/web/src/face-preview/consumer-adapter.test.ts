@@ -197,8 +197,14 @@ describe('FE026 face preview consumer adapter', () => {
   });
 
   it('fails closed on module drift, malformed attempts, and widened session data', async () => {
-    const invalidModule = config(vi.fn());
-    invalidModule.engineModule.FE023_CONTRACT_VERSION = 'wrong';
+    const baseInvalidModule = config(vi.fn());
+    const invalidModule = {
+      ...baseInvalidModule,
+      engineModule: {
+        ...baseInvalidModule.engineModule,
+        FE023_CONTRACT_VERSION: 'wrong',
+      },
+    } as FacePreviewConsumerConfigV1;
     expect(await openFacePreviewConsumerSessionV1(invalidModule)).toMatchObject({
       status: 'rejected',
       rejection: { code: 'INVALID_CONFIGURATION', stage: 'open' },
