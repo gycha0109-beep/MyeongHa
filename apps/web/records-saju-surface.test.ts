@@ -60,7 +60,9 @@ describe('Records Saju history surface', () => {
     expect(page).toContain('실제 Reading이 없을 때만 보이는 UI fixture');
     expect(page).toContain("empty.className = 'records-reading-empty'");
     expect(page).toContain('아직 저장된 사주 풀이가 없습니다.');
-    expect(page).toContain("link.href = 'reading.html';");
+    expect(page).toContain("link.href = options.href ?? 'reading.html';");
+    expect(page).toContain('buildPersistedReadingHandoffUrlV1({');
+    expect(page).toContain("'저장된 풀이 열기 →'");
     expect(page).not.toContain('responseSnapshotJsonb');
     expect(page).not.toContain('value.score');
     expect(page).not.toContain('점수');
