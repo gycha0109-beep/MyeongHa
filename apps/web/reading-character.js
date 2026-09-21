@@ -67,8 +67,11 @@ const aliases = new Map([
 const params = new URLSearchParams(window.location.search);
 const requestedReader = params.get('character') || params.get('reader') || 'baekheon';
 const normalizedReader = aliases.get(requestedReader) || requestedReader.toLowerCase();
-const readerKey = readerCatalog[normalizedReader] ? normalizedReader : 'baekheon';
-const reader = readerCatalog[readerKey];
+// Frontend integration authority: URL-selected Reader identity is presentation-only.
+// When Reader Interpretation is activated, the server-returned readerCharacterId wins.
+const presentationReaderHint = readerCatalog[normalizedReader] ? normalizedReader : 'baekheon';
+const readerKey = presentationReaderHint;
+const reader = readerCatalog[presentationReaderHint];
 const route = resolveReadingDetailRoute(params);
 const engineRequest = route.valid ? resolveSajuButtonEngineRequest(route) : null;
 const currentYear = new Date().getFullYear();
@@ -85,8 +88,9 @@ const productTitle = document.querySelector('[data-reading-product-title]');
 const stateTitle = document.querySelector('[data-reading-state-title]');
 const stateCopy = document.querySelector('[data-reading-state-copy]');
 
-root.dataset.reader = readerKey;
+root.dataset.reader = presentationReaderHint;
 root.dataset.readerSelection = params.has('reader') || params.has('character') ? 'explicit' : 'default';
+root.dataset.readerAuthority = 'presentation_hint_only';
 root.dataset.readerPresentation = 'reading-scene-v1';
 root.dataset.readingRouteState = route.valid
   ? (previewEligible ? 'preview_loading' : 'blocked_by_authority')

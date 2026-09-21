@@ -235,6 +235,18 @@ It does not expose Reader content-bundle ids, DB artifact hashes, Saju source ha
 The existing browser `reading-character.js` is not switched to this endpoint in this slice because the current page flow does not yet carry the required server-authorized `threadId + officialReadingId` handoff. Falling back to URL-selected Reader identity would violate this authority model.
 
 
+## 11.1 Frontend Integration Boundary
+
+The web integration layer now has a dormant Reader Scene client contract without opening the Production route.
+
+- `apps/web/reader-scene-contract.js` validates only the bounded browser DTO emitted by the Reader Preview HTTP seam and rejects unexpected internal provenance fields.
+- `apps/web/reader-runtime-client.js` sends only `threadId + officialReadingId`, reuses the current Bearer authority, distinguishes feature-unavailable from request failure, and is disabled by default until route activation is separately approved.
+- `apps/web/reader-scene-controller.js` owns loading/retry/abort/stale-response state and treats the server-returned `readerCharacterId` as authoritative.
+- URL `reader` / `character` values remain presentation hints only; they are not Reader runtime authority.
+- The current Saju Preview path remains unchanged while the Reader Production route is closed. A failed Reader request must never silently fall back to Saju Preview as if it were Reader output.
+
+No `api/me.ts` dispatch target, Vercel rewrite, Production Reader route, Character asset authority, relationship threshold, Saju semantic rule, Commerce rule, or persistence policy is introduced by this frontend integration slice.
+
 ## 12. Hosted Production grounding evidence and remaining MyeongHa gates
 
 Hosted grounding transport is closed with exact evidence:
