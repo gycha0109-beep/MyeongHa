@@ -1,4 +1,4 @@
-name: Dispatch Latest Main Hosted Auth Canary
+name: Dispatch Latest Main Production Privacy Canary
 
 on:
   push:
@@ -11,18 +11,18 @@ permissions:
 
 jobs:
   dispatch:
-    name: dispatch-account-deletion-hosted-auth-canary
+    name: dispatch-production-privacy-recovery-canary
     runs-on: ubuntu-24.04
     steps:
-      - name: Dispatch latest main hosted Auth canary
+      - name: Dispatch latest main canary
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           main_sha="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq '.sha')"
-          echo "Dispatching Account Deletion Hosted Auth Canary from main@$main_sha"
-          gh workflow run account-deletion-hosted-auth-canary.yml \
+          echo "Dispatching Production Privacy Recovery Canary from main@$main_sha"
+          gh workflow run production-privacy-recovery-canary.yml \
             --repo "$GITHUB_REPOSITORY" \
             --ref main \
-            -f confirmation=DELETE_SYNTHETIC_AUTH_USER_ONLY
+            -f confirmation=RUN_SYNTHETIC_PRODUCTION_PRIVACY_CANARY
