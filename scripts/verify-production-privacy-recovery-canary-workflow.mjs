@@ -30,7 +30,7 @@ for (const fragment of [
   'environment: production',
   'watchtower_track:',
   'MYEONGHA_WATCHTOWER_TRACK: ${{ inputs.watchtower_track }}',
-  '[[ "$MYEONGHA_WATCHTOWER_TRACK" == \'privacy-recovery\' ]]',
+  '[[ "$MYEONGHA_WATCHTOWER_TRACK" == \'ops\' ]]',
   'Provision ephemeral API canary login',
   'node scripts/run-production-privacy-recovery-canary.mjs provision-api-login',
   'Remove ephemeral API canary login',
