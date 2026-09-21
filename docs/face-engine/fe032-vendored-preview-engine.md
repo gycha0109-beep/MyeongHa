@@ -17,6 +17,8 @@ The accepted FE024 package is materialized into MyeongHa as a digest-pinned vend
 
 The root package path and internal implementation paths remain unexported.
 
+`loadVendoredFacePreviewEngineFE032()` projects the installed package back down to the two FE023 members FE029 accepts. `runVendoredFacePreviewOneShotFE032(blob)` then supplies that loader to FE031, so product code no longer needs to inject an engine module manually.
+
 ## Materialization
 
 A branch-scoped seed workflow reconstructs the package from the exact public Saju source commit, runs the preview-package build, packs the private workspace package, and refuses to commit it unless the resulting SHA-256 exactly matches the already accepted FE024 handoff digest.
