@@ -80,9 +80,17 @@ function parseDatabaseUrl(value: string): string {
   }
 
   const decodedUser = decodeURIComponent(url.username);
-  if (decodedUser !== MYEONGHA_ACCOUNT_DELETION_WORKER_DATABASE_PRINCIPAL) {
+  const directWorkerUser = MYEONGHA_ACCOUNT_DELETION_WORKER_DATABASE_PRINCIPAL;
+  const supavisorWorkerUserPattern = new RegExp(
+    `^${directWorkerUser}\\.[a-z0-9]{20}$`,
+    'u',
+  );
+  if (
+    decodedUser !== directWorkerUser &&
+    !supavisorWorkerUserPattern.test(decodedUser)
+  ) {
     return fail(
-      'MYEONGHA_WORKER_DATABASE_URL must authenticate as the dedicated worker login principal.',
+      'MYEONGHA_WORKER_DATABASE_URL must authenticate as the dedicated worker login principal, directly or through a Supavisor-qualified project username.',
     );
   }
 
