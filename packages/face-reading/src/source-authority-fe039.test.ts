@@ -216,7 +216,7 @@ describe('FE039 source authority admission', () => {
     ['score', 'score', 99],
     ['source strength', 'sourceStrength', 'strong'],
   ])('rejects arbitrary %s authority injection', async (_label, key, injected) => {
-    const value = clone(syntheticBundle()) as Record<string, unknown>;
+    const value = clone(syntheticBundle()) as unknown as Record<string, unknown>;
     value[key] = injected;
 
     await expect(admitFaceSourceAuthorityBundleFE039(value))
