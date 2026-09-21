@@ -1,0 +1,71 @@
+name: Dispatch Authoritative Privacy Isolated Restore 35653303484
+
+on:
+  push:
+    branches:
+      - ops/dispatch-authoritative-privacy-restore-35653303484-20260922
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  dispatch:
+    name: dispatch-authoritative-privacy-isolated-restore
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Resolve ledger coverage and dispatch exact-main restore
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_MAIN_SHA: 31746f635ae249811842b8d225c2734e4d1b4c51
+          BACKUP_RUN_ID: '35643472159'
+          PRIVACY_LEDGER_RUN_ID: '35653303484'
+          PRODUCTION_PRIVACY_CANARY_RUN_ID: '35653222211'
+        run: |
+          set -euo pipefail
+
+          main_sha="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq '.sha')"
+          [[ "$main_sha" == "$EXPECTED_MAIN_SHA" ]] || {
+            echo "::error title=Authoritative restore dispatch blocked::main moved from expected SHA."
+            exit 1
+          }
+
+          artifact_dir="$RUNNER_TEMP/privacy-ledger-public"
+          rm -rf "$artifact_dir"
+          mkdir -p "$artifact_dir"
+          gh run download "$PRIVACY_LEDGER_RUN_ID" \
+            --repo "$GITHUB_REPOSITORY" \
+            --dir "$artifact_dir"
+
+          mapfile -t manifests < <(
+            find "$artifact_dir" -type f -name 'myeongha-privacy-ledger-*.manifest.json' -print
+          )
+          [[ "${#manifests[@]}" -eq 1 ]]
+          manifest="${manifests[0]}"
+
+          jq -e \
+            --argjson backup_run_id "$BACKUP_RUN_ID" '
+              .schema_version == "myeongha-postgres-privacy-recovery-ledger-artifact-v1"
+              and .backupRunId == $backup_run_id
+              and .sourceAuthorityClass == "AUTHORITATIVE_CAPTURED_WINDOW_V1"
+              and .authoritativePostBackupSource == true
+              and .eventCount > 0
+              and (.eventTypeCounts.ACCOUNT_DELETION_STARTED // 0) >= 1
+              and .capturedAt == .authoritativeCoverageThrough
+              and .authoritativePrivacyReconciliation == false
+              and .futureSafePrivacyReconciliation == false
+              and .drReady == false
+            ' "$manifest" >/dev/null
+
+          incident_reference_utc="$(jq -er '.capturedAt' "$manifest")"
+          [[ "$(date -u -d "$incident_reference_utc" +'%Y-%m-%dT%H:%M:%SZ')" == "$incident_reference_utc" ]]
+
+          gh workflow run postgres-isolated-restore-drill.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref main \
+            -f backup_run_id="$BACKUP_RUN_ID" \
+            -f incident_reference_utc="$incident_reference_utc" \
+            -f privacy_ledger_run_id="$PRIVACY_LEDGER_RUN_ID" \
+            -f production_privacy_canary_run_id="$PRODUCTION_PRIVACY_CANARY_RUN_ID" \
+            -f watchtower_track=ops
