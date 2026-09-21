@@ -78,8 +78,10 @@ requireRegex(
 requireFragment('decisions', '### P0-OPS-02');
 requireFragment('decisions', 'rpo: PT24H');
 requireFragment('decisions', 'rto: PT6H');
-requireFragment('decisions', 'full_authoritative_rpo_comparison: PENDING');
-requireFragment('decisions', 'full_authoritative_rto_comparison: PENDING');
+requireFragment('decisions', 'authoritative_privacy_reconciliation: PROVEN_BOUNDED_CAPTURED_WINDOW_RUN_35659483080');
+requireFragment('decisions', 'full_authoritative_rpo_comparison: PASS_RUN_35659483080_5536S');
+requireFragment('decisions', 'full_authoritative_rto_comparison: PASS_RUN_35659483080_67S');
+requireFragment('decisions', 'provider_managed_full_restore_equivalence: NOT_PROVEN');
 requireFragment('privacy', '`P0-PR-01`은 2026-09-19 **DECIDED**다');
 requireFragment('privacy', 'calendar `P5Y` RETAIN');
 requireRegex(
@@ -92,11 +94,13 @@ requireFragment('restoreHarness', 'dr_ready: false');
 requireFragment('restoreRunbook', 'Production state: CURRENT-FRONTIER BACKUP+RESTORE PROVEN / DR NOT READY');
 requireFragment('restoreRunbook', 'backup schema freshness             = CURRENT — backup frontier 1280 / deployed frontier 1280');
 requireFragment('restoreRunbook', 'current-schema restore              = EVIDENCED — run 35633155263 / frontier 1280');
-requireFragment('restoreRunbook', 'bounded privacy source authority    = RUNTIME-PROVEN — run 35539838537');
+requireFragment('restoreRunbook', 'bounded privacy source authority    = RUNTIME-PROVEN — run 35653303484 / AUTHORITATIVE_CAPTURED_WINDOW_V1');
 requireFragment('restoreRunbook', 'recovered finalization mechanics    = IMPLEMENTED / POST-MERGE CI GREEN');
-requireFragment('restoreRunbook', 'recovered finalization on fresh restore = PROVEN — run 35633155263');
-requireFragment('restoreRunbook', 'authoritative privacy reconciliation= NOT YET PROVEN');
+requireFragment('restoreRunbook', 'recovered finalization on fresh restore = PROVEN — run 35659483080 / Production non-zero ledger');
+requireFragment('restoreRunbook', 'authoritative privacy reconciliation= PROVEN — run 35659483080 / bounded captured window only');
 requireFragment('restoreRunbook', 'future-safe privacy reconciliation  = false');
+requireFragment('restoreRunbook', 'full authoritative achieved evidence comparison **PASS** — `5536s`');
+requireFragment('restoreRunbook', 'full authoritative achieved evidence comparison **PASS** — `67s`');
 requireFragment('restoreRunbook', 'provider-managed full restore       = NOT PROVEN');
 requireFragment('restoreRunbook', 'Restore drill: PASSED for MyeongHa application-data portability and application-critical Auth identity continuity');
 requireFragment('restoreRunbook', 'scripts/run-postgres-privacy-reconciliation-synthetic-drill.sh');
@@ -108,7 +112,9 @@ requireFragment('restoreRunbook', '- [x] account-deletion finalizer and recovere
 requireFragment('restoreRunbook', '- [x] fresh governed backup captured after deployed migration `1280` — run `35631594765` / artifact `10654730578`');
 requireFragment('restoreRunbook', '- [x] isolated restore completed from that current-frontier backup — run `35633155263`');
 requireFragment('restoreRunbook', '- [x] recovered-state finalization drill executed on that fresh governed restore — run `35633155263`');
-requireFragment('restoreRunbook', '- [x] synthetic drill data-loss window measured — `1s` (diagnostic, not approved RPO)');
+requireFragment('restoreRunbook', '- [x] authoritative privacy/deletion/legal-retention reconciliation exercised for the applicable captured window — run `35659483080`');
+requireFragment('restoreRunbook', '- [x] achieved recovery duration measured across the full authoritative recovery procedure — `67s`');
+requireFragment('restoreRunbook', '- [x] full authoritative data-loss window measured — `5536s`');
 requireFragment('restoreRunbook', 'RPO: APPROVED — PT24H (24 hours)');
 requireFragment('restoreRunbook', 'RTO: APPROVED — PT6H (6 hours)');
 requireFragment('restoreRunbook', 'DR Ready = FALSE / NOT EVIDENCED');
@@ -125,53 +131,40 @@ for (const staleFragment of [
 
 const requiredStatusFragments = [
   'latest_governed_backup_run_id: 35631594765',
-  'latest_governed_backup_source_sha: b0b8656e89d13e12d77871875f7a2ed3c935b177',
-  'latest_governed_backup_artifact_id: 10654730578',
-  'latest_governed_backup_encrypted_sha256: 42b34d8991fc69c979ed6029aeeca3e36c018f573ad2cf586d51d94327e1a990',
-  'latest_governed_backup_artifact_name: myeongha-postgres-20260921T172244Z',
-  'latest_governed_backup_completed_at_utc: 2026-09-21T17:25:10Z',
   'latest_proven_backup_migration_frontier: 1280',
   'production_schema_latest_deployed_migration: 1280',
-  'production_schema_deploy_run_id: 35629348943',
-  'production_schema_deploy_head_sha: b0b8656e89d13e12d77871875f7a2ed3c935b177',
   'current_repository_migration_frontier: 1280',
   'latest_isolated_restore_run_id: 35633155263',
   'latest_isolated_restore_result: SUCCESS',
-  'latest_isolated_restore_backup_run_id: 35631594765',
-  'latest_isolated_restore_incident_reference_utc: 2026-09-21T17:25:11Z',
-  'latest_isolated_restore_evidence_artifact_id: 10655731358',
-  'latest_isolated_restore_evidence_artifact_expires_at: 2026-10-21T17:37:58Z',
-  'latest_isolated_restore_evidence_artifact_digest: sha256:9df259c46fdefc9f7f933dac7baf3ad4bb3d0cd82014cd155e3fe8fbd9ee5c66',
-  'latest_isolated_restore_backup_migration_frontier: 1280',
-  'restore_evidence_envelope_runtime: PROVEN_ON_RUN_35633155263',
   'provider_managed_data_full_restore: false',
-  'privacy_recovery_ledger_workflow: RUNTIME_PROVEN',
-  'privacy_recovery_ledger_run_id: 35539838537',
-  'privacy_recovery_ledger_result: SUCCESS',
-  'privacy_recovery_ledger_runtime_head_sha: 5bb5de08ef211f78565d06c1f9c4ff0c0ec8a956',
-  'privacy_recovery_ledger_backup_run_id: 35536655149',
-  'privacy_recovery_ledger_backup_completed_at_utc: 2026-09-20T20:50:05Z',
-  'privacy_recovery_ledger_artifact_id: 10614412005',
-  'privacy_recovery_ledger_artifact_name: myeongha-privacy-ledger-20260920T214938Z',
-  'privacy_recovery_ledger_artifact_expires_at: 2026-10-20T21:49:39Z',
-  'privacy_recovery_ledger_artifact_digest: sha256:c048023ae254a8aa176a4c0c23f0853c699f902711bfefe350200ab4718f70ef',
   'privacy_recovery_ledger_authority_class: AUTHORITATIVE_CAPTURED_WINDOW_V1',
-  'privacy_recovery_ledger_retention: P30D',
   'authoritative_post_backup_source: true_bounded_captured_window_only',
   'account_deletion_finalizer_runtime: IMPLEMENTED_AND_PROVIDER_MECHANICS_SEPARATELY_PROVEN',
-  'recovered_state_finalization_drill: IMPLEMENTED_MERGED_POST_MERGE_CI_GREEN',
-  'recovered_state_finalization_restored_backup_runtime: PROVEN_ON_RUN_35633155263',
-  'privacy_reconciliation: BLOCKED_BY_PRODUCTION_NONZERO_AUTHORITATIVE_DELTA_PROOF',
-  'authoritative_privacy_reconciliation: false',
+  'authoritative_privacy_reconciliation_run_id: 35659483080',
+  'authoritative_privacy_reconciliation_result: SUCCESS',
+  'authoritative_privacy_reconciliation_runtime_head_sha: 31746f635ae249811842b8d225c2734e4d1b4c51',
+  'authoritative_privacy_reconciliation_backup_run_id: 35643472159',
+  'authoritative_privacy_reconciliation_backup_completed_at_utc: 2026-09-21T19:16:17Z',
+  'authoritative_privacy_reconciliation_ledger_run_id: 35653303484',
+  'authoritative_privacy_reconciliation_canary_run_id: 35653222211',
+  'authoritative_privacy_reconciliation_incident_reference_utc: 2026-09-21T20:48:33Z',
+  'authoritative_privacy_reconciliation_evidence_artifact_id: 10666580699',
+  'authoritative_privacy_reconciliation_evidence_artifact_digest: sha256:58d56b54f1b3ffe1d21fd1934bf3c2edce0826bb624bf261fad30b766f127c28',
+  'authoritative_privacy_reconciliation: true',
+  'authoritative_privacy_reconciliation_scope: BOUNDED_CAPTURED_WINDOW_ONLY',
   'future_safe_privacy_reconciliation: false',
+  'privacy_reconciliation: PRODUCTION_NONZERO_AUTHORITATIVE_CAPTURED_WINDOW_PROVEN',
+  'full_authoritative_data_loss_window_seconds: 5536',
+  'full_authoritative_recovery_duration_seconds: 67',
   'rpo_authority: PRODUCT_OWNER_APPROVED_PT24H',
+  'rpo_full_authoritative_comparison: PASS_5536S_LE_PT24H',
   'rto_authority: PRODUCT_OWNER_APPROVED_PT6H',
+  'rto_full_authoritative_comparison: PASS_67S_LE_PT6H',
   'dr_ready: false',
 ]
 for (const fragment of requiredStatusFragments) requireFragment('readinessStatus', fragment);
 
 const forbiddenReadyFragments = [
-  'authoritative_privacy_reconciliation: true',
   'future_safe_privacy_reconciliation: true',
   'dr_ready: true',
   '"dr_ready": true',
@@ -203,5 +196,5 @@ const candidateFrontierNote =
     : '';
 
 console.log(
-  `PostgreSQL DR readiness authority guard PASS: production is deployed through migration ${productionMigrationFrontier}; governed backup/restore freshness, Production authoritative reconciliation, provider recovery gaps, and full-procedure comparison against approved RPO/RTO objectives keep dr_ready=false.${candidateFrontierNote}`,
+  `PostgreSQL DR readiness authority guard PASS: production is deployed through migration ${productionMigrationFrontier}; Production non-zero bounded-window reconciliation and full authoritative RPO/RTO comparisons are proven, while provider-managed full-restore equivalence and future-safe recovery remain open so dr_ready=false.${candidateFrontierNote}`,
 );
