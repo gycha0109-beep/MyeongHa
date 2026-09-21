@@ -5,6 +5,10 @@ import { defineConfig } from 'vite';
 
 const webRoot = fileURLToPath(new URL('.', import.meta.url));
 const repositoryRoot = resolve(webRoot, '..', '..');
+const webOutputRoot = resolve(
+  repositoryRoot,
+  process.env.MYEONGHA_WEB_OUTPUT_DIR ?? 'public',
+);
 const htmlEntries = [
   'index.html',
   'hall.html',
@@ -32,7 +36,7 @@ export default defineConfig({
     strictPort: true,
   },
   build: {
-    outDir: resolve(repositoryRoot, 'public'),
+    outDir: webOutputRoot,
     emptyOutDir: false,
     sourcemap: false,
     rollupOptions: {
