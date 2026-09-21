@@ -1,0 +1,28 @@
+name: FE026 Face Preview Consumer Adapter
+
+on:
+  pull_request:
+    paths:
+      - 'apps/web/src/face-preview/consumer-adapter.ts'
+      - 'apps/web/src/face-preview/consumer-adapter.test.ts'
+      - 'docs/face-engine/fe026-face-preview-consumer-adapter.md'
+      - '.github/workflows/fe026-face-preview-consumer-adapter.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify-fe026-consumer-adapter:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Verify FE026 adapter
+        run: npx vitest run apps/web/src/face-preview/consumer-adapter.test.ts
