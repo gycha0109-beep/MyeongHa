@@ -1,4 +1,5 @@
 name: Production Saju Service Origin Binding
+run-name: "[WT:ops] Production Saju Service Origin Binding"
 
 on:
   workflow_dispatch:
