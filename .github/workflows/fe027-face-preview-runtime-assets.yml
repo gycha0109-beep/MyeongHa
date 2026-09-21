@@ -3,8 +3,10 @@ name: FE027 Face Preview Runtime Assets
 on:
   pull_request:
     paths:
+      - 'config/face-preview-runtime-assets-fe027.json'
       - 'scripts/probe-face-preview-runtime-assets-fe027.mjs'
       - 'scripts/stage-face-preview-runtime-assets-fe027.mjs'
+      - 'scripts/verify-face-preview-runtime-assets-fe027.mjs'
       - 'apps/web/src/face-preview/runtime-assets-fe027.ts'
       - 'docs/face-engine/fe027-face-preview-runtime-assets.md'
       - '.github/workflows/fe027-face-preview-runtime-assets.yml'
@@ -22,5 +24,7 @@ jobs:
         with:
           node-version: '24'
           package-manager-cache: false
-      - name: Probe pinned FE027 runtime assets
-        run: node scripts/probe-face-preview-runtime-assets-fe027.mjs
+      - name: Stage digest-locked FE027 runtime assets
+        run: node scripts/stage-face-preview-runtime-assets-fe027.mjs
+      - name: Verify staged FE027 runtime assets
+        run: node scripts/verify-face-preview-runtime-assets-fe027.mjs
