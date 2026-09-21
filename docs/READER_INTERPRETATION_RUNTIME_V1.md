@@ -115,7 +115,7 @@ The projection input intentionally contains no Reader id, Reader content bundle,
 
 MyeongHa does **not** construct grounding units from Product blocks and does not read Saju internal Claim Graph material. A narrow in-process adapter, `createSajuCharacterGroundingProjectionAdapterV1`, maps this port to Saju's source-owned `buildCharacterGroundingBundleV1` contract without reimplementing projection semantics. The runtime also provides `createSajuCharacterGroundingHttpAdapterV1` plus `createProductionSajuCharacterGroundingProjectionPortV1`, which bind the same authority to the configured Saju service origin and Bearer credential.
 
-The matching authenticated Saju endpoint is proposed in `gycha0109-beep/Saju#1143` at `POST /api/character-grounding`. Until that source-side change is merged/deployed, the cross-service path remains an integration dependency rather than Production authority. Reader Interpretation therefore remains Preview-only and Production Saju interpretation remains HOLD.
+The matching authenticated Saju endpoint from `gycha0109-beep/Saju#1143` is now deployed at `POST /api/character-grounding`. Production Cloud Run run `35622856668` deployed Saju source `54667c70e46140b004d3b81c5797191538f6cbc3`, promoted revision `saju-production-00013-lar` to 100% traffic, and passed Production smoke. Hosted Reader Grounding Canary run `35624392882` then passed against that active deployment using MyeongHa harness authority `a2873e4546e5a7cea822ce9ccc2878f4de5e9711`. The cross-service Saju grounding transport dependency is therefore closed. Reader Interpretation remains Preview-only because public MyeongHa HTTP/Reader Scene activation is a separate authority boundary.
 
 ## 8. Activation boundary
 
@@ -128,7 +128,7 @@ This PR does **not**:
 - promote Preview output to Official Reading Source Truth;
 - expose the raw Official Reading artifact in Character memory or the Reader envelope.
 
-Server-owned Reader context composition is now connected through the thread-bound Preview seam. The next integration slice is **Preview HTTP/Reader Scene wiring** after the source-side Saju endpoint is available. Browser input must never provide Character runtime context, Character perspective, semantic grounding, Reader access, or Official Reading prose. Neither step may promote Production Saju or Commerce authority implicitly.
+Server-owned Reader context composition is connected through the thread-bound Preview seam, and the source-side Saju grounding endpoint is now hosted-canary verified. The next integration slice is **MyeongHa Preview HTTP/Reader Scene wiring**. Browser input must never provide Character runtime context, Character perspective, semantic grounding, Reader access, or Official Reading prose. Public wiring must not synthesize missing Production content/context authority merely because the Saju transport is now available, and it must not promote Commerce authority implicitly.
 
 
 ## 9. Cross-service projection transport
@@ -208,3 +208,29 @@ The bounded HTTP response exposes only the Reader Scene material required by the
 It does not expose Reader content-bundle ids, DB artifact hashes, Saju source hashes, grounding hashes, raw ProductReadingResponse material, entitlement ids, or internal authority rows.
 
 The existing browser `reading-character.js` is not switched to this endpoint in this slice because the current page flow does not yet carry the required server-authorized `threadId + officialReadingId` handoff. Falling back to URL-selected Reader identity would violate this authority model.
+
+
+## 12. Hosted Production grounding evidence and remaining MyeongHa gates
+
+Hosted grounding transport is closed with exact evidence:
+
+- Saju Production deployment run: `35622856668`
+- deployed Saju source: `54667c70e46140b004d3b81c5797191538f6cbc3`
+- active Cloud Run revision: `saju-production-00013-lar`
+- traffic: `100%`
+- candidate + promoted Production smoke: `PASS`
+- Hosted Reader Grounding Canary run: `35624392882`
+- MyeongHa cross-service harness authority: `a2873e4546e5a7cea822ce9ccc2878f4de5e9711`
+- hosted health, authenticated grounding, MyeongHa identity/hash admission, bounded Reader render, semantic preservation, wrong-Bearer denial, and revoked-Reader pre-transport denial: `PASS`
+
+This evidence closes only the Saju cross-service transport prerequisite. It does not by itself authorize a public Reader Interpretation route.
+
+Before `api/me.ts` / `vercel.json` may expose `POST /api/me/readings/reader-interpretation/preview`, Production MyeongHa composition must bind all of the existing HTTP seam dependencies to concrete server authorities. In particular:
+
+1. the exact pinned immutable `ContentReleaseRuntime` entry must be recoverable from server-owned published content authority rather than browser Reader keys or development fixtures;
+2. `ReaderInterpretationPreviewContextAuthorityPortV1` must be backed by concrete server context authority for its non-content fields rather than invented empty/default context;
+3. current relationship, Memory, thread binding, Reader access, and Official artifact reads must execute inside the canonical subject-scoped PostgreSQL transaction;
+4. the already-hosted `createProductionSajuCharacterGroundingProjectionPortV1` is the only Production grounding transport;
+5. Reader Scene handoff must carry only `threadId + officialReadingId`; URL-selected Reader identity remains presentation input and must not become runtime authority.
+
+Until those MyeongHa composition gates are concrete and tested, the public rewrite and browser endpoint switch remain fail-closed.
