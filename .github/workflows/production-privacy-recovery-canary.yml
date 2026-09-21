@@ -1,4 +1,5 @@
 name: Production Privacy Recovery Canary
+run-name: "[WT:ops] Production Privacy Recovery Canary"
 
 on:
   workflow_dispatch:

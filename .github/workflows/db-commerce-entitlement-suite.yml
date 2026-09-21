@@ -1,4 +1,5 @@
 name: DB Commerce Entitlement Suite
+run-name: "[WT:commerce] DB Commerce Entitlement Suite"
 
 on:
   pull_request:

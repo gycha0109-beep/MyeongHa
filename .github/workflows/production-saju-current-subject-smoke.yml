@@ -1,4 +1,5 @@
 name: Production Saju Current Subject Smoke
+run-name: "[WT:ops] Production Saju Current Subject Smoke"
 
 on:
   workflow_dispatch:

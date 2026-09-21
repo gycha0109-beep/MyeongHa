@@ -1,4 +1,5 @@
 name: PostgreSQL Isolated Restore Drill
+run-name: "[WT:ops] PostgreSQL Isolated Restore Drill"
 
 on:
   workflow_dispatch:
@@ -8,7 +9,21 @@ on:
         required: true
         type: string
       incident_reference_utc:
-        description: Synthetic incident/reference time in canonical UTC YYYY-MM-DDTHH:MM:SSZ
+        description: Recovery incident/reference time in canonical UTC YYYY-MM-DDTHH:MM:SSZ
+        required: true
+        type: string
+      privacy_ledger_run_id:
+        description: Optional authoritative Production PostgreSQL Privacy Recovery Ledger run ID
+        required: false
+        default: ''
+        type: string
+      production_privacy_canary_run_id:
+        description: Required with privacy_ledger_run_id; successful Production Privacy Recovery Canary evidence run ID
+        required: false
+        default: ''
+        type: string
+      watchtower_track:
+        description: Watchtower Track Key for CI attribution
         required: true
         type: string
 
@@ -41,10 +56,17 @@ jobs:
           --health-retries 12
           --health-start-period 30s
     env:
+      MYEONGHA_WATCHTOWER_TRACK: ${{ inputs.watchtower_track }}
       EXPECTED_PROJECT_REF: cnsfpcdiyofqvhpcegfc
       MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE: ${{ secrets.MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE }}
 
     steps:
+      - name: Require operations Watchtower attribution
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$MYEONGHA_WATCHTOWER_TRACK" == 'ops' ]]
+
       - name: Checkout exact repository state
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -65,6 +87,39 @@ jobs:
           artifact-ids: ${{ steps.source.outputs.artifact_id }}
           merge-multiple: true
           path: ${{ runner.temp }}/backup-artifact
+
+      - name: Resolve authoritative Production privacy replay provenance
+        id: privacy-source
+        if: inputs.privacy_ledger_run_id != '' || inputs.production_privacy_canary_run_id != ''
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BACKUP_RUN_ID: ${{ inputs.backup_run_id }}
+          PRIVACY_LEDGER_RUN_ID: ${{ inputs.privacy_ledger_run_id }}
+          PRODUCTION_PRIVACY_CANARY_RUN_ID: ${{ inputs.production_privacy_canary_run_id }}
+        run: bash scripts/operations/resolve-postgres-authoritative-privacy-replay-source.sh
+
+      - name: Download authoritative privacy ledger artifact
+        if: inputs.privacy_ledger_run_id != ''
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.privacy_ledger_run_id }}
+          artifact-ids: ${{ steps.privacy-source.outputs.ledger_artifact_id }}
+          merge-multiple: true
+          path: ${{ runner.temp }}/privacy-ledger-artifact
+
+      - name: Download Production privacy canary public evidence
+        if: inputs.production_privacy_canary_run_id != ''
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.production_privacy_canary_run_id }}
+          artifact-ids: ${{ steps.privacy-source.outputs.canary_artifact_id }}
+          merge-multiple: true
+          path: ${{ runner.temp }}/privacy-canary-evidence
 
       - name: Install PostgreSQL client and jq
         shell: bash
@@ -93,6 +148,24 @@ jobs:
           PGPASSWORD: restore-drill
           PGDATABASE: postgres
         run: bash scripts/operations/run-restored-postgres-privacy-drill.sh
+      - name: Replay authoritative Production privacy ledger on restored database
+        if: inputs.privacy_ledger_run_id != ''
+        shell: bash
+        env:
+          LEDGER_ARTIFACT_DIR: ${{ runner.temp }}/privacy-ledger-artifact
+          CANARY_EVIDENCE_DIR: ${{ runner.temp }}/privacy-canary-evidence
+          PRIVACY_RECONCILIATION_BACKUP_RUN_ID: ${{ inputs.backup_run_id }}
+          PRIVACY_RECONCILIATION_LEDGER_RUN_ID: ${{ inputs.privacy_ledger_run_id }}
+          PRODUCTION_PRIVACY_CANARY_RUN_ID: ${{ inputs.production_privacy_canary_run_id }}
+          PRIVACY_RECONCILIATION_INCIDENT_REFERENCE_UTC: ${{ inputs.incident_reference_utc }}
+          PRIVACY_RECONCILIATION_EVIDENCE_PATH: ${{ runner.temp }}/restore-evidence/authoritative-privacy-reconciliation-evidence.json
+          PGHOST: 127.0.0.1
+          PGPORT: 5432
+          PGUSER: supabase_admin
+          PGPASSWORD: restore-drill
+          PGDATABASE: postgres
+        run: bash scripts/operations/run-restored-postgres-authoritative-privacy-replay.sh
+
       - name: Build self-contained restore evidence envelope
         shell: bash
         env:
@@ -107,9 +180,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: postgres-isolated-restore-drill-${{ github.run_id }}
-          path: |
-            ${{ runner.temp }}/restore-evidence/restore-evidence.json
-            ${{ runner.temp }}/restore-evidence/privacy-reconciliation-evidence.json
+          path: ${{ runner.temp }}/restore-evidence/*.json
           if-no-files-found: error
           retention-days: 30
           compression-level: 0
@@ -123,5 +194,10 @@ jobs:
           echo 'synthetic_privacy_reconciliation_mechanics=replay_and_finalization_exercised_on_restored_db'
           echo 'privacy_reconciliation=synthetic_captured_window_authority_mechanics_only'
           echo 'hosted_auth_provider_ack=synthetic_only_real_provider_proven_separately'
-          echo 'authoritative_privacy_reconciliation=not_yet_proven_with_production_nonzero_ledger'
+          if [[ -n "${{ inputs.privacy_ledger_run_id }}" ]]; then
+            echo 'authoritative_privacy_reconciliation=production_nonzero_captured_window_replay_proven'
+            echo 'future_safe_privacy_reconciliation=false'
+          else
+            echo 'authoritative_privacy_reconciliation=not_exercised_without_production_ledger'
+          fi
           echo 'dr_ready=false'

@@ -1,4 +1,5 @@
 name: Production PostgreSQL Privacy Recovery Ledger
+run-name: "[WT:ops] Production PostgreSQL Privacy Recovery Ledger"
 
 on:
   workflow_dispatch:
