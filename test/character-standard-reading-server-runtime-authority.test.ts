@@ -60,7 +60,7 @@ describe('Character Standard Reading server runtime authority', () => {
       nonMemoryContextAuthorityPort: {} as never,
       contextInput: forgedContext,
     })).rejects.toThrow(
-      `Server Reader runtime does not accept caller-supplied ${field} authority.`,
+      `Server Reader runtime does not accept non-empty caller-supplied ${field} authority.`,
     );
   });
 });

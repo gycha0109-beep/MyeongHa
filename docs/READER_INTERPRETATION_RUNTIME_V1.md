@@ -69,7 +69,7 @@ Consequences:
 - Reader code must not calculate or reconstruct day master, element balance, ten gods, hidden stems, major luck, annual luck, useful/favorable elements, or similar Saju facts from birth data.
 - If those facts are needed for a future product surface, Saju/Official Reading authority must expose them first and the Reader contract must be versioned explicitly.
 - Reader-to-Reader variation is limited to admitted unit selection, ordering, framing, uncertainty handling, and advice style. `canonicalMeaning`, disclosures, ambiguity, source hashes, and Official Reading identity remain invariant.
-- Historical relationship events and raw messages are deliberately absent, so Reader v1 has no product-defined history/message window and no arbitrary retrieval limit.
+- Historical relationship events and raw messages are deliberately absent, so Reader v1 has no product-defined history/message window and no arbitrary retrieval limit. Legacy empty arrays may cross older internal seams, but non-empty history is rejected and the server normalizes both fields to empty.
 - Current relationship projection remains available for Character delivery, but its numeric band projection policy is not invented here; SRC-22 remains the policy-authority blocker for Production thresholds.
 
 ## 3. Current executable slice

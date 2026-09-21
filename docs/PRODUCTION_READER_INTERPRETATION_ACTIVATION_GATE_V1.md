@@ -98,8 +98,9 @@ The composition boundary remains fail-closed where source authority is not yet c
   injection is rejected before runtime assembly.
 - **Decision-R / Reader Context Product Policy V1:** Reader Interpretation does not
   consume relationship-event history or raw message text. The server composition seam
-  injects empty `recentRelationshipEventKeys` / `recentMessages` and rejects caller or
-  context-provider attempts to supply them; therefore no event/message window or limit
+  injects empty `recentRelationshipEventKeys` / `recentMessages`; legacy empty arrays
+  are tolerated but any non-empty caller/context-provider history is rejected, so no
+  event/message window or limit
   is invented for Reader v1.
 - Current relationship state still comes from the owner-scoped PostgreSQL projection.
   `relationshipProjectionPolicy` remains a separate source-backed requirement; SRC-22

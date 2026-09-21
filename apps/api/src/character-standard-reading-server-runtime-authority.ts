@@ -74,12 +74,21 @@ function assertNoCallerContentAuthorityFields(
     'relationshipState',
     'grantedLifeFacts',
     'grantedMemories',
-    'recentRelationshipEventKeys',
-    'recentMessages',
   ] as const) {
     if (Object.prototype.hasOwnProperty.call(input, field)) {
       throw new CharacterStandardReadingServerRuntimeAuthorityErrorV1(
         `Server Reader runtime does not accept caller-supplied ${field} authority.`,
+      );
+    }
+  }
+
+  const legacy = input as unknown as Record<string, unknown>;
+  for (const field of ['recentRelationshipEventKeys', 'recentMessages'] as const) {
+    if (!Object.prototype.hasOwnProperty.call(legacy, field)) continue;
+    const value = legacy[field];
+    if (!Array.isArray(value) || value.length !== 0) {
+      throw new CharacterStandardReadingServerRuntimeAuthorityErrorV1(
+        `Server Reader runtime does not accept non-empty caller-supplied ${field} authority.`,
       );
     }
   }
