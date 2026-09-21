@@ -97,7 +97,7 @@ for (const fragment of [
   'authoritative_post_backup_source: true_bounded_captured_window_only',
   'authoritative_privacy_reconciliation: false',
   'future_safe_privacy_reconciliation: false',
-  'privacy_reconciliation: BLOCKED_BY_FRESH_RESTORE_RUNTIME_AND_APPLICABLE_AUTHORITATIVE_DELTA_PROOF',
+  'privacy_reconciliation: BLOCKED_BY_PRODUCTION_NONZERO_AUTHORITATIVE_DELTA_PROOF',
   'rpo_authority: OPEN_DECISION',
   'rto_authority: OPEN_DECISION',
   'dr_ready: false',
