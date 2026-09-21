@@ -1,0 +1,62 @@
+name: FE032 Seed Vendored Preview Engine
+
+on:
+  push:
+    branches:
+      - feat/fe032-vendored-preview-engine
+    paths:
+      - '.github/workflows/fe032-seed-vendored-preview-engine.yml'
+      - 'vendor/face-preview/manifest.json'
+
+permissions:
+  contents: write
+
+jobs:
+  seed-vendored-preview-engine:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    env:
+      SAJU_SOURCE_SHA: 1c0be383844bd7c5aa75079e2084da7bee9de13c
+      EXPECTED_PACKAGE_SHA256: 8d793c57e104fc0137a17dc631d208b468131b1d9a9668142a846e34dacbf84a
+      VENDOR_TARBALL: vendor/face-preview/myeongha-face-reading-0.0.0.tgz
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: feat/fe032-vendored-preview-engine
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Rebuild exact accepted Saju preview package
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf "$RUNNER_TEMP/saju-source"
+          mkdir -p "$RUNNER_TEMP/saju-source"
+          curl --fail --location --retry 3             "https://api.github.com/repos/gycha0109-beep/Saju/tarball/$SAJU_SOURCE_SHA"             --output "$RUNNER_TEMP/saju-source.tar.gz"
+          tar -xzf "$RUNNER_TEMP/saju-source.tar.gz"             -C "$RUNNER_TEMP/saju-source" --strip-components=1
+          cd "$RUNNER_TEMP/saju-source"
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run face:build:preview-package
+          mkdir -p "$GITHUB_WORKSPACE/vendor/face-preview"
+          rm -f "$GITHUB_WORKSPACE/$VENDOR_TARBALL"
+          npm pack ./packages/face-reading             --pack-destination "$GITHUB_WORKSPACE/vendor/face-preview"
+      - name: Require accepted FE024 digest
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f "$VENDOR_TARBALL"
+          ACTUAL_SHA256="$(sha256sum "$VENDOR_TARBALL" | awk '{print $1}')"
+          test "$ACTUAL_SHA256" = "$EXPECTED_PACKAGE_SHA256"
+          node scripts/verify-vendored-face-preview-engine-fe032.mjs
+      - name: Commit digest-pinned vendor artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$VENDOR_TARBALL"
+          git diff --cached --quiet && exit 0
+          git commit -m "build(face-engine): materialize accepted FE032 package"
+          git push origin HEAD:feat/fe032-vendored-preview-engine
