@@ -1,0 +1,36 @@
+name: FE032 Vendored Preview Engine
+
+on:
+  pull_request:
+    paths:
+      - 'vendor/face-preview/**'
+      - 'apps/web/package.json'
+      - 'package-lock.json'
+      - 'apps/web/src/face-preview/engine-loader-fe032.ts'
+      - 'apps/web/src/face-preview/engine-loader-fe032.test.ts'
+      - 'scripts/verify-vendored-face-preview-engine-fe032.mjs'
+      - 'docs/face-engine/fe032-vendored-preview-engine.md'
+      - '.github/workflows/fe032-vendored-preview-engine.yml'
+      - '.github/workflows/fe032-seed-vendored-preview-engine.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify-fe032-vendored-engine:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked MyeongHa dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Verify vendored FE024 provenance and package boundary
+        run: node scripts/verify-vendored-face-preview-engine-fe032.mjs
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Verify FE032 loader and FE031 composition
+        run: npx vitest run apps/web/src/face-preview/engine-loader-fe032.test.ts apps/web/src/face-preview/one-shot-fe031.test.ts
