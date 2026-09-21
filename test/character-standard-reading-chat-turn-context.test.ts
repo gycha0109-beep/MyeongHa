@@ -18,6 +18,7 @@ import {
   type CharacterStandardReadingChatTurnServerContextInputV1,
 } from '../apps/api/src/index.js';
 import type { ChatThreadRuntimeBindingReadAuthorityPortV1 } from '../apps/api/src/chat-thread-runtime-binding-read.js';
+import type { CharacterRelationshipReadAuthorityPortV1 } from '../apps/api/src/character-relationship-read.js';
 import type {
   CharacterStandardReadingAccessAuthorityPortV1,
   CharacterStandardReadingArtifactAuthorityPortV1,
@@ -182,6 +183,7 @@ function serverContextInput(): CharacterStandardReadingChatTurnServerContextInpu
     character: _character,
     contentBundleId: _contentBundleId,
     worldRelations: _worldRelations,
+    relationshipState: _relationshipState,
     ...context
   } = contextInput();
   return context;
@@ -240,10 +242,25 @@ function authorities(participants: readonly string[] = ['baekheon']) {
       completedAt: '2026-09-21T00:00:00.000Z',
     }]),
   };
+  const relationshipAuthorityPort: CharacterRelationshipReadAuthorityPortV1 = {
+    readCurrentRelationship: vi.fn(async () => [{
+      stateId: '99999999-9999-4999-8999-999999999991',
+      characterId: 'baekheon',
+      closeness: 47,
+      trust: 52,
+      friction: 8,
+      relationshipStage: 'familiar',
+      policyVersion: 'relationship-policy-v1',
+      revision: 7,
+      lastInteractionAt: '2026-09-21T00:01:30.000Z',
+      updatedAt: '2026-09-21T00:01:30.000Z',
+    }]),
+  };
   return {
     threadBindingAuthorityPort,
     accessAuthorityPort,
     artifactAuthorityPort,
+    relationshipAuthorityPort,
   };
 }
 
@@ -413,6 +430,12 @@ describe('Official Reading Reader Chat turn preflight', () => {
       expect(result.runtime.threadBinding.activeContentBundleId).toBe(BUNDLE_ID);
       expect(result.runtime.source.readerCharacterId).toBe('baekheon');
       expect(result.runtime.context.saju?.readingRef).toBe(READING_ID);
+      expect(result.runtime.context.relationship.relationshipRevision).toBe(7);
+      expect(result.runtime.context.relationship.stageKey).toBe('familiar');
+      expect(authority.relationshipAuthorityPort.readCurrentRelationship).toHaveBeenCalledWith({
+        subjectId: SUBJECT_ID,
+        characterId: 'baekheon',
+      });
       expect(result.runtime.context.saju?.protectedSegments.map((segment) => segment.text)).toEqual([
         '서버가 다시 읽은 공식 직업 Reading입니다.',
       ]);
@@ -446,7 +469,7 @@ describe('Official Reading Reader Chat turn preflight', () => {
     expect(authority.artifactAuthorityPort.readArtifactSource).not.toHaveBeenCalled();
   });
 
-  it('rejects caller-supplied Character/world authority before thread or Reader Knowledge lookup', async () => {
+  it('rejects caller-supplied Character/world/relationship authority before thread or Reader Knowledge lookup', async () => {
     const authority = authorities();
     const receivePlan = existingThreadReceivePlan();
     const forgedContext = {
@@ -454,6 +477,14 @@ describe('Official Reading Reader Chat turn preflight', () => {
       character: authoredCharacter('seyeon'),
       contentBundleId: 'caller-bundle',
       worldRelations: [],
+      relationshipState: {
+        closeness: 999,
+        trust: 999,
+        friction: 0,
+        stage: 'caller-forged',
+        revision: 999,
+        policyVersion: 'caller-forged',
+      },
     } as unknown as CharacterStandardReadingChatTurnServerContextInputV1;
 
     await expect(
@@ -468,6 +499,26 @@ describe('Official Reading Reader Chat turn preflight', () => {
     ).rejects.toThrow(/does not accept caller-supplied character authority/u);
 
     expect(authority.threadBindingAuthorityPort.readRuntimeBinding).not.toHaveBeenCalled();
+    expect(authority.accessAuthorityPort.readAccessibleReadings).not.toHaveBeenCalled();
+    expect(authority.artifactAuthorityPort.readArtifactSource).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when no stored current relationship projection exists', async () => {
+    const authority = authorities();
+    authority.relationshipAuthorityPort.readCurrentRelationship = vi.fn(async () => []);
+    const receivePlan = existingThreadReceivePlan();
+
+    await expect(
+      prepareCharacterStandardReadingChatTurnPreflightV1({
+        resolvedSubjectId: SUBJECT_ID,
+        receivePlan,
+        readingId: READING_ID,
+        effectiveAt: '2026-09-21T00:02:00.000Z',
+        ...authority,
+        contextInput: serverContextInput(),
+      }),
+    ).rejects.toThrow(/requires a stored current relationship projection/u);
+
     expect(authority.accessAuthorityPort.readAccessibleReadings).not.toHaveBeenCalled();
     expect(authority.artifactAuthorityPort.readArtifactSource).not.toHaveBeenCalled();
   });
