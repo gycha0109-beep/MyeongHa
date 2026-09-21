@@ -500,6 +500,8 @@ describe('Reader Interpretation Preview Runtime v1', () => {
       readArtifactSource: vi.fn(async () => [artifactRow('seyeon')]),
     };
 
+    const projectionPort = groundingProjectionPort(baseBundle);
+
     await expect(
       runReaderInterpretationPreviewV1({
         resolvedSubjectId: SUBJECT_ID,
@@ -508,11 +510,13 @@ describe('Reader Interpretation Preview Runtime v1', () => {
         effectiveAt: '2026-09-21T00:00:00.000Z',
         requestedDomain: 'general',
         context: unsupportedContext,
-        groundingProjectionPort: groundingProjectionPort(baseBundle),
+        groundingProjectionPort: projectionPort,
         accessAuthorityPort,
         artifactAuthorityPort,
       }),
     ).rejects.toMatchObject({ code: 'PERSPECTIVE_UNAVAILABLE' });
+
+    expect(projectionPort.projectGrounding).not.toHaveBeenCalled();
   });
 
   it('does not let one Reader borrow another Reader runtime context', async () => {
