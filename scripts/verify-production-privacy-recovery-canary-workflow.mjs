@@ -28,6 +28,8 @@ for (const fragment of [
   'contents: read',
   'cancel-in-progress: false',
   'environment: production',
+  'MYEONGHA_DATABASE_URL: ${{ secrets.MYEONGHA_DATABASE_URL }}',
+  'MYEONGHA_DATABASE_PRINCIPAL: myeongha_runtime',
   'MYEONGHA_WORKER_DATABASE_URL: ${{ secrets.MYEONGHA_WORKER_DATABASE_URL }}',
   'MYEONGHA_WORKER_DATABASE_PRINCIPAL: myeongha_worker_runtime',
   'MYEONGHA_PRIVACY_CANARY_ADMIN_DATABASE_URL',
@@ -55,12 +57,21 @@ for (const fragment of ['\n  push:', '\n  schedule:', '\n  pull_request:', 'canc
 const prepareIndex = workflow.indexOf(
   'Create disposable hosted Auth + Production application canary state',
 );
+const apiCredentialIndex = workflow.indexOf(
+  '[[ -n "${MYEONGHA_DATABASE_URL:-}" ]]',
+);
 const workerCredentialIndex = workflow.indexOf(
   '[[ -n "${MYEONGHA_WORKER_DATABASE_URL:-}" ]]',
 );
-if (workerCredentialIndex < 0 || prepareIndex < 0 || workerCredentialIndex > prepareIndex) {
+if (
+  apiCredentialIndex < 0 ||
+  workerCredentialIndex < 0 ||
+  prepareIndex < 0 ||
+  apiCredentialIndex > prepareIndex ||
+  workerCredentialIndex > prepareIndex
+) {
   throw new Error(
-    `${workflowPath} must fail closed on the dedicated worker credential before creating Production canary state.`,
+    `${workflowPath} must fail closed on API and worker runtime credentials before creating Production canary state.`,
   );
 }
 
@@ -74,6 +85,10 @@ if (
 for (const fragment of [
   "const CONFIRMATION = 'RUN_SYNTHETIC_PRODUCTION_PRIVACY_CANARY';",
   "const PROVIDER = 'myeongha-privacy-canary-v1';",
+  "const API_DATABASE_PRINCIPAL = 'myeongha_runtime';",
+  "const API_EXECUTION_ROLE = 'myeongha_api_executor';",
+  "requiredEnv('MYEONGHA_DATABASE_URL')",
+  'await assertApiRuntimePrincipal(client);',
   "phase: 'preparing'",
   "state.phase = 'prepared';",
   "state.phase = 'deletion_started';",
