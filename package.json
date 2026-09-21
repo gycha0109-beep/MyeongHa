@@ -17,7 +17,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && npm run typecheck -w @myeongha/web",
     "test": "vitest run",
     "build": "tsc -p tsconfig.build.json",
-    "build:web": "node scripts/build-web-static.mjs && npm run build -w @myeongha/web",
+    "build:web": "node scripts/build-web-static.mjs && node scripts/stage-face-preview-runtime-assets-fe027.mjs && npm run build -w @myeongha/web",
     "verify:deployment-config": "node scripts/verify-web-deployment.mjs",
     "verify:supabase-deployment-config": "node scripts/verify-supabase-deployment.mjs",
     "verify:production-guest-bootstrap-ttl-binding": "node scripts/verify-production-guest-bootstrap-ttl-binding.mjs",
