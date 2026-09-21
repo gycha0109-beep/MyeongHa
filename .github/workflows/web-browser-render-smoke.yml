@@ -3,6 +3,14 @@ name: Web Browser Smoke
 on:
   pull_request:
     paths:
+      - 'apps/web/src/face-reading/**'
+      - 'apps/web/src/face-preview/**'
+      - 'packages/face-reading/**'
+      - 'scripts/stage-face-preview-runtime-assets-fe027.mjs'
+      - 'scripts/verify-face-preview-runtime-canary-fe034.mjs'
+      - 'scripts/verify-face-observation-repeatability-fe037.mjs'
+      - 'docs/face-engine/fe034-face-preview-runtime-canary.md'
+      - 'docs/face-engine/fe037-neutral-observation-repeatability.md'
       - '.github/workflows/web-browser-render-smoke.yml'
   push:
     branches:
@@ -45,12 +53,28 @@ jobs:
         run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Build static web
         run: npm run build:web
+      - name: Fetch pinned Face Reading browser fixture
+        run: |
+          curl --fail --location --retry 3 \
+            "https://raw.githubusercontent.com/scikit-image/scikit-image/9311ab50b2e3392bb5272253b43cb4dd1ce04e31/src/_skimage2/data/astronaut.png" \
+            --output "$RUNNER_TEMP/face-reading-astronaut.png"
+          echo "88431cd9653ccd539741b555fb0a46b61558b301d4110412b5bc28b5e3ea6cb5  $RUNNER_TEMP/face-reading-astronaut.png" | sha256sum --check --strict
       - name: Set up Chrome for Testing
         id: chrome
         uses: browser-actions/setup-chrome@48ad923757ca74d66703209fe939badbdf80f2f4
         with:
           chrome-version: stable
           install-dependencies: true
+      - name: Verify real FaceLandmarker browser canary
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+          FE034_CANARY_IMAGE: ${{ runner.temp }}/face-reading-astronaut.png
+        run: node scripts/verify-face-preview-runtime-canary-fe034.mjs
+      - name: Record neutral observation repeatability evidence
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+          FE037_CANARY_IMAGE: ${{ runner.temp }}/face-reading-astronaut.png
+        run: node scripts/verify-face-observation-repeatability-fe037.mjs
       - name: Verify Hall to Saju browser render
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
@@ -114,4 +138,5 @@ jobs:
             artifacts/web-my-birth-browser-smoke*
             artifacts/web-birth-session-browser-smoke*
             artifacts/web-conversation-browser-smoke*
+            artifacts/face-observation-repeatability-fe037.json
           if-no-files-found: ignore
