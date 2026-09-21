@@ -32,7 +32,24 @@ Raw subject IDs are not accepted in the activation allowlist.
 
 ## Runtime order
 
-The Production wrapper checks activation before any Reader context, Official Reading authority, Memory authority, or Saju grounding transport is touched.
+For the canonical PostgreSQL execution path, identity is resolved to the transaction-bound
+`subjects.id` first. The activation hash is evaluated from that canonical subject, not
+from a browser value or upstream auth-provider identifier.
+
+```text
+verified auth evidence
+→ canonical subjects.id transaction binding
+→ internal-preview activation gate
+→ Reader/thread/Reading/content/context authority
+→ reviewed Character perspective admission
+→ Saju grounding transport
+→ bounded rendering + semantic guard
+→ Reader Scene safe DTO
+```
+
+When the mode is `off` or the canonical subject is outside the cohort, the transaction
+rolls back without constructing Reader context ports and without touching thread,
+Official Reading, content, relationship, Memory, or Saju grounding authority.
 
 After activation admission, the existing hardened Preview HTTP seam remains authoritative for:
 
@@ -61,3 +78,26 @@ V1 does not:
 - add Se-yeon or Yeo-ul semantic mappings.
 
 A future public activation requires a separate reviewed change and explicit approval.
+
+
+## Production composition authority status
+
+The composition boundary remains fail-closed where source authority is not yet complete.
+
+- Reader Scene HTTP projection exposes only Character/domain plus segment `kind` and
+  `text`; renderer IDs, Reading refs, plan refs, grounding unit refs, framing keys,
+  disclosure refs, content hashes, and DB provenance are not browser DTO fields.
+- Reviewed Character perspective admission happens before Saju grounding transport.
+  A Reader without a reviewed perspective cannot trigger the cross-service Saju call.
+- Production immutable Character/world artifact recovery is **not** synthesized from
+  DB runtime metadata. `content_bundles.artifact_ref` is a private resolver key, but
+  current source authority still blocks concrete Production Character asset payload
+  approval/publication (Character Runtime Asset Gate B/C).
+- Relationship rendering still requires source-backed
+  `relationshipProjectionPolicy` and recent relationship-event authority. SRC-22
+  remains open, so test thresholds or invented empty event history must not be
+  promoted into Production composition.
+
+Accordingly, this change hardens the composition order and browser projection but does
+not claim a positive end-to-end Production Reader Scene until the immutable content
+artifact and relationship projection authorities are source-complete.
