@@ -119,7 +119,7 @@ const requiredRunbookFragments = [
   'data_deletion_jobs',
   'Never restore a drill directly over serving production.',
   'backup schema freshness             = CURRENT — backup frontier 1230 / deployed frontier 1230',
-  'current-schema restore              = PENDING ISOLATED RESTORE',
+  'current-schema restore              = EVIDENCED — run 35546262378 / frontier 1230',
   'achieved recovery duration',
   'achieved data-loss window',
 ];
