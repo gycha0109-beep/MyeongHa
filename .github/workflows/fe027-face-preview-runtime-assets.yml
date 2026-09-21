@@ -1,0 +1,26 @@
+name: FE027 Face Preview Runtime Assets
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/probe-face-preview-runtime-assets-fe027.mjs'
+      - 'scripts/stage-face-preview-runtime-assets-fe027.mjs'
+      - 'apps/web/src/face-preview/runtime-assets-fe027.ts'
+      - 'docs/face-engine/fe027-face-preview-runtime-assets.md'
+      - '.github/workflows/fe027-face-preview-runtime-assets.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  probe-fe027-runtime-assets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Probe pinned FE027 runtime assets
+        run: node scripts/probe-face-preview-runtime-assets-fe027.mjs
