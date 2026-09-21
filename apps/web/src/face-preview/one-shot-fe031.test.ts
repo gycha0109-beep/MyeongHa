@@ -5,6 +5,7 @@ import {
 } from './one-shot-fe031.js';
 import type {
   FacePreviewConsumerOpenResultV1,
+  FacePreviewConsumerSessionV1,
 } from './consumer-adapter.js';
 
 const boundary = Object.freeze({
@@ -24,8 +25,8 @@ const sourceBlob = new Blob([new ArrayBuffer(8)], { type: 'image/jpeg' });
 const canonicalBlob = new Blob([new ArrayBuffer(4)], { type: 'image/jpeg' });
 
 function readyOpen(
-  analyze: ReturnType<typeof vi.fn>,
-  close: ReturnType<typeof vi.fn>,
+  analyze: FacePreviewConsumerSessionV1['analyze'],
+  close: FacePreviewConsumerSessionV1['close'],
 ): FacePreviewConsumerOpenResultV1 {
   return {
     schemaVersion: 'myeongha-face-preview-consumer-open-v1',
@@ -69,7 +70,7 @@ function intakeReady() {
 describe('FE031 one-shot Face Preview controller', () => {
   it('sanitizes first, analyzes only canonical bytes, closes, and returns neutral preview', async () => {
     const sanitize = vi.fn().mockResolvedValue(intakeReady());
-    const analyze = vi.fn().mockResolvedValue({
+    const analyze = vi.fn<FacePreviewConsumerSessionV1['analyze']>().mockResolvedValue({
       schemaVersion: 'myeongha-face-preview-consumer-attempt-v1',
       contractVersion: 'MHA-FACE-PREVIEW-CONSUMER-FE023-v1',
       status: 'ok',
@@ -89,7 +90,8 @@ describe('FE031 one-shot Face Preview controller', () => {
       },
       boundary,
     });
-    const close = vi.fn().mockResolvedValue({ status: 'closed' });
+    const close = vi.fn<FacePreviewConsumerSessionV1['close']>()
+      .mockResolvedValue({ status: 'closed' });
     const bootstrap = vi.fn().mockResolvedValue(readyOpen(analyze, close));
     const loadEngineModule = vi.fn();
 
@@ -171,7 +173,8 @@ describe('FE031 one-shot Face Preview controller', () => {
       rejection: { code: 'ENGINE_CONTRACT_MISMATCH', stage: 'open' },
     });
 
-    const close = vi.fn().mockResolvedValue({ status: 'closed' });
+    const close = vi.fn<FacePreviewConsumerSessionV1['close']>()
+      .mockResolvedValue({ status: 'closed' });
     const analysisRejected = await runFacePreviewOneShotFE031({
       schemaVersion: 'myeongha-face-preview-one-shot-input-v1',
       blob: sourceBlob,
@@ -179,7 +182,7 @@ describe('FE031 one-shot Face Preview controller', () => {
     }, {
       sanitize: vi.fn().mockResolvedValue(intakeReady()),
       bootstrap: vi.fn().mockResolvedValue(readyOpen(
-        vi.fn().mockResolvedValue({
+        vi.fn<FacePreviewConsumerSessionV1['analyze']>().mockResolvedValue({
           schemaVersion: 'myeongha-face-preview-consumer-attempt-v1',
           contractVersion: 'MHA-FACE-PREVIEW-CONSUMER-FE023-v1',
           status: 'rejected',
@@ -197,7 +200,8 @@ describe('FE031 one-shot Face Preview controller', () => {
   });
 
   it('fails closed when session cleanup fails and leaks no raw error', async () => {
-    const close = vi.fn().mockRejectedValue(new Error('cleanup secret'));
+    const close = vi.fn<FacePreviewConsumerSessionV1['close']>()
+      .mockRejectedValue(new Error('cleanup secret'));
     const result = await runFacePreviewOneShotFE031({
       schemaVersion: 'myeongha-face-preview-one-shot-input-v1',
       blob: sourceBlob,
