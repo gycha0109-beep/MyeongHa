@@ -12,6 +12,7 @@ const CONFIRMATION = 'RUN_SYNTHETIC_PRODUCTION_PRIVACY_CANARY';
 const PROVIDER = 'myeongha-privacy-canary-v1';
 const API_EXECUTION_ROLE = 'myeongha_api_executor';
 const API_CANARY_ROLE_MARKER = 'myeongha:privacy-canary-api-login:v1';
+const WORKER_DATABASE_PRINCIPAL = 'myeongha_worker_runtime';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 
 class CanaryFailure extends Error {
@@ -477,15 +478,63 @@ function classifyWorkerDatabaseFailure(error) {
   return null;
 }
 
+function canonicalWorkerDatabaseUrl() {
+  const source = requiredEnv('MYEONGHA_WORKER_DATABASE_URL');
+  let url;
+  try {
+    url = new URL(source);
+  } catch {
+    fail('WORKER_DATABASE_URL_SOURCE_INVALID');
+  }
+
+  if (url.protocol !== 'postgres:' && url.protocol !== 'postgresql:') {
+    fail('WORKER_DATABASE_URL_SOURCE_INVALID');
+  }
+  if (url.password.length === 0) {
+    fail('WORKER_DATABASE_URL_SOURCE_INVALID');
+  }
+
+  const decodedUser = decodeURIComponent(url.username);
+  const qualifiedPrincipal = `${WORKER_DATABASE_PRINCIPAL}.${PROJECT_REF}`;
+  if (
+    decodedUser !== WORKER_DATABASE_PRINCIPAL &&
+    decodedUser !== qualifiedPrincipal
+  ) {
+    fail('WORKER_DATABASE_URL_SOURCE_PRINCIPAL_INVALID');
+  }
+
+  const poolerHost = requiredEnv('SUPABASE_PRODUCTION_SESSION_POOLER_HOST');
+  if (
+    !/^[a-z0-9-]+(?:[.][a-z0-9-]+)*[.]pooler[.]supabase[.]com$/u.test(
+      poolerHost,
+    )
+  ) {
+    fail('WORKER_DATABASE_POOLER_HOST_INVALID');
+  }
+
+  url.hostname = poolerHost;
+  url.port = '5432';
+  url.username = qualifiedPrincipal;
+  url.pathname = '/postgres';
+  url.search = '';
+  url.searchParams.set('sslmode', 'require');
+
+  const canonical = url.toString();
+  console.log(`::add-mask::${canonical}`);
+  return canonical;
+}
+
 async function parseWorkerDatabaseConfig() {
   const { parseProductionAccountDeletionWorkerDbConfigV1 } =
     await runtimeModules();
   try {
     return parseProductionAccountDeletionWorkerDbConfigV1({
       ...process.env,
-      MYEONGHA_WORKER_DATABASE_PRINCIPAL: 'myeongha_worker_runtime',
+      MYEONGHA_WORKER_DATABASE_URL: canonicalWorkerDatabaseUrl(),
+      MYEONGHA_WORKER_DATABASE_PRINCIPAL: WORKER_DATABASE_PRINCIPAL,
     });
-  } catch {
+  } catch (error) {
+    if (error instanceof CanaryFailure) throw error;
     fail('WORKER_CONFIG_INVALID');
   }
 }
