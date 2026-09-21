@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   FACE_PREVIEW_ENGINE_LOADER_VERSION_FE032,
   loadVendoredFacePreviewEngineFE032,
+  runVendoredFacePreviewOneShotFE032,
 } from './engine-loader-fe032.js';
 
 describe('FE032 vendored Face Preview engine loader', () => {
@@ -17,5 +18,6 @@ describe('FE032 vendored Face Preview engine loader', () => {
       .toBe('FE023-DIGEST-BOUND-DIRECT-BLOB-PRODUCT-PREVIEW-SESSION-v1');
     expect(typeof engine.openDigestBoundProductPreviewSessionFE023)
       .toBe('function');
+    expect(typeof runVendoredFacePreviewOneShotFE032).toBe('function');
   });
 });
