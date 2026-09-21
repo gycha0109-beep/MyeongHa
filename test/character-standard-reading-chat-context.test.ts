@@ -1,9 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { CharacterContentDefinition } from '../packages/character-content/src/index.js';
+import { DEV_CHARACTER_CONTENT_BUNDLE } from '../packages/test-fixtures/src/index.js';
 import {
   CharacterStandardReadingChatContextErrorV1,
+  assemblePreparedCharacterStandardReadingRuntimeContextV1,
   prepareCharacterStandardReadingChatContextV1,
   type CharacterRuntimeContextAssemblyInputV1,
+  type CharacterStandardReadingChatBaseContextInputV1,
 } from '../apps/api/src/index.js';
+import { assembleCharacterRuntimeContext } from '../packages/domain/src/index.js';
 import type {
   CharacterStandardReadingAccessAuthorityPortV1,
   CharacterStandardReadingArtifactAuthorityPortV1,
@@ -74,28 +79,151 @@ function ports() {
   return { accessAuthorityPort, artifactAuthorityPort };
 }
 
+function authoredCharacter(characterId = 'baekheon'): CharacterContentDefinition {
+  const base = DEV_CHARACTER_CONTENT_BUNDLE.characters[0]!;
+  return {
+    ...base,
+    characterId,
+    displayName: 'Official Reading Runtime Test Reader',
+    deityProxyLabel: 'official_reading_runtime_test',
+    shortDescriptor: 'official reading runtime test only',
+    personalityTraits: ['observant'],
+    flaws: ['overchecks continuity'],
+    values: ['truth'],
+    emotionIds: ['neutral', 'serious'],
+    animationCueIds: ['idle'],
+    canon: {
+      worldRole: 'record witness',
+      origin: 'record hall',
+      apparentAgeBand: 'adult',
+      deityBond: {
+        deityId: 'deity-official-reading-runtime-test',
+        representationRole: 'witness',
+        oath: 'Keep the record intact.',
+        acceptedDoctrine: ['Records matter.'],
+        resistedDoctrine: ['Records do not own people.'],
+      },
+      worldview: {
+        coreValues: ['truth'],
+        humanTheory: 'People repeat and revise themselves.',
+        agencyTheory: 'People can act on what they learn.',
+        truthTheory: 'Claims need provenance.',
+      },
+      psychology: {
+        desire: 'Understand continuity.',
+        fear: 'Confusing preservation with control.',
+        flaw: 'Overchecks continuity.',
+        contradiction: 'Questions change in order to protect it.',
+        hiddenMotivation: 'Wants to see change survive memory.',
+      },
+    },
+    persona: {
+      communication: {
+        register: 'measured',
+        sentenceRhythm: 'short',
+        verbosity: 'medium',
+        humorStyle: 'dry',
+        metaphorStyle: 'records',
+        profanityIntensity: 'none',
+        politenessStyle: 'reserved',
+      },
+      cognition: {
+        thinkingTempo: 'slow',
+        ambiguityTolerance: 'high',
+        conclusionStyle: 'evidence_first',
+        contradictionSensitivity: 'high',
+      },
+      questioning: {
+        preferredStrategies: ['chronology'],
+        avoidedStrategies: ['forced_binary'],
+        followUpDepth: 'deep',
+      },
+      emotion: {
+        expressiveness: 'restrained',
+        empathyStyle: 'recall',
+        angerStyle: 'precise',
+        embarrassmentStyle: 'deflect',
+      },
+      conflict: {
+        confrontationStyle: 'direct',
+        apologyStyle: 'specific',
+        withdrawalStyle: 'temporary',
+      },
+      intimacy: {
+        pace: 'slow',
+        selfDisclosure: 'selective',
+        boundaryStyle: 'clear',
+        attachmentExpression: 'remembering',
+      },
+    },
+    behavior: {
+      policyVersion: 'behavior-v1',
+      questionPriorities: ['chronology'],
+      supportPriorities: ['witness'],
+      rules: [],
+    },
+    sajuProfile: {
+      profileVersion: 'saju-profile-v1',
+      attentionAxes: ['continuity'],
+      followUpQuestionStrategies: ['chronology'],
+      framingStyle: 'record_first',
+      uncertaintyResponseStyle: 'preserve',
+      insufficientEvidenceResponseStyle: 'state_limit',
+      referralBehavior: {
+        maySuggestAnotherCharacter: false,
+        conditions: [],
+      },
+    },
+    relationshipBehavior: {
+      behaviorVersion: 'relationship-behavior-v1',
+      defaultMode: {
+        distance: 'reserved',
+        questionDepth: 'medium',
+        selfDisclosure: 'low',
+        humorIntensity: 'low',
+        directness: 'medium',
+        memoryReferenceFrequency: 'low',
+        nicknameBehavior: 'formal',
+        conflictSensitivity: 'medium',
+      },
+      rules: [],
+    },
+    capabilities: [
+      {
+        domain: 'career',
+        role: 'primary',
+        canInitiate: true,
+        capabilityVersion: 'career-v1',
+      },
+    ],
+    developmentPlaceholder: undefined as never,
+  };
+}
+
 function baseContext(characterId = 'baekheon') {
   return {
-    character: {
-      characterId,
-      capabilities: [
-        {
-          domain: 'career',
-          role: 'primary',
-          canInitiate: true,
-          capabilityVersion: 'career-v1',
-        },
-      ],
-    },
+    character: authoredCharacter(characterId),
     contentBundleId: 'bundle-v1',
-    relationshipState: {},
+    relationshipState: {
+      closeness: 40,
+      trust: 40,
+      friction: 10,
+      stage: 'familiar',
+      revision: 1,
+      policyVersion: 'relationship-policy-v1',
+    },
     recentRelationshipEventKeys: [],
-    relationshipProjectionPolicy: {},
+    relationshipProjectionPolicy: {
+      version: 'relationship-render-v1',
+      closeness: { lowMax: 20, mediumMax: 60 },
+      trust: { lowMax: 20, mediumMax: 60 },
+      friction: { lowMax: 20, mediumMax: 60 },
+    },
     worldRelations: [],
     grantedLifeFacts: [],
     grantedMemories: [],
     recentMessages: [],
-  } as unknown as Omit<CharacterRuntimeContextAssemblyInputV1, 'saju'>;
+  } as CharacterStandardReadingChatBaseContextInputV1;
 }
 
 describe('Official Reading -> Reader Chat context composition', () => {
@@ -205,5 +333,55 @@ describe('Official Reading -> Reader Chat context composition', () => {
         contextInput,
       }),
     ).rejects.toThrow(/does not authorize the Official Reading domain/u);
+  });
+
+  it('assembles the server-minted Official Reading plan in Production without opening direct Saju injection', async () => {
+    const previousNodeEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+
+    try {
+      const plan = await prepareCharacterStandardReadingChatContextV1({
+        resolvedSubjectId: SUBJECT_ID,
+        readerCharacterId: 'baekheon',
+        readingId: READING_ID,
+        effectiveAt: '2026-09-21T00:01:00.000Z',
+        ...ports(),
+        contextInput: baseContext(),
+      });
+
+      expect(() => assembleCharacterRuntimeContext(plan.contextInput)).toThrow(
+        /Direct Saju context assembly is blocked outside development\/test fixtures/u,
+      );
+
+      const context =
+        assemblePreparedCharacterStandardReadingRuntimeContextV1(plan);
+      expect(context.characterId).toBe('baekheon');
+      expect(context.saju?.readingRef).toBe(READING_ID);
+      expect(context.saju?.protectedSegments.map((segment) => segment.text)).toEqual([
+        '공식 직업 Reading의 핵심 내용입니다.',
+      ]);
+    } finally {
+      if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = previousNodeEnv;
+    }
+  });
+
+  it('rejects a structural lookalike instead of treating a caller-forged plan as server authority', async () => {
+    const plan = await prepareCharacterStandardReadingChatContextV1({
+      resolvedSubjectId: SUBJECT_ID,
+      readerCharacterId: 'baekheon',
+      readingId: READING_ID,
+      effectiveAt: '2026-09-21T00:01:00.000Z',
+      ...ports(),
+      contextInput: baseContext(),
+    });
+    const forgedPlan = Object.freeze({
+      source: plan.source,
+      contextInput: plan.contextInput,
+    });
+
+    expect(() =>
+      assemblePreparedCharacterStandardReadingRuntimeContextV1(forgedPlan),
+    ).toThrow(/was not minted by server authority/u);
   });
 });
