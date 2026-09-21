@@ -534,6 +534,39 @@ implementation_effect:
 record: docs/COMMERCE_EVIDENCE_DATA_MINIMIZATION_DECISION_V1.md
 ```
 
+### P0-OPS-02
+
+```yaml
+id: P0-OPS-02
+status: DECIDED
+decided_at: 2026-09-21
+choice:
+  rpo: PT24H
+  rto: PT6H
+authority:
+  type: PRODUCT_OWNER_APPROVED
+  record: GitHub issue #389
+scope:
+  decides:
+    - maximum acceptable persistent-data loss window is 24 hours
+    - maximum acceptable qualifying service-recovery duration is 6 hours
+  does_not_decide:
+    - whether isolated/synthetic diagnostics alone satisfy the objectives
+    - Production non-zero authoritative privacy reconciliation
+    - full hosted provider-managed Auth/Storage recovery equivalence
+    - DR Ready
+validation_rule:
+  - compare achieved data-loss window against PT24H only from the full authoritative recovery procedure
+  - compare achieved recovery duration against PT6H only from the full authoritative recovery procedure
+  - daily backup cadence does not redefine RPO authority
+implementation_state:
+  objective_authority: APPROVED
+  full_authoritative_rpo_comparison: PENDING
+  full_authoritative_rto_comparison: PENDING
+  dr_ready: false
+record: docs/operations/POSTGRES_DR_READINESS_STATUS_V1.md
+```
+
 ### Remaining open decisions
 
 `P0-CM-02` exact Web PSP is now **DECIDED: PortOne V2**. This closes provider selection only; live merchant/PG/channel/credential readiness and Production activation remain independent gates.
@@ -542,7 +575,7 @@ record: docs/COMMERCE_EVIDENCE_DATA_MINIMIZATION_DECISION_V1.md
 
 `P0-CM-04` closes the product/ownership question of whether Guest may purchase. Its historical `does_not_decide` list records the boundary at the time that decision was made; the later `P0-CM-02` record now supplies the PSP decision without rewriting `P0-CM-04` history.
 
-`P0-PR-01` is now **DECIDED** by product-owner approval on 2026-09-19. The current schema baseline is DELETE for service/personalization data, ANONYMIZE for four structural tombstones, RETAIN `P5Y` for nine enumerated Commerce evidence/history tables (including `purchase_intent_reader_selections` added by migration 1130), and the existing encrypted backup lifecycle `P30D` with privacy reconciliation required before a restored environment is serviceable. This does not claim that the destructive runtime finalizer, authoritative recovery reconciliation, RPO/RTO, or DR Ready are already proven. `P0-PR-01B` remains the independent Commerce evidence minimization/security boundary.
+`P0-PR-01` is now **DECIDED** by product-owner approval on 2026-09-19. The current schema baseline is DELETE for service/personalization data, ANONYMIZE for four structural tombstones, RETAIN `P5Y` for nine enumerated Commerce evidence/history tables (including `purchase_intent_reader_selections` added by migration 1130), and the existing encrypted backup lifecycle `P30D` with privacy reconciliation required before a restored environment is serviceable. RPO/RTO objective authority is now separately decided by `P0-OPS-02` (`PT24H` / `PT6H`); authoritative Production reconciliation, full-procedure objective comparison, and DR Ready remain independently gated. `P0-PR-01B` remains the independent Commerce evidence minimization/security boundary.
 
 Use the following template when another P0 becomes authoritative:
 

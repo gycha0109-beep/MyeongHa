@@ -75,14 +75,16 @@ recovered_state_finalization_restored_backup_runtime: PROVEN_ON_RUN_35546262378
 authoritative_privacy_reconciliation: false
 future_safe_privacy_reconciliation: false
 privacy_reconciliation: BLOCKED_BY_PRODUCTION_NONZERO_AUTHORITATIVE_DELTA_PROOF
-rpo_authority: OPEN_DECISION
-rto_authority: OPEN_DECISION
+rpo_authority: PRODUCT_OWNER_APPROVED_PT24H
+rto_authority: PRODUCT_OWNER_APPROVED_PT6H
 dr_ready: false
 ```
 
 The latest governed backup is run `35536655149`, source SHA `00580651fa79c6361a03d09f207b6c27678d2714`, artifact `10612622254` (`myeongha-postgres-20260920T204732Z`). Its exact completion cutoff is `2026-09-20T20:50:05Z`. Production deployment run `35522337472` had already applied migrations `1220` and `1230`, and the backup source SHA contains repository migration frontier `1230`. Governed backup freshness and current-frontier isolated restore execution are now both proven; remaining recovery authority is not blocked on backup/restore freshness.
 
 The latest isolated restore runtime evidence is run `35546262378` against governed backup `35536655149`, covering migration frontier `1230`. Artifact `10615818654` contains restore and privacy-reconciliation evidence; the run passed application-data portability, projected provider COPY handling, Auth identity continuity for the supported loopback scope, captured-window coverage, encrypted non-zero synthetic replay, governed account-deletion finalization/completion, idempotency, non-resurrection, revoked P5Y Commerce retention, identifier-free evidence, and the negative terminal-revoke fail-closed case. The workflow elapsed 55 seconds and the synthetic incident was 4 seconds after the backup cutoff; these remain diagnostics only, not approved RTO/RPO.
+Approved objective authority: Product Owner approved **RPO `PT24H` (24 hours)** and **RTO `PT6H` (6 hours)** on 2026-09-21 KST under #389. The existing synthetic 4-second data-loss-window diagnostic and 55-second workflow elapsed diagnostic are numerically inside those objectives, but they are not the full authoritative recovery procedure and therefore do not close the comparison gate or promote `dr_ready`.
+
 
 Historical count-only audit run `35353128407` remains valid evidence for its exact 2026-09-18 observation interval only: it observed zero deltas across the seven audited timestamp-authoritative surfaces and is retained as `COUNT_ONLY_OBSERVATION_NON_AUTHORITATIVE`. It no longer defines current post-backup source authority; the promoted bounded ledger below supersedes that source-authority question.
 
@@ -92,11 +94,11 @@ The governed account-deletion finalizer, hosted Auth deletion adapter/canary pat
 
 ## Promotion blockers
 
-The privacy/legal-retention policy, bounded captured-window source authority, current-frontier governed backup, isolated restore, and recovered-state finalization mechanics are all runtime-proven. DR remains blocked because Production non-zero authoritative privacy/deletion delta execution is still unproven, provider-service gaps remain outside full restore equivalence, and numeric RPO/RTO authority is still OPEN.
+The privacy/legal-retention policy, bounded captured-window source authority, current-frontier governed backup, isolated restore, and recovered-state finalization mechanics are all runtime-proven. DR remains blocked because Production non-zero authoritative privacy/deletion delta execution is still unproven, provider-service gaps remain outside full restore equivalence, and the approved RPO/RTO objectives still require comparison against the full authoritative recovery procedure.
 
 Canonical authority remains unresolved in the existing source documents:
 
-- `docs/architecture/PRODUCTION_OPERATIONS_ARCHITECTURE_V1.md`: `RPO = OPEN DECISION`, `RTO = OPEN DECISION`, and no DR Ready claim before approved objectives plus achieved evidence.
+- `docs/architecture/PRODUCTION_OPERATIONS_ARCHITECTURE_V1.md`: Product Owner approved `RPO = PT24H` and `RTO = PT6H` on 2026-09-21; no DR Ready claim is allowed until full authoritative recovery evidence is compared against those objectives.
 - `docs/P0_DECISION_REGISTER.md`: parent `P0-PR-01` is `DECIDED`; the current reachable policy baseline is 39 DELETE / 4 ANONYMIZE / 9 RETAIN(P5Y), with P30D encrypted backup handling and bounded captured-window privacy recovery source authority.
 - `docs/AUTH_RLS_PRIVACY_SPEC.md`: account deletion keeps personalization erase separate from the approved nine-table `P5Y` Commerce retention baseline; destructive runtime finalization is implemented, while recovered-state authoritative execution evidence remains separately gated.
 - `docs/SOURCE_AUTHORITY_GAPS.md`: `SRC-06` remains blocking before the final standalone Birth/Target deletion DDL baseline.
@@ -116,8 +118,8 @@ recovered finalization mechanics   = implemented / post-merge CI green
 recovered finalization on current-frontier governed restore = proven — run 35546262378
 authoritative privacy reconciliation= false
 future-safe privacy reconciliation = false
-approved RPO                       = no
-approved RTO                       = no
+approved RPO                       = yes — PT24H
+approved RTO                       = yes — PT6H
 DR Ready                           = false
 ```
 
@@ -129,8 +131,8 @@ Promotion requires all of the following authority changes to be reviewed togethe
 
 1. The approved `P0-PR-01` finalization policy is implemented as an idempotent, FK-safe destructive finalizer and hosted Auth cleanup path.
 2. The applicable deletion/revocation/finalization reconciliation procedure is exercised against an isolated recovered state with non-zero or intentionally constructed authoritative deltas.
-3. Numeric RPO and RTO objectives are explicitly approved by the owning product/business authority.
-4. Achieved evidence is compared against those approved objectives.
+3. Numeric RPO and RTO objectives remain explicitly approved by the owning product/business authority (`PT24H` / `PT6H`).
+4. Full authoritative recovery achieved evidence is compared against those approved objectives.
 5. The #389 closure contract is updated with the exact evidence and only then may DR readiness be reconsidered.
 
 `scripts/verify-postgres-dr-readiness-authority.mjs` fail-closes repository CI while the canonical authority remains in the current OPEN state.

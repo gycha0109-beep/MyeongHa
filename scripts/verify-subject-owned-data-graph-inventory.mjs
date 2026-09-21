@@ -125,8 +125,8 @@ for (const fragment of [
   'authoritative_privacy_reconciliation: false',
   'future_safe_privacy_reconciliation: false',
   'privacy_reconciliation: BLOCKED_BY_PRODUCTION_NONZERO_AUTHORITATIVE_DELTA_PROOF',
-  'rpo_authority: OPEN_DECISION',
-  'rto_authority: OPEN_DECISION',
+  'rpo_authority: PRODUCT_OWNER_APPROVED_PT24H',
+  'rto_authority: PRODUCT_OWNER_APPROVED_PT6H',
   'dr_ready: false',
 ]) {
   if (!drStatus.includes(fragment)) {

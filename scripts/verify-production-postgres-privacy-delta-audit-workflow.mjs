@@ -170,8 +170,8 @@ const requiredStatusFragments = [
   'authoritative_post_backup_source: true_bounded_captured_window_only',
   'authoritative_privacy_reconciliation: false',
   'future_safe_privacy_reconciliation: false',
-  'rpo_authority: OPEN_DECISION',
-  'rto_authority: OPEN_DECISION',
+  'rpo_authority: PRODUCT_OWNER_APPROVED_PT24H',
+  'rto_authority: PRODUCT_OWNER_APPROVED_PT6H',
   'dr_ready: false',
 ];
 

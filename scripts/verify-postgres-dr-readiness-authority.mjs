@@ -67,14 +67,19 @@ function requireRegex(key, regex, description) {
   }
 }
 
-requireFragment('operations', 'RPO = OPEN DECISION');
-requireFragment('operations', 'RTO = OPEN DECISION');
+requireFragment('operations', 'RPO = PT24H (24 hours) — PRODUCT OWNER APPROVED 2026-09-21');
+requireFragment('operations', 'RTO = PT6H (6 hours) — PRODUCT OWNER APPROVED 2026-09-21');
 requireFragment('operations', 'no `DR Ready` claim is allowed');
 requireRegex(
   'decisions',
   /^\|\s*`P0-PR-01`\s*\|[^|\n]*\|\s*\*\*DECIDED\*\*\s*\|/m,
   'P0-PR-01 must remain DECIDED after product-owner approval',
 );
+requireFragment('decisions', '### P0-OPS-02');
+requireFragment('decisions', 'rpo: PT24H');
+requireFragment('decisions', 'rto: PT6H');
+requireFragment('decisions', 'full_authoritative_rpo_comparison: PENDING');
+requireFragment('decisions', 'full_authoritative_rto_comparison: PENDING');
 requireFragment('privacy', '`P0-PR-01`은 2026-09-19 **DECIDED**다');
 requireFragment('privacy', 'calendar `P5Y` RETAIN');
 requireRegex(
@@ -104,8 +109,8 @@ requireFragment('restoreRunbook', '- [x] fresh governed backup captured after de
 requireFragment('restoreRunbook', '- [x] isolated restore completed from that current-frontier backup — run `35546262378`');
 requireFragment('restoreRunbook', '- [x] recovered-state finalization drill executed on that fresh governed restore — run `35546262378`');
 requireFragment('restoreRunbook', '- [x] synthetic drill data-loss window measured — `4s` (diagnostic, not approved RPO)');
-requireFragment('restoreRunbook', 'RPO: OPEN DECISION');
-requireFragment('restoreRunbook', 'RTO: OPEN DECISION');
+requireFragment('restoreRunbook', 'RPO: APPROVED — PT24H (24 hours)');
+requireFragment('restoreRunbook', 'RTO: APPROVED — PT6H (6 hours)');
 requireFragment('restoreRunbook', 'DR Ready = FALSE / NOT EVIDENCED');
 
 for (const staleFragment of [
@@ -158,8 +163,8 @@ const requiredStatusFragments = [
   'privacy_reconciliation: BLOCKED_BY_PRODUCTION_NONZERO_AUTHORITATIVE_DELTA_PROOF',
   'authoritative_privacy_reconciliation: false',
   'future_safe_privacy_reconciliation: false',
-  'rpo_authority: OPEN_DECISION',
-  'rto_authority: OPEN_DECISION',
+  'rpo_authority: PRODUCT_OWNER_APPROVED_PT24H',
+  'rto_authority: PRODUCT_OWNER_APPROVED_PT6H',
   'dr_ready: false',
 ]
 for (const fragment of requiredStatusFragments) requireFragment('readinessStatus', fragment);
@@ -197,5 +202,5 @@ const candidateFrontierNote =
     : '';
 
 console.log(
-  `PostgreSQL DR readiness authority guard PASS: production is deployed through migration ${productionMigrationFrontier}; governed backup/restore freshness, recovered-state authoritative reconciliation, and OPEN RPO/RTO authority keep dr_ready=false.${candidateFrontierNote}`,
+  `PostgreSQL DR readiness authority guard PASS: production is deployed through migration ${productionMigrationFrontier}; governed backup/restore freshness, Production authoritative reconciliation, provider recovery gaps, and full-procedure comparison against approved RPO/RTO objectives keep dr_ready=false.${candidateFrontierNote}`,
 );

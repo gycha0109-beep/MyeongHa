@@ -816,17 +816,19 @@ Definitions:
 Current numeric authority:
 
 ```text
-RPO = OPEN DECISION
-RTO = OPEN DECISION
+RPO = PT24H (24 hours) — PRODUCT OWNER APPROVED 2026-09-21
+RTO = PT6H (6 hours) — PRODUCT OWNER APPROVED 2026-09-21
 ```
 
 Decision direction is **product requirement → infrastructure validation**, not provider capability → product requirement.
+
+A Product Owner decision recorded under #389 on 2026-09-21 establishes the numeric objectives as **RPO `PT24H`** and **RTO `PT6H`**. This resolves objective authority only. Historical synthetic/isolated timing diagnostics do not by themselves establish full-procedure compliance or `DR Ready`.
 
 Correct sequence:
 
 ```text
 1. classify data/service criticality and acceptable business impact
-2. approve provisional RPO/RTO objectives
+2. bind the approved RPO/RTO objectives (`PT24H` / `PT6H`)
 3. compare provider backup/PITR/restore capability against those objectives
 4. change plan/provider/design if capability cannot meet the objectives, or explicitly accept a documented gap
 5. run restore drill
@@ -1132,7 +1134,7 @@ Each runbook names observable evidence, containment action, rollback/recovery ve
 #### P0-OPS-02 — PostgreSQL backup / restore / RPO / RTO
 
 - classify product/data criticality
-- approve provisional RPO/RTO objectives
+- maintain approved RPO/RTO objectives (`PT24H` / `PT6H`)
 - confirm Supabase plan backup/PITR capability
 - record backup schedule/retention
 - reconcile retention with privacy/deletion/legal-retention authority
@@ -1204,7 +1206,7 @@ Architecture stage closes only when:
 - [x] backup/restore requirements are defined.
 - [x] restore privacy/deletion/legal-retention reconciliation is defined.
 - [x] RPO/RTO direction is product requirement → provider validation.
-- [x] RPO/RTO numeric values remain unresolved until approved.
+- [x] RPO/RTO numeric values are approved: `PT24H` / `PT6H`; full authoritative recovery comparison remains required.
 - [x] cacheability classification is defined.
 - [x] performance baseline plan exists.
 - [x] load/capacity matrix exists.
@@ -1313,7 +1315,7 @@ First review found and corrected:
 | SR-04 | dependency retry policy incomplete | expanded dependency table |
 | SR-05 | 5s timeout could be misread as SLO | marked implementation boundary |
 | SR-06 | latest container contract needed recheck | rechecked Dockerfile/workflow |
-| SR-07 | fabricated RPO/RTO risk | kept numeric values unresolved |
+| SR-07 | fabricated RPO/RTO risk | numeric values remain authority-gated; Product Owner approved `PT24H` / `PT6H` on 2026-09-21 |
 | SR-08 | platform/payment boundary risk | preserved semantic authority |
 | SR-09 | whole-product readiness risk | separated Saju degradation |
 | SR-10 | telemetry privacy risk | bounded/redacted schema |
@@ -1353,7 +1355,7 @@ Restore privacy/legal-retention gap: CORRECTED
 Source-governance omission: CORRECTED
 Configuration-preflight gap: CORRECTED
 Compatibility-verification gap: CORRECTED
-Fabricated SLO/capacity/RPO/RTO authority: NONE
+Fabricated SLO/capacity/RPO/RTO authority: NONE — RPO/RTO authority is explicit Product Owner approval `PT24H` / `PT6H`
 Unresolved production operations P0: YES — explicitly recorded
 Second architecture self-review: PASS
 Implementation readiness: NOT YET COMPLETE
