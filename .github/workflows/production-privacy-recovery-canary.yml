@@ -25,6 +25,8 @@ jobs:
     env:
       MYEONGHA_PRIVACY_CANARY_CONFIRM: ${{ inputs.confirmation }}
       MYEONGHA_SUPABASE_URL: https://cnsfpcdiyofqvhpcegfc.supabase.co
+      MYEONGHA_DATABASE_URL: ${{ secrets.MYEONGHA_DATABASE_URL }}
+      MYEONGHA_DATABASE_PRINCIPAL: myeongha_runtime
       MYEONGHA_WORKER_DATABASE_URL: ${{ secrets.MYEONGHA_WORKER_DATABASE_URL }}
       MYEONGHA_WORKER_DATABASE_PRINCIPAL: myeongha_worker_runtime
       MYEONGHA_SUPABASE_AUTH_ADMIN_SECRET: ${{ secrets.MYEONGHA_SUPABASE_AUTH_ADMIN_SECRET }}
@@ -41,6 +43,7 @@ jobs:
           [[ "$MYEONGHA_PRIVACY_CANARY_CONFIRM" == 'RUN_SYNTHETIC_PRODUCTION_PRIVACY_CANARY' ]]
 
           missing=()
+          [[ -n "${MYEONGHA_DATABASE_URL:-}" ]] || missing+=(MYEONGHA_DATABASE_URL)
           [[ -n "${MYEONGHA_WORKER_DATABASE_URL:-}" ]] || missing+=(MYEONGHA_WORKER_DATABASE_URL)
           [[ -n "${SUPABASE_DB_PASSWORD:-}" ]] || missing+=(SUPABASE_DB_PASSWORD)
           [[ -n "${SUPABASE_PRODUCTION_SESSION_POOLER_HOST:-}" ]] || missing+=(SUPABASE_PRODUCTION_SESSION_POOLER_HOST)
@@ -57,6 +60,7 @@ jobs:
             exit 1
           fi
 
+          echo "::add-mask::$MYEONGHA_DATABASE_URL"
           echo "::add-mask::$MYEONGHA_WORKER_DATABASE_URL"
           echo "::add-mask::$SUPABASE_DB_PASSWORD"
           [[ -z "${MYEONGHA_SUPABASE_AUTH_ADMIN_SECRET:-}" ]] || echo "::add-mask::$MYEONGHA_SUPABASE_AUTH_ADMIN_SECRET"
