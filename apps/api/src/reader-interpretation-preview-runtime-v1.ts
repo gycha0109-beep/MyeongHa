@@ -384,7 +384,7 @@ function withHash<T extends object>(value: T): T & { readonly interpretationHash
  * and separately promoted.
  */
 function resolveRuntimePerspective(
-  context: CharacterRuntimeContextWithGroundingV1,
+  context: CharacterRuntimeContextV1,
 ): CharacterPerspectiveProfileV1 {
   const perspective = resolveCharacterSajuFirstSlicePerspectiveV1({
     characterId: context.characterId,
@@ -406,12 +406,15 @@ async function renderResolvedReaderInterpretationPreviewV1(input: {
   readonly requestedDomain: SajuDomain;
   readonly groundingProjectionPort: OfficialReadingCharacterGroundingProjectionPortV1;
 }): Promise<ReaderInterpretationPreviewEnvelopeV1> {
+  // Perspective admission is content-only and must happen before the cross-service
+  // Saju call. Unsupported Readers fail closed without spending grounding transport
+  // or exposing an unreviewed Character interpretation path.
+  const perspective = resolveRuntimePerspective(input.context);
   const { grounding, runtimeContext } = await projectAndAdmitGrounding({
     source: input.source,
     context: input.context,
     projectionPort: input.groundingProjectionPort,
   });
-  const perspective = resolveRuntimePerspective(runtimeContext);
 
   assertRuntimeIdentity({
     source: input.source,
