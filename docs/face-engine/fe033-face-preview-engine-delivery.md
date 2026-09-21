@@ -15,9 +15,11 @@ The consumer is pinned to the immutable Saju materialization commit:
 
 The package is consumed from the commit-addressed producer tarball. It is not registry-published and MyeongHa does not copy Saju source.
 
+Direct producer-engine coupling is isolated under `packages/face-reading`, matching the existing MyeongHa cutover boundary. That workspace is named `@myeongha/physiognomy-engine-runtime`; the web app depends only on this local runtime boundary and never imports or declares the producer package directly.
+
 ## Browser boundary
 
-`engine-loader-fe033.ts` dynamically imports the public preview-engine package and immediately projects it down to the exact FE023 contract/open function required by FE029. Earlier preview contracts and internal runtime modules are not exposed to the page.
+`packages/face-reading/src/index.ts` dynamically imports the public preview-engine package and immediately projects it down to the exact FE023 contract/open function required by FE029. `engine-loader-fe033.ts` delegates only to that local boundary. Earlier preview contracts and internal runtime modules are not exposed to the page.
 
 FE032's temporary `window.__MHA_FACE_PREVIEW_ENGINE_LOADER_FE032__` injection is removed. The page now passes `loadFacePreviewEngineFE033` directly into the existing FE032 API → FE031 one-shot → FE029 bootstrap chain.
 
@@ -25,7 +27,7 @@ FE032's temporary `window.__MHA_FACE_PREVIEW_ENGINE_LOADER_FE032__` injection is
 
 The FE033 verifier checks:
 
-1. exact immutable tarball URL in the web package and lockfile;
+1. exact local Face-runtime workspace boundary plus immutable producer tarball URL in its package and lockfile;
 2. exact lockfile SHA-512 and MediaPipe 0.10.35;
 3. producer manifest schema, FE024 source provenance, FE023 contract and distribution boundary;
 4. producer tarball SHA-256;
