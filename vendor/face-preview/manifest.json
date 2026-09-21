@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "fe024-digest-bound-preview-consumer-handoff-manifest-v1",
+  "package": {
+    "name": "@myeongha/face-reading",
+    "version": "0.0.0",
+    "publicExportPath": "./preview-engine",
+    "private": true
+  },
+  "artifact": {
+    "filename": "myeongha-face-reading-0.0.0.tgz",
+    "sha256": "8d793c57e104fc0137a17dc631d208b468131b1d9a9668142a846e34dacbf84a"
+  },
+  "contract": {
+    "fe023": "FE023-DIGEST-BOUND-DIRECT-BLOB-PRODUCT-PREVIEW-SESSION-v1",
+    "openFunction": "openDigestBoundProductPreviewSessionFE023"
+  },
+  "runtimeConfiguration": {
+    "schemaVersion": "fe023-digest-bound-product-preview-config-v1",
+    "assetSchemaVersion": "fe022-digest-bound-mediapipe-model-config-v1",
+    "requiredAssetFields": [
+      "wasmRoot",
+      "modelAssetPath",
+      "modelAssetSha256"
+    ],
+    "modelDigestAlgorithm": "SHA-256",
+    "modelDigestRequired": true,
+    "wasmDigestVerifiedByEngine": false,
+    "assetValuesBundled": false
+  },
+  "runtimeDependency": {
+    "package": "@mediapipe/tasks-vision",
+    "version": "0.10.35"
+  },
+  "source": {
+    "commit": "1c0be383844bd7c5aa75079e2084da7bee9de13c"
+  },
+  "distribution": {
+    "registryPublished": false,
+    "handoffOnly": true
+  }
+}
