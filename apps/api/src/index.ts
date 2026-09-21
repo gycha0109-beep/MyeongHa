@@ -20,6 +20,7 @@ export {
 
 export {
   ApiCommandError,
+  assertServerPreparedChatReceivePlanV1,
   prepareChatReceiveCommand,
   type ChatReceivePlan,
   type PrepareChatReceiveInput,
@@ -659,6 +660,13 @@ export {
   type CharacterStandardReadingThreadRuntimeV1,
   type PrepareCharacterStandardReadingThreadRuntimeInputV1,
 } from './character-standard-reading-chat-turn-context.js';
+
+export {
+  CharacterStandardReadingChatTurnPreflightErrorV1,
+  prepareCharacterStandardReadingChatTurnPreflightV1,
+  type CharacterStandardReadingChatTurnPreflightV1,
+  type PrepareCharacterStandardReadingChatTurnPreflightInputV1,
+} from './character-standard-reading-chat-turn-preflight.js';
 
 export {
   createPostgresChatThreadRuntimeBindingAuthorityPortV1,
