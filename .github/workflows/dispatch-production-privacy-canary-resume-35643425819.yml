@@ -34,4 +34,6 @@ jobs:
             -f watchtower_track=ops \
             -f operation=resume \
             -f resume_canary_run_id=35643425819 \
-            -f resume_backup_run_id=35643472159
+            -f resume_backup_run_id=35643472159 \
+            -f worker_credential_action=sync_from_secret \
+            -f worker_credential_confirmation=SYNC_PRODUCTION_WORKER_PASSWORD
