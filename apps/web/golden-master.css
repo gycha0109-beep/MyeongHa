@@ -580,7 +580,7 @@ body.gm-page .mobile-bottom-nav { display: none; }
   .gm-recent-time { display: none; }
   .gm-saju-hero { background-position: center; }
   .gm-saju-quote { display: none; }
-  body.gm-page .mobile-bottom-nav { display: flex; }
+  body.gm-page .mobile-bottom-nav { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); }
   body.gm-page { padding-bottom: 76px; }
 }
 
