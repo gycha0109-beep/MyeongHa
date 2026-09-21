@@ -35,8 +35,8 @@ recovered finalization on fresh restore = PROVEN — run 35546262378
 provider-managed full restore       = NOT PROVEN — provider projection/omission occurred
 authoritative privacy reconciliation= NOT YET PROVEN
 future-safe privacy reconciliation  = false
-RPO                                = OPEN DECISION
-RTO                                = OPEN DECISION
+RPO                                = APPROVED — PT24H (24 hours)
+RTO                                = APPROVED — PT6H (6 hours)
 ```
 
 Restore drill: PASSED for MyeongHa application-data portability and application-critical Auth identity continuity; full hosted provider-managed Auth/Storage recovery and DR readiness remain NOT EVIDENCED.
@@ -363,11 +363,11 @@ These expanded mechanics are merged, post-merge CI is green, and run `3554626237
 Current decision state:
 
 ```text
-RPO: OPEN DECISION
-RTO: OPEN DECISION
+RPO: APPROVED — PT24H (24 hours)
+RTO: APPROVED — PT6H (6 hours)
 ```
 
-Daily backup frequency is not an approved RPO.
+Daily backup frequency is not itself the approved RPO. Product Owner authority under #389 sets the objective at `PT24H`; schedule/capability must be validated against that objective.
 
 Each completed drill must record:
 
@@ -405,9 +405,9 @@ Latest run `35546262378` recorded:
 - synthetic data-loss-window diagnostic: `4s`
 - evidence artifact: `10615818654`, expires `2026-10-21T00:01:09Z`, digest `sha256:31ef8410a2f2c3760311df80c3b077836644ed6035d5e5d58813d28a6bff3bfc`
 
-These are diagnostic metrics from the migration-`1230` current-frontier drill, not a full achieved RTO or an approved RPO/RTO comparison. The current-frontier restore and synthetic recovered-state finalization procedure have now executed end-to-end on a governed restore, but Production non-zero authoritative reconciliation and the remaining provider/RPO/RTO gates are still open.
+These are diagnostic metrics from the migration-`1230` current-frontier drill. The 4-second synthetic data-loss-window is within approved RPO `PT24H`, and the 55-second workflow elapsed diagnostic is within approved RTO `PT6H`; however neither is the full authoritative recovery procedure. Production non-zero authoritative reconciliation, provider equivalence, and the full-procedure RPO/RTO comparison remain open.
 
-Only business-approved RPO/RTO values may be compared as PASS/FAIL.
+Approved objectives are RPO `PT24H` and RTO `PT6H`. PASS/FAIL for #389 requires measurements from the full authoritative recovery procedure, not isolated/synthetic diagnostics alone.
 
 ## 13. #389 closure gate
 
@@ -430,8 +430,8 @@ Do not close `#389` until all are evidenced:
 - [ ] authoritative privacy/deletion/legal-retention reconciliation exercised for the applicable recovery window
 - [ ] achieved recovery duration measured across the full authoritative recovery procedure
 - [x] synthetic drill data-loss window measured — `4s` (diagnostic, not approved RPO)
-- [ ] RPO approved and compared with achieved evidence
-- [ ] RTO approved and compared with achieved evidence
+- [x] RPO approved — `PT24H`; [ ] full authoritative achieved evidence compared
+- [x] RTO approved — `PT6H`; [ ] full authoritative achieved evidence compared
 
 Until all closure gates are satisfied:
 
