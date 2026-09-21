@@ -29,11 +29,42 @@ const webPackage = JSON.parse(
   readFileSync(resolve('apps/web/package.json'), 'utf8'),
 );
 assert(
-  webPackage.dependencies?.['@myeongha/face-reading'] === TARBALL_URL,
-  'web dependency is not pinned to the immutable producer tarball.',
+  webPackage.dependencies?.['@myeongha/physiognomy-engine-runtime'] === '0.0.0',
+  'web must depend only on the isolated MyeongHa physiognomy runtime.',
+);
+assert(
+  !Object.hasOwn(webPackage.dependencies ?? {}, '@myeongha/face-reading'),
+  'web must not couple directly to the producer engine package.',
+);
+
+const runtimePackage = JSON.parse(
+  readFileSync(resolve('packages/face-reading/package.json'), 'utf8'),
+);
+assert(
+  runtimePackage.name === '@myeongha/physiognomy-engine-runtime',
+  'isolated runtime package name drift.',
+);
+assert(
+  runtimePackage.dependencies?.['@myeongha/face-reading'] === TARBALL_URL,
+  'isolated runtime is not pinned to the immutable producer tarball.',
 );
 
 const lock = JSON.parse(readFileSync(resolve('package-lock.json'), 'utf8'));
+const runtimeWorkspace = lock.packages?.['packages/face-reading'];
+assert(
+  runtimeWorkspace?.name === '@myeongha/physiognomy-engine-runtime',
+  'runtime workspace lock entry drift.',
+);
+assert(
+  runtimeWorkspace?.dependencies?.['@myeongha/face-reading'] === TARBALL_URL,
+  'runtime workspace producer pin drift.',
+);
+assert(
+  lock.packages?.['node_modules/@myeongha/physiognomy-engine-runtime']?.link === true &&
+    lock.packages?.['node_modules/@myeongha/physiognomy-engine-runtime']?.resolved ===
+      'packages/face-reading',
+  'runtime workspace link drift.',
+);
 const installedLock = lock.packages?.['node_modules/@myeongha/face-reading'];
 assert(installedLock?.version === '0.0.0', 'lockfile package version drift.');
 assert(installedLock?.resolved === TARBALL_URL, 'lockfile tarball URL drift.');
