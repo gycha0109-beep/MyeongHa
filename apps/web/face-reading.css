@@ -26,7 +26,7 @@
 .phys-guide-list li { position: relative; padding-left: 18px; }
 .phys-guide-list li::before { content: "·"; position: absolute; left: 3px; color: #9b4e6c; font-weight: 900; }
 .phys-file-input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
-.phys-actions { display: grid; grid-template-columns: 1fr 1.18fr; gap: 10px; }
+.phys-actions { display: grid; grid-template-columns: .82fr .82fr 1.2fr; gap: 10px; }
 .phys-actions button { min-height: 50px; border-radius: 999px; font-weight: 800; cursor: pointer; }
 .phys-actions button:disabled { cursor: not-allowed; opacity: .46; }
 .phys-secondary { border: 1px solid #d9c8ce; color: #5f4c55; background: #fffaf7; }
