@@ -209,7 +209,7 @@ export function hashReaderInterpretationActivationSubjectV1(
 
 export function assertProductionReaderInterpretationActivationV1(input: {
   readonly config: ProductionReaderInterpretationActivationConfigV1;
-  readonly resolvedSubjectId?: string;
+  readonly resolvedSubjectId: string | undefined;
 }): void {
   const subjectId = requireSubject(input.resolvedSubjectId);
   if (input.config.mode === 'off') {
