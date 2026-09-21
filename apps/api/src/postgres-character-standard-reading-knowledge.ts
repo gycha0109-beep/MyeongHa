@@ -56,7 +56,7 @@ select
   reading_contract_version as "readingContractVersion",
   saju_engine_version as "sajuEngineVersion",
   response_hash as "responseHash"
-from public.internal_qry_character_standard_reading_access_v1(
+from public.qry_character_standard_reading_access_runtime_v1(
   $1::uuid,
   $2::text,
   $3::timestamptz
@@ -73,7 +73,7 @@ select
   response_snapshot_jsonb as "responseSnapshotJsonb",
   response_hash as "responseHash",
   completed_at::text as "completedAt"
-from public.internal_qry_standard_reading_artifact_source_v2(
+from public.qry_standard_reading_artifact_source_runtime_v1(
   $1::uuid,
   $2::uuid,
   $3::text,
@@ -108,7 +108,7 @@ function mapPostgresError(error: unknown): never {
       return fail('INVALID_INPUT', 'Character Standard Reading authority input was rejected.');
     case 'member_subject_context_unresolved':
     case 'guest_subject_context_unresolved':
-    case 'myeongha_subject_context_missing':
+    case 'myeongha_subject_context_required':
     case 'myeongha_subject_context_mismatch':
       return fail('SUBJECT_INELIGIBLE', 'Character Standard Reading subject is unavailable.');
     default:
@@ -191,9 +191,10 @@ implements CharacterStandardReadingAccessAuthorityPortV1, CharacterStandardReadi
 }
 
 /**
- * Adapter only. Migration 1220 intentionally keeps both underlying INTERNAL
- * functions ungranted to ordinary runtime roles, so constructing this adapter does
- * not activate Production Reader Knowledge.
+ * Production server adapter. Migration 1240 exposes only the two transaction-
+ * subject-bound SECURITY DEFINER runtime wrappers to myeongha_api_executor.
+ * The migration-1220 INTERNAL source functions and raw authority tables remain
+ * ungranted to ordinary runtime roles.
  */
 export function createPostgresCharacterStandardReadingKnowledgePortsV1(
   client: PostgresTransactionQueryV1,

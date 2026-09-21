@@ -2,9 +2,9 @@ import type { SajuDomain } from '../../../packages/contracts/src/index.js';
 import { ApiCommandError } from './api-error.js';
 
 export const CHARACTER_STANDARD_READING_ACCESS_AUTHORITY_BINDING_V1 =
-  'public.internal_qry_character_standard_reading_access_v1' as const;
+  'public.qry_character_standard_reading_access_runtime_v1' as const;
 export const CHARACTER_STANDARD_READING_ARTIFACT_SOURCE_AUTHORITY_BINDING_V1 =
-  'public.internal_qry_standard_reading_artifact_source_v2' as const;
+  'public.qry_standard_reading_artifact_source_runtime_v1' as const;
 
 type Awaitable<T> = T | Promise<T>;
 

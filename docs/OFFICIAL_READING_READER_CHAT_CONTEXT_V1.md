@@ -68,10 +68,13 @@ The thread-bound server composition is now implemented: active owned thread,
 single Reader identity, active content bundle, Reader access, and Official Reading
 artifact provenance must all correlate before Production runtime assembly.
 
-No public Chat send route is activated by this slice. Migration 1220 still keeps
-the two raw Reader Knowledge functions ungranted to the ordinary Production API
-executor, so actual public send activation remains fail-closed until that explicit
-authority/ACL gate and the Chat receive/generate/guard/commit transport are promoted.
+Production DB Reader Knowledge is now reachable only through transaction-subject-
+bound server runtime wrappers. The migration-1220 INTERNAL source functions and
+raw authority tables remain ungranted to ordinary runtime roles.
+
+No public Chat send route is activated by this slice. Actual public send remains
+fail-closed until the Chat receive/generate/output-guard/commit transport is
+promoted through the same server-owned thread and Official Reading authority path.
 
 
 ## Relationship to Reader Interpretation Preview

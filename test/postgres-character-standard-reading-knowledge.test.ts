@@ -5,12 +5,12 @@ import {
 import type { PostgresTransactionQueryV1 } from '../apps/api/src/postgres-subject-execution.js';
 
 describe('PostgreSQL Character Standard Reading Reader Knowledge adapter', () => {
-  it('binds metadata and raw source reads to the two migration-1220 INTERNAL authorities', async () => {
+  it('binds metadata and raw source reads to the two transaction-bound Production runtime authorities', async () => {
     const calls: { text: string; values?: readonly unknown[] }[] = [];
     const client: PostgresTransactionQueryV1 = {
       async query<Row>(text: string, values?: readonly unknown[]) {
         calls.push(values === undefined ? { text } : { text, values });
-        if (text.includes('internal_qry_character_standard_reading_access_v1')) {
+        if (text.includes('qry_character_standard_reading_access_runtime_v1')) {
           return {
             rows: [{
               readingId: '11111111-1111-4111-8111-111111111111',
@@ -58,13 +58,13 @@ describe('PostgreSQL Character Standard Reading Reader Knowledge adapter', () =>
     });
 
     expect(calls).toHaveLength(2);
-    expect(calls[0]?.text).toContain('internal_qry_character_standard_reading_access_v1');
+    expect(calls[0]?.text).toContain('qry_character_standard_reading_access_runtime_v1');
     expect(calls[0]?.values).toEqual([
       'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
       'baekheon',
       '2026-09-21T00:00:00.000Z',
     ]);
-    expect(calls[1]?.text).toContain('internal_qry_standard_reading_artifact_source_v2');
+    expect(calls[1]?.text).toContain('qry_standard_reading_artifact_source_runtime_v1');
     expect(calls[1]?.values).toEqual([
       'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
       '11111111-1111-4111-8111-111111111111',
