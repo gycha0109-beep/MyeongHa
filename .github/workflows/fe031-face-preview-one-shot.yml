@@ -1,0 +1,28 @@
+name: FE031 Face Preview One Shot
+
+on:
+  pull_request:
+    paths:
+      - 'apps/web/src/face-preview/one-shot-fe031.ts'
+      - 'apps/web/src/face-preview/one-shot-fe031.test.ts'
+      - 'docs/face-engine/fe031-face-preview-one-shot.md'
+      - '.github/workflows/fe031-face-preview-one-shot.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify-fe031-one-shot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Verify FE031 one-shot controller
+        run: npx vitest run apps/web/src/face-preview/one-shot-fe031.test.ts apps/web/src/face-preview/image-intake-fe030.test.ts
