@@ -446,8 +446,9 @@ implementation_state:
   destructive_runtime_finalizer: IMPLEMENTED_AND_PROVIDER_PROVEN
   destructive_sql_generation: INTERNAL_GOVERNED_FINALIZER_ONLY
   authoritative_post_backup_source: BOUNDED_CAPTURED_WINDOW_AUTHORITY
-  authoritative_privacy_reconciliation: false
+  authoritative_privacy_reconciliation: PROVEN_BOUNDED_CAPTURED_WINDOW_RUN_35659483080
   future_safe_privacy_reconciliation: false
+  provider_managed_full_restore_equivalence: NOT_PROVEN
   dr_ready: false
 record: docs/operations/ACCOUNT_DELETION_FINALIZATION_POLICY_V1.md
 machine_policy: docs/operations/ACCOUNT_DELETION_FINALIZATION_POLICY_V1.json
