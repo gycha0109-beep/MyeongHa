@@ -1,0 +1,37 @@
+name: Dispatch Production Privacy Canary Resume 35643425819
+
+on:
+  push:
+    branches:
+      - ops/dispatch-production-privacy-canary-resume-35643425819-20260922
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  dispatch:
+    name: dispatch-production-privacy-recovery-canary-resume
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Dispatch exact-main resume canary
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_MAIN_SHA: 866e71ddab5a3290485dc229968216bfe585ada2
+        run: |
+          set -euo pipefail
+          main_sha="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq '.sha')"
+          [[ "$main_sha" == "$EXPECTED_MAIN_SHA" ]] || {
+            echo "::error title=Production privacy canary dispatch blocked::main moved from expected SHA."
+            exit 1
+          }
+
+          gh workflow run production-privacy-recovery-canary.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref main \
+            -f confirmation=RUN_SYNTHETIC_PRODUCTION_PRIVACY_CANARY \
+            -f watchtower_track=ops \
+            -f operation=resume \
+            -f resume_canary_run_id=35643425819 \
+            -f resume_backup_run_id=35643472159
