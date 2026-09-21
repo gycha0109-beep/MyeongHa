@@ -119,12 +119,14 @@ async function runtimeModules() {
     authDeletionModule,
     workerDbConfigModule,
     workerRuntimeModule,
+    workerPoolModule,
     postgresPoolModule,
   ] = await Promise.all([
     import('../dist/apps/api/src/production-account-deletion-auth-admin-config.js'),
     import('../dist/apps/api/src/supabase-auth-admin-user-deletion.js'),
     import('../dist/apps/api/src/production-account-deletion-worker-db-config.js'),
     import('../dist/apps/api/src/production-account-deletion-worker-runtime.js'),
+    import('../dist/apps/api/src/node-postgres-account-deletion-worker-pool.js'),
     import('../dist/apps/api/src/node-postgres-subject-pool.js'),
   ]);
   return {
@@ -132,6 +134,7 @@ async function runtimeModules() {
     ...authDeletionModule,
     ...workerDbConfigModule,
     ...workerRuntimeModule,
+    ...workerPoolModule,
     ...postgresPoolModule,
   };
 }
@@ -449,6 +452,151 @@ async function readState() {
   return parsed;
 }
 
+function classifyWorkerDatabaseFailure(error) {
+  const code =
+    error && typeof error === 'object' && typeof error.code === 'string'
+      ? error.code
+      : null;
+  const message =
+    error && typeof error === 'object' && typeof error.message === 'string'
+      ? error.message
+      : '';
+
+  if (code === 'XX000' && /tenant or user not found/iu.test(message)) {
+    return 'WORKER_DB_ROUTING_INVALID';
+  }
+  if (code === '28P01') return 'WORKER_DB_AUTH_INVALID';
+  if (
+    code === 'ENOTFOUND' ||
+    code === 'ECONNREFUSED' ||
+    code === 'ETIMEDOUT' ||
+    code === 'EHOSTUNREACH'
+  ) {
+    return 'WORKER_DB_TRANSPORT_INVALID';
+  }
+  return null;
+}
+
+async function parseWorkerDatabaseConfig() {
+  const { parseProductionAccountDeletionWorkerDbConfigV1 } =
+    await runtimeModules();
+  try {
+    return parseProductionAccountDeletionWorkerDbConfigV1({
+      ...process.env,
+      MYEONGHA_WORKER_DATABASE_PRINCIPAL: 'myeongha_worker_runtime',
+    });
+  } catch {
+    fail('WORKER_CONFIG_INVALID');
+  }
+}
+
+async function preflightWorker() {
+  if (requiredEnv('MYEONGHA_PRIVACY_CANARY_CONFIRM') !== CONFIRMATION) {
+    fail('CONFIRMATION_REQUIRED');
+  }
+  requiredEnv('MYEONGHA_WORKER_DATABASE_URL');
+
+  const {
+    createNodePostgresAccountDeletionWorkerPoolV1,
+  } = await runtimeModules();
+  const databaseConfig = await parseWorkerDatabaseConfig();
+  const pool = createNodePostgresAccountDeletionWorkerPoolV1(databaseConfig);
+  try {
+    let connection;
+    try {
+      connection = await pool.connect();
+    } catch (error) {
+      const classified = classifyWorkerDatabaseFailure(error);
+      if (classified !== null) fail(classified);
+      throw error;
+    } finally {
+      connection?.release();
+    }
+  } finally {
+    await pool.close();
+  }
+
+  console.log('MYEONGHA_PRODUCTION_PRIVACY_CANARY_WORKER_DB_PREFLIGHT_PASS');
+}
+
+async function recoverResumeState() {
+  if (requiredEnv('MYEONGHA_PRIVACY_CANARY_CONFIRM') !== CONFIRMATION) {
+    fail('CONFIRMATION_REQUIRED');
+  }
+  const sourceRunId = requireRunId(
+    requiredEnv('MYEONGHA_PRIVACY_CANARY_RESUME_RUN_ID'),
+  );
+  const pool = await createAdminPool();
+  try {
+    const result = await pool.query(
+      `select
+         s.id::text as "subjectId",
+         s.auth_user_id::text as "authUserId",
+         s.status as "subjectStatus",
+         cal.id::text as "commerceAccountLinkId",
+         cal.status as "commerceStatus",
+         dj.id::text as "deletionJobId",
+         dj.request_dedupe_key as "requestDedupeKey",
+         dj.status as "deletionJobStatus",
+         oe.id::text as "outboxEventId",
+         oe.status as "outboxStatus",
+         oe.lease_expires_at as "leaseExpiresAt"
+       from public.commerce_account_links cal
+       join public.subjects s
+         on s.id = cal.subject_id
+       join public.data_deletion_jobs dj
+         on dj.subject_id = s.id
+        and dj.scope = 'account'
+       join public.outbox_events oe
+         on oe.aggregate_type = 'data_deletion_job'
+        and oe.aggregate_id = dj.id::text
+        and oe.event_type = 'ACCOUNT_DELETION_STARTED'
+        and oe.event_schema_version = 'v1'
+        and oe.dedupe_key = 'account-delete-start-v1'
+       where cal.provider = $1::text
+         and cal.external_account_fingerprint like $2::text`,
+      [PROVIDER, `synthetic:${sourceRunId}:%`],
+    );
+    const row = result.rows[0];
+    if (
+      result.rows.length !== 1 ||
+      row?.subjectStatus !== 'deletion_pending' ||
+      row?.commerceStatus !== 'active' ||
+      row?.deletionJobStatus !== 'running' ||
+      !['pending', 'processing'].includes(row?.outboxStatus) ||
+      (row?.outboxStatus === 'processing' &&
+        row?.leaseExpiresAt instanceof Date &&
+        row.leaseExpiresAt.getTime() > Date.now())
+    ) {
+      fail('RESUME_STATE_NOT_RECOVERABLE');
+    }
+
+    const state = {
+      schema: 'myeongha-production-privacy-canary-state-v1',
+      phase: 'deletion_started',
+      sourceCanaryRunId: sourceRunId,
+      authUserId: requireUuid(row.authUserId, 'RESUME_STATE_INVALID'),
+      subjectId: requireUuid(row.subjectId, 'RESUME_STATE_INVALID'),
+      commerceAccountLinkId: requireUuid(
+        row.commerceAccountLinkId,
+        'RESUME_STATE_INVALID',
+      ),
+      deletionJobId: requireUuid(row.deletionJobId, 'RESUME_STATE_INVALID'),
+      outboxEventId: requireUuid(row.outboxEventId, 'RESUME_STATE_INVALID'),
+      requestDedupeKey:
+        typeof row.requestDedupeKey === 'string' &&
+        row.requestDedupeKey.length > 0
+          ? row.requestDedupeKey
+          : fail('RESUME_STATE_INVALID'),
+    };
+    await writeState(state);
+  } finally {
+    await pool.end();
+  }
+
+  console.log('MYEONGHA_PRODUCTION_PRIVACY_CANARY_RESUME_STATE_RECOVERED');
+}
+
 async function prepare() {
   if (requiredEnv('MYEONGHA_PRIVACY_CANARY_CONFIRM') !== CONFIRMATION) {
     fail('CONFIRMATION_REQUIRED');
@@ -585,18 +733,13 @@ async function startDeletion(state) {
 
 async function runWorker(state, secret) {
   const {
-    parseProductionAccountDeletionWorkerDbConfigV1,
     parseProductionAccountDeletionAuthAdminConfigV1,
     createProductionAccountDeletionWorkerRuntimeV1,
   } = await runtimeModules();
 
-  let databaseConfig;
+  const databaseConfig = await parseWorkerDatabaseConfig();
   let authAdminConfig;
   try {
-    databaseConfig = parseProductionAccountDeletionWorkerDbConfigV1({
-      ...process.env,
-      MYEONGHA_WORKER_DATABASE_PRINCIPAL: 'myeongha_worker_runtime',
-    });
     authAdminConfig = parseProductionAccountDeletionAuthAdminConfigV1({
       ...process.env,
       MYEONGHA_SUPABASE_AUTH_ADMIN_SECRET: secret,
@@ -688,6 +831,9 @@ async function verifyFinalState(state, secret, worker) {
     schema: 'myeongha-production-privacy-recovery-canary-evidence-v1',
     productionProjectRef: PROJECT_REF,
     fixtureClass: 'synthetic-disposable-member',
+    canaryOperation: state.sourceCanaryRunId === undefined ? 'fresh' : 'resume',
+    resumedFromCanaryRunId:
+      state.sourceCanaryRunId === undefined ? null : Number(state.sourceCanaryRunId),
     commerceProvider: PROVIDER,
     accountDeletionStartAuthority: 'ephemeral-canary-login->myeongha_api_executor/cmd_start_account_deletion_runtime_v1',
     workerAuthority: 'myeongha_worker_runtime->myeongha_system_executor',
@@ -730,6 +876,30 @@ async function execute() {
   state.phase = 'completed';
   await writeState(state);
   console.log('MYEONGHA_PRODUCTION_PRIVACY_CANARY_DELETE_PASS');
+}
+
+async function resumeDeletion() {
+  if (requiredEnv('MYEONGHA_PRIVACY_CANARY_CONFIRM') !== CONFIRMATION) {
+    fail('CONFIRMATION_REQUIRED');
+  }
+  requiredEnv('MYEONGHA_WORKER_DATABASE_URL');
+  const state = await readState();
+  if (state.phase !== 'deletion_started') fail('CANARY_NOT_RESUMABLE');
+
+  const sourceRunId = requireRunId(
+    requiredEnv('MYEONGHA_PRIVACY_CANARY_RESUME_RUN_ID'),
+  );
+  if (state.sourceCanaryRunId !== sourceRunId) {
+    fail('RESUME_SOURCE_RUN_MISMATCH');
+  }
+
+  const secret = await resolveAdminSecret();
+  const worker = await runWorker(state, secret);
+  await verifyFinalState(state, secret, worker);
+
+  state.phase = 'completed';
+  await writeState(state);
+  console.log('MYEONGHA_PRODUCTION_PRIVACY_CANARY_RESUME_PASS');
 }
 
 async function cleanupPrestart() {
@@ -798,9 +968,12 @@ async function cleanupPrestart() {
 
 async function main() {
   const mode = process.argv[2];
+  if (mode === 'preflight-worker') return preflightWorker();
   if (mode === 'provision-api-login') return provisionApiCanaryLogin();
   if (mode === 'prepare') return prepare();
   if (mode === 'execute') return execute();
+  if (mode === 'recover-resume-state') return recoverResumeState();
+  if (mode === 'resume') return resumeDeletion();
   if (mode === 'cleanup-api-login') return cleanupApiCanaryLogin();
   if (mode === 'cleanup-prestart') return cleanupPrestart();
   fail('MODE_REQUIRED');
