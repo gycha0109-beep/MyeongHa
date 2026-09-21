@@ -15,6 +15,10 @@ import {
   getChatThreadRuntimeBinding,
   type ChatThreadRuntimeBindingReadAuthorityPortV1,
 } from './chat-thread-runtime-binding-read.js';
+import {
+  getCharacterRelationship,
+  type CharacterRelationshipReadAuthorityPortV1,
+} from './character-relationship-read.js';
 
 export type CharacterStandardReadingChatTurnServerContextInputV1 = Omit<
   CharacterStandardReadingChatBaseContextInputV1,
