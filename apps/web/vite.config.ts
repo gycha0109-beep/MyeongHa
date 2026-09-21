@@ -16,6 +16,7 @@ const htmlEntries = [
   'birth.html',
   'chat-hub.html',
   'chat.html',
+  'face-reading.html',
   'my.html',
   'reading.html',
   'reading-detail.html',
