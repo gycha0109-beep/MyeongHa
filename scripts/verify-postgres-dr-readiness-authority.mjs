@@ -93,7 +93,7 @@ requireFragment('restoreHarness', 'privacy_reconciliation: "not_exercised_by_thi
 requireFragment('restoreHarness', 'dr_ready: false');
 requireFragment('restoreRunbook', 'Production state: CURRENT-FRONTIER BACKUP+RESTORE PROVEN / DR NOT READY');
 requireFragment('restoreRunbook', 'backup schema freshness             = CURRENT — backup frontier 1280 / deployed frontier 1280');
-requireFragment('restoreRunbook', 'current-schema restore              = EVIDENCED — run 35633155263 / frontier 1280');
+requireFragment('restoreRunbook', 'current-schema restore              = EVIDENCED — run 35659483080 / frontier 1280');
 requireFragment('restoreRunbook', 'bounded privacy source authority    = RUNTIME-PROVEN — run 35653303484 / AUTHORITATIVE_CAPTURED_WINDOW_V1');
 requireFragment('restoreRunbook', 'recovered finalization mechanics    = IMPLEMENTED / POST-MERGE CI GREEN');
 requireFragment('restoreRunbook', 'recovered finalization on fresh restore = PROVEN — run 35659483080 / Production non-zero ledger');
@@ -134,7 +134,7 @@ const requiredStatusFragments = [
   'latest_proven_backup_migration_frontier: 1280',
   'production_schema_latest_deployed_migration: 1280',
   'current_repository_migration_frontier: 1280',
-  'latest_isolated_restore_run_id: 35633155263',
+  'latest_isolated_restore_run_id: 35659483080',
   'latest_isolated_restore_result: SUCCESS',
   'provider_managed_data_full_restore: false',
   'privacy_recovery_ledger_authority_class: AUTHORITATIVE_CAPTURED_WINDOW_V1',
@@ -186,7 +186,7 @@ for (const staleRuntimeFragment of [
   'post_backup_privacy_delta_count: 0',
 ]) {
   if (files.readinessStatus.includes(staleRuntimeFragment)) {
-    throw new Error(`${paths.readinessStatus} contains stale runtime evidence after current-schema restore run 35633155263: ${staleRuntimeFragment}`);
+    throw new Error(`${paths.readinessStatus} contains stale runtime evidence after authoritative current-schema restore run 35659483080: ${staleRuntimeFragment}`);
   }
 }
 
