@@ -23,9 +23,9 @@ function scene(readerCharacterId = 'baekheon') {
 }
 
 function deferred() {
-  let resolve;
-  let reject;
-  const promise = new Promise((res, rej) => {
+  let resolve!: (value: ReturnType<typeof scene>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<ReturnType<typeof scene>>((res, rej) => {
     resolve = res;
     reject = rej;
   });
@@ -34,12 +34,12 @@ function deferred() {
 
 describe('web Reader Scene controller', () => {
   it('projects loading then ready and keeps server Reader identity authoritative', async () => {
-    const states = [];
+    const states: Array<{ state: string; [key: string]: unknown }> = [];
     const client = { readReaderScene: vi.fn().mockResolvedValue(scene('taegyeom')) };
     const controller = createReaderSceneControllerV1({
       client,
       onState: (state) => states.push(state),
-      resolvePresentation: (id) => id === 'taegyeom' ? { name: '태겸' } : null,
+      resolvePresentation: (id: string) => id === 'taegyeom' ? { name: '태겸' } : null,
     });
 
     const result = await controller.load({
@@ -58,7 +58,7 @@ describe('web Reader Scene controller', () => {
   });
 
   it('retries only explicit retryable failures', async () => {
-    const states = [];
+    const states: Array<{ state: string; [key: string]: unknown }> = [];
     const client = {
       readReaderScene: vi.fn()
         .mockRejectedValueOnce(
@@ -92,7 +92,7 @@ describe('web Reader Scene controller', () => {
   it('drops a stale response after a newer request becomes authoritative', async () => {
     const first = deferred();
     const second = deferred();
-    const states = [];
+    const states: Array<{ state: string; [key: string]: unknown }> = [];
     const client = {
       readReaderScene: vi.fn()
         .mockReturnValueOnce(first.promise)
@@ -130,7 +130,7 @@ describe('web Reader Scene controller', () => {
   });
 
   it('separates feature unavailable from request failure', async () => {
-    const states = [];
+    const states: Array<{ state: string; [key: string]: unknown }> = [];
     const controller = createReaderSceneControllerV1({
       client: {
         readReaderScene: vi.fn().mockRejectedValue(

@@ -78,7 +78,7 @@ describe('web Reader Scene contract', () => {
     const scene = parseReaderSceneEnvelopeV1(base);
     const viewModel = projectReaderSceneViewModelV1(scene, {
       presentationHint: 'baekheon',
-      resolvePresentation(characterId) {
+      resolvePresentation(characterId: string) {
         return characterId === 'taegyeom'
           ? { name: '태겸', title: '대리자', intro: '근거부터 보겠습니다.' }
           : null;

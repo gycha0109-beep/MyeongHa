@@ -37,7 +37,7 @@ function successResponse(data = sceneData()) {
   });
 }
 
-function errorResponse(status, code, retryable = false) {
+function errorResponse(status: number, code: string, retryable = false) {
   return new Response(JSON.stringify({
     ok: false,
     error: { code, messageKey: 'reader.failure', retryable },
@@ -78,7 +78,7 @@ describe('web Reader runtime client', () => {
 
     expect(scene.readerCharacterId).toBe('baekheon');
     expect(fetchImpl).toHaveBeenCalledTimes(1);
-    const [endpoint, init] = fetchImpl.mock.calls[0];
+    const [endpoint, init] = fetchImpl.mock.calls[0]!;
     expect(endpoint).toBe('/api/me/readings/reader-interpretation/preview');
     expect(init).toMatchObject({
       method: 'POST',
@@ -133,7 +133,7 @@ describe('web Reader runtime client', () => {
       enabled: true,
       fetchImpl: vi.fn().mockResolvedValue(successResponse({
         ...sceneData(),
-        groundingHash: 'private',
+        ...({ groundingHash: 'private' } as Record<string, unknown>),
       })),
       resolveBearer: vi.fn().mockResolvedValue({ kind: 'member', token: 'member-token' }),
     });
@@ -179,7 +179,7 @@ describe('web Reader runtime client', () => {
       grounding: { forged: true },
     });
 
-    const [, init] = fetchImpl.mock.calls[0];
+    const [, init] = fetchImpl.mock.calls[0]!;
     expect(JSON.parse(init.body)).toEqual({
       threadId: 'thread-1',
       officialReadingId: 'reading-1',
