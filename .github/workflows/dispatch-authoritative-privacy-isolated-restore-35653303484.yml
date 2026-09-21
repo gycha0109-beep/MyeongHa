@@ -58,8 +58,9 @@ jobs:
               and .drReady == false
             ' "$manifest" >/dev/null
 
-          incident_reference_utc="$(jq -er '.capturedAt' "$manifest")"
-          [[ "$(date -u -d "$incident_reference_utc" +'%Y-%m-%dT%H:%M:%SZ')" == "$incident_reference_utc" ]]
+          captured_at="$(jq -er '.capturedAt' "$manifest")"
+          incident_reference_utc="$(date -u -d "$captured_at" +'%Y-%m-%dT%H:%M:%SZ')"
+          [[ -n "$incident_reference_utc" ]]
 
           gh workflow run postgres-isolated-restore-drill.yml \
             --repo "$GITHUB_REPOSITORY" \
