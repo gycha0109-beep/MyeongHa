@@ -1,8 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { ContentReleaseRuntime } from '../packages/world-content/src/index.js';
-import {
-  ReaderInterpretationPreviewHttpErrorV1,
-  type ReaderInterpretationPreviewContextAuthorityPortV1,
+import type {
+  ReaderInterpretationPreviewContextAuthorityPortV1,
 } from '../apps/api/src/reader-interpretation-preview-http.js';
 import {
   executeReaderInterpretationPreviewPostgresV1,
@@ -68,7 +67,7 @@ describe('Reader Interpretation Preview PostgreSQL execution', () => {
     })).rejects.toMatchObject({
       name: 'ReaderInterpretationPreviewHttpErrorV1',
       code: 'INVALID_REQUEST',
-    } satisfies Partial<ReaderInterpretationPreviewHttpErrorV1>);
+    });
 
     expect(database.query).toHaveBeenCalledWith('BEGIN');
     expect(database.query).toHaveBeenCalledWith('SET LOCAL ROLE myeongha_api_executor');
