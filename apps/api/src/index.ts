@@ -214,6 +214,11 @@ export {
 } from './memory-grants-read.js';
 
 export {
+  createPostgresReaderContextMemoryGrantsAuthorityPortV1,
+  createPostgresReaderContextMemoryItemsAuthorityPortV1,
+} from './postgres-reader-context-memory.js';
+
+export {
   MEMORY_ITEM_REVOKE_COMMAND_AUTHORITY_BINDING_V1,
   MemoryItemRevokeCommandAuthorityPortErrorV1,
   revokeMemoryItem,

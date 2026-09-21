@@ -89,6 +89,12 @@ grant; private/ungranted or other-Reader memories are excluded. Caller-supplied
 `grantedMemories` is rejected. This consumes already-authoritative stored records
 and grants only; it does not create, regrant, infer, or validate a new Memory value.
 
+Production execution for this Memory slice is now backed by the dedicated
+transaction-subject-bound API executor path. The executor receives only the
+owner-scoped Memory Item projection, active Memory grant projection, and the
+minimum RLS-scoped grant columns those SECURITY INVOKER queries require. This
+does not grant Memory creation, regrant, or revoke authority.
+
 This slice does not invent the still-open SRC-22 relationship event evaluator,
 score deltas, stage transitions, anti-farming rules, or relationship rendering
 threshold authority. It also does not resolve SRC-25 positive Memory creation
