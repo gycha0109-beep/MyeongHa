@@ -3,13 +3,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="명하 기록 — 현세록, 사주 기록, 명식록, 대리자 기억을 한곳에서 확인합니다." />
-  <title>기록 · 명하</title>
+  <meta name="description" content="명하 관상 — 사진을 안전하게 처리한 뒤 얼굴의 관측 가능한 구조를 확인합니다." />
+  <title>관상 · 명하</title>
   <link rel="stylesheet" href="product.css" vite-ignore />
-  <link rel="stylesheet" href="records-v2.css" vite-ignore />
+  <link rel="stylesheet" href="golden-master.css" vite-ignore />
+  <link rel="stylesheet" href="face-reading.css" vite-ignore />
   <script src="product-theme.js"></script>
 </head>
-<body class="product-page records-page" data-page="records">
+<body class="product-page gm-page physiognomy-page" data-page="physiognomy">
   <header class="product-header">
     <div class="product-shell product-header-inner">
       <a class="product-brand" href="hall.html" aria-label="명하 홈">
@@ -19,14 +20,15 @@
       </a>
       <nav class="product-nav" aria-label="주요 메뉴">
         <a class="product-nav-link" href="hall.html">홈</a>
-        <a class="product-nav-link" href="reading.html">사주</a>\n        <a class="product-nav-link" href="face-reading.html">관상</a>
+        <a class="product-nav-link" href="reading.html">사주</a>
+        <a class="product-nav-link" href="face-reading.html" aria-current="page">관상</a>
         <a class="product-nav-link" href="chat-hub.html">대화</a>
-        <a class="product-nav-link" href="records.html" aria-current="page">기록</a>
+        <a class="product-nav-link" href="records.html">기록</a>
         <a class="product-nav-link" href="my.html">마이</a>
       </nav>
       <div class="product-utilities">
         <button class="product-icon-button" type="button" aria-label="알림"></button>
-        <a class="product-profile" href="my.html" aria-label="마이 페이지">
+        <a class="product-profile" href="my.html" aria-label="내 프로필">
           <span class="product-profile-mark" aria-hidden="true">之</span>
           <span>마이</span>
         </a>
@@ -34,23 +36,17 @@
     </div>
   </header>
 
-  <main class="records-main" id="records-react-root"></main>
-
-  <footer class="product-footer">
-    <div class="product-shell product-footer-inner">
-      <span>© 2026 MyeongHa. All rights reserved.</span>
-      <span class="product-footer-seal" aria-hidden="true">明河</span>
-    </div>
-  </footer>
+  <main class="phys-main" id="face-reading-react-root"></main>
 
   <nav class="mobile-bottom-nav" aria-label="모바일 주요 메뉴">
     <a class="mobile-nav-link" href="hall.html"><span class="mobile-nav-icon" aria-hidden="true">⌂</span><span>홈</span></a>
-    <a class="mobile-nav-link" href="reading.html"><span class="mobile-nav-icon" aria-hidden="true">✦</span><span>사주</span></a>\n    <a class="mobile-nav-link" href="face-reading.html"><span class="mobile-nav-icon" aria-hidden="true">相</span><span>관상</span></a>
+    <a class="mobile-nav-link" href="reading.html"><span class="mobile-nav-icon" aria-hidden="true">✦</span><span>사주</span></a>
+    <a class="mobile-nav-link" href="face-reading.html" aria-current="page"><span class="mobile-nav-icon" aria-hidden="true">相</span><span>관상</span></a>
     <a class="mobile-nav-link" href="chat-hub.html"><span class="mobile-nav-icon" aria-hidden="true">◌</span><span>대화</span></a>
-    <a class="mobile-nav-link" href="records.html" aria-current="page"><span class="mobile-nav-icon" aria-hidden="true">▤</span><span>기록</span></a>
+    <a class="mobile-nav-link" href="records.html"><span class="mobile-nav-icon" aria-hidden="true">▤</span><span>기록</span></a>
     <a class="mobile-nav-link" href="my.html"><span class="mobile-nav-icon" aria-hidden="true">♙</span><span>마이</span></a>
   </nav>
 
-  <script type="module" src="/src/records/main.tsx"></script>
+  <script type="module" src="/src/face-reading/main.tsx"></script>
 </body>
 </html>

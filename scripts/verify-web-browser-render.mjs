@@ -207,7 +207,7 @@ async function verifyDarkPage(client, origin, pathname, selector, { toggle = tru
 }
 
 for (const file of [
-  'hall.html', 'reading.html', 'reading-detail.html', 'reading-detail-route.js', 'chat-hub.html', 'chat.html',
+  'hall.html', 'reading.html', 'reading-detail.html', 'reading-detail-route.js', 'face-reading.html', 'face-reading.css', 'chat-hub.html', 'chat.html',
   'records.html', 'my.html', 'product-theme.js', 'product-theme.css',
   'golden-master.css', 'golden-master-lock.css',
 ]) {
@@ -279,6 +279,36 @@ try {
   assert(hallState.bodyText.includes('사주 읽기 주제') && hallState.bodyText.includes('전체 사주') && hallState.bodyText.includes('직업 · 커리어') && hallState.bodyText.includes('재물') && hallState.bodyText.includes('연애 · 관계'), 'Home four-card Saju row missing');
   assert(hallState.bodyText.includes('최근 이야기') && hallState.bodyText.includes('지금은 저장된 사실을 이야기로 추측해 이어 붙이지 않습니다.'), 'Home recent-story fail-closed state missing');
   await artifact(client, '-home');
+
+  await navigate(client, origin, '/face-reading.html', '.phys-workspace');
+  const physiognomyState = await client.evaluate(`(() => {
+    const visible = (selector) => {
+      const el = document.querySelector(selector); if (!el || el.hidden) return false;
+      const r = el.getBoundingClientRect(); const s = getComputedStyle(el);
+      return r.width > 0 && r.height > 0 && s.display !== 'none' && s.visibility !== 'hidden';
+    };
+    const inputs = [...document.querySelectorAll('.phys-file-input')];
+    return {
+      pathname: location.pathname,
+      bodyText: document.body.innerText,
+      activeNav: document.querySelector('.product-nav-link[aria-current="page"]')?.textContent?.trim() ?? '',
+      workspace: visible('.phys-workspace'),
+      preview: visible('.phys-preview'),
+      actionCount: document.querySelectorAll('.phys-actions button').length,
+      inputCount: inputs.length,
+      cameraCapture: inputs[0]?.getAttribute('capture') ?? null,
+      galleryCapture: inputs[1]?.getAttribute('capture') ?? null,
+      overflow: document.documentElement.scrollWidth - innerWidth,
+    };
+  })()`);
+  assert(physiognomyState.pathname === '/face-reading.html', `Expected /face-reading.html, got ${physiognomyState.pathname}`);
+  assert(physiognomyState.activeNav === '관상', `Physiognomy top-level navigation is not active: ${physiognomyState.activeNav}`);
+  assert(physiognomyState.workspace && physiognomyState.preview, 'Physiognomy workspace is not visible');
+  assert(physiognomyState.actionCount === 3 && physiognomyState.inputCount === 2, `Physiognomy camera/gallery controls drifted: ${JSON.stringify(physiognomyState)}`);
+  assert(physiognomyState.cameraCapture === 'user' && physiognomyState.galleryCapture === null, `Camera/gallery capture separation drifted: ${JSON.stringify(physiognomyState)}`);
+  assert(physiognomyState.bodyText.includes('사진 촬영') && physiognomyState.bodyText.includes('사진 선택'), 'Physiognomy camera/gallery actions missing');
+  assert(physiognomyState.overflow <= 2, `Physiognomy horizontal overflow: ${physiognomyState.overflow}px`);
+  await artifact(client, '-physiognomy');
 
   await navigate(client, origin, '/reading.html', '#saju-empty');
   await waitForVisible(client, '#saju-empty');
@@ -438,6 +468,18 @@ try {
   assert(mobileSaju.width === 390 && mobileSaju.empty && mobileSaju.form && mobileSaju.bottomNav, 'Mobile Saju onboarding is not fully visible');
   assert(mobileSaju.overflow <= 2, `Mobile Saju horizontal overflow: ${mobileSaju.overflow}px`);
   await artifact(client, '-saju-mobile');
+
+  await navigate(client, origin, '/face-reading.html', '.phys-workspace');
+  const mobilePhysiognomy = await client.evaluate(`(() => ({
+    width: innerWidth,
+    navCount: document.querySelectorAll('.mobile-bottom-nav .mobile-nav-link').length,
+    activeNav: document.querySelector('.mobile-bottom-nav .mobile-nav-link[aria-current="page"]')?.textContent?.trim() ?? '',
+    overflow: document.documentElement.scrollWidth - innerWidth,
+  }))()`);
+  assert(mobilePhysiognomy.width === 390 && mobilePhysiognomy.navCount === 6, `Mobile physiognomy navigation drifted: ${JSON.stringify(mobilePhysiognomy)}`);
+  assert(mobilePhysiognomy.activeNav.includes('관상'), `Mobile physiognomy tab is not active: ${mobilePhysiognomy.activeNav}`);
+  assert(mobilePhysiognomy.overflow <= 2, `Mobile physiognomy horizontal overflow: ${mobilePhysiognomy.overflow}px`);
+  await artifact(client, '-physiognomy-mobile');
 
   await client.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
   await navigate(client, origin, '/reading-detail.html?scope=year', '.reading-route-state');
