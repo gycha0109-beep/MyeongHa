@@ -7,6 +7,10 @@ on:
         description: 'Type RUN_SYNTHETIC_PRODUCTION_PRIVACY_CANARY to execute the disposable Production privacy/deletion canary.'
         required: true
         type: string
+      watchtower_track:
+        description: 'Watchtower Track Key for CI attribution.'
+        required: true
+        type: string
 
 permissions:
   actions: write
@@ -24,9 +28,12 @@ jobs:
     environment: production
     env:
       MYEONGHA_PRIVACY_CANARY_CONFIRM: ${{ inputs.confirmation }}
+      MYEONGHA_WATCHTOWER_TRACK: ${{ inputs.watchtower_track }}
       MYEONGHA_SUPABASE_URL: https://cnsfpcdiyofqvhpcegfc.supabase.co
-      MYEONGHA_DATABASE_URL: ${{ secrets.MYEONGHA_DATABASE_URL }}
       MYEONGHA_DATABASE_PRINCIPAL: myeongha_runtime
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_PROJECT_ID: prj_nXF0b5uv27Lyucz2SEBxzdCRXVsP
+      VERCEL_TEAM_ID: team_xuYA9OhCWlJETaYFOmeVodgS
       MYEONGHA_WORKER_DATABASE_URL: ${{ secrets.MYEONGHA_WORKER_DATABASE_URL }}
       MYEONGHA_WORKER_DATABASE_PRINCIPAL: myeongha_worker_runtime
       MYEONGHA_SUPABASE_AUTH_ADMIN_SECRET: ${{ secrets.MYEONGHA_SUPABASE_AUTH_ADMIN_SECRET }}
@@ -41,9 +48,10 @@ jobs:
         run: |
           set -euo pipefail
           [[ "$MYEONGHA_PRIVACY_CANARY_CONFIRM" == 'RUN_SYNTHETIC_PRODUCTION_PRIVACY_CANARY' ]]
+          [[ "$MYEONGHA_WATCHTOWER_TRACK" == 'privacy-recovery' ]]
 
           missing=()
-          [[ -n "${MYEONGHA_DATABASE_URL:-}" ]] || missing+=(MYEONGHA_DATABASE_URL)
+          [[ -n "${VERCEL_TOKEN:-}" ]] || missing+=(VERCEL_TOKEN)
           [[ -n "${MYEONGHA_WORKER_DATABASE_URL:-}" ]] || missing+=(MYEONGHA_WORKER_DATABASE_URL)
           [[ -n "${SUPABASE_DB_PASSWORD:-}" ]] || missing+=(SUPABASE_DB_PASSWORD)
           [[ -n "${SUPABASE_PRODUCTION_SESSION_POOLER_HOST:-}" ]] || missing+=(SUPABASE_PRODUCTION_SESSION_POOLER_HOST)
@@ -60,7 +68,7 @@ jobs:
             exit 1
           fi
 
-          echo "::add-mask::$MYEONGHA_DATABASE_URL"
+          echo "::add-mask::$VERCEL_TOKEN"
           echo "::add-mask::$MYEONGHA_WORKER_DATABASE_URL"
           echo "::add-mask::$SUPABASE_DB_PASSWORD"
           [[ -z "${MYEONGHA_SUPABASE_AUTH_ADMIN_SECRET:-}" ]] || echo "::add-mask::$MYEONGHA_SUPABASE_AUTH_ADMIN_SECRET"
@@ -80,6 +88,60 @@ jobs:
 
       - name: Build server runtime
         run: npm run build
+
+      - name: Resolve governed Production API database binding from Vercel
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          env_file="$RUNNER_TEMP/vercel-production-env.json"
+          cleanup() {
+            exit_code=$?
+            trap - EXIT
+            rm -f "$env_file"
+            exit "$exit_code"
+          }
+          trap cleanup EXIT
+
+          curl -fsS \
+            -H "Authorization: Bearer $VERCEL_TOKEN" \
+            "https://api.vercel.com/v9/projects/$VERCEL_PROJECT_ID/env?decrypt=true&teamId=$VERCEL_TEAM_ID" \
+            -o "$env_file"
+
+          database_url="$(
+            jq -er '
+              [
+                .envs[]
+                | select(
+                    .key == "MYEONGHA_DATABASE_URL"
+                    and ((.target // []) | index("production")) != null
+                    and (.value | type) == "string"
+                    and (.value | length) > 0
+                  )
+              ]
+              | if length == 1
+                then .[0].value
+                else error("expected exactly one Production MYEONGHA_DATABASE_URL")
+                end
+            ' "$env_file"
+          )"
+
+          DATABASE_URL="$database_url" python3 - <<'PY'
+          import os
+          from urllib.parse import unquote, urlparse
+
+          value = os.environ["DATABASE_URL"]
+          assert "\n" not in value and "\r" not in value
+          parsed = urlparse(value)
+          assert parsed.scheme in {"postgres", "postgresql"}
+          assert unquote(parsed.username or "") == "myeongha_runtime.cnsfpcdiyofqvhpcegfc"
+          assert parsed.hostname is not None and parsed.hostname.endswith(".pooler.supabase.com")
+          assert parsed.port in {5432, 6543}
+          assert parsed.path == "/postgres"
+          PY
+
+          echo "::add-mask::$database_url"
+          printf 'MYEONGHA_DATABASE_URL=%s\n' "$database_url" >> "$GITHUB_ENV"
 
       - name: Prepare protected canary runtime paths
         shell: bash
