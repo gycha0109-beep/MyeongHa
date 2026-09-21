@@ -1,0 +1,43 @@
+name: FE034 Face Preview Runtime Canary
+
+on:
+  push:
+    branches:
+      - feat/fe034-face-preview-runtime-canary
+    paths:
+      - 'scripts/verify-face-preview-runtime-canary-fe034.mjs'
+      - '.github/workflows/fe034-face-preview-runtime-canary.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  real-browser-canary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run build:web
+      - name: Fetch pinned scikit-image astronaut canary
+        run: |
+          curl --fail --location --retry 3 \
+            "https://raw.githubusercontent.com/scikit-image/scikit-image/9311ab50b2e3392bb5272253b43cb4dd1ce04e31/src/_skimage2/data/astronaut.png" \
+            --output "$RUNNER_TEMP/fe034-astronaut.png"
+          sha256sum "$RUNNER_TEMP/fe034-astronaut.png"
+      - name: Set up Chrome for Testing
+        id: chrome
+        uses: browser-actions/setup-chrome@48ad923757ca74d66703209fe939badbdf80f2f4
+        with:
+          chrome-version: stable
+          install-dependencies: true
+      - name: Run real FaceLandmarker browser canary
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+          FE034_CANARY_IMAGE: ${{ runner.temp }}/fe034-astronaut.png
+        run: node scripts/verify-face-preview-runtime-canary-fe034.mjs
