@@ -16,7 +16,9 @@ function imageBlob(
   bytes: Uint8Array = jpegBytes,
   type = 'image/jpeg',
 ): Blob {
-  return new Blob([bytes], { type });
+  const buffer = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(buffer).set(bytes);
+  return new Blob([buffer], { type });
 }
 
 function platform(
@@ -105,7 +107,7 @@ describe('FE030 Face Preview image intake', () => {
 
   it('rejects oversized byte and pixel inputs before analysis', async () => {
     const oversized = new Blob(
-      [new Uint8Array(FACE_PREVIEW_MAX_INPUT_BYTES_FE030 + 1)],
+      [new ArrayBuffer(FACE_PREVIEW_MAX_INPUT_BYTES_FE030 + 1)],
       { type: 'image/jpeg' },
     );
     expect(await sanitizeFacePreviewImageFE030({
