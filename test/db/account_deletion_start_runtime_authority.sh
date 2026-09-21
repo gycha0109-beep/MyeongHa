@@ -71,7 +71,7 @@ from public.cmd_start_account_deletion_runtime_v1(
   'c4000000-0000-0000-0000-000000000001'
 );
 commit;
-)
+")
 [[ "$result" == *"c2000000-0000-0000-0000-000000000001"* ]] || fail "member subject context did not resolve"
 [[ "$result" == *"c3000000-0000-0000-0000-000000000001:running:0"* ]] || fail "runtime wrapper did not start deletion"
 pass "API executor enters the canonical Member context and starts account deletion through the runtime wrapper"
@@ -90,7 +90,7 @@ join public.outbox_events oe
 where s.id='c2000000-0000-0000-0000-000000000001'
   and dj.id='c3000000-0000-0000-0000-000000000001'
   and oe.id='c4000000-0000-0000-0000-000000000001';
-)
+")
 [[ "$state" == "deletion_pending|running|ACCOUNT_DELETION_STARTED|pending" ]] || fail "runtime deletion state mismatch: $state"
 pass "runtime wrapper preserves the core account-deletion transaction contract"
 
@@ -110,7 +110,7 @@ select has_function_privilege(
   'public.cmd_start_account_deletion_runtime_v1(uuid,uuid,text,uuid)',
   'EXECUTE'
 );
-)
+")
 [[ "$public_exec" == "f" ]] || fail "runtime wrapper is executable by PUBLIC"
 
 api_direct_dml=$("${psql_base[@]}" -Atqc "
@@ -120,7 +120,7 @@ select
     or has_table_privilege('myeongha_api_executor','public.data_deletion_jobs','INSERT')
     or has_table_privilege('myeongha_api_executor','public.outbox_events','INSERT')
   )::int;
-)
+")
 [[ "$api_direct_dml" == "0" ]] || fail "API executor gained direct deletion table DML"
 pass "runtime activation preserves closed direct-DML and PUBLIC boundaries"
 
