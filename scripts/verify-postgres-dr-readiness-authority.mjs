@@ -90,11 +90,11 @@ requireRegex(
 requireFragment('restoreHarness', 'privacy_reconciliation: "not_exercised_by_this_workflow"');
 requireFragment('restoreHarness', 'dr_ready: false');
 requireFragment('restoreRunbook', 'Production state: CURRENT-FRONTIER BACKUP+RESTORE PROVEN / DR NOT READY');
-requireFragment('restoreRunbook', 'backup schema freshness             = CURRENT — backup frontier 1270 / deployed frontier 1270');
-requireFragment('restoreRunbook', 'current-schema restore              = EVIDENCED — run 35610864276 / frontier 1270');
+requireFragment('restoreRunbook', 'backup schema freshness             = CURRENT — backup frontier 1280 / deployed frontier 1280');
+requireFragment('restoreRunbook', 'current-schema restore              = EVIDENCED — run 35633155263 / frontier 1280');
 requireFragment('restoreRunbook', 'bounded privacy source authority    = RUNTIME-PROVEN — run 35539838537');
 requireFragment('restoreRunbook', 'recovered finalization mechanics    = IMPLEMENTED / POST-MERGE CI GREEN');
-requireFragment('restoreRunbook', 'recovered finalization on fresh restore = PROVEN — run 35610864276');
+requireFragment('restoreRunbook', 'recovered finalization on fresh restore = PROVEN — run 35633155263');
 requireFragment('restoreRunbook', 'authoritative privacy reconciliation= NOT YET PROVEN');
 requireFragment('restoreRunbook', 'future-safe privacy reconciliation  = false');
 requireFragment('restoreRunbook', 'provider-managed full restore       = NOT PROVEN');
@@ -105,10 +105,10 @@ requireFragment('restoreRunbook', 'Production PostgreSQL Privacy Recovery Ledger
 requireFragment('restoreRunbook', '35539838537');
 requireFragment('restoreRunbook', '- [x] bounded captured-window privacy source authority runtime-proven — run `35539838537`');
 requireFragment('restoreRunbook', '- [x] account-deletion finalizer and recovered-state finalization mechanics implemented / post-merge CI green');
-requireFragment('restoreRunbook', '- [x] fresh governed backup captured after deployed migration `1270` — run `35610150628` / artifact `10643338312`');
-requireFragment('restoreRunbook', '- [x] isolated restore completed from that current-frontier backup — run `35610864276`');
-requireFragment('restoreRunbook', '- [x] recovered-state finalization drill executed on that fresh governed restore — run `35610864276`');
-requireFragment('restoreRunbook', '- [x] synthetic drill data-loss window measured — `6s` (diagnostic, not approved RPO)');
+requireFragment('restoreRunbook', '- [x] fresh governed backup captured after deployed migration `1280` — run `35631594765` / artifact `10654730578`');
+requireFragment('restoreRunbook', '- [x] isolated restore completed from that current-frontier backup — run `35633155263`');
+requireFragment('restoreRunbook', '- [x] recovered-state finalization drill executed on that fresh governed restore — run `35633155263`');
+requireFragment('restoreRunbook', '- [x] synthetic drill data-loss window measured — `1s` (diagnostic, not approved RPO)');
 requireFragment('restoreRunbook', 'RPO: APPROVED — PT24H (24 hours)');
 requireFragment('restoreRunbook', 'RTO: APPROVED — PT6H (6 hours)');
 requireFragment('restoreRunbook', 'DR Ready = FALSE / NOT EVIDENCED');
@@ -119,31 +119,31 @@ for (const staleFragment of [
   'isolated restore                = NOT YET EVIDENCED',
 ]) {
   if (files.restoreRunbook.includes(staleFragment)) {
-    throw new Error(`${paths.restoreRunbook} contains stale restore-state evidence after latest successful runtime-proof run 35610864276: ${staleFragment}`);
+    throw new Error(`${paths.restoreRunbook} contains stale restore-state evidence after latest successful runtime-proof run 35633155263: ${staleFragment}`);
   }
 }
 
 const requiredStatusFragments = [
-  'latest_governed_backup_run_id: 35610150628',
-  'latest_governed_backup_source_sha: 7d4b3b68ce65e254a2f6b1e7b2aa479abbfdaec1',
-  'latest_governed_backup_artifact_id: 10643338312',
-  'latest_governed_backup_encrypted_sha256: 08b58c5a522e9077ba67724e099d53af34b5c07532b9d7f950bd623003114e11',
-  'latest_governed_backup_artifact_name: myeongha-postgres-20260921T140850Z',
-  'latest_governed_backup_completed_at_utc: 2026-09-21T14:12:28Z',
-  'latest_proven_backup_migration_frontier: 1270',
-  'production_schema_latest_deployed_migration: 1270',
-  'production_schema_deploy_run_id: 35608999263',
-  'production_schema_deploy_head_sha: 7d4b3b68ce65e254a2f6b1e7b2aa479abbfdaec1',
-  'current_repository_migration_frontier: 1270',
-  'latest_isolated_restore_run_id: 35610864276',
+  'latest_governed_backup_run_id: 35631594765',
+  'latest_governed_backup_source_sha: b0b8656e89d13e12d77871875f7a2ed3c935b177',
+  'latest_governed_backup_artifact_id: 10654730578',
+  'latest_governed_backup_encrypted_sha256: 42b34d8991fc69c979ed6029aeeca3e36c018f573ad2cf586d51d94327e1a990',
+  'latest_governed_backup_artifact_name: myeongha-postgres-20260921T172244Z',
+  'latest_governed_backup_completed_at_utc: 2026-09-21T17:25:10Z',
+  'latest_proven_backup_migration_frontier: 1280',
+  'production_schema_latest_deployed_migration: 1280',
+  'production_schema_deploy_run_id: 35629348943',
+  'production_schema_deploy_head_sha: b0b8656e89d13e12d77871875f7a2ed3c935b177',
+  'current_repository_migration_frontier: 1280',
+  'latest_isolated_restore_run_id: 35633155263',
   'latest_isolated_restore_result: SUCCESS',
-  'latest_isolated_restore_backup_run_id: 35610150628',
-  'latest_isolated_restore_incident_reference_utc: 2026-09-21T14:12:34Z',
-  'latest_isolated_restore_evidence_artifact_id: 10644116472',
-  'latest_isolated_restore_evidence_artifact_expires_at: 2026-10-21T14:16:16Z',
-  'latest_isolated_restore_evidence_artifact_digest: sha256:39b4858092083ce05cbffdfe6c4acac7e968dc4c6d4dfc790ac2ec037770502a',
-  'latest_isolated_restore_backup_migration_frontier: 1270',
-  'restore_evidence_envelope_runtime: PROVEN_ON_RUN_35610864276',
+  'latest_isolated_restore_backup_run_id: 35631594765',
+  'latest_isolated_restore_incident_reference_utc: 2026-09-21T17:25:11Z',
+  'latest_isolated_restore_evidence_artifact_id: 10655731358',
+  'latest_isolated_restore_evidence_artifact_expires_at: 2026-10-21T17:37:58Z',
+  'latest_isolated_restore_evidence_artifact_digest: sha256:9df259c46fdefc9f7f933dac7baf3ad4bb3d0cd82014cd155e3fe8fbd9ee5c66',
+  'latest_isolated_restore_backup_migration_frontier: 1280',
+  'restore_evidence_envelope_runtime: PROVEN_ON_RUN_35633155263',
   'provider_managed_data_full_restore: false',
   'privacy_recovery_ledger_workflow: RUNTIME_PROVEN',
   'privacy_recovery_ledger_run_id: 35539838537',
@@ -160,7 +160,7 @@ const requiredStatusFragments = [
   'authoritative_post_backup_source: true_bounded_captured_window_only',
   'account_deletion_finalizer_runtime: IMPLEMENTED_AND_PROVIDER_MECHANICS_SEPARATELY_PROVEN',
   'recovered_state_finalization_drill: IMPLEMENTED_MERGED_POST_MERGE_CI_GREEN',
-  'recovered_state_finalization_restored_backup_runtime: PROVEN_ON_RUN_35610864276',
+  'recovered_state_finalization_restored_backup_runtime: PROVEN_ON_RUN_35633155263',
   'privacy_reconciliation: BLOCKED_BY_PRODUCTION_NONZERO_AUTHORITATIVE_DELTA_PROOF',
   'authoritative_privacy_reconciliation: false',
   'future_safe_privacy_reconciliation: false',
@@ -193,7 +193,7 @@ for (const staleRuntimeFragment of [
   'post_backup_privacy_delta_count: 0',
 ]) {
   if (files.readinessStatus.includes(staleRuntimeFragment)) {
-    throw new Error(`${paths.readinessStatus} contains stale runtime evidence after current-schema restore run 35610864276: ${staleRuntimeFragment}`);
+    throw new Error(`${paths.readinessStatus} contains stale runtime evidence after current-schema restore run 35633155263: ${staleRuntimeFragment}`);
   }
 }
 
