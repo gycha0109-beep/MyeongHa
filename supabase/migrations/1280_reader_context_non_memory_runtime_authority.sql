@@ -26,7 +26,6 @@ create policy relationship_events_api_current_select_v1
   to myeongha_api_executor
   using (subject_id = public.current_myeongha_subject_id());
 
-revoke select on public.life_facts from myeongha_api_executor;
 grant select (
   id,
   subject_id,
@@ -39,7 +38,6 @@ grant select (
 
 grant select (life_fact_id) on public.record_access_grants to myeongha_api_executor;
 
-revoke select on public.relationship_events from myeongha_api_executor;
 grant select (
   subject_id,
   character_id,
