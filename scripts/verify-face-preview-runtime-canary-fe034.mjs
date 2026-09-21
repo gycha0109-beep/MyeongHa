@@ -10,12 +10,13 @@ const root = resolve(process.cwd(), process.env.MYEONGHA_WEB_OUTPUT_DIR ?? 'publ
 const fixturePath = resolve(
   process.env.FE034_CANARY_IMAGE ?? (() => { throw new Error('FE034_CANARY_IMAGE is required'); })(),
 );
-const expectedSha256 = process.env.FE034_CANARY_SHA256?.trim() ?? '';
+const expectedSha256 =
+  '88431cd9653ccd539741b555fb0a46b61558b301d4110412b5bc28b5e3ea6cb5';
 const chromeBin = process.env.CHROME_BIN ?? process.env.CHROME_PATH ?? 'chrome';
 const fixtureBytes = await readFile(fixturePath);
 const fixtureSha256 = createHash('sha256').update(fixtureBytes).digest('hex');
 
-if (expectedSha256 && fixtureSha256 !== expectedSha256) {
+if (fixtureSha256 !== expectedSha256) {
   throw new Error(
     `FE034 fixture SHA-256 mismatch: expected ${expectedSha256}, got ${fixtureSha256}`,
   );
@@ -188,6 +189,19 @@ chrome.stderr.on('data', (chunk) => {
 });
 let client;
 
+async function stopChrome() {
+  if (chrome.exitCode !== null) return;
+  chrome.kill('SIGTERM');
+  await Promise.race([
+    new Promise((done) => chrome.once('exit', done)),
+    sleep(2_000),
+  ]);
+  if (chrome.exitCode === null) {
+    chrome.kill('SIGKILL');
+    await new Promise((done) => chrome.once('exit', done));
+  }
+}
+
 try {
   client = await cdp(await devtoolsPort(profile, chrome));
   await waitForPage(client, origin);
@@ -259,6 +273,6 @@ try {
 } finally {
   client?.close();
   server.close();
-  if (chrome.exitCode === null) chrome.kill('SIGTERM');
+  await stopChrome();
   await rm(profile, { recursive: true, force: true });
 }
