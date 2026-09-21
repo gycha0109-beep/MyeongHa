@@ -19,6 +19,8 @@ import {
 } from '../apps/api/src/index.js';
 import type { ChatThreadRuntimeBindingReadAuthorityPortV1 } from '../apps/api/src/chat-thread-runtime-binding-read.js';
 import type { CharacterRelationshipReadAuthorityPortV1 } from '../apps/api/src/character-relationship-read.js';
+import type { MemoryItemsReadAuthorityPortV1 } from '../apps/api/src/memory-items-read.js';
+import type { MemoryGrantsReadAuthorityPortV1 } from '../apps/api/src/memory-grants-read.js';
 import type {
   CharacterStandardReadingAccessAuthorityPortV1,
   CharacterStandardReadingArtifactAuthorityPortV1,
@@ -184,6 +186,7 @@ function serverContextInput(): CharacterStandardReadingChatTurnServerContextInpu
     contentBundleId: _contentBundleId,
     worldRelations: _worldRelations,
     relationshipState: _relationshipState,
+    grantedMemories: _grantedMemories,
     ...context
   } = contextInput();
   return context;
@@ -256,11 +259,50 @@ function authorities(participants: readonly string[] = ['baekheon']) {
       updatedAt: '2026-09-21T00:01:30.000Z',
     }]),
   };
+  const memoryItemsAuthorityPort: MemoryItemsReadAuthorityPortV1 = {
+    readCurrentItems: vi.fn(async () => [
+      {
+        memoryItemId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1',
+        memoryType: 'reader_memory',
+        schemaVersion: 'v1',
+        contentJsonb: { summary: '사용자가 직업 선택을 고민하고 있다고 말했다.' },
+        createdByCharacterId: 'baekheon',
+        createdAt: '2026-09-21T00:01:20.000Z',
+      },
+      {
+        memoryItemId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2',
+        memoryType: 'private_memory',
+        schemaVersion: 'v1',
+        contentJsonb: { summary: '다른 Reader에게만 공유된 기억' },
+        createdByCharacterId: 'seyeon',
+        createdAt: '2026-09-21T00:01:10.000Z',
+      },
+    ]),
+  };
+  const memoryGrantsAuthorityPort: MemoryGrantsReadAuthorityPortV1 = {
+    readActiveGrants: vi.fn(async ({ memoryItemId }) => (
+      memoryItemId === 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1'
+        ? [{
+            grantId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1',
+            characterId: 'baekheon',
+            grantReason: 'user_explicit',
+            grantedAt: '2026-09-21T00:01:25.000Z',
+          }]
+        : [{
+            grantId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2',
+            characterId: 'seyeon',
+            grantReason: 'user_explicit',
+            grantedAt: '2026-09-21T00:01:15.000Z',
+          }]
+    )),
+  };
   return {
     threadBindingAuthorityPort,
     accessAuthorityPort,
     artifactAuthorityPort,
     relationshipAuthorityPort,
+    memoryItemsAuthorityPort,
+    memoryGrantsAuthorityPort,
   };
 }
 
@@ -432,6 +474,14 @@ describe('Official Reading Reader Chat turn preflight', () => {
       expect(result.runtime.context.saju?.readingRef).toBe(READING_ID);
       expect(result.runtime.context.relationship.relationshipRevision).toBe(7);
       expect(result.runtime.context.relationship.stageKey).toBe('familiar');
+      expect(result.runtime.context.memories).toEqual([{
+        memoryItemId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1',
+        memoryType: 'reader_memory',
+        schemaVersion: 'v1',
+        content: { summary: '사용자가 직업 선택을 고민하고 있다고 말했다.' },
+        grantId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1',
+        granteeCharacterId: 'baekheon',
+      }]);
       expect(authority.relationshipAuthorityPort.readCurrentRelationship).toHaveBeenCalledWith({
         subjectId: SUBJECT_ID,
         characterId: 'baekheon',
@@ -518,6 +568,69 @@ describe('Official Reading Reader Chat turn preflight', () => {
         contextInput: serverContextInput(),
       }),
     ).rejects.toThrow(/requires a stored current relationship projection/u);
+
+    expect(authority.accessAuthorityPort.readAccessibleReadings).not.toHaveBeenCalled();
+    expect(authority.artifactAuthorityPort.readArtifactSource).not.toHaveBeenCalled();
+  });
+
+  it('rejects caller-supplied granted Memory context before authority lookup', async () => {
+    const authority = authorities();
+    const receivePlan = existingThreadReceivePlan();
+    const forgedContext = {
+      ...serverContextInput(),
+      grantedMemories: [{
+        memoryItemId: 'caller-memory',
+        memoryType: 'caller-memory',
+        schemaVersion: 'v1',
+        content: { forged: true },
+        grantId: 'caller-grant',
+        granteeCharacterId: 'baekheon',
+      }],
+    } as unknown as CharacterStandardReadingChatTurnServerContextInputV1;
+
+    await expect(
+      prepareCharacterStandardReadingChatTurnPreflightV1({
+        resolvedSubjectId: SUBJECT_ID,
+        receivePlan,
+        readingId: READING_ID,
+        effectiveAt: '2026-09-21T00:02:00.000Z',
+        ...authority,
+        contextInput: forgedContext,
+      }),
+    ).rejects.toThrow(/does not accept caller-supplied grantedMemories authority/u);
+
+    expect(authority.memoryItemsAuthorityPort.readCurrentItems).not.toHaveBeenCalled();
+    expect(authority.memoryGrantsAuthorityPort.readActiveGrants).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when Memory authority returns duplicate active grants for the same Reader', async () => {
+    const authority = authorities();
+    authority.memoryGrantsAuthorityPort.readActiveGrants = vi.fn(async () => [
+      {
+        grantId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1',
+        characterId: 'baekheon',
+        grantReason: 'user_explicit',
+        grantedAt: '2026-09-21T00:01:25.000Z',
+      },
+      {
+        grantId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb3',
+        characterId: 'baekheon',
+        grantReason: 'user_explicit',
+        grantedAt: '2026-09-21T00:01:26.000Z',
+      },
+    ]);
+    const receivePlan = existingThreadReceivePlan();
+
+    await expect(
+      prepareCharacterStandardReadingChatTurnPreflightV1({
+        resolvedSubjectId: SUBJECT_ID,
+        receivePlan,
+        readingId: READING_ID,
+        effectiveAt: '2026-09-21T00:02:00.000Z',
+        ...authority,
+        contextInput: serverContextInput(),
+      }),
+    ).rejects.toThrow(/multiple active grants for the current Reader/u);
 
     expect(authority.accessAuthorityPort.readAccessibleReadings).not.toHaveBeenCalled();
     expect(authority.artifactAuthorityPort.readArtifactSource).not.toHaveBeenCalled();
