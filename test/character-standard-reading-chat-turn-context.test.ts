@@ -313,7 +313,7 @@ describe('thread-bound Official Reading Reader runtime', () => {
         readingId: READING_ID,
         effectiveAt: '2026-09-21T00:01:00.000Z',
         ...authority,
-        contextInput: serverContextInput(),
+        contextInput: contextInput(),
       });
 
       expect(result.threadBinding.participantCharacterIds).toEqual(['baekheon']);
@@ -344,7 +344,7 @@ describe('thread-bound Official Reading Reader runtime', () => {
         readingId: READING_ID,
         effectiveAt: '2026-09-21T00:01:00.000Z',
         ...authority,
-        contextInput: serverContextInput(),
+        contextInput: contextInput(),
       }),
     ).rejects.toBeInstanceOf(CharacterStandardReadingThreadRuntimeErrorV1);
 
