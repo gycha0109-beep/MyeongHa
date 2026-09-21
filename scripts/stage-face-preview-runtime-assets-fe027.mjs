@@ -12,7 +12,9 @@ const manifestPath = resolve(
   process.argv[2] ?? 'config/face-preview-runtime-assets-fe027.json',
 );
 const outputRoot = resolve(
-  process.argv[3] ?? '.artifacts/fe027-face-preview-runtime-assets',
+  process.argv[3] ??
+    process.env.MYEONGHA_WEB_OUTPUT_DIR ??
+    'public',
 );
 
 function assert(condition, message) {
@@ -41,7 +43,7 @@ assert(
 );
 assert(Array.isArray(manifest.assets) && manifest.assets.length === 7, 'asset set drift.');
 
-await rm(outputRoot, { recursive: true, force: true });
+await rm(resolve(outputRoot, 'face-preview'), { recursive: true, force: true });
 
 const staged = [];
 for (const asset of manifest.assets) {
