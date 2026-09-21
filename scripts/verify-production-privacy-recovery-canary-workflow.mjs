@@ -28,8 +28,17 @@ for (const fragment of [
   'contents: read',
   'cancel-in-progress: false',
   'environment: production',
-  'MYEONGHA_DATABASE_URL: ${{ secrets.MYEONGHA_DATABASE_URL }}',
+  'watchtower_track:',
+  'MYEONGHA_WATCHTOWER_TRACK: ${{ inputs.watchtower_track }}',
+  '[[ "$MYEONGHA_WATCHTOWER_TRACK" == \'privacy-recovery\' ]]',
   'MYEONGHA_DATABASE_PRINCIPAL: myeongha_runtime',
+  'VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}',
+  'VERCEL_PROJECT_ID: prj_nXF0b5uv27Lyucz2SEBxzdCRXVsP',
+  'VERCEL_TEAM_ID: team_xuYA9OhCWlJETaYFOmeVodgS',
+  'Resolve governed Production API database binding from Vercel',
+  'env?decrypt=true&teamId=$VERCEL_TEAM_ID',
+  '.key == "MYEONGHA_DATABASE_URL"',
+  'MYEONGHA_DATABASE_URL=%s\\n',
   'MYEONGHA_WORKER_DATABASE_URL: ${{ secrets.MYEONGHA_WORKER_DATABASE_URL }}',
   'MYEONGHA_WORKER_DATABASE_PRINCIPAL: myeongha_worker_runtime',
   'MYEONGHA_PRIVACY_CANARY_ADMIN_DATABASE_URL',
@@ -50,28 +59,44 @@ for (const fragment of [
   requireFragment(workflow, fragment, workflowPath);
 }
 
-for (const fragment of ['\n  push:', '\n  schedule:', '\n  pull_request:', 'cancel-in-progress: true']) {
+for (const fragment of [
+  '\n  push:',
+  '\n  schedule:',
+  '\n  pull_request:',
+  'cancel-in-progress: true',
+  'MYEONGHA_DATABASE_URL: ${{ secrets.MYEONGHA_DATABASE_URL }}',
+]) {
   forbidFragment(workflow, fragment, workflowPath);
 }
 
 const prepareIndex = workflow.indexOf(
   'Create disposable hosted Auth + Production application canary state',
 );
-const apiCredentialIndex = workflow.indexOf(
-  '[[ -n "${MYEONGHA_DATABASE_URL:-}" ]]',
+const vercelCredentialIndex = workflow.indexOf(
+  '[[ -n "${VERCEL_TOKEN:-}" ]]',
+);
+const resolverIndex = workflow.indexOf(
+  'Resolve governed Production API database binding from Vercel',
+);
+const databaseExportIndex = workflow.indexOf(
+  "printf 'MYEONGHA_DATABASE_URL=%s\\n' \"$database_url\" >> \"$GITHUB_ENV\"",
 );
 const workerCredentialIndex = workflow.indexOf(
   '[[ -n "${MYEONGHA_WORKER_DATABASE_URL:-}" ]]',
 );
 if (
-  apiCredentialIndex < 0 ||
+  vercelCredentialIndex < 0 ||
+  resolverIndex < 0 ||
+  databaseExportIndex < 0 ||
   workerCredentialIndex < 0 ||
   prepareIndex < 0 ||
-  apiCredentialIndex > prepareIndex ||
+  vercelCredentialIndex > resolverIndex ||
+  resolverIndex > prepareIndex ||
+  databaseExportIndex > prepareIndex ||
   workerCredentialIndex > prepareIndex
 ) {
   throw new Error(
-    `${workflowPath} must fail closed on API and worker runtime credentials before creating Production canary state.`,
+    `${workflowPath} must resolve the governed Vercel Production API database binding and fail closed on worker credentials before creating Production canary state.`,
   );
 }
 
