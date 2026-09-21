@@ -1,11 +1,17 @@
 name: FE034 Face Preview Runtime Canary
 
 on:
+  pull_request:
+    paths:
+      - 'scripts/verify-face-preview-runtime-canary-fe034.mjs'
+      - 'docs/face-engine/fe034-face-preview-runtime-canary.md'
+      - '.github/workflows/fe034-face-preview-runtime-canary.yml'
   push:
     branches:
       - feat/fe034-face-preview-runtime-canary
     paths:
       - 'scripts/verify-face-preview-runtime-canary-fe034.mjs'
+      - 'docs/face-engine/fe034-face-preview-runtime-canary.md'
       - '.github/workflows/fe034-face-preview-runtime-canary.yml'
   workflow_dispatch:
 
