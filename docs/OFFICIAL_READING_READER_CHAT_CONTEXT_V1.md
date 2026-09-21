@@ -70,8 +70,17 @@ thread or Reader Knowledge authority lookup.
 
 For an existing Reader thread, preflight then independently re-reads the owned
 thread and Official Reading runtime and requires the receive-plan release/bundle
-to still match the current thread binding. It does not call a model/provider,
-create a durable turn/attempt, commit a Character message, or reveal output.
+to still match the current thread binding.
+
+The exact immutable release entry used to mint the receive plan is retained only
+inside the server process. Preflight derives the active Reader Character definition
+and Reader-relevant world relations from that bound release. Caller-supplied
+`character`, `contentBundleId`, or `worldRelations` fields are rejected before
+thread or Reader Knowledge lookup, so Character/world canon cannot be replaced by
+request/session data.
+
+It does not call a model/provider, create a durable turn/attempt, commit a
+Character message, or reveal output.
 
 This does **not** weaken `SRC-15`. Current client/content compatibility comparison
 authority is still unresolved, so Production `ContentReleaseRuntime` cannot mint
