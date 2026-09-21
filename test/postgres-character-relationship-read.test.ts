@@ -1,9 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
-  CharacterRelationshipReadAuthorityPortErrorV1,
-} from '../apps/api/src/character-relationship-read.js';
-import {
   createPostgresCharacterRelationshipReadAuthorityPortV1,
 } from '../apps/api/src/postgres-character-relationship-read.js';
 import type { PostgresTransactionQueryV1 } from '../apps/api/src/postgres-subject-execution.js';
@@ -69,6 +66,6 @@ describe('Reader relationship PostgreSQL runtime authority adapter', () => {
     })).rejects.toMatchObject({
       name: 'CharacterRelationshipReadAuthorityPortErrorV1',
       code: 'SUBJECT_INELIGIBLE',
-    } satisfies Partial<CharacterRelationshipReadAuthorityPortErrorV1>);
+    });
   });
 });
