@@ -13,6 +13,8 @@ const PROVIDER = 'myeongha-privacy-canary-v1';
 const API_EXECUTION_ROLE = 'myeongha_api_executor';
 const API_CANARY_ROLE_MARKER = 'myeongha:privacy-canary-api-login:v1';
 const WORKER_DATABASE_PRINCIPAL = 'myeongha_worker_runtime';
+const WORKER_EXECUTION_ROLE = 'myeongha_system_executor';
+const WORKER_ROLE_MARKER = 'myeongha:production-worker-login-principal:v1';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 
 class CanaryFailure extends Error {
@@ -539,11 +541,57 @@ async function parseWorkerDatabaseConfig() {
   }
 }
 
+async function assertWorkerRoleProvisioned() {
+  const pool = await createAdminPool();
+  try {
+    const result = await pool.query(
+      `select
+         r.rolcanlogin,
+         r.rolsuper,
+         r.rolcreatedb,
+         r.rolcreaterole,
+         r.rolinherit,
+         r.rolreplication,
+         r.rolbypassrls,
+         a.rolpassword is not null as "hasPassword",
+         pg_catalog.shobj_description(r.oid, 'pg_authid') as marker,
+         pg_catalog.pg_has_role($1::name, $2::name, 'MEMBER') as "canEnterExecutionRole"
+       from pg_catalog.pg_roles r
+       join pg_catalog.pg_authid a on a.oid = r.oid
+       where r.rolname = $1`,
+      [WORKER_DATABASE_PRINCIPAL, WORKER_EXECUTION_ROLE],
+    );
+    const row = result.rows[0];
+    if (result.rows.length !== 1) fail('WORKER_ROLE_MISSING');
+    if (
+      row?.rolcanlogin !== true ||
+      row?.rolsuper !== false ||
+      row?.rolcreatedb !== false ||
+      row?.rolcreaterole !== false ||
+      row?.rolinherit !== false ||
+      row?.rolreplication !== false ||
+      row?.rolbypassrls !== false ||
+      row?.marker !== WORKER_ROLE_MARKER
+    ) {
+      fail('WORKER_ROLE_SHAPE_INVALID');
+    }
+    if (row?.canEnterExecutionRole !== true) {
+      fail('WORKER_EXECUTION_ROLE_UNAVAILABLE');
+    }
+    if (row?.hasPassword !== true) {
+      fail('WORKER_ROLE_PASSWORD_MISSING');
+    }
+  } finally {
+    await pool.end();
+  }
+}
+
 async function preflightWorker() {
   if (requiredEnv('MYEONGHA_PRIVACY_CANARY_CONFIRM') !== CONFIRMATION) {
     fail('CONFIRMATION_REQUIRED');
   }
   requiredEnv('MYEONGHA_WORKER_DATABASE_URL');
+  await assertWorkerRoleProvisioned();
 
   const {
     createNodePostgresAccountDeletionWorkerPoolV1,
