@@ -231,7 +231,7 @@ jobs:
             echo '- DR Ready: FALSE'
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Cleanup only if failure occurred before deletion start
-        if: failure()
+      - name: Cleanup only if failure occurred after canary preparation
+        if: failure() && steps.prepare.outcome == 'success'
         continue-on-error: true
         run: node scripts/run-production-privacy-recovery-canary.mjs cleanup-prestart
