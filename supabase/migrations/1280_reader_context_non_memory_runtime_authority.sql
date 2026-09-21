@@ -37,6 +37,8 @@ grant select (
   revoked_at
 ) on public.life_facts to myeongha_api_executor;
 
+grant select (life_fact_id) on public.record_access_grants to myeongha_api_executor;
+
 revoke select on public.relationship_events from myeongha_api_executor;
 grant select (
   subject_id,
