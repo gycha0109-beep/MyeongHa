@@ -2,7 +2,7 @@
 
 > Scope: non-character production operations only  
 > Issue: `#389` — authoritative persistent-data recovery  
-> Evidence date: 2026-09-21 KST  
+> Evidence date: 2026-09-22 KST  
 > Production state: CURRENT-FRONTIER BACKUP+RESTORE PROVEN / DR NOT READY
 
 ## 1. Current production authority
@@ -22,13 +22,13 @@ provider automatic daily backup = NOT RELIED UPON ON CURRENT FREE PLAN
 provider retention              = NOT RELIED UPON ON CURRENT FREE PLAN
 PITR                            = NOT AVAILABLE UNDER THE CURRENT FREE-PLAN OPERATING BASELINE
 application-owned logical dump     = IMPLEMENTED BY REPOSITORY WORKFLOW
-successful production dump         = EVIDENCED — latest run 35631594765
+successful production dump         = EVIDENCED — authoritative proof backup run 35643472159
 backup schema freshness             = CURRENT — backup frontier 1280 / deployed frontier 1280
-current-schema restore              = EVIDENCED — run 35633155263 / frontier 1280
+current-schema restore              = EVIDENCED — run 35659483080 / frontier 1280
 isolated restore drill path         = IMPLEMENTED / EXECUTED ON FRONTIER 1280
-isolated application restore        = EVIDENCED — run 35633155263 / frontier 1280
-application integrity/auth baseline = PASS — run 35633155263 / frontier 1280
-restore evidence envelope runtime   = PROVEN — run 35633155263 / frontier 1280
+isolated application restore        = EVIDENCED — run 35659483080 / frontier 1280
+application integrity/auth baseline = PASS — run 35659483080 / frontier 1280
+restore evidence envelope runtime   = PROVEN — run 35659483080 / frontier 1280
 bounded privacy source authority    = RUNTIME-PROVEN — run 35653303484 / AUTHORITATIVE_CAPTURED_WINDOW_V1
 recovered finalization mechanics    = IMPLEMENTED / POST-MERGE CI GREEN
 recovered finalization on fresh restore = PROVEN — run 35659483080 / Production non-zero ledger
@@ -106,7 +106,7 @@ Rules:
 - backup passphrase must be at least 32 characters and must not reuse the database password;
 - recovery operators need a break-glass path to the passphrase that does not depend on the database being healthy.
 
-The credentials and endpoint path are production-proven by successful backup runs including latest governed run `35631594765`.
+The credentials and endpoint path are production-proven by successful governed backup runs including current-frontier baseline `35631594765` and authoritative-reconciliation backup `35643472159`.
 
 ## 4. Backup success evidence
 
