@@ -22,7 +22,8 @@ export function PhysiognomyPage({
 }: {
   readonly api: PhysiognomyPageApiFE032;
 }) {
-  const inputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
   const [state, setState] = useState<PageState>('idle');
   const [selected, setSelected] = useState<File | null>(null);
   const [result, setResult] =
@@ -112,11 +113,18 @@ export function PhysiognomyPage({
           </ul>
 
           <input
-            ref={inputRef}
+            ref={cameraInputRef}
             className="phys-file-input"
             type="file"
             accept="image/jpeg,image/png,image/webp"
             capture="user"
+            onChange={(event) => chooseFile(event.currentTarget.files?.[0] ?? null)}
+          />
+          <input
+            ref={galleryInputRef}
+            className="phys-file-input"
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
             onChange={(event) => chooseFile(event.currentTarget.files?.[0] ?? null)}
           />
 
@@ -125,9 +133,17 @@ export function PhysiognomyPage({
               className="phys-secondary"
               type="button"
               disabled={state === 'processing'}
-              onClick={() => inputRef.current?.click()}
+              onClick={() => cameraInputRef.current?.click()}
             >
-              {selected ? '다른 사진 선택' : '사진 촬영 · 선택'}
+              사진 촬영
+            </button>
+            <button
+              className="phys-secondary"
+              type="button"
+              disabled={state === 'processing'}
+              onClick={() => galleryInputRef.current?.click()}
+            >
+              사진 선택
             </button>
             <button
               className="phys-primary"
