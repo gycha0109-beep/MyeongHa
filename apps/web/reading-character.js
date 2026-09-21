@@ -1,6 +1,7 @@
 import { resolveReadingDetailRoute } from './reading-detail-route.js';
 import { resolveSajuButtonEngineRequest } from './reading-saju-engine-request.js';
 import { getActiveBearer, invalidateGuestSession, invalidateMemberSession } from './product-auth.js';
+import { parsePersistedReadingHandoffV1 } from './reading-history-handoff.js';
 
 const readerCatalog = {
   baekheon: {
@@ -65,6 +66,7 @@ const aliases = new Map([
 ]);
 
 const params = new URLSearchParams(window.location.search);
+const persistedReadingHandoff = parsePersistedReadingHandoffV1(params);
 const requestedReader = params.get('character') || params.get('reader') || 'baekheon';
 const normalizedReader = aliases.get(requestedReader) || requestedReader.toLowerCase();
 // Frontend integration authority: URL-selected Reader identity is presentation-only.
@@ -79,7 +81,7 @@ const SAJU_PREVIEW_READING_ENDPOINT = '/api/me/saju/preview-reading';
 const PREVIEW_READING_TEXTS = new Set(['전체 사주', '직업운', '재물운', '연애운', '사업운']);
 const PREVIEW_NOTICE_SECTION_TITLE = '프리뷰 안내';
 const STRUCTURE_PREFIX = '근거 구조:';
-const previewEligible = engineRequest?.state === 'ready' && PREVIEW_READING_TEXTS.has(engineRequest.readingText);
+const previewEligible = persistedReadingHandoff.state === 'none' && engineRequest?.state === 'ready' && PREVIEW_READING_TEXTS.has(engineRequest.readingText);
 
 const root = document.body;
 const routeState = document.querySelector('[data-reading-route-state]');
@@ -92,9 +94,13 @@ root.dataset.reader = presentationReaderHint;
 root.dataset.readerSelection = params.has('reader') || params.has('character') ? 'explicit' : 'default';
 root.dataset.readerAuthority = 'presentation_hint_only';
 root.dataset.readerPresentation = 'reading-scene-v1';
-root.dataset.readingRouteState = route.valid
-  ? (previewEligible ? 'preview_loading' : 'blocked_by_authority')
-  : 'invalid';
+root.dataset.readingRouteState = persistedReadingHandoff.state === 'ready'
+  ? 'persisted_handoff_unavailable'
+  : persistedReadingHandoff.state === 'invalid'
+    ? 'persisted_handoff_invalid'
+    : route.valid
+      ? (previewEligible ? 'preview_loading' : 'blocked_by_authority')
+      : 'invalid';
 if (engineRequest) {
   root.dataset.readingEngineRequestState = engineRequest.state;
   if ('domain' in engineRequest) root.dataset.readingEngineDomain = engineRequest.domain;
@@ -138,6 +144,32 @@ function renderInvalidRoute() {
     stateCopy.textContent = '지원하지 않는 사주 읽기 주소입니다. 전체 사주나 올해의 흐름으로 자동 대체하지 않았습니다.';
   }
   document.title = '읽기를 찾을 수 없음 · 명하';
+}
+
+function renderPersistedReadingHandoffInvalid() {
+  root.dataset.readingRouteState = 'persisted_handoff_invalid';
+  if (stage) stage.hidden = true;
+  if (routeState) routeState.hidden = false;
+  if (productTitle) productTitle.textContent = '저장된 사주 풀이';
+  if (stateTitle) stateTitle.textContent = '저장된 풀이 연결 정보를 확인할 수 없습니다.';
+  if (stateCopy) {
+    stateCopy.textContent = '기록 페이지에서 다시 열어 주세요. 불완전한 식별자로 다른 풀이를 대신 표시하지 않습니다.';
+  }
+  document.title = '저장된 풀이 연결 오류 · 명하';
+}
+
+function renderPersistedReadingHandoffUnavailable() {
+  root.dataset.readingRouteState = 'persisted_handoff_unavailable';
+  if (stage) stage.hidden = true;
+  if (routeState) routeState.hidden = false;
+  if (productTitle) productTitle.textContent = '저장된 사주 풀이';
+  if (stateTitle) stateTitle.textContent = '저장된 풀이 다시 열기는 아직 연결 준비 중입니다.';
+  if (stateCopy) {
+    stateCopy.textContent = '저장된 Reading 식별자는 확인했습니다. 검증된 재열기 계약과 Reader 연결이 활성화되기 전에는 현재 프리뷰나 다른 풀이로 대신 보여드리지 않습니다.';
+  }
+  root.dataset.persistedReadingHandoff = 'records';
+  root.dataset.persistedReadingDomain = persistedReadingHandoff.sajuDomain;
+  document.title = '저장된 사주 풀이 · 명하';
 }
 
 function renderAuthorityBlockedRoute() {
@@ -586,7 +618,11 @@ document.querySelector('[data-chart-close]')?.addEventListener('click', () => {
 if (stage) stage.hidden = true;
 if (routeState) routeState.hidden = false;
 
-if (!route.valid) {
+if (persistedReadingHandoff.state === 'invalid') {
+  renderPersistedReadingHandoffInvalid();
+} else if (persistedReadingHandoff.state === 'ready') {
+  renderPersistedReadingHandoffUnavailable();
+} else if (!route.valid) {
   renderInvalidRoute();
 } else if (previewEligible) {
   renderPreviewLoading();

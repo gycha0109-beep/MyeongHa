@@ -1,4 +1,5 @@
 import { createRecordsRuntimeClient, RecordsRuntimeError } from './records-runtime-client.js';
+import { buildPersistedReadingHandoffUrlV1 } from './reading-history-handoff.js';
 
 const SAMPLE_SAJU_FACT_TYPE = 'sample_saju_reading_result';
 const SAMPLE_SAJU_SCHEMA_VERSION = 'sample.v1';
@@ -159,13 +160,13 @@ function productResponseStateLabel(value) {
   return '저장됨';
 }
 
-function appendReadingFooter(card, leftText) {
+function appendReadingFooter(card, leftText, options = {}) {
   const footer = document.createElement('div');
   footer.className = 'records-reading-footer';
   footer.append(textElement('span', 'fine', leftText));
   const link = document.createElement('a');
-  link.href = 'reading.html';
-  link.textContent = '사주 페이지에서 보기 →';
+  link.href = options.href ?? 'reading.html';
+  link.textContent = options.label ?? '사주 페이지에서 보기 →';
   footer.append(link);
   card.append(footer);
 }
@@ -196,7 +197,16 @@ function renderPersistedReading(target, reading) {
     'records-reading-summary',
     '완료된 사주 풀이 기록입니다. 저장된 풀이의 세부 내용은 검증된 Reading 표시 계약이 연결되는 범위에서만 보여드립니다.',
   ));
-  appendReadingFooter(card, `Reading contract · ${String(reading.readingContractVersion ?? '—')}`);
+  const handoffUrl = buildPersistedReadingHandoffUrlV1({
+    readingId: reading.readingId,
+    readingSessionId: reading.readingSessionId,
+    sajuDomain: reading.sajuDomain,
+  });
+  appendReadingFooter(
+    card,
+    `Reading contract · ${String(reading.readingContractVersion ?? '—')}`,
+    { href: handoffUrl, label: '저장된 풀이 열기 →' },
+  );
   target.append(card);
 }
 

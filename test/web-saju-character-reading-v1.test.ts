@@ -6,6 +6,7 @@ const readingPagePath = new URL('../apps/web/src/reading-detail/ReadingDetailPag
 const readingCssPath = new URL('../apps/web/reading-v3.css', import.meta.url);
 const readingScenesCssPath = new URL('../apps/web/reading-scenes.css', import.meta.url);
 const readingRuntimePath = new URL('../apps/web/reading-character.js', import.meta.url);
+const readingHandoffPath = new URL('../apps/web/reading-history-handoff.js', import.meta.url);
 const baekheonScenePath = new URL('../apps/web/assets/characters/rooms/baekheon-room.webp', import.meta.url);
 
 async function readReadingMarkup() {
@@ -110,6 +111,25 @@ describe('MyeongHa character-led Saju Reading v1', () => {
     expect(html).toContain('data-reading-completion');
     expect(html).toContain('data-reading-chat-link');
     expect(html).toContain('data-reading-records-link');
+  });
+
+  it('fails closed for persisted Reading re-entry until a governed reread contract is active', async () => {
+    const [runtime, handoff] = await Promise.all([
+      readFile(readingRuntimePath, 'utf8'),
+      readFile(readingHandoffPath, 'utf8'),
+    ]);
+
+    expect(runtime).toContain("from './reading-history-handoff.js'");
+    expect(runtime).toContain('parsePersistedReadingHandoffV1(params)');
+    expect(runtime).toContain("persistedReadingHandoff.state === 'none' && engineRequest?.state === 'ready'");
+    expect(runtime).toContain("root.dataset.readingRouteState = 'persisted_handoff_unavailable'");
+    expect(runtime).toContain('현재 프리뷰나 다른 풀이로 대신 보여드리지 않습니다.');
+    expect(runtime.indexOf("persistedReadingHandoff.state === 'ready'")).toBeLessThan(
+      runtime.lastIndexOf('previewEligible'),
+    );
+    expect(handoff).toContain("PERSISTED_READING_HANDOFF_SOURCE_V1 = 'records'");
+    expect(handoff).not.toContain('readerCharacterId');
+    expect(handoff).not.toContain('threadId');
   });
 
   it('renders the admitted calculation summary instead of shipping a fake chart placeholder', async () => {

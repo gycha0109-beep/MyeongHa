@@ -247,6 +247,12 @@ The web integration layer now has a dormant Reader Scene client contract without
 
 No `api/me.ts` dispatch target, Vercel rewrite, Production Reader route, Character asset authority, relationship threshold, Saju semantic rule, Commerce rule, or persistence policy is introduced by this frontend integration slice.
 
+## 11.2 Persisted Reading navigation handoff
+
+Records now carries only stored Reading navigation identifiers (`readingId`, `readingSessionId`, and `sajuDomain`) into the Reading Detail surface. These values are navigation hints, not semantic or Reader authority.
+
+The Reading Detail runtime detects this handoff before Saju Preview eligibility. While no governed persisted-Reading reread route is publicly activated, it fails closed with a dedicated unavailable state and does not silently execute the current Saju Preview or invent a Reader/thread binding.
+
 ## 12. Hosted Production grounding evidence and remaining MyeongHa gates
 
 Hosted grounding transport is closed with exact evidence:
