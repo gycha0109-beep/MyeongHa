@@ -42,6 +42,17 @@ export interface ReaderInterpretationPreviewContextAuthorityPortV1 {
   }): Awaitable<CharacterStandardReadingServerContextInputV1>;
 }
 
+export interface ReaderInterpretationPreviewSceneSegmentV1 {
+  readonly kind: CharacterSajuUtteranceV1['segments'][number]['kind'];
+  readonly text: string;
+}
+
+export interface ReaderInterpretationPreviewSceneUtteranceV1 {
+  readonly characterId: string;
+  readonly requestedDomain: ReaderInterpretationPreviewEnvelopeV1['requestedDomain'];
+  readonly segments: readonly ReaderInterpretationPreviewSceneSegmentV1[];
+}
+
 export type ReaderInterpretationPreviewHttpResponseV1 =
   | {
       readonly schemaVersion: typeof READER_INTERPRETATION_PREVIEW_HTTP_SCHEMA_VERSION_V1;
@@ -51,7 +62,7 @@ export type ReaderInterpretationPreviewHttpResponseV1 =
       readonly readerCharacterId: string;
       readonly domain: ReaderInterpretationPreviewEnvelopeV1['requestedDomain'];
       readonly interpretationHash: string;
-      readonly utterance: CharacterSajuUtteranceV1;
+      readonly utterance: ReaderInterpretationPreviewSceneUtteranceV1;
     }
   | {
       readonly schemaVersion: typeof READER_INTERPRETATION_PREVIEW_HTTP_SCHEMA_VERSION_V1;
@@ -167,7 +178,18 @@ export function projectReaderInterpretationPreviewHttpResponseV1(
     ? Object.freeze({
         ...common,
         mode: 'reader_interpretation' as const,
-        utterance: envelope.utterance,
+        utterance: Object.freeze({
+          characterId: envelope.utterance.characterId,
+          requestedDomain: envelope.utterance.requestedDomain,
+          segments: Object.freeze(
+            envelope.utterance.segments.map((segment) =>
+              Object.freeze({
+                kind: segment.kind,
+                text: segment.text,
+              }),
+            ),
+          ),
+        }),
       })
     : Object.freeze({
         ...common,
