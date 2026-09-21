@@ -38,3 +38,5 @@ export function loadPhysiognomyEngineRuntimeV1(): Promise<PhysiognomyEngineRunti
 }
 
 export * from './interpretation-shell-fe038.js';
+export * from './source-authority-fe039.js';
+export * from './criterion-candidate-fe039.js';
