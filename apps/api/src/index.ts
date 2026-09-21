@@ -665,6 +665,7 @@ export {
   CharacterStandardReadingChatTurnPreflightErrorV1,
   prepareCharacterStandardReadingChatTurnPreflightV1,
   type CharacterStandardReadingChatTurnPreflightV1,
+  type CharacterStandardReadingChatTurnServerContextInputV1,
   type PrepareCharacterStandardReadingChatTurnPreflightInputV1,
 } from './character-standard-reading-chat-turn-preflight.js';
 
