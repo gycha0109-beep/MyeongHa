@@ -32,11 +32,17 @@ for (const fragment of [
   'operation:',
   'resume_canary_run_id:',
   'resume_backup_run_id:',
+  'worker_credential_action:',
+  'worker_credential_confirmation:',
   'MYEONGHA_WATCHTOWER_TRACK: ${{ inputs.watchtower_track }}',
   'MYEONGHA_PRIVACY_CANARY_OPERATION: ${{ inputs.operation }}',
   'MYEONGHA_PRIVACY_CANARY_RESUME_RUN_ID: ${{ inputs.resume_canary_run_id }}',
   'MYEONGHA_PRIVACY_CANARY_RESUME_BACKUP_RUN_ID: ${{ inputs.resume_backup_run_id }}',
+  'MYEONGHA_WORKER_CREDENTIAL_ACTION: ${{ inputs.worker_credential_action }}',
+  'MYEONGHA_WORKER_CREDENTIAL_CONFIRMATION: ${{ inputs.worker_credential_confirmation }}',
   '[[ "$MYEONGHA_WATCHTOWER_TRACK" == \'ops\' ]]',
+  'Synchronize dedicated worker login password from protected secret',
+  'node scripts/run-production-privacy-recovery-canary.mjs sync-worker-password',
   'Verify dedicated worker database authority before mutation',
   'node scripts/run-production-privacy-recovery-canary.mjs preflight-worker',
   'Provision ephemeral API canary login',
@@ -86,6 +92,9 @@ for (const fragment of [
 const runtimePathsIndex = workflow.indexOf(
   'Prepare protected canary runtime paths',
 );
+const workerSyncIndex = workflow.indexOf(
+  'Synchronize dedicated worker login password from protected secret',
+);
 const workerPreflightIndex = workflow.indexOf(
   'Verify dedicated worker database authority before mutation',
 );
@@ -118,6 +127,7 @@ const workerCredentialIndex = workflow.indexOf(
 );
 if (
   runtimePathsIndex < 0 ||
+  workerSyncIndex < 0 ||
   workerPreflightIndex < 0 ||
   provisionIndex < 0 ||
   prepareIndex < 0 ||
@@ -129,7 +139,8 @@ if (
   ledgerIndex < 0 ||
   workerCredentialIndex < 0 ||
   workerCredentialIndex > prepareIndex ||
-  runtimePathsIndex > workerPreflightIndex ||
+  runtimePathsIndex > workerSyncIndex ||
+  workerSyncIndex > workerPreflightIndex ||
   workerPreflightIndex > provisionIndex ||
   provisionIndex > prepareIndex ||
   executeIndex > cleanupLoginIndex ||
@@ -183,7 +194,20 @@ for (const fragment of [
   "WORKER_DB_ROUTING_INVALID",
   "WORKER_DB_AUTH_INVALID",
   "WORKER_DB_TRANSPORT_INVALID",
+  'readWorkerRoleProvisioning()',
   'assertWorkerRoleProvisioned()',
+  'protectedWorkerPassword()',
+  'syncWorkerPassword()',
+  "requiredEnv('MYEONGHA_WORKER_CREDENTIAL_ACTION')",
+  "requiredEnv('MYEONGHA_WORKER_CREDENTIAL_CONFIRMATION')",
+  "SYNC_PRODUCTION_WORKER_PASSWORD",
+  "WORKER_PASSWORD_SYNC_CONFIRMATION_REQUIRED",
+  "WORKER_DATABASE_PASSWORD_INVALID",
+  "WORKER_PASSWORD_SYNC_STATE_CHANGED",
+  "WORKER_PASSWORD_SYNC_SQL_INVALID",
+  "WORKER_PASSWORD_SYNC_VERIFY_FAILED",
+  "MYEONGHA_PRODUCTION_PRIVACY_CANARY_WORKER_PASSWORD_SYNC_PASS",
+  "MYEONGHA_PRODUCTION_PRIVACY_CANARY_WORKER_PASSWORD_SYNC_SKIP",
   'pg_catalog.pg_has_role($1::name, $2::name, \'MEMBER\')',
   "WORKER_ROLE_MISSING",
   "WORKER_ROLE_SHAPE_INVALID",
@@ -191,6 +215,7 @@ for (const fragment of [
   "WORKER_ROLE_PASSWORD_MISSING",
   'createNodePostgresAccountDeletionWorkerPoolV1',
   'MYEONGHA_PRODUCTION_PRIVACY_CANARY_WORKER_DB_PREFLIGHT_PASS',
+  "if (mode === 'sync-worker-password') return syncWorkerPassword();",
   "requiredEnv('MYEONGHA_PRIVACY_CANARY_RESUME_RUN_ID')",
   "cal.external_account_fingerprint like $2::text",
   "phase: 'deletion_started'",
@@ -240,5 +265,5 @@ for (const fragment of [
 }
 
 console.log(
-  'Production privacy recovery canary workflow verification passed: workflow_dispatch-only, ops attribution, pre-mutation worker DB preflight, fresh-or-resume canary recovery, ephemeral least-privilege API login, dedicated worker, hosted Auth cleanup, governed backup binding, non-zero canonical ledger gate, identifier-free evidence, and DR fail-closed semantics are pinned.',
+  'Production privacy recovery canary workflow verification passed: workflow_dispatch-only, ops attribution, explicit one-time worker-password synchronization, pre-mutation worker DB preflight, fresh-or-resume canary recovery, ephemeral least-privilege API login, dedicated worker, hosted Auth cleanup, governed backup binding, non-zero canonical ledger gate, identifier-free evidence, and DR fail-closed semantics are pinned.',
 );
