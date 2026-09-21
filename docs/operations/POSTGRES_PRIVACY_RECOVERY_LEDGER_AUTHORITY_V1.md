@@ -71,12 +71,13 @@ source authority contract                = DECIDED
 captured-window coverage validator       = IMPLEMENTED
 encrypted off-DB transport mechanics     = RUNTIME-PROVEN historically
 non-zero encrypted roundtrip/replay      = CI-PROVEN
-promoted authoritative workflow runtime  = PROVEN — run 35539838537 / artifact 10614412005
-synthetic recovered-state finalization   = PROVEN — run 35546262378 / current-frontier restore 1230
-authoritative destructive reconciliation = NOT YET PROVEN WITH PRODUCTION NON-ZERO LEDGER
+promoted authoritative workflow runtime  = PROVEN — run 35653303484 / artifact 10662304561
+Production non-zero canary                = PROVEN — run 35653222211
+authoritative destructive reconciliation = PROVEN — isolated restore run 35659483080 / artifact 10666580699
+authoritative reconciliation scope       = BOUNDED CAPTURED WINDOW ONLY
 future-safe reconciliation               = false
-RPO                                      = OPEN DECISION
-RTO                                      = OPEN DECISION
+RPO                                      = APPROVED PT24H / full-procedure comparison PASS (5536s)
+RTO                                      = APPROVED PT6H / full-procedure comparison PASS (67s)
 DR Ready                                 = false
 ```
 
@@ -87,7 +88,7 @@ this authority contract existed.
 
 ## Next closure slice
 
-#1140 is complete: isolated restore run `35546262378` against governed backup `35536655149` exercised the captured-window coverage gate, encrypted non-zero synthetic replay, DB finalizer, synthetic Auth-ACK boundary, completion ACK, idempotency, non-resurrection representatives, P5Y Commerce retention, and identifier-free evidence at migration frontier `1230`. #964 now remains open only for the Production non-zero authoritative ledger/reconciliation boundary; synthetic non-zero proof does not promote `authoritative_privacy_reconciliation`.
+#1140 remains complete for synthetic recovered-state mechanics. The follow-on Production boundary is now also complete: canary run `35653222211` produced governed pre-deletion backup `35643472159` and non-zero authoritative ledger run `35653303484`; isolated restore run `35659483080` replayed that exact captured window, executed governed account-deletion finalization/completion, verified non-resurrection and revoked P5Y Commerce retention, and emitted identifier-free artifact `10666580699`. This promotes `authoritative_privacy_reconciliation=true` only for the exact captured window. It does not make reconciliation future-safe and does not prove full hosted Supabase Auth/Storage recovery equivalence.
 
 ## Non-claims
 
@@ -95,6 +96,8 @@ This authority does not claim:
 
 - coverage after `authoritative_coverage_through`;
 - full hosted Supabase Auth/Storage disaster recovery equivalence;
-- numeric RPO/RTO;
-- successful full recovery duration;
+- future coverage beyond the captured ledger window;
+- full hosted provider-managed Auth/Storage recovery equivalence;
 - DR Ready.
+
+RPO `PT24H` and RTO `PT6H` are Product Owner approved, and run `35659483080` measures this authoritative isolated procedure at a 5,536-second data-loss window and 67-second workflow duration, both within those objectives. Those comparisons do not override the separate provider-equivalence gate.

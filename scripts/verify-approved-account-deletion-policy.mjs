@@ -198,16 +198,18 @@ if (!/^\|\s*`P0-PR-01`\s*\|[^|\n]*\|\s*\*\*DECIDED\*\*\s*\|/m.test(decisions)) {
 for (const fragment of [
   'privacy_recovery_ledger_authority_class: AUTHORITATIVE_CAPTURED_WINDOW_V1',
   'authoritative_post_backup_source: true_bounded_captured_window_only',
-  'authoritative_privacy_reconciliation: false',
+  'authoritative_privacy_reconciliation_run_id: 35659483080',
+  'authoritative_privacy_reconciliation: true',
+  'authoritative_privacy_reconciliation_scope: BOUNDED_CAPTURED_WINDOW_ONLY',
   'future_safe_privacy_reconciliation: false',
-  'privacy_reconciliation: BLOCKED_BY_PRODUCTION_NONZERO_AUTHORITATIVE_DELTA_PROOF',
-  'rpo_authority: PRODUCT_OWNER_APPROVED_PT24H',
-  'rto_authority: PRODUCT_OWNER_APPROVED_PT6H',
+  'privacy_reconciliation: PRODUCTION_NONZERO_AUTHORITATIVE_CAPTURED_WINDOW_PROVEN',
+  'rpo_full_authoritative_comparison: PASS_5536S_LE_PT24H',
+  'rto_full_authoritative_comparison: PASS_67S_LE_PT6H',
   'dr_ready: false',
 ]) {
   if (!drStatus.includes(fragment)) fail('DR status missing boundary: ' + fragment);
 }
 
 console.log(
-  'Approved account deletion policy PASS: P0-PR-01 is DECIDED, 52/52 tables map to DELETE 39 / ANONYMIZE 4 / RETAIN 9, 36 mixed FK edges are explicitly planned, retained Commerce uses calendar P5Y, structured plan generation is allowed, and destructive SQL / privacy reconciliation / DR promotion remain blocked.',
+  'Approved account deletion policy PASS: P0-PR-01 is DECIDED, 52/52 tables map to DELETE 39 / ANONYMIZE 4 / RETAIN 9, 36 mixed FK edges are explicitly planned, retained Commerce uses calendar P5Y, component policy artifacts remain non-promoting, current bounded Production reconciliation evidence is tracked separately, and DR Ready remains false.',
 );

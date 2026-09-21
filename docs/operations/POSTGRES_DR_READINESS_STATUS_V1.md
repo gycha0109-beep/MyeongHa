@@ -1,8 +1,8 @@
 # PostgreSQL DR Readiness Status v1
 
 > Issue: #389  
-> Evidence date: 2026-09-21 KST  
-> Purpose: record measured restore evidence separately from unresolved privacy/legal-retention and RPO/RTO authority.
+> Evidence date: 2026-09-22 KST  
+> Purpose: record measured recovery evidence, bounded authoritative privacy reconciliation, approved RPO/RTO comparisons, and the remaining provider-equivalence boundary.
 
 ## Current evidence
 
@@ -23,19 +23,19 @@ current_repository_migration_frontier: 1280
 backup_schema_freshness: CURRENT_FOR_DEPLOYED_MIGRATION_1280
 backup_refresh_required: false
 
-latest_isolated_restore_run_id: 35633155263
+latest_isolated_restore_run_id: 35659483080
 latest_isolated_restore_result: SUCCESS
 latest_isolated_restore_target: github-actions-loopback-supabase-postgres
-latest_isolated_restore_runtime_head_sha: 89e1f9b5c543e0610a723732adee29de220ec8fa
-latest_isolated_restore_backup_run_id: 35631594765
-latest_isolated_restore_incident_reference_utc: 2026-09-21T17:25:11Z
-latest_isolated_restore_evidence_artifact_id: 10655731358
-latest_isolated_restore_evidence_artifact_expires_at: 2026-10-21T17:37:58Z
-latest_isolated_restore_evidence_artifact_digest: sha256:9df259c46fdefc9f7f933dac7baf3ad4bb3d0cd82014cd155e3fe8fbd9ee5c66
+latest_isolated_restore_runtime_head_sha: 31746f635ae249811842b8d225c2734e4d1b4c51
+latest_isolated_restore_backup_run_id: 35643472159
+latest_isolated_restore_incident_reference_utc: 2026-09-21T20:48:33Z
+latest_isolated_restore_evidence_artifact_id: 10666580699
+latest_isolated_restore_evidence_artifact_expires_at: 2026-10-21T21:51:40Z
+latest_isolated_restore_evidence_artifact_digest: sha256:58d56b54f1b3ffe1d21fd1934bf3c2edce0826bb624bf261fad30b766f127c28
 latest_isolated_restore_backup_migration_frontier: 1280
-restore_evidence_envelope_runtime: PROVEN_ON_RUN_35633155263
+restore_evidence_envelope_runtime: PROVEN_ON_RUN_35659483080
 isolated_restore_validation_duration_seconds: 3
-manual_drill_workflow_elapsed_seconds: 56
+manual_drill_workflow_elapsed_seconds: 67
 synthetic_data_loss_window_seconds: 1
 provider_managed_data_full_restore: false
 provider_managed_data_blocks_projected: 3
@@ -73,11 +73,29 @@ authoritative_post_backup_source: true_bounded_captured_window_only
 account_deletion_finalizer_runtime: IMPLEMENTED_AND_PROVIDER_MECHANICS_SEPARATELY_PROVEN
 recovered_state_finalization_drill: IMPLEMENTED_MERGED_POST_MERGE_CI_GREEN
 recovered_state_finalization_restored_backup_runtime: PROVEN_ON_RUN_35633155263
-authoritative_privacy_reconciliation: false
+
+authoritative_privacy_reconciliation_run_id: 35659483080
+authoritative_privacy_reconciliation_result: SUCCESS
+authoritative_privacy_reconciliation_runtime_head_sha: 31746f635ae249811842b8d225c2734e4d1b4c51
+authoritative_privacy_reconciliation_backup_run_id: 35643472159
+authoritative_privacy_reconciliation_backup_completed_at_utc: 2026-09-21T19:16:17Z
+authoritative_privacy_reconciliation_ledger_run_id: 35653303484
+authoritative_privacy_reconciliation_canary_run_id: 35653222211
+authoritative_privacy_reconciliation_incident_reference_utc: 2026-09-21T20:48:33Z
+authoritative_privacy_reconciliation_evidence_artifact_id: 10666580699
+authoritative_privacy_reconciliation_evidence_artifact_expires_at: 2026-10-21T21:51:40Z
+authoritative_privacy_reconciliation_evidence_artifact_digest: sha256:58d56b54f1b3ffe1d21fd1934bf3c2edce0826bb624bf261fad30b766f127c28
+authoritative_privacy_reconciliation: true
+authoritative_privacy_reconciliation_scope: BOUNDED_CAPTURED_WINDOW_ONLY
 future_safe_privacy_reconciliation: false
-privacy_reconciliation: BLOCKED_BY_PRODUCTION_NONZERO_AUTHORITATIVE_DELTA_PROOF
+privacy_reconciliation: PRODUCTION_NONZERO_AUTHORITATIVE_CAPTURED_WINDOW_PROVEN
+
+full_authoritative_data_loss_window_seconds: 5536
+full_authoritative_recovery_duration_seconds: 67
 rpo_authority: PRODUCT_OWNER_APPROVED_PT24H
+rpo_full_authoritative_comparison: PASS_5536S_LE_PT24H
 rto_authority: PRODUCT_OWNER_APPROVED_PT6H
+rto_full_authoritative_comparison: PASS_67S_LE_PT6H
 dr_ready: false
 ```
 
@@ -91,11 +109,11 @@ Historical count-only audit run `35353128407` remains valid evidence for its exa
 
 The promoted encrypted off-primary-DB privacy recovery ledger has a newer scheduled runtime proof bound to the current-frontier backup. Production PostgreSQL Privacy Recovery Ledger run `35539838537` completed successfully from repository SHA `5bb5de08ef211f78565d06c1f9c4ff0c0ec8a956`, selected governed backup run `35536655149` and artifact `10612622254`, used cutoff `2026-09-20T20:50:05Z`, executed the read-only export path, and uploaded encrypted artifact `10614412005` (`myeongha-privacy-ledger-20260920T214938Z`) with P30D retention. The ledger remains authoritative only for its exact captured window under `AUTHORITATIVE_CAPTURED_WINDOW_V1`; it is not unbounded or future-safe, and incident references later than coverage remain fail-closed.
 
-The governed account-deletion finalizer, hosted Auth deletion adapter/canary path, completion authority, worker identity, and recovered-state synthetic finalization mechanics are implemented and now runtime-proven on the current-frontier restored database by run `35633155263`. The drill exercised exact worker claim, DB finalizer, isolated synthetic Auth ACK, completion ACK, idempotent replay/completion, non-resurrection representatives, and revoked P5Y Commerce retention. #1140 is therefore complete. Authoritative privacy reconciliation still remains false because this drill uses an intentionally constructed synthetic non-zero ledger rather than a Production non-zero authoritative ledger.
+The governed account-deletion finalizer, hosted Auth deletion adapter/canary path, completion authority, worker identity, and recovered-state synthetic finalization mechanics remain runtime-proven on run `35633155263`. The Production non-zero authoritative boundary is now separately runtime-proven by isolated restore run `35659483080`, which bound governed backup `35643472159`, authoritative ledger `35653303484`, and Production canary `35653222211`, replayed the captured-window ledger idempotently, executed DB finalization and completion, preserved revoked P5Y Commerce evidence, and uploaded identifier-free evidence artifact `10666580699`. Authoritative privacy reconciliation is therefore true for that exact captured window only; it is not future-safe or an assertion of full hosted provider recovery equivalence.
 
 ## Promotion blockers
 
-The privacy/legal-retention policy, bounded captured-window source authority, current-frontier governed backup, isolated restore, and recovered-state finalization mechanics are all runtime-proven. DR remains blocked because Production non-zero authoritative privacy/deletion delta execution is still unproven, provider-service gaps remain outside full restore equivalence, and the approved RPO/RTO objectives still require comparison against the full authoritative recovery procedure.
+The privacy/legal-retention policy, bounded captured-window source authority, current-frontier governed backup, isolated restore, recovered-state finalization mechanics, Production non-zero authoritative reconciliation, and full-procedure RPO/RTO comparisons are now runtime-proven. DR still remains blocked because provider-managed Auth/Storage full-restore equivalence is not proven; `future_safe_privacy_reconciliation=false` and `dr_ready=false` therefore remain mandatory.
 
 Canonical authority remains unresolved in the existing source documents:
 
@@ -103,7 +121,7 @@ Canonical authority remains unresolved in the existing source documents:
 - `docs/P0_DECISION_REGISTER.md`: parent `P0-PR-01` is `DECIDED`; the current reachable policy baseline is 39 DELETE / 4 ANONYMIZE / 9 RETAIN(P5Y), with P30D encrypted backup handling and bounded captured-window privacy recovery source authority.
 - `docs/AUTH_RLS_PRIVACY_SPEC.md`: account deletion keeps personalization erase separate from the approved nine-table `P5Y` Commerce retention baseline; destructive runtime finalization is implemented, while recovered-state authoritative execution evidence remains separately gated.
 - `docs/SOURCE_AUTHORITY_GAPS.md`: `SRC-06` remains blocking before the final standalone Birth/Target deletion DDL baseline.
-- GitHub issue `#964`: product-owner policy authority, bounded source authority, and current-frontier recovered-state runtime evidence are resolved; closure now depends on the remaining Production non-zero authoritative reconciliation boundary.
+- GitHub issue `#964`: its remaining Production non-zero authoritative reconciliation boundary is now runtime-proven by run `35659483080`; issue closure can consume this evidence without claiming full hosted provider equivalence.
 
 Therefore restore success must remain classified as mechanics evidence only:
 
@@ -117,10 +135,10 @@ bounded privacy source authority   = yes — run 35539838537 / AUTHORITATIVE_CAP
 account-deletion finalizer runtime = implemented
 recovered finalization mechanics   = implemented / post-merge CI green
 recovered finalization on current-frontier governed restore = proven — run 35633155263
-authoritative privacy reconciliation= false
+authoritative privacy reconciliation= yes — run 35659483080 / bounded captured window only
 future-safe privacy reconciliation = false
-approved RPO                       = yes — PT24H
-approved RTO                       = yes — PT6H
+approved RPO                       = yes — PT24H / full authoritative comparison PASS (5536s)
+approved RTO                       = yes — PT6H / full authoritative comparison PASS (67s)
 DR Ready                           = false
 ```
 
@@ -158,8 +176,10 @@ destructive account finalization     = implemented under governed worker authori
 recovered-state finalization drill   = implemented / post-merge CI green
 fresh governed restore execution     = proven — run 35633155263 / backup 35631594765
 commerce legal retention             = decided — approved 9-table P5Y baseline
-authoritative privacy reconciliation = not yet proven with Production non-zero authoritative ledger
+authoritative privacy reconciliation = proven — run 35659483080 / Production non-zero bounded captured window
 future-safe privacy reconciliation   = false
+RPO full-procedure comparison        = PASS — 5536s <= PT24H
+RTO full-procedure comparison        = PASS — 67s <= PT6H
 DR Ready                             = false
 ```
 

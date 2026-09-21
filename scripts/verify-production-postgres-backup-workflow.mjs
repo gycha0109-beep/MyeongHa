@@ -109,7 +109,7 @@ const requiredRunbookFragments = [
   'Current Supabase organization plan: `free`',
   'PITR',
   'NOT AVAILABLE UNDER THE CURRENT FREE-PLAN OPERATING BASELINE',
-  'successful production dump         = EVIDENCED — latest run 35631594765',
+  'successful production dump         = EVIDENCED — authoritative proof backup run 35643472159',
   'RPO: APPROVED — PT24H (24 hours)',
   'RTO: APPROVED — PT6H (6 hours)',
   'SUPABASE_PRODUCTION_SESSION_POOLER_HOST',
@@ -119,7 +119,7 @@ const requiredRunbookFragments = [
   'data_deletion_jobs',
   'Never restore a drill directly over serving production.',
   'backup schema freshness             = CURRENT — backup frontier 1280 / deployed frontier 1280',
-  'current-schema restore              = EVIDENCED — run 35633155263 / frontier 1280',
+  'current-schema restore              = EVIDENCED — run 35659483080 / frontier 1280',
   'achieved recovery duration',
   'achieved data-loss window',
 ];

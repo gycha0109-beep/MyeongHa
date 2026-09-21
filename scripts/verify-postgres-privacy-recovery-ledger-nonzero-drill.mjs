@@ -68,8 +68,11 @@ if (/roundtrip_passphrase=['"][^$]/.test(drill)) {
 for (const fragment of [
   'AUTHORITATIVE_CAPTURED_WINDOW_V1',
   'incident_reference_utc <= authoritative_coverage_through',
-  'authoritative destructive reconciliation = NOT YET PROVEN',
+  'authoritative destructive reconciliation = PROVEN — isolated restore run 35659483080 / artifact 10666580699',
+  'authoritative reconciliation scope       = BOUNDED CAPTURED WINDOW ONLY',
   'future-safe reconciliation               = false',
+  'RPO                                      = APPROVED PT24H / full-procedure comparison PASS (5536s)',
+  'RTO                                      = APPROVED PT6H / full-procedure comparison PASS (67s)',
   'DR Ready                                 = false',
 ]) {
   if (!authorityDoc.includes(fragment)) fail('authority documentation boundary missing: ' + fragment);
@@ -95,16 +98,21 @@ if (!/^\|\s*`P0-PR-01`\s*\|[^|\n]*\|\s*\*\*DECIDED\*\*\s*\|/m.test(decisions)) {
 for (const fragment of [
   'privacy_recovery_ledger_authority_class: AUTHORITATIVE_CAPTURED_WINDOW_V1',
   'authoritative_post_backup_source: true_bounded_captured_window_only',
-  'authoritative_privacy_reconciliation: false',
+  'authoritative_privacy_reconciliation: true',
+  'authoritative_privacy_reconciliation_scope: BOUNDED_CAPTURED_WINDOW_ONLY',
   'future_safe_privacy_reconciliation: false',
-  'privacy_reconciliation: BLOCKED_BY_PRODUCTION_NONZERO_AUTHORITATIVE_DELTA_PROOF',
+  'privacy_reconciliation: PRODUCTION_NONZERO_AUTHORITATIVE_CAPTURED_WINDOW_PROVEN',
+  'full_authoritative_data_loss_window_seconds: 5536',
+  'full_authoritative_recovery_duration_seconds: 67',
   'rpo_authority: PRODUCT_OWNER_APPROVED_PT24H',
+  'rpo_full_authoritative_comparison: PASS_5536S_LE_PT24H',
   'rto_authority: PRODUCT_OWNER_APPROVED_PT6H',
+  'rto_full_authoritative_comparison: PASS_67S_LE_PT6H',
   'dr_ready: false',
 ]) {
   if (!status.includes(fragment)) fail('DR authority drifted: ' + fragment);
 }
 
 console.log(
-  'Non-zero privacy ledger recovery drill contract PASS: captured-window coverage -> encrypted roundtrip -> replay -> recovered DB finalization is guarded while authoritative reconciliation and DR Ready remain false.',
+  'Non-zero privacy ledger recovery drill contract PASS: captured-window authority and Production non-zero isolated replay/finalization are proven; future-safe reconciliation and DR Ready remain false.',
 );
