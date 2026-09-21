@@ -19,10 +19,22 @@ import {
   getCharacterRelationship,
   type CharacterRelationshipReadAuthorityPortV1,
 } from './character-relationship-read.js';
+import {
+  getMemoryItems,
+  type MemoryItemsReadAuthorityPortV1,
+} from './memory-items-read.js';
+import {
+  getMemoryGrants,
+  type MemoryGrantsReadAuthorityPortV1,
+} from './memory-grants-read.js';
 
 export type CharacterStandardReadingChatTurnServerContextInputV1 = Omit<
   CharacterStandardReadingChatBaseContextInputV1,
-  'character' | 'contentBundleId' | 'worldRelations' | 'relationshipState'
+  | 'character'
+  | 'contentBundleId'
+  | 'worldRelations'
+  | 'relationshipState'
+  | 'grantedMemories'
 >;
 
 export interface PrepareCharacterStandardReadingChatTurnPreflightInputV1 {
@@ -34,6 +46,8 @@ export interface PrepareCharacterStandardReadingChatTurnPreflightInputV1 {
   readonly accessAuthorityPort: CharacterStandardReadingAccessAuthorityPortV1;
   readonly artifactAuthorityPort: CharacterStandardReadingArtifactAuthorityPortV1;
   readonly relationshipAuthorityPort: CharacterRelationshipReadAuthorityPortV1;
+  readonly memoryItemsAuthorityPort: MemoryItemsReadAuthorityPortV1;
+  readonly memoryGrantsAuthorityPort: MemoryGrantsReadAuthorityPortV1;
   readonly contextInput: CharacterStandardReadingChatTurnServerContextInputV1;
 }
 
@@ -57,6 +71,7 @@ function assertNoCallerContentAuthorityFields(
     'contentBundleId',
     'worldRelations',
     'relationshipState',
+    'grantedMemories',
   ] as const) {
     if (Object.prototype.hasOwnProperty.call(input, field)) {
       throw new CharacterStandardReadingChatTurnPreflightErrorV1(
@@ -90,8 +105,10 @@ function findExactReaderCharacter(
  *
  * Character/world canon is recovered only from the exact server-bound immutable
  * release entry. Current relationship scores/stage/revision are independently
- * re-read from stored relationship authority. Caller-supplied Character/bundle/
- * world/relationship-state authority is rejected.
+ * re-read from stored relationship authority. Current non-revoked Memory Items
+ * are independently re-read and admitted only when the active Reader has an
+ * explicit current grant. Caller-supplied Character/bundle/world/relationship/
+ * Memory authority is rejected.
  *
  * It does not call a model/provider, create a chat turn/attempt, commit a message,
  * expose an HTTP send route, or weaken SRC-15 fail-closed behavior. Until the
@@ -182,6 +199,37 @@ export async function prepareCharacterStandardReadingChatTurnPreflightV1(
     policyVersion: relationship.relationship.policyVersion,
   });
 
+  const memoryItems = await getMemoryItems({
+    ...subjectBinding,
+    authorityPort: input.memoryItemsAuthorityPort,
+  });
+  const grantedMemories = [];
+  for (const memory of memoryItems.memories) {
+    const grants = await getMemoryGrants({
+      ...subjectBinding,
+      memoryItemId: memory.memoryItemId,
+      authorityPort: input.memoryGrantsAuthorityPort,
+    });
+    const readerGrants = grants.grants.filter(
+      (grant) => grant.characterId === readerCharacterId,
+    );
+    if (readerGrants.length > 1) {
+      throw new CharacterStandardReadingChatTurnPreflightErrorV1(
+        'Memory grant authority returned multiple active grants for the current Reader.',
+      );
+    }
+    const grant = readerGrants[0];
+    if (grant === undefined) continue;
+    grantedMemories.push(Object.freeze({
+      memoryItemId: memory.memoryItemId,
+      memoryType: memory.memoryType,
+      schemaVersion: memory.schemaVersion,
+      content: memory.contentJsonb,
+      grantId: grant.grantId,
+      granteeCharacterId: grant.characterId,
+    }));
+  }
+
   const runtime = await prepareCharacterStandardReadingThreadRuntimeV1({
     ...subjectBinding,
     threadId: request.threadId,
@@ -196,6 +244,7 @@ export async function prepareCharacterStandardReadingChatTurnPreflightV1(
       contentBundleId: contentEntry.release.bundleId,
       relationshipState,
       worldRelations,
+      grantedMemories: Object.freeze(grantedMemories),
     },
   });
 

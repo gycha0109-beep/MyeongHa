@@ -83,9 +83,16 @@ baseline. Caller-supplied `character`, `contentBundleId`, `worldRelations`, or
 `relationshipState` fields are rejected before Reader Knowledge lookup, so
 Character/world/relationship state cannot be replaced by request/session data.
 
+Current non-revoked Memory Items are also re-read from owner authority. A Memory
+enters Reader runtime only when the same Reader has exactly one active explicit
+grant; private/ungranted or other-Reader memories are excluded. Caller-supplied
+`grantedMemories` is rejected. This consumes already-authoritative stored records
+and grants only; it does not create, regrant, infer, or validate a new Memory value.
+
 This slice does not invent the still-open SRC-22 relationship event evaluator,
 score deltas, stage transitions, anti-farming rules, or relationship rendering
-threshold authority. It only consumes the already-stored current projection.
+threshold authority. It also does not resolve SRC-25 positive Memory creation
+schemas. It only consumes already-stored current relationship/Memory authority.
 
 It does not call a model/provider, create a durable turn/attempt, commit a
 Character message, or reveal output.
