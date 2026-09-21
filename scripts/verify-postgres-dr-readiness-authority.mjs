@@ -69,7 +69,7 @@ function requireRegex(key, regex, description) {
 
 requireFragment('operations', 'RPO = PT24H (24 hours) — PRODUCT OWNER APPROVED 2026-09-21');
 requireFragment('operations', 'RTO = PT6H (6 hours) — PRODUCT OWNER APPROVED 2026-09-21');
-requireFragment('operations', 'no `DR Ready` claim is allowed');
+requireFragment('operations', 'No `DR Ready` claim is allowed until the separate provider-managed full-restore equivalence gate is also evidenced.');
 requireRegex(
   'decisions',
   /^\|\s*`P0-PR-01`\s*\|[^|\n]*\|\s*\*\*DECIDED\*\*\s*\|/m,
