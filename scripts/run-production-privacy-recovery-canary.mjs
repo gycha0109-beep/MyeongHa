@@ -541,7 +541,7 @@ async function parseWorkerDatabaseConfig() {
   }
 }
 
-async function assertWorkerRoleProvisioned() {
+async function readWorkerRoleProvisioning() {
   const pool = await createAdminPool();
   try {
     const result = await pool.query(
@@ -578,12 +578,111 @@ async function assertWorkerRoleProvisioned() {
     if (row?.canEnterExecutionRole !== true) {
       fail('WORKER_EXECUTION_ROLE_UNAVAILABLE');
     }
-    if (row?.hasPassword !== true) {
-      fail('WORKER_ROLE_PASSWORD_MISSING');
+    return row;
+  } finally {
+    await pool.end();
+  }
+}
+
+async function assertWorkerRoleProvisioned() {
+  const row = await readWorkerRoleProvisioning();
+  if (row?.hasPassword !== true) fail('WORKER_ROLE_PASSWORD_MISSING');
+}
+
+function protectedWorkerPassword() {
+  const canonical = canonicalWorkerDatabaseUrl();
+  const url = new URL(canonical);
+  let password;
+  try {
+    password = decodeURIComponent(url.password);
+  } catch {
+    fail('WORKER_DATABASE_URL_SOURCE_INVALID');
+  }
+  if (
+    typeof password !== 'string' ||
+    password.length < 16 ||
+    password.length > 512 ||
+    /[\u0000\r\n]/u.test(password)
+  ) {
+    fail('WORKER_DATABASE_PASSWORD_INVALID');
+  }
+  console.log(`::add-mask::${password}`);
+  return password;
+}
+
+async function syncWorkerPassword() {
+  if (requiredEnv('MYEONGHA_PRIVACY_CANARY_CONFIRM') !== CONFIRMATION) {
+    fail('CONFIRMATION_REQUIRED');
+  }
+  if (
+    requiredEnv('MYEONGHA_WORKER_CREDENTIAL_ACTION') !== 'sync_from_secret' ||
+    requiredEnv('MYEONGHA_WORKER_CREDENTIAL_CONFIRMATION') !==
+      'SYNC_PRODUCTION_WORKER_PASSWORD'
+  ) {
+    fail('WORKER_PASSWORD_SYNC_CONFIRMATION_REQUIRED');
+  }
+
+  const current = await readWorkerRoleProvisioning();
+  if (current?.hasPassword === true) {
+    console.log('MYEONGHA_PRODUCTION_PRIVACY_CANARY_WORKER_PASSWORD_SYNC_SKIP');
+    return;
+  }
+
+  const password = protectedWorkerPassword();
+  const pool = await createAdminPool();
+  try {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const before = await client.query(
+        `select a.rolpassword is not null as "hasPassword"
+         from pg_catalog.pg_authid a
+         where a.rolname = $1`,
+        [WORKER_DATABASE_PRINCIPAL],
+      );
+      if (before.rows.length !== 1 || before.rows[0]?.hasPassword !== false) {
+        fail('WORKER_PASSWORD_SYNC_STATE_CHANGED');
+      }
+
+      const generated = await client.query(
+        `select pg_catalog.format(
+           'alter role %I password %L',
+           $1::text,
+           $2::text
+         ) as sql`,
+        [WORKER_DATABASE_PRINCIPAL, password],
+      );
+      const sql = generated.rows[0]?.sql;
+      if (generated.rows.length !== 1 || typeof sql !== 'string') {
+        fail('WORKER_PASSWORD_SYNC_SQL_INVALID');
+      }
+      await client.query(sql);
+
+      const after = await client.query(
+        `select a.rolpassword is not null as "hasPassword"
+         from pg_catalog.pg_authid a
+         where a.rolname = $1`,
+        [WORKER_DATABASE_PRINCIPAL],
+      );
+      if (after.rows.length !== 1 || after.rows[0]?.hasPassword !== true) {
+        fail('WORKER_PASSWORD_SYNC_VERIFY_FAILED');
+      }
+      await client.query('COMMIT');
+    } catch (error) {
+      try {
+        await client.query('ROLLBACK');
+      } catch {
+        // Original failure remains authoritative.
+      }
+      throw error;
+    } finally {
+      client.release();
     }
   } finally {
     await pool.end();
   }
+
+  console.log('MYEONGHA_PRODUCTION_PRIVACY_CANARY_WORKER_PASSWORD_SYNC_PASS');
 }
 
 async function preflightWorker() {
@@ -1065,6 +1164,7 @@ async function cleanupPrestart() {
 
 async function main() {
   const mode = process.argv[2];
+  if (mode === 'sync-worker-password') return syncWorkerPassword();
   if (mode === 'preflight-worker') return preflightWorker();
   if (mode === 'provision-api-login') return provisionApiCanaryLogin();
   if (mode === 'prepare') return prepare();
