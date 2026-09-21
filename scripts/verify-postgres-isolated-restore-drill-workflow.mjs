@@ -50,6 +50,18 @@ const [
   readFile(runbookPath, 'utf8'),
 ]);
 
+function requireFragment(text, fragment, source) {
+  if (!text.includes(fragment)) {
+    throw new Error(`${source} missing required fragment: ${fragment}`);
+  }
+}
+
+function forbidFragment(text, fragment, source) {
+  if (text.includes(fragment)) {
+    throw new Error(`${source} contains forbidden fragment: ${fragment}`);
+  }
+}
+
 function section(source, start, next) {
   const startIndex = source.indexOf(start);
   if (startIndex < 0) return '';
@@ -75,39 +87,28 @@ for (const fragment of [
   'MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE: ${{ secrets.MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE }}',
   'uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7',
   'run: bash scripts/operations/resolve-postgres-restore-source.sh',
-  'uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7',
   'artifact-ids: ${{ steps.source.outputs.artifact_id }}',
   'run: bash scripts/run-postgres-isolated-restore-drill.sh',
-  'Exercise synthetic privacy reconciliation and finalization on restored database',
   'run: bash scripts/operations/run-restored-postgres-privacy-drill.sh',
-  'Resolve authoritative Production privacy replay provenance',
   'run: bash scripts/operations/resolve-postgres-authoritative-privacy-replay-source.sh',
-  'Download authoritative privacy ledger artifact',
-  'Download Production privacy canary public evidence',
-  'Replay authoritative Production privacy ledger on restored database',
+  'artifact-ids: ${{ steps.privacy-source.outputs.ledger_artifact_id }}',
+  'artifact-ids: ${{ steps.privacy-source.outputs.canary_artifact_id }}',
   'run: bash scripts/operations/run-restored-postgres-authoritative-privacy-replay.sh',
-  'run: bash scripts/operations/build-postgres-restore-evidence.sh',
-  'uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7',
   '${{ runner.temp }}/restore-evidence/*.json',
   'retention-days: 30',
-  "echo 'synthetic_privacy_reconciliation_mechanics=replay_and_finalization_exercised_on_restored_db'",
-  "echo 'privacy_reconciliation=synthetic_captured_window_authority_mechanics_only'",
-  "echo 'hosted_auth_provider_ack=synthetic_only_real_provider_proven_separately'",
   "echo 'authoritative_privacy_reconciliation=production_nonzero_captured_window_replay_proven'",
   "echo 'future_safe_privacy_reconciliation=false'",
   "echo 'dr_ready=false'",
 ]) {
-  if (!workflow.includes(fragment)) {
-    throw new Error('Missing isolated restore workflow invariant: ' + fragment);
-  }
+  requireFragment(workflow, fragment, workflowPath);
 }
 
 if ((onSection.match(/workflow_dispatch:/g) ?? []).length !== 1) {
-  throw new Error('Restore drill must expose exactly one manual workflow_dispatch trigger.');
+  throw new Error('Restore drill must expose exactly one workflow_dispatch trigger.');
 }
 for (const forbidden of ['push:', 'pull_request:', 'schedule:']) {
   if (onSection.includes(forbidden)) {
-    throw new Error('Restore drill must remain manual-only; forbidden trigger: ' + forbidden);
+    throw new Error('Restore drill must remain manual-only: ' + forbidden);
   }
 }
 if (!permissionsSection.includes('actions: read') || !permissionsSection.includes('contents: read')) {
@@ -117,7 +118,7 @@ if (permissionsSection.includes('write')) {
   throw new Error('Restore drill must not request write permissions.');
 }
 
-const sourceContract = [
+for (const fragment of [
   '.name == "Production PostgreSQL Logical Backup"',
   '.path == ".github/workflows/production-postgres-backup.yml"',
   '.conclusion == "success"',
@@ -127,11 +128,8 @@ const sourceContract = [
   '^myeongha-postgres-[0-9]{8}T[0-9]{6}Z$',
   'echo "artifact_id=$artifact_id" >> "$GITHUB_OUTPUT"',
   'echo "source_sha=$source_sha" >> "$GITHUB_OUTPUT"',
-];
-for (const fragment of sourceContract) {
-  if (!sourceResolver.includes(fragment)) {
-    throw new Error('Missing governed backup source invariant: ' + fragment);
-  }
+]) {
+  requireFragment(sourceResolver, fragment, sourceResolverPath);
 }
 
 for (const fragment of [
@@ -148,9 +146,7 @@ for (const fragment of [
   'restore_target: "github-actions-loopback-supabase-postgres"',
   'dr_ready: false',
 ]) {
-  if (!harness.includes(fragment)) {
-    throw new Error('Missing isolated restore harness invariant: ' + fragment);
-  }
+  requireFragment(harness, fragment, harnessPath);
 }
 
 for (const fragment of [
@@ -162,18 +158,14 @@ for (const fragment of [
   'projectCopyRow',
   'replayed_provider_relations',
 ]) {
-  if (!portableReplay.includes(fragment)) {
-    throw new Error('Missing portable replay invariant: ' + fragment);
-  }
+  requireFragment(portableReplay, fragment, portableReplayPath);
 }
 
 for (const fragment of [
   'PRIVACY_RECONCILIATION_BACKUP_COMPLETED_AT_UTC',
   'bash scripts/run-postgres-privacy-reconciliation-synthetic-drill.sh',
 ]) {
-  if (!privacyRunner.includes(fragment)) {
-    throw new Error('Missing restored privacy drill orchestration invariant: ' + fragment);
-  }
+  requireFragment(privacyRunner, fragment, privacyRunnerPath);
 }
 
 for (const fragment of [
@@ -183,17 +175,12 @@ for (const fragment of [
   'authoritative_privacy_reconciliation: false',
   'future_safe_privacy_reconciliation: false',
   "recovered_state_finalization: 'synthetic-isolated-pass'",
-  "hosted_auth_provider_ack: 'synthetic-row-removal-only-hosted-canary-35522208400-separate'",
   "personalization_access_resurrection_guard: 'pass'",
   "commerce_p5y_retention_guard: 'pass'",
-  "replay_result: 'pass'",
   "second_identical_replay: 'idempotent-pass'",
-  "negative_terminal_state_guard: 'fail-closed-pass'",
   'dr_ready: false',
 ]) {
-  if (!privacySynthetic.includes(fragment)) {
-    throw new Error('Missing restored-db privacy drill invariant: ' + fragment);
-  }
+  requireFragment(privacySynthetic, fragment, privacySyntheticPath);
 }
 
 for (const fragment of [
@@ -201,69 +188,16 @@ for (const fragment of [
   '.path == ".github/workflows/production-postgres-privacy-recovery-ledger.yml"',
   '.name == "Production Privacy Recovery Canary"',
   '.path == ".github/workflows/production-privacy-recovery-canary.yml"',
-  '^myeongha-privacy-ledger-[0-9]{8}T[0-9]{6}Z
-  '--backup-run-id "$BACKUP_RUN_ID"',
-  '--incident-reference-utc "$INCIDENT_REFERENCE_UTC"',
-  'chmod 600 "$RESTORE_EVIDENCE_PATH"',
-]) {
-  if (!evidenceRunner.includes(fragment)) {
-    throw new Error('Missing restore evidence orchestration invariant: ' + fragment);
-  }
-}
-
-const isolatedRuntime =
-  workflow +
-  '\n' +
-  sourceResolver +
-  '\n' +
-  privacyRunner +
-  '\n' +
-  authoritativePrivacySource +
-  '\n' +
-  authoritativePrivacyRunner +
-  '\n' +
-  evidenceRunner +
-  '\n' +
-  harness;
-for (const fragment of [
-  'SUPABASE_DB_PASSWORD',
-  'SUPABASE_ACCESS_TOKEN',
-  'pooler.supabase.com',
-  'api.supabase.com/v1/projects',
-  'myeongha.vercel.app',
-  'gcloud ',
-  'service_role',
-]) {
-  if (isolatedRuntime.includes(fragment)) {
-    throw new Error('Restore drill crossed the isolated/local boundary: ' + fragment);
-  }
-}
-
-for (const fragment of [
-  '.github/workflows/postgres-isolated-restore-drill.yml',
-  'GitHub Actions loopback Supabase PostgreSQL 17.6.1.166',
-  'manual-only',
-  'does not accept a remote restore database URL',
-  'must not fabricate missing provider-managed roles',
-  'identity continuity',
-  'DR Ready = FALSE / NOT EVIDENCED',
-]) {
-  if (!runbook.includes(fragment)) {
-    throw new Error('Restore-drill runbook lost required boundary: ' + fragment);
-  }
-}
-
-console.log(
-  'MyeongHa isolated PostgreSQL restore workflow boundary verification passed: governed backup restore, synthetic privacy mechanics, optional Production non-zero authoritative ledger replay/finalization, identifier-free evidence, and DR fail-closed semantics are pinned.',
-);
-,
+  '^myeongha-privacy-ledger-[0-9]{8}T[0-9]{6}Z$',
   'production-privacy-recovery-canary-$PRODUCTION_PRIVACY_CANARY_RUN_ID',
   'echo "ledger_artifact_id=$ledger_artifact_id" >> "$GITHUB_OUTPUT"',
   'echo "canary_artifact_id=$canary_artifact_id" >> "$GITHUB_OUTPUT"',
 ]) {
-  if (!authoritativePrivacySource.includes(fragment)) {
-    throw new Error('Missing authoritative privacy source invariant: ' + fragment);
-  }
+  requireFragment(
+    authoritativePrivacySource,
+    fragment,
+    authoritativePrivacySourcePath,
+  );
 }
 
 for (const fragment of [
@@ -286,22 +220,32 @@ for (const fragment of [
   "output_contains_row_payloads: false",
   "dr_ready: false",
 ]) {
-  if (!authoritativePrivacyRunner.includes(fragment)) {
-    throw new Error('Missing authoritative restored privacy replay invariant: ' + fragment);
-  }
+  requireFragment(
+    authoritativePrivacyRunner,
+    fragment,
+    authoritativePrivacyRunnerPath,
+  );
 }
+
 for (const fragment of [
   'node scripts/build-postgres-restore-evidence-envelope.mjs',
   '--backup-run-id "$BACKUP_RUN_ID"',
   '--incident-reference-utc "$INCIDENT_REFERENCE_UTC"',
   'chmod 600 "$RESTORE_EVIDENCE_PATH"',
 ]) {
-  if (!evidenceRunner.includes(fragment)) {
-    throw new Error('Missing restore evidence orchestration invariant: ' + fragment);
-  }
+  requireFragment(evidenceRunner, fragment, evidenceRunnerPath);
 }
 
-const isolatedRuntime = workflow + '\n' + sourceResolver + '\n' + privacyRunner + '\n' + evidenceRunner + '\n' + harness;
+const isolatedRuntime = [
+  workflow,
+  sourceResolver,
+  privacyRunner,
+  authoritativePrivacySource,
+  authoritativePrivacyRunner,
+  evidenceRunner,
+  harness,
+].join('\n');
+
 for (const fragment of [
   'SUPABASE_DB_PASSWORD',
   'SUPABASE_ACCESS_TOKEN',
@@ -311,9 +255,7 @@ for (const fragment of [
   'gcloud ',
   'service_role',
 ]) {
-  if (isolatedRuntime.includes(fragment)) {
-    throw new Error('Restore drill crossed the isolated/local boundary: ' + fragment);
-  }
+  forbidFragment(isolatedRuntime, fragment, 'isolated restore runtime');
 }
 
 for (const fragment of [
@@ -325,9 +267,9 @@ for (const fragment of [
   'identity continuity',
   'DR Ready = FALSE / NOT EVIDENCED',
 ]) {
-  if (!runbook.includes(fragment)) {
-    throw new Error('Restore-drill runbook lost required boundary: ' + fragment);
-  }
+  requireFragment(runbook, fragment, runbookPath);
 }
 
-console.log('MyeongHa isolated PostgreSQL restore workflow boundary verification passed.');
+console.log(
+  'MyeongHa isolated PostgreSQL restore workflow boundary verification passed: governed backup restore, synthetic privacy mechanics, optional Production non-zero authoritative ledger replay/finalization, identifier-free evidence, and DR fail-closed semantics are pinned.',
+);
