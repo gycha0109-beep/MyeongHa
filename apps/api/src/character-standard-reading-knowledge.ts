@@ -2,16 +2,19 @@ import type { SajuDomain } from '../../../packages/contracts/src/index.js';
 import { ApiCommandError } from './api-error.js';
 
 export const CHARACTER_STANDARD_READING_ACCESS_AUTHORITY_BINDING_V1 =
-  'public.qry_character_standard_reading_access_runtime_v1' as const;
+  'public.qry_character_standard_reading_access_runtime_v2' as const;
 export const CHARACTER_STANDARD_READING_ARTIFACT_SOURCE_AUTHORITY_BINDING_V1 =
   'public.qry_standard_reading_artifact_source_runtime_v1' as const;
 
 type Awaitable<T> = T | Promise<T>;
 
 export interface CharacterStandardReadingAccessAuthorityRowV1 {
+  readonly subjectId: string;
   readonly readingId: string;
   readonly readingSessionId: string;
   readonly productId: string;
+  readonly readerCharacterId: string;
+  readonly readerContentBundleId: string;
   readonly topicKey: string;
   readonly sajuDomain: string;
   readonly readingPeriod: string;
@@ -76,10 +79,12 @@ export interface ResolveCharacterStandardReadingKnowledgeInputV1 {
 }
 
 export interface CharacterStandardReadingKnowledgeSourceV1 {
+  readonly subjectId: string;
   readonly readingId: string;
   readonly readingSessionId: string;
   readonly productId: string;
   readonly readerCharacterId: string;
+  readonly readerContentBundleId: string;
   readonly topicKey: string;
   readonly sajuDomain: SajuDomain;
   readonly readingPeriod: string;
@@ -227,7 +232,8 @@ function selectExactArtifact(
  *
  * This boundary does not itself authorize public Chat injection. The underlying DB
  * functions remain INTERNAL/HOLD until the separate Production Saju/Character
- * authority gates are promoted.
+ * authority gates are promoted. Access metadata also carries the exact server-owned
+ * Reader content-bundle id so semantic runtimes cannot swap Character content.
  */
 export async function resolveCharacterStandardReadingKnowledgeV1(
   input: ResolveCharacterStandardReadingKnowledgeInputV1,
@@ -256,8 +262,17 @@ export async function resolveCharacterStandardReadingKnowledgeV1(
     });
     const artifact = selectExactArtifact(artifactRows);
 
+    const accessSubjectId = requireStoredString('subject id', access.subjectId);
     const accessReadingId = requireStoredString('Reading id', access.readingId);
     const accessProductId = requireStoredString('Product id', access.productId);
+    const accessReaderCharacterId = requireStoredString(
+      'Reader Character id',
+      access.readerCharacterId,
+    );
+    const accessReaderContentBundleId = requireStoredString(
+      'Reader content bundle id',
+      access.readerContentBundleId,
+    );
     const accessContractVersion = requireStoredString(
       'Reading contract version',
       access.readingContractVersion,
@@ -265,7 +280,9 @@ export async function resolveCharacterStandardReadingKnowledgeV1(
     const accessResponseHash = requireStoredString('response hash', access.responseHash);
 
     if (
+      accessSubjectId !== subjectId ||
       accessReadingId !== readingId ||
+      accessReaderCharacterId !== readerCharacterId ||
       requireStoredString('artifact Reading id', artifact.readingId) !== readingId ||
       requireStoredString('artifact Reader Character id', artifact.readerCharacterId) !==
         readerCharacterId ||
@@ -282,10 +299,12 @@ export async function resolveCharacterStandardReadingKnowledgeV1(
     }
 
     return Object.freeze({
+      subjectId,
       readingId,
       readingSessionId: requireStoredString('Reading Session id', access.readingSessionId),
       productId: accessProductId,
       readerCharacterId,
+      readerContentBundleId: accessReaderContentBundleId,
       topicKey: requireStoredString('topic key', access.topicKey),
       sajuDomain: requireSajuDomain(access.sajuDomain),
       readingPeriod: requireStoredString('reading period', access.readingPeriod),

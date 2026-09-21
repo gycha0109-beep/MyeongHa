@@ -15,9 +15,12 @@ export {
 };
 
 type AccessQueryRowV1 = Readonly<{
+  subjectId: unknown;
   readingId: unknown;
   readingSessionId: unknown;
   productId: unknown;
+  readerCharacterId: unknown;
+  readerContentBundleId: unknown;
   topicKey: unknown;
   sajuDomain: unknown;
   readingPeriod: unknown;
@@ -43,9 +46,12 @@ type ArtifactQueryRowV1 = Readonly<{
 
 const ACCESS_SQL = `
 select
+  subject_id::text as "subjectId",
   reading_id::text as "readingId",
   reading_session_id::text as "readingSessionId",
   product_id::text as "productId",
+  reader_character_id as "readerCharacterId",
+  reader_content_bundle_id::text as "readerContentBundleId",
   topic_key as "topicKey",
   saju_domain as "sajuDomain",
   reading_period as "readingPeriod",
@@ -56,7 +62,7 @@ select
   reading_contract_version as "readingContractVersion",
   saju_engine_version as "sajuEngineVersion",
   response_hash as "responseHash"
-from public.qry_character_standard_reading_access_runtime_v1(
+from public.qry_character_standard_reading_access_runtime_v2(
   $1::uuid,
   $2::text,
   $3::timestamptz
@@ -104,11 +110,13 @@ function fail(
 function mapPostgresError(error: unknown): never {
   switch (postgresConstraint(error)) {
     case 'internal_character_standard_reading_access_input_required':
+    case 'internal_character_standard_reading_access_v2_input_required':
     case 'internal_standard_reading_artifact_source_v2_input_required':
       return fail('INVALID_INPUT', 'Character Standard Reading authority input was rejected.');
     case 'member_subject_context_unresolved':
     case 'guest_subject_context_unresolved':
     case 'myeongha_subject_context_required':
+    case 'myeongha_subject_context_missing':
     case 'myeongha_subject_context_mismatch':
       return fail('SUBJECT_INELIGIBLE', 'Character Standard Reading subject is unavailable.');
     default:
@@ -120,9 +128,12 @@ function mapAccessRows(
   rows: readonly AccessQueryRowV1[],
 ): readonly CharacterStandardReadingAccessAuthorityRowV1[] {
   return Object.freeze(rows.map((row) => Object.freeze({
+    subjectId: requireString('subject id', row.subjectId),
     readingId: requireString('Reading id', row.readingId),
     readingSessionId: requireString('Reading Session id', row.readingSessionId),
     productId: requireString('Product id', row.productId),
+    readerCharacterId: requireString('Reader Character id', row.readerCharacterId),
+    readerContentBundleId: requireString('Reader content bundle id', row.readerContentBundleId),
     topicKey: requireString('topic key', row.topicKey),
     sajuDomain: requireString('Saju domain', row.sajuDomain),
     readingPeriod: requireString('reading period', row.readingPeriod),
@@ -191,10 +202,10 @@ implements CharacterStandardReadingAccessAuthorityPortV1, CharacterStandardReadi
 }
 
 /**
- * Production server adapter. Migration 1240 exposes only the two transaction-
- * subject-bound SECURITY DEFINER runtime wrappers to myeongha_api_executor.
- * The migration-1220 INTERNAL source functions and raw authority tables remain
- * ungranted to ordinary runtime roles.
+ * Production server adapter. Migration 1240 exposes the transaction-bound artifact
+ * wrapper; migration 1250 adds the bundle-aware Reader access runtime v2 wrapper.
+ * INTERNAL source functions and raw authority tables remain ungranted to ordinary
+ * runtime roles.
  */
 export function createPostgresCharacterStandardReadingKnowledgePortsV1(
   client: PostgresTransactionQueryV1,
