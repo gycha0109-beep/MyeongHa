@@ -728,3 +728,22 @@ export {
   type ReaderInterpretationPreviewHttpResponseV1,
 } from './reader-interpretation-preview-http.js';
 
+
+
+export {
+  PRODUCTION_READER_INTERPRETATION_ACTIVATION_ENV_V1,
+  PRODUCTION_READER_INTERPRETATION_OFF_POLICY_VERSION_V1,
+  READER_INTERPRETATION_HOSTED_CANARY_EVIDENCE_V1,
+  ProductionReaderInterpretationActivationConfigErrorV1,
+  ProductionReaderInterpretationActivationErrorV1,
+  assertProductionReaderInterpretationActivationV1,
+  hashReaderInterpretationActivationSubjectV1,
+  parseProductionReaderInterpretationActivationConfigV1,
+  runProductionReaderInterpretationPreviewHttpV1,
+  summarizeProductionReaderInterpretationActivationConfigV1,
+  type ProductionReaderInterpretationActivationConfigV1,
+  type ProductionReaderInterpretationActivationEnvV1,
+  type ProductionReaderInterpretationActivationModeV1,
+  type ProductionReaderInterpretationActivationSummaryV1,
+  type RunProductionReaderInterpretationPreviewHttpInputV1,
+} from './production-reader-interpretation-activation.js';
