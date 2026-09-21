@@ -44,7 +44,7 @@ jobs:
         run: |
           set -euo pipefail
           [[ "$MYEONGHA_PRIVACY_CANARY_CONFIRM" == 'RUN_SYNTHETIC_PRODUCTION_PRIVACY_CANARY' ]]
-          [[ "$MYEONGHA_WATCHTOWER_TRACK" == 'privacy-recovery' ]]
+          [[ "$MYEONGHA_WATCHTOWER_TRACK" == 'ops' ]]
 
           missing=()
           [[ -n "${MYEONGHA_WORKER_DATABASE_URL:-}" ]] || missing+=(MYEONGHA_WORKER_DATABASE_URL)
