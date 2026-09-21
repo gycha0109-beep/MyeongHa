@@ -27,6 +27,18 @@ on:
         description: 'Required only for resume: successful pre-deletion Production backup run id.'
         required: false
         type: string
+      worker_credential_action:
+        description: 'Verify the worker login or perform the one-time password sync from the protected worker URL.'
+        required: true
+        default: verify_only
+        type: choice
+        options:
+          - verify_only
+          - sync_from_secret
+      worker_credential_confirmation:
+        description: 'Required only for sync_from_secret: type SYNC_PRODUCTION_WORKER_PASSWORD.'
+        required: false
+        type: string
 
 permissions:
   actions: write
@@ -48,6 +60,8 @@ jobs:
       MYEONGHA_PRIVACY_CANARY_OPERATION: ${{ inputs.operation }}
       MYEONGHA_PRIVACY_CANARY_RESUME_RUN_ID: ${{ inputs.resume_canary_run_id }}
       MYEONGHA_PRIVACY_CANARY_RESUME_BACKUP_RUN_ID: ${{ inputs.resume_backup_run_id }}
+      MYEONGHA_WORKER_CREDENTIAL_ACTION: ${{ inputs.worker_credential_action }}
+      MYEONGHA_WORKER_CREDENTIAL_CONFIRMATION: ${{ inputs.worker_credential_confirmation }}
       MYEONGHA_SUPABASE_URL: https://cnsfpcdiyofqvhpcegfc.supabase.co
       MYEONGHA_WORKER_DATABASE_URL: ${{ secrets.MYEONGHA_WORKER_DATABASE_URL }}
       MYEONGHA_WORKER_DATABASE_PRINCIPAL: myeongha_worker_runtime
@@ -65,6 +79,12 @@ jobs:
           [[ "$MYEONGHA_PRIVACY_CANARY_CONFIRM" == 'RUN_SYNTHETIC_PRODUCTION_PRIVACY_CANARY' ]]
           [[ "$MYEONGHA_WATCHTOWER_TRACK" == 'ops' ]]
           [[ "$MYEONGHA_PRIVACY_CANARY_OPERATION" == 'fresh' || "$MYEONGHA_PRIVACY_CANARY_OPERATION" == 'resume' ]]
+          [[ "$MYEONGHA_WORKER_CREDENTIAL_ACTION" == 'verify_only' || "$MYEONGHA_WORKER_CREDENTIAL_ACTION" == 'sync_from_secret' ]]
+          if [[ "$MYEONGHA_WORKER_CREDENTIAL_ACTION" == 'sync_from_secret' ]]; then
+            [[ "$MYEONGHA_WORKER_CREDENTIAL_CONFIRMATION" == 'SYNC_PRODUCTION_WORKER_PASSWORD' ]]
+          else
+            [[ -z "$MYEONGHA_WORKER_CREDENTIAL_CONFIRMATION" ]]
+          fi
           if [[ "$MYEONGHA_PRIVACY_CANARY_OPERATION" == 'resume' ]]; then
             [[ "$MYEONGHA_PRIVACY_CANARY_RESUME_RUN_ID" =~ ^[1-9][0-9]*$ ]]
             [[ "$MYEONGHA_PRIVACY_CANARY_RESUME_BACKUP_RUN_ID" =~ ^[1-9][0-9]*$ ]]
@@ -127,6 +147,10 @@ jobs:
             echo "MYEONGHA_PRIVACY_CANARY_STATE_PATH=$RUNNER_TEMP/production-privacy-canary-state.json"
             echo "MYEONGHA_PRIVACY_CANARY_EVIDENCE_PATH=$RUNNER_TEMP/production-privacy-canary-evidence.json"
           } >> "$GITHUB_ENV"
+
+      - name: Synchronize dedicated worker login password from protected secret
+        if: env.MYEONGHA_WORKER_CREDENTIAL_ACTION == 'sync_from_secret'
+        run: node scripts/run-production-privacy-recovery-canary.mjs sync-worker-password
 
       - name: Verify dedicated worker database authority before mutation
         run: node scripts/run-production-privacy-recovery-canary.mjs preflight-worker
