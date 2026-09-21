@@ -36,4 +36,6 @@ jobs:
             exit 0
           fi
           git commit -m "build(face-engine): lock FE033 preview package"
+          git fetch origin feat/fe033-face-preview-engine-delivery
+          git rebase origin/feat/fe033-face-preview-engine-delivery
           git push origin HEAD:feat/fe033-face-preview-engine-delivery
