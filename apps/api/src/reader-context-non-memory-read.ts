@@ -50,7 +50,7 @@ export type ReaderContextNonMemoryReadAuthorityErrorCodeV1 =
   | 'THREAD_UNAVAILABLE';
 
 export class ReaderContextNonMemoryReadAuthorityPortErrorV1 extends Error {
-  readonly name = 'ReaderContextNonMemoryReadAuthorityPortErrorV1';
+  override readonly name = 'ReaderContextNonMemoryReadAuthorityPortErrorV1';
 
   constructor(
     readonly code: ReaderContextNonMemoryReadAuthorityErrorCodeV1,
