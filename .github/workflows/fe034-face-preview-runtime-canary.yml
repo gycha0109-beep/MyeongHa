@@ -29,7 +29,7 @@ jobs:
           curl --fail --location --retry 3 \
             "https://raw.githubusercontent.com/scikit-image/scikit-image/9311ab50b2e3392bb5272253b43cb4dd1ce04e31/src/_skimage2/data/astronaut.png" \
             --output "$RUNNER_TEMP/fe034-astronaut.png"
-          sha256sum "$RUNNER_TEMP/fe034-astronaut.png"
+          echo "88431cd9653ccd539741b555fb0a46b61558b301d4110412b5bc28b5e3ea6cb5  $RUNNER_TEMP/fe034-astronaut.png" | sha256sum --check --strict
       - name: Set up Chrome for Testing
         id: chrome
         uses: browser-actions/setup-chrome@48ad923757ca74d66703209fe939badbdf80f2f4
