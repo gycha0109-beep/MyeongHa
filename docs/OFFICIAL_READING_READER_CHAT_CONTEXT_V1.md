@@ -62,6 +62,22 @@ The ordinary `assembleCharacterRuntimeContext` path remains fail-closed for
 direct Saju injection in Production, so this does not turn client-carried Saju
 data into authority.
 
+## Server receive → Reader runtime preflight
+
+The non-generative turn preflight now requires an exact `ChatReceivePlan` object
+minted by `prepareChatReceiveCommand`. A structural lookalike is rejected before
+thread or Reader Knowledge authority lookup.
+
+For an existing Reader thread, preflight then independently re-reads the owned
+thread and Official Reading runtime and requires the receive-plan release/bundle
+to still match the current thread binding. It does not call a model/provider,
+create a durable turn/attempt, commit a Character message, or reveal output.
+
+This does **not** weaken `SRC-15`. Current client/content compatibility comparison
+authority is still unresolved, so Production `ContentReleaseRuntime` cannot mint
+a positive compatible receive plan today. The preflight therefore remains
+fail-closed until a source-authorized compatibility verdict exists.
+
 ## Remaining gate
 
 The thread-bound server composition is now implemented: active owned thread,
@@ -73,8 +89,9 @@ bound server runtime wrappers. The migration-1220 INTERNAL source functions and
 raw authority tables remain ungranted to ordinary runtime roles.
 
 No public Chat send route is activated by this slice. Actual public send remains
-fail-closed until the Chat receive/generate/output-guard/commit transport is
-promoted through the same server-owned thread and Official Reading authority path.
+fail-closed until `SRC-15` compatibility authority and the receive/generate/
+output-guard/commit transport are promoted through the same server-owned thread
+and Official Reading authority path.
 
 
 ## Relationship to Reader Interpretation Preview

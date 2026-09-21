@@ -1,9 +1,19 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { CharacterContentDefinition } from '../packages/character-content/src/index.js';
-import { DEV_CHARACTER_CONTENT_BUNDLE } from '../packages/test-fixtures/src/index.js';
 import {
+  DEV_CHARACTER_CONTENT_BUNDLE,
+  DEV_WORLD_CONTENT_BUNDLE,
+} from '../packages/test-fixtures/src/index.js';
+import {
+  ContentReleaseRuntime,
+  type ContentReleaseRuntimeEntry,
+} from '../packages/world-content/src/index.js';
+import {
+  CharacterStandardReadingChatTurnPreflightErrorV1,
   CharacterStandardReadingThreadRuntimeErrorV1,
+  prepareCharacterStandardReadingChatTurnPreflightV1,
   prepareCharacterStandardReadingThreadRuntimeV1,
+  prepareChatReceiveCommand,
   type CharacterStandardReadingChatBaseContextInputV1,
 } from '../apps/api/src/index.js';
 import type { ChatThreadRuntimeBindingReadAuthorityPortV1 } from '../apps/api/src/chat-thread-runtime-binding-read.js';
@@ -17,6 +27,7 @@ const THREAD_ID = '66666666-6666-4666-8666-666666666666';
 const READING_ID = '11111111-1111-4111-8111-111111111111';
 const PRODUCT_ID = '22222222-2222-4222-8222-222222222222';
 const BUNDLE_ID = '77777777-7777-4777-8777-777777777777';
+const RELEASE_ID = '88888888-8888-4888-8888-888888888888';
 
 function authoredCharacter(characterId = 'baekheon'): CharacterContentDefinition {
   const base = DEV_CHARACTER_CONTENT_BUNDLE.characters[0]!;
@@ -170,7 +181,7 @@ function authorities(participants: readonly string[] = ['baekheon']) {
     readRuntimeBinding: vi.fn(async () => [{
       threadId: THREAD_ID,
       status: 'active',
-      activeContentReleaseId: '88888888-8888-4888-8888-888888888888',
+      activeContentReleaseId: RELEASE_ID,
       activeContentBundleId: BUNDLE_ID,
       contentRevision: 4,
       participantCharacterIds: participants,
@@ -223,6 +234,47 @@ function authorities(participants: readonly string[] = ['baekheon']) {
     accessAuthorityPort,
     artifactAuthorityPort,
   };
+}
+
+function compatibleReceiveRuntime(
+  releaseId = RELEASE_ID,
+  bundleId = BUNDLE_ID,
+): ContentReleaseRuntime {
+  const entry = {
+    release: {
+      releaseId,
+      bundleId,
+      contentVersion: 'reader-follow-up-test-v1',
+    },
+    characters: DEV_CHARACTER_CONTENT_BUNDLE,
+    world: DEV_WORLD_CONTENT_BUNDLE,
+    lifecycle: 'active',
+  } as unknown as ContentReleaseRuntimeEntry;
+
+  return {
+    assertPinnedClientCompatible: vi.fn(() => entry),
+    resolveForNewThread: vi.fn(() => entry),
+  } as unknown as ContentReleaseRuntime;
+}
+
+function existingThreadReceivePlan(
+  releaseId = RELEASE_ID,
+  bundleId = BUNDLE_ID,
+) {
+  return prepareChatReceiveCommand({
+    request: {
+      threadId: THREAD_ID,
+      clientTurnId: 'turn-reader-follow-up-1',
+      text: '방금 본 직업 해석을 조금 더 설명해 주세요.',
+      clientCapability: 'source-authorized-test-capability',
+    },
+    releaseRuntime: compatibleReceiveRuntime(releaseId, bundleId),
+    trustedThread: {
+      threadId: THREAD_ID,
+      pinnedReleaseId: releaseId,
+      participantCharacterIds: ['baekheon'],
+    },
+  });
 }
 
 describe('thread-bound Official Reading Reader runtime', () => {
@@ -314,3 +366,106 @@ describe('thread-bound Official Reading Reader runtime', () => {
     expect(authority.accessAuthorityPort.readAccessibleReadings).not.toHaveBeenCalled();
   });
 });
+
+describe('Official Reading Reader Chat turn preflight', () => {
+  it('joins a server-minted receive plan to a fresh thread-bound Official Reading runtime without generation or commit', async () => {
+    const authority = authorities();
+    const receivePlan = existingThreadReceivePlan();
+    const previousNodeEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+
+    try {
+      const result = await prepareCharacterStandardReadingChatTurnPreflightV1({
+        resolvedSubjectId: SUBJECT_ID,
+        receivePlan,
+        readingId: READING_ID,
+        effectiveAt: '2026-09-21T00:02:00.000Z',
+        ...authority,
+        contextInput: contextInput(),
+      });
+
+      expect(result.receivePlan).toBe(receivePlan);
+      expect(result.runtime.threadBinding.threadId).toBe(THREAD_ID);
+      expect(result.runtime.threadBinding.activeContentReleaseId).toBe(RELEASE_ID);
+      expect(result.runtime.threadBinding.activeContentBundleId).toBe(BUNDLE_ID);
+      expect(result.runtime.source.readerCharacterId).toBe('baekheon');
+      expect(result.runtime.context.saju?.readingRef).toBe(READING_ID);
+      expect(result.runtime.context.saju?.protectedSegments.map((segment) => segment.text)).toEqual([
+        '서버가 다시 읽은 공식 직업 Reading입니다.',
+      ]);
+    } finally {
+      if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = previousNodeEnv;
+    }
+  });
+
+  it('rejects a structural receive-plan lookalike before any Reader Knowledge authority lookup', async () => {
+    const authority = authorities();
+    const genuinePlan = existingThreadReceivePlan();
+    const forgedPlan = Object.freeze({
+      ...genuinePlan,
+      resolvedContent: Object.freeze({ ...genuinePlan.resolvedContent }),
+    });
+
+    await expect(
+      prepareCharacterStandardReadingChatTurnPreflightV1({
+        resolvedSubjectId: SUBJECT_ID,
+        receivePlan: forgedPlan,
+        readingId: READING_ID,
+        effectiveAt: '2026-09-21T00:02:00.000Z',
+        ...authority,
+        contextInput: contextInput(),
+      }),
+    ).rejects.toThrow(/not minted by server receive authority/u);
+
+    expect(authority.threadBindingAuthorityPort.readRuntimeBinding).not.toHaveBeenCalled();
+    expect(authority.accessAuthorityPort.readAccessibleReadings).not.toHaveBeenCalled();
+    expect(authority.artifactAuthorityPort.readArtifactSource).not.toHaveBeenCalled();
+  });
+
+  it('rejects a receive plan whose release no longer matches the freshly reread owned thread', async () => {
+    const authority = authorities();
+    const receivePlan = existingThreadReceivePlan(
+      '99999999-9999-4999-8999-999999999999',
+      BUNDLE_ID,
+    );
+
+    await expect(
+      prepareCharacterStandardReadingChatTurnPreflightV1({
+        resolvedSubjectId: SUBJECT_ID,
+        receivePlan,
+        readingId: READING_ID,
+        effectiveAt: '2026-09-21T00:02:00.000Z',
+        ...authority,
+        contextInput: contextInput(),
+      }),
+    ).rejects.toBeInstanceOf(CharacterStandardReadingChatTurnPreflightErrorV1);
+  });
+
+  it('rejects a new-thread receive plan because Reader follow-up must stay bound to an owned existing thread', async () => {
+    const authority = authorities();
+    const receivePlan = prepareChatReceiveCommand({
+      request: {
+        clientTurnId: 'turn-reader-follow-up-new',
+        text: '이 해석을 이어서 이야기해 주세요.',
+        clientCapability: 'source-authorized-test-capability',
+      },
+      releaseRuntime: compatibleReceiveRuntime(),
+      orderedReleaseIdsForNewThread: [RELEASE_ID],
+    });
+
+    await expect(
+      prepareCharacterStandardReadingChatTurnPreflightV1({
+        resolvedSubjectId: SUBJECT_ID,
+        receivePlan,
+        readingId: READING_ID,
+        effectiveAt: '2026-09-21T00:02:00.000Z',
+        ...authority,
+        contextInput: contextInput(),
+      }),
+    ).rejects.toThrow(/requires an existing server-bound thread/u);
+
+    expect(authority.threadBindingAuthorityPort.readRuntimeBinding).not.toHaveBeenCalled();
+  });
+});
+
