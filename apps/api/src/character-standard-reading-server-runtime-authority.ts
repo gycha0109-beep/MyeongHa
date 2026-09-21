@@ -25,7 +25,7 @@ import {
   type MemoryGrantsReadAuthorityPortV1,
 } from './memory-grants-read.js';
 import type {
-  ReaderContextNonMemoryReadAuthorityPortV1,
+  ReaderContextLifeFactsReadAuthorityPortV1,
 } from './reader-context-non-memory-read.js';
 
 export type CharacterStandardReadingServerContextInputV1 = Omit<
@@ -36,6 +36,8 @@ export type CharacterStandardReadingServerContextInputV1 = Omit<
   | 'relationshipState'
   | 'grantedLifeFacts'
   | 'grantedMemories'
+  | 'recentRelationshipEventKeys'
+  | 'recentMessages'
 >;
 
 export interface PrepareCharacterStandardReadingServerRuntimeInputV1 {
@@ -51,7 +53,7 @@ export interface PrepareCharacterStandardReadingServerRuntimeInputV1 {
   readonly relationshipAuthorityPort: CharacterRelationshipReadAuthorityPortV1;
   readonly memoryItemsAuthorityPort: MemoryItemsReadAuthorityPortV1;
   readonly memoryGrantsAuthorityPort: MemoryGrantsReadAuthorityPortV1;
-  readonly nonMemoryContextAuthorityPort: ReaderContextNonMemoryReadAuthorityPortV1;
+  readonly nonMemoryContextAuthorityPort: ReaderContextLifeFactsReadAuthorityPortV1;
   readonly contextInput: CharacterStandardReadingServerContextInputV1;
 }
 
@@ -72,6 +74,8 @@ function assertNoCallerContentAuthorityFields(
     'relationshipState',
     'grantedLifeFacts',
     'grantedMemories',
+    'recentRelationshipEventKeys',
+    'recentMessages',
   ] as const) {
     if (Object.prototype.hasOwnProperty.call(input, field)) {
       throw new CharacterStandardReadingServerRuntimeAuthorityErrorV1(
@@ -227,9 +231,14 @@ export async function prepareCharacterStandardReadingServerRuntimeV1(
       character,
       contentBundleId: input.contentEntry.release.bundleId,
       relationshipState,
+      // Decision-R / Reader Context Product Policy V1: historical relationship
+      // events and raw message text are not Reader Interpretation inputs. Current
+      // relationship projection remains authoritative; history stays outside this seam.
+      recentRelationshipEventKeys: Object.freeze([]),
       worldRelations,
       grantedLifeFacts: Object.freeze(grantedLifeFacts.map((fact) => Object.freeze({ ...fact }))),
       grantedMemories: Object.freeze(grantedMemories),
+      recentMessages: Object.freeze([]),
     },
   });
 

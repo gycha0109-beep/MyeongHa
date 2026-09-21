@@ -42,7 +42,7 @@ import type {
   MemoryGrantsReadAuthorityPortV1,
 } from './memory-grants-read.js';
 import type {
-  ReaderContextNonMemoryReadAuthorityPortV1,
+  ReaderContextLifeFactsReadAuthorityPortV1,
 } from './reader-context-non-memory-read.js';
 import {
   CharacterStandardReadingServerRuntimeAuthorityErrorV1,
@@ -130,7 +130,7 @@ export interface RunThreadBoundReaderInterpretationPreviewInputV1 {
   readonly relationshipAuthorityPort: CharacterRelationshipReadAuthorityPortV1;
   readonly memoryItemsAuthorityPort: MemoryItemsReadAuthorityPortV1;
   readonly memoryGrantsAuthorityPort: MemoryGrantsReadAuthorityPortV1;
-  readonly nonMemoryContextAuthorityPort: ReaderContextNonMemoryReadAuthorityPortV1;
+  readonly nonMemoryContextAuthorityPort: ReaderContextLifeFactsReadAuthorityPortV1;
   readonly groundingProjectionPort: OfficialReadingCharacterGroundingProjectionPortV1;
 }
 

@@ -47,6 +47,31 @@ The Reader Knowledge source resolver is the authority merged by PR #1142. This r
 - No new official Reading is created by this runtime.
 - No Production Saju, Product Offer, Charge Terms, or payment activation is introduced.
 
+## 2.1 Decision-R — Reader Context Product Policy V1
+
+Reader v1 keeps one Saju semantic authority rather than introducing a parallel raw-natal context.
+
+| Context material | Reader v1 authority | Decision |
+| --- | --- | --- |
+| Official Reading Source Truth | owner-authorized stored ProductReadingResponse | required, server-only |
+| semantic units / disclosures / ambiguities | Saju-owned Character Grounding projection | required, positively admitted |
+| day master / five elements / ten gods / hidden stems | no separate Reader field | excluded unless already expressed by the Official Reading and therefore present through grounding |
+| major-luck / annual-luck material | no separate Reader calculation | only through admitted Official Reading `timing` semantics |
+| current relationship state | owner-scoped PostgreSQL current projection | required for Character delivery |
+| relationship-event history | none | excluded from Reader v1 |
+| raw recent message text | none | excluded from Reader v1 |
+| Reader-granted Life Facts | owner-scoped PostgreSQL grant authority | allowed |
+| Reader-granted Memory | existing Memory item + grant authority | allowed |
+| Reader Character perspective | pinned published Character content | selection/framing only; cannot change canonical Saju meaning |
+
+Consequences:
+
+- Reader code must not calculate or reconstruct day master, element balance, ten gods, hidden stems, major luck, annual luck, useful/favorable elements, or similar Saju facts from birth data.
+- If those facts are needed for a future product surface, Saju/Official Reading authority must expose them first and the Reader contract must be versioned explicitly.
+- Reader-to-Reader variation is limited to admitted unit selection, ordering, framing, uncertainty handling, and advice style. `canonicalMeaning`, disclosures, ambiguity, source hashes, and Official Reading identity remain invariant.
+- Historical relationship events and raw messages are deliberately absent, so Reader v1 has no product-defined history/message window and no arbitrary retrieval limit.
+- Current relationship projection remains available for Character delivery, but its numeric band projection policy is not invented here; SRC-22 remains the policy-authority blocker for Production thresholds.
+
 ## 3. Current executable slice
 
 The runtime is intentionally perspective-agnostic: it receives an already-admitted `CharacterPerspectiveProfileV1` and does not invent Character-to-grounding mappings.

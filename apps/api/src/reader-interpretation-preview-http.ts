@@ -22,7 +22,7 @@ import type {
   MemoryGrantsReadAuthorityPortV1,
 } from './memory-grants-read.js';
 import type {
-  ReaderContextNonMemoryReadAuthorityPortV1,
+  ReaderContextLifeFactsReadAuthorityPortV1,
 } from './reader-context-non-memory-read.js';
 import {
   runThreadBoundReaderInterpretationPreviewV1,
@@ -213,7 +213,7 @@ export async function runReaderInterpretationPreviewHttpV1(input: {
   readonly relationshipAuthorityPort: CharacterRelationshipReadAuthorityPortV1;
   readonly memoryItemsAuthorityPort: MemoryItemsReadAuthorityPortV1;
   readonly memoryGrantsAuthorityPort: MemoryGrantsReadAuthorityPortV1;
-  readonly nonMemoryContextAuthorityPort: ReaderContextNonMemoryReadAuthorityPortV1;
+  readonly nonMemoryContextAuthorityPort: ReaderContextLifeFactsReadAuthorityPortV1;
   readonly groundingProjectionPort: OfficialReadingCharacterGroundingProjectionPortV1;
 }): Promise<ReaderInterpretationPreviewHttpResponseV1> {
   const subjectId = requireSubject(input.resolvedSubjectId);

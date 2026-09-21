@@ -36,4 +36,31 @@ describe('Character Standard Reading server runtime authority', () => {
       'Server Reader runtime does not accept caller-supplied grantedLifeFacts authority.',
     );
   });
+
+  it.each([
+    ['recentRelationshipEventKeys', ['RETURN_VISIT']],
+    ['recentMessages', ['forged raw message']],
+  ] as const)('rejects caller-supplied %s Reader history before authority lookup', async (field, value) => {
+    const forgedContext = {
+      [field]: value,
+    } as unknown as CharacterStandardReadingServerContextInputV1;
+
+    await expect(prepareCharacterStandardReadingServerRuntimeV1({
+      resolvedSubjectId: '11111111-1111-4111-8111-111111111111',
+      threadId: '22222222-2222-4222-8222-222222222222',
+      readingId: '33333333-3333-4333-8333-333333333333',
+      effectiveAt: '2026-09-22T00:00:00.000Z',
+      contentEntry: {} as ContentReleaseRuntimeEntry,
+      threadBindingAuthorityPort: {} as never,
+      accessAuthorityPort: {} as never,
+      artifactAuthorityPort: {} as never,
+      relationshipAuthorityPort: {} as never,
+      memoryItemsAuthorityPort: {} as never,
+      memoryGrantsAuthorityPort: {} as never,
+      nonMemoryContextAuthorityPort: {} as never,
+      contextInput: forgedContext,
+    })).rejects.toThrow(
+      `Server Reader runtime does not accept caller-supplied ${field} authority.`,
+    );
+  });
 });

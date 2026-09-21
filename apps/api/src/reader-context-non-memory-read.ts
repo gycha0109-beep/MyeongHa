@@ -44,6 +44,11 @@ export interface ReaderContextNonMemoryReadAuthorityPortV1 {
   }): Promise<readonly ReaderRecentMessageAuthorityRowV1[]>;
 }
 
+export type ReaderContextLifeFactsReadAuthorityPortV1 = Pick<
+  ReaderContextNonMemoryReadAuthorityPortV1,
+  'readGrantedLifeFacts'
+>;
+
 export type ReaderContextNonMemoryReadAuthorityErrorCodeV1 =
   | 'INVALID_INPUT'
   | 'SUBJECT_INELIGIBLE'

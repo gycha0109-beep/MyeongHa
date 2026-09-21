@@ -96,11 +96,19 @@ The composition boundary remains fail-closed where source authority is not yet c
 - Reader-granted current Life Facts are now re-read through the owner-scoped
   PostgreSQL authority introduced by PR #1201; caller/context-provider Life Fact
   injection is rejected before runtime assembly.
-- Relationship rendering still requires source-backed
-  `relationshipProjectionPolicy` plus an approved relationship-event window, and
-  recent messages still require an approved server-owned message window. SRC-22
-  remains open, so test thresholds, arbitrary limits, or invented empty history must
-  not be promoted into Production composition.
+- **Decision-R / Reader Context Product Policy V1:** Reader Interpretation does not
+  consume relationship-event history or raw message text. The server composition seam
+  injects empty `recentRelationshipEventKeys` / `recentMessages` and rejects caller or
+  context-provider attempts to supply them; therefore no event/message window or limit
+  is invented for Reader v1.
+- Current relationship state still comes from the owner-scoped PostgreSQL projection.
+  `relationshipProjectionPolicy` remains a separate source-backed requirement; SRC-22
+  is still open and test threshold values must not be promoted into Production.
+- Reader v1 does not duplicate raw natal fields such as day master, five-element counts,
+  ten-god tables, hidden stems, major-luck cycles, or annual-luck cycles into a second
+  MyeongHa authority. Canonical Saju meaning comes only from the exact Official Reading
+  Source Truth projected by Saju into the admitted Character Grounding bundle. Timing
+  is available only when the Official Reading itself yields an admitted `timing` unit.
 
 Accordingly, this change hardens the composition order and browser projection but does
 not claim a positive end-to-end Production Reader Scene until the immutable content
