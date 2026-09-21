@@ -36,3 +36,5 @@ export function loadPhysiognomyEngineRuntimeV1(): Promise<PhysiognomyEngineRunti
   );
   return cachedEngineModule;
 }
+
+export * from './interpretation-shell-fe038.js';

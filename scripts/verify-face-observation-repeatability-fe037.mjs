@@ -550,6 +550,16 @@ try {
   client?.close();
   await new Promise((done) => server.close(done));
   await stopChrome();
-  await rm(profile, { recursive: true, force: true });
-  await rm(harnessRoot, { recursive: true, force: true });
+  await rm(profile, {
+    recursive: true,
+    force: true,
+    maxRetries: 10,
+    retryDelay: 100,
+  });
+  await rm(harnessRoot, {
+    recursive: true,
+    force: true,
+    maxRetries: 10,
+    retryDelay: 100,
+  });
 }
