@@ -20,10 +20,14 @@ Promise<FacePreviewEngineModuleV1> {
     throw new Error('FE032_ENGINE_CONTRACT_MISMATCH');
   }
 
+  const open = module.openDigestBoundProductPreviewSessionFE023;
   return Object.freeze({
     FE023_CONTRACT_VERSION,
-    openDigestBoundProductPreviewSessionFE023:
-      module.openDigestBoundProductPreviewSessionFE023,
+    async openDigestBoundProductPreviewSessionFE023(
+      config: unknown,
+    ): Promise<unknown> {
+      return open(config as Parameters<typeof open>[0]);
+    },
   });
 }
 
