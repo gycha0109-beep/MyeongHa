@@ -15,6 +15,7 @@ import {
   prepareCharacterStandardReadingThreadRuntimeV1,
   prepareChatReceiveCommand,
   type CharacterStandardReadingChatBaseContextInputV1,
+  type CharacterStandardReadingChatTurnServerContextInputV1,
 } from '../apps/api/src/index.js';
 import type { ChatThreadRuntimeBindingReadAuthorityPortV1 } from '../apps/api/src/chat-thread-runtime-binding-read.js';
 import type {
@@ -176,6 +177,16 @@ function contextInput(
   };
 }
 
+function serverContextInput(): CharacterStandardReadingChatTurnServerContextInputV1 {
+  const {
+    character: _character,
+    contentBundleId: _contentBundleId,
+    worldRelations: _worldRelations,
+    ...context
+  } = contextInput();
+  return context;
+}
+
 function authorities(participants: readonly string[] = ['baekheon']) {
   const threadBindingAuthorityPort: ChatThreadRuntimeBindingReadAuthorityPortV1 = {
     readRuntimeBinding: vi.fn(async () => [{
@@ -240,14 +251,26 @@ function compatibleReceiveRuntime(
   releaseId = RELEASE_ID,
   bundleId = BUNDLE_ID,
 ): ContentReleaseRuntime {
+  const contentVersion = 'reader-follow-up-test-v1';
   const entry = {
     release: {
       releaseId,
       bundleId,
-      contentVersion: 'reader-follow-up-test-v1',
+      contentVersion,
     },
-    characters: DEV_CHARACTER_CONTENT_BUNDLE,
-    world: DEV_WORLD_CONTENT_BUNDLE,
+    characters: {
+      ...DEV_CHARACTER_CONTENT_BUNDLE,
+      bundleId,
+      contentVersion,
+      characters: [authoredCharacter('baekheon')],
+    },
+    world: {
+      ...DEV_WORLD_CONTENT_BUNDLE,
+      bundleId,
+      contentVersion,
+      characterRelations: [],
+      episodes: [],
+    },
     lifecycle: 'active',
   } as unknown as ContentReleaseRuntimeEntry;
 
@@ -290,7 +313,7 @@ describe('thread-bound Official Reading Reader runtime', () => {
         readingId: READING_ID,
         effectiveAt: '2026-09-21T00:01:00.000Z',
         ...authority,
-        contextInput: contextInput(),
+        contextInput: serverContextInput(),
       });
 
       expect(result.threadBinding.participantCharacterIds).toEqual(['baekheon']);
@@ -321,7 +344,7 @@ describe('thread-bound Official Reading Reader runtime', () => {
         readingId: READING_ID,
         effectiveAt: '2026-09-21T00:01:00.000Z',
         ...authority,
-        contextInput: contextInput(),
+        contextInput: serverContextInput(),
       }),
     ).rejects.toBeInstanceOf(CharacterStandardReadingThreadRuntimeErrorV1);
 
@@ -381,7 +404,7 @@ describe('Official Reading Reader Chat turn preflight', () => {
         readingId: READING_ID,
         effectiveAt: '2026-09-21T00:02:00.000Z',
         ...authority,
-        contextInput: contextInput(),
+        contextInput: serverContextInput(),
       });
 
       expect(result.receivePlan).toBe(receivePlan);
@@ -414,9 +437,35 @@ describe('Official Reading Reader Chat turn preflight', () => {
         readingId: READING_ID,
         effectiveAt: '2026-09-21T00:02:00.000Z',
         ...authority,
-        contextInput: contextInput(),
+        contextInput: serverContextInput(),
       }),
     ).rejects.toThrow(/not minted by server receive authority/u);
+
+    expect(authority.threadBindingAuthorityPort.readRuntimeBinding).not.toHaveBeenCalled();
+    expect(authority.accessAuthorityPort.readAccessibleReadings).not.toHaveBeenCalled();
+    expect(authority.artifactAuthorityPort.readArtifactSource).not.toHaveBeenCalled();
+  });
+
+  it('rejects caller-supplied Character/world authority before thread or Reader Knowledge lookup', async () => {
+    const authority = authorities();
+    const receivePlan = existingThreadReceivePlan();
+    const forgedContext = {
+      ...serverContextInput(),
+      character: authoredCharacter('seyeon'),
+      contentBundleId: 'caller-bundle',
+      worldRelations: [],
+    } as unknown as CharacterStandardReadingChatTurnServerContextInputV1;
+
+    await expect(
+      prepareCharacterStandardReadingChatTurnPreflightV1({
+        resolvedSubjectId: SUBJECT_ID,
+        receivePlan,
+        readingId: READING_ID,
+        effectiveAt: '2026-09-21T00:02:00.000Z',
+        ...authority,
+        contextInput: forgedContext,
+      }),
+    ).rejects.toThrow(/does not accept caller-supplied character authority/u);
 
     expect(authority.threadBindingAuthorityPort.readRuntimeBinding).not.toHaveBeenCalled();
     expect(authority.accessAuthorityPort.readAccessibleReadings).not.toHaveBeenCalled();
@@ -437,7 +486,7 @@ describe('Official Reading Reader Chat turn preflight', () => {
         readingId: READING_ID,
         effectiveAt: '2026-09-21T00:02:00.000Z',
         ...authority,
-        contextInput: contextInput(),
+        contextInput: serverContextInput(),
       }),
     ).rejects.toBeInstanceOf(CharacterStandardReadingChatTurnPreflightErrorV1);
   });
@@ -461,7 +510,7 @@ describe('Official Reading Reader Chat turn preflight', () => {
         readingId: READING_ID,
         effectiveAt: '2026-09-21T00:02:00.000Z',
         ...authority,
-        contextInput: contextInput(),
+        contextInput: serverContextInput(),
       }),
     ).rejects.toThrow(/requires an existing server-bound thread/u);
 
