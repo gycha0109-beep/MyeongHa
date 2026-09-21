@@ -1,0 +1,237 @@
+name: Production Privacy Recovery Canary
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Type RUN_SYNTHETIC_PRODUCTION_PRIVACY_CANARY to execute the disposable Production privacy/deletion canary.'
+        required: true
+        type: string
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: production-privacy-recovery-canary
+  cancel-in-progress: false
+
+jobs:
+  canary:
+    name: production-privacy-recovery-canary
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: production
+    env:
+      MYEONGHA_PRIVACY_CANARY_CONFIRM: ${{ inputs.confirmation }}
+      MYEONGHA_SUPABASE_URL: https://cnsfpcdiyofqvhpcegfc.supabase.co
+      MYEONGHA_WORKER_DATABASE_URL: ${{ secrets.MYEONGHA_WORKER_DATABASE_URL }}
+      MYEONGHA_WORKER_DATABASE_PRINCIPAL: myeongha_worker_runtime
+      MYEONGHA_SUPABASE_AUTH_ADMIN_SECRET: ${{ secrets.MYEONGHA_SUPABASE_AUTH_ADMIN_SECRET }}
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PRODUCTION_SESSION_POOLER_HOST: ${{ secrets.SUPABASE_PRODUCTION_SESSION_POOLER_HOST }}
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - name: Require exact destructive-canary confirmation and credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$MYEONGHA_PRIVACY_CANARY_CONFIRM" == 'RUN_SYNTHETIC_PRODUCTION_PRIVACY_CANARY' ]]
+
+          missing=()
+          [[ -n "${MYEONGHA_WORKER_DATABASE_URL:-}" ]] || missing+=(MYEONGHA_WORKER_DATABASE_URL)
+          [[ -n "${SUPABASE_DB_PASSWORD:-}" ]] || missing+=(SUPABASE_DB_PASSWORD)
+          [[ -n "${SUPABASE_PRODUCTION_SESSION_POOLER_HOST:-}" ]] || missing+=(SUPABASE_PRODUCTION_SESSION_POOLER_HOST)
+          if [[ -z "${MYEONGHA_SUPABASE_AUTH_ADMIN_SECRET:-}" && -z "${SUPABASE_ACCESS_TOKEN:-}" ]]; then
+            missing+=(MYEONGHA_SUPABASE_AUTH_ADMIN_SECRET_OR_SUPABASE_ACCESS_TOKEN)
+          fi
+          if (( ${#missing[@]} > 0 )); then
+            printf '::error title=Production privacy canary credential missing::%s\n' "${missing[*]}"
+            exit 1
+          fi
+
+          if [[ ! "$SUPABASE_PRODUCTION_SESSION_POOLER_HOST" =~ ^[a-z0-9-]+([.][a-z0-9-]+)*[.]pooler[.]supabase[.]com$ ]]; then
+            echo '::error title=Production privacy canary pooler host invalid::Expected a bare *.pooler.supabase.com hostname.'
+            exit 1
+          fi
+
+          echo "::add-mask::$MYEONGHA_WORKER_DATABASE_URL"
+          echo "::add-mask::$SUPABASE_DB_PASSWORD"
+          [[ -z "${MYEONGHA_SUPABASE_AUTH_ADMIN_SECRET:-}" ]] || echo "::add-mask::$MYEONGHA_SUPABASE_AUTH_ADMIN_SECRET"
+          [[ -z "${SUPABASE_ACCESS_TOKEN:-}" ]] || echo "::add-mask::$SUPABASE_ACCESS_TOKEN"
+
+      - name: Checkout exact repository state
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Build server runtime
+        run: npm run build
+
+      - name: Prepare protected canary runtime paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          encoded_password="$(python3 - <<'PY'
+          import os
+          import urllib.parse
+          print(urllib.parse.quote(os.environ['SUPABASE_DB_PASSWORD'], safe=''))
+          PY
+          )"
+          admin_url="postgresql://postgres.cnsfpcdiyofqvhpcegfc:${encoded_password}@${SUPABASE_PRODUCTION_SESSION_POOLER_HOST}:5432/postgres?sslmode=require"
+          echo "::add-mask::$admin_url"
+          {
+            echo "MYEONGHA_PRIVACY_CANARY_ADMIN_DATABASE_URL=$admin_url"
+            echo "MYEONGHA_PRIVACY_CANARY_STATE_PATH=$RUNNER_TEMP/production-privacy-canary-state.json"
+            echo "MYEONGHA_PRIVACY_CANARY_EVIDENCE_PATH=$RUNNER_TEMP/production-privacy-canary-evidence.json"
+          } >> "$GITHUB_ENV"
+
+      - name: Create disposable hosted Auth + Production application canary state
+        id: prepare
+        run: node scripts/run-production-privacy-recovery-canary.mjs prepare
+
+      - name: Dispatch and wait for governed pre-deletion Production backup
+        id: backup
+        shell: bash
+        run: |
+          set -euo pipefail
+          dispatched_at="$(date -u +%s)"
+          gh workflow run production-postgres-backup.yml --ref main
+
+          run_id=''
+          for _ in $(seq 1 30); do
+            runs="$(gh run list               --workflow production-postgres-backup.yml               --branch main               --event workflow_dispatch               --limit 20               --json databaseId,headSha,createdAt)"
+            run_id="$(jq -r               --arg sha "$GITHUB_SHA"               --argjson dispatched_at "$dispatched_at"               '[.[] | select(.headSha == $sha and ((.createdAt | fromdateiso8601) >= $dispatched_at))] | sort_by(.createdAt) | last | .databaseId // empty'               <<<"$runs")"
+            [[ -z "$run_id" ]] || break
+            sleep 2
+          done
+          [[ -n "$run_id" ]] || {
+            echo '::error title=Production privacy canary backup dispatch unresolved::Could not bind the dispatched governed backup run.'
+            exit 1
+          }
+
+          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+          gh run watch "$run_id" --exit-status
+
+      - name: Start deletion through API executor and run dedicated worker
+        id: execute
+        run: node scripts/run-production-privacy-recovery-canary.mjs execute
+
+      - name: Dispatch and wait for canonical non-zero privacy recovery ledger
+        id: ledger
+        shell: bash
+        env:
+          BACKUP_RUN_ID: ${{ steps.backup.outputs.run_id }}
+        run: |
+          set -euo pipefail
+          [[ "$BACKUP_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+          dispatched_at="$(date -u +%s)"
+          gh workflow run production-postgres-privacy-recovery-ledger.yml             --ref main             -f "backup_run_id=$BACKUP_RUN_ID"
+
+          run_id=''
+          for _ in $(seq 1 30); do
+            runs="$(gh run list               --workflow production-postgres-privacy-recovery-ledger.yml               --branch main               --event workflow_dispatch               --limit 20               --json databaseId,headSha,createdAt)"
+            run_id="$(jq -r               --arg sha "$GITHUB_SHA"               --argjson dispatched_at "$dispatched_at"               '[.[] | select(.headSha == $sha and ((.createdAt | fromdateiso8601) >= $dispatched_at))] | sort_by(.createdAt) | last | .databaseId // empty'               <<<"$runs")"
+            [[ -z "$run_id" ]] || break
+            sleep 2
+          done
+          [[ -n "$run_id" ]] || {
+            echo '::error title=Production privacy canary ledger dispatch unresolved::Could not bind the dispatched canonical ledger run.'
+            exit 1
+          }
+
+          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+          gh run watch "$run_id" --exit-status
+
+      - name: Require non-zero ACCOUNT_DELETION_STARTED ledger evidence
+        id: validate
+        shell: bash
+        env:
+          BACKUP_RUN_ID: ${{ steps.backup.outputs.run_id }}
+          LEDGER_RUN_ID: ${{ steps.ledger.outputs.run_id }}
+        run: |
+          set -euo pipefail
+          artifact_dir="$RUNNER_TEMP/privacy-canary-ledger"
+          rm -rf "$artifact_dir"
+          mkdir -p "$artifact_dir"
+          gh run download "$LEDGER_RUN_ID" --dir "$artifact_dir"
+
+          mapfile -t manifests < <(find "$artifact_dir" -type f -name 'myeongha-privacy-ledger-*.manifest.json' -print)
+          [[ "${#manifests[@]}" -eq 1 ]] || {
+            echo '::error title=Production privacy canary ledger manifest invalid::Expected exactly one public ledger manifest.'
+            exit 1
+          }
+          manifest="${manifests[0]}"
+
+          jq -e             --argjson backup_run_id "$BACKUP_RUN_ID"             '.backupRunId == $backup_run_id
+             and .sourceAuthorityClass == "AUTHORITATIVE_CAPTURED_WINDOW_V1"
+             and .authoritativePostBackupSource == true
+             and .eventCount > 0
+             and (.eventTypeCounts.ACCOUNT_DELETION_STARTED // 0) >= 1
+             and .authoritativePrivacyReconciliation == false
+             and .futureSafePrivacyReconciliation == false
+             and .drReady == false'             "$manifest" >/dev/null
+
+          event_count="$(jq -r '.eventCount' "$manifest")"
+          account_deletion_count="$(jq -r '.eventTypeCounts.ACCOUNT_DELETION_STARTED' "$manifest")"
+          final_evidence="$RUNNER_TEMP/production-privacy-canary-public-evidence.json"
+
+          jq             --argjson backup_run_id "$BACKUP_RUN_ID"             --argjson ledger_run_id "$LEDGER_RUN_ID"             --argjson event_count "$event_count"             --argjson account_deletion_count "$account_deletion_count"             '. + {
+              governedBackupRunId: $backup_run_id,
+              privacyRecoveryLedgerRunId: $ledger_run_id,
+              privacyRecoveryLedgerEventCount: $event_count,
+              accountDeletionStartedEventCount: $account_deletion_count,
+              authoritativePrivacyReconciliation: false,
+              futureSafePrivacyReconciliation: false,
+              drReady: false
+            }'             "$MYEONGHA_PRIVACY_CANARY_EVIDENCE_PATH" > "$final_evidence"
+
+          jq -e             '.outputContainsIdentifiers == false
+             and .outputContainsRowPayloads == false
+             and .privacyRecoveryLedgerEventCount > 0
+             and .accountDeletionStartedEventCount >= 1
+             and .authoritativePrivacyReconciliation == false
+             and .drReady == false'             "$final_evidence" >/dev/null
+
+          echo "public_evidence=$final_evidence" >> "$GITHUB_OUTPUT"
+
+      - name: Upload identifier-free canary evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
+        with:
+          name: production-privacy-recovery-canary-${{ github.run_id }}
+          path: ${{ steps.validate.outputs.public_evidence }}
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish canary summary
+        shell: bash
+        env:
+          BACKUP_RUN_ID: ${{ steps.backup.outputs.run_id }}
+          LEDGER_RUN_ID: ${{ steps.ledger.outputs.run_id }}
+        run: |
+          set -euo pipefail
+          {
+            echo '### Production privacy recovery canary'
+            echo
+            printf -- '- governed pre-deletion backup run: `%s`\n' "$BACKUP_RUN_ID"
+            printf -- '- canonical privacy ledger run: `%s`\n' "$LEDGER_RUN_ID"
+            echo '- account deletion path: API executor runtime wrapper -> dedicated worker -> hosted Auth Admin'
+            echo '- non-zero ACCOUNT_DELETION_STARTED ledger evidence: PASS'
+            echo '- identifier-free evidence: PASS'
+            echo '- authoritative privacy reconciliation: NOT YET CLAIMED'
+            echo '- DR Ready: FALSE'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Cleanup only if failure occurred before deletion start
+        if: failure()
+        continue-on-error: true
+        run: node scripts/run-production-privacy-recovery-canary.mjs cleanup-prestart
