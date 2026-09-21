@@ -1,0 +1,40 @@
+name: FE032 Physiognomy Page
+
+on:
+  pull_request:
+    paths:
+      - 'apps/web/face-reading.html'
+      - 'apps/web/face-reading.css'
+      - 'apps/web/src/face-reading/**'
+      - 'apps/web/*.html'
+      - 'apps/web/product.css'
+      - 'apps/web/vite.config.ts'
+      - 'docs/face-engine/fe032-physiognomy-page.md'
+      - '.github/workflows/fe032-physiognomy-page.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify-fe032-physiognomy-page:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Verify FE032 page API
+        run: npx vitest run apps/web/src/face-reading/page-api-fe032.test.ts
+      - name: Build standalone physiognomy page
+        run: npm run build:web
+      - name: Verify standalone page output
+        run: |
+          test -f public/face-reading.html
+          test -f public/face-reading.css
+          grep -q '관상' public/face-reading.html
+          grep -q 'face-reading.html' public/hall.html
