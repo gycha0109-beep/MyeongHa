@@ -27,6 +27,9 @@ import type {
 import type {
   MemoryGrantsReadAuthorityPortV1,
 } from '../apps/api/src/memory-grants-read.js';
+import type {
+  ReaderContextNonMemoryReadAuthorityPortV1,
+} from '../apps/api/src/reader-context-non-memory-read.js';
 
 describe('Reader Interpretation Preview HTTP seam', () => {
   it('accepts only threadId + officialReadingId and normalizes them', () => {
@@ -148,6 +151,11 @@ describe('Reader Interpretation Preview HTTP seam', () => {
     const memoryGrantsAuthorityPort = {
       readActiveGrants: vi.fn(),
     } as unknown as MemoryGrantsReadAuthorityPortV1;
+    const nonMemoryContextAuthorityPort = {
+      readGrantedLifeFacts: vi.fn(),
+      readRelationshipEvents: vi.fn(),
+      readRecentMessages: vi.fn(),
+    } as unknown as ReaderContextNonMemoryReadAuthorityPortV1;
 
     await expect(
       runReaderInterpretationPreviewHttpV1({
@@ -165,6 +173,7 @@ describe('Reader Interpretation Preview HTTP seam', () => {
         relationshipAuthorityPort,
         memoryItemsAuthorityPort,
         memoryGrantsAuthorityPort,
+        nonMemoryContextAuthorityPort,
         groundingProjectionPort: { projectGrounding: vi.fn() },
       }),
     ).rejects.toMatchObject({ code: 'AUTH_REQUIRED' });
@@ -196,6 +205,11 @@ describe('Reader Interpretation Preview HTTP seam', () => {
     const memoryGrantsAuthorityPort = {
       readActiveGrants: vi.fn(),
     } as unknown as MemoryGrantsReadAuthorityPortV1;
+    const nonMemoryContextAuthorityPort = {
+      readGrantedLifeFacts: vi.fn(),
+      readRelationshipEvents: vi.fn(),
+      readRecentMessages: vi.fn(),
+    } as unknown as ReaderContextNonMemoryReadAuthorityPortV1;
 
     await expect(
       runReaderInterpretationPreviewHttpV1({
@@ -214,6 +228,7 @@ describe('Reader Interpretation Preview HTTP seam', () => {
         relationshipAuthorityPort,
         memoryItemsAuthorityPort,
         memoryGrantsAuthorityPort,
+        nonMemoryContextAuthorityPort,
         groundingProjectionPort: { projectGrounding: vi.fn() },
       }),
     ).rejects.toMatchObject({ code: 'INVALID_REQUEST' });

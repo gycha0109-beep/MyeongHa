@@ -41,6 +41,9 @@ import type {
 import type {
   MemoryGrantsReadAuthorityPortV1,
 } from './memory-grants-read.js';
+import type {
+  ReaderContextNonMemoryReadAuthorityPortV1,
+} from './reader-context-non-memory-read.js';
 import {
   CharacterStandardReadingServerRuntimeAuthorityErrorV1,
   prepareCharacterStandardReadingServerRuntimeV1,
@@ -127,6 +130,7 @@ export interface RunThreadBoundReaderInterpretationPreviewInputV1 {
   readonly relationshipAuthorityPort: CharacterRelationshipReadAuthorityPortV1;
   readonly memoryItemsAuthorityPort: MemoryItemsReadAuthorityPortV1;
   readonly memoryGrantsAuthorityPort: MemoryGrantsReadAuthorityPortV1;
+  readonly nonMemoryContextAuthorityPort: ReaderContextNonMemoryReadAuthorityPortV1;
   readonly groundingProjectionPort: OfficialReadingCharacterGroundingProjectionPortV1;
 }
 
@@ -557,6 +561,7 @@ export async function runThreadBoundReaderInterpretationPreviewV1(
       relationshipAuthorityPort: input.relationshipAuthorityPort,
       memoryItemsAuthorityPort: input.memoryItemsAuthorityPort,
       memoryGrantsAuthorityPort: input.memoryGrantsAuthorityPort,
+      nonMemoryContextAuthorityPort: input.nonMemoryContextAuthorityPort,
       contextInput: input.contextInput,
     });
   } catch (error) {

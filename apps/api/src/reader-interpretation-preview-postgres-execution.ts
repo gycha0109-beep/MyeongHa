@@ -15,6 +15,9 @@ import {
   createPostgresReaderContextMemoryItemsAuthorityPortV1,
 } from './postgres-reader-context-memory.js';
 import {
+  createPostgresReaderContextNonMemoryReadAuthorityPortV1,
+} from './postgres-reader-context-non-memory.js';
+import {
   executePostgresSubjectTransactionV1,
   type PostgresSubjectPoolV1,
   type PostgresTransactionQueryV1,
@@ -84,6 +87,8 @@ export function executeReaderInterpretationPreviewPostgresV1(
           createPostgresReaderContextMemoryItemsAuthorityPortV1(client),
         memoryGrantsAuthorityPort:
           createPostgresReaderContextMemoryGrantsAuthorityPortV1(client),
+        nonMemoryContextAuthorityPort:
+          createPostgresReaderContextNonMemoryReadAuthorityPortV1(client),
         groundingProjectionPort: input.groundingProjectionPort,
       });
     },

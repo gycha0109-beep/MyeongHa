@@ -24,6 +24,9 @@ import {
   getMemoryGrants,
   type MemoryGrantsReadAuthorityPortV1,
 } from './memory-grants-read.js';
+import type {
+  ReaderContextNonMemoryReadAuthorityPortV1,
+} from './reader-context-non-memory-read.js';
 
 export type CharacterStandardReadingServerContextInputV1 = Omit<
   CharacterStandardReadingChatBaseContextInputV1,
@@ -31,6 +34,7 @@ export type CharacterStandardReadingServerContextInputV1 = Omit<
   | 'contentBundleId'
   | 'worldRelations'
   | 'relationshipState'
+  | 'grantedLifeFacts'
   | 'grantedMemories'
 >;
 
@@ -47,6 +51,7 @@ export interface PrepareCharacterStandardReadingServerRuntimeInputV1 {
   readonly relationshipAuthorityPort: CharacterRelationshipReadAuthorityPortV1;
   readonly memoryItemsAuthorityPort: MemoryItemsReadAuthorityPortV1;
   readonly memoryGrantsAuthorityPort: MemoryGrantsReadAuthorityPortV1;
+  readonly nonMemoryContextAuthorityPort: ReaderContextNonMemoryReadAuthorityPortV1;
   readonly contextInput: CharacterStandardReadingServerContextInputV1;
 }
 
@@ -65,6 +70,7 @@ function assertNoCallerContentAuthorityFields(
     'contentBundleId',
     'worldRelations',
     'relationshipState',
+    'grantedLifeFacts',
     'grantedMemories',
   ] as const) {
     if (Object.prototype.hasOwnProperty.call(input, field)) {
@@ -172,6 +178,11 @@ export async function prepareCharacterStandardReadingServerRuntimeV1(
     policyVersion: relationship.relationship.policyVersion,
   });
 
+  const grantedLifeFacts = await input.nonMemoryContextAuthorityPort.readGrantedLifeFacts({
+    subjectId: input.resolvedSubjectId!,
+    characterId: readerCharacterId,
+  });
+
   const memoryItems = await getMemoryItems({
     ...subjectBinding,
     authorityPort: input.memoryItemsAuthorityPort,
@@ -217,6 +228,7 @@ export async function prepareCharacterStandardReadingServerRuntimeV1(
       contentBundleId: input.contentEntry.release.bundleId,
       relationshipState,
       worldRelations,
+      grantedLifeFacts: Object.freeze(grantedLifeFacts.map((fact) => Object.freeze({ ...fact }))),
       grantedMemories: Object.freeze(grantedMemories),
     },
   });

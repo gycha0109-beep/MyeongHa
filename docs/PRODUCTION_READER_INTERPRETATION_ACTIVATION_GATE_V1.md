@@ -93,10 +93,14 @@ The composition boundary remains fail-closed where source authority is not yet c
   DB runtime metadata. `content_bundles.artifact_ref` is a private resolver key, but
   current source authority still blocks concrete Production Character asset payload
   approval/publication (Character Runtime Asset Gate B/C).
+- Reader-granted current Life Facts are now re-read through the owner-scoped
+  PostgreSQL authority introduced by PR #1201; caller/context-provider Life Fact
+  injection is rejected before runtime assembly.
 - Relationship rendering still requires source-backed
-  `relationshipProjectionPolicy` and recent relationship-event authority. SRC-22
-  remains open, so test thresholds or invented empty event history must not be
-  promoted into Production composition.
+  `relationshipProjectionPolicy` plus an approved relationship-event window, and
+  recent messages still require an approved server-owned message window. SRC-22
+  remains open, so test thresholds, arbitrary limits, or invented empty history must
+  not be promoted into Production composition.
 
 Accordingly, this change hardens the composition order and browser projection but does
 not claim a positive end-to-end Production Reader Scene until the immutable content
