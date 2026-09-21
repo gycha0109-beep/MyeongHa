@@ -28,6 +28,34 @@ describe('production account deletion worker DB config', () => {
     });
   });
 
+  it('accepts the Supavisor-qualified worker username while retaining the database role authority', () => {
+    const config = parseProductionAccountDeletionWorkerDbConfigV1({
+      MYEONGHA_WORKER_DATABASE_URL:
+        'postgresql://myeongha_worker_runtime.cnsfpcdiyofqvhpcegfc:secret-value@aws-0-ap-northeast-2.pooler.supabase.com:5432/postgres?sslmode=require',
+      MYEONGHA_WORKER_DATABASE_PRINCIPAL: 'myeongha_worker_runtime',
+    });
+
+    expect(config.databasePrincipal).toBe(
+      MYEONGHA_ACCOUNT_DELETION_WORKER_DATABASE_PRINCIPAL,
+    );
+  });
+
+  it('rejects malformed or unrelated Supavisor-qualified principals', () => {
+    for (const username of [
+      'myeongha_worker_runtime.short',
+      'myeongha_runtime.cnsfpcdiyofqvhpcegfc',
+      'postgres.cnsfpcdiyofqvhpcegfc',
+    ]) {
+      expect(() =>
+        parseProductionAccountDeletionWorkerDbConfigV1({
+          MYEONGHA_WORKER_DATABASE_URL:
+            `postgresql://${username}:secret-value@aws-0-ap-northeast-2.pooler.supabase.com:5432/postgres?sslmode=require`,
+          MYEONGHA_WORKER_DATABASE_PRINCIPAL: 'myeongha_worker_runtime',
+        }),
+      ).toThrow(/dedicated worker login principal/u);
+    }
+  });
+
   it('rejects ordinary or privileged database principals', () => {
     expect(() =>
       parseProductionAccountDeletionWorkerDbConfigV1({
