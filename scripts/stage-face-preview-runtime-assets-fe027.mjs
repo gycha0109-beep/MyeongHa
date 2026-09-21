@@ -43,7 +43,7 @@ assert(
 );
 assert(Array.isArray(manifest.assets) && manifest.assets.length === 7, 'asset set drift.');
 
-await rm(outputRoot, { recursive: true, force: true });
+await rm(resolve(outputRoot, 'face-preview'), { recursive: true, force: true });
 
 const staged = [];
 for (const asset of manifest.assets) {
