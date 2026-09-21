@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'apps/web/package.json'
+      - 'packages/face-reading/**'
       - 'package-lock.json'
       - 'apps/web/src/face-reading/engine-loader-fe033.ts'
       - 'apps/web/src/face-reading/engine-loader-fe033.test.ts'
