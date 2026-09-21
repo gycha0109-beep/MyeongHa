@@ -25,4 +25,5 @@ jobs:
           gh workflow run production-privacy-recovery-canary.yml \
             --repo "$GITHUB_REPOSITORY" \
             --ref main \
-            -f confirmation=RUN_SYNTHETIC_PRODUCTION_PRIVACY_CANARY
+            -f confirmation=RUN_SYNTHETIC_PRODUCTION_PRIVACY_CANARY \
+            -f watchtower_track=privacy-recovery
