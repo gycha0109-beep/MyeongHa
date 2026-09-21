@@ -18,7 +18,7 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          EXPECTED_MAIN_SHA: 1ecb4e07bb0f3fd2ad768a54ebd06ee45d3be552
+          EXPECTED_MAIN_SHA: 12ba80350423a74196cfc41099a13859c983e987
         run: |
           set -euo pipefail
           main_sha="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq '.sha')"
