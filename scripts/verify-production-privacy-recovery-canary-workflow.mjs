@@ -31,14 +31,11 @@ for (const fragment of [
   'watchtower_track:',
   'MYEONGHA_WATCHTOWER_TRACK: ${{ inputs.watchtower_track }}',
   '[[ "$MYEONGHA_WATCHTOWER_TRACK" == \'privacy-recovery\' ]]',
-  'MYEONGHA_DATABASE_PRINCIPAL: myeongha_runtime',
-  'VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}',
-  'VERCEL_PROJECT_ID: prj_nXF0b5uv27Lyucz2SEBxzdCRXVsP',
-  'VERCEL_TEAM_ID: team_xuYA9OhCWlJETaYFOmeVodgS',
-  'Resolve governed Production API database binding from Vercel',
-  'env?decrypt=true&teamId=$VERCEL_TEAM_ID',
-  '.key == "MYEONGHA_DATABASE_URL"',
-  'MYEONGHA_DATABASE_URL=%s\\n',
+  'Provision ephemeral API canary login',
+  'node scripts/run-production-privacy-recovery-canary.mjs provision-api-login',
+  'Remove ephemeral API canary login',
+  'if: always()',
+  'node scripts/run-production-privacy-recovery-canary.mjs cleanup-api-login',
   'MYEONGHA_WORKER_DATABASE_URL: ${{ secrets.MYEONGHA_WORKER_DATABASE_URL }}',
   'MYEONGHA_WORKER_DATABASE_PRINCIPAL: myeongha_worker_runtime',
   'MYEONGHA_PRIVACY_CANARY_ADMIN_DATABASE_URL',
@@ -65,38 +62,50 @@ for (const fragment of [
   '\n  pull_request:',
   'cancel-in-progress: true',
   'MYEONGHA_DATABASE_URL: ${{ secrets.MYEONGHA_DATABASE_URL }}',
+  'VERCEL_TOKEN:',
+  'env?decrypt=true',
+  'Resolve governed Production API database binding from Vercel',
 ]) {
   forbidFragment(workflow, fragment, workflowPath);
 }
 
+const runtimePathsIndex = workflow.indexOf(
+  'Prepare protected canary runtime paths',
+);
+const provisionIndex = workflow.indexOf(
+  'Provision ephemeral API canary login',
+);
 const prepareIndex = workflow.indexOf(
   'Create disposable hosted Auth + Production application canary state',
 );
-const vercelCredentialIndex = workflow.indexOf(
-  '[[ -n "${VERCEL_TOKEN:-}" ]]',
+const executeIndex = workflow.indexOf(
+  'Start deletion through API executor and run dedicated worker',
 );
-const resolverIndex = workflow.indexOf(
-  'Resolve governed Production API database binding from Vercel',
+const cleanupLoginIndex = workflow.indexOf(
+  'Remove ephemeral API canary login',
 );
-const databaseExportIndex = workflow.indexOf(
-  "printf 'MYEONGHA_DATABASE_URL=%s\\n' \"$database_url\" >> \"$GITHUB_ENV\"",
+const ledgerIndex = workflow.indexOf(
+  'Dispatch and wait for canonical non-zero privacy recovery ledger',
 );
 const workerCredentialIndex = workflow.indexOf(
   '[[ -n "${MYEONGHA_WORKER_DATABASE_URL:-}" ]]',
 );
 if (
-  vercelCredentialIndex < 0 ||
-  resolverIndex < 0 ||
-  databaseExportIndex < 0 ||
-  workerCredentialIndex < 0 ||
+  runtimePathsIndex < 0 ||
+  provisionIndex < 0 ||
   prepareIndex < 0 ||
-  vercelCredentialIndex > resolverIndex ||
-  resolverIndex > prepareIndex ||
-  databaseExportIndex > prepareIndex ||
-  workerCredentialIndex > prepareIndex
+  executeIndex < 0 ||
+  cleanupLoginIndex < 0 ||
+  ledgerIndex < 0 ||
+  workerCredentialIndex < 0 ||
+  workerCredentialIndex > prepareIndex ||
+  runtimePathsIndex > provisionIndex ||
+  provisionIndex > prepareIndex ||
+  executeIndex > cleanupLoginIndex ||
+  cleanupLoginIndex > ledgerIndex
 ) {
   throw new Error(
-    `${workflowPath} must resolve the governed Vercel Production API database binding and fail closed on worker credentials before creating Production canary state.`,
+    `${workflowPath} must provision an ephemeral API login only after protected admin transport exists, remove it after execution, and fail closed on worker credentials before creating Production canary state.`,
   );
 }
 
@@ -110,8 +119,17 @@ if (
 for (const fragment of [
   "const CONFIRMATION = 'RUN_SYNTHETIC_PRODUCTION_PRIVACY_CANARY';",
   "const PROVIDER = 'myeongha-privacy-canary-v1';",
-  "const API_DATABASE_PRINCIPAL = 'myeongha_runtime';",
   "const API_EXECUTION_ROLE = 'myeongha_api_executor';",
+  "const API_CANARY_ROLE_MARKER = 'myeongha:privacy-canary-api-login:v1';",
+  "myeongha_privacy_canary_",
+  "randomBytes(32).toString('hex')",
+  "create role \${roleIdentifier}",
+  "grant \${API_EXECUTION_ROLE} to \${roleIdentifier}",
+  "MYEONGHA_DATABASE_PRINCIPAL=\${roleName}",
+  "MYEONGHA_DATABASE_URL=\${databaseUrl}",
+  "expectedApiDatabasePrincipal()",
+  "API_CANARY_ROLE_CLEANUP_GUARD_FAILED",
+  "drop role \${roleIdentifier}",
   "requiredEnv('MYEONGHA_DATABASE_URL')",
   'await assertApiRuntimePrincipal(client);',
   "phase: 'preparing'",
@@ -131,7 +149,7 @@ for (const fragment of [
   'row?.profile_count !== 0',
   'await assertHostedUserAbsent(secret, state.authUserId);',
   "fixtureClass: 'synthetic-disposable-member'",
-  "accountDeletionStartAuthority: 'myeongha_api_executor/cmd_start_account_deletion_runtime_v1'",
+  "accountDeletionStartAuthority: 'ephemeral-canary-login->myeongha_api_executor/cmd_start_account_deletion_runtime_v1'",
   "workerAuthority: 'myeongha_worker_runtime->myeongha_system_executor'",
   "personalizationNonResurrectionGuard: 'pass'",
   "commerceP5yRetentionGuard: 'retained-revoked-pass'",
@@ -145,6 +163,7 @@ for (const fragment of [
 }
 
 for (const fragment of [
+  "const API_DATABASE_PRINCIPAL = 'myeongha_runtime';",
   'customer_id',
   'customerId',
   'generic retry',
@@ -154,5 +173,5 @@ for (const fragment of [
 }
 
 console.log(
-  'Production privacy recovery canary workflow verification passed: workflow_dispatch-only, synthetic fixture, API-executor deletion start, dedicated worker, hosted Auth cleanup, non-zero canonical ledger gate, identifier-free evidence, and DR fail-closed semantics are pinned.',
+  'Production privacy recovery canary workflow verification passed: workflow_dispatch-only, ephemeral least-privilege API login, synthetic fixture, API-executor deletion start, dedicated worker, hosted Auth cleanup, non-zero canonical ledger gate, identifier-free evidence, and DR fail-closed semantics are pinned.',
 );
