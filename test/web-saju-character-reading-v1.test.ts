@@ -60,9 +60,12 @@ describe('MyeongHa character-led Saju Reading v1', () => {
     }
 
     expect(runtime).toContain("params.get('character') || params.get('reader')");
-    expect(runtime).toContain('root.dataset.reader = readerKey');
+    expect(runtime).toContain('root.dataset.reader = presentationReaderHint');
     expect(runtime).toContain("root.dataset.readerSelection = params.has('reader') || params.has('character') ? 'explicit' : 'default';");
+    expect(runtime).toContain("root.dataset.readerAuthority = 'presentation_hint_only';");
     expect(runtime).toContain("root.dataset.readerPresentation = 'reading-scene-v1';");
+    expect(runtime).toContain('const readerKey = presentationReaderHint');
+    expect(runtime).toContain('the server-returned readerCharacterId wins');
     expect(runtime).toContain('data-reader-hanja');
   });
 
