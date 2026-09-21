@@ -29,8 +29,16 @@ for (const fragment of [
   'cancel-in-progress: false',
   'environment: production',
   'watchtower_track:',
+  'operation:',
+  'resume_canary_run_id:',
+  'resume_backup_run_id:',
   'MYEONGHA_WATCHTOWER_TRACK: ${{ inputs.watchtower_track }}',
+  'MYEONGHA_PRIVACY_CANARY_OPERATION: ${{ inputs.operation }}',
+  'MYEONGHA_PRIVACY_CANARY_RESUME_RUN_ID: ${{ inputs.resume_canary_run_id }}',
+  'MYEONGHA_PRIVACY_CANARY_RESUME_BACKUP_RUN_ID: ${{ inputs.resume_backup_run_id }}',
   '[[ "$MYEONGHA_WATCHTOWER_TRACK" == \'ops\' ]]',
+  'Verify dedicated worker database authority before mutation',
+  'node scripts/run-production-privacy-recovery-canary.mjs preflight-worker',
   'Provision ephemeral API canary login',
   'node scripts/run-production-privacy-recovery-canary.mjs provision-api-login',
   'Remove ephemeral API canary login',
@@ -42,6 +50,12 @@ for (const fragment of [
   'node scripts/run-production-privacy-recovery-canary.mjs prepare',
   'gh workflow run production-postgres-backup.yml --ref main',
   'node scripts/run-production-privacy-recovery-canary.mjs execute',
+  'Recover stranded canary state from Production',
+  'node scripts/run-production-privacy-recovery-canary.mjs recover-resume-state',
+  'Resume dedicated worker for already-started deletion',
+  'node scripts/run-production-privacy-recovery-canary.mjs resume',
+  'Resolve governed pre-deletion backup',
+  'steps.backup-ref.outputs.run_id',
   'gh workflow run production-postgres-privacy-recovery-ledger.yml',
   '-f "backup_run_id=$BACKUP_RUN_ID"',
   '.eventCount > 0',
@@ -72,6 +86,9 @@ for (const fragment of [
 const runtimePathsIndex = workflow.indexOf(
   'Prepare protected canary runtime paths',
 );
+const workerPreflightIndex = workflow.indexOf(
+  'Verify dedicated worker database authority before mutation',
+);
 const provisionIndex = workflow.indexOf(
   'Provision ephemeral API canary login',
 );
@@ -84,6 +101,15 @@ const executeIndex = workflow.indexOf(
 const cleanupLoginIndex = workflow.indexOf(
   'Remove ephemeral API canary login',
 );
+const recoverIndex = workflow.indexOf(
+  'Recover stranded canary state from Production',
+);
+const resumeIndex = workflow.indexOf(
+  'Resume dedicated worker for already-started deletion',
+);
+const backupRefIndex = workflow.indexOf(
+  'Resolve governed pre-deletion backup',
+);
 const ledgerIndex = workflow.indexOf(
   'Dispatch and wait for canonical non-zero privacy recovery ledger',
 );
@@ -92,20 +118,28 @@ const workerCredentialIndex = workflow.indexOf(
 );
 if (
   runtimePathsIndex < 0 ||
+  workerPreflightIndex < 0 ||
   provisionIndex < 0 ||
   prepareIndex < 0 ||
   executeIndex < 0 ||
   cleanupLoginIndex < 0 ||
+  recoverIndex < 0 ||
+  resumeIndex < 0 ||
+  backupRefIndex < 0 ||
   ledgerIndex < 0 ||
   workerCredentialIndex < 0 ||
   workerCredentialIndex > prepareIndex ||
-  runtimePathsIndex > provisionIndex ||
+  runtimePathsIndex > workerPreflightIndex ||
+  workerPreflightIndex > provisionIndex ||
   provisionIndex > prepareIndex ||
   executeIndex > cleanupLoginIndex ||
-  cleanupLoginIndex > ledgerIndex
+  recoverIndex > resumeIndex ||
+  resumeIndex > backupRefIndex ||
+  cleanupLoginIndex > backupRefIndex ||
+  backupRefIndex > ledgerIndex
 ) {
   throw new Error(
-    `${workflowPath} must provision an ephemeral API login only after protected admin transport exists, remove it after execution, and fail closed on worker credentials before creating Production canary state.`,
+    `${workflowPath} must preflight the dedicated worker before mutation, keep fresh API-login lifecycle ordering, recover resume state before resumed execution, and resolve one governed backup before ledger dispatch.`,
   );
 }
 
@@ -131,6 +165,20 @@ for (const fragment of [
   "API_CANARY_ROLE_CLEANUP_GUARD_FAILED",
   "drop role \${roleIdentifier}",
   "requiredEnv('MYEONGHA_DATABASE_URL')",
+  "requiredEnv('MYEONGHA_WORKER_DATABASE_URL')",
+  'classifyWorkerDatabaseFailure(error)',
+  "WORKER_DB_ROUTING_INVALID",
+  "WORKER_DB_AUTH_INVALID",
+  "WORKER_DB_TRANSPORT_INVALID",
+  'createNodePostgresAccountDeletionWorkerPoolV1',
+  'MYEONGHA_PRODUCTION_PRIVACY_CANARY_WORKER_DB_PREFLIGHT_PASS',
+  "requiredEnv('MYEONGHA_PRIVACY_CANARY_RESUME_RUN_ID')",
+  "cal.external_account_fingerprint like $2::text",
+  "phase: 'deletion_started'",
+  "MYEONGHA_PRODUCTION_PRIVACY_CANARY_RESUME_STATE_RECOVERED",
+  "MYEONGHA_PRODUCTION_PRIVACY_CANARY_RESUME_PASS",
+  "canaryOperation: state.sourceCanaryRunId === undefined ? 'fresh' : 'resume'",
+  'resumedFromCanaryRunId:',
   'await assertApiRuntimePrincipal(client);',
   "phase: 'preparing'",
   "state.phase = 'prepared';",
@@ -173,5 +221,5 @@ for (const fragment of [
 }
 
 console.log(
-  'Production privacy recovery canary workflow verification passed: workflow_dispatch-only, ephemeral least-privilege API login, synthetic fixture, API-executor deletion start, dedicated worker, hosted Auth cleanup, non-zero canonical ledger gate, identifier-free evidence, and DR fail-closed semantics are pinned.',
+  'Production privacy recovery canary workflow verification passed: workflow_dispatch-only, ops attribution, pre-mutation worker DB preflight, fresh-or-resume canary recovery, ephemeral least-privilege API login, dedicated worker, hosted Auth cleanup, governed backup binding, non-zero canonical ledger gate, identifier-free evidence, and DR fail-closed semantics are pinned.',
 );
