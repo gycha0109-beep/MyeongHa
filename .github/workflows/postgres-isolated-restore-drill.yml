@@ -21,6 +21,10 @@ on:
         required: false
         default: ''
         type: string
+      watchtower_track:
+        description: Watchtower Track Key for CI attribution
+        required: true
+        type: string
 
 permissions:
   actions: read
@@ -51,10 +55,17 @@ jobs:
           --health-retries 12
           --health-start-period 30s
     env:
+      MYEONGHA_WATCHTOWER_TRACK: ${{ inputs.watchtower_track }}
       EXPECTED_PROJECT_REF: cnsfpcdiyofqvhpcegfc
       MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE: ${{ secrets.MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE }}
 
     steps:
+      - name: Require operations Watchtower attribution
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$MYEONGHA_WATCHTOWER_TRACK" == 'ops' ]]
+
       - name: Checkout exact repository state
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
