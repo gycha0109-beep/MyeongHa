@@ -1,5 +1,5 @@
 import {
-  assertServerPreparedChatReceivePlanV1,
+  getServerPreparedChatReceiveContentEntryV1,
   type ChatReceivePlan,
 } from './chat-receive.js';
 import {
@@ -11,7 +11,15 @@ import type {
   CharacterStandardReadingAccessAuthorityPortV1,
   CharacterStandardReadingArtifactAuthorityPortV1,
 } from './character-standard-reading-knowledge.js';
-import type { ChatThreadRuntimeBindingReadAuthorityPortV1 } from './chat-thread-runtime-binding-read.js';
+import {
+  getChatThreadRuntimeBinding,
+  type ChatThreadRuntimeBindingReadAuthorityPortV1,
+} from './chat-thread-runtime-binding-read.js';
+
+export type CharacterStandardReadingChatTurnServerContextInputV1 = Omit<
+  CharacterStandardReadingChatBaseContextInputV1,
+  'character' | 'contentBundleId' | 'worldRelations'
+>;
 
 export interface PrepareCharacterStandardReadingChatTurnPreflightInputV1 {
   readonly resolvedSubjectId?: string;
@@ -21,7 +29,7 @@ export interface PrepareCharacterStandardReadingChatTurnPreflightInputV1 {
   readonly threadBindingAuthorityPort: ChatThreadRuntimeBindingReadAuthorityPortV1;
   readonly accessAuthorityPort: CharacterStandardReadingAccessAuthorityPortV1;
   readonly artifactAuthorityPort: CharacterStandardReadingArtifactAuthorityPortV1;
-  readonly contextInput: CharacterStandardReadingChatBaseContextInputV1;
+  readonly contextInput: CharacterStandardReadingChatTurnServerContextInputV1;
 }
 
 export interface CharacterStandardReadingChatTurnPreflightV1 {
@@ -36,6 +44,31 @@ export class CharacterStandardReadingChatTurnPreflightErrorV1 extends Error {
   }
 }
 
+function assertNoCallerContentAuthorityFields(
+  input: CharacterStandardReadingChatTurnServerContextInputV1,
+): void {
+  for (const field of ['character', 'contentBundleId', 'worldRelations'] as const) {
+    if (Object.prototype.hasOwnProperty.call(input, field)) {
+      throw new CharacterStandardReadingChatTurnPreflightErrorV1(
+        `Official Reading Reader follow-up preflight does not accept caller-supplied ${field} authority.`,
+      );
+    }
+  }
+}
+
+function findExactReaderCharacter(
+  characterId: string,
+  characters: ReturnType<typeof getServerPreparedChatReceiveContentEntryV1>['characters']['characters'],
+) {
+  const matches = characters.filter((character) => character.characterId === characterId);
+  if (matches.length !== 1 || matches[0] === undefined) {
+    throw new CharacterStandardReadingChatTurnPreflightErrorV1(
+      'Pinned Chat release does not contain exactly one authored Reader Character.',
+    );
+  }
+  return matches[0];
+}
+
 /**
  * Server-only, non-generative Reader follow-up preflight.
  *
@@ -45,6 +78,9 @@ export class CharacterStandardReadingChatTurnPreflightErrorV1 extends Error {
  * 2. a fresh owner/thread/Reader/Official-Reading reread assembled by the
  *    thread-bound Reader Knowledge runtime.
  *
+ * Character/world canon is recovered only from the exact server-bound immutable
+ * release entry; caller-supplied Character/bundle/world authority is rejected.
+ *
  * It does not call a model/provider, create a chat turn/attempt, commit a message,
  * expose an HTTP send route, or weaken SRC-15 fail-closed behavior. Until the
  * client/content compatibility authority is resolved, Production cannot mint a
@@ -53,7 +89,8 @@ export class CharacterStandardReadingChatTurnPreflightErrorV1 extends Error {
 export async function prepareCharacterStandardReadingChatTurnPreflightV1(
   input: PrepareCharacterStandardReadingChatTurnPreflightInputV1,
 ): Promise<CharacterStandardReadingChatTurnPreflightV1> {
-  assertServerPreparedChatReceivePlanV1(input.receivePlan);
+  assertNoCallerContentAuthorityFields(input.contextInput);
+  const contentEntry = getServerPreparedChatReceiveContentEntryV1(input.receivePlan);
 
   const request = input.receivePlan.normalizedRequest;
   if (input.receivePlan.isNewThread || request.threadId === undefined) {
@@ -62,17 +99,72 @@ export async function prepareCharacterStandardReadingChatTurnPreflightV1(
     );
   }
 
-  const runtime = await prepareCharacterStandardReadingThreadRuntimeV1({
-    ...(input.resolvedSubjectId === undefined
+  const subjectBinding =
+    input.resolvedSubjectId === undefined
       ? {}
-      : { resolvedSubjectId: input.resolvedSubjectId }),
+      : { resolvedSubjectId: input.resolvedSubjectId };
+
+  const initialThreadBinding = await getChatThreadRuntimeBinding({
+    ...subjectBinding,
+    threadId: request.threadId,
+    authorityPort: input.threadBindingAuthorityPort,
+  });
+
+  if (initialThreadBinding.participantCharacterIds.length !== 1) {
+    throw new CharacterStandardReadingChatTurnPreflightErrorV1(
+      'Official Reading Reader follow-up preflight requires an active single-Character thread.',
+    );
+  }
+  if (initialThreadBinding.activeContentReleaseId !== input.receivePlan.resolvedContent.releaseId) {
+    throw new CharacterStandardReadingChatTurnPreflightErrorV1(
+      'Chat receive release no longer matches the current owned thread binding.',
+    );
+  }
+  if (initialThreadBinding.activeContentBundleId !== input.receivePlan.resolvedContent.bundleId) {
+    throw new CharacterStandardReadingChatTurnPreflightErrorV1(
+      'Chat receive bundle no longer matches the current owned thread binding.',
+    );
+  }
+
+  const readerCharacterId = initialThreadBinding.participantCharacterIds[0];
+  if (readerCharacterId === undefined) {
+    throw new CharacterStandardReadingChatTurnPreflightErrorV1(
+      'Official Reading Reader follow-up thread has no active Reader.',
+    );
+  }
+  if (
+    input.receivePlan.requestedCharacterId !== undefined &&
+    input.receivePlan.requestedCharacterId !== readerCharacterId
+  ) {
+    throw new CharacterStandardReadingChatTurnPreflightErrorV1(
+      'Chat receive Character no longer matches the current thread Reader.',
+    );
+  }
+
+  const character = findExactReaderCharacter(
+    readerCharacterId,
+    contentEntry.characters.characters,
+  );
+  const worldRelations = contentEntry.world.characterRelations.filter(
+    (relation) =>
+      relation.fromCharacterId === readerCharacterId ||
+      relation.toCharacterId === readerCharacterId,
+  );
+
+  const runtime = await prepareCharacterStandardReadingThreadRuntimeV1({
+    ...subjectBinding,
     threadId: request.threadId,
     readingId: input.readingId,
     effectiveAt: input.effectiveAt,
     threadBindingAuthorityPort: input.threadBindingAuthorityPort,
     accessAuthorityPort: input.accessAuthorityPort,
     artifactAuthorityPort: input.artifactAuthorityPort,
-    contextInput: input.contextInput,
+    contextInput: {
+      ...input.contextInput,
+      character,
+      contentBundleId: contentEntry.release.bundleId,
+      worldRelations,
+    },
   });
 
   if (runtime.threadBinding.activeContentReleaseId !== input.receivePlan.resolvedContent.releaseId) {
@@ -85,15 +177,6 @@ export async function prepareCharacterStandardReadingChatTurnPreflightV1(
       'Chat receive bundle no longer matches the current owned thread binding.',
     );
   }
-  if (
-    input.receivePlan.requestedCharacterId !== undefined &&
-    input.receivePlan.requestedCharacterId !== runtime.source.readerCharacterId
-  ) {
-    throw new CharacterStandardReadingChatTurnPreflightErrorV1(
-      'Chat receive Character no longer matches the current thread Reader.',
-    );
-  }
-
   return Object.freeze({
     receivePlan: input.receivePlan,
     runtime,
