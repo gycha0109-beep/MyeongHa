@@ -40,6 +40,8 @@ export interface ChatReceivePlan {
 }
 
 const serverPreparedChatReceivePlansV1 = new WeakSet<object>();
+const serverPreparedChatReceiveContentEntriesV1 =
+  new WeakMap<object, ContentReleaseRuntimeEntry>();
 
 export function assertServerPreparedChatReceivePlanV1(
   plan: ChatReceivePlan,
@@ -50,6 +52,28 @@ export function assertServerPreparedChatReceivePlanV1(
       'Chat receive plan was not minted by server receive authority.',
     );
   }
+}
+
+export function getServerPreparedChatReceiveContentEntryV1(
+  plan: ChatReceivePlan,
+): ContentReleaseRuntimeEntry {
+  assertServerPreparedChatReceivePlanV1(plan);
+  const entry = serverPreparedChatReceiveContentEntriesV1.get(plan);
+  if (entry === undefined) {
+    throw new Error(
+      'Server-minted Chat receive plan lost its immutable content authority binding.',
+    );
+  }
+  if (
+    entry.release.releaseId !== plan.resolvedContent.releaseId ||
+    entry.release.bundleId !== plan.resolvedContent.bundleId ||
+    entry.release.contentVersion !== plan.resolvedContent.contentVersion
+  ) {
+    throw new Error(
+      'Server-minted Chat receive plan no longer matches its immutable content authority binding.',
+    );
+  }
+  return entry;
 }
 
 function hashRequest(request: ChatRequestV1): string {
@@ -191,5 +215,6 @@ export function prepareChatReceiveCommand(
   });
 
   serverPreparedChatReceivePlansV1.add(plan);
+  serverPreparedChatReceiveContentEntriesV1.set(plan, entry);
   return plan;
 }
