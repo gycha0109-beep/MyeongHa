@@ -23,6 +23,12 @@ Official Reading provenance correlation
 #1147 protected Character Saju projection
         ↓
 Character Chat context assembly input
+        ↓
+owned active single-Character thread re-read
+        ↓
+thread Reader + content bundle correlation
+        ↓
+Production Character runtime context
 ```
 
 ## Invariants
@@ -58,9 +64,14 @@ data into authority.
 
 ## Remaining gate
 
-No public Chat send route is activated by this slice. The next integration must
-bind the server-resolved Chat thread/subject/Reader/Reading identities to this
-admitted runtime path and keep existing output/commit/reveal guards intact.
+The thread-bound server composition is now implemented: active owned thread,
+single Reader identity, active content bundle, Reader access, and Official Reading
+artifact provenance must all correlate before Production runtime assembly.
+
+No public Chat send route is activated by this slice. Migration 1220 still keeps
+the two raw Reader Knowledge functions ungranted to the ordinary Production API
+executor, so actual public send activation remains fail-closed until that explicit
+authority/ACL gate and the Chat receive/generate/guard/commit transport are promoted.
 
 
 ## Relationship to Reader Interpretation Preview
