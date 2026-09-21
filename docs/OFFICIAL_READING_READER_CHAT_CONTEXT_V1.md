@@ -74,10 +74,18 @@ to still match the current thread binding.
 
 The exact immutable release entry used to mint the receive plan is retained only
 inside the server process. Preflight derives the active Reader Character definition
-and Reader-relevant world relations from that bound release. Caller-supplied
-`character`, `contentBundleId`, or `worldRelations` fields are rejected before
-thread or Reader Knowledge lookup, so Character/world canon cannot be replaced by
-request/session data.
+and Reader-relevant world relations from that bound release.
+
+The current relationship score/stage/revision projection is independently re-read
+through the verified owner-scoped Character relationship read authority. If no
+stored projection exists, Reader follow-up fails closed instead of fabricating a
+baseline. Caller-supplied `character`, `contentBundleId`, `worldRelations`, or
+`relationshipState` fields are rejected before Reader Knowledge lookup, so
+Character/world/relationship state cannot be replaced by request/session data.
+
+This slice does not invent the still-open SRC-22 relationship event evaluator,
+score deltas, stage transitions, anti-farming rules, or relationship rendering
+threshold authority. It only consumes the already-stored current projection.
 
 It does not call a model/provider, create a durable turn/attempt, commit a
 Character message, or reveal output.
