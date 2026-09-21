@@ -1,4 +1,5 @@
 name: PostgreSQL Isolated Restore Drill
+run-name: "[WT:ops] PostgreSQL Isolated Restore Drill"
 
 on:
   workflow_dispatch:
