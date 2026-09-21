@@ -39,6 +39,19 @@ export interface ChatReceivePlan {
   readonly requestedCharacterId?: string;
 }
 
+const serverPreparedChatReceivePlansV1 = new WeakSet<object>();
+
+export function assertServerPreparedChatReceivePlanV1(
+  plan: ChatReceivePlan,
+): void {
+  if (!serverPreparedChatReceivePlansV1.has(plan)) {
+    throw new ApiCommandError(
+      'INVALID_REQUEST',
+      'Chat receive plan was not minted by server receive authority.',
+    );
+  }
+}
+
 function hashRequest(request: ChatRequestV1): string {
   return `sha256:v1:${createHash('sha256')
     .update(canonicalJson(request))
@@ -165,7 +178,7 @@ export function prepareChatReceiveCommand(
     }
   }
 
-  return Object.freeze({
+  const plan = Object.freeze({
     normalizedRequest: request,
     requestHash: hashRequest(request),
     isNewThread,
@@ -176,4 +189,7 @@ export function prepareChatReceiveCommand(
     }),
     ...(characterId === undefined ? {} : { requestedCharacterId: characterId }),
   });
+
+  serverPreparedChatReceivePlansV1.add(plan);
+  return plan;
 }
