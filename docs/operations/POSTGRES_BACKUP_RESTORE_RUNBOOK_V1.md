@@ -29,14 +29,14 @@ isolated restore drill path         = IMPLEMENTED / EXECUTED ON FRONTIER 1280
 isolated application restore        = EVIDENCED — run 35633155263 / frontier 1280
 application integrity/auth baseline = PASS — run 35633155263 / frontier 1280
 restore evidence envelope runtime   = PROVEN — run 35633155263 / frontier 1280
-bounded privacy source authority    = RUNTIME-PROVEN — run 35539838537
+bounded privacy source authority    = RUNTIME-PROVEN — run 35653303484 / AUTHORITATIVE_CAPTURED_WINDOW_V1
 recovered finalization mechanics    = IMPLEMENTED / POST-MERGE CI GREEN
-recovered finalization on fresh restore = PROVEN — run 35633155263
+recovered finalization on fresh restore = PROVEN — run 35659483080 / Production non-zero ledger
 provider-managed full restore       = NOT PROVEN — provider projection/omission occurred
-authoritative privacy reconciliation= NOT YET PROVEN
+authoritative privacy reconciliation= PROVEN — run 35659483080 / bounded captured window only
 future-safe privacy reconciliation  = false
-RPO                                = APPROVED — PT24H (24 hours)
-RTO                                = APPROVED — PT6H (6 hours)
+RPO                                = APPROVED — PT24H (24 hours) / full authoritative comparison PASS (5536s)
+RTO                                = APPROVED — PT6H (6 hours) / full authoritative comparison PASS (67s)
 ```
 
 Restore drill: PASSED for MyeongHa application-data portability and application-critical Auth identity continuity; full hosted provider-managed Auth/Storage recovery and DR readiness remain NOT EVIDENCED.
@@ -361,7 +361,7 @@ The `Production PostgreSQL Privacy Recovery Ledger` encrypted off-primary-DB wor
 
 Repository mechanics include the policy-neutral replay planner plus the separately governed account-deletion worker/finalizer authority. The restored-state orchestration continues to invoke `scripts/run-postgres-privacy-reconciliation-synthetic-drill.sh` for the collision-guarded synthetic replay/finalization mechanics. The merged recovered-state drill now validates ledger coverage, performs encrypted roundtrip and idempotent revocation/account-deletion-start replay, claims the exact deletion outbox event, executes the DB finalizer, simulates only the isolated Auth-provider ACK boundary, executes completion ACK, proves completion replay convergence, checks representative personalization/access state cannot resurrect, and checks approved P5Y Commerce evidence survives only in revoked form.
 
-These expanded mechanics are merged, post-merge CI is green, and run `35633155263` exercised them inside the isolated restore workflow against governed backup `35631594765` at frontier `1280`. Therefore recovered-state finalization runtime is proven. `authoritative_privacy_reconciliation=false`, `future_safe_privacy_reconciliation=false`, and `dr_ready=false` remain because the non-zero ledger in this drill is intentionally synthetic rather than a Production non-zero authoritative ledger.
+These expanded mechanics remain proven by run `35633155263`. The Production non-zero follow-on is now proven separately by run `35659483080`: exact governed backup `35643472159`, authoritative ledger `35653303484`, and Production canary `35653222211` were bound together, the ledger was replayed twice idempotently, account deletion was finalized/completed, non-resurrection checks passed, and identifier-free evidence artifact `10666580699` was uploaded. Therefore `authoritative_privacy_reconciliation=true` for that bounded captured window. `future_safe_privacy_reconciliation=false` and `dr_ready=false` remain because full hosted provider-managed Auth/Storage restore equivalence is still not proven.
 
 ## 12. RPO / RTO evidence
 
@@ -410,9 +410,26 @@ Latest run `35633155263` recorded:
 - synthetic data-loss-window diagnostic: `1s`
 - evidence artifact: `10655731358`, expires `2026-10-21T17:37:58Z`, digest `sha256:9df259c46fdefc9f7f933dac7baf3ad4bb3d0cd82014cd155e3fe8fbd9ee5c66`
 
-These are diagnostic metrics from the migration-`1280` current-frontier drill. The 1-second synthetic data-loss-window is within approved RPO `PT24H`, and the 56-second workflow elapsed diagnostic is within approved RTO `PT6H`; however neither is the full authoritative recovery procedure. Production non-zero authoritative reconciliation, provider equivalence, and the full-procedure RPO/RTO comparison remain open.
+Those run `35633155263` values remain synthetic diagnostics only.
 
-Approved objectives are RPO `PT24H` and RTO `PT6H`. PASS/FAIL for #389 requires measurements from the full authoritative recovery procedure, not isolated/synthetic diagnostics alone.
+Full authoritative procedure run `35659483080` recorded:
+- runtime head: `31746f635ae249811842b8d225c2734e4d1b4c51`
+- selected governed backup: `35643472159`
+- backup completed at: `2026-09-21T19:16:17Z`
+- incident/reference time: `2026-09-21T20:48:33Z`
+- authoritative ledger: `35653303484`
+- Production canary: `35653222211`
+- workflow start: `2026-09-21T21:50:39Z`
+- workflow completion: `2026-09-21T21:51:46Z`
+- achieved authoritative data-loss window: `5536s` (1h 32m 16s)
+- achieved authoritative recovery duration: `67s`
+- evidence artifact: `10666580699`, expires `2026-10-21T21:51:40Z`, digest `sha256:58d56b54f1b3ffe1d21fd1934bf3c2edce0826bb624bf261fad30b766f127c28`
+
+Comparison result:
+- RPO: **PASS** — `5536s <= PT24H`
+- RTO: **PASS** — `67s <= PT6H`
+
+These comparisons close the #389 full-procedure objective-comparison gate. They do not prove full hosted provider-managed Auth/Storage restore equivalence and therefore do not promote `DR Ready`.
 
 ## 13. #389 closure gate
 
@@ -432,14 +449,15 @@ Do not close `#389` until all are evidenced:
 - [x] fresh governed backup captured after deployed migration `1280` — run `35631594765` / artifact `10654730578`
 - [x] isolated restore completed from that current-frontier backup — run `35633155263`
 - [x] recovered-state finalization drill executed on that fresh governed restore — run `35633155263`
-- [ ] authoritative privacy/deletion/legal-retention reconciliation exercised for the applicable recovery window
-- [ ] achieved recovery duration measured across the full authoritative recovery procedure
-- [x] synthetic drill data-loss window measured — `1s` (diagnostic, not approved RPO)
-- [x] RPO approved — `PT24H`; [ ] full authoritative achieved evidence compared
-- [x] RTO approved — `PT6H`; [ ] full authoritative achieved evidence compared
+- [x] authoritative privacy/deletion/legal-retention reconciliation exercised for the applicable captured window — run `35659483080`
+- [x] achieved recovery duration measured across the full authoritative recovery procedure — `67s`
+- [x] full authoritative data-loss window measured — `5536s`
+- [x] RPO approved — `PT24H`; full authoritative achieved evidence comparison **PASS** — `5536s`
+- [x] RTO approved — `PT6H`; full authoritative achieved evidence comparison **PASS** — `67s`
 
-Until all closure gates are satisfied:
+The #389 backup/restore, privacy reconciliation, and objective-comparison closure gates are now evidenced. The issue may close without asserting full hosted provider recovery equivalence.
 
 ```text
 DR Ready = FALSE / NOT EVIDENCED
+reason   = provider-managed Auth/Storage full-restore equivalence remains unproven
 ```
