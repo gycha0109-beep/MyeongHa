@@ -10,6 +10,8 @@ const PROJECT_REF = 'cnsfpcdiyofqvhpcegfc';
 const ORIGIN = `https://${PROJECT_REF}.supabase.co`;
 const CONFIRMATION = 'RUN_SYNTHETIC_PRODUCTION_PRIVACY_CANARY';
 const PROVIDER = 'myeongha-privacy-canary-v1';
+const API_DATABASE_PRINCIPAL = 'myeongha_runtime';
+const API_EXECUTION_ROLE = 'myeongha_api_executor';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 
 class CanaryFailure extends Error {
@@ -133,6 +135,36 @@ async function createAdminPool() {
     statement_timeout: 10_000,
     allowExitOnIdle: true,
   });
+}
+
+async function createApiPool() {
+  const { normalizeNodePostgresConnectionStringV1 } = await runtimeModules();
+  const connectionString = normalizeNodePostgresConnectionStringV1(
+    requiredEnv('MYEONGHA_DATABASE_URL'),
+  );
+  return new Pool({
+    connectionString,
+    max: 1,
+    connectionTimeoutMillis: 5_000,
+    idleTimeoutMillis: 10_000,
+    statement_timeout: 10_000,
+    allowExitOnIdle: true,
+  });
+}
+
+async function assertApiRuntimePrincipal(client) {
+  const result = await client.query(
+    'select current_user::text as "currentUser", pg_catalog.pg_has_role(current_user, $1::name, \'MEMBER\') as "canEnterExecutionRole"',
+    [API_EXECUTION_ROLE],
+  );
+  const row = result.rows[0];
+  if (
+    result.rows.length !== 1 ||
+    row?.currentUser !== API_DATABASE_PRINCIPAL ||
+    row?.canEnterExecutionRole !== true
+  ) {
+    fail('API_DATABASE_PRINCIPAL_INVALID');
+  }
 }
 
 async function authHeaders(secret) {
@@ -326,10 +358,11 @@ async function prepare() {
 }
 
 async function startDeletion(state) {
-  const pool = await createAdminPool();
+  const pool = await createApiPool();
   try {
     const client = await pool.connect();
     try {
+      await assertApiRuntimePrincipal(client);
       await client.query('BEGIN');
       await client.query('SET LOCAL ROLE myeongha_api_executor');
       const resolved = await client.query(
@@ -516,6 +549,7 @@ async function execute() {
   if (requiredEnv('MYEONGHA_PRIVACY_CANARY_CONFIRM') !== CONFIRMATION) {
     fail('CONFIRMATION_REQUIRED');
   }
+  requiredEnv('MYEONGHA_DATABASE_URL');
   requiredEnv('MYEONGHA_WORKER_DATABASE_URL');
   const state = await readState();
   if (state.phase !== 'prepared') fail('CANARY_NOT_PREPARED');
