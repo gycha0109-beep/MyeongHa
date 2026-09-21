@@ -1,4 +1,5 @@
 name: Account Deletion Hosted Auth Canary
+run-name: "[WT:ops] Account Deletion Hosted Auth Canary"
 
 on:
   workflow_dispatch:

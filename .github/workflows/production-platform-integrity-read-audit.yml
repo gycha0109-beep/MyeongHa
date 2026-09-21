@@ -1,4 +1,5 @@
 name: Production Platform Integrity Read Audit
+run-name: "[WT:ops] Production Platform Integrity Read Audit"
 
 on:
   workflow_dispatch:

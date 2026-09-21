@@ -1,4 +1,5 @@
 name: PostgreSQL DR Readiness Authority
+run-name: "[WT:ops] PostgreSQL DR Readiness Authority"
 
 on:
   workflow_dispatch:

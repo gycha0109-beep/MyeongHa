@@ -1,4 +1,5 @@
 name: DB Commerce Payment Suite
+run-name: "[WT:commerce] DB Commerce Payment Suite"
 
 on:
   pull_request:

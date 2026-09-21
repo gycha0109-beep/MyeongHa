@@ -1,4 +1,5 @@
 name: Production PostgreSQL Logical Backup
+run-name: "[WT:ops] Production PostgreSQL Logical Backup"
 
 on:
   workflow_dispatch:

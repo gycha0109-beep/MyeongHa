@@ -1,4 +1,5 @@
 name: Production PostgreSQL Privacy Delta Count Audit
+run-name: "[WT:ops] Production PostgreSQL Privacy Delta Count Audit"
 
 on:
   workflow_dispatch:
