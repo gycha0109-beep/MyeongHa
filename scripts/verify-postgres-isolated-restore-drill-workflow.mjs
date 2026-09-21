@@ -290,7 +290,6 @@ for (const fragment of [
     throw new Error('Missing authoritative restored privacy replay invariant: ' + fragment);
   }
 }
-
 for (const fragment of [
   'node scripts/build-postgres-restore-evidence-envelope.mjs',
   '--backup-run-id "$BACKUP_RUN_ID"',
