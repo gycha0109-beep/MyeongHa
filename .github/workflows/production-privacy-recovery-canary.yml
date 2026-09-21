@@ -11,6 +11,22 @@ on:
         description: 'Watchtower Track Key for CI attribution.'
         required: true
         type: string
+      operation:
+        description: 'Run a fresh canary or resume one that already reached deletion_started.'
+        required: true
+        default: fresh
+        type: choice
+        options:
+          - fresh
+          - resume
+      resume_canary_run_id:
+        description: 'Required only for resume: failed Production Privacy Recovery Canary run id.'
+        required: false
+        type: string
+      resume_backup_run_id:
+        description: 'Required only for resume: successful pre-deletion Production backup run id.'
+        required: false
+        type: string
 
 permissions:
   actions: write
@@ -29,11 +45,10 @@ jobs:
     env:
       MYEONGHA_PRIVACY_CANARY_CONFIRM: ${{ inputs.confirmation }}
       MYEONGHA_WATCHTOWER_TRACK: ${{ inputs.watchtower_track }}
+      MYEONGHA_PRIVACY_CANARY_OPERATION: ${{ inputs.operation }}
+      MYEONGHA_PRIVACY_CANARY_RESUME_RUN_ID: ${{ inputs.resume_canary_run_id }}
+      MYEONGHA_PRIVACY_CANARY_RESUME_BACKUP_RUN_ID: ${{ inputs.resume_backup_run_id }}
       MYEONGHA_SUPABASE_URL: https://cnsfpcdiyofqvhpcegfc.supabase.co
-      MYEONGHA_DATABASE_PRINCIPAL: myeongha_runtime
-      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-      VERCEL_PROJECT_ID: prj_nXF0b5uv27Lyucz2SEBxzdCRXVsP
-      VERCEL_TEAM_ID: team_xuYA9OhCWlJETaYFOmeVodgS
       MYEONGHA_WORKER_DATABASE_URL: ${{ secrets.MYEONGHA_WORKER_DATABASE_URL }}
       MYEONGHA_WORKER_DATABASE_PRINCIPAL: myeongha_worker_runtime
       MYEONGHA_SUPABASE_AUTH_ADMIN_SECRET: ${{ secrets.MYEONGHA_SUPABASE_AUTH_ADMIN_SECRET }}
@@ -48,10 +63,17 @@ jobs:
         run: |
           set -euo pipefail
           [[ "$MYEONGHA_PRIVACY_CANARY_CONFIRM" == 'RUN_SYNTHETIC_PRODUCTION_PRIVACY_CANARY' ]]
-          [[ "$MYEONGHA_WATCHTOWER_TRACK" == 'privacy-recovery' ]]
+          [[ "$MYEONGHA_WATCHTOWER_TRACK" == 'ops' ]]
+          [[ "$MYEONGHA_PRIVACY_CANARY_OPERATION" == 'fresh' || "$MYEONGHA_PRIVACY_CANARY_OPERATION" == 'resume' ]]
+          if [[ "$MYEONGHA_PRIVACY_CANARY_OPERATION" == 'resume' ]]; then
+            [[ "$MYEONGHA_PRIVACY_CANARY_RESUME_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+            [[ "$MYEONGHA_PRIVACY_CANARY_RESUME_BACKUP_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+          else
+            [[ -z "$MYEONGHA_PRIVACY_CANARY_RESUME_RUN_ID" ]]
+            [[ -z "$MYEONGHA_PRIVACY_CANARY_RESUME_BACKUP_RUN_ID" ]]
+          fi
 
           missing=()
-          [[ -n "${VERCEL_TOKEN:-}" ]] || missing+=(VERCEL_TOKEN)
           [[ -n "${MYEONGHA_WORKER_DATABASE_URL:-}" ]] || missing+=(MYEONGHA_WORKER_DATABASE_URL)
           [[ -n "${SUPABASE_DB_PASSWORD:-}" ]] || missing+=(SUPABASE_DB_PASSWORD)
           [[ -n "${SUPABASE_PRODUCTION_SESSION_POOLER_HOST:-}" ]] || missing+=(SUPABASE_PRODUCTION_SESSION_POOLER_HOST)
@@ -68,7 +90,6 @@ jobs:
             exit 1
           fi
 
-          echo "::add-mask::$VERCEL_TOKEN"
           echo "::add-mask::$MYEONGHA_WORKER_DATABASE_URL"
           echo "::add-mask::$SUPABASE_DB_PASSWORD"
           [[ -z "${MYEONGHA_SUPABASE_AUTH_ADMIN_SECRET:-}" ]] || echo "::add-mask::$MYEONGHA_SUPABASE_AUTH_ADMIN_SECRET"
@@ -89,60 +110,6 @@ jobs:
       - name: Build server runtime
         run: npm run build
 
-      - name: Resolve governed Production API database binding from Vercel
-        shell: bash
-        run: |
-          set -euo pipefail
-          umask 077
-          env_file="$RUNNER_TEMP/vercel-production-env.json"
-          cleanup() {
-            exit_code=$?
-            trap - EXIT
-            rm -f "$env_file"
-            exit "$exit_code"
-          }
-          trap cleanup EXIT
-
-          curl -fsS \
-            -H "Authorization: Bearer $VERCEL_TOKEN" \
-            "https://api.vercel.com/v9/projects/$VERCEL_PROJECT_ID/env?decrypt=true&teamId=$VERCEL_TEAM_ID" \
-            -o "$env_file"
-
-          database_url="$(
-            jq -er '
-              [
-                .envs[]
-                | select(
-                    .key == "MYEONGHA_DATABASE_URL"
-                    and ((.target // []) | index("production")) != null
-                    and (.value | type) == "string"
-                    and (.value | length) > 0
-                  )
-              ]
-              | if length == 1
-                then .[0].value
-                else error("expected exactly one Production MYEONGHA_DATABASE_URL")
-                end
-            ' "$env_file"
-          )"
-
-          DATABASE_URL="$database_url" python3 - <<'PY'
-          import os
-          from urllib.parse import unquote, urlparse
-
-          value = os.environ["DATABASE_URL"]
-          assert "\n" not in value and "\r" not in value
-          parsed = urlparse(value)
-          assert parsed.scheme in {"postgres", "postgresql"}
-          assert unquote(parsed.username or "") == "myeongha_runtime.cnsfpcdiyofqvhpcegfc"
-          assert parsed.hostname is not None and parsed.hostname.endswith(".pooler.supabase.com")
-          assert parsed.port in {5432, 6543}
-          assert parsed.path == "/postgres"
-          PY
-
-          echo "::add-mask::$database_url"
-          printf 'MYEONGHA_DATABASE_URL=%s\n' "$database_url" >> "$GITHUB_ENV"
-
       - name: Prepare protected canary runtime paths
         shell: bash
         run: |
@@ -161,11 +128,21 @@ jobs:
             echo "MYEONGHA_PRIVACY_CANARY_EVIDENCE_PATH=$RUNNER_TEMP/production-privacy-canary-evidence.json"
           } >> "$GITHUB_ENV"
 
+      - name: Verify dedicated worker database authority before mutation
+        run: node scripts/run-production-privacy-recovery-canary.mjs preflight-worker
+
+      - name: Provision ephemeral API canary login
+        if: env.MYEONGHA_PRIVACY_CANARY_OPERATION == 'fresh'
+        id: api-login
+        run: node scripts/run-production-privacy-recovery-canary.mjs provision-api-login
+
       - name: Create disposable hosted Auth + Production application canary state
+        if: env.MYEONGHA_PRIVACY_CANARY_OPERATION == 'fresh'
         id: prepare
         run: node scripts/run-production-privacy-recovery-canary.mjs prepare
 
       - name: Dispatch and wait for governed pre-deletion Production backup
+        if: env.MYEONGHA_PRIVACY_CANARY_OPERATION == 'fresh'
         id: backup
         shell: bash
         run: |
@@ -189,14 +166,63 @@ jobs:
           gh run watch "$run_id" --exit-status
 
       - name: Start deletion through API executor and run dedicated worker
+        if: env.MYEONGHA_PRIVACY_CANARY_OPERATION == 'fresh'
         id: execute
         run: node scripts/run-production-privacy-recovery-canary.mjs execute
+
+      - name: Recover stranded canary state from Production
+        if: env.MYEONGHA_PRIVACY_CANARY_OPERATION == 'resume'
+        id: recover
+        run: node scripts/run-production-privacy-recovery-canary.mjs recover-resume-state
+
+      - name: Resume dedicated worker for already-started deletion
+        if: env.MYEONGHA_PRIVACY_CANARY_OPERATION == 'resume'
+        id: resume
+        run: node scripts/run-production-privacy-recovery-canary.mjs resume
+
+      - name: Remove ephemeral API canary login
+        if: always() && env.MYEONGHA_PRIVACY_CANARY_OPERATION == 'fresh'
+        run: node scripts/run-production-privacy-recovery-canary.mjs cleanup-api-login
+
+      - name: Resolve governed pre-deletion backup
+        id: backup-ref
+        shell: bash
+        env:
+          FRESH_BACKUP_RUN_ID: ${{ steps.backup.outputs.run_id }}
+        run: |
+          set -euo pipefail
+          if [[ "$MYEONGHA_PRIVACY_CANARY_OPERATION" == 'fresh' ]]; then
+            backup_run_id="$FRESH_BACKUP_RUN_ID"
+          else
+            backup_run_id="$MYEONGHA_PRIVACY_CANARY_RESUME_BACKUP_RUN_ID"
+            source_run_id="$MYEONGHA_PRIVACY_CANARY_RESUME_RUN_ID"
+            source_run="$(gh api "/repos/$GITHUB_REPOSITORY/actions/runs/$source_run_id")"
+            backup_run="$(gh api "/repos/$GITHUB_REPOSITORY/actions/runs/$backup_run_id")"
+            jq -e '
+              .name == "Production Privacy Recovery Canary"
+              and .event == "workflow_dispatch"
+              and .head_branch == "main"
+              and .status == "completed"
+              and .conclusion == "failure"
+            ' <<<"$source_run" >/dev/null
+            source_sha="$(jq -r '.head_sha' <<<"$source_run")"
+            jq -e --arg source_sha "$source_sha" '
+              .name == "Production PostgreSQL Logical Backup"
+              and .event == "workflow_dispatch"
+              and .head_branch == "main"
+              and .status == "completed"
+              and .conclusion == "success"
+              and .head_sha == $source_sha
+            ' <<<"$backup_run" >/dev/null
+          fi
+          [[ "$backup_run_id" =~ ^[1-9][0-9]*$ ]]
+          echo "run_id=$backup_run_id" >> "$GITHUB_OUTPUT"
 
       - name: Dispatch and wait for canonical non-zero privacy recovery ledger
         id: ledger
         shell: bash
         env:
-          BACKUP_RUN_ID: ${{ steps.backup.outputs.run_id }}
+          BACKUP_RUN_ID: ${{ steps.backup-ref.outputs.run_id }}
         run: |
           set -euo pipefail
           [[ "$BACKUP_RUN_ID" =~ ^[1-9][0-9]*$ ]]
@@ -222,7 +248,7 @@ jobs:
         id: validate
         shell: bash
         env:
-          BACKUP_RUN_ID: ${{ steps.backup.outputs.run_id }}
+          BACKUP_RUN_ID: ${{ steps.backup-ref.outputs.run_id }}
           LEDGER_RUN_ID: ${{ steps.ledger.outputs.run_id }}
         run: |
           set -euo pipefail
@@ -281,7 +307,7 @@ jobs:
       - name: Publish canary summary
         shell: bash
         env:
-          BACKUP_RUN_ID: ${{ steps.backup.outputs.run_id }}
+          BACKUP_RUN_ID: ${{ steps.backup-ref.outputs.run_id }}
           LEDGER_RUN_ID: ${{ steps.ledger.outputs.run_id }}
         run: |
           set -euo pipefail
@@ -297,7 +323,7 @@ jobs:
             echo '- DR Ready: FALSE'
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Cleanup only if failure occurred after canary preparation
-        if: failure() && steps.prepare.outcome == 'success'
+      - name: Cleanup only if fresh canary failure occurred after preparation
+        if: failure() && env.MYEONGHA_PRIVACY_CANARY_OPERATION == 'fresh' && steps.prepare.outcome == 'success'
         continue-on-error: true
         run: node scripts/run-production-privacy-recovery-canary.mjs cleanup-prestart

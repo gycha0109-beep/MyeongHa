@@ -1,5 +1,5 @@
-import { randomUUID } from 'node:crypto';
-import { readFile, writeFile } from 'node:fs/promises';
+import { randomBytes, randomUUID } from 'node:crypto';
+import { appendFile, readFile, writeFile } from 'node:fs/promises';
 import { Pool } from 'pg';
 import {
   HostedAuthCanaryKeySelectionError,
@@ -10,8 +10,9 @@ const PROJECT_REF = 'cnsfpcdiyofqvhpcegfc';
 const ORIGIN = `https://${PROJECT_REF}.supabase.co`;
 const CONFIRMATION = 'RUN_SYNTHETIC_PRODUCTION_PRIVACY_CANARY';
 const PROVIDER = 'myeongha-privacy-canary-v1';
-const API_DATABASE_PRINCIPAL = 'myeongha_runtime';
 const API_EXECUTION_ROLE = 'myeongha_api_executor';
+const API_CANARY_ROLE_MARKER = 'myeongha:privacy-canary-api-login:v1';
+const WORKER_DATABASE_PRINCIPAL = 'myeongha_worker_runtime';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 
 class CanaryFailure extends Error {
@@ -35,6 +36,20 @@ function requiredEnv(name) {
 function requireRunId(value) {
   if (!/^[1-9][0-9]{0,19}$/u.test(value ?? '')) fail('INVALID_RUN_ID');
   return value;
+}
+
+function apiCanaryRoleName() {
+  const roleName = `myeongha_privacy_canary_${requireRunId(process.env.GITHUB_RUN_ID)}`;
+  if (!/^[a-z_][a-z0-9_]{0,62}$/u.test(roleName)) fail('API_CANARY_ROLE_INVALID');
+  return roleName;
+}
+
+function expectedApiDatabasePrincipal() {
+  const roleName = apiCanaryRoleName();
+  if (requiredEnv('MYEONGHA_DATABASE_PRINCIPAL') !== roleName) {
+    fail('API_DATABASE_PRINCIPAL_INVALID');
+  }
+  return roleName;
 }
 
 function requireUuid(value, code) {
@@ -105,12 +120,14 @@ async function runtimeModules() {
     authDeletionModule,
     workerDbConfigModule,
     workerRuntimeModule,
+    workerPoolModule,
     postgresPoolModule,
   ] = await Promise.all([
     import('../dist/apps/api/src/production-account-deletion-auth-admin-config.js'),
     import('../dist/apps/api/src/supabase-auth-admin-user-deletion.js'),
     import('../dist/apps/api/src/production-account-deletion-worker-db-config.js'),
     import('../dist/apps/api/src/production-account-deletion-worker-runtime.js'),
+    import('../dist/apps/api/src/node-postgres-account-deletion-worker-pool.js'),
     import('../dist/apps/api/src/node-postgres-subject-pool.js'),
   ]);
   return {
@@ -118,6 +135,7 @@ async function runtimeModules() {
     ...authDeletionModule,
     ...workerDbConfigModule,
     ...workerRuntimeModule,
+    ...workerPoolModule,
     ...postgresPoolModule,
   };
 }
@@ -137,6 +155,136 @@ async function createAdminPool() {
   });
 }
 
+async function provisionApiCanaryLogin() {
+  if (requiredEnv('MYEONGHA_PRIVACY_CANARY_CONFIRM') !== CONFIRMATION) {
+    fail('CONFIRMATION_REQUIRED');
+  }
+
+  const roleName = apiCanaryRoleName();
+  const password = randomBytes(32).toString('hex');
+  const roleIdentifier = `"${roleName}"`;
+  const pool = await createAdminPool();
+  let created = false;
+
+  try {
+    const client = await pool.connect();
+    try {
+      const existing = await client.query(
+        'select 1 from pg_catalog.pg_roles where rolname = $1',
+        [roleName],
+      );
+      if (existing.rows.length !== 0) fail('API_CANARY_ROLE_ALREADY_EXISTS');
+
+      await client.query(
+        `create role ${roleIdentifier}
+           login nosuperuser nocreatedb nocreaterole noinherit noreplication nobypassrls
+           password '${password}'`,
+      );
+      created = true;
+      await client.query(
+        `comment on role ${roleIdentifier} is '${API_CANARY_ROLE_MARKER}'`,
+      );
+      await client.query(`grant ${API_EXECUTION_ROLE} to ${roleIdentifier}`);
+
+      const verified = await client.query(
+        `select
+           r.rolcanlogin,
+           r.rolsuper,
+           r.rolcreatedb,
+           r.rolcreaterole,
+           r.rolinherit,
+           r.rolreplication,
+           r.rolbypassrls,
+           a.rolpassword is not null as "hasPassword",
+           pg_catalog.shobj_description(r.oid, 'pg_authid') as marker,
+           pg_catalog.pg_has_role($1::name, $2::name, 'MEMBER') as "canEnterExecutionRole"
+         from pg_catalog.pg_roles r
+         join pg_catalog.pg_authid a on a.oid = r.oid
+         where r.rolname = $1`,
+        [roleName, API_EXECUTION_ROLE],
+      );
+      const row = verified.rows[0];
+      if (
+        verified.rows.length !== 1 ||
+        row?.rolcanlogin !== true ||
+        row?.rolsuper !== false ||
+        row?.rolcreatedb !== false ||
+        row?.rolcreaterole !== false ||
+        row?.rolinherit !== false ||
+        row?.rolreplication !== false ||
+        row?.rolbypassrls !== false ||
+        row?.hasPassword !== true ||
+        row?.marker !== API_CANARY_ROLE_MARKER ||
+        row?.canEnterExecutionRole !== true
+      ) {
+        fail('API_CANARY_ROLE_SHAPE_INVALID');
+      }
+    } catch (error) {
+      if (created) {
+        try {
+          await client.query(`revoke ${API_EXECUTION_ROLE} from ${roleIdentifier}`);
+          await client.query(`drop role ${roleIdentifier}`);
+        } catch {
+          // Preserve the provisioning failure as authoritative.
+        }
+      }
+      throw error;
+    } finally {
+      client.release();
+    }
+  } finally {
+    await pool.end();
+  }
+
+  const adminUrl = new URL(requiredEnv('MYEONGHA_PRIVACY_CANARY_ADMIN_DATABASE_URL'));
+  adminUrl.username = `${roleName}.${PROJECT_REF}`;
+  adminUrl.password = password;
+  const databaseUrl = adminUrl.toString();
+
+  console.log(`::add-mask::${password}`);
+  console.log(`::add-mask::${databaseUrl}`);
+  await appendFile(
+    requiredEnv('GITHUB_ENV'),
+    `MYEONGHA_DATABASE_PRINCIPAL=${roleName}\nMYEONGHA_DATABASE_URL=${databaseUrl}\n`,
+    { encoding: 'utf8', mode: 0o600 },
+  );
+  console.log('MYEONGHA_PRODUCTION_PRIVACY_CANARY_API_LOGIN_PROVISIONED');
+}
+
+async function cleanupApiCanaryLogin() {
+  const roleName = apiCanaryRoleName();
+  const roleIdentifier = `"${roleName}"`;
+  const pool = await createAdminPool();
+  try {
+    const client = await pool.connect();
+    try {
+      const existing = await client.query(
+        `select pg_catalog.shobj_description(r.oid, 'pg_authid') as marker
+         from pg_catalog.pg_roles r
+         where r.rolname = $1`,
+        [roleName],
+      );
+      if (existing.rows.length === 0) {
+        console.log('MYEONGHA_PRODUCTION_PRIVACY_CANARY_API_LOGIN_CLEANUP_SKIP');
+        return;
+      }
+      if (
+        existing.rows.length !== 1 ||
+        existing.rows[0]?.marker !== API_CANARY_ROLE_MARKER
+      ) {
+        fail('API_CANARY_ROLE_CLEANUP_GUARD_FAILED');
+      }
+      await client.query(`revoke ${API_EXECUTION_ROLE} from ${roleIdentifier}`);
+      await client.query(`drop role ${roleIdentifier}`);
+    } finally {
+      client.release();
+    }
+  } finally {
+    await pool.end();
+  }
+  console.log('MYEONGHA_PRODUCTION_PRIVACY_CANARY_API_LOGIN_CLEANUP_PASS');
+}
+
 async function createApiPool() {
   const { normalizeNodePostgresConnectionStringV1 } = await runtimeModules();
   const connectionString = normalizeNodePostgresConnectionStringV1(
@@ -153,14 +301,35 @@ async function createApiPool() {
 }
 
 async function assertApiRuntimePrincipal(client) {
+  const expectedPrincipal = expectedApiDatabasePrincipal();
   const result = await client.query(
-    'select current_user::text as "currentUser", pg_catalog.pg_has_role(current_user, $1::name, \'MEMBER\') as "canEnterExecutionRole"',
+    `select
+       current_user::text as "currentUser",
+       r.rolcanlogin,
+       r.rolsuper,
+       r.rolcreatedb,
+       r.rolcreaterole,
+       r.rolinherit,
+       r.rolreplication,
+       r.rolbypassrls,
+       pg_catalog.shobj_description(r.oid, 'pg_authid') as marker,
+       pg_catalog.pg_has_role(current_user, $1::name, 'MEMBER') as "canEnterExecutionRole"
+     from pg_catalog.pg_roles r
+     where r.rolname = current_user`,
     [API_EXECUTION_ROLE],
   );
   const row = result.rows[0];
   if (
     result.rows.length !== 1 ||
-    row?.currentUser !== API_DATABASE_PRINCIPAL ||
+    row?.currentUser !== expectedPrincipal ||
+    row?.rolcanlogin !== true ||
+    row?.rolsuper !== false ||
+    row?.rolcreatedb !== false ||
+    row?.rolcreaterole !== false ||
+    row?.rolinherit !== false ||
+    row?.rolreplication !== false ||
+    row?.rolbypassrls !== false ||
+    row?.marker !== API_CANARY_ROLE_MARKER ||
     row?.canEnterExecutionRole !== true
   ) {
     fail('API_DATABASE_PRINCIPAL_INVALID');
@@ -282,6 +451,199 @@ async function readState() {
     fail('CANARY_STATE_INVALID');
   }
   return parsed;
+}
+
+function classifyWorkerDatabaseFailure(error) {
+  const code =
+    error && typeof error === 'object' && typeof error.code === 'string'
+      ? error.code
+      : null;
+  const message =
+    error && typeof error === 'object' && typeof error.message === 'string'
+      ? error.message
+      : '';
+
+  if (code === 'XX000' && /tenant or user not found/iu.test(message)) {
+    return 'WORKER_DB_ROUTING_INVALID';
+  }
+  if (code === '28P01') return 'WORKER_DB_AUTH_INVALID';
+  if (
+    code === 'ENOTFOUND' ||
+    code === 'ECONNREFUSED' ||
+    code === 'ETIMEDOUT' ||
+    code === 'EHOSTUNREACH'
+  ) {
+    return 'WORKER_DB_TRANSPORT_INVALID';
+  }
+  return null;
+}
+
+function canonicalWorkerDatabaseUrl() {
+  const source = requiredEnv('MYEONGHA_WORKER_DATABASE_URL');
+  let url;
+  try {
+    url = new URL(source);
+  } catch {
+    fail('WORKER_DATABASE_URL_SOURCE_INVALID');
+  }
+
+  if (url.protocol !== 'postgres:' && url.protocol !== 'postgresql:') {
+    fail('WORKER_DATABASE_URL_SOURCE_INVALID');
+  }
+  if (url.password.length === 0) {
+    fail('WORKER_DATABASE_URL_SOURCE_INVALID');
+  }
+
+  const decodedUser = decodeURIComponent(url.username);
+  const qualifiedPrincipal = `${WORKER_DATABASE_PRINCIPAL}.${PROJECT_REF}`;
+  if (
+    decodedUser !== WORKER_DATABASE_PRINCIPAL &&
+    decodedUser !== qualifiedPrincipal
+  ) {
+    fail('WORKER_DATABASE_URL_SOURCE_PRINCIPAL_INVALID');
+  }
+
+  const poolerHost = requiredEnv('SUPABASE_PRODUCTION_SESSION_POOLER_HOST');
+  if (
+    !/^[a-z0-9-]+(?:[.][a-z0-9-]+)*[.]pooler[.]supabase[.]com$/u.test(
+      poolerHost,
+    )
+  ) {
+    fail('WORKER_DATABASE_POOLER_HOST_INVALID');
+  }
+
+  url.hostname = poolerHost;
+  url.port = '5432';
+  url.username = qualifiedPrincipal;
+  url.pathname = '/postgres';
+  url.search = '';
+  url.searchParams.set('sslmode', 'require');
+
+  const canonical = url.toString();
+  console.log(`::add-mask::${canonical}`);
+  return canonical;
+}
+
+async function parseWorkerDatabaseConfig() {
+  const { parseProductionAccountDeletionWorkerDbConfigV1 } =
+    await runtimeModules();
+  try {
+    return parseProductionAccountDeletionWorkerDbConfigV1({
+      ...process.env,
+      MYEONGHA_WORKER_DATABASE_URL: canonicalWorkerDatabaseUrl(),
+      MYEONGHA_WORKER_DATABASE_PRINCIPAL: WORKER_DATABASE_PRINCIPAL,
+    });
+  } catch (error) {
+    if (error instanceof CanaryFailure) throw error;
+    fail('WORKER_CONFIG_INVALID');
+  }
+}
+
+async function preflightWorker() {
+  if (requiredEnv('MYEONGHA_PRIVACY_CANARY_CONFIRM') !== CONFIRMATION) {
+    fail('CONFIRMATION_REQUIRED');
+  }
+  requiredEnv('MYEONGHA_WORKER_DATABASE_URL');
+
+  const {
+    createNodePostgresAccountDeletionWorkerPoolV1,
+  } = await runtimeModules();
+  const databaseConfig = await parseWorkerDatabaseConfig();
+  const pool = createNodePostgresAccountDeletionWorkerPoolV1(databaseConfig);
+  try {
+    let connection;
+    try {
+      connection = await pool.connect();
+    } catch (error) {
+      const classified = classifyWorkerDatabaseFailure(error);
+      if (classified !== null) fail(classified);
+      throw error;
+    } finally {
+      connection?.release();
+    }
+  } finally {
+    await pool.close();
+  }
+
+  console.log('MYEONGHA_PRODUCTION_PRIVACY_CANARY_WORKER_DB_PREFLIGHT_PASS');
+}
+
+async function recoverResumeState() {
+  if (requiredEnv('MYEONGHA_PRIVACY_CANARY_CONFIRM') !== CONFIRMATION) {
+    fail('CONFIRMATION_REQUIRED');
+  }
+  const sourceRunId = requireRunId(
+    requiredEnv('MYEONGHA_PRIVACY_CANARY_RESUME_RUN_ID'),
+  );
+  const pool = await createAdminPool();
+  try {
+    const result = await pool.query(
+      `select
+         s.id::text as "subjectId",
+         s.auth_user_id::text as "authUserId",
+         s.status as "subjectStatus",
+         cal.id::text as "commerceAccountLinkId",
+         cal.status as "commerceStatus",
+         dj.id::text as "deletionJobId",
+         dj.request_dedupe_key as "requestDedupeKey",
+         dj.status as "deletionJobStatus",
+         oe.id::text as "outboxEventId",
+         oe.status as "outboxStatus",
+         oe.lease_expires_at as "leaseExpiresAt"
+       from public.commerce_account_links cal
+       join public.subjects s
+         on s.id = cal.subject_id
+       join public.data_deletion_jobs dj
+         on dj.subject_id = s.id
+        and dj.scope = 'account'
+       join public.outbox_events oe
+         on oe.aggregate_type = 'data_deletion_job'
+        and oe.aggregate_id = dj.id::text
+        and oe.event_type = 'ACCOUNT_DELETION_STARTED'
+        and oe.event_schema_version = 'v1'
+        and oe.dedupe_key = 'account-delete-start-v1'
+       where cal.provider = $1::text
+         and cal.external_account_fingerprint like $2::text`,
+      [PROVIDER, `synthetic:${sourceRunId}:%`],
+    );
+    const row = result.rows[0];
+    if (
+      result.rows.length !== 1 ||
+      row?.subjectStatus !== 'deletion_pending' ||
+      row?.commerceStatus !== 'active' ||
+      row?.deletionJobStatus !== 'running' ||
+      !['pending', 'processing'].includes(row?.outboxStatus) ||
+      (row?.outboxStatus === 'processing' &&
+        row?.leaseExpiresAt instanceof Date &&
+        row.leaseExpiresAt.getTime() > Date.now())
+    ) {
+      fail('RESUME_STATE_NOT_RECOVERABLE');
+    }
+
+    const state = {
+      schema: 'myeongha-production-privacy-canary-state-v1',
+      phase: 'deletion_started',
+      sourceCanaryRunId: sourceRunId,
+      authUserId: requireUuid(row.authUserId, 'RESUME_STATE_INVALID'),
+      subjectId: requireUuid(row.subjectId, 'RESUME_STATE_INVALID'),
+      commerceAccountLinkId: requireUuid(
+        row.commerceAccountLinkId,
+        'RESUME_STATE_INVALID',
+      ),
+      deletionJobId: requireUuid(row.deletionJobId, 'RESUME_STATE_INVALID'),
+      outboxEventId: requireUuid(row.outboxEventId, 'RESUME_STATE_INVALID'),
+      requestDedupeKey:
+        typeof row.requestDedupeKey === 'string' &&
+        row.requestDedupeKey.length > 0
+          ? row.requestDedupeKey
+          : fail('RESUME_STATE_INVALID'),
+    };
+    await writeState(state);
+  } finally {
+    await pool.end();
+  }
+
+  console.log('MYEONGHA_PRODUCTION_PRIVACY_CANARY_RESUME_STATE_RECOVERED');
 }
 
 async function prepare() {
@@ -420,18 +782,13 @@ async function startDeletion(state) {
 
 async function runWorker(state, secret) {
   const {
-    parseProductionAccountDeletionWorkerDbConfigV1,
     parseProductionAccountDeletionAuthAdminConfigV1,
     createProductionAccountDeletionWorkerRuntimeV1,
   } = await runtimeModules();
 
-  let databaseConfig;
+  const databaseConfig = await parseWorkerDatabaseConfig();
   let authAdminConfig;
   try {
-    databaseConfig = parseProductionAccountDeletionWorkerDbConfigV1({
-      ...process.env,
-      MYEONGHA_WORKER_DATABASE_PRINCIPAL: 'myeongha_worker_runtime',
-    });
     authAdminConfig = parseProductionAccountDeletionAuthAdminConfigV1({
       ...process.env,
       MYEONGHA_SUPABASE_AUTH_ADMIN_SECRET: secret,
@@ -523,8 +880,11 @@ async function verifyFinalState(state, secret, worker) {
     schema: 'myeongha-production-privacy-recovery-canary-evidence-v1',
     productionProjectRef: PROJECT_REF,
     fixtureClass: 'synthetic-disposable-member',
+    canaryOperation: state.sourceCanaryRunId === undefined ? 'fresh' : 'resume',
+    resumedFromCanaryRunId:
+      state.sourceCanaryRunId === undefined ? null : Number(state.sourceCanaryRunId),
     commerceProvider: PROVIDER,
-    accountDeletionStartAuthority: 'myeongha_api_executor/cmd_start_account_deletion_runtime_v1',
+    accountDeletionStartAuthority: 'ephemeral-canary-login->myeongha_api_executor/cmd_start_account_deletion_runtime_v1',
     workerAuthority: 'myeongha_worker_runtime->myeongha_system_executor',
     workerStatus: worker.status,
     hostedAuthDeletionInvoked: worker.authDeletionInvoked,
@@ -565,6 +925,30 @@ async function execute() {
   state.phase = 'completed';
   await writeState(state);
   console.log('MYEONGHA_PRODUCTION_PRIVACY_CANARY_DELETE_PASS');
+}
+
+async function resumeDeletion() {
+  if (requiredEnv('MYEONGHA_PRIVACY_CANARY_CONFIRM') !== CONFIRMATION) {
+    fail('CONFIRMATION_REQUIRED');
+  }
+  requiredEnv('MYEONGHA_WORKER_DATABASE_URL');
+  const state = await readState();
+  if (state.phase !== 'deletion_started') fail('CANARY_NOT_RESUMABLE');
+
+  const sourceRunId = requireRunId(
+    requiredEnv('MYEONGHA_PRIVACY_CANARY_RESUME_RUN_ID'),
+  );
+  if (state.sourceCanaryRunId !== sourceRunId) {
+    fail('RESUME_SOURCE_RUN_MISMATCH');
+  }
+
+  const secret = await resolveAdminSecret();
+  const worker = await runWorker(state, secret);
+  await verifyFinalState(state, secret, worker);
+
+  state.phase = 'completed';
+  await writeState(state);
+  console.log('MYEONGHA_PRODUCTION_PRIVACY_CANARY_RESUME_PASS');
 }
 
 async function cleanupPrestart() {
@@ -633,8 +1017,13 @@ async function cleanupPrestart() {
 
 async function main() {
   const mode = process.argv[2];
+  if (mode === 'preflight-worker') return preflightWorker();
+  if (mode === 'provision-api-login') return provisionApiCanaryLogin();
   if (mode === 'prepare') return prepare();
   if (mode === 'execute') return execute();
+  if (mode === 'recover-resume-state') return recoverResumeState();
+  if (mode === 'resume') return resumeDeletion();
+  if (mode === 'cleanup-api-login') return cleanupApiCanaryLogin();
   if (mode === 'cleanup-prestart') return cleanupPrestart();
   fail('MODE_REQUIRED');
 }
