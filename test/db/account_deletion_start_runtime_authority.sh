@@ -29,26 +29,26 @@ expect_fail() {
 
 "${psql_base[@]}" <<'SQL'
 insert into auth.users(id) values
-  ('c1000000-0000-0000-0000-000000000001'),
-  ('c1000000-0000-0000-0000-000000000002')
+  ('12610000-0000-0000-0000-000000000001'),
+  ('12610000-0000-0000-0000-000000000002')
 on conflict do nothing;
 
 insert into public.subjects(
   id,kind,auth_user_id,status,merged_into_subject_id,created_at,updated_at
 ) values
   (
-    'c2000000-0000-0000-0000-000000000001',
+    '12620000-0000-0000-0000-000000000001',
     'member',
-    'c1000000-0000-0000-0000-000000000001',
+    '12610000-0000-0000-0000-000000000001',
     'active',
     null,
     clock_timestamp(),
     clock_timestamp()
   ),
   (
-    'c2000000-0000-0000-0000-000000000002',
+    '12620000-0000-0000-0000-000000000002',
     'member',
-    'c1000000-0000-0000-0000-000000000002',
+    '12610000-0000-0000-0000-000000000002',
     'active',
     null,
     clock_timestamp(),
@@ -61,19 +61,19 @@ begin;
 set local role myeongha_api_executor;
 select subject_id::text
 from public.begin_member_subject_context_v1(
-  'c1000000-0000-0000-0000-000000000001'
+  '12610000-0000-0000-0000-000000000001'
 );
 select deletion_job_id::text||':'||deletion_job_status||':'||(replayed::int)
 from public.cmd_start_account_deletion_runtime_v1(
-  'c2000000-0000-0000-0000-000000000001',
-  'c3000000-0000-0000-0000-000000000001',
+  '12620000-0000-0000-0000-000000000001',
+  '12630000-0000-0000-0000-000000000001',
   'runtime-account-delete-1',
-  'c4000000-0000-0000-0000-000000000001'
+  '12640000-0000-0000-0000-000000000001'
 );
 commit;
 ")
-[[ "$result" == *"c2000000-0000-0000-0000-000000000001"* ]] || fail "member subject context did not resolve"
-[[ "$result" == *"c3000000-0000-0000-0000-000000000001:running:0"* ]] || fail "runtime wrapper did not start deletion"
+[[ "$result" == *"12620000-0000-0000-0000-000000000001"* ]] || fail "member subject context did not resolve"
+[[ "$result" == *"12630000-0000-0000-0000-000000000001:running:0"* ]] || fail "runtime wrapper did not start deletion"
 pass "API executor enters the canonical Member context and starts account deletion through the runtime wrapper"
 
 state=$("${psql_base[@]}" -Atqc "
@@ -87,9 +87,9 @@ join public.data_deletion_jobs dj on dj.subject_id=s.id
 join public.outbox_events oe
   on oe.aggregate_type='data_deletion_job'
  and oe.aggregate_id=dj.id::text
-where s.id='c2000000-0000-0000-0000-000000000001'
-  and dj.id='c3000000-0000-0000-0000-000000000001'
-  and oe.id='c4000000-0000-0000-0000-000000000001';
+where s.id='12620000-0000-0000-0000-000000000001'
+  and dj.id='12630000-0000-0000-0000-000000000001'
+  and oe.id='12640000-0000-0000-0000-000000000001';
 ")
 [[ "$state" == "deletion_pending|running|ACCOUNT_DELETION_STARTED|pending" ]] || fail "runtime deletion state mismatch: $state"
 pass "runtime wrapper preserves the core account-deletion transaction contract"
@@ -97,12 +97,12 @@ pass "runtime wrapper preserves the core account-deletion transaction contract"
 expect_fail \
   "API executor cannot invoke the historical core command directly" \
   "permission denied for function cmd_start_account_deletion_v1" \
-  "begin; set local role myeongha_api_executor; select * from public.cmd_start_account_deletion_v1('c2000000-0000-0000-0000-000000000002','c3000000-0000-0000-0000-000000000002','direct-core-denied','c4000000-0000-0000-0000-000000000002'); rollback;"
+  "begin; set local role myeongha_api_executor; select * from public.cmd_start_account_deletion_v1('12620000-0000-0000-0000-000000000002','12630000-0000-0000-0000-000000000002','direct-core-denied','12640000-0000-0000-0000-000000000002'); rollback;"
 
 expect_fail \
   "runtime wrapper rejects a subject different from the bound Member context" \
   "subject execution context mismatch" \
-  "begin; set local role myeongha_api_executor; select * from public.begin_member_subject_context_v1('c1000000-0000-0000-0000-000000000002'); select * from public.cmd_start_account_deletion_runtime_v1('c2000000-0000-0000-0000-000000000001','c3000000-0000-0000-0000-000000000099','wrong-subject','c4000000-0000-0000-0000-000000000099'); rollback;"
+  "begin; set local role myeongha_api_executor; select * from public.begin_member_subject_context_v1('12610000-0000-0000-0000-000000000002'); select * from public.cmd_start_account_deletion_runtime_v1('12620000-0000-0000-0000-000000000001','12630000-0000-0000-0000-000000000099','wrong-subject','12640000-0000-0000-0000-000000000099'); rollback;"
 
 public_exec=$("${psql_base[@]}" -Atqc "
 select has_function_privilege(
