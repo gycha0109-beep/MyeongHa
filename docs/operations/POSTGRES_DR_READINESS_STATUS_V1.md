@@ -1,8 +1,8 @@
 # PostgreSQL DR Readiness Status v1
 
 > Issue: #389  
-> Evidence date: 2026-09-21 KST  
-> Purpose: record measured restore evidence separately from unresolved privacy/legal-retention and RPO/RTO authority.
+> Evidence date: 2026-09-22 KST  
+> Purpose: record measured recovery evidence, bounded authoritative privacy reconciliation, approved RPO/RTO comparisons, and the remaining provider-equivalence boundary.
 
 ## Current evidence
 
@@ -23,19 +23,19 @@ current_repository_migration_frontier: 1280
 backup_schema_freshness: CURRENT_FOR_DEPLOYED_MIGRATION_1280
 backup_refresh_required: false
 
-latest_isolated_restore_run_id: 35633155263
+latest_isolated_restore_run_id: 35659483080
 latest_isolated_restore_result: SUCCESS
 latest_isolated_restore_target: github-actions-loopback-supabase-postgres
-latest_isolated_restore_runtime_head_sha: 89e1f9b5c543e0610a723732adee29de220ec8fa
-latest_isolated_restore_backup_run_id: 35631594765
-latest_isolated_restore_incident_reference_utc: 2026-09-21T17:25:11Z
-latest_isolated_restore_evidence_artifact_id: 10655731358
-latest_isolated_restore_evidence_artifact_expires_at: 2026-10-21T17:37:58Z
-latest_isolated_restore_evidence_artifact_digest: sha256:9df259c46fdefc9f7f933dac7baf3ad4bb3d0cd82014cd155e3fe8fbd9ee5c66
+latest_isolated_restore_runtime_head_sha: 31746f635ae249811842b8d225c2734e4d1b4c51
+latest_isolated_restore_backup_run_id: 35643472159
+latest_isolated_restore_incident_reference_utc: 2026-09-21T20:48:33Z
+latest_isolated_restore_evidence_artifact_id: 10666580699
+latest_isolated_restore_evidence_artifact_expires_at: 2026-10-21T21:51:40Z
+latest_isolated_restore_evidence_artifact_digest: sha256:58d56b54f1b3ffe1d21fd1934bf3c2edce0826bb624bf261fad30b766f127c28
 latest_isolated_restore_backup_migration_frontier: 1280
-restore_evidence_envelope_runtime: PROVEN_ON_RUN_35633155263
+restore_evidence_envelope_runtime: PROVEN_ON_RUN_35659483080
 isolated_restore_validation_duration_seconds: 3
-manual_drill_workflow_elapsed_seconds: 56
+manual_drill_workflow_elapsed_seconds: 67
 synthetic_data_loss_window_seconds: 1
 provider_managed_data_full_restore: false
 provider_managed_data_blocks_projected: 3
