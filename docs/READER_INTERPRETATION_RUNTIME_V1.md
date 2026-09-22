@@ -277,3 +277,12 @@ Before `api/me.ts` / `vercel.json` may expose `POST /api/me/readings/reader-inte
 5. Reader Scene handoff must carry only `threadId + officialReadingId`; URL-selected Reader identity remains presentation input and must not become runtime authority.
 
 Until those MyeongHa composition gates are concrete and tested, the public rewrite and browser endpoint switch remain fail-closed.
+
+
+## Reading completion → Chat open boundary
+
+The current Saju Preview completion surface does not possess a server-authoritative Reader Character identity. Its URL-selected Reader remains presentation-only, so completion navigation no longer forwards `reader` or `character` as Chat authority.
+
+A browser-safe `chat-open-client.js` adapter now mirrors the existing `POST /api/chat` contract. It accepts only a caller-supplied server Reader identity, sends exactly `{ characterId }`, validates that the returned Character identity matches, and navigates only by the authoritative returned `threadId`.
+
+This adapter is intentionally not invoked by the legacy Saju Preview path. It is reserved for the Reader Scene path once that path is publicly activated and supplies `readerCharacterId`. Character publication/content availability remains server-authoritative and may fail closed.

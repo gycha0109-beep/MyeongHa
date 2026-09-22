@@ -429,7 +429,6 @@ function activatePreviewReading(preview) {
   function handoffUrl(path) {
     const next = new URL(path, window.location.href);
     next.searchParams.set('from', 'reading');
-    next.searchParams.set('reader', readerKey);
     next.searchParams.set('topic', route.topic);
     next.searchParams.set('scope', route.scope);
     return `${next.pathname.replace(/^\//, '')}${next.search}`;
@@ -440,11 +439,13 @@ function activatePreviewReading(preview) {
     root.dataset.readingExperience = 'complete';
     if (readingSheet) readingSheet.dataset.readingCompleted = 'true';
     if (completion) completion.hidden = false;
-    if (chatLink) chatLink.setAttribute('href', handoffUrl(`chat.html?character=${encodeURIComponent(readerKey)}`));
+    // Saju Preview has no server-authoritative Reader identity. Do not promote
+    // the presentation Reader hint into Chat character authority.
+    if (chatLink) chatLink.setAttribute('href', handoffUrl('chat.html'));
     if (recordsLink) recordsLink.setAttribute('href', handoffUrl('records.html?tab=saju'));
     try {
       sessionStorage.setItem('myeongha.readingHandoff.v1', JSON.stringify({
-        reader: readerKey,
+        presentationReaderHint: readerKey,
         topic: route.topic,
         scope: route.scope,
         readingText: engineRequest?.readingText ?? null,
