@@ -58,7 +58,7 @@ const characters = {
 const params = new URLSearchParams(window.location.search);
 const threadId = params.get('threadId');
 const requestedCharacter = params.get('character')?.toLowerCase() ?? null;
-const presentationCharacterKey = requestedCharacter && Object.hasOwn(characters, requestedCharacter)
+const presentationCharacterKey = !threadId && requestedCharacter && Object.hasOwn(characters, requestedCharacter)
   ? requestedCharacter
   : null;
 const characterKey = presentationCharacterKey ?? (threadId ? null : 'baekheon');

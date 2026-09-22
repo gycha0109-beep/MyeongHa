@@ -83,6 +83,7 @@ describe('MyeongHa immersive long-form Character Room', () => {
     }
 
     expect(presentation).toContain("const requestedCharacter = params.get('character')?.toLowerCase() ?? null");
+    expect(presentation).toContain('const presentationCharacterKey = !threadId && requestedCharacter');
     expect(presentation).toContain("presentationCharacterKey ?? (threadId ? null : 'baekheon')");
     expect(presentation).toContain("root.dataset.characterAuthority = 'thread_identity_pending'");
     expect(presentation).toContain("root.dataset.characterAuthority = 'presentation_hint_only'");

@@ -63,6 +63,10 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
     expect(js).toContain('visibleCount + PAGE_SIZE');
     expect(js).toContain('safePresentationKey');
     expect(js).toContain("url.searchParams.set('character', safeKey)");
+    expect(js).toContain("url.searchParams.set('threadId', safeThreadId)");
+    expect(js.indexOf("url.searchParams.set('threadId', safeThreadId)")).toBeLessThan(
+      js.indexOf("url.searchParams.set('character', safeKey)"),
+    );
     expect(js).not.toContain('characterId:');
   });
 
@@ -144,6 +148,7 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
 
     expect(runtime).toContain("const threadId = params.get('threadId')");
     expect(runtime).toContain("const requestedCharacter = params.get('character')?.toLowerCase() ?? null");
+    expect(runtime).toContain('const presentationCharacterKey = !threadId && requestedCharacter');
     expect(runtime).toContain("presentationCharacterKey ?? (threadId ? null : 'baekheon')");
     expect(runtime).toContain("root.dataset.characterAuthority = 'thread_identity_pending'");
     expect(runtime).toContain("root.dataset.characterAuthority = 'presentation_hint_only'");

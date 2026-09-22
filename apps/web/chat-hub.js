@@ -107,11 +107,16 @@ function safePresentationKey(value) {
 }
 
 function roomHref(characterKey, threadId) {
+  const url = new URL('chat.html', window.location.href);
+  const safeThreadId = typeof threadId === 'string' && threadId.trim() ? threadId.trim() : null;
+  if (safeThreadId) {
+    url.searchParams.set('threadId', safeThreadId);
+    return `${url.pathname.split('/').pop()}${url.search}`;
+  }
+
   const safeKey = safePresentationKey(characterKey);
   if (!safeKey) return 'chat.html';
-  const url = new URL('chat.html', window.location.href);
   url.searchParams.set('character', safeKey);
-  if (typeof threadId === 'string' && threadId.trim()) url.searchParams.set('threadId', threadId.trim());
   return `${url.pathname.split('/').pop()}${url.search}`;
 }
 

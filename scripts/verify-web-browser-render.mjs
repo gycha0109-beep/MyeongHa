@@ -392,6 +392,16 @@ try {
   assert(threadOnlyChat.name === '대화 상대' && threadOnlyChat.title === '서버 확인 중', `Thread-only Chat leaked the static default Character: ${JSON.stringify(threadOnlyChat)}`);
   assert(!threadOnlyChat.dialogue.includes('백헌'), `Thread-only Chat reused Baekheon presentation before authority resolution: ${JSON.stringify(threadOnlyChat)}`);
 
+  await navigate(client, origin, '/chat.html?threadId=123e4567-e89b-42d3-a456-426614174000&character=baekheon', '.character-room-v2');
+  const conflictingThreadHintChat = await client.evaluate(`(() => ({
+    character: document.body.dataset.character ?? '',
+    authority: document.body.dataset.characterAuthority ?? '',
+    name: document.querySelector('[data-dialogue-name]')?.textContent?.trim() ?? '',
+    title: document.querySelector('[data-character-title]')?.textContent?.trim() ?? '',
+  }))()`);
+  assert(conflictingThreadHintChat.character === '' && conflictingThreadHintChat.authority === 'thread_identity_pending', `Thread-bound Chat accepted a presentation Character hint: ${JSON.stringify(conflictingThreadHintChat)}`);
+  assert(conflictingThreadHintChat.name === '대화 상대' && conflictingThreadHintChat.title === '서버 확인 중', `Thread-bound Chat rendered a conflicting presentation Character before authority resolution: ${JSON.stringify(conflictingThreadHintChat)}`);
+
   await navigate(client, origin, '/records.html?tab=saju&from=reading&reader=baekheon&topic=temperament&scope=original', '#saju-records');
   const readingRecordsHandoff = await client.evaluate(`(() => {
     const tab = document.querySelector('#saju-records-tab');
