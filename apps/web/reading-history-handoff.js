@@ -1,6 +1,6 @@
 export const PERSISTED_READING_HANDOFF_SOURCE_V1 = 'records';
 
-const MAX_IDENTIFIER_LENGTH = 512;
+const UUID_V1 = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const MAX_DOMAIN_LENGTH = 128;
 
 function normalizeRequired(value, field, maxLength) {
@@ -14,12 +14,19 @@ function normalizeRequired(value, field, maxLength) {
   return normalized;
 }
 
+function normalizeUuid(value, field) {
+  const normalized = normalizeRequired(value, field, 36);
+  if (!UUID_V1.test(normalized)) {
+    throw new TypeError(field + ' must be a UUID.');
+  }
+  return normalized;
+}
+
 export function createPersistedReadingHandoffV1(input) {
-  const readingId = normalizeRequired(input?.readingId, 'readingId', MAX_IDENTIFIER_LENGTH);
-  const readingSessionId = normalizeRequired(
+  const readingId = normalizeUuid(input?.readingId, 'readingId');
+  const readingSessionId = normalizeUuid(
     input?.readingSessionId,
     'readingSessionId',
-    MAX_IDENTIFIER_LENGTH,
   );
   const sajuDomain = normalizeRequired(input?.sajuDomain, 'sajuDomain', MAX_DOMAIN_LENGTH);
 

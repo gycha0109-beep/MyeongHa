@@ -9,13 +9,13 @@ import {
 describe('persisted Reading browser handoff', () => {
   it('carries only stored Reading navigation identifiers', () => {
     const url = buildPersistedReadingHandoffUrlV1({
-      readingId: ' reading-1 ',
-      readingSessionId: ' session-1 ',
+      readingId: ' 44444444-4444-4444-8444-444444444444 ',
+      readingSessionId: ' 55555555-5555-4555-8555-555555555555 ',
       sajuDomain: ' career ',
     });
 
     expect(url).toBe(
-      'reading-detail.html?from=records&readingId=reading-1&readingSessionId=session-1&sajuDomain=career',
+      'reading-detail.html?from=records&readingId=44444444-4444-4444-8444-444444444444&readingSessionId=55555555-5555-4555-8555-555555555555&sajuDomain=career',
     );
     expect(url).not.toContain('reader=');
     expect(url).not.toContain('character=');
@@ -26,12 +26,12 @@ describe('persisted Reading browser handoff', () => {
 
   it('parses a Records handoff without turning hints into authority', () => {
     expect(parsePersistedReadingHandoffV1(
-      '?from=records&readingId=reading-1&readingSessionId=session-1&sajuDomain=career',
+      '?from=records&readingId=44444444-4444-4444-8444-444444444444&readingSessionId=55555555-5555-4555-8555-555555555555&sajuDomain=career',
     )).toEqual({
       state: 'ready',
       source: 'records',
-      readingId: 'reading-1',
-      readingSessionId: 'session-1',
+      readingId: '44444444-4444-4444-8444-444444444444',
+      readingSessionId: '55555555-5555-4555-8555-555555555555',
       sajuDomain: 'career',
     });
   });
@@ -51,13 +51,13 @@ describe('persisted Reading browser handoff', () => {
   it('rejects unbounded identifiers before navigation', () => {
     expect(() => createPersistedReadingHandoffV1({
       readingId: '',
-      readingSessionId: 'session-1',
+      readingSessionId: '55555555-5555-4555-8555-555555555555',
       sajuDomain: 'career',
     })).toThrow(TypeError);
 
     expect(() => createPersistedReadingHandoffV1({
-      readingId: 'reading-1',
-      readingSessionId: 'session-1',
+      readingId: '44444444-4444-4444-8444-444444444444',
+      readingSessionId: '55555555-5555-4555-8555-555555555555',
       sajuDomain: 'x'.repeat(129),
     })).toThrow(TypeError);
   });
