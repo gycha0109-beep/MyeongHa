@@ -23,8 +23,11 @@ describe('Records Saju history surface', () => {
 
   it('loads persisted Reading History with the same Records bearer', () => {
     expect(client).toContain("readings: '/api/readings'");
-    expect(client).toContain('readReadings: () => readEndpoint(endpoints.readings)');
-    expect(client).toContain('const [lifeFacts, readings, memories] = await Promise.all([');
+    expect(client).toContain("parseReadingHistoryPayloadV1");
+    expect(client).toContain('readReadings: () => readStable(async (bearer) =>');
+    expect(client).toContain('projectReadingHistory(await readJson(fetchImpl, endpoints.readings, bearer))');
+    expect(client).toContain('const [lifeFacts, readingsPayload, memories] = await Promise.all([');
+    expect(client).toContain('const readings = projectReadingHistory(readingsPayload);');
     expect(client).toContain('return Object.freeze({ profile, lifeFacts, readings, memories });');
   });
 
