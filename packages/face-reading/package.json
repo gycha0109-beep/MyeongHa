@@ -10,6 +10,6 @@
     }
   },
   "dependencies": {
-    "@myeongha/face-reading": "https://raw.githubusercontent.com/gycha0109-beep/Saju/1f80c30f5c829ce8d0d839cdd5816dad943c5afd/distribution/face-reading/fe024/myeongha-face-reading-0.0.0.tgz"
+    "@myeongha/face-reading": "https://raw.githubusercontent.com/gycha0109-beep/Saju/50fd5b511326033861b3cab48028b989c4499b3c/distribution/face-reading/fe040b/myeongha-face-reading-0.0.0.tgz"
   }
 }
