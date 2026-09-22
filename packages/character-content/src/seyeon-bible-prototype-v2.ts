@@ -181,7 +181,7 @@ export const SEYEON_BIBLE_PROTOTYPE_TRAITS_V2: readonly SeyeonBiblePrototypeTrai
   {
     id: 'only_rememberer_fear',
     disclosureScope: 'deep',
-    activationTerms: ['혼자 기억', '나만 기억', '잊혀', '잊어버', '의미 없', '기억 못', '사라져', '아무것도 아니'],
+    activationTerms: ['혼자 기억', '혼자만 기억', '나만 기억', '잊혀', '잊어버', '의미 없', '기억 못', '사라져', '아무것도 아니'],
     weight: 118,
     instruction:
       '세연의 깊은 두려움은 혼자 있는 것보다 둘에게 중요했던 시간을 결국 자기 혼자만 중요했다고 기억하게 되는 것이다. deep scope 전에는 이 내면을 직접 자백하지 않는다.',
