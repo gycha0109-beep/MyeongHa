@@ -2,27 +2,9 @@ name: Governance
 
 on:
   pull_request:
-    paths:
-      - '.github/workflows/**'
-      - '.github/*.trigger'
-      - 'scripts/**'
-      - 'docs/**'
-      - 'supabase/migrations/**'
-      - 'test/db/**'
-      - 'package.json'
-      - 'package-lock.json'
   push:
     branches:
       - main
-    paths:
-      - '.github/workflows/**'
-      - '.github/*.trigger'
-      - 'scripts/**'
-      - 'docs/**'
-      - 'supabase/migrations/**'
-      - 'test/db/**'
-      - 'package.json'
-      - 'package-lock.json'
 
 permissions:
   contents: read
@@ -32,7 +14,56 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  scope:
+    name: route-governance-scope
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      contracts: ${{ steps.scope.outputs.contracts }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - name: Resolve governance scope
+        id: scope
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PUSH_BASE_SHA: ${{ github.event.before }}
+          PUSH_HEAD_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          changed_files="${RUNNER_TEMP}/myeongha-governance-changed-files.txt"
+
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            git diff --name-only "$PR_BASE_SHA" "$PR_HEAD_SHA" > "$changed_files"
+          elif [[ "$EVENT_NAME" == "push" ]]; then
+            if [[ "$PUSH_BASE_SHA" =~ ^0+$ ]]; then
+              git show --pretty='' --name-only "$PUSH_HEAD_SHA" > "$changed_files"
+            else
+              git diff --name-only "$PUSH_BASE_SHA" "$PUSH_HEAD_SHA" > "$changed_files"
+            fi
+          else
+            echo "Unsupported Governance event: $EVENT_NAME" >&2
+            exit 1
+          fi
+
+          echo "Changed files:"
+          cat "$changed_files"
+
+          if grep -Eq '^(\.github/workflows/|\.github/[^/]+\.trigger$|scripts/|docs/|supabase/migrations/|test/db/|package\.json$|package-lock\.json$)' "$changed_files"; then
+            echo "contracts=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "contracts=false" >> "$GITHUB_OUTPUT"
+          fi
+
   contracts:
+    needs: scope
+    if: needs.scope.outputs.contracts == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -45,3 +76,22 @@ jobs:
         run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Verify governance contracts
         run: npm run check:governance
+
+  verify:
+    name: Governance Verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    if: ${{ always() && !cancelled() }}
+    needs:
+      - scope
+      - contracts
+    steps:
+      - name: Require selected governance gates
+        env:
+          SCOPE_RESULT: ${{ needs.scope.result }}
+          CONTRACTS_RESULT: ${{ needs.contracts.result }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$SCOPE_RESULT" = "success"
+          test "$CONTRACTS_RESULT" = "success" || test "$CONTRACTS_RESULT" = "skipped"
