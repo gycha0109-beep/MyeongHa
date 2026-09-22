@@ -91,7 +91,10 @@ describe('persisted Reading → Reader Scene entry authority boundary', () => {
     expect(productionCharacter).toContain(
       'does not\n * establish canonical characterId values',
     );
-    expect(handoff).toContain("source: 'records'");
+    expect(handoff).toContain(
+      "PERSISTED_READING_HANDOFF_SOURCE_V1 = 'records'",
+    );
+    expect(handoff).toContain('source: PERSISTED_READING_HANDOFF_SOURCE_V1');
     expect(handoff).toContain('readingId');
     expect(handoff).toContain('readingSessionId');
     expect(handoff).toContain('sajuDomain');
