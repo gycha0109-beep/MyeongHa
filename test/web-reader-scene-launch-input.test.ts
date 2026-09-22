@@ -23,8 +23,6 @@ describe('Reader Scene launch input boundary', () => {
     expect(createReaderSceneLaunchRequestV1({
       threadId: `  ${THREAD_ID}  `,
       persistedReadingHandoff: persistedReading(),
-      readerCharacterId: 'baekheon',
-      presentationHint: 'baekheon',
     })).toEqual({
       threadId: THREAD_ID,
       officialReadingId: READING_ID,
@@ -61,11 +59,10 @@ describe('Reader Scene launch input boundary', () => {
     })).toThrow(ReaderSceneLaunchInputErrorV1);
   });
 
-  it('rejects non-Records or incomplete handoffs', () => {
+  it('rejects incomplete persisted Reading handoffs', () => {
     for (const persistedReadingHandoff of [
-      { state: 'none' },
-      { state: 'invalid' },
-      { ...persistedReading(), source: 'other' },
+      { state: 'none' } as const,
+      { state: 'invalid' } as const,
     ]) {
       expect(() => createReaderSceneLaunchRequestV1({
         threadId: THREAD_ID,
