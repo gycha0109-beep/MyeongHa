@@ -82,10 +82,13 @@ describe('MyeongHa immersive long-form Character Room', () => {
       expect(presentation).toContain(`name: '${name}'`);
     }
 
+    expect(presentation).toContain("const rawThreadId = params.get('threadId')");
+    expect(presentation).toContain('const threadId = parseChatThreadIdV1(rawThreadId)');
     expect(presentation).toContain("const requestedCharacter = params.get('character')?.toLowerCase() ?? null");
-    expect(presentation).toContain('const presentationCharacterKey = !threadId && requestedCharacter');
-    expect(presentation).toContain("presentationCharacterKey ?? (threadId ? null : 'baekheon')");
-    expect(presentation).toContain("root.dataset.characterAuthority = 'thread_identity_pending'");
+    expect(presentation).toContain('const presentationCharacterKey = !hasThreadRoute && requestedCharacter');
+    expect(presentation).toContain("presentationCharacterKey ?? (hasThreadRoute ? null : 'baekheon')");
+    expect(presentation).toContain("'thread_identity_pending'");
+    expect(presentation).toContain("'thread_identity_invalid'");
     expect(presentation).toContain("root.dataset.characterAuthority = 'presentation_hint_only'");
     expect(presentation).toContain('root.dataset.character = characterKey');
     expect(presentation).toContain("sceneLabel: '세연의 봄날 산책 공간'");
