@@ -289,5 +289,7 @@ A browser-safe `chat-open-client.js` adapter now mirrors the existing `POST /api
 
 This adapter is intentionally not invoked by the legacy Saju Preview path. It is reserved for the Reader Scene path once that path is publicly activated and supplies `readerCharacterId`. Character publication/content availability remains server-authoritative and may fail closed.
 
+A dormant `reader-chat-open-controller.js` now closes the browser orchestration boundary around that adapter. It accepts only a `ready` Reader Scene view model, coalesces double-submit while Chat open is in flight, retries only explicit retryable server failures, and navigates only to the authoritative returned `threadId`. Protected fallback or any non-ready Reader Scene fails before transport. This controller is not wired into the legacy Saju Preview surface and does not activate the Reader public route.
+
 
 A thread-only Chat URL also stays identity-neutral until a governed Character presentation mapping exists. The room does not default an authoritative `threadId` to Baekheon or any other presentation Character; it marks the Character authority as pending and lets the owner-scoped thread read remain identity-neutral.
