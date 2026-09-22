@@ -14,8 +14,8 @@ const readerRuntimePath = new URL(
   import.meta.url,
 );
 const chatOpenPath = new URL('../apps/api/src/chat-open-http.ts', import.meta.url);
-const productionCharacterPath = new URL(
-  '../packages/character-content/src/production.ts',
+const immutableCharacterAuthoringPath = new URL(
+  '../packages/character-content/src/immutable-authoring-v1.ts',
   import.meta.url,
 );
 const recordsHandoffPath = new URL(
@@ -80,17 +80,31 @@ describe('persisted Reading → Reader Scene entry authority boundary', () => {
     expect(runtime).not.toContain('readerCatalog');
   });
 
-  it('does not let Records manufacture the canonical Character required to open a thread', async () => {
-    const [chatOpen, productionCharacter, handoff] = await Promise.all([
+  it('keeps approved canonical Character ids separate from Records Reader selection authority', async () => {
+    const [chatOpen, immutableAuthoring, handoff] = await Promise.all([
       readFile(chatOpenPath, 'utf8'),
-      readFile(productionCharacterPath, 'utf8'),
+      readFile(immutableCharacterAuthoringPath, 'utf8'),
       readFile(recordsHandoffPath, 'utf8'),
     ]);
 
     expect(chatOpen).toContain("requestAuthority: 'canonical-character-id-only:v1'");
-    expect(productionCharacter).toContain(
-      'does not\n * establish canonical characterId values',
+    expect(immutableAuthoring).toContain(
+      'CHARACTER_IMMUTABLE_AUTHORING_V1_CHARACTER_IDS',
     );
+    for (const characterId of [
+      'seyeon',
+      'yeoul',
+      'seorin',
+      'rahyeon',
+      'mira',
+      'taegyeom',
+      'yunho',
+      'doyun',
+      'baekheon',
+    ]) {
+      expect(immutableAuthoring).toContain(`  '${characterId}',`);
+    }
+    expect(immutableAuthoring).not.toContain("  'doyoon',");
     expect(handoff).toContain(
       "PERSISTED_READING_HANDOFF_SOURCE_V1 = 'records'",
     );

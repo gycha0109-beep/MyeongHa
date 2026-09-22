@@ -271,7 +271,7 @@ The source boundaries make that absence intentional:
 - `standard_reading_reader_interpretations` is keyed by `(official_reading_id, reader_character_id)`, so one Official Reading may have distinct Reader interpretations. Records cannot silently choose one.
 - the thread-bound Reader runtime derives the Reader only from the exact owner-authorized active single-Character thread.
 - `POST /api/chat` can create/reuse that thread only when given a canonical Character id; the current Records DTO does not possess one.
-- the current Production Character roster authority explicitly fixes display names without establishing canonical `characterId` values, so browser presentation keys such as `baekheon` / `seyeon` must not be promoted into that missing authority.
+- exact-nine canonical Character ids are separately approved by the immutable #551 authoring authority and materialized in `CHARACTER_IMMUTABLE_AUTHORING_V1`; however Records exposes neither a `readerCharacterId` nor a server-approved rule that selects one for a persisted Reading. Browser presentation keys are a different namespace (`doyoon` versus canonical `doyun` is already a concrete mismatch), so string coincidence for other roster entries cannot become Reader-selection authority.
 
 Therefore Records→Reading Detail remains fail-closed for Reader Scene execution until a separately reviewed server authority supplies or selects the exact Reader/thread relationship. The frontend must not derive a thread from `readingId`, `readingSessionId`, `sajuDomain`, a presentation key, or local/session storage.
 
