@@ -128,18 +128,15 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
     expect(records).toContain('href="chat-hub.html">대화</a>');
   });
 
-  it('accepts a validated Saju Reading handoff without pretending unrelated chat context', async () => {
+  it('rejects the legacy client-authored Saju Reading continuation claim', async () => {
     const runtime = await readFile(roomRuntimePath, 'utf8');
 
-    expect(runtime).toContain("const READING_HANDOFF_STORAGE_KEY = 'myeongha.readingHandoff.v1';");
-    expect(runtime).toContain("params.get('from') !== 'reading'");
-    expect(runtime).toContain("if (stored.reader !== characterKey) return null;");
-    expect(runtime).toContain("if (queryTopic && stored.topic !== queryTopic) return null;");
-    expect(runtime).toContain("root.dataset.chatEntry = 'reading-handoff'");
-    expect(runtime).toContain("document.querySelector('[data-context-pill]')");
-    expect(runtime).toContain("document.querySelector('[data-thread-bar]')");
-    expect(runtime).toContain('readingHandoff,');
-    expect(runtime).toContain('읽기에서 이어왔군요.');
+    expect(runtime).not.toContain('myeongha.readingHandoff.v1');
+    expect(runtime).not.toContain("params.get('from') !== 'reading'");
+    expect(runtime).not.toContain("root.dataset.chatEntry = 'reading-handoff'");
+    expect(runtime).not.toContain('readingHandoff');
+    expect(runtime).not.toContain('읽기에서 이어왔군요.');
+    expect(runtime).toContain('setDialogueLines(character.intro)');
   });
 
   it('keeps My as the fifth active destination instead of falling back to Records', async () => {
