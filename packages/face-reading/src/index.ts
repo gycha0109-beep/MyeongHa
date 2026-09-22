@@ -36,3 +36,9 @@ export function loadPhysiognomyEngineRuntimeV1(): Promise<PhysiognomyEngineRunti
   );
   return cachedEngineModule;
 }
+
+export * from './interpretation-shell-fe038.js';
+export * from './source-authority-fe039.js';
+export * from './criterion-candidate-fe039.js';
+export * from './metric-registry-bridge-fe040a.js';
+export * from './static-observation-allowlist-fe040a.js';
