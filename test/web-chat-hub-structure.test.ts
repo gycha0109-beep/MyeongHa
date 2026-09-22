@@ -139,6 +139,18 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
     expect(runtime).toContain('setDialogueLines(character.intro)');
   });
 
+  it('keeps thread-only Chat navigation identity-neutral until server presentation authority exists', async () => {
+    const runtime = await readFile(roomRuntimePath, 'utf8');
+
+    expect(runtime).toContain("const threadId = params.get('threadId')");
+    expect(runtime).toContain("const requestedCharacter = params.get('character')?.toLowerCase() ?? null");
+    expect(runtime).toContain("presentationCharacterKey ?? (threadId ? null : 'baekheon')");
+    expect(runtime).toContain("root.dataset.characterAuthority = 'thread_identity_pending'");
+    expect(runtime).toContain("root.dataset.characterAuthority = 'presentation_hint_only'");
+    expect(runtime).toContain("name: '대화 상대'");
+    expect(runtime).not.toContain("(params.get('character') || 'baekheon')");
+  });
+
   it('keeps My as the fifth active destination instead of falling back to Records', async () => {
     const html = await readFile(hubHtmlPath, 'utf8');
 

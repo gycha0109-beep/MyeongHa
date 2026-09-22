@@ -288,3 +288,6 @@ The Chat room also ignores the removed legacy `myeongha.readingHandoff.v1` brows
 A browser-safe `chat-open-client.js` adapter now mirrors the existing `POST /api/chat` contract. It accepts only a caller-supplied server Reader identity, sends exactly `{ characterId }`, validates that the returned Character identity matches, and navigates only by the authoritative returned `threadId`.
 
 This adapter is intentionally not invoked by the legacy Saju Preview path. It is reserved for the Reader Scene path once that path is publicly activated and supplies `readerCharacterId`. Character publication/content availability remains server-authoritative and may fail closed.
+
+
+A thread-only Chat URL also stays identity-neutral until a governed Character presentation mapping exists. The room does not default an authoritative `threadId` to Baekheon or any other presentation Character; it marks the Character authority as pending and lets the owner-scoped thread read remain identity-neutral.

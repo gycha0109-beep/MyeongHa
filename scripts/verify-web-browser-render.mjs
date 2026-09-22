@@ -367,47 +367,30 @@ try {
     return true;
   })()`);
   await navigate(client, origin, '/chat.html?character=baekheon&from=reading&reader=baekheon&topic=temperament&scope=original', '.character-room-v2');
-  const readingChatHandoff = await client.evaluate(`(() => {
-    const contextPill = document.querySelector('[data-context-pill]');
-    const threadBar = document.querySelector('[data-thread-bar]');
-    return {
-      entry: document.body.dataset.chatEntry ?? '',
-      character: document.body.dataset.character ?? '',
-      contextVisible: contextPill instanceof HTMLElement && !contextPill.hidden,
-      threadVisible: threadBar instanceof HTMLElement && !threadBar.hidden,
-      contextTitle: document.querySelector('[data-context-title]')?.textContent?.trim() ?? '',
-      threadTitle: document.querySelector('[data-thread-bar-title]')?.textContent?.trim() ?? '',
-      dialogue: document.querySelector('[data-dialogue-line]')?.textContent?.trim() ?? '',
-    };
-  })()`);
-  assert(readingChatHandoff.entry === 'reading-handoff' && readingChatHandoff.character === 'baekheon', `Reading handoff did not bind to selected Reader chat: ${JSON.stringify(readingChatHandoff)}`);
-  assert(readingChatHandoff.contextVisible && readingChatHandoff.threadVisible, `Reading handoff context surfaces stayed hidden: ${JSON.stringify(readingChatHandoff)}`);
-  assert(readingChatHandoff.contextTitle.includes('전체 사주') && readingChatHandoff.threadTitle === '전체 사주', `Reading handoff title missing: ${JSON.stringify(readingChatHandoff)}`);
-  assert(readingChatHandoff.dialogue.includes('읽기에서 이어왔군요.'), `Reader chat did not acknowledge Reading handoff: ${readingChatHandoff.dialogue}`);
-
-  await navigate(client, origin, '/chat.html?character=seyeon&from=reading&reader=baekheon&topic=temperament&scope=original', '.character-room-v2');
-  const crossReaderHandoff = await client.evaluate(`(() => ({
+  const ignoredLegacyReadingHandoff = await client.evaluate(`(() => ({
     entry: document.body.dataset.chatEntry ?? '',
     character: document.body.dataset.character ?? '',
+    authority: document.body.dataset.characterAuthority ?? '',
     contextHidden: document.querySelector('[data-context-pill]')?.hidden ?? false,
     threadHidden: document.querySelector('[data-thread-bar]')?.hidden ?? false,
     dialogue: document.querySelector('[data-dialogue-line]')?.textContent?.trim() ?? '',
   }))()`);
-  assert(crossReaderHandoff.character === 'seyeon' && crossReaderHandoff.entry === '', `Reading handoff leaked across Readers: ${JSON.stringify(crossReaderHandoff)}`);
-  assert(crossReaderHandoff.contextHidden && crossReaderHandoff.threadHidden, `Cross-Reader handoff exposed Reading context: ${JSON.stringify(crossReaderHandoff)}`);
-  assert(!crossReaderHandoff.dialogue.includes('읽기에서 이어왔군요.'), `Cross-Reader handoff reused Reading dialogue: ${crossReaderHandoff.dialogue}`);
+  assert(ignoredLegacyReadingHandoff.entry === '' && ignoredLegacyReadingHandoff.character === 'baekheon', `Legacy Reading handoff changed Chat entry identity: ${JSON.stringify(ignoredLegacyReadingHandoff)}`);
+  assert(ignoredLegacyReadingHandoff.authority === 'presentation_hint_only', `Legacy Reading handoff escaped presentation-only Character authority: ${JSON.stringify(ignoredLegacyReadingHandoff)}`);
+  assert(ignoredLegacyReadingHandoff.contextHidden && ignoredLegacyReadingHandoff.threadHidden, `Legacy Reading handoff exposed continuation context: ${JSON.stringify(ignoredLegacyReadingHandoff)}`);
+  assert(!ignoredLegacyReadingHandoff.dialogue.includes('읽기에서 이어왔군요.'), `Legacy Reading handoff reused removed continuation dialogue: ${ignoredLegacyReadingHandoff.dialogue}`);
 
-  await navigate(client, origin, '/chat.html?character=baekheon&from=reading&reader=baekheon&topic=money&scope=original', '.character-room-v2');
-  const crossTopicHandoff = await client.evaluate(`(() => ({
-    entry: document.body.dataset.chatEntry ?? '',
+  await navigate(client, origin, '/chat.html?threadId=123e4567-e89b-42d3-a456-426614174000', '.character-room-v2');
+  const threadOnlyChat = await client.evaluate(`(() => ({
     character: document.body.dataset.character ?? '',
-    contextHidden: document.querySelector('[data-context-pill]')?.hidden ?? false,
-    threadHidden: document.querySelector('[data-thread-bar]')?.hidden ?? false,
+    authority: document.body.dataset.characterAuthority ?? '',
+    name: document.querySelector('[data-dialogue-name]')?.textContent?.trim() ?? '',
+    title: document.querySelector('[data-character-title]')?.textContent?.trim() ?? '',
     dialogue: document.querySelector('[data-dialogue-line]')?.textContent?.trim() ?? '',
   }))()`);
-  assert(crossTopicHandoff.character === 'baekheon' && crossTopicHandoff.entry === '', `Reading handoff leaked across topics: ${JSON.stringify(crossTopicHandoff)}`);
-  assert(crossTopicHandoff.contextHidden && crossTopicHandoff.threadHidden, `Cross-topic handoff exposed Reading context: ${JSON.stringify(crossTopicHandoff)}`);
-  assert(!crossTopicHandoff.dialogue.includes('읽기에서 이어왔군요.'), `Cross-topic handoff reused Reading dialogue: ${crossTopicHandoff.dialogue}`);
+  assert(threadOnlyChat.character === '' && threadOnlyChat.authority === 'thread_identity_pending', `Thread-only Chat invented presentation Character authority: ${JSON.stringify(threadOnlyChat)}`);
+  assert(threadOnlyChat.name === '대화 상대' && threadOnlyChat.title === '서버 확인 중', `Thread-only Chat leaked the static default Character: ${JSON.stringify(threadOnlyChat)}`);
+  assert(!threadOnlyChat.dialogue.includes('백헌'), `Thread-only Chat reused Baekheon presentation before authority resolution: ${JSON.stringify(threadOnlyChat)}`);
 
   await navigate(client, origin, '/records.html?tab=saju&from=reading&reader=baekheon&topic=temperament&scope=original', '#saju-records');
   const readingRecordsHandoff = await client.evaluate(`(() => {

@@ -56,11 +56,28 @@ const characters = {
 };
 
 const params = new URLSearchParams(window.location.search);
-const requestedCharacter = (params.get('character') || 'baekheon').toLowerCase();
-const characterKey = Object.hasOwn(characters, requestedCharacter) ? requestedCharacter : 'baekheon';
-const character = characters[characterKey];
+const threadId = params.get('threadId');
+const requestedCharacter = params.get('character')?.toLowerCase() ?? null;
+const presentationCharacterKey = requestedCharacter && Object.hasOwn(characters, requestedCharacter)
+  ? requestedCharacter
+  : null;
+const characterKey = presentationCharacterKey ?? (threadId ? null : 'baekheon');
+const character = characterKey
+  ? characters[characterKey]
+  : Object.freeze({
+      name: '대화 상대',
+      title: '서버 확인 중',
+      sceneLabel: '대화 상대 확인 중',
+      intro: ['대화 상대를 확인하고 있습니다.'],
+    });
 const root = document.body;
-root.dataset.character = characterKey;
+if (characterKey) {
+  root.dataset.character = characterKey;
+  root.dataset.characterAuthority = 'presentation_hint_only';
+} else {
+  delete root.dataset.character;
+  root.dataset.characterAuthority = 'thread_identity_pending';
+}
 document.title = `${character.name} · 대화 · 명하`;
 
 document.querySelectorAll('[data-character-name], [data-dialogue-name]').forEach((node) => {
@@ -72,7 +89,8 @@ document.querySelectorAll('[data-character-title]').forEach((node) => {
 });
 
 document.querySelectorAll('[data-character-avatar]').forEach((node) => {
-  node.dataset.character = characterKey;
+  if (characterKey) node.dataset.character = characterKey;
+  else delete node.dataset.character;
   node.textContent = character.name.slice(0, 1);
 });
 
@@ -100,6 +118,7 @@ setDialogueLines(character.intro);
 window.MyeongHaCharacterRoom = Object.freeze({
   characterKey,
   characterName: character.name,
+  characterAuthority: root.dataset.characterAuthority,
   setDialogueText(text) {
     if (typeof text !== 'string' || text.trim().length === 0) return;
     setDialogueLines(text.split(/\n+/).filter(Boolean));
