@@ -4,13 +4,13 @@ export const FACE_SQUARE_BROAD_READINESS_BRIDGE_VERSION_FE041C =
 export const FACE_SQUARE_BROAD_READINESS_SOURCE_FE041C = Object.freeze({
   repository: 'gycha0109-beep/Saju' as const,
   validatedDistributionCommit:
-    '8b49d4e03e35ef5447f0f2873ff2b8737bd36110' as const,
+    '66a98e15d27d2aa7dfb6d09df27bee57c137b1c5' as const,
   materializedCommit:
-    'b782c91e0ff18e05fd2ae9e742c4c0afe2127a71' as const,
+    '37f3728996992144eaa60b083334e466ae648b98' as const,
   distributionPath:
-    'distribution/face-reading/fe041b/myeongha-face-reading-0.0.0.tgz' as const,
+    'distribution/face-reading/fe041d/myeongha-face-reading-0.0.0.tgz' as const,
   artifactSha256:
-    '170dc999e0cb01e3e9a38c59a9a510170def54d7055c3b988eabb1330d68620e' as const,
+    'f306515639aef5366308018ec3374f35ee1c20c35adb107ee140381ee6c8cd6d' as const,
   sourcePath:
     'packages/face-reading/src/square-broad-operationalization-readiness-fe041b.ts' as const,
   sourceBlobSha:

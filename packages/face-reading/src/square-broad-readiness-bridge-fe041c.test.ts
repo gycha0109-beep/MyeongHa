@@ -13,19 +13,19 @@ function clone<T>(value: T): any {
 }
 
 describe('FE041C square-broad operationalization readiness consumer', () => {
-  it('pins the validated immutable FE041B handoff', () => {
+  it('pins the FE041B readiness export from the validated immutable FE041D superseding handoff', () => {
     expect(FACE_SQUARE_BROAD_READINESS_BRIDGE_VERSION_FE041C)
       .toBe('MHA-FACE-SQUARE-BROAD-READINESS-BRIDGE-FE041C-v1');
     expect(FACE_SQUARE_BROAD_READINESS_SOURCE_FE041C).toEqual({
       repository: 'gycha0109-beep/Saju',
       validatedDistributionCommit:
-        '8b49d4e03e35ef5447f0f2873ff2b8737bd36110',
+        '66a98e15d27d2aa7dfb6d09df27bee57c137b1c5',
       materializedCommit:
-        'b782c91e0ff18e05fd2ae9e742c4c0afe2127a71',
+        '37f3728996992144eaa60b083334e466ae648b98',
       distributionPath:
-        'distribution/face-reading/fe041b/myeongha-face-reading-0.0.0.tgz',
+        'distribution/face-reading/fe041d/myeongha-face-reading-0.0.0.tgz',
       artifactSha256:
-        '170dc999e0cb01e3e9a38c59a9a510170def54d7055c3b988eabb1330d68620e',
+        'f306515639aef5366308018ec3374f35ee1c20c35adb107ee140381ee6c8cd6d',
       sourcePath:
         'packages/face-reading/src/square-broad-operationalization-readiness-fe041b.ts',
       sourceBlobSha:

@@ -17,11 +17,11 @@ export const FACE_CANONICAL_METRIC_REGISTRY_SOURCE_FE040A = Object.freeze({
 });
 
 export const FACE_CURRENT_PINNED_ARTIFACT_FE040A = Object.freeze({
-  distributionCommit: '8b49d4e03e35ef5447f0f2873ff2b8737bd36110' as const,
+  distributionCommit: '37f3728996992144eaa60b083334e466ae648b98' as const,
   distributionPath:
-    'distribution/face-reading/fe041b/myeongha-face-reading-0.0.0.tgz' as const,
+    'distribution/face-reading/fe041d/myeongha-face-reading-0.0.0.tgz' as const,
   artifactSha256:
-    '170dc999e0cb01e3e9a38c59a9a510170def54d7055c3b988eabb1330d68620e' as const,
+    'f306515639aef5366308018ec3374f35ee1c20c35adb107ee140381ee6c8cd6d' as const,
   publicExportPath: './preview-engine' as const,
   canonicalRegistryExportPath:
     './product-neutral-observation-contract-fe035b' as const,

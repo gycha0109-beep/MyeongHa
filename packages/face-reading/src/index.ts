@@ -45,3 +45,5 @@ export * from './static-observation-allowlist-fe040a.js';
 export * from './operationalization-candidate-fe041a.js';
 
 export * from './square-broad-readiness-bridge-fe041c.js';
+
+export * from './square-broad-candidate-mapping-bridge-fe041e.js';
