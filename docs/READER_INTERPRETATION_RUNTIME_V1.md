@@ -243,7 +243,7 @@ The web integration layer now has a dormant Reader Scene client contract without
 - `apps/web/reader-runtime-client.js` sends only `threadId + officialReadingId`, reuses the current Bearer authority, distinguishes feature-unavailable from request failure, and is disabled by default until route activation is separately approved.
 - `apps/web/reader-scene-controller.js` owns loading/retry/abort/stale-response state and treats the server-returned `readerCharacterId` as authoritative.
 - URL `reader` / `character` values remain presentation hints only; they are not Reader runtime authority.
-- The current Saju Preview path remains unchanged while the Reader Production route is closed. A failed Reader request must never silently fall back to Saju Preview as if it were Reader output.
+- The current Saju Preview execution remains separate while the Reader Production route is closed. Its completion surface does not persist or forward a Reader identity into Chat; it routes only to the general Chat hub because the selected Reader is presentation-only. A failed Reader request must never silently fall back to Saju Preview as if it were Reader output.
 
 No `api/me.ts` dispatch target, Vercel rewrite, Production Reader route, Character asset authority, relationship threshold, Saju semantic rule, Commerce rule, or persistence policy is introduced by this frontend integration slice.
 
@@ -281,7 +281,7 @@ Until those MyeongHa composition gates are concrete and tested, the public rewri
 
 ## Reading completion → Chat open boundary
 
-The current Saju Preview completion surface does not possess a server-authoritative Reader Character identity. Its URL-selected Reader remains presentation-only, so completion navigation no longer forwards `reader` or `character` as Chat authority.
+The current Saju Preview completion surface does not possess a server-authoritative Reader Character identity. Its URL-selected Reader remains presentation-only, so completion navigation no longer forwards `reader` or `character` as Chat authority and no longer writes a Reader-specific Reading-to-Chat continuation claim into `sessionStorage`. The legacy Preview CTA goes to the general Chat hub, where Character selection is a separate interaction rather than implied continuation.
 
 A browser-safe `chat-open-client.js` adapter now mirrors the existing `POST /api/chat` contract. It accepts only a caller-supplied server Reader identity, sends exactly `{ characterId }`, validates that the returned Character identity matches, and navigates only by the authoritative returned `threadId`.
 

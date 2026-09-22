@@ -440,19 +440,10 @@ function activatePreviewReading(preview) {
     if (readingSheet) readingSheet.dataset.readingCompleted = 'true';
     if (completion) completion.hidden = false;
     // Saju Preview has no server-authoritative Reader identity. Do not promote
-    // the presentation Reader hint into Chat character authority.
-    if (chatLink) chatLink.setAttribute('href', handoffUrl('chat.html'));
+    // the presentation Reader hint into Chat character authority or a stored
+    // Reading-to-Chat continuation claim. General Chat remains independently selectable.
+    if (chatLink) chatLink.setAttribute('href', 'chat-hub.html');
     if (recordsLink) recordsLink.setAttribute('href', handoffUrl('records.html?tab=saju'));
-    try {
-      sessionStorage.setItem('myeongha.readingHandoff.v1', JSON.stringify({
-        presentationReaderHint: readerKey,
-        topic: route.topic,
-        scope: route.scope,
-        readingText: engineRequest?.readingText ?? null,
-      }));
-    } catch {
-      // Navigation still works when storage is unavailable.
-    }
   }
 
   function replayReadingExperience() {
