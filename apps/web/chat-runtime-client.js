@@ -1,9 +1,10 @@
+import { parseChatRoomReadPayloadV1, parseChatThreadIdV1 } from './chat-room-read-contract.js';
 import { getActiveBearer, invalidateGuestSession, invalidateMemberSession } from './product-auth.js';
 import { PRODUCT_AUTH_STORAGE_V1 } from './product-auth.js';
 import { shouldReloadChatForMemberSessionStorageChange } from './product-auth-surface.js';
 
 const params = new URLSearchParams(window.location.search);
-const threadId = params.get('threadId');
+const threadId = parseChatThreadIdV1(params.get('threadId'));
 const room = window.MyeongHaCharacterRoom;
 const apiEnvelopePromise = import('./api-envelope.js');
 
@@ -28,25 +29,6 @@ function formatTimestamp(value) {
     hour: '2-digit',
     minute: '2-digit',
   }).format(parsed);
-}
-
-function assertRoomState(payload) {
-  if (!payload || typeof payload !== 'object') {
-    throw new Error('Character Room runtime returned an invalid response.');
-  }
-  if (typeof payload.threadId !== 'string' || payload.threadId !== threadId) {
-    throw new Error('Character Room runtime returned a different thread identity.');
-  }
-  if (typeof payload.characterId !== 'string' || payload.characterId.trim().length === 0) {
-    throw new Error('Character Room runtime did not return an authoritative character identity.');
-  }
-  if (!Array.isArray(payload.messages)) {
-    throw new Error('Character Room runtime did not return an authoritative message stream.');
-  }
-  if (!Number.isSafeInteger(payload.lastSequenceNo) || payload.lastSequenceNo < 0) {
-    throw new Error('Character Room runtime returned an invalid sequence cursor.');
-  }
-  return payload;
 }
 
 function senderLabel(message, authoritativeCharacterId) {
@@ -145,7 +127,10 @@ function renderConversation(messages, authoritativeCharacterId) {
 }
 
 function renderRoomState(payload) {
-  const state = assertRoomState(payload);
+  const state = parseChatRoomReadPayloadV1(payload, {
+    expectedThreadId: threadId,
+    expectedAfterSequenceNo: 0,
+  });
   renderHistory(state.messages, state.characterId);
   renderConversation(state.messages, state.characterId);
 

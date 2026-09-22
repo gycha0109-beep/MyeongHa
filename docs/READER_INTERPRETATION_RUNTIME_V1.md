@@ -293,3 +293,5 @@ A dormant `reader-chat-open-controller.js` now closes the browser orchestration 
 
 
 A thread-only Chat URL also stays identity-neutral until a governed Character presentation mapping exists. The room does not default an authoritative `threadId` to Baekheon or any other presentation Character; it marks the Character authority as pending and lets the owner-scoped thread read remain identity-neutral. When `threadId` is present, any simultaneous `?character=` presentation hint is ignored rather than allowed to override the thread-bound identity boundary. Chat Hub links likewise emit `threadId` alone for an existing thread and reserve `?character=` for pre-thread discovery navigation.
+
+The owner-scoped Chat read now crosses a dedicated browser DTO validator before rendering. It requires the exact requested UUID thread, exact sequence cursor, a non-empty server character identity, a strictly increasing message stream, matching `lastSequenceNo`, and redaction-safe message fields. Internal release/bundle/relationship/message-payload fields returned by the broader API response are not promoted into the browser render model.
