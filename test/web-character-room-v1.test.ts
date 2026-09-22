@@ -36,6 +36,12 @@ describe('MyeongHa immersive long-form Character Room', () => {
     expect(source).not.toContain('John Doe');
     expect(source).not.toContain('DEMO');
     expect(source).not.toContain('mobile-bottom-nav');
+    expect(html).not.toContain('data-character="baekheon"');
+    expect(page).not.toContain('>백헌<');
+    expect(page).not.toContain('충추원의 장');
+    expect(page).toContain('data-character-name>대화 상대</strong>');
+    expect(page).toContain('data-character-title>서버 확인 중</span>');
+    expect(page).toContain('data-dialogue-line>대화 상대를 확인하고 있습니다.</p>');
   });
 
   it('does not ship fabricated Life Thread or past-conversation claims in static room data', async () => {
