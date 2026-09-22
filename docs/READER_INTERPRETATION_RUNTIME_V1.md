@@ -255,6 +255,10 @@ Records now carries only stored Reading navigation identifiers (`readingId`, `re
 
 The Reading Detail runtime detects this handoff before Saju Preview eligibility. While no governed persisted-Reading reread route is publicly activated, it fails closed with a dedicated unavailable state and does not silently execute the current Saju Preview or invent a Reader/thread binding.
 
+Migration 1220 defines the Official Standard Reading identity as `standard_reading_official_bindings.reading_id`, referencing the canonical `readings.id`. The browser may therefore forward a Records `readingId` only as an opaque candidate `officialReadingId`; it does not prove that the row is an Official Standard Reading. The Reader Preview server must still re-resolve the exact official binding and Reader access. A separately supplied thread candidate is also mandatory and is independently owner/participant/content-bound by server authority.
+
+`reader-scene-launch-input.js` encodes that boundary. It can form the exact `{ threadId, officialReadingId }` Reader request only when both UUID candidates are present and the persisted Records handoff is structurally ready. It never forwards `readingSessionId`, `sajuDomain`, Reader/Character presentation keys, prose, or any authority-shaped field. Reading Detail remains unwired because Records navigation alone has no thread candidate.
+
 ## 12. Hosted Production grounding evidence and remaining MyeongHa gates
 
 Hosted grounding transport is closed with exact evidence:
