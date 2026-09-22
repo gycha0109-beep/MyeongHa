@@ -37,12 +37,16 @@ export const READER_INTERPRETATION_PREVIEW_HTTP_SCHEMA_VERSION_V1 =
 
 type Awaitable<T> = T | Promise<T>;
 
+export type ReaderInterpretationPreviewServerContextV1 = Readonly<
+  Pick<CharacterStandardReadingServerContextInputV1, 'relationshipProjectionPolicy'>
+>;
+
 export interface ReaderInterpretationPreviewContextAuthorityPortV1 {
   resolveContext(input: {
     readonly subjectId: string;
     readonly threadId: string;
     readonly effectiveAt: string;
-  }): Awaitable<CharacterStandardReadingServerContextInputV1>;
+  }): Awaitable<ReaderInterpretationPreviewServerContextV1>;
 }
 
 export interface ReaderInterpretationPreviewSceneSegmentV1 {

@@ -221,7 +221,7 @@ The following are rejected when supplied by the client:
 - Character perspective
 - raw Official Reading response
 
-The authenticated subject and effective time are server inputs. `ReaderInterpretationPreviewContextAuthorityPortV1` may provide only non-content server context; Character, content bundle, world relations, relationship state, and granted Memory context are explicitly excluded. The owner-authorized thread is independently re-read, its pinned release is resolved through the server `ContentReleaseRuntime`, relationship and Memory grants are re-read from their authorities, and exact Reader access is then revalidated. The Reading domain is derived from the authorized Official Reading source, not from client input.
+The authenticated subject and effective time are server inputs. `ReaderInterpretationPreviewContextAuthorityPortV1` is explicitly narrowed to the server-owned `relationshipProjectionPolicy` input only; Character, content bundle, world relations, relationship state, Life Facts, granted Memory context, event/message history, and Saju context are not fields of this port. The concrete threshold policy remains SRC-22-owned and is not defined by this track. The owner-authorized thread is independently re-read, its pinned release is resolved through the server `ContentReleaseRuntime`, relationship and Memory grants are re-read from their authorities, and exact Reader access is then revalidated. The Reading domain is derived from the authorized Official Reading source, not from client input.
 
 The bounded HTTP response exposes only the Reader Scene material required by the Preview UI:
 
