@@ -402,6 +402,19 @@ try {
   assert(conflictingThreadHintChat.character === '' && conflictingThreadHintChat.authority === 'thread_identity_pending', `Thread-bound Chat accepted a presentation Character hint: ${JSON.stringify(conflictingThreadHintChat)}`);
   assert(conflictingThreadHintChat.name === '대화 상대' && conflictingThreadHintChat.title === '서버 확인 중', `Thread-bound Chat rendered a conflicting presentation Character before authority resolution: ${JSON.stringify(conflictingThreadHintChat)}`);
 
+  await navigate(client, origin, '/chat.html?threadId=not-a-thread&character=baekheon', '.character-room-v2');
+  await sleep(100);
+  const invalidThreadChat = await client.evaluate(`(() => ({
+    character: document.body.dataset.character ?? '',
+    authority: document.body.dataset.characterAuthority ?? '',
+    name: document.querySelector('[data-dialogue-name]')?.textContent?.trim() ?? '',
+    status: document.querySelector('[data-compose-status]')?.textContent?.trim() ?? '',
+    history: document.querySelector('[data-history-empty]')?.textContent?.trim() ?? '',
+  }))()`);
+  assert(invalidThreadChat.character === '' && invalidThreadChat.authority === 'thread_identity_invalid', `Invalid thread route fell back to presentation Character authority: ${JSON.stringify(invalidThreadChat)}`);
+  assert(invalidThreadChat.name === '대화 상대', `Invalid thread route leaked a presentation Character: ${JSON.stringify(invalidThreadChat)}`);
+  assert(invalidThreadChat.status === '유효한 대화를 다시 선택해 주세요.' && invalidThreadChat.history === '대화 주소가 올바르지 않습니다.', `Invalid thread route did not fail closed visibly: ${JSON.stringify(invalidThreadChat)}`);
+
   await navigate(client, origin, '/records.html?tab=saju&from=reading&reader=baekheon&topic=temperament&scope=original', '#saju-records');
   const readingRecordsHandoff = await client.evaluate(`(() => {
     const tab = document.querySelector('#saju-records-tab');

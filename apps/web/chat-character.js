@@ -1,3 +1,4 @@
+import { parseChatThreadIdV1 } from './chat-room-read-contract.js';
 const characters = {
   baekheon: {
     name: '백헌',
@@ -56,12 +57,14 @@ const characters = {
 };
 
 const params = new URLSearchParams(window.location.search);
-const threadId = params.get('threadId');
+const rawThreadId = params.get('threadId');
+const threadId = parseChatThreadIdV1(rawThreadId);
+const hasThreadRoute = rawThreadId !== null;
 const requestedCharacter = params.get('character')?.toLowerCase() ?? null;
-const presentationCharacterKey = !threadId && requestedCharacter && Object.hasOwn(characters, requestedCharacter)
+const presentationCharacterKey = !hasThreadRoute && requestedCharacter && Object.hasOwn(characters, requestedCharacter)
   ? requestedCharacter
   : null;
-const characterKey = presentationCharacterKey ?? (threadId ? null : 'baekheon');
+const characterKey = presentationCharacterKey ?? (hasThreadRoute ? null : 'baekheon');
 const character = characterKey
   ? characters[characterKey]
   : Object.freeze({
@@ -76,7 +79,9 @@ if (characterKey) {
   root.dataset.characterAuthority = 'presentation_hint_only';
 } else {
   delete root.dataset.character;
-  root.dataset.characterAuthority = 'thread_identity_pending';
+  root.dataset.characterAuthority = threadId === null
+    ? 'thread_identity_invalid'
+    : 'thread_identity_pending';
 }
 document.title = `${character.name} · 대화 · 명하`;
 

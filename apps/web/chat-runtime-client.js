@@ -4,7 +4,9 @@ import { PRODUCT_AUTH_STORAGE_V1 } from './product-auth.js';
 import { shouldReloadChatForMemberSessionStorageChange } from './product-auth-surface.js';
 
 const params = new URLSearchParams(window.location.search);
-const threadId = parseChatThreadIdV1(params.get('threadId'));
+const rawThreadId = params.get('threadId');
+const threadId = parseChatThreadIdV1(rawThreadId);
+const invalidThreadRoute = rawThreadId !== null && threadId === null;
 const room = window.MyeongHaCharacterRoom;
 const apiEnvelopePromise = import('./api-envelope.js');
 
@@ -167,6 +169,15 @@ function invalidateRejectedBearer(activeBearer) {
 }
 
 async function loadRoomState() {
+  if (invalidThreadRoute) {
+    if (historyEmpty) {
+      historyEmpty.hidden = false;
+      historyEmpty.textContent = '대화 주소가 올바르지 않습니다.';
+    }
+    setComposeStatus('유효한 대화를 다시 선택해 주세요.');
+    return;
+  }
+
   if (!threadId) {
     if (historyEmpty) {
       historyEmpty.hidden = false;
@@ -220,6 +231,11 @@ function submitTurn(event) {
 
   const message = event.detail?.message;
   if (typeof message !== 'string' || message.trim().length === 0) return;
+
+  if (invalidThreadRoute) {
+    setComposeStatus('대화 주소가 올바르지 않아 메시지를 보낼 수 없습니다.');
+    return;
+  }
 
   if (!threadId) {
     setComposeStatus('먼저 이어갈 대화를 선택해야 합니다. 입력한 내용은 보내지지 않았습니다.');

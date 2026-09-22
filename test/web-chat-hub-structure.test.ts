@@ -146,13 +146,24 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
   it('keeps thread-only Chat navigation identity-neutral until server presentation authority exists', async () => {
     const runtime = await readFile(roomRuntimePath, 'utf8');
 
-    expect(runtime).toContain("const threadId = params.get('threadId')");
+    expect(runtime).toContain("const rawThreadId = params.get('threadId')");
+    expect(runtime).toContain('const threadId = parseChatThreadIdV1(rawThreadId)');
     expect(runtime).toContain("const requestedCharacter = params.get('character')?.toLowerCase() ?? null");
-    expect(runtime).toContain('const presentationCharacterKey = !threadId && requestedCharacter');
-    expect(runtime).toContain("presentationCharacterKey ?? (threadId ? null : 'baekheon')");
-    expect(runtime).toContain("root.dataset.characterAuthority = 'thread_identity_pending'");
+    expect(runtime).toContain('const presentationCharacterKey = !hasThreadRoute && requestedCharacter');
+    expect(runtime).toContain("presentationCharacterKey ?? (hasThreadRoute ? null : 'baekheon')");
+    expect(runtime).toContain("'thread_identity_pending'");
+    expect(runtime).toContain("'thread_identity_invalid'");
     expect(runtime).toContain("root.dataset.characterAuthority = 'presentation_hint_only'");
     expect(runtime).toContain("name: '대화 상대'");
+    expect(runtime).not.toContain("(params.get('character') || 'baekheon')");
+  });
+
+  it('fails closed on malformed thread route identity instead of falling back to a presentation Character', async () => {
+    const runtime = await readFile(roomRuntimePath, 'utf8');
+
+    expect(runtime).toContain('parseChatThreadIdV1(rawThreadId)');
+    expect(runtime).toContain("'thread_identity_invalid'");
+    expect(runtime).toContain('hasThreadRoute ? null');
     expect(runtime).not.toContain("(params.get('character') || 'baekheon')");
   });
 
