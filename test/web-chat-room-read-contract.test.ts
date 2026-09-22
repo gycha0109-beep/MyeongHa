@@ -113,13 +113,19 @@ describe('browser Chat room read contract', () => {
   });
 
   it('rejects redacted content leaks at the browser trust boundary', () => {
-    const leaked = payload();
-    leaked.messages[1] = {
-      ...leaked.messages[1]!,
-      bodyText: 'must not render',
-      messagePayloadJsonb: null,
-      redacted: true,
-      redactedAt: '2026-09-05T15:02:00.000Z',
+    const base = payload();
+    const leaked = {
+      ...base,
+      messages: [
+        base.messages[0]!,
+        {
+          ...base.messages[1]!,
+          bodyText: 'must not render',
+          messagePayloadJsonb: null,
+          redacted: true,
+          redactedAt: '2026-09-05T15:02:00.000Z',
+        },
+      ],
     };
 
     expect(() => parseChatRoomReadPayloadV1(leaked, {
