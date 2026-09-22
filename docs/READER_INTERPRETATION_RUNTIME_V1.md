@@ -259,6 +259,23 @@ Migration 1220 defines the Official Standard Reading identity as `standard_readi
 
 `reading-history-contract.js` now validates the `/api/readings` browser DTO before Records can construct navigation links: Reading and Reading Session identities must be UUIDs, timestamps and required strings must be structurally valid, duplicate Reading identities fail closed, and undeclared internal fields are not promoted into the render model. The Records→Reading URL handoff independently revalidates both persisted identities as UUIDs, so a hand-authored or corrupted query cannot become a structurally ready persisted Reading handoff. `reader-scene-launch-input.js` then encodes the narrower Reader launch boundary. It can form the exact `{ threadId, officialReadingId }` Reader request only when both UUID candidates are present and the persisted Records handoff is structurally ready. It never forwards `readingSessionId`, `sajuDomain`, Reader/Character presentation keys, prose, or any authority-shaped field. Reading Detail remains unwired because Records navigation alone has no thread candidate. The dormant Reader Scene controller now exposes `loadPersistedReading` through this builder; missing/malformed thread or Records identity fails before Reader transport and clears retry authority. This still does not wire Records directly to Reader Scene or activate the public route.
 
+## 11.3 Persisted Reading → Reader Scene entry authority blocker
+
+The repository currently has **no canonical Reading → Chat thread binding** and no approved automatic Reader-selection rule for a persisted Reading.
+
+The source boundaries make that absence intentional:
+
+- `qry_reading_history_v1` exposes committed Reading metadata only; it does not return a thread or Reader Character identity.
+- `standard_reading_official_bindings` is Reader-independent and has no Chat thread identity.
+- `standard_reading_reader_interpretations` is keyed by `(official_reading_id, reader_character_id)`, so one Official Reading may have distinct Reader interpretations. Records cannot silently choose one.
+- the thread-bound Reader runtime derives the Reader only from the exact owner-authorized active single-Character thread.
+- `POST /api/chat` can create/reuse that thread only when given a canonical Character id; the current Records DTO does not possess one.
+- the current Production Character roster authority explicitly fixes display names without establishing canonical `characterId` values, so browser presentation keys such as `baekheon` / `seyeon` must not be promoted into that missing authority.
+
+Therefore Records→Reading Detail remains fail-closed for Reader Scene execution until a separately reviewed server authority supplies or selects the exact Reader/thread relationship. The frontend must not derive a thread from `readingId`, `readingSessionId`, `sajuDomain`, a presentation key, or local/session storage.
+
+`test/reader-scene-entry-authority-boundary.test.ts` locks these cross-layer facts as an executable tripwire. A future implementation that intentionally introduces a governed Reader/thread source must update that authority first and then revise the tripwire in the same reviewed change.
+
 ## 12. Hosted Production grounding evidence and remaining MyeongHa gates
 
 Hosted grounding transport is closed with exact evidence:
