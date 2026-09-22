@@ -209,6 +209,8 @@ The request body is intentionally limited to:
 - `threadId`
 - `officialReadingId`
 
+Both request identities are UUID-backed database identities. The browser client and HTTP seam reject malformed values before any Reader context, thread binding, access, artifact, relationship, Memory, or Saju authority is consulted.
+
 The following are rejected when supplied by the client:
 
 - Reader Character id

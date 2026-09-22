@@ -10,7 +10,7 @@ function sceneData() {
     schemaVersion: 'myeongha-reader-interpretation-preview-http-v1',
     lifecycle: 'preview',
     mode: 'reader_interpretation',
-    officialReadingId: 'reading-1',
+    officialReadingId: '44444444-4444-4444-8444-444444444444',
     readerCharacterId: 'baekheon',
     domain: 'general_natal',
     interpretationHash: 'sha256:v1:reader-result',
@@ -57,8 +57,8 @@ describe('web Reader runtime client', () => {
     });
 
     await expect(client.readReaderScene({
-      threadId: 'thread-1',
-      officialReadingId: 'reading-1',
+      threadId: '33333333-3333-4333-8333-333333333333',
+      officialReadingId: '44444444-4444-4444-8444-444444444444',
     })).rejects.toMatchObject({ code: 'READER_FEATURE_UNAVAILABLE' });
     expect(fetchImpl).not.toHaveBeenCalled();
   });
@@ -72,8 +72,8 @@ describe('web Reader runtime client', () => {
     });
 
     const scene = await client.readReaderScene({
-      threadId: ' thread-1 ',
-      officialReadingId: ' reading-1 ',
+      threadId: ' 33333333-3333-4333-8333-333333333333 ',
+      officialReadingId: ' 44444444-4444-4444-8444-444444444444 ',
     });
 
     expect(scene.readerCharacterId).toBe('baekheon');
@@ -90,9 +90,30 @@ describe('web Reader runtime client', () => {
       'Content-Type': 'application/json',
     });
     expect(JSON.parse(init.body)).toEqual({
-      threadId: 'thread-1',
-      officialReadingId: 'reading-1',
+      threadId: '33333333-3333-4333-8333-333333333333',
+      officialReadingId: '44444444-4444-4444-8444-444444444444',
     });
+  });
+
+  it('rejects malformed Reader request identities before transport', async () => {
+    const fetchImpl = vi.fn();
+    const client = createReaderRuntimeClientV1({
+      enabled: true,
+      fetchImpl,
+      resolveBearer: vi.fn().mockResolvedValue({ kind: 'member', token: 'member-token' }),
+    });
+
+    await expect(client.readReaderScene({
+      threadId: 'not-a-thread',
+      officialReadingId: '44444444-4444-4444-8444-444444444444',
+    })).rejects.toMatchObject({ code: 'READER_REQUEST_INVALID' });
+
+    await expect(client.readReaderScene({
+      threadId: '33333333-3333-4333-8333-333333333333',
+      officialReadingId: 'not-a-reading',
+    })).rejects.toMatchObject({ code: 'READER_REQUEST_INVALID' });
+
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 
   it('invalidates a rejected member bearer on 401', async () => {
@@ -105,8 +126,8 @@ describe('web Reader runtime client', () => {
     });
 
     await expect(client.readReaderScene({
-      threadId: 'thread-1',
-      officialReadingId: 'reading-1',
+      threadId: '33333333-3333-4333-8333-333333333333',
+      officialReadingId: '44444444-4444-4444-8444-444444444444',
     })).rejects.toMatchObject({ code: 'READER_SESSION_REQUIRED', retryable: false });
 
     expect(invalidateMember).toHaveBeenCalledWith('expired');
@@ -120,8 +141,8 @@ describe('web Reader runtime client', () => {
     });
 
     await expect(client.readReaderScene({
-      threadId: 'thread-1',
-      officialReadingId: 'reading-1',
+      threadId: '33333333-3333-4333-8333-333333333333',
+      officialReadingId: '44444444-4444-4444-8444-444444444444',
     })).rejects.toMatchObject({
       code: 'READER_SERVICE_UNAVAILABLE',
       retryable: true,
@@ -139,8 +160,8 @@ describe('web Reader runtime client', () => {
     });
 
     await expect(client.readReaderScene({
-      threadId: 'thread-1',
-      officialReadingId: 'reading-1',
+      threadId: '33333333-3333-4333-8333-333333333333',
+      officialReadingId: '44444444-4444-4444-8444-444444444444',
     })).rejects.toMatchObject({ code: 'READER_MALFORMED_RESPONSE' });
   });
 
@@ -156,8 +177,8 @@ describe('web Reader runtime client', () => {
     });
 
     await expect(client.readReaderScene({
-      threadId: 'thread-1',
-      officialReadingId: 'reading-1',
+      threadId: '33333333-3333-4333-8333-333333333333',
+      officialReadingId: '44444444-4444-4444-8444-444444444444',
     })).rejects.toMatchObject({
       code: 'READER_REQUEST_ABORTED',
       retryable: false,
@@ -173,16 +194,16 @@ describe('web Reader runtime client', () => {
     });
 
     await client.readReaderScene({
-      threadId: 'thread-1',
-      officialReadingId: 'reading-1',
+      threadId: '33333333-3333-4333-8333-333333333333',
+      officialReadingId: '44444444-4444-4444-8444-444444444444',
       readerCharacterId: 'forged-reader',
       grounding: { forged: true },
     });
 
     const [, init] = fetchImpl.mock.calls[0]!;
     expect(JSON.parse(init.body)).toEqual({
-      threadId: 'thread-1',
-      officialReadingId: 'reading-1',
+      threadId: '33333333-3333-4333-8333-333333333333',
+      officialReadingId: '44444444-4444-4444-8444-444444444444',
     });
   });
 });

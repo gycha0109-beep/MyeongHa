@@ -16,6 +16,8 @@ import {
 export const READER_RUNTIME_ENDPOINT_V1 =
   '/api/me/readings/reader-interpretation/preview';
 
+const UUID_V1 = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+
 export class ReaderRuntimeClientErrorV1 extends Error {
   constructor(code, message, retryable = false, cause) {
     super(message, cause ? { cause } : undefined);
@@ -37,6 +39,17 @@ function requireIdentifier(value, field) {
     throw new ReaderRuntimeClientErrorV1(
       'READER_REQUEST_INVALID',
       field + ' is outside the supported bounds.',
+    );
+  }
+  return normalized;
+}
+
+function requireUuidIdentifier(value, field) {
+  const normalized = requireIdentifier(value, field);
+  if (!UUID_V1.test(normalized)) {
+    throw new ReaderRuntimeClientErrorV1(
+      'READER_REQUEST_INVALID',
+      field + ' must be a UUID.',
     );
   }
   return normalized;
@@ -162,8 +175,8 @@ export function createReaderRuntimeClientV1(options = {}) {
         );
       }
 
-      const threadId = requireIdentifier(input?.threadId, 'threadId');
-      const officialReadingId = requireIdentifier(
+      const threadId = requireUuidIdentifier(input?.threadId, 'threadId');
+      const officialReadingId = requireUuidIdentifier(
         input?.officialReadingId,
         'officialReadingId',
       );

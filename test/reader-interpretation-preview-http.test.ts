@@ -35,13 +35,25 @@ describe('Reader Interpretation Preview HTTP seam', () => {
   it('accepts only threadId + officialReadingId and normalizes them', () => {
     expect(
       parseReaderInterpretationPreviewHttpRequestV1({
-        threadId: '  thread-1  ',
-        officialReadingId: '  reading-1  ',
+        threadId: '  33333333-3333-4333-8333-333333333333  ',
+        officialReadingId: '  44444444-4444-4444-8444-444444444444  ',
       }),
     ).toEqual({
-      threadId: 'thread-1',
-      officialReadingId: 'reading-1',
+      threadId: '33333333-3333-4333-8333-333333333333',
+      officialReadingId: '44444444-4444-4444-8444-444444444444',
     });
+  });
+
+  it('rejects malformed thread and Official Reading identities before authority resolution', () => {
+    expect(() => parseReaderInterpretationPreviewHttpRequestV1({
+      threadId: 'not-a-thread',
+      officialReadingId: '44444444-4444-4444-8444-444444444444',
+    })).toThrow(ReaderInterpretationPreviewHttpErrorV1);
+
+    expect(() => parseReaderInterpretationPreviewHttpRequestV1({
+      threadId: '33333333-3333-4333-8333-333333333333',
+      officialReadingId: 'not-a-reading',
+    })).toThrow(ReaderInterpretationPreviewHttpErrorV1);
   });
 
   it.each([
@@ -56,8 +68,8 @@ describe('Reader Interpretation Preview HTTP seam', () => {
   ])('rejects client authority field %s', (field) => {
     expect(() =>
       parseReaderInterpretationPreviewHttpRequestV1({
-        threadId: 'thread-1',
-        officialReadingId: 'reading-1',
+        threadId: '33333333-3333-4333-8333-333333333333',
+        officialReadingId: '44444444-4444-4444-8444-444444444444',
         [field]: 'forged',
       }),
     ).toThrow(ReaderInterpretationPreviewHttpErrorV1);
@@ -69,7 +81,7 @@ describe('Reader Interpretation Preview HTTP seam', () => {
       contractVersion: 'reader-interpretation-preview-v1',
       lifecycle: 'preview',
       mode: 'reader_interpretation',
-      officialReadingId: 'reading-1',
+      officialReadingId: '44444444-4444-4444-8444-444444444444',
       readerCharacterId: 'baekheon',
       readerContentBundleId: 'bundle-private',
       requestedDomain: 'career',
@@ -100,7 +112,7 @@ describe('Reader Interpretation Preview HTTP seam', () => {
     expect(response).toMatchObject({
       lifecycle: 'preview',
       mode: 'reader_interpretation',
-      officialReadingId: 'reading-1',
+      officialReadingId: '44444444-4444-4444-8444-444444444444',
       readerCharacterId: 'baekheon',
       domain: 'career',
       interpretationHash: 'sha256:v1:interpretation',
@@ -162,8 +174,8 @@ describe('Reader Interpretation Preview HTTP seam', () => {
         resolvedSubjectId: ' ',
         effectiveAt: '2026-09-21T01:00:00.000Z',
         body: {
-          threadId: 'thread-1',
-          officialReadingId: 'reading-1',
+          threadId: '33333333-3333-4333-8333-333333333333',
+          officialReadingId: '44444444-4444-4444-8444-444444444444',
         },
         contextAuthorityPort,
         contentReleaseRuntime,
@@ -216,8 +228,8 @@ describe('Reader Interpretation Preview HTTP seam', () => {
         resolvedSubjectId: 'subject-1',
         effectiveAt: '2026-09-21T01:00:00.000Z',
         body: {
-          threadId: 'thread-1',
-          officialReadingId: 'reading-1',
+          threadId: '33333333-3333-4333-8333-333333333333',
+          officialReadingId: '44444444-4444-4444-8444-444444444444',
           readerCharacterId: 'taegyeom',
         },
         contextAuthorityPort,

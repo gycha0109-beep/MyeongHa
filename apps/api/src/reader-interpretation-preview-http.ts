@@ -94,6 +94,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+const UUID_V1 = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+
 function requireIdentifier(value: unknown, field: string): string {
   if (typeof value !== 'string') {
     throw new ReaderInterpretationPreviewHttpErrorV1(
@@ -106,6 +108,17 @@ function requireIdentifier(value: unknown, field: string): string {
     throw new ReaderInterpretationPreviewHttpErrorV1(
       'INVALID_REQUEST',
       `${field} is outside the supported bounds.`,
+    );
+  }
+  return normalized;
+}
+
+function requireUuidIdentifier(value: unknown, field: string): string {
+  const normalized = requireIdentifier(value, field);
+  if (!UUID_V1.test(normalized)) {
+    throw new ReaderInterpretationPreviewHttpErrorV1(
+      'INVALID_REQUEST',
+      `${field} must be a UUID.`,
     );
   }
   return normalized;
@@ -157,8 +170,8 @@ export function parseReaderInterpretationPreviewHttpRequestV1(
   }
 
   return Object.freeze({
-    threadId: requireIdentifier(body.threadId, 'threadId'),
-    officialReadingId: requireIdentifier(
+    threadId: requireUuidIdentifier(body.threadId, 'threadId'),
+    officialReadingId: requireUuidIdentifier(
       body.officialReadingId,
       'officialReadingId',
     ),
