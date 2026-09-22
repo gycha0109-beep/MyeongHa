@@ -85,10 +85,15 @@ function isRef(value: unknown): value is string {
     /^[A-Za-z0-9._:-]{1,160}$/.test(value);
 }
 
-function isUniqueRefArray(value: unknown): value is string[] {
+function isUniqueMetricRefArray(value: unknown): value is string[] {
   return Array.isArray(value) &&
     value.length > 0 &&
-    value.every(isRef) &&
+    value.every(
+      (entry) =>
+        typeof entry === 'string' &&
+        entry.trim().length > 0 &&
+        entry.length <= 300,
+    ) &&
     new Set(value).size === value.length;
 }
 
@@ -101,7 +106,7 @@ export function createFaceOperationalizationCandidateFE041A(
     value.schemaVersion !==
       'myeongha-face-operationalization-candidate-input-v1' ||
     !isRef(value.operationalizationRef) ||
-    !isUniqueRefArray(value.inputMetricRefs) ||
+    !isUniqueMetricRefArray(value.inputMetricRefs) ||
     value.reviewStatus !== 'research'
   ) {
     return null;
