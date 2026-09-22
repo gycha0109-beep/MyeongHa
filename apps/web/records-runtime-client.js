@@ -1,3 +1,4 @@
+import { parseReadingHistoryPayloadV1, ReadingHistoryContractErrorV1 } from './reading-history-contract.js';
 import { unwrapApiSuccessEnvelope, WebApiEnvelopeError } from './api-envelope.js';
 import {
   PRODUCT_AUTH_STORAGE_V1,
@@ -124,6 +125,21 @@ async function readJson(fetchImpl, endpoint, bearer) {
     throw error;
   }
 }
+function projectReadingHistory(payload) {
+  try {
+    return parseReadingHistoryPayloadV1(payload);
+  } catch (error) {
+    if (error instanceof ReadingHistoryContractErrorV1) {
+      throw new RecordsRuntimeError(
+        'WEB_RECORDS_MALFORMED_RESPONSE',
+        'Records API returned a malformed Reading History payload.',
+        error,
+      );
+    }
+    throw error;
+  }
+}
+
 
 export function createRecordsRuntimeClient(options = {}) {
   const fetchImpl = requireFetch(options.fetchImpl ?? globalThis.fetch);
@@ -147,16 +163,18 @@ export function createRecordsRuntimeClient(options = {}) {
   return Object.freeze({
     readProfile: () => readEndpoint(endpoints.profile),
     readLifeFacts: () => readEndpoint(endpoints.lifeFacts),
-    readReadings: () => readEndpoint(endpoints.readings),
+    readReadings: () => readStable(async (bearer) =>
+      projectReadingHistory(await readJson(fetchImpl, endpoints.readings, bearer))),
     readMemories: () => readEndpoint(endpoints.memories),
     readRecords() {
       return readStable(async (bearer) => {
         const profile = await readJson(fetchImpl, endpoints.profile, bearer);
-        const [lifeFacts, readings, memories] = await Promise.all([
+        const [lifeFacts, readingsPayload, memories] = await Promise.all([
           readJson(fetchImpl, endpoints.lifeFacts, bearer),
           readJson(fetchImpl, endpoints.readings, bearer),
           readJson(fetchImpl, endpoints.memories, bearer),
         ]);
+        const readings = projectReadingHistory(readingsPayload);
         return Object.freeze({ profile, lifeFacts, readings, memories });
       });
     },
