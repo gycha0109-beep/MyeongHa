@@ -345,19 +345,8 @@ function renderProgressDots(stepCount, activeIndex) {
   }
 }
 
-function readerCommentForStep(step) {
-  const suffixByReader = {
-    baekheon: '말보다 실제 선택과 행동에서 이 흐름이 반복되는지 보십시오.',
-    seyeon: '좋고 나쁨으로 자르기보다, 언제 이 흐름이 편하게 살아나는지 같이 볼게요.',
-    yeoul: '실제 선택에서 이 흐름이 어떤 순간에 튀어나오는지 보는 게 핵심이에요.',
-    seorin: '지금뿐 아니라 예전에도 비슷한 선택 패턴이 반복됐는지 떠올려 보세요.',
-    rahyeon: '겉으로 드러난 모습보다, 이 흐름 때문에 실제로 흔들리는 순간을 보는 편이 정확합니다.',
-    mira: '과장할 필요는 없습니다. 실제 생활에서 반복되는지만 확인하면 됩니다.',
-    taegyeom: '좋은 말로 포장하지 않겠습니다. 이 구조가 실제 행동에서 확인되는지가 기준입니다.',
-    yunho: '한 번의 사건보다 반복되는 선택의 순서를 보면 이 구조가 더 분명해집니다.',
-    doyoon: '복잡하게 외우지 마세요. 실제로 자주 나오는 선택 패턴인지 보면 됩니다.',
-  };
-  return suffixByReader[readerKey] ?? '실제 생활에서 이 흐름이 반복되는지 확인해 보세요.';
+function previewCommentForStep() {
+  return '좋고 나쁨으로 단정하기보다 실제 생활에서 이 흐름이 반복되는지 확인해 보세요.';
 }
 
 function displayFactValue(fact) {
@@ -475,8 +464,8 @@ function activatePreviewReading(preview) {
         ? structureParts.join('\n\n')
         : '원국에서 확인된 해석 축을 바탕으로 읽는 항목입니다.';
     }
-    if (readerLine) readerLine.textContent = `${step.title}부터 핵심을 짚겠습니다.`;
-    if (readerComment) readerComment.textContent = readerCommentForStep(step);
+    if (readerLine) readerLine.textContent = `${step.title} 항목을 확인합니다.`;
+    if (readerComment) readerComment.textContent = previewCommentForStep();
     if (authorityNote) {
       authorityNote.textContent = 'Preview · 연구 검증 중인 원국 해석이며 확정적 미래 예측은 포함하지 않습니다.';
       if (preview.notice) authorityNote.title = preview.notice;
@@ -504,6 +493,7 @@ function activatePreviewReading(preview) {
   replayButton?.addEventListener('click', replayReadingExperience);
 
   root.dataset.readingRouteState = 'preview';
+  root.dataset.previewReaderVoice = 'disabled';
   root.dataset.readingExperience = 'entering';
   if (routeState) routeState.hidden = true;
   if (stage) stage.hidden = false;

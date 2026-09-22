@@ -100,7 +100,10 @@ describe('MyeongHa character-led Saju Reading v1', () => {
     expect(runtime).toContain("const PREVIEW_NOTICE_SECTION_TITLE = '프리뷰 안내';");
     expect(runtime).toContain("const STRUCTURE_PREFIX = '근거 구조:';");
     expect(runtime).toContain("'이 해석의 사주 근거'");
-    expect(runtime).toContain('readerCommentForStep(step)');
+    expect(runtime).toContain('previewCommentForStep()');
+    expect(runtime).toContain("root.dataset.previewReaderVoice = 'disabled';");
+    expect(runtime).not.toContain('suffixByReader');
+    expect(runtime).not.toContain('readerCommentForStep');
     expect(runtime).not.toContain('const lead = firstSentence(step.primary)');
     expect(runtime).not.toContain('function firstSentence(text)');
     expect(runtime).toContain('if (stage) stage.hidden = true;');

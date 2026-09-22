@@ -246,6 +246,7 @@ The web integration layer now has a dormant Reader Scene client contract without
 - `apps/web/reader-scene-controller.js` owns loading/retry/abort/stale-response state and treats the server-returned `readerCharacterId` as authoritative.
 - URL `reader` / `character` values remain presentation hints only; they are not Reader runtime authority.
 - The current Saju Preview execution remains separate while the Reader Production route is closed. Its completion surface does not persist or forward a Reader identity into Chat; it routes only to the general Chat hub because the selected Reader is presentation-only. A failed Reader request must never silently fall back to Saju Preview as if it were Reader output.
+- That legacy Saju Preview also keeps its step guidance Reader-neutral: the browser no longer synthesizes per-Reader commentary from the presentation key while server-authorized Reader Interpretation is inactive.
 
 No `api/me.ts` dispatch target, Vercel rewrite, Production Reader route, Character asset authority, relationship threshold, Saju semantic rule, Commerce rule, or persistence policy is introduced by this frontend integration slice.
 
