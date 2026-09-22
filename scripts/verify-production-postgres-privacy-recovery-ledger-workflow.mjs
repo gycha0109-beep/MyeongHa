@@ -116,7 +116,7 @@ for (const fragment of [
   'serviceability_guard: incident_reference_utc <= authoritative_coverage_through',
   'snapshot_cadence_is_rpo: false',
   'authoritative_post_backup_source: BOUNDED_CAPTURED_WINDOW_AUTHORITY',
-  'authoritative_privacy_reconciliation: false',
+  'authoritative_privacy_reconciliation: PROVEN_BOUNDED_CAPTURED_WINDOW_RUN_35659483080',
   'dr_ready: false',
 ]) {
   requireFragment('decisions', fragment);
@@ -126,7 +126,7 @@ for (const fragment of [
   'authoritative post-backup privacy source **only for its explicit captured window**',
   'incident_reference_utc <= authoritative_coverage_through',
   'hourly capture cadence is operational mechanics only',
-  'promoted authoritative workflow runtime  = PROVEN — run 35539838537 / artifact 10614412005',
+  'promoted authoritative workflow runtime  = PROVEN — run 35653303484 / artifact 10662304561',
   'DR Ready                                 = false',
 ]) {
   requireFragment('authority', fragment);
@@ -141,13 +141,15 @@ for (const fragment of [
 }
 
 for (const fragment of [
-  'privacy_recovery_ledger_run_id: 35539838537',
   'privacy_recovery_ledger_authority_class: AUTHORITATIVE_CAPTURED_WINDOW_V1',
   'authoritative_post_backup_source: true_bounded_captured_window_only',
-  'authoritative_privacy_reconciliation: false',
+  'authoritative_privacy_reconciliation_run_id: 35659483080',
+  'authoritative_privacy_reconciliation_ledger_run_id: 35653303484',
+  'authoritative_privacy_reconciliation: true',
+  'authoritative_privacy_reconciliation_scope: BOUNDED_CAPTURED_WINDOW_ONLY',
   'future_safe_privacy_reconciliation: false',
-  'rpo_authority: PRODUCT_OWNER_APPROVED_PT24H',
-  'rto_authority: PRODUCT_OWNER_APPROVED_PT6H',
+  'rpo_full_authoritative_comparison: PASS_5536S_LE_PT24H',
+  'rto_full_authoritative_comparison: PASS_67S_LE_PT6H',
   'dr_ready: false',
 ]) {
   requireFragment('status', fragment);

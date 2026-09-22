@@ -168,16 +168,20 @@ const requiredStatusFragments = [
   'historical_privacy_delta_audit_authority: COUNT_ONLY_OBSERVATION_NON_AUTHORITATIVE',
   'privacy_recovery_ledger_authority_class: AUTHORITATIVE_CAPTURED_WINDOW_V1',
   'authoritative_post_backup_source: true_bounded_captured_window_only',
-  'authoritative_privacy_reconciliation: false',
+  'authoritative_privacy_reconciliation_run_id: 35659483080',
+  'authoritative_privacy_reconciliation: true',
+  'authoritative_privacy_reconciliation_scope: BOUNDED_CAPTURED_WINDOW_ONLY',
   'future_safe_privacy_reconciliation: false',
   'rpo_authority: PRODUCT_OWNER_APPROVED_PT24H',
+  'rpo_full_authoritative_comparison: PASS_5536S_LE_PT24H',
   'rto_authority: PRODUCT_OWNER_APPROVED_PT6H',
+  'rto_full_authoritative_comparison: PASS_67S_LE_PT6H',
   'dr_ready: false',
 ];
 
 for (const fragment of requiredStatusFragments) {
   if (!status.includes(fragment)) {
-    throw new Error(`DR status authority changed unexpectedly after current count-only audit evidence was recorded: ${fragment}`);
+    throw new Error(`DR status lost historical count-only audit evidence or current promoted recovery authority: ${fragment}`);
   }
 }
 

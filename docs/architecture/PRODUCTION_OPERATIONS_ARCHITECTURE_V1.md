@@ -822,7 +822,7 @@ RTO = PT6H (6 hours) — PRODUCT OWNER APPROVED 2026-09-21
 
 Decision direction is **product requirement → infrastructure validation**, not provider capability → product requirement.
 
-A Product Owner decision recorded under #389 on 2026-09-21 establishes the numeric objectives as **RPO `PT24H`** and **RTO `PT6H`**. This resolves objective authority only. Historical synthetic/isolated timing diagnostics do not by themselves establish full-procedure compliance or `DR Ready`.
+A Product Owner decision recorded under #389 on 2026-09-21 establishes the numeric objectives as **RPO `PT24H`** and **RTO `PT6H`**. Full authoritative isolated recovery run `35659483080` now supplies the required objective comparison: the bounded authoritative data-loss window was `5536s` and the end-to-end workflow duration was `67s`, so both objectives pass. This comparison does not establish full hosted provider-managed Auth/Storage recovery equivalence and does not by itself promote `DR Ready`.
 
 Correct sequence:
 
@@ -837,7 +837,7 @@ Correct sequence:
 
 A restore drill proves achievable recovery; it does not define what loss/downtime the product should accept.
 
-Until objectives and achieved evidence are both present, no `DR Ready` claim is allowed.
+Approved objectives and full-authoritative achieved evidence are now both present for the repository-controlled recovery procedure. No `DR Ready` claim is allowed until the separate provider-managed full-restore equivalence gate is also evidenced.
 
 ---
 
