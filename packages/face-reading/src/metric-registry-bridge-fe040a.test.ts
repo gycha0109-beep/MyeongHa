@@ -8,8 +8,8 @@ import {
   loadCanonicalFaceMetricRegistryFE040A,
 } from './metric-registry-bridge-fe040a.js';
 
-describe('FE040A canonical metric registry bridge', () => {
-  it('pins upstream FE035B authority without redefining metric definitions', () => {
+describe('FE040B canonical metric registry consumer bridge', () => {
+  it('keeps FE035B as the upstream canonical authority', () => {
     expect(FACE_METRIC_REGISTRY_BRIDGE_VERSION_FE040A)
       .toBe('MHA-FACE-METRIC-REGISTRY-BRIDGE-FE040A-v1');
     expect(FACE_CANONICAL_METRIC_REGISTRY_SOURCE_FE040A).toMatchObject({
@@ -23,22 +23,25 @@ describe('FE040A canonical metric registry bridge', () => {
     });
   });
 
-  it('records that the current FE024 artifact does not export the canonical registry', () => {
+  it('pins the immutable FE040B distribution artifact and records export readiness', () => {
     expect(FACE_CURRENT_PINNED_ARTIFACT_FE040A).toMatchObject({
-      distributionCommit: '1f80c30f5c829ce8d0d839cdd5816dad943c5afd',
+      distributionCommit: '50fd5b511326033861b3cab48028b989c4499b3c',
+      distributionPath:
+        'distribution/face-reading/fe040b/myeongha-face-reading-0.0.0.tgz',
       artifactSha256:
-        '8d793c57e104fc0137a17dc631d208b468131b1d9a9668142a846e34dacbf84a',
+        '210cb8f4358fb3b111e0ad3ab7914ef6846ef14af80e781c31544a8fbc527706',
       publicExportPath: './preview-engine',
-      canonicalRegistryExported: false,
+      canonicalRegistryExportPath:
+        './product-neutral-observation-contract-fe035b',
+      canonicalRegistryExported: true,
     });
 
     expect(assessCurrentPinnedFaceMetricRegistryFE040A()).toMatchObject({
-      status: 'blocked',
-      reason: 'canonical_registry_export_unavailable',
+      status: 'ready',
+      reason: 'canonical_registry_export_available',
       boundary: {
-        upstreamOwnsMetricAuthority: true,
+        registryAdmissionStillRequiresRuntimeValidation: true,
         localMetricDefinitionAuthorityIssued: false,
-        staticObservationAdmissionIssued: false,
         operationalizationAuthorityIssued: false,
         traditionalBindingAuthorityIssued: false,
         productionInterpretationAuthorityIssued: false,
@@ -46,14 +49,32 @@ describe('FE040A canonical metric registry bridge', () => {
     });
   });
 
-  it('fails closed when loading the canonical registry from the current pinned artifact', async () => {
+  it('loads and admits the canonical FE035B registry from the pinned artifact', async () => {
     const result = await loadCanonicalFaceMetricRegistryFE040A();
+
     expect(result).toMatchObject({
-      status: 'blocked',
-      reason: 'canonical_registry_export_unavailable',
+      status: 'admitted',
+      registryState: 'canonical_upstream_registry_admitted',
+      upstreamContractVersion:
+        'FE035B-PRODUCT-NEUTRAL-OBSERVATION-CONTRACT-v1',
+      metricCount: 13,
+      requiredMetricCount: 8,
+      conditionalMetricCount: 5,
+      boundary: {
+        upstreamOwnsMetricAuthority: true,
+        localMetricDefinitionAuthorityIssued: false,
+        traditionalBindingAuthorityIssued: false,
+        thresholdAuthorityIssued: false,
+        calibrationAuthorityIssued: false,
+        classificationAuthorityIssued: false,
+        scoreAuthorityIssued: false,
+        rankingAuthorityIssued: false,
+        narrativeAuthorityIssued: false,
+        productionInterpretationAuthorityIssued: false,
+      },
     });
     expect(isIssuedCanonicalFaceMetricRegistryAdmissionFE040A(result))
-      .toBe(false);
+      .toBe(true);
   });
 
   it('does not treat a structurally forged object as an issued registry admission', () => {

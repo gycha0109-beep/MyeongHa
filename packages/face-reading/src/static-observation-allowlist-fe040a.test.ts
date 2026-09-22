@@ -107,6 +107,52 @@ describe('FE040A static observation allowlist', () => {
     });
   });
 
+  it('admits a complete static observation derived from the issued canonical registry', async () => {
+    const { loadCanonicalFaceMetricRegistryFE040A } = await import(
+      './metric-registry-bridge-fe040a.js'
+    );
+    const registry = await loadCanonicalFaceMetricRegistryFE040A();
+    expect(registry.status).toBe('admitted');
+    if (registry.status !== 'admitted') return;
+
+    const observation = {
+      schemaVersion: 'myeongha-face-static-observation-envelope-v1' as const,
+      registryRef: registry.registryRef,
+      metrics: registry.metrics.map((metric, index) => ({
+        regionKey: metric.regionKey,
+        metricRef: metric.metricRef,
+        value: (index + 1) / 100,
+        unit: metric.unit,
+      })),
+      regions: registry.regions.map((region) => ({
+        regionKey: region.regionKey,
+        state: 'available' as const,
+        unavailableSurfaces: [] as string[],
+      })),
+    };
+
+    const admission = admitFaceStaticObservationFE040A(
+      registry,
+      observation,
+    );
+    expect(admission).toMatchObject({
+      status: 'admitted',
+      registryRef: registry.registryRef,
+      boundary: {
+        staticNeutralObservationOnly: true,
+        operationalizationAuthorityIssued: false,
+        traditionalBindingAuthorityIssued: false,
+        thresholdAuthorityIssued: false,
+        classificationAuthorityIssued: false,
+        scoreAuthorityIssued: false,
+        rankingAuthorityIssued: false,
+        structuredClaimIssued: false,
+        narrativeAuthorityIssued: false,
+        productionInterpretationAuthorityIssued: false,
+      },
+    });
+  });
+
   it('does not unlock the FE038 interpretation shell', () => {
     const shell = createFaceInterpretationShellFE038({
       schemaVersion: 'myeongha-face-neutral-observation-ref-v1',

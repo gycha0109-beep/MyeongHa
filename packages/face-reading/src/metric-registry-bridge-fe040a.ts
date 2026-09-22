@@ -17,13 +17,15 @@ export const FACE_CANONICAL_METRIC_REGISTRY_SOURCE_FE040A = Object.freeze({
 });
 
 export const FACE_CURRENT_PINNED_ARTIFACT_FE040A = Object.freeze({
-  distributionCommit: '1f80c30f5c829ce8d0d839cdd5816dad943c5afd' as const,
+  distributionCommit: '50fd5b511326033861b3cab48028b989c4499b3c' as const,
   distributionPath:
-    'distribution/face-reading/fe024/myeongha-face-reading-0.0.0.tgz' as const,
+    'distribution/face-reading/fe040b/myeongha-face-reading-0.0.0.tgz' as const,
   artifactSha256:
-    '8d793c57e104fc0137a17dc631d208b468131b1d9a9668142a846e34dacbf84a' as const,
+    '210cb8f4358fb3b111e0ad3ab7914ef6846ef14af80e781c31544a8fbc527706' as const,
   publicExportPath: './preview-engine' as const,
-  canonicalRegistryExported: false as const,
+  canonicalRegistryExportPath:
+    './product-neutral-observation-contract-fe035b' as const,
+  canonicalRegistryExported: true as const,
 });
 
 const REGION_KEYS = [
@@ -507,9 +509,38 @@ async function projectCanonicalRegistryModule(
   }
 }
 
+export interface FaceCanonicalMetricRegistryArtifactReadyFE040B {
+  readonly schemaVersion: 'myeongha-face-canonical-metric-registry-artifact-readiness-v1';
+  readonly status: 'ready';
+  readonly reason: 'canonical_registry_export_available';
+  readonly currentArtifact: typeof FACE_CURRENT_PINNED_ARTIFACT_FE040A;
+  readonly requiredSource: typeof FACE_CANONICAL_METRIC_REGISTRY_SOURCE_FE040A;
+  readonly boundary: Readonly<{
+    registryAdmissionStillRequiresRuntimeValidation: true;
+    localMetricDefinitionAuthorityIssued: false;
+    operationalizationAuthorityIssued: false;
+    traditionalBindingAuthorityIssued: false;
+    productionInterpretationAuthorityIssued: false;
+  }>;
+}
+
 export function assessCurrentPinnedFaceMetricRegistryFE040A():
-  FaceCanonicalMetricRegistryBlockedFE040A {
-  return blocked('canonical_registry_export_unavailable');
+  FaceCanonicalMetricRegistryArtifactReadyFE040B {
+  return Object.freeze({
+    schemaVersion:
+      'myeongha-face-canonical-metric-registry-artifact-readiness-v1' as const,
+    status: 'ready' as const,
+    reason: 'canonical_registry_export_available' as const,
+    currentArtifact: FACE_CURRENT_PINNED_ARTIFACT_FE040A,
+    requiredSource: FACE_CANONICAL_METRIC_REGISTRY_SOURCE_FE040A,
+    boundary: Object.freeze({
+      registryAdmissionStillRequiresRuntimeValidation: true as const,
+      localMetricDefinitionAuthorityIssued: false as const,
+      operationalizationAuthorityIssued: false as const,
+      traditionalBindingAuthorityIssued: false as const,
+      productionInterpretationAuthorityIssued: false as const,
+    }),
+  });
 }
 
 export async function loadCanonicalFaceMetricRegistryFE040A():
