@@ -13,9 +13,11 @@ export interface SeyeonBiblePrototypeTraitV1 {
   readonly id: string;
   readonly disclosureScope: SeyeonPrototypeDisclosureScopeV1;
   readonly activationTerms: readonly string[];
+  readonly suppressionTerms?: readonly string[];
   readonly weight: number;
   readonly instruction: string;
   readonly alwaysInclude?: boolean;
+  readonly expressionPolicy?: 'normal' | 'sparse';
 }
 
 export interface SeyeonBiblePrototypeMemoryV1 {
@@ -23,10 +25,17 @@ export interface SeyeonBiblePrototypeMemoryV1 {
   readonly text: string;
 }
 
+export interface SeyeonBiblePrototypeDialogueTurnV1 {
+  readonly role: 'user' | 'assistant';
+  readonly text: string;
+}
+
 export interface SeyeonBiblePrototypeContextInputV1 {
   readonly userMessage: string;
   readonly disclosureScope: SeyeonPrototypeDisclosureScopeV1;
   readonly authorizedMemories?: readonly SeyeonBiblePrototypeMemoryV1[];
+  readonly recentDialogue?: readonly SeyeonBiblePrototypeDialogueTurnV1[];
+  readonly recentlyExpressedTraitIds?: readonly string[];
   readonly maxRelevantTraits?: number;
 }
 
@@ -37,8 +46,11 @@ export interface SeyeonBiblePrototypeContextV1 {
   readonly selectedTraits: readonly {
     readonly id: string;
     readonly instruction: string;
+    readonly expressionPolicy: 'normal' | 'sparse';
+    readonly recentlyExpressed: boolean;
   }[];
   readonly authorizedMemories: readonly SeyeonBiblePrototypeMemoryV1[];
+  readonly recentDialogue: readonly SeyeonBiblePrototypeDialogueTurnV1[];
   readonly rendererRules: readonly string[];
 }
 
@@ -135,6 +147,7 @@ export const SEYEON_BIBLE_PROTOTYPE_TRAITS_V1: readonly SeyeonBiblePrototypeTrai
     id: 'indecision_friction',
     disclosureScope: 'public',
     activationTerms: ['아무거나', '모르겠', '못 고르', '결정 못', '네가 골라', '다 해줘'],
+    suppressionTerms: ['아무거나 말고', '아무거나가 아니라', '아무거나는 싫'],
     weight: 72,
     instruction:
       '세연은 진짜 고민은 기다리지만 아무 선택도 하지 않은 채 결정을 계속 떠넘기는 상황에는 답답함을 느낀다. 필요하면 선택지를 줄여주되 계속 대신 결정해주지는 않는다.',
@@ -174,8 +187,9 @@ export const SEYEON_BIBLE_PROTOTYPE_TRAITS_V1: readonly SeyeonBiblePrototypeTrai
   {
     id: 'other_character_jealousy',
     disclosureScope: 'familiar',
-    activationTerms: ['백헌', '여울', '서린', '라현', '미라', '태겸', '윤호', '도윤', '다른 캐릭터', '다른 애'],
+    activationTerms: ['백헌', '여울', '서린', '라현', '미라', '태겸', '윤호', '도윤', '다른 캐릭터', '다른 애', '질투'],
     weight: 78,
+    expressionPolicy: 'sparse',
     instruction:
       '세연은 소유욕 캐릭터가 아니다. 관계가 충분히 가까운 상황이라면 다른 Character 이야기에 아주 작은 질투나 관심이 새어 나올 수 있지만, 대놓고 경쟁하거나 사용자의 선택을 제한하지 않는다.',
   },
@@ -200,6 +214,7 @@ export const SEYEON_BIBLE_PROTOTYPE_TRAITS_V1: readonly SeyeonBiblePrototypeTrai
     disclosureScope: 'deep',
     activationTerms: ['기다렸', '보고 싶', '왜 왔', '오랜만', '돌아왔', '같이 가', '오늘은 네가', '네가 하고 싶은'],
     weight: 100,
+    expressionPolicy: 'sparse',
     instruction:
       '깊은 관계에서 세연의 보상은 더 달콤한 말이 아니라 공적인 친절과 사적인 애착의 차이다. 이유 없이 먼저 찾기, 자신의 선택을 맡기기, 기다렸다고 인정하기 같은 변화는 드물게 사용한다.',
   },
@@ -214,6 +229,8 @@ const RENDERER_RULES = [
   '관계 점수·단계·호감도·해금 같은 내부 시스템을 대사로 언급하지 않는다.',
   '관계 상태를 직접 변경하거나 새로운 세계관·과거사·사용자 현실 사실을 발명하지 않는다.',
   '같은 trait가 반복 호출되어도 문구를 복붙하지 말고 상황에 맞게 자연스럽게 변주한다.',
+  'recentlyExpressed=true인 sparse trait는 현재 발화가 직접 그 반응을 요구하지 않는 한 같은 시그니처 반응을 연속 재생하지 않는다.',
+  'recentDialogue는 단기 대화 연속성만 제공하며 durable memory나 관계 진실로 승격하지 않는다.',
 ] as const;
 
 function normalize(value: string): string {
@@ -234,8 +251,30 @@ function traitAllowed(
 
 function relevanceScore(trait: SeyeonBiblePrototypeTraitV1, message: string): number {
   if (trait.alwaysInclude) return trait.weight + 10_000;
+  if (
+    trait.suppressionTerms?.some((term) => message.includes(normalize(term))) === true
+  ) {
+    return 0;
+  }
   const matches = trait.activationTerms.filter((term) => message.includes(normalize(term))).length;
   return matches === 0 ? 0 : trait.weight + matches * 10;
+}
+
+function sanitizeRecentDialogue(
+  dialogue: readonly SeyeonBiblePrototypeDialogueTurnV1[] | undefined,
+): readonly SeyeonBiblePrototypeDialogueTurnV1[] {
+  if (dialogue === undefined) return Object.freeze([]);
+  return Object.freeze(
+    dialogue
+      .slice(-6)
+      .map((turn) =>
+        Object.freeze({
+          role: turn.role,
+          text: boundedText(turn.text, 500),
+        }),
+      )
+      .filter((turn) => turn.text.length > 0),
+  );
 }
 
 function sanitizeMemories(
@@ -260,6 +299,9 @@ export function compileSeyeonBiblePrototypeContextV1(
 ): SeyeonBiblePrototypeContextV1 {
   const message = normalize(boundedText(input.userMessage, 4_000));
   const maxRelevantTraits = Math.min(Math.max(input.maxRelevantTraits ?? 6, 2), 8);
+  const recentlyExpressedTraitIds = new Set(
+    (input.recentlyExpressedTraitIds ?? []).slice(-8),
+  );
 
   const selectedTraits = SEYEON_BIBLE_PROTOTYPE_TRAITS_V1
     .filter((trait) => traitAllowed(trait, input.disclosureScope))
@@ -275,6 +317,8 @@ export function compileSeyeonBiblePrototypeContextV1(
       Object.freeze({
         id: trait.id,
         instruction: trait.instruction,
+        expressionPolicy: trait.expressionPolicy ?? 'normal',
+        recentlyExpressed: recentlyExpressedTraitIds.has(trait.id),
       }),
     );
 
@@ -284,6 +328,7 @@ export function compileSeyeonBiblePrototypeContextV1(
     disclosureScope: input.disclosureScope,
     selectedTraits: Object.freeze(selectedTraits),
     authorizedMemories: sanitizeMemories(input.authorizedMemories),
+    recentDialogue: sanitizeRecentDialogue(input.recentDialogue),
     rendererRules: RENDERER_RULES,
   });
 }
@@ -293,8 +338,20 @@ export function buildSeyeonBiblePrototypePromptV1(input: {
   readonly userMessage: string;
 }): string {
   const traitLines = input.context.selectedTraits
-    .map((trait) => `- [${trait.id}] ${trait.instruction}`)
+    .map((trait) => {
+      const recency =
+        trait.expressionPolicy === 'sparse' && trait.recentlyExpressed
+          ? ' [recent-expression: avoid automatic repetition]'
+          : '';
+      return `- [${trait.id}]${recency} ${trait.instruction}`;
+    })
     .join('\n');
+  const dialogueLines =
+    input.context.recentDialogue.length === 0
+      ? '- 없음'
+      : input.context.recentDialogue
+          .map((turn) => `- ${turn.role}: ${turn.text}`)
+          .join('\n');
   const memoryLines =
     input.context.authorizedMemories.length === 0
       ? '- 없음'
@@ -309,6 +366,9 @@ export function buildSeyeonBiblePrototypePromptV1(input: {
     '',
     '이번 턴에 관련 있는 세연 특성:',
     traitLines || '- 없음',
+    '',
+    '최근 대화(단기 연속성 전용):',
+    dialogueLines,
     '',
     '이번 턴에 사용 가능한 승인된 기억:',
     memoryLines,

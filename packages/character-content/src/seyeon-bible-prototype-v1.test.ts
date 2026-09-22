@@ -156,3 +156,82 @@ describe('Seyeon Character Bible prototype v1', () => {
     expect(prompt).toContain('승인된 기억:\n- 없음');
   });
 });
+
+
+describe('Seyeon Character Bible probe hardening after long-horizon run', () => {
+  it('retrieves subtle jealousy from a direct follow-up question', () => {
+    const context = compileSeyeonBiblePrototypeContextV1({
+      userMessage: '왜, 질투해?',
+      disclosureScope: 'familiar',
+    });
+
+    expect(context.selectedTraits.map((trait) => trait.id)).toContain(
+      'other_character_jealousy',
+    );
+  });
+
+  it('suppresses indecision friction when the user explicitly rejects an 아무거나 answer', () => {
+    const context = compileSeyeonBiblePrototypeContextV1({
+      userMessage: '아무거나 말고. 진짜 네가 하고 싶은 거.',
+      disclosureScope: 'deep',
+    });
+
+    expect(context.selectedTraits.map((trait) => trait.id)).not.toContain(
+      'indecision_friction',
+    );
+  });
+
+  it('keeps only the six most recent dialogue turns as non-durable continuity context', () => {
+    const context = compileSeyeonBiblePrototypeContextV1({
+      userMessage: '왜 갑자기 조용해?',
+      disclosureScope: 'familiar',
+      recentDialogue: Array.from({ length: 8 }, (_, index) => ({
+        role: index % 2 === 0 ? ('user' as const) : ('assistant' as const),
+        text: `turn-${index + 1}`,
+      })),
+    });
+
+    expect(context.recentDialogue).toHaveLength(6);
+    expect(context.recentDialogue[0]?.text).toBe('turn-3');
+    expect(context.recentDialogue[5]?.text).toBe('turn-8');
+    expect(context.status.memoryAuthority).toBe(false);
+  });
+
+  it('marks sparse traits that were recently expressed without changing relationship authority', () => {
+    const context = compileSeyeonBiblePrototypeContextV1({
+      userMessage: '요즘 백헌이랑 또 얘기했어.',
+      disclosureScope: 'familiar',
+      recentlyExpressedTraitIds: ['other_character_jealousy'],
+    });
+    const jealousy = context.selectedTraits.find(
+      (trait) => trait.id === 'other_character_jealousy',
+    );
+
+    expect(jealousy).toMatchObject({
+      expressionPolicy: 'sparse',
+      recentlyExpressed: true,
+    });
+    expect(context.status.relationshipAuthority).toBe(false);
+  });
+
+  it('renders recent dialogue separately from authorized durable memory', () => {
+    const context = compileSeyeonBiblePrototypeContextV1({
+      userMessage: '왜, 질투해?',
+      disclosureScope: 'familiar',
+      recentDialogue: [
+        { role: 'user', text: '요즘 백헌이랑 얘기 많이 했어.' },
+        { role: 'assistant', text: '뭐가 그렇게 재밌었어요?' },
+      ],
+      recentlyExpressedTraitIds: ['other_character_jealousy'],
+    });
+    const prompt = buildSeyeonBiblePrototypePromptV1({
+      context,
+      userMessage: '왜, 질투해?',
+    });
+
+    expect(prompt).toContain('최근 대화(단기 연속성 전용):');
+    expect(prompt).toContain('user: 요즘 백헌이랑 얘기 많이 했어.');
+    expect(prompt).toContain('[recent-expression: avoid automatic repetition]');
+    expect(prompt).toContain('이번 턴에 사용 가능한 승인된 기억:\n- 없음');
+  });
+});
