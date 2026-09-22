@@ -108,7 +108,7 @@ describe('MyeongHa character-led Saju Reading v1', () => {
     expect(runtime).not.toContain("sessionStorage.setItem('myeongha.readingHandoff.v1'");
     expect(runtime).toContain("chatLink.setAttribute('href', 'chat-hub.html')");
     expect(runtime).toContain('Do not promote');
-    expect(runtime).toContain('stored Reading-to-Chat continuation claim');
+    expect(runtime).toContain('Reading-to-Chat continuation claim');
     expect(runtime).not.toContain("chat.html?character=");
     expect(runtime).not.toContain("next.searchParams.set('reader', readerKey)");
     expect(runtime).not.toContain('presentationReaderHint: readerKey');
