@@ -5,6 +5,7 @@ import {
   ReaderInterpretationPreviewHttpErrorV1,
   parseReaderInterpretationPreviewHttpRequestV1,
   projectReaderInterpretationPreviewHttpResponseV1,
+  projectReaderInterpretationPreviewServerContextV1,
   runReaderInterpretationPreviewHttpV1,
   type ReaderInterpretationPreviewContextAuthorityPortV1,
 } from '../apps/api/src/reader-interpretation-preview-http.js';
@@ -138,6 +139,29 @@ describe('Reader Interpretation Preview HTTP seam', () => {
     expect(JSON.stringify(response)).not.toContain('private-unit-1');
     expect(JSON.stringify(response)).not.toContain('private-framing-key');
     expect(JSON.stringify(response)).not.toContain('sourceUnitRefs');
+  });
+
+  it('projects the context-authority result down to relationship policy only', () => {
+    const relationshipProjectionPolicy = Object.freeze({
+      closenessBands: Object.freeze([]),
+      trustBands: Object.freeze([]),
+      frictionBands: Object.freeze([]),
+    });
+
+    const projected = projectReaderInterpretationPreviewServerContextV1({
+      relationshipProjectionPolicy,
+      character: { characterId: 'forged' },
+      grantedLifeFacts: [{ factId: 'forged' }],
+      recentMessages: ['forged'],
+      saju: { readingRef: 'forged' },
+    } as never);
+
+    expect(projected).toEqual({ relationshipProjectionPolicy });
+    expect(Object.keys(projected)).toEqual(['relationshipProjectionPolicy']);
+    expect(projected).not.toHaveProperty('character');
+    expect(projected).not.toHaveProperty('grantedLifeFacts');
+    expect(projected).not.toHaveProperty('recentMessages');
+    expect(projected).not.toHaveProperty('saju');
   });
 
   it('rejects unauthenticated requests before resolving server Character context', async () => {

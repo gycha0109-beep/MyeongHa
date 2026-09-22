@@ -41,6 +41,14 @@ export type ReaderInterpretationPreviewServerContextV1 = Readonly<
   Pick<CharacterStandardReadingServerContextInputV1, 'relationshipProjectionPolicy'>
 >;
 
+export function projectReaderInterpretationPreviewServerContextV1(
+  input: ReaderInterpretationPreviewServerContextV1,
+): ReaderInterpretationPreviewServerContextV1 {
+  return Object.freeze({
+    relationshipProjectionPolicy: input.relationshipProjectionPolicy,
+  });
+}
+
 export interface ReaderInterpretationPreviewContextAuthorityPortV1 {
   resolveContext(input: {
     readonly subjectId: string;
@@ -237,11 +245,14 @@ export async function runReaderInterpretationPreviewHttpV1(input: {
   const effectiveAt = requireEffectiveAt(input.effectiveAt);
   const request = parseReaderInterpretationPreviewHttpRequestV1(input.body);
 
-  const contextInput = await input.contextAuthorityPort.resolveContext({
+  const resolvedContext = await input.contextAuthorityPort.resolveContext({
     subjectId,
     threadId: request.threadId,
     effectiveAt,
   });
+  const contextInput = projectReaderInterpretationPreviewServerContextV1(
+    resolvedContext,
+  );
 
   const envelope = await runThreadBoundReaderInterpretationPreviewV1({
     resolvedSubjectId: subjectId,
