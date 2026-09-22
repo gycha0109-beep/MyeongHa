@@ -2,16 +2,18 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-const PRODUCER_COMMIT = '50fd5b511326033861b3cab48028b989c4499b3c';
+const PRODUCER_COMMIT = '8b49d4e03e35ef5447f0f2873ff2b8737bd36110';
 const FE035B_SOURCE_COMMIT = '0f7de13b18a9dd9966074f371cbfd9554490f0ef';
 const FE035B_SOURCE_BLOB =
   'c9ed7dfb347144759694056e89d571c433d4dfc8';
 const EXPECTED_SHA256 =
-  '210cb8f4358fb3b111e0ad3ab7914ef6846ef14af80e781c31544a8fbc527706';
+  '170dc999e0cb01e3e9a38c59a9a510170def54d7055c3b988eabb1330d68620e';
 const EXPECTED_FE023 =
   'FE023-DIGEST-BOUND-DIRECT-BLOB-PRODUCT-PREVIEW-SESSION-v1';
 const EXPECTED_FE035B =
   'FE035B-PRODUCT-NEUTRAL-OBSERVATION-CONTRACT-v1';
+const EXPECTED_FE041B =
+  'FE041B-SQUARE-BROAD-OPERATIONALIZATION-READINESS-v1';
 const EXPECTED_EXPORTS = {
   './preview-engine': {
     types: './dist/preview-engine.d.ts',
@@ -21,9 +23,13 @@ const EXPECTED_EXPORTS = {
     types: './dist/product-neutral-observation-contract-fe035b.d.ts',
     default: './dist/product-neutral-observation-contract-fe035b.js',
   },
+  './square-broad-operationalization-readiness-fe041b': {
+    types: './dist/square-broad-operationalization-readiness-fe041b.d.ts',
+    default: './dist/square-broad-operationalization-readiness-fe041b.js',
+  },
 };
 const BASE =
-  `https://raw.githubusercontent.com/gycha0109-beep/Saju/${PRODUCER_COMMIT}/distribution/face-reading/fe040b`;
+  `https://raw.githubusercontent.com/gycha0109-beep/Saju/${PRODUCER_COMMIT}/distribution/face-reading/fe041b`;
 const TARBALL_URL = `${BASE}/myeongha-face-reading-0.0.0.tgz`;
 const MANIFEST_URL = `${BASE}/manifest.json`;
 
@@ -58,7 +64,7 @@ assert(
 );
 assert(
   runtimePackage.dependencies?.['@myeongha/face-reading'] === TARBALL_URL,
-  'isolated runtime is not pinned to the immutable FE040B producer tarball.',
+  'isolated runtime is not pinned to the immutable FE041B producer tarball.',
 );
 
 const lock = JSON.parse(readFileSync(resolve('package-lock.json'), 'utf8'));
@@ -89,8 +95,8 @@ const manifestResponse = await fetchRequired(MANIFEST_URL);
 const manifest = await manifestResponse.json();
 assert(
   manifest.schemaVersion ===
-    'fe040b-canonical-registry-consumer-handoff-manifest-v1',
-  'FE040B manifest schema drift.',
+    'fe041b-square-broad-operationalization-readiness-handoff-manifest-v1',
+  'FE041B manifest schema drift.',
 );
 assert(manifest.package?.name === '@myeongha/face-reading', 'package name drift.');
 assert(manifest.package?.version === '0.0.0', 'package version drift.');
@@ -99,28 +105,37 @@ assert(
     JSON.stringify([
       './preview-engine',
       './product-neutral-observation-contract-fe035b',
+      './square-broad-operationalization-readiness-fe041b',
     ]),
-  'FE040B public export map drift.',
+  'FE041B public export map drift.',
 );
 assert(manifest.package?.private === true, 'package private boundary drift.');
 assert(manifest.artifact?.sha256 === EXPECTED_SHA256, 'manifest SHA-256 drift.');
 assert(manifest.contracts?.fe023 === EXPECTED_FE023, 'FE023 contract drift.');
 assert(manifest.contracts?.fe035b === EXPECTED_FE035B, 'FE035B contract drift.');
+assert(manifest.contracts?.fe041b === EXPECTED_FE041B, 'FE041B contract drift.');
 assert(
-  manifest.canonicalRegistry?.sourceRepository === 'gycha0109-beep/Saju' &&
-    manifest.canonicalRegistry?.sourceCommit === FE035B_SOURCE_COMMIT &&
-    manifest.canonicalRegistry?.sourceBlobSha === FE035B_SOURCE_BLOB &&
-    manifest.canonicalRegistry?.regionCount === 4 &&
-    manifest.canonicalRegistry?.metricCount === 13 &&
-    manifest.canonicalRegistry?.requiredMetricCount === 8 &&
-    manifest.canonicalRegistry?.conditionalMetricCount === 5 &&
-    manifest.canonicalRegistry?.semanticAuthorityIssued === false,
-  'canonical registry provenance or authority boundary drift.',
-);
-assert(
-  manifest.runtimeDependency?.package === '@mediapipe/tasks-vision' &&
-    manifest.runtimeDependency?.version === '0.10.35',
-  'MediaPipe manifest pin drift.',
+  manifest.operationalizationReadiness?.authorityRepository === 'gycha0109-beep/Saju' &&
+    manifest.operationalizationReadiness?.authoritySnapshotCommit ===
+      '50fd5b511326033861b3cab48028b989c4499b3c' &&
+    manifest.operationalizationReadiness?.criterionRef ===
+      'criterion.intake.square_broad' &&
+    manifest.operationalizationReadiness?.sourceConcept === '方大' &&
+    manifest.operationalizationReadiness?.sourcePassageVerificationStatus ===
+      'scan_checked' &&
+    manifest.operationalizationReadiness?.reviewedMethodologyRef ===
+      'method.shenxiang.five_officers.intake_criteria@0.3.0' &&
+    manifest.operationalizationReadiness?.methodologyReviewStatus === 'reviewed' &&
+    manifest.operationalizationReadiness?.canonicalMetricBindingAuthorized === false &&
+    manifest.operationalizationReadiness?.constructValidityEstablished === false &&
+    manifest.operationalizationReadiness?.calibrationAuthorityIssued === false &&
+    manifest.operationalizationReadiness?.numericThresholdAuthorityIssued === false &&
+    manifest.operationalizationReadiness?.classificationBandsIssued === false &&
+    manifest.operationalizationReadiness?.criterionStateIssued === false &&
+    manifest.operationalizationReadiness?.structuredClaimIssued === false &&
+    manifest.operationalizationReadiness?.narrativeAuthorityIssued === false &&
+    manifest.operationalizationReadiness?.productionSemanticExecutionAuthorized === false,
+  'FE041B readiness provenance or authority boundary drift.',
 );
 assert(
   manifest.distribution?.handoffOnly === true &&
@@ -176,6 +191,37 @@ assert(
   'public FE035B canonical registry cardinality drift.',
 );
 
+const readiness = await import(
+  '@myeongha/face-reading/square-broad-operationalization-readiness-fe041b'
+);
+assert(
+  readiness.FE041B_SQUARE_BROAD_OPERATIONALIZATION_READINESS_VERSION ===
+    EXPECTED_FE041B,
+  'public FE041B readiness contract missing.',
+);
+assert(
+  typeof readiness.issueSquareBroadOperationalizationReadinessFE041B === 'function' &&
+    typeof readiness.assertIssuedSquareBroadOperationalizationReadinessFE041B ===
+      'function',
+  'public FE041B readiness issuer/assertion missing.',
+);
+const readinessArtifact =
+  readiness.issueSquareBroadOperationalizationReadinessFE041B();
+readiness.assertIssuedSquareBroadOperationalizationReadinessFE041B(
+  readinessArtifact,
+);
+assert(
+  readinessArtifact.target?.criterionRef === 'criterion.intake.square_broad' &&
+    readinessArtifact.target?.sourceConcept === '方大' &&
+    readinessArtifact.target?.sourcePassageVerificationStatus === 'scan_checked' &&
+    readinessArtifact.target?.methodologyReviewStatus === 'reviewed' &&
+    readinessArtifact.operationalization?.canonicalInputMetricRefs?.length === 0 &&
+    readinessArtifact.operationalization?.classificationBands === null &&
+    readinessArtifact.operationalization?.numericThresholds === null &&
+    readinessArtifact.authorityBoundary?.productionSemanticExecutionAuthorized === false,
+  'public FE041B readiness boundary widened or drifted.',
+);
+
 async function assertBlocked(specifier) {
   try {
     await import(specifier);
@@ -196,6 +242,7 @@ await assertBlocked('@myeongha/face-reading');
 await assertBlocked('@myeongha/face-reading/digest-bound-product-preview-session-fe023');
 await assertBlocked('@myeongha/face-reading/digest-bound-mediapipe-model-runtime-fe022');
 await assertBlocked('@myeongha/face-reading/product-neutral-observation-contract-fe035b.js');
+await assertBlocked('@myeongha/face-reading/square-broad-operationalization-readiness-fe041b.js');
 
 process.stdout.write(
   JSON.stringify({
@@ -206,8 +253,10 @@ process.stdout.write(
     sha256,
     fe023Contract: EXPECTED_FE023,
     fe035bContract: EXPECTED_FE035B,
+    fe041bContract: EXPECTED_FE041B,
     publicPreviewImportVerified: true,
     publicCanonicalRegistryImportVerified: true,
+    publicOperationalizationReadinessImportVerified: true,
     internalImportsBlocked: true,
     productionInterpretationAuthorityIssued: false,
   }) + '\n',
