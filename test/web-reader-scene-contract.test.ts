@@ -74,41 +74,21 @@ describe('web Reader Scene contract', () => {
     ).toThrow(/domain does not match/u);
   });
 
-  it('uses the server Reader identity even when the presentation hint disagrees', () => {
-    const scene = parseReaderSceneEnvelopeV1(base);
-    const viewModel = projectReaderSceneViewModelV1(scene, {
-      presentationHint: 'baekheon',
-      resolvePresentation(characterId: string) {
-        return characterId === 'taegyeom'
-          ? { name: '태겸', title: '대리자', intro: '근거부터 보겠습니다.' }
-          : null;
-      },
-    });
+  it('keeps the canonical server Reader identity presentation-neutral until SRC-36 closes', () => {
+    const viewModel = projectReaderSceneViewModelV1(parseReaderSceneEnvelopeV1(base));
 
     expect(viewModel).toMatchObject({
       state: 'ready',
       readerCharacterId: 'taegyeom',
-      presentationHint: 'baekheon',
-      presentationHintMismatch: true,
       presentation: {
         id: 'taegyeom',
-        name: '태겸',
+        name: '대리자',
+        title: '',
+        intro: '',
+        generic: true,
       },
     });
-  });
-
-  it('uses identity-neutral presentation when the server Reader has no web decoration', () => {
-    const viewModel = projectReaderSceneViewModelV1(
-      parseReaderSceneEnvelopeV1(base),
-      { presentationHint: 'taegyeom' },
-    );
-
-    expect(viewModel.presentation).toEqual({
-      id: 'taegyeom',
-      name: '대리자',
-      title: '',
-      intro: '',
-      generic: true,
-    });
+    expect(viewModel).not.toHaveProperty('presentationHint');
+    expect(viewModel).not.toHaveProperty('presentationHintMismatch');
   });
 });

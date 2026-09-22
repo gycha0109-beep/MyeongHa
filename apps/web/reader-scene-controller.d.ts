@@ -5,7 +5,6 @@ import type { PersistedReadingHandoffParseResultV1 } from './reading-history-han
 export interface ReaderSceneControllerInputV1 {
   readonly threadId: string;
   readonly officialReadingId: string;
-  readonly presentationHint?: string | null;
 }
 
 export type ReaderSceneControllerStateV1 =
@@ -27,7 +26,6 @@ export type ReaderSceneControllerStateV1 =
 export interface ReaderSceneControllerPersistedInputV1 {
   readonly threadId: unknown;
   readonly persistedReadingHandoff: PersistedReadingHandoffParseResultV1;
-  readonly presentationHint?: string | null;
 }
 
 export interface ReaderSceneControllerV1 {
@@ -44,15 +42,5 @@ export function createReaderSceneControllerV1(
   options: Readonly<{
     client: Pick<ReaderRuntimeClientV1, 'readReaderScene'>;
     onState: (state: ReaderSceneControllerStateV1) => void;
-    resolvePresentation?: (
-      readerCharacterId: string,
-    ) =>
-      | Readonly<{
-          name?: string;
-          title?: string;
-          intro?: string;
-        }>
-      | null
-      | undefined;
   }>,
 ): ReaderSceneControllerV1;

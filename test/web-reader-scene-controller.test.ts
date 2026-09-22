@@ -43,21 +43,18 @@ describe('web Reader Scene controller', () => {
     const controller = createReaderSceneControllerV1({
       client,
       onState: (state) => states.push(state),
-      resolvePresentation: (id: string) => id === 'taegyeom' ? { name: '태겸' } : null,
     });
 
     const result = await controller.load({
       threadId: 'thread-1',
       officialReadingId: 'reading-1',
-      presentationHint: 'baekheon',
     });
 
     expect(states[0]!.state).toBe('loading');
     expect(result).toMatchObject({
       state: 'ready',
       readerCharacterId: 'taegyeom',
-      presentationHintMismatch: true,
-      presentation: { name: '태겸' },
+      presentation: { id: 'taegyeom', name: '대리자', generic: true },
     });
   });
 
@@ -77,7 +74,6 @@ describe('web Reader Scene controller', () => {
         readingSessionId: '55555555-5555-4555-8555-555555555555',
         sajuDomain: 'career',
       },
-      presentationHint: 'baekheon',
     });
 
     expect(client.readReaderScene).toHaveBeenCalledTimes(1);
@@ -92,8 +88,8 @@ describe('web Reader Scene controller', () => {
       state: 'ready',
       readerCharacterId: 'taegyeom',
       officialReadingId: '44444444-4444-4444-8444-444444444444',
-      presentationHint: 'baekheon',
     });
+    expect(result).not.toHaveProperty('presentationHint');
   });
 
   it('fails a persisted Reading launch closed before transport when thread authority is absent', async () => {

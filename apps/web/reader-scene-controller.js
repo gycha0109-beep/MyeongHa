@@ -81,8 +81,6 @@ export function createReaderSceneControllerV1(options) {
     lastInput = Object.freeze({
       threadId: input.threadId,
       officialReadingId: input.officialReadingId,
-      presentationHint:
-        typeof input.presentationHint === 'string' ? input.presentationHint : null,
     });
 
     emit(Object.freeze({
@@ -99,10 +97,7 @@ export function createReaderSceneControllerV1(options) {
       });
       if (requestGeneration !== generation) return currentState;
 
-      return emit(projectReaderSceneViewModelV1(scene, {
-        presentationHint: lastInput.presentationHint,
-        resolvePresentation: options.resolvePresentation,
-      }));
+      return emit(projectReaderSceneViewModelV1(scene));
     } catch (error) {
       if (requestGeneration !== generation) return currentState;
       const projected = projectErrorState(error);
@@ -135,11 +130,7 @@ export function createReaderSceneControllerV1(options) {
       throw error;
     }
 
-    return load({
-      ...request,
-      presentationHint:
-        typeof input?.presentationHint === 'string' ? input.presentationHint : null,
-    });
+    return load(request);
   }
 
   function retry() {

@@ -55,8 +55,6 @@ export type ReaderSceneViewModelV1 =
       state: 'ready';
       readerCharacterId: string;
       presentation: ReaderPresentationV1;
-      presentationHint: string | null;
-      presentationHintMismatch: boolean;
       officialReadingId: string;
       domain: string;
       interpretationHash: string;
@@ -66,8 +64,6 @@ export type ReaderSceneViewModelV1 =
       state: 'protected_fallback';
       readerCharacterId: string;
       presentation: ReaderPresentationV1;
-      presentationHint: string | null;
-      presentationHintMismatch: boolean;
       officialReadingId: string;
       domain: string;
       interpretationHash: string;
@@ -81,17 +77,4 @@ export function parseReaderSceneEnvelopeV1(payload: unknown): ReaderSceneV1;
 
 export function projectReaderSceneViewModelV1(
   scene: ReaderSceneV1,
-  options?: Readonly<{
-    presentationHint?: string | null;
-    resolvePresentation?: (
-      readerCharacterId: string,
-    ) =>
-      | Readonly<{
-          name?: string;
-          title?: string;
-          intro?: string;
-        }>
-      | null
-      | undefined;
-  }>,
 ): ReaderSceneViewModelV1;

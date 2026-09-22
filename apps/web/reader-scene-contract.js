@@ -177,42 +177,15 @@ function genericPresentation(readerCharacterId) {
   });
 }
 
-export function projectReaderSceneViewModelV1(scene, options = {}) {
-  const presentationHint =
-    typeof options.presentationHint === 'string' && options.presentationHint.trim().length > 0
-      ? options.presentationHint.trim()
-      : null;
-  const resolvedPresentation =
-    typeof options.resolvePresentation === 'function'
-      ? options.resolvePresentation(scene.readerCharacterId)
-      : null;
-  const presentation =
-    resolvedPresentation && typeof resolvedPresentation === 'object'
-      ? Object.freeze({
-          id: scene.readerCharacterId,
-          name:
-            typeof resolvedPresentation.name === 'string' &&
-            resolvedPresentation.name.trim().length > 0
-              ? resolvedPresentation.name.trim()
-              : '대리자',
-          title:
-            typeof resolvedPresentation.title === 'string'
-              ? resolvedPresentation.title.trim()
-              : '',
-          intro:
-            typeof resolvedPresentation.intro === 'string'
-              ? resolvedPresentation.intro.trim()
-              : '',
-          generic: false,
-        })
-      : genericPresentation(scene.readerCharacterId);
+export function projectReaderSceneViewModelV1(scene) {
+  // SRC-36: canonical Reader Character identity and browser presentation identity
+  // are separate namespaces. Until a governed bundle-scoped projection exists,
+  // Reader Scene remains identity-neutral and cannot accept a browser resolver/hint.
+  const presentation = genericPresentation(scene.readerCharacterId);
 
   const common = {
     readerCharacterId: scene.readerCharacterId,
     presentation,
-    presentationHint,
-    presentationHintMismatch:
-      presentationHint !== null && presentationHint !== scene.readerCharacterId,
     officialReadingId: scene.officialReadingId,
     domain: scene.domain,
     interpretationHash: scene.interpretationHash,

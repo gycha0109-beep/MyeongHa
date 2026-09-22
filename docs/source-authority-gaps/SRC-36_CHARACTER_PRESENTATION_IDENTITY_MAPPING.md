@@ -48,6 +48,7 @@ Source-backed and enforceable now:
 - owner-scoped Chat read returns the canonical thread Character id;
 - thread identity outranks browser `?character=` hints;
 - the browser Chat read DTO preserves canonical `characterId` while stripping unsolicited presentation metadata;
+- the browser Reader Scene DTO preserves canonical `readerCharacterId` but projects only an identity-neutral generic presentation until this gap closes;
 - `CharacterPresentationIdentityAuthorityPortV1` defines a server-side mapping contract scoped to an already-resolved content bundle;
 - the resolver fails closed on missing, duplicate, wrong-key, or wrong-bundle mapping rows.
 
@@ -73,7 +74,8 @@ Until this authority is resolved, do not:
 - map canonical `doyun` to browser `doyoon` by convention alone;
 - let `chat-character.js` static data become canonical server identity authority;
 - project thread-bound canonical ids into static Character names/portraits/room art merely because most strings currently match;
-- accept client-supplied presentation metadata as authoritative for an existing thread.
+- accept client-supplied presentation metadata as authoritative for an existing thread;
+- pass a browser `presentationHint` or arbitrary `resolvePresentation(readerCharacterId)` callback into a server-authoritative Reader Scene and treat it as governed presentation authority.
 
 ## 5. Required source resolution
 
@@ -107,6 +109,9 @@ canonical Character identity / owner-scoped Chat read
 → enabled
 
 thread-bound Chat message rendering with identity-neutral labels
+→ enabled
+
+Reader Scene rendering with identity-neutral Reader presentation
 → enabled
 
 canonical Character → named/styled browser presentation
