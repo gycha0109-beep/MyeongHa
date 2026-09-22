@@ -262,7 +262,7 @@ Migration 1220 defines the Official Standard Reading identity as `standard_readi
 
 ## 11.3 Persisted Reading → Reader Scene entry authority blocker
 
-The repository currently has **no canonical Reading → Chat thread binding** and no approved automatic Reader-selection rule for a persisted Reading.
+The repository currently has **no canonical Reading → Chat thread binding** and no approved Reader re-entry selection rule for a persisted Reading. Purchase-time Reader eligibility does not close this gap because it validates an already-supplied Reader candidate; the re-entry selection gap is tracked explicitly as `SRC-37`.
 
 The source boundaries make that absence intentional:
 
