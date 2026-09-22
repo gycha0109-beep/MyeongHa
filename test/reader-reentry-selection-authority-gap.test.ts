@@ -13,6 +13,7 @@ const recordsHandoffPath = new URL(
   '../apps/web/reading-history-handoff.js',
   import.meta.url,
 );
+const chatOpenPath = new URL('../apps/api/src/chat-open-http.ts', import.meta.url);
 
 function sqlBlock(source: string, start: string, end: string): string {
   const startIndex = source.indexOf(start);
@@ -63,5 +64,16 @@ describe('persisted Reading Reader re-entry selection authority gap', () => {
     expect(handoff).toContain('sajuDomain');
     expect(handoff).not.toContain('readerCharacterId');
     expect(handoff).not.toContain('threadId');
+  });
+
+  it('can delegate thread creation/reuse to existing server authority after an exact Reader is known', async () => {
+    const chatOpen = await readFile(chatOpenPath, 'utf8');
+
+    expect(chatOpen).toContain(
+      "commandAuthority: 'public.cmd_open_member_single_character_thread_v1'",
+    );
+    expect(chatOpen).toContain("requestAuthority: 'canonical-character-id-only:v1'");
+    expect(chatOpen).toContain('threadId');
+    expect(chatOpen).toContain('characterId');
   });
 });

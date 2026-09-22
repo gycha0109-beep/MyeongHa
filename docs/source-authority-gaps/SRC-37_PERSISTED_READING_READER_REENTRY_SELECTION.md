@@ -28,6 +28,8 @@ It does not carry a Reader Character id or Chat thread id.
 
 Therefore the existing purchase-time Reader resolver cannot be reused as an automatic Records re-entry selector: it validates a Reader candidate already chosen for a purchase; it does not decide which Reader should own a later re-entry.
 
+A separate direct Reading → thread persistence relation is not required to close this specific gap. Once an exact canonical Reader is selected by approved authority, the existing Chat-open command can create/reuse the owner-scoped single-Character thread for that Reader and return the canonical `threadId`.
+
 ## 2. Existing source-backed authority
 
 The following facts are already authoritative:
