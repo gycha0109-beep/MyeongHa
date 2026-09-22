@@ -174,7 +174,7 @@ function compile(turn: DriftTurn) {
   return compileSeyeonBiblePrototypeContextV1({
     userMessage: turn.message,
     disclosureScope: turn.scope,
-    authorizedMemories: turn.memories,
+    ...(turn.memories === undefined ? {} : { authorizedMemories: turn.memories }),
   });
 }
 
