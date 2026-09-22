@@ -87,6 +87,28 @@ describe('browser Chat room read contract', () => {
     expect(result.messages[0]).not.toHaveProperty('messagePayloadJsonb');
   });
 
+  it('keeps canonical Character identity presentation-neutral until a governed projection exists', () => {
+    const result = parseChatRoomReadPayloadV1(
+      {
+        ...payload(),
+        presentationKey: 'baekheon',
+        displayName: '백헌',
+        characterTitle: '충추원의 장',
+        portraitUrl: '/assets/characters/baekheon-portrait.webp',
+      },
+      {
+        expectedThreadId: THREAD_ID,
+        expectedAfterSequenceNo: 0,
+      },
+    );
+
+    expect(result.characterId).toBe('canonical-primary');
+    expect(result).not.toHaveProperty('presentationKey');
+    expect(result).not.toHaveProperty('displayName');
+    expect(result).not.toHaveProperty('characterTitle');
+    expect(result).not.toHaveProperty('portraitUrl');
+  });
+
   it('rejects a response for a different thread or cursor', () => {
     expect(() => parseChatRoomReadPayloadV1(
       { ...payload(), threadId: '93000000-0000-4000-8000-000000000002' },

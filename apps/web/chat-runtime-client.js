@@ -136,9 +136,10 @@ function renderRoomState(payload) {
   renderHistory(state.messages, state.characterId);
   renderConversation(state.messages, state.characterId);
 
-  // The repository does not yet contain a governed presentationKey -> canonical
-  // characterId correspondence. Do not project an authoritative DB character's
-  // message into the current presentation room bubble until that authority exists.
+  // The repository does not yet contain a production-bound governed canonical
+  // characterId -> browser presentation projection for this authoritative read path.
+  // Do not treat the DB characterId as a chat-character.js presentation key or
+  // project its message into a named/styled room until that authority exists.
   // The owner-scoped stream remains visible with identity-neutral labels.
 
   // Life Thread / 이어지는 이야기 authority is intentionally not inferred from
