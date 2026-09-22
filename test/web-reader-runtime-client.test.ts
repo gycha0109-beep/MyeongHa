@@ -149,6 +149,22 @@ describe('web Reader runtime client', () => {
     });
   });
 
+  it('rejects a success payload bound to a different Official Reading', async () => {
+    const client = createReaderRuntimeClientV1({
+      enabled: true,
+      fetchImpl: vi.fn().mockResolvedValue(successResponse({
+        ...sceneData(),
+        officialReadingId: '44444444-4444-4444-8444-444444444445',
+      })),
+      resolveBearer: vi.fn().mockResolvedValue({ kind: 'member', token: 'member-token' }),
+    });
+
+    await expect(client.readReaderScene({
+      threadId: '33333333-3333-4333-8333-333333333333',
+      officialReadingId: '44444444-4444-4444-8444-444444444444',
+    })).rejects.toMatchObject({ code: 'READER_MALFORMED_RESPONSE' });
+  });
+
   it('rejects malformed or provenance-leaking success payloads', async () => {
     const client = createReaderRuntimeClientV1({
       enabled: true,

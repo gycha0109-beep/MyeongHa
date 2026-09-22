@@ -260,7 +260,13 @@ export function createReaderRuntimeClientV1(options = {}) {
       }
 
       try {
-        return parseReaderSceneEnvelopeV1(data);
+        const scene = parseReaderSceneEnvelopeV1(data);
+        if (scene.officialReadingId !== officialReadingId) {
+          throw new ReaderSceneContractErrorV1(
+            'Reader Scene response officialReadingId does not match the requested Reading.',
+          );
+        }
+        return scene;
       } catch (error) {
         if (error instanceof ReaderSceneContractErrorV1) {
           throw new ReaderRuntimeClientErrorV1(

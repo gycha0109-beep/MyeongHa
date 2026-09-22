@@ -242,7 +242,7 @@ The existing browser `reading-character.js` is not switched to this endpoint in 
 The web integration layer now has a dormant Reader Scene client contract without opening the Production route.
 
 - `apps/web/reader-scene-contract.js` validates only the bounded browser DTO emitted by the Reader Preview HTTP seam and rejects unexpected internal provenance fields.
-- `apps/web/reader-runtime-client.js` sends only `threadId + officialReadingId`, reuses the current Bearer authority, distinguishes feature-unavailable from request failure, and is disabled by default until route activation is separately approved.
+- `apps/web/reader-runtime-client.js` sends only `threadId + officialReadingId`, reuses the current Bearer authority, distinguishes feature-unavailable from request failure, and is disabled by default until route activation is separately approved. A successful response is accepted only when its server-returned `officialReadingId` exactly matches the UUID requested by that browser operation; a cross-Reading success response fails closed as malformed.
 - `apps/web/reader-scene-controller.js` owns loading/retry/abort/stale-response state and treats the server-returned `readerCharacterId` as authoritative.
 - URL `reader` / `character` values remain presentation hints only; they are not Reader runtime authority.
 - The current Saju Preview execution remains separate while the Reader Production route is closed. Its completion surface does not persist or forward a Reader identity into Chat; it routes only to the general Chat hub because the selected Reader is presentation-only. A failed Reader request must never silently fall back to Saju Preview as if it were Reader output.
