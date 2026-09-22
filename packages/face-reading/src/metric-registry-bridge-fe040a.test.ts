@@ -23,13 +23,13 @@ describe('FE040B canonical metric registry consumer bridge', () => {
     });
   });
 
-  it('pins the immutable FE040B distribution artifact and records export readiness', () => {
+  it('pins the immutable FE041B superseding distribution while preserving FE035B registry readiness', () => {
     expect(FACE_CURRENT_PINNED_ARTIFACT_FE040A).toMatchObject({
-      distributionCommit: '50fd5b511326033861b3cab48028b989c4499b3c',
+      distributionCommit: '8b49d4e03e35ef5447f0f2873ff2b8737bd36110',
       distributionPath:
-        'distribution/face-reading/fe040b/myeongha-face-reading-0.0.0.tgz',
+        'distribution/face-reading/fe041b/myeongha-face-reading-0.0.0.tgz',
       artifactSha256:
-        '210cb8f4358fb3b111e0ad3ab7914ef6846ef14af80e781c31544a8fbc527706',
+        '170dc999e0cb01e3e9a38c59a9a510170def54d7055c3b988eabb1330d68620e',
       publicExportPath: './preview-engine',
       canonicalRegistryExportPath:
         './product-neutral-observation-contract-fe035b',

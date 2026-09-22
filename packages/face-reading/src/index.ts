@@ -43,3 +43,5 @@ export * from './criterion-candidate-fe039.js';
 export * from './metric-registry-bridge-fe040a.js';
 export * from './static-observation-allowlist-fe040a.js';
 export * from './operationalization-candidate-fe041a.js';
+
+export * from './square-broad-readiness-bridge-fe041c.js';
