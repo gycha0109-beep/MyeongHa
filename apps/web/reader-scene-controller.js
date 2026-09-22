@@ -1,5 +1,9 @@
 import { ReaderRuntimeClientErrorV1 } from './reader-runtime-client.js';
 import { projectReaderSceneViewModelV1 } from './reader-scene-contract.js';
+import {
+  ReaderSceneLaunchInputErrorV1,
+  createReaderSceneLaunchRequestV1,
+} from './reader-scene-launch-input.js';
 
 function projectErrorState(error) {
   if (!(error instanceof ReaderRuntimeClientErrorV1)) {
@@ -109,6 +113,35 @@ export function createReaderSceneControllerV1(options) {
     }
   }
 
+  function loadPersistedReading(input) {
+    let request;
+    try {
+      request = createReaderSceneLaunchRequestV1({
+        threadId: input?.threadId,
+        persistedReadingHandoff: input?.persistedReadingHandoff,
+      });
+    } catch (error) {
+      generation += 1;
+      if (activeController !== null) activeController.abort();
+      activeController = null;
+      lastInput = null;
+      if (error instanceof ReaderSceneLaunchInputErrorV1) {
+        return Promise.resolve(emit(Object.freeze({
+          state: 'unavailable',
+          canRetry: false,
+          code: error.code,
+        })));
+      }
+      throw error;
+    }
+
+    return load({
+      ...request,
+      presentationHint:
+        typeof input?.presentationHint === 'string' ? input.presentationHint : null,
+    });
+  }
+
   function retry() {
     if (!currentState.canRetry || lastInput === null) return Promise.resolve(currentState);
     return load(lastInput);
@@ -123,6 +156,7 @@ export function createReaderSceneControllerV1(options) {
 
   return Object.freeze({
     load,
+    loadPersistedReading,
     retry,
     cancel,
     getState: () => currentState,
