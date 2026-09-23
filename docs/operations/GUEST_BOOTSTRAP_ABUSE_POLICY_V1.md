@@ -1,6 +1,6 @@
 # MyeongHa Guest Bootstrap Abuse Policy V1
 
-Status: **IMPLEMENTATION READY / PRODUCTION OBSERVE PENDING**
+Status: **PRODUCTION OBSERVE ACTIVE / EVIDENCE & TRAFFIC REVIEW PENDING**
 
 Issue: `#646`
 
@@ -34,6 +34,25 @@ The threshold is an initial V1 abuse bound, not a statement that 30 requests/min
 5. promote to `enforce` only through another reviewed/recorded operator action;
 6. verify excess requests receive the Vercel rate-limit response before application persistence;
 7. keep the scheduled evidence workflow green for drift detection.
+
+## Production observe evidence
+
+Authoritative activation evidence:
+
+```text
+run                   = 35886551596
+main SHA              = 6bc5e1f96415ab94c78a0de13331c5ecdb1952eb
+mode                   = observe
+active config id       = waf_HPi141YAu0mK
+active config version  = 3
+active rule id         = rule_myeongha_guest_bootstrap_rate_limit_v1_fAj5rl
+rate-limit action      = log
+```
+
+The run verified the governed Vercel project, exact draft mutation/readback, draft activation, and exact post-activation active-rule readback. Observe mode is therefore active and inspectable; it is not inferred from generic DDoS protection.
+
+A first runtime-log review immediately after activation found no `/api/session/bootstrap` traffic in the inspected post-activation window. That is not evidence that the threshold is safe for legitimate traffic, so it does **not** authorize promotion to `enforce`. Promotion remains gated on legitimate-traffic review plus a separately reviewed/recorded operator action.
+The scheduled evidence workflow remains pinned to `expected_mode=observe` while this review gate is open.
 
 ## Safety boundaries
 
