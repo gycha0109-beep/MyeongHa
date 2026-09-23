@@ -1,14 +1,16 @@
+import { SAJU_DOMAINS, type SajuDomain } from '../../../packages/contracts/src/index.js';
 import { ApiCommandError } from './api-error.js';
 
 export const OFFICIAL_READING_RECORD_READ_AUTHORITY_BINDING_V1 =
   'public.qry_official_reading_record_runtime_v1' as const;
 
 const UUID_V1 = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+const SAJU_DOMAIN_SET_V1 = new Set<string>(SAJU_DOMAINS);
 
 export interface OfficialReadingRecordAuthorityRowV1 {
   readonly readingId: string;
   readonly readingSessionId: string;
-  readonly sajuDomain: string;
+  readonly sajuDomain: SajuDomain;
   readonly readingContractVersion: string;
   readonly productResponseState: string;
   readonly responseSnapshotJsonb: unknown;
@@ -63,6 +65,22 @@ function requireStoredString(name: string, value: unknown): string {
     throw new Error(`Official Reading record authority returned an invalid ${name}.`);
   }
   return value;
+}
+
+function requireStoredUuid(name: string, value: unknown): string {
+  const stored = requireStoredString(name, value);
+  if (!UUID_V1.test(stored)) {
+    throw new Error(`Official Reading record authority returned an invalid ${name}.`);
+  }
+  return stored;
+}
+
+function requireSajuDomain(value: unknown): SajuDomain {
+  const stored = requireStoredString('Saju domain', value);
+  if (!SAJU_DOMAIN_SET_V1.has(stored)) {
+    throw new Error('Official Reading record authority returned an invalid Saju domain.');
+  }
+  return stored as SajuDomain;
 }
 
 function requireTimestamp(value: unknown): string {
@@ -154,7 +172,7 @@ export async function getOfficialReadingRecord(input: {
     if (row === null) {
       throw new ApiCommandError('NOT_FOUND', 'Official Reading record was not found.');
     }
-    if (requireUuid('Stored Official Reading identity', row.readingId) !== readingId) {
+    if (requireStoredUuid('Stored Official Reading identity', row.readingId) !== readingId) {
       throw new Error('Official Reading record authority returned a different Reading identity.');
     }
     requireStoredString('response hash', row.responseHash);
@@ -175,8 +193,8 @@ export async function getOfficialReadingRecord(input: {
 
     return Object.freeze({
       readingId,
-      readingSessionId: requireUuid('Stored Reading Session identity', row.readingSessionId),
-      sajuDomain: requireStoredString('Saju domain', row.sajuDomain),
+      readingSessionId: requireStoredUuid('Stored Reading Session identity', row.readingSessionId),
+      sajuDomain: requireSajuDomain(row.sajuDomain),
       readingContractVersion,
       productResponseState,
       readerCharacterIds: requireReaderCharacterIds(row.readerCharacterIds),

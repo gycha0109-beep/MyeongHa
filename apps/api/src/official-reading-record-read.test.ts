@@ -78,6 +78,26 @@ describe('Official Reading Records read contract', () => {
     })).rejects.toThrow('different Reading identity');
   });
 
+  it('fails closed on malformed stored Reading identities and Saju domain', async () => {
+    await expect(getOfficialReadingRecord({
+      resolvedSubjectId: SUBJECT_ID,
+      readingId: READING_ID,
+      authorityPort: port({ ...ROW, readingId: 'stored-reading' }),
+    })).rejects.toThrow('invalid Stored Official Reading identity');
+
+    await expect(getOfficialReadingRecord({
+      resolvedSubjectId: SUBJECT_ID,
+      readingId: READING_ID,
+      authorityPort: port({ ...ROW, readingSessionId: 'stored-session' }),
+    })).rejects.toThrow('invalid Stored Reading Session identity');
+
+    await expect(getOfficialReadingRecord({
+      resolvedSubjectId: SUBJECT_ID,
+      readingId: READING_ID,
+      authorityPort: port({ ...ROW, sajuDomain: 'career-ish' }),
+    })).rejects.toThrow('invalid Saju domain');
+  });
+
   it('rejects stored snapshot provenance mismatches before archive projection', async () => {
     for (const responseSnapshotJsonb of [
       {
