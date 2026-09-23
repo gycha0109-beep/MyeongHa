@@ -196,7 +196,7 @@ assert(!authPageSource.includes('/api/session/bootstrap'), 'auth-page.js still o
 assert(!authPageSource.includes('sessionStorage.setItem'), 'auth-page.js still writes auth session credentials directly');
 assert(!authPageSource.includes('PRODUCT_AUTH_STORAGE_V1'), 'auth-page.js still depends on auth credential storage keys');
 assert(productAuthSource.includes('export async function ensureGuestBearer()'), 'product-auth.js does not expose centralized Guest bootstrap authority');
-assert(productAuthSource.includes("postJson('/api/session/bootstrap', {})"), 'product-auth.js does not own Guest bootstrap transport');
+assert(productAuthSource.includes("postJson('/api/session/bootstrap', {}, null, {"), 'product-auth.js does not own Guest bootstrap transport');
 
 const { server, origin } = await serve();
 const profile = await mkdtemp(join(tmpdir(), 'myeongha-auth-signup-guest-bootstrap-browser-'));
