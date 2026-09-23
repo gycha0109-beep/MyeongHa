@@ -14,10 +14,10 @@ const ROW = Object.freeze({
   readingId: READING_ID,
   readingSessionId: SESSION_ID,
   sajuDomain: 'career',
-  readingContractVersion: 'product-reading.v1',
+  readingContractVersion: 'myeonghwa-product-reading-response-v2',
   productResponseState: 'delivered',
   responseSnapshotJsonb: Object.freeze({
-    responseVersion: 'product-reading.v1',
+    responseVersion: 'myeonghwa-product-reading-response-v2',
     state: 'delivered',
     reading: Object.freeze({
       readingId: READING_ID,
