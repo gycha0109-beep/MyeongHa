@@ -1,5 +1,5 @@
 import { resolveCanonicalCharacterPresentationV1 } from './character-presentation-identity.js';
-import { parseChatThreadIdV1 } from './chat-room-read-contract.js';
+import { parseChatThreadRouteV1 } from './chat-room-read-contract.js';
 const characters = {
   baekheon: {
     name: '백헌',
@@ -58,9 +58,9 @@ const characters = {
 };
 
 const params = new URLSearchParams(window.location.search);
-const rawThreadId = params.get('threadId');
-const threadId = parseChatThreadIdV1(rawThreadId);
-const hasThreadRoute = rawThreadId !== null;
+const threadRoute = parseChatThreadRouteV1(params);
+const threadId = threadRoute.threadId;
+const hasThreadRoute = threadRoute.state !== 'none';
 const requestedCharacter = params.get('character')?.toLowerCase() ?? null;
 const presentationCharacterKey = !hasThreadRoute && requestedCharacter && Object.hasOwn(characters, requestedCharacter)
   ? requestedCharacter
@@ -80,9 +80,9 @@ if (characterKey) {
   root.dataset.characterAuthority = 'presentation_hint_only';
 } else {
   delete root.dataset.character;
-  root.dataset.characterAuthority = threadId === null
-    ? 'thread_identity_invalid'
-    : 'thread_identity_pending';
+  root.dataset.characterAuthority = threadRoute.state === 'ready'
+    ? 'thread_identity_pending'
+    : 'thread_identity_invalid';
 }
 document.title = `${character.name} · 대화 · 명하`;
 

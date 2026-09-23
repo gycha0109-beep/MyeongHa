@@ -1,14 +1,14 @@
 import { resolveCanonicalCharacterPresentationV1 } from './character-presentation-identity.js';
 import { applyCanonicalCharacterPresentationV1 } from './chat-character.js';
-import { parseChatRoomReadPayloadV1, parseChatThreadIdV1 } from './chat-room-read-contract.js';
+import { parseChatRoomReadPayloadV1, parseChatThreadRouteV1 } from './chat-room-read-contract.js';
 import { getActiveBearer, invalidateGuestSession, invalidateMemberSession } from './product-auth.js';
 import { PRODUCT_AUTH_STORAGE_V1 } from './product-auth.js';
 import { shouldReloadChatForMemberSessionStorageChange } from './product-auth-surface.js';
 
 const params = new URLSearchParams(window.location.search);
-const rawThreadId = params.get('threadId');
-const threadId = parseChatThreadIdV1(rawThreadId);
-const invalidThreadRoute = rawThreadId !== null && threadId === null;
+const threadRoute = parseChatThreadRouteV1(params);
+const threadId = threadRoute.threadId;
+const invalidThreadRoute = threadRoute.state === 'invalid';
 const apiEnvelopePromise = import('./api-envelope.js');
 
 const historyList = document.querySelector('[data-history-list]');
