@@ -59,64 +59,13 @@ describe('web Reader Scene controller', () => {
     if ('presentation' in result) expect(result.presentation).not.toHaveProperty('id');
   });
 
-  it('loads a persisted Reading only through the candidate launch boundary', async () => {
-    const client = { readReaderScene: vi.fn().mockResolvedValue(scene('taegyeom', '44444444-4444-4444-8444-444444444444')) };
+  it('does not expose a Records-to-Reader re-entry method', () => {
     const controller = createReaderSceneControllerV1({
-      client,
+      client: { readReaderScene: vi.fn() },
       onState: vi.fn(),
     });
 
-    const result = await controller.loadPersistedReading({
-      threadId: '33333333-3333-4333-8333-333333333333',
-      persistedReadingHandoff: {
-        state: 'ready',
-        source: 'records',
-        readingId: '44444444-4444-4444-8444-444444444444',
-        readingSessionId: '55555555-5555-4555-8555-555555555555',
-        sajuDomain: 'career',
-      },
-    });
-
-    expect(client.readReaderScene).toHaveBeenCalledTimes(1);
-    expect(client.readReaderScene).toHaveBeenCalledWith(expect.objectContaining({
-      threadId: '33333333-3333-4333-8333-333333333333',
-      officialReadingId: '44444444-4444-4444-8444-444444444444',
-    }));
-    const request = client.readReaderScene.mock.calls[0]![0];
-    expect(request).not.toHaveProperty('readingSessionId');
-    expect(request).not.toHaveProperty('sajuDomain');
-    expect(result).toMatchObject({
-      state: 'ready',
-      readerCharacterId: 'taegyeom',
-      officialReadingId: '44444444-4444-4444-8444-444444444444',
-    });
-    expect(result).not.toHaveProperty('presentationHint');
-  });
-
-  it('fails a persisted Reading launch closed before transport when thread authority is absent', async () => {
-    const client = { readReaderScene: vi.fn() };
-    const controller = createReaderSceneControllerV1({
-      client,
-      onState: vi.fn(),
-    });
-
-    const result = await controller.loadPersistedReading({
-      threadId: null,
-      persistedReadingHandoff: {
-        state: 'ready',
-        source: 'records',
-        readingId: '44444444-4444-4444-8444-444444444444',
-        readingSessionId: '55555555-5555-4555-8555-555555555555',
-        sajuDomain: 'career',
-      },
-    });
-
-    expect(result).toEqual({
-      state: 'unavailable',
-      canRetry: false,
-      code: 'READER_SCENE_LAUNCH_INVALID',
-    });
-    expect(client.readReaderScene).not.toHaveBeenCalled();
+    expect(controller).not.toHaveProperty('loadPersistedReading');
   });
 
   it('retries only explicit retryable failures', async () => {

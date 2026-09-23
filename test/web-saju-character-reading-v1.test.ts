@@ -125,20 +125,22 @@ describe('MyeongHa character-led Saju Reading v1', () => {
     expect(html).toContain('data-reading-records-link');
   });
 
-  it('fails closed for persisted Reading re-entry until a governed reread contract is active', async () => {
+  it('reopens persisted Official Reading from Records without entering Reader Scene', async () => {
     const [runtime, handoff] = await Promise.all([
       readFile(readingRuntimePath, 'utf8'),
       readFile(readingHandoffPath, 'utf8'),
     ]);
 
-    expect(runtime).toContain("from './reading-history-handoff.js'");
-    expect(runtime).toContain('parsePersistedReadingHandoffV1(params)');
-    expect(runtime).toContain("persistedReadingHandoff.state === 'none' && engineRequest?.state === 'ready'");
-    expect(runtime).toContain("root.dataset.readingRouteState = 'persisted_handoff_unavailable'");
-    expect(runtime).toContain('Records용 공식 저장 결과 재열기 계약이 연결되기 전에는 현재 프리뷰나 Reader 장면으로 대신 보여드리지 않습니다.');
-    expect(runtime.indexOf("persistedReadingHandoff.state === 'ready'")).toBeLessThan(
-      runtime.lastIndexOf('previewEligible'),
-    );
+    expect(runtime).toContain("from './official-reading-record-contract.js'");
+    expect(runtime).toContain("const OFFICIAL_READING_RECORD_ENDPOINT = '/api/readings';");
+    expect(runtime).toContain("endpoint.searchParams.set('readingId', persistedReadingHandoff.readingId)");
+    expect(runtime).toContain('record.readingId !== persistedReadingHandoff.readingId');
+    expect(runtime).toContain('record.readingSessionId !== persistedReadingHandoff.readingSessionId');
+    expect(runtime).toContain('record.sajuDomain !== persistedReadingHandoff.sajuDomain');
+    expect(runtime).toContain("activatePreviewReading({ ...readingView, source: 'record' })");
+    expect(runtime).toContain("root.dataset.readingRouteState = isStoredRecord ? 'persisted_record' : 'preview'");
+    expect(runtime).toContain("document.querySelector('.reader-scene')?.setAttribute('hidden', '')");
+    expect(runtime).not.toContain('renderPersistedReadingHandoffUnavailable');
     expect(handoff).toContain("PERSISTED_READING_HANDOFF_SOURCE_V1 = 'records'");
     expect(handoff).not.toContain('readerCharacterId');
     expect(handoff).not.toContain('threadId');
