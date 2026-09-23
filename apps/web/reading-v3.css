@@ -810,3 +810,20 @@ body[data-reader="doyun"] { --reader-accent: #8a7967; --reader-night: #272521; -
   .reading-completion-actions { grid-template-columns: 1fr; margin-top: 28px; }
   .reading-completion-primary, .reading-completion-secondary { min-height: 52px; font-size: 13px; }
 }
+
+
+/* Records archive reread: the stored Official Reading is not a Reader Scene. */
+body[data-reading-record-mode="official_archive"] .reading-stage {
+  grid-template-columns: minmax(0, 900px);
+  justify-content: center;
+}
+
+body[data-reading-record-mode="official_archive"] .reader-scene,
+body[data-reading-record-mode="official_archive"] .reading-character-block {
+  display: none !important;
+}
+
+body[data-reading-record-mode="official_archive"] .reading-sheet {
+  grid-column: 1;
+  width: 100%;
+}
