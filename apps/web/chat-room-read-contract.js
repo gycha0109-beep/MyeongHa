@@ -31,6 +31,25 @@ export function parseChatThreadIdV1(value) {
   return UUID_V1.test(normalized) ? normalized : null;
 }
 
+export function parseChatThreadRouteV1(search) {
+  const params = search instanceof URLSearchParams
+    ? search
+    : new URLSearchParams(search || '');
+  const values = params.getAll('threadId');
+
+  if (values.length === 0) {
+    return Object.freeze({ state: 'none', threadId: null });
+  }
+  if (values.length !== 1) {
+    return Object.freeze({ state: 'invalid', threadId: null });
+  }
+
+  const threadId = parseChatThreadIdV1(values[0]);
+  return threadId === null
+    ? Object.freeze({ state: 'invalid', threadId: null })
+    : Object.freeze({ state: 'ready', threadId });
+}
+
 function parseMessage(message, previousSequenceNo, seenMessageIds) {
   if (!message || typeof message !== 'object' || Array.isArray(message)) {
     fail('message is invalid');
