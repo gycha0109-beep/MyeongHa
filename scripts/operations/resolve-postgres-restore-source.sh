@@ -13,8 +13,7 @@ curl -fsSL \
   -o "$run_json"
 
 jq -e '
-  .name == "Production PostgreSQL Logical Backup"
-  and .path == ".github/workflows/production-postgres-backup.yml"
+  .path == ".github/workflows/production-postgres-backup.yml"
   and .conclusion == "success"
   and .head_branch == "main"
   and (.event == "schedule" or .event == "workflow_dispatch")
