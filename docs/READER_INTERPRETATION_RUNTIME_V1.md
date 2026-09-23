@@ -153,7 +153,7 @@ This PR does **not**:
 - promote Preview output to Official Reading Source Truth;
 - expose the raw Official Reading artifact in Character memory or the Reader envelope.
 
-Server-owned Reader context composition is connected through the thread-bound Preview seam, and the source-side Saju grounding endpoint is now hosted-canary verified. The next integration slice is **MyeongHa Preview HTTP/Reader Scene wiring**. Browser input must never provide Character runtime context, Character perspective, semantic grounding, Reader access, or Official Reading prose. Public wiring must not synthesize missing Production content/context authority merely because the Saju transport is now available, and it must not promote Commerce authority implicitly.
+Server-owned Reader context composition is connected through the thread-bound Preview seam, the source-side Saju grounding endpoint is hosted-canary verified, and the Preview HTTP plus dormant Reader Scene browser client/controller boundaries are implemented. The remaining activation work is to close the explicit Production authority gates before any public route or browser endpoint switch is enabled. Browser input must never provide Character runtime context, Character perspective, semantic grounding, Reader access, or Official Reading prose. Public wiring must not synthesize missing Production content/context authority merely because the Saju transport is available, and it must not promote Commerce authority implicitly.
 
 
 ## 9. Cross-service projection transport
@@ -316,7 +316,7 @@ This evidence closes only the Saju cross-service transport prerequisite. It does
 Before `api/me.ts` / `vercel.json` may expose `POST /api/me/readings/reader-interpretation/preview`, Production MyeongHa composition must bind all of the existing HTTP seam dependencies to concrete server authorities. In particular:
 
 1. the exact pinned immutable `ContentReleaseRuntime` entry must be recoverable from server-owned published content authority rather than browser Reader keys or development fixtures;
-2. `ReaderInterpretationPreviewContextAuthorityPortV1` must be backed by concrete server context authority for its non-content fields rather than invented empty/default context;
+2. the remaining `ReaderInterpretationPreviewContextAuthorityPortV1` input, `relationshipProjectionPolicy`, must come from approved source-backed authority; SRC-22 does not authorize invented Production thresholds;
 3. current relationship, Memory, thread binding, Reader access, and Official artifact reads must execute inside the canonical subject-scoped PostgreSQL transaction;
 4. the already-hosted `createProductionSajuCharacterGroundingProjectionPortV1` is the only Production grounding transport;
 5. Reader Scene handoff must carry only `threadId + officialReadingId`; URL-selected Reader identity remains presentation input and must not become runtime authority.
