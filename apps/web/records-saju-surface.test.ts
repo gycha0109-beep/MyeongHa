@@ -43,6 +43,12 @@ describe('Records Saju history surface', () => {
     expect(page).toContain('renderSajuReadingEmpty(target);');
   });
 
+  it('labels authoritative delivered states as completed without using the stale complete alias', () => {
+    expect(page).toContain("value === 'delivered' || value === 'delivered_with_fallback'");
+    expect(page).toContain("return '완료'");
+    expect(page).not.toContain("value === 'complete'");
+  });
+
   it('recognizes only the explicit sample fixture contract and removes it from the Life Fact ledger', () => {
     expect(page).toContain("const SAMPLE_SAJU_FACT_TYPE = 'sample_saju_reading_result';");
     expect(page).toContain("const SAMPLE_SAJU_SCHEMA_VERSION = 'sample.v1';");

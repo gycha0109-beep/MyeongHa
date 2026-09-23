@@ -156,7 +156,7 @@ function readingPresentation(sajuDomain) {
 }
 
 function productResponseStateLabel(value) {
-  if (value === 'complete') return '완료';
+  if (value === 'delivered' || value === 'delivered_with_fallback') return '완료';
   if (value === 'clarification_required') return '추가 확인 필요';
   return '저장됨';
 }
