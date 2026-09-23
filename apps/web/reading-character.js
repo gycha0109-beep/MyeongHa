@@ -420,6 +420,8 @@ function activatePreviewReading(preview) {
   const nextLabel = nextButton?.querySelector('span:first-child');
   const readingSheet = document.querySelector('.reading-sheet');
   const completion = document.querySelector('[data-reading-completion]');
+  const completionTitle = document.querySelector('[data-reading-completion-title]');
+  const completionCopy = document.querySelector('[data-reading-completion-copy]');
   const chatLink = document.querySelector('[data-reading-chat-link]');
   const recordsLink = document.querySelector('[data-reading-records-link]');
   const replayButton = document.querySelector('[data-reading-replay]');
@@ -519,6 +521,13 @@ function activatePreviewReading(preview) {
   if (isStoredRecord) {
     document.querySelector('.reader-scene')?.setAttribute('hidden', '');
     document.querySelector('.reading-character-block')?.setAttribute('hidden', '');
+    if (completionTitle) {
+      completionTitle.textContent = '저장된 공식 사주 풀이를 끝까지 확인했습니다.';
+    }
+    if (completionCopy) {
+      completionCopy.textContent =
+        '이 결과는 기록에 저장된 Official Reading입니다. 대화를 시작하려면 대화 상대를 새로 선택해 주세요.';
+    }
     if (productTitle) productTitle.textContent = '저장된 사주 풀이';
     document.title = '저장된 사주 풀이 · 명하';
   }

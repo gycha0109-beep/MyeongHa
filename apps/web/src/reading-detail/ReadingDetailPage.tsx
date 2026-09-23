@@ -96,8 +96,8 @@ export function ReadingDetailPage() {
 
           <section className="reading-completion" data-reading-completion hidden aria-live="polite">
             <span className="reading-completion-kicker">READING COMPLETE</span>
-            <h2><span data-reader-name>백헌</span>이 이번 사주 읽기를 마쳤습니다.</h2>
-            <p>읽은 내용은 기록에서 다시 확인할 수 있습니다. 대화를 시작하려면 대화 상대를 새로 선택해 주세요.</p>
+            <h2 data-reading-completion-title><span data-reader-name>백헌</span>이 이번 사주 읽기를 마쳤습니다.</h2>
+            <p data-reading-completion-copy>읽은 내용은 기록에서 다시 확인할 수 있습니다. 대화를 시작하려면 대화 상대를 새로 선택해 주세요.</p>
             <div className="reading-completion-actions">
               <a className="reading-completion-primary" data-reading-chat-link href="chat-hub.html">
                 대화 상대 선택

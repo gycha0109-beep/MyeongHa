@@ -140,6 +140,8 @@ describe('MyeongHa character-led Saju Reading v1', () => {
     expect(runtime).toContain("activatePreviewReading({ ...readingView, source: 'record' })");
     expect(runtime).toContain("root.dataset.readingRouteState = isStoredRecord ? 'persisted_record' : 'preview'");
     expect(runtime).toContain("document.querySelector('.reader-scene')?.setAttribute('hidden', '')");
+    expect(runtime).toContain("completionTitle.textContent = '저장된 공식 사주 풀이를 끝까지 확인했습니다.'");
+    expect(runtime).toContain("'이 결과는 기록에 저장된 Official Reading입니다. 대화를 시작하려면 대화 상대를 새로 선택해 주세요.'");
     expect(runtime).not.toContain('renderPersistedReadingHandoffUnavailable');
     expect(handoff).toContain("PERSISTED_READING_HANDOFF_SOURCE_V1 = 'records'");
     expect(handoff).not.toContain('readerCharacterId');
