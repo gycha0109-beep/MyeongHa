@@ -1,6 +1,8 @@
 export const READER_SCENE_SCHEMA_VERSION_V1 =
   'myeongha-reader-interpretation-preview-http-v1';
 
+const UUID_V1 = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+
 const FALLBACK_REASONS_V1 = new Set([
   'renderer_protected_fallback',
   'semantic_guard_failed',
@@ -25,6 +27,14 @@ function requireString(value, field, maxLength = 512) {
   const normalized = value.trim();
   if (normalized.length === 0 || normalized.length > maxLength) {
     throw new ReaderSceneContractErrorV1(field + ' is outside the supported bounds.');
+  }
+  return normalized;
+}
+
+function requireUuid(value, field) {
+  const normalized = requireString(value, field, 36);
+  if (!UUID_V1.test(normalized)) {
+    throw new ReaderSceneContractErrorV1(field + ' must be a UUID.');
   }
   return normalized;
 }
@@ -79,7 +89,7 @@ export function parseReaderSceneEnvelopeV1(payload) {
     schemaVersion,
     lifecycle: 'preview',
     mode,
-    officialReadingId: requireString(payload.officialReadingId, 'officialReadingId'),
+    officialReadingId: requireUuid(payload.officialReadingId, 'officialReadingId'),
     readerCharacterId: requireString(payload.readerCharacterId, 'readerCharacterId'),
     domain: requireString(payload.domain, 'domain', 128),
     interpretationHash: requireString(payload.interpretationHash, 'interpretationHash', 512),

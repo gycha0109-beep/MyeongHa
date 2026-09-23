@@ -10,7 +10,7 @@ const base = {
   schemaVersion: 'myeongha-reader-interpretation-preview-http-v1',
   lifecycle: 'preview',
   mode: 'reader_interpretation',
-  officialReadingId: 'reading-1',
+  officialReadingId: '44444444-4444-4444-8444-444444444444',
   readerCharacterId: 'taegyeom',
   domain: 'career',
   interpretationHash: 'sha256:v1:reader-result',
@@ -34,7 +34,7 @@ describe('web Reader Scene contract', () => {
       schemaVersion: base.schemaVersion,
       lifecycle: 'preview',
       mode: 'protected_fallback',
-      officialReadingId: 'reading-1',
+      officialReadingId: '44444444-4444-4444-8444-444444444444',
       readerCharacterId: 'taegyeom',
       domain: 'career',
       interpretationHash: 'sha256:v1:fallback',
@@ -56,6 +56,13 @@ describe('web Reader Scene contract', () => {
     expect(() => parseReaderSceneEnvelopeV1({ ...base, ...extra })).toThrow(
       ReaderSceneContractErrorV1,
     );
+  });
+
+  it('rejects a malformed Official Reading identity at the browser response boundary', () => {
+    expect(() => parseReaderSceneEnvelopeV1({
+      ...base,
+      officialReadingId: 'reading-1',
+    })).toThrow(/officialReadingId must be a UUID/u);
   });
 
   it('rejects Reader identity and domain mismatches inside the utterance', () => {
