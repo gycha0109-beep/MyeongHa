@@ -407,6 +407,7 @@ function activatePreviewReading(preview) {
   const { steps } = preview;
   const isStoredRecord = preview.source === 'record';
   let activeIndex = 0;
+  const backLink = document.querySelector('[data-reading-back-link]');
   const progressLabel = document.querySelector('[data-reading-progress-label]');
   const stepTitle = document.querySelector('[data-reading-step-title]');
   const stepBody = document.querySelector('[data-reading-step-body]');
@@ -519,8 +520,17 @@ function activatePreviewReading(preview) {
   if (routeState) routeState.hidden = true;
   if (stage) stage.hidden = false;
   if (isStoredRecord) {
+    delete root.dataset.reader;
+    delete root.dataset.readerSelection;
+    delete root.dataset.readerAuthority;
+    delete root.dataset.readerPresentation;
     document.querySelector('.reader-scene')?.setAttribute('hidden', '');
     document.querySelector('.reading-character-block')?.setAttribute('hidden', '');
+    if (stage) stage.setAttribute('aria-label', '저장된 공식 사주 풀이');
+    if (backLink) {
+      backLink.setAttribute('href', 'records.html?tab=saju');
+      backLink.textContent = '← 사주 기록으로 돌아가기';
+    }
     if (completionTitle) {
       completionTitle.textContent = '저장된 공식 사주 풀이를 끝까지 확인했습니다.';
     }

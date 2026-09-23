@@ -7,7 +7,7 @@ export function ReadingDetailPage() {
 
   return (
     <>
-      <a className="reading-back-to-hub" href="reading.html">← 내 사주로 돌아가기</a>
+      <a className="reading-back-to-hub" data-reading-back-link href="reading.html">← 내 사주로 돌아가기</a>
 
       <section className="reading-route-state" data-reading-route-state aria-live="polite">
         <span className="reading-route-kicker" data-reading-product-title>사주 읽기</span>
