@@ -130,10 +130,9 @@ BEGIN
     'public.qry_official_reading_record_runtime_v1(uuid,uuid)'::pg_catalog.regprocedure
   ) INTO v_detail_def;
 
-  IF position(
-    'rr.product_response_state IN (''delivered'', ''delivered_with_fallback'')'
-    in v_detail_def
-  ) = 0 THEN
+  IF position('product_response_state' in lower(v_detail_def)) = 0
+     OR position('delivered' in lower(v_detail_def)) = 0
+     OR position('delivered_with_fallback' in lower(v_detail_def)) = 0 THEN
     RAISE EXCEPTION 'Official Reading archive detail lost openable-state filtering';
   END IF;
 
