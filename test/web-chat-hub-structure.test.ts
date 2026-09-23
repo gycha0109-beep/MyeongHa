@@ -58,7 +58,7 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
     expect(js).not.toContain('hasIncoming: true');
   });
 
-  it('keeps thread-backed relationship surfaces presentation-neutral until SRC-36 closes', async () => {
+  it('keeps thread-backed relationship surfaces presentation-neutral until thread identity supplies canonical Character authority', async () => {
     const js = await readFile(hubJsPath, 'utf8');
 
     expect(js).toContain("import { parseChatThreadIdV1 } from './chat-room-read-contract.js'");
