@@ -35,8 +35,9 @@ describe('Records Saju history surface', () => {
     expect(page).toContain("requireArray(readingPayload, 'readings')");
     expect(page).toContain('if (readings.length > 0)');
     expect(page).toContain('for (const reading of readings) renderPersistedReading(target, reading);');
+    expect(page).toContain('resolveCanonicalCharacterPresentationV1(characterId)?.name');
     expect(page).toContain("records-reading-card records-reading-card--persisted");
-    expect(page).toContain("records-reading-badge', '저장된 풀이'");
+    expect(page).toContain("records-reading-badge', readerProvenanceLabel(reading.readerCharacterIds)");
     expect(page).toContain('if (allowsDevelopmentSajuSamples())');
     expect(page).toContain('renderSajuReadingSamples(target, lifeFactsPayload)');
     expect(page).toContain('renderSajuReadingEmpty(target);');

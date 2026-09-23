@@ -106,6 +106,7 @@ function snapshotFor(label: string, endpoint: string) {
         sajuDomain: 'career',
         readingContractVersion: 'reading-v1',
         productResponseState: 'delivered',
+        readerCharacterIds: [label === 'member-a' ? 'seyeon' : 'taegyeom'],
         createdAt: '2026-09-10T00:00:00.000Z',
         completedAt: '2026-09-10T00:01:00.000Z',
       }],
