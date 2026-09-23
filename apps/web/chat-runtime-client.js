@@ -1,3 +1,5 @@
+import { resolveCanonicalCharacterPresentationV1 } from './character-presentation-identity.js';
+import { applyCanonicalCharacterPresentationV1 } from './chat-character.js';
 import { parseChatRoomReadPayloadV1, parseChatThreadIdV1 } from './chat-room-read-contract.js';
 import { getActiveBearer, invalidateGuestSession, invalidateMemberSession } from './product-auth.js';
 import { PRODUCT_AUTH_STORAGE_V1 } from './product-auth.js';
@@ -35,7 +37,9 @@ function formatTimestamp(value) {
 function senderLabel(message, authoritativeCharacterId) {
   if (message.senderType === 'user') return '나';
   if (message.senderType === 'character') {
-    return message.characterId === authoritativeCharacterId ? '대리자' : '다른 대리자';
+    const identity = resolveCanonicalCharacterPresentationV1(message.characterId);
+    if (message.characterId === authoritativeCharacterId) return identity?.name ?? '대리자';
+    return identity?.name ?? '다른 대리자';
   }
   return '대화 기록';
 }
@@ -135,11 +139,9 @@ function renderRoomState(payload) {
   renderHistory(state.messages, state.characterId);
   renderConversation(state.messages, state.characterId);
 
-  // The repository does not yet contain a production-bound governed canonical
-  // characterId -> browser presentation projection for this authoritative read path.
-  // Do not treat the DB characterId as a chat-character.js presentation key or
-  // project its message into a named/styled room until that authority exists.
-  // The owner-scoped stream remains visible with identity-neutral labels.
+  // Exact-nine product authority maps canonical Character id to the same
+  // English browser presentation key. The thread read remains identity authority.
+  applyCanonicalCharacterPresentationV1(state.characterId);
 
   // Life Thread / 이어지는 이야기 authority is intentionally not inferred from
   // chat messages. Until a verified continuation projection is supplied, the

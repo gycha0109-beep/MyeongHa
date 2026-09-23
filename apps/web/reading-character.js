@@ -52,7 +52,7 @@ const readerCatalog = {
     title: '대리자',
     intro: '급하게 결론부터 내리지 않고, 구조와 시기를 차례대로 읽어보겠습니다.',
   },
-  doyoon: {
+  doyun: {
     name: '도윤',
     hanja: '',
     title: '대리자',
@@ -62,7 +62,7 @@ const readerCatalog = {
 
 const aliases = new Map([
   ['백헌', 'baekheon'], ['세연', 'seyeon'], ['여울', 'yeoul'], ['서린', 'seorin'],
-  ['라현', 'rahyeon'], ['미라', 'mira'], ['태겸', 'taegyeom'], ['윤호', 'yunho'], ['도윤', 'doyoon'],
+  ['라현', 'rahyeon'], ['미라', 'mira'], ['태겸', 'taegyeom'], ['윤호', 'yunho'], ['도윤', 'doyun'],
 ]);
 
 const params = new URLSearchParams(window.location.search);
@@ -165,7 +165,7 @@ function renderPersistedReadingHandoffUnavailable() {
   if (productTitle) productTitle.textContent = '저장된 사주 풀이';
   if (stateTitle) stateTitle.textContent = '저장된 풀이 다시 열기는 아직 연결 준비 중입니다.';
   if (stateCopy) {
-    stateCopy.textContent = '저장된 Reading 식별자는 확인했습니다. 검증된 재열기 계약과 Reader 연결이 활성화되기 전에는 현재 프리뷰나 다른 풀이로 대신 보여드리지 않습니다.';
+    stateCopy.textContent = '저장된 Reading 식별자는 확인했습니다. Records용 공식 저장 결과 재열기 계약이 연결되기 전에는 현재 프리뷰나 Reader 장면으로 대신 보여드리지 않습니다.';
   }
   root.dataset.persistedReadingHandoff = 'records';
   root.dataset.persistedReadingDomain = persistedReadingHandoff.sajuDomain;

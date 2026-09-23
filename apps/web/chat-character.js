@@ -1,3 +1,4 @@
+import { resolveCanonicalCharacterPresentationV1 } from './character-presentation-identity.js';
 import { parseChatThreadIdV1 } from './chat-room-read-contract.js';
 const characters = {
   baekheon: {
@@ -48,7 +49,7 @@ const characters = {
     sceneLabel: '윤호의 따뜻한 목재 서재',
     intro: ['천천히 말씀하셔도 됩니다.', '어떤 이야기부터 시작할까요?'],
   },
-  doyoon: {
+  doyun: {
     name: '도윤',
     title: '대리자',
     sceneLabel: '도윤의 자유롭고 비공식적인 공간',
@@ -119,6 +120,33 @@ function setDialogueLines(lines) {
 }
 
 setDialogueLines(character.intro);
+
+export function applyCanonicalCharacterPresentationV1(characterId) {
+  const identity = resolveCanonicalCharacterPresentationV1(characterId);
+  if (!identity) return false;
+  const next = characters[identity.presentationKey];
+  if (!next) return false;
+
+  root.dataset.character = identity.presentationKey;
+  root.dataset.characterAuthority = 'canonical_character_id';
+  document.title = `${next.name} · 대화 · 명하`;
+
+  document.querySelectorAll('[data-character-name], [data-dialogue-name]').forEach((node) => {
+    node.textContent = next.name;
+  });
+  document.querySelectorAll('[data-character-title]').forEach((node) => {
+    node.textContent = next.title;
+  });
+  document.querySelectorAll('[data-character-avatar]').forEach((node) => {
+    node.dataset.character = identity.presentationKey;
+    node.textContent = next.name.slice(0, 1);
+  });
+  document.querySelectorAll('[data-history-character-name]').forEach((node) => {
+    node.textContent = `${next.name}과 나눈 이야기`;
+  });
+  if (scene) scene.setAttribute('aria-label', next.sceneLabel);
+  return true;
+}
 
 // Presentation metadata is observable for the static discovery route only.
 window.MyeongHaCharacterRoom = Object.freeze({

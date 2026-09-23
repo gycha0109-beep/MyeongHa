@@ -1,3 +1,5 @@
+import { resolveCanonicalCharacterPresentationV1 } from './character-presentation-identity.js';
+
 export const READER_SCENE_SCHEMA_VERSION_V1 =
   'myeongha-reader-interpretation-preview-http-v1';
 
@@ -186,11 +188,19 @@ function genericPresentation() {
   });
 }
 
+function readerPresentation(readerCharacterId) {
+  const identity = resolveCanonicalCharacterPresentationV1(readerCharacterId);
+  if (!identity) return genericPresentation();
+  return Object.freeze({
+    name: identity.name,
+    title: identity.title,
+    intro: '',
+    generic: false,
+  });
+}
+
 export function projectReaderSceneViewModelV1(scene) {
-  // SRC-36: canonical Reader Character identity and browser presentation identity
-  // are separate namespaces. Until a governed bundle-scoped projection exists,
-  // Reader Scene remains identity-neutral and cannot accept a browser resolver/hint.
-  const presentation = genericPresentation();
+  const presentation = readerPresentation(scene.readerCharacterId);
 
   const common = {
     readerCharacterId: scene.readerCharacterId,
