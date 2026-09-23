@@ -79,6 +79,7 @@ for (const fragment of [
   'VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}',
   'SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}',
   'SUPABASE_PRODUCTION_SESSION_POOLER_HOST: ${{ secrets.SUPABASE_PRODUCTION_SESSION_POOLER_HOST }}',
+  'Install canary dependencies before enforce mutation',
   'run: bash scripts/operations/run-production-guest-bootstrap-abuse-policy.sh',
   'MYEONGHA_GUEST_BOOTSTRAP_CANARY_CONFIRM: VERIFY_GUEST_BOOTSTRAP_RATE_LIMIT_CANARY_V1',
   'node scripts/operations/run-production-guest-bootstrap-rate-limit-canary.mjs',
@@ -92,6 +93,11 @@ for (const fragment of [
 }
 for (const forbidden of ['\npush:', '\npull_request:', '\nschedule:']) {
   forbidFragment(paths.applyWorkflow, applyWorkflow, forbidden);
+}
+const dependencyInstallIndex = applyWorkflow.indexOf('Install canary dependencies before enforce mutation');
+const applyPolicyIndex = applyWorkflow.indexOf('Apply and verify governed Guest bootstrap abuse policy');
+if (dependencyInstallIndex < 0 || applyPolicyIndex < 0 || dependencyInstallIndex > applyPolicyIndex) {
+  throw new Error('Enforce canary dependencies must be prepared before the Firewall mutation step.');
 }
 
 for (const fragment of [
