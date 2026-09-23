@@ -17,6 +17,7 @@ function payload() {
         sajuDomain: 'career',
         readingContractVersion: 'reading-v1',
         productResponseState: 'delivered',
+        readerCharacterIds: ['seyeon'],
         createdAt: '2026-09-22T00:00:00.000Z',
         completedAt: '2026-09-22T00:01:00.000Z',
         internalAuthority: 'must-not-project',
@@ -35,6 +36,7 @@ describe('Reading History browser contract', () => {
         sajuDomain: 'career',
         readingContractVersion: 'reading-v1',
         productResponseState: 'delivered',
+        readerCharacterIds: ['seyeon'],
         createdAt: '2026-09-22T00:00:00.000Z',
         completedAt: '2026-09-22T00:01:00.000Z',
       }],
@@ -52,6 +54,9 @@ describe('Reading History browser contract', () => {
     { readings: [{ ...payload().readings[0], readingId: 'reading-1' }] },
     { readings: [{ ...payload().readings[0], readingSessionId: 'session-1' }] },
     { readings: [{ ...payload().readings[0], completedAt: 'not-a-time' }] },
+    { readings: [{ ...payload().readings[0], readerCharacterIds: 'seyeon' }] },
+    { readings: [{ ...payload().readings[0], readerCharacterIds: ['seyeon', 'seyeon'] }] },
+    { readings: [{ ...payload().readings[0], readerCharacterIds: ['taegyeom', 'seyeon'] }] },
     { readings: [payload().readings[0], payload().readings[0]] },
   ])('rejects malformed persisted Reading authority %#', (value) => {
     expect(() => parseReadingHistoryPayloadV1(value)).toThrow(

@@ -4,6 +4,7 @@ export interface ReadingHistoryBrowserItemV1 {
   readonly sajuDomain: string;
   readonly readingContractVersion: string;
   readonly productResponseState: string;
+  readonly readerCharacterIds: readonly string[];
   readonly createdAt: string;
   readonly completedAt: string;
 }

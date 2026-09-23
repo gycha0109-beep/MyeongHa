@@ -27,6 +27,15 @@ function requireString(value, field) {
   return value;
 }
 
+function requireStringArray(value, field) {
+  if (!Array.isArray(value)) fail(field + ' is invalid');
+  const items = value.map((item) => requireString(item, field));
+  if (new Set(items).size !== items.length) fail(field + ' contains duplicates');
+  const sorted = [...items].sort((left, right) => left.localeCompare(right));
+  if (sorted.some((item, index) => item !== items[index])) fail(field + ' is not deterministic');
+  return Object.freeze(items);
+}
+
 function requireTimestamp(value, field) {
   const stored = requireString(value, field);
   if (!Number.isFinite(Date.parse(stored))) fail(field + ' is invalid');
@@ -50,6 +59,7 @@ function parseReading(value) {
       value.productResponseState,
       'productResponseState',
     ),
+    readerCharacterIds: requireStringArray(value.readerCharacterIds, 'readerCharacterIds'),
     createdAt: requireTimestamp(value.createdAt, 'createdAt'),
     completedAt: requireTimestamp(value.completedAt, 'completedAt'),
   });
