@@ -14,12 +14,12 @@ beforeAll(() => {
 
 describe('GET Records public source path dispatch', () => {
   it.each([
-    ['life-record', '/api/life-record'],
-    ['readings', '/api/readings'],
-    ['memories', '/api/memories'],
+    ['life-record', '/api/life-record', 'v0.9'],
+    ['readings', '/api/readings', 'v0.10'],
+    ['memories', '/api/memories', 'v0.9'],
   ] as const)(
     'accepts the Vercel-preserved %s source pathname when the private rewrite marker matches',
-    async (dispatchValue, publicRoute) => {
+    async (dispatchValue, publicRoute, apiContractVersion) => {
       const response = await meEndpoint.fetch(
         new Request(
           `https://myeongha.example${publicRoute}?__myeongha_records_read=${dispatchValue}`,
@@ -37,11 +37,28 @@ describe('GET Records public source path dispatch', () => {
           retryable: false,
         },
         meta: {
-          apiContractVersion: 'v0.9',
+          apiContractVersion,
         },
       });
     },
   );
+
+  it('preserves a validated Official Reading identity through the private readings rewrite', async () => {
+    const readingId = '44444444-4444-4444-8444-444444444444';
+    const response = await meEndpoint.fetch(
+      new Request(
+        `https://myeongha.example/api/readings?__myeongha_records_read=readings&readingId=${readingId}`,
+        { method: 'GET' },
+      ),
+    );
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toMatchObject({
+      ok: false,
+      error: { code: 'AUTH_REQUIRED' },
+      meta: { apiContractVersion: 'v0.10' },
+    });
+  });
 
   it.each([
     'https://myeongha.example/api/life-record',
@@ -51,6 +68,8 @@ describe('GET Records public source path dispatch', () => {
     'https://myeongha.example/api/readings?__myeongha_records_read=life-record',
     'https://myeongha.example/api/memories?__myeongha_records_read=readings',
     'https://myeongha.example/api/chat?__myeongha_records_read=life-record',
+    'https://myeongha.example/api/readings?__myeongha_records_read=readings&readingId=reading-1',
+    'https://myeongha.example/api/life-record?__myeongha_records_read=life-record&readingId=44444444-4444-4444-8444-444444444444',
   ])('fails closed for missing, mismatched, or foreign Records source evidence: %s', async (url) => {
     const response = await meEndpoint.fetch(new Request(url, { method: 'GET' }));
 

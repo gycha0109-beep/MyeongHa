@@ -21,6 +21,7 @@ const TARGET_PERSONS_ROUTE = '/api/target-persons' as const;
 const TARGET_PERSON_ROUTE_PREFIX = '/api/target-persons/' as const;
 const SAJU_PREVIEW_READING_ROUTE = '/api/me/saju/preview-reading' as const;
 const RECORDS_ROUTE_PARAM = '__myeongha_records_read' as const;
+const READING_RECORD_ID_PARAM = 'readingId' as const;
 const CHAT_OPEN_PARAM = '__myeongha_chat_open' as const;
 const CHAT_THREAD_PARAM = '__myeongha_chat_thread_id' as const;
 const VERCEL_DYNAMIC_CHAT_THREAD_PARAM = 'threadId' as const;
@@ -124,6 +125,7 @@ type DispatchTarget =
   | {
       readonly kind: 'records';
       readonly route: typeof LIFE_RECORD_ROUTE | typeof READINGS_ROUTE | typeof MEMORIES_ROUTE;
+      readonly readingId?: string;
     }
   | { readonly kind: 'chat-open'; readonly route: typeof CHAT_OPEN_ROUTE }
   | { readonly kind: 'chat-read'; readonly route: string; readonly afterSequenceNo?: string }
@@ -213,6 +215,7 @@ function resolveDispatchTarget(request: Request): DispatchTarget | null {
   const keys = [...new Set(url.searchParams.keys())];
   const knownKeys = new Set<string>([
     RECORDS_ROUTE_PARAM,
+    READING_RECORD_ID_PARAM,
     CHAT_OPEN_PARAM,
     CHAT_THREAD_PARAM,
     VERCEL_DYNAMIC_CHAT_THREAD_PARAM,
@@ -230,6 +233,9 @@ function resolveDispatchTarget(request: Request): DispatchTarget | null {
 
   const recordsRoute = getSingleNonEmptyParam(url.searchParams, RECORDS_ROUTE_PARAM);
   if (recordsRoute === null) return null;
+  const readingRecordId = getSingleNonEmptyParam(url.searchParams, READING_RECORD_ID_PARAM);
+  if (readingRecordId === null) return null;
+  if (readingRecordId !== undefined && !isUuid(readingRecordId)) return null;
   const recordsSourceRoute = getRecordsDispatchValueForSourcePath(url.pathname);
   if (recordsSourceRoute !== undefined && recordsRoute !== recordsSourceRoute) return null;
   if (
@@ -410,12 +416,18 @@ function resolveDispatchTarget(request: Request): DispatchTarget | null {
   }
 
   if (recordsRoute === 'life-record') {
+    if (readingRecordId !== undefined) return null;
     return { kind: 'records', route: LIFE_RECORD_ROUTE };
   }
   if (recordsRoute === 'readings') {
-    return { kind: 'records', route: READINGS_ROUTE };
+    return {
+      kind: 'records',
+      route: READINGS_ROUTE,
+      ...(readingRecordId === undefined ? {} : { readingId: readingRecordId }),
+    };
   }
   if (recordsRoute === 'memories') {
+    if (readingRecordId !== undefined) return null;
     return { kind: 'records', route: MEMORIES_ROUTE };
   }
   if (recordsRoute !== undefined) return null;
@@ -445,6 +457,9 @@ export function toCanonicalMeRequestForTestV1(
   const url = new URL(`https://myeongha.internal${target.route}`);
   if (target.kind === 'chat-read' && target.afterSequenceNo !== undefined) {
     url.searchParams.set(CHAT_CURSOR_PARAM, target.afterSequenceNo);
+  }
+  if (target.kind === 'records' && target.route === READINGS_ROUTE && target.readingId !== undefined) {
+    url.searchParams.set(READING_RECORD_ID_PARAM, target.readingId);
   }
 
   const body = request.method === 'GET' || request.method === 'HEAD'
