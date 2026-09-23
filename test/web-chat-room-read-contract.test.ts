@@ -88,7 +88,7 @@ describe('browser Chat room read contract', () => {
     expect(result.messages[0]).not.toHaveProperty('messagePayloadJsonb');
   });
 
-  it('keeps canonical Character identity presentation-neutral until a governed projection exists', () => {
+  it('keeps server Character identity independent from untrusted response presentation fields', () => {
     const result = parseChatRoomReadPayloadV1(
       {
         ...payload(),
