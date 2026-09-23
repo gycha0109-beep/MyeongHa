@@ -55,6 +55,22 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
     expect(js).not.toContain('hasIncoming: true');
   });
 
+  it('keeps thread-backed relationship surfaces presentation-neutral until SRC-36 closes', async () => {
+    const js = await readFile(hubJsPath, 'utf8');
+
+    expect(js).toContain("import { parseChatThreadIdV1 } from './chat-room-read-contract.js'");
+    expect(js).toContain('const threadId = parseChatThreadIdV1(state.threadId)');
+    expect(js).toContain('const threadId = parseChatThreadIdV1(item?.threadId)');
+    expect(js).toContain("const name = '대화 상대'");
+    expect(js).toContain("continuationTitle.textContent = '서버 확인 중'");
+    expect(js).toContain('continuationLink.href = roomHref(null, threadId)');
+    expect(js).toContain('delete continuationScene.dataset.character');
+    expect(js).toContain('link.href = roomHref(null, threadId)');
+    expect(js).not.toContain('link.dataset.character = characterKey');
+    expect(js).not.toContain('avatar.dataset.character = characterKey');
+    expect(js).not.toContain('art.dataset.character = characterKey');
+  });
+
   it('keeps discovery searchable and pageable without inventing canonical character authority', async () => {
     const js = await readFile(hubJsPath, 'utf8');
 

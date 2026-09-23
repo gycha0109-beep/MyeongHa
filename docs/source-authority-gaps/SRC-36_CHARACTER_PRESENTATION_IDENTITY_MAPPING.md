@@ -49,6 +49,7 @@ Source-backed and enforceable now:
 - thread identity outranks browser `?character=` hints;
 - the browser Chat read DTO preserves canonical `characterId` while stripping unsolicited presentation metadata;
 - the browser Reader Scene DTO preserves canonical `readerCharacterId` but projects only an identity-neutral generic presentation until this gap closes;
+- Chat Hub relationship-thread surfaces require a canonical UUID `threadId` and remain presentation-neutral; static discovery cards stay presentation-only and cannot decorate an authoritative thread;
 - the generic Reader presentation object does not mirror canonical `readerCharacterId` into a presentation `id`/key slot; canonical identity remains a separate top-level field.
 - `CharacterPresentationIdentityAuthorityPortV1` defines a server-side mapping contract scoped to an already-resolved content bundle;
 - the resolver fails closed on missing, duplicate, wrong-key, or wrong-bundle mapping rows.
