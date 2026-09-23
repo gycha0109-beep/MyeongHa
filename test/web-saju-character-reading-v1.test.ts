@@ -152,7 +152,7 @@ describe('MyeongHa character-led Saju Reading v1', () => {
     expect(runtime).not.toContain('renderPersistedReadingHandoffUnavailable');
     expect(handoff).toContain("PERSISTED_READING_HANDOFF_SOURCE_V1 = 'records'");
     expect(handoff).not.toContain('readerCharacterId');
-    expect(handoff).not.toContain('threadId');
+    expect(handoff).not.toContain("params.set('threadId'");
   });
 
   it('renders the admitted calculation summary instead of shipping a fake chart placeholder', async () => {

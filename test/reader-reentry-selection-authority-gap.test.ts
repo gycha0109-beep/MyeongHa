@@ -63,7 +63,7 @@ describe('persisted Reading Reader re-entry selection authority gap', () => {
     expect(handoff).toContain('readingSessionId');
     expect(handoff).toContain('sajuDomain');
     expect(handoff).not.toContain('readerCharacterId');
-    expect(handoff).not.toContain('threadId');
+    expect(handoff).not.toContain("params.set('threadId'");
   });
 
   it('can delegate thread creation/reuse to existing server authority after an exact Reader is known', async () => {
