@@ -1,7 +1,7 @@
 import { ApiCommandError } from './api-error.js';
 
 export const READING_HISTORY_READ_AUTHORITY_BINDING_V1 =
-  'public.qry_reading_history_v1' as const;
+  'public.qry_reading_history_v2' as const;
 
 export interface ReadingHistoryAuthorityRowV1 {
   readonly readingId: string;
@@ -9,6 +9,7 @@ export interface ReadingHistoryAuthorityRowV1 {
   readonly sajuDomain: string;
   readonly readingContractVersion: string;
   readonly productResponseState: string;
+  readonly readerCharacterIds: readonly string[];
   readonly createdAt: string;
   readonly completedAt: string;
 }
@@ -39,6 +40,7 @@ export interface ReadingHistoryItemV1 {
   readonly sajuDomain: string;
   readonly readingContractVersion: string;
   readonly productResponseState: string;
+  readonly readerCharacterIds: readonly string[];
   readonly createdAt: string;
   readonly completedAt: string;
 }
@@ -72,6 +74,21 @@ function requireTimestamp(name: string, value: unknown): string {
     throw new Error(`Reading History authority returned an invalid ${name}.`);
   }
   return stored;
+}
+
+function requireReaderCharacterIds(value: unknown): readonly string[] {
+  if (!Array.isArray(value)) {
+    throw new Error('Reading History authority returned invalid Reader provenance.');
+  }
+  const ids = value.map((item) => requireStoredString('Reader Character identity', item));
+  if (new Set(ids).size !== ids.length) {
+    throw new Error('Reading History authority returned duplicate Reader provenance.');
+  }
+  const sorted = [...ids].sort((left, right) => left.localeCompare(right));
+  if (sorted.some((value, index) => value !== ids[index])) {
+    throw new Error('Reading History authority returned non-deterministic Reader provenance.');
+  }
+  return Object.freeze(ids);
 }
 
 function compareStoredOrder(
@@ -108,6 +125,7 @@ function projectHistory(
         'Product response state',
         row.productResponseState,
       ),
+      readerCharacterIds: requireReaderCharacterIds(row.readerCharacterIds),
       createdAt: requireTimestamp('created timestamp', row.createdAt),
       completedAt: requireTimestamp('completed timestamp', row.completedAt),
     });

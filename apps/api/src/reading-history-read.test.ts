@@ -12,6 +12,7 @@ const NEWER: ReadingHistoryAuthorityRowV1 = Object.freeze({
   sajuDomain: 'career',
   readingContractVersion: 'product-reading.v1',
   productResponseState: 'complete',
+  readerCharacterIds: Object.freeze(['taegyeom']),
   createdAt: '2026-09-09T09:00:00.000Z',
   completedAt: '2026-09-09T09:01:00.000Z',
 });
@@ -22,6 +23,7 @@ const OLDER: ReadingHistoryAuthorityRowV1 = Object.freeze({
   sajuDomain: 'general',
   readingContractVersion: 'product-reading.v1',
   productResponseState: 'complete',
+  readerCharacterIds: Object.freeze(['seyeon']),
   createdAt: '2026-09-08T09:00:00.000Z',
   completedAt: '2026-09-08T09:01:00.000Z',
 });
@@ -55,6 +57,18 @@ describe('Reading History read contract', () => {
       resolvedSubjectId: '20000000-0000-4000-8000-000000000001',
       authorityPort: port([NEWER, { ...OLDER, readingId: NEWER.readingId }]),
     })).rejects.toThrow('duplicate Reading identity');
+  });
+
+  it('fails closed on malformed or non-deterministic Reader provenance', async () => {
+    await expect(getReadingHistory({
+      resolvedSubjectId: '20000000-0000-4000-8000-000000000001',
+      authorityPort: port([{ ...NEWER, readerCharacterIds: ['taegyeom', 'seyeon'] }]),
+    })).rejects.toThrow('non-deterministic Reader provenance');
+
+    await expect(getReadingHistory({
+      resolvedSubjectId: '20000000-0000-4000-8000-000000000001',
+      authorityPort: port([{ ...NEWER, readerCharacterIds: ['taegyeom', 'taegyeom'] }]),
+    })).rejects.toThrow('duplicate Reader provenance');
   });
 
   it('fails closed on malformed stored timestamps', async () => {
