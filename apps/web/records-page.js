@@ -8,12 +8,14 @@ const DEVELOPMENT_SAMPLE_HOSTS = Object.freeze(new Set(['localhost', '127.0.0.1'
 
 const SAJU_DOMAIN_PRESENTATION = Object.freeze({
   general: Object.freeze({ icon: '命', title: '전체 사주' }),
-  career: Object.freeze({ icon: '職', title: '직업 · 커리어' }),
-  wealth: Object.freeze({ icon: '財', title: '재물' }),
+  family: Object.freeze({ icon: '家', title: '가족' }),
   relationship: Object.freeze({ icon: '緣', title: '관계' }),
   compatibility: Object.freeze({ icon: '合', title: '궁합' }),
-  annual: Object.freeze({ icon: '年', title: '연운' }),
-  monthly: Object.freeze({ icon: '月', title: '월운' }),
+  career: Object.freeze({ icon: '職', title: '직업 · 커리어' }),
+  business: Object.freeze({ icon: '商', title: '사업' }),
+  wealth: Object.freeze({ icon: '財', title: '재물' }),
+  life_stage: Object.freeze({ icon: '生', title: '삶의 단계' }),
+  question_specific: Object.freeze({ icon: '問', title: '지금 고민으로 보기' }),
 });
 
 function byId(id) {

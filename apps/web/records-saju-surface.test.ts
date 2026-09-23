@@ -49,6 +49,24 @@ describe('Records Saju history surface', () => {
     expect(page).not.toContain("value === 'complete'");
   });
 
+  it('maps only canonical SajuDomain values for persisted records', () => {
+    for (const domain of [
+      'general',
+      'family',
+      'relationship',
+      'compatibility',
+      'career',
+      'business',
+      'wealth',
+      'life_stage',
+      'question_specific',
+    ]) {
+      expect(page).toContain(`${domain}: Object.freeze(`);
+    }
+    expect(page).not.toContain('annual: Object.freeze(');
+    expect(page).not.toContain('monthly: Object.freeze(');
+  });
+
   it('recognizes only the explicit sample fixture contract and removes it from the Life Fact ledger', () => {
     expect(page).toContain("const SAMPLE_SAJU_FACT_TYPE = 'sample_saju_reading_result';");
     expect(page).toContain("const SAMPLE_SAJU_SCHEMA_VERSION = 'sample.v1';");
