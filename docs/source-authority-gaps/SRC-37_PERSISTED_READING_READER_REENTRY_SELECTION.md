@@ -1,6 +1,6 @@
 # SRC-37 — Persisted Reading Reader Re-entry Selection Authority
 
-> Status: **RESOLVED / RETIRED AS A PRODUCT REQUIREMENT**  
+> Status: **RESOLVED / RECORDS ARCHIVE PATH IMPLEMENTED**  
 > Domain: Reading / Reader / Records
 
 ## 1. Product decision
@@ -39,15 +39,18 @@ Reader knowledge remains available only through Reader/Character runtime authori
 
 Reader attribution is display provenance, not re-entry authority. It must come from server-owned purchase/access provenance for the stored Reading. If more than one Reader has provenance for one Official Reading, the projection must represent that provenance without arbitrarily choosing one row.
 
-## 4. Remaining implementation work
+## 4. Implemented authority path
 
-The browser already preserves validated persisted `readingId` / `readingSessionId` handoff. Remaining work is technical:
+The Records archive path now has explicit runtime authority:
 
-1. expose an owner-authorized Official Reading detail projection for Records;
-2. expose bounded Reader attribution for the Records list;
-3. render the stored result without entering Reader Scene.
+- `public.qry_reading_history_v2` returns succeeded Official Reading metadata plus bounded Reader display provenance;
+- `public.qry_official_reading_record_runtime_v1` returns the owner-scoped stored admitted ProductReadingResponse without Reader selection;
+- `GET /api/readings` serves history;
+- `GET /api/readings?readingId=<uuid>` serves one stored Official Reading;
+- the browser verifies `readingId`, `readingSessionId`, and `sajuDomain` against the validated Records handoff before rendering;
+- persisted reread hides Reader Scene/Reader commentary and renders the stored Official Reading as a Records archive surface.
 
-This work no longer requires a product decision about Reader re-entry.
+Reader provenance is display-only and never becomes Reader/Chat authority.
 
 ## 5. Prohibited regressions
 
