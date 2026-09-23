@@ -7,8 +7,14 @@ export class ReaderSceneContractErrorV1 extends Error {
   readonly code: 'WEB_READER_SCENE_MALFORMED_RESPONSE';
 }
 
+export type ReaderSceneSegmentKindV1 =
+  | 'semantic_realization'
+  | 'character_reaction'
+  | 'follow_up_question'
+  | 'protected_disclosure';
+
 export interface ReaderSceneSegmentV1 {
-  readonly kind: string;
+  readonly kind: ReaderSceneSegmentKindV1;
   readonly text: string;
 }
 

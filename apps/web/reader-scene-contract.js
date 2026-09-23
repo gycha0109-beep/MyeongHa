@@ -11,6 +11,13 @@ const FALLBACK_REASONS_V1 = new Set([
   'semantic_guard_failed',
 ]);
 
+const SEGMENT_KINDS_V1 = new Set([
+  'semantic_realization',
+  'character_reaction',
+  'follow_up_question',
+  'protected_disclosure',
+]);
+
 export class ReaderSceneContractErrorV1 extends Error {
   constructor(message) {
     super(message);
@@ -59,6 +66,14 @@ function assertExactKeys(record, allowed, field) {
   }
 }
 
+function requireSegmentKind(value, field) {
+  const normalized = requireString(value, field, 128);
+  if (!SEGMENT_KINDS_V1.has(normalized)) {
+    throw new ReaderSceneContractErrorV1(field + ' is unsupported.');
+  }
+  return normalized;
+}
+
 function parseSegments(value) {
   if (!Array.isArray(value) || value.length === 0) {
     throw new ReaderSceneContractErrorV1('utterance.segments must be a non-empty array.');
@@ -76,7 +91,7 @@ function parseSegments(value) {
       'utterance.segments[' + index + ']',
     );
     return Object.freeze({
-      kind: requireString(segment.kind, 'utterance.segments[' + index + '].kind', 128),
+      kind: requireSegmentKind(segment.kind, 'utterance.segments[' + index + '].kind'),
       text: requireString(segment.text, 'utterance.segments[' + index + '].text', 10000),
     });
   }));

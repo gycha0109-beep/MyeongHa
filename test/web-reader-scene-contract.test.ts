@@ -19,7 +19,7 @@ const base = {
     requestedDomain: 'career',
     segments: [
       { kind: 'character_reaction', text: '확인된 구조부터 보겠습니다.' },
-      { kind: 'bounded_guidance', text: '선택 가능성은 남겨 두겠습니다.' },
+      { kind: 'follow_up_question', text: '선택 가능성은 남겨 두겠습니다.' },
     ],
   },
 };
@@ -27,6 +27,33 @@ const base = {
 describe('web Reader Scene contract', () => {
   it('accepts the bounded Reader Interpretation browser DTO', () => {
     expect(parseReaderSceneEnvelopeV1(base)).toEqual(base);
+  });
+
+  it('accepts only the four server-owned Reader segment kinds', () => {
+    for (const kind of [
+      'semantic_realization',
+      'character_reaction',
+      'follow_up_question',
+      'protected_disclosure',
+    ]) {
+      expect(parseReaderSceneEnvelopeV1({
+        ...base,
+        utterance: {
+          ...base.utterance,
+          segments: [{ kind, text: '검증된 문장입니다.' }],
+        },
+      })).toMatchObject({
+        utterance: { segments: [{ kind }] },
+      });
+    }
+
+    expect(() => parseReaderSceneEnvelopeV1({
+      ...base,
+      utterance: {
+        ...base.utterance,
+        segments: [{ kind: 'bounded_guidance', text: '허용되지 않은 종류입니다.' }],
+      },
+    })).toThrow(/kind is unsupported/u);
   });
 
   it('accepts a protected fallback without inventing semantic text', () => {
