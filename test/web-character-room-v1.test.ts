@@ -82,8 +82,9 @@ describe('MyeongHa immersive long-form Character Room', () => {
       expect(presentation).toContain(`name: '${name}'`);
     }
 
-    expect(presentation).toContain("const rawThreadId = params.get('threadId')");
-    expect(presentation).toContain('const threadId = parseChatThreadIdV1(rawThreadId)');
+    expect(presentation).toContain('const threadRoute = parseChatThreadRouteV1(params)');
+    expect(presentation).toContain('const threadId = threadRoute.threadId');
+    expect(presentation).toContain("const hasThreadRoute = threadRoute.state !== 'none'");
     expect(presentation).toContain("const requestedCharacter = params.get('character')?.toLowerCase() ?? null");
     expect(presentation).toContain('const presentationCharacterKey = !hasThreadRoute && requestedCharacter');
     expect(presentation).toContain("presentationCharacterKey ?? (hasThreadRoute ? null : 'baekheon')");
