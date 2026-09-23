@@ -1,6 +1,6 @@
 # MyeongHa Guest Bootstrap Abuse Policy V1
 
-Status: **PRODUCTION OBSERVE ACTIVE / PRE-LAUNCH ENFORCE GATE READY**
+Status: **PRODUCTION ENFORCE ACTIVE / CANARY VERIFIED**
 
 Issue: `#646`
 
@@ -54,7 +54,7 @@ The run verified the governed Vercel project, exact draft mutation/readback, dra
 
 A first runtime-log review immediately after activation found no `/api/session/bootstrap` traffic in the inspected post-activation window. The MVP has not launched, so no legitimate end-user traffic is expected in Production. The empty traffic sample is therefore expected and is not treated as threshold-safety evidence, but it is also not a reason to block the pre-launch protection gate indefinitely.
 
-The pre-launch replacement for live-traffic review is the governed synthetic canary below. The scheduled evidence workflow remains pinned to `expected_mode=observe` until a successful enforce run is recorded.
+The pre-launch replacement for live-traffic review is the governed synthetic canary below. Production enforce subsequently passed that canary in run `35899155942`; scheduled drift evidence is therefore pinned to `expected_mode=enforce`.
 
 ## Pre-launch enforce gate
 
@@ -67,6 +67,34 @@ The `mode=enforce` workflow is fail-closed:
 - it runs the synthetic canary using only the canonical Production host;
 - if apply, deployment binding, or canary proof fails, it performs an automatic rollback to `observe` and fails the workflow;
 - a successful enforce run is the authority for changing scheduled drift evidence from `observe` to `enforce`.
+
+## Production enforce evidence
+
+Authoritative activation and canary evidence:
+
+```text
+run                           = 35899155942
+deployed main SHA             = 3d101dc323d8f417472de657b3ef1bea126a838b
+exact Production deployment   = dpl_FQu9CchzYSSR8Uosgz597YztmetR
+mode                          = enforce
+active config id              = waf_HPi141YAu0mK
+active config version         = 5
+active rule id                = rule_myeongha_guest_bootstrap_rate_limit_v1_fAj5rl
+rate-limit action             = rate_limit
+allowed invalid requests      = 30
+first rate-limited attempt    = 31
+rate-limited status           = 429
+invalid-probe Guest row delta = 0
+fresh Guest subject delta     = 1
+fresh Guest session delta     = 1
+reused-bootstrap row delta    = 0
+/api/me continuity            = pass
+rollback required             = false
+```
+
+The enforce run verified the exact active Firewall readback before executing the governed synthetic canary. The first 30 invalid requests reached the application and failed before Guest persistence, attempt 31 was rejected at the edge with HTTP 429, and the invalid burst created no durable Guest rows. After the bucket cleared, one real bootstrap created exactly one Guest subject/session; `GET /api/me` and authenticated bootstrap reuse preserved that canonical identity without another durable-row allocation.
+
+This run is the authority for the Production enforce baseline. The scheduled evidence workflow expects `enforce`; a later mismatch is treated as Production drift rather than a reason to silently mutate the Firewall.
 
 ## Safety boundaries
 
