@@ -36,6 +36,28 @@ describe('Official Reading Records browser contract', () => {
     expect(result).not.toHaveProperty('threadId');
   });
 
+  it('rejects non-openable Product response states at the browser archive boundary', () => {
+    for (const productResponseState of ['clarification_required', 'pending']) {
+      expect(() => parseOfficialReadingRecordPayloadV1({
+        ...payload,
+        productResponseState,
+        reading: {
+          ...payload.reading,
+          state: productResponseState,
+        },
+      })).toThrow('productResponseState is not archive-openable');
+    }
+
+    expect(() => parseOfficialReadingRecordPayloadV1({
+      ...payload,
+      productResponseState: 'delivered_with_fallback',
+      reading: {
+        ...payload.reading,
+        state: 'delivered_with_fallback',
+      },
+    })).not.toThrow();
+  });
+
   it.each([
     { ...payload, readingId: 'reading-1' },
     { ...payload, readingSessionId: 'session-1' },
