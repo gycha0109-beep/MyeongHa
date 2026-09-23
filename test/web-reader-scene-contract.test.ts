@@ -94,7 +94,7 @@ describe('web Reader Scene contract', () => {
     ).toThrow(/domain does not match/u);
   });
 
-  it('keeps the canonical server Reader identity presentation-neutral until SRC-36 closes', () => {
+  it('uses the resolved SRC-36 presentation mapping without promoting presentation identity into runtime authority', () => {
     const viewModel = projectReaderSceneViewModelV1(parseReaderSceneEnvelopeV1(base));
 
     expect(viewModel).toMatchObject({

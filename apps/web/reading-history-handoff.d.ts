@@ -1,9 +1,11 @@
+import type { SajuDomainV1 } from './saju-domain-contract.js';
+
 export const PERSISTED_READING_HANDOFF_SOURCE_V1: 'records';
 
 export interface PersistedReadingHandoffInputV1 {
   readonly readingId: string;
   readonly readingSessionId: string;
-  readonly sajuDomain: string;
+  readonly sajuDomain: SajuDomainV1;
 }
 
 export interface PersistedReadingHandoffReadyV1
@@ -23,7 +25,7 @@ export function createPersistedReadingHandoffV1(
   source: typeof PERSISTED_READING_HANDOFF_SOURCE_V1;
   readingId: string;
   readingSessionId: string;
-  sajuDomain: string;
+  sajuDomain: SajuDomainV1;
 }>;
 
 export function buildPersistedReadingHandoffUrlV1(

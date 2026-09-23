@@ -71,6 +71,18 @@ describe('persisted Reading browser handoff', () => {
     )).toEqual({ state: 'invalid' });
   });
 
+  it('rejects non-canonical Saju domains before navigation or lookup', () => {
+    expect(() => createPersistedReadingHandoffV1({
+      readingId: '44444444-4444-4444-8444-444444444444',
+      readingSessionId: '55555555-5555-4555-8555-555555555555',
+      sajuDomain: 'annual' as never,
+    })).toThrow(/sajuDomain is unsupported/u);
+
+    expect(parsePersistedReadingHandoffV1(
+      '?from=records&readingId=44444444-4444-4444-8444-444444444444&readingSessionId=55555555-5555-4555-8555-555555555555&sajuDomain=general_natal',
+    )).toEqual({ state: 'invalid' });
+  });
+
   it('rejects unbounded identifiers before navigation', () => {
     expect(() => createPersistedReadingHandoffV1({
       readingId: '',
@@ -78,10 +90,5 @@ describe('persisted Reading browser handoff', () => {
       sajuDomain: 'career',
     })).toThrow(TypeError);
 
-    expect(() => createPersistedReadingHandoffV1({
-      readingId: '44444444-4444-4444-8444-444444444444',
-      readingSessionId: '55555555-5555-4555-8555-555555555555',
-      sajuDomain: 'x'.repeat(129),
-    })).toThrow(TypeError);
   });
 });

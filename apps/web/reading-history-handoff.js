@@ -1,7 +1,8 @@
+import { normalizeSajuDomainV1 } from './saju-domain-contract.js';
+
 export const PERSISTED_READING_HANDOFF_SOURCE_V1 = 'records';
 
 const UUID_V1 = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
-const MAX_DOMAIN_LENGTH = 128;
 
 function normalizeRequired(value, field, maxLength) {
   if (typeof value !== 'string') {
@@ -28,7 +29,10 @@ export function createPersistedReadingHandoffV1(input) {
     input?.readingSessionId,
     'readingSessionId',
   );
-  const sajuDomain = normalizeRequired(input?.sajuDomain, 'sajuDomain', MAX_DOMAIN_LENGTH);
+  const sajuDomain = normalizeSajuDomainV1(input?.sajuDomain);
+  if (sajuDomain === null) {
+    throw new TypeError('sajuDomain is unsupported.');
+  }
 
   return Object.freeze({
     source: PERSISTED_READING_HANDOFF_SOURCE_V1,
