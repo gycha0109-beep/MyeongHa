@@ -384,8 +384,8 @@ function withHash<T extends object>(value: T): T & { readonly interpretationHash
  * Grounding is requested only through the Saju-owned projection port after the exact
  * Official Reading source has been re-resolved. MyeongHa admits and verifies the
  * returned bundle; it never constructs semantic grounding units from Product blocks.
- * Production activation remains HOLD until a real Saju projection adapter is wired
- * and separately promoted.
+ * Production activation remains HOLD on the remaining MyeongHa composition
+ * authorities; the hosted Saju projection transport is already verified.
  */
 function resolveRuntimePerspective(
   context: CharacterRuntimeContextV1,
