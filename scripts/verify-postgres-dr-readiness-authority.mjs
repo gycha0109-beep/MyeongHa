@@ -96,7 +96,7 @@ requireFragment('restoreRunbook', 'backup schema freshness             = CURRENT
 requireFragment('restoreRunbook', 'current-schema restore              = EVIDENCED — run 35807858750 / frontier 1300');
 requireFragment('restoreRunbook', 'bounded privacy source authority    = RUNTIME-PROVEN — run 35653303484 / AUTHORITATIVE_CAPTURED_WINDOW_V1');
 requireFragment('restoreRunbook', 'recovered finalization mechanics    = IMPLEMENTED / POST-MERGE CI GREEN');
-requireFragment('restoreRunbook', 'recovered finalization on fresh restore = PROVEN — run 35659483080 / Production non-zero ledger');
+requireFragment('restoreRunbook', 'recovered finalization on current-frontier synthetic restore = PROVEN — run 35807858750 / synthetic captured-window mechanics');
 requireFragment('restoreRunbook', 'authoritative privacy reconciliation= PROVEN — run 35659483080 / bounded captured window only');
 requireFragment('restoreRunbook', 'future-safe privacy reconciliation  = false');
 requireFragment('restoreRunbook', 'full authoritative achieved evidence comparison **PASS** — `5536s`');
