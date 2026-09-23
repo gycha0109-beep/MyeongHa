@@ -99,7 +99,8 @@ insert into public.conversation_threads(
   ('77400000-0000-0000-0000-000000000006','77100000-0000-0000-0000-000000000001','system','active','system runtime thread','77300000-0000-0000-0000-000000000001','77200000-0000-0000-0000-000000000001',0,1,timestamptz '2026-08-31 20:25:00+00',timestamptz '2026-08-31 20:25:00+00',null),
   ('77400000-0000-0000-0000-000000000007','77100000-0000-0000-0000-000000000001','single_character','active','no participant runtime thread','77300000-0000-0000-0000-000000000001','77200000-0000-0000-0000-000000000001',0,1,timestamptz '2026-08-31 20:26:00+00',timestamptz '2026-08-31 20:26:00+00',null),
   ('77400000-0000-0000-0000-000000000008','77100000-0000-0000-0000-000000000003','single_character','active','merged subject runtime thread','77300000-0000-0000-0000-000000000001','77200000-0000-0000-0000-000000000001',0,1,timestamptz '2026-08-31 20:27:00+00',timestamptz '2026-08-31 20:27:00+00',null),
-  ('77400000-0000-0000-0000-000000000009','77100000-0000-0000-0000-000000000004','single_character','active','deletion pending runtime thread','77300000-0000-0000-0000-000000000001','77200000-0000-0000-0000-000000000001',0,1,timestamptz '2026-08-31 20:28:00+00',timestamptz '2026-08-31 20:28:00+00',null);
+  ('77400000-0000-0000-0000-000000000009','77100000-0000-0000-0000-000000000004','single_character','active','deletion pending runtime thread','77300000-0000-0000-0000-000000000001','77200000-0000-0000-0000-000000000001',0,1,timestamptz '2026-08-31 20:28:00+00',timestamptz '2026-08-31 20:28:00+00',null),
+  ('77400000-0000-0000-0000-000000000010','77100000-0000-0000-0000-000000000001','multi_character','active','participant-only runtime thread','77300000-0000-0000-0000-000000000001','77200000-0000-0000-0000-000000000001',0,1,timestamptz '2026-08-31 20:29:00+00',timestamptz '2026-08-31 20:29:00+00',null);
 
 insert into public.conversation_thread_characters(
   id,thread_id,character_id,content_bundle_id,role,joined_at,left_at
@@ -108,7 +109,8 @@ insert into public.conversation_thread_characters(
   ('77500000-0000-0000-0000-000000000002','77400000-0000-0000-0000-000000000001','char-a-participant-77','77200000-0000-0000-0000-000000000001','participant',timestamptz '2026-08-31 20:20:00+00',null),
   ('77500000-0000-0000-0000-000000000003','77400000-0000-0000-0000-000000000001','char-left-77','77200000-0000-0000-0000-000000000001','participant',timestamptz '2026-08-31 20:20:00+00',timestamptz '2026-08-31 20:21:00+00'),
   ('77500000-0000-0000-0000-000000000004','77400000-0000-0000-0000-000000000001','char-old-bundle-77','77200000-0000-0000-0000-000000000002','participant',timestamptz '2026-08-31 20:19:00+00',null),
-  ('77500000-0000-0000-0000-000000000005','77400000-0000-0000-0000-000000000004','char-z-primary-77','77200000-0000-0000-0000-000000000001','primary',timestamptz '2026-08-31 20:23:00+00',null);
+  ('77500000-0000-0000-0000-000000000005','77400000-0000-0000-0000-000000000004','char-z-primary-77','77200000-0000-0000-0000-000000000001','primary',timestamptz '2026-08-31 20:23:00+00',null),
+  ('77500000-0000-0000-0000-000000000006','77400000-0000-0000-0000-000000000010','char-a-participant-77','77200000-0000-0000-0000-000000000001','participant',timestamptz '2026-08-31 20:29:00+00',null);
 SQL
 
 binding=$("${psql_base[@]}" -At -F '|' -c "
@@ -142,6 +144,8 @@ expect_fail "system thread" "active chat thread runtime binding is unavailable f
   "select * from public.qry_chat_thread_runtime_binding_v1('77100000-0000-0000-0000-000000000001','77400000-0000-0000-0000-000000000006');"
 expect_fail "no current participants" "active chat thread has no participants in its active content bundle" \
   "select * from public.qry_chat_thread_runtime_binding_v1('77100000-0000-0000-0000-000000000001','77400000-0000-0000-0000-000000000007');"
+expect_fail "no canonical primary participant" "active chat thread must have exactly one primary participant in its active content bundle" \
+  "select * from public.qry_chat_thread_runtime_binding_v1('77100000-0000-0000-0000-000000000001','77400000-0000-0000-0000-000000000010');"
 expect_fail "merged subject" "subject is not eligible for chat thread runtime binding" \
   "select * from public.qry_chat_thread_runtime_binding_v1('77100000-0000-0000-0000-000000000003','77400000-0000-0000-0000-000000000008');"
 expect_fail "deletion pending subject" "subject is not eligible for chat thread runtime binding" \
