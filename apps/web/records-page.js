@@ -1,3 +1,4 @@
+import { resolveCanonicalCharacterPresentationV1 } from './character-presentation-identity.js';
 import { createRecordsRuntimeClient, RecordsRuntimeError } from './records-runtime-client.js';
 import { buildPersistedReadingHandoffUrlV1 } from './reading-history-handoff.js';
 
@@ -160,6 +161,14 @@ function productResponseStateLabel(value) {
   return '저장됨';
 }
 
+function readerProvenanceLabel(readerCharacterIds) {
+  if (!Array.isArray(readerCharacterIds) || readerCharacterIds.length === 0) return 'Reader 기록 없음';
+  const names = readerCharacterIds.map((characterId) =>
+    resolveCanonicalCharacterPresentationV1(characterId)?.name ?? '대리자');
+  if (names.length === 1) return `${names[0]}에게`;
+  return `${names.join(' · ')}에게`;
+}
+
 function appendReadingFooter(card, leftText, options = {}) {
   const footer = document.createElement('div');
   footer.className = 'records-reading-footer';
@@ -184,7 +193,7 @@ function renderPersistedReading(target, reading) {
   const heading = document.createElement('div');
   const eyebrow = document.createElement('div');
   eyebrow.className = 'records-reading-eyebrow';
-  eyebrow.append(textElement('span', 'records-reading-badge', '저장된 풀이'));
+  eyebrow.append(textElement('span', 'records-reading-badge', readerProvenanceLabel(reading.readerCharacterIds)));
   eyebrow.append(textElement('span', 'records-reading-period', productResponseStateLabel(reading.productResponseState)));
   heading.append(eyebrow, textElement('h3', 'records-reading-title', presentation.title));
   identity.append(heading);
@@ -195,7 +204,7 @@ function renderPersistedReading(target, reading) {
   card.append(textElement(
     'p',
     'records-reading-summary',
-    '완료된 사주 풀이 기록입니다. 저장된 풀이의 세부 내용은 검증된 Reading 표시 계약이 연결되는 범위에서만 보여드립니다.',
+    `${formatTimestamp(reading.completedAt)}에 본 ${presentation.title} 기록입니다. 저장된 공식 풀이를 그대로 다시 열 수 있습니다.`,
   ));
   const handoffUrl = buildPersistedReadingHandoffUrlV1({
     readingId: reading.readingId,
