@@ -124,7 +124,7 @@ case "$ABUSE_POLICY_MODE" in
     ;;
 esac
 
-rule_value="$(jq -c   --arg name "$rule_name"   --arg route "$(jq -r '.route' "$POLICY_FILE")"   --arg method "$(jq -r '.method' "$POLICY_FILE")"   --arg algo "$(jq -r '.algorithm' "$POLICY_FILE")"   --arg action "$rate_limit_action"   --argjson window "$(jq '.windowSeconds' "$POLICY_FILE")"   --argjson limit "$(jq '.requestLimit' "$POLICY_FILE")"   --argjson active "$rule_active"   '{
+rule_value="$(jq -nc   --arg name "$rule_name"   --arg route "$(jq -r '.route' "$POLICY_FILE")"   --arg method "$(jq -r '.method' "$POLICY_FILE")"   --arg algo "$(jq -r '.algorithm' "$POLICY_FILE")"   --arg action "$rate_limit_action"   --argjson window "$(jq '.windowSeconds' "$POLICY_FILE")"   --argjson limit "$(jq '.requestLimit' "$POLICY_FILE")"   --argjson active "$rule_active"   '{
     active: $active,
     name: $name,
     description: "MyeongHa governed Guest bootstrap durable-row abuse bound v1",

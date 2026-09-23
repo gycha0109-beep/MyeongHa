@@ -103,6 +103,7 @@ for (const fragment of [
   '[[ "$DISPATCH_CONFIRM" == "APPLY_GUEST_BOOTSTRAP_ABUSE_POLICY_V1" ]]',
   'rules.insert',
   'rules.update',
+  'rule_value="$(jq -nc',
   'A different active rate-limit rule already exists; no mutation was attempted.',
   '.draft.id // empty',
   '/activate?projectId=$VERCEL_PROJECT_ID&teamId=$VERCEL_TEAM_ID',
