@@ -10,7 +10,7 @@ const THREAD_ID = '93000000-0000-4000-8000-000000000001';
 function payload() {
   return {
     threadId: THREAD_ID,
-    characterId: 'canonical-primary',
+    characterId: 'baekheon',
     contentReleaseId: 'internal-release-not-projected',
     contentBundleId: 'internal-bundle-not-projected',
     contentRevision: 7,
@@ -33,7 +33,7 @@ function payload() {
         messageId: '96000000-0000-4000-8000-000000000002',
         sequenceNo: 2,
         senderType: 'character',
-        characterId: 'canonical-primary',
+        characterId: 'baekheon',
         bodyText: 'source-backed answer',
         messagePayloadJsonb: {},
         messageSchemaVersion: 'dialogue-v1',
@@ -55,7 +55,7 @@ describe('browser Chat room read contract', () => {
 
     expect(result).toEqual({
       threadId: THREAD_ID,
-      characterId: 'canonical-primary',
+      characterId: 'baekheon',
       afterSequenceNo: 0,
       lastSequenceNo: 2,
       messages: [
@@ -73,7 +73,7 @@ describe('browser Chat room read contract', () => {
           messageId: '96000000-0000-4000-8000-000000000002',
           sequenceNo: 2,
           senderType: 'character',
-          characterId: 'canonical-primary',
+          characterId: 'baekheon',
           bodyText: 'source-backed answer',
           createdAt: '2026-09-05T15:01:00.000Z',
           redacted: false,
@@ -87,7 +87,7 @@ describe('browser Chat room read contract', () => {
     expect(result.messages[0]).not.toHaveProperty('messagePayloadJsonb');
   });
 
-  it('keeps canonical Character identity presentation-neutral until a governed projection exists', () => {
+  it('keeps admitted canonical Character identity separate from untrusted presentation extras', () => {
     const result = parseChatRoomReadPayloadV1(
       {
         ...payload(),
@@ -102,11 +102,20 @@ describe('browser Chat room read contract', () => {
       },
     );
 
-    expect(result.characterId).toBe('canonical-primary');
+    expect(result.characterId).toBe('baekheon');
     expect(result).not.toHaveProperty('presentationKey');
     expect(result).not.toHaveProperty('displayName');
     expect(result).not.toHaveProperty('characterTitle');
     expect(result).not.toHaveProperty('portraitUrl');
+  });
+
+  it('rejects unknown and legacy Character ids before thread content can be rendered', () => {
+    for (const characterId of ['canonical-primary', 'unknown', 'doyoon']) {
+      expect(() => parseChatRoomReadPayloadV1(
+        { ...payload(), characterId },
+        { expectedThreadId: THREAD_ID },
+      )).toThrow('characterId is not an admitted canonical presentation identity');
+    }
   });
 
   it('rejects a response for a different thread or cursor', () => {
