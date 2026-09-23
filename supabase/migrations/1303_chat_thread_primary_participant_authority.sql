@@ -66,21 +66,6 @@ begin
       message = 'active chat thread runtime binding is unavailable for this subject';
   end if;
 
-  select count(*)
-    into v_active_primary_count
-  from public.conversation_thread_characters ctc
-  where ctc.thread_id = v_thread.id
-    and ctc.content_bundle_id = v_thread.active_content_bundle_id
-    and ctc.left_at is null
-    and ctc.role = 'primary';
-
-  if v_active_primary_count <> 1 then
-    raise exception using
-      errcode = 'P0001',
-      constraint = 'qry_chat_thread_runtime_binding_participants_unavailable',
-      message = 'active chat thread must have exactly one primary participant in its active content bundle';
-  end if;
-
   select array_agg(
     ctc.character_id
     order by case ctc.role when 'primary' then 0 else 1 end, ctc.character_id
@@ -96,6 +81,21 @@ begin
       errcode = 'P0001',
       constraint = 'qry_chat_thread_runtime_binding_participants_unavailable',
       message = 'active chat thread has no participants in its active content bundle';
+  end if;
+
+  select count(*)
+    into v_active_primary_count
+  from public.conversation_thread_characters ctc
+  where ctc.thread_id = v_thread.id
+    and ctc.content_bundle_id = v_thread.active_content_bundle_id
+    and ctc.left_at is null
+    and ctc.role = 'primary';
+
+  if v_active_primary_count <> 1 then
+    raise exception using
+      errcode = 'P0001',
+      constraint = 'qry_chat_thread_runtime_binding_participants_unavailable',
+      message = 'active chat thread must have exactly one primary participant in its active content bundle';
   end if;
 
   return query
