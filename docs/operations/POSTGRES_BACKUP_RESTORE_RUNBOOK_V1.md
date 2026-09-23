@@ -2,7 +2,7 @@
 
 > Scope: non-character production operations only  
 > Issue: `#389` — authoritative persistent-data recovery  
-> Evidence date: 2026-09-22 KST  
+> Evidence date: 2026-09-23 KST  
 > Production state: CURRENT-FRONTIER BACKUP+RESTORE PROVEN / DR NOT READY
 
 ## 1. Current production authority
@@ -22,16 +22,16 @@ provider automatic daily backup = NOT RELIED UPON ON CURRENT FREE PLAN
 provider retention              = NOT RELIED UPON ON CURRENT FREE PLAN
 PITR                            = NOT AVAILABLE UNDER THE CURRENT FREE-PLAN OPERATING BASELINE
 application-owned logical dump     = IMPLEMENTED BY REPOSITORY WORKFLOW
-successful production dump         = EVIDENCED — authoritative proof backup run 35643472159
-backup schema freshness             = CURRENT — backup frontier 1280 / deployed frontier 1280
-current-schema restore              = EVIDENCED — run 35659483080 / frontier 1280
-isolated restore drill path         = IMPLEMENTED / EXECUTED ON FRONTIER 1280
-isolated application restore        = EVIDENCED — run 35659483080 / frontier 1280
-application integrity/auth baseline = PASS — run 35659483080 / frontier 1280
-restore evidence envelope runtime   = PROVEN — run 35659483080 / frontier 1280
+successful production dump         = EVIDENCED — current-frontier backup run 35806027337
+backup schema freshness             = CURRENT — backup frontier 1300 / deployed frontier 1300
+current-schema restore              = EVIDENCED — run 35807858750 / frontier 1300
+isolated restore drill path         = IMPLEMENTED / EXECUTED ON FRONTIER 1300
+isolated application restore        = EVIDENCED — run 35807858750 / frontier 1300
+application integrity/auth baseline = PASS — run 35807858750 / frontier 1300
+restore evidence envelope runtime   = PROVEN — run 35807858750 / frontier 1300
 bounded privacy source authority    = RUNTIME-PROVEN — run 35653303484 / AUTHORITATIVE_CAPTURED_WINDOW_V1
 recovered finalization mechanics    = IMPLEMENTED / POST-MERGE CI GREEN
-recovered finalization on fresh restore = PROVEN — run 35659483080 / Production non-zero ledger
+recovered finalization on current-frontier synthetic restore = PROVEN — run 35807858750 / synthetic captured-window mechanics
 provider-managed full restore       = NOT PROVEN — provider projection/omission occurred
 authoritative privacy reconciliation= PROVEN — run 35659483080 / bounded captured window only
 future-safe privacy reconciliation  = false
@@ -136,22 +136,24 @@ retention     30 days
 
 ### 4.1 Current backup freshness boundary
 
-Production deployment run `35629348943` applied the repository migration frontier through `1280_reader_context_non_memory_runtime_authority.sql` successfully on head `b0b8656e89d13e12d77871875f7a2ed3c935b177`. Production is therefore deployed through migration `1280`.
+Production deployment run `35802856790` applied the repository migration frontier through `1300_public_trigger_search_path_regression_hardening.sql` successfully on head `2a7040c40a126760f08dc05c74032bc88a08d02a`. Production is therefore deployed through migration `1300`.
 
-The latest governed backup is run `35631594765`, source SHA `b0b8656e89d13e12d77871875f7a2ed3c935b177`, artifact `10654730578` (`myeongha-postgres-20260921T172244Z`), completed at `2026-09-21T17:25:10Z`. The GitHub artifact digest is `sha256:0933c7dd3bf5936cbab5f7c6e2234471f1ddd90d39277101171b0389426a4c95`; the encrypted archive SHA-256 recorded by restore evidence is `42b34d8991fc69c979ed6029aeeca3e36c018f573ad2cf586d51d94327e1a990`. Isolated restore run `35633155263` successfully restored and validated that current frontier, so backup and current-schema restore freshness are both proven.
+The latest governed backup is run `35806027337`, source SHA `2a7040c40a126760f08dc05c74032bc88a08d02a`, artifact `10727238435` (`myeongha-postgres-20260923T012250Z`), completed at `2026-09-23T01:25:26Z`. The GitHub artifact digest is `sha256:ecde992c8f302e0a24d4e6a4e7086d19c28db0a9e9e951e59d4d47dce999c7d8`; the encrypted archive SHA-256 recorded by restore evidence is `2debbe9ee99f7041ed2c3db41dcb497cf1e4055f85e45bcca2cc3f921e9abb66`. Isolated restore run `35807858750` successfully restored and validated that current frontier, so backup and current-schema restore freshness are both proven. That run exercised synthetic privacy replay/finalization mechanics only; the separate Production non-zero authoritative privacy reconciliation remains run `35659483080` for its exact bounded captured window.
 
 ```text
-latest governed backup                = PROVEN — run 35631594765
-latest backup migration frontier      = 1280
-latest deployed production migration  = 1280
-backup schema freshness               = CURRENT / FRONTIER 1280 PROVEN
-latest successful isolated restore    = PROVEN — run 35633155263 / frontier 1280
-current-frontier restore              = PROVEN — run 35633155263
+latest governed backup                = PROVEN — run 35806027337
+latest backup migration frontier      = 1300
+latest deployed production migration  = 1300
+backup schema freshness               = CURRENT / FRONTIER 1300 PROVEN
+latest successful isolated restore    = PROVEN — run 35807858750 / frontier 1300
+current-frontier restore              = PROVEN — run 35807858750
+current-frontier privacy mechanics    = SYNTHETIC PASS — run 35807858750
+authoritative privacy reconciliation  = PROVEN — run 35659483080 / bounded captured window only
 provider-managed full restore         = NOT PROVEN
 DR Ready                              = false
 ```
 
-Current-frontier governed backup `35631594765` and isolated restore run `35633155263` now prove current-production-schema recovery mechanics through migration `1280`. This does not establish full hosted provider recovery equivalence or DR readiness.
+Current-frontier governed backup `35806027337` and isolated restore run `35807858750` now prove current-production-schema recovery mechanics through migration `1300`. This does not establish full hosted provider recovery equivalence, future-safe privacy reconciliation, or DR readiness.
 
 Backup failure observability for v1 is the scheduled GitHub Actions workflow conclusion. A failed or missing scheduled run remains an operations alert until a dedicated alerting sink is approved.
 
@@ -446,9 +448,9 @@ Do not close `#389` until all are evidenced:
 - [x] historical integrity and database-level authorization baseline passed — run `35331742188`
 - [x] bounded captured-window privacy source authority runtime-proven — run `35539838537`
 - [x] account-deletion finalizer and recovered-state finalization mechanics implemented / post-merge CI green
-- [x] fresh governed backup captured after deployed migration `1280` — run `35631594765` / artifact `10654730578`
-- [x] isolated restore completed from that current-frontier backup — run `35633155263`
-- [x] recovered-state finalization drill executed on that fresh governed restore — run `35633155263`
+- [x] fresh governed backup captured after deployed migration `1300` — run `35806027337` / artifact `10727238435`
+- [x] isolated restore completed from that current-frontier backup — run `35807858750`
+- [x] recovered-state synthetic finalization drill executed on that fresh governed restore — run `35807858750`
 - [x] authoritative privacy/deletion/legal-retention reconciliation exercised for the applicable captured window — run `35659483080`
 - [x] achieved recovery duration measured across the full authoritative recovery procedure — `67s`
 - [x] full authoritative data-loss window measured — `5536s`
