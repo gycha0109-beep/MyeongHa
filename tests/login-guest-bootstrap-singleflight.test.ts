@@ -80,6 +80,24 @@ describe('same-tab Guest bootstrap single-flight authority', () => {
     expect(globalThis.dispatchEvent).toHaveBeenCalledTimes(1);
   });
 
+  it('maps a Guest bootstrap edge 429 without persisting credentials and permits a later explicit retry', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(null, { status: 429 }))
+      .mockResolvedValueOnce(guestBootstrapResponse('guest-after-rate-limit'));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(ensureGuestBearer()).rejects.toMatchObject({
+      code: 'WEB_AUTH_GUEST_RATE_LIMITED',
+    });
+    expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.guestBearer)).toBeNull();
+    expect(globalThis.dispatchEvent).not.toHaveBeenCalled();
+
+    await expect(ensureGuestBearer()).resolves.toBe('guest-after-rate-limit');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.guestBearer)).toBe('guest-after-rate-limit');
+    expect(globalThis.dispatchEvent).toHaveBeenCalledTimes(1);
+  });
+
   it('clears a failed bootstrap flight so the next caller can retry', async () => {
     const fetchMock = vi.fn()
       .mockRejectedValueOnce(new Error('offline'))
