@@ -8,7 +8,7 @@ const payload = {
   readingId: '44444444-4444-4444-8444-444444444444',
   readingSessionId: '55555555-5555-4555-8555-555555555555',
   sajuDomain: 'career',
-  readingContractVersion: 'product-reading.v1',
+  readingContractVersion: 'myeonghwa-product-reading-response-v2',
   productResponseState: 'delivered',
   readerCharacterIds: ['seyeon'],
   completedAt: '2026-09-23T00:01:00.000Z',
@@ -20,7 +20,7 @@ const payload = {
 };
 
 describe('Official Reading Records browser contract', () => {
-  it('projects only the stored Official Reading archive surface', () => {
+  it('projects the current Production stored Official Reading archive surface without widening authority', () => {
     const result = parseOfficialReadingRecordPayloadV1(payload);
     expect(result).toEqual({
       readingId: payload.readingId,
