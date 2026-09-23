@@ -122,8 +122,11 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
 
     for (const key of ['seyeon', 'baekheon', 'yeoul', 'seorin', 'rahyeon', 'mira', 'taegyeom', 'yunho', 'doyun']) {
       expect(v2Css).toContain(`.character-room-v2[data-character="${key}"]`);
+    }
+    for (const key of ['seyeon', 'baekheon', 'yeoul', 'seorin', 'rahyeon', 'mira', 'taegyeom', 'yunho']) {
       expect(v2Css).toContain(`assets/characters/rooms/${key}-room.webp`);
     }
+    expect(v2Css).toContain('assets/characters/rooms/doyoon-room.webp');
 
     expect(v2Css).toContain('var(--conversation-room-art)');
     expect(v2Css).toContain('.conversation-room-scene .character-room-scene-decoration');

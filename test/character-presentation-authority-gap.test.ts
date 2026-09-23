@@ -18,8 +18,8 @@ const browserPresentationPath = new URL(
   import.meta.url,
 );
 
-describe('Character presentation identity authority gap', () => {
-  it('keeps canonical Character ids distinct from the browser presentation namespace', async () => {
+describe('Character presentation identity authority', () => {
+  it('uses the approved exact English id for canonical and browser presentation identity', async () => {
     const [immutableAuthoring, browserPresentation] = await Promise.all([
       readFile(immutableAuthoringPath, 'utf8'),
       readFile(browserPresentationPath, 'utf8'),
@@ -27,11 +27,11 @@ describe('Character presentation identity authority gap', () => {
 
     expect(immutableAuthoring).toContain("  'doyun',");
     expect(immutableAuthoring).not.toContain("  'doyoon',");
-    expect(browserPresentation).toContain('doyoon: {');
-    expect(browserPresentation).not.toContain('doyun: {');
+    expect(browserPresentation).toContain('doyun: {');
+    expect(browserPresentation).not.toContain('doyoon: {');
   });
 
-  it('keeps the Production presentation mapping unbound instead of inferring it from content shape', async () => {
+  it('keeps content schema separate from the explicit browser product mapping', async () => {
     const [schema, resolver] = await Promise.all([
       readFile(schemaPath, 'utf8'),
       readFile(resolverPath, 'utf8'),
@@ -40,11 +40,10 @@ describe('Character presentation identity authority gap', () => {
     expect(schema).toContain('readonly characterId: string;');
     expect(schema).toContain('readonly displayName: string;');
     expect(schema).not.toContain('presentationKey');
-    expect(resolver).toContain('production storage/query');
-    expect(resolver).toContain('binding for this mapping has not been decided');
+    expect(resolver).toContain('CharacterPresentationIdentityAuthorityPortV1');
   });
 
-  it('keeps thread routes presentation-neutral until the missing mapping authority exists', async () => {
+  it('keeps thread routes neutral until server identity arrives, then permits canonical projection', async () => {
     const browserPresentation = await readFile(browserPresentationPath, 'utf8');
 
     expect(browserPresentation).toContain(
@@ -52,5 +51,6 @@ describe('Character presentation identity authority gap', () => {
     );
     expect(browserPresentation).toContain("'thread_identity_pending'");
     expect(browserPresentation).toContain("'thread_identity_invalid'");
+    expect(browserPresentation).toContain("root.dataset.characterAuthority = 'canonical_character_id'");
   });
 });

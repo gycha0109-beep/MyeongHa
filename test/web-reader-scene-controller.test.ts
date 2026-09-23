@@ -54,7 +54,7 @@ describe('web Reader Scene controller', () => {
     expect(result).toMatchObject({
       state: 'ready',
       readerCharacterId: 'taegyeom',
-      presentation: { name: '대리자', generic: true },
+      presentation: { name: '태겸', generic: false },
     });
     if ('presentation' in result) expect(result.presentation).not.toHaveProperty('id');
   });
