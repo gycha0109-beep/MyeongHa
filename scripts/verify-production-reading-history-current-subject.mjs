@@ -11,6 +11,7 @@ const READING_KEYS = Object.freeze([
   'readingContractVersion',
   'readingId',
   'readingSessionId',
+  'readerCharacterIds',
   'sajuDomain',
 ]);
 const FORBIDDEN_KEYS = new Set([
@@ -110,10 +111,10 @@ async function fetchCanonical(url, init = {}) {
   });
 }
 
-function requireApiContract(body, label) {
+function requireApiContract(body, label, expectedVersion = 'v0.9') {
   const meta = requireRecord(`${label} meta`, body.meta);
-  if (meta.apiContractVersion !== 'v0.9') {
-    throw new Error(`${label} did not return API contract v0.9.`);
+  if (meta.apiContractVersion !== expectedVersion) {
+    throw new Error(`${label} did not return API contract ${expectedVersion}.`);
   }
   requireNonEmptyString(`${label} request id`, meta.requestId);
 }
@@ -151,7 +152,7 @@ async function verifyUnauthenticatedFailClosed() {
     throw new Error(`Production Reading History unauthenticated expected HTTP 401, received ${response.status}.`);
   }
   const body = await readJsonWithoutLogging(response, 'Production Reading History unauthenticated');
-  requireApiContract(body, 'Production Reading History unauthenticated');
+  requireApiContract(body, 'Production Reading History unauthenticated', 'v0.10');
   if (body.ok !== false) throw new Error('Production Reading History unauthenticated did not return ok=false.');
   const error = requireRecord('Production Reading History unauthenticated error', body.error);
   if (error.code !== 'AUTH_REQUIRED') {
@@ -175,6 +176,22 @@ function validateReadingsData(value) {
     requireNonEmptyString(`Production Reading History item ${index} Saju domain`, reading.sajuDomain);
     requireNonEmptyString(`Production Reading History item ${index} contract version`, reading.readingContractVersion);
     requireNonEmptyString(`Production Reading History item ${index} product response state`, reading.productResponseState);
+    const readerCharacterIds = requireArray(
+      `Production Reading History item ${index} Reader provenance`,
+      reading.readerCharacterIds,
+    );
+    const normalizedReaderIds = readerCharacterIds.map((value, readerIndex) =>
+      requireNonEmptyString(
+        `Production Reading History item ${index} Reader provenance ${readerIndex}`,
+        value,
+      ));
+    if (new Set(normalizedReaderIds).size !== normalizedReaderIds.length) {
+      throw new Error('Production Reading History returned duplicate Reader provenance.');
+    }
+    const sortedReaderIds = [...normalizedReaderIds].sort((left, right) => left.localeCompare(right));
+    if (sortedReaderIds.some((value, readerIndex) => value !== normalizedReaderIds[readerIndex])) {
+      throw new Error('Production Reading History returned non-deterministic Reader provenance.');
+    }
     const createdAt = requireTimestamp(`Production Reading History item ${index} created-at`, reading.createdAt);
     const completedAt = requireTimestamp(`Production Reading History item ${index} completed-at`, reading.completedAt);
     const order = [Date.parse(completedAt), Date.parse(createdAt), readingId];
@@ -228,7 +245,7 @@ if (readingsResponse.status !== 200) {
   throw new Error(`Production Reading History expected HTTP 200, received ${readingsResponse.status}.`);
 }
 const readingsBody = await readJsonWithoutLogging(readingsResponse, 'Production Reading History');
-requireApiContract(readingsBody, 'Production Reading History');
+requireApiContract(readingsBody, 'Production Reading History', 'v0.10');
 if (readingsBody.ok !== true) throw new Error('Production Reading History did not return ok=true.');
 requireNoForbiddenKeys(readingsBody);
 const readingCount = validateReadingsData(readingsBody.data);
