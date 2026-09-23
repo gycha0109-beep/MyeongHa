@@ -105,9 +105,10 @@ for (const fragment of [
   'rules.update',
   'rule_value="$(jq -nc',
   'A different active rate-limit rule already exists; no mutation was attempted.',
-  '.draft.version // empty',
-  'firewall_draft_version=$draft_version',
-  '/activate?projectId=$VERCEL_PROJECT_ID&teamId=$VERCEL_TEAM_ID',
+  'FIREWALL_DRAFT_API="https://api.vercel.com/v1/security/firewall/config/draft?projectId=$VERCEL_PROJECT_ID&teamId=$VERCEL_TEAM_ID"',
+  'firewall_request PATCH "$FIREWALL_DRAFT_API"',
+  'firewall_draft_readback=verified',
+  '/config/draft/activate?projectId=$VERCEL_PROJECT_ID&teamId=$VERCEL_TEAM_ID',
   '.active.firewallEnabled == true',
   'value: "/api/session/bootstrap"',
   'value: "POST"',
@@ -119,6 +120,14 @@ for (const fragment of [
   'durable_network_identifier_persistence=false',
 ]) {
   requireFragment(paths.applyScript, applyScript, fragment);
+}
+
+for (const forbidden of [
+  '.draft.version // empty',
+  'firewall_draft_version=$draft_version',
+  'firewall_request PATCH "$FIREWALL_API"',
+]) {
+  forbidFragment(paths.applyScript, applyScript, forbidden);
 }
 
 for (const fragment of [
