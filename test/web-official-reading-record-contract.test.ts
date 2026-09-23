@@ -26,7 +26,7 @@ describe('Official Reading Records browser contract', () => {
       readingId: payload.readingId,
       readingSessionId: payload.readingSessionId,
       sajuDomain: 'career',
-      readingContractVersion: 'product-reading.v1',
+      readingContractVersion: 'myeonghwa-product-reading-response-v2',
       productResponseState: 'delivered',
       readerCharacterIds: ['seyeon'],
       completedAt: '2026-09-23T00:01:00.000Z',
