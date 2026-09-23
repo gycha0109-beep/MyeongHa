@@ -268,17 +268,30 @@ async function connectCdp(port) {
 
 async function waitFor(client, expression, message, timeout = 10_000) {
   const deadline = Date.now() + timeout;
+  let lastEvaluationError = null;
   while (Date.now() < deadline) {
-    if (await client.evaluate(expression)) return;
+    try {
+      if (await client.evaluate(expression)) return;
+      lastEvaluationError = null;
+    } catch (error) {
+      lastEvaluationError = error;
+    }
     await sleep(50);
   }
-  const diagnostics = await client.evaluate(`(() => ({
-    pathname: location.pathname,
-    status: document.querySelector('#records-status')?.textContent?.trim() ?? null,
-    displayName: document.querySelector('#records-display-name')?.textContent?.trim() ?? null,
-    memberSession: localStorage.getItem('myeongha.memberSession.v1'),
-  }))()`);
-  throw new Error(`${message}; diagnostics=${JSON.stringify(diagnostics)}; requests=${JSON.stringify(requests)}`);
+  let diagnostics = null;
+  try {
+    diagnostics = await client.evaluate(`(() => ({
+      pathname: location.pathname,
+      status: document.querySelector('#records-status')?.textContent?.trim() ?? null,
+      displayName: document.querySelector('#records-display-name')?.textContent?.trim() ?? null,
+      routeState: document.body.dataset.readingRouteState ?? null,
+      recordMode: document.body.dataset.readingRecordMode ?? null,
+      memberSession: localStorage.getItem('myeongha.memberSession.v1'),
+    }))()`);
+  } catch (error) {
+    lastEvaluationError = error;
+  }
+  throw new Error(`${message}; diagnostics=${JSON.stringify(diagnostics)}; lastEvaluationError=${lastEvaluationError instanceof Error ? lastEvaluationError.message : null}; requests=${JSON.stringify(requests)}`);
 }
 
 for (const file of [
