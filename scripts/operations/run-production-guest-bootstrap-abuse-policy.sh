@@ -12,6 +12,7 @@ source scripts/operations/vercel-production-common.sh
 
 readonly POLICY_FILE="config/operations/guest-bootstrap-abuse-policy-v1.json"
 readonly FIREWALL_API="https://api.vercel.com/v1/security/firewall/config?projectId=$VERCEL_PROJECT_ID&teamId=$VERCEL_TEAM_ID"
+readonly FIREWALL_DRAFT_API="https://api.vercel.com/v1/security/firewall/config/draft?projectId=$VERCEL_PROJECT_ID&teamId=$VERCEL_TEAM_ID"
 
 [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]
 [[ "$GITHUB_REF" == "refs/heads/main" ]]
@@ -65,14 +66,14 @@ firewall_request() {
 before_file="$RUNNER_TEMP/vercel-firewall-before.json"
 patch_file="$RUNNER_TEMP/vercel-firewall-patch.json"
 patch_response="$RUNNER_TEMP/vercel-firewall-patch-response.json"
-staged_file="$RUNNER_TEMP/vercel-firewall-staged.json"
+activate_request="$RUNNER_TEMP/vercel-firewall-activate-request.json"
 activate_response="$RUNNER_TEMP/vercel-firewall-activate.json"
 after_file="$RUNNER_TEMP/vercel-firewall-after.json"
 
 cleanup() {
   exit_code=$?
   trap - EXIT
-  rm -f "$before_file" "$patch_file" "$patch_response" "$staged_file" "$activate_response" "$after_file"
+  rm -f "$before_file" "$patch_file" "$patch_response" "$activate_request" "$activate_response" "$after_file"
   exit "$exit_code"
 }
 trap cleanup EXIT
@@ -164,29 +165,13 @@ else
   }' > "$patch_file"
 fi
 
-firewall_request PATCH "$FIREWALL_API" "$patch_response" "$patch_file"
+firewall_request PATCH "$FIREWALL_DRAFT_API" "$patch_response" "$patch_file"
 echo "firewall_draft_mutation=accepted"
 
-firewall_request GET "$FIREWALL_API" "$staged_file"
-
-draft_version="$(jq -er '.draft.version // empty' "$staged_file")" || {
-  echo "::error title=Guest bootstrap firewall draft version missing::Vercel accepted the draft mutation but no draft.version was available for activation."
-  jq -c '{
-    active_version: (.active.version // null),
-    active_firewall_enabled: (.active.firewallEnabled // null),
-    draft_type: (.draft | type),
-    draft_keys: ((.draft // {}) | keys),
-    draft_rule_count: (((.draft.rules // [])) | length)
-  }' "$staged_file"
-  exit 1
-}
-test -n "$draft_version"
-echo "firewall_draft_version=$draft_version"
-
 jq -e   --arg name "$rule_name"   --arg mode "$ABUSE_POLICY_MODE"   --arg rate_action "$rate_limit_action"   '
-    (.draft.firewallEnabled == true)
-    and ([((.draft.rules // []))[] | select(.name == $name)] | length) == 1
-    and ([((.draft.rules // []))[] | select(.name == $name)][0] as $rule
+    (.firewallEnabled == true)
+    and ([((.rules // []))[] | select(.name == $name)] | length) == 1
+    and ([((.rules // []))[] | select(.name == $name)][0] as $rule
       | $rule.valid != false
       and (($rule.validationErrors // []) | length) == 0
       and $rule.conditionGroup == [{
@@ -203,9 +188,11 @@ jq -e   --arg name "$rule_name"   --arg mode "$ABUSE_POLICY_MODE"   --arg rate_a
       and $rule.action.mitigate.rateLimit.action == $rate_action
       and ($rule.active == ($mode != "disable"))
     )
-  ' "$staged_file" >/dev/null
+  ' "$patch_response" >/dev/null
+echo "firewall_draft_readback=verified"
 
-firewall_request POST "https://api.vercel.com/v1/security/firewall/config/$draft_version/activate?projectId=$VERCEL_PROJECT_ID&teamId=$VERCEL_TEAM_ID" "$activate_response"
+printf '{}\n' > "$activate_request"
+firewall_request POST "https://api.vercel.com/v1/security/firewall/config/draft/activate?projectId=$VERCEL_PROJECT_ID&teamId=$VERCEL_TEAM_ID" "$activate_response" "$activate_request"
 echo "firewall_draft_activation=accepted"
 
 firewall_request GET "$FIREWALL_API" "$after_file"
