@@ -123,18 +123,165 @@ if (permissionsSection.includes('write')) {
 }
 
 for (const fragment of [
-  '.name == "Production PostgreSQL Logical Backup"',
   '.path == ".github/workflows/production-postgres-backup.yml"',
   '.conclusion == "success"',
   '.head_branch == "main"',
   '(.event == "schedule" or .event == "workflow_dispatch")',
+  '.repository.full_name == env.GITHUB_REPOSITORY',
   '.expired == false',
-  '^myeongha-postgres-[0-9]{8}T[0-9]{6}Z$',
+  '^myeongha-postgres-[0-9]{8}T[0-9]{6}Z
+for (const fragment of [
+  "readonly RESTORE_DATABASE_URL='postgresql://postgres:restore-drill@127.0.0.1:5432/postgres'",
+  "readonly RESTORE_ADMIN_DATABASE_URL='postgresql://supabase_admin:restore-drill@127.0.0.1:5432/postgres'",
+  'myeongha-postgres-backup-artifact-v1',
+  'sha256sum -c',
+  'openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000',
+  'roles.portable.sql',
+  'target-copy-catalog.json',
+  'node scripts/build-postgres-portable-data-replay.mjs',
+  'auth.users',
+  'subject_auth_user_referential_integrity: "pass"',
+  'restore_target: "github-actions-loopback-supabase-postgres"',
+  'dr_ready: false',
+]) {
+  requireFragment(harness, fragment, harnessPath);
+}
+
+for (const fragment of [
+  'myeongha-postgres-portable-data-replay-v2',
+  "application_schema_policy: 'public-fail-closed'",
+  "provider_schema_policy: 'target-compatible-column-projection'",
+  'Application COPY target mismatch',
+  'target_requires_unbacked_columns',
+  'projectCopyRow',
+  'replayed_provider_relations',
+]) {
+  requireFragment(portableReplay, fragment, portableReplayPath);
+}
+
+for (const fragment of [
+  'PRIVACY_RECONCILIATION_BACKUP_COMPLETED_AT_UTC',
+  'bash scripts/run-postgres-privacy-reconciliation-synthetic-drill.sh',
+]) {
+  requireFragment(privacyRunner, fragment, privacyRunnerPath);
+}
+
+for (const fragment of [
+  'synthetic_fixture: true',
+  'authoritative_post_backup_source: true',
+  "authoritative_source_scope: 'captured-window-only'",
+  'authoritative_privacy_reconciliation: false',
+  'future_safe_privacy_reconciliation: false',
+  "recovered_state_finalization: 'synthetic-isolated-pass'",
+  "personalization_access_resurrection_guard: 'pass'",
+  "commerce_p5y_retention_guard: 'pass'",
+  "second_identical_replay: 'idempotent-pass'",
+  'dr_ready: false',
+]) {
+  requireFragment(privacySynthetic, fragment, privacySyntheticPath);
+}
+
+for (const fragment of [
+  '.name == "Production PostgreSQL Privacy Recovery Ledger"',
+  '.path == ".github/workflows/production-postgres-privacy-recovery-ledger.yml"',
+  '.name == "Production Privacy Recovery Canary"',
+  '.path == ".github/workflows/production-privacy-recovery-canary.yml"',
+  '^myeongha-privacy-ledger-[0-9]{8}T[0-9]{6}Z$',
+  'production-privacy-recovery-canary-$PRODUCTION_PRIVACY_CANARY_RUN_ID',
+  'echo "ledger_artifact_id=$ledger_artifact_id" >> "$GITHUB_OUTPUT"',
+  'echo "canary_artifact_id=$canary_artifact_id" >> "$GITHUB_OUTPUT"',
+]) {
+  requireFragment(
+    authoritativePrivacySource,
+    fragment,
+    authoritativePrivacySourcePath,
+  );
+}
+
+for (const fragment of [
+  'myeongha-postgres-privacy-recovery-ledger-artifact-v1',
+  'AUTHORITATIVE_CAPTURED_WINDOW_V1',
+  'production-privacy-canary-public-evidence.json',
+  'validate-postgres-privacy-recovery-ledger-coverage.mjs',
+  'myeongha-production-postgres-privacy-ledger-v1',
+  'build-postgres-privacy-reconciliation-plan.mjs',
+  '"${psql_base[@]}" -f "$plan" >/dev/null',
+  'set local role myeongha_system_executor',
+  'internal_claim_account_deletion_outbox_v1',
+  'internal_finalize_account_deletion_db_v1',
+  'delete from auth.users',
+  'internal_complete_account_deletion_v1',
+  "authoritative_privacy_reconciliation: true",
+  "future_safe_privacy_reconciliation: false",
+  "production_nonzero_authoritative_delta: true",
+  "output_contains_identifiers: false",
+  "output_contains_row_payloads: false",
+  "dr_ready: false",
+]) {
+  requireFragment(
+    authoritativePrivacyRunner,
+    fragment,
+    authoritativePrivacyRunnerPath,
+  );
+}
+
+for (const fragment of [
+  'node scripts/build-postgres-restore-evidence-envelope.mjs',
+  '--backup-run-id "$BACKUP_RUN_ID"',
+  '--incident-reference-utc "$INCIDENT_REFERENCE_UTC"',
+  'chmod 600 "$RESTORE_EVIDENCE_PATH"',
+]) {
+  requireFragment(evidenceRunner, fragment, evidenceRunnerPath);
+}
+
+const isolatedRuntime = [
+  workflow,
+  sourceResolver,
+  privacyRunner,
+  authoritativePrivacySource,
+  authoritativePrivacyRunner,
+  evidenceRunner,
+  harness,
+].join('\n');
+
+for (const fragment of [
+  'SUPABASE_DB_PASSWORD',
+  'SUPABASE_ACCESS_TOKEN',
+  'pooler.supabase.com',
+  'api.supabase.com/v1/projects',
+  'myeongha.vercel.app',
+  'gcloud ',
+  'service_role',
+]) {
+  forbidFragment(isolatedRuntime, fragment, 'isolated restore runtime');
+}
+
+for (const fragment of [
+  '.github/workflows/postgres-isolated-restore-drill.yml',
+  'GitHub Actions loopback Supabase PostgreSQL 17.6.1.166',
+  'manual-only',
+  'does not accept a remote restore database URL',
+  'must not fabricate missing provider-managed roles',
+  'identity continuity',
+  'DR Ready = FALSE / NOT EVIDENCED',
+]) {
+  requireFragment(runbook, fragment, runbookPath);
+}
+
+console.log(
+  'MyeongHa isolated PostgreSQL restore workflow boundary verification passed: governed backup restore, synthetic privacy mechanics, optional Production non-zero authoritative ledger replay/finalization, identifier-free evidence, and DR fail-closed semantics are pinned.',
+);
+,
   'echo "artifact_id=$artifact_id" >> "$GITHUB_OUTPUT"',
   'echo "source_sha=$source_sha" >> "$GITHUB_OUTPUT"',
 ]) {
   requireFragment(sourceResolver, fragment, sourceResolverPath);
 }
+forbidFragment(
+  sourceResolver,
+  '.name == "Production PostgreSQL Logical Backup"',
+  sourceResolverPath,
+);
 
 for (const fragment of [
   "readonly RESTORE_DATABASE_URL='postgresql://postgres:restore-drill@127.0.0.1:5432/postgres'",
