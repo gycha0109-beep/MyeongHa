@@ -167,9 +167,8 @@ export function parseReaderSceneEnvelopeV1(payload) {
   throw new ReaderSceneContractErrorV1('Reader Scene mode is unsupported.');
 }
 
-function genericPresentation(readerCharacterId) {
+function genericPresentation() {
   return Object.freeze({
-    id: readerCharacterId,
     name: '대리자',
     title: '',
     intro: '',
@@ -181,7 +180,7 @@ export function projectReaderSceneViewModelV1(scene) {
   // SRC-36: canonical Reader Character identity and browser presentation identity
   // are separate namespaces. Until a governed bundle-scoped projection exists,
   // Reader Scene remains identity-neutral and cannot accept a browser resolver/hint.
-  const presentation = genericPresentation(scene.readerCharacterId);
+  const presentation = genericPresentation();
 
   const common = {
     readerCharacterId: scene.readerCharacterId,

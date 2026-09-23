@@ -54,8 +54,9 @@ describe('web Reader Scene controller', () => {
     expect(result).toMatchObject({
       state: 'ready',
       readerCharacterId: 'taegyeom',
-      presentation: { id: 'taegyeom', name: '대리자', generic: true },
+      presentation: { name: '대리자', generic: true },
     });
+    if ('presentation' in result) expect(result.presentation).not.toHaveProperty('id');
   });
 
   it('loads a persisted Reading only through the candidate launch boundary', async () => {

@@ -43,7 +43,6 @@ export type ReaderSceneV1 =
   | ReaderSceneProtectedFallbackV1;
 
 export interface ReaderPresentationV1 {
-  readonly id: string;
   readonly name: string;
   readonly title: string;
   readonly intro: string;

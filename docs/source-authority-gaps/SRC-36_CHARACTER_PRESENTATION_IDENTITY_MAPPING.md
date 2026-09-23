@@ -49,6 +49,7 @@ Source-backed and enforceable now:
 - thread identity outranks browser `?character=` hints;
 - the browser Chat read DTO preserves canonical `characterId` while stripping unsolicited presentation metadata;
 - the browser Reader Scene DTO preserves canonical `readerCharacterId` but projects only an identity-neutral generic presentation until this gap closes;
+- the generic Reader presentation object does not mirror canonical `readerCharacterId` into a presentation `id`/key slot; canonical identity remains a separate top-level field.
 - `CharacterPresentationIdentityAuthorityPortV1` defines a server-side mapping contract scoped to an already-resolved content bundle;
 - the resolver fails closed on missing, duplicate, wrong-key, or wrong-bundle mapping rows.
 
@@ -76,6 +77,7 @@ Until this authority is resolved, do not:
 - project thread-bound canonical ids into static Character names/portraits/room art merely because most strings currently match;
 - accept client-supplied presentation metadata as authoritative for an existing thread;
 - pass a browser `presentationHint` or arbitrary `resolvePresentation(readerCharacterId)` callback into a server-authoritative Reader Scene and treat it as governed presentation authority.
+- copy canonical `readerCharacterId` into a browser presentation `id`/key field and later treat that field as presentation namespace authority.
 
 ## 5. Required source resolution
 

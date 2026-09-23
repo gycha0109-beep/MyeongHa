@@ -81,13 +81,13 @@ describe('web Reader Scene contract', () => {
       state: 'ready',
       readerCharacterId: 'taegyeom',
       presentation: {
-        id: 'taegyeom',
         name: '대리자',
         title: '',
         intro: '',
         generic: true,
       },
     });
+    expect(viewModel.presentation).not.toHaveProperty('id');
     expect(viewModel).not.toHaveProperty('presentationHint');
     expect(viewModel).not.toHaveProperty('presentationHintMismatch');
   });
