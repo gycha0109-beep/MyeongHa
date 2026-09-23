@@ -38,6 +38,29 @@ jq -e '
 ' "$POLICY_FILE" >/dev/null
 
 verify_governed_vercel_project
+echo "governed_vercel_project=verified"
+
+firewall_request() {
+  local method="${1:?method required}"
+  local url="${2:?url required}"
+  local output="${3:?output path required}"
+  local input="${4:-}"
+  local http_code
+
+  if [[ -n "$input" ]]; then
+    http_code="$(curl -sS       -X "$method"       -H "Authorization: Bearer $VERCEL_TOKEN"       -H "Content-Type: application/json"       --data-binary "@$input"       -o "$output"       -w '%{http_code}'       "$url")"
+  else
+    http_code="$(curl -sS       -X "$method"       -H "Authorization: Bearer $VERCEL_TOKEN"       -H "Content-Type: application/json"       -o "$output"       -w '%{http_code}'       "$url")"
+  fi
+
+  if [[ ! "$http_code" =~ ^2[0-9][0-9]$ ]]; then
+    local error_code error_message
+    error_code="$(jq -r '.error.code // .code // "unknown"' "$output" 2>/dev/null || printf 'unknown')"
+    error_message="$(jq -r '.error.message // .message // "Vercel API request failed"' "$output" 2>/dev/null || printf 'Vercel API request failed')"
+    echo "::error title=Vercel Firewall API request failed::method=$method http=$http_code code=$error_code message=$error_message"
+    return 1
+  fi
+}
 
 before_file="$RUNNER_TEMP/vercel-firewall-before.json"
 patch_file="$RUNNER_TEMP/vercel-firewall-patch.json"
@@ -54,7 +77,8 @@ cleanup() {
 }
 trap cleanup EXIT
 
-curl -fsS   -H "Authorization: Bearer $VERCEL_TOKEN"   "$FIREWALL_API"   -o "$before_file"
+firewall_request GET "$FIREWALL_API" "$before_file"
+echo "firewall_config_read=verified"
 
 rule_name="$(jq -r '.ruleName' "$POLICY_FILE")"
 same_name_count="$(jq --arg name "$rule_name" '[((.active.rules // []) + (.draft.rules // []))[] | select(.name == $name)] | unique_by(.id) | length' "$before_file")"
@@ -140,9 +164,10 @@ else
   }' > "$patch_file"
 fi
 
-curl -fsS   -X PATCH   -H "Authorization: Bearer $VERCEL_TOKEN"   -H "Content-Type: application/json"   --data-binary "@$patch_file"   "$FIREWALL_API"   -o "$patch_response"
+firewall_request PATCH "$FIREWALL_API" "$patch_response" "$patch_file"
+echo "firewall_draft_mutation=accepted"
 
-curl -fsS   -H "Authorization: Bearer $VERCEL_TOKEN"   "$FIREWALL_API"   -o "$staged_file"
+firewall_request GET "$FIREWALL_API" "$staged_file"
 
 draft_id="$(jq -er '.draft.id // empty' "$staged_file")"
 test -n "$draft_id"
@@ -169,9 +194,10 @@ jq -e   --arg name "$rule_name"   --arg mode "$ABUSE_POLICY_MODE"   --arg rate_a
     )
   ' "$staged_file" >/dev/null
 
-curl -fsS   -X POST   -H "Authorization: Bearer $VERCEL_TOKEN"   -H "Content-Type: application/json"   "https://api.vercel.com/v1/security/firewall/config/$draft_id/activate?projectId=$VERCEL_PROJECT_ID&teamId=$VERCEL_TEAM_ID"   -o "$activate_response"
+firewall_request POST "https://api.vercel.com/v1/security/firewall/config/$draft_id/activate?projectId=$VERCEL_PROJECT_ID&teamId=$VERCEL_TEAM_ID" "$activate_response"
+echo "firewall_draft_activation=accepted"
 
-curl -fsS   -H "Authorization: Bearer $VERCEL_TOKEN"   "$FIREWALL_API"   -o "$after_file"
+firewall_request GET "$FIREWALL_API" "$after_file"
 
 jq -e   --arg name "$rule_name"   --arg mode "$ABUSE_POLICY_MODE"   --arg rate_action "$rate_limit_action"   '
     (.active.firewallEnabled == true)
