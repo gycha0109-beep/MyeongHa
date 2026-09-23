@@ -48,6 +48,29 @@ describe('persisted Reading browser handoff', () => {
     )).toEqual({ state: 'invalid' });
   });
 
+  it('fails closed on ambiguous or competing Records handoff authority', () => {
+    const base = '?from=records&readingId=44444444-4444-4444-8444-444444444444&readingSessionId=55555555-5555-4555-8555-555555555555&sajuDomain=career';
+
+    expect(parsePersistedReadingHandoffV1(
+      `${base}&readingId=66666666-6666-4666-8666-666666666666`,
+    )).toEqual({ state: 'invalid' });
+    expect(parsePersistedReadingHandoffV1(
+      `${base}&reader=seyeon`,
+    )).toEqual({ state: 'invalid' });
+    expect(parsePersistedReadingHandoffV1(
+      `${base}&character=seyeon`,
+    )).toEqual({ state: 'invalid' });
+    expect(parsePersistedReadingHandoffV1(
+      `${base}&threadId=77777777-7777-4777-8777-777777777777`,
+    )).toEqual({ state: 'invalid' });
+    expect(parsePersistedReadingHandoffV1(
+      `${base}&topic=career&scope=natal`,
+    )).toEqual({ state: 'invalid' });
+    expect(parsePersistedReadingHandoffV1(
+      `${base}&from=reading`,
+    )).toEqual({ state: 'invalid' });
+  });
+
   it('rejects unbounded identifiers before navigation', () => {
     expect(() => createPersistedReadingHandoffV1({
       readingId: '',

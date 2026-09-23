@@ -53,8 +53,20 @@ export function parsePersistedReadingHandoffV1(search) {
     ? search
     : new URLSearchParams(search || '');
 
-  if (params.get('from') !== PERSISTED_READING_HANDOFF_SOURCE_V1) {
+  const fromValues = params.getAll('from');
+  if (!fromValues.includes(PERSISTED_READING_HANDOFF_SOURCE_V1)) {
     return Object.freeze({ state: 'none' });
+  }
+
+  const identityKeys = ['readingId', 'readingSessionId', 'sajuDomain'];
+  const competingAuthorityKeys = ['reader', 'character', 'threadId', 'topic', 'scope'];
+  if (
+    fromValues.length !== 1
+    || fromValues[0] !== PERSISTED_READING_HANDOFF_SOURCE_V1
+    || identityKeys.some((key) => params.getAll(key).length !== 1)
+    || competingAuthorityKeys.some((key) => params.has(key))
+  ) {
+    return Object.freeze({ state: 'invalid' });
   }
 
   try {
