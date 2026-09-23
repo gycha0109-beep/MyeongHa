@@ -50,26 +50,58 @@ function requireReaderCharacterIds(value) {
   return Object.freeze(ids);
 }
 
-export function parseOfficialReadingRecordPayloadV1(payload) {
-  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) fail('payload is invalid');
-  if (!payload.reading || typeof payload.reading !== 'object' || Array.isArray(payload.reading)) {
+function requireReadingSnapshot(value, expected) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
     fail('reading is invalid');
   }
 
+  const responseVersion = requireString(value.responseVersion, 'reading.responseVersion');
+  if (responseVersion !== expected.readingContractVersion) {
+    fail('reading.responseVersion does not match readingContractVersion');
+  }
+
+  const responseState = requireString(value.state, 'reading.state');
+  if (responseState !== expected.productResponseState) {
+    fail('reading.state does not match productResponseState');
+  }
+
+  if (!value.reading || typeof value.reading !== 'object' || Array.isArray(value.reading)) {
+    fail('reading.reading is invalid');
+  }
+  const snapshotReadingId = requireUuid(value.reading.readingId, 'reading.reading.readingId');
+  if (snapshotReadingId !== expected.readingId) {
+    fail('reading.reading.readingId does not match readingId');
+  }
+
+  return Object.freeze({ ...value });
+}
+
+export function parseOfficialReadingRecordPayloadV1(payload) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) fail('payload is invalid');
+
+  const readingId = requireUuid(payload.readingId, 'readingId');
+  const readingContractVersion = requireString(
+    payload.readingContractVersion,
+    'readingContractVersion',
+  );
+  const productResponseState = requireString(payload.productResponseState, 'productResponseState');
+  if (!ARCHIVE_OPENABLE_PRODUCT_RESPONSE_STATES_V1.has(productResponseState)) {
+    fail('productResponseState is not archive-openable');
+  }
+  const reading = requireReadingSnapshot(payload.reading, {
+    readingId,
+    readingContractVersion,
+    productResponseState,
+  });
+
   return Object.freeze({
-    readingId: requireUuid(payload.readingId, 'readingId'),
+    readingId,
     readingSessionId: requireUuid(payload.readingSessionId, 'readingSessionId'),
     sajuDomain: requireSajuDomain(payload.sajuDomain, 'sajuDomain'),
-    readingContractVersion: requireString(payload.readingContractVersion, 'readingContractVersion'),
-    productResponseState: (() => {
-      const state = requireString(payload.productResponseState, 'productResponseState');
-      if (!ARCHIVE_OPENABLE_PRODUCT_RESPONSE_STATES_V1.has(state)) {
-        fail('productResponseState is not archive-openable');
-      }
-      return state;
-    })(),
+    readingContractVersion,
+    productResponseState,
     readerCharacterIds: requireReaderCharacterIds(payload.readerCharacterIds),
     completedAt: requireTimestamp(payload.completedAt, 'completedAt'),
-    reading: Object.freeze({ ...payload.reading }),
+    reading,
   });
 }
