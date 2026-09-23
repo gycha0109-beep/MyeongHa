@@ -1,0 +1,54 @@
+name: Production Guest Bootstrap Abuse Policy
+run-name: "[WT:ops] Production Guest Bootstrap Abuse Policy — ${{ inputs.mode }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Governed policy mode. Start with observe; enforce only after reviewed observation evidence.
+        required: true
+        type: choice
+        options:
+          - observe
+          - enforce
+          - disable
+      confirm:
+        description: Type APPLY_GUEST_BOOTSTRAP_ABUSE_POLICY_V1
+        required: true
+        type: string
+      watchtower_track:
+        description: Watchtower Track Key for CI attribution
+        required: true
+        default: ops
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-guest-bootstrap-abuse-policy
+  cancel-in-progress: false
+
+env:
+  VERCEL_PROJECT_ID: prj_nXF0b5uv27Lyucz2SEBxzdCRXVsP
+  VERCEL_TEAM_ID: team_xuYA9OhCWlJETaYFOmeVodgS
+  VERCEL_PROJECT_NAME: myeongha
+
+jobs:
+  apply:
+    name: apply-production-guest-bootstrap-abuse-policy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: production
+    env:
+      MYEONGHA_WATCHTOWER_TRACK: ${{ inputs.watchtower_track }}
+      ABUSE_POLICY_MODE: ${{ inputs.mode }}
+      DISPATCH_CONFIRM: ${{ inputs.confirm }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+    steps:
+      - name: Checkout exact repository state
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Apply and verify governed Guest bootstrap abuse policy
+        shell: bash
+        run: bash scripts/operations/run-production-guest-bootstrap-abuse-policy.sh

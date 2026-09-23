@@ -1,0 +1,19 @@
+{
+  "contractVersion": "myeongha-guest-bootstrap-abuse-policy-v1",
+  "vercelProjectId": "prj_nXF0b5uv27Lyucz2SEBxzdCRXVsP",
+  "vercelTeamId": "team_xuYA9OhCWlJETaYFOmeVodgS",
+  "vercelProjectName": "myeongha",
+  "ruleName": "myeongha-guest-bootstrap-rate-limit-v1",
+  "route": "/api/session/bootstrap",
+  "method": "POST",
+  "algorithm": "fixed_window",
+  "windowSeconds": 60,
+  "requestLimit": 30,
+  "keys": [
+    "ip"
+  ],
+  "observeRateLimitAction": "log",
+  "enforceRateLimitAction": "rate_limit",
+  "durableNetworkIdentifierPersistence": false,
+  "applicationRetryOnRateLimit": false
+}

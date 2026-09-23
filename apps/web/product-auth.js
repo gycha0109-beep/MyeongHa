@@ -570,7 +570,7 @@ async function readEnvelope(response) {
   return payload.data;
 }
 
-async function postJson(endpoint, body, authorization = null) {
+async function postJson(endpoint, body, authorization = null, options = undefined) {
   const headers = new Headers({
     Accept: 'application/json',
     'Content-Type': 'application/json',
@@ -587,6 +587,13 @@ async function postJson(endpoint, body, authorization = null) {
     });
   } catch (error) {
     throw new ProductAuthError('WEB_AUTH_NETWORK_FAILED', '인증 서버에 연결할 수 없습니다.', error);
+  }
+
+  if (response.status === 429 && options?.rateLimitCode) {
+    throw new ProductAuthError(
+      options.rateLimitCode,
+      options.rateLimitMessage ?? '요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.',
+    );
   }
   return readEnvelope(response);
 }
@@ -644,7 +651,10 @@ export async function ensureGuestBearer() {
   if (readMemberSession()) return null;
 
   const request = guestBootstrapInFlight ??= (async () => {
-    const data = await postJson('/api/session/bootstrap', {});
+    const data = await postJson('/api/session/bootstrap', {}, null, {
+      rateLimitCode: 'WEB_AUTH_GUEST_RATE_LIMITED',
+      rateLimitMessage: '게스트 세션 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.',
+    });
     const guestSession = isRecord(data) && isRecord(data.guestSession) ? data.guestSession : null;
     const token = normalizeGuestBearer(guestSession?.bearerToken);
     if (!isRecord(data) || data.kind !== 'guest' || !token) {
