@@ -88,11 +88,57 @@ function requireReaderCharacterIds(value: unknown): readonly string[] {
   return Object.freeze(ids);
 }
 
-function requireReadingSnapshot(value: unknown): Readonly<Record<string, unknown>> {
+function requireReadingSnapshot(
+  value: unknown,
+  expected: {
+    readonly readingId: string;
+    readonly readingContractVersion: string;
+    readonly productResponseState: string;
+  },
+): Readonly<Record<string, unknown>> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     throw new Error('Official Reading record authority returned an invalid stored Reading.');
   }
-  return Object.freeze({ ...(value as Record<string, unknown>) });
+
+  const snapshot = value as Record<string, unknown>;
+  const responseVersion = requireStoredString(
+    'stored Reading snapshot response version',
+    snapshot.responseVersion,
+  );
+  if (responseVersion !== expected.readingContractVersion) {
+    throw new Error(
+      'Official Reading record snapshot contract version does not match stored provenance.',
+    );
+  }
+
+  const responseState = requireStoredString(
+    'stored Reading snapshot response state',
+    snapshot.state,
+  );
+  if (responseState !== expected.productResponseState) {
+    throw new Error(
+      'Official Reading record snapshot state does not match stored provenance.',
+    );
+  }
+
+  if (
+    typeof snapshot.reading !== 'object'
+    || snapshot.reading === null
+    || Array.isArray(snapshot.reading)
+  ) {
+    throw new Error('Official Reading record snapshot reading is invalid.');
+  }
+  const snapshotReadingId = requireStoredString(
+    'stored Reading snapshot identity',
+    (snapshot.reading as Record<string, unknown>).readingId,
+  );
+  if (snapshotReadingId !== expected.readingId) {
+    throw new Error(
+      'Official Reading record snapshot identity does not match stored Reading identity.',
+    );
+  }
+
+  return Object.freeze({ ...snapshot });
 }
 
 export async function getOfficialReadingRecord(input: {
@@ -113,15 +159,29 @@ export async function getOfficialReadingRecord(input: {
     }
     requireStoredString('response hash', row.responseHash);
 
+    const readingContractVersion = requireStoredString(
+      'Reading contract version',
+      row.readingContractVersion,
+    );
+    const productResponseState = requireStoredString(
+      'Product response state',
+      row.productResponseState,
+    );
+    const reading = requireReadingSnapshot(row.responseSnapshotJsonb, {
+      readingId,
+      readingContractVersion,
+      productResponseState,
+    });
+
     return Object.freeze({
       readingId,
       readingSessionId: requireUuid('Stored Reading Session identity', row.readingSessionId),
       sajuDomain: requireStoredString('Saju domain', row.sajuDomain),
-      readingContractVersion: requireStoredString('Reading contract version', row.readingContractVersion),
-      productResponseState: requireStoredString('Product response state', row.productResponseState),
+      readingContractVersion,
+      productResponseState,
       readerCharacterIds: requireReaderCharacterIds(row.readerCharacterIds),
       completedAt: requireTimestamp(row.completedAt),
-      reading: requireReadingSnapshot(row.responseSnapshotJsonb),
+      reading,
     });
   } catch (error) {
     if (!(error instanceof OfficialReadingRecordReadAuthorityPortErrorV1)) throw error;

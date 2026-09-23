@@ -17,8 +17,12 @@ const ROW: OfficialReadingRecordAuthorityRowV1 = Object.freeze({
   readingContractVersion: 'product-reading.v1',
   productResponseState: 'delivered',
   responseSnapshotJsonb: Object.freeze({
+    responseVersion: 'product-reading.v1',
     state: 'delivered',
-    reading: Object.freeze({ sections: Object.freeze([]) }),
+    reading: Object.freeze({
+      readingId: READING_ID,
+      sections: Object.freeze([]),
+    }),
   }),
   responseHash: 'sha256:stored-reading',
   readerCharacterIds: Object.freeze(['seyeon']),
@@ -72,6 +76,32 @@ describe('Official Reading Records read contract', () => {
       readingId: READING_ID,
       authorityPort: port({ ...ROW, readingId: '77777777-7777-4777-8777-777777777777' }),
     })).rejects.toThrow('different Reading identity');
+  });
+
+  it('rejects stored snapshot provenance mismatches before archive projection', async () => {
+    for (const responseSnapshotJsonb of [
+      {
+        ...ROW.responseSnapshotJsonb,
+        responseVersion: 'different-contract',
+      },
+      {
+        ...ROW.responseSnapshotJsonb,
+        state: 'delivered_with_fallback',
+      },
+      {
+        ...ROW.responseSnapshotJsonb,
+        reading: {
+          readingId: '77777777-7777-4777-8777-777777777777',
+          sections: [],
+        },
+      },
+    ]) {
+      await expect(getOfficialReadingRecord({
+        resolvedSubjectId: SUBJECT_ID,
+        readingId: READING_ID,
+        authorityPort: port({ ...ROW, responseSnapshotJsonb }),
+      })).rejects.toThrow(/snapshot/u);
+    }
   });
 
   it('maps authority input rejection without leaking database details', async () => {
