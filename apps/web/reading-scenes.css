@@ -40,7 +40,7 @@ body[data-reader="yunho"] {
   --reader-reading-art: url("assets/characters/rooms/yunho-room.webp");
   --reader-reading-position: center 27%;
 }
-body[data-reader="doyoon"] {
+body[data-reader="doyun"] {
   --reader-reading-art: url("assets/characters/rooms/doyoon-room.webp");
   --reader-reading-position: center 27%;
 }
