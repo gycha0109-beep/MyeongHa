@@ -206,7 +206,7 @@ for (const fragment of [
   'no database IP/fingerprint retention table',
   'mode=observe',
   '400 INVALID_REQUEST',
-  'edge rate limiting',
+  'edge `429`',
   'pre-launch',
   'no legitimate end-user traffic',
   'automatic rollback to `observe`',
