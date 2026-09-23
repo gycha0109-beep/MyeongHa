@@ -182,6 +182,8 @@ describe('MyeongHa immersive long-form Character Room', () => {
     expect(presentation).not.toContain('detail: Object.freeze({ characterKey, message: value })');
     expect(presentation).not.toContain("messageInput.value = ''");
     expect(presentation).not.toContain('setTimeout');
+    expect(presentation).not.toContain('setDialogueText(text)');
+    expect(transport).not.toContain('window.MyeongHaCharacterRoom');
 
     expect(transport).toContain('event.preventDefault()');
     expect(transport).toContain('현재 메시지를 보낼 수 없습니다. 입력한 내용은 그대로 남아 있습니다.');

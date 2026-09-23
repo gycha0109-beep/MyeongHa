@@ -120,14 +120,11 @@ function setDialogueLines(lines) {
 
 setDialogueLines(character.intro);
 
+// Presentation metadata is observable for the static discovery route only.
 window.MyeongHaCharacterRoom = Object.freeze({
   characterKey,
   characterName: character.name,
   characterAuthority: root.dataset.characterAuthority,
-  setDialogueText(text) {
-    if (typeof text !== 'string' || text.trim().length === 0) return;
-    setDialogueLines(text.split(/\n+/).filter(Boolean));
-  },
 });
 
 const historyDrawer = document.querySelector('[data-history-drawer]');

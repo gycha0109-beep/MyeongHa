@@ -385,19 +385,10 @@ function setIncoming(items) {
   incomingSection.hidden = false;
 }
 
-window.MyeongHaChatHub = Object.freeze({
-  people,
-  setRelationshipState(state = {}) {
-    setContinuation(state.continuation ?? null);
-    setRecent(state.recent ?? []);
-    setIncoming(state.incoming ?? []);
-  },
-  clearRelationshipState() {
-    setContinuation(null);
-    setRecent([]);
-    setIncoming([]);
-  },
-});
+// No browser relationship hydration mutator is exposed while the repository has
+// no validated server relationship-thread projection contract. Discovery remains
+// presentation-only; relationship surfaces stay empty until such a contract exists.
+window.MyeongHaChatHub = Object.freeze({ people });
 
 renderPeople();
 setContinuation(null);

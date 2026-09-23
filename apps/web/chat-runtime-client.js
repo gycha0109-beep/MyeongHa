@@ -7,7 +7,6 @@ const params = new URLSearchParams(window.location.search);
 const rawThreadId = params.get('threadId');
 const threadId = parseChatThreadIdV1(rawThreadId);
 const invalidThreadRoute = rawThreadId !== null && threadId === null;
-const room = window.MyeongHaCharacterRoom;
 const apiEnvelopePromise = import('./api-envelope.js');
 
 const historyList = document.querySelector('[data-history-list]');

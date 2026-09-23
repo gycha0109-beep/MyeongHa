@@ -49,6 +49,9 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
     expect(js).toContain('setContinuation(null)');
     expect(js).toContain('setRecent([])');
     expect(js).toContain('setIncoming([])');
+    expect(js).toContain('window.MyeongHaChatHub = Object.freeze({ people })');
+    expect(js).not.toContain('setRelationshipState(state = {})');
+    expect(js).not.toContain('clearRelationshipState()');
     expect(js).toContain('typeof state.threadTitle');
     expect(js).toContain('item.hasIncoming === true');
     expect(js).not.toContain('threadTitle:');
