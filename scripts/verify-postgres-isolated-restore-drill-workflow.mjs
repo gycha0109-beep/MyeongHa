@@ -129,7 +129,18 @@ for (const fragment of [
   '(.event == "schedule" or .event == "workflow_dispatch")',
   '.repository.full_name == env.GITHUB_REPOSITORY',
   '.expired == false',
-  '^myeongha-postgres-[0-9]{8}T[0-9]{6}Z
+  '^myeongha-postgres-[0-9]{8}T[0-9]{6}Z$',
+  'echo "artifact_id=$artifact_id" >> "$GITHUB_OUTPUT"',
+  'echo "source_sha=$source_sha" >> "$GITHUB_OUTPUT"',
+]) {
+  requireFragment(sourceResolver, fragment, sourceResolverPath);
+}
+forbidFragment(
+  sourceResolver,
+  '.name == "Production PostgreSQL Logical Backup"',
+  sourceResolverPath,
+);
+
 for (const fragment of [
   "readonly RESTORE_DATABASE_URL='postgresql://postgres:restore-drill@127.0.0.1:5432/postgres'",
   "readonly RESTORE_ADMIN_DATABASE_URL='postgresql://supabase_admin:restore-drill@127.0.0.1:5432/postgres'",
