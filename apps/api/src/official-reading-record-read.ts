@@ -1,4 +1,4 @@
-import { SAJU_DOMAINS, type SajuDomain } from '../../../packages/contracts/src/index.js';
+import { SAJU_DOMAINS } from '../../../packages/contracts/src/index.js';
 import { ApiCommandError } from './api-error.js';
 
 export const OFFICIAL_READING_RECORD_READ_AUTHORITY_BINDING_V1 =
@@ -10,7 +10,7 @@ const SAJU_DOMAIN_SET_V1 = new Set<string>(SAJU_DOMAINS);
 export interface OfficialReadingRecordAuthorityRowV1 {
   readonly readingId: string;
   readonly readingSessionId: string;
-  readonly sajuDomain: SajuDomain;
+  readonly sajuDomain: string;
   readonly readingContractVersion: string;
   readonly productResponseState: string;
   readonly responseSnapshotJsonb: unknown;
@@ -75,12 +75,12 @@ function requireStoredUuid(name: string, value: unknown): string {
   return stored;
 }
 
-function requireSajuDomain(value: unknown): SajuDomain {
+function requireSajuDomain(value: unknown): string {
   const stored = requireStoredString('Saju domain', value);
   if (!SAJU_DOMAIN_SET_V1.has(stored)) {
     throw new Error('Official Reading record authority returned an invalid Saju domain.');
   }
-  return stored as SajuDomain;
+  return stored;
 }
 
 function requireTimestamp(value: unknown): string {
