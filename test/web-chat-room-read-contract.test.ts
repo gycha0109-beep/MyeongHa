@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   parseChatRoomReadPayloadV1,
   parseChatThreadIdV1,
+  parseChatThreadRouteV1,
 } from '../apps/web/chat-room-read-contract.js';
 
 const THREAD_ID = '93000000-0000-4000-8000-000000000001';
@@ -160,5 +161,21 @@ describe('browser Chat room read contract', () => {
     expect(parseChatThreadIdV1('not-a-thread')).toBeNull();
     expect(parseChatThreadIdV1('')).toBeNull();
     expect(parseChatThreadIdV1(null)).toBeNull();
+  });
+
+
+  it('fails closed on duplicate or malformed thread route identities', () => {
+    expect(parseChatThreadRouteV1('')).toEqual({ state: 'none', threadId: null });
+    expect(parseChatThreadRouteV1(`?threadId=${THREAD_ID}`)).toEqual({
+      state: 'ready',
+      threadId: THREAD_ID,
+    });
+    expect(parseChatThreadRouteV1(
+      `?threadId=${THREAD_ID}&threadId=93000000-0000-4000-8000-000000000002`,
+    )).toEqual({ state: 'invalid', threadId: null });
+    expect(parseChatThreadRouteV1('?threadId=not-a-thread')).toEqual({
+      state: 'invalid',
+      threadId: null,
+    });
   });
 });
