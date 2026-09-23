@@ -53,7 +53,7 @@ select
   reader_character_ids as "readerCharacterIds",
   created_at as "createdAt",
   completed_at as "completedAt"
-from public.qry_reading_history_v1($1::uuid)
+from public.qry_reading_history_v2($1::uuid)
 `.trim();
 
 function requireNonEmptyString(name: string, value: unknown): string {
