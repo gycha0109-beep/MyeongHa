@@ -140,11 +140,16 @@ describe('MyeongHa character-led Saju Reading v1', () => {
     expect(runtime).toContain('record.sajuDomain !== persistedReadingHandoff.sajuDomain');
     expect(runtime).toContain("activatePreviewReading({ ...readingView, source: 'record' })");
     expect(runtime).toContain("root.dataset.readingRouteState = isStoredRecord ? 'persisted_record' : 'preview'");
+    expect(runtime).toContain('function clearPersistedReadingPresentation()');
     expect(runtime).toContain("delete root.dataset.reader;");
     expect(runtime).toContain("delete root.dataset.readerSelection;");
     expect(runtime).toContain("delete root.dataset.readerAuthority;");
     expect(runtime).toContain("delete root.dataset.readerPresentation;");
     expect(runtime).toContain("document.querySelector('.reader-scene')?.setAttribute('hidden', '')");
+    expect(runtime).toContain('function renderPersistedReadingHandoffInvalid() {\n  clearPersistedReadingPresentation();');
+    expect(runtime).toContain('function renderPersistedReadingLoading() {\n  clearPersistedReadingPresentation();');
+    expect(runtime).toContain("function renderPersistedReadingFailure(title, copy, state = 'persisted_record_unavailable') {\n  clearPersistedReadingPresentation();");
+    expect(runtime).toContain('if (isStoredRecord) {\n    clearPersistedReadingPresentation();');
     expect(runtime).toContain("stage.setAttribute('aria-label', '저장된 공식 사주 풀이')");
     expect(runtime).toContain('function configurePersistedReadingNavigation()');
     expect(runtime).toContain("backLink.setAttribute('href', 'records.html?tab=saju')");

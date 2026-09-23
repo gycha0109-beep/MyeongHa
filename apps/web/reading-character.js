@@ -150,6 +150,15 @@ function renderInvalidRoute() {
   document.title = '읽기를 찾을 수 없음 · 명하';
 }
 
+function clearPersistedReadingPresentation() {
+  delete root.dataset.reader;
+  delete root.dataset.readerSelection;
+  delete root.dataset.readerAuthority;
+  delete root.dataset.readerPresentation;
+  document.querySelector('.reader-scene')?.setAttribute('hidden', '');
+  document.querySelector('.reading-character-block')?.setAttribute('hidden', '');
+}
+
 function configurePersistedReadingNavigation() {
   if (backLink) {
     backLink.setAttribute('href', 'records.html?tab=saju');
@@ -162,6 +171,7 @@ function configurePersistedReadingNavigation() {
 }
 
 function renderPersistedReadingHandoffInvalid() {
+  clearPersistedReadingPresentation();
   configurePersistedReadingNavigation();
   root.dataset.readingRouteState = 'persisted_handoff_invalid';
   if (stage) stage.hidden = true;
@@ -175,6 +185,7 @@ function renderPersistedReadingHandoffInvalid() {
 }
 
 function renderPersistedReadingLoading() {
+  clearPersistedReadingPresentation();
   configurePersistedReadingNavigation();
   root.dataset.readingRouteState = 'persisted_record_loading';
   if (stage) stage.hidden = true;
@@ -188,6 +199,7 @@ function renderPersistedReadingLoading() {
 }
 
 function renderPersistedReadingFailure(title, copy, state = 'persisted_record_unavailable') {
+  clearPersistedReadingPresentation();
   configurePersistedReadingNavigation();
   root.dataset.readingRouteState = state;
   if (stage) stage.hidden = true;
@@ -535,12 +547,7 @@ function activatePreviewReading(preview) {
   if (routeState) routeState.hidden = true;
   if (stage) stage.hidden = false;
   if (isStoredRecord) {
-    delete root.dataset.reader;
-    delete root.dataset.readerSelection;
-    delete root.dataset.readerAuthority;
-    delete root.dataset.readerPresentation;
-    document.querySelector('.reader-scene')?.setAttribute('hidden', '');
-    document.querySelector('.reading-character-block')?.setAttribute('hidden', '');
+    clearPersistedReadingPresentation();
     if (stage) stage.setAttribute('aria-label', '저장된 공식 사주 풀이');
     configurePersistedReadingNavigation();
     if (completionTitle) {
