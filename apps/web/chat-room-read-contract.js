@@ -1,3 +1,5 @@
+import { resolveCanonicalCharacterPresentationV1 } from './character-presentation-identity.js';
+
 const UUID_V1 = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 
 function fail(message) {
@@ -88,6 +90,9 @@ export function parseChatRoomReadPayloadV1(payload, options) {
   }
 
   const characterId = nonEmptyString('characterId', payload.characterId);
+  if (resolveCanonicalCharacterPresentationV1(characterId) === null) {
+    fail('characterId is not an admitted canonical presentation identity');
+  }
   const expectedAfterSequenceNo = safeSequence(
     'expected afterSequenceNo',
     options?.expectedAfterSequenceNo ?? 0,
