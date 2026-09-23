@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: Governed policy mode. Start with observe; enforce only after reviewed observation evidence.
+        description: Governed policy mode. Observe first; enforce only after the reviewed pre-launch gate is satisfied.
         required: true
         type: choice
         options:
@@ -38,17 +38,80 @@ jobs:
   apply:
     name: apply-production-guest-bootstrap-abuse-policy
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 25
     environment: production
     env:
       MYEONGHA_WATCHTOWER_TRACK: ${{ inputs.watchtower_track }}
       ABUSE_POLICY_MODE: ${{ inputs.mode }}
       DISPATCH_CONFIRM: ${{ inputs.confirm }}
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PRODUCTION_SESSION_POOLER_HOST: ${{ secrets.SUPABASE_PRODUCTION_SESSION_POOLER_HOST }}
     steps:
       - name: Checkout exact repository state
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Apply and verify governed Guest bootstrap abuse policy
+        id: apply_policy
+        continue-on-error: ${{ inputs.mode == 'enforce' }}
         shell: bash
         run: bash scripts/operations/run-production-guest-bootstrap-abuse-policy.sh
+
+      - name: Set up Node 24 for enforce canary
+        if: ${{ inputs.mode == 'enforce' && steps.apply_policy.outcome == 'success' }}
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      - name: Install canary dependencies
+        if: ${{ inputs.mode == 'enforce' && steps.apply_policy.outcome == 'success' }}
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Bind canary to exact main Production deployment
+        id: exact_deployment
+        if: ${{ inputs.mode == 'enforce' && steps.apply_policy.outcome == 'success' }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          source scripts/operations/vercel-production-common.sh
+          verify_governed_vercel_project
+          read -r exact_deployment_id exact_deployment_name < <(wait_exact_main_deployment)
+          test -n "$exact_deployment_id"
+          [[ "$exact_deployment_name" == "$VERCEL_PROJECT_NAME" ]]
+          echo "exact_production_deployment_id=$exact_deployment_id"
+
+      - name: Run pre-launch enforce canary
+        id: enforce_canary
+        if: ${{ inputs.mode == 'enforce' && steps.apply_policy.outcome == 'success' && steps.exact_deployment.outcome == 'success' }}
+        continue-on-error: true
+        env:
+          MYEONGHA_GUEST_BOOTSTRAP_CANARY_CONFIRM: VERIFY_GUEST_BOOTSTRAP_RATE_LIMIT_CANARY_V1
+        run: node scripts/operations/run-production-guest-bootstrap-rate-limit-canary.mjs
+
+      - name: Roll back failed enforce attempt to observe
+        id: rollback_observe
+        if: ${{ always() && inputs.mode == 'enforce' && (steps.apply_policy.outcome != 'success' || steps.exact_deployment.outcome != 'success' || steps.enforce_canary.outcome != 'success') }}
+        env:
+          ABUSE_POLICY_MODE: observe
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/operations/run-production-guest-bootstrap-abuse-policy.sh
+          echo "guest_bootstrap_enforce_rollback=observe"
+
+      - name: Fail closed after enforce rollback
+        if: ${{ always() && inputs.mode == 'enforce' && (steps.apply_policy.outcome != 'success' || steps.exact_deployment.outcome != 'success' || steps.enforce_canary.outcome != 'success') }}
+        shell: bash
+        run: |
+          echo "::error title=Guest bootstrap enforce canary failed::The enforce attempt did not prove the governed Production boundary. Observe rollback was attempted."
+          exit 1
+
+      - name: Record enforce canary success
+        if: ${{ inputs.mode == 'enforce' && steps.apply_policy.outcome == 'success' && steps.exact_deployment.outcome == 'success' && steps.enforce_canary.outcome == 'success' }}
+        shell: bash
+        run: |
+          echo "guest_bootstrap_enforce_status=success"
+          echo "guest_bootstrap_enforce_canary=pass"
+          echo "rollback_required=false"

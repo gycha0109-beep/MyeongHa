@@ -1,6 +1,6 @@
 # MyeongHa Guest Bootstrap Abuse Policy V1
 
-Status: **PRODUCTION OBSERVE ACTIVE / EVIDENCE & TRAFFIC REVIEW PENDING**
+Status: **PRODUCTION OBSERVE ACTIVE / PRE-LAUNCH ENFORCE GATE READY**
 
 Issue: `#646`
 
@@ -30,10 +30,11 @@ The threshold is an initial V1 abuse bound, not a statement that 30 requests/min
 1. merge the reviewed repository contract;
 2. dispatch `Production Guest Bootstrap Abuse Policy` with `mode=observe`;
 3. verify exact active rule/config readback;
-4. inspect legitimate bootstrap traffic before changing the mode;
+4. while the MVP is pre-launch, record that no legitimate end-user traffic is expected and do not wait for a traffic sample that cannot exist;
 5. promote to `enforce` only through another reviewed/recorded operator action;
-6. verify excess requests receive the Vercel rate-limit response before application persistence;
-7. keep the scheduled evidence workflow green for drift detection.
+6. bind the canary to the exact main Production deployment, prove edge `429` before Guest persistence with invalid bodies, then prove one fresh Guest plus existing-Guest reuse continuity;
+7. automatically roll a failed `enforce` attempt back to `observe`;
+8. after successful enforce evidence, pin scheduled drift evidence to `enforce` and close the issue only when every acceptance criterion is recorded.
 
 ## Production observe evidence
 
@@ -51,8 +52,21 @@ rate-limit action      = log
 
 The run verified the governed Vercel project, exact draft mutation/readback, draft activation, and exact post-activation active-rule readback. Observe mode is therefore active and inspectable; it is not inferred from generic DDoS protection.
 
-A first runtime-log review immediately after activation found no `/api/session/bootstrap` traffic in the inspected post-activation window. That is not evidence that the threshold is safe for legitimate traffic, so it does **not** authorize promotion to `enforce`. Promotion remains gated on legitimate-traffic review plus a separately reviewed/recorded operator action.
-The scheduled evidence workflow remains pinned to `expected_mode=observe` while this review gate is open.
+A first runtime-log review immediately after activation found no `/api/session/bootstrap` traffic in the inspected post-activation window. The MVP has not launched, so no legitimate end-user traffic is expected in Production. The empty traffic sample is therefore expected and is not treated as threshold-safety evidence, but it is also not a reason to block the pre-launch protection gate indefinitely.
+
+The pre-launch replacement for live-traffic review is the governed synthetic canary below. The scheduled evidence workflow remains pinned to `expected_mode=observe` until a successful enforce run is recorded.
+
+## Pre-launch enforce gate
+
+The product is still pre-launch. Therefore the normal "observe legitimate traffic, then choose a threshold" loop cannot produce a representative end-user sample yet. V1 keeps the already reviewed conservative bound of **30 requests per 60 seconds per IP**, which is far above the intended single-flight browser bootstrap path, and requires synthetic proof before launch instead of inventing traffic.
+
+The `mode=enforce` workflow is fail-closed:
+
+- it applies and reads back the exact governed Firewall rule;
+- it waits for the exact workflow SHA to be READY in Vercel Production;
+- it runs the synthetic canary using only the canonical Production host;
+- if apply, deployment binding, or canary proof fails, it performs an automatic rollback to `observe` and fails the workflow;
+- a successful enforce run is the authority for changing scheduled drift evidence from `observe` to `enforce`.
 
 ## Safety boundaries
 
@@ -69,9 +83,18 @@ The scheduled evidence workflow remains pinned to `expected_mode=observe` while 
 
 ## Production canary after enforce
 
-Use invalid bootstrap bodies such as `{"probe":true}` so requests that pass the edge fail as `400 INVALID_REQUEST` before Guest persistence. The expected sequence is normal 400 responses until the configured bucket is exhausted, followed by edge rate limiting. Compare aggregate Guest row counts before/after the canary; the canary itself must create zero durable Guest rows.
+The enforce workflow runs the canary automatically.
 
-A final real bootstrap is allowed only after the bucket window has cleared, followed by `GET /api/me` continuity verification.
+1. wait for Firewall propagation and align the probe burst inside one 60-second bucket;
+2. send the governed first **30** invalid bootstrap requests with `{"probe":true}`; each request that reaches the application must return `400 INVALID_REQUEST`;
+3. require an edge `429` within attempts 31-35;
+4. compare aggregate `subjects(kind='guest')` and `guest_sessions` counts before/after the invalid burst and require **zero durable-row delta**;
+5. wait 65 seconds for the bucket to clear;
+6. perform exactly one real `{}` bootstrap and require exactly **+1 Guest subject / +1 Guest session**;
+7. call `GET /api/me` with the returned bearer and require the same canonical Guest subject;
+8. call `POST /api/session/bootstrap` again with that valid bearer and require the same Guest/session with `bearerToken=null` and **zero additional durable-row delta**.
+
+The canary never logs bearer material. Failure at any enforce prerequisite or canary step triggers automatic rollback to `observe`.
 
 ## Closure boundary
 

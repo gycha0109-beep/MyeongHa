@@ -7,6 +7,7 @@ const paths = {
   evidenceWorkflow: '.github/workflows/production-guest-bootstrap-abuse-policy-evidence.yml',
   applyScript: 'scripts/operations/run-production-guest-bootstrap-abuse-policy.sh',
   evidenceScript: 'scripts/operations/verify-production-guest-bootstrap-abuse-policy-live.sh',
+  canaryScript: 'scripts/operations/run-production-guest-bootstrap-rate-limit-canary.mjs',
   productAuth: 'apps/web/product-auth.js',
   docs: 'docs/operations/GUEST_BOOTSTRAP_ABUSE_POLICY_V1.md',
 };
@@ -14,14 +15,16 @@ const paths = {
 for (const script of [paths.applyScript, paths.evidenceScript]) {
   execFileSync('bash', ['-n', script], { stdio: 'inherit' });
 }
+execFileSync(process.execPath, ['--check', paths.canaryScript], { stdio: 'inherit' });
 
-const [policyRaw, applyWorkflow, evidenceWorkflow, applyScript, evidenceScript, productAuth, docs] =
+const [policyRaw, applyWorkflow, evidenceWorkflow, applyScript, evidenceScript, canaryScript, productAuth, docs] =
   await Promise.all([
     readFile(paths.policy, 'utf8'),
     readFile(paths.applyWorkflow, 'utf8'),
     readFile(paths.evidenceWorkflow, 'utf8'),
     readFile(paths.applyScript, 'utf8'),
     readFile(paths.evidenceScript, 'utf8'),
+    readFile(paths.canaryScript, 'utf8'),
     readFile(paths.productAuth, 'utf8'),
     readFile(paths.docs, 'utf8'),
   ]);
@@ -74,7 +77,15 @@ for (const fragment of [
   'environment: production',
   'MYEONGHA_WATCHTOWER_TRACK: ${{ inputs.watchtower_track }}',
   'VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}',
+  'SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}',
+  'SUPABASE_PRODUCTION_SESSION_POOLER_HOST: ${{ secrets.SUPABASE_PRODUCTION_SESSION_POOLER_HOST }}',
   'run: bash scripts/operations/run-production-guest-bootstrap-abuse-policy.sh',
+  'MYEONGHA_GUEST_BOOTSTRAP_CANARY_CONFIRM: VERIFY_GUEST_BOOTSTRAP_RATE_LIMIT_CANARY_V1',
+  'node scripts/operations/run-production-guest-bootstrap-rate-limit-canary.mjs',
+  'Roll back failed enforce attempt to observe',
+  'ABUSE_POLICY_MODE: observe',
+  'guest_bootstrap_enforce_rollback=observe',
+  'guest_bootstrap_enforce_canary=pass',
   'cancel-in-progress: false',
 ]) {
   requireFragment(paths.applyWorkflow, applyWorkflow, fragment);
@@ -156,6 +167,30 @@ for (const forbidden of [
 }
 
 for (const fragment of [
+  'const REQUEST_LIMIT = 30;',
+  'const WINDOW_SECONDS = 60;',
+  'body: \'{"probe":true}\'',
+  'response.status === 429',
+  'public.subjects where kind = \'guest\'',
+  'public.guest_sessions',
+  "body: '{}'",
+  'fresh_bootstrap_guest_subject_delta=1',
+  'fresh_bootstrap_guest_session_delta=1',
+  'reused_bootstrap_guest_row_delta=0',
+  'api_me_continuity=pass',
+  'bearer_material_logged=false',
+]) {
+  requireFragment(paths.canaryScript, canaryScript, fragment);
+}
+for (const forbidden of [
+  'console.log(bearerToken)',
+  'console.log(freshBody)',
+  'console.log(reusedBody)',
+]) {
+  forbidFragment(paths.canaryScript, canaryScript, forbidden);
+}
+
+for (const fragment of [
   "response.status === 429 && options?.rateLimitCode",
   "rateLimitCode: 'WEB_AUTH_GUEST_RATE_LIMITED'",
   '게스트 세션 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.',
@@ -171,7 +206,10 @@ for (const fragment of [
   'no database IP/fingerprint retention table',
   'mode=observe',
   '400 INVALID_REQUEST',
-  'edge rate limiting',
+  'edge `429`',
+  'pre-launch',
+  'no legitimate end-user traffic',
+  'automatic rollback to `observe`',
 ]) {
   requireFragment(paths.docs, docs, fragment);
 }
