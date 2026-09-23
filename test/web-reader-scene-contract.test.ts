@@ -13,7 +13,7 @@ const base = {
   officialReadingId: '44444444-4444-4444-8444-444444444444',
   readerCharacterId: 'taegyeom',
   domain: 'career',
-  interpretationHash: 'sha256:v1:reader-result',
+  interpretationHash: 'sha256:v1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
   utterance: {
     characterId: 'taegyeom',
     requestedDomain: 'career',
@@ -64,7 +64,7 @@ describe('web Reader Scene contract', () => {
       officialReadingId: '44444444-4444-4444-8444-444444444444',
       readerCharacterId: 'taegyeom',
       domain: 'career',
-      interpretationHash: 'sha256:v1:fallback',
+      interpretationHash: 'sha256:v1:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
       fallbackReason: 'semantic_guard_failed',
     });
 
@@ -83,6 +83,13 @@ describe('web Reader Scene contract', () => {
     expect(() => parseReaderSceneEnvelopeV1({ ...base, ...extra })).toThrow(
       ReaderSceneContractErrorV1,
     );
+  });
+
+  it('rejects malformed interpretation hashes', () => {
+    expect(() => parseReaderSceneEnvelopeV1({
+      ...base,
+      interpretationHash: 'sha256:v1:reader-result',
+    })).toThrow(/interpretationHash is malformed/u);
   });
 
   it('rejects a malformed Official Reading identity at the browser response boundary', () => {

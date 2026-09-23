@@ -17,7 +17,7 @@ function readyScene(readerCharacterId = 'taegyeom') {
       generic: true,
     }),
     domain: 'general',
-    interpretationHash: 'sha256:v1:reader-result',
+    interpretationHash: 'sha256:v1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     segments: Object.freeze([]),
   });
 }

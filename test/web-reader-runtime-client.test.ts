@@ -13,7 +13,7 @@ function sceneData() {
     officialReadingId: '44444444-4444-4444-8444-444444444444',
     readerCharacterId: 'baekheon',
     domain: 'general',
-    interpretationHash: 'sha256:v1:reader-result',
+    interpretationHash: 'sha256:v1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     utterance: {
       characterId: 'baekheon',
       requestedDomain: 'general',

@@ -21,7 +21,7 @@ function scene(
     officialReadingId,
     readerCharacterId,
     domain: 'general',
-    interpretationHash: 'sha256:v1:reader-result',
+    interpretationHash: 'sha256:v1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     utterance: Object.freeze({
       characterId: readerCharacterId,
       requestedDomain: 'general',

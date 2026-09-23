@@ -49,6 +49,14 @@ function requireUuid(value, field) {
   return normalized;
 }
 
+function requireInterpretationHash(value) {
+  const normalized = requireString(value, 'interpretationHash', 74);
+  if (!/^sha256:v1:[0-9a-f]{64}$/u.test(normalized)) {
+    throw new ReaderSceneContractErrorV1('interpretationHash is malformed.');
+  }
+  return normalized;
+}
+
 function requireSajuDomain(value, field) {
   const normalized = normalizeSajuDomainV1(value);
   if (normalized === null) {
@@ -118,7 +126,7 @@ export function parseReaderSceneEnvelopeV1(payload) {
     officialReadingId: requireUuid(payload.officialReadingId, 'officialReadingId'),
     readerCharacterId: requireString(payload.readerCharacterId, 'readerCharacterId'),
     domain: requireSajuDomain(payload.domain, 'domain'),
-    interpretationHash: requireString(payload.interpretationHash, 'interpretationHash', 512),
+    interpretationHash: requireInterpretationHash(payload.interpretationHash),
   };
 
   if (mode === 'reader_interpretation') {
