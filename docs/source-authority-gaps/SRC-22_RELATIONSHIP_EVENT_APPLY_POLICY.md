@@ -1,5 +1,7 @@
 # SRC-22 — Relationship Event Apply / Policy Evaluation Authority
 
+> Current disposition: **HOLD — Product-Commerce track owns the pending relationship-band / numeric policy decision.** Frontend Integration must not invent thresholds while that work is in progress.
+
 > Status: **OPEN / BLOCKING for authoritative Relationship Event score/stage mutation**  
 > Domain: Relationship / World  
 > Source authority reviewed:

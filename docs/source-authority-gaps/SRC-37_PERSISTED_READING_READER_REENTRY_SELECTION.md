@@ -1,148 +1,58 @@
 # SRC-37 — Persisted Reading Reader Re-entry Selection Authority
 
-> Status: **OPEN / BLOCKING Records → Reader Scene re-entry**  
-> Domain: Reading / Reader / Records  
-> Scope: selecting the exact Reader identity when reopening a persisted Official Reading from Records
+> Status: **RESOLVED / RETIRED AS A PRODUCT REQUIREMENT**  
+> Domain: Reading / Reader / Records
 
-## 1. Gap
+## 1. Product decision
 
-The repository already has authoritative Reader selection for **purchase creation**, but it does not have an authoritative Reader selection contract for **reopening a persisted Reading from Records**.
+A persisted Saju result is reopened from **Records as the stored Official Reading result**. Reopening a record does not re-enter a Reader Scene and does not choose a Reader for Chat.
 
-These are different operations.
+Reader-held knowledge/context and the Records copy of the Saju result are separate concerns.
 
-Purchase creation accepts an explicit client choice:
-
-```text
-productOfferId + readerCharacterId
-→ server Reader catalog/unlock validation
-→ immutable purchase Reader selection provenance
-```
-
-Records currently carries:
+The Records experience is a history/archive surface. Each item should communicate:
 
 ```text
-readingId + readingSessionId + sajuDomain
+who it was read with · when it was read · what Saju product/domain it was
 ```
 
-It does not carry a Reader Character id or Chat thread id.
+Opening that item reads the stored Official Reading result. It does not manufacture `readerCharacterId`, does not select first/latest/default Reader, and does not derive a Chat `threadId`.
 
-Therefore the existing purchase-time Reader resolver cannot be reused as an automatic Records re-entry selector: it validates a Reader candidate already chosen for a purchase; it does not decide which Reader should own a later re-entry.
-
-A separate direct Reading → thread persistence relation is not required to close this specific gap. Once an exact canonical Reader is selected by approved authority, the existing Chat-open command can create/reuse the owner-scoped single-Character thread for that Reader and return the canonical `threadId`.
-
-## 2. Existing source-backed authority
-
-The following facts are already authoritative:
-
-- `purchase_intent_reader_selections` preserves the Reader selected for an exact purchase intent.
-- `standard_reading_reader_interpretations` permits multiple Reader identities for one Official Reading through primary key `(official_reading_id, reader_character_id)`.
-- `standard_reading_reader_access_grants` preserves exact purchase-backed Reader access provenance.
-- `internal_qry_standard_reading_artifact_source_v2` requires the caller to supply the exact Reader Character id and then verifies exact active Reader access.
-- the thread-bound Reader runtime derives its Reader from the exact owner-authorized active single-Character Chat thread.
-- `qry_reading_history_v1` and the browser Records handoff do not expose Reader or thread authority.
-
-This means the repository can verify an exact Reader after one is authoritatively known. It cannot currently choose that Reader for a Records re-entry.
-
-## 3. Why purchase-time Reader selection does not close this gap
-
-`StandardReadingReaderSelectionPortV4.resolveEligibleReaderSelection` requires:
+## 2. Approved Records chain
 
 ```text
-subjectId
-productId
-readerCharacterId
+Records history
+→ persisted Official Reading identity
+→ owner-authorized stored Official Reading detail
 ```
 
-The `readerCharacterId` is already a candidate before the resolver runs.
-
-That resolver answers:
-
-> “Is this explicitly selected Reader currently eligible for this Product?”
-
-It does not answer:
-
-> “Which Reader should Records choose for this persisted Official Reading?”
-
-Promoting the first question into the second would manufacture selection authority.
-
-## 4. Multi-Reader ambiguity is intentional
-
-One Official Reading can have multiple Reader interpretations/access grants.
-
-Accordingly, none of the following is authoritative without a separately reviewed contract:
-
-- first Reader row;
-- earliest Reader;
-- latest Reader;
-- initial Reader;
-- alphabetically first Reader;
-- currently open Character room;
-- browser presentation Character;
-- default Baekheon/Se-yeon;
-- any Reader inferred from `sajuDomain`;
-- any Reader inferred from static Character catalog order.
-
-Database row order is not product selection policy.
-
-## 5. Required source resolution
-
-A reviewed re-entry authority must define how an exact persisted Official Reading obtains one Reader candidate before Reader Preview/Chat orchestration.
-
-The source may only be adopted after its semantics are explicitly reviewed. Examples of source shapes that require such a decision include:
-
-1. an exact persisted purchase/access context carried by a server-owned Records detail projection;
-2. an owner-scoped server projection of purchased Reader interpretations followed by explicit user selection;
-3. an explicit server-owned “last/primary Reader for this Reading” policy with defined lifecycle semantics;
-4. another reviewed source that deterministically binds the persisted Reading to one exact Reader/thread context.
-
-This document does not select among those designs.
-
-## 6. Required output boundary
-
-Once resolved, the authority must provide enough server-owned identity to enter the existing hardened chain without browser inference:
+The former Records requirement:
 
 ```text
-persisted Official Reading
-→ exact Reader selection authority
-→ canonical readerCharacterId
-→ owner-authorized Chat open/reuse
-→ canonical threadId
-→ thread-bound Reader Preview
+Records → exact Reader selection → Reader Preview → Chat
 ```
 
-The browser must not manufacture either `readerCharacterId` or `threadId`.
+is retired.
 
-## 7. Verification gate after resolution
+Reader knowledge remains available only through Reader/Character runtime authority and its own access/context rules.
 
-At minimum:
+## 3. Reader attribution in the list
 
-- one-Reader and multi-Reader Official Readings are handled deterministically according to the approved policy;
-- a Reader without exact purchase-backed access cannot be selected;
-- stale/revoked access fails closed;
-- Records URL/query/local/session storage cannot become Reader authority;
-- purchase-time eligibility validation is not treated as re-entry selection;
-- no database row-order dependency exists;
-- the resulting Reader identity is canonical, not a browser presentation key;
-- Chat open returns the canonical thread id; the browser does not derive one from Reading ids.
+Reader attribution is display provenance, not re-entry authority. It must come from server-owned purchase/access provenance for the stored Reading. If more than one Reader has provenance for one Official Reading, the projection must represent that provenance without arbitrarily choosing one row.
 
-## 8. Promotion boundary
+## 4. Remaining implementation work
 
-```text
-purchase-time explicit Reader selection + eligibility validation
-→ enabled
+The browser already preserves validated persisted `readingId` / `readingSessionId` handoff. Remaining work is technical:
 
-per-Reader Official Reading access verification
-→ enabled
+1. expose an owner-authorized Official Reading detail projection for Records;
+2. expose bounded Reader attribution for the Records list;
+3. render the stored result without entering Reader Scene.
 
-Records persisted Reading identity handoff
-→ enabled
+This work no longer requires a product decision about Reader re-entry.
 
-Records persisted Reading → exact Reader re-entry selection
-→ BLOCKED by SRC-37
+## 5. Prohibited regressions
 
-exact Reader → Chat open/reuse
-→ existing server authority available once an exact Reader is supplied
-
-canonical Character → named/styled browser presentation
-→ separately blocked by SRC-36
-```
+- do not reopen Records through Reader Scene;
+- do not require a Reader selection merely to reread the stored Saju result;
+- do not use `readingId` or `readingSessionId` as Chat `threadId`;
+- do not infer a Reader from URL/local/session storage, Saju domain, catalog order, or a default Character;
+- do not merge Reader memory/context storage with the Records Official Reading artifact.
