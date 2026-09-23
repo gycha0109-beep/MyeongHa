@@ -140,6 +140,13 @@ describe('MyeongHa immersive long-form Character Room', () => {
     expect(transport).toContain('resolveCanonicalCharacterPresentationV1(message.characterId)');
     expect(transport).toContain('renderHistory(state.messages, state.characterId)');
     expect(transport).toContain('renderConversation(state.messages, state.characterId)');
+    expect(transport).toContain('if (!applyCanonicalCharacterPresentationV1(state.characterId))');
+    expect(transport.indexOf('if (!applyCanonicalCharacterPresentationV1(state.characterId))')).toBeLessThan(
+      transport.indexOf('renderHistory(state.messages, state.characterId)'),
+    );
+    expect(transport.indexOf('if (!applyCanonicalCharacterPresentationV1(state.characterId))')).toBeLessThan(
+      transport.indexOf('renderConversation(state.messages, state.characterId)'),
+    );
     expect(transport).not.toContain('presentationKey: state.characterId');
     expect(presentation).toContain("root.dataset.characterAuthority = 'canonical_character_id'");
     expect(presentation).toContain("presentationCharacterKey ?? (hasThreadRoute ? null : 'baekheon')");
