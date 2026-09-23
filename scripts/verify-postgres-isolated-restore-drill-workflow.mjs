@@ -123,11 +123,11 @@ if (permissionsSection.includes('write')) {
 }
 
 for (const fragment of [
-  '.name == "Production PostgreSQL Logical Backup"',
   '.path == ".github/workflows/production-postgres-backup.yml"',
   '.conclusion == "success"',
   '.head_branch == "main"',
   '(.event == "schedule" or .event == "workflow_dispatch")',
+  '.repository.full_name == env.GITHUB_REPOSITORY',
   '.expired == false',
   '^myeongha-postgres-[0-9]{8}T[0-9]{6}Z$',
   'echo "artifact_id=$artifact_id" >> "$GITHUB_OUTPUT"',
@@ -135,6 +135,11 @@ for (const fragment of [
 ]) {
   requireFragment(sourceResolver, fragment, sourceResolverPath);
 }
+forbidFragment(
+  sourceResolver,
+  '.name == "Production PostgreSQL Logical Backup"',
+  sourceResolverPath,
+);
 
 for (const fragment of [
   "readonly RESTORE_DATABASE_URL='postgresql://postgres:restore-drill@127.0.0.1:5432/postgres'",

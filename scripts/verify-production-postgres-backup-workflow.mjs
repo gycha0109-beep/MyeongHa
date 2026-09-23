@@ -2,11 +2,13 @@ import { readFile } from 'node:fs/promises';
 
 const workflowPath = '.github/workflows/production-postgres-backup.yml';
 const runnerPath = 'scripts/operations/export-production-postgres-backup.sh';
+const restoreSourceResolverPath = 'scripts/operations/resolve-postgres-restore-source.sh';
 const runbookPath = 'docs/operations/POSTGRES_BACKUP_RESTORE_RUNBOOK_V1.md';
 
-const [workflow, runner, runbook] = await Promise.all([
+const [workflow, runner, restoreSourceResolver, runbook] = await Promise.all([
   readFile(workflowPath, 'utf8'),
   readFile(runnerPath, 'utf8'),
+  readFile(restoreSourceResolverPath, 'utf8'),
   readFile(runbookPath, 'utf8'),
 ]);
 const contract = workflow + '\n' + runner;
@@ -102,6 +104,23 @@ if (encryptIndex < 0 || plaintextDeleteIndex < 0 || runnerStepIndex < 0 || uploa
 }
 if (!(encryptIndex < plaintextDeleteIndex && runnerStepIndex < uploadIndex)) {
   throw new Error('Plaintext backup must be encrypted and removed by the runner before artifact upload.');
+}
+
+
+const requiredRestoreSourceResolverFragments = [
+  '.path == ".github/workflows/production-postgres-backup.yml"',
+  '.conclusion == "success"',
+  '.head_branch == "main"',
+  '(.event == "schedule" or .event == "workflow_dispatch")',
+  '.repository.full_name == env.GITHUB_REPOSITORY',
+];
+for (const fragment of requiredRestoreSourceResolverFragments) {
+  if (!restoreSourceResolver.includes(fragment)) {
+    throw new Error(`Missing restore-source resolver authority fragment: ${fragment}`);
+  }
+}
+if (restoreSourceResolver.includes('.name == "Production PostgreSQL Logical Backup"')) {
+  throw new Error('Restore-source resolver must bind to canonical workflow path, not mutable workflow/run display name.');
 }
 
 const requiredRunbookFragments = [
