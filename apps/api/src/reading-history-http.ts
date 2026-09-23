@@ -13,14 +13,14 @@ import {
 } from './postgres-subject-execution.js';
 
 const GET_METHOD = 'GET' as const;
-const API_CONTRACT_VERSION = 'v0.9' as const;
+const API_CONTRACT_VERSION = 'v0.10' as const;
 const NO_STORE_CACHE_CONTROL = 'no-store' as const;
 const READINGS_ROUTE = '/api/readings' as const;
 
 export const READING_HISTORY_HTTP_BINDING_V1 = Object.freeze({
   method: GET_METHOD,
   route: READINGS_ROUTE,
-  readAuthority: 'public.qry_reading_history_v1',
+  readAuthority: 'public.qry_reading_history_v2',
   apiContractVersion: API_CONTRACT_VERSION,
 } as const);
 
@@ -38,6 +38,7 @@ type ReadingHistoryQueryRowV1 = Readonly<{
   sajuDomain: unknown;
   readingContractVersion: unknown;
   productResponseState: unknown;
+  readerCharacterIds: unknown;
   createdAt: unknown;
   completedAt: unknown;
 }>;
@@ -49,6 +50,7 @@ select
   saju_domain as "sajuDomain",
   reading_contract_version as "readingContractVersion",
   product_response_state as "productResponseState",
+  reader_character_ids as "readerCharacterIds",
   created_at as "createdAt",
   completed_at as "completedAt"
 from public.qry_reading_history_v1($1::uuid)
@@ -74,6 +76,13 @@ function requireStoredString(name: string, value: unknown): string {
     throw new Error(`Reading History authority ${name} is invalid.`);
   }
   return value;
+}
+
+function requireStoredStringArray(name: string, value: unknown): readonly string[] {
+  if (!Array.isArray(value)) {
+    throw new Error(`Reading History authority ${name} is invalid.`);
+  }
+  return Object.freeze(value.map((item) => requireStoredString(name, item)));
 }
 
 function requireTimestamp(name: string, value: unknown): string {
@@ -102,6 +111,7 @@ function mapReadingHistoryRow(row: ReadingHistoryQueryRowV1): ReadingHistoryAuth
       'Product response state',
       row.productResponseState,
     ),
+    readerCharacterIds: requireStoredStringArray('Reader Character identities', row.readerCharacterIds),
     createdAt: requireTimestamp('created timestamp', row.createdAt),
     completedAt: requireTimestamp('completed timestamp', row.completedAt),
   });

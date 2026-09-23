@@ -8,6 +8,7 @@ import {
 } from './production-user-data-runtime-config.js';
 import { handleReadingCreateRequestV1 } from './reading-create-http.js';
 import { handleReadingHistoryRequestV1 } from './reading-history-http.js';
+import { handleOfficialReadingRecordRequestV1 } from './official-reading-record-http.js';
 import {
   handleLifeRecordReadRequestV1,
   handleMemoryItemsReadRequestV1,
@@ -122,7 +123,11 @@ export function createProductionReadingHistoryReadRuntimeV1(
   return Object.freeze({
     async handleRequest(requestInput: ProductionRecordsReadRequestV1) {
       if (requestInput.request.method === 'GET') {
-        return handleReadingHistoryRequestV1({
+        const url = new URL(requestInput.request.url);
+        const handler = url.search === ''
+          ? handleReadingHistoryRequestV1
+          : handleOfficialReadingRecordRequestV1;
+        return handler({
           request: requestInput.request,
           requestId: requestInput.requestId,
           serverTime: requestInput.serverTime,
