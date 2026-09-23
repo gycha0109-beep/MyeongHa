@@ -81,15 +81,15 @@ describe('Official Reading Records read contract', () => {
   it('rejects stored snapshot provenance mismatches before archive projection', async () => {
     for (const responseSnapshotJsonb of [
       {
-        ...ROW.responseSnapshotJsonb,
+        ...(ROW.responseSnapshotJsonb as Record<string, unknown>),
         responseVersion: 'different-contract',
       },
       {
-        ...ROW.responseSnapshotJsonb,
+        ...(ROW.responseSnapshotJsonb as Record<string, unknown>),
         state: 'delivered_with_fallback',
       },
       {
-        ...ROW.responseSnapshotJsonb,
+        ...(ROW.responseSnapshotJsonb as Record<string, unknown>),
         reading: {
           readingId: '77777777-7777-4777-8777-777777777777',
           sections: [],
