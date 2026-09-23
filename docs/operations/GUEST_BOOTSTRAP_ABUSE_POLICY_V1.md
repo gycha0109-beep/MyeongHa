@@ -52,6 +52,7 @@ rate-limit action      = log
 The run verified the governed Vercel project, exact draft mutation/readback, draft activation, and exact post-activation active-rule readback. Observe mode is therefore active and inspectable; it is not inferred from generic DDoS protection.
 
 A first runtime-log review immediately after activation found no `/api/session/bootstrap` traffic in the inspected post-activation window. That is not evidence that the threshold is safe for legitimate traffic, so it does **not** authorize promotion to `enforce`. Promotion remains gated on legitimate-traffic review plus a separately reviewed/recorded operator action.
+The scheduled evidence workflow remains pinned to `expected_mode=observe` while this review gate is open.
 
 ## Safety boundaries
 
