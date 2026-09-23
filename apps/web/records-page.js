@@ -163,6 +163,10 @@ function productResponseStateLabel(value) {
   return '저장됨';
 }
 
+function isPersistedReadingOpenableState(value) {
+  return value === 'delivered' || value === 'delivered_with_fallback';
+}
+
 function readerProvenanceLabel(readerCharacterIds) {
   if (!Array.isArray(readerCharacterIds) || readerCharacterIds.length === 0) return 'Reader 기록 없음';
   const names = readerCharacterIds.map((characterId) =>
@@ -175,6 +179,11 @@ function appendReadingFooter(card, leftText, options = {}) {
   const footer = document.createElement('div');
   footer.className = 'records-reading-footer';
   footer.append(textElement('span', 'fine', leftText));
+  if (options.href === null) {
+    footer.append(textElement('span', 'fine', options.label ?? '현재 다시 열 수 없습니다.'));
+    card.append(footer);
+    return;
+  }
   const link = document.createElement('a');
   link.href = options.href ?? 'reading.html';
   link.textContent = options.label ?? '사주 페이지에서 보기 →';
@@ -203,21 +212,32 @@ function renderPersistedReading(target, reading) {
   top.append(textElement('span', 'records-reading-date', formatTimestamp(reading.completedAt)));
   card.append(top);
 
+  const openable = isPersistedReadingOpenableState(reading.productResponseState);
   card.append(textElement(
     'p',
     'records-reading-summary',
-    `${formatTimestamp(reading.completedAt)}에 본 ${presentation.title} 기록입니다. 저장된 공식 풀이를 그대로 다시 열 수 있습니다.`,
+    openable
+      ? `${formatTimestamp(reading.completedAt)}에 본 ${presentation.title} 기록입니다. 저장된 공식 풀이를 그대로 다시 열 수 있습니다.`
+      : `${formatTimestamp(reading.completedAt)}의 ${presentation.title} 기록입니다. 완료된 Official Reading만 다시 열 수 있습니다.`,
   ));
-  const handoffUrl = buildPersistedReadingHandoffUrlV1({
-    readingId: reading.readingId,
-    readingSessionId: reading.readingSessionId,
-    sajuDomain: reading.sajuDomain,
-  });
-  appendReadingFooter(
-    card,
-    `Reading contract · ${String(reading.readingContractVersion ?? '—')}`,
-    { href: handoffUrl, label: '저장된 풀이 열기 →' },
-  );
+  if (openable) {
+    const handoffUrl = buildPersistedReadingHandoffUrlV1({
+      readingId: reading.readingId,
+      readingSessionId: reading.readingSessionId,
+      sajuDomain: reading.sajuDomain,
+    });
+    appendReadingFooter(
+      card,
+      `Reading contract · ${String(reading.readingContractVersion ?? '—')}`,
+      { href: handoffUrl, label: '저장된 풀이 열기 →' },
+    );
+  } else {
+    appendReadingFooter(
+      card,
+      `Reading contract · ${String(reading.readingContractVersion ?? '—')}`,
+      { href: null, label: '완료 후 다시 열 수 있습니다.' },
+    );
+  }
   target.append(card);
 }
 

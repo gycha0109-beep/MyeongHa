@@ -67,6 +67,15 @@ describe('Records Saju history surface', () => {
     expect(page).not.toContain('monthly: Object.freeze(');
   });
 
+  it('shows archive open links only for delivered states', () => {
+    expect(page).toContain('function isPersistedReadingOpenableState(value)');
+    expect(page).toContain("value === 'delivered' || value === 'delivered_with_fallback'");
+    expect(page).toContain('if (openable) {');
+    expect(page).toContain("{ href: handoffUrl, label: '저장된 풀이 열기 →' }");
+    expect(page).toContain("{ href: null, label: '완료 후 다시 열 수 있습니다.' }");
+    expect(page).toContain('완료된 Official Reading만 다시 열 수 있습니다.');
+  });
+
   it('recognizes only the explicit sample fixture contract and removes it from the Life Fact ledger', () => {
     expect(page).toContain("const SAMPLE_SAJU_FACT_TYPE = 'sample_saju_reading_result';");
     expect(page).toContain("const SAMPLE_SAJU_SCHEMA_VERSION = 'sample.v1';");
