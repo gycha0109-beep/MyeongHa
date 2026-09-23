@@ -169,13 +169,24 @@ echo "firewall_draft_mutation=accepted"
 
 firewall_request GET "$FIREWALL_API" "$staged_file"
 
-draft_id="$(jq -er '.draft.id // empty' "$staged_file")"
-test -n "$draft_id"
+draft_version="$(jq -er '.draft.version // empty' "$staged_file")" || {
+  echo "::error title=Guest bootstrap firewall draft version missing::Vercel accepted the draft mutation but no draft.version was available for activation."
+  jq -c '{
+    active_version: (.active.version // null),
+    active_firewall_enabled: (.active.firewallEnabled // null),
+    draft_type: (.draft | type),
+    draft_keys: ((.draft // {}) | keys),
+    draft_rule_count: (((.draft.rules // [])) | length)
+  }' "$staged_file"
+  exit 1
+}
+test -n "$draft_version"
+echo "firewall_draft_version=$draft_version"
 
 jq -e   --arg name "$rule_name"   --arg mode "$ABUSE_POLICY_MODE"   --arg rate_action "$rate_limit_action"   '
     (.draft.firewallEnabled == true)
-    and ([.draft.rules[] | select(.name == $name)] | length) == 1
-    and ([.draft.rules[] | select(.name == $name)][0] as $rule
+    and ([((.draft.rules // []))[] | select(.name == $name)] | length) == 1
+    and ([((.draft.rules // []))[] | select(.name == $name)][0] as $rule
       | $rule.valid != false
       and (($rule.validationErrors // []) | length) == 0
       and $rule.conditionGroup == [{
@@ -194,15 +205,15 @@ jq -e   --arg name "$rule_name"   --arg mode "$ABUSE_POLICY_MODE"   --arg rate_a
     )
   ' "$staged_file" >/dev/null
 
-firewall_request POST "https://api.vercel.com/v1/security/firewall/config/$draft_id/activate?projectId=$VERCEL_PROJECT_ID&teamId=$VERCEL_TEAM_ID" "$activate_response"
+firewall_request POST "https://api.vercel.com/v1/security/firewall/config/$draft_version/activate?projectId=$VERCEL_PROJECT_ID&teamId=$VERCEL_TEAM_ID" "$activate_response"
 echo "firewall_draft_activation=accepted"
 
 firewall_request GET "$FIREWALL_API" "$after_file"
 
 jq -e   --arg name "$rule_name"   --arg mode "$ABUSE_POLICY_MODE"   --arg rate_action "$rate_limit_action"   '
     (.active.firewallEnabled == true)
-    and ([.active.rules[] | select(.name == $name)] | length) == 1
-    and ([.active.rules[] | select(.name == $name)][0] as $rule
+    and ([((.active.rules // []))[] | select(.name == $name)] | length) == 1
+    and ([((.active.rules // []))[] | select(.name == $name)][0] as $rule
       | $rule.valid != false
       and (($rule.validationErrors // []) | length) == 0
       and $rule.conditionGroup == [{
