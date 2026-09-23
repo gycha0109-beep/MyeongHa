@@ -19,6 +19,16 @@ export interface ChatRoomReadPayloadV1 {
 
 export function parseChatThreadIdV1(value: unknown): string | null;
 
+
+export type ChatThreadRouteV1 =
+  | Readonly<{ state: 'none'; threadId: null }>
+  | Readonly<{ state: 'invalid'; threadId: null }>
+  | Readonly<{ state: 'ready'; threadId: string }>;
+
+export function parseChatThreadRouteV1(
+  search: URLSearchParams | string | null | undefined,
+): ChatThreadRouteV1;
+
 export function parseChatRoomReadPayloadV1(
   payload: unknown,
   options: Readonly<{
