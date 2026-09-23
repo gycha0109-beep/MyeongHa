@@ -47,6 +47,31 @@ The Reader Knowledge source resolver is the authority merged by PR #1142. This r
 - No new official Reading is created by this runtime.
 - No Production Saju, Product Offer, Charge Terms, or payment activation is introduced.
 
+## 2.1 Decision-R — Reader Context Product Policy V1
+
+Reader v1 keeps one Saju semantic authority rather than introducing a parallel raw-natal context.
+
+| Context material | Reader v1 authority | Decision |
+| --- | --- | --- |
+| Official Reading Source Truth | owner-authorized stored ProductReadingResponse | required, server-only |
+| semantic units / disclosures / ambiguities | Saju-owned Character Grounding projection | required, positively admitted |
+| day master / five elements / ten gods / hidden stems | no separate Reader field | excluded unless already expressed by the Official Reading and therefore present through grounding |
+| major-luck / annual-luck material | no separate Reader calculation | only through admitted Official Reading `timing` semantics |
+| current relationship state | owner-scoped PostgreSQL current projection | required for Character delivery |
+| relationship-event history | none | excluded from Reader v1 |
+| raw recent message text | none | excluded from Reader v1 |
+| Reader-granted Life Facts | owner-scoped PostgreSQL grant authority | allowed |
+| Reader-granted Memory | existing Memory item + grant authority | allowed |
+| Reader Character perspective | pinned published Character content | selection/framing only; cannot change canonical Saju meaning |
+
+Consequences:
+
+- Reader code must not calculate or reconstruct day master, element balance, ten gods, hidden stems, major luck, annual luck, useful/favorable elements, or similar Saju facts from birth data.
+- If those facts are needed for a future product surface, Saju/Official Reading authority must expose them first and the Reader contract must be versioned explicitly.
+- Reader-to-Reader variation is limited to admitted unit selection, ordering, framing, uncertainty handling, and advice style. `canonicalMeaning`, disclosures, ambiguity, source hashes, and Official Reading identity remain invariant.
+- Historical relationship events and raw messages are deliberately absent, so Reader v1 has no product-defined history/message window and no arbitrary retrieval limit. Legacy empty arrays may cross older internal seams, but non-empty history is rejected and the server normalizes both fields to empty.
+- Current relationship projection remains available for Character delivery, but its numeric band projection policy is not invented here; SRC-22 remains the policy-authority blocker for Production thresholds.
+
 ## 3. Current executable slice
 
 The runtime is intentionally perspective-agnostic: it receives an already-admitted `CharacterPerspectiveProfileV1` and does not invent Character-to-grounding mappings.
@@ -128,7 +153,7 @@ This PR does **not**:
 - promote Preview output to Official Reading Source Truth;
 - expose the raw Official Reading artifact in Character memory or the Reader envelope.
 
-Server-owned Reader context composition is connected through the thread-bound Preview seam, and the source-side Saju grounding endpoint is now hosted-canary verified. The next integration slice is **MyeongHa Preview HTTP/Reader Scene wiring**. Browser input must never provide Character runtime context, Character perspective, semantic grounding, Reader access, or Official Reading prose. Public wiring must not synthesize missing Production content/context authority merely because the Saju transport is now available, and it must not promote Commerce authority implicitly.
+Server-owned Reader context composition is connected through the thread-bound Preview seam, the source-side Saju grounding endpoint is hosted-canary verified, and the Preview HTTP plus dormant Reader Scene browser client/controller boundaries are implemented. The remaining activation work is to close the explicit Production authority gates before any public route or browser endpoint switch is enabled. Browser input must never provide Character runtime context, Character perspective, semantic grounding, Reader access, or Official Reading prose. Public wiring must not synthesize missing Production content/context authority merely because the Saju transport is available, and it must not promote Commerce authority implicitly.
 
 
 ## 9. Cross-service projection transport
@@ -184,6 +209,8 @@ The request body is intentionally limited to:
 - `threadId`
 - `officialReadingId`
 
+Both request identities are UUID-backed database identities. The browser client and HTTP seam reject malformed values before any Reader context, thread binding, access, artifact, relationship, Memory, or Saju authority is consulted.
+
 The following are rejected when supplied by the client:
 
 - Reader Character id
@@ -194,7 +221,7 @@ The following are rejected when supplied by the client:
 - Character perspective
 - raw Official Reading response
 
-The authenticated subject and effective time are server inputs. `ReaderInterpretationPreviewContextAuthorityPortV1` may provide only non-content server context; Character, content bundle, world relations, relationship state, and granted Memory context are explicitly excluded. The owner-authorized thread is independently re-read, its pinned release is resolved through the server `ContentReleaseRuntime`, relationship and Memory grants are re-read from their authorities, and exact Reader access is then revalidated. The Reading domain is derived from the authorized Official Reading source, not from client input.
+The authenticated subject and effective time are server inputs. `ReaderInterpretationPreviewContextAuthorityPortV1` is explicitly narrowed to the server-owned `relationshipProjectionPolicy` input only; Character, content bundle, world relations, relationship state, Life Facts, granted Memory context, event/message history, and Saju context are not fields of this port. The HTTP seam also reconstructs a fresh one-field context object from that result, so runtime-only extra properties from an unsound adapter are discarded before Reader composition. The concrete threshold policy remains SRC-22-owned and is not defined by this track. The owner-authorized thread is independently re-read, its pinned release is resolved through the server `ContentReleaseRuntime`, relationship and Memory grants are re-read from their authorities, and exact Reader access is then revalidated. The Reading domain is derived from the authorized Official Reading source, not from client input.
 
 The bounded HTTP response exposes only the Reader Scene material required by the Preview UI:
 
@@ -209,6 +236,67 @@ It does not expose Reader content-bundle ids, DB artifact hashes, Saju source ha
 
 The existing browser `reading-character.js` is not switched to this endpoint in this slice because the current page flow does not yet carry the required server-authorized `threadId + officialReadingId` handoff. Falling back to URL-selected Reader identity would violate this authority model.
 
+
+## 11.1 Frontend Integration Boundary
+
+The web integration layer now has a dormant Reader Scene client contract without opening the Production route.
+
+- `apps/web/reader-scene-contract.js` validates only the bounded browser DTO emitted by the Reader Preview HTTP seam and rejects unexpected internal provenance fields.
+- `apps/web/reader-runtime-client.js` sends only `threadId + officialReadingId`, reuses the current Bearer authority, distinguishes feature-unavailable from request failure, and is disabled by default until route activation is separately approved. A successful response is accepted only when its server-returned `officialReadingId` exactly matches the UUID requested by that browser operation; a cross-Reading success response fails closed as malformed.
+- `apps/web/reader-scene-controller.js` owns loading/retry/abort/stale-response state and treats the server-returned `readerCharacterId` as authoritative.
+- URL `reader` / `character` values remain presentation hints only; they are not Reader runtime authority.
+- The current Saju Preview execution remains separate while the Reader Production route is closed. Its completion surface does not persist or forward a Reader identity into Chat; it routes only to the general Chat hub because the selected Reader is presentation-only. A failed Reader request must never silently fall back to Saju Preview as if it were Reader output.
+- That legacy Saju Preview also keeps its step guidance Reader-neutral: the browser no longer synthesizes per-Reader commentary from the presentation key while server-authorized Reader Interpretation is inactive.
+
+No `api/me.ts` dispatch target, Vercel rewrite, Production Reader route, Character asset authority, relationship threshold, Saju semantic rule, Commerce rule, or persistence policy is introduced by this frontend integration slice.
+
+## 11.2 Persisted Reading archive handoff
+
+Records carries only stored Reading navigation identifiers (`readingId`, `readingSessionId`, and `sajuDomain`) into the Reading Detail surface. `qry_reading_history_v2` may also expose bounded Reader provenance for list display, but that provenance is not Reader/Chat authority.
+
+The governed archive path is now implemented:
+
+```text
+Records history
+→ persisted Official Reading identity
+→ owner-authorized stored Official Reading detail
+→ stored Official Reading reread
+```
+
+- `GET /api/readings` serves the owner-scoped history projection.
+- `GET /api/readings?readingId=<uuid>` resolves one owner-scoped stored Official Reading through `qry_official_reading_record_runtime_v1`.
+- `reading-history-contract.js` validates the history DTO before Records constructs navigation links.
+- `reading-history-handoff.js` revalidates the stored identities, requires one exact Records source marker, and rejects duplicate identities plus competing `reader`, `character`, `threadId`, `topic`, or `scope` hints.
+- Reading Detail verifies `readingId`, `readingSessionId`, and `sajuDomain` against the stored record before rendering.
+- Verified archive mode hides Reader Scene and Reader commentary, clears Reader presentation datasets, uses Reader-neutral completion/accessibility copy, and navigates back to the Saju Records surface.
+
+The archive path does not execute Reader Preview, does not create/reuse a Chat thread, and does not turn Reader display provenance into Reader selection authority. A failed or malformed archive lookup fails closed rather than silently executing Saju Preview or Reader Interpretation.
+
+The generic Reader Scene controller remains a separate future activation boundary and accepts only explicit `threadId + officialReadingId` candidates from a future approved Reader entry surface. Records does not provide such an entry surface.
+
+## 11.3 SRC-37 resolution — Records reread does not re-enter Reader Scene
+
+`SRC-37` is resolved by product decision: reopening a persisted Saju result means reading the stored Official Reading from Records. It does **not** mean selecting a Reader again, entering Reader Scene, or choosing a Reader for Chat.
+
+The former chain:
+
+```text
+Records → exact Reader selection → Reader Preview → Chat
+```
+
+is retired for archive reread.
+
+Reader attribution in Records is display provenance only. If one Official Reading has provenance for multiple Readers, the history projection may represent that provenance without arbitrarily selecting one as the active Reader. Reader-held knowledge/context remains governed by Reader/Character runtime authority and is not merged into the Records Official Reading artifact.
+
+The frontend must continue to reject these regressions:
+
+- deriving a Chat `threadId` from `readingId` or `readingSessionId`;
+- inferring an active Reader from URL/local/session storage, Saju domain, catalog order, or a default Character;
+- reopening Records through Reader Scene;
+- treating Reader provenance as permission to create/reuse Chat;
+- falling back to Preview when stored-record identity validation fails.
+
+`test/reader-scene-entry-authority-boundary.test.ts`, `test/web-reading-history-handoff.test.ts`, `test/reading-history-v2-authority-binding.test.ts`, and the stored-record browser tests preserve these cross-layer boundaries.
 
 ## 12. Hosted Production grounding evidence and remaining MyeongHa gates
 
@@ -228,9 +316,27 @@ This evidence closes only the Saju cross-service transport prerequisite. It does
 Before `api/me.ts` / `vercel.json` may expose `POST /api/me/readings/reader-interpretation/preview`, Production MyeongHa composition must bind all of the existing HTTP seam dependencies to concrete server authorities. In particular:
 
 1. the exact pinned immutable `ContentReleaseRuntime` entry must be recoverable from server-owned published content authority rather than browser Reader keys or development fixtures;
-2. `ReaderInterpretationPreviewContextAuthorityPortV1` must be backed by concrete server context authority for its non-content fields rather than invented empty/default context;
+2. the remaining `ReaderInterpretationPreviewContextAuthorityPortV1` input, `relationshipProjectionPolicy`, must come from approved source-backed authority; SRC-22 does not authorize invented Production thresholds;
 3. current relationship, Memory, thread binding, Reader access, and Official artifact reads must execute inside the canonical subject-scoped PostgreSQL transaction;
 4. the already-hosted `createProductionSajuCharacterGroundingProjectionPortV1` is the only Production grounding transport;
 5. Reader Scene handoff must carry only `threadId + officialReadingId`; URL-selected Reader identity remains presentation input and must not become runtime authority.
 
 Until those MyeongHa composition gates are concrete and tested, the public rewrite and browser endpoint switch remain fail-closed.
+
+
+## Reading completion → Chat open boundary
+
+The current Saju Preview completion surface does not possess a server-authoritative Reader Character identity. Its URL-selected Reader remains presentation-only, so completion navigation no longer forwards `reader` or `character` as Chat authority and no longer writes a Reader-specific Reading-to-Chat continuation claim into `sessionStorage`. The legacy Preview CTA goes to the general Chat hub, where Character selection is a separate interaction rather than implied continuation.
+
+The Chat room also ignores the removed legacy `myeongha.readingHandoff.v1` browser claim. A stale query or sessionStorage value cannot recreate a Reading continuation banner or context; only a future server-authorized thread/context projection may do that.
+
+A browser-safe `chat-open-client.js` adapter now mirrors the existing `POST /api/chat` contract. It accepts only a caller-supplied server Reader identity, sends exactly `{ characterId }`, validates that the returned Character identity matches, and navigates only by the authoritative returned `threadId`.
+
+This adapter is intentionally not invoked by the legacy Saju Preview path. It is reserved for the Reader Scene path once that path is publicly activated and supplies `readerCharacterId`. Character publication/content availability remains server-authoritative and may fail closed.
+
+A dormant `reader-chat-open-controller.js` now closes the browser orchestration boundary around that adapter. It accepts only a `ready` Reader Scene view model, coalesces double-submit while Chat open is in flight, retries only explicit retryable server failures, and navigates only to the authoritative returned `threadId`. Protected fallback or any non-ready Reader Scene fails before transport. This controller is not wired into the legacy Saju Preview surface and does not activate the Reader public route.
+
+
+A thread-only Chat URL stays identity-neutral at the browser route boundary even though SRC-36 now provides the exact-nine canonical Character → presentation mapping. The room does not default an authoritative `threadId` to Baekheon or any other presentation Character; the owner-scoped thread read supplies the canonical Character identity, and only then may the approved presentation resolver map it for display. When `threadId` is present, any simultaneous `?character=` presentation hint is ignored rather than allowed to override the thread-bound identity boundary. Chat Hub links likewise emit `threadId` alone for an existing thread and reserve `?character=` for pre-thread discovery navigation.
+
+The owner-scoped Chat read now crosses a dedicated browser DTO validator before rendering. It requires the exact requested UUID thread, exact sequence cursor, a non-empty server character identity, a strictly increasing message stream, matching `lastSequenceNo`, and redaction-safe message fields. Internal release/bundle/relationship/message-payload fields returned by the broader API response are not promoted into the browser render model. A malformed `threadId` route is rejected before transport and remains identity-neutral; it cannot fall back to a presentation Character or silently become a new/discovery Chat route.

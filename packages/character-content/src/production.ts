@@ -8,9 +8,10 @@ import { validateCharacterContentBundle } from './validate.js';
 /**
  * Product-owner-approved MVP Production Launch display-name authority.
  *
- * This fixes Launch membership and official display names only. It does not
- * establish canonical characterId values or any still-open detailed Character
- * canon/persona/behavior/visual/gender authority.
+ * This fixes Launch membership and official display names only. Canonical
+ * characterId values are governed separately by the approved immutable authoring
+ * authority; this display-name constant must not be mistaken for that mapping or
+ * for any still-open publication/runtime asset authority.
  */
 export const MVP_PRODUCTION_LAUNCH_CHARACTER_DISPLAY_NAMES = [
   '세연',

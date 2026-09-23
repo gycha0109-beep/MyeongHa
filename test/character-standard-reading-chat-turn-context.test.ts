@@ -29,6 +29,7 @@ import type { ChatThreadRuntimeBindingReadAuthorityPortV1 } from '../apps/api/sr
 import type { CharacterRelationshipReadAuthorityPortV1 } from '../apps/api/src/character-relationship-read.js';
 import type { MemoryItemsReadAuthorityPortV1 } from '../apps/api/src/memory-items-read.js';
 import type { MemoryGrantsReadAuthorityPortV1 } from '../apps/api/src/memory-grants-read.js';
+import type { ReaderContextNonMemoryReadAuthorityPortV1 } from '../apps/api/src/reader-context-non-memory-read.js';
 import type {
   CharacterStandardReadingAccessAuthorityPortV1,
   CharacterStandardReadingArtifactAuthorityPortV1,
@@ -194,6 +195,7 @@ function serverContextInput(): CharacterStandardReadingChatTurnServerContextInpu
     contentBundleId: _contentBundleId,
     worldRelations: _worldRelations,
     relationshipState: _relationshipState,
+    grantedLifeFacts: _grantedLifeFacts,
     grantedMemories: _grantedMemories,
     ...context
   } = contextInput();
@@ -310,6 +312,18 @@ function authorities(
           }]
     )),
   };
+  const nonMemoryContextAuthorityPort: ReaderContextNonMemoryReadAuthorityPortV1 = {
+    readGrantedLifeFacts: vi.fn(async () => [{
+      factId: 'cccccccc-cccc-4ccc-8ccc-ccccccccccc1',
+      factType: 'occupation',
+      schemaVersion: 'life-fact-v1',
+      value: { value: 'designer' },
+      grantId: 'dddddddd-dddd-4ddd-8ddd-ddddddddddd1',
+      granteeCharacterId: 'baekheon',
+    }]),
+    readRelationshipEvents: vi.fn(async () => []),
+    readRecentMessages: vi.fn(async () => []),
+  };
   return {
     threadBindingAuthorityPort,
     accessAuthorityPort,
@@ -317,6 +331,7 @@ function authorities(
     relationshipAuthorityPort,
     memoryItemsAuthorityPort,
     memoryGrantsAuthorityPort,
+    nonMemoryContextAuthorityPort,
   };
 }
 
@@ -691,6 +706,18 @@ describe('Official Reading Reader Chat turn preflight', () => {
       expect(result.runtime.context.saju?.readingRef).toBe(READING_ID);
       expect(result.runtime.context.relationship.relationshipRevision).toBe(7);
       expect(result.runtime.context.relationship.stageKey).toBe('familiar');
+      expect(result.runtime.context.lifeFacts).toEqual([{
+        factId: 'cccccccc-cccc-4ccc-8ccc-ccccccccccc1',
+        factType: 'occupation',
+        schemaVersion: 'life-fact-v1',
+        value: { value: 'designer' },
+        grantId: 'dddddddd-dddd-4ddd-8ddd-ddddddddddd1',
+        granteeCharacterId: 'baekheon',
+      }]);
+      expect(authority.nonMemoryContextAuthorityPort.readGrantedLifeFacts).toHaveBeenCalledWith({
+        subjectId: SUBJECT_ID,
+        characterId: 'baekheon',
+      });
       expect(result.runtime.context.memories).toEqual([{
         memoryItemId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1',
         memoryType: 'reader_memory',

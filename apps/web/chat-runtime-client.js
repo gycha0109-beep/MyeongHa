@@ -1,10 +1,14 @@
+import { resolveCanonicalCharacterPresentationV1 } from './character-presentation-identity.js';
+import { applyCanonicalCharacterPresentationV1 } from './chat-character.js';
+import { parseChatRoomReadPayloadV1, parseChatThreadIdV1 } from './chat-room-read-contract.js';
 import { getActiveBearer, invalidateGuestSession, invalidateMemberSession } from './product-auth.js';
 import { PRODUCT_AUTH_STORAGE_V1 } from './product-auth.js';
 import { shouldReloadChatForMemberSessionStorageChange } from './product-auth-surface.js';
 
 const params = new URLSearchParams(window.location.search);
-const threadId = params.get('threadId');
-const room = window.MyeongHaCharacterRoom;
+const rawThreadId = params.get('threadId');
+const threadId = parseChatThreadIdV1(rawThreadId);
+const invalidThreadRoute = rawThreadId !== null && threadId === null;
 const apiEnvelopePromise = import('./api-envelope.js');
 
 const historyList = document.querySelector('[data-history-list]');
@@ -30,29 +34,12 @@ function formatTimestamp(value) {
   }).format(parsed);
 }
 
-function assertRoomState(payload) {
-  if (!payload || typeof payload !== 'object') {
-    throw new Error('Character Room runtime returned an invalid response.');
-  }
-  if (typeof payload.threadId !== 'string' || payload.threadId !== threadId) {
-    throw new Error('Character Room runtime returned a different thread identity.');
-  }
-  if (typeof payload.characterId !== 'string' || payload.characterId.trim().length === 0) {
-    throw new Error('Character Room runtime did not return an authoritative character identity.');
-  }
-  if (!Array.isArray(payload.messages)) {
-    throw new Error('Character Room runtime did not return an authoritative message stream.');
-  }
-  if (!Number.isSafeInteger(payload.lastSequenceNo) || payload.lastSequenceNo < 0) {
-    throw new Error('Character Room runtime returned an invalid sequence cursor.');
-  }
-  return payload;
-}
-
 function senderLabel(message, authoritativeCharacterId) {
   if (message.senderType === 'user') return '나';
   if (message.senderType === 'character') {
-    return message.characterId === authoritativeCharacterId ? '대리자' : '다른 대리자';
+    const identity = resolveCanonicalCharacterPresentationV1(message.characterId);
+    if (message.characterId === authoritativeCharacterId) return identity?.name ?? '대리자';
+    return identity?.name ?? '다른 대리자';
   }
   return '대화 기록';
 }
@@ -145,14 +132,16 @@ function renderConversation(messages, authoritativeCharacterId) {
 }
 
 function renderRoomState(payload) {
-  const state = assertRoomState(payload);
+  const state = parseChatRoomReadPayloadV1(payload, {
+    expectedThreadId: threadId,
+    expectedAfterSequenceNo: 0,
+  });
   renderHistory(state.messages, state.characterId);
   renderConversation(state.messages, state.characterId);
 
-  // The repository does not yet contain a governed presentationKey -> canonical
-  // characterId correspondence. Do not project an authoritative DB character's
-  // message into the current presentation room bubble until that authority exists.
-  // The owner-scoped stream remains visible with identity-neutral labels.
+  // Exact-nine product authority maps canonical Character id to the same
+  // English browser presentation key. The thread read remains identity authority.
+  applyCanonicalCharacterPresentationV1(state.characterId);
 
   // Life Thread / 이어지는 이야기 authority is intentionally not inferred from
   // chat messages. Until a verified continuation projection is supplied, the
@@ -182,6 +171,15 @@ function invalidateRejectedBearer(activeBearer) {
 }
 
 async function loadRoomState() {
+  if (invalidThreadRoute) {
+    if (historyEmpty) {
+      historyEmpty.hidden = false;
+      historyEmpty.textContent = '대화 주소가 올바르지 않습니다.';
+    }
+    setComposeStatus('유효한 대화를 다시 선택해 주세요.');
+    return;
+  }
+
   if (!threadId) {
     if (historyEmpty) {
       historyEmpty.hidden = false;
@@ -235,6 +233,11 @@ function submitTurn(event) {
 
   const message = event.detail?.message;
   if (typeof message !== 'string' || message.trim().length === 0) return;
+
+  if (invalidThreadRoute) {
+    setComposeStatus('대화 주소가 올바르지 않아 메시지를 보낼 수 없습니다.');
+    return;
+  }
 
   if (!threadId) {
     setComposeStatus('먼저 이어갈 대화를 선택해야 합니다. 입력한 내용은 보내지지 않았습니다.');

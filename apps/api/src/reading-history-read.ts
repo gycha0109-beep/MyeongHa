@@ -1,7 +1,11 @@
+import { SAJU_DOMAINS } from '../../../packages/contracts/src/index.js';
 import { ApiCommandError } from './api-error.js';
 
 export const READING_HISTORY_READ_AUTHORITY_BINDING_V1 =
-  'public.qry_reading_history_v1' as const;
+  'public.qry_reading_history_v2' as const;
+
+const UUID_V1 = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+const SAJU_DOMAIN_SET_V1 = new Set<string>(SAJU_DOMAINS);
 
 export interface ReadingHistoryAuthorityRowV1 {
   readonly readingId: string;
@@ -9,6 +13,7 @@ export interface ReadingHistoryAuthorityRowV1 {
   readonly sajuDomain: string;
   readonly readingContractVersion: string;
   readonly productResponseState: string;
+  readonly readerCharacterIds: readonly string[];
   readonly createdAt: string;
   readonly completedAt: string;
 }
@@ -39,6 +44,7 @@ export interface ReadingHistoryItemV1 {
   readonly sajuDomain: string;
   readonly readingContractVersion: string;
   readonly productResponseState: string;
+  readonly readerCharacterIds: readonly string[];
   readonly createdAt: string;
   readonly completedAt: string;
 }
@@ -66,12 +72,43 @@ function requireStoredString(name: string, value: unknown): string {
   return value;
 }
 
+function requireStoredUuid(name: string, value: unknown): string {
+  const stored = requireStoredString(name, value);
+  if (!UUID_V1.test(stored)) {
+    throw new Error(`Reading History authority returned an invalid ${name}.`);
+  }
+  return stored;
+}
+
+function requireSajuDomain(value: unknown): string {
+  const stored = requireStoredString('Saju domain', value);
+  if (!SAJU_DOMAIN_SET_V1.has(stored)) {
+    throw new Error('Reading History authority returned an invalid Saju domain.');
+  }
+  return stored;
+}
+
 function requireTimestamp(name: string, value: unknown): string {
   const stored = requireStoredString(name, value);
   if (Number.isNaN(Date.parse(stored))) {
     throw new Error(`Reading History authority returned an invalid ${name}.`);
   }
   return stored;
+}
+
+function requireReaderCharacterIds(value: unknown): readonly string[] {
+  if (!Array.isArray(value)) {
+    throw new Error('Reading History authority returned invalid Reader provenance.');
+  }
+  const ids = value.map((item) => requireStoredString('Reader Character identity', item));
+  if (new Set(ids).size !== ids.length) {
+    throw new Error('Reading History authority returned duplicate Reader provenance.');
+  }
+  const sorted = [...ids].sort((left, right) => left.localeCompare(right));
+  if (sorted.some((value, index) => value !== ids[index])) {
+    throw new Error('Reading History authority returned non-deterministic Reader provenance.');
+  }
+  return Object.freeze(ids);
 }
 
 function compareStoredOrder(
@@ -90,7 +127,7 @@ function projectHistory(
 ): readonly ReadingHistoryItemV1[] {
   const seenIds = new Set<string>();
   const normalized = rows.map((row) => {
-    const readingId = requireStoredString('Reading identity', row.readingId);
+    const readingId = requireStoredUuid('Reading identity', row.readingId);
     if (seenIds.has(readingId)) {
       throw new Error('Reading History authority returned a duplicate Reading identity.');
     }
@@ -98,8 +135,8 @@ function projectHistory(
 
     return Object.freeze({
       readingId,
-      readingSessionId: requireStoredString('Reading Session identity', row.readingSessionId),
-      sajuDomain: requireStoredString('Saju domain', row.sajuDomain),
+      readingSessionId: requireStoredUuid('Reading Session identity', row.readingSessionId),
+      sajuDomain: requireSajuDomain(row.sajuDomain),
       readingContractVersion: requireStoredString(
         'Reading contract version',
         row.readingContractVersion,
@@ -108,6 +145,7 @@ function projectHistory(
         'Product response state',
         row.productResponseState,
       ),
+      readerCharacterIds: requireReaderCharacterIds(row.readerCharacterIds),
       createdAt: requireTimestamp('created timestamp', row.createdAt),
       completedAt: requireTimestamp('completed timestamp', row.completedAt),
     });

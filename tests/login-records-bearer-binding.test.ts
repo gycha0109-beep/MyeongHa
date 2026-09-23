@@ -92,7 +92,26 @@ function snapshotFor(label: string, endpoint: string) {
     };
   }
   if (endpoint === '/api/life-record') return { facts: [{ factType: `${label}-fact` }] };
-  if (endpoint === '/api/readings') return { readings: [{ readingId: `${label}-reading` }] };
+  if (endpoint === '/api/readings') {
+    const readingIdentity = label === 'member-a'
+      ? '44444444-4444-4444-8444-444444444401'
+      : '44444444-4444-4444-8444-444444444402';
+    const sessionIdentity = label === 'member-a'
+      ? '55555555-5555-4555-8555-555555555501'
+      : '55555555-5555-4555-8555-555555555502';
+    return {
+      readings: [{
+        readingId: readingIdentity,
+        readingSessionId: sessionIdentity,
+        sajuDomain: 'career',
+        readingContractVersion: 'reading-v1',
+        productResponseState: 'delivered',
+        readerCharacterIds: [label === 'member-a' ? 'seyeon' : 'taegyeom'],
+        createdAt: '2026-09-10T00:00:00.000Z',
+        completedAt: '2026-09-10T00:01:00.000Z',
+      }],
+    };
+  }
   return { memories: [{ memoryId: `${label}-memory` }] };
 }
 
@@ -175,7 +194,7 @@ describe('Records active bearer binding', () => {
     await expect(client.readRecords()).resolves.toMatchObject({
       profile: { profile: { displayName: 'member-b' } },
       lifeFacts: { facts: [{ factType: 'member-b-fact' }] },
-      readings: { readings: [{ readingId: 'member-b-reading' }] },
+      readings: { readings: [{ readingId: '44444444-4444-4444-8444-444444444402' }] },
       memories: { memories: [{ memoryId: 'member-b-memory' }] },
     });
 

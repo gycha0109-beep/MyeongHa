@@ -24,6 +24,9 @@ import {
   getMemoryGrants,
   type MemoryGrantsReadAuthorityPortV1,
 } from './memory-grants-read.js';
+import type {
+  ReaderContextLifeFactsReadAuthorityPortV1,
+} from './reader-context-non-memory-read.js';
 
 export type CharacterStandardReadingServerContextInputV1 = Omit<
   CharacterStandardReadingChatBaseContextInputV1,
@@ -31,7 +34,10 @@ export type CharacterStandardReadingServerContextInputV1 = Omit<
   | 'contentBundleId'
   | 'worldRelations'
   | 'relationshipState'
+  | 'grantedLifeFacts'
   | 'grantedMemories'
+  | 'recentRelationshipEventKeys'
+  | 'recentMessages'
 >;
 
 export interface PrepareCharacterStandardReadingServerRuntimeInputV1 {
@@ -47,6 +53,7 @@ export interface PrepareCharacterStandardReadingServerRuntimeInputV1 {
   readonly relationshipAuthorityPort: CharacterRelationshipReadAuthorityPortV1;
   readonly memoryItemsAuthorityPort: MemoryItemsReadAuthorityPortV1;
   readonly memoryGrantsAuthorityPort: MemoryGrantsReadAuthorityPortV1;
+  readonly nonMemoryContextAuthorityPort: ReaderContextLifeFactsReadAuthorityPortV1;
   readonly contextInput: CharacterStandardReadingServerContextInputV1;
 }
 
@@ -65,11 +72,23 @@ function assertNoCallerContentAuthorityFields(
     'contentBundleId',
     'worldRelations',
     'relationshipState',
+    'grantedLifeFacts',
     'grantedMemories',
   ] as const) {
     if (Object.prototype.hasOwnProperty.call(input, field)) {
       throw new CharacterStandardReadingServerRuntimeAuthorityErrorV1(
         `Server Reader runtime does not accept caller-supplied ${field} authority.`,
+      );
+    }
+  }
+
+  const legacy = input as unknown as Record<string, unknown>;
+  for (const field of ['recentRelationshipEventKeys', 'recentMessages'] as const) {
+    if (!Object.prototype.hasOwnProperty.call(legacy, field)) continue;
+    const value = legacy[field];
+    if (!Array.isArray(value) || value.length !== 0) {
+      throw new CharacterStandardReadingServerRuntimeAuthorityErrorV1(
+        `Server Reader runtime does not accept non-empty caller-supplied ${field} authority.`,
       );
     }
   }
@@ -172,6 +191,11 @@ export async function prepareCharacterStandardReadingServerRuntimeV1(
     policyVersion: relationship.relationship.policyVersion,
   });
 
+  const grantedLifeFacts = await input.nonMemoryContextAuthorityPort.readGrantedLifeFacts({
+    subjectId: input.resolvedSubjectId!,
+    characterId: readerCharacterId,
+  });
+
   const memoryItems = await getMemoryItems({
     ...subjectBinding,
     authorityPort: input.memoryItemsAuthorityPort,
@@ -216,8 +240,14 @@ export async function prepareCharacterStandardReadingServerRuntimeV1(
       character,
       contentBundleId: input.contentEntry.release.bundleId,
       relationshipState,
+      // Decision-R / Reader Context Product Policy V1: historical relationship
+      // events and raw message text are not Reader Interpretation inputs. Current
+      // relationship projection remains authoritative; history stays outside this seam.
+      recentRelationshipEventKeys: Object.freeze([]),
       worldRelations,
+      grantedLifeFacts: Object.freeze(grantedLifeFacts.map((fact) => Object.freeze({ ...fact }))),
       grantedMemories: Object.freeze(grantedMemories),
+      recentMessages: Object.freeze([]),
     },
   });
 

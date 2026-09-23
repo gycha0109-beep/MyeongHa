@@ -35,11 +35,11 @@ const mime = new Map([
   ['.webp', 'image/webp'],
 ]);
 const responses = new Map([
-  ['member-401', 401],
-  ['guest-401', 401],
-  ['member-403', 403],
-  ['guest-403', 403],
-  ['member-500', 500],
+  ['93000000-0000-4000-8000-000000000101', 401],
+  ['93000000-0000-4000-8000-000000000102', 401],
+  ['93000000-0000-4000-8000-000000000103', 403],
+  ['93000000-0000-4000-8000-000000000104', 403],
+  ['93000000-0000-4000-8000-000000000105', 500],
 ]);
 const requests = [];
 let envelopeNo = 0;
@@ -90,24 +90,29 @@ function memberForAuthorization(value) {
 
 function ownerThreadState() {
   return {
-    threadId: 'owner-thread',
+    threadId: '93000000-0000-4000-8000-000000000201',
     characterId: '11111111-1111-4111-8111-111111111111',
+    afterSequenceNo: 0,
     lastSequenceNo: 2,
     messages: [
       {
+        messageId: '96000000-0000-4000-8000-000000000101',
         sequenceNo: 1,
         senderType: 'user',
         characterId: null,
         bodyText: 'Member A private owner message',
         redacted: false,
+        redactedAt: null,
         createdAt: '2026-09-11T01:00:00.000Z',
       },
       {
+        messageId: '96000000-0000-4000-8000-000000000102',
         sequenceNo: 2,
         senderType: 'character',
         characterId: '11111111-1111-4111-8111-111111111111',
         bodyText: 'Member A private character reply',
         redacted: false,
+        redactedAt: null,
         createdAt: '2026-09-11T01:01:00.000Z',
       },
     ],
@@ -135,7 +140,7 @@ async function serve() {
     if (url.pathname.startsWith('/api/chat/')) {
       const threadId = decodeURIComponent(url.pathname.slice('/api/chat/'.length));
       const authorization = request.headers.authorization ?? null;
-      if (threadId === 'owner-thread') {
+      if (threadId === '93000000-0000-4000-8000-000000000201') {
         const member = memberForAuthorization(authorization);
         const status = member?.id === memberA.id ? 200 : 403;
         requests.push({
@@ -339,33 +344,33 @@ try {
   const port = await devtoolsPort(profile, chrome);
   client = await connectCdp(port);
 
-  const member401 = await runScenario(client, { threadId: 'member-401', kind: 'member' });
+  const member401 = await runScenario(client, { threadId: '93000000-0000-4000-8000-000000000101', kind: 'member' });
   assert(member401.member === null, 'Chat Member 401 retained the rejected Member session');
   assert(member401.active === null, 'Chat Member 401 retained the rejected active JWT');
 
   const guest401Token = 'guest-chat-401';
-  const guest401 = await runScenario(client, { threadId: 'guest-401', kind: 'guest', guestToken: guest401Token });
+  const guest401 = await runScenario(client, { threadId: '93000000-0000-4000-8000-000000000102', kind: 'guest', guestToken: guest401Token });
   assert(guest401.member === null, 'Chat Guest 401 unexpectedly created a Member session');
   assert(guest401.active === null, 'Chat Guest 401 retained the rejected Guest bearer');
 
-  const member403 = await runScenario(client, { threadId: 'member-403', kind: 'member' });
+  const member403 = await runScenario(client, { threadId: '93000000-0000-4000-8000-000000000103', kind: 'member' });
   assert(member403.member !== null, 'Chat Member 403 discarded the Member session');
   assert(member403.active === memberToken, 'Chat Member 403 discarded the active Member bearer');
 
   const guest403Token = 'guest-chat-403';
-  const guest403 = await runScenario(client, { threadId: 'guest-403', kind: 'guest', guestToken: guest403Token });
+  const guest403 = await runScenario(client, { threadId: '93000000-0000-4000-8000-000000000104', kind: 'guest', guestToken: guest403Token });
   assert(guest403.active === guest403Token, 'Chat Guest 403 discarded the Guest bearer');
 
-  const member500 = await runScenario(client, { threadId: 'member-500', kind: 'member' });
+  const member500 = await runScenario(client, { threadId: '93000000-0000-4000-8000-000000000105', kind: 'member' });
   assert(member500.member !== null, 'Chat 500 discarded the Member session');
   assert(member500.active === memberToken, 'Chat 500 discarded the active Member bearer');
 
   const expectedAuth = new Map([
-    ['member-401', `Bearer ${memberToken}`],
-    ['guest-401', `Bearer ${guest401Token}`],
-    ['member-403', `Bearer ${memberToken}`],
-    ['guest-403', `Bearer ${guest403Token}`],
-    ['member-500', `Bearer ${memberToken}`],
+    ['93000000-0000-4000-8000-000000000101', `Bearer ${memberToken}`],
+    ['93000000-0000-4000-8000-000000000102', `Bearer ${guest401Token}`],
+    ['93000000-0000-4000-8000-000000000103', `Bearer ${memberToken}`],
+    ['93000000-0000-4000-8000-000000000104', `Bearer ${guest403Token}`],
+    ['93000000-0000-4000-8000-000000000105', `Bearer ${memberToken}`],
   ]);
   for (const [scenarioThreadId, authorization] of expectedAuth) {
     const request = requests.find((candidate) => candidate.threadId === scenarioThreadId);
@@ -378,7 +383,7 @@ try {
   await clearAuthority(client);
   const firstASession = await signIn(client, memberA);
   assert(firstASession?.user?.id === memberA.id, 'Member A sign-in did not return Member A');
-  await navigate(client, `${origin}/chat.html?character=seyeon&threadId=owner-thread`);
+  await navigate(client, `${origin}/chat.html?character=seyeon&threadId=93000000-0000-4000-8000-000000000201`);
   await waitFor(
     client,
     `document.body.textContent.includes('Member A private owner message') && document.body.textContent.includes('Member A private character reply')`,
@@ -418,11 +423,11 @@ try {
   const staleOwnerCleared = await client.evaluate(`!document.body.textContent.includes('Member A private owner message') && !document.body.textContent.includes('Member A private character reply')`);
   assert(staleOwnerCleared, 'Member A owner-scoped Chat messages remained visible after Member B became canonical');
 
-  const ownerThreadRequests = requests.filter((entry) => entry.threadId === 'owner-thread');
-  assert(ownerThreadRequests.length === 2, `unexpected owner-thread read count: ${ownerThreadRequests.length}`);
-  assert(ownerThreadRequests[0].member === memberA.email && ownerThreadRequests[0].status === 200, 'initial owner-thread read did not use Member A authority');
-  assert(ownerThreadRequests[1].member === memberB.email && ownerThreadRequests[1].status === 403, 'replacement owner-thread read was not rejected under Member B authority');
-  assert(ownerThreadRequests[1].authorization === `Bearer ${bSession.accessToken}`, 'replacement owner-thread read did not use Member B canonical token');
+  const ownerThreadRequests = requests.filter((entry) => entry.threadId === '93000000-0000-4000-8000-000000000201');
+  assert(ownerThreadRequests.length === 2, `unexpected 93000000-0000-4000-8000-000000000201 read count: ${ownerThreadRequests.length}`);
+  assert(ownerThreadRequests[0].member === memberA.email && ownerThreadRequests[0].status === 200, 'initial 93000000-0000-4000-8000-000000000201 read did not use Member A authority');
+  assert(ownerThreadRequests[1].member === memberB.email && ownerThreadRequests[1].status === 403, 'replacement 93000000-0000-4000-8000-000000000201 read was not rejected under Member B authority');
+  assert(ownerThreadRequests[1].authorization === `Bearer ${bSession.accessToken}`, 'replacement 93000000-0000-4000-8000-000000000201 read did not use Member B canonical token');
 
   await mkdir('artifacts', { recursive: true });
   await writeFile('artifacts/web-chat-auth-browser-smoke.json', `${JSON.stringify({

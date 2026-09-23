@@ -7,13 +7,13 @@ export function ReadingDetailPage() {
 
   return (
     <>
-      <a className="reading-back-to-hub" href="reading.html">← 내 사주로 돌아가기</a>
+      <a className="reading-back-to-hub" data-reading-back-link href="reading.html">← 내 사주로 돌아가기</a>
 
       <section className="reading-route-state" data-reading-route-state aria-live="polite">
         <span className="reading-route-kicker" data-reading-product-title>사주 읽기</span>
         <h1 data-reading-state-title>읽기를 확인하는 중입니다.</h1>
         <p data-reading-state-copy>요청한 주제와 범위를 확인하고 있습니다.</p>
-        <a className="reading-route-action" href="reading.html">다른 사주 읽기 보기 <span aria-hidden="true">→</span></a>
+        <a className="reading-route-action" data-reading-route-action href="reading.html">다른 사주 읽기 보기 <span aria-hidden="true">→</span></a>
       </section>
 
       <section className="reading-stage" data-reading-stage hidden aria-label="캐릭터와 함께 읽는 사주">
@@ -96,11 +96,11 @@ export function ReadingDetailPage() {
 
           <section className="reading-completion" data-reading-completion hidden aria-live="polite">
             <span className="reading-completion-kicker">READING COMPLETE</span>
-            <h2><span data-reader-name>백헌</span>이 이번 사주 읽기를 마쳤습니다.</h2>
-            <p>읽은 내용을 바탕으로 이야기를 이어가거나, 기록에서 사주 결과를 다시 확인할 수 있습니다.</p>
+            <h2 data-reading-completion-title><span data-reader-name>백헌</span>이 이번 사주 읽기를 마쳤습니다.</h2>
+            <p data-reading-completion-copy>읽은 내용은 기록에서 다시 확인할 수 있습니다. 대화를 시작하려면 대화 상대를 새로 선택해 주세요.</p>
             <div className="reading-completion-actions">
-              <a className="reading-completion-primary" data-reading-chat-link href="chat.html?character=baekheon">
-                <span data-reader-name>백헌</span>과 이어서 대화
+              <a className="reading-completion-primary" data-reading-chat-link href="chat-hub.html">
+                대화 상대 선택
                 <span aria-hidden="true">→</span>
               </a>
               <a className="reading-completion-secondary" data-reading-records-link href="records.html">

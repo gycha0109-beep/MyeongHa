@@ -1,3 +1,5 @@
+import { resolveCanonicalCharacterPresentationV1 } from './character-presentation-identity.js';
+import { parseChatThreadIdV1 } from './chat-room-read-contract.js';
 const characters = {
   baekheon: {
     name: '백헌',
@@ -47,7 +49,7 @@ const characters = {
     sceneLabel: '윤호의 따뜻한 목재 서재',
     intro: ['천천히 말씀하셔도 됩니다.', '어떤 이야기부터 시작할까요?'],
   },
-  doyoon: {
+  doyun: {
     name: '도윤',
     title: '대리자',
     sceneLabel: '도윤의 자유롭고 비공식적인 공간',
@@ -56,59 +58,32 @@ const characters = {
 };
 
 const params = new URLSearchParams(window.location.search);
-const requestedCharacter = (params.get('character') || 'baekheon').toLowerCase();
-const characterKey = Object.hasOwn(characters, requestedCharacter) ? requestedCharacter : 'baekheon';
-const character = characters[characterKey];
+const rawThreadId = params.get('threadId');
+const threadId = parseChatThreadIdV1(rawThreadId);
+const hasThreadRoute = rawThreadId !== null;
+const requestedCharacter = params.get('character')?.toLowerCase() ?? null;
+const presentationCharacterKey = !hasThreadRoute && requestedCharacter && Object.hasOwn(characters, requestedCharacter)
+  ? requestedCharacter
+  : null;
+const characterKey = presentationCharacterKey ?? (hasThreadRoute ? null : 'baekheon');
+const character = characterKey
+  ? characters[characterKey]
+  : Object.freeze({
+      name: '대화 상대',
+      title: '서버 확인 중',
+      sceneLabel: '대화 상대 확인 중',
+      intro: ['대화 상대를 확인하고 있습니다.'],
+    });
 const root = document.body;
-const READING_HANDOFF_STORAGE_KEY = 'myeongha.readingHandoff.v1';
-const readingTopicLabels = Object.freeze({
-  general: '전체 사주',
-  temperament: '타고난 성향',
-  career: '직업운',
-  money: '재물운',
-  love: '연애운',
-  business: '사업운',
-  family: '가족운',
-  health: '건강 흐름',
-  year: '올해의 흐름',
-  month: '이번 달 흐름',
-});
-
-function readReadingHandoff() {
-  if (params.get('from') !== 'reading') return null;
-  const queryReader = (params.get('reader') || '').toLowerCase();
-  const queryTopic = params.get('topic') || '';
-  const queryScope = params.get('scope') || '';
-  if (queryReader && queryReader !== characterKey) return null;
-
-  let stored = null;
-  try {
-    const raw = sessionStorage.getItem(READING_HANDOFF_STORAGE_KEY);
-    stored = raw ? JSON.parse(raw) : null;
-  } catch {
-    stored = null;
-  }
-
-  if (!stored || typeof stored !== 'object') return null;
-  if (stored.reader !== characterKey) return null;
-  if (queryTopic && stored.topic !== queryTopic) return null;
-  if (queryScope && stored.scope !== queryScope) return null;
-
-  const topic = typeof stored.topic === 'string' ? stored.topic : queryTopic;
-  const readingText = typeof stored.readingText === 'string' && stored.readingText.trim()
-    ? stored.readingText.trim()
-    : null;
-  return Object.freeze({
-    topic,
-    scope: typeof stored.scope === 'string' ? stored.scope : queryScope,
-    title: readingText || readingTopicLabels[topic] || '사주 Reading',
-  });
+if (characterKey) {
+  root.dataset.character = characterKey;
+  root.dataset.characterAuthority = 'presentation_hint_only';
+} else {
+  delete root.dataset.character;
+  root.dataset.characterAuthority = threadId === null
+    ? 'thread_identity_invalid'
+    : 'thread_identity_pending';
 }
-
-const readingHandoff = readReadingHandoff();
-
-root.dataset.character = characterKey;
-if (readingHandoff) root.dataset.chatEntry = 'reading-handoff';
 document.title = `${character.name} · 대화 · 명하`;
 
 document.querySelectorAll('[data-character-name], [data-dialogue-name]').forEach((node) => {
@@ -120,7 +95,8 @@ document.querySelectorAll('[data-character-title]').forEach((node) => {
 });
 
 document.querySelectorAll('[data-character-avatar]').forEach((node) => {
-  node.dataset.character = characterKey;
+  if (characterKey) node.dataset.character = characterKey;
+  else delete node.dataset.character;
   node.textContent = character.name.slice(0, 1);
 });
 
@@ -143,32 +119,40 @@ function setDialogueLines(lines) {
   });
 }
 
-if (readingHandoff) {
-  const contextTitle = `${readingHandoff.title} · Reading에서 이어짐`;
-  const contextPill = document.querySelector('[data-context-pill]');
-  const contextTitleNode = document.querySelector('[data-context-title]');
-  const threadBar = document.querySelector('[data-thread-bar]');
-  const threadBarTitle = document.querySelector('[data-thread-bar-title]');
-  if (contextTitleNode) contextTitleNode.textContent = contextTitle;
-  if (threadBarTitle) threadBarTitle.textContent = readingHandoff.title;
-  if (contextPill) contextPill.hidden = false;
-  if (threadBar) threadBar.hidden = false;
-  setDialogueLines([
-    `${readingHandoff.title} 읽기에서 이어왔군요.`,
-    '그 내용에서 더 궁금한 지점을 말씀해 주세요.',
-  ]);
-} else {
-  setDialogueLines(character.intro);
+setDialogueLines(character.intro);
+
+export function applyCanonicalCharacterPresentationV1(characterId) {
+  const identity = resolveCanonicalCharacterPresentationV1(characterId);
+  if (!identity) return false;
+  const next = characters[identity.presentationKey];
+  if (!next) return false;
+
+  root.dataset.character = identity.presentationKey;
+  root.dataset.characterAuthority = 'canonical_character_id';
+  document.title = `${next.name} · 대화 · 명하`;
+
+  document.querySelectorAll('[data-character-name], [data-dialogue-name]').forEach((node) => {
+    node.textContent = next.name;
+  });
+  document.querySelectorAll('[data-character-title]').forEach((node) => {
+    node.textContent = next.title;
+  });
+  document.querySelectorAll('[data-character-avatar]').forEach((node) => {
+    node.dataset.character = identity.presentationKey;
+    node.textContent = next.name.slice(0, 1);
+  });
+  document.querySelectorAll('[data-history-character-name]').forEach((node) => {
+    node.textContent = `${next.name}과 나눈 이야기`;
+  });
+  if (scene) scene.setAttribute('aria-label', next.sceneLabel);
+  return true;
 }
 
+// Presentation metadata is observable for the static discovery route only.
 window.MyeongHaCharacterRoom = Object.freeze({
   characterKey,
   characterName: character.name,
-  readingHandoff,
-  setDialogueText(text) {
-    if (typeof text !== 'string' || text.trim().length === 0) return;
-    setDialogueLines(text.split(/\n+/).filter(Boolean));
-  },
+  characterAuthority: root.dataset.characterAuthority,
 });
 
 const historyDrawer = document.querySelector('[data-history-drawer]');
@@ -233,7 +217,9 @@ composer?.addEventListener('submit', (event) => {
   const submitEvent = new CustomEvent('myeongha:chat-submit', {
     bubbles: true,
     cancelable: true,
-    detail: Object.freeze({ characterKey, message: value }),
+    // Presentation keys are never mutation authority. The transport resolves
+    // all canonical Chat identity from the validated thread route.
+    detail: Object.freeze({ message: value }),
   });
 
   const handled = !composer.dispatchEvent(submitEvent);

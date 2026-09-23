@@ -1,4 +1,6 @@
+import { resolveCanonicalCharacterPresentationV1 } from './character-presentation-identity.js';
 import { createRecordsRuntimeClient, RecordsRuntimeError } from './records-runtime-client.js';
+import { buildPersistedReadingHandoffUrlV1 } from './reading-history-handoff.js';
 
 const SAMPLE_SAJU_FACT_TYPE = 'sample_saju_reading_result';
 const SAMPLE_SAJU_SCHEMA_VERSION = 'sample.v1';
@@ -6,12 +8,14 @@ const DEVELOPMENT_SAMPLE_HOSTS = Object.freeze(new Set(['localhost', '127.0.0.1'
 
 const SAJU_DOMAIN_PRESENTATION = Object.freeze({
   general: Object.freeze({ icon: '命', title: '전체 사주' }),
-  career: Object.freeze({ icon: '職', title: '직업 · 커리어' }),
-  wealth: Object.freeze({ icon: '財', title: '재물' }),
+  family: Object.freeze({ icon: '家', title: '가족' }),
   relationship: Object.freeze({ icon: '緣', title: '관계' }),
   compatibility: Object.freeze({ icon: '合', title: '궁합' }),
-  annual: Object.freeze({ icon: '年', title: '연운' }),
-  monthly: Object.freeze({ icon: '月', title: '월운' }),
+  career: Object.freeze({ icon: '職', title: '직업 · 커리어' }),
+  business: Object.freeze({ icon: '商', title: '사업' }),
+  wealth: Object.freeze({ icon: '財', title: '재물' }),
+  life_stage: Object.freeze({ icon: '生', title: '삶의 단계' }),
+  question_specific: Object.freeze({ icon: '問', title: '지금 고민으로 보기' }),
 });
 
 function byId(id) {
@@ -154,18 +158,35 @@ function readingPresentation(sajuDomain) {
 }
 
 function productResponseStateLabel(value) {
-  if (value === 'complete') return '완료';
+  if (value === 'delivered' || value === 'delivered_with_fallback') return '완료';
   if (value === 'clarification_required') return '추가 확인 필요';
   return '저장됨';
 }
 
-function appendReadingFooter(card, leftText) {
+function isPersistedReadingOpenableState(value) {
+  return value === 'delivered' || value === 'delivered_with_fallback';
+}
+
+function readerProvenanceLabel(readerCharacterIds) {
+  if (!Array.isArray(readerCharacterIds) || readerCharacterIds.length === 0) return 'Reader 기록 없음';
+  const names = readerCharacterIds.map((characterId) =>
+    resolveCanonicalCharacterPresentationV1(characterId)?.name ?? '대리자');
+  if (names.length === 1) return `${names[0]}에게`;
+  return `${names.join(' · ')}에게`;
+}
+
+function appendReadingFooter(card, leftText, options = {}) {
   const footer = document.createElement('div');
   footer.className = 'records-reading-footer';
   footer.append(textElement('span', 'fine', leftText));
+  if (options.href === null) {
+    footer.append(textElement('span', 'fine', options.label ?? '현재 다시 열 수 없습니다.'));
+    card.append(footer);
+    return;
+  }
   const link = document.createElement('a');
-  link.href = 'reading.html';
-  link.textContent = '사주 페이지에서 보기 →';
+  link.href = options.href ?? 'reading.html';
+  link.textContent = options.label ?? '사주 페이지에서 보기 →';
   footer.append(link);
   card.append(footer);
 }
@@ -183,7 +204,7 @@ function renderPersistedReading(target, reading) {
   const heading = document.createElement('div');
   const eyebrow = document.createElement('div');
   eyebrow.className = 'records-reading-eyebrow';
-  eyebrow.append(textElement('span', 'records-reading-badge', '저장된 풀이'));
+  eyebrow.append(textElement('span', 'records-reading-badge', readerProvenanceLabel(reading.readerCharacterIds)));
   eyebrow.append(textElement('span', 'records-reading-period', productResponseStateLabel(reading.productResponseState)));
   heading.append(eyebrow, textElement('h3', 'records-reading-title', presentation.title));
   identity.append(heading);
@@ -191,12 +212,32 @@ function renderPersistedReading(target, reading) {
   top.append(textElement('span', 'records-reading-date', formatTimestamp(reading.completedAt)));
   card.append(top);
 
+  const openable = isPersistedReadingOpenableState(reading.productResponseState);
   card.append(textElement(
     'p',
     'records-reading-summary',
-    '완료된 사주 풀이 기록입니다. 저장된 풀이의 세부 내용은 검증된 Reading 표시 계약이 연결되는 범위에서만 보여드립니다.',
+    openable
+      ? `${formatTimestamp(reading.completedAt)}에 본 ${presentation.title} 기록입니다. 저장된 공식 풀이를 그대로 다시 열 수 있습니다.`
+      : `${formatTimestamp(reading.completedAt)}의 ${presentation.title} 기록입니다. 완료된 Official Reading만 다시 열 수 있습니다.`,
   ));
-  appendReadingFooter(card, `Reading contract · ${String(reading.readingContractVersion ?? '—')}`);
+  if (openable) {
+    const handoffUrl = buildPersistedReadingHandoffUrlV1({
+      readingId: reading.readingId,
+      readingSessionId: reading.readingSessionId,
+      sajuDomain: reading.sajuDomain,
+    });
+    appendReadingFooter(
+      card,
+      `Reading contract · ${String(reading.readingContractVersion ?? '—')}`,
+      { href: handoffUrl, label: '저장된 풀이 열기 →' },
+    );
+  } else {
+    appendReadingFooter(
+      card,
+      `Reading contract · ${String(reading.readingContractVersion ?? '—')}`,
+      { href: null, label: '완료 후 다시 열 수 있습니다.' },
+    );
+  }
   target.append(card);
 }
 

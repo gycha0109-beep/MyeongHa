@@ -21,6 +21,9 @@ import type {
 import type {
   MemoryGrantsReadAuthorityPortV1,
 } from './memory-grants-read.js';
+import type {
+  ReaderContextLifeFactsReadAuthorityPortV1,
+} from './reader-context-non-memory-read.js';
 import {
   runThreadBoundReaderInterpretationPreviewV1,
   type OfficialReadingCharacterGroundingProjectionPortV1,
@@ -34,12 +37,35 @@ export const READER_INTERPRETATION_PREVIEW_HTTP_SCHEMA_VERSION_V1 =
 
 type Awaitable<T> = T | Promise<T>;
 
+export type ReaderInterpretationPreviewServerContextV1 = Readonly<
+  Pick<CharacterStandardReadingServerContextInputV1, 'relationshipProjectionPolicy'>
+>;
+
+export function projectReaderInterpretationPreviewServerContextV1(
+  input: ReaderInterpretationPreviewServerContextV1,
+): ReaderInterpretationPreviewServerContextV1 {
+  return Object.freeze({
+    relationshipProjectionPolicy: input.relationshipProjectionPolicy,
+  });
+}
+
 export interface ReaderInterpretationPreviewContextAuthorityPortV1 {
   resolveContext(input: {
     readonly subjectId: string;
     readonly threadId: string;
     readonly effectiveAt: string;
-  }): Awaitable<CharacterStandardReadingServerContextInputV1>;
+  }): Awaitable<ReaderInterpretationPreviewServerContextV1>;
+}
+
+export interface ReaderInterpretationPreviewSceneSegmentV1 {
+  readonly kind: CharacterSajuUtteranceV1['segments'][number]['kind'];
+  readonly text: string;
+}
+
+export interface ReaderInterpretationPreviewSceneUtteranceV1 {
+  readonly characterId: string;
+  readonly requestedDomain: ReaderInterpretationPreviewEnvelopeV1['requestedDomain'];
+  readonly segments: readonly ReaderInterpretationPreviewSceneSegmentV1[];
 }
 
 export type ReaderInterpretationPreviewHttpResponseV1 =
@@ -51,7 +77,7 @@ export type ReaderInterpretationPreviewHttpResponseV1 =
       readonly readerCharacterId: string;
       readonly domain: ReaderInterpretationPreviewEnvelopeV1['requestedDomain'];
       readonly interpretationHash: string;
-      readonly utterance: CharacterSajuUtteranceV1;
+      readonly utterance: ReaderInterpretationPreviewSceneUtteranceV1;
     }
   | {
       readonly schemaVersion: typeof READER_INTERPRETATION_PREVIEW_HTTP_SCHEMA_VERSION_V1;
@@ -80,6 +106,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+const UUID_V1 = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+
 function requireIdentifier(value: unknown, field: string): string {
   if (typeof value !== 'string') {
     throw new ReaderInterpretationPreviewHttpErrorV1(
@@ -92,6 +120,17 @@ function requireIdentifier(value: unknown, field: string): string {
     throw new ReaderInterpretationPreviewHttpErrorV1(
       'INVALID_REQUEST',
       `${field} is outside the supported bounds.`,
+    );
+  }
+  return normalized;
+}
+
+function requireUuidIdentifier(value: unknown, field: string): string {
+  const normalized = requireIdentifier(value, field);
+  if (!UUID_V1.test(normalized)) {
+    throw new ReaderInterpretationPreviewHttpErrorV1(
+      'INVALID_REQUEST',
+      `${field} must be a UUID.`,
     );
   }
   return normalized;
@@ -143,8 +182,8 @@ export function parseReaderInterpretationPreviewHttpRequestV1(
   }
 
   return Object.freeze({
-    threadId: requireIdentifier(body.threadId, 'threadId'),
-    officialReadingId: requireIdentifier(
+    threadId: requireUuidIdentifier(body.threadId, 'threadId'),
+    officialReadingId: requireUuidIdentifier(
       body.officialReadingId,
       'officialReadingId',
     ),
@@ -167,7 +206,18 @@ export function projectReaderInterpretationPreviewHttpResponseV1(
     ? Object.freeze({
         ...common,
         mode: 'reader_interpretation' as const,
-        utterance: envelope.utterance,
+        utterance: Object.freeze({
+          characterId: envelope.utterance.characterId,
+          requestedDomain: envelope.utterance.requestedDomain,
+          segments: Object.freeze(
+            envelope.utterance.segments.map((segment) =>
+              Object.freeze({
+                kind: segment.kind,
+                text: segment.text,
+              }),
+            ),
+          ),
+        }),
       })
     : Object.freeze({
         ...common,
@@ -188,17 +238,21 @@ export async function runReaderInterpretationPreviewHttpV1(input: {
   readonly relationshipAuthorityPort: CharacterRelationshipReadAuthorityPortV1;
   readonly memoryItemsAuthorityPort: MemoryItemsReadAuthorityPortV1;
   readonly memoryGrantsAuthorityPort: MemoryGrantsReadAuthorityPortV1;
+  readonly nonMemoryContextAuthorityPort: ReaderContextLifeFactsReadAuthorityPortV1;
   readonly groundingProjectionPort: OfficialReadingCharacterGroundingProjectionPortV1;
 }): Promise<ReaderInterpretationPreviewHttpResponseV1> {
   const subjectId = requireSubject(input.resolvedSubjectId);
   const effectiveAt = requireEffectiveAt(input.effectiveAt);
   const request = parseReaderInterpretationPreviewHttpRequestV1(input.body);
 
-  const contextInput = await input.contextAuthorityPort.resolveContext({
+  const resolvedContext = await input.contextAuthorityPort.resolveContext({
     subjectId,
     threadId: request.threadId,
     effectiveAt,
   });
+  const contextInput = projectReaderInterpretationPreviewServerContextV1(
+    resolvedContext,
+  );
 
   const envelope = await runThreadBoundReaderInterpretationPreviewV1({
     resolvedSubjectId: subjectId,
@@ -213,6 +267,7 @@ export async function runReaderInterpretationPreviewHttpV1(input: {
     relationshipAuthorityPort: input.relationshipAuthorityPort,
     memoryItemsAuthorityPort: input.memoryItemsAuthorityPort,
     memoryGrantsAuthorityPort: input.memoryGrantsAuthorityPort,
+    nonMemoryContextAuthorityPort: input.nonMemoryContextAuthorityPort,
     groundingProjectionPort: input.groundingProjectionPort,
   });
 

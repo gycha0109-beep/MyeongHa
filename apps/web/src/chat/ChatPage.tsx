@@ -14,7 +14,7 @@ export function ChatPage() {
     <>
       <main className="character-room-stage conversation-room-stage" aria-label="캐릭터 대화 공간">
         <section className="conversation-scene-column" aria-label="캐릭터 공간">
-          <div className="character-room-scene conversation-room-scene" data-character-scene role="img" aria-label="백헌의 대화 공간">
+          <div className="character-room-scene conversation-room-scene" data-character-scene role="img" aria-label="대화 상대의 공간">
             <div className="character-room-scene-decoration" aria-hidden="true">
               <span className="scene-window" />
               <span className="scene-lamp" />
@@ -31,8 +31,8 @@ export function ChatPage() {
 
           <div className="conversation-character-card">
             <div>
-              <strong data-character-name>백헌</strong>
-              <span data-character-title>충추원의 장</span>
+              <strong data-character-name>대화 상대</strong>
+              <span data-character-title>서버 확인 중</span>
             </div>
             <p>이 사람과 나눈 말과 흐름은 다음 대화에서도 이어집니다.</p>
           </div>
@@ -43,8 +43,8 @@ export function ChatPage() {
             <div>
               <span className="conversation-chat-kicker">CONVERSATION</span>
               <div className="character-dialogue-name-row">
-                <h1 data-dialogue-name>백헌</h1>
-                <span data-character-title>충추원의 장</span>
+                <h1 data-dialogue-name>대화 상대</h1>
+                <span data-character-title>서버 확인 중</span>
               </div>
             </div>
             <div className="conversation-chat-head-actions">
@@ -63,8 +63,8 @@ export function ChatPage() {
             <article className="conversation-message" data-sender="character" data-chat-intro>
               <span className="conversation-message-avatar" data-character-avatar aria-hidden="true">明</span>
               <div className="conversation-message-body">
-                <strong data-character-name>백헌</strong>
-                <p className="character-dialogue-line" data-dialogue-line>이야기를 시작하죠.<br />지금 가장 먼저 꺼내고 싶은 것은 무엇입니까?</p>
+                <strong data-character-name>대화 상대</strong>
+                <p className="character-dialogue-line" data-dialogue-line>대화 상대를 확인하고 있습니다.</p>
               </div>
             </article>
           </div>
@@ -85,7 +85,7 @@ export function ChatPage() {
         <div className="character-history-head">
           <div>
             <span className="character-history-kicker">지난 대화</span>
-            <h2 data-history-character-name>백헌과 나눈 이야기</h2>
+            <h2 data-history-character-name>대화 상대와 나눈 이야기</h2>
           </div>
           <button type="button" data-history-close aria-label="지난 대화 닫기">×</button>
         </div>

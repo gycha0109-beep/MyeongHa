@@ -1,0 +1,22 @@
+import type { SajuDomainV1 } from './saju-domain-contract.js';
+
+export interface ReadingHistoryBrowserItemV1 {
+  readonly readingId: string;
+  readonly readingSessionId: string;
+  readonly sajuDomain: SajuDomainV1;
+  readonly readingContractVersion: string;
+  readonly productResponseState: string;
+  readonly readerCharacterIds: readonly string[];
+  readonly createdAt: string;
+  readonly completedAt: string;
+}
+
+export interface ReadingHistoryBrowserPayloadV1 {
+  readonly readings: readonly ReadingHistoryBrowserItemV1[];
+}
+
+export class ReadingHistoryContractErrorV1 extends TypeError {}
+
+export function parseReadingHistoryPayloadV1(
+  payload: unknown,
+): ReadingHistoryBrowserPayloadV1;

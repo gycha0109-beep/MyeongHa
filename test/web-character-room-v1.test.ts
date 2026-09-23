@@ -36,6 +36,12 @@ describe('MyeongHa immersive long-form Character Room', () => {
     expect(source).not.toContain('John Doe');
     expect(source).not.toContain('DEMO');
     expect(source).not.toContain('mobile-bottom-nav');
+    expect(html).not.toContain('data-character="baekheon"');
+    expect(page).not.toContain('>백헌<');
+    expect(page).not.toContain('충추원의 장');
+    expect(page).toContain('data-character-name>대화 상대</strong>');
+    expect(page).toContain('data-character-title>서버 확인 중</span>');
+    expect(page).toContain('data-dialogue-line>대화 상대를 확인하고 있습니다.</p>');
   });
 
   it('does not ship fabricated Life Thread or past-conversation claims in static room data', async () => {
@@ -67,7 +73,7 @@ describe('MyeongHa immersive long-form Character Room', () => {
       stat(seyeonAssetPath),
     ]);
 
-    for (const key of ['baekheon', 'seyeon', 'yeoul', 'seorin', 'rahyeon', 'mira', 'taegyeom', 'yunho', 'doyoon']) {
+    for (const key of ['baekheon', 'seyeon', 'yeoul', 'seorin', 'rahyeon', 'mira', 'taegyeom', 'yunho', 'doyun']) {
       expect(presentation).toContain(`${key}: {`);
       expect(baseCss).toContain(`body[data-character="${key}"]`);
     }
@@ -76,14 +82,21 @@ describe('MyeongHa immersive long-form Character Room', () => {
       expect(presentation).toContain(`name: '${name}'`);
     }
 
-    expect(presentation).toContain("params.get('character') || 'baekheon'");
+    expect(presentation).toContain("const rawThreadId = params.get('threadId')");
+    expect(presentation).toContain('const threadId = parseChatThreadIdV1(rawThreadId)');
+    expect(presentation).toContain("const requestedCharacter = params.get('character')?.toLowerCase() ?? null");
+    expect(presentation).toContain('const presentationCharacterKey = !hasThreadRoute && requestedCharacter');
+    expect(presentation).toContain("presentationCharacterKey ?? (hasThreadRoute ? null : 'baekheon')");
+    expect(presentation).toContain("'thread_identity_pending'");
+    expect(presentation).toContain("'thread_identity_invalid'");
+    expect(presentation).toContain("root.dataset.characterAuthority = 'presentation_hint_only'");
     expect(presentation).toContain('root.dataset.character = characterKey');
     expect(presentation).toContain("sceneLabel: '세연의 봄날 산책 공간'");
     expect(conversationCss).toContain('.character-room-v2[data-character="seyeon"] .conversation-room-scene');
     expect(conversationCss).toContain('url("seyeon-chat.webp")');
     expect(asset.size).toBeGreaterThan(10_000);
 
-    for (const key of ['baekheon', 'yeoul', 'seorin', 'rahyeon', 'mira', 'taegyeom', 'yunho', 'doyoon']) {
+    for (const key of ['baekheon', 'yeoul', 'seorin', 'rahyeon', 'mira', 'taegyeom', 'yunho', 'doyun']) {
       expect(conversationCss).not.toContain(`.character-room-v2[data-character="${key}"] .conversation-room-scene {\n  background-image:`);
     }
   });
@@ -117,6 +130,22 @@ describe('MyeongHa immersive long-form Character Room', () => {
     expect(transport).not.toContain('service_role');
   });
 
+  it('projects thread-bound canonical Character identity through the approved exact-name mapping', async () => {
+    const [presentation, transport] = await Promise.all([
+      readFile(characterPresentationPath, 'utf8'),
+      readFile(transportPath, 'utf8'),
+    ]);
+
+    expect(transport).toContain('applyCanonicalCharacterPresentationV1(state.characterId)');
+    expect(transport).toContain('resolveCanonicalCharacterPresentationV1(message.characterId)');
+    expect(transport).toContain('renderHistory(state.messages, state.characterId)');
+    expect(transport).toContain('renderConversation(state.messages, state.characterId)');
+    expect(transport).not.toContain('presentationKey: state.characterId');
+    expect(presentation).toContain("root.dataset.characterAuthority = 'canonical_character_id'");
+    expect(presentation).toContain("presentationCharacterKey ?? (hasThreadRoute ? null : 'baekheon')");
+    expect(presentation).toContain("'thread_identity_pending'");
+  });
+
   it('fails chat mutation closed instead of inventing a client capability or canonical character authority', async () => {
     const [transport, requestContract, apiContract] = await Promise.all([
       readFile(transportPath, 'utf8'),
@@ -147,8 +176,12 @@ describe('MyeongHa immersive long-form Character Room', () => {
 
     expect(presentation).toContain("new CustomEvent('myeongha:chat-submit'");
     expect(presentation).toContain('cancelable: true');
+    expect(presentation).toContain('detail: Object.freeze({ message: value })');
+    expect(presentation).not.toContain('detail: Object.freeze({ characterKey, message: value })');
     expect(presentation).not.toContain("messageInput.value = ''");
     expect(presentation).not.toContain('setTimeout');
+    expect(presentation).not.toContain('setDialogueText(text)');
+    expect(transport).not.toContain('window.MyeongHaCharacterRoom');
 
     expect(transport).toContain('event.preventDefault()');
     expect(transport).toContain('현재 메시지를 보낼 수 없습니다. 입력한 내용은 그대로 남아 있습니다.');

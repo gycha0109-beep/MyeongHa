@@ -1,6 +1,8 @@
 import { resolveReadingDetailRoute } from './reading-detail-route.js';
 import { resolveSajuButtonEngineRequest } from './reading-saju-engine-request.js';
 import { getActiveBearer, invalidateGuestSession, invalidateMemberSession } from './product-auth.js';
+import { parsePersistedReadingHandoffV1 } from './reading-history-handoff.js';
+import { parseOfficialReadingRecordPayloadV1 } from './official-reading-record-contract.js';
 
 const readerCatalog = {
   baekheon: {
@@ -51,7 +53,7 @@ const readerCatalog = {
     title: '대리자',
     intro: '급하게 결론부터 내리지 않고, 구조와 시기를 차례대로 읽어보겠습니다.',
   },
-  doyoon: {
+  doyun: {
     name: '도윤',
     hanja: '',
     title: '대리자',
@@ -61,22 +63,27 @@ const readerCatalog = {
 
 const aliases = new Map([
   ['백헌', 'baekheon'], ['세연', 'seyeon'], ['여울', 'yeoul'], ['서린', 'seorin'],
-  ['라현', 'rahyeon'], ['미라', 'mira'], ['태겸', 'taegyeom'], ['윤호', 'yunho'], ['도윤', 'doyoon'],
+  ['라현', 'rahyeon'], ['미라', 'mira'], ['태겸', 'taegyeom'], ['윤호', 'yunho'], ['도윤', 'doyun'],
 ]);
 
 const params = new URLSearchParams(window.location.search);
+const persistedReadingHandoff = parsePersistedReadingHandoffV1(params);
 const requestedReader = params.get('character') || params.get('reader') || 'baekheon';
 const normalizedReader = aliases.get(requestedReader) || requestedReader.toLowerCase();
-const readerKey = readerCatalog[normalizedReader] ? normalizedReader : 'baekheon';
-const reader = readerCatalog[readerKey];
+// Frontend integration authority: URL-selected Reader identity is presentation-only.
+// When Reader Interpretation is activated, the server-returned readerCharacterId wins.
+const presentationReaderHint = readerCatalog[normalizedReader] ? normalizedReader : 'baekheon';
+const readerKey = presentationReaderHint;
+const reader = readerCatalog[presentationReaderHint];
 const route = resolveReadingDetailRoute(params);
 const engineRequest = route.valid ? resolveSajuButtonEngineRequest(route) : null;
 const currentYear = new Date().getFullYear();
 const SAJU_PREVIEW_READING_ENDPOINT = '/api/me/saju/preview-reading';
+const OFFICIAL_READING_RECORD_ENDPOINT = '/api/readings';
 const PREVIEW_READING_TEXTS = new Set(['전체 사주', '직업운', '재물운', '연애운', '사업운']);
 const PREVIEW_NOTICE_SECTION_TITLE = '프리뷰 안내';
 const STRUCTURE_PREFIX = '근거 구조:';
-const previewEligible = engineRequest?.state === 'ready' && PREVIEW_READING_TEXTS.has(engineRequest.readingText);
+const previewEligible = persistedReadingHandoff.state === 'none' && engineRequest?.state === 'ready' && PREVIEW_READING_TEXTS.has(engineRequest.readingText);
 
 const root = document.body;
 const routeState = document.querySelector('[data-reading-route-state]');
@@ -84,13 +91,20 @@ const stage = document.querySelector('[data-reading-stage]');
 const productTitle = document.querySelector('[data-reading-product-title]');
 const stateTitle = document.querySelector('[data-reading-state-title]');
 const stateCopy = document.querySelector('[data-reading-state-copy]');
+const backLink = document.querySelector('[data-reading-back-link]');
+const routeAction = document.querySelector('[data-reading-route-action]');
 
-root.dataset.reader = readerKey;
+root.dataset.reader = presentationReaderHint;
 root.dataset.readerSelection = params.has('reader') || params.has('character') ? 'explicit' : 'default';
+root.dataset.readerAuthority = 'presentation_hint_only';
 root.dataset.readerPresentation = 'reading-scene-v1';
-root.dataset.readingRouteState = route.valid
-  ? (previewEligible ? 'preview_loading' : 'blocked_by_authority')
-  : 'invalid';
+root.dataset.readingRouteState = persistedReadingHandoff.state === 'ready'
+  ? 'persisted_record_loading'
+  : persistedReadingHandoff.state === 'invalid'
+    ? 'persisted_handoff_invalid'
+    : route.valid
+      ? (previewEligible ? 'preview_loading' : 'blocked_by_authority')
+      : 'invalid';
 if (engineRequest) {
   root.dataset.readingEngineRequestState = engineRequest.state;
   if ('domain' in engineRequest) root.dataset.readingEngineDomain = engineRequest.domain;
@@ -134,6 +148,65 @@ function renderInvalidRoute() {
     stateCopy.textContent = '지원하지 않는 사주 읽기 주소입니다. 전체 사주나 올해의 흐름으로 자동 대체하지 않았습니다.';
   }
   document.title = '읽기를 찾을 수 없음 · 명하';
+}
+
+function clearPersistedReadingPresentation() {
+  delete root.dataset.reader;
+  delete root.dataset.readerSelection;
+  delete root.dataset.readerAuthority;
+  delete root.dataset.readerPresentation;
+  document.querySelector('.reader-scene')?.setAttribute('hidden', '');
+  document.querySelector('.reading-character-block')?.setAttribute('hidden', '');
+}
+
+function configurePersistedReadingNavigation() {
+  if (backLink) {
+    backLink.setAttribute('href', 'records.html?tab=saju');
+    backLink.textContent = '← 사주 기록으로 돌아가기';
+  }
+  if (routeAction) {
+    routeAction.setAttribute('href', 'records.html?tab=saju');
+    routeAction.textContent = '사주 기록으로 돌아가기 →';
+  }
+}
+
+function renderPersistedReadingHandoffInvalid() {
+  clearPersistedReadingPresentation();
+  configurePersistedReadingNavigation();
+  root.dataset.readingRouteState = 'persisted_handoff_invalid';
+  if (stage) stage.hidden = true;
+  if (routeState) routeState.hidden = false;
+  if (productTitle) productTitle.textContent = '저장된 사주 풀이';
+  if (stateTitle) stateTitle.textContent = '저장된 풀이 연결 정보를 확인할 수 없습니다.';
+  if (stateCopy) {
+    stateCopy.textContent = '기록 페이지에서 다시 열어 주세요. 불완전한 식별자로 다른 풀이를 대신 표시하지 않습니다.';
+  }
+  document.title = '저장된 풀이 연결 오류 · 명하';
+}
+
+function renderPersistedReadingLoading() {
+  clearPersistedReadingPresentation();
+  configurePersistedReadingNavigation();
+  root.dataset.readingRouteState = 'persisted_record_loading';
+  if (stage) stage.hidden = true;
+  if (routeState) routeState.hidden = false;
+  if (productTitle) productTitle.textContent = '저장된 사주 풀이';
+  if (stateTitle) stateTitle.textContent = '저장된 공식 풀이를 불러오고 있습니다.';
+  if (stateCopy) stateCopy.textContent = '기록에 저장된 Official Reading 결과를 확인하고 있습니다.';
+  root.dataset.persistedReadingHandoff = 'records';
+  root.dataset.persistedReadingDomain = persistedReadingHandoff.sajuDomain;
+  document.title = '저장된 사주 풀이 · 명하';
+}
+
+function renderPersistedReadingFailure(title, copy, state = 'persisted_record_unavailable') {
+  clearPersistedReadingPresentation();
+  configurePersistedReadingNavigation();
+  root.dataset.readingRouteState = state;
+  if (stage) stage.hidden = true;
+  if (routeState) routeState.hidden = false;
+  if (productTitle) productTitle.textContent = '저장된 사주 풀이';
+  if (stateTitle) stateTitle.textContent = title;
+  if (stateCopy) stateCopy.textContent = copy;
 }
 
 function renderAuthorityBlockedRoute() {
@@ -309,19 +382,8 @@ function renderProgressDots(stepCount, activeIndex) {
   }
 }
 
-function readerCommentForStep(step) {
-  const suffixByReader = {
-    baekheon: '말보다 실제 선택과 행동에서 이 흐름이 반복되는지 보십시오.',
-    seyeon: '좋고 나쁨으로 자르기보다, 언제 이 흐름이 편하게 살아나는지 같이 볼게요.',
-    yeoul: '실제 선택에서 이 흐름이 어떤 순간에 튀어나오는지 보는 게 핵심이에요.',
-    seorin: '지금뿐 아니라 예전에도 비슷한 선택 패턴이 반복됐는지 떠올려 보세요.',
-    rahyeon: '겉으로 드러난 모습보다, 이 흐름 때문에 실제로 흔들리는 순간을 보는 편이 정확합니다.',
-    mira: '과장할 필요는 없습니다. 실제 생활에서 반복되는지만 확인하면 됩니다.',
-    taegyeom: '좋은 말로 포장하지 않겠습니다. 이 구조가 실제 행동에서 확인되는지가 기준입니다.',
-    yunho: '한 번의 사건보다 반복되는 선택의 순서를 보면 이 구조가 더 분명해집니다.',
-    doyoon: '복잡하게 외우지 마세요. 실제로 자주 나오는 선택 패턴인지 보면 됩니다.',
-  };
-  return suffixByReader[readerKey] ?? '실제 생활에서 이 흐름이 반복되는지 확인해 보세요.';
+function previewCommentForStep() {
+  return '좋고 나쁨으로 단정하기보다 실제 생활에서 이 흐름이 반복되는지 확인해 보세요.';
 }
 
 function displayFactValue(fact) {
@@ -371,6 +433,7 @@ function renderCalculationSummary(summary) {
 
 function activatePreviewReading(preview) {
   const { steps } = preview;
+  const isStoredRecord = preview.source === 'record';
   let activeIndex = 0;
   const progressLabel = document.querySelector('[data-reading-progress-label]');
   const stepTitle = document.querySelector('[data-reading-step-title]');
@@ -385,6 +448,8 @@ function activatePreviewReading(preview) {
   const nextLabel = nextButton?.querySelector('span:first-child');
   const readingSheet = document.querySelector('.reading-sheet');
   const completion = document.querySelector('[data-reading-completion]');
+  const completionTitle = document.querySelector('[data-reading-completion-title]');
+  const completionCopy = document.querySelector('[data-reading-completion-copy]');
   const chatLink = document.querySelector('[data-reading-chat-link]');
   const recordsLink = document.querySelector('[data-reading-records-link]');
   const replayButton = document.querySelector('[data-reading-replay]');
@@ -393,7 +458,6 @@ function activatePreviewReading(preview) {
   function handoffUrl(path) {
     const next = new URL(path, window.location.href);
     next.searchParams.set('from', 'reading');
-    next.searchParams.set('reader', readerKey);
     next.searchParams.set('topic', route.topic);
     next.searchParams.set('scope', route.scope);
     return `${next.pathname.replace(/^\//, '')}${next.search}`;
@@ -404,17 +468,15 @@ function activatePreviewReading(preview) {
     root.dataset.readingExperience = 'complete';
     if (readingSheet) readingSheet.dataset.readingCompleted = 'true';
     if (completion) completion.hidden = false;
-    if (chatLink) chatLink.setAttribute('href', handoffUrl(`chat.html?character=${encodeURIComponent(readerKey)}`));
-    if (recordsLink) recordsLink.setAttribute('href', handoffUrl('records.html?tab=saju'));
-    try {
-      sessionStorage.setItem('myeongha.readingHandoff.v1', JSON.stringify({
-        reader: readerKey,
-        topic: route.topic,
-        scope: route.scope,
-        readingText: engineRequest?.readingText ?? null,
-      }));
-    } catch {
-      // Navigation still works when storage is unavailable.
+    // Saju Preview has no server-authoritative Reader identity. Do not promote
+    // the presentation Reader hint into Chat character authority or a stored
+    // Reading-to-Chat continuation claim. General Chat remains independently selectable.
+    if (chatLink) chatLink.setAttribute('href', 'chat-hub.html');
+    if (recordsLink) {
+      recordsLink.setAttribute(
+        'href',
+        isStoredRecord ? 'records.html?tab=saju' : handoffUrl('records.html?tab=saju'),
+      );
     }
   }
 
@@ -447,10 +509,12 @@ function activatePreviewReading(preview) {
         ? structureParts.join('\n\n')
         : '원국에서 확인된 해석 축을 바탕으로 읽는 항목입니다.';
     }
-    if (readerLine) readerLine.textContent = `${step.title}부터 핵심을 짚겠습니다.`;
-    if (readerComment) readerComment.textContent = readerCommentForStep(step);
+    if (readerLine) readerLine.textContent = `${step.title} 항목을 확인합니다.`;
+    if (readerComment) readerComment.textContent = previewCommentForStep();
     if (authorityNote) {
-      authorityNote.textContent = 'Preview · 연구 검증 중인 원국 해석이며 확정적 미래 예측은 포함하지 않습니다.';
+      authorityNote.textContent = isStoredRecord
+        ? '기록 · 당시 저장된 공식 사주 풀이를 그대로 다시 읽고 있습니다.'
+        : 'Preview · 연구 검증 중인 원국 해석이며 확정적 미래 예측은 포함하지 않습니다.';
       if (preview.notice) authorityNote.title = preview.notice;
     }
     if (previousButton) previousButton.disabled = activeIndex === 0;
@@ -475,10 +539,27 @@ function activatePreviewReading(preview) {
   });
   replayButton?.addEventListener('click', replayReadingExperience);
 
-  root.dataset.readingRouteState = 'preview';
-  root.dataset.readingExperience = 'entering';
+  root.dataset.readingRouteState = isStoredRecord ? 'persisted_record' : 'preview';
+  root.dataset.previewReaderVoice = 'disabled';
+  root.dataset.readingExperience = isStoredRecord ? 'reading' : 'entering';
+  if (isStoredRecord) root.dataset.readingRecordMode = 'official_archive';
+  else delete root.dataset.readingRecordMode;
   if (routeState) routeState.hidden = true;
   if (stage) stage.hidden = false;
+  if (isStoredRecord) {
+    clearPersistedReadingPresentation();
+    if (stage) stage.setAttribute('aria-label', '저장된 공식 사주 풀이');
+    configurePersistedReadingNavigation();
+    if (completionTitle) {
+      completionTitle.textContent = '저장된 공식 사주 풀이를 끝까지 확인했습니다.';
+    }
+    if (completionCopy) {
+      completionCopy.textContent =
+        '이 결과는 기록에 저장된 Official Reading입니다. 대화를 시작하려면 대화 상대를 새로 선택해 주세요.';
+    }
+    if (productTitle) productTitle.textContent = '저장된 사주 풀이';
+    document.title = '저장된 사주 풀이 · 명하';
+  }
   renderCalculationSummary(preview.calculationSummary);
   renderStep();
 
@@ -488,6 +569,101 @@ function activatePreviewReading(preview) {
       root.dataset.readingExperience = 'reading';
     }
   }, reducedMotion ? 0 : 1550);
+}
+
+async function loadPersistedReading() {
+  let activeBearer;
+  try {
+    activeBearer = await getActiveBearer();
+  } catch {
+    renderPersistedReadingFailure(
+      '저장된 풀이를 불러오지 못했습니다.',
+      '현재 세션을 확인하지 못했습니다. 기록 페이지에서 다시 시도해 주세요.',
+    );
+    return;
+  }
+
+  if (!activeBearer) {
+    renderPersistedReadingFailure(
+      '저장된 풀이를 보려면 현재 세션이 필요합니다.',
+      '로그인하거나 게스트 세션을 다시 연결한 뒤 기록 페이지에서 열어 주세요.',
+      'persisted_record_auth_required',
+    );
+    return;
+  }
+
+  try {
+    const endpoint = new URL(OFFICIAL_READING_RECORD_ENDPOINT, window.location.origin);
+    endpoint.searchParams.set('readingId', persistedReadingHandoff.readingId);
+    const response = await fetch(endpoint, {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${activeBearer.token}`,
+      },
+      credentials: 'same-origin',
+      cache: 'no-store',
+    });
+    const payload = await readJson(response);
+
+    if (response.status === 401) {
+      invalidateActiveBearer(activeBearer);
+      renderPersistedReadingFailure(
+        '세션을 다시 확인해 주세요.',
+        '현재 세션이 만료되었습니다. 기록 페이지에서 다시 열어 주세요.',
+        'persisted_record_auth_required',
+      );
+      return;
+    }
+    if (response.status === 404 || publicErrorCode(payload) === 'NOT_FOUND') {
+      renderPersistedReadingFailure(
+        '저장된 풀이를 찾을 수 없습니다.',
+        '현재 계정의 기록에서 이 Official Reading을 확인할 수 없습니다.',
+        'persisted_record_not_found',
+      );
+      return;
+    }
+    if (!response.ok || !payload || payload.ok !== true) {
+      renderPersistedReadingFailure(
+        '저장된 풀이를 잠시 불러올 수 없습니다.',
+        'Records 저장 결과 조회가 일시적으로 준비되지 않았습니다. 잠시 후 다시 시도해 주세요.',
+      );
+      return;
+    }
+
+    const record = parseOfficialReadingRecordPayloadV1(payload.data);
+    if (
+      record.readingId !== persistedReadingHandoff.readingId
+      || record.readingSessionId !== persistedReadingHandoff.readingSessionId
+      || record.sajuDomain !== persistedReadingHandoff.sajuDomain
+    ) {
+      renderPersistedReadingFailure(
+        '저장된 풀이 연결 정보가 일치하지 않습니다.',
+        '다른 기록이나 현재 프리뷰로 대신 표시하지 않습니다. 기록 페이지에서 다시 열어 주세요.',
+        'persisted_record_identity_mismatch',
+      );
+      return;
+    }
+
+    const readingView = previewStepsFromPayload({
+      ok: true,
+      data: { lifecycle: 'preview', reading: record.reading },
+    });
+    if (!readingView) {
+      renderPersistedReadingFailure(
+        '저장된 풀이를 표시할 수 없습니다.',
+        '저장된 Official Reading이 현재 표시 가능한 완료 상태가 아닙니다.',
+      );
+      return;
+    }
+
+    activatePreviewReading({ ...readingView, source: 'record' });
+  } catch {
+    renderPersistedReadingFailure(
+      '저장된 풀이를 잠시 불러올 수 없습니다.',
+      '네트워크 연결 또는 Records 조회 상태를 확인한 뒤 다시 시도해 주세요.',
+    );
+  }
 }
 
 async function loadPreviewReading() {
@@ -582,7 +758,12 @@ document.querySelector('[data-chart-close]')?.addEventListener('click', () => {
 if (stage) stage.hidden = true;
 if (routeState) routeState.hidden = false;
 
-if (!route.valid) {
+if (persistedReadingHandoff.state === 'invalid') {
+  renderPersistedReadingHandoffInvalid();
+} else if (persistedReadingHandoff.state === 'ready') {
+  renderPersistedReadingLoading();
+  void loadPersistedReading();
+} else if (!route.valid) {
   renderInvalidRoute();
 } else if (previewEligible) {
   renderPreviewLoading();

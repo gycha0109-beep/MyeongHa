@@ -5,6 +5,7 @@ import {
   ReaderInterpretationPreviewHttpErrorV1,
   parseReaderInterpretationPreviewHttpRequestV1,
   projectReaderInterpretationPreviewHttpResponseV1,
+  projectReaderInterpretationPreviewServerContextV1,
   runReaderInterpretationPreviewHttpV1,
   type ReaderInterpretationPreviewContextAuthorityPortV1,
 } from '../apps/api/src/reader-interpretation-preview-http.js';
@@ -27,18 +28,33 @@ import type {
 import type {
   MemoryGrantsReadAuthorityPortV1,
 } from '../apps/api/src/memory-grants-read.js';
+import type {
+  ReaderContextNonMemoryReadAuthorityPortV1,
+} from '../apps/api/src/reader-context-non-memory-read.js';
 
 describe('Reader Interpretation Preview HTTP seam', () => {
   it('accepts only threadId + officialReadingId and normalizes them', () => {
     expect(
       parseReaderInterpretationPreviewHttpRequestV1({
-        threadId: '  thread-1  ',
-        officialReadingId: '  reading-1  ',
+        threadId: '  33333333-3333-4333-8333-333333333333  ',
+        officialReadingId: '  44444444-4444-4444-8444-444444444444  ',
       }),
     ).toEqual({
-      threadId: 'thread-1',
-      officialReadingId: 'reading-1',
+      threadId: '33333333-3333-4333-8333-333333333333',
+      officialReadingId: '44444444-4444-4444-8444-444444444444',
     });
+  });
+
+  it('rejects malformed thread and Official Reading identities before authority resolution', () => {
+    expect(() => parseReaderInterpretationPreviewHttpRequestV1({
+      threadId: 'not-a-thread',
+      officialReadingId: '44444444-4444-4444-8444-444444444444',
+    })).toThrow(ReaderInterpretationPreviewHttpErrorV1);
+
+    expect(() => parseReaderInterpretationPreviewHttpRequestV1({
+      threadId: '33333333-3333-4333-8333-333333333333',
+      officialReadingId: 'not-a-reading',
+    })).toThrow(ReaderInterpretationPreviewHttpErrorV1);
   });
 
   it.each([
@@ -53,8 +69,8 @@ describe('Reader Interpretation Preview HTTP seam', () => {
   ])('rejects client authority field %s', (field) => {
     expect(() =>
       parseReaderInterpretationPreviewHttpRequestV1({
-        threadId: 'thread-1',
-        officialReadingId: 'reading-1',
+        threadId: '33333333-3333-4333-8333-333333333333',
+        officialReadingId: '44444444-4444-4444-8444-444444444444',
         [field]: 'forged',
       }),
     ).toThrow(ReaderInterpretationPreviewHttpErrorV1);
@@ -66,7 +82,7 @@ describe('Reader Interpretation Preview HTTP seam', () => {
       contractVersion: 'reader-interpretation-preview-v1',
       lifecycle: 'preview',
       mode: 'reader_interpretation',
-      officialReadingId: 'reading-1',
+      officialReadingId: '44444444-4444-4444-8444-444444444444',
       readerCharacterId: 'baekheon',
       readerContentBundleId: 'bundle-private',
       requestedDomain: 'career',
@@ -79,8 +95,16 @@ describe('Reader Interpretation Preview HTTP seam', () => {
         rendererVersion: 'myeongha-character-saju-bounded-renderer-v1',
         characterId: 'baekheon',
         requestedDomain: 'career',
-        renderedUnitIds: [],
-        segments: [],
+        utteranceId: 'private-utterance-id',
+        readingRef: 'private-reading-ref',
+        readingPlanRef: 'private-reading-plan-ref',
+        renderedUnitIds: ['private-unit-1'],
+        segments: [{
+          kind: 'character_reaction',
+          text: '장기 흐름은 참고하되 지금의 선택 가능성은 남겨 두겠습니다.',
+          sourceUnitRefs: ['private-unit-1'],
+          framingKey: 'private-framing-key',
+        }],
       },
     } as unknown as ReaderInterpretationPreviewEnvelopeV1;
 
@@ -89,7 +113,7 @@ describe('Reader Interpretation Preview HTTP seam', () => {
     expect(response).toMatchObject({
       lifecycle: 'preview',
       mode: 'reader_interpretation',
-      officialReadingId: 'reading-1',
+      officialReadingId: '44444444-4444-4444-8444-444444444444',
       readerCharacterId: 'baekheon',
       domain: 'career',
       interpretationHash: 'sha256:v1:interpretation',
@@ -99,6 +123,45 @@ describe('Reader Interpretation Preview HTTP seam', () => {
     expect(response).not.toHaveProperty('sourceResponseHash');
     expect(response).not.toHaveProperty('groundingHash');
     expect(response).not.toHaveProperty('responseSnapshotJsonb');
+    expect(response).toMatchObject({
+      utterance: {
+        characterId: 'baekheon',
+        requestedDomain: 'career',
+        segments: [{
+          kind: 'character_reaction',
+          text: '장기 흐름은 참고하되 지금의 선택 가능성은 남겨 두겠습니다.',
+        }],
+      },
+    });
+    expect(JSON.stringify(response)).not.toContain('private-utterance-id');
+    expect(JSON.stringify(response)).not.toContain('private-reading-ref');
+    expect(JSON.stringify(response)).not.toContain('private-reading-plan-ref');
+    expect(JSON.stringify(response)).not.toContain('private-unit-1');
+    expect(JSON.stringify(response)).not.toContain('private-framing-key');
+    expect(JSON.stringify(response)).not.toContain('sourceUnitRefs');
+  });
+
+  it('projects the context-authority result down to relationship policy only', () => {
+    const relationshipProjectionPolicy = Object.freeze({
+      closenessBands: Object.freeze([]),
+      trustBands: Object.freeze([]),
+      frictionBands: Object.freeze([]),
+    });
+
+    const projected = projectReaderInterpretationPreviewServerContextV1({
+      relationshipProjectionPolicy,
+      character: { characterId: 'forged' },
+      grantedLifeFacts: [{ factId: 'forged' }],
+      recentMessages: ['forged'],
+      saju: { readingRef: 'forged' },
+    } as never);
+
+    expect(projected).toEqual({ relationshipProjectionPolicy });
+    expect(Object.keys(projected)).toEqual(['relationshipProjectionPolicy']);
+    expect(projected).not.toHaveProperty('character');
+    expect(projected).not.toHaveProperty('grantedLifeFacts');
+    expect(projected).not.toHaveProperty('recentMessages');
+    expect(projected).not.toHaveProperty('saju');
   });
 
   it('rejects unauthenticated requests before resolving server Character context', async () => {
@@ -124,14 +187,19 @@ describe('Reader Interpretation Preview HTTP seam', () => {
     const memoryGrantsAuthorityPort = {
       readActiveGrants: vi.fn(),
     } as unknown as MemoryGrantsReadAuthorityPortV1;
+    const nonMemoryContextAuthorityPort = {
+      readGrantedLifeFacts: vi.fn(),
+      readRelationshipEvents: vi.fn(),
+      readRecentMessages: vi.fn(),
+    } as unknown as ReaderContextNonMemoryReadAuthorityPortV1;
 
     await expect(
       runReaderInterpretationPreviewHttpV1({
         resolvedSubjectId: ' ',
         effectiveAt: '2026-09-21T01:00:00.000Z',
         body: {
-          threadId: 'thread-1',
-          officialReadingId: 'reading-1',
+          threadId: '33333333-3333-4333-8333-333333333333',
+          officialReadingId: '44444444-4444-4444-8444-444444444444',
         },
         contextAuthorityPort,
         contentReleaseRuntime,
@@ -141,6 +209,7 @@ describe('Reader Interpretation Preview HTTP seam', () => {
         relationshipAuthorityPort,
         memoryItemsAuthorityPort,
         memoryGrantsAuthorityPort,
+        nonMemoryContextAuthorityPort,
         groundingProjectionPort: { projectGrounding: vi.fn() },
       }),
     ).rejects.toMatchObject({ code: 'AUTH_REQUIRED' });
@@ -172,14 +241,19 @@ describe('Reader Interpretation Preview HTTP seam', () => {
     const memoryGrantsAuthorityPort = {
       readActiveGrants: vi.fn(),
     } as unknown as MemoryGrantsReadAuthorityPortV1;
+    const nonMemoryContextAuthorityPort = {
+      readGrantedLifeFacts: vi.fn(),
+      readRelationshipEvents: vi.fn(),
+      readRecentMessages: vi.fn(),
+    } as unknown as ReaderContextNonMemoryReadAuthorityPortV1;
 
     await expect(
       runReaderInterpretationPreviewHttpV1({
         resolvedSubjectId: 'subject-1',
         effectiveAt: '2026-09-21T01:00:00.000Z',
         body: {
-          threadId: 'thread-1',
-          officialReadingId: 'reading-1',
+          threadId: '33333333-3333-4333-8333-333333333333',
+          officialReadingId: '44444444-4444-4444-8444-444444444444',
           readerCharacterId: 'taegyeom',
         },
         contextAuthorityPort,
@@ -190,6 +264,7 @@ describe('Reader Interpretation Preview HTTP seam', () => {
         relationshipAuthorityPort,
         memoryItemsAuthorityPort,
         memoryGrantsAuthorityPort,
+        nonMemoryContextAuthorityPort,
         groundingProjectionPort: { projectGrounding: vi.fn() },
       }),
     ).rejects.toMatchObject({ code: 'INVALID_REQUEST' });

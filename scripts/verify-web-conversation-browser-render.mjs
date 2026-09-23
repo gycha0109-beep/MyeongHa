@@ -231,7 +231,7 @@ async function verifyHub(page, origin, suffix, width, height, mobile) {
       mira: 'mira-portrait-v2.webp',
       taegyeom: 'taegyeom-portrait-v2.webp',
       yunho: 'yunho-portrait-v2.webp',
-      doyoon: 'doyoon-portrait-v2.webp',
+      doyun: 'doyoon-portrait-v2.webp',
     };
     const portraits = Object.entries(expectedPortraits).map(([key, filename]) => {
       const art = document.querySelector('.chat-person-art[data-character="' + key + '"]');

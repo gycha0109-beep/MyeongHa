@@ -726,6 +726,8 @@ export {
   type ReaderInterpretationPreviewContextAuthorityPortV1,
   type ReaderInterpretationPreviewHttpRequestV1,
   type ReaderInterpretationPreviewHttpResponseV1,
+  type ReaderInterpretationPreviewSceneSegmentV1,
+  type ReaderInterpretationPreviewSceneUtteranceV1,
 } from './reader-interpretation-preview-http.js';
 
 

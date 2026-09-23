@@ -24,24 +24,27 @@ describe('MyeongHa Saju Reader picker', () => {
     expect(runtime).toContain("next.searchParams.set('reader', readerKey);");
     expect(runtime).toContain("window.location.assign(next.href);");
     expect(runtime).toContain("dialog.showModal()");
-    expect(runtime).toContain("9명의 Reader 모두 전용 Reading Scene까지 연결되어 있습니다.");
+    expect(runtime).toContain('현재 프리뷰에서는 사주 근거와 해석 문장은 그대로 유지하고');
+    expect(runtime).toContain('선택한 Reader의 장면과 이름만 화면 연출에 적용합니다.');
     expect(css).toContain('.reading-reader-picker-grid');
   });
 
-  it('offers the canonical nine Readers with Reading Scene v1 available for every Reader', async () => {
+  it('offers nine browser presentation Reader options without promoting them to canonical identity', async () => {
     const runtime = await readFile(pickerRuntimePath, 'utf8');
-    const keys = ['seyeon', 'baekheon', 'yeoul', 'seorin', 'rahyeon', 'mira', 'taegyeom', 'yunho', 'doyoon'];
+    const keys = ['seyeon', 'baekheon', 'yeoul', 'seorin', 'rahyeon', 'mira', 'taegyeom', 'yunho', 'doyun'];
     const names = ['세연', '백헌', '여울', '서린', '라현', '미라', '태겸', '윤호', '도윤'];
 
-    for (const key of keys) {
-      expect(runtime).toContain(`key: '${key}'`);
+    for (const key of keys) expect(runtime).toContain(`key: '${key}'`);
+    for (const key of keys.filter((key) => key !== 'doyun')) {
       expect(runtime).toContain(`assets/characters/${key}-portrait-v2.webp`);
     }
+    expect(runtime).toContain('assets/characters/doyoon-portrait-v2.webp');
     for (const name of names) expect(runtime).toContain(`name: '${name}'`);
 
     expect(runtime).not.toContain('representativeDemo: true');
-    expect(runtime).toContain('9명의 Reader 모두 전용 Reading Scene까지 연결되어 있습니다.');
-    expect(runtime).toContain('Reading이 끝난 뒤에는 선택한 Reader와 대화를 이어가거나 기록에서 결과를 다시 볼 수 있습니다.');
-    expect(runtime).toContain('챗봇 응답 연결은 후속 단계입니다.');
+    expect(runtime).toContain('이 선택은 프리뷰 화면 연출에만 적용됩니다.');
+    expect(runtime).toContain('저장된 풀이를 다시 읽거나 대화를 이어가는 Reader는 서버에서 연결 가능한 상태가 확인된 뒤 별도로 표시됩니다.');
+    expect(runtime).not.toContain('Reading이 끝난 뒤에는 선택한 Reader와 대화를 이어가거나');
+    expect(runtime).not.toContain("fallback.searchParams.set('reader', 'baekheon')");
   });
 });

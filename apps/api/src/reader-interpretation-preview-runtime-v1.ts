@@ -41,6 +41,9 @@ import type {
 import type {
   MemoryGrantsReadAuthorityPortV1,
 } from './memory-grants-read.js';
+import type {
+  ReaderContextLifeFactsReadAuthorityPortV1,
+} from './reader-context-non-memory-read.js';
 import {
   CharacterStandardReadingServerRuntimeAuthorityErrorV1,
   prepareCharacterStandardReadingServerRuntimeV1,
@@ -127,6 +130,7 @@ export interface RunThreadBoundReaderInterpretationPreviewInputV1 {
   readonly relationshipAuthorityPort: CharacterRelationshipReadAuthorityPortV1;
   readonly memoryItemsAuthorityPort: MemoryItemsReadAuthorityPortV1;
   readonly memoryGrantsAuthorityPort: MemoryGrantsReadAuthorityPortV1;
+  readonly nonMemoryContextAuthorityPort: ReaderContextLifeFactsReadAuthorityPortV1;
   readonly groundingProjectionPort: OfficialReadingCharacterGroundingProjectionPortV1;
 }
 
@@ -380,11 +384,11 @@ function withHash<T extends object>(value: T): T & { readonly interpretationHash
  * Grounding is requested only through the Saju-owned projection port after the exact
  * Official Reading source has been re-resolved. MyeongHa admits and verifies the
  * returned bundle; it never constructs semantic grounding units from Product blocks.
- * Production activation remains HOLD until a real Saju projection adapter is wired
- * and separately promoted.
+ * Production activation remains HOLD on the remaining MyeongHa composition
+ * authorities; the hosted Saju projection transport is already verified.
  */
 function resolveRuntimePerspective(
-  context: CharacterRuntimeContextWithGroundingV1,
+  context: CharacterRuntimeContextV1,
 ): CharacterPerspectiveProfileV1 {
   const perspective = resolveCharacterSajuFirstSlicePerspectiveV1({
     characterId: context.characterId,
@@ -406,12 +410,15 @@ async function renderResolvedReaderInterpretationPreviewV1(input: {
   readonly requestedDomain: SajuDomain;
   readonly groundingProjectionPort: OfficialReadingCharacterGroundingProjectionPortV1;
 }): Promise<ReaderInterpretationPreviewEnvelopeV1> {
+  // Perspective admission is content-only and must happen before the cross-service
+  // Saju call. Unsupported Readers fail closed without spending grounding transport
+  // or exposing an unreviewed Character interpretation path.
+  const perspective = resolveRuntimePerspective(input.context);
   const { grounding, runtimeContext } = await projectAndAdmitGrounding({
     source: input.source,
     context: input.context,
     projectionPort: input.groundingProjectionPort,
   });
-  const perspective = resolveRuntimePerspective(runtimeContext);
 
   assertRuntimeIdentity({
     source: input.source,
@@ -554,6 +561,7 @@ export async function runThreadBoundReaderInterpretationPreviewV1(
       relationshipAuthorityPort: input.relationshipAuthorityPort,
       memoryItemsAuthorityPort: input.memoryItemsAuthorityPort,
       memoryGrantsAuthorityPort: input.memoryGrantsAuthorityPort,
+      nonMemoryContextAuthorityPort: input.nonMemoryContextAuthorityPort,
       contextInput: input.contextInput,
     });
   } catch (error) {

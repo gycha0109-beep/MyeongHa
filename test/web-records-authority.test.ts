@@ -6,6 +6,7 @@ const webRoot = join(process.cwd(), 'apps', 'web');
 const html = `${readFileSync(join(webRoot, 'records.html'), 'utf8')}\n${readFileSync(join(webRoot, 'src', 'records', 'RecordsPage.tsx'), 'utf8')}`;
 const client = readFileSync(join(webRoot, 'records-runtime-client.js'), 'utf8');
 const page = readFileSync(join(webRoot, 'records-page.js'), 'utf8');
+const handoff = readFileSync(join(webRoot, 'reading-history-handoff.js'), 'utf8');
 
 describe('web records authority boundary', () => {
   it('removes the old demo identity and fabricated private records', () => {
@@ -70,6 +71,19 @@ describe('web records authority boundary', () => {
     expect(page).toContain("requestedTab === 'saju' || fromReading");
     expect(page).toContain("tab.id === 'saju-records-tab'");
     expect(page).toContain("document.body.dataset.recordsEntry = fromReading ? 'reading-handoff' : 'saju-deeplink';");
+  });
+
+  it('links persisted Reading history by stored identifiers without inventing Reader authority', () => {
+    expect(page).toContain("from './reading-history-handoff.js'");
+    expect(page).toContain('buildPersistedReadingHandoffUrlV1({');
+    expect(page).toContain('readingId: reading.readingId');
+    expect(page).toContain('readingSessionId: reading.readingSessionId');
+    expect(page).toContain('sajuDomain: reading.sajuDomain');
+    expect(page).toContain("'저장된 풀이 열기 →'");
+    expect(handoff).toContain("params.set('from', handoff.source)");
+    expect(handoff).not.toContain("params.set('reader'");
+    expect(handoff).not.toContain("params.set('character'");
+    expect(handoff).not.toContain("params.set('threadId'");
   });
 
   it('keeps memory grants separate instead of inventing an aggregate grant API', () => {

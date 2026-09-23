@@ -717,7 +717,7 @@ body[data-reader="rahyeon"] { --reader-accent: #a7666d; --reader-night: #2c171d;
 body[data-reader="mira"] { --reader-accent: #8b8b82; --reader-night: #25282c; --reader-scene-light: rgba(170, 168, 154, .17); }
 body[data-reader="taegyeom"] { --reader-accent: #758293; --reader-night: #17212d; --reader-scene-light: rgba(103, 124, 150, .17); }
 body[data-reader="yunho"] { --reader-accent: #9d815d; --reader-night: #2c2823; --reader-scene-light: rgba(191, 154, 98, .20); }
-body[data-reader="doyoon"] { --reader-accent: #8a7967; --reader-night: #272521; --reader-scene-light: rgba(186, 153, 108, .16); }
+body[data-reader="doyun"] { --reader-accent: #8a7967; --reader-night: #272521; --reader-scene-light: rgba(186, 153, 108, .16); }
 
 @media (max-width: 1160px) {
   .reading-stage {
@@ -809,4 +809,21 @@ body[data-reader="doyoon"] { --reader-accent: #8a7967; --reader-night: #272521; 
   .reading-completion { min-height: 440px; padding: 42px 22px 96px; }
   .reading-completion-actions { grid-template-columns: 1fr; margin-top: 28px; }
   .reading-completion-primary, .reading-completion-secondary { min-height: 52px; font-size: 13px; }
+}
+
+
+/* Records archive reread: the stored Official Reading is not a Reader Scene. */
+body[data-reading-record-mode="official_archive"] .reading-stage {
+  grid-template-columns: minmax(0, 900px);
+  justify-content: center;
+}
+
+body[data-reading-record-mode="official_archive"] .reader-scene,
+body[data-reading-record-mode="official_archive"] .reading-character-block {
+  display: none !important;
+}
+
+body[data-reading-record-mode="official_archive"] .reading-sheet {
+  grid-column: 1;
+  width: 100%;
 }

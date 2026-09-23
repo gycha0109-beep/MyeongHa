@@ -49,10 +49,29 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
     expect(js).toContain('setContinuation(null)');
     expect(js).toContain('setRecent([])');
     expect(js).toContain('setIncoming([])');
+    expect(js).toContain('window.MyeongHaChatHub = Object.freeze({ people })');
+    expect(js).not.toContain('setRelationshipState(state = {})');
+    expect(js).not.toContain('clearRelationshipState()');
     expect(js).toContain('typeof state.threadTitle');
     expect(js).toContain('item.hasIncoming === true');
     expect(js).not.toContain('threadTitle:');
     expect(js).not.toContain('hasIncoming: true');
+  });
+
+  it('keeps thread-backed relationship surfaces presentation-neutral until thread identity supplies canonical Character authority', async () => {
+    const js = await readFile(hubJsPath, 'utf8');
+
+    expect(js).toContain("import { parseChatThreadIdV1 } from './chat-room-read-contract.js'");
+    expect(js).toContain('const threadId = parseChatThreadIdV1(state.threadId)');
+    expect(js).toContain('const threadId = parseChatThreadIdV1(item?.threadId)');
+    expect(js).toContain("const name = '대화 상대'");
+    expect(js).toContain("continuationTitle.textContent = '서버 확인 중'");
+    expect(js).toContain('continuationLink.href = roomHref(null, threadId)');
+    expect(js).toContain('delete continuationScene.dataset.character');
+    expect(js).toContain('link.href = roomHref(null, threadId)');
+    expect(js).not.toContain('link.dataset.character = characterKey');
+    expect(js).not.toContain('avatar.dataset.character = characterKey');
+    expect(js).not.toContain('art.dataset.character = characterKey');
   });
 
   it('keeps discovery searchable and pageable without inventing canonical character authority', async () => {
@@ -63,10 +82,14 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
     expect(js).toContain('visibleCount + PAGE_SIZE');
     expect(js).toContain('safePresentationKey');
     expect(js).toContain("url.searchParams.set('character', safeKey)");
+    expect(js).toContain("url.searchParams.set('threadId', safeThreadId)");
+    expect(js.indexOf("url.searchParams.set('threadId', safeThreadId)")).toBeLessThan(
+      js.indexOf("url.searchParams.set('character', safeKey)"),
+    );
     expect(js).not.toContain('characterId:');
   });
 
-  it('keeps legacy Se-yeon scene art out of cards and pins all nine canonical card portraits', async () => {
+  it('keeps legacy Se-yeon scene art out of cards and pins all nine presentation card portraits', async () => {
     const [v2Css, hubCss, js] = await Promise.all([
       readFile(hubV2CssPath, 'utf8'),
       readFile(hubCssPath, 'utf8'),
@@ -78,9 +101,10 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
     expect(v2Css).toContain('.chat-recent-avatar[data-character="seyeon"]');
     expect(v2Css).toContain('url("seyeon-chat.webp")');
 
-    for (const key of ['seyeon', 'baekheon', 'yeoul', 'seorin', 'rahyeon', 'mira', 'taegyeom', 'yunho', 'doyoon']) {
+    for (const key of ['seyeon', 'baekheon', 'yeoul', 'seorin', 'rahyeon', 'mira', 'taegyeom', 'yunho']) {
       expect(js).toContain(`${key}: Object.freeze({ src: 'assets/characters/${key}-portrait-v2.webp'`);
     }
+    expect(js).toContain("doyun: Object.freeze({ src: 'assets/characters/doyoon-portrait-v2.webp'");
 
     expect(js).toContain("image.className = 'chat-person-art-image'");
     expect(hubCss).toContain('background-image: none !important');
@@ -93,13 +117,16 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
     expect(hubCss).toContain('html[data-theme="dark"] body.chat-hub-page .chat-person-tag');
   });
 
-  it('maps all nine canonical characters to representative room art', async () => {
+  it('maps all nine presentation characters to representative room art', async () => {
     const v2Css = await readFile(hubV2CssPath, 'utf8');
 
-    for (const key of ['seyeon', 'baekheon', 'yeoul', 'seorin', 'rahyeon', 'mira', 'taegyeom', 'yunho', 'doyoon']) {
+    for (const key of ['seyeon', 'baekheon', 'yeoul', 'seorin', 'rahyeon', 'mira', 'taegyeom', 'yunho', 'doyun']) {
       expect(v2Css).toContain(`.character-room-v2[data-character="${key}"]`);
+    }
+    for (const key of ['seyeon', 'baekheon', 'yeoul', 'seorin', 'rahyeon', 'mira', 'taegyeom', 'yunho']) {
       expect(v2Css).toContain(`assets/characters/rooms/${key}-room.webp`);
     }
+    expect(v2Css).toContain('assets/characters/rooms/doyoon-room.webp');
 
     expect(v2Css).toContain('var(--conversation-room-art)');
     expect(v2Css).toContain('.conversation-room-scene .character-room-scene-decoration');
@@ -128,18 +155,39 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
     expect(records).toContain('href="chat-hub.html">대화</a>');
   });
 
-  it('accepts a validated Saju Reading handoff without pretending unrelated chat context', async () => {
+  it('rejects the legacy client-authored Saju Reading continuation claim', async () => {
     const runtime = await readFile(roomRuntimePath, 'utf8');
 
-    expect(runtime).toContain("const READING_HANDOFF_STORAGE_KEY = 'myeongha.readingHandoff.v1';");
-    expect(runtime).toContain("params.get('from') !== 'reading'");
-    expect(runtime).toContain("if (stored.reader !== characterKey) return null;");
-    expect(runtime).toContain("if (queryTopic && stored.topic !== queryTopic) return null;");
-    expect(runtime).toContain("root.dataset.chatEntry = 'reading-handoff'");
-    expect(runtime).toContain("document.querySelector('[data-context-pill]')");
-    expect(runtime).toContain("document.querySelector('[data-thread-bar]')");
-    expect(runtime).toContain('readingHandoff,');
-    expect(runtime).toContain('읽기에서 이어왔군요.');
+    expect(runtime).not.toContain('myeongha.readingHandoff.v1');
+    expect(runtime).not.toContain("params.get('from') !== 'reading'");
+    expect(runtime).not.toContain("root.dataset.chatEntry = 'reading-handoff'");
+    expect(runtime).not.toContain('readingHandoff');
+    expect(runtime).not.toContain('읽기에서 이어왔군요.');
+    expect(runtime).toContain('setDialogueLines(character.intro)');
+  });
+
+  it('keeps thread-only Chat navigation identity-neutral until server presentation authority exists', async () => {
+    const runtime = await readFile(roomRuntimePath, 'utf8');
+
+    expect(runtime).toContain("const rawThreadId = params.get('threadId')");
+    expect(runtime).toContain('const threadId = parseChatThreadIdV1(rawThreadId)');
+    expect(runtime).toContain("const requestedCharacter = params.get('character')?.toLowerCase() ?? null");
+    expect(runtime).toContain('const presentationCharacterKey = !hasThreadRoute && requestedCharacter');
+    expect(runtime).toContain("presentationCharacterKey ?? (hasThreadRoute ? null : 'baekheon')");
+    expect(runtime).toContain("'thread_identity_pending'");
+    expect(runtime).toContain("'thread_identity_invalid'");
+    expect(runtime).toContain("root.dataset.characterAuthority = 'presentation_hint_only'");
+    expect(runtime).toContain("name: '대화 상대'");
+    expect(runtime).not.toContain("(params.get('character') || 'baekheon')");
+  });
+
+  it('fails closed on malformed thread route identity instead of falling back to a presentation Character', async () => {
+    const runtime = await readFile(roomRuntimePath, 'utf8');
+
+    expect(runtime).toContain('parseChatThreadIdV1(rawThreadId)');
+    expect(runtime).toContain("'thread_identity_invalid'");
+    expect(runtime).toContain('hasThreadRoute ? null');
+    expect(runtime).not.toContain("(params.get('character') || 'baekheon')");
   });
 
   it('keeps My as the fifth active destination instead of falling back to Records', async () => {

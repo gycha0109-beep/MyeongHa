@@ -1,3 +1,5 @@
+import { parseChatThreadIdV1 } from './chat-room-read-contract.js';
+
 const people = Object.freeze([
   {
     key: 'seyeon',
@@ -56,7 +58,7 @@ const people = Object.freeze([
     tags: ['따뜻한', '안정적인', '지적인'],
   },
   {
-    key: 'doyoon',
+    key: 'doyun',
     name: '도윤',
     title: '대리자',
     line: '자, 무슨 얘기부터 해볼까요? 편하게 말해요.',
@@ -73,7 +75,7 @@ const portraitArt = Object.freeze({
   mira: Object.freeze({ src: 'assets/characters/mira-portrait-v2.webp' }),
   taegyeom: Object.freeze({ src: 'assets/characters/taegyeom-portrait-v2.webp' }),
   yunho: Object.freeze({ src: 'assets/characters/yunho-portrait-v2.webp' }),
-  doyoon: Object.freeze({ src: 'assets/characters/doyoon-portrait-v2.webp' }),
+  doyun: Object.freeze({ src: 'assets/characters/doyoon-portrait-v2.webp' }),
 });
 
 const peopleGrid = document.querySelector('[data-people-grid]');
@@ -107,11 +109,16 @@ function safePresentationKey(value) {
 }
 
 function roomHref(characterKey, threadId) {
+  const url = new URL('chat.html', window.location.href);
+  const safeThreadId = parseChatThreadIdV1(threadId);
+  if (safeThreadId) {
+    url.searchParams.set('threadId', safeThreadId);
+    return `${url.pathname.split('/').pop()}${url.search}`;
+  }
+
   const safeKey = safePresentationKey(characterKey);
   if (!safeKey) return 'chat.html';
-  const url = new URL('chat.html', window.location.href);
   url.searchParams.set('character', safeKey);
-  if (typeof threadId === 'string' && threadId.trim()) url.searchParams.set('threadId', threadId.trim());
   return `${url.pathname.split('/').pop()}${url.search}`;
 }
 
@@ -232,30 +239,27 @@ function setContinuation(state) {
     return;
   }
 
-  const characterKey = safePresentationKey(state.characterKey);
-  if (!characterKey || typeof state.context !== 'string' || !state.context.trim()) {
+  const threadId = parseChatThreadIdV1(state.threadId);
+  if (!threadId || typeof state.context !== 'string' || !state.context.trim()) {
     continuationEmpty.hidden = false;
     continuationActive.hidden = true;
     return;
   }
 
-  const person = findPerson(characterKey);
-  const name = typeof state.name === 'string' && state.name.trim() ? state.name.trim() : person?.name;
-  if (!name) {
-    continuationEmpty.hidden = false;
-    continuationActive.hidden = true;
-    return;
-  }
+  // SRC-36: an authoritative thread id does not authorize a browser presentation
+  // key/name/title. Keep relationship-thread surfaces neutral until the governed
+  // canonical Character -> browser presentation projection exists.
+  const name = '대화 상대';
 
   continuationEmpty.hidden = true;
   continuationActive.hidden = false;
 
   if (continuationName) continuationName.textContent = name;
-  if (continuationTitle) continuationTitle.textContent = typeof state.title === 'string' ? state.title : (person?.title ?? '');
+  if (continuationTitle) continuationTitle.textContent = '서버 확인 중';
   if (continuationContext) continuationContext.textContent = state.context.trim();
   if (continuationInitial) continuationInitial.textContent = name.slice(0, 2);
-  if (continuationLink) continuationLink.href = roomHref(characterKey, state.threadId);
-  if (continuationScene) continuationScene.dataset.character = characterKey;
+  if (continuationLink) continuationLink.href = roomHref(null, threadId);
+  if (continuationScene) delete continuationScene.dataset.character;
 
   const threadTitle = typeof state.threadTitle === 'string' ? state.threadTitle.trim() : '';
   if (continuationThreadNote) continuationThreadNote.hidden = !threadTitle;
@@ -263,20 +267,16 @@ function setContinuation(state) {
 }
 
 function createRecentItem(item) {
-  const characterKey = safePresentationKey(item?.characterKey);
-  if (!characterKey) return null;
-  const person = findPerson(characterKey);
-  const name = typeof item.name === 'string' && item.name.trim() ? item.name.trim() : person?.name;
-  if (!name) return null;
+  const threadId = parseChatThreadIdV1(item?.threadId);
+  if (!threadId) return null;
+  const name = '대화 상대';
 
   const link = document.createElement('a');
   link.className = 'chat-recent-item';
-  link.dataset.character = characterKey;
-  link.href = roomHref(characterKey, item.threadId);
+  link.href = roomHref(null, threadId);
 
   const avatar = document.createElement('span');
   avatar.className = 'chat-recent-avatar';
-  avatar.dataset.character = characterKey;
   avatar.setAttribute('aria-hidden', 'true');
   avatar.textContent = name.slice(0, 2);
 
@@ -335,20 +335,16 @@ function setRecent(items) {
 }
 
 function createIncomingItem(item) {
-  const characterKey = safePresentationKey(item?.characterKey);
-  if (!characterKey || typeof item?.message !== 'string' || !item.message.trim()) return null;
-  const person = findPerson(characterKey);
-  const name = typeof item.name === 'string' && item.name.trim() ? item.name.trim() : person?.name;
-  if (!name) return null;
+  const threadId = parseChatThreadIdV1(item?.threadId);
+  if (!threadId || typeof item?.message !== 'string' || !item.message.trim()) return null;
+  const name = '대화 상대';
 
   const link = document.createElement('a');
   link.className = 'chat-incoming-item';
-  link.dataset.character = characterKey;
-  link.href = roomHref(characterKey, item.threadId);
+  link.href = roomHref(null, threadId);
 
   const art = document.createElement('span');
   art.className = 'chat-incoming-art';
-  art.dataset.character = characterKey;
   art.setAttribute('aria-hidden', 'true');
   const initial = document.createElement('span');
   initial.textContent = name.slice(0, 2);
@@ -389,19 +385,10 @@ function setIncoming(items) {
   incomingSection.hidden = false;
 }
 
-window.MyeongHaChatHub = Object.freeze({
-  people,
-  setRelationshipState(state = {}) {
-    setContinuation(state.continuation ?? null);
-    setRecent(state.recent ?? []);
-    setIncoming(state.incoming ?? []);
-  },
-  clearRelationshipState() {
-    setContinuation(null);
-    setRecent([]);
-    setIncoming([]);
-  },
-});
+// No browser relationship hydration mutator is exposed while the repository has
+// no validated server relationship-thread projection contract. Discovery remains
+// presentation-only; relationship surfaces stay empty until such a contract exists.
+window.MyeongHaChatHub = Object.freeze({ people });
 
 renderPeople();
 setContinuation(null);

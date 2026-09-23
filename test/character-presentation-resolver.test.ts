@@ -20,7 +20,7 @@ async function expectApiCode(
 }
 
 describe('character presentation identity resolver', () => {
-  it('resolves a presentation key to a distinct canonical character identity inside the trusted bundle', async () => {
+  it('resolves a presentation key to the canonical character identity supplied by the trusted bundle', async () => {
     const authorityPort: CharacterPresentationIdentityAuthorityPortV1 = {
       resolveCharacterIdentity: async (input) => [
         {
@@ -43,6 +43,30 @@ describe('character presentation identity resolver', () => {
       contentBundleId: 'bundle-release-a',
     });
     expect(identity.characterId).not.toBe(identity.presentationKey);
+  });
+
+  it('allows identical tokens only when trusted authority explicitly binds both namespaces', async () => {
+    const authorityPort: CharacterPresentationIdentityAuthorityPortV1 = {
+      resolveCharacterIdentity: async ({ contentBundleId, presentationKey }) => [
+        {
+          presentationKey,
+          characterId: presentationKey,
+          contentBundleId,
+        },
+      ],
+    };
+
+    const identity = await resolveCharacterPresentationIdentity({
+      contentBundleId: 'bundle-release-a',
+      presentationKey: 'seyeon',
+      authorityPort,
+    });
+
+    expect(identity).toEqual({
+      presentationKey: 'seyeon',
+      characterId: 'seyeon',
+      contentBundleId: 'bundle-release-a',
+    });
   });
 
   it('keeps the API roster-agnostic so a future presentation key can be admitted by content authority', async () => {
