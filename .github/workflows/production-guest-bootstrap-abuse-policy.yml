@@ -51,22 +51,22 @@ jobs:
       - name: Checkout exact repository state
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - name: Apply and verify governed Guest bootstrap abuse policy
-        id: apply_policy
-        continue-on-error: ${{ inputs.mode == 'enforce' }}
-        shell: bash
-        run: bash scripts/operations/run-production-guest-bootstrap-abuse-policy.sh
-
       - name: Set up Node 24 for enforce canary
-        if: ${{ inputs.mode == 'enforce' && steps.apply_policy.outcome == 'success' }}
+        if: ${{ inputs.mode == 'enforce' }}
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: '24'
           package-manager-cache: false
 
-      - name: Install canary dependencies
-        if: ${{ inputs.mode == 'enforce' && steps.apply_policy.outcome == 'success' }}
+      - name: Install canary dependencies before enforce mutation
+        if: ${{ inputs.mode == 'enforce' }}
         run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Apply and verify governed Guest bootstrap abuse policy
+        id: apply_policy
+        continue-on-error: ${{ inputs.mode == 'enforce' }}
+        shell: bash
+        run: bash scripts/operations/run-production-guest-bootstrap-abuse-policy.sh
 
       - name: Bind canary to exact main Production deployment
         id: exact_deployment
