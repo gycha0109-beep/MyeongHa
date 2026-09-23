@@ -52,25 +52,25 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Apply and verify governed Guest bootstrap abuse policy
-        id: apply-policy
+        id: apply_policy
         continue-on-error: ${{ inputs.mode == 'enforce' }}
         shell: bash
         run: bash scripts/operations/run-production-guest-bootstrap-abuse-policy.sh
 
       - name: Set up Node 24 for enforce canary
-        if: ${{ inputs.mode == 'enforce' && steps.apply-policy.outcome == 'success' }}
+        if: ${{ inputs.mode == 'enforce' && steps.apply_policy.outcome == 'success' }}
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: '24'
           package-manager-cache: false
 
       - name: Install canary dependencies
-        if: ${{ inputs.mode == 'enforce' && steps.apply-policy.outcome == 'success' }}
+        if: ${{ inputs.mode == 'enforce' && steps.apply_policy.outcome == 'success' }}
         run: npm ci --ignore-scripts --no-audit --no-fund
 
       - name: Bind canary to exact main Production deployment
-        id: exact-deployment
-        if: ${{ inputs.mode == 'enforce' && steps.apply-policy.outcome == 'success' }}
+        id: exact_deployment
+        if: ${{ inputs.mode == 'enforce' && steps.apply_policy.outcome == 'success' }}
         continue-on-error: true
         shell: bash
         run: |
@@ -83,16 +83,16 @@ jobs:
           echo "exact_production_deployment_id=$exact_deployment_id"
 
       - name: Run pre-launch enforce canary
-        id: enforce-canary
-        if: ${{ inputs.mode == 'enforce' && steps.apply-policy.outcome == 'success' && steps.exact-deployment.outcome == 'success' }}
+        id: enforce_canary
+        if: ${{ inputs.mode == 'enforce' && steps.apply_policy.outcome == 'success' && steps.exact_deployment.outcome == 'success' }}
         continue-on-error: true
         env:
           MYEONGHA_GUEST_BOOTSTRAP_CANARY_CONFIRM: VERIFY_GUEST_BOOTSTRAP_RATE_LIMIT_CANARY_V1
         run: node scripts/operations/run-production-guest-bootstrap-rate-limit-canary.mjs
 
       - name: Roll back failed enforce attempt to observe
-        id: rollback-observe
-        if: ${{ always() && inputs.mode == 'enforce' && (steps.apply-policy.outcome != 'success' || steps.exact-deployment.outcome != 'success' || steps.enforce-canary.outcome != 'success') }}
+        id: rollback_observe
+        if: ${{ always() && inputs.mode == 'enforce' && (steps.apply_policy.outcome != 'success' || steps.exact_deployment.outcome != 'success' || steps.enforce_canary.outcome != 'success') }}
         env:
           ABUSE_POLICY_MODE: observe
         shell: bash
@@ -102,14 +102,14 @@ jobs:
           echo "guest_bootstrap_enforce_rollback=observe"
 
       - name: Fail closed after enforce rollback
-        if: ${{ always() && inputs.mode == 'enforce' && (steps.apply-policy.outcome != 'success' || steps.exact-deployment.outcome != 'success' || steps.enforce-canary.outcome != 'success') }}
+        if: ${{ always() && inputs.mode == 'enforce' && (steps.apply_policy.outcome != 'success' || steps.exact_deployment.outcome != 'success' || steps.enforce_canary.outcome != 'success') }}
         shell: bash
         run: |
           echo "::error title=Guest bootstrap enforce canary failed::The enforce attempt did not prove the governed Production boundary. Observe rollback was attempted."
           exit 1
 
       - name: Record enforce canary success
-        if: ${{ inputs.mode == 'enforce' && steps.apply-policy.outcome == 'success' && steps.exact-deployment.outcome == 'success' && steps.enforce-canary.outcome == 'success' }}
+        if: ${{ inputs.mode == 'enforce' && steps.apply_policy.outcome == 'success' && steps.exact_deployment.outcome == 'success' && steps.enforce_canary.outcome == 'success' }}
         shell: bash
         run: |
           echo "guest_bootstrap_enforce_status=success"
