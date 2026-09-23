@@ -106,10 +106,10 @@ function createPicker() {
 
   const title = document.createElement('h2');
   title.id = 'reading-reader-picker-title';
-  title.textContent = '누가 이 사주를 읽을까요?';
+  title.textContent = '어떤 Reader 장면으로 볼까요?';
 
   const copy = document.createElement('p');
-  copy.textContent = '사주 근거는 그대로 두고, Reader마다 설명 방식과 말투를 다르게 연결합니다.';
+  copy.textContent = '현재 프리뷰에서는 사주 근거와 해석 문장은 그대로 유지하고, 선택한 Reader의 장면과 이름만 화면 연출에 적용합니다.';
 
   const target = document.createElement('span');
   target.className = 'reading-reader-picker-target';
@@ -161,7 +161,7 @@ function createPicker() {
 
     const action = document.createElement('span');
     action.className = 'reading-reader-option-action';
-    action.textContent = '이 Reader로 읽기 →';
+    action.textContent = '이 장면으로 보기 →';
 
     body.append(heading, tone, action);
     button.append(art, body);
@@ -170,7 +170,7 @@ function createPicker() {
 
   const note = document.createElement('p');
   note.className = 'reading-reader-picker-note';
-  note.textContent = '9명의 Reader 모두 전용 Reading Scene까지 연결되어 있습니다. Reading이 끝난 뒤에는 선택한 Reader와 대화를 이어가거나 기록에서 결과를 다시 볼 수 있습니다. 챗봇 응답 연결은 후속 단계입니다.';
+  note.textContent = '이 선택은 프리뷰 화면 연출에만 적용됩니다. 저장된 풀이를 다시 읽거나 대화를 이어가는 Reader는 서버에서 연결 가능한 상태가 확인된 뒤 별도로 표시됩니다.';
 
   panel.append(close, intro, grid, note);
   dialog.append(panel);
@@ -219,9 +219,9 @@ function openPicker(anchor) {
   if (typeof dialog.showModal === 'function') {
     dialog.showModal();
   } else {
-    const fallback = new URL(pendingReadingUrl.href);
-    fallback.searchParams.set('reader', 'baekheon');
-    window.location.assign(fallback.href);
+    // No modal means no explicit Reader presentation choice was made.
+    // Continue without manufacturing a browser Reader hint.
+    window.location.assign(pendingReadingUrl.href);
     return;
   }
 
