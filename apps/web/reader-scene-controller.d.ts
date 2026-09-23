@@ -1,6 +1,5 @@
 import type { ReaderRuntimeClientV1 } from './reader-runtime-client.js';
 import type { ReaderSceneViewModelV1 } from './reader-scene-contract.js';
-import type { PersistedReadingHandoffParseResultV1 } from './reading-history-handoff.js';
 
 export interface ReaderSceneControllerInputV1 {
   readonly threadId: string;
@@ -23,16 +22,8 @@ export type ReaderSceneControllerStateV1 =
       code: string;
     }>;
 
-export interface ReaderSceneControllerPersistedInputV1 {
-  readonly threadId: unknown;
-  readonly persistedReadingHandoff: PersistedReadingHandoffParseResultV1;
-}
-
 export interface ReaderSceneControllerV1 {
   load(input: ReaderSceneControllerInputV1): Promise<ReaderSceneControllerStateV1>;
-  loadPersistedReading(
-    input: ReaderSceneControllerPersistedInputV1,
-  ): Promise<ReaderSceneControllerStateV1>;
   retry(): Promise<ReaderSceneControllerStateV1>;
   cancel(): ReaderSceneControllerStateV1;
   getState(): ReaderSceneControllerStateV1;

@@ -1,8 +1,14 @@
+import { readFile } from 'node:fs/promises';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ReaderRuntimeClientErrorV1 } from '../apps/web/reader-runtime-client.js';
 import { createReaderSceneControllerV1 } from '../apps/web/reader-scene-controller.js';
 import type { ReaderSceneInterpretationV1 } from '../apps/web/reader-scene-contract.js';
+
+const controllerTypesPath = new URL(
+  '../apps/web/reader-scene-controller.d.ts',
+  import.meta.url,
+);
 
 function scene(
   readerCharacterId = 'baekheon',
@@ -66,6 +72,14 @@ describe('web Reader Scene controller', () => {
     });
 
     expect(controller).not.toHaveProperty('loadPersistedReading');
+  });
+
+  it('keeps the public controller type contract free of Records re-entry', async () => {
+    const types = await readFile(controllerTypesPath, 'utf8');
+
+    expect(types).not.toContain('PersistedReadingHandoffParseResultV1');
+    expect(types).not.toContain('ReaderSceneControllerPersistedInputV1');
+    expect(types).not.toContain('loadPersistedReading');
   });
 
   it('retries only explicit retryable failures', async () => {

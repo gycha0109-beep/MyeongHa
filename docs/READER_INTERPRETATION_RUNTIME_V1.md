@@ -272,7 +272,7 @@ Records history
 
 The archive path does not execute Reader Preview, does not create/reuse a Chat thread, and does not turn Reader display provenance into Reader selection authority. A failed or malformed archive lookup fails closed rather than silently executing Saju Preview or Reader Interpretation.
 
-The dormant `reader-scene-launch-input.js` / Reader Scene controller remains a separate future Reader activation boundary. It is not used to reopen Records.
+The generic Reader Scene controller remains a separate future activation boundary and accepts only explicit `threadId + officialReadingId` candidates from a future approved Reader entry surface. Records does not provide such an entry surface.
 
 ## 11.3 SRC-37 resolution — Records reread does not re-enter Reader Scene
 
