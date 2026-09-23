@@ -13,8 +13,12 @@ const payload = {
   readerCharacterIds: ['seyeon'],
   completedAt: '2026-09-23T00:01:00.000Z',
   reading: {
+    responseVersion: 'myeonghwa-product-reading-response-v2',
     state: 'delivered',
-    reading: { sections: [] },
+    reading: {
+      readingId: '44444444-4444-4444-8444-444444444444',
+      sections: [],
+    },
   },
   responseHash: 'must-not-project',
 };
@@ -34,6 +38,35 @@ describe('Official Reading Records browser contract', () => {
     });
     expect(result).not.toHaveProperty('responseHash');
     expect(result).not.toHaveProperty('threadId');
+  });
+
+  it('rejects stored snapshot provenance mismatches before archive rendering', () => {
+    expect(() => parseOfficialReadingRecordPayloadV1({
+      ...payload,
+      reading: {
+        ...payload.reading,
+        responseVersion: 'different-contract',
+      },
+    })).toThrow('reading.responseVersion does not match readingContractVersion');
+
+    expect(() => parseOfficialReadingRecordPayloadV1({
+      ...payload,
+      reading: {
+        ...payload.reading,
+        state: 'delivered_with_fallback',
+      },
+    })).toThrow('reading.state does not match productResponseState');
+
+    expect(() => parseOfficialReadingRecordPayloadV1({
+      ...payload,
+      reading: {
+        ...payload.reading,
+        reading: {
+          ...payload.reading.reading,
+          readingId: '77777777-7777-4777-8777-777777777777',
+        },
+      },
+    })).toThrow('reading.reading.readingId does not match readingId');
   });
 
   it('rejects non-openable Product response states at the browser archive boundary', () => {
