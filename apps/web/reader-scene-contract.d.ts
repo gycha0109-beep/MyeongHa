@@ -1,3 +1,5 @@
+import type { SajuDomainV1 } from './saju-domain-contract.js';
+
 export const READER_SCENE_SCHEMA_VERSION_V1:
   'myeongha-reader-interpretation-preview-http-v1';
 
@@ -16,11 +18,11 @@ export interface ReaderSceneInterpretationV1 {
   readonly mode: 'reader_interpretation';
   readonly officialReadingId: string;
   readonly readerCharacterId: string;
-  readonly domain: string;
+  readonly domain: SajuDomainV1;
   readonly interpretationHash: string;
   readonly utterance: Readonly<{
     characterId: string;
-    requestedDomain: string;
+    requestedDomain: SajuDomainV1;
     segments: readonly ReaderSceneSegmentV1[];
   }>;
 }
@@ -31,7 +33,7 @@ export interface ReaderSceneProtectedFallbackV1 {
   readonly mode: 'protected_fallback';
   readonly officialReadingId: string;
   readonly readerCharacterId: string;
-  readonly domain: string;
+  readonly domain: SajuDomainV1;
   readonly interpretationHash: string;
   readonly fallbackReason:
     | 'renderer_protected_fallback'

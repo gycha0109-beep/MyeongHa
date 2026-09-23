@@ -42,6 +42,7 @@ describe('Official Reading Records browser contract', () => {
     { ...payload, readerCharacterIds: 'seyeon' },
     { ...payload, readerCharacterIds: ['seyeon', 'seyeon'] },
     { ...payload, completedAt: 'not-a-time' },
+    { ...payload, sajuDomain: 'general_natal' },
     { ...payload, reading: null },
   ])('fails closed on malformed archive payload %#', (value) => {
     expect(() => parseOfficialReadingRecordPayloadV1(value)).toThrow(

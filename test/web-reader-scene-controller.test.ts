@@ -20,11 +20,11 @@ function scene(
     mode: 'reader_interpretation',
     officialReadingId,
     readerCharacterId,
-    domain: 'general_natal',
+    domain: 'general',
     interpretationHash: 'sha256:v1:reader-result',
     utterance: Object.freeze({
       characterId: readerCharacterId,
-      requestedDomain: 'general_natal',
+      requestedDomain: 'general',
       segments: Object.freeze([
         Object.freeze({ kind: 'character_reaction', text: '핵심부터 보겠습니다.' }),
       ]),

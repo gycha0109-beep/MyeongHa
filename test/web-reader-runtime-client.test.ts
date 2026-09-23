@@ -12,11 +12,11 @@ function sceneData() {
     mode: 'reader_interpretation',
     officialReadingId: '44444444-4444-4444-8444-444444444444',
     readerCharacterId: 'baekheon',
-    domain: 'general_natal',
+    domain: 'general',
     interpretationHash: 'sha256:v1:reader-result',
     utterance: {
       characterId: 'baekheon',
-      requestedDomain: 'general_natal',
+      requestedDomain: 'general',
       segments: [{ kind: 'character_reaction', text: '핵심부터 보겠습니다.' }],
     },
   };

@@ -1,3 +1,5 @@
+import { normalizeSajuDomainV1 } from './saju-domain-contract.js';
+
 const UUID_V1 = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 
 export class ReadingHistoryContractErrorV1 extends TypeError {
@@ -27,6 +29,12 @@ function requireString(value, field) {
   return value;
 }
 
+function requireSajuDomain(value, field) {
+  const normalized = normalizeSajuDomainV1(value);
+  if (normalized === null) fail(field + ' is invalid');
+  return normalized;
+}
+
 function requireStringArray(value, field) {
   if (!Array.isArray(value)) fail(field + ' is invalid');
   const items = value.map((item) => requireString(item, field));
@@ -50,7 +58,7 @@ function parseReading(value) {
   return Object.freeze({
     readingId: requireUuid(value.readingId, 'readingId'),
     readingSessionId: requireUuid(value.readingSessionId, 'readingSessionId'),
-    sajuDomain: requireString(value.sajuDomain, 'sajuDomain'),
+    sajuDomain: requireSajuDomain(value.sajuDomain, 'sajuDomain'),
     readingContractVersion: requireString(
       value.readingContractVersion,
       'readingContractVersion',

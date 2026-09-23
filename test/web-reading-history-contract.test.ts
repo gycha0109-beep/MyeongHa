@@ -54,6 +54,7 @@ describe('Reading History browser contract', () => {
     { readings: [{ ...payload().readings[0], readingId: 'reading-1' }] },
     { readings: [{ ...payload().readings[0], readingSessionId: 'session-1' }] },
     { readings: [{ ...payload().readings[0], completedAt: 'not-a-time' }] },
+    { readings: [{ ...payload().readings[0], sajuDomain: 'annual' }] },
     { readings: [{ ...payload().readings[0], readerCharacterIds: 'seyeon' }] },
     { readings: [{ ...payload().readings[0], readerCharacterIds: ['seyeon', 'seyeon'] }] },
     { readings: [{ ...payload().readings[0], readerCharacterIds: ['taegyeom', 'seyeon'] }] },

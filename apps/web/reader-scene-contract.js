@@ -1,4 +1,5 @@
 import { resolveCanonicalCharacterPresentationV1 } from './character-presentation-identity.js';
+import { normalizeSajuDomainV1 } from './saju-domain-contract.js';
 
 export const READER_SCENE_SCHEMA_VERSION_V1 =
   'myeongha-reader-interpretation-preview-http-v1';
@@ -37,6 +38,14 @@ function requireUuid(value, field) {
   const normalized = requireString(value, field, 36);
   if (!UUID_V1.test(normalized)) {
     throw new ReaderSceneContractErrorV1(field + ' must be a UUID.');
+  }
+  return normalized;
+}
+
+function requireSajuDomain(value, field) {
+  const normalized = normalizeSajuDomainV1(value);
+  if (normalized === null) {
+    throw new ReaderSceneContractErrorV1(field + ' is unsupported.');
   }
   return normalized;
 }
@@ -93,7 +102,7 @@ export function parseReaderSceneEnvelopeV1(payload) {
     mode,
     officialReadingId: requireUuid(payload.officialReadingId, 'officialReadingId'),
     readerCharacterId: requireString(payload.readerCharacterId, 'readerCharacterId'),
-    domain: requireString(payload.domain, 'domain', 128),
+    domain: requireSajuDomain(payload.domain, 'domain'),
     interpretationHash: requireString(payload.interpretationHash, 'interpretationHash', 512),
   };
 
@@ -123,10 +132,9 @@ export function parseReaderSceneEnvelopeV1(payload) {
     );
 
     const characterId = requireString(payload.utterance.characterId, 'utterance.characterId');
-    const requestedDomain = requireString(
+    const requestedDomain = requireSajuDomain(
       payload.utterance.requestedDomain,
       'utterance.requestedDomain',
-      128,
     );
     if (characterId !== common.readerCharacterId) {
       throw new ReaderSceneContractErrorV1(

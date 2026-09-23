@@ -65,6 +65,19 @@ describe('web Reader Scene contract', () => {
     })).toThrow(/officialReadingId must be a UUID/u);
   });
 
+  it('rejects non-canonical Saju domains', () => {
+    expect(() => parseReaderSceneEnvelopeV1({
+      ...base,
+      domain: 'general_natal',
+      utterance: { ...base.utterance, requestedDomain: 'general_natal' },
+    })).toThrow(/domain is unsupported/u);
+
+    expect(() => parseReaderSceneEnvelopeV1({
+      ...base,
+      utterance: { ...base.utterance, requestedDomain: 'annual' },
+    })).toThrow(/requestedDomain is unsupported/u);
+  });
+
   it('rejects Reader identity and domain mismatches inside the utterance', () => {
     expect(() =>
       parseReaderSceneEnvelopeV1({

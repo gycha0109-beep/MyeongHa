@@ -16,7 +16,7 @@ function readyScene(readerCharacterId = 'taegyeom') {
       intro: '',
       generic: true,
     }),
-    domain: 'general_natal',
+    domain: 'general',
     interpretationHash: 'sha256:v1:reader-result',
     segments: Object.freeze([]),
   });
