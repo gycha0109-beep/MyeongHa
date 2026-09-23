@@ -11,7 +11,7 @@ describe('persisted Reading browser handoff', () => {
     const url = buildPersistedReadingHandoffUrlV1({
       readingId: ' 44444444-4444-4444-8444-444444444444 ',
       readingSessionId: ' 55555555-5555-4555-8555-555555555555 ',
-      sajuDomain: ' career ',
+      sajuDomain: ' career ' as never,
     });
 
     expect(url).toBe(
