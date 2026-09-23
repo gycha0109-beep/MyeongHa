@@ -69,10 +69,10 @@ const people = Object.freeze([
 const portraitArt = Object.freeze({
   seyeon: Object.freeze({ src: 'assets/characters/seyeon-portrait-v2.webp' }),
   baekheon: Object.freeze({ src: 'assets/characters/baekheon-portrait-v2.webp' }),
-  yeoul: Object.freeze({ src: 'assets/characters/yeoul-portrait-v2.webp' }),
+  yeoul: Object.freeze({ src: 'assets/characters/yeoul-portrait-uploaded.svg' }),
   seorin: Object.freeze({ src: 'assets/characters/seorin-portrait-v2.webp' }),
   rahyeon: Object.freeze({ src: 'assets/characters/rahyeon-portrait-v2.webp' }),
-  mira: Object.freeze({ src: 'assets/characters/mira-portrait-v2.webp' }),
+  mira: Object.freeze({ src: 'assets/characters/mira-portrait-uploaded.svg' }),
   taegyeom: Object.freeze({ src: 'assets/characters/taegyeom-portrait-v2.webp' }),
   yunho: Object.freeze({ src: 'assets/characters/yunho-portrait-v2.webp' }),
   doyun: Object.freeze({ src: 'assets/characters/doyoon-portrait-v2.webp' }),
