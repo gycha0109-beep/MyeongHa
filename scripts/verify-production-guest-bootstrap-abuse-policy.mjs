@@ -110,7 +110,7 @@ for (const fragment of [
   'value: "/api/session/bootstrap"',
   'value: "POST"',
   'action: "rate_limit"',
-  'algo: "fixed_window"',
+  'algo: $algo',
   'window: $window',
   'limit: $limit',
   'keys: ["ip"]',
