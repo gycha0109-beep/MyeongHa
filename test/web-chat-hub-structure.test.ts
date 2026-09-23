@@ -86,7 +86,7 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
     expect(js).not.toContain('characterId:');
   });
 
-  it('keeps legacy Se-yeon scene art out of cards and pins all nine canonical card portraits', async () => {
+  it('keeps legacy Se-yeon scene art out of cards and pins all nine presentation card portraits', async () => {
     const [v2Css, hubCss, js] = await Promise.all([
       readFile(hubV2CssPath, 'utf8'),
       readFile(hubCssPath, 'utf8'),
@@ -113,7 +113,7 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
     expect(hubCss).toContain('html[data-theme="dark"] body.chat-hub-page .chat-person-tag');
   });
 
-  it('maps all nine canonical characters to representative room art', async () => {
+  it('maps all nine presentation characters to representative room art', async () => {
     const v2Css = await readFile(hubV2CssPath, 'utf8');
 
     for (const key of ['seyeon', 'baekheon', 'yeoul', 'seorin', 'rahyeon', 'mira', 'taegyeom', 'yunho', 'doyoon']) {

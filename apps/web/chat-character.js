@@ -192,7 +192,9 @@ composer?.addEventListener('submit', (event) => {
   const submitEvent = new CustomEvent('myeongha:chat-submit', {
     bubbles: true,
     cancelable: true,
-    detail: Object.freeze({ characterKey, message: value }),
+    // Presentation keys are never mutation authority. The transport resolves
+    // all canonical Chat identity from the validated thread route.
+    detail: Object.freeze({ message: value }),
   });
 
   const handled = !composer.dispatchEvent(submitEvent);

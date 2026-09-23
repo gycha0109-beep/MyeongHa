@@ -178,6 +178,8 @@ describe('MyeongHa immersive long-form Character Room', () => {
 
     expect(presentation).toContain("new CustomEvent('myeongha:chat-submit'");
     expect(presentation).toContain('cancelable: true');
+    expect(presentation).toContain('detail: Object.freeze({ message: value })');
+    expect(presentation).not.toContain('detail: Object.freeze({ characterKey, message: value })');
     expect(presentation).not.toContain("messageInput.value = ''");
     expect(presentation).not.toContain('setTimeout');
 
