@@ -13,7 +13,7 @@ export function ReadingDetailPage() {
         <span className="reading-route-kicker" data-reading-product-title>사주 읽기</span>
         <h1 data-reading-state-title>읽기를 확인하는 중입니다.</h1>
         <p data-reading-state-copy>요청한 주제와 범위를 확인하고 있습니다.</p>
-        <a className="reading-route-action" href="reading.html">다른 사주 읽기 보기 <span aria-hidden="true">→</span></a>
+        <a className="reading-route-action" data-reading-route-action href="reading.html">다른 사주 읽기 보기 <span aria-hidden="true">→</span></a>
       </section>
 
       <section className="reading-stage" data-reading-stage hidden aria-label="캐릭터와 함께 읽는 사주">

@@ -91,6 +91,8 @@ const stage = document.querySelector('[data-reading-stage]');
 const productTitle = document.querySelector('[data-reading-product-title]');
 const stateTitle = document.querySelector('[data-reading-state-title]');
 const stateCopy = document.querySelector('[data-reading-state-copy]');
+const backLink = document.querySelector('[data-reading-back-link]');
+const routeAction = document.querySelector('[data-reading-route-action]');
 
 root.dataset.reader = presentationReaderHint;
 root.dataset.readerSelection = params.has('reader') || params.has('character') ? 'explicit' : 'default';
@@ -148,7 +150,19 @@ function renderInvalidRoute() {
   document.title = '읽기를 찾을 수 없음 · 명하';
 }
 
+function configurePersistedReadingNavigation() {
+  if (backLink) {
+    backLink.setAttribute('href', 'records.html?tab=saju');
+    backLink.textContent = '← 사주 기록으로 돌아가기';
+  }
+  if (routeAction) {
+    routeAction.setAttribute('href', 'records.html?tab=saju');
+    routeAction.textContent = '사주 기록으로 돌아가기 →';
+  }
+}
+
 function renderPersistedReadingHandoffInvalid() {
+  configurePersistedReadingNavigation();
   root.dataset.readingRouteState = 'persisted_handoff_invalid';
   if (stage) stage.hidden = true;
   if (routeState) routeState.hidden = false;
@@ -161,6 +175,7 @@ function renderPersistedReadingHandoffInvalid() {
 }
 
 function renderPersistedReadingLoading() {
+  configurePersistedReadingNavigation();
   root.dataset.readingRouteState = 'persisted_record_loading';
   if (stage) stage.hidden = true;
   if (routeState) routeState.hidden = false;
@@ -173,6 +188,7 @@ function renderPersistedReadingLoading() {
 }
 
 function renderPersistedReadingFailure(title, copy, state = 'persisted_record_unavailable') {
+  configurePersistedReadingNavigation();
   root.dataset.readingRouteState = state;
   if (stage) stage.hidden = true;
   if (routeState) routeState.hidden = false;
@@ -407,7 +423,6 @@ function activatePreviewReading(preview) {
   const { steps } = preview;
   const isStoredRecord = preview.source === 'record';
   let activeIndex = 0;
-  const backLink = document.querySelector('[data-reading-back-link]');
   const progressLabel = document.querySelector('[data-reading-progress-label]');
   const stepTitle = document.querySelector('[data-reading-step-title]');
   const stepBody = document.querySelector('[data-reading-step-body]');
@@ -527,10 +542,7 @@ function activatePreviewReading(preview) {
     document.querySelector('.reader-scene')?.setAttribute('hidden', '');
     document.querySelector('.reading-character-block')?.setAttribute('hidden', '');
     if (stage) stage.setAttribute('aria-label', '저장된 공식 사주 풀이');
-    if (backLink) {
-      backLink.setAttribute('href', 'records.html?tab=saju');
-      backLink.textContent = '← 사주 기록으로 돌아가기';
-    }
+    configurePersistedReadingNavigation();
     if (completionTitle) {
       completionTitle.textContent = '저장된 공식 사주 풀이를 끝까지 확인했습니다.';
     }

@@ -117,6 +117,7 @@ describe('MyeongHa character-led Saju Reading v1', () => {
     expect(runtime).not.toContain('presentationReaderHint: readerKey');
     expect(runtime).toContain("handoffUrl('records.html?tab=saju')");
     expect(html).toContain('대화를 시작하려면 대화 상대를 새로 선택해 주세요.');
+    expect(html).toContain('data-reading-route-action href="reading.html"');
     expect(html).toContain('data-reading-chat-link href="chat-hub.html"');
     expect(html).toContain('대화 상대 선택');
     expect(html).not.toContain('과 이어서 대화');
@@ -145,8 +146,13 @@ describe('MyeongHa character-led Saju Reading v1', () => {
     expect(runtime).toContain("delete root.dataset.readerPresentation;");
     expect(runtime).toContain("document.querySelector('.reader-scene')?.setAttribute('hidden', '')");
     expect(runtime).toContain("stage.setAttribute('aria-label', '저장된 공식 사주 풀이')");
+    expect(runtime).toContain('function configurePersistedReadingNavigation()');
     expect(runtime).toContain("backLink.setAttribute('href', 'records.html?tab=saju')");
     expect(runtime).toContain("backLink.textContent = '← 사주 기록으로 돌아가기'");
+    expect(runtime).toContain("routeAction.setAttribute('href', 'records.html?tab=saju')");
+    expect(runtime).toContain("routeAction.textContent = '사주 기록으로 돌아가기 →'");
+    expect(runtime).toContain('function renderPersistedReadingFailure');
+    expect(runtime).toContain('configurePersistedReadingNavigation();');
     expect(runtime).toContain("completionTitle.textContent = '저장된 공식 사주 풀이를 끝까지 확인했습니다.'");
     expect(runtime).toContain("'이 결과는 기록에 저장된 Official Reading입니다. 대화를 시작하려면 대화 상대를 새로 선택해 주세요.'");
     expect(runtime).not.toContain('renderPersistedReadingHandoffUnavailable');
