@@ -1,0 +1,52 @@
+name: Production Guest Bootstrap Abuse Policy Evidence
+run-name: "[WT:ops] Production Guest Bootstrap Abuse Policy Evidence — ${{ inputs.expected_mode || 'observe' }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_mode:
+        description: Expected active policy mode
+        required: true
+        default: observe
+        type: choice
+        options:
+          - observe
+          - enforce
+          - disable
+      watchtower_track:
+        description: Watchtower Track Key for CI attribution
+        required: true
+        default: ops
+        type: string
+  schedule:
+    - cron: '41 18 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-guest-bootstrap-abuse-policy-evidence
+  cancel-in-progress: false
+
+env:
+  VERCEL_PROJECT_ID: prj_nXF0b5uv27Lyucz2SEBxzdCRXVsP
+  VERCEL_TEAM_ID: team_xuYA9OhCWlJETaYFOmeVodgS
+  VERCEL_PROJECT_NAME: myeongha
+
+jobs:
+  evidence:
+    name: verify-live-guest-bootstrap-abuse-policy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: production
+    env:
+      MYEONGHA_WATCHTOWER_TRACK: ${{ github.event_name == 'schedule' && 'ops' || inputs.watchtower_track }}
+      EXPECTED_ABUSE_POLICY_MODE: ${{ github.event_name == 'schedule' && 'observe' || inputs.expected_mode }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+    steps:
+      - name: Checkout exact repository state
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Verify live governed Guest bootstrap abuse policy
+        shell: bash
+        run: bash scripts/operations/verify-production-guest-bootstrap-abuse-policy-live.sh
