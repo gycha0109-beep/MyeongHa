@@ -98,6 +98,39 @@ describe('Official Reading Records read contract', () => {
     })).rejects.toThrow('invalid Saju domain');
   });
 
+  it('admits only archive-openable Product response states', async () => {
+    await expect(getOfficialReadingRecord({
+      resolvedSubjectId: SUBJECT_ID,
+      readingId: READING_ID,
+      authorityPort: port({
+        ...ROW,
+        productResponseState: 'delivered_with_fallback',
+        responseSnapshotJsonb: {
+          ...(ROW.responseSnapshotJsonb as Record<string, unknown>),
+          state: 'delivered_with_fallback',
+        },
+      }),
+    })).resolves.toMatchObject({
+      readingId: READING_ID,
+      productResponseState: 'delivered_with_fallback',
+    });
+
+    for (const productResponseState of ['clarification_required', 'pending']) {
+      await expect(getOfficialReadingRecord({
+        resolvedSubjectId: SUBJECT_ID,
+        readingId: READING_ID,
+        authorityPort: port({
+          ...ROW,
+          productResponseState,
+          responseSnapshotJsonb: {
+            ...(ROW.responseSnapshotJsonb as Record<string, unknown>),
+            state: productResponseState,
+          },
+        }),
+      })).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    }
+  });
+
   it('rejects stored snapshot provenance mismatches before archive projection', async () => {
     for (const responseSnapshotJsonb of [
       {

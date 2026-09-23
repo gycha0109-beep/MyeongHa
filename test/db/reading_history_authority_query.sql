@@ -121,3 +121,31 @@ BEGIN
   END IF;
 END
 $$;
+
+DO $$
+DECLARE
+  v_detail_def text;
+BEGIN
+  SELECT pg_catalog.pg_get_functiondef(
+    'public.qry_official_reading_record_runtime_v1(uuid,uuid)'::pg_catalog.regprocedure
+  ) INTO v_detail_def;
+
+  IF position('product_response_state' in lower(v_detail_def)) = 0
+     OR position('delivered' in lower(v_detail_def)) = 0
+     OR position('delivered_with_fallback' in lower(v_detail_def)) = 0 THEN
+    RAISE EXCEPTION 'Official Reading archive detail lost openable-state filtering';
+  END IF;
+
+  IF position('execution_status = ''succeeded''' in v_detail_def) = 0 THEN
+    RAISE EXCEPTION 'Official Reading archive detail lost succeeded Reading filtering';
+  END IF;
+
+  IF NOT pg_catalog.has_function_privilege(
+    'myeongha_api_executor',
+    'public.qry_official_reading_record_runtime_v1(uuid,uuid)'::pg_catalog.regprocedure,
+    'EXECUTE'
+  ) THEN
+    RAISE EXCEPTION 'myeongha_api_executor cannot execute Official Reading archive detail authority';
+  END IF;
+END
+$$;

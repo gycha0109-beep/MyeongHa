@@ -6,6 +6,10 @@ export const OFFICIAL_READING_RECORD_READ_AUTHORITY_BINDING_V1 =
 
 const UUID_V1 = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const SAJU_DOMAIN_SET_V1 = new Set<string>(SAJU_DOMAINS);
+const ARCHIVE_OPENABLE_PRODUCT_RESPONSE_STATES_V1 = new Set([
+  'delivered',
+  'delivered_with_fallback',
+]);
 
 export interface OfficialReadingRecordAuthorityRowV1 {
   readonly readingId: string;
@@ -185,6 +189,12 @@ export async function getOfficialReadingRecord(input: {
       'Product response state',
       row.productResponseState,
     );
+    if (!ARCHIVE_OPENABLE_PRODUCT_RESPONSE_STATES_V1.has(productResponseState)) {
+      throw new ApiCommandError(
+        'NOT_FOUND',
+        'Official Reading record is not available for archive reread.',
+      );
+    }
     const reading = requireReadingSnapshot(row.responseSnapshotJsonb, {
       readingId,
       readingContractVersion,
