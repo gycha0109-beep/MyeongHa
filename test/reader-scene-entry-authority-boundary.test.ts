@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 
 const readingHistoryMigrationPath = new URL(
-  '../supabase/migrations/0984_records_reading_history_runtime_authority.sql',
+  '../supabase/migrations/1301_records_official_reading_archive_runtime_authority.sql',
   import.meta.url,
 );
 const officialReadingMigrationPath = new URL(
@@ -32,18 +32,22 @@ function sqlBlock(source: string, start: string, end: string): string {
 }
 
 describe('persisted Reading → Reader Scene entry authority boundary', () => {
-  it('keeps Records Reading History free of Reader and Chat thread authority', async () => {
+  it('keeps Records Reading History v2 Reader provenance display-only and free of Chat authority', async () => {
     const migration = await readFile(readingHistoryMigrationPath, 'utf8');
     const projection = sqlBlock(
       migration,
-      'create or replace function public.qry_reading_history_v1',
-      'revoke all on function public.qry_reading_history_v1',
+      'create or replace function public.qry_reading_history_v2',
+      'comment on function public.qry_reading_history_v2',
     );
 
     expect(projection).toContain('reading_id uuid');
     expect(projection).toContain('reading_session_id uuid');
+    expect(projection).toContain('saju_domain text');
+    expect(projection).toContain('reader_character_ids text[]');
+    expect(projection).toContain('select distinct sri.reader_character_id');
     expect(projection).not.toContain('thread_id');
-    expect(projection).not.toContain('reader_character_id');
+    expect(projection).not.toContain('active_reader');
+    expect(projection).not.toContain('selected_reader');
   });
 
   it('keeps the Official Reading Reader-independent and permits distinct Reader interpretations', async () => {
