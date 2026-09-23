@@ -1,0 +1,43 @@
+{
+  "contractVersion": "myeongha-collection-read-resource-policy-v1",
+  "defaultPageSize": 50,
+  "maximumPageSize": 50,
+  "pageSizeQueryParameter": "pageSize",
+  "collections": {
+    "chatThreadStream": {
+      "route": "/api/chat/:threadId",
+      "method": "GET",
+      "cursorKind": "sequence_no",
+      "cursorQueryParameter": "afterSequenceNo",
+      "ordering": ["sequence_no:asc"],
+      "databaseAuthority": "public.qry_chat_thread_stream_v2"
+    },
+    "lifeRecord": {
+      "route": "/api/life-record",
+      "method": "GET",
+      "cursorKind": "opaque_keyset_v1",
+      "cursorQueryParameter": "cursor",
+      "ordering": ["confirmed_at:desc", "created_at:desc", "id:asc"],
+      "databaseAuthority": "public.qry_life_record_ledger_v2"
+    },
+    "memories": {
+      "route": "/api/memories",
+      "method": "GET",
+      "cursorKind": "opaque_keyset_v1",
+      "cursorQueryParameter": "cursor",
+      "ordering": ["created_at:desc", "id:desc"],
+      "databaseAuthority": "public.qry_memory_items_v2"
+    },
+    "readingHistory": {
+      "route": "/api/readings",
+      "method": "GET",
+      "cursorKind": "opaque_keyset_v1",
+      "cursorQueryParameter": "cursor",
+      "ordering": ["completed_at:desc", "created_at:desc", "id:desc"],
+      "databaseAuthority": "public.qry_reading_history_v3"
+    }
+  },
+  "hasMoreDerivation": "database_page_size_plus_one",
+  "cursorOwnershipRule": "cursor_is_position_only_and_never_owner_authority",
+  "offsetPaginationAllowed": false
+}
