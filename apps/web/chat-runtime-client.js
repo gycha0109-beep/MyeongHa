@@ -136,12 +136,15 @@ function renderRoomState(payload) {
     expectedThreadId: threadId,
     expectedAfterSequenceNo: 0,
   });
+  // Exact-nine product authority maps canonical Character id to the same
+  // English browser presentation key. Do not reveal owner-scoped thread content
+  // until that server-owned Character identity is admitted by the current client.
+  if (!applyCanonicalCharacterPresentationV1(state.characterId)) {
+    throw new Error('Character Room read returned an unadmitted Character identity.');
+  }
+
   renderHistory(state.messages, state.characterId);
   renderConversation(state.messages, state.characterId);
-
-  // Exact-nine product authority maps canonical Character id to the same
-  // English browser presentation key. The thread read remains identity authority.
-  applyCanonicalCharacterPresentationV1(state.characterId);
 
   // Life Thread / 이어지는 이야기 authority is intentionally not inferred from
   // chat messages. Until a verified continuation projection is supplied, the
