@@ -539,8 +539,41 @@ For personal records, old/new schema compatibility cannot be inferred from the g
 
 ## 20. Pagination / Ordering
 
-- messages: `(thread_id, sequence_no)` cursor
-- readings/history: `(created_at,id)` cursor
+Repository-owned read-resource authority: `docs/operations/COLLECTION_READ_RESOURCE_POLICY_V1.md`.
+
+V1 common bound:
+
+```text
+default pageSize = 50
+maximum pageSize = 50
+explicit range   = 1..50
+hasMore          = PostgreSQL pageSize + 1 derivation
+offset paging    = forbidden for these growing collections
+```
+
+Covered Production reads:
+
+- messages: `GET /api/chat/:threadId`
+  - cursor: existing non-negative `afterSequenceNo`
+  - order: `sequence_no ASC`
+  - optional `pageSize=1..50`
+- Life Record: `GET /api/life-record`
+  - opaque keyset cursor v1
+  - order: `confirmed_at DESC, created_at DESC, id ASC`
+  - optional `pageSize=1..50`
+- Memories: `GET /api/memories`
+  - opaque keyset cursor v1
+  - order: `created_at DESC, id DESC`
+  - optional `pageSize=1..50`
+- Reading History: `GET /api/readings`
+  - opaque keyset cursor v1
+  - order: `completed_at DESC, created_at DESC, id DESC`
+  - optional `pageSize=1..50`
+
+Opaque cursor material is only a server-issued position token. Canonical subject ownership remains independently resolved from verified identity. Cross-collection, cross-subject, malformed, duplicate, unknown-parameter, or out-of-range pagination material fails closed.
+
+The numeric ceiling is an explicit operations/resource authority introduced for #647 because the product/source pack does not provide a page-size number. It is not inferred from UI examples, Vercel limits, or current dataset size. Changing the ceiling requires a reviewed authority update and regression tests.
+
 - final notification inbox membership/order/cursor: `SRC-13` 해결 전 normative contract로 확정하지 않는다. Raw stored notification ledger의 deterministic internal/read projection은 public inbox ordering authority가 아니다.
 - offset pagination은 append-heavy stream 기본값으로 사용하지 않는다.
 
