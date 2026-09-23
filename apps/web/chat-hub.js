@@ -246,9 +246,10 @@ function setContinuation(state) {
     return;
   }
 
-  // SRC-36: an authoritative thread id does not authorize a browser presentation
-  // key/name/title. Keep relationship-thread surfaces neutral until the governed
-  // canonical Character -> browser presentation projection exists.
+  // SRC-36 is resolved, but a thread id alone still carries no canonical
+  // Character identity. Keep relationship-thread surfaces neutral until an
+  // owner-scoped server thread projection supplies that identity; never infer it
+  // from the opaque thread id or browser state.
   const name = '대화 상대';
 
   continuationEmpty.hidden = true;
