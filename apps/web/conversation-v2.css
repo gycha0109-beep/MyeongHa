@@ -1220,7 +1220,7 @@
   --conversation-room-position: center 30%;
   --conversation-room-mobile-position: center 20%;
 }
-.character-room-v2[data-character="doyoon"] {
+.character-room-v2[data-character="doyun"] {
   --conversation-room-art: url("assets/characters/rooms/doyoon-room.webp");
   --conversation-room-position: center 34%;
   --conversation-room-mobile-position: center 22%;

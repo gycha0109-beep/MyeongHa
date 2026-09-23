@@ -60,7 +60,7 @@ const readers = Object.freeze([
     portrait: 'assets/characters/yunho-portrait-v2.webp',
   }),
   Object.freeze({
-    key: 'doyoon',
+    key: 'doyun',
     name: '도윤',
     title: '대리자',
     tone: '복잡한 설명보다 걸리는 부분부터 시작합니다.',

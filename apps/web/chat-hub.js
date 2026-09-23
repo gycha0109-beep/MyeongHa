@@ -58,7 +58,7 @@ const people = Object.freeze([
     tags: ['따뜻한', '안정적인', '지적인'],
   },
   {
-    key: 'doyoon',
+    key: 'doyun',
     name: '도윤',
     title: '대리자',
     line: '자, 무슨 얘기부터 해볼까요? 편하게 말해요.',
@@ -75,7 +75,7 @@ const portraitArt = Object.freeze({
   mira: Object.freeze({ src: 'assets/characters/mira-portrait-v2.webp' }),
   taegyeom: Object.freeze({ src: 'assets/characters/taegyeom-portrait-v2.webp' }),
   yunho: Object.freeze({ src: 'assets/characters/yunho-portrait-v2.webp' }),
-  doyoon: Object.freeze({ src: 'assets/characters/doyoon-portrait-v2.webp' }),
+  doyun: Object.freeze({ src: 'assets/characters/doyoon-portrait-v2.webp' }),
 });
 
 const peopleGrid = document.querySelector('[data-people-grid]');

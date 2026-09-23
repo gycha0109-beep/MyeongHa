@@ -652,10 +652,10 @@ body[data-character="yunho"] .character-room-scene {
   background: radial-gradient(circle at 48% 26%, rgba(219,185,132,.28), transparent 26%), linear-gradient(145deg, #8c755d, #544437 56%, #2d251f);
 }
 
-body[data-character="doyoon"] {
+body[data-character="doyun"] {
   --room-accent: #8a765c;
 }
-body[data-character="doyoon"] .character-room-scene {
+body[data-character="doyun"] .character-room-scene {
   background: radial-gradient(circle at 50% 26%, rgba(195,168,125,.24), transparent 26%), linear-gradient(145deg, #70614c, #3c352c 56%, #23201c);
 }
 
