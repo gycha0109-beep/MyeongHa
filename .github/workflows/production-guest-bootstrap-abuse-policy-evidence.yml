@@ -1,5 +1,5 @@
 name: Production Guest Bootstrap Abuse Policy Evidence
-run-name: "[WT:ops] Production Guest Bootstrap Abuse Policy Evidence — ${{ inputs.expected_mode || 'observe' }}"
+run-name: "[WT:ops] Production Guest Bootstrap Abuse Policy Evidence — ${{ inputs.expected_mode || 'enforce' }}"
 
 on:
   workflow_dispatch:
@@ -7,7 +7,7 @@ on:
       expected_mode:
         description: Expected active policy mode
         required: true
-        default: observe
+        default: enforce
         type: choice
         options:
           - observe
@@ -41,7 +41,7 @@ jobs:
     environment: production
     env:
       MYEONGHA_WATCHTOWER_TRACK: ${{ github.event_name == 'schedule' && 'ops' || inputs.watchtower_track }}
-      EXPECTED_ABUSE_POLICY_MODE: ${{ github.event_name == 'schedule' && 'observe' || inputs.expected_mode }}
+      EXPECTED_ABUSE_POLICY_MODE: ${{ github.event_name == 'schedule' && 'enforce' || inputs.expected_mode }}
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
     steps:
       - name: Checkout exact repository state

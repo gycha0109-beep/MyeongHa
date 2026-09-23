@@ -105,12 +105,20 @@ for (const fragment of [
   'run-name: "[WT:ops] Production Guest Bootstrap Abuse Policy Evidence',
   'workflow_dispatch:',
   "cron: '41 18 * * *'",
-  "github.event_name == 'schedule' && 'observe'",
+  "github.event_name == 'schedule' && 'enforce'",
+  'default: enforce',
   'environment: production',
   'VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}',
   'run: bash scripts/operations/verify-production-guest-bootstrap-abuse-policy-live.sh',
 ]) {
   requireFragment(paths.evidenceWorkflow, evidenceWorkflow, fragment);
+}
+for (const forbidden of [
+  "github.event_name == 'schedule' && 'observe'",
+  "inputs.expected_mode || 'observe'",
+  'default: observe',
+]) {
+  forbidFragment(paths.evidenceWorkflow, evidenceWorkflow, forbidden);
 }
 
 for (const fragment of [
@@ -216,10 +224,16 @@ for (const fragment of [
   'pre-launch',
   'no legitimate end-user traffic',
   'automatic rollback to `observe`',
+  'PRODUCTION ENFORCE ACTIVE / CANARY VERIFIED',
+  '35899155942',
+  'active config version         = 5',
+  'first rate-limited attempt    = 31',
+  'invalid-probe Guest row delta = 0',
+  'scheduled evidence workflow expects `enforce`',
 ]) {
   requireFragment(paths.docs, docs, fragment);
 }
 
 console.log(
-  'MyeongHa Guest bootstrap abuse policy v1 verification passed: exact POST route, 30/60s/IP edge bound, observe/enforce/disable control plane, live drift evidence, no durable network-identifier store, and no automatic 429 retry are pinned.',
+  'MyeongHa Guest bootstrap abuse policy v1 verification passed: exact POST route, 30/60s/IP edge bound, observe/enforce/disable control plane, enforce-by-default live drift evidence, no durable network-identifier store, and no automatic 429 retry are pinned.',
 );
