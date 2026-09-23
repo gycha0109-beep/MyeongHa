@@ -1,6 +1,10 @@
 import { normalizeSajuDomainV1 } from './saju-domain-contract.js';
 
 const UUID_V1 = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+const ARCHIVE_OPENABLE_PRODUCT_RESPONSE_STATES_V1 = new Set([
+  'delivered',
+  'delivered_with_fallback',
+]);
 
 export class OfficialReadingRecordContractErrorV1 extends TypeError {
   constructor(message) {
@@ -57,7 +61,13 @@ export function parseOfficialReadingRecordPayloadV1(payload) {
     readingSessionId: requireUuid(payload.readingSessionId, 'readingSessionId'),
     sajuDomain: requireSajuDomain(payload.sajuDomain, 'sajuDomain'),
     readingContractVersion: requireString(payload.readingContractVersion, 'readingContractVersion'),
-    productResponseState: requireString(payload.productResponseState, 'productResponseState'),
+    productResponseState: (() => {
+      const state = requireString(payload.productResponseState, 'productResponseState');
+      if (!ARCHIVE_OPENABLE_PRODUCT_RESPONSE_STATES_V1.has(state)) {
+        fail('productResponseState is not archive-openable');
+      }
+      return state;
+    })(),
     readerCharacterIds: requireReaderCharacterIds(payload.readerCharacterIds),
     completedAt: requireTimestamp(payload.completedAt, 'completedAt'),
     reading: Object.freeze({ ...payload.reading }),
