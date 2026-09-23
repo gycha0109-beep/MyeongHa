@@ -51,7 +51,7 @@ describe('MyeongHa character-led Saju Reading v1', () => {
       readFile(readingCssPath, 'utf8'),
     ]);
 
-    for (const key of ['baekheon', 'seyeon', 'yeoul', 'seorin', 'rahyeon', 'mira', 'taegyeom', 'yunho', 'doyoon']) {
+    for (const key of ['baekheon', 'seyeon', 'yeoul', 'seorin', 'rahyeon', 'mira', 'taegyeom', 'yunho', 'doyun']) {
       expect(runtime).toContain(`${key}: {`);
       expect(css).toContain(`body[data-reader="${key}"]`);
     }
@@ -135,7 +135,7 @@ describe('MyeongHa character-led Saju Reading v1', () => {
     expect(runtime).toContain('parsePersistedReadingHandoffV1(params)');
     expect(runtime).toContain("persistedReadingHandoff.state === 'none' && engineRequest?.state === 'ready'");
     expect(runtime).toContain("root.dataset.readingRouteState = 'persisted_handoff_unavailable'");
-    expect(runtime).toContain('현재 프리뷰나 다른 풀이로 대신 보여드리지 않습니다.');
+    expect(runtime).toContain('Records용 공식 저장 결과 재열기 계약이 연결되기 전에는 현재 프리뷰나 Reader 장면으로 대신 보여드리지 않습니다.');
     expect(runtime.indexOf("persistedReadingHandoff.state === 'ready'")).toBeLessThan(
       runtime.lastIndexOf('previewEligible'),
     );
@@ -178,9 +178,10 @@ describe('MyeongHa character-led Saju Reading v1', () => {
       readFile(baekheonScenePath),
     ]);
 
-    for (const key of ['baekheon', 'seyeon', 'yeoul', 'seorin', 'rahyeon', 'mira', 'taegyeom', 'yunho', 'doyoon']) {
+    for (const key of ['baekheon', 'seyeon', 'yeoul', 'seorin', 'rahyeon', 'mira', 'taegyeom', 'yunho', 'doyun']) {
       expect(sceneCss).toContain(`body[data-reader="${key}"]`);
-      expect(sceneCss).toContain(`url("assets/characters/rooms/${key}-room.webp")`);
+      if (key === 'doyun') expect(sceneCss).toContain('url("assets/characters/rooms/doyoon-room.webp")');
+      else expect(sceneCss).toContain(`url("assets/characters/rooms/${key}-room.webp")`);
     }
     expect(sceneCss).toContain('body[data-reading-experience="entering"] .reader-scene-art');
     expect(sceneCss).toContain('body[data-reading-experience="reading"] .reader-scene-art');

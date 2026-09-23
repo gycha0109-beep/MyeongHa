@@ -34,10 +34,11 @@ describe('MyeongHa Saju Reader picker', () => {
     const keys = ['seyeon', 'baekheon', 'yeoul', 'seorin', 'rahyeon', 'mira', 'taegyeom', 'yunho', 'doyun'];
     const names = ['세연', '백헌', '여울', '서린', '라현', '미라', '태겸', '윤호', '도윤'];
 
-    for (const key of keys) {
-      expect(runtime).toContain(`key: '${key}'`);
+    for (const key of keys) expect(runtime).toContain(`key: '${key}'`);
+    for (const key of keys.filter((key) => key !== 'doyun')) {
       expect(runtime).toContain(`assets/characters/${key}-portrait-v2.webp`);
     }
+    expect(runtime).toContain('assets/characters/doyoon-portrait-v2.webp');
     for (const name of names) expect(runtime).toContain(`name: '${name}'`);
 
     expect(runtime).not.toContain('representativeDemo: true');
