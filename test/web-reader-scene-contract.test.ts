@@ -88,10 +88,10 @@ describe('web Reader Scene contract', () => {
       state: 'ready',
       readerCharacterId: 'taegyeom',
       presentation: {
-        name: '대리자',
-        title: '',
+        name: '태겸',
+        title: '대리자',
         intro: '',
-        generic: true,
+        generic: false,
       },
     });
     expect(viewModel.presentation).not.toHaveProperty('id');

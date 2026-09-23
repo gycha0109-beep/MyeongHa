@@ -73,7 +73,7 @@ describe('MyeongHa immersive long-form Character Room', () => {
       stat(seyeonAssetPath),
     ]);
 
-    for (const key of ['baekheon', 'seyeon', 'yeoul', 'seorin', 'rahyeon', 'mira', 'taegyeom', 'yunho', 'doyoon']) {
+    for (const key of ['baekheon', 'seyeon', 'yeoul', 'seorin', 'rahyeon', 'mira', 'taegyeom', 'yunho', 'doyun']) {
       expect(presentation).toContain(`${key}: {`);
       expect(baseCss).toContain(`body[data-character="${key}"]`);
     }
@@ -96,7 +96,7 @@ describe('MyeongHa immersive long-form Character Room', () => {
     expect(conversationCss).toContain('url("seyeon-chat.webp")');
     expect(asset.size).toBeGreaterThan(10_000);
 
-    for (const key of ['baekheon', 'yeoul', 'seorin', 'rahyeon', 'mira', 'taegyeom', 'yunho', 'doyoon']) {
+    for (const key of ['baekheon', 'yeoul', 'seorin', 'rahyeon', 'mira', 'taegyeom', 'yunho', 'doyun']) {
       expect(conversationCss).not.toContain(`.character-room-v2[data-character="${key}"] .conversation-room-scene {\n  background-image:`);
     }
   });
@@ -130,22 +130,20 @@ describe('MyeongHa immersive long-form Character Room', () => {
     expect(transport).not.toContain('service_role');
   });
 
-  it('keeps thread-bound canonical Character identity neutral before a governed presentation projection exists', async () => {
+  it('projects thread-bound canonical Character identity through the approved exact-name mapping', async () => {
     const [presentation, transport] = await Promise.all([
       readFile(characterPresentationPath, 'utf8'),
       readFile(transportPath, 'utf8'),
     ]);
 
-    expect(transport).toContain('characterId -> browser presentation projection');
-    expect(transport).toContain('Do not treat the DB characterId as a chat-character.js presentation key');
+    expect(transport).toContain('applyCanonicalCharacterPresentationV1(state.characterId)');
+    expect(transport).toContain('resolveCanonicalCharacterPresentationV1(message.characterId)');
     expect(transport).toContain('renderHistory(state.messages, state.characterId)');
     expect(transport).toContain('renderConversation(state.messages, state.characterId)');
-    expect(transport).not.toContain('root.dataset.character = state.characterId');
-    expect(transport).not.toContain('characters[state.characterId]');
     expect(transport).not.toContain('presentationKey: state.characterId');
+    expect(presentation).toContain("root.dataset.characterAuthority = 'canonical_character_id'");
     expect(presentation).toContain("presentationCharacterKey ?? (hasThreadRoute ? null : 'baekheon')");
     expect(presentation).toContain("'thread_identity_pending'");
-    expect(presentation).not.toContain('canonical-primary');
   });
 
   it('fails chat mutation closed instead of inventing a client capability or canonical character authority', async () => {

@@ -31,7 +31,7 @@ describe('MyeongHa Saju Reader picker', () => {
 
   it('offers nine browser presentation Reader options without promoting them to canonical identity', async () => {
     const runtime = await readFile(pickerRuntimePath, 'utf8');
-    const keys = ['seyeon', 'baekheon', 'yeoul', 'seorin', 'rahyeon', 'mira', 'taegyeom', 'yunho', 'doyoon'];
+    const keys = ['seyeon', 'baekheon', 'yeoul', 'seorin', 'rahyeon', 'mira', 'taegyeom', 'yunho', 'doyun'];
     const names = ['세연', '백헌', '여울', '서린', '라현', '미라', '태겸', '윤호', '도윤'];
 
     for (const key of keys) {

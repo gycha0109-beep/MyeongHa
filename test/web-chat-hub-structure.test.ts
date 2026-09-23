@@ -101,7 +101,7 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
     expect(v2Css).toContain('.chat-recent-avatar[data-character="seyeon"]');
     expect(v2Css).toContain('url("seyeon-chat.webp")');
 
-    for (const key of ['seyeon', 'baekheon', 'yeoul', 'seorin', 'rahyeon', 'mira', 'taegyeom', 'yunho', 'doyoon']) {
+    for (const key of ['seyeon', 'baekheon', 'yeoul', 'seorin', 'rahyeon', 'mira', 'taegyeom', 'yunho', 'doyun']) {
       expect(js).toContain(`${key}: Object.freeze({ src: 'assets/characters/${key}-portrait-v2.webp'`);
     }
 
@@ -119,7 +119,7 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
   it('maps all nine presentation characters to representative room art', async () => {
     const v2Css = await readFile(hubV2CssPath, 'utf8');
 
-    for (const key of ['seyeon', 'baekheon', 'yeoul', 'seorin', 'rahyeon', 'mira', 'taegyeom', 'yunho', 'doyoon']) {
+    for (const key of ['seyeon', 'baekheon', 'yeoul', 'seorin', 'rahyeon', 'mira', 'taegyeom', 'yunho', 'doyun']) {
       expect(v2Css).toContain(`.character-room-v2[data-character="${key}"]`);
       expect(v2Css).toContain(`assets/characters/rooms/${key}-room.webp`);
     }
