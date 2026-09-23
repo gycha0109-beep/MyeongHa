@@ -329,7 +329,7 @@ try {
   })()`);
   assert(pickerOpen.triggerFound && pickerOpen.open, 'Saju Reading entry did not open the Reader picker');
   assert(pickerOpen.optionCount === 9, `Saju Reader picker must expose nine Readers, got ${pickerOpen.optionCount}`);
-  assert(pickerOpen.note.includes('9명의 Reader 모두 전용 Reading Scene까지 연결'), `Reader Scene readiness note missing: ${pickerOpen.note}`);
+  assert(pickerOpen.note.includes('이 선택은 프리뷰 화면 연출에만 적용됩니다.'), `Reader presentation-only note missing: ${pickerOpen.note}`);
   await artifact(client, '-saju-reader-picker');
 
   await client.evaluate(`(() => {

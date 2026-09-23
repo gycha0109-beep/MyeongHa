@@ -1,6 +1,7 @@
 const READER_PICKER_SELECTOR = '[data-reading-reader-picker]';
 const READING_DETAIL_PATH = '/reading-detail.html';
 
+// Browser presentation catalog only. These keys are not canonical readerCharacterId authority.
 const readers = Object.freeze([
   Object.freeze({
     key: 'seyeon',
