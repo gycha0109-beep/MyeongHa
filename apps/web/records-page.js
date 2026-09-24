@@ -325,7 +325,25 @@ function renderMemories(payload) {
   clear(target);
   const memories = requireArray(payload, 'memories');
   if (memories.length === 0) {
-    target.append(textElement('p', 'muted records-empty', '현재 저장된 대리자 기억이 없습니다.'));
+    const empty = document.createElement('div');
+    empty.className = 'records-memory-empty';
+
+    const rule = document.createElement('span');
+    rule.className = 'records-memory-empty-rule';
+    rule.setAttribute('aria-hidden', 'true');
+
+    const ornament = document.createElement('span');
+    ornament.className = 'records-memory-empty-ornament';
+    ornament.setAttribute('aria-hidden', 'true');
+    ornament.append(textElement('span', 'records-memory-empty-symbol', '之'));
+
+    const copy = document.createElement('div');
+    copy.className = 'records-memory-empty-copy';
+    copy.append(textElement('h3', '', '아직 저장된 기억이 없습니다.'));
+    copy.append(textElement('p', '', '대화와 기록이 쌓이면 이곳에서 다시 확인할 수 있습니다.'));
+
+    empty.append(rule, ornament, copy);
+    target.append(empty);
     return;
   }
   for (const memory of memories) {
