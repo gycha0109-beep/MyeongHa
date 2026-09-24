@@ -328,7 +328,7 @@ try {
     `document.readyState === 'complete'
       && location.pathname === '/my.html'
       && document.querySelector('#my-account-email')?.textContent?.trim() === ${JSON.stringify(identity.email)}
-      && Boolean(document.querySelector('.my-auth-actions button'))`,
+      && Boolean(document.querySelector('.my-logout-action'))`,
     'My page did not fully initialize with a Member logout button',
   );
 
@@ -345,7 +345,7 @@ try {
     };
   })()`);
 
-  await client.evaluate(`document.querySelector('.my-auth-actions button')?.click()`);
+  await client.evaluate(`document.querySelector('.my-logout-action')?.click()`);
   await sleep(800);
   const afterSignOutFailure = await client.evaluate(snapshotExpression());
   assert(afterSignOutFailure.pathname === '/my.html', 'My page redirected despite failed local Member removal');
