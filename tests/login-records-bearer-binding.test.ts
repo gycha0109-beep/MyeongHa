@@ -70,9 +70,9 @@ function recordsFetch(calls: Array<{ endpoint: string; authorization: string | n
         },
       });
     }
-    if (endpoint === '/api/life-record') return successEnvelope({ facts: [] });
-    if (endpoint === '/api/readings') return successEnvelope({ readings: [] });
-    if (endpoint === '/api/memories') return successEnvelope({ memories: [] });
+    if (endpoint === '/api/life-record') return successEnvelope({ facts: [], pagination: { pageSize: 50, hasMore: false, nextCursor: null } });
+    if (endpoint === '/api/readings') return successEnvelope({ readings: [], pagination: { pageSize: 50, hasMore: false, nextCursor: null } });
+    if (endpoint === '/api/memories') return successEnvelope({ memories: [], pagination: { pageSize: 50, hasMore: false, nextCursor: null } });
     return Response.json({ ok: false }, { status: 404 });
   });
 }
@@ -91,7 +91,7 @@ function snapshotFor(label: string, endpoint: string) {
       },
     };
   }
-  if (endpoint === '/api/life-record') return { facts: [{ factType: `${label}-fact` }] };
+  if (endpoint === '/api/life-record') return { facts: [{ factType: `${label}-fact` }], pagination: { pageSize: 50, hasMore: false, nextCursor: null } };
   if (endpoint === '/api/readings') {
     const readingIdentity = label === 'member-a'
       ? '44444444-4444-4444-8444-444444444401'
@@ -110,9 +110,10 @@ function snapshotFor(label: string, endpoint: string) {
         createdAt: '2026-09-10T00:00:00.000Z',
         completedAt: '2026-09-10T00:01:00.000Z',
       }],
+      pagination: { pageSize: 50, hasMore: false, nextCursor: null },
     };
   }
-  return { memories: [{ memoryId: `${label}-memory` }] };
+  return { memories: [{ memoryId: `${label}-memory` }], pagination: { pageSize: 50, hasMore: false, nextCursor: null } };
 }
 
 beforeEach(() => {
