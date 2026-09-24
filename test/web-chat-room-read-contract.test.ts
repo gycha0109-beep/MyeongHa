@@ -135,6 +135,42 @@ describe('browser Chat room read contract', () => {
     )).toThrow('lastSequenceNo does not match');
   });
 
+  it('rejects unsupported sender types and sender/Character identity shape drift', () => {
+    const base = payload();
+
+    expect(() => parseChatRoomReadPayloadV1({
+      ...base,
+      messages: [
+        { ...base.messages[0]!, senderType: 'assistant' },
+        base.messages[1]!,
+      ],
+    }, { expectedThreadId: THREAD_ID })).toThrow('senderType is unsupported');
+
+    expect(() => parseChatRoomReadPayloadV1({
+      ...base,
+      messages: [
+        base.messages[0]!,
+        { ...base.messages[1]!, characterId: null },
+      ],
+    }, { expectedThreadId: THREAD_ID })).toThrow('character message is missing characterId');
+
+    expect(() => parseChatRoomReadPayloadV1({
+      ...base,
+      messages: [
+        { ...base.messages[0]!, characterId: 'canonical-primary' },
+        base.messages[1]!,
+      ],
+    }, { expectedThreadId: THREAD_ID })).toThrow('non-character message exposed characterId');
+
+    expect(() => parseChatRoomReadPayloadV1({
+      ...base,
+      messages: [
+        { ...base.messages[0]!, senderType: 'system', characterId: 'canonical-primary' },
+        base.messages[1]!,
+      ],
+    }, { expectedThreadId: THREAD_ID })).toThrow('non-character message exposed characterId');
+  });
+
   it('rejects redacted content leaks at the browser trust boundary', () => {
     const base = payload();
     const leaked = {
