@@ -302,7 +302,7 @@ describe('owner Records read HTTP boundary', () => {
 
   it('maps cross/ineligible-subject authority failure to NOT_FOUND without existence leakage', async () => {
     const f = fixture('/api/life-record');
-    f.connection.lifeRecordError = postgresError('qry_life_record_ledger_subject_ineligible');
+    f.connection.lifeRecordError = postgresError('qry_life_record_ledger_v2_subject_ineligible');
 
     const response = await handleLifeRecordReadRequestV1(f.input);
 
