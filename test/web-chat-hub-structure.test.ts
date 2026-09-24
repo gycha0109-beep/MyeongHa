@@ -74,6 +74,22 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
     expect(js).not.toContain('art.dataset.character = characterKey');
   });
 
+  it('opens discovery Characters through the Member thread authority without Reader continuation claims', async () => {
+    const js = await readFile(hubJsPath, 'utf8');
+
+    expect(js).toContain("from './chat-open-client.js'");
+    expect(js).toContain('createChatOpenClientV1()');
+    expect(js).toContain('openForCanonicalCharacter({');
+    expect(js).toContain('characterId: person.key');
+    expect(js).toContain('buildChatThreadUrlV1(result.threadId)');
+    expect(js).toContain("params.set('next', 'chat-hub.html')");
+    expect(js).toContain("'CHAT_OPEN_MEMBER_REQUIRED'");
+    expect(js).toContain("'CHAT_OPEN_SESSION_REQUIRED'");
+    expect(js).not.toContain('createReaderChatOpenControllerV1');
+    expect(js).not.toContain('officialReadingId');
+    expect(js).not.toContain('readingId');
+  });
+
   it('keeps discovery searchable and pageable without inventing canonical character authority', async () => {
     const js = await readFile(hubJsPath, 'utf8');
 
@@ -86,7 +102,10 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
     expect(js.indexOf("url.searchParams.set('threadId', safeThreadId)")).toBeLessThan(
       js.indexOf("url.searchParams.set('character', safeKey)"),
     );
-    expect(js).not.toContain('characterId:');
+    expect(js).toContain('characterId: person.key');
+    expect(js).not.toContain('subjectId: person');
+    expect(js).not.toContain('releaseId: person');
+    expect(js).not.toContain('bundleId: person');
   });
 
   it('keeps legacy Se-yeon scene art out of cards and pins all nine presentation card portraits', async () => {
@@ -101,9 +120,11 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
     expect(v2Css).toContain('.chat-recent-avatar[data-character="seyeon"]');
     expect(v2Css).toContain('url("seyeon-chat.webp")');
 
-    for (const key of ['seyeon', 'baekheon', 'yeoul', 'seorin', 'rahyeon', 'mira', 'taegyeom', 'yunho']) {
+    for (const key of ['seyeon', 'baekheon', 'seorin', 'rahyeon', 'taegyeom', 'yunho']) {
       expect(js).toContain(`${key}: Object.freeze({ src: 'assets/characters/${key}-portrait-v2.webp'`);
     }
+    expect(js).toContain("yeoul: Object.freeze({ src: 'assets/characters/yeoul-portrait-uploaded.svg'");
+    expect(js).toContain("mira: Object.freeze({ src: 'assets/characters/mira-portrait-uploaded.svg'");
     expect(js).toContain("doyun: Object.freeze({ src: 'assets/characters/doyoon-portrait-v2.webp'");
 
     expect(js).toContain("image.className = 'chat-person-art-image'");
@@ -123,9 +144,11 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
     for (const key of ['seyeon', 'baekheon', 'yeoul', 'seorin', 'rahyeon', 'mira', 'taegyeom', 'yunho', 'doyun']) {
       expect(v2Css).toContain(`.character-room-v2[data-character="${key}"]`);
     }
-    for (const key of ['seyeon', 'baekheon', 'yeoul', 'seorin', 'rahyeon', 'mira', 'taegyeom', 'yunho']) {
+    for (const key of ['seyeon', 'baekheon', 'seorin', 'rahyeon', 'taegyeom', 'yunho']) {
       expect(v2Css).toContain(`assets/characters/rooms/${key}-room.webp`);
     }
+    expect(v2Css).toContain('assets/characters/rooms/yeoul-room-uploaded.svg');
+    expect(v2Css).toContain('assets/characters/rooms/mira-room-uploaded.svg');
     expect(v2Css).toContain('assets/characters/rooms/doyoon-room.webp');
 
     expect(v2Css).toContain('var(--conversation-room-art)');

@@ -1,3 +1,8 @@
+import {
+  ChatOpenClientErrorV1,
+  buildChatThreadUrlV1,
+  createChatOpenClientV1,
+} from './chat-open-client.js';
 import { parseChatThreadIdV1 } from './chat-room-read-contract.js';
 
 const people = Object.freeze([
@@ -69,10 +74,10 @@ const people = Object.freeze([
 const portraitArt = Object.freeze({
   seyeon: Object.freeze({ src: 'assets/characters/seyeon-portrait-v2.webp' }),
   baekheon: Object.freeze({ src: 'assets/characters/baekheon-portrait-v2.webp' }),
-  yeoul: Object.freeze({ src: 'assets/characters/yeoul-portrait-v2.webp' }),
+  yeoul: Object.freeze({ src: 'assets/characters/yeoul-portrait-uploaded.svg' }),
   seorin: Object.freeze({ src: 'assets/characters/seorin-portrait-v2.webp' }),
   rahyeon: Object.freeze({ src: 'assets/characters/rahyeon-portrait-v2.webp' }),
-  mira: Object.freeze({ src: 'assets/characters/mira-portrait-v2.webp' }),
+  mira: Object.freeze({ src: 'assets/characters/mira-portrait-uploaded.svg' }),
   taegyeom: Object.freeze({ src: 'assets/characters/taegyeom-portrait-v2.webp' }),
   yunho: Object.freeze({ src: 'assets/characters/yunho-portrait-v2.webp' }),
   doyun: Object.freeze({ src: 'assets/characters/doyoon-portrait-v2.webp' }),
@@ -99,8 +104,50 @@ const incomingSection = document.querySelector('[data-incoming-section]');
 const incomingList = document.querySelector('[data-incoming-list]');
 
 const PAGE_SIZE = 9;
+const chatOpenClient = createChatOpenClientV1();
+const openingCharacterKeys = new Set();
 let visibleCount = PAGE_SIZE;
 let searchTerm = '';
+
+function chatHubAuthUrl() {
+  const params = new URLSearchParams();
+  params.set('next', 'chat-hub.html');
+  return 'auth.html?' + params.toString();
+}
+
+async function openDiscoveryCharacter(person, action, actionLabel) {
+  if (!person || openingCharacterKeys.has(person.key)) return;
+
+  openingCharacterKeys.add(person.key);
+  action.setAttribute('aria-busy', 'true');
+  actionLabel.textContent = '대화 여는 중…';
+
+  try {
+    const result = await chatOpenClient.openForCanonicalCharacter({
+      characterId: person.key,
+    });
+    window.location.assign(buildChatThreadUrlV1(result.threadId));
+  } catch (error) {
+    if (
+      error instanceof ChatOpenClientErrorV1
+      && (
+        error.code === 'CHAT_OPEN_SESSION_REQUIRED'
+        || error.code === 'CHAT_OPEN_MEMBER_REQUIRED'
+      )
+    ) {
+      window.location.assign(chatHubAuthUrl());
+      return;
+    }
+
+    actionLabel.textContent = error instanceof ChatOpenClientErrorV1
+      && error.code === 'CHAT_OPEN_CHARACTER_UNAVAILABLE'
+      ? '현재 대화 불가'
+      : '다시 시도';
+  } finally {
+    openingCharacterKeys.delete(person.key);
+    action.removeAttribute('aria-busy');
+  }
+}
 
 function safePresentationKey(value) {
   if (typeof value !== 'string') return null;
@@ -183,6 +230,7 @@ function createPersonCard(person) {
   const action = document.createElement('a');
   action.className = 'chat-person-action';
   action.href = roomHref(person.key);
+  action.dataset.chatOpenCharacter = person.key;
 
   const actionLabel = document.createElement('span');
   actionLabel.textContent = '이야기하기';
@@ -190,6 +238,10 @@ function createPersonCard(person) {
   actionArrow.setAttribute('aria-hidden', 'true');
   actionArrow.textContent = '→';
   action.append(actionLabel, actionArrow);
+  action.addEventListener('click', (event) => {
+    event.preventDefault();
+    void openDiscoveryCharacter(person, action, actionLabel);
+  });
 
   copy.append(titleRow, line, tags, action);
   article.append(art, copy);
