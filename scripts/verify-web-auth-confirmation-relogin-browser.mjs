@@ -292,7 +292,7 @@ async function submitSignIn(client) {
 async function clickMySignOut(client) {
   const scheduled = await client.evaluate(`(() => {
     if (document.readyState !== 'complete') return false;
-    const button = [...document.querySelectorAll('.my-auth-actions button')]
+    const button = [...document.querySelectorAll('.my-logout-action')]
       .find((candidate) => candidate.textContent?.trim() === '로그아웃');
     if (!button) return false;
     setTimeout(() => button.click(), 0);
@@ -367,7 +367,7 @@ try {
   await navigate(client, origin, '/my.html', '#my-status');
   await waitFor(
     client,
-    `[...document.querySelectorAll('.my-auth-actions button')].some((button) => button.textContent?.trim() === '로그아웃')`,
+    `[...document.querySelectorAll('.my-logout-action')].some((button) => button.textContent?.trim() === '로그아웃')`,
     'My page did not render the Member sign-out control',
   );
   await clickMySignOut(client);
