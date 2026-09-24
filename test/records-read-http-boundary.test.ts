@@ -140,7 +140,7 @@ describe('owner Records read HTTP boundary', () => {
         route: '/api/memories',
         readAuthority: 'public.qry_memory_items_v2',
       },
-      apiContractVersion: 'v0.11',
+      apiContractVersion: 'v0.9',
     });
   });
 
@@ -177,7 +177,7 @@ describe('owner Records read HTTP boundary', () => {
         },
       },
       meta: {
-        apiContractVersion: 'v0.11',
+        apiContractVersion: 'v0.9',
         requestId: REQUEST_ID,
         serverTime: SERVER_TIME,
       },
@@ -240,7 +240,7 @@ describe('owner Records read HTTP boundary', () => {
         retryable: false,
       },
       meta: {
-        apiContractVersion: 'v0.11',
+        apiContractVersion: 'v0.9',
         requestId: REQUEST_ID,
       },
     });
