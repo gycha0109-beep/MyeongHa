@@ -9,6 +9,12 @@ const authEnv = {
   MYEONGHA_SUPABASE_API_KEY: 'test-publishable-key-that-is-long-enough',
 };
 
+const clearPasswordGuard = Object.freeze({
+  async check() {
+    return Object.freeze({ status: 'clear' as const });
+  },
+});
+
 function requestFor(action: SupabaseAuthActionV1): Request {
   const url = `https://myeongha.example/api/auth/${action}`;
   if (action === 'sign-out') {
@@ -93,6 +99,7 @@ describe('Supabase Auth unused non-success response bodies', () => {
         request: requestFor(action),
         env: authEnv,
         action,
+        passwordCompromiseGuard: clearPasswordGuard,
       });
 
       expect(response.status).toBe(expectedStatus);
@@ -118,6 +125,7 @@ describe('Supabase Auth unused non-success response bodies', () => {
       request: requestFor('sign-in'),
       env: authEnv,
       action: 'sign-in',
+      passwordCompromiseGuard: clearPasswordGuard,
     });
 
     expect(cancelled).toBe(true);
