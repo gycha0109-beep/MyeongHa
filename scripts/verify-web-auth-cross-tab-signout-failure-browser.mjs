@@ -392,10 +392,10 @@ try {
   await waitFor(
     tabA,
     `document.querySelector('#my-account-email')?.textContent?.trim() === ${JSON.stringify(testIdentity.email)}
-      && Boolean(document.querySelector('.my-auth-actions button'))`,
+      && Boolean(document.querySelector('.my-logout-action'))`,
     'Tab A My page did not expose the Member logout action',
   );
-  await tabA.evaluate(`document.querySelector('.my-auth-actions button')?.click()`);
+  await tabA.evaluate(`document.querySelector('.my-logout-action')?.click()`);
 
   await waitFor(
     tabA,
