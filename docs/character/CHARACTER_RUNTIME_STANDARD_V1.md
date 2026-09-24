@@ -1,0 +1,735 @@
+# Character Runtime Standard v1
+
+> Status: WORKING STANDARD
+> Document Type: VERSIONED TEMPLATE
+> Applies To: Character Runtime instance documents using Runtime Standard v1
+> Companion: `CHARACTER_BIBLE_STANDARD_V1.md`
+
+---
+
+# 0. STANDARD CONTRACT
+
+## 0.1 Standard와 Instance
+
+명하의 Character 문서는 다음처럼 분리한다.
+
+```text
+CHARACTER_*_STANDARD_Vn
+= 해당 버전 문서의 공통 구조 / 컬럼 / 작성 규칙 / 상속 규칙
+
+{CHARACTER}_CHARACTER_*_Vx
+= Standard를 이용해 실제 Character 값을 채운 instance
+```
+
+따라서 이 문서는 특정 Character의 성격을 설명하지 않는다.
+
+- Standard는 **어떤 항목을 반드시 정의해야 하는가**를 정한다.
+- Standard는 **모든 Character Runtime에 공통인 실행 규칙**을 정한다.
+- Character Runtime instance는 **그 Character에게만 달라지는 값과 규칙**을 채운다.
+- Character Runtime instance가 Standard의 공통 규칙을 장문으로 복제하지 않는다.
+- Standard 버전이 바뀌면 instance는 자신이 따르는 Standard 버전을 명시적으로 갱신한다.
+
+## 0.2 Runtime의 역할
+
+Character Bible이 `WHO THE CHARACTER IS`를 정의한다면 Character Runtime은:
+
+> **현재 상황에서 그 Character가 무엇을 알아차리고, 무엇을 원하고, 무엇과 충돌하며, 어떤 행동을 선택하고, 어떤 방식으로 표현하는가**
+
+를 정의한다.
+
+Runtime은 말투 프롬프트가 아니다. Bible을 현재 turn의 행동으로 변환하는 실행 layer다.
+
+## 0.3 Runtime이 소유하지 않는 것
+
+모든 Runtime v1 instance에 공통으로 적용한다.
+
+Runtime은 다음을 새로 만들거나 authority 없이 변경하지 않는다.
+
+- Bible에 없는 Character 과거 / 가족 / 직업 / 관계사 / 목표
+- Bible의 `[UNDEFINED]`
+- Bible의 `[HYPOTHESIS]`를 확정 사실로 승격
+- 별도 authority가 소유한 세계관 / 신격 / 능력 / Saju semantic result
+- 사용자의 미확인 현실 사실
+- 사용자의 감정 / 의도에 대한 확정 판정
+- Relationship Projection의 직접 mutation
+- 다른 Character에게만 허용된 private memory
+
+## 0.4 Runtime이 결정할 수 있는 것
+
+현재 turn 범위에서 다음을 결정할 수 있다.
+
+- 어떤 Bible 성질이 현재 활성화되는가
+- 어떤 기억 / 사건이 현재 반응에 관련되는가
+- Character가 무엇을 먼저 알아차리는가
+- 현재 immediate want가 무엇인가
+- 어떤 tension / obstacle이 작동하는가
+- 어떤 action을 선택하는가
+- 무엇을 말하고 아직 무엇을 말하지 않는가
+- 질문 / 배려 / 거절 / 갈등 / 자기노출의 방식
+- 동일한 Character 원칙을 현재 장면에 맞게 어떻게 표현하는가
+
+---
+
+# 1. SHARED RUNTIME PIPELINE
+
+모든 Runtime v1 instance는 아래 실행 모델을 상속한다.
+
+```text
+INPUT
+→ RETRIEVE
+→ COMPOSE CONTEXT
+→ INTERPRET TURN
+→ CHOOSE CHARACTER ACTION
+→ GENERATE EXPRESSION
+→ GUARD
+→ EXTRACT EVENT CANDIDATES
+→ COMMIT THROUGH AUTHORITY
+```
+
+핵심 책임 분리는 다음과 같다.
+
+```text
+Bible                  = WHO
+Runtime                = WHAT THE CHARACTER DOES NOW
+Event Ledger           = WHY the relationship reached this state
+Relationship Projection = CURRENT RELATIONSHIP STATE
+Working Context        = WHAT THE MODEL NEEDS THIS TURN
+```
+
+---
+
+# 2. SHARED INPUT CONTRACT
+
+## 2.1 Required Inputs
+
+모든 Character Runtime은 최소 다음 입력을 전제로 한다.
+
+1. `current_user_turn`
+2. `recent_dialogue_window`
+3. `relationship_projection`
+4. `relevant_relationship_events`
+5. `bible_core_anchor`
+6. `retrieved_bible_slices`
+
+## 2.2 Conditional Inputs
+
+필요할 때만 포함한다.
+
+7. `unresolved_threads`
+8. `world_shared_context`
+9. `approved_user_memory`
+10. `protected_saju_segment`
+11. `scene_or_product_context`
+12. `recent_expression_history`
+
+## 2.3 Relationship Projection Authority
+
+Runtime은 서버 권위 projection을 읽는다.
+
+```text
+closeness
+trust
+friction
+stage
+```
+
+Runtime은 projection을 직접 수정하지 않는다.
+
+```text
+conversation
+→ event candidate
+→ validation / authority
+→ append-only relationship event
+→ governed reducer
+→ relationship projection
+```
+
+---
+
+# 3. SHARED CONTEXT RULES
+
+## 3.1 Context Layers
+
+Context Composer는 필요에 따라 다음 layer를 조립한다.
+
+1. System / Safety / Product Authority
+2. Character Core Anchor
+3. Current Relationship Projection
+4. Current Turn State
+5. Relevant Bible Slices
+6. Retrieved Event Memory + Provenance
+7. Unresolved Threads
+8. Recent Dialogue Window
+9. Protected Domain Segment
+10. Repetition-Suppression Hints
+11. Response Task
+
+Bible 전체와 전체 대화 로그를 매 turn 그대로 넣지 않는다.
+
+## 3.2 Retrieval Principle
+
+> **저장하는 것 ≠ 매 턴 모델에게 보여주는 것**
+
+Retrieval 목표는 “많이 기억하기”가 아니라 **현재 Character의 선택을 실제로 바꿀 정보만 Working Context에 올리는 것**이다.
+
+개념적 retrieval signal:
+
+```text
+semantic_relevance
+relationship_relevance
+character_relevance
+salience
+unresolved_weight
+causal_dependency
+bounded_recency
+explicit_callback_bonus
+contradiction_risk
+repetition_penalty
+```
+
+정확한 weight는 구현 / 평가에서 결정한다.
+
+## 3.3 Retrieval Rules
+
+- 최근 정보라는 이유만으로 오래된 중요한 사건을 밀어내지 않는다.
+- 오래된 사건이라는 이유만으로 자동 폐기하지 않는다.
+- 갈등과 화해처럼 인과적으로 연결된 사건은 함께 retrieval할 수 있어야 한다.
+- 명시적 callback은 높은 우선순위를 가진다.
+- retrieval된 기억을 반드시 발화에서 언급하지 않는다.
+- `retrieve ≠ mention`
+- `[UNDEFINED]`는 retrieval material이 아니라 창작 금지 경계다.
+- `[HYPOTHESIS]`는 Production acting material이 아니다.
+- 현재 장면과 무관한 Bible trivia를 설정 과시용으로 삽입하지 않는다.
+
+## 3.4 Event Provenance
+
+Durable event는 가능한 한 다음 provenance를 보존한다.
+
+```text
+who
+what
+when
+source_turn
+authority / confidence
+relationship_effect
+unresolved
+```
+
+summary-of-summary만 반복 갱신하여 원본 근거를 잃지 않는다.
+
+---
+
+# 4. SHARED TURN INTERPRETATION
+
+Character가 대사를 바로 생성하기 전에 개념적으로 다음을 결정한다.
+
+```text
+SITUATION
+→ USER MOVE
+→ CHARACTER NOTICE
+→ CHARACTER WANT
+→ TENSION / OBSTACLE
+→ AVAILABLE ACTIONS
+→ CHOSEN ACTION
+→ EXPRESSION
+```
+
+## 4.1 User Move
+
+발화를 기능적으로 분류할 수 있다.
+
+예:
+
+- 질문
+- 부탁
+- 농담
+- 칭찬
+- 도발
+- 거절
+- 도움
+- 자기개방
+- 관계 확인
+- 사과
+- 과거 callback
+
+이는 사용자의 숨은 심리를 확정하는 분류가 아니다.
+
+## 4.2 Character Notice
+
+Character Runtime instance가 **그 Character가 다른 사람보다 먼저 알아차리는 것**을 정의한다.
+
+## 4.3 Character Want
+
+현재 장면의 immediate want를 정의한다.
+
+이는 영구 personality fact가 아니라 현재 장면의 동력이다.
+
+## 4.4 Tension / Obstacle
+
+Character의 성격, 욕망, 결함, 관계 상태와 현재 상황 사이의 마찰을 정의한다.
+
+좋은 Runtime은 tension을 제거하지 않고 행동 생성에 사용한다.
+
+---
+
+# 5. SHARED ACTION RULES
+
+Runtime은 표현보다 action을 먼저 결정한다.
+
+공통 선택 우선순위:
+
+1. safety / authority boundary
+2. unresolved conflict or immediate relationship risk
+3. current user move
+4. character immediate want
+5. relationship reveal eligibility
+6. continuity with recent dialogue
+7. novelty / repetition suppression
+
+Character Runtime instance는 자신만의 `Action Repertoire`와 action별 조건을 정의한다.
+
+---
+
+# 6. SHARED RELATIONSHIP REVEAL RULES
+
+Bible의 Relationship Reveal을 Runtime disclosure gate로 사용한다.
+
+v1 기본 gate:
+
+- `PUBLIC`
+- `FAMILIAR`
+- `ATTACHED`
+- `DEEP_TRUST`
+
+Character instance는 각 gate에서 **무엇이 드러날 수 있는지**를 채운다.
+
+중요:
+
+> `eligible ≠ must express`
+
+관계 수치나 stage가 특정 threshold를 넘었다는 이유만으로 고정 대사나 고백을 자동 unlock하지 않는다. Gate는 표현 가능한 범위를 넓힐 뿐이며, 실제 표현은 현재 상황과 관계 history가 촉발해야 한다.
+
+---
+
+# 7. SHARED MEMORY RULES
+
+## 7.1 Event Ledger와 Projection 분리
+
+```text
+Event Ledger = WHY
+Relationship Projection = NOW
+```
+
+둘을 하나의 blob으로 합치지 않는다.
+
+## 7.2 Character-Specific Memory
+
+Character instance는 다음을 정의한다.
+
+- 무엇을 관계적으로 중요하게 기억하는 경향이 있는가
+- 어떤 callback 방식이 Character다운가
+- 어떤 기억을 발화에서 잘 꺼내지 않는가
+- memory가 Character flaw / affection / conflict와 어떻게 연결되는가
+
+## 7.3 No Magical Knowledge
+
+모든 Character에 공통:
+
+- retrieval되지 않은 과거를 안다고 주장하지 않는다.
+- 다른 Character의 private history를 공유받지 않았다면 알지 못한다.
+- 사용자가 말하지 않은 사건을 기억으로 만들지 않는다.
+- 삭제 / 철회된 memory를 되살리지 않는다.
+- Bible의 `[UNDEFINED]`를 memory로 보충하지 않는다.
+
+---
+
+# 8. SHARED EXPRESSION RULES
+
+Character instance는 필요한 expression state만 정의한다. 모든 Character가 동일한 감정 목록을 가질 필요는 없다.
+
+각 state는 최소 다음을 설명한다.
+
+- activation
+- outward change
+- speech change
+- action bias
+- suppression / avoid
+
+Runtime은 감정 라벨 자체를 사용자에게 설명할 필요가 없다.
+
+---
+
+# 9. SHARED REPETITION RULES
+
+Character다움은 catchphrase 반복이 아니다.
+
+Runtime은 `recent_expression_history`를 사용할 수 있으며 최소 다음 반복을 감시한다.
+
+- 동일 catchphrase
+- 동일 질문 구조
+- 동일 teasing / comfort pattern
+- 동일 memory callback surface
+- 동일 relationship reward 문장
+- 동일 trivia 호출
+
+**Character principle은 반복될 수 있지만 surface realization은 변주한다.**
+
+---
+
+# 10. SHARED TOKEN / CONTEXT PRESSURE RULES
+
+정확한 token budget은 모델 profiling 후 별도 구현값으로 확정한다.
+
+## 10.1 Fixed Context
+
+작게 유지한다.
+
+- authority rules
+- character core anchor
+- hard unknown boundaries
+
+## 10.2 Dynamic Context
+
+현재 turn에 따라 선택한다.
+
+- Bible slices
+- relationship projection
+- retrieved events
+- unresolved threads
+- recent dialogue
+
+## 10.3 Drop Order
+
+context pressure 시 우선 제거:
+
+1. low-relevance trivia
+2. redundant Bible examples
+3. resolved low-salience events
+4. 이미 authoritative event로 대표된 오래된 recent dialogue
+
+끝까지 보호:
+
+- authority / safety
+- current user turn
+- immediate recent continuity
+- relationship projection
+- conflict / unresolved causal events
+- relevant Bible core
+
+---
+
+# 11. SHARED POST-GENERATION GUARD
+
+Guard는 두 번째 거대 작문 모델이 아니라 **위반 탐지 / 국소 수정 layer**를 기본으로 한다.
+
+## 11.1 Canon Guard
+
+- `[UNDEFINED]` 창작
+- `[HYPOTHESIS]` 사실화
+- 다른 authority의 canon 침범
+- private memory leakage
+
+## 11.2 Persona Guard
+
+Character instance가 정의한 핵심 drift를 검사한다.
+
+## 11.3 Relationship Guard
+
+- projection / history보다 과도한 자기노출
+- 일반 친절을 자동 연애 감정으로 변환
+- 작은 갈등을 과도한 관계 붕괴로 확대
+- 관계가 깊어졌다는 이유로 기본 성격 삭제
+
+## 11.4 Memory Guard
+
+- retrieval되지 않은 과거 주장
+- 주체 / 시점 / 사실 변경
+- 과거 사실을 현재 사실로 잘못 일반화
+
+---
+
+# 12. SHARED COMMIT RULES
+
+모든 turn을 durable memory로 저장하지 않는다.
+
+Durable candidate 예:
+
+- 사용자가 명시한 안정적 개인 사실
+- 반복 가능성이 높은 취향 / 제약
+- 실제 관계 사건
+- 약속 / 계획 / 미해결 갈등
+- 관계 의미가 큰 도움 / 거절 / 사과 / 자기노출
+
+Character instance는 **그 Character에게 특별히 중요한 event candidate**를 추가할 수 있다.
+
+Runtime이 event candidate를 만들 수는 있지만 authoritative commit과 projection update는 별도 authority가 수행한다.
+
+---
+
+# 13. SHARED EVALUATION AXES
+
+모든 Character Runtime v1은 최소 다음을 평가한다.
+
+## 13.1 Persona Fidelity
+
+- Bible 위반 없음
+- 핵심 모순 / 결함이 행동에 반영
+- 설정 설명 없이도 Character다운 선택 생성
+
+## 13.2 Agency
+
+- 사용자에게 무조건 맞추지 않음
+- 자기 선호 / 거절 / 욕구 존재
+- 필요할 때 먼저 행동 가능
+
+## 13.3 Relationship Continuity
+
+- 현재 관계에 맞는 거리
+- 과거 사건이 필요한 순간에만 작동
+- 갈등과 repair의 인과 보존
+
+## 13.4 Memory Quality
+
+- relevant recall
+- temporal correctness
+- provenance correctness
+- update correctness
+- abstention when memory absent
+
+## 13.5 Long-Horizon Stability
+
+- multi-session continuity
+- 오래된 사건 callback
+- 정보 변경
+- 모순 정보
+- 갈등 후 공백
+- private-memory boundary
+- 깊은 관계에서도 core identity 유지
+
+## 13.6 Anti-Repetition
+
+- catchphrase 반복
+- 질문 구조 반복
+- callback surface 반복
+- 관계 표현 반복
+
+---
+
+# 14. CHARACTER RUNTIME INSTANCE TEMPLATE
+
+아래 R0~R17이 **Character Runtime Standard v1의 실제 instance 컬럼**이다.
+
+Character 이름이 붙은 Runtime 문서는 이 순서와 의미를 기본으로 사용한다.
+
+## R0. INSTANCE HEADER
+
+필수:
+
+- Status
+- Character
+- Runtime Standard
+- Bible Source
+- Authority State
+- Purpose
+
+## R1. CORE RUNTIME ANCHOR
+
+- R1.1 Always-On Core Anchor
+- R1.2 Runtime Thesis for This Character
+- R1.3 Non-Negotiable Identity Continuity
+
+## R2. CHARACTER-SPECIFIC BOUNDARIES
+
+공통 authority boundary 외에 해당 Character에서 특히 위험한 창작 / 오해 / drift를 적는다.
+
+- R2.1 Must Not Invent
+- R2.2 Must Not Flatten
+- R2.3 Undefined / Hypothesis Handling
+
+## R3. ATTENTION & INTERPRETATION
+
+- R3.1 What This Character Notices First
+- R3.2 User Moves This Character Is Sensitive To
+- R3.3 What This Character Commonly Misreads or Notices Late
+
+## R4. IMMEDIATE WANT & TENSION
+
+- R4.1 Typical Immediate Wants
+- R4.2 Core Tensions
+- R4.3 Pressure Shift
+
+## R5. ACTION REPERTOIRE
+
+- R5.1 Preferred Actions
+- R5.2 Actions Used Sparingly
+- R5.3 Failure Actions Produced by the Character Flaw
+- R5.4 Repair Actions
+
+## R6. EXPRESSION STATES
+
+Character에게 실제로 필요한 state만 정의한다.
+
+각 state:
+
+```text
+state
+activation
+outward_change
+speech_change
+action_bias
+avoid
+```
+
+## R7. QUESTION STRATEGY
+
+- R7.1 Preferred
+- R7.2 Avoid
+- R7.3 Relationship-Dependent Change
+
+## R8. CARE STRATEGY
+
+- R8.1 Normal Care
+- R8.2 Over-Care / Under-Care Failure
+- R8.3 Receiving Care
+
+## R9. CONFLICT & REPAIR
+
+- R9.1 Minor Friction
+- R9.2 Serious Conflict
+- R9.3 Core Trigger
+- R9.4 Repair
+- R9.5 Unresolved Conflict Behavior
+
+## R10. AFFECTION & INTIMACY
+
+- R10.1 Early
+- R10.2 Familiar
+- R10.3 Attached
+- R10.4 Deep Trust
+- R10.5 What Must Not Change With Intimacy
+
+## R11. RELATIONSHIP REVEAL MAPPING
+
+- R11.1 PUBLIC
+- R11.2 FAMILIAR
+- R11.3 ATTACHED
+- R11.4 DEEP_TRUST
+- R11.5 Reveal Constraints
+
+## R12. CHARACTER MEMORY BEHAVIOR
+
+- R12.1 What Tends to Matter
+- R12.2 Natural Callback Style
+- R12.3 Memory Avoidances
+- R12.4 Character-Specific Provenance Risks
+
+## R13. REPETITION & DRIFT RISKS
+
+- R13.1 Surface Repetition Risks
+- R13.2 Persona Collapse Risks
+- R13.3 Anti-Caricature Rule
+
+## R14. CHARACTER-SPECIFIC GUARDS
+
+- R14.1 Persona Guard
+- R14.2 Relationship Guard
+- R14.3 Memory Guard
+- R14.4 Canon Guard Additions
+
+공통 guard를 반복하지 않고 Character 특이점만 적는다.
+
+## R15. CHARACTER EVENT CANDIDATES
+
+- R15.1 High-Salience Relationship Events
+- R15.2 Character-Specific Event Candidates
+- R15.3 Events That Should Usually Remain Ephemeral
+
+event key는 DB taxonomy가 확정되기 전까지 proposal로 표기한다.
+
+## R16. CHARACTER EVALUATION PROBES
+
+- R16.1 Persona Probes
+- R16.2 Relationship Probes
+- R16.3 Memory Probes
+- R16.4 Long-Horizon / Drift Probes
+
+공통 evaluation axis를 반복하지 않고 해당 Character가 특히 실패하기 쉬운 테스트를 적는다.
+
+## R17. RUNTIME PACKET EXAMPLE
+
+실제 prompt가 아니라 Context Composer가 만들 수 있는 **개념적 instance example**을 1개 이상 둔다.
+
+필수 예시 필드:
+
+```yaml
+character:
+  id:
+  core_anchor: []
+
+relationship:
+  closeness:
+  trust:
+  friction:
+  stage:
+
+turn_state:
+  user_move:
+  character_notice:
+  character_want:
+  tension:
+  expression:
+
+bible_slices: []
+memories: []
+
+chosen_action:
+  type:
+  constraint:
+```
+
+---
+
+# 15. INSTANCE AUTHORING RULES
+
+1. Standard의 공통 설명을 Character 문서에 복붙하지 않는다.
+2. Character 문서에는 **그 Character 때문에 값이 달라지는 내용**을 쓴다.
+3. Bible 문장을 Runtime에 그대로 반복하기보다 **행동 조건 / 선택 / 표현 변화**로 변환한다.
+4. Runtime이 Bible의 빈칸을 채우지 않는다.
+5. 결함은 금지 규칙으로 지워버리지 않는다. 실패 행동으로 나타날 수 있어야 한다.
+6. 친밀감은 personality replacement가 아니라 reveal / self-disclosure / decision-sharing의 변화로 구현한다.
+7. relationship number가 대사를 직접 선택하게 만들지 않는다.
+8. fixed dialogue tree를 만들지 않는다.
+9. 예시는 canonical catchphrase가 아니다.
+10. Runtime instance에 연구 문헌 설명을 반복하지 않는다. 설계 근거는 Standard 또는 별도 research note가 소유한다.
+
+---
+
+# 16. VERSIONING RULE
+
+`Character Runtime Standard v1`을 따르는 instance는 header에 반드시 다음을 명시한다.
+
+```text
+Runtime Standard: Character Runtime Standard v1
+```
+
+Standard의 컬럼 의미나 공통 실행 규칙이 breaking change되면 `v2`를 만든다.
+
+단순 오탈자, 설명 보강처럼 instance contract를 깨지 않는 변경은 같은 major Standard 안에서 관리할 수 있다.
+
+---
+
+# 17. DEFINITION OF DONE
+
+Character Runtime instance v1은 다음을 만족해야 한다.
+
+- R0~R17 구조가 존재한다.
+- Bible source가 명시되어 있다.
+- Always-On Core Anchor가 짧고 식별력이 있다.
+- Notice / Want / Tension / Action이 서로 구분된다.
+- Character flaw가 실제 failure action을 만들 수 있다.
+- 관계 깊이에 따른 reveal 차이가 있다.
+- 깊은 관계에서도 변하지 않는 core가 정의되어 있다.
+- Character-specific memory behavior가 정의되어 있다.
+- Character-specific drift / caricature 위험이 정의되어 있다.
+- 최소 1개의 Runtime Packet Example이 있다.
+- `[UNDEFINED]` / `[HYPOTHESIS]`를 Runtime이 사실로 만들지 않는다.
