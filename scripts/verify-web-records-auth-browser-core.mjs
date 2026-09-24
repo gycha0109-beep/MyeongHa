@@ -151,7 +151,7 @@ async function serve() {
           return;
         }
         if (pathname === '/api/life-record') {
-          sendJson(res, 200, envelope({ facts: [] }));
+          sendJson(res, 200, envelope({ facts: [], pagination: { pageSize: 50, hasMore: false, nextCursor: null } }));
           return;
         }
         if (pathname === '/api/readings') {
@@ -176,10 +176,10 @@ async function serve() {
             sendJson(res, 200, envelope(storedReading));
             return;
           }
-          sendJson(res, 200, envelope({ readings: [reading] }));
+          sendJson(res, 200, envelope({ readings: [reading], pagination: { pageSize: 50, hasMore: false, nextCursor: null } }));
           return;
         }
-        sendJson(res, 200, envelope({ memories: [] }));
+        sendJson(res, 200, envelope({ memories: [], pagination: { pageSize: 50, hasMore: false, nextCursor: null } }));
         return;
       }
 
