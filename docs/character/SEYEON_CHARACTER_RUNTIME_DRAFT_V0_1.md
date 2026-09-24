@@ -1,5 +1,7 @@
 # 세연 Character Runtime Draft v0.1
 
+# R0. INSTANCE HEADER
+
 > Status: RUNTIME DESIGN DRAFT
 > Document Type: CHARACTER RUNTIME INSTANCE
 > Character: 세연
