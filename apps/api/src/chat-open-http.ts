@@ -12,6 +12,20 @@ const ROUTE = '/api/chat' as const;
 const API_CONTRACT_VERSION = 'v0.9' as const;
 const NO_STORE = 'no-store' as const;
 
+export const CHAT_LAUNCH_CHARACTER_IDS_V1 = Object.freeze([
+  'seyeon',
+  'yeoul',
+  'seorin',
+  'rahyeon',
+  'mira',
+  'taegyeom',
+  'yunho',
+  'doyun',
+  'baekheon',
+] as const);
+
+const CHAT_LAUNCH_CHARACTER_ID_SET_V1 = new Set<string>(CHAT_LAUNCH_CHARACTER_IDS_V1);
+
 export const CHAT_OPEN_HTTP_BINDING_V1 = Object.freeze({
   method: POST_METHOD,
   route: ROUTE,
@@ -312,6 +326,15 @@ export async function handleChatOpenRequestV1(
       status: 400,
       code: 'INVALID_REQUEST',
       messageKey: 'request.invalid',
+      retryable: false,
+      requestId,
+    });
+  }
+  if (!CHAT_LAUNCH_CHARACTER_ID_SET_V1.has(characterId)) {
+    return jsonError({
+      status: 404,
+      code: 'NOT_FOUND',
+      messageKey: 'chat.character_unavailable',
       retryable: false,
       requestId,
     });

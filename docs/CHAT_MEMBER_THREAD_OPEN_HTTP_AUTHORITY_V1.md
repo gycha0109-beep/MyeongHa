@@ -29,6 +29,7 @@ Content-Type: application/json
 Normative rules:
 
 - `characterId` is the canonical Character identity consumed by the governed DB command.
+- V1 admits only the approved Launch roster canonical ids resolved by SRC-36: `seyeon`, `yeoul`, `seorin`, `rahyeon`, `mira`, `taegyeom`, `yunho`, `doyun`, `baekheon`. A canonical-looking id outside this exact set is unavailable to this Member Launch command even if future content rows exist.
 - The request object contains exactly `characterId` for V1.
 - The server resolves the canonical Member subject from verified request identity.
 - Caller-supplied `subjectId`, `releaseId`, `bundleId`, `presentationKey`, thread candidate IDs, or other authority-bearing fields are rejected fail-closed.

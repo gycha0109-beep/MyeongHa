@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { handleChatOpenRequestV1 } from './chat-open-http.js';
+import { CHAT_LAUNCH_CHARACTER_IDS_V1, handleChatOpenRequestV1 } from './chat-open-http.js';
 import type { IdentityEvidenceVerificationPortV1 } from './current-subject-profile-http.js';
 import type {
   PostgresSubjectConnectionV1,
@@ -122,6 +122,20 @@ async function invoke(input: {
 }
 
 describe('Member single-Character thread open HTTP adapter', () => {
+  it('pins the SRC-36 exact-nine Launch roster', () => {
+    expect(CHAT_LAUNCH_CHARACTER_IDS_V1).toEqual([
+      'seyeon',
+      'yeoul',
+      'seorin',
+      'rahyeon',
+      'mira',
+      'taegyeom',
+      'yunho',
+      'doyun',
+      'baekheon',
+    ]);
+  });
+
   it('requires verified identity before body parsing or PostgreSQL', async () => {
     const connect = vi.fn(async () => { throw new Error('must not connect'); });
     const response = await invoke({
@@ -153,6 +167,21 @@ describe('Member single-Character thread open HTTP adapter', () => {
       expect(response.headers.get('cache-control')).toBe('no-store');
       expect(connect).not.toHaveBeenCalled();
     }
+  });
+
+  it('rejects canonical-looking non-Launch Character ids before PostgreSQL', async () => {
+    const connect = vi.fn(async () => { throw new Error('must not connect'); });
+    const response = await invoke({
+      request: post({ characterId: 'future-character' }),
+      pool: { connect },
+    });
+    const payload = await response.json() as any;
+
+    expect(response.status).toBe(404);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(payload.error.code).toBe('NOT_FOUND');
+    expect(payload.error.messageKey).toBe('chat.character_unavailable');
+    expect(connect).not.toHaveBeenCalled();
   });
 
   it('binds the canonical Member subject and server UUID candidates to the governed command', async () => {
