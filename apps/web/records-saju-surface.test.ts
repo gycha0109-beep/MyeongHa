@@ -18,7 +18,7 @@ describe('Records Saju history surface', () => {
     expect(html).toContain('완료되어 저장된 사주 풀이 이력을 삶의 사실과 분리해 확인합니다.');
     expect(html).toContain('>현세록<');
     expect(html).toContain('>명식록<');
-    expect(html).toContain('>대리자 기억<');
+    expect(html).toContain('>대리가 기억<');
   });
 
   it('loads persisted Reading History with the same Records bearer', () => {

@@ -87,7 +87,7 @@ describe('web records authority boundary', () => {
   });
 
   it('keeps memory grants separate instead of inventing an aggregate grant API', () => {
-    expect(html).toContain('캐릭터마다 실제로 볼 수 있는 기억 범위는 서로 다를 수 있습니다.');
+    expect(html).toContain('캐릭터가 삭제된 후 남는 기억 범위는 서로 다를 수 있습니다.');
     expect(client).not.toContain('access-grants');
     expect(client).not.toContain('readAccessGrants');
   });
