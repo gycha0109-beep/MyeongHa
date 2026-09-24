@@ -65,7 +65,7 @@ function sexText(value: BirthInput['sex']) {
 }
 
 function AuthActions({ subjectKind, hasStoredMemberSession }: {
-  subjectKind?: ProfilePayload['subjectKind'];
+  subjectKind: ProfilePayload['subjectKind'] | undefined;
   hasStoredMemberSession: boolean;
 }) {
   const [signingOut, setSigningOut] = useState(false);
@@ -123,7 +123,7 @@ function ProfileHome({ state }: { state: AccountState }) {
           : state.kind === 'unavailable' ? state.message : ''}
         {state.kind === 'unavailable' && state.login ? (
           <div className="my-status-action">
-            <AuthActions hasStoredMemberSession={hasStoredMemberSession} />
+            <AuthActions subjectKind={undefined} hasStoredMemberSession={hasStoredMemberSession} />
           </div>
         ) : null}
       </div>
