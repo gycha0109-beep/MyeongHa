@@ -346,6 +346,16 @@ async function verifyRoom(page, origin, suffix, width, height, mobile) {
   return state;
 }
 
+for (const assetPath of [
+  '../apps/web/assets/characters/mira-portrait-v2.webp',
+  '../apps/web/assets/characters/yeoul-portrait-v2.webp',
+  '../apps/web/assets/characters/rooms/mira-room.webp',
+  '../apps/web/assets/characters/rooms/yeoul-room.webp',
+]) {
+  const asset = await readFile(new URL(assetPath, import.meta.url));
+  console.log('MyeongHa_CHARACTER_ASSET_DIAGNOSTIC', assetPath, 'bytes=' + asset.length, 'head=' + asset.subarray(0, 24).toString('hex'));
+}
+
 await mkdir(artifactDir, { recursive: true });
 const server = await startStaticServer();
 const chrome = await startChrome();
