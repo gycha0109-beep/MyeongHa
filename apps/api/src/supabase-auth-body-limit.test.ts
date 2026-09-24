@@ -7,6 +7,11 @@ const env = {
   MYEONGHA_SUPABASE_URL: 'https://cnsfpcdiyofqvhpcegfc.supabase.co',
   MYEONGHA_SUPABASE_API_KEY: 'test-publishable-key-that-is-long-enough',
 };
+const clearPasswordGuard = Object.freeze({
+  async check() {
+    return Object.freeze({ status: 'clear' as const });
+  },
+});
 
 function signInBodyWithExactBytes(byteLength: number): string {
   const prefix = '{"email":"person@example.com","password":"test-password","padding":"';
@@ -80,6 +85,7 @@ async function expectInvalidRequest(request: Request, upstream: ReturnType<typeo
     request,
     env,
     action: 'sign-in',
+      passwordCompromiseGuard: clearPasswordGuard,
   });
   const payload = await response.json() as any;
 
@@ -151,6 +157,7 @@ describe('Supabase auth actual request-body byte limit', () => {
       request: input.request,
       env,
       action: 'sign-in',
+      passwordCompromiseGuard: clearPasswordGuard,
     });
 
     expect(response.status).toBe(200);
@@ -168,6 +175,7 @@ describe('Supabase auth actual request-body byte limit', () => {
       request: input.request,
       env,
       action: 'sign-in',
+      passwordCompromiseGuard: clearPasswordGuard,
     });
 
     const outcome = await Promise.race([
