@@ -155,6 +155,21 @@ describe('Member single-Character thread open HTTP adapter', () => {
     }
   });
 
+  it('rejects canonical-looking non-Launch Character ids before PostgreSQL', async () => {
+    const connect = vi.fn(async () => { throw new Error('must not connect'); });
+    const response = await invoke({
+      request: post({ characterId: 'future-character' }),
+      pool: { connect },
+    });
+    const payload = await response.json() as any;
+
+    expect(response.status).toBe(404);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(payload.error.code).toBe('NOT_FOUND');
+    expect(payload.error.messageKey).toBe('chat.character_unavailable');
+    expect(connect).not.toHaveBeenCalled();
+  });
+
   it('binds the canonical Member subject and server UUID candidates to the governed command', async () => {
     const onCommand = vi.fn((values: readonly unknown[]) => {
       expect(values).toEqual([
