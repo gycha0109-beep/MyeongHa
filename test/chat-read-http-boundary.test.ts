@@ -146,7 +146,7 @@ describe('owner Chat read HTTP boundary', () => {
       primaryCharacterAuthority: 'ordered-participant-character-ids[0]:v1',
       streamAuthority: 'public.qry_chat_thread_stream_v2',
       relationshipAuthority: 'public.qry_character_relationship_v1',
-      apiContractVersion: 'v0.11',
+      apiContractVersion: 'v0.9',
     });
   });
 
@@ -190,7 +190,7 @@ describe('owner Chat read HTTP boundary', () => {
         },
       },
       meta: {
-        apiContractVersion: 'v0.11',
+        apiContractVersion: 'v0.9',
         requestId: REQUEST_ID,
         serverTime: SERVER_TIME,
       },
