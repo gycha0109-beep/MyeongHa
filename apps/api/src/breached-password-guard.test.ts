@@ -26,7 +26,6 @@ describe('Password Compromise Guard v1', () => {
     expect(result).toEqual({ status: 'compromised', occurrenceCount: 3861493 });
     expect(fetchImpl).toHaveBeenCalledTimes(1);
     expect(observedUrl).toBe('https://api.pwnedpasswords.com/range/5BAA6');
-    expect(observedUrl).not.toContain('password');
     expect(observedUrl).not.toContain('1E4C9B93F3F0682250B6CF8331B7EE68FD8');
     expect(observedInit?.method).toBe('GET');
     expect(observedInit?.headers).toMatchObject({
