@@ -103,10 +103,12 @@ function ProfileHome({ state }: { state: AccountState }) {
   const hasStoredMemberSession = state.kind === 'unavailable'
     ? state.hasStoredMemberSession
     : Boolean(memberSession);
-  const displayName = profile?.displayName?.trim() || '호칭을 설정해주세요';
-  const email = payload?.subjectKind === 'member'
-    ? memberSession?.user?.email ?? '로그인 계정 확인 중'
-    : '게스트로 둘러보는 중';
+  const displayName = payload ? profile?.displayName?.trim() || '호칭을 설정해주세요' : '';
+  const email = payload
+    ? payload.subjectKind === 'member'
+      ? memberSession?.user?.email ?? '로그인 계정 확인 중'
+      : '게스트로 둘러보는 중'
+    : '';
 
   return (
     <header className="my-home-hero" aria-labelledby="my-page-title">
@@ -145,9 +147,11 @@ function ProfileHome({ state }: { state: AccountState }) {
             <span id="my-onboarding-state">{profile?.onboardingState ?? ''}</span>
             <span id="my-profile-updated">{profile?.updatedAt ?? ''}</span>
             <span id="my-account-note">
-              {payload?.subjectKind === 'member'
-                ? '로그인한 회원 세션으로 현재 계정의 저장된 흐름을 이어갑니다.'
-                : '현재 브라우저의 게스트 흐름입니다. 계정 연결 전까지 회원 기록으로 가정하지 않습니다.'}
+              {payload
+                ? payload.subjectKind === 'member'
+                  ? '로그인한 회원 세션으로 현재 계정의 저장된 흐름을 이어갑니다.'
+                  : '현재 브라우저의 게스트 흐름입니다. 계정 연결 전까지 회원 기록으로 가정하지 않습니다.'
+                : ''}
             </span>
           </div>
         </article>
