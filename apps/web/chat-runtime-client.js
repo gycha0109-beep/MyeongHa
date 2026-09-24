@@ -131,11 +131,7 @@ function renderConversation(messages, authoritativeCharacterId) {
   chatStream.scrollTop = chatStream.scrollHeight;
 }
 
-function renderRoomState(payload) {
-  const state = parseChatRoomReadPayloadV1(payload, {
-    expectedThreadId: threadId,
-    expectedAfterSequenceNo: 0,
-  });
+function renderRoomState(state) {
   renderHistory(state.messages, state.characterId);
   renderConversation(state.messages, state.characterId);
 
@@ -170,6 +166,36 @@ function invalidateRejectedBearer(activeBearer) {
   if (activeBearer?.kind === 'guest') invalidateGuestSession(activeBearer.token);
 }
 
+async function readChatPage(activeBearer, afterSequenceNo) {
+  const url = new URL(`/api/chat/${encodeURIComponent(threadId)}`, window.location.origin);
+  url.searchParams.set('afterSequenceNo', String(afterSequenceNo));
+
+  const response = await fetch(url, {
+    method: 'GET',
+    credentials: 'same-origin',
+    cache: 'no-store',
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${activeBearer.token}`,
+    },
+  });
+
+  if (response.status === 401) {
+    invalidateRejectedBearer(activeBearer);
+    throw new Error('Character Room read requires a current session.');
+  }
+  if (!response.ok) {
+    throw new Error(`Character Room read failed with ${response.status}.`);
+  }
+
+  const envelope = await response.json();
+  const { unwrapApiSuccessEnvelope } = await apiEnvelopePromise;
+  return parseChatRoomReadPayloadV1(unwrapApiSuccessEnvelope(envelope), {
+    expectedThreadId: threadId,
+    expectedAfterSequenceNo: afterSequenceNo,
+  });
+}
+
 async function loadRoomState() {
   if (invalidThreadRoute) {
     if (historyEmpty) {
@@ -194,30 +220,48 @@ async function loadRoomState() {
       throw new Error('Character Room read requires an active authenticated or guest bearer.');
     }
 
-    const url = new URL(`/api/chat/${encodeURIComponent(threadId)}`, window.location.origin);
-    url.searchParams.set('afterSequenceNo', '0');
+    const messages = [];
+    const seenMessageIds = new Set();
+    const seenCursors = new Set([0]);
+    let afterSequenceNo = 0;
+    let characterId = null;
 
-    const response = await fetch(url, {
-      method: 'GET',
-      credentials: 'same-origin',
-      cache: 'no-store',
-      headers: {
-        Accept: 'application/json',
-        Authorization: `Bearer ${activeBearer.token}`,
-      },
-    });
+    for (;;) {
+      const page = await readChatPage(activeBearer, afterSequenceNo);
+      if (characterId === null) {
+        characterId = page.characterId;
+      } else if (page.characterId !== characterId) {
+        throw new Error('Character Room read changed character authority across pages.');
+      }
 
-    if (response.status === 401) {
-      invalidateRejectedBearer(activeBearer);
-      throw new Error('Character Room read requires a current session.');
+      for (const message of page.messages) {
+        if (seenMessageIds.has(message.messageId)) {
+          throw new Error('Character Room read repeated a message across pages.');
+        }
+        seenMessageIds.add(message.messageId);
+        messages.push(message);
+      }
+
+      if (!page.pagination.hasMore) break;
+      const next = page.pagination.nextAfterSequenceNo;
+      if (
+        !Number.isSafeInteger(next)
+        || next <= afterSequenceNo
+        || seenCursors.has(next)
+      ) {
+        throw new Error('Character Room read returned a non-advancing page cursor.');
+      }
+      seenCursors.add(next);
+      afterSequenceNo = next;
     }
-    if (!response.ok) {
-      throw new Error(`Character Room read failed with ${response.status}.`);
-    }
 
-    const envelope = await response.json();
-    const { unwrapApiSuccessEnvelope } = await apiEnvelopePromise;
-    renderRoomState(unwrapApiSuccessEnvelope(envelope));
+    if (characterId === null) {
+      throw new Error('Character Room read omitted character authority.');
+    }
+    renderRoomState(Object.freeze({
+      characterId,
+      messages: Object.freeze(messages),
+    }));
   } catch {
     if (historyEmpty) {
       historyEmpty.hidden = false;
