@@ -18,7 +18,7 @@ const authorityMigration = readFileSync(
 );
 
 describe('Reading History v3 bounded runtime authority binding', () => {
-  it('keeps the v0.11 HTTP projection on the bounded DB authority that owns Reader provenance', () => {
+  it('keeps the v0.10 HTTP projection on the bounded DB authority that owns Reader provenance', () => {
     expect(runtimeSource).toContain("readAuthority: 'public.qry_reading_history_v3'");
     expect(runtimeSource).toContain('reader_character_ids as "readerCharacterIds"');
     expect(runtimeSource).toContain('from public.qry_reading_history_v3($1::uuid, $2::timestamptz, $3::timestamptz, $4::uuid, $5::integer)');
