@@ -317,7 +317,7 @@ try {
     note: document.querySelector('#my-account-note')?.textContent?.trim(),
   }))()`);
   assert(verifiedGuest.subjectKind === '게스트', 'My guest subject label missing');
-  assert(verifiedGuest.email === '게스트 세션', 'My guest account identity missing');
+  assert(verifiedGuest.email === '게스트로 둘러보는 중', 'My guest account identity missing');
   assert(verifiedGuest.action === '계정 연결', 'My guest account-connect action missing');
   assert(verifiedGuest.note?.includes('회원 기록으로 가정하지 않습니다.'), 'My guest/member authority boundary copy missing');
 
