@@ -102,7 +102,10 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
     expect(js.indexOf("url.searchParams.set('threadId', safeThreadId)")).toBeLessThan(
       js.indexOf("url.searchParams.set('character', safeKey)"),
     );
-    expect(js).not.toContain('characterId:');
+    expect(js).toContain('characterId: person.key');
+    expect(js).not.toContain('subjectId: person');
+    expect(js).not.toContain('releaseId: person');
+    expect(js).not.toContain('bundleId: person');
   });
 
   it('keeps legacy Se-yeon scene art out of cards and pins all nine presentation card portraits', async () => {
