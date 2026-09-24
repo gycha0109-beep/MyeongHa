@@ -16,7 +16,7 @@ describe('web auth continuity browser navigation-race contract', () => {
 
   it('uses the narrow evaluator for navigation polling and navigation-triggering interactions', () => {
     expect(source).toContain('const evaluation = await evaluateAcrossExpectedNavigation(client, expression);');
-    expect(source).toContain("await evaluateAcrossExpectedNavigation(client, `document.querySelector('.my-auth-actions button')?.click()`);");
+    expect(source).toContain("await evaluateAcrossExpectedNavigation(client, `document.querySelector('.my-logout-action')?.click()`);");
     expect(source).toContain("await evaluateAcrossExpectedNavigation(client, `document.querySelector('.product-profile')?.click()`);");
   });
 

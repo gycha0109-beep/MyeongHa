@@ -498,6 +498,10 @@ function authErrorMessage(error) {
       return '이메일 또는 비밀번호를 확인해 주세요.';
     case 'SIGN_UP_REJECTED':
       return '이 이메일로 계정을 만들 수 없습니다. 이미 가입한 계정인지 확인해 주세요.';
+    case 'COMPROMISED_PASSWORD':
+      return '유출 이력이 확인된 비밀번호는 사용할 수 없습니다. 다른 비밀번호로 다시 시도해 주세요.';
+    case 'PASSWORD_SECURITY_UNAVAILABLE':
+      return '비밀번호 안전성 확인 서비스를 사용할 수 없습니다. 잠시 뒤 다시 시도해 주세요.';
     case 'RATE_LIMITED':
       return '요청이 너무 많습니다. 잠시 뒤 다시 시도해 주세요.';
     case 'WEB_AUTH_NETWORK_FAILED':

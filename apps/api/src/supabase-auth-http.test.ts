@@ -8,6 +8,22 @@ const env = {
 };
 const encoder = new TextEncoder();
 
+const clearPasswordGuard = Object.freeze({
+  async check() {
+    return Object.freeze({ status: 'clear' as const });
+  },
+});
+const compromisedPasswordGuard = Object.freeze({
+  async check() {
+    return Object.freeze({ status: 'compromised' as const, occurrenceCount: 42 });
+  },
+});
+const unavailablePasswordGuard = Object.freeze({
+  async check() {
+    return Object.freeze({ status: 'unavailable' as const });
+  },
+});
+
 function request(body: unknown): Request {
   return new Request('https://myeongha.example/api/auth/sign-in', {
     method: 'POST',
@@ -63,6 +79,7 @@ describe('Supabase auth HTTP proxy', () => {
       request: request({ email: ' Person@Example.com ', password: 'secret-password' }),
       env,
       action: 'sign-in',
+      passwordCompromiseGuard: clearPasswordGuard,
     });
     const payload = await response.json() as any;
 
@@ -101,6 +118,7 @@ describe('Supabase auth HTTP proxy', () => {
       request: authRequest,
       env,
       action: 'sign-in',
+      passwordCompromiseGuard: clearPasswordGuard,
     });
     await vi.advanceTimersByTimeAsync(INGRESS_REQUEST_BODY_COMPLETION_DEADLINE_MS_V1);
     const response = await responsePromise;
@@ -134,6 +152,7 @@ describe('Supabase auth HTTP proxy', () => {
       request: authRequest,
       env,
       action: 'sign-in',
+      passwordCompromiseGuard: clearPasswordGuard,
     });
     await vi.advanceTimersByTimeAsync(2_500);
     controller?.enqueue(encoder.encode('"password":"secret-password"}'));
@@ -165,6 +184,7 @@ describe('Supabase auth HTTP proxy', () => {
       request: authRequest,
       env,
       action: 'sign-in',
+      passwordCompromiseGuard: clearPasswordGuard,
     });
 
     expect(response.status).toBe(200);
@@ -187,6 +207,7 @@ describe('Supabase auth HTTP proxy', () => {
       request: authRequest,
       env,
       action: 'sign-in',
+      passwordCompromiseGuard: clearPasswordGuard,
     });
     const payload = await response.json() as any;
 
@@ -219,6 +240,7 @@ describe('Supabase auth HTTP proxy', () => {
       }),
       env,
       action: 'sign-up',
+      passwordCompromiseGuard: clearPasswordGuard,
     });
     const payload = await response.json() as any;
 
@@ -251,9 +273,103 @@ describe('Supabase auth HTTP proxy', () => {
       }),
       env,
       action: 'sign-up',
+      passwordCompromiseGuard: clearPasswordGuard,
     });
 
     expect(response.status).toBe(200);
+    expect(upstream).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects a compromised signup password before Supabase receives credentials', async () => {
+    const upstream = vi.fn();
+    vi.stubGlobal('fetch', upstream);
+
+    const response = await handleSupabaseAuthRequestV1({
+      request: request({ email: 'new@example.com', password: 'compromised-password' }),
+      env,
+      action: 'sign-up',
+      passwordCompromiseGuard: compromisedPasswordGuard,
+    });
+    const payload = await response.json() as any;
+
+    expect(response.status).toBe(422);
+    expect(payload.error.code).toBe('COMPROMISED_PASSWORD');
+    expect(JSON.stringify(payload)).not.toContain('compromised-password');
+    expect(upstream).not.toHaveBeenCalled();
+  });
+
+  it('fails signup closed when the compromise provider is unavailable', async () => {
+    const upstream = vi.fn();
+    vi.stubGlobal('fetch', upstream);
+
+    const response = await handleSupabaseAuthRequestV1({
+      request: request({ email: 'new@example.com', password: 'new-password' }),
+      env,
+      action: 'sign-up',
+      passwordCompromiseGuard: unavailablePasswordGuard,
+    });
+    const payload = await response.json() as any;
+
+    expect(response.status).toBe(503);
+    expect(payload.error.code).toBe('PASSWORD_SECURITY_UNAVAILABLE');
+    expect(payload.error.retryable).toBe(true);
+    expect(upstream).not.toHaveBeenCalled();
+  });
+
+  it('revokes and withholds a newly-created session when valid credentials use a compromised password', async () => {
+    const upstream = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const url = new URL(String(input));
+      if (url.pathname === '/auth/v1/logout') {
+        expect(init?.headers).toMatchObject({
+          Authorization: 'Bearer header.payload.signature',
+        });
+        return Response.json({ ok: true });
+      }
+      return Response.json({
+        access_token: 'header.payload.signature',
+        refresh_token: 'refresh-token',
+        expires_in: 3600,
+        user: { id: '11111111-1111-4111-8111-111111111111', email: 'person@example.com' },
+      });
+    });
+    vi.stubGlobal('fetch', upstream);
+
+    const response = await handleSupabaseAuthRequestV1({
+      request: request({ email: 'person@example.com', password: 'compromised-password' }),
+      env,
+      action: 'sign-in',
+      passwordCompromiseGuard: compromisedPasswordGuard,
+    });
+    const payload = await response.json() as any;
+
+    expect(response.status).toBe(403);
+    expect(payload.error.code).toBe('COMPROMISED_PASSWORD');
+    expect(JSON.stringify(payload)).not.toContain('header.payload.signature');
+    expect(JSON.stringify(payload)).not.toContain('refresh-token');
+    expect(JSON.stringify(payload)).not.toContain('compromised-password');
+    expect(upstream).toHaveBeenCalledTimes(2);
+  });
+
+  it('preserves established sign-in availability when the compromise provider is unavailable', async () => {
+    const upstream = vi.fn(async () => Response.json({
+      access_token: 'header.payload.signature',
+      refresh_token: 'refresh-token',
+      expires_in: 3600,
+      user: { id: '11111111-1111-4111-8111-111111111111', email: 'person@example.com' },
+    }));
+    vi.stubGlobal('fetch', upstream);
+
+    const response = await handleSupabaseAuthRequestV1({
+      request: request({ email: 'person@example.com', password: 'secret-password' }),
+      env,
+      action: 'sign-in',
+      passwordCompromiseGuard: unavailablePasswordGuard,
+    });
+    const payload = await response.json() as any;
+
+    expect(response.status).toBe(200);
+    expect(payload.data.status).toBe('authenticated');
+    expect(payload.data.passwordCompromiseCheck).toBe('unavailable');
     expect(upstream).toHaveBeenCalledTimes(1);
   });
 
@@ -267,6 +383,7 @@ describe('Supabase auth HTTP proxy', () => {
       request: request({ email: 'person@example.com', password: 'wrong-password' }),
       env,
       action: 'sign-in',
+      passwordCompromiseGuard: clearPasswordGuard,
     });
     const payload = await response.json() as any;
 

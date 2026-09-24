@@ -253,7 +253,7 @@ async function waitFor(client, expression, message, timeout = 8_000) {
     pathname: location.pathname,
     status: document.querySelector('#my-status')?.textContent?.trim() ?? null,
     accountEmail: document.querySelector('#my-account-email')?.textContent?.trim() ?? null,
-    authAction: document.querySelector('.my-auth-actions')?.textContent?.trim() ?? null,
+    authAction: document.querySelector('.my-logout-action')?.textContent?.trim() ?? null,
   }))()`);
   throw new Error(`${message}; diagnostics=${JSON.stringify(diagnostics)}; requests=${JSON.stringify(requests)}`);
 }
@@ -329,10 +329,10 @@ try {
   await navigate(client, origin, '/my.html', '#my-account-email');
   await waitFor(
     client,
-    `document.querySelector('#my-account-email')?.textContent?.trim() === ${JSON.stringify(testIdentity.email)} && Boolean(document.querySelector('.my-auth-actions button'))`,
+    `document.querySelector('#my-account-email')?.textContent?.trim() === ${JSON.stringify(testIdentity.email)} && Boolean(document.querySelector('.my-logout-action'))`,
     'My page did not resolve the signed-in Member account and logout action',
   );
-  await evaluateAcrossExpectedNavigation(client, `document.querySelector('.my-auth-actions button')?.click()`);
+  await evaluateAcrossExpectedNavigation(client, `document.querySelector('.my-logout-action')?.click()`);
   await waitFor(
     client,
     `location.pathname === '/auth.html' && !localStorage.getItem('myeongha.memberSession.v1')`,

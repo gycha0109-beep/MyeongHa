@@ -445,11 +445,11 @@ try {
   await navigate(tabA, origin, '/my.html', '#my-account-email');
   await waitFor(
     tabA,
-    `document.querySelector('#my-account-email')?.textContent?.trim() === ${JSON.stringify(testIdentity.email)} && Boolean(document.querySelector('.my-auth-actions button'))`,
+    `document.querySelector('#my-account-email')?.textContent?.trim() === ${JSON.stringify(testIdentity.email)} && Boolean(document.querySelector('.my-logout-action'))`,
     'Tab A My page did not expose the Member logout action',
   );
   const signOutScheduled = await tabA.evaluate(`(() => {
-    const button = document.querySelector('.my-auth-actions button');
+    const button = document.querySelector('.my-logout-action');
     if (!(button instanceof HTMLButtonElement)) return false;
     setTimeout(() => button.click(), 0);
     return true;

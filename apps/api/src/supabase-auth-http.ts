@@ -8,6 +8,10 @@ import {
   IngressRequestBodyCompletionDeadlineExceededV1,
 } from './ingress-request-body-deadline.js';
 import { fetchSupabaseAuthWithDeadlineV1 } from './supabase-auth-upstream-deadline.js';
+import {
+  createPwnedPasswordCompromiseGuardV1,
+  type PasswordCompromiseGuardPortV1,
+} from './breached-password-guard.js';
 
 const NO_STORE = 'no-store' as const;
 const MAX_AUTH_BODY_BYTES = 16_384;
@@ -286,6 +290,7 @@ export async function handleSupabaseAuthRequestV1(input: {
   readonly request: Request;
   readonly env: ProductionUserDataRuntimeEnvV1;
   readonly action: SupabaseAuthActionV1;
+  readonly passwordCompromiseGuard?: PasswordCompromiseGuardPortV1;
 }): Promise<Response> {
   if (input.request.method !== 'POST') {
     try {
@@ -336,6 +341,19 @@ export async function handleSupabaseAuthRequestV1(input: {
     const email = rawEmail === null ? null : normalizeEmail(rawEmail);
     if (email === null || password === null) return errorResponse('INVALID_REQUEST', 400);
 
+    const passwordCompromiseGuard = input.passwordCompromiseGuard
+      ?? createPwnedPasswordCompromiseGuardV1();
+
+    if (input.action === 'sign-up') {
+      const compromiseCheck = await passwordCompromiseGuard.check(password);
+      if (compromiseCheck.status === 'compromised') {
+        return errorResponse('COMPROMISED_PASSWORD', 422);
+      }
+      if (compromiseCheck.status === 'unavailable') {
+        return errorResponse('PASSWORD_SECURITY_UNAVAILABLE', 503);
+      }
+    }
+
     const path = input.action === 'sign-in'
       ? '/auth/v1/token?grant_type=password'
       : signupRedirectPath(body);
@@ -347,6 +365,29 @@ export async function handleSupabaseAuthRequestV1(input: {
 
     const session = normalizeSession(upstream.payload);
     if (session !== null) {
+      if (input.action === 'sign-in') {
+        const compromiseCheck = await passwordCompromiseGuard.check(password);
+        if (compromiseCheck.status === 'compromised') {
+          try {
+            await callSupabase(config, '/auth/v1/logout', {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${session.accessToken}` },
+              body: '{}',
+            });
+          } catch {
+            // The compromised credential never receives the newly-created session tokens.
+          }
+          return errorResponse('COMPROMISED_PASSWORD', 403);
+        }
+        return response({
+          ok: true,
+          data: {
+            status: 'authenticated',
+            session,
+            passwordCompromiseCheck: compromiseCheck.status,
+          },
+        });
+      }
       return response({ ok: true, data: { status: 'authenticated', session } });
     }
 

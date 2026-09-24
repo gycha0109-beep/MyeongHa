@@ -126,7 +126,7 @@ async function serve() {
           sendJson(res, 403, errorEnvelope('FORBIDDEN'));
           return;
         }
-        sendJson(res, 200, envelope({ facts: [] }));
+        sendJson(res, 200, envelope({ facts: [], pagination: { pageSize: 50, hasMore: false, nextCursor: null } }));
         return;
       }
 
@@ -136,7 +136,7 @@ async function serve() {
           sendJson(res, 401, errorEnvelope());
           return;
         }
-        sendJson(res, 200, envelope({ readings: [] }));
+        sendJson(res, 200, envelope({ readings: [], pagination: { pageSize: 50, hasMore: false, nextCursor: null } }));
         return;
       }
 
@@ -146,7 +146,7 @@ async function serve() {
           sendJson(res, 401, errorEnvelope());
           return;
         }
-        sendJson(res, 200, envelope({ memories: [] }));
+        sendJson(res, 200, envelope({ memories: [], pagination: { pageSize: 50, hasMore: false, nextCursor: null } }));
         return;
       }
 
