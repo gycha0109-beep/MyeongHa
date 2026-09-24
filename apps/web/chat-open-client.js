@@ -188,80 +188,87 @@ export function createChatOpenClientV1(options = {}) {
     );
   }
 
-  return Object.freeze({
-    endpoint,
-    async openForServerCharacter(input) {
-      const characterId = requireCharacterId(input?.readerCharacterId);
+  async function openCanonicalCharacter(characterIdInput) {
+    const characterId = requireCharacterId(characterIdInput);
 
-      let bearer;
-      try {
-        bearer = await resolveBearer();
-      } catch (error) {
+    let bearer;
+    try {
+      bearer = await resolveBearer();
+    } catch (error) {
+      throw new ChatOpenClientErrorV1(
+        'CHAT_OPEN_SESSION_REQUIRED',
+        'Chat open session could not be resolved.',
+        false,
+        error,
+      );
+    }
+    if (
+      !bearer ||
+      (bearer.kind !== 'member' && bearer.kind !== 'guest') ||
+      typeof bearer.token !== 'string' ||
+      bearer.token.trim().length === 0
+    ) {
+      throw new ChatOpenClientErrorV1(
+        'CHAT_OPEN_SESSION_REQUIRED',
+        'Chat open requires a current session.',
+      );
+    }
+
+    let response;
+    try {
+      response = await fetchImpl(endpoint, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          Authorization: 'Bearer ' + bearer.token,
+          'Content-Type': 'application/json',
+        },
+        credentials: 'same-origin',
+        cache: 'no-store',
+        body: JSON.stringify({ characterId }),
+      });
+    } catch (error) {
+      throw new ChatOpenClientErrorV1(
+        'CHAT_OPEN_REQUEST_FAILED',
+        'Chat open transport failed.',
+        true,
+        error,
+      );
+    }
+
+    const payload = await readPayload(response);
+    if (!response.ok) {
+      const failure = mapFailure(response, payload);
+      if (failure.code === 'CHAT_OPEN_SESSION_REQUIRED') {
+        invalidateRejectedBearer(bearer, invalidators);
+      }
+      throw failure;
+    }
+
+    let data;
+    try {
+      data = unwrapApiSuccessEnvelope(payload);
+    } catch (error) {
+      if (error instanceof WebApiEnvelopeError) {
         throw new ChatOpenClientErrorV1(
-          'CHAT_OPEN_SESSION_REQUIRED',
-          'Chat open session could not be resolved.',
+          'CHAT_OPEN_MALFORMED_RESPONSE',
+          error.message,
           false,
           error,
         );
       }
-      if (
-        !bearer ||
-        (bearer.kind !== 'member' && bearer.kind !== 'guest') ||
-        typeof bearer.token !== 'string' ||
-        bearer.token.trim().length === 0
-      ) {
-        throw new ChatOpenClientErrorV1(
-          'CHAT_OPEN_SESSION_REQUIRED',
-          'Chat open requires a current session.',
-        );
-      }
+      throw error;
+    }
+    return parseSuccessData(data, characterId);
+  }
 
-      let response;
-      try {
-        response = await fetchImpl(endpoint, {
-          method: 'POST',
-          headers: {
-            Accept: 'application/json',
-            Authorization: 'Bearer ' + bearer.token,
-            'Content-Type': 'application/json',
-          },
-          credentials: 'same-origin',
-          cache: 'no-store',
-          body: JSON.stringify({ characterId }),
-        });
-      } catch (error) {
-        throw new ChatOpenClientErrorV1(
-          'CHAT_OPEN_REQUEST_FAILED',
-          'Chat open transport failed.',
-          true,
-          error,
-        );
-      }
-
-      const payload = await readPayload(response);
-      if (!response.ok) {
-        const failure = mapFailure(response, payload);
-        if (failure.code === 'CHAT_OPEN_SESSION_REQUIRED') {
-          invalidateRejectedBearer(bearer, invalidators);
-        }
-        throw failure;
-      }
-
-      let data;
-      try {
-        data = unwrapApiSuccessEnvelope(payload);
-      } catch (error) {
-        if (error instanceof WebApiEnvelopeError) {
-          throw new ChatOpenClientErrorV1(
-            'CHAT_OPEN_MALFORMED_RESPONSE',
-            error.message,
-            false,
-            error,
-          );
-        }
-        throw error;
-      }
-      return parseSuccessData(data, characterId);
+  return Object.freeze({
+    endpoint,
+    openForCanonicalCharacter(input) {
+      return openCanonicalCharacter(input?.characterId);
+    },
+    openForServerCharacter(input) {
+      return openCanonicalCharacter(input?.readerCharacterId);
     },
   });
 }

@@ -58,6 +58,29 @@ describe('Chat open browser client', () => {
     expect(String(init?.body)).not.toContain('scope');
   });
 
+  it('opens Chat Hub discovery using only the canonical Character id', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(response(200, successEnvelope('seyeon')));
+    const client = createChatOpenClientV1({
+      fetchImpl,
+      resolveBearer: () => ({ kind: 'member', token: 'member-token' }),
+    });
+
+    await expect(client.openForCanonicalCharacter({
+      characterId: ' seyeon ',
+    })).resolves.toEqual({
+      threadId: THREAD_ID,
+      characterId: 'seyeon',
+      created: true,
+    });
+
+    const [, init] = fetchImpl.mock.calls[0]!;
+    expect(init?.body).toBe(JSON.stringify({ characterId: 'seyeon' }));
+    expect(String(init?.body)).not.toContain('subjectId');
+    expect(String(init?.body)).not.toContain('releaseId');
+    expect(String(init?.body)).not.toContain('bundleId');
+    expect(String(init?.body)).not.toContain('threadId');
+  });
+
   it('navigates by the authoritative thread id without carrying Character hints', () => {
     const url = buildChatThreadUrlV1(THREAD_ID);
     expect(url).toBe('chat.html?threadId=123e4567-e89b-42d3-a456-426614174000');

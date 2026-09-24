@@ -74,6 +74,22 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
     expect(js).not.toContain('art.dataset.character = characterKey');
   });
 
+  it('opens discovery Characters through the Member thread authority without Reader continuation claims', async () => {
+    const js = await readFile(hubJsPath, 'utf8');
+
+    expect(js).toContain("from './chat-open-client.js'");
+    expect(js).toContain('createChatOpenClientV1()');
+    expect(js).toContain('openForCanonicalCharacter({');
+    expect(js).toContain('characterId: person.key');
+    expect(js).toContain('buildChatThreadUrlV1(result.threadId)');
+    expect(js).toContain("params.set('next', 'chat-hub.html')");
+    expect(js).toContain("'CHAT_OPEN_MEMBER_REQUIRED'");
+    expect(js).toContain("'CHAT_OPEN_SESSION_REQUIRED'");
+    expect(js).not.toContain('createReaderChatOpenControllerV1');
+    expect(js).not.toContain('officialReadingId');
+    expect(js).not.toContain('readingId');
+  });
+
   it('keeps discovery searchable and pageable without inventing canonical character authority', async () => {
     const js = await readFile(hubJsPath, 'utf8');
 
@@ -86,7 +102,10 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
     expect(js.indexOf("url.searchParams.set('threadId', safeThreadId)")).toBeLessThan(
       js.indexOf("url.searchParams.set('character', safeKey)"),
     );
-    expect(js).not.toContain('characterId:');
+    expect(js).toContain('characterId: person.key');
+    expect(js).not.toContain('subjectId: person');
+    expect(js).not.toContain('releaseId: person');
+    expect(js).not.toContain('bundleId: person');
   });
 
   it('keeps legacy Se-yeon scene art out of cards and pins all nine presentation card portraits', async () => {
