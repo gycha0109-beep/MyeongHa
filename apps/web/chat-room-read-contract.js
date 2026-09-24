@@ -14,6 +14,23 @@ function nullableString(name, value) {
   return nonEmptyString(name, value);
 }
 
+function senderType(value) {
+  const normalized = nonEmptyString('senderType', value);
+  if (normalized !== 'user' && normalized !== 'character' && normalized !== 'system') {
+    fail('senderType is unsupported');
+  }
+  return normalized;
+}
+
+function assertSenderCharacterShape(sender, characterId) {
+  if (sender === 'character' && characterId === null) {
+    fail('character message is missing characterId');
+  }
+  if (sender !== 'character' && characterId !== null) {
+    fail('non-character message exposed characterId');
+  }
+}
+
 function safeSequence(name, value) {
   if (!Number.isSafeInteger(value) || value < 0) fail(`${name} is invalid`);
   return value;
@@ -61,8 +78,9 @@ function parseMessage(message, previousSequenceNo, seenMessageIds) {
   const sequenceNo = safeSequence('sequenceNo', message.sequenceNo);
   if (sequenceNo <= previousSequenceNo) fail('message sequence is not strictly increasing');
 
-  const senderType = nonEmptyString('senderType', message.senderType);
+  const sender = senderType(message.senderType);
   const characterId = nullableString('message characterId', message.characterId);
+  assertSenderCharacterShape(sender, characterId);
   const bodyText = nullableString('message bodyText', message.bodyText);
   const createdAt = timestamp('message createdAt', message.createdAt);
 
@@ -84,7 +102,7 @@ function parseMessage(message, previousSequenceNo, seenMessageIds) {
   return Object.freeze({
     messageId,
     sequenceNo,
-    senderType,
+    senderType: sender,
     characterId,
     bodyText,
     createdAt,
@@ -171,7 +189,7 @@ export function parseChatRoomReadPayloadV1(payload, options) {
     fail('lastSequenceNo does not match the authoritative stream');
   }
 
-  const pagination = parsePagination(payload, lastSequenceNo, messages.length);
+  const paginationState = parsePagination(payload, lastSequenceNo, messages.length);
 
   return Object.freeze({
     threadId,
@@ -179,6 +197,6 @@ export function parseChatRoomReadPayloadV1(payload, options) {
     afterSequenceNo,
     lastSequenceNo,
     messages: Object.freeze(messages),
-    pagination,
+    pagination: paginationState,
   });
 }
