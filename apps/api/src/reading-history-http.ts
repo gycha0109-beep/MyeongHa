@@ -24,7 +24,7 @@ import {
 } from './postgres-subject-execution.js';
 
 const GET_METHOD = 'GET' as const;
-const API_CONTRACT_VERSION = 'v0.11' as const;
+const API_CONTRACT_VERSION = 'v0.10' as const;
 const NO_STORE_CACHE_CONTROL = 'no-store' as const;
 const READINGS_ROUTE = '/api/readings' as const;
 
