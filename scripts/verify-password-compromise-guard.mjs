@@ -74,7 +74,7 @@ for (const fragment of [
   'Status: **APPROVED IMPLEMENTATION AUTHORITY**',
   'HIBP Pwned Passwords Range API',
   'first 5 hexadecimal characters of SHA-1(password)',
-  'plaintext passwords and full password hashes',
+  'plaintext passwords and complete password hashes',
   'fail closed',
   'passwordCompromiseCheck = unavailable',
   'There is no active MyeongHa password-change endpoint',
