@@ -1,8 +1,10 @@
 # 세연 Character Bible Draft v0.2
 
 > Status: WORKING CHARACTER BIBLE
+> Document Type: CHARACTER BIBLE INSTANCE
 > Character: 세연
-> Schema: Character Bible Standard v1
+> Bible Standard: Character Bible Standard v1
+> Authority State: DRAFT / NOT YET PRODUCTION AUTHORITY
 > Source: 기존 `세연 Character Bible Draft v0.1` 재구성
 > World / Deity Layer: 별도 세계관 설계에서 관리
 
