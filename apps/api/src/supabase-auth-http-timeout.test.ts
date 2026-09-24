@@ -6,6 +6,11 @@ const env = {
   MYEONGHA_SUPABASE_URL: 'https://cnsfpcdiyofqvhpcegfc.supabase.co',
   MYEONGHA_SUPABASE_API_KEY: 'test-publishable-key-that-is-long-enough',
 };
+const clearPasswordGuard = Object.freeze({
+  async check() {
+    return Object.freeze({ status: 'clear' as const });
+  },
+});
 
 function signInRequest(): Request {
   return new Request('https://myeongha.example/api/auth/sign-in', {
@@ -36,6 +41,7 @@ describe('Supabase auth HTTP timeout semantics', () => {
       request: signInRequest(),
       env,
       action: 'sign-in',
+      passwordCompromiseGuard: clearPasswordGuard,
     });
 
     await vi.advanceTimersByTimeAsync(SUPABASE_AUTH_UPSTREAM_DEFAULT_TIMEOUT_MS_V1);
