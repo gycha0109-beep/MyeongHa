@@ -12,7 +12,7 @@ import {
 
 const GET_METHOD = 'GET' as const;
 const ROUTE_PREFIX = '/api/chat/' as const;
-const API_CONTRACT_VERSION = 'v0.11' as const;
+const API_CONTRACT_VERSION = 'v0.9' as const;
 const NO_STORE = 'no-store' as const;
 
 export const CHAT_READ_HTTP_BINDING_V1 = Object.freeze({
