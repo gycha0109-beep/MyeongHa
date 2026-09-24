@@ -45,6 +45,18 @@ class FakeConnection implements PostgresSubjectConnectionV1 {
   readonly calls: QueryCall[] = [];
   readonly releases: unknown[] = [];
   bindingError: unknown;
+  streamRows: readonly Record<string, unknown>[] = [{
+    messageId: '96000000-0000-4000-8000-000000000001',
+    sequenceNo: 4,
+    senderType: 'character',
+    characterId: PRIMARY_CHARACTER_ID,
+    bodyText: 'source-backed message',
+    messagePayloadJsonb: {},
+    messageSchemaVersion: 'v1',
+    createdAt: new Date('2026-09-05T15:00:00.000Z'),
+    redacted: false,
+    redactedAt: null,
+  }];
 
   async query<Row = Record<string, unknown>>(
     text: string,
@@ -70,21 +82,8 @@ class FakeConnection implements PostgresSubjectConnectionV1 {
         }] as unknown as readonly Row[],
       };
     }
-    if (text.includes('qry_chat_thread_stream_v1')) {
-      return {
-        rows: [{
-          messageId: '96000000-0000-4000-8000-000000000001',
-          sequenceNo: 4,
-          senderType: 'character',
-          characterId: PRIMARY_CHARACTER_ID,
-          bodyText: 'source-backed message',
-          messagePayloadJsonb: {},
-          messageSchemaVersion: 'v1',
-          createdAt: new Date('2026-09-05T15:00:00.000Z'),
-          redacted: false,
-          redactedAt: null,
-        }] as unknown as readonly Row[],
-      };
+    if (text.includes('qry_chat_thread_stream_v2')) {
+      return { rows: this.streamRows as unknown as readonly Row[] };
     }
     if (text.includes('qry_character_relationship_v1')) {
       return {
@@ -145,9 +144,9 @@ describe('owner Chat read HTTP boundary', () => {
       route: '/api/chat/:threadId',
       threadBindingAuthority: 'public.qry_chat_thread_runtime_binding_v1',
       primaryCharacterAuthority: 'ordered-participant-character-ids[0]:v1',
-      streamAuthority: 'public.qry_chat_thread_stream_v1',
+      streamAuthority: 'public.qry_chat_thread_stream_v2',
       relationshipAuthority: 'public.qry_character_relationship_v1',
-      apiContractVersion: 'v0.9',
+      apiContractVersion: 'v0.11',
     });
   });
 
@@ -174,6 +173,11 @@ describe('owner Chat read HTTP boundary', () => {
           bodyText: 'source-backed message',
           redacted: false,
         }],
+        pagination: {
+          pageSize: 50,
+          hasMore: false,
+          nextAfterSequenceNo: null,
+        },
         latestCharacterMessage: {
           characterId: PRIMARY_CHARACTER_ID,
           bodyText: 'source-backed message',
@@ -186,7 +190,7 @@ describe('owner Chat read HTTP boundary', () => {
         },
       },
       meta: {
-        apiContractVersion: 'v0.9',
+        apiContractVersion: 'v0.11',
         requestId: REQUEST_ID,
         serverTime: SERVER_TIME,
       },
@@ -198,13 +202,54 @@ describe('owner Chat read HTTP boundary', () => {
       expect.stringContaining('public.begin_member_subject_context_v1($1::uuid)'),
       'select public.assert_myeongha_subject_context_v1($1::uuid)',
       expect.stringContaining('public.qry_chat_thread_runtime_binding_v1($1::uuid, $2::uuid)'),
-      expect.stringContaining('public.qry_chat_thread_stream_v1($1::uuid, $2::uuid, $3::bigint)'),
+      expect.stringContaining('public.qry_chat_thread_stream_v2($1::uuid, $2::uuid, $3::bigint, $4::integer)'),
       expect.stringContaining('public.qry_character_relationship_v1($1::uuid, $2::text)'),
       'COMMIT',
     ]);
     expect(f.connection.calls[4]?.values).toEqual([SUBJECT_ID, THREAD_ID]);
-    expect(f.connection.calls[5]?.values).toEqual([SUBJECT_ID, THREAD_ID, 0]);
+    expect(f.connection.calls[5]?.values).toEqual([SUBJECT_ID, THREAD_ID, 0, 50]);
     expect(f.connection.calls[6]?.values).toEqual([SUBJECT_ID, PRIMARY_CHARACTER_ID]);
+  });
+
+  it('uses pageSize + 1 rows to derive a bounded next sequence cursor', async () => {
+    const f = fixture(`https://myeongha.test/api/chat/${THREAD_ID}?afterSequenceNo=0&pageSize=1`);
+    f.connection.streamRows = [
+      {
+        ...f.connection.streamRows[0],
+        sequenceNo: 4,
+      },
+      {
+        ...f.connection.streamRows[0],
+        messageId: '96000000-0000-4000-8000-000000000002',
+        sequenceNo: 5,
+      },
+    ];
+
+    const response = await handleChatReadRequestV1(f.input);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.data.messages).toHaveLength(1);
+    expect(body.data.pagination).toEqual({
+      pageSize: 1,
+      hasMore: true,
+      nextAfterSequenceNo: 4,
+    });
+    expect(f.connection.calls[5]?.values).toEqual([SUBJECT_ID, THREAD_ID, 0, 1]);
+  });
+
+  it.each([
+    'pageSize=0',
+    'pageSize=51',
+    'pageSize=1.5',
+    'pageSize=1&pageSize=2',
+  ])('rejects invalid page-size query %s before identity or DB work', async (query) => {
+    const f = fixture(`https://myeongha.test/api/chat/${THREAD_ID}?afterSequenceNo=0&${query}`);
+    const response = await handleChatReadRequestV1(f.input);
+
+    expect(response.status).toBe(400);
+    expect(f.verifier.calls).toHaveLength(0);
+    expect(f.pool.connectCalls).toBe(0);
   });
 
   it('fails closed with 401/no-store before PostgreSQL when identity is absent', async () => {
