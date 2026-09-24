@@ -8,6 +8,8 @@ const paths = {
   authPage: 'apps/web/auth-page.js',
   vercel: 'vercel.json',
   authority: 'docs/operations/PASSWORD_COMPROMISE_GUARD_V1.md',
+  productionCanaryWorkflow: '.github/workflows/production-password-compromise-guard-evidence.yml',
+  productionCanary: 'scripts/operations/verify-production-password-compromise-guard-live.mjs',
 };
 
 const entries = await Promise.all(
@@ -69,6 +71,46 @@ for (const fragment of [
 ]) requireFragment('authPage', fragment);
 
 requireFragment('vercel', '"value": "default-src \'self\'; base-uri \'self\'; object-src \'none\'; frame-ancestors \'none\'; form-action \'self\'; img-src \'self\' data:; font-src \'self\'; style-src \'self\'; script-src \'self\'; connect-src \'self\'"');
+
+for (const fragment of [
+  'workflow_dispatch:',
+  "default: ops",
+  "environment: production",
+  "MYEONGHA_PASSWORD_COMPROMISE_CANARY_CONFIRM: ${{ inputs.confirmation }}",
+  "MYEONGHA_WATCHTOWER_TRACK: ${{ inputs.watchtower_track }}",
+  "node scripts/operations/verify-production-password-compromise-guard-live.mjs",
+]) requireFragment('productionCanaryWorkflow', fragment);
+
+for (const fragment of [
+  "const PRODUCTION_SIGNUP_ENDPOINT = 'https://myeongha.vercel.app/api/auth/sign-up'",
+  "const EXPECTED_STATUS = 422",
+  "const EXPECTED_ERROR_CODE = 'COMPROMISED_PASSWORD'",
+  "const compromisedPassword = ['pass', 'word'].join('')",
+  "process.env.GITHUB_REF !== 'refs/heads/main'",
+  "process.env.GITHUB_EVENT_NAME !== 'workflow_dispatch'",
+  "containsForbiddenSessionMaterial(payload)",
+  "serializedPayload.includes(compromisedPassword)",
+  "console.log('password_compromise_guard_evidence=pass')",
+  "console.log('plaintext_password_logged=false')",
+  "console.log('full_password_hash_logged=false')",
+  "console.log('session_material_returned=false')",
+]) requireFragment('productionCanary', fragment);
+
+for (const fragment of [
+  'actions/upload-artifact',
+  'set -x',
+  'secrets.',
+]) forbidFragment('productionCanaryWorkflow', fragment);
+
+for (const fragment of [
+  'console.log(compromisedPassword',
+  'console.error(compromisedPassword',
+  'console.log(payload',
+  'console.error(payload',
+  'console.log(serializedPayload',
+  'console.error(serializedPayload',
+  'createHash(',
+]) forbidFragment('productionCanary', fragment);
 
 for (const fragment of [
   'Status: **APPROVED IMPLEMENTATION AUTHORITY**',

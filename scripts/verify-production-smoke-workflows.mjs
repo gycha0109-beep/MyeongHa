@@ -5,6 +5,19 @@ const SETUP_NODE_SHA = 'actions/setup-node@820762786026740c76f36085b0efc47a31fe5
 
 const contracts = [
   {
+    file: 'production-password-compromise-guard-evidence.yml',
+    confirm: 'VERIFY_PASSWORD_COMPROMISE_GUARD',
+    commands: ['node scripts/operations/verify-production-password-compromise-guard-live.mjs'],
+    required: [
+      'watchtower_track:',
+      'default: ops',
+      'MYEONGHA_WATCHTOWER_TRACK: ${{ inputs.watchtower_track }}',
+      'MYEONGHA_PASSWORD_COMPROMISE_CANARY_CONFIRM: ${{ inputs.confirmation }}',
+      '[[ "$GITHUB_REF" == \'refs/heads/main\' ]]',
+    ],
+    forbidSecrets: true,
+  },
+  {
     file: 'production-member-me-smoke.yml',
     confirm: 'VERIFY_MEMBER_ME',
     commands: ['node scripts/verify-production-member-me.mjs'],
