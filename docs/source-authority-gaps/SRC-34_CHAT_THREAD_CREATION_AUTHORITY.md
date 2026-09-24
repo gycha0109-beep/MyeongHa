@@ -1,323 +1,247 @@
 # SRC-34 — Chat Thread Creation Authority
 
-> Status: **OPEN / BLOCKING for production-authoritative Character Chat thread creation**  
+> Status: **PARTIALLY RESOLVED**  
+> Production status: **Member + Launch Character single-character create/reuse is authorized and implemented**  
+> Still blocking: **Guest create/open, first-meeting side effects, archived-thread resume policy, multi-character creation, and future conditional/non-Launch Character composition**  
 > Domain: Conversation / Character / Content / World  
-> Source authority reviewed:
-> - `Usecase_re_reviewed_v2(1).md`
-> - `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`
-> - `MyeongHa_Integration_Spine_v1_FINAL_REVIEWED_v1.2(1).md`
-> - current repository source-gap contracts `SRC-15`, `SRC-16`, `SRC-23`, `SRC-27`
+> Resolution authority:
+> - `docs/source-authority-decisions/CHARACTER_LAUNCH_MVP_AUTHORITY_V1.md`
+> - `supabase/migrations/0970_member_character_thread_open_runtime_authority.sql`
+> - `apps/api/src/chat-open-http.ts`
 
 ---
 
-## 1. Gap
+## 1. Resolution overlay
 
-Primary source fixes the product flow at a high level:
+The original SRC-34 gap correctly identified that the relational model alone did not decide how a selected Character becomes one concrete owner-scoped Chat thread.
+
+That gap was later **partially resolved** by the approved product authority `CHARACTER_LAUNCH_MVP_AUTHORITY_V1` on 2026-09-06.
+
+For the MVP Member path, the approved rule is now:
 
 ```text
-Character selected
-→ first meeting
-→ conversation continues
+normal Member
++ Launch roster Character
+→ current active default release/bundle
+→ at most one active single-character thread per (Member, Character)
+→ existing thread: reuse
+→ no existing thread: create
+→ concurrent/retried open requests converge on one logical active thread
 ```
 
-and the ERD fixes the durable conversation aggregate:
+This decision supersedes the earlier SRC-34 statements that treated all production-authoritative Character thread creation as blocked.
+
+SRC-34 is **not fully closed**. The decision deliberately leaves several creation semantics outside the approved Member MVP slice.
+
+## 2. Source-backed Member MVP authority
+
+### 2.1 Character eligibility
+
+The Launch roster is exactly:
 
 ```text
-conversation_threads
-conversation_thread_characters
-conversation_thread_content_transitions
+seyeon
+yeoul
+seorin
+rahyeon
+mira
+taegyeom
+yunho
+doyun
+baekheon
 ```
 
-For a Character thread, source also fixes that the thread pins one content release/bundle at creation, and that each active Character participation row pins the exact Character/content-bundle version.
+All nine Launch Characters are available to normal Members from launch. The Member open command must still verify actual published/runtime availability from server-owned content authority; a browser `unlocked=true`, presentation card, or arbitrary caller Character id is not authorization.
 
-However, source does **not** define the executable authority that turns a subject selecting a Character into one concrete, owner-scoped, bundle-pinned Chat thread. In particular, it does not define the complete eligibility, release-resolution, reuse/idempotency, and atomic creation contract.
+Future conditional or non-Launch Character eligibility remains outside this resolution and continues to compose with the unresolved unlock authority.
 
-Therefore the relational model can represent a valid created thread, but a production-authoritative `create/open Character conversation` command cannot safely manufacture that thread yet. This is `SRC-34`.
+### 2.2 Release/bundle resolution
 
-This gap is now directly observable in Production: the governed read-only Member Chat smoke can verify an existing owned thread, but current Production authority contains no owned thread to verify. That absence is not authorization to seed one by direct INSERT.
-
-## 2. What source authority already fixes
-
-### 2.1 Thread ownership and lifecycle envelope
-
-`conversation_threads` fixes:
+For the Member MVP there is no cohort, percentage rollout, allowlist rollout, or subject hash.
 
 ```text
-id
-subject_id
-thread_type = single_character | multi_character | system
-status = active | archived | deleted
-active_content_release_id
-active_content_bundle_id
-content_revision
-next_sequence_no
-created_at / updated_at / deleted_at
+Member
+→ current active default release
+→ its content_bundle_id
+→ pin that exact pair when a new thread is created
 ```
 
-Source fixes at least:
+An existing thread keeps its pinned release/bundle when the global default later changes.
 
-- `subject_id` owns the thread;
-- Character threads pin one release/bundle when created;
-- later default-release changes do not silently rewrite existing thread canon;
-- release/bundle identity is relationally coupled;
-- message sequencing belongs to the thread aggregate rather than `MAX(sequence_no)+1` reconstruction;
-- content transitions are explicit, revisioned history rather than silent rebinding.
+The detailed generic client/content compatibility evaluator remains a separate SRC-15 concern. SRC-34 does not authorize inventing a new comparator or fallback algorithm.
 
-### 2.2 Character participation envelope
+### 2.3 Reuse and concurrency
 
-`conversation_thread_characters` fixes:
+The approved logical aggregate is:
 
 ```text
-thread_id
-character_id
-content_bundle_id
-role = primary | participant
-joined_at
-left_at
+(Member subject, Character, active single-character)
+→ cardinality <= 1
 ```
 
-Source fixes:
+Selecting the same Character again reuses the existing active thread. If no active thread exists, one is created.
 
-- active Character participation is bundle-pinned;
-- one active primary exists for a Character thread;
-- a `single_character` thread has exactly one active participant;
-- Character messages refer to authoritative participation provenance rather than an arbitrary caller-supplied Character/bundle pair.
+Retries and concurrent opens must converge on the same logical active thread. The Member MVP therefore does not require a caller-visible idempotency key for this open operation.
 
-### 2.3 User-facing product shape
+### 2.4 Creation shape
 
-Use Case source fixes that:
+A newly created Member single-character thread is required to:
 
-- a user can select a Character and enter a first-meeting/conversation flow;
-- the Launch MVP contains actual Characters as well as locked/future Characters;
-- unlock state is authoritative server-side state rather than a client direct-write decision;
-- remote content must satisfy client compatibility requirements before activation;
-- content/canon and operational state are separate authorities.
+- belong to the server-resolved canonical Member subject;
+- use `thread_type = 'single_character'`;
+- be active;
+- pin the resolved active default release/bundle;
+- create exactly one active primary Character participation for the selected Character;
+- keep the participation bundle equal to the thread bundle;
+- start without inventing first-meeting messages, World Events, Relationship Events, or outbox effects.
 
-These facts constrain a future creation command, but they do not specify the missing executable decision.
+Those omitted side effects are omissions by explicit scope, not implied negative product decisions for future versions.
 
-## 3. Missing creation authority
+## 3. Current executable boundary
 
-### 3.1 Character selection eligibility
-
-Source does not define the complete predicate for whether a selected Character may open a new Character thread for a subject.
-
-Missing decisions include the required interaction among:
+The production Member path is:
 
 ```text
-Character runtime availability
-enabled state
-release / retirement window
-subject Character unlock state
-locked/future Character presentation
-client/content compatibility
-rollout/cohort resolution
-entitlement or product-policy gate, if applicable
+POST /api/chat
+→ authenticated identity evidence
+→ server-resolved canonical Member subject
+→ canonical Character id only
+→ public.cmd_open_member_single_character_thread_v1
+→ lock canonical Member subject
+→ resolve active default release/bundle
+→ verify Character published + currently available
+→ detect existing active single-character thread
+   ├─ exactly one valid thread → reuse
+   ├─ none → atomically create thread + primary participation
+   └─ duplicate/malformed state → fail closed
+→ return { threadId, characterId, created }
 ```
 
-A caller-supplied `character_id` that exists in `character_runtime_catalog` is not by itself proof that the subject is authorized to create a conversation with that Character.
+The browser must not supply subject id, release id, bundle id, unlock state, thread ownership, or reuse policy.
 
-### 3.2 Release / bundle selection at creation
+Guest callers are not silently upgraded into this Member authority. The current HTTP boundary rejects the Guest path.
 
-The ERD requires a Character thread to pin one release/bundle at creation, but source does not define which authoritative resolver supplies that pair.
+## 4. Still unresolved under SRC-34
 
-Missing authority includes:
+The following remain outside the approved Member MVP create/reuse slice.
+
+### 4.1 Guest thread create/open
+
+No Guest creation policy is established here. Do not copy the Member policy onto Guest subjects.
+
+### 4.2 First-meeting side effects
+
+Still unresolved:
 
 ```text
-whether creation always uses the active default release
-whether subject-specific rollout may select another release
-how client/content compatibility participates
-what happens when no compatible eligible release exists
-whether Character runtime availability is evaluated before or after rollout resolution
-which release/bundle evidence is returned or persisted as the creation decision provenance
+automatic first-meeting message
+World Event
+Relationship Event / initialization
+outbox/domain event
+other first-contact durable effects
 ```
 
-Do not infer the pair from a lexical `release_key`, latest timestamp, highest version, or arbitrary active row. This composes directly with `SRC-15` and `SRC-16`.
+The current Member open command intentionally creates none of these.
 
-### 3.3 Existing-thread reuse vs new-thread semantics
+### 4.3 Archived thread semantics
 
-Source does not define whether selecting the same Character should:
+The decision does not establish whether selecting a Character with an archived prior thread should resume it, restore it, or create a new thread under a future lifecycle policy.
 
-```text
-return an existing active single-character thread
-create a new thread every time
-reuse only the newest active thread
-reuse a thread only when its pinned bundle/release remains eligible
-archive/supersede an older thread
-allow multiple simultaneous active threads with the same Character
-```
+### 4.4 Multi-character creation
 
-The current relational uniqueness constraints do not establish a unique `(subject, character)` conversation aggregate, so repository code must not invent such a product rule.
+Multi-character thread creation remains outside this authority.
 
-### 3.4 Create request identity / idempotency
+### 4.5 Future conditional / non-Launch Characters
 
-Source defines strong retry/idempotency principles for durable user actions elsewhere, but does not define a positive Chat-thread creation request contract such as:
+Launch 9 are default-available for Members. Future Characters that require unlock/world-state conditions still need the relevant source authority and must not inherit Launch eligibility automatically.
+
+## 5. Composition with other source authorities
 
 ```text
-client creation id / dedupe key
-request hash inputs
-same-key same-request replay result
-same-key changed-request conflict result
-concurrent duplicate selection behavior
-whether a retry returns the same thread id or only an equivalent thread
-```
+CHARACTER_LAUNCH_MVP_AUTHORITY_V1
+→ closes the Member Launch-9 create/reuse decision needed by this slice
 
-Without this authority, a network retry around first meeting can create duplicate conversations if a command invents its own semantics.
-
-### 3.5 Initial thread state
-
-Source does not fully define creation-time values/effects for:
-
-```text
-status/title policy
-content_revision initial provenance beyond structural default
-initial primary participation timestamp/evidence
-whether relationship/user-character state must already exist or is initialized atomically
-whether a first-meeting World Event is required
-whether first-meeting dialogue/message rows are created in the same transaction or by a later turn command
-whether thread creation emits an outbox/domain event
-```
-
-The absence of a required side effect in the relational schema is not authority to omit or invent one.
-
-### 3.6 Locked / newly unlocked Character composition
-
-Launch source distinguishes available Characters from locked/future Characters, and UC-14 defines a Character Unlock flow at a product level. But `SRC-23` documents that executable unlock-condition/effect authority remains unresolved.
-
-Until the relevant source is resolved, thread creation must not silently equate any of these with authorization:
-
-```text
-Character row exists
-runtime row is enabled
-Character appears in Hall presentation
-character_unlocks row is absent
-character_unlocks row says unlocked without a resolved creation policy
-client sends an unlocked flag
-```
-
-The future command needs an explicit source-approved composition rule.
-
-## 4. Current safe boundary
-
-Source-complete and enforceable now:
-
-```text
-owned thread relational envelope
-thread_type/status/content-binding integrity
-bundle-pinned Character participation integrity
-single-character active-primary structural invariant
-existing owned active thread read
-existing thread sequence stream read
-existing relationship projection read for its authoritative primary Character
-existing thread canon is not silently changed by a new default release
-```
-
-Blocked until `SRC-34` is resolved:
-
-```text
-production-authoritative create/open Character conversation command
-server claim that a selected Character is eligible for a new thread
-automatic active/default release → subject thread binding
-same-Character existing-thread reuse policy
-creation idempotency/dedupe semantics
-first-meeting side-effect transaction
-Production fixture creation solely to make Chat smoke pass
-```
-
-## 5. Dependencies and separation
-
-`SRC-34` is distinct from, but composes with, existing gaps:
-
-```text
 SRC-15
-→ is the resolved content compatible with the current client?
+→ generic Production Web Client/content compatibility evaluator remains separate
 
 SRC-16
-→ which release applies to this subject under rollout policy?
+→ closed for Member MVP by uniform active-default rollout
 
 SRC-23
-→ when/how does authoritative world state unlock a Character?
+→ not required for Launch 9; still relevant to future conditional Characters
 
 SRC-27
-→ how are content bundles/releases registered, activated, retired, and audited?
+→ release lifecycle is only partially resolved; thread open may consume the
+  approved active default but must not invent publication/retirement authority
 
 SRC-34
-→ given authoritative content/world state, how is one concrete Character Chat thread created or reused for this subject?
+→ partially resolved for Member Launch-9 single-character create/reuse
 ```
 
-Closing content publication alone does not define thread creation. Closing thread creation does not authorize unresolved content publication, rollout, compatibility, or unlock mutation.
+Closing the Member open slice does **not** authorize Reader → Chat continuation by itself. Reader/Reading continuation must separately satisfy its own Reading identity, Reader/Character authority, and publication/runtime gates.
 
-## 6. What implementation must NOT invent
+## 6. Implementation invariants
 
-Until source resolution, do not promote a Production command or operational script that silently chooses:
+Implementation must not:
 
-- Character eligibility from row existence alone;
-- `enabled=true` as sufficient per-subject Chat authorization;
-- absent unlock row as either locked or unlocked;
-- active-default release as the universal subject resolver;
-- newest/highest release as a fallback;
-- one-thread-per-Character or unlimited-thread semantics;
-- create-vs-reuse behavior;
-- caller-supplied release/bundle authority;
-- arbitrary creation dedupe keys or retry behavior;
-- direct Production fixture INSERT as a substitute for product creation authority;
-- first-meeting World/relationship/outbox effects.
+1. accept a browser-supplied subject as ownership authority;
+2. accept browser-supplied release/bundle ids for Member thread creation;
+3. treat Character row existence alone as availability;
+4. create more than one logical active single-character thread for one Member + Character;
+5. silently choose among duplicate/malformed existing threads;
+6. rebind an existing thread when the global default release changes;
+7. copy the Member policy to Guest creation;
+8. invent first-meeting World/Relationship/message/outbox effects;
+9. invent archived-thread resume behavior;
+10. extend Launch-9 default availability to future conditional Characters;
+11. use this decision as authorization to activate Reader → Chat continuation before its separate gates close.
 
-## 7. Required source resolution
+## 7. Verification gate
 
-Source authority should define at minimum:
+The Member MVP open path must continue to verify:
 
-1. versioned Character-thread create/open request contract;
-2. authoritative per-subject Character eligibility predicate;
-3. exact composition with Character unlock/current world state;
-4. exact release/bundle resolver used at creation and its failure behavior;
-5. client/content compatibility requirement at creation;
-6. existing active thread reuse vs new-thread policy;
-7. create request dedupe/idempotency and concurrency semantics;
-8. initial thread status/title/content revision rules;
-9. atomic primary participation creation rules;
-10. required first-meeting, relationship, World Event, message, or outbox side effects, if any;
-11. server response contract and minimum provenance needed for audit/retry;
-12. authorization/ACL boundary for Member and Guest callers.
+- unauthenticated caller → deny;
+- Guest caller → deny for this Member command;
+- caller cannot choose another subject;
+- unknown/unpublished/unavailable Character → deny;
+- forged client release/bundle/unlock inputs cannot override server authority;
+- no active default release/bundle → fail closed;
+- new thread pins the approved active default release/bundle;
+- thread and primary participation commit atomically;
+- participation Character/bundle matches the created thread;
+- existing valid active thread is reused;
+- duplicate or malformed active state fails closed;
+- concurrent/retried opens converge on one logical active thread;
+- later default release changes do not silently rebind the existing thread.
 
-## 8. Verification gate after resolution
-
-At minimum:
-
-- caller cannot create a thread for another subject;
-- unknown Character → deny;
-- disabled/unavailable/out-of-window Character → source-approved deny result;
-- locked Character → source-approved deny result;
-- forged client unlock/availability/release inputs cannot override server authority;
-- incompatible client/content pair → deterministic source-approved result;
-- rollout resolution pins the approved release/bundle exactly;
-- no eligible compatible release → fail closed;
-- thread and active primary participation commit atomically;
-- participation Character/bundle matches the pinned runtime catalog;
-- duplicate same create request → source-approved idempotent result;
-- changed payload under the same dedupe identity → conflict/deny according to approved contract;
-- concurrent duplicate requests cannot create an unintended number of logical conversations;
-- existing same-Character thread behavior matches the approved reuse/new policy;
-- no silent rebinding when the global default release later changes;
-- required first-meeting/world/relationship/outbox effects commit atomically if the resolved contract requires them;
-- Guest/Member ownership and later guest-merge behavior preserve the approved thread ownership semantics.
-
-## 9. Promotion boundary
+## 8. Promotion boundary
 
 ```text
 existing owned Chat thread read
 → production-capable
 
-Character thread relational integrity
+Member + Launch-9 single-character create/reuse
 → production-capable
+→ CHARACTER_LAUNCH_MVP_AUTHORITY_V1
+→ cmd_open_member_single_character_thread_v1
 
-Character Chat thread create/open mutation
-→ BLOCKED by SRC-34
+Guest Character thread create/open
+→ BLOCKED
 
-release-dependent creation
-→ SRC-15 + SRC-16 + SRC-27 + SRC-34
+first-meeting durable side effects
+→ BLOCKED / separately unresolved
 
-unlock-dependent creation
-→ SRC-23 + SRC-34
+archived-thread resume policy
+→ BLOCKED / separately unresolved
+
+multi-character create/open
+→ BLOCKED / separately unresolved
+
+future conditional Character create/open
+→ requires its unlock/world/content authorities
+
+Reader → Chat continuation
+→ NOT authorized by SRC-34 alone; remains gated by Reader/Reading runtime authority
 ```
 
-A valid schema for `conversation_threads` proves how an already-created thread is stored. It does not prove the missing authority that decides whether, which, and how a new Character conversation is created for a subject.
+SRC-34 therefore remains a live gap document only for the unresolved creation scopes above. It must no longer be interpreted as a blanket prohibition on the approved Member Launch-9 single-character create/reuse path.
