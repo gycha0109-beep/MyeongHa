@@ -168,11 +168,13 @@ describe('web Birth session guard', () => {
     expect(clientSource).not.toContain('inputHash');
   });
 
-  it('keeps the My Birth route fail-closed until authoritative null is rendered', () => {
-    expect(myPage).toContain("href={canCreateBirth ? 'birth.html' : '#my-birth-title'}");
-    expect(myPage).toContain("birth.kind === 'ready' && birth.payload.birthProfile === null");
-    expect(myPage).toContain('저장된 본인 출생 정보가 없으므로 새 원본 입력을 시작합니다.');
-    expect(myPage).toContain('현재 저장된 원본 입력을 이 화면에서 확인합니다. 수정 기능은 아직 열지 않습니다.');
+  it('keeps the My Birth create path fail-closed until authoritative null is rendered', () => {
+    expect(myPage).toContain("const isEmpty = state.kind === 'ready' && state.payload.birthProfile === null;");
+    expect(myPage).toContain("isEmpty ? (");
+    expect(myPage).toContain('<a href="birth.html">출생 정보 입력하기 →</a>');
+    expect(myPage).toContain('hidden={Boolean(birthProfile)}');
+    expect(myPage).toContain('hidden={!birthProfile}');
+    expect(myPage).toContain('출생 정보 수정 준비 중');
     expect(myPage).toContain('알림과 이용 권한 설정은 준비 중입니다.');
     expect(myPage).toContain('내 정보를 보려면 현재 세션이 필요합니다.');
     expect(myPage).toContain('확인되지 않은 계정 정보를 대신 표시하지 않습니다.');
