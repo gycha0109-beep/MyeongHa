@@ -1,7 +1,7 @@
 import { ApiCommandError } from './api-error.js';
 
 export const LIFE_RECORD_LEDGER_READ_AUTHORITY_BINDING_V1 =
-  'public.qry_life_record_ledger_v1' as const;
+  'public.qry_life_record_ledger_v2' as const;
 
 export interface LifeRecordLedgerAuthorityRowV1 {
   readonly lifeFactId: string;
@@ -41,7 +41,7 @@ type Awaitable<T> = T | Promise<T>;
  * This read preserves stored supersession/revocation history. It deliberately
  * does not define positive Life Fact type/value schemas while SRC-25 remains
  * unresolved. A production adapter may bind this to
- * `qry_life_record_ledger_v1`; PostgreSQL execution identity remains outside
+ * `qry_life_record_ledger_v2`; PostgreSQL execution identity remains outside
  * this contract while P0-AUTH-01 is unresolved.
  */
 export interface LifeRecordLedgerReadAuthorityPortV1 {

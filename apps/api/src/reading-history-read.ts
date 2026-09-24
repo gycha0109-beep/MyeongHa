@@ -2,7 +2,7 @@ import { SAJU_DOMAINS } from '../../../packages/contracts/src/index.js';
 import { ApiCommandError } from './api-error.js';
 
 export const READING_HISTORY_READ_AUTHORITY_BINDING_V1 =
-  'public.qry_reading_history_v2' as const;
+  'public.qry_reading_history_v3' as const;
 
 const UUID_V1 = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const SAJU_DOMAIN_SET_V1 = new Set<string>(SAJU_DOMAINS);

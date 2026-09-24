@@ -94,7 +94,7 @@ async function expectApiCode(
 describe('Life Record ledger API authority boundary', () => {
   it('pins the read boundary to the verified owner Life Fact ledger query', () => {
     expect(LIFE_RECORD_LEDGER_READ_AUTHORITY_BINDING_V1)
-      .toBe('public.qry_life_record_ledger_v1');
+      .toBe('public.qry_life_record_ledger_v2');
   });
 
   it('passes only trusted resolved subject identity to authority', async () => {

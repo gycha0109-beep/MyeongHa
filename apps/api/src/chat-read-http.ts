@@ -1,5 +1,10 @@
 import type { IdentityEvidenceVerificationPortV1 } from './current-subject-profile-http.js';
 import {
+  CollectionReadPaginationInputErrorV1,
+  parseCollectionPageSizeV1,
+  requireAllowedQueryKeysV1,
+} from './collection-read-pagination.js';
+import {
   executePostgresSubjectTransactionV1,
   type PostgresSubjectPoolV1,
   type PostgresTransactionQueryV1,
@@ -15,7 +20,7 @@ export const CHAT_READ_HTTP_BINDING_V1 = Object.freeze({
   route: '/api/chat/:threadId',
   threadBindingAuthority: 'public.qry_chat_thread_runtime_binding_v1',
   primaryCharacterAuthority: 'ordered-participant-character-ids[0]:v1',
-  streamAuthority: 'public.qry_chat_thread_stream_v1',
+  streamAuthority: 'public.qry_chat_thread_stream_v2',
   relationshipAuthority: 'public.qry_character_relationship_v1',
   apiContractVersion: API_CONTRACT_VERSION,
 } as const);
@@ -31,6 +36,7 @@ export interface HandleChatReadRequestInputV1 {
 type ParsedChatReadRequestV1 = Readonly<{
   threadId: string;
   afterSequenceNo: number;
+  pageSize: number;
 }>;
 
 type ThreadBindingRow = Readonly<{
@@ -91,7 +97,7 @@ select
   created_at as "createdAt",
   redacted,
   redacted_at as "redactedAt"
-from public.qry_chat_thread_stream_v1($1::uuid, $2::uuid, $3::bigint)
+from public.qry_chat_thread_stream_v2($1::uuid, $2::uuid, $3::bigint, $4::integer)
 `.trim();
 
 const READ_RELATIONSHIP_SQL = `
@@ -220,17 +226,20 @@ function parseRequest(request: Request): ParsedChatReadRequestV1 | null {
   }
   if (!isUuid(threadId)) return null;
 
-  const keys = [...new Set(url.searchParams.keys())];
-  if (keys.some((key) => key !== 'afterSequenceNo')) return null;
-
-  const cursorValues = url.searchParams.getAll('afterSequenceNo');
-  if (cursorValues.length > 1) return null;
-  const rawCursor = cursorValues[0] ?? '0';
-  if (!/^(0|[1-9][0-9]*)$/u.test(rawCursor)) return null;
-  const afterSequenceNo = Number(rawCursor);
-  if (!Number.isSafeInteger(afterSequenceNo)) return null;
-
-  return Object.freeze({ threadId, afterSequenceNo });
+  try {
+    requireAllowedQueryKeysV1(url.searchParams, ['afterSequenceNo', 'pageSize']);
+    const cursorValues = url.searchParams.getAll('afterSequenceNo');
+    if (cursorValues.length > 1) return null;
+    const rawCursor = cursorValues[0] ?? '0';
+    if (!/^(0|[1-9][0-9]*)$/u.test(rawCursor)) return null;
+    const afterSequenceNo = Number(rawCursor);
+    if (!Number.isSafeInteger(afterSequenceNo)) return null;
+    const pageSize = parseCollectionPageSizeV1(url.searchParams);
+    return Object.freeze({ threadId, afterSequenceNo, pageSize });
+  } catch (error) {
+    if (error instanceof CollectionReadPaginationInputErrorV1) return null;
+    throw error;
+  }
 }
 
 function mapThreadBinding(row: ThreadBindingRow, threadId: string) {
@@ -317,13 +326,16 @@ async function readChatState(
     subjectId,
     parsed.threadId,
     parsed.afterSequenceNo,
+    parsed.pageSize,
   ]);
   const relationshipResult = await client.query<RelationshipRow>(READ_RELATIONSHIP_SQL, [
     subjectId,
     binding.primaryCharacterId,
   ]);
 
-  const messages = Object.freeze(streamResult.rows.map(mapStreamRow));
+  const hasMore = streamResult.rows.length > parsed.pageSize;
+  const pageRows = hasMore ? streamResult.rows.slice(0, parsed.pageSize) : streamResult.rows;
+  const messages = Object.freeze(pageRows.map(mapStreamRow));
   const latestCharacterMessage = [...messages].reverse().find((message) =>
     !message.redacted &&
     message.senderType === 'character' &&
@@ -349,6 +361,11 @@ async function readChatState(
     afterSequenceNo: parsed.afterSequenceNo,
     lastSequenceNo,
     messages,
+    pagination: Object.freeze({
+      pageSize: parsed.pageSize,
+      hasMore,
+      nextAfterSequenceNo: hasMore ? lastSequenceNo : null,
+    }),
     latestCharacterMessage,
     relationship: relationshipRow === undefined
       ? null

@@ -111,6 +111,46 @@ function parseMessage(message, previousSequenceNo, seenMessageIds) {
   });
 }
 
+function parsePagination(payload, lastSequenceNo, messageCount) {
+  const pagination = payload.pagination;
+  if (!pagination || typeof pagination !== 'object' || Array.isArray(pagination)) {
+    fail('pagination is invalid');
+  }
+  if (
+    !Number.isSafeInteger(pagination.pageSize)
+    || pagination.pageSize < 1
+    || pagination.pageSize > 50
+    || typeof pagination.hasMore !== 'boolean'
+    || messageCount > pagination.pageSize
+  ) {
+    fail('pagination bound is invalid');
+  }
+
+  if (pagination.hasMore) {
+    const nextAfterSequenceNo = safeSequence(
+      'pagination nextAfterSequenceNo',
+      pagination.nextAfterSequenceNo,
+    );
+    if (nextAfterSequenceNo !== lastSequenceNo) {
+      fail('pagination cursor does not match the authoritative stream');
+    }
+    return Object.freeze({
+      pageSize: pagination.pageSize,
+      hasMore: true,
+      nextAfterSequenceNo,
+    });
+  }
+
+  if (pagination.nextAfterSequenceNo !== null) {
+    fail('terminal pagination cursor must be null');
+  }
+  return Object.freeze({
+    pageSize: pagination.pageSize,
+    hasMore: false,
+    nextAfterSequenceNo: null,
+  });
+}
+
 export function parseChatRoomReadPayloadV1(payload, options) {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
     fail('payload is invalid');
@@ -149,11 +189,14 @@ export function parseChatRoomReadPayloadV1(payload, options) {
     fail('lastSequenceNo does not match the authoritative stream');
   }
 
+  const paginationState = parsePagination(payload, lastSequenceNo, messages.length);
+
   return Object.freeze({
     threadId,
     characterId,
     afterSequenceNo,
     lastSequenceNo,
     messages: Object.freeze(messages),
+    pagination: paginationState,
   });
 }

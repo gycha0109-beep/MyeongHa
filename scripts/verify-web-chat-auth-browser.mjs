@@ -116,6 +116,11 @@ function ownerThreadState() {
         createdAt: '2026-09-11T01:01:00.000Z',
       },
     ],
+    pagination: {
+      pageSize: 50,
+      hasMore: false,
+      nextAfterSequenceNo: null,
+    },
   };
 }
 

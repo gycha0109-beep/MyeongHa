@@ -117,6 +117,7 @@ bash test/db/public_share_query.sh
 bash test/db/saju_domain_runtime_query.sh
 bash test/db/subject_profile_current_query.sh
 bash test/db/chat_thread_stream_query.sh
+bash test/db/bounded_collection_read_runtime_authority.sh
 bash test/db/subject_merge_job_query.sh
 bash test/db/direct_merged_guest_lineage_query.sh
 bash test/db/life_fact_supersede_concurrency.sh

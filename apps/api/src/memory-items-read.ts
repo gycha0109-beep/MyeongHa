@@ -1,7 +1,7 @@
 import { ApiCommandError } from './api-error.js';
 
 export const MEMORY_ITEMS_READ_AUTHORITY_BINDING_V1 =
-  'public.qry_memory_items_v1' as const;
+  'public.qry_memory_items_v2' as const;
 
 export interface MemoryItemCurrentAuthorityRowV1 {
   readonly memoryItemId: string;
@@ -34,7 +34,7 @@ type Awaitable<T> = T | Promise<T>;
  * The read deliberately preserves stored type/schema/content without defining
  * a positive Memory registry while SRC-25 remains unresolved. Character grants
  * and internal creation provenance are separate authorities and are not folded
- * into this list. A production adapter may bind this to `qry_memory_items_v1`;
+ * into this list. A production adapter may bind this to `qry_memory_items_v2`;
  * PostgreSQL execution identity remains outside this contract while
  * P0-AUTH-01 is unresolved.
  */

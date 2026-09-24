@@ -143,9 +143,9 @@ Node may drop the extra row after deriving `hasMore`; Node must not implement th
 
 ## Compatibility
 
-Pagination is a resource-bound contract change. Affected route API contract metadata must advance rather than pretending the old unbounded response contract is unchanged.
+Pagination metadata is additive to the existing route DTOs. Existing route `apiContractVersion` values remain unchanged because no existing required field is removed or retyped; clients that understand the new pagination fields may follow server-issued pages while older consumers can continue reading the first bounded page.
 
-Browser clients may continue presenting the same user-visible history by following server-issued pages, but every individual server request remains bounded.
+Browser clients that present the full existing history must follow server-issued pages, and every individual server request remains bounded.
 
 A browser paginator must fail closed if a server cursor does not advance. It must not invent a cursor from local sort order.
 

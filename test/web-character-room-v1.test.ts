@@ -116,7 +116,10 @@ describe('MyeongHa immersive long-form Character Room', () => {
     expect(transport).toContain("new URL(`/api/chat/${encodeURIComponent(threadId)}`, window.location.origin)");
     expect(transport).toContain("credentials: 'same-origin'");
     expect(transport).toContain("cache: 'no-store'");
-    expect(transport).toContain("url.searchParams.set('afterSequenceNo', '0')");
+    expect(transport).toContain("url.searchParams.set('afterSequenceNo', String(afterSequenceNo))");
+    expect(transport).toContain('if (!page.pagination.hasMore) break;');
+    expect(transport).toContain('page.pagination.nextAfterSequenceNo');
+    expect(transport).toContain('non-advancing page cursor');
     expect(transport).not.toContain("url.searchParams.set('presentationKey'");
     expect(transport).not.toContain('payload.presentationKey');
     expect(transport).toContain("import('./api-envelope.js')");

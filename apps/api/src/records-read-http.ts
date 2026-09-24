@@ -1,4 +1,15 @@
 import { ApiCommandError } from './api-error.js';
+import {
+  CollectionReadPaginationInputErrorV1,
+  decodeOpaqueCollectionCursorV1,
+  encodeOpaqueCollectionCursorV1,
+  parseCollectionPageSizeV1,
+  readOptionalSingleQueryValueV1,
+  requireAllowedQueryKeysV1,
+  requireCursorTimestampV1,
+  requireCursorUuidV1,
+  requireExactCursorPositionKeysV1,
+} from './collection-read-pagination.js';
 import type { IdentityEvidenceVerificationPortV1 } from './current-subject-profile-http.js';
 import {
   getLifeRecordLedger,
@@ -28,12 +39,12 @@ export const RECORDS_READ_HTTP_BINDINGS_V1 = Object.freeze({
   lifeRecord: Object.freeze({
     method: GET_METHOD,
     route: LIFE_RECORD_ROUTE,
-    readAuthority: 'public.qry_life_record_ledger_v1',
+    readAuthority: 'public.qry_life_record_ledger_v2',
   }),
   memories: Object.freeze({
     method: GET_METHOD,
     route: MEMORIES_ROUTE,
-    readAuthority: 'public.qry_memory_items_v1',
+    readAuthority: 'public.qry_memory_items_v2',
   }),
   apiContractVersion: API_CONTRACT_VERSION,
 } as const);
@@ -71,6 +82,22 @@ type MemoryItemQueryRowV1 = Readonly<{
   createdAt: unknown;
 }>;
 
+type ParsedRecordsPageRequestV1 = Readonly<{
+  pageSize: number;
+  cursor: string | null;
+}>;
+
+type LifeRecordCursorPositionV1 = Readonly<{
+  confirmedAt: string;
+  createdAt: string;
+  id: string;
+}>;
+
+type MemoryCursorPositionV1 = Readonly<{
+  createdAt: string;
+  id: string;
+}>;
+
 const READ_LIFE_RECORD_LEDGER_SQL = `
 select
   life_fact_id::text as "lifeFactId",
@@ -86,7 +113,7 @@ select
   confirmed_at as "confirmedAt",
   revoked_at as "revokedAt",
   created_at as "createdAt"
-from public.qry_life_record_ledger_v1($1::uuid)
+from public.qry_life_record_ledger_v2($1::uuid, $2::timestamptz, $3::timestamptz, $4::uuid, $5::integer)
 `.trim();
 
 const READ_MEMORY_ITEMS_SQL = `
@@ -97,7 +124,7 @@ select
   content_jsonb as "contentJsonb",
   created_by_character_id as "createdByCharacterId",
   created_at as "createdAt"
-from public.qry_memory_items_v1($1::uuid)
+from public.qry_memory_items_v2($1::uuid, $2::timestamptz, $3::uuid, $4::integer)
 `.trim();
 
 function requireNonEmptyString(name: string, value: unknown): string {
@@ -189,7 +216,14 @@ function mapMemoryItemRow(row: MemoryItemQueryRowV1): MemoryItemCurrentAuthority
 }
 
 class TransactionLifeRecordLedgerReadPortV1 implements LifeRecordLedgerReadAuthorityPortV1 {
-  constructor(private readonly client: PostgresTransactionQueryV1) {}
+  hasMore = false;
+  lastItem: LifeRecordLedgerAuthorityRowV1 | null = null;
+
+  constructor(
+    private readonly client: PostgresTransactionQueryV1,
+    private readonly cursor: LifeRecordCursorPositionV1 | null,
+    private readonly pageSize: number,
+  ) {}
 
   async readLedger(input: {
     readonly subjectId: string;
@@ -197,16 +231,28 @@ class TransactionLifeRecordLedgerReadPortV1 implements LifeRecordLedgerReadAutho
     try {
       const result = await this.client.query<LifeRecordQueryRowV1>(READ_LIFE_RECORD_LEDGER_SQL, [
         input.subjectId,
+        this.cursor?.confirmedAt ?? null,
+        this.cursor?.createdAt ?? null,
+        this.cursor?.id ?? null,
+        this.pageSize,
       ]);
-      return Object.freeze(result.rows.map(mapLifeRecordRow));
+      const mapped = result.rows.map(mapLifeRecordRow);
+      this.hasMore = mapped.length > this.pageSize;
+      const page = this.hasMore ? mapped.slice(0, this.pageSize) : mapped;
+      this.lastItem = page.at(-1) ?? null;
+      return Object.freeze(page);
     } catch (error) {
-      if (isPostgresConstraint(error, 'qry_life_record_ledger_subject_ineligible')) {
+      if (isPostgresConstraint(error, 'qry_life_record_ledger_v2_subject_ineligible')) {
         throw new LifeRecordLedgerReadAuthorityPortErrorV1(
           'SUBJECT_INELIGIBLE',
           'Life Record is unavailable for the current subject.',
         );
       }
-      if (isPostgresConstraint(error, 'qry_life_record_ledger_subject_required')) {
+      if (
+        isPostgresConstraint(error, 'qry_life_record_ledger_v2_subject_required')
+        || isPostgresConstraint(error, 'qry_life_record_ledger_v2_cursor_valid')
+        || isPostgresConstraint(error, 'qry_life_record_ledger_v2_page_size_valid')
+      ) {
         throw new LifeRecordLedgerReadAuthorityPortErrorV1(
           'INVALID_INPUT',
           'Life Record read input is invalid.',
@@ -218,7 +264,14 @@ class TransactionLifeRecordLedgerReadPortV1 implements LifeRecordLedgerReadAutho
 }
 
 class TransactionMemoryItemsReadPortV1 implements MemoryItemsReadAuthorityPortV1 {
-  constructor(private readonly client: PostgresTransactionQueryV1) {}
+  hasMore = false;
+  lastItem: MemoryItemCurrentAuthorityRowV1 | null = null;
+
+  constructor(
+    private readonly client: PostgresTransactionQueryV1,
+    private readonly cursor: MemoryCursorPositionV1 | null,
+    private readonly pageSize: number,
+  ) {}
 
   async readCurrentItems(input: {
     readonly subjectId: string;
@@ -226,16 +279,27 @@ class TransactionMemoryItemsReadPortV1 implements MemoryItemsReadAuthorityPortV1
     try {
       const result = await this.client.query<MemoryItemQueryRowV1>(READ_MEMORY_ITEMS_SQL, [
         input.subjectId,
+        this.cursor?.createdAt ?? null,
+        this.cursor?.id ?? null,
+        this.pageSize,
       ]);
-      return Object.freeze(result.rows.map(mapMemoryItemRow));
+      const mapped = result.rows.map(mapMemoryItemRow);
+      this.hasMore = mapped.length > this.pageSize;
+      const page = this.hasMore ? mapped.slice(0, this.pageSize) : mapped;
+      this.lastItem = page.at(-1) ?? null;
+      return Object.freeze(page);
     } catch (error) {
-      if (isPostgresConstraint(error, 'qry_memory_items_subject_ineligible')) {
+      if (isPostgresConstraint(error, 'qry_memory_items_v2_subject_ineligible')) {
         throw new MemoryItemsReadAuthorityPortErrorV1(
           'SUBJECT_INELIGIBLE',
           'Memories are unavailable for the current subject.',
         );
       }
-      if (isPostgresConstraint(error, 'qry_memory_items_subject_required')) {
+      if (
+        isPostgresConstraint(error, 'qry_memory_items_v2_subject_required')
+        || isPostgresConstraint(error, 'qry_memory_items_v2_cursor_valid')
+        || isPostgresConstraint(error, 'qry_memory_items_v2_page_size_valid')
+      ) {
         throw new MemoryItemsReadAuthorityPortErrorV1(
           'INVALID_INPUT',
           'Memory read input is invalid.',
@@ -246,9 +310,83 @@ class TransactionMemoryItemsReadPortV1 implements MemoryItemsReadAuthorityPortV1
   }
 }
 
-function routeMatches(request: Request, route: string): boolean {
+function routePathMatches(request: Request, route: string): boolean {
+  return new URL(request.url).pathname === route;
+}
+
+function parseRecordsPageRequest(request: Request): ParsedRecordsPageRequestV1 {
   const url = new URL(request.url);
-  return url.pathname === route && url.search === '';
+  requireAllowedQueryKeysV1(url.searchParams, ['cursor', 'pageSize']);
+  return Object.freeze({
+    pageSize: parseCollectionPageSizeV1(url.searchParams),
+    cursor: readOptionalSingleQueryValueV1(url.searchParams, 'cursor'),
+  });
+}
+
+function decodeLifeRecordCursor(
+  cursor: string | null,
+  subjectId: string,
+): LifeRecordCursorPositionV1 | null {
+  if (cursor === null) return null;
+  const position = decodeOpaqueCollectionCursorV1({
+    cursor,
+    collection: 'life-record',
+    subjectId,
+  });
+  requireExactCursorPositionKeysV1(position, ['confirmedAt', 'createdAt', 'id']);
+  return Object.freeze({
+    confirmedAt: requireCursorTimestampV1('confirmedAt', position.confirmedAt),
+    createdAt: requireCursorTimestampV1('createdAt', position.createdAt),
+    id: requireCursorUuidV1('id', position.id),
+  });
+}
+
+function decodeMemoryCursor(
+  cursor: string | null,
+  subjectId: string,
+): MemoryCursorPositionV1 | null {
+  if (cursor === null) return null;
+  const position = decodeOpaqueCollectionCursorV1({
+    cursor,
+    collection: 'memories',
+    subjectId,
+  });
+  requireExactCursorPositionKeysV1(position, ['createdAt', 'id']);
+  return Object.freeze({
+    createdAt: requireCursorTimestampV1('createdAt', position.createdAt),
+    id: requireCursorUuidV1('id', position.id),
+  });
+}
+
+function nextLifeRecordCursor(
+  subjectId: string,
+  port: TransactionLifeRecordLedgerReadPortV1,
+): string | null {
+  if (!port.hasMore || port.lastItem === null) return null;
+  return encodeOpaqueCollectionCursorV1({
+    collection: 'life-record',
+    subjectId,
+    position: Object.freeze({
+      confirmedAt: port.lastItem.confirmedAt,
+      createdAt: port.lastItem.createdAt,
+      id: port.lastItem.lifeFactId,
+    }),
+  });
+}
+
+function nextMemoryCursor(
+  subjectId: string,
+  port: TransactionMemoryItemsReadPortV1,
+): string | null {
+  if (!port.hasMore || port.lastItem === null) return null;
+  return encodeOpaqueCollectionCursorV1({
+    collection: 'memories',
+    subjectId,
+    position: Object.freeze({
+      createdAt: port.lastItem.createdAt,
+      id: port.lastItem.memoryItemId,
+    }),
+  });
 }
 
 function jsonError(input: {
@@ -348,11 +486,25 @@ function mapCommandError(error: ApiCommandError, requestId: string, notFoundMess
 export async function handleLifeRecordReadRequestV1(
   input: HandleOwnerRecordReadRequestInputV1,
 ): Promise<Response> {
-  if (!routeMatches(input.request, LIFE_RECORD_ROUTE)) return notFound();
+  if (!routePathMatches(input.request, LIFE_RECORD_ROUTE)) return notFound();
   if (input.request.method !== GET_METHOD) return methodNotAllowed();
 
   const requestId = requireNonEmptyString('request id', input.requestId);
   const serverTime = requireServerTime(input.serverTime);
+  let pageRequest: ParsedRecordsPageRequestV1;
+  try {
+    pageRequest = parseRecordsPageRequest(input.request);
+  } catch (error) {
+    if (!(error instanceof CollectionReadPaginationInputErrorV1)) throw error;
+    return jsonError({
+      status: 400,
+      code: 'INVALID_REQUEST',
+      messageKey: 'request.invalid',
+      retryable: false,
+      requestId,
+    });
+  }
+
   const verifiedEvidence = await requireVerifiedIdentity(input);
   if (verifiedEvidence === null) {
     return jsonError({
@@ -368,14 +520,39 @@ export async function handleLifeRecordReadRequestV1(
     const data = await executePostgresSubjectTransactionV1({
       pool: input.pool,
       verifiedEvidence,
-      execute: ({ resolvedSubject, client }) =>
-        getLifeRecordLedger({
-          resolvedSubjectId: resolvedSubject.subjectId,
-          authorityPort: new TransactionLifeRecordLedgerReadPortV1(client),
-        }),
+      execute: async ({ resolvedSubject, client }) => {
+        const subjectId = resolvedSubject.subjectId;
+        const cursor = decodeLifeRecordCursor(pageRequest.cursor, subjectId);
+        const authorityPort = new TransactionLifeRecordLedgerReadPortV1(
+          client,
+          cursor,
+          pageRequest.pageSize,
+        );
+        const page = await getLifeRecordLedger({
+          resolvedSubjectId: subjectId,
+          authorityPort,
+        });
+        return Object.freeze({
+          ...page,
+          pagination: Object.freeze({
+            pageSize: pageRequest.pageSize,
+            hasMore: authorityPort.hasMore,
+            nextCursor: nextLifeRecordCursor(subjectId, authorityPort),
+          }),
+        });
+      },
     });
     return successResponse(data, requestId, serverTime);
   } catch (error) {
+    if (error instanceof CollectionReadPaginationInputErrorV1) {
+      return jsonError({
+        status: 400,
+        code: 'INVALID_REQUEST',
+        messageKey: 'request.invalid',
+        retryable: false,
+        requestId,
+      });
+    }
     if (!(error instanceof ApiCommandError)) throw error;
     return mapCommandError(error, requestId, 'life_record.not_found');
   }
@@ -384,11 +561,25 @@ export async function handleLifeRecordReadRequestV1(
 export async function handleMemoryItemsReadRequestV1(
   input: HandleOwnerRecordReadRequestInputV1,
 ): Promise<Response> {
-  if (!routeMatches(input.request, MEMORIES_ROUTE)) return notFound();
+  if (!routePathMatches(input.request, MEMORIES_ROUTE)) return notFound();
   if (input.request.method !== GET_METHOD) return methodNotAllowed();
 
   const requestId = requireNonEmptyString('request id', input.requestId);
   const serverTime = requireServerTime(input.serverTime);
+  let pageRequest: ParsedRecordsPageRequestV1;
+  try {
+    pageRequest = parseRecordsPageRequest(input.request);
+  } catch (error) {
+    if (!(error instanceof CollectionReadPaginationInputErrorV1)) throw error;
+    return jsonError({
+      status: 400,
+      code: 'INVALID_REQUEST',
+      messageKey: 'request.invalid',
+      retryable: false,
+      requestId,
+    });
+  }
+
   const verifiedEvidence = await requireVerifiedIdentity(input);
   if (verifiedEvidence === null) {
     return jsonError({
@@ -404,14 +595,39 @@ export async function handleMemoryItemsReadRequestV1(
     const data = await executePostgresSubjectTransactionV1({
       pool: input.pool,
       verifiedEvidence,
-      execute: ({ resolvedSubject, client }) =>
-        getMemoryItems({
-          resolvedSubjectId: resolvedSubject.subjectId,
-          authorityPort: new TransactionMemoryItemsReadPortV1(client),
-        }),
+      execute: async ({ resolvedSubject, client }) => {
+        const subjectId = resolvedSubject.subjectId;
+        const cursor = decodeMemoryCursor(pageRequest.cursor, subjectId);
+        const authorityPort = new TransactionMemoryItemsReadPortV1(
+          client,
+          cursor,
+          pageRequest.pageSize,
+        );
+        const page = await getMemoryItems({
+          resolvedSubjectId: subjectId,
+          authorityPort,
+        });
+        return Object.freeze({
+          ...page,
+          pagination: Object.freeze({
+            pageSize: pageRequest.pageSize,
+            hasMore: authorityPort.hasMore,
+            nextCursor: nextMemoryCursor(subjectId, authorityPort),
+          }),
+        });
+      },
     });
     return successResponse(data, requestId, serverTime);
   } catch (error) {
+    if (error instanceof CollectionReadPaginationInputErrorV1) {
+      return jsonError({
+        status: 400,
+        code: 'INVALID_REQUEST',
+        messageKey: 'request.invalid',
+        retryable: false,
+        requestId,
+      });
+    }
     if (!(error instanceof ApiCommandError)) throw error;
     return mapCommandError(error, requestId, 'memories.not_found');
   }

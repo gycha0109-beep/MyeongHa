@@ -1,4 +1,15 @@
 import { ApiCommandError } from './api-error.js';
+import {
+  CollectionReadPaginationInputErrorV1,
+  decodeOpaqueCollectionCursorV1,
+  encodeOpaqueCollectionCursorV1,
+  parseCollectionPageSizeV1,
+  readOptionalSingleQueryValueV1,
+  requireAllowedQueryKeysV1,
+  requireCursorTimestampV1,
+  requireCursorUuidV1,
+  requireExactCursorPositionKeysV1,
+} from './collection-read-pagination.js';
 import type { IdentityEvidenceVerificationPortV1 } from './current-subject-profile-http.js';
 import {
   getReadingHistory,
@@ -20,7 +31,7 @@ const READINGS_ROUTE = '/api/readings' as const;
 export const READING_HISTORY_HTTP_BINDING_V1 = Object.freeze({
   method: GET_METHOD,
   route: READINGS_ROUTE,
-  readAuthority: 'public.qry_reading_history_v2',
+  readAuthority: 'public.qry_reading_history_v3',
   apiContractVersion: API_CONTRACT_VERSION,
 } as const);
 
@@ -43,6 +54,17 @@ type ReadingHistoryQueryRowV1 = Readonly<{
   completedAt: unknown;
 }>;
 
+type ParsedReadingHistoryPageRequestV1 = Readonly<{
+  pageSize: number;
+  cursor: string | null;
+}>;
+
+type ReadingHistoryCursorPositionV1 = Readonly<{
+  completedAt: string;
+  createdAt: string;
+  id: string;
+}>;
+
 const READ_READING_HISTORY_SQL = `
 select
   reading_id::text as "readingId",
@@ -53,7 +75,7 @@ select
   reader_character_ids as "readerCharacterIds",
   created_at as "createdAt",
   completed_at as "completedAt"
-from public.qry_reading_history_v2($1::uuid)
+from public.qry_reading_history_v3($1::uuid, $2::timestamptz, $3::timestamptz, $4::uuid, $5::integer)
 `.trim();
 
 function requireNonEmptyString(name: string, value: unknown): string {
@@ -118,7 +140,14 @@ function mapReadingHistoryRow(row: ReadingHistoryQueryRowV1): ReadingHistoryAuth
 }
 
 class TransactionReadingHistoryReadPortV1 implements ReadingHistoryReadAuthorityPortV1 {
-  constructor(private readonly client: PostgresTransactionQueryV1) {}
+  hasMore = false;
+  lastItem: ReadingHistoryAuthorityRowV1 | null = null;
+
+  constructor(
+    private readonly client: PostgresTransactionQueryV1,
+    private readonly cursor: ReadingHistoryCursorPositionV1 | null,
+    private readonly pageSize: number,
+  ) {}
 
   async readHistory(input: {
     readonly subjectId: string;
@@ -126,10 +155,22 @@ class TransactionReadingHistoryReadPortV1 implements ReadingHistoryReadAuthority
     try {
       const result = await this.client.query<ReadingHistoryQueryRowV1>(READ_READING_HISTORY_SQL, [
         input.subjectId,
+        this.cursor?.completedAt ?? null,
+        this.cursor?.createdAt ?? null,
+        this.cursor?.id ?? null,
+        this.pageSize,
       ]);
-      return Object.freeze(result.rows.map(mapReadingHistoryRow));
+      const mapped = result.rows.map(mapReadingHistoryRow);
+      this.hasMore = mapped.length > this.pageSize;
+      const page = this.hasMore ? mapped.slice(0, this.pageSize) : mapped;
+      this.lastItem = page.at(-1) ?? null;
+      return Object.freeze(page);
     } catch (error) {
-      if (isPostgresConstraint(error, 'qry_reading_history_subject_required')) {
+      if (
+        isPostgresConstraint(error, 'qry_reading_history_v3_subject_required')
+        || isPostgresConstraint(error, 'qry_reading_history_v3_cursor_valid')
+        || isPostgresConstraint(error, 'qry_reading_history_v3_page_size_valid')
+      ) {
         throw new ReadingHistoryReadAuthorityPortErrorV1(
           'INVALID_INPUT',
           'Reading History read input is invalid.',
@@ -140,9 +181,51 @@ class TransactionReadingHistoryReadPortV1 implements ReadingHistoryReadAuthority
   }
 }
 
-function routeMatches(request: Request): boolean {
+function routePathMatches(request: Request): boolean {
+  return new URL(request.url).pathname === READINGS_ROUTE;
+}
+
+function parseReadingHistoryPageRequest(request: Request): ParsedReadingHistoryPageRequestV1 {
   const url = new URL(request.url);
-  return url.pathname === READINGS_ROUTE && url.search === '';
+  requireAllowedQueryKeysV1(url.searchParams, ['cursor', 'pageSize']);
+  return Object.freeze({
+    pageSize: parseCollectionPageSizeV1(url.searchParams),
+    cursor: readOptionalSingleQueryValueV1(url.searchParams, 'cursor'),
+  });
+}
+
+function decodeReadingHistoryCursor(
+  cursor: string | null,
+  subjectId: string,
+): ReadingHistoryCursorPositionV1 | null {
+  if (cursor === null) return null;
+  const position = decodeOpaqueCollectionCursorV1({
+    cursor,
+    collection: 'readings',
+    subjectId,
+  });
+  requireExactCursorPositionKeysV1(position, ['completedAt', 'createdAt', 'id']);
+  return Object.freeze({
+    completedAt: requireCursorTimestampV1('completedAt', position.completedAt),
+    createdAt: requireCursorTimestampV1('createdAt', position.createdAt),
+    id: requireCursorUuidV1('id', position.id),
+  });
+}
+
+function nextReadingHistoryCursor(
+  subjectId: string,
+  port: TransactionReadingHistoryReadPortV1,
+): string | null {
+  if (!port.hasMore || port.lastItem === null) return null;
+  return encodeOpaqueCollectionCursorV1({
+    collection: 'readings',
+    subjectId,
+    position: Object.freeze({
+      completedAt: port.lastItem.completedAt,
+      createdAt: port.lastItem.createdAt,
+      id: port.lastItem.readingId,
+    }),
+  });
 }
 
 function jsonError(input: {
@@ -235,11 +318,25 @@ function mapCommandError(error: ApiCommandError, requestId: string): Response {
 export async function handleReadingHistoryRequestV1(
   input: HandleReadingHistoryRequestInputV1,
 ): Promise<Response> {
-  if (!routeMatches(input.request)) return notFound();
+  if (!routePathMatches(input.request)) return notFound();
   if (input.request.method !== GET_METHOD) return methodNotAllowed();
 
   const requestId = requireNonEmptyString('request id', input.requestId);
   const serverTime = requireServerTime(input.serverTime);
+  let pageRequest: ParsedReadingHistoryPageRequestV1;
+  try {
+    pageRequest = parseReadingHistoryPageRequest(input.request);
+  } catch (error) {
+    if (!(error instanceof CollectionReadPaginationInputErrorV1)) throw error;
+    return jsonError({
+      status: 400,
+      code: 'INVALID_REQUEST',
+      messageKey: 'request.invalid',
+      retryable: false,
+      requestId,
+    });
+  }
+
   const verifiedEvidence = await input.identityEvidenceVerifier.verifyRequestIdentity(input.request);
   if (verifiedEvidence === null) {
     return jsonError({
@@ -255,14 +352,39 @@ export async function handleReadingHistoryRequestV1(
     const data = await executePostgresSubjectTransactionV1({
       pool: input.pool,
       verifiedEvidence,
-      execute: ({ resolvedSubject, client }) =>
-        getReadingHistory({
-          resolvedSubjectId: resolvedSubject.subjectId,
-          authorityPort: new TransactionReadingHistoryReadPortV1(client),
-        }),
+      execute: async ({ resolvedSubject, client }) => {
+        const subjectId = resolvedSubject.subjectId;
+        const cursor = decodeReadingHistoryCursor(pageRequest.cursor, subjectId);
+        const authorityPort = new TransactionReadingHistoryReadPortV1(
+          client,
+          cursor,
+          pageRequest.pageSize,
+        );
+        const page = await getReadingHistory({
+          resolvedSubjectId: subjectId,
+          authorityPort,
+        });
+        return Object.freeze({
+          ...page,
+          pagination: Object.freeze({
+            pageSize: pageRequest.pageSize,
+            hasMore: authorityPort.hasMore,
+            nextCursor: nextReadingHistoryCursor(subjectId, authorityPort),
+          }),
+        });
+      },
     });
     return successResponse(data, requestId, serverTime);
   } catch (error) {
+    if (error instanceof CollectionReadPaginationInputErrorV1) {
+      return jsonError({
+        status: 400,
+        code: 'INVALID_REQUEST',
+        messageKey: 'request.invalid',
+        retryable: false,
+        requestId,
+      });
+    }
     if (!(error instanceof ApiCommandError)) throw error;
     return mapCommandError(error, requestId);
   }

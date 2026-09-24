@@ -37,9 +37,10 @@ function memberForAuth(value) {
 
 function recordsPayload(member, path) {
   if (path === '/api/me') return { subjectKind: 'member', subjectStatus: 'active', profile: { displayName: member.name, locale: 'ko-KR', timezone: 'Asia/Seoul', onboardingState: 'completed', updatedAt: '2026-09-10T00:00:00.000Z' } };
-  if (path === '/api/life-record') return { facts: [{ factType: member.fact, schemaVersion: 'test.v1', valueJsonb: { owner: member.email }, confirmedAt: '2026-09-10T00:00:00.000Z', revokedAt: null }] };
-  if (path === '/api/readings') return { readings: [] };
-  return { memories: [] };
+  const pagination = { pageSize: 50, hasMore: false, nextCursor: null };
+  if (path === '/api/life-record') return { facts: [{ factType: member.fact, schemaVersion: 'test.v1', valueJsonb: { owner: member.email }, confirmedAt: '2026-09-10T00:00:00.000Z', revokedAt: null }], pagination };
+  if (path === '/api/readings') return { readings: [], pagination };
+  return { memories: [], pagination };
 }
 
 function json(res, status, body) {

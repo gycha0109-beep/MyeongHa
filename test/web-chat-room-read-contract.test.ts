@@ -44,6 +44,11 @@ function payload() {
       },
     ],
     relationship: { trust: 20 },
+    pagination: {
+      pageSize: 50,
+      hasMore: false,
+      nextAfterSequenceNo: null,
+    },
   };
 }
 
@@ -81,11 +86,38 @@ describe('browser Chat room read contract', () => {
           redactedAt: null,
         },
       ],
+      pagination: {
+        pageSize: 50,
+        hasMore: false,
+        nextAfterSequenceNo: null,
+      },
     });
     expect(result).not.toHaveProperty('contentReleaseId');
     expect(result).not.toHaveProperty('contentBundleId');
     expect(result).not.toHaveProperty('relationship');
     expect(result.messages[0]).not.toHaveProperty('messagePayloadJsonb');
+  });
+
+  it('requires bounded pagination metadata to match the authoritative stream', () => {
+    expect(() => parseChatRoomReadPayloadV1(
+      { ...payload(), pagination: { pageSize: 51, hasMore: false, nextAfterSequenceNo: null } },
+      { expectedThreadId: THREAD_ID },
+    )).toThrow('pagination bound is invalid');
+
+    expect(() => parseChatRoomReadPayloadV1(
+      { ...payload(), pagination: { pageSize: 50, hasMore: true, nextAfterSequenceNo: 1 } },
+      { expectedThreadId: THREAD_ID },
+    )).toThrow('pagination cursor does not match');
+
+    const nextPage = parseChatRoomReadPayloadV1(
+      { ...payload(), pagination: { pageSize: 50, hasMore: true, nextAfterSequenceNo: 2 } },
+      { expectedThreadId: THREAD_ID },
+    );
+    expect(nextPage.pagination).toEqual({
+      pageSize: 50,
+      hasMore: true,
+      nextAfterSequenceNo: 2,
+    });
   });
 
   it('keeps server Character identity independent from untrusted response presentation fields', () => {
