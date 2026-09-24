@@ -7,7 +7,7 @@ const OPAQUE_CURSOR_VERSION = 1 as const;
 const CURSOR_BINDING_PREFIX = 'myeongha-collection-cursor-v1:' as const;
 const MAX_CURSOR_BYTES = 2048;
 const BASE64URL = /^[A-Za-z0-9_-]+$/u;
-const UUID_V1 = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+const POSTGRES_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 
 export type OpaqueCollectionKeyV1 = 'life-record' | 'memories' | 'readings';
 
@@ -62,7 +62,7 @@ export function parseCollectionPageSizeV1(searchParams: URLSearchParams): number
 }
 
 function subjectBinding(subjectId: string): string {
-  if (typeof subjectId !== 'string' || !UUID_V1.test(subjectId)) {
+  if (typeof subjectId !== 'string' || !POSTGRES_UUID.test(subjectId)) {
     fail('Canonical subject binding is invalid.');
   }
   return createHash('sha256')
@@ -138,7 +138,7 @@ export function decodeOpaqueCollectionCursorV1(input: {
 }
 
 export function requireCursorUuidV1(name: string, value: unknown): string {
-  if (typeof value !== 'string' || !UUID_V1.test(value)) {
+  if (typeof value !== 'string' || !POSTGRES_UUID.test(value)) {
     fail(`Opaque collection cursor ${name} is invalid.`);
   }
   return value.toLowerCase();
