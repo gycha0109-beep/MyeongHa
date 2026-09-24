@@ -66,9 +66,9 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
     expect(js).toContain('const threadId = parseChatThreadIdV1(item?.threadId)');
     expect(js).toContain("const name = '대화 상대'");
     expect(js).toContain("continuationTitle.textContent = '서버 확인 중'");
-    expect(js).toContain('continuationLink.href = roomHref(null, threadId)');
+    expect(js).toContain('continuationLink.href = roomHref(threadId)');
     expect(js).toContain('delete continuationScene.dataset.character');
-    expect(js).toContain('link.href = roomHref(null, threadId)');
+    expect(js).toContain('link.href = roomHref(threadId)');
     expect(js).not.toContain('link.dataset.character = characterKey');
     expect(js).not.toContain('avatar.dataset.character = characterKey');
     expect(js).not.toContain('art.dataset.character = characterKey');
@@ -82,6 +82,8 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
     expect(js).toContain('openForCanonicalCharacter({');
     expect(js).toContain('characterId: person.key');
     expect(js).toContain('buildChatThreadUrlV1(result.threadId)');
+    expect(js).toContain("action.href = 'chat-hub.html#people'");
+    expect(js).not.toContain("action.href = roomHref(person.key)");
     expect(js).toContain("params.set('next', 'chat-hub.html')");
     expect(js).toContain("'CHAT_OPEN_MEMBER_REQUIRED'");
     expect(js).toContain("'CHAT_OPEN_SESSION_REQUIRED'");
@@ -96,12 +98,11 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
     expect(js).toContain('const PAGE_SIZE = 9');
     expect(js).toContain('data-people-search');
     expect(js).toContain('visibleCount + PAGE_SIZE');
-    expect(js).toContain('safePresentationKey');
-    expect(js).toContain("url.searchParams.set('character', safeKey)");
+    expect(js).not.toContain('safePresentationKey');
+    expect(js).not.toContain("url.searchParams.set('character'");
     expect(js).toContain("url.searchParams.set('threadId', safeThreadId)");
-    expect(js.indexOf("url.searchParams.set('threadId', safeThreadId)")).toBeLessThan(
-      js.indexOf("url.searchParams.set('character', safeKey)"),
-    );
+    expect(js).toContain("action.href = 'chat-hub.html#people'");
+    expect(js).toContain("if (!safeThreadId) return 'chat-hub.html#people'");
     expect(js).toContain('characterId: person.key');
     expect(js).not.toContain('subjectId: person');
     expect(js).not.toContain('releaseId: person');

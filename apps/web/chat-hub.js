@@ -149,29 +149,12 @@ async function openDiscoveryCharacter(person, action, actionLabel) {
   }
 }
 
-function safePresentationKey(value) {
-  if (typeof value !== 'string') return null;
-  const normalized = value.trim().toLowerCase();
-  return /^[a-z0-9_-]{1,64}$/.test(normalized) ? normalized : null;
-}
-
-function roomHref(characterKey, threadId) {
+function roomHref(threadId) {
   const url = new URL('chat.html', window.location.href);
   const safeThreadId = parseChatThreadIdV1(threadId);
-  if (safeThreadId) {
-    url.searchParams.set('threadId', safeThreadId);
-    return `${url.pathname.split('/').pop()}${url.search}`;
-  }
-
-  const safeKey = safePresentationKey(characterKey);
-  if (!safeKey) return 'chat.html';
-  url.searchParams.set('character', safeKey);
+  if (!safeThreadId) return 'chat-hub.html#people';
+  url.searchParams.set('threadId', safeThreadId);
   return `${url.pathname.split('/').pop()}${url.search}`;
-}
-
-function findPerson(characterKey) {
-  const safeKey = safePresentationKey(characterKey);
-  return safeKey ? people.find((person) => person.key === safeKey) ?? null : null;
 }
 
 function createPersonCard(person) {
@@ -229,7 +212,7 @@ function createPersonCard(person) {
 
   const action = document.createElement('a');
   action.className = 'chat-person-action';
-  action.href = roomHref(person.key);
+  action.href = 'chat-hub.html#people';
   action.dataset.chatOpenCharacter = person.key;
 
   const actionLabel = document.createElement('span');
@@ -311,7 +294,7 @@ function setContinuation(state) {
   if (continuationTitle) continuationTitle.textContent = '서버 확인 중';
   if (continuationContext) continuationContext.textContent = state.context.trim();
   if (continuationInitial) continuationInitial.textContent = name.slice(0, 2);
-  if (continuationLink) continuationLink.href = roomHref(null, threadId);
+  if (continuationLink) continuationLink.href = roomHref(threadId);
   if (continuationScene) delete continuationScene.dataset.character;
 
   const threadTitle = typeof state.threadTitle === 'string' ? state.threadTitle.trim() : '';
@@ -326,7 +309,7 @@ function createRecentItem(item) {
 
   const link = document.createElement('a');
   link.className = 'chat-recent-item';
-  link.href = roomHref(null, threadId);
+  link.href = roomHref(threadId);
 
   const avatar = document.createElement('span');
   avatar.className = 'chat-recent-avatar';
@@ -394,7 +377,7 @@ function createIncomingItem(item) {
 
   const link = document.createElement('a');
   link.className = 'chat-incoming-item';
-  link.href = roomHref(null, threadId);
+  link.href = roomHref(threadId);
 
   const art = document.createElement('span');
   art.className = 'chat-incoming-art';
