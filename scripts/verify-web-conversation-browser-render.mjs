@@ -225,10 +225,10 @@ async function verifyHub(page, origin, suffix, width, height, mobile) {
     const expectedPortraits = {
       seyeon: 'seyeon-portrait-v2.webp',
       baekheon: 'baekheon-portrait-v2.webp',
-      yeoul: 'yeoul-portrait-v2.webp',
+      yeoul: 'yeoul-portrait-uploaded.svg',
       seorin: 'seorin-portrait-v2.webp',
       rahyeon: 'rahyeon-portrait-v2.webp',
-      mira: 'mira-portrait-v2.webp',
+      mira: 'mira-portrait-uploaded.svg',
       taegyeom: 'taegyeom-portrait-v2.webp',
       yunho: 'yunho-portrait-v2.webp',
       doyun: 'doyoon-portrait-v2.webp',

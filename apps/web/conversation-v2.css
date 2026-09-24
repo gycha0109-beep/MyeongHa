@@ -1196,7 +1196,7 @@
   --conversation-room-mobile-position: center 24%;
 }
 .character-room-v2[data-character="yeoul"] {
-  --conversation-room-art: url("assets/characters/rooms/yeoul-room.webp");
+  --conversation-room-art: url("assets/characters/rooms/yeoul-room-uploaded.svg");
   --conversation-room-position: center 34%;
   --conversation-room-mobile-position: center 22%;
 }
@@ -1206,7 +1206,7 @@
   --conversation-room-mobile-position: center 22%;
 }
 .character-room-v2[data-character="mira"] {
-  --conversation-room-art: url("assets/characters/rooms/mira-room.webp");
+  --conversation-room-art: url("assets/characters/rooms/mira-room-uploaded.svg");
   --conversation-room-position: center 36%;
   --conversation-room-mobile-position: center 23%;
 }
