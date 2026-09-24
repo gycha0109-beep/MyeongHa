@@ -48,10 +48,12 @@ export interface ChatThreadStreamReadAuthorityPortV1 {
   }): Awaitable<readonly ChatThreadStreamAuthorityRowV1[]>;
 }
 
+export type ChatThreadStreamSenderTypeV1 = 'user' | 'character' | 'system';
+
 export interface ChatThreadStreamMessageV1 {
   readonly messageId: string;
   readonly sequenceNo: number;
-  readonly senderType: string;
+  readonly senderType: ChatThreadStreamSenderTypeV1;
   readonly characterId: string | null;
   readonly bodyText: string | null;
   readonly messagePayloadJsonb: unknown | null;
@@ -128,6 +130,26 @@ function requireNullableStoredString(name: string, value: unknown): string | nul
   return value;
 }
 
+function requireSenderType(value: unknown): ChatThreadStreamSenderTypeV1 {
+  const senderType = requireNonEmptyStoredString('sender type', value);
+  if (senderType !== 'user' && senderType !== 'character' && senderType !== 'system') {
+    throw new Error('Chat stream authority returned an unsupported sender type.');
+  }
+  return senderType;
+}
+
+function assertSenderCharacterShape(
+  senderType: ChatThreadStreamSenderTypeV1,
+  characterId: string | null,
+): void {
+  if (senderType === 'character' && characterId === null) {
+    throw new Error('Chat stream authority returned a Character message without character identity.');
+  }
+  if (senderType !== 'character' && characterId !== null) {
+    throw new Error('Chat stream authority returned non-Character message with character identity.');
+  }
+}
+
 function projectRows(
   afterSequenceNo: number,
   rows: readonly ChatThreadStreamAuthorityRowV1[],
@@ -137,8 +159,9 @@ function projectRows(
 
   const messages = rows.map((row) => {
     const messageId = requireNonEmptyStoredString('message identity', row.messageId);
-    const senderType = requireNonEmptyStoredString('sender type', row.senderType);
+    const senderType = requireSenderType(row.senderType);
     const characterId = requireNullableStoredString('character identity', row.characterId);
+    assertSenderCharacterShape(senderType, characterId);
     const bodyText = requireNullableStoredString('message body', row.bodyText);
     const messageSchemaVersion = requireNullableStoredString(
       'message schema version',

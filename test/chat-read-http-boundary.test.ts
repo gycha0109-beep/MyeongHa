@@ -45,6 +45,7 @@ class FakeConnection implements PostgresSubjectConnectionV1 {
   readonly calls: QueryCall[] = [];
   readonly releases: unknown[] = [];
   bindingError: unknown;
+  streamRows: readonly Record<string, unknown>[] | undefined;
 
   async query<Row = Record<string, unknown>>(
     text: string,
@@ -72,7 +73,7 @@ class FakeConnection implements PostgresSubjectConnectionV1 {
     }
     if (text.includes('qry_chat_thread_stream_v1')) {
       return {
-        rows: [{
+        rows: (this.streamRows ?? [{
           messageId: '96000000-0000-4000-8000-000000000001',
           sequenceNo: 4,
           senderType: 'character',
@@ -83,7 +84,7 @@ class FakeConnection implements PostgresSubjectConnectionV1 {
           createdAt: new Date('2026-09-05T15:00:00.000Z'),
           redacted: false,
           redactedAt: null,
-        }] as unknown as readonly Row[],
+        }]) as unknown as readonly Row[],
       };
     }
     if (text.includes('qry_character_relationship_v1')) {
@@ -236,6 +237,50 @@ describe('owner Chat read HTTP boundary', () => {
       expect(f.pool.connectCalls).toBe(0);
     },
   );
+
+  it('fails closed when PostgreSQL stream sender shape contradicts the stored message authority', async () => {
+    const invalidRows = [
+      {
+        senderType: 'assistant',
+        characterId: PRIMARY_CHARACTER_ID,
+        expected: 'sender type is unsupported',
+      },
+      {
+        senderType: 'character',
+        characterId: null,
+        expected: 'missing character identity',
+      },
+      {
+        senderType: 'user',
+        characterId: PRIMARY_CHARACTER_ID,
+        expected: 'non-Character message exposed character identity',
+      },
+      {
+        senderType: 'system',
+        characterId: PRIMARY_CHARACTER_ID,
+        expected: 'non-Character message exposed character identity',
+      },
+    ] as const;
+
+    for (const invalid of invalidRows) {
+      const f = fixture();
+      f.connection.streamRows = [{
+        messageId: '96000000-0000-4000-8000-000000000001',
+        sequenceNo: 4,
+        senderType: invalid.senderType,
+        characterId: invalid.characterId,
+        bodyText: 'source-backed message',
+        messagePayloadJsonb: {},
+        messageSchemaVersion: 'v1',
+        createdAt: new Date('2026-09-05T15:00:00.000Z'),
+        redacted: false,
+        redactedAt: null,
+      }];
+
+      await expect(handleChatReadRequestV1(f.input)).rejects.toThrow(invalid.expected);
+      expect(callTexts(f.connection).at(-1)).toBe('ROLLBACK');
+    }
+  });
 
   it('maps unavailable/cross-subject thread authority to NOT_FOUND and rolls back', async () => {
     const f = fixture();

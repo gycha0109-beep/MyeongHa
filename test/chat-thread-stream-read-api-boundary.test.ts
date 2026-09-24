@@ -368,6 +368,50 @@ describe('chat thread sequence stream API authority boundary', () => {
     })).rejects.toThrow('redactedAt for visible content');
   });
 
+  it('fails closed on unsupported sender types or sender/Character identity shape drift', async () => {
+    const port = new FakeChatThreadStreamReadAuthorityPortV1();
+
+    port.result = Object.freeze([
+      Object.freeze({ ...VISIBLE_MESSAGE, senderType: 'assistant' }),
+    ]);
+    await expect(getChatThreadStream({
+      resolvedSubjectId: SUBJECT_ID,
+      threadId: THREAD_ID,
+      afterSequenceNo: 0,
+      authorityPort: port,
+    })).rejects.toThrow('unsupported sender type');
+
+    port.result = Object.freeze([
+      Object.freeze({ ...VISIBLE_MESSAGE, characterId: null }),
+    ]);
+    await expect(getChatThreadStream({
+      resolvedSubjectId: SUBJECT_ID,
+      threadId: THREAD_ID,
+      afterSequenceNo: 0,
+      authorityPort: port,
+    })).rejects.toThrow('without character identity');
+
+    port.result = Object.freeze([
+      Object.freeze({ ...VISIBLE_MESSAGE, senderType: 'user', characterId: CHARACTER_ID }),
+    ]);
+    await expect(getChatThreadStream({
+      resolvedSubjectId: SUBJECT_ID,
+      threadId: THREAD_ID,
+      afterSequenceNo: 0,
+      authorityPort: port,
+    })).rejects.toThrow('non-Character message with character identity');
+
+    port.result = Object.freeze([
+      Object.freeze({ ...REDACTED_MESSAGE, senderType: 'system', characterId: CHARACTER_ID }),
+    ]);
+    await expect(getChatThreadStream({
+      resolvedSubjectId: SUBJECT_ID,
+      threadId: THREAD_ID,
+      afterSequenceNo: 0,
+      authorityPort: port,
+    })).rejects.toThrow('non-Character message with character identity');
+  });
+
   it('fails closed on out-of-cursor, non-increasing, or duplicate message identities', async () => {
     const port = new FakeChatThreadStreamReadAuthorityPortV1();
 
