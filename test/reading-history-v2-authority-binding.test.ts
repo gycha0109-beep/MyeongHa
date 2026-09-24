@@ -12,21 +12,23 @@ const authorityMigration = readFileSync(
     repositoryRoot,
     'supabase',
     'migrations',
-    '1301_records_official_reading_archive_runtime_authority.sql',
+    '1305_bounded_collection_read_runtime_authority.sql',
   ),
   'utf8',
 );
 
-describe('Reading History v2 runtime authority binding', () => {
-  it('keeps the v0.10 HTTP projection on the DB authority that owns Reader provenance', () => {
-    expect(runtimeSource).toContain("readAuthority: 'public.qry_reading_history_v2'");
+describe('Reading History v3 bounded runtime authority binding', () => {
+  it('keeps the v0.11 HTTP projection on the bounded DB authority that owns Reader provenance', () => {
+    expect(runtimeSource).toContain("readAuthority: 'public.qry_reading_history_v3'");
     expect(runtimeSource).toContain('reader_character_ids as "readerCharacterIds"');
-    expect(runtimeSource).toContain('from public.qry_reading_history_v2($1::uuid)');
-    expect(runtimeSource).not.toContain('from public.qry_reading_history_v1($1::uuid)');
+    expect(runtimeSource).toContain('from public.qry_reading_history_v3($1::uuid, $2::timestamptz, $3::timestamptz, $4::uuid, $5::integer)');
+    expect(runtimeSource).not.toContain('from public.qry_reading_history_v2($1::uuid)');
 
     expect(authorityMigration).toContain(
-      'create or replace function public.qry_reading_history_v2(p_subject_id uuid)',
+      'create or replace function public.qry_reading_history_v3(',
     );
     expect(authorityMigration).toContain('reader_character_ids text[]');
+    expect(authorityMigration).toContain('limit (p_page_size + 1)');
+    expect(authorityMigration).toContain('p_page_size is null or p_page_size < 1 or p_page_size > 50');
   });
 });
