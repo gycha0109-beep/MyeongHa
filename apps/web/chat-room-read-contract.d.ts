@@ -15,6 +15,11 @@ export interface ChatRoomReadPayloadV1 {
   readonly afterSequenceNo: number;
   readonly lastSequenceNo: number;
   readonly messages: readonly ChatRoomReadMessageV1[];
+  readonly pagination: Readonly<{
+    pageSize: number;
+    hasMore: boolean;
+    nextAfterSequenceNo: number | null;
+  }>;
 }
 
 export function parseChatThreadIdV1(value: unknown): string | null;
