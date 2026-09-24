@@ -6,18 +6,11 @@ import {
 
 describe('Password Compromise Guard v1', () => {
   it('sends only the five-character SHA-1 prefix to the HIBP range endpoint', async () => {
+    let observedUrl = '';
+    let observedInit: RequestInit | undefined;
     const fetchImpl = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
-      const url = String(input);
-      expect(url).toBe('https://api.pwnedpasswords.com/range/5BAA6');
-      expect(url).not.toContain('password');
-      expect(url).not.toContain('1E4C9B93F3F0682250B6CF8331B7EE68FD8');
-      expect(init?.method).toBe('GET');
-      expect(init?.headers).toMatchObject({
-        Accept: 'text/plain',
-        'Add-Padding': 'true',
-        'User-Agent': 'MyeongHa-Password-Compromise-Guard/1.0',
-      });
-      expect(init?.body).toBeUndefined();
+      observedUrl = String(input);
+      observedInit = init;
       return new Response(
         [
           '00000000000000000000000000000000000:0',
@@ -32,6 +25,16 @@ describe('Password Compromise Guard v1', () => {
 
     expect(result).toEqual({ status: 'compromised', occurrenceCount: 3861493 });
     expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(observedUrl).toBe('https://api.pwnedpasswords.com/range/5BAA6');
+    expect(observedUrl).not.toContain('password');
+    expect(observedUrl).not.toContain('1E4C9B93F3F0682250B6CF8331B7EE68FD8');
+    expect(observedInit?.method).toBe('GET');
+    expect(observedInit?.headers).toMatchObject({
+      Accept: 'text/plain',
+      'Add-Padding': 'true',
+      'User-Agent': 'MyeongHa-Password-Compromise-Guard/1.0',
+    });
+    expect(observedInit?.body ?? null).toBeNull();
     expect(PASSWORD_COMPROMISE_GUARD_V1.requestAuthority).toBe('SHA1_PREFIX_5_ONLY');
     expect(PASSWORD_COMPROMISE_GUARD_V1.plaintextPasswordExternalTransmission).toBe(false);
     expect(PASSWORD_COMPROMISE_GUARD_V1.fullSha1ExternalTransmission).toBe(false);
