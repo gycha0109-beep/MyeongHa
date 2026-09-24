@@ -30,6 +30,9 @@ export interface ChatOpenResultV1 {
 
 export interface ChatOpenClientV1 {
   readonly endpoint: string;
+  openForCanonicalCharacter(input: Readonly<{
+    characterId: string;
+  }>): Promise<Readonly<ChatOpenResultV1>>;
   openForServerCharacter(input: Readonly<{
     readerCharacterId: string;
   }>): Promise<Readonly<ChatOpenResultV1>>;
