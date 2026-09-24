@@ -121,6 +121,28 @@ function nullableString(name: string, value: unknown): string | null {
   return stringValue(name, value);
 }
 
+type ChatReadSenderTypeV1 = 'user' | 'character' | 'system';
+
+function senderTypeValue(value: unknown): ChatReadSenderTypeV1 {
+  const senderType = stringValue('sender type', value);
+  if (senderType !== 'user' && senderType !== 'character' && senderType !== 'system') {
+    throw new Error('Chat read sender type is unsupported.');
+  }
+  return senderType;
+}
+
+function assertSenderCharacterShape(
+  senderType: ChatReadSenderTypeV1,
+  characterId: string | null,
+): void {
+  if (senderType === 'character' && characterId === null) {
+    throw new Error('Chat read Character message is missing character identity.');
+  }
+  if (senderType !== 'character' && characterId !== null) {
+    throw new Error('Chat read non-Character message exposed character identity.');
+  }
+}
+
 function integerValue(name: string, value: unknown): number {
   const parsed = typeof value === 'number'
     ? value
@@ -240,11 +262,15 @@ function mapStreamRow(row: StreamRow) {
   if (typeof row.redacted !== 'boolean') {
     throw new Error('Chat read redaction flag is invalid.');
   }
+  const senderType = senderTypeValue(row.senderType);
+  const characterId = nullableString('message character identity', row.characterId);
+  assertSenderCharacterShape(senderType, characterId);
+
   return Object.freeze({
     messageId: stringValue('message identity', row.messageId),
     sequenceNo: integerValue('message sequence', row.sequenceNo),
-    senderType: stringValue('sender type', row.senderType),
-    characterId: nullableString('message character identity', row.characterId),
+    senderType,
+    characterId,
     bodyText: nullableString('message body', row.bodyText),
     messagePayloadJsonb: row.messagePayloadJsonb === undefined ? null : row.messagePayloadJsonb,
     messageSchemaVersion: nullableString('message schema version', row.messageSchemaVersion),
