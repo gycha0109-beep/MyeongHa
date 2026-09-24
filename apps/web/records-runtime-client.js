@@ -141,6 +141,99 @@ function projectReadingHistory(payload) {
 }
 
 
+function requirePageItems(payload, field, endpoint) {
+  if (!Array.isArray(payload?.[field])) {
+    throw new RecordsRuntimeError(
+      'WEB_RECORDS_MALFORMED_RESPONSE',
+      `Records API returned malformed ${field} for ${endpoint}.`,
+    );
+  }
+  return payload[field];
+}
+
+function parsePagination(payload, endpoint) {
+  const pagination = payload?.pagination;
+  if (pagination === null || typeof pagination !== 'object' || Array.isArray(pagination)) {
+    throw new RecordsRuntimeError(
+      'WEB_RECORDS_MALFORMED_RESPONSE',
+      `Records API returned malformed pagination for ${endpoint}.`,
+    );
+  }
+  if (
+    !Number.isSafeInteger(pagination.pageSize)
+    || pagination.pageSize < 1
+    || pagination.pageSize > 50
+    || typeof pagination.hasMore !== 'boolean'
+  ) {
+    throw new RecordsRuntimeError(
+      'WEB_RECORDS_MALFORMED_RESPONSE',
+      `Records API returned invalid pagination bounds for ${endpoint}.`,
+    );
+  }
+  if (pagination.hasMore) {
+    if (typeof pagination.nextCursor !== 'string' || pagination.nextCursor.length === 0) {
+      throw new RecordsRuntimeError(
+        'WEB_RECORDS_MALFORMED_RESPONSE',
+        `Records API omitted the next cursor for ${endpoint}.`,
+      );
+    }
+  } else if (pagination.nextCursor !== null) {
+    throw new RecordsRuntimeError(
+      'WEB_RECORDS_MALFORMED_RESPONSE',
+      `Records API returned a cursor for a terminal page at ${endpoint}.`,
+    );
+  }
+  return pagination;
+}
+
+function appendCursor(endpoint, cursor) {
+  const base = 'https://myeongha.invalid';
+  const url = new URL(endpoint, base);
+  url.searchParams.set('cursor', cursor);
+  return url.origin === base ? `${url.pathname}${url.search}` : url.toString();
+}
+
+async function readPagedCollection(fetchImpl, endpoint, bearer, field) {
+  const all = [];
+  const seenCursors = new Set();
+  let requestEndpoint = endpoint;
+
+  for (;;) {
+    const payload = await readJson(fetchImpl, requestEndpoint, bearer);
+    const items = requirePageItems(payload, field, requestEndpoint);
+    const pagination = parsePagination(payload, requestEndpoint);
+    if (items.length > pagination.pageSize) {
+      throw new RecordsRuntimeError(
+        'WEB_RECORDS_MALFORMED_RESPONSE',
+        `Records API exceeded its page bound for ${requestEndpoint}.`,
+      );
+    }
+    all.push(...items);
+
+    if (!pagination.hasMore) {
+      return Object.freeze({
+        ...payload,
+        [field]: Object.freeze(all),
+        pagination: Object.freeze({
+          pageSize: pagination.pageSize,
+          hasMore: false,
+          nextCursor: null,
+        }),
+      });
+    }
+
+    const nextCursor = pagination.nextCursor;
+    if (seenCursors.has(nextCursor)) {
+      throw new RecordsRuntimeError(
+        'WEB_RECORDS_MALFORMED_RESPONSE',
+        `Records API returned a non-advancing cursor for ${endpoint}.`,
+      );
+    }
+    seenCursors.add(nextCursor);
+    requestEndpoint = appendCursor(endpoint, nextCursor);
+  }
+}
+
 export function createRecordsRuntimeClient(options = {}) {
   const fetchImpl = requireFetch(options.fetchImpl ?? globalThis.fetch);
   const resolveBearer = options.resolveBearer ?? ensureActiveBearer;
@@ -162,17 +255,21 @@ export function createRecordsRuntimeClient(options = {}) {
 
   return Object.freeze({
     readProfile: () => readEndpoint(endpoints.profile),
-    readLifeFacts: () => readEndpoint(endpoints.lifeFacts),
+    readLifeFacts: () => readStable((bearer) =>
+      readPagedCollection(fetchImpl, endpoints.lifeFacts, bearer, 'facts')),
     readReadings: () => readStable(async (bearer) =>
-      projectReadingHistory(await readJson(fetchImpl, endpoints.readings, bearer))),
-    readMemories: () => readEndpoint(endpoints.memories),
+      projectReadingHistory(
+        await readPagedCollection(fetchImpl, endpoints.readings, bearer, 'readings'),
+      )),
+    readMemories: () => readStable((bearer) =>
+      readPagedCollection(fetchImpl, endpoints.memories, bearer, 'memories')),
     readRecords() {
       return readStable(async (bearer) => {
         const profile = await readJson(fetchImpl, endpoints.profile, bearer);
         const [lifeFacts, readingsPayload, memories] = await Promise.all([
-          readJson(fetchImpl, endpoints.lifeFacts, bearer),
-          readJson(fetchImpl, endpoints.readings, bearer),
-          readJson(fetchImpl, endpoints.memories, bearer),
+          readPagedCollection(fetchImpl, endpoints.lifeFacts, bearer, 'facts'),
+          readPagedCollection(fetchImpl, endpoints.readings, bearer, 'readings'),
+          readPagedCollection(fetchImpl, endpoints.memories, bearer, 'memories'),
         ]);
         const readings = projectReadingHistory(readingsPayload);
         return Object.freeze({ profile, lifeFacts, readings, memories });
