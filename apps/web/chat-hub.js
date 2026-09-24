@@ -1,8 +1,3 @@
-import {
-  ChatOpenClientErrorV1,
-  buildChatThreadUrlV1,
-  createChatOpenClientV1,
-} from './chat-open-client.js';
 import { parseChatThreadIdV1 } from './chat-room-read-contract.js';
 
 const people = Object.freeze([
@@ -104,59 +99,28 @@ const incomingSection = document.querySelector('[data-incoming-section]');
 const incomingList = document.querySelector('[data-incoming-list]');
 
 const PAGE_SIZE = 9;
-const chatOpenClient = createChatOpenClientV1();
-const openingCharacterKeys = new Set();
 let visibleCount = PAGE_SIZE;
 let searchTerm = '';
 
-function chatHubAuthUrl() {
-  const params = new URLSearchParams();
-  params.set('next', 'chat-hub.html');
-  return 'auth.html?' + params.toString();
+function safePresentationKey(value) {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim().toLowerCase();
+  return /^[a-z0-9_-]{1,64}$/.test(normalized) ? normalized : null;
 }
 
-async function openDiscoveryCharacter(person, action, actionLabel) {
-  if (!person || openingCharacterKeys.has(person.key)) return;
-
-  openingCharacterKeys.add(person.key);
-  action.setAttribute('aria-busy', 'true');
-  actionLabel.textContent = '대화 여는 중…';
-
-  try {
-    const result = await chatOpenClient.openForCanonicalCharacter({
-      characterId: person.key,
-    });
-    window.location.assign(buildChatThreadUrlV1(result.threadId));
-  } catch (error) {
-    if (
-      error instanceof ChatOpenClientErrorV1
-      && (
-        error.code === 'CHAT_OPEN_SESSION_REQUIRED'
-        || error.code === 'CHAT_OPEN_MEMBER_REQUIRED'
-      )
-    ) {
-      window.location.assign(chatHubAuthUrl());
-      return;
-    }
-
-    actionLabel.textContent = error instanceof ChatOpenClientErrorV1
-      && error.code === 'CHAT_OPEN_CHARACTER_UNAVAILABLE'
-      ? '현재 대화 불가'
-      : '다시 시도';
-  } finally {
-    openingCharacterKeys.delete(person.key);
-    action.removeAttribute('aria-busy');
-  }
-}
-
-function roomHref(threadId) {
+function roomHref(characterKey, threadId) {
   const url = new URL('chat.html', window.location.href);
   const safeThreadId = parseChatThreadIdV1(threadId);
-  if (!safeThreadId) return 'chat-hub.html#people';
-  url.searchParams.set('threadId', safeThreadId);
+  if (safeThreadId) {
+    url.searchParams.set('threadId', safeThreadId);
+    return `${url.pathname.split('/').pop()}${url.search}`;
+  }
+
+  const safeKey = safePresentationKey(characterKey);
+  if (!safeKey) return 'chat.html';
+  url.searchParams.set('character', safeKey);
   return `${url.pathname.split('/').pop()}${url.search}`;
 }
-
 function createPersonCard(person) {
   const article = document.createElement('article');
   article.className = 'chat-person-card';
@@ -212,8 +176,8 @@ function createPersonCard(person) {
 
   const action = document.createElement('a');
   action.className = 'chat-person-action';
-  action.href = 'chat-hub.html#people';
-  action.dataset.chatOpenCharacter = person.key;
+  action.href = roomHref(person.key);
+  action.dataset.chatPreviewCharacter = person.key;
 
   const actionLabel = document.createElement('span');
   actionLabel.textContent = '이야기하기';
@@ -221,10 +185,6 @@ function createPersonCard(person) {
   actionArrow.setAttribute('aria-hidden', 'true');
   actionArrow.textContent = '→';
   action.append(actionLabel, actionArrow);
-  action.addEventListener('click', (event) => {
-    event.preventDefault();
-    void openDiscoveryCharacter(person, action, actionLabel);
-  });
 
   copy.append(titleRow, line, tags, action);
   article.append(art, copy);
@@ -294,7 +254,7 @@ function setContinuation(state) {
   if (continuationTitle) continuationTitle.textContent = '서버 확인 중';
   if (continuationContext) continuationContext.textContent = state.context.trim();
   if (continuationInitial) continuationInitial.textContent = name.slice(0, 2);
-  if (continuationLink) continuationLink.href = roomHref(threadId);
+  if (continuationLink) continuationLink.href = roomHref(null, threadId);
   if (continuationScene) delete continuationScene.dataset.character;
 
   const threadTitle = typeof state.threadTitle === 'string' ? state.threadTitle.trim() : '';
@@ -309,7 +269,7 @@ function createRecentItem(item) {
 
   const link = document.createElement('a');
   link.className = 'chat-recent-item';
-  link.href = roomHref(threadId);
+  link.href = roomHref(null, threadId);
 
   const avatar = document.createElement('span');
   avatar.className = 'chat-recent-avatar';
@@ -377,7 +337,7 @@ function createIncomingItem(item) {
 
   const link = document.createElement('a');
   link.className = 'chat-incoming-item';
-  link.href = roomHref(threadId);
+  link.href = roomHref(null, threadId);
 
   const art = document.createElement('span');
   art.className = 'chat-incoming-art';
