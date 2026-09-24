@@ -237,7 +237,7 @@ async function authSnapshot(client) {
       activeBearer: sessionStorage.getItem('myeongha.guestBearer.v1'),
       pendingGuest: sessionStorage.getItem('myeongha.pendingGuestBearer.v1'),
       myStatus: document.querySelector('#my-status')?.textContent?.trim() ?? null,
-      myActions: document.querySelector('.my-logout-action')?.textContent?.trim() ?? null,
+      myActions: document.querySelector('.my-logout-action, .my-connect-action')?.textContent?.trim() ?? null,
     };
   })()`);
 }
@@ -372,7 +372,7 @@ try {
     tabA,
     `!localStorage.getItem('myeongha.memberSession.v1')
       && document.querySelector('#my-status')?.textContent?.includes('현재 세션이 필요합니다.')
-      && document.querySelector('.my-logout-action a')?.textContent?.includes('로그인하기')
+      && document.querySelector('.my-connect-action')?.textContent?.includes('로그인하기')
       && sessionStorage.getItem('myeongha.guestBearer.v1') === ${JSON.stringify(tabAGuestBearer)}
       && sessionStorage.getItem('myeongha.pendingGuestBearer.v1') === null`,
     'Canonical /api/me 401 did not invalidate Tab A and restore its Guest authority',
