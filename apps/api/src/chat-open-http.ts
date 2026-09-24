@@ -32,7 +32,7 @@ export const CHAT_OPEN_HTTP_BINDING_V1 = Object.freeze({
   commandAuthority: 'public.cmd_open_member_single_character_thread_v1',
   subjectAuthority: 'server-resolved-canonical-member:v1',
   releaseAuthority: 'active-default-release-inside-command:v1',
-  requestAuthority: 'launch-canonical-character-id-only:v1',
+  requestAuthority: 'canonical-character-id-only:v1',
   apiContractVersion: API_CONTRACT_VERSION,
 } as const);
 
