@@ -66,30 +66,29 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
     expect(js).toContain('const threadId = parseChatThreadIdV1(item?.threadId)');
     expect(js).toContain("const name = '대화 상대'");
     expect(js).toContain("continuationTitle.textContent = '서버 확인 중'");
-    expect(js).toContain('continuationLink.href = roomHref(threadId)');
+    expect(js).toContain('continuationLink.href = roomHref(null, threadId)');
     expect(js).toContain('delete continuationScene.dataset.character');
-    expect(js).toContain('link.href = roomHref(threadId)');
+    expect(js).toContain('link.href = roomHref(null, threadId)');
     expect(js).not.toContain('link.dataset.character = characterKey');
     expect(js).not.toContain('avatar.dataset.character = characterKey');
     expect(js).not.toContain('art.dataset.character = characterKey');
   });
 
-  it('opens discovery Characters through the Member thread authority without Reader continuation claims', async () => {
+  it('keeps discovery Character Room access presentation-only until authoritative Member thread open is publish-ready', async () => {
     const js = await readFile(hubJsPath, 'utf8');
 
-    expect(js).toContain("from './chat-open-client.js'");
-    expect(js).toContain('createChatOpenClientV1()');
-    expect(js).toContain('openForCanonicalCharacter({');
-    expect(js).toContain('characterId: person.key');
-    expect(js).toContain('buildChatThreadUrlV1(result.threadId)');
-    expect(js).toContain("action.href = 'chat-hub.html#people'");
-    expect(js).not.toContain("action.href = roomHref(person.key)");
-    expect(js).toContain("params.set('next', 'chat-hub.html')");
-    expect(js).toContain("'CHAT_OPEN_MEMBER_REQUIRED'");
-    expect(js).toContain("'CHAT_OPEN_SESSION_REQUIRED'");
-    expect(js).not.toContain('createReaderChatOpenControllerV1');
-    expect(js).not.toContain('officialReadingId');
-    expect(js).not.toContain('readingId');
+    expect(js).toContain('action.href = roomHref(person.key)');
+    expect(js).toContain('action.dataset.chatPreviewCharacter = person.key');
+    expect(js).toContain("url.searchParams.set('character', safeKey)");
+    expect(js).not.toContain("from './chat-open-client.js'");
+    expect(js).not.toContain('createChatOpenClientV1()');
+    expect(js).not.toContain('openForCanonicalCharacter({');
+    expect(js).not.toContain('openDiscoveryCharacter');
+    expect(js).not.toContain("event.preventDefault()");
+    expect(js).not.toContain('characterId: person.key');
+    expect(js).not.toContain('subjectId: person');
+    expect(js).not.toContain('releaseId: person');
+    expect(js).not.toContain('bundleId: person');
   });
 
   it('keeps discovery searchable and pageable without inventing canonical character authority', async () => {
@@ -98,12 +97,12 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
     expect(js).toContain('const PAGE_SIZE = 9');
     expect(js).toContain('data-people-search');
     expect(js).toContain('visibleCount + PAGE_SIZE');
-    expect(js).not.toContain('safePresentationKey');
-    expect(js).not.toContain("url.searchParams.set('character'");
+    expect(js).toContain('safePresentationKey');
+    expect(js).toContain("url.searchParams.set('character', safeKey)");
     expect(js).toContain("url.searchParams.set('threadId', safeThreadId)");
-    expect(js).toContain("action.href = 'chat-hub.html#people'");
-    expect(js).toContain("if (!safeThreadId) return 'chat-hub.html#people'");
-    expect(js).toContain('characterId: person.key');
+    expect(js).toContain('action.href = roomHref(person.key)');
+    expect(js).toContain("if (!safeKey) return 'chat.html'");
+    expect(js).not.toContain('characterId: person.key');
     expect(js).not.toContain('subjectId: person');
     expect(js).not.toContain('releaseId: person');
     expect(js).not.toContain('bundleId: person');
