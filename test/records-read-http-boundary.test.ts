@@ -83,11 +83,11 @@ class FakeConnection implements PostgresSubjectConnectionV1 {
         rows: [{ subjectId: SUBJECT_ID, subjectKind: 'member' }] as unknown as readonly Row[],
       };
     }
-    if (text.includes('qry_life_record_ledger_v1')) {
+    if (text.includes('qry_life_record_ledger_v2')) {
       if (this.lifeRecordError !== undefined) throw this.lifeRecordError;
       return { rows: this.lifeRecordRows as unknown as readonly Row[] };
     }
-    if (text.includes('qry_memory_items_v1')) {
+    if (text.includes('qry_memory_items_v2')) {
       if (this.memoriesError !== undefined) throw this.memoriesError;
       return { rows: this.memoryRows as unknown as readonly Row[] };
     }
@@ -108,7 +108,7 @@ class FakePool implements PostgresSubjectPoolV1 {
   }
 }
 
-function fixture(path: '/api/life-record' | '/api/memories', method = 'GET') {
+function fixture(path: string, method = 'GET') {
   const request = new Request(`https://myeongha.test${path}`, { method });
   const verifier = new FakeVerifier();
   const connection = new FakeConnection();
@@ -128,19 +128,19 @@ function callTexts(connection: FakeConnection): string[] {
 }
 
 describe('owner Records read HTTP boundary', () => {
-  it('pins browser routes to the v0.9 owner-scoped query authorities', () => {
+  it('pins browser routes to the v0.11 bounded owner-scoped query authorities', () => {
     expect(RECORDS_READ_HTTP_BINDINGS_V1).toEqual({
       lifeRecord: {
         method: 'GET',
         route: '/api/life-record',
-        readAuthority: 'public.qry_life_record_ledger_v1',
+        readAuthority: 'public.qry_life_record_ledger_v2',
       },
       memories: {
         method: 'GET',
         route: '/api/memories',
-        readAuthority: 'public.qry_memory_items_v1',
+        readAuthority: 'public.qry_memory_items_v2',
       },
-      apiContractVersion: 'v0.9',
+      apiContractVersion: 'v0.11',
     });
   });
 
@@ -170,9 +170,14 @@ describe('owner Records read HTTP boundary', () => {
             createdAt: '2026-09-03T00:00:00.000Z',
           },
         ],
+        pagination: {
+          pageSize: 50,
+          hasMore: false,
+          nextCursor: null,
+        },
       },
       meta: {
-        apiContractVersion: 'v0.9',
+        apiContractVersion: 'v0.11',
         requestId: REQUEST_ID,
         serverTime: SERVER_TIME,
       },
@@ -182,10 +187,10 @@ describe('owner Records read HTTP boundary', () => {
       'SET LOCAL ROLE myeongha_api_executor',
       expect.stringContaining('public.begin_member_subject_context_v1($1::uuid)'),
       'select public.assert_myeongha_subject_context_v1($1::uuid)',
-      expect.stringContaining('public.qry_life_record_ledger_v1($1::uuid)'),
+      expect.stringContaining('public.qry_life_record_ledger_v2($1::uuid, $2::timestamptz, $3::timestamptz, $4::uuid, $5::integer)'),
       'COMMIT',
     ]);
-    expect(f.connection.calls[4]?.values).toEqual([SUBJECT_ID]);
+    expect(f.connection.calls[4]?.values).toEqual([SUBJECT_ID, null, null, null, 50]);
   });
 
   it('reads current Memories only with the same server-resolved canonical subject', async () => {
@@ -207,10 +212,15 @@ describe('owner Records read HTTP boundary', () => {
             createdAt: '2026-09-04T00:00:00.000Z',
           },
         ],
+        pagination: {
+          pageSize: 50,
+          hasMore: false,
+          nextCursor: null,
+        },
       },
     });
-    expect(f.connection.calls[4]?.values).toEqual([SUBJECT_ID]);
-    expect(f.connection.calls[4]?.text).toContain('public.qry_memory_items_v1($1::uuid)');
+    expect(f.connection.calls[4]?.values).toEqual([SUBJECT_ID, null, null, 50]);
+    expect(f.connection.calls[4]?.text).toContain('public.qry_memory_items_v2($1::uuid, $2::timestamptz, $3::uuid, $4::integer)');
   });
 
   it('fails closed with 401/no-store before opening PostgreSQL when identity is absent', async () => {
@@ -230,7 +240,7 @@ describe('owner Records read HTTP boundary', () => {
         retryable: false,
       },
       meta: {
-        apiContractVersion: 'v0.9',
+        apiContractVersion: 'v0.11',
         requestId: REQUEST_ID,
       },
     });
@@ -244,10 +254,50 @@ describe('owner Records read HTTP boundary', () => {
 
     const response = await handleMemoryItemsReadRequestV1({ ...f.input, request });
 
-    expect(response.status).toBe(404);
+    expect(response.status).toBe(400);
     expect(response.headers.get('Cache-Control')).toBe('no-store');
     expect(f.verifier.calls).toHaveLength(0);
     expect(f.pool.connectCalls).toBe(0);
+  });
+
+  it.each([
+    '/api/life-record?pageSize=0',
+    '/api/life-record?pageSize=51',
+    '/api/memories?pageSize=1.5',
+    '/api/memories?pageSize=1&pageSize=2',
+    '/api/memories?cursor=abc&cursor=def',
+  ])('rejects malformed pagination %s before identity or database work', async (path) => {
+    const f = fixture(path);
+    const response = path.startsWith('/api/life-record')
+      ? await handleLifeRecordReadRequestV1(f.input)
+      : await handleMemoryItemsReadRequestV1(f.input);
+
+    expect(response.status).toBe(400);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    expect(f.verifier.calls).toHaveLength(0);
+    expect(f.pool.connectCalls).toBe(0);
+  });
+
+  it('derives Life Record hasMore from pageSize + 1 and emits an opaque next cursor', async () => {
+    const f = fixture('/api/life-record?pageSize=1');
+    f.connection.lifeRecordRows = [
+      f.connection.lifeRecordRows[0]!,
+      {
+        ...f.connection.lifeRecordRows[0]!,
+        lifeFactId: '11111111-1111-4111-8111-111111111112',
+        confirmedAt: new Date('2026-09-02T00:00:00.000Z'),
+        createdAt: new Date('2026-09-02T00:00:00.000Z'),
+      },
+    ];
+    const response = await handleLifeRecordReadRequestV1(f.input);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.data.facts).toHaveLength(1);
+    expect(body.data.pagination.pageSize).toBe(1);
+    expect(body.data.pagination.hasMore).toBe(true);
+    expect(body.data.pagination.nextCursor).toEqual(expect.any(String));
+    expect(f.connection.calls[4]?.values).toEqual([SUBJECT_ID, null, null, null, 1]);
   });
 
   it('maps cross/ineligible-subject authority failure to NOT_FOUND without existence leakage', async () => {
