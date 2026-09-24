@@ -64,7 +64,7 @@ async function expectApiCode(
 describe('current Memory Item API authority boundary', () => {
   it('pins the read boundary to the verified owner current Memory Item query', () => {
     expect(MEMORY_ITEMS_READ_AUTHORITY_BINDING_V1)
-      .toBe('public.qry_memory_items_v1');
+      .toBe('public.qry_memory_items_v2');
   });
 
   it('passes only trusted resolved subject identity to authority', async () => {
