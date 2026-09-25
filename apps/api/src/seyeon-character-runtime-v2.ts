@@ -89,3 +89,340 @@ export interface RunSeyeonCharacterTurnV2Result {
 }
 
 const TURN_INTERPRETATION_RESPONSE_SCHEMA_V2 = Object.freeze({
+  type: 'object',
+  additionalProperties: false,
+  required: [
+    'schemaVersion',
+    'userMove',
+    'notice',
+    'immediateWant',
+    'tension',
+    'chosenAction',
+    'expressionState',
+    'reveal',
+    'memoryRefsUsed',
+  ],
+  properties: {
+    schemaVersion: { const: 'seyeon-turn-interpretation-v2' },
+    userMove: { enum: SEYEON_USER_MOVE_KEYS_V2 },
+    notice: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['summary', 'evidenceRefs'],
+      properties: {
+        summary: { type: 'string', minLength: 1, maxLength: 1200 },
+        evidenceRefs: {
+          type: 'array',
+          maxItems: 8,
+          uniqueItems: true,
+          items: { type: 'string', minLength: 1, maxLength: 512 },
+        },
+      },
+    },
+    immediateWant: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['key', 'summary'],
+      properties: {
+        key: { enum: SEYEON_IMMEDIATE_WANT_KEYS_V2 },
+        summary: { type: 'string', minLength: 1, maxLength: 1200 },
+      },
+    },
+    tension: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['key', 'summary'],
+      properties: {
+        key: { enum: SEYEON_TENSION_KEYS_V2 },
+        summary: { type: 'string', minLength: 1, maxLength: 1200 },
+      },
+    },
+    chosenAction: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['key', 'rationale'],
+      properties: {
+        key: { enum: SEYEON_ACTION_KEYS_V2 },
+        rationale: { type: 'string', minLength: 1, maxLength: 1200 },
+      },
+    },
+    expressionState: { enum: SEYEON_EXPRESSION_STATES_V2 },
+    reveal: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['level', 'triggerRef', 'supportingHistoryRefs'],
+      properties: {
+        level: { enum: SEYEON_REVEAL_LEVELS_V2 },
+        triggerRef: {
+          anyOf: [
+            { type: 'string', minLength: 1, maxLength: 512 },
+            { type: 'null' },
+          ],
+        },
+        supportingHistoryRefs: {
+          type: 'array',
+          maxItems: 8,
+          uniqueItems: true,
+          items: { type: 'string', minLength: 1, maxLength: 512 },
+        },
+      },
+    },
+    memoryRefsUsed: {
+      type: 'array',
+      maxItems: 8,
+      uniqueItems: true,
+      items: { type: 'string', minLength: 1, maxLength: 512 },
+    },
+  },
+} as const);
+
+const RENDERER_RESPONSE_SCHEMA_V2 = Object.freeze({
+  type: 'object',
+  additionalProperties: false,
+  required: [
+    'schemaVersion',
+    'utterance',
+    'expressionState',
+    'revealLevel',
+    'memoryRefsMentioned',
+    'disclosureSliceIds',
+  ],
+  properties: {
+    schemaVersion: { const: 'seyeon-renderer-draft-v2' },
+    utterance: { type: 'string', minLength: 1, maxLength: 1200 },
+    expressionState: { enum: SEYEON_EXPRESSION_STATES_V2 },
+    revealLevel: { enum: SEYEON_REVEAL_LEVELS_V2 },
+    memoryRefsMentioned: {
+      type: 'array',
+      maxItems: 8,
+      uniqueItems: true,
+      items: { type: 'string', minLength: 1, maxLength: 512 },
+    },
+    disclosureSliceIds: {
+      type: 'array',
+      maxItems: 8,
+      uniqueItems: true,
+      items: { enum: SEYEON_BIBLE_SLICE_IDS_V2 },
+    },
+  },
+} as const);
+
+const SEMANTIC_REVIEW_RESPONSE_SCHEMA_V2 = Object.freeze({
+  type: 'object',
+  additionalProperties: false,
+  required: [
+    'schemaVersion',
+    'reviewedUtteranceHash',
+    'failureCodes',
+    'evidence',
+  ],
+  properties: {
+    schemaVersion: { const: 'seyeon-semantic-review-v2' },
+    reviewedUtteranceHash: { type: 'string', minLength: 1, maxLength: 128 },
+    failureCodes: {
+      type: 'array',
+      maxItems: 11,
+      uniqueItems: true,
+      items: {
+        enum: SEYEON_SEMANTIC_FAILURE_CODES_V2,
+      },
+    },
+    evidence: {
+      type: 'array',
+      maxItems: 16,
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['code', 'excerpt', 'reason'],
+        properties: {
+          code: {
+            enum: SEYEON_SEMANTIC_FAILURE_CODES_V2,
+          },
+          excerpt: { type: 'string', minLength: 1, maxLength: 400 },
+          reason: { type: 'string', minLength: 1, maxLength: 800 },
+        },
+      },
+    },
+  },
+} as const);
+
+function providerIdentity(provider: SeyeonStructuredProviderPortV2) {
+  const providerKey = provider.providerKey.trim();
+  const modelKey = provider.modelKey.trim();
+  if (
+    providerKey.length === 0 ||
+    providerKey.length > 128 ||
+    modelKey.length === 0 ||
+    modelKey.length > 128
+  ) {
+    throw new SeyeonCharacterRuntimeErrorV2(
+      'context',
+      'Structured provider identity is outside supported bounds.',
+    );
+  }
+  return Object.freeze({ providerKey, modelKey });
+}
+
+export function buildSeyeonTurnInterpreterRequestV2(
+  context: SeyeonRuntimeContextV2,
+): SeyeonStructuredProviderRequestV2 {
+  return Object.freeze({
+    contractVersion: SEYEON_STRUCTURED_PROVIDER_CONTRACT_VERSION_V2,
+    purpose: 'turn_interpretation' as const,
+    instructions:
+      'Interpret the current Se-yeon turn. Use only supplied context. Keep fact and Character interpretation distinct. Do not invent user emotion, thought, intent, action, biography, relationship history, or memory. Choose one bounded action/expression/reveal state and cite only refs present in context.',
+    input: context,
+    responseSchema: TURN_INTERPRETATION_RESPONSE_SCHEMA_V2,
+  });
+}
+
+export function buildSeyeonRendererRequestV2(
+  packet: SeyeonRendererPacketV2,
+): SeyeonStructuredProviderRequestV2 {
+  return Object.freeze({
+    contractVersion: SEYEON_STRUCTURED_PROVIDER_CONTRACT_VERSION_V2,
+    purpose: 'dialogue_render' as const,
+    instructions:
+      'Render one natural Korean honorific utterance as Se-yeon. Follow the guarded interpretation rather than re-deciding relationship state. Preserve Se-yeon opinion, playfulness, independence, flaws, and refusal capacity. Never narrate unperformed user actions or canonize hidden user emotion/thought/intent. Never invent undefined biography. Mention memory only when authorized by memoryRefsUsed.',
+    input: packet,
+    responseSchema: RENDERER_RESPONSE_SCHEMA_V2,
+  });
+}
+
+export function buildSeyeonSemanticReviewRequestV2(input: {
+  readonly packet: SeyeonRendererPacketV2;
+  readonly rendererDraft: unknown;
+  readonly utteranceHash: string;
+}): SeyeonStructuredProviderRequestV2 {
+  return Object.freeze({
+    contractVersion: SEYEON_STRUCTURED_PROVIDER_CONTRACT_VERSION_V2,
+    purpose: 'semantic_review' as const,
+    instructions:
+      'Review the rendered Se-yeon utterance against the supplied authority boundaries, Bible slices, relationship reveal, memory evidence, and user-agency rules. Report every supported failure code. Do not repair or rewrite the utterance. Copy expectedUtteranceHash exactly into reviewedUtteranceHash.',
+    input: Object.freeze({
+      packet: input.packet,
+      rendererDraft: input.rendererDraft,
+      expectedUtteranceHash: input.utteranceHash,
+    }),
+    responseSchema: SEMANTIC_REVIEW_RESPONSE_SCHEMA_V2,
+  });
+}
+
+async function generate(
+  provider: SeyeonStructuredProviderPortV2,
+  request: SeyeonStructuredProviderRequestV2,
+  stage: SeyeonRuntimeStageV2,
+): Promise<unknown> {
+  try {
+    return await provider.generate(request);
+  } catch (error) {
+    throw new SeyeonCharacterRuntimeErrorV2(
+      stage,
+      error instanceof Error ? error.message : `Se-yeon ${stage} provider failed.`,
+      error,
+    );
+  }
+}
+
+export async function runSeyeonCharacterTurnV2(
+  input: RunSeyeonCharacterTurnV2Input,
+): Promise<RunSeyeonCharacterTurnV2Result> {
+  const interpreterIdentity = providerIdentity(input.interpreterProvider);
+  const rendererIdentity = providerIdentity(input.rendererProvider);
+  const reviewerIdentity = providerIdentity(input.semanticReviewerProvider);
+
+  let context: SeyeonRuntimeContextV2;
+  try {
+    context = assembleSeyeonRuntimeContextV2(input.contextInput);
+  } catch (error) {
+    throw new SeyeonCharacterRuntimeErrorV2(
+      'context',
+      error instanceof Error ? error.message : 'Se-yeon context assembly failed.',
+      error,
+    );
+  }
+
+  const rawInterpretation = await generate(
+    input.interpreterProvider,
+    buildSeyeonTurnInterpreterRequestV2(context),
+    'interpret',
+  );
+
+  let interpretation: SeyeonTurnInterpretationV2;
+  try {
+    interpretation = guardSeyeonTurnInterpretationV2({
+      rawOutput: rawInterpretation,
+      context,
+    });
+  } catch (error) {
+    throw new SeyeonCharacterRuntimeErrorV2(
+      'interpret',
+      error instanceof Error ? error.message : 'Se-yeon turn interpretation failed.',
+      error,
+    );
+  }
+
+  const rendererPacket = buildSeyeonRendererPacketV2({
+    context,
+    interpretation,
+  });
+  const rawRendererDraft = await generate(
+    input.rendererProvider,
+    buildSeyeonRendererRequestV2(rendererPacket),
+    'render',
+  );
+
+  let admittedRendererDraft: SeyeonRendererDraftV2;
+  try {
+    admittedRendererDraft = admitSeyeonRendererDraftV2({
+      rawOutput: rawRendererDraft,
+      packet: rendererPacket,
+    });
+  } catch (error) {
+    throw new SeyeonCharacterRuntimeErrorV2(
+      'render',
+      error instanceof Error ? error.message : 'Se-yeon renderer draft admission failed.',
+      error,
+    );
+  }
+
+  const utteranceHash = hashSeyeonRendererUtteranceV2(
+    admittedRendererDraft.utterance,
+  );
+  const rawSemanticReview = await generate(
+    input.semanticReviewerProvider,
+    buildSeyeonSemanticReviewRequestV2({
+      packet: rendererPacket,
+      rendererDraft: admittedRendererDraft,
+      utteranceHash,
+    }),
+    'semantic_review',
+  );
+
+  let envelope: SeyeonDialogueEnvelopeV2;
+  try {
+    envelope = guardSeyeonRendererOutputV2({
+      rawOutput: admittedRendererDraft,
+      packet: rendererPacket,
+      semanticReview: rawSemanticReview,
+    });
+  } catch (error) {
+    throw new SeyeonCharacterRuntimeErrorV2(
+      'validate',
+      error instanceof Error ? error.message : 'Se-yeon semantic/output guard failed.',
+      error,
+    );
+  }
+
+  return Object.freeze({
+    context,
+    interpretation,
+    rendererPacket,
+    envelope,
+    providers: Object.freeze({
+      interpreter: interpreterIdentity,
+      renderer: rendererIdentity,
+      semanticReviewer: reviewerIdentity,
+    }),
+  });
+}
