@@ -59,6 +59,76 @@ function consumesSecrets(source) {
   return /\$\{\{\s*secrets\.[A-Za-z0-9_]+\s*\}\}/u.test(source);
 }
 
+function parseActionReferences(source) {
+  const references = [];
+  const invalidLines = [];
+
+  for (const line of source.replace(/\r\n/g, '\n').split('\n')) {
+    if (!/^\s*(?:-\s*)?uses\s*:/u.test(line)) continue;
+
+    const match = line.match(
+      /^\s*(?:-\s*)?uses:\s*(['"]?)([^'"\s#]+)\1\s*(?:#.*)?$/u,
+    );
+    if (!match) {
+      invalidLines.push(line.trim());
+      continue;
+    }
+
+    references.push(match[2]);
+  }
+
+  return { references, invalidLines };
+}
+
+function isImmutableExternalActionReference(reference) {
+  return /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(?:\/[^@\s]+)?@[0-9a-fA-F]{40}$/u.test(
+    reference,
+  );
+}
+
+function isLocalActionReference(reference) {
+  return reference.startsWith('./');
+}
+
+function validateActionReferences(source) {
+  const violations = [];
+  const { references, invalidLines } = parseActionReferences(source);
+
+  for (const line of invalidLines) {
+    violations.push(`unsupported uses syntax: ${line}`);
+  }
+
+  for (const reference of references) {
+    if (isLocalActionReference(reference)) continue;
+    if (!isImmutableExternalActionReference(reference)) {
+      violations.push(`external action must use a full 40-character commit SHA: ${reference}`);
+    }
+  }
+
+  return violations;
+}
+
+function actionReferenceStats(source) {
+  const { references, invalidLines } = parseActionReferences(source);
+  let external = 0;
+  let immutable = 0;
+  let mutable = invalidLines.length;
+  let local = 0;
+
+  for (const reference of references) {
+    if (isLocalActionReference(reference)) {
+      local += 1;
+      continue;
+    }
+
+    external += 1;
+    if (isImmutableExternalActionReference(reference)) immutable += 1;
+    else mutable += 1;
+  }
+
+  return { external, immutable, mutable, local };
+}
+
 function hasPrivilegedCallerControlledCheckout(source) {
   return /^\s+ref:\s*\$\{\{\s*(?:inputs\.|github\.event\.pull_request(?:\.|\s*\}\}))/mu.test(
     source,
@@ -115,6 +185,8 @@ export function validateWorkflowSource(fileName, source) {
       'secret-consuming/write-capable workflow must not checkout caller-controlled input or pull-request refs',
     );
   }
+
+  violations.push(...validateActionReferences(source));
 
   return violations;
 }
@@ -239,6 +311,59 @@ jobs:
       - uses: actions/checkout@0000000000000000000000000000000000000000
 `,
   );
+
+  for (const [name, reference] of [
+    ['movable-major-tag', 'actions/setup-node@v7'],
+    ['movable-version-tag', 'actions/checkout@v7.0.1'],
+    ['movable-branch', 'somebody/action@main'],
+    ['short-sha', 'somebody/action@0123456789abcdef'],
+  ]) {
+    expectViolation(
+      name,
+      'fixture.yml',
+      `on:
+  push:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: ${reference}
+`,
+      'full 40-character commit SHA',
+    );
+  }
+
+  expectPass(
+    'immutable-external-action',
+    'fixture.yml',
+    `on:
+  push:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: somebody/action@0123456789abcdef0123456789abcdef01234567
+`,
+  );
+
+  expectPass(
+    'repository-local-action',
+    'fixture.yml',
+    `on:
+  push:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: ./some/local-action
+`,
+  );
 }
 
 runSelfTests();
@@ -259,6 +384,10 @@ if (workflowFiles.length === 0) {
 const failures = [];
 let secretConsumers = 0;
 let writeCapableWorkflows = 0;
+let externalActionRefs = 0;
+let immutableActionRefs = 0;
+let mutableActionRefs = 0;
+let localActionRefs = 0;
 
 for (const fileName of workflowFiles) {
   const source = await readFile(path.join(workflowDirectory, fileName), 'utf8');
@@ -270,6 +399,12 @@ for (const fileName of workflowFiles) {
   ) {
     writeCapableWorkflows += 1;
   }
+
+  const actionStats = actionReferenceStats(source);
+  externalActionRefs += actionStats.external;
+  immutableActionRefs += actionStats.immutable;
+  mutableActionRefs += actionStats.mutable;
+  localActionRefs += actionStats.local;
 
   const violations = validateWorkflowSource(fileName, source);
   for (const violation of violations) {
@@ -284,5 +419,5 @@ if (failures.length > 0) {
 }
 
 console.log(
-  `GitHub Actions trust-boundary governance passed: workflows=${workflowFiles.length} secret_consumers=${secretConsumers} write_capable_workflows=${writeCapableWorkflows} explicit_permissions=true pull_request_target=false`,
+  `GitHub Actions trust-boundary governance passed: workflows=${workflowFiles.length} secret_consumers=${secretConsumers} write_capable_workflows=${writeCapableWorkflows} external_action_refs=${externalActionRefs} immutable_action_refs=${immutableActionRefs} mutable_action_refs=${mutableActionRefs} local_action_refs=${localActionRefs} explicit_permissions=true pull_request_target=false`,
 );
