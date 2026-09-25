@@ -350,6 +350,8 @@ closure_note
 - 값이 A~K와 충돌하면 A~K를 먼저 수정한 뒤 Appendix를 동기화한다.
 - 장래 machine-readable Character Manifest가 도입되면 이 metadata를 Bible에서 **컴파일 / 추출**한다.
 - Manifest를 사람이 별도 설정 원본처럼 수정하지 않는다.
+- 현재 experimental foundation schema는 `docs/character/schema/character-manifest.v0.schema.json`에 둔다.
+- 해당 schema는 아직 Runtime implementation binding이 아니며, 실제 필요성이 확인될 때 compiler / extractor와 instance 생성 여부를 결정한다.
 
 ---
 
