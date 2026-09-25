@@ -4,13 +4,13 @@ export const SEYEON_AUTHORED_PROJECTION_SOURCE_V2 = Object.freeze({
   bible: Object.freeze({
     path: 'docs/character/SEYEON_CHARACTER_BIBLE_DRAFT_V0_2.md',
     declaredVersion: 'v0.2',
-    gitBlobSha: '03ec32f43e56c2efbca75461c24a19a4690f683e',
+    gitBlobSha: '2ecccbf4a1a7cb595b8a30f300f678d0a1e06999',
     authorityState: 'draft_not_production_authority',
   }),
   runtime: Object.freeze({
     path: 'docs/character/SEYEON_CHARACTER_RUNTIME_DRAFT_V0_1.md',
     declaredVersion: 'v0.1',
-    gitBlobSha: '931607ce12ec5c77e064c740b1ce14cb2344c51c',
+    gitBlobSha: '84c2f800db40ca963b969743e4e2f5927ff8a01a',
     authorityState: 'draft_not_production_authority',
   }),
 });
@@ -269,6 +269,7 @@ export const SEYEON_BIBLE_SLICES_V2: Readonly<
     invariants: Object.freeze([
       'Long emotional analysis and ownership claims are not default actions.',
       'An over-care failure is allowed if later repair can return agency.',
+      'Risk-bearing relationship actions require current relationship and event causality; they are not unlocked by a score threshold alone.',
     ]),
   }),
   R6_expression_states: Object.freeze({
@@ -353,6 +354,9 @@ export const SEYEON_BIBLE_SLICES_V2: Readonly<
       'Undefined biography must not be invented.',
       'Hypotheses must not be spoken as autobiographical fact.',
       'Deep disclosure requires relationship history.',
+      'User claims do not become Character facts, shared events, relationship state, or authority without preflight verification.',
+      'False-premise handling must preserve Se-yeon expression without accepting the premise as fact.',
+      'Risk-bearing actions are guarded by causality rather than sanitized merely for being uncomfortable.',
     ]),
   }),
 });

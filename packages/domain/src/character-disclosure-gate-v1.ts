@@ -6,6 +6,11 @@ import {
   type CharacterDisclosurePolicyV1,
   type CharacterDisclosureTopicKeyV1,
 } from '../../character-content/src/character-disclosure-policy-v1.js';
+import type {
+  CharacterDisclosureDefaultV1,
+  CharacterKnowledgeStateV1,
+  CharacterSourceAuthorityV1,
+} from '../../character-content/src/character-fact-authority-v1.js';
 
 export const CHARACTER_DISCLOSURE_DECISION_SCHEMA_VERSION_V1 =
   'character-disclosure-decision-v1' as const;
@@ -23,9 +28,7 @@ export type CharacterDisclosureResultV1 =
   (typeof CHARACTER_DISCLOSURE_RESULTS_V1)[number];
 
 export type CharacterDisclosureSourceAuthorityStateV1 =
-  | 'CANON'
-  | 'UNDEFINED'
-  | 'HYPOTHESIS';
+  CharacterSourceAuthorityV1;
 
 export type CharacterDisclosureTrustBandV1 = 'low' | 'medium' | 'high';
 
@@ -36,10 +39,18 @@ export type CharacterDisclosureQuestionContextV1 =
   | 'relationship_relevant'
   | 'pressuring';
 
+export type CharacterDisclosureAuthorityDispositionV1 =
+  | 'AVAILABLE'
+  | 'AUTHORING_GAP'
+  | 'INTENTIONALLY_OPEN'
+  | 'EXTERNAL_AUTHORITY_REQUIRED'
+  | 'CHARACTER_KNOWLEDGE_UNAVAILABLE';
+
 export interface CharacterDisclosureSourceMetadataV1 {
   readonly topicKey: CharacterDisclosureTopicKeyV1;
-  readonly sourceAuthorityState: CharacterDisclosureSourceAuthorityStateV1;
-  readonly minimumDisclosureGate: CharacterDisclosureGateV1;
+  readonly sourceAuthorityState: CharacterSourceAuthorityV1;
+  readonly characterKnowledge: CharacterKnowledgeStateV1;
+  readonly disclosureDefault: CharacterDisclosureDefaultV1;
   readonly allowedDepth: Exclude<CharacterDisclosureDepthV1, 'none'>;
   readonly previouslyDisclosedDepth: CharacterDisclosureDepthV1;
   readonly sourceRef: string;
@@ -63,7 +74,9 @@ export interface CharacterDisclosureDecisionV1 {
   readonly schemaVersion: typeof CHARACTER_DISCLOSURE_DECISION_SCHEMA_VERSION_V1;
   readonly characterId: CharacterDisclosureCharacterIdV1;
   readonly topicKey: CharacterDisclosureTopicKeyV1;
-  readonly sourceAuthorityState: CharacterDisclosureSourceAuthorityStateV1;
+  readonly sourceAuthorityState: CharacterSourceAuthorityV1;
+  readonly characterKnowledge: CharacterKnowledgeStateV1;
+  readonly disclosureDefault: CharacterDisclosureDefaultV1;
   readonly result: CharacterDisclosureResultV1;
   readonly retrievalScope: Readonly<{
     readonly depth: CharacterDisclosureDepthV1;
@@ -78,6 +91,7 @@ export interface CharacterDisclosureDecisionV1 {
     readonly previouslyDisclosedDepth: CharacterDisclosureDepthV1;
   }>;
   readonly authorityGap: boolean;
+  readonly authorityDisposition: CharacterDisclosureAuthorityDispositionV1;
 }
 
 const GATE_RANK: Readonly<Record<CharacterDisclosureGateV1, number>> = Object.freeze({
@@ -148,6 +162,21 @@ function hasContextSupport(input: CharacterDisclosurePreflightInputV1): boolean 
   );
 }
 
+function sourceDisclosureDefaultAllows(
+  input: CharacterDisclosurePreflightInputV1,
+): boolean {
+  const disclosureDefault = input.source.disclosureDefault;
+  if (disclosureDefault === 'NEVER') return false;
+  if (disclosureDefault === 'NOT_APPLICABLE') return true;
+  if (disclosureDefault === 'CONTEXTUAL') {
+    return input.questionContext !== 'pressuring' && hasContextSupport(input);
+  }
+  return (
+    GATE_RANK[input.relationship.gate] >=
+    GATE_RANK[disclosureDefault]
+  );
+}
+
 function isEligibleByRelationship(
   input: CharacterDisclosurePreflightInputV1,
   requestedDepth: CharacterDisclosureDepthV1,
@@ -156,7 +185,13 @@ function isEligibleByRelationship(
   if (input.questionContext === 'pressuring') return false;
 
   const gate = input.relationship.gate;
-  if (gate === 'PUBLIC') return false;
+  if (gate === 'PUBLIC') {
+    return (
+      input.source.disclosureDefault === 'PUBLIC' ||
+      (input.source.disclosureDefault === 'CONTEXTUAL' &&
+        hasContextSupport(input))
+    );
+  }
 
   if (gate === 'FAMILIAR') {
     return input.relationship.trustBand !== 'low' && hasContextSupport(input);
@@ -175,39 +210,86 @@ function isEligibleByRelationship(
   );
 }
 
+function authorityDisposition(
+  input: CharacterDisclosurePreflightInputV1,
+): CharacterDisclosureAuthorityDispositionV1 {
+  if (
+    input.source.characterKnowledge === 'UNKNOWN_TO_CHARACTER' ||
+    (input.source.characterKnowledge === 'NOT_APPLICABLE' &&
+      (input.source.sourceAuthorityState === 'CANON' ||
+        input.source.sourceAuthorityState === 'SOFT_CANON'))
+  ) {
+    return 'CHARACTER_KNOWLEDGE_UNAVAILABLE';
+  }
+  switch (input.source.sourceAuthorityState) {
+    case 'CANON':
+    case 'SOFT_CANON':
+      return 'AVAILABLE';
+    case 'AUTHOR_UNDEFINED':
+      return 'AUTHORING_GAP';
+    case 'INTENTIONALLY_OPEN':
+      return 'INTENTIONALLY_OPEN';
+    case 'WORLD_DEPENDENT':
+      return 'EXTERNAL_AUTHORITY_REQUIRED';
+  }
+}
+
+function baseDecision(input: {
+  readonly request: CharacterDisclosurePreflightInputV1;
+  readonly result: CharacterDisclosureResultV1;
+  readonly behaviorAction: string;
+  readonly sharedHistoryRefs: readonly string[];
+  readonly depth?: CharacterDisclosureDepthV1;
+  readonly sourceRef?: string | null;
+  readonly authorityGap: boolean;
+  readonly disposition: CharacterDisclosureAuthorityDispositionV1;
+}): CharacterDisclosureDecisionV1 {
+  return Object.freeze({
+    schemaVersion: CHARACTER_DISCLOSURE_DECISION_SCHEMA_VERSION_V1,
+    characterId: input.request.characterId,
+    topicKey: input.request.topicKey,
+    sourceAuthorityState: input.request.source.sourceAuthorityState,
+    characterKnowledge: input.request.source.characterKnowledge,
+    disclosureDefault: input.request.source.disclosureDefault,
+    result: input.result,
+    retrievalScope: Object.freeze({
+      depth: input.depth ?? ('none' as const),
+      sourceRef: input.sourceRef ?? null,
+    }),
+    behaviorAction: input.behaviorAction,
+    evidence: Object.freeze({
+      relationshipGate: input.request.relationship.gate,
+      trustBand: input.request.relationship.trustBand,
+      relevantSharedHistoryRefs: input.sharedHistoryRefs,
+      questionContext: input.request.questionContext,
+      previouslyDisclosedDepth:
+        input.request.source.previouslyDisclosedDepth,
+    }),
+    authorityGap: input.authorityGap,
+    authorityDisposition: input.disposition,
+  });
+}
+
 function closedDecision(
   input: CharacterDisclosurePreflightInputV1,
   policy: CharacterDisclosurePolicyV1,
   sharedHistoryRefs: readonly string[],
 ): CharacterDisclosureDecisionV1 {
   const result =
-    input.questionContext === 'pressuring'
+    input.questionContext === 'pressuring' ||
+    input.source.disclosureDefault === 'NEVER'
       ? ('BOUNDARY' as const)
       : policy.behavior.closedResult;
-  const behaviorAction =
-    result === 'DEFLECT'
-      ? policy.behavior.deflectAction
-      : policy.behavior.boundaryAction;
-
-  return Object.freeze({
-    schemaVersion: CHARACTER_DISCLOSURE_DECISION_SCHEMA_VERSION_V1,
-    characterId: input.characterId,
-    topicKey: input.topicKey,
-    sourceAuthorityState: input.source.sourceAuthorityState,
+  return baseDecision({
+    request: input,
     result,
-    retrievalScope: Object.freeze({
-      depth: 'none' as const,
-      sourceRef: null,
-    }),
-    behaviorAction,
-    evidence: Object.freeze({
-      relationshipGate: input.relationship.gate,
-      trustBand: input.relationship.trustBand,
-      relevantSharedHistoryRefs: sharedHistoryRefs,
-      questionContext: input.questionContext,
-      previouslyDisclosedDepth: input.source.previouslyDisclosedDepth,
-    }),
+    behaviorAction:
+      result === 'DEFLECT'
+        ? policy.behavior.deflectAction
+        : policy.behavior.boundaryAction,
+    sharedHistoryRefs,
     authorityGap: false,
+    disposition: authorityDisposition(input),
   });
 }
 
@@ -222,12 +304,19 @@ export function evaluateCharacterDisclosurePreflightV1(
   const sharedHistoryRefs = assertUniqueRefs(
     input.relationship.relevantSharedHistoryRefs,
   );
+  const sourceAvailable =
+    input.source.sourceAuthorityState === 'CANON' ||
+    input.source.sourceAuthorityState === 'SOFT_CANON';
+  const characterCanKnow =
+    input.source.characterKnowledge === 'KNOWN' ||
+    input.source.characterKnowledge === 'PARTIAL';
+
   if (
-    input.source.sourceAuthorityState !== 'CANON' &&
+    (!sourceAvailable || !characterCanKnow) &&
     input.source.previouslyDisclosedDepth !== 'none'
   ) {
     throw new TypeError(
-      'Undefined or hypothetical Character biography cannot have a prior disclosed depth.',
+      'Unavailable or unknown Character biography cannot have a prior disclosed depth.',
     );
   }
 
@@ -237,19 +326,30 @@ export function evaluateCharacterDisclosurePreflightV1(
     topicKey: input.topicKey,
     relationshipGate: input.relationship.gate,
   });
-  const minimumSourceGateSatisfied =
-    GATE_RANK[input.relationship.gate] >=
-    GATE_RANK[input.source.minimumDisclosureGate];
   const previouslyDisclosed =
     input.source.previouslyDisclosedDepth !== 'none';
   const relationshipEligible =
     input.questionContext !== 'pressuring' &&
     (previouslyDisclosed ||
-      (minimumSourceGateSatisfied &&
+      (sourceDisclosureDefaultAllows(input) &&
         isEligibleByRelationship(input, policyDepth)));
 
   if (!relationshipEligible) {
     return closedDecision(input, policy, sharedHistoryRefs);
+  }
+
+  const disposition = authorityDisposition(input);
+  if (disposition !== 'AVAILABLE') {
+    return baseDecision({
+      request: input,
+      result: 'AUTHORITY_ABSTAIN',
+      behaviorAction: policy.behavior.authorityAbstainAction,
+      sharedHistoryRefs,
+      authorityGap:
+        disposition === 'AUTHORING_GAP' ||
+        disposition === 'EXTERNAL_AUTHORITY_REQUIRED',
+      disposition,
+    });
   }
 
   const priorDepth = input.source.previouslyDisclosedDepth;
@@ -257,32 +357,12 @@ export function evaluateCharacterDisclosurePreflightV1(
     DEPTH_RANK[priorDepth] > DEPTH_RANK[policyDepth]
       ? priorDepth
       : policyDepth;
-  const allowedDepth = minDepth(requestedDepth, input.source.allowedDepth);
-
+  let allowedDepth = minDepth(requestedDepth, input.source.allowedDepth);
   if (
-    input.source.sourceAuthorityState === 'UNDEFINED' ||
-    input.source.sourceAuthorityState === 'HYPOTHESIS'
+    input.source.characterKnowledge === 'PARTIAL' &&
+    DEPTH_RANK[allowedDepth] > DEPTH_RANK.surface
   ) {
-    return Object.freeze({
-      schemaVersion: CHARACTER_DISCLOSURE_DECISION_SCHEMA_VERSION_V1,
-      characterId: input.characterId,
-      topicKey: input.topicKey,
-      sourceAuthorityState: input.source.sourceAuthorityState,
-      result: 'AUTHORITY_ABSTAIN' as const,
-      retrievalScope: Object.freeze({
-        depth: 'none' as const,
-        sourceRef: null,
-      }),
-      behaviorAction: policy.behavior.authorityAbstainAction,
-      evidence: Object.freeze({
-        relationshipGate: input.relationship.gate,
-        trustBand: input.relationship.trustBand,
-        relevantSharedHistoryRefs: sharedHistoryRefs,
-        questionContext: input.questionContext,
-        previouslyDisclosedDepth: priorDepth,
-      }),
-      authorityGap: true,
-    });
+    allowedDepth = 'surface';
   }
 
   const fullDepth = minDepth(
@@ -294,32 +374,23 @@ export function evaluateCharacterDisclosurePreflightV1(
     input.source.allowedDepth,
   );
   const result =
-    DEPTH_RANK[allowedDepth] >= DEPTH_RANK[fullDepth]
-      ? ('ALLOW' as const)
-      : ('PARTIAL' as const);
+    input.source.characterKnowledge === 'PARTIAL' ||
+    DEPTH_RANK[allowedDepth] < DEPTH_RANK[fullDepth]
+      ? ('PARTIAL' as const)
+      : ('ALLOW' as const);
 
-  return Object.freeze({
-    schemaVersion: CHARACTER_DISCLOSURE_DECISION_SCHEMA_VERSION_V1,
-    characterId: input.characterId,
-    topicKey: input.topicKey,
-    sourceAuthorityState: input.source.sourceAuthorityState,
+  return baseDecision({
+    request: input,
     result,
-    retrievalScope: Object.freeze({
-      depth: allowedDepth,
-      sourceRef,
-    }),
+    depth: allowedDepth,
+    sourceRef,
     behaviorAction:
       result === 'ALLOW'
         ? policy.behavior.allowAction
         : policy.behavior.partialAction,
-    evidence: Object.freeze({
-      relationshipGate: input.relationship.gate,
-      trustBand: input.relationship.trustBand,
-      relevantSharedHistoryRefs: sharedHistoryRefs,
-      questionContext: input.questionContext,
-      previouslyDisclosedDepth: priorDepth,
-    }),
+    sharedHistoryRefs,
     authorityGap: false,
+    disposition,
   });
 }
 
@@ -342,6 +413,12 @@ export function guardCharacterDisclosureRetrievalV1(input: {
       );
     }
     return Object.freeze([]);
+  }
+
+  if (input.decision.authorityDisposition !== 'AVAILABLE') {
+    throw new TypeError(
+      'Private content retrieval requires available source authority and Character knowledge.',
+    );
   }
 
   if (input.retrievedSources.length > 8) {

@@ -37,7 +37,7 @@ describe('Se-yeon runtime context v2', () => {
 
     expect(context.character.characterId).toBe('seyeon');
     expect(context.character.sourceBibleBlobSha).toBe(
-      '03ec32f43e56c2efbca75461c24a19a4690f683e',
+      '2ecccbf4a1a7cb595b8a30f300f678d0a1e06999',
     );
     expect(context.authorityBoundaries.hypothesisMayBeUsedAsAutobiographicalFact).toBe(false);
     expect(context.bibleSlices.map((slice) => slice.id)).toEqual(

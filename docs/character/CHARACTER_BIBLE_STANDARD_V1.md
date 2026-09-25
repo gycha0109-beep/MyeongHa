@@ -82,6 +82,41 @@ Memory / Relation = 사용자와 실제로 무엇이 있었는가
 
 생일, 혈액형, MBTI, 좋아하는 색처럼 작품에 따라 유용할 수 있는 정보는 필요할 때 추가할 수 있지만 v1 공통 필수 컬럼은 아니다.
 
+## 2.1 Answerability / Biography Closure
+
+모든 biography를 전기처럼 완성할 필요는 없다. 다만 Production Character가 사용자에게 반복적으로 질문받을 가능성이 높은 사실은 **High-Answerability Fact**로 관리한다.
+
+기본 Closure 대상 예:
+
+- 정확한 나이 또는 명시적인 age policy
+- 생일
+- 혈액형
+- 출생 / 성장 지역
+- 현재 생활 기반 / 거주 형태
+- 직업 / 교육 상태
+- 가족 구성 / 형제자매
+- 가족과의 현재 관계
+- 주요 성장 / 학교 이력의 필요한 범위
+- 현재 인물을 이해하는 데 필요한 주요 전환점
+- 과거 연애의 존재 여부와 필요한 표면 범위
+- 현재 중요한 비사용자 인간관계
+- 현재 책임 / 의무
+- MBTI 경험 / self-report policy
+
+이 목록은 trivia를 강제하기 위한 것이 아니다.
+
+> **사용자가 자연스럽게 물을 질문에 Runtime이 매번 authoring gap 때문에 회피해야 한다면 그 사실은 Closure 대상이다.**
+
+반대로 낮은 가치의 예측 불가능한 trivia까지 미리 무한히 작성하지 않는다.
+
+Production 전 Closure Pass에서는 각 High-Answerability Fact를 최소 하나로 분류한다.
+
+- 실제 값을 채택한다.
+- `SOFT_CANON`으로 범위 / 정책만 채택한다.
+- 의도적으로 열어둘 이유가 있으면 `INTENTIONALLY_OPEN`으로 명시한다.
+- 다른 authority가 결정해야 하면 `WORLD_DEPENDENT`로 명시한다.
+- 아직 결정하지 못했다면 `AUTHOR_UNDEFINED`로 남기되 authoring debt로 추적한다.
+
 ---
 
 # 3. CHARACTER BIBLE INSTANCE TEMPLATE
@@ -226,14 +261,97 @@ Character도 사용자를 선택하는 주체여야 한다. 관계는 일방향�
 
 ---
 
-# 4. STATE RULES
+# 4. FACT AUTHORITY / KNOWLEDGE / DISCLOSURE MODEL
 
-- `[UNDEFINED]`: 아직 설정하지 않음. Runtime이 추론 / 창작하면 안 됨.
-- `[HYPOTHESIS]`: 작가 검토용 가설. Production Runtime authority로 사용하면 안 됨.
-- 별도 표기 없음: 해당 Bible version에서 채택된 설정.
-- 단, Bible 자체가 Draft이면 Production authority 승격 여부는 별도 release gate가 결정한다.
+기존의 `[UNDEFINED]` 하나에 "작가가 아직 안 정함", "Character가 모름", "Character가 알지만 말하지 않음"을 동시에 담지 않는다.
 
-`[UNDEFINED]`는 결함이 아니라 **의도적으로 아직 확정하지 않은 영역**이다.
+> **Authoring authority, Character knowledge, user disclosure는 서로 다른 축이다.**
+
+## 4.1 Source Authority
+
+| 값 | 의미 | Runtime 취급 |
+|---|---|---|
+| `CANON` | 해당 Bible version에서 채택된 확정 person-level fact | authority로 사용 가능 |
+| `SOFT_CANON` | 범위 / 인상 / self-report처럼 의도적으로 약한 정밀도로 채택된 fact | 적힌 정밀도 이상으로 확장 금지 |
+| `AUTHOR_UNDEFINED` | 작가가 아직 결정하지 않음 | 추론 / 창작 / durable fact 승격 금지 |
+| `INTENTIONALLY_OPEN` | 작가가 의도적으로 값을 고정하지 않기로 결정 | 빈칸이 아니라 설계 결정. Runtime이 durable biography를 임의 확정하지 않음 |
+| `WORLD_DEPENDENT` | World / Deity 등 다른 authority가 결정해야 함 | 해당 authority 없이 Character Bible이 확정하지 않음 |
+
+Bible 자체가 Draft이면 `CANON` / `SOFT_CANON` 표기도 **그 Draft 내부에서 채택된 값**이라는 뜻이며, Production authority 승격 여부는 별도 release gate가 결정한다.
+
+## 4.2 Character Knowledge
+
+| 값 | 의미 |
+|---|---|
+| `KNOWN` | Character가 해당 사실을 알고 있음 |
+| `PARTIAL` | Character가 일부만 알고 있거나 불확실하게 알고 있음 |
+| `UNKNOWN_TO_CHARACTER` | 세계에는 사실이 존재할 수 있으나 Character 자신은 모름 |
+| `NOT_APPLICABLE` | knowledge 축이 적용되지 않음 |
+
+`AUTHOR_UNDEFINED`와 `UNKNOWN_TO_CHARACTER`를 혼동하지 않는다.
+
+```text
+AUTHOR_UNDEFINED
+= 작가가 아직 사실을 만들지 않음
+
+UNKNOWN_TO_CHARACTER
+= 사실의 authority는 존재하지만 Character가 그 사실을 모름
+```
+
+## 4.3 Disclosure Default
+
+| 값 | 의미 |
+|---|---|
+| `PUBLIC` | 초기 관계에서도 자연스럽게 공개 가능 |
+| `FAMILIAR` | 어느 정도 친숙함 / 맥락이 필요 |
+| `ATTACHED` | 실제 애착과 관계 history가 필요 |
+| `DEEP_TRUST` | 깊은 신뢰와 적절한 상황이 필요 |
+| `CONTEXTUAL` | 관계 stage보다 질문 맥락 / 사건 / 현재 상태가 우선 |
+| `NEVER` | 해당 Character가 원칙적으로 공개하지 않는 것으로 채택된 설정 |
+| `NOT_APPLICABLE` | disclosure 축이 적용되지 않음 |
+
+Disclosure 값은 **기본 접근 깊이**다. 실제 turn의 공개 여부는 Runtime Disclosure Gate가 현재 trust, shared history, 질문 맥락, 이전 공개 이력을 함께 보고 결정한다.
+
+## 4.4 Authoring State Compatibility
+
+기존 instance의 표기는 v1 안에서 다음처럼 해석한다.
+
+- `[UNDEFINED]` → 기본적으로 `source_authority: AUTHOR_UNDEFINED`
+- `[HYPOTHESIS]` → authoring proposal. `CANON` / `SOFT_CANON`이 아니며 Production Runtime authority로 사용 금지
+- 별도 표기 없음 → 해당 Bible Draft 내부에서 채택된 내용. 필요할 때 fact registry에서 `CANON` 또는 `SOFT_CANON` 정밀도를 명시
+
+중요:
+
+- `[UNDEFINED]`는 "Character가 비밀로 함"을 뜻하지 않는다.
+- `[HYPOTHESIS]`는 "Character가 불확실하게 기억함"을 뜻하지 않는다.
+- `PRIVATE` 같은 표현을 source authority 값으로 사용하지 않는다. private 여부는 disclosure 축이다.
+- 현재 성격에서 과거 trauma / 가족사 / 연애사를 역산해 빈칸을 채우지 않는다.
+
+## 4.5 Fact Registry / Closure Appendix
+
+Character instance는 A~K의 인간 설정집 본문을 훼손하지 않기 위해 문서 말미에 선택적으로 **Fact Authority & Biography Closure Appendix**를 둘 수 있다.
+
+권장 최소 컬럼:
+
+```text
+fact_key
+value_or_policy
+source_authority
+character_knowledge
+disclosure_default
+source_section
+closure_note
+```
+
+이 Appendix는 A~K와 경쟁하는 두 번째 Canon이 아니다.
+
+- 실제 서술의 원본은 A~K다.
+- Appendix는 high-answerability fact의 authority / knowledge / disclosure를 빠르게 확인하기 위한 index다.
+- 값이 A~K와 충돌하면 A~K를 먼저 수정한 뒤 Appendix를 동기화한다.
+- 장래 machine-readable Character Manifest가 도입되면 이 metadata를 Bible에서 **컴파일 / 추출**한다.
+- Manifest를 사람이 별도 설정 원본처럼 수정하지 않는다.
+- 현재 experimental foundation schema는 `docs/character/schema/character-manifest.v0.schema.json`에 둔다.
+- 해당 schema는 아직 Runtime implementation binding이 아니며, 실제 필요성이 확인될 때 compiler / extractor와 instance 생성 여부를 결정한다.
 
 ---
 
@@ -299,5 +417,7 @@ Character Bible v1 instance는 다음을 만족해야 한다.
 - I를 통해 사용자 없이도 삶이 지속된다.
 - J의 빈칸을 억지로 채우지 않는다.
 - K가 Visual Authority를 중복하지 않는다.
-- `[UNDEFINED]` / `[HYPOTHESIS]` 경계가 명확하다.
+- fact의 source authority / Character knowledge / disclosure 축이 혼동되지 않는다.
+- 기존 `[UNDEFINED]` / `[HYPOTHESIS]` 표기는 v1 compatibility rule에 맞게 해석된다.
+- High-Answerability biography의 unresolved gap이 Closure Pass에서 식별된다.
 - Runtime instruction이 Bible 안으로 역류하지 않는다.

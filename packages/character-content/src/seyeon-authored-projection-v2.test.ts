@@ -18,10 +18,10 @@ describe('Se-yeon authored projection v2', () => {
     expect(SEYEON_AUTHORED_PROJECTION_V2.source.bible.declaredVersion).toBe('v0.2');
     expect(SEYEON_AUTHORED_PROJECTION_V2.source.runtime.declaredVersion).toBe('v0.1');
     expect(SEYEON_AUTHORED_PROJECTION_V2.source.bible.gitBlobSha).toBe(
-      '03ec32f43e56c2efbca75461c24a19a4690f683e',
+      '2ecccbf4a1a7cb595b8a30f300f678d0a1e06999',
     );
     expect(SEYEON_AUTHORED_PROJECTION_V2.source.runtime.gitBlobSha).toBe(
-      '931607ce12ec5c77e064c740b1ce14cb2344c51c',
+      '84c2f800db40ca963b969743e4e2f5927ff8a01a',
     );
   });
 
