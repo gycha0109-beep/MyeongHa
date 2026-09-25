@@ -193,3 +193,69 @@ export function resolveSeyeonFactAuthorityV1(
 ): CharacterFactAuthorityRecordV1 {
   return SEYEON_HIGH_ANSWERABILITY_FACT_AUTHORITY_V1[factKey];
 }
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+export function guardCharacterFactAuthorityRecordV1(
+  raw: unknown,
+): CharacterFactAuthorityRecordV1 {
+  if (!isRecord(raw)) {
+    throw new TypeError('Character fact authority record must be an object.');
+  }
+  const unexpected = Object.keys(raw).find(
+    (key) =>
+      key !== 'factKey' &&
+      key !== 'sourceAuthority' &&
+      key !== 'characterKnowledge' &&
+      key !== 'disclosureDefault' &&
+      key !== 'sourceRef' &&
+      key !== 'closureNote',
+  );
+  if (unexpected !== undefined) {
+    throw new TypeError(
+      `Character fact authority record contains unexpected field: ${unexpected}`,
+    );
+  }
+  if (
+    typeof raw.sourceAuthority !== 'string' ||
+    !CHARACTER_SOURCE_AUTHORITIES_V1.includes(
+      raw.sourceAuthority as CharacterSourceAuthorityV1,
+    )
+  ) {
+    throw new TypeError('Character fact sourceAuthority is invalid.');
+  }
+  if (
+    typeof raw.characterKnowledge !== 'string' ||
+    !CHARACTER_KNOWLEDGE_STATES_V1.includes(
+      raw.characterKnowledge as CharacterKnowledgeStateV1,
+    )
+  ) {
+    throw new TypeError('Character fact characterKnowledge is invalid.');
+  }
+  if (
+    typeof raw.disclosureDefault !== 'string' ||
+    !CHARACTER_DISCLOSURE_DEFAULTS_V1.includes(
+      raw.disclosureDefault as CharacterDisclosureDefaultV1,
+    )
+  ) {
+    throw new TypeError('Character fact disclosureDefault is invalid.');
+  }
+  if (
+    typeof raw.factKey !== 'string' ||
+    typeof raw.sourceRef !== 'string' ||
+    typeof raw.closureNote !== 'string'
+  ) {
+    throw new TypeError('Character fact authority text fields are invalid.');
+  }
+
+  return fact({
+    factKey: raw.factKey,
+    sourceAuthority: raw.sourceAuthority as CharacterSourceAuthorityV1,
+    characterKnowledge: raw.characterKnowledge as CharacterKnowledgeStateV1,
+    disclosureDefault: raw.disclosureDefault as CharacterDisclosureDefaultV1,
+    sourceRef: raw.sourceRef,
+    closureNote: raw.closureNote,
+  });
+}
