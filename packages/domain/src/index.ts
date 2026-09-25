@@ -268,3 +268,51 @@ export {
   type SajuProductionCalculationIngressArtifactV1,
   type SajuProductionCalculationIngressErrorCodeV1,
 } from './saju-production-calculation-ingress.js';
+
+export {
+  SEYEON_CONTEXT_FOCUS_KEYS_V2,
+  SEYEON_RUNTIME_CONTEXT_SCHEMA_VERSION_V2,
+  assembleSeyeonRuntimeContextV2,
+  resolveSeyeonBibleSliceSelectionV2,
+  type AssembleSeyeonRuntimeContextV2Input,
+  type SeyeonContextFocusKeyV2,
+  type SeyeonRecentMessageV2,
+  type SeyeonRelationshipContextV2,
+  type SeyeonRetrievedClaimKindV2,
+  type SeyeonRetrievedMemoryKindV2,
+  type SeyeonRetrievedMemoryV2,
+  type SeyeonRuntimeContextV2,
+} from './seyeon-runtime-context-v2.js';
+
+export {
+  SEYEON_IMMEDIATE_WANT_KEYS_V2,
+  SEYEON_REVEAL_LEVELS_V2,
+  SEYEON_TENSION_KEYS_V2,
+  SEYEON_TURN_INTERPRETATION_SCHEMA_VERSION_V2,
+  SEYEON_USER_MOVE_KEYS_V2,
+  SeyeonTurnInterpretationErrorV2,
+  guardSeyeonTurnInterpretationV2,
+  type SeyeonImmediateWantKeyV2,
+  type SeyeonRevealLevelV2,
+  type SeyeonTensionKeyV2,
+  type SeyeonTurnInterpretationV2,
+  type SeyeonUserMoveKeyV2,
+} from './seyeon-turn-interpreter-v2.js';
+
+export {
+  SEYEON_RENDERER_DRAFT_SCHEMA_VERSION_V2,
+  SEYEON_RENDERER_PACKET_SCHEMA_VERSION_V2,
+  SEYEON_SEMANTIC_FAILURE_CODES_V2,
+  SEYEON_SEMANTIC_REVIEW_SCHEMA_VERSION_V2,
+  SeyeonRendererGuardErrorV2,
+  admitSeyeonRendererDraftV2,
+  buildSeyeonRendererPacketV2,
+  guardSeyeonRendererOutputV2,
+  guardSeyeonSemanticReviewV2,
+  hashSeyeonRendererUtteranceV2,
+  type SeyeonDialogueEnvelopeV2,
+  type SeyeonRendererDraftV2,
+  type SeyeonRendererPacketV2,
+  type SeyeonSemanticFailureCodeV2,
+  type SeyeonSemanticReviewV2,
+} from './seyeon-renderer-v2.js';
