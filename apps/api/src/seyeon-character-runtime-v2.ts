@@ -29,7 +29,8 @@ export const SEYEON_STRUCTURED_PROVIDER_CONTRACT_VERSION_V2 =
 export type SeyeonStructuredPurposeV2 =
   | 'turn_interpretation'
   | 'dialogue_render'
-  | 'semantic_review';
+  | 'semantic_review'
+  | 'event_extraction';
 
 export interface SeyeonStructuredProviderRequestV2 {
   readonly contractVersion: typeof SEYEON_STRUCTURED_PROVIDER_CONTRACT_VERSION_V2;

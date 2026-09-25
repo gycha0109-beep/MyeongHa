@@ -336,3 +336,16 @@ export {
   type SeyeonRelationshipProjectionV2,
   type SeyeonRepairStateV2,
 } from './seyeon-event-ledger-v2.js';
+
+export {
+  SEYEON_EVENT_EXTRACTION_CANDIDATE_SCHEMA_VERSION_V2,
+  SEYEON_EVENT_RETRIEVAL_POLICY_VERSION_V2,
+  SeyeonEventExtractionErrorV2,
+  guardSeyeonEventExtractionCandidateV2,
+  materializeSeyeonEventCandidateV2,
+  rankSeyeonEventRetrievalV2,
+  type SeyeonEventExtractionCandidateV2,
+  type SeyeonEventExtractionContextV2,
+  type SeyeonEventExtractionMessageV2,
+  type SeyeonEventRetrievalCandidateV2,
+} from './seyeon-event-extraction-v2.js';
