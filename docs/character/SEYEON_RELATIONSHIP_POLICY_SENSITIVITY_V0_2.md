@@ -271,3 +271,77 @@ Nothing in this report may write production:
 SRC-22 remains OPEN.
 
 The next evidence gate is B1 vs B2-A/B2-B shadow comparison.
+
+## 13. B2 shadow comparison
+
+Two independent changes are now executable shadows.
+
+### B2-A — rolling family-credit window
+
+Change only:
+
+~~~text
+fixed 7-day bucket
+→ rolling 7-day window
+~~~
+
+Observed comparison:
+
+- Day-7/Day-8 boundary burst: B1 credits 4, B2-A credits 2;
+- normal Events spaced eight days apart: same score/milestone result as B1;
+- no production authority is implied.
+
+This is a materially better anti-boundary mechanism in the tested cases.
+
+### B2-B — sustained narrow-route qualification
+
+B2-B does not simply lower the five-family gate.
+
+It keeps the normal B1 mixed route and adds a slower alternate route:
+
+~~~text
+S2 alternate
+>= 8 positive weeks
+>= 2 positive families
+
+S3 alternate
+>= 20 positive weeks
+>= 2 positive families
+
+S4 alternate
+>= 40 positive weeks
+>= 2 positive families
++ existing score/day/milestone requirements
+~~~
+
+Observed comparison after one year at two meaningful Events/week:
+
+| Route | B1 | B2-B |
+|---|---|---|
+| shallow visit-only | S0 | S0 |
+| shared activity | S1 | S4 |
+| reliability | S1 | S4 |
+| reciprocity | S2 | S4 |
+| disclosure-heavy | S2 | S4 |
+| mixed organic | S4 | S4 |
+
+A reliability route at 39 positive weeks is still below S4; at 40 positive weeks it can qualify.
+
+This makes the alternate path slow rather than reducing the relationship to one repeated action.
+
+### Combined shadow
+
+`CANDIDATE_B2_COMBINED_SHADOW` combines B2-A and B2-B only for comparison.
+
+It still uses B1's `recompute` stage behavior.
+
+Therefore it intentionally **does not resolve F03 stage-regression semantics**. An established S4 plus `SPECIALNESS_INVALIDATED` still recomputes downward in this shadow.
+
+### Current technical disposition
+
+- B2-A: **preferred experimental anti-farming mechanism** over fixed buckets in the tested boundary cases.
+- B2-B: **promising route-diversity candidate**, but its 8/20/40-week alternate gates are calibration values and require further owner/product review.
+- Combined B2: useful for shadow comparison only; not production policy.
+- F03/F04/F05/F06 remain open.
+
+SRC-22 therefore remains OPEN.
