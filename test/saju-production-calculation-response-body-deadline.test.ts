@@ -28,6 +28,9 @@ function response(
     status,
     headers: new Headers({ 'Content-Type': contentType }),
     body,
+    async text() {
+      throw new Error('Calculation adapter must consume the governed response stream.');
+    },
   };
 }
 
