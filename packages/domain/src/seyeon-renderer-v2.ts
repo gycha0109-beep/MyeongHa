@@ -434,9 +434,6 @@ export function guardSeyeonRendererOutputV2(input: {
     rawOutput: input.semanticReview,
     utterance: draft.utterance,
   });
-    rawOutput: input.semanticReview,
-    utterance,
-  });
   const expectedHash = semanticReview.reviewedUtteranceHash;
 
   if (semanticReview.failureCodes.length > 0) {
