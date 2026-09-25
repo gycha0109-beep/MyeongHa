@@ -12,6 +12,8 @@ const chatHttpPath = 'apps/api/src/chat-open-http.ts';
 const readingHttpPath = 'apps/api/src/reading-create-http.ts';
 const readingCommandPath = 'apps/api/src/reading-create-command.ts';
 const birthAdapterPath = 'api/birth-profiles.ts';
+const productionWorkflowPath = '.github/workflows/production-authenticated-json-resource-evidence.yml';
+const productionVerifierPath = 'scripts/operations/verify-production-authenticated-json-resource-live.mjs';
 
 const [
   policyRaw,
@@ -25,6 +27,8 @@ const [
   readingHttp,
   readingCommand,
   birthAdapter,
+  productionWorkflow,
+  productionVerifier,
 ] = await Promise.all([
   readFile(policyPath, 'utf8'),
   readFile(docsPath, 'utf8'),
@@ -37,6 +41,8 @@ const [
   readFile(readingHttpPath, 'utf8'),
   readFile(readingCommandPath, 'utf8'),
   readFile(birthAdapterPath, 'utf8'),
+  readFile(productionWorkflowPath, 'utf8'),
+  readFile(productionVerifierPath, 'utf8'),
 ]);
 
 const policy = JSON.parse(policyRaw);
@@ -195,6 +201,40 @@ for (const fragment of [
 }
 if (birthAdapter.includes('JSON.stringify(body)')) {
   throw new Error(`${birthAdapterPath} regressed to unbounded direct parsed-body serialization.`);
+}
+
+for (const fragment of [
+  'workflow_dispatch:',
+  'watchtower_track:',
+  'default: ops',
+  'environment: production',
+  'MYEONGHA_PRODUCTION_BIRTH_SMOKE_MEMBER_BEARER',
+  'node scripts/operations/verify-production-authenticated-json-resource-live.mjs',
+]) {
+  requireFragment(productionWorkflowPath, productionWorkflow, fragment);
+}
+for (const fragment of [
+  "GITHUB_REF !== 'refs/heads/main'",
+  "GITHUB_EVENT_NAME !== 'workflow_dispatch'",
+  "'x'.repeat(17_000)",
+  "response.status !== 413",
+  "payload.error.code !== 'REQUEST_TOO_LARGE'",
+  "authenticated_json_resource_evidence=pass",
+  "request_body_logged=false",
+  "credential_logged=false",
+]) {
+  requireFragment(productionVerifierPath, productionVerifier, fragment);
+}
+for (const forbidden of [
+  'console.log(bearer',
+  'console.log(birthBody',
+  'console.log(chatBody',
+  'access_token',
+  'refresh_token',
+]) {
+  if (productionVerifier.includes(forbidden)) {
+    throw new Error(`${productionVerifierPath} contains forbidden evidence material: ${forbidden}`);
+  }
 }
 
 console.log(
