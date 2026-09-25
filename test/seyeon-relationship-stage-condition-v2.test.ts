@@ -60,6 +60,39 @@ describe('Se-yeon relationship attained stage vs current condition v2', () => {
     expect(state.causalEventIds).toEqual(['conflict', 'repair']);
   });
 
+  it('lets later meaningful non-conflict evidence clear the immediate post-repair overlay without using wall-clock decay', () => {
+    const conflict = seyeonEventFixture({
+      id: 'repair-overlay-conflict',
+      kind: 'CONFLICT_EVENT',
+      day: 100,
+    });
+    const repair = seyeonEventFixture({
+      id: 'repair-overlay-repair',
+      kind: 'RECONCILIATION_EVENT',
+      day: 110,
+      causalPredecessorEventIds: [conflict.eventId],
+    });
+    const laterRecognition = seyeonEventFixture({
+      id: 'repair-overlay-recognition',
+      kind: 'USER_REMEMBERED_SEYEON_DETAIL',
+      day: 120,
+    });
+    const episodes = buildSeyeonRelationshipEvidenceEpisodesV2([
+      conflict,
+      repair,
+      laterRecognition,
+    ]);
+
+    const state = projectSeyeonRelationshipStateShadowV2({
+      previousAttainedStage: 'S4_SPECIAL',
+      currentCandidateStage: 'S4_SPECIAL',
+      episodes,
+    });
+
+    expect(state.currentCondition).toBe('STABLE');
+    expect(state.behaviorAccess).toBe('STAGE_ALIGNED');
+  });
+
   it('never promotes attained depth merely because time passes or the user returns', () => {
     const returned = seyeonEventFixture({
       id: 'returned',
