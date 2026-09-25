@@ -30,7 +30,8 @@ jobs:
     env:
       MYEONGHA_AUTHENTICATED_JSON_RESOURCE_CONFIRM: ${{ inputs.confirmation }}
       MYEONGHA_WATCHTOWER_TRACK: ${{ inputs.watchtower_track }}
-      MYEONGHA_PRODUCTION_BIRTH_SMOKE_MEMBER_BEARER: ${{ secrets.MYEONGHA_PRODUCTION_BIRTH_SMOKE_MEMBER_BEARER }}
+      MYEONGHA_PRODUCTION_MEMBER_EMAIL: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_EMAIL }}
+      MYEONGHA_PRODUCTION_MEMBER_PASSWORD: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_PASSWORD }}
     steps:
       - name: Verify dispatch authority
         shell: bash
@@ -40,7 +41,8 @@ jobs:
           [[ "$MYEONGHA_WATCHTOWER_TRACK" == 'ops' ]]
           [[ "$GITHUB_EVENT_NAME" == 'workflow_dispatch' ]]
           [[ "$GITHUB_REF" == 'refs/heads/main' ]]
-          test -n "${MYEONGHA_PRODUCTION_BIRTH_SMOKE_MEMBER_BEARER:-}"
+          test -n "${MYEONGHA_PRODUCTION_MEMBER_EMAIL:-}"
+          test -n "${MYEONGHA_PRODUCTION_MEMBER_PASSWORD:-}"
 
       - name: Check out exact repository verifier
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
