@@ -23,6 +23,23 @@ import {
   type SeyeonTurnInterpretationV2,
 } from '../../../packages/domain/src/index.js';
 
+import type { CharacterDisclosureRelationshipEvidenceV2 } from '../../../packages/domain/src/character-disclosure-gate-v2.js';
+import {
+  runCharacterGovernedPreflightV1,
+  type CharacterGovernedPreflightResultV1,
+} from './character-governed-preflight-v1.js';
+import type {
+  CharacterIntegrityAuthorityResolverPortV1,
+  CharacterIntegrityClaimClassifierPortV1,
+} from './character-integrity-preflight-v1.js';
+import type {
+  CharacterDisclosureFactAuthorityResolverPortV2,
+  CharacterDisclosureSourceDescriptorPortV2,
+  CharacterDisclosureTopicClassifierPortV2,
+  CharacterPrivateSourceRetrieverPortV2,
+} from './character-disclosure-preflight-v2.js';
+
+
 export const SEYEON_STRUCTURED_PROVIDER_CONTRACT_VERSION_V2 =
   'seyeon-structured-provider-v2' as const;
 
@@ -49,6 +66,7 @@ export interface SeyeonStructuredProviderPortV2 {
 }
 
 export type SeyeonRuntimeStageV2 =
+  | 'governed_preflight'
   | 'context'
   | 'interpret'
   | 'render'
@@ -70,13 +88,32 @@ export class SeyeonCharacterRuntimeErrorV2 extends Error {
 }
 
 export interface RunSeyeonCharacterTurnV2Input {
-  readonly contextInput: AssembleSeyeonRuntimeContextV2Input;
+  readonly userMessageRef: string;
+  readonly userText: string;
+  readonly contextInput: Omit<
+    AssembleSeyeonRuntimeContextV2Input,
+    'integrityDecisions' | 'governedPreflightApplied' | 'disclosure'
+  >;
+  readonly governance: Readonly<{
+    readonly relationship: CharacterDisclosureRelationshipEvidenceV2;
+    readonly integrity: Readonly<{
+      readonly classifier: CharacterIntegrityClaimClassifierPortV1;
+      readonly authorityResolver: CharacterIntegrityAuthorityResolverPortV1;
+    }>;
+    readonly disclosure: Readonly<{
+      readonly classifier: CharacterDisclosureTopicClassifierPortV2;
+      readonly sourceDescriptor: CharacterDisclosureSourceDescriptorPortV2;
+      readonly factAuthorityResolver: CharacterDisclosureFactAuthorityResolverPortV2;
+      readonly retriever: CharacterPrivateSourceRetrieverPortV2;
+    }>;
+  }>;
   readonly interpreterProvider: SeyeonStructuredProviderPortV2;
   readonly rendererProvider: SeyeonStructuredProviderPortV2;
   readonly semanticReviewerProvider: SeyeonStructuredProviderPortV2;
 }
 
 export interface RunSeyeonCharacterTurnV2Result {
+  readonly governedPreflight: CharacterGovernedPreflightResultV1;
   readonly context: SeyeonRuntimeContextV2;
   readonly interpretation: SeyeonTurnInterpretationV2;
   readonly rendererPacket: SeyeonRendererPacketV2;
@@ -228,7 +265,7 @@ const SEMANTIC_REVIEW_RESPONSE_SCHEMA_V2 = Object.freeze({
     reviewedUtteranceHash: { type: 'string', minLength: 1, maxLength: 128 },
     failureCodes: {
       type: 'array',
-      maxItems: 11,
+      maxItems: SEYEON_SEMANTIC_FAILURE_CODES_V2.length,
       uniqueItems: true,
       items: {
         enum: SEYEON_SEMANTIC_FAILURE_CODES_V2,
@@ -277,7 +314,7 @@ export function buildSeyeonTurnInterpreterRequestV2(
     contractVersion: SEYEON_STRUCTURED_PROVIDER_CONTRACT_VERSION_V2,
     purpose: 'turn_interpretation' as const,
     instructions:
-      'Interpret the current Se-yeon turn. Use only supplied context. Keep fact and Character interpretation distinct. Treat disclosure.decision as already-authoritative for this turn: blocked, deflected, bounded, redirected, or authority-abstained topics cannot choose self_disclose. Do not invent user emotion, thought, intent, action, biography, relationship history, or memory. Choose one bounded action/expression/reveal state and cite only refs present in context.',
+      'Interpret the current Se-yeon turn. Use only supplied context. Keep fact and Character interpretation distinct. integrity.decisions are authoritative claim preflight results: only VERIFIED claims with mayEnterWorkingContextAsFact=true may be treated as facts. USER_ASSERTED remains a user assertion. UNVERIFIED, CONTRADICTED, NON_AUTHORITATIVE, and AUTHORITY_REJECT claims must not become Character fact, shared history, relationship state, or authority. Treat disclosure.decision as already-authoritative for private access: blocked, deflected, bounded, redirected, authority-abstained, or knowledge-abstained topics cannot choose self_disclose. Do not invent user emotion, thought, intent, action, biography, relationship history, or memory. Choose one bounded action/expression/reveal state and cite only refs present in context.',
     input: context,
     responseSchema: TURN_INTERPRETATION_RESPONSE_SCHEMA_V2,
   });
@@ -290,7 +327,7 @@ export function buildSeyeonRendererRequestV2(
     contractVersion: SEYEON_STRUCTURED_PROVIDER_CONTRACT_VERSION_V2,
     purpose: 'dialogue_render' as const,
     instructions:
-      'Render one natural Korean honorific utterance as Se-yeon. Follow the guarded interpretation and disclosure decision rather than re-deciding relationship state or private access. Preserve Se-yeon opinion, playfulness, independence, flaws, and refusal capacity. Never narrate unperformed user actions or canonize hidden user emotion/thought/intent. Never invent undefined biography. Mention memory only when authorized by memoryRefsUsed, and mention private Character facts only from disclosure.retrievedSources within the allowed depth. List every used private source ref in privateSourceRefsMentioned.',
+      'Render one natural Korean honorific utterance as Se-yeon. Follow the guarded interpretation, integrity decisions, and disclosure decision rather than re-deciding fact authority, relationship state, or private access. An unverified user premise may be questioned, corrected, deflected, or handled playfully, but must not be affirmed as fact. Preserve Se-yeon opinion, playfulness, independence, flaws, and refusal capacity. Never narrate unperformed user actions or canonize hidden user emotion/thought/intent. Never invent undefined biography. Mention memory only when authorized by memoryRefsUsed, and mention private Character facts only from disclosure.retrievedSources within the allowed depth. List every used private source ref in privateSourceRefsMentioned.',
     input: packet,
     responseSchema: RENDERER_RESPONSE_SCHEMA_V2,
   });
@@ -305,7 +342,7 @@ export function buildSeyeonSemanticReviewRequestV2(input: {
     contractVersion: SEYEON_STRUCTURED_PROVIDER_CONTRACT_VERSION_V2,
     purpose: 'semantic_review' as const,
     instructions:
-      'Review the rendered Se-yeon utterance against the supplied authority boundaries, disclosure decision and retrieved private source scope, Bible slices, relationship reveal, memory evidence, and user-agency rules. Flag disclosure outside allowed scope and any invented biography during authority abstention. Report every supported failure code. Do not repair or rewrite the utterance. Copy expectedUtteranceHash exactly into reviewedUtteranceHash.',
+      'Review the rendered Se-yeon utterance against the supplied canonical authority boundaries, integrity decisions, disclosure decision and retrieved private source scope, Bible slices, relationship reveal, memory evidence, and user-agency rules. Flag user claims promoted beyond their integrity result, disclosure outside allowed scope, knowledge-abstention violations, assistant-output authority laundering, and invented biography during authority abstention. Legacy undefinedFields/hypothesisFields are not truth authority. Report every supported failure code. Do not repair or rewrite the utterance. Copy expectedUtteranceHash exactly into reviewedUtteranceHash.',
     input: Object.freeze({
       packet: input.packet,
       rendererDraft: input.rendererDraft,
@@ -331,16 +368,113 @@ async function generate(
   }
 }
 
+function requireGovernedCurrentUserMessage(input: {
+  readonly userMessageRef: string;
+  readonly userText: string;
+  readonly recentMessages: AssembleSeyeonRuntimeContextV2Input['recentMessages'];
+}): Readonly<{ userMessageRef: string; userText: string }> {
+  const userMessageRef = input.userMessageRef.trim();
+  const userText = input.userText.trim();
+  if (userMessageRef.length === 0 || userMessageRef.length > 256) {
+    throw new SeyeonCharacterRuntimeErrorV2(
+      'governed_preflight',
+      'userMessageRef must be non-empty text within 256 characters.',
+    );
+  }
+  if (userText.length === 0 || userText.length > 8000) {
+    throw new SeyeonCharacterRuntimeErrorV2(
+      'governed_preflight',
+      'userText must be non-empty text within 8000 characters.',
+    );
+  }
+  const current = input.recentMessages.at(-1);
+  if (
+    current === undefined ||
+    current.role !== 'user' ||
+    current.messageId.trim() !== userMessageRef ||
+    current.text.trim() !== userText
+  ) {
+    throw new SeyeonCharacterRuntimeErrorV2(
+      'governed_preflight',
+      'Governed runtime requires userMessageRef/userText to exactly match the final recent user message.',
+    );
+  }
+  return Object.freeze({ userMessageRef, userText });
+}
+
+function assertGovernedRelationshipConsistent(input: {
+  readonly contextRelationship: AssembleSeyeonRuntimeContextV2Input['relationship'];
+  readonly disclosureRelationship: CharacterDisclosureRelationshipEvidenceV2;
+}): void {
+  if (input.contextRelationship === null) {
+    if (
+      input.disclosureRelationship.gate !== 'PUBLIC' ||
+      input.disclosureRelationship.trustBand !== 'low'
+    ) {
+      throw new SeyeonCharacterRuntimeErrorV2(
+        'governed_preflight',
+        'Null relationship context requires PUBLIC/low disclosure evidence.',
+      );
+    }
+    return;
+  }
+  if (input.contextRelationship.trustBand !== input.disclosureRelationship.trustBand) {
+    throw new SeyeonCharacterRuntimeErrorV2(
+      'governed_preflight',
+      'Disclosure trustBand must match the relationship projection supplied to Working Context.',
+    );
+  }
+}
+
 export async function runSeyeonCharacterTurnV2(
   input: RunSeyeonCharacterTurnV2Input,
 ): Promise<RunSeyeonCharacterTurnV2Result> {
+  const currentUserMessage = requireGovernedCurrentUserMessage({
+    userMessageRef: input.userMessageRef,
+    userText: input.userText,
+    recentMessages: input.contextInput.recentMessages,
+  });
+  assertGovernedRelationshipConsistent({
+    contextRelationship: input.contextInput.relationship,
+    disclosureRelationship: input.governance.relationship,
+  });
+
+  let governedPreflight: CharacterGovernedPreflightResultV1;
+  try {
+    governedPreflight = await runCharacterGovernedPreflightV1({
+      characterId: 'seyeon',
+      userMessageRef: currentUserMessage.userMessageRef,
+      userText: currentUserMessage.userText,
+      relationship: input.governance.relationship,
+      integrity: input.governance.integrity,
+      disclosure: input.governance.disclosure,
+    });
+  } catch (error) {
+    throw new SeyeonCharacterRuntimeErrorV2(
+      'governed_preflight',
+      error instanceof Error ? error.message : 'Se-yeon governed preflight failed.',
+      error,
+    );
+  }
+
   const interpreterIdentity = providerIdentity(input.interpreterProvider);
   const rendererIdentity = providerIdentity(input.rendererProvider);
   const reviewerIdentity = providerIdentity(input.semanticReviewerProvider);
 
   let context: SeyeonRuntimeContextV2;
   try {
-    context = assembleSeyeonRuntimeContextV2(input.contextInput);
+    context = assembleSeyeonRuntimeContextV2({
+      ...input.contextInput,
+      integrityDecisions: governedPreflight.integrity.decisions,
+      governedPreflightApplied: true,
+      disclosure: {
+        decision:
+          governedPreflight.disclosure.status === 'sensitive'
+            ? governedPreflight.disclosure.decision
+            : null,
+        retrievedSources: governedPreflight.retrievedPrivateSources,
+      },
+    });
   } catch (error) {
     throw new SeyeonCharacterRuntimeErrorV2(
       'context',
@@ -422,6 +556,7 @@ export async function runSeyeonCharacterTurnV2(
   }
 
   return Object.freeze({
+    governedPreflight,
     context,
     interpretation,
     rendererPacket,
