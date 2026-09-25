@@ -31,11 +31,13 @@ function baseMemory() {
   };
 }
 
-function source(authority: 'CANON' | 'UNDEFINED') {
+function source(authority: 'CANON' | 'AUTHOR_UNDEFINED') {
+  const available = authority === 'CANON';
   return {
     topicKey: 'past_romance_detail' as const,
     sourceAuthorityState: authority,
-    minimumDisclosureGate: 'FAMILIAR' as const,
+    characterKnowledge: available ? ('KNOWN' as const) : ('NOT_APPLICABLE' as const),
+    disclosureDefault: available ? ('FAMILIAR' as const) : ('NOT_APPLICABLE' as const),
     allowedDepth: 'deep' as const,
     previouslyDisclosedDepth: 'none' as const,
     sourceRef: 'runtime:R11.6/past_romance_detail',
@@ -227,11 +229,11 @@ describe('Se-yeon disclosure runtime v2 integration', () => {
     ]);
   });
 
-  it('keeps disclosure-eligible UNDEFINED content out of context as AUTHORITY_ABSTAIN', () => {
+  it('keeps disclosure-eligible AUTHOR_UNDEFINED content out of context as AUTHORITY_ABSTAIN', () => {
     const decision = evaluateCharacterDisclosurePreflightV1({
       characterId: 'seyeon',
       topicKey: 'past_romance_detail',
-      source: source('UNDEFINED'),
+      source: source('AUTHOR_UNDEFINED'),
       relationship: {
         gate: 'DEEP_TRUST',
         trustBand: 'high',
