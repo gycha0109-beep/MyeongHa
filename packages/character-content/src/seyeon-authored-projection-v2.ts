@@ -1,16 +1,18 @@
+import { SEYEON_FACT_AUTHORITY_REGISTRY_V1 } from './seyeon-fact-authority-v1.js';
+
 export const SEYEON_AUTHORED_PROJECTION_SCHEMA_VERSION_V2 = 'seyeon-authored-projection-v2' as const;
 
 export const SEYEON_AUTHORED_PROJECTION_SOURCE_V2 = Object.freeze({
   bible: Object.freeze({
     path: 'docs/character/SEYEON_CHARACTER_BIBLE_DRAFT_V0_2.md',
     declaredVersion: 'v0.2',
-    gitBlobSha: '03ec32f43e56c2efbca75461c24a19a4690f683e',
+    gitBlobSha: '2ecccbf4a1a7cb595b8a30f300f678d0a1e06999',
     authorityState: 'draft_not_production_authority',
   }),
   runtime: Object.freeze({
     path: 'docs/character/SEYEON_CHARACTER_RUNTIME_DRAFT_V0_1.md',
     declaredVersion: 'v0.1',
-    gitBlobSha: '931607ce12ec5c77e064c740b1ce14cb2344c51c',
+    gitBlobSha: '84c2f800db40ca963b969743e4e2f5927ff8a01a',
     authorityState: 'draft_not_production_authority',
   }),
 });
@@ -363,6 +365,7 @@ export const SEYEON_AUTHORED_PROJECTION_V2 = Object.freeze({
   displayName: '세연',
   source: SEYEON_AUTHORED_PROJECTION_SOURCE_V2,
   authority: 'derived_projection_not_independent_canon',
+  factAuthority: SEYEON_FACT_AUTHORITY_REGISTRY_V1,
   coreAnchor: SEYEON_CORE_ANCHOR_V2,
   undefinedFields: SEYEON_UNDEFINED_FIELDS_V2,
   hypothesisFields: SEYEON_HYPOTHESIS_FIELDS_V2,
