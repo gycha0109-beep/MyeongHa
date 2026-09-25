@@ -338,9 +338,13 @@ export function guardSeyeonTurnInterpretationV2(input: {
   const disclosureResult = input.context.disclosure.decision?.result ?? null;
   if (
     disclosureResult !== null &&
-    ['DEFLECT', 'BOUNDARY', 'REDIRECT', 'AUTHORITY_ABSTAIN'].includes(
-      disclosureResult,
-    ) &&
+    [
+      'DEFLECT',
+      'BOUNDARY',
+      'REDIRECT',
+      'AUTHORITY_ABSTAIN',
+      'KNOWLEDGE_ABSTAIN',
+    ].includes(disclosureResult) &&
     chosenAction === 'self_disclose'
   ) {
     throw new SeyeonTurnInterpretationErrorV2(
