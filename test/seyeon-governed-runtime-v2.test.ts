@@ -483,9 +483,9 @@ describe('Se-yeon governed runtime v2', () => {
     const runtimeInput = baseInput({ userText: '안녕하세요.' });
     runtimeInput.contextInput.retrievedMemories.push({
       memoryId: 'smuggled-private',
-      kind: 'life_fact',
+      kind: 'relationship_event',
       claimKind: 'fact',
-      summary: 'legacy hypothesis disguised as memory truth',
+      summary: 'legacy Character-private source disguised as memory truth',
       sourceRef: 'bible:J2',
       relevance: 1,
       salience: 1,
