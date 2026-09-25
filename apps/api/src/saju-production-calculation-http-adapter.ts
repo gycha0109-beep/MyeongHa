@@ -6,6 +6,11 @@ import {
   type SajuProductionCalculationIngressErrorCodeV1,
 } from '../../../packages/domain/src/index.js';
 import { ApiCommandError } from './api-error.js';
+import {
+  SAJU_CALCULATION_JSON_RESPONSE_MAXIMUM_BYTES_V1,
+  UpstreamJsonResponseTooLargeV1,
+  readBoundedUpstreamJsonTextV1,
+} from './upstream-json-response-resource.js';
 
 export const SAJU_PRODUCTION_CALCULATION_HTTP_PATH_V1 = '/api/calculations' as const;
 export const SAJU_PRODUCTION_CALCULATION_HTTP_DEFAULT_TIMEOUT_MS_V1 = 5_000 as const;
@@ -21,6 +26,7 @@ export type SajuProductionCalculationHttpAdapterFailureCodeV1 =
   | 'HTTP_UNEXPECTED_STATUS'
   | 'INVALID_CONTENT_TYPE'
   | 'INVALID_JSON'
+  | 'RESPONSE_TOO_LARGE'
   | 'INGRESS_REJECTED';
 
 export class SajuProductionCalculationHttpAdapterErrorV1 extends Error {
@@ -40,10 +46,7 @@ export interface SajuProductionCalculationHttpResponseV1 {
   readonly headers: Readonly<{
     get(name: string): string | null;
   }>;
-  readonly body?: Readonly<{
-    cancel(reason?: unknown): Promise<void>;
-  }> | null;
-  text(): Promise<string>;
+  readonly body: ReadableStream<Uint8Array> | null;
 }
 
 export interface SajuProductionCalculationHttpRequestInitV1 {
@@ -85,6 +88,7 @@ export interface SajuProductionCalculationRequestV1 {
 interface SajuProductionCalculationHttpDeadlineLeaseV1 {
   readonly response: SajuProductionCalculationHttpResponseV1;
   readonly deadline: Promise<never>;
+  readonly signal: AbortSignal;
   readonly didTimeout: () => boolean;
   readonly release: () => void;
 }
@@ -293,6 +297,7 @@ async function fetchWithTimeout(input: {
     return Object.freeze({
       response,
       deadline,
+      signal: controller.signal,
       didTimeout: () => timedOut,
       release,
     });
@@ -368,13 +373,23 @@ function assertJsonContentType(response: SajuProductionCalculationHttpResponseV1
 
 async function parseJsonResponse(
   response: SajuProductionCalculationHttpResponseV1,
-  deadline: Promise<never>,
+  signal: AbortSignal,
   didTimeout: () => boolean,
 ): Promise<unknown> {
   let text: string;
   try {
-    text = await Promise.race([response.text(), deadline]);
+    text = await readBoundedUpstreamJsonTextV1(response, {
+      maximumBodyBytes: SAJU_CALCULATION_JSON_RESPONSE_MAXIMUM_BYTES_V1,
+      signal,
+    });
   } catch (error) {
+    if (error instanceof UpstreamJsonResponseTooLargeV1) {
+      throw new SajuProductionCalculationHttpAdapterErrorV1(
+        'RESPONSE_TOO_LARGE',
+        'Saju calculation response exceeded the governed resource ceiling.',
+        response.status,
+      );
+    }
     if (
       didTimeout() ||
       (error instanceof SajuProductionCalculationHttpAdapterErrorV1 && error.code === 'TIMEOUT')
@@ -417,7 +432,7 @@ export function createSajuProductionCalculationHttpAdapterV1(
         const { response } = lease;
         assertSuccessfulStatus(response);
         assertJsonContentType(response);
-        const payload = await parseJsonResponse(response, lease.deadline, lease.didTimeout);
+        const payload = await parseJsonResponse(response, lease.signal, lease.didTimeout);
 
         try {
           return ingestAuthorizedSajuProductionCalculationV1({
