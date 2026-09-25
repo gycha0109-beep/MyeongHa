@@ -431,3 +431,13 @@ export {
   projectSeyeonRelationshipRuntimeOverlayV2,
   type SeyeonRelationshipRuntimeOverlayV2,
 } from './seyeon-relationship-runtime-overlay-v2.js';
+
+
+export {
+  SEYEON_RISK_ACTION_CAUSALITY_VERSION_V1,
+  SEYEON_RISK_ACTION_KINDS_V1,
+  SeyeonRiskActionCausalityErrorV1,
+  guardSeyeonRiskBearingActionCausalityV1,
+  type SeyeonRiskActionCausalityDecisionV1,
+  type SeyeonRiskActionKindV1,
+} from './seyeon-risk-action-causality-v1.js';
