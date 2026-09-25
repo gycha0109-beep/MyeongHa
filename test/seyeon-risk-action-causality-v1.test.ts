@@ -40,7 +40,7 @@ function overlay() {
 }
 
 function historyMemory(
-  causalAuthority: SeyeonRetrievedMemoryV2['causalAuthority'] | undefined =
+  causalAuthority: SeyeonRetrievedMemoryV2['causalAuthority'] | null =
     'authorized_shared_history',
 ): SeyeonRetrievedMemoryV2 {
   return {
@@ -49,7 +49,7 @@ function historyMemory(
     claimKind: 'fact',
     summary: '권위 있는 관계 사건의 bounded runtime summary.',
     sourceRef: HISTORY,
-    ...(causalAuthority === undefined ? {} : { causalAuthority }),
+    ...(causalAuthority === null ? {} : { causalAuthority }),
     relevance: 0.95,
     salience: 0.9,
   };
@@ -155,7 +155,7 @@ describe('Se-yeon risk-bearing action causality v1', () => {
   });
 
   it('rejects high trust plus overlay when shared history is not explicitly authorized for causal use', () => {
-    const ctx = context({ memories: [historyMemory(undefined)] });
+    const ctx = context({ memories: [historyMemory(null)] });
     const turn = interpretation(ctx, {
       immediateWant: 'create_next_step',
       tension: 'solve_vs_overstep',
