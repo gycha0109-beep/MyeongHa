@@ -19,6 +19,8 @@ const BIRTH_REVISION = {
   sex: 'unspecified',
 } as const satisfies SajuBirthRevisionBindingV1;
 
+const encoder = new TextEncoder();
+
 async function expectAdapterError(
   execute: () => Promise<unknown>,
   code: SajuProductionCalculationHttpAdapterErrorV1['code'],
@@ -47,23 +49,34 @@ function adapterForResponse(response: SajuProductionCalculationHttpResponseV1) {
 function responseWithCancellation(input: {
   readonly status: number;
   readonly contentType: string;
-  readonly cancel: () => Promise<void>;
+  readonly cancel: () => void | Promise<void>;
   readonly text?: string;
 }): {
   readonly response: SajuProductionCalculationHttpResponseV1;
-  readonly text: ReturnType<typeof vi.fn>;
+  readonly pulls: ReturnType<typeof vi.fn>;
 } {
-  const text = vi.fn(async () => input.text ?? '{}');
+  const pulls = vi.fn();
+  const body = new ReadableStream<Uint8Array>({
+    pull(controller) {
+      pulls();
+      controller.enqueue(encoder.encode(input.text ?? '{}'));
+      controller.close();
+    },
+    cancel() {
+      return input.cancel();
+    },
+  }, { highWaterMark: 0 });
+
   return {
     response: {
       status: input.status,
-      headers: {
-        get: (name) => (name.toLowerCase() === 'content-type' ? input.contentType : null),
+      headers: new Headers({ 'Content-Type': input.contentType }),
+      body,
+      async text() {
+        throw new Error('Calculation adapter must consume the governed response stream.');
       },
-      body: { cancel: input.cancel },
-      text,
     },
-    text,
+    pulls,
   };
 }
 
@@ -87,7 +100,7 @@ describe('Saju production calculation rejected-response cleanup', () => {
 
       expect(error.httpStatus).toBe(status);
       expect(cancel).toHaveBeenCalledTimes(1);
-      expect(fixture.text).not.toHaveBeenCalled();
+      expect(fixture.pulls).not.toHaveBeenCalled();
     },
   );
 
@@ -109,11 +122,11 @@ describe('Saju production calculation rejected-response cleanup', () => {
 
     expect(error.httpStatus).toBe(503);
     expect(cancel).toHaveBeenCalledTimes(1);
-    expect(fixture.text).not.toHaveBeenCalled();
+    expect(fixture.pulls).not.toHaveBeenCalled();
   });
 
   it('does not let a synchronous cancellation failure mask the established content-type error', async () => {
-    const cancel = vi.fn((): Promise<void> => {
+    const cancel = vi.fn((): void => {
       throw new Error('synchronous cleanup failure');
     });
     const fixture = responseWithCancellation({
@@ -130,7 +143,7 @@ describe('Saju production calculation rejected-response cleanup', () => {
 
     expect(error.httpStatus).toBe(200);
     expect(cancel).toHaveBeenCalledTimes(1);
-    expect(fixture.text).not.toHaveBeenCalled();
+    expect(fixture.pulls).not.toHaveBeenCalled();
   });
 
   it('does not cancel a consumed application/json response body', async () => {
@@ -149,7 +162,7 @@ describe('Saju production calculation rejected-response cleanup', () => {
     );
 
     expect(error.httpStatus).toBe(200);
-    expect(fixture.text).toHaveBeenCalledTimes(1);
+    expect(fixture.pulls).toHaveBeenCalledTimes(1);
     expect(cancel).not.toHaveBeenCalled();
   });
 });

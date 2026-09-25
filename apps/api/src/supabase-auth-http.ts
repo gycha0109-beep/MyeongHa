@@ -9,6 +9,11 @@ import {
 } from './ingress-request-body-deadline.js';
 import { fetchSupabaseAuthWithDeadlineV1 } from './supabase-auth-upstream-deadline.js';
 import {
+  SUPABASE_AUTH_JSON_RESPONSE_MAXIMUM_BYTES_V1,
+  UpstreamJsonResponseTooLargeV1,
+  readBoundedUpstreamJsonTextV1,
+} from './upstream-json-response-resource.js';
+import {
   createPwnedPasswordCompromiseGuardV1,
   type PasswordCompromiseGuardPortV1,
 } from './breached-password-guard.js';
@@ -235,6 +240,7 @@ async function callSupabase(
   config: AuthProxyConfigV1,
   path: string,
   init: Omit<RequestInit, 'signal'>,
+  responseMode: 'json' | 'status-only' = 'json',
 ): Promise<{ response: Response; payload: unknown }> {
   const deadline = await fetchSupabaseAuthWithDeadlineV1(
     globalThis.fetch,
@@ -256,10 +262,20 @@ async function callSupabase(
       return { response: deadline.response, payload: null };
     }
 
+    if (responseMode === 'status-only') {
+      cancelUnusedResponseBody(deadline.response);
+      return { response: deadline.response, payload: null };
+    }
+
     let payload: unknown = null;
     try {
-      payload = await deadline.response.json();
+      const text = await readBoundedUpstreamJsonTextV1(deadline.response, {
+        maximumBodyBytes: SUPABASE_AUTH_JSON_RESPONSE_MAXIMUM_BYTES_V1,
+        signal: deadline.signal,
+      });
+      payload = JSON.parse(text) as unknown;
     } catch (error) {
+      if (error instanceof UpstreamJsonResponseTooLargeV1) throw error;
       if (deadline.signal.aborted) throw error;
       payload = null;
     }
@@ -315,7 +331,7 @@ export async function handleSupabaseAuthRequestV1(input: {
         method: 'POST',
         headers: { Authorization: authorization },
         body: '{}',
-      });
+      }, 'status-only');
       if (!upstream.response.ok) return upstreamError(input.action, upstream.response.status);
       return response({ ok: true, data: { signedOut: true } });
     }
@@ -373,7 +389,7 @@ export async function handleSupabaseAuthRequestV1(input: {
               method: 'POST',
               headers: { Authorization: `Bearer ${session.accessToken}` },
               body: '{}',
-            });
+            }, 'status-only');
           } catch {
             // The compromised credential never receives the newly-created session tokens.
           }
@@ -410,6 +426,9 @@ export async function handleSupabaseAuthRequestV1(input: {
   } catch (error) {
     if (error instanceof IngressRequestBodyCompletionDeadlineExceededV1) {
       return errorResponse('REQUEST_BODY_TIMEOUT', 408);
+    }
+    if (error instanceof UpstreamJsonResponseTooLargeV1) {
+      return errorResponse('AUTH_UPSTREAM_MALFORMED', 502);
     }
     return errorResponse('AUTH_UPSTREAM_UNAVAILABLE', 503);
   }
