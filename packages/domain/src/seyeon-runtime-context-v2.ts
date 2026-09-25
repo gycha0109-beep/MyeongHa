@@ -391,7 +391,7 @@ export function assembleSeyeonRuntimeContextV2(
     authorityBoundaries: Object.freeze({
       factAuthorityRegistryVersion: SEYEON_FACT_AUTHORITY_REGISTRY_V1.schemaVersion,
       factAuthorityRegistrySourceBibleBlobSha:
-        SEYEON_FACT_AUTHORITY_REGISTRY_V1.sourceBibleBlobSha,
+        SEYEON_FACT_AUTHORITY_REGISTRY_V1.sourceBible.gitBlobSha,
       legacyProjectionFieldsAreNonAuthoritative: true as const,
       userClaimRequiresIntegrityDecision: true as const,
       assistantOutputNeverAuthority: true as const,
