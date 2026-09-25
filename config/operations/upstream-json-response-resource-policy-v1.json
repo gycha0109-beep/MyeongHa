@@ -1,0 +1,42 @@
+{
+  "contractVersion": "myeongha-upstream-json-response-resource-policy-v1",
+  "responseByteUnit": "application_visible_octets",
+  "contentLengthAuthority": "early_rejection_hint_only_stream_count_is_final",
+  "encodedContentLengthAuthority": "not_an_application_visible_size_approval_signal",
+  "cancellation": "best_effort_non_blocking",
+  "existingDeadlinesRemainAuthoritative": true,
+  "boundaries": {
+    "supabaseAuth": {
+      "productionExposure": "active",
+      "maximumBodyBytes": 131072,
+      "successActions": [
+        "sign-in",
+        "sign-up",
+        "refresh"
+      ],
+      "statusOnlyActions": [
+        "sign-out"
+      ],
+      "resourceFailure": {
+        "publicHttpStatus": 502,
+        "publicErrorCode": "AUTH_UPSTREAM_MALFORMED"
+      }
+    },
+    "supabaseMember": {
+      "productionExposure": "active",
+      "maximumBodyBytes": 65536,
+      "resourceFailure": {
+        "internalErrorCode": "SUPABASE_MEMBER_VERIFIER_RESPONSE_INVALID"
+      }
+    },
+    "sajuCalculation": {
+      "productionExposure": "active",
+      "maximumBodyBytes": 262144,
+      "resourceFailure": {
+        "internalErrorCode": "RESPONSE_TOO_LARGE",
+        "publicErrorCode": "SAJU_TEMPORARILY_UNAVAILABLE"
+      }
+    }
+  },
+  "semanticContractsOtherwiseUnchanged": true
+}
