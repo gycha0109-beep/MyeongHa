@@ -298,3 +298,21 @@ export {
   type SeyeonTurnInterpretationV2,
   type SeyeonUserMoveKeyV2,
 } from './seyeon-turn-interpreter-v2.js';
+
+export {
+  SEYEON_RENDERER_DRAFT_SCHEMA_VERSION_V2,
+  SEYEON_RENDERER_PACKET_SCHEMA_VERSION_V2,
+  SEYEON_SEMANTIC_FAILURE_CODES_V2,
+  SEYEON_SEMANTIC_REVIEW_SCHEMA_VERSION_V2,
+  SeyeonRendererGuardErrorV2,
+  admitSeyeonRendererDraftV2,
+  buildSeyeonRendererPacketV2,
+  guardSeyeonRendererOutputV2,
+  guardSeyeonSemanticReviewV2,
+  hashSeyeonRendererUtteranceV2,
+  type SeyeonDialogueEnvelopeV2,
+  type SeyeonRendererDraftV2,
+  type SeyeonRendererPacketV2,
+  type SeyeonSemanticFailureCodeV2,
+  type SeyeonSemanticReviewV2,
+} from './seyeon-renderer-v2.js';
