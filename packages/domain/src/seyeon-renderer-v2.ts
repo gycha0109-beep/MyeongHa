@@ -232,10 +232,122 @@ export function buildSeyeonRendererPacketV2(input: {
   });
 }
 
+export function guardSeyeonSemanticReviewV2(input: {
+  readonly rawOutput: unknown;
+  readonly utterance: string;
+}): SeyeonSemanticReviewV2 {
+  if (!isRecord(input.rawOutput)) {
+    throw new SeyeonRendererGuardErrorV2('Se-yeon semantic review must be an object.');
+  }
+  assertOnlyKeys(
+    input.rawOutput,
+    ['schemaVersion', 'reviewedUtteranceHash', 'failureCodes', 'evidence'],
+    'semanticReview',
+  );
+  if (input.rawOutput.schemaVersion !== SEYEON_SEMANTIC_REVIEW_SCHEMA_VERSION_V2) {
+    throw new SeyeonRendererGuardErrorV2('semanticReview.schemaVersion is invalid.');
+  }
+
+  const reviewedUtteranceHash = boundedText(
+    input.rawOutput.reviewedUtteranceHash,
+    'semanticReview.reviewedUtteranceHash',
+    128,
+  );
+  const expectedHash = hashUtterance(boundedText(input.utterance, 'utterance', 1200));
+  if (reviewedUtteranceHash !== expectedHash) {
+    throw new SeyeonRendererGuardErrorV2(
+      'Semantic review is not bound to the current renderer utterance.',
+    );
+  }
+
+  const rawFailureCodes = parseUniqueStringArray(
+    input.rawOutput.failureCodes,
+    'semanticReview.failureCodes',
+    SEYEON_SEMANTIC_FAILURE_CODES_V2.length,
+  );
+  const allowedFailureCodes = new Set<SeyeonSemanticFailureCodeV2>(
+    SEYEON_SEMANTIC_FAILURE_CODES_V2,
+  );
+  const failureCodes: SeyeonSemanticFailureCodeV2[] = [];
+  for (const code of rawFailureCodes) {
+    if (!allowedFailureCodes.has(code as SeyeonSemanticFailureCodeV2)) {
+      throw new SeyeonRendererGuardErrorV2(
+        `Semantic review contains an unknown failure code: ${code}`,
+      );
+    }
+    failureCodes.push(code as SeyeonSemanticFailureCodeV2);
+  }
+
+  if (!Array.isArray(input.rawOutput.evidence) || input.rawOutput.evidence.length > 16) {
+    throw new SeyeonRendererGuardErrorV2(
+      'semanticReview.evidence must be an array of at most 16 items.',
+    );
+  }
+  const evidence = Object.freeze(
+    input.rawOutput.evidence.map((entry, index) => {
+      if (!isRecord(entry)) {
+        throw new SeyeonRendererGuardErrorV2(
+          `semanticReview.evidence[${index}] must be an object.`,
+        );
+      }
+      assertOnlyKeys(
+        entry,
+        ['code', 'excerpt', 'reason'],
+        `semanticReview.evidence[${index}]`,
+      );
+      const code = parseEnum(
+        entry.code,
+        SEYEON_SEMANTIC_FAILURE_CODES_V2,
+        `semanticReview.evidence[${index}].code`,
+      );
+      if (!failureCodes.includes(code)) {
+        throw new SeyeonRendererGuardErrorV2(
+          `semanticReview.evidence[${index}].code is not present in failureCodes.`,
+        );
+      }
+      return Object.freeze({
+        code,
+        excerpt: boundedText(
+          entry.excerpt,
+          `semanticReview.evidence[${index}].excerpt`,
+          400,
+        ),
+        reason: boundedText(
+          entry.reason,
+          `semanticReview.evidence[${index}].reason`,
+          800,
+        ),
+      });
+    }),
+  );
+
+  if (failureCodes.length === 0 && evidence.length > 0) {
+    throw new SeyeonRendererGuardErrorV2(
+      'Passing semantic review must not contain failure evidence.',
+    );
+  }
+  if (failureCodes.length > 0) {
+    const evidencedCodes = new Set(evidence.map((entry) => entry.code));
+    const missingEvidence = failureCodes.find((code) => !evidencedCodes.has(code));
+    if (missingEvidence !== undefined) {
+      throw new SeyeonRendererGuardErrorV2(
+        `Semantic review failure lacks evidence: ${missingEvidence}`,
+      );
+    }
+  }
+
+  return Object.freeze({
+    schemaVersion: SEYEON_SEMANTIC_REVIEW_SCHEMA_VERSION_V2,
+    reviewedUtteranceHash,
+    failureCodes: Object.freeze(failureCodes),
+    evidence,
+  });
+}
+
 export function guardSeyeonRendererOutputV2(input: {
   readonly rawOutput: unknown;
   readonly packet: SeyeonRendererPacketV2;
-  readonly semanticReview: SeyeonSemanticReviewV2;
+  readonly semanticReview: unknown;
 }): SeyeonDialogueEnvelopeV2 {
   if (!isRecord(input.rawOutput)) {
     throw new SeyeonRendererGuardErrorV2('Se-yeon renderer output must be an object.');
@@ -299,43 +411,15 @@ export function guardSeyeonRendererOutputV2(input: {
     );
   }
 
-  if (
-    input.semanticReview.schemaVersion !== SEYEON_SEMANTIC_REVIEW_SCHEMA_VERSION_V2
-  ) {
-    throw new SeyeonRendererGuardErrorV2('semanticReview.schemaVersion is invalid.');
-  }
-  const expectedHash = hashUtterance(utterance);
-  if (input.semanticReview.reviewedUtteranceHash !== expectedHash) {
-    throw new SeyeonRendererGuardErrorV2(
-      'Semantic review is not bound to the current renderer utterance.',
-    );
-  }
+  const semanticReview = guardSeyeonSemanticReviewV2({
+    rawOutput: input.semanticReview,
+    utterance,
+  });
+  const expectedHash = semanticReview.reviewedUtteranceHash;
 
-  const allowedFailureCodes = new Set<SeyeonSemanticFailureCodeV2>(
-    SEYEON_SEMANTIC_FAILURE_CODES_V2,
-  );
-  for (const code of input.semanticReview.failureCodes) {
-    if (!allowedFailureCodes.has(code)) {
-      throw new SeyeonRendererGuardErrorV2(
-        `Semantic review contains an unknown failure code: ${code}`,
-      );
-    }
-  }
-  if (new Set(input.semanticReview.failureCodes).size !== input.semanticReview.failureCodes.length) {
+  if (semanticReview.failureCodes.length > 0) {
     throw new SeyeonRendererGuardErrorV2(
-      'Semantic review failureCodes must not contain duplicates.',
-    );
-  }
-
-  if (input.semanticReview.failureCodes.length > 0) {
-    throw new SeyeonRendererGuardErrorV2(
-      `Se-yeon semantic review rejected renderer output: ${input.semanticReview.failureCodes.join(', ')}`,
-    );
-  }
-
-  if (input.semanticReview.evidence.length > 0) {
-    throw new SeyeonRendererGuardErrorV2(
-      'Passing semantic review must not contain failure evidence.',
+      `Se-yeon semantic review rejected renderer output: ${semanticReview.failureCodes.join(', ')}`,
     );
   }
 
