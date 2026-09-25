@@ -157,13 +157,14 @@ Context Composer는 필요에 따라 다음 layer를 조립한다.
 2. Character Core Anchor
 3. Current Relationship Projection
 4. Current Turn State
-5. Relevant Bible Slices
-6. Retrieved Event Memory + Provenance
-7. Unresolved Threads
-8. Recent Dialogue Window
-9. Protected Domain Segment
-10. Repetition-Suppression Hints
-11. Response Task
+5. Disclosure Decision *(sensitive-topic turn only)*
+6. Relevant Bible Slices
+7. Retrieved Event Memory + Provenance
+8. Unresolved Threads
+9. Recent Dialogue Window
+10. Protected Domain Segment
+11. Repetition-Suppression Hints
+12. Response Task
 
 Bible 전체와 전체 대화 로그를 매 turn 그대로 넣지 않는다.
 
@@ -421,6 +422,18 @@ partial
 allow
 → 필요한 source slice만 retrieval
 ```
+
+Disclosure preflight를 위해 orchestrator는 실제 private content와 분리된 compact metadata를 유지할 수 있다.
+
+```text
+topic_key
+source_authority_state
+minimum_disclosure_gate
+allowed_depth
+previously_disclosed
+```
+
+이 metadata는 gate 판정용이며 private biography 본문 자체가 아니다.
 
 장점:
 
@@ -846,6 +859,14 @@ turn_state:
   character_want:
   tension:
   expression:
+
+# sensitive-topic turn에서만 선택적으로 포함
+disclosure:
+  topic:
+  source_authority:
+  eligibility:
+  result:
+  retrieval_scope:
 
 bible_slices: []
 memories: []
