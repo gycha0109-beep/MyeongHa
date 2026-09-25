@@ -1,6 +1,7 @@
 import {
   SEYEON_EXPERIMENTAL_EVENT_KINDS_V2,
   guardSeyeonEventExtractionCandidateV2,
+  validateSeyeonEventExtractionContextV2,
   type SeyeonEventExtractionCandidateV2,
   type SeyeonEventExtractionContextV2,
 } from '../../../packages/domain/src/index.js';
@@ -116,6 +117,7 @@ const EVENT_EXTRACTION_RESPONSE_SCHEMA_V2 = Object.freeze({
 export function buildSeyeonEventExtractorRequestV2(
   context: SeyeonEventExtractionContextV2,
 ): SeyeonStructuredProviderRequestV2 {
+  validateSeyeonEventExtractionContextV2(context);
   return Object.freeze({
     contractVersion: SEYEON_STRUCTURED_PROVIDER_CONTRACT_VERSION_V2,
     purpose: 'event_extraction' as const,
