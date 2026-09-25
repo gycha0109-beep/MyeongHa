@@ -85,7 +85,7 @@ for (const fragment of [
   "const PRODUCTION_SIGNUP_ENDPOINT = 'https://myeongha.vercel.app/api/auth/sign-up'",
   "const EXPECTED_STATUS = 422",
   "const EXPECTED_ERROR_CODE = 'COMPROMISED_PASSWORD'",
-  "const compromisedPassword = ['pass', 'word'].join('')",
+  "const compromisedPassword = ['123', '456'].join('')",
   "process.env.GITHUB_REF !== 'refs/heads/main'",
   "process.env.GITHUB_EVENT_NAME !== 'workflow_dispatch'",
   "containsForbiddenSessionMaterial(payload)",
