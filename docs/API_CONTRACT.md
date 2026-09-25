@@ -609,7 +609,27 @@ Streaming-capable runtimes count bytes while consuming the request and reject as
 
 The 16 KiB ceiling and field ceilings are explicit operations/resource authority introduced for #699 because the product/source pack does not provide those numeric limits. They are not inferred from Vercel's platform payload ceiling. Changing them requires a reviewed authority update and regression tests.
 
-## 22. Contract Test Gate
+## 22. Upstream JSON Response Resource Bounds
+
+Repository-owned response-resource authority: `docs/operations/UPSTREAM_JSON_RESPONSE_RESOURCE_POLICY_V1.md`.
+
+V1 active upstream boundaries:
+
+```text
+Supabase Auth success JSON maximum = 131,072 application-visible bytes
+Supabase Member success JSON maximum = 65,536 application-visible bytes
+Saju calculation success JSON maximum = 262,144 application-visible bytes
+```
+
+Actual application-visible response stream bytes are final authority. `Content-Length` is an early-rejection hint only and cannot approve a response whose consumed stream crosses the governed ceiling; encoded-response metadata likewise cannot substitute for actual application-visible counting.
+
+The existing upstream deadlines remain independently authoritative. Resource enforcement adds a finite space bound without weakening timeout behavior, status-first rejection, Auth/Member semantics, or Saju semantic ingress.
+
+Successful governed JSON bodies must be bounded before whole-body decode/JSON parsing. Unused rejected/status-only bodies are cancelled on a best-effort non-blocking basis. Supabase Auth sign-out remains status-only and does not require success-body materialization.
+
+The Auth 128 KiB, Member 64 KiB, and Saju 256 KiB ceilings are explicit operations/resource authority introduced for #700 because the product/source pack and upstream contracts do not provide application-owned response byte limits. They are independent of the #699 authenticated request-body ceiling. Changing them requires a reviewed authority update and regression tests.
+
+## 23. Contract Test Gate
 
 - 모든 endpoint unknown field policy
 - Web/Mobile same fixture same schema
