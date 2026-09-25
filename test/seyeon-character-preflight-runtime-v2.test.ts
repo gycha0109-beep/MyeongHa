@@ -87,7 +87,7 @@ function reviewer(request: SeyeonStructuredProviderRequestV2) {
 describe('Se-yeon preflight runtime v2', () => {
   it('runs Integrity before Disclosure and carries an unverified shared-event claim into Working Context', async () => {
     const order: string[] = [];
-    const interpreter = new Provider((request) => {
+    const interpreter = new Provider((request: SeyeonStructuredProviderRequestV2) => {
       order.push('interpreter');
       const context = request.input as {
         integrity: { decisions: Array<{ result: string }> };
@@ -187,7 +187,7 @@ describe('Se-yeon preflight runtime v2', () => {
       'past_romance.existence',
     );
 
-    const interpreter = new Provider((request) => {
+    const interpreter = new Provider((request: SeyeonStructuredProviderRequestV2) => {
       order.push('interpreter');
       const context = request.input as {
         integrity: { decisions: Array<{ result: string }> };
