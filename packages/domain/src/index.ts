@@ -283,3 +283,18 @@ export {
   type SeyeonRetrievedMemoryV2,
   type SeyeonRuntimeContextV2,
 } from './seyeon-runtime-context-v2.js';
+
+export {
+  SEYEON_IMMEDIATE_WANT_KEYS_V2,
+  SEYEON_REVEAL_LEVELS_V2,
+  SEYEON_TENSION_KEYS_V2,
+  SEYEON_TURN_INTERPRETATION_SCHEMA_VERSION_V2,
+  SEYEON_USER_MOVE_KEYS_V2,
+  SeyeonTurnInterpretationErrorV2,
+  guardSeyeonTurnInterpretationV2,
+  type SeyeonImmediateWantKeyV2,
+  type SeyeonRevealLevelV2,
+  type SeyeonTensionKeyV2,
+  type SeyeonTurnInterpretationV2,
+  type SeyeonUserMoveKeyV2,
+} from './seyeon-turn-interpreter-v2.js';
