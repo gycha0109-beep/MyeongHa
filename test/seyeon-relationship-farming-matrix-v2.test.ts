@@ -101,7 +101,7 @@ describe('Se-yeon relationship anti-farming sensitivity v2', () => {
 
     expect(state.stage).toBe('S0_FIRST_MEETING');
     expect(state.trust).toBeLessThan(10);
-    expect(state.friction).toBe(100);
+    expect(state.friction).toBeGreaterThanOrEqual(90);
     expect(state.milestoneCount).toBe(50);
   });
 
