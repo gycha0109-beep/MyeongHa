@@ -255,4 +255,43 @@ describe('Se-yeon renderer packet and guard v2', () => {
       }),
     ).toThrow(/self_disclose/);
   });
+
+  it('rejects relationship-overlay authority laundering reported by semantic review', () => {
+    const prepared = interpretation();
+    const packet = buildSeyeonRendererPacketV2(prepared);
+    const utterance = '지금 좀 어색하니까, 지난번에 크게 싸운 일부터 얘기해요.';
+
+    expect(packet.relationshipSemantics).toBeNull();
+    expect(packet.outputPolicy.experimentalRelationshipSemanticsNeverAuthority).toBe(true);
+    expect(packet.outputPolicy.relationshipSemanticsCannotUnlockDisclosure).toBe(true);
+    expect(packet.outputPolicy.relationshipSemanticsCannotCreateHistory).toBe(true);
+
+    expect(() =>
+      guardSeyeonRendererOutputV2({
+        packet,
+        rawOutput: {
+          schemaVersion: 'seyeon-renderer-draft-v2',
+          utterance,
+          expressionState: 'baseline',
+          revealLevel: 'familiar',
+          memoryRefsMentioned: [],
+          privateSourceRefsMentioned: [],
+          disclosureSliceIds: [],
+        },
+        semanticReview: {
+          schemaVersion: 'seyeon-semantic-review-v2',
+          reviewedUtteranceHash: hashSeyeonRendererUtteranceV2(utterance),
+          failureCodes: ['RELATIONSHIP_OVERLAY_HISTORY_FABRICATION'],
+          evidence: [
+            {
+              code: 'RELATIONSHIP_OVERLAY_HISTORY_FABRICATION',
+              excerpt: '지난번에 크게 싸운 일',
+              reason: '행동 overlay를 구체적인 공유 사건 이력으로 승격했다.',
+            },
+          ],
+        },
+      }),
+    ).toThrow(SeyeonRendererGuardErrorV2);
+  });
+
 });
