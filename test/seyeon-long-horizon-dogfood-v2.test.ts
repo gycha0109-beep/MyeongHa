@@ -197,6 +197,7 @@ describe('Se-yeon long-horizon relationship dogfood v2', () => {
     const longContext = assembleSeyeonRuntimeContextV2({
       relationship: relationshipContext(events.length),
       recentMessages: messages,
+      disclosure: { decision: null, retrievedSources: [] },
       retrievedMemories: ranked.map(runtimeMemory),
       focuses: ['memory', 'intimacy'],
     });
@@ -204,6 +205,7 @@ describe('Se-yeon long-horizon relationship dogfood v2', () => {
     const shortContext = assembleSeyeonRuntimeContextV2({
       relationship: relationshipContext(events.length),
       recentMessages: messages.slice(-120),
+      disclosure: { decision: null, retrievedSources: [] },
       retrievedMemories: ranked.map(runtimeMemory),
       focuses: ['memory', 'intimacy'],
     });
