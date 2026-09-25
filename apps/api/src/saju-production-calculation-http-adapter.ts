@@ -47,6 +47,7 @@ export interface SajuProductionCalculationHttpResponseV1 {
     get(name: string): string | null;
   }>;
   readonly body: ReadableStream<Uint8Array> | null;
+  text(): Promise<string>;
 }
 
 export interface SajuProductionCalculationHttpRequestInitV1 {
