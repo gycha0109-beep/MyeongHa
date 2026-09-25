@@ -29,10 +29,10 @@ export interface SeyeonRiskActionCausalityDecisionV1 {
     readonly relationshipRevision: number | null;
     readonly relationshipPolicyVersion: string | null;
     readonly currentCondition:
-      | SeyeonRuntimeContextV2['relationshipSemantics']['currentCondition']
+      | NonNullable<SeyeonRuntimeContextV2['relationshipSemantics']>['currentCondition']
       | null;
     readonly behaviorAccess:
-      | SeyeonRuntimeContextV2['relationshipSemantics']['behaviorAccess']
+      | NonNullable<SeyeonRuntimeContextV2['relationshipSemantics']>['behaviorAccess']
       | null;
     readonly authorizedSharedHistoryRefs: readonly string[];
   }>;
