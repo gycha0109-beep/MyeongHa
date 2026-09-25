@@ -56,10 +56,16 @@ jobs:
           echo "Changed files:"
           cat "$changed_files"
 
-          if grep -Eq '^(\.github/workflows/|\.github/[^/]+\.trigger$|scripts/|docs/|supabase/migrations/|test/db/|package\.json$|package-lock\.json$)' "$changed_files"; then
+          if grep -Eq '^(\.github/workflows/|\.github/dependabot\.yml$|\.github/[^/]+\.trigger$|scripts/|docs/|supabase/migrations/|test/db/|package\.json$|package-lock\.json$)' "$changed_files"; then
             echo "contracts=true" >> "$GITHUB_OUTPUT"
           else
             echo "contracts=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          if grep -Eq '^(\.github/workflows/|\.github/dependabot\.yml$|package\.json$|package-lock\.json$|apps/[^/]+/package\.json$|packages/[^/]+/package\.json$)' "$changed_files"; then
+            echo "dependencies=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "dependencies=false" >> "$GITHUB_OUTPUT"
           fi
 
   contracts:
