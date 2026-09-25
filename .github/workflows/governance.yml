@@ -85,6 +85,7 @@ jobs:
         run: |
           node scripts/verify-github-actions-trust-boundary.mjs
           node scripts/verify-dependency-supply-chain-governance.mjs
+          node scripts/verify-production-environment-governance.mjs
           npm run check:governance
           node scripts/verify-upstream-json-response-resource-policy.mjs
 
