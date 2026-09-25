@@ -257,6 +257,24 @@ function validateRelationshipSemanticsOverlay(
   if (overlay.characterId !== 'seyeon') {
     throw new TypeError('Se-yeon relationship runtime overlay characterId is invalid.');
   }
+  if (
+    !(['STABLE', 'OPEN_CONFLICT', 'RESOLVED_RECENTLY'] as const).includes(
+      overlay.currentCondition,
+    )
+  ) {
+    throw new TypeError(
+      'Se-yeon relationship runtime overlay currentCondition is invalid.',
+    );
+  }
+  if (
+    !(['STAGE_ALIGNED', 'RESTRICTED_BY_CONFLICT', 'CAUTIOUS_AFTER_REPAIR'] as const).includes(
+      overlay.behaviorAccess,
+    )
+  ) {
+    throw new TypeError(
+      'Se-yeon relationship runtime overlay behaviorAccess is invalid.',
+    );
+  }
   for (const value of Object.values(overlay.constraints)) {
     if (value !== false) {
       throw new TypeError(
