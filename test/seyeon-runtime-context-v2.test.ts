@@ -107,6 +107,7 @@ describe('Se-yeon runtime context v2', () => {
     const context = assembleSeyeonRuntimeContextV2({
       relationship: null,
       recentMessages,
+      disclosure: { decision: null, retrievedSources: [] },
       retrievedMemories,
     });
 
@@ -141,6 +142,7 @@ describe('Se-yeon runtime context v2', () => {
       assembleSeyeonRuntimeContextV2({
         relationship: null,
         recentMessages: [],
+        disclosure: { decision: null, retrievedSources: [] },
         retrievedMemories: [
           {
             memoryId: 'memory-1',
