@@ -32,6 +32,9 @@ describe('Saju production calculation response resource boundary', () => {
           cancelled = true;
         },
       }),
+      async text() {
+        throw new Error('Calculation adapter must consume the governed response stream.');
+      },
     });
 
     const adapter = createSajuProductionCalculationHttpAdapterV1({
