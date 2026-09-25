@@ -335,6 +335,19 @@ export function guardSeyeonTurnInterpretationV2(input: {
     );
   }
 
+  const disclosureResult = input.context.disclosure.decision?.result ?? null;
+  if (
+    disclosureResult !== null &&
+    ['DEFLECT', 'BOUNDARY', 'REDIRECT', 'AUTHORITY_ABSTAIN'].includes(
+      disclosureResult,
+    ) &&
+    chosenAction === 'self_disclose'
+  ) {
+    throw new SeyeonTurnInterpretationErrorV2(
+      'Blocked or authority-abstained disclosure cannot choose self_disclose.',
+    );
+  }
+
   return Object.freeze({
     schemaVersion: SEYEON_TURN_INTERPRETATION_SCHEMA_VERSION_V2,
     userMove: parseEnum(
