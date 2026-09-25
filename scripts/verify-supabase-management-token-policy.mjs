@@ -29,6 +29,18 @@ const expected = {
   managementApiResponseLogging: 'forbidden',
   authorizationHeaderLogging: 'forbidden',
   credentialLogging: 'forbidden',
+  denialOnlyEvidenceProbes: [
+    { method: 'GET', path: '/v1/projects/{projectRef}/config/database/pooler', expectedStatus: 403, forbiddenPermission: 'Connection Pooling Read' },
+    { method: 'GET', path: '/v1/projects/{projectRef}/api-keys?reveal=true', expectedStatus: 403, forbiddenPermission: 'API Keys Read / API Key Secrets Read' },
+    { method: 'GET', path: '/v1/projects/{projectRef}/config/auth', expectedStatus: 403, forbiddenPermission: 'Auth Config Read' },
+  ],
+  leastPrivilegeEvidence: {
+    workflow: '.github/workflows/production-data-api-containment.yml',
+    mode: 'verify-least-privilege',
+    confirmation: 'VERIFY_SUPABASE_MANAGEMENT_TOKEN_LEAST_PRIVILEGE',
+    idempotentWriteRequired: true,
+    logicalStateChangeAllowed: false,
+  },
 };
 if (JSON.stringify(policy) !== JSON.stringify(expected)) {
   throw new Error(`${policyPath} drifted from the approved V1 authority.`);
@@ -44,6 +56,9 @@ for (const fragment of [
   'public alpha',
   'classic broad PAT is not accepted as closure evidence',
   'superseded broad PAT is revoked',
+  'Denial-only evidence exception',
+  'VERIFY_SUPABASE_MANAGEMENT_TOKEN_LEAST_PRIVILEGE',
+  'state_changed=false',
 ]) {
   if (!docs.includes(fragment)) throw new Error(`${docsPath} missing authority fragment: ${fragment}`);
 }
@@ -61,6 +76,7 @@ if (JSON.stringify(consumers.sort()) !== JSON.stringify(expected.allowedWorkflow
 
 const containmentWorkflow = await readFile('.github/workflows/production-data-api-containment.yml', 'utf8');
 const containmentRunner = await readFile('scripts/run-production-data-api-containment.sh', 'utf8');
+const leastPrivilegeEvidence = await readFile('scripts/operations/verify-production-supabase-management-token-least-privilege.sh', 'utf8');
 for (const fragment of [
   'SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}',
   'https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_ID/postgrest',
@@ -70,6 +86,30 @@ for (const fragment of [
     throw new Error(`Data API containment missing approved Management authority fragment: ${fragment}`);
   }
 }
+for (const fragment of [
+  "[[ \"$SUPABASE_ACCESS_TOKEN\" == sbp_fc* ]]",
+  '/v1/projects/$SUPABASE_PROJECT_ID/postgrest',
+  '/v1/projects/$SUPABASE_PROJECT_ID/config/database/pooler',
+  '/v1/projects/$SUPABASE_PROJECT_ID/api-keys?reveal=true',
+  '/v1/projects/$SUPABASE_PROJECT_ID/config/auth',
+  "[[ \"$pooler_status\" == '403' ]]",
+  "[[ \"$api_keys_status\" == '403' ]]",
+  "[[ \"$auth_config_status\" == '403' ]]",
+  'state_changed=false',
+  'credential_logged=false',
+  'authorization_header_logged=false',
+  'raw_response_logged=false',
+]) {
+  if (!leastPrivilegeEvidence.includes(fragment)) {
+    throw new Error(`Least-privilege evidence missing required boundary fragment: ${fragment}`);
+  }
+}
+for (const forbidden of ['echo "$SUPABASE_ACCESS_TOKEN"', 'set -x', 'cat "$pre_raw"', 'cat "$patch_raw"', 'cat "$post_raw"']) {
+  if (leastPrivilegeEvidence.includes(forbidden)) {
+    throw new Error(`Least-privilege evidence contains unsafe credential/raw-response logging: ${forbidden}`);
+  }
+}
+
 for (const forbidden of ['/api-keys', '/config/database/pooler', '/config/auth', '/functions', '/storage', '/branches', '/organizations']) {
   if (containmentRunner.includes(forbidden)) {
     throw new Error(`Data API containment expanded beyond approved Management surface: ${forbidden}`);

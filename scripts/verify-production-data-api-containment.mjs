@@ -3,11 +3,13 @@ import { readFile } from 'node:fs/promises';
 const workflowPath = '.github/workflows/production-data-api-containment.yml';
 const runnerPath = 'scripts/run-production-data-api-containment.sh';
 const runtimeSmokePath = 'scripts/verify-production-data-api-containment-guest-runtime.mjs';
+const leastPrivilegeEvidencePath = 'scripts/operations/verify-production-supabase-management-token-least-privilege.sh';
 
-const [workflow, runner, runtimeSmoke] = await Promise.all([
+const [workflow, runner, runtimeSmoke, leastPrivilegeEvidence] = await Promise.all([
   readFile(workflowPath, 'utf8'),
   readFile(runnerPath, 'utf8'),
   readFile(runtimeSmokePath, 'utf8'),
+  readFile(leastPrivilegeEvidencePath, 'utf8'),
 ]);
 
 const requiredWorkflowFragments = [
@@ -16,12 +18,17 @@ const requiredWorkflowFragments = [
   'type: choice',
   '- contain',
   '- rollback',
-  "contain: DISABLE_PRODUCT_DATA_API / rollback: RESTORE_PRODUCT_DATA_API",
+  '- verify-least-privilege',
+  "contain: DISABLE_PRODUCT_DATA_API / rollback: RESTORE_PRODUCT_DATA_API / verify-least-privilege: VERIFY_SUPABASE_MANAGEMENT_TOKEN_LEAST_PRIVILEGE",
   'permissions:\n  contents: read',
   'cancel-in-progress: false',
   'SUPABASE_PROJECT_ID: cnsfpcdiyofqvhpcegfc',
   'environment: production',
+  "if: ${{ inputs.mode == 'contain' || inputs.mode == 'rollback' }}",
+  "if: ${{ inputs.mode == 'verify-least-privilege' }}",
   'SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}',
+  'VERIFY_SUPABASE_MANAGEMENT_TOKEN_LEAST_PRIVILEGE',
+  'run: bash scripts/operations/verify-production-supabase-management-token-least-privilege.sh',
   'test -n "${SUPABASE_ACCESS_TOKEN:-}"',
   'uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1',
   'Set up Node 24 for governed runtime smoke',
@@ -151,6 +158,37 @@ const requiredRuntimeSmokeFragments = [
 for (const fragment of requiredRuntimeSmokeFragments) {
   if (!runtimeSmoke.includes(fragment)) {
     throw new Error(`Missing canonical Guest containment smoke fragment: ${fragment}`);
+  }
+}
+
+for (const fragment of [
+  "[[ \"$SUPABASE_ACCESS_TOKEN\" == sbp_fc* ]]",
+  "before_schema=\"$(jq -r '.db_schema // \"\"' \"$pre_raw\")\"",
+  "jq -n --arg db_schema \"$before_schema\" '{db_schema: $db_schema}'",
+  "[[ \"$after_schema\" == \"$before_schema\" ]]",
+  '/config/database/pooler',
+  '/api-keys?reveal=true',
+  '/config/auth',
+  "[[ \"$pooler_status\" == '403' ]]",
+  "[[ \"$api_keys_status\" == '403' ]]",
+  "[[ \"$auth_config_status\" == '403' ]]",
+  'state_changed=false',
+  'raw_response_logged=false',
+]) {
+  if (!leastPrivilegeEvidence.includes(fragment)) {
+    throw new Error(`Missing scoped PAT least-privilege evidence fragment: ${fragment}`);
+  }
+}
+
+for (const forbidden of [
+  'echo "$SUPABASE_ACCESS_TOKEN"',
+  'set -x',
+  'cat "$pre_raw"',
+  'cat "$patch_raw"',
+  'cat "$post_raw"',
+]) {
+  if (leastPrivilegeEvidence.includes(forbidden)) {
+    throw new Error(`Least-privilege evidence must not log credential/raw Management material: ${forbidden}`);
   }
 }
 

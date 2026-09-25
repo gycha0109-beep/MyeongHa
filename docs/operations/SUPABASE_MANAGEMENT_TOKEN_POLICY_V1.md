@@ -38,6 +38,23 @@ PATCH /v1/projects/{projectRef}/postgrest
 
 No other workflow may receive `secrets.SUPABASE_ACCESS_TOKEN`.
 
+
+### Denial-only evidence exception
+
+The same approved workflow may be manually dispatched with mode `verify-least-privilege` and confirmation `VERIFY_SUPABASE_MANAGEMENT_TOKEN_LEAST_PRIVILEGE`.
+
+That evidence mode may issue read-only denial probes to these otherwise forbidden surfaces:
+
+```text
+GET /v1/projects/{projectRef}/config/database/pooler  -> 403
+GET /v1/projects/{projectRef}/api-keys?reveal=true   -> 403
+GET /v1/projects/{projectRef}/config/auth             -> 403
+```
+
+These requests are not operational authority. A 2xx response is a hard failure because it proves the PAT is broader than V1 allows. Probe bodies are discarded and never uploaded or logged.
+
+The positive write proof PATCHes the already-observed governed `db_schema` value back to itself and then re-reads it. Evidence requires `state_changed=false`; unexpected Production schema state fails closed before PATCH.
+
 ## Explicitly forbidden PAT authority
 
 The V1 token must not be granted API Keys, API Key Secrets, Connection Pooling, Database, Database Config, Migrations, Auth Config, Project Settings, Edge Functions, Storage, Organizations, or Projects (account-wide) permissions.

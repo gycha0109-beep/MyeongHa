@@ -5,15 +5,16 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'Contain removes product schemas from the Data API; rollback restores the captured baseline schema list.'
+        description: 'Contain removes product schemas; rollback restores the baseline; verify-least-privilege proves the scoped Management PAT boundary without changing logical state.'
         required: true
         type: choice
         default: contain
         options:
           - contain
           - rollback
+          - verify-least-privilege
       confirm:
-        description: 'contain: DISABLE_PRODUCT_DATA_API / rollback: RESTORE_PRODUCT_DATA_API'
+        description: 'contain: DISABLE_PRODUCT_DATA_API / rollback: RESTORE_PRODUCT_DATA_API / verify-least-privilege: VERIFY_SUPABASE_MANAGEMENT_TOKEN_LEAST_PRIVILEGE'
         required: true
         type: string
 
@@ -29,6 +30,7 @@ env:
 
 jobs:
   containment:
+    if: ${{ inputs.mode == 'contain' || inputs.mode == 'rollback' }}
     name: guarded-postgrest-schema-containment
     runs-on: ubuntu-24.04
     environment: production
@@ -116,5 +118,38 @@ jobs:
         with:
           name: myeongha-production-data-api-containment-${{ github.run_id }}
           path: ${{ runner.temp }}/myeongha-data-api-containment
+          if-no-files-found: warn
+          retention-days: 14
+
+  least-privilege-evidence:
+    if: ${{ inputs.mode == 'verify-least-privilege' }}
+    name: verify-supabase-management-token-least-privilege
+    runs-on: ubuntu-24.04
+    environment: production
+    env:
+      DISPATCH_CONFIRM: ${{ inputs.confirm }}
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+    steps:
+      - name: Checkout exact workflow revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Verify explicit least-privilege evidence authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$SUPABASE_PROJECT_ID" == 'cnsfpcdiyofqvhpcegfc' ]]
+          [[ "$DISPATCH_CONFIRM" == 'VERIFY_SUPABASE_MANAGEMENT_TOKEN_LEAST_PRIVILEGE' ]]
+          test -n "${SUPABASE_ACCESS_TOKEN:-}"
+
+      - name: Verify scoped Management PAT least privilege
+        shell: bash
+        run: bash scripts/operations/verify-production-supabase-management-token-least-privilege.sh
+
+      - name: Upload least-privilege evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: myeongha-production-supabase-management-token-least-privilege-${{ github.run_id }}
+          path: ${{ runner.temp }}/myeongha-supabase-management-token-least-privilege
           if-no-files-found: warn
           retention-days: 14
