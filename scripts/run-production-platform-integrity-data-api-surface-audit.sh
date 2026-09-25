@@ -3,7 +3,6 @@ set -euo pipefail
 umask 077
 
 : "${SUPABASE_PROJECT_ID:?SUPABASE_PROJECT_ID is required}"
-: "${SUPABASE_ACCESS_TOKEN:?SUPABASE_ACCESS_TOKEN is required}"
 : "${SUPABASE_DB_PASSWORD:?SUPABASE_DB_PASSWORD is required}"
 : "${POOL_HOST:?POOL_HOST is required}"
 : "${POOL_PORT:?POOL_PORT is required}"
@@ -14,49 +13,17 @@ umask 077
 [[ "$SUPABASE_PROJECT_ID" == 'cnsfpcdiyofqvhpcegfc' ]]
 [[ "$ADMIN_POOL_USER" == "postgres.$SUPABASE_PROJECT_ID" ]]
 [[ "$POOL_HOST" == *.pooler.supabase.com ]]
-[[ "$POOL_PORT" == '5432' || "$POOL_PORT" == '6543' ]]
+[[ "$POOL_PORT" == '5432' ]]
 [[ "$POOL_DB" == 'postgres' ]]
 
 snapshot_dir="$RUNNER_TEMP/myeongha-platform-integrity-catalog"
 test -d "$snapshot_dir"
 
-postgrest_raw="$RUNNER_TEMP/myeongha-pi-postgrest-config.json"
-cleanup() {
-  exit_code=$?
-  trap - EXIT
-  rm -f "$postgrest_raw"
-  exit "$exit_code"
-}
-trap cleanup EXIT
+# PostgREST Management API configuration is governed separately by the manual
+# Production Data API Surface Containment workflow. This post-deploy audit
+# intentionally uses only the explicit PostgreSQL authority and never inherits
+# a Supabase Management PAT.
 
-curl -fsS \
-  -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
-  "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_ID/postgrest" \
-  -o "$postgrest_raw"
-
-jq -e '
-  if type != "object" then
-    error("unexpected PostgREST config response")
-  else
-    {
-      db_schema: (.db_schema // ""),
-      db_extra_search_path: (.db_extra_search_path // ""),
-      max_rows: (.max_rows // null),
-      db_pool: (.db_pool // null),
-      db_pool_acquisition_timeout: (.db_pool_acquisition_timeout // null)
-    }
-  end
-' "$postgrest_raw" > "$snapshot_dir/postgrest_config.json"
-
-if jq -e 'has("jwt_secret")' "$snapshot_dir/postgrest_config.json" >/dev/null; then
-  echo 'Sanitized PostgREST config must never contain jwt_secret.' >&2
-  exit 1
-fi
-
-if [[ "$(jq -r '.db_schema' "$snapshot_dir/postgrest_config.json")" != '' ]]; then
-  echo 'Production Data API containment drift detected: PostgREST db_schema is not disabled.' >&2
-  exit 1
-fi
 
 export PGPASSWORD="$SUPABASE_DB_PASSWORD"
 export PGSSLMODE=require
@@ -274,14 +241,15 @@ if ! awk -F, '$1 == "supabase_admin_default_anon_authenticated_grant_count" { fo
 fi
 
 {
-  echo 'data_api_config_source=management_api_v1_postgrest'
-  echo 'data_api_surface_metadata_captured=yes'
+  echo 'data_api_config_authority=production_data_api_surface_containment_workflow'
+  echo 'data_api_config_management_read=not_performed'
+  echo 'data_api_surface_metadata_captured=database_acl_only'
   echo 'api_role_acl_drift_gate=pass'
 } >> "$snapshot_dir/audit_metadata.txt"
 
 (
   cd "$snapshot_dir"
-  sha256sum *.csv *.json audit_metadata.txt > SHA256SUMS
+  sha256sum *.csv audit_metadata.txt > SHA256SUMS
   sha256sum --check SHA256SUMS
 )
 
