@@ -350,7 +350,7 @@ describe('Se-yeon post-turn relationship runtime v2', () => {
     expect(result.decision).toBe('rejected');
     if (result.decision !== 'rejected') throw new Error('Expected rejection.');
     expect(result.authorityDecision.reasonCodes).toContain('UNVERIFIED_CLAIM');
-    expect(result.relationshipAfter).toBe(before);
+    expect(result.relationshipAfter).toEqual(before);
     expect(ledger.entries).toHaveLength(1);
   });
 
