@@ -111,7 +111,7 @@ export function buildSeyeonEventExtractorRequestV2(
 ): SeyeonStructuredProviderRequestV2 {
   return Object.freeze({
     contractVersion: SEYEON_STRUCTURED_PROVIDER_CONTRACT_VERSION_V2,
-    purpose: 'turn_interpretation' as const,
+    purpose: 'event_extraction' as const,
     instructions:
       'Post-turn event extraction for Se-yeon. Most ordinary turns must return decision=none. Create an event only for durable relationship meaning consistent with Se-yeon Runtime R12/R15: promises, remembered Se-yeon details, receiving/requesting help, meaningful self-disclosure, admitted waiting, specialness invalidation, conflict/repair, or return after absence. Keep objective facts separate from Se-yeon interpretation. Cite only current turn message IDs. Do not infer hidden user emotion, thought, intent, or unperformed action. The event vocabulary is experimental and must not be treated as canonical DB taxonomy.',
     input: Object.freeze({
