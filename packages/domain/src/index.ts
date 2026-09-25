@@ -404,3 +404,21 @@ export {
   type CharacterIntegrityDecisionV1,
   type CharacterIntegrityResultV1,
 } from './character-integrity-gate-v1.js';
+
+
+export {
+  CHARACTER_DISCLOSURE_DECISION_SCHEMA_VERSION_V2,
+  CHARACTER_DISCLOSURE_REASON_CODES_V2,
+  CHARACTER_DISCLOSURE_RESULTS_V2,
+  evaluateCharacterDisclosurePreflightV2,
+  guardCharacterDisclosureRetrievalV2,
+  type CharacterDisclosureDecisionV2,
+  type CharacterDisclosurePreflightInputV2,
+  type CharacterDisclosureQuestionContextV2,
+  type CharacterDisclosureReasonCodeV2,
+  type CharacterDisclosureRelationshipEvidenceV2,
+  type CharacterDisclosureResultV2,
+  type CharacterDisclosureRetrievedSourceV2,
+  type CharacterDisclosureSourceDescriptorV2,
+  type CharacterDisclosureTrustBandV2,
+} from './character-disclosure-gate-v2.js';

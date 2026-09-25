@@ -97,7 +97,7 @@ export const CHARACTER_DISCLOSURE_POLICIES_V1: Readonly<
     schemaVersion: CHARACTER_DISCLOSURE_POLICY_SCHEMA_VERSION_V1,
     characterId: 'seyeon',
     sourceRuntimePath: 'docs/character/SEYEON_CHARACTER_RUNTIME_DRAFT_V0_1.md',
-    sourceRuntimeBlobSha: '931607ce12ec5c77e064c740b1ce14cb2344c51c',
+    sourceRuntimeBlobSha: '84c2f800db40ca963b969743e4e2f5927ff8a01a',
     authority: 'derived_runtime_policy_not_independent_canon',
     topicRules: SHARED_TOPIC_RULES,
     behavior: Object.freeze({
@@ -119,7 +119,7 @@ export const CHARACTER_DISCLOSURE_POLICIES_V1: Readonly<
     schemaVersion: CHARACTER_DISCLOSURE_POLICY_SCHEMA_VERSION_V1,
     characterId: 'yeoul',
     sourceRuntimePath: 'docs/character/YEOUL_CHARACTER_RUNTIME_DRAFT_V0_1.md',
-    sourceRuntimeBlobSha: '85f1393681bca8f48b5a7bc9273f6e7690a5325a',
+    sourceRuntimeBlobSha: 'a58db23ffc62e1bbf3ee70959e14c67ade33a51c',
     authority: 'derived_runtime_policy_not_independent_canon',
     topicRules: SHARED_TOPIC_RULES,
     behavior: Object.freeze({
@@ -141,7 +141,7 @@ export const CHARACTER_DISCLOSURE_POLICIES_V1: Readonly<
     schemaVersion: CHARACTER_DISCLOSURE_POLICY_SCHEMA_VERSION_V1,
     characterId: 'rahyeon',
     sourceRuntimePath: 'docs/character/RAHYEON_CHARACTER_RUNTIME_DRAFT_V0_1.md',
-    sourceRuntimeBlobSha: '437ea9f9223ecef529049e5ec5ff888a5d6d4e09',
+    sourceRuntimeBlobSha: '5a5d29a3ebfefff502730f23b89e668782936a6f',
     authority: 'derived_runtime_policy_not_independent_canon',
     topicRules: SHARED_TOPIC_RULES,
     behavior: Object.freeze({
