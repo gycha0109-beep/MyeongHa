@@ -10,7 +10,7 @@ import {
   type CharacterIntegrityClaimV1,
   type CharacterIntegrityDecisionV1,
 } from '../../../packages/domain/src/character-integrity-gate-v1.js';
-import type { CharacterFactAuthorityRecordV1 } from '../../../packages/character-content/src/character-fact-authority-v1.js';
+import { guardCharacterFactAuthorityRecordV1 } from '../../../packages/character-content/src/character-fact-authority-v1.js';
 import type { CharacterDisclosureCharacterIdV1 } from '../../../packages/character-content/src/character-disclosure-policy-v1.js';
 
 export const CHARACTER_INTEGRITY_PREFLIGHT_SCHEMA_VERSION_V1 =
@@ -179,7 +179,7 @@ export function guardCharacterIntegrityAuthorityEvidenceV1(
   const factAuthority =
     raw.factAuthority === null || raw.factAuthority === undefined
       ? null
-      : (raw.factAuthority as CharacterFactAuthorityRecordV1);
+      : guardCharacterFactAuthorityRecordV1(raw.factAuthority);
 
   return Object.freeze({
     sourceKind: parseAuthoritySourceKind(raw.sourceKind),
