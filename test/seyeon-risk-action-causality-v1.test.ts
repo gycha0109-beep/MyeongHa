@@ -156,7 +156,14 @@ describe('Se-yeon risk-bearing action causality v1', () => {
 
   it('rejects high trust plus overlay when shared history is not explicitly authorized for causal use', () => {
     const ctx = context({ memories: [historyMemory(undefined)] });
-    const turn = interpretation(ctx);
+    const turn = interpretation(ctx, {
+      immediateWant: 'create_next_step',
+      tension: 'solve_vs_overstep',
+      action: 'care_practically',
+      expression: 'caring',
+      reveal: 'familiar',
+      supportingHistoryRefs: [],
+    });
 
     expect(() =>
       guardSeyeonRiskBearingActionCausalityV1({
@@ -170,6 +177,10 @@ describe('Se-yeon risk-bearing action causality v1', () => {
     const ctx = context();
     const turn = interpretation(ctx, {
       evidenceRefs: [CURRENT],
+      immediateWant: 'create_next_step',
+      tension: 'solve_vs_overstep',
+      action: 'care_practically',
+      expression: 'caring',
       supportingHistoryRefs: [],
       memoryRefsUsed: [],
       reveal: 'familiar',
@@ -188,6 +199,12 @@ describe('Se-yeon risk-bearing action causality v1', () => {
     const turn = interpretation(ctx, {
       evidenceRefs: [HISTORY],
       triggerRef: HISTORY,
+      immediateWant: 'create_next_step',
+      tension: 'solve_vs_overstep',
+      action: 'care_practically',
+      expression: 'caring',
+      reveal: 'familiar',
+      supportingHistoryRefs: [],
     });
 
     expect(() =>
@@ -200,7 +217,14 @@ describe('Se-yeon risk-bearing action causality v1', () => {
 
   it('rejects relationship depth alone when the current behavior overlay is absent', () => {
     const ctx = context({ relationshipSemantics: null });
-    const turn = interpretation(ctx);
+    const turn = interpretation(ctx, {
+      immediateWant: 'create_next_step',
+      tension: 'solve_vs_overstep',
+      action: 'care_practically',
+      expression: 'caring',
+      reveal: 'familiar',
+      supportingHistoryRefs: [],
+    });
 
     expect(() =>
       guardSeyeonRiskBearingActionCausalityV1({
@@ -216,6 +240,10 @@ describe('Se-yeon risk-bearing action causality v1', () => {
       relationshipSemantics: null,
     });
     const turn = interpretation(ctx, {
+      immediateWant: 'create_next_step',
+      tension: 'solve_vs_overstep',
+      action: 'care_practically',
+      expression: 'caring',
       reveal: 'familiar',
       supportingHistoryRefs: [],
       memoryRefsUsed: [],
