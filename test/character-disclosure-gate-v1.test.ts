@@ -14,13 +14,20 @@ import {
 } from '../packages/domain/src/character-disclosure-gate-v1.js';
 
 function source(
-  authority: 'CANON' | 'UNDEFINED' | 'HYPOTHESIS' = 'CANON',
+  authority:
+    | 'CANON'
+    | 'SOFT_CANON'
+    | 'AUTHOR_UNDEFINED'
+    | 'INTENTIONALLY_OPEN'
+    | 'WORLD_DEPENDENT' = 'CANON',
   previous: 'none' | 'surface' | 'meaning' | 'deep' = 'none',
 ): CharacterDisclosureSourceMetadataV1 {
+  const available = authority === 'CANON' || authority === 'SOFT_CANON';
   return {
     topicKey: 'past_romance_detail',
     sourceAuthorityState: authority,
-    minimumDisclosureGate: 'FAMILIAR',
+    characterKnowledge: available ? 'KNOWN' : 'NOT_APPLICABLE',
+    disclosureDefault: available ? 'FAMILIAR' : 'NOT_APPLICABLE',
     allowedDepth: 'deep',
     previouslyDisclosedDepth: previous,
     sourceRef: 'runtime:R11.6/past_romance_detail',
@@ -109,11 +116,11 @@ describe('Character disclosure gate v1', () => {
     );
   });
 
-  it('turns disclosure-eligible UNDEFINED biography into AUTHORITY_ABSTAIN rather than a secret', () => {
+  it('turns disclosure-eligible AUTHOR_UNDEFINED biography into AUTHORITY_ABSTAIN rather than a secret', () => {
     const decision = evaluateCharacterDisclosurePreflightV1({
       characterId: 'rahyeon',
       topicKey: 'past_romance_detail',
-      source: source('UNDEFINED'),
+      source: source('AUTHOR_UNDEFINED'),
       relationship: {
         gate: 'DEEP_TRUST',
         trustBand: 'high',
@@ -131,6 +138,28 @@ describe('Character disclosure gate v1', () => {
     expect(decision.behaviorAction).toBe(
       'abstain_without_mysterious_backstory',
     );
+  });
+
+  it('keeps Character knowledge separate from source authority and blocks retrieval when the Character does not know the fact', () => {
+    const base = source('CANON');
+    const decision = evaluateCharacterDisclosurePreflightV1({
+      characterId: 'seyeon',
+      topicKey: 'past_romance_detail',
+      source: {
+        ...base,
+        characterKnowledge: 'UNKNOWN_TO_CHARACTER',
+      },
+      relationship: {
+        gate: 'DEEP_TRUST',
+        trustBand: 'high',
+        relevantSharedHistoryRefs: ['event:deep-trust'],
+      },
+      questionContext: 'relationship_relevant',
+    });
+
+    expect(decision.result).toBe('AUTHORITY_ABSTAIN');
+    expect(decision.authorityDisposition).toBe('CHARACTER_KNOWLEDGE_UNAVAILABLE');
+    expect(decision.retrievalScope.depth).toBe('none');
   });
 
   it('keeps already disclosed surface facts retrievable after relationship regression without unlocking deeper meaning', () => {
