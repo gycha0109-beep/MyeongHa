@@ -208,7 +208,8 @@ for (const fragment of [
   'watchtower_track:',
   'default: ops',
   'environment: production',
-  'MYEONGHA_PRODUCTION_BIRTH_SMOKE_MEMBER_BEARER',
+  'MYEONGHA_PRODUCTION_MEMBER_EMAIL',
+  'MYEONGHA_PRODUCTION_MEMBER_PASSWORD',
   'node scripts/operations/verify-production-authenticated-json-resource-live.mjs',
 ]) {
   requireFragment(productionWorkflowPath, productionWorkflow, fragment);
@@ -216,6 +217,7 @@ for (const fragment of [
 for (const fragment of [
   "GITHUB_REF !== 'refs/heads/main'",
   "GITHUB_EVENT_NAME !== 'workflow_dispatch'",
+  "acquireProductionMemberSmokeSession",
   "'x'.repeat(17_000)",
   "response.status !== 413",
   "payload.error.code !== 'REQUEST_TOO_LARGE'",
