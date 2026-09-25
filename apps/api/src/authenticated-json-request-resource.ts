@@ -238,7 +238,7 @@ export function serializePreparsedJsonBodyBoundedV1(body: unknown): string | und
     return body;
   }
 
-  let normalized = body;
+  let normalized: unknown = body;
   if (
     typeof normalized === 'object' &&
     normalized !== null &&
