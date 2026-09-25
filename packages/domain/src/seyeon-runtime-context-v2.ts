@@ -1,6 +1,11 @@
 import type { RelationshipStateBand } from '../../character-content/src/schema.js';
 import type { CharacterIntegrityDecisionV1 } from './character-integrity-gate-v1.js';
 import {
+  SEYEON_RELATIONSHIP_RUNTIME_OVERLAY_AUTHORITY_V2,
+  SEYEON_RELATIONSHIP_RUNTIME_OVERLAY_VERSION_V2,
+  type SeyeonRelationshipRuntimeOverlayV2,
+} from './seyeon-relationship-runtime-overlay-v2.js';
+import {
   guardCharacterDisclosureRetrievalV2,
   type CharacterDisclosureDecisionV2,
   type CharacterDisclosureRetrievedSourceV2,
@@ -87,6 +92,7 @@ export interface SeyeonRuntimeContextV2 {
     readonly claimsMayMutateRelationshipState: false;
   }>;
   readonly relationship: SeyeonRelationshipContextV2 | null;
+  readonly relationshipSemantics: SeyeonRelationshipRuntimeOverlayV2 | null;
   readonly bibleSlices: readonly Readonly<{
     readonly id: SeyeonBibleSliceIdV2;
     readonly sourceSections: readonly string[];
@@ -116,6 +122,7 @@ export interface SeyeonRuntimeContextV2 {
 
 export interface AssembleSeyeonRuntimeContextV2Input {
   readonly relationship: SeyeonRelationshipContextV2 | null;
+  readonly relationshipSemantics?: SeyeonRelationshipRuntimeOverlayV2 | null;
   readonly integrityDecisions?: readonly CharacterIntegrityDecisionV1[];
   readonly governedPreflightApplied?: boolean;
   readonly recentMessages: readonly SeyeonRecentMessageV2[];
@@ -218,6 +225,66 @@ function validateRelationship(
       'relationship.policyVersion',
       128,
     ),
+  });
+}
+
+function validateRelationshipSemanticsOverlay(
+  overlay: SeyeonRelationshipRuntimeOverlayV2 | null | undefined,
+  relationship: SeyeonRelationshipContextV2 | null,
+): SeyeonRelationshipRuntimeOverlayV2 | null {
+  if (overlay === null || overlay === undefined) return null;
+  if (relationship === null) {
+    throw new TypeError(
+      'Experimental relationship semantics cannot create a relationship context.',
+    );
+  }
+  if (overlay.schemaVersion !== SEYEON_RELATIONSHIP_RUNTIME_OVERLAY_VERSION_V2) {
+    throw new TypeError('Se-yeon relationship runtime overlay schemaVersion is invalid.');
+  }
+  if (overlay.authority !== SEYEON_RELATIONSHIP_RUNTIME_OVERLAY_AUTHORITY_V2) {
+    throw new TypeError(
+      'Se-yeon relationship runtime overlay must remain non-authoritative.',
+    );
+  }
+  if (
+    overlay.source.schemaVersion !== 'seyeon-relationship-state-shadow-v2' ||
+    overlay.source.authority !== 'experimental_shadow_not_production_authority'
+  ) {
+    throw new TypeError(
+      'Se-yeon relationship runtime overlay source must remain the experimental shadow.',
+    );
+  }
+  if (overlay.characterId !== 'seyeon') {
+    throw new TypeError('Se-yeon relationship runtime overlay characterId is invalid.');
+  }
+  for (const value of Object.values(overlay.constraints)) {
+    if (value !== false) {
+      throw new TypeError(
+        'Experimental relationship semantics cannot gain runtime authority.',
+      );
+    }
+  }
+
+  return Object.freeze({
+    schemaVersion: SEYEON_RELATIONSHIP_RUNTIME_OVERLAY_VERSION_V2,
+    authority: SEYEON_RELATIONSHIP_RUNTIME_OVERLAY_AUTHORITY_V2,
+    source: Object.freeze({
+      schemaVersion: 'seyeon-relationship-state-shadow-v2' as const,
+      authority: 'experimental_shadow_not_production_authority' as const,
+    }),
+    characterId: 'seyeon' as const,
+    currentCondition: overlay.currentCondition,
+    behaviorAccess: overlay.behaviorAccess,
+    constraints: Object.freeze({
+      mayOverrideRelationshipState: false as const,
+      mayOverrideRelationshipBands: false as const,
+      mayUnlockDisclosure: false as const,
+      mayCreateCharacterFact: false as const,
+      mayCreateSharedHistory: false as const,
+      mayCreateRelationshipEvent: false as const,
+      mayMutateRelationshipState: false as const,
+      mayAppendDurableMemory: false as const,
+    }),
   });
 }
 
@@ -329,6 +396,12 @@ export function assembleSeyeonRuntimeContextV2(
     'maxRetrievedMemories',
   );
 
+  const relationship = validateRelationship(input.relationship);
+  const relationshipSemantics = validateRelationshipSemanticsOverlay(
+    input.relationshipSemantics,
+    relationship,
+  );
+
   const recentConversation = Object.freeze(
     input.recentMessages
       .slice(-maxRecentMessages)
@@ -409,7 +482,8 @@ export function assembleSeyeonRuntimeContextV2(
       claimsMayCreateRelationshipEvents: false as const,
       claimsMayMutateRelationshipState: false as const,
     }),
-    relationship: validateRelationship(input.relationship),
+    relationship,
+    relationshipSemantics,
     bibleSlices,
     recentConversation,
     retrievedMemories,
