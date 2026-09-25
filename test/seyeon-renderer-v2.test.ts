@@ -106,7 +106,9 @@ describe('Se-yeon renderer packet and guard v2', () => {
       'memory-a',
     ]);
     expect(packet.outputPolicy.memoryCallbackRequiresBoundEvidence).toBe(true);
-    expect(packet.authorityBoundaries.hypothesisMayBeUsedAsAutobiographicalFact).toBe(false);
+    expect(packet.authorityBoundaries.legacyProjectionFieldsAreNonAuthoritative).toBe(true);
+    expect(packet.outputPolicy.legacyProjectionFieldsNeverTruthAuthority).toBe(true);
+    expect(packet.integrity.unverifiedClaimsMayEnterAsFacts).toBe(false);
   });
 
   it('accepts a renderer draft only when expression, reveal, memory, and semantic review all bind', () => {
