@@ -59,6 +59,7 @@ function context(): SeyeonEventExtractionContextV2 {
       expressionState: 'embarrassed',
       revealLevel: 'familiar',
       memoryRefsMentioned: [],
+      privateSourceRefsMentioned: [],
       disclosureSliceIds: [],
       interpretationSchemaVersion: 'seyeon-turn-interpretation-v2',
       semanticReviewHash: 'sha256:v1:test',
