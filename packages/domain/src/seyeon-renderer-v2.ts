@@ -5,6 +5,7 @@ import type {
   SeyeonRetrievedMemoryV2,
   SeyeonRuntimeContextV2,
 } from './seyeon-runtime-context-v2.js';
+import type { SeyeonRiskActionCausalityDecisionV1 } from './seyeon-risk-action-causality-v1.js';
 import type {
   SeyeonRevealLevelV2,
   SeyeonTurnInterpretationV2,
@@ -36,6 +37,7 @@ export const SEYEON_SEMANTIC_FAILURE_CODES_V2 = Object.freeze([
   'RELATIONSHIP_OVERLAY_AUTHORITY_VIOLATION',
   'RELATIONSHIP_OVERLAY_DISCLOSURE_VIOLATION',
   'RELATIONSHIP_OVERLAY_HISTORY_FABRICATION',
+  'RISK_ACTION_CAUSALITY_VIOLATION',
 ] as const);
 
 export type SeyeonSemanticFailureCodeV2 =
@@ -48,6 +50,7 @@ export interface SeyeonRendererPacketV2 {
   readonly integrity: SeyeonRuntimeContextV2['integrity'];
   readonly relationship: SeyeonRuntimeContextV2['relationship'];
   readonly relationshipSemantics: SeyeonRuntimeContextV2['relationshipSemantics'];
+  readonly riskCausality: SeyeonRiskActionCausalityDecisionV1;
   readonly bibleSlices: SeyeonRuntimeContextV2['bibleSlices'];
   readonly recentConversation: SeyeonRuntimeContextV2['recentConversation'];
   readonly disclosure: SeyeonRuntimeContextV2['disclosure'];
@@ -69,6 +72,8 @@ export interface SeyeonRendererPacketV2 {
     readonly experimentalRelationshipSemanticsNeverAuthority: true;
     readonly relationshipSemanticsCannotUnlockDisclosure: true;
     readonly relationshipSemanticsCannotCreateHistory: true;
+    readonly riskBearingActionRequiresCausalEvidence: true;
+    readonly engagementOptimizationCannotJustifyRisk: true;
   }>;
 }
 
@@ -201,6 +206,7 @@ export function hashSeyeonRendererUtteranceV2(utterance: string): string {
 export function buildSeyeonRendererPacketV2(input: {
   readonly context: SeyeonRuntimeContextV2;
   readonly interpretation: SeyeonTurnInterpretationV2;
+  readonly riskCausality: SeyeonRiskActionCausalityDecisionV1;
 }): SeyeonRendererPacketV2 {
   const memoryIds = new Set(input.interpretation.memoryRefsUsed);
   const memoryEvidence = Object.freeze(
@@ -234,6 +240,7 @@ export function buildSeyeonRendererPacketV2(input: {
     integrity: input.context.integrity,
     relationship: input.context.relationship,
     relationshipSemantics: input.context.relationshipSemantics,
+    riskCausality: input.riskCausality,
     bibleSlices: input.context.bibleSlices,
     recentConversation: input.context.recentConversation,
     disclosure: input.context.disclosure,
@@ -255,6 +262,8 @@ export function buildSeyeonRendererPacketV2(input: {
       experimentalRelationshipSemanticsNeverAuthority: true as const,
       relationshipSemanticsCannotUnlockDisclosure: true as const,
       relationshipSemanticsCannotCreateHistory: true as const,
+      riskBearingActionRequiresCausalEvidence: true as const,
+      engagementOptimizationCannotJustifyRisk: true as const,
     }),
   });
 }

@@ -12,6 +12,7 @@ import {
 import {
   assembleSeyeonRuntimeContextV2,
   buildSeyeonRendererPacketV2,
+  guardSeyeonRiskBearingActionCausalityV1,
   guardSeyeonTurnInterpretationV2,
   hashSeyeonRendererUtteranceV2,
 } from '../packages/domain/src/index.js';
@@ -322,7 +323,8 @@ describe('Se-yeon structured Character runtime v2', () => {
       context,
       rawOutput: validInterpretation(),
     });
-    const packet = buildSeyeonRendererPacketV2({ context, interpretation });
+    const riskCausality = guardSeyeonRiskBearingActionCausalityV1({ context, interpretation });
+    const packet = buildSeyeonRendererPacketV2({ context, interpretation, riskCausality });
     const rendererDraft = validRendererDraft();
     const utteranceHash = hashSeyeonRendererUtteranceV2(rendererDraft.utterance);
 

@@ -63,6 +63,7 @@ export interface SeyeonRetrievedMemoryV2 {
   readonly claimKind: SeyeonRetrievedClaimKindV2;
   readonly summary: string;
   readonly sourceRef: string;
+  readonly causalAuthority?: 'authorized_shared_history';
   readonly relevance: number;
   readonly salience: number;
 }
@@ -331,12 +332,29 @@ function validateRetrievedMemory(
       'Character-authored private source content must enter through governed disclosure retrieval.',
     );
   }
+  if (
+    memory.causalAuthority !== undefined &&
+    memory.causalAuthority !== 'authorized_shared_history'
+  ) {
+    throw new TypeError('retrievedMemory.causalAuthority is invalid.');
+  }
+  if (
+    memory.causalAuthority === 'authorized_shared_history' &&
+    (memory.kind !== 'relationship_event' || memory.claimKind !== 'fact')
+  ) {
+    throw new TypeError(
+      'Only factual relationship_event memory may be authorized as shared-history causal evidence.',
+    );
+  }
   return Object.freeze({
     memoryId: requireText(memory.memoryId, 'retrievedMemory.memoryId', 256),
     kind: memory.kind,
     claimKind: memory.claimKind,
     summary: requireText(memory.summary, 'retrievedMemory.summary', 4000),
     sourceRef,
+    ...(memory.causalAuthority === undefined
+      ? {}
+      : { causalAuthority: memory.causalAuthority }),
     relevance: memory.relevance,
     salience: memory.salience,
   });
