@@ -201,7 +201,7 @@ function validateCausalRequirements(input: {
   }
 }
 
-function validateExtractionContext(
+export function validateSeyeonEventExtractionContextV2(
   context: SeyeonEventExtractionContextV2,
 ): void {
   if (context.messages.length === 0 || context.messages.length > 8) {
@@ -245,7 +245,7 @@ export function guardSeyeonEventExtractionCandidateV2(input: {
   readonly rawOutput: unknown;
   readonly context: SeyeonEventExtractionContextV2;
 }): SeyeonEventExtractionCandidateV2 {
-  validateExtractionContext(input.context);
+  validateSeyeonEventExtractionContextV2(input.context);
   if (!isRecord(input.rawOutput)) {
     throw new SeyeonEventExtractionErrorV2(
       'Se-yeon event extraction candidate must be an object.',
