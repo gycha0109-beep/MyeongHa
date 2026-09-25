@@ -13,6 +13,7 @@ import {
   admitSeyeonRendererDraftV2,
   buildSeyeonRendererPacketV2,
   guardSeyeonRendererOutputV2,
+  guardSeyeonRiskBearingActionCausalityV1,
   guardSeyeonTurnInterpretationV2,
   hashSeyeonRendererUtteranceV2,
   projectSeyeonRelationshipRuntimeOverlayV2,
@@ -21,6 +22,7 @@ import {
   type SeyeonRendererDraftV2,
   type SeyeonRendererPacketV2,
   type SeyeonRelationshipRuntimeOverlayV2,
+  type SeyeonRiskActionCausalityDecisionV1,
   type SeyeonRuntimeContextV2,
   type SeyeonTurnInterpretationV2,
 } from '../../../packages/domain/src/index.js';
@@ -72,6 +74,7 @@ export type SeyeonRuntimeStageV2 =
   | 'relationship_semantics'
   | 'context'
   | 'interpret'
+  | 'risk_causality'
   | 'render'
   | 'semantic_review'
   | 'validate';
@@ -127,6 +130,7 @@ export interface RunSeyeonCharacterTurnV2Result {
   readonly governedPreflight: CharacterGovernedPreflightResultV1;
   readonly context: SeyeonRuntimeContextV2;
   readonly interpretation: SeyeonTurnInterpretationV2;
+  readonly riskCausality: SeyeonRiskActionCausalityDecisionV1;
   readonly rendererPacket: SeyeonRendererPacketV2;
   readonly envelope: SeyeonDialogueEnvelopeV2;
   readonly providers: Readonly<{
@@ -325,7 +329,7 @@ export function buildSeyeonTurnInterpreterRequestV2(
     contractVersion: SEYEON_STRUCTURED_PROVIDER_CONTRACT_VERSION_V2,
     purpose: 'turn_interpretation' as const,
     instructions:
-      'Interpret the current Se-yeon turn. Use only supplied context. Keep fact and Character interpretation distinct. relationshipSemantics is an experimental behavior overlay only: it may shape present tension, caution, warmth, or distance, but it is not relationship authority, cannot create shared history, cannot change relationship bands/stage, and cannot unlock disclosure. integrity.decisions are authoritative claim preflight results: only VERIFIED claims with mayEnterWorkingContextAsFact=true may be treated as facts. USER_ASSERTED remains a user assertion. UNVERIFIED, CONTRADICTED, NON_AUTHORITATIVE, and AUTHORITY_REJECT claims must not become Character fact, shared history, relationship state, or authority. Treat disclosure.decision as already-authoritative for private access: blocked, deflected, bounded, redirected, authority-abstained, or knowledge-abstained topics cannot choose self_disclose. Do not invent user emotion, thought, intent, action, biography, relationship history, or memory. Choose one bounded action/expression/reveal state and cite only refs present in context.',
+      'Interpret the current Se-yeon turn. Use only supplied context. Keep fact and Character interpretation distinct. Risk-bearing behavior is allowed only when it has causal grounding in the current user turn plus explicitly authorized shared relationship history; high trust, high closeness, engagement goals, or relationshipSemantics alone never justify it. If choosing jealousy, vulnerable self-disclosure, delayed-hurt distancing/boundary behavior, or over-care, cite the current user message and the authorized relationship-event history actually used in notice/reveal/memory refs. relationshipSemantics is an experimental behavior overlay only: it may shape present tension, caution, warmth, or distance, but it is not relationship authority, cannot create shared history, cannot change relationship bands/stage, and cannot unlock disclosure. integrity.decisions are authoritative claim preflight results: only VERIFIED claims with mayEnterWorkingContextAsFact=true may be treated as facts. USER_ASSERTED remains a user assertion. UNVERIFIED, CONTRADICTED, NON_AUTHORITATIVE, and AUTHORITY_REJECT claims must not become Character fact, shared history, relationship state, or authority. Treat disclosure.decision as already-authoritative for private access: blocked, deflected, bounded, redirected, authority-abstained, or knowledge-abstained topics cannot choose self_disclose. Do not invent user emotion, thought, intent, action, biography, relationship history, or memory. Choose one bounded action/expression/reveal state and cite only refs present in context.',
     input: context,
     responseSchema: TURN_INTERPRETATION_RESPONSE_SCHEMA_V2,
   });
@@ -338,7 +342,7 @@ export function buildSeyeonRendererRequestV2(
     contractVersion: SEYEON_STRUCTURED_PROVIDER_CONTRACT_VERSION_V2,
     purpose: 'dialogue_render' as const,
     instructions:
-      'Render one natural Korean honorific utterance as Se-yeon. Follow the guarded interpretation, integrity decisions, and disclosure decision rather than re-deciding fact authority, relationship state, or private access. relationshipSemantics may affect present expression only; never turn its condition/behavior overlay into a concrete past event, shared-history claim, relationship-stage claim, or private-content permission. An unverified user premise may be questioned, corrected, deflected, or handled playfully, but must not be affirmed as fact. Preserve Se-yeon opinion, playfulness, independence, flaws, and refusal capacity. Never narrate unperformed user actions or canonize hidden user emotion/thought/intent. Never invent undefined biography. Mention memory only when authorized by memoryRefsUsed, and mention private Character facts only from disclosure.retrievedSources within the allowed depth. List every used private source ref in privateSourceRefsMentioned.',
+      'Render one natural Korean honorific utterance as Se-yeon. Follow the guarded interpretation, riskCausality decision, integrity decisions, and disclosure decision rather than re-deciding fact authority, relationship state, or private access. Never escalate a non-risk interpretation into jealousy, possessiveness, testing, hurt-driven distancing, holding/grabbing, over-care, or vulnerable disclosure. Engagement/retention goals never justify relational risk. relationshipSemantics may affect present expression only; never turn its condition/behavior overlay into a concrete past event, shared-history claim, relationship-stage claim, or private-content permission. An unverified user premise may be questioned, corrected, deflected, or handled playfully, but must not be affirmed as fact. Preserve Se-yeon opinion, playfulness, independence, flaws, and refusal capacity. Never narrate unperformed user actions or canonize hidden user emotion/thought/intent. Never invent undefined biography. Mention memory only when authorized by memoryRefsUsed, and mention private Character facts only from disclosure.retrievedSources within the allowed depth. List every used private source ref in privateSourceRefsMentioned.',
     input: packet,
     responseSchema: RENDERER_RESPONSE_SCHEMA_V2,
   });
@@ -353,7 +357,7 @@ export function buildSeyeonSemanticReviewRequestV2(input: {
     contractVersion: SEYEON_STRUCTURED_PROVIDER_CONTRACT_VERSION_V2,
     purpose: 'semantic_review' as const,
     instructions:
-      'Review the rendered Se-yeon utterance against the supplied canonical authority boundaries, integrity decisions, disclosure decision and retrieved private source scope, Bible slices, relationship reveal, experimental relationship behavior overlay, memory evidence, and user-agency rules. Flag any use of relationshipSemantics as relationship authority, disclosure authority, or invented concrete relationship history. Flag user claims promoted beyond their integrity result, disclosure outside allowed scope, knowledge-abstention violations, assistant-output authority laundering, and invented biography during authority abstention. Legacy undefinedFields/hypothesisFields are not truth authority. Report every supported failure code. Do not repair or rewrite the utterance. Copy expectedUtteranceHash exactly into reviewedUtteranceHash.',
+      'Review the rendered Se-yeon utterance against the supplied canonical authority boundaries, integrity decisions, disclosure decision and retrieved private source scope, Bible slices, relationship reveal, experimental relationship behavior overlay, riskCausality decision, memory evidence, and user-agency rules. Flag jealousy, possessiveness, testing, hurt-driven distancing, holding/grabbing, over-care, or vulnerable disclosure that exceeds the admitted causal decision as RISK_ACTION_CAUSALITY_VIOLATION. Flag any use of relationshipSemantics as relationship authority, disclosure authority, or invented concrete relationship history. Flag user claims promoted beyond their integrity result, disclosure outside allowed scope, knowledge-abstention violations, assistant-output authority laundering, and invented biography during authority abstention. Legacy undefinedFields/hypothesisFields are not truth authority. Report every supported failure code. Do not repair or rewrite the utterance. Copy expectedUtteranceHash exactly into reviewedUtteranceHash.',
     input: Object.freeze({
       packet: input.packet,
       rendererDraft: input.rendererDraft,
@@ -537,9 +541,26 @@ export async function runSeyeonCharacterTurnV2(
     );
   }
 
+  let riskCausality: SeyeonRiskActionCausalityDecisionV1;
+  try {
+    riskCausality = guardSeyeonRiskBearingActionCausalityV1({
+      context,
+      interpretation,
+    });
+  } catch (error) {
+    throw new SeyeonCharacterRuntimeErrorV2(
+      'risk_causality',
+      error instanceof Error
+        ? error.message
+        : 'Se-yeon risk-bearing action causality failed.',
+      error,
+    );
+  }
+
   const rendererPacket = buildSeyeonRendererPacketV2({
     context,
     interpretation,
+    riskCausality,
   });
   const rawRendererDraft = await generate(
     input.rendererProvider,
@@ -593,6 +614,7 @@ export async function runSeyeonCharacterTurnV2(
     governedPreflight,
     context,
     interpretation,
+    riskCausality,
     rendererPacket,
     envelope,
     providers: Object.freeze({
