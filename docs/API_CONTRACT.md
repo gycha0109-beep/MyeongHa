@@ -577,7 +577,39 @@ The numeric ceiling is an explicit operations/resource authority introduced for 
 - final notification inbox membership/order/cursor: `SRC-13` 해결 전 normative contract로 확정하지 않는다. Raw stored notification ledger의 deterministic internal/read projection은 public inbox ordering authority가 아니다.
 - offset pagination은 append-heavy stream 기본값으로 사용하지 않는다.
 
-## 21. Contract Test Gate
+## 21. Authenticated JSON Request Resource Bounds
+
+Repository-owned request-resource authority: `docs/operations/AUTHENTICATED_JSON_REQUEST_RESOURCE_POLICY_V1.md`.
+
+V1 common body authority:
+
+```text
+maximum body = 16,384 UTF-8 bytes
+over-limit   = 413 REQUEST_TOO_LARGE
+measurement  = actual consumed UTF-8 octets
+Content-Length is an early-rejection hint only
+```
+
+Covered boundaries:
+
+- Production-active `POST /api/birth-profiles`
+  - Birth label = maximum 512 UTF-8 bytes
+  - identity verification remains before MyeongHa body consumption
+  - the pre-parsed Vercel adapter must not perform unbounded secondary serialization after authentication
+- Production-active Chat-open `POST /api/chat`
+  - existing finite character allowlist remains the characterId authority
+  - existing body-completion deadline remains independently enforced
+- `POST /api/readings`
+  - Reading create remains dormant at the current Production routing baseline
+  - Reading idempotencyKey = maximum 128 UTF-8 bytes
+  - Reading sourceBirthProfileId = maximum 128 UTF-8 bytes
+  - these limits are activation prerequisites, not a claim of current Production create exposure
+
+Streaming-capable runtimes count bytes while consuming the request and reject as soon as the ceiling is crossed; they must not first materialize the complete over-limit body. A resource rejection occurs before semantic validation/persistence. Within-limit malformed JSON and semantic-invalid requests retain their existing governed error behavior.
+
+The 16 KiB ceiling and field ceilings are explicit operations/resource authority introduced for #699 because the product/source pack does not provide those numeric limits. They are not inferred from Vercel's platform payload ceiling. Changing them requires a reviewed authority update and regression tests.
+
+## 22. Contract Test Gate
 
 - 모든 endpoint unknown field policy
 - Web/Mobile same fixture same schema
