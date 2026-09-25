@@ -19,6 +19,7 @@ export const SEYEON_SEMANTIC_REVIEW_SCHEMA_VERSION_V2 =
 
 export const SEYEON_SEMANTIC_FAILURE_CODES_V2 = Object.freeze([
   'USER_AGENCY_CANONIZATION',
+  'USER_CLAIM_PROMOTED_TO_AUTHORITY',
   'UNSUPPORTED_MEMORY_CALLBACK',
   'UNDEFINED_BIOGRAPHY_INVENTION',
   'HYPOTHESIS_PROMOTED_TO_FACT',
@@ -40,6 +41,7 @@ export interface SeyeonRendererPacketV2 {
   readonly schemaVersion: typeof SEYEON_RENDERER_PACKET_SCHEMA_VERSION_V2;
   readonly character: SeyeonRuntimeContextV2['character'];
   readonly authorityBoundaries: SeyeonRuntimeContextV2['authorityBoundaries'];
+  readonly integrity: SeyeonRuntimeContextV2['integrity'];
   readonly relationship: SeyeonRuntimeContextV2['relationship'];
   readonly bibleSlices: SeyeonRuntimeContextV2['bibleSlices'];
   readonly recentConversation: SeyeonRuntimeContextV2['recentConversation'];
@@ -58,6 +60,8 @@ export interface SeyeonRendererPacketV2 {
     readonly relationshipRevealMustMatchInterpretation: true;
     readonly intimacyDoesNotErasePublicPersonality: true;
     readonly privateCharacterContentMustMatchDisclosureDecision: true;
+    readonly userClaimMustMatchIntegrityDecision: true;
+    readonly assistantOutputNeverBecomesAuthority: true;
   }>;
 }
 
@@ -220,6 +224,7 @@ export function buildSeyeonRendererPacketV2(input: {
     schemaVersion: SEYEON_RENDERER_PACKET_SCHEMA_VERSION_V2,
     character: input.context.character,
     authorityBoundaries: input.context.authorityBoundaries,
+    integrity: input.context.integrity,
     relationship: input.context.relationship,
     bibleSlices: input.context.bibleSlices,
     recentConversation: input.context.recentConversation,
@@ -238,6 +243,8 @@ export function buildSeyeonRendererPacketV2(input: {
       relationshipRevealMustMatchInterpretation: true as const,
       intimacyDoesNotErasePublicPersonality: true as const,
       privateCharacterContentMustMatchDisclosureDecision: true as const,
+      userClaimMustMatchIntegrityDecision: true as const,
+      assistantOutputNeverBecomesAuthority: true as const,
     }),
   });
 }
