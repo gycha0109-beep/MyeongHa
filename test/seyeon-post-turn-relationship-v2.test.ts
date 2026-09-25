@@ -62,7 +62,7 @@ function turn() {
     ],
     interpretation: {
       schemaVersion: 'seyeon-turn-interpretation-v2' as const,
-      userMove: 'followed_through' as const,
+      userMove: 'promise_followup' as const,
       notice: {
         summary: '사용자가 이전 약속의 이행을 현재 발화에서 확인했다.',
         evidenceRefs: ['user-current'],
@@ -72,7 +72,7 @@ function turn() {
         summary: '행동으로 이어진 약속을 관계 맥락에서 받아들인다.',
       },
       tension: {
-        key: 'say_vs_do' as const,
+        key: 'none_material' as const,
         summary: '말보다 실제 행동의 무게를 본다.',
       },
       chosenAction: {
