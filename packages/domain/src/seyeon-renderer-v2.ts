@@ -33,6 +33,9 @@ export const SEYEON_SEMANTIC_FAILURE_CODES_V2 = Object.freeze([
   'AUTHORITY_ABSTENTION_VIOLATION',
   'KNOWLEDGE_ABSTENTION_VIOLATION',
   'INTEGRITY_SCOPE_VIOLATION',
+  'RELATIONSHIP_OVERLAY_AUTHORITY_VIOLATION',
+  'RELATIONSHIP_OVERLAY_DISCLOSURE_VIOLATION',
+  'RELATIONSHIP_OVERLAY_HISTORY_FABRICATION',
 ] as const);
 
 export type SeyeonSemanticFailureCodeV2 =
@@ -44,6 +47,7 @@ export interface SeyeonRendererPacketV2 {
   readonly authorityBoundaries: SeyeonRuntimeContextV2['authorityBoundaries'];
   readonly integrity: SeyeonRuntimeContextV2['integrity'];
   readonly relationship: SeyeonRuntimeContextV2['relationship'];
+  readonly relationshipSemantics: SeyeonRuntimeContextV2['relationshipSemantics'];
   readonly bibleSlices: SeyeonRuntimeContextV2['bibleSlices'];
   readonly recentConversation: SeyeonRuntimeContextV2['recentConversation'];
   readonly disclosure: SeyeonRuntimeContextV2['disclosure'];
@@ -62,6 +66,9 @@ export interface SeyeonRendererPacketV2 {
     readonly relationshipRevealMustMatchInterpretation: true;
     readonly intimacyDoesNotErasePublicPersonality: true;
     readonly privateCharacterContentMustMatchDisclosureDecision: true;
+    readonly experimentalRelationshipSemanticsNeverAuthority: true;
+    readonly relationshipSemanticsCannotUnlockDisclosure: true;
+    readonly relationshipSemanticsCannotCreateHistory: true;
   }>;
 }
 
@@ -226,6 +233,7 @@ export function buildSeyeonRendererPacketV2(input: {
     authorityBoundaries: input.context.authorityBoundaries,
     integrity: input.context.integrity,
     relationship: input.context.relationship,
+    relationshipSemantics: input.context.relationshipSemantics,
     bibleSlices: input.context.bibleSlices,
     recentConversation: input.context.recentConversation,
     disclosure: input.context.disclosure,
@@ -244,6 +252,9 @@ export function buildSeyeonRendererPacketV2(input: {
       relationshipRevealMustMatchInterpretation: true as const,
       intimacyDoesNotErasePublicPersonality: true as const,
       privateCharacterContentMustMatchDisclosureDecision: true as const,
+      experimentalRelationshipSemanticsNeverAuthority: true as const,
+      relationshipSemanticsCannotUnlockDisclosure: true as const,
+      relationshipSemanticsCannotCreateHistory: true as const,
     }),
   });
 }

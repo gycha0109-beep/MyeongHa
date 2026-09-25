@@ -422,3 +422,12 @@ export {
   type CharacterDisclosureSourceDescriptorV2,
   type CharacterDisclosureTrustBandV2,
 } from './character-disclosure-gate-v2.js';
+
+
+export {
+  SEYEON_RELATIONSHIP_RUNTIME_OVERLAY_AUTHORITY_V2,
+  SEYEON_RELATIONSHIP_RUNTIME_OVERLAY_VERSION_V2,
+  SeyeonRelationshipRuntimeOverlayErrorV2,
+  projectSeyeonRelationshipRuntimeOverlayV2,
+  type SeyeonRelationshipRuntimeOverlayV2,
+} from './seyeon-relationship-runtime-overlay-v2.js';
