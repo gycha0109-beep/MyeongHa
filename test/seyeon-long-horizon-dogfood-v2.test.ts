@@ -31,6 +31,7 @@ function event(input: {
     occurredAt: input.occurredAt,
     sourceTurnId: `turn-${input.id}`,
     sourceMessageRefs: [sourceRef],
+    causalPredecessorEventIds: [],
     facts: [
       {
         factKey: 'observed_interaction',
