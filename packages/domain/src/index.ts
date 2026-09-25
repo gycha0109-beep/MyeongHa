@@ -350,3 +350,26 @@ export {
   type SeyeonEventExtractionMessageV2,
   type SeyeonEventRetrievalCandidateV2,
 } from './seyeon-event-extraction-v2.js';
+
+export {
+  SEYEON_RELATIONSHIP_EPISODE_SCHEMA_VERSION_V2,
+  SEYEON_RELATIONSHIP_STATE_SHADOW_VERSION_V2,
+  SeyeonRelationshipSemanticsErrorV2,
+  buildSeyeonRelationshipEvidenceEpisodesV2,
+  creditSeyeonRelationshipEpisodesV2,
+  projectSeyeonRelationshipStateShadowV2,
+  summarizeSeyeonRelationshipEpisodeProfileV2,
+  type SeyeonCurrentRelationshipConditionV2,
+  type SeyeonEpisodeCreditDecisionV2,
+  type SeyeonEpisodeCreditResultV2,
+  type SeyeonEpisodeSuppressionReasonV2,
+  type SeyeonRelationshipBehaviorAccessV2,
+  type SeyeonRelationshipEpisodeFamilyV2,
+  type SeyeonRelationshipEpisodeOutcomeV2,
+  type SeyeonRelationshipEpisodeProfileV2,
+  type SeyeonRelationshipEpisodeStatusV2,
+  type SeyeonRelationshipEvidenceEpisodeV2,
+  type SeyeonRelationshipMilestoneKindV2,
+  type SeyeonRelationshipStageShadowV2,
+  type SeyeonRelationshipStateShadowV2,
+} from './seyeon-relationship-semantics-v2.js';
