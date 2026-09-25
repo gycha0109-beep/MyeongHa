@@ -1,0 +1,51 @@
+{
+  "contractVersion": "myeongha-authenticated-json-request-resource-policy-v1",
+  "maximumBodyBytes": 16384,
+  "bodyByteUnit": "utf8_octets",
+  "overLimitHttpStatus": 413,
+  "overLimitErrorCode": "REQUEST_TOO_LARGE",
+  "authenticationOrder": "verify_identity_before_body_consumption",
+  "contentLengthAuthority": "early_rejection_hint_only_stream_count_is_final",
+  "routes": {
+    "birthProfileCreate": {
+      "route": "/api/birth-profiles",
+      "method": "POST",
+      "productionExposure": "active",
+      "bodyMode": "streaming_runtime_with_preparsed_vercel_adapter",
+      "fields": {
+        "label": {
+          "maximumUtf8Bytes": 512,
+          "nullable": true
+        }
+      }
+    },
+    "chatOpen": {
+      "route": "/api/chat",
+      "method": "POST",
+      "productionExposure": "active",
+      "bodyMode": "streaming",
+      "fields": {
+        "characterId": {
+          "authority": "existing_finite_allowlist"
+        }
+      }
+    },
+    "readingCreate": {
+      "route": "/api/readings",
+      "method": "POST",
+      "productionExposure": "dormant",
+      "bodyMode": "streaming",
+      "fields": {
+        "idempotencyKey": {
+          "maximumUtf8Bytes": 128
+        },
+        "sourceBirthProfileId": {
+          "maximumUtf8Bytes": 128
+        }
+      }
+    }
+  },
+  "preparsedAdapterGuarantee": "after_authentication_no_unbounded_secondary_serialization",
+  "malformedJsonErrorCode": "INVALID_REQUEST",
+  "semanticContractsOtherwiseUnchanged": true
+}
