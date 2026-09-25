@@ -60,8 +60,7 @@
     "verify:production-privacy-recovery-canary-workflow": "node scripts/verify-production-privacy-recovery-canary-workflow.mjs",
     "verify:production-guest-bootstrap-abuse-policy": "node scripts/verify-production-guest-bootstrap-abuse-policy.mjs",
     "verify:collection-read-resource-policy": "node scripts/verify-collection-read-resource-policy.mjs",
-    "verify:password-compromise-guard": "node scripts/verify-password-compromise-guard.mjs",
-    "dogfood:seyeon-long-horizon-v2": "vitest run test/seyeon-long-horizon-dogfood-v2.test.ts --reporter=verbose"
+    "verify:password-compromise-guard": "node scripts/verify-password-compromise-guard.mjs"
   },
   "dependencies": {
     "pg": "8.23.0"
