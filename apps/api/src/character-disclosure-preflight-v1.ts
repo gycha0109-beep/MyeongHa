@@ -182,20 +182,21 @@ export async function retrieveAllowedCharacterDisclosureSourcesV1(input: {
   readonly preflight: CharacterDisclosurePreflightResultV1;
   readonly retriever: CharacterPrivateSourceRetrieverPortV1;
 }): Promise<readonly CharacterDisclosureRetrievedSourceV1[]> {
-  if (
-    input.preflight.status === 'not_sensitive' ||
-    input.preflight.decision.retrievalScope.depth === 'none' ||
-    input.preflight.decision.retrievalScope.sourceRef === null
-  ) {
+  if (input.preflight.status === 'not_sensitive') {
     return Object.freeze([]);
   }
 
   const decision = input.preflight.decision;
+  const scope = decision.retrievalScope;
+  if (scope.depth === 'none' || scope.sourceRef === null) {
+    return Object.freeze([]);
+  }
+
   const raw = await input.retriever.retrieve({
     characterId: decision.characterId,
     topicKey: decision.topicKey,
-    sourceRef: decision.retrievalScope.sourceRef,
-    depth: decision.retrievalScope.depth,
+    sourceRef: scope.sourceRef,
+    depth: scope.depth,
   });
 
   return guardCharacterDisclosureRetrievalV1({
