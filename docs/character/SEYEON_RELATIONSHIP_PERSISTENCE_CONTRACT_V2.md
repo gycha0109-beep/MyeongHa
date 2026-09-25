@@ -5,6 +5,7 @@
 > Scope: Se-yeon V2 vertical slice only
 > Source baseline: DB ERD v0.6 + Use Case v2 + current repository DDL + Se-yeon experimental Event/Relationship runtime
 > Non-goal: resolving product policy values that source authority has not defined
+> Runtime guard: `experimental_non_production` until SRC-22 closure
 
 ---
 
