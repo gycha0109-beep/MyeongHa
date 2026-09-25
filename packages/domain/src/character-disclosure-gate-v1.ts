@@ -330,8 +330,9 @@ export function evaluateCharacterDisclosurePreflightV1(
     input.source.previouslyDisclosedDepth !== 'none';
   const relationshipEligible =
     input.questionContext !== 'pressuring' &&
-    sourceDisclosureDefaultAllows(input) &&
-    (previouslyDisclosed || isEligibleByRelationship(input, policyDepth));
+    (previouslyDisclosed ||
+      (sourceDisclosureDefaultAllows(input) &&
+        isEligibleByRelationship(input, policyDepth)));
 
   if (!relationshipEligible) {
     return closedDecision(input, policy, sharedHistoryRefs);
