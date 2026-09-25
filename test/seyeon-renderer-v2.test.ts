@@ -8,6 +8,7 @@ import {
   SeyeonRendererGuardErrorV2,
 } from '../packages/domain/src/seyeon-renderer-v2.js';
 import { guardSeyeonTurnInterpretationV2 } from '../packages/domain/src/seyeon-turn-interpreter-v2.js';
+import { guardSeyeonRiskBearingActionCausalityV1 } from '../packages/domain/src/seyeon-risk-action-causality-v1.js';
 
 function runtimeContext() {
   return assembleSeyeonRuntimeContextV2({
@@ -53,11 +54,9 @@ function runtimeContext() {
 
 function interpretation() {
   const context = runtimeContext();
-  return {
+  const guardedInterpretation = guardSeyeonTurnInterpretationV2({
     context,
-    interpretation: guardSeyeonTurnInterpretationV2({
-      context,
-      rawOutput: {
+    rawOutput: {
         schemaVersion: 'seyeon-turn-interpretation-v2',
         userMove: 'remembered_seyeon_detail',
         notice: {
@@ -84,6 +83,13 @@ function interpretation() {
         },
         memoryRefsUsed: ['memory-a'],
       },
+    });
+  return {
+    context,
+    interpretation: guardedInterpretation,
+    riskCausality: guardSeyeonRiskBearingActionCausalityV1({
+      context,
+      interpretation: guardedInterpretation,
     }),
   };
 }
