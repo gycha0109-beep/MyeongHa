@@ -27,6 +27,7 @@ function event(
     occurredAt: new Date(Date.UTC(2026, 8, 25, 0, sequence)).toISOString(),
     sourceTurnId: `turn-${sequence}`,
     sourceMessageRefs: [`message-${sequence}`],
+    causalPredecessorEventIds: [],
     facts: [
       {
         factKey: 'observed_interaction',
