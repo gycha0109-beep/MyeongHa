@@ -23,25 +23,21 @@ const requiredWorkflowFragments = [
   'SUPABASE_PROJECT_ID: cnsfpcdiyofqvhpcegfc',
   "SUPABASE_CLI_VERSION: '2.117.0'",
   "BACKUP_RETENTION_DAYS: '30'",
-  'SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}',
   'SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}',
   'SUPABASE_PRODUCTION_SESSION_POOLER_HOST: ${{ secrets.SUPABASE_PRODUCTION_SESSION_POOLER_HOST }}',
   'MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE: ${{ secrets.MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE }}',
   'missing=()',
   'missing+=(SUPABASE_DB_PASSWORD)',
   'missing+=(MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE)',
-  '[[ -n "${SUPABASE_ACCESS_TOKEN:-}" ]] || missing+=(SUPABASE_ACCESS_TOKEN)',
+  'missing+=(SUPABASE_PRODUCTION_SESSION_POOLER_HOST)',
   'SUPABASE_PRODUCTION_SESSION_POOLER_HOST must be a bare *.pooler.supabase.com hostname.',
   '::error title=Production backup credential missing::Missing Actions secret: $secret_name',
   '::error title=Production backup encryption secret invalid::MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE must be at least 32 characters.',
   'GITHUB_STEP_SUMMARY',
-  'if [[ -n "${SUPABASE_PRODUCTION_SESSION_POOLER_HOST:-}" ]]; then',
   'admin_pool_user="postgres.$SUPABASE_PROJECT_ID"',
   'pool_host="$SUPABASE_PRODUCTION_SESSION_POOLER_HOST"',
   "pool_port='5432'",
   "pool_db='postgres'",
-  'https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_ID/config/database/pooler',
-  'select((.database_type // "") == "PRIMARY")',
   '[[ "$pool_host" =~ ^[a-z0-9-]+([.][a-z0-9-]+)*[.]pooler[.]supabase[.]com$ ]]',
   "[[ \"$pool_port\" == '5432' ]]",
   'npx --yes "supabase@$SUPABASE_CLI_VERSION" db dump',
@@ -70,6 +66,9 @@ for (const fragment of requiredWorkflowFragments) {
 }
 
 const forbiddenWorkflowFragments = [
+  'SUPABASE_ACCESS_TOKEN',
+  'api.supabase.com',
+  '/config/database/pooler',
   'uses: actions/checkout@v7',
   'uses: actions/upload-artifact@v7',
   'uses: actions/checkout@v4',
@@ -132,8 +131,7 @@ const requiredRunbookFragments = [
   'RPO: APPROVED — PT24H (24 hours)',
   'RTO: APPROVED — PT6H (6 hours)',
   'SUPABASE_PRODUCTION_SESSION_POOLER_HOST',
-  'preferred explicit Session Pooler host',
-  'Management API fallback',
+  'one governed mode: the protected explicit Session Pooler host',
   'MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE',
   'data_deletion_jobs',
   'Never restore a drill directly over serving production.',
@@ -149,4 +147,4 @@ for (const fragment of requiredRunbookFragments) {
   }
 }
 
-console.log('MyeongHa production PostgreSQL backup workflow explicit Session Pooler / Management API fallback contract verification passed.');
+console.log('MyeongHa production PostgreSQL backup workflow explicit Session Pooler-only contract verification passed.');

@@ -1,10 +1,6 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import { appendFile, readFile, writeFile } from 'node:fs/promises';
 import { Pool } from 'pg';
-import {
-  HostedAuthCanaryKeySelectionError,
-  selectHostedAuthCanaryAdminKey,
-} from './account-deletion-hosted-auth-canary-key-selection.mjs';
 
 const PROJECT_REF = 'cnsfpcdiyofqvhpcegfc';
 const ORIGIN = `https://${PROJECT_REF}.supabase.co`;
@@ -81,39 +77,17 @@ async function fetchWithTimeout(url, init, timeoutMs = 10_000) {
   }
 }
 
-async function resolveAdminSecret() {
-  const explicit = process.env.MYEONGHA_SUPABASE_AUTH_ADMIN_SECRET;
-  if (typeof explicit === 'string' && explicit.length > 0) return explicit;
-
-  const token = requiredEnv('SUPABASE_ACCESS_TOKEN');
+function resolveAdminSecret() {
+  const secret = requiredEnv('MYEONGHA_SUPABASE_AUTH_ADMIN_SECRET');
   if (
-    token.trim() !== token ||
-    token.length < 20 ||
-    token.length > 4096 ||
-    /\s/u.test(token)
+    secret.trim() !== secret ||
+    secret.length < 16 ||
+    secret.length > 4_096 ||
+    /\s/u.test(secret)
   ) {
-    fail('MANAGEMENT_ACCESS_TOKEN_INVALID');
+    fail('AUTH_ADMIN_SECRET_INVALID');
   }
-
-  const response = await fetchWithTimeout(
-    `https://api.supabase.com/v1/projects/${PROJECT_REF}/api-keys`,
-    {
-      method: 'GET',
-      headers: {
-        accept: 'application/json',
-        authorization: `Bearer ${token}`,
-      },
-    },
-  );
-  if (!response.ok) fail(`MANAGEMENT_API_REJECTED_${response.status}`);
-
-  const payload = await readBoundedJson(response);
-  try {
-    return selectHostedAuthCanaryAdminKey(payload);
-  } catch (error) {
-    if (error instanceof HostedAuthCanaryKeySelectionError) fail(error.code);
-    throw error;
-  }
+  return secret;
 }
 
 async function runtimeModules() {
@@ -798,7 +772,7 @@ async function prepare() {
     fail('CONFIRMATION_REQUIRED');
   }
   const runId = requireRunId(process.env.GITHUB_RUN_ID);
-  const secret = await resolveAdminSecret();
+  const secret = resolveAdminSecret();
   const authUserId = await createHostedUser(secret, runId);
   const state = {
     schema: 'myeongha-production-privacy-canary-state-v1',
@@ -1065,7 +1039,7 @@ async function execute() {
   state.phase = 'deletion_started';
   await writeState(state);
 
-  const secret = await resolveAdminSecret();
+  const secret = resolveAdminSecret();
   const worker = await runWorker(state, secret);
   await verifyFinalState(state, secret, worker);
 
@@ -1089,7 +1063,7 @@ async function resumeDeletion() {
     fail('RESUME_SOURCE_RUN_MISMATCH');
   }
 
-  const secret = await resolveAdminSecret();
+  const secret = resolveAdminSecret();
   const worker = await runWorker(state, secret);
   await verifyFinalState(state, secret, worker);
 
@@ -1155,7 +1129,7 @@ async function cleanupPrestart() {
     await pool.end();
   }
 
-  const secret = await resolveAdminSecret();
+  const secret = resolveAdminSecret();
   await deleteHostedUserBestEffort(secret, state.authUserId);
   state.phase = 'cleaned';
   await writeState(state);

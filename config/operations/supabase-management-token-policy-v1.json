@@ -1,0 +1,46 @@
+{
+  "contractVersion": "myeongha-supabase-management-token-policy-v1",
+  "status": "approved_implementation_authority",
+  "projectRef": "cnsfpcdiyofqvhpcegfc",
+  "secretName": "SUPABASE_ACCESS_TOKEN",
+  "tokenClass": "scoped_personal_access_token",
+  "tokenPrefix": "sbp_fc",
+  "providerStage": "public_alpha",
+  "allowedWorkflowConsumers": [
+    ".github/workflows/production-data-api-containment.yml"
+  ],
+  "allowedManagementApi": [
+    {
+      "method": "GET",
+      "path": "/v1/projects/{projectRef}/postgrest"
+    },
+    {
+      "method": "PATCH",
+      "path": "/v1/projects/{projectRef}/postgrest"
+    }
+  ],
+  "requiredPermission": {
+    "name": "Data API Config",
+    "access": "Read-write"
+  },
+  "forbiddenPermissions": [
+    "API Keys",
+    "API Key Secrets",
+    "Connection Pooling",
+    "Database",
+    "Database Config",
+    "Migrations",
+    "Auth Config",
+    "Project Settings",
+    "Edge Functions",
+    "Storage",
+    "Organizations",
+    "Projects (account-wide)"
+  ],
+  "authAdminAuthority": "MYEONGHA_SUPABASE_AUTH_ADMIN_SECRET",
+  "databaseRoutingAuthority": "SUPABASE_PRODUCTION_SESSION_POOLER_HOST",
+  "databasePasswordAuthority": "SUPABASE_DB_PASSWORD",
+  "managementApiResponseLogging": "forbidden",
+  "authorizationHeaderLogging": "forbidden",
+  "credentialLogging": "forbidden"
+}

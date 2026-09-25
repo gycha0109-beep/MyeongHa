@@ -22,22 +22,26 @@ const requiredWorkflowFragments = [
   'environment: production',
   'cancel-in-progress: false',
   'SUPABASE_PROJECT_ID: cnsfpcdiyofqvhpcegfc',
-  'SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}',
+  'SUPABASE_PRODUCTION_SESSION_POOLER_HOST: ${{ secrets.SUPABASE_PRODUCTION_SESSION_POOLER_HOST }}',
   'SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}',
   '[[ "$DISPATCH_CONFIRM" == \'READ_ONLY_CATALOG\' ]]',
   'uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1',
-  'https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_ID/config/database/pooler',
-  'select((.database_type // "") == "PRIMARY")',
-  'test("\\\\.pooler\\\\.supabase\\\\.com:(5432|6543)/postgres(?:\\\\?|$)")',
-  'sort_by(',
-  'test(":5432/postgres(?:\\\\?|$)")',
+  'Bind governed production Session Pooler endpoint',
+  'pool_host="$SUPABASE_PRODUCTION_SESSION_POOLER_HOST"',
+  '[[ "$pool_host" =~ ^[a-z0-9-]+([.][a-z0-9-]+)*[.]pooler[.]supabase[.]com$ ]]',
   '[[ "$admin_pool_user" == "postgres.$SUPABASE_PROJECT_ID" ]]',
-  '[[ "$pool_port" == \'5432\' || "$pool_port" == \'6543\' ]]',
+  '[[ "$pool_port" == \'5432\' ]]',
   'run: bash scripts/run-production-platform-integrity-read-audit.sh',
   'run: bash scripts/run-production-platform-integrity-data-api-surface-audit.sh',
   'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1',
   'retention-days: 14',
 ];
+
+for (const forbidden of ['SUPABASE_ACCESS_TOKEN', 'api.supabase.com', '/config/database/pooler']) {
+  if (workflow.includes(forbidden)) {
+    throw new Error(`Production read-audit must not consume Management PAT authority: ${forbidden}`);
+  }
+}
 
 for (const fragment of requiredWorkflowFragments) {
   if (!workflow.includes(fragment)) {

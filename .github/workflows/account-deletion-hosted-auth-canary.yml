@@ -54,5 +54,4 @@ jobs:
       - name: Run disposable hosted Auth delete canary
         env:
           MYEONGHA_SUPABASE_AUTH_ADMIN_SECRET: ${{ secrets.MYEONGHA_SUPABASE_AUTH_ADMIN_SECRET }}
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: node scripts/run-account-deletion-hosted-auth-canary.mjs

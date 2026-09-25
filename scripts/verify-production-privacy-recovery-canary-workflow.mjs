@@ -51,6 +51,7 @@ for (const fragment of [
   'if: always()',
   'node scripts/run-production-privacy-recovery-canary.mjs cleanup-api-login',
   'MYEONGHA_WORKER_DATABASE_URL: ${{ secrets.MYEONGHA_WORKER_DATABASE_URL }}',
+  'MYEONGHA_SUPABASE_AUTH_ADMIN_SECRET: ${{ secrets.MYEONGHA_SUPABASE_AUTH_ADMIN_SECRET }}',
   'MYEONGHA_WORKER_DATABASE_PRINCIPAL: myeongha_worker_runtime',
   'MYEONGHA_PRIVACY_CANARY_ADMIN_DATABASE_URL',
   'node scripts/run-production-privacy-recovery-canary.mjs prepare',
@@ -85,6 +86,7 @@ for (const fragment of [
   'VERCEL_TOKEN:',
   'env?decrypt=true',
   'Resolve governed Production API database binding from Vercel',
+  'SUPABASE_ACCESS_TOKEN',
 ]) {
   forbidFragment(workflow, fragment, workflowPath);
 }
@@ -179,6 +181,7 @@ for (const fragment of [
   "API_CANARY_ROLE_CLEANUP_GUARD_FAILED",
   "drop role \${roleIdentifier}",
   "requiredEnv('MYEONGHA_DATABASE_URL')",
+  "requiredEnv('MYEONGHA_SUPABASE_AUTH_ADMIN_SECRET')",
   "requiredEnv('MYEONGHA_WORKER_DATABASE_URL')",
   'canonicalWorkerDatabaseUrl()',
   "requiredEnv('SUPABASE_PRODUCTION_SESSION_POOLER_HOST')",
@@ -259,6 +262,9 @@ for (const fragment of [
   'customer_id',
   'customerId',
   'generic retry',
+  'SUPABASE_ACCESS_TOKEN',
+  'api.supabase.com/v1/projects',
+  'selectHostedAuthCanaryAdminKey',
   'dead-letter',
 ]) {
   forbidFragment(runtime, fragment, runtimePath);

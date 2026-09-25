@@ -1,12 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import {
-  HostedAuthCanaryKeySelectionError,
-  selectHostedAuthCanaryAdminKey,
-} from './account-deletion-hosted-auth-canary-key-selection.mjs';
-
 const CONFIRMATION = 'DELETE_SYNTHETIC_AUTH_USER_ONLY';
 const PROJECT_REF = 'cnsfpcdiyofqvhpcegfc';
-const MANAGEMENT_API_ORIGIN = 'https://api.supabase.com';
 const MAX_RESPONSE_BYTES = 65_536;
 const REQUEST_TIMEOUT_MS = 10_000;
 
@@ -26,18 +20,6 @@ function requireExact(value, expected, code) {
 function requireRunId(value) {
   if (typeof value !== 'string' || !/^[0-9]+$/u.test(value)) {
     throw new CanaryFailure('INVALID_RUN_ID');
-  }
-  return value;
-}
-
-function requireManagementAccessToken(value) {
-  if (
-    typeof value !== 'string' ||
-    value.length < 16 ||
-    value.length > 4_096 ||
-    /\s/u.test(value)
-  ) {
-    throw new CanaryFailure('MANAGEMENT_ACCESS_TOKEN_MISSING_OR_INVALID');
   }
   return value;
 }
@@ -107,45 +89,17 @@ async function fetchWithTimeout(
   }
 }
 
-async function resolveAdminSecret() {
+function resolveAdminSecret() {
   const explicit = process.env.MYEONGHA_SUPABASE_AUTH_ADMIN_SECRET;
-  if (typeof explicit === 'string' && explicit.length > 0) {
-    return explicit;
+  if (
+    typeof explicit !== 'string' ||
+    explicit.length < 16 ||
+    explicit.length > 4_096 ||
+    /\s/u.test(explicit)
+  ) {
+    throw new CanaryFailure('AUTH_ADMIN_SECRET_MISSING_OR_INVALID');
   }
-
-  const managementAccessToken = requireManagementAccessToken(
-    process.env.SUPABASE_ACCESS_TOKEN,
-  );
-  const response = await fetchWithTimeout(
-    `${MANAGEMENT_API_ORIGIN}/v1/projects/${PROJECT_REF}/api-keys?reveal=true`,
-    {
-      method: 'GET',
-      headers: Object.freeze({
-        accept: 'application/json',
-        authorization: `Bearer ${managementAccessToken}`,
-      }),
-    },
-    'MANAGEMENT_API_TRANSPORT_FAILURE',
-  );
-
-  if (!response.ok) {
-    try {
-      void response.body?.cancel();
-    } catch {
-      // Best-effort body cancellation only. Never print the response body.
-    }
-    throw new CanaryFailure(`MANAGEMENT_API_REJECTED_${response.status}`);
-  }
-
-  const payload = await readBoundedJson(response);
-  try {
-    return selectHostedAuthCanaryAdminKey(payload);
-  } catch (error) {
-    if (error instanceof HostedAuthCanaryKeySelectionError) {
-      throw new CanaryFailure(error.code);
-    }
-    throw new CanaryFailure('MANAGEMENT_API_KEY_SELECTION_FAILED');
-  }
+  return explicit;
 }
 
 async function createDisposableHostedUser({
@@ -194,7 +148,7 @@ async function main() {
     'CONFIRMATION_REQUIRED',
   );
   const runId = requireRunId(process.env.GITHUB_RUN_ID);
-  const adminSecret = await resolveAdminSecret();
+  const adminSecret = resolveAdminSecret();
 
   const {
     parseProductionAccountDeletionAuthAdminConfigV1,
