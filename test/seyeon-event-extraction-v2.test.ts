@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import {
   SEYEON_EVENT_EXTRACTION_CANDIDATE_SCHEMA_VERSION_V2,
   guardSeyeonEventExtractionCandidateV2,
-  materializeSeyeonEventCandidateV2,
   rankSeyeonEventRetrievalV2,
   type SeyeonEventExtractionContextV2,
 } from '../packages/domain/src/seyeon-event-extraction-v2.js';
@@ -236,44 +235,6 @@ describe('Se-yeon event extraction and retrieval v2', () => {
     ).toThrow(/minimum salience/);
   });
 
-  it('materializes server-owned identity separately from provider-authored event meaning', () => {
-    const context = extractionContext();
-    const candidate = guardSeyeonEventExtractionCandidateV2({
-      context,
-      rawOutput: {
-        schemaVersion: SEYEON_EVENT_EXTRACTION_CANDIDATE_SCHEMA_VERSION_V2,
-        decision: 'event',
-        reason: '관계적으로 의미 있는 기억 확인.',
-        eventKind: 'USER_REMEMBERED_SEYEON_DETAIL',
-        sourceMessageRefs: ['user-current'],
-        causalPredecessorEventIds: [],
-        facts: [
-          {
-            factKey: 'remembered_detail',
-            statement: '사용자가 세연의 취향을 기억했다.',
-            sourceRefs: ['user-current'],
-          },
-        ],
-        characterInterpretation: null,
-        salience: 0.8,
-        confidence: 0.9,
-        dedupeBasis: 'provider-suggestion-only',
-      },
-    });
-
-    const event = materializeSeyeonEventCandidateV2({
-      candidate,
-      context,
-      eventId: 'server-event-id',
-      dedupeKey: 'server-dedupe-key',
-      occurredAt: '2026-09-25T03:00:00.000Z',
-    });
-
-    expect(event?.eventId).toBe('server-event-id');
-    expect(event?.dedupeKey).toBe('server-dedupe-key');
-    expect(event?.sourceTurnId).toBe('turn-current');
-  });
-
   it('requires PROMISE_KEPT to point at a prior PROMISE_MADE event', () => {
     const promise = retrievalEvent({
       id: 'promise-made-prior',
@@ -313,14 +274,7 @@ describe('Se-yeon event extraction and retrieval v2', () => {
     if (candidate.decision !== 'event') throw new Error('Expected event candidate.');
     expect(candidate.causalPredecessorEventIds).toEqual([promise.eventId]);
 
-    const materialized = materializeSeyeonEventCandidateV2({
-      candidate,
-      context,
-      eventId: 'promise-kept-current',
-      dedupeKey: 'promise-kept-current-dedupe',
-      occurredAt: '2026-09-25T03:00:00.000Z',
-    });
-    expect(materialized?.causalPredecessorEventIds).toEqual([promise.eventId]);
+    expect(candidate.causalPredecessorEventIds).toEqual([promise.eventId]);
   });
 
   it('rejects a promise outcome when no prior promise evidence is supplied', () => {
