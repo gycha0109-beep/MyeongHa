@@ -157,7 +157,9 @@ function parseBibleSliceIds(
       );
     }
   }
-  return Object.freeze(parsed as SeyeonBibleSliceIdV2[]);
+  return Object.freeze(
+    parsed.map((sliceId) => sliceId as SeyeonBibleSliceIdV2),
+  );
 }
 
 function parseEnum<const T extends readonly string[]>(
