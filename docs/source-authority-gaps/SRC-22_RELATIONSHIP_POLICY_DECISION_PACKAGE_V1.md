@@ -679,3 +679,105 @@ These findings do not resolve:
 - final Event registry or payload schemas.
 
 SRC-22 remains OPEN.
+
+---
+
+## 16. Relationship semantics experiment
+
+Evidence report:
+
+`docs/character/SEYEON_RELATIONSHIP_SEMANTICS_EXPERIMENT_V0_1.md`
+
+The second sensitivity slice separates concepts that Candidate B1 previously conflated:
+
+~~~text
+Event Ledger
+= source-backed WHAT happened
+
+Causal Evidence Episode
+= which Events belong to one relationship experience
+
+attainedStage
+= deepest evidence-backed relationship depth reached
+
+currentCondition
+= current conflict / repair condition
+
+behaviorAccess
+= Character behavior constraint derived from current condition
+~~~
+
+### D27 — Stage depth versus current condition
+
+**Disposition: EXPERIMENTAL SHADOW / OWNER DECISION REQUIRED**
+
+The shadow preserves attained relationship depth while representing unresolved conflict separately.
+
+Example:
+
+~~~text
+previous attainedStage = S4_SPECIAL
+current numeric/gate candidate = S2_REGULAR
+unresolved explicit conflict exists
+
+shadow result:
+attainedStage = S4_SPECIAL
+currentCondition = OPEN_CONFLICT
+behaviorAccess = RESTRICTED_BY_CONFLICT
+~~~
+
+This avoids silently rewriting shared relationship history.
+
+It does not authorize permanent non-regression in production.
+
+### D28 — Causal Episode as anti-farming unit
+
+**Disposition: EXPERIMENTAL SHADOW**
+
+Promise creation/outcome and conflict/repair chains are folded into one causal Episode before positive-credit evaluation.
+
+The Episode shadow then applies the rolling seven-day family-credit limit.
+
+This separates:
+
+~~~text
+same causal experience repeated/retried
+from
+different experiences in the same evidence family
+~~~
+
+### D29 — Repair milestone semantics
+
+**Disposition: UNRESOLVED / NOW EXPLICITLY TESTABLE**
+
+Repair milestone credit is now an explicit policy option.
+
+The default shadow excludes repair from progression milestones; a comparison mode enables it.
+
+This does not decide that repair is never relationship-significant.
+
+It prevents the experimental harness from silently assuming every reconciliation is an unlimited progression milestone.
+
+### D30 — Saturated coarse scores
+
+**Disposition: EXPERIMENTAL EVIDENCE**
+
+Episode profiles preserve causal differences even when a coarse projection is identical, including family/outcome composition and conflict history.
+
+This weakens the assumption that 100/100 score saturation necessarily destroys all personalization.
+
+Model/runtime dogfood is still required to prove that the Character actually behaves differently from those causal profiles.
+
+### Remaining owner decisions
+
+The experiment does not close:
+
+- stage regression versus attained-depth semantics;
+- final current-condition vocabulary;
+- B2 8/20/40-week alternate gates;
+- repair milestone policy;
+- score saturation policy;
+- production Episode persistence;
+- production Event registry.
+
+SRC-22 remains OPEN.
