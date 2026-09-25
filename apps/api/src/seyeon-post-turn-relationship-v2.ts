@@ -19,6 +19,7 @@ export const SEYEON_POST_TURN_RELATIONSHIP_RUNTIME_VERSION_V2 =
   'seyeon-post-turn-relationship-exp-v2' as const;
 
 export interface SeyeonEventLedgerPortV2 {
+  readonly authority: 'experimental_non_production';
   activeEvents(): readonly SeyeonRelationshipEventV2[];
   appendEvent(input: {
     readonly ledgerEntryId: string;
@@ -110,6 +111,12 @@ function selectPriorCausalEvents(input: {
 export async function runSeyeonPostTurnRelationshipV2(
   input: RunSeyeonPostTurnRelationshipV2Input,
 ): Promise<RunSeyeonPostTurnRelationshipV2Result> {
+  if (input.ledger.authority !== 'experimental_non_production') {
+    throw new TypeError(
+      'Se-yeon V2 relationship persistence is experimental-only until SRC-22 is resolved.',
+    );
+  }
+
   const relationshipBefore = input.ledger.projectRelationship();
   const activeEvents = input.ledger.activeEvents();
   const priorEvents = selectPriorCausalEvents({
