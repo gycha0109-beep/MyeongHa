@@ -1,9 +1,11 @@
 import type { RelationshipStateBand } from '../../character-content/src/schema.js';
+import type { CharacterIntegrityDecisionV1 } from './character-integrity-gate-v1.js';
 import {
-  guardCharacterDisclosureRetrievalV1,
-  type CharacterDisclosureDecisionV1,
-  type CharacterDisclosureRetrievedSourceV1,
-} from './character-disclosure-gate-v1.js';
+  guardCharacterDisclosureRetrievalV2,
+  type CharacterDisclosureDecisionV2,
+  type CharacterDisclosureRetrievedSourceV2,
+} from './character-disclosure-gate-v2.js';
+import { SEYEON_FACT_AUTHORITY_REGISTRY_V1 } from '../../character-content/src/seyeon-fact-authority-v1.js';
 import {
   SEYEON_AUTHORED_PROJECTION_V2,
   SEYEON_BIBLE_SLICE_IDS_V2,
@@ -71,9 +73,18 @@ export interface SeyeonRuntimeContextV2 {
     readonly coreAnchor: readonly string[];
   }>;
   readonly authorityBoundaries: Readonly<{
-    readonly undefinedFields: readonly string[];
-    readonly hypothesisFields: readonly string[];
-    readonly hypothesisMayBeUsedAsAutobiographicalFact: false;
+    readonly factAuthorityRegistryVersion: string;
+    readonly factAuthorityRegistrySourceBibleBlobSha: string;
+    readonly legacyProjectionFieldsAreNonAuthoritative: true;
+    readonly userClaimRequiresIntegrityDecision: true;
+    readonly assistantOutputNeverAuthority: true;
+  }>;
+  readonly integrity: Readonly<{
+    readonly decisions: readonly CharacterIntegrityDecisionV1[];
+    readonly governedPreflightApplied: boolean;
+    readonly unverifiedClaimsMayEnterAsFacts: false;
+    readonly claimsMayCreateRelationshipEvents: false;
+    readonly claimsMayMutateRelationshipState: false;
   }>;
   readonly relationship: SeyeonRelationshipContextV2 | null;
   readonly bibleSlices: readonly Readonly<{
@@ -85,14 +96,17 @@ export interface SeyeonRuntimeContextV2 {
   readonly recentConversation: readonly SeyeonRecentMessageV2[];
   readonly retrievedMemories: readonly SeyeonRetrievedMemoryV2[];
   readonly disclosure: Readonly<{
-    readonly decision: CharacterDisclosureDecisionV1 | null;
-    readonly retrievedSources: readonly CharacterDisclosureRetrievedSourceV1[];
+    readonly decision: CharacterDisclosureDecisionV2 | null;
+    readonly retrievedSources: readonly CharacterDisclosureRetrievedSourceV2[];
   }>;
   readonly retrievalPolicy: Readonly<{
     readonly callbackRequiresSourceRef: true;
     readonly factAndInterpretationRemainDistinct: true;
     readonly anotherCharacterPrivateHistoryForbidden: true;
     readonly privateCharacterContentRequiresDisclosureDecision: true;
+    readonly userClaimRequiresIntegrityDecision: true;
+    readonly assistantOutputNeverAuthority: true;
+    readonly legacyUndefinedAndHypothesisFieldsNeverTruthAuthority: true;
   }>;
   readonly actionPolicy: Readonly<{
     readonly allowedActionKeys: readonly string[];
@@ -102,11 +116,13 @@ export interface SeyeonRuntimeContextV2 {
 
 export interface AssembleSeyeonRuntimeContextV2Input {
   readonly relationship: SeyeonRelationshipContextV2 | null;
+  readonly integrityDecisions?: readonly CharacterIntegrityDecisionV1[];
+  readonly governedPreflightApplied?: boolean;
   readonly recentMessages: readonly SeyeonRecentMessageV2[];
   readonly retrievedMemories: readonly SeyeonRetrievedMemoryV2[];
   readonly disclosure: Readonly<{
-    readonly decision: CharacterDisclosureDecisionV1 | null;
-    readonly retrievedSources: readonly CharacterDisclosureRetrievedSourceV1[];
+    readonly decision: CharacterDisclosureDecisionV2 | null;
+    readonly retrievedSources: readonly CharacterDisclosureRetrievedSourceV2[];
   }>;
   readonly focuses?: readonly SeyeonContextFocusKeyV2[];
   readonly additionalBibleSliceIds?: readonly SeyeonBibleSliceIdV2[];
@@ -224,15 +240,54 @@ function validateRetrievedMemory(
   if (!Number.isFinite(memory.salience) || memory.salience < 0 || memory.salience > 1) {
     throw new TypeError('retrievedMemory.salience must be between 0 and 1.');
   }
+  const sourceRef = requireText(memory.sourceRef, 'retrievedMemory.sourceRef', 512);
+  if (sourceRef.startsWith('bible:') || sourceRef.startsWith('runtime:')) {
+    throw new TypeError(
+      'Character-authored private source content must enter through governed disclosure retrieval.',
+    );
+  }
   return Object.freeze({
     memoryId: requireText(memory.memoryId, 'retrievedMemory.memoryId', 256),
     kind: memory.kind,
     claimKind: memory.claimKind,
     summary: requireText(memory.summary, 'retrievedMemory.summary', 4000),
-    sourceRef: requireText(memory.sourceRef, 'retrievedMemory.sourceRef', 512),
+    sourceRef,
     relevance: memory.relevance,
     salience: memory.salience,
   });
+}
+
+function validateIntegrityDecisions(
+  decisions: readonly CharacterIntegrityDecisionV1[],
+): readonly CharacterIntegrityDecisionV1[] {
+  if (decisions.length > 8) {
+    throw new TypeError('Se-yeon runtime context accepts at most 8 integrity decisions.');
+  }
+  const claimIds = new Set<string>();
+  return Object.freeze(
+    decisions.map((decision, index) => {
+      if (decision.schemaVersion !== 'character-integrity-decision-v1') {
+        throw new TypeError(
+          'integrityDecisions[' + index + '] has an unsupported schemaVersion.',
+        );
+      }
+      if (claimIds.has(decision.claim.claimId)) {
+        throw new TypeError('Se-yeon integrity decision claim ids must be unique.');
+      }
+      claimIds.add(decision.claim.claimId);
+      if (decision.mayCreateRelationshipEvent || decision.mayMutateRelationshipState) {
+        throw new TypeError(
+          'Integrity decision violates immutable relationship boundaries.',
+        );
+      }
+      if (decision.result !== 'VERIFIED' && decision.mayEnterWorkingContextAsFact) {
+        throw new TypeError(
+          'Only VERIFIED integrity decisions may enter Working Context as fact.',
+        );
+      }
+      return decision;
+    }),
+  );
 }
 
 export function resolveSeyeonBibleSliceSelectionV2(input: {
@@ -308,11 +363,14 @@ export function assembleSeyeonRuntimeContextV2(
   }
   const disclosureSources =
     input.disclosure.decision === null
-      ? Object.freeze([] as CharacterDisclosureRetrievedSourceV1[])
-      : guardCharacterDisclosureRetrievalV1({
+      ? Object.freeze([] as CharacterDisclosureRetrievedSourceV2[])
+      : guardCharacterDisclosureRetrievalV2({
           decision: input.disclosure.decision,
           retrievedSources: input.disclosure.retrievedSources,
         });
+  const integrityDecisions = validateIntegrityDecisions(
+    input.integrityDecisions ?? [],
+  );
 
   const sliceIds = resolveSeyeonBibleSliceSelectionV2({
     ...(input.focuses === undefined ? {} : { focuses: input.focuses }),
@@ -337,9 +395,19 @@ export function assembleSeyeonRuntimeContextV2(
       coreAnchor: SEYEON_AUTHORED_PROJECTION_V2.coreAnchor,
     }),
     authorityBoundaries: Object.freeze({
-      undefinedFields: SEYEON_AUTHORED_PROJECTION_V2.undefinedFields,
-      hypothesisFields: SEYEON_AUTHORED_PROJECTION_V2.hypothesisFields,
-      hypothesisMayBeUsedAsAutobiographicalFact: false as const,
+      factAuthorityRegistryVersion: SEYEON_FACT_AUTHORITY_REGISTRY_V1.schemaVersion,
+      factAuthorityRegistrySourceBibleBlobSha:
+        SEYEON_FACT_AUTHORITY_REGISTRY_V1.sourceBible.gitBlobSha,
+      legacyProjectionFieldsAreNonAuthoritative: true as const,
+      userClaimRequiresIntegrityDecision: true as const,
+      assistantOutputNeverAuthority: true as const,
+    }),
+    integrity: Object.freeze({
+      decisions: integrityDecisions,
+      governedPreflightApplied: input.governedPreflightApplied ?? false,
+      unverifiedClaimsMayEnterAsFacts: false as const,
+      claimsMayCreateRelationshipEvents: false as const,
+      claimsMayMutateRelationshipState: false as const,
     }),
     relationship: validateRelationship(input.relationship),
     bibleSlices,
@@ -354,6 +422,9 @@ export function assembleSeyeonRuntimeContextV2(
       factAndInterpretationRemainDistinct: true as const,
       anotherCharacterPrivateHistoryForbidden: true as const,
       privateCharacterContentRequiresDisclosureDecision: true as const,
+      userClaimRequiresIntegrityDecision: true as const,
+      assistantOutputNeverAuthority: true as const,
+      legacyUndefinedAndHypothesisFieldsNeverTruthAuthority: true as const,
     }),
     actionPolicy: Object.freeze({
       allowedActionKeys: SEYEON_AUTHORED_PROJECTION_V2.actionKeys,
