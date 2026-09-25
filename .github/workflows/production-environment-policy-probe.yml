@@ -1,0 +1,36 @@
+name: Production Environment Policy Probe
+run-name: "[WT:ops] Production Environment Policy Probe"
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type PROBE_PRODUCTION_ENVIRONMENT to test only the GitHub Environment gate.'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-environment-policy-probe
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    name: production-environment-policy-probe
+    runs-on: ubuntu-24.04
+    environment: production
+    env:
+      DISPATCH_CONFIRM: ${{ inputs.confirm }}
+    steps:
+      - name: Verify non-mutating Production Environment admission
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$DISPATCH_CONFIRM" == 'PROBE_PRODUCTION_ENVIRONMENT' ]]
+          [[ "${{ github.event_name }}" == 'workflow_dispatch' ]]
+          printf 'production_environment_probe=admitted\n'
+          printf 'repository=%s\n' "${{ github.repository }}"
+          printf 'ref=%s\n' "${{ github.ref }}"
+          printf 'sha=%s\n' "${{ github.sha }}"
