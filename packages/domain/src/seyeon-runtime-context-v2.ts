@@ -240,12 +240,18 @@ function validateRetrievedMemory(
   if (!Number.isFinite(memory.salience) || memory.salience < 0 || memory.salience > 1) {
     throw new TypeError('retrievedMemory.salience must be between 0 and 1.');
   }
+  const sourceRef = requireText(memory.sourceRef, 'retrievedMemory.sourceRef', 512);
+  if (sourceRef.startsWith('bible:') || sourceRef.startsWith('runtime:')) {
+    throw new TypeError(
+      'Character-authored private source content must enter through governed disclosure retrieval.',
+    );
+  }
   return Object.freeze({
     memoryId: requireText(memory.memoryId, 'retrievedMemory.memoryId', 256),
     kind: memory.kind,
     claimKind: memory.claimKind,
     summary: requireText(memory.summary, 'retrievedMemory.summary', 4000),
-    sourceRef: requireText(memory.sourceRef, 'retrievedMemory.sourceRef', 512),
+    sourceRef,
     relevance: memory.relevance,
     salience: memory.salience,
   });
