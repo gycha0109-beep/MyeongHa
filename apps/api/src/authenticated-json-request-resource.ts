@@ -304,7 +304,7 @@ export async function readAuthenticatedJsonRequestBodyV1(
   } finally {
     if (!completed) {
       try {
-        await reader.cancel();
+        void reader.cancel().catch(() => undefined);
       } catch {
       }
     }
