@@ -45,6 +45,7 @@ export interface SeyeonRelationshipEventV2 {
   readonly occurredAt: string;
   readonly sourceTurnId: string;
   readonly sourceMessageRefs: readonly string[];
+  readonly causalPredecessorEventIds: readonly string[];
   readonly facts: readonly SeyeonEventFactV2[];
   readonly characterInterpretation: SeyeonCharacterInterpretationV2 | null;
   readonly salience: number;
@@ -180,6 +181,25 @@ function uniqueRefs(
   return Object.freeze(normalized);
 }
 
+function uniqueOptionalRefs(
+  refs: readonly string[],
+  path: string,
+  maxLength: number,
+): readonly string[] {
+  if (refs.length > maxLength) {
+    throw new SeyeonEventLedgerErrorV2(
+      `${path} must contain at most ${maxLength} refs.`,
+    );
+  }
+  const normalized = refs.map((ref, index) =>
+    boundedText(ref, `${path}[${index}]`, 512),
+  );
+  if (new Set(normalized).size !== normalized.length) {
+    throw new SeyeonEventLedgerErrorV2(`${path} must not contain duplicates.`);
+  }
+  return Object.freeze(normalized);
+}
+
 function validateEventKind(
   value: SeyeonExperimentalEventKindV2,
 ): SeyeonExperimentalEventKindV2 {
@@ -260,6 +280,11 @@ function validateEvent(event: SeyeonRelationshipEventV2): SeyeonRelationshipEven
       event.sourceMessageRefs,
       'event.sourceMessageRefs',
       16,
+    ),
+    causalPredecessorEventIds: uniqueOptionalRefs(
+      event.causalPredecessorEventIds,
+      'event.causalPredecessorEventIds',
+      8,
     ),
     facts,
     characterInterpretation,
