@@ -3,6 +3,7 @@ import {
   SupabaseMemberIdentityEvidenceVerifierV1,
   SupabaseMemberIdentityVerifierErrorV1,
 } from './supabase-member-identity-verifier.js';
+import { SUPABASE_MEMBER_JSON_RESPONSE_MAXIMUM_BYTES_V1 } from './upstream-json-response-resource.js';
 
 const supabaseOrigin = 'https://example.supabase.co';
 const supabaseApiKey = 'test-publishable-key-that-is-long-enough';
@@ -123,6 +124,35 @@ describe('Supabase Member identity verifier deadline', () => {
     });
     expect(upstream.wasCancelled()).toBe(true);
     expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('classifies an over-limit successful Member response as invalid and cancels the body', async () => {
+    let cancelled = false;
+    const verifier = new SupabaseMemberIdentityEvidenceVerifierV1({
+      supabaseOrigin,
+      supabaseApiKey,
+      fetchImpl: vi.fn(async () => new Response(
+        new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(new Uint8Array(SUPABASE_MEMBER_JSON_RESPONSE_MAXIMUM_BYTES_V1 + 1));
+          },
+          cancel() {
+            cancelled = true;
+          },
+        }),
+        {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        },
+      )),
+      timeoutMs: 1_000,
+    });
+
+    await expect(verifier.verifyRequestIdentity(memberRequest())).rejects.toMatchObject({
+      name: 'SupabaseMemberIdentityVerifierErrorV1',
+      code: 'SUPABASE_MEMBER_VERIFIER_RESPONSE_INVALID',
+    });
+    expect(cancelled).toBe(true);
   });
 
   it('classifies a deadline abort as upstream failure rather than invalid identity', async () => {
