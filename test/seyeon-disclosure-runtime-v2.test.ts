@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  evaluateCharacterDisclosurePreflightV1,
+  evaluateCharacterDisclosurePreflightV2,
   assembleSeyeonRuntimeContextV2,
   buildSeyeonRendererPacketV2,
   guardSeyeonTurnInterpretationV2,
   admitSeyeonRendererDraftV2,
 } from '../packages/domain/src/index.js';
+import type { CharacterFactAuthorityEntryV1 } from '../packages/character-content/src/character-fact-authority-v1.js';
 
 function relationship() {
   return {
@@ -31,23 +32,37 @@ function baseMemory() {
   };
 }
 
-function source(authority: 'CANON' | 'UNDEFINED') {
+function authority(
+  sourceAuthority: CharacterFactAuthorityEntryV1['sourceAuthority'],
+): CharacterFactAuthorityEntryV1 {
+  const authoritative = sourceAuthority === 'CANON' || sourceAuthority === 'SOFT_CANON';
+  return {
+    factKey: 'past_romance.existence',
+    sourceAuthority,
+    characterKnowledge: authoritative ? 'KNOWN' : 'NOT_APPLICABLE',
+    disclosureDefault: authoritative ? 'FAMILIAR' : 'NOT_APPLICABLE',
+    sourceSection: 'J4',
+    closureNote: 'runtime test fixture',
+  };
+}
+
+function source() {
   return {
     topicKey: 'past_romance_detail' as const,
-    sourceAuthorityState: authority,
-    minimumDisclosureGate: 'FAMILIAR' as const,
+    factKey: 'past_romance.existence',
     allowedDepth: 'deep' as const,
     previouslyDisclosedDepth: 'none' as const,
-    sourceRef: 'runtime:R11.6/past_romance_detail',
+    sourceRef: 'bible:J4',
   };
 }
 
 describe('Se-yeon disclosure runtime v2 integration', () => {
   it('keeps blocked private content out of the assembled model context', () => {
-    const decision = evaluateCharacterDisclosurePreflightV1({
+    const decision = evaluateCharacterDisclosurePreflightV2({
       characterId: 'seyeon',
       topicKey: 'past_romance_detail',
-      source: source('CANON'),
+      source: source(),
+      factAuthority: authority('CANON'),
       relationship: {
         gate: 'PUBLIC',
         trustBand: 'low',
@@ -72,8 +87,9 @@ describe('Se-yeon disclosure runtime v2 integration', () => {
           retrievedSources: [
             {
               topicKey: 'past_romance_detail',
+              factKey: 'past_romance.existence',
               depth: 'deep',
-              sourceRef: 'runtime:R11.6/past_romance_detail',
+              sourceRef: 'bible:J4',
               content: 'blocked private biography',
             },
           ],
@@ -82,11 +98,12 @@ describe('Se-yeon disclosure runtime v2 integration', () => {
     ).toThrow(/must not enter runtime context/);
   });
 
-  it('rejects self_disclose when the preflight chose a boundary/deflection path', () => {
-    const decision = evaluateCharacterDisclosurePreflightV1({
+  it('rejects self_disclose when V2 chose a boundary/deflection path', () => {
+    const decision = evaluateCharacterDisclosurePreflightV2({
       characterId: 'seyeon',
       topicKey: 'past_romance_detail',
-      source: source('CANON'),
+      source: source(),
+      factAuthority: authority('CANON'),
       relationship: {
         gate: 'PUBLIC',
         trustBand: 'low',
@@ -142,11 +159,12 @@ describe('Se-yeon disclosure runtime v2 integration', () => {
     ).toThrow(/cannot choose self_disclose/);
   });
 
-  it('allows only source-backed private content after an ALLOW preflight', () => {
-    const decision = evaluateCharacterDisclosurePreflightV1({
+  it('allows only V2 source-backed private content after an ALLOW preflight', () => {
+    const decision = evaluateCharacterDisclosurePreflightV2({
       characterId: 'seyeon',
       topicKey: 'past_romance_detail',
-      source: source('CANON'),
+      source: source(),
+      factAuthority: authority('CANON'),
       relationship: {
         gate: 'DEEP_TRUST',
         trustBand: 'high',
@@ -169,8 +187,9 @@ describe('Se-yeon disclosure runtime v2 integration', () => {
         retrievedSources: [
           {
             topicKey: 'past_romance_detail',
+            factKey: 'past_romance.existence',
             depth: 'deep',
-            sourceRef: 'runtime:R11.6/past_romance_detail',
+            sourceRef: 'bible:J4',
             content: 'authoritative private source slice',
           },
         ],
@@ -216,22 +235,21 @@ describe('Se-yeon disclosure runtime v2 integration', () => {
         expressionState: 'vulnerable',
         revealLevel: 'deep_trust',
         memoryRefsMentioned: [],
-        privateSourceRefsMentioned: ['runtime:R11.6/past_romance_detail'],
+        privateSourceRefsMentioned: ['bible:J4'],
         disclosureSliceIds: ['R11_relationship_reveal'],
       },
     });
 
     expect(packet.disclosure.decision?.result).toBe('ALLOW');
-    expect(draft.privateSourceRefsMentioned).toEqual([
-      'runtime:R11.6/past_romance_detail',
-    ]);
+    expect(draft.privateSourceRefsMentioned).toEqual(['bible:J4']);
   });
 
-  it('keeps disclosure-eligible UNDEFINED content out of context as AUTHORITY_ABSTAIN', () => {
-    const decision = evaluateCharacterDisclosurePreflightV1({
+  it('keeps AUTHOR_UNDEFINED content out of context as AUTHORITY_ABSTAIN', () => {
+    const decision = evaluateCharacterDisclosurePreflightV2({
       characterId: 'seyeon',
       topicKey: 'past_romance_detail',
-      source: source('UNDEFINED'),
+      source: source(),
+      factAuthority: authority('AUTHOR_UNDEFINED'),
       relationship: {
         gate: 'DEEP_TRUST',
         trustBand: 'high',
