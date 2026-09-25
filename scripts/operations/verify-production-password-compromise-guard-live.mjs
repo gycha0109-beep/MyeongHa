@@ -94,7 +94,7 @@ async function readBoundedJson(response) {
 
 requireRuntimeAuthority();
 
-const compromisedPassword = ['pass', 'word'].join('');
+const compromisedPassword = ['123', '456'].join('');
 const syntheticEmail = [
   'password-compromise-canary+',
   process.env.GITHUB_RUN_ID,
