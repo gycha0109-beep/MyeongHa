@@ -9,6 +9,7 @@ import {
 function streamRequest(
   chunks: readonly Uint8Array[],
   onCancel?: () => void,
+  keepOpenAfterChunks = false,
 ): Request {
   let index = 0;
   const stream = new ReadableStream<Uint8Array>(
@@ -16,7 +17,10 @@ function streamRequest(
       pull(controller) {
         const chunk = chunks[index];
         index += 1;
-        if (chunk === undefined) return;
+        if (chunk === undefined) {
+          if (!keepOpenAfterChunks) controller.close();
+          return;
+        }
         controller.enqueue(chunk);
       },
       cancel() {
@@ -52,7 +56,7 @@ describe('authenticated structured JSON request resource V1', () => {
     const crossing = encoder.encode(' '.repeat(500));
     const request = streamRequest([first, crossing], () => {
       cancelCalls += 1;
-    });
+    }, true);
 
     await expect(readAuthenticatedJsonRequestBodyV1(request)).rejects.toBeInstanceOf(
       AuthenticatedJsonRequestBodyTooLargeV1,
