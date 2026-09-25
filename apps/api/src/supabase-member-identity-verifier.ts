@@ -6,6 +6,11 @@ import {
   type SupabaseAuthUpstreamDeadlineLeaseV1,
 } from './supabase-auth-upstream-deadline.js';
 import type { VerifiedSubjectIdentityEvidenceV1 } from './subject-identity-resolver.js';
+import {
+  SUPABASE_MEMBER_JSON_RESPONSE_MAXIMUM_BYTES_V1,
+  UpstreamJsonResponseTooLargeV1,
+  readBoundedUpstreamJsonTextV1,
+} from './upstream-json-response-resource.js';
 
 const AUTHORIZATION_HEADER = 'authorization';
 const API_KEY_HEADER = 'apikey';
@@ -209,12 +214,23 @@ export class SupabaseMemberIdentityEvidenceVerifierV1
 
       let payload: unknown;
       try {
-        payload = await response.json();
+        const text = await readBoundedUpstreamJsonTextV1(response, {
+          maximumBodyBytes: SUPABASE_MEMBER_JSON_RESPONSE_MAXIMUM_BYTES_V1,
+          signal: deadline.signal,
+        });
+        payload = JSON.parse(text) as unknown;
       } catch (error) {
         if (deadline.signal.aborted) {
           throw new SupabaseMemberIdentityVerifierErrorV1(
             'SUPABASE_MEMBER_VERIFIER_UPSTREAM_FAILED',
             'Supabase Auth user verification response exceeded the application deadline.',
+            { cause: error },
+          );
+        }
+        if (error instanceof UpstreamJsonResponseTooLargeV1) {
+          throw new SupabaseMemberIdentityVerifierErrorV1(
+            'SUPABASE_MEMBER_VERIFIER_RESPONSE_INVALID',
+            'Supabase Auth user verification response exceeded the governed resource ceiling.',
             { cause: error },
           );
         }
