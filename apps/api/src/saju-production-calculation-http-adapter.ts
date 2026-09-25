@@ -46,7 +46,7 @@ export interface SajuProductionCalculationHttpResponseV1 {
   readonly headers: Readonly<{
     get(name: string): string | null;
   }>;
-  readonly body: ReadableStream<Uint8Array> | null;
+  readonly body?: ReadableStream<Uint8Array> | null;
   text(): Promise<string>;
 }
 
