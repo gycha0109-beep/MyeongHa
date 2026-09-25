@@ -76,6 +76,7 @@ jobs:
         run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Verify governance contracts
         run: |
+          node scripts/verify-github-actions-trust-boundary.mjs
           npm run check:governance
           node scripts/verify-upstream-json-response-resource-policy.mjs
 
