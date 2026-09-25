@@ -128,7 +128,7 @@ function baseInput(input: {
   factAuthority?: CharacterFactAuthorityEntryV1;
   retriever?: (input: any) => any;
   relationshipSemantics?: () => unknown;
-  retrievedMemories?: readonly any[];
+  retrievedMemories?: any[];
   interpreterOutput?: (messageRef: string) => unknown;
 }) {
   const messageRef = 'message:current';
