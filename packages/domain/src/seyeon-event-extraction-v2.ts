@@ -201,6 +201,32 @@ function validateCausalRequirements(input: {
   }
 }
 
+function validateExtractionContext(
+  context: SeyeonEventExtractionContextV2,
+): void {
+  if (context.messages.length === 0 || context.messages.length > 8) {
+    throw new SeyeonEventExtractionErrorV2(
+      'event extraction context must contain between 1 and 8 current-turn messages.',
+    );
+  }
+  if (context.priorEvents.length > 8) {
+    throw new SeyeonEventExtractionErrorV2(
+      'event extraction context may contain at most 8 prior causal Event candidates.',
+    );
+  }
+  const eventIds = context.priorEvents.map((event) => event.eventId);
+  if (new Set(eventIds).size !== eventIds.length) {
+    throw new SeyeonEventExtractionErrorV2(
+      'event extraction context priorEvents must have unique event IDs.',
+    );
+  }
+  if (context.priorEvents.some((event) => event.characterId !== 'seyeon')) {
+    throw new SeyeonEventExtractionErrorV2(
+      'event extraction context cannot contain another Character private Event.',
+    );
+  }
+}
+
 function parseEventKind(value: unknown): SeyeonExperimentalEventKindV2 {
   if (
     typeof value !== 'string' ||
@@ -219,6 +245,7 @@ export function guardSeyeonEventExtractionCandidateV2(input: {
   readonly rawOutput: unknown;
   readonly context: SeyeonEventExtractionContextV2;
 }): SeyeonEventExtractionCandidateV2 {
+  validateExtractionContext(input.context);
   if (!isRecord(input.rawOutput)) {
     throw new SeyeonEventExtractionErrorV2(
       'Se-yeon event extraction candidate must be an object.',
