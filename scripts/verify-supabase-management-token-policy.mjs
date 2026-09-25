@@ -88,6 +88,7 @@ const forbiddenPatFiles = [
   'scripts/run-production-privacy-recovery-canary.mjs',
   'scripts/operations/run-supabase-production-migrations.sh',
   'scripts/run-production-platform-integrity-postdeploy-verify.sh',
+  'scripts/run-production-platform-integrity-data-api-surface-audit.sh',
 ];
 for (const path of forbiddenPatFiles) {
   const source = await readFile(path, 'utf8');

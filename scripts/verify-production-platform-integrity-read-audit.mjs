@@ -87,12 +87,6 @@ for (const fragment of requiredScriptFragments) {
 }
 
 const requiredDataApiFragments = [
-  'https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_ID/postgrest',
-  'db_schema: (.db_schema // "")',
-  'db_extra_search_path: (.db_extra_search_path // "")',
-  'postgrest_config.json',
-  'has("jwt_secret")',
-  'Production Data API containment drift detected: PostgREST db_schema is not disabled.',
   'begin read only;',
   "set local statement_timeout = '30s';",
   "set local lock_timeout = '5s';",
@@ -120,9 +114,11 @@ const requiredDataApiFragments = [
   'assert_zero_metric',
   'migration_max_version',
   'api_role_acl_drift_gate=pass',
-  'data_api_config_source=management_api_v1_postgrest',
-  'data_api_surface_metadata_captured=yes',
-  'sha256sum *.csv *.json audit_metadata.txt > SHA256SUMS',
+  'data_api_config_authority=production_data_api_surface_containment_workflow',
+  'data_api_config_management_read=not_performed',
+  'data_api_surface_metadata_captured=database_acl_only',
+  'sha256sum *.csv audit_metadata.txt > SHA256SUMS',
+  `[[ "$POOL_PORT" == '5432' ]]`,
   'sha256sum --check SHA256SUMS',
 ];
 
@@ -134,6 +130,8 @@ for (const fragment of requiredDataApiFragments) {
 
 const combined = `${workflow}\n${auditScript}\n${dataApiAuditScript}`;
 const forbiddenFragments = [
+  'SUPABASE_ACCESS_TOKEN',
+  'api.supabase.com',
   'actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4',
   '\npush:',
   '\npull_request:',
@@ -264,8 +262,17 @@ for (const file of ['audit_metadata.txt', 'SHA256SUMS']) {
   }
 }
 
-if (!dataApiAuditScript.includes('postgrest_config.json')) {
-  throw new Error('Production Data API read-audit is missing sanitized postgrest_config.json.');
+if (dataApiAuditScript.includes('postgrest_config.json')) {
+  throw new Error('Production Data API read-audit must not materialize Management API PostgREST configuration.');
+}
+for (const fragment of [
+  'data_api_config_authority=production_data_api_surface_containment_workflow',
+  'data_api_config_management_read=not_performed',
+  'data_api_surface_metadata_captured=database_acl_only',
+]) {
+  if (!dataApiAuditScript.includes(fragment)) {
+    throw new Error(`Production Data API read-audit is missing PAT-free authority evidence: ${fragment}`);
+  }
 }
 
-console.log('MyeongHa production platform-integrity catalog + Data API surface read-audit contract verification passed.');
+console.log('MyeongHa production platform-integrity catalog + PAT-free database ACL read-audit contract verification passed.');

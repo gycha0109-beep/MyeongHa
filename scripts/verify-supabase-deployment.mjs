@@ -5,16 +5,18 @@ const expectedProjectRef = 'cnsfpcdiyofqvhpcegfc';
 const workflowPath = '.github/workflows/supabase-production.yml';
 const migrationRunnerPath = 'scripts/operations/run-supabase-production-migrations.sh';
 const postdeployVerifyPath = 'scripts/run-production-platform-integrity-postdeploy-verify.sh';
+const dataApiSurfaceAuditPath = 'scripts/run-production-platform-integrity-data-api-surface-audit.sh';
 const configPath = 'supabase/config.toml';
 const migrationDir = 'supabase/migrations';
 
 execFileSync('bash', ['-n', migrationRunnerPath], { stdio: 'inherit' });
 execFileSync('bash', ['-n', postdeployVerifyPath], { stdio: 'inherit' });
 
-const [workflow, migrationRunner, postdeployVerify, config, migrationFiles] = await Promise.all([
+const [workflow, migrationRunner, postdeployVerify, dataApiSurfaceAudit, config, migrationFiles] = await Promise.all([
   readFile(workflowPath, 'utf8'),
   readFile(migrationRunnerPath, 'utf8'),
   readFile(postdeployVerifyPath, 'utf8'),
+  readFile(dataApiSurfaceAuditPath, 'utf8'),
   readFile(configPath, 'utf8'),
   readdir(migrationDir),
 ]);
@@ -137,6 +139,22 @@ const forbiddenPostdeployFragments = [
 for (const fragment of forbiddenPostdeployFragments) {
   if (postdeployVerify.includes(fragment)) {
     throw new Error(`Production post-deploy integrity verifier contains a forbidden mutation or unsafe fragment: ${fragment}`);
+  }
+}
+
+for (const forbidden of ['SUPABASE_ACCESS_TOKEN', 'api.supabase.com', '/postgrest']) {
+  if (dataApiSurfaceAudit.includes(forbidden)) {
+    throw new Error(`Production Data API/default-ACL audit must not inherit Management PAT authority: ${forbidden}`);
+  }
+}
+for (const required of [
+  "data_api_config_authority=production_data_api_surface_containment_workflow",
+  "data_api_config_management_read=not_performed",
+  "data_api_surface_metadata_captured=database_acl_only",
+  "[[ \"$POOL_PORT\" == '5432' ]]",
+]) {
+  if (!dataApiSurfaceAudit.includes(required)) {
+    throw new Error(`Production Data API/default-ACL audit missing explicit database-only authority fragment: ${required}`);
   }
 }
 
