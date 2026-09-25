@@ -111,6 +111,36 @@ describe('Supabase Auth unused non-success response bodies', () => {
     },
   );
 
+  it('treats successful sign-out as status-only and cancels its unused body without waiting', async () => {
+    let cancelled = false;
+    vi.stubGlobal('fetch', vi.fn(async () => nonClosingResponse({
+      status: 200,
+      onCancel() {
+        cancelled = true;
+        return new Promise<void>(() => undefined);
+      },
+    })));
+
+    const result = await Promise.race([
+      handleSupabaseAuthRequestV1({
+        request: requestFor('sign-out'),
+        env: authEnv,
+        action: 'sign-out',
+        passwordCompromiseGuard: clearPasswordGuard,
+      }),
+      new Promise<never>((_resolve, reject) => {
+        setTimeout(() => reject(new Error('Sign-out waited for an unused upstream body.')), 250);
+      }),
+    ]);
+
+    expect(result.status).toBe(200);
+    expect(await result.json()).toMatchObject({
+      ok: true,
+      data: { signedOut: true },
+    });
+    expect(cancelled).toBe(true);
+  });
+
   it('preserves the status mapping when unused-body cancellation rejects', async () => {
     let cancelled = false;
     vi.stubGlobal('fetch', vi.fn(async () => nonClosingResponse({
