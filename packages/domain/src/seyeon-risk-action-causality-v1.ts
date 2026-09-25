@@ -220,6 +220,16 @@ export function guardSeyeonRiskBearingActionCausalityV1(input: {
     );
   }
 
+  if (
+    riskKind === 'VULNERABLE_SELF_DISCLOSURE' &&
+    (input.context.relationship.trustBand !== 'high' ||
+      input.interpretation.reveal.level !== 'deep_trust')
+  ) {
+    throw new SeyeonRiskActionCausalityErrorV1(
+      'VULNERABLE_SELF_DISCLOSURE requires high trust and a deep_trust reveal; causal history does not lower the authored reveal boundary.',
+    );
+  }
+
   return decision({
     riskKind,
     result: 'ADMIT',
