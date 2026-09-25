@@ -42,5 +42,32 @@
   "databasePasswordAuthority": "SUPABASE_DB_PASSWORD",
   "managementApiResponseLogging": "forbidden",
   "authorizationHeaderLogging": "forbidden",
-  "credentialLogging": "forbidden"
+  "credentialLogging": "forbidden",
+  "denialOnlyEvidenceProbes": [
+    {
+      "method": "GET",
+      "path": "/v1/projects/{projectRef}/config/database/pooler",
+      "expectedStatus": 403,
+      "forbiddenPermission": "Connection Pooling Read"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/projects/{projectRef}/api-keys?reveal=true",
+      "expectedStatus": 403,
+      "forbiddenPermission": "API Keys Read / API Key Secrets Read"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/projects/{projectRef}/config/auth",
+      "expectedStatus": 403,
+      "forbiddenPermission": "Auth Config Read"
+    }
+  ],
+  "leastPrivilegeEvidence": {
+    "workflow": ".github/workflows/production-data-api-containment.yml",
+    "mode": "verify-least-privilege",
+    "confirmation": "VERIFY_SUPABASE_MANAGEMENT_TOKEN_LEAST_PRIVILEGE",
+    "idempotentWriteRequired": true,
+    "logicalStateChangeAllowed": false
+  }
 }
