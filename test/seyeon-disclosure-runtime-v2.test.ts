@@ -4,7 +4,9 @@ import {
   evaluateCharacterDisclosurePreflightV2,
   assembleSeyeonRuntimeContextV2,
   buildSeyeonRendererPacketV2,
+  guardSeyeonRiskBearingActionCausalityV1,
   guardSeyeonTurnInterpretationV2,
+  projectSeyeonRelationshipRuntimeOverlayV2,
   admitSeyeonRendererDraftV2,
 } from '../packages/domain/src/index.js';
 import type { CharacterFactAuthorityEntryV1 } from '../packages/character-content/src/character-fact-authority-v1.js';
@@ -27,6 +29,7 @@ function baseMemory() {
     claimKind: 'fact' as const,
     summary: '두 사람 사이에 관련된 신뢰 사건이 실제로 있었다.',
     sourceRef: 'event:shared-history',
+    causalAuthority: 'authorized_shared_history' as const,
     relevance: 0.95,
     salience: 0.95,
   };
@@ -174,6 +177,17 @@ describe('Se-yeon disclosure runtime v2 integration', () => {
     });
     const context = assembleSeyeonRuntimeContextV2({
       relationship: relationship(),
+      relationshipSemantics: projectSeyeonRelationshipRuntimeOverlayV2({
+        schemaVersion: 'seyeon-relationship-state-shadow-v2',
+        authority: 'experimental_shadow_not_production_authority',
+        characterId: 'seyeon',
+        attainedStage: 'S4_SPECIAL',
+        currentCandidateStage: 'S4_SPECIAL',
+        currentCondition: 'STABLE',
+        behaviorAccess: 'STAGE_ALIGNED',
+        unresolvedEpisodeIds: [],
+        causalEventIds: [],
+      }),
       recentMessages: [
         {
           messageId: 'question',
@@ -226,7 +240,8 @@ describe('Se-yeon disclosure runtime v2 integration', () => {
         memoryRefsUsed: [],
       },
     });
-    const packet = buildSeyeonRendererPacketV2({ context, interpretation });
+    const riskCausality = guardSeyeonRiskBearingActionCausalityV1({ context, interpretation });
+    const packet = buildSeyeonRendererPacketV2({ context, interpretation, riskCausality });
     const draft = admitSeyeonRendererDraftV2({
       packet,
       rawOutput: {
