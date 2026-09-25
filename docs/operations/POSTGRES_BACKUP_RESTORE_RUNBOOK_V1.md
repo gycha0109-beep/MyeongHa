@@ -56,12 +56,9 @@ Triggers:
 
 The schedule is a backup frequency, not an approved RPO.
 
-Endpoint resolution has two governed modes:
+Endpoint resolution has one governed mode: the protected explicit Session Pooler host from `SUPABASE_PRODUCTION_SESSION_POOLER_HOST`.
 
-1. preferred explicit Session Pooler host from protected `SUPABASE_PRODUCTION_SESSION_POOLER_HOST`;
-2. Supabase Management API fallback when the explicit host is absent.
-
-The workflow validates the resolved user/host/port/database tuple and never guesses a pooler hostname. `SUPABASE_DB_PASSWORD` remains the database-password authority.
+The workflow validates the fixed user/host/port/database tuple and fails closed when the explicit host is absent or invalid. It does not use a Supabase Management API token to discover database routing. `SUPABASE_DB_PASSWORD` remains the database-password authority.
 
 The backup workflow:
 
@@ -87,12 +84,6 @@ SUPABASE_DB_PASSWORD
 SUPABASE_PRODUCTION_SESSION_POOLER_HOST
 ```
 
-Management API fallback:
-
-```text
-SUPABASE_ACCESS_TOKEN
-```
-
 Backup-only secret:
 
 ```text
@@ -102,7 +93,7 @@ MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE
 Rules:
 
 - pooler host must be a bare `*.pooler.supabase.com` hostname from an operator-verified Supabase surface;
-- never commit or log the real host, password, access token, or passphrase;
+- never commit or log the real host, password, or passphrase;
 - backup passphrase must be at least 32 characters and must not reuse the database password;
 - recovery operators need a break-glass path to the passphrase that does not depend on the database being healthy.
 
@@ -440,7 +431,7 @@ These comparisons close the #389 full-procedure objective-comparison gate. They 
 Do not close `#389` until all are evidenced:
 
 - [x] backup encryption secret provisioned through production control plane
-- [x] exact Production Session Pooler endpoint path provisioned or Management API fallback authorization restored
+- [x] exact Production Session Pooler endpoint path provisioned as the sole database-routing authority
 - [x] actual production logical backup succeeded
 - [x] backup schedule and 30-day artifact retention evidenced
 - [x] provider plan / automatic backup / PITR state recorded

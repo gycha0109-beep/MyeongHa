@@ -296,4 +296,6 @@ if (workflow.includes('myeongha-data-api-containment-runtime-smoke.json\n       
   throw new Error('Runtime Guest credential material must never be uploaded as containment evidence.');
 }
 
+await import('./verify-supabase-management-token-policy.mjs');
+
 console.log('MyeongHa guarded production Data API containment contract verification passed.');
