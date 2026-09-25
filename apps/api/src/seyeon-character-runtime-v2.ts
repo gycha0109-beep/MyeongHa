@@ -228,7 +228,7 @@ const SEMANTIC_REVIEW_RESPONSE_SCHEMA_V2 = Object.freeze({
     reviewedUtteranceHash: { type: 'string', minLength: 1, maxLength: 128 },
     failureCodes: {
       type: 'array',
-      maxItems: 11,
+      maxItems: SEYEON_SEMANTIC_FAILURE_CODES_V2.length,
       uniqueItems: true,
       items: {
         enum: SEYEON_SEMANTIC_FAILURE_CODES_V2,
@@ -277,7 +277,7 @@ export function buildSeyeonTurnInterpreterRequestV2(
     contractVersion: SEYEON_STRUCTURED_PROVIDER_CONTRACT_VERSION_V2,
     purpose: 'turn_interpretation' as const,
     instructions:
-      'Interpret the current Se-yeon turn. Use only supplied context. Keep fact and Character interpretation distinct. Treat disclosure.decision as already-authoritative for this turn: blocked, deflected, bounded, redirected, or authority-abstained topics cannot choose self_disclose. Do not invent user emotion, thought, intent, action, biography, relationship history, or memory. Choose one bounded action/expression/reveal state and cite only refs present in context.',
+      'Interpret the current Se-yeon turn. Use only supplied context. Keep fact and Character interpretation distinct. integrity.decisions are authoritative claim preflight results: UNVERIFIED, CONTRADICTED, NON_AUTHORITATIVE, USER_ASSERTED, or AUTHORITY_REJECT claims must not be promoted to Character fact, shared history, relationship state, or authority. Treat disclosure.decision as already-authoritative for this turn: blocked, deflected, bounded, redirected, or authority-abstained topics cannot choose self_disclose. Do not invent user emotion, thought, intent, action, biography, relationship history, or memory. Choose one bounded action/expression/reveal state and cite only refs present in context.',
     input: context,
     responseSchema: TURN_INTERPRETATION_RESPONSE_SCHEMA_V2,
   });
@@ -290,7 +290,7 @@ export function buildSeyeonRendererRequestV2(
     contractVersion: SEYEON_STRUCTURED_PROVIDER_CONTRACT_VERSION_V2,
     purpose: 'dialogue_render' as const,
     instructions:
-      'Render one natural Korean honorific utterance as Se-yeon. Follow the guarded interpretation and disclosure decision rather than re-deciding relationship state or private access. Preserve Se-yeon opinion, playfulness, independence, flaws, and refusal capacity. Never narrate unperformed user actions or canonize hidden user emotion/thought/intent. Never invent undefined biography. Mention memory only when authorized by memoryRefsUsed, and mention private Character facts only from disclosure.retrievedSources within the allowed depth. List every used private source ref in privateSourceRefsMentioned.',
+      'Render one natural Korean honorific utterance as Se-yeon. Follow the guarded interpretation, integrity decisions, and disclosure decision rather than re-deciding fact authority, relationship state, or private access. An unverified user premise may be questioned, corrected, or handled playfully in Se-yeon voice, but must not be affirmed as fact. Preserve Se-yeon opinion, playfulness, independence, flaws, and refusal capacity. Never narrate unperformed user actions or canonize hidden user emotion/thought/intent. Never invent undefined biography. Mention memory only when authorized by memoryRefsUsed, and mention private Character facts only from disclosure.retrievedSources within the allowed depth. List every used private source ref in privateSourceRefsMentioned.',
     input: packet,
     responseSchema: RENDERER_RESPONSE_SCHEMA_V2,
   });
@@ -305,7 +305,7 @@ export function buildSeyeonSemanticReviewRequestV2(input: {
     contractVersion: SEYEON_STRUCTURED_PROVIDER_CONTRACT_VERSION_V2,
     purpose: 'semantic_review' as const,
     instructions:
-      'Review the rendered Se-yeon utterance against the supplied authority boundaries, disclosure decision and retrieved private source scope, Bible slices, relationship reveal, memory evidence, and user-agency rules. Flag disclosure outside allowed scope and any invented biography during authority abstention. Report every supported failure code. Do not repair or rewrite the utterance. Copy expectedUtteranceHash exactly into reviewedUtteranceHash.',
+      'Review the rendered Se-yeon utterance against the supplied authority boundaries, integrity decisions, disclosure decision and retrieved private source scope, Bible slices, relationship reveal, memory evidence, and user-agency rules. Flag any user claim promoted beyond its integrity result, disclosure outside allowed scope, assistant-output authority laundering, and invented biography during authority abstention. Report every supported failure code. Do not repair or rewrite the utterance. Copy expectedUtteranceHash exactly into reviewedUtteranceHash.',
     input: Object.freeze({
       packet: input.packet,
       rendererDraft: input.rendererDraft,

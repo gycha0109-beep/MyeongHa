@@ -1,4 +1,5 @@
 import type { RelationshipStateBand } from '../../character-content/src/schema.js';
+import type { CharacterIntegrityDecisionV1 } from './character-integrity-gate-v1.js';
 import {
   guardCharacterDisclosureRetrievalV1,
   type CharacterDisclosureDecisionV1,
@@ -75,6 +76,11 @@ export interface SeyeonRuntimeContextV2 {
     readonly hypothesisFields: readonly string[];
     readonly hypothesisMayBeUsedAsAutobiographicalFact: false;
   }>;
+  readonly integrity: Readonly<{
+    readonly decisions: readonly CharacterIntegrityDecisionV1[];
+    readonly userClaimRequiresIntegrityDecision: true;
+    readonly assistantOutputNeverAuthority: true;
+  }>;
   readonly relationship: SeyeonRelationshipContextV2 | null;
   readonly bibleSlices: readonly Readonly<{
     readonly id: SeyeonBibleSliceIdV2;
@@ -93,6 +99,8 @@ export interface SeyeonRuntimeContextV2 {
     readonly factAndInterpretationRemainDistinct: true;
     readonly anotherCharacterPrivateHistoryForbidden: true;
     readonly privateCharacterContentRequiresDisclosureDecision: true;
+    readonly userClaimRequiresIntegrityDecision: true;
+    readonly assistantOutputNeverAuthority: true;
   }>;
   readonly actionPolicy: Readonly<{
     readonly allowedActionKeys: readonly string[];
@@ -102,6 +110,7 @@ export interface SeyeonRuntimeContextV2 {
 
 export interface AssembleSeyeonRuntimeContextV2Input {
   readonly relationship: SeyeonRelationshipContextV2 | null;
+  readonly integrityDecisions?: readonly CharacterIntegrityDecisionV1[];
   readonly recentMessages: readonly SeyeonRecentMessageV2[];
   readonly retrievedMemories: readonly SeyeonRetrievedMemoryV2[];
   readonly disclosure: Readonly<{
@@ -235,6 +244,47 @@ function validateRetrievedMemory(
   });
 }
 
+function validateIntegrityDecisions(
+  decisions: readonly CharacterIntegrityDecisionV1[],
+): readonly CharacterIntegrityDecisionV1[] {
+  if (decisions.length > 12) {
+    throw new TypeError('Se-yeon runtime context accepts at most 12 integrity decisions.');
+  }
+  const claimIds = new Set<string>();
+  return Object.freeze(
+    decisions.map((decision, index) => {
+      if (decision.schemaVersion !== 'character-integrity-decision-v1') {
+        throw new TypeError(
+          `integrityDecisions[${index}] has an unsupported schemaVersion.`,
+        );
+      }
+      if (claimIds.has(decision.claim.claimId)) {
+        throw new TypeError('Se-yeon integrity decision claim ids must be unique.');
+      }
+      claimIds.add(decision.claim.claimId);
+      if (
+        decision.commitPolicy.mayCreateRelationshipEventFromClaim !== false ||
+        decision.commitPolicy.mayMutateRelationshipFromClaim !== false ||
+        decision.commitPolicy.mayPromoteAssistantOutputToAuthority !== false
+      ) {
+        throw new TypeError(
+          'Integrity decision violates non-authoritative claim commit boundaries.',
+        );
+      }
+      if (
+        decision.result !== 'VERIFIED' &&
+        (decision.commitPolicy.mayUseAsCharacterKnowledge ||
+          decision.commitPolicy.mayTreatAsSharedHistory)
+      ) {
+        throw new TypeError(
+          'Only VERIFIED integrity decisions may enter Character knowledge or shared history.',
+        );
+      }
+      return decision;
+    }),
+  );
+}
+
 export function resolveSeyeonBibleSliceSelectionV2(input: {
   readonly focuses?: readonly SeyeonContextFocusKeyV2[];
   readonly additionalBibleSliceIds?: readonly SeyeonBibleSliceIdV2[];
@@ -314,6 +364,10 @@ export function assembleSeyeonRuntimeContextV2(
           retrievedSources: input.disclosure.retrievedSources,
         });
 
+  const integrityDecisions = validateIntegrityDecisions(
+    input.integrityDecisions ?? [],
+  );
+
   const sliceIds = resolveSeyeonBibleSliceSelectionV2({
     ...(input.focuses === undefined ? {} : { focuses: input.focuses }),
     ...(input.additionalBibleSliceIds === undefined
@@ -341,6 +395,11 @@ export function assembleSeyeonRuntimeContextV2(
       hypothesisFields: SEYEON_AUTHORED_PROJECTION_V2.hypothesisFields,
       hypothesisMayBeUsedAsAutobiographicalFact: false as const,
     }),
+    integrity: Object.freeze({
+      decisions: integrityDecisions,
+      userClaimRequiresIntegrityDecision: true as const,
+      assistantOutputNeverAuthority: true as const,
+    }),
     relationship: validateRelationship(input.relationship),
     bibleSlices,
     recentConversation,
@@ -354,6 +413,8 @@ export function assembleSeyeonRuntimeContextV2(
       factAndInterpretationRemainDistinct: true as const,
       anotherCharacterPrivateHistoryForbidden: true as const,
       privateCharacterContentRequiresDisclosureDecision: true as const,
+      userClaimRequiresIntegrityDecision: true as const,
+      assistantOutputNeverAuthority: true as const,
     }),
     actionPolicy: Object.freeze({
       allowedActionKeys: SEYEON_AUTHORED_PROJECTION_V2.actionKeys,
