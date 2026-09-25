@@ -273,8 +273,6 @@ describe('Se-yeon event extraction and retrieval v2', () => {
     expect(candidate.decision).toBe('event');
     if (candidate.decision !== 'event') throw new Error('Expected event candidate.');
     expect(candidate.causalPredecessorEventIds).toEqual([promise.eventId]);
-
-    expect(candidate.causalPredecessorEventIds).toEqual([promise.eventId]);
   });
 
   it('rejects a promise outcome when no prior promise evidence is supplied', () => {
