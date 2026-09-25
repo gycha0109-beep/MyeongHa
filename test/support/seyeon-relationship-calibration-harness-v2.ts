@@ -303,6 +303,12 @@ export const ROUTES = Object.freeze({
     'SEYEON_REQUESTED_HELP',
     'RETURN_VISIT',
   ] as readonly CalibrationEventKey[],
+  care: [
+    'SEYEON_ACCEPTED_HELP',
+    'SEYEON_REQUESTED_HELP',
+    'RETURN_VISIT',
+    'SEYEON_ACCEPTED_HELP',
+  ] as readonly CalibrationEventKey[],
   disclosureHeavy: [
     'SHARED_PERSONAL_FACT',
     'SEYEON_SELF_DISCLOSED',
