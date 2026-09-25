@@ -131,7 +131,7 @@ const requiredRunbookFragments = [
   'RPO: APPROVED — PT24H (24 hours)',
   'RTO: APPROVED — PT6H (6 hours)',
   'SUPABASE_PRODUCTION_SESSION_POOLER_HOST',
-  'preferred explicit Session Pooler host',
+  'one governed mode: the protected explicit Session Pooler host',
   'MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE',
   'data_deletion_jobs',
   'Never restore a drill directly over serving production.',
