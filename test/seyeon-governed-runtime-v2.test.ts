@@ -128,6 +128,8 @@ function baseInput(input: {
   factAuthority?: CharacterFactAuthorityEntryV1;
   retriever?: (input: any) => any;
   relationshipSemantics?: () => unknown;
+  retrievedMemories?: readonly any[];
+  interpreterOutput?: (messageRef: string) => unknown;
 }) {
   const messageRef = 'message:current';
   const rel = relationship(input.level ?? 'low');
@@ -145,7 +147,8 @@ function baseInput(input: {
         },
       ],
       retrievedMemories:
-        input.level === 'high'
+        input.retrievedMemories ??
+        (input.level === 'high'
           ? [
               {
                 memoryId: 'event:deep-trust',
@@ -157,7 +160,7 @@ function baseInput(input: {
                 salience: 0.9,
               },
             ]
-          : [],
+          : []),
     },
     governance: {
       relationship: rel.disclosure,
@@ -203,7 +206,9 @@ function baseInput(input: {
         },
       },
     },
-    interpreterProvider: new Provider(() => interpretation(messageRef)),
+    interpreterProvider: new Provider(() =>
+      input.interpreterOutput?.(messageRef) ?? interpretation(messageRef),
+    ),
     rendererProvider: new Provider(renderer()),
     semanticReviewerProvider: new Provider(reviewer),
   };
@@ -650,6 +655,134 @@ describe('Se-yeon governed runtime v2', () => {
     expect(interpreter.requests).toHaveLength(0);
     expect(rendererProvider.requests).toHaveLength(0);
     expect(reviewerProvider.requests).toHaveLength(0);
+  });
+
+
+  it('fails at risk_causality before rendering when high trust/overlay lacks explicitly authorized shared history', async () => {
+    const runtimeInput = baseInput({
+      userText: '오늘은 다른 사람이랑 계속 얘기했어요.',
+      level: 'high',
+      relationshipSemantics: () => ({
+        schemaVersion: 'seyeon-relationship-state-shadow-v2',
+        authority: 'experimental_shadow_not_production_authority',
+        characterId: 'seyeon',
+        attainedStage: 'S4_SPECIAL',
+        currentCandidateStage: 'S4_SPECIAL',
+        currentCondition: 'STABLE',
+        behaviorAccess: 'STAGE_ALIGNED',
+        unresolvedEpisodeIds: [],
+        causalEventIds: [],
+      }),
+      interpreterOutput: (messageRef) => ({
+        schemaVersion: 'seyeon-turn-interpretation-v2',
+        userMove: 'neutral_or_other',
+        notice: {
+          summary: '현재 반응과 관계 이력을 함께 본다.',
+          evidenceRefs: [messageRef, 'event:deep-trust'],
+        },
+        immediateWant: {
+          key: 'check_if_remembered',
+          summary: '상대 반응을 확인하고 싶다.',
+        },
+        tension: {
+          key: 'jealousy_vs_ownership',
+          summary: '질투와 소유권 주장을 구분한다.',
+        },
+        chosenAction: {
+          key: 'tease',
+          rationale: '가볍게 반응을 확인한다.',
+        },
+        expressionState: 'jealous',
+        reveal: {
+          level: 'attached',
+          triggerRef: messageRef,
+          supportingHistoryRefs: ['event:deep-trust'],
+        },
+        memoryRefsUsed: ['event:deep-trust'],
+      }),
+    });
+    const rendererProvider = runtimeInput.rendererProvider;
+    const reviewerProvider = runtimeInput.semanticReviewerProvider;
+
+    await expect(runSeyeonCharacterTurnV2(runtimeInput)).rejects.toMatchObject({
+      stage: 'risk_causality',
+    });
+    expect(rendererProvider.requests).toHaveLength(0);
+    expect(reviewerProvider.requests).toHaveLength(0);
+  });
+
+  it('admits causally grounded jealousy and binds the decision into the renderer packet', async () => {
+    const runtimeInput = baseInput({
+      userText: '오늘은 다른 사람이랑 계속 얘기했어요.',
+      level: 'high',
+      retrievedMemories: [{
+        memoryId: 'event:deep-trust',
+        kind: 'relationship_event',
+        claimKind: 'fact',
+        summary: '권위 있는 관계 이력',
+        sourceRef: 'event:deep-trust',
+        causalAuthority: 'authorized_shared_history',
+        relevance: 0.9,
+        salience: 0.9,
+      }],
+      relationshipSemantics: () => ({
+        schemaVersion: 'seyeon-relationship-state-shadow-v2',
+        authority: 'experimental_shadow_not_production_authority',
+        characterId: 'seyeon',
+        attainedStage: 'S4_SPECIAL',
+        currentCandidateStage: 'S4_SPECIAL',
+        currentCondition: 'STABLE',
+        behaviorAccess: 'STAGE_ALIGNED',
+        unresolvedEpisodeIds: [],
+        causalEventIds: [],
+      }),
+      interpreterOutput: (messageRef) => ({
+        schemaVersion: 'seyeon-turn-interpretation-v2',
+        userMove: 'neutral_or_other',
+        notice: {
+          summary: '현재 반응과 권위 있는 관계 이력을 함께 본다.',
+          evidenceRefs: [messageRef, 'event:deep-trust'],
+        },
+        immediateWant: {
+          key: 'check_if_remembered',
+          summary: '상대 반응을 확인하고 싶다.',
+        },
+        tension: {
+          key: 'jealousy_vs_ownership',
+          summary: '질투와 소유권 주장을 구분한다.',
+        },
+        chosenAction: {
+          key: 'tease',
+          rationale: '소유권을 주장하지 않고 가볍게 반응을 확인한다.',
+        },
+        expressionState: 'jealous',
+        reveal: {
+          level: 'attached',
+          triggerRef: messageRef,
+          supportingHistoryRefs: ['event:deep-trust'],
+        },
+        memoryRefsUsed: ['event:deep-trust'],
+      }),
+    });
+    runtimeInput.rendererProvider = new Provider({
+      schemaVersion: 'seyeon-renderer-draft-v2',
+      utterance: '요즘은 그쪽하고 더 많이 이야기하네요?',
+      expressionState: 'jealous',
+      revealLevel: 'attached',
+      memoryRefsMentioned: ['event:deep-trust'],
+      privateSourceRefsMentioned: [],
+      disclosureSliceIds: [],
+    });
+
+    const result = await runSeyeonCharacterTurnV2(runtimeInput);
+    expect(result.riskCausality).toMatchObject({
+      riskKind: 'JEALOUS_PROBE',
+      result: 'ADMIT',
+    });
+    expect(result.rendererPacket.riskCausality).toEqual(result.riskCausality);
+    expect(result.riskCausality.evidence.authorizedSharedHistoryRefs).toEqual([
+      'event:deep-trust',
+    ]);
   });
 
 });
