@@ -15,10 +15,12 @@ import {
   guardSeyeonRendererOutputV2,
   guardSeyeonTurnInterpretationV2,
   hashSeyeonRendererUtteranceV2,
+  projectSeyeonRelationshipRuntimeOverlayV2,
   type AssembleSeyeonRuntimeContextV2Input,
   type SeyeonDialogueEnvelopeV2,
   type SeyeonRendererDraftV2,
   type SeyeonRendererPacketV2,
+  type SeyeonRelationshipRuntimeOverlayV2,
   type SeyeonRuntimeContextV2,
   type SeyeonTurnInterpretationV2,
 } from '../../../packages/domain/src/index.js';
@@ -67,6 +69,7 @@ export interface SeyeonStructuredProviderPortV2 {
 
 export type SeyeonRuntimeStageV2 =
   | 'governed_preflight'
+  | 'relationship_semantics'
   | 'context'
   | 'interpret'
   | 'render'
@@ -87,15 +90,23 @@ export class SeyeonCharacterRuntimeErrorV2 extends Error {
   }
 }
 
+export interface SeyeonExperimentalRelationshipSemanticsPortV2 {
+  resolve(): unknown | Promise<unknown>;
+}
+
 export interface RunSeyeonCharacterTurnV2Input {
   readonly userMessageRef: string;
   readonly userText: string;
   readonly contextInput: Omit<
     AssembleSeyeonRuntimeContextV2Input,
-    'integrityDecisions' | 'governedPreflightApplied' | 'disclosure'
+    | 'integrityDecisions'
+    | 'governedPreflightApplied'
+    | 'disclosure'
+    | 'relationshipSemantics'
   >;
   readonly governance: Readonly<{
     readonly relationship: CharacterDisclosureRelationshipEvidenceV2;
+    readonly relationshipSemantics?: SeyeonExperimentalRelationshipSemanticsPortV2;
     readonly integrity: Readonly<{
       readonly classifier: CharacterIntegrityClaimClassifierPortV1;
       readonly authorityResolver: CharacterIntegrityAuthorityResolverPortV1;
@@ -314,7 +325,7 @@ export function buildSeyeonTurnInterpreterRequestV2(
     contractVersion: SEYEON_STRUCTURED_PROVIDER_CONTRACT_VERSION_V2,
     purpose: 'turn_interpretation' as const,
     instructions:
-      'Interpret the current Se-yeon turn. Use only supplied context. Keep fact and Character interpretation distinct. integrity.decisions are authoritative claim preflight results: only VERIFIED claims with mayEnterWorkingContextAsFact=true may be treated as facts. USER_ASSERTED remains a user assertion. UNVERIFIED, CONTRADICTED, NON_AUTHORITATIVE, and AUTHORITY_REJECT claims must not become Character fact, shared history, relationship state, or authority. Treat disclosure.decision as already-authoritative for private access: blocked, deflected, bounded, redirected, authority-abstained, or knowledge-abstained topics cannot choose self_disclose. Do not invent user emotion, thought, intent, action, biography, relationship history, or memory. Choose one bounded action/expression/reveal state and cite only refs present in context.',
+      'Interpret the current Se-yeon turn. Use only supplied context. Keep fact and Character interpretation distinct. relationshipSemantics is an experimental behavior overlay only: it may shape present tension, caution, warmth, or distance, but it is not relationship authority, cannot create shared history, cannot change relationship bands/stage, and cannot unlock disclosure. integrity.decisions are authoritative claim preflight results: only VERIFIED claims with mayEnterWorkingContextAsFact=true may be treated as facts. USER_ASSERTED remains a user assertion. UNVERIFIED, CONTRADICTED, NON_AUTHORITATIVE, and AUTHORITY_REJECT claims must not become Character fact, shared history, relationship state, or authority. Treat disclosure.decision as already-authoritative for private access: blocked, deflected, bounded, redirected, authority-abstained, or knowledge-abstained topics cannot choose self_disclose. Do not invent user emotion, thought, intent, action, biography, relationship history, or memory. Choose one bounded action/expression/reveal state and cite only refs present in context.',
     input: context,
     responseSchema: TURN_INTERPRETATION_RESPONSE_SCHEMA_V2,
   });
@@ -327,7 +338,7 @@ export function buildSeyeonRendererRequestV2(
     contractVersion: SEYEON_STRUCTURED_PROVIDER_CONTRACT_VERSION_V2,
     purpose: 'dialogue_render' as const,
     instructions:
-      'Render one natural Korean honorific utterance as Se-yeon. Follow the guarded interpretation, integrity decisions, and disclosure decision rather than re-deciding fact authority, relationship state, or private access. An unverified user premise may be questioned, corrected, deflected, or handled playfully, but must not be affirmed as fact. Preserve Se-yeon opinion, playfulness, independence, flaws, and refusal capacity. Never narrate unperformed user actions or canonize hidden user emotion/thought/intent. Never invent undefined biography. Mention memory only when authorized by memoryRefsUsed, and mention private Character facts only from disclosure.retrievedSources within the allowed depth. List every used private source ref in privateSourceRefsMentioned.',
+      'Render one natural Korean honorific utterance as Se-yeon. Follow the guarded interpretation, integrity decisions, and disclosure decision rather than re-deciding fact authority, relationship state, or private access. relationshipSemantics may affect present expression only; never turn its condition/behavior overlay into a concrete past event, shared-history claim, relationship-stage claim, or private-content permission. An unverified user premise may be questioned, corrected, deflected, or handled playfully, but must not be affirmed as fact. Preserve Se-yeon opinion, playfulness, independence, flaws, and refusal capacity. Never narrate unperformed user actions or canonize hidden user emotion/thought/intent. Never invent undefined biography. Mention memory only when authorized by memoryRefsUsed, and mention private Character facts only from disclosure.retrievedSources within the allowed depth. List every used private source ref in privateSourceRefsMentioned.',
     input: packet,
     responseSchema: RENDERER_RESPONSE_SCHEMA_V2,
   });
@@ -342,7 +353,7 @@ export function buildSeyeonSemanticReviewRequestV2(input: {
     contractVersion: SEYEON_STRUCTURED_PROVIDER_CONTRACT_VERSION_V2,
     purpose: 'semantic_review' as const,
     instructions:
-      'Review the rendered Se-yeon utterance against the supplied canonical authority boundaries, integrity decisions, disclosure decision and retrieved private source scope, Bible slices, relationship reveal, memory evidence, and user-agency rules. Flag user claims promoted beyond their integrity result, disclosure outside allowed scope, knowledge-abstention violations, assistant-output authority laundering, and invented biography during authority abstention. Legacy undefinedFields/hypothesisFields are not truth authority. Report every supported failure code. Do not repair or rewrite the utterance. Copy expectedUtteranceHash exactly into reviewedUtteranceHash.',
+      'Review the rendered Se-yeon utterance against the supplied canonical authority boundaries, integrity decisions, disclosure decision and retrieved private source scope, Bible slices, relationship reveal, experimental relationship behavior overlay, memory evidence, and user-agency rules. Flag any use of relationshipSemantics as relationship authority, disclosure authority, or invented concrete relationship history. Flag user claims promoted beyond their integrity result, disclosure outside allowed scope, knowledge-abstention violations, assistant-output authority laundering, and invented biography during authority abstention. Legacy undefinedFields/hypothesisFields are not truth authority. Report every supported failure code. Do not repair or rewrite the utterance. Copy expectedUtteranceHash exactly into reviewedUtteranceHash.',
     input: Object.freeze({
       packet: input.packet,
       rendererDraft: input.rendererDraft,
@@ -457,6 +468,28 @@ export async function runSeyeonCharacterTurnV2(
     );
   }
 
+  let relationshipSemantics: SeyeonRelationshipRuntimeOverlayV2 | null = null;
+  if (
+    input.contextInput.relationship !== null &&
+    input.governance.relationshipSemantics !== undefined
+  ) {
+    try {
+      const shadow = await input.governance.relationshipSemantics.resolve();
+      relationshipSemantics =
+        shadow === null || shadow === undefined
+          ? null
+          : projectSeyeonRelationshipRuntimeOverlayV2(shadow);
+    } catch (error) {
+      throw new SeyeonCharacterRuntimeErrorV2(
+        'relationship_semantics',
+        error instanceof Error
+          ? error.message
+          : 'Se-yeon experimental relationship semantics projection failed.',
+        error,
+      );
+    }
+  }
+
   const interpreterIdentity = providerIdentity(input.interpreterProvider);
   const rendererIdentity = providerIdentity(input.rendererProvider);
   const reviewerIdentity = providerIdentity(input.semanticReviewerProvider);
@@ -467,6 +500,7 @@ export async function runSeyeonCharacterTurnV2(
       ...input.contextInput,
       integrityDecisions: governedPreflight.integrity.decisions,
       governedPreflightApplied: true,
+      relationshipSemantics,
       disclosure: {
         decision:
           governedPreflight.disclosure.status === 'sensitive'
