@@ -550,10 +550,21 @@ export function projectSeyeonRelationshipStateShadowV2(input: {
     )
     .at(-1);
 
+  const latestEpisode = input.episodes
+    .slice()
+    .sort(
+      (left, right) =>
+        Date.parse(left.openedAt) - Date.parse(right.openedAt),
+    )
+    .at(-1);
+  const repairStillCurrent =
+    latestConditionEpisode?.conflictResolved === true &&
+    latestEpisode?.episodeId === latestConditionEpisode.episodeId;
+
   const currentCondition: SeyeonCurrentRelationshipConditionV2 =
     unresolved.length > 0
       ? 'OPEN_CONFLICT'
-      : latestConditionEpisode?.conflictResolved === true
+      : repairStillCurrent
         ? 'RESOLVED_RECENTLY'
         : 'STABLE';
 
