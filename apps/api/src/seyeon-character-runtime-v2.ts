@@ -6,6 +6,7 @@ import {
 import {
   SEYEON_IMMEDIATE_WANT_KEYS_V2,
   SEYEON_REVEAL_LEVELS_V2,
+  SEYEON_SEMANTIC_FAILURE_CODES_V2,
   SEYEON_TENSION_KEYS_V2,
   SEYEON_USER_MOVE_KEYS_V2,
   assembleSeyeonRuntimeContextV2,
@@ -16,6 +17,7 @@ import {
   hashSeyeonRendererUtteranceV2,
   type AssembleSeyeonRuntimeContextV2Input,
   type SeyeonDialogueEnvelopeV2,
+  type SeyeonRendererDraftV2,
   type SeyeonRendererPacketV2,
   type SeyeonRuntimeContextV2,
   type SeyeonTurnInterpretationV2,
@@ -221,19 +223,7 @@ const SEMANTIC_REVIEW_RESPONSE_SCHEMA_V2 = Object.freeze({
       maxItems: 11,
       uniqueItems: true,
       items: {
-        enum: [
-          'USER_AGENCY_CANONIZATION',
-          'UNSUPPORTED_MEMORY_CALLBACK',
-          'UNDEFINED_BIOGRAPHY_INVENTION',
-          'HYPOTHESIS_PROMOTED_TO_FACT',
-          'RELATIONSHIP_OVERREACH',
-          'HELPFUL_ASSISTANT_COLLAPSE',
-          'SUNSHINE_COLLAPSE',
-          'CARETAKER_COLLAPSE',
-          'MEMORY_SHOWOFF',
-          'OWNERSHIP_ESCALATION',
-          'CROSS_CHARACTER_PRIVATE_MEMORY',
-        ],
+        enum: SEYEON_SEMANTIC_FAILURE_CODES_V2,
       },
     },
     evidence: {
@@ -393,7 +383,7 @@ export async function runSeyeonCharacterTurnV2(
     'render',
   );
 
-  let admittedRendererDraft;
+  let admittedRendererDraft: SeyeonRendererDraftV2;
   try {
     admittedRendererDraft = admitSeyeonRendererDraftV2({
       rawOutput: rawRendererDraft,
