@@ -1,6 +1,7 @@
 import {
   SEYEON_EXPERIMENTAL_EVENT_KINDS_V2,
   guardSeyeonEventExtractionCandidateV2,
+  validateSeyeonEventExtractionContextV2,
   type SeyeonEventExtractionCandidateV2,
   type SeyeonEventExtractionContextV2,
 } from '../../../packages/domain/src/index.js';
@@ -36,6 +37,7 @@ const EVENT_EXTRACTION_RESPONSE_SCHEMA_V2 = Object.freeze({
         'reason',
         'eventKind',
         'sourceMessageRefs',
+        'causalPredecessorEventIds',
         'facts',
         'characterInterpretation',
         'salience',
@@ -53,6 +55,12 @@ const EVENT_EXTRACTION_RESPONSE_SCHEMA_V2 = Object.freeze({
           type: 'array',
           minItems: 1,
           maxItems: 16,
+          uniqueItems: true,
+          items: { type: 'string', minLength: 1, maxLength: 512 },
+        },
+        causalPredecessorEventIds: {
+          type: 'array',
+          maxItems: 8,
           uniqueItems: true,
           items: { type: 'string', minLength: 1, maxLength: 512 },
         },
@@ -109,11 +117,12 @@ const EVENT_EXTRACTION_RESPONSE_SCHEMA_V2 = Object.freeze({
 export function buildSeyeonEventExtractorRequestV2(
   context: SeyeonEventExtractionContextV2,
 ): SeyeonStructuredProviderRequestV2 {
+  validateSeyeonEventExtractionContextV2(context);
   return Object.freeze({
     contractVersion: SEYEON_STRUCTURED_PROVIDER_CONTRACT_VERSION_V2,
     purpose: 'event_extraction' as const,
     instructions:
-      'Post-turn event extraction for Se-yeon. Most ordinary turns must return decision=none. Create an event only for durable relationship meaning consistent with Se-yeon Runtime R12/R15: promises, remembered Se-yeon details, receiving/requesting help, meaningful self-disclosure, admitted waiting, specialness invalidation, conflict/repair, or return after absence. Keep objective facts separate from Se-yeon interpretation. Cite only current turn message IDs. Do not infer hidden user emotion, thought, intent, or unperformed action. The event vocabulary is experimental and must not be treated as canonical DB taxonomy.',
+      'Post-turn event extraction for Se-yeon. Most ordinary turns must return decision=none. Create an event only for durable relationship meaning consistent with Se-yeon Runtime R12/R15: promises, remembered Se-yeon details, receiving/requesting help, meaningful self-disclosure, admitted waiting, specialness invalidation, conflict/repair, or return after absence. Keep objective facts separate from Se-yeon interpretation. Cite only current turn message IDs for new facts. Use causalPredecessorEventIds only from context.priorEvents when the new event depends on prior relationship history. PROMISE_KEPT/PROMISE_BROKEN require a prior PROMISE_MADE; RECONCILIATION_EVENT requires a prior conflict predecessor. Do not infer hidden user emotion, thought, intent, or unperformed action. The event vocabulary is experimental and must not be treated as canonical DB taxonomy.',
     input: Object.freeze({
       extractorVersion: SEYEON_EVENT_EXTRACTOR_PROVIDER_VERSION_V2,
       context,

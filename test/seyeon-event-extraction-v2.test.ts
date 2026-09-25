@@ -57,6 +57,7 @@ function extractionContext(): SeyeonEventExtractionContextV2 {
         text: '그걸 기억하고 계셨네요. 조금 의외인데요.',
       },
     ],
+    priorEvents: [],
     interpretation: {
       schemaVersion: 'seyeon-turn-interpretation-v2',
       userMove: 'remembered_seyeon_detail',
@@ -114,6 +115,7 @@ function retrievalEvent(input: {
     occurredAt: input.occurredAt,
     sourceTurnId: `turn-${input.id}`,
     sourceMessageRefs: [`message-${input.id}`],
+    causalPredecessorEventIds: [],
     facts: [
       {
         factKey: 'fact',
@@ -137,6 +139,7 @@ describe('Se-yeon event extraction and retrieval v2', () => {
         reason: '세연에게 작은 행동을 정확히 기억해 준 것은 R12상 관계 salience가 높다.',
         eventKind: 'USER_REMEMBERED_SEYEON_DETAIL',
         sourceMessageRefs: ['user-current', 'assistant-current'],
+        causalPredecessorEventIds: [],
         facts: [
           {
             factKey: 'user_remembered_seyeon_detail',
@@ -188,6 +191,7 @@ describe('Se-yeon event extraction and retrieval v2', () => {
           reason: 'bad provenance',
           eventKind: 'PROMISE_MADE',
           sourceMessageRefs: ['message-does-not-exist'],
+          causalPredecessorEventIds: [],
           facts: [
             {
               factKey: 'promise',
@@ -214,6 +218,7 @@ describe('Se-yeon event extraction and retrieval v2', () => {
           reason: '메뉴를 한 번 골랐다.',
           eventKind: 'PROMISE_MADE',
           sourceMessageRefs: ['user-current'],
+          causalPredecessorEventIds: [],
           facts: [
             {
               factKey: 'trivia',
@@ -240,6 +245,7 @@ describe('Se-yeon event extraction and retrieval v2', () => {
         reason: '관계적으로 의미 있는 기억 확인.',
         eventKind: 'USER_REMEMBERED_SEYEON_DETAIL',
         sourceMessageRefs: ['user-current'],
+        causalPredecessorEventIds: [],
         facts: [
           {
             factKey: 'remembered_detail',
@@ -265,6 +271,82 @@ describe('Se-yeon event extraction and retrieval v2', () => {
     expect(event?.eventId).toBe('server-event-id');
     expect(event?.dedupeKey).toBe('server-dedupe-key');
     expect(event?.sourceTurnId).toBe('turn-current');
+  });
+
+  it('requires PROMISE_KEPT to point at a prior PROMISE_MADE event', () => {
+    const promise = retrievalEvent({
+      id: 'promise-made-prior',
+      kind: 'PROMISE_MADE',
+      occurredAt: '2026-09-20T00:00:00.000Z',
+      salience: 0.9,
+    });
+    const context = {
+      ...extractionContext(),
+      priorEvents: [promise],
+    };
+
+    const candidate = guardSeyeonEventExtractionCandidateV2({
+      context,
+      rawOutput: {
+        schemaVersion: SEYEON_EVENT_EXTRACTION_CANDIDATE_SCHEMA_VERSION_V2,
+        decision: 'event',
+        reason: '현재 발화가 기존 약속의 이행을 확인한다.',
+        eventKind: 'PROMISE_KEPT',
+        sourceMessageRefs: ['user-current'],
+        causalPredecessorEventIds: [promise.eventId],
+        facts: [
+          {
+            factKey: 'promise_outcome',
+            statement: '사용자가 이전 약속을 지켰다고 현재 발화에서 확인했다.',
+            sourceRefs: ['user-current'],
+          },
+        ],
+        characterInterpretation: null,
+        salience: 0.9,
+        confidence: 0.95,
+        dedupeBasis: 'turn-current:promise-kept',
+      },
+    });
+
+    expect(candidate.decision).toBe('event');
+    if (candidate.decision !== 'event') throw new Error('Expected event candidate.');
+    expect(candidate.causalPredecessorEventIds).toEqual([promise.eventId]);
+
+    const materialized = materializeSeyeonEventCandidateV2({
+      candidate,
+      context,
+      eventId: 'promise-kept-current',
+      dedupeKey: 'promise-kept-current-dedupe',
+      occurredAt: '2026-09-25T03:00:00.000Z',
+    });
+    expect(materialized?.causalPredecessorEventIds).toEqual([promise.eventId]);
+  });
+
+  it('rejects a promise outcome when no prior promise evidence is supplied', () => {
+    expect(() =>
+      guardSeyeonEventExtractionCandidateV2({
+        context: extractionContext(),
+        rawOutput: {
+          schemaVersion: SEYEON_EVENT_EXTRACTION_CANDIDATE_SCHEMA_VERSION_V2,
+          decision: 'event',
+          reason: '약속을 지켰다고 분류하려 했지만 선행 사건이 없다.',
+          eventKind: 'PROMISE_KEPT',
+          sourceMessageRefs: ['user-current'],
+          causalPredecessorEventIds: [],
+          facts: [
+            {
+              factKey: 'promise_outcome',
+              statement: '사용자가 약속을 지켰다고 말했다.',
+              sourceRefs: ['user-current'],
+            },
+          ],
+          characterInterpretation: null,
+          salience: 0.9,
+          confidence: 0.95,
+          dedupeBasis: 'turn-current:unsupported-promise-kept',
+        },
+      }),
+    ).toThrow(/requires a prior PROMISE_MADE/);
   });
 
   it('lets an old unresolved conflict outrank a newer weakly relevant event when the current query needs it', () => {

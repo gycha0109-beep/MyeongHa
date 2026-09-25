@@ -344,6 +344,7 @@ export {
   guardSeyeonEventExtractionCandidateV2,
   materializeSeyeonEventCandidateV2,
   rankSeyeonEventRetrievalV2,
+  validateSeyeonEventExtractionContextV2,
   type SeyeonEventExtractionCandidateV2,
   type SeyeonEventExtractionContextV2,
   type SeyeonEventExtractionMessageV2,

@@ -24,6 +24,7 @@ export interface SeyeonEventExtractionMessageV2 {
 export interface SeyeonEventExtractionContextV2 {
   readonly turnId: string;
   readonly messages: readonly SeyeonEventExtractionMessageV2[];
+  readonly priorEvents: readonly SeyeonRelationshipEventV2[];
   readonly interpretation: SeyeonTurnInterpretationV2;
   readonly envelope: SeyeonDialogueEnvelopeV2;
   readonly relationshipBefore: SeyeonRelationshipProjectionV2;
@@ -41,6 +42,7 @@ export type SeyeonEventExtractionCandidateV2 =
       readonly reason: string;
       readonly eventKind: SeyeonExperimentalEventKindV2;
       readonly sourceMessageRefs: readonly string[];
+      readonly causalPredecessorEventIds: readonly string[];
       readonly facts: readonly SeyeonEventFactV2[];
       readonly characterInterpretation: SeyeonCharacterInterpretationV2 | null;
       readonly salience: number;
@@ -130,6 +132,101 @@ function parseRefs(
   return Object.freeze(refs);
 }
 
+function parseOptionalRefs(
+  value: unknown,
+  path: string,
+  allowedRefs: ReadonlySet<string>,
+  maxLength: number,
+): readonly string[] {
+  if (!Array.isArray(value) || value.length > maxLength) {
+    throw new SeyeonEventExtractionErrorV2(
+      `${path} must contain at most ${maxLength} refs.`,
+    );
+  }
+  const refs = value.map((entry, index) =>
+    boundedText(entry, `${path}[${index}]`, 512),
+  );
+  if (new Set(refs).size !== refs.length) {
+    throw new SeyeonEventExtractionErrorV2(`${path} must not contain duplicates.`);
+  }
+  for (const ref of refs) {
+    if (!allowedRefs.has(ref)) {
+      throw new SeyeonEventExtractionErrorV2(
+        `${path} contains ref absent from prior Event context: ${ref}`,
+      );
+    }
+  }
+  return Object.freeze(refs);
+}
+
+function validateCausalRequirements(input: {
+  readonly eventKind: SeyeonExperimentalEventKindV2;
+  readonly causalPredecessorEventIds: readonly string[];
+  readonly priorEvents: readonly SeyeonRelationshipEventV2[];
+}): void {
+  const priorById = new Map(
+    input.priorEvents.map((event) => [event.eventId, event] as const),
+  );
+  if (priorById.size !== input.priorEvents.length) {
+    throw new SeyeonEventExtractionErrorV2(
+      'priorEvents must not contain duplicate event IDs.',
+    );
+  }
+
+  const predecessorKinds = input.causalPredecessorEventIds.map(
+    (eventId) => priorById.get(eventId)!.eventKind,
+  );
+
+  if (
+    (input.eventKind === 'PROMISE_KEPT' ||
+      input.eventKind === 'PROMISE_BROKEN') &&
+    !predecessorKinds.includes('PROMISE_MADE')
+  ) {
+    throw new SeyeonEventExtractionErrorV2(
+      `${input.eventKind} requires a prior PROMISE_MADE causal predecessor.`,
+    );
+  }
+
+  if (
+    input.eventKind === 'RECONCILIATION_EVENT' &&
+    !predecessorKinds.some((kind) =>
+      kind === 'CONFLICT_EVENT' ||
+      kind === 'PROMISE_BROKEN' ||
+      kind === 'SPECIALNESS_INVALIDATED'
+    )
+  ) {
+    throw new SeyeonEventExtractionErrorV2(
+      'RECONCILIATION_EVENT requires a prior unresolved conflict causal predecessor.',
+    );
+  }
+}
+
+export function validateSeyeonEventExtractionContextV2(
+  context: SeyeonEventExtractionContextV2,
+): void {
+  if (context.messages.length === 0 || context.messages.length > 8) {
+    throw new SeyeonEventExtractionErrorV2(
+      'event extraction context must contain between 1 and 8 current-turn messages.',
+    );
+  }
+  if (context.priorEvents.length > 8) {
+    throw new SeyeonEventExtractionErrorV2(
+      'event extraction context may contain at most 8 prior causal Event candidates.',
+    );
+  }
+  const eventIds = context.priorEvents.map((event) => event.eventId);
+  if (new Set(eventIds).size !== eventIds.length) {
+    throw new SeyeonEventExtractionErrorV2(
+      'event extraction context priorEvents must have unique event IDs.',
+    );
+  }
+  if (context.priorEvents.some((event) => event.characterId !== 'seyeon')) {
+    throw new SeyeonEventExtractionErrorV2(
+      'event extraction context cannot contain another Character private Event.',
+    );
+  }
+}
+
 function parseEventKind(value: unknown): SeyeonExperimentalEventKindV2 {
   if (
     typeof value !== 'string' ||
@@ -148,6 +245,7 @@ export function guardSeyeonEventExtractionCandidateV2(input: {
   readonly rawOutput: unknown;
   readonly context: SeyeonEventExtractionContextV2;
 }): SeyeonEventExtractionCandidateV2 {
+  validateSeyeonEventExtractionContextV2(input.context);
   if (!isRecord(input.rawOutput)) {
     throw new SeyeonEventExtractionErrorV2(
       'Se-yeon event extraction candidate must be an object.',
@@ -187,6 +285,7 @@ export function guardSeyeonEventExtractionCandidateV2(input: {
       'reason',
       'eventKind',
       'sourceMessageRefs',
+      'causalPredecessorEventIds',
       'facts',
       'characterInterpretation',
       'salience',
@@ -205,6 +304,21 @@ export function guardSeyeonEventExtractionCandidateV2(input: {
     messageRefs,
     16,
   );
+  const priorEventIds = new Set(
+    input.context.priorEvents.map((event) => event.eventId),
+  );
+  const causalPredecessorEventIds = parseOptionalRefs(
+    input.rawOutput.causalPredecessorEventIds,
+    'causalPredecessorEventIds',
+    priorEventIds,
+    8,
+  );
+  const eventKind = parseEventKind(input.rawOutput.eventKind);
+  validateCausalRequirements({
+    eventKind,
+    causalPredecessorEventIds,
+    priorEvents: input.context.priorEvents,
+  });
 
   if (!Array.isArray(input.rawOutput.facts) || input.rawOutput.facts.length === 0 || input.rawOutput.facts.length > 12) {
     throw new SeyeonEventExtractionErrorV2(
@@ -275,8 +389,9 @@ export function guardSeyeonEventExtractionCandidateV2(input: {
     schemaVersion: SEYEON_EVENT_EXTRACTION_CANDIDATE_SCHEMA_VERSION_V2,
     decision: 'event' as const,
     reason: boundedText(input.rawOutput.reason, 'reason', 1200),
-    eventKind: parseEventKind(input.rawOutput.eventKind),
+    eventKind,
     sourceMessageRefs,
+    causalPredecessorEventIds,
     facts,
     characterInterpretation,
     salience,
@@ -304,6 +419,7 @@ export function materializeSeyeonEventCandidateV2(input: {
     occurredAt: boundedText(input.occurredAt, 'occurredAt', 64),
     sourceTurnId: boundedText(input.context.turnId, 'context.turnId', 256),
     sourceMessageRefs: input.candidate.sourceMessageRefs,
+    causalPredecessorEventIds: input.candidate.causalPredecessorEventIds,
     facts: input.candidate.facts,
     characterInterpretation: input.candidate.characterInterpretation,
     salience: input.candidate.salience,
