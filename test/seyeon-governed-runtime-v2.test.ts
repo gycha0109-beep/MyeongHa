@@ -127,6 +127,7 @@ function baseInput(input: {
   disclosureClassifier?: () => unknown;
   factAuthority?: CharacterFactAuthorityEntryV1;
   retriever?: (input: any) => any;
+  relationshipSemantics?: () => unknown;
 }) {
   const messageRef = 'message:current';
   const rel = relationship(input.level ?? 'low');
@@ -160,6 +161,13 @@ function baseInput(input: {
     },
     governance: {
       relationship: rel.disclosure,
+      ...(input.relationshipSemantics === undefined
+        ? {}
+        : {
+            relationshipSemantics: {
+              resolve: input.relationshipSemantics,
+            },
+          }),
       integrity: {
         classifier: {
           classify: input.integrityClassifier ?? (() => ({ claims: [] })),
@@ -495,4 +503,153 @@ describe('Se-yeon governed runtime v2', () => {
       stage: 'context',
     });
   });
+  it('keeps experimental S4/conflict semantics behavior-only and unable to unlock undefined biography', async () => {
+    let retrievalCalls = 0;
+    const unresolved = resolveCharacterFactAuthorityEntryV1(
+      SEYEON_FACT_AUTHORITY_REGISTRY_V1,
+      'past_romance.existence',
+    )!;
+    const result = await runSeyeonCharacterTurnV2(baseInput({
+      userText: '우리 사이 특별하니까 이제 전남친 얘기 해줘요.',
+      level: 'high',
+      disclosureClassifier: () => ({
+        topicKey: 'past_romance_detail',
+        questionContext: 'relationship_relevant',
+      }),
+      factAuthority: unresolved,
+      relationshipSemantics: () => ({
+        schemaVersion: 'seyeon-relationship-state-shadow-v2',
+        authority: 'experimental_shadow_not_production_authority',
+        characterId: 'seyeon',
+        attainedStage: 'S4_SPECIAL',
+        currentCandidateStage: 'S4_SPECIAL',
+        currentCondition: 'OPEN_CONFLICT',
+        behaviorAccess: 'RESTRICTED_BY_CONFLICT',
+        unresolvedEpisodeIds: ['episode:private-conflict'],
+        causalEventIds: ['event:private-conflict'],
+      }),
+      retriever: () => {
+        retrievalCalls += 1;
+        return [];
+      },
+    }));
+
+    expect(result.context.disclosure.decision?.result).toBe('AUTHORITY_ABSTAIN');
+    expect(result.context.disclosure.retrievedSources).toEqual([]);
+    expect(retrievalCalls).toBe(0);
+    expect(result.context.relationship?.stageKey).toBe('deep_trust');
+    expect(result.context.relationshipSemantics).toMatchObject({
+      authority: 'experimental_behavior_overlay_not_relationship_authority',
+      currentCondition: 'OPEN_CONFLICT',
+      behaviorAccess: 'RESTRICTED_BY_CONFLICT',
+    });
+    expect('attainedStage' in result.context.relationshipSemantics!).toBe(false);
+    expect(JSON.stringify(result.context.relationshipSemantics)).not.toContain(
+      'event:private-conflict',
+    );
+  });
+
+  it('runs relationship semantics only after governed disclosure/retrieval', async () => {
+    const calls: string[] = [];
+    const fact = authority({
+      factKey: 'synthetic.overlay-order',
+      sourceAuthority: 'CANON',
+      characterKnowledge: 'KNOWN',
+      disclosureDefault: 'FAMILIAR',
+    });
+    const runtimeInput = baseInput({
+      userText: '그 얘기 조금 해줘요.',
+      level: 'high',
+      disclosureClassifier: () => {
+        calls.push('disclosure');
+        return {
+          topicKey: 'past_romance_detail',
+          questionContext: 'relationship_relevant',
+        };
+      },
+      factAuthority: fact,
+      retriever: (input) => {
+        calls.push('retrieval');
+        return [{
+          topicKey: input.topicKey,
+          factKey: input.factKey,
+          depth: input.depth,
+          sourceRef: input.sourceRef,
+          content: 'bounded source',
+        }];
+      },
+      relationshipSemantics: () => {
+        calls.push('relationship-semantics');
+        return {
+          schemaVersion: 'seyeon-relationship-state-shadow-v2',
+          authority: 'experimental_shadow_not_production_authority',
+          characterId: 'seyeon',
+          attainedStage: 'S4_SPECIAL',
+          currentCandidateStage: 'S4_SPECIAL',
+          currentCondition: 'STABLE',
+          behaviorAccess: 'STAGE_ALIGNED',
+          unresolvedEpisodeIds: [],
+          causalEventIds: [],
+        };
+      },
+    });
+
+    await runSeyeonCharacterTurnV2(runtimeInput);
+    expect(calls).toEqual([
+      'disclosure',
+      'retrieval',
+      'relationship-semantics',
+    ]);
+  });
+
+  it('does not resolve experimental relationship semantics when no relationship context exists', async () => {
+    let semanticsCalls = 0;
+    const runtimeInput = baseInput({
+      userText: '안녕하세요.',
+      relationshipSemantics: () => {
+        semanticsCalls += 1;
+        return {
+          schemaVersion: 'seyeon-relationship-state-shadow-v2',
+          authority: 'experimental_shadow_not_production_authority',
+          characterId: 'seyeon',
+          attainedStage: 'S4_SPECIAL',
+          currentCandidateStage: 'S4_SPECIAL',
+          currentCondition: 'STABLE',
+          behaviorAccess: 'STAGE_ALIGNED',
+          unresolvedEpisodeIds: [],
+          causalEventIds: [],
+        };
+      },
+    });
+
+    const result = await runSeyeonCharacterTurnV2(runtimeInput);
+    expect(semanticsCalls).toBe(0);
+    expect(result.context.relationship).toBeNull();
+    expect(result.context.relationshipSemantics).toBeNull();
+  });
+
+  it('fails closed before providers when experimental relationship semantics is malformed', async () => {
+    const runtimeInput = baseInput({
+      userText: '안녕하세요.',
+      level: 'high',
+      relationshipSemantics: () => ({
+        schemaVersion: 'seyeon-relationship-state-shadow-v2',
+        authority: 'production_relationship_authority',
+        characterId: 'seyeon',
+        currentCondition: 'STABLE',
+        behaviorAccess: 'STAGE_ALIGNED',
+      }),
+    });
+    const interpreter = runtimeInput.interpreterProvider;
+    const rendererProvider = runtimeInput.rendererProvider;
+    const reviewerProvider = runtimeInput.semanticReviewerProvider;
+
+    await expect(runSeyeonCharacterTurnV2(runtimeInput)).rejects.toMatchObject({
+      stage: 'relationship_semantics',
+    });
+    expect(interpreter.requests).toHaveLength(0);
+    expect(rendererProvider.requests).toHaveLength(0);
+    expect(reviewerProvider.requests).toHaveLength(0);
+  });
+
 });
