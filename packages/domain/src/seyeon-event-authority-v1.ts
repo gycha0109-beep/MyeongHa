@@ -111,7 +111,7 @@ const RISK_BOUND_CHARACTER_EVENTS = new Set<SeyeonExperimentalEventKindV2>([
   'SEYEON_ADMITTED_WAITING',
 ]);
 
-function unique(values: readonly string[]): readonly string[] {
+function unique<T extends string>(values: readonly T[]): readonly T[] {
   return Object.freeze(
     values.filter((value, index, all) => all.indexOf(value) === index),
   );
