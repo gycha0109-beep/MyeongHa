@@ -176,14 +176,21 @@ function assertEvidenceFitsClaim(
 
     const sourceAuthority = evidence.factAuthority?.sourceAuthority ?? null;
     if (
-      evidence.sourceKind === 'CHARACTER_BIBLE' &&
       evidence.match === 'MATCH' &&
       (sourceAuthority === 'AUTHOR_UNDEFINED' ||
-        sourceAuthority === 'INTENTIONALLY_OPEN' ||
-        sourceAuthority === 'WORLD_DEPENDENT')
+        sourceAuthority === 'INTENTIONALLY_OPEN')
     ) {
       throw new TypeError(
-        `${sourceAuthority} cannot be verified as a Character Bible fact.`,
+        `${sourceAuthority} cannot be verified as an authored Character fact.`,
+      );
+    }
+    if (
+      evidence.match === 'MATCH' &&
+      sourceAuthority === 'WORLD_DEPENDENT' &&
+      evidence.sourceKind !== 'WORLD_AUTHORITY'
+    ) {
+      throw new TypeError(
+        'WORLD_DEPENDENT fact requires the owning World authority for verification.',
       );
     }
   } else if (evidence.factAuthority !== null) {
