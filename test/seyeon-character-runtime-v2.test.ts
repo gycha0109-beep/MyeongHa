@@ -83,6 +83,47 @@ function contextInput() {
   };
 }
 
+function governance() {
+  return {
+    relationship: {
+      gate: 'FAMILIAR' as const,
+      trustBand: 'medium' as const,
+      relevantSharedHistoryRefs: [] as string[],
+    },
+    integrity: {
+      classifier: { classify: () => ({ claims: [] }) },
+      authorityResolver: {
+        resolve: () => {
+          throw new Error('No authority resolution expected for an empty claim set.');
+        },
+      },
+    },
+    disclosure: {
+      classifier: {
+        classify: () => ({
+          topicKey: null,
+          questionContext: 'casual_curiosity' as const,
+        }),
+      },
+      sourceDescriptor: {
+        readDescriptor: () => {
+          throw new Error('Non-sensitive turn must not read private source descriptor.');
+        },
+      },
+      factAuthorityResolver: {
+        resolve: () => {
+          throw new Error('Non-sensitive turn must not resolve private fact authority.');
+        },
+      },
+      retriever: {
+        retrieve: () => {
+          throw new Error('Non-sensitive turn must not retrieve private source.');
+        },
+      },
+    },
+  };
+}
+
 function validInterpretation() {
   return {
     schemaVersion: 'seyeon-turn-interpretation-v2',
@@ -154,7 +195,10 @@ describe('Se-yeon structured Character runtime v2', () => {
     );
 
     const result = await runSeyeonCharacterTurnV2({
+      userMessageRef: 'message-current',
+      userText: '지난번에 제가 A 좋아한다고 했던 거 기억나요?',
       contextInput: contextInput(),
+      governance: governance(),
       interpreterProvider: interpreter,
       rendererProvider: renderer,
       semanticReviewerProvider: reviewer,
