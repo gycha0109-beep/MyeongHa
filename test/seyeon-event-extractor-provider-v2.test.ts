@@ -25,6 +25,7 @@ function context(): SeyeonEventExtractionContextV2 {
         text: '그걸 기억하고 계셨네요.',
       },
     ],
+    priorEvents: [],
     interpretation: {
       schemaVersion: 'seyeon-turn-interpretation-v2',
       userMove: 'remembered_seyeon_detail',
@@ -114,6 +115,7 @@ describe('Se-yeon event extractor provider adapter v2', () => {
           reason: '세연의 작은 말을 사용자가 기억한 관계 사건.',
           eventKind: 'USER_REMEMBERED_SEYEON_DETAIL',
           sourceMessageRefs: ['user-1', 'assistant-1'],
+          causalPredecessorEventIds: [],
           facts: [
             {
               factKey: 'user_remembered_seyeon_detail',
@@ -154,6 +156,7 @@ describe('Se-yeon event extractor provider adapter v2', () => {
           reason: 'bad',
           eventKind: 'PROMISE_MADE',
           sourceMessageRefs: ['invented-message'],
+          causalPredecessorEventIds: [],
           facts: [
             {
               factKey: 'promise',
