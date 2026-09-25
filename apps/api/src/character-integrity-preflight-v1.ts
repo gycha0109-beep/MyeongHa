@@ -167,10 +167,14 @@ export async function runCharacterIntegrityPreflightV1(input: {
       : undefined;
 
     decisions.push(
-      evaluateCharacterIntegrityClaimV1({
-        claim,
-        evidence,
-      }),
+      evidence
+        ? evaluateCharacterIntegrityClaimV1({
+            claim,
+            evidence,
+          })
+        : evaluateCharacterIntegrityClaimV1({
+            claim,
+          }),
     );
   }
 
