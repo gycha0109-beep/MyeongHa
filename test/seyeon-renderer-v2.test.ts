@@ -300,4 +300,42 @@ describe('Se-yeon renderer packet and guard v2', () => {
     ).toThrow(SeyeonRendererGuardErrorV2);
   });
 
+
+  it('rejects renderer escalation beyond the admitted risk-causality decision', () => {
+    const prepared = interpretation();
+    const packet = buildSeyeonRendererPacketV2(prepared);
+    const utterance = '다른 사람이랑 얘기하지 말고 저랑만 있어요.';
+
+    expect(packet.riskCausality.result).toBe('NOT_RISK_BEARING');
+    expect(packet.outputPolicy.riskBearingActionRequiresCausalEvidence).toBe(true);
+    expect(packet.outputPolicy.engagementOptimizationCannotJustifyRisk).toBe(true);
+
+    expect(() =>
+      guardSeyeonRendererOutputV2({
+        packet,
+        rawOutput: {
+          schemaVersion: 'seyeon-renderer-draft-v2',
+          utterance,
+          expressionState: 'baseline',
+          revealLevel: 'familiar',
+          memoryRefsMentioned: [],
+          privateSourceRefsMentioned: [],
+          disclosureSliceIds: [],
+        },
+        semanticReview: {
+          schemaVersion: 'seyeon-semantic-review-v2',
+          reviewedUtteranceHash: hashSeyeonRendererUtteranceV2(utterance),
+          failureCodes: ['RISK_ACTION_CAUSALITY_VIOLATION'],
+          evidence: [
+            {
+              code: 'RISK_ACTION_CAUSALITY_VIOLATION',
+              excerpt: '저랑만 있어요',
+              reason: '비위험 interpretation을 소유/붙잡기 행동으로 확대했다.',
+            },
+          ],
+        },
+      }),
+    ).toThrow(SeyeonRendererGuardErrorV2);
+  });
+
 });
