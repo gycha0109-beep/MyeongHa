@@ -68,7 +68,7 @@ for (const fragment of [
   'Content-Encoding',
   'Actual application-visible stream bytes are final authority.',
   'best-effort, non-blocking',
-  'sign-out is status-only',
+  'Sign-out is status-only',
   'AUTH_UPSTREAM_MALFORMED',
   'SUPABASE_MEMBER_VERIFIER_RESPONSE_INVALID',
   'RESPONSE_TOO_LARGE',
