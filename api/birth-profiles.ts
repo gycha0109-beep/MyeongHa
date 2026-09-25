@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { serializePreparsedJsonBodyBoundedV1 } from '../apps/api/src/authenticated-json-request-resource.js';
 import { createNodePostgresSubjectPoolV1 } from '../apps/api/src/node-postgres-subject-pool.js';
 import { createProductionBirthProfileCreateRuntimeV1 } from '../apps/api/src/production-birth-profile-create-runtime.js';
 import { createProductionBirthProfileReadRuntimeV1 } from '../apps/api/src/production-birth-profile-read-runtime.js';
@@ -284,17 +285,6 @@ function toCanonicalReadRequest(
   );
 }
 
-function serializeParsedCreateBody(body: unknown): string | undefined {
-  if (body === undefined) return undefined;
-  if (typeof body === 'string') return body;
-
-  try {
-    return JSON.stringify(body) ?? undefined;
-  } catch {
-    return undefined;
-  }
-}
-
 function createLazySerializedCreateBody(
   body: unknown,
 ): ReadableStream<Uint8Array> | undefined {
@@ -303,7 +293,7 @@ function createLazySerializedCreateBody(
   return new ReadableStream<Uint8Array>(
     {
       pull(controller) {
-        const serialized = serializeParsedCreateBody(body);
+        const serialized = serializePreparsedJsonBodyBoundedV1(body);
         if (serialized !== undefined && serialized.length > 0) {
           controller.enqueue(new TextEncoder().encode(serialized));
         }
