@@ -27,7 +27,8 @@ const contracts = [
       'MYEONGHA_WATCHTOWER_TRACK: ${{ inputs.watchtower_track }}',
       'MYEONGHA_AUTHENTICATED_JSON_RESOURCE_CONFIRM: ${{ inputs.confirmation }}',
       '[[ "$GITHUB_REF" == \'refs/heads/main\' ]]',
-      'MYEONGHA_PRODUCTION_BIRTH_SMOKE_MEMBER_BEARER: ${{ secrets.MYEONGHA_PRODUCTION_BIRTH_SMOKE_MEMBER_BEARER }}',
+      'MYEONGHA_PRODUCTION_MEMBER_EMAIL: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_EMAIL }}',
+      'MYEONGHA_PRODUCTION_MEMBER_PASSWORD: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_PASSWORD }}',
     ],
   },
   {

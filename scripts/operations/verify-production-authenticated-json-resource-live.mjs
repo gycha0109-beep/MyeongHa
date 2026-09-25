@@ -1,3 +1,5 @@
+import { acquireProductionMemberSmokeSession } from '../production-member-smoke-session.mjs';
+
 const PRODUCTION_ORIGIN = 'https://myeongha.vercel.app';
 const BIRTH_URL = `${PRODUCTION_ORIGIN}/api/birth-profiles`;
 const CHAT_URL = `${PRODUCTION_ORIGIN}/api/chat`;
@@ -86,7 +88,7 @@ async function probe(label, url, body, bearer) {
 }
 
 requireAuthority();
-const bearer = requireEnv('MYEONGHA_PRODUCTION_BIRTH_SMOKE_MEMBER_BEARER');
+const { accessToken: bearer } = await acquireProductionMemberSmokeSession();
 
 const birthBody = JSON.stringify({
   label: 'resource-canary',
