@@ -314,6 +314,26 @@ describe('Se-yeon risk-bearing action causality v1', () => {
     expect(result.result).toBe('ADMIT');
   });
 
+
+  it('rejects vulnerable self-disclosure below the authored deep-trust reveal boundary', () => {
+    const ctx = context();
+    const turn = interpretation(ctx, {
+      immediateWant: 'disclose_desire',
+      tension: 'approach_vs_self_disclosure',
+      action: 'self_disclose',
+      expression: 'vulnerable',
+      reveal: 'familiar',
+      supportingHistoryRefs: [],
+    });
+
+    expect(() =>
+      guardSeyeonRiskBearingActionCausalityV1({
+        context: ctx,
+        interpretation: turn,
+      }),
+    ).toThrow(/deep_trust reveal/);
+  });
+
   it('leaves ordinary actions alone without requiring relationship or history causality', () => {
     const ctx = context({
       relationship: null,
