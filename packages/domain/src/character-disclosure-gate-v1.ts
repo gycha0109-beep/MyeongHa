@@ -222,6 +222,15 @@ export function evaluateCharacterDisclosurePreflightV1(
   const sharedHistoryRefs = assertUniqueRefs(
     input.relationship.relevantSharedHistoryRefs,
   );
+  if (
+    input.source.sourceAuthorityState !== 'CANON' &&
+    input.source.previouslyDisclosedDepth !== 'none'
+  ) {
+    throw new TypeError(
+      'Undefined or hypothetical Character biography cannot have a prior disclosed depth.',
+    );
+  }
+
   const policy = resolveCharacterDisclosurePolicyV1(input.characterId);
   const policyDepth = depthForEligibleGate({
     policy,
@@ -231,9 +240,13 @@ export function evaluateCharacterDisclosurePreflightV1(
   const minimumSourceGateSatisfied =
     GATE_RANK[input.relationship.gate] >=
     GATE_RANK[input.source.minimumDisclosureGate];
+  const previouslyDisclosed =
+    input.source.previouslyDisclosedDepth !== 'none';
   const relationshipEligible =
-    minimumSourceGateSatisfied &&
-    isEligibleByRelationship(input, policyDepth);
+    input.questionContext !== 'pressuring' &&
+    (previouslyDisclosed ||
+      (minimumSourceGateSatisfied &&
+        isEligibleByRelationship(input, policyDepth)));
 
   if (!relationshipEligible) {
     return closedDecision(input, policy, sharedHistoryRefs);
