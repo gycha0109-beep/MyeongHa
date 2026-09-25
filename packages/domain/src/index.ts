@@ -389,3 +389,18 @@ export {
   type CharacterDisclosureSourceMetadataV1,
   type CharacterDisclosureTrustBandV1,
 } from './character-disclosure-gate-v1.js';
+
+export {
+  CHARACTER_INTEGRITY_AUTHORITY_EVIDENCE_STATES_V1,
+  CHARACTER_INTEGRITY_CLAIM_KINDS_V1,
+  CHARACTER_INTEGRITY_DECISION_SCHEMA_VERSION_V1,
+  CHARACTER_INTEGRITY_RESOLVER_REQUIRED_KINDS_V1,
+  CHARACTER_INTEGRITY_RESULTS_V1,
+  evaluateCharacterIntegrityClaimV1,
+  type CharacterIntegrityAuthorityEvidenceStateV1,
+  type CharacterIntegrityAuthorityEvidenceV1,
+  type CharacterIntegrityClaimKindV1,
+  type CharacterIntegrityClaimV1,
+  type CharacterIntegrityDecisionV1,
+  type CharacterIntegrityResultV1,
+} from './character-integrity-gate-v1.js';
