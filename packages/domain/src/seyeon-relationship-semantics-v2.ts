@@ -525,6 +525,12 @@ export function creditSeyeonRelationshipEpisodesV2(
   });
 }
 
+function episodeActivityTimestamp(
+  episode: SeyeonRelationshipEvidenceEpisodeV2,
+): number {
+  return Date.parse(episode.resolvedAt ?? episode.openedAt);
+}
+
 export function projectSeyeonRelationshipStateShadowV2(input: {
   readonly previousAttainedStage?: SeyeonRelationshipStageShadowV2;
   readonly currentCandidateStage: SeyeonRelationshipStageShadowV2;
@@ -546,7 +552,7 @@ export function projectSeyeonRelationshipStateShadowV2(input: {
     .slice()
     .sort(
       (left, right) =>
-        Date.parse(left.openedAt) - Date.parse(right.openedAt),
+        episodeActivityTimestamp(left) - episodeActivityTimestamp(right),
     )
     .at(-1);
 
@@ -554,7 +560,7 @@ export function projectSeyeonRelationshipStateShadowV2(input: {
     .slice()
     .sort(
       (left, right) =>
-        Date.parse(left.openedAt) - Date.parse(right.openedAt),
+        episodeActivityTimestamp(left) - episodeActivityTimestamp(right),
     )
     .at(-1);
   const repairStillCurrent =
@@ -630,7 +636,7 @@ export function summarizeSeyeonRelationshipEpisodeProfileV2(
   const recentEpisodeIds = [...episodes]
     .sort(
       (left, right) =>
-        Date.parse(right.openedAt) - Date.parse(left.openedAt),
+        episodeActivityTimestamp(right) - episodeActivityTimestamp(left),
     )
     .slice(0, recentLimit)
     .map((episode) => episode.episodeId);
