@@ -349,3 +349,22 @@ That contract does **not** close SRC-22. It maps the experimental Se-yeon Event/
 - revision-0 baseline / stage replay semantics.
 
 Until those items and the existing SRC-22 policy gaps are source-approved, Se-yeon V2 is explicitly guarded as `experimental_non_production` and must fail closed if bound as a production relationship ledger.
+
+---
+
+## 12. Decision package ready
+
+The source-resolution packet is now:
+
+`docs/source-authority-gaps/SRC-22_RELATIONSHIP_POLICY_DECISION_PACKAGE_V1.md`
+
+It separates:
+
+- source-fixed relationship invariants;
+- Candidate B1 calibration evidence;
+- unresolved production policy decisions;
+- proposed ERD extensions required by the long-term causal Event target.
+
+Candidate B1 also closes a calibration blind spot from the first Candidate-B fixture: a five-events/week neighboring route could otherwise satisfy the S4 evidence count in eight weeks. The revised test-only candidate requires evidence across at least ten distinct positive weeks for S4, while still requiring score, evidence-family, and milestone gates.
+
+This does **not** close SRC-22. The current owner/disposition remains in force until the decision package is explicitly accepted or replaced.
