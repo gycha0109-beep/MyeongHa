@@ -9,7 +9,7 @@ export interface UpstreamJsonResponseReadableV1 {
   readonly headers: Readonly<{
     get(name: string): string | null;
   }>;
-  readonly body: ReadableStream<Uint8Array> | null;
+  readonly body?: ReadableStream<Uint8Array> | null;
 }
 
 export interface ReadBoundedUpstreamJsonTextOptionsV1 {
@@ -98,7 +98,7 @@ export async function readBoundedUpstreamJsonTextV1(
   options: ReadBoundedUpstreamJsonTextOptionsV1,
 ): Promise<string> {
   const maximumBodyBytes = requireMaximumBodyBytes(options.maximumBodyBytes);
-  const body = response.body;
+  const body = response.body ?? null;
   if (body === null) return '';
 
   if (contentLengthExceedsLimit(response, maximumBodyBytes)) {
