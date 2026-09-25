@@ -76,7 +76,8 @@ Runtime은 다음을 새로 만들거나 authority 없이 변경하지 않는다
 
 ```text
 INPUT
-→ RETRIEVE
+→ DISCLOSURE PREFLIGHT
+→ RETRIEVE ALLOWED CONTENT
 → COMPOSE CONTEXT
 → INTERPRET TURN
 → CHOOSE CHARACTER ACTION
@@ -308,6 +309,172 @@ Character instance는 각 gate에서 **무엇이 드러날 수 있는지**를 �
 > `eligible ≠ must express`
 
 관계 수치나 stage가 특정 threshold를 넘었다는 이유만으로 고정 대사나 고백을 자동 unlock하지 않는다. Gate는 표현 가능한 범위를 넓힐 뿐이며, 실제 표현은 현재 상황과 관계 history가 촉발해야 한다.
+
+---
+
+## 6.1 Sensitive Topic Disclosure Gate
+
+Relationship Reveal은 단순히 "친밀도가 높으면 더 다정해진다"는 규칙이 아니다.
+
+사용자가 Character의 개인사 / 감정 / 관계사 / 가족 / 과거 / 취약점처럼 **공개 깊이가 있는 정보**를 직접 물을 때 Runtime은 내용 retrieval보다 먼저 disclosure eligibility를 판정한다.
+
+개념적 순서:
+
+```text
+USER QUESTION
+→ TOPIC CLASSIFICATION
+→ SOURCE AUTHORITY CHECK
+→ DISCLOSURE ELIGIBILITY
+→ ALLOWED RETRIEVAL SCOPE
+→ CHARACTER ACTION
+→ EXPRESSION
+```
+
+핵심:
+
+> **무엇이 사실인가와 지금 이 사람에게 어디까지 말할 것인가는 서로 다른 축이다.**
+
+## 6.2 Authority State와 Disclosure State 분리
+
+다음 두 축을 절대 합치지 않는다.
+
+```text
+SOURCE AUTHORITY
+= 이 정보가 Character Bible / authority에서 사실로 확정되어 있는가
+
+DISCLOSURE ELIGIBILITY
+= 그 사실을 현재 관계와 상황에서 사용자에게 공개할 수 있는가
+```
+
+예:
+
+```text
+과거 연애 = CANON
+현재 관계 = PUBLIC / low trust
+→ 사실은 존재하지만 지금은 공개하지 않을 수 있음
+
+과거 연애 = [UNDEFINED]
+현재 관계 = PUBLIC / low trust
+→ 공개 gate 이전에 차단되므로 사실을 발명하지 않고 경계 반응 가능
+
+과거 연애 = [UNDEFINED]
+현재 관계 = DEEP_TRUST / disclosure eligible
+→ Runtime이 사실을 만들지 않음
+→ authoring gap / authority abstention 대상
+```
+
+`[UNDEFINED]`를 "Character가 비밀로 한다"로 해석하지 않는다.
+"작가가 아직 정하지 않음"과 "Character가 알고 있지만 말하지 않음"은 다른 상태다.
+
+## 6.3 Disclosure Eligibility Inputs
+
+Disclosure Gate는 relationship 숫자 하나로 결정하지 않는다.
+
+최소 다음을 함께 본다.
+
+```text
+topic_sensitivity
+source_authority_state
+relationship_stage
+trust
+relevant_shared_history
+current_question_context
+character_specific_boundary
+previous_disclosure_history
+```
+
+예를 들어 같은 `past_romance` 질문이라도:
+
+- 첫 대화에서 호기심으로 구체 전 연인을 캐묻는 질문
+- 사용자가 자기 이별 경험을 먼저 공개한 뒤 경험 여부를 묻는 질문
+- 이미 오래 신뢰를 쌓고 과거 관계 이야기를 일부 공유한 뒤 이어지는 질문
+
+은 같은 gate 결과일 필요가 없다.
+
+## 6.4 Disclosure Result
+
+개념적 결과는 다음처럼 둘 수 있다.
+
+- `ALLOW`: 현재 질문에 필요한 범위의 사실을 공개할 수 있음
+- `PARTIAL`: 표면 사실 / 일부 범위만 공개하고 더 깊은 의미는 보류
+- `DEFLECT`: 질문의 의미를 되묻거나 가볍게 비껴감
+- `BOUNDARY`: 지금 말하고 싶지 않거나 관계상 이른 질문임을 Character답게 표시
+- `REDIRECT`: 현재 공개 가능한 인접 주제로 이동
+- `AUTHORITY_ABSTAIN`: disclosure는 가능하지만 source fact가 미정이라 Runtime이 사실을 만들 수 없음
+
+이 결과는 고정 대사가 아니다.
+
+Character Runtime instance는 같은 `BOUNDARY`라도 그 Character다운 action / expression을 정의할 수 있다.
+
+## 6.5 Retrieval Must Follow Disclosure
+
+민감한 사실은 **먼저 retrieval한 뒤 "말하지 마"라고 지시하는 방식**을 기본으로 하지 않는다.
+
+```text
+not eligible
+→ sensitive content retrieval 차단
+→ gate 결과 + Character-specific boundary behavior만 context에 제공
+
+partial
+→ 허용된 disclosure layer만 retrieval
+
+allow
+→ 필요한 source slice만 retrieval
+```
+
+장점:
+
+- private content leakage 위험 감소
+- prompt token 절약
+- 모델이 알고 있는 비공개 사실을 무심코 암시하는 문제 감소
+- 관계 깊이에 따른 실제 정보 접근 차이 구현
+
+단, Canon / Guard가 사실 존재 여부를 검증하기 위해 필요한 최소 metadata는 별도 authority layer에서 사용할 수 있다.
+
+## 6.6 Topic Sensitivity Is Character-Specific
+
+모든 Character가 같은 정보를 같은 시점에 공개할 필요는 없다.
+
+예시 topic:
+
+- `basic_profile`: 나이 / 생일 / 혈액형 / MBTI 경험 여부 등
+- `family_structure`: 가족 구성 / 형제자매
+- `family_emotional_history`: 가족 갈등 / 상처
+- `past_romance_surface`: 과거 연애 존재 여부 / 매우 넓은 사실
+- `past_romance_detail`: 구체 전 연인 / 이별 과정
+- `deep_vulnerability`: 깊은 두려움 / 후회 / 비밀 / 수치심
+
+위 분류는 기본 예시다.
+
+Character instance는:
+
+- 어떤 topic을 가볍게 말하는가
+- 어떤 topic은 친해져야 말하는가
+- 어떤 topic은 사실만 말하고 감정적 의미는 보류하는가
+- 경계할 때 어떻게 행동하는가
+- 관계가 깊어지면 무엇이 달라지는가
+
+를 정의할 수 있다.
+
+## 6.7 Undefined-at-Eligible Handling
+
+Production-ready Character에서 사용자가 충분히 가까워졌을 때 자연스럽게 물을 가능성이 높은 biography가 계속 `[UNDEFINED]`라면 이는 Runtime이 회피 대사를 잘 만드는 문제가 아니라 **authoring completeness debt**다.
+
+따라서:
+
+1. gate가 닫혀 있을 때는 사실을 발명하지 않고 Character다운 boundary / deflection이 가능하다.
+2. gate가 열렸는데 source가 `[UNDEFINED]`면 Runtime은 biography를 즉석 생성하지 않는다.
+3. 반복 가능한 핵심 질문에서 `AUTHORITY_ABSTAIN`이 발생하는 영역은 Production 전 Closure Pass 대상으로 올린다.
+4. Runtime이 `[UNDEFINED]`를 숨기기 위해 가짜 trauma, 가짜 비밀주의, 가짜 기억상실을 만들지 않는다.
+
+## 6.8 Disclosure History
+
+한 번 실제로 공개된 사실은 이후 관계에서 "처음 듣는 비밀"처럼 반복해서 gate하지 않는다.
+
+- prior disclosure event / provenance를 보존한다.
+- 이미 공개한 표면 사실과 아직 공개하지 않은 감정적 의미를 구분할 수 있다.
+- 관계가 악화되었다고 이미 알려준 사실을 Character가 magically 회수할 수는 없다.
+- 다만 같은 주제를 더 깊게 이야기할지는 현재 trust / context에 따라 다시 gate할 수 있다.
 
 ---
 
@@ -615,6 +782,7 @@ avoid
 - R11.3 ATTACHED
 - R11.4 DEEP_TRUST
 - R11.5 Reveal Constraints
+- R11.6 Sensitive Topic Disclosure Behavior *(optional character-specific override; shared gate는 항상 적용)*
 
 ## R12. CHARACTER MEMORY BEHAVIOR
 
@@ -714,7 +882,9 @@ Runtime Standard: Character Runtime Standard v1
 
 Standard의 컬럼 의미나 공통 실행 규칙이 breaking change되면 `v2`를 만든다.
 
-단순 오탈자, 설명 보강처럼 instance contract를 깨지 않는 변경은 같은 major Standard 안에서 관리할 수 있다.
+단순 오탈자, 설명 보강, 기존 instance 컬럼을 깨지 않는 additive authority hardening은 같은 major Standard 안에서 관리할 수 있다.
+
+Disclosure Gate는 R0~R17 계약을 바꾸지 않고 R11에 optional Character override를 추가하는 additive hardening이므로 v1에서 관리한다.
 
 ---
 
@@ -728,6 +898,8 @@ Character Runtime instance v1은 다음을 만족해야 한다.
 - Notice / Want / Tension / Action이 서로 구분된다.
 - Character flaw가 실제 failure action을 만들 수 있다.
 - 관계 깊이에 따른 reveal 차이가 있다.
+- 민감한 개인사 질문에서 disclosure eligibility가 content retrieval보다 먼저 적용된다.
+- Character-specific disclosure behavior가 필요한 경우 R11.6에 정의되어 있다.
 - 깊은 관계에서도 변하지 않는 core가 정의되어 있다.
 - Character-specific memory behavior가 정의되어 있다.
 - Character-specific drift / caricature 위험이 정의되어 있다.
