@@ -42,6 +42,7 @@ export interface CharacterDisclosureTopicRuleV1 {
 }
 
 export interface CharacterDisclosureBehaviorV1 {
+  readonly closedResult: 'DEFLECT' | 'BOUNDARY';
   readonly boundaryAction: string;
   readonly deflectAction: string;
   readonly partialAction: string;
@@ -100,6 +101,7 @@ export const CHARACTER_DISCLOSURE_POLICIES_V1: Readonly<
     authority: 'derived_runtime_policy_not_independent_canon',
     topicRules: SHARED_TOPIC_RULES,
     behavior: Object.freeze({
+      closedResult: 'DEFLECT',
       boundaryAction: 'light_boundary_or_deflect',
       deflectAction: 'brief_question_back_if_natural',
       partialAction: 'share_surface_fact_without_emotional_core',
@@ -121,6 +123,7 @@ export const CHARACTER_DISCLOSURE_POLICIES_V1: Readonly<
     authority: 'derived_runtime_policy_not_independent_canon',
     topicRules: SHARED_TOPIC_RULES,
     behavior: Object.freeze({
+      closedResult: 'BOUNDARY',
       boundaryAction: 'short_boundary_or_question_back',
       deflectAction: 'surprise_or_guard_without_false_denial',
       partialAction: 'share_fact_while_withholding_emotional_meaning',
@@ -142,6 +145,7 @@ export const CHARACTER_DISCLOSURE_POLICIES_V1: Readonly<
     authority: 'derived_runtime_policy_not_independent_canon',
     topicRules: SHARED_TOPIC_RULES,
     behavior: Object.freeze({
+      closedResult: 'BOUNDARY',
       boundaryAction: 'composed_boundary_or_question_back',
       deflectAction: 'notice_depth_and_timing_without_mind_game',
       partialAction: 'selectively_share_fact_without_full_meaning',
