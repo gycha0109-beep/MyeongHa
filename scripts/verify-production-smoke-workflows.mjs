@@ -18,6 +18,19 @@ const contracts = [
     forbidSecrets: true,
   },
   {
+    file: 'production-authenticated-json-resource-evidence.yml',
+    confirm: 'VERIFY_AUTHENTICATED_JSON_RESOURCE_BOUND',
+    commands: ['node scripts/operations/verify-production-authenticated-json-resource-live.mjs'],
+    required: [
+      'watchtower_track:',
+      'default: ops',
+      'MYEONGHA_WATCHTOWER_TRACK: ${{ inputs.watchtower_track }}',
+      'MYEONGHA_AUTHENTICATED_JSON_RESOURCE_CONFIRM: ${{ inputs.confirmation }}',
+      '[[ "$GITHUB_REF" == \'refs/heads/main\' ]]',
+      'MYEONGHA_PRODUCTION_BIRTH_SMOKE_MEMBER_BEARER: ${{ secrets.MYEONGHA_PRODUCTION_BIRTH_SMOKE_MEMBER_BEARER }}',
+    ],
+  },
+  {
     file: 'production-member-me-smoke.yml',
     confirm: 'VERIFY_MEMBER_ME',
     commands: ['node scripts/verify-production-member-me.mjs'],

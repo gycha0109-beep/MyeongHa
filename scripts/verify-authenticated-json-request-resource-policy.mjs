@@ -4,10 +4,45 @@ const policyPath = 'config/operations/authenticated-json-request-resource-policy
 const docsPath = 'docs/operations/AUTHENTICATED_JSON_REQUEST_RESOURCE_POLICY_V1.md';
 const apiContractPath = 'docs/API_CONTRACT.md';
 
-const [policyRaw, docs, apiContract] = await Promise.all([
+const runtimePath = 'apps/api/src/authenticated-json-request-resource.ts';
+const birthHttpPath = 'apps/api/src/birth-profile-create-http.ts';
+const birthCommandPath = 'apps/api/src/birth-profile-create-command.ts';
+const chatBodyPath = 'apps/api/src/chat-open-request-body.ts';
+const chatHttpPath = 'apps/api/src/chat-open-http.ts';
+const readingHttpPath = 'apps/api/src/reading-create-http.ts';
+const readingCommandPath = 'apps/api/src/reading-create-command.ts';
+const birthAdapterPath = 'api/birth-profiles.ts';
+const productionWorkflowPath = '.github/workflows/production-authenticated-json-resource-evidence.yml';
+const productionVerifierPath = 'scripts/operations/verify-production-authenticated-json-resource-live.mjs';
+
+const [
+  policyRaw,
+  docs,
+  apiContract,
+  runtime,
+  birthHttp,
+  birthCommand,
+  chatBody,
+  chatHttp,
+  readingHttp,
+  readingCommand,
+  birthAdapter,
+  productionWorkflow,
+  productionVerifier,
+] = await Promise.all([
   readFile(policyPath, 'utf8'),
   readFile(docsPath, 'utf8'),
   readFile(apiContractPath, 'utf8'),
+  readFile(runtimePath, 'utf8'),
+  readFile(birthHttpPath, 'utf8'),
+  readFile(birthCommandPath, 'utf8'),
+  readFile(chatBodyPath, 'utf8'),
+  readFile(chatHttpPath, 'utf8'),
+  readFile(readingHttpPath, 'utf8'),
+  readFile(readingCommandPath, 'utf8'),
+  readFile(birthAdapterPath, 'utf8'),
+  readFile(productionWorkflowPath, 'utf8'),
+  readFile(productionVerifierPath, 'utf8'),
 ]);
 
 const policy = JSON.parse(policyRaw);
@@ -102,6 +137,104 @@ for (const fragment of [
   'Content-Length is an early-rejection hint only',
 ]) {
   requireFragment(apiContractPath, apiContract, fragment);
+}
+
+
+for (const fragment of [
+  'AUTHENTICATED_JSON_REQUEST_MAXIMUM_BODY_BYTES_V1 = 16_384',
+  'BIRTH_PROFILE_LABEL_MAXIMUM_UTF8_BYTES_V1 = 512',
+  'READING_IDEMPOTENCY_KEY_MAXIMUM_UTF8_BYTES_V1 = 128',
+  'READING_SOURCE_BIRTH_PROFILE_ID_MAXIMUM_UTF8_BYTES_V1 = 128',
+  'AuthenticatedJsonRequestBodyTooLargeV1',
+  'totalBytes = addBounded(',
+  'reader.releaseLock()',
+  'serializePreparsedJsonBodyBoundedV1',
+  'measureJsonUtf8BytesBoundedV1(',
+]) {
+  requireFragment(runtimePath, runtime, fragment);
+}
+
+for (const [name, source] of [
+  [birthHttpPath, birthHttp],
+  [readingHttpPath, readingHttp],
+]) {
+  requireFragment(name, source, 'readAuthenticatedJsonRequestBodyV1(input.request)');
+  requireFragment(name, source, "status: 413");
+  requireFragment(name, source, "code: 'REQUEST_TOO_LARGE'");
+  if (source.includes('input.request.json()')) {
+    throw new Error(`${name} regressed to unbounded Request.json() body consumption.`);
+  }
+}
+
+for (const fragment of [
+  'readAuthenticatedJsonRequestBodyV1(request',
+  'deadline.waitFor(pending)',
+]) {
+  requireFragment(chatBodyPath, chatBody, fragment);
+}
+for (const fragment of [
+  'AuthenticatedJsonRequestBodyTooLargeV1',
+  "status: 413",
+  "code: 'REQUEST_TOO_LARGE'",
+]) {
+  requireFragment(chatHttpPath, chatHttp, fragment);
+}
+for (const fragment of [
+  'BIRTH_PROFILE_LABEL_MAXIMUM_UTF8_BYTES_V1',
+  'utf8ByteLengthV1(label)',
+]) {
+  requireFragment(birthCommandPath, birthCommand, fragment);
+}
+for (const fragment of [
+  'READING_IDEMPOTENCY_KEY_MAXIMUM_UTF8_BYTES_V1',
+  'READING_SOURCE_BIRTH_PROFILE_ID_MAXIMUM_UTF8_BYTES_V1',
+  'utf8ByteLengthV1(value)',
+]) {
+  requireFragment(readingCommandPath, readingCommand, fragment);
+}
+for (const fragment of [
+  'serializePreparsedJsonBodyBoundedV1',
+  'createLazySerializedCreateBody',
+  "headers.delete('content-length')",
+]) {
+  requireFragment(birthAdapterPath, birthAdapter, fragment);
+}
+if (birthAdapter.includes('JSON.stringify(body)')) {
+  throw new Error(`${birthAdapterPath} regressed to unbounded direct parsed-body serialization.`);
+}
+
+for (const fragment of [
+  'workflow_dispatch:',
+  'watchtower_track:',
+  'default: ops',
+  'environment: production',
+  'MYEONGHA_PRODUCTION_BIRTH_SMOKE_MEMBER_BEARER',
+  'node scripts/operations/verify-production-authenticated-json-resource-live.mjs',
+]) {
+  requireFragment(productionWorkflowPath, productionWorkflow, fragment);
+}
+for (const fragment of [
+  "GITHUB_REF !== 'refs/heads/main'",
+  "GITHUB_EVENT_NAME !== 'workflow_dispatch'",
+  "'x'.repeat(17_000)",
+  "response.status !== 413",
+  "payload.error.code !== 'REQUEST_TOO_LARGE'",
+  "authenticated_json_resource_evidence=pass",
+  "request_body_logged=false",
+  "credential_logged=false",
+]) {
+  requireFragment(productionVerifierPath, productionVerifier, fragment);
+}
+for (const forbidden of [
+  'console.log(bearer',
+  'console.log(birthBody',
+  'console.log(chatBody',
+  'access_token',
+  'refresh_token',
+]) {
+  if (productionVerifier.includes(forbidden)) {
+    throw new Error(`${productionVerifierPath} contains forbidden evidence material: ${forbidden}`);
+  }
 }
 
 console.log(

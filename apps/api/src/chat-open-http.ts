@@ -1,4 +1,5 @@
 import { ApiCommandError } from './api-error.js';
+import { AuthenticatedJsonRequestBodyTooLargeV1 } from './authenticated-json-request-resource.js';
 import { readChatOpenJsonRequestBodyV1 } from './chat-open-request-body.js';
 import type { IdentityEvidenceVerificationPortV1 } from './current-subject-profile-http.js';
 import { IngressRequestBodyCompletionDeadlineExceededV1 } from './ingress-request-body-deadline.js';
@@ -302,6 +303,15 @@ export async function handleChatOpenRequestV1(
   try {
     body = await readChatOpenJsonRequestBodyV1(input.request);
   } catch (error) {
+    if (error instanceof AuthenticatedJsonRequestBodyTooLargeV1) {
+      return jsonError({
+        status: 413,
+        code: 'REQUEST_TOO_LARGE',
+        messageKey: 'request.too_large',
+        retryable: false,
+        requestId,
+      });
+    }
     if (error instanceof IngressRequestBodyCompletionDeadlineExceededV1) {
       return jsonError({
         status: 408,

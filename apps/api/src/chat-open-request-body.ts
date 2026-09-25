@@ -1,41 +1,20 @@
+import { readAuthenticatedJsonRequestBodyV1 } from './authenticated-json-request-resource.js';
 import { createIngressRequestBodyCompletionDeadlineLeaseV1 } from './ingress-request-body-deadline.js';
 
 /**
- * Reads one Chat-open JSON body under the governed absolute V1 ingress
- * completion deadline.
+ * Reads one Chat-open JSON body under both the governed absolute V1 ingress
+ * completion deadline and the authenticated structured-JSON byte ceiling.
  *
  * The caller must establish identity authority before invoking this helper.
- * This helper intentionally does not add a byte ceiling; request resource
- * ceilings remain governed separately by #699.
  */
 export async function readChatOpenJsonRequestBodyV1(request: Request): Promise<unknown> {
-  if (request.body === null) {
-    return request.json();
-  }
-
-  const reader = request.body.getReader();
-  const decoder = new TextDecoder();
   const deadline = createIngressRequestBodyCompletionDeadlineLeaseV1();
-  const parts: string[] = [];
 
   try {
-    while (true) {
-      const chunk = await deadline.waitFor(reader.read());
-      if (chunk.done) break;
-      parts.push(decoder.decode(chunk.value, { stream: true }));
-    }
-    parts.push(decoder.decode());
-    return JSON.parse(parts.join('')) as unknown;
+    return await readAuthenticatedJsonRequestBodyV1(request, {
+      waitForRead: (pending) => deadline.waitFor(pending),
+    });
   } finally {
     deadline.release();
-    try {
-      void reader.cancel().catch(() => undefined);
-    } catch {
-    } finally {
-      try {
-        reader.releaseLock();
-      } catch {
-      }
-    }
   }
 }

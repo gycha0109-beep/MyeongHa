@@ -139,4 +139,24 @@ describe('Chat open ingress request-body completion bound', () => {
     expect(request.body?.locked).toBe(false);
     expect(connect).not.toHaveBeenCalled();
   });
+
+  it('rejects an authenticated body above 16 KiB before PostgreSQL work', async () => {
+    const request = textPost(JSON.stringify({ characterId: 'x'.repeat(17_000) }));
+    const connect = vi.fn(async () => {
+      throw new Error('must not connect');
+    });
+
+    const response = await invoke({ request, connect });
+    const payload = await response.json() as any;
+
+    expect(response.status).toBe(413);
+    expect(payload.error).toEqual({
+      code: 'REQUEST_TOO_LARGE',
+      messageKey: 'request.too_large',
+      retryable: false,
+    });
+    expect(request.body?.locked).toBe(false);
+    expect(connect).not.toHaveBeenCalled();
+  });
+
 });

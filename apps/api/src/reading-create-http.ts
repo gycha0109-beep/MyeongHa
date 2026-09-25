@@ -1,5 +1,9 @@
 import { ApiCommandError } from './api-error.js';
 import {
+  AuthenticatedJsonRequestBodyTooLargeV1,
+  readAuthenticatedJsonRequestBodyV1,
+} from './authenticated-json-request-resource.js';
+import {
   createDirectReading,
   type ReadingCreateIdPortV1,
 } from './reading-create-command.js';
@@ -140,8 +144,17 @@ export async function handleReadingCreateRequestV1(
 
   let requestBody: unknown;
   try {
-    requestBody = await input.request.json();
-  } catch {
+    requestBody = await readAuthenticatedJsonRequestBodyV1(input.request);
+  } catch (error) {
+    if (error instanceof AuthenticatedJsonRequestBodyTooLargeV1) {
+      return jsonError({
+        status: 413,
+        code: 'REQUEST_TOO_LARGE',
+        messageKey: 'request.too_large',
+        retryable: false,
+        requestId,
+      });
+    }
     return jsonError({
       status: 400,
       code: 'INVALID_REQUEST',

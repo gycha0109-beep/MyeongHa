@@ -1,0 +1,55 @@
+name: "[WT:ops] Production Authenticated JSON Resource Evidence"
+run-name: "[WT:ops] Production Authenticated JSON Resource Evidence"
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Type VERIFY_AUTHENTICATED_JSON_RESOURCE_BOUND to verify Production 413 enforcement.'
+        required: true
+        type: string
+      watchtower_track:
+        description: 'Watchtower track authority.'
+        required: true
+        default: ops
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-authenticated-json-resource-evidence
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: verify-production-authenticated-json-resource
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    environment: production
+    env:
+      MYEONGHA_AUTHENTICATED_JSON_RESOURCE_CONFIRM: ${{ inputs.confirmation }}
+      MYEONGHA_WATCHTOWER_TRACK: ${{ inputs.watchtower_track }}
+      MYEONGHA_PRODUCTION_BIRTH_SMOKE_MEMBER_BEARER: ${{ secrets.MYEONGHA_PRODUCTION_BIRTH_SMOKE_MEMBER_BEARER }}
+    steps:
+      - name: Verify dispatch authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$MYEONGHA_AUTHENTICATED_JSON_RESOURCE_CONFIRM" == 'VERIFY_AUTHENTICATED_JSON_RESOURCE_BOUND' ]]
+          [[ "$MYEONGHA_WATCHTOWER_TRACK" == 'ops' ]]
+          [[ "$GITHUB_EVENT_NAME" == 'workflow_dispatch' ]]
+          [[ "$GITHUB_REF" == 'refs/heads/main' ]]
+          test -n "${MYEONGHA_PRODUCTION_BIRTH_SMOKE_MEMBER_BEARER:-}"
+
+      - name: Check out exact repository verifier
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      - name: Verify live Production request resource rejection
+        run: node scripts/operations/verify-production-authenticated-json-resource-live.mjs

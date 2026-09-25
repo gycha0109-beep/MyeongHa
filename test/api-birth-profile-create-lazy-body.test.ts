@@ -1,6 +1,7 @@
 import { EventEmitter } from 'node:events';
 import { describe, expect, it } from 'vitest';
 import { createBirthProfilesVercelHandlerV1 } from '../api/birth-profiles.js';
+import { AuthenticatedJsonRequestBodyTooLargeV1 } from '../apps/api/src/authenticated-json-request-resource.js';
 
 type Endpoint = ReturnType<typeof createBirthProfilesVercelHandlerV1>;
 type EndpointRequest = Parameters<Endpoint>[0];
@@ -209,6 +210,68 @@ describe('POST /api/birth-profiles lazy parsed-body serialization', () => {
     expect(canonicalContentLength).toBeNull();
     expect(canonicalTransferEncoding).toBeNull();
   });
+
+  it('bounds secondary serialization after the downstream runtime elects to consume the body', async () => {
+    let serializationCalls = 0;
+    const parsedBody = {
+      toJSON() {
+        serializationCalls += 1;
+        return {
+          label: '가'.repeat(6_000),
+          input: {
+            calendarType: 'solar',
+            birthDate: '1990-01-02',
+            birthTime: '08:30:00',
+            timeKnown: true,
+            isLeapMonth: false,
+            sex: 'female',
+          },
+        };
+      },
+    };
+
+    const endpoint = createBirthProfilesVercelHandlerV1({
+      getReadRuntime: failIfReadRuntimeConstructed,
+      getCreateRuntime() {
+        return {
+          async handleRequest(input) {
+            await expect(input.request.text()).rejects.toBeInstanceOf(
+              AuthenticatedJsonRequestBodyTooLargeV1,
+            );
+            return Response.json(
+              {
+                ok: false,
+                error: {
+                  code: 'REQUEST_TOO_LARGE',
+                  messageKey: 'request.too_large',
+                  retryable: false,
+                },
+              },
+              {
+                status: 413,
+                headers: { 'Cache-Control': 'no-store' },
+              },
+            );
+          },
+        };
+      },
+    });
+
+    const response = await invokeEndpoint(endpoint, {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer opaque-test-evidence',
+        'content-type': 'application/json',
+      },
+      query: {},
+      url: '/api/birth-profiles',
+      body: parsedBody,
+    });
+
+    expect(response.status).toBe(413);
+    expect(serializationCalls).toBe(1);
+  });
+
 });
 
 describe('Birth Profile Vercel response streaming', () => {
