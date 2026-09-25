@@ -172,14 +172,19 @@ function integrityForCandidate(
   );
 }
 
-function verifiedSharedEventClaims(
+function verifiedAuthoritativeClaims(
+  eventKind: SeyeonExperimentalEventKindV2,
   decisions: readonly CharacterIntegrityDecisionV1[],
 ): readonly CharacterIntegrityDecisionV1[] {
+  const allowedKinds =
+    eventKind === 'USER_REMEMBERED_SEYEON_DETAIL'
+      ? new Set(['CHARACTER_FACT_CLAIM'])
+      : new Set(['SHARED_EVENT_CLAIM']);
   return Object.freeze(
     decisions.filter(
       (decision) =>
         decision.result === 'VERIFIED' &&
-        decision.claim.kind === 'SHARED_EVENT_CLAIM' &&
+        allowedKinds.has(decision.claim.kind) &&
         decision.mayEnterWorkingContextAsFact,
     ),
   );
@@ -234,7 +239,10 @@ function baseDecision(input: {
   readonly guardedCharacterOutputRef: string | null;
   readonly relevantIntegrity: readonly CharacterIntegrityDecisionV1[];
 }): SeyeonEventAuthorityDecisionV1 {
-  const verified = verifiedSharedEventClaims(input.relevantIntegrity);
+  const verified = verifiedAuthoritativeClaims(
+    input.candidate.eventKind,
+    input.relevantIntegrity,
+  );
   const serverObservationRefs = unique(
     input.evidence.serverObservationRefs ?? [],
   );
@@ -290,7 +298,10 @@ export function validateSeyeonEventAuthorityV1(input: {
     input.candidate,
     input.evidence.integrityDecisions,
   );
-  const verifiedClaims = verifiedSharedEventClaims(relevantIntegrity);
+  const verifiedClaims = verifiedAuthoritativeClaims(
+    input.candidate.eventKind,
+    relevantIntegrity,
+  );
   const guardedCharacterOutputRef = currentAssistantMessageRef(input.context);
   const candidateRefs = new Set(input.candidate.sourceMessageRefs);
   const serverObservationRefs = unique(
