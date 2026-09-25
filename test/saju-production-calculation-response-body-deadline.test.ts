@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { SajuBirthRevisionBindingV1 } from '../packages/domain/src/index.js';
 import {
   SajuProductionCalculationHttpAdapterErrorV1,
@@ -17,19 +17,17 @@ const BIRTH_REVISION = {
   sex: 'unspecified',
 } as const satisfies SajuBirthRevisionBindingV1;
 
+const encoder = new TextEncoder();
+
 function response(
   status: number,
   contentType: string,
-  text: () => Promise<string>,
+  body: ReadableStream<Uint8Array> | null,
 ): SajuProductionCalculationHttpResponseV1 {
   return {
     status,
-    headers: {
-      get(name) {
-        return name.toLowerCase() === 'content-type' ? contentType : null;
-      },
-    },
-    text,
+    headers: new Headers({ 'Content-Type': contentType }),
+    body,
   };
 }
 
@@ -46,102 +44,59 @@ async function settledError(
 
 describe('Saju production calculation response body deadline', () => {
   it('keeps the configured deadline active after headers arrive and maps a non-closing body to TIMEOUT', async () => {
-    vi.useFakeTimers();
-    try {
-      let signal: AbortSignal | undefined;
-      let bodyStarted = false;
-      const fetchImpl: SajuProductionCalculationHttpFetchV1 = async (_url, init) => {
-        signal = init.signal;
-        return response(200, 'application/json', () => {
-          bodyStarted = true;
-          return new Promise<string>((_resolve, reject) => {
-            if (init.signal.aborted) {
-              reject(new DOMException('Aborted', 'AbortError'));
-              return;
-            }
+    let signal: AbortSignal | undefined;
+    let bodyStarted = false;
+    const fetchImpl: SajuProductionCalculationHttpFetchV1 = async (_url, init) => {
+      signal = init.signal;
+      return response(
+        200,
+        'application/json',
+        new ReadableStream<Uint8Array>({
+          start(controller) {
+            bodyStarted = true;
             init.signal.addEventListener(
               'abort',
-              () => reject(new DOMException('Aborted', 'AbortError')),
+              () => controller.error(new DOMException('Aborted', 'AbortError')),
               { once: true },
             );
-          });
-        });
-      };
-      const adapter = createSajuProductionCalculationHttpAdapterV1({
-        baseUrl: 'https://saju.example',
-        bearerToken: 'deadline-test-secret',
-        timeoutMs: 25,
-        fetchImpl,
-      });
-
-      const result = adapter.calculate(BIRTH_REVISION).then(
-        () => null,
-        (error: unknown) => error,
+          },
+        }, { highWaterMark: 0 }),
       );
-      await vi.advanceTimersByTimeAsync(0);
-      expect(bodyStarted).toBe(true);
-      expect(signal?.aborted).toBe(false);
+    };
+    const adapter = createSajuProductionCalculationHttpAdapterV1({
+      baseUrl: 'https://saju.example',
+      bearerToken: 'deadline-test-secret',
+      timeoutMs: 25,
+      fetchImpl,
+    });
 
-      await vi.advanceTimersByTimeAsync(24);
-      expect(signal?.aborted).toBe(false);
-      await vi.advanceTimersByTimeAsync(1);
+    const error = await settledError(adapter.calculate(BIRTH_REVISION));
 
-      const error = await result;
-      expect(error).toBeInstanceOf(SajuProductionCalculationHttpAdapterErrorV1);
-      expect((error as SajuProductionCalculationHttpAdapterErrorV1).code).toBe('TIMEOUT');
-      expect(signal?.aborted).toBe(true);
-    } finally {
-      vi.useRealTimers();
-    }
+    expect(bodyStarted).toBe(true);
+    expect(signal?.aborted).toBe(true);
+    expect(error.code).toBe('TIMEOUT');
   });
 
   it('releases the deadline on status and content-type rejection without consuming the body', async () => {
-    vi.useFakeTimers();
-    try {
-      for (const testCase of [
-        { status: 400, contentType: 'application/json', code: 'HTTP_4XX' as const },
-        { status: 200, contentType: 'text/plain', code: 'INVALID_CONTENT_TYPE' as const },
-      ]) {
-        let signal: AbortSignal | undefined;
-        let bodyReads = 0;
-        const fetchImpl: SajuProductionCalculationHttpFetchV1 = async (_url, init) => {
-          signal = init.signal;
-          return response(testCase.status, testCase.contentType, async () => {
-            bodyReads += 1;
-            return '{}';
-          });
-        };
-        const adapter = createSajuProductionCalculationHttpAdapterV1({
-          baseUrl: 'https://saju.example',
-          bearerToken: 'deadline-test-secret',
-          timeoutMs: 25,
-          fetchImpl,
-        });
-
-        const error = await settledError(adapter.calculate(BIRTH_REVISION));
-        expect(error.code).toBe(testCase.code);
-        expect(bodyReads).toBe(0);
-        expect(signal?.aborted).toBe(false);
-
-        await vi.advanceTimersByTimeAsync(100);
-        expect(signal?.aborted).toBe(false);
-      }
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it('releases the deadline after a completed response body read', async () => {
-    vi.useFakeTimers();
-    try {
+    for (const testCase of [
+      { status: 400, contentType: 'application/json', code: 'HTTP_4XX' as const },
+      { status: 200, contentType: 'text/plain', code: 'INVALID_CONTENT_TYPE' as const },
+    ]) {
       let signal: AbortSignal | undefined;
-      let bodyReads = 0;
+      let bodyPulls = 0;
       const fetchImpl: SajuProductionCalculationHttpFetchV1 = async (_url, init) => {
         signal = init.signal;
-        return response(200, 'application/json; charset=utf-8', async () => {
-          bodyReads += 1;
-          return '{broken-json';
-        });
+        return response(
+          testCase.status,
+          testCase.contentType,
+          new ReadableStream<Uint8Array>({
+            pull(controller) {
+              bodyPulls += 1;
+              controller.enqueue(encoder.encode('{}'));
+              controller.close();
+            },
+          }, { highWaterMark: 0 }),
+        );
       };
       const adapter = createSajuProductionCalculationHttpAdapterV1({
         baseUrl: 'https://saju.example',
@@ -151,14 +106,45 @@ describe('Saju production calculation response body deadline', () => {
       });
 
       const error = await settledError(adapter.calculate(BIRTH_REVISION));
-      expect(error.code).toBe('INVALID_JSON');
-      expect(bodyReads).toBe(1);
+      expect(error.code).toBe(testCase.code);
+      expect(bodyPulls).toBe(0);
       expect(signal?.aborted).toBe(false);
 
-      await vi.advanceTimersByTimeAsync(100);
+      await new Promise((resolve) => setTimeout(resolve, 40));
       expect(signal?.aborted).toBe(false);
-    } finally {
-      vi.useRealTimers();
     }
+  });
+
+  it('releases the deadline after a completed response body read', async () => {
+    let signal: AbortSignal | undefined;
+    let bodyPulls = 0;
+    const fetchImpl: SajuProductionCalculationHttpFetchV1 = async (_url, init) => {
+      signal = init.signal;
+      return response(
+        200,
+        'application/json; charset=utf-8',
+        new ReadableStream<Uint8Array>({
+          pull(controller) {
+            bodyPulls += 1;
+            controller.enqueue(encoder.encode('{broken-json'));
+            controller.close();
+          },
+        }, { highWaterMark: 0 }),
+      );
+    };
+    const adapter = createSajuProductionCalculationHttpAdapterV1({
+      baseUrl: 'https://saju.example',
+      bearerToken: 'deadline-test-secret',
+      timeoutMs: 25,
+      fetchImpl,
+    });
+
+    const error = await settledError(adapter.calculate(BIRTH_REVISION));
+    expect(error.code).toBe('INVALID_JSON');
+    expect(bodyPulls).toBe(1);
+    expect(signal?.aborted).toBe(false);
+
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    expect(signal?.aborted).toBe(false);
   });
 });
