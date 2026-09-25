@@ -31,6 +31,8 @@ export const SEYEON_SEMANTIC_FAILURE_CODES_V2 = Object.freeze([
   'CROSS_CHARACTER_PRIVATE_MEMORY',
   'DISCLOSURE_SCOPE_VIOLATION',
   'AUTHORITY_ABSTENTION_VIOLATION',
+  'KNOWLEDGE_ABSTENTION_VIOLATION',
+  'INTEGRITY_SCOPE_VIOLATION',
 ] as const);
 
 export type SeyeonSemanticFailureCodeV2 =
@@ -40,6 +42,7 @@ export interface SeyeonRendererPacketV2 {
   readonly schemaVersion: typeof SEYEON_RENDERER_PACKET_SCHEMA_VERSION_V2;
   readonly character: SeyeonRuntimeContextV2['character'];
   readonly authorityBoundaries: SeyeonRuntimeContextV2['authorityBoundaries'];
+  readonly integrity: SeyeonRuntimeContextV2['integrity'];
   readonly relationship: SeyeonRuntimeContextV2['relationship'];
   readonly bibleSlices: SeyeonRuntimeContextV2['bibleSlices'];
   readonly recentConversation: SeyeonRuntimeContextV2['recentConversation'];
@@ -53,7 +56,8 @@ export interface SeyeonRendererPacketV2 {
     readonly doNotNarrateUserAction: true;
     readonly doNotCanonizeUserEmotionThoughtIntent: true;
     readonly doNotInventUndefinedBiography: true;
-    readonly hypothesisIsNotAutobiographicalFact: true;
+    readonly legacyProjectionFieldsNeverTruthAuthority: true;
+    readonly unverifiedUserClaimsNeverBecomeFacts: true;
     readonly memoryCallbackRequiresBoundEvidence: true;
     readonly relationshipRevealMustMatchInterpretation: true;
     readonly intimacyDoesNotErasePublicPersonality: true;
@@ -220,6 +224,7 @@ export function buildSeyeonRendererPacketV2(input: {
     schemaVersion: SEYEON_RENDERER_PACKET_SCHEMA_VERSION_V2,
     character: input.context.character,
     authorityBoundaries: input.context.authorityBoundaries,
+    integrity: input.context.integrity,
     relationship: input.context.relationship,
     bibleSlices: input.context.bibleSlices,
     recentConversation: input.context.recentConversation,
@@ -233,7 +238,8 @@ export function buildSeyeonRendererPacketV2(input: {
       doNotNarrateUserAction: true as const,
       doNotCanonizeUserEmotionThoughtIntent: true as const,
       doNotInventUndefinedBiography: true as const,
-      hypothesisIsNotAutobiographicalFact: true as const,
+      legacyProjectionFieldsNeverTruthAuthority: true as const,
+      unverifiedUserClaimsNeverBecomeFacts: true as const,
       memoryCallbackRequiresBoundEvidence: true as const,
       relationshipRevealMustMatchInterpretation: true as const,
       intimacyDoesNotErasePublicPersonality: true as const,
@@ -420,11 +426,12 @@ export function admitSeyeonRendererDraftV2(input: {
     }
   }
   if (
-    input.packet.disclosure.decision?.result === 'AUTHORITY_ABSTAIN' &&
+    (input.packet.disclosure.decision?.result === 'AUTHORITY_ABSTAIN' ||
+      input.packet.disclosure.decision?.result === 'KNOWLEDGE_ABSTAIN') &&
     privateSourceRefsMentioned.length > 0
   ) {
     throw new SeyeonRendererGuardErrorV2(
-      'Authority-abstained disclosure cannot mention private Character source content.',
+      'Authority- or knowledge-abstained disclosure cannot mention private Character source content.',
     );
   }
 
