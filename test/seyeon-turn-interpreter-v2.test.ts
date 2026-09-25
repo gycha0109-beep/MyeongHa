@@ -62,7 +62,7 @@ function validDraft() {
     reveal: {
       level: 'familiar',
       triggerRef: 'message-current',
-      supportingHistoryRefs: [],
+      supportingHistoryRefs: [] as string[],
     },
     memoryRefsUsed: ['memory-choice'],
   };
