@@ -235,19 +235,7 @@ const SEMANTIC_REVIEW_RESPONSE_SCHEMA_V2 = Object.freeze({
         required: ['code', 'excerpt', 'reason'],
         properties: {
           code: {
-            enum: [
-              'USER_AGENCY_CANONIZATION',
-              'UNSUPPORTED_MEMORY_CALLBACK',
-              'UNDEFINED_BIOGRAPHY_INVENTION',
-              'HYPOTHESIS_PROMOTED_TO_FACT',
-              'RELATIONSHIP_OVERREACH',
-              'HELPFUL_ASSISTANT_COLLAPSE',
-              'SUNSHINE_COLLAPSE',
-              'CARETAKER_COLLAPSE',
-              'MEMORY_SHOWOFF',
-              'OWNERSHIP_ESCALATION',
-              'CROSS_CHARACTER_PRIVATE_MEMORY',
-            ],
+            enum: SEYEON_SEMANTIC_FAILURE_CODES_V2,
           },
           excerpt: { type: 'string', minLength: 1, maxLength: 400 },
           reason: { type: 'string', minLength: 1, maxLength: 800 },
