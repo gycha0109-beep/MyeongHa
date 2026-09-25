@@ -262,8 +262,17 @@ for (const file of ['audit_metadata.txt', 'SHA256SUMS']) {
   }
 }
 
-if (!dataApiAuditScript.includes('postgrest_config.json')) {
-  throw new Error('Production Data API read-audit is missing sanitized postgrest_config.json.');
+if (dataApiAuditScript.includes('postgrest_config.json')) {
+  throw new Error('Production Data API read-audit must not materialize Management API PostgREST configuration.');
+}
+for (const fragment of [
+  'data_api_config_authority=production_data_api_surface_containment_workflow',
+  'data_api_config_management_read=not_performed',
+  'data_api_surface_metadata_captured=database_acl_only',
+]) {
+  if (!dataApiAuditScript.includes(fragment)) {
+    throw new Error(`Production Data API read-audit is missing PAT-free authority evidence: ${fragment}`);
+  }
 }
 
-console.log('MyeongHa production platform-integrity catalog + Data API surface read-audit contract verification passed.');
+console.log('MyeongHa production platform-integrity catalog + PAT-free database ACL read-audit contract verification passed.');
