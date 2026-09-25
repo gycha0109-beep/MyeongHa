@@ -344,11 +344,10 @@ export function guardSeyeonSemanticReviewV2(input: {
   });
 }
 
-export function guardSeyeonRendererOutputV2(input: {
+export function admitSeyeonRendererDraftV2(input: {
   readonly rawOutput: unknown;
   readonly packet: SeyeonRendererPacketV2;
-  readonly semanticReview: unknown;
-}): SeyeonDialogueEnvelopeV2 {
+}): SeyeonRendererDraftV2 {
   if (!isRecord(input.rawOutput)) {
     throw new SeyeonRendererGuardErrorV2('Se-yeon renderer output must be an object.');
   }
@@ -411,7 +410,30 @@ export function guardSeyeonRendererOutputV2(input: {
     );
   }
 
+  return Object.freeze({
+    schemaVersion: SEYEON_RENDERER_DRAFT_SCHEMA_VERSION_V2,
+    utterance,
+    expressionState: input.packet.interpretation.expressionState,
+    revealLevel: input.packet.interpretation.reveal.level,
+    memoryRefsMentioned,
+    disclosureSliceIds,
+  });
+}
+
+export function guardSeyeonRendererOutputV2(input: {
+  readonly rawOutput: unknown;
+  readonly packet: SeyeonRendererPacketV2;
+  readonly semanticReview: unknown;
+}): SeyeonDialogueEnvelopeV2 {
+  const draft = admitSeyeonRendererDraftV2({
+    rawOutput: input.rawOutput,
+    packet: input.packet,
+  });
+
   const semanticReview = guardSeyeonSemanticReviewV2({
+    rawOutput: input.semanticReview,
+    utterance: draft.utterance,
+  });
     rawOutput: input.semanticReview,
     utterance,
   });
@@ -425,11 +447,11 @@ export function guardSeyeonRendererOutputV2(input: {
 
   return Object.freeze({
     schemaVersion: 'seyeon-dialogue-envelope-v2' as const,
-    utterance,
-    expressionState: input.packet.interpretation.expressionState,
-    revealLevel: input.packet.interpretation.reveal.level,
-    memoryRefsMentioned,
-    disclosureSliceIds,
+    utterance: draft.utterance,
+    expressionState: draft.expressionState,
+    revealLevel: draft.revealLevel,
+    memoryRefsMentioned: draft.memoryRefsMentioned,
+    disclosureSliceIds: draft.disclosureSliceIds,
     interpretationSchemaVersion: input.packet.interpretation.schemaVersion,
     semanticReviewHash: expectedHash,
   });
