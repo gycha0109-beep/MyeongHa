@@ -92,6 +92,7 @@ export class SeyeonEventAuthorityErrorV1 extends Error {
 const VERIFIED_OUTCOME_EVENTS = new Set<SeyeonExperimentalEventKindV2>([
   'PROMISE_KEPT',
   'PROMISE_BROKEN',
+  'USER_REMEMBERED_SEYEON_DETAIL',
 ]);
 
 const SERVER_OBSERVED_EVENTS = new Set<SeyeonExperimentalEventKindV2>([
