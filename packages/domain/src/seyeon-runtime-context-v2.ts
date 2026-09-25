@@ -1,5 +1,10 @@
 import type { RelationshipStateBand } from '../../character-content/src/schema.js';
 import {
+  guardCharacterDisclosureRetrievalV1,
+  type CharacterDisclosureDecisionV1,
+  type CharacterDisclosureRetrievedSourceV1,
+} from './character-disclosure-gate-v1.js';
+import {
   SEYEON_AUTHORED_PROJECTION_V2,
   SEYEON_BIBLE_SLICE_IDS_V2,
   type SeyeonBibleSliceIdV2,
@@ -79,10 +84,15 @@ export interface SeyeonRuntimeContextV2 {
   }>[];
   readonly recentConversation: readonly SeyeonRecentMessageV2[];
   readonly retrievedMemories: readonly SeyeonRetrievedMemoryV2[];
+  readonly disclosure: Readonly<{
+    readonly decision: CharacterDisclosureDecisionV1 | null;
+    readonly retrievedSources: readonly CharacterDisclosureRetrievedSourceV1[];
+  }>;
   readonly retrievalPolicy: Readonly<{
     readonly callbackRequiresSourceRef: true;
     readonly factAndInterpretationRemainDistinct: true;
     readonly anotherCharacterPrivateHistoryForbidden: true;
+    readonly privateCharacterContentRequiresDisclosureDecision: true;
   }>;
   readonly actionPolicy: Readonly<{
     readonly allowedActionKeys: readonly string[];
@@ -94,6 +104,10 @@ export interface AssembleSeyeonRuntimeContextV2Input {
   readonly relationship: SeyeonRelationshipContextV2 | null;
   readonly recentMessages: readonly SeyeonRecentMessageV2[];
   readonly retrievedMemories: readonly SeyeonRetrievedMemoryV2[];
+  readonly disclosure: Readonly<{
+    readonly decision: CharacterDisclosureDecisionV1 | null;
+    readonly retrievedSources: readonly CharacterDisclosureRetrievedSourceV1[];
+  }>;
   readonly focuses?: readonly SeyeonContextFocusKeyV2[];
   readonly additionalBibleSliceIds?: readonly SeyeonBibleSliceIdV2[];
   readonly maxRecentMessages?: number;
@@ -278,6 +292,28 @@ export function assembleSeyeonRuntimeContextV2(
       .slice(0, maxRetrievedMemories),
   );
 
+  if (
+    input.disclosure.decision !== null &&
+    input.disclosure.decision.characterId !== 'seyeon'
+  ) {
+    throw new TypeError('Se-yeon runtime context requires a Se-yeon disclosure decision.');
+  }
+  if (
+    input.disclosure.decision === null &&
+    input.disclosure.retrievedSources.length > 0
+  ) {
+    throw new TypeError(
+      'Private Character content cannot be supplied without a disclosure decision.',
+    );
+  }
+  const disclosureSources =
+    input.disclosure.decision === null
+      ? Object.freeze([] as CharacterDisclosureRetrievedSourceV1[])
+      : guardCharacterDisclosureRetrievalV1({
+          decision: input.disclosure.decision,
+          retrievedSources: input.disclosure.retrievedSources,
+        });
+
   const sliceIds = resolveSeyeonBibleSliceSelectionV2({
     ...(input.focuses === undefined ? {} : { focuses: input.focuses }),
     ...(input.additionalBibleSliceIds === undefined
@@ -309,10 +345,15 @@ export function assembleSeyeonRuntimeContextV2(
     bibleSlices,
     recentConversation,
     retrievedMemories,
+    disclosure: Object.freeze({
+      decision: input.disclosure.decision,
+      retrievedSources: disclosureSources,
+    }),
     retrievalPolicy: Object.freeze({
       callbackRequiresSourceRef: true as const,
       factAndInterpretationRemainDistinct: true as const,
       anotherCharacterPrivateHistoryForbidden: true as const,
+      privateCharacterContentRequiresDisclosureDecision: true as const,
     }),
     actionPolicy: Object.freeze({
       allowedActionKeys: SEYEON_AUTHORED_PROJECTION_V2.actionKeys,

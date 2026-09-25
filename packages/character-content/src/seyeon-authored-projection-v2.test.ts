@@ -21,7 +21,7 @@ describe('Se-yeon authored projection v2', () => {
       '03ec32f43e56c2efbca75461c24a19a4690f683e',
     );
     expect(SEYEON_AUTHORED_PROJECTION_V2.source.runtime.gitBlobSha).toBe(
-      'cd3f4256d981ec7476522b35474785207cd5d34a',
+      '931607ce12ec5c77e064c740b1ce14cb2344c51c',
     );
   });
 
@@ -76,6 +76,9 @@ describe('Se-yeon authored projection v2', () => {
     );
     expect(SEYEON_AUTHORED_PROJECTION_V2.bibleSlices.R13_drift_risks.invariants).toContain(
       'Brightness does not convert every emotion into positivity.',
+    );
+    expect(SEYEON_AUTHORED_PROJECTION_V2.bibleSlices.R11_relationship_reveal.invariants).toContain(
+      'Sensitive personal questions require disclosure eligibility before private content retrieval.',
     );
     expect(SEYEON_AUTHORED_PROJECTION_V2.bibleSlices.R14_guards.invariants).toContain(
       'Undefined biography must not be invented.',

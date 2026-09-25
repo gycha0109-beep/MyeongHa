@@ -373,3 +373,19 @@ export {
   type SeyeonRelationshipStageShadowV2,
   type SeyeonRelationshipStateShadowV2,
 } from './seyeon-relationship-semantics-v2.js';
+
+export {
+  CHARACTER_DISCLOSURE_DECISION_SCHEMA_VERSION_V1,
+  CHARACTER_DISCLOSURE_RESULTS_V1,
+  evaluateCharacterDisclosurePreflightV1,
+  guardCharacterDisclosureRetrievalV1,
+  type CharacterDisclosureDecisionV1,
+  type CharacterDisclosurePreflightInputV1,
+  type CharacterDisclosureQuestionContextV1,
+  type CharacterDisclosureRelationshipEvidenceV1,
+  type CharacterDisclosureResultV1,
+  type CharacterDisclosureRetrievedSourceV1,
+  type CharacterDisclosureSourceAuthorityStateV1,
+  type CharacterDisclosureSourceMetadataV1,
+  type CharacterDisclosureTrustBandV1,
+} from './character-disclosure-gate-v1.js';

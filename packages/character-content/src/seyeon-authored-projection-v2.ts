@@ -10,7 +10,7 @@ export const SEYEON_AUTHORED_PROJECTION_SOURCE_V2 = Object.freeze({
   runtime: Object.freeze({
     path: 'docs/character/SEYEON_CHARACTER_RUNTIME_DRAFT_V0_1.md',
     declaredVersion: 'v0.1',
-    gitBlobSha: 'cd3f4256d981ec7476522b35474785207cd5d34a',
+    gitBlobSha: '931607ce12ec5c77e064c740b1ce14cb2344c51c',
     authorityState: 'draft_not_production_authority',
   }),
 });
@@ -317,11 +317,13 @@ export const SEYEON_BIBLE_SLICES_V2: Readonly<
   }),
   R11_relationship_reveal: Object.freeze({
     id: 'R11_relationship_reveal',
-    sourceSections: Object.freeze(['R11']),
+    sourceSections: Object.freeze(['R11', 'R11.6']),
     runtimePurpose: 'Bound what may surface at public, familiar, attached, and deep-trust depths.',
     invariants: Object.freeze([
       'A single relationship number never auto-unlocks a reveal.',
       'A scene trigger and supporting history are required for deep reveal.',
+      'Sensitive personal questions require disclosure eligibility before private content retrieval.',
+      'Undefined biography that becomes disclosure-eligible is an authority gap, not a secret to invent.',
     ]),
   }),
   R12_memory_behavior: Object.freeze({

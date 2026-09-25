@@ -20,6 +20,7 @@ describe('Se-yeon runtime context v2', () => {
         { messageId: 'm1', role: 'user', text: 'A랑 B 중 아직도 못 정했어요.' },
         { messageId: 'm2', role: 'assistant', text: '지난번에는 A 쪽을 더 보셨죠.' },
       ],
+      disclosure: { decision: null, retrievedSources: [] },
       retrievedMemories: [
         {
           memoryId: 'memory-1',
@@ -49,12 +50,14 @@ describe('Se-yeon runtime context v2', () => {
     );
     expect(context.retrievedMemories[0]?.sourceRef).toBe('turn:184/message:901');
     expect(context.retrievalPolicy.callbackRequiresSourceRef).toBe(true);
+    expect(context.retrievalPolicy.privateCharacterContentRequiresDisclosureDecision).toBe(true);
   });
 
   it('keeps fact and Character interpretation distinct instead of flattening both into memory truth', () => {
     const context = assembleSeyeonRuntimeContextV2({
       relationship: null,
       recentMessages: [],
+      disclosure: { decision: null, retrievedSources: [] },
       retrievedMemories: [
         {
           memoryId: 'fact-1',
@@ -104,6 +107,7 @@ describe('Se-yeon runtime context v2', () => {
     const context = assembleSeyeonRuntimeContextV2({
       relationship: null,
       recentMessages,
+      disclosure: { decision: null, retrievedSources: [] },
       retrievedMemories,
     });
 
@@ -138,6 +142,7 @@ describe('Se-yeon runtime context v2', () => {
       assembleSeyeonRuntimeContextV2({
         relationship: null,
         recentMessages: [],
+        disclosure: { decision: null, retrievedSources: [] },
         retrievedMemories: [
           {
             memoryId: 'memory-1',

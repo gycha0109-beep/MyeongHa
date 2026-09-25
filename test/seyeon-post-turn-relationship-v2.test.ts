@@ -94,6 +94,7 @@ function turn() {
       expressionState: 'baseline' as const,
       revealLevel: 'familiar' as const,
       memoryRefsMentioned: [],
+      privateSourceRefsMentioned: [],
       disclosureSliceIds: [],
       interpretationSchemaVersion: 'seyeon-turn-interpretation-v2' as const,
       semanticReviewHash: 'sha256:v1:test',

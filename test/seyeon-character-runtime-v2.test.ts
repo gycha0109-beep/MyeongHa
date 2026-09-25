@@ -58,6 +58,7 @@ function contextInput() {
         text: '지난번에 제가 A 좋아한다고 했던 거 기억나요?',
       },
     ],
+    disclosure: { decision: null, retrievedSources: [] },
     retrievedMemories: [
       {
         memoryId: 'memory-a',
@@ -119,6 +120,7 @@ function validRendererDraft() {
     expressionState: 'baseline',
     revealLevel: 'familiar',
     memoryRefsMentioned: ['memory-a'],
+    privateSourceRefsMentioned: [],
     disclosureSliceIds: [],
   };
 }

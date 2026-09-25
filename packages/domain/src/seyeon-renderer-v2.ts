@@ -29,6 +29,8 @@ export const SEYEON_SEMANTIC_FAILURE_CODES_V2 = Object.freeze([
   'MEMORY_SHOWOFF',
   'OWNERSHIP_ESCALATION',
   'CROSS_CHARACTER_PRIVATE_MEMORY',
+  'DISCLOSURE_SCOPE_VIOLATION',
+  'AUTHORITY_ABSTENTION_VIOLATION',
 ] as const);
 
 export type SeyeonSemanticFailureCodeV2 =
@@ -41,6 +43,7 @@ export interface SeyeonRendererPacketV2 {
   readonly relationship: SeyeonRuntimeContextV2['relationship'];
   readonly bibleSlices: SeyeonRuntimeContextV2['bibleSlices'];
   readonly recentConversation: SeyeonRuntimeContextV2['recentConversation'];
+  readonly disclosure: SeyeonRuntimeContextV2['disclosure'];
   readonly memoryEvidence: readonly SeyeonRetrievedMemoryV2[];
   readonly interpretation: SeyeonTurnInterpretationV2;
   readonly outputPolicy: Readonly<{
@@ -54,6 +57,7 @@ export interface SeyeonRendererPacketV2 {
     readonly memoryCallbackRequiresBoundEvidence: true;
     readonly relationshipRevealMustMatchInterpretation: true;
     readonly intimacyDoesNotErasePublicPersonality: true;
+    readonly privateCharacterContentMustMatchDisclosureDecision: true;
   }>;
 }
 
@@ -63,6 +67,7 @@ export interface SeyeonRendererDraftV2 {
   readonly expressionState: SeyeonTurnInterpretationV2['expressionState'];
   readonly revealLevel: SeyeonRevealLevelV2;
   readonly memoryRefsMentioned: readonly string[];
+  readonly privateSourceRefsMentioned: readonly string[];
   readonly disclosureSliceIds: readonly SeyeonBibleSliceIdV2[];
 }
 
@@ -83,6 +88,7 @@ export interface SeyeonDialogueEnvelopeV2 {
   readonly expressionState: SeyeonTurnInterpretationV2['expressionState'];
   readonly revealLevel: SeyeonRevealLevelV2;
   readonly memoryRefsMentioned: readonly string[];
+  readonly privateSourceRefsMentioned: readonly string[];
   readonly disclosureSliceIds: readonly SeyeonBibleSliceIdV2[];
   readonly interpretationSchemaVersion: SeyeonTurnInterpretationV2['schemaVersion'];
   readonly semanticReviewHash: string;
@@ -217,6 +223,7 @@ export function buildSeyeonRendererPacketV2(input: {
     relationship: input.context.relationship,
     bibleSlices: input.context.bibleSlices,
     recentConversation: input.context.recentConversation,
+    disclosure: input.context.disclosure,
     memoryEvidence,
     interpretation: input.interpretation,
     outputPolicy: Object.freeze({
@@ -230,6 +237,7 @@ export function buildSeyeonRendererPacketV2(input: {
       memoryCallbackRequiresBoundEvidence: true as const,
       relationshipRevealMustMatchInterpretation: true as const,
       intimacyDoesNotErasePublicPersonality: true as const,
+      privateCharacterContentMustMatchDisclosureDecision: true as const,
     }),
   });
 }
@@ -361,6 +369,7 @@ export function admitSeyeonRendererDraftV2(input: {
       'expressionState',
       'revealLevel',
       'memoryRefsMentioned',
+      'privateSourceRefsMentioned',
       'disclosureSliceIds',
     ],
     'rendererOutput',
@@ -395,6 +404,30 @@ export function admitSeyeonRendererDraftV2(input: {
     }
   }
 
+  const privateSourceRefsMentioned = parseUniqueStringArray(
+    input.rawOutput.privateSourceRefsMentioned,
+    'privateSourceRefsMentioned',
+    8,
+  );
+  const allowedPrivateSourceRefs = new Set(
+    input.packet.disclosure.retrievedSources.map((source) => source.sourceRef),
+  );
+  for (const sourceRef of privateSourceRefsMentioned) {
+    if (!allowedPrivateSourceRefs.has(sourceRef)) {
+      throw new SeyeonRendererGuardErrorV2(
+        `Renderer mentioned private Character source outside disclosure scope: ${sourceRef}`,
+      );
+    }
+  }
+  if (
+    input.packet.disclosure.decision?.result === 'AUTHORITY_ABSTAIN' &&
+    privateSourceRefsMentioned.length > 0
+  ) {
+    throw new SeyeonRendererGuardErrorV2(
+      'Authority-abstained disclosure cannot mention private Character source content.',
+    );
+  }
+
   const allowedSliceIds = new Set(
     input.packet.bibleSlices.map((slice) => slice.id),
   );
@@ -418,6 +451,7 @@ export function admitSeyeonRendererDraftV2(input: {
     expressionState: input.packet.interpretation.expressionState,
     revealLevel: input.packet.interpretation.reveal.level,
     memoryRefsMentioned,
+    privateSourceRefsMentioned,
     disclosureSliceIds,
   });
 }
@@ -450,6 +484,7 @@ export function guardSeyeonRendererOutputV2(input: {
     expressionState: draft.expressionState,
     revealLevel: draft.revealLevel,
     memoryRefsMentioned: draft.memoryRefsMentioned,
+    privateSourceRefsMentioned: draft.privateSourceRefsMentioned,
     disclosureSliceIds: draft.disclosureSliceIds,
     interpretationSchemaVersion: input.packet.interpretation.schemaVersion,
     semanticReviewHash: expectedHash,
