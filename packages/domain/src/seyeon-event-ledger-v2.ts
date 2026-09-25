@@ -471,6 +471,7 @@ export function reduceSeyeonRelationshipProjectionV2(
 }
 
 export class InMemorySeyeonEventLedgerV2 {
+  readonly authority = 'experimental_non_production' as const;
   readonly #entries: SeyeonEventLedgerEntryV2[] = [];
   readonly #dedupeKeys = new Set<string>();
   readonly #knownEventIds = new Set<string>();

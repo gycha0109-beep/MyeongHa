@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   runSeyeonPostTurnRelationshipV2,
+  type SeyeonEventLedgerPortV2,
 } from '../apps/api/src/seyeon-post-turn-relationship-v2.js';
 import type {
   SeyeonStructuredProviderPortV2,
@@ -111,6 +112,39 @@ function identity() {
 }
 
 describe('Se-yeon post-turn relationship runtime v2', () => {
+  it('fails closed before extraction when a production relationship ledger is bound prematurely', async () => {
+    let providerCalled = false;
+    const inMemory = new InMemorySeyeonEventLedgerV2();
+    const forbiddenLedger = {
+      authority: 'production_relationship_events',
+      activeEvents: () => inMemory.activeEvents(),
+      appendEvent: (input: Parameters<typeof inMemory.appendEvent>[0]) =>
+        inMemory.appendEvent(input),
+      projectRelationship: () => inMemory.projectRelationship(),
+    } as unknown as SeyeonEventLedgerPortV2;
+    const provider: SeyeonStructuredProviderPortV2 = {
+      providerKey: 'must-not-run',
+      modelKey: 'must-not-run',
+      generate() {
+        providerCalled = true;
+        throw new Error('provider must not be called');
+      },
+    };
+
+    await expect(
+      runSeyeonPostTurnRelationshipV2({
+        ...turn(),
+        ledger: forbiddenLedger,
+        extractorProvider: provider,
+        semanticRelevanceByEventId: {},
+        identity: identity(),
+      }),
+    ).rejects.toThrow(/experimental-only until SRC-22 is resolved/);
+
+    expect(providerCalled).toBe(false);
+    expect(inMemory.entries).toHaveLength(0);
+  });
+
   it('does not mutate relationship state when extractor returns none', async () => {
     const ledger = new InMemorySeyeonEventLedgerV2();
     const provider: SeyeonStructuredProviderPortV2 = {

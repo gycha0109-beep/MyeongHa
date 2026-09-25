@@ -331,3 +331,21 @@ relationship-driven downstream unlock
 ```
 
 The presence of `relationship_events.delta_*` and `user_character_states` score columns proves representability, not the missing policy function that computes authoritative values.
+
+---
+
+## 11. Se-yeon V2 persistence impact note
+
+The Se-yeon Character Chat / Memory track now has an implementation contract at:
+
+`docs/character/SEYEON_RELATIONSHIP_PERSISTENCE_CONTRACT_V2.md`
+
+That contract does **not** close SRC-22. It maps the experimental Se-yeon Event/Relationship runtime onto the existing ERD and identifies additional physical gaps that must be resolved before production persistence binding:
+
+- relationship Event occurrence time distinct from apply time;
+- source-message provenance for Event facts;
+- FK-backed causal predecessor links;
+- correction/retraction linkage;
+- revision-0 baseline / stage replay semantics.
+
+Until those items and the existing SRC-22 policy gaps are source-approved, Se-yeon V2 is explicitly guarded as `experimental_non_production` and must fail closed if bound as a production relationship ledger.
