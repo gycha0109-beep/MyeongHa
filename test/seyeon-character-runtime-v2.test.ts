@@ -238,7 +238,10 @@ describe('Se-yeon structured Character runtime v2', () => {
 
     await expect(
       runSeyeonCharacterTurnV2({
+        userMessageRef: 'message-current',
+        userText: '지난번에 제가 A 좋아한다고 했던 거 기억나요?',
         contextInput: contextInput(),
+        governance: governance(),
         interpreterProvider: interpreter,
         rendererProvider: renderer,
         semanticReviewerProvider: reviewer,
@@ -259,7 +262,10 @@ describe('Se-yeon structured Character runtime v2', () => {
 
     await expect(
       runSeyeonCharacterTurnV2({
+        userMessageRef: 'message-current',
+        userText: '지난번에 제가 A 좋아한다고 했던 거 기억나요?',
         contextInput: contextInput(),
+        governance: governance(),
         interpreterProvider: interpreter,
         rendererProvider: renderer,
         semanticReviewerProvider: reviewer,
@@ -299,7 +305,10 @@ describe('Se-yeon structured Character runtime v2', () => {
 
     await expect(
       runSeyeonCharacterTurnV2({
+        userMessageRef: 'message-current',
+        userText: '지난번에 제가 A 좋아한다고 했던 거 기억나요?',
         contextInput: contextInput(),
+        governance: governance(),
         interpreterProvider: interpreter,
         rendererProvider: renderer,
         semanticReviewerProvider: reviewer,
@@ -346,7 +355,10 @@ describe('Se-yeon structured Character runtime v2', () => {
 
     await expect(
       runSeyeonCharacterTurnV2({
+        userMessageRef: 'message-current',
+        userText: '지난번에 제가 A 좋아한다고 했던 거 기억나요?',
         contextInput: contextInput(),
+        governance: governance(),
         interpreterProvider: interpreter,
         rendererProvider: new StaticProvider('renderer', 'model', validRendererDraft()),
         semanticReviewerProvider: new StaticProvider('reviewer', 'model', passingSemanticReview),
