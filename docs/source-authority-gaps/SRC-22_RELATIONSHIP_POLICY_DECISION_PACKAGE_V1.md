@@ -636,3 +636,46 @@ REJECT
 with exact replacement values/contracts where required.
 
 Until then, SRC-22 stays OPEN and the existing experimental_non_production fail-closed guard remains correct.
+
+---
+
+## 15. Sensitivity matrix update
+
+Evidence report:
+
+`docs/character/SEYEON_RELATIONSHIP_POLICY_SENSITIVITY_V0_2.md`
+
+The expanded B1 matrix found:
+
+- **MAJOR:** narrow but meaningful routes dead-end under the five-family deep-stage gate;
+- **MAJOR:** fixed seven-day family buckets allow boundary credit amplification;
+- **MAJOR / authority gap:** B1 recompute can drop an established S4 to S2 on one unresolved strong conflict;
+- **WARNING:** reconciliation can become the fifth family that unlocks S4;
+- **WARNING:** repeated reconciliation inflates milestone count even when trust/friction prevent farming;
+- **WARNING:** one-year mixed use can saturate closeness/trust at 100.
+
+Two isolated shadow candidates now exist:
+
+~~~text
+B2-A
+B1 + rolling seven-day family-credit window
+
+B2-B
+B1 + slow sustained narrow-route qualification
+
+Combined B2
+B2-A + B2-B for comparison only
+~~~
+
+B2-A removes the tested Day-7/Day-8 boundary amplification while preserving normally spaced credit.
+
+B2-B lets shared-activity, reliability, reciprocity, and disclosure-heavy routes qualify over a much longer evidence horizon without allowing visit-only interaction to qualify.
+
+These findings do not resolve:
+
+- production stage regression semantics;
+- repair/milestone semantics;
+- score saturation semantics;
+- final Event registry or payload schemas.
+
+SRC-22 remains OPEN.
