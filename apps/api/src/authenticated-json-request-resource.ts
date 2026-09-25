@@ -201,6 +201,11 @@ function measureJsonUtf8BytesBoundedV1(value: unknown, maximum: number): number 
       throw new InvalidPreparsedJsonBodyV1();
     }
 
+    if (
+      typeof (current as { toJSON?: unknown }).toJSON === 'function'
+    ) {
+      throw new InvalidPreparsedJsonBodyV1();
+    }
     if (ancestors.has(current)) throw new InvalidPreparsedJsonBodyV1();
     ancestors.add(current);
 
