@@ -214,6 +214,28 @@ describe('Se-yeon long-horizon relationship dogfood v2', () => {
     );
   });
 
+  it('does not auto-progress intimacy after 1,200 turns without relationship evidence', () => {
+    const ledger = new InMemorySeyeonEventLedgerV2();
+    const messages = Array.from({ length: 1200 }, (_, index) =>
+      fixedMessage(index),
+    );
+
+    expect(messages).toHaveLength(1200);
+    expect(ledger.activeEvents()).toHaveLength(0);
+
+    const projection = ledger.projectRelationship();
+    expect(projection.revision).toBe(0);
+    expect(projection.evidence).toEqual({
+      familiarity: 0,
+      trust: 0,
+      reciprocity: 0,
+      disclosure: 0,
+      agencyRespect: 0,
+    });
+    expect(projection.conflictState).toBe('none');
+    expect(projection.repairState).toBe('none');
+  });
+
   it('propagates correction so the superseded event cannot be retrieved from active history', () => {
     const ledger = new InMemorySeyeonEventLedgerV2();
     const wrong = event({
