@@ -72,6 +72,9 @@ function responseWithCancellation(input: {
       status: input.status,
       headers: new Headers({ 'Content-Type': input.contentType }),
       body,
+      async text() {
+        throw new Error('Calculation adapter must consume the governed response stream.');
+      },
     },
     pulls,
   };
