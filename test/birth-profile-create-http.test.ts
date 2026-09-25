@@ -315,4 +315,47 @@ describe('production Birth Profile create HTTP foundation', () => {
       expect(pool.connectCalls).toBe(0);
     }
   });
+
+  it('rejects an authenticated body above 16 KiB before opening PostgreSQL', async () => {
+    const { input, pool } = makeInput({
+      request: jsonRequest({
+        ...validRequestBody(),
+        padding: 'x'.repeat(17_000),
+      }),
+    });
+
+    const response = await handleBirthProfileCreateRequestV1(input);
+    expect(response.status).toBe(413);
+    expect(await response.json()).toMatchObject({
+      ok: false,
+      error: {
+        code: 'REQUEST_TOO_LARGE',
+        messageKey: 'request.too_large',
+        retryable: false,
+      },
+    });
+    expect(pool.connectCalls).toBe(0);
+  });
+
+  it('rejects a Birth label above the governed 512 UTF-8 byte field limit', async () => {
+    const { input, pool } = makeInput({
+      request: jsonRequest({
+        ...validRequestBody(),
+        label: '가'.repeat(171),
+      }),
+    });
+
+    const response = await handleBirthProfileCreateRequestV1(input);
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      ok: false,
+      error: { code: 'INVALID_REQUEST' },
+    });
+    expect(
+      pool.connection.calls.some((call) =>
+        call.text.includes('cmd_create_birth_profile_runtime_v1'),
+      ),
+    ).toBe(false);
+  });
+
 });
