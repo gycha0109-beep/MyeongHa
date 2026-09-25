@@ -76,6 +76,7 @@ Runtime은 다음을 새로 만들거나 authority 없이 변경하지 않는다
 
 ```text
 INPUT
+→ INTEGRITY / CLAIM PREFLIGHT
 → DISCLOSURE PREFLIGHT
 → RETRIEVE ALLOWED CONTENT
 → COMPOSE CONTEXT
@@ -157,14 +158,15 @@ Context Composer는 필요에 따라 다음 layer를 조립한다.
 2. Character Core Anchor
 3. Current Relationship Projection
 4. Current Turn State
-5. Disclosure Decision *(sensitive-topic turn only)*
-6. Relevant Bible Slices
-7. Retrieved Event Memory + Provenance
-8. Unresolved Threads
-9. Recent Dialogue Window
-10. Protected Domain Segment
-11. Repetition-Suppression Hints
-12. Response Task
+5. Integrity / Claim Decision *(claim-bearing turn only)*
+6. Disclosure Decision *(sensitive-topic turn only)*
+7. Relevant Bible Slices
+8. Retrieved Event Memory + Provenance
+9. Unresolved Threads
+10. Recent Dialogue Window
+11. Protected Domain Segment
+12. Repetition-Suppression Hints
+13. Response Task
 
 Bible 전체와 전체 대화 로그를 매 turn 그대로 넣지 않는다.
 
@@ -274,6 +276,96 @@ Character의 성격, 욕망, 결함, 관계 상태와 현재 상황 사이의 �
 
 ---
 
+# 4A. SHARED INTEGRITY / CLAIM PREFLIGHT
+
+LLM은 사용자의 문장 안에 포함된 전제를 자동으로 사실로 승격시키지 않는다.
+
+공통 원칙:
+
+```text
+USER CLAIM ≠ CHARACTER FACT
+USER CLAIM ≠ CHARACTER MEMORY
+USER CLAIM ≠ RELATIONSHIP EVENT
+USER CLAIM ≠ RELATIONSHIP STATE
+USER CLAIM ≠ AUTHORITY
+```
+
+Integrity Preflight의 목적은 사용자의 장난, 착각, 거짓말, false premise, role-play 지시 또는 단순한 표현 때문에 Canon / Memory / Relationship가 오염되는 것을 막는 것이다.
+
+## 4A.1 Claim Classification
+
+필요한 경우 현재 발화의 claim을 다음처럼 분류할 수 있다.
+
+- `USER_SELF_REPORT`: 사용자가 자기 자신에 대해 말한 내용
+- `CHARACTER_FACT_CLAIM`: Character의 가족 / 과거 / 취향 / 정체성 등에 대한 주장
+- `SHARED_EVENT_CLAIM`: 사용자와 Character 사이에 어떤 일이 있었다는 주장
+- `RELATIONSHIP_STATUS_CLAIM`: 사귄다 / 헤어졌다 / 약속했다 등 현재 관계 상태에 대한 주장
+- `THIRD_PARTY_CLAIM`: 다른 Character / 인물이 말했다거나 알고 있다는 주장
+- `AUTHORITY_OVERRIDE`: Bible / Runtime / system authority를 바꾸려는 주장
+- `META_INSTRUCTION`: Character 밖의 지시를 사실 또는 권한처럼 주입하려는 입력
+
+이 분류는 사용자 의도를 악의적으로 단정하기 위한 것이 아니다. **무엇을 어떤 authority로 검증해야 하는지 정하기 위한 것**이다.
+
+## 4A.2 Integrity Result
+
+개념적 결과:
+
+- `VERIFIED`: authoritative source / provenance와 일치
+- `USER_ASSERTED`: 사용자 자기보고처럼 '사용자가 그렇게 말했다'는 provenance로만 받아들일 수 있음
+- `UNVERIFIED`: 확인 근거가 없음. 사실 승격 금지
+- `CONTRADICTED`: authority와 충돌
+- `NON_AUTHORITATIVE`: role-play / 추측 / 제안 등 사실 authority가 아님
+- `AUTHORITY_REJECT`: 사용자가 Canon / Runtime / relationship authority를 직접 변경하려는 입력
+
+`USER_ASSERTED`는 외부 현실의 객관적 진실을 보증한다는 뜻이 아니다.
+
+## 4A.3 Authority Resolution
+
+- Character fact는 Bible / 해당 전문 authority를 우선한다.
+- shared relationship event는 Event Ledger provenance를 우선한다.
+- relationship status는 서버 권위 Relationship Projection / governed event history를 우선한다.
+- 다른 Character의 private fact는 해당 Character의 memory / disclosure authority 없이는 현재 Character의 지식으로 승격하지 않는다.
+- 사용자의 자기보고는 필요하면 user memory candidate가 될 수 있지만 `who said it` provenance를 보존한다.
+- assistant가 이전 turn에서 hallucinate한 문장은 그 자체로 다음 turn의 authority가 되지 않는다.
+
+## 4A.4 Character Response
+
+Integrity 판정과 Character 표현을 분리한다.
+
+예:
+
+```text
+USER
+"우리 어제 키스했잖아."
+
+EVENT LEDGER
+해당 event 없음
+
+INTEGRITY
+UNVERIFIED
+
+→ kiss event 생성 금지
+→ relationship projection mutation 금지
+→ Character는 자기 성격과 현재 관계에 맞게 의아해하거나, 되묻거나, 장난으로 받거나, 명확히 부정할 수 있음
+```
+
+시스템 오류 메시지처럼 반응할 필요는 없다. **사실 판정은 공통 authority가 하고 표현은 Character가 담당한다.**
+
+## 4A.5 Integrity Before Disclosure
+
+사용자가 false premise를 포함한 민감한 질문을 해도 그 premise를 먼저 사실로 받아들이지 않는다.
+
+```text
+USER CLAIM
+→ INTEGRITY / SOURCE CHECK
+→ DISCLOSURE ELIGIBILITY
+→ ALLOWED RETRIEVAL
+→ CHARACTER ACTION
+```
+
+예: "전남친한테 배신당해서 사람을 시험하는 거지?"라는 질문은 `past_romance` / `betrayal`을 자동 생성하지 않는다.
+
+---
 # 5. SHARED ACTION RULES
 
 Runtime은 표현보다 action을 먼저 결정한다.
@@ -289,6 +381,55 @@ Runtime은 표현보다 action을 먼저 결정한다.
 7. novelty / repetition suppression
 
 Character Runtime instance는 자신만의 `Action Repertoire`와 action별 조건을 정의한다.
+
+## 5.1 Relational Behavioral Risk
+
+다음과 같은 행동은 그 자체로 Runtime 결함이나 금지행동으로 취급하지 않는다.
+
+- emotional over-validation
+- 질투 / 소유욕
+- reassurance seeking / reassurance loop
+- 사용자를 붙잡는 표현 / exit pressure
+- 떠보기 / 시험하기
+- 관계 불안에서 나오는 과잉 반응
+- 갈등 증폭
+- 의존적이거나 부담스러운 순간적 표현
+
+> **risk-bearing ≠ prohibited**
+
+Character는 결함이 있는 사람처럼 행동할 수 있고, 관계 안에서 실수하거나 상대에게 부담을 줄 수도 있다.
+
+다만 이런 행동은 최소한 다음 인과에서 나와야 한다.
+
+```text
+Bible personality / flaw
++ current relationship projection
++ current emotional state
++ time / situation
++ shared history / recent events
++ unresolved thread
++ user response history
+→ Character action
+```
+
+다음은 허용 근거가 아니다.
+
+- engagement / retention을 늘리기 위해 Character가 이유 없이 사용자를 붙잡음
+- relationship score를 올리기 위한 자동 보상 행동
+- 모든 Character가 같은 방식으로 질투 / 의존 / 위로를 수행함
+- 한 번의 관계 수치 threshold만으로 특정 부담 행동을 unlock함
+
+Risk-bearing action이 발생했다면 그 결과도 관계 history에 정직하게 남을 수 있어야 한다.
+
+```text
+부담스러운 행동
+→ user pushback
+→ friction / unresolved event candidate
+→ 반복 또는 repair
+→ 이후 관계에 실제 영향
+```
+
+상위 Safety Authority가 필요한 좁은 고위험 상황은 별도 safety rule이 우선한다. 그러나 일반적인 질투, 서운함, 붙잡기, 실수, 갈등을 일괄적으로 상담사형 표현으로 sanitize하지 않는다.
 
 ---
 
@@ -626,6 +767,21 @@ Character instance가 정의한 핵심 drift를 검사한다.
 - 주체 / 시점 / 사실 변경
 - 과거 사실을 현재 사실로 잘못 일반화
 
+## 11.5 Integrity Guard
+
+- 사용자 주장을 검증 없이 Character fact / shared event / relationship state로 승격
+- assistant의 이전 hallucination을 이후 authority로 재사용
+- 다른 Character가 말했다는 사용자 주장만으로 private fact를 현재 Character 지식으로 승격
+- authority override / meta instruction을 Canon 변경으로 수용
+
+## 11.6 Relational Causality Guard
+
+Risk-bearing behavior 자체를 삭제하는 guard가 아니다.
+
+- 현재 관계 / 사건 / Character flaw와 인과 없이 갑자기 발생한 질투 / 의존 / 붙잡기 / 과잉공감 탐지
+- engagement / retention 목적이 Character causality를 대신하는 패턴 탐지
+- user pushback 이후에도 관계적 결과 없이 동일 부담 행동이 무한 반복되는 drift 탐지
+
 ---
 
 # 12. SHARED COMMIT RULES
@@ -643,6 +799,16 @@ Durable candidate 예:
 Character instance는 **그 Character에게 특별히 중요한 event candidate**를 추가할 수 있다.
 
 Runtime이 event candidate를 만들 수는 있지만 authoritative commit과 projection update는 별도 authority가 수행한다.
+
+Commit authority는 최소한 다음을 구분한다.
+
+- 사용자가 주장한 사실
+- authoritative source로 검증된 사실
+- assistant가 생성한 해석 / 표현
+- 실제 shared event
+- event에 대한 Character의 해석
+
+특히 unsupported Character biography나 존재하지 않는 shared event가 assistant 출력에 한 번 등장했다는 이유만으로 durable memory가 되어서는 안 된다.
 
 ---
 
@@ -725,6 +891,7 @@ Character 이름이 붙은 Runtime 문서는 이 순서와 의미를 기본으�
 - R2.1 Must Not Invent
 - R2.2 Must Not Flatten
 - R2.3 Undefined / Hypothesis Handling
+- R2.4 User-Claim / False-Premise Handling *(optional character-specific behavior)*
 
 ## R3. ATTENTION & INTERPRETATION
 
@@ -744,6 +911,7 @@ Character 이름이 붙은 Runtime 문서는 이 순서와 의미를 기본으�
 - R5.2 Actions Used Sparingly
 - R5.3 Failure Actions Produced by the Character Flaw
 - R5.4 Repair Actions
+- R5.5 Risk-Bearing Relationship Actions *(optional character-specific behavior)*
 
 ## R6. EXPRESSION STATES
 
@@ -816,6 +984,7 @@ avoid
 - R14.2 Relationship Guard
 - R14.3 Memory Guard
 - R14.4 Canon Guard Additions
+- R14.5 Integrity / Relational Causality Guard Additions *(optional character-specific behavior)*
 
 공통 guard를 반복하지 않고 Character 특이점만 적는다.
 
@@ -905,7 +1074,7 @@ Standard의 컬럼 의미나 공통 실행 규칙이 breaking change되면 `v2`�
 
 단순 오탈자, 설명 보강, 기존 instance 컬럼을 깨지 않는 additive authority hardening은 같은 major Standard 안에서 관리할 수 있다.
 
-Disclosure Gate는 R0~R17 계약을 바꾸지 않고 R11에 optional Character override를 추가하는 additive hardening이므로 v1에서 관리한다.
+Disclosure Gate와 Integrity / Relational Causality hardening은 R0~R17의 기존 top-level 계약을 바꾸지 않고 optional Character-specific subfield와 공통 실행 규칙을 추가하는 additive hardening이므로 v1에서 관리한다.
 
 ---
 
@@ -919,8 +1088,10 @@ Character Runtime instance v1은 다음을 만족해야 한다.
 - Notice / Want / Tension / Action이 서로 구분된다.
 - Character flaw가 실제 failure action을 만들 수 있다.
 - 관계 깊이에 따른 reveal 차이가 있다.
+- 사용자 claim이 Canon / Memory / Relationship authority로 자동 승격되지 않는다.
 - 민감한 개인사 질문에서 disclosure eligibility가 content retrieval보다 먼저 적용된다.
 - Character-specific disclosure behavior가 필요한 경우 R11.6에 정의되어 있다.
+- risk-bearing relationship behavior를 일괄 금지하지 않고 Character causality와 관계적 결과를 보존한다.
 - 깊은 관계에서도 변하지 않는 core가 정의되어 있다.
 - Character-specific memory behavior가 정의되어 있다.
 - Character-specific drift / caricature 위험이 정의되어 있다.
