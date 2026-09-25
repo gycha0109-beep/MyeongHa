@@ -6,6 +6,11 @@ import {
 } from '../../../packages/contracts/src/index.js';
 import { canonicalJson } from '../../../packages/domain/src/index.js';
 import { ApiCommandError } from './api-error.js';
+import {
+  READING_IDEMPOTENCY_KEY_MAXIMUM_UTF8_BYTES_V1,
+  READING_SOURCE_BIRTH_PROFILE_ID_MAXIMUM_UTF8_BYTES_V1,
+  utf8ByteLengthV1,
+} from './authenticated-json-request-resource.js';
 
 export const READING_CREATE_AUTHORITY_BINDING_V1 =
   'public.cmd_create_reading_session_v1' as const;
@@ -106,9 +111,19 @@ function requireResolvedSubjectId(value: string | undefined): string {
   return value;
 }
 
-function requireNonBlank(name: string, value: unknown): string {
+function requireNonBlank(
+  name: string,
+  value: unknown,
+  maximumUtf8Bytes?: number,
+): string {
   if (typeof value !== 'string' || value.trim().length === 0) {
     throw new ApiCommandError('INVALID_REQUEST', `${name} must be a non-empty string.`);
+  }
+  if (maximumUtf8Bytes !== undefined && utf8ByteLengthV1(value) > maximumUtf8Bytes) {
+    throw new ApiCommandError(
+      'INVALID_REQUEST',
+      `${name} exceeds the governed UTF-8 byte limit.`,
+    );
   }
   return value;
 }
@@ -142,11 +157,16 @@ function parseRequest(value: unknown): DirectReadingCreateRequestV1 {
     throw new ApiCommandError('INVALID_REQUEST', 'Reading request contains unsupported fields.');
   }
 
-  const idempotencyKey = requireNonBlank('idempotencyKey', request.idempotencyKey);
+  const idempotencyKey = requireNonBlank(
+    'idempotencyKey',
+    request.idempotencyKey,
+    READING_IDEMPOTENCY_KEY_MAXIMUM_UTF8_BYTES_V1,
+  );
   const domain = parseDomain(request.domain);
   const sourceBirthProfileId = requireNonBlank(
     'sourceBirthProfileId',
     request.sourceBirthProfileId,
+    READING_SOURCE_BIRTH_PROFILE_ID_MAXIMUM_UTF8_BYTES_V1,
   );
 
   for (const key of ['targetBirthProfileId', 'characterId', 'sourceTurnId'] as const) {
