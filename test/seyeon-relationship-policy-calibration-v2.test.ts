@@ -33,6 +33,7 @@ interface CalibrationState {
   readonly friction: number;
   readonly stage: Stage;
   readonly distinctPositiveDays: number;
+  readonly distinctPositiveWeeks: number;
   readonly distinctPositiveFamilies: number;
   readonly milestoneCount: number;
   readonly conflictOpen: boolean;
@@ -90,6 +91,7 @@ function resolveStage(input: {
   closeness: number;
   trust: number;
   distinctPositiveDays: number;
+  distinctPositiveWeeks: number;
   distinctPositiveFamilies: number;
   milestoneCount: number;
   conflictOpen: boolean;
@@ -98,6 +100,7 @@ function resolveStage(input: {
     input.closeness >= 75 &&
     input.trust >= 65 &&
     input.distinctPositiveDays >= 40 &&
+    input.distinctPositiveWeeks >= 10 &&
     input.distinctPositiveFamilies >= 5 &&
     input.milestoneCount >= 3 &&
     !input.conflictOpen
@@ -135,6 +138,7 @@ function resolveStage(input: {
 function simulate(events: readonly CalibrationEvent[]): CalibrationState {
   const seenSources = new Set<string>();
   const positiveDays = new Set<number>();
+  const positiveWeeks = new Set<number>();
   const positiveFamilies = new Set<string>();
   const weeklyFamilyCredits = new Map<string, number>();
   let closeness = 0;
@@ -157,6 +161,7 @@ function simulate(events: readonly CalibrationEvent[]): CalibrationState {
     if (positive && eligibleForPositiveCredit) {
       weeklyFamilyCredits.set(creditKey, familyCredits + 1);
       positiveDays.add(input.day);
+      positiveWeeks.add(week);
       positiveFamilies.add(rule.family);
       if (rule.milestone) milestoneCount += 1;
     }
@@ -186,11 +191,13 @@ function simulate(events: readonly CalibrationEvent[]): CalibrationState {
       closeness,
       trust,
       distinctPositiveDays: positiveDays.size,
+      distinctPositiveWeeks: positiveWeeks.size,
       distinctPositiveFamilies: positiveFamilies.size,
       milestoneCount,
       conflictOpen,
     }),
     distinctPositiveDays: positiveDays.size,
+    distinctPositiveWeeks: positiveWeeks.size,
     distinctPositiveFamilies: positiveFamilies.size,
     milestoneCount,
     conflictOpen,
@@ -268,6 +275,20 @@ describe('Se-yeon relationship policy calibration candidate B v2', () => {
 
     expect(firstMonth.stage).not.toBe('S4_SPECIAL');
     expect(aroundTenWeeks.stage).toBe('S4_SPECIAL');
+  });
+
+  it('does not let five meaningful events per week compress S4 into eight weeks', () => {
+    const eightWeeks = simulate(
+      patternedSchedule({ weeks: 8, eventsPerWeek: 5 }),
+    );
+    const tenWeeks = simulate(
+      patternedSchedule({ weeks: 10, eventsPerWeek: 5 }),
+    );
+
+    expect(eightWeeks.stage).not.toBe('S4_SPECIAL');
+    expect(eightWeeks.distinctPositiveWeeks).toBe(8);
+    expect(tenWeeks.distinctPositiveWeeks).toBe(10);
+    expect(tenWeeks.stage).toBe('S4_SPECIAL');
   });
 
   it('keeps a low-frequency route below S4 after six months', () => {
