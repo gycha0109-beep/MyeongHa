@@ -11,7 +11,7 @@ This document records a concrete simulation candidate so relationship-policy dec
 
 It does not close SRC-22 and does not authorize PostgreSQL relationship mutation.
 
-The calibration target is the previously selected Candidate-B pacing basis:
+The calibration target is the previously selected Candidate-B pacing basis. A sensitivity pass promotes the test fixture to **Candidate B1**; this remains calibration evidence, not production authority:
 
 - ordinary diverse use should approach the highest tested stage over several months, not a few weeks;
 - high-frequency but diverse use may progress faster, roughly around the ten-week order of magnitude;
@@ -76,7 +76,7 @@ These are candidate values for simulation, not approved production deltas.
 | S1_FAMILIAR | closeness >= 8, trust >= 4, 2 positive days, 2 families |
 | S2_REGULAR | closeness >= 20, trust >= 12, 5 positive days, 3 families |
 | S3_OPENED | closeness >= 42, trust >= 30, 12 positive days, 4 families, no unresolved conflict |
-| S4_SPECIAL | closeness >= 75, trust >= 65, 40 positive days, 5 families, 3 milestones, no unresolved conflict |
+| S4_SPECIAL | closeness >= 75, trust >= 65, 40 positive days, **10 distinct positive weeks**, 5 families, 3 milestones, no unresolved conflict |
 
 A score threshold alone can never advance S3/S4.
 
@@ -86,6 +86,7 @@ The harness applies:
 
 - exact source identity dedupe before any credit;
 - at most two positive credits per event family per seven-day bucket;
+- S4 evidence must span at least 10 distinct positive weeks;
 - stage gates require multiple distinct event families;
 - S4 requires multiple milestone events;
 - repeated RETURN_VISIT alone cannot raise trust or relationship stage.
@@ -117,12 +118,14 @@ The automated dogfood requires:
 2. ordinary diverse route at 20 weeks reaches S4;
 3. high-frequency diverse route at 4 weeks is not S4;
 4. high-frequency diverse route at 10 weeks reaches S4;
-5. low-frequency route after 26 weeks is still below S4;
-6. 100 RETURN_VISIT events alone remain S0 and trust 0;
-7. unresolved conflict blocks S3/S4;
-8. explicit reconciliation can clear that block;
-9. absence alone causes no score degradation;
-10. identical source identity is credited once.
+5. five meaningful events/week still cannot compress S4 into 8 weeks;
+6. the same five-events/week route can qualify at 10 weeks;
+7. low-frequency route after 26 weeks is still below S4;
+8. 100 RETURN_VISIT events alone remain S0 and trust 0;
+9. unresolved conflict blocks S3/S4;
+10. explicit reconciliation can clear that block;
+11. absence alone causes no score degradation;
+12. identical source identity is credited once.
 
 ## 7. Promotion gate
 
@@ -138,3 +141,19 @@ None of the numbers in this file may enter:
 until they are reviewed as an SRC-22 source decision.
 
 The value of this candidate is empirical comparison, not authority.
+
+## 8. Sensitivity finding
+
+The first Candidate-B fixture only asserted a four-events/week high-frequency route. A neighboring five-events/week route could satisfy the original 40-positive-day S4 gate in eight weeks.
+
+Candidate B1 therefore adds a **10 distinct positive weeks** requirement to the test fixture. This is a calibration mechanism, not a source-backed product rule.
+
+Reason for retaining it as a candidate:
+
+- it prevents dense but short binge interaction from collapsing the intended slow-burn pacing;
+- it still requires meaningful event evidence, not elapsed time alone;
+- ordinary two-events/week progression remains around the twenty-week order of magnitude;
+- five-events/week progression cannot qualify at eight weeks but can at ten weeks;
+- low-frequency users are not rewarded merely for calendar age because score/evidence/milestone gates still apply.
+
+The exact ten-week value remains subject to SRC-22 product authority.
