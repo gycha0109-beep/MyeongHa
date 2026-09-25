@@ -23,6 +23,7 @@ function context() {
         text: '지난번에 제가 고른 A, 기억나요?',
       },
     ],
+    disclosure: { decision: null, retrievedSources: [] },
     retrievedMemories: [
       {
         memoryId: 'memory-choice',
@@ -141,6 +142,7 @@ describe('Se-yeon turn interpreter v2 guard', () => {
         policyVersion: 'relationship-policy-v1',
       },
       recentMessages: context().recentConversation,
+      disclosure: { decision: null, retrievedSources: [] },
       retrievedMemories: context().retrievedMemories,
       focuses: ['intimacy', 'memory'],
     });
