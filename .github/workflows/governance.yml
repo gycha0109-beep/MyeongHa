@@ -20,6 +20,7 @@ jobs:
     timeout-minutes: 3
     outputs:
       contracts: ${{ steps.scope.outputs.contracts }}
+      dependencies: ${{ steps.scope.outputs.dependencies }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -55,10 +56,16 @@ jobs:
           echo "Changed files:"
           cat "$changed_files"
 
-          if grep -Eq '^(\.github/workflows/|\.github/[^/]+\.trigger$|scripts/|docs/|supabase/migrations/|test/db/|package\.json$|package-lock\.json$)' "$changed_files"; then
+          if grep -Eq '^(\.github/workflows/|\.github/dependabot\.yml$|\.github/[^/]+\.trigger$|scripts/|docs/|supabase/migrations/|test/db/|package\.json$|package-lock\.json$)' "$changed_files"; then
             echo "contracts=true" >> "$GITHUB_OUTPUT"
           else
             echo "contracts=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          if grep -Eq '^(\.github/workflows/|\.github/dependabot\.yml$|package\.json$|package-lock\.json$|apps/[^/]+/package\.json$|packages/[^/]+/package\.json$)' "$changed_files"; then
+            echo "dependencies=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "dependencies=false" >> "$GITHUB_OUTPUT"
           fi
 
   contracts:
@@ -77,8 +84,23 @@ jobs:
       - name: Verify governance contracts
         run: |
           node scripts/verify-github-actions-trust-boundary.mjs
+          node scripts/verify-dependency-supply-chain-governance.mjs
           npm run check:governance
           node scripts/verify-upstream-json-response-resource-policy.mjs
+
+  dependency-review:
+    needs: scope
+    if: github.event_name == 'pull_request' && needs.scope.outputs.dependencies == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Review dependency changes
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: moderate
+          fail-on-scopes: runtime, development, unknown
+          comment-summary-in-pr: never
 
   verify:
     name: Governance Verify
@@ -88,13 +110,16 @@ jobs:
     needs:
       - scope
       - contracts
+      - dependency-review
     steps:
       - name: Require selected governance gates
         env:
           SCOPE_RESULT: ${{ needs.scope.result }}
           CONTRACTS_RESULT: ${{ needs.contracts.result }}
+          DEPENDENCY_REVIEW_RESULT: ${{ needs.dependency-review.result }}
         shell: bash
         run: |
           set -euo pipefail
           test "$SCOPE_RESULT" = "success"
           test "$CONTRACTS_RESULT" = "success" || test "$CONTRACTS_RESULT" = "skipped"
+          test "$DEPENDENCY_REVIEW_RESULT" = "success" || test "$DEPENDENCY_REVIEW_RESULT" = "skipped"
