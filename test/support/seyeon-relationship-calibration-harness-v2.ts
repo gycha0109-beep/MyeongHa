@@ -46,6 +46,10 @@ export type CalibrationStageMode =
   | 'lock_progress_block_on_conflict'
   | 'behavior_overlay';
 
+export type CalibrationStageGateVariant =
+  | 'b1_family_diversity'
+  | 'b2_sustained_route_shadow';
+
 export interface CalibrationEvent {
   readonly day: number;
   readonly event: CalibrationEventKey;
@@ -68,6 +72,7 @@ export interface CalibrationPolicy {
   readonly familyWindow: 'fixed_7_day_bucket' | 'rolling_7_day_window';
   readonly maxPositiveCreditsPerFamilyWindow: number;
   readonly stageMode: CalibrationStageMode;
+  readonly stageGateVariant: CalibrationStageGateVariant;
   readonly eventRules: Readonly<Record<CalibrationEventKey, CalibrationEventRule>>;
 }
 
@@ -243,6 +248,7 @@ export const CANDIDATE_B1_POLICY: CalibrationPolicy = Object.freeze({
   familyWindow: 'fixed_7_day_bucket',
   maxPositiveCreditsPerFamilyWindow: 2,
   stageMode: 'recompute',
+  stageGateVariant: 'b1_family_diversity',
   eventRules: EVENT_RULES_B1,
 });
 
@@ -252,6 +258,18 @@ export const CANDIDATE_B1_ROLLING_WINDOW_SHADOW: CalibrationPolicy =
     policyId: 'seyeon-relationship-candidate-b1-rolling-window-shadow-v0.1',
     familyWindow: 'rolling_7_day_window',
   });
+
+export const CANDIDATE_B2_ROUTE_SHADOW: CalibrationPolicy = Object.freeze({
+  ...CANDIDATE_B1_POLICY,
+  policyId: 'seyeon-relationship-candidate-b2-route-shadow-v0.1',
+  stageGateVariant: 'b2_sustained_route_shadow',
+});
+
+export const CANDIDATE_B2_COMBINED_SHADOW: CalibrationPolicy = Object.freeze({
+  ...CANDIDATE_B2_ROUTE_SHADOW,
+  policyId: 'seyeon-relationship-candidate-b2-combined-shadow-v0.1',
+  familyWindow: 'rolling_7_day_window',
+});
 
 export const ROUTE_WITHOUT_FORCED_SELF_DISCLOSURE: readonly CalibrationEventKey[] =
   Object.freeze([
@@ -340,6 +358,60 @@ export function resolveCandidateB1Stage(input: {
     input.trust >= 12 &&
     input.distinctPositiveDays >= 5 &&
     input.distinctPositiveFamilies >= 3
+  ) {
+    return 'S2_REGULAR';
+  }
+  if (
+    input.closeness >= 8 &&
+    input.trust >= 4 &&
+    input.distinctPositiveDays >= 2 &&
+    input.distinctPositiveFamilies >= 2
+  ) {
+    return 'S1_FAMILIAR';
+  }
+  return 'S0_FIRST_MEETING';
+}
+
+export function resolveCandidateB2RouteStage(input: {
+  readonly closeness: number;
+  readonly trust: number;
+  readonly distinctPositiveDays: number;
+  readonly distinctPositiveWeeks: number;
+  readonly distinctPositiveFamilies: number;
+  readonly milestoneCount: number;
+  readonly conflictOpen: boolean;
+}): CalibrationStage {
+  if (
+    input.closeness >= 75 &&
+    input.trust >= 65 &&
+    input.distinctPositiveDays >= 40 &&
+    input.milestoneCount >= 3 &&
+    !input.conflictOpen &&
+    ((input.distinctPositiveWeeks >= 10 &&
+      input.distinctPositiveFamilies >= 5) ||
+      (input.distinctPositiveWeeks >= 40 &&
+        input.distinctPositiveFamilies >= 2))
+  ) {
+    return 'S4_SPECIAL';
+  }
+  if (
+    input.closeness >= 42 &&
+    input.trust >= 30 &&
+    input.distinctPositiveDays >= 12 &&
+    !input.conflictOpen &&
+    (input.distinctPositiveFamilies >= 4 ||
+      (input.distinctPositiveWeeks >= 20 &&
+        input.distinctPositiveFamilies >= 2))
+  ) {
+    return 'S3_OPENED';
+  }
+  if (
+    input.closeness >= 20 &&
+    input.trust >= 12 &&
+    input.distinctPositiveDays >= 5 &&
+    (input.distinctPositiveFamilies >= 3 ||
+      (input.distinctPositiveWeeks >= 8 &&
+        input.distinctPositiveFamilies >= 2))
   ) {
     return 'S2_REGULAR';
   }
@@ -495,7 +567,7 @@ export function simulateRelationshipCalibration(
     if (rule.opensConflict) conflictOpen = true;
     if (rule.repairsConflict) conflictOpen = false;
 
-    const candidateStage = resolveCandidateB1Stage({
+    const stageInput = {
       closeness,
       trust,
       distinctPositiveDays: positiveDays.size,
@@ -503,7 +575,11 @@ export function simulateRelationshipCalibration(
       distinctPositiveFamilies: positiveFamilies.size,
       milestoneCount,
       conflictOpen,
-    });
+    };
+    const candidateStage =
+      policy.stageGateVariant === 'b2_sustained_route_shadow'
+        ? resolveCandidateB2RouteStage(stageInput)
+        : resolveCandidateB1Stage(stageInput);
     const nextStage = resolveStageForMode({
       candidate: candidateStage,
       current: stage,
