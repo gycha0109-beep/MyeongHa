@@ -110,9 +110,7 @@ const ALWAYS_ON_SLICE_IDS = Object.freeze([
   'R14_guards',
 ] as const satisfies readonly SeyeonBibleSliceIdV2[]);
 
-const FOCUS_SLICE_IDS: Readonly<
-  Record<SeyeonContextFocusKeyV2, readonly SeyeonBibleSliceIdV2[]>
-> = Object.freeze({
+const FOCUS_SLICE_IDS = Object.freeze({
   choice: Object.freeze([
     'C1_values',
     'C7_real_flaw',
@@ -146,7 +144,10 @@ const FOCUS_SLICE_IDS: Readonly<
     'E_expression',
     'R6_expression_states',
   ]),
-});
+} as const satisfies Record<
+  SeyeonContextFocusKeyV2,
+  readonly SeyeonBibleSliceIdV2[]
+>);
 
 function assertPositiveBoundedInteger(
   value: number | undefined,
