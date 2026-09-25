@@ -342,7 +342,6 @@ export {
   SEYEON_EVENT_RETRIEVAL_POLICY_VERSION_V2,
   SeyeonEventExtractionErrorV2,
   guardSeyeonEventExtractionCandidateV2,
-  materializeSeyeonEventCandidateV2,
   rankSeyeonEventRetrievalV2,
   validateSeyeonEventExtractionContextV2,
   type SeyeonEventExtractionCandidateV2,
@@ -350,6 +349,18 @@ export {
   type SeyeonEventExtractionMessageV2,
   type SeyeonEventRetrievalCandidateV2,
 } from './seyeon-event-extraction-v2.js';
+
+export {
+  SEYEON_EVENT_AUTHORITY_MARKER_V1,
+  SEYEON_EVENT_AUTHORITY_REASON_CODES_V1,
+  SEYEON_EVENT_AUTHORITY_VERSION_V1,
+  SeyeonEventAuthorityErrorV1,
+  materializeSeyeonAuthorizedExperimentalEventV1,
+  validateSeyeonEventAuthorityV1,
+  type SeyeonEventAuthorityDecisionV1,
+  type SeyeonEventAuthorityEvidenceV1,
+  type SeyeonEventAuthorityReasonCodeV1,
+} from './seyeon-event-authority-v1.js';
 
 export {
   SEYEON_RELATIONSHIP_EPISODE_SCHEMA_VERSION_V2,
