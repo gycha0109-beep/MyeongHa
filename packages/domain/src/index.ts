@@ -268,3 +268,18 @@ export {
   type SajuProductionCalculationIngressArtifactV1,
   type SajuProductionCalculationIngressErrorCodeV1,
 } from './saju-production-calculation-ingress.js';
+
+export {
+  SEYEON_CONTEXT_FOCUS_KEYS_V2,
+  SEYEON_RUNTIME_CONTEXT_SCHEMA_VERSION_V2,
+  assembleSeyeonRuntimeContextV2,
+  resolveSeyeonBibleSliceSelectionV2,
+  type AssembleSeyeonRuntimeContextV2Input,
+  type SeyeonContextFocusKeyV2,
+  type SeyeonRecentMessageV2,
+  type SeyeonRelationshipContextV2,
+  type SeyeonRetrievedClaimKindV2,
+  type SeyeonRetrievedMemoryKindV2,
+  type SeyeonRetrievedMemoryV2,
+  type SeyeonRuntimeContextV2,
+} from './seyeon-runtime-context-v2.js';
