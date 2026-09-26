@@ -5,6 +5,7 @@ import {
   MYEONGHA_PRODUCTION_SUPABASE_PROJECT_REF,
   PRODUCTION_USER_DATA_RUNTIME_ENV_V1,
   ProductionUserDataRuntimeConfigErrorV1,
+  inspectProductionDatabaseTlsPostureV1,
   parseProductionUserDataRuntimeConfigV1,
   summarizeProductionUserDataRuntimeConfigV1,
 } from '../apps/api/src/production-user-data-runtime-config.js';
@@ -127,6 +128,72 @@ describe('production user-data runtime configuration', () => {
     );
   });
 
+  it('classifies PostgreSQL TLS modes without returning connection authority material', () => {
+    expect(inspectProductionDatabaseTlsPostureV1(DATABASE_URL)).toEqual({
+      mode: 'require',
+      peerVerification: 'none',
+      explicitRootCertificateConfigured: false,
+    });
+
+    expect(
+      inspectProductionDatabaseTlsPostureV1(
+        'postgresql://user:secret@pooler.example/postgres?sslmode=verify-ca&sslrootcert=%2Fvar%2Frun%2Fproject-ca.crt',
+      ),
+    ).toEqual({
+      mode: 'verify-ca',
+      peerVerification: 'ca_only',
+      explicitRootCertificateConfigured: true,
+    });
+
+    expect(
+      inspectProductionDatabaseTlsPostureV1(
+        'postgresql://user:secret@pooler.example/postgres?sslmode=verify-full&sslrootcert=%2Fvar%2Frun%2Fproject-ca.crt',
+      ),
+    ).toEqual({
+      mode: 'verify-full',
+      peerVerification: 'full',
+      explicitRootCertificateConfigured: true,
+    });
+
+    expect(
+      inspectProductionDatabaseTlsPostureV1(
+        'postgresql://user:secret@pooler.example/postgres',
+      ),
+    ).toEqual({
+      mode: 'absent',
+      peerVerification: 'none',
+      explicitRootCertificateConfigured: false,
+    });
+
+    expect(
+      inspectProductionDatabaseTlsPostureV1(
+        'postgresql://user:secret@pooler.example/postgres?sslmode=no-verify',
+      ),
+    ).toEqual({
+      mode: 'no-verify',
+      peerVerification: 'none',
+      explicitRootCertificateConfigured: false,
+    });
+  });
+
+  it('keeps unknown or malformed TLS authority fail-observable without reflecting input', () => {
+    expect(
+      inspectProductionDatabaseTlsPostureV1(
+        'postgresql://user:secret@pooler.example/postgres?sslmode=future-mode',
+      ),
+    ).toEqual({
+      mode: 'unknown',
+      peerVerification: 'unknown',
+      explicitRootCertificateConfigured: false,
+    });
+
+    expect(inspectProductionDatabaseTlsPostureV1('not a database url')).toEqual({
+      mode: 'unknown',
+      peerVerification: 'unknown',
+      explicitRootCertificateConfigured: false,
+    });
+  });
+
   it('produces a diagnostic summary without exposing secret values or the database URL', () => {
     const config = parseProductionUserDataRuntimeConfigV1(validEnv());
     const summary = summarizeProductionUserDataRuntimeConfigV1(config);
@@ -136,12 +203,17 @@ describe('production user-data runtime configuration', () => {
       databaseConfigured: true,
       databasePrincipal: DATABASE_PRINCIPAL,
       databaseExecutionRole: 'myeongha_api_executor',
+      databaseTlsMode: 'require',
+      databaseTlsPeerVerification: 'none',
+      databaseTlsRootCertificateConfigured: false,
       supabaseOrigin: MYEONGHA_PRODUCTION_SUPABASE_ORIGIN,
       supabaseApiKeyConfigured: true,
       guestFingerprintSecretConfigured: true,
     });
     expect(serialized).not.toContain(DATABASE_URL);
     expect(serialized).not.toContain('runtime-password');
+    expect(serialized).not.toContain('db.example.internal');
+    expect(serialized).not.toContain('sslrootcert');
     expect(serialized).not.toContain(SUPABASE_API_KEY);
     expect(serialized).not.toContain(GUEST_FINGERPRINT_SECRET);
   });
