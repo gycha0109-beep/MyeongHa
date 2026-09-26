@@ -10,6 +10,7 @@ const birthCommandPath = 'apps/api/src/birth-profile-create-command.ts';
 const chatBodyPath = 'apps/api/src/chat-open-request-body.ts';
 const chatHttpPath = 'apps/api/src/chat-open-http.ts';
 const readingHttpPath = 'apps/api/src/reading-create-http.ts';
+const previewReadingHttpPath = 'apps/api/src/current-subject-saju-preview-reading-http.ts';
 const readingCommandPath = 'apps/api/src/reading-create-command.ts';
 const birthAdapterPath = 'api/birth-profiles.ts';
 const productionWorkflowPath = '.github/workflows/production-authenticated-json-resource-evidence.yml';
@@ -25,6 +26,7 @@ const [
   chatBody,
   chatHttp,
   readingHttp,
+  previewReadingHttp,
   readingCommand,
   birthAdapter,
   productionWorkflow,
@@ -39,6 +41,7 @@ const [
   readFile(chatBodyPath, 'utf8'),
   readFile(chatHttpPath, 'utf8'),
   readFile(readingHttpPath, 'utf8'),
+  readFile(previewReadingHttpPath, 'utf8'),
   readFile(readingCommandPath, 'utf8'),
   readFile(birthAdapterPath, 'utf8'),
   readFile(productionWorkflowPath, 'utf8'),
@@ -164,6 +167,27 @@ for (const [name, source] of [
   if (source.includes('input.request.json()')) {
     throw new Error(`${name} regressed to unbounded Request.json() body consumption.`);
   }
+}
+
+for (const fragment of [
+  'readAuthenticatedJsonRequestBodyV1(input.request, {',
+  'bodyDeadline.waitFor(pending)',
+  'AuthenticatedJsonRequestBodyTooLargeV1',
+  'IngressRequestBodyCompletionDeadlineExceededV1',
+  "status: 413",
+  "code: 'REQUEST_TOO_LARGE'",
+  "status: 408",
+  "code: 'REQUEST_BODY_TIMEOUT'",
+]) {
+  requireFragment(previewReadingHttpPath, previewReadingHttp, fragment);
+}
+if (previewReadingHttp.includes('input.request.json()')) {
+  throw new Error(`${previewReadingHttpPath} regressed to unbounded Request.json() body consumption.`);
+}
+const previewAuthIndex = previewReadingHttp.indexOf('verifyRequestIdentity');
+const previewBodyIndex = previewReadingHttp.indexOf('readAuthenticatedJsonRequestBodyV1(input.request');
+if (previewAuthIndex < 0 || previewBodyIndex < 0 || previewBodyIndex <= previewAuthIndex) {
+  throw new Error(`${previewReadingHttpPath} must preserve authentication-before-body consumption.`);
 }
 
 for (const fragment of [
