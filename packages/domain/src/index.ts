@@ -71,6 +71,21 @@ export {
 } from './character-saju-grounding-admission.js';
 
 export {
+  CHARACTER_FACE_CONTEXT_SCHEMA_VERSION_V1,
+  CHARACTER_FACE_REALIZATION_MODE_V1,
+  CHARACTER_FACE_SOURCE_BINDING_SCHEMA_VERSION_V1,
+  FACE_CHARACTER_GROUNDING_PROJECTION_VERSION_V1,
+  FACE_CHARACTER_GROUNDING_REF_SCHEMA_VERSION_V1,
+  CharacterFaceGroundingAdmissionErrorV1,
+  admitCharacterFaceGroundingRefV1,
+  admitCharacterRuntimeFaceGroundingV1,
+  type CharacterFaceGroundingRefV1,
+  type CharacterFaceRuntimeContextV1,
+  type CharacterFaceSourceBindingV1,
+  type CharacterRuntimeContextWithFaceGroundingV1,
+} from './character-face-grounding-admission.js';
+
+export {
   CHARACTER_PERSPECTIVE_NARRATIVE_ROLES_V1,
   CHARACTER_PERSPECTIVE_SCHEMA_VERSION_V1,
   SAJU_GROUNDING_AXIS_KEYS_V1,
