@@ -452,3 +452,14 @@ export {
   type SeyeonRiskActionCausalityDecisionV1,
   type SeyeonRiskActionKindV1,
 } from './seyeon-risk-action-causality-v1.js';
+
+
+export {
+  SEYEON_RELATIONSHIP_POLICY_SHADOW_AUTHORITY_V3,
+  SEYEON_RELATIONSHIP_POLICY_SHADOW_VERSION_V3,
+  SeyeonRelationshipPolicyShadowErrorV3,
+  bindSeyeonAuthorizedRelationshipEvidenceV3,
+  projectSeyeonRelationshipPolicyShadowV3,
+  type SeyeonAuthorizedRelationshipEvidenceV3,
+  type SeyeonRelationshipPolicyShadowProjectionV3,
+} from './seyeon-relationship-policy-shadow-v3.js';
