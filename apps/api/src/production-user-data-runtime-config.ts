@@ -25,10 +25,35 @@ export interface ProductionUserDataRuntimeConfigV1 {
   readonly guestFingerprintSecret: string;
 }
 
+export type ProductionDatabaseTlsModeV1 =
+  | 'absent'
+  | 'disable'
+  | 'no-verify'
+  | 'prefer'
+  | 'require'
+  | 'verify-ca'
+  | 'verify-full'
+  | 'unknown';
+
+export type ProductionDatabaseTlsPeerVerificationV1 =
+  | 'none'
+  | 'ca_only'
+  | 'full'
+  | 'unknown';
+
+export interface ProductionDatabaseTlsPostureV1 {
+  readonly mode: ProductionDatabaseTlsModeV1;
+  readonly peerVerification: ProductionDatabaseTlsPeerVerificationV1;
+  readonly explicitRootCertificateConfigured: boolean;
+}
+
 export interface ProductionUserDataRuntimeConfigSummaryV1 {
   readonly databaseConfigured: true;
   readonly databasePrincipal: string;
   readonly databaseExecutionRole: typeof MYEONGHA_API_EXECUTION_ROLE;
+  readonly databaseTlsMode: ProductionDatabaseTlsModeV1;
+  readonly databaseTlsPeerVerification: ProductionDatabaseTlsPeerVerificationV1;
+  readonly databaseTlsRootCertificateConfigured: boolean;
   readonly supabaseOrigin: typeof MYEONGHA_PRODUCTION_SUPABASE_ORIGIN;
   readonly supabaseApiKeyConfigured: true;
   readonly guestFingerprintSecretConfigured: true;
@@ -88,6 +113,50 @@ function parseDatabaseUrl(value: string): string {
   }
 
   return value;
+}
+
+export function inspectProductionDatabaseTlsPostureV1(
+  databaseUrl: string,
+): ProductionDatabaseTlsPostureV1 {
+  let url: URL;
+  try {
+    url = new URL(databaseUrl);
+  } catch {
+    return Object.freeze({
+      mode: 'unknown',
+      peerVerification: 'unknown',
+      explicitRootCertificateConfigured: false,
+    });
+  }
+
+  const rawMode = url.searchParams.get('sslmode')?.trim().toLowerCase() ?? '';
+  const mode: ProductionDatabaseTlsModeV1 =
+    rawMode === ''
+      ? 'absent'
+      : rawMode === 'disable' ||
+          rawMode === 'no-verify' ||
+          rawMode === 'prefer' ||
+          rawMode === 'require' ||
+          rawMode === 'verify-ca' ||
+          rawMode === 'verify-full'
+        ? rawMode
+        : 'unknown';
+
+  const peerVerification: ProductionDatabaseTlsPeerVerificationV1 =
+    mode === 'verify-full'
+      ? 'full'
+      : mode === 'verify-ca'
+        ? 'ca_only'
+        : mode === 'unknown'
+          ? 'unknown'
+          : 'none';
+
+  return Object.freeze({
+    mode,
+    peerVerification,
+    explicitRootCertificateConfigured:
+      (url.searchParams.get('sslrootcert')?.trim().length ?? 0) > 0,
+  });
 }
 
 function parseDatabasePrincipal(value: string): string {
@@ -175,10 +244,18 @@ export function parseProductionUserDataRuntimeConfigV1(
 export function summarizeProductionUserDataRuntimeConfigV1(
   config: ProductionUserDataRuntimeConfigV1,
 ): ProductionUserDataRuntimeConfigSummaryV1 {
+  const databaseTlsPosture = inspectProductionDatabaseTlsPostureV1(
+    config.databaseUrl,
+  );
+
   return Object.freeze({
     databaseConfigured: true,
     databasePrincipal: config.databasePrincipal,
     databaseExecutionRole: config.databaseExecutionRole,
+    databaseTlsMode: databaseTlsPosture.mode,
+    databaseTlsPeerVerification: databaseTlsPosture.peerVerification,
+    databaseTlsRootCertificateConfigured:
+      databaseTlsPosture.explicitRootCertificateConfigured,
     supabaseOrigin: config.supabaseOrigin,
     supabaseApiKeyConfigured: true,
     guestFingerprintSecretConfigured: true,
