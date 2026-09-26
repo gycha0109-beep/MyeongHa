@@ -123,7 +123,7 @@ export function buildSeyeonRelationshipPolicyConvergenceReportV3(input: {
         : 'OPEN',
       F04_REPAIR_FIFTH_FAMILY: input.repairFifthFamilyMitigated
         ? 'MITIGATED'
-        : 'OPEN',
+        : 'OWNER_DECISION_REQUIRED',
       F05_REPAIR_MILESTONE_FARMING: input.repairMilestoneFarmingMitigated
         ? 'MITIGATED'
         : 'OPEN',
