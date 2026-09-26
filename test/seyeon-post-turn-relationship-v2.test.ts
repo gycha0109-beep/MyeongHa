@@ -11,6 +11,7 @@ import type {
 import {
   InMemorySeyeonEventLedgerV2,
   SEYEON_EVENT_LEDGER_SCHEMA_VERSION_V2,
+  evaluateCharacterIntegrityClaimV1,
   type SeyeonExperimentalEventKindV2,
   type SeyeonRelationshipEventV2,
 } from '../packages/domain/src/index.js';
@@ -112,6 +113,50 @@ function identity() {
   };
 }
 
+function emptyEventAuthorityEvidence() {
+  return {
+    integrityDecisions: [],
+  };
+}
+
+function verifiedSharedEventEvidence() {
+  return {
+    integrityDecisions: [
+      evaluateCharacterIntegrityClaimV1({
+        claim: {
+          claimId: 'claim-promise-kept',
+          kind: 'SHARED_EVENT_CLAIM',
+          statement: '사용자가 이전 약속을 실제로 이행했다.',
+          sourceRef: 'user-current',
+        },
+        evidence: {
+          state: 'MATCH',
+          authorityRefs: ['world:event:promise-kept'],
+        },
+      }),
+    ],
+  };
+}
+
+function unverifiedSharedEventEvidence() {
+  return {
+    integrityDecisions: [
+      evaluateCharacterIntegrityClaimV1({
+        claim: {
+          claimId: 'claim-promise-kept',
+          kind: 'SHARED_EVENT_CLAIM',
+          statement: '사용자가 이전 약속을 실제로 이행했다.',
+          sourceRef: 'user-current',
+        },
+        evidence: {
+          state: 'MISSING',
+          authorityRefs: [],
+        },
+      }),
+    ],
+  };
+}
+
 describe('Se-yeon post-turn relationship runtime v2', () => {
   it('fails closed before extraction when a production relationship ledger is bound prematurely', async () => {
     let providerCalled = false;
@@ -137,6 +182,7 @@ describe('Se-yeon post-turn relationship runtime v2', () => {
         ...turn(),
         ledger: forbiddenLedger,
         extractorProvider: provider,
+        eventAuthorityEvidence: emptyEventAuthorityEvidence(),
         semanticRelevanceByEventId: {},
         identity: identity(),
       }),
@@ -164,6 +210,7 @@ describe('Se-yeon post-turn relationship runtime v2', () => {
       ...turn(),
       ledger,
       extractorProvider: provider,
+      eventAuthorityEvidence: emptyEventAuthorityEvidence(),
       semanticRelevanceByEventId: {},
       identity: identity(),
     });
@@ -223,6 +270,7 @@ describe('Se-yeon post-turn relationship runtime v2', () => {
       ...turn(),
       ledger,
       extractorProvider: provider,
+      eventAuthorityEvidence: verifiedSharedEventEvidence(),
       semanticRelevanceByEventId: {
         [promise.eventId]: 0.96,
       },
@@ -233,6 +281,10 @@ describe('Se-yeon post-turn relationship runtime v2', () => {
     if (result.decision !== 'event') throw new Error('Expected event result.');
     expect(result.priorCausalEventIds).toContain(promise.eventId);
     expect(result.event.causalPredecessorEventIds).toEqual([promise.eventId]);
+    expect(result.authorityDecision.decision).toBe('ADMIT_EXPERIMENTAL');
+    expect(result.event.facts[0]?.statement).toBe(
+      '사용자가 이전 약속을 실제로 이행했다.',
+    );
     expect(result.relationshipBefore.evidence.trust).toBe(0);
     expect(result.relationshipAfter.evidence.trust).toBe(2);
     expect(ledger.entries).toHaveLength(2);
@@ -243,6 +295,63 @@ describe('Se-yeon post-turn relationship runtime v2', () => {
     expect(requestInput.context.priorEvents.map((item) => item.eventId)).toContain(
       promise.eventId,
     );
+  });
+
+  it('rejects an unverified promise outcome and leaves the ledger projection unchanged', async () => {
+    const ledger = new InMemorySeyeonEventLedgerV2();
+    const promise = event({
+      id: 'promise-made-prior',
+      kind: 'PROMISE_MADE',
+      occurredAt: '2026-09-20T00:00:00.000Z',
+    });
+    ledger.appendEvent({
+      ledgerEntryId: 'entry-prior',
+      recordedAt: '2026-09-20T00:00:01.000Z',
+      event: promise,
+    });
+    const provider: SeyeonStructuredProviderPortV2 = {
+      providerKey: 'mock-extractor',
+      modelKey: 'cheap-structured',
+      generate() {
+        return {
+          schemaVersion: 'seyeon-event-extraction-candidate-exp-v2',
+          decision: 'event',
+          reason: '사용자 주장을 PROMISE_KEPT 후보로 분류했다.',
+          eventKind: 'PROMISE_KEPT',
+          sourceMessageRefs: ['user-current'],
+          causalPredecessorEventIds: [promise.eventId],
+          facts: [
+            {
+              factKey: 'promise_outcome',
+              statement: '사용자가 이전 약속을 지켰다고 말했다.',
+              sourceRefs: ['user-current'],
+            },
+          ],
+          characterInterpretation: null,
+          salience: 1,
+          confidence: 1,
+          dedupeBasis: 'provider-cannot-authorize',
+        };
+      },
+    };
+
+    const before = ledger.projectRelationship();
+    const result = await runSeyeonPostTurnRelationshipV2({
+      ...turn(),
+      ledger,
+      extractorProvider: provider,
+      eventAuthorityEvidence: unverifiedSharedEventEvidence(),
+      semanticRelevanceByEventId: {
+        [promise.eventId]: 1,
+      },
+      identity: identity(),
+    });
+
+    expect(result.decision).toBe('rejected');
+    if (result.decision !== 'rejected') throw new Error('Expected rejection.');
+    expect(result.authorityDecision.reasonCodes).toContain('UNVERIFIED_CLAIM');
+    expect(result.relationshipAfter).toEqual(before);
+    expect(ledger.entries).toHaveLength(1);
   });
 
   it('fails closed when extractor invents a causal predecessor and leaves the ledger unchanged', async () => {
@@ -278,6 +387,7 @@ describe('Se-yeon post-turn relationship runtime v2', () => {
         ...turn(),
         ledger,
         extractorProvider: provider,
+        eventAuthorityEvidence: emptyEventAuthorityEvidence(),
         semanticRelevanceByEventId: {},
         identity: identity(),
       }),
@@ -318,6 +428,7 @@ describe('Se-yeon post-turn relationship runtime v2', () => {
       ...turn(),
       ledger,
       extractorProvider: provider,
+      eventAuthorityEvidence: emptyEventAuthorityEvidence(),
       semanticRelevanceByEventId: {
         [conflict.eventId]: 0,
       },
