@@ -204,13 +204,20 @@ export function projectSeyeonRelationshipPolicyShadowV3(input: {
 
   const events = input.evidence.map((item) => item.event);
   const episodes = buildSeyeonRelationshipEvidenceEpisodesV2(events);
-  const credits = creditSeyeonRelationshipEpisodesV2(episodes, {
-    maxPositiveCreditsPerFamilyRolling7Days:
-      input.maxPositiveCreditsPerFamilyRolling7Days,
-  });
+  const credits = creditSeyeonRelationshipEpisodesV2(
+    episodes,
+    input.maxPositiveCreditsPerFamilyRolling7Days === undefined
+      ? {}
+      : {
+          maxPositiveCreditsPerFamilyRolling7Days:
+            input.maxPositiveCreditsPerFamilyRolling7Days,
+        },
+  );
   const profile = summarizeSeyeonRelationshipEpisodeProfileV2(episodes);
   const state = projectSeyeonRelationshipStateShadowV2({
-    previousAttainedStage: input.previousAttainedStage,
+    ...(input.previousAttainedStage === undefined
+      ? {}
+      : { previousAttainedStage: input.previousAttainedStage }),
     currentCandidateStage: input.currentCandidateStage,
     episodes,
   });
