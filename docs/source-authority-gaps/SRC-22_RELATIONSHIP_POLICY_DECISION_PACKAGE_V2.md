@@ -294,7 +294,13 @@ Event Authority
 
 ## 6. Owner decision request
 
-For D08-D29, respond with:
+The operational source-owner decision surface is:
+
+`docs/source-authority-gaps/SRC-22_RELATIONSHIP_POLICY_OWNER_FREEZE_WORKSHEET_V1.md`
+
+This V2 package remains the evidence/disposition source. The worksheet may organize decisions but must not silently change the evidence status recorded here.
+
+For every owner-bound D08-D29 item, the source owner must explicitly record:
 
 ~~~text
 ACCEPT
@@ -303,6 +309,8 @@ DEFER
 REJECT
 ~~~
 
-and exact replacement contracts/values where required.
+plus exact replacement contracts/values where required.
 
-Until that decision is recorded, SRC-22 remains OPEN.
+A working candidate, calibration value, implementation prototype, blank worksheet field, or assistant recommendation is not a Production decision.
+
+Until the explicit freeze is complete and its closure audit passes, SRC-22 remains OPEN and Production relationship mutation remains blocked.
