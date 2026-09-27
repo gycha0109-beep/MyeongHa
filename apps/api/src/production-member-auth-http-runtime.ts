@@ -90,7 +90,10 @@ export function createProductionMemberAuthHttpRuntimeV1(
   }
 
   return Object.freeze({
-    async handleRequest(requestInput) {
+    async handleRequest(requestInput: {
+      readonly request: Request;
+      readonly action: MemberAuthRateLimitActionV1;
+    }) {
       if (requestInput.request.method !== 'POST') {
         return authHandler({
           request: requestInput.request,
