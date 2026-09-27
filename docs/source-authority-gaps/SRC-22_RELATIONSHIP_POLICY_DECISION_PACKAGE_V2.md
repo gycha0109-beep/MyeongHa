@@ -1,7 +1,7 @@
 # SRC-22 Relationship Policy Decision Package V2
 
 > Track: character-memory  
-> Status: **SOURCE-OWNER FREEZE COMPLETE / CLOSURE AUDIT PASS / MERGE PENDING**  
+> Status: **SRC-22 CLOSED / PHASE K ACTIVE**  
 > Evidence: Event Authority V1 + Governed Authority Dogfood V3 + Relationship Policy Convergence V3  
 > Production mutation: **BLOCKED**
 
@@ -21,7 +21,7 @@ Block B — owner-frozen 2026-09-27
 Block C — owner-frozen 2026-09-27
 Block D — owner-frozen 2026-09-27
 Closure audit — PASS
-Authoritative gap state — keep OPEN until this decision package is merged
+Authoritative gap state — CLOSED after decision package merge
 ~~~
 
 The owner-frozen values are recorded only in `SRC-22_RELATIONSHIP_POLICY_OWNER_FREEZE_WORKSHEET_V1.md`; this V2 document preserves the evidence/disposition record that led to those decisions.
