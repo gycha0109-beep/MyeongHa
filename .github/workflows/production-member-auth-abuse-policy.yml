@@ -1,5 +1,5 @@
 name: Production Member Auth Abuse Policy
-run-name: "[WT:ops] Production Member Auth Abuse Policy — ${{ inputs.mode }}"
+run-name: "[WT:ops] Production Member Auth Abuse Policy — ${{ github.event_name == 'workflow_dispatch' && inputs.mode || 'one-shot-probe-preview-capability' }}"
 
 on:
   workflow_dispatch:
@@ -20,6 +20,11 @@ on:
         required: true
         default: ops
         type: string
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/ops/sec-02-b1a-preview-waf-capability.once'
 
 permissions:
   contents: read
@@ -40,14 +45,29 @@ jobs:
     timeout-minutes: 10
     environment: production
     env:
-      MYEONGHA_WATCHTOWER_TRACK: ${{ inputs.watchtower_track }}
-      MEMBER_AUTH_ABUSE_POLICY_MODE: ${{ inputs.mode }}
-      DISPATCH_CONFIRM: ${{ inputs.confirm }}
+      MYEONGHA_WATCHTOWER_TRACK: ${{ github.event_name == 'workflow_dispatch' && inputs.watchtower_track || 'ops' }}
+      MEMBER_AUTH_ABUSE_POLICY_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.mode || 'probe-preview-capability' }}
+      DISPATCH_CONFIRM: ${{ github.event_name == 'workflow_dispatch' && inputs.confirm || 'PROBE_MEMBER_AUTH_PREVIEW_WAF_CAPABILITY_V1' }}
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
     steps:
       - name: Checkout exact repository state
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
+      - name: Gate one-shot push probe marker
+        id: one_shot
+        if: ${{ github.event_name == 'push' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          marker='.github/ops/sec-02-b1a-preview-waf-capability.once'
+          if [[ ! -f "$marker" ]]; then
+            echo "execute=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          [[ "$(tr -d '\r\n' < "$marker")" == "SEC-02-B1A-PREVIEW-WAF-CAPABILITY-PROBE-V1" ]]
+          echo "execute=true" >> "$GITHUB_OUTPUT"
+
       - name: Verify HOLD state or run reversible Preview capability probe
+        if: ${{ github.event_name == 'workflow_dispatch' || steps.one_shot.outputs.execute == 'true' }}
         shell: bash
         run: bash scripts/operations/run-production-member-auth-abuse-policy.sh
