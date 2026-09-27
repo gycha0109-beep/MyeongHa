@@ -59,10 +59,10 @@ function authority(
   return Object.freeze({
     schemaVersion: 'seyeon-event-authority-v1',
     authority:
-      'experimental_event_admission_not_production_relationship_authority',
-    decision: 'ADMIT_EXPERIMENTAL',
+      'experimental_event_admission_not_production_relationship_authority' as const,
+    decision: 'ADMIT_EXPERIMENTAL' as const,
     eventKind: relationshipEvent.eventKind,
-    reasonCodes: Object.freeze(['OBSERVED_CURRENT_TURN_INTERACTION']),
+    reasonCodes: Object.freeze(['OBSERVED_CURRENT_TURN_INTERACTION'] as const),
     evidence: Object.freeze({
       currentTurnId: relationshipEvent.sourceTurnId,
       observedMessageRefs: relationshipEvent.sourceMessageRefs,
@@ -84,12 +84,12 @@ function authority(
     characterInterpretation: null,
     constraints: Object.freeze({
       mayAppendExperimentalLedger: true,
-      mayAppendProductionRelationshipEvent: false,
-      mayMutateProductionRelationshipState: false,
-      mayCreateDurableMemory: false,
-      mayGrantTruthAuthority: false,
-      mayOverrideIntegrity: false,
-      mayOverrideDisclosure: false,
+      mayAppendProductionRelationshipEvent: false as const,
+      mayMutateProductionRelationshipState: false as const,
+      mayCreateDurableMemory: false as const,
+      mayGrantTruthAuthority: false as const,
+      mayOverrideIntegrity: false as const,
+      mayOverrideDisclosure: false as const,
     }),
   });
 }
