@@ -856,3 +856,17 @@ export {
   type SyncSeyeonProductionRelationshipEventV1Input,
   type SyncSeyeonProductionRelationshipEventV1Result,
 } from './seyeon-production-relationship-sync-v1.js';
+export {
+  SEYEON_PRODUCTION_RELATIONSHIP_ACTIVATION_VERSION_V1,
+  resolveSeyeonProductionRelationshipActivationV1,
+  type SeyeonProductionRelationshipActivationV1,
+} from './seyeon-production-relationship-activation-v1.js';
+
+export {
+  SEYEON_PRODUCTION_VERTICAL_SLICE_VERSION_V1,
+  SeyeonProductionVerticalSliceErrorV1,
+  runSeyeonProductionVerticalSliceV1,
+  type RunSeyeonProductionVerticalSliceInputV1,
+  type RunSeyeonProductionVerticalSliceResultV1,
+  type SeyeonCommittedTurnRelationshipSignalV1,
+} from './seyeon-production-vertical-slice-v1.js';
