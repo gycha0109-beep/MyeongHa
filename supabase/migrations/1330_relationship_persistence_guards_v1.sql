@@ -154,15 +154,27 @@ begin
       message = 'relationship history entry is missing';
   end if;
 
-  select count(*), min(id)
-    into v_event_count, v_event_id
+  select count(*)
+    into v_event_count
   from public.relationship_event_records
   where history_entry_id = v_history_entry_id;
 
-  select count(*), min(adjustment_type), min(replacement_event_id)
-    into v_adjustment_count, v_adjustment_type, v_replacement_event_id
+  select id
+    into v_event_id
+  from public.relationship_event_records
+  where history_entry_id = v_history_entry_id
+  limit 1;
+
+  select count(*)
+    into v_adjustment_count
   from public.relationship_event_adjustments
   where history_entry_id = v_history_entry_id;
+
+  select adjustment_type, replacement_event_id
+    into v_adjustment_type, v_replacement_event_id
+  from public.relationship_event_adjustments
+  where history_entry_id = v_history_entry_id
+  limit 1;
 
   if v_entry_kind = 'event' then
     if v_event_count <> 1 or v_adjustment_count <> 0 then
