@@ -1,7 +1,7 @@
 {
   "contractVersion": "myeongha-member-auth-abuse-policy-v2",
   "strategy": "postgres-application-admission",
-  "activationState": "production-enforcement-pending-canary",
+  "activationState": "production-active",
   "algorithm": "anchored-fixed-window",
   "windowSeconds": 60,
   "requestLimit": 30,
@@ -53,10 +53,21 @@
     ]
   },
   "productionCanary": {
-    "status": "pending",
+    "status": "pass",
+    "runId": 36346090857,
+    "exactProductionDeploymentId": "dpl_8sA237CXZ4vN65N9Nq4uSPYf9p4h",
     "sideEffectFree": true,
     "expectedAllowedInvalidRequests": 30,
     "expectedFirstRateLimitedAttempt": 31,
-    "signOutExcluded": true
+    "observedRetryAfterSeconds": {
+      "sign-in": 52,
+      "sign-up": 53,
+      "refresh": 52
+    },
+    "endpointBucketIndependence": true,
+    "signOutExcluded": true,
+    "probePayloads": "local-invalid-only",
+    "rawNetworkIdentifiersEmitted": false,
+    "credentialMaterialEmitted": false
   }
 }
