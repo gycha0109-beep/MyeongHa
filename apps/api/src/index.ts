@@ -870,3 +870,18 @@ export {
   type RunSeyeonProductionVerticalSliceResultV1,
   type SeyeonCommittedTurnRelationshipSignalV1,
 } from './seyeon-production-vertical-slice-v1.js';
+export {
+  SEYEON_PRODUCTION_RELATIONSHIP_SYNC_OUTBOX_VERSION_V1,
+  SeyeonProductionRelationshipSyncOutboxErrorV1,
+  processSeyeonProductionRelationshipSyncOutboxV1,
+  type ProcessSeyeonProductionRelationshipSyncOutboxInputV1,
+  type ProcessSeyeonProductionRelationshipSyncOutboxResultV1,
+  type SeyeonProductionRelationshipSyncOutboxPortV1,
+} from './seyeon-production-relationship-outbox-v1.js';
+
+export {
+  POSTGRES_SEYEON_RELATIONSHIP_SYNC_CLAIM_BINDING_V1,
+  POSTGRES_SEYEON_RELATIONSHIP_SYNC_COMPLETE_BINDING_V1,
+  POSTGRES_SEYEON_RELATIONSHIP_SYNC_ENQUEUE_BINDING_V1,
+  createPostgresSeyeonProductionRelationshipSyncOutboxPortV1,
+} from './postgres-seyeon-production-relationship-outbox-v1.js';
