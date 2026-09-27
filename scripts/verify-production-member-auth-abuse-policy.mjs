@@ -8,6 +8,7 @@ const paths = {
   runScript: 'scripts/operations/run-production-member-auth-abuse-policy.sh',
   liveScript: 'scripts/operations/verify-production-member-auth-abuse-policy-live.sh',
   probeScript: 'scripts/operations/probe-production-member-auth-waf-capability.sh',
+  oneShotMarker: '.github/ops/sec-02-b1a-preview-waf-capability.once',
   signIn: 'api/auth/sign-in.ts',
   signUp: 'api/auth/sign-up.ts',
   refresh: 'api/auth/refresh.ts',
@@ -19,7 +20,7 @@ for (const script of [paths.runScript, paths.liveScript, paths.probeScript]) {
   execFileSync('bash', ['-n', script], { stdio: 'inherit' });
 }
 
-const [policyRaw, registryRaw, workflow, runScript, liveScript, probeScript, signIn, signUp, refresh, signOut, docs] =
+const [policyRaw, registryRaw, workflow, runScript, liveScript, probeScript, oneShotMarker, signIn, signUp, refresh, signOut, docs] =
   await Promise.all([
     readFile(paths.policy, 'utf8'),
     readFile(paths.registry, 'utf8'),
@@ -27,6 +28,7 @@ const [policyRaw, registryRaw, workflow, runScript, liveScript, probeScript, sig
     readFile(paths.runScript, 'utf8'),
     readFile(paths.liveScript, 'utf8'),
     readFile(paths.probeScript, 'utf8'),
+    readFile(paths.oneShotMarker, 'utf8'),
     readFile(paths.signIn, 'utf8'),
     readFile(paths.signUp, 'utf8'),
     readFile(paths.refresh, 'utf8'),
@@ -113,6 +115,10 @@ for (const fragment of [
   'name: Production Member Auth Abuse Policy',
   'run-name: "[WT:ops] Production Member Auth Abuse Policy',
   'workflow_dispatch:',
+  'push:',
+  'branches:',
+  '- main',
+  "'.github/ops/sec-02-b1a-preview-waf-capability.once'",
   '- verify-live',
   '- probe-preview-capability',
   'VERIFY_MEMBER_AUTH_ABUSE_POLICY_V1 or PROBE_MEMBER_AUTH_PREVIEW_WAF_CAPABILITY_V1',
@@ -120,10 +126,15 @@ for (const fragment of [
   'default: ops',
   'group: production-vercel-firewall-config',
   'VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}',
+  "github.event_name == 'workflow_dispatch' && inputs.mode || 'probe-preview-capability'",
+  "github.event_name == 'workflow_dispatch' && inputs.confirm || 'PROBE_MEMBER_AUTH_PREVIEW_WAF_CAPABILITY_V1'",
+  'Gate one-shot push probe marker',
+  'SEC-02-B1A-PREVIEW-WAF-CAPABILITY-PROBE-V1',
+  "github.event_name == 'workflow_dispatch' || steps.one_shot.outputs.execute == 'true'",
   'run: bash scripts/operations/run-production-member-auth-abuse-policy.sh',
   'cancel-in-progress: false',
 ]) requireFragment(paths.workflow, workflow, fragment);
-for (const forbidden of ['\npush:', '\npull_request:', '\nschedule:']) {
+for (const forbidden of ['\npull_request:', '\nschedule:']) {
   forbidFragment(paths.workflow, workflow, forbidden);
 }
 
@@ -135,6 +146,9 @@ for (const fragment of [
   'probe-preview-capability',
   'VERIFY_MEMBER_AUTH_ABUSE_POLICY_V1',
   'PROBE_MEMBER_AUTH_PREVIEW_WAF_CAPABILITY_V1',
+  'ONE_SHOT_MARKER_FILE=".github/ops/sec-02-b1a-preview-waf-capability.once"',
+  'ONE_SHOT_MARKER_VALUE="SEC-02-B1A-PREVIEW-WAF-CAPABILITY-PROBE-V1"',
+  'elif [[ "$GITHUB_EVENT_NAME" == "push" ]]',
   'verify-production-member-auth-abuse-policy-live.sh',
   'probe-production-member-auth-waf-capability.sh',
 ]) requireFragment(paths.runScript, runScript, fragment);
@@ -150,6 +164,9 @@ for (const fragment of [
 
 for (const fragment of [
   'PROBE_MEMBER_AUTH_PREVIEW_WAF_CAPABILITY_V1',
+  'ONE_SHOT_MARKER_FILE=".github/ops/sec-02-b1a-preview-waf-capability.once"',
+  'ONE_SHOT_MARKER_VALUE="SEC-02-B1A-PREVIEW-WAF-CAPABILITY-PROBE-V1"',
+  'elif [[ "$GITHUB_EVENT_NAME" == "push" ]]',
   'activationState == "hold"',
   'draftAuthority == "preview-capability-probe"',
   'assert_managed_rate_limit_registry_live_safety "$before_file" ""',
@@ -196,6 +213,10 @@ for (const source of [runScript, liveScript, workflow]) {
     'SUPABASE_DB_PASSWORD',
     'MYEONGHA_DATABASE_URL',
   ]) forbidFragment('Member Auth Phase A control plane', source, forbidden);
+}
+
+if (oneShotMarker.trim() !== 'SEC-02-B1A-PREVIEW-WAF-CAPABILITY-PROBE-V1') {
+  throw new Error('One-shot B1a probe marker content is not exact.');
 }
 
 for (const fragment of [
