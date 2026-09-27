@@ -562,7 +562,11 @@ Block B progression semantics are frozen. Exact Event-to-family mapping, per-Eve
 
 ## 5. Block C — Production Event contract
 
+Decision brief: `docs/source-authority-gaps/SRC-22_RELATIONSHIP_POLICY_BLOCK_C_DECISION_BRIEF_V1.md`
+
 This block defines which authoritative occurrences are eligible to enter the Production relationship ledger and what provenance/schema they must carry.
+
+The decision brief contains recommendations only. Every Block C owner-freeze field below remains PENDING until explicit source-owner approval.
 
 ### C1 — D13 Production Event allowlist
 
