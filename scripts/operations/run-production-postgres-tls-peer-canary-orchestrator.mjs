@@ -9,11 +9,10 @@ const TEAM_ID = 'team_xuYA9OhCWlJETaYFOmeVodgS';
 const MARKER_PATH =
   'config/operations/run-once/production-postgres-tls-peer-canary-b2b.marker';
 const MARKER_VALUE =
-  'VERIFY_POSTGRES_TLS_PEER_B2B_SKIP_DOMAIN_CANARY_RETRY3\n';
+  'VERIFY_POSTGRES_TLS_PEER_B2B_SKIP_DOMAIN_CANARY_RETRY4\n';
 const TRACK = 'security';
 const VERCEL_CLI_PACKAGE = 'vercel@59.16.0';
 const CANARY_MODE = 'one-shot-b2b';
-const TEAM_SLUG = 'johnny-self';
 
 class CanaryOrchestratorError extends Error {
   constructor(code, message) {
@@ -129,6 +128,28 @@ function classifyVercelCliFailure(stderr) {
   return 'DEPLOYMENT_CREATE_FAILED';
 }
 
+export function buildSkipDomainDeploymentArgs(input) {
+  return [
+    '--yes',
+    VERCEL_CLI_PACKAGE,
+    'deploy',
+    '.',
+    '--prod',
+    '--skip-domain',
+    '--yes',
+    '--env',
+    `MYEONGHA_DATABASE_SSL_ROOT_CERT_B64=${input.rootCertificateBase64}`,
+    '--env',
+    `MYEONGHA_POSTGRES_TLS_CANARY_TOKEN=${input.canaryToken}`,
+    '--env',
+    `MYEONGHA_POSTGRES_TLS_CANARY_MODE=${CANARY_MODE}`,
+    '--env',
+    `MYEONGHA_POSTGRES_TLS_CANARY_SHA=${input.githubSha}`,
+    '--meta',
+    `myeonghaCanarySha=${input.githubSha}`,
+  ];
+}
+
 function runSkipDomainDeployment(input) {
   return new Promise((resolvePromise, rejectPromise) => {
     const childEnv = { ...process.env };
@@ -137,29 +158,7 @@ function runSkipDomainDeployment(input) {
     childEnv.VERCEL_ORG_ID = TEAM_ID;
     childEnv.VERCEL_PROJECT_ID = PROJECT_ID;
 
-    const args = [
-      '--yes',
-      VERCEL_CLI_PACKAGE,
-      'deploy',
-      '.',
-      '--prod',
-      '--skip-domain',
-      '--yes',
-      '--project',
-      PROJECT_ID,
-      '--team',
-      TEAM_SLUG,
-      '--env',
-      `MYEONGHA_DATABASE_SSL_ROOT_CERT_B64=${input.rootCertificateBase64}`,
-      '--env',
-      `MYEONGHA_POSTGRES_TLS_CANARY_TOKEN=${input.canaryToken}`,
-      '--env',
-      `MYEONGHA_POSTGRES_TLS_CANARY_MODE=${CANARY_MODE}`,
-      '--env',
-      `MYEONGHA_POSTGRES_TLS_CANARY_SHA=${input.githubSha}`,
-      '--meta',
-      `myeonghaCanarySha=${input.githubSha}`,
-    ];
+    const args = buildSkipDomainDeploymentArgs(input);
 
     const child = spawn('npx', args, {
       cwd: process.cwd(),
