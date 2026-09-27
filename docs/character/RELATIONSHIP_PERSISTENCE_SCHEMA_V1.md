@@ -41,7 +41,11 @@ Migration preflight fails closed if:
 
 Zero-revision baseline projection rows may remain for read compatibility. Their new Production V1 columns stay NULL until a later governed initialization command.
 
-After migration, direct legacy `relationship_events` writes are disabled.
+The legacy table remains present for compatibility and existing structural tests, but it is **not** the Production V1 persistence surface.
+
+The pre-SRC-22 chat mutation ingress is retired at the command boundary instead: `cmd_commit_chat_turn_v1` rejects any non-null caller-provided `relationshipEffect`. Its old implementation is retained as a non-public helper only to preserve chat/world/memory commit behavior when no relationship mutation is requested.
+
+PHASE L still does not write the new Production V1 relationship history. That write path is introduced only by the governed Atomic Relationship Apply command in PHASE M.
 
 ## 3. Persistence layers
 
