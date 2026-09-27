@@ -16,10 +16,13 @@ export type ProductionUserDataRuntimeEnvV1 = Readonly<
   Record<string, string | undefined>
 >;
 
-export interface ProductionUserDataRuntimeConfigV1 {
+export interface ProductionPostgresRuntimeConfigV1 {
   readonly databaseUrl: string;
   readonly databasePrincipal: string;
   readonly databaseExecutionRole: typeof MYEONGHA_API_EXECUTION_ROLE;
+}
+
+export interface ProductionUserDataRuntimeConfigV1 extends ProductionPostgresRuntimeConfigV1 {
   readonly supabaseOrigin: typeof MYEONGHA_PRODUCTION_SUPABASE_ORIGIN;
   readonly supabaseApiKey: string;
   readonly guestFingerprintSecret: string;
@@ -208,15 +211,27 @@ function requireSecret(name: string, value: string, minimumLength: number): stri
   return value;
 }
 
-export function parseProductionUserDataRuntimeConfigV1(
+export function parseProductionPostgresRuntimeConfigV1(
   env: ProductionUserDataRuntimeEnvV1,
-): ProductionUserDataRuntimeConfigV1 {
+): ProductionPostgresRuntimeConfigV1 {
   const databaseUrl = parseDatabaseUrl(
     requiredEnv(env, PRODUCTION_USER_DATA_RUNTIME_ENV_V1.databaseUrl),
   );
   const databasePrincipal = parseDatabasePrincipal(
     requiredEnv(env, PRODUCTION_USER_DATA_RUNTIME_ENV_V1.databasePrincipal),
   );
+
+  return Object.freeze({
+    databaseUrl,
+    databasePrincipal,
+    databaseExecutionRole: MYEONGHA_API_EXECUTION_ROLE,
+  });
+}
+
+export function parseProductionUserDataRuntimeConfigV1(
+  env: ProductionUserDataRuntimeEnvV1,
+): ProductionUserDataRuntimeConfigV1 {
+  const postgres = parseProductionPostgresRuntimeConfigV1(env);
   const supabaseOrigin = parseSupabaseOrigin(
     requiredEnv(env, PRODUCTION_USER_DATA_RUNTIME_ENV_V1.supabaseUrl),
   );
@@ -232,9 +247,7 @@ export function parseProductionUserDataRuntimeConfigV1(
   );
 
   return Object.freeze({
-    databaseUrl,
-    databasePrincipal,
-    databaseExecutionRole: MYEONGHA_API_EXECUTION_ROLE,
+    ...postgres,
     supabaseOrigin,
     supabaseApiKey,
     guestFingerprintSecret,

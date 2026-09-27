@@ -1,0 +1,41 @@
+{
+  "contractVersion": "myeongha-member-auth-abuse-policy-v2",
+  "strategy": "postgres-application-admission",
+  "activationState": "foundation-dormant",
+  "algorithm": "anchored-fixed-window",
+  "windowSeconds": 60,
+  "requestLimit": 30,
+  "blockedCountSaturation": 31,
+  "actions": [
+    "sign-in",
+    "sign-up",
+    "refresh"
+  ],
+  "excludedActions": [
+    "sign-out"
+  ],
+  "clientKey": {
+    "source": "trusted-vercel-x-forwarded-for",
+    "derivation": "hmac-sha256",
+    "domainVersion": "myeongha-member-auth-rate-limit-hmac-sha256-v1",
+    "rawNetworkIdentifierPersistence": false,
+    "crossEndpointLinkability": false
+  },
+  "counterStore": {
+    "kind": "postgres",
+    "table": "public.member_auth_rate_limit_buckets",
+    "persistence": "unlogged-ephemeral",
+    "staleCleanupAfterSeconds": 300,
+    "maximumCleanupRowsPerAdmission": 8
+  },
+  "authority": {
+    "executionRole": "myeongha_api_executor",
+    "command": "public.cmd_admit_member_auth_request_v1",
+    "dedicatedOwner": "myeongha_member_auth_rate_limit_owner",
+    "directTableAuthorityForApiExecutor": false
+  },
+  "failureMode": "fail-closed",
+  "applicationRetryOnRateLimit": false,
+  "supabaseSecretKeyRequired": false,
+  "productionHttpActivation": false
+}

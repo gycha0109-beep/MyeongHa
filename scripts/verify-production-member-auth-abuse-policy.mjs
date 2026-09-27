@@ -222,4 +222,8 @@ for (const fragment of [
   'production-vercel-firewall-config',
 ]) requireFragment(paths.docs, docs, fragment);
 
+execFileSync('node', ['scripts/verify-member-auth-rate-limit-foundation.mjs'], {
+  stdio: 'inherit',
+});
+
 console.log('MyeongHa Member Auth abuse policy B1a verification passed.');
