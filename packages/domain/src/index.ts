@@ -86,6 +86,23 @@ export {
 } from './character-face-grounding-admission.js';
 
 export {
+  FACE_CHARACTER_GROUNDING_SCHEMA_VERSION_V1,
+  FACE_CHARACTER_NEUTRAL_REALIZATION_POLICY_V1,
+  FACE_CHARACTER_REALIZATION_POLICY_REGISTRY_VERSION_V1,
+  CharacterFaceGroundingBundleAdmissionErrorV1,
+  admitCharacterFaceGroundingBundleViewV1,
+  hashCharacterFaceGroundingBundleMaterialV1,
+  type CharacterFaceAxesDisplayValueV1,
+  type CharacterFaceDisplayAxisV1,
+  type CharacterFaceDisplayUnitV1,
+  type CharacterFaceDisplayValueV1,
+  type CharacterFaceGroundingBundleProviderV1,
+  type CharacterFaceGroundingBundleViewV1,
+  type CharacterFaceObservationUnitViewV1,
+  type CharacterFaceScalarDisplayValueV1,
+} from './character-face-grounding-bundle.js';
+
+export {
   CHARACTER_PERSPECTIVE_NARRATIVE_ROLES_V1,
   CHARACTER_PERSPECTIVE_SCHEMA_VERSION_V1,
   SAJU_GROUNDING_AXIS_KEYS_V1,
