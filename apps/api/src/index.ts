@@ -66,6 +66,14 @@ export {
 } from './character-face-reading-artifact-commit.js';
 
 export {
+  CHARACTER_FACE_CONTROLLED_REVEAL_VERSION_V1,
+  CharacterFaceControlledRevealErrorV1,
+  commitAndRevealCharacterFaceReadingV1,
+  type CharacterFaceControlledRevealResultV1,
+  type CharacterFaceControlledRevealStateV1,
+} from './character-face-reading-artifact-orchestration.js';
+
+export {
   PRODUCTION_CHARACTER_SAJU_SP2_OFF_POLICY_VERSION_V1,
   PRODUCTION_CHARACTER_SAJU_SP2_ROLLOUT_ENV_V1,
   ProductionCharacterSajuSp2RolloutConfigErrorV1,
