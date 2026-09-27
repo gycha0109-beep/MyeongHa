@@ -850,6 +850,10 @@ Block C semantics are owner-frozen. Exact DDL, deterministic per-Event delta pol
 
 ## 6. Block D — Replay / persistence strategy
 
+Decision brief: `docs/source-authority-gaps/SRC-22_RELATIONSHIP_POLICY_BLOCK_D_DECISION_BRIEF_V1.md`
+
+The decision brief contains recommendations only. Block D remains PENDING until explicit source-owner approval.
+
 ### D1 — D24 Replay / rebuild
 
 **Evidence status:** DETERMINISTIC SHADOW REBUILD DEMONSTRATED / PRODUCTION PERSISTENCE STRATEGY UNRESOLVED
