@@ -59,16 +59,17 @@ Pending, processed-before-finalization, failed, dead-lettered, foreign-owner pro
 
 ## Current outbox association coverage
 
-The repository currently creates outbox rows from exactly four governed producer migrations:
+The repository currently creates outbox rows from exactly five governed producer migrations:
 
 ```text
 0220_chat_attempt_commit_commands.sql       -> aggregate_type = chat_turn
 0260_reading_transport_commands.sql         -> aggregate_type = reading
 0290_account_deletion_start_command.sql      -> aggregate_type = data_deletion_job
 1080_entitlement_effect_apply_v1.sql         -> aggregate_type = entitlement
+1440_seyeon_relationship_sync_outbox_v1.sql  -> aggregate_type = character_relationship
 ```
 
-The preflight associates those aggregate types back to the canonical Subject through their authoritative tables.
+The preflight associates those aggregate types back to the canonical Subject through their authoritative tables or server-owned aggregate identity. The Se-yeon Production relationship sync aggregate is bound as `{subject_id}:seyeon` and its payload also carries the canonical top-level `subjectId`.
 
 It also treats top-level `payload_jsonb.subjectId` as a fail-closed fallback so a Subject-linked event remains visible even when its aggregate type is not in the current mapping.
 
