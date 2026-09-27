@@ -749,3 +749,25 @@ export {
   type ProductionReaderInterpretationActivationSummaryV1,
   type RunProductionReaderInterpretationPreviewHttpInputV1,
 } from './production-reader-interpretation-activation.js';
+export {
+  PRODUCTION_RELATIONSHIP_EVENT_APPLY_VERSION_V1,
+  PRODUCTION_RELATIONSHIP_POLICY_STATE_SCHEMA_VERSION_V1,
+  ProductionRelationshipApplyErrorV1,
+  applyProductionRelationshipEventV1,
+  projectProductionRelationshipPolicyStateV1,
+  type ApplyProductionRelationshipEventInputV1,
+  type ApplyProductionRelationshipEventResultV1,
+  type ProductionRelationshipApplyCommitPortV1,
+  type ProductionRelationshipApplyCommitRowV1,
+  type ProductionRelationshipApplyContextPortV1,
+  type ProductionRelationshipApplyFailureCodeV1,
+  type ProductionRelationshipApplyIdPortV1,
+  type ProductionRelationshipLockedContextV1,
+  type ProductionRelationshipPolicyStateV1,
+} from './production-relationship-event-apply-command-v1.js';
+
+export {
+  POSTGRES_RELATIONSHIP_APPLY_COMMIT_BINDING_V1,
+  POSTGRES_RELATIONSHIP_APPLY_CONTEXT_BINDING_V1,
+  createPostgresProductionRelationshipApplyPortV1,
+} from './postgres-production-relationship-event-apply-v1.js';
