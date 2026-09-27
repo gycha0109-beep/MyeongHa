@@ -1,7 +1,7 @@
 # SRC-22 Relationship Policy — Source-owner Freeze Worksheet V1
 
 > Track: character-memory  
-> Status: **SOURCE-OWNER FREEZE COMPLETE / CLOSURE AUDIT PASS / MERGE PENDING**  
+> Status: **CLOSED 2026-09-27 / PHASE K AUTHORIZED**  
 > Evidence authority: `SRC-22_RELATIONSHIP_POLICY_DECISION_PACKAGE_V2.md`  
 > Production mutation: **BLOCKED**  
 > Rule: this worksheet organizes decisions; it does not create source authority by itself.
@@ -963,7 +963,7 @@ active_policy_selection:
 
 ## 7. Closure audit — **PASS 2026-09-27**
 
-SRC-22 source-owner decision freeze is complete. The audit below passes on this branch. SRC-22 must remain OPEN in the authoritative merged stack until this decision package is merged; after merge it may be marked CLOSED without another product-policy decision.
+SRC-22 source-owner decision freeze is complete and the decision package has been merged into the authoritative stacked parent. SRC-22 is therefore CLOSED as a policy-authority gap. This does not itself activate Production database mutation; PHASE K remains policy-only.
 
 Audit conditions:
 
@@ -982,7 +982,7 @@ Final owner sign-off record:
 
 ~~~yaml
 src_gap: SRC-22
-status: READY_TO_CLOSE_AFTER_DECISION_PACKAGE_MERGE
+status: CLOSED
 source_owner_freeze:
   completed: true
   completed_at: 2026-09-27
@@ -1038,7 +1038,9 @@ source_owner_freeze:
     - exact per-Event deterministic score delta table within frozen semantics
     - snapshot cadence and storage representation
   production_mutation_authorized: false
+  production_mutation_note: PHASE_K_POLICY_ONLY_DB_MUTATION_REMAINS_DISABLED
   phase_k_authoring_authorized_after_merge: true
+  closed_at: 2026-09-27
 ~~~
 
 
