@@ -1,7 +1,7 @@
 {
   "contractVersion": "myeongha-member-auth-abuse-policy-v2",
   "strategy": "postgres-application-admission",
-  "activationState": "foundation-dormant",
+  "activationState": "production-enforcement-pending-canary",
   "algorithm": "anchored-fixed-window",
   "windowSeconds": 60,
   "requestLimit": 30,
@@ -37,5 +37,26 @@
   "failureMode": "fail-closed",
   "applicationRetryOnRateLimit": false,
   "supabaseSecretKeyRequired": false,
-  "productionHttpActivation": false
+  "productionHttpActivation": true,
+  "runtime": {
+    "routeComposition": "production-member-auth-http-runtime-v1",
+    "admissionBeforeRequestBody": true,
+    "postgresConnectionTimeoutMs": 1500,
+    "postgresStatementTimeoutMs": 1500,
+    "failureStatus": 503,
+    "failureCode": "AUTH_RATE_LIMIT_UNAVAILABLE",
+    "blockedStatus": 429,
+    "blockedCode": "RATE_LIMITED",
+    "retryAfterSecondsRange": [
+      1,
+      60
+    ]
+  },
+  "productionCanary": {
+    "status": "pending",
+    "sideEffectFree": true,
+    "expectedAllowedInvalidRequests": 30,
+    "expectedFirstRateLimitedAttempt": 31,
+    "signOutExcluded": true
+  }
 }

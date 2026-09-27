@@ -6,7 +6,10 @@ const paths = {
   migration: 'supabase/migrations/1310_member_auth_rate_limit_runtime_authority.sql',
   networkKey: 'apps/api/src/member-auth-client-network-key.ts',
   rateLimit: 'apps/api/src/member-auth-rate-limit.ts',
+  rateLimitHttp: 'apps/api/src/member-auth-rate-limit-http.ts',
   postgresPort: 'apps/api/src/postgres-member-auth-rate-limit.ts',
+  productionRuntime: 'apps/api/src/production-member-auth-http-runtime.ts',
+  pool: 'apps/api/src/node-postgres-subject-pool.ts',
   config: 'apps/api/src/production-member-auth-rate-limit-config.ts',
   dbTest: 'test/db/member_auth_rate_limit_authority.sh',
   authorityCore: 'test/db/run_authority_core.sh',
@@ -16,16 +19,22 @@ const paths = {
   refresh: 'api/auth/refresh.ts',
   signOut: 'api/auth/sign-out.ts',
   authHttp: 'apps/api/src/supabase-auth-http.ts',
+  canaryScript: 'scripts/operations/run-production-member-auth-rate-limit-canary.mjs',
+  canaryWorkflow: '.github/workflows/production-member-auth-rate-limit-canary.yml',
 };
 
 execFileSync('bash', ['-n', paths.dbTest], { stdio: 'inherit' });
+execFileSync(process.execPath, ['--check', paths.canaryScript], { stdio: 'inherit' });
 
 const [
   policyRaw,
   migration,
   networkKey,
   rateLimit,
+  rateLimitHttp,
   postgresPort,
+  productionRuntime,
+  pool,
   config,
   dbTest,
   authorityCore,
@@ -35,12 +44,17 @@ const [
   refresh,
   signOut,
   authHttp,
+  canaryScript,
+  canaryWorkflow,
 ] = await Promise.all([
   readFile(paths.policy, 'utf8'),
   readFile(paths.migration, 'utf8'),
   readFile(paths.networkKey, 'utf8'),
   readFile(paths.rateLimit, 'utf8'),
+  readFile(paths.rateLimitHttp, 'utf8'),
   readFile(paths.postgresPort, 'utf8'),
+  readFile(paths.productionRuntime, 'utf8'),
+  readFile(paths.pool, 'utf8'),
   readFile(paths.config, 'utf8'),
   readFile(paths.dbTest, 'utf8'),
   readFile(paths.authorityCore, 'utf8'),
@@ -50,13 +64,15 @@ const [
   readFile(paths.refresh, 'utf8'),
   readFile(paths.signOut, 'utf8'),
   readFile(paths.authHttp, 'utf8'),
+  readFile(paths.canaryScript, 'utf8'),
+  readFile(paths.canaryWorkflow, 'utf8'),
 ]);
 
 const policy = JSON.parse(policyRaw);
 const expectedPolicy = {
   contractVersion: 'myeongha-member-auth-abuse-policy-v2',
   strategy: 'postgres-application-admission',
-  activationState: 'foundation-dormant',
+  activationState: 'production-enforcement-pending-canary',
   algorithm: 'anchored-fixed-window',
   windowSeconds: 60,
   requestLimit: 30,
@@ -66,7 +82,7 @@ const expectedPolicy = {
   failureMode: 'fail-closed',
   applicationRetryOnRateLimit: false,
   supabaseSecretKeyRequired: false,
-  productionHttpActivation: false,
+  productionHttpActivation: true,
 };
 for (const [key, value] of Object.entries(expectedPolicy)) {
   if (JSON.stringify(policy[key]) !== JSON.stringify(value)) {
@@ -87,6 +103,29 @@ if (
   policy.counterStore?.maximumCleanupRowsPerAdmission !== 8
 ) {
   throw new Error('Member Auth V2 counter-store contract drifted.');
+}
+
+if (
+  policy.runtime?.routeComposition !== 'production-member-auth-http-runtime-v1' ||
+  policy.runtime?.admissionBeforeRequestBody !== true ||
+  policy.runtime?.postgresConnectionTimeoutMs !== 1500 ||
+  policy.runtime?.postgresStatementTimeoutMs !== 1500 ||
+  policy.runtime?.failureStatus !== 503 ||
+  policy.runtime?.failureCode !== 'AUTH_RATE_LIMIT_UNAVAILABLE' ||
+  policy.runtime?.blockedStatus !== 429 ||
+  policy.runtime?.blockedCode !== 'RATE_LIMITED' ||
+  JSON.stringify(policy.runtime?.retryAfterSecondsRange) !== JSON.stringify([1, 60])
+) {
+  throw new Error('Member Auth V2 production runtime contract drifted.');
+}
+if (
+  policy.productionCanary?.status !== 'pending' ||
+  policy.productionCanary?.sideEffectFree !== true ||
+  policy.productionCanary?.expectedAllowedInvalidRequests !== 30 ||
+  policy.productionCanary?.expectedFirstRateLimitedAttempt !== 31 ||
+  policy.productionCanary?.signOutExcluded !== true
+) {
+  throw new Error('Member Auth V2 canary state must remain pending before runtime proof.');
 }
 
 function requireFragment(name, source, fragment) {
@@ -159,6 +198,45 @@ for (const forbidden of [
 ]) forbidFragment(paths.postgresPort, postgresPort, forbidden);
 
 for (const fragment of [
+  'readTrustedVercelClientIpV1',
+  'fingerprintMemberAuthClientV1',
+  "input.request.method !== 'POST'",
+  'AUTH_RATE_LIMIT_UNAVAILABLE',
+  'RATE_LIMITED',
+  "'Retry-After'",
+  'MAXIMUM_RETRY_AFTER_SECONDS = 60',
+  'cancelUnusedRequestBodyBestEffort',
+  'return input.next()',
+]) requireFragment(paths.rateLimitHttp, rateLimitHttp, fragment);
+for (const forbidden of [
+  'email',
+  'password',
+  'refreshToken',
+  'MYEONGHA_SUPABASE_API_KEY',
+  'console.log',
+]) forbidFragment(paths.rateLimitHttp, rateLimitHttp, forbidden);
+
+for (const fragment of [
+  'parseProductionMemberAuthRateLimitConfigV1',
+  'createNodePostgresSubjectPoolV1',
+  'PostgresMemberAuthRateLimitAdmissionPortV1',
+  'handleMemberAuthRateLimitHttpV1',
+  'handleSupabaseAuthRequestV1',
+  'connectionTimeoutMs: 1_500',
+  'statementTimeoutMs: 1_500',
+  'idleTimeoutMs: 5_000',
+  'maxConnectionsPerRuntime: 4',
+  "requestInput.request.method !== 'POST'",
+]) requireFragment(paths.productionRuntime, productionRuntime, fragment);
+
+for (const fragment of [
+  'NodePostgresSubjectPoolOptionsV1',
+  'connectionTimeoutMs?: number',
+  'statementTimeoutMs?: number',
+  'options: NodePostgresSubjectPoolOptionsV1 = {}',
+]) requireFragment(paths.pool, pool, fragment);
+
+for (const fragment of [
   'MYEONGHA_AUTH_RATE_LIMIT_SECRET',
   'parseProductionPostgresRuntimeConfigV1',
   'rawSecret.trim().length < 32',
@@ -175,29 +253,70 @@ for (const fragment of [
 requireFragment(paths.authorityCore, authorityCore, 'bash test/db/member_auth_rate_limit_authority.sh');
 
 for (const fragment of [
-  'C1 FOUNDATION DORMANT',
+  'C2 PRODUCTION ENFORCEMENT WIRED / CANARY PENDING',
   'UNLOGGED',
   '30 allowed',
   '10 denied',
   'MYEONGHA_AUTH_RATE_LIMIT_SECRET',
   'fail-closed',
-  'C2',
+  'production-enforcement-pending-canary',
+  'AUTH_RATE_LIMIT_UNAVAILABLE',
+  'RATE_LIMITED',
+  '36341568878',
+  '1500 ms',
+  'C2B canary success',
 ]) requireFragment(paths.docs, docs, fragment);
 
-for (const [name, source] of [
-  [paths.signIn, signIn],
-  [paths.signUp, signUp],
-  [paths.refresh, refresh],
-  [paths.signOut, signOut],
-  [paths.authHttp, authHttp],
+for (const [name, source, action] of [
+  [paths.signIn, signIn, 'sign-in'],
+  [paths.signUp, signUp, 'sign-up'],
+  [paths.refresh, refresh, 'refresh'],
 ]) {
-  for (const forbidden of [
-    'member-auth-rate-limit',
-    'MYEONGHA_AUTH_RATE_LIMIT_SECRET',
-    'cmd_admit_member_auth_request_v1',
-  ]) {
-    forbidFragment(name, source, forbidden);
-  }
+  requireFragment(name, source, 'createProductionMemberAuthHttpRuntimeV1');
+  requireFragment(name, source, 'let runtime: ReturnType<typeof createProductionMemberAuthHttpRuntimeV1> | undefined;');
+  requireFragment(name, source, "action: '" + action + "'");
+  forbidFragment(name, source, 'handleSupabaseAuthRequestV1');
 }
 
-console.log('MyeongHa Member Auth Postgres rate-limit C1 foundation verification passed.');
+requireFragment(paths.signOut, signOut, 'handleSupabaseAuthRequestV1');
+requireFragment(paths.signOut, signOut, "action: 'sign-out'");
+forbidFragment(paths.signOut, signOut, 'createProductionMemberAuthHttpRuntimeV1');
+
+for (const forbidden of [
+  'member-auth-rate-limit',
+  'MYEONGHA_AUTH_RATE_LIMIT_SECRET',
+  'cmd_admit_member_auth_request_v1',
+]) forbidFragment(paths.authHttp, authHttp, forbidden);
+
+for (const fragment of [
+  'const REQUEST_LIMIT = 30;',
+  'const WINDOW_SECONDS = 60;',
+  '{"email":"","password":""}',
+  '{"refreshToken":""}',
+  "body.error.code !== 'INVALID_REQUEST'",
+  "body.error.code !== 'RATE_LIMITED'",
+  'sign_out_rate_limit_excluded=pass',
+  'endpoint_bucket_independence=pass',
+  'raw_network_identifiers_emitted=false',
+  'credential_material_emitted=false',
+]) requireFragment(paths.canaryScript, canaryScript, fragment);
+
+for (const fragment of [
+  'name: Production Member Auth Rate Limit Canary',
+  'run-name: "[WT:ops] Production Member Auth Rate Limit Canary"',
+  'workflow_dispatch:',
+  'VERIFY_MEMBER_AUTH_RATE_LIMIT_CANARY_V2',
+  'default: ops',
+  'environment: production',
+  'VERCEL_TOKEN: 
+ + '{{ secrets.VERCEL_TOKEN }}',
+  'wait_exact_main_deployment',
+  'node scripts/operations/run-production-member-auth-rate-limit-canary.mjs',
+  'group: production-member-auth-rate-limit-canary',
+  'cancel-in-progress: false',
+]) requireFragment(paths.canaryWorkflow, canaryWorkflow, fragment);
+for (const forbidden of ['\npush:', '\npull_request:', '\nschedule:']) {
+  forbidFragment(paths.canaryWorkflow, canaryWorkflow, forbidden);
+}
+
+console.log('MyeongHa Member Auth rate-limit V2 verification passed: C1 PostgreSQL authority remains pinned, C2A production HTTP enforcement is wired for sign-in/sign-up/refresh, sign-out remains excluded, fail-closed 503 and 429 Retry-After contracts are fixed, and the side-effect-free Production canary is pending.');

@@ -90,16 +90,26 @@ for (const entry of registry.managedRules.filter((entry) => entry.policyId.start
   }
 }
 
-const routeSources = [
+const protectedRouteSources = [
   [signIn, "action: 'sign-in'"],
   [signUp, "action: 'sign-up'"],
   [refresh, "action: 'refresh'"],
-  [signOut, "action: 'sign-out'"],
 ];
-for (const [source, fragment] of routeSources) {
-  if (!source.includes('handleSupabaseAuthRequestV1') || !source.includes(fragment)) {
-    throw new Error('Auth route no longer matches the pinned handler contract: ' + fragment);
+for (const [source, fragment] of protectedRouteSources) {
+  if (
+    !source.includes('createProductionMemberAuthHttpRuntimeV1') ||
+    !source.includes(fragment) ||
+    source.includes('handleSupabaseAuthRequestV1')
+  ) {
+    throw new Error('Protected Auth route no longer matches the V2 application-admission contract: ' + fragment);
   }
+}
+if (
+  !signOut.includes('handleSupabaseAuthRequestV1') ||
+  !signOut.includes("action: 'sign-out'") ||
+  signOut.includes('createProductionMemberAuthHttpRuntimeV1')
+) {
+  throw new Error('sign-out must remain outside the V2 application rate limiter.');
 }
 
 function requireFragment(name, source, fragment) {
