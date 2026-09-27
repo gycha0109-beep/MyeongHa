@@ -214,6 +214,16 @@ export {
 } from './character-face-semantic-guard.js';
 
 export {
+  CHARACTER_FACE_FINAL_OUTPUT_SCHEMA_VERSION_V1,
+  CHARACTER_FACE_FINALIZER_VERSION_V1,
+  CHARACTER_FACE_PUBLIC_FALLBACK_REASON_V1,
+  finalizeCharacterFaceOutputV1,
+  type CharacterFaceFinalOutputEnvelopeV1,
+  type CharacterFaceFinalRendererDraftV1,
+  type CharacterFaceProtectedFinalMaterialV1,
+} from './character-face-final-output.js';
+
+export {
   CHARACTER_PERSPECTIVE_NARRATIVE_ROLES_V1,
   CHARACTER_PERSPECTIVE_SCHEMA_VERSION_V1,
   SAJU_GROUNDING_AXIS_KEYS_V1,
