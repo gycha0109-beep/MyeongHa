@@ -59,6 +59,109 @@ update public.readings set committed_execution_attempt_id='$execution_id' where 
 update public.reading_sessions set current_reading_id='$reading_id' where id='$reading_session_id';
 insert into public.commerce_account_links(id,subject_id,provider,external_account_fingerprint,status,verified_at,revoked_at,created_at)
 values ('$commerce_link_id','$subject_id','test-provider','sha256:retain','active',clock_timestamp(),null,clock_timestamp());
+
+insert into public.characters(character_id,created_at,retired_at)
+values ('account-delete-relationship-char',clock_timestamp(),null)
+on conflict (character_id) do nothing;
+
+insert into public.relationship_policy_artifacts(
+  policy_version,artifact_schema_version,content_hash,artifact_jsonb,created_at,retired_at
+) values (
+  'relationship-policy-v1',
+  'relationship-policy-definition-v1',
+  'sha256:v1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  '{"schemaVersion":"relationship-policy-definition-v1","policyVersion":"relationship-policy-v1"}'::jsonb,
+  clock_timestamp(),
+  null
+)
+on conflict (policy_version) do nothing;
+
+insert into public.user_character_states(
+  id,subject_id,character_id,closeness,trust,friction,relationship_stage,policy_version,revision,
+  last_interaction_at,created_at,updated_at,attained_stage,current_candidate_stage,current_condition,
+  policy_content_hash,policy_state_schema_version,policy_state_jsonb
+) values (
+  'fb700000-0000-0000-0000-000000000001',
+  '$subject_id',
+  'account-delete-relationship-char',
+  0,0,0,
+  'S0_FIRST_MEETING',
+  'relationship-policy-v1',
+  1,
+  clock_timestamp(),
+  clock_timestamp(),
+  clock_timestamp(),
+  'S0_FIRST_MEETING',
+  'S0_FIRST_MEETING',
+  'STABLE',
+  'sha256:v1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  'relationship-policy-state-v1',
+  '{}'::jsonb
+);
+
+begin;
+set constraints all deferred;
+
+insert into public.relationship_history_entries(
+  id,subject_id,character_id,entry_kind,history_dedupe_key,state_revision_before,state_revision_after,applied_at
+) values (
+  'fb710000-0000-0000-0000-000000000001',
+  '$subject_id',
+  'account-delete-relationship-char',
+  'event',
+  'account-delete-relationship-history',
+  0,1,
+  clock_timestamp()
+);
+
+insert into public.relationship_event_records(
+  id,history_entry_id,subject_id,character_id,event_type,event_schema_version,event_dedupe_key,
+  character_behavior_key,occurred_at,source_kind,source_ref,source_turn_id,source_world_event_id,
+  source_merge_action_id,source_server_observation_ref,facts_jsonb,character_interpretation_jsonb,
+  payload_jsonb,relationship_family,applied_effect_disposition,progression_credited,
+  delta_closeness,delta_trust,delta_friction,milestone_kind,policy_version,policy_content_hash,created_at
+) values (
+  'fb720000-0000-0000-0000-000000000001',
+  'fb710000-0000-0000-0000-000000000001',
+  '$subject_id',
+  'account-delete-relationship-char',
+  'RETURN_AFTER_ABSENCE',
+  '1',
+  'account-delete-relationship-event',
+  null,
+  clock_timestamp(),
+  'server_observation',
+  'observation:account-delete',
+  null,null,null,
+  'observation:account-delete',
+  '[{"factKey":"return","statement":"server observed return","sourceRefs":["observation:account-delete"]}]'::jsonb,
+  null,
+  '{"observationKey":"account-delete-return"}'::jsonb,
+  'return',
+  'NON_PROGRESSION',
+  false,
+  0,0,0,null,
+  'relationship-policy-v1',
+  'sha256:v1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  clock_timestamp()
+);
+
+insert into public.relationship_event_provenance_refs(
+  id,event_id,subject_id,character_id,ref_kind,ordinal,ref_value,source_message_id,created_at
+) values (
+  'fb730000-0000-0000-0000-000000000001',
+  'fb720000-0000-0000-0000-000000000001',
+  '$subject_id',
+  'account-delete-relationship-char',
+  'authority',
+  1,
+  'authority:account-delete',
+  null,
+  clock_timestamp()
+);
+
+set constraints all immediate;
+commit;
 SQL
 
 if "${psql_base[@]}" -c "delete from public.birth_profile_revisions where id='$revision_id';" >/dev/null 2>&1; then fail "birth revision delete escaped immutable guard"; fi
@@ -123,6 +226,20 @@ result="$("${psql_base[@]}" -Atc "select (finalized::int)||'|'||(replayed::int)|
 
 deleted="$("${psql_base[@]}" -Atc "select (select count(*) from public.profiles where subject_id='$subject_id')||'|'||(select count(*) from public.birth_profile_revisions where subject_id='$subject_id')||'|'||(select count(*) from public.readings where subject_id='$subject_id')||'|'||(select count(*) from public.reading_execution_attempts where subject_id='$subject_id')||'|'||(select count(*) from public.guest_sessions where claimed_by_subject_id='$subject_id');")"
 [[ "$deleted" == "0|0|0|0|0" ]] || fail "DELETE representatives remain: $deleted"
+
+relationship_deleted="$("${psql_base[@]}" -Atc "select
+  (select count(*) from public.user_character_states where subject_id='$subject_id')||'|'||
+  (select count(*) from public.relationship_history_entries where subject_id='$subject_id')||'|'||
+  (select count(*) from public.relationship_event_records where subject_id='$subject_id')||'|'||
+  (select count(*) from public.relationship_event_adjustments where subject_id='$subject_id')||'|'||
+  (select count(*) from public.relationship_event_links where subject_id='$subject_id')||'|'||
+  (select count(*) from public.relationship_event_provenance_refs where subject_id='$subject_id')||'|'||
+  (select count(*) from public.relationship_state_snapshots where subject_id='$subject_id');")"
+[[ "$relationship_deleted" == "0|0|0|0|0|0|0" ]] || fail "relationship deletion graph remains: $relationship_deleted"
+
+policy_retained="$("${psql_base[@]}" -Atc "select count(*) from public.relationship_policy_artifacts where policy_version='relationship-policy-v1' and content_hash='sha256:v1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';")"
+[[ "$policy_retained" == "1" ]] || fail "global relationship policy artifact was deleted with Subject data"
+pass "Production relationship history is deleted while global policy authority is retained"
 
 retain="$("${psql_base[@]}" -Atc "select count(*)||'|'||status||'|'||case when revoked_at is null then 'NO' else 'YES' end from public.commerce_account_links where id='$commerce_link_id' group by status,revoked_at;")"
 [[ "$retain" == "1|revoked|YES" ]] || fail "Commerce RETAIN/revocation mismatch: $retain"
