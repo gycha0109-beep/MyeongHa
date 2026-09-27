@@ -26,7 +26,7 @@ expect_fail() {
   pass "$label -> $needle"
 }
 
-policy_hash="sha256:v1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+policy_hash="sha256:v1:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
 snapshot_hash="sha256:v1:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 source_hash="sha256:v1:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
 
@@ -40,10 +40,10 @@ values ('relationship-schema-v1-char',clock_timestamp(),null);
 insert into public.relationship_policy_artifacts(
   policy_version,artifact_schema_version,content_hash,artifact_jsonb,created_at,retired_at
 ) values (
-  'relationship-policy-v1',
+  'relationship-policy-v1-persistence-test',
   'relationship-policy-definition-v1',
   '$policy_hash',
-  '{"schemaVersion":"relationship-policy-definition-v1","policyVersion":"relationship-policy-v1"}'::jsonb,
+  '{"schemaVersion":"relationship-policy-definition-v1","policyVersion":"relationship-policy-v1-persistence-test"}'::jsonb,
   clock_timestamp(),
   null
 );
@@ -52,11 +52,11 @@ insert into public.relationship_policy_activations(
   id,policy_version,policy_content_hash,character_id,effective_from,activation_ref,created_at
 ) values (
   '9a110000-0000-0000-0000-000000000001',
-  'relationship-policy-v1',
+  'relationship-policy-v1-persistence-test',
   '$policy_hash',
   'relationship-schema-v1-char',
   timestamptz '2026-09-27 00:00:00+00',
-  'test:relationship-policy-v1',
+  'test:relationship-policy-v1-persistence-test',
   timestamptz '2026-09-27 00:00:00+00'
 );
 
@@ -71,7 +71,7 @@ insert into public.user_character_states(
   'relationship-schema-v1-char',
   0,0,0,
   'S0_FIRST_MEETING',
-  'relationship-policy-v1',
+  'relationship-policy-v1-persistence-test',
   0,
   null,
   clock_timestamp(),
@@ -123,7 +123,7 @@ insert into public.relationship_event_records(
   '{"observationKey":"return-1"}'::jsonb,
   'return','NON_PROGRESSION',false,
   0,0,0,null,
-  'relationship-policy-v1','$policy_hash',
+  'relationship-policy-v1-persistence-test','$policy_hash',
   timestamptz '2026-09-27 00:01:00+00'
 );
 
@@ -184,7 +184,7 @@ insert into public.relationship_event_records(
   '{"detailKey":"detail-1"}'::jsonb,
   'recognition','APPLIED',true,
   3,4,0,'recognition',
-  'relationship-policy-v1','$policy_hash',
+  'relationship-policy-v1-persistence-test','$policy_hash',
   timestamptz '2026-09-27 00:02:00+00'
 );
 
@@ -271,7 +271,7 @@ insert into public.relationship_state_snapshots(
   '9a100000-0000-0000-0000-000000000001',
   'relationship-schema-v1-char',
   3,
-  'relationship-policy-v1',
+  'relationship-policy-v1-persistence-test',
   '$policy_hash',
   'relationship-snapshot-v1',
   '{"scores":{"closeness":0,"trust":0,"friction":0},"attainedStage":"S0_FIRST_MEETING"}'::jsonb,
@@ -289,13 +289,13 @@ expect_fail "history rows are append-only on update"   "tr_relationship_subject_
 
 expect_fail "history rows are append-only on delete"   "tr_relationship_subject_owned_immutable_v1"   "delete from public.relationship_history_entries where id='9a130000-0000-0000-0000-000000000001';"
 
-expect_fail "policy artifacts are immutable"   "tr_relationship_policy_immutable_v1"   "update public.relationship_policy_artifacts set artifact_schema_version='changed' where policy_version='relationship-policy-v1';"
+expect_fail "policy artifacts are immutable"   "tr_relationship_policy_immutable_v1"   "update public.relationship_policy_artifacts set artifact_schema_version='changed' where policy_version='relationship-policy-v1-persistence-test';"
 
 expect_fail "one physical revision cannot be occupied twice"   "relationship_history_entries_revision_unique"   "insert into public.relationship_history_entries(id,subject_id,character_id,entry_kind,history_dedupe_key,state_revision_before,state_revision_after,applied_at) values ('9a130000-0000-0000-0000-000000000009','9a100000-0000-0000-0000-000000000001','relationship-schema-v1-char','event','duplicate-revision',2,3,clock_timestamp());"
 
-expect_fail "snapshot cannot move beyond current projection"   "ct_relationship_snapshot_revision_v1"   "begin; set constraints all deferred; insert into public.relationship_state_snapshots(id,subject_id,character_id,through_revision,policy_version,policy_content_hash,snapshot_schema_version,snapshot_jsonb,snapshot_hash,source_fingerprint,created_at) values ('9a170000-0000-0000-0000-000000000009','9a100000-0000-0000-0000-000000000001','relationship-schema-v1-char',4,'relationship-policy-v1','$policy_hash','relationship-snapshot-v1','{}'::jsonb,'$snapshot_hash','$source_hash',clock_timestamp()); set constraints all immediate; commit;"
+expect_fail "snapshot cannot move beyond current projection"   "ct_relationship_snapshot_revision_v1"   "begin; set constraints all deferred; insert into public.relationship_state_snapshots(id,subject_id,character_id,through_revision,policy_version,policy_content_hash,snapshot_schema_version,snapshot_jsonb,snapshot_hash,source_fingerprint,created_at) values ('9a170000-0000-0000-0000-000000000009','9a100000-0000-0000-0000-000000000001','relationship-schema-v1-char',4,'relationship-policy-v1-persistence-test','$policy_hash','relationship-snapshot-v1','{}'::jsonb,'$snapshot_hash','$source_hash',clock_timestamp()); set constraints all immediate; commit;"
 
-expect_fail "causal outcome requires predecessor link"   "ct_relationship_event_causal_shape_v1"   "begin; set constraints all deferred; insert into public.relationship_history_entries(id,subject_id,character_id,entry_kind,history_dedupe_key,state_revision_before,state_revision_after,applied_at) values ('9a130000-0000-0000-0000-000000000010','9a100000-0000-0000-0000-000000000001','relationship-schema-v1-char','event','missing-cause',3,4,clock_timestamp()); insert into public.relationship_event_records(id,history_entry_id,subject_id,character_id,event_type,event_schema_version,event_dedupe_key,character_behavior_key,occurred_at,source_kind,source_ref,source_turn_id,source_world_event_id,source_merge_action_id,source_server_observation_ref,facts_jsonb,character_interpretation_jsonb,payload_jsonb,relationship_family,applied_effect_disposition,progression_credited,delta_closeness,delta_trust,delta_friction,milestone_kind,policy_version,policy_content_hash,created_at) values ('9a140000-0000-0000-0000-000000000010','9a130000-0000-0000-0000-000000000010','9a100000-0000-0000-0000-000000000001','relationship-schema-v1-char','COMMITMENT_KEPT','1','event:missing-cause',null,clock_timestamp(),'server_observation','observation:missing-cause',null,null,null,'observation:missing-cause','[{"factKey":"promise","statement":"kept","sourceRefs":["observation:missing-cause"]}]'::jsonb,null,'{"commitmentKey":"promise-1"}'::jsonb,'commitment','APPLIED',true,4,5,0,'commitment_follow_through','relationship-policy-v1','$policy_hash',clock_timestamp()); insert into public.relationship_event_provenance_refs(id,event_id,subject_id,character_id,ref_kind,ordinal,ref_value,source_message_id,created_at) values ('9a150000-0000-0000-0000-000000000010','9a140000-0000-0000-0000-000000000010','9a100000-0000-0000-0000-000000000001','relationship-schema-v1-char','authority',1,'authority:missing-cause',null,clock_timestamp()); set constraints all immediate; commit;"
+expect_fail "causal outcome requires predecessor link"   "ct_relationship_event_causal_shape_v1"   "begin; set constraints all deferred; insert into public.relationship_history_entries(id,subject_id,character_id,entry_kind,history_dedupe_key,state_revision_before,state_revision_after,applied_at) values ('9a130000-0000-0000-0000-000000000010','9a100000-0000-0000-0000-000000000001','relationship-schema-v1-char','event','missing-cause',3,4,clock_timestamp()); insert into public.relationship_event_records(id,history_entry_id,subject_id,character_id,event_type,event_schema_version,event_dedupe_key,character_behavior_key,occurred_at,source_kind,source_ref,source_turn_id,source_world_event_id,source_merge_action_id,source_server_observation_ref,facts_jsonb,character_interpretation_jsonb,payload_jsonb,relationship_family,applied_effect_disposition,progression_credited,delta_closeness,delta_trust,delta_friction,milestone_kind,policy_version,policy_content_hash,created_at) values ('9a140000-0000-0000-0000-000000000010','9a130000-0000-0000-0000-000000000010','9a100000-0000-0000-0000-000000000001','relationship-schema-v1-char','COMMITMENT_KEPT','1','event:missing-cause',null,clock_timestamp(),'server_observation','observation:missing-cause',null,null,null,'observation:missing-cause','[{"factKey":"promise","statement":"kept","sourceRefs":["observation:missing-cause"]}]'::jsonb,null,'{"commitmentKey":"promise-1"}'::jsonb,'commitment','APPLIED',true,4,5,0,'commitment_follow_through','relationship-policy-v1-persistence-test','$policy_hash',clock_timestamp()); insert into public.relationship_event_provenance_refs(id,event_id,subject_id,character_id,ref_kind,ordinal,ref_value,source_message_id,created_at) values ('9a150000-0000-0000-0000-000000000010','9a140000-0000-0000-0000-000000000010','9a100000-0000-0000-0000-000000000001','relationship-schema-v1-char','authority',1,'authority:missing-cause',null,clock_timestamp()); set constraints all immediate; commit;"
 
 revision_state=$("${psql_base[@]}" -Atc "select revision||'|'||closeness||'|'||trust from public.user_character_states where id='9a120000-0000-0000-0000-000000000001';")
 [[ "$revision_state" == "3|0|0" ]] || fail "projection state drifted: $revision_state"
