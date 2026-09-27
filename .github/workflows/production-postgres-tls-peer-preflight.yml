@@ -1,0 +1,60 @@
+name: Production PostgreSQL TLS Peer Preflight
+run-name: "[WT:ops] Production PostgreSQL TLS Peer Preflight"
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: Type VERIFY_POSTGRES_TLS_PEER_B2A
+        required: true
+        type: string
+      watchtower_track:
+        description: Watchtower Track Key for Production operations attribution
+        required: true
+        default: ops
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-postgres-tls-peer-preflight
+  cancel-in-progress: false
+
+env:
+  VERCEL_PROJECT_ID: prj_nXF0b5uv27Lyucz2SEBxzdCRXVsP
+  VERCEL_TEAM_ID: team_xuYA9OhCWlJETaYFOmeVodgS
+  VERCEL_PROJECT_NAME: myeongha
+
+jobs:
+  preflight:
+    name: verify-production-postgres-tls-peer-authority
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: production
+    env:
+      MYEONGHA_WATCHTOWER_TRACK: ${{ inputs.watchtower_track }}
+      MYEONGHA_POSTGRES_TLS_PEER_PREFLIGHT_CONFIRM: ${{ inputs.confirm }}
+      SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM: ${{ secrets.SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM }}
+      SUPABASE_PRODUCTION_SESSION_POOLER_HOST: ${{ secrets.SUPABASE_PRODUCTION_SESSION_POOLER_HOST }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+    steps:
+      - name: Checkout exact repository state
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Use governed Node runtime
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 24
+
+      - name: Validate exact dispatch authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_EVENT_NAME" == 'workflow_dispatch' ]]
+          [[ "$GITHUB_REF" == 'refs/heads/main' ]]
+          [[ "$MYEONGHA_WATCHTOWER_TRACK" == 'ops' ]]
+          [[ "$MYEONGHA_POSTGRES_TLS_PEER_PREFLIGHT_CONFIRM" == 'VERIFY_POSTGRES_TLS_PEER_B2A' ]]
+
+      - name: Run metadata-only PostgreSQL TLS peer authority preflight
+        run: node scripts/operations/run-production-postgres-tls-peer-preflight.mjs
