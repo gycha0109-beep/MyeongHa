@@ -98,6 +98,10 @@ as $$
             and e.subject_id = p_subject_id
         )
       )
+      or (
+        oe.aggregate_type = 'character_relationship'
+        and oe.aggregate_id = p_subject_id::text || ':seyeon'
+      )
   ),
   rollup as (
     select

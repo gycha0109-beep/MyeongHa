@@ -100,6 +100,7 @@ bash test/db/relationship_current_query.sh
 bash test/db/relationship_persistence_schema_v1.sh
 bash test/db/relationship_event_apply_command_v1.sh
 bash test/db/relationship_reliability_v1.sh
+bash test/db/seyeon_production_relationship_vertical_slice_v1.sh
 bash test/db/character_unlocks_current_query.sh
 run_isolated_case myeongha_standard_reader_runtime_test bash test/db/standard_reading_reader_runtime_query.sh
 run_isolated_case myeongha_standard_reading_unit_binding_test bash test/db/standard_reading_unit_binding.sh

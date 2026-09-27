@@ -10,11 +10,13 @@ import {
   type SeyeonStructuredProviderRequestV2,
 } from '../apps/api/src/seyeon-character-runtime-v2.js';
 import {
+  PRODUCTION_RELATIONSHIP_POLICY_ARTIFACT_V1,
   assembleSeyeonRuntimeContextV2,
   buildSeyeonRendererPacketV2,
   guardSeyeonRiskBearingActionCausalityV1,
   guardSeyeonTurnInterpretationV2,
   hashSeyeonRendererUtteranceV2,
+  projectSeyeonProductionRelationshipRuntimeOverlayV1,
 } from '../packages/domain/src/index.js';
 
 class StaticProvider implements SeyeonStructuredProviderPortV2 {
@@ -344,6 +346,79 @@ describe('Se-yeon structured Character runtime v2', () => {
         additionalProperties: false,
       });
     }
+  });
+
+  it('accepts an exact Production relationship overlay as current behavior authority without granting disclosure or fact authority', async () => {
+    const productionOverlay =
+      projectSeyeonProductionRelationshipRuntimeOverlayV1({
+        stateId: '11111111-1111-4111-8111-111111111111',
+        subjectId: '22222222-2222-4222-8222-222222222222',
+        characterId: 'seyeon',
+        closeness: 60,
+        trust: 58,
+        friction: 20,
+        attainedStage: 'S3_OPENED',
+        currentCandidateStage: 'S3_OPENED',
+        currentCondition: 'OPEN_CONFLICT',
+        policyVersion: 'relationship-policy-v1',
+        policyContentHash:
+          PRODUCTION_RELATIONSHIP_POLICY_ARTIFACT_V1.contentHash,
+        policyStateSchemaVersion: 'relationship-policy-state-v1',
+        policyStateJsonb: {
+          behaviorAccess: 'RESTRICTED_BY_CONFLICT',
+        },
+        revision: 8,
+        lastInteractionAt: null,
+        updatedAt: '2026-09-28T08:00:00.000Z',
+      });
+
+    const baseContext = contextInput();
+    const baseGovernance = governance();
+    const result = await runSeyeonCharacterTurnV2({
+      userMessageRef: 'message-current',
+      userText: '지난번에 제가 A 좋아한다고 했던 거 기억나요?',
+      contextInput: {
+        ...baseContext,
+        relationship: {
+          ...baseContext.relationship,
+          stageKey: 'S3_OPENED',
+        },
+      },
+      governance: {
+        ...baseGovernance,
+        relationshipSemantics: {
+          resolve: () => productionOverlay,
+        },
+      },
+      interpreterProvider: new StaticProvider(
+        'mock-interpreter',
+        'cheap',
+        validInterpretation(),
+      ),
+      rendererProvider: new StaticProvider(
+        'mock-renderer',
+        'primary',
+        validRendererDraft(),
+      ),
+      semanticReviewerProvider: new StaticProvider(
+        'mock-reviewer',
+        'cheap',
+        passingSemanticReview,
+      ),
+    });
+
+    expect(result.context.relationshipSemantics?.authority).toBe(
+      'production_relationship_behavior_authority_v1',
+    );
+    expect(result.context.relationshipSemantics?.behaviorAccess).toBe(
+      'RESTRICTED_BY_CONFLICT',
+    );
+    expect(
+      result.context.relationshipSemantics?.constraints.mayUnlockDisclosure,
+    ).toBe(false);
+    expect(
+      result.context.relationshipSemantics?.constraints.mayCreateCharacterFact,
+    ).toBe(false);
   });
 
   it('wraps provider failures with the exact runtime stage', async () => {

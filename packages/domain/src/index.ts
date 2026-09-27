@@ -278,6 +278,7 @@ export {
   type SeyeonContextFocusKeyV2,
   type SeyeonRecentMessageV2,
   type SeyeonRelationshipContextV2,
+  type SeyeonRelationshipRuntimeSemanticsV2,
   type SeyeonRetrievedClaimKindV2,
   type SeyeonRetrievedMemoryKindV2,
   type SeyeonRetrievedMemoryV2,
@@ -516,6 +517,27 @@ export {
   type ProductionRelationshipHistoryRecordV1,
   type ProductionRelationshipReplayResultV1,
 } from './relationship-policy-reference-replay-v1.js';
+
+export {
+  SEYEON_PRODUCTION_RELATIONSHIP_ADMISSION_VERSION_V1,
+  SEYEON_PRODUCTION_RELATIONSHIP_MAX_EVENTS_PER_TURN_V1,
+  SeyeonProductionRelationshipAdmissionErrorV1,
+  admitSeyeonProductionRelationshipEventV1,
+  deriveSeyeonProductionRelationshipDedupeKeyV1,
+  type AdmitSeyeonProductionRelationshipEventV1Input,
+  type SeyeonProductionRelationshipAdmissionV1,
+  type SeyeonProductionRelationshipCausalBindingV1,
+} from './seyeon-production-relationship-bridge-v1.js';
+
+export {
+  SEYEON_PRODUCTION_RELATIONSHIP_RUNTIME_AUTHORITY_V1,
+  SEYEON_PRODUCTION_RELATIONSHIP_RUNTIME_OVERLAY_VERSION_V1,
+  SeyeonProductionRelationshipRuntimeErrorV1,
+  projectSeyeonProductionRelationshipRuntimeOverlayV1,
+  validateSeyeonProductionRelationshipRuntimeStateV1,
+  type SeyeonProductionRelationshipRuntimeOverlayV1,
+  type SeyeonProductionRelationshipRuntimeStateV1,
+} from './seyeon-production-relationship-runtime-v1.js';
 
 export {
   SEYEON_PRODUCTION_RELATIONSHIP_EVENT_BINDINGS_V1,

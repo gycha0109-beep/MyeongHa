@@ -6,6 +6,11 @@ import {
   type SeyeonRelationshipRuntimeOverlayV2,
 } from './seyeon-relationship-runtime-overlay-v2.js';
 import {
+  SEYEON_PRODUCTION_RELATIONSHIP_RUNTIME_AUTHORITY_V1,
+  SEYEON_PRODUCTION_RELATIONSHIP_RUNTIME_OVERLAY_VERSION_V1,
+  type SeyeonProductionRelationshipRuntimeOverlayV1,
+} from './seyeon-production-relationship-runtime-v1.js';
+import {
   guardCharacterDisclosureRetrievalV2,
   type CharacterDisclosureDecisionV2,
   type CharacterDisclosureRetrievedSourceV2,
@@ -41,6 +46,10 @@ export interface SeyeonRelationshipContextV2 {
   readonly revision: number;
   readonly policyVersion: string;
 }
+
+export type SeyeonRelationshipRuntimeSemanticsV2 =
+  | SeyeonRelationshipRuntimeOverlayV2
+  | SeyeonProductionRelationshipRuntimeOverlayV1;
 
 export interface SeyeonRecentMessageV2 {
   readonly messageId: string;
@@ -93,7 +102,7 @@ export interface SeyeonRuntimeContextV2 {
     readonly claimsMayMutateRelationshipState: false;
   }>;
   readonly relationship: SeyeonRelationshipContextV2 | null;
-  readonly relationshipSemantics: SeyeonRelationshipRuntimeOverlayV2 | null;
+  readonly relationshipSemantics: SeyeonRelationshipRuntimeSemanticsV2 | null;
   readonly bibleSlices: readonly Readonly<{
     readonly id: SeyeonBibleSliceIdV2;
     readonly sourceSections: readonly string[];
@@ -123,7 +132,7 @@ export interface SeyeonRuntimeContextV2 {
 
 export interface AssembleSeyeonRuntimeContextV2Input {
   readonly relationship: SeyeonRelationshipContextV2 | null;
-  readonly relationshipSemantics?: SeyeonRelationshipRuntimeOverlayV2 | null;
+  readonly relationshipSemantics?: SeyeonRelationshipRuntimeSemanticsV2 | null;
   readonly integrityDecisions?: readonly CharacterIntegrityDecisionV1[];
   readonly governedPreflightApplied?: boolean;
   readonly recentMessages: readonly SeyeonRecentMessageV2[];
@@ -230,21 +239,98 @@ function validateRelationship(
 }
 
 function validateRelationshipSemanticsOverlay(
-  overlay: SeyeonRelationshipRuntimeOverlayV2 | null | undefined,
+  overlay: SeyeonRelationshipRuntimeSemanticsV2 | null | undefined,
   relationship: SeyeonRelationshipContextV2 | null,
-): SeyeonRelationshipRuntimeOverlayV2 | null {
+): SeyeonRelationshipRuntimeSemanticsV2 | null {
   if (overlay === null || overlay === undefined) return null;
   if (relationship === null) {
     throw new TypeError(
-      'Experimental relationship semantics cannot create a relationship context.',
+      'Relationship semantics cannot create a relationship context.',
     );
   }
+
+  if (
+    overlay.schemaVersion ===
+      SEYEON_PRODUCTION_RELATIONSHIP_RUNTIME_OVERLAY_VERSION_V1 &&
+    overlay.authority ===
+      SEYEON_PRODUCTION_RELATIONSHIP_RUNTIME_AUTHORITY_V1
+  ) {
+    if (overlay.characterId !== 'seyeon') {
+      throw new TypeError(
+        'Production Se-yeon relationship runtime overlay characterId is invalid.',
+      );
+    }
+    if (
+      overlay.source.relationshipRevision !== relationship.revision ||
+      overlay.source.policyVersion !== relationship.policyVersion ||
+      overlay.source.attainedStage !== relationship.stageKey
+    ) {
+      throw new TypeError(
+        'Production relationship overlay must be pinned to the exact relationship revision/stage/policy used for this turn.',
+      );
+    }
+    if (
+      !(['STABLE', 'OPEN_CONFLICT', 'RESOLVED_RECENTLY'] as const).includes(
+        overlay.currentCondition,
+      )
+    ) {
+      throw new TypeError(
+        'Production relationship overlay currentCondition is invalid.',
+      );
+    }
+    if (
+      !(['STAGE_ALIGNED', 'RESTRICTED_BY_CONFLICT', 'CAUTIOUS_AFTER_REPAIR'] as const).includes(
+        overlay.behaviorAccess,
+      )
+    ) {
+      throw new TypeError(
+        'Production relationship overlay behaviorAccess is invalid.',
+      );
+    }
+    if (
+      overlay.constraints.mayOverrideRelationshipState !== true ||
+      overlay.constraints.mayOverrideRelationshipBands !== false ||
+      overlay.constraints.mayUnlockDisclosure !== false ||
+      overlay.constraints.mayCreateCharacterFact !== false ||
+      overlay.constraints.mayCreateSharedHistory !== false ||
+      overlay.constraints.mayCreateRelationshipEvent !== false ||
+      overlay.constraints.mayMutateRelationshipState !== false ||
+      overlay.constraints.mayAppendDurableMemory !== false
+    ) {
+      throw new TypeError(
+        'Production relationship overlay authority must remain limited to current relationship behavior state.',
+      );
+    }
+
+    return Object.freeze({
+      schemaVersion:
+        SEYEON_PRODUCTION_RELATIONSHIP_RUNTIME_OVERLAY_VERSION_V1,
+      authority: SEYEON_PRODUCTION_RELATIONSHIP_RUNTIME_AUTHORITY_V1,
+      characterId: 'seyeon' as const,
+      source: Object.freeze({ ...overlay.source }),
+      currentCondition: overlay.currentCondition,
+      behaviorAccess: overlay.behaviorAccess,
+      constraints: Object.freeze({
+        mayOverrideRelationshipState: true as const,
+        mayOverrideRelationshipBands: false as const,
+        mayUnlockDisclosure: false as const,
+        mayCreateCharacterFact: false as const,
+        mayCreateSharedHistory: false as const,
+        mayCreateRelationshipEvent: false as const,
+        mayMutateRelationshipState: false as const,
+        mayAppendDurableMemory: false as const,
+      }),
+    });
+  }
+
   if (overlay.schemaVersion !== SEYEON_RELATIONSHIP_RUNTIME_OVERLAY_VERSION_V2) {
-    throw new TypeError('Se-yeon relationship runtime overlay schemaVersion is invalid.');
+    throw new TypeError(
+      'Se-yeon relationship runtime overlay schemaVersion is invalid.',
+    );
   }
   if (overlay.authority !== SEYEON_RELATIONSHIP_RUNTIME_OVERLAY_AUTHORITY_V2) {
     throw new TypeError(
-      'Se-yeon relationship runtime overlay must remain non-authoritative.',
+      'Experimental relationship runtime overlay must remain non-authoritative.',
     );
   }
   if (
@@ -252,7 +338,7 @@ function validateRelationshipSemanticsOverlay(
     overlay.source.authority !== 'experimental_shadow_not_production_authority'
   ) {
     throw new TypeError(
-      'Se-yeon relationship runtime overlay source must remain the experimental shadow.',
+      'Experimental relationship runtime overlay source must remain the experimental shadow.',
     );
   }
   if (overlay.characterId !== 'seyeon') {
