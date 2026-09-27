@@ -6,8 +6,11 @@
 -- rebuilt or snapshotted.
 
 grant insert
-  on public.relationship_event_adjustments,
-     public.relationship_state_snapshots
+  on public.relationship_event_adjustments
+  to myeongha_relationship_apply_owner;
+
+grant select, insert
+  on public.relationship_state_snapshots
   to myeongha_relationship_apply_owner;
 
 drop policy if exists relationship_reliability_adjustment_insert_v1
