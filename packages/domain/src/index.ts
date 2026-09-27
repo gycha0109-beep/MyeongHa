@@ -224,6 +224,16 @@ export {
 } from './character-face-final-output.js';
 
 export {
+  CHARACTER_FACE_ARTIFACT_BUILDER_VERSION_V1,
+  CHARACTER_FACE_READING_ARTIFACT_SCHEMA_VERSION_V1,
+  buildCharacterFaceReadingArtifactCandidateV1,
+  hashCharacterFaceFinalOutputV1,
+  hashCharacterFaceReadingArtifactV1,
+  type CharacterFaceReadingArtifactBuildDecisionV1,
+  type CharacterFaceReadingArtifactCandidateV1,
+} from './character-face-reading-artifact.js';
+
+export {
   CHARACTER_PERSPECTIVE_NARRATIVE_ROLES_V1,
   CHARACTER_PERSPECTIVE_SCHEMA_VERSION_V1,
   SAJU_GROUNDING_AXIS_KEYS_V1,
