@@ -72,7 +72,7 @@ const policy = JSON.parse(policyRaw);
 const expectedPolicy = {
   contractVersion: 'myeongha-member-auth-abuse-policy-v2',
   strategy: 'postgres-application-admission',
-  activationState: 'production-enforcement-pending-canary',
+  activationState: 'production-active',
   algorithm: 'anchored-fixed-window',
   windowSeconds: 60,
   requestLimit: 30,
@@ -119,13 +119,24 @@ if (
   throw new Error('Member Auth V2 production runtime contract drifted.');
 }
 if (
-  policy.productionCanary?.status !== 'pending' ||
+  policy.productionCanary?.status !== 'pass' ||
+  policy.productionCanary?.runId !== 36346090857 ||
+  policy.productionCanary?.exactProductionDeploymentId !== 'dpl_8sA237CXZ4vN65N9Nq4uSPYf9p4h' ||
   policy.productionCanary?.sideEffectFree !== true ||
   policy.productionCanary?.expectedAllowedInvalidRequests !== 30 ||
   policy.productionCanary?.expectedFirstRateLimitedAttempt !== 31 ||
-  policy.productionCanary?.signOutExcluded !== true
+  JSON.stringify(policy.productionCanary?.observedRetryAfterSeconds) !== JSON.stringify({
+    'sign-in': 52,
+    'sign-up': 53,
+    refresh: 52,
+  }) ||
+  policy.productionCanary?.endpointBucketIndependence !== true ||
+  policy.productionCanary?.signOutExcluded !== true ||
+  policy.productionCanary?.probePayloads !== 'local-invalid-only' ||
+  policy.productionCanary?.rawNetworkIdentifiersEmitted !== false ||
+  policy.productionCanary?.credentialMaterialEmitted !== false
 ) {
-  throw new Error('Member Auth V2 canary state must remain pending before runtime proof.');
+  throw new Error('Member Auth V2 production canary evidence drifted.');
 }
 
 function requireFragment(name, source, fragment) {
@@ -253,18 +264,24 @@ for (const fragment of [
 requireFragment(paths.authorityCore, authorityCore, 'bash test/db/member_auth_rate_limit_authority.sh');
 
 for (const fragment of [
-  'C2 PRODUCTION ENFORCEMENT WIRED / CANARY PENDING',
+  'PRODUCTION ACTIVE / C2 CANARY PROVEN',
   'UNLOGGED',
   '30 allowed',
   '10 denied',
   'MYEONGHA_AUTH_RATE_LIMIT_SECRET',
   'fail-closed',
-  'production-enforcement-pending-canary',
+  'production-active',
   'AUTH_RATE_LIMIT_UNAVAILABLE',
   'RATE_LIMITED',
   '36341568878',
+  '36346090857',
+  'dpl_8sA237CXZ4vN65N9Nq4uSPYf9p4h',
+  'Retry-After: 52',
+  'Retry-After: 53',
   '1500 ms',
-  'C2B canary success',
+  'endpoint bucket independence passed',
+  'raw network identifiers were not emitted',
+  'credential material was not emitted',
 ]) requireFragment(paths.docs, docs, fragment);
 
 for (const [name, source, action] of [
@@ -319,5 +336,5 @@ for (const forbidden of ['\npush:', '\npull_request:', '\nschedule:']) {
 }
 
 console.log(
-  'MyeongHa Member Auth rate-limit V2 verification passed: C1 PostgreSQL authority remains pinned, C2A production HTTP enforcement is wired for sign-in/sign-up/refresh, sign-out remains excluded, fail-closed 503 and 429 Retry-After contracts are fixed, and the side-effect-free Production canary is pending.',
+  'MyeongHa Member Auth rate-limit V2 verification passed: C1 PostgreSQL authority remains pinned, C2 production HTTP enforcement is active for sign-in/sign-up/refresh, sign-out remains excluded, fail-closed 503 and 429 Retry-After contracts are fixed, and the side-effect-free Production canary is runtime-proven.',
 );
