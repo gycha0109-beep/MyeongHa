@@ -52,40 +52,6 @@ begin
 end;
 $relationship_policy_immutable$;
 
-create or replace function public.tr_relationship_legacy_events_disabled_v1()
-returns trigger
-language plpgsql
-set search_path = pg_catalog, public
-as $relationship_legacy$
-begin
-  if tg_op = 'DELETE'
-     and current_user = (
-       select pg_catalog.pg_get_userbyid(p.proowner)
-       from pg_catalog.pg_proc p
-       where p.oid = pg_catalog.to_regprocedure(
-         'public.internal_finalize_account_deletion_db_v1(uuid,uuid,text)'
-       )
-     )
-     and coalesce(
-       nullif(
-         pg_catalog.current_setting(
-           'myeongha.account_deletion_finalizer_subject_id',
-           true
-         ),
-         ''
-       )::uuid = old.subject_id,
-       false
-     ) then
-    return old;
-  end if;
-
-  raise exception using
-    errcode = '23514',
-    constraint = 'tr_relationship_legacy_events_disabled_v1',
-    message = 'legacy relationship_events writes are disabled after Production relationship policy V1';
-end;
-$relationship_legacy$;
-
 create trigger tr_relationship_history_entries_immutable_v1
   before update or delete on public.relationship_history_entries
   for each row execute function public.tr_relationship_subject_owned_immutable_v1();
@@ -117,10 +83,6 @@ create trigger tr_relationship_policy_artifacts_immutable_v1
 create trigger tr_relationship_policy_activations_immutable_v1
   before update or delete on public.relationship_policy_activations
   for each row execute function public.tr_relationship_policy_immutable_v1();
-
-create trigger tr_relationship_legacy_events_disabled_v1
-  before insert or update or delete on public.relationship_events
-  for each row execute function public.tr_relationship_legacy_events_disabled_v1();
 
 create or replace function public.ct_validate_relationship_history_shape_v1()
 returns trigger
@@ -561,7 +523,6 @@ create constraint trigger ct_relationship_snapshot_revision_v1
 
 revoke all on function public.tr_relationship_subject_owned_immutable_v1() from public;
 revoke all on function public.tr_relationship_policy_immutable_v1() from public;
-revoke all on function public.tr_relationship_legacy_events_disabled_v1() from public;
 revoke all on function public.ct_validate_relationship_history_shape_v1() from public;
 revoke all on function public.ct_validate_relationship_event_contract_v1() from public;
 revoke all on function public.ct_validate_relationship_event_provenance_v1() from public;
