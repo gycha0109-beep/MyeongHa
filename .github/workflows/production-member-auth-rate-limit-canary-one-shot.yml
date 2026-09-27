@@ -1,0 +1,59 @@
+name: Production Member Auth Rate Limit Canary One Shot
+run-name: "[WT:ops] Production Member Auth Rate Limit Canary — one-shot"
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/ops/sec-02-c2b-member-auth-rate-limit-canary.once'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-member-auth-rate-limit-canary
+  cancel-in-progress: false
+
+env:
+  VERCEL_PROJECT_ID: prj_nXF0b5uv27Lyucz2SEBxzdCRXVsP
+  VERCEL_TEAM_ID: team_xuYA9OhCWlJETaYFOmeVodgS
+  VERCEL_PROJECT_NAME: myeongha
+
+jobs:
+  canary:
+    name: verify-production-member-auth-rate-limit-one-shot
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: production
+    env:
+      MYEONGHA_WATCHTOWER_TRACK: ops
+      MYEONGHA_MEMBER_AUTH_RATE_LIMIT_CANARY_CONFIRM: VERIFY_MEMBER_AUTH_RATE_LIMIT_CANARY_V2
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+    steps:
+      - name: Checkout exact repository state
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Gate exact one-shot marker
+        shell: bash
+        run: |
+          set -euo pipefail
+          marker='.github/ops/sec-02-c2b-member-auth-rate-limit-canary.once'
+          [[ -f "$marker" ]]
+          [[ "$(tr -d '\r\n' < "$marker")" == 'SEC-02-C2B-MEMBER-AUTH-RATE-LIMIT-CANARY-V1' ]]
+          [[ "$MYEONGHA_WATCHTOWER_TRACK" == 'ops' ]]
+          [[ "$MYEONGHA_MEMBER_AUTH_RATE_LIMIT_CANARY_CONFIRM" == 'VERIFY_MEMBER_AUTH_RATE_LIMIT_CANARY_V2' ]]
+
+      - name: Bind canary to exact main Production deployment
+        shell: bash
+        run: |
+          set -euo pipefail
+          source scripts/operations/vercel-production-common.sh
+          verify_governed_vercel_project
+          read -r exact_deployment_id exact_deployment_name < <(wait_exact_main_deployment)
+          test -n "$exact_deployment_id"
+          [[ "$exact_deployment_name" == "$VERCEL_PROJECT_NAME" ]]
+          echo "exact_production_deployment_id=$exact_deployment_id"
+
+      - name: Run side-effect-free Member Auth rate-limit canary
+        run: node scripts/operations/run-production-member-auth-rate-limit-canary.mjs
