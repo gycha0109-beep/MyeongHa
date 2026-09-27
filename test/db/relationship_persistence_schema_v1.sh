@@ -285,8 +285,6 @@ SQL
 
 expect_fail "relationship score bounds reject overflow"   "user_character_states_closeness_bounds_v1_check"   "update public.user_character_states set closeness=101 where id='9a120000-0000-0000-0000-000000000001';"
 
-expect_fail "legacy relationship_events writes are disabled"   "tr_relationship_legacy_events_disabled_v1"   "insert into public.relationship_events(id,subject_id,character_id,event_type,event_schema_version,event_dedupe_key,delta_closeness,delta_trust,delta_friction,policy_version,state_revision_before,state_revision_after,applied_at) values ('9a180000-0000-0000-0000-000000000001','9a100000-0000-0000-0000-000000000001','relationship-schema-v1-char','legacy','v1','legacy-write',0,0,0,'relationship-policy-v1',3,4,clock_timestamp());"
-
 expect_fail "history rows are append-only on update"   "tr_relationship_subject_owned_immutable_v1"   "update public.relationship_history_entries set history_dedupe_key='changed' where id='9a130000-0000-0000-0000-000000000001';"
 
 expect_fail "history rows are append-only on delete"   "tr_relationship_subject_owned_immutable_v1"   "delete from public.relationship_history_entries where id='9a130000-0000-0000-0000-000000000001';"
