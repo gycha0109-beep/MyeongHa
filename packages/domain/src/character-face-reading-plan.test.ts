@@ -14,7 +14,6 @@ import {
   type CharacterFaceCapabilityProfileV1,
 } from './character-face-capability.js';
 import {
-  CHARACTER_FACE_CONTEXT_SCHEMA_VERSION_V1,
   CHARACTER_FACE_REALIZATION_MODE_V1,
   CHARACTER_FACE_SOURCE_BINDING_SCHEMA_VERSION_V1,
   FACE_CHARACTER_GROUNDING_PROJECTION_VERSION_V1,
@@ -36,9 +35,10 @@ import {
   type CharacterFacePerspectiveProfileV1,
 } from './character-face-perspective.js';
 import {
-  CHARACTER_FACE_INSIGHT_SELECTION_SCHEMA_VERSION_V1,
-  selectCharacterFaceInsightsV1,
-} from './character-face-insight-selector.js';
+  CHARACTER_FACE_READING_PLAN_DECISION_SCHEMA_VERSION_V1,
+  CHARACTER_FACE_READING_PLAN_SCHEMA_VERSION_V1,
+  buildCharacterFaceReadingPlanDecisionV1,
+} from './character-face-reading-plan.js';
 
 const SOURCE_RESULT_HASH =
   `face-topic-source-result:${'a'.repeat(64)}`;
@@ -147,18 +147,38 @@ function bundleCandidate(input?: {
   };
 }
 
-function baseRuntimeContext(
-  characterId: string,
-  relationshipRevision: number,
-): CharacterRuntimeContextV1 {
+function baseRuntimeContext(input?: {
+  readonly characterId?: string;
+  readonly contentVersion?: string;
+  readonly relationshipRevision?: number;
+  readonly preferredQuestionStrategies?:
+    readonly string[];
+}): CharacterRuntimeContextV1 {
+  const characterId =
+    input?.characterId ??
+    'character.alpha';
+  const contentVersion =
+    input?.contentVersion ??
+    'character-content-alpha-v1';
+
   return {
+    schemaVersion: 'v1',
     characterId,
-    contentVersion:
-      characterId === 'character.beta'
-        ? 'character-content-beta-v1'
-        : 'character-content-alpha-v1',
+    contentVersion,
+    persona: {
+      questioning: {
+        preferredStrategies:
+          input?.preferredQuestionStrategies ??
+          [
+            'ask_current_context',
+            'ask_recent_change',
+          ],
+      },
+    },
     relationship: {
-      relationshipRevision,
+      relationshipRevision:
+        input?.relationshipRevision ??
+        1,
       relationshipPolicyVersion:
         'relationship-policy-test-v1',
       projectionPolicyVersion:
@@ -172,25 +192,37 @@ function baseRuntimeContext(
 
 function runtimeContext(input?: {
   readonly characterId?: string;
+  readonly contentVersion?: string;
   readonly relationshipRevision?: number;
+  readonly preferredQuestionStrategies?:
+    readonly string[];
   readonly bundle?: ReturnType<
     typeof bundleCandidate
   >;
 }): CharacterRuntimeContextWithFaceGroundingV1 {
-  const characterId =
-    input?.characterId ??
-    'character.alpha';
   const bundle =
     input?.bundle ??
     bundleCandidate();
 
   return admitCharacterRuntimeFaceGroundingV1({
     context:
-      baseRuntimeContext(
-        characterId,
-        input?.relationshipRevision ??
+      baseRuntimeContext({
+        characterId:
+          input?.characterId ??
+          'character.alpha',
+        contentVersion:
+          input?.contentVersion ??
+          'character-content-alpha-v1',
+        relationshipRevision:
+          input?.relationshipRevision ??
           1,
-      ),
+        preferredQuestionStrategies:
+          input?.preferredQuestionStrategies ??
+          [
+            'ask_current_context',
+            'ask_recent_change',
+          ],
+      }),
     source: {
       schemaVersion:
         CHARACTER_FACE_SOURCE_BINDING_SCHEMA_VERSION_V1,
@@ -236,18 +268,16 @@ function runtimeContext(input?: {
   });
 }
 
-function capability(
-  input?: {
-    readonly characterId?: string;
-    readonly contentVersion?: string;
-    readonly faceProfileVersion?: string;
-    readonly allowedTopicKeys?: readonly (
-      | 'face.discover.structure'
-      | 'face.discover.extended'
-    )[];
-    readonly allowPartial?: boolean;
-  },
-): CharacterFaceCapabilityProfileV1 {
+function capability(input?: {
+  readonly characterId?: string;
+  readonly contentVersion?: string;
+  readonly faceProfileVersion?: string;
+  readonly allowedTopicKeys?: readonly (
+    | 'face.discover.structure'
+    | 'face.discover.extended'
+  )[];
+  readonly allowPartial?: boolean;
+}): CharacterFaceCapabilityProfileV1 {
   const characterId =
     input?.characterId ??
     'character.alpha';
@@ -269,7 +299,7 @@ function capability(
     schemaVersion:
       CHARACTER_FACE_CAPABILITY_SOURCE_SCHEMA_VERSION_V1,
     capabilityVersion:
-      'face-capability-alpha-v1',
+      `face-capability-${characterId}-v1`,
     characterId,
     contentVersion,
     faceProfileVersion,
@@ -388,19 +418,23 @@ function perspective(input?: {
   });
 }
 
-function select(input?: {
+function plan(input?: {
   readonly bundle?: ReturnType<
     typeof bundleCandidate
   >;
-  readonly context?: CharacterRuntimeContextWithFaceGroundingV1;
-  readonly capability?: CharacterFaceCapabilityProfileV1;
-  readonly perspective?: CharacterFacePerspectiveProfileV1;
+  readonly context?:
+    CharacterRuntimeContextWithFaceGroundingV1;
+  readonly capability?:
+    CharacterFaceCapabilityProfileV1;
+  readonly perspective?:
+    CharacterFacePerspectiveProfileV1;
   readonly characterContentVersion?: string;
 }) {
   const bundle =
     input?.bundle ??
     bundleCandidate();
-  return selectCharacterFaceInsightsV1({
+
+  return buildCharacterFaceReadingPlanDecisionV1({
     context:
       input?.context ??
       runtimeContext({ bundle }),
@@ -418,127 +452,165 @@ function select(input?: {
 }
 
 describe(
-  'TOPIC-FACE-005D deterministic production Face insight selector',
+  'TOPIC-FACE-005E production Face Reading Plan',
   () => {
-    it('selects all four structure units while separating source order from Perspective order', () => {
-      const result = select();
+    it('mirrors the Saju plan architecture with deterministic Face beats and no final prose', () => {
+      const decision = plan();
 
-      expect(result.schemaVersion).toBe(
-        CHARACTER_FACE_INSIGHT_SELECTION_SCHEMA_VERSION_V1,
+      expect(
+        decision.schemaVersion,
+      ).toBe(
+        CHARACTER_FACE_READING_PLAN_DECISION_SCHEMA_VERSION_V1,
+      );
+      expect(decision.mode).toBe(
+        'character_plan',
       );
       expect(
-        result.selectedUnitIds,
-      ).toEqual([
-        `face-grounding-unit:${'1'.repeat(64)}`,
-        `face-grounding-unit:${'2'.repeat(64)}`,
-        `face-grounding-unit:${'3'.repeat(64)}`,
-        `face-grounding-unit:${'4'.repeat(64)}`,
-      ]);
+        decision.plan.schemaVersion,
+      ).toBe(
+        CHARACTER_FACE_READING_PLAN_SCHEMA_VERSION_V1,
+      );
       expect(
-        result.orderedUnitIds,
-      ).toEqual([
-        `face-grounding-unit:${'3'.repeat(64)}`,
-        `face-grounding-unit:${'1'.repeat(64)}`,
-        `face-grounding-unit:${'2'.repeat(64)}`,
-        `face-grounding-unit:${'4'.repeat(64)}`,
-      ]);
-      expect(
-        result.omittedUnitIds,
-      ).toEqual([]);
-      expect(result.coverage).toBe('full');
-    });
+        decision.plan.planId,
+      ).toMatch(
+        /^character_face_reading_plan_[0-9a-f]{24}$/u,
+      );
 
-    it('applies maxUnits without letting omitted units disappear from the source partition', () => {
-      const result = select({
-        perspective:
-          perspective({
-            maxUnits: 2,
-          }),
+      const semantic =
+        decision.plan.beats.filter(
+          (beat) =>
+            beat.kind ===
+            'neutral_fact_realization',
+        );
+      expect(semantic).toEqual([
+        {
+          kind:
+            'neutral_fact_realization',
+          unitRefs: [
+            `face-grounding-unit:${'3'.repeat(64)}`,
+          ],
+          purpose: 'lead',
+        },
+        {
+          kind:
+            'neutral_fact_realization',
+          unitRefs: [
+            `face-grounding-unit:${'1'.repeat(64)}`,
+          ],
+          purpose: 'expand',
+        },
+        {
+          kind:
+            'neutral_fact_realization',
+          unitRefs: [
+            `face-grounding-unit:${'2'.repeat(64)}`,
+          ],
+          purpose: 'expand',
+        },
+        {
+          kind:
+            'neutral_fact_realization',
+          unitRefs: [
+            `face-grounding-unit:${'4'.repeat(64)}`,
+          ],
+          purpose: 'expand',
+        },
+      ]);
+
+      expect(
+        decision.plan.beats.at(-2),
+      ).toEqual({
+        kind:
+          'character_reaction',
+        allowedSourceUnitRefs:
+          decision.selection
+            .orderedUnitIds,
+      });
+      expect(
+        decision.plan.beats.at(-1),
+      ).toEqual({
+        kind:
+          'follow_up_question',
+        sourceUnitRefs:
+          decision.selection
+            .orderedUnitIds,
+        questionStrategy:
+          'ask_current_context',
       });
 
       expect(
-        result.orderedUnitIds,
-      ).toEqual([
-        `face-grounding-unit:${'3'.repeat(64)}`,
-        `face-grounding-unit:${'1'.repeat(64)}`,
-      ]);
-      expect(
-        result.selectedUnitIds,
-      ).toEqual([
-        `face-grounding-unit:${'1'.repeat(64)}`,
-        `face-grounding-unit:${'3'.repeat(64)}`,
-      ]);
-      expect(
-        result.omittedUnitIds,
-      ).toEqual([
-        `face-grounding-unit:${'2'.repeat(64)}`,
-        `face-grounding-unit:${'4'.repeat(64)}`,
-      ]);
-
-      const omittedCodes =
-        new Map(
-          result.selectionReasons.map(
-            (reason) => [
-              reason.unitId,
-              reason.codes,
-            ],
-          ),
-        );
-      expect(
-        omittedCodes.get(
-          `face-grounding-unit:${'2'.repeat(64)}`,
+        JSON.stringify(
+          decision.plan,
         ),
-      ).toEqual([
-        'max_units_exhausted',
-      ]);
-      expect(
-        omittedCodes.get(
-          `face-grounding-unit:${'4'.repeat(64)}`,
-        ),
-      ).toEqual([
-        'max_units_exhausted',
-      ]);
+      ).not.toMatch(
+        /displayValue|canonicalMeaning|personality|fortune|wealth/u,
+      );
     });
 
-    it('omits source units that the Perspective does not mention', () => {
-      const result = select({
-        perspective:
-          perspective({
-            attentionOrder: [
-              'mouth.width_and_relative_size',
-              'eye.width_height_ratio',
-            ],
-            maxUnits: 2,
-          }),
+    it('pins bundle, capability, Perspective and relationship identities into the plan', () => {
+      const decision = plan();
+
+      expect(
+        decision.plan.bundleHash,
+      ).toBe(
+        decision.selection.bundleHash,
+      );
+      expect(
+        decision.plan
+          .capabilityProfileRef,
+      ).toMatchObject({
+        characterId:
+          'character.alpha',
+        capabilityVersion:
+          'face-capability-character.alpha-v1',
+        sourceContentVersion:
+          'character-content-alpha-v1',
+        sourceFaceProfileVersion:
+          'face-profile-alpha-v1',
       });
-
-      const reasons =
-        new Map(
-          result.selectionReasons.map(
-            (reason) => [
-              reason.capabilityKey,
-              reason.codes,
-            ],
-          ),
-        );
-
       expect(
-        reasons.get(
-          'nose.alar_width_and_nostril_geometry',
-        ),
-      ).toEqual([
-        'not_selected_by_perspective',
-      ]);
+        decision.plan
+          .perspectiveProfileRef,
+      ).toMatchObject({
+        characterId:
+          'character.alpha',
+        perspectiveVersion:
+          'face-perspective-alpha-v1',
+        sourceContentVersion:
+          'character-content-alpha-v1',
+        sourceFaceProfileVersion:
+          'face-profile-alpha-v1',
+      });
       expect(
-        reasons.get(
-          'chin_lower_face.visible_width_ratio',
-        ),
-      ).toEqual([
-        'not_selected_by_perspective',
-      ]);
+        decision.plan
+          .capabilityProfileRef
+          .profileHash,
+      ).toMatch(
+        /^[0-9a-f]{64}$/u,
+      );
+      expect(
+        decision.plan
+          .perspectiveProfileRef
+          .profileHash,
+      ).toMatch(
+        /^[0-9a-f]{64}$/u,
+      );
+      expect(
+        decision.plan
+          .relationshipProjectionRef,
+      ).toMatchObject({
+        schemaVersion: 'v1',
+        relationshipRevision: 1,
+        relationshipPolicyVersion:
+          'relationship-policy-test-v1',
+        projectionPolicyVersion:
+          'projection-policy-test-v1',
+        behaviorVersion:
+          'behavior-test-v1',
+      });
     });
 
-    it('resolves unavailable forehead without fabricating a unit or consuming quota', () => {
+    it('preserves partial forehead unavailability as a notice without fabricating a semantic unit', () => {
       const unavailableSections = [
         'observation:forehead.visible_width_shape',
       ];
@@ -550,7 +622,7 @@ describe(
             'partial',
           unavailableSections,
         });
-      const result = select({
+      const decision = plan({
         bundle,
         context:
           runtimeContext({ bundle }),
@@ -565,54 +637,42 @@ describe(
           }),
       });
 
-      expect(result.coverage).toBe('partial');
       expect(
-        result.orderedUnitIds,
-      ).toEqual([
-        `face-grounding-unit:${'3'.repeat(64)}`,
-        `face-grounding-unit:${'1'.repeat(64)}`,
-      ]);
+        decision.selection.coverage,
+      ).toBe('partial');
       expect(
-        result.attentionResolutions[0],
-      ).toEqual({
+        decision.plan.beats,
+      ).toContainEqual({
+        kind:
+          'unavailable_notice',
         attentionKey:
           'forehead.visible_width_shape',
         status: 'unavailable',
       });
-      expect(
-        result.selectedUnitIds,
-      ).toHaveLength(2);
+
+      const semanticRefs =
+        decision.plan.beats
+          .filter(
+            (beat) =>
+              beat.kind ===
+              'neutral_fact_realization',
+          )
+          .flatMap(
+            (beat) =>
+              beat.kind ===
+              'neutral_fact_realization'
+                ? [...beat.unitRefs]
+                : [],
+          );
+
+      expect(semanticRefs).toEqual(
+        decision.selection
+          .orderedUnitIds,
+      );
+      expect(semanticRefs).toHaveLength(2);
     });
 
-    it('distinguishes an authored attention key that is absent but not source-declared unavailable', () => {
-      const result = select({
-        perspective:
-          perspective({
-            attentionOrder: [
-              'forehead.visible_width_shape',
-            ],
-            maxUnits: 1,
-          }),
-      });
-
-      expect(
-        result.selectedUnitIds,
-      ).toEqual([]);
-      expect(
-        result.attentionResolutions,
-      ).toEqual([
-        {
-          attentionKey:
-            'forehead.visible_width_shape',
-          status: 'not_present',
-        },
-      ]);
-      expect(
-        result.omittedUnitIds,
-      ).toHaveLength(4);
-    });
-
-    it('allows an empty-but-explained selection when the only authored attention target is unavailable', () => {
+    it('builds an unavailable-only plan without reaction or follow-up beats', () => {
       const unavailableSections = [
         'observation:forehead.visible_width_shape',
       ];
@@ -625,7 +685,7 @@ describe(
           unavailableSections,
         });
 
-      const result = select({
+      const decision = plan({
         bundle,
         context:
           runtimeContext({ bundle }),
@@ -639,15 +699,15 @@ describe(
       });
 
       expect(
-        result.selectedUnitIds,
+        decision.selection
+          .selectedUnitIds,
       ).toEqual([]);
       expect(
-        result.orderedUnitIds,
-      ).toEqual([]);
-      expect(
-        result.attentionResolutions,
+        decision.plan.beats,
       ).toEqual([
         {
+          kind:
+            'unavailable_notice',
           attentionKey:
             'forehead.visible_width_shape',
           status: 'unavailable',
@@ -655,127 +715,63 @@ describe(
       ]);
     });
 
-    it('suppresses duplicate source capability units deterministically', () => {
-      const bundle =
-        bundleCandidate({
-          units: [
-            unit(
-              1,
-              'eye.width_height_ratio',
-            ),
-            unit(
-              2,
-              'eye.width_height_ratio',
-            ),
-            unit(
-              3,
-              'mouth.width_and_relative_size',
-            ),
-            unit(
-              4,
-              'chin_lower_face.visible_width_ratio',
-            ),
-          ],
-        });
-
-      const result = select({
-        bundle,
-        context:
-          runtimeContext({ bundle }),
+    it('preserves not-present attention as an explicit notice', () => {
+      const decision = plan({
         perspective:
           perspective({
             attentionOrder: [
-              'eye.width_height_ratio',
-              'mouth.width_and_relative_size',
-              'chin_lower_face.visible_width_ratio',
+              'forehead.visible_width_shape',
             ],
-            maxUnits: 3,
+            maxUnits: 1,
           }),
       });
 
       expect(
-        result.orderedUnitIds[0],
-      ).toBe(
-        `face-grounding-unit:${'1'.repeat(64)}`,
-      );
-
-      const duplicate =
-        result.selectionReasons.find(
-          (reason) =>
-            reason.unitId ===
-            `face-grounding-unit:${'2'.repeat(64)}`,
-        );
-      expect(duplicate).toEqual({
-        unitId:
-          `face-grounding-unit:${'2'.repeat(64)}`,
-        capabilityKey:
-          'eye.width_height_ratio',
-        disposition: 'omitted',
-        codes: [
-          'duplicate_capability_omitted',
-        ],
-      });
+        decision.plan.beats,
+      ).toEqual([
+        {
+          kind:
+            'unavailable_notice',
+          attentionKey:
+            'forehead.visible_width_shape',
+          status: 'not_present',
+        },
+      ]);
     });
 
-    it('does not auto-select a future source capability that is absent from the Perspective registry', () => {
-      const bundle =
-        bundleCandidate({
-          units: [
-            unit(
-              1,
-              'eye.width_height_ratio',
-            ),
-            unit(
-              2,
-              'future.face.capability',
-            ),
-            unit(
-              3,
-              'mouth.width_and_relative_size',
-            ),
-            unit(
-              4,
-              'chin_lower_face.visible_width_ratio',
-            ),
-          ],
-        });
-
-      const result = select({
-        bundle,
-        context:
-          runtimeContext({ bundle }),
-      });
-
-      const future =
-        result.selectionReasons.find(
-          (reason) =>
-            reason.capabilityKey ===
-            'future.face.capability',
-        );
-
-      expect(future).toEqual({
-        unitId:
-          `face-grounding-unit:${'2'.repeat(64)}`,
-        capabilityKey:
-          'future.face.capability',
-        disposition: 'omitted',
-        codes: [
-          'not_selected_by_perspective',
-        ],
-      });
-    });
-
-    it('is deterministic for repeated identical inputs', () => {
-      const first = select();
-      const second = select();
-
-      expect(second).toEqual(first);
-    });
-
-    it('is invariant to relationship revision changes', () => {
+    it('omits follow-up beat when the active Character has no authored question strategy', () => {
       const bundle =
         bundleCandidate();
-      const first = select({
+      const decision = plan({
+        bundle,
+        context:
+          runtimeContext({
+            bundle,
+            preferredQuestionStrategies:
+              [],
+          }),
+      });
+
+      expect(
+        decision.plan.beats.some(
+          (beat) =>
+            beat.kind ===
+            'follow_up_question',
+        ),
+      ).toBe(false);
+      expect(
+        decision.plan.beats.some(
+          (beat) =>
+            beat.kind ===
+            'character_reaction',
+        ),
+      ).toBe(true);
+    });
+
+    it('keeps selection invariant while relationship revision changes only the plan identity', () => {
+      const bundle =
+        bundleCandidate();
+      const first = plan({
         bundle,
         context:
           runtimeContext({
@@ -783,41 +779,74 @@ describe(
             relationshipRevision: 1,
           }),
       });
-      const second = select({
+      const second = plan({
         bundle,
         context:
           runtimeContext({
             bundle,
-            relationshipRevision: 999,
+            relationshipRevision: 99,
           }),
       });
 
-      expect(second).toEqual(first);
+      expect(
+        second.selection,
+      ).toEqual(
+        first.selection,
+      );
+      expect(
+        second.plan.beats,
+      ).toEqual(
+        first.plan.beats,
+      );
+      expect(
+        second.plan.planId,
+      ).not.toBe(
+        first.plan.planId,
+      );
+      expect(
+        second.plan
+          .relationshipProjectionRef
+          .relationshipRevision,
+      ).toBe(99);
     });
 
-    it('lets two Characters order the same source bundle differently without changing source identity', () => {
+    it('is deterministic for repeated identical plan inputs', () => {
+      expect(plan()).toEqual(
+        plan(),
+      );
+    });
+
+    it('lets two Character Perspectives change beat order while preserving the same source bundle', () => {
       const bundle =
         bundleCandidate();
 
-      const alpha = select({
+      const alpha = plan({
         bundle,
         context:
           runtimeContext({
             bundle,
             characterId:
               'character.alpha',
+            contentVersion:
+              'character-content-alpha-v1',
           }),
         capability:
           capability({
             characterId:
               'character.alpha',
+            contentVersion:
+              'character-content-alpha-v1',
+            faceProfileVersion:
+              'face-profile-alpha-v1',
           }),
         perspective:
           perspective({
             characterId:
               'character.alpha',
-            perspectiveVersion:
-              'face-perspective-alpha-v1',
+            contentVersion:
+              'character-content-alpha-v1',
+            faceProfileVersion:
+              'face-profile-alpha-v1',
             attentionOrder: [
               'mouth.width_and_relative_size',
               'eye.width_height_ratio',
@@ -827,13 +856,15 @@ describe(
           }),
       });
 
-      const beta = select({
+      const beta = plan({
         bundle,
         context:
           runtimeContext({
             bundle,
             characterId:
               'character.beta',
+            contentVersion:
+              'character-content-beta-v1',
           }),
         characterContentVersion:
           'character-content-beta-v1',
@@ -865,37 +896,50 @@ describe(
           }),
       });
 
-      expect(alpha.bundleHash).toBe(
-        beta.bundleHash,
+      expect(
+        alpha.plan.bundleHash,
+      ).toBe(
+        beta.plan.bundleHash,
       );
       expect(
-        alpha.selectedUnitIds,
+        alpha.selection
+          .selectedUnitIds,
       ).toEqual(
-        beta.selectedUnitIds,
+        beta.selection
+          .selectedUnitIds,
       );
       expect(
-        alpha.orderedUnitIds,
+        alpha.selection
+          .orderedUnitIds,
       ).not.toEqual(
-        beta.orderedUnitIds,
+        beta.selection
+          .orderedUnitIds,
       );
     });
 
-    it('fails closed when Face context is absent', () => {
-      const context = {
-        ...runtimeContext(),
-        face: null,
-      };
-
+    it('fails closed when capability denies, runtime content is stale, or grounding identity mismatches', () => {
       expect(() =>
-        select({
-          context,
+        plan({
+          capability:
+            capability({
+              allowedTopicKeys: [
+                'face.discover.extended',
+              ],
+            }),
         }),
       ).toThrow(
-        'requires an admitted Face context',
+        'TOPIC_NOT_ALLOWED',
       );
-    });
 
-    it('fails closed when the full grounding does not match the admitted context', () => {
+      expect(() =>
+        plan({
+          characterContentVersion:
+            'stale-content',
+        }),
+      ).toThrow(
+        'contentVersion does not match the active Character runtime context',
+      );
+
       const first =
         bundleCandidate();
       const second =
@@ -917,7 +961,7 @@ describe(
         });
 
       expect(() =>
-        select({
+        plan({
           bundle: second,
           context:
             runtimeContext({
@@ -927,128 +971,45 @@ describe(
       ).toThrow();
     });
 
-    it('fails closed when Character Face capability denies the active source', () => {
+    it('fails closed without admitted Face context', () => {
+      const context = {
+        ...runtimeContext(),
+        face: null,
+      };
+
       expect(() =>
-        select({
-          capability:
-            capability({
-              allowedTopicKeys: [
-                'face.discover.extended',
-              ],
-            }),
+        plan({
+          context,
         }),
       ).toThrow(
-        'Character Face capability denied: TOPIC_NOT_ALLOWED',
+        'requires an admitted Face context',
       );
     });
 
-    it('fails closed on Character/content identity mismatches', () => {
-      expect(() =>
-        select({
-          capability:
-            capability({
-              characterId:
-                'character.other',
-            }),
-        }),
-      ).toThrow(
-        'Character Face capability denied: CHARACTER_ID_MISMATCH',
-      );
-
-      expect(() =>
-        select({
-          characterContentVersion:
-            'stale-content',
-        }),
-      ).toThrow(
-        'Character Face selection contentVersion does not match the active Character runtime context',
-      );
-    });
-
-    it('fails closed when Capability and Perspective are authored for different Characters', () => {
-      expect(() =>
-        select({
-          perspective:
-            perspective({
-              characterId:
-                'character.other',
-            }),
-        }),
-      ).toThrow(
-        'Capability/Perspective identity mismatch',
-      );
-    });
-
-    it('rejects forged runtime capability or Perspective scope expansion before selection', () => {
-      const forgedCapability = {
-        ...capability(),
-        allowedTopicKeys: [
-          'face.reading.three_divisions',
-        ],
-      } as unknown as CharacterFaceCapabilityProfileV1;
-
-      expect(() =>
-        select({
-          capability:
-            forgedCapability,
-        }),
-      ).toThrow(
-        'unsupported or duplicate topic keys',
-      );
-
-      const forgedPerspective = {
-        ...perspective(),
-        attentionRegistryVersion:
-          'character-face-attention-registry-v2',
-      } as unknown as CharacterFacePerspectiveProfileV1;
-
-      expect(() =>
-        select({
-          perspective:
-            forgedPerspective,
-        }),
-      ).toThrow(
-        'attention registry version is not supported',
-      );
-    });
-
-    it('rejects a selection content version that differs from the active Character runtime context', () => {
-      expect(() =>
-        select({
-          characterContentVersion:
-            'character-content-beta-v1',
-        }),
-      ).toThrow(
-        'contentVersion does not match the active Character runtime context',
-      );
-    });
-
-    it('does not copy display values, semantics, relationship or Commerce metadata into the selection artifact', () => {
-      const result = select();
-      const keys = new Set(
-        JSON.stringify(result)
-          .match(
-            /"([^"]+)":/gu,
-          )
-          ?.map((match) =>
-            match.slice(1, -2),
-          ) ?? [],
-      );
+    it('keeps plan payload structural and free of Face values, final prose, raw biometrics, and Commerce metadata', () => {
+      const decision = plan();
+      const serialized =
+        JSON.stringify(
+          decision.plan,
+        );
 
       for (const forbidden of [
         'displayValue',
         'qualifiers',
         'prohibitedExtensions',
         'semanticClaims',
-        'personality',
-        'fortune',
-        'relationship',
+        'canonicalMeaning',
+        'rawImage',
+        'rawLandmarks',
+        'faceEmbedding',
         'price',
         'entitlement',
-        'requestId',
+        '"text"',
       ]) {
         expect(
-          keys.has(forbidden),
+          serialized.includes(
+            forbidden,
+          ),
         ).toBe(false);
       }
     });

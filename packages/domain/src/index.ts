@@ -148,6 +148,20 @@ export {
 } from './character-face-insight-selector.js';
 
 export {
+  CHARACTER_FACE_READING_PLAN_DECISION_SCHEMA_VERSION_V1,
+  CHARACTER_FACE_READING_PLAN_SCHEMA_VERSION_V1,
+  CharacterFaceReadingPlanErrorV1,
+  buildCharacterFaceReadingPlanDecisionV1,
+  type CharacterFaceReadingBeatV1,
+  type CharacterFaceReadingCapabilityRefV1,
+  type CharacterFaceReadingPerspectiveRefV1,
+  type CharacterFaceReadingPlanDecisionV1,
+  type CharacterFaceReadingPlanV1,
+  type CharacterFaceReadingRelationshipProjectionRefV1,
+  type CharacterFaceReadingSemanticPurposeV1,
+} from './character-face-reading-plan.js';
+
+export {
   CHARACTER_PERSPECTIVE_NARRATIVE_ROLES_V1,
   CHARACTER_PERSPECTIVE_SCHEMA_VERSION_V1,
   SAJU_GROUNDING_AXIS_KEYS_V1,
