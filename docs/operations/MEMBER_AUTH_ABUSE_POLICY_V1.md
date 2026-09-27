@@ -1,6 +1,6 @@
 # MyeongHa Member Auth Abuse Policy V1
 
-Status: **REPOSITORY CONTRACT / PRODUCTION ACTIVATION HOLD / B1a DRAFT CAPABILITY PROBE**
+Status: **REPOSITORY CONTRACT / PRODUCTION ACTIVATION HOLD / B1a BLOCKED BY CURRENT VERCEL PLAN**
 
 Issue: `#1332`
 
@@ -70,19 +70,34 @@ The probe requires a clean draft, rejects active custom `bypass` rules for manua
 
 The Guest bootstrap mutation workflow and Member Auth workflow share the concurrency group `production-vercel-firewall-config` so both cannot mutate the same Firewall draft concurrently.
 
-A failed cleanup is a hard failure with `DRAFT_RESIDUE_REQUIRES_MANUAL_REVIEW`. A Vercel insert rejection that creates **zero** target rules is not residue: the probe must re-read the Firewall configuration, verify active and draft are unchanged, emit `preview_rule_set_supported=false`, and classify the plan blocker separately. B1a never invokes full-draft discard, whole-config PUT, `rules.update`, rule priority mutation, or draft activation.
+A failed cleanup is a hard failure with `DRAFT_RESIDUE_REQUIRES_MANUAL_REVIEW`. A rejected insert that creates zero target rules is classified separately: the probe re-reads the Firewall state and must prove the active configuration and draft are unchanged before reporting a clean capability blocker. B1a never invokes full-draft discard, whole-config PUT, `rules.update`, rule priority mutation, or draft activation.
 
 No scheduled evidence workflow is admitted while the policy is still HOLD.
 
-### One-shot execution bridge
+## B1a live capability evidence
 
-Because the connected GitHub control surface does not expose `workflow_dispatch`, B1a may be executed once through the exact marker `.github/ops/sec-02-b1a-preview-waf-capability.once`. The push trigger is restricted to `main` and that marker path, requires exact marker value `SEC-02-B1A-PREVIEW-WAF-CAPABILITY-PROBE-V1`, and hard-codes only the governed `probe-preview-capability` mode. After the runtime probe is evaluated, the marker and push bridge must be removed in a cleanup PR. Removing the marker may trigger the workflow path filter, but the marker gate causes the probe step to skip.
+The governed runtime probe on GitHub Actions run `36289593626` reached the exact MyeongHa Vercel project and attempted the first disabled Preview-scoped Auth rate-limit insert. Vercel rejected that request with HTTP `401`, code `unauthorized`, and the message `Rate limiting is not available for this plan`.
+
+The corrected probe then re-read the Firewall configuration and emitted:
+
+```text
+preview_rule_set_supported=false
+active_config_unchanged=true
+draft_restored=true
+production_publish_performed=false
+member_auth_waf_capability_probe=blocked
+capability_blocker=rate_limiting_not_available_for_plan
+```
+
+Therefore B1a established a **current-plan capability blocker**, not a draft-integrity failure. No Member Auth rate-limit rule was created, no draft residue remained, and no Firewall configuration was published.
+
+B1b Preview activation is blocked until the governed Vercel project supports the additional rate-limit rules or SEC-02 adopts a separately reviewed alternative rate-limit architecture.
 
 ## B1a completion and later Phase B activation requirements
 
 B1a does not hard-code an unverified Vercel plan quota. Capability is proven against the actual Firewall draft validation response. A successful B1a run must report `preview_rule_set_supported=true`, `active_config_unchanged=true`, `draft_restored=true`, and `production_publish_performed=false`.
 
-After B1a passes, Preview activation and canary work remains a separate reviewed change.
+If a future re-probe passes after the capability blocker is resolved, Preview activation and canary work remains a separate reviewed change.
 
 The activation sequence must:
 
