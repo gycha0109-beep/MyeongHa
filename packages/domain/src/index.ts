@@ -190,6 +190,20 @@ export {
 } from './character-face-voice-authority.js';
 
 export {
+  CHARACTER_FACE_BOUNDED_RENDERER_VERSION_V1,
+  CHARACTER_FACE_NEUTRAL_CAPABILITY_LABELS_V1,
+  CHARACTER_FACE_UTTERANCE_SCHEMA_VERSION_V1,
+  CharacterFaceBoundedRendererErrorV1,
+  formatCharacterFaceDisplayValueV1,
+  renderCharacterFaceBoundedNeutralV1,
+  type CharacterFaceBoundedRenderDecisionV1,
+  type CharacterFaceDeliveryProfileRefV1,
+  type CharacterFaceProtectedFallbackReasonV1,
+  type CharacterFaceUtteranceSegmentV1,
+  type CharacterFaceUtteranceV1,
+} from './character-face-bounded-renderer.js';
+
+export {
   CHARACTER_PERSPECTIVE_NARRATIVE_ROLES_V1,
   CHARACTER_PERSPECTIVE_SCHEMA_VERSION_V1,
   SAJU_GROUNDING_AXIS_KEYS_V1,
