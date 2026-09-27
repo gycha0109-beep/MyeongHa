@@ -69,6 +69,43 @@ export function buildRestoreEvidenceEnvelope(input) {
   if (!SHA_RE.test(sourceSha)) fail('restoreEvidence.source_sha must be a 40-character lowercase Git SHA');
   requireExact(backupManifest.source_sha, sourceSha, 'backupManifest.source_sha');
 
+  if (backupManifest.migration_frontier !== undefined) {
+    if (
+      !Number.isSafeInteger(backupManifest.migration_frontier) ||
+      backupManifest.migration_frontier < 1
+    ) {
+      fail('backupManifest.migration_frontier must be a positive safe integer when present');
+    }
+    requireExact(
+      restoreEvidence.backup_migration_frontier,
+      backupManifest.migration_frontier,
+      'restoreEvidence.backup_migration_frontier',
+    );
+
+    if (backupManifest.migration_frontier >= 1310) {
+      requireExact(
+        JSON.stringify(backupManifest.ephemeral_data_exclusions),
+        JSON.stringify(['public.member_auth_rate_limit_buckets']),
+        'backupManifest.ephemeral_data_exclusions',
+      );
+      requireExact(
+        JSON.stringify(restoreEvidence.backup_ephemeral_data_exclusions),
+        JSON.stringify(['public.member_auth_rate_limit_buckets']),
+        'restoreEvidence.backup_ephemeral_data_exclusions',
+      );
+      for (const [key, expected] of Object.entries({
+        member_auth_rate_limit_schema_restore: 'pass',
+        member_auth_rate_limit_unlogged: 'true',
+        member_auth_rate_limit_ephemeral_data_restore: 'excluded',
+        member_auth_rate_limit_owner_restore: 'pass',
+        member_auth_rate_limit_acl_restore: 'pass',
+        member_auth_rate_limit_synthetic_admission: 'pass',
+      })) {
+        requireExact(restoreEvidence[key], expected, `restoreEvidence.${key}`);
+      }
+    }
+  }
+
   const restoreStarted = requireUtc(
     restoreEvidence.restore_started_at_utc,
     'restoreEvidence.restore_started_at_utc',

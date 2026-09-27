@@ -64,11 +64,14 @@ jobs:
           echo "::add-mask::$SUPABASE_DB_PASSWORD"
           echo "::add-mask::$MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE"
 
-      - name: Verify Docker and pinned Supabase CLI
+      - name: Verify Docker, PostgreSQL client, and pinned Supabase CLI
         shell: bash
         run: |
           set -euo pipefail
           docker info >/dev/null
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+          psql --version
           cli_version="$(npx --yes "supabase@$SUPABASE_CLI_VERSION" --version)"
           [[ "$cli_version" == "$SUPABASE_CLI_VERSION" ]]
 

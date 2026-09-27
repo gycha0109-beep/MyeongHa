@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 umask 077
+
 backup_dir="$RUNNER_TEMP/myeongha-postgres-backup"
 rm -rf "$backup_dir"
 mkdir -p "$backup_dir"
@@ -25,6 +26,48 @@ echo "::add-mask::$db_url"
 started_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
 backup_stamp="$(date -u +'%Y%m%dT%H%M%SZ')"
 
+migration_frontier="$(psql "$db_url" -At --set ON_ERROR_STOP=1 -c "
+  select max(version::bigint)
+  from supabase_migrations.schema_migrations
+  where version ~ '^[0-9]+$';
+")"
+[[ "$migration_frontier" =~ ^[0-9]+$ ]]
+(( migration_frontier >= 1310 ))
+
+member_auth_rate_limit_preflight="$(psql "$db_url" -At --set ON_ERROR_STOP=1 -F '|' -c "
+  select
+    (select c.relpersistence
+       from pg_catalog.pg_class c
+       join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+      where n.nspname = 'public'
+        and c.relname = 'member_auth_rate_limit_buckets'
+        and c.relkind = 'r'),
+    (select owner_role.rolname
+       from pg_catalog.pg_class c
+       join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+       join pg_catalog.pg_roles owner_role on owner_role.oid = c.relowner
+      where n.nspname = 'public'
+        and c.relname = 'member_auth_rate_limit_buckets'
+        and c.relkind = 'r'),
+    (select owner_role.rolname
+       from pg_catalog.pg_proc p
+       join pg_catalog.pg_namespace n on n.oid = p.pronamespace
+       join pg_catalog.pg_roles owner_role on owner_role.oid = p.proowner
+      where p.oid = 'public.cmd_admit_member_auth_request_v1(text,bytea)'::pg_catalog.regprocedure),
+    pg_catalog.has_function_privilege(
+      'myeongha_api_executor',
+      'public.cmd_admit_member_auth_request_v1(text,bytea)'::pg_catalog.regprocedure,
+      'EXECUTE'
+    ),
+    (
+      pg_catalog.has_table_privilege('myeongha_api_executor','public.member_auth_rate_limit_buckets','SELECT')
+      or pg_catalog.has_table_privilege('myeongha_api_executor','public.member_auth_rate_limit_buckets','INSERT')
+      or pg_catalog.has_table_privilege('myeongha_api_executor','public.member_auth_rate_limit_buckets','UPDATE')
+      or pg_catalog.has_table_privilege('myeongha_api_executor','public.member_auth_rate_limit_buckets','DELETE')
+    );
+")"
+[[ "$member_auth_rate_limit_preflight" == 'u|myeongha_member_auth_rate_limit_owner|myeongha_member_auth_rate_limit_owner|t|f' ]]
+
 npx --yes "supabase@$SUPABASE_CLI_VERSION" db dump \
   --db-url "$db_url" \
   -f "$backup_dir/roles.sql" \
@@ -38,11 +81,18 @@ npx --yes "supabase@$SUPABASE_CLI_VERSION" db dump \
   --use-copy \
   --data-only \
   -x 'storage.buckets_vectors' \
-  -x 'storage.vector_indexes'
+  -x 'storage.vector_indexes' \
+  -x 'public.member_auth_rate_limit_buckets'
 
 test -s "$backup_dir/roles.sql"
 test -s "$backup_dir/schema.sql"
 test -s "$backup_dir/data.sql"
+
+grep -Fq 'member_auth_rate_limit_buckets' "$backup_dir/schema.sql"
+if grep -Eq 'COPY[[:space:]]+public[.]member_auth_rate_limit_buckets|INSERT[[:space:]]+INTO[[:space:]]+public[.]member_auth_rate_limit_buckets' "$backup_dir/data.sql"; then
+  echo 'Ephemeral Member Auth rate-limit counter data leaked into the governed backup.' >&2
+  exit 1
+fi
 
 (
   cd "$backup_dir"
@@ -57,13 +107,18 @@ jq -n \
   --arg cli_version "$SUPABASE_CLI_VERSION" \
   --arg started_at "$started_at" \
   --arg completed_at "$completed_at" \
+  --argjson migration_frontier "$migration_frontier" \
   '{
     schema_version: $schema_version,
     project_ref: $project_ref,
     source_sha: $source_sha,
     supabase_cli_version: $cli_version,
     started_at_utc: $started_at,
-    completed_at_utc: $completed_at
+    completed_at_utc: $completed_at,
+    migration_frontier: $migration_frontier,
+    ephemeral_data_exclusions: [
+      "public.member_auth_rate_limit_buckets"
+    ]
   }' > "$backup_dir/manifest.json"
 
 plaintext_archive="$RUNNER_TEMP/myeongha-postgres-${backup_stamp}.tar.gz"
@@ -89,16 +144,22 @@ jq -n \
   --arg created_at "$completed_at" \
   --arg encrypted_sha256 "$encrypted_sha256" \
   --arg archive_name "$(basename "$encrypted_archive")" \
+  --argjson migration_frontier "$migration_frontier" \
   '{
     schema_version: $schema_version,
     project_ref: $project_ref,
     source_sha: $source_sha,
     created_at_utc: $created_at,
     encrypted_sha256: $encrypted_sha256,
-    archive_name: $archive_name
+    archive_name: $archive_name,
+    migration_frontier: $migration_frontier,
+    ephemeral_data_exclusions: [
+      "public.member_auth_rate_limit_buckets"
+    ]
   }' > "$public_manifest"
 
 echo "archive=$encrypted_archive" >> "$GITHUB_OUTPUT"
 echo "checksum=${encrypted_archive}.sha256" >> "$GITHUB_OUTPUT"
 echo "manifest=$public_manifest" >> "$GITHUB_OUTPUT"
 echo "artifact_name=myeongha-postgres-${backup_stamp}" >> "$GITHUB_OUTPUT"
+echo "migration_frontier=$migration_frontier" >> "$GITHUB_OUTPUT"

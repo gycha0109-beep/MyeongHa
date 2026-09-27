@@ -40,6 +40,16 @@ manifest="${manifests[0]}"
 [[ "$(jq -er '.schema_version' "$manifest")" == 'myeongha-postgres-backup-artifact-v1' ]]
 [[ "$(jq -er '.project_ref' "$manifest")" == "$EXPECTED_PROJECT_REF" ]]
 [[ "$(jq -er '.source_sha' "$manifest")" == "$EXPECTED_SOURCE_SHA" ]]
+
+backup_migration_frontier="$(jq -r '.migration_frontier // empty' "$manifest")"
+backup_ephemeral_data_exclusions_json="$(jq -c '.ephemeral_data_exclusions // []' "$manifest")"
+if [[ -n "$backup_migration_frontier" ]]; then
+  [[ "$backup_migration_frontier" =~ ^[0-9]+$ ]]
+  if (( backup_migration_frontier >= 1310 )); then
+    jq -e '.ephemeral_data_exclusions == ["public.member_auth_rate_limit_buckets"]' "$manifest" >/dev/null
+  fi
+fi
+
 [[ "$(jq -er '.archive_name' "$manifest")" == "$(basename "$archive")" ]]
 expected_cipher_sha="$(jq -er '.encrypted_sha256' "$manifest")"
 [[ "$expected_cipher_sha" =~ ^[0-9a-f]{64}$ ]]
@@ -102,6 +112,9 @@ done < "$work_dir/plaintext-sha256.txt"
 [[ "$(jq -er '.schema_version' "$work_dir/manifest.json")" == 'myeongha-postgres-logical-backup-v1' ]]
 [[ "$(jq -er '.project_ref' "$work_dir/manifest.json")" == "$EXPECTED_PROJECT_REF" ]]
 [[ "$(jq -er '.source_sha' "$work_dir/manifest.json")" == "$EXPECTED_SOURCE_SHA" ]]
+internal_backup_migration_frontier="$(jq -r '.migration_frontier // empty' "$work_dir/manifest.json")"
+[[ "$internal_backup_migration_frontier" == "$backup_migration_frontier" ]]
+[[ "$(jq -c '.ephemeral_data_exclusions // []' "$work_dir/manifest.json")" == "$backup_ephemeral_data_exclusions_json" ]]
 
 restore_started_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
 restore_started_epoch="$(date -u +%s)"
@@ -288,6 +301,44 @@ done
 [[ "$(psql "$RESTORE_DATABASE_URL" -At --set ON_ERROR_STOP=1 -c \
   "select count(*) from public.subjects s left join auth.users u on u.id = s.auth_user_id where s.auth_user_id is not null and u.id is null;")" == '0' ]]
 
+member_auth_rate_limit_schema_restore='not_applicable'
+member_auth_rate_limit_unlogged='not_applicable'
+member_auth_rate_limit_ephemeral_data_restore='not_applicable'
+member_auth_rate_limit_owner_restore='not_applicable'
+member_auth_rate_limit_acl_restore='not_applicable'
+member_auth_rate_limit_synthetic_admission='not_applicable'
+
+if [[ -n "$backup_migration_frontier" ]] && (( backup_migration_frontier >= 1310 )); then
+  [[ "$(psql "$RESTORE_DATABASE_URL" -At --set ON_ERROR_STOP=1 -c \
+    "select to_regclass('public.member_auth_rate_limit_buckets') is not null;")" == 't' ]]
+  member_auth_rate_limit_schema_restore='pass'
+
+  [[ "$(psql "$RESTORE_DATABASE_URL" -At --set ON_ERROR_STOP=1 -c \
+    "select c.relpersistence from pg_catalog.pg_class c join pg_catalog.pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relname='member_auth_rate_limit_buckets' and c.relkind='r';")" == 'u' ]]
+  member_auth_rate_limit_unlogged='true'
+
+  [[ "$(psql "$RESTORE_DATABASE_URL" -At --set ON_ERROR_STOP=1 -c \
+    "select count(*) from public.member_auth_rate_limit_buckets;")" == '0' ]]
+  member_auth_rate_limit_ephemeral_data_restore='excluded'
+
+  [[ "$(psql "$RESTORE_DATABASE_URL" -At --set ON_ERROR_STOP=1 -F '|' -c \
+    "select owner_role.rolname, owner_role.rolcanlogin, owner_role.rolsuper, owner_role.rolbypassrls from pg_catalog.pg_class c join pg_catalog.pg_namespace n on n.oid=c.relnamespace join pg_catalog.pg_roles owner_role on owner_role.oid=c.relowner where n.nspname='public' and c.relname='member_auth_rate_limit_buckets' and c.relkind='r';")" == 'myeongha_member_auth_rate_limit_owner|f|f|f' ]]
+  [[ "$(psql "$RESTORE_DATABASE_URL" -At --set ON_ERROR_STOP=1 -F '|' -c \
+    "select owner_role.rolname, p.prosecdef from pg_catalog.pg_proc p join pg_catalog.pg_roles owner_role on owner_role.oid=p.proowner where p.oid='public.cmd_admit_member_auth_request_v1(text,bytea)'::pg_catalog.regprocedure;")" == 'myeongha_member_auth_rate_limit_owner|t' ]]
+  member_auth_rate_limit_owner_restore='pass'
+
+  [[ "$(psql "$RESTORE_DATABASE_URL" -At --set ON_ERROR_STOP=1 -c \
+    "select pg_catalog.has_function_privilege('myeongha_api_executor','public.cmd_admit_member_auth_request_v1(text,bytea)'::pg_catalog.regprocedure,'EXECUTE');")" == 't' ]]
+  [[ "$(psql "$RESTORE_DATABASE_URL" -At --set ON_ERROR_STOP=1 -c \
+    "select not (pg_catalog.has_table_privilege('myeongha_api_executor','public.member_auth_rate_limit_buckets','SELECT') or pg_catalog.has_table_privilege('myeongha_api_executor','public.member_auth_rate_limit_buckets','INSERT') or pg_catalog.has_table_privilege('myeongha_api_executor','public.member_auth_rate_limit_buckets','UPDATE') or pg_catalog.has_table_privilege('myeongha_api_executor','public.member_auth_rate_limit_buckets','DELETE'));")" == 't' ]]
+  member_auth_rate_limit_acl_restore='pass'
+
+  synthetic_member_auth_admission="$(psql "$RESTORE_DATABASE_URL" -Atq --set ON_ERROR_STOP=1 -c \
+    "set role myeongha_api_executor; select allowed::text || ':' || request_count::text from public.cmd_admit_member_auth_request_v1('sign-in', decode(repeat('cd',32),'hex'));")"
+  [[ "$synthetic_member_auth_admission" == 'true:1' ]]
+  member_auth_rate_limit_synthetic_admission='pass'
+fi
+
 restore_completed_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
 restore_completed_epoch="$(date -u +%s)"
 duration_seconds=$((restore_completed_epoch - restore_started_epoch))
@@ -301,6 +352,10 @@ replayed_data_copy_blocks="$(jq -r '.replayed_copy_blocks' "$portable_data_repor
 provider_managed_data_full_restore='true'
 if (( provider_managed_data_blocks_projected > 0 || provider_managed_data_blocks_skipped > 0 )); then
   provider_managed_data_full_restore='false'
+fi
+backup_migration_frontier_json='null'
+if [[ -n "$backup_migration_frontier" ]]; then
+  backup_migration_frontier_json="$backup_migration_frontier"
 fi
 
 mkdir -p "$(dirname "$RESTORE_EVIDENCE_PATH")"
@@ -322,6 +377,14 @@ jq -n \
   --argjson provider_managed_data_blocks_skipped "$provider_managed_data_blocks_skipped" \
   --argjson provider_managed_data_skips "$provider_managed_data_skips_json" \
   --argjson provider_managed_data_full_restore "$provider_managed_data_full_restore" \
+  --argjson backup_migration_frontier "$backup_migration_frontier_json" \
+  --argjson backup_ephemeral_data_exclusions "$backup_ephemeral_data_exclusions_json" \
+  --arg member_auth_rate_limit_schema_restore "$member_auth_rate_limit_schema_restore" \
+  --arg member_auth_rate_limit_unlogged "$member_auth_rate_limit_unlogged" \
+  --arg member_auth_rate_limit_ephemeral_data_restore "$member_auth_rate_limit_ephemeral_data_restore" \
+  --arg member_auth_rate_limit_owner_restore "$member_auth_rate_limit_owner_restore" \
+  --arg member_auth_rate_limit_acl_restore "$member_auth_rate_limit_acl_restore" \
+  --arg member_auth_rate_limit_synthetic_admission "$member_auth_rate_limit_synthetic_admission" \
   '{
     schema_version: $schema_version,
     source_sha: $source_sha,
@@ -348,6 +411,14 @@ jq -n \
     provider_managed_data_blocks_skipped: $provider_managed_data_blocks_skipped,
     provider_managed_data_skips: $provider_managed_data_skips,
     provider_managed_data_full_restore: $provider_managed_data_full_restore,
+    backup_migration_frontier: $backup_migration_frontier,
+    backup_ephemeral_data_exclusions: $backup_ephemeral_data_exclusions,
+    member_auth_rate_limit_schema_restore: $member_auth_rate_limit_schema_restore,
+    member_auth_rate_limit_unlogged: $member_auth_rate_limit_unlogged,
+    member_auth_rate_limit_ephemeral_data_restore: $member_auth_rate_limit_ephemeral_data_restore,
+    member_auth_rate_limit_owner_restore: $member_auth_rate_limit_owner_restore,
+    member_auth_rate_limit_acl_restore: $member_auth_rate_limit_acl_restore,
+    member_auth_rate_limit_synthetic_admission: $member_auth_rate_limit_synthetic_admission,
     auth_users_restore: "identity-continuity-pass",
     auth_users_restore_mode: $auth_users_restore_mode,
     subject_auth_user_referential_integrity: "pass",
