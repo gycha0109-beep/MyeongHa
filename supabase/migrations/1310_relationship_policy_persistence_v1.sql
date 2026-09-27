@@ -69,9 +69,7 @@ create table public.relationship_policy_activations (
     foreign key (character_id)
     references public.characters(character_id),
   constraint relationship_policy_activations_ref_check
-    check (btrim(activation_ref) <> ''),
-  constraint relationship_policy_activations_time_check
-    check (created_at >= effective_from)
+    check (btrim(activation_ref) <> '')
 );
 
 create unique index relationship_policy_activations_global_time_unique
