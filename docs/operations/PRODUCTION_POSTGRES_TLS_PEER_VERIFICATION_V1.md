@@ -1,6 +1,6 @@
 # Production PostgreSQL TLS Peer Verification V1
 
-Status: **B2A ROOT AUTHORITY PINNED / METADATA PREFLIGHT PENDING / PRODUCTION ACTIVATION HOLD**
+Status: **B2A AUTHORITY + VERCEL METADATA PROVEN / B2B RUNTIME CANARY PENDING / PRODUCTION ACTIVATION HOLD**
 
 Watchtower-Track: security
 
@@ -103,19 +103,26 @@ credential material emitted = false
 
 The one-shot bridge is removed in the same governed change that pins this fingerprint.
 
-The connected Vercel surface still does not provide a safe environment-value readback
-action, so this track has not independently established whether the live
-`MYEONGHA_DATABASE_URL` currently uses:
+The connected Vercel surface does not expose a safe environment-value readback action.
+A one-shot GitHub Production metadata bridge therefore queried only the governed Vercel
+project environment metadata endpoint without requesting decryption.
+
+On 2026-09-28 KST, run `36354168577` established:
 
 ```text
-absent
-require
-verify-ca
-verify-full
-other
+MYEONGHA_DATABASE_URL exists = true
+target = production
+type = sensitive
+value read = false
+decrypt requested = false
+preferred B2B execution = vercel-runtime-required
 ```
 
-No credential or connection URL may be printed merely to answer that question.
+Because the binding is `sensitive`, B2B must execute inside the Vercel Production runtime.
+The credential must not be copied or decrypted into GitHub Actions.
+
+This metadata evidence still does not reveal the live URL's current `sslmode`.
+That posture must be evaluated in-process without emitting the URL.
 
 ## Phase A — redacted posture evidence
 
@@ -280,19 +287,19 @@ enum metadata. The workflow uploads no artifact.
 B2A root-authority intake has now passed through the exact one-shot security bridge.
 The repository pins only the safe SHA-256 fingerprint and does not retain certificate PEM.
 
-The standard metadata-only Vercel preflight remains pending because the connected GitHub
-action surface cannot dispatch `workflow_dispatch` and the connected Vercel surface does
-not provide a safe environment-value readback action. The authority bridge intentionally
-did not broaden into Vercel access or database connectivity.
+The Vercel metadata-only preflight has now passed through the exact one-shot security
+bridge. The bridge requested no decryption and did not inspect the database URL value.
 
-Current authority state:
+Current B2A state:
 
 ```text
 productionFingerprint256 = 80:70:25:AD:50:D4:ED:21:9D:2C:9C:7D:29:9C:00:4F:82:4E:B0:0C:F7:F6:5A:FE:F6:07:D0:7B:72:E6:CA:FA
 sourceStatus = official-supabase-dashboard-preflighted
+Vercel database env type = sensitive
+preferred B2B execution = vercel-runtime-required
 Production database connection attempted = false
+Production database URL read = false
 Production binding mutated = false
-Vercel metadata preflight = pending
 ```
 
 ## Phase B2B — Production-safe connectivity canary
@@ -310,10 +317,9 @@ The canary must be read-only and must prove:
 - connected login principal remains the governed `myeongha_runtime`;
 - no database URL, password, or certificate PEM is emitted.
 
-If the Vercel Production database binding is `sensitive`, B2B must run inside the
-Vercel Production runtime rather than extracting the value into GitHub Actions.
-An `encrypted` binding may remain a runner candidate, but Vercel-runtime execution is
-still preferred.
+The Vercel Production database binding is confirmed `sensitive`. B2B therefore must run
+inside the Vercel Production runtime. Exporting, decrypting, or copying the database URL
+into GitHub Actions is forbidden for this path.
 
 The canary must not mutate the live Production binding.
 
