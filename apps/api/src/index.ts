@@ -771,3 +771,64 @@ export {
   POSTGRES_RELATIONSHIP_APPLY_CONTEXT_BINDING_V1,
   createPostgresProductionRelationshipApplyPortV1,
 } from './postgres-production-relationship-event-apply-v1.js';
+export {
+  PRODUCTION_RELATIONSHIP_RELIABILITY_VERSION_V1,
+  ProductionRelationshipReliabilityErrorV1,
+  applyProductionRelationshipAdjustmentBatchV1,
+  type ApplyProductionRelationshipAdjustmentBatchInputV1,
+  type ApplyProductionRelationshipAdjustmentBatchResultV1,
+  type ProductionRelationshipAdjustmentAppendPortV1,
+  type ProductionRelationshipAdjustmentIdPortV1,
+  type ProductionRelationshipAdjustmentOperationV1,
+  type ProductionRelationshipHistoryContextPortV1,
+  type ProductionRelationshipHistoryContextV1,
+  type ProductionRelationshipReliabilityFailureCodeV1,
+  type ProductionRelationshipReliabilityHistoryRecordV1,
+  type ProductionRelationshipReplayProjectionCommitRowV1,
+} from './production-relationship-reliability-v1.js';
+
+export {
+  POSTGRES_RELATIONSHIP_CORRECTION_BINDING_V1,
+  POSTGRES_RELATIONSHIP_HISTORY_CONTEXT_BINDING_V1,
+  POSTGRES_RELATIONSHIP_REPLAY_PROJECTION_BINDING_V1,
+  POSTGRES_RELATIONSHIP_RETRACTION_BINDING_V1,
+  createPostgresProductionRelationshipReliabilityPortV1,
+} from './postgres-production-relationship-reliability-v1.js';
+
+export {
+  PRODUCTION_RELATIONSHIP_PROJECTION_RECOVERY_VERSION_V1,
+  rebuildProductionRelationshipProjectionV1,
+  verifyProductionRelationshipProjectionV1,
+  type ProductionRelationshipProjectionRebuildPortV1,
+  type ProductionRelationshipProjectionVerificationV1,
+  type RebuildProductionRelationshipProjectionInputV1,
+} from './production-relationship-projection-recovery-v1.js';
+
+export {
+  POSTGRES_RELATIONSHIP_PROJECTION_REBUILD_BINDING_V1,
+  createPostgresProductionRelationshipProjectionRebuildPortV1,
+} from './postgres-production-relationship-projection-recovery-v1.js';
+
+export {
+  PRODUCTION_RELATIONSHIP_SNAPSHOT_SCHEMA_VERSION_V1,
+  buildProductionRelationshipSnapshotMaterialV1,
+  readLatestVerifiedRelationshipSnapshotV1,
+  verifyProductionRelationshipSnapshotMaterialV1,
+  writeProductionRelationshipSnapshotV1,
+  type ProductionRelationshipSnapshotIdPortV1,
+  type ProductionRelationshipSnapshotPayloadV1,
+  type ProductionRelationshipSnapshotPortV1,
+  type ProductionRelationshipSnapshotRowV1,
+} from './production-relationship-snapshot-v1.js';
+
+export {
+  POSTGRES_RELATIONSHIP_SNAPSHOT_LATEST_BINDING_V1,
+  POSTGRES_RELATIONSHIP_SNAPSHOT_WRITE_BINDING_V1,
+  createPostgresProductionRelationshipSnapshotPortV1,
+} from './postgres-production-relationship-snapshot-v1.js';
+
+export {
+  PRODUCTION_RELATIONSHIP_APPLY_MAX_ATTEMPTS_V1,
+  executeProductionRelationshipEventWithRetryV1,
+  type ExecuteProductionRelationshipEventWithRetryInputV1,
+} from './production-relationship-event-retry-v1.js';
