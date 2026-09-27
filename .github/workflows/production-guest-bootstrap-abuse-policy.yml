@@ -26,7 +26,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: production-guest-bootstrap-abuse-policy
+  group: production-vercel-firewall-config
   cancel-in-progress: false
 
 env:
