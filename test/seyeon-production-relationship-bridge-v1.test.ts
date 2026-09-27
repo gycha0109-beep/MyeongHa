@@ -313,8 +313,8 @@ describe('Se-yeon Production relationship admission bridge V1', () => {
       deriveSeyeonProductionRelationshipDedupeKeyV1({
         subjectId: SUBJECT_ID,
         experimentalEvent: {
-          ...event,
-          eventId: 'different-retry-event-id',
+          eventKind: event.eventKind,
+          dedupeKey: event.dedupeKey,
         },
       }),
     );
