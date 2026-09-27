@@ -9,10 +9,11 @@ const TEAM_ID = 'team_xuYA9OhCWlJETaYFOmeVodgS';
 const MARKER_PATH =
   'config/operations/run-once/production-postgres-tls-peer-canary-b2b.marker';
 const MARKER_VALUE =
-  'VERIFY_POSTGRES_TLS_PEER_B2B_SKIP_DOMAIN_CANARY_RETRY4\n';
+  'VERIFY_POSTGRES_TLS_PEER_B2B_SKIP_DOMAIN_CANARY_RETRY5\n';
 const TRACK = 'security';
 const VERCEL_CLI_PACKAGE = 'vercel@59.16.0';
 const CANARY_MODE = 'one-shot-b2b';
+const ALLOWED_GENERATED_CLI_ALIAS = 'myeongha-johnny-self.vercel.app';
 
 class CanaryOrchestratorError extends Error {
   constructor(code, message) {
@@ -236,6 +237,35 @@ async function deleteDeployment(id, token) {
   }
 }
 
+export function inspectSkipDomainAliasEvidence(payload) {
+  if (!Array.isArray(payload?.aliases)) {
+    return fail(
+      'DEPLOYMENT_ALIAS_LOOKUP_INVALID',
+      'Skip-domain alias response is not recognized.',
+    );
+  }
+
+  const names = payload.aliases.map((entry) =>
+    typeof entry?.alias === 'string' ? entry.alias : null,
+  );
+
+  if (
+    names.length !== 1 ||
+    names[0] !== ALLOWED_GENERATED_CLI_ALIAS
+  ) {
+    return fail(
+      'DEPLOYMENT_ALIAS_PRESENT',
+      'Skip-domain canary deployment has a non-generated alias.',
+    );
+  }
+
+  return Object.freeze({
+    generatedCliAliasPresent: true,
+    generatedCliAlias: ALLOWED_GENERATED_CLI_ALIAS,
+    productionDomainAliased: false,
+  });
+}
+
 function validateCanaryEvidence(payload) {
   const evidence = payload?.evidence;
   if (
@@ -319,12 +349,7 @@ export async function runProductionPostgresTlsPeerCanaryOrchestrator(env = proce
       { method: 'GET' },
       'DEPLOYMENT_ALIAS_LOOKUP_FAILED',
     );
-    if (!Array.isArray(aliases?.aliases) || aliases.aliases.length !== 0) {
-      return fail(
-        'DEPLOYMENT_ALIAS_PRESENT',
-        'Skip-domain canary deployment unexpectedly has an alias.',
-      );
-    }
+    const aliasEvidence = inspectSkipDomainAliasEvidence(aliases);
 
     let canaryResponse;
     try {
@@ -365,7 +390,7 @@ export async function runProductionPostgresTlsPeerCanaryOrchestrator(env = proce
       schemaVersion: 'myeongha-production-postgres-tls-peer-canary-orchestration-v2',
       deploymentMode: 'production-skip-domain',
       customEnvironmentCreated: false,
-      productionDomainAliased: false,
+      ...aliasEvidence,
       productionEnvironmentMutated: false,
       productionDatabaseBindingMutated: false,
       databaseUrlExported: false,
