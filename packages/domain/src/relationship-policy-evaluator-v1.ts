@@ -28,8 +28,8 @@ export interface ProductionRelationshipEventDecisionV1 {
   readonly dedupeKey: string;
   readonly applied: boolean;
   readonly duplicateRetry: boolean;
-  readonly revisionBefore: number;
-  readonly revisionAfter: number;
+  readonly evaluationSequenceBefore: number;
+  readonly evaluationSequenceAfter: number;
   readonly episodeId: string | null;
   readonly family: ProductionRelationshipFamilyV1;
   readonly effectDisposition: ProductionRelationshipEffectDispositionV1 | null;
@@ -53,6 +53,7 @@ export interface ProductionRelationshipProjectionV1 {
   readonly policyVersion: typeof PRODUCTION_RELATIONSHIP_POLICY_VERSION_V1;
   readonly policyContentHash: string;
   readonly revision: number;
+  readonly evaluatedEventCount: number;
   readonly scores: ProductionRelationshipScoreVectorV1;
   readonly attainedStage: ProductionRelationshipStageV1;
   readonly currentCandidateStage: ProductionRelationshipStageV1;
@@ -226,6 +227,7 @@ function makeFamilyCounts(): Record<ProductionRelationshipFamilyV1, number> {
 
 export function evaluateProductionRelationshipHistoryV1(
   inputEvents: readonly ProductionRelationshipEventV1[],
+  options: { readonly physicalRevision?: number } = {},
 ): ProductionRelationshipProjectionV1 {
   const seenDedupeKeys = new Set<string>();
   const eventsById = new Map<string, ProductionRelationshipEventV1>();
@@ -257,7 +259,7 @@ export function evaluateProductionRelationshipHistoryV1(
   let currentCandidateStage: ProductionRelationshipStageV1 =
     'S0_FIRST_MEETING';
   let currentCondition: ProductionRelationshipConditionV1 = 'STABLE';
-  let revision = 0;
+  let evaluationSequence = 0;
 
   const registerEpisode = (
     episodeId: string,
@@ -296,8 +298,8 @@ export function evaluateProductionRelationshipHistoryV1(
           dedupeKey: event.dedupeKey,
           applied: false,
           duplicateRetry: true,
-          revisionBefore: revision,
-          revisionAfter: revision,
+          evaluationSequenceBefore: evaluationSequence,
+          evaluationSequenceAfter: evaluationSequence,
           episodeId: null,
           family: rule.family,
           effectDisposition: null,
@@ -316,8 +318,8 @@ export function evaluateProductionRelationshipHistoryV1(
       );
     }
 
-    const revisionBefore = revision;
-    revision += 1;
+    const evaluationSequenceBefore = evaluationSequence;
+    evaluationSequence += 1;
     eventsById.set(event.eventId, event);
 
     let episodeId: string | null = null;
@@ -528,8 +530,8 @@ export function evaluateProductionRelationshipHistoryV1(
         dedupeKey: event.dedupeKey,
         applied: true,
         duplicateRetry: false,
-        revisionBefore,
-        revisionAfter: revision,
+        evaluationSequenceBefore,
+        evaluationSequenceAfter: evaluationSequence,
         episodeId,
         family: rule.family,
         effectDisposition,
@@ -555,7 +557,8 @@ export function evaluateProductionRelationshipHistoryV1(
     policyVersion: PRODUCTION_RELATIONSHIP_POLICY_VERSION_V1,
     policyContentHash:
       PRODUCTION_RELATIONSHIP_POLICY_ARTIFACT_V1.contentHash,
-    revision,
+    revision: options.physicalRevision ?? evaluationSequence,
+    evaluatedEventCount: evaluationSequence,
     scores,
     attainedStage,
     currentCandidateStage,
