@@ -437,6 +437,28 @@ export function validateProductionRelationshipEventV1(
     );
   }
 
+  const sourceRef = boundedText(
+    event.source.sourceRef,
+    'source.sourceRef',
+    512,
+  );
+  const sourceMessageRefs = uniqueTexts(
+    event.source.sourceMessageRefs,
+    'source.sourceMessageRefs',
+    16,
+  );
+  const authorityRefs = uniqueTexts(
+    event.source.authorityRefs,
+    'source.authorityRefs',
+    16,
+    1,
+  );
+  const allowedProvenanceRefs = new Set([
+    sourceRef,
+    ...sourceMessageRefs,
+    ...authorityRefs,
+  ]);
+
   const facts = Object.freeze(
     event.facts.map((fact, index) =>
       Object.freeze({
@@ -456,6 +478,16 @@ export function validateProductionRelationshipEventV1(
     ),
   );
 
+  for (const [index, fact] of facts.entries()) {
+    if (
+      fact.sourceRefs.some((ref) => !allowedProvenanceRefs.has(ref))
+    ) {
+      throw new ProductionRelationshipEventValidationErrorV1(
+        'facts[' + index + '].sourceRefs must be bound to Event provenance.',
+      );
+    }
+  }
+
   const interpretation =
     event.characterInterpretation === null
       ? null
@@ -469,8 +501,18 @@ export function validateProductionRelationshipEventV1(
             event.characterInterpretation.sourceRefs,
             'characterInterpretation.sourceRefs',
             8,
+            1,
           ),
         });
+
+  if (
+    interpretation !== null &&
+    interpretation.sourceRefs.some((ref) => !allowedProvenanceRefs.has(ref))
+  ) {
+    throw new ProductionRelationshipEventValidationErrorV1(
+      'characterInterpretation.sourceRefs must be bound to Event provenance.',
+    );
+  }
 
   return Object.freeze({
     schemaVersion: PRODUCTION_RELATIONSHIP_EVENT_SCHEMA_VERSION_V1,
@@ -489,18 +531,9 @@ export function validateProductionRelationshipEventV1(
     occurredAt: validateIsoInstant(event.occurredAt, 'occurredAt'),
     source: Object.freeze({
       sourceKind,
-      sourceRef: boundedText(event.source.sourceRef, 'source.sourceRef', 512),
-      sourceMessageRefs: uniqueTexts(
-        event.source.sourceMessageRefs,
-        'source.sourceMessageRefs',
-        16,
-      ),
-      authorityRefs: uniqueTexts(
-        event.source.authorityRefs,
-        'source.authorityRefs',
-        16,
-        1,
-      ),
+      sourceRef,
+      sourceMessageRefs,
+      authorityRefs,
     }),
     causalPredecessorEventIds: uniqueTexts(
       event.causalPredecessorEventIds,
