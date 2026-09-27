@@ -157,3 +157,91 @@ assert_managed_rate_limit_registry_live_safety() {
     fi
   done < <(jq -r '.managedRules[] | [.policyId, .ruleName, .policyFile, .activationAuthority] | @tsv' "$registry")
 }
+
+
+count_active_bypass_rules() {
+  local config_file="${1:?config file required}"
+  jq '
+    [(.active.rules // [])[]
+      | select(
+          .active == true
+          and (.action.mitigate.action // "") == "bypass"
+        )]
+    | length
+  ' "$config_file"
+}
+
+_firewall_semantic_config_json() {
+  local config_file="${1:?config file required}"
+  local scope="${2:?scope required}"
+  jq -Sc --arg scope "$scope" '
+    def semantic_rule:
+      del(.valid, .validationErrors);
+    def semantic_config:
+      {
+        firewallEnabled: (.firewallEnabled // false),
+        crs: (.crs // null),
+        rules: [(.rules // [])[] | semantic_rule],
+        ips: (.ips // []),
+        rulesets: (.rulesets // []),
+        managedRules: (.managedRules // null),
+        botIdEnabled: (.botIdEnabled // null),
+        logHeaders: (.logHeaders // null)
+      };
+    (if $scope == "active" then .active else .draft end) as $config
+    | ($config // {}) | semantic_config
+  ' "$config_file"
+}
+
+firewall_semantic_fingerprint() {
+  local config_file="${1:?config file required}"
+  local scope="${2:?scope required}"
+  _firewall_semantic_config_json "$config_file" "$scope" | sha256sum | awk '{print $1}'
+}
+
+assert_firewall_draft_matches_active() {
+  local config_file="${1:?config file required}"
+  if jq -e '.draft == null or ((.draft | type) == "object" and (.draft | length) == 0)' "$config_file" >/dev/null; then
+    return 0
+  fi
+
+  local active_json draft_json
+  active_json="$(_firewall_semantic_config_json "$config_file" active)"
+  draft_json="$(_firewall_semantic_config_json "$config_file" draft)"
+  [[ "$active_json" == "$draft_json" ]]
+}
+
+assert_member_auth_probe_delta_only() {
+  local config_file="${1:?config file required}"
+  local policy_file="${2:?policy file required}"
+
+  jq -e --slurpfile policy "$policy_file" '
+    def semantic_rule:
+      del(.valid, .validationErrors);
+    def semantic_config:
+      {
+        firewallEnabled: (.firewallEnabled // false),
+        crs: (.crs // null),
+        rules: [(.rules // [])[] | semantic_rule],
+        ips: (.ips // []),
+        rulesets: (.rulesets // []),
+        managedRules: (.managedRules // null),
+        botIdEnabled: (.botIdEnabled // null),
+        logHeaders: (.logHeaders // null)
+      };
+
+    ($policy[0].rules | map(.ruleName)) as $target_names
+    | (.active | semantic_config) as $active
+    | (.draft | semantic_config) as $draft
+    | [($draft.rules // [])[]
+        | select((.name // "") as $name | ($target_names | index($name)) != null)] as $targets
+    | ($targets | length) == 3
+      and ([$targets[].name] | sort) == ($target_names | sort)
+      and (
+        [$draft.rules[]
+          | select((.name // "") as $name | ($target_names | index($name)) == null)]
+        == $active.rules
+      )
+      and (($draft | .rules = $active.rules) == $active)
+  ' "$config_file" >/dev/null
+}

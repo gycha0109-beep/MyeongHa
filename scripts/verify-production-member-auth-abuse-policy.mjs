@@ -7,6 +7,7 @@ const paths = {
   workflow: '.github/workflows/production-member-auth-abuse-policy.yml',
   runScript: 'scripts/operations/run-production-member-auth-abuse-policy.sh',
   liveScript: 'scripts/operations/verify-production-member-auth-abuse-policy-live.sh',
+  probeScript: 'scripts/operations/probe-production-member-auth-waf-capability.sh',
   signIn: 'api/auth/sign-in.ts',
   signUp: 'api/auth/sign-up.ts',
   refresh: 'api/auth/refresh.ts',
@@ -14,17 +15,18 @@ const paths = {
   docs: 'docs/operations/MEMBER_AUTH_ABUSE_POLICY_V1.md',
 };
 
-for (const script of [paths.runScript, paths.liveScript]) {
+for (const script of [paths.runScript, paths.liveScript, paths.probeScript]) {
   execFileSync('bash', ['-n', script], { stdio: 'inherit' });
 }
 
-const [policyRaw, registryRaw, workflow, runScript, liveScript, signIn, signUp, refresh, signOut, docs] =
+const [policyRaw, registryRaw, workflow, runScript, liveScript, probeScript, signIn, signUp, refresh, signOut, docs] =
   await Promise.all([
     readFile(paths.policy, 'utf8'),
     readFile(paths.registry, 'utf8'),
     readFile(paths.workflow, 'utf8'),
     readFile(paths.runScript, 'utf8'),
     readFile(paths.liveScript, 'utf8'),
+    readFile(paths.probeScript, 'utf8'),
     readFile(paths.signIn, 'utf8'),
     readFile(paths.signUp, 'utf8'),
     readFile(paths.refresh, 'utf8'),
@@ -40,6 +42,7 @@ const expectedTop = {
   vercelTeamId: 'team_xuYA9OhCWlJETaYFOmeVodgS',
   vercelProjectName: 'myeongha',
   activationState: 'hold',
+  draftAuthority: 'preview-capability-probe',
   durableNetworkIdentifierPersistence: false,
   applicationRetryOnRateLimit: false,
   supabaseSecretKeyRequired: false,
@@ -83,7 +86,7 @@ if (policy.rules.some((rule) => rule.route === '/api/auth/sign-out')) {
 
 for (const entry of registry.managedRules.filter((entry) => entry.policyId.startsWith('member-auth-'))) {
   if (entry.activationAuthority !== 'hold') {
-    throw new Error(entry.policyId + ' must remain activation-hold in Phase A.');
+    throw new Error(entry.policyId + ' must remain activation-hold during B1a.');
   }
 }
 
@@ -103,20 +106,19 @@ function requireFragment(name, source, fragment) {
   if (!source.includes(fragment)) throw new Error(name + ' missing required fragment: ' + fragment);
 }
 function forbidFragment(name, source, fragment) {
-  if (source.includes(fragment)) throw new Error(name + ' contains forbidden Phase A fragment: ' + fragment);
+  if (source.includes(fragment)) throw new Error(name + ' contains forbidden B1a fragment: ' + fragment);
 }
 
 for (const fragment of [
   'name: Production Member Auth Abuse Policy',
   'run-name: "[WT:ops] Production Member Auth Abuse Policy',
   'workflow_dispatch:',
-  '- verify',
-  '- observe',
-  '- enforce',
-  '- disable',
-  'Type VERIFY_MEMBER_AUTH_ABUSE_POLICY_V1',
+  '- verify-live',
+  '- probe-preview-capability',
+  'VERIFY_MEMBER_AUTH_ABUSE_POLICY_V1 or PROBE_MEMBER_AUTH_PREVIEW_WAF_CAPABILITY_V1',
   'environment: production',
   'default: ops',
+  'group: production-vercel-firewall-config',
   'VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}',
   'run: bash scripts/operations/run-production-member-auth-abuse-policy.sh',
   'cancel-in-progress: false',
@@ -127,10 +129,14 @@ for (const forbidden of ['\npush:', '\npull_request:', '\nschedule:']) {
 
 for (const fragment of [
   'activationState == "hold"',
+  'draftAuthority == "preview-capability-probe"',
   'MEMBER_AUTH_ABUSE_POLICY_MODE',
+  'verify-live',
+  'probe-preview-capability',
   'VERIFY_MEMBER_AUTH_ABUSE_POLICY_V1',
+  'PROBE_MEMBER_AUTH_PREVIEW_WAF_CAPABILITY_V1',
   'verify-production-member-auth-abuse-policy-live.sh',
-  'Phase A contains no Production mutation path',
+  'probe-production-member-auth-waf-capability.sh',
 ]) requireFragment(paths.runScript, runScript, fragment);
 
 for (const fragment of [
@@ -141,6 +147,44 @@ for (const fragment of [
   'production_mutation_authorized=false',
   'raw_network_identifiers_emitted=false',
 ]) requireFragment(paths.liveScript, liveScript, fragment);
+
+for (const fragment of [
+  'PROBE_MEMBER_AUTH_PREVIEW_WAF_CAPABILITY_V1',
+  'activationState == "hold"',
+  'draftAuthority == "preview-capability-probe"',
+  'assert_managed_rate_limit_registry_live_safety "$before_file" ""',
+  'count_active_bypass_rules "$before_file"',
+  'BYPASS_REVIEW_REQUIRED',
+  'assert_firewall_draft_matches_active "$before_file"',
+  'FIREWALL_DRAFT_NOT_CLEAN',
+  'firewall_semantic_fingerprint "$before_file" active',
+  'action: "rules.insert"',
+  'action: "rules.remove"',
+  'active: false',
+  '{type: "environment", op: "eq", neg: false, value: "preview"}',
+  'inserted_rule_ids',
+  'assert_member_auth_probe_delta_only "$staged_file" "$POLICY_FILE"',
+  'DRAFT_RESIDUE_REQUIRES_MANUAL_REVIEW',
+  'member_auth_waf_capability_validation=pass',
+  'preview_rule_set_supported=true',
+  'active_config_unchanged=true',
+  'draft_restored=true',
+  'production_publish_performed=false',
+  'raw_network_identifiers_emitted=false',
+]) requireFragment(paths.probeScript, probeScript, fragment);
+
+for (const forbidden of [
+  '/draft/activate',
+  'rules.update',
+  'rules.priority',
+  'firewall publish',
+  'firewall discard',
+  '-X PUT',
+  'SUPABASE_SECRET',
+  'SUPABASE_SERVICE_ROLE',
+  'SUPABASE_DB_PASSWORD',
+  'MYEONGHA_DATABASE_URL',
+]) forbidFragment(paths.probeScript, probeScript, forbidden);
 
 for (const source of [runScript, liveScript, workflow]) {
   for (const forbidden of [
@@ -164,8 +208,13 @@ for (const fragment of [
   '30 requests per 60 seconds per IP',
   'no Supabase secret key',
   'no durable IP',
-  'Phase B',
-  'single activation',
+  'B1a',
+  'preview-capability-probe',
+  'rules.insert',
+  'rules.remove',
+  'disabled',
+  'no publish',
+  'production-vercel-firewall-config',
 ]) requireFragment(paths.docs, docs, fragment);
 
-console.log('MyeongHa Member Auth abuse policy v1 verification passed.');
+console.log('MyeongHa Member Auth abuse policy B1a verification passed.');

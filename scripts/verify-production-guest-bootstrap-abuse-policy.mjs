@@ -91,6 +91,7 @@ for (const fragment of [
   'ABUSE_POLICY_MODE: observe',
   'guest_bootstrap_enforce_rollback=observe',
   'guest_bootstrap_enforce_canary=pass',
+  'group: production-vercel-firewall-config',
   'cancel-in-progress: false',
 ]) {
   requireFragment(paths.applyWorkflow, applyWorkflow, fragment);
@@ -160,6 +161,10 @@ for (const fragment of [
   'activationAuthority',
   'production-active',
   'hold',
+  'count_active_bypass_rules',
+  'firewall_semantic_fingerprint',
+  'assert_firewall_draft_matches_active',
+  'assert_member_auth_probe_delta_only',
 ]) {
   requireFragment(paths.managedRuleCommon, managedRuleCommon, fragment);
 }

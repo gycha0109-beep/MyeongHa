@@ -1,6 +1,6 @@
 # MyeongHa Member Auth Abuse Policy V1
 
-Status: **REPOSITORY CONTRACT / PRODUCTION ACTIVATION HOLD**
+Status: **REPOSITORY CONTRACT / PRODUCTION ACTIVATION HOLD / B1a DRAFT CAPABILITY PROBE**
 
 Issue: `#1332`
 
@@ -55,17 +55,30 @@ A Production operation fails closed when it sees:
 - an active managed rule whose registry authority is `hold`;
 - a missing non-target rule whose registry authority is `production-active`.
 
-The existing Guest bootstrap rule remains `production-active`. All three Member Auth rules remain `hold` in Phase A.
+The existing Guest bootstrap rule remains `production-active`. All three Member Auth rules remain `hold`. B1a adds only `draftAuthority=preview-capability-probe`; it does not grant live activation authority.
 
-## Phase A control-plane boundary
+## B1a control-plane boundary
 
-Phase A deliberately has **no Firewall mutation implementation** for Member Auth. The manual Production workflow supports a read-only `verify` path. Selecting `observe`, `enforce`, or `disable` fails closed before any Firewall mutation can occur.
+The manual workflow exposes exactly two governed modes:
+
+- `verify-live`: read-only verification of the current HOLD state.
+- `probe-preview-capability`: a reversible unpublished-draft capability probe.
+
+B1a may use only `rules.insert` and `rules.remove` against the Vercel Firewall draft. The three probe rules are **disabled**, scoped to `environment=preview`, and are never published. B1a has **no publish** authority.
+
+The probe requires a clean draft, rejects active custom `bypass` rules for manual review, verifies that the active configuration fingerprint does not change, inserts exactly the three governed Member Auth rules, validates the complete three-rule draft, and removes only the exact rule IDs created by that probe.
+
+The Guest bootstrap mutation workflow and Member Auth workflow share the concurrency group `production-vercel-firewall-config` so both cannot mutate the same Firewall draft concurrently.
+
+A failed cleanup is a hard failure with `DRAFT_RESIDUE_REQUIRES_MANUAL_REVIEW`. B1a never invokes full-draft discard, whole-config PUT, `rules.update`, rule priority mutation, or draft activation.
 
 No scheduled evidence workflow is admitted while the policy is still HOLD.
 
-## Phase B activation requirements
+## B1a completion and later Phase B activation requirements
 
-Phase B is a separate reviewed change. It must not hard-code an unverified Vercel plan quota. Capability is proven against the actual Firewall draft validation response.
+B1a does not hard-code an unverified Vercel plan quota. Capability is proven against the actual Firewall draft validation response. A successful B1a run must report `preview_rule_set_supported=true`, `active_config_unchanged=true`, `draft_restored=true`, and `production_publish_performed=false`.
+
+After B1a passes, Preview activation and canary work remains a separate reviewed change.
 
 The activation sequence must:
 
@@ -81,8 +94,8 @@ The activation sequence must:
 
 The three endpoint buckets must remain independent. Final canary evidence must demonstrate that exhausting one endpoint does not consume another endpoint's bucket.
 
-Sign-up canary design requires additional care because a syntactically valid repeated signup can create hosted-auth side effects. Phase A does not pretend that risk is solved; the Phase B canary must prove its mutation safety before Production enforcement is authorized.
+The later canary can remain side-effect-free: sign-in/sign-up use an invalid email so the shared auth handler returns `400 INVALID_REQUEST` before breached-password or Supabase Auth calls, and refresh uses an empty token so it also returns locally. B1a itself sends no auth canary traffic.
 
 ## Closure boundary
 
-Closing #1332 requires Production activation evidence, exact active-rule readback, independent-bucket canary evidence, and a documented rollback result. Merging this Phase A contract alone does not close SEC-02.
+Closing #1332 requires Production activation evidence, exact active-rule readback, independent-bucket canary evidence, and a documented rollback result. Merging or running B1a alone does not close SEC-02.
