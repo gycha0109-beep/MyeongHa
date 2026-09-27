@@ -64,7 +64,7 @@ The manual workflow exposes exactly two governed modes:
 - `verify-live`: read-only verification of the current HOLD state.
 - `probe-preview-capability`: a reversible unpublished-draft capability probe.
 
-B1a may use only `rules.insert` and `rules.remove` against the Vercel Firewall draft. The three probe rules are **disabled**, scoped to `environment=preview`, and are never published.
+B1a may use only `rules.insert` and `rules.remove` against the Vercel Firewall draft. The three probe rules are **disabled**, scoped to `environment=preview`, and are never published. B1a has **no publish** authority.
 
 The probe requires a clean draft, rejects active custom `bypass` rules for manual review, verifies that the active configuration fingerprint does not change, inserts exactly the three governed Member Auth rules, validates the complete three-rule draft, and removes only the exact rule IDs created by that probe.
 
