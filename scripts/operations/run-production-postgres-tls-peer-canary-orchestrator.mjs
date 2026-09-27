@@ -9,10 +9,19 @@ const TEAM_ID = 'team_xuYA9OhCWlJETaYFOmeVodgS';
 const MARKER_PATH =
   'config/operations/run-once/production-postgres-tls-peer-canary-b2b.marker';
 const MARKER_VALUE =
-  'VERIFY_POSTGRES_TLS_PEER_B2B_SKIP_DOMAIN_CANARY_RETRY5\n';
+  'VERIFY_POSTGRES_TLS_PEER_B2B_SKIP_DOMAIN_CANARY_RETRY6\n';
 const TRACK = 'security';
 const VERCEL_CLI_PACKAGE = 'vercel@59.16.0';
 const CANARY_MODE = 'one-shot-b2b';
+const ALLOWED_CANARY_ENDPOINT_CODES = new Set([
+  'CANARY_ENV_INVALID',
+  'CANARY_PRINCIPAL_INVALID',
+  'CANARY_DATABASE_URL_INVALID',
+  'CANARY_STRICT_TARGET_REJECTED',
+  'CANARY_CONNECT_FAILED',
+  'CANARY_QUERY_FAILED',
+  'CANARY_EVIDENCE_INVALID',
+]);
 const ALLOWED_GENERATED_CLI_ALIAS = 'myeongha-johnny-self.vercel.app';
 
 class CanaryOrchestratorError extends Error {
@@ -266,6 +275,116 @@ export function inspectSkipDomainAliasEvidence(payload) {
   });
 }
 
+export function buildProtectedCanaryCurlArgs(input) {
+  return [
+    '--yes',
+    VERCEL_CLI_PACKAGE,
+    'curl',
+    '/api/readiness',
+    '--deployment',
+    input.deploymentUrl,
+    '--',
+    '--request',
+    'POST',
+    '--header',
+    `Authorization: Bearer ${input.canaryToken}`,
+    '--header',
+    'Content-Type: application/json',
+    '--header',
+    'Accept: application/json',
+    '--data',
+    '{}',
+    '--silent',
+    '--show-error',
+  ];
+}
+
+function runProtectedCanaryRequest(input) {
+  return new Promise((resolvePromise, rejectPromise) => {
+    const childEnv = { ...process.env };
+    delete childEnv.SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM;
+    childEnv.VERCEL_TOKEN = input.vercelToken;
+    childEnv.VERCEL_ORG_ID = TEAM_ID;
+    childEnv.VERCEL_PROJECT_ID = PROJECT_ID;
+
+    const child = spawn(
+      'npx',
+      buildProtectedCanaryCurlArgs(input),
+      {
+        cwd: process.cwd(),
+        env: childEnv,
+        shell: false,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      },
+    );
+
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', (chunk) => {
+      stdout = boundedAppend(stdout, chunk);
+    });
+    child.stderr.on('data', (chunk) => {
+      stderr = boundedAppend(stderr, chunk);
+    });
+
+    const timeout = setTimeout(() => {
+      child.kill('SIGTERM');
+    }, 45_000);
+
+    child.once('error', () => {
+      clearTimeout(timeout);
+      rejectPromise(
+        new CanaryOrchestratorError(
+          'CANARY_REQUEST_FAILED',
+          'Authenticated Vercel canary request failed to start.',
+        ),
+      );
+    });
+
+    child.once('close', (code, signal) => {
+      clearTimeout(timeout);
+      if (code !== 0 || signal !== null) {
+        rejectPromise(
+          new CanaryOrchestratorError(
+            classifyVercelCliFailure(stderr),
+            'Authenticated Vercel canary request failed.',
+          ),
+        );
+        return;
+      }
+
+      let payload;
+      try {
+        payload = JSON.parse(stdout.trim());
+      } catch {
+        rejectPromise(
+          new CanaryOrchestratorError(
+            'CANARY_RESPONSE_INVALID',
+            'Authenticated Vercel canary response was not JSON.',
+          ),
+        );
+        return;
+      }
+
+      if (
+        payload?.status === 'fail' &&
+        typeof payload?.code === 'string' &&
+        ALLOWED_CANARY_ENDPOINT_CODES.has(payload.code)
+      ) {
+        rejectPromise(
+          new CanaryOrchestratorError(
+            `CANARY_ENDPOINT_${payload.code}`,
+            'PostgreSQL TLS canary endpoint failed closed.',
+          ),
+        );
+        return;
+      }
+
+      resolvePromise(payload);
+    });
+  });
+}
+
 function validateCanaryEvidence(payload) {
   const evidence = payload?.evidence;
   if (
@@ -351,39 +470,11 @@ export async function runProductionPostgresTlsPeerCanaryOrchestrator(env = proce
     );
     const aliasEvidence = inspectSkipDomainAliasEvidence(aliases);
 
-    let canaryResponse;
-    try {
-      canaryResponse = await fetch(
-        `${deploymentUrl}/api/readiness`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${canaryToken}`,
-            Accept: 'application/json',
-            'Content-Type': 'application/json',
-          },
-          body: '{}',
-          redirect: 'error',
-          signal: AbortSignal.timeout(20_000),
-        },
-      );
-    } catch {
-      return fail('CANARY_REQUEST_FAILED', 'Canary endpoint request failed.');
-    }
-
-    if (!canaryResponse.ok) {
-      return fail(
-        'CANARY_REQUEST_FAILED',
-        `Canary endpoint rejected the request with status ${canaryResponse.status}.`,
-      );
-    }
-
-    let canaryPayload;
-    try {
-      canaryPayload = await canaryResponse.json();
-    } catch {
-      return fail('CANARY_RESPONSE_INVALID', 'Canary response was not JSON.');
-    }
+    const canaryPayload = await runProtectedCanaryRequest({
+      vercelToken: token,
+      deploymentUrl,
+      canaryToken,
+    });
 
     const evidence = validateCanaryEvidence(canaryPayload);
     return Object.freeze({
