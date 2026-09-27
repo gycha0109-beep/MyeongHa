@@ -207,8 +207,7 @@ function requireAttentionOrder(
       if (
         typeof entry !== 'string' ||
         !(
-          CHARACTER_FACE_ATTENTION_KEYS_V1
-            as readonly string[]
+          CHARACTER_FACE_ATTENTION_KEYS_V1 as readonly string[]
         ).includes(entry)
       ) {
         fail(
@@ -255,8 +254,7 @@ function requireUncertaintyHandling(
   if (
     typeof value !== 'string' ||
     !(
-      CHARACTER_FACE_UNCERTAINTY_HANDLING_V1
-        as readonly string[]
+      CHARACTER_FACE_UNCERTAINTY_HANDLING_V1 as readonly string[]
     ).includes(value)
   ) {
     fail(
