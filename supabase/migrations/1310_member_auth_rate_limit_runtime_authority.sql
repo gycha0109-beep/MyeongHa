@@ -82,6 +82,8 @@ comment on table public.member_auth_rate_limit_buckets is
   'Ephemeral UNLOGGED Member Auth abuse-admission counters keyed only by endpoint action and a 32-byte server-derived HMAC fingerprint. Raw network identifiers are forbidden.';
 
 grant myeongha_member_auth_rate_limit_owner to current_user;
+grant create on schema public to myeongha_member_auth_rate_limit_owner;
+
 alter table public.member_auth_rate_limit_buckets
   owner to myeongha_member_auth_rate_limit_owner;
 
@@ -216,6 +218,7 @@ grant execute on function public.cmd_admit_member_auth_request_v1(text, bytea)
 revoke all on table public.member_auth_rate_limit_buckets
   from myeongha_api_executor;
 
+revoke create on schema public from myeongha_member_auth_rate_limit_owner;
 revoke myeongha_member_auth_rate_limit_owner from current_user;
 
 DO $$
@@ -258,6 +261,14 @@ BEGIN
     'EXECUTE'
   ) THEN
     RAISE EXCEPTION 'myeongha_api_executor cannot execute the Member Auth rate-limit command';
+  END IF;
+
+  IF pg_catalog.has_schema_privilege(
+    'myeongha_member_auth_rate_limit_owner',
+    'public',
+    'CREATE'
+  ) THEN
+    RAISE EXCEPTION 'Member Auth rate-limit owner unexpectedly retains CREATE on public schema';
   END IF;
 
   IF pg_catalog.has_table_privilege(

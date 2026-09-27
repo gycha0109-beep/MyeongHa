@@ -109,6 +109,8 @@ for (const fragment of [
   'myeongha_member_auth_rate_limit_owner',
   'NOLOGIN',
   'NOBYPASSRLS',
+  'grant create on schema public to myeongha_member_auth_rate_limit_owner',
+  'revoke create on schema public from myeongha_member_auth_rate_limit_owner',
   'security definer',
   'public.cmd_admit_member_auth_request_v1',
   "interval '60 seconds'",
