@@ -278,6 +278,7 @@ export {
   type SeyeonContextFocusKeyV2,
   type SeyeonRecentMessageV2,
   type SeyeonRelationshipContextV2,
+  type SeyeonRelationshipRuntimeSemanticsV2,
   type SeyeonRetrievedClaimKindV2,
   type SeyeonRetrievedMemoryKindV2,
   type SeyeonRetrievedMemoryV2,
