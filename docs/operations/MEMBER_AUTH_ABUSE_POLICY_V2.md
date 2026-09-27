@@ -1,6 +1,6 @@
 # MyeongHa Member Auth Abuse Policy V2
 
-Status: **C1 FOUNDATION DORMANT / NOT WIRED TO PRODUCTION AUTH HTTP**
+Status: **C2 PRODUCTION ENFORCEMENT WIRED / CANARY PENDING**
 
 Issue: `#1332`
 
@@ -29,7 +29,7 @@ C1 creates only dormant security primitives:
 - a PostgreSQL admission port that enters `myeongha_api_executor`;
 - unit and real-PostgreSQL concurrency tests.
 
-C1 does **not** modify `api/auth/sign-in.ts`, `api/auth/sign-up.ts`, `api/auth/refresh.ts`, `api/auth/sign-out.ts`, or `apps/api/src/supabase-auth-http.ts`. Production Auth traffic therefore remains unchanged after C1.
+C1 did **not** modify `api/auth/sign-in.ts`, `api/auth/sign-up.ts`, `api/auth/refresh.ts`, `api/auth/sign-out.ts`, or `apps/api/src/supabase-auth-http.ts`. That dormant boundary is historical after C2A activation.
 
 ## Client network key
 
@@ -106,7 +106,21 @@ Because the table is UNLOGGED, it is intentionally outside durable recovery sema
 
 The V2 contract is `fail-closed`.
 
-C1 is dormant, so this does not affect Production HTTP yet. C2 activation will map admission-infrastructure failure to a bounded 503 and will not silently bypass the limiter into Supabase Auth.
+C2A wires the production `sign-in`, `sign-up`, and `refresh` routes through the application admission boundary. Missing/invalid trusted client IP, missing/invalid HMAC activation config, PostgreSQL connection failure, statement timeout, or malformed admission authority output returns:
+
+```text
+503 AUTH_RATE_LIMIT_UNAVAILABLE
+```
+
+The runtime does not silently bypass the limiter into Supabase Auth. A blocked client receives:
+
+```text
+429 RATE_LIMITED
+Retry-After: 1..60
+Cache-Control: no-store
+```
+
+The request body is not parsed after a block or admission-infrastructure failure.
 
 ## Vercel WAF relation
 
@@ -114,19 +128,44 @@ The V1 WAF evidence remains authoritative history: the governed project rejected
 
 V2 does not delete or rewrite that evidence. Existing Guest Bootstrap WAF protection also remains unchanged.
 
-## C2 activation boundary
+## C2A production activation
 
-C2 is a separate reviewed change. It must:
+C2A activates the already-proven C1 primitive without changing the existing Supabase Auth business logic.
 
-1. bind `MYEONGHA_AUTH_RATE_LIMIT_SECRET` in Production;
-2. compose one module-scoped PostgreSQL runtime for Member Auth;
-3. derive the client fingerprint before request-body parsing;
-4. admit sign-in/sign-up/refresh before any Supabase Auth call;
-5. return 429 with `Retry-After` when denied;
-6. return a bounded 503 when admission infrastructure is unavailable;
-7. keep sign-out excluded;
-8. run side-effect-free Production canaries;
-9. prove independent endpoint buckets;
-10. preserve the existing Guest Bootstrap WAF rule.
+The protected routes now compose a module-scoped `ProductionMemberAuthHttpRuntimeV1`:
 
-C1 alone does not close #1332.
+```text
+POST /api/auth/sign-in
+POST /api/auth/sign-up
+POST /api/auth/refresh
+  -> trusted x-forwarded-for
+  -> endpoint-separated HMAC-SHA256 fingerprint
+  -> PostgreSQL admission
+  -> existing handleSupabaseAuthRequestV1()
+```
+
+`POST /api/auth/sign-out` remains directly bound to the existing Auth handler and is not rate-limited.
+
+The Member Auth admission pool uses a narrow profile only for this boundary:
+
+```text
+max connections per runtime = 4
+connection timeout           = 1500 ms
+statement timeout            = 1500 ms
+idle timeout                 = 5000 ms
+```
+
+Ordinary MyeongHa PostgreSQL callers keep their prior pool defaults.
+
+The dedicated Production secret `MYEONGHA_AUTH_RATE_LIMIT_SECRET` was provisioned in Vercel as a `sensitive`, Production-only environment variable by governed run `36341568878`. The run recorded `secret_value_emitted=false`; the secret value is not repository or runtime evidence.
+
+The activation state remains `production-enforcement-pending-canary` until a side-effect-free Production canary proves:
+
+1. sign-in invalid requests 1..30 remain local `400 INVALID_REQUEST`, then attempt 31 returns `429 RATE_LIMITED`;
+2. sign-up has an independent 30/31 bucket;
+3. refresh has an independent 30/31 bucket;
+4. `Retry-After` is within 1..60 seconds;
+5. sign-out remains outside the limiter and returns its ordinary Auth result rather than 429;
+6. no legitimate account/session side effect is created by the invalid probe payloads.
+
+C2A alone does not close #1332. C2B canary success and evidence promotion to `production-active` are still required.

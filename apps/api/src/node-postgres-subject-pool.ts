@@ -16,6 +16,50 @@ export const NODE_POSTGRES_SUBJECT_POOL_DEFAULTS_V1 = Object.freeze({
   statementTimeoutMs: 5_000,
 } as const);
 
+export interface NodePostgresSubjectPoolOptionsV1 {
+  readonly maxConnectionsPerRuntime?: number;
+  readonly connectionTimeoutMs?: number;
+  readonly idleTimeoutMs?: number;
+  readonly statementTimeoutMs?: number;
+}
+
+function requirePositivePoolInteger(name: string, value: number): number {
+  if (!Number.isInteger(value) || value < 1 || value > 60_000) {
+    throw new NodePostgresSubjectPoolErrorV1(
+      'INVALID_POOL_OPTIONS',
+      `PostgreSQL subject pool ${name} must be an integer from 1 to 60000.`,
+    );
+  }
+  return value;
+}
+
+function resolvePoolOptions(
+  options: NodePostgresSubjectPoolOptionsV1 = {},
+): Required<NodePostgresSubjectPoolOptionsV1> {
+  return Object.freeze({
+    maxConnectionsPerRuntime: requirePositivePoolInteger(
+      'maxConnectionsPerRuntime',
+      options.maxConnectionsPerRuntime
+        ?? NODE_POSTGRES_SUBJECT_POOL_DEFAULTS_V1.maxConnectionsPerRuntime,
+    ),
+    connectionTimeoutMs: requirePositivePoolInteger(
+      'connectionTimeoutMs',
+      options.connectionTimeoutMs
+        ?? NODE_POSTGRES_SUBJECT_POOL_DEFAULTS_V1.connectionTimeoutMs,
+    ),
+    idleTimeoutMs: requirePositivePoolInteger(
+      'idleTimeoutMs',
+      options.idleTimeoutMs
+        ?? NODE_POSTGRES_SUBJECT_POOL_DEFAULTS_V1.idleTimeoutMs,
+    ),
+    statementTimeoutMs: requirePositivePoolInteger(
+      'statementTimeoutMs',
+      options.statementTimeoutMs
+        ?? NODE_POSTGRES_SUBJECT_POOL_DEFAULTS_V1.statementTimeoutMs,
+    ),
+  });
+}
+
 const VERIFY_LOGIN_PRINCIPAL_SQL = `
 select
   current_user::text as "currentUser",
@@ -45,7 +89,8 @@ export class NodePostgresSubjectPoolErrorV1 extends Error {
       | 'PRINCIPAL_MISMATCH'
       | 'EXECUTION_ROLE_UNAVAILABLE'
       | 'INVALID_PREFLIGHT_RESULT'
-      | 'TLS_MODE_UNSUPPORTED',
+      | 'TLS_MODE_UNSUPPORTED'
+      | 'INVALID_POOL_OPTIONS',
     message: string,
   ) {
     super(message);
@@ -99,14 +144,15 @@ export function normalizeNodePostgresConnectionStringV1(
 
 export function buildNodePostgresPoolConfigV1(
   connectionString: string,
+  options: NodePostgresSubjectPoolOptionsV1 = {},
 ): PoolConfig {
+  const resolved = resolvePoolOptions(options);
   return Object.freeze({
     connectionString: normalizeNodePostgresConnectionStringV1(connectionString),
-    max: NODE_POSTGRES_SUBJECT_POOL_DEFAULTS_V1.maxConnectionsPerRuntime,
-    connectionTimeoutMillis:
-      NODE_POSTGRES_SUBJECT_POOL_DEFAULTS_V1.connectionTimeoutMs,
-    idleTimeoutMillis: NODE_POSTGRES_SUBJECT_POOL_DEFAULTS_V1.idleTimeoutMs,
-    statement_timeout: NODE_POSTGRES_SUBJECT_POOL_DEFAULTS_V1.statementTimeoutMs,
+    max: resolved.maxConnectionsPerRuntime,
+    connectionTimeoutMillis: resolved.connectionTimeoutMs,
+    idleTimeoutMillis: resolved.idleTimeoutMs,
+    statement_timeout: resolved.statementTimeoutMs,
     allowExitOnIdle: true,
   });
 }
@@ -136,8 +182,11 @@ class PgDriverClientV1 implements NodePostgresDriverClientV1 {
 class PgDriverPoolV1 implements NodePostgresDriverPoolV1 {
   private readonly pool: Pool;
 
-  constructor(connectionString: string) {
-    this.pool = new Pool(buildNodePostgresPoolConfigV1(connectionString));
+  constructor(
+    connectionString: string,
+    options: NodePostgresSubjectPoolOptionsV1 = {},
+  ) {
+    this.pool = new Pool(buildNodePostgresPoolConfigV1(connectionString, options));
 
     this.pool.on('error', (error) => {
       const code = (error as Error & { code?: unknown }).code;
@@ -271,6 +320,7 @@ export function createNodePostgresSubjectPoolFromDriverV1(input: {
 
 export function createNodePostgresSubjectPoolV1(
   config: ProductionPostgresRuntimeConfigV1,
+  options: NodePostgresSubjectPoolOptionsV1 = {},
 ): NodePostgresSubjectPoolV1 {
   if (config.databaseExecutionRole !== MYEONGHA_API_EXECUTION_ROLE) {
     throw new NodePostgresSubjectPoolErrorV1(
@@ -280,7 +330,7 @@ export function createNodePostgresSubjectPoolV1(
   }
 
   return new NodePostgresSubjectPoolV1(
-    new PgDriverPoolV1(config.databaseUrl),
+    new PgDriverPoolV1(config.databaseUrl, options),
     config.databasePrincipal,
   );
 }
