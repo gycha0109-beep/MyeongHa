@@ -32,6 +32,7 @@ const expectedProducerFiles = [
   '0260_reading_transport_commands.sql',
   '0290_account_deletion_start_command.sql',
   '1080_entitlement_effect_apply_v1.sql',
+  '1440_seyeon_relationship_sync_outbox_v1.sql',
 ];
 
 if (JSON.stringify(producerFiles) !== JSON.stringify(expectedProducerFiles)) {
@@ -48,6 +49,7 @@ for (const [path, aggregateType] of [
   ['supabase/migrations/0260_reading_transport_commands.sql', 'reading'],
   ['supabase/migrations/0290_account_deletion_start_command.sql', 'data_deletion_job'],
   ['supabase/migrations/1080_entitlement_effect_apply_v1.sql', 'entitlement'],
+  ['supabase/migrations/1440_seyeon_relationship_sync_outbox_v1.sql', 'character_relationship'],
 ]) {
   const text = await readFile(path, 'utf8');
   const outboxInsertCount = (text.match(/insert\s+into\s+public\.outbox_events\b/gi) || []).length;
@@ -117,6 +119,7 @@ for (const fragment of [
   'reading',
   'data_deletion_job',
   'entitlement',
+  'character_relationship',
   'payload_jsonb.subjectId',
 ]) {
   if (!normalizedDoc.includes(fragment)) fail('documentation missing boundary: ' + fragment);
