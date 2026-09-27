@@ -333,7 +333,7 @@ if [[ -n "$backup_migration_frontier" ]] && (( backup_migration_frontier >= 1310
     "select not (pg_catalog.has_table_privilege('myeongha_api_executor','public.member_auth_rate_limit_buckets','SELECT') or pg_catalog.has_table_privilege('myeongha_api_executor','public.member_auth_rate_limit_buckets','INSERT') or pg_catalog.has_table_privilege('myeongha_api_executor','public.member_auth_rate_limit_buckets','UPDATE') or pg_catalog.has_table_privilege('myeongha_api_executor','public.member_auth_rate_limit_buckets','DELETE'));")" == 't' ]]
   member_auth_rate_limit_acl_restore='pass'
 
-  synthetic_member_auth_admission="$(psql "$RESTORE_DATABASE_URL" -Atq --set ON_ERROR_STOP=1 -c \
+  synthetic_member_auth_admission="$(psql "$RESTORE_ADMIN_DATABASE_URL" -Atq --set ON_ERROR_STOP=1 -c \
     "set role myeongha_api_executor; select allowed::text || ':' || request_count::text from public.cmd_admit_member_auth_request_v1('sign-in', decode(repeat('cd',32),'hex'));")"
   [[ "$synthetic_member_auth_admission" == 'true:1' ]]
   member_auth_rate_limit_synthetic_admission='pass'
