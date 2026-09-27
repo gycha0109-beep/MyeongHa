@@ -117,6 +117,78 @@ Production 전 Closure Pass에서는 각 High-Answerability Fact를 최소 하�
 - 다른 authority가 결정해야 하면 `WORLD_DEPENDENT`로 명시한다.
 - 아직 결정하지 못했다면 `AUTHOR_UNDEFINED`로 남기되 authoring debt로 추적한다.
 
+
+## 2.2 Open-World Authoring Boundary
+
+Character Bible은 세상의 모든 취향과 trivia를 미리 열거하는 백과사전이 아니다.
+
+사용자가 물을 수 있는 질문의 공간은 사실상 무한하므로, Bible은 **어떤 사실을 반드시 사람이 닫아야 하는가**와 **어떤 낮은 영향도의 세부사항은 Runtime에서 생겨도 되는가**의 경계를 제공한다.
+
+핵심 기준은 사실의 분야가 아니라 **causal fan-out / setting volume**이다.
+
+### Authorial Closure가 필요한 사실
+
+다음 중 하나라도 해당하면 기본적으로 Bible 또는 해당 전문 authority가 먼저 결정해야 한다.
+
+- core identity / 가치 / 핵심 결함을 바꾼다.
+- 가족 / 직업 / 교육 / 출신 / 연애사 / 중요한 인간관계 같은 biography를 새로 만든다.
+- 새로운 인물 / 조직 / 과거 사건의 존재를 암묵적으로 확정한다.
+- 관계 행동과 disclosure에 장기적으로 큰 영향을 준다.
+- 반복적인 생활 리듬 / 책임 / 일정 / 습관을 새로 만든다.
+- 하나의 답이 다수의 후속 사실을 연쇄적으로 요구한다.
+
+예를 들어 "가끔 배드민턴을 좋아한다"와 "매주 화·목·토 5km를 달린다"는 같은 운동 질문처럼 보여도 후자의 생활 구조 파급력이 훨씬 크다.
+
+### Runtime-Eligible Detail
+
+다음 조건을 만족하는 낮은 영향도의 세부사항은 Runtime Standard가 허용하는 경우에만 open-world fact candidate가 될 수 있다.
+
+- 기존 Canon / World / Memory와 충돌하지 않는다.
+- 새로운 biography 축을 만들지 않는다.
+- 높은 전문성 / 마니아 이력 / 장기간의 경험을 암묵적으로 요구하지 않는다.
+- 관계 구조나 반복 생활 패턴을 크게 바꾸지 않는다.
+- 한 번 정해졌다면 provenance와 함께 일관되게 재사용할 수 있다.
+
+예: 커피 온도 선호, 낮은 영향도의 음식 취향, 사소한 물건 취향 등.
+
+이 허용은 **모든 미정값을 Runtime이 채워도 된다는 뜻이 아니다.**
+
+특히 Bible에 명시적으로 `AUTHOR_UNDEFINED`로 등록된 fact는 authoring debt로 보호된다. Runtime open-world generation은 그 보호를 우회하지 않는다.
+
+### Domain Exhaustion 금지
+
+다음과 같은 도메인별 취향 목록을 공통 필수 항목으로 만들지 않는다.
+
+- 영화
+- 게임
+- 애니메이션
+- 음악
+- 동물
+- 색
+- 액세서리
+- 여행지
+- 브랜드
+- 스포츠
+- 음식의 모든 하위 분류
+
+필요하다면 Character의 기존 A~K에서 드러나는 **범용적인 취향 성향**을 Runtime이 약한 prior로 투영할 수 있다. 이 prior는 새로운 Canon이 아니며 특정 답을 결정하는 규칙으로 사용하지 않는다.
+
+### Specificity와 Experience
+
+특정 작품 / 배우 / 브랜드 / 게임 / 감독처럼 고유명사 수준의 강한 선호는 일반적인 저영향 preference보다 더 많은 배경을 암묵적으로 만든다.
+
+따라서 Bible에 이미 정해져 있지 않은 named preference는 Runtime이 무조건 즉석 생성하지 않는다. 실제 대화 / 사건 / 경험에서 자연스럽게 형성될 수 있는 경우에는 Runtime의 `EXPERIENCE_ONLY` 정책을 사용할 수 있다.
+
+목표는 다음 두 실패를 동시에 피하는 것이다.
+
+```text
+모든 trivia를 Bible에 미리 작성
+→ authoring explosion
+
+미정이면 LLM이 아무 설정이나 즉석 생성
+→ persona drift / biography pollution
+```
+
 ---
 
 # 3. CHARACTER BIBLE INSTANCE TEMPLATE
@@ -421,3 +493,4 @@ Character Bible v1 instance는 다음을 만족해야 한다.
 - 기존 `[UNDEFINED]` / `[HYPOTHESIS]` 표기는 v1 compatibility rule에 맞게 해석된다.
 - High-Answerability biography의 unresolved gap이 Closure Pass에서 식별된다.
 - Runtime instruction이 Bible 안으로 역류하지 않는다.
+- Open-world trivia를 무한히 선작성하지 않으면서도, high-fan-out biography와 Runtime-eligible detail의 경계가 식별된다.
