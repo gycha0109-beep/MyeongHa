@@ -239,7 +239,7 @@ begin
 
   if not found
      or v_row.aggregate_type is distinct from 'character_relationship'
-     or v_row.aggregate_id is distinct from p_subject_id::text || ':seyeon'
+     or v_row.aggregate_id is distinct from (p_subject_id::text || ':seyeon')
      or v_row.event_type
           is distinct from 'SEYEON_PRODUCTION_RELATIONSHIP_SYNC_REQUESTED'
      or v_row.event_schema_version is distinct from 'v1'
@@ -304,7 +304,7 @@ begin
 
   if not found
      or v_row.aggregate_type is distinct from 'character_relationship'
-     or v_row.aggregate_id is distinct from p_subject_id::text || ':seyeon'
+     or v_row.aggregate_id is distinct from (p_subject_id::text || ':seyeon')
      or v_row.event_type
           is distinct from 'SEYEON_PRODUCTION_RELATIONSHIP_SYNC_REQUESTED' then
     raise exception using
