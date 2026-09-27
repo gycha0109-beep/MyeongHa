@@ -44,14 +44,15 @@ These names are slots for an owner-approved policy. Their presence in this contr
 
 ## Coverage invariant
 
-`scripts/evaluate-account-deletion-disposition-contract.mjs` derives the expected table set from `TRANSITIVE_SUBJECT_DEPENDENCY_GRAPH_V1.json` and requires exact one-to-one coverage.
+`scripts/verify-account-deletion-disposition-execution-gate.mjs` preserves this historical artifact by projecting the current canonical Subject graph onto the candidate's original 52-table boundary, then evaluates the immutable candidate against that historical projection. The separately approved successor policy covers the full current graph.
 
 Therefore:
 
 - every one of the 52 reachable tables must have exactly one disposition entry;
 - unknown, duplicate, or omitted tables fail closed;
 - every one of the 125 reachable FK edges must map to a covered child table;
-- graph identity/count drift fails closed.
+- drift inside the historical 52-table / 125-edge boundary fails closed;
+- newly added Subject-owned tables are governed by the separately approved successor policy rather than mutating this historical candidate.
 
 ## Dependency conflict invariant
 
