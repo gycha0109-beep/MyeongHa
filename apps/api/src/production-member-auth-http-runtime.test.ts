@@ -5,12 +5,12 @@ import {
   MEMBER_AUTH_RATE_LIMIT_POSTGRES_POOL_OPTIONS_V1,
 } from './production-member-auth-http-runtime.js';
 
-function env(secret: string | undefined = 's'.repeat(32)) {
+function env(secret: string | null = 's'.repeat(32)) {
   return {
     MYEONGHA_DATABASE_URL:
       'postgresql://myeongha_login:secret@db.example.test:5432/postgres?sslmode=require',
     MYEONGHA_DATABASE_PRINCIPAL: 'myeongha_login',
-    ...(secret === undefined ? {} : { MYEONGHA_AUTH_RATE_LIMIT_SECRET: secret }),
+    ...(secret === null ? {} : { MYEONGHA_AUTH_RATE_LIMIT_SECRET: secret }),
   };
 }
 
@@ -60,7 +60,7 @@ describe('Production Member Auth HTTP runtime', () => {
   it('maps missing activation config to fail-closed 503 without Auth work', async () => {
     const authHandler = vi.fn();
     const runtime = createProductionMemberAuthHttpRuntimeV1({
-      env: env(undefined),
+      env: env(null),
       admissionPort: {
         admit: vi.fn(async () => ({
           allowed: true,
