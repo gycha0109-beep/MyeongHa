@@ -340,6 +340,32 @@ export function formatCharacterFaceDisplayValueV1(
     .join('; ');
 }
 
+function koreanTopicParticle(
+  label: string,
+): '은' | '는' {
+  const last =
+    [...label].at(-1);
+  if (last === undefined) {
+    return '은';
+  }
+
+  const codePoint =
+    last.codePointAt(0);
+  if (
+    codePoint === undefined ||
+    codePoint < 0xac00 ||
+    codePoint > 0xd7a3
+  ) {
+    return '은';
+  }
+
+  return (
+    (codePoint - 0xac00) % 28 === 0
+      ? '는'
+      : '은'
+  );
+}
+
 function renderNeutralFactText(
   input: Readonly<{
     label: string;
@@ -352,7 +378,9 @@ function renderNeutralFactText(
     case 'plain':
       return `${input.label}: ${input.valueText}.`;
     case 'soft_observation':
-      return `${input.label}은 ${input.valueText}로 확인돼요.`;
+      return `${input.label}${koreanTopicParticle(
+        input.label,
+      )} ${input.valueText}로 확인돼요.`;
     case 'compact':
       return `${input.label}, ${input.valueText}.`;
   }
