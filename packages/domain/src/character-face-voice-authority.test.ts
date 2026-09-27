@@ -254,7 +254,8 @@ describe(
           ...valid,
           voiceAuthority: {
             ...valid.voiceAuthority,
-            speech: {},
+            speech:
+              {} as unknown as typeof valid.speech,
           },
         }),
       ).toThrow(
@@ -266,7 +267,8 @@ describe(
           ...valid,
           voiceAuthority: {
             ...valid.voiceAuthority,
-            communication: {},
+            communication:
+              {} as unknown as typeof valid.persona.communication,
           },
         }),
       ).toThrow(
