@@ -67,10 +67,10 @@ on conflict (character_id) do nothing;
 insert into public.relationship_policy_artifacts(
   policy_version,artifact_schema_version,content_hash,artifact_jsonb,created_at,retired_at
 ) values (
-  'relationship-policy-v1',
+  'relationship-policy-v1-account-delete-test',
   'relationship-policy-definition-v1',
-  'sha256:v1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-  '{"schemaVersion":"relationship-policy-definition-v1","policyVersion":"relationship-policy-v1"}'::jsonb,
+  'sha256:v1:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
+  '{"schemaVersion":"relationship-policy-definition-v1","policyVersion":"relationship-policy-v1-account-delete-test"}'::jsonb,
   clock_timestamp(),
   null
 )
@@ -86,7 +86,7 @@ insert into public.user_character_states(
   'account-delete-relationship-char',
   0,0,0,
   'S0_FIRST_MEETING',
-  'relationship-policy-v1',
+  'relationship-policy-v1-account-delete-test',
   1,
   clock_timestamp(),
   clock_timestamp(),
@@ -94,7 +94,7 @@ insert into public.user_character_states(
   'S0_FIRST_MEETING',
   'S0_FIRST_MEETING',
   'STABLE',
-  'sha256:v1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  'sha256:v1:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
   'relationship-policy-state-v1',
   '{}'::jsonb
 );
@@ -141,8 +141,8 @@ insert into public.relationship_event_records(
   'NON_PROGRESSION',
   false,
   0,0,0,null,
-  'relationship-policy-v1',
-  'sha256:v1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  'relationship-policy-v1-account-delete-test',
+  'sha256:v1:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
   clock_timestamp()
 );
 
@@ -237,7 +237,7 @@ relationship_deleted="$("${psql_base[@]}" -Atc "select
   (select count(*) from public.relationship_state_snapshots where subject_id='$subject_id');")"
 [[ "$relationship_deleted" == "0|0|0|0|0|0|0" ]] || fail "relationship deletion graph remains: $relationship_deleted"
 
-policy_retained="$("${psql_base[@]}" -Atc "select count(*) from public.relationship_policy_artifacts where policy_version='relationship-policy-v1' and content_hash='sha256:v1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';")"
+policy_retained="$("${psql_base[@]}" -Atc "select count(*) from public.relationship_policy_artifacts where policy_version='relationship-policy-v1-account-delete-test' and content_hash='sha256:v1:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee';")"
 [[ "$policy_retained" == "1" ]] || fail "global relationship policy artifact was deleted with Subject data"
 pass "Production relationship history is deleted while global policy authority is retained"
 
