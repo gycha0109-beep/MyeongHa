@@ -1,5 +1,4 @@
 import {
-  SEYEON_EVENT_LEDGER_SCHEMA_VERSION_V2,
   SEYEON_EXPERIMENTAL_EVENT_KINDS_V2,
   type SeyeonCharacterInterpretationV2,
   type SeyeonEventFactV2,
@@ -397,33 +396,6 @@ export function guardSeyeonEventExtractionCandidateV2(input: {
     salience,
     confidence,
     dedupeBasis: boundedText(input.rawOutput.dedupeBasis, 'dedupeBasis', 256),
-  });
-}
-
-export function materializeSeyeonEventCandidateV2(input: {
-  readonly candidate: SeyeonEventExtractionCandidateV2;
-  readonly context: SeyeonEventExtractionContextV2;
-  readonly eventId: string;
-  readonly dedupeKey: string;
-  readonly occurredAt: string;
-}): SeyeonRelationshipEventV2 | null {
-  if (input.candidate.decision === 'none') return null;
-
-  return Object.freeze({
-    schemaVersion: SEYEON_EVENT_LEDGER_SCHEMA_VERSION_V2,
-    authority: 'experimental_non_canonical_event' as const,
-    eventId: boundedText(input.eventId, 'eventId', 256),
-    dedupeKey: boundedText(input.dedupeKey, 'dedupeKey', 256),
-    characterId: 'seyeon' as const,
-    eventKind: input.candidate.eventKind,
-    occurredAt: boundedText(input.occurredAt, 'occurredAt', 64),
-    sourceTurnId: boundedText(input.context.turnId, 'context.turnId', 256),
-    sourceMessageRefs: input.candidate.sourceMessageRefs,
-    causalPredecessorEventIds: input.candidate.causalPredecessorEventIds,
-    facts: input.candidate.facts,
-    characterInterpretation: input.candidate.characterInterpretation,
-    salience: input.candidate.salience,
-    confidence: input.candidate.confidence,
   });
 }
 

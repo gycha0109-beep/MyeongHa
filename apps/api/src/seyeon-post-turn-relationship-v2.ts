@@ -1,8 +1,12 @@
 import {
-  materializeSeyeonEventCandidateV2,
+  materializeSeyeonAuthorizedExperimentalEventV1,
   rankSeyeonEventRetrievalV2,
+  validateSeyeonEventAuthorityV1,
   type SeyeonDialogueEnvelopeV2,
   type SeyeonEventExtractionMessageV2,
+  type SeyeonEventAuthorityDecisionV1,
+  type SeyeonEventAuthorityEvidenceV1,
+  type SeyeonEventExtractionCandidateV2,
   type SeyeonEventLedgerEntryV2,
   type SeyeonRelationshipEventV2,
   type SeyeonRelationshipProjectionV2,
@@ -36,6 +40,7 @@ export interface RunSeyeonPostTurnRelationshipV2Input {
   readonly envelope: SeyeonDialogueEnvelopeV2;
   readonly ledger: SeyeonEventLedgerPortV2;
   readonly extractorProvider: SeyeonStructuredProviderPortV2;
+  readonly eventAuthorityEvidence: SeyeonEventAuthorityEvidenceV1;
   readonly semanticRelevanceByEventId: Readonly<Record<string, number>>;
   readonly recentlyMentionedEventIds?: readonly string[];
   readonly identity: Readonly<{
@@ -57,9 +62,19 @@ export type RunSeyeonPostTurnRelationshipV2Result =
     }>
   | Readonly<{
       readonly runtimeVersion: typeof SEYEON_POST_TURN_RELATIONSHIP_RUNTIME_VERSION_V2;
+      readonly decision: 'rejected';
+      readonly priorCausalEventIds: readonly string[];
+      readonly candidate: Extract<SeyeonEventExtractionCandidateV2, { readonly decision: 'event' }>;
+      readonly authorityDecision: SeyeonEventAuthorityDecisionV1;
+      readonly relationshipBefore: SeyeonRelationshipProjectionV2;
+      readonly relationshipAfter: SeyeonRelationshipProjectionV2;
+    }>
+  | Readonly<{
+      readonly runtimeVersion: typeof SEYEON_POST_TURN_RELATIONSHIP_RUNTIME_VERSION_V2;
       readonly decision: 'event';
       readonly priorCausalEventIds: readonly string[];
       readonly event: SeyeonRelationshipEventV2;
+      readonly authorityDecision: SeyeonEventAuthorityDecisionV1;
       readonly ledgerEntry: SeyeonEventLedgerEntryV2;
       readonly relationshipBefore: SeyeonRelationshipProjectionV2;
       readonly relationshipAfter: SeyeonRelationshipProjectionV2;
@@ -133,15 +148,17 @@ export async function runSeyeonPostTurnRelationshipV2(
     priorEvents.map((event) => event.eventId),
   );
 
+  const extractionContext = Object.freeze({
+    turnId: input.turnId,
+    messages: input.messages,
+    priorEvents,
+    interpretation: input.interpretation,
+    envelope: input.envelope,
+    relationshipBefore,
+  });
+
   const candidate = await extractSeyeonEventCandidateV2({
-    context: {
-      turnId: input.turnId,
-      messages: input.messages,
-      priorEvents,
-      interpretation: input.interpretation,
-      envelope: input.envelope,
-      relationshipBefore,
-    },
+    context: extractionContext,
     provider: input.extractorProvider,
   });
 
@@ -155,26 +172,30 @@ export async function runSeyeonPostTurnRelationshipV2(
     });
   }
 
-  const event = materializeSeyeonEventCandidateV2({
+  const authorityDecision = validateSeyeonEventAuthorityV1({
     candidate,
-    context: {
-      turnId: input.turnId,
-      messages: input.messages,
-      priorEvents,
-      interpretation: input.interpretation,
-      envelope: input.envelope,
+    context: extractionContext,
+    evidence: input.eventAuthorityEvidence,
+  });
+
+  if (authorityDecision.decision === 'REJECT') {
+    return Object.freeze({
+      runtimeVersion: SEYEON_POST_TURN_RELATIONSHIP_RUNTIME_VERSION_V2,
+      decision: 'rejected' as const,
+      priorCausalEventIds,
+      candidate,
+      authorityDecision,
       relationshipBefore,
-    },
+      relationshipAfter: relationshipBefore,
+    });
+  }
+
+  const event = materializeSeyeonAuthorizedExperimentalEventV1({
+    authorityDecision,
     eventId: input.identity.eventId,
     dedupeKey: input.identity.eventDedupeKey,
     occurredAt: input.identity.occurredAt,
   });
-
-  if (event === null) {
-    throw new TypeError(
-      'Se-yeon post-turn runtime received an event decision without a materialized Event.',
-    );
-  }
 
   const ledgerEntry = input.ledger.appendEvent({
     ledgerEntryId: input.identity.ledgerEntryId,
@@ -188,6 +209,7 @@ export async function runSeyeonPostTurnRelationshipV2(
     decision: 'event' as const,
     priorCausalEventIds,
     event,
+    authorityDecision,
     ledgerEntry,
     relationshipBefore,
     relationshipAfter,
