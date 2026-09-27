@@ -204,6 +204,16 @@ export {
 } from './character-face-bounded-renderer.js';
 
 export {
+  CHARACTER_FACE_SEMANTIC_GUARD_FAILURE_CODES_V1,
+  CHARACTER_FACE_SEMANTIC_GUARD_VERSION_V1,
+  guardCharacterFaceSemanticPreservationV1,
+  type CharacterFaceSemanticGuardDecisionV1,
+  type CharacterFaceSemanticGuardEvidenceV1,
+  type CharacterFaceSemanticGuardFailureCodeV1,
+  type CharacterFaceSemanticGuardFailureV1,
+} from './character-face-semantic-guard.js';
+
+export {
   CHARACTER_PERSPECTIVE_NARRATIVE_ROLES_V1,
   CHARACTER_PERSPECTIVE_SCHEMA_VERSION_V1,
   SAJU_GROUNDING_AXIS_KEYS_V1,
