@@ -118,6 +118,113 @@ export function hashCharacterFaceReadingArtifactV1(
   )}`;
 }
 
+
+export function computeCharacterFaceReadingArtifactIdV1(
+  material:
+    Omit<
+      CharacterFaceReadingArtifactCandidateV1,
+      'artifactId'
+    >,
+): string {
+  return `character_face_reading_artifact_${sha256Json(
+    material,
+  ).slice(0, 24)}`;
+}
+
+export function assertCharacterFaceReadingArtifactCandidateIntegrityV1(
+  artifact:
+    CharacterFaceReadingArtifactCandidateV1,
+): void {
+  if (
+    artifact.schemaVersion !==
+      CHARACTER_FACE_READING_ARTIFACT_SCHEMA_VERSION_V1 ||
+    artifact.artifactBuilderVersion !==
+      CHARACTER_FACE_ARTIFACT_BUILDER_VERSION_V1 ||
+    artifact.validationState !==
+      'semantic_validated' ||
+    artifact.commitState !==
+      'requires_atomic_commit' ||
+    artifact.revealState !==
+      'forbidden_before_commit'
+  ) {
+    throw new TypeError(
+      'Character Face reading artifact lifecycle or schema state is invalid.',
+    );
+  }
+
+  if (
+    artifact.finalOutput.face.state !==
+    'accepted'
+  ) {
+    throw new TypeError(
+      'Character Face reading artifact must contain an accepted Face final output.',
+    );
+  }
+
+  if (
+    artifact.finalOutputHash !==
+    hashCharacterFaceFinalOutputV1(
+      artifact.finalOutput,
+    )
+  ) {
+    throw new TypeError(
+      'Character Face reading artifact finalOutputHash does not match finalOutput.',
+    );
+  }
+
+  if (
+    artifact.characterId !==
+      artifact.finalOutput.characterId ||
+    artifact.topicKey !==
+      artifact.finalOutput.topicKey ||
+    artifact.bundleHash !==
+      artifact.finalOutput.bundleHash ||
+    artifact.readingPlanRef !==
+      artifact.finalOutput.face
+        .utterance
+        .readingPlanRef ||
+    artifact.deliveryProfileRef
+        .profileHash !==
+      artifact.finalOutput.face
+        .utterance
+        .deliveryProfileRef
+        .profileHash ||
+    artifact.rendererVersion !==
+      artifact.finalOutput.face
+        .utterance
+        .rendererVersion ||
+    artifact.semanticGuardVersion !==
+      artifact.finalOutput.face
+        .guardVersion ||
+    artifact.outputGuardVersion !==
+      artifact.finalOutput
+        .outputGuardVersion ||
+    artifact.finalizerVersion !==
+      artifact.finalOutput
+        .finalizerVersion
+  ) {
+    throw new TypeError(
+      'Character Face reading artifact identity does not match its accepted final output.',
+    );
+  }
+
+  const {
+    artifactId: _artifactId,
+    ...material
+  } = artifact;
+
+  if (
+    artifact.artifactId !==
+    computeCharacterFaceReadingArtifactIdV1(
+      material,
+    )
+  ) {
+    throw new TypeError(
+      'Character Face reading artifactId does not match the immutable artifact material.',
+    );
+  }
+}
+
 export function buildCharacterFaceReadingArtifactCandidateV1(
   input: Readonly<{
     candidateFaceUtterance:
@@ -272,9 +379,9 @@ export function buildCharacterFaceReadingArtifactCandidateV1(
     Object.freeze({
       ...withoutArtifactId,
       artifactId:
-        `character_face_reading_artifact_${sha256Json(
+        computeCharacterFaceReadingArtifactIdV1(
           withoutArtifactId,
-        ).slice(0, 24)}`,
+        ),
     }) satisfies CharacterFaceReadingArtifactCandidateV1;
 
   return Object.freeze({
