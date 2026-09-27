@@ -308,7 +308,7 @@ for (const fragment of [
   'VERIFY_MEMBER_AUTH_RATE_LIMIT_CANARY_V2',
   'default: ops',
   'environment: production',
-  'VERCEL_TOKEN: 
+  'VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}',
   'wait_exact_main_deployment',
   'node scripts/operations/run-production-member-auth-rate-limit-canary.mjs',
   'group: production-member-auth-rate-limit-canary',
@@ -318,15 +318,6 @@ for (const forbidden of ['\npush:', '\npull_request:', '\nschedule:']) {
   forbidFragment(paths.canaryWorkflow, canaryWorkflow, forbidden);
 }
 
-console.log('MyeongHa Member Auth rate-limit V2 verification passed: C1 PostgreSQL authority remains pinned, C2A production HTTP enforcement is wired for sign-in/sign-up/refresh, sign-out remains excluded, fail-closed 503 and 429 Retry-After contracts are fixed, and the side-effect-free Production canary is pending.');
- + '{{ secrets.VERCEL_TOKEN }}',
-  'wait_exact_main_deployment',
-  'node scripts/operations/run-production-member-auth-rate-limit-canary.mjs',
-  'group: production-member-auth-rate-limit-canary',
-  'cancel-in-progress: false',
-]) requireFragment(paths.canaryWorkflow, canaryWorkflow, fragment);
-for (const forbidden of ['\npush:', '\npull_request:', '\nschedule:']) {
-  forbidFragment(paths.canaryWorkflow, canaryWorkflow, forbidden);
-}
-
-console.log('MyeongHa Member Auth rate-limit V2 verification passed: C1 PostgreSQL authority remains pinned, C2A production HTTP enforcement is wired for sign-in/sign-up/refresh, sign-out remains excluded, fail-closed 503 and 429 Retry-After contracts are fixed, and the side-effect-free Production canary is pending.');
+console.log(
+  'MyeongHa Member Auth rate-limit V2 verification passed: C1 PostgreSQL authority remains pinned, C2A production HTTP enforcement is wired for sign-in/sign-up/refresh, sign-out remains excluded, fail-closed 503 and 429 Retry-After contracts are fixed, and the side-effect-free Production canary is pending.',
+);
