@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 const hallHtmlPath = new URL('../apps/web/hall.html', import.meta.url);
 const readingHtmlPath = new URL('../apps/web/reading.html', import.meta.url);
 const pickerRuntimePath = new URL('../apps/web/reading-reader-picker.js', import.meta.url);
+const readerCatalogPath = new URL('../apps/web/reader-presentation-catalog.js', import.meta.url);
 const pickerCssPath = new URL('../apps/web/reading-reader-picker.css', import.meta.url);
 
 describe('MyeongHa Saju Reader picker', () => {
@@ -30,18 +31,22 @@ describe('MyeongHa Saju Reader picker', () => {
   });
 
   it('offers nine browser presentation Reader options without promoting them to canonical identity', async () => {
-    const runtime = await readFile(pickerRuntimePath, 'utf8');
+    const [runtime, catalog] = await Promise.all([
+      readFile(pickerRuntimePath, 'utf8'),
+      readFile(readerCatalogPath, 'utf8'),
+    ]);
     const keys = ['seyeon', 'baekheon', 'yeoul', 'seorin', 'rahyeon', 'mira', 'taegyeom', 'yunho', 'doyun'];
     const names = ['세연', '백헌', '여울', '서린', '라현', '미라', '태겸', '윤호', '도윤'];
 
-    for (const key of keys) expect(runtime).toContain(`key: '${key}'`);
+    expect(runtime).toContain("import { READER_PRESENTATIONS } from './reader-presentation-catalog.js';");
+    for (const key of keys) expect(catalog).toContain(`key: '${key}'`);
     for (const key of keys.filter((key) => key !== 'doyun')) {
-      expect(runtime).toContain(`assets/characters/${key}-portrait-v2.webp`);
+      expect(catalog).toContain(`assets/characters/${key}-portrait-v2.webp`);
     }
-    expect(runtime).toContain('assets/characters/doyoon-portrait-v2.webp');
-    for (const name of names) expect(runtime).toContain(`name: '${name}'`);
+    expect(catalog).toContain('assets/characters/doyoon-portrait-v2.webp');
+    for (const name of names) expect(catalog).toContain(`name: '${name}'`);
 
-    expect(runtime).not.toContain('representativeDemo: true');
+    expect(catalog).not.toContain('representativeDemo: true');
     expect(runtime).toContain('이 선택은 프리뷰 화면 연출에만 적용됩니다.');
     expect(runtime).toContain('저장된 풀이를 다시 읽거나 대화를 이어가는 Reader는 서버에서 연결 가능한 상태가 확인된 뒤 별도로 표시됩니다.');
     expect(runtime).not.toContain('Reading이 끝난 뒤에는 선택한 Reader와 대화를 이어가거나');
