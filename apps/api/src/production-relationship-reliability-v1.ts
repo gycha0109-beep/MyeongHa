@@ -283,18 +283,24 @@ function operationExistingMatch(
   record: ProductionRelationshipReliabilityHistoryRecordV1,
   operation: ProductionRelationshipAdjustmentOperationV1,
 ): boolean {
-  if (
-    record.dedupeKey !== operation.dedupeKey ||
-    record.targetEventId !== operation.targetEventId ||
-    record.reason !== operation.reason ||
-    record.reasonCode !== operation.reasonCode ||
-    record.authorityRef !== operation.authorityRef
-  ) {
-    return false;
+  if (record.dedupeKey !== operation.dedupeKey) return false;
+
+  if (operation.action === 'retract') {
+    if (record.action !== 'retract') return false;
+    return (
+      record.targetEventId === operation.targetEventId &&
+      record.reason === operation.reason &&
+      record.reasonCode === operation.reasonCode &&
+      record.authorityRef === operation.authorityRef
+    );
   }
-  if (operation.action === 'retract') return record.action === 'retract';
+
+  if (record.action !== 'correct') return false;
   return (
-    record.action === 'correct' &&
+    record.targetEventId === operation.targetEventId &&
+    record.reason === operation.reason &&
+    record.reasonCode === operation.reasonCode &&
+    record.authorityRef === operation.authorityRef &&
     sameJson(
       eventRetryMaterial(record.replacementEvent),
       eventRetryMaterial(operation.replacementEvent),
