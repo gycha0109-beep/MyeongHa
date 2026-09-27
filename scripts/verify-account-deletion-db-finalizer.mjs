@@ -6,9 +6,16 @@ function fail(message) {
   throw new Error('Account deletion DB finalizer verifier rejected: ' + message);
 }
 
-const [baseMigration, readerAccessSyncMigration, policyText, finalPolicyText] = await Promise.all([
+const [
+  baseMigration,
+  readerAccessSyncMigration,
+  relationshipSchemaMigration,
+  policyText,
+  finalPolicyText,
+] = await Promise.all([
   readFile('supabase/migrations/1171_account_deletion_db_finalizer.sql', 'utf8'),
   readFile('supabase/migrations/1230_account_deletion_finalizer_reader_access_sync.sql', 'utf8'),
+  readFile('supabase/migrations/1320_relationship_history_schema_v1.sql', 'utf8'),
   readFile('docs/operations/ACCOUNT_DELETION_DISPOSITION_POLICY_V1.json', 'utf8'),
   readFile('docs/operations/ACCOUNT_DELETION_FINALIZATION_POLICY_V1.json', 'utf8'),
 ]);
@@ -30,20 +37,42 @@ const expectedRetain = policy.tableDispositions
   .map((entry) => entry.table)
   .sort();
 
-if (expectedDelete.length !== 39 || expectedAnonymize.length !== 4 || expectedRetain.length !== 9) {
+if (expectedDelete.length !== 45 || expectedAnonymize.length !== 4 || expectedRetain.length !== 9) {
   fail('approved disposition cardinality drifted');
 }
+
+const relationshipCascadeDeleteTables = [
+  'relationship_event_adjustments',
+  'relationship_event_links',
+  'relationship_event_provenance_refs',
+  'relationship_event_records',
+  'relationship_history_entries',
+  'relationship_state_snapshots',
+].sort();
 
 const deleteMatches = [...migration.matchAll(/delete\s+from\s+public\.([a-z0-9_]+)/gi)]
   .map((match) => match[1])
   .sort();
 
 const uniqueDeletes = [...new Set(deleteMatches)].sort();
-if (JSON.stringify(uniqueDeletes) !== JSON.stringify(expectedDelete)) {
+const expectedExplicitDeletes = expectedDelete
+  .filter((table) => !relationshipCascadeDeleteTables.includes(table))
+  .sort();
+if (JSON.stringify(uniqueDeletes) !== JSON.stringify(expectedExplicitDeletes)) {
   fail(
-    'DELETE target set mismatch expected=' + expectedDelete.join(',') +
+    'explicit DELETE target set mismatch expected=' + expectedExplicitDeletes.join(',') +
     ' actual=' + uniqueDeletes.join(',')
   );
+}
+
+for (const table of relationshipCascadeDeleteTables) {
+  const tableBlock = new RegExp(
+    'create\\s+table\\s+public\\.' + table + '\\s*\\([\\s\\S]*?\\n\\);',
+    'i',
+  ).exec(relationshipSchemaMigration)?.[0];
+  if (!tableBlock || !/on\s+delete\s+cascade/i.test(tableBlock)) {
+    fail('DELETE-class relationship table lacks schema-proven cascade path: ' + table);
+  }
 }
 
 for (const table of expectedRetain) {
