@@ -14,7 +14,6 @@ import {
   PRODUCTION_RELATIONSHIP_POLICY_STATE_SCHEMA_VERSION_V1,
   projectProductionRelationshipPolicyStateV1,
   type ProductionRelationshipApplyContextPortV1,
-  type ProductionRelationshipApplyCommitRowV1,
   type ProductionRelationshipPolicyStateV1,
 } from './production-relationship-event-apply-command-v1.js';
 
@@ -105,6 +104,20 @@ export interface ProductionRelationshipAdjustmentIdPortV1 {
   nextProvenanceRefId(): Awaitable<string>;
 }
 
+export interface ProductionRelationshipReplayProjectionCommitRowV1 {
+  readonly stateId: string;
+  readonly revisionAfter: number;
+  readonly closeness: number;
+  readonly trust: number;
+  readonly friction: number;
+  readonly attainedStage: ProductionRelationshipProjectionV1['attainedStage'];
+  readonly currentCandidateStage: ProductionRelationshipProjectionV1['currentCandidateStage'];
+  readonly currentCondition: ProductionRelationshipProjectionV1['currentCondition'];
+  readonly policyVersion: string;
+  readonly policyContentHash: string;
+  readonly lastInteractionAt: string | null;
+}
+
 export interface ProductionRelationshipAdjustmentAppendPortV1 {
   appendRetraction(input: {
     readonly subjectId: string;
@@ -143,7 +156,7 @@ export interface ProductionRelationshipAdjustmentAppendPortV1 {
     readonly expectedBaseRevision: number;
     readonly projection: ProductionRelationshipProjectionV1;
     readonly policyState: ProductionRelationshipPolicyStateV1;
-  }): Awaitable<readonly ProductionRelationshipApplyCommitRowV1[]>;
+  }): Awaitable<readonly ProductionRelationshipReplayProjectionCommitRowV1[]>;
 }
 
 export interface ApplyProductionRelationshipAdjustmentBatchInputV1 {
@@ -327,8 +340,8 @@ function decisionForEvent(
 }
 
 function requireOneCommitRow(
-  rows: readonly ProductionRelationshipApplyCommitRowV1[],
-): ProductionRelationshipApplyCommitRowV1 {
+  rows: readonly ProductionRelationshipReplayProjectionCommitRowV1[],
+): ProductionRelationshipReplayProjectionCommitRowV1 {
   if (rows.length !== 1 || rows[0] === undefined) {
     throw new ProductionRelationshipReliabilityErrorV1(
       'COMMIT_RESULT_MISMATCH',
