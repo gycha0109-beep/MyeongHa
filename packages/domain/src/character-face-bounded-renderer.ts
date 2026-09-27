@@ -1,7 +1,9 @@
 import { createHash } from 'node:crypto';
 
 import {
+  CHARACTER_FACE_DELIVERY_LOCALE_V1,
   CHARACTER_FACE_NEUTRAL_FACT_STYLES_V1,
+  CHARACTER_FACE_SAFE_FOLLOW_UP_FRAMING_V1,
   CHARACTER_FACE_SAFE_REACTION_FRAMING_V1,
   CHARACTER_FACE_UNAVAILABLE_STYLES_V1,
   resolveCharacterFaceFollowUpFramingV1,
@@ -218,6 +220,8 @@ function assertDeliveryCompatibility(
   }
 
   if (
+    input.delivery.locale !==
+      CHARACTER_FACE_DELIVERY_LOCALE_V1 ||
     !(
       CHARACTER_FACE_NEUTRAL_FACT_STYLES_V1 as readonly string[]
     ).includes(
@@ -230,7 +234,7 @@ function assertDeliveryCompatibility(
     )
   ) {
     throw new CharacterFaceBoundedRendererErrorV1(
-      'Face delivery profile contains an unsupported bounded delivery style.',
+      'Face delivery profile contains an unsupported bounded delivery style or locale.',
     );
   }
 
@@ -252,10 +256,18 @@ function assertDeliveryCompatibility(
     );
   if (
     new Set(strategies).size !==
-    strategies.length
+    strategies.length ||
+    input.delivery.followUpFraming.some(
+      (binding) =>
+        binding.questionStrategy.trim().length === 0 ||
+        !(
+          binding.framingKey in
+          CHARACTER_FACE_SAFE_FOLLOW_UP_FRAMING_V1
+        ),
+    )
   ) {
     throw new CharacterFaceBoundedRendererErrorV1(
-      'Face delivery profile contains duplicate follow-up strategies.',
+      'Face delivery profile contains an unsupported or duplicate follow-up framing binding.',
     );
   }
 }
