@@ -519,6 +519,17 @@ export {
 } from './relationship-policy-reference-replay-v1.js';
 
 export {
+  SEYEON_PRODUCTION_RELATIONSHIP_ADMISSION_VERSION_V1,
+  SEYEON_PRODUCTION_RELATIONSHIP_MAX_EVENTS_PER_TURN_V1,
+  SeyeonProductionRelationshipAdmissionErrorV1,
+  admitSeyeonProductionRelationshipEventV1,
+  deriveSeyeonProductionRelationshipDedupeKeyV1,
+  type AdmitSeyeonProductionRelationshipEventV1Input,
+  type SeyeonProductionRelationshipAdmissionV1,
+  type SeyeonProductionRelationshipCausalBindingV1,
+} from './seyeon-production-relationship-bridge-v1.js';
+
+export {
   SEYEON_PRODUCTION_RELATIONSHIP_RUNTIME_AUTHORITY_V1,
   SEYEON_PRODUCTION_RELATIONSHIP_RUNTIME_OVERLAY_VERSION_V1,
   SeyeonProductionRelationshipRuntimeErrorV1,
