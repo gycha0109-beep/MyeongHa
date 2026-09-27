@@ -1,0 +1,12 @@
+{
+  "contractVersion": "myeongha-vercel-waf-managed-rate-limit-rules-v1",
+  "vercelProjectId": "prj_nXF0b5uv27Lyucz2SEBxzdCRXVsP",
+  "vercelTeamId": "team_xuYA9OhCWlJETaYFOmeVodgS",
+  "vercelProjectName": "myeongha",
+  "managedRules": [
+    {"policyId":"guest-bootstrap-v1","ruleName":"myeongha-guest-bootstrap-rate-limit-v1","policyFile":"config/operations/guest-bootstrap-abuse-policy-v1.json","activationAuthority":"production-active"},
+    {"policyId":"member-auth-sign-in-v1","ruleName":"myeongha-auth-sign-in-rate-limit-v1","policyFile":"config/operations/member-auth-abuse-policy-v1.json","activationAuthority":"hold"},
+    {"policyId":"member-auth-sign-up-v1","ruleName":"myeongha-auth-sign-up-rate-limit-v1","policyFile":"config/operations/member-auth-abuse-policy-v1.json","activationAuthority":"hold"},
+    {"policyId":"member-auth-refresh-v1","ruleName":"myeongha-auth-refresh-rate-limit-v1","policyFile":"config/operations/member-auth-abuse-policy-v1.json","activationAuthority":"hold"}
+  ]
+}
