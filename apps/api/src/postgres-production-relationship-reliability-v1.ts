@@ -1,6 +1,8 @@
-import type {
-  ProductionRelationshipConditionV1,
-  ProductionRelationshipStageV1,
+import {
+  PRODUCTION_RELATIONSHIP_POLICY_ARTIFACT_V1,
+  PRODUCTION_RELATIONSHIP_POLICY_VERSION_V1,
+  type ProductionRelationshipConditionV1,
+  type ProductionRelationshipStageV1,
 } from '../../../packages/domain/src/index.js';
 import type { PostgresTransactionQueryV1 } from './postgres-subject-execution.js';
 import {
@@ -362,8 +364,8 @@ class PostgresProductionRelationshipReliabilityPortV1
         input.decision.effectiveDelta.trust,
         input.decision.effectiveDelta.friction,
         input.decision.milestoneKind,
-        input.decision.policyVersion,
-        input.decision.policyContentHash,
+        PRODUCTION_RELATIONSHIP_POLICY_VERSION_V1,
+        PRODUCTION_RELATIONSHIP_POLICY_ARTIFACT_V1.contentHash,
       ]);
     } catch (error) {
       return mapReliabilityError(error);
