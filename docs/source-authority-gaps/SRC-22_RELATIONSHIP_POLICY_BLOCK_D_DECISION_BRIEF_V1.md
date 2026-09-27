@@ -1,7 +1,7 @@
 # SRC-22 Relationship Policy — Block D Replay / Persistence Decision Brief V1
 
 > Track: character-memory  
-> Status: **DECISION BRIEF ONLY / BLOCK D REMAINS PENDING**  
+> Status: **OWNER-APPROVED 2026-09-27 / RECORDED IN FREEZE WORKSHEET**  
 > Parent worksheet: SRC-22_RELATIONSHIP_POLICY_OWNER_FREEZE_WORKSHEET_V1.md  
 > Production mutation: **BLOCKED**
 
@@ -497,7 +497,7 @@ stored applied_effect_disposition remains immutable
 current effective effect is derived by replay
 ~~~
 
-All remain PENDING until explicit source-owner approval.
+Source-owner approval was given on 2026-09-27. The authoritative frozen contract is recorded in `SRC-22_RELATIONSHIP_POLICY_OWNER_FREEZE_WORKSHEET_V1.md`.
 
 ## 19. Production hold
 
