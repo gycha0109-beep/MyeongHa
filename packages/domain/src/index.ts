@@ -162,6 +162,34 @@ export {
 } from './character-face-reading-plan.js';
 
 export {
+  CHARACTER_FACE_DELIVERY_LOCALE_V1,
+  CHARACTER_FACE_DELIVERY_PROFILE_SCHEMA_VERSION_V1,
+  CHARACTER_FACE_DELIVERY_SOURCE_SCHEMA_VERSION_V1,
+  CHARACTER_FACE_NEUTRAL_FACT_STYLES_V1,
+  CHARACTER_FACE_SAFE_FOLLOW_UP_FRAMING_V1,
+  CHARACTER_FACE_SAFE_REACTION_FRAMING_V1,
+  CHARACTER_FACE_UNAVAILABLE_STYLES_V1,
+  CharacterFaceDeliveryProfileAdmissionErrorV1,
+  admitCharacterFaceDeliveryProfileV1,
+  admitCharacterFaceDeliverySourceV1,
+  resolveCharacterFaceFollowUpFramingV1,
+  resolveCharacterFaceReactionFramingV1,
+  type CharacterFaceDeliveryProfileV1,
+  type CharacterFaceDeliverySourceV1,
+  type CharacterFaceFollowUpFramingBindingV1,
+  type CharacterFaceNeutralFactStyleV1,
+  type CharacterFaceSafeFollowUpFramingKeyV1,
+  type CharacterFaceSafeReactionFramingKeyV1,
+  type CharacterFaceUnavailableStyleV1,
+} from './character-face-delivery-profile.js';
+
+export {
+  CHARACTER_FACE_VOICE_RUNTIME_INVARIANT_VERSION_V1,
+  CharacterFaceVoiceRuntimeInvariantErrorV1,
+  assertCharacterFaceVoiceRuntimeInvariantV1,
+} from './character-face-voice-authority.js';
+
+export {
   CHARACTER_PERSPECTIVE_NARRATIVE_ROLES_V1,
   CHARACTER_PERSPECTIVE_SCHEMA_VERSION_V1,
   SAJU_GROUNDING_AXIS_KEYS_V1,

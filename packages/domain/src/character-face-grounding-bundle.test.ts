@@ -40,8 +40,31 @@ const STRUCTURE_BUNDLE_HASH =
 
 function runtimeContext():
   CharacterRuntimeContextV1 {
+  const speech = Object.freeze({});
+  const communication = Object.freeze({});
+
   return {
+    schemaVersion: 'v1',
     characterId: 'character.alpha',
+    contentBundleId:
+      'character-content-bundle-test-v1',
+    contentVersion:
+      'character-content-alpha-v1',
+    speech,
+    voiceAuthority: {
+      characterId:
+        'character.alpha',
+      surface: 'general_chat',
+      source:
+        'published_character_content',
+      contentVersion:
+        'character-content-alpha-v1',
+      speech,
+      communication,
+    },
+    persona: {
+      communication,
+    },
     saju: null,
   } as unknown as CharacterRuntimeContextV1;
 }

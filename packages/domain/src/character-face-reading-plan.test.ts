@@ -161,11 +161,27 @@ function baseRuntimeContext(input?: {
     input?.contentVersion ??
     'character-content-alpha-v1';
 
+  const speech = Object.freeze({});
+  const communication = Object.freeze({});
+
   return {
     schemaVersion: 'v1',
     characterId,
+    contentBundleId:
+      'character-content-bundle-test-v1',
     contentVersion,
+    speech,
+    voiceAuthority: {
+      characterId,
+      surface: 'general_chat',
+      source:
+        'published_character_content',
+      contentVersion,
+      speech,
+      communication,
+    },
     persona: {
+      communication,
       questioning: {
         preferredStrategies:
           input?.preferredQuestionStrategies ??

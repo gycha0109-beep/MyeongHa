@@ -151,12 +151,32 @@ function baseRuntimeContext(
   characterId: string,
   relationshipRevision: number,
 ): CharacterRuntimeContextV1 {
+  const contentVersion =
+    characterId === 'character.beta'
+      ? 'character-content-beta-v1'
+      : 'character-content-alpha-v1';
+  const speech = Object.freeze({});
+  const communication = Object.freeze({});
+
   return {
+    schemaVersion: 'v1',
     characterId,
-    contentVersion:
-      characterId === 'character.beta'
-        ? 'character-content-beta-v1'
-        : 'character-content-alpha-v1',
+    contentBundleId:
+      'character-content-bundle-test-v1',
+    contentVersion,
+    speech,
+    voiceAuthority: {
+      characterId,
+      surface: 'general_chat',
+      source:
+        'published_character_content',
+      contentVersion,
+      speech,
+      communication,
+    },
+    persona: {
+      communication,
+    },
     relationship: {
       relationshipRevision,
       relationshipPolicyVersion:
