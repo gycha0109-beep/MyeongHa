@@ -6,23 +6,27 @@ const paths = {
   applyWorkflow: '.github/workflows/production-guest-bootstrap-abuse-policy.yml',
   evidenceWorkflow: '.github/workflows/production-guest-bootstrap-abuse-policy-evidence.yml',
   applyScript: 'scripts/operations/run-production-guest-bootstrap-abuse-policy.sh',
+  managedRuleCommon: 'scripts/operations/vercel-waf-managed-rule-common.sh',
   evidenceScript: 'scripts/operations/verify-production-guest-bootstrap-abuse-policy-live.sh',
   canaryScript: 'scripts/operations/run-production-guest-bootstrap-rate-limit-canary.mjs',
   productAuth: 'apps/web/product-auth.js',
   docs: 'docs/operations/GUEST_BOOTSTRAP_ABUSE_POLICY_V1.md',
 };
 
-for (const script of [paths.applyScript, paths.evidenceScript]) {
+for (const script of [paths.applyScript, paths.evidenceScript, paths.managedRuleCommon]) {
   execFileSync('bash', ['-n', script], { stdio: 'inherit' });
 }
 execFileSync(process.execPath, ['--check', paths.canaryScript], { stdio: 'inherit' });
+execFileSync(process.execPath, ['scripts/verify-vercel-waf-managed-rate-limit-rules.mjs'], { stdio: 'inherit' });
+execFileSync(process.execPath, ['scripts/verify-production-member-auth-abuse-policy.mjs'], { stdio: 'inherit' });
 
-const [policyRaw, applyWorkflow, evidenceWorkflow, applyScript, evidenceScript, canaryScript, productAuth, docs] =
+const [policyRaw, applyWorkflow, evidenceWorkflow, applyScript, managedRuleCommon, evidenceScript, canaryScript, productAuth, docs] =
   await Promise.all([
     readFile(paths.policy, 'utf8'),
     readFile(paths.applyWorkflow, 'utf8'),
     readFile(paths.evidenceWorkflow, 'utf8'),
     readFile(paths.applyScript, 'utf8'),
+    readFile(paths.managedRuleCommon, 'utf8'),
     readFile(paths.evidenceScript, 'utf8'),
     readFile(paths.canaryScript, 'utf8'),
     readFile(paths.productAuth, 'utf8'),
@@ -129,7 +133,9 @@ for (const fragment of [
   'rules.insert',
   'rules.update',
   'rule_value="$(jq -nc',
-  'A different active rate-limit rule already exists; no mutation was attempted.',
+  'source scripts/operations/vercel-waf-managed-rule-common.sh',
+  'assert_managed_rate_limit_registry_live_safety "$before_file" "$rule_name"',
+  'managed_rate_limit_registry_safety=verified',
   'FIREWALL_DRAFT_API="https://api.vercel.com/v1/security/firewall/config/draft?projectId=$VERCEL_PROJECT_ID&teamId=$VERCEL_TEAM_ID"',
   'firewall_request PATCH "$FIREWALL_DRAFT_API"',
   'firewall_draft_readback=verified',
@@ -145,6 +151,17 @@ for (const fragment of [
   'durable_network_identifier_persistence=false',
 ]) {
   requireFragment(paths.applyScript, applyScript, fragment);
+}
+
+for (const fragment of [
+  'MYEONGHA_WAF_MANAGED_RULE_REGISTRY',
+  'count_foreign_active_rate_limit_rules',
+  'assert_managed_rate_limit_registry_live_safety',
+  'activationAuthority',
+  'production-active',
+  'hold',
+]) {
+  requireFragment(paths.managedRuleCommon, managedRuleCommon, fragment);
 }
 
 for (const forbidden of [

@@ -1,0 +1,55 @@
+name: Production Member Auth Abuse Policy
+run-name: "[WT:ops] Production Member Auth Abuse Policy — ${{ inputs.mode }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Phase A is read-only. Only verify is admitted until a separate Phase B activation review.
+        required: true
+        type: choice
+        options:
+          - verify
+          - observe
+          - enforce
+          - disable
+      confirm:
+        description: Type VERIFY_MEMBER_AUTH_ABUSE_POLICY_V1
+        required: true
+        type: string
+      watchtower_track:
+        description: Watchtower Track Key for Production operations attribution
+        required: true
+        default: ops
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-member-auth-abuse-policy
+  cancel-in-progress: false
+
+env:
+  VERCEL_PROJECT_ID: prj_nXF0b5uv27Lyucz2SEBxzdCRXVsP
+  VERCEL_TEAM_ID: team_xuYA9OhCWlJETaYFOmeVodgS
+  VERCEL_PROJECT_NAME: myeongha
+
+jobs:
+  verify-or-hold:
+    name: verify-production-member-auth-abuse-policy-phase-a
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: production
+    env:
+      MYEONGHA_WATCHTOWER_TRACK: ${{ inputs.watchtower_track }}
+      MEMBER_AUTH_ABUSE_POLICY_MODE: ${{ inputs.mode }}
+      DISPATCH_CONFIRM: ${{ inputs.confirm }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+    steps:
+      - name: Checkout exact repository state
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Verify Phase A Member Auth abuse policy or fail closed on mutation modes
+        shell: bash
+        run: bash scripts/operations/run-production-member-auth-abuse-policy.sh
