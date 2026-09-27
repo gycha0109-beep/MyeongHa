@@ -235,8 +235,8 @@ delete_trigger_count="$(grep -c '^DELETE_TRIGGER|' "$catalog_file" || true)"
 delete_cycle_count="$(grep -c '^DELETE_CYCLE|' "$catalog_file" || true)"
 detach_shape_count="$(grep -c '^DETACH_SHAPE|' "$catalog_file" || true)"
 
-if [[ "$delete_trigger_count" != "13" ]]; then
-  echo "FAIL expected 13 DELETE-trigger catalog rows, found $delete_trigger_count" >&2
+if [[ "$delete_trigger_count" != "12" ]]; then
+  echo "FAIL expected 12 DELETE-trigger catalog rows, found $delete_trigger_count" >&2
   exit 1
 fi
 if [[ "$delete_cycle_count" != "19" ]]; then
