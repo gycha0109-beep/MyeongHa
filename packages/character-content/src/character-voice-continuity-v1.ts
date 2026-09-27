@@ -6,6 +6,7 @@ import type {
 export const CHARACTER_CONVERSATION_SURFACES_V1 = [
   'general_chat',
   'saju_product',
+  'face_product',
 ] as const;
 
 export type CharacterConversationSurfaceV1 =
@@ -73,9 +74,9 @@ export interface CharacterVoiceContinuityValidationResultV1 {
 }
 
 /**
- * General chat and Saju products deliberately resolve the same published speech and
- * communication objects. A product surface may add grounded content constraints,
- * but it never receives a separate Character voice authority.
+ * General chat, Saju products, and Face products deliberately resolve the same
+ * published speech and communication objects. A product surface may add grounded
+ * content constraints, but it never receives a separate Character voice authority.
  */
 export function resolveCharacterVoiceAuthorityV1(
   character: CharacterVoiceSourceV1,
