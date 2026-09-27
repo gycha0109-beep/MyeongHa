@@ -1,3 +1,6 @@
+import {
+  resolveCharacterVoiceAuthorityV1,
+} from '../../character-content/src/index.js';
 import type { CharacterRuntimeContextV1 } from './character-runtime-context.js';
 
 export const FACE_CHARACTER_GROUNDING_REF_SCHEMA_VERSION_V1 =
@@ -479,8 +482,25 @@ export function admitCharacterRuntimeFaceGroundingV1(input: {
     groundingRef,
   }) satisfies CharacterFaceRuntimeContextV1;
 
+  const voiceAuthority = Object.freeze(
+    resolveCharacterVoiceAuthorityV1(
+      {
+        characterId:
+          input.context.characterId,
+        contentVersion:
+          input.context.contentVersion,
+        speech:
+          input.context.speech,
+        persona:
+          input.context.persona,
+      },
+      'face_product',
+    ),
+  );
+
   return Object.freeze({
     ...input.context,
+    voiceAuthority,
     face,
   });
 }
