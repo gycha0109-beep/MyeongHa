@@ -1,6 +1,6 @@
 # Production PostgreSQL TLS Peer Verification V1
 
-Status: **SECURITY GAP / PRODUCTION ACTIVATION HOLD**
+Status: **B1 STRICT TARGET IMPLEMENTED / PRODUCTION ACTIVATION HOLD**
 
 Watchtower-Track: security
 
@@ -17,7 +17,7 @@ certificate and hostname verification.
 
 ## Confirmed repository state
 
-Current runtime behavior on the SEC-01 baseline:
+Current active runtime behavior on the SEC-01 baseline remains:
 
 - `sslmode=require` is normalized with `uselibpqcompat=true`.
 - Under current node-postgres / pg-connection-string libpq-compatible semantics, that means
@@ -25,11 +25,18 @@ Current runtime behavior on the SEC-01 baseline:
 - `sslmode=verify-ca` is preserved and represents CA verification without hostname verification.
 - `sslmode=verify-full` is preserved and represents CA plus server identity verification.
 - `parseProductionUserDataRuntimeConfigV1()` currently rejects only explicit
-  `sslmode=disable`; Phase A deliberately does not tighten the live parser yet.
+  `sslmode=disable`; B1 deliberately does not tighten the live parser yet.
 
 This is therefore a repository **Security Gap** even before the live Production value is known.
 
-## External authority verified on 2026-09-26
+Repository runtime versions at the B1 implementation point:
+
+```text
+Node engine = >=24 <25
+pg          = 8.23.0
+```
+
+## External authority verified on 2026-09-28
 
 Supabase current documentation supports SSL peer verification for the Session Pooler and
 documents a connection using:
@@ -48,9 +55,16 @@ Relevant official references:
 - https://supabase.com/docs/guides/database/ssl-enforcement
 - https://supabase.com/docs/guides/database/connecting-to-postgres
 
-node-postgres / pg-connection-string current libpq-compatibility reference:
+Current node-postgres SSL documentation also warns that when a connection string includes
+`sslmode`, `sslcert`, `sslkey`, or `sslrootcert`, an explicit driver `ssl` object can be
+replaced by connection-string parsing. B1 therefore validates the source mode first and then
+removes the mode before passing CA material as an explicit driver TLS option.
 
-- https://github.com/brianc/node-postgres/blob/master/packages/pg-connection-string/README.md
+Relevant references:
+
+- https://node-postgres.com/features/ssl
+- https://nodejs.org/download/release/v24.21.0/docs/api/tls.html
+- https://nodejs.org/download/release/v24.21.0/docs/api/crypto.html
 
 ## Production control remains unverified
 
@@ -101,21 +115,141 @@ It MUST NOT expose:
 
 Phase A is diagnostic only. It MUST NOT make an unverified Production binding fail to boot.
 
-## Phase B — activation gate
+## Phase B1 — dormant strict target contract
+
+B1 adds a strict target builder without changing the active Production parser or pool.
+
+Implementation:
+
+```text
+apps/api/src/production-postgres-tls-peer-verification.ts
+test/production-postgres-tls-peer-verification.test.ts
+config/operations/production-postgres-tls-peer-verification-v1.json
+```
+
+The target contract requires all of the following before it can produce driver TLS material:
+
+```text
+governed project ref
++
+contract version
++
+sslmode=verify-full
++
+exactly one parseable X.509 root certificate
++
+uppercase colon-delimited SHA-256 certificate fingerprint pin
++
+rejectUnauthorized=true
++
+Node default hostname verification left intact
+```
+
+The builder rejects:
+
+```text
+missing/disable/no-verify/prefer/require/verify-ca
+ambiguous sslrootcert/sslcert/sslkey/sslpassword query settings
+uselibpqcompat overrides
+empty/malformed/multiple certificate PEM input
+private-key material
+certificate fingerprint mismatch
+non-governed authority records
+```
+
+After source validation, `sslmode` is removed from the driver connection string and the CA is
+supplied separately through the node-postgres `ssl` object. This prevents connection-string
+SSL parsing from replacing the explicit strict TLS object.
+
+The redacted evidence object contains only:
+
+```text
+contract version
+project ref
+tls mode = verify-full
+peer verification = full
+rejectUnauthorized = true
+root certificate SHA-256 fingerprint
+root certificate pinned = true
+```
+
+It does not contain the database URL, database host, credentials, or certificate PEM.
+
+### B1 is deliberately dormant
+
+B1 does **not**:
+
+- change `parseProductionUserDataRuntimeConfigV1()`;
+- change `createNodePostgresSubjectPoolV1()`;
+- add a required Production environment variable;
+- alter `MYEONGHA_DATABASE_URL`;
+- alter Vercel Production;
+- claim that the official project Server root certificate has been obtained;
+- pin a fabricated Production certificate fingerprint.
+
+The operation contract therefore records:
+
+```text
+productionActivation=false
+productionBindingMutated=false
+productionFingerprint256=null
+sourceStatus=pending-supported-supabase-authority
+```
+
+## Phase B2 — Production-safe connectivity canary
+
+B2 may begin only after the official Server root certificate for project
+`cnsfpcdiyofqvhpcegfc` is obtained through supported Supabase authority and its SHA-256
+fingerprint is pinned.
+
+The canary must be read-only and must prove:
+
+- TLS negotiation succeeds;
+- certificate chain verification succeeds;
+- hostname verification succeeds;
+- connected login principal remains the governed `myeongha_runtime`;
+- no database URL, password, or certificate PEM is emitted.
+
+The canary must not mutate the live Production binding.
+
+## Phase B3 — Production activation
 
 Do not tighten Production to `verify-full` until all are true:
 
 1. the official Server root certificate for project `cnsfpcdiyofqvhpcegfc` is obtained
    through a supported Supabase authority;
-2. a Vercel-compatible certificate delivery mechanism is defined without putting secret
-   credentials in the repository;
-3. a read-only Production-safe Session Pooler canary proves:
-   - TLS negotiation succeeds;
-   - certificate chain verification succeeds;
-   - hostname verification succeeds;
-   - connected login principal remains the governed `myeongha_runtime`;
-4. rollback preserves the prior known-working binding without credential disclosure;
-5. only after positive evidence is recorded does the runtime parser reject weaker modes.
+2. its exact SHA-256 fingerprint is pinned by governed repository authority;
+3. a Vercel-compatible certificate delivery mechanism is defined without putting credential
+   material in the repository;
+4. the B2 read-only Production-safe Session Pooler canary passes;
+5. rollback preserves the prior known-working binding without credential disclosure.
+
+Only after positive evidence is recorded may the live Production binding be changed.
+
+## Phase B4 — permanent fail-closed enforcement
+
+After B3 succeeds, the ordinary Production runtime may be changed to reject weaker modes.
+
+Target rejection set:
+
+```text
+sslmode absent
+disable
+no-verify
+prefer
+require
+verify-ca
+unknown
+
+root CA missing
+root CA malformed
+root CA fingerprint mismatch
+```
+
+At that point the legacy `sslmode=require -> uselibpqcompat=true` compatibility path may be
+removed from the Production execution path.
+
+It must not be removed before positive Production peer-verification evidence exists.
 
 ## Forbidden shortcuts
 
@@ -124,4 +258,6 @@ Do not tighten Production to `verify-full` until all are true:
 - no disabling certificate validation to make the canary pass;
 - no `rejectUnauthorized: false` as the final state;
 - no copying database credentials or full connection URLs into issues, CI logs, or evidence;
+- no certificate PEM emission into logs or artifacts;
+- no fabricated or guessed Production certificate fingerprint;
 - no Production binding mutation before positive peer-verification connectivity evidence.
