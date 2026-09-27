@@ -70,7 +70,7 @@ The probe requires a clean draft, rejects active custom `bypass` rules for manua
 
 The Guest bootstrap mutation workflow and Member Auth workflow share the concurrency group `production-vercel-firewall-config` so both cannot mutate the same Firewall draft concurrently.
 
-A failed cleanup is a hard failure with `DRAFT_RESIDUE_REQUIRES_MANUAL_REVIEW`. B1a never invokes full-draft discard, whole-config PUT, `rules.update`, rule priority mutation, or draft activation.
+A failed cleanup is a hard failure with `DRAFT_RESIDUE_REQUIRES_MANUAL_REVIEW`. A Vercel insert rejection that creates **zero** target rules is not residue: the probe must re-read the Firewall configuration, verify active and draft are unchanged, emit `preview_rule_set_supported=false`, and classify the plan blocker separately. B1a never invokes full-draft discard, whole-config PUT, `rules.update`, rule priority mutation, or draft activation.
 
 No scheduled evidence workflow is admitted while the policy is still HOLD.
 
