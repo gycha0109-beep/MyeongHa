@@ -1,7 +1,7 @@
 # SRC-22 Relationship Policy — Source-owner Freeze Worksheet V1
 
 > Track: character-memory  
-> Status: **READY FOR SOURCE-OWNER INPUT / NO PRODUCTION DECISION RECORDED**  
+> Status: **PARTIALLY FROZEN — BLOCK A/B OWNER-APPROVED / BLOCK C/D PENDING**  
 > Evidence authority: `SRC-22_RELATIONSHIP_POLICY_DECISION_PACKAGE_V2.md`  
 > Production mutation: **BLOCKED**  
 > Rule: this worksheet organizes decisions; it does not create source authority by itself.
@@ -82,6 +82,26 @@ Reopen trigger:
 
 If a Production-critical item is `DEFER` and no fail-closed Production contract remains possible, SRC-22 stays OPEN.
 
+### Owner decision checkpoint — 2026-09-27
+
+The source owner explicitly approved the Block A baseline and then explicitly directed implementation of the detailed Block B recommendation.
+
+Recorded authority at this checkpoint:
+
+~~~yaml
+owner_decision_checkpoint:
+  decided_at: 2026-09-27
+  blocks:
+    A_relationship_state_semantics: OWNER_FROZEN
+    B_progression_and_anti_farming: OWNER_FROZEN
+    C_production_event_contract: PENDING
+    D_replay_and_persistence: PENDING
+  production_mutation_authorized: false
+  src22_status: OPEN
+~~~
+
+The owner approval freezes the semantics below. It does **not** activate the current calibration/shadow implementation as Production runtime.
+
 ## 3. Block A — Relationship-state semantics
 
 This block defines what "relationship depth" and "current relationship condition" mean before any Production threshold or database representation is frozen.
@@ -102,10 +122,30 @@ Owner freeze:
 
 ~~~yaml
 decision_id: D08
-disposition: PENDING
-exact_contract: PENDING
-reason: PENDING
-reopen_trigger: PENDING
+disposition: ACCEPT_WITH_CHANGE
+decided_at: 2026-09-27
+exact_contract:
+  stage_count: 5
+  stable_internal_keys:
+    - S0_FIRST_MEETING
+    - S1_FAMILIAR
+    - S2_REGULAR
+    - S3_OPENED
+    - S4_SPECIAL
+  semantics:
+    S0_FIRST_MEETING: relationship formation not yet established
+    S1_FAMILIAR: familiar / recognized recurring counterpart
+    S2_REGULAR: sustained regular relationship
+    S3_OPENED: high openness and trust
+    S4_SPECIAL: special relational importance distinct from ordinary relationships
+  s4_is_romance_confirmation: false
+reason:
+  - preserves the evidence-supported five-stage model
+  - keeps the Relationship Engine reusable across characters
+  - avoids treating S4 as an automatic romance/confession state
+reopen_trigger:
+  - product owner changes the number of relationship depth stages
+  - a future Character requires semantics incompatible with these stable generic keys
 ~~~
 
 ### A2 — D09 Score semantics
@@ -124,10 +164,33 @@ Owner freeze:
 
 ~~~yaml
 decision_id: D09
-disposition: PENDING
-exact_contract: PENDING
-reason: PENDING
-reopen_trigger: PENDING
+disposition: ACCEPT
+decided_at: 2026-09-27
+exact_contract:
+  closeness:
+    range: 0..100
+    role: coarse relationship-affinity signal
+  trust:
+    range: 0..100
+    role: coarse reliability / interpersonal-trust signal
+  friction:
+    range: 0..100
+    role: coarse current-or-accumulated relationship-friction signal
+  clamp_to_range: true
+  qualitative_history_authority: Causal Episode Profile
+  score_is_relationship_truth: false
+  automatic_inactivity_decay: false
+  saturation_behavior:
+    allow_score_saturation: true
+    do_not_expand_range_only_to_hide_saturation: true
+    preserve_qualitative_difference_in_episode_profile: true
+reason:
+  - bounded scores remain operationally simple
+  - Episode Profile preserves qualitative differences after numeric saturation
+  - inactivity-only decay is already forbidden
+reopen_trigger:
+  - bounded scores become incapable of supporting required deterministic policy
+  - a later policy needs materially different score semantics rather than different thresholds
 ~~~
 
 ### A3 — D18 + D27 Attained depth versus current condition
@@ -158,16 +221,41 @@ Owner freeze:
 decision_ids:
   - D18
   - D27
-disposition: PENDING
-exact_contract: PENDING
-stage_regression_rule: PENDING
-reason: PENDING
-reopen_trigger: PENDING
+disposition: ACCEPT
+decided_at: 2026-09-27
+exact_contract:
+  attainedStage: deepest evidence-backed relationship depth historically attained
+  currentCandidateStage: stage currently supported by active evidence and policy evaluation
+  currentCondition:
+    allowed:
+      - STABLE
+      - OPEN_CONFLICT
+      - RESOLVED_RECENTLY
+  behaviorAccess:
+    allowed:
+      - STAGE_ALIGNED
+      - RESTRICTED_BY_CONFLICT
+      - CAUTIOUS_AFTER_REPAIR
+  promotion_condition:
+    attained_stage_promotion_requires: STABLE
+    open_conflict_behavior: block_new_stage_promotion
+    resolved_recently_behavior: block_new_stage_promotion_until_non_repair_positive_episode
+stage_regression_rule:
+  ordinary_conflict_or_distance: attainedStage does_not_regress
+  correction_or_retraction_of_prior_authoritative_evidence: replay_may_reduce_attainedStage
+  reason_for_reduction: evidence_history_was_corrected_not_relationship_decay
+reason:
+  - separates historical relationship depth from current conflict state
+  - preserves the meaning of an established relationship during temporary conflict
+  - still permits evidence correction to rebuild the historically justified stage
+reopen_trigger:
+  - product owner explicitly authorizes relationship-depth regression as a normal conflict mechanic
+  - currentCondition needs states beyond the approved three-state baseline
 ~~~
 
-### Block A dependency gate
+### Block A dependency gate — **FROZEN 2026-09-27**
 
-Block A is frozen only when:
+Block A is frozen because:
 
 - D08 has a stable Production progression representation;
 - D09 has authoritative score semantics or an explicit replacement;
@@ -188,9 +276,20 @@ Owner record:
 
 ~~~yaml
 decision_id: D10
-disposition: PENDING
-role_in_production_policy: PENDING
-reason: PENDING
+disposition: ACCEPT_WITH_CHANGE
+decided_at: 2026-09-27
+role_in_production_policy:
+  purpose: optional auxiliary pacing for positive score deltas only
+  may_create_relationship_authority: false
+  may_replace_episode_credit_limits: false
+  may_replace_stage_gates: false
+  may_hide_saturation_by_range_expansion: false
+  automatic_decay: forbidden
+  exact_numeric_curve: not_frozen_by_D10
+  curve_dependency: D13/D25 Production Event and payload/delta contract
+reason:
+  - soft-cap alone did not prevent long-horizon saturation
+  - progression pacing is primarily governed by Causal Episode credit, diversity, positive weeks, milestones, and stage gates
 ~~~
 
 ### B2 — D11 + D12 Stage gates and pacing
@@ -222,16 +321,78 @@ Owner freeze:
 decision_ids:
   - D11
   - D12
-disposition: PENDING
-stage_gate_contract: PENDING
-pacing_contract: PENDING
-numeric_values:
-  s2_alternate_positive_weeks: PENDING
-  s3_alternate_positive_weeks: PENDING
-  s4_alternate_positive_weeks: PENDING
-  minimum_positive_families: PENDING
-reason: PENDING
-reopen_trigger: PENDING
+disposition: ACCEPT_WITH_CHANGE
+decided_at: 2026-09-27
+stage_gate_contract:
+  evaluation_unit: credited_positive_causal_episode
+  routes:
+    - DIVERSE_ORGANIC
+    - SUSTAINED_NARROW
+  route_match: either_route_may_qualify
+  score_floors:
+    S1_FAMILIAR:
+      closeness: 10
+      trust: 5
+    S2_REGULAR:
+      closeness: 25
+      trust: 20
+    S3_OPENED:
+      closeness: 55
+      trust: 50
+    S4_SPECIAL:
+      closeness: 80
+      trust: 75
+  gates:
+    S1_FAMILIAR:
+      common:
+        credited_positive_episodes: 2
+        distinct_positive_days: 2
+    S2_REGULAR:
+      DIVERSE_ORGANIC:
+        positive_weeks: 4
+        positive_families: 3
+        credited_positive_episodes: 6
+      SUSTAINED_NARROW:
+        positive_weeks: 8
+        positive_families: 2
+    S3_OPENED:
+      DIVERSE_ORGANIC:
+        positive_weeks: 10
+        positive_families: 4
+        credited_positive_episodes: 16
+        milestones: 1
+      SUSTAINED_NARROW:
+        positive_weeks: 20
+        positive_families: 2
+        milestones: 1
+    S4_SPECIAL:
+      DIVERSE_ORGANIC:
+        positive_weeks: 20
+        positive_families: 4
+        credited_positive_episodes: 32
+        milestones: 3
+      SUSTAINED_NARROW:
+        positive_weeks: 40
+        positive_families: 2
+        milestones: 3
+pacing_contract:
+  calendar_age_alone_counts: false
+  raw_message_count_counts: false
+  visit_only_counts_as_positive_progression: false
+  self_disclosure_required: false
+  positive_week_definition:
+    anchor: earliest_active_credited_positive_episode
+    bucket_size: 7_days
+    bucket_index: floor((credit_at - anchor_at) / 7_days)
+    qualifies_when: bucket_contains_at_least_one_credited_positive_causal_episode
+  promotion_condition: currentCondition_must_be_STABLE
+reason:
+  - preserves the V3 sustained narrow route while preventing visit-only progression
+  - gives diverse organic relationships a faster path without requiring disclosure
+  - makes elapsed time useful only when authoritative positive evidence actually exists
+reopen_trigger:
+  - dogfood shows the approved pacing is materially too fast or too slow
+  - family taxonomy or Event registry changes invalidate the diversity thresholds
 ~~~
 
 ### B3 — D14 Exact logical dedupe
@@ -261,13 +422,23 @@ Owner freeze:
 
 ~~~yaml
 decision_id: D15
-disposition: PENDING
-mechanism: PENDING
-horizon: PENDING
-credit_cap: PENDING
-family_taxonomy_ref: PENDING
-reason: PENDING
-reopen_trigger: PENDING
+disposition: ACCEPT
+decided_at: 2026-09-27
+mechanism: rolling_family_window
+horizon: 7_days
+window_semantics: "(credit_at - 7 days, credit_at]"
+credit_cap: 2_credited_positive_causal_episodes_per_family
+family_taxonomy_ref: D16 + D13 Production Event registry mapping
+suppressed_episode_semantics:
+  occurrence_remains_true: true
+  progression_credit: false
+  score_gain_from_positive_progression: false
+  persistence_representation: D26_PENDING
+reason:
+  - removes the demonstrated fixed-bucket boundary amplification
+  - preserves valid occurrence history while preventing repeated same-family progression
+reopen_trigger:
+  - calibration or dogfood demonstrates material under-crediting or remaining farming
 ~~~
 
 ### B5 — D16 Evidence diversity
@@ -280,10 +451,25 @@ Owner freeze:
 
 ~~~yaml
 decision_id: D16
-disposition: PENDING
-diversity_contract: PENDING
-taxonomy_ref: PENDING
-reason: PENDING
+disposition: ACCEPT_WITH_CHANGE
+decided_at: 2026-09-27
+diversity_contract:
+  deep_relationship_requires_multiple_meaningful_positive_families: true
+  sustained_narrow_route_minimum_positive_families: 2
+  diverse_route_minimum_positive_families:
+    S2_REGULAR: 3
+    S3_OPENED: 4
+    S4_SPECIAL: 4
+  self_disclosure_mandatory: false
+  visit_family_counts_for_positive_diversity: false
+  conflict_repair_counts_for_positive_diversity: false
+taxonomy_ref:
+  owner_frozen_semantics: meaningful_positive_relationship_family
+  exact_event_to_family_mapping: D13 Production Event registry
+reason:
+  - prevents one repeated shallow action from becoming deep relationship authority
+  - avoids making self-disclosure a mandatory price of intimacy
+  - keeps the exact Event-to-family mapping with the Production Event registry instead of the shadow vocabulary
 ~~~
 
 ### B6 — D17 Conflict is relationship evidence
@@ -309,10 +495,21 @@ Owner freeze:
 
 ~~~yaml
 decision_id: D28
-disposition: PENDING
-anti_farming_unit: PENDING
-episode_boundary_contract: PENDING
-reason: PENDING
+disposition: ACCEPT
+decided_at: 2026-09-27
+anti_farming_unit: Causal_Episode
+episode_boundary_contract:
+  general_rule: causally-linked Event rows belonging to one relationship occurrence resolve to one progression unit
+  promise_chain:
+    PROMISE_MADE_to_PROMISE_KEPT: one_commitment_episode
+    PROMISE_MADE_to_PROMISE_BROKEN_to_RECONCILIATION: one_commitment_episode
+  conflict_chain:
+    conflict_plus_repeated_reconciliation_callbacks: one_conflict_repair_episode
+  raw_event_rows_may_each_earn_progression_credit: false
+  one_episode_may_emit_more_than_one_progression_credit: false
+reason:
+  - prevents callback/event-row multiplication from becoming relationship growth
+  - matches the V3 causal folding evidence
 schema_dependency:
   - D20
   - D21
@@ -335,16 +532,26 @@ Owner freeze:
 
 ~~~yaml
 decision_id: D29
-disposition: PENDING
-repair_progression_family: PENDING
-repair_milestone_credit: PENDING
-repair_effect_on_attained_depth: PENDING
-reason: PENDING
+disposition: ACCEPT_WITH_CHANGE
+decided_at: 2026-09-27
+repair_progression_family: excluded_from_positive_progression_diversity
+repair_milestone_credit: 0
+repair_positive_progression_credit: 0
+repair_effect_on_attained_depth: no_direct_advancement
+repair_condition_effect:
+  may_resolve_open_conflict: true
+  next_condition: RESOLVED_RECENTLY
+  return_to_stable_requires: later_non_repair_credited_positive_causal_episode
+repair_score_delta_contract: deferred_to_D13_D25_but_must_not_create_stage_progression_credit
+reason:
+  - preserves conflict/repair as real relationship history
+  - blocks deliberate conflict-repair farming
+  - allows repair to restore current relationship condition without manufacturing deeper attained history
 ~~~
 
-### Block B dependency gate
+### Block B dependency gate — **OWNER-FROZEN 2026-09-27**
 
-Block B is frozen only when:
+Block B progression semantics are frozen. Exact Event-to-family mapping, per-Event payloads/deltas, and suppressed-Event persistence remain Block C dependencies. The frozen Block B contract requires:
 
 - stage-gate/pacing values are explicit;
 - rolling anti-farming mechanism and numbers are explicit;
@@ -586,10 +793,42 @@ status: OPEN
 source_owner_freeze:
   completed: false
   completed_at: null
+  partial_freeze:
+    block_a:
+      status: OWNER_FROZEN
+      decided_at: 2026-09-27
+      decisions:
+        - D08
+        - D09
+        - D18
+        - D27
+    block_b:
+      status: OWNER_FROZEN_WITH_BLOCK_C_BINDINGS_PENDING
+      decided_at: 2026-09-27
+      decisions:
+        - D10
+        - D11
+        - D12
+        - D14
+        - D15
+        - D16
+        - D17
+        - D28
+        - D29
   reviewed_evidence:
     - SRC-22_RELATIONSHIP_POLICY_DECISION_PACKAGE_V2.md
     - SEYEON_RELATIONSHIP_POLICY_CONVERGENCE_V3.md
-  unresolved_decisions: D08-D29 owner-bound items
+  unresolved_decisions:
+    - D13
+    - D19
+    - D20
+    - D21
+    - D22
+    - D23
+    - D24
+    - D25
+    - D26
+    - active_policy_selection_and_migration
   production_mutation_authorized: false
 ~~~
 
