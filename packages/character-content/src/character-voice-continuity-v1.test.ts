@@ -11,7 +11,7 @@ import {
 } from './character-voice-continuity-v1.js';
 
 describe('Character/Saju voice continuity v1', () => {
-  it('resolves general chat and Saju products to the exact same published voice objects', () => {
+  it('resolves general chat, Saju products, and Face products to the exact same published voice objects', () => {
     for (const definition of CHARACTER_RUNTIME_AUTHORING_V1) {
       const published = {
         characterId: definition.characterId,
@@ -21,12 +21,18 @@ describe('Character/Saju voice continuity v1', () => {
       };
       const general = resolveCharacterVoiceAuthorityV1(published, 'general_chat');
       const saju = resolveCharacterVoiceAuthorityV1(published, 'saju_product');
+      const face = resolveCharacterVoiceAuthorityV1(published, 'face_product');
 
       expect(general.source).toBe(CHARACTER_VOICE_AUTHORITY_SOURCE_V1);
       expect(saju.source).toBe(CHARACTER_VOICE_AUTHORITY_SOURCE_V1);
+      expect(face.source).toBe(CHARACTER_VOICE_AUTHORITY_SOURCE_V1);
       expect(saju.contentVersion).toBe(published.contentVersion);
+      expect(face.contentVersion).toBe(published.contentVersion);
       expect(saju.speech).toBe(general.speech);
+      expect(face.speech).toBe(general.speech);
       expect(saju.communication).toBe(general.communication);
+      expect(face.communication).toBe(general.communication);
+      expect(face.surface).toBe('face_product');
     }
   });
 
