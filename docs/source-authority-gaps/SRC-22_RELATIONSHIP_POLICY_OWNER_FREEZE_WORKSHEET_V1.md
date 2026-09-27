@@ -1,7 +1,7 @@
 # SRC-22 Relationship Policy — Source-owner Freeze Worksheet V1
 
 > Track: character-memory  
-> Status: **PARTIALLY FROZEN — BLOCK A/B/C OWNER-APPROVED / BLOCK D PENDING**  
+> Status: **SOURCE-OWNER FREEZE COMPLETE / CLOSURE AUDIT PASS / MERGE PENDING**  
 > Evidence authority: `SRC-22_RELATIONSHIP_POLICY_DECISION_PACKAGE_V2.md`  
 > Production mutation: **BLOCKED**  
 > Rule: this worksheet organizes decisions; it does not create source authority by itself.
@@ -95,7 +95,7 @@ owner_decision_checkpoint:
     A_relationship_state_semantics: OWNER_FROZEN
     B_progression_and_anti_farming: OWNER_FROZEN
     C_production_event_contract: OWNER_FROZEN
-    D_replay_and_persistence: PENDING
+    D_replay_and_persistence: OWNER_FROZEN
   production_mutation_authorized: false
   src22_status: OPEN
 ~~~
@@ -870,13 +870,71 @@ Owner freeze:
 
 ~~~yaml
 decision_id: D24
-disposition: PENDING
-persistence_strategy: PENDING
-snapshot_contract: PENDING
-historical_policy_requirement: PENDING
-rebuild_trigger: PENDING
-reason: PENDING
-reopen_trigger: PENDING
+disposition: ACCEPT_WITH_CHANGE
+decided_at: 2026-09-27
+persistence_strategy: SNAPSHOT_ASSISTED_APPEND_ONLY_DETERMINISTIC_REPLAY
+authority_order:
+  - authoritative_relationship_event_and_adjustment_ledger
+  - immutable_historical_policy_artifacts_and_activation_timeline
+  - deterministic_replay_result
+  - user_character_states_current_projection
+  - disposable_snapshots_and_caches
+normal_operation:
+  write_path: incremental_atomic_apply
+  read_path: current_projection
+  full_history_replay_on_normal_read: false
+snapshot_contract:
+  role: derived_acceleration_only
+  truth_authority: false
+  disposable_and_rebuildable: true
+  invalidation_rule: invalidate_snapshots_at_or_after_earliest_affected_logical_history_slot
+  replay_start: nearest_valid_snapshot_strictly_before_affected_slot_or_genesis
+  exact_cadence: operational_tuning_not_source_authority
+historical_policy_requirement:
+  every_committed_policy_version_remains_reconstructable: true
+  policy_version_semantics_immutable: true
+  machine_readable_artifact_required: true
+  content_hash_required: true
+  retired_versions_retained_for_replay: true
+  missing_historical_policy_behavior: FAIL_CLOSED
+policy_upgrade_semantics:
+  default: PROSPECTIVE_ONLY
+  automatically_reinterpret_old_events_under_new_policy: false
+  automatic_all_user_replay_on_deploy: false
+  retroactive_migration_requires_separate_explicit_migration_authority: true
+rebuild_trigger:
+  - authoritative_event_correction
+  - authoritative_event_retraction
+  - explicit_authority_invalidation_materialized_as_correction_or_retraction
+  - projection_or_snapshot_integrity_recovery
+  - explicit_operator_repair
+  - separately_authorized_policy_migration
+non_triggers:
+  - ordinary_read
+  - calendar_passage
+  - inactivity
+  - model_output
+  - deployment_alone
+  - registering_a_new_policy_version
+revision_contract:
+  meaning: serialized_relationship_ledger_application_sequence
+  every_appended_production_relationship_history_record_consumes_one_revision: true
+  zero_positive_effect_event_still_advances_revision: true
+  replay_never_reuses_or_decrements_physical_revision: true
+effect_replay_contract:
+  original_applied_effect_disposition_is_immutable: true
+  current_effective_result_is_derived_by_replay: true
+  historical_event_rows_are_never_rewritten_to_match_replay: true
+determinism:
+  llm_call_inside_replay: forbidden
+  same_ledger_policy_timeline_and_registry_yields_same_semantic_projection: true
+reason:
+  - correction/retraction can change which later Episodes deserve anti-farming credit
+  - snapshot-assisted replay preserves correctness without replaying genesis on every read
+  - immutable policy history prevents deployments from silently rewriting past relationships
+reopen_trigger:
+  - replay cost becomes operationally unacceptable despite snapshots
+  - a future explicit migration model requires retroactive reinterpretation semantics
 ~~~
 
 ### D2 — Cross-cutting active-policy selection / migration blocker
@@ -887,16 +945,27 @@ Before SRC-22 closure, the Production policy artifact must explicitly define:
 
 ~~~yaml
 active_policy_selection:
-  status: PENDING
-  selection_authority: PENDING
-  version_change_rule: PENDING
-  current_projection_migration_rule: PENDING
+  status: OWNER_FROZEN
+  decided_at: 2026-09-27
+  selection_authority: server_owned_relationship_policy_registry_or_manifest
+  client_or_llm_may_select_policy: false
+  version_change_rule:
+    new_policy_activation: prospective_for_new_relationship_evaluations
+    same_policy_version_content_mutation: forbidden
+    semantic_change_requires_new_policy_version: true
+  current_projection_policy_version_meaning: policy_version_that_produced_latest_committed_projection_transition
+  current_projection_migration_rule:
+    ordinary_policy_activation: no_retroactive_projection_rewrite
+    retroactive_reinterpretation: separate_explicit_migration_authority_required
   historical_event_rewrite_allowed: false
+  historical_policy_artifacts_retained: true
 ~~~
 
-## 7. Closure audit
+## 7. Closure audit — **PASS 2026-09-27**
 
-SRC-22 may move from OPEN only when all of the following are true:
+SRC-22 source-owner decision freeze is complete. The audit below passes on this branch. SRC-22 must remain OPEN in the authoritative merged stack until this decision package is merged; after merge it may be marked CLOSED without another product-policy decision.
+
+Audit conditions:
 
 - every owner-bound D08-D29 item has an explicit disposition;
 - every `ACCEPT_WITH_CHANGE` includes an exact replacement contract/value;
@@ -913,10 +982,11 @@ Final owner sign-off record:
 
 ~~~yaml
 src_gap: SRC-22
-status: OPEN
+status: READY_TO_CLOSE_AFTER_DECISION_PACKAGE_MERGE
 source_owner_freeze:
-  completed: false
-  completed_at: null
+  completed: true
+  completed_at: 2026-09-27
+  closure_audit: PASS
   partial_freeze:
     block_a:
       status: OWNER_FROZEN
@@ -951,14 +1021,38 @@ source_owner_freeze:
         - D23
         - D25
         - D26
+    block_d:
+      status: OWNER_FROZEN
+      decided_at: 2026-09-27
+      decisions:
+        - D24
+        - active_policy_selection_and_migration
   reviewed_evidence:
     - SRC-22_RELATIONSHIP_POLICY_DECISION_PACKAGE_V2.md
     - SEYEON_RELATIONSHIP_POLICY_CONVERGENCE_V3.md
-  unresolved_decisions:
-    - D24
-    - active_policy_selection_and_migration
+  unresolved_decisions: []
+  implementation_bindings_deferred_to_phase_k_l:
+    - exact optional positive soft_cap curve; default if absent is DISABLED
+    - deterministic turn-completion timestamp implementation for last_interaction_at
+    - exact Production Event DDL and registry representation
+    - exact per-Event deterministic score delta table within frozen semantics
+    - snapshot cadence and storage representation
   production_mutation_authorized: false
+  phase_k_authoring_authorized_after_merge: true
 ~~~
+
+
+### Closure classification of deferred implementation bindings
+
+The following do **not** reopen SRC-22 because the product meaning is already frozen and each item has a fail-closed/default contract:
+
+- optional positive soft-cap curve: if Phase K does not define one, it is disabled; it may never replace Episode credit/stage gates;
+- last_interaction_at timestamp mechanics: must use one deterministic server-owned completed-turn rule and cannot become progression/decay authority;
+- exact DDL/registry representation: Phase L implementation may vary only within the frozen authority/provenance contracts;
+- per-Event score deltas: Phase K must define deterministic server-owned values inside the frozen 0..100 semantics, Block B gates, and Block C Event registry;
+- snapshot cadence: operational tuning only; snapshots remain disposable non-authoritative artifacts.
+
+Any implementation proposal that changes those meanings reopens the relevant SRC-22 decision instead of silently changing policy.
 
 ## 8. What happens after freeze
 
