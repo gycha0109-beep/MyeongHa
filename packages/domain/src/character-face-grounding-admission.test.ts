@@ -37,10 +37,34 @@ function makeRuntimeContext(
   characterId = 'character.alpha',
   relationshipRevision = 1,
 ): CharacterRuntimeContextV1 {
+  const speech = Object.freeze({});
+  const communication = Object.freeze({});
+
   return {
+    schemaVersion: 'v1',
     characterId,
+    contentBundleId: 'character-content-bundle-test-v1',
+    contentVersion: 'character-content-test-v1',
+    speech,
+    voiceAuthority: {
+      characterId,
+      surface: 'general_chat',
+      source: 'published_character_content',
+      contentVersion: 'character-content-test-v1',
+      speech,
+      communication,
+    },
+    persona: {
+      communication,
+    },
     relationship: {
       relationshipRevision,
+      relationshipPolicyVersion:
+        'relationship-policy-test-v1',
+      projectionPolicyVersion:
+        'projection-policy-test-v1',
+      behaviorVersion:
+        'relationship-behavior-test-v1',
     },
     saju: null,
   } as unknown as CharacterRuntimeContextV1;
@@ -220,6 +244,15 @@ describe(
           result.face?.groundingRef,
         ),
       ).toBe(true);
+      expect(
+        result.voiceAuthority.surface,
+      ).toBe('face_product');
+      expect(
+        result.voiceAuthority.speech,
+      ).toBe(result.speech);
+      expect(
+        result.voiceAuthority.communication,
+      ).toBe(result.persona.communication);
     });
 
     it('preserves partial readiness and unavailable forehead without inventing a value', () => {
@@ -271,6 +304,9 @@ describe(
       expect(
         admitted.characterId,
       ).toBe(context.characterId);
+      expect(
+        admitted.voiceAuthority.surface,
+      ).toBe('general_chat');
     });
 
     it('rejects a grounding ref without an active Face source binding', () => {
