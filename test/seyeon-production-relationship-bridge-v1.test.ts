@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  SEYEON_EVENT_LEDGER_SCHEMA_VERSION_V2,
   admitSeyeonProductionRelationshipEventV1,
   deriveSeyeonProductionRelationshipDedupeKeyV1,
   type SeyeonEventAuthorityDecisionV1,
@@ -26,7 +27,7 @@ function experimentalEvent(input: {
   readonly predecessors?: readonly string[];
 }): SeyeonRelationshipEventV2 {
   return Object.freeze({
-    schemaVersion: 'seyeon-event-ledger-exp-v2',
+    schemaVersion: SEYEON_EVENT_LEDGER_SCHEMA_VERSION_V2,
     authority: 'experimental_non_canonical_event',
     eventId: input.id,
     dedupeKey: input.dedupe,
