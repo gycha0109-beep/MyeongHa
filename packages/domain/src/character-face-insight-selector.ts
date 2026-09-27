@@ -623,6 +623,15 @@ export function selectCharacterFaceInsightsV1(
     );
   }
 
+  if (
+    input.context.contentVersion !==
+    input.characterContentVersion
+  ) {
+    fail(
+      'Character Face selection contentVersion does not match the active Character runtime context.',
+    );
+  }
+
   assertRuntimeCapability(
     input.capability,
   );
