@@ -1,6 +1,6 @@
 # Production PostgreSQL TLS Peer Verification V1
 
-Status: **B1 STRICT TARGET IMPLEMENTED / PRODUCTION ACTIVATION HOLD**
+Status: **B2A AUTHORITY PREFLIGHT INFRASTRUCTURE READY / PRODUCTION ACTIVATION HOLD**
 
 Watchtower-Track: security
 
@@ -196,11 +196,71 @@ productionFingerprint256=null
 sourceStatus=pending-supported-supabase-authority
 ```
 
-## Phase B2 — Production-safe connectivity canary
+## Phase B2A — official authority intake preflight
 
-B2 may begin only after the official Server root certificate for project
-`cnsfpcdiyofqvhpcegfc` is obtained through supported Supabase authority and its SHA-256
-fingerprint is pinned.
+B2A infrastructure is manual-only and does not connect to PostgreSQL.
+
+Implementation:
+
+```text
+.github/workflows/production-postgres-tls-peer-preflight.yml
+scripts/operations/run-production-postgres-tls-peer-preflight.mjs
+test/production-postgres-tls-peer-preflight.test.ts
+```
+
+The workflow is valid only when all dispatch authority is exact:
+
+```text
+event = workflow_dispatch
+ref = refs/heads/main
+watchtower_track = ops
+confirm = VERIFY_POSTGRES_TLS_PEER_B2A
+GitHub Environment = production
+```
+
+The Production Environment must provide:
+
+```text
+SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM
+SUPABASE_PRODUCTION_SESSION_POOLER_HOST
+VERCEL_TOKEN
+```
+
+B2A deliberately does not use `SUPABASE_DB_PASSWORD`.
+
+The Server root certificate must be obtained from the governed Supabase Production
+project dashboard through the supported Database Settings / SSL certificate surface.
+The connected Supabase account available to this track still does not expose project
+`cnsfpcdiyofqvhpcegfc`, so the repository must not fabricate or infer the Production
+certificate.
+
+The preflight validates, without emitting PEM contents:
+
+- exactly one PEM encoded X.509 certificate;
+- no private-key material;
+- CA basic constraint;
+- current validity interval;
+- canonical SHA-256 fingerprint;
+- governed bare `*.pooler.supabase.com` Session Pooler host shape.
+
+It also calls the Vercel project environment metadata endpoint without requesting
+decryption. It proves only that exactly one protected `MYEONGHA_DATABASE_URL` binding
+targets Production and records whether its type is `sensitive` or `encrypted`.
+The environment value is ignored and never emitted.
+
+The B2A evidence is restricted to the certificate fingerprint and redacted booleans /
+enum metadata. The workflow uploads no artifact.
+
+B2A infrastructure alone does not claim that the Production certificate has been
+provided or verified. Until an authorized Production dispatch succeeds,
+`productionFingerprint256` remains null and the authority source status remains
+`awaiting-official-supabase-dashboard-export`.
+
+## Phase B2B — Production-safe connectivity canary
+
+B2B may begin only after an authorized B2A dispatch succeeds and the exact official
+Server root certificate fingerprint for project `cnsfpcdiyofqvhpcegfc` is pinned by
+repository authority.
 
 The canary must be read-only and must prove:
 
@@ -209,6 +269,11 @@ The canary must be read-only and must prove:
 - hostname verification succeeds;
 - connected login principal remains the governed `myeongha_runtime`;
 - no database URL, password, or certificate PEM is emitted.
+
+If the Vercel Production database binding is `sensitive`, B2B must run inside the
+Vercel Production runtime rather than extracting the value into GitHub Actions.
+An `encrypted` binding may remain a runner candidate, but Vercel-runtime execution is
+still preferred.
 
 The canary must not mutate the live Production binding.
 

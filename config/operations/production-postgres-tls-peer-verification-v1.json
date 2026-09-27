@@ -2,8 +2,8 @@
   "contractVersion": "myeongha-production-postgres-tls-peer-verification-v1",
   "issue": 1330,
   "watchtowerTrack": "security",
-  "phase": "B1",
-  "activationState": "strict-target-dormant",
+  "phase": "B2A",
+  "activationState": "authority-preflight-infrastructure-ready",
   "productionActivation": false,
   "productionBindingMutated": false,
   "governedProjectRef": "cnsfpcdiyofqvhpcegfc",
@@ -14,13 +14,13 @@
     "connectionStringSslParametersRemovedAfterValidation": true
   },
   "rootCertificateAuthority": {
-    "sourceStatus": "pending-supported-supabase-authority",
+    "sourceStatus": "awaiting-official-supabase-dashboard-export",
     "productionFingerprint256": null,
     "repositoryPemAllowed": false,
     "runtimePemBindingPlanned": "MYEONGHA_DATABASE_SSL_ROOT_CERT_PEM"
   },
   "activationBlockers": [
-    "official-project-server-root-certificate-not-yet-obtained",
+    "official-project-server-root-certificate-not-yet-preflighted",
     "production-root-certificate-fingerprint-not-yet-pinned",
     "production-safe-verify-full-connectivity-canary-not-yet-passed"
   ],
@@ -31,5 +31,17 @@
     "rejectUnauthorized-false-final-state",
     "management-pat-fallback",
     "management-api-pooler-discovery"
-  ]
+  ],
+  "preflight": {
+    "workflow": ".github/workflows/production-postgres-tls-peer-preflight.yml",
+    "execution": "manual-main-only",
+    "watchtowerTrack": "ops",
+    "confirmation": "VERIFY_POSTGRES_TLS_PEER_B2A",
+    "metadataOnlyVercelProbe": true,
+    "vercelDecryptRequested": false,
+    "productionDatabaseConnectionAttempted": false,
+    "productionDatabaseUrlMutated": false,
+    "productionVercelBindingMutated": false,
+    "artifactUploadAllowed": false
+  }
 }
