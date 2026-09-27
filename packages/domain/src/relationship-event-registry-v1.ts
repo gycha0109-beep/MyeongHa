@@ -288,10 +288,20 @@ function uniqueTexts(
   values: readonly string[],
   path: string,
   maxItems: number,
+  minItems = 0,
 ): readonly string[] {
-  if (!Array.isArray(values) || values.length > maxItems) {
+  if (
+    !Array.isArray(values) ||
+    values.length < minItems ||
+    values.length > maxItems
+  ) {
     throw new ProductionRelationshipEventValidationErrorV1(
-      path + ' must contain at most ' + maxItems + ' values.',
+      path +
+        ' must contain between ' +
+        minItems +
+        ' and ' +
+        maxItems +
+        ' values.',
     );
   }
   const normalized = values.map((value, index) =>
@@ -418,6 +428,15 @@ export function validateProductionRelationshipEventV1(
     );
   }
 
+  if (
+    sourceKind === 'conversation_turn' &&
+    event.source.sourceMessageRefs.length === 0
+  ) {
+    throw new ProductionRelationshipEventValidationErrorV1(
+      'conversation_turn source requires at least one sourceMessageRef.',
+    );
+  }
+
   const facts = Object.freeze(
     event.facts.map((fact, index) =>
       Object.freeze({
@@ -431,6 +450,7 @@ export function validateProductionRelationshipEventV1(
           fact.sourceRefs,
           'facts[' + index + '].sourceRefs',
           8,
+          1,
         ),
       }),
     ),
@@ -479,6 +499,7 @@ export function validateProductionRelationshipEventV1(
         event.source.authorityRefs,
         'source.authorityRefs',
         16,
+        1,
       ),
     }),
     causalPredecessorEventIds: uniqueTexts(
