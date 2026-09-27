@@ -3,11 +3,6 @@ run-name: "[WT:ops] Production PostgreSQL Logical Backup"
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - '.github/ops/postgres-backup-frontier-1310.once'
   schedule:
     # 03:17 KST. The non-round minute reduces fleet-wide scheduler contention.
     - cron: '17 18 * * *'
@@ -37,15 +32,6 @@ jobs:
     steps:
       - name: Checkout exact repository state
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-
-      - name: Gate one-shot frontier-1310 backup marker
-        if: ${{ github.event_name == 'push' }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          marker='.github/ops/postgres-backup-frontier-1310.once'
-          [[ -f "$marker" ]]
-          [[ "$(tr -d '\r\n' < "$marker")" == 'POSTGRES-BACKUP-FRONTIER-1310-V1' ]]
 
       - name: Fail closed unless recovery credentials are provisioned
         shell: bash
