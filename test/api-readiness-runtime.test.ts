@@ -157,10 +157,10 @@ describe('GET /api/readiness', () => {
     expect(body).not.toContain(env.MYEONGHA_SAJU_SERVICE_BEARER);
   });
 
-  it('returns 405 without waiting for unused-body cancellation to settle', () => {
+  it('returns 405 without waiting for unused-body cancellation to settle', async () => {
     const source = requestWithCancellation(() => new Promise<void>(() => undefined));
 
-    const response = readinessEndpoint.fetch(source.request);
+    const response = await readinessEndpoint.fetch(source.request);
 
     expect(response.status).toBe(405);
     expect(response.headers.get('allow')).toBe('GET');
@@ -173,7 +173,7 @@ describe('GET /api/readiness', () => {
       Promise.reject(new Error('synthetic cancellation failure')),
     );
 
-    const response = readinessEndpoint.fetch(source.request);
+    const response = await readinessEndpoint.fetch(source.request);
     await Promise.resolve();
 
     expect(response.status).toBe(405);
@@ -182,12 +182,12 @@ describe('GET /api/readiness', () => {
     expect(source.cancelCalls()).toBe(1);
   });
 
-  it('keeps bodyless method rejection harmless without evaluating production configuration', () => {
+  it('keeps bodyless method rejection harmless without evaluating production configuration', async () => {
     const request = new Request('https://myeongha.example/api/readiness', {
       method: 'POST',
     });
 
-    const response = readinessEndpoint.fetch(request);
+    const response = await readinessEndpoint.fetch(request);
 
     expect(response.status).toBe(405);
     expect(response.headers.get('allow')).toBe('GET');
