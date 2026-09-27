@@ -4,11 +4,11 @@ import {
   type ProductionRelationshipApplyCommitPortV1,
   type ProductionRelationshipApplyCommitRowV1,
   type ProductionRelationshipApplyContextPortV1,
-  type ProductionRelationshipHistoryRecordV1,
   type ProductionRelationshipLockedContextV1,
 } from './production-relationship-event-apply-command-v1.js';
 import type {
   ProductionRelationshipConditionV1,
+  ProductionRelationshipHistoryRecordV1,
   ProductionRelationshipStageV1,
 } from '../../../packages/domain/src/index.js';
 import type { PostgresTransactionQueryV1 } from './postgres-subject-execution.js';
