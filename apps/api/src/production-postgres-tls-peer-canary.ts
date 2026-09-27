@@ -17,13 +17,16 @@ export const PRODUCTION_POSTGRES_TLS_CANARY_EXPECTED_PRINCIPAL_V1 =
   'myeongha_runtime' as const;
 export const PRODUCTION_POSTGRES_TLS_CANARY_ROOT_FINGERPRINT256_V1 =
   '80:70:25:AD:50:D4:ED:21:9D:2C:9C:7D:29:9C:00:4F:82:4E:B0:0C:F7:F6:5A:FE:F6:07:D0:7B:72:E6:CA:FA' as const;
-export const PRODUCTION_POSTGRES_TLS_CANARY_TARGET_PREFIX_V1 =
-  'sec01-b2b-' as const;
+export const PRODUCTION_POSTGRES_TLS_CANARY_MODE_V1 =
+  'one-shot-b2b' as const;
 
 export const PRODUCTION_POSTGRES_TLS_CANARY_ENV_V1 = Object.freeze({
-  rootCertificatePem: 'MYEONGHA_DATABASE_SSL_ROOT_CERT_PEM',
+  rootCertificateBase64: 'MYEONGHA_DATABASE_SSL_ROOT_CERT_B64',
   token: 'MYEONGHA_POSTGRES_TLS_CANARY_TOKEN',
+  mode: 'MYEONGHA_POSTGRES_TLS_CANARY_MODE',
+  expectedGitSha: 'MYEONGHA_POSTGRES_TLS_CANARY_SHA',
   vercelTargetEnv: 'VERCEL_TARGET_ENV',
+  vercelGitCommitSha: 'VERCEL_GIT_COMMIT_SHA',
 } as const);
 
 export interface ProductionPostgresTlsCanaryClientV1 {
@@ -51,6 +54,8 @@ export interface ProductionPostgresTlsCanaryEvidenceV1 {
   readonly rootCertificateFingerprint256:
     typeof PRODUCTION_POSTGRES_TLS_CANARY_ROOT_FINGERPRINT256_V1;
   readonly rootCertificatePinned: true;
+  readonly deploymentTarget: 'production';
+  readonly exactGitShaBound: true;
   readonly connectionSucceeded: true;
   readonly sslSession: true;
   readonly transactionReadOnly: true;
@@ -99,13 +104,59 @@ function requiredEnv(
   return value.trim();
 }
 
-export function isProductionPostgresTlsCanaryTargetV1(
-  value: string | undefined,
+export function isProductionPostgresTlsCanaryRuntimeV1(
+  env: ProductionUserDataRuntimeEnvV1,
 ): boolean {
+  const expectedSha =
+    env[PRODUCTION_POSTGRES_TLS_CANARY_ENV_V1.expectedGitSha];
+  const runtimeSha =
+    env[PRODUCTION_POSTGRES_TLS_CANARY_ENV_V1.vercelGitCommitSha];
+  const token = env[PRODUCTION_POSTGRES_TLS_CANARY_ENV_V1.token];
+
   return (
-    typeof value === 'string' &&
-    /^sec01-b2b-[a-z0-9-]{1,20}$/u.test(value)
+    env[PRODUCTION_POSTGRES_TLS_CANARY_ENV_V1.vercelTargetEnv] ===
+      'production' &&
+    env[PRODUCTION_POSTGRES_TLS_CANARY_ENV_V1.mode] ===
+      PRODUCTION_POSTGRES_TLS_CANARY_MODE_V1 &&
+    typeof expectedSha === 'string' &&
+    /^[0-9a-f]{40}$/u.test(expectedSha) &&
+    runtimeSha === expectedSha &&
+    typeof token === 'string' &&
+    token.length >= 32 &&
+    typeof env[
+      PRODUCTION_POSTGRES_TLS_CANARY_ENV_V1.rootCertificateBase64
+    ] === 'string'
   );
+}
+
+function decodeRootCertificatePemV1(
+  env: ProductionUserDataRuntimeEnvV1,
+): string {
+  const encoded = requiredEnv(
+    env,
+    PRODUCTION_POSTGRES_TLS_CANARY_ENV_V1.rootCertificateBase64,
+  );
+
+  let pem: string;
+  try {
+    pem = Buffer.from(encoded, 'base64').toString('utf8').trim();
+  } catch {
+    return fail(
+      'CANARY_ENV_INVALID',
+      'PostgreSQL TLS canary root certificate encoding is invalid.',
+    );
+  }
+
+  if (
+    !pem.startsWith('-----BEGIN CERTIFICATE-----') ||
+    !pem.endsWith('-----END CERTIFICATE-----')
+  ) {
+    return fail(
+      'CANARY_ENV_INVALID',
+      'PostgreSQL TLS canary root certificate encoding is invalid.',
+    );
+  }
+  return pem;
 }
 
 export function buildProductionPostgresTlsCanaryPlanV1(
@@ -116,14 +167,10 @@ export function buildProductionPostgresTlsCanaryPlanV1(
   currentBindingPeerVerification:
     ProductionPostgresTlsCanaryEvidenceV1['currentBindingPeerVerification'];
 }> {
-  if (
-    !isProductionPostgresTlsCanaryTargetV1(
-      env[PRODUCTION_POSTGRES_TLS_CANARY_ENV_V1.vercelTargetEnv],
-    )
-  ) {
+  if (!isProductionPostgresTlsCanaryRuntimeV1(env)) {
     return fail(
       'CANARY_ENV_INVALID',
-      'PostgreSQL TLS canary requires the governed temporary Vercel target.',
+      'PostgreSQL TLS canary requires exact one-shot Production deployment authority.',
     );
   }
 
@@ -138,10 +185,7 @@ export function buildProductionPostgresTlsCanaryPlanV1(
     );
   }
 
-  const rootCertificatePem = requiredEnv(
-    env,
-    PRODUCTION_POSTGRES_TLS_CANARY_ENV_V1.rootCertificatePem,
-  );
+  const rootCertificatePem = decodeRootCertificatePemV1(env);
   const currentPosture = inspectProductionDatabaseTlsPostureV1(
     postgres.databaseUrl,
   );
@@ -269,6 +313,8 @@ export async function runProductionPostgresTlsPeerCanaryV1(input: {
         rootCertificateFingerprint256:
           PRODUCTION_POSTGRES_TLS_CANARY_ROOT_FINGERPRINT256_V1,
         rootCertificatePinned: true,
+        deploymentTarget: 'production',
+        exactGitShaBound: true,
         connectionSucceeded: true,
         sslSession: true,
         transactionReadOnly: true,

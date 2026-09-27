@@ -1,3 +1,4 @@
+import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
@@ -5,13 +6,13 @@ import { resolve } from 'node:path';
 
 const PROJECT_ID = 'prj_nXF0b5uv27Lyucz2SEBxzdCRXVsP';
 const TEAM_ID = 'team_xuYA9OhCWlJETaYFOmeVodgS';
-const PROJECT_NAME = 'myeongha';
-const GITHUB_ORG = 'gycha0109-beep';
-const GITHUB_REPO = 'MyeongHa';
 const MARKER_PATH =
   'config/operations/run-once/production-postgres-tls-peer-canary-b2b.marker';
-const MARKER_VALUE = 'VERIFY_POSTGRES_TLS_PEER_B2B_CANARY_ONCE\n';
+const MARKER_VALUE =
+  'VERIFY_POSTGRES_TLS_PEER_B2B_SKIP_DOMAIN_CANARY_ONCE\n';
 const TRACK = 'security';
+const VERCEL_CLI_PACKAGE = 'vercel@50.1.0';
+const CANARY_MODE = 'one-shot-b2b';
 
 class CanaryOrchestratorError extends Error {
   constructor(code, message) {
@@ -61,7 +62,6 @@ async function requestJson(url, token, init, code) {
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: 'application/json',
-        ...(init?.body === undefined ? {} : { 'Content-Type': 'application/json' }),
         ...(init?.headers ?? {}),
       },
       redirect: 'error',
@@ -75,7 +75,6 @@ async function requestJson(url, token, init, code) {
     return fail(code, `Vercel API request rejected with status ${response.status}.`);
   }
 
-  if (response.status === 204) return {};
   try {
     return await response.json();
   } catch {
@@ -83,36 +82,96 @@ async function requestJson(url, token, init, code) {
   }
 }
 
-function createdIds(payload) {
-  const created = Array.isArray(payload?.created)
-    ? payload.created
-    : payload?.created
-      ? [payload.created]
-      : [];
-  return created
-    .map((entry) => entry?.id)
-    .filter((value) => typeof value === 'string' && value.length > 0);
+function boundedAppend(current, chunk) {
+  const next = current + chunk.toString('utf8');
+  return next.length > 65_536 ? next.slice(-65_536) : next;
 }
 
-async function pollDeployment(id, token) {
-  const endpoint =
-    `https://api.vercel.com/v13/deployments/${encodeURIComponent(id)}?teamId=${encodeURIComponent(TEAM_ID)}`;
+function runSkipDomainDeployment(input) {
+  return new Promise((resolvePromise, rejectPromise) => {
+    const childEnv = { ...process.env };
+    delete childEnv.SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM;
+    childEnv.VERCEL_TOKEN = input.vercelToken;
+    childEnv.VERCEL_ORG_ID = TEAM_ID;
+    childEnv.VERCEL_PROJECT_ID = PROJECT_ID;
 
-  for (let attempt = 0; attempt < 60; attempt += 1) {
-    const deployment = await requestJson(
-      endpoint,
-      token,
-      { method: 'GET' },
-      'DEPLOYMENT_STATUS_FAILED',
-    );
-    const state = deployment?.readyState ?? deployment?.status;
-    if (state === 'READY') return deployment;
-    if (['ERROR', 'CANCELED', 'BLOCKED'].includes(state)) {
-      return fail('DEPLOYMENT_NOT_READY', 'Canary deployment did not become ready.');
-    }
-    await new Promise((resolvePromise) => setTimeout(resolvePromise, 2_000));
-  }
-  return fail('DEPLOYMENT_TIMEOUT', 'Canary deployment timed out.');
+    const args = [
+      '--yes',
+      VERCEL_CLI_PACKAGE,
+      'deploy',
+      '.',
+      '--prod',
+      '--skip-domain',
+      '--yes',
+      '--non-interactive',
+      '--env',
+      `MYEONGHA_DATABASE_SSL_ROOT_CERT_B64=${input.rootCertificateBase64}`,
+      '--env',
+      `MYEONGHA_POSTGRES_TLS_CANARY_TOKEN=${input.canaryToken}`,
+      '--env',
+      `MYEONGHA_POSTGRES_TLS_CANARY_MODE=${CANARY_MODE}`,
+      '--env',
+      `MYEONGHA_POSTGRES_TLS_CANARY_SHA=${input.githubSha}`,
+      '--meta',
+      `myeonghaCanarySha=${input.githubSha}`,
+    ];
+
+    const child = spawn('npx', args, {
+      cwd: process.cwd(),
+      env: childEnv,
+      shell: false,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', (chunk) => {
+      stdout = boundedAppend(stdout, chunk);
+    });
+    child.stderr.on('data', (chunk) => {
+      stderr = boundedAppend(stderr, chunk);
+    });
+
+    const timeout = setTimeout(() => {
+      child.kill('SIGTERM');
+    }, 180_000);
+
+    child.once('error', () => {
+      clearTimeout(timeout);
+      rejectPromise(
+        new CanaryOrchestratorError(
+          'DEPLOYMENT_CREATE_FAILED',
+          'Vercel CLI deployment process failed to start.',
+        ),
+      );
+    });
+
+    child.once('close', (code, signal) => {
+      clearTimeout(timeout);
+      if (code !== 0 || signal !== null) {
+        rejectPromise(
+          new CanaryOrchestratorError(
+            'DEPLOYMENT_CREATE_FAILED',
+            'Vercel skip-domain deployment failed.',
+          ),
+        );
+        return;
+      }
+
+      const urls = stdout.match(/https:\/\/[a-z0-9][a-z0-9.-]*[.]vercel[.]app/giu) ?? [];
+      const deploymentUrl = urls.at(-1);
+      if (deploymentUrl === undefined || stderr.includes('Error:')) {
+        rejectPromise(
+          new CanaryOrchestratorError(
+            'DEPLOYMENT_URL_MISSING',
+            'Vercel skip-domain deployment did not return a deployment URL.',
+          ),
+        );
+        return;
+      }
+      resolvePromise(deploymentUrl);
+    });
+  });
 }
 
 async function deleteDeployment(id, token) {
@@ -133,34 +192,13 @@ async function deleteDeployment(id, token) {
   }
 }
 
-async function deleteCustomEnvironment(id, token) {
-  if (!id) return true;
-  try {
-    const response = await fetch(
-      `https://api.vercel.com/v9/projects/${PROJECT_ID}/custom-environments/${encodeURIComponent(id)}?teamId=${encodeURIComponent(TEAM_ID)}`,
-      {
-        method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ deleteUnassignedEnvironmentVariables: true }),
-        redirect: 'error',
-        signal: AbortSignal.timeout(20_000),
-      },
-    );
-    return response.ok || response.status === 404;
-  } catch {
-    return false;
-  }
-}
-
 function validateCanaryEvidence(payload) {
   const evidence = payload?.evidence;
   if (
     payload?.status !== 'pass' ||
     evidence?.schemaVersion !== 'myeongha-production-postgres-tls-peer-canary-v1' ||
+    evidence?.deploymentTarget !== 'production' ||
+    evidence?.exactGitShaBound !== true ||
     evidence?.canaryTlsMode !== 'verify-full' ||
     evidence?.canaryPeerVerification !== 'full' ||
     evidence?.rejectUnauthorized !== true ||
@@ -192,121 +230,62 @@ export async function runProductionPostgresTlsPeerCanaryOrchestrator(env = proce
     'ROOT_CERTIFICATE_MISSING',
   );
   const githubSha = required(env.GITHUB_SHA, 'GITHUB_SHA_MISSING');
+  if (!/^[0-9a-f]{40}$/u.test(githubSha)) {
+    return fail('GITHUB_SHA_INVALID', 'Governed Git SHA is invalid.');
+  }
 
-  const suffix = required(env.GITHUB_RUN_ID, 'GITHUB_RUN_ID_MISSING').slice(-12);
-  const environmentSlug = `sec01-b2b-${suffix}`;
+  const rootCertificateBase64 = Buffer.from(rootCertificatePem, 'utf8').toString('base64');
   const canaryToken = randomBytes(32).toString('base64url');
 
-  let customEnvironmentId;
   let deploymentId;
   let cleanupDeployment = true;
-  let cleanupEnvironment = true;
 
   try {
-    const customEnvironment = await requestJson(
-      `https://api.vercel.com/v9/projects/${PROJECT_ID}/custom-environments?teamId=${encodeURIComponent(TEAM_ID)}`,
-      token,
-      {
-        method: 'POST',
-        body: JSON.stringify({
-          slug: environmentSlug,
-          description: 'One-shot SEC-01 verify-full PostgreSQL TLS peer canary',
-          copyEnvVarsFrom: 'production',
-        }),
-      },
-      'CUSTOM_ENVIRONMENT_CREATE_FAILED',
-    );
+    const deploymentUrl = await runSkipDomainDeployment({
+      vercelToken: token,
+      rootCertificateBase64,
+      canaryToken,
+      githubSha,
+    });
 
-    if (
-      typeof customEnvironment?.id !== 'string' ||
-      !customEnvironment.id.startsWith('env_') ||
-      customEnvironment.slug !== environmentSlug
-    ) {
-      return fail(
-        'CUSTOM_ENVIRONMENT_INVALID',
-        'Vercel custom environment response was not recognized.',
-      );
-    }
-    customEnvironmentId = customEnvironment.id;
-
-    const envCreate = await requestJson(
-      `https://api.vercel.com/v10/projects/${PROJECT_ID}/env?teamId=${encodeURIComponent(TEAM_ID)}`,
-      token,
-      {
-        method: 'POST',
-        body: JSON.stringify([
-          {
-            key: 'MYEONGHA_DATABASE_SSL_ROOT_CERT_PEM',
-            value: rootCertificatePem,
-            type: 'sensitive',
-            customEnvironmentIds: [customEnvironmentId],
-            comment: 'Temporary SEC-01 B2B canary root authority',
-          },
-          {
-            key: 'MYEONGHA_POSTGRES_TLS_CANARY_TOKEN',
-            value: canaryToken,
-            type: 'sensitive',
-            customEnvironmentIds: [customEnvironmentId],
-            comment: 'Temporary SEC-01 B2B canary authorization',
-          },
-        ]),
-      },
-      'CANARY_ENV_CREATE_FAILED',
-    );
-
-    if (createdIds(envCreate).length !== 2) {
-      return fail(
-        'CANARY_ENV_CREATE_FAILED',
-        'Temporary canary environment variables were not created exactly.',
-      );
-    }
-
+    const hostname = new URL(deploymentUrl).hostname;
     const deployment = await requestJson(
-      `https://api.vercel.com/v13/deployments?teamId=${encodeURIComponent(TEAM_ID)}`,
+      `https://api.vercel.com/v13/deployments/${encodeURIComponent(hostname)}?teamId=${encodeURIComponent(TEAM_ID)}`,
       token,
-      {
-        method: 'POST',
-        body: JSON.stringify({
-          name: PROJECT_NAME,
-          customEnvironmentSlugOrId: customEnvironmentId,
-          gitSource: {
-            type: 'github',
-            org: GITHUB_ORG,
-            repo: GITHUB_REPO,
-            ref: githubSha,
-          },
-        }),
-      },
-      'DEPLOYMENT_CREATE_FAILED',
+      { method: 'GET' },
+      'DEPLOYMENT_STATUS_FAILED',
     );
 
     if (
       typeof deployment?.id !== 'string' ||
-      typeof deployment?.url !== 'string'
-    ) {
-      return fail('DEPLOYMENT_CREATE_FAILED', 'Canary deployment response was not recognized.');
-    }
-    deploymentId = deployment.id;
-
-    const ready = await pollDeployment(deploymentId, token);
-    if (
-      ready?.projectId !== PROJECT_ID ||
-      ready?.meta?.githubCommitSha !== githubSha ||
-      ready?.meta?.githubRepo !== GITHUB_REPO ||
-      ready?.meta?.githubOrg !== GITHUB_ORG
+      deployment?.readyState !== 'READY' ||
+      deployment?.meta?.myeonghaCanarySha !== githubSha ||
+      deployment?.meta?.githubCommitSha !== githubSha
     ) {
       return fail(
         'DEPLOYMENT_SOURCE_UNVERIFIED',
         'Canary deployment did not prove the exact governed Git source.',
       );
     }
+    deploymentId = deployment.id;
 
-    const deploymentUrl =
-      typeof ready.url === 'string' ? ready.url : deployment.url;
+    const aliases = await requestJson(
+      `https://api.vercel.com/v2/deployments/${encodeURIComponent(deploymentId)}/aliases?teamId=${encodeURIComponent(TEAM_ID)}`,
+      token,
+      { method: 'GET' },
+      'DEPLOYMENT_ALIAS_LOOKUP_FAILED',
+    );
+    if (!Array.isArray(aliases?.aliases) || aliases.aliases.length !== 0) {
+      return fail(
+        'DEPLOYMENT_ALIAS_PRESENT',
+        'Skip-domain canary deployment unexpectedly has an alias.',
+      );
+    }
+
     let canaryResponse;
     try {
       canaryResponse = await fetch(
-        `https://${deploymentUrl}/api/readiness`,
+        `${deploymentUrl}/api/readiness`,
         {
           method: 'POST',
           headers: {
@@ -339,8 +318,10 @@ export async function runProductionPostgresTlsPeerCanaryOrchestrator(env = proce
 
     const evidence = validateCanaryEvidence(canaryPayload);
     return Object.freeze({
-      schemaVersion: 'myeongha-production-postgres-tls-peer-canary-orchestration-v1',
-      customEnvironmentCreated: true,
+      schemaVersion: 'myeongha-production-postgres-tls-peer-canary-orchestration-v2',
+      deploymentMode: 'production-skip-domain',
+      customEnvironmentCreated: false,
+      productionDomainAliased: false,
       productionEnvironmentMutated: false,
       productionDatabaseBindingMutated: false,
       databaseUrlExported: false,
@@ -350,10 +331,8 @@ export async function runProductionPostgresTlsPeerCanaryOrchestrator(env = proce
     });
   } finally {
     cleanupDeployment = await deleteDeployment(deploymentId, token);
-    cleanupEnvironment = await deleteCustomEnvironment(customEnvironmentId, token);
     console.log(`canary_deployment_deleted=${cleanupDeployment}`);
-    console.log(`canary_custom_environment_deleted=${cleanupEnvironment}`);
-    if (!cleanupDeployment || !cleanupEnvironment) {
+    if (!cleanupDeployment) {
       process.exitCode = 1;
     }
   }
@@ -361,6 +340,8 @@ export async function runProductionPostgresTlsPeerCanaryOrchestrator(env = proce
 
 function printEvidence(evidence) {
   console.log('postgres_tls_peer_canary=pass');
+  console.log(`deployment_mode=${evidence.deploymentMode}`);
+  console.log(`production_domain_aliased=${evidence.productionDomainAliased}`);
   console.log(`current_binding_tls_mode=${evidence.currentBindingTlsMode}`);
   console.log(
     `current_binding_peer_verification=${evidence.currentBindingPeerVerification}`,

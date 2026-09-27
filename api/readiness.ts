@@ -4,7 +4,7 @@ import { Client, type ClientConfig } from 'pg';
 import {
   PRODUCTION_POSTGRES_TLS_CANARY_ENV_V1,
   ProductionPostgresTlsCanaryErrorV1,
-  isProductionPostgresTlsCanaryTargetV1,
+  isProductionPostgresTlsCanaryRuntimeV1,
   runProductionPostgresTlsPeerCanaryV1,
 } from '../apps/api/src/production-postgres-tls-peer-canary.js';
 import {
@@ -118,7 +118,7 @@ export default {
   fetch(request: Request): Response | Promise<Response> {
     if (
       request.method === POST_METHOD &&
-      isProductionPostgresTlsCanaryTargetV1(process.env.VERCEL_TARGET_ENV)
+      isProductionPostgresTlsCanaryRuntimeV1(process.env)
     ) {
       return createTlsCanaryResponse(request);
     }

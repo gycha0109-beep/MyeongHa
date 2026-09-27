@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   buildProductionPostgresTlsCanaryPlanV1,
+  isProductionPostgresTlsCanaryRuntimeV1,
   PRODUCTION_POSTGRES_TLS_CANARY_ROOT_FINGERPRINT256_V1,
   ProductionPostgresTlsCanaryErrorV1,
   runProductionPostgresTlsPeerCanaryV1,
@@ -27,24 +28,45 @@ Ke86t9CoR2yY50HHByZVx6v7PoYLURoPe2pCBoXYwstRdCdyksoajTlRIzFy6/8H
 NH/Ftgkyl6n4MnWooh1lZOXFNu/ao+PSnEim1mtqwA==
 -----END CERTIFICATE-----`;
 
+const SHA = '1234567890abcdef1234567890abcdef12345678';
+
 function env(overrides = {}) {
   return {
-    VERCEL_TARGET_ENV: 'sec01-b2b-12345',
+    VERCEL_TARGET_ENV: 'production',
+    VERCEL_GIT_COMMIT_SHA: SHA,
+    MYEONGHA_POSTGRES_TLS_CANARY_MODE: 'one-shot-b2b',
+    MYEONGHA_POSTGRES_TLS_CANARY_SHA: SHA,
+    MYEONGHA_POSTGRES_TLS_CANARY_TOKEN:
+      'synthetic-canary-token-value-1234567890',
     MYEONGHA_DATABASE_URL:
       'postgresql://myeongha_runtime:secret@example.pooler.supabase.com:5432/postgres?sslmode=require&uselibpqcompat=true',
     MYEONGHA_DATABASE_PRINCIPAL: 'myeongha_runtime',
-    MYEONGHA_DATABASE_SSL_ROOT_CERT_PEM: TEST_ROOT_CERTIFICATE_PEM,
+    MYEONGHA_DATABASE_SSL_ROOT_CERT_B64: Buffer.from(
+      TEST_ROOT_CERTIFICATE_PEM,
+      'utf8',
+    ).toString('base64'),
     ...overrides,
   };
 }
 
 describe('Production PostgreSQL TLS peer canary', () => {
-  it('fails closed outside the exact temporary Vercel target', () => {
-    expect(() =>
-      buildProductionPostgresTlsCanaryPlanV1(
-        env({ VERCEL_TARGET_ENV: 'production' }),
+  it('requires exact one-shot Production deployment authority', () => {
+    expect(isProductionPostgresTlsCanaryRuntimeV1(env())).toBe(true);
+    expect(
+      isProductionPostgresTlsCanaryRuntimeV1(
+        env({ VERCEL_TARGET_ENV: 'preview' }),
       ),
-    ).toThrowError(ProductionPostgresTlsCanaryErrorV1);
+    ).toBe(false);
+    expect(
+      isProductionPostgresTlsCanaryRuntimeV1(
+        env({ MYEONGHA_POSTGRES_TLS_CANARY_MODE: undefined }),
+      ),
+    ).toBe(false);
+    expect(
+      isProductionPostgresTlsCanaryRuntimeV1(
+        env({ VERCEL_GIT_COMMIT_SHA: 'abcdef' }),
+      ),
+    ).toBe(false);
   });
 
   it('fails closed for a non-governed login principal', () => {
@@ -105,6 +127,8 @@ describe('Production PostgreSQL TLS peer canary', () => {
       canaryPeerVerification: 'full',
       rejectUnauthorized: true,
       defaultHostnameVerification: true,
+      deploymentTarget: 'production',
+      exactGitShaBound: true,
       connectionSucceeded: true,
       sslSession: true,
       transactionReadOnly: true,
