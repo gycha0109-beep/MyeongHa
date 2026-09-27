@@ -1,7 +1,7 @@
 # SRC-22 Relationship Policy — Source-owner Freeze Worksheet V1
 
 > Track: character-memory  
-> Status: **PARTIALLY FROZEN — BLOCK A/B OWNER-APPROVED / BLOCK C/D PENDING**  
+> Status: **PARTIALLY FROZEN — BLOCK A/B/C OWNER-APPROVED / BLOCK D PENDING**  
 > Evidence authority: `SRC-22_RELATIONSHIP_POLICY_DECISION_PACKAGE_V2.md`  
 > Production mutation: **BLOCKED**  
 > Rule: this worksheet organizes decisions; it does not create source authority by itself.
@@ -94,7 +94,7 @@ owner_decision_checkpoint:
   blocks:
     A_relationship_state_semantics: OWNER_FROZEN
     B_progression_and_anti_farming: OWNER_FROZEN
-    C_production_event_contract: PENDING
+    C_production_event_contract: OWNER_FROZEN
     D_replay_and_persistence: PENDING
   production_mutation_authorized: false
   src22_status: OPEN
@@ -583,11 +583,28 @@ Owner freeze must define:
 
 ~~~yaml
 decision_id: D13
-disposition: PENDING
-production_event_registry_ref: PENDING
-generic_event_boundary: PENDING
-character_specific_event_boundary: PENDING
-versioning_rule: PENDING
+disposition: ACCEPT_WITH_CHANGE
+decided_at: 2026-09-27
+production_event_registry_ref: PHASE_K_VERSIONED_PRODUCTION_RELATIONSHIP_EVENT_REGISTRY
+generic_event_boundary:
+  event_kind: stable_generic_relationship_semantic
+  rule: semantic_meaning_must_not_depend_on_one_characters_personality_or_prose
+character_specific_event_boundary:
+  field: optional_character_behavior_key
+  format: namespaced_character_behavior_key
+  role: preserve_character_specific_cause_or_expression_without_becoming_global_relationship_truth
+  may_grant_fact_authority_by_itself: false
+registry_key:
+  - event_kind
+  - event_schema_version
+versioning_rule:
+  unknown_event_kind: FAIL_CLOSED
+  unknown_schema_version: FAIL_CLOSED
+  semantic_change_requires_new_schema_or_event_version: true
+  experimental_seyeon_vocabulary_auto_promoted: false
+reason:
+  - keeps relationship semantics reusable across characters
+  - preserves Se-yeon-specific causality without making the global registry Se-yeon-specific
 ~~~
 
 ### C2 — D19 last_interaction_at authority
@@ -600,11 +617,26 @@ Owner freeze:
 
 ~~~yaml
 decision_id: D19
-disposition: PENDING
-write_authority: PENDING
-write_triggers: PENDING
-non_triggers: PENDING
-reason: PENDING
+disposition: ACCEPT
+decided_at: 2026-09-27
+write_authority: server_committed_direct_user_character_turn
+write_triggers:
+  - successful_server_committed_user_to_character_turn_completion
+  - successful_server_committed_character_response_bound_to_that_turn
+exact_timestamp_selection: PHASE_K_MUST_CHOOSE_ONE_DETERMINISTIC_TURN_COMPLETION_RULE
+non_triggers:
+  - policy_replay
+  - correction_or_retraction_rebuild
+  - anti_farming_suppression_processing
+  - background_projection_rebuild
+  - notification_delivery
+  - calendar_passage
+  - caller_claimed_interaction_time
+relationship_progression_signal: false
+inactivity_decay_authority: false
+reason:
+  - field means latest real direct interaction, not latest relationship growth
+  - prevents replay/background work from looking like a user interaction
 ~~~
 
 ### C3 — D20 occurred_at
@@ -617,10 +649,23 @@ Owner freeze:
 
 ~~~yaml
 decision_id: D20
-disposition: PENDING
-occurred_at_contract: PENDING
-clock_authority: PENDING
-schema_impact: PENDING
+disposition: ACCEPT_WITH_CHANGE
+decided_at: 2026-09-27
+occurred_at_contract:
+  occurred_at_is_distinct_from_applied_at: true
+  current_conversation_event: server_timestamp_bound_to_authoritative_turn_or_message
+  guarded_character_output: server_timestamp_of_committed_guarded_output
+  server_observed_condition: server_observation_timestamp
+  world_event: authoritative_world_event_timestamp
+  correction_or_retraction:
+    adjustment_has_separate_recorded_at: true
+    target_event_occurred_at_rewritten: false
+clock_authority: server_or_authoritative_source_only
+caller_arbitrary_backdating: forbidden
+historical_import_exception: requires_separate_explicit_import_authority
+schema_impact:
+  - add_or_confirm_occurred_at_as_authority_bound_occurrence_time
+  - preserve_applied_at_as_server_commit_time
 ~~~
 
 ### C4 — D21 Source-message provenance
@@ -633,11 +678,27 @@ Owner freeze:
 
 ~~~yaml
 decision_id: D21
-disposition: PENDING
-provenance_contract: PENDING
-allowed_source_reference_types: PENDING
-referential_constraints: PENDING
-schema_impact: PENDING
+disposition: ACCEPT_WITH_CHANGE
+decided_at: 2026-09-27
+provenance_contract:
+  source_kind: required_allowlisted_kind
+  source_ref: canonical_server_owned_identifier
+  source_message_refs: bounded_referentially_validated_refs_when_message_based
+  authority_refs: server_owned_authority_refs
+allowed_source_reference_types:
+  - conversation_turn
+  - world_event
+  - merge_action
+  - server_observation
+referential_constraints:
+  source_ref_must_resolve: true
+  message_refs_must_match_bound_turn_subject_and_character: true
+  foreign_subject_or_character_refs: reject
+  caller_defined_authority_refs: reject
+  provenance_survives_correction_and_retraction_history: true
+schema_impact:
+  representation: columns_or_normalized_links_may_be_chosen_in_PHASE_L
+  referential_integrity_required: true
 ~~~
 
 ### C5 — D22 Causal / correction / retraction links
@@ -648,12 +709,31 @@ Owner freeze:
 
 ~~~yaml
 decision_id: D22
-disposition: PENDING
-causal_predecessor_contract: PENDING
-correction_contract: PENDING
-retraction_contract: PENDING
-referential_constraints: PENDING
-schema_impact: PENDING
+disposition: ACCEPT_WITH_CHANGE
+decided_at: 2026-09-27
+causal_predecessor_contract:
+  link_type: CAUSAL_PREDECESSOR
+  target_must_exist: true
+  same_subject_character_boundary: true
+  self_link: forbidden
+correction_contract:
+  link_type: CORRECTS
+  target_must_be_active_when_command_applies: true
+  replacement_event_gets_new_event_id: true
+  historical_target_rewrite: forbidden
+  command_idempotent: true
+retraction_contract:
+  link_type: RETRACTS
+  target_must_be_active_when_command_applies: true
+  historical_target_rewrite: forbidden
+  command_idempotent: true
+referential_constraints:
+  same_subject_character_boundary: true
+  target_exists: true
+  free_form_json_only_linkage: forbidden
+schema_impact:
+  preferred_shape: relationship_event_links_or_equivalent_referential_representation
+  exact_DDL: PHASE_L
 ~~~
 
 ### C6 — D23 Fact versus Character interpretation
@@ -674,10 +754,16 @@ Owner freeze must preserve that boundary in the Production payload contract.
 
 ~~~yaml
 decision_id: D23
-disposition: PENDING
-fact_payload_contract: PENDING
-character_interpretation_contract: PENDING
-authority_separation_rule: PENDING
+disposition: ACCEPT
+decided_at: 2026-09-27
+fact_payload_contract:
+  role: source_backed_schema_validated_objective_event_facts
+  may_participate_in_event_occurrence_authority: true
+character_interpretation_contract:
+  role: optional_character_owned_interpretation_of_authorized_facts
+  may_affect_character_behavior_or_expression: true
+  may_grant_or_overwrite_objective_fact_authority: false
+authority_separation_rule: facts_and_character_interpretation_are_structurally_separate
 ~~~
 
 ### C7 — D25 Production payload schema
@@ -690,11 +776,27 @@ Owner freeze:
 
 ~~~yaml
 decision_id: D25
-disposition: PENDING
-payload_registry_ref: PENDING
-validation_rule: PENDING
-unknown_type_behavior: PENDING
-schema_versioning_rule: PENDING
+disposition: ACCEPT_WITH_CHANGE
+decided_at: 2026-09-27
+payload_registry_ref: PHASE_K_EVENT_KIND_AND_SCHEMA_VERSION_REGISTRY
+validation_rule:
+  positive_validator_per_event_kind_and_schema_version: true
+  validation_before_production_event_append: true
+  arbitrary_json_authority: forbidden
+  schema_defines:
+    - required_and_optional_fields
+    - scalar_bounds
+    - allowed_identifiers
+    - allowed_provenance_references
+    - causal_link_requirements
+    - whether_character_interpretation_is_permitted
+    - mandatory_authority_proof_type
+    - canonical_dedupe_material
+unknown_type_behavior: FAIL_CLOSED
+schema_versioning_rule:
+  unknown_version: FAIL_CLOSED
+  semantic_contract_change_requires_new_version: true
+  authority_bearing_unknown_fields: reject
 ~~~
 
 ### C8 — D26 Blocked / suppressed Event semantics
@@ -714,16 +816,30 @@ Owner freeze:
 
 ~~~yaml
 decision_id: D26
-disposition: PENDING
-suppressed_event_representation: PENDING
-relationship_mutation_allowed: false
-audit_visibility: PENDING
-reason: PENDING
+disposition: ACCEPT_WITH_CHANGE
+decided_at: 2026-09-27
+suppressed_event_representation:
+  storage: append_to_relationship_events
+  effect_disposition: SUPPRESSED_POSITIVE_CREDIT
+  occurrence_remains_authoritative_history: true
+  positive_progression_credit: 0
+  positive_score_gain: 0
+  stage_advancement: false
+relationship_mutation_allowed:
+  event_append: true
+  positive_progression_state_effect: false
+audit_visibility: retained_in_single_append_only_relationship_history
+revision_semantics:
+  source_envelope_conflict: PHASE_K_MUST_DEFINE_WHETHER_ZERO_EFFECT_EVENT_ADVANCES_STATE_REVISION
+  requirement: do_not_fake_positive_relationship_mutation
+reason:
+  - anti-farming changes progression effect, not whether the event occurred
+  - retaining one history improves replay, audit, and qualitative Episode Profile
 ~~~
 
-### Block C dependency gate
+### Block C dependency gate — **OWNER-FROZEN 2026-09-27**
 
-Block C is frozen only when:
+Block C semantics are owner-frozen. Exact DDL, deterministic per-Event delta policy, and the zero-effect revision rule are deferred to PHASE K/L but may not contradict the frozen contract. Block C requires:
 
 - the Production Event registry exists as an explicit allowlist/versioned contract;
 - message/provenance/time authority is explicit;
@@ -807,7 +923,7 @@ source_owner_freeze:
         - D18
         - D27
     block_b:
-      status: OWNER_FROZEN_WITH_BLOCK_C_BINDINGS_PENDING
+      status: OWNER_FROZEN
       decided_at: 2026-09-27
       decisions:
         - D10
@@ -819,19 +935,23 @@ source_owner_freeze:
         - D17
         - D28
         - D29
+    block_c:
+      status: OWNER_FROZEN
+      decided_at: 2026-09-27
+      decisions:
+        - D13
+        - D19
+        - D20
+        - D21
+        - D22
+        - D23
+        - D25
+        - D26
   reviewed_evidence:
     - SRC-22_RELATIONSHIP_POLICY_DECISION_PACKAGE_V2.md
     - SEYEON_RELATIONSHIP_POLICY_CONVERGENCE_V3.md
   unresolved_decisions:
-    - D13
-    - D19
-    - D20
-    - D21
-    - D22
-    - D23
     - D24
-    - D25
-    - D26
     - active_policy_selection_and_migration
   production_mutation_authorized: false
 ~~~
