@@ -196,8 +196,7 @@ function requireExactSupportedTopics(
       if (
         typeof entry !== 'string' ||
         !(
-          CHARACTER_FACE_SUPPORTED_TOPIC_KEYS_V1
-            as readonly string[]
+          CHARACTER_FACE_SUPPORTED_TOPIC_KEYS_V1 as readonly string[]
         ).includes(entry)
       ) {
         fail(
@@ -235,8 +234,7 @@ function requireExactSupportedModes(
       if (
         typeof entry !== 'string' ||
         !(
-          CHARACTER_FACE_SUPPORTED_REALIZATION_MODES_V1
-            as readonly string[]
+          CHARACTER_FACE_SUPPORTED_REALIZATION_MODES_V1 as readonly string[]
         ).includes(entry)
       ) {
         fail(
