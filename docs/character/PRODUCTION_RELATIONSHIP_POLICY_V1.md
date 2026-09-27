@@ -358,6 +358,32 @@ It is built through the repository immutable artifact registry, which canonicali
 
 The same policy version must not be silently reused for materially different semantics. A semantic change requires a new policy version.
 
+## 13. Shadow V3 → Production V1 convergence
+
+Production V1 intentionally preserves these shadow-proven semantics:
+
+- five stable stage keys;
+- rolling seven-day family anti-farming;
+- two positive credits per family/window;
+- Causal Episode folding before progression;
+- sustained narrow 8/20/40-week path;
+- attained depth separated from current conflict condition;
+- deterministic correction/retraction rebuild;
+- self-disclosure is not mandatory.
+
+Production V1 intentionally changes these experimental/calibration details:
+
+| Shadow / calibration behavior | Production V1 |
+|---|---|
+| Se-yeon-specific Event vocabulary | generic Production Event registry + optional namespaced Character behavior key |
+| PROMISE_MADE may carry positive calibration delta | COMMITMENT_MADE score/progression effect = 0 |
+| RECONCILIATION may carry positive calibration trust/closeness | RECONCILIATION only reduces friction / resolves condition; positive progression = 0 |
+| RETURN_AFTER_ABSENCE may carry positive calibration delta | RETURN_AFTER_ABSENCE score/progression effect = 0 |
+| experimental arbitrary evidence payload shape | exact allowlisted payload schema + provenance-bound facts |
+| shadow runtime authority says SRC-22 OPEN | Production policy artifact exists only after SRC-22 CLOSED |
+
+These differences are deliberate Production decisions, not accidental drift.
+
 ## 13. PHASE K completion boundary
 
 PHASE K is complete only when:
