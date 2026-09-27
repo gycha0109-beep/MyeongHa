@@ -17,6 +17,8 @@ for (const script of [paths.applyScript, paths.evidenceScript, paths.managedRule
   execFileSync('bash', ['-n', script], { stdio: 'inherit' });
 }
 execFileSync(process.execPath, ['--check', paths.canaryScript], { stdio: 'inherit' });
+execFileSync(process.execPath, ['scripts/verify-vercel-waf-managed-rate-limit-rules.mjs'], { stdio: 'inherit' });
+execFileSync(process.execPath, ['scripts/verify-production-member-auth-abuse-policy.mjs'], { stdio: 'inherit' });
 
 const [policyRaw, applyWorkflow, evidenceWorkflow, applyScript, managedRuleCommon, evidenceScript, canaryScript, productAuth, docs] =
   await Promise.all([
