@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { readdir, readFile } from 'node:fs/promises';
 
 const paths = {
@@ -5,7 +6,10 @@ const paths = {
   decisions: 'docs/P0_DECISION_REGISTER.md',
   privacy: 'docs/AUTH_RLS_PRIVACY_SPEC.md',
   sourceGaps: 'docs/SOURCE_AUTHORITY_GAPS.md',
+  backupExport: 'scripts/operations/export-production-postgres-backup.sh',
+  backupWorkflow: '.github/workflows/production-postgres-backup.yml',
   restoreHarness: 'scripts/run-postgres-isolated-restore-drill.sh',
+  restoreEnvelope: 'scripts/build-postgres-restore-evidence-envelope.mjs',
   restoreRunbook: 'docs/operations/POSTGRES_BACKUP_RESTORE_RUNBOOK_V1.md',
   readinessStatus: 'docs/operations/POSTGRES_DR_READINESS_STATUS_V1.md',
 };
@@ -14,6 +18,10 @@ const entries = await Promise.all(
   Object.entries(paths).map(async ([key, path]) => [key, await readFile(path, 'utf8')]),
 );
 const files = Object.fromEntries(entries);
+
+execFileSync('bash', ['-n', paths.backupExport], { stdio: 'inherit' });
+execFileSync('bash', ['-n', paths.restoreHarness], { stdio: 'inherit' });
+
 const migrationFiles = await readdir('supabase/migrations');
 const migrationNumbers = migrationFiles
   .map((name) => name.match(/^(\d+)_.*\.sql$/))
@@ -89,8 +97,24 @@ requireRegex(
   /SRC-06[\s\S]{0,2000}BLOCKING BEFORE FINAL DELETION DDL BASELINE/,
   'SRC-06 must remain blocking before final deletion DDL authority is resolved',
 );
+requireFragment('backupExport', "select max(version::bigint)");
+requireFragment('backupExport', "public.member_auth_rate_limit_buckets");
+requireFragment('backupExport', "-x 'public.member_auth_rate_limit_buckets'");
+requireFragment('backupExport', 'migration_frontier');
+requireFragment('backupExport', 'ephemeral_data_exclusions');
+requireFragment('backupWorkflow', 'postgresql-client');
+requireFragment('restoreHarness', 'backup_migration_frontier');
+requireFragment('restoreHarness', 'member_auth_rate_limit_schema_restore');
+requireFragment('restoreHarness', 'member_auth_rate_limit_unlogged');
+requireFragment('restoreHarness', 'member_auth_rate_limit_ephemeral_data_restore');
+requireFragment('restoreHarness', 'member_auth_rate_limit_owner_restore');
+requireFragment('restoreHarness', 'member_auth_rate_limit_acl_restore');
+requireFragment('restoreHarness', 'member_auth_rate_limit_synthetic_admission');
 requireFragment('restoreHarness', 'privacy_reconciliation: "not_exercised_by_this_workflow"');
 requireFragment('restoreHarness', 'dr_ready: false');
+requireFragment('restoreEnvelope', 'backupManifest.migration_frontier');
+requireFragment('restoreEnvelope', "public.member_auth_rate_limit_buckets");
+requireFragment('restoreEnvelope', "member_auth_rate_limit_synthetic_admission: 'pass'");
 requireFragment('restoreRunbook', 'Production state: CURRENT-FRONTIER BACKUP+RESTORE PROVEN / DR NOT READY');
 requireFragment('restoreRunbook', 'backup schema freshness             = CURRENT — backup frontier 1305 / deployed frontier 1305');
 requireFragment('restoreRunbook', 'current-schema restore              = EVIDENCED — run 35947730074 / frontier 1305');
