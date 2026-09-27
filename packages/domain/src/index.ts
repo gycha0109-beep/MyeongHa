@@ -226,7 +226,9 @@ export {
 export {
   CHARACTER_FACE_ARTIFACT_BUILDER_VERSION_V1,
   CHARACTER_FACE_READING_ARTIFACT_SCHEMA_VERSION_V1,
+  assertCharacterFaceReadingArtifactCandidateIntegrityV1,
   buildCharacterFaceReadingArtifactCandidateV1,
+  computeCharacterFaceReadingArtifactIdV1,
   hashCharacterFaceFinalOutputV1,
   hashCharacterFaceReadingArtifactV1,
   type CharacterFaceReadingArtifactBuildDecisionV1,
