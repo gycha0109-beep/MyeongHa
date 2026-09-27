@@ -241,6 +241,9 @@ declare
   v_behavior_key text;
   v_occurred_at timestamptz;
   v_payload jsonb;
+  v_subject_id uuid;
+  v_source_kind text;
+  v_source_merge_action_id uuid;
   v_expected_payload_key text;
   v_link_count integer;
   v_predecessor_type text;
@@ -258,13 +261,19 @@ begin
     character_id,
     character_behavior_key,
     occurred_at,
-    payload_jsonb
+    payload_jsonb,
+    subject_id,
+    source_kind,
+    source_merge_action_id
   into
     v_event_type,
     v_character_id,
     v_behavior_key,
     v_occurred_at,
-    v_payload
+    v_payload,
+    v_subject_id,
+    v_source_kind,
+    v_source_merge_action_id
   from public.relationship_event_records
   where id = v_event_id;
 
@@ -273,6 +282,21 @@ begin
       errcode = '23514',
       constraint = 'ct_relationship_event_contract_v1',
       message = 'relationship Event is missing';
+  end if;
+
+  if v_source_kind = 'merge_action'
+     and not exists (
+       select 1
+       from public.subject_merge_actions sma
+       join public.subject_merge_jobs smj
+         on smj.id = sma.merge_job_id
+       where sma.id = v_source_merge_action_id
+         and v_subject_id in (smj.guest_subject_id, smj.member_subject_id)
+     ) then
+    raise exception using
+      errcode = '23514',
+      constraint = 'ct_relationship_event_merge_subject_v1',
+      message = 'merge_action relationship provenance must belong to the Event Subject';
   end if;
 
   v_expected_payload_key := case v_event_type
