@@ -516,9 +516,9 @@ from public.cmd_complete_seyeon_relationship_sync_v1(
 commit;
 SQL
 )
-[[ "$worker_result" == *processing|f'* ]] || fail "relationship sync claim mismatch: $worker_result"
-[[ "$worker_result" == *3|3|4|OPEN_CONFLICT'* ]] || fail "relationship sync apply mismatch: $worker_result"
-[[ "$worker_result" == *processed|f'* ]] || fail "relationship sync completion mismatch: $worker_result"
+[[ "$worker_result" == *"processing|f"* ]] || fail "relationship sync claim mismatch: $worker_result"
+[[ "$worker_result" == *"3|3|4|OPEN_CONFLICT"* ]] || fail "relationship sync apply mismatch: $worker_result"
+[[ "$worker_result" == *"processed|f"* ]] || fail "relationship sync completion mismatch: $worker_result"
 pass "durable worker claim -> PHASE M apply -> completion commits as one governed processing transaction"
 
 durable_shape=$("${psql_base[@]}" -At -F '|' -c "
