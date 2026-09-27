@@ -3,7 +3,7 @@
   "issue": 1330,
   "watchtowerTrack": "security",
   "phase": "B2A",
-  "activationState": "root-authority-pinned-metadata-preflight-pending",
+  "activationState": "metadata-preflight-passed-runtime-canary-pending",
   "productionActivation": false,
   "productionBindingMutated": false,
   "governedProjectRef": "cnsfpcdiyofqvhpcegfc",
@@ -20,7 +20,6 @@
     "runtimePemBindingPlanned": "MYEONGHA_DATABASE_SSL_ROOT_CERT_PEM"
   },
   "activationBlockers": [
-    "production-vercel-database-env-metadata-preflight-not-yet-passed",
     "production-safe-verify-full-connectivity-canary-not-yet-passed"
   ],
   "forbidden": [
@@ -42,7 +41,27 @@
     "productionDatabaseUrlMutated": false,
     "productionVercelBindingMutated": false,
     "artifactUploadAllowed": false,
-    "metadataOnlyVercelProbeStatus": "pending"
+    "metadataOnlyVercelProbeStatus": "passed",
+    "productionDatabaseEnvType": "sensitive",
+    "preferredB2bExecution": "vercel-runtime-required",
+    "metadataEvidence": {
+      "status": "passed",
+      "workflowRunId": 36354168577,
+      "sourceMainSha": "96652331b4ae6a2604ada002379d032068a7949e",
+      "recordedAt": "2026-09-27T22:07:33Z",
+      "databaseEnvExists": true,
+      "databaseEnvTarget": "production",
+      "databaseEnvType": "sensitive",
+      "databaseEnvValueRead": false,
+      "vercelDecryptRequested": false,
+      "productionDatabaseConnectionAttempted": false,
+      "productionDatabaseUrlRead": false,
+      "productionDatabaseUrlEmitted": false,
+      "productionDatabaseUrlMutated": false,
+      "productionVercelBindingMutated": false,
+      "credentialMaterialEmitted": false,
+      "oneShotBridgeRemovedInMetadataPinChange": true
+    }
   },
   "authorityIntake": {
     "status": "passed",
