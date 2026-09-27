@@ -242,6 +242,7 @@ relationship_outbox_id="d1431000-0000-4000-8000-000000000012"
 relationship_event_id="d1431000-0000-4000-8000-000000000013"
 relationship_history_id="d1431000-0000-4000-8000-000000000014"
 relationship_provenance_id="d1431000-0000-4000-8000-000000000015"
+relationship_authority_provenance_id="d1431000-0000-4000-8000-000000000016"
 
 "${psql_base[@]}" <<SQL
 insert into public.content_bundles(
@@ -477,7 +478,10 @@ from public.cmd_apply_relationship_event_runtime_v1(
   '$turn_id',
   jsonb_build_array('$assistant_message_id'),
   jsonb_build_array('seyeon-production-admission:durable-v1'),
-  jsonb_build_array('$relationship_provenance_id'),
+  jsonb_build_array(
+    '$relationship_provenance_id',
+    '$relationship_authority_provenance_id'
+  ),
   '[]'::jsonb,
   jsonb_build_array(
     jsonb_build_object(
