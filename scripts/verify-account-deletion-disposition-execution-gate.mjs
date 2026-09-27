@@ -42,7 +42,31 @@ function expectThrow(label, fn, pattern) {
   fail(label + ' did not fail closed');
 }
 
-const report = evaluateAccountDeletionDispositionContract(contract, graph);
+const historicalTables = new Set(
+  contract.tableDispositions.map((entry) => entry.table),
+);
+const historicalEdges = graph.edges.filter(
+  (edge) =>
+    historicalTables.has(edge.childTable) &&
+    historicalTables.has(edge.parentTable),
+);
+const historicalGraph = {
+  ...graph,
+  discovery: {
+    ...graph.discovery,
+    edgeCount: historicalEdges.length,
+    distinctReachableTableCount: new Set(
+      historicalEdges.map((edge) => edge.childTable),
+    ).size,
+    maxDepth: Math.max(...historicalEdges.map((edge) => edge.minDepth)),
+  },
+  edges: historicalEdges,
+};
+
+const report = evaluateAccountDeletionDispositionContract(
+  contract,
+  historicalGraph,
+);
 for (const [field, expected] of [
   ['graphEdgeCount', 125],
   ['graphReachableTableCount', 52],
@@ -85,17 +109,17 @@ for (const fragment of [
 
 expectThrow(
   'canonical execution plan',
-  () => buildAccountDeletionExecutionPlan(contract, graph),
+  () => buildAccountDeletionExecutionPlan(contract, historicalGraph),
   /execution plan generation is not authorized/,
 );
 
 const missing = clone(contract);
 missing.tableDispositions.pop();
-expectThrow('missing table coverage', () => evaluateAccountDeletionDispositionContract(missing, graph), /coverage mismatch/);
+expectThrow('missing table coverage', () => evaluateAccountDeletionDispositionContract(missing, historicalGraph), /coverage mismatch/);
 
 const duplicate = clone(contract);
 duplicate.tableDispositions.push(clone(duplicate.tableDispositions[0]));
-expectThrow('duplicate table coverage', () => evaluateAccountDeletionDispositionContract(duplicate, graph), /duplicate table disposition/);
+expectThrow('duplicate table coverage', () => evaluateAccountDeletionDispositionContract(duplicate, historicalGraph), /duplicate table disposition/);
 
 const unknown = clone(contract);
 unknown.tableDispositions.push({
@@ -104,15 +128,15 @@ unknown.tableDispositions.push({
   authorityReference: null,
   retentionDurationDays: null,
 });
-expectThrow('unknown table coverage', () => evaluateAccountDeletionDispositionContract(unknown, graph), /coverage mismatch/);
+expectThrow('unknown table coverage', () => evaluateAccountDeletionDispositionContract(unknown, historicalGraph), /coverage mismatch/);
 
 const invalidDisposition = clone(contract);
 invalidDisposition.tableDispositions[0].disposition = 'DROP_EVERYTHING';
-expectThrow('invalid disposition', () => evaluateAccountDeletionDispositionContract(invalidDisposition, graph), /unsupported disposition/);
+expectThrow('invalid disposition', () => evaluateAccountDeletionDispositionContract(invalidDisposition, historicalGraph), /unsupported disposition/);
 
 const unauthorizedOpen = clone(contract);
 unauthorizedOpen.executionAuthorized = true;
-expectThrow('OPEN-P0 authorization', () => evaluateAccountDeletionDispositionContract(unauthorizedOpen, graph), /OPEN-P0 executionAuthorized must be false/);
+expectThrow('OPEN-P0 authorization', () => evaluateAccountDeletionDispositionContract(unauthorizedOpen, historicalGraph), /OPEN-P0 executionAuthorized must be false/);
 
 // Test-only resolved fixture. This is not a policy artifact and carries no production authority.
 const testOnlyApproved = clone(contract);
@@ -128,18 +152,18 @@ for (const entry of testOnlyApproved.tableDispositions) {
   entry.retentionDurationDays = 1;
 }
 
-const testOnlyReport = evaluateAccountDeletionDispositionContract(testOnlyApproved, graph);
+const testOnlyReport = evaluateAccountDeletionDispositionContract(testOnlyApproved, historicalGraph);
 if (!testOnlyReport.policyReady || !testOnlyReport.executionPlanAllowed) {
   fail('test-only complete approved fixture should prove the positive plan gate path');
 }
-const testOnlyPlan = buildAccountDeletionExecutionPlan(testOnlyApproved, graph);
+const testOnlyPlan = buildAccountDeletionExecutionPlan(testOnlyApproved, historicalGraph);
 if (testOnlyPlan.stepCount !== 52) fail('test-only plan must cover all 52 reachable tables');
 if (testOnlyPlan.destructiveSqlGenerated !== false || testOnlyPlan.sql !== null) {
   fail('v1 execution plan must remain structured and non-SQL');
 }
 
 const conflict = clone(testOnlyApproved);
-const conflictEdge = graph.edges.find(
+const conflictEdge = historicalGraph.edges.find(
   (edge) => edge.parentTable !== edge.childTable && edge.parentTable === 'subjects',
 );
 if (!conflictEdge) fail('expected a direct Subject dependency edge for conflict test');
@@ -147,17 +171,17 @@ const conflictChild = conflict.tableDispositions.find((entry) => entry.table ===
 conflictChild.disposition = 'DELETE';
 conflictChild.retentionDurationDays = null;
 conflict.executionAuthorized = false;
-const conflictReport = evaluateAccountDeletionDispositionContract(conflict, graph);
+const conflictReport = evaluateAccountDeletionDispositionContract(conflict, historicalGraph);
 if (conflictReport.dependencyConflictCount < 1 || conflictReport.policyReady !== false) {
   fail('mixed resolved FK dispositions must be blocked without explicit edge resolution');
 }
 conflict.executionAuthorized = true;
 expectThrow(
   'conflicting execution authorization',
-  () => evaluateAccountDeletionDispositionContract(conflict, graph),
+  () => evaluateAccountDeletionDispositionContract(conflict, historicalGraph),
   /requires an approved, complete, conflict-free policy/,
 );
 
 console.log(
-  'Account deletion disposition historical gate PASS: 52/52 tables and 125/125 edges remain covered by the immutable pre-approval candidate, conflict drift fails closed, and SQL generation remains absent.',
+  'Account deletion disposition historical gate PASS: the immutable pre-approval candidate still covers its 52-table / 125-edge historical projection inside the current canonical graph, conflict drift fails closed, and SQL generation remains absent.',
 );

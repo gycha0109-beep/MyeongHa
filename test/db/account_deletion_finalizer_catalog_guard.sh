@@ -50,7 +50,13 @@ insert into _ad_policy(table_name, disposition) values
   ('reading_sessions','DELETE'),
   ('readings','DELETE'),
   ('record_access_grants','DELETE'),
+  ('relationship_event_adjustments','DELETE'),
+  ('relationship_event_links','DELETE'),
+  ('relationship_event_provenance_refs','DELETE'),
+  ('relationship_event_records','DELETE'),
   ('relationship_events','DELETE'),
+  ('relationship_history_entries','DELETE'),
+  ('relationship_state_snapshots','DELETE'),
   ('share_artifacts','DELETE'),
   ('standard_reading_official_bindings','DELETE'),
   ('standard_reading_reader_access_grants','DELETE'),
@@ -81,10 +87,10 @@ begin
     raise exception 'account deletion policy tables missing from migrated catalog: %', v_missing;
   end if;
 
-  if (select count(*) from _ad_policy where disposition='DELETE') <> 39
+  if (select count(*) from _ad_policy where disposition='DELETE') <> 45
      or (select count(*) from _ad_policy where disposition='ANONYMIZE') <> 4
      or (select count(*) from _ad_policy where disposition='RETAIN') <> 9
-     or (select count(*) from _ad_policy) <> 52 then
+     or (select count(*) from _ad_policy) <> 58 then
     raise exception 'account deletion policy cardinality drifted';
   end if;
 end
@@ -212,7 +218,7 @@ order by section, k1, k2, line;
 SQL
 
 actual="$(sha256sum "$catalog_file" | awk '{print $1}')"
-expected="1414f1a8764d7d3f48127b3282594cbd78c43f3cd9f96d2a44b35daf3e7ffe97"
+expected="566c74087feeac8bb3c8f84b26fbb3fba11e4622aa90a838a140d3e4d6454ed7"
 
 echo "Account deletion finalizer catalog digest: $actual"
 
@@ -229,8 +235,8 @@ delete_trigger_count="$(grep -c '^DELETE_TRIGGER|' "$catalog_file" || true)"
 delete_cycle_count="$(grep -c '^DELETE_CYCLE|' "$catalog_file" || true)"
 detach_shape_count="$(grep -c '^DETACH_SHAPE|' "$catalog_file" || true)"
 
-if [[ "$delete_trigger_count" != "6" ]]; then
-  echo "FAIL expected 6 DELETE-trigger catalog rows, found $delete_trigger_count" >&2
+if [[ "$delete_trigger_count" != "12" ]]; then
+  echo "FAIL expected 12 DELETE-trigger catalog rows, found $delete_trigger_count" >&2
   exit 1
 fi
 if [[ "$delete_cycle_count" != "19" ]]; then

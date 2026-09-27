@@ -38,13 +38,13 @@ The initial #1066 discovery run intentionally used an empty inventory and emitte
 ## Current graph
 
 ```text
-reachable FK edges         = 125
-distinct reachable tables  = 52
+reachable FK edges         = 138
+distinct reachable tables  = 58
 maximum minimum depth      = 4
 
 depth 1 = 30
-depth 2 = 44
-depth 3 = 47
+depth 2 = 47
+depth 3 = 57
 depth 4 = 4
 ```
 
