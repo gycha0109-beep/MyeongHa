@@ -153,6 +153,10 @@ function baseRuntimeContext(
 ): CharacterRuntimeContextV1 {
   return {
     characterId,
+    contentVersion:
+      characterId === 'character.beta'
+        ? 'character-content-beta-v1'
+        : 'character-content-alpha-v1',
     relationship: {
       relationshipRevision,
       relationshipPolicyVersion:
@@ -957,7 +961,7 @@ describe(
             'stale-content',
         }),
       ).toThrow(
-        'Character Face capability denied: CONTENT_VERSION_MISMATCH',
+        'Character Face selection contentVersion does not match the active Character runtime context',
       );
     });
 
@@ -1005,6 +1009,17 @@ describe(
         }),
       ).toThrow(
         'attention registry version is not supported',
+      );
+    });
+
+    it('rejects a selection content version that differs from the active Character runtime context', () => {
+      expect(() =>
+        select({
+          characterContentVersion:
+            'character-content-beta-v1',
+        }),
+      ).toThrow(
+        'contentVersion does not match the active Character runtime context',
       );
     });
 
