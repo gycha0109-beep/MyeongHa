@@ -81,7 +81,6 @@ for (const fragment of [
   'privacy_ledger_run_id:',
   'production_privacy_canary_run_id:',
   'watchtower_track:',
-  'MYEONGHA_WATCHTOWER_TRACK: ${{ inputs.watchtower_track }}',
   'Require operations Watchtower attribution',
   '[[ "$MYEONGHA_WATCHTOWER_TRACK" == \'ops\' ]]',
   'environment: production',
@@ -107,12 +106,42 @@ for (const fragment of [
   requireFragment(workflow, fragment, workflowPath);
 }
 
+const manualWatchtowerBinding = 'MYEONGHA_WATCHTOWER_TRACK: ${{ inputs.watchtower_track }}';
+const oneShotWatchtowerBinding =
+  "MYEONGHA_WATCHTOWER_TRACK: ${{ github.event_name == 'workflow_dispatch' && inputs.watchtower_track || 'ops' }}";
+if (
+  !workflow.includes(manualWatchtowerBinding) &&
+  !workflow.includes(oneShotWatchtowerBinding)
+) {
+  throw new Error(
+    'Restore drill must bind Watchtower attribution either directly from workflow_dispatch or through the exact ops-only one-shot fallback.',
+  );
+}
+
 if ((onSection.match(/workflow_dispatch:/g) ?? []).length !== 1) {
   throw new Error('Restore drill must expose exactly one workflow_dispatch trigger.');
 }
-for (const forbidden of ['push:', 'pull_request:', 'schedule:']) {
+for (const forbidden of ['pull_request:', 'schedule:']) {
   if (onSection.includes(forbidden)) {
-    throw new Error('Restore drill must remain manual-only: ' + forbidden);
+    throw new Error('Restore drill contains a forbidden trigger: ' + forbidden);
+  }
+}
+if (onSection.includes('push:')) {
+  for (const fragment of [
+    'branches:',
+    '- main',
+    "'.github/ops/postgres-restore-frontier-1310.once'",
+  ]) {
+    requireFragment(onSection, fragment, workflowPath);
+  }
+  for (const fragment of [
+    'Gate one-shot frontier-1310 restore marker',
+    'POSTGRES-RESTORE-FRONTIER-1310-V1',
+    "github.event_name == 'push'",
+    "github.event_name == 'workflow_dispatch' && inputs.backup_run_id || steps.one_shot.outputs.backup_run_id",
+    "github.event_name == 'workflow_dispatch' && inputs.incident_reference_utc || steps.one_shot.outputs.incident_reference_utc",
+  ]) {
+    requireFragment(workflow, fragment, workflowPath);
   }
 }
 if (!permissionsSection.includes('actions: read') || !permissionsSection.includes('contents: read')) {
@@ -126,7 +155,12 @@ for (const fragment of [
   '.path == ".github/workflows/production-postgres-backup.yml"',
   '.conclusion == "success"',
   '.head_branch == "main"',
-  '(.event == "schedule" or .event == "workflow_dispatch")',
+  '(.event == "schedule" or .event == "workflow_dispatch" or .event == "push")',
+  "if [[ \"$run_event\" == 'push' ]]",
+  '.github/ops/postgres-backup-frontier-1310.once?ref=$source_sha',
+  '.github/workflows/production-postgres-backup.yml?ref=$source_sha',
+  'POSTGRES-BACKUP-FRONTIER-1310-V1',
+  'Gate one-shot frontier-1310 backup marker',
   '.repository.full_name == env.GITHUB_REPOSITORY',
   '.expired == false',
   '^myeongha-postgres-[0-9]{8}T[0-9]{6}Z$',

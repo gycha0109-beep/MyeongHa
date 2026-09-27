@@ -106,12 +106,29 @@ if (!(encryptIndex < plaintextDeleteIndex && runnerStepIndex < uploadIndex)) {
 }
 
 
+if (workflow.includes('push:')) {
+  for (const fragment of [
+    "'.github/ops/postgres-backup-frontier-1310.once'",
+    'Gate one-shot frontier-1310 backup marker',
+    'POSTGRES-BACKUP-FRONTIER-1310-V1',
+  ]) {
+    if (!workflow.includes(fragment)) {
+      throw new Error(`One-shot backup bridge missing exact authority fragment: ${fragment}`);
+    }
+  }
+}
+
 const requiredRestoreSourceResolverFragments = [
   '.path == ".github/workflows/production-postgres-backup.yml"',
   '.conclusion == "success"',
   '.head_branch == "main"',
-  '(.event == "schedule" or .event == "workflow_dispatch")',
+  '(.event == "schedule" or .event == "workflow_dispatch" or .event == "push")',
   '.repository.full_name == env.GITHUB_REPOSITORY',
+  "if [[ \"$run_event\" == 'push' ]]",
+  '.github/ops/postgres-backup-frontier-1310.once?ref=$source_sha',
+  '.github/workflows/production-postgres-backup.yml?ref=$source_sha',
+  'POSTGRES-BACKUP-FRONTIER-1310-V1',
+  'Gate one-shot frontier-1310 backup marker',
 ];
 for (const fragment of requiredRestoreSourceResolverFragments) {
   if (!restoreSourceResolver.includes(fragment)) {
