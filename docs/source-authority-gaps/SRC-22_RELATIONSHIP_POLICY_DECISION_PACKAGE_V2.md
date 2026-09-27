@@ -1,7 +1,7 @@
 # SRC-22 Relationship Policy Decision Package V2
 
 > Track: character-memory  
-> Status: **READY FOR SOURCE-OWNER DECISION / SRC-22 REMAINS OPEN**  
+> Status: **SOURCE-OWNER FREEZE IN PROGRESS / SRC-22 REMAINS OPEN**  
 > Evidence: Event Authority V1 + Governed Authority Dogfood V3 + Relationship Policy Convergence V3  
 > Production mutation: **BLOCKED**
 
@@ -12,6 +12,17 @@ This package updates the V1 decision package with evidence produced after Event 
 It does not self-approve Production policy.
 
 The source owner must explicitly ACCEPT, ACCEPT_WITH_CHANGE, DEFER, or REJECT production-critical decisions before SRC-22 can close.
+
+Current freeze progress:
+
+~~~text
+Block A — owner-frozen 2026-09-27
+Block B — owner-frozen 2026-09-27
+Block C — decision brief prepared / owner decision pending
+Block D — pending
+~~~
+
+The owner-frozen values are recorded only in `SRC-22_RELATIONSHIP_POLICY_OWNER_FREEZE_WORKSHEET_V1.md`; this V2 document preserves the evidence/disposition record that led to those decisions.
 
 ## 1. Source-fixed invariants
 
