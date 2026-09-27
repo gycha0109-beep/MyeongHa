@@ -5,13 +5,13 @@
   "graphAuthority": "SCHEMA_DISCOVERED_POLICY_NEUTRAL",
   "executionAuthorized": false,
   "discovery": {
-    "edgeCount": 125,
-    "distinctReachableTableCount": 52,
+    "edgeCount": 138,
+    "distinctReachableTableCount": 58,
     "maxDepth": 4,
     "depthCounts": {
       "1": 30,
-      "2": 44,
-      "3": 47,
+      "2": 47,
+      "3": 57,
       "4": 4
     },
     "directDepthOneEdgeCount": 30
@@ -1015,6 +1015,36 @@
     },
     {
       "minDepth": 2,
+      "parentTable": "user_character_states",
+      "childTable": "relationship_history_entries",
+      "constraintName": "relationship_history_entries_state_fk",
+      "childColumns": [
+        "subject_id",
+        "character_id"
+      ],
+      "parentColumns": [
+        "subject_id",
+        "character_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 2,
+      "parentTable": "user_character_states",
+      "childTable": "relationship_state_snapshots",
+      "constraintName": "relationship_state_snapshots_state_fk",
+      "childColumns": [
+        "subject_id",
+        "character_id"
+      ],
+      "parentColumns": [
+        "subject_id",
+        "character_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 2,
       "parentTable": "user_episode_progress",
       "childTable": "episode_progress_events",
       "constraintName": "episode_progress_events_progress_fk",
@@ -1052,6 +1082,21 @@
       "parentTable": "world_events",
       "childTable": "notifications",
       "constraintName": "notifications_source_world_subject_fk",
+      "childColumns": [
+        "source_world_event_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 2,
+      "parentTable": "world_events",
+      "childTable": "relationship_event_records",
+      "constraintName": "relationship_event_records_source_world_fk",
       "childColumns": [
         "source_world_event_id",
         "subject_id"
@@ -1371,6 +1416,21 @@
     {
       "minDepth": 3,
       "parentTable": "chat_turns",
+      "childTable": "relationship_event_records",
+      "constraintName": "relationship_event_records_source_turn_fk",
+      "childColumns": [
+        "source_turn_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "chat_turns",
       "childTable": "relationship_events",
       "constraintName": "relationship_events_source_turn_subject_fk",
       "childColumns": [
@@ -1520,6 +1580,21 @@
       "parentColumns": [
         "id",
         "turn_id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "conversation_messages",
+      "childTable": "relationship_event_provenance_refs",
+      "constraintName": "relationship_event_provenance_message_fk",
+      "childColumns": [
+        "source_message_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
         "subject_id"
       ],
       "disposition": "UNDECIDED"
@@ -1714,6 +1789,125 @@
     },
     {
       "minDepth": 3,
+      "parentTable": "relationship_event_records",
+      "childTable": "relationship_event_adjustments",
+      "constraintName": "relationship_event_adjustments_replacement_fk",
+      "childColumns": [
+        "replacement_event_id",
+        "subject_id",
+        "character_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id",
+        "character_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "relationship_event_records",
+      "childTable": "relationship_event_adjustments",
+      "constraintName": "relationship_event_adjustments_target_fk",
+      "childColumns": [
+        "target_event_id",
+        "subject_id",
+        "character_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id",
+        "character_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "relationship_event_records",
+      "childTable": "relationship_event_links",
+      "constraintName": "relationship_event_links_event_fk",
+      "childColumns": [
+        "event_id",
+        "subject_id",
+        "character_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id",
+        "character_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "relationship_event_records",
+      "childTable": "relationship_event_links",
+      "constraintName": "relationship_event_links_linked_event_fk",
+      "childColumns": [
+        "linked_event_id",
+        "subject_id",
+        "character_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id",
+        "character_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "relationship_event_records",
+      "childTable": "relationship_event_provenance_refs",
+      "constraintName": "relationship_event_provenance_event_fk",
+      "childColumns": [
+        "event_id",
+        "subject_id",
+        "character_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id",
+        "character_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "relationship_history_entries",
+      "childTable": "relationship_event_adjustments",
+      "constraintName": "relationship_event_adjustments_history_fk",
+      "childColumns": [
+        "history_entry_id",
+        "subject_id",
+        "character_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id",
+        "character_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "relationship_history_entries",
+      "childTable": "relationship_event_records",
+      "constraintName": "relationship_event_records_history_fk",
+      "childColumns": [
+        "history_entry_id",
+        "subject_id",
+        "character_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id",
+        "character_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
       "parentTable": "standard_reading_official_bindings",
       "childTable": "standard_reading_reader_access_grants",
       "constraintName": "standard_reading_reader_access_official_subject_fk",
@@ -1773,6 +1967,19 @@
       "parentTable": "subject_merge_actions",
       "childTable": "memory_items",
       "constraintName": "memory_items_source_merge_action_fk",
+      "childColumns": [
+        "source_merge_action_id"
+      ],
+      "parentColumns": [
+        "id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "subject_merge_actions",
+      "childTable": "relationship_event_records",
+      "constraintName": "relationship_event_records_source_merge_fk",
       "childColumns": [
         "source_merge_action_id"
       ],
