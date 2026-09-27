@@ -253,12 +253,11 @@ export function PhysiognomyPage({
             <div className="phys-result is-ready" role="status">
               <span className="phys-result-mark" aria-hidden="true">✓</span>
               <div>
-                <strong>얼굴 확인이 완료되었습니다.</strong>
+                <strong>얼굴 관측이 완료되었습니다.</strong>
                 <p>
-                  전체 {ready.observation.totalRegions}개 영역 중
-                  {' '}{ready.observation.availableRegions}개 영역을 확인했습니다.
+                  확인 가능한 영역 {ready.observation.availableRegions}개
                   {ready.observation.partialRegions > 0 && (
-                    <> 일부 확인 영역은 {ready.observation.partialRegions}개입니다.</>
+                    <> · 부분 확인 {ready.observation.partialRegions}개</>
                   )}
                 </p>
                 <div className="phys-result-meter" aria-hidden="true">
