@@ -89,7 +89,6 @@ security definer
 set search_path = pg_catalog, public
 as $relationship_retraction$
 declare
-  v_state_id uuid;
   v_now timestamptz := clock_timestamp();
   v_revision_before bigint;
   v_revision_after bigint;
@@ -100,13 +99,12 @@ begin
     p_character_id
   );
 
-  v_state_id := public.relationship_assert_adjustment_slot_v1(
+  perform public.relationship_assert_adjustment_slot_v1(
     p_subject_id,
     p_character_id,
     p_expected_base_revision,
     p_ordinal
   );
-  void v_state_id;
 
   if p_history_entry_id is null
      or p_adjustment_id is null
