@@ -126,11 +126,18 @@ begin
     where e.id = p_target_event_id
       and e.subject_id = p_subject_id
       and e.character_id = p_character_id
+  )
+  or exists (
+    select 1
+    from public.relationship_event_adjustments prior
+    where prior.subject_id = p_subject_id
+      and prior.character_id = p_character_id
+      and prior.target_event_id = p_target_event_id
   ) then
     raise exception using
       errcode = '23514',
       constraint = 'relationship_retraction_target_invalid',
-      message = 'relationship retraction target does not belong to this relationship';
+      message = 'relationship retraction target must be an active Event in this relationship';
   end if;
 
   v_revision_before := p_expected_base_revision + p_ordinal - 1;
@@ -322,11 +329,18 @@ begin
     where e.id = p_target_event_id
       and e.subject_id = p_subject_id
       and e.character_id = p_character_id
+  )
+  or exists (
+    select 1
+    from public.relationship_event_adjustments prior
+    where prior.subject_id = p_subject_id
+      and prior.character_id = p_character_id
+      and prior.target_event_id = p_target_event_id
   ) then
     raise exception using
       errcode = '23514',
       constraint = 'relationship_correction_target_invalid',
-      message = 'relationship correction target does not belong to this relationship';
+      message = 'relationship correction target must be an active Event in this relationship';
   end if;
 
   select count(*)
