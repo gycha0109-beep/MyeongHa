@@ -187,10 +187,17 @@ select pg_temp.assert_fails('world event source turn cannot claim a different ca
   $$insert into public.world_events(id,subject_id,event_type,event_schema_version,event_dedupe_key,source_turn_id,content_bundle_id,payload_jsonb,occurred_at) values ('48100000-0000-0000-0000-000000000003','40000000-0000-0000-0000-000000000001','conversation_event','world-event/v1','world-bad-bundle','46200000-0000-0000-0000-000000000001','44000000-0000-0000-0000-000000000002','{}',now())$$,
   'world_events_source_turn_bundle_fk');
 
-select pg_temp.assert_fails('legacy relationship event writes are disabled after Production V1',
-  $$insert into public.relationship_events(id,subject_id,character_id,event_type,event_schema_version,event_dedupe_key,source_turn_id,source_world_event_id,delta_closeness,delta_trust,delta_friction,policy_version,state_revision_before,state_revision_after,payload_jsonb,applied_at)
-    values ('48200000-0000-0000-0000-000000000001','40000000-0000-0000-0000-000000000001','record-char-01','conversation_committed','relationship-event/v1','rel-1','46200000-0000-0000-0000-000000000001','48100000-0000-0000-0000-000000000001',1,1,0,'relationship-policy-v1',0,1,'{}'::jsonb,now())$$,
-  'tr_relationship_legacy_events_disabled_v1');
+insert into public.relationship_events(id,subject_id,character_id,event_type,event_schema_version,event_dedupe_key,source_turn_id,source_world_event_id,delta_closeness,delta_trust,delta_friction,policy_version,state_revision_before,state_revision_after,payload_jsonb,applied_at)
+values ('48200000-0000-0000-0000-000000000001','40000000-0000-0000-0000-000000000001','record-char-01','conversation_committed','relationship-event/v1','rel-1','46200000-0000-0000-0000-000000000001','48100000-0000-0000-0000-000000000001',1,1,0,'relationship-policy-v1',0,1,'{}'::jsonb,now());
+select pg_temp.assert_fails('relationship applied revision cannot be occupied twice',
+  $$insert into public.relationship_events(id,subject_id,character_id,event_type,event_schema_version,event_dedupe_key,delta_closeness,delta_trust,delta_friction,policy_version,state_revision_before,state_revision_after,applied_at) values ('48200000-0000-0000-0000-000000000002','40000000-0000-0000-0000-000000000001','record-char-01','other','relationship-event/v1','rel-2',0,0,0,'relationship-policy-v1',0,1,now())$$,
+  'relationship_events_applied_revision_unique');
+select pg_temp.assert_fails('relationship event revision must advance exactly one',
+  $$insert into public.relationship_events(id,subject_id,character_id,event_type,event_schema_version,event_dedupe_key,delta_closeness,delta_trust,delta_friction,policy_version,state_revision_before,state_revision_after,applied_at) values ('48200000-0000-0000-0000-000000000003','40000000-0000-0000-0000-000000000001','record-char-01','other','relationship-event/v1','rel-jump',0,0,0,'relationship-policy-v1',1,3,now())$$,
+  'relationship_events_revision_step_check');
+select pg_temp.assert_fails('relationship event cannot inject another subject into a relationship projection',
+  $$insert into public.relationship_events(id,subject_id,character_id,event_type,event_schema_version,event_dedupe_key,delta_closeness,delta_trust,delta_friction,policy_version,state_revision_before,state_revision_after,applied_at) values ('48200000-0000-0000-0000-000000000004','40000000-0000-0000-0000-000000000002','record-char-01','other','relationship-event/v1','rel-cross-owner',0,0,0,'relationship-policy-v1',0,1,now())$$,
+  'relationship_events_state_fk');
 
 do $$
 declare table_count integer;
