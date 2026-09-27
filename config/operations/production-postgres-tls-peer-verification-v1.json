@@ -3,7 +3,7 @@
   "issue": 1330,
   "watchtowerTrack": "security",
   "phase": "B2A",
-  "activationState": "authority-preflight-infrastructure-ready",
+  "activationState": "root-authority-pinned-metadata-preflight-pending",
   "productionActivation": false,
   "productionBindingMutated": false,
   "governedProjectRef": "cnsfpcdiyofqvhpcegfc",
@@ -14,14 +14,13 @@
     "connectionStringSslParametersRemovedAfterValidation": true
   },
   "rootCertificateAuthority": {
-    "sourceStatus": "awaiting-official-supabase-dashboard-export",
-    "productionFingerprint256": null,
+    "sourceStatus": "official-supabase-dashboard-preflighted",
+    "productionFingerprint256": "80:70:25:AD:50:D4:ED:21:9D:2C:9C:7D:29:9C:00:4F:82:4E:B0:0C:F7:F6:5A:FE:F6:07:D0:7B:72:E6:CA:FA",
     "repositoryPemAllowed": false,
     "runtimePemBindingPlanned": "MYEONGHA_DATABASE_SSL_ROOT_CERT_PEM"
   },
   "activationBlockers": [
-    "official-project-server-root-certificate-not-yet-preflighted",
-    "production-root-certificate-fingerprint-not-yet-pinned",
+    "production-vercel-database-env-metadata-preflight-not-yet-passed",
     "production-safe-verify-full-connectivity-canary-not-yet-passed"
   ],
   "forbidden": [
@@ -42,6 +41,26 @@
     "productionDatabaseConnectionAttempted": false,
     "productionDatabaseUrlMutated": false,
     "productionVercelBindingMutated": false,
-    "artifactUploadAllowed": false
+    "artifactUploadAllowed": false,
+    "metadataOnlyVercelProbeStatus": "pending"
+  },
+  "authorityIntake": {
+    "status": "passed",
+    "source": "official-supabase-dashboard",
+    "workflowRunId": 36351386841,
+    "sourceMainSha": "4efdff400d415a7cfbe2dd2c8e003e228351da02",
+    "recordedAt": "2026-09-27T21:21:05Z",
+    "certificateParse": "pass",
+    "certificateValidNow": true,
+    "certificatePrivateKeyPresent": false,
+    "certificateFingerprint256": "80:70:25:AD:50:D4:ED:21:9D:2C:9C:7D:29:9C:00:4F:82:4E:B0:0C:F7:F6:5A:FE:F6:07:D0:7B:72:E6:CA:FA",
+    "sessionPoolerHostShapeValid": true,
+    "productionDatabaseConnectionAttempted": false,
+    "productionDatabaseUrlRead": false,
+    "productionDatabaseUrlMutated": false,
+    "productionVercelBindingMutated": false,
+    "certificatePemEmitted": false,
+    "credentialMaterialEmitted": false,
+    "oneShotBridgeRemovedInAuthorityPinChange": true
   }
 }

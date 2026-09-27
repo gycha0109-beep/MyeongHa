@@ -1,6 +1,6 @@
 # Production PostgreSQL TLS Peer Verification V1
 
-Status: **B2A AUTHORITY PREFLIGHT INFRASTRUCTURE READY / PRODUCTION ACTIVATION HOLD**
+Status: **B2A ROOT AUTHORITY PINNED / METADATA PREFLIGHT PENDING / PRODUCTION ACTIVATION HOLD**
 
 Watchtower-Track: security
 
@@ -66,7 +66,7 @@ Relevant references:
 - https://nodejs.org/download/release/v24.21.0/docs/api/tls.html
 - https://nodejs.org/download/release/v24.21.0/docs/api/crypto.html
 
-## Production control remains unverified
+## Production root authority verified; live binding remains unverified
 
 The governed Production project ref is:
 
@@ -74,11 +74,37 @@ The governed Production project ref is:
 cnsfpcdiyofqvhpcegfc
 ```
 
-The connected Supabase account available to this track does not expose that project.
-The connected Vercel surface identifies the `myeongha` project but does not currently
-provide a safe environment-value readback action.
+On 2026-09-28 KST, the official Server root certificate downloaded from the governed
+Supabase Production dashboard was supplied through the GitHub `production` Environment
+secret and validated by the exact one-shot authority bridge.
 
-Therefore this track has not independently established whether the live
+Pinned SHA-256 fingerprint:
+
+```text
+80:70:25:AD:50:D4:ED:21:9D:2C:9C:7D:29:9C:00:4F:82:4E:B0:0C:F7:F6:5A:FE:F6:07:D0:7B:72:E6:CA:FA
+```
+
+Authority evidence:
+
+```text
+workflow run id = 36351386841
+source main SHA = 4efdff400d415a7cfbe2dd2c8e003e228351da02
+certificate parse = pass
+certificate valid now = true
+certificate private key present = false
+Session Pooler host shape valid = true
+Production database connection attempted = false
+Production database URL read = false
+Production database URL mutated = false
+Production Vercel binding mutated = false
+certificate PEM emitted = false
+credential material emitted = false
+```
+
+The one-shot bridge is removed in the same governed change that pins this fingerprint.
+
+The connected Vercel surface still does not provide a safe environment-value readback
+action, so this track has not independently established whether the live
 `MYEONGHA_DATABASE_URL` currently uses:
 
 ```text
@@ -251,16 +277,30 @@ The environment value is ignored and never emitted.
 The B2A evidence is restricted to the certificate fingerprint and redacted booleans /
 enum metadata. The workflow uploads no artifact.
 
-B2A infrastructure alone does not claim that the Production certificate has been
-provided or verified. Until an authorized Production dispatch succeeds,
-`productionFingerprint256` remains null and the authority source status remains
-`awaiting-official-supabase-dashboard-export`.
+B2A root-authority intake has now passed through the exact one-shot security bridge.
+The repository pins only the safe SHA-256 fingerprint and does not retain certificate PEM.
+
+The standard metadata-only Vercel preflight remains pending because the connected GitHub
+action surface cannot dispatch `workflow_dispatch` and the connected Vercel surface does
+not provide a safe environment-value readback action. The authority bridge intentionally
+did not broaden into Vercel access or database connectivity.
+
+Current authority state:
+
+```text
+productionFingerprint256 = 80:70:25:AD:50:D4:ED:21:9D:2C:9C:7D:29:9C:00:4F:82:4E:B0:0C:F7:F6:5A:FE:F6:07:D0:7B:72:E6:CA:FA
+sourceStatus = official-supabase-dashboard-preflighted
+Production database connection attempted = false
+Production binding mutated = false
+Vercel metadata preflight = pending
+```
 
 ## Phase B2B — Production-safe connectivity canary
 
-B2B may begin only after an authorized B2A dispatch succeeds and the exact official
-Server root certificate fingerprint for project `cnsfpcdiyofqvhpcegfc` is pinned by
-repository authority.
+B2B may begin only after the exact official Server root certificate fingerprint for
+project `cnsfpcdiyofqvhpcegfc` is pinned by repository authority **and** the governed
+execution path can access the existing Production database binding without exporting or
+logging credential material.
 
 The canary must be read-only and must prove:
 
