@@ -74,6 +74,10 @@ A failed cleanup is a hard failure with `DRAFT_RESIDUE_REQUIRES_MANUAL_REVIEW`. 
 
 No scheduled evidence workflow is admitted while the policy is still HOLD.
 
+### One-shot execution bridge
+
+Because the connected GitHub control surface does not expose `workflow_dispatch`, B1a may be executed once through the exact marker `.github/ops/sec-02-b1a-preview-waf-capability.once`. The push trigger is restricted to `main` and that marker path, requires exact marker value `SEC-02-B1A-PREVIEW-WAF-CAPABILITY-PROBE-V1`, and hard-codes only the governed `probe-preview-capability` mode. After the runtime probe is evaluated, the marker and push bridge must be removed in a cleanup PR. Removing the marker may trigger the workflow path filter, but the marker gate causes the probe step to skip.
+
 ## B1a completion and later Phase B activation requirements
 
 B1a does not hard-code an unverified Vercel plan quota. Capability is proven against the actual Firewall draft validation response. A successful B1a run must report `preview_rule_set_supported=true`, `active_config_unchanged=true`, `draft_restored=true`, and `production_publish_performed=false`.
