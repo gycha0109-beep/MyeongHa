@@ -579,8 +579,8 @@ body.product-page::before {
 
 @media (min-width: 768px) and (max-width: 900px) {
   .product-header-inner {
-    grid-template-columns: 150px minmax(0, 1fr) 130px;
-    gap: 12px;
+    grid-template-columns: 120px minmax(0, 1fr) 190px;
+    gap: 10px;
   }
   .product-brand-sub { display: none; }
   .product-nav { gap: 12px; }
