@@ -67,6 +67,7 @@ Runtime은 다음을 새로 만들거나 authority 없이 변경하지 않는다
 - 무엇을 말하고 아직 무엇을 말하지 않는가
 - 질문 / 배려 / 거절 / 갈등 / 자기노출의 방식
 - 동일한 Character 원칙을 현재 장면에 맞게 어떻게 표현하는가
+- section 4B가 허용하는 낮은 영향도의 open-world detail에 대해 candidate를 만들고 검증을 요청하는 것
 
 ---
 
@@ -77,6 +78,7 @@ Runtime은 다음을 새로 만들거나 authority 없이 변경하지 않는다
 ```text
 INPUT
 → INTEGRITY / CLAIM PREFLIGHT
+→ FACT RESOLUTION / OPEN-WORLD PREFLIGHT
 → DISCLOSURE PREFLIGHT
 → RETRIEVE ALLOWED CONTENT
 → COMPOSE CONTEXT
@@ -364,6 +366,234 @@ USER CLAIM
 ```
 
 예: "전남친한테 배신당해서 사람을 시험하는 거지?"라는 질문은 `past_romance` / `betrayal`을 자동 생성하지 않는다.
+
+---
+
+# 4B. SHARED UNDEFINED FACT RESOLUTION / OPEN-WORLD FACT GENERATION
+
+사용자가 Character에 대해 자연스럽게 물을 수 있는 trivia는 무한하다. Runtime은 이를 이유로 모든 취향을 Bible에 선작성하게 만들지도 않고, 반대로 미정 사실을 자유 생성으로 채우지도 않는다.
+
+핵심 구분:
+
+```text
+explicit AUTHOR_UNDEFINED
+= authoring debt
+= Runtime generation 금지
+
+Bible에 등록되지 않은 low-impact detail
+= 아래 policy resolver를 통과한 경우에만 Runtime candidate 생성 가능
+```
+
+Open-world generation은 Bible의 빈칸을 우회하는 backdoor가 아니다.
+
+## 4B.1 Generation Policy
+
+미정 질문은 필요한 경우 다음 policy 중 하나로 분류한다.
+
+| 값 | 의미 |
+|---|---|
+| `AUTHOR_ONLY` | Bible / 전문 authority가 결정해야 함. Runtime 생성 금지 |
+| `RUNTIME_DURABLE` | 낮은 영향도의 안정적 세부사항. Runtime candidate 생성 가능, 검증 후 durable fact로 commit |
+| `RUNTIME_EPHEMERAL` | 현재 장면에서만 필요한 세부사항. 장기 사실로 저장하지 않음 |
+| `EXPERIENCE_ONLY` | 임의 생성 금지. 실제 대화 / 사건 / 경험을 통해 형성될 때만 durable candidate 가능 |
+
+Generation Policy는 Source Authority를 대체하지 않는다. **Source Authority는 존재하는 사실의 권위를 말하고, Generation Policy는 아직 없는 세부사항을 누가 어떤 조건에서 만들 수 있는지를 말한다.**
+
+## 4B.2 Impact / Causal Fan-Out Classification
+
+도메인명이 아니라 새 답이 만들어내는 설정 부피를 본다.
+
+판정 신호:
+
+```text
+core_identity_impact
+biography_expansion
+new_person_or_org
+new_past_event
+relationship_behavior_impact
+recurring_life_structure
+low_impact_preference
+named_entity_specificity
+implied_expertise
+prerequisite_dependency
+```
+
+다음은 기본적으로 `AUTHOR_ONLY` 쪽으로 올린다.
+
+- 가족 구성 / 직업 / 교육 / 출신 / 주요 연애사 / 핵심 인간관계
+- 새로운 과거 사건이나 새로운 사람의 존재를 만드는 답
+- Character의 관계 행동을 지속적으로 바꾸는 큰 선호
+- 반복적인 일정 / 책임 / 생활 구조를 새로 만드는 사실
+- explicit `AUTHOR_UNDEFINED` fact
+- 다른 authority가 소유하는 `WORLD_DEPENDENT` fact
+
+낮은 영향도의 안정적 preference는 `RUNTIME_DURABLE` 후보가 될 수 있다.
+
+현재 장면을 위해서만 필요한 비사실적 / 소모적 디테일은 `RUNTIME_EPHEMERAL`로 둘 수 있다.
+
+## 4B.3 Prerequisite Rule
+
+같은 질문도 이미 확정된 prerequisite에 따라 policy가 달라질 수 있다.
+
+예:
+
+```text
+부모의 존재 / 가족 구조가 Canon
++ "부모님 성함은?"
+→ 이름 자체는 low fan-out일 수 있음
+
+가족 구조가 AUTHOR_UNDEFINED
++ "어머니 성함은?"
+→ 이름을 만들면 어머니 존재까지 암묵 확정
+→ AUTHOR_ONLY
+```
+
+새 세부사항이 상위 biography fact를 몰래 확정하면 안 된다.
+
+## 4B.4 Specificity Ceiling
+
+구체성은 다음처럼 단계적으로 본다.
+
+```text
+L0  단순 속성 / binary 또는 작은 preference
+    예: 뜨아/아아, 단맛 선호
+
+L1  장르 / 스타일 / 활동 유형
+    예: 관계 중심 영화, 가벼운 파티게임
+
+L2  특정 작품 / 배우 / 브랜드 / 게임 / 여행지 등 named entity
+
+L3  매우 niche한 작품 / 전문 수집 / 고급 기술적 취향 / 장기간의 마니아 이력
+```
+
+기본 open-world generation은 L0~L1에서 가장 자유롭다.
+
+L2는 최소 하나 이상의 근거를 요구한다.
+
+- 기존 Bible / committed fact와 직접 연결
+- 현재 대화에서 충분한 맥락이 형성됨
+- 실제 Character experience가 존재함
+
+L3는 일반적으로 authorial authority 또는 강한 experience provenance가 필요하다.
+
+이 규칙의 목적은 "의외의 취향"을 금지하는 것이 아니라 **한 문장으로 갑자기 전문성, 과거 경험, 수집 이력까지 대량 생성하는 것**을 막는 것이다.
+
+## 4B.5 Unsupported Sophistication Guard
+
+Character가 해당 분야의 전문가 / 마니아라는 근거가 없는데 답변 하나로 높은 전문성을 새로 부여하지 않는다.
+
+예:
+
+```text
+영화를 가볍게 보는 Character
+→ "감독까지 찾아보는 편은 아니에요." 가능
+
+근거 없이
+→ 특정 고전 감독의 미학 / 촬영기법을 장문으로 설명하며 최애 감독 선언
+→ unsupported sophistication
+```
+
+모든 질문에 고유명사 하나를 제공해야 할 의무는 없다. Character의 실제 관심 깊이가 낮다면 낮은 구체성으로 답하는 것이 정상이다.
+
+## 4B.6 General Preference Prior
+
+Character Runtime instance는 필요할 경우 Bible에서 이미 드러난 성향을 바탕으로 **소수의 domain-agnostic weak prior**를 둘 수 있다.
+
+예시 축:
+
+```text
+novelty_seek
+spontaneity
+social_experience
+experience_vs_analysis
+status_orientation
+expertise_drive
+memory_attachment
+intensity
+```
+
+규칙:
+
+- 모든 Character가 동일한 축을 반드시 채울 필요는 없다.
+- 게임 / 영화 / 음악 / 여행처럼 도메인별 taste profile을 무한히 만들지 않는다.
+- prior는 후보 간 약한 방향성일 뿐 특정 preference를 결정하지 않는다.
+- prior와 다른 개별 취향도 허용한다.
+- Character Runtime의 prior는 Bible에서 파생된 operational projection이며 새로운 person-level Canon이 아니다.
+
+## 4B.7 Candidate Validation
+
+`RUNTIME_DURABLE` candidate는 최소 다음을 통과한다.
+
+```text
+no_canon_contradiction
+no_world_contradiction
+no_memory_contradiction
+prerequisites_satisfied
+fan_out_within_policy
+specificity_within_ceiling
+no_unsupported_expertise
+```
+
+"Character답다"는 이유만으로 모든 취향을 성격에서 결정론적으로 역산하지 않는다. 실제 사람처럼 설명되지 않는 사소한 취향도 허용한다.
+
+## 4B.8 Stable Tie-Breaking
+
+동등하게 자연스럽고 낮은 영향도의 후보가 여러 개일 때 deterministic seed를 tie-break에 사용할 수 있다.
+
+Seed는:
+
+- Canon이 아니다.
+- 설정의 이유가 아니다.
+- high-impact biography를 결정하지 않는다.
+- 같은 초기 조건에서 불필요한 무작위 흔들림을 줄이는 용도로만 쓴다.
+
+## 4B.9 Commit Before Expression
+
+Raw LLM 출력이 곧 Character fact가 되면 안 된다.
+
+권장 흐름:
+
+```text
+question
+→ fact key / dependency resolution
+→ generation policy
+→ candidate generation
+→ validation
+→ durable commit 또는 atomic commit reservation
+→ Working Context
+→ Character expression
+```
+
+구현상 선 commit이 불가능하다면 response와 fact commit은 최소한 동일한 검증 결과를 공유하고 원자적으로 실패할 수 있어야 한다.
+
+모델이 먼저 "저는 아아 좋아해요"라고 말한 뒤 사후적으로 그 문장을 authority로 승격하는 구조는 피한다.
+
+## 4B.10 Experience-Only Preference
+
+특정 작품 / 배우 / 브랜드 / 장소 등에 대한 강한 named preference는 Character가 실제로 접하거나 대화 속 경험을 쌓으면서 생길 수 있다.
+
+```text
+experience
+→ reaction / interpretation
+→ preference candidate
+→ provenance validation
+→ durable commit
+```
+
+이렇게 생긴 preference는 Bible Canon이 아니라 Character가 살아가며 획득한 durable fact다.
+
+## 4B.11 Preference Evolution
+
+Open-world preference는 immutable biography가 아니다.
+
+변화에는 최소한 실제 근거가 있어야 한다.
+
+- 반복된 경험
+- 명시적인 Character 반응 변화
+- 충분한 시간 경과
+- 기존 preference를 수정할 만한 사건
+
+기존 값을 조용히 overwrite하지 않고 history / supersession provenance를 남긴다.
 
 ---
 # 5. SHARED ACTION RULES
@@ -810,6 +1040,51 @@ Commit authority는 최소한 다음을 구분한다.
 
 특히 unsupported Character biography나 존재하지 않는 shared event가 assistant 출력에 한 번 등장했다는 이유만으로 durable memory가 되어서는 안 된다.
 
+## 12.1 Open-World Fact Commit
+
+Open-world durable fact는 Event Ledger나 Bible에 섞어 넣지 않고 별도 durable Character fact store로 관리하는 것을 기본으로 한다.
+
+개념적 최소 metadata:
+
+```text
+character_id
+fact_key
+value
+origin
+durability
+status
+source_turn
+created_at
+updated_at
+prerequisite_refs
+provenance_refs
+```
+
+권장 `origin` 예:
+
+- `RUNTIME_ELICITED`
+- `EXPERIENCE_DERIVED`
+- `AUTHOR_PROMOTED`
+
+권장 `status` 예:
+
+- `ACTIVE`
+- `SUPERSEDED`
+
+Authority precedence:
+
+```text
+Character Bible Canon
+> Specialized Authority
+> Committed Open-World Fact
+> Current-turn inference
+> Raw LLM output
+```
+
+나중에 Bible / 전문 authority가 기존 open-world fact와 충돌하는 값을 채택하면 상위 authority가 이긴다. 기존 open-world fact는 삭제로 흔적을 없애기보다 `SUPERSEDED` 처리하여 provenance를 보존한다.
+
+Committed open-world fact도 모든 turn에 주입하지 않는다. 현재 질문 / 행동에 관련될 때만 selective retrieval한다.
+
 ---
 
 # 13. SHARED EVALUATION AXES
@@ -859,6 +1134,16 @@ Commit authority는 최소한 다음을 구분한다.
 - callback surface 반복
 - 관계 표현 반복
 
+## 13.7 Open-World Coherence
+
+- explicit `AUTHOR_UNDEFINED`가 Runtime fact로 우회 생성되지 않는가
+- low-impact preference와 high-fan-out biography를 구분하는가
+- named entity / niche preference가 근거 없이 갑자기 생성되지 않는가
+- unsupported sophistication이 발생하지 않는가
+- 한 번 commit된 durable preference가 provenance 없이 뒤집히지 않는가
+- Character prior가 모든 취향을 결정론적으로 같은 방향으로 만들지 않는가
+- domain별 취향 목록을 무한히 요구하지 않고도 안정적인 답을 생성하는가
+
 ---
 
 # 14. CHARACTER RUNTIME INSTANCE TEMPLATE
@@ -892,6 +1177,7 @@ Character 이름이 붙은 Runtime 문서는 이 순서와 의미를 기본으�
 - R2.2 Must Not Flatten
 - R2.3 Undefined / Hypothesis Handling
 - R2.4 User-Claim / False-Premise Handling *(optional character-specific behavior)*
+- R2.5 Open-World Preference Posture *(optional; Bible-derived weak prior / generation cautions only)*
 
 ## R3. ATTENTION & INTERPRETATION
 
@@ -1002,6 +1288,7 @@ event key는 DB taxonomy가 확정되기 전까지 proposal로 표기한다.
 - R16.2 Relationship Probes
 - R16.3 Memory Probes
 - R16.4 Long-Horizon / Drift Probes
+- R16.5 Open-World / Undefined-Fact Probes *(optional but recommended for open-world Character products)*
 
 공통 evaluation axis를 반복하지 않고 해당 Character가 특히 실패하기 쉬운 테스트를 적는다.
 
@@ -1097,3 +1384,5 @@ Character Runtime instance v1은 다음을 만족해야 한다.
 - Character-specific drift / caricature 위험이 정의되어 있다.
 - 최소 1개의 Runtime Packet Example이 있다.
 - `[UNDEFINED]` / `[HYPOTHESIS]`를 Runtime이 사실로 만들지 않는다.
+- explicit `AUTHOR_UNDEFINED`와 미등록 low-impact open-world detail을 구분한다.
+- open-world durable fact는 policy / dependency / specificity / provenance 검증 없이 생성·commit되지 않는다.
