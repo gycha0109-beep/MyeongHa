@@ -137,6 +137,17 @@ export {
 } from './character-face-perspective.js';
 
 export {
+  CHARACTER_FACE_INSIGHT_SELECTION_SCHEMA_VERSION_V1,
+  CharacterFaceInsightSelectionErrorV1,
+  selectCharacterFaceInsightsV1,
+  type CharacterFaceAttentionResolutionStatusV1,
+  type CharacterFaceAttentionResolutionV1,
+  type CharacterFaceInsightSelectionV1,
+  type CharacterFaceSelectionReasonCodeV1,
+  type CharacterFaceSelectionReasonV1,
+} from './character-face-insight-selector.js';
+
+export {
   CHARACTER_PERSPECTIVE_NARRATIVE_ROLES_V1,
   CHARACTER_PERSPECTIVE_SCHEMA_VERSION_V1,
   SAJU_GROUNDING_AXIS_KEYS_V1,
