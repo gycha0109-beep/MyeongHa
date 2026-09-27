@@ -93,11 +93,29 @@ function makeRule(policy, action = policy.enforceRateLimitAction) {
   };
 }
 
+function makeProbeRule(policy) {
+  const rule = makeRule(policy);
+  return {
+    ...rule,
+    active: false,
+    conditionGroup: [{
+      conditions: [
+        { type: 'path', op: 'eq', neg: false, value: policy.route },
+        { type: 'method', op: 'eq', neg: false, value: policy.method },
+        { type: 'environment', op: 'eq', neg: false, value: 'preview' },
+      ],
+    }],
+  };
+}
+
 const temp = await mkdtemp(join(tmpdir(), 'myeongha-waf-registry-'));
 try {
   const safe = join(temp, 'safe.json');
   const foreign = join(temp, 'foreign.json');
   const held = join(temp, 'held.json');
+  const dirtyDraft = join(temp, 'dirty-draft.json');
+  const bypass = join(temp, 'bypass.json');
+  const probe = join(temp, 'probe.json');
 
   await writeFile(safe, JSON.stringify({
     active: { firewallEnabled: true, rules: [makeRule(guestPolicy)] },
@@ -121,6 +139,39 @@ try {
     },
   }));
 
+  await writeFile(dirtyDraft, JSON.stringify({
+    active: { firewallEnabled: true, rules: [makeRule(guestPolicy)] },
+    draft: {
+      firewallEnabled: true,
+      rules: [{ ...makeRule(guestPolicy), description: 'unexpected draft drift' }],
+    },
+  }));
+  await writeFile(bypass, JSON.stringify({
+    active: {
+      firewallEnabled: true,
+      rules: [
+        makeRule(guestPolicy),
+        {
+          id: 'rule_bypass',
+          name: 'temporary-bypass',
+          active: true,
+          conditionGroup: [],
+          action: { mitigate: { action: 'bypass', rateLimit: null, redirect: null, actionDuration: null } },
+        },
+      ],
+    },
+  }));
+  await writeFile(probe, JSON.stringify({
+    active: { firewallEnabled: true, rules: [makeRule(guestPolicy)] },
+    draft: {
+      firewallEnabled: true,
+      rules: [
+        makeRule(guestPolicy),
+        ...memberPolicy.rules.map((rule) => makeProbeRule(rule)),
+      ],
+    },
+  }));
+
   const runFixture = (fixture, shouldPass) => {
     try {
       execFileSync('bash', [
@@ -140,8 +191,48 @@ try {
   runFixture(safe, true);
   runFixture(foreign, false);
   runFixture(held, false);
+
+  execFileSync('bash', [
+    '-c',
+    'source "$1"; assert_firewall_draft_matches_active "$2"',
+    'bash',
+    paths.common,
+    safe,
+  ], { stdio: 'inherit' });
+
+  let dirtyDraftRejected = false;
+  try {
+    execFileSync('bash', [
+      '-c',
+      'source "$1"; assert_firewall_draft_matches_active "$2"',
+      'bash',
+      paths.common,
+      dirtyDraft,
+    ], { stdio: 'ignore' });
+  } catch {
+    dirtyDraftRejected = true;
+  }
+  if (!dirtyDraftRejected) throw new Error('Dirty Firewall draft fixture unexpectedly passed.');
+
+  const bypassCount = execFileSync('bash', [
+    '-c',
+    'source "$1"; count_active_bypass_rules "$2"',
+    'bash',
+    paths.common,
+    bypass,
+  ], { encoding: 'utf8' }).trim();
+  if (bypassCount !== '1') throw new Error('Active bypass fixture was not detected.');
+
+  execFileSync('bash', [
+    '-c',
+    'source "$1"; assert_member_auth_probe_delta_only "$2" "$3"',
+    'bash',
+    paths.common,
+    probe,
+    paths.memberPolicy,
+  ], { stdio: 'inherit' });
 } finally {
   await rm(temp, { recursive: true, force: true });
 }
 
-console.log('MyeongHa Vercel WAF managed rate-limit registry verification passed.');
+console.log('MyeongHa Vercel WAF managed rate-limit registry verification passed: ownership, clean-draft authority, bypass detection, and exact Member Auth probe delta are pinned.');
