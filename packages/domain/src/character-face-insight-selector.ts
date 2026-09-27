@@ -715,6 +715,14 @@ export function selectCharacterFaceInsightsV1(
       selected.size >=
       input.perspective.selection.maxUnits
     ) {
+      const firstCandidate =
+        candidates[0];
+      if (firstCandidate === undefined) {
+        fail(
+          'Character Face selector encountered an empty capability candidate group.',
+        );
+      }
+
       for (const candidate of candidates) {
         if (
           !reasonCodes.has(
@@ -736,7 +744,7 @@ export function selectCharacterFaceInsightsV1(
           status:
             'omitted_max_units',
           unitId:
-            candidates[0]?.unitId,
+            firstCandidate.unitId,
         }),
       );
       continue;
