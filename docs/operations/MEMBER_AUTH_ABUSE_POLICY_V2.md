@@ -1,6 +1,6 @@
 # MyeongHa Member Auth Abuse Policy V2
 
-Status: **C2 PRODUCTION ENFORCEMENT WIRED / CANARY PENDING**
+Status: **PRODUCTION ACTIVE / C2 CANARY PROVEN**
 
 Issue: `#1332`
 
@@ -159,13 +159,15 @@ Ordinary MyeongHa PostgreSQL callers keep their prior pool defaults.
 
 The dedicated Production secret `MYEONGHA_AUTH_RATE_LIMIT_SECRET` was provisioned in Vercel as a `sensitive`, Production-only environment variable by governed run `36341568878`. The run recorded `secret_value_emitted=false`; the secret value is not repository or runtime evidence.
 
-The activation state remains `production-enforcement-pending-canary` until a side-effect-free Production canary proves:
+The activation state is `production-active`. Side-effect-free Production canary run `36346090857`, bound to exact Production deployment `dpl_8sA237CXZ4vN65N9Nq4uSPYf9p4h`, proved:
 
-1. sign-in invalid requests 1..30 remain local `400 INVALID_REQUEST`, then attempt 31 returns `429 RATE_LIMITED`;
-2. sign-up has an independent 30/31 bucket;
-3. refresh has an independent 30/31 bucket;
-4. `Retry-After` is within 1..60 seconds;
-5. sign-out remains outside the limiter and returns its ordinary Auth result rather than 429;
-6. no legitimate account/session side effect is created by the invalid probe payloads.
+1. sign-in invalid requests 1..30 returned local `400 INVALID_REQUEST`; attempt 31 returned `429 RATE_LIMITED` with `Retry-After: 52`;
+2. sign-up independently admitted 30 invalid requests; attempt 31 returned `429 RATE_LIMITED` with `Retry-After: 53`;
+3. refresh independently admitted 30 invalid requests; attempt 31 returned `429 RATE_LIMITED` with `Retry-After: 52`;
+4. endpoint bucket independence passed;
+5. sign-out remained outside the limiter and preserved `401 AUTH_REQUIRED`;
+6. probe payloads were local-invalid-only;
+7. raw network identifiers were not emitted;
+8. credential material was not emitted.
 
-C2A alone does not close #1332. C2B canary success and evidence promotion to `production-active` are still required.
+The one-shot canary bridge was used only to obtain runtime evidence. The permanent canary workflow remains manual-only and the V2 application limiter is now the active Member Auth abuse boundary. #1332 may be closed once this evidence promotion and cleanup are merged.
