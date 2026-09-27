@@ -103,6 +103,40 @@ export {
 } from './character-face-grounding-bundle.js';
 
 export {
+  CHARACTER_FACE_CAPABILITY_SCHEMA_VERSION_V1,
+  CHARACTER_FACE_CAPABILITY_SOURCE_SCHEMA_VERSION_V1,
+  CHARACTER_FACE_SUPPORTED_REALIZATION_MODES_V1,
+  CHARACTER_FACE_SUPPORTED_TOPIC_KEYS_V1,
+  CharacterFaceCapabilityAdmissionErrorV1,
+  admitCharacterFaceCapabilityProfileV1,
+  admitCharacterFaceCapabilitySourceV1,
+  evaluateCharacterFaceCapabilityV1,
+  type CharacterFaceCapabilityDecisionV1,
+  type CharacterFaceCapabilityProfileV1,
+  type CharacterFaceCapabilitySourceV1,
+  type CharacterFaceSupportedRealizationModeV1,
+  type CharacterFaceSupportedTopicKeyV1,
+} from './character-face-capability.js';
+
+export {
+  CHARACTER_FACE_ATTENTION_KEYS_V1,
+  CHARACTER_FACE_ATTENTION_REGISTRY_VERSION_V1,
+  CHARACTER_FACE_PERSPECTIVE_SCHEMA_VERSION_V1,
+  CHARACTER_FACE_PERSPECTIVE_SOURCE_SCHEMA_VERSION_V1,
+  CHARACTER_FACE_UNCERTAINTY_HANDLING_V1,
+  CharacterFacePerspectiveAdmissionErrorV1,
+  admitCharacterFacePerspectiveProfileV1,
+  admitCharacterFacePerspectiveSourceV1,
+  assertCharacterFacePerspectiveCapabilityCompatibilityV1,
+  type CharacterFaceAttentionKeyV1,
+  type CharacterFacePerspectiveDeliveryAuthorityV1,
+  type CharacterFacePerspectiveProfileV1,
+  type CharacterFacePerspectiveSelectionV1,
+  type CharacterFacePerspectiveSourceV1,
+  type CharacterFaceUncertaintyHandlingV1,
+} from './character-face-perspective.js';
+
+export {
   CHARACTER_PERSPECTIVE_NARRATIVE_ROLES_V1,
   CHARACTER_PERSPECTIVE_SCHEMA_VERSION_V1,
   SAJU_GROUNDING_AXIS_KEYS_V1,
