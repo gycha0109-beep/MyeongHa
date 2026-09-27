@@ -6,7 +6,7 @@ import type {
 } from './postgres-subject-execution.js';
 import {
   MYEONGHA_API_EXECUTION_ROLE,
-  type ProductionUserDataRuntimeConfigV1,
+  type ProductionPostgresRuntimeConfigV1,
 } from './production-user-data-runtime-config.js';
 
 export const NODE_POSTGRES_SUBJECT_POOL_DEFAULTS_V1 = Object.freeze({
@@ -270,7 +270,7 @@ export function createNodePostgresSubjectPoolFromDriverV1(input: {
 }
 
 export function createNodePostgresSubjectPoolV1(
-  config: ProductionUserDataRuntimeConfigV1,
+  config: ProductionPostgresRuntimeConfigV1,
 ): NodePostgresSubjectPoolV1 {
   if (config.databaseExecutionRole !== MYEONGHA_API_EXECUTION_ROLE) {
     throw new NodePostgresSubjectPoolErrorV1(
