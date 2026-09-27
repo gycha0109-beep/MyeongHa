@@ -45,12 +45,6 @@ insert into public.user_character_states(
   ('2b300000-0000-0000-0000-000000000002','2b200000-0000-0000-0000-000000000002','relationship-beta',30,20,1,'trusted','relationship-policy-v1',1,timestamptz '2026-08-24 10:00:00+00',timestamptz '2026-08-20 00:00:00+00',timestamptz '2026-08-24 10:00:00+00'),
   ('2b300000-0000-0000-0000-000000000003','2b200000-0000-0000-0000-000000000001','relationship-retired',7,4,3,'acquainted','relationship-policy-v1',0,null,timestamptz '2026-08-20 00:00:00+00',timestamptz '2026-08-20 00:00:00+00');
 
-insert into public.relationship_events(
-  id,subject_id,character_id,event_type,event_schema_version,event_dedupe_key,source_turn_id,
-  source_world_event_id,source_merge_action_id,delta_closeness,delta_trust,delta_friction,policy_version,
-  state_revision_before,state_revision_after,payload_jsonb,applied_at
-) values
-  ('2b400000-0000-0000-0000-000000000001','2b200000-0000-0000-0000-000000000001','relationship-alpha','RETURN_VISIT','v1','relationship-history-1',null,null,null,4,2,0,'relationship-policy-v1',1,2,'{"internal":"ledger-only"}'::jsonb,timestamptz '2026-08-25 10:00:00+00');
 SQL
 
 projection=$("${psql_base[@]}" -Atc "select state_id||'|'||character_id||'|'||closeness||'|'||trust||'|'||friction||'|'||relationship_stage||'|'||policy_version||'|'||revision||'|'||coalesce(to_char(last_interaction_at at time zone 'UTC','YYYY-MM-DD HH24:MI:SS'),'NULL') from public.qry_character_relationship_v1('2b200000-0000-0000-0000-000000000001','relationship-alpha');")
@@ -68,8 +62,8 @@ before=$("${psql_base[@]}" -Atc "select closeness||'|'||trust||'|'||friction||'|
 "${psql_base[@]}" -Atc "select count(*) from public.qry_character_relationship_v1('2b200000-0000-0000-0000-000000000001','relationship-alpha');" >/dev/null
 after=$("${psql_base[@]}" -Atc "select closeness||'|'||trust||'|'||friction||'|'||revision from public.user_character_states where id='2b300000-0000-0000-0000-000000000001';")
 [[ "$before" == "$after" ]] || fail "relationship read mutated projection authority: before=$before after=$after"
-[[ "$("${psql_base[@]}" -Atc "select count(*) from public.relationship_events where id='2b400000-0000-0000-0000-000000000001' and payload_jsonb ->> 'internal'='ledger-only';")" == "1" ]] || fail "relationship read mutated source ledger"
-pass "relationship read is projection-only and does not recalculate or mutate ledger/projection"
+[[ "$("${psql_base[@]}" -Atc "select count(*) from public.relationship_history_entries where subject_id='2b200000-0000-0000-0000-000000000001' and character_id='relationship-alpha';")" == "0" ]] || fail "relationship read created Production relationship history"
+pass "relationship read is projection-only and does not recalculate or create relationship history"
 
 expect_fail "unknown character relationship read is denied" "character was not found" "select * from public.qry_character_relationship_v1('2b200000-0000-0000-0000-000000000001','relationship-missing');"
 expect_fail "deletion-pending subject relationship read is denied" "relationship read requires an active canonical subject" "select * from public.qry_character_relationship_v1('2b200000-0000-0000-0000-000000000003','relationship-alpha');"
