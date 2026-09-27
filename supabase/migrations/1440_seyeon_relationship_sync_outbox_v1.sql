@@ -6,7 +6,7 @@
 -- Production relationship sync event type. No new retry/dead-letter policy is
 -- introduced; existing outbox lease claim/success completion semantics are reused.
 
-grant select, insert
+grant select, insert, update
   on public.outbox_events
   to myeongha_relationship_apply_owner;
 
@@ -34,6 +34,40 @@ create policy outbox_events_relationship_apply_owner_insert_v1
 on public.outbox_events
 for insert
 to myeongha_relationship_apply_owner
+with check (
+  aggregate_type = 'character_relationship'
+  and aggregate_id = public.current_myeongha_subject_id()::text || ':seyeon'
+  and event_type = 'SEYEON_PRODUCTION_RELATIONSHIP_SYNC_REQUESTED'
+  and event_schema_version = 'v1'
+  and payload_jsonb ->> 'schemaVersion'
+        = 'seyeon-production-relationship-sync-request-v1'
+  and payload_jsonb ->> 'subjectId'
+        = public.current_myeongha_subject_id()::text
+  and payload_jsonb ->> 'characterId' = 'seyeon'
+  and payload_jsonb #>> '{productionEvent,authority}'
+        = 'authorized_relationship_event_v1'
+  and payload_jsonb #>> '{productionEvent,subjectId}'
+        = public.current_myeongha_subject_id()::text
+  and payload_jsonb #>> '{productionEvent,characterId}' = 'seyeon'
+);
+
+drop policy if exists outbox_events_relationship_apply_owner_update_v1
+  on public.outbox_events;
+create policy outbox_events_relationship_apply_owner_update_v1
+on public.outbox_events
+for update
+to myeongha_relationship_apply_owner
+using (
+  aggregate_type = 'character_relationship'
+  and aggregate_id = public.current_myeongha_subject_id()::text || ':seyeon'
+  and event_type = 'SEYEON_PRODUCTION_RELATIONSHIP_SYNC_REQUESTED'
+  and event_schema_version = 'v1'
+  and payload_jsonb ->> 'schemaVersion'
+        = 'seyeon-production-relationship-sync-request-v1'
+  and payload_jsonb ->> 'subjectId'
+        = public.current_myeongha_subject_id()::text
+  and payload_jsonb ->> 'characterId' = 'seyeon'
+)
 with check (
   aggregate_type = 'character_relationship'
   and aggregate_id = public.current_myeongha_subject_id()::text || ':seyeon'
