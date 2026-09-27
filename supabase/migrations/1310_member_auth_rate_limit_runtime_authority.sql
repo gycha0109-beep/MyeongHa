@@ -263,6 +263,14 @@ BEGIN
     RAISE EXCEPTION 'myeongha_api_executor cannot execute the Member Auth rate-limit command';
   END IF;
 
+  IF pg_catalog.has_schema_privilege(
+    'myeongha_member_auth_rate_limit_owner',
+    'public',
+    'CREATE'
+  ) THEN
+    RAISE EXCEPTION 'Member Auth rate-limit owner unexpectedly retains CREATE on public schema';
+  END IF;
+
   IF pg_catalog.has_table_privilege(
       'myeongha_api_executor',
       'public.member_auth_rate_limit_buckets',
