@@ -220,7 +220,11 @@ for idx in "${!policy_rules[@]}"; do
     value: $value
   }' > "$patch_file"
 
-  firewall_request PATCH "$FIREWALL_DRAFT_API" "$patch_response" "$patch_file"
+  insert_request_status=0
+  if ! firewall_request PATCH "$FIREWALL_DRAFT_API" "$patch_response" "$patch_file"; then
+    insert_request_status=1
+  fi
+
   firewall_request GET "$FIREWALL_API" "$step_file"
   assert_active_baseline_unchanged "$step_file"
 
@@ -233,6 +237,11 @@ for idx in "${!policy_rules[@]}"; do
 
   inserted_rule_id="$(jq -er --arg name "$rule_name" '.draft.rules[] | select(.name == $name) | .id' "$step_file")"
   inserted_rule_ids+=("$inserted_rule_id")
+
+  if (( insert_request_status != 0 )); then
+    echo "::error title=Member Auth WAF capability probe insert rejected::The API rejected the insert; any observed target rule was captured for cleanup." >&2
+    exit 1
+  fi
 
   jq -e --arg name "$rule_name" --argjson expected "$rule_json" '
     [.draft.rules[] | select(.name == $name)][0] as $rule
