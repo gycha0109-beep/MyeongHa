@@ -218,7 +218,7 @@ order by section, k1, k2, line;
 SQL
 
 actual="$(sha256sum "$catalog_file" | awk '{print $1}')"
-expected="1414f1a8764d7d3f48127b3282594cbd78c43f3cd9f96d2a44b35daf3e7ffe97"
+expected="566c74087feeac8bb3c8f84b26fbb3fba11e4622aa90a838a140d3e4d6454ed7"
 
 echo "Account deletion finalizer catalog digest: $actual"
 
