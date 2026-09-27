@@ -1,0 +1,64 @@
+name: Production PostgreSQL TLS Peer Canary
+run-name: "[WT:security] Production PostgreSQL TLS Peer Canary"
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - config/operations/run-once/production-postgres-tls-peer-canary-b2b.marker
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-postgres-tls-peer-canary
+  cancel-in-progress: false
+
+jobs:
+  route-exact-marker:
+    name: validate-exact-one-shot-marker
+    runs-on: ubuntu-24.04
+    outputs:
+      authorized: ${{ steps.route.outputs.authorized }}
+    steps:
+      - name: Checkout exact main state
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - id: route
+        name: Require exact main push marker
+        shell: bash
+        run: |
+          set -euo pipefail
+          marker='config/operations/run-once/production-postgres-tls-peer-canary-b2b.marker'
+          expected='VERIFY_POSTGRES_TLS_PEER_B2B_CANARY_ONCE'
+          [[ "$GITHUB_EVENT_NAME" == 'push' ]]
+          [[ "$GITHUB_REF" == 'refs/heads/main' ]]
+          [[ -f "$marker" ]]
+          [[ "$(cat "$marker")" == "$expected" ]]
+          echo 'authorized=true' >> "$GITHUB_OUTPUT"
+
+  canary:
+    name: verify-production-postgres-tls-peer
+    needs:
+      - route-exact-marker
+    if: needs.route-exact-marker.outputs.authorized == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: production
+    env:
+      MYEONGHA_WATCHTOWER_TRACK: security
+      MYEONGHA_POSTGRES_TLS_PEER_CANARY_MARKER_PATH: config/operations/run-once/production-postgres-tls-peer-canary-b2b.marker
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM: ${{ secrets.SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM }}
+    steps:
+      - name: Checkout exact main state
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Use governed Node runtime
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 24
+
+      - name: Run Vercel-internal read-only verify-full canary
+        run: node scripts/operations/run-production-postgres-tls-peer-canary-orchestrator.mjs
