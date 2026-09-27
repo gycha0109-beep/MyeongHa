@@ -11,8 +11,9 @@ const MARKER_PATH =
 const MARKER_VALUE =
   'VERIFY_POSTGRES_TLS_PEER_B2B_SKIP_DOMAIN_CANARY_ONCE\n';
 const TRACK = 'security';
-const VERCEL_CLI_PACKAGE = 'vercel@50.1.0';
+const VERCEL_CLI_PACKAGE = 'vercel@59.16.0';
 const CANARY_MODE = 'one-shot-b2b';
+const TEAM_SLUG = 'johnny-self';
 
 class CanaryOrchestratorError extends Error {
   constructor(code, message) {
@@ -87,6 +88,47 @@ function boundedAppend(current, chunk) {
   return next.length > 65_536 ? next.slice(-65_536) : next;
 }
 
+function classifyVercelCliFailure(stderr) {
+  const normalized = stderr.toLowerCase();
+  if (
+    normalized.includes('unknown option') ||
+    normalized.includes('unexpected option') ||
+    normalized.includes('invalid option')
+  ) {
+    return 'DEPLOYMENT_CLI_OPTION_INVALID';
+  }
+  if (
+    normalized.includes('project not found') ||
+    normalized.includes('could not find project') ||
+    normalized.includes('scope') && normalized.includes('project')
+  ) {
+    return 'DEPLOYMENT_PROJECT_RESOLUTION_FAILED';
+  }
+  if (
+    normalized.includes('unauthorized') ||
+    normalized.includes('authentication') ||
+    normalized.includes('invalid token') ||
+    normalized.includes('not authenticated')
+  ) {
+    return 'DEPLOYMENT_AUTH_FAILED';
+  }
+  if (
+    normalized.includes('environment variable') ||
+    normalized.includes('invalid env') ||
+    normalized.includes('invalid environment')
+  ) {
+    return 'DEPLOYMENT_ENV_INVALID';
+  }
+  if (
+    normalized.includes('build failed') ||
+    normalized.includes('build error') ||
+    normalized.includes('command') && normalized.includes('exited with')
+  ) {
+    return 'DEPLOYMENT_BUILD_FAILED';
+  }
+  return 'DEPLOYMENT_CREATE_FAILED';
+}
+
 function runSkipDomainDeployment(input) {
   return new Promise((resolvePromise, rejectPromise) => {
     const childEnv = { ...process.env };
@@ -103,7 +145,10 @@ function runSkipDomainDeployment(input) {
       '--prod',
       '--skip-domain',
       '--yes',
-      '--non-interactive',
+      '--project',
+      PROJECT_ID,
+      '--team',
+      TEAM_SLUG,
       '--env',
       `MYEONGHA_DATABASE_SSL_ROOT_CERT_B64=${input.rootCertificateBase64}`,
       '--env',
@@ -151,7 +196,7 @@ function runSkipDomainDeployment(input) {
       if (code !== 0 || signal !== null) {
         rejectPromise(
           new CanaryOrchestratorError(
-            'DEPLOYMENT_CREATE_FAILED',
+            classifyVercelCliFailure(stderr),
             'Vercel skip-domain deployment failed.',
           ),
         );
