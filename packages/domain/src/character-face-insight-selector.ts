@@ -630,21 +630,6 @@ export function selectCharacterFaceInsightsV1(
     input.perspective,
   );
 
-  try {
-    assertCharacterFacePerspectiveCapabilityCompatibilityV1({
-      capability: input.capability,
-      perspective: input.perspective,
-    });
-  } catch (error) {
-    fail(
-      `Character Face Capability/Perspective identity mismatch: ${String(
-        error instanceof Error
-          ? error.message
-          : error,
-      )}`,
-    );
-  }
-
   const grounding =
     admitCharacterFaceGroundingBundleViewV1(
       {
@@ -667,6 +652,21 @@ export function selectCharacterFaceInsightsV1(
           input.capability,
       }),
     );
+
+  try {
+    assertCharacterFacePerspectiveCapabilityCompatibilityV1({
+      capability: input.capability,
+      perspective: input.perspective,
+    });
+  } catch (error) {
+    fail(
+      `Character Face Capability/Perspective identity mismatch: ${String(
+        error instanceof Error
+          ? error.message
+          : error,
+      )}`,
+    );
+  }
 
   const byCapability =
     unitMapByCapability(
