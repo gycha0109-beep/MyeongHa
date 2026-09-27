@@ -18,8 +18,8 @@ Current freeze progress:
 ~~~text
 Block A — owner-frozen 2026-09-27
 Block B — owner-frozen 2026-09-27
-Block C — decision brief prepared / owner decision pending
-Block D — pending
+Block C — owner-frozen 2026-09-27
+Block D — decision brief prepared / owner decision pending
 ~~~
 
 The owner-frozen values are recorded only in `SRC-22_RELATIONSHIP_POLICY_OWNER_FREEZE_WORKSHEET_V1.md`; this V2 document preserves the evidence/disposition record that led to those decisions.
