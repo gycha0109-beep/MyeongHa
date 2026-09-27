@@ -241,19 +241,50 @@ for idx in "${!policy_rules[@]}"; do
   assert_active_baseline_unchanged "$step_file"
 
   same_name_count="$(jq --arg name "$rule_name" '[.draft.rules[]? | select(.name == $name)] | length' "$step_file")"
+
+  if (( insert_request_status != 0 )); then
+    if (( same_name_count == 0 )); then
+      rejection_code="$(jq -r '.error.code // .code // "unknown"' "$patch_response" 2>/dev/null || printf 'unknown')"
+      rejection_message="$(jq -r '.error.message // .message // "Vercel API request failed"' "$patch_response" 2>/dev/null || printf 'Vercel API request failed')"
+      verify_restored_state
+
+      echo "preview_rule_set_supported=false"
+      echo "active_config_unchanged=true"
+      echo "draft_restored=true"
+      echo "production_publish_performed=false"
+
+      if [[ "$rejection_code" == "unauthorized" && "$rejection_message" == *"Rate limiting is not available for this plan"* ]]; then
+        echo "member_auth_waf_capability_probe=blocked"
+        echo "capability_blocker=rate_limiting_not_available_for_plan"
+        echo "::error title=Member Auth WAF capability blocked::Vercel rejected the first governed Auth rate-limit insert because rate limiting is not available for the current plan. Active config and draft were verified unchanged." >&2
+        exit 78
+      fi
+
+      echo "member_auth_waf_capability_probe=rejected_without_mutation"
+      echo "::error title=Member Auth WAF capability probe insert rejected::The API rejected the insert and no target rule was created; active config and draft were verified unchanged." >&2
+      exit 1
+    fi
+
+    if (( same_name_count == 1 )); then
+      inserted_rule_id="$(jq -er --arg name "$rule_name" '.draft.rules[] | select(.name == $name) | .id' "$step_file")"
+      inserted_rule_ids+=("$inserted_rule_id")
+      echo "::error title=Member Auth WAF capability probe insert rejected after mutation::The API rejected the request but one target draft rule exists; exact-ID cleanup is required." >&2
+      exit 1
+    fi
+
+    untracked_mutation_possible=true
+    echo "::error title=Member Auth WAF capability probe authority ambiguous::Rejected insert left an ambiguous target-rule count." >&2
+    exit 1
+  fi
+
   if (( same_name_count != 1 )); then
     untracked_mutation_possible=true
-    echo "::error title=Member Auth WAF capability probe authority ambiguous::Inserted target rule could not be resolved to one exact draft rule ID." >&2
+    echo "::error title=Member Auth WAF capability probe authority ambiguous::Accepted insert could not be resolved to one exact draft rule ID." >&2
     exit 1
   fi
 
   inserted_rule_id="$(jq -er --arg name "$rule_name" '.draft.rules[] | select(.name == $name) | .id' "$step_file")"
   inserted_rule_ids+=("$inserted_rule_id")
-
-  if (( insert_request_status != 0 )); then
-    echo "::error title=Member Auth WAF capability probe insert rejected::The API rejected the insert; any observed target rule was captured for cleanup." >&2
-    exit 1
-  fi
 
   jq -e --arg name "$rule_name" --argjson expected "$rule_json" '
     [.draft.rules[] | select(.name == $name)][0] as $rule
