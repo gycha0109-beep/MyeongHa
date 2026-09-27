@@ -66,7 +66,7 @@ export type SyncSeyeonProductionRelationshipEventV1Result =
     }>
   | Readonly<{
       readonly version: typeof SEYEON_PRODUCTION_RELATIONSHIP_SYNC_VERSION_V1;
-      readonly mode: 'SHADOW' | 'BEHAVIOR_SHADOW';
+      readonly mode: 'SHADOW';
       readonly status: 'shadow';
       readonly admission: SeyeonProductionRelationshipAdmissionV1;
       readonly projectedRelationship: ProductionRelationshipProjectionV1;
@@ -75,7 +75,7 @@ export type SyncSeyeonProductionRelationshipEventV1Result =
     }>
   | Readonly<{
       readonly version: typeof SEYEON_PRODUCTION_RELATIONSHIP_SYNC_VERSION_V1;
-      readonly mode: 'WRITE_DARK' | 'LIVE';
+      readonly mode: 'WRITE_DARK' | 'BEHAVIOR_SHADOW' | 'LIVE';
       readonly status: 'committed';
       readonly admission: SeyeonProductionRelationshipAdmissionV1;
       readonly applyResult: ApplyProductionRelationshipEventResultV1;
@@ -195,7 +195,7 @@ export async function syncSeyeonProductionRelationshipEventV1(
     }),
   });
 
-  if (input.mode === 'SHADOW' || input.mode === 'BEHAVIOR_SHADOW') {
+  if (input.mode === 'SHADOW') {
     const projectedRelationship = evaluateProductionRelationshipHistoryV1(
       [...historyReplay.activeEvents, admission.event],
       { physicalRevision: input.expectedRevision + 1 },
