@@ -1,0 +1,35 @@
+{
+  "contractVersion": "myeongha-production-postgres-tls-peer-verification-v1",
+  "issue": 1330,
+  "watchtowerTrack": "security",
+  "phase": "B1",
+  "activationState": "strict-target-dormant",
+  "productionActivation": false,
+  "productionBindingMutated": false,
+  "governedProjectRef": "cnsfpcdiyofqvhpcegfc",
+  "requiredTlsMode": "verify-full",
+  "driverContract": {
+    "rejectUnauthorized": true,
+    "defaultHostnameVerification": true,
+    "connectionStringSslParametersRemovedAfterValidation": true
+  },
+  "rootCertificateAuthority": {
+    "sourceStatus": "pending-supported-supabase-authority",
+    "productionFingerprint256": null,
+    "repositoryPemAllowed": false,
+    "runtimePemBindingPlanned": "MYEONGHA_DATABASE_SSL_ROOT_CERT_PEM"
+  },
+  "activationBlockers": [
+    "official-project-server-root-certificate-not-yet-obtained",
+    "production-root-certificate-fingerprint-not-yet-pinned",
+    "production-safe-verify-full-connectivity-canary-not-yet-passed"
+  ],
+  "forbidden": [
+    "production-binding-mutation-before-positive-canary",
+    "database-url-or-credential-emission",
+    "root-certificate-pem-emission",
+    "rejectUnauthorized-false-final-state",
+    "management-pat-fallback",
+    "management-api-pooler-discovery"
+  ]
+}
