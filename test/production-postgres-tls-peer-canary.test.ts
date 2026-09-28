@@ -103,7 +103,6 @@ describe('Production PostgreSQL TLS peer canary', () => {
             principal: 'myeongha_runtime',
             transaction_read_only: 'on',
             execution_role_member: true,
-            ssl_session: true,
           },
         ],
       })
@@ -134,7 +133,7 @@ describe('Production PostgreSQL TLS peer canary', () => {
       deploymentTarget: 'production',
       oneShotGitShaConfigured: true,
       connectionSucceeded: true,
-      sslSession: true,
+      strictTlsHandshakeSucceeded: true,
       transactionReadOnly: true,
       principalExpected: 'myeongha_runtime',
       principalMatch: true,
@@ -146,6 +145,11 @@ describe('Production PostgreSQL TLS peer canary', () => {
       rootCertificatePemEmitted: false,
     });
     expect(query).toHaveBeenNthCalledWith(1, 'BEGIN READ ONLY');
+    expect(query).toHaveBeenNthCalledWith(
+      2,
+      "SELECT current_user AS principal, current_setting('transaction_read_only') AS transaction_read_only, pg_has_role(current_user, 'myeongha_api_executor', 'MEMBER') AS execution_role_member",
+    );
+    expect(query.mock.calls[1]?.[0]).not.toContain('pg_stat_ssl');
     expect(query).toHaveBeenNthCalledWith(3, 'ROLLBACK');
   });
 
@@ -162,7 +166,6 @@ describe('Production PostgreSQL TLS peer canary', () => {
           principal: 'unexpected-principal',
           transaction_read_only: 'on',
           execution_role_member: true,
-          ssl_session: true,
         },
       ],
       'CANARY_EVIDENCE_PRINCIPAL_MISMATCH',
@@ -174,7 +177,6 @@ describe('Production PostgreSQL TLS peer canary', () => {
           principal: 'myeongha_runtime',
           transaction_read_only: 'off',
           execution_role_member: true,
-          ssl_session: true,
         },
       ],
       'CANARY_EVIDENCE_TRANSACTION_READ_ONLY_INVALID',
@@ -186,22 +188,9 @@ describe('Production PostgreSQL TLS peer canary', () => {
           principal: 'myeongha_runtime',
           transaction_read_only: 'on',
           execution_role_member: false,
-          ssl_session: true,
         },
       ],
       'CANARY_EVIDENCE_ROLE_MEMBERSHIP_INVALID',
-    ],
-    [
-      'SSL session',
-      [
-        {
-          principal: 'myeongha_runtime',
-          transaction_read_only: 'on',
-          execution_role_member: true,
-          ssl_session: false,
-        },
-      ],
-      'CANARY_EVIDENCE_SSL_SESSION_INVALID',
     ],
   ])('classifies %s evidence failure without exposing row values', async (_label, rows, code) => {
     const query = vi
