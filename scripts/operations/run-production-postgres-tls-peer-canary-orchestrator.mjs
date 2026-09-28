@@ -9,7 +9,7 @@ const TEAM_ID = 'team_xuYA9OhCWlJETaYFOmeVodgS';
 const MARKER_PATH =
   'config/operations/run-once/production-postgres-tls-peer-canary-b2b.marker';
 const MARKER_VALUE =
-  'VERIFY_POSTGRES_TLS_PEER_B2B_SKIP_DOMAIN_CANARY_RETRY10\n';
+  'VERIFY_POSTGRES_TLS_PEER_B2B_SKIP_DOMAIN_CANARY_RETRY11\n';
 const TRACK = 'security';
 const VERCEL_CLI_PACKAGE = 'vercel@59.16.0';
 const CANARY_MODE = 'one-shot-b2b';
@@ -81,6 +81,55 @@ async function requestJson(url, token, init, code) {
   } catch {
     return fail(code, 'Vercel API response was not JSON.');
   }
+}
+
+export function inspectAutomationBypassBinding(
+  projectPayload,
+  automationBypassSecret,
+) {
+  const protectionBypass = projectPayload?.protectionBypass;
+  if (
+    protectionBypass === null ||
+    typeof protectionBypass !== 'object' ||
+    Array.isArray(protectionBypass)
+  ) {
+    return fail(
+      'VERCEL_AUTOMATION_BYPASS_BINDING_UNAVAILABLE',
+      'Vercel project automation bypass metadata is unavailable.',
+    );
+  }
+
+  const metadata = protectionBypass[automationBypassSecret];
+  if (
+    metadata === null ||
+    typeof metadata !== 'object' ||
+    metadata.scope !== 'automation-bypass'
+  ) {
+    return fail(
+      'VERCEL_AUTOMATION_BYPASS_SECRET_MISMATCH',
+      'Configured automation bypass secret does not match the governed Vercel project.',
+    );
+  }
+
+  return Object.freeze({
+    automationBypassProjectMatch: true,
+    automationBypassScope: 'automation-bypass',
+    automationBypassSecretEmitted: false,
+  });
+}
+
+async function verifyAutomationBypassBinding(input) {
+  const project = await requestJson(
+    `https://api.vercel.com/v9/projects/${encodeURIComponent(PROJECT_ID)}?teamId=${encodeURIComponent(TEAM_ID)}`,
+    input.vercelToken,
+    { method: 'GET' },
+    'VERCEL_AUTOMATION_BYPASS_BINDING_LOOKUP_FAILED',
+  );
+
+  return inspectAutomationBypassBinding(
+    project,
+    input.automationBypassSecret,
+  );
 }
 
 function boundedAppend(current, chunk) {
@@ -396,6 +445,12 @@ export async function runProductionPostgresTlsPeerCanaryOrchestrator(env = proce
   let cleanupDeployment = true;
 
   try {
+    const bypassBindingEvidence =
+      await verifyAutomationBypassBinding({
+        vercelToken: token,
+        automationBypassSecret,
+      });
+
     const deploymentUrl = await runSkipDomainDeployment({
       vercelToken: token,
       rootCertificateBase64,
@@ -444,8 +499,8 @@ export async function runProductionPostgresTlsPeerCanaryOrchestrator(env = proce
       deploymentMode: 'production-skip-domain',
       customEnvironmentCreated: false,
       ...aliasEvidence,
+      ...bypassBindingEvidence,
       automationBypassUsed: true,
-      automationBypassSecretEmitted: false,
       projectDeploymentProtectionMutated: false,
       productionEnvironmentMutated: false,
       productionDatabaseBindingMutated: false,
@@ -468,6 +523,12 @@ function printEvidence(evidence) {
   console.log('postgres_tls_peer_canary=pass');
   console.log(`deployment_mode=${evidence.deploymentMode}`);
   console.log(`production_domain_aliased=${evidence.productionDomainAliased}`);
+  console.log(
+    `automation_bypass_project_match=${evidence.automationBypassProjectMatch}`,
+  );
+  console.log(
+    `automation_bypass_scope=${evidence.automationBypassScope}`,
+  );
   console.log(
     `automation_bypass_used=${evidence.automationBypassUsed}`,
   );
