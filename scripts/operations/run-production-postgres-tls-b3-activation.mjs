@@ -26,6 +26,10 @@ const PINNED_ROOT_FINGERPRINT256 =
   '80:70:25:AD:50:D4:ED:21:9D:2C:9C:7D:29:9C:00:4F:82:4E:B0:0C:F7:F6:5A:FE:F6:07:D0:7B:72:E6:CA:FA';
 const AUTHORITY_PATH =
   'config/operations/production-postgres-tls-peer-verification-v1.json';
+const ONE_SHOT_MARKER_PATH =
+  'config/operations/run-once/production-postgres-tls-b3-activation.marker';
+const ONE_SHOT_MARKER_VALUE =
+  'ACTIVATE_POSTGRES_TLS_VERIFY_FULL_B3_RUN1';
 
 class ActivationOrchestratorError extends Error {
   constructor(code, message) {
@@ -48,16 +52,56 @@ function required(value, code) {
 
 function requireAuthority(env) {
   if (
-    env.GITHUB_EVENT_NAME !== 'workflow_dispatch' ||
     env.GITHUB_REF !== 'refs/heads/main' ||
-    env.MYEONGHA_WATCHTOWER_TRACK !== TRACK ||
-    env.DISPATCH_CONFIRM !== 'ACTIVATE_POSTGRES_TLS_VERIFY_FULL_B3'
+    env.MYEONGHA_WATCHTOWER_TRACK !== TRACK
   ) {
     return fail(
       'ACTIVATION_AUTHORITY_INVALID',
       'Production PostgreSQL TLS activation authority is invalid.',
     );
   }
+
+  if (env.GITHUB_EVENT_NAME === 'workflow_dispatch') {
+    if (env.DISPATCH_CONFIRM !== 'ACTIVATE_POSTGRES_TLS_VERIFY_FULL_B3') {
+      return fail(
+        'ACTIVATION_AUTHORITY_INVALID',
+        'Production PostgreSQL TLS activation dispatch confirmation is invalid.',
+      );
+    }
+    return;
+  }
+
+  if (env.GITHUB_EVENT_NAME === 'push') {
+    if (env.MYEONGHA_POSTGRES_TLS_B3_MARKER_PATH !== ONE_SHOT_MARKER_PATH) {
+      return fail(
+        'ACTIVATION_MARKER_AUTHORITY_INVALID',
+        'Production PostgreSQL TLS activation marker authority is invalid.',
+      );
+    }
+
+    let marker;
+    try {
+      marker = readFileSync(ONE_SHOT_MARKER_PATH, 'utf8');
+    } catch {
+      return fail(
+        'ACTIVATION_MARKER_MISSING',
+        'Production PostgreSQL TLS activation marker is missing.',
+      );
+    }
+
+    if (marker !== ONE_SHOT_MARKER_VALUE) {
+      return fail(
+        'ACTIVATION_MARKER_INVALID',
+        'Production PostgreSQL TLS activation marker value is invalid.',
+      );
+    }
+    return;
+  }
+
+  return fail(
+    'ACTIVATION_AUTHORITY_INVALID',
+    'Production PostgreSQL TLS activation event is invalid.',
+  );
 }
 
 async function requestJson(url, token, init, code) {
