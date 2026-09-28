@@ -9,7 +9,7 @@ const TEAM_ID = 'team_xuYA9OhCWlJETaYFOmeVodgS';
 const MARKER_PATH =
   'config/operations/run-once/production-postgres-tls-peer-canary-b2b.marker';
 const MARKER_VALUE =
-  'VERIFY_POSTGRES_TLS_PEER_B2B_SKIP_DOMAIN_CANARY_RETRY12\n';
+  'VERIFY_POSTGRES_TLS_PEER_B2B_SKIP_DOMAIN_CANARY_RETRY13\n';
 const TRACK = 'security';
 const VERCEL_CLI_PACKAGE = 'vercel@59.16.0';
 const CANARY_MODE = 'one-shot-b2b';
@@ -213,7 +213,7 @@ async function runAutomationBypassCanaryRequest(input) {
   let response;
   try {
     response = await fetch(
-      `${input.deploymentUrl}/api/readiness`,
+      `${input.requestBaseUrl}/api/readiness`,
       {
         method: 'POST',
         headers: buildAutomationBypassCanaryHeaders(input),
@@ -498,7 +498,7 @@ export async function runProductionPostgresTlsPeerCanaryOrchestrator(env = proce
     const aliasEvidence = inspectSkipDomainAliasEvidence(aliases);
 
     const canaryPayload = await runAutomationBypassCanaryRequest({
-      deploymentUrl,
+      requestBaseUrl: `https://${aliasEvidence.generatedCliAlias}`,
       canaryToken,
       automationBypassSecret,
     });
@@ -511,6 +511,7 @@ export async function runProductionPostgresTlsPeerCanaryOrchestrator(env = proce
       ...aliasEvidence,
       ...bypassBindingEvidence,
       automationBypassUsed: true,
+      canaryRequestAliasVerified: true,
       projectDeploymentProtectionMutated: false,
       productionEnvironmentMutated: false,
       productionDatabaseBindingMutated: false,
@@ -541,6 +542,9 @@ function printEvidence(evidence) {
   );
   console.log(
     `automation_bypass_used=${evidence.automationBypassUsed}`,
+  );
+  console.log(
+    `canary_request_alias_verified=${evidence.canaryRequestAliasVerified}`,
   );
   console.log(
     `automation_bypass_secret_emitted=${evidence.automationBypassSecretEmitted}`,
