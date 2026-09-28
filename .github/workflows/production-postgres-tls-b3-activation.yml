@@ -2,6 +2,11 @@ name: Production PostgreSQL TLS B3 Activation
 run-name: "[WT:security] Production PostgreSQL TLS B3 Activation"
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - config/operations/run-once/production-postgres-tls-b3-activation.marker
   workflow_dispatch:
     inputs:
       confirm:
@@ -18,6 +23,7 @@ concurrency:
 
 env:
   MYEONGHA_WATCHTOWER_TRACK: security
+  MYEONGHA_POSTGRES_TLS_B3_MARKER_PATH: config/operations/run-once/production-postgres-tls-b3-activation.marker
   VERCEL_PROJECT_ID: prj_nXF0b5uv27Lyucz2SEBxzdCRXVsP
   VERCEL_TEAM_ID: team_xuYA9OhCWlJETaYFOmeVodgS
   VERCEL_PROJECT_NAME: myeongha
