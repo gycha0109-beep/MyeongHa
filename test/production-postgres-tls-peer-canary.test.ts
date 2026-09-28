@@ -148,4 +148,85 @@ describe('Production PostgreSQL TLS peer canary', () => {
     expect(query).toHaveBeenNthCalledWith(1, 'BEGIN READ ONLY');
     expect(query).toHaveBeenNthCalledWith(3, 'ROLLBACK');
   });
+
+  it.each([
+    [
+      'row count',
+      [],
+      'CANARY_EVIDENCE_ROW_COUNT_INVALID',
+    ],
+    [
+      'principal',
+      [
+        {
+          principal: 'unexpected-principal',
+          transaction_read_only: 'on',
+          execution_role_member: true,
+          ssl_session: true,
+        },
+      ],
+      'CANARY_EVIDENCE_PRINCIPAL_MISMATCH',
+    ],
+    [
+      'read-only transaction',
+      [
+        {
+          principal: 'myeongha_runtime',
+          transaction_read_only: 'off',
+          execution_role_member: true,
+          ssl_session: true,
+        },
+      ],
+      'CANARY_EVIDENCE_TRANSACTION_READ_ONLY_INVALID',
+    ],
+    [
+      'execution-role membership',
+      [
+        {
+          principal: 'myeongha_runtime',
+          transaction_read_only: 'on',
+          execution_role_member: false,
+          ssl_session: true,
+        },
+      ],
+      'CANARY_EVIDENCE_ROLE_MEMBERSHIP_INVALID',
+    ],
+    [
+      'SSL session',
+      [
+        {
+          principal: 'myeongha_runtime',
+          transaction_read_only: 'on',
+          execution_role_member: true,
+          ssl_session: false,
+        },
+      ],
+      'CANARY_EVIDENCE_SSL_SESSION_INVALID',
+    ],
+  ])('classifies %s evidence failure without exposing row values', async (_label, rows, code) => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows })
+      .mockResolvedValueOnce({ rows: [] });
+
+    await expect(
+      runProductionPostgresTlsPeerCanaryV1({
+        env: env(),
+        buildPlan: () => ({
+          clientConfig: {},
+          currentBindingTlsMode: 'require',
+          currentBindingPeerVerification: 'none',
+        }),
+        createClient: () => ({
+          connect: vi.fn().mockResolvedValue(undefined),
+          query,
+          end: vi.fn().mockResolvedValue(undefined),
+        }),
+      }),
+    ).rejects.toMatchObject({ code });
+
+    expect(query).toHaveBeenNthCalledWith(1, 'BEGIN READ ONLY');
+    expect(query).toHaveBeenNthCalledWith(3, 'ROLLBACK');
+  });
 });

@@ -77,7 +77,11 @@ export class ProductionPostgresTlsCanaryErrorV1 extends Error {
       | 'CANARY_STRICT_TARGET_REJECTED'
       | 'CANARY_CONNECT_FAILED'
       | 'CANARY_QUERY_FAILED'
-      | 'CANARY_EVIDENCE_INVALID',
+      | 'CANARY_EVIDENCE_ROW_COUNT_INVALID'
+      | 'CANARY_EVIDENCE_PRINCIPAL_MISMATCH'
+      | 'CANARY_EVIDENCE_TRANSACTION_READ_ONLY_INVALID'
+      | 'CANARY_EVIDENCE_ROLE_MEMBERSHIP_INVALID'
+      | 'CANARY_EVIDENCE_SSL_SESSION_INVALID',
     message: string,
   ) {
     super(message);
@@ -277,21 +281,36 @@ export async function runProductionPostgresTlsPeerCanaryV1(input: {
 
       if (result.rows.length !== 1) {
         return fail(
-          'CANARY_EVIDENCE_INVALID',
+          'CANARY_EVIDENCE_ROW_COUNT_INVALID',
           'PostgreSQL TLS canary returned an unexpected evidence row count.',
         );
       }
 
       const row = result.rows[0];
       if (
-        row?.principal !== PRODUCTION_POSTGRES_TLS_CANARY_EXPECTED_PRINCIPAL_V1 ||
-        row.transaction_read_only !== 'on' ||
-        !exactlyTrue(row.execution_role_member) ||
-        !exactlyTrue(row.ssl_session)
+        row?.principal !== PRODUCTION_POSTGRES_TLS_CANARY_EXPECTED_PRINCIPAL_V1
       ) {
         return fail(
-          'CANARY_EVIDENCE_INVALID',
-          'PostgreSQL TLS canary evidence did not satisfy the governed contract.',
+          'CANARY_EVIDENCE_PRINCIPAL_MISMATCH',
+          'PostgreSQL TLS canary principal evidence did not match the governed principal.',
+        );
+      }
+      if (row.transaction_read_only !== 'on') {
+        return fail(
+          'CANARY_EVIDENCE_TRANSACTION_READ_ONLY_INVALID',
+          'PostgreSQL TLS canary read-only transaction evidence was invalid.',
+        );
+      }
+      if (!exactlyTrue(row.execution_role_member)) {
+        return fail(
+          'CANARY_EVIDENCE_ROLE_MEMBERSHIP_INVALID',
+          'PostgreSQL TLS canary execution-role membership evidence was invalid.',
+        );
+      }
+      if (!exactlyTrue(row.ssl_session)) {
+        return fail(
+          'CANARY_EVIDENCE_SSL_SESSION_INVALID',
+          'PostgreSQL TLS canary SSL session evidence was invalid.',
         );
       }
 
