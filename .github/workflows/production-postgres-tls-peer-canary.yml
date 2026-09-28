@@ -31,7 +31,7 @@ jobs:
         run: |
           set -euo pipefail
           marker='config/operations/run-once/production-postgres-tls-peer-canary-b2b.marker'
-          expected='VERIFY_POSTGRES_TLS_PEER_B2B_SKIP_DOMAIN_CANARY_RETRY9'
+          expected='VERIFY_POSTGRES_TLS_PEER_B2B_SKIP_DOMAIN_CANARY_RETRY10'
           [[ "$GITHUB_EVENT_NAME" == 'push' ]]
           [[ "$GITHUB_REF" == 'refs/heads/main' ]]
           [[ -f "$marker" ]]
@@ -50,6 +50,7 @@ jobs:
       MYEONGHA_WATCHTOWER_TRACK: security
       MYEONGHA_POSTGRES_TLS_PEER_CANARY_MARKER_PATH: config/operations/run-once/production-postgres-tls-peer-canary-b2b.marker
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
       SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM: ${{ secrets.SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM }}
     steps:
       - name: Checkout exact main state
