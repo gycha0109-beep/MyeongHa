@@ -9,7 +9,7 @@ const TEAM_ID = 'team_xuYA9OhCWlJETaYFOmeVodgS';
 const MARKER_PATH =
   'config/operations/run-once/production-postgres-tls-peer-canary-b2b.marker';
 const MARKER_VALUE =
-  'VERIFY_POSTGRES_TLS_PEER_B2B_SKIP_DOMAIN_CANARY_RETRY9\n';
+  'VERIFY_POSTGRES_TLS_PEER_B2B_SKIP_DOMAIN_CANARY_RETRY10\n';
 const TRACK = 'security';
 const VERCEL_CLI_PACKAGE = 'vercel@59.16.0';
 const CANARY_MODE = 'one-shot-b2b';
@@ -157,7 +157,7 @@ async function patchDeploymentProtectionBypass(input) {
   let response;
   try {
     response = await fetch(
-      `https://api.vercel.com/aliases/${encodeURIComponent(input.deploymentId)}/protection-bypass?teamId=${encodeURIComponent(TEAM_ID)}`,
+      `https://api.vercel.com/aliases/${encodeURIComponent(input.aliasId)}/protection-bypass?teamId=${encodeURIComponent(TEAM_ID)}`,
       {
         method: 'PATCH',
         headers: {
@@ -196,7 +196,7 @@ async function patchDeploymentProtectionBypass(input) {
 
 export async function createTemporaryDeploymentShareableLink(input) {
   const payload = await patchDeploymentProtectionBypass({
-    deploymentId: input.deploymentId,
+    deploymentId: input.aliasId,
     vercelToken: input.vercelToken,
     body: { ttl: TEMPORARY_SHAREABLE_LINK_TTL_SECONDS },
     failureCode: 'CANARY_SHAREABLE_LINK_CREATE_FAILED',
@@ -216,7 +216,7 @@ export async function revokeTemporaryDeploymentShareableLink(input) {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
       await patchDeploymentProtectionBypass({
-        deploymentId: input.deploymentId,
+        deploymentId: input.aliasId,
         vercelToken: input.vercelToken,
         body: {
           revoke: {
@@ -450,13 +450,15 @@ export function inspectSkipDomainAliasEvidence(payload) {
     );
   }
 
-  const names = payload.aliases.map((entry) =>
-    typeof entry?.alias === 'string' ? entry.alias : null,
-  );
+  const entries = payload.aliases.map((entry) => ({
+    alias: typeof entry?.alias === 'string' ? entry.alias : null,
+    uid: typeof entry?.uid === 'string' ? entry.uid : null,
+  }));
 
   if (
-    names.length !== 1 ||
-    names[0] !== ALLOWED_GENERATED_CLI_ALIAS
+    entries.length !== 1 ||
+    entries[0]?.alias !== ALLOWED_GENERATED_CLI_ALIAS ||
+    entries[0]?.uid === null
   ) {
     return fail(
       'DEPLOYMENT_ALIAS_PRESENT',
@@ -467,6 +469,7 @@ export function inspectSkipDomainAliasEvidence(payload) {
   return Object.freeze({
     generatedCliAliasPresent: true,
     generatedCliAlias: ALLOWED_GENERATED_CLI_ALIAS,
+    generatedCliAliasId: entries[0].uid,
     productionDomainAliased: false,
   });
 }
@@ -517,6 +520,7 @@ export async function runProductionPostgresTlsPeerCanaryOrchestrator(env = proce
   const canaryToken = randomBytes(32).toString('base64url');
 
   let deploymentId;
+  let aliasEvidenceForCleanup;
   let shareableSecret;
   let cleanupShareableLink = true;
   let cleanupDeployment = true;
@@ -557,15 +561,16 @@ export async function runProductionPostgresTlsPeerCanaryOrchestrator(env = proce
       'DEPLOYMENT_ALIAS_LOOKUP_FAILED',
     );
     const aliasEvidence = inspectSkipDomainAliasEvidence(aliases);
+    aliasEvidenceForCleanup = aliasEvidence;
 
     shareableSecret =
       await createTemporaryDeploymentShareableLink({
-        deploymentId,
+        aliasId: aliasEvidence.generatedCliAliasId,
         vercelToken: token,
       });
 
     const canaryPayload = await runShareableCanaryRequest({
-      deploymentUrl,
+      deploymentUrl: `https://${aliasEvidence.generatedCliAlias}`,
       canaryToken,
       shareableSecret,
     });
@@ -588,10 +593,13 @@ export async function runProductionPostgresTlsPeerCanaryOrchestrator(env = proce
       ...evidence,
     });
   } finally {
-    if (deploymentId && shareableSecret) {
+    if (
+      aliasEvidenceForCleanup?.generatedCliAliasId &&
+      shareableSecret
+    ) {
       cleanupShareableLink =
         await revokeTemporaryDeploymentShareableLink({
-          deploymentId,
+          aliasId: aliasEvidenceForCleanup?.generatedCliAliasId,
           vercelToken: token,
           shareableSecret,
         });
