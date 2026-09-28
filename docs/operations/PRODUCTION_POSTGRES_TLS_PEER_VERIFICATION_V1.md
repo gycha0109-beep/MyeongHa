@@ -1,6 +1,6 @@
 # Production PostgreSQL TLS Peer Verification V1
 
-Status: **B2B RUNTIME CANARY PASS / B3 PRODUCTION ACTIVATION PENDING / LIVE BINDING STILL LEGACY**
+Status: **B3 PRODUCTION VERIFY-FULL ACTIVE / B4 FAIL-CLOSED HARDENING PENDING**
 
 Watchtower-Track: security
 
@@ -423,6 +423,45 @@ Do not tighten Production to `verify-full` until all are true:
 5. rollback preserves the prior known-working binding without credential disclosure.
 
 Only after positive evidence is recorded may the live Production binding be changed.
+
+### B3 positive activation evidence pinned
+
+Production B3 activation completed successfully on 2026-09-28.
+
+```text
+workflow run id = 36497482499
+workflow run number = 1
+source main SHA = 2efb484be5d487f92d5877dbe00cfa429b0e3fda
+result = pass
+
+staged ordinary pool canary = pass
+Production peer mode = verify-full
+Production activation = true
+Production binding mutated = true
+root certificate binding = sensitive
+root certificate fingerprint pinned = true
+ordinary pool connection = pass
+transaction read only = true
+principal match = true
+execution role membership = true
+write executed = false
+canonical exact-main redeploy = pass
+canonical readiness = pass
+
+database URL read = false
+database URL decrypted = false
+database URL emitted = false
+credential material emitted = false
+root certificate PEM emitted = false
+automation bypass secret emitted = false
+temporary alias deleted = true
+staged deployment deleted = true
+rollback required = false
+```
+
+B3 is complete. The ordinary Production PostgreSQL runtime now uses the governed
+`verify-full` path with the pinned Supabase Server root certificate. B4 remains open to
+remove transitional legacy compatibility and make weak/missing TLS authority fail closed.
 
 ## Phase B4 — permanent fail-closed enforcement
 
