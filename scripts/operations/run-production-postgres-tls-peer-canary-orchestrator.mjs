@@ -9,7 +9,7 @@ const TEAM_ID = 'team_xuYA9OhCWlJETaYFOmeVodgS';
 const MARKER_PATH =
   'config/operations/run-once/production-postgres-tls-peer-canary-b2b.marker';
 const MARKER_VALUE =
-  'VERIFY_POSTGRES_TLS_PEER_B2B_SKIP_DOMAIN_CANARY_RETRY13\n';
+  'VERIFY_POSTGRES_TLS_PEER_B2B_SKIP_DOMAIN_CANARY_RETRY14\n';
 const TRACK = 'security';
 const VERCEL_CLI_PACKAGE = 'vercel@59.16.0';
 const CANARY_MODE = 'one-shot-b2b';
@@ -200,13 +200,83 @@ export function buildSkipDomainDeploymentArgs(input) {
   ];
 }
 
+export function buildAutomationBypassBootstrapHeaders(input) {
+  return Object.freeze({
+    Accept: 'text/html,application/xhtml+xml',
+    'x-vercel-protection-bypass': input.automationBypassSecret,
+    'x-vercel-set-bypass-cookie': 'true',
+  });
+}
+
 export function buildAutomationBypassCanaryHeaders(input) {
   return Object.freeze({
     Authorization: `Bearer ${input.canaryToken}`,
     Accept: 'application/json',
     'Content-Type': 'application/json',
+    Cookie: input.bypassCookie,
     'x-vercel-protection-bypass': input.automationBypassSecret,
   });
+}
+
+function extractAutomationBypassCookie(response) {
+  const values =
+    typeof response.headers.getSetCookie === 'function'
+      ? response.headers.getSetCookie()
+      : [response.headers.get('set-cookie')].filter(Boolean);
+
+  const cookie = values
+    .map((value) => value.split(';', 1)[0]?.trim())
+    .filter((value) => typeof value === 'string' && value.length > 0)
+    .find((value) => value.startsWith('_vercel_jwt='));
+
+  if (typeof cookie !== 'string' || cookie.length === 0) {
+    return fail(
+      'CANARY_AUTOMATION_BYPASS_COOKIE_MISSING',
+      'Automation bypass bootstrap did not establish the expected Vercel cookie.',
+    );
+  }
+
+  return cookie;
+}
+
+async function bootstrapAutomationBypassCookie(input) {
+  let response;
+  try {
+    response = await fetch(`${input.requestBaseUrl}/`, {
+      method: 'GET',
+      headers: buildAutomationBypassBootstrapHeaders(input),
+      redirect: 'manual',
+      signal: AbortSignal.timeout(20_000),
+    });
+  } catch {
+    return fail(
+      'CANARY_AUTOMATION_BYPASS_BOOTSTRAP_FAILED',
+      'Automation bypass cookie bootstrap failed.',
+    );
+  }
+
+  if (response.status === 401) {
+    return fail(
+      'CANARY_AUTOMATION_BYPASS_BOOTSTRAP_UNAUTHORIZED',
+      'Vercel returned 401 during automation bypass cookie bootstrap.',
+    );
+  }
+
+  if (response.status === 403) {
+    return fail(
+      'CANARY_AUTOMATION_BYPASS_BOOTSTRAP_FORBIDDEN',
+      'Vercel returned 403 during automation bypass cookie bootstrap.',
+    );
+  }
+
+  if (response.status < 200 || response.status >= 400) {
+    return fail(
+      'CANARY_AUTOMATION_BYPASS_BOOTSTRAP_INVALID',
+      'Automation bypass cookie bootstrap returned an unexpected status.',
+    );
+  }
+
+  return extractAutomationBypassCookie(response);
 }
 
 async function runAutomationBypassCanaryRequest(input) {
@@ -497,10 +567,18 @@ export async function runProductionPostgresTlsPeerCanaryOrchestrator(env = proce
     );
     const aliasEvidence = inspectSkipDomainAliasEvidence(aliases);
 
+    const requestBaseUrl =
+      `https://${aliasEvidence.generatedCliAlias}`;
+    const bypassCookie = await bootstrapAutomationBypassCookie({
+      requestBaseUrl,
+      automationBypassSecret,
+    });
+
     const canaryPayload = await runAutomationBypassCanaryRequest({
-      requestBaseUrl: `https://${aliasEvidence.generatedCliAlias}`,
+      requestBaseUrl,
       canaryToken,
       automationBypassSecret,
+      bypassCookie,
     });
 
     const evidence = validateCanaryEvidence(canaryPayload);
@@ -511,6 +589,8 @@ export async function runProductionPostgresTlsPeerCanaryOrchestrator(env = proce
       ...aliasEvidence,
       ...bypassBindingEvidence,
       automationBypassUsed: true,
+      automationBypassCookieEstablished: true,
+      automationBypassCookieEmitted: false,
       canaryRequestAliasVerified: true,
       projectDeploymentProtectionMutated: false,
       productionEnvironmentMutated: false,
@@ -542,6 +622,12 @@ function printEvidence(evidence) {
   );
   console.log(
     `automation_bypass_used=${evidence.automationBypassUsed}`,
+  );
+  console.log(
+    `automation_bypass_cookie_established=${evidence.automationBypassCookieEstablished}`,
+  );
+  console.log(
+    `automation_bypass_cookie_emitted=${evidence.automationBypassCookieEmitted}`,
   );
   console.log(
     `canary_request_alias_verified=${evidence.canaryRequestAliasVerified}`,
