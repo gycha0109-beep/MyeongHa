@@ -1,10 +1,35 @@
 # Production PostgreSQL TLS Peer Verification V1
 
-Status: **B3 PRODUCTION VERIFY-FULL ACTIVE / B4 FAIL-CLOSED HARDENING PENDING**
+Status: **SEC-01 COMPLETE / B4 PRODUCTION VERIFY-FULL FAIL-CLOSED ENFORCED**
 
 Watchtower-Track: security
 
 Tracking: #1330
+
+## Current resolved state
+
+SEC-01 is complete for the ordinary Production user-data PostgreSQL runtime.
+
+The effective Production contract is now:
+
+```text
+MYEONGHA_DATABASE_TLS_PEER_MODE = verify-full (required)
+MYEONGHA_DATABASE_SSL_ROOT_CERT_PEM = required protected binding
+official Supabase Server root fingerprint = pinned
+explicit node-postgres ssl.ca = enabled
+rejectUnauthorized = true
+Node default hostname verification = enabled
+ordinary Production legacy pool fallback = removed
+```
+
+The protected historical database URL remains a credential/host carrier and is not read or
+decrypted for evidence. Any SSL-related source parameters are removed before the ordinary
+Production driver configuration is constructed, and the governed strict TLS target is applied
+separately. Therefore historical `sslmode=require` source text cannot select legacy TLS
+semantics in the ordinary Production runtime.
+
+The account-deletion worker uses a separate database URL/principal authority and remains
+outside this SEC-01 ordinary-runtime scope.
 
 ## Purpose
 
@@ -464,6 +489,42 @@ B3 is complete. The ordinary Production PostgreSQL runtime now uses the governed
 remove transitional legacy compatibility and make weak/missing TLS authority fail closed.
 
 ## Phase B4 — permanent fail-closed enforcement
+
+### B4 completion evidence
+
+B4 fail-closed enforcement merged through PR #1424.
+
+```text
+PR exact head = 0d06e23b8d4604cfad9677ca3e132e2b8682dd9b
+main merge SHA = b7706808d5937c6e41c40c256c633d8babeb4ec7
+
+CI #4138 = pass
+Governance #1242 = pass
+Supabase Production #321 = pass
+Web Browser Smoke #2199 = pass
+
+Vercel Production deployment = dpl_EGx7UmjxjVRjjygAuu49TmqozDzF
+deployment state = READY
+deployment Git SHA = b7706808d5937c6e41c40c256c633d8babeb4ec7
+canonical alias = myeongha.vercel.app
+canonical readiness HTTP = 200
+canonical readiness status = ready
+userData = ready
+sajuCalculation = ready
+```
+
+The ordinary Production parser now requires the explicit `verify-full` peer-mode binding and
+root certificate binding. Missing, retired legacy, and unknown peer-mode authority fail closed.
+The ordinary Production pool no longer falls back to the legacy
+`sslmode=require -> uselibpqcompat=true` execution path. Source SSL parameters are stripped
+before the strict target is handed to node-postgres, which receives explicit CA material with
+`rejectUnauthorized=true` and the default Node hostname verifier.
+
+The completed B3 activation workflow, marker, mutation orchestrator, and temporary activation
+canary surface were removed after successful activation. No database URL, credentials, or
+certificate PEM were emitted while collecting B4 evidence.
+
+
 
 After B3 succeeds, the ordinary Production runtime may be changed to reject weaker modes.
 
