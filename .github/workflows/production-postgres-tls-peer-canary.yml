@@ -31,7 +31,7 @@ jobs:
         run: |
           set -euo pipefail
           marker='config/operations/run-once/production-postgres-tls-peer-canary-b2b.marker'
-          expected='VERIFY_POSTGRES_TLS_PEER_B2B_SKIP_DOMAIN_CANARY_RETRY15'
+          expected='VERIFY_POSTGRES_TLS_PEER_B2B_SKIP_DOMAIN_CANARY_RETRY16'
           [[ "$GITHUB_EVENT_NAME" == 'push' ]]
           [[ "$GITHUB_REF" == 'refs/heads/main' ]]
           [[ -f "$marker" ]]

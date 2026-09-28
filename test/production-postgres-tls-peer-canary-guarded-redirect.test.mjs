@@ -3,37 +3,35 @@ import { describe, expect, it } from 'vitest';
 import { resolveAllowedCanaryRedirect } from '../scripts/operations/run-production-postgres-tls-peer-canary-orchestrator.mjs';
 
 const REQUEST =
-  'https://myeongha-johnny-self.vercel.app/api/readiness';
+  'https://myeongha-example-johnny-self.vercel.app/api/readiness';
 const DEPLOYMENT =
   'https://myeongha-example-johnny-self.vercel.app';
 
 describe('Production PostgreSQL TLS peer canary guarded redirect contract', () => {
-  it('allows one method-preserving redirect only within the verified staged hosts', () => {
+  it('allows one method-preserving redirect only within the exact staged deployment host', () => {
     expect(
       resolveAllowedCanaryRedirect({
         status: 308,
-        location:
-          'https://myeongha-example-johnny-self.vercel.app/api/readiness',
-        requestUrl: REQUEST,
-        deploymentUrl: DEPLOYMENT,
-      }),
-    ).toBe(
-      'https://myeongha-example-johnny-self.vercel.app/api/readiness',
-    );
-
-    expect(
-      resolveAllowedCanaryRedirect({
-        status: 307,
         location: '/api/readiness/',
         requestUrl: REQUEST,
         deploymentUrl: DEPLOYMENT,
       }),
     ).toBe(
-      'https://myeongha-johnny-self.vercel.app/api/readiness/',
+      'https://myeongha-example-johnny-self.vercel.app/api/readiness/',
     );
   });
 
-  it('rejects canonical Production, arbitrary domains, and non-method-preserving redirects', () => {
+  it('rejects generated alias, canonical Production, arbitrary domains, and non-method-preserving redirects', () => {
+    expect(() =>
+      resolveAllowedCanaryRedirect({
+        status: 308,
+        location:
+          'https://myeongha-johnny-self.vercel.app/api/readiness',
+        requestUrl: REQUEST,
+        deploymentUrl: DEPLOYMENT,
+      }),
+    ).toThrow();
+
     expect(() =>
       resolveAllowedCanaryRedirect({
         status: 308,
