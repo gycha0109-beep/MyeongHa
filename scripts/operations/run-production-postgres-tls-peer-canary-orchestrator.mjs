@@ -9,7 +9,7 @@ const TEAM_ID = 'team_xuYA9OhCWlJETaYFOmeVodgS';
 const MARKER_PATH =
   'config/operations/run-once/production-postgres-tls-peer-canary-b2b.marker';
 const MARKER_VALUE =
-  'VERIFY_POSTGRES_TLS_PEER_B2B_SKIP_DOMAIN_CANARY_RETRY8\n';
+  'VERIFY_POSTGRES_TLS_PEER_B2B_SKIP_DOMAIN_CANARY_RETRY9\n';
 const TRACK = 'security';
 const VERCEL_CLI_PACKAGE = 'vercel@59.16.0';
 const CANARY_MODE = 'one-shot-b2b';
@@ -151,82 +151,151 @@ export function buildSkipDomainDeploymentArgs(input) {
   ];
 }
 
-export async function fetchGitHubOidcTokenForCanary(env = process.env) {
-  const requestUrl = required(
-    env.ACTIONS_ID_TOKEN_REQUEST_URL,
-    'GITHUB_OIDC_REQUEST_URL_MISSING',
-  );
-  const requestToken = required(
-    env.ACTIONS_ID_TOKEN_REQUEST_TOKEN,
-    'GITHUB_OIDC_REQUEST_TOKEN_MISSING',
-  );
+export const TEMPORARY_SHAREABLE_LINK_TTL_SECONDS = 120;
 
+async function patchDeploymentProtectionBypass(input) {
   let response;
   try {
-    response = await fetch(requestUrl, {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${requestToken}`,
-        Accept: 'application/json',
+    response = await fetch(
+      `https://api.vercel.com/aliases/${encodeURIComponent(input.deploymentId)}/protection-bypass?teamId=${encodeURIComponent(TEAM_ID)}`,
+      {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${input.vercelToken}`,
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(input.body),
+        redirect: 'error',
+        signal: AbortSignal.timeout(20_000),
       },
-      redirect: 'error',
-      signal: AbortSignal.timeout(20_000),
-    });
+    );
   } catch {
     return fail(
-      'GITHUB_OIDC_REQUEST_FAILED',
-      'GitHub Actions OIDC token request failed.',
+      input.failureCode,
+      'Vercel deployment-scoped protection bypass request failed.',
     );
   }
 
   if (!response.ok) {
     return fail(
-      'GITHUB_OIDC_REQUEST_FAILED',
-      'GitHub Actions OIDC token request was rejected.',
+      input.failureCode,
+      'Vercel deployment-scoped protection bypass request was rejected.',
     );
   }
 
-  let payload;
   try {
-    payload = await response.json();
+    return await response.json();
   } catch {
     return fail(
-      'GITHUB_OIDC_RESPONSE_INVALID',
-      'GitHub Actions OIDC token response was invalid.',
+      input.failureCode,
+      'Vercel deployment-scoped protection bypass response was invalid.',
     );
   }
+}
 
-  if (
-    typeof payload?.value !== 'string' ||
-    payload.value.length < 32 ||
-    payload.value.split('.').length !== 3
-  ) {
+export async function createTemporaryDeploymentShareableLink(input) {
+  const payload = await patchDeploymentProtectionBypass({
+    deploymentId: input.deploymentId,
+    vercelToken: input.vercelToken,
+    body: { ttl: TEMPORARY_SHAREABLE_LINK_TTL_SECONDS },
+    failureCode: 'CANARY_SHAREABLE_LINK_CREATE_FAILED',
+  });
+
+  if (typeof payload?.value !== 'string' || payload.value.length < 16) {
     return fail(
-      'GITHUB_OIDC_RESPONSE_INVALID',
-      'GitHub Actions OIDC token response was invalid.',
+      'CANARY_SHAREABLE_LINK_CREATE_FAILED',
+      'Vercel deployment-scoped shareable link was not returned.',
     );
   }
 
   return payload.value;
 }
 
-export function buildTrustedOidcCanaryHeaders(input) {
-  return Object.freeze({
-    Authorization: `Bearer ${input.canaryToken}`,
-    'Content-Type': 'application/json',
-    Accept: 'application/json',
-    'x-vercel-trusted-oidc-idp-token': input.githubOidcToken,
-  });
+export async function revokeTemporaryDeploymentShareableLink(input) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      await patchDeploymentProtectionBypass({
+        deploymentId: input.deploymentId,
+        vercelToken: input.vercelToken,
+        body: {
+          revoke: {
+            secret: input.shareableSecret,
+            regenerate: false,
+          },
+        },
+        failureCode: 'CANARY_SHAREABLE_LINK_REVOKE_FAILED',
+      });
+      return true;
+    } catch {
+      if (attempt < 2) {
+        await new Promise((resolvePromise) =>
+          setTimeout(resolvePromise, 500 * (attempt + 1)),
+        );
+      }
+    }
+  }
+  return false;
 }
 
-async function runTrustedOidcCanaryRequest(input) {
+function extractShareableCookie(response) {
+  const values =
+    typeof response.headers.getSetCookie === 'function'
+      ? response.headers.getSetCookie()
+      : [response.headers.get('set-cookie')].filter(Boolean);
+
+  const cookie = values
+    .map((value) => value.split(';', 1)[0]?.trim())
+    .filter((value) => typeof value === 'string' && value.length > 0)
+    .join('; ');
+
+  if (cookie.length === 0) {
+    return fail(
+      'CANARY_SHAREABLE_COOKIE_MISSING',
+      'Deployment-scoped shareable link did not establish an access cookie.',
+    );
+  }
+  return cookie;
+}
+
+async function runShareableCanaryRequest(input) {
+  let bootstrap;
+  try {
+    const bootstrapUrl =
+      `${input.deploymentUrl}/?_vercel_share=${encodeURIComponent(input.shareableSecret)}`;
+    bootstrap = await fetch(bootstrapUrl, {
+      method: 'GET',
+      redirect: 'manual',
+      signal: AbortSignal.timeout(20_000),
+    });
+  } catch {
+    return fail(
+      'CANARY_SHAREABLE_BOOTSTRAP_FAILED',
+      'Deployment-scoped shareable access bootstrap failed.',
+    );
+  }
+
+  if (bootstrap.status < 200 || bootstrap.status >= 400) {
+    return fail(
+      'CANARY_SHAREABLE_BOOTSTRAP_REJECTED',
+      'Deployment-scoped shareable access bootstrap was rejected.',
+    );
+  }
+
+  const cookie = extractShareableCookie(bootstrap);
+
   let response;
   try {
     response = await fetch(
       `${input.deploymentUrl}/api/readiness`,
       {
         method: 'POST',
-        headers: buildTrustedOidcCanaryHeaders(input),
+        headers: {
+          Authorization: `Bearer ${input.canaryToken}`,
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          Cookie: cookie,
+        },
         body: '{}',
         redirect: 'manual',
         signal: AbortSignal.timeout(20_000),
@@ -234,8 +303,8 @@ async function runTrustedOidcCanaryRequest(input) {
     );
   } catch {
     return fail(
-      'CANARY_TRUSTED_OIDC_REQUEST_FAILED',
-      'Trusted OIDC canary request failed.',
+      'CANARY_SHAREABLE_REQUEST_FAILED',
+      'Deployment-scoped shareable canary request failed.',
     );
   }
 
@@ -245,8 +314,8 @@ async function runTrustedOidcCanaryRequest(input) {
     (response.status >= 300 && response.status < 400)
   ) {
     return fail(
-      'CANARY_TRUSTED_OIDC_REJECTED',
-      'Vercel Deployment Protection rejected the trusted OIDC request.',
+      'CANARY_SHAREABLE_ACCESS_REJECTED',
+      'Vercel Deployment Protection rejected deployment-scoped shareable access.',
     );
   }
 
@@ -448,6 +517,8 @@ export async function runProductionPostgresTlsPeerCanaryOrchestrator(env = proce
   const canaryToken = randomBytes(32).toString('base64url');
 
   let deploymentId;
+  let shareableSecret;
+  let cleanupShareableLink = true;
   let cleanupDeployment = true;
 
   try {
@@ -487,13 +558,16 @@ export async function runProductionPostgresTlsPeerCanaryOrchestrator(env = proce
     );
     const aliasEvidence = inspectSkipDomainAliasEvidence(aliases);
 
-    const githubOidcToken =
-      await fetchGitHubOidcTokenForCanary(env);
+    shareableSecret =
+      await createTemporaryDeploymentShareableLink({
+        deploymentId,
+        vercelToken: token,
+      });
 
-    const canaryPayload = await runTrustedOidcCanaryRequest({
+    const canaryPayload = await runShareableCanaryRequest({
       deploymentUrl,
       canaryToken,
-      githubOidcToken,
+      shareableSecret,
     });
 
     const evidence = validateCanaryEvidence(canaryPayload);
@@ -502,9 +576,10 @@ export async function runProductionPostgresTlsPeerCanaryOrchestrator(env = proce
       deploymentMode: 'production-skip-domain',
       customEnvironmentCreated: false,
       ...aliasEvidence,
-      trustedGitHubOidcAttempted: true,
-      trustedGitHubOidcTokenEmitted: false,
-      deploymentProtectionMutated: false,
+      temporaryDeploymentShareableLinkCreated: true,
+      temporaryDeploymentShareableLinkTtlSeconds:
+        TEMPORARY_SHAREABLE_LINK_TTL_SECONDS,
+      projectDeploymentProtectionMutated: false,
       productionEnvironmentMutated: false,
       productionDatabaseBindingMutated: false,
       databaseUrlExported: false,
@@ -513,9 +588,22 @@ export async function runProductionPostgresTlsPeerCanaryOrchestrator(env = proce
       ...evidence,
     });
   } finally {
+    if (deploymentId && shareableSecret) {
+      cleanupShareableLink =
+        await revokeTemporaryDeploymentShareableLink({
+          deploymentId,
+          vercelToken: token,
+          shareableSecret,
+        });
+    }
+    console.log(
+      `canary_shareable_link_revoked=${cleanupShareableLink}`,
+    );
+
     cleanupDeployment = await deleteDeployment(deploymentId, token);
     console.log(`canary_deployment_deleted=${cleanupDeployment}`);
-    if (!cleanupDeployment) {
+
+    if (!cleanupShareableLink || !cleanupDeployment) {
       process.exitCode = 1;
     }
   }
@@ -526,13 +614,13 @@ function printEvidence(evidence) {
   console.log(`deployment_mode=${evidence.deploymentMode}`);
   console.log(`production_domain_aliased=${evidence.productionDomainAliased}`);
   console.log(
-    `trusted_github_oidc_attempted=${evidence.trustedGitHubOidcAttempted}`,
+    `temporary_deployment_shareable_link_created=${evidence.temporaryDeploymentShareableLinkCreated}`,
   );
   console.log(
-    `trusted_github_oidc_token_emitted=${evidence.trustedGitHubOidcTokenEmitted}`,
+    `temporary_deployment_shareable_link_ttl_seconds=${evidence.temporaryDeploymentShareableLinkTtlSeconds}`,
   );
   console.log(
-    `deployment_protection_mutated=${evidence.deploymentProtectionMutated}`,
+    `project_deployment_protection_mutated=${evidence.projectDeploymentProtectionMutated}`,
   );
   console.log(`current_binding_tls_mode=${evidence.currentBindingTlsMode}`);
   console.log(
