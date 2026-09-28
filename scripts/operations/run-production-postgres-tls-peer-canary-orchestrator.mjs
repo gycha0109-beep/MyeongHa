@@ -9,7 +9,7 @@ const TEAM_ID = 'team_xuYA9OhCWlJETaYFOmeVodgS';
 const MARKER_PATH =
   'config/operations/run-once/production-postgres-tls-peer-canary-b2b.marker';
 const MARKER_VALUE =
-  'VERIFY_POSTGRES_TLS_PEER_B2B_SKIP_DOMAIN_CANARY_RETRY7\n';
+  'VERIFY_POSTGRES_TLS_PEER_B2B_SKIP_DOMAIN_CANARY_RETRY8\n';
 const TRACK = 'security';
 const VERCEL_CLI_PACKAGE = 'vercel@59.16.0';
 const CANARY_MODE = 'one-shot-b2b';
@@ -83,48 +83,6 @@ async function requestJson(url, token, init, code) {
   }
 }
 
-export function selectExistingAutomationBypassSecret(projectPayload) {
-  const protectionBypass = projectPayload?.protectionBypass;
-  if (
-    protectionBypass === null ||
-    typeof protectionBypass !== 'object' ||
-    Array.isArray(protectionBypass)
-  ) {
-    return fail(
-      'DEPLOYMENT_PROTECTION_BYPASS_MISSING',
-      'Existing Vercel automation bypass secret is unavailable.',
-    );
-  }
-
-  for (const [secret, metadata] of Object.entries(protectionBypass)) {
-    if (
-      typeof secret === 'string' &&
-      secret.length > 0 &&
-      metadata !== null &&
-      typeof metadata === 'object' &&
-      metadata.scope === 'automation-bypass'
-    ) {
-      return secret;
-    }
-  }
-
-  return fail(
-    'DEPLOYMENT_PROTECTION_BYPASS_MISSING',
-    'Existing Vercel automation bypass secret is unavailable.',
-  );
-}
-
-async function fetchExistingAutomationBypassSecret(token) {
-  const project = await requestJson(
-    `https://api.vercel.com/v9/projects/${encodeURIComponent(PROJECT_ID)}?teamId=${encodeURIComponent(TEAM_ID)}`,
-    token,
-    { method: 'GET' },
-    'DEPLOYMENT_PROTECTION_LOOKUP_FAILED',
-  );
-
-  return selectExistingAutomationBypassSecret(project);
-}
-
 function boundedAppend(current, chunk) {
   const next = current + chunk.toString('utf8');
   return next.length > 65_536 ? next.slice(-65_536) : next;
@@ -193,116 +151,140 @@ export function buildSkipDomainDeploymentArgs(input) {
   ];
 }
 
-export function buildProtectedCanaryCurlArgs(input) {
-  return [
-    '--yes',
-    VERCEL_CLI_PACKAGE,
-    'curl',
-    `${input.deploymentUrl}/api/readiness`,
-    '--',
-    '--silent',
-    '--show-error',
-    '--request',
-    'POST',
-    '--header',
-    'Content-Type: application/json',
-    '--header',
-    '@-',
-    '--data',
-    '{}',
-  ];
-}
+export async function fetchGitHubOidcTokenForCanary(env = process.env) {
+  const requestUrl = required(
+    env.ACTIONS_ID_TOKEN_REQUEST_URL,
+    'GITHUB_OIDC_REQUEST_URL_MISSING',
+  );
+  const requestToken = required(
+    env.ACTIONS_ID_TOKEN_REQUEST_TOKEN,
+    'GITHUB_OIDC_REQUEST_TOKEN_MISSING',
+  );
 
-function parseCanaryCurlPayload(stdout) {
-  const lines = stdout
-    .split(/\r?\n/u)
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
-
-  for (let index = lines.length - 1; index >= 0; index -= 1) {
-    const line = lines[index];
-    if (!line.startsWith('{') || !line.endsWith('}')) continue;
-    try {
-      return JSON.parse(line);
-    } catch {
-      // Continue searching only within already bounded, non-secret response output.
-    }
+  let response;
+  try {
+    response = await fetch(requestUrl, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${requestToken}`,
+        Accept: 'application/json',
+      },
+      redirect: 'error',
+      signal: AbortSignal.timeout(20_000),
+    });
+  } catch {
+    return fail(
+      'GITHUB_OIDC_REQUEST_FAILED',
+      'GitHub Actions OIDC token request failed.',
+    );
   }
 
-  return fail(
-    'CANARY_RESPONSE_INVALID',
-    'Protected canary response was not recognized as JSON.',
-  );
+  if (!response.ok) {
+    return fail(
+      'GITHUB_OIDC_REQUEST_FAILED',
+      'GitHub Actions OIDC token request was rejected.',
+    );
+  }
+
+  let payload;
+  try {
+    payload = await response.json();
+  } catch {
+    return fail(
+      'GITHUB_OIDC_RESPONSE_INVALID',
+      'GitHub Actions OIDC token response was invalid.',
+    );
+  }
+
+  if (
+    typeof payload?.value !== 'string' ||
+    payload.value.length < 32 ||
+    payload.value.split('.').length !== 3
+  ) {
+    return fail(
+      'GITHUB_OIDC_RESPONSE_INVALID',
+      'GitHub Actions OIDC token response was invalid.',
+    );
+  }
+
+  return payload.value;
 }
 
-function runProtectedCanaryRequest(input) {
-  return new Promise((resolvePromise, rejectPromise) => {
-    const childEnv = { ...process.env };
-    delete childEnv.SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM;
-    childEnv.VERCEL_TOKEN = input.vercelToken;
-    childEnv.VERCEL_ORG_ID = TEAM_ID;
-    childEnv.VERCEL_PROJECT_ID = PROJECT_ID;
-    childEnv.VERCEL_AUTOMATION_BYPASS_SECRET =
-      input.automationBypassSecret;
-
-    const child = spawn('npx', buildProtectedCanaryCurlArgs(input), {
-      cwd: process.cwd(),
-      env: childEnv,
-      shell: false,
-      stdio: ['pipe', 'pipe', 'pipe'],
-    });
-
-    let stdout = '';
-    let stderr = '';
-    child.stdout.on('data', (chunk) => {
-      stdout = boundedAppend(stdout, chunk);
-    });
-    child.stderr.on('data', (chunk) => {
-      stderr = boundedAppend(stderr, chunk);
-    });
-
-    const timeout = setTimeout(() => {
-      child.kill('SIGTERM');
-    }, 30_000);
-
-    child.once('error', () => {
-      clearTimeout(timeout);
-      rejectPromise(
-        new CanaryOrchestratorError(
-          'CANARY_REQUEST_FAILED',
-          'Protected canary request process failed to start.',
-        ),
-      );
-    });
-
-    child.once('close', (code, signal) => {
-      clearTimeout(timeout);
-      if (code !== 0 || signal !== null) {
-        rejectPromise(
-          new CanaryOrchestratorError(
-            'CANARY_REQUEST_FAILED',
-            'Protected canary request failed.',
-          ),
-        );
-        return;
-      }
-
-      if (stderr.toLowerCase().includes('error:')) {
-        rejectPromise(
-          new CanaryOrchestratorError(
-            'CANARY_REQUEST_FAILED',
-            'Protected canary request reported a CLI error.',
-          ),
-        );
-        return;
-      }
-
-      resolvePromise(parseCanaryCurlPayload(stdout));
-    });
-
-    child.stdin.write(`Authorization: Bearer ${input.canaryToken}\n`);
-    child.stdin.end();
+export function buildTrustedOidcCanaryHeaders(input) {
+  return Object.freeze({
+    Authorization: `Bearer ${input.canaryToken}`,
+    'Content-Type': 'application/json',
+    Accept: 'application/json',
+    'x-vercel-trusted-oidc-idp-token': input.githubOidcToken,
   });
+}
+
+async function runTrustedOidcCanaryRequest(input) {
+  let response;
+  try {
+    response = await fetch(
+      `${input.deploymentUrl}/api/readiness`,
+      {
+        method: 'POST',
+        headers: buildTrustedOidcCanaryHeaders(input),
+        body: '{}',
+        redirect: 'manual',
+        signal: AbortSignal.timeout(20_000),
+      },
+    );
+  } catch {
+    return fail(
+      'CANARY_TRUSTED_OIDC_REQUEST_FAILED',
+      'Trusted OIDC canary request failed.',
+    );
+  }
+
+  if (
+    response.status === 401 ||
+    response.status === 403 ||
+    (response.status >= 300 && response.status < 400)
+  ) {
+    return fail(
+      'CANARY_TRUSTED_OIDC_REJECTED',
+      'Vercel Deployment Protection rejected the trusted OIDC request.',
+    );
+  }
+
+  let payload;
+  try {
+    payload = await response.json();
+  } catch {
+    if (!response.ok) {
+      return fail(
+        'CANARY_REQUEST_REJECTED',
+        'Canary endpoint rejected the request.',
+      );
+    }
+    return fail(
+      'CANARY_RESPONSE_INVALID',
+      'Canary response was not JSON.',
+    );
+  }
+
+  if (
+    payload?.status === 'fail' &&
+    typeof payload?.code === 'string' &&
+    /^[A-Z0-9_]+$/u.test(payload.code)
+  ) {
+    return fail(
+      `CANARY_ENDPOINT_${payload.code}`,
+      'Canary endpoint reported a fail-closed result.',
+    );
+  }
+
+  if (!response.ok) {
+    return fail(
+      'CANARY_REQUEST_REJECTED',
+      'Canary endpoint rejected the request.',
+    );
+  }
+
+  return payload;
 }
 
 function runSkipDomainDeployment(input) {
@@ -505,26 +487,14 @@ export async function runProductionPostgresTlsPeerCanaryOrchestrator(env = proce
     );
     const aliasEvidence = inspectSkipDomainAliasEvidence(aliases);
 
-    const automationBypassSecret =
-      await fetchExistingAutomationBypassSecret(token);
+    const githubOidcToken =
+      await fetchGitHubOidcTokenForCanary(env);
 
-    const canaryPayload = await runProtectedCanaryRequest({
+    const canaryPayload = await runTrustedOidcCanaryRequest({
       deploymentUrl,
-      vercelToken: token,
       canaryToken,
-      automationBypassSecret,
+      githubOidcToken,
     });
-
-    if (
-      canaryPayload?.status === 'fail' &&
-      typeof canaryPayload?.code === 'string' &&
-      /^[A-Z0-9_]+$/u.test(canaryPayload.code)
-    ) {
-      return fail(
-        `CANARY_ENDPOINT_${canaryPayload.code}`,
-        'Canary endpoint reported a fail-closed result.',
-      );
-    }
 
     const evidence = validateCanaryEvidence(canaryPayload);
     return Object.freeze({
@@ -532,7 +502,8 @@ export async function runProductionPostgresTlsPeerCanaryOrchestrator(env = proce
       deploymentMode: 'production-skip-domain',
       customEnvironmentCreated: false,
       ...aliasEvidence,
-      deploymentProtectionBypassExisting: true,
+      trustedGitHubOidcAttempted: true,
+      trustedGitHubOidcTokenEmitted: false,
       deploymentProtectionMutated: false,
       productionEnvironmentMutated: false,
       productionDatabaseBindingMutated: false,
@@ -555,7 +526,10 @@ function printEvidence(evidence) {
   console.log(`deployment_mode=${evidence.deploymentMode}`);
   console.log(`production_domain_aliased=${evidence.productionDomainAliased}`);
   console.log(
-    `deployment_protection_bypass_existing=${evidence.deploymentProtectionBypassExisting}`,
+    `trusted_github_oidc_attempted=${evidence.trustedGitHubOidcAttempted}`,
+  );
+  console.log(
+    `trusted_github_oidc_token_emitted=${evidence.trustedGitHubOidcTokenEmitted}`,
   );
   console.log(
     `deployment_protection_mutated=${evidence.deploymentProtectionMutated}`,
