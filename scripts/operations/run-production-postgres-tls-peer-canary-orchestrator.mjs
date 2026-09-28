@@ -9,7 +9,7 @@ const TEAM_ID = 'team_xuYA9OhCWlJETaYFOmeVodgS';
 const MARKER_PATH =
   'config/operations/run-once/production-postgres-tls-peer-canary-b2b.marker';
 const MARKER_VALUE =
-  'VERIFY_POSTGRES_TLS_PEER_B2B_SKIP_DOMAIN_CANARY_RETRY14\n';
+  'VERIFY_POSTGRES_TLS_PEER_B2B_SKIP_DOMAIN_CANARY_RETRY15\n';
 const TRACK = 'security';
 const VERCEL_CLI_PACKAGE = 'vercel@59.16.0';
 const CANARY_MODE = 'one-shot-b2b';
@@ -567,15 +567,15 @@ export async function runProductionPostgresTlsPeerCanaryOrchestrator(env = proce
     );
     const aliasEvidence = inspectSkipDomainAliasEvidence(aliases);
 
-    const requestBaseUrl =
+    const bootstrapBaseUrl =
       `https://${aliasEvidence.generatedCliAlias}`;
     const bypassCookie = await bootstrapAutomationBypassCookie({
-      requestBaseUrl,
+      requestBaseUrl: bootstrapBaseUrl,
       automationBypassSecret,
     });
 
     const canaryPayload = await runAutomationBypassCanaryRequest({
-      requestBaseUrl,
+      requestBaseUrl: deploymentUrl,
       canaryToken,
       automationBypassSecret,
       bypassCookie,
@@ -591,7 +591,8 @@ export async function runProductionPostgresTlsPeerCanaryOrchestrator(env = proce
       automationBypassUsed: true,
       automationBypassCookieEstablished: true,
       automationBypassCookieEmitted: false,
-      canaryRequestAliasVerified: true,
+      canaryBootstrapAliasVerified: true,
+      canaryRequestExactDeployment: true,
       projectDeploymentProtectionMutated: false,
       productionEnvironmentMutated: false,
       productionDatabaseBindingMutated: false,
@@ -630,7 +631,10 @@ function printEvidence(evidence) {
     `automation_bypass_cookie_emitted=${evidence.automationBypassCookieEmitted}`,
   );
   console.log(
-    `canary_request_alias_verified=${evidence.canaryRequestAliasVerified}`,
+    `canary_bootstrap_alias_verified=${evidence.canaryBootstrapAliasVerified}`,
+  );
+  console.log(
+    `canary_request_exact_deployment=${evidence.canaryRequestExactDeployment}`,
   );
   console.log(
     `automation_bypass_secret_emitted=${evidence.automationBypassSecretEmitted}`,
