@@ -286,29 +286,39 @@ class PgDriverClientV1 implements NodePostgresDriverClientV1 {
 }
 
 class PgDriverPoolV1 implements NodePostgresDriverPoolV1 {
-  private readonly pool: Pool;
+  private pool: Pool | undefined;
 
   constructor(
-    config: ProductionPostgresRuntimeConfigV1,
-    options: NodePostgresSubjectPoolOptionsV1 = {},
-  ) {
-    this.pool = new Pool(buildProductionNodePostgresPoolConfigV1(config, options));
+    private readonly config: ProductionPostgresRuntimeConfigV1,
+    private readonly options: NodePostgresSubjectPoolOptionsV1 = {},
+  ) {}
 
-    this.pool.on('error', (error) => {
+  private getOrCreatePool(): Pool {
+    if (this.pool !== undefined) return this.pool;
+
+    const pool = new Pool(
+      buildProductionNodePostgresPoolConfigV1(this.config, this.options),
+    );
+    pool.on('error', (error) => {
       const code = (error as Error & { code?: unknown }).code;
       console.error('MyeongHa PostgreSQL idle-pool error.', {
         name: error.name,
         code: typeof code === 'string' ? code : null,
       });
     });
+    this.pool = pool;
+    return pool;
   }
 
   async connect(): Promise<NodePostgresDriverClientV1> {
-    return new PgDriverClientV1(await this.pool.connect());
+    return new PgDriverClientV1(await this.getOrCreatePool().connect());
   }
 
   async end(): Promise<void> {
-    await this.pool.end();
+    if (this.pool === undefined) return;
+    const pool = this.pool;
+    this.pool = undefined;
+    await pool.end();
   }
 }
 
