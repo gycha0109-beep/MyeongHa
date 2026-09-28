@@ -18,6 +18,9 @@ const SUPABASE_API_KEY = 'sb_publishable_example_key_for_runtime_contract';
 const GUEST_FINGERPRINT_SECRET =
   'guest-fingerprint-secret-material-at-least-thirty-two-bytes';
 
+const TEST_ROOT_PEM =
+  '-----BEGIN CERTIFICATE-----\\ntest-only-sensitive-material\\n-----END CERTIFICATE-----';
+
 function validEnv(): Record<string, string> {
   return {
     [PRODUCTION_USER_DATA_RUNTIME_ENV_V1.databaseUrl]: DATABASE_URL,
@@ -27,6 +30,9 @@ function validEnv(): Record<string, string> {
     [PRODUCTION_USER_DATA_RUNTIME_ENV_V1.supabaseApiKey]: SUPABASE_API_KEY,
     [PRODUCTION_USER_DATA_RUNTIME_ENV_V1.guestFingerprintSecret]:
       GUEST_FINGERPRINT_SECRET,
+    [PRODUCTION_POSTGRES_TLS_ACTIVATION_ENV_V1.peerMode]: 'verify-full',
+    [PRODUCTION_POSTGRES_TLS_ACTIVATION_ENV_V1.rootCertificatePem]:
+      TEST_ROOT_PEM,
   };
 }
 
@@ -48,37 +54,35 @@ describe('production user-data runtime configuration', () => {
     });
   });
 
-  it('parses only a complete production user-data runtime binding', () => {
+  it('parses only a complete strict production user-data runtime binding', () => {
     expect(parseProductionUserDataRuntimeConfigV1(validEnv())).toEqual({
       databaseUrl: DATABASE_URL,
       databasePrincipal: DATABASE_PRINCIPAL,
       databaseExecutionRole: 'myeongha_api_executor',
+      databaseTlsPeerMode: 'verify-full',
+      databaseSslRootCertificatePem: TEST_ROOT_PEM,
       supabaseOrigin: MYEONGHA_PRODUCTION_SUPABASE_ORIGIN,
       supabaseApiKey: SUPABASE_API_KEY,
       guestFingerprintSecret: GUEST_FINGERPRINT_SECRET,
     });
   });
 
-  it('activates verify-full only with an explicit root certificate binding', () => {
+  it('fails closed when the TLS peer-verification mode is absent', () => {
     const env = validEnv();
-    env[PRODUCTION_POSTGRES_TLS_ACTIVATION_ENV_V1.peerMode] = 'verify-full';
-    env[PRODUCTION_POSTGRES_TLS_ACTIVATION_ENV_V1.rootCertificatePem] =
-      '-----BEGIN CERTIFICATE-----\\ntest-only\\n-----END CERTIFICATE-----';
+    delete env[PRODUCTION_POSTGRES_TLS_ACTIVATION_ENV_V1.peerMode];
 
-    expect(parseProductionUserDataRuntimeConfigV1(env)).toMatchObject({
-      databaseTlsPeerMode: 'verify-full',
-      databaseSslRootCertificatePem:
-        '-----BEGIN CERTIFICATE-----\\ntest-only\\n-----END CERTIFICATE-----',
-    });
+    expect(() => parseProductionUserDataRuntimeConfigV1(env)).toThrow(
+      'MYEONGHA_DATABASE_TLS_PEER_MODE',
+    );
   });
 
-  it('keeps legacy mode explicit during the controlled B3 rollback window', () => {
+  it('rejects the retired legacy mode after B3 activation', () => {
     const env = validEnv();
     env[PRODUCTION_POSTGRES_TLS_ACTIVATION_ENV_V1.peerMode] = 'legacy';
 
-    expect(parseProductionUserDataRuntimeConfigV1(env)).toMatchObject({
-      databaseTlsPeerMode: 'legacy',
-    });
+    expect(() => parseProductionUserDataRuntimeConfigV1(env)).toThrow(
+      'must be verify-full after SEC-01 Production activation',
+    );
   });
 
   it('fails closed when verify-full activation has no root certificate binding', () => {
@@ -108,7 +112,7 @@ describe('production user-data runtime configuration', () => {
     env[PRODUCTION_POSTGRES_TLS_ACTIVATION_ENV_V1.peerMode] = 'prefer';
 
     expect(() => parseProductionUserDataRuntimeConfigV1(env)).toThrow(
-      'must be legacy or verify-full',
+      'must be verify-full after SEC-01 Production activation',
     );
   });
 
@@ -257,9 +261,9 @@ describe('production user-data runtime configuration', () => {
       databaseConfigured: true,
       databasePrincipal: DATABASE_PRINCIPAL,
       databaseExecutionRole: 'myeongha_api_executor',
-      databaseTlsMode: 'require',
-      databaseTlsPeerVerification: 'none',
-      databaseTlsRootCertificateConfigured: false,
+      databaseTlsMode: 'verify-full',
+      databaseTlsPeerVerification: 'full',
+      databaseTlsRootCertificateConfigured: true,
       supabaseOrigin: MYEONGHA_PRODUCTION_SUPABASE_ORIGIN,
       supabaseApiKeyConfigured: true,
       guestFingerprintSecretConfigured: true,
@@ -274,9 +278,7 @@ describe('production user-data runtime configuration', () => {
 
   it('summarizes activated verify-full posture without emitting root certificate material', () => {
     const env = validEnv();
-    const rootCertificatePem =
-      '-----BEGIN CERTIFICATE-----\\ntest-only-sensitive-material\\n-----END CERTIFICATE-----';
-    env[PRODUCTION_POSTGRES_TLS_ACTIVATION_ENV_V1.peerMode] = 'verify-full';
+    const rootCertificatePem = TEST_ROOT_PEM;
     env[PRODUCTION_POSTGRES_TLS_ACTIVATION_ENV_V1.rootCertificatePem] =
       rootCertificatePem;
 
