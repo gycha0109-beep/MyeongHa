@@ -4,7 +4,10 @@ import {
   buildProductionNodePostgresPoolConfigV1,
   normalizeNodePostgresConnectionStringV1,
 } from '../apps/api/src/node-postgres-subject-pool.js';
-import { PRODUCTION_POSTGRES_TLS_ROOT_FINGERPRINT256_V1 } from '../apps/api/src/production-postgres-tls-peer-verification.js';
+import {
+  buildProductionPostgresStrictTlsTargetV1,
+  PRODUCTION_POSTGRES_TLS_ROOT_FINGERPRINT256_V1,
+} from '../apps/api/src/production-postgres-tls-peer-verification.js';
 import {
   MYEONGHA_API_EXECUTION_ROLE,
   MYEONGHA_PRODUCTION_SUPABASE_PROJECT_REF,
@@ -52,11 +55,9 @@ describe('node-postgres production pooler TLS semantics', () => {
   });
 
   it('builds the activated ordinary runtime with explicit verify-full TLS authority', () => {
-    let capturedInput: Parameters<
-      NonNullable<
-        Parameters<typeof buildProductionNodePostgresPoolConfigV1>[2]['buildStrictTarget']
-      >
-    >[0] | undefined;
+    let capturedInput:
+      | Parameters<typeof buildProductionPostgresStrictTlsTargetV1>[0]
+      | undefined;
 
     const config = buildProductionNodePostgresPoolConfigV1(
       {
