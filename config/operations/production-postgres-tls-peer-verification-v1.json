@@ -2,8 +2,8 @@
   "contractVersion": "myeongha-production-postgres-tls-peer-verification-v1",
   "issue": 1330,
   "watchtowerTrack": "security",
-  "phase": "B2A",
-  "activationState": "metadata-preflight-passed-runtime-canary-pending",
+  "phase": "B2B",
+  "activationState": "runtime-canary-passed-production-activation-pending",
   "productionActivation": false,
   "productionBindingMutated": false,
   "governedProjectRef": "cnsfpcdiyofqvhpcegfc",
@@ -20,7 +20,7 @@
     "runtimePemBindingPlanned": "MYEONGHA_DATABASE_SSL_ROOT_CERT_PEM"
   },
   "activationBlockers": [
-    "production-safe-verify-full-connectivity-canary-not-yet-passed"
+    "production-strict-tls-activation-not-yet-applied"
   ],
   "forbidden": [
     "production-binding-mutation-before-positive-canary",
@@ -81,5 +81,38 @@
     "certificatePemEmitted": false,
     "credentialMaterialEmitted": false,
     "oneShotBridgeRemovedInAuthorityPinChange": true
+  },
+  "runtimeCanary": {
+    "status": "passed",
+    "workflowRunId": 36475232900,
+    "workflowRunNumber": 24,
+    "sourceMainSha": "9e85ea79695bc7620a34ba93ce068c3cad0b1676",
+    "recordedAt": "2026-09-28T19:53:34Z",
+    "currentBindingTlsMode": "require",
+    "currentBindingPeerVerification": "none",
+    "canaryTlsMode": "verify-full",
+    "canaryPeerVerification": "full",
+    "rejectUnauthorized": true,
+    "defaultHostnameVerification": true,
+    "rootCertificateFingerprint256": "80:70:25:AD:50:D4:ED:21:9D:2C:9C:7D:29:9C:00:4F:82:4E:B0:0C:F7:F6:5A:FE:F6:07:D0:7B:72:E6:CA:FA",
+    "rootCertificatePinned": true,
+    "connectionSucceeded": true,
+    "strictTlsHandshakeSucceeded": true,
+    "transactionReadOnly": true,
+    "principalExpected": "myeongha_runtime",
+    "principalMatch": true,
+    "executionRole": "myeongha_api_executor",
+    "executionRoleMembership": true,
+    "writeExecuted": false,
+    "productionEnvironmentMutated": false,
+    "productionDatabaseBindingMutated": false,
+    "databaseUrlExported": false,
+    "databaseUrlDecrypted": false,
+    "databaseUrlEmitted": false,
+    "credentialMaterialEmitted": false,
+    "rootCertificatePemEmitted": false,
+    "automationBypassSecretEmitted": false,
+    "temporaryAliasDeleted": true,
+    "stagedDeploymentDeleted": true
   }
 }
