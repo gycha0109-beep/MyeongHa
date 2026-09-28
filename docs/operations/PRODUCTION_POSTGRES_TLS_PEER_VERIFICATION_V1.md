@@ -1,6 +1,6 @@
 # Production PostgreSQL TLS Peer Verification V1
 
-Status: **B2A AUTHORITY + VERCEL METADATA PROVEN / B2B RUNTIME CANARY PENDING / PRODUCTION ACTIVATION HOLD**
+Status: **B2B RUNTIME CANARY PASS / B3 PRODUCTION ACTIVATION PENDING / LIVE BINDING STILL LEGACY**
 
 Watchtower-Track: security
 
@@ -367,6 +367,48 @@ Relevant official references:
 - https://node-postgres.com/features/ssl
 - https://nodejs.org/download/release/v24.21.0/docs/api/tls.html
 - https://www.postgresql.org/docs/17/monitoring-stats.html
+
+### B2B positive evidence pinned
+
+Production B2B completed successfully on 2026-09-28.
+
+```text
+workflow run id = 36475232900
+workflow run number = 24
+source main SHA = 9e85ea79695bc7620a34ba93ce068c3cad0b1676
+result = pass
+
+current binding TLS mode = require
+current binding peer verification = none
+canary TLS mode = verify-full
+canary peer verification = full
+rejectUnauthorized = true
+default hostname verification = true
+root certificate fingerprint pinned = true
+strict TLS handshake succeeded = true
+connection succeeded = true
+transaction read only = true
+principal expected = myeongha_runtime
+principal match = true
+execution role = myeongha_api_executor
+execution role membership = true
+write executed = false
+
+Production environment mutated = false
+Production database binding mutated = false
+database URL exported = false
+database URL decrypted = false
+database URL emitted = false
+credential material emitted = false
+root certificate PEM emitted = false
+automation bypass secret emitted = false
+temporary canary alias deleted = true
+staged canary deployment deleted = true
+```
+
+This closes the B2B connectivity blocker only. It does not activate strict TLS on the live
+Production binding. The observed live binding remains `sslmode=require` semantics and must
+not be described as peer-verified until B3 is completed.
 
 ## Phase B3 — Production activation
 
