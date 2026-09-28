@@ -9,7 +9,7 @@ const TEAM_ID = 'team_xuYA9OhCWlJETaYFOmeVodgS';
 const MARKER_PATH =
   'config/operations/run-once/production-postgres-tls-peer-canary-b2b.marker';
 const MARKER_VALUE =
-  'VERIFY_POSTGRES_TLS_PEER_B2B_SKIP_DOMAIN_CANARY_RETRY9\n';
+  'VERIFY_POSTGRES_TLS_PEER_B2B_SKIP_DOMAIN_CANARY_RETRY10\n';
 const TRACK = 'security';
 const VERCEL_CLI_PACKAGE = 'vercel@59.16.0';
 const CANARY_MODE = 'one-shot-b2b';
@@ -151,151 +151,23 @@ export function buildSkipDomainDeploymentArgs(input) {
   ];
 }
 
-export const TEMPORARY_SHAREABLE_LINK_TTL_SECONDS = 120;
-
-async function patchDeploymentProtectionBypass(input) {
-  let response;
-  try {
-    response = await fetch(
-      `https://api.vercel.com/aliases/${encodeURIComponent(input.deploymentId)}/protection-bypass?teamId=${encodeURIComponent(TEAM_ID)}`,
-      {
-        method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${input.vercelToken}`,
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(input.body),
-        redirect: 'error',
-        signal: AbortSignal.timeout(20_000),
-      },
-    );
-  } catch {
-    return fail(
-      input.failureCode,
-      'Vercel deployment-scoped protection bypass request failed.',
-    );
-  }
-
-  if (!response.ok) {
-    return fail(
-      input.failureCode,
-      'Vercel deployment-scoped protection bypass request was rejected.',
-    );
-  }
-
-  try {
-    return await response.json();
-  } catch {
-    return fail(
-      input.failureCode,
-      'Vercel deployment-scoped protection bypass response was invalid.',
-    );
-  }
-}
-
-export async function createTemporaryDeploymentShareableLink(input) {
-  const payload = await patchDeploymentProtectionBypass({
-    deploymentId: input.deploymentId,
-    vercelToken: input.vercelToken,
-    body: { ttl: TEMPORARY_SHAREABLE_LINK_TTL_SECONDS },
-    failureCode: 'CANARY_SHAREABLE_LINK_CREATE_FAILED',
+export function buildAutomationBypassCanaryHeaders(input) {
+  return Object.freeze({
+    Authorization: `Bearer ${input.canaryToken}`,
+    Accept: 'application/json',
+    'Content-Type': 'application/json',
+    'x-vercel-protection-bypass': input.automationBypassSecret,
   });
-
-  if (typeof payload?.value !== 'string' || payload.value.length < 16) {
-    return fail(
-      'CANARY_SHAREABLE_LINK_CREATE_FAILED',
-      'Vercel deployment-scoped shareable link was not returned.',
-    );
-  }
-
-  return payload.value;
 }
 
-export async function revokeTemporaryDeploymentShareableLink(input) {
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    try {
-      await patchDeploymentProtectionBypass({
-        deploymentId: input.deploymentId,
-        vercelToken: input.vercelToken,
-        body: {
-          revoke: {
-            secret: input.shareableSecret,
-            regenerate: false,
-          },
-        },
-        failureCode: 'CANARY_SHAREABLE_LINK_REVOKE_FAILED',
-      });
-      return true;
-    } catch {
-      if (attempt < 2) {
-        await new Promise((resolvePromise) =>
-          setTimeout(resolvePromise, 500 * (attempt + 1)),
-        );
-      }
-    }
-  }
-  return false;
-}
-
-function extractShareableCookie(response) {
-  const values =
-    typeof response.headers.getSetCookie === 'function'
-      ? response.headers.getSetCookie()
-      : [response.headers.get('set-cookie')].filter(Boolean);
-
-  const cookie = values
-    .map((value) => value.split(';', 1)[0]?.trim())
-    .filter((value) => typeof value === 'string' && value.length > 0)
-    .join('; ');
-
-  if (cookie.length === 0) {
-    return fail(
-      'CANARY_SHAREABLE_COOKIE_MISSING',
-      'Deployment-scoped shareable link did not establish an access cookie.',
-    );
-  }
-  return cookie;
-}
-
-async function runShareableCanaryRequest(input) {
-  let bootstrap;
-  try {
-    const bootstrapUrl =
-      `${input.deploymentUrl}/?_vercel_share=${encodeURIComponent(input.shareableSecret)}`;
-    bootstrap = await fetch(bootstrapUrl, {
-      method: 'GET',
-      redirect: 'manual',
-      signal: AbortSignal.timeout(20_000),
-    });
-  } catch {
-    return fail(
-      'CANARY_SHAREABLE_BOOTSTRAP_FAILED',
-      'Deployment-scoped shareable access bootstrap failed.',
-    );
-  }
-
-  if (bootstrap.status < 200 || bootstrap.status >= 400) {
-    return fail(
-      'CANARY_SHAREABLE_BOOTSTRAP_REJECTED',
-      'Deployment-scoped shareable access bootstrap was rejected.',
-    );
-  }
-
-  const cookie = extractShareableCookie(bootstrap);
-
+async function runAutomationBypassCanaryRequest(input) {
   let response;
   try {
     response = await fetch(
       `${input.deploymentUrl}/api/readiness`,
       {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${input.canaryToken}`,
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-          Cookie: cookie,
-        },
+        headers: buildAutomationBypassCanaryHeaders(input),
         body: '{}',
         redirect: 'manual',
         signal: AbortSignal.timeout(20_000),
@@ -303,8 +175,8 @@ async function runShareableCanaryRequest(input) {
     );
   } catch {
     return fail(
-      'CANARY_SHAREABLE_REQUEST_FAILED',
-      'Deployment-scoped shareable canary request failed.',
+      'CANARY_AUTOMATION_BYPASS_REQUEST_FAILED',
+      'Automation bypass canary request failed.',
     );
   }
 
@@ -314,8 +186,8 @@ async function runShareableCanaryRequest(input) {
     (response.status >= 300 && response.status < 400)
   ) {
     return fail(
-      'CANARY_SHAREABLE_ACCESS_REJECTED',
-      'Vercel Deployment Protection rejected deployment-scoped shareable access.',
+      'CANARY_AUTOMATION_BYPASS_REJECTED',
+      'Vercel Deployment Protection rejected the automation bypass request.',
     );
   }
 
@@ -504,6 +376,10 @@ export async function runProductionPostgresTlsPeerCanaryOrchestrator(env = proce
   requireAuthority(env);
 
   const token = required(env.VERCEL_TOKEN, 'VERCEL_TOKEN_MISSING');
+  const automationBypassSecret = required(
+    env.VERCEL_AUTOMATION_BYPASS_SECRET,
+    'VERCEL_AUTOMATION_BYPASS_SECRET_MISSING',
+  );
   const rootCertificatePem = required(
     env.SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM,
     'ROOT_CERTIFICATE_MISSING',
@@ -517,8 +393,6 @@ export async function runProductionPostgresTlsPeerCanaryOrchestrator(env = proce
   const canaryToken = randomBytes(32).toString('base64url');
 
   let deploymentId;
-  let shareableSecret;
-  let cleanupShareableLink = true;
   let cleanupDeployment = true;
 
   try {
@@ -558,16 +432,10 @@ export async function runProductionPostgresTlsPeerCanaryOrchestrator(env = proce
     );
     const aliasEvidence = inspectSkipDomainAliasEvidence(aliases);
 
-    shareableSecret =
-      await createTemporaryDeploymentShareableLink({
-        deploymentId,
-        vercelToken: token,
-      });
-
-    const canaryPayload = await runShareableCanaryRequest({
+    const canaryPayload = await runAutomationBypassCanaryRequest({
       deploymentUrl,
       canaryToken,
-      shareableSecret,
+      automationBypassSecret,
     });
 
     const evidence = validateCanaryEvidence(canaryPayload);
@@ -576,9 +444,8 @@ export async function runProductionPostgresTlsPeerCanaryOrchestrator(env = proce
       deploymentMode: 'production-skip-domain',
       customEnvironmentCreated: false,
       ...aliasEvidence,
-      temporaryDeploymentShareableLinkCreated: true,
-      temporaryDeploymentShareableLinkTtlSeconds:
-        TEMPORARY_SHAREABLE_LINK_TTL_SECONDS,
+      automationBypassUsed: true,
+      automationBypassSecretEmitted: false,
       projectDeploymentProtectionMutated: false,
       productionEnvironmentMutated: false,
       productionDatabaseBindingMutated: false,
@@ -588,22 +455,10 @@ export async function runProductionPostgresTlsPeerCanaryOrchestrator(env = proce
       ...evidence,
     });
   } finally {
-    if (deploymentId && shareableSecret) {
-      cleanupShareableLink =
-        await revokeTemporaryDeploymentShareableLink({
-          deploymentId,
-          vercelToken: token,
-          shareableSecret,
-        });
-    }
-    console.log(
-      `canary_shareable_link_revoked=${cleanupShareableLink}`,
-    );
-
     cleanupDeployment = await deleteDeployment(deploymentId, token);
     console.log(`canary_deployment_deleted=${cleanupDeployment}`);
 
-    if (!cleanupShareableLink || !cleanupDeployment) {
+    if (!cleanupDeployment) {
       process.exitCode = 1;
     }
   }
@@ -614,10 +469,10 @@ function printEvidence(evidence) {
   console.log(`deployment_mode=${evidence.deploymentMode}`);
   console.log(`production_domain_aliased=${evidence.productionDomainAliased}`);
   console.log(
-    `temporary_deployment_shareable_link_created=${evidence.temporaryDeploymentShareableLinkCreated}`,
+    `automation_bypass_used=${evidence.automationBypassUsed}`,
   );
   console.log(
-    `temporary_deployment_shareable_link_ttl_seconds=${evidence.temporaryDeploymentShareableLinkTtlSeconds}`,
+    `automation_bypass_secret_emitted=${evidence.automationBypassSecretEmitted}`,
   );
   console.log(
     `project_deployment_protection_mutated=${evidence.projectDeploymentProtectionMutated}`,
