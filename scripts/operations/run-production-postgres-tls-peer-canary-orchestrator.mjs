@@ -9,7 +9,7 @@ const TEAM_ID = 'team_xuYA9OhCWlJETaYFOmeVodgS';
 const MARKER_PATH =
   'config/operations/run-once/production-postgres-tls-peer-canary-b2b.marker';
 const MARKER_VALUE =
-  'VERIFY_POSTGRES_TLS_PEER_B2B_SKIP_DOMAIN_CANARY_RETRY14\n';
+  'VERIFY_POSTGRES_TLS_PEER_B2B_SKIP_DOMAIN_CANARY_RETRY15\n';
 const TRACK = 'security';
 const VERCEL_CLI_PACKAGE = 'vercel@59.16.0';
 const CANARY_MODE = 'one-shot-b2b';
@@ -279,14 +279,66 @@ async function bootstrapAutomationBypassCookie(input) {
   return extractAutomationBypassCookie(response);
 }
 
+export function resolveAllowedCanaryRedirect(input) {
+  if (input.status !== 307 && input.status !== 308) {
+    return fail(
+      'CANARY_AUTOMATION_BYPASS_UNSAFE_REDIRECT',
+      'Canary redirect is not method-preserving.',
+    );
+  }
+
+  if (typeof input.location !== 'string' || input.location.trim().length === 0) {
+    return fail(
+      'CANARY_AUTOMATION_BYPASS_REDIRECT_LOCATION_MISSING',
+      'Canary redirect location is missing.',
+    );
+  }
+
+  let requestUrl;
+  let deploymentUrl;
+  let targetUrl;
+  try {
+    requestUrl = new URL(input.requestUrl);
+    deploymentUrl = new URL(input.deploymentUrl);
+    targetUrl = new URL(input.location, requestUrl);
+  } catch {
+    return fail(
+      'CANARY_AUTOMATION_BYPASS_REDIRECT_INVALID',
+      'Canary redirect location is invalid.',
+    );
+  }
+
+  const allowedHosts = new Set([
+    requestUrl.hostname,
+    deploymentUrl.hostname,
+  ]);
+  if (
+    targetUrl.protocol !== 'https:' ||
+    !allowedHosts.has(targetUrl.hostname) ||
+    !['/api/readiness', '/api/readiness/'].includes(targetUrl.pathname) ||
+    targetUrl.search.length !== 0 ||
+    targetUrl.hash.length !== 0
+  ) {
+    return fail(
+      'CANARY_AUTOMATION_BYPASS_REDIRECT_OUT_OF_SCOPE',
+      'Canary redirect left the exact staged deployment boundary.',
+    );
+  }
+
+  return targetUrl.toString();
+}
+
 async function runAutomationBypassCanaryRequest(input) {
+  const headers = buildAutomationBypassCanaryHeaders(input);
+  const firstRequestUrl = `${input.requestBaseUrl}/api/readiness`;
+
   let response;
   try {
     response = await fetch(
-      `${input.requestBaseUrl}/api/readiness`,
+      firstRequestUrl,
       {
         method: 'POST',
-        headers: buildAutomationBypassCanaryHeaders(input),
+        headers,
         body: '{}',
         redirect: 'manual',
         signal: AbortSignal.timeout(20_000),
@@ -314,10 +366,51 @@ async function runAutomationBypassCanaryRequest(input) {
   }
 
   if (response.status >= 300 && response.status < 400) {
-    return fail(
-      'CANARY_AUTOMATION_BYPASS_REDIRECTED',
-      'Vercel Deployment Protection redirected the automation bypass request.',
-    );
+    const redirectUrl = resolveAllowedCanaryRedirect({
+      status: response.status,
+      location: response.headers.get('location'),
+      requestUrl: firstRequestUrl,
+      deploymentUrl: input.deploymentUrl,
+    });
+
+    try {
+      response = await fetch(
+        redirectUrl,
+        {
+          method: 'POST',
+          headers,
+          body: '{}',
+          redirect: 'manual',
+          signal: AbortSignal.timeout(20_000),
+        },
+      );
+    } catch {
+      return fail(
+        'CANARY_AUTOMATION_BYPASS_REDIRECT_REQUEST_FAILED',
+        'Guarded canary redirect request failed.',
+      );
+    }
+
+    if (response.status >= 300 && response.status < 400) {
+      return fail(
+        'CANARY_AUTOMATION_BYPASS_SECOND_REDIRECT',
+        'Guarded canary request redirected more than once.',
+      );
+    }
+
+    if (response.status === 401) {
+      return fail(
+        'CANARY_AUTOMATION_BYPASS_UNAUTHORIZED',
+        'Vercel Deployment Protection returned 401 after the guarded redirect.',
+      );
+    }
+
+    if (response.status === 403) {
+      return fail(
+        'CANARY_AUTOMATION_BYPASS_FORBIDDEN',
+        'Vercel Deployment Protection returned 403 after the guarded redirect.',
+      );
+    }
   }
 
   let payload;
@@ -576,6 +669,7 @@ export async function runProductionPostgresTlsPeerCanaryOrchestrator(env = proce
 
     const canaryPayload = await runAutomationBypassCanaryRequest({
       requestBaseUrl,
+      deploymentUrl,
       canaryToken,
       automationBypassSecret,
       bypassCookie,
