@@ -259,6 +259,15 @@ export function parseProductionPostgresRuntimeConfigV1(
     env,
     PRODUCTION_POSTGRES_TLS_ACTIVATION_ENV_V1.rootCertificatePem,
   );
+  const sourceTlsPosture = inspectProductionDatabaseTlsPostureV1(databaseUrl);
+  if (
+    sourceTlsPosture.mode !== 'require' &&
+    sourceTlsPosture.mode !== 'verify-full'
+  ) {
+    return fail(
+      'MYEONGHA_DATABASE_TLS_PEER_MODE=verify-full requires the governed require migration source or verify-full source.',
+    );
+  }
 
   return Object.freeze({
     databaseUrl,
