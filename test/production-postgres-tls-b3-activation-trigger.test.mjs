@@ -11,18 +11,28 @@ const orchestrator = readFileSync(
 );
 
 describe('Production PostgreSQL TLS B3 activation trigger contract', () => {
-  it('is manual, main-authorized, Production-environment scoped, and security tracked', () => {
+  it('is exact-main one-shot or explicit manual, Production-environment scoped, and security tracked', () => {
+    expect(workflow).toContain('push:');
     expect(workflow).toContain('workflow_dispatch:');
+    expect(workflow).toContain(
+      'config/operations/run-once/production-postgres-tls-b3-activation.marker',
+    );
     expect(workflow).toContain(
       'ACTIVATE_POSTGRES_TLS_VERIFY_FULL_B3',
     );
     expect(workflow).toContain('environment: production');
     expect(workflow).toContain('MYEONGHA_WATCHTOWER_TRACK: security');
     expect(orchestrator).toContain(
-      "env.GITHUB_EVENT_NAME !== 'workflow_dispatch'",
+      "env.GITHUB_REF !== 'refs/heads/main'",
     );
     expect(orchestrator).toContain(
-      "env.GITHUB_REF !== 'refs/heads/main'",
+      "env.GITHUB_EVENT_NAME === 'push'",
+    );
+    expect(orchestrator).toContain(
+      "env.GITHUB_EVENT_NAME === 'workflow_dispatch'",
+    );
+    expect(orchestrator).toContain(
+      "'ACTIVATE_POSTGRES_TLS_VERIFY_FULL_B3_RUN1'",
     );
   });
 
