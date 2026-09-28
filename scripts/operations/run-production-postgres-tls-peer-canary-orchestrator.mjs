@@ -9,7 +9,7 @@ const TEAM_ID = 'team_xuYA9OhCWlJETaYFOmeVodgS';
 const MARKER_PATH =
   'config/operations/run-once/production-postgres-tls-peer-canary-b2b.marker';
 const MARKER_VALUE =
-  'VERIFY_POSTGRES_TLS_PEER_B2B_SKIP_DOMAIN_CANARY_RETRY15\n';
+  'VERIFY_POSTGRES_TLS_PEER_B2B_SKIP_DOMAIN_CANARY_RETRY16\n';
 const TRACK = 'security';
 const VERCEL_CLI_PACKAGE = 'vercel@59.16.0';
 const CANARY_MODE = 'one-shot-b2b';
@@ -660,8 +660,7 @@ export async function runProductionPostgresTlsPeerCanaryOrchestrator(env = proce
     );
     const aliasEvidence = inspectSkipDomainAliasEvidence(aliases);
 
-    const requestBaseUrl =
-      `https://${aliasEvidence.generatedCliAlias}`;
+    const requestBaseUrl = deploymentUrl;
     const bypassCookie = await bootstrapAutomationBypassCookie({
       requestBaseUrl,
       automationBypassSecret,
@@ -685,7 +684,8 @@ export async function runProductionPostgresTlsPeerCanaryOrchestrator(env = proce
       automationBypassUsed: true,
       automationBypassCookieEstablished: true,
       automationBypassCookieEmitted: false,
-      canaryRequestAliasVerified: true,
+      stagedAliasSafetyVerified: true,
+      canaryRequestExactDeploymentUrl: true,
       projectDeploymentProtectionMutated: false,
       productionEnvironmentMutated: false,
       productionDatabaseBindingMutated: false,
@@ -724,7 +724,10 @@ function printEvidence(evidence) {
     `automation_bypass_cookie_emitted=${evidence.automationBypassCookieEmitted}`,
   );
   console.log(
-    `canary_request_alias_verified=${evidence.canaryRequestAliasVerified}`,
+    `staged_alias_safety_verified=${evidence.stagedAliasSafetyVerified}`,
+  );
+  console.log(
+    `canary_request_exact_deployment_url=${evidence.canaryRequestExactDeploymentUrl}`,
   );
   console.log(
     `automation_bypass_secret_emitted=${evidence.automationBypassSecretEmitted}`,
