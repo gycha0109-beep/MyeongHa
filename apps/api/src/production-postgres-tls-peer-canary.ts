@@ -4,6 +4,7 @@ import {
   buildProductionPostgresStrictTlsTargetV1,
   PRODUCTION_POSTGRES_TLS_PEER_VERIFICATION_CONTRACT_VERSION_V1,
   PRODUCTION_POSTGRES_TLS_REQUIRED_MODE_V1,
+  PRODUCTION_POSTGRES_TLS_ROOT_FINGERPRINT256_V1,
 } from './production-postgres-tls-peer-verification.js';
 import {
   inspectProductionDatabaseTlsPostureV1,
@@ -16,7 +17,7 @@ import {
 export const PRODUCTION_POSTGRES_TLS_CANARY_EXPECTED_PRINCIPAL_V1 =
   'myeongha_runtime' as const;
 export const PRODUCTION_POSTGRES_TLS_CANARY_ROOT_FINGERPRINT256_V1 =
-  '80:70:25:AD:50:D4:ED:21:9D:2C:9C:7D:29:9C:00:4F:82:4E:B0:0C:F7:F6:5A:FE:F6:07:D0:7B:72:E6:CA:FA' as const;
+  PRODUCTION_POSTGRES_TLS_ROOT_FINGERPRINT256_V1;
 export const PRODUCTION_POSTGRES_TLS_CANARY_MODE_V1 =
   'one-shot-b2b' as const;
 

@@ -3,6 +3,7 @@ import {
   MYEONGHA_API_EXECUTION_ROLE,
   MYEONGHA_PRODUCTION_SUPABASE_ORIGIN,
   MYEONGHA_PRODUCTION_SUPABASE_PROJECT_REF,
+  PRODUCTION_POSTGRES_TLS_ACTIVATION_ENV_V1,
   PRODUCTION_USER_DATA_RUNTIME_ENV_V1,
   ProductionUserDataRuntimeConfigErrorV1,
   inspectProductionDatabaseTlsPostureV1,
@@ -56,6 +57,59 @@ describe('production user-data runtime configuration', () => {
       supabaseApiKey: SUPABASE_API_KEY,
       guestFingerprintSecret: GUEST_FINGERPRINT_SECRET,
     });
+  });
+
+  it('activates verify-full only with an explicit root certificate binding', () => {
+    const env = validEnv();
+    env[PRODUCTION_POSTGRES_TLS_ACTIVATION_ENV_V1.peerMode] = 'verify-full';
+    env[PRODUCTION_POSTGRES_TLS_ACTIVATION_ENV_V1.rootCertificatePem] =
+      '-----BEGIN CERTIFICATE-----\\ntest-only\\n-----END CERTIFICATE-----';
+
+    expect(parseProductionUserDataRuntimeConfigV1(env)).toMatchObject({
+      databaseTlsPeerMode: 'verify-full',
+      databaseSslRootCertificatePem:
+        '-----BEGIN CERTIFICATE-----\\ntest-only\\n-----END CERTIFICATE-----',
+    });
+  });
+
+  it('keeps legacy mode explicit during the controlled B3 rollback window', () => {
+    const env = validEnv();
+    env[PRODUCTION_POSTGRES_TLS_ACTIVATION_ENV_V1.peerMode] = 'legacy';
+
+    expect(parseProductionUserDataRuntimeConfigV1(env)).toMatchObject({
+      databaseTlsPeerMode: 'legacy',
+    });
+  });
+
+  it('fails closed when verify-full activation has no root certificate binding', () => {
+    const env = validEnv();
+    env[PRODUCTION_POSTGRES_TLS_ACTIVATION_ENV_V1.peerMode] = 'verify-full';
+
+    expect(() => parseProductionUserDataRuntimeConfigV1(env)).toThrow(
+      'MYEONGHA_DATABASE_SSL_ROOT_CERT_PEM',
+    );
+  });
+
+  it('fails closed when verify-full activation is applied to an ungoverned source TLS mode', () => {
+    const env = validEnv();
+    env[PRODUCTION_USER_DATA_RUNTIME_ENV_V1.databaseUrl] =
+      'postgresql://myeongha_runtime:password@db.example.internal/postgres?sslmode=prefer';
+    env[PRODUCTION_POSTGRES_TLS_ACTIVATION_ENV_V1.peerMode] = 'verify-full';
+    env[PRODUCTION_POSTGRES_TLS_ACTIVATION_ENV_V1.rootCertificatePem] =
+      '-----BEGIN CERTIFICATE-----\\ntest-only\\n-----END CERTIFICATE-----';
+
+    expect(() => parseProductionUserDataRuntimeConfigV1(env)).toThrow(
+      'governed require migration source or verify-full source',
+    );
+  });
+
+  it('fails closed on an unknown PostgreSQL TLS activation mode', () => {
+    const env = validEnv();
+    env[PRODUCTION_POSTGRES_TLS_ACTIVATION_ENV_V1.peerMode] = 'prefer';
+
+    expect(() => parseProductionUserDataRuntimeConfigV1(env)).toThrow(
+      'must be legacy or verify-full',
+    );
   });
 
   it('fails closed when any required runtime binding is absent', () => {
@@ -216,5 +270,25 @@ describe('production user-data runtime configuration', () => {
     expect(serialized).not.toContain('sslrootcert');
     expect(serialized).not.toContain(SUPABASE_API_KEY);
     expect(serialized).not.toContain(GUEST_FINGERPRINT_SECRET);
+  });
+
+  it('summarizes activated verify-full posture without emitting root certificate material', () => {
+    const env = validEnv();
+    const rootCertificatePem =
+      '-----BEGIN CERTIFICATE-----\\ntest-only-sensitive-material\\n-----END CERTIFICATE-----';
+    env[PRODUCTION_POSTGRES_TLS_ACTIVATION_ENV_V1.peerMode] = 'verify-full';
+    env[PRODUCTION_POSTGRES_TLS_ACTIVATION_ENV_V1.rootCertificatePem] =
+      rootCertificatePem;
+
+    const summary = summarizeProductionUserDataRuntimeConfigV1(
+      parseProductionUserDataRuntimeConfigV1(env),
+    );
+    const serialized = JSON.stringify(summary);
+
+    expect(summary.databaseTlsMode).toBe('verify-full');
+    expect(summary.databaseTlsPeerVerification).toBe('full');
+    expect(summary.databaseTlsRootCertificateConfigured).toBe(true);
+    expect(serialized).not.toContain(rootCertificatePem);
+    expect(serialized).not.toContain('test-only-sensitive-material');
   });
 });
