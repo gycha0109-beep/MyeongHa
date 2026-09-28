@@ -22,6 +22,8 @@ const CANARY_MODE = 'one-shot-b3';
 const ROOT_CERT_ENV_KEY = 'MYEONGHA_DATABASE_SSL_ROOT_CERT_PEM';
 const PEER_MODE_ENV_KEY = 'MYEONGHA_DATABASE_TLS_PEER_MODE';
 const CANONICAL_PRODUCTION_HOST = 'myeongha.vercel.app';
+const PINNED_ROOT_FINGERPRINT256 =
+  '80:70:25:AD:50:D4:ED:21:9D:2C:9C:7D:29:9C:00:4F:82:4E:B0:0C:F7:F6:5A:FE:F6:07:D0:7B:72:E6:CA:FA';
 const AUTHORITY_PATH =
   'config/operations/production-postgres-tls-peer-verification-v1.json';
 
@@ -100,7 +102,8 @@ function loadPinnedFingerprint() {
     authority?.rootCertificateAuthority?.productionFingerprint256;
   if (
     typeof fingerprint !== 'string' ||
-    !/^(?:[0-9A-F]{2}:){31}[0-9A-F]{2}$/u.test(fingerprint)
+    !/^(?:[0-9A-F]{2}:){31}[0-9A-F]{2}$/u.test(fingerprint) ||
+    fingerprint !== PINNED_ROOT_FINGERPRINT256
   ) {
     return fail(
       'ACTIVATION_FINGERPRINT_AUTHORITY_INVALID',
@@ -388,38 +391,54 @@ async function assignTemporaryAlias(input) {
 
 async function deleteTemporaryAlias(aliasUid, token) {
   if (!aliasUid) return true;
-  try {
-    const response = await fetch(
-      `https://api.vercel.com/v2/aliases/${encodeURIComponent(aliasUid)}?teamId=${encodeURIComponent(TEAM_ID)}`,
-      {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
-        redirect: 'error',
-        signal: AbortSignal.timeout(20_000),
-      },
-    );
-    return response.ok || response.status === 404;
-  } catch {
-    return false;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const response = await fetch(
+        `https://api.vercel.com/v2/aliases/${encodeURIComponent(aliasUid)}?teamId=${encodeURIComponent(TEAM_ID)}`,
+        {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` },
+          redirect: 'error',
+          signal: AbortSignal.timeout(20_000),
+        },
+      );
+      if (response.ok || response.status === 404) return true;
+    } catch {
+      // Retry below.
+    }
+    if (attempt < 2) {
+      await new Promise((resolvePromise) =>
+        setTimeout(resolvePromise, 500 * (attempt + 1)),
+      );
+    }
   }
+  return false;
 }
 
 async function deleteDeployment(id, token) {
   if (!id) return true;
-  try {
-    const response = await fetch(
-      `https://api.vercel.com/v13/deployments/${encodeURIComponent(id)}?teamId=${encodeURIComponent(TEAM_ID)}`,
-      {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
-        redirect: 'error',
-        signal: AbortSignal.timeout(20_000),
-      },
-    );
-    return response.ok || response.status === 404;
-  } catch {
-    return false;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const response = await fetch(
+        `https://api.vercel.com/v13/deployments/${encodeURIComponent(id)}?teamId=${encodeURIComponent(TEAM_ID)}`,
+        {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` },
+          redirect: 'error',
+          signal: AbortSignal.timeout(20_000),
+        },
+      );
+      if (response.ok || response.status === 404) return true;
+    } catch {
+      // Retry below.
+    }
+    if (attempt < 2) {
+      await new Promise((resolvePromise) =>
+        setTimeout(resolvePromise, 500 * (attempt + 1)),
+      );
+    }
   }
+  return false;
 }
 
 async function runActivationCanaryRequest(input) {
@@ -496,6 +515,7 @@ export function validateActivationCanaryEvidence(payload) {
     evidence?.rejectUnauthorized !== true ||
     evidence?.defaultHostnameVerification !== true ||
     evidence?.rootCertificateConfigured !== true ||
+    evidence?.rootCertificateFingerprint256 !== PINNED_ROOT_FINGERPRINT256 ||
     evidence?.ordinaryPoolConnectionSucceeded !== true ||
     evidence?.transactionReadOnly !== true ||
     evidence?.principalExpected !== 'myeongha_runtime' ||
@@ -527,6 +547,7 @@ async function findExactMainProductionDeployment(input) {
     const matches = (payload?.deployments ?? []).filter(
       (deployment) =>
         deployment?.meta?.githubCommitSha === input.githubSha &&
+        deployment?.meta?.myeonghaTlsB3Sha === undefined &&
         deployment?.target === 'production' &&
         (deployment?.state === 'READY' || deployment?.readyState === 'READY'),
     );
