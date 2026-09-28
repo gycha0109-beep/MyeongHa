@@ -9,7 +9,7 @@ const TEAM_ID = 'team_xuYA9OhCWlJETaYFOmeVodgS';
 const MARKER_PATH =
   'config/operations/run-once/production-postgres-tls-peer-canary-b2b.marker';
 const MARKER_VALUE =
-  'VERIFY_POSTGRES_TLS_PEER_B2B_SKIP_DOMAIN_CANARY_RETRY5\n';
+  'VERIFY_POSTGRES_TLS_PEER_B2B_SKIP_DOMAIN_CANARY_RETRY6\n';
 const TRACK = 'security';
 const VERCEL_CLI_PACKAGE = 'vercel@59.16.0';
 const CANARY_MODE = 'one-shot-b2b';
@@ -149,6 +149,118 @@ export function buildSkipDomainDeploymentArgs(input) {
     '--meta',
     `myeonghaCanarySha=${input.githubSha}`,
   ];
+}
+
+export function buildProtectedCanaryCurlArgs(input) {
+  return [
+    '--yes',
+    VERCEL_CLI_PACKAGE,
+    'curl',
+    '/api/readiness',
+    '--deployment',
+    input.deploymentUrl,
+    '--',
+    '--silent',
+    '--show-error',
+    '--request',
+    'POST',
+    '--header',
+    'Content-Type: application/json',
+    '--header',
+    '@-',
+    '--data',
+    '{}',
+  ];
+}
+
+function parseCanaryCurlPayload(stdout) {
+  const lines = stdout
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const line = lines[index];
+    if (!line.startsWith('{') || !line.endsWith('}')) continue;
+    try {
+      return JSON.parse(line);
+    } catch {
+      // Continue searching only within already bounded, non-secret response output.
+    }
+  }
+
+  return fail(
+    'CANARY_RESPONSE_INVALID',
+    'Protected canary response was not recognized as JSON.',
+  );
+}
+
+function runProtectedCanaryRequest(input) {
+  return new Promise((resolvePromise, rejectPromise) => {
+    const childEnv = { ...process.env };
+    delete childEnv.SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM;
+    childEnv.VERCEL_TOKEN = input.vercelToken;
+    childEnv.VERCEL_ORG_ID = TEAM_ID;
+    childEnv.VERCEL_PROJECT_ID = PROJECT_ID;
+
+    const child = spawn('npx', buildProtectedCanaryCurlArgs(input), {
+      cwd: process.cwd(),
+      env: childEnv,
+      shell: false,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', (chunk) => {
+      stdout = boundedAppend(stdout, chunk);
+    });
+    child.stderr.on('data', (chunk) => {
+      stderr = boundedAppend(stderr, chunk);
+    });
+
+    const timeout = setTimeout(() => {
+      child.kill('SIGTERM');
+    }, 30_000);
+
+    child.once('error', () => {
+      clearTimeout(timeout);
+      rejectPromise(
+        new CanaryOrchestratorError(
+          'CANARY_REQUEST_FAILED',
+          'Protected canary request process failed to start.',
+        ),
+      );
+    });
+
+    child.once('close', (code, signal) => {
+      clearTimeout(timeout);
+      if (code !== 0 || signal !== null) {
+        rejectPromise(
+          new CanaryOrchestratorError(
+            'CANARY_REQUEST_FAILED',
+            'Protected canary request failed.',
+          ),
+        );
+        return;
+      }
+
+      if (stderr.toLowerCase().includes('error:')) {
+        rejectPromise(
+          new CanaryOrchestratorError(
+            'CANARY_REQUEST_FAILED',
+            'Protected canary request reported a CLI error.',
+          ),
+        );
+        return;
+      }
+
+      resolvePromise(parseCanaryCurlPayload(stdout));
+    });
+
+    child.stdin.write(`Authorization: Bearer ${input.canaryToken}\n`);
+    child.stdin.end();
+  });
 }
 
 function runSkipDomainDeployment(input) {
@@ -351,38 +463,21 @@ export async function runProductionPostgresTlsPeerCanaryOrchestrator(env = proce
     );
     const aliasEvidence = inspectSkipDomainAliasEvidence(aliases);
 
-    let canaryResponse;
-    try {
-      canaryResponse = await fetch(
-        `${deploymentUrl}/api/readiness`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${canaryToken}`,
-            Accept: 'application/json',
-            'Content-Type': 'application/json',
-          },
-          body: '{}',
-          redirect: 'error',
-          signal: AbortSignal.timeout(20_000),
-        },
-      );
-    } catch {
-      return fail('CANARY_REQUEST_FAILED', 'Canary endpoint request failed.');
-    }
+    const canaryPayload = await runProtectedCanaryRequest({
+      deploymentUrl,
+      vercelToken: token,
+      canaryToken,
+    });
 
-    if (!canaryResponse.ok) {
+    if (
+      canaryPayload?.status === 'fail' &&
+      typeof canaryPayload?.code === 'string' &&
+      /^[A-Z0-9_]+$/u.test(canaryPayload.code)
+    ) {
       return fail(
-        'CANARY_REQUEST_FAILED',
-        `Canary endpoint rejected the request with status ${canaryResponse.status}.`,
+        `CANARY_ENDPOINT_${canaryPayload.code}`,
+        'Canary endpoint reported a fail-closed result.',
       );
-    }
-
-    let canaryPayload;
-    try {
-      canaryPayload = await canaryResponse.json();
-    } catch {
-      return fail('CANARY_RESPONSE_INVALID', 'Canary response was not JSON.');
     }
 
     const evidence = validateCanaryEvidence(canaryPayload);
