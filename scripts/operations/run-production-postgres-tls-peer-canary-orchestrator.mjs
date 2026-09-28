@@ -9,7 +9,7 @@ const TEAM_ID = 'team_xuYA9OhCWlJETaYFOmeVodgS';
 const MARKER_PATH =
   'config/operations/run-once/production-postgres-tls-peer-canary-b2b.marker';
 const MARKER_VALUE =
-  'VERIFY_POSTGRES_TLS_PEER_B2B_SKIP_DOMAIN_CANARY_RETRY17\n';
+  'VERIFY_POSTGRES_TLS_PEER_B2B_SKIP_DOMAIN_CANARY_RETRY18\n';
 const TRACK = 'security';
 const VERCEL_CLI_PACKAGE = 'vercel@59.16.0';
 const CANARY_MODE = 'one-shot-b2b';
@@ -562,6 +562,165 @@ function runSkipDomainDeployment(input) {
   });
 }
 
+export function buildTemporaryCanaryAlias(input) {
+  const runId = required(input.githubRunId, 'GITHUB_RUN_ID_MISSING');
+  if (!/^[0-9]{1,20}$/u.test(runId)) {
+    return fail(
+      'GITHUB_RUN_ID_INVALID',
+      'GitHub Actions run id is invalid.',
+    );
+  }
+
+  return `myeongha-sec01-${runId}-johnny-self.vercel.app`;
+}
+
+async function assertTemporaryCanaryAliasAvailable(input) {
+  let response;
+  try {
+    response = await fetch(
+      `https://api.vercel.com/v4/aliases/${encodeURIComponent(input.alias)}?teamId=${encodeURIComponent(TEAM_ID)}`,
+      {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${input.vercelToken}`,
+          Accept: 'application/json',
+        },
+        redirect: 'error',
+        signal: AbortSignal.timeout(20_000),
+      },
+    );
+  } catch {
+    return fail(
+      'TEMPORARY_CANARY_ALIAS_PREFLIGHT_FAILED',
+      'Temporary canary alias availability check failed.',
+    );
+  }
+
+  if (response.status === 404) return true;
+
+  if (response.ok) {
+    return fail(
+      'TEMPORARY_CANARY_ALIAS_ALREADY_EXISTS',
+      'Temporary canary alias already exists.',
+    );
+  }
+
+  return fail(
+    'TEMPORARY_CANARY_ALIAS_PREFLIGHT_FAILED',
+    'Temporary canary alias availability check was rejected.',
+  );
+}
+
+async function assignTemporaryCanaryAlias(input) {
+  await assertTemporaryCanaryAliasAvailable(input);
+
+  const payload = await requestJson(
+    `https://api.vercel.com/v2/deployments/${encodeURIComponent(input.deploymentId)}/aliases?teamId=${encodeURIComponent(TEAM_ID)}`,
+    input.vercelToken,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        alias: input.alias,
+        redirect: null,
+      }),
+    },
+    'TEMPORARY_CANARY_ALIAS_ASSIGN_FAILED',
+  );
+
+  if (
+    typeof payload?.uid !== 'string' ||
+    payload.uid.length === 0 ||
+    payload?.alias !== input.alias ||
+    payload?.oldDeploymentId !== undefined
+  ) {
+    return fail(
+      'TEMPORARY_CANARY_ALIAS_ASSIGN_INVALID',
+      'Temporary canary alias assignment response was invalid.',
+    );
+  }
+
+  return Object.freeze({
+    uid: payload.uid,
+    alias: payload.alias,
+  });
+}
+
+export function inspectTemporaryCanaryAliasEvidence(
+  payload,
+  temporaryAlias,
+  temporaryAliasUid,
+) {
+  if (!Array.isArray(payload?.aliases) || payload.aliases.length !== 2) {
+    return fail(
+      'TEMPORARY_CANARY_ALIAS_VERIFY_INVALID',
+      'Temporary canary alias verification payload was invalid.',
+    );
+  }
+
+  const byName = new Map(
+    payload.aliases.map((entry) => [
+      typeof entry?.alias === 'string' ? entry.alias : '',
+      entry,
+    ]),
+  );
+
+  const generated = byName.get(ALLOWED_GENERATED_CLI_ALIAS);
+  const temporary = byName.get(temporaryAlias);
+
+  if (
+    byName.size !== 2 ||
+    generated === undefined ||
+    temporary === undefined ||
+    temporary?.uid !== temporaryAliasUid ||
+    (temporary?.redirect !== undefined && temporary.redirect !== null)
+  ) {
+    return fail(
+      'TEMPORARY_CANARY_ALIAS_VERIFY_INVALID',
+      'Temporary canary alias did not map exclusively to the staged deployment.',
+    );
+  }
+
+  return Object.freeze({
+    temporaryCanaryAliasCreated: true,
+    temporaryCanaryAliasVerified: true,
+    temporaryCanaryAliasRedirect: false,
+  });
+}
+
+async function deleteTemporaryCanaryAlias(aliasUid, token) {
+  if (!aliasUid) return true;
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const response = await fetch(
+        `https://api.vercel.com/v2/aliases/${encodeURIComponent(aliasUid)}?teamId=${encodeURIComponent(TEAM_ID)}`,
+        {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: 'application/json',
+          },
+          redirect: 'error',
+          signal: AbortSignal.timeout(20_000),
+        },
+      );
+
+      if (response.ok || response.status === 404) return true;
+    } catch {
+      // Retry below.
+    }
+
+    if (attempt < 2) {
+      await new Promise((resolvePromise) =>
+        setTimeout(resolvePromise, 500 * (attempt + 1)),
+      );
+    }
+  }
+
+  return false;
+}
+
 async function deleteDeployment(id, token) {
   if (!id) return true;
   try {
@@ -659,6 +818,8 @@ export async function runProductionPostgresTlsPeerCanaryOrchestrator(env = proce
   const canaryToken = randomBytes(32).toString('base64url');
 
   let deploymentId;
+  let temporaryAliasUid;
+  let cleanupTemporaryAlias = true;
   let cleanupDeployment = true;
 
   try {
@@ -704,7 +865,31 @@ export async function runProductionPostgresTlsPeerCanaryOrchestrator(env = proce
     );
     const aliasEvidence = inspectSkipDomainAliasEvidence(aliases);
 
-    const requestBaseUrl = deploymentUrl;
+    const temporaryAlias = buildTemporaryCanaryAlias({
+      githubRunId: env.GITHUB_RUN_ID,
+    });
+    const temporaryAliasAssignment =
+      await assignTemporaryCanaryAlias({
+        deploymentId,
+        alias: temporaryAlias,
+        vercelToken: token,
+      });
+    temporaryAliasUid = temporaryAliasAssignment.uid;
+
+    const aliasesAfterAssignment = await requestJson(
+      `https://api.vercel.com/v2/deployments/${encodeURIComponent(deploymentId)}/aliases?teamId=${encodeURIComponent(TEAM_ID)}`,
+      token,
+      { method: 'GET' },
+      'TEMPORARY_CANARY_ALIAS_VERIFY_LOOKUP_FAILED',
+    );
+    const temporaryAliasEvidence =
+      inspectTemporaryCanaryAliasEvidence(
+        aliasesAfterAssignment,
+        temporaryAlias,
+        temporaryAliasUid,
+      );
+
+    const requestBaseUrl = `https://${temporaryAlias}`;
     const bypassCookie = await bootstrapAutomationBypassCookie({
       requestBaseUrl,
       automationBypassSecret,
@@ -724,12 +909,13 @@ export async function runProductionPostgresTlsPeerCanaryOrchestrator(env = proce
       deploymentMode: 'production-skip-domain',
       customEnvironmentCreated: false,
       ...aliasEvidence,
+      ...temporaryAliasEvidence,
       ...bypassBindingEvidence,
       automationBypassUsed: true,
       automationBypassCookieEstablished: true,
       automationBypassCookieEmitted: false,
       stagedAliasSafetyVerified: true,
-      canaryRequestExactDeploymentUrl: true,
+      canaryRequestTemporaryAlias: true,
       projectDeploymentProtectionMutated: false,
       productionEnvironmentMutated: false,
       productionDatabaseBindingMutated: false,
@@ -739,10 +925,16 @@ export async function runProductionPostgresTlsPeerCanaryOrchestrator(env = proce
       ...evidence,
     });
   } finally {
+    cleanupTemporaryAlias =
+      await deleteTemporaryCanaryAlias(temporaryAliasUid, token);
+    console.log(
+      `canary_temporary_alias_deleted=${cleanupTemporaryAlias}`,
+    );
+
     cleanupDeployment = await deleteDeployment(deploymentId, token);
     console.log(`canary_deployment_deleted=${cleanupDeployment}`);
 
-    if (!cleanupDeployment) {
+    if (!cleanupTemporaryAlias || !cleanupDeployment) {
       process.exitCode = 1;
     }
   }
@@ -771,7 +963,16 @@ function printEvidence(evidence) {
     `staged_alias_safety_verified=${evidence.stagedAliasSafetyVerified}`,
   );
   console.log(
-    `canary_request_exact_deployment_url=${evidence.canaryRequestExactDeploymentUrl}`,
+    `temporary_canary_alias_created=${evidence.temporaryCanaryAliasCreated}`,
+  );
+  console.log(
+    `temporary_canary_alias_verified=${evidence.temporaryCanaryAliasVerified}`,
+  );
+  console.log(
+    `temporary_canary_alias_redirect=${evidence.temporaryCanaryAliasRedirect}`,
+  );
+  console.log(
+    `canary_request_temporary_alias=${evidence.canaryRequestTemporaryAlias}`,
   );
   console.log(
     `automation_bypass_secret_emitted=${evidence.automationBypassSecretEmitted}`,
