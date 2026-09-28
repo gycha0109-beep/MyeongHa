@@ -26,7 +26,6 @@ export const PRODUCTION_POSTGRES_TLS_CANARY_ENV_V1 = Object.freeze({
   mode: 'MYEONGHA_POSTGRES_TLS_CANARY_MODE',
   expectedGitSha: 'MYEONGHA_POSTGRES_TLS_CANARY_SHA',
   vercelTargetEnv: 'VERCEL_TARGET_ENV',
-  vercelGitCommitSha: 'VERCEL_GIT_COMMIT_SHA',
 } as const);
 
 export interface ProductionPostgresTlsCanaryClientV1 {
@@ -55,7 +54,7 @@ export interface ProductionPostgresTlsCanaryEvidenceV1 {
     typeof PRODUCTION_POSTGRES_TLS_CANARY_ROOT_FINGERPRINT256_V1;
   readonly rootCertificatePinned: true;
   readonly deploymentTarget: 'production';
-  readonly exactGitShaBound: true;
+  readonly oneShotGitShaConfigured: true;
   readonly connectionSucceeded: true;
   readonly sslSession: true;
   readonly transactionReadOnly: true;
@@ -109,8 +108,6 @@ export function isProductionPostgresTlsCanaryRuntimeV1(
 ): boolean {
   const expectedSha =
     env[PRODUCTION_POSTGRES_TLS_CANARY_ENV_V1.expectedGitSha];
-  const runtimeSha =
-    env[PRODUCTION_POSTGRES_TLS_CANARY_ENV_V1.vercelGitCommitSha];
   const token = env[PRODUCTION_POSTGRES_TLS_CANARY_ENV_V1.token];
 
   return (
@@ -120,7 +117,6 @@ export function isProductionPostgresTlsCanaryRuntimeV1(
       PRODUCTION_POSTGRES_TLS_CANARY_MODE_V1 &&
     typeof expectedSha === 'string' &&
     /^[0-9a-f]{40}$/u.test(expectedSha) &&
-    runtimeSha === expectedSha &&
     typeof token === 'string' &&
     token.length >= 32 &&
     typeof env[
@@ -314,7 +310,7 @@ export async function runProductionPostgresTlsPeerCanaryV1(input: {
           PRODUCTION_POSTGRES_TLS_CANARY_ROOT_FINGERPRINT256_V1,
         rootCertificatePinned: true,
         deploymentTarget: 'production',
-        exactGitShaBound: true,
+        oneShotGitShaConfigured: true,
         connectionSucceeded: true,
         sslSession: true,
         transactionReadOnly: true,

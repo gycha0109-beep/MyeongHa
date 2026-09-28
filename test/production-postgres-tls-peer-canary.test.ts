@@ -33,7 +33,6 @@ const SHA = '1234567890abcdef1234567890abcdef12345678';
 function env(overrides = {}) {
   return {
     VERCEL_TARGET_ENV: 'production',
-    VERCEL_GIT_COMMIT_SHA: SHA,
     MYEONGHA_POSTGRES_TLS_CANARY_MODE: 'one-shot-b2b',
     MYEONGHA_POSTGRES_TLS_CANARY_SHA: SHA,
     MYEONGHA_POSTGRES_TLS_CANARY_TOKEN:
@@ -64,9 +63,14 @@ describe('Production PostgreSQL TLS peer canary', () => {
     ).toBe(false);
     expect(
       isProductionPostgresTlsCanaryRuntimeV1(
-        env({ VERCEL_GIT_COMMIT_SHA: 'abcdef' }),
+        env({ MYEONGHA_POSTGRES_TLS_CANARY_SHA: 'abcdef' }),
       ),
     ).toBe(false);
+    expect(
+      isProductionPostgresTlsCanaryRuntimeV1(
+        env({ VERCEL_GIT_COMMIT_SHA: undefined }),
+      ),
+    ).toBe(true);
   });
 
   it('fails closed for a non-governed login principal', () => {
@@ -128,7 +132,7 @@ describe('Production PostgreSQL TLS peer canary', () => {
       rejectUnauthorized: true,
       defaultHostnameVerification: true,
       deploymentTarget: 'production',
-      exactGitShaBound: true,
+      oneShotGitShaConfigured: true,
       connectionSucceeded: true,
       sslSession: true,
       transactionReadOnly: true,

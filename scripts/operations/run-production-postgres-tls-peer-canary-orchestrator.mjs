@@ -9,7 +9,7 @@ const TEAM_ID = 'team_xuYA9OhCWlJETaYFOmeVodgS';
 const MARKER_PATH =
   'config/operations/run-once/production-postgres-tls-peer-canary-b2b.marker';
 const MARKER_VALUE =
-  'VERIFY_POSTGRES_TLS_PEER_B2B_SKIP_DOMAIN_CANARY_RETRY19\n';
+  'VERIFY_POSTGRES_TLS_PEER_B2B_SKIP_DOMAIN_CANARY_RETRY20\n';
 const TRACK = 'security';
 const VERCEL_CLI_PACKAGE = 'vercel@59.16.0';
 const CANARY_MODE = 'one-shot-b2b';
@@ -704,7 +704,7 @@ function validateCanaryEvidence(payload) {
     payload?.status !== 'pass' ||
     evidence?.schemaVersion !== 'myeongha-production-postgres-tls-peer-canary-v1' ||
     evidence?.deploymentTarget !== 'production' ||
-    evidence?.exactGitShaBound !== true ||
+    evidence?.oneShotGitShaConfigured !== true ||
     evidence?.canaryTlsMode !== 'verify-full' ||
     evidence?.canaryPeerVerification !== 'full' ||
     evidence?.rejectUnauthorized !== true ||
