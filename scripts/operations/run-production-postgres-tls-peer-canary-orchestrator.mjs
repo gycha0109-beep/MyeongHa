@@ -9,11 +9,12 @@ const TEAM_ID = 'team_xuYA9OhCWlJETaYFOmeVodgS';
 const MARKER_PATH =
   'config/operations/run-once/production-postgres-tls-peer-canary-b2b.marker';
 const MARKER_VALUE =
-  'VERIFY_POSTGRES_TLS_PEER_B2B_SKIP_DOMAIN_CANARY_RETRY16\n';
+  'VERIFY_POSTGRES_TLS_PEER_B2B_SKIP_DOMAIN_CANARY_RETRY17\n';
 const TRACK = 'security';
 const VERCEL_CLI_PACKAGE = 'vercel@59.16.0';
 const CANARY_MODE = 'one-shot-b2b';
 const ALLOWED_GENERATED_CLI_ALIAS = 'myeongha-johnny-self.vercel.app';
+const PRODUCTION_CANONICAL_ALIAS = 'myeongha.vercel.app';
 
 class CanaryOrchestratorError extends Error {
   constructor(code, message) {
@@ -279,6 +280,44 @@ async function bootstrapAutomationBypassCookie(input) {
   return extractAutomationBypassCookie(response);
 }
 
+export function classifyOutOfScopeCanaryRedirect(input) {
+  const targetUrl = input.targetUrl;
+  const requestUrl = input.requestUrl;
+  const deploymentUrl = input.deploymentUrl;
+
+  if (targetUrl.hostname === ALLOWED_GENERATED_CLI_ALIAS) {
+    return 'CANARY_AUTOMATION_BYPASS_REDIRECT_TO_GENERATED_ALIAS';
+  }
+
+  if (targetUrl.hostname === PRODUCTION_CANONICAL_ALIAS) {
+    return 'CANARY_AUTOMATION_BYPASS_REDIRECT_TO_PRODUCTION_ALIAS';
+  }
+
+  if (
+    targetUrl.hostname === 'vercel.com' ||
+    targetUrl.hostname.endsWith('.vercel.com')
+  ) {
+    return 'CANARY_AUTOMATION_BYPASS_REDIRECT_TO_VERCEL_AUTH';
+  }
+
+  if (
+    targetUrl.hostname.endsWith('.vercel.app') &&
+    targetUrl.hostname !== requestUrl.hostname &&
+    targetUrl.hostname !== deploymentUrl.hostname
+  ) {
+    return 'CANARY_AUTOMATION_BYPASS_REDIRECT_TO_OTHER_VERCEL_ALIAS';
+  }
+
+  if (
+    targetUrl.hostname === requestUrl.hostname ||
+    targetUrl.hostname === deploymentUrl.hostname
+  ) {
+    return 'CANARY_AUTOMATION_BYPASS_REDIRECT_PATH_OUT_OF_SCOPE';
+  }
+
+  return 'CANARY_AUTOMATION_BYPASS_REDIRECT_TO_EXTERNAL_HOST';
+}
+
 export function resolveAllowedCanaryRedirect(input) {
   if (input.status !== 307 && input.status !== 308) {
     return fail(
@@ -319,8 +358,13 @@ export function resolveAllowedCanaryRedirect(input) {
     targetUrl.search.length !== 0 ||
     targetUrl.hash.length !== 0
   ) {
+    const code = classifyOutOfScopeCanaryRedirect({
+      targetUrl,
+      requestUrl,
+      deploymentUrl,
+    });
     return fail(
-      'CANARY_AUTOMATION_BYPASS_REDIRECT_OUT_OF_SCOPE',
+      code,
       'Canary redirect left the exact staged deployment boundary.',
     );
   }
