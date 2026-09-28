@@ -20,7 +20,7 @@ type RedirectRule = {
 };
 
 describe('Vercel canonical production host routing', () => {
-  it('redirects non-primary MyeongHa Vercel hosts to the stable production alias', async () => {
+  it('redirects non-primary MyeongHa Vercel hosts except the governed readiness endpoint', async () => {
     const config = JSON.parse(await readFile(vercelConfigPath, 'utf8')) as {
       redirects?: RedirectRule[];
     };
@@ -30,7 +30,7 @@ describe('Vercel canonical production host routing', () => {
     );
 
     expect(redirect).toBeDefined();
-    expect(redirect?.source).toBe('/:path*');
+    expect(redirect?.source).toBe('/:path((?!api/readiness).*)');
     expect(redirect?.permanent).toBe(false);
 
     const hostMatch = redirect?.has?.find(
@@ -50,5 +50,9 @@ describe('Vercel canonical production host routing', () => {
     expect(matchesGeneratedHost('myeongha-q95qezvmj-johnny-self.vercel.app')).toBe(true);
     expect(matchesGeneratedHost('myeongha-johnny-self.vercel.app')).toBe(true);
     expect(matchesGeneratedHost('myeongha.vercel.app')).toBe(false);
+
+    const canonicalRedirectSource = redirect?.source ?? '';
+    expect(canonicalRedirectSource).toContain('(?!api/readiness)');
+    expect(canonicalRedirectSource).not.toBe('/:path*');
   });
 });

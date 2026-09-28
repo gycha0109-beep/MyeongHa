@@ -23,7 +23,7 @@
   },
   "redirects": [
     {
-      "source": "/:path*",
+      "source": "/:path((?!api/readiness).*)",
       "has": [
         {
           "type": "header",

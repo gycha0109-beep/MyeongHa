@@ -9,7 +9,7 @@ const TEAM_ID = 'team_xuYA9OhCWlJETaYFOmeVodgS';
 const MARKER_PATH =
   'config/operations/run-once/production-postgres-tls-peer-canary-b2b.marker';
 const MARKER_VALUE =
-  'VERIFY_POSTGRES_TLS_PEER_B2B_SKIP_DOMAIN_CANARY_RETRY20\n';
+  'VERIFY_POSTGRES_TLS_PEER_B2B_SKIP_DOMAIN_CANARY_RETRY21\n';
 const TRACK = 'security';
 const VERCEL_CLI_PACKAGE = 'vercel@59.16.0';
 const CANARY_MODE = 'one-shot-b2b';
