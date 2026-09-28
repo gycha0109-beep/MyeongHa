@@ -2,6 +2,12 @@ import { timingSafeEqual } from 'node:crypto';
 import { Client, type ClientConfig } from 'pg';
 
 import {
+  PRODUCTION_POSTGRES_TLS_ACTIVATION_CANARY_ENV_V1,
+  ProductionPostgresTlsActivationCanaryErrorV1,
+  isProductionPostgresTlsActivationCanaryRuntimeV1,
+  runProductionPostgresTlsActivationCanaryV1,
+} from '../apps/api/src/production-postgres-tls-activation-canary.js';
+import {
   PRODUCTION_POSTGRES_TLS_CANARY_ENV_V1,
   ProductionPostgresTlsCanaryErrorV1,
   isProductionPostgresTlsCanaryRuntimeV1,
@@ -44,14 +50,63 @@ function safeEqual(left: string, right: string): boolean {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
-function authorizeTlsCanary(request: Request): boolean {
-  const token = process.env[PRODUCTION_POSTGRES_TLS_CANARY_ENV_V1.token];
+function authorizeBearerToken(request: Request, token: unknown): boolean {
   if (typeof token !== 'string' || token.length < 32) return false;
 
   const header = request.headers.get('authorization');
   if (header === null || !header.startsWith('Bearer ')) return false;
 
   return safeEqual(header.slice('Bearer '.length), token);
+}
+
+function authorizeTlsCanary(request: Request): boolean {
+  return authorizeBearerToken(
+    request,
+    process.env[PRODUCTION_POSTGRES_TLS_CANARY_ENV_V1.token],
+  );
+}
+
+function authorizeTlsActivationCanary(request: Request): boolean {
+  return authorizeBearerToken(
+    request,
+    process.env[PRODUCTION_POSTGRES_TLS_ACTIVATION_CANARY_ENV_V1.token],
+  );
+}
+
+async function createTlsActivationCanaryResponse(
+  request: Request,
+): Promise<Response> {
+  if (!authorizeTlsActivationCanary(request)) {
+    return Response.json(
+      { status: 'not_found' },
+      { status: 404, headers: { 'Cache-Control': NO_STORE_CACHE_CONTROL } },
+    );
+  }
+
+  try {
+    const evidence = await runProductionPostgresTlsActivationCanaryV1({
+      env: process.env,
+    });
+    return Response.json(
+      { status: 'pass', evidence },
+      {
+        status: 200,
+        headers: { 'Cache-Control': NO_STORE_CACHE_CONTROL },
+      },
+    );
+  } catch (error) {
+    const code =
+      error instanceof ProductionPostgresTlsActivationCanaryErrorV1
+        ? error.code
+        : 'ACTIVATION_CANARY_UNEXPECTED_FAILURE';
+    return Response.json(
+      { status: 'fail', code },
+      {
+        status: 503,
+        headers: { 'Cache-Control': NO_STORE_CACHE_CONTROL },
+      },
+    );
+  }
 }
 
 async function createTlsCanaryResponse(request: Request): Promise<Response> {
@@ -116,6 +171,13 @@ export function createProductionReadinessResponseV1(
 
 export default {
   fetch(request: Request): Response | Promise<Response> {
+    if (
+      request.method === POST_METHOD &&
+      isProductionPostgresTlsActivationCanaryRuntimeV1(process.env)
+    ) {
+      return createTlsActivationCanaryResponse(request);
+    }
+
     if (
       request.method === POST_METHOD &&
       isProductionPostgresTlsCanaryRuntimeV1(process.env)
