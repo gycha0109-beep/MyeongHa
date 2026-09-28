@@ -115,6 +115,17 @@ describe('node-postgres production pooler TLS semantics', () => {
     ).toThrowError(NodePostgresSubjectPoolErrorV1);
   });
 
+  it('fails closed when the ordinary Production pool lacks verify-full activation mode', () => {
+    expect(() =>
+      buildProductionNodePostgresPoolConfigV1({
+        databaseUrl: `${BASE_URL}?sslmode=require`,
+        databasePrincipal: 'myeongha_runtime',
+        databaseExecutionRole: MYEONGHA_API_EXECUTION_ROLE,
+        databaseSslRootCertificatePem: 'test-only-root-pem',
+      }),
+    ).toThrowError(NodePostgresSubjectPoolErrorV1);
+  });
+
   it('fails closed when verify-full activation is missing root certificate material', () => {
     expect(() =>
       buildProductionNodePostgresPoolConfigV1({

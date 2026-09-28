@@ -40,6 +40,9 @@ function env(overrides = {}) {
     MYEONGHA_DATABASE_URL:
       'postgresql://myeongha_runtime:secret@example.pooler.supabase.com:5432/postgres?sslmode=require&uselibpqcompat=true',
     MYEONGHA_DATABASE_PRINCIPAL: 'myeongha_runtime',
+    MYEONGHA_DATABASE_TLS_PEER_MODE: 'verify-full',
+    MYEONGHA_DATABASE_SSL_ROOT_CERT_PEM:
+      '-----BEGIN CERTIFICATE-----\\ntest-only\\n-----END CERTIFICATE-----',
     MYEONGHA_DATABASE_SSL_ROOT_CERT_B64: Buffer.from(
       TEST_ROOT_CERTIFICATE_PEM,
       'utf8',

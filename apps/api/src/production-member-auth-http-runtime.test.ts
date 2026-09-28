@@ -10,6 +10,9 @@ function env(secret: string | null = 's'.repeat(32)) {
     MYEONGHA_DATABASE_URL:
       'postgresql://myeongha_login:secret@db.example.test:5432/postgres?sslmode=require',
     MYEONGHA_DATABASE_PRINCIPAL: 'myeongha_login',
+    MYEONGHA_DATABASE_TLS_PEER_MODE: 'verify-full',
+    MYEONGHA_DATABASE_SSL_ROOT_CERT_PEM:
+      '-----BEGIN CERTIFICATE-----\\ntest-only\\n-----END CERTIFICATE-----',
     ...(secret === null ? {} : { MYEONGHA_AUTH_RATE_LIMIT_SECRET: secret }),
   };
 }

@@ -108,16 +108,12 @@ export class NodePostgresSubjectPoolErrorV1 extends Error {
 }
 
 /**
- * node-postgres 8.x currently interprets sslmode=require without libpq
- * compatibility as certificate/hostname verification. The production Supabase
- * connection authority is explicitly bound as libpq sslmode=require, whose
- * contract is encrypted transport without CA/hostname verification. Pin that
- * interpretation explicitly so a pg-connection-string compatibility change
- * cannot silently change the deployed meaning of the governed URL.
+ * Legacy/libpq-compatible connection-string normalization retained only for
+ * non-ordinary-runtime callers that still own a separate database authority.
  *
- * Stronger modes such as verify-ca / verify-full are deliberately untouched.
- * They require their corresponding CA material and must never be downgraded by
- * this adapter.
+ * The ordinary Production subject pool MUST NOT use this helper after SEC-01 B4.
+ * Its only admissible path is buildProductionNodePostgresPoolConfigV1(), which
+ * requires the governed verify-full activation binding and explicit CA object.
  */
 export function normalizeNodePostgresConnectionStringV1(
   connectionString: string,
@@ -190,7 +186,10 @@ export function buildProductionNodePostgresPoolConfigV1(
   }> = {},
 ): PoolConfig {
   if (config.databaseTlsPeerMode !== 'verify-full') {
-    return buildNodePostgresPoolConfigV1(config.databaseUrl, options);
+    throw new NodePostgresSubjectPoolErrorV1(
+      'TLS_MODE_UNSUPPORTED',
+      'Production PostgreSQL runtime requires governed verify-full peer verification.',
+    );
   }
 
   if (
@@ -287,29 +286,39 @@ class PgDriverClientV1 implements NodePostgresDriverClientV1 {
 }
 
 class PgDriverPoolV1 implements NodePostgresDriverPoolV1 {
-  private readonly pool: Pool;
+  private pool: Pool | undefined;
 
   constructor(
-    config: ProductionPostgresRuntimeConfigV1,
-    options: NodePostgresSubjectPoolOptionsV1 = {},
-  ) {
-    this.pool = new Pool(buildProductionNodePostgresPoolConfigV1(config, options));
+    private readonly config: ProductionPostgresRuntimeConfigV1,
+    private readonly options: NodePostgresSubjectPoolOptionsV1 = {},
+  ) {}
 
-    this.pool.on('error', (error) => {
+  private getOrCreatePool(): Pool {
+    if (this.pool !== undefined) return this.pool;
+
+    const pool = new Pool(
+      buildProductionNodePostgresPoolConfigV1(this.config, this.options),
+    );
+    pool.on('error', (error) => {
       const code = (error as Error & { code?: unknown }).code;
       console.error('MyeongHa PostgreSQL idle-pool error.', {
         name: error.name,
         code: typeof code === 'string' ? code : null,
       });
     });
+    this.pool = pool;
+    return pool;
   }
 
   async connect(): Promise<NodePostgresDriverClientV1> {
-    return new PgDriverClientV1(await this.pool.connect());
+    return new PgDriverClientV1(await this.getOrCreatePool().connect());
   }
 
   async end(): Promise<void> {
-    await this.pool.end();
+    if (this.pool === undefined) return;
+    const pool = this.pool;
+    this.pool = undefined;
+    await pool.end();
   }
 }
 

@@ -17,7 +17,7 @@ export const PRODUCTION_POSTGRES_TLS_ACTIVATION_ENV_V1 = Object.freeze({
   rootCertificatePem: 'MYEONGHA_DATABASE_SSL_ROOT_CERT_PEM',
 } as const);
 
-export type ProductionPostgresTlsPeerModeV1 = 'legacy' | 'verify-full';
+export type ProductionPostgresTlsPeerModeV1 = 'verify-full';
 
 export type ProductionUserDataRuntimeEnvV1 = Readonly<
   Record<string, string | undefined>
@@ -229,29 +229,13 @@ export function parseProductionPostgresRuntimeConfigV1(
   const databasePrincipal = parseDatabasePrincipal(
     requiredEnv(env, PRODUCTION_USER_DATA_RUNTIME_ENV_V1.databasePrincipal),
   );
-  const rawPeerMode = env[PRODUCTION_POSTGRES_TLS_ACTIVATION_ENV_V1.peerMode];
-  const peerMode = rawPeerMode?.trim();
-
-  if (peerMode === undefined || peerMode.length === 0) {
-    return Object.freeze({
-      databaseUrl,
-      databasePrincipal,
-      databaseExecutionRole: MYEONGHA_API_EXECUTION_ROLE,
-    });
-  }
-
-  if (peerMode === 'legacy') {
-    return Object.freeze({
-      databaseUrl,
-      databasePrincipal,
-      databaseExecutionRole: MYEONGHA_API_EXECUTION_ROLE,
-      databaseTlsPeerMode: 'legacy' as const,
-    });
-  }
-
+  const peerMode = requiredEnv(
+    env,
+    PRODUCTION_POSTGRES_TLS_ACTIVATION_ENV_V1.peerMode,
+  );
   if (peerMode !== 'verify-full') {
     return fail(
-      'MYEONGHA_DATABASE_TLS_PEER_MODE must be legacy or verify-full during controlled B3 activation.',
+      'MYEONGHA_DATABASE_TLS_PEER_MODE must be verify-full after SEC-01 Production activation.',
     );
   }
 

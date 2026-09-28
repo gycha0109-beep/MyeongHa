@@ -5,6 +5,9 @@ const ENV = Object.freeze({
   MYEONGHA_DATABASE_URL:
     'postgresql://myeongha_runtime.cnsfpcdiyofqvhpcegfc:test-password@aws-0-test.pooler.supabase.com:5432/postgres?sslmode=require',
   MYEONGHA_DATABASE_PRINCIPAL: 'myeongha_runtime',
+  MYEONGHA_DATABASE_TLS_PEER_MODE: 'verify-full',
+  MYEONGHA_DATABASE_SSL_ROOT_CERT_PEM:
+    '-----BEGIN CERTIFICATE-----\\ntest-only\\n-----END CERTIFICATE-----',
   MYEONGHA_SUPABASE_URL: 'https://cnsfpcdiyofqvhpcegfc.supabase.co',
   MYEONGHA_SUPABASE_API_KEY:
     'sb_publishable_test_key_material_for_guest_promotion_auth_before_body',
