@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 
 import { describe, expect, it } from 'vitest';
 
-const EXPECTED = 'VERIFY_POSTGRES_TLS_PEER_B2B_SKIP_DOMAIN_CANARY_RETRY7';
+const EXPECTED = 'VERIFY_POSTGRES_TLS_PEER_B2B_SKIP_DOMAIN_CANARY_RETRY8';
 const MARKER_PATH =
   'config/operations/run-once/production-postgres-tls-peer-canary-b2b.marker';
 
@@ -20,6 +20,7 @@ describe('Production PostgreSQL TLS peer canary trigger contract', () => {
 
     expect(marker).toBe(`${EXPECTED}\n`);
     expect(workflow).toContain(`expected='${EXPECTED}'`);
+    expect(workflow).toContain('id-token: write');
     expect(orchestrator).toContain(
       `const MARKER_VALUE =\n  '${EXPECTED}\\n';`,
     );
