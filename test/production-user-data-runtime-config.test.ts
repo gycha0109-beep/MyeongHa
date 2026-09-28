@@ -87,7 +87,7 @@ describe('production user-data runtime configuration', () => {
 
   it('fails closed when verify-full activation has no root certificate binding', () => {
     const env = validEnv();
-    env[PRODUCTION_POSTGRES_TLS_ACTIVATION_ENV_V1.peerMode] = 'verify-full';
+    delete env[PRODUCTION_POSTGRES_TLS_ACTIVATION_ENV_V1.rootCertificatePem];
 
     expect(() => parseProductionUserDataRuntimeConfigV1(env)).toThrow(
       'MYEONGHA_DATABASE_SSL_ROOT_CERT_PEM',
