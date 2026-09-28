@@ -2,8 +2,8 @@
   "contractVersion": "myeongha-production-postgres-tls-peer-verification-v1",
   "issue": 1330,
   "watchtowerTrack": "security",
-  "phase": "B3",
-  "activationState": "production-verify-full-active-b4-hardening-pending",
+  "phase": "B4",
+  "activationState": "production-verify-full-fail-closed-enforced",
   "productionActivation": true,
   "productionBindingMutated": true,
   "governedProjectRef": "cnsfpcdiyofqvhpcegfc",
@@ -19,9 +19,7 @@
     "repositoryPemAllowed": false,
     "runtimePemBindingPlanned": "MYEONGHA_DATABASE_SSL_ROOT_CERT_PEM"
   },
-  "activationBlockers": [
-    "production-fail-closed-hardening-not-yet-complete"
-  ],
+  "activationBlockers": [],
   "forbidden": [
     "production-binding-mutation-before-positive-canary",
     "database-url-or-credential-emission",
@@ -141,5 +139,60 @@
     "credentialMaterialEmitted": false,
     "rootCertificatePemEmitted": false,
     "automationBypassSecretEmitted": false
+  },
+  "b4EnforcementEvidence": {
+    "status": "passed",
+    "pullRequestNumber": 1424,
+    "pullRequestHeadSha": "0d06e23b8d4604cfad9677ca3e132e2b8682dd9b",
+    "mergeMainSha": "b7706808d5937c6e41c40c256c633d8babeb4ec7",
+    "recordedAt": "2026-09-28T23:49:41Z",
+    "ordinaryRuntimeRequiresVerifyFullMode": true,
+    "ordinaryRuntimeRequiresRootCertificateBinding": true,
+    "ordinaryRuntimeLegacyFallbackRemoved": true,
+    "sourceSslParametersRemovedBeforeDriver": true,
+    "explicitDriverCa": true,
+    "rejectUnauthorized": true,
+    "defaultHostnameVerification": true,
+    "b3ActivationSurfaceRetired": true,
+    "separateWorkerAuthorityUntouched": true,
+    "mainCi": {
+      "status": "passed",
+      "workflowRunId": 36499200380,
+      "workflowRunNumber": 4138
+    },
+    "governance": {
+      "status": "passed",
+      "workflowRunId": 36499200245,
+      "workflowRunNumber": 1242
+    },
+    "supabaseProduction": {
+      "status": "passed",
+      "workflowRunId": 36499200260,
+      "workflowRunNumber": 321
+    },
+    "webBrowserSmoke": {
+      "status": "passed",
+      "workflowRunId": 36499200198,
+      "workflowRunNumber": 2199
+    },
+    "vercelProduction": {
+      "deploymentId": "dpl_EGx7UmjxjVRjjygAuu49TmqozDzF",
+      "deploymentReady": true,
+      "target": "production",
+      "githubCommitSha": "b7706808d5937c6e41c40c256c633d8babeb4ec7",
+      "canonicalAlias": "myeongha.vercel.app",
+      "canonicalAliasVerified": true
+    },
+    "canonicalReadiness": {
+      "statusCode": 200,
+      "status": "ready",
+      "userData": "ready",
+      "sajuCalculation": "ready"
+    },
+    "databaseUrlRead": false,
+    "databaseUrlDecrypted": false,
+    "databaseUrlEmitted": false,
+    "credentialMaterialEmitted": false,
+    "rootCertificatePemEmitted": false
   }
 }
