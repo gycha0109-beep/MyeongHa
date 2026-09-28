@@ -12,6 +12,13 @@ export const PRODUCTION_USER_DATA_RUNTIME_ENV_V1 = Object.freeze({
   guestFingerprintSecret: 'MYEONGHA_GUEST_FINGERPRINT_SECRET',
 } as const);
 
+export const PRODUCTION_POSTGRES_TLS_ACTIVATION_ENV_V1 = Object.freeze({
+  peerMode: 'MYEONGHA_DATABASE_TLS_PEER_MODE',
+  rootCertificatePem: 'MYEONGHA_DATABASE_SSL_ROOT_CERT_PEM',
+} as const);
+
+export type ProductionPostgresTlsPeerModeV1 = 'legacy' | 'verify-full';
+
 export type ProductionUserDataRuntimeEnvV1 = Readonly<
   Record<string, string | undefined>
 >;
@@ -20,6 +27,8 @@ export interface ProductionPostgresRuntimeConfigV1 {
   readonly databaseUrl: string;
   readonly databasePrincipal: string;
   readonly databaseExecutionRole: typeof MYEONGHA_API_EXECUTION_ROLE;
+  readonly databaseTlsPeerMode?: ProductionPostgresTlsPeerModeV1;
+  readonly databaseSslRootCertificatePem?: string;
 }
 
 export interface ProductionUserDataRuntimeConfigV1 extends ProductionPostgresRuntimeConfigV1 {
@@ -220,11 +229,43 @@ export function parseProductionPostgresRuntimeConfigV1(
   const databasePrincipal = parseDatabasePrincipal(
     requiredEnv(env, PRODUCTION_USER_DATA_RUNTIME_ENV_V1.databasePrincipal),
   );
+  const rawPeerMode = env[PRODUCTION_POSTGRES_TLS_ACTIVATION_ENV_V1.peerMode];
+  const peerMode = rawPeerMode?.trim();
+
+  if (peerMode === undefined || peerMode.length === 0) {
+    return Object.freeze({
+      databaseUrl,
+      databasePrincipal,
+      databaseExecutionRole: MYEONGHA_API_EXECUTION_ROLE,
+    });
+  }
+
+  if (peerMode === 'legacy') {
+    return Object.freeze({
+      databaseUrl,
+      databasePrincipal,
+      databaseExecutionRole: MYEONGHA_API_EXECUTION_ROLE,
+      databaseTlsPeerMode: 'legacy' as const,
+    });
+  }
+
+  if (peerMode !== 'verify-full') {
+    return fail(
+      'MYEONGHA_DATABASE_TLS_PEER_MODE must be legacy or verify-full during controlled B3 activation.',
+    );
+  }
+
+  const databaseSslRootCertificatePem = requiredEnv(
+    env,
+    PRODUCTION_POSTGRES_TLS_ACTIVATION_ENV_V1.rootCertificatePem,
+  );
 
   return Object.freeze({
     databaseUrl,
     databasePrincipal,
     databaseExecutionRole: MYEONGHA_API_EXECUTION_ROLE,
+    databaseTlsPeerMode: 'verify-full' as const,
+    databaseSslRootCertificatePem,
   });
 }
 
@@ -261,14 +302,22 @@ export function summarizeProductionUserDataRuntimeConfigV1(
     config.databaseUrl,
   );
 
+  const strictPeerVerification = config.databaseTlsPeerMode === 'verify-full';
+
   return Object.freeze({
     databaseConfigured: true,
     databasePrincipal: config.databasePrincipal,
     databaseExecutionRole: config.databaseExecutionRole,
-    databaseTlsMode: databaseTlsPosture.mode,
-    databaseTlsPeerVerification: databaseTlsPosture.peerVerification,
-    databaseTlsRootCertificateConfigured:
-      databaseTlsPosture.explicitRootCertificateConfigured,
+    databaseTlsMode: strictPeerVerification
+      ? 'verify-full'
+      : databaseTlsPosture.mode,
+    databaseTlsPeerVerification: strictPeerVerification
+      ? 'full'
+      : databaseTlsPosture.peerVerification,
+    databaseTlsRootCertificateConfigured: strictPeerVerification
+      ? typeof config.databaseSslRootCertificatePem === 'string' &&
+        config.databaseSslRootCertificatePem.length > 0
+      : databaseTlsPosture.explicitRootCertificateConfigured,
     supabaseOrigin: config.supabaseOrigin,
     supabaseApiKeyConfigured: true,
     guestFingerprintSecretConfigured: true,
