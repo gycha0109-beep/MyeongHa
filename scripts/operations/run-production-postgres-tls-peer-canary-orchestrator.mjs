@@ -9,7 +9,7 @@ const TEAM_ID = 'team_xuYA9OhCWlJETaYFOmeVodgS';
 const MARKER_PATH =
   'config/operations/run-once/production-postgres-tls-peer-canary-b2b.marker';
 const MARKER_VALUE =
-  'VERIFY_POSTGRES_TLS_PEER_B2B_SKIP_DOMAIN_CANARY_RETRY11\n';
+  'VERIFY_POSTGRES_TLS_PEER_B2B_SKIP_DOMAIN_CANARY_RETRY12\n';
 const TRACK = 'security';
 const VERCEL_CLI_PACKAGE = 'vercel@59.16.0';
 const CANARY_MODE = 'one-shot-b2b';
@@ -229,14 +229,24 @@ async function runAutomationBypassCanaryRequest(input) {
     );
   }
 
-  if (
-    response.status === 401 ||
-    response.status === 403 ||
-    (response.status >= 300 && response.status < 400)
-  ) {
+  if (response.status === 401) {
     return fail(
-      'CANARY_AUTOMATION_BYPASS_REJECTED',
-      'Vercel Deployment Protection rejected the automation bypass request.',
+      'CANARY_AUTOMATION_BYPASS_UNAUTHORIZED',
+      'Vercel Deployment Protection returned 401 for the automation bypass request.',
+    );
+  }
+
+  if (response.status === 403) {
+    return fail(
+      'CANARY_AUTOMATION_BYPASS_FORBIDDEN',
+      'Vercel Deployment Protection returned 403 for the automation bypass request.',
+    );
+  }
+
+  if (response.status >= 300 && response.status < 400) {
+    return fail(
+      'CANARY_AUTOMATION_BYPASS_REDIRECTED',
+      'Vercel Deployment Protection redirected the automation bypass request.',
     );
   }
 
