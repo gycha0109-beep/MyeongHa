@@ -22,6 +22,7 @@ export interface ProductionPostgresTlsPeerVerificationEvidenceV1 {
   readonly tlsMode: typeof PRODUCTION_POSTGRES_TLS_REQUIRED_MODE_V1;
   readonly peerVerification: 'full';
   readonly rejectUnauthorized: true;
+  readonly defaultHostnameVerification: true;
   readonly rootCertificateFingerprint256: string;
   readonly rootCertificatePinned: true;
 }
@@ -255,6 +256,7 @@ export function buildProductionPostgresStrictTlsTargetV1(input: {
       tlsMode: PRODUCTION_POSTGRES_TLS_REQUIRED_MODE_V1,
       peerVerification: 'full' as const,
       rejectUnauthorized: true as const,
+      defaultHostnameVerification: true as const,
       rootCertificateFingerprint256:
         input.authority.rootCertificateFingerprint256,
       rootCertificatePinned: true as const,

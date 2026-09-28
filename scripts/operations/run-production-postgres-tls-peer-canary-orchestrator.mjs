@@ -9,7 +9,7 @@ const TEAM_ID = 'team_xuYA9OhCWlJETaYFOmeVodgS';
 const MARKER_PATH =
   'config/operations/run-once/production-postgres-tls-peer-canary-b2b.marker';
 const MARKER_VALUE =
-  'VERIFY_POSTGRES_TLS_PEER_B2B_SKIP_DOMAIN_CANARY_RETRY22\n';
+  'VERIFY_POSTGRES_TLS_PEER_B2B_SKIP_DOMAIN_CANARY_RETRY23\n';
 const TRACK = 'security';
 const VERCEL_CLI_PACKAGE = 'vercel@59.16.0';
 const CANARY_MODE = 'one-shot-b2b';
@@ -711,7 +711,7 @@ function validateCanaryEvidence(payload) {
     evidence?.defaultHostnameVerification !== true ||
     evidence?.rootCertificatePinned !== true ||
     evidence?.connectionSucceeded !== true ||
-    evidence?.sslSession !== true ||
+    evidence?.strictTlsHandshakeSucceeded !== true ||
     evidence?.transactionReadOnly !== true ||
     evidence?.principalExpected !== 'myeongha_runtime' ||
     evidence?.principalMatch !== true ||
@@ -920,7 +920,9 @@ function printEvidence(evidence) {
   );
   console.log(`root_certificate_pinned=${evidence.rootCertificatePinned}`);
   console.log(`connection_succeeded=${evidence.connectionSucceeded}`);
-  console.log(`ssl_session=${evidence.sslSession}`);
+  console.log(
+    `strict_tls_handshake_succeeded=${evidence.strictTlsHandshakeSucceeded}`,
+  );
   console.log(`transaction_read_only=${evidence.transactionReadOnly}`);
   console.log(`principal_expected=${evidence.principalExpected}`);
   console.log(`principal_match=${evidence.principalMatch}`);

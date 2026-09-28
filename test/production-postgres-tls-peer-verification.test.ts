@@ -87,6 +87,7 @@ describe('Production PostgreSQL strict TLS peer-verification target', () => {
       tlsMode: 'verify-full',
       peerVerification: 'full',
       rejectUnauthorized: true,
+      defaultHostnameVerification: true,
       rootCertificateFingerprint256: TEST_ROOT_FINGERPRINT_256,
       rootCertificatePinned: true,
     });

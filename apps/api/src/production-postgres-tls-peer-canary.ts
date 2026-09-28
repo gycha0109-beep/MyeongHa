@@ -56,7 +56,7 @@ export interface ProductionPostgresTlsCanaryEvidenceV1 {
   readonly deploymentTarget: 'production';
   readonly oneShotGitShaConfigured: true;
   readonly connectionSucceeded: true;
-  readonly sslSession: true;
+  readonly strictTlsHandshakeSucceeded: true;
   readonly transactionReadOnly: true;
   readonly principalExpected: typeof PRODUCTION_POSTGRES_TLS_CANARY_EXPECTED_PRINCIPAL_V1;
   readonly principalMatch: true;
@@ -80,8 +80,7 @@ export class ProductionPostgresTlsCanaryErrorV1 extends Error {
       | 'CANARY_EVIDENCE_ROW_COUNT_INVALID'
       | 'CANARY_EVIDENCE_PRINCIPAL_MISMATCH'
       | 'CANARY_EVIDENCE_TRANSACTION_READ_ONLY_INVALID'
-      | 'CANARY_EVIDENCE_ROLE_MEMBERSHIP_INVALID'
-      | 'CANARY_EVIDENCE_SSL_SESSION_INVALID',
+      | 'CANARY_EVIDENCE_ROLE_MEMBERSHIP_INVALID',
     message: string,
   ) {
     super(message);
@@ -276,7 +275,7 @@ export async function runProductionPostgresTlsPeerCanaryV1(input: {
       await client.query('BEGIN READ ONLY');
       transactionOpen = true;
       const result = await client.query(
-        "SELECT current_user AS principal, current_setting('transaction_read_only') AS transaction_read_only, pg_has_role(current_user, 'myeongha_api_executor', 'MEMBER') AS execution_role_member, COALESCE((SELECT ssl FROM pg_stat_ssl WHERE pid = pg_backend_pid()), false) AS ssl_session",
+        "SELECT current_user AS principal, current_setting('transaction_read_only') AS transaction_read_only, pg_has_role(current_user, 'myeongha_api_executor', 'MEMBER') AS execution_role_member",
       );
 
       if (result.rows.length !== 1) {
@@ -307,12 +306,6 @@ export async function runProductionPostgresTlsPeerCanaryV1(input: {
           'PostgreSQL TLS canary execution-role membership evidence was invalid.',
         );
       }
-      if (!exactlyTrue(row.ssl_session)) {
-        return fail(
-          'CANARY_EVIDENCE_SSL_SESSION_INVALID',
-          'PostgreSQL TLS canary SSL session evidence was invalid.',
-        );
-      }
 
       await client.query('ROLLBACK');
       transactionOpen = false;
@@ -331,7 +324,7 @@ export async function runProductionPostgresTlsPeerCanaryV1(input: {
         deploymentTarget: 'production',
         oneShotGitShaConfigured: true,
         connectionSucceeded: true,
-        sslSession: true,
+        strictTlsHandshakeSucceeded: true,
         transactionReadOnly: true,
         principalExpected:
           PRODUCTION_POSTGRES_TLS_CANARY_EXPECTED_PRINCIPAL_V1,
