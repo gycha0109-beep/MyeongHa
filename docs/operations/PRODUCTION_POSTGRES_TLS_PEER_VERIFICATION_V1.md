@@ -323,6 +323,51 @@ into GitHub Actions is forbidden for this path.
 
 The canary must not mutate the live Production binding.
 
+### B2B Session Pooler TLS evidence correction
+
+Production canary run `36474197438` on source SHA
+`6c960c05dfccdacd34c42115a8fcbfacd1530313` reached the strict client connection,
+read-only transaction, governed principal, and execution-role checks, but the former
+`pg_stat_ssl` predicate returned false. Temporary alias and staged deployment cleanup both
+completed successfully.
+
+That predicate is not authoritative for the TLS hop SEC-01 is trying to prove. Supabase
+Session Pooler is Supavisor: the application creates a client connection to the pooler and
+the pooler establishes an underlying direct/database connection on the client's behalf.
+PostgreSQL documents `pg_stat_ssl` as backend-process evidence for SSL used on that backend
+connection. Therefore `pg_stat_ssl` describes the pooler-to-Postgres backend hop in this
+topology, not the application's client-to-Supavisor TLS socket.
+
+The governed B2B peer-verification proof is instead:
+
+```text
+pinned official Server root certificate
++ strict target requires verify-full
++ explicit node-postgres ssl.ca
++ rejectUnauthorized=true
++ no checkServerIdentity override (Node default hostname verification)
++ pg.Client.connect() succeeds
++ read-only governed SQL evidence succeeds
+```
+
+node-postgres documents that its `ssl` configuration is passed to the Node TLS socket.
+Node TLS rejects an unauthorized peer when `rejectUnauthorized` is enabled and uses the
+default server-identity check when no custom `checkServerIdentity` is supplied. Supabase
+also documents Session Pooler connections using `verify-full` plus the project Server root
+certificate.
+
+Accordingly B2B does not use `pg_stat_ssl` as proof of the client-to-pooler TLS session and
+does not inspect undocumented node-postgres internal socket fields. The canary records the
+successful strict client TLS handshake together with the pinned configuration evidence.
+
+Relevant official references:
+
+- https://supabase.com/docs/guides/database/psql
+- https://supabase.com/docs/guides/troubleshooting/supavisor-and-connection-terminology-explained-9pr_ZO
+- https://node-postgres.com/features/ssl
+- https://nodejs.org/download/release/v24.21.0/docs/api/tls.html
+- https://www.postgresql.org/docs/17/monitoring-stats.html
+
 ## Phase B3 — Production activation
 
 Do not tighten Production to `verify-full` until all are true:
