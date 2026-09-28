@@ -2,10 +2,10 @@
   "contractVersion": "myeongha-production-postgres-tls-peer-verification-v1",
   "issue": 1330,
   "watchtowerTrack": "security",
-  "phase": "B2B",
-  "activationState": "runtime-canary-passed-production-activation-pending",
-  "productionActivation": false,
-  "productionBindingMutated": false,
+  "phase": "B3",
+  "activationState": "production-verify-full-active-b4-hardening-pending",
+  "productionActivation": true,
+  "productionBindingMutated": true,
   "governedProjectRef": "cnsfpcdiyofqvhpcegfc",
   "requiredTlsMode": "verify-full",
   "driverContract": {
@@ -20,7 +20,7 @@
     "runtimePemBindingPlanned": "MYEONGHA_DATABASE_SSL_ROOT_CERT_PEM"
   },
   "activationBlockers": [
-    "production-strict-tls-activation-not-yet-applied"
+    "production-fail-closed-hardening-not-yet-complete"
   ],
   "forbidden": [
     "production-binding-mutation-before-positive-canary",
@@ -114,5 +114,32 @@
     "automationBypassSecretEmitted": false,
     "temporaryAliasDeleted": true,
     "stagedDeploymentDeleted": true
+  },
+  "productionActivationEvidence": {
+    "status": "passed",
+    "workflowRunId": 36497482499,
+    "workflowRunNumber": 1,
+    "sourceMainSha": "2efb484be5d487f92d5877dbe00cfa429b0e3fda",
+    "recordedAt": "2026-09-28T23:22:25Z",
+    "stagedOrdinaryPoolCanaryPassed": true,
+    "productionPeerModeBound": "verify-full",
+    "rootCertificateSensitiveBinding": true,
+    "rootCertificateFingerprint256": "80:70:25:AD:50:D4:ED:21:9D:2C:9C:7D:29:9C:00:4F:82:4E:B0:0C:F7:F6:5A:FE:F6:07:D0:7B:72:E6:CA:FA",
+    "ordinaryPoolConnectionSucceeded": true,
+    "transactionReadOnly": true,
+    "principalMatch": true,
+    "executionRoleMembership": true,
+    "writeExecuted": false,
+    "canonicalRedeployExactGitSha": true,
+    "canonicalReadinessPassed": true,
+    "temporaryAliasDeleted": true,
+    "stagedDeploymentDeleted": true,
+    "rollbackRequired": false,
+    "databaseUrlRead": false,
+    "databaseUrlDecrypted": false,
+    "databaseUrlEmitted": false,
+    "credentialMaterialEmitted": false,
+    "rootCertificatePemEmitted": false,
+    "automationBypassSecretEmitted": false
   }
 }
