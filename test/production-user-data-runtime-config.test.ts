@@ -90,6 +90,19 @@ describe('production user-data runtime configuration', () => {
     );
   });
 
+  it('fails closed when verify-full activation is applied to an ungoverned source TLS mode', () => {
+    const env = validEnv();
+    env[PRODUCTION_USER_DATA_RUNTIME_ENV_V1.databaseUrl] =
+      'postgresql://myeongha_runtime:password@db.example.internal/postgres?sslmode=prefer';
+    env[PRODUCTION_POSTGRES_TLS_ACTIVATION_ENV_V1.peerMode] = 'verify-full';
+    env[PRODUCTION_POSTGRES_TLS_ACTIVATION_ENV_V1.rootCertificatePem] =
+      '-----BEGIN CERTIFICATE-----\\ntest-only\\n-----END CERTIFICATE-----';
+
+    expect(() => parseProductionUserDataRuntimeConfigV1(env)).toThrow(
+      'governed require migration source or verify-full source',
+    );
+  });
+
   it('fails closed on an unknown PostgreSQL TLS activation mode', () => {
     const env = validEnv();
     env[PRODUCTION_POSTGRES_TLS_ACTIVATION_ENV_V1.peerMode] = 'prefer';
