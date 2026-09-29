@@ -1,7 +1,7 @@
 # MyeongHa Mobile Client Architecture v1
 
 > Track: `applizing`  
-> Status: M0 architecture foundation  
+> Status: M5 Home projection composition implemented  
 > Date: 2026-09-29  
 > Server authority: existing MyeongHa API / PostgreSQL  
 > Client principle: Web and Mobile are separate first-class clients of the same server world.
@@ -197,13 +197,13 @@ Server idempotency/revision contracts remain mandatory.
 ## 9. Delivery phases
 
 ```text
-M0  architecture foundation + navigation contract
-M1  Expo runtime bootstrap + five-tab shell
-M2  shared API/auth + secure credential adapter
-M3  Saju + Birth vertical slice
-M4  Records + My
-M5  Home projection composition
-M6  Chat Hub + server-authorized read path
+M0  architecture foundation + navigation contract       DONE
+M1  Expo runtime bootstrap + five-tab shell              DONE
+M2  shared API/auth + secure credential adapter          DONE
+M3  Saju + Birth vertical slice                          DONE
+M4  Records + My                                         DONE
+M5  Home projection composition                          DONE
+M6  Chat Hub + server-authorized read path               NEXT
 M7  Face Reading media path
 M8  Chat send after authority unblock
 M9  Push after notification authority unblock
@@ -221,3 +221,26 @@ M0 is complete when:
 - Face routes resolve to the Saju primary tab;
 - the mobile README no longer describes the app as an undefined future placeholder;
 - no Expo dependency is partially added without a synchronized lockfile update.
+
+
+## 11. M5 Home projection boundary
+
+The Mobile Home screen is a client-side presentation composition over existing owner-scoped authorities:
+
+```text
+GET  /api/me
+GET  /api/me/birth-profile
+GET  /api/readings?pageSize=1
+POST /api/me/saju/calculation   # only when current Birth exists
+```
+
+M5 invariants:
+
+- Home is not a new canonical aggregate and does not persist a Home state.
+- `/api/home` remains unused until a Production route/runtime exists.
+- no Character recommendation or static roster is promoted into Mobile authority.
+- no Chat continuation is inferred without a server-authorized thread-list/discovery projection.
+- the Saju card exposes calculation facts only; it cannot synthesize daily-fortune claims.
+- Reading topic tiles are presentation-only and do not auto-execute Preview Reading.
+- current Birth revision and Saju `birthRevisionRef` must match before calculation facts are shown.
+- Home cache is process-memory presentation state only; SecureStore remains credential-only.
