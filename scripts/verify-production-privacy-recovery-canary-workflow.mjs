@@ -103,6 +103,28 @@ for (const fragment of [
   forbidFragment(workflow, fragment, workflowPath);
 }
 
+const adminPoolStart = runtime.indexOf('async function createAdminPool()');
+const adminPoolEnd = runtime.indexOf('async function provisionApiCanaryLogin()');
+if (adminPoolStart < 0 || adminPoolEnd <= adminPoolStart) {
+  throw new Error(`${runtimePath} must retain the privileged admin-pool boundary.`);
+}
+const adminPoolContract = runtime.slice(adminPoolStart, adminPoolEnd);
+for (const fragment of [
+  'buildProductionPrivilegedPostgresStrictTlsTargetV1',
+  "requiredEnv('MYEONGHA_PRIVACY_CANARY_ADMIN_DATABASE_URL')",
+  "requiredEnv(\n      'MYEONGHA_WORKER_DATABASE_SSL_ROOT_CERT_PEM'",
+  'connectionString: target.connectionString',
+  'ssl: target.ssl',
+]) {
+  requireFragment(adminPoolContract, fragment, runtimePath);
+}
+for (const fragment of [
+  'normalizeNodePostgresConnectionStringV1',
+  'buildNodePostgresPoolConfigV1',
+]) {
+  forbidFragment(adminPoolContract, fragment, runtimePath);
+}
+
 const runtimePathsIndex = workflow.indexOf(
   'Prepare protected canary runtime paths',
 );
@@ -229,6 +251,9 @@ for (const fragment of [
   "WORKER_EXECUTION_ROLE_UNAVAILABLE",
   "WORKER_ROLE_PASSWORD_MISSING",
   'createNodePostgresAccountDeletionWorkerPoolV1',
+  'buildProductionPrivilegedPostgresStrictTlsTargetV1',
+  "requiredEnv('MYEONGHA_WORKER_DATABASE_SSL_ROOT_CERT_PEM')",
+  'ssl: target.ssl',
   'MYEONGHA_PRODUCTION_PRIVACY_CANARY_WORKER_DB_PREFLIGHT_PASS',
   "if (mode === 'sync-worker-password') return syncWorkerPassword();",
   "requiredEnv('MYEONGHA_PRIVACY_CANARY_RESUME_RUN_ID')",
