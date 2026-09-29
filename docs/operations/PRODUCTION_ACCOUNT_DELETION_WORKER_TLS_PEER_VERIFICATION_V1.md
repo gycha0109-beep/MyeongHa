@@ -1,6 +1,6 @@
 # Production Account-Deletion Worker PostgreSQL TLS Peer Verification V1
 
-Status: **B2 STRICT CANARY PASS / B3 ACTIVATION PENDING**
+Status: **B3A STRICT RUNTIME CANARY PASS / PRODUCTION WORKFLOW ACTIVATION PENDING**
 
 Watchtower-Track: security
 
@@ -67,9 +67,42 @@ root certificate PEM emitted = false
 
 The same main push also completed CI #4149, including `db-authority-core` and the account-deletion worker PostgreSQL synthetic E2E, plus Governance #1253.
 
+## B3A concrete worker runtime proof
+
+PR #1434 fixed the dormant migration bridge so the historical protected worker credential carrier may remain `sslmode=require` while the internal strict target is reconstructed as `verify-full`. Connection-string SSL parameters are removed before the governed explicit TLS object reaches node-postgres.
+
+PR #1435 armed the exact one-shot Production runtime canary. The canary passed:
+
+```text
+workflow run id = 36505985106
+workflow run number = 1
+source main SHA = dc3e4cef2af448fa97b393b232ff57fea5791da6
+
+concrete worker pool = true
+source TLS mode = require
+effective TLS mode = verify-full
+peer verification = full
+rejectUnauthorized = true
+default hostname verification = true
+root certificate pinned = true
+connection succeeded = true
+transaction read only = true
+principal match = true
+execution role membership = true
+write executed = false
+
+database URL emitted = false
+credential material emitted = false
+root certificate PEM emitted = false
+```
+
+The same main push completed CI #4170 including `db-authority-core` and the account-deletion worker PostgreSQL synthetic E2E, Governance #1274, and Supabase Production #331.
+
+This proves the concrete `createNodePostgresAccountDeletionWorkerPoolV1()` Production path can establish the governed strict TLS connection without changing deletion behavior.
+
 ## B3 next boundary
 
-B3 may now wire the Production worker runtime to the already-proven strict target.
+The Production privacy recovery workflow still does not bind the strict worker TLS activation environment, so its worker execution remains on the historical legacy path until a separate activation change is merged and exercised.
 
 B3 must remain fail-safe:
 
