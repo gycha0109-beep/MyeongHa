@@ -16,9 +16,11 @@
     ],
     "paths": {
       "@/*": [
-        "./apps/mobile/src/*"
+        "apps/mobile/src/*"
       ]
-    }
+    },
+    "baseUrl": ".",
+    "ignoreDeprecations": "6.0"
   },
   "include": [
     "api/**/*.ts",
