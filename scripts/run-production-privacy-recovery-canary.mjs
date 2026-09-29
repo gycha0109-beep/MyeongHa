@@ -98,6 +98,7 @@ async function runtimeModules() {
     workerRuntimeModule,
     workerPoolModule,
     postgresPoolModule,
+    privilegedPostgresTlsModule,
   ] = await Promise.all([
     import('../dist/apps/api/src/production-account-deletion-auth-admin-config.js'),
     import('../dist/apps/api/src/supabase-auth-admin-user-deletion.js'),
@@ -105,6 +106,7 @@ async function runtimeModules() {
     import('../dist/apps/api/src/production-account-deletion-worker-runtime.js'),
     import('../dist/apps/api/src/node-postgres-account-deletion-worker-pool.js'),
     import('../dist/apps/api/src/node-postgres-subject-pool.js'),
+    import('../dist/apps/api/src/production-privileged-postgres-tls-peer-verification.js'),
   ]);
   return {
     ...authConfigModule,
@@ -113,16 +115,22 @@ async function runtimeModules() {
     ...workerRuntimeModule,
     ...workerPoolModule,
     ...postgresPoolModule,
+    ...privilegedPostgresTlsModule,
   };
 }
 
 async function createAdminPool() {
-  const { normalizeNodePostgresConnectionStringV1 } = await runtimeModules();
-  const connectionString = normalizeNodePostgresConnectionStringV1(
-    requiredEnv('MYEONGHA_PRIVACY_CANARY_ADMIN_DATABASE_URL'),
-  );
+  const { buildProductionPrivilegedPostgresStrictTlsTargetV1 } =
+    await runtimeModules();
+  const target = buildProductionPrivilegedPostgresStrictTlsTargetV1({
+    databaseUrl: requiredEnv('MYEONGHA_PRIVACY_CANARY_ADMIN_DATABASE_URL'),
+    rootCertificatePem: requiredEnv(
+      'MYEONGHA_WORKER_DATABASE_SSL_ROOT_CERT_PEM',
+    ),
+  });
   return new Pool({
-    connectionString,
+    connectionString: target.connectionString,
+    ssl: target.ssl,
     max: 1,
     connectionTimeoutMillis: 5_000,
     idleTimeoutMillis: 10_000,
