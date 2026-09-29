@@ -387,7 +387,7 @@ describe('Official Reading -> Reader Chat context composition', () => {
         '공식 직업 Reading의 핵심 내용입니다.',
       ]);
     } finally {
-      if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
+      if (previousNodeEnv === undefined) Reflect.deleteProperty(process.env, 'NODE_ENV');
       else process.env.NODE_ENV = previousNodeEnv;
     }
   });

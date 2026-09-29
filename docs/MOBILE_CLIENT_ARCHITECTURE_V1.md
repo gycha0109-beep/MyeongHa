@@ -1,7 +1,7 @@
 # MyeongHa Mobile Client Architecture v1
 
 > Track: `applizing`  
-> Status: M6 server-authorized Chat read implemented  
+> Status: M7 native Face media staging implemented  
 > Date: 2026-09-29  
 > Server authority: existing MyeongHa API / PostgreSQL  
 > Client principle: Web and Mobile are separate first-class clients of the same server world.
@@ -206,7 +206,7 @@ M3  Saju + Birth vertical slice                          DONE
 M4  Records + My                                         DONE
 M5  Home projection composition                          DONE
 M6  Chat Hub + server-authorized read path               DONE
-M7  Face Reading media path                              NEXT
+M7  Face Reading media path                              DONE
 M8  Chat send after authority unblock
 M9  Push after notification authority unblock
 M10 native store commerce after rail decision
@@ -265,3 +265,33 @@ M6 invariants:
 - redacted message body/payload content is never rendered.
 - relationship data stays server-owned; M6 does not locally mutate or score it.
 - no input composer, Chat-open mutation, or Chat-send mutation is activated by M6.
+
+
+## 13. M7 Face media staging boundary
+
+M7 adds the native photo staging path under the existing Saju primary tab / Face secondary tab:
+
+```text
+Expo ImagePicker 57.0.20
+├─ front-camera capture
+└─ system image-library selection
+```
+
+M7 media rules:
+
+- image media only;
+- one asset at a time;
+- JPEG / PNG / WebP when MIME metadata is available;
+- 16 MiB client-side size bound when file-size metadata is available;
+- no Base64 projection;
+- no EXIF object projection into JavaScript;
+- microphone permission is explicitly disabled for this photo-only path;
+- selected URI/dimensions/size stay in ephemeral screen state only;
+- no SecureStore / AsyncStorage / Records persistence;
+- no `fetch`, `FormData`, upload, analysis request, or Face semantic generation.
+
+Important privacy boundary:
+
+`expo-image-picker` with `exif: false` only means EXIF data is not returned in the picker result. M7 does **not** treat that option as evidence that metadata has been stripped from the selected file bytes. The Face Reading engine authority requires EXIF/metadata removal at intake, so engine handoff remains disabled until a source-approved intake adapter explicitly satisfies that requirement.
+
+M7 therefore completes the **native media staging** path without inventing a Production Face Reading upload/API contract or bypassing the separate Face Reading engine authority.
