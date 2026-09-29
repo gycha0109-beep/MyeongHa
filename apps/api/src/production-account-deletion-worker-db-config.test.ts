@@ -8,33 +8,20 @@ import {
 import { ACCOUNT_DELETION_WORKER_RUNTIME_BINDINGS_V1 } from './production-account-deletion-worker-runtime.js';
 
 const ROOT_PEM =
-  '-----BEGIN CERTIFICATE-----\\ntest-only-root\\n-----END CERTIFICATE-----';
+  '-----BEGIN CERTIFICATE-----\ntest-only-root\n-----END CERTIFICATE-----';
 
 describe('production account deletion worker DB config', () => {
-  it('keeps the current worker binding legacy when strict activation authority is absent', () => {
-    const config = parseProductionAccountDeletionWorkerDbConfigV1({
-      MYEONGHA_WORKER_DATABASE_URL:
-        'postgresql://myeongha_worker_runtime:secret-value@db.example.test:5432/postgres?sslmode=require',
-      MYEONGHA_WORKER_DATABASE_PRINCIPAL: 'myeongha_worker_runtime',
-    });
-
-    expect(config.databasePrincipal).toBe(
-      MYEONGHA_ACCOUNT_DELETION_WORKER_DATABASE_PRINCIPAL,
-    );
-    expect(config.databaseExecutionRole).toBe(
-      MYEONGHA_ACCOUNT_DELETION_SYSTEM_EXECUTION_ROLE,
-    );
-    expect(config.databaseTlsPeerMode).toBeUndefined();
-    expect(summarizeProductionAccountDeletionWorkerDbConfigV1(config)).toEqual({
-      databaseConfigured: true,
-      databasePrincipal: 'myeongha_worker_runtime',
-      databaseExecutionRole: 'myeongha_system_executor',
-      databaseTlsPeerMode: 'legacy',
-      databaseTlsRootCertificateConfigured: false,
-    });
+  it('fails closed when strict TLS authority is absent', () => {
+    expect(() =>
+      parseProductionAccountDeletionWorkerDbConfigV1({
+        MYEONGHA_WORKER_DATABASE_URL:
+          'postgresql://myeongha_worker_runtime:secret-value@db.example.test:5432/postgres?sslmode=require',
+        MYEONGHA_WORKER_DATABASE_PRINCIPAL: 'myeongha_worker_runtime',
+      }),
+    ).toThrow(/MYEONGHA_WORKER_DATABASE_TLS_PEER_MODE/u);
   });
 
-  it('admits explicit verify-full activation only with protected root material', () => {
+  it('admits verify-full only with protected root material', () => {
     const config = parseProductionAccountDeletionWorkerDbConfigV1({
       MYEONGHA_WORKER_DATABASE_URL:
         'postgresql://myeongha_worker_runtime.cnsfpcdiyofqvhpcegfc:fixture-password@aws-0-test.pooler.supabase.com:5432/postgres?sslmode=verify-full',
@@ -93,16 +80,22 @@ describe('production account deletion worker DB config', () => {
     ).toThrow(/require migration source or verify-full source/u);
   });
 
-  it('accepts a Supavisor-qualified worker username while retaining database role authority', () => {
+  it('accepts a Supavisor-qualified worker username while retaining strict database role authority', () => {
     const config = parseProductionAccountDeletionWorkerDbConfigV1({
       MYEONGHA_WORKER_DATABASE_URL:
         'postgresql://myeongha_worker_runtime.cnsfpcdiyofqvhpcegfc:fixture-password@pooler.example.test:5432/postgres?sslmode=require',
       MYEONGHA_WORKER_DATABASE_PRINCIPAL: 'myeongha_worker_runtime',
+      MYEONGHA_WORKER_DATABASE_TLS_PEER_MODE: 'verify-full',
+      MYEONGHA_WORKER_DATABASE_SSL_ROOT_CERT_PEM: ROOT_PEM,
     });
 
     expect(config.databasePrincipal).toBe(
       MYEONGHA_ACCOUNT_DELETION_WORKER_DATABASE_PRINCIPAL,
     );
+    expect(config.databaseExecutionRole).toBe(
+      MYEONGHA_ACCOUNT_DELETION_SYSTEM_EXECUTION_ROLE,
+    );
+    expect(config.databaseTlsPeerMode).toBe('verify-full');
   });
 
   it('rejects malformed or unrelated Supavisor-qualified principals', () => {
@@ -116,6 +109,8 @@ describe('production account deletion worker DB config', () => {
           MYEONGHA_WORKER_DATABASE_URL:
             `postgresql://${username}:fixture-password@pooler.example.test:5432/postgres?sslmode=require`,
           MYEONGHA_WORKER_DATABASE_PRINCIPAL: 'myeongha_worker_runtime',
+          MYEONGHA_WORKER_DATABASE_TLS_PEER_MODE: 'verify-full',
+          MYEONGHA_WORKER_DATABASE_SSL_ROOT_CERT_PEM: ROOT_PEM,
         }),
       ).toThrow(/dedicated worker login principal/u);
     }
@@ -125,18 +120,37 @@ describe('production account deletion worker DB config', () => {
     expect(() =>
       parseProductionAccountDeletionWorkerDbConfigV1({
         MYEONGHA_WORKER_DATABASE_URL:
-          'postgresql://myeongha_runtime:secret-value@db.example.test/postgres',
+          'postgresql://myeongha_runtime:secret-value@db.example.test/postgres?sslmode=require',
         MYEONGHA_WORKER_DATABASE_PRINCIPAL: 'myeongha_runtime',
+        MYEONGHA_WORKER_DATABASE_TLS_PEER_MODE: 'verify-full',
+        MYEONGHA_WORKER_DATABASE_SSL_ROOT_CERT_PEM: ROOT_PEM,
       }),
     ).toThrow(/must be myeongha_worker_runtime/u);
 
     expect(() =>
       parseProductionAccountDeletionWorkerDbConfigV1({
         MYEONGHA_WORKER_DATABASE_URL:
-          'postgresql://postgres:secret-value@db.example.test/postgres',
+          'postgresql://postgres:secret-value@db.example.test/postgres?sslmode=require',
         MYEONGHA_WORKER_DATABASE_PRINCIPAL: 'myeongha_worker_runtime',
+        MYEONGHA_WORKER_DATABASE_TLS_PEER_MODE: 'verify-full',
+        MYEONGHA_WORKER_DATABASE_SSL_ROOT_CERT_PEM: ROOT_PEM,
       }),
     ).toThrow(/dedicated worker login principal/u);
+  });
+
+  it('rejects malformed config summaries that do not carry strict TLS authority', () => {
+    expect(() =>
+      summarizeProductionAccountDeletionWorkerDbConfigV1({
+        databaseUrl:
+          'postgresql://myeongha_worker_runtime:secret@db.example.test/postgres?sslmode=require',
+        databasePrincipal: 'myeongha_worker_runtime',
+        databaseExecutionRole: 'myeongha_system_executor',
+        databaseTlsPeerMode: undefined,
+        databaseSslRootCertificatePem: undefined,
+      } as unknown as Parameters<
+        typeof summarizeProductionAccountDeletionWorkerDbConfigV1
+      >[0]),
+    ).toThrow(/requires strict verify-full TLS authority/u);
   });
 
   it('keeps the worker internal and owns no discovery or retry policy', () => {
