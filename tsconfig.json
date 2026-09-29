@@ -16,7 +16,7 @@
     ],
     "paths": {
       "@/*": [
-        "apps/mobile/src/*"
+        "./apps/mobile/src/*"
       ]
     }
   },
