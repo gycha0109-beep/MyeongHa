@@ -1,0 +1,56 @@
+name: Production Account Deletion Worker Strict Runtime Canary
+run-name: "[WT:security] Production Account Deletion Worker Strict Runtime Canary"
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - config/operations/run-once/production-account-deletion-worker-tls-runtime-canary-b3.marker
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type VERIFY_ACCOUNT_DELETION_WORKER_TLS_B3_RUNTIME'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-account-deletion-worker-strict-runtime-canary
+  cancel-in-progress: false
+
+env:
+  MYEONGHA_WATCHTOWER_TRACK: security
+  MYEONGHA_WORKER_TLS_RUNTIME_CANARY_MARKER_PATH: config/operations/run-once/production-account-deletion-worker-tls-runtime-canary-b3.marker
+  MYEONGHA_WORKER_TLS_RUNTIME_CANARY_CONFIRM: ${{ inputs.confirm }}
+
+jobs:
+  canary:
+    name: production-worker-strict-runtime-read-only-canary
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: production
+    env:
+      MYEONGHA_WORKER_DATABASE_URL: ${{ secrets.MYEONGHA_WORKER_DATABASE_URL }}
+      SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM: ${{ secrets.SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM }}
+      SUPABASE_PRODUCTION_SESSION_POOLER_HOST: ${{ secrets.SUPABASE_PRODUCTION_SESSION_POOLER_HOST }}
+    steps:
+      - name: Checkout exact main state
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Use governed Node runtime
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Build server runtime
+        run: npm run build
+
+      - name: Run fixed read-only strict worker runtime canary
+        run: node scripts/operations/run-production-account-deletion-worker-strict-runtime-canary.mjs
