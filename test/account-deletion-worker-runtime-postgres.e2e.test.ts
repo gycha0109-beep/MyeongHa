@@ -1,9 +1,8 @@
 import { Pool } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createNodePostgresAccountDeletionWorkerPoolV1 } from '../apps/api/src/node-postgres-account-deletion-worker-pool.js';
+import { createLocalAccountDeletionWorkerTestPoolV1 } from './support/local-account-deletion-worker-test-pool.js';
 import { createPostgresAccountDeletionWorkerPortsV1 } from '../apps/api/src/postgres-account-deletion-worker.js';
 import { createAccountDeletionWorkerRuntimeV1 } from '../apps/api/src/production-account-deletion-worker-runtime.js';
-import { parseProductionAccountDeletionWorkerDbConfigV1 } from '../apps/api/src/production-account-deletion-worker-db-config.js';
 import type { SupabaseAuthAdminUserDeletionPortV1 } from '../apps/api/src/supabase-auth-admin-user-deletion.js';
 
 const enabled = process.env.MYEONGHA_RUN_ACCOUNT_DELETION_DB_E2E === '1';
@@ -33,7 +32,7 @@ suite('account deletion concrete worker PostgreSQL E2E', () => {
     database: process.env.PGDATABASE ?? 'myeongha_test',
     max: 2,
   });
-  let workerPool: ReturnType<typeof createNodePostgresAccountDeletionWorkerPoolV1>;
+  let workerPool: ReturnType<typeof createLocalAccountDeletionWorkerTestPoolV1>;
   let authDeleteCalls = 0;
 
   beforeAll(async () => {
@@ -94,12 +93,7 @@ suite('account deletion concrete worker PostgreSQL E2E', () => {
 
     const workerUrl =
       `postgresql://myeongha_worker_runtime:${WORKER_PASSWORD}@${process.env.PGHOST ?? 'localhost'}:${process.env.PGPORT ?? '5432'}/${process.env.PGDATABASE ?? 'myeongha_test'}`;
-    workerPool = createNodePostgresAccountDeletionWorkerPoolV1(
-      parseProductionAccountDeletionWorkerDbConfigV1({
-        MYEONGHA_WORKER_DATABASE_URL: workerUrl,
-        MYEONGHA_WORKER_DATABASE_PRINCIPAL: 'myeongha_worker_runtime',
-      }),
-    );
+    workerPool = createLocalAccountDeletionWorkerTestPoolV1(workerUrl);
   });
 
   afterAll(async () => {

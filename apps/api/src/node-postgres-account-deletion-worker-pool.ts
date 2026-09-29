@@ -79,7 +79,10 @@ export function buildNodePostgresAccountDeletionWorkerPoolConfigV1(
   }> = {},
 ): PoolConfig {
   if (config.databaseTlsPeerMode !== 'verify-full') {
-    return buildNodePostgresPoolConfigV1(config.databaseUrl);
+    throw new NodePostgresAccountDeletionWorkerPoolErrorV1(
+      'TLS_MODE_UNSUPPORTED',
+      'Account-deletion worker PostgreSQL TLS must use verify-full.',
+    );
   }
 
   if (
