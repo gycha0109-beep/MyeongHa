@@ -1,7 +1,7 @@
 # MyeongHa Mobile Client Architecture v1
 
 > Track: `applizing`  
-> Status: M5 Home projection composition implemented  
+> Status: M6 server-authorized Chat read implemented  
 > Date: 2026-09-29  
 > Server authority: existing MyeongHa API / PostgreSQL  
 > Client principle: Web and Mobile are separate first-class clients of the same server world.
@@ -244,3 +244,22 @@ M5 invariants:
 - Reading topic tiles are presentation-only and do not auto-execute Preview Reading.
 - current Birth revision and Saju `birthRevisionRef` must match before calculation facts are shown.
 - Home cache is process-memory presentation state only; SecureStore remains credential-only.
+
+
+## 12. M6 Chat read boundary
+
+Mobile Chat now supports a known owner-scoped thread read:
+
+```text
+GET /api/chat/:threadId?afterSequenceNo=<n>&pageSize=<1..50>
+```
+
+M6 invariants:
+
+- a thread id must already come from a server-authorized link or future discovery projection; Mobile does not invent a thread list.
+- Chat Hub remains an authority-safe blocked surface for recent-thread discovery and Character browsing.
+- Character names/titles/portraits are not inferred from `characterId`.
+- forward stream pagination is preserved; Mobile does not claim to have the latest message until it has traversed the available forward pages.
+- redacted message body/payload content is never rendered.
+- relationship data stays server-owned; M6 does not locally mutate or score it.
+- no input composer, Chat-open mutation, or Chat-send mutation is activated by M6.
