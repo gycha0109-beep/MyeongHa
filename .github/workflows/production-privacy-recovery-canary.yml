@@ -2,6 +2,11 @@ name: Production Privacy Recovery Canary
 run-name: "[WT:ops] Production Privacy Recovery Canary"
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - config/operations/run-once/production-account-deletion-worker-strict-activation-proof-b3.marker
   workflow_dispatch:
     inputs:
       confirmation:
@@ -56,13 +61,14 @@ jobs:
     timeout-minutes: 20
     environment: production
     env:
-      MYEONGHA_PRIVACY_CANARY_CONFIRM: ${{ inputs.confirmation }}
-      MYEONGHA_WATCHTOWER_TRACK: ${{ inputs.watchtower_track }}
-      MYEONGHA_PRIVACY_CANARY_OPERATION: ${{ inputs.operation }}
+      MYEONGHA_PRIVACY_CANARY_CONFIRM: ${{ github.event_name == 'push' && 'RUN_SYNTHETIC_PRODUCTION_PRIVACY_CANARY' || inputs.confirmation }}
+      MYEONGHA_WATCHTOWER_TRACK: ${{ github.event_name == 'push' && 'ops' || inputs.watchtower_track }}
+      MYEONGHA_PRIVACY_CANARY_OPERATION: ${{ github.event_name == 'push' && 'fresh' || inputs.operation }}
       MYEONGHA_PRIVACY_CANARY_RESUME_RUN_ID: ${{ inputs.resume_canary_run_id }}
       MYEONGHA_PRIVACY_CANARY_RESUME_BACKUP_RUN_ID: ${{ inputs.resume_backup_run_id }}
-      MYEONGHA_WORKER_CREDENTIAL_ACTION: ${{ inputs.worker_credential_action }}
+      MYEONGHA_WORKER_CREDENTIAL_ACTION: ${{ github.event_name == 'push' && 'verify_only' || inputs.worker_credential_action }}
       MYEONGHA_WORKER_CREDENTIAL_CONFIRMATION: ${{ inputs.worker_credential_confirmation }}
+      MYEONGHA_PRIVACY_CANARY_ONE_SHOT_MARKER_PATH: config/operations/run-once/production-account-deletion-worker-strict-activation-proof-b3.marker
       MYEONGHA_SUPABASE_URL: https://cnsfpcdiyofqvhpcegfc.supabase.co
       MYEONGHA_WORKER_DATABASE_URL: ${{ secrets.MYEONGHA_WORKER_DATABASE_URL }}
       MYEONGHA_WORKER_DATABASE_PRINCIPAL: myeongha_worker_runtime
@@ -118,6 +124,18 @@ jobs:
 
       - name: Checkout exact repository state
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Validate one-shot strict activation proof authority
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF" == 'refs/heads/main' ]]
+          [[ "$MYEONGHA_PRIVACY_CANARY_OPERATION" == 'fresh' ]]
+          [[ "$MYEONGHA_WORKER_CREDENTIAL_ACTION" == 'verify_only' ]]
+          [[ -z "$MYEONGHA_WORKER_CREDENTIAL_CONFIRMATION" ]]
+          [[ -f "$MYEONGHA_PRIVACY_CANARY_ONE_SHOT_MARKER_PATH" ]]
+          [[ "$(cat "$MYEONGHA_PRIVACY_CANARY_ONE_SHOT_MARKER_PATH")" == 'VERIFY_ACCOUNT_DELETION_WORKER_STRICT_ACTIVATION_PROOF_B3_RUN1' ]]
 
       - name: Setup Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
