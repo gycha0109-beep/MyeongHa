@@ -32,10 +32,6 @@ function requireFragment(key, fragment) {
 
 for (const fragment of [
   'name: Production PostgreSQL Privacy Recovery Ledger',
-  'push:',
-  'branches:',
-  'paths:',
-  'config/operations/run-once/production-postgres-privacy-ledger-sec03-b3.marker',
   'workflow_dispatch:',
   'schedule:',
   "cron: '47 * * * *'",
@@ -46,15 +42,7 @@ for (const fragment of [
   'SUPABASE_PRODUCTION_SESSION_POOLER_HOST: ' + '$' + '{{ secrets.SUPABASE_PRODUCTION_SESSION_POOLER_HOST }}',
   'MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE: ' + '$' + '{{ secrets.MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE }}',
   '.path == ".github/workflows/production-postgres-backup.yml"',
-  "INPUT_BACKUP_RUN_ID: ${{ github.event_name == 'push' && '36508883110' || inputs.backup_run_id }}",
-  'Validate SEC-03 one-shot ledger replay authority',
-  'SEC03_B3_POST_ACTIVATION_LEDGER_RUN2',
-  'Require SEC-03 non-zero account-deletion evidence',
-  '.backupRunId == 36508883110',
-  '.eventCount > 0',
-  '(.eventTypeCounts.ACCOUNT_DELETION_STARTED // 0) >= 1',
-  '.replayPlannerAccepted == true',
-  'identifiers emitted: false',
+  'INPUT_BACKUP_RUN_ID: ${{ inputs.backup_run_id }}',
   'begin transaction read only;',
   "where current_setting('transaction_read_only') = 'on';",
   'rollback;',
@@ -90,6 +78,11 @@ if (files.workflow.includes('.name == "Production PostgreSQL Logical Backup"')) 
 }
 
 for (const fragment of [
+  '\n  push:',
+  'github.event_name == \'push\'',
+  'config/operations/run-once/production-postgres-privacy-ledger-sec03-b3.marker',
+  'Validate SEC-03 one-shot ledger replay authority',
+  'Require SEC-03 non-zero account-deletion evidence',
   'SUPABASE_SERVICE_ROLE_KEY',
   'sslmode=disable',
   'pg_dump',
