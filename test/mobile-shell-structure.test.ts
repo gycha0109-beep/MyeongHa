@@ -16,6 +16,8 @@ describe('mobile M1 shell', () => {
       'react-native': '0.86.3',
     });
     expect(manifest.scripts.typecheck).toBe('tsc -p tsconfig.json --noEmit');
+    expect(manifest.dependencies['expo-secure-store']).toBe('~57.0.4');
+    expect(manifest.dependencies['@myeongha/api-client']).toBe('0.1.0');
   });
 
   it('contains exactly the five primary route groups plus nested Face Reading', async () => {
