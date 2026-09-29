@@ -1,6 +1,13 @@
 {
   "name": "@myeongha/api-client",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p ../../tsconfig.json --noEmit"
+  }
 }
