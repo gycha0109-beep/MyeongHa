@@ -43,6 +43,35 @@ export class NodePostgresAccountDeletionWorkerPoolErrorV1 extends Error {
   }
 }
 
+function buildStrictWorkerDatabaseUrlV1(databaseUrl: string): string {
+  let url: URL;
+  try {
+    url = new URL(databaseUrl);
+  } catch {
+    throw new NodePostgresAccountDeletionWorkerPoolErrorV1(
+      'TLS_MODE_UNSUPPORTED',
+      'Strict account-deletion worker PostgreSQL URL could not be parsed.',
+    );
+  }
+
+  const sourceMode = url.searchParams.get('sslmode')?.trim().toLowerCase();
+  if (sourceMode !== 'require' && sourceMode !== 'verify-full') {
+    throw new NodePostgresAccountDeletionWorkerPoolErrorV1(
+      'TLS_MODE_UNSUPPORTED',
+      'Strict account-deletion worker PostgreSQL TLS requires the governed require migration source or verify-full source.',
+    );
+  }
+
+  for (const key of [...url.searchParams.keys()]) {
+    const normalized = key.trim().toLowerCase();
+    if (normalized.startsWith('ssl') || normalized === 'uselibpqcompat') {
+      url.searchParams.delete(key);
+    }
+  }
+  url.searchParams.set('sslmode', 'verify-full');
+  return url.toString();
+}
+
 export function buildNodePostgresAccountDeletionWorkerPoolConfigV1(
   config: ProductionAccountDeletionWorkerDbConfigV1,
   dependencies: Readonly<{
@@ -69,7 +98,7 @@ export function buildNodePostgresAccountDeletionWorkerPoolConfigV1(
       dependencies.buildStrictTarget ??
       buildProductionAccountDeletionWorkerStrictTlsTargetV1
     )({
-      databaseUrl: config.databaseUrl,
+      databaseUrl: buildStrictWorkerDatabaseUrlV1(config.databaseUrl),
       rootCertificatePem: config.databaseSslRootCertificatePem,
     });
   } catch {
