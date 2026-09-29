@@ -53,7 +53,7 @@ jobs:
           marker='config/operations/run-once/production-postgres-privacy-ledger-sec03-b3.marker'
           [[ "$GITHUB_REF" == 'refs/heads/main' ]]
           [[ -f "$marker" ]]
-          [[ "$(cat "$marker")" == 'SEC03_B3_POST_ACTIVATION_LEDGER_RUN1' ]]
+          [[ "$(cat "$marker")" == 'SEC03_B3_POST_ACTIVATION_LEDGER_RUN2' ]]
 
       - name: Fail closed unless recovery credentials are provisioned
         shell: bash
@@ -211,6 +211,34 @@ jobs:
           BACKUP_SOURCE_SHA: ${{ steps.source.outputs.backup_source_sha }}
           BACKUP_ARTIFACT_NAME: ${{ steps.source.outputs.backup_artifact_name }}
         run: bash scripts/operations/export-production-postgres-privacy-recovery-ledger.sh
+      - name: Require SEC-03 non-zero account-deletion evidence
+        if: github.event_name == 'push'
+        shell: bash
+        env:
+          PUBLIC_MANIFEST: ${{ steps.export.outputs.public_manifest }}
+        run: |
+          set -euo pipefail
+          jq -e '
+            .backupRunId == 36508883110
+            and .eventCount > 0
+            and (.eventTypeCounts.ACCOUNT_DELETION_STARTED // 0) >= 1
+            and .replayPlannerAccepted == true
+            and .sourceAuthorityClass == "AUTHORITATIVE_CAPTURED_WINDOW_V1"
+            and .authoritativePostBackupSource == true
+            and .authoritativePrivacyReconciliation == false
+            and .futureSafePrivacyReconciliation == false
+            and .drReady == false
+          ' "$PUBLIC_MANIFEST" >/dev/null
+          event_count="$(jq -r '.eventCount' "$PUBLIC_MANIFEST")"
+          deletion_count="$(jq -r '.eventTypeCounts.ACCOUNT_DELETION_STARTED' "$PUBLIC_MANIFEST")"
+          {
+            echo '### SEC-03 post-activation ledger proof'
+            echo
+            printf -- '- replay-supported event count: `%s`\n' "$event_count"
+            printf -- '- ACCOUNT_DELETION_STARTED count: `%s`\n' "$deletion_count"
+            echo '- identifiers emitted: false'
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Upload encrypted privacy recovery ledger
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
