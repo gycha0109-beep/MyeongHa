@@ -1,7 +1,7 @@
-import { createMobileApiClientV1 } from '../api/mobile-api-client.js';
-import { mobileGuestCredentialStoreV1 } from '../auth/native-guest-credential-store.js';
-import { readMobileRuntimeConfigV1 } from '../config/mobile-runtime-config.js';
-import { createMobileSubjectSessionCoordinatorV1 } from '../session/mobile-subject-session.js';
+import { createMobileApiClientV1 } from '@/core/api/mobile-api-client';
+import { mobileGuestCredentialStoreV1 } from '@/core/auth/native-guest-credential-store';
+import { readMobileRuntimeConfigV1 } from '@/core/config/mobile-runtime-config';
+import { createMobileSubjectSessionCoordinatorV1 } from '@/core/session/mobile-subject-session';
 
 const config = readMobileRuntimeConfigV1();
 const apiClient = createMobileApiClientV1(config.apiOrigin);

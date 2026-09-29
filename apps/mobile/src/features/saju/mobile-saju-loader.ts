@@ -4,8 +4,8 @@ import {
   type CurrentSajuCalculationV1,
 } from '@myeongha/api-client';
 
-import type { MobileBirthServiceV1 } from '../birth/mobile-birth-service.js';
-import type { MobileSajuServiceV1 } from './mobile-saju-service.js';
+import type { MobileBirthServiceV1 } from '@/features/birth/mobile-birth-service';
+import type { MobileSajuServiceV1 } from '@/features/saju/mobile-saju-service';
 
 export type MobileSajuLoadStateV1 =
   | Readonly<{ kind: 'birth_required' }>

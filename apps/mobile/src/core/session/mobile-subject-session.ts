@@ -7,7 +7,7 @@ import {
   type MyeongHaApiClientV1,
 } from '@myeongha/api-client';
 
-import type { MobileGuestCredentialStoreV1 } from '../auth/guest-credential-store.js';
+import type { MobileGuestCredentialStoreV1 } from '@/core/auth/guest-credential-store';
 
 export type MobileSubjectSessionErrorCodeV1 =
   | 'MOBILE_MEMBER_AUTH_NOT_AVAILABLE'

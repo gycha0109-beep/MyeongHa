@@ -1,6 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 
-import { createMobileGuestCredentialStoreV1 } from './guest-credential-store.js';
+import { createMobileGuestCredentialStoreV1 } from '@/core/auth/guest-credential-store';
 
 export const mobileGuestCredentialStoreV1 = createMobileGuestCredentialStoreV1({
   getItemAsync: (key) => SecureStore.getItemAsync(key),

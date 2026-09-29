@@ -4,7 +4,7 @@ import {
   type MyeongHaApiClientV1,
 } from '@myeongha/api-client';
 
-import type { MobileSubjectSessionCoordinatorV1 } from '../../core/session/mobile-subject-session.js';
+import type { MobileSubjectSessionCoordinatorV1 } from '@/core/session/mobile-subject-session';
 
 export interface MobileSajuServiceV1 {
   calculateCurrent(): Promise<CurrentSajuCalculationV1>;
