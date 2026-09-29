@@ -18,6 +18,9 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "apiOrigin": "https://myeongha.vercel.app"
     }
   }
 }
