@@ -221,17 +221,17 @@ export function createMobileRecordsRepositoriesV1(
   }
 
   return Object.freeze({
-    life: createCollectionRepositoryV1({
+    life: createCollectionRepositoryV1<LifeRecordFactV1>({
       pageSize,
       identity: (item) => item.lifeFactId,
       readPage: async (options) => lifePage(await service.readLifeRecordPage(options)),
     }),
-    readings: createCollectionRepositoryV1({
+    readings: createCollectionRepositoryV1<ReadingHistoryItemV1>({
       pageSize,
       identity: (item) => item.readingId,
       readPage: async (options) => readingPage(await service.readReadingPage(options)),
     }),
-    memories: createCollectionRepositoryV1({
+    memories: createCollectionRepositoryV1<MemoryItemV1>({
       pageSize,
       identity: (item) => item.memoryItemId,
       readPage: async (options) => memoryPage(await service.readMemoryPage(options)),
