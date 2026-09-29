@@ -32,9 +32,8 @@ describe('mobile M5 acceptance', () => {
     expect(roles).toHaveLength(pressables.length);
   });
 
-  it('records M5 as complete and M6 as the next delivery phase', async () => {
+  it('keeps M5 recorded as complete after later mobile phases advance', async () => {
     const architecture = await readRepoFile('docs/MOBILE_CLIENT_ARCHITECTURE_V1.md');
     expect(architecture).toContain('M5  Home projection composition                          DONE');
-    expect(architecture).toContain('M6  Chat Hub + server-authorized read path               NEXT');
   });
 });
