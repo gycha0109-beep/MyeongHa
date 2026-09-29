@@ -11,8 +11,8 @@ import {
 import {
   ensureMobileGuestSessionV1,
   type MobileGuestSessionV1,
-} from '@/core/auth/guest-session';
-import type { MobileGuestCredentialStoreV1 } from '@/core/auth/guest-credential-store';
+} from '../../core/auth/guest-session.js';
+import type { MobileGuestCredentialStoreV1 } from '../../core/auth/guest-credential-store.js';
 
 export type MobileSajuLoadStateV1 =
   | Readonly<{
