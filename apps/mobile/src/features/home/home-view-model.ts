@@ -184,7 +184,7 @@ export function createMobileHomeViewModelV1(
     characterSurface: Object.freeze({
       kind: 'pending',
       title: '오늘 이야기할 사람',
-      body: '캐릭터 선택은 서버가 허용한 대화 authority와 함께 연결됩니다.',
+      body: '대화할 사람을 고르는 기능은 다음 단계에서 연결됩니다.',
     }),
   });
 }
