@@ -45,6 +45,11 @@ export function createMobileSubjectSessionCoordinatorV1(input: {
   readonly nowEpochMs?: () => number;
 }): MobileSubjectSessionCoordinatorV1 {
   const nowEpochMs = input.nowEpochMs ?? Date.now;
+  let acquireInFlight: Promise<GuestCredentialV1> | null = null;
+  let replacementInFlight: Readonly<{
+    failedBearer: string;
+    promise: Promise<GuestCredentialV1>;
+  }> | null = null;
 
   async function persistBootstrap(
     existing: GuestCredentialV1 | null,
@@ -83,7 +88,7 @@ export function createMobileSubjectSessionCoordinatorV1(input: {
     return persistBootstrap(null);
   }
 
-  async function acquireGuestCredential(): Promise<GuestCredentialV1> {
+  async function acquireGuestCredentialUncoordinated(): Promise<GuestCredentialV1> {
     let existing = await input.store.read();
 
     if (existing !== null && isGuestCredentialExpiredV1(existing, nowEpochMs())) {
@@ -118,6 +123,71 @@ export function createMobileSubjectSessionCoordinatorV1(input: {
     }
   }
 
+  async function acquireGuestCredential(): Promise<GuestCredentialV1> {
+    if (replacementInFlight !== null) return replacementInFlight.promise;
+    if (acquireInFlight !== null) return acquireInFlight;
+
+    const pending = acquireGuestCredentialUncoordinated();
+    acquireInFlight = pending;
+    try {
+      return await pending;
+    } finally {
+      if (acquireInFlight === pending) acquireInFlight = null;
+    }
+  }
+
+  async function replaceUnauthorizedGuestCredential(
+    failedBearer: string,
+  ): Promise<GuestCredentialV1> {
+    if (replacementInFlight !== null) {
+      return replacementInFlight.promise;
+    }
+
+    const pending = (async () => {
+      let observed = await input.store.read();
+
+      if (
+        observed !== null &&
+        observed.bearerToken !== failedBearer &&
+        !isGuestCredentialExpiredV1(observed, nowEpochMs())
+      ) {
+        return observed;
+      }
+
+      if (observed !== null && isGuestCredentialExpiredV1(observed, nowEpochMs())) {
+        await input.store.clear(observed.bearerToken);
+        observed = await input.store.read();
+        if (
+          observed !== null &&
+          observed.bearerToken !== failedBearer &&
+          !isGuestCredentialExpiredV1(observed, nowEpochMs())
+        ) {
+          return observed;
+        }
+      }
+
+      await input.store.clear(failedBearer);
+
+      const afterClear = await input.store.read();
+      if (
+        afterClear !== null &&
+        afterClear.bearerToken !== failedBearer &&
+        !isGuestCredentialExpiredV1(afterClear, nowEpochMs())
+      ) {
+        return afterClear;
+      }
+
+      return bootstrapFresh();
+    })();
+
+    replacementInFlight = Object.freeze({ failedBearer, promise: pending });
+    try {
+      return await pending;
+    } finally {
+      if (replacementInFlight?.promise === pending) replacementInFlight = null;
+    }
+  }
+
   async function withGuestBearer<T>(
     operation: (bearer: string) => Promise<T>,
   ): Promise<T> {
@@ -129,10 +199,7 @@ export function createMobileSubjectSessionCoordinatorV1(input: {
       if (!isUnauthorized(error)) throw error;
     }
 
-    const cleared = await input.store.clear(first.bearerToken);
-    const replacement = cleared
-      ? await bootstrapFresh()
-      : await acquireGuestCredential();
+    const replacement = await replaceUnauthorizedGuestCredential(first.bearerToken);
 
     try {
       return await operation(replacement.bearerToken);

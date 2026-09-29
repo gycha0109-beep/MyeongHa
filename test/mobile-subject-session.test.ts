@@ -223,6 +223,213 @@ describe('mobile subject session coordinator', () => {
     expect(attempts).toBe(2);
   });
 
+
+  it('single-flights concurrent acquisition when SecureStore is empty', async () => {
+    let bootstrapCount = 0;
+    let releaseBootstrap!: () => void;
+    let markStarted!: () => void;
+    const bootstrapGate = new Promise<void>((resolve) => { releaseBootstrap = resolve; });
+    const bootstrapStarted = new Promise<void>((resolve) => { markStarted = resolve; });
+
+    const client = new MyeongHaApiClientV1({
+      origin: 'https://myeongha.test',
+      fetchImpl: async () => {
+        bootstrapCount += 1;
+        markStarted();
+        await bootstrapGate;
+        return json({
+          subjectId: 'subject-fresh',
+          kind: 'guest',
+          guestSession: {
+            guestSessionId: 'guest-fresh',
+            expiresAt: '2026-10-10T00:00:00.000Z',
+            bearerToken: 'opaque-fresh-token',
+          },
+        });
+      },
+    });
+    const store = createMobileGuestCredentialStoreV1(createMemorySecureStore());
+    const coordinator = createMobileSubjectSessionCoordinatorV1({
+      client,
+      store,
+      nowEpochMs: () => Date.parse('2026-09-29T00:00:00.000Z'),
+    });
+
+    const pending = [
+      coordinator.acquireGuestCredential(),
+      coordinator.acquireGuestCredential(),
+      coordinator.acquireGuestCredential(),
+    ];
+    await bootstrapStarted;
+    expect(bootstrapCount).toBe(1);
+
+    releaseBootstrap();
+    const credentials = await Promise.all(pending);
+    expect(bootstrapCount).toBe(1);
+    expect(credentials.map((item) => item.bearerToken)).toEqual([
+      'opaque-fresh-token',
+      'opaque-fresh-token',
+      'opaque-fresh-token',
+    ]);
+  });
+
+  it('single-flights concurrent 401 recovery to one replacement bootstrap', async () => {
+    let bootstrapCount = 0;
+    let freshBootstrapCount = 0;
+    let releaseFresh!: () => void;
+    let markFreshStarted!: () => void;
+    const freshGate = new Promise<void>((resolve) => { releaseFresh = resolve; });
+    const freshStarted = new Promise<void>((resolve) => { markFreshStarted = resolve; });
+
+    const client = new MyeongHaApiClientV1({
+      origin: 'https://myeongha.test',
+      fetchImpl: async (_input, init) => {
+        bootstrapCount += 1;
+        const auth = new Headers(init?.headers).get('Authorization');
+        if (auth === 'Bearer opaque-existing-token') {
+          return json({
+            subjectId: existing.subjectId,
+            kind: 'guest',
+            guestSession: {
+              guestSessionId: existing.guestSessionId,
+              expiresAt: existing.expiresAt,
+              bearerToken: null,
+            },
+          });
+        }
+
+        freshBootstrapCount += 1;
+        markFreshStarted();
+        await freshGate;
+        return json({
+          subjectId: 'subject-replacement',
+          kind: 'guest',
+          guestSession: {
+            guestSessionId: 'guest-replacement',
+            expiresAt: '2026-10-10T00:00:00.000Z',
+            bearerToken: 'opaque-replacement-token',
+          },
+        });
+      },
+    });
+    const store = createMobileGuestCredentialStoreV1(createMemorySecureStore());
+    await store.write(existing);
+    const coordinator = createMobileSubjectSessionCoordinatorV1({
+      client,
+      store,
+      nowEpochMs: () => Date.parse('2026-09-29T00:00:00.000Z'),
+    });
+
+    const attempts: string[] = [];
+    const run = () => coordinator.withGuestBearer(async (bearer) => {
+      attempts.push(bearer);
+      if (bearer === existing.bearerToken) {
+        throw new MyeongHaApiClientErrorV1(
+          'http',
+          'AUTH_REQUIRED',
+          'unauthorized',
+          401,
+          false,
+        );
+      }
+      return bearer;
+    });
+
+    const first = run();
+    const second = run();
+    await freshStarted;
+    expect(freshBootstrapCount).toBe(1);
+    releaseFresh();
+
+    await expect(Promise.all([first, second])).resolves.toEqual([
+      'opaque-replacement-token',
+      'opaque-replacement-token',
+    ]);
+    expect(bootstrapCount).toBe(2);
+    expect(freshBootstrapCount).toBe(1);
+    expect(attempts.filter((bearer) => bearer === existing.bearerToken)).toHaveLength(2);
+    expect(attempts.filter((bearer) => bearer === 'opaque-replacement-token')).toHaveLength(2);
+  });
+
+  it('reuses an already-written replacement for a late 401 without another bootstrap', async () => {
+    let bootstrapCount = 0;
+    const client = new MyeongHaApiClientV1({
+      origin: 'https://myeongha.test',
+      fetchImpl: async (_input, init) => {
+        bootstrapCount += 1;
+        const auth = new Headers(init?.headers).get('Authorization');
+        if (auth === 'Bearer opaque-existing-token') {
+          return json({
+            subjectId: existing.subjectId,
+            kind: 'guest',
+            guestSession: {
+              guestSessionId: existing.guestSessionId,
+              expiresAt: existing.expiresAt,
+              bearerToken: null,
+            },
+          });
+        }
+        return json({
+          subjectId: 'subject-replacement',
+          kind: 'guest',
+          guestSession: {
+            guestSessionId: 'guest-replacement',
+            expiresAt: '2026-10-10T00:00:00.000Z',
+            bearerToken: 'opaque-replacement-token',
+          },
+        });
+      },
+    });
+    const store = createMobileGuestCredentialStoreV1(createMemorySecureStore());
+    await store.write(existing);
+    const coordinator = createMobileSubjectSessionCoordinatorV1({
+      client,
+      store,
+      nowEpochMs: () => Date.parse('2026-09-29T00:00:00.000Z'),
+    });
+
+    let releaseLate!: () => void;
+    const lateGate = new Promise<void>((resolve) => { releaseLate = resolve; });
+    let firstAttempts = 0;
+    let lateAttempts = 0;
+
+    const first = coordinator.withGuestBearer(async (bearer) => {
+      firstAttempts += 1;
+      if (firstAttempts === 1) {
+        throw new MyeongHaApiClientErrorV1(
+          'http',
+          'AUTH_REQUIRED',
+          'unauthorized',
+          401,
+          false,
+        );
+      }
+      return bearer;
+    });
+    const late = coordinator.withGuestBearer(async (bearer) => {
+      lateAttempts += 1;
+      if (lateAttempts === 1) {
+        await lateGate;
+        throw new MyeongHaApiClientErrorV1(
+          'http',
+          'AUTH_REQUIRED',
+          'unauthorized',
+          401,
+          false,
+        );
+      }
+      return bearer;
+    });
+
+    await expect(first).resolves.toBe('opaque-replacement-token');
+    releaseLate();
+    await expect(late).resolves.toBe('opaque-replacement-token');
+
+    expect(firstAttempts).toBe(2);
+    expect(lateAttempts).toBe(2);
+    expect(bootstrapCount).toBe(2);
+  });
+
   it('fails closed when bootstrap unexpectedly resolves a Member subject', async () => {
     const client = new MyeongHaApiClientV1({
       origin: 'https://myeongha.test',
