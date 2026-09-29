@@ -32,6 +32,10 @@ function requireFragment(key, fragment) {
 
 for (const fragment of [
   'name: Production PostgreSQL Privacy Recovery Ledger',
+  'push:',
+  'branches:',
+  'paths:',
+  'config/operations/run-once/production-postgres-privacy-ledger-sec03-b3.marker',
   'workflow_dispatch:',
   'schedule:',
   "cron: '47 * * * *'",
@@ -41,8 +45,10 @@ for (const fragment of [
   'SUPABASE_DB_PASSWORD: ' + '$' + '{{ secrets.SUPABASE_DB_PASSWORD }}',
   'SUPABASE_PRODUCTION_SESSION_POOLER_HOST: ' + '$' + '{{ secrets.SUPABASE_PRODUCTION_SESSION_POOLER_HOST }}',
   'MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE: ' + '$' + '{{ secrets.MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE }}',
-  '.name == "Production PostgreSQL Logical Backup"',
   '.path == ".github/workflows/production-postgres-backup.yml"',
+  "INPUT_BACKUP_RUN_ID: ${{ github.event_name == 'push' && '36508883110' || inputs.backup_run_id }}",
+  'Validate SEC-03 one-shot ledger replay authority',
+  'SEC03_B3_POST_ACTIVATION_LEDGER_RUN1',
   'begin transaction read only;',
   "where current_setting('transaction_read_only') = 'on';",
   'rollback;',
@@ -69,6 +75,12 @@ for (const fragment of [
   if (!contract.includes(fragment)) {
     throw new Error('Missing privacy recovery ledger workflow contract fragment: ' + fragment);
   }
+}
+
+if (files.workflow.includes('.name == "Production PostgreSQL Logical Backup"')) {
+  throw new Error(
+    'Privacy recovery ledger must bind backup authority to canonical workflow path, not mutable workflow/run display name.',
+  );
 }
 
 for (const fragment of [
