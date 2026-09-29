@@ -58,3 +58,14 @@ export {
   type ReadingHistoryPageV1,
   type RecordsPageOptionsV1,
 } from './records.js';
+
+export {
+  parseChatThreadIdV1,
+  readChatThreadPageV1,
+  type ChatMessageV1,
+  type ChatReadPageOptionsV1,
+  type ChatReadPaginationV1,
+  type ChatRelationshipV1,
+  type ChatSenderTypeV1,
+  type ChatThreadPageV1,
+} from './chat.js';
