@@ -205,8 +205,8 @@ M2  shared API/auth + secure credential adapter          DONE
 M3  Saju + Birth vertical slice                          DONE
 M4  Records + My                                         DONE
 M5  Home projection composition                          DONE
-M6  Chat Hub + server-authorized read path               NEXT
-M7  Face Reading media path
+M6  Chat Hub + server-authorized read path               DONE
+M7  Face Reading media path                              NEXT
 M8  Chat send after authority unblock
 M9  Push after notification authority unblock
 M10 native store commerce after rail decision
