@@ -109,10 +109,12 @@ src/app/
 │  │  ├─ _layout.tsx
 │  │  ├─ index.tsx
 │  │  └─ face.tsx
-│  ├─ chat/index.tsx
+│  ├─ chat/
+│  │  ├─ _layout.tsx
+│  │  ├─ index.tsx
+│  │  └─ [threadId].tsx
 │  ├─ records/index.tsx
 │  └─ my/index.tsx
-├─ chat/[threadId].tsx
 ├─ reading/[readingId].tsx
 ├─ birth/
 ├─ face-reading/

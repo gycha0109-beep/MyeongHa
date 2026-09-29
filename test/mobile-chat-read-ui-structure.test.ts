@@ -8,7 +8,9 @@ async function readRepoFile(path: string) {
 describe('mobile M6-B Chat read UI structure', () => {
   it('keeps known-thread detail under the Chat primary tab and read-only', async () => {
     const detail = await readRepoFile('apps/mobile/src/app/(tabs)/chat/[threadId].tsx');
+    const layout = await readRepoFile('apps/mobile/src/app/(tabs)/chat/_layout.tsx');
     expect(detail).toContain('useMobileChatThreadV1');
+    expect(layout).toContain('<Stack');
     expect(detail).not.toContain('TextInput');
     expect(detail).not.toContain('fetch(');
     expect(detail).not.toContain('SecureStore');
