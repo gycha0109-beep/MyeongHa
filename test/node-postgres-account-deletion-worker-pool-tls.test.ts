@@ -6,17 +6,15 @@ import {
 import type { ProductionAccountDeletionWorkerDbConfigV1 } from '../apps/api/src/production-account-deletion-worker-db-config.js';
 
 describe('account-deletion worker node-postgres TLS selection', () => {
-  it('preserves the legacy path while B3 activation authority is absent', () => {
-    const config = buildNodePostgresAccountDeletionWorkerPoolConfigV1({
-      databaseUrl:
-        'postgresql://myeongha_worker_runtime:secret@db.example.test/postgres?sslmode=require',
-      databasePrincipal: 'myeongha_worker_runtime',
-      databaseExecutionRole: 'myeongha_system_executor',
-    });
-
-    const url = new URL(String(config.connectionString));
-    expect(url.searchParams.get('sslmode')).toBe('require');
-    expect(url.searchParams.get('uselibpqcompat')).toBe('true');
+  it('fails closed when strict TLS authority is absent', () => {
+    expect(() =>
+      buildNodePostgresAccountDeletionWorkerPoolConfigV1({
+        databaseUrl:
+          'postgresql://myeongha_worker_runtime:secret@db.example.test/postgres?sslmode=require',
+        databasePrincipal: 'myeongha_worker_runtime',
+        databaseExecutionRole: 'myeongha_system_executor',
+      } as unknown as ProductionAccountDeletionWorkerDbConfigV1),
+    ).toThrowError(NodePostgresAccountDeletionWorkerPoolErrorV1);
   });
 
   it('transforms the governed require migration source before the strict target', () => {
@@ -107,14 +105,14 @@ describe('account-deletion worker node-postgres TLS selection', () => {
     ).toThrowError(NodePostgresAccountDeletionWorkerPoolErrorV1);
   });
 
-  it('fails closed if strict activation lacks root material or target validation fails', () => {
-    const missingRoot: ProductionAccountDeletionWorkerDbConfigV1 = {
+  it('fails closed if root material is absent or strict target validation fails', () => {
+    const missingRoot = {
       databaseUrl:
         'postgresql://myeongha_worker_runtime.cnsfpcdiyofqvhpcegfc:secret@aws-0-test.pooler.supabase.com/postgres?sslmode=verify-full',
       databasePrincipal: 'myeongha_worker_runtime',
       databaseExecutionRole: 'myeongha_system_executor',
       databaseTlsPeerMode: 'verify-full',
-    };
+    } as unknown as ProductionAccountDeletionWorkerDbConfigV1;
 
     expect(() =>
       buildNodePostgresAccountDeletionWorkerPoolConfigV1(missingRoot),
