@@ -13,7 +13,7 @@ export default function RootLayout() {
           contentStyle: { backgroundColor: mobileColors.canvas },
         }}
       >
-        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="(tabs)" />\n        <Stack.Screen name="birth" />
       </Stack>
     </>
   );
