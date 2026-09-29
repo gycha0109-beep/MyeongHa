@@ -7,8 +7,8 @@ import {
   type MyeongHaApiClientV1,
 } from '@myeongha/api-client';
 
-import type { MobileSubjectSessionCoordinatorV1 } from '@/core/session/mobile-subject-session';
-import { nativeMobileRuntimeV1 } from '@/core/runtime/native-mobile-runtime';
+import type { MobileSubjectSessionCoordinatorV1 } from '../../core/session/mobile-subject-session.js';
+import { nativeMobileRuntimeV1 } from '../../core/runtime/native-mobile-runtime.js';
 
 export interface MobileBirthServiceV1 {
   readCurrent(): Promise<CurrentBirthProfileV1 | null>;
