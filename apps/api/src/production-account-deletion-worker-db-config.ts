@@ -20,16 +20,16 @@ export interface ProductionAccountDeletionWorkerDbConfigV1 {
   readonly databaseUrl: string;
   readonly databasePrincipal: typeof MYEONGHA_ACCOUNT_DELETION_WORKER_DATABASE_PRINCIPAL;
   readonly databaseExecutionRole: typeof MYEONGHA_ACCOUNT_DELETION_SYSTEM_EXECUTION_ROLE;
-  readonly databaseTlsPeerMode?: ProductionAccountDeletionWorkerTlsPeerModeV1;
-  readonly databaseSslRootCertificatePem?: string;
+  readonly databaseTlsPeerMode: ProductionAccountDeletionWorkerTlsPeerModeV1;
+  readonly databaseSslRootCertificatePem: string;
 }
 
 export interface ProductionAccountDeletionWorkerDbConfigSummaryV1 {
   readonly databaseConfigured: true;
   readonly databasePrincipal: typeof MYEONGHA_ACCOUNT_DELETION_WORKER_DATABASE_PRINCIPAL;
   readonly databaseExecutionRole: typeof MYEONGHA_ACCOUNT_DELETION_SYSTEM_EXECUTION_ROLE;
-  readonly databaseTlsPeerMode: 'legacy' | 'verify-full';
-  readonly databaseTlsRootCertificateConfigured: boolean;
+  readonly databaseTlsPeerMode: 'verify-full';
+  readonly databaseTlsRootCertificateConfigured: true;
 }
 
 export class ProductionAccountDeletionWorkerDbConfigErrorV1 extends Error {
@@ -132,16 +132,10 @@ export function parseProductionAccountDeletionWorkerDbConfigV1(
     requiredEnv(env, PRODUCTION_ACCOUNT_DELETION_WORKER_DB_ENV_V1.databaseUrl),
   );
 
-  const rawPeerMode =
-    env[PRODUCTION_ACCOUNT_DELETION_WORKER_DB_ENV_V1.tlsPeerMode]?.trim();
-
-  if (rawPeerMode === undefined || rawPeerMode.length === 0) {
-    return Object.freeze({
-      databaseUrl,
-      databasePrincipal,
-      databaseExecutionRole: MYEONGHA_ACCOUNT_DELETION_SYSTEM_EXECUTION_ROLE,
-    });
-  }
+  const rawPeerMode = requiredEnv(
+    env,
+    PRODUCTION_ACCOUNT_DELETION_WORKER_DB_ENV_V1.tlsPeerMode,
+  );
 
   if (rawPeerMode !== 'verify-full') {
     return fail(
@@ -183,15 +177,21 @@ export function summarizeProductionAccountDeletionWorkerDbConfigV1(
     );
   }
 
-  const strict = config.databaseTlsPeerMode === 'verify-full';
+  if (
+    config.databaseTlsPeerMode !== 'verify-full' ||
+    typeof config.databaseSslRootCertificatePem !== 'string' ||
+    config.databaseSslRootCertificatePem.trim().length === 0
+  ) {
+    return fail(
+      'Account-deletion worker DB config summary requires strict verify-full TLS authority.',
+    );
+  }
+
   return Object.freeze({
     databaseConfigured: true,
     databasePrincipal: MYEONGHA_ACCOUNT_DELETION_WORKER_DATABASE_PRINCIPAL,
     databaseExecutionRole: MYEONGHA_ACCOUNT_DELETION_SYSTEM_EXECUTION_ROLE,
-    databaseTlsPeerMode: strict ? 'verify-full' : 'legacy',
-    databaseTlsRootCertificateConfigured:
-      strict &&
-      typeof config.databaseSslRootCertificatePem === 'string' &&
-      config.databaseSslRootCertificatePem.length > 0,
+    databaseTlsPeerMode: 'verify-full',
+    databaseTlsRootCertificateConfigured: true,
   });
 }
