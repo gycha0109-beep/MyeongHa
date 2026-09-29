@@ -20,7 +20,13 @@ describe('account-deletion worker node-postgres TLS selection', () => {
   });
 
   it('uses the worker strict target and explicit ssl object when activated', () => {
-    const buildStrictTarget = vi.fn(() => ({
+    let strictInput:
+      | Readonly<{ databaseUrl: string; rootCertificatePem: string }>
+      | undefined;
+    const buildStrictTarget = vi.fn(
+      (input: Readonly<{ databaseUrl: string; rootCertificatePem: string }>) => {
+        strictInput = input;
+        return ({
       connectionString:
         'postgresql://myeongha_worker_runtime.cnsfpcdiyofqvhpcegfc:secret@aws-0-test.pooler.supabase.com:5432/postgres',
       ssl: {
@@ -42,7 +48,9 @@ describe('account-deletion worker node-postgres TLS selection', () => {
           '80:70:25:AD:50:D4:ED:21:9D:2C:9C:7D:29:9C:00:4F:82:4E:B0:0C:F7:F6:5A:FE:F6:07:D0:7B:72:E6:CA:FA' as const,
         rootCertificatePinned: true as const,
       },
-    }));
+    });
+      },
+    );
 
     const input: ProductionAccountDeletionWorkerDbConfigV1 = {
       databaseUrl:
@@ -59,7 +67,7 @@ describe('account-deletion worker node-postgres TLS selection', () => {
     );
 
     expect(buildStrictTarget).toHaveBeenCalledTimes(1);
-    const strictInput = buildStrictTarget.mock.calls[0]?.[0];
+    expect(strictInput).toBeDefined();
     const strictUrl = new URL(String(strictInput?.databaseUrl));
     expect(strictUrl.searchParams.get('sslmode')).toBe('verify-full');
     expect(strictUrl.searchParams.get('uselibpqcompat')).toBeNull();
