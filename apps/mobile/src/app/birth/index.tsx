@@ -18,6 +18,7 @@ import {
   buildMobileBirthProfileCreateRequestV1,
 } from '@/features/birth/birth-input';
 import { mobileBirthServiceV1 } from '@/features/birth/native-mobile-birth-service';
+import { mobileHomeControllerV1 } from '@/features/home/native-mobile-home-controller';
 import { mobileColors } from '@/ui/mobile-colors';
 
 const sexOptions = [
@@ -69,6 +70,7 @@ export default function BirthInputScreen() {
     setSubmitting(true);
     try {
       await mobileBirthServiceV1.create(request);
+      mobileHomeControllerV1.invalidate();
       router.replace('/reading');
     } catch (cause) {
       if (
@@ -79,6 +81,7 @@ export default function BirthInputScreen() {
         try {
           const existing = await mobileBirthServiceV1.readCurrent();
           if (existing !== null) {
+            mobileHomeControllerV1.invalidate();
             router.replace('/reading');
             return;
           }

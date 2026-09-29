@@ -5,7 +5,7 @@ MyeongHa Mobile is a first-class React Native client of the existing MyeongHa se
 ## Current state
 
 - Track: `applizing`
-- Phase: **M2 shared API/auth boundary**
+- Phase: **M5 Home projection composition**
 - Runtime: **Expo SDK 57 / React Native 0.86.x**
 - Navigation: **Expo Router**
 - Secure Guest credential persistence: **Expo SecureStore**
@@ -14,16 +14,28 @@ MyeongHa Mobile is a first-class React Native client of the existing MyeongHa se
 - Primary navigation: **Home / Saju / Chat / Records / My**
 - Reading sub-navigation: **Saju(default) / Face**
 
-## M2 authority boundary
+## Current authority boundary
 
 Mobile now has:
 
-- a portable shared API client for `POST /api/session/bootstrap` and `GET /api/me`;
-- fail-closed Guest bootstrap response parsing;
-- one-time bearer reuse protection when the server intentionally returns `bearerToken: null`;
-- a Mobile SecureStore adapter for Guest bearer persistence.
+- Expo Router five-tab shell with Saju / Face secondary navigation;
+- portable shared API/auth clients and Expo SecureStore Guest credential persistence;
+- single-flight Guest bootstrap and concurrent 401 replacement recovery;
+- current Birth Profile create/read and current-subject Saju calculation rendering;
+- Records reads for Life Record, Reading History, and Memory with cursor pagination;
+- My projection from current Profile + Birth;
+- Home projection composed from current Profile, Birth, latest Reading History, and calculation-only Saju evidence.
 
-Member sign-in/refresh storage, Birth/Saju feature binding, Chat mutation, Push, Face upload, and native commerce are not activated by M2.
+Home does not invent a separate server authority. It does not call unimplemented `/api/home` or `/api/characters`, does not infer a recent Chat thread, does not auto-run Preview Reading, and does not synthesize daily-fortune claims from calculation-only Saju evidence.
+
+Still gated after M5:
+
+- native Member auth/account management;
+- server-authorized Chat Hub/thread discovery and send;
+- production Character catalog/recommendation projection;
+- Face Reading native media path;
+- Push;
+- native store commerce.
 
 ## Commands
 
