@@ -1,0 +1,14 @@
+{
+  "expo": {
+    "name": "명하",
+    "slug": "myeongha-mobile",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "myeongha",
+    "userInterfaceStyle": "light",
+    "ios": { "supportsTablet": false },
+    "android": { "predictiveBackGestureEnabled": false },
+    "plugins": ["expo-router"],
+    "experiments": { "typedRoutes": true }
+  }
+}
