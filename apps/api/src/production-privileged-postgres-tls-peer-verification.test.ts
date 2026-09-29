@@ -6,6 +6,12 @@ import {
   inspectProductionPrivilegedPostgresAuthorityV1,
 } from './production-privileged-postgres-tls-peer-verification.js';
 
+type StrictTargetBuilder = NonNullable<
+  NonNullable<
+    Parameters<typeof buildProductionPrivilegedPostgresStrictTlsTargetV1>[1]
+  >['buildStrictTarget']
+>;
+
 describe('Production privileged PostgreSQL TLS authority', () => {
   const governedUrl =
     'postgresql://postgres.cnsfpcdiyofqvhpcegfc:secret@aws-0-test.pooler.supabase.com:5432/postgres?sslmode=require';
@@ -57,20 +63,10 @@ describe('Production privileged PostgreSQL TLS authority', () => {
   });
 
   it('transforms the governed require source into the generic verify-full target', () => {
-    let captured:
-      | Readonly<{
-          databaseUrl: string;
-          rootCertificatePem: string;
-          authority: Readonly<Record<string, unknown>>;
-        }>
-      | undefined;
+    let captured: Parameters<StrictTargetBuilder>[0] | undefined;
 
-    const buildStrictTarget = vi.fn(
-      (input: Readonly<{
-        databaseUrl: string;
-        rootCertificatePem: string;
-        authority: Readonly<Record<string, unknown>>;
-      }>) => {
+    const buildStrictTarget: StrictTargetBuilder = vi.fn(
+      (input: Parameters<StrictTargetBuilder>[0]) => {
         captured = input;
         return {
           connectionString:
