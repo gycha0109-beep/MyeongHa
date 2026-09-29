@@ -2,8 +2,8 @@
   "contractVersion": "myeongha-production-account-deletion-worker-postgres-tls-peer-verification-v1",
   "issue": 1427,
   "watchtowerTrack": "security",
-  "phase": "B2",
-  "activationState": "strict-worker-canary-passed-production-activation-pending",
+  "phase": "B3A",
+  "activationState": "strict-runtime-canary-passed-production-workflow-activation-pending",
   "productionActivation": false,
   "productionBindingMutated": false,
   "governedProjectRef": "cnsfpcdiyofqvhpcegfc",
@@ -40,6 +40,34 @@
     "rootCertificatePemEmitted": false
   },
   "activationBlockers": [
-    "production-worker-runtime-strict-path-not-yet-activated"
-  ]
+    "production-privacy-worker-strict-binding-not-yet-activated",
+    "post-activation-production-privacy-canary-not-yet-passed"
+  ],
+  "strictRuntimeCanary": {
+    "status": "passed",
+    "workflowRunId": 36505985106,
+    "workflowRunNumber": 1,
+    "sourceMainSha": "dc3e4cef2af448fa97b393b232ff57fea5791da6",
+    "concreteWorkerPool": true,
+    "sourceTlsMode": "require",
+    "effectiveTlsMode": "verify-full",
+    "peerVerification": "full",
+    "rejectUnauthorized": true,
+    "defaultHostnameVerification": true,
+    "rootCertificatePinned": true,
+    "connectionSucceeded": true,
+    "transactionReadOnly": true,
+    "principalMatch": true,
+    "executionRoleMembership": true,
+    "writeExecuted": false,
+    "databaseUrlEmitted": false,
+    "credentialMaterialEmitted": false,
+    "rootCertificatePemEmitted": false,
+    "mainCiRunId": 36505985112,
+    "mainCiRunNumber": 4170,
+    "governanceRunId": 36505985073,
+    "governanceRunNumber": 1274,
+    "supabaseProductionRunId": 36505985079,
+    "supabaseProductionRunNumber": 331
+  }
 }
