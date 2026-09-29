@@ -138,12 +138,6 @@ function parseMessage(value: unknown): ChatMessageV1 {
   }
   const bodyText = nullableString('message bodyText', value.bodyText);
   const redactedAt = nullableTimestamp('message redactedAt', value.redactedAt);
-  if (value.redacted && redactedAt === null) {
-    return invalid('Redacted message requires redactedAt.');
-  }
-  if (!value.redacted && redactedAt !== null) {
-    return invalid('Non-redacted message cannot expose redactedAt.');
-  }
 
   return Object.freeze({
     messageId: stringValue('messageId', value.messageId),
