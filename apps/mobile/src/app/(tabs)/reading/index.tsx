@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { mobileBirthServiceV1 } from '@/features/birth/mobile-birth-service';
+import { mobileBirthServiceV1 } from '@/features/birth/native-mobile-birth-service';
 import { ReadingSubnav } from '@/features/reading/ReadingSubnav';
 import { MobileScreen } from '@/ui/MobileScreen';
 import { mobileColors } from '@/ui/mobile-colors';

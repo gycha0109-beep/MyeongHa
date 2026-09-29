@@ -17,7 +17,7 @@ import {
   MobileBirthInputValidationErrorV1,
   buildMobileBirthProfileCreateRequestV1,
 } from '@/features/birth/birth-input';
-import { mobileBirthServiceV1 } from '@/features/birth/mobile-birth-service';
+import { mobileBirthServiceV1 } from '@/features/birth/native-mobile-birth-service';
 import { mobileColors } from '@/ui/mobile-colors';
 
 const sexOptions = [

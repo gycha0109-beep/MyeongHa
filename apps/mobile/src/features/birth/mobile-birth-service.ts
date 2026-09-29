@@ -8,8 +8,6 @@ import {
 } from '@myeongha/api-client';
 
 import type { MobileSubjectSessionCoordinatorV1 } from '../../core/session/mobile-subject-session.js';
-import { nativeMobileRuntimeV1 } from '../../core/runtime/native-mobile-runtime.js';
-
 export interface MobileBirthServiceV1 {
   readCurrent(): Promise<CurrentBirthProfileV1 | null>;
   create(request: BirthProfileCreateRequestV1): Promise<BirthProfileCreateReceiptV1>;
@@ -33,7 +31,3 @@ export function createMobileBirthServiceV1(input: {
   });
 }
 
-export const mobileBirthServiceV1 = createMobileBirthServiceV1({
-  client: nativeMobileRuntimeV1.apiClient,
-  session: nativeMobileRuntimeV1.subjectSession,
-});
