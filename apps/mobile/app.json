@@ -6,9 +6,18 @@
     "orientation": "portrait",
     "scheme": "myeongha",
     "userInterfaceStyle": "light",
-    "ios": { "supportsTablet": false },
-    "android": { "predictiveBackGestureEnabled": false },
-    "plugins": ["expo-router"],
-    "experiments": { "typedRoutes": true }
+    "ios": {
+      "supportsTablet": false
+    },
+    "android": {
+      "predictiveBackGestureEnabled": false
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
   }
 }
