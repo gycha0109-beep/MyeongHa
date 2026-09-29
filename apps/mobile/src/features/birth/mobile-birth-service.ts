@@ -25,7 +25,7 @@ export function createMobileBirthServiceV1(input: {
         readCurrentBirthProfileV1(input.client, bearer),
       );
     },
-    create(request) {
+    create(request: BirthProfileCreateRequestV1) {
       return input.session.withGuestBearer((bearer) =>
         createBirthProfileV1(input.client, bearer, request),
       );
