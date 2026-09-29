@@ -16,7 +16,8 @@
     ],
     "paths": {
       "@/*": [
-        "apps/mobile/src/*"
+        "apps/mobile/src/*.ts",
+        "apps/mobile/src/*.tsx"
       ]
     },
     "baseUrl": ".",
