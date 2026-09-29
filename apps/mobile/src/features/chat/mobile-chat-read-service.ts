@@ -19,7 +19,7 @@ export function createMobileChatReadServiceV1(input: {
   readonly session: Pick<MobileSubjectSessionCoordinatorV1, 'withGuestBearer'>;
 }): MobileChatReadServiceV1 {
   return Object.freeze({
-    readThreadPage(threadId, options = {}) {
+    readThreadPage(threadId: string, options: ChatReadPageOptionsV1 = {}) {
       return input.session.withGuestBearer((bearer) =>
         readChatThreadPageV1(input.client, bearer, threadId, options),
       );
