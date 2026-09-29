@@ -16,14 +16,24 @@ trap cleanup EXIT
 
 captured_at_utc="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
 
+admin_pool_user="postgres.$SUPABASE_PROJECT_ID"
+root_certificate_file="$work_dir/server-root.crt"
+node scripts/operations/prepare-production-postgres-strict-libpq.mjs \
+  --output "$root_certificate_file" \
+  --host "$SUPABASE_PRODUCTION_SESSION_POOLER_HOST" \
+  --principal "$admin_pool_user" \
+  --port '5432' \
+  --database 'postgres'
+export PGSSLMODE='verify-full'
+export PGSSLROOTCERT="$root_certificate_file"
+
 encoded_password="$(python3 - <<'PY'
 import os
 import urllib.parse
 print(urllib.parse.quote(os.environ['SUPABASE_DB_PASSWORD'], safe=''))
 PY
 )"
-admin_pool_user="postgres.$SUPABASE_PROJECT_ID"
-db_url="postgresql://${admin_pool_user}:${encoded_password}@${SUPABASE_PRODUCTION_SESSION_POOLER_HOST}:5432/postgres?sslmode=require"
+db_url="postgresql://${admin_pool_user}:${encoded_password}@${SUPABASE_PRODUCTION_SESSION_POOLER_HOST}:5432/postgres"
 echo "::add-mask::$db_url"
 
 export PGOPTIONS='-c statement_timeout=30000 -c lock_timeout=5000 -c idle_in_transaction_session_timeout=30000'

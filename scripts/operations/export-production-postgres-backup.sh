@@ -14,13 +14,23 @@ cleanup() {
 }
 trap cleanup EXIT
 
+root_certificate_file="$backup_dir/server-root.crt"
+node scripts/operations/prepare-production-postgres-strict-libpq.mjs \
+  --output "$root_certificate_file" \
+  --host "$POOL_HOST" \
+  --principal "$ADMIN_POOL_USER" \
+  --port "$POOL_PORT" \
+  --database "$POOL_DB"
+export PGSSLMODE='verify-full'
+export PGSSLROOTCERT="$root_certificate_file"
+
 encoded_password="$(python3 - <<'PY'
 import os
 import urllib.parse
 print(urllib.parse.quote(os.environ['SUPABASE_DB_PASSWORD'], safe=''))
 PY
 )"
-db_url="postgresql://${ADMIN_POOL_USER}:${encoded_password}@${POOL_HOST}:${POOL_PORT}/${POOL_DB}?sslmode=require"
+db_url="postgresql://${ADMIN_POOL_USER}:${encoded_password}@${POOL_HOST}:${POOL_PORT}/${POOL_DB}"
 echo "::add-mask::$db_url"
 
 started_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"

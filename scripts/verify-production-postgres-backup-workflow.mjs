@@ -2,16 +2,18 @@ import { readFile } from 'node:fs/promises';
 
 const workflowPath = '.github/workflows/production-postgres-backup.yml';
 const runnerPath = 'scripts/operations/export-production-postgres-backup.sh';
+const strictTlsHelperPath = 'scripts/operations/prepare-production-postgres-strict-libpq.mjs';
 const restoreSourceResolverPath = 'scripts/operations/resolve-postgres-restore-source.sh';
 const runbookPath = 'docs/operations/POSTGRES_BACKUP_RESTORE_RUNBOOK_V1.md';
 
-const [workflow, runner, restoreSourceResolver, runbook] = await Promise.all([
+const [workflow, runner, strictTlsHelper, restoreSourceResolver, runbook] = await Promise.all([
   readFile(workflowPath, 'utf8'),
   readFile(runnerPath, 'utf8'),
+  readFile(strictTlsHelperPath, 'utf8'),
   readFile(restoreSourceResolverPath, 'utf8'),
   readFile(runbookPath, 'utf8'),
 ]);
-const contract = workflow + '\n' + runner;
+const contract = workflow + '\n' + runner + '\n' + strictTlsHelper;
 
 const requiredWorkflowFragments = [
   'name: Production PostgreSQL Logical Backup',
@@ -25,11 +27,13 @@ const requiredWorkflowFragments = [
   "BACKUP_RETENTION_DAYS: '30'",
   'SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}',
   'SUPABASE_PRODUCTION_SESSION_POOLER_HOST: ${{ secrets.SUPABASE_PRODUCTION_SESSION_POOLER_HOST }}',
+  'SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM: ${{ secrets.SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM }}',
   'MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE: ${{ secrets.MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE }}',
   'missing=()',
   'missing+=(SUPABASE_DB_PASSWORD)',
   'missing+=(MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE)',
   'missing+=(SUPABASE_PRODUCTION_SESSION_POOLER_HOST)',
+  'missing+=(SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM)',
   'SUPABASE_PRODUCTION_SESSION_POOLER_HOST must be a bare *.pooler.supabase.com hostname.',
   '::error title=Production backup credential missing::Missing Actions secret: $secret_name',
   '::error title=Production backup encryption secret invalid::MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE must be at least 32 characters.',
@@ -40,6 +44,10 @@ const requiredWorkflowFragments = [
   "pool_db='postgres'",
   '[[ "$pool_host" =~ ^[a-z0-9-]+([.][a-z0-9-]+)*[.]pooler[.]supabase[.]com$ ]]',
   "[[ \"$pool_port\" == '5432' ]]",
+  'prepare-production-postgres-strict-libpq.mjs',
+  "export PGSSLMODE='verify-full'",
+  'export PGSSLROOTCERT="$root_certificate_file"',
+  'root_certificate_pem_emitted=false',
   'npx --yes "supabase@$SUPABASE_CLI_VERSION" db dump',
   '--db-url "$db_url"',
   '--role-only',
@@ -75,6 +83,8 @@ const forbiddenWorkflowFragments = [
   'uses: actions/upload-artifact@v4',
   'service_role',
   'sslmode=disable',
+  'sslmode=require',
+  'sslmode=prefer',
   'SUPABASE_DB_PASSWORD: postgres',
   'echo "$SUPABASE_ACCESS_TOKEN"',
   'echo "$SUPABASE_DB_PASSWORD"',
