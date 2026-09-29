@@ -46,7 +46,7 @@ describe('account-deletion worker node-postgres TLS selection', () => {
 
     const input: ProductionAccountDeletionWorkerDbConfigV1 = {
       databaseUrl:
-        'postgresql://myeongha_worker_runtime.cnsfpcdiyofqvhpcegfc:secret@aws-0-test.pooler.supabase.com:5432/postgres?sslmode=verify-full',
+        'postgresql://myeongha_worker_runtime.cnsfpcdiyofqvhpcegfc:secret@aws-0-test.pooler.supabase.com:5432/postgres?application_name=worker&sslmode=require&uselibpqcompat=true',
       databasePrincipal: 'myeongha_worker_runtime',
       databaseExecutionRole: 'myeongha_system_executor',
       databaseTlsPeerMode: 'verify-full',
@@ -58,10 +58,13 @@ describe('account-deletion worker node-postgres TLS selection', () => {
       { buildStrictTarget },
     );
 
-    expect(buildStrictTarget).toHaveBeenCalledWith({
-      databaseUrl: input.databaseUrl,
-      rootCertificatePem: 'test-only-root',
-    });
+    expect(buildStrictTarget).toHaveBeenCalledTimes(1);
+    const strictInput = buildStrictTarget.mock.calls[0]?.[0];
+    const strictUrl = new URL(String(strictInput?.databaseUrl));
+    expect(strictUrl.searchParams.get('sslmode')).toBe('verify-full');
+    expect(strictUrl.searchParams.get('uselibpqcompat')).toBeNull();
+    expect(strictUrl.searchParams.get('application_name')).toBe('worker');
+    expect(strictInput?.rootCertificatePem).toBe('test-only-root');
     expect(poolConfig.ssl).toEqual({
       ca: 'test-only-root',
       rejectUnauthorized: true,
@@ -69,6 +72,26 @@ describe('account-deletion worker node-postgres TLS selection', () => {
     expect(poolConfig.ssl).not.toHaveProperty('checkServerIdentity');
     expect(new URL(String(poolConfig.connectionString)).searchParams.get('sslmode')).toBeNull();
     expect(JSON.stringify(poolConfig.ssl)).not.toContain('secret@');
+  });
+
+  it.each([
+    '',
+    '?sslmode=disable',
+    '?sslmode=allow',
+    '?sslmode=prefer',
+    '?sslmode=verify-ca',
+    '?sslmode=unknown',
+  ])('rejects non-migration strict source mode %s', (query) => {
+    expect(() =>
+      buildNodePostgresAccountDeletionWorkerPoolConfigV1({
+        databaseUrl:
+          `postgresql://myeongha_worker_runtime.cnsfpcdiyofqvhpcegfc:secret@aws-0-test.pooler.supabase.com/postgres${query}`,
+        databasePrincipal: 'myeongha_worker_runtime',
+        databaseExecutionRole: 'myeongha_system_executor',
+        databaseTlsPeerMode: 'verify-full',
+        databaseSslRootCertificatePem: 'test-only-root',
+      }),
+    ).toThrowError(NodePostgresAccountDeletionWorkerPoolErrorV1);
   });
 
   it('fails closed if strict activation lacks root material or target validation fails', () => {
