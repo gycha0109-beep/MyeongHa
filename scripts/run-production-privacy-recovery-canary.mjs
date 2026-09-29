@@ -125,7 +125,7 @@ async function createAdminPool() {
   const target = buildProductionPrivilegedPostgresStrictTlsTargetV1({
     databaseUrl: requiredEnv('MYEONGHA_PRIVACY_CANARY_ADMIN_DATABASE_URL'),
     rootCertificatePem: requiredEnv(
-      'SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM',
+      'MYEONGHA_WORKER_DATABASE_SSL_ROOT_CERT_PEM',
     ),
   });
   return new Pool({
