@@ -224,7 +224,7 @@ jobs:
             source_run="$(gh api "/repos/$GITHUB_REPOSITORY/actions/runs/$source_run_id")"
             backup_run="$(gh api "/repos/$GITHUB_REPOSITORY/actions/runs/$backup_run_id")"
             jq -e '
-              .name == "Production Privacy Recovery Canary"
+              .path == ".github/workflows/production-privacy-recovery-canary.yml"
               and .event == "workflow_dispatch"
               and .head_branch == "main"
               and .status == "completed"
@@ -232,7 +232,7 @@ jobs:
             ' <<<"$source_run" >/dev/null
             source_sha="$(jq -r '.head_sha' <<<"$source_run")"
             jq -e --arg source_sha "$source_sha" '
-              .name == "Production PostgreSQL Logical Backup"
+              .path == ".github/workflows/production-postgres-backup.yml"
               and .event == "workflow_dispatch"
               and .head_branch == "main"
               and .status == "completed"
