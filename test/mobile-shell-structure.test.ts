@@ -40,7 +40,9 @@ describe('mobile M1 shell', () => {
     const lockfile = JSON.parse(await readRepoFile('package-lock.json'));
 
     expect(rootManifest.overrides?.['decode-uri-component']).toBe('0.5.0');
+    expect(rootManifest.overrides?.uuid).toBe('11.1.1');
     expect(lockfile.packages?.['node_modules/decode-uri-component']?.version).toBe('0.5.0');
+    expect(lockfile.packages?.['node_modules/uuid']?.version).toBe('11.1.1');
   });
 
   it('does not depend on a WebView wrapper', async () => {
