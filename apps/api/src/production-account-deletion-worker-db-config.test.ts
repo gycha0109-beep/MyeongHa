@@ -7,8 +7,11 @@ import {
 } from './production-account-deletion-worker-db-config.js';
 import { ACCOUNT_DELETION_WORKER_RUNTIME_BINDINGS_V1 } from './production-account-deletion-worker-runtime.js';
 
+const ROOT_PEM =
+  '-----BEGIN CERTIFICATE-----\\ntest-only-root\\n-----END CERTIFICATE-----';
+
 describe('production account deletion worker DB config', () => {
-  it('binds a dedicated worker login and system execution role without exposing the URL in summary', () => {
+  it('keeps the current worker binding legacy when strict activation authority is absent', () => {
     const config = parseProductionAccountDeletionWorkerDbConfigV1({
       MYEONGHA_WORKER_DATABASE_URL:
         'postgresql://myeongha_worker_runtime:secret-value@db.example.test:5432/postgres?sslmode=require',
@@ -21,11 +24,73 @@ describe('production account deletion worker DB config', () => {
     expect(config.databaseExecutionRole).toBe(
       MYEONGHA_ACCOUNT_DELETION_SYSTEM_EXECUTION_ROLE,
     );
+    expect(config.databaseTlsPeerMode).toBeUndefined();
     expect(summarizeProductionAccountDeletionWorkerDbConfigV1(config)).toEqual({
       databaseConfigured: true,
       databasePrincipal: 'myeongha_worker_runtime',
       databaseExecutionRole: 'myeongha_system_executor',
+      databaseTlsPeerMode: 'legacy',
+      databaseTlsRootCertificateConfigured: false,
     });
+  });
+
+  it('admits explicit verify-full activation only with protected root material', () => {
+    const config = parseProductionAccountDeletionWorkerDbConfigV1({
+      MYEONGHA_WORKER_DATABASE_URL:
+        'postgresql://myeongha_worker_runtime.cnsfpcdiyofqvhpcegfc:fixture-password@aws-0-test.pooler.supabase.com:5432/postgres?sslmode=verify-full',
+      MYEONGHA_WORKER_DATABASE_PRINCIPAL: 'myeongha_worker_runtime',
+      MYEONGHA_WORKER_DATABASE_TLS_PEER_MODE: 'verify-full',
+      MYEONGHA_WORKER_DATABASE_SSL_ROOT_CERT_PEM: ROOT_PEM,
+    });
+
+    expect(config).toMatchObject({
+      databasePrincipal: 'myeongha_worker_runtime',
+      databaseExecutionRole: 'myeongha_system_executor',
+      databaseTlsPeerMode: 'verify-full',
+      databaseSslRootCertificatePem: ROOT_PEM,
+    });
+    expect(summarizeProductionAccountDeletionWorkerDbConfigV1(config)).toEqual({
+      databaseConfigured: true,
+      databasePrincipal: 'myeongha_worker_runtime',
+      databaseExecutionRole: 'myeongha_system_executor',
+      databaseTlsPeerMode: 'verify-full',
+      databaseTlsRootCertificateConfigured: true,
+    });
+    expect(
+      JSON.stringify(summarizeProductionAccountDeletionWorkerDbConfigV1(config)),
+    ).not.toContain(ROOT_PEM);
+  });
+
+  it('fails closed for unknown strict mode, missing root material, or weak source posture', () => {
+    const base = {
+      MYEONGHA_WORKER_DATABASE_URL:
+        'postgresql://myeongha_worker_runtime.cnsfpcdiyofqvhpcegfc:fixture-password@aws-0-test.pooler.supabase.com:5432/postgres?sslmode=require',
+      MYEONGHA_WORKER_DATABASE_PRINCIPAL: 'myeongha_worker_runtime',
+    };
+
+    expect(() =>
+      parseProductionAccountDeletionWorkerDbConfigV1({
+        ...base,
+        MYEONGHA_WORKER_DATABASE_TLS_PEER_MODE: 'legacy',
+      }),
+    ).toThrow(/must be verify-full/u);
+
+    expect(() =>
+      parseProductionAccountDeletionWorkerDbConfigV1({
+        ...base,
+        MYEONGHA_WORKER_DATABASE_TLS_PEER_MODE: 'verify-full',
+      }),
+    ).toThrow(/MYEONGHA_WORKER_DATABASE_SSL_ROOT_CERT_PEM/u);
+
+    expect(() =>
+      parseProductionAccountDeletionWorkerDbConfigV1({
+        ...base,
+        MYEONGHA_WORKER_DATABASE_URL:
+          'postgresql://myeongha_worker_runtime.cnsfpcdiyofqvhpcegfc:fixture-password@aws-0-test.pooler.supabase.com:5432/postgres?sslmode=prefer',
+        MYEONGHA_WORKER_DATABASE_TLS_PEER_MODE: 'verify-full',
+        MYEONGHA_WORKER_DATABASE_SSL_ROOT_CERT_PEM: ROOT_PEM,
+      }),
+    ).toThrow(/require migration source or verify-full source/u);
   });
 
   it('accepts a Supavisor-qualified worker username while retaining database role authority', () => {

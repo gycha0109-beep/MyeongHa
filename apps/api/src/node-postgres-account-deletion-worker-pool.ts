@@ -1,5 +1,8 @@
-import { Pool, type PoolClient } from 'pg';
+import { Pool, type PoolClient, type PoolConfig } from 'pg';
 import { buildNodePostgresPoolConfigV1 } from './node-postgres-subject-pool.js';
+import {
+  buildProductionAccountDeletionWorkerStrictTlsTargetV1,
+} from './production-account-deletion-worker-tls-peer-verification.js';
 import type {
   PostgresQueryResultV1,
   PostgresSubjectConnectionV1,
@@ -23,17 +26,63 @@ type WorkerPrincipalRowV1 = Readonly<{
   canEnterExecutionRole?: unknown;
 }>;
 
+type StrictWorkerTargetBuilderV1 =
+  typeof buildProductionAccountDeletionWorkerStrictTlsTargetV1;
+
 export class NodePostgresAccountDeletionWorkerPoolErrorV1 extends Error {
   constructor(
     readonly code:
       | 'PRINCIPAL_MISMATCH'
       | 'EXECUTION_ROLE_UNAVAILABLE'
-      | 'INVALID_PREFLIGHT_RESULT',
+      | 'INVALID_PREFLIGHT_RESULT'
+      | 'TLS_MODE_UNSUPPORTED',
     message: string,
   ) {
     super(message);
     this.name = 'NodePostgresAccountDeletionWorkerPoolErrorV1';
   }
+}
+
+export function buildNodePostgresAccountDeletionWorkerPoolConfigV1(
+  config: ProductionAccountDeletionWorkerDbConfigV1,
+  dependencies: Readonly<{
+    buildStrictTarget?: StrictWorkerTargetBuilderV1;
+  }> = {},
+): PoolConfig {
+  if (config.databaseTlsPeerMode !== 'verify-full') {
+    return buildNodePostgresPoolConfigV1(config.databaseUrl);
+  }
+
+  if (
+    typeof config.databaseSslRootCertificatePem !== 'string' ||
+    config.databaseSslRootCertificatePem.trim().length === 0
+  ) {
+    throw new NodePostgresAccountDeletionWorkerPoolErrorV1(
+      'TLS_MODE_UNSUPPORTED',
+      'Strict account-deletion worker PostgreSQL TLS requires governed root certificate material.',
+    );
+  }
+
+  let target;
+  try {
+    target = (
+      dependencies.buildStrictTarget ??
+      buildProductionAccountDeletionWorkerStrictTlsTargetV1
+    )({
+      databaseUrl: config.databaseUrl,
+      rootCertificatePem: config.databaseSslRootCertificatePem,
+    });
+  } catch {
+    throw new NodePostgresAccountDeletionWorkerPoolErrorV1(
+      'TLS_MODE_UNSUPPORTED',
+      'Strict account-deletion worker PostgreSQL TLS target was rejected.',
+    );
+  }
+
+  return Object.freeze({
+    ...buildNodePostgresPoolConfigV1(target.connectionString),
+    ssl: target.ssl,
+  });
 }
 
 class WorkerConnectionV1 implements PostgresSubjectConnectionV1 {
@@ -63,7 +112,9 @@ class WorkerConnectionV1 implements PostgresSubjectConnectionV1 {
   }
 }
 
-function requirePrincipalRow(rows: readonly Record<string, unknown>[]): WorkerPrincipalRowV1 {
+function requirePrincipalRow(
+  rows: readonly Record<string, unknown>[],
+): WorkerPrincipalRowV1 {
   const row = rows[0];
   if (rows.length !== 1 || row === undefined) {
     throw new NodePostgresAccountDeletionWorkerPoolErrorV1(
@@ -100,14 +151,21 @@ export class NodePostgresAccountDeletionWorkerPoolV1
 {
   private readonly pool: Pool;
 
-  constructor(private readonly config: ProductionAccountDeletionWorkerDbConfigV1) {
-    this.pool = new Pool(buildNodePostgresPoolConfigV1(config.databaseUrl));
+  constructor(
+    private readonly config: ProductionAccountDeletionWorkerDbConfigV1,
+  ) {
+    this.pool = new Pool(
+      buildNodePostgresAccountDeletionWorkerPoolConfigV1(config),
+    );
     this.pool.on('error', (error) => {
       const code = (error as Error & { code?: unknown }).code;
-      console.error('MyeongHa account-deletion worker PostgreSQL idle-pool error.', {
-        name: error.name,
-        code: typeof code === 'string' ? code : null,
-      });
+      console.error(
+        'MyeongHa account-deletion worker PostgreSQL idle-pool error.',
+        {
+          name: error.name,
+          code: typeof code === 'string' ? code : null,
+        },
+      );
     });
   }
 
@@ -117,7 +175,10 @@ export class NodePostgresAccountDeletionWorkerPoolV1
       const result = await client.query(VERIFY_WORKER_LOGIN_SQL, [
         MYEONGHA_ACCOUNT_DELETION_SYSTEM_EXECUTION_ROLE,
       ]);
-      verifyPrincipal(requirePrincipalRow(result.rows), this.config.databasePrincipal);
+      verifyPrincipal(
+        requirePrincipalRow(result.rows),
+        this.config.databasePrincipal,
+      );
       return new WorkerConnectionV1(client);
     } catch (error) {
       client.release(
