@@ -23,6 +23,19 @@ export interface CharacterStandardReadingProductionRendererInputV1 {
   readonly context: CharacterRendererRuntimeContextV1;
 }
 
+export interface CharacterStandardReadingProductionPromotionDecisionV1 {
+  readonly allowed: boolean;
+  readonly authorityVersion: string;
+}
+
+export interface CharacterStandardReadingProductionPromotionAuthorityPortV1 {
+  resolvePromotion(input: {
+    readonly releaseId: string;
+    readonly characterId: string;
+    readonly readingId: string;
+  }): Awaitable<CharacterStandardReadingProductionPromotionDecisionV1>;
+}
+
 export interface CharacterStandardReadingProductionRendererPortV1 {
   readonly providerKey: string;
   readonly modelKey: string;
@@ -83,6 +96,7 @@ export interface CharacterStandardReadingTurnPersistenceAuthorityPortV1 {
 export interface RunCharacterStandardReadingProductionTurnInputV1 {
   readonly preflight: CharacterStandardReadingChatTurnPreflightV1;
   readonly catalogAuthorityPort: CharacterPublicFactCatalogReadAuthorityPortV1;
+  readonly promotionAuthorityPort: CharacterStandardReadingProductionPromotionAuthorityPortV1;
   readonly renderer: CharacterStandardReadingProductionRendererPortV1;
   readonly persistence: CharacterStandardReadingTurnPersistenceAuthorityPortV1;
   readonly allowedSuggestedActionKeys: readonly string[];
@@ -185,6 +199,19 @@ export async function runCharacterStandardReadingProductionTurnV1(
   const text = requireTextTurn(input.preflight);
   const providerKey = requiredIdentifier(input.renderer.providerKey, 'renderer.providerKey');
   const modelKey = requiredIdentifier(input.renderer.modelKey, 'renderer.modelKey');
+
+  const promotion = await input.promotionAuthorityPort.resolvePromotion({
+    releaseId: input.preflight.runtime.threadBinding.activeContentReleaseId,
+    characterId: input.preflight.runtime.context.characterId,
+    readingId: input.preflight.runtime.source.readingId,
+  });
+  requiredIdentifier(promotion.authorityVersion, 'promotion.authorityVersion');
+  if (!promotion.allowed) {
+    throw new CharacterStandardReadingProductionTurnErrorV1(
+      'receive',
+      'Standard Reading Character public injection is not promoted for this authority scope.',
+    );
+  }
 
   let lease: CharacterStandardReadingExecutionLeaseV1;
   try {
