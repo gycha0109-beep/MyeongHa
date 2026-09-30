@@ -804,3 +804,14 @@ export {
   type CharacterStandardReadingTurnPersistenceAuthorityPortV1,
   type RunCharacterStandardReadingProductionTurnInputV1,
 } from './character-standard-reading-production-orchestration.js';
+
+
+export {
+  CharacterStandardReadingChatExecutionLifecycleErrorV1,
+  acquireCharacterStandardReadingChatExecutionHoldV1,
+  markCharacterStandardReadingChatContextReadyHoldV1,
+  markCharacterStandardReadingChatFailedHoldV1,
+  type CharacterStandardReadingChatExecutionLifecycleErrorCodeV1,
+  type CharacterStandardReadingChatExecutionLifecycleModeV1,
+  type CharacterStandardReadingChatExecutionLifecycleRowV1,
+} from './postgres-character-standard-reading-chat-execution-hold.js';
