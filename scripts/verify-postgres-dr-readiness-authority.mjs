@@ -7,6 +7,7 @@ const paths = {
   privacy: 'docs/AUTH_RLS_PRIVACY_SPEC.md',
   sourceGaps: 'docs/SOURCE_AUTHORITY_GAPS.md',
   backupExport: 'scripts/operations/export-production-postgres-backup.sh',
+  strictDump: 'scripts/operations/run-production-postgres-strict-dump.sh',
   backupWorkflow: '.github/workflows/production-postgres-backup.yml',
   restoreHarness: 'scripts/run-postgres-isolated-restore-drill.sh',
   restoreEnvelope: 'scripts/build-postgres-restore-evidence-envelope.mjs',
@@ -20,6 +21,7 @@ const entries = await Promise.all(
 const files = Object.fromEntries(entries);
 
 execFileSync('bash', ['-n', paths.backupExport], { stdio: 'inherit' });
+execFileSync('bash', ['-n', paths.strictDump], { stdio: 'inherit' });
 execFileSync('bash', ['-n', paths.restoreHarness], { stdio: 'inherit' });
 
 const migrationFiles = await readdir('supabase/migrations');
@@ -99,7 +101,9 @@ requireRegex(
 );
 requireFragment('backupExport', "select max(version::bigint)");
 requireFragment('backupExport', "public.member_auth_rate_limit_buckets");
-requireFragment('backupExport', "-x 'public.member_auth_rate_limit_buckets'");
+requireFragment('strictDump', '--exclude-table "public.member_auth_rate_limit_buckets"');
+requireFragment('strictDump', '--env PGSSLMODE=verify-full');
+requireFragment('strictDump', '--env PGSSLROOTCERT="$container_root_certificate"');
 requireFragment('backupExport', 'migration_frontier');
 requireFragment('backupExport', 'ephemeral_data_exclusions');
 requireFragment('backupWorkflow', 'postgresql-client');
