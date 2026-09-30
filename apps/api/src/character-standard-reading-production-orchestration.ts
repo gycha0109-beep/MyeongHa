@@ -119,7 +119,7 @@ export class CharacterStandardReadingProductionTurnErrorV1 extends Error {
   constructor(
     readonly stage: 'receive' | 'context' | 'render' | 'validate' | 'commit',
     message: string,
-    readonly cause?: unknown,
+    override readonly cause?: unknown,
   ) {
     super(message);
   }
