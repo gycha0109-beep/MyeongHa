@@ -228,7 +228,9 @@ function genuinePreflight(): CharacterStandardReadingChatTurnPreflightV1 {
         contentRevision: 1,
         participantCharacterIds: [character.characterId],
       },
-      source: {},
+      source: {
+        readingId: 'reading-production-orchestration-test',
+      },
       context,
     },
   } as unknown as CharacterStandardReadingChatTurnPreflightV1;
@@ -323,6 +325,16 @@ class Persistence implements CharacterStandardReadingTurnPersistenceAuthorityPor
   }
 }
 
+
+const allowPromotion = {
+  async resolvePromotion() {
+    return {
+      allowed: true,
+      authorityVersion: 'production-promotion-test-v1',
+    };
+  },
+} as const;
+
 function validRendererOutput() {
   return {
     schemaVersion: 'v1',
@@ -345,6 +357,7 @@ describe('Standard Reading production Character turn orchestration', () => {
     const result = await runCharacterStandardReadingProductionTurnV1({
       preflight: genuinePreflight(),
       catalogAuthorityPort: catalog,
+      promotionAuthorityPort: allowPromotion,
       renderer,
       persistence,
       allowedSuggestedActionKeys: [],
@@ -411,6 +424,7 @@ describe('Standard Reading production Character turn orchestration', () => {
     const result = await runCharacterStandardReadingProductionTurnV1({
       preflight: genuinePreflight(),
       catalogAuthorityPort: catalog,
+      promotionAuthorityPort: allowPromotion,
       renderer,
       persistence,
       allowedSuggestedActionKeys: [],
@@ -436,6 +450,7 @@ describe('Standard Reading production Character turn orchestration', () => {
       runCharacterStandardReadingProductionTurnV1({
         preflight: genuinePreflight(),
         catalogAuthorityPort: new CatalogPort([]),
+        promotionAuthorityPort: allowPromotion,
         renderer,
         persistence,
         allowedSuggestedActionKeys: [],
@@ -472,6 +487,7 @@ describe('Standard Reading production Character turn orchestration', () => {
       runCharacterStandardReadingProductionTurnV1({
         preflight: genuinePreflight(),
         catalogAuthorityPort: new CatalogPort([]),
+        promotionAuthorityPort: allowPromotion,
         renderer,
         persistence,
         allowedSuggestedActionKeys: [],
@@ -514,6 +530,7 @@ describe('Standard Reading production Character turn orchestration', () => {
       runCharacterStandardReadingProductionTurnV1({
         preflight: structured,
         catalogAuthorityPort: new CatalogPort([]),
+        promotionAuthorityPort: allowPromotion,
         renderer: new Renderer(validRendererOutput()),
         persistence,
         allowedSuggestedActionKeys: [],
@@ -524,4 +541,33 @@ describe('Standard Reading production Character turn orchestration', () => {
 
     expect(persistence.events).toEqual([]);
   });
+
+  it('does not allocate execution while Standard Reading Character injection remains unpromoted', async () => {
+    const persistence = new Persistence();
+    const renderer = new Renderer(validRendererOutput());
+
+    await expect(
+      runCharacterStandardReadingProductionTurnV1({
+        preflight: genuinePreflight(),
+        catalogAuthorityPort: new CatalogPort([]),
+        promotionAuthorityPort: {
+          async resolvePromotion() {
+            return {
+              allowed: false,
+              authorityVersion: 'production-hold-test-v1',
+            };
+          },
+        },
+        renderer,
+        persistence,
+        allowedSuggestedActionKeys: [],
+      }),
+    ).rejects.toMatchObject({
+      stage: 'receive',
+    });
+
+    expect(persistence.events).toEqual([]);
+    expect(renderer.calls).toEqual([]);
+  });
+
 });
