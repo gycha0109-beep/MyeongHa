@@ -5,13 +5,13 @@ psql_base=(psql -X -q -v ON_ERROR_STOP=1)
 fail() { echo "FAIL $*" >&2; exit 1; }
 pass() { echo "PASS $*"; }
 
-query() { "\${psql_base[@]}" -Atc "$1"; }
+query() { "${psql_base[@]}" -Atc "$1"; }
 
 expect_failure_stdin() {
   local expected="$1"
   local tmp
   tmp="$(mktemp)"
-  if "\${psql_base[@]}" >"$tmp" 2>&1; then
+  if "${psql_base[@]}" >"$tmp" 2>&1; then
     cat "$tmp" >&2
     rm -f "$tmp"
     fail "expected SQL failure containing: $expected"
@@ -30,7 +30,7 @@ expect_failure_stdin() {
 [[ "$(query "select has_table_privilege('myeongha_content_operator','public.character_fact_registry','INSERT')::int;")" == '0' ]] || fail "operator can bypass publication command"
 pass "registry authority is function-bounded"
 
-"\${psql_base[@]}" -At <<'SQL' >/tmp/character-fact-bundle.out
+"${psql_base[@]}" -At <<'SQL' >/tmp/character-fact-bundle.out
 set role myeongha_content_operator;
 select public.cmd_publish_character_content_bundle_v1(
   '13060000-0000-0000-0000-000000000001'::uuid,
@@ -54,7 +54,7 @@ rm -f /tmp/character-fact-bundle.out
 [[ "$bundle_id" == '13060000-0000-0000-0000-000000000001' ]] || fail "bundle publication failed"
 
 publish_registry() {
-  "\${psql_base[@]}" -At <<'SQL' | tail -n1
+  "${psql_base[@]}" -At <<'SQL' | tail -n1
 set role myeongha_content_operator;
 select public.cmd_publish_character_fact_registry_v1(
   '13060000-0000-0000-0000-000000000001'::uuid,
@@ -91,7 +91,7 @@ where content_bundle_id = '13060000-0000-0000-0000-000000000001'
 SQL
 pass "published registry cannot be changed"
 
-"\${psql_base[@]}" -At <<'SQL' >/dev/null
+"${psql_base[@]}" -At <<'SQL' >/dev/null
 set role myeongha_content_operator;
 select public.cmd_create_content_release_v1(
   '13061000-0000-0000-0000-000000000001'::uuid,
@@ -108,7 +108,7 @@ select public.cmd_activate_content_release_v1(
 reset role;
 SQL
 
-read_shape="$("\${psql_base[@]}" -At <<'SQL' | tail -n1
+read_shape="$("${psql_base[@]}" -At <<'SQL' | tail -n1
 set role myeongha_api_executor;
 select
   release_id::text||'|'||character_id||'|'||fact_key||'|'||
@@ -124,7 +124,7 @@ SQL
 )"
 [[ "$read_shape" == '13061000-0000-0000-0000-000000000001|fact-seyeon|identity.name|CANON|KNOWN|PUBLIC|1|세연' ]] || fail "release-pinned read mismatch: $read_shape"
 
-unresolved_shape="$("\${psql_base[@]}" -At <<'SQL' | tail -n1
+unresolved_shape="$("${psql_base[@]}" -At <<'SQL' | tail -n1
 set role myeongha_api_executor;
 select source_authority||'|'||has_value::int||'|'||(value_jsonb is null)::int
 from public.qry_character_fact_registry_v1(
