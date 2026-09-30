@@ -225,6 +225,12 @@ function validateAttempt(attempt: CharacterProductionAttemptV1): CharacterProduc
       'Character turn attempt authority returned an invalid replay marker.',
     );
   }
+  if (attempt.replayed) {
+    throw new CharacterStandardReadingProductionTurnErrorV1(
+      'attempt',
+      'An uncommitted Character turn attempt is already in flight; Production orchestration must not regenerate it.',
+    );
+  }
   return attempt;
 }
 
