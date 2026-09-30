@@ -88,7 +88,7 @@ Memory / Relation = 사용자와 실제로 무엇이 있었는가
 
 기본 Closure 대상 예:
 
-- 정확한 나이 또는 명시적인 age policy
+- 생년월일 또는 Canon 기준시점과 연결된 명시적인 age policy
 - 생일
 - 혈액형
 - 출생 / 성장 지역
@@ -102,6 +102,17 @@ Memory / Relation = 사용자와 실제로 무엇이 있었는가
 - 현재 중요한 비사용자 인간관계
 - 현재 책임 / 의무
 - MBTI 경험 / self-report policy
+
+### Age Policy
+
+명하와 현실은 같은 역사시간을 공유하고 인간은 정상적으로 나이를 먹으므로, age를 영구 고정 숫자로만 두지 않는다.
+
+권장 authority는 다음 순서다.
+
+1. 출생일이 Canon으로 닫혀 있으면 birth_date를 기준으로 현재 연령을 파생한다.
+2. 출생연도가 아직 닫히지 않았다면 canon_epoch + age_at_canon_epoch로 기준시점 연령을 보존한다.
+3. 25세 같은 값이 특정 Canon epoch의 값이라면 그것이 영구적으로 고정된 나이라는 의미로 재사용하지 않는다.
+4. Runtime은 World time authority 없이 출생연도나 현재 나이를 임의 역산·확정하지 않는다.
 
 이 목록은 trivia를 강제하기 위한 것이 아니다.
 

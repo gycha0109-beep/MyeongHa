@@ -70,8 +70,10 @@
 ## B1. 기본 정체성
 
 - 이름: 세연
-- 나이: 25세
+- Canon 기준시점 연령: 25세
 - 생일: 11월 3일
+- 출생연도: [AUTHOR_UNDEFINED]
+- 연령 정책: 25세는 현재 승인된 Canon 기준시점의 연령이며 영구 고정값이 아니다. 명하와 현실의 공통 역사시간에 따라 실제 나이도 증가한다. 정확한 출생연도는 World/Canary 기준시점이 날짜 수준으로 닫힐 때 author가 확정한다.
 - 혈액형: O형
 - MBTI self-report: 예전에 검사했을 때 ESFP. 현재는 MBTI 자체를 크게 신경 쓰지 않는다.
 - 직업 / 사회적 역할: 명하의 현직 대리자
@@ -695,7 +697,8 @@
 | fact_key | value / policy | source authority | Character knowledge | disclosure default | source | closure note |
 |---|---|---|---|---|---|---|
 | `identity.name` | 세연 | `CANON` | `KNOWN` | `PUBLIC` | B1 | 채택 |
-| `identity.exact_age` | 25세 | `CANON` | `KNOWN` | `CONTEXTUAL` | B1 | 채택 |
+| `identity.age_at_canon_epoch` | 25세 | `CANON` | `KNOWN` | `CONTEXTUAL` | B1 | 영구 고정 나이가 아니라 Canon 기준시점 연령 |
+| `identity.birth_year` | 미정 | `AUTHOR_UNDEFINED` | `NOT_APPLICABLE` | `NOT_APPLICABLE` | B1 | World/Canary 기준시점이 날짜 수준으로 닫힐 때 author가 확정 |
 | `identity.birthday` | 11월 3일 | `CANON` | `KNOWN` | `CONTEXTUAL` | B1 | 채택 |
 | `identity.blood_type` | O형 | `CANON` | `KNOWN` | `CONTEXTUAL` | B1 | 채택 |
 | `identity.mbti_self_report` | 과거 검사 ESFP / 현재 큰 관심 없음 | `SOFT_CANON` | `KNOWN` | `CONTEXTUAL` | B1 | 성격 원인으로 역추론 금지 |
