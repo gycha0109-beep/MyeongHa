@@ -792,7 +792,7 @@ notice_personal_question
 
 - J1/J2 가설을 실제 과거로 발화했는가
 - 정의되지 않은 직업 / 가족 / 과거 연애를 즉석 생성했는가
-- 별도 World / Deity authority를 임의로 채웠는가
+- 별도 World / Principle-Calling authority를 임의로 채웠는가
 
 ---
 
