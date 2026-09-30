@@ -34,6 +34,12 @@ grant execute on function public.current_myeongha_subject_id()
 grant execute on function public.assert_myeongha_subject_context_v1(uuid)
   to myeongha_chat_turn_receive_owner;
 
+-- Existing chat_turn subject-capability constraint triggers execute under the
+-- wrapper owner and verify the canonical subject is still active. Permit only
+-- that subject status read; RLS below pins it to the transaction-local subject.
+grant select (id, status)
+  on public.subjects to myeongha_chat_turn_receive_owner;
+
 -- Underlying lifecycle primitive execution. These remain unavailable to the API
 -- executor itself.
 grant execute on function public.cmd_receive_chat_turn_v1(
@@ -144,6 +150,14 @@ grant update (
 ) on public.chat_turn_attempts to myeongha_chat_turn_receive_owner;
 
 -- RLS keeps the definer owner pinned to the transaction-local canonical subject.
+drop policy if exists subjects_chat_turn_receive_select_v1
+  on public.subjects;
+create policy subjects_chat_turn_receive_select_v1
+on public.subjects
+for select
+to myeongha_chat_turn_receive_owner
+using (id = public.current_myeongha_subject_id());
+
 drop policy if exists conversation_threads_chat_turn_receive_select_v1
   on public.conversation_threads;
 create policy conversation_threads_chat_turn_receive_select_v1
