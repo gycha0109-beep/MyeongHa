@@ -77,6 +77,7 @@ type CommittedRowV1 = Readonly<{
 interface GeneratedAttemptStateV1 {
   readonly generatedContentHash: string;
   readonly groundingIds: readonly string[];
+  readonly characterId: string;
 }
 
 const READ_COMMITTED_SQL = `
@@ -443,7 +444,11 @@ implements CharacterProductionTurnPersistencePortV1 {
 
     this.#generatedByAttempt.set(
       input.attemptId,
-      Object.freeze({ generatedContentHash: contentHash, groundingIds }),
+      Object.freeze({
+        generatedContentHash: contentHash,
+        groundingIds,
+        characterId: input.characterId,
+      }),
     );
   }
 
@@ -479,7 +484,7 @@ implements CharacterProductionTurnPersistencePortV1 {
         this.input.outputGuardPromptVersion,
         'outputGuardPromptVersion',
       ),
-      null,
+      generated.characterId,
       JSON.stringify({
         schemaVersion: 'v1',
         generatedContentHash: contentHash,
