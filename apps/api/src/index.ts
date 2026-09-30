@@ -769,3 +769,23 @@ export {
   type ProductionReaderInterpretationActivationSummaryV1,
   type RunProductionReaderInterpretationPreviewHttpInputV1,
 } from './production-reader-interpretation-activation.js';
+
+
+export {
+  CHARACTER_PUBLIC_FACT_CATALOG_MAX_ROWS_V1,
+  CharacterPublicFactCatalogAuthorityErrorV1,
+  getCharacterPublicFactCatalogV1,
+  type CharacterPublicFactCatalogAuthorityErrorCodeV1,
+  type CharacterPublicFactCatalogReadAuthorityPortV1,
+  type CharacterPublicFactCatalogRowV1,
+} from './character-public-fact-catalog-authority.js';
+
+export {
+  createPostgresCharacterPublicFactCatalogReadAuthorityPortV1,
+} from './postgres-character-public-fact-catalog-authority.js';
+
+export {
+  CharacterStandardReadingPublicFactCatalogRendererContextErrorV1,
+  prepareCharacterStandardReadingRendererContextFromPublicCatalogV1,
+  type CharacterStandardReadingPublicFactCatalogRendererContextV1,
+} from './character-standard-reading-public-fact-catalog-context.js';
