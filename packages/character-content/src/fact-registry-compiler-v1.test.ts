@@ -63,6 +63,7 @@ describe('Character fact registry compiler v1', () => {
         sourceSection: 'J1',
         sourceBibleDocument: 'SEYEON_CHARACTER_BIBLE_DRAFT_V0_2.md',
         sourceBibleRevision: 'abc123',
+        policy: '미정',
         closureNote: '생활권 이동 가설은 HYPOTHESIS이며 authority 아님',
       },
       {
@@ -74,6 +75,7 @@ describe('Character fact registry compiler v1', () => {
         sourceSection: 'World/Principle-Calling',
         sourceBibleDocument: 'SEYEON_CHARACTER_BIBLE_DRAFT_V0_2.md',
         sourceBibleRevision: 'abc123',
+        policy: '별도 World authority',
         closureNote: '미정 유지',
       },
     ]);
