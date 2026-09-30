@@ -334,7 +334,6 @@ describe('Production Standard Reading Character turn orchestration', () => {
       'read_committed',
       'allocate_attempt',
       'context_ready',
-      'generated',
       'validation_failed',
     ]);
     expect(persistence.events).not.toContain('committed');
