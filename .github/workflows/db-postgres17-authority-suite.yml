@@ -9,6 +9,7 @@ on:
       - 'test/db/birth_profile_create_runtime_authority.sh'
       - 'test/db/content_release_lifecycle_authority.sh'
       - 'test/db/character_fact_registry_runtime_authority.sh'
+      - 'test/db/character_standard_reading_chat_execution_hold_authority.sh'
       - 'test/db/character_fact_registry_runtime_authority.sh'
       - 'test/db/member_character_thread_open_concurrency.sh'
       - 'docs/CHARACTER_GATE_B_PUBLICATION_BLOCKER_EVIDENCE.md'
@@ -45,6 +46,7 @@ jobs:
           - birth-profile-create-runtime-authority
           - content-release-lifecycle
           - character-fact-registry-runtime-authority
+          - character-standard-reading-chat-execution-hold-authority
           - member-character-thread-open
     services:
       postgres:
