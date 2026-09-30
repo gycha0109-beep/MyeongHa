@@ -4,6 +4,16 @@ import type {
 
 export const CHARACTER_PUBLIC_FACT_CATALOG_MAX_ROWS_V1 = 64 as const;
 
+export type CharacterPublicFactCatalogRowV1 = Omit<
+  CharacterFactRegistryAuthorityRowV1,
+  'sourceAuthority' | 'characterKnowledge' | 'disclosureDefault' | 'value'
+> & {
+  readonly sourceAuthority: 'CANON' | 'SOFT_CANON';
+  readonly characterKnowledge: 'KNOWN';
+  readonly disclosureDefault: 'PUBLIC';
+  readonly value: unknown;
+};
+
 export interface CharacterPublicFactCatalogReadAuthorityPortV1 {
   readPublicFacts(input: {
     readonly releaseId: string;
@@ -59,7 +69,7 @@ export async function getCharacterPublicFactCatalogV1(input: {
   readonly releaseId: string;
   readonly characterId: string;
   readonly authorityPort: CharacterPublicFactCatalogReadAuthorityPortV1;
-}): Promise<readonly CharacterFactRegistryAuthorityRowV1[]> {
+}): Promise<readonly CharacterPublicFactCatalogRowV1[]> {
   const releaseId = requiredSelector(input.releaseId, 'releaseId');
   const characterId = requiredSelector(input.characterId, 'characterId');
 
@@ -126,7 +136,14 @@ export async function getCharacterPublicFactCatalogV1(input: {
       `rows[${index}].sourceBibleRevision`,
     );
 
-    return Object.freeze({ ...row, factKey });
+    return Object.freeze({
+      ...row,
+      factKey,
+      sourceAuthority: row.sourceAuthority,
+      characterKnowledge: 'KNOWN' as const,
+      disclosureDefault: 'PUBLIC' as const,
+      value: row.value,
+    }) satisfies CharacterPublicFactCatalogRowV1;
   });
 
   return Object.freeze(validated);
