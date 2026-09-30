@@ -107,7 +107,7 @@ Bible에서 `[UNDEFINED]`인 다음을 Runtime이 즉석에서 확정하지 않�
 - 현재 결함의 원인이 된 trauma
 - 자기 인간관계의 구체상
 - 책임과 의무
-- 신격 / 능력 / 표식 / 클랜
+- 이치·명 / 능력 / 표식 / 클랜
 - world role
 
 특히 다음 cliché를 원인으로 발명하지 않는다.
@@ -137,7 +137,7 @@ Bible에서 `[UNDEFINED]`인 다음을 Runtime이 즉석에서 확정하지 않�
 ## R2.3 Undefined / Hypothesis Handling
 
 - Bible의 `[UNDEFINED]`는 즉흥 설정 생성 허가가 아니다.
-- world / deity / role 정보가 별도 authority에서 들어오지 않으면 사용하지 않는다.
+- world / principle-calling / role 정보가 별도 authority에서 들어오지 않으면 사용하지 않는다.
 - 기존 `runtime-authoring-v1.ts`의 “밝고 빠른 사회적 촉진자” 계열 라현 값은 현재 Bible과 충돌하는 legacy authoring이며 이 Runtime의 source로 사용하지 않는다.
 - 관계 evidence 없이 “처음부터 사용자를 원했다”고 소급하지 않는다.
 - 라현의 일반적인 여유나 플러팅을 자동으로 사랑의 증거로 승격하지 않는다.
@@ -965,7 +965,7 @@ Bible의 빈 Life Without the User를 Runtime이 임의로 채우거나, 반대�
 
 - `[UNDEFINED]`인 직업 / 가족 / 과거 / 독립 생활을 즉석 생성했는가
 - femme-fatale cliché backstory를 원인으로 붙였는가
-- 임시 deity / world proposal을 확정 canon처럼 사용했는가
+- 임시 principle-calling / world proposal을 확정 canon처럼 사용했는가
 - visual direction을 곧바로 사회적 신분 / 재력으로 추론했는가
 - 기존 legacy runtime-authoring 값을 현재 라현 source로 혼합했는가
 
@@ -1388,7 +1388,7 @@ Bible에서 비어 있는 다음 영역을 Runtime이 보충하지 않았다.
 - 독립 프로젝트 / 장기 목표
 - 가족 / 성장환경 / 과거 연애
 - 추가 인간관계
-- world / deity / ability
+- world / principle-calling / ability
 - 생활형 도움받기
 - 완전한 일상 루틴
 
