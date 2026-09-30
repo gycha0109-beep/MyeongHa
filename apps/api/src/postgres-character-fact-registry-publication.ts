@@ -69,6 +69,9 @@ function publicationPayload(
       'sourceBibleRevision',
     ),
     ...('value' in row ? { value: row.value } : {}),
+    ...(row.policy === undefined
+      ? {}
+      : { policy: requiredText(row.policy, 'policy') }),
     ...(row.closureNote === undefined
       ? {}
       : { closureNote: requiredText(row.closureNote, 'closureNote') }),
