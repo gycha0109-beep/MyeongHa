@@ -87,7 +87,6 @@ const forbiddenWorkflowFragments = [
   'uses: actions/upload-artifact@v7',
   'uses: actions/checkout@v4',
   'uses: actions/upload-artifact@v4',
-  'service_role',
   'sslmode=disable',
   'sslmode=require',
   'sslmode=prefer',
@@ -111,6 +110,9 @@ for (const fragment of forbiddenWorkflowFragments) {
   if (contract.includes(fragment)) {
     throw new Error(`Forbidden production backup workflow fragment: ${fragment}`);
   }
+}
+if ((workflow + '\n' + runner).includes('service_role')) {
+  throw new Error('Production backup workflow/runner must not consume service_role credentials.');
 }
 if (runner.includes('pg_dump ') || runner.includes('pg_dumpall ')) {
   throw new Error('Production backup runner must route dump execution through the strict Docker helper.');
