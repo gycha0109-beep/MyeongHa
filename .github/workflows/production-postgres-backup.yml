@@ -17,6 +17,7 @@ concurrency:
 env:
   SUPABASE_PROJECT_ID: cnsfpcdiyofqvhpcegfc
   SUPABASE_CLI_VERSION: '2.117.0'
+  SUPABASE_POSTGRES_IMAGE: 'supabase/postgres:17.6.1.167'
   BACKUP_RETENTION_DAYS: '30'
 
 jobs:
@@ -66,16 +67,15 @@ jobs:
           echo "::add-mask::$SUPABASE_DB_PASSWORD"
           echo "::add-mask::$MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE"
 
-      - name: Verify Docker, PostgreSQL client, and pinned Supabase CLI
+      - name: Verify Docker, PostgreSQL client, and pinned backup image
         shell: bash
         run: |
           set -euo pipefail
           docker info >/dev/null
+          docker pull "$SUPABASE_POSTGRES_IMAGE" >/dev/null
           sudo apt-get update
           sudo apt-get install -y postgresql-client
           psql --version
-          cli_version="$(npx --yes "supabase@$SUPABASE_CLI_VERSION" --version)"
-          [[ "$cli_version" == "$SUPABASE_CLI_VERSION" ]]
 
       - name: Bind governed production Session Pooler endpoint
         id: database

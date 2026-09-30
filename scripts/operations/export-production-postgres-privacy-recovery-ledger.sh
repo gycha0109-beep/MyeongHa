@@ -24,17 +24,13 @@ node scripts/operations/prepare-production-postgres-strict-libpq.mjs \
   --principal "$admin_pool_user" \
   --port '5432' \
   --database 'postgres'
+export PGHOST="$SUPABASE_PRODUCTION_SESSION_POOLER_HOST"
+export PGPORT='5432'
+export PGUSER="$admin_pool_user"
+export PGPASSWORD="$SUPABASE_DB_PASSWORD"
+export PGDATABASE='postgres'
 export PGSSLMODE='verify-full'
 export PGSSLROOTCERT="$root_certificate_file"
-
-encoded_password="$(python3 - <<'PY'
-import os
-import urllib.parse
-print(urllib.parse.quote(os.environ['SUPABASE_DB_PASSWORD'], safe=''))
-PY
-)"
-db_url="postgresql://${admin_pool_user}:${encoded_password}@${SUPABASE_PRODUCTION_SESSION_POOLER_HOST}:5432/postgres"
-echo "::add-mask::$db_url"
 
 export PGOPTIONS='-c statement_timeout=30000 -c lock_timeout=5000 -c idle_in_transaction_session_timeout=30000'
 
@@ -241,7 +237,7 @@ rollback;
 SQL
 )"
 
-if ! printf '%s\n' "$sql" | psql "$db_url" -X -qAt \
+if ! printf '%s\n' "$sql" | psql -X -qAt \
   -v ON_ERROR_STOP=1 \
   -v "cutoff=$BACKUP_COMPLETED_AT_UTC" \
   -v "captured=$captured_at_utc" > "$raw_source"; then

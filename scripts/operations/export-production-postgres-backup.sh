@@ -21,22 +21,18 @@ node scripts/operations/prepare-production-postgres-strict-libpq.mjs \
   --principal "$ADMIN_POOL_USER" \
   --port "$POOL_PORT" \
   --database "$POOL_DB"
+export PGHOST="$POOL_HOST"
+export PGPORT="$POOL_PORT"
+export PGUSER="$ADMIN_POOL_USER"
+export PGPASSWORD="$SUPABASE_DB_PASSWORD"
+export PGDATABASE="$POOL_DB"
 export PGSSLMODE='verify-full'
 export PGSSLROOTCERT="$root_certificate_file"
-
-encoded_password="$(python3 - <<'PY'
-import os
-import urllib.parse
-print(urllib.parse.quote(os.environ['SUPABASE_DB_PASSWORD'], safe=''))
-PY
-)"
-db_url="postgresql://${ADMIN_POOL_USER}:${encoded_password}@${POOL_HOST}:${POOL_PORT}/${POOL_DB}"
-echo "::add-mask::$db_url"
 
 started_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
 backup_stamp="$(date -u +'%Y%m%dT%H%M%SZ')"
 
-migration_frontier="$(psql "$db_url" -At --set ON_ERROR_STOP=1 -c "
+migration_frontier="$(psql -At --set ON_ERROR_STOP=1 -c "
   select max(version::bigint)
   from supabase_migrations.schema_migrations
   where version ~ '^[0-9]+$';
@@ -44,7 +40,7 @@ migration_frontier="$(psql "$db_url" -At --set ON_ERROR_STOP=1 -c "
 [[ "$migration_frontier" =~ ^[0-9]+$ ]]
 (( migration_frontier >= 1310 ))
 
-member_auth_rate_limit_preflight="$(psql "$db_url" -At --set ON_ERROR_STOP=1 -F '|' -c "
+member_auth_rate_limit_preflight="$(psql -At --set ON_ERROR_STOP=1 -F '|' -c "
   select
     (select c.relpersistence
        from pg_catalog.pg_class c
@@ -78,21 +74,9 @@ member_auth_rate_limit_preflight="$(psql "$db_url" -At --set ON_ERROR_STOP=1 -F 
 ")"
 [[ "$member_auth_rate_limit_preflight" == 'u|myeongha_member_auth_rate_limit_owner|myeongha_member_auth_rate_limit_owner|t|f' ]]
 
-npx --yes "supabase@$SUPABASE_CLI_VERSION" db dump \
-  --db-url "$db_url" \
-  -f "$backup_dir/roles.sql" \
-  --role-only
-npx --yes "supabase@$SUPABASE_CLI_VERSION" db dump \
-  --db-url "$db_url" \
-  -f "$backup_dir/schema.sql"
-npx --yes "supabase@$SUPABASE_CLI_VERSION" db dump \
-  --db-url "$db_url" \
-  -f "$backup_dir/data.sql" \
-  --use-copy \
-  --data-only \
-  -x 'storage.buckets_vectors' \
-  -x 'storage.vector_indexes' \
-  -x 'public.member_auth_rate_limit_buckets'
+bash scripts/operations/run-production-postgres-strict-dump.sh roles "$backup_dir/roles.sql"
+bash scripts/operations/run-production-postgres-strict-dump.sh schema "$backup_dir/schema.sql"
+bash scripts/operations/run-production-postgres-strict-dump.sh data "$backup_dir/data.sql"
 
 test -s "$backup_dir/roles.sql"
 test -s "$backup_dir/schema.sql"
