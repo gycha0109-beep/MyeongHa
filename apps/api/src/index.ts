@@ -805,3 +805,19 @@ export {
   type PersistPreparedChatReceiveResultV1,
   type AllocateChatTurnAttemptRuntimeResultV1,
 } from './postgres-chat-turn-receive-runtime.js';
+
+
+export {
+  CHAT_TURN_GENERATED_RUNTIME_AUTHORITY_BINDING_V1,
+  CHAT_TURN_VALIDATED_RUNTIME_AUTHORITY_BINDING_V1,
+  CHAT_TURN_COMMIT_NO_EFFECTS_RUNTIME_AUTHORITY_BINDING_V1,
+  CHARACTER_DIALOGUE_MESSAGE_SCHEMA_VERSION_V1,
+  ChatTurnGenerationRuntimeAuthorityErrorV1,
+  projectCharacterDialogueEnvelopeBodyTextV1,
+  projectValidatedCharacterDialogueForPersistenceV1,
+  persistValidatedCharacterGenerationV1,
+  commitCharacterChatTurnNoEffectsV1,
+  type CharacterDialoguePersistenceProjectionV1,
+  type PersistValidatedCharacterGenerationResultV1,
+  type CommitCharacterChatTurnNoEffectsResultV1,
+} from './postgres-chat-turn-generation-runtime.js';
