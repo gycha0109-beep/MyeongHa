@@ -232,4 +232,63 @@ describe('mobile existing-Member session coordinator', () => {
       coordinator.withMemberBearer(async () => 'unexpected'),
     ).rejects.toMatchObject({ code: 'MOBILE_MEMBER_SESSION_REQUIRED' });
   });
+  it('serializes refresh and sign-in so a newer explicit login generation wins', async () => {
+    const store = createMobileMemberSessionStoreV1(createMemorySecureStore());
+    await store.write(session({ expiresAt: '2026-09-30T01:00:30.000Z' }));
+
+    let releaseRefresh!: () => void;
+    const refreshGate = new Promise<void>((resolve) => { releaseRefresh = resolve; });
+    const client = new MyeongHaApiClientV1({
+      origin: 'https://myeongha.test',
+      fetchImpl: async (input) => {
+        const path = new URL(String(input)).pathname;
+        if (path === '/api/auth/refresh') {
+          await refreshGate;
+          return success({
+            status: 'authenticated',
+            session: session({
+              access: 'access-refreshed',
+              refresh: 'refresh-refreshed',
+              expiresAt: '2026-09-30T02:00:00.000Z',
+            }),
+          });
+        }
+        if (path === '/api/auth/sign-in') {
+          return success({
+            status: 'authenticated',
+            session: session({
+              access: 'access-login',
+              refresh: 'refresh-login',
+              expiresAt: '2026-09-30T03:00:00.000Z',
+            }),
+            passwordCompromiseCheck: 'safe',
+          });
+        }
+        throw new Error('unexpected path');
+      },
+    });
+    const coordinator = createMobileMemberSessionCoordinatorV1({
+      client,
+      store,
+      nowEpochMs: () => Date.parse('2026-09-30T01:00:00.000Z'),
+    });
+
+    const refreshing = coordinator.getAccessToken();
+    const signingIn = coordinator.signIn({
+      email: 'member@example.com',
+      password: 'secret',
+    });
+    releaseRefresh();
+
+    await expect(refreshing).resolves.toBe('access-refreshed');
+    await expect(signingIn).resolves.toMatchObject({
+      accessToken: 'access-login',
+      refreshToken: 'refresh-login',
+    });
+    await expect(coordinator.readSession()).resolves.toMatchObject({
+      accessToken: 'access-login',
+      refreshToken: 'refresh-login',
+    });
+  });
+
 });
