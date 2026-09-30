@@ -42,6 +42,7 @@ export interface CharacterFactRegistryPublicationRowV1 {
   readonly sourceBibleDocument: string;
   readonly sourceBibleRevision: string;
   readonly value?: string;
+  readonly policy?: string;
   readonly closureNote?: string;
 }
 
@@ -119,7 +120,8 @@ function resolvedAuthority(sourceAuthority: CharacterFactSourceAuthorityV1): boo
  *
  * It does not infer facts from prose, fix missing authoring, or interpret
  * Principle/Calling. Resolved values are preserved as the appendix's exact
- * value/policy cell text. Unresolved authority rows carry no value.
+ * value/policy cell text. Unresolved authority rows carry no value; the same
+ * explicit cell is preserved only as policy metadata.
  */
 export function compileCharacterFactRegistryFromBibleV1(input: {
   readonly characterId: string;
@@ -231,7 +233,7 @@ export function compileCharacterFactRegistryFromBibleV1(input: {
       sourceBibleRevision,
       ...(resolvedAuthority(sourceAuthority)
         ? { value: valueOrPolicy }
-        : {}),
+        : { policy: valueOrPolicy }),
       ...(closureNote.length === 0 ? {} : { closureNote }),
     }));
   }
