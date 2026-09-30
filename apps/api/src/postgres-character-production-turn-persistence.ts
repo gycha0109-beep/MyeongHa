@@ -470,6 +470,7 @@ implements CharacterProductionTurnPersistencePortV1 {
         JSON.stringify({
           schemaVersion: 'v1',
           source: 'server-admitted-character-runtime',
+          readingId,
         }),
         JSON.stringify(outputRef),
         JSON.stringify(groundingIds),
@@ -537,6 +538,7 @@ implements CharacterProductionTurnPersistencePortV1 {
         generated.characterId,
         JSON.stringify({
           schemaVersion: 'v1',
+          readingId: generated.readingId,
           generatedContentHash: contentHash,
         }),
         JSON.stringify({ generatedContentHash: contentHash }),
