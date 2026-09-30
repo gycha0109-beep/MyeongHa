@@ -299,14 +299,9 @@ class Persistence implements CharacterStandardReadingTurnPersistenceAuthorityPor
     this.events.push('context_ready');
   }
 
-  async commitValidatedEnvelope(input: {
-    readonly turnId: string;
-    readonly attemptId: string;
-    readonly providerKey: string;
-    readonly modelKey: string;
-    readonly envelope: CharacterDialogueEnvelopeV1;
-    readonly envelopeHash: string;
-  }): Promise<CharacterStandardReadingCommittedTurnV1> {
+  async commitValidatedEnvelope(
+    input: Parameters<CharacterStandardReadingTurnPersistenceAuthorityPortV1['commitValidatedEnvelope']>[0],
+  ): Promise<CharacterStandardReadingCommittedTurnV1> {
     this.events.push('commit');
     return {
       turnId: input.turnId,
