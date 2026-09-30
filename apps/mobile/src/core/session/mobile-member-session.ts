@@ -3,6 +3,7 @@ import {
   isMemberSessionExpiredV1,
   isMemberSessionRefreshDueV1,
   refreshMemberSessionV1,
+  sameMemberSessionGenerationV1,
   signInMemberV1,
   signOutMemberV1,
   type MemberSessionV1,
@@ -61,22 +62,42 @@ export function createMobileMemberSessionCoordinatorV1(input: {
   const nowEpochMs = input.nowEpochMs ?? Date.now;
   const refreshSkewMs = input.refreshSkewMs ?? 60_000;
   let refreshInFlight: Promise<MemberSessionV1 | null> | null = null;
+  let mutationQueue: Promise<void> = Promise.resolve();
+
+  function withMemberMutationLock<T>(operation: () => Promise<T>): Promise<T> {
+    const pending = mutationQueue.then(operation, operation);
+    mutationQueue = pending.then(
+      () => undefined,
+      () => undefined,
+    );
+    return pending;
+  }
 
   async function refreshExact(
     current: MemberSessionV1,
   ): Promise<MemberSessionV1 | null> {
-    try {
-      const refreshed = await refreshMemberSessionV1(
-        input.client,
-        current.refreshToken,
-      );
-      return input.store.replace(current, refreshed);
-    } catch (error) {
-      if (isSessionExpiredError(error)) {
-        await input.store.clear(current);
+    return withMemberMutationLock(async () => {
+      const latest = await input.store.read();
+      if (
+        latest === null ||
+        !sameMemberSessionGenerationV1(latest, current)
+      ) {
+        return latest;
       }
-      throw error;
-    }
+
+      try {
+        const refreshed = await refreshMemberSessionV1(
+          input.client,
+          current.refreshToken,
+        );
+        return input.store.replace(current, refreshed);
+      } catch (error) {
+        if (isSessionExpiredError(error)) {
+          await input.store.clear(current);
+        }
+        throw error;
+      }
+    });
   }
 
   async function refreshCurrent(
@@ -125,8 +146,10 @@ export function createMobileMemberSessionCoordinatorV1(input: {
   async function signIn(
     credentials: Readonly<{ email: string; password: string }>,
   ): Promise<MemberSessionV1> {
-    const result = await signInMemberV1(input.client, credentials);
-    return input.store.write(result.session);
+    return withMemberMutationLock(async () => {
+      const result = await signInMemberV1(input.client, credentials);
+      return input.store.write(result.session);
+    });
   }
 
   async function forceRefreshForRejectedBearer(
@@ -174,22 +197,24 @@ export function createMobileMemberSessionCoordinatorV1(input: {
   }
 
   async function signOut(): Promise<void> {
-    const current = await input.store.read();
-    if (current !== null) {
-      try {
-        await signOutMemberV1(input.client, current.accessToken);
-      } catch {
-        // Local sign-out remains authoritative for this device when local authority can be cleared.
+    return withMemberMutationLock(async () => {
+      const current = await input.store.read();
+      if (current !== null) {
+        try {
+          await signOutMemberV1(input.client, current.accessToken);
+        } catch {
+          // Local sign-out remains authoritative for this device when local authority can be cleared.
+        }
       }
-    }
 
-    const cleared = await input.store.clear(current ?? undefined);
-    if (!cleared) {
-      throw new MobileMemberSessionErrorV1(
-        'MOBILE_MEMBER_SESSION_CLEAR_FAILED',
-        '로그인 세션을 기기에서 안전하게 제거하지 못했습니다.',
-      );
-    }
+      const cleared = await input.store.clear(current ?? undefined);
+      if (!cleared) {
+        throw new MobileMemberSessionErrorV1(
+          'MOBILE_MEMBER_SESSION_CLEAR_FAILED',
+          '로그인 세션을 기기에서 안전하게 제거하지 못했습니다.',
+        );
+      }
+    });
   }
 
   return Object.freeze({
