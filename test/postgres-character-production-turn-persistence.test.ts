@@ -9,7 +9,8 @@ import {
   type CharacterProductionFailurePolicyV1,
 } from '../apps/api/src/postgres-character-production-turn-persistence.js';
 import type {
-  PostgresTransactionQueryV1,
+  PostgresSubjectConnectionV1,
+  PostgresSubjectPoolV1,
 } from '../apps/api/src/postgres-subject-execution.js';
 import { createHash } from 'node:crypto';
 
@@ -39,44 +40,82 @@ function envelope(): CharacterDialogueEnvelopeV1 {
   });
 }
 
-class RecordingClient implements PostgresTransactionQueryV1 {
+class RecordingPool implements PostgresSubjectPoolV1 {
   readonly calls: { text: string; values: readonly unknown[] }[] = [];
+  readonly transactionGroups: string[][] = [];
+  #activeGroup: string[] | null = null;
+  committedRow: Record<string, unknown> | null = null;
 
-  async query<Row = Record<string, unknown>>(
-    text: string,
-    values: readonly unknown[] = [],
-  ): Promise<{ rows: readonly Row[] }> {
-    this.calls.push({ text, values });
+  async connect(): Promise<PostgresSubjectConnectionV1> {
+    const pool = this;
+    return {
+      async query<Row = Record<string, unknown>>(
+        text: string,
+        values: readonly unknown[] = [],
+      ): Promise<{ rows: readonly Row[] }> {
+        pool.calls.push({ text, values });
 
-    if (text.includes('cmd_allocate_chat_turn_attempt_runtime_v1')) {
-      return {
-        rows: [{
-          attemptId: ATTEMPT_ID,
-          attemptNo: 1,
-          replayed: false,
-        }] as unknown as Row[],
-      };
-    }
+        if (text === 'BEGIN') {
+          pool.#activeGroup = ['BEGIN'];
+          pool.transactionGroups.push(pool.#activeGroup);
+          return { rows: [] };
+        }
+        pool.#activeGroup?.push(text);
+        if (text === 'COMMIT' || text === 'ROLLBACK') {
+          pool.#activeGroup = null;
+          return { rows: [] };
+        }
 
-    if (text.includes('cmd_commit_chat_turn_runtime_v1')) {
-      return {
-        rows: [{
-          turnId: TURN_ID,
-          attemptId: ATTEMPT_ID,
-          messageId: MESSAGE_ID,
-          sequenceNo: 2,
-          replayed: false,
-        }] as unknown as Row[],
-      };
-    }
+        if (text.includes('begin_member_subject_context_v1')) {
+          return {
+            rows: [{
+              subjectId: SUBJECT_ID,
+              subjectKind: 'member',
+            }] as unknown as Row[],
+          };
+        }
 
-    if (text.includes('qry_committed_chat_turn_runtime_v1')) {
-      return { rows: [] };
-    }
+        if (text.includes('cmd_allocate_chat_turn_attempt_runtime_v1')) {
+          return {
+            rows: [{
+              attemptId: ATTEMPT_ID,
+              attemptNo: 1,
+              replayed: false,
+            }] as unknown as Row[],
+          };
+        }
 
-    return { rows: [] };
+        if (text.includes('cmd_commit_chat_turn_runtime_v1')) {
+          return {
+            rows: [{
+              turnId: TURN_ID,
+              attemptId: ATTEMPT_ID,
+              messageId: MESSAGE_ID,
+              sequenceNo: 2,
+              replayed: false,
+            }] as unknown as Row[],
+          };
+        }
+
+        if (text.includes('qry_committed_chat_turn_runtime_v1')) {
+          return {
+            rows: (pool.committedRow === null
+              ? []
+              : [pool.committedRow]) as unknown as Row[],
+          };
+        }
+
+        return { rows: [] };
+      },
+      release() {},
+    };
   }
 }
+
+const verifiedEvidence = Object.freeze({
+  kind: 'member' as const,
+  verifiedAuthUserId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+});
 
 function uuids() {
   const values = [
@@ -105,10 +144,11 @@ const failurePolicy: CharacterProductionFailurePolicyV1 = {
 
 describe('PostgreSQL Production Character turn persistence', () => {
   it('pins one guarded-envelope hash across renderer, generated, guard, validation and commit', async () => {
-    const client = new RecordingClient();
+    const pool = new RecordingPool();
     const groundingCalls: unknown[] = [];
     const persistence = createPostgresCharacterProductionTurnPersistenceV1({
-      client,
+      pool,
+      verifiedEvidence,
       createUuid: uuids(),
       rendererVersion: 'renderer-runtime-v1',
       rendererPromptVersion: 'renderer-prompt-v1',
@@ -183,20 +223,20 @@ describe('PostgreSQL Production Character turn persistence', () => {
       .update(canonicalJson(guarded), 'utf8')
       .digest('hex')}`;
 
-    const rendererLog = client.calls.find(
+    const rendererLog = pool.calls.find(
       (call) =>
         call.text.includes('cmd_record_chat_success_ai_execution_runtime_v1') &&
         call.values[4] === 'renderer',
     );
-    const generated = client.calls.find((call) =>
+    const generated = pool.calls.find((call) =>
       call.text.includes('cmd_mark_chat_turn_generated_runtime_v1'),
     );
-    const guardLog = client.calls.find(
+    const guardLog = pool.calls.find(
       (call) =>
         call.text.includes('cmd_record_chat_success_ai_execution_runtime_v1') &&
         call.values[4] === 'output_guard',
     );
-    const validation = client.calls.find((call) =>
+    const validation = pool.calls.find((call) =>
       call.text.includes('cmd_validate_chat_turn_attempt_runtime_v1'),
     );
 
@@ -231,7 +271,14 @@ describe('PostgreSQL Production Character turn persistence', () => {
       characterId: 'seyeon',
     }]);
 
-    expect(client.calls.map((call) => {
+    expect(
+      pool.calls
+        .filter(
+          (call) =>
+            call.text.includes('cmd_') ||
+            call.text.includes('qry_committed_chat_turn_runtime_v1'),
+        )
+        .map((call) => {
       if (call.text.includes('qry_committed_chat_turn_runtime_v1')) return 'read';
       if (call.text.includes('cmd_allocate_chat_turn_attempt_runtime_v1')) return 'allocate';
       if (call.text.includes('cmd_mark_chat_turn_context_ready_runtime_v1')) return 'context';
@@ -247,7 +294,8 @@ describe('PostgreSQL Production Character turn persistence', () => {
       if (call.text.includes('cmd_validate_chat_turn_attempt_runtime_v1')) return 'validated';
       if (call.text.includes('cmd_commit_chat_turn_runtime_v1')) return 'committed';
       return 'other';
-    })).toEqual([
+        }),
+    ).toEqual([
       'allocate',
       'context',
       'renderer_log',
@@ -256,12 +304,46 @@ describe('PostgreSQL Production Character turn persistence', () => {
       'validated',
       'committed',
     ]);
+
+    expect(pool.transactionGroups).toHaveLength(5);
+    expect(
+      pool.transactionGroups.every(
+        (group) => group[0] === 'BEGIN' && group.at(-1) === 'COMMIT',
+      ),
+    ).toBe(true);
+
+    const generatedTransaction = pool.transactionGroups.find((group) =>
+      group.some((text) =>
+        text.includes('cmd_mark_chat_turn_generated_runtime_v1'),
+      ),
+    );
+    expect(
+      generatedTransaction?.filter(
+        (text) =>
+          text.includes('cmd_record_chat_success_ai_execution_runtime_v1') ||
+          text.includes('cmd_mark_chat_turn_generated_runtime_v1'),
+      ),
+    ).toHaveLength(2);
+
+    const validationTransaction = pool.transactionGroups.find((group) =>
+      group.some((text) =>
+        text.includes('cmd_validate_chat_turn_attempt_runtime_v1'),
+      ),
+    );
+    expect(
+      validationTransaction?.filter(
+        (text) =>
+          text.includes('cmd_record_chat_success_ai_execution_runtime_v1') ||
+          text.includes('cmd_validate_chat_turn_attempt_runtime_v1'),
+      ),
+    ).toHaveLength(2);
   });
 
   it('delegates retryability to the supplied failure policy instead of inferring it', async () => {
-    const client = new RecordingClient();
+    const pool = new RecordingPool();
     const persistence = createPostgresCharacterProductionTurnPersistenceV1({
-      client,
+      pool,
+      verifiedEvidence,
       createUuid: uuids(),
       rendererVersion: 'renderer-runtime-v1',
       rendererPromptVersion: 'renderer-prompt-v1',
@@ -287,7 +369,7 @@ describe('PostgreSQL Production Character turn persistence', () => {
       error: new Error('bad output'),
     });
 
-    const failures = client.calls.filter((call) =>
+    const failures = pool.calls.filter((call) =>
       call.text.includes('cmd_mark_chat_turn_failed_runtime_v1'),
     );
     expect(failures).toHaveLength(2);
@@ -302,9 +384,10 @@ describe('PostgreSQL Production Character turn persistence', () => {
   });
 
   it('rejects validation if the guarded envelope changes after generated staging', async () => {
-    const client = new RecordingClient();
+    const pool = new RecordingPool();
     const persistence = createPostgresCharacterProductionTurnPersistenceV1({
-      client,
+      pool,
+      verifiedEvidence,
       createUuid: uuids(),
       rendererVersion: 'renderer-runtime-v1',
       rendererPromptVersion: 'renderer-prompt-v1',
@@ -341,7 +424,7 @@ describe('PostgreSQL Production Character turn persistence', () => {
     ).rejects.toThrow(/changed after generated staging/u);
 
     expect(
-      client.calls.some(
+      pool.calls.some(
         (call) =>
           call.text.includes('cmd_record_chat_success_ai_execution_runtime_v1') &&
           call.values[4] === 'output_guard',
@@ -351,28 +434,21 @@ describe('PostgreSQL Production Character turn persistence', () => {
 
   it('reads only a committed character-dialogue-v1 payload', async () => {
     const guarded = envelope();
-    const client: PostgresTransactionQueryV1 = {
-      async query<Row>(text) {
-        if (!text.includes('qry_committed_chat_turn_runtime_v1')) {
-          return { rows: [] };
-        }
-        return {
-          rows: [{
-            turnId: TURN_ID,
-            attemptId: ATTEMPT_ID,
-            messageId: MESSAGE_ID,
-            sequenceNo: 2,
-            provider: 'provider-test',
-            model: 'model-test',
-            bodyText: null,
-            messagePayloadJsonb: guarded,
-            messageSchemaVersion: 'character-dialogue-v1',
-          }] as unknown as Row[],
-        };
-      },
+    const pool = new RecordingPool();
+    pool.committedRow = {
+      turnId: TURN_ID,
+      attemptId: ATTEMPT_ID,
+      messageId: MESSAGE_ID,
+      sequenceNo: 2,
+      provider: 'provider-test',
+      model: 'model-test',
+      bodyText: null,
+      messagePayloadJsonb: guarded,
+      messageSchemaVersion: 'character-dialogue-v1',
     };
     const persistence = createPostgresCharacterProductionTurnPersistenceV1({
-      client,
+      pool,
+      verifiedEvidence,
       createUuid: uuids(),
       rendererVersion: 'renderer-runtime-v1',
       rendererPromptVersion: 'renderer-prompt-v1',
