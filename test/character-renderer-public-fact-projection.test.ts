@@ -4,6 +4,7 @@ import type { CharacterContentDefinition } from '../packages/character-content/s
 import {
   assembleCharacterRuntimeContext,
   projectCharacterRuntimeContextForRendererV1,
+  type CharacterRuntimeContextV1,
 } from '../packages/domain/src/index.js';
 import {
   attachServerAuthorizedCharacterPublicFactsV1,
@@ -149,4 +150,55 @@ describe('Character renderer context projection', () => {
     expect(source.publicCharacterFacts[0]).toHaveProperty('sourceReleaseId');
     expect(projected.publicCharacterFacts[0]).not.toHaveProperty('sourceReleaseId');
   });
+
+  it('strips protected Saju semantics and Reading identity from provider input', () => {
+    const source = runtimeContext();
+    const sajuSource = Object.freeze({
+      ...source,
+      saju: Object.freeze({
+        readingRef: 'reading-secret-ref',
+        domain: 'general',
+        coverageState: 'complete',
+        protectedSegments: Object.freeze([Object.freeze({
+          segmentId: 'secret-segment',
+          sourceReadingRef: 'reading-secret-ref',
+          sourceRef: 'secret-source-ref',
+          contentHash: 'sha256:v1:secret-hash',
+          text: '서버만 보유해야 하는 사주 본문',
+        })]),
+        disclosures: Object.freeze([Object.freeze({
+          segmentId: 'secret-disclosure',
+          sourceReadingRef: 'reading-secret-ref',
+          sourceRef: 'secret-disclosure-ref',
+          contentHash: 'sha256:v1:secret-disclosure-hash',
+          text: '서버만 보유해야 하는 고지 본문',
+        })]),
+        ambiguity: Object.freeze(['민감한 계산 애매성 원문']),
+        capability: authoredCharacter().capabilities[0]!,
+      }),
+    }) as unknown as CharacterRuntimeContextV1;
+
+    const projected = projectCharacterRuntimeContextForRendererV1(sajuSource);
+
+    expect(projected.saju).toEqual({
+      domain: 'general',
+      coverageState: 'complete',
+      hasProtectedSegments: true,
+      hasDisclosures: true,
+      hasAmbiguity: true,
+      capability: authoredCharacter().capabilities[0]!,
+    });
+
+    const serialized = JSON.stringify(projected);
+    expect(serialized).not.toContain('reading-secret-ref');
+    expect(serialized).not.toContain('secret-source-ref');
+    expect(serialized).not.toContain('서버만 보유해야 하는 사주 본문');
+    expect(serialized).not.toContain('서버만 보유해야 하는 고지 본문');
+    expect(serialized).not.toContain('민감한 계산 애매성 원문');
+
+    expect(sajuSource.saju?.protectedSegments[0]?.text).toBe(
+      '서버만 보유해야 하는 사주 본문',
+    );
+  });
+
 });

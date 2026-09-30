@@ -789,3 +789,26 @@ export {
   prepareCharacterStandardReadingRendererContextFromPublicCatalogV1,
   type CharacterStandardReadingPublicFactCatalogRendererContextV1,
 } from './character-standard-reading-public-fact-catalog-context.js';
+
+
+export {
+  CharacterStandardReadingProductionTurnErrorV1,
+  runCharacterStandardReadingProductionTurnV1,
+  type CharacterStandardReadingCommittedTurnV1,
+  type CharacterStandardReadingExecutionLeaseV1,
+  type CharacterStandardReadingProductionPromotionAuthorityPortV1,
+  type CharacterStandardReadingProductionPromotionDecisionV1,
+  type CharacterStandardReadingProductionRendererInputV1,
+  type CharacterStandardReadingProductionRendererPortV1,
+  type CharacterStandardReadingProductionTurnResultV1,
+  type CharacterStandardReadingTurnPersistenceAuthorityPortV1,
+  type RunCharacterStandardReadingProductionTurnInputV1,
+} from './character-standard-reading-production-orchestration.js';
+
+
+export {
+  CHARACTER_DIALOGUE_MESSAGE_SCHEMA_VERSION_V1,
+  CharacterDialogueMessagePersistenceErrorV1,
+  serializeCharacterDialogueEnvelopeForPersistenceV1,
+  type CharacterDialoguePersistedMessageV1,
+} from './character-dialogue-message-persistence.js';

@@ -4,6 +4,7 @@ import {
 import {
   projectCharacterRuntimeContextForRendererV1,
   type CharacterRendererRuntimeContextV1,
+  type CharacterRuntimeContextV1,
 } from '../../../packages/domain/src/index.js';
 import {
   getServerPreparedChatReceiveContentEntryV1,
@@ -20,6 +21,7 @@ export interface CharacterStandardReadingPublicFactCatalogRendererContextV1 {
   readonly schemaVersion: 'v1';
   readonly releaseId: string;
   readonly characterId: string;
+  readonly serverContext: CharacterRuntimeContextV1;
   readonly providerContext: CharacterRendererRuntimeContextV1;
   readonly admittedPublicFactCount: number;
 }
@@ -131,6 +133,7 @@ export async function prepareCharacterStandardReadingRendererContextFromPublicCa
     schemaVersion: 'v1',
     releaseId: identity.releaseId,
     characterId: identity.characterId,
+    serverContext: context,
     providerContext: projectCharacterRuntimeContextForRendererV1(context),
     admittedPublicFactCount: rows.length,
   });
