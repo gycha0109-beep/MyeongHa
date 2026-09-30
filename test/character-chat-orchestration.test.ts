@@ -45,12 +45,13 @@ function authoredCharacter(): CharacterContentDefinition {
       worldRole: 'record witness',
       origin: 'record hall',
       apparentAgeBand: 'adult',
-      deityBond: {
-        deityId: 'deity-orchestration-test',
-        representationRole: 'witness',
+      callingBond: {
+        authorityState: 'resolved',
+        principleId: 'principle-orchestration-test',
+        callingDefinition: 'test-only witness calling',
         oath: 'Keep governed records intact.',
-        acceptedDoctrine: ['Records require provenance.'],
-        resistedDoctrine: ['Records do not replace the person.'],
+        acceptedInterpretations: ['Records require provenance.'],
+        resistedExtremes: ['Records do not replace the person.'],
       },
       worldview: {
         coreValues: ['truth'],
