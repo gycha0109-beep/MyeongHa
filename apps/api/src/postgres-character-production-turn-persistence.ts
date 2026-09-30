@@ -5,7 +5,14 @@ import {
   canonicalJson,
   type CharacterDialogueEnvelopeV1,
 } from '../../../packages/domain/src/index.js';
-import type { PostgresTransactionQueryV1 } from './postgres-subject-execution.js';
+import {
+  executePostgresSubjectTransactionV1,
+  type PostgresSubjectPoolV1,
+  type PostgresTransactionQueryV1,
+} from './postgres-subject-execution.js';
+import type {
+  VerifiedSubjectIdentityEvidenceV1,
+} from './subject-identity-resolver.js';
 import type {
   CharacterProductionAttemptV1,
   CharacterProductionCommittedTurnV1,
@@ -39,7 +46,8 @@ export interface CharacterProductionGroundingAuthorityV1 {
 }
 
 export interface CreatePostgresCharacterProductionTurnPersistenceInputV1 {
-  readonly client: PostgresTransactionQueryV1;
+  readonly pool: PostgresSubjectPoolV1;
+  readonly verifiedEvidence: VerifiedSubjectIdentityEvidenceV1;
   readonly createUuid: () => string;
   readonly rendererVersion: string;
   readonly rendererPromptVersion: string;
@@ -325,13 +333,35 @@ implements CharacterProductionTurnPersistencePortV1 {
     private readonly input: CreatePostgresCharacterProductionTurnPersistenceInputV1,
   ) {}
 
+  async #withSubjectClient<T>(
+    expectedSubjectId: string,
+    execute: (client: PostgresTransactionQueryV1) => Promise<T> | T,
+  ): Promise<T> {
+    return executePostgresSubjectTransactionV1({
+      pool: this.input.pool,
+      verifiedEvidence: this.input.verifiedEvidence,
+      execute: async ({ resolvedSubject, client }) => {
+        if (resolvedSubject.subjectId !== expectedSubjectId) {
+          throw new Error(
+            'Character Production persistence resolved a different canonical Subject.',
+          );
+        }
+        return execute(client);
+      },
+    });
+  }
+
   async readCommitted(input: {
     readonly subjectId: string;
     readonly turnId: string;
   }): Promise<CharacterProductionCommittedTurnV1 | null> {
-    const result = await this.input.client.query<CommittedRowV1>(
-      READ_COMMITTED_SQL,
-      [input.subjectId, input.turnId],
+    const result = await this.#withSubjectClient(
+      input.subjectId,
+      (client) =>
+        client.query<CommittedRowV1>(
+          READ_COMMITTED_SQL,
+          [input.subjectId, input.turnId],
+        ),
     );
     if (result.rows.length === 0) return null;
     if (result.rows.length !== 1 || result.rows[0] === undefined) {
@@ -358,9 +388,13 @@ implements CharacterProductionTurnPersistencePortV1 {
     readonly plannerVersion: string;
   }): Promise<CharacterProductionAttemptV1> {
     const attemptId = requiredUuid(this.input.createUuid(), 'new attempt id');
-    const result = await this.input.client.query<AttemptRowV1>(
-      ALLOCATE_SQL,
-      [input.subjectId, input.turnId, attemptId, input.plannerVersion],
+    const result = await this.#withSubjectClient(
+      input.subjectId,
+      (client) =>
+        client.query<AttemptRowV1>(
+          ALLOCATE_SQL,
+          [input.subjectId, input.turnId, attemptId, input.plannerVersion],
+        ),
     );
     if (result.rows.length !== 1 || result.rows[0] === undefined) {
       throw new Error('Character attempt allocation returned an invalid row set.');
@@ -378,11 +412,15 @@ implements CharacterProductionTurnPersistencePortV1 {
     readonly turnId: string;
     readonly attemptId: string;
   }): Promise<void> {
-    await this.input.client.query(CONTEXT_READY_SQL, [
+    await this.#withSubjectClient(
       input.subjectId,
-      input.turnId,
-      input.attemptId,
-    ]);
+      (client) =>
+        client.query(CONTEXT_READY_SQL, [
+          input.subjectId,
+          input.turnId,
+          input.attemptId,
+        ]),
+    );
   }
 
   async stageGenerated(input: {
@@ -410,37 +448,39 @@ implements CharacterProductionTurnPersistencePortV1 {
     const contentHash = generatedContentHash(input.envelope);
     const outputRef = { generatedContentHash: contentHash };
 
-    await this.input.client.query(RECORD_AI_SQL, [
-      input.subjectId,
-      executionLogId,
-      input.turnId,
-      input.attemptId,
-      'renderer',
-      input.providerKey,
-      input.modelKey,
-      requiredText(this.input.rendererPromptVersion, 'rendererPromptVersion'),
-      input.characterId,
-      JSON.stringify({
-        schemaVersion: 'v1',
-        source: 'server-admitted-character-runtime',
-      }),
-      JSON.stringify(outputRef),
-      JSON.stringify(groundingIds),
-    ]);
+    await this.#withSubjectClient(input.subjectId, async (client) => {
+      await client.query(RECORD_AI_SQL, [
+        input.subjectId,
+        executionLogId,
+        input.turnId,
+        input.attemptId,
+        'renderer',
+        input.providerKey,
+        input.modelKey,
+        requiredText(this.input.rendererPromptVersion, 'rendererPromptVersion'),
+        input.characterId,
+        JSON.stringify({
+          schemaVersion: 'v1',
+          source: 'server-admitted-character-runtime',
+        }),
+        JSON.stringify(outputRef),
+        JSON.stringify(groundingIds),
+      ]);
 
-    await this.input.client.query(GENERATED_SQL, [
-      input.subjectId,
-      input.turnId,
-      input.attemptId,
-      executionLogId,
-      requiredText(this.input.rendererVersion, 'rendererVersion'),
-      input.characterId,
-      null,
-      JSON.stringify(input.envelope),
-      'character-dialogue-v1',
-      contentHash,
-      JSON.stringify(groundingIds),
-    ]);
+      await client.query(GENERATED_SQL, [
+        input.subjectId,
+        input.turnId,
+        input.attemptId,
+        executionLogId,
+        requiredText(this.input.rendererVersion, 'rendererVersion'),
+        input.characterId,
+        null,
+        JSON.stringify(input.envelope),
+        'character-dialogue-v1',
+        contentHash,
+        JSON.stringify(groundingIds),
+      ]);
+    });
 
     this.#generatedByAttempt.set(
       input.attemptId,
@@ -472,39 +512,41 @@ implements CharacterProductionTurnPersistencePortV1 {
       'Output Guard execution log id',
     );
 
-    await this.input.client.query(RECORD_AI_SQL, [
-      input.subjectId,
-      executionLogId,
-      input.turnId,
-      input.attemptId,
-      'output_guard',
-      'myeongha-server',
-      CHARACTER_OUTPUT_GUARD_VERSION_V1,
-      requiredText(
-        this.input.outputGuardPromptVersion,
-        'outputGuardPromptVersion',
-      ),
-      generated.characterId,
-      JSON.stringify({
-        schemaVersion: 'v1',
-        generatedContentHash: contentHash,
-      }),
-      JSON.stringify({ generatedContentHash: contentHash }),
-      JSON.stringify(generated.groundingIds),
-    ]);
+    await this.#withSubjectClient(input.subjectId, async (client) => {
+      await client.query(RECORD_AI_SQL, [
+        input.subjectId,
+        executionLogId,
+        input.turnId,
+        input.attemptId,
+        'output_guard',
+        'myeongha-server',
+        CHARACTER_OUTPUT_GUARD_VERSION_V1,
+        requiredText(
+          this.input.outputGuardPromptVersion,
+          'outputGuardPromptVersion',
+        ),
+        generated.characterId,
+        JSON.stringify({
+          schemaVersion: 'v1',
+          generatedContentHash: contentHash,
+        }),
+        JSON.stringify({ generatedContentHash: contentHash }),
+        JSON.stringify(generated.groundingIds),
+      ]);
 
-    await this.input.client.query(VALIDATE_SQL, [
-      input.subjectId,
-      input.turnId,
-      input.attemptId,
-      executionLogId,
-      CHARACTER_OUTPUT_GUARD_VERSION_V1,
-      JSON.stringify({
-        schemaVersion: 'v1',
-        passed: true,
-        generatedContentHash: contentHash,
-      }),
-    ]);
+      await client.query(VALIDATE_SQL, [
+        input.subjectId,
+        input.turnId,
+        input.attemptId,
+        executionLogId,
+        CHARACTER_OUTPUT_GUARD_VERSION_V1,
+        JSON.stringify({
+          schemaVersion: 'v1',
+          passed: true,
+          generatedContentHash: contentHash,
+        }),
+      ]);
+    });
   }
 
   async recordContextFailure(input: {
@@ -554,13 +596,17 @@ implements CharacterProductionTurnPersistencePortV1 {
         : (() => {
             throw new Error('Character Production failure policy returned an invalid state.');
           })();
-    await this.input.client.query(FAIL_SQL, [
+    await this.#withSubjectClient(
       input.subjectId,
-      input.turnId,
-      input.attemptId,
-      failureState,
-      stableErrorCode(decision.errorCode),
-    ]);
+      (client) =>
+        client.query(FAIL_SQL, [
+          input.subjectId,
+          input.turnId,
+          input.attemptId,
+          failureState,
+          stableErrorCode(decision.errorCode),
+        ]),
+    );
   }
 
   async commitValidated(input: {
@@ -576,16 +622,20 @@ implements CharacterProductionTurnPersistencePortV1 {
     const messageId = requiredUuid(this.input.createUuid(), 'committed message id');
     const outboxEventId = requiredUuid(this.input.createUuid(), 'commit outbox event id');
 
-    const result = await this.input.client.query<CommitRowV1>(
-      COMMIT_SQL,
-      [
-        input.subjectId,
-        input.threadId,
-        input.turnId,
-        input.attemptId,
-        messageId,
-        outboxEventId,
-      ],
+    const result = await this.#withSubjectClient(
+      input.subjectId,
+      (client) =>
+        client.query<CommitRowV1>(
+          COMMIT_SQL,
+          [
+            input.subjectId,
+            input.threadId,
+            input.turnId,
+            input.attemptId,
+            messageId,
+            outboxEventId,
+          ],
+        ),
     );
     if (result.rows.length !== 1 || result.rows[0] === undefined) {
       throw new Error('Character Production commit returned an invalid row set.');
