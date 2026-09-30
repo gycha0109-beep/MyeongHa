@@ -52,11 +52,31 @@ typed Character content contract는 Principle/Calling 기준으로 정렬한다.
 ## 3. Character Definition
 
 ```ts
+type CharacterCallingBinding =
+  | {
+      authorityState: 'resolved';
+      principleId: string;
+      callingDefinition: string;
+      oath: string;
+      acceptedInterpretations?: string[];
+      resistedExtremes?: string[];
+    }
+  | {
+      authorityState: 'world_dependent' | 'author_undefined' | 'intentionally_open';
+      note?: string;
+    };
+
 interface CharacterDefinition {
   characterId: string;
   schemaVersion: string;
-  display: { name: string; shortDescription: string };
-  calling: { principleId: string; callingDefinition: string; representationRole: string; oath: string };
+  display: {
+    name: string;
+    shortDescription: string;
+    representativeTitle?: string;
+  };
+  callingBond: CharacterCallingBinding;
+  vocation?: string;
+  duties?: string[];
   persona: CharacterPersona;
   voice: CharacterVoice;
   specialties: string[];
@@ -327,7 +347,8 @@ Publish 전에 source-complete 범위의 자동 검증:
 - Production Launch display-name set이 승인된 9개와 정확히 일치하는지 확인;
 - development placeholder가 Production boundary를 통과하지 않는지 확인;
 - stable IDs unique;
-- referenced principle/calling/character/episode 존재;
+- resolved Principle/Calling binding은 source-backed authority를 가져야 하며, unresolved state를 가짜 ID로 채우지 않음;
+- referenced character/episode 존재;
 - relation target 존재;
 - capability domain stable key 존재;
 - asset references manifest 안에 존재;
