@@ -42,6 +42,7 @@ export interface CharacterProductionGroundingAuthorityV1 {
     readonly turnId: string;
     readonly attemptId: string;
     readonly characterId: string;
+    readonly readingId: string;
   }): Promise<readonly string[]> | readonly string[];
 }
 
@@ -86,6 +87,7 @@ interface GeneratedAttemptStateV1 {
   readonly generatedContentHash: string;
   readonly groundingIds: readonly string[];
   readonly characterId: string;
+  readonly readingId: string;
 }
 
 const READ_COMMITTED_SQL = `
@@ -149,7 +151,8 @@ select public.cmd_record_chat_success_ai_execution_runtime_v1(
   $9::text,
   $10::jsonb,
   $11::jsonb,
-  $12::jsonb
+  $12::uuid,
+  $13::jsonb
 )
 `.trim();
 
@@ -428,6 +431,7 @@ implements CharacterProductionTurnPersistencePortV1 {
     readonly turnId: string;
     readonly attemptId: string;
     readonly characterId: string;
+    readonly readingId: string;
     readonly contentBundleId: string;
     readonly providerKey: string;
     readonly modelKey: string;
@@ -443,6 +447,7 @@ implements CharacterProductionTurnPersistencePortV1 {
         turnId: input.turnId,
         attemptId: input.attemptId,
         characterId: input.characterId,
+        readingId: input.readingId,
       }),
     );
     const contentHash = generatedContentHash(input.envelope);
@@ -488,6 +493,7 @@ implements CharacterProductionTurnPersistencePortV1 {
         generatedContentHash: contentHash,
         groundingIds,
         characterId: input.characterId,
+        readingId: requiredUuid(input.readingId, 'readingId'),
       }),
     );
   }
@@ -531,6 +537,7 @@ implements CharacterProductionTurnPersistencePortV1 {
           generatedContentHash: contentHash,
         }),
         JSON.stringify({ generatedContentHash: contentHash }),
+        generated.readingId,
         JSON.stringify(generated.groundingIds),
       ]);
 
