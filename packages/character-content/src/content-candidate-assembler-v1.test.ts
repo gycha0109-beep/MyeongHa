@@ -5,6 +5,7 @@ import {
   assembleCharacterContentBundleCandidateV1,
   type CharacterCanonCompletionV1,
   type CharacterContentBundleCandidateInputV1,
+  type CharacterPrincipleCallingCompletionV1,
   type CharacterPublicationMaterialInputV1,
 } from './content-candidate-assembler-v1.js';
 import {
@@ -31,6 +32,18 @@ const canonCompletions: readonly CharacterCanonCompletionV1[] =
     },
   }));
 
+const principleCallingCompletions: readonly CharacterPrincipleCallingCompletionV1[] =
+  CHARACTER_IMMUTABLE_AUTHORING_V1_CHARACTER_IDS.map((characterId) => ({
+    characterId,
+    representativeTitle: `fixture representative ${characterId}`,
+    callingBond: {
+      authorityState: 'resolved',
+      principleId: `principle-${characterId}`,
+      callingDefinition: `fixture calling for ${characterId}`,
+      oath: `fixture oath for ${characterId}`,
+    },
+  }));
+
 const publicationMaterials: readonly CharacterPublicationMaterialInputV1[] =
   CHARACTER_IMMUTABLE_AUTHORING_V1_CHARACTER_IDS.map((characterId) => ({
     characterId,
@@ -52,6 +65,7 @@ function fixtureInput(
       minClientCapability: 'fixture-client-v1',
     },
     canonCompletions,
+    principleCallingCompletions,
     publicationMaterials,
     ...overrides,
   };
@@ -61,6 +75,7 @@ function expectAssemblyError(
   input: CharacterContentBundleCandidateInputV1,
   code:
     | 'CANON_COMPLETION_ROSTER_MISMATCH'
+    | 'PRINCIPLE_CALLING_COMPLETION_ROSTER_INVALID'
     | 'PUBLICATION_MATERIAL_ROSTER_MISMATCH',
 ): void {
   try {
@@ -93,6 +108,9 @@ describe('Character content candidate assembler v1', () => {
       const completion = canonCompletions.find(
         (entry) => entry.characterId === character.characterId,
       );
+      const principleCalling = principleCallingCompletions.find(
+        (entry) => entry.characterId === character.characterId,
+      );
       const material = publicationMaterials.find(
         (entry) => entry.characterId === character.characterId,
       );
@@ -100,6 +118,7 @@ describe('Character content candidate assembler v1', () => {
       expect(immutable).toBeDefined();
       expect(runtime).toBeDefined();
       expect(completion).toBeDefined();
+      expect(principleCalling).toBeDefined();
       expect(material).toBeDefined();
 
       expect(character.displayName).toBe(immutable?.displayName);
@@ -112,6 +131,10 @@ describe('Character content candidate assembler v1', () => {
       expect(character.relationshipBehavior).toEqual(
         runtime?.relationshipBehavior,
       );
+      expect(character.representativeTitle).toBe(
+        principleCalling?.representativeTitle,
+      );
+      expect(character.canon?.callingBond).toEqual(principleCalling?.callingBond);
       expect(character.canon?.worldview).toEqual(completion?.worldview);
       expect(character.canon?.psychology).toEqual(completion?.psychology);
       expect(character.assetRefs).toEqual(material?.assetRefs);
@@ -124,6 +147,38 @@ describe('Character content candidate assembler v1', () => {
     expectAssemblyError(
       fixtureInput({ canonCompletions: canonCompletions.slice(1) }),
       'CANON_COMPLETION_ROSTER_MISMATCH',
+    );
+  });
+
+  it('preserves an unresolved Principle/Calling state instead of inventing a binding', () => {
+    const [firstId] = CHARACTER_IMMUTABLE_AUTHORING_V1_CHARACTER_IDS;
+    if (firstId === undefined) throw new Error('fixture roster is empty');
+
+    const bundle = assembleCharacterContentBundleCandidateV1(
+      fixtureInput({
+        principleCallingCompletions: principleCallingCompletions.filter(
+          (entry) => entry.characterId !== firstId,
+        ),
+      }),
+    );
+
+    const first = bundle.characters.find((entry) => entry.characterId === firstId);
+    expect(first?.representativeTitle).toBeUndefined();
+    expect(first?.canon?.callingBond).toEqual({
+      authorityState: 'world_dependent',
+      note: 'Principle/Calling binding has not been supplied by separate World/Character authority.',
+    });
+  });
+
+  it('rejects duplicate Principle/Calling completion authority rows', () => {
+    const first = principleCallingCompletions[0];
+    if (first === undefined) throw new Error('fixture roster is empty');
+
+    expectAssemblyError(
+      fixtureInput({
+        principleCallingCompletions: [...principleCallingCompletions, first],
+      }),
+      'PRINCIPLE_CALLING_COMPLETION_ROSTER_INVALID',
     );
   });
 
