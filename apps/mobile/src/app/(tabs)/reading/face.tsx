@@ -174,7 +174,7 @@ export default function FaceScreen() {
       </Pressable>
 
       <Text style={styles.privacyNote}>
-        선택한 사진 URI는 이 화면의 일시적인 UI 상태에만 두며 SecureStore나 앱 기록에 저장하지 않습니다.
+        선택한 사진은 이 화면에서만 일시적으로 사용하며 기기 보안 저장소나 앱 기록에 저장하지 않습니다.
       </Text>
     </MobileScreen>
   );
