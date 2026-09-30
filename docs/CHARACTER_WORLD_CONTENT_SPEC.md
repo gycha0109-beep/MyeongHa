@@ -29,13 +29,25 @@ Git/versioned source
 packages/character-content/
   schema/
   characters/
-  deities/
+  principles/
   relations/
   episodes/
   scenes/
   assets-manifest/
   bundles/
 ```
+
+## 2.1 Principle-Calling ontology migration note
+
+World Root Canon은 기존 Deity ontology를 이치(理) → 명(命) → 대리자 구조로 교체했다.
+
+따라서 이 문서에서 새로 정의하는 authoring 의미는 principle/calling 기준을 따른다.
+
+현재 일부 런타임 TypeScript schema에는 deityId, deityBond, deityProxyLabel 같은 레거시 필드명이 남아 있을 수 있다. 이는 아직 수행하지 않은 typed migration의 호환 명칭이며, 별도의 인간형 신격 NPC가 Canon으로 존재한다는 뜻으로 해석하지 않는다.
+
+이 문서 변경은 ontology와 authoring contract의 방향을 먼저 고정하며, 런타임 필드명 마이그레이션은 별도 구현 작업으로 수행한다.
+
+---
 
 ## 3. Character Definition
 
@@ -44,7 +56,7 @@ interface CharacterDefinition {
   characterId: string;
   schemaVersion: string;
   display: { name: string; shortDescription: string };
-  deity: { deityId: string; representationRole: string };
+  calling: { principleId: string; callingDefinition: string; representationRole: string; oath: string };
   persona: CharacterPersona;
   voice: CharacterVoice;
   specialties: string[];
@@ -79,9 +91,9 @@ UC-24는 조건부 Character content에 `unlock 조건` 개념이 존재할 수 
 
 **결함 없는 모범 답안형 캐릭터를 기본값으로 만들지 않는다.**
 
-## 5. 신의 대리자 규칙
+## 5. 명을 받은 대리자 규칙
 
-대리자는 신 그 자체가 아니며 전지전능하지 않다.
+대리자는 이치 자체의 personification이 아니며 전지전능하지 않다. 대리자는 특정 인간에게 닿은 명을 받아들이고 서약한 인간이다.
 
 세계관상 최소 경계:
 
@@ -300,7 +312,7 @@ Engineering Slice는 더 작은 dev subset 또는 explicit `developmentPlacehold
 
 ```text
 canonical characterId
-final gender / origin / apparent age / deity / visual canon
+final gender / origin / apparent age / principle-calling / visual canon
 상세 Canon / Persona / Behavior / SajuProfile / RelationshipBehavior
 Character-to-Character relation graph / shared history
 asset provenance
@@ -315,7 +327,7 @@ Publish 전에 source-complete 범위의 자동 검증:
 - Production Launch display-name set이 승인된 9개와 정확히 일치하는지 확인;
 - development placeholder가 Production boundary를 통과하지 않는지 확인;
 - stable IDs unique;
-- referenced deity/character/episode 존재;
+- referenced principle/calling/character/episode 존재;
 - relation target 존재;
 - capability domain stable key 존재;
 - asset references manifest 안에 존재;
