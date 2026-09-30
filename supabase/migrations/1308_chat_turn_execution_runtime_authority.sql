@@ -97,6 +97,7 @@ grant update (
 grant select (
   id, turn_id, subject_id, attempt_no, state, error_code,
   generation_ai_execution_log_id, generated_thread_character_id,
+  generated_character_content_bundle_id,
   generated_body_text, generated_message_payload_jsonb,
   generated_message_schema_version, generated_content_hash,
   grounding_refs_jsonb, validation_ai_execution_log_id,
