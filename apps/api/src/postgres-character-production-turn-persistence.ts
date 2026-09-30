@@ -319,9 +319,11 @@ function validateGroundingIds(values: readonly string[]): readonly string[] {
   if (values.length > 128) {
     throw new Error('Character Production grounding set exceeds the supported bound.');
   }
-  const normalized = values.map((value, index) =>
-    requiredUuid(value, `groundingIds[${index}]`),
-  );
+  const normalized = values
+    .map((value, index) =>
+      requiredUuid(value, `groundingIds[${index}]`),
+    )
+    .sort();
   if (new Set(normalized).size !== normalized.length) {
     throw new Error('Character Production grounding ids must be unique.');
   }
@@ -441,13 +443,14 @@ implements CharacterProductionTurnPersistencePortV1 {
       this.input.createUuid(),
       'renderer execution log id',
     );
+    const readingId = requiredUuid(input.readingId, 'readingId');
     const groundingIds = validateGroundingIds(
       await this.input.groundingAuthority.readGroundingIds({
         subjectId: input.subjectId,
         turnId: input.turnId,
         attemptId: input.attemptId,
         characterId: input.characterId,
-        readingId: input.readingId,
+        readingId,
       }),
     );
     const contentHash = generatedContentHash(input.envelope);
@@ -493,7 +496,7 @@ implements CharacterProductionTurnPersistencePortV1 {
         generatedContentHash: contentHash,
         groundingIds,
         characterId: input.characterId,
-        readingId: requiredUuid(input.readingId, 'readingId'),
+        readingId,
       }),
     );
   }
