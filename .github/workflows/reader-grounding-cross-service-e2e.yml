@@ -1,5 +1,4 @@
 name: Reader Grounding Cross-Service E2E
-run-name: "[WT:frontend-integration] Reader Grounding Cross-Service E2E"
 
 on:
   pull_request:
