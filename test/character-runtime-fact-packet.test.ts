@@ -8,6 +8,7 @@ import {
 import {
   CharacterRuntimeFactPacketErrorV1,
   prepareCharacterRuntimeFactPacketV1,
+  type CharacterRuntimeFactPacketRequestV1,
 } from '../apps/api/src/character-runtime-fact-packet.js';
 
 class MetadataMapPort implements CharacterRuntimeFactMetadataReadAuthorityPortV1 {
@@ -78,8 +79,8 @@ function value(
 
 function request(
   factKey: string,
-  overrides: Record<string, unknown> = {},
-) {
+  overrides: Partial<CharacterRuntimeFactPacketRequestV1> = {},
+): CharacterRuntimeFactPacketRequestV1 {
   return {
     factKey,
     relationshipStage: 'public' as const,
