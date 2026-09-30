@@ -6,7 +6,7 @@
 > Bible Standard: Character Bible Standard v1
 > Authority State: DRAFT / NOT YET PRODUCTION AUTHORITY
 > Source: 기존 `세연 Character Bible Draft v0.1` 재구성
-> World / Deity Layer: 별도 세계관 설계에서 관리
+> World / Principle-Calling Layer: 별도 세계관 설계에서 관리
 
 ## 상태 표기
 
@@ -666,8 +666,8 @@
 - 자기 외모에 대한 인식
 - 패션 / 자기 연출 방식
 - 대표 자세 / 시그니처 포즈
-- 세연이 서약한 신격의 정확한 정체와 doctrine
-- 세연이 처음 부름을 수락한 이유와 지금까지 남아 있는 개인적 이유
+- 세연에게 닿은 명의 정확한 내용, 배후 이치 계열, 그 명에 대한 세연의 해석
+- 세연이 처음 명을 받아들인 이유와 지금까지 대리자로 남아 있는 개인적 이유
 
 이 영역들은 **빈칸이라는 이유만으로 채우지 않는다.** 세연이라는 사람을 더 선명하게 만들거나 실제 생활과 관계에서 새로운 행동을 생성할 수 있는 설정이 생겼을 때만 확정한다.
 
