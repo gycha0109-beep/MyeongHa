@@ -59,12 +59,13 @@ function authoredCharacter(characterId = 'baekheon'): CharacterContentDefinition
       worldRole: 'record witness',
       origin: 'record hall',
       apparentAgeBand: 'adult',
-      deityBond: {
-        deityId: 'deity-thread-bound-test',
-        representationRole: 'witness',
+      callingBond: {
+        authorityState: 'resolved',
+        principleId: 'principle-thread-bound-test',
+        callingDefinition: 'test-only witness calling',
         oath: 'Keep the record intact.',
-        acceptedDoctrine: ['Records matter.'],
-        resistedDoctrine: ['Records do not own people.'],
+        acceptedInterpretations: ['Records matter.'],
+        resistedExtremes: ['Records do not own people.'],
       },
       worldview: {
         coreValues: ['truth'],
