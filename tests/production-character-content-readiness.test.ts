@@ -36,7 +36,7 @@ function authoredCharacter(
     contentVersion: CONTENT_VERSION,
     displayName,
     gender: 'test-only authored gender',
-    deityProxyLabel: 'authored representative',
+    representativeTitle: 'authored representative',
     shortDescriptor: 'test-only fully authored production-boundary fixture',
     personalityTraits: ['deliberate'],
     flaws: ['overthinks'],
@@ -64,12 +64,13 @@ function authoredCharacter(
       worldRole: 'test representative',
       origin: 'test fixture only',
       apparentAgeBand: 'adult',
-      deityBond: {
-        deityId: `deity-${characterId}`,
-        representationRole: 'representative',
+      callingBond: {
+        authorityState: 'resolved',
+        principleId: `principle-${characterId}`,
+        callingDefinition: 'test-only calling definition',
         oath: 'preserve authority boundaries',
-        acceptedDoctrine: ['agency'],
-        resistedDoctrine: ['fatalism'],
+        acceptedInterpretations: ['agency'],
+        resistedExtremes: ['fatalism'],
       },
       worldview: {
         coreValues: ['agency'],
@@ -275,6 +276,47 @@ describe('Production Character content readiness', () => {
     expectProductionFailureCode(
       missingVisual,
       'CHARACTER_VISUAL_CANON_REQUIRED',
+    );
+  });
+
+  it('rejects Production publication without a source-authored representative title', () => {
+    const [first, ...rest] = AUTHORED_PRODUCTION_TEST_BUNDLE.characters;
+    if (first === undefined) throw new Error('test fixture requires a first character');
+    const { representativeTitle: _representativeTitle, ...withoutRepresentativeTitle } = first;
+    const missingRepresentativeTitle = {
+      ...AUTHORED_PRODUCTION_TEST_BUNDLE,
+      characters: [withoutRepresentativeTitle, ...rest],
+    } satisfies CharacterContentBundle;
+
+    expectProductionFailureCode(
+      missingRepresentativeTitle,
+      'CHARACTER_REPRESENTATIVE_TITLE_REQUIRED',
+    );
+  });
+
+  it('rejects Production publication while Principle/Calling authority is unresolved', () => {
+    const [first, ...rest] = AUTHORED_PRODUCTION_TEST_BUNDLE.characters;
+    if (first === undefined) throw new Error('test fixture requires a first character');
+    const unresolvedCalling = {
+      ...AUTHORED_PRODUCTION_TEST_BUNDLE,
+      characters: [
+        {
+          ...first,
+          canon: {
+            ...first.canon!,
+            callingBond: {
+              authorityState: 'world_dependent',
+              note: 'test-only unresolved authority',
+            },
+          },
+        },
+        ...rest,
+      ],
+    } satisfies CharacterContentBundle;
+
+    expectProductionFailureCode(
+      unresolvedCalling,
+      'CHARACTER_CALLING_AUTHORITY_REQUIRED',
     );
   });
 
