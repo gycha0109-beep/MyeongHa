@@ -69,6 +69,7 @@ export interface CharacterProductionTurnPersistencePortV1 {
     readonly turnId: string;
     readonly attemptId: string;
     readonly characterId: string;
+    readonly readingId: string;
     readonly contentBundleId: string;
     readonly providerKey: string;
     readonly modelKey: string;
@@ -373,6 +374,7 @@ export async function runCharacterStandardReadingProductionTurnV1(
       turnId,
       attemptId: attempt.attemptId,
       characterId: prepared.characterId,
+      readingId: input.preflight.runtime.source.readingId,
       contentBundleId: prepared.serverContext.contentBundleId,
       providerKey,
       modelKey,
