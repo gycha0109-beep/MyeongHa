@@ -2,7 +2,7 @@
 
 > Track: `applizing`  
 > Status: M8 prerequisite — existing-Member auth foundation implemented  
-> Date: 2026-09-29  
+> Date: 2026-09-30  
 > Server authority: existing MyeongHa API / PostgreSQL  
 > Client principle: Web and Mobile are separate first-class clients of the same server world.
 
@@ -163,9 +163,11 @@ Native media capture can be prepared independently, but the client must not inve
 
 ### Chat
 
-Current Production state permits read-oriented mobile scaffolding only where server authority exists.
+Current Production authority supports known-thread read and the narrow Member + Launch-9 single-Character thread open/reuse command.
 
-Mobile must not locally commit synthetic assistant/user turns when server send/thread-creation authority is blocked.
+Mobile currently activates only the known-thread read path. Member thread open still requires native Member-session integration plus a server-authorized Character discovery/presentation path. Chat turn-send remains separately blocked because the current Member thread-open authority does not define a replacement send HTTP contract.
+
+Mobile must not locally commit synthetic assistant/user turns or infer a turn-send request from the obsolete generic API example.
 
 ### Records / My
 
