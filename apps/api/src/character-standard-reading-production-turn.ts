@@ -72,7 +72,7 @@ export interface CharacterProductionTurnPersistencePortV1 {
     readonly contentBundleId: string;
     readonly providerKey: string;
     readonly modelKey: string;
-    readonly rawOutput: unknown;
+    readonly envelope: CharacterDialogueEnvelopeV1;
   }): Awaitable<void>;
 
   stageValidationPassed(input: {
@@ -330,6 +330,37 @@ export async function runCharacterStandardReadingProductionTurnV1(
     );
   }
 
+  let envelope: CharacterDialogueEnvelopeV1;
+  try {
+    envelope = prepared.serverContext.saju === null
+      ? guardCharacterRendererOutput({
+          rawOutput,
+          context: prepared.serverContext,
+          allowedSuggestedActionKeys: input.allowedSuggestedActionKeys,
+        })
+      : guardCharacterSajuSafeRendererOutput({
+          rawOutput,
+          context: prepared.serverContext,
+          allowedSuggestedActionKeys: input.allowedSuggestedActionKeys,
+        });
+  } catch (error) {
+    try {
+      await input.persistence.recordValidationFailure({
+        subjectId,
+        turnId,
+        attemptId: attempt.attemptId,
+        error,
+      });
+    } catch {
+      // Preserve the guard failure as the primary orchestration error.
+    }
+    throw new CharacterStandardReadingProductionTurnErrorV1(
+      'validate',
+      error instanceof Error ? error.message : 'Character Output Guard validation failed.',
+      error,
+    );
+  }
+
   try {
     await input.persistence.stageGenerated({
       subjectId,
@@ -339,7 +370,7 @@ export async function runCharacterStandardReadingProductionTurnV1(
       contentBundleId: prepared.serverContext.contentBundleId,
       providerKey,
       modelKey,
-      rawOutput,
+      envelope,
     });
   } catch (error) {
     try {
@@ -359,20 +390,7 @@ export async function runCharacterStandardReadingProductionTurnV1(
     );
   }
 
-  let envelope: CharacterDialogueEnvelopeV1;
   try {
-    envelope = prepared.serverContext.saju === null
-      ? guardCharacterRendererOutput({
-          rawOutput,
-          context: prepared.serverContext,
-          allowedSuggestedActionKeys: input.allowedSuggestedActionKeys,
-        })
-      : guardCharacterSajuSafeRendererOutput({
-          rawOutput,
-          context: prepared.serverContext,
-          allowedSuggestedActionKeys: input.allowedSuggestedActionKeys,
-        });
-
     await input.persistence.stageValidationPassed({
       subjectId,
       turnId,
@@ -388,11 +406,11 @@ export async function runCharacterStandardReadingProductionTurnV1(
         error,
       });
     } catch {
-      // Preserve the guard/validation failure as the primary orchestration error.
+      // Preserve validation persistence failure as the primary orchestration error.
     }
     throw new CharacterStandardReadingProductionTurnErrorV1(
       'validate',
-      error instanceof Error ? error.message : 'Character Output Guard validation failed.',
+      error instanceof Error ? error.message : 'Character validation persistence failed.',
       error,
     );
   }
