@@ -43,14 +43,14 @@ Bible은 설정집이다. Runtime 프롬프트 매뉴얼이 아니다.
 ```text
 Character Bible   = 이 사람은 누구인가
 Character Runtime = 이 사람이 지금 어떻게 행동하는가
-World / Deity     = 세계에서 무엇이 사실인가
+World / Principle-Calling = 세계에서 이치·명·Access·현현에 관해 무엇이 사실인가
 Visual Authority  = 시각 자산의 확정 규격
 Memory / Relation = 사용자와 실제로 무엇이 있었는가
 ```
 
 승인된 Bible은 person-level authority가 된다. 같은 내용을 별도 `Canon` 문서로 중복 관리하지 않는다.
 
-세계관 / 신격 / 능력 / 시각 asset처럼 별도 authority가 필요한 층은 해당 authority가 소유하며 Bible은 사람을 이해하는 데 필요한 연결만 참조한다.
+세계관 / 이치·명 / 능력 / 시각 asset처럼 별도 authority가 필요한 층은 해당 authority가 소유하며 Bible은 사람을 이해하는 데 필요한 연결만 참조한다.
 
 ---
 
@@ -347,7 +347,7 @@ Character도 사용자를 선택하는 주체여야 한다. 관계는 일방향�
 | `SOFT_CANON` | 범위 / 인상 / self-report처럼 의도적으로 약한 정밀도로 채택된 fact | 적힌 정밀도 이상으로 확장 금지 |
 | `AUTHOR_UNDEFINED` | 작가가 아직 결정하지 않음 | 추론 / 창작 / durable fact 승격 금지 |
 | `INTENTIONALLY_OPEN` | 작가가 의도적으로 값을 고정하지 않기로 결정 | 빈칸이 아니라 설계 결정. Runtime이 durable biography를 임의 확정하지 않음 |
-| `WORLD_DEPENDENT` | World / Deity 등 다른 authority가 결정해야 함 | 해당 authority 없이 Character Bible이 확정하지 않음 |
+| `WORLD_DEPENDENT` | World / Principle-Calling 등 다른 authority가 결정해야 함 | 해당 authority 없이 Character Bible이 확정하지 않음 |
 
 Bible 자체가 Draft이면 `CANON` / `SOFT_CANON` 표기도 **그 Draft 내부에서 채택된 값**이라는 뜻이며, Production authority 승격 여부는 별도 release gate가 결정한다.
 
@@ -439,7 +439,7 @@ Document Type: CHARACTER BIBLE INSTANCE
 Character:
 Bible Standard: Character Bible Standard v1
 Authority State:
-World / Deity Layer:
+World / Principle-Calling Layer:
 Source:
 ```
 
