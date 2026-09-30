@@ -1390,3 +1390,8 @@ Character Runtime instance v1은 다음을 만족해야 한다.
 - `[UNDEFINED]` / `[HYPOTHESIS]`를 Runtime이 사실로 만들지 않는다.
 - explicit `AUTHOR_UNDEFINED`와 미등록 low-impact open-world detail을 구분한다.
 - open-world durable fact는 policy / dependency / specificity / provenance 검증 없이 생성·commit되지 않는다.
+
+
+### Renderer-facing public fact projection
+
+Server-admitted `publicCharacterFacts` retain release/Bible provenance inside Runtime authority, but renderer/provider input MUST project each fact down to only `factKey + sourceAuthority + exact value`. Release ID, Bible document/revision, and source-section provenance are verification metadata and MUST NOT be forwarded to the model/provider.

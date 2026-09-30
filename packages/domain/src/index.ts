@@ -300,3 +300,5 @@ export {
   type SajuProductionCalculationIngressArtifactV1,
   type SajuProductionCalculationIngressErrorCodeV1,
 } from './saju-production-calculation-ingress.js';
+
+export * from './character-renderer-context.js';
