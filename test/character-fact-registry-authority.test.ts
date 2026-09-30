@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  CharacterFactRegistryAuthorityErrorV1,
   getCharacterFactRegistryAuthorityV1,
   type CharacterFactRegistryAuthorityRowV1,
   type CharacterFactRegistryReadAuthorityPortV1,
@@ -111,11 +110,9 @@ describe('Character fact registry authority', () => {
         factKey: 'missing_fact',
         authorityPort: new StaticFactAuthorityPort(null),
       }),
-    ).rejects.toEqual(
-      expect.objectContaining<CharacterFactRegistryAuthorityErrorV1>({
-        code: 'FACT_NOT_FOUND',
-      }),
-    );
+    ).rejects.toMatchObject({
+      code: 'FACT_NOT_FOUND',
+    });
   });
 });
 
