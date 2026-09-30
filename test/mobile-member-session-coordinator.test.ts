@@ -60,7 +60,7 @@ describe('mobile existing-Member session coordinator', () => {
       fetchImpl: async () => success({
         status: 'authenticated',
         session: session(),
-        passwordCompromiseCheck: 'safe',
+        passwordCompromiseCheck: 'clear',
       }),
     });
     const coordinator = createMobileMemberSessionCoordinatorV1({ client, store });
@@ -261,7 +261,7 @@ describe('mobile existing-Member session coordinator', () => {
               refresh: 'refresh-login',
               expiresAt: '2026-09-30T03:00:00.000Z',
             }),
-            passwordCompromiseCheck: 'safe',
+            passwordCompromiseCheck: 'clear',
           });
         }
         throw new Error('unexpected path');

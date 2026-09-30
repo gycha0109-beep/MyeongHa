@@ -36,7 +36,7 @@ function requireTimestamp(name: string, value: unknown): string {
 
 function nullableString(name: string, value: unknown): string | null {
   if (value === null) return null;
-  if (typeof value !== 'string') {
+  if (typeof value !== 'string' || value.length === 0) {
     throw new Error(`Member session user ${name} is invalid.`);
   }
   return value;

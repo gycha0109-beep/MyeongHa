@@ -9,7 +9,7 @@ import {
 
 export interface MemberSignInResultV1 {
   readonly session: MemberSessionV1;
-  readonly passwordCompromiseCheck: 'safe' | 'unavailable' | null;
+  readonly passwordCompromiseCheck: 'clear' | 'unavailable';
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -58,14 +58,13 @@ export async function signInMemberV1(
   const session = parseAuthenticatedSession(data);
   if (!isRecord(data)) return malformed('Member sign-in response is invalid.');
   const check = data.passwordCompromiseCheck;
-  if (check !== undefined && check !== 'safe' && check !== 'unavailable') {
+  if (check !== 'clear' && check !== 'unavailable') {
     return malformed('Member sign-in password compromise status is invalid.');
   }
 
   return Object.freeze({
     session,
-    passwordCompromiseCheck:
-      check === 'safe' || check === 'unavailable' ? check : null,
+    passwordCompromiseCheck: check,
   });
 }
 

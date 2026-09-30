@@ -37,7 +37,7 @@ describe('shared existing-Member auth API client', () => {
         return success({
           status: 'authenticated',
           session: session(),
-          passwordCompromiseCheck: 'safe',
+          passwordCompromiseCheck: 'clear',
         });
       },
     });
@@ -53,7 +53,7 @@ describe('shared existing-Member auth API client', () => {
       password: 'secret',
     });
     expect(result.session.accessToken).toBe('member-access-token');
-    expect(result.passwordCompromiseCheck).toBe('safe');
+    expect(result.passwordCompromiseCheck).toBe('clear');
   });
 
   it('refreshes with only the refresh token and accepts credential rotation', async () => {
@@ -113,4 +113,33 @@ describe('shared existing-Member auth API client', () => {
       code: 'API_MEMBER_AUTH_RESPONSE_INVALID',
     });
   });
+  it('requires the source-backed password compromise status on successful sign-in', async () => {
+    const missing = new MyeongHaApiClientV1({
+      origin: 'https://myeongha.test',
+      fetchImpl: async () => success({
+        status: 'authenticated',
+        session: session(),
+      }),
+    });
+    await expect(
+      signInMemberV1(missing, { email: 'member@example.com', password: 'secret' }),
+    ).rejects.toMatchObject({
+      code: 'API_MEMBER_AUTH_RESPONSE_INVALID',
+    });
+
+    const unsupported = new MyeongHaApiClientV1({
+      origin: 'https://myeongha.test',
+      fetchImpl: async () => success({
+        status: 'authenticated',
+        session: session(),
+        passwordCompromiseCheck: 'safe',
+      }),
+    });
+    await expect(
+      signInMemberV1(unsupported, { email: 'member@example.com', password: 'secret' }),
+    ).rejects.toMatchObject({
+      code: 'API_MEMBER_AUTH_RESPONSE_INVALID',
+    });
+  });
+
 });
