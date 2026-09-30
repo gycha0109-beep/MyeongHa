@@ -11,7 +11,7 @@ const base = DEV_CHARACTER_CONTENT_BUNDLE.characters[0]!;
 const authoredCharacter: CharacterContentDefinition = {
   ...base,
   displayName: 'Architecture Test Representative',
-  deityProxyLabel: 'archive_witness',
+  representativeTitle: 'archive witness',
   shortDescriptor: 'C1 authored contract fixture',
   personalityTraits: ['observant', 'deliberate'],
   flaws: ['holds onto continuity too strongly'],
@@ -43,12 +43,13 @@ const authoredCharacter: CharacterContentDefinition = {
     worldRole: 'keeper of continuing records',
     origin: 'the record hall',
     apparentAgeBand: 'mature_adult',
-    deityBond: {
-      deityId: 'deity-archive',
-      representationRole: 'witness',
+    callingBond: {
+      authorityState: 'resolved',
+      principleId: 'principle-archive',
+      callingDefinition: 'Witness continuity without turning prior records into a prison.',
       oath: 'Do not rewrite what was actually recorded.',
-      acceptedDoctrine: ['Continuity matters.'],
-      resistedDoctrine: ['Preservation must not become imprisonment.'],
+      acceptedInterpretations: ['Continuity matters.'],
+      resistedExtremes: ['Preservation must not become imprisonment.'],
     },
     worldview: {
       coreValues: ['continuity', 'accountability'],
