@@ -13,7 +13,7 @@ output_file="${2:-}"
 [[ -n "$PGSSLROOTCERT" && -f "$PGSSLROOTCERT" ]]
 [[ -n "$PGHOST" && -n "$PGPORT" && -n "$PGUSER" && -n "$PGPASSWORD" && -n "$PGDATABASE" ]]
 
-container_root_certificate='/run/myeongha/server-root.crt'
+container_root_certificate='/tmp/myeongha-postgres-root.crt'
 
 role_script="$(cat <<'BASH'
 set -euo pipefail
