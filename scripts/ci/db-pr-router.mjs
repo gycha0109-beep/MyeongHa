@@ -78,27 +78,33 @@ function addAll(selected) {
 }
 
 function classifyMigration(path, selected) {
-  const name = basename(path).toLowerCase();
+  const name = basename(path).toLowerCase().replace(/\.sql$/u, '');
+  const tokens = new Set(name.split(/[^a-z0-9]+/u).filter(Boolean));
+  const hasAny = (...values) => values.some((value) => tokens.has(value));
   let classified = false;
 
-  if (/(?:commerce|payment|receipt|purchase|entitlement|product|capability|offer)/u.test(name)) {
+  if (hasAny('commerce', 'payment', 'receipt', 'purchase', 'entitlement', 'product', 'capability', 'offer')) {
     selected.add('commerce-payment');
     selected.add('commerce-entitlement');
     classified = true;
   }
 
-  if (/(?:character|chat|reading|content|episode|outbox|reader|grounding)/u.test(name)) {
+  if (hasAny('character', 'chat', 'reading', 'content', 'episode', 'outbox', 'reader', 'grounding')) {
     selected.add('content');
     selected.add('postgres17');
     classified = true;
   }
 
-  if (/(?:birth|guest|record|subject|profile|auth|rls|privacy|deletion|memory|life_fact|notification)/u.test(name)) {
+  if (hasAny('birth', 'guest', 'record', 'records', 'subject', 'profile', 'auth', 'authentication', 'rls', 'privacy', 'deletion', 'memory', 'notification')) {
     selected.add('runtime');
     classified = true;
   }
 
-  if (/(?:birth_profile_create|content_release|member_character_thread)/u.test(name)) {
+  if (
+    name.includes('birth_profile_create')
+    || name.includes('content_release')
+    || name.includes('member_character_thread')
+  ) {
     selected.add('postgres17');
     classified = true;
   }
