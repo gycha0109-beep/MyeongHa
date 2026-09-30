@@ -34,10 +34,17 @@ const rows: readonly CharacterFactRegistryPublicationRowV1[] = [
 
 describe('PostgreSQL Character fact registry publication adapter', () => {
   it('publishes the compiler rows without adding values to unresolved facts', async () => {
-    const query = vi.fn(async () => ({
-      rows: [{ contentBundleId: '11111111-1111-4111-8111-111111111111' }],
-    }));
-    const client = { query } as unknown as PostgresTransactionQueryV1;
+    const calls: { text: string; values?: readonly unknown[] }[] = [];
+    const client: PostgresTransactionQueryV1 = {
+      async query<Row>(text: string, values?: readonly unknown[]) {
+        calls.push(values === undefined ? { text } : { text, values });
+        return {
+          rows: [{
+            contentBundleId: '11111111-1111-4111-8111-111111111111',
+          }] as unknown as Row[],
+        };
+      },
+    };
 
     await expect(
       publishCharacterFactRegistryV1({
@@ -47,11 +54,11 @@ describe('PostgreSQL Character fact registry publication adapter', () => {
       }),
     ).resolves.toBe('11111111-1111-4111-8111-111111111111');
 
-    expect(query).toHaveBeenCalledTimes(1);
-    expect(query.mock.calls[0]?.[0]).toContain(
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.text).toContain(
       'cmd_publish_character_fact_registry_v1',
     );
-    const serialized = query.mock.calls[0]?.[1]?.[1];
+    const serialized = calls[0]?.values?.[1];
     expect(typeof serialized).toBe('string');
     const payload = JSON.parse(serialized as string) as Record<string, unknown>[];
     expect(payload[0]).toMatchObject({
