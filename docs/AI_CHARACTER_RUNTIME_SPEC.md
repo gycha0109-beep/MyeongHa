@@ -67,6 +67,7 @@ Renderer context에 들어갈 수 있는 것만 retrieval 단계에서 선택한
 
 ```text
 character canon for pinned bundle
+release-pinned PUBLIC Character facts admitted from the compiled Fact Authority registry
 world relation canon for pinned bundle
 current relationship projection
 explicitly granted Life Facts
@@ -77,6 +78,8 @@ scene state
 ```
 
 비공개 데이터를 prompt에 넣고 숨기라고 지시하는 방식 금지.
+
+`publicCharacterFacts`는 일반 caller가 주입하는 자유형 설정 슬롯이 아니다. 서버가 exact content release / Character / fact selector provenance를 다시 검증한 뒤, `CANON | SOFT_CANON + KNOWN + PUBLIC`인 fact만 Runtime context에 부착한다. 관계단계 기반 disclosure mapping이 source-authoritative하게 닫히기 전에는 `FAMILIAR / ATTACHED / DEEP_TRUST / CONTEXTUAL` fact를 이 슬롯에 넣지 않는다. `AUTHOR_UNDEFINED / INTENTIONALLY_OPEN / WORLD_DEPENDENT`는 값으로 승격하지 않는다.
 
 `CharacterSajuContextEnvelopeV2`의 존재는 raw transport body를 runtime grounding으로 승격할 authority를 만들지 않는다. `SRC-33` 해결 전 real Saju transport response에서 production semantic envelope를 구성하지 않는다. Lower-level runtime/renderer invariants는 explicitly prevalidated canonical fixture로 독립 검증할 수 있다.
 
