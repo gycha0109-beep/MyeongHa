@@ -42,6 +42,37 @@ export {
 } from './relationship-engine.js';
 
 export {
+  CHARACTER_RUNTIME_CLAIM_CLASSES_V1,
+  CHARACTER_RUNTIME_CLAIM_EVIDENCE_STATES_V1,
+  CHARACTER_RUNTIME_DISCLOSURE_DEPTHS_V1,
+  CHARACTER_RUNTIME_DISCLOSURE_GATES_V1,
+  CHARACTER_RUNTIME_DISCLOSURE_RESULTS_V1,
+  CHARACTER_RUNTIME_INTEGRITY_RESULTS_V1,
+  CHARACTER_RUNTIME_SOURCE_AUTHORITY_STATES_V1,
+  resolveCharacterRuntimeClaimIntegrityV1,
+  resolveCharacterRuntimeDisclosurePreflightV1,
+  resolveCharacterRuntimeSensitiveTopicPreflightV1,
+  type CharacterRuntimeClaimClassV1,
+  type CharacterRuntimeClaimEvidenceStateV1,
+  type CharacterRuntimeClaimIntegrityDecisionV1,
+  type CharacterRuntimeClaimIntegrityInputV1,
+  type CharacterRuntimeDisclosureDecisionV1,
+  type CharacterRuntimeDisclosureDepthV1,
+  type CharacterRuntimeDisclosureGateV1,
+  type CharacterRuntimeDisclosureIneligibleResultV1,
+  type CharacterRuntimeDisclosurePreflightInputV1,
+  type CharacterRuntimeDisclosureReasonV1,
+  type CharacterRuntimeDisclosureRelationshipStageV1,
+  type CharacterRuntimeDisclosureResultV1,
+  type CharacterRuntimeDisclosureRetrievalPlanV1,
+  type CharacterRuntimeDisclosureTrustBandV1,
+  type CharacterRuntimeIntegrityResultV1,
+  type CharacterRuntimeSensitiveTopicPreflightInputV1,
+  type CharacterRuntimeSensitiveTopicPreflightV1,
+  type CharacterRuntimeSourceAuthorityStateV1,
+} from './character-runtime-preflight.js';
+
+export {
   assembleCharacterRuntimeContext,
   hashProtectedSajuTextV1,
   projectCharacterRelationshipBehavior,
