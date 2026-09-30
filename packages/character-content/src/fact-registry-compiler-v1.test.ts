@@ -108,7 +108,7 @@ describe('Character fact registry compiler v1', () => {
         characterId: 'seyeon',
         sourceBibleDocument: 'SEYEON_CHARACTER_BIBLE_DRAFT_V0_2.md',
         sourceBibleRevision: 'abc123',
-        bibleMarkdown: bible.replace('\\`CANON\\`', '\\`INVENTED\\`'),
+        bibleMarkdown: bible.replace('`CANON`', '`INVENTED`'),
       }),
     ).toThrow(CharacterFactRegistryCompilerErrorV1);
   });
