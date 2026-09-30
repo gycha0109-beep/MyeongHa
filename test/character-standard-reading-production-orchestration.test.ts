@@ -604,4 +604,39 @@ describe('Standard Reading production Character turn orchestration', () => {
     ]);
   });
 
+
+  it('rejects forged receive-plan provenance before promotion authority lookup', async () => {
+    const base = genuinePreflight();
+    const forged = {
+      ...base,
+      receivePlan: Object.freeze({
+        ...base.receivePlan,
+        resolvedContent: Object.freeze({
+          ...base.receivePlan.resolvedContent,
+        }),
+      }),
+    } as CharacterStandardReadingChatTurnPreflightV1;
+    const promotionAuthorityPort = {
+      resolvePromotion: vi.fn(async () => ({
+        allowed: true,
+        authorityVersion: 'must-not-be-used',
+      })),
+    };
+    const persistence = new Persistence();
+
+    await expect(
+      runCharacterStandardReadingProductionTurnV1({
+        preflight: forged,
+        catalogAuthorityPort: new CatalogPort([]),
+        promotionAuthorityPort,
+        renderer: new Renderer(validRendererOutput()),
+        persistence,
+        allowedSuggestedActionKeys: [],
+      }),
+    ).rejects.toThrow(/not minted by server receive authority/u);
+
+    expect(promotionAuthorityPort.resolvePromotion).not.toHaveBeenCalled();
+    expect(persistence.events).toEqual([]);
+  });
+
 });
