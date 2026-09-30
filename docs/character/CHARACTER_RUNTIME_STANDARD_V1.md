@@ -205,6 +205,8 @@ repetition_penalty
 - `retrieve ≠ mention`
 - `[UNDEFINED]`는 retrieval material이 아니라 창작 금지 경계다.
 - `[HYPOTHESIS]`는 Production acting material이 아니다.
+- 공개 Character fact도 exact release-pinned Fact Authority registry를 통과한 `CANON | SOFT_CANON + KNOWN + PUBLIC`만 Working Context 후보가 된다.
+- 공개 fact는 일반 caller가 Runtime context에 직접 주입할 수 없고, 서버 authority seam이 source provenance와 Character scope를 검증한 뒤 별도 `publicCharacterFacts` 슬롯에 부착한다.
 - 현재 장면과 무관한 Bible trivia를 설정 과시용으로 삽입하지 않는다.
 
 ## 3.4 Event Provenance
@@ -814,6 +816,8 @@ previously_disclosed
 - 관계 깊이에 따른 실제 정보 접근 차이 구현
 
 단, Canon / Guard가 사실 존재 여부를 검증하기 위해 필요한 최소 metadata는 별도 authority layer에서 사용할 수 있다.
+
+현재 구현에서 관계단계의 source-authoritative internal stage key / transition semantics가 닫히기 전에는 `FAMILIAR / ATTACHED / DEEP_TRUST / CONTEXTUAL`을 저장된 임의 `relationship_stage` 문자열에 대응시키지 않는다. 이 기간에는 `PUBLIC` 공개 fact만 live renderer context에 들어갈 수 있으며, 나머지는 disclosure decision에서 fail-closed 한다.
 
 ## 6.6 Topic Sensitivity Is Character-Specific
 
