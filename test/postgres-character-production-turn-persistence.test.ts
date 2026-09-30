@@ -23,7 +23,8 @@ const MESSAGE_ID = '66666666-6666-4666-8666-666666666666';
 const OUTBOX_ID = '77777777-7777-4777-8777-777777777777';
 const THREAD_ID = '88888888-8888-4888-8888-888888888888';
 const READING_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa01';
-const GROUNDING_ID = '99999999-9999-4999-8999-999999999999';
+const GROUNDING_ID_A = '99999999-9999-4999-8999-999999999998';
+const GROUNDING_ID_B = '99999999-9999-4999-8999-999999999999';
 
 function envelope(): CharacterDialogueEnvelopeV1 {
   return Object.freeze({
@@ -158,7 +159,7 @@ describe('PostgreSQL Production Character turn persistence', () => {
       groundingAuthority: {
         readGroundingIds(input) {
           groundingCalls.push(input);
-          return [GROUNDING_ID];
+          return [GROUNDING_ID_B, GROUNDING_ID_A];
         },
       },
     });
@@ -264,10 +265,10 @@ describe('PostgreSQL Production Character turn persistence', () => {
     });
 
     expect(rendererLog!.values[11]).toBe(READING_ID);
-    expect(rendererLog!.values[12]).toBe(JSON.stringify([GROUNDING_ID]));
-    expect(generated!.values[10]).toBe(JSON.stringify([GROUNDING_ID]));
+    expect(rendererLog!.values[12]).toBe(JSON.stringify([GROUNDING_ID_A, GROUNDING_ID_B]));
+    expect(generated!.values[10]).toBe(JSON.stringify([GROUNDING_ID_A, GROUNDING_ID_B]));
     expect(guardLog!.values[11]).toBe(READING_ID);
-    expect(guardLog!.values[12]).toBe(JSON.stringify([GROUNDING_ID]));
+    expect(guardLog!.values[12]).toBe(JSON.stringify([GROUNDING_ID_A, GROUNDING_ID_B]));
     expect(groundingCalls).toEqual([{
       subjectId: SUBJECT_ID,
       turnId: TURN_ID,
