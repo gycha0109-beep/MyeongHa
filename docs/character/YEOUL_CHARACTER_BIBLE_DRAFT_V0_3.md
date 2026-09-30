@@ -7,7 +7,7 @@
 > Bible Standard: Character Bible Standard v1
 > Authority State: DRAFT / SOURCE-ALIGNED / INCOMPLETE
 > Source: 기존 여울 Character Bible v0.2 작업본 + 승인된 roster / visual 관계 자료를 Standard v1로 재구성
-> World / Deity Layer: 별도 세계관 설계에서 관리
+> World / Principle-Calling Layer: 별도 세계관 설계에서 관리
 
 ## 상태 표기
 
