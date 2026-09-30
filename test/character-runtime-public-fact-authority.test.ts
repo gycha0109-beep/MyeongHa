@@ -27,6 +27,7 @@ function authoredCharacter(): CharacterContentDefinition {
     values: ['truth'],
     speech: runtime.speech,
     capabilities: runtime.capabilities,
+    assetRefs: [],
     emotionIds: ['neutral'],
     animationCueIds: ['idle'],
     canon: {
