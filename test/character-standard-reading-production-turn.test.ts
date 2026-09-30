@@ -368,4 +368,42 @@ describe('Production Standard Reading Character turn orchestration', () => {
     ]);
     expect(renderer.calls).toHaveLength(0);
   });
+
+  it('fails closed when attempt allocation replays an uncommitted in-flight attempt', async () => {
+    const catalog = new StaticCatalogPort();
+    const renderer = new CapturingRenderer(validRendererOutput());
+    const persistence = new RecordingPersistence();
+    persistence.allocateAttempt = async () => {
+      persistence.events.push('allocate_attempt');
+      return {
+        attemptId: ATTEMPT_ID,
+        attemptNo: 1,
+        replayed: true,
+      };
+    };
+
+    await expect(
+      runCharacterStandardReadingProductionTurnV1({
+        resolvedSubjectId: SUBJECT_ID,
+        turnId: TURN_ID,
+        plannerVersion: 'production-planner-v1',
+        preflight: genuinePreflight(),
+        catalogAuthorityPort: catalog,
+        renderer,
+        persistence,
+        allowedSuggestedActionKeys: [],
+      }),
+    ).rejects.toMatchObject({
+      name: 'CharacterStandardReadingProductionTurnErrorV1',
+      stage: 'attempt',
+    });
+
+    expect(persistence.events).toEqual([
+      'read_committed',
+      'allocate_attempt',
+    ]);
+    expect(catalog.calls).toBe(0);
+    expect(renderer.calls).toHaveLength(0);
+  });
+
 });
