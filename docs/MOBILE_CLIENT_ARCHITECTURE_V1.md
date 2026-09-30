@@ -1,7 +1,7 @@
 # MyeongHa Mobile Client Architecture v1
 
 > Track: `applizing`  
-> Status: M7 native Face media staging implemented  
+> Status: M8 prerequisite — existing-Member auth foundation implemented  
 > Date: 2026-09-29  
 > Server authority: existing MyeongHa API / PostgreSQL  
 > Client principle: Web and Mobile are separate first-class clients of the same server world.
@@ -207,7 +207,7 @@ M4  Records + My                                         DONE
 M5  Home projection composition                          DONE
 M6  Chat Hub + server-authorized read path               DONE
 M7  Face Reading media path                              DONE
-M8  Chat send after authority unblock
+M8  Chat send after authority unblock                    BLOCKED
 M9  Push after notification authority unblock
 M10 native store commerce after rail decision
 M11 Android/iOS release hardening
@@ -295,3 +295,40 @@ Important privacy boundary:
 `expo-image-picker` with `exif: false` only means EXIF data is not returned in the picker result. M7 does **not** treat that option as evidence that metadata has been stripped from the selected file bytes. The Face Reading engine authority requires EXIF/metadata removal at intake, so engine handoff remains disabled until a source-approved intake adapter explicitly satisfies that requirement.
 
 M7 therefore completes the **native media staging** path without inventing a Production Face Reading upload/API contract or bypassing the separate Face Reading engine authority.
+
+
+## 14. M8 prerequisite A — existing-Member authentication
+
+Before Mobile can consume the already-authorized Member-only Chat thread-open path, it needs a native Member session authority distinct from the Guest credential.
+
+Implemented prerequisite:
+
+```text
+POST /api/auth/sign-in
+POST /api/auth/refresh
+POST /api/auth/sign-out
+        ↓
+shared strict Member session parser
+        ↓
+Expo SecureStore Member session key
+        ↓
+single-flight proactive refresh
++ serialized sign-in / refresh / sign-out mutation ordering
+```
+
+Rules:
+
+- Member and Guest credentials use separate SecureStore keys.
+- existing-Member sign-in does not silently clear, merge, or promote the current Guest authority.
+- refresh-token rotation is persisted as one Member session generation.
+- stale refresh completion cannot intentionally overwrite a newer explicit sign-in generation inside the native coordinator.
+- an authoritative `SESSION_EXPIRED` refresh rejection clears only the expected Member generation.
+- transient proactive-refresh failure may continue using the still-unexpired access token.
+- sign-out is local-device authoritative after best-effort server sign-out, matching the existing Web authority pattern.
+- the foundation does not activate Chat open, Chat send, Character discovery, or a static Character roster.
+
+Mobile sign-up is intentionally not activated by this prerequisite. The current server sign-up path generates an email confirmation redirect to the governed Web `/auth.html` flow. A native confirmation/deep-link handoff contract must be established before Mobile can claim a complete sign-up lifecycle.
+
+### M8 send blocker
+
+The current Production `POST /api/chat` contract is the Member Launch-Character **thread open/reuse** command. `CHAT_MEMBER_THREAD_OPEN_HTTP_AUTHORITY_V1` explicitly states that it does not define a replacement turn-send HTTP contract. Therefore M8 Chat send remains blocked; Mobile must not reuse the obsolete API-contract example or invent `clientCapability`/turn-send transport semantics.
