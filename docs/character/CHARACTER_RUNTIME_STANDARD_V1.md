@@ -48,7 +48,7 @@ Runtime은 다음을 새로 만들거나 authority 없이 변경하지 않는다
 - Bible에 없는 Character 과거 / 가족 / 직업 / 관계사 / 목표
 - Bible의 `[UNDEFINED]`
 - Bible의 `[HYPOTHESIS]`를 확정 사실로 승격
-- 별도 authority가 소유한 세계관 / 신격 / 능력 / Saju semantic result
+- 별도 authority가 소유한 세계관 / 이치·명 / 능력 / Saju semantic result
 - 사용자의 미확인 현실 사실
 - 사용자의 감정 / 의도에 대한 확정 판정
 - Relationship Projection의 직접 mutation
