@@ -223,6 +223,12 @@ SQL
     apply_pg17_migrations_without_birth_authority
     bash test/db/character_fact_registry_runtime_authority.sh
     ;;
+  chat-turn-execution-runtime-authority)
+    verify_pg17
+    apply_pg17_migrations_without_birth_authority
+    bash test/db/chat_turn_execution_runtime_authority.sh
+    catalog_snapshot
+    ;;
   content-release-lifecycle)
     verify_pg17
     apply_pg17_migrations_without_birth_authority
