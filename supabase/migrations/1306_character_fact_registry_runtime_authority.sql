@@ -89,8 +89,6 @@ create index character_fact_registry_character_lookup_idx
 
 grant select, insert on public.character_fact_registry
   to myeongha_content_publication_owner;
-grant select on public.character_fact_registry
-  to myeongha_api_executor;
 
 create or replace function public.tr_character_fact_registry_immutable_v1()
 returns trigger
@@ -361,7 +359,7 @@ returns table (
 )
 language plpgsql
 stable
-security invoker
+security definer
 set search_path = pg_catalog, public
 as $$
 declare
@@ -414,6 +412,8 @@ $$;
 grant create on schema public to myeongha_content_publication_owner;
 alter function public.cmd_publish_character_fact_registry_v1(uuid, jsonb)
   owner to myeongha_content_publication_owner;
+alter function public.qry_character_fact_registry_v1(uuid, text, text)
+  owner to myeongha_content_publication_owner;
 revoke create on schema public from myeongha_content_publication_owner;
 
 revoke all on function public.cmd_publish_character_fact_registry_v1(uuid, jsonb)
@@ -422,9 +422,12 @@ grant execute on function public.cmd_publish_character_fact_registry_v1(uuid, js
   to myeongha_content_operator;
 
 revoke all on function public.qry_character_fact_registry_v1(uuid, text, text)
-  from public, anon, authenticated, service_role;
+  from public, anon, authenticated, service_role, myeongha_content_operator;
 grant execute on function public.qry_character_fact_registry_v1(uuid, text, text)
   to myeongha_api_executor;
+
+revoke all on table public.character_fact_registry
+  from public, anon, authenticated, service_role, myeongha_api_executor, myeongha_content_operator;
 
 comment on table public.character_fact_registry is
 'Immutable runtime projection compiled from versioned Character Bible authority. Not an editable Canon source.';
