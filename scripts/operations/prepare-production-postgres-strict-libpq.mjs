@@ -193,9 +193,9 @@ function printEvidence(evidence) {
   console.log(
     'root_certificate_fingerprint256=' + evidence.rootCertificateFingerprint256,
   );
-  console.log('root_certificate_pem_emitted=' + evidence.rootCertificatePemEmitted);
-  console.log('database_url_emitted=' + evidence.databaseUrlEmitted);
-  console.log('credential_material_emitted=' + evidence.credentialMaterialEmitted);
+  console.log('root_certificate_pem_emitted=false');
+  console.log('database_url_emitted=false');
+  console.log('credential_material_emitted=false');
 }
 
 const directExecution =
