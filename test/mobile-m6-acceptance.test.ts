@@ -13,9 +13,8 @@ describe('mobile M6 acceptance', () => {
     expect(readme).toContain('Chat send');
   });
 
-  it('records M6 as complete and M7 as next', async () => {
+  it('keeps M6 recorded as complete after later mobile phases advance', async () => {
     const architecture = await readRepoFile('docs/MOBILE_CLIENT_ARCHITECTURE_V1.md');
     expect(architecture).toContain('M6  Chat Hub + server-authorized read path               DONE');
-    expect(architecture).toContain('M7  Face Reading media path                              NEXT');
   });
 });

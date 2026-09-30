@@ -5,7 +5,7 @@ MyeongHa Mobile is a first-class React Native client of the existing MyeongHa se
 ## Current state
 
 - Track: `applizing`
-- Phase: **M6 server-authorized Chat read**
+- Phase: **M7 native Face media staging**
 - Runtime: **Expo SDK 57 / React Native 0.86.x**
 - Navigation: **Expo Router**
 - Secure Guest credential persistence: **Expo SecureStore**
@@ -24,16 +24,20 @@ Mobile now has:
 - current Birth Profile create/read and current-subject Saju calculation rendering;
 - Records reads for Life Record, Reading History, and Memory with cursor pagination;
 - My projection from current Profile + Birth;
-- Home projection composed from current Profile, Birth, latest Reading History, and calculation-only Saju evidence;\n- known-thread Chat read through `GET /api/chat/:threadId` with forward cursor pagination and redaction-safe rendering.
+- Home projection composed from current Profile, Birth, latest Reading History, and calculation-only Saju evidence;
+- known-thread Chat read through `GET /api/chat/:threadId` with forward cursor pagination and redaction-safe rendering;
+- Face Reading camera/library photo staging through Expo ImagePicker with image-only selection, 16MB client bound, local preview, and no server analysis.
 
 Home does not invent a separate server authority. It does not call unimplemented `/api/home` or `/api/characters`, does not infer a recent Chat thread, does not auto-run Preview Reading, and does not synthesize daily-fortune claims from calculation-only Saju evidence.
 
-Still gated after M6:
+Still gated after M7:
 
 - native Member auth/account management;
-- Chat thread discovery / recent-thread listing;\n- Mobile Chat-open activation while native Member auth and Character discovery are unavailable;\n- Chat send;
+- Chat thread discovery / recent-thread listing;
+- Mobile Chat-open activation while native Member auth and Character discovery are unavailable;
+- Chat send;
 - production Character catalog/recommendation projection;
-- Face Reading native media path;
+- Face Reading engine intake / analysis upload. M7 does not treat `exif: false` as proof that selected file bytes are metadata-stripped;
 - Push;
 - native store commerce.
 
