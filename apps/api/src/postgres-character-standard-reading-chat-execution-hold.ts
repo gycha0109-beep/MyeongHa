@@ -1,3 +1,4 @@
+import { getServerPreparedChatReceiveContentEntryV1 } from './chat-receive.js';
 import type {
   CharacterStandardReadingChatTurnPreflightV1,
 } from './character-standard-reading-chat-turn-preflight.js';
@@ -149,6 +150,9 @@ function exactExecutionIdentity(
   readonly releaseId: string;
   readonly bundleId: string;
 } {
+  const contentEntry = getServerPreparedChatReceiveContentEntryV1(
+    preflight.receivePlan,
+  );
   const subjectId = requiredText(
     preflight.runtime.source.subjectId,
     'source.subjectId',
@@ -165,18 +169,32 @@ function exactExecutionIdentity(
     );
   }
 
+  const releaseId = requiredText(
+    preflight.runtime.threadBinding.activeContentReleaseId,
+    'activeContentReleaseId',
+  );
+  const bundleId = requiredText(
+    preflight.runtime.threadBinding.activeContentBundleId,
+    'activeContentBundleId',
+  );
+  if (
+    releaseId !== preflight.receivePlan.resolvedContent.releaseId ||
+    releaseId !== contentEntry.release.releaseId ||
+    bundleId !== preflight.receivePlan.resolvedContent.bundleId ||
+    bundleId !== contentEntry.release.bundleId
+  ) {
+    throw new CharacterStandardReadingChatExecutionLifecycleErrorV1(
+      'CONTENT_PROVENANCE_MISMATCH',
+      'Standard Reading Chat preflight content provenance is inconsistent.',
+    );
+  }
+
   return Object.freeze({
     subjectId,
     threadId,
     clientTurnId: requiredText(request.clientTurnId, 'clientTurnId'),
-    releaseId: requiredText(
-      preflight.runtime.threadBinding.activeContentReleaseId,
-      'activeContentReleaseId',
-    ),
-    bundleId: requiredText(
-      preflight.runtime.threadBinding.activeContentBundleId,
-      'activeContentBundleId',
-    ),
+    releaseId,
+    bundleId,
   });
 }
 
