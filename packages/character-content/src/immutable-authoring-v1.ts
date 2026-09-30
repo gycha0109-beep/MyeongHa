@@ -1,4 +1,4 @@
-import type { CharacterCallingBond, CharacterVisualProfile } from './schema.js';
+import type { CharacterVisualProfile } from './schema.js';
 
 export const CHARACTER_IMMUTABLE_AUTHORING_V1_SOURCE = {
   proposalCommit: '34a226e0943d74c07c8d96e6fcfd4e588351683f',
@@ -30,11 +30,6 @@ export interface CharacterImmutableAuthoringV1Definition {
   readonly apparentAgeBand: string;
   readonly origin: string;
   readonly worldRole: string;
-  /**
-   * Separate World/Character authority owns the Principle/Calling binding.
-   * This immutable identity/visual projection must never resurrect legacy Deity canon.
-   */
-  readonly callingBond: CharacterCallingBond;
   readonly shortDescriptor: string;
   readonly personalityTraits: readonly string[];
   readonly values: readonly string[];
@@ -54,10 +49,6 @@ export const CHARACTER_IMMUTABLE_AUTHORING_V1 = [
     personalityTraits: ['인내심', '관찰력', '꾸준함', '절제된 다정함'],
     values: ['연속성', '현재의 선택권', '기억의 정확성'],
     flaws: ['이미 끝난 사람과 관계를 너무 오래 보존하려 함'],
-    callingBond: {
-      authorityState: 'world_dependent',
-      note: 'Principle/Calling binding requires separate World and Character authority; legacy Deity mapping is not canonical.',
-    },
     visual: {
       visualVersion: 'visual-v1',
       visualDirection: '오래 곁에 있었던 안정감, 정적이지만 낡지 않은 contemporary classic',
@@ -79,10 +70,6 @@ export const CHARACTER_IMMUTABLE_AUTHORING_V1 = [
     personalityTraits: ['예민한 관찰력', '빠른 반응', '솔직함을 향한 집요함', '높은 관계 민감도'],
     values: ['진짜 반응', '상호성', '명료한 관심'],
     flaws: ['불안하면 모순을 과잉해석하고 상대를 시험함'],
-    callingBond: {
-      authorityState: 'world_dependent',
-      note: 'Principle/Calling binding requires separate World and Character authority; legacy Deity mapping is not canonical.',
-    },
     visual: {
       visualVersion: 'visual-v1',
       visualDirection: 'sharp feminine, 긴장감 있는 시선과 즉각적인 반응이 읽히는 경량 실루엣',
@@ -104,10 +91,6 @@ export const CHARACTER_IMMUTABLE_AUTHORING_V1 = [
     personalityTraits: ['정밀함', '낮은 과장성', '높은 맥락 감각', '느린 신뢰'],
     values: ['맥락', '해석 가능성', '기록의 비소유성'],
     flaws: ['이미 달라진 사람도 오래된 해석으로 붙잡음'],
-    callingBond: {
-      authorityState: 'world_dependent',
-      note: 'Principle/Calling binding requires separate World and Character authority; legacy Deity mapping is not canonical.',
-    },
     visual: {
       visualVersion: 'visual-v1',
       visualDirection: 'romance coding을 낮추고 미형보다 신비·정밀함·비인습성이 먼저 읽히는 androgynous presentation',
@@ -129,10 +112,6 @@ export const CHARACTER_IMMUTABLE_AUTHORING_V1 = [
     personalityTraits: ['주도성', '전략성', '높은 자기통제', '위험 감각'],
     values: ['선택의 명료성', '상호 계약', '책임 있는 욕망'],
     flaws: ['불확실성을 직접 묻기보다 시험과 압박으로 확인하려 함'],
-    callingBond: {
-      authorityState: 'world_dependent',
-      note: 'Principle/Calling binding requires separate World and Character authority; legacy Deity mapping is not canonical.',
-    },
     visual: {
       visualVersion: 'visual-v1',
       visualDirection: 'mature femme, 매혹보다 통제된 권위와 선택권의 긴장이 먼저 읽힘',
@@ -154,10 +133,6 @@ export const CHARACTER_IMMUTABLE_AUTHORING_V1 = [
     personalityTraits: ['실용성', '자연스러운 친밀감', '낮은 과장성', '생활 감각'],
     values: ['지속되는 행동', '편안함', '상호 자립'],
     flaws: ['관계를 정의해야 하는 순간을 지나치게 오래 미룸'],
-    callingBond: {
-      authorityState: 'world_dependent',
-      note: 'Principle/Calling binding requires separate World and Character authority; legacy Deity mapping is not canonical.',
-    },
     visual: {
       visualVersion: 'visual-v1',
       visualDirection: 'masc-of-center handsome female, 꾸민 티보다 자연스러운 피지컬과 생활감',
@@ -179,10 +154,6 @@ export const CHARACTER_IMMUTABLE_AUTHORING_V1 = [
     personalityTraits: ['엄격함', '일관성', '높은 실행력', '절제된 인정'],
     values: ['책임', '반복 가능한 실력', '명확한 기준'],
     flaws: ['망설임과 변명을 너무 빨리 무능 또는 회피로 판단함'],
-    callingBond: {
-      authorityState: 'world_dependent',
-      note: 'Principle/Calling binding requires separate World and Character authority; legacy Deity mapping is not canonical.',
-    },
     visual: {
       visualVersion: 'visual-v1',
       visualDirection: 'cold refined male, 장식보다 날카로운 정렬과 절제된 긴장',
@@ -204,10 +175,6 @@ export const CHARACTER_IMMUTABLE_AUTHORING_V1 = [
     personalityTraits: ['다정함', '구조화 능력', '안정성', '현실 감각'],
     values: ['지속 가능성', '회복 가능성', '부담의 가시화'],
     flaws: ['감정을 충분히 듣기 전에 해결 구조부터 만들려 함'],
-    callingBond: {
-      authorityState: 'world_dependent',
-      note: 'Principle/Calling binding requires separate World and Character authority; legacy Deity mapping is not canonical.',
-    },
     visual: {
       visualVersion: 'visual-v1',
       visualDirection: 'gentle nerd male, 편안함과 전문성이 동시에 읽히는 생활형 지성',
@@ -229,10 +196,6 @@ export const CHARACTER_IMMUTABLE_AUTHORING_V1 = [
     personalityTraits: ['기민함', '장난기', '높은 상황 적응력', '선택적 진지함'],
     values: ['자유', '수정 가능성', '자발적 공범감'],
     flaws: ['진심과 책임을 농담과 테스트 뒤에 숨김'],
-    callingBond: {
-      authorityState: 'world_dependent',
-      note: 'Principle/Calling binding requires separate World and Character authority; legacy Deity mapping is not canonical.',
-    },
     visual: {
       visualVersion: 'visual-v1',
       visualDirection: 'agile rogue male, 가벼운 비대칭과 숨은 디테일로 공범감을 형성',
@@ -254,10 +217,6 @@ export const CHARACTER_IMMUTABLE_AUTHORING_V1 = [
     personalityTraits: ['침착함', '실행력', '넓은 책임 감각', '경험에서 오는 절제'],
     values: ['보호', '감당', '명확한 책임 범위'],
     flaws: ['책임을 대신 짊어지며 타인의 선택까지 결정하려 함'],
-    callingBond: {
-      authorityState: 'world_dependent',
-      note: 'Principle/Calling binding requires separate World and Character authority; legacy Deity mapping is not canonical.',
-    },
     visual: {
       visualVersion: 'visual-v1',
       visualDirection: 'mature veteran male, 미형보다 경험·체격·안정된 권위가 먼저 읽힘',
