@@ -76,6 +76,60 @@ describe('Character runtime authoring v1 authority', () => {
     }
   });
 
+  it('aligns Seyeon, Yeoul, and Rahyeon typed runtime projections with the reviewed Runtime instances', () => {
+    const seyeon = CHARACTER_RUNTIME_AUTHORING_V1.find(
+      (character) => character.characterId === 'seyeon',
+    );
+    const yeoul = CHARACTER_RUNTIME_AUTHORING_V1.find(
+      (character) => character.characterId === 'yeoul',
+    );
+    const rahyeon = CHARACTER_RUNTIME_AUTHORING_V1.find(
+      (character) => character.characterId === 'rahyeon',
+    );
+
+    expect(seyeon?.speech.register).toBe('밝고 행동적인 현실형 동행자');
+    expect(seyeon?.behavior.questionPriorities).toEqual([
+      'activate_next_step',
+      'clarify_boundary',
+    ]);
+    expect(seyeon?.relationshipBehavior.defaultMode.distance).toBe('warm-proactive');
+
+    expect(yeoul?.speech.register).toBe(
+      '새침하지만 감정이 행동으로 먼저 새는 관계형 동행자',
+    );
+    expect(yeoul?.behavior.questionPriorities).toEqual([
+      'ask_emotional_signal',
+      'ask_evidence_gap',
+    ]);
+    expect(yeoul?.relationshipBehavior.defaultMode.distance).toBe('slightly-prickly');
+
+    expect(rahyeon?.speech.register).toBe('자기 확신과 여유가 있는 성숙한 주도형');
+    expect(rahyeon?.behavior.questionPriorities).toEqual([
+      'surface_tradeoff',
+      'ask_decision_constraint',
+    ]);
+    expect(rahyeon?.relationshipBehavior.defaultMode.distance).toBe('composed');
+
+    const reviewedRuntimeProjection = JSON.stringify([seyeon, yeoul, rahyeon]);
+    expect(reviewedRuntimeProjection).not.toContain('차분하고 균형 잡힌 검토자');
+    expect(reviewedRuntimeProjection).not.toContain('부드럽고 감각적인 정서 관찰자');
+    expect(reviewedRuntimeProjection).not.toContain('밝고 빠른 사회적 촉진자');
+  });
+
+  it('keeps unresolved Principle/Calling authority out of Runtime authoring', () => {
+    for (const characterId of ['seyeon', 'yeoul', 'rahyeon'] as const) {
+      const character = CHARACTER_RUNTIME_AUTHORING_V1.find(
+        (entry) => entry.characterId === characterId,
+      );
+
+      expect(character).toBeDefined();
+      expect('principleId' in (character ?? {})).toBe(false);
+      expect('callingBond' in (character ?? {})).toBe(false);
+      expect('representativeTitle' in (character ?? {})).toBe(false);
+      expect('oath' in (character ?? {})).toBe(false);
+    }
+  });
+
   it('keeps publication-only fields outside the runtime authoring registry', () => {
     for (const character of CHARACTER_RUNTIME_AUTHORING_V1) {
       expect('assetRefs' in character).toBe(false);
