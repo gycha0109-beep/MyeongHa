@@ -9,6 +9,7 @@ on:
       - 'test/db/birth_profile_create_runtime_authority.sh'
       - 'test/db/content_release_lifecycle_authority.sh'
       - 'test/db/character_fact_registry_runtime_authority.sh'
+      - 'test/db/chat_turn_receive_runtime_authority.sh'
       - 'test/db/character_fact_registry_runtime_authority.sh'
       - 'test/db/member_character_thread_open_concurrency.sh'
       - 'docs/CHARACTER_GATE_B_PUBLICATION_BLOCKER_EVIDENCE.md'
@@ -22,6 +23,7 @@ on:
       - 'test/db/run_ci_case.sh'
       - 'test/db/birth_profile_create_runtime_authority.sh'
       - 'test/db/content_release_lifecycle_authority.sh'
+      - 'test/db/chat_turn_receive_runtime_authority.sh'
       - 'test/db/member_character_thread_open_concurrency.sh'
       - 'docs/CHARACTER_GATE_B_PUBLICATION_BLOCKER_EVIDENCE.md'
       - '.github/workflows/db-postgres17-authority-suite.yml'
@@ -45,6 +47,7 @@ jobs:
           - birth-profile-create-runtime-authority
           - content-release-lifecycle
           - character-fact-registry-runtime-authority
+          - chat-turn-receive-runtime-authority
           - member-character-thread-open
     services:
       postgres:
