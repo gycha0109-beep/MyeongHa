@@ -26,7 +26,7 @@ function authoredCharacter(): CharacterContentDefinition {
   return {
     ...base,
     displayName: 'Orchestration Test Representative',
-    deityProxyLabel: 'orchestration_witness',
+    representativeTitle: 'orchestration_witness',
     shortDescriptor: 'test-only authored character',
     personalityTraits: ['observant'],
     flaws: ['overchecks continuity'],
