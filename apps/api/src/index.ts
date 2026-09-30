@@ -789,3 +789,17 @@ export {
   prepareCharacterStandardReadingRendererContextFromPublicCatalogV1,
   type CharacterStandardReadingPublicFactCatalogRendererContextV1,
 } from './character-standard-reading-public-fact-catalog-context.js';
+
+
+export {
+  CharacterStandardReadingProductionTurnErrorV1,
+  runCharacterStandardReadingProductionTurnV1,
+  type CharacterProductionAttemptV1,
+  type CharacterProductionCommittedTurnV1,
+  type CharacterProductionRendererInputV1,
+  type CharacterProductionRendererPortV1,
+  type CharacterProductionTurnPersistencePortV1,
+  type CharacterStandardReadingProductionTurnResultV1,
+  type CharacterStandardReadingProductionTurnStageV1,
+  type RunCharacterStandardReadingProductionTurnInputV1,
+} from './character-standard-reading-production-turn.js';
