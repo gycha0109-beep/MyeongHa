@@ -90,17 +90,6 @@ insert into public.content_bundles(
   now()
 );
 
-insert into public.content_releases(
-  id, release_key, content_bundle_id, status, is_default,
-  rollout_policy_version, rollout_seed, activated_at, created_at
-) values (
-  '13080000-0000-0000-0000-000000000022',
-  'chat-production-runtime-release-v1',
-  '13080000-0000-0000-0000-000000000021',
-  'active', false, 'test-rollout-v1',
-  'chat-production-runtime-seed', now(), now()
-);
-
 insert into public.characters(character_id, created_at)
 values ('seyeon-runtime-test', now());
 
@@ -110,6 +99,17 @@ insert into public.character_runtime_catalog(
   'seyeon-runtime-test',
   '13080000-0000-0000-0000-000000000021',
   'available', true, now()
+);
+
+insert into public.content_releases(
+  id, release_key, content_bundle_id, status, is_default,
+  rollout_policy_version, rollout_seed, activated_at, created_at
+) values (
+  '13080000-0000-0000-0000-000000000022',
+  'chat-production-runtime-release-v1',
+  '13080000-0000-0000-0000-000000000021',
+  'active', false, 'test-rollout-v1',
+  'chat-production-runtime-seed', now(), now()
 );
 
 insert into public.conversation_threads(
