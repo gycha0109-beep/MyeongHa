@@ -682,6 +682,13 @@ export {
 } from './character-standard-reading-chat-turn-preflight.js';
 
 export {
+  CharacterPublicFactChatReadErrorV1,
+  readCharacterPublicFactForStandardReadingChatV1,
+  type CharacterPublicFactChatReadBlockedReasonV1,
+  type CharacterPublicFactChatReadV1,
+} from './character-standard-reading-public-fact-read.js';
+
+export {
   createPostgresChatThreadRuntimeBindingAuthorityPortV1,
 } from './postgres-chat-thread-runtime-binding.js';
 
