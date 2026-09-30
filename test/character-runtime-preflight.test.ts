@@ -222,7 +222,7 @@ describe('Character Runtime disclosure preflight', () => {
           minimumDisclosureGate: 'CONTEXTUAL',
           relationshipStage: 'public',
           trustBand: 'medium',
-          minimumTrustBand: undefined,
+          minimumTrustBand: 'low',
           contextualEligibility: true,
           requestedDepth: 'surface',
           allowedDepth: 'surface',
@@ -238,7 +238,7 @@ describe('Character Runtime disclosure preflight', () => {
         disclosureInput({
           minimumDisclosureGate: 'CONTEXTUAL',
           contextualEligibility: false,
-          minimumTrustBand: undefined,
+          minimumTrustBand: 'low',
         }),
       ),
     ).toMatchObject({
