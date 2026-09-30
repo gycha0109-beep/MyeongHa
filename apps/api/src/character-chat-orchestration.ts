@@ -12,6 +12,7 @@ import {
   type CharacterRuntimeContextV1,
   type CapabilityGateInput,
 } from '../../../packages/domain/src/index.js';
+import type { CharacterRuntimeFactRendererPacketV1 } from './character-runtime-fact-packet.js';
 import { assertEngineeringVerticalSliceMockExecution } from './mock-execution-boundary.js';
 
 export type CharacterRuntimeContextAssemblyInputV1 = Parameters<
@@ -22,6 +23,11 @@ export interface CharacterRendererProviderInputV1 {
   readonly turnId: string;
   readonly attemptId: string;
   readonly context: CharacterRuntimeContextV1;
+  /**
+   * Optional server-prepared Character fact packet.
+   * Request handlers must never accept this packet from client payloads.
+   */
+  readonly characterFacts?: CharacterRuntimeFactRendererPacketV1;
 }
 
 /**
