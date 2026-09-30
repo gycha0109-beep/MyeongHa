@@ -815,3 +815,11 @@ export {
   type CharacterStandardReadingChatExecutionLifecycleModeV1,
   type CharacterStandardReadingChatExecutionLifecycleRowV1,
 } from './postgres-character-standard-reading-chat-execution-hold.js';
+
+
+export {
+  CHARACTER_DIALOGUE_MESSAGE_SCHEMA_VERSION_V1,
+  CharacterDialogueMessagePersistenceErrorV1,
+  serializeCharacterDialogueEnvelopeForPersistenceV1,
+  type CharacterDialoguePersistedMessageV1,
+} from './character-dialogue-message-persistence.js';
