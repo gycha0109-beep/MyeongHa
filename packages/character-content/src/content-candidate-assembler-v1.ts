@@ -27,6 +27,14 @@ export interface CharacterCanonCompletionV1 {
   readonly psychology: CharacterCanonProfile['psychology'];
 }
 
+export interface CharacterPrincipleCallingCompletionV1 {
+  readonly characterId: CharacterContentCandidateV1CharacterId;
+  readonly callingBond: CharacterCanonProfile['callingBond'];
+  readonly representativeTitle?: string;
+  readonly vocation?: string;
+  readonly duties?: readonly string[];
+}
+
 export interface CharacterPublicationMaterialInputV1 {
   readonly characterId: CharacterContentCandidateV1CharacterId;
   readonly assetRefs: readonly string[];
@@ -45,6 +53,11 @@ export interface CharacterContentBundleCandidateMetadataV1 {
 export interface CharacterContentBundleCandidateInputV1 {
   readonly metadata: CharacterContentBundleCandidateMetadataV1;
   readonly canonCompletions: readonly CharacterCanonCompletionV1[];
+  /**
+   * Separate World/Character authority handoff. Missing entries remain unresolved
+   * and therefore cannot cross the Production publication boundary.
+   */
+  readonly principleCallingCompletions?: readonly CharacterPrincipleCallingCompletionV1[];
   readonly publicationMaterials: readonly CharacterPublicationMaterialInputV1[];
 }
 
@@ -52,6 +65,7 @@ export type CharacterContentCandidateAssemblyErrorCode =
   | 'SOURCE_ROSTER_MISMATCH'
   | 'SOURCE_DISPLAY_NAME_MISMATCH'
   | 'CANON_COMPLETION_ROSTER_MISMATCH'
+  | 'PRINCIPLE_CALLING_COMPLETION_ROSTER_INVALID'
   | 'PUBLICATION_MATERIAL_ROSTER_MISMATCH';
 
 export class CharacterContentCandidateAssemblyError extends Error {
@@ -113,6 +127,29 @@ function assertExactRoster(
       code,
       `${label} must contain exactly one entry for each approved Character; ${problem}`,
     );
+  }
+}
+
+function assertPartialRoster(
+  entries: readonly { readonly characterId: string }[],
+): void {
+  const expected = new Set<string>(CANONICAL_CHARACTER_IDS);
+  const seen = new Set<string>();
+
+  for (const entry of entries) {
+    if (!expected.has(entry.characterId)) {
+      throw new CharacterContentCandidateAssemblyError(
+        'PRINCIPLE_CALLING_COMPLETION_ROSTER_INVALID',
+        `principleCallingCompletions contains unexpected Character: ${entry.characterId}.`,
+      );
+    }
+    if (seen.has(entry.characterId)) {
+      throw new CharacterContentCandidateAssemblyError(
+        'PRINCIPLE_CALLING_COMPLETION_ROSTER_INVALID',
+        `principleCallingCompletions contains duplicate Character: ${entry.characterId}.`,
+      );
+    }
+    seen.add(entry.characterId);
   }
 }
 
@@ -184,12 +221,17 @@ export function assembleCharacterContentBundleCandidateV1(
     'PUBLICATION_MATERIAL_ROSTER_MISMATCH',
     'publicationMaterials',
   );
+  const principleCallingCompletions = input.principleCallingCompletions ?? [];
+  assertPartialRoster(principleCallingCompletions);
 
   const canonById = new Map(
     input.canonCompletions.map((entry) => [entry.characterId, entry] as const),
   );
   const materialById = new Map(
     input.publicationMaterials.map((entry) => [entry.characterId, entry] as const),
+  );
+  const principleCallingById = new Map(
+    principleCallingCompletions.map((entry) => [entry.characterId, entry] as const),
   );
 
   const characters = CANONICAL_CHARACTER_IDS.map((characterId) => {
@@ -200,6 +242,7 @@ export function assembleCharacterContentBundleCandidateV1(
       (entry) => entry.characterId === characterId,
     );
     const canonCompletion = canonById.get(characterId);
+    const principleCallingCompletion = principleCallingById.get(characterId);
     const material = materialById.get(characterId);
 
     if (
@@ -219,7 +262,9 @@ export function assembleCharacterContentBundleCandidateV1(
       contentVersion: input.metadata.contentVersion,
       displayName: immutable.displayName,
       gender: immutable.gender,
-      deityProxyLabel: immutable.deityProxyLabel,
+      ...(principleCallingCompletion?.representativeTitle !== undefined
+        ? { representativeTitle: principleCallingCompletion.representativeTitle }
+        : {}),
       shortDescriptor: immutable.shortDescriptor,
       personalityTraits: immutable.personalityTraits,
       flaws: immutable.flaws,
@@ -233,13 +278,17 @@ export function assembleCharacterContentBundleCandidateV1(
         worldRole: immutable.worldRole,
         origin: immutable.origin,
         apparentAgeBand: immutable.apparentAgeBand,
-        deityBond: {
-          deityId: immutable.deityId,
-          representationRole: immutable.deityBond.representationRole,
-          oath: immutable.deityBond.oath,
-          acceptedDoctrine: immutable.deityBond.acceptedDoctrine,
-          resistedDoctrine: immutable.deityBond.resistedDoctrine,
-        },
+        callingBond:
+          principleCallingCompletion?.callingBond ?? {
+            authorityState: 'world_dependent',
+            note: 'Principle/Calling binding has not been supplied by separate World/Character authority.',
+          },
+        ...(principleCallingCompletion?.vocation !== undefined
+          ? { vocation: principleCallingCompletion.vocation }
+          : {}),
+        ...(principleCallingCompletion?.duties !== undefined
+          ? { duties: principleCallingCompletion.duties }
+          : {}),
         worldview: canonCompletion.worldview,
         psychology: canonCompletion.psychology,
       },
