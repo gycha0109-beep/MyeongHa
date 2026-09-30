@@ -6,7 +6,7 @@
 > Canonical ID: `rahyeon`
 > Bible Standard: Character Bible Standard v1
 > Authority State: DRAFT / NOT YET PRODUCTION AUTHORITY
-> World / Deity Layer: `[UNDEFINED / 별도 설계 예정]`
+> World / Principle-Calling Layer: `[UNDEFINED / 별도 설계 예정]`
 > Source: prior Rahyeon Bible v0.4 working draft + approved/latest person-level direction + `CHARACTER_DETAILED_AUTHORING_PROPOSAL_V1.md` + `CHARACTER_IMMUTABLE_IDENTITY_VISUAL_PROPOSAL_V1.md`
 > Purpose: 라현을 Runtime 프롬프트가 아니라 **실제로 존재하는 한 사람의 설정 원본**으로 정의한다.
 
@@ -24,7 +24,7 @@
 - 최신 라현 방향인 **성숙한 팜므파탈 / 자기 매력을 알고 있음 / 상대가 자기를 의식하는 긴장을 즐김**을 표면 인상에 반영한다.
 - 라현을 “agency를 설명하는 협상가”로 먼저 읽히게 하지 않는다. 그 철학은 인물의 내적 골격이다.
 - `packages/character-content/src/runtime-authoring-v1.ts`의 기존 라현 `밝고 빠른 사회적 촉진자` 계열 값은 현재 Character 방향과 충돌하는 **legacy runtime authoring**으로 보고 이 Bible의 인물 source로 사용하지 않는다.
-- 신격 / 능력 / 표식 / 클랜 / 구체 세계 역할은 현재 Bible에서 확정하지 않는다.
+- 이치·명 / 능력 / 표식 / 클랜 / 구체 세계 역할은 현재 Bible에서 확정하지 않는다.
 - 과거 비극이나 femme-fatale cliché를 현재 성격의 원인으로 역산하지 않는다.
 
 ---
@@ -130,9 +130,9 @@
 - 정확한 연령: `[UNDEFINED]`
 - 직업 / 사회적 역할: `[UNDEFINED]`
 - 구체적인 생활권: `[UNDEFINED]`
-- 신격 / 능력 / 표식 / 클랜: `[UNDEFINED]`
+- 이치·명 / 능력 / 표식 / 클랜: `[UNDEFINED]`
 
-기존 world proposal의 협상 / 상업외교 / 신격 연결은 현재 Bible의 사람 자체를 규정하는 확정 사실로 사용하지 않는다.
+기존 world proposal의 협상 / 상업외교 / 이치·명 연결은 현재 Bible의 사람 자체를 규정하는 확정 사실로 사용하지 않는다.
 
 ## B2. 기본 성격
 
