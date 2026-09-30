@@ -56,6 +56,25 @@ export interface CharacterDialogueEnvelopeV1 {
   readonly suggestedActions: readonly CharacterSuggestedActionV1[];
 }
 
+const serverValidatedCharacterDialogueEnvelopesV1 = new WeakSet<object>();
+
+/**
+ * @internal Persistence boundary proof.
+ *
+ * A structural lookalike of CharacterDialogueEnvelopeV1 is not sufficient for
+ * durable Chat publication. Only an envelope returned by the server Output Guard
+ * in this process is admitted.
+ */
+export function assertServerValidatedCharacterDialogueEnvelopeV1(
+  envelope: CharacterDialogueEnvelopeV1,
+): void {
+  if (!serverValidatedCharacterDialogueEnvelopesV1.has(envelope)) {
+    throw new CharacterOutputGuardError(
+      'Character dialogue envelope was not minted by the server Output Guard.',
+    );
+  }
+}
+
 export class CharacterOutputGuardError extends Error {
   constructor(message: string) {
     super(message);
@@ -329,7 +348,7 @@ export function guardCharacterRendererOutput(input: {
     'framingAfter',
   );
 
-  return Object.freeze({
+  const envelope = Object.freeze({
     schemaVersion: 'v1',
     framingBefore,
     protectedSajuSegments,
@@ -341,5 +360,8 @@ export function guardCharacterRendererOutput(input: {
     memoryProposals,
     relationshipEventProposals: Object.freeze(relationshipEventProposals),
     suggestedActions: Object.freeze(suggestedActions),
-  });
+  }) satisfies CharacterDialogueEnvelopeV1;
+
+  serverValidatedCharacterDialogueEnvelopesV1.add(envelope);
+  return envelope;
 }
