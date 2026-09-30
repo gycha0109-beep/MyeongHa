@@ -16,6 +16,10 @@ import type {
   CharacterStandardReadingChatTurnPreflightV1,
 } from './character-standard-reading-chat-turn-preflight.js';
 import {
+  serializeCharacterDialogueEnvelopeForPersistenceV1,
+  type CharacterDialoguePersistedMessageV1,
+} from './character-dialogue-message-persistence.js';
+import {
   getServerPreparedChatReceiveContentEntryV1,
 } from './chat-receive.js';
 
@@ -85,6 +89,7 @@ export interface CharacterStandardReadingTurnPersistenceAuthorityPortV1 {
     readonly modelKey: string;
     readonly envelope: CharacterDialogueEnvelopeV1;
     readonly envelopeHash: string;
+    readonly persistedMessage: CharacterDialoguePersistedMessageV1;
   }): Awaitable<CharacterStandardReadingCommittedTurnV1>;
 
   markFailed(input: {
@@ -346,6 +351,8 @@ export async function runCharacterStandardReadingProductionTurnV1(
   }
 
   const envelopeHash = hashEnvelope(envelope);
+  const persistedMessage =
+    serializeCharacterDialogueEnvelopeForPersistenceV1(envelope);
 
   try {
     const committed = await input.persistence.commitValidatedEnvelope({
@@ -355,6 +362,7 @@ export async function runCharacterStandardReadingProductionTurnV1(
       modelKey,
       envelope,
       envelopeHash,
+      persistedMessage,
     });
 
     if (
