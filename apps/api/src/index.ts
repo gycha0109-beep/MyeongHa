@@ -796,6 +796,8 @@ export {
   runCharacterStandardReadingProductionTurnV1,
   type CharacterStandardReadingCommittedTurnV1,
   type CharacterStandardReadingExecutionLeaseV1,
+  type CharacterStandardReadingProductionPromotionAuthorityPortV1,
+  type CharacterStandardReadingProductionPromotionDecisionV1,
   type CharacterStandardReadingProductionRendererInputV1,
   type CharacterStandardReadingProductionRendererPortV1,
   type CharacterStandardReadingProductionTurnResultV1,
