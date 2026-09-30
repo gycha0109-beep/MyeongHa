@@ -102,7 +102,9 @@ function genuinePreflight(): CharacterStandardReadingChatTurnPreflightV1 {
         contentRevision: 1,
         participantCharacterIds: [CHARACTER_ID],
       },
-      source: {},
+      source: {
+        readingId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa01',
+      },
       context,
     },
   } as unknown as CharacterStandardReadingChatTurnPreflightV1;
