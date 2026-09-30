@@ -18,7 +18,7 @@ function directSajuOnlyInput() {
 
 describe.sequential('Character Runtime Saju source-authority boundary', () => {
   afterEach(() => {
-    if (originalNodeEnv === undefined) delete process.env.NODE_ENV;
+    if (originalNodeEnv === undefined) Reflect.deleteProperty(process.env, 'NODE_ENV');
     else process.env.NODE_ENV = originalNodeEnv;
   });
 
@@ -31,7 +31,7 @@ describe.sequential('Character Runtime Saju source-authority boundary', () => {
   });
 
   it('fails closed when runtime mode is unclassified instead of assuming fixture authority', () => {
-    delete process.env.NODE_ENV;
+    Reflect.deleteProperty(process.env, 'NODE_ENV');
 
     expect(() => assembleCharacterRuntimeContext(directSajuOnlyInput())).toThrow(
       /blocked outside development\/test fixtures while SRC-09\/SRC-33 authority is unresolved/u,

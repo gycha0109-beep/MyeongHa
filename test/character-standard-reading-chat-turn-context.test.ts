@@ -475,7 +475,7 @@ describe('thread-bound Official Reading Reader runtime', () => {
         effectiveAt: '2026-09-21T00:01:00.000Z',
       });
     } finally {
-      if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
+      if (previousNodeEnv === undefined) Reflect.deleteProperty(process.env, 'NODE_ENV');
       else process.env.NODE_ENV = previousNodeEnv;
     }
   });
@@ -734,7 +734,7 @@ describe('Official Reading Reader Chat turn preflight', () => {
         '서버가 다시 읽은 공식 직업 Reading입니다.',
       ]);
     } finally {
-      if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
+      if (previousNodeEnv === undefined) Reflect.deleteProperty(process.env, 'NODE_ENV');
       else process.env.NODE_ENV = previousNodeEnv;
     }
   });
