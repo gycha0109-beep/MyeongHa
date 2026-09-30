@@ -206,6 +206,12 @@ export async function runCharacterStandardReadingProductionTurnV1(
     readingId: input.preflight.runtime.source.readingId,
   });
   requiredIdentifier(promotion.authorityVersion, 'promotion.authorityVersion');
+  if (typeof promotion.allowed !== 'boolean') {
+    throw new CharacterStandardReadingProductionTurnErrorV1(
+      'receive',
+      'Standard Reading production promotion authority returned an invalid decision.',
+    );
+  }
   if (!promotion.allowed) {
     throw new CharacterStandardReadingProductionTurnErrorV1(
       'receive',
