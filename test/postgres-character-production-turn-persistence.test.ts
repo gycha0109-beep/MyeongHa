@@ -22,6 +22,7 @@ const GUARD_LOG_ID = '55555555-5555-4555-8555-555555555555';
 const MESSAGE_ID = '66666666-6666-4666-8666-666666666666';
 const OUTBOX_ID = '77777777-7777-4777-8777-777777777777';
 const THREAD_ID = '88888888-8888-4888-8888-888888888888';
+const READING_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa01';
 const GROUNDING_ID = '99999999-9999-4999-8999-999999999999';
 
 function envelope(): CharacterDialogueEnvelopeV1 {
@@ -185,6 +186,7 @@ describe('PostgreSQL Production Character turn persistence', () => {
       turnId: TURN_ID,
       attemptId: ATTEMPT_ID,
       characterId: 'seyeon',
+      readingId: READING_ID,
       contentBundleId: 'bundle-test',
       providerKey: 'provider-test',
       modelKey: 'model-test',
@@ -261,14 +263,17 @@ describe('PostgreSQL Production Character turn persistence', () => {
       generatedContentHash: expectedHash,
     });
 
-    expect(rendererLog!.values[11]).toBe(JSON.stringify([GROUNDING_ID]));
+    expect(rendererLog!.values[11]).toBe(READING_ID);
+    expect(rendererLog!.values[12]).toBe(JSON.stringify([GROUNDING_ID]));
     expect(generated!.values[10]).toBe(JSON.stringify([GROUNDING_ID]));
-    expect(guardLog!.values[11]).toBe(JSON.stringify([GROUNDING_ID]));
+    expect(guardLog!.values[11]).toBe(READING_ID);
+    expect(guardLog!.values[12]).toBe(JSON.stringify([GROUNDING_ID]));
     expect(groundingCalls).toEqual([{
       subjectId: SUBJECT_ID,
       turnId: TURN_ID,
       attemptId: ATTEMPT_ID,
       characterId: 'seyeon',
+      readingId: READING_ID,
     }]);
 
     expect(
@@ -405,6 +410,7 @@ describe('PostgreSQL Production Character turn persistence', () => {
       turnId: TURN_ID,
       attemptId: ATTEMPT_ID,
       characterId: 'seyeon',
+      readingId: READING_ID,
       contentBundleId: 'bundle-test',
       providerKey: 'provider-test',
       modelKey: 'model-test',
