@@ -9,6 +9,8 @@ import {
   transitionChatTurn,
   type CapabilityDenialReason,
   type CharacterDialogueEnvelopeV1,
+  projectCharacterRuntimeContextForRendererV1,
+  type CharacterRendererRuntimeContextV1,
   type CharacterRuntimeContextV1,
   type CapabilityGateInput,
 } from '../../../packages/domain/src/index.js';
@@ -21,7 +23,7 @@ export type CharacterRuntimeContextAssemblyInputV1 = Parameters<
 export interface CharacterRendererProviderInputV1 {
   readonly turnId: string;
   readonly attemptId: string;
-  readonly context: CharacterRuntimeContextV1;
+  readonly context: CharacterRendererRuntimeContextV1;
 }
 
 /**
@@ -297,7 +299,11 @@ export function runMockCharacterChatTurn(
 
   let rawOutput: unknown;
   try {
-    rawOutput = input.renderer.render({ turnId, attemptId, context });
+    rawOutput = input.renderer.render({
+      turnId,
+      attemptId,
+      context: projectCharacterRuntimeContextForRendererV1(context),
+    });
   } catch (error) {
     throw new CharacterChatTurnOrchestrationError(
       'render',
