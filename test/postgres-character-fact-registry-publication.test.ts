@@ -28,6 +28,7 @@ const rows: readonly CharacterFactRegistryPublicationRowV1[] = [
     sourceSection: 'J1',
     sourceBibleDocument: 'SEYEON_CHARACTER_BIBLE_DRAFT_V0_2.md',
     sourceBibleRevision: 'abc123',
+    policy: '미정',
     closureNote: 'authoring debt',
   },
 ];
@@ -69,6 +70,7 @@ describe('PostgreSQL Character fact registry publication adapter', () => {
     expect(payload[1]).toMatchObject({
       factKey: 'backstory.birth_or_growth_region',
       sourceAuthority: 'AUTHOR_UNDEFINED',
+      policy: '미정',
     });
     expect('value' in payload[1]!).toBe(false);
   });
