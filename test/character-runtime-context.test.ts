@@ -20,7 +20,7 @@ function authoredCharacter(): CharacterContentDefinition {
   return {
     ...base,
     displayName: 'Runtime Test Representative',
-    deityProxyLabel: 'runtime_witness',
+    representativeTitle: 'runtime_witness',
     shortDescriptor: 'runtime test only',
     personalityTraits: ['observant'],
     flaws: ['overchecks continuity'],
