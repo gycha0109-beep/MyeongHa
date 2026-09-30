@@ -777,6 +777,7 @@ export {
   getCharacterPublicFactCatalogV1,
   type CharacterPublicFactCatalogAuthorityErrorCodeV1,
   type CharacterPublicFactCatalogReadAuthorityPortV1,
+  type CharacterPublicFactCatalogRowV1,
 } from './character-public-fact-catalog-authority.js';
 
 export {
