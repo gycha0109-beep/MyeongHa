@@ -287,3 +287,8 @@ Saju transport/provider output도 동일하게 transport 성공만으로 product
 - failed retryable abandon → next turn possible
 - canon mismatch participant → deny
 - LLM proposal alone → no relationship/unlock/entitlement mutation
+
+
+### Renderer-facing public fact projection
+
+Server-admitted `publicCharacterFacts` retain release/Bible provenance inside Runtime authority, but renderer/provider input MUST project each fact down to only `factKey + sourceAuthority + exact value`. Release ID, Bible document/revision, and source-section provenance are verification metadata and MUST NOT be forwarded to the model/provider.
