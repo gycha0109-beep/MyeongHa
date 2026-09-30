@@ -237,7 +237,7 @@ select public.cmd_record_chat_success_ai_execution_runtime_v1(
   '13080000-0000-0000-0000-000000000051',
   'renderer','provider-test','model-test','renderer-prompt-v1',
   'seyeon-runtime-test',
-  '{"schemaVersion":"v1","source":"server-admitted-character-runtime"}'::jsonb,
+  '{"schemaVersion":"v1","source":"server-admitted-character-runtime","readingId":"13080000-0000-0000-0000-000000000081"}'::jsonb,
   jsonb_build_object('generatedContentHash','${content_hash}'),
   '13080000-0000-0000-0000-000000000081'::uuid,
   '[]'::jsonb
@@ -262,7 +262,11 @@ select public.cmd_record_chat_success_ai_execution_runtime_v1(
   '13080000-0000-0000-0000-000000000051',
   'output_guard','myeongha-server','myeongha-character-output-guard-v1','output-guard-prompt-v1',
   'seyeon-runtime-test',
-  jsonb_build_object('schemaVersion','v1','generatedContentHash','${content_hash}'),
+  jsonb_build_object(
+    'schemaVersion','v1',
+    'readingId','13080000-0000-0000-0000-000000000081',
+    'generatedContentHash','${content_hash}'
+  ),
   jsonb_build_object('generatedContentHash','${content_hash}'),
   '13080000-0000-0000-0000-000000000081'::uuid,
   '[]'::jsonb
