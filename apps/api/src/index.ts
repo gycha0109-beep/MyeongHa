@@ -696,6 +696,12 @@ export {
 } from './character-standard-reading-public-fact-context.js';
 
 export {
+  prepareCharacterStandardReadingRendererContextV1,
+  type CharacterStandardReadingRendererContextPlanV1,
+  type PrepareCharacterStandardReadingRendererContextInputV1,
+} from './character-standard-reading-renderer-context.js';
+
+export {
   createPostgresChatThreadRuntimeBindingAuthorityPortV1,
 } from './postgres-chat-thread-runtime-binding.js';
 

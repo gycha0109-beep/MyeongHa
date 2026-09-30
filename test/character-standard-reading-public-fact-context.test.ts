@@ -15,6 +15,9 @@ import {
 import {
   prepareCharacterStandardReadingPublicFactGenerationContextV1,
 } from '../apps/api/src/character-standard-reading-public-fact-context.js';
+import {
+  prepareCharacterStandardReadingRendererContextV1,
+} from '../apps/api/src/character-standard-reading-renderer-context.js';
 import type {
   CharacterFactRegistryAuthorityRowV1,
   CharacterFactRegistryReadAuthorityPortV1,
@@ -222,5 +225,95 @@ describe('Character Standard Reading public fact generation context', () => {
     ).rejects.toThrow(/Duplicate Character fact selector/u);
 
     expect(authorityPort.calls).toEqual([]);
+  });
+});
+
+
+describe('Character Standard Reading renderer context composition', () => {
+  it('delivers only provider-safe public facts while retaining blocked decisions server-side', async () => {
+    const publicFact = row('identity.birthday', {
+      value: '3월 18일',
+      sourceBibleDocument: 'SEYEON_CHARACTER_BIBLE_DRAFT_V0_2.md',
+      sourceBibleRevision: 'private-source-revision-test',
+    });
+    const gatedFact = row('past_romance.existence', {
+      disclosureDefault: 'FAMILIAR',
+      value: '과거 연애 경험 있음',
+      sourceBibleDocument: 'SEYEON_CHARACTER_BIBLE_DRAFT_V0_2.md',
+      sourceBibleRevision: 'private-source-revision-test',
+    });
+    const authorityPort = new MapFactAuthorityPort(new Map([
+      [publicFact.factKey, publicFact],
+      [gatedFact.factKey, gatedFact],
+    ]));
+
+    const result = await prepareCharacterStandardReadingRendererContextV1({
+      preflight: genuinePreflight(),
+      publicFactKeys: [
+        'identity.birthday',
+        'past_romance.existence',
+      ],
+      factAuthorityPort: authorityPort,
+    });
+
+    expect(result.providerContext.publicCharacterFacts).toEqual([
+      {
+        factKey: 'identity.birthday',
+        sourceAuthority: 'CANON',
+        value: '3월 18일',
+      },
+    ]);
+
+    const providerSerialized = JSON.stringify(
+      result.providerContext.publicCharacterFacts,
+    );
+    expect(providerSerialized).not.toContain('SEYEON_CHARACTER_BIBLE_DRAFT_V0_2.md');
+    expect(providerSerialized).not.toContain('private-source-revision-test');
+    expect(providerSerialized).not.toContain(RELEASE_ID);
+
+    expect(result.publicFactDecisions.map((decision) => ({
+      factKey: decision.factKey,
+      status: decision.status,
+      reason: decision.status === 'blocked' ? decision.reason : null,
+    }))).toEqual([
+      {
+        factKey: 'identity.birthday',
+        status: 'available',
+        reason: null,
+      },
+      {
+        factKey: 'past_romance.existence',
+        status: 'blocked',
+        reason: 'relationship_disclosure_authority_unresolved',
+      },
+    ]);
+  });
+
+  it('keeps unresolved Principle/Calling out of provider context', async () => {
+    const unresolved = row('principle_calling.binding', {
+      sourceAuthority: 'WORLD_DEPENDENT',
+      characterKnowledge: 'NOT_APPLICABLE',
+      disclosureDefault: 'NOT_APPLICABLE',
+      policy: '별도 World authority',
+    });
+    const { value: _value, ...withoutValue } = unresolved;
+    const authorityPort = new MapFactAuthorityPort(new Map([
+      [withoutValue.factKey, withoutValue],
+    ]));
+
+    const result = await prepareCharacterStandardReadingRendererContextV1({
+      preflight: genuinePreflight(),
+      publicFactKeys: ['principle_calling.binding'],
+      factAuthorityPort: authorityPort,
+    });
+
+    expect(result.providerContext.publicCharacterFacts).toEqual([]);
+    expect(result.publicFactDecisions).toEqual([
+      expect.objectContaining({
+        factKey: 'principle_calling.binding',
+        status: 'blocked',
+        reason: 'source_authority_unresolved',
+      }),
+    ]);
   });
 });
