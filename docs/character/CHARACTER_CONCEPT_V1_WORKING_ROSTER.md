@@ -55,7 +55,7 @@ canonical characterId
 final gender canon
 origin
 apparent age band
-final deity hierarchy / deityId / deity doctrine binding
+final principle/calling binding / calling doctrine interpretation
 versioned immutable visual profile
 Character-to-Character canonical relation graph
 Production roster-level differentiation PASS
@@ -97,7 +97,7 @@ Production Character publication에는 여전히 다음이 필요하다.
 
 ```text
 상세 Character canon/persona/behavior/saju/relationship authoring 승인
-final gender / visual / origin / deity 등 필수 content 값
+final gender / visual / origin / principle-calling 등 필수 content 값
 SRC-15 compatibility evaluator 해결
 SRC-27의 남은 lifecycle mutation authority 해결
 SRC-35 roster-level differentiation acceptance 해결
@@ -122,7 +122,7 @@ Member Chat thread create/reuse의 핵심 제품 정책은 `CHARACTER_LAUNCH_MVP
 - 승인 없이 9명 외 캐릭터를 Launch roster에 추가;
 - `미라`를 temporary로 되돌림;
 - 표시 이름을 근거로 canonical `characterId`를 자동 생성하고 그것을 source canon이라고 주장;
-- 누락된 gender/age/origin/deity/visual을 추론;
+- 누락된 gender/age/origin/principle-calling/visual을 추론;
 - generated Persona/Behavior/Saju/relationship text를 별도 승인 없이 immutable canon이라고 주장;
 - roster 이름이 확정됐다는 이유만으로 Character Differentiation PASS를 선언.
 
