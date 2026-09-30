@@ -88,8 +88,8 @@ describe('resolved-bundle character detail read', () => {
       'catalogAvailability',
       'catalogEnabled',
       'characterId',
-      'representativeTitle',
       'displayName',
+      'representativeTitle',
       'shortDescriptor',
     ]);
   });
