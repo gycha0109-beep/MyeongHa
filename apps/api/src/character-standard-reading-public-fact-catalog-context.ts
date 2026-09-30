@@ -20,6 +20,9 @@ export interface CharacterStandardReadingPublicFactCatalogRendererContextV1 {
   readonly schemaVersion: 'v1';
   readonly releaseId: string;
   readonly characterId: string;
+  /** Server-owned full Runtime Context used by Output Guard / commit validation. */
+  readonly serverContext: import('../../../packages/domain/src/index.js').CharacterRuntimeContextV1;
+  /** Provider/model-facing projection with registry provenance stripped. */
   readonly providerContext: CharacterRendererRuntimeContextV1;
   readonly admittedPublicFactCount: number;
 }
@@ -131,6 +134,7 @@ export async function prepareCharacterStandardReadingRendererContextFromPublicCa
     schemaVersion: 'v1',
     releaseId: identity.releaseId,
     characterId: identity.characterId,
+    serverContext: context,
     providerContext: projectCharacterRuntimeContextForRendererV1(context),
     admittedPublicFactCount: rows.length,
   });
