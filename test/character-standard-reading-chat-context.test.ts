@@ -88,7 +88,7 @@ function authoredCharacter(characterId = 'baekheon'): CharacterContentDefinition
     ...base,
     characterId,
     displayName: 'Official Reading Runtime Test Reader',
-    deityProxyLabel: 'official_reading_runtime_test',
+    representativeTitle: 'official_reading_runtime_test',
     shortDescriptor: 'official reading runtime test only',
     personalityTraits: ['observant'],
     flaws: ['overchecks continuity'],
