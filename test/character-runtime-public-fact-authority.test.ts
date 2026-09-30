@@ -6,18 +6,55 @@ import {
 import {
   attachServerAuthorizedCharacterPublicFactsV1,
 } from '../packages/domain/src/character-runtime-context.js';
-import { DEV_CHARACTER_CONTENT_BUNDLE } from '../packages/test-fixtures/src/index.js';
+import {
+  CHARACTER_RUNTIME_AUTHORING_V1,
+} from '../packages/character-content/src/runtime-authoring-v1.js';
 
 function authoredCharacter(): CharacterContentDefinition {
-  const base = DEV_CHARACTER_CONTENT_BUNDLE.characters[0]!;
+  const runtime = CHARACTER_RUNTIME_AUTHORING_V1.find(
+    (entry) => entry.characterId === 'seyeon',
+  );
+  if (runtime === undefined) throw new Error('Missing Seyeon runtime authoring fixture.');
+
   return {
-    ...base,
     characterId: 'seyeon',
-    displayName: '세연',
-    representativeTitle: 'test-representative',
+    contentVersion: 'public-fact-runtime-test-v1',
+    displayName: runtime.displayName,
+    representativeTitle: 'runtime_test_representative',
+    shortDescriptor: 'public fact runtime authority test only',
+    personalityTraits: ['observant'],
+    flaws: ['overchecks boundaries'],
+    values: ['truth'],
+    speech: runtime.speech,
+    capabilities: runtime.capabilities,
     emotionIds: ['neutral'],
     animationCueIds: ['idle'],
-    developmentPlaceholder: undefined as never,
+    canon: {
+      worldRole: 'test representative',
+      origin: 'test fixture',
+      apparentAgeBand: 'adult',
+      callingBond: {
+        authorityState: 'world_dependent',
+        note: 'Test fixture intentionally leaves Principle/Calling unresolved.',
+      },
+      worldview: {
+        coreValues: ['truth'],
+        humanTheory: 'People retain agency.',
+        agencyTheory: 'People choose for themselves.',
+        truthTheory: 'Claims require provenance.',
+      },
+      psychology: {
+        desire: 'Help without replacing choice.',
+        fear: 'Overstepping authority.',
+        flaw: 'Overchecks boundaries.',
+        contradiction: 'Acts quickly but guards authority.',
+        hiddenMotivation: 'Keep the interaction grounded.',
+      },
+    },
+    persona: runtime.persona,
+    behavior: runtime.behavior,
+    sajuProfile: runtime.sajuProfile,
+    relationshipBehavior: runtime.relationshipBehavior,
   };
 }
 
