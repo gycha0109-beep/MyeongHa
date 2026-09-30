@@ -15,6 +15,9 @@ import {
 import type {
   CharacterStandardReadingChatTurnPreflightV1,
 } from './character-standard-reading-chat-turn-preflight.js';
+import {
+  getServerPreparedChatReceiveContentEntryV1,
+} from './chat-receive.js';
 
 type Awaitable<T> = T | Promise<T>;
 
@@ -197,6 +200,25 @@ export async function runCharacterStandardReadingProductionTurnV1(
   input: RunCharacterStandardReadingProductionTurnInputV1,
 ): Promise<CharacterStandardReadingProductionTurnResultV1> {
   const text = requireTextTurn(input.preflight);
+  const contentEntry = getServerPreparedChatReceiveContentEntryV1(
+    input.preflight.receivePlan,
+  );
+  const binding = input.preflight.runtime.threadBinding;
+  if (
+    binding.activeContentReleaseId !== input.preflight.receivePlan.resolvedContent.releaseId ||
+    binding.activeContentReleaseId !== contentEntry.release.releaseId ||
+    binding.activeContentBundleId !== input.preflight.receivePlan.resolvedContent.bundleId ||
+    binding.activeContentBundleId !== contentEntry.release.bundleId ||
+    input.preflight.runtime.context.contentBundleId !== binding.activeContentBundleId ||
+    binding.participantCharacterIds.length !== 1 ||
+    binding.participantCharacterIds[0] !== input.preflight.runtime.context.characterId
+  ) {
+    throw new CharacterStandardReadingProductionTurnErrorV1(
+      'receive',
+      'Standard Reading production preflight provenance is inconsistent.',
+    );
+  }
+
   const providerKey = requiredIdentifier(input.renderer.providerKey, 'renderer.providerKey');
   const modelKey = requiredIdentifier(input.renderer.modelKey, 'renderer.modelKey');
 
