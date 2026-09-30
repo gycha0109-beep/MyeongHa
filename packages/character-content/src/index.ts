@@ -10,3 +10,5 @@ export * from './character-voice-continuity-v1.js';
 export * from './immutable-authoring-v1.js';
 export * from './content-candidate-assembler-v1.js';
 export * from './publication-readiness-v1.js';
+
+export * from './fact-registry-compiler-v1.js';
