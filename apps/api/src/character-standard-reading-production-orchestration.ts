@@ -300,6 +300,15 @@ export async function runCharacterStandardReadingProductionTurnV1(
             context: prepared.serverContext,
             allowedSuggestedActionKeys: input.allowedSuggestedActionKeys,
           });
+
+    if (
+      envelope.memoryProposals.length > 0 ||
+      envelope.relationshipEventProposals.length > 0
+    ) {
+      throw new Error(
+        'Production Standard Reading v1 does not admit memory or relationship side-effect proposals.',
+      );
+    }
   } catch (error) {
     await failAttemptBestEffort({
       persistence: input.persistence,
