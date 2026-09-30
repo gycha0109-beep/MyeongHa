@@ -79,6 +79,7 @@ grant select (
   client_turn_id,
   request_hash,
   state,
+  revision,
   next_attempt_no,
   created_at
 ) on public.chat_turns to myeongha_chat_turn_receive_owner;
