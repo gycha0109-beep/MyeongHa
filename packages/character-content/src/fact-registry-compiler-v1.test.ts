@@ -115,8 +115,11 @@ describe('Character fact registry compiler v1', () => {
 
   it('fails closed when duplicate fact keys appear', () => {
     const duplicate = bible.replace(
-      '## Closure Rule',
-      '| \`identity.name\` | duplicate | \`CANON\` | \`KNOWN\` | \`PUBLIC\` | B1 | duplicate |\n\n## Closure Rule',
+      '| `identity.name` | 세연 | `CANON` | `KNOWN` | `PUBLIC` | B1 | 채택 |',
+      [
+        '| `identity.name` | 세연 | `CANON` | `KNOWN` | `PUBLIC` | B1 | 채택 |',
+        '| `identity.name` | duplicate | `CANON` | `KNOWN` | `PUBLIC` | B1 | duplicate |',
+      ].join('\n'),
     );
 
     expect(() =>
