@@ -2,7 +2,7 @@
 
 > 상태: **LAUNCH ROSTER / NAME AUTHORITY APPROVED · DETAILED CANON INCOMPLETE · PRODUCTION CONTENT INELIGIBLE**  
 > 범위: MVP Launch roster 구성, 공식 표시 이름, 기존 relationship-fantasy 방향  
-> 비범위: canonical Character ID, 최종 gender/age/origin/deity/visual, 상세 Canon/Persona/Behavior/SajuProfile/RelationshipBehavior, Production publication
+> 비범위: canonical Character ID, 최종 gender/age/origin/principle-calling/visual, 상세 Canon/Persona/Behavior/SajuProfile/RelationshipBehavior, Production publication
 
 ## 1. 권한 경계
 
@@ -55,7 +55,7 @@ canonical characterId
 final gender canon
 origin
 apparent age band
-final principle/calling binding / calling doctrine interpretation
+final principle/calling binding / calling interpretation
 versioned immutable visual profile
 Character-to-Character canonical relation graph
 Production roster-level differentiation PASS
