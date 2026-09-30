@@ -26,6 +26,7 @@ expect_failure_stdin() {
 
 [[ "$(query "select has_function_privilege('myeongha_content_operator','public.cmd_publish_character_fact_registry_v1(uuid,jsonb)','EXECUTE')::int;")" == '1' ]] || fail "operator lacks publication command"
 [[ "$(query "select has_function_privilege('myeongha_api_executor','public.qry_character_fact_registry_v1(uuid,text,text)','EXECUTE')::int;")" == '1' ]] || fail "API executor lacks read function"
+[[ "$(query "select has_function_privilege('myeongha_api_executor','public.qry_character_public_fact_catalog_v1(uuid,text)','EXECUTE')::int;")" == '1' ]] || fail "API executor lacks PUBLIC fact catalog read function"
 [[ "$(query "select has_table_privilege('myeongha_api_executor','public.character_fact_registry','SELECT')::int;")" == '0' ]] || fail "API executor can bypass read function"
 [[ "$(query "select has_table_privilege('myeongha_content_operator','public.character_fact_registry','INSERT')::int;")" == '0' ]] || fail "operator can bypass publication command"
 pass "registry authority is function-bounded"
@@ -60,6 +61,7 @@ select public.cmd_publish_character_fact_registry_v1(
   '13060000-0000-0000-0000-000000000001'::uuid,
   '[
     {"characterId":"fact-seyeon","factKey":"identity.name","sourceAuthority":"CANON","characterKnowledge":"KNOWN","disclosureDefault":"PUBLIC","sourceSection":"B1","sourceBibleDocument":"SEYEON_CHARACTER_BIBLE_DRAFT_V0_2.md","sourceBibleRevision":"test-revision","value":"세연","closureNote":"채택"},
+    {"characterId":"fact-seyeon","factKey":"past_romance.existence","sourceAuthority":"CANON","characterKnowledge":"KNOWN","disclosureDefault":"FAMILIAR","sourceSection":"J4","sourceBibleDocument":"SEYEON_CHARACTER_BIBLE_DRAFT_V0_2.md","sourceBibleRevision":"test-revision","value":"과거 연애 경험 있음","closureNote":"관계단계 authority 필요"},
     {"characterId":"fact-seyeon","factKey":"principle_calling.binding","sourceAuthority":"WORLD_DEPENDENT","characterKnowledge":"NOT_APPLICABLE","disclosureDefault":"NOT_APPLICABLE","sourceSection":"World/Principle-Calling","sourceBibleDocument":"SEYEON_CHARACTER_BIBLE_DRAFT_V0_2.md","sourceBibleRevision":"test-revision","closureNote":"미정 유지"}
   ]'::jsonb
 );
@@ -70,7 +72,7 @@ SQL
 first="$(publish_registry)"
 retry="$(publish_registry)"
 [[ "$first" == "$bundle_id" && "$retry" == "$bundle_id" ]] || fail "registry publication is not idempotent"
-[[ "$(query "select count(*) from public.character_fact_registry where content_bundle_id='$bundle_id';")" == '2' ]] || fail "registry rows were not persisted"
+[[ "$(query "select count(*) from public.character_fact_registry where content_bundle_id='$bundle_id';")" == '3' ]] || fail "registry rows were not persisted"
 [[ "$(query "select has_value::int from public.character_fact_registry where content_bundle_id='$bundle_id' and fact_key='identity.name';")" == '1' ]] || fail "resolved fact did not preserve value"
 [[ "$(query "select has_value::int||'|'||(value_jsonb is null)::int from public.character_fact_registry where content_bundle_id='$bundle_id' and fact_key='principle_calling.binding';")" == '0|1' ]] || fail "World-dependent fact gained a value"
 pass "resolved and World-dependent facts preserve source authority"
@@ -137,6 +139,116 @@ SQL
 )"
 [[ "$unresolved_shape" == 'WORLD_DEPENDENT|0|1' ]] || fail "Principle/Calling gap was not preserved: $unresolved_shape"
 pass "release-pinned read preserves unresolved Principle/Calling"
+
+catalog_shape="$("${psql_base[@]}" -At <<'SQL'
+set role myeongha_api_executor;
+select
+  fact_key||'|'||source_authority||'|'||character_knowledge||'|'||
+  disclosure_default||'|'||has_value::int||'|'||
+  trim(both '"' from value_jsonb::text)
+from public.qry_character_public_fact_catalog_v1(
+  '13061000-0000-0000-0000-000000000001'::uuid,
+  'fact-seyeon'
+);
+reset role;
+SQL
+)"
+catalog_shape="$(printf '%s\n' "$catalog_shape" | grep -v '^
+set role myeongha_content_operator;
+select public.cmd_publish_character_fact_registry_v1(
+  '13060000-0000-0000-0000-000000000001'::uuid,
+  '[{"characterId":"fact-seyeon","factKey":"identity.name","sourceAuthority":"CANON","characterKnowledge":"KNOWN","disclosureDefault":"PUBLIC","sourceSection":"B1","sourceBibleDocument":"SEYEON_CHARACTER_BIBLE_DRAFT_V0_2.md","sourceBibleRevision":"test-revision","value":"세연","closureNote":"채택"}]'::jsonb
+);
+SQL
+pass "activated bundle fact authority cannot be republished"
+
+"${psql_base[@]}" -At <<'SQL' >/dev/null
+set role myeongha_content_operator;
+select public.cmd_publish_character_content_bundle_v1(
+  '13070000-0000-0000-0000-000000000001'::uuid,
+  'character-public-fact-catalog-overflow-v1',
+  'sha256:v1:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
+  'private://character-fact-registry/catalog-overflow-v1',
+  'character-artifact-v1',
+  'client-cap-v1',
+  'sha256:v1:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd',
+  'cue-v1',
+  '{"schema":"character-bundle-v1","source":"character-public-fact-catalog-overflow-test"}'::jsonb,
+  '[{"character_id":"fact-overflow","availability":"available","enabled":true,"release_at":null,"retire_at":null}]'::jsonb,
+  '[]'::jsonb,
+  '[]'::jsonb
+);
+
+select public.cmd_publish_character_fact_registry_v1(
+  '13070000-0000-0000-0000-000000000001'::uuid,
+  (
+    select jsonb_agg(
+      jsonb_build_object(
+        'characterId','fact-overflow',
+        'factKey','public.fact.'||lpad(gs::text, 3, '0'),
+        'sourceAuthority','CANON',
+        'characterKnowledge','KNOWN',
+        'disclosureDefault','PUBLIC',
+        'sourceSection','B1',
+        'sourceBibleDocument','OVERFLOW_CHARACTER_BIBLE_TEST.md',
+        'sourceBibleRevision','test-revision',
+        'value','value-'||gs::text
+      )
+      order by gs
+    )
+    from generate_series(1,65) gs
+  )
+);
+
+select public.cmd_create_content_release_v1(
+  '13071000-0000-0000-0000-000000000001'::uuid,
+  'character-public-fact-catalog-overflow-release-v1',
+  '13070000-0000-0000-0000-000000000001'::uuid,
+  '{"cohort":"default"}'::jsonb,
+  'rollout-v1',
+  'public-fact-catalog-overflow-seed'
+);
+select public.cmd_activate_content_release_v1(
+  '13071000-0000-0000-0000-000000000001'::uuid,
+  true
+);
+reset role;
+SQL
+
+expect_failure_stdin "exceeds the v1 bound" <<'SQL'
+set role myeongha_api_executor;
+select *
+from public.qry_character_public_fact_catalog_v1(
+  '13071000-0000-0000-0000-000000000001'::uuid,
+  'fact-overflow'
+);
+SQL
+pass "PUBLIC catalog fails closed instead of truncating above 64 facts"
+
+echo "Character fact registry runtime authority tests passed"
+ | grep -v '^SET
+set role myeongha_content_operator;
+select public.cmd_publish_character_fact_registry_v1(
+  '13060000-0000-0000-0000-000000000001'::uuid,
+  '[{"characterId":"fact-seyeon","factKey":"identity.name","sourceAuthority":"CANON","characterKnowledge":"KNOWN","disclosureDefault":"PUBLIC","sourceSection":"B1","sourceBibleDocument":"SEYEON_CHARACTER_BIBLE_DRAFT_V0_2.md","sourceBibleRevision":"test-revision","value":"세연","closureNote":"채택"}]'::jsonb
+);
+SQL
+pass "activated bundle fact authority cannot be republished"
+
+echo "Character fact registry runtime authority tests passed"
+ | grep -v '^RESET
+set role myeongha_content_operator;
+select public.cmd_publish_character_fact_registry_v1(
+  '13060000-0000-0000-0000-000000000001'::uuid,
+  '[{"characterId":"fact-seyeon","factKey":"identity.name","sourceAuthority":"CANON","characterKnowledge":"KNOWN","disclosureDefault":"PUBLIC","sourceSection":"B1","sourceBibleDocument":"SEYEON_CHARACTER_BIBLE_DRAFT_V0_2.md","sourceBibleRevision":"test-revision","value":"세연","closureNote":"채택"}]'::jsonb
+);
+SQL
+pass "activated bundle fact authority cannot be republished"
+
+echo "Character fact registry runtime authority tests passed"
+ || true)"
+[[ "$catalog_shape" == 'identity.name|CANON|KNOWN|PUBLIC|1|세연' ]] || fail "PUBLIC catalog leaked gated/unresolved fact: $catalog_shape"
+pass "PUBLIC catalog exposes only resolved KNOWN PUBLIC facts"
 
 expect_failure_stdin "cannot be added after bundle activation" <<'SQL'
 set role myeongha_content_operator;
