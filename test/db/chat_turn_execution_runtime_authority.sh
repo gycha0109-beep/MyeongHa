@@ -28,7 +28,7 @@ for signature in \
   "public.cmd_allocate_chat_turn_attempt_runtime_v1(uuid,uuid,uuid,text)" \
   "public.cmd_mark_chat_turn_context_ready_runtime_v1(uuid,uuid,uuid)" \
   "public.cmd_mark_chat_turn_failed_runtime_v1(uuid,uuid,uuid,text,text)" \
-  "public.cmd_record_chat_success_ai_execution_runtime_v1(uuid,uuid,uuid,uuid,text,text,text,text,text,jsonb,jsonb,jsonb)" \
+  "public.cmd_record_chat_success_ai_execution_runtime_v1(uuid,uuid,uuid,uuid,text,text,text,text,text,jsonb,jsonb,uuid,jsonb)" \
   "public.cmd_mark_chat_turn_generated_runtime_v1(uuid,uuid,uuid,uuid,text,text,text,jsonb,text,text,jsonb)" \
   "public.cmd_validate_chat_turn_attempt_runtime_v1(uuid,uuid,uuid,uuid,text,jsonb)" \
   "public.cmd_commit_chat_turn_runtime_v1(uuid,uuid,uuid,uuid,uuid,uuid)" \
@@ -239,6 +239,7 @@ select public.cmd_record_chat_success_ai_execution_runtime_v1(
   'seyeon-runtime-test',
   '{"schemaVersion":"v1","source":"server-admitted-character-runtime"}'::jsonb,
   jsonb_build_object('generatedContentHash','${content_hash}'),
+  '13080000-0000-0000-0000-000000000081'::uuid,
   '[]'::jsonb
 );
 
@@ -263,6 +264,7 @@ select public.cmd_record_chat_success_ai_execution_runtime_v1(
   'seyeon-runtime-test',
   jsonb_build_object('schemaVersion','v1','generatedContentHash','${content_hash}'),
   jsonb_build_object('generatedContentHash','${content_hash}'),
+  '13080000-0000-0000-0000-000000000081'::uuid,
   '[]'::jsonb
 );
 
