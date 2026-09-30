@@ -154,7 +154,7 @@ grant insert (
   ai_execution_log_id, grounding_id, subject_id, role, created_at
 ) on public.ai_execution_groundings to myeongha_chat_turn_runtime_owner;
 
-grant select (id, subject_id)
+grant select (id, reading_id, subject_id)
   on public.reading_groundings to myeongha_chat_turn_runtime_owner;
 
 grant insert (
@@ -297,6 +297,7 @@ create or replace function public.cmd_record_chat_success_ai_execution_runtime_v
   p_character_id text,
   p_input_ref_jsonb jsonb,
   p_output_ref_jsonb jsonb,
+  p_reading_id uuid,
   p_grounding_ids_jsonb jsonb
 )
 returns boolean
@@ -324,6 +325,7 @@ begin
      or p_character_id is null or btrim(p_character_id) = ''
      or p_output_ref_jsonb is null
      or jsonb_typeof(p_output_ref_jsonb) <> 'object'
+     or p_reading_id is null
      or coalesce(p_output_ref_jsonb ->> 'generatedContentHash', '') !~ '^sha256:v1:[0-9a-f]{64}$'
      or p_grounding_ids_jsonb is null
      or jsonb_typeof(p_grounding_ids_jsonb) <> 'array' then
@@ -412,6 +414,7 @@ begin
       from public.reading_groundings rg
       where rg.id = v_grounding_id
         and rg.subject_id = p_subject_id
+        and rg.reading_id = p_reading_id
     ) then
       raise exception using
         errcode = '23514',
@@ -656,7 +659,7 @@ alter function public.cmd_mark_chat_turn_context_ready_runtime_v1(uuid, uuid, uu
 alter function public.cmd_mark_chat_turn_failed_runtime_v1(uuid, uuid, uuid, text, text)
   owner to myeongha_chat_turn_runtime_owner;
 alter function public.cmd_record_chat_success_ai_execution_runtime_v1(
-  uuid, uuid, uuid, uuid, text, text, text, text, text, jsonb, jsonb, jsonb
+  uuid, uuid, uuid, uuid, text, text, text, text, text, jsonb, jsonb, uuid, jsonb
 ) owner to myeongha_chat_turn_runtime_owner;
 alter function public.cmd_mark_chat_turn_generated_runtime_v1(
   uuid, uuid, uuid, uuid, text, text, text, jsonb, text, text, jsonb
@@ -681,7 +684,7 @@ revoke all on function public.cmd_mark_chat_turn_context_ready_runtime_v1(uuid, 
 revoke all on function public.cmd_mark_chat_turn_failed_runtime_v1(uuid, uuid, uuid, text, text)
   from public, anon, authenticated, service_role;
 revoke all on function public.cmd_record_chat_success_ai_execution_runtime_v1(
-  uuid, uuid, uuid, uuid, text, text, text, text, text, jsonb, jsonb, jsonb
+  uuid, uuid, uuid, uuid, text, text, text, text, text, jsonb, jsonb, uuid, jsonb
 ) from public, anon, authenticated, service_role;
 revoke all on function public.cmd_mark_chat_turn_generated_runtime_v1(
   uuid, uuid, uuid, uuid, text, text, text, jsonb, text, text, jsonb
@@ -702,7 +705,7 @@ grant execute on function public.cmd_mark_chat_turn_context_ready_runtime_v1(uui
 grant execute on function public.cmd_mark_chat_turn_failed_runtime_v1(uuid, uuid, uuid, text, text)
   to myeongha_api_executor;
 grant execute on function public.cmd_record_chat_success_ai_execution_runtime_v1(
-  uuid, uuid, uuid, uuid, text, text, text, text, text, jsonb, jsonb, jsonb
+  uuid, uuid, uuid, uuid, text, text, text, text, text, jsonb, jsonb, uuid, jsonb
 ) to myeongha_api_executor;
 grant execute on function public.cmd_mark_chat_turn_generated_runtime_v1(
   uuid, uuid, uuid, uuid, text, text, text, jsonb, text, text, jsonb
