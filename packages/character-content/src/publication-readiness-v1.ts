@@ -5,6 +5,7 @@ import {
 import type {
   CharacterCanonCompletionV1,
   CharacterContentBundleCandidateMetadataV1,
+  CharacterPrincipleCallingCompletionV1,
   CharacterPublicationMaterialInputV1,
 } from './content-candidate-assembler-v1.js';
 
@@ -30,15 +31,22 @@ export type CharacterPublicationMaterialField =
   | 'emotionIds'
   | 'animationCueIds';
 
+export type CharacterPrincipleCallingReadinessField =
+  | 'representativeTitle'
+  | 'callingBond.resolved';
+
+
 export interface CharacterPublicationReadinessInputV1 {
   readonly metadata?: Partial<CharacterContentBundleCandidateMetadataV1>;
   readonly canonCompletions?: readonly CharacterCanonCompletionV1[];
+  readonly principleCallingCompletions?: readonly CharacterPrincipleCallingCompletionV1[];
   readonly publicationMaterials?: readonly CharacterPublicationMaterialInputV1[];
 }
 
 export interface CharacterPublicationReadinessEntryV1 {
   readonly characterId: CharacterPublicationReadinessCharacterId;
   readonly missingCanonFields: readonly CharacterCanonReadinessField[];
+  readonly missingPrincipleCallingFields: readonly CharacterPrincipleCallingReadinessField[];
   readonly missingPublicationMaterialFields: readonly CharacterPublicationMaterialField[];
 }
 
@@ -47,6 +55,8 @@ export interface CharacterPublicationReadinessReportV1 {
   readonly missingMetadataFields: readonly CharacterPublicationMetadataField[];
   readonly duplicateCanonCharacterIds: readonly string[];
   readonly unexpectedCanonCharacterIds: readonly string[];
+  readonly duplicatePrincipleCallingCharacterIds: readonly string[];
+  readonly unexpectedPrincipleCallingCharacterIds: readonly string[];
   readonly duplicatePublicationMaterialCharacterIds: readonly string[];
   readonly unexpectedPublicationMaterialCharacterIds: readonly string[];
   readonly characters: readonly CharacterPublicationReadinessEntryV1[];
@@ -70,6 +80,11 @@ const ALL_CANON_FIELDS: readonly CharacterCanonReadinessField[] = [
   'psychology.flaw',
   'psychology.contradiction',
   'psychology.hiddenMotivation',
+];
+
+const ALL_PRINCIPLE_CALLING_FIELDS: readonly CharacterPrincipleCallingReadinessField[] = [
+  'representativeTitle',
+  'callingBond.resolved',
 ];
 
 const ALL_PUBLICATION_MATERIAL_FIELDS: readonly CharacterPublicationMaterialField[] = [
@@ -151,6 +166,21 @@ function missingCanonFields(
   return missing;
 }
 
+function missingPrincipleCallingFields(
+  completion: CharacterPrincipleCallingCompletionV1 | undefined,
+): readonly CharacterPrincipleCallingReadinessField[] {
+  if (completion === undefined) return [...ALL_PRINCIPLE_CALLING_FIELDS];
+
+  const missing: CharacterPrincipleCallingReadinessField[] = [];
+  if (!hasText(completion.representativeTitle)) {
+    missing.push('representativeTitle');
+  }
+  if (completion.callingBond.authorityState !== 'resolved') {
+    missing.push('callingBond.resolved');
+  }
+  return missing;
+}
+
 function missingPublicationMaterialFields(
   material: CharacterPublicationMaterialInputV1 | undefined,
 ): readonly CharacterPublicationMaterialField[] {
@@ -175,17 +205,22 @@ export function inspectCharacterPublicationReadinessV1(
 ): CharacterPublicationReadinessReportV1 {
   const metadata = input.metadata ?? {};
   const canonCompletions = input.canonCompletions ?? [];
+  const principleCallingCompletions = input.principleCallingCompletions ?? [];
   const publicationMaterials = input.publicationMaterials ?? [];
 
   const missingMetadataFields = METADATA_FIELDS.filter(
     (field) => !hasText(metadata[field]),
   );
   const canonDiagnostics = rosterDiagnostics(canonCompletions);
+  const principleCallingDiagnostics = rosterDiagnostics(principleCallingCompletions);
   const publicationDiagnostics = rosterDiagnostics(publicationMaterials);
 
   const characters = CHARACTER_IMMUTABLE_AUTHORING_V1_CHARACTER_IDS.map(
     (characterId) => {
       const canonEntries = canonCompletions.filter(
+        (entry) => entry.characterId === characterId,
+      );
+      const principleCallingEntries = principleCallingCompletions.filter(
         (entry) => entry.characterId === characterId,
       );
       const materialEntries = publicationMaterials.filter(
@@ -199,6 +234,12 @@ export function inspectCharacterPublicationReadinessV1(
             ? missingCanonFields(canonEntries[0])
             : canonEntries.length === 0
               ? [...ALL_CANON_FIELDS]
+              : [],
+        missingPrincipleCallingFields:
+          principleCallingEntries.length === 1
+            ? missingPrincipleCallingFields(principleCallingEntries[0])
+            : principleCallingEntries.length === 0
+              ? [...ALL_PRINCIPLE_CALLING_FIELDS]
               : [],
         missingPublicationMaterialFields:
           materialEntries.length === 1
@@ -214,14 +255,18 @@ export function inspectCharacterPublicationReadinessV1(
     missingMetadataFields.length === 0 &&
     canonDiagnostics.duplicate.length === 0 &&
     canonDiagnostics.unexpected.length === 0 &&
+    principleCallingDiagnostics.duplicate.length === 0 &&
+    principleCallingDiagnostics.unexpected.length === 0 &&
     publicationDiagnostics.duplicate.length === 0 &&
     publicationDiagnostics.unexpected.length === 0 &&
     characters.every(
       (entry) =>
         entry.missingCanonFields.length === 0 &&
+        entry.missingPrincipleCallingFields.length === 0 &&
         entry.missingPublicationMaterialFields.length === 0,
     ) &&
     canonCompletions.length === CHARACTER_IMMUTABLE_AUTHORING_V1_CHARACTER_IDS.length &&
+    principleCallingCompletions.length === CHARACTER_IMMUTABLE_AUTHORING_V1_CHARACTER_IDS.length &&
     publicationMaterials.length === CHARACTER_IMMUTABLE_AUTHORING_V1_CHARACTER_IDS.length;
 
   return {
@@ -229,6 +274,8 @@ export function inspectCharacterPublicationReadinessV1(
     missingMetadataFields,
     duplicateCanonCharacterIds: canonDiagnostics.duplicate,
     unexpectedCanonCharacterIds: canonDiagnostics.unexpected,
+    duplicatePrincipleCallingCharacterIds: principleCallingDiagnostics.duplicate,
+    unexpectedPrincipleCallingCharacterIds: principleCallingDiagnostics.unexpected,
     duplicatePublicationMaterialCharacterIds: publicationDiagnostics.duplicate,
     unexpectedPublicationMaterialCharacterIds: publicationDiagnostics.unexpected,
     characters,
