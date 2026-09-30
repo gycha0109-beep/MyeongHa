@@ -153,7 +153,11 @@ from public.qry_character_public_fact_catalog_v1(
 reset role;
 SQL
 )"
-catalog_shape="$(printf '%s\n' "$catalog_shape" | grep -v '^
+catalog_shape="$(printf '%s\n' "$catalog_shape" | grep -v '^$' | grep -v '^SET$' | grep -v '^RESET$' || true)"
+[[ "$catalog_shape" == 'identity.name|CANON|KNOWN|PUBLIC|1|세연' ]] || fail "PUBLIC catalog leaked gated/unresolved fact: $catalog_shape"
+pass "PUBLIC catalog exposes only resolved KNOWN PUBLIC facts"
+
+expect_failure_stdin "cannot be added after bundle activation" <<'SQL'
 set role myeongha_content_operator;
 select public.cmd_publish_character_fact_registry_v1(
   '13060000-0000-0000-0000-000000000001'::uuid,
@@ -224,39 +228,5 @@ from public.qry_character_public_fact_catalog_v1(
 );
 SQL
 pass "PUBLIC catalog fails closed instead of truncating above 64 facts"
-
-echo "Character fact registry runtime authority tests passed"
- | grep -v '^SET
-set role myeongha_content_operator;
-select public.cmd_publish_character_fact_registry_v1(
-  '13060000-0000-0000-0000-000000000001'::uuid,
-  '[{"characterId":"fact-seyeon","factKey":"identity.name","sourceAuthority":"CANON","characterKnowledge":"KNOWN","disclosureDefault":"PUBLIC","sourceSection":"B1","sourceBibleDocument":"SEYEON_CHARACTER_BIBLE_DRAFT_V0_2.md","sourceBibleRevision":"test-revision","value":"세연","closureNote":"채택"}]'::jsonb
-);
-SQL
-pass "activated bundle fact authority cannot be republished"
-
-echo "Character fact registry runtime authority tests passed"
- | grep -v '^RESET
-set role myeongha_content_operator;
-select public.cmd_publish_character_fact_registry_v1(
-  '13060000-0000-0000-0000-000000000001'::uuid,
-  '[{"characterId":"fact-seyeon","factKey":"identity.name","sourceAuthority":"CANON","characterKnowledge":"KNOWN","disclosureDefault":"PUBLIC","sourceSection":"B1","sourceBibleDocument":"SEYEON_CHARACTER_BIBLE_DRAFT_V0_2.md","sourceBibleRevision":"test-revision","value":"세연","closureNote":"채택"}]'::jsonb
-);
-SQL
-pass "activated bundle fact authority cannot be republished"
-
-echo "Character fact registry runtime authority tests passed"
- || true)"
-[[ "$catalog_shape" == 'identity.name|CANON|KNOWN|PUBLIC|1|세연' ]] || fail "PUBLIC catalog leaked gated/unresolved fact: $catalog_shape"
-pass "PUBLIC catalog exposes only resolved KNOWN PUBLIC facts"
-
-expect_failure_stdin "cannot be added after bundle activation" <<'SQL'
-set role myeongha_content_operator;
-select public.cmd_publish_character_fact_registry_v1(
-  '13060000-0000-0000-0000-000000000001'::uuid,
-  '[{"characterId":"fact-seyeon","factKey":"identity.name","sourceAuthority":"CANON","characterKnowledge":"KNOWN","disclosureDefault":"PUBLIC","sourceSection":"B1","sourceBibleDocument":"SEYEON_CHARACTER_BIBLE_DRAFT_V0_2.md","sourceBibleRevision":"test-revision","value":"세연","closureNote":"채택"}]'::jsonb
-);
-SQL
-pass "activated bundle fact authority cannot be republished"
 
 echo "Character fact registry runtime authority tests passed"
