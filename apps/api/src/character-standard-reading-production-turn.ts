@@ -82,6 +82,13 @@ export interface CharacterProductionTurnPersistencePortV1 {
     readonly envelope: CharacterDialogueEnvelopeV1;
   }): Awaitable<void>;
 
+  recordContextFailure(input: {
+    readonly subjectId: string;
+    readonly turnId: string;
+    readonly attemptId: string;
+    readonly error: unknown;
+  }): Awaitable<void>;
+
   recordGenerationFailure(input: {
     readonly subjectId: string;
     readonly turnId: string;
@@ -280,6 +287,16 @@ export async function runCharacterStandardReadingProductionTurnV1(
       attemptId: attempt.attemptId,
     });
   } catch (error) {
+    try {
+      await input.persistence.recordContextFailure({
+        subjectId,
+        turnId,
+        attemptId: attempt.attemptId,
+        error,
+      });
+    } catch {
+      // Preserve the context failure as the primary orchestration error.
+    }
     throw new CharacterStandardReadingProductionTurnErrorV1(
       'context',
       error instanceof Error ? error.message : 'Character production context preparation failed.',
@@ -325,6 +342,16 @@ export async function runCharacterStandardReadingProductionTurnV1(
       rawOutput,
     });
   } catch (error) {
+    try {
+      await input.persistence.recordGenerationFailure({
+        subjectId,
+        turnId,
+        attemptId: attempt.attemptId,
+        error,
+      });
+    } catch {
+      // Preserve generated-staging failure as the primary orchestration error.
+    }
     throw new CharacterStandardReadingProductionTurnErrorV1(
       'generate_persist',
       error instanceof Error ? error.message : 'Character generated output staging failed.',
