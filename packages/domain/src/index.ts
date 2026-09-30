@@ -78,6 +78,7 @@ export {
   projectCharacterRelationshipBehavior,
   type CharacterRelationshipProjectionV1,
   type CharacterRendererPolicyV1,
+  type CharacterPublicFactContextV1,
   type CharacterRuntimeContextV1,
   type CharacterSajuRuntimeContextV1,
   type GrantedLifeFactContextV1,

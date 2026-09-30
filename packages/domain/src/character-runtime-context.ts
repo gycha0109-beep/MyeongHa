@@ -212,6 +212,21 @@ export interface CharacterRendererPolicyV1 {
   readonly allowedAnimationCueIds: readonly string[];
 }
 
+export interface CharacterPublicFactContextV1 {
+  readonly factKey: string;
+  readonly sourceAuthority: 'CANON' | 'SOFT_CANON';
+  readonly value: unknown;
+  readonly sourceReleaseId: string;
+  readonly sourceSection: string;
+  readonly sourceBibleDocument: string;
+  readonly sourceBibleRevision: string;
+}
+
+interface ServerAuthorizedCharacterPublicFactAttachmentV1
+  extends CharacterPublicFactContextV1 {
+  readonly characterId: string;
+}
+
 export interface CharacterRuntimeContextV1 {
   readonly schemaVersion: 'v1';
   readonly characterId: string;
@@ -226,6 +241,7 @@ export interface CharacterRuntimeContextV1 {
   readonly relationship: CharacterRelationshipProjectionV1;
   readonly rendererPolicy: CharacterRendererPolicyV1;
   readonly worldRelations: readonly CharacterRelationDefinition[];
+  readonly publicCharacterFacts: readonly CharacterPublicFactContextV1[];
   readonly lifeFacts: readonly GrantedLifeFactContextV1[];
   readonly memories: readonly GrantedMemoryContextV1[];
   readonly recentMessages: readonly string[];
@@ -365,6 +381,7 @@ function assembleCharacterRuntimeContextCore(input: {
       allowedAnimationCueIds: Object.freeze([...input.character.animationCueIds]),
     }),
     worldRelations: Object.freeze(input.worldRelations.map((relation) => Object.freeze({ ...relation }))),
+    publicCharacterFacts: Object.freeze([]),
     lifeFacts: Object.freeze(input.grantedLifeFacts.map((fact) => Object.freeze({ ...fact }))),
     memories: Object.freeze(input.grantedMemories.map((memory) => Object.freeze({ ...memory }))),
     recentMessages: Object.freeze([...input.recentMessages]),
@@ -397,4 +414,82 @@ export function assembleCharacterRuntimeContextFromServerAuthorizedSajuV1(
     );
   }
   return assembleCharacterRuntimeContextCore(input);
+}
+
+
+function requiredPublicFactText(value: string, path: string): string {
+  const normalized = value.trim();
+  if (normalized.length === 0 || normalized.length > 256) {
+    throw new TypeError(`${path} is outside the supported bounds.`);
+  }
+  return normalized;
+}
+
+/**
+ * @internal Server-authority seam for facts already admitted by the release-pinned
+ * Character fact registry.
+ *
+ * This function is intentionally not exported from the domain package root.
+ * Direct/general Character context assembly always starts with an empty
+ * publicCharacterFacts collection.
+ */
+export function attachServerAuthorizedCharacterPublicFactsV1(
+  context: CharacterRuntimeContextV1,
+  facts: readonly ServerAuthorizedCharacterPublicFactAttachmentV1[],
+): CharacterRuntimeContextV1 {
+  const seen = new Set<string>();
+  const publicCharacterFacts = facts.map((fact, index) => {
+    if (fact.characterId !== context.characterId) {
+      throw new TypeError(
+        `publicCharacterFacts[${index}] is not scoped to the active character.`,
+      );
+    }
+
+    const factKey = requiredPublicFactText(
+      fact.factKey,
+      `publicCharacterFacts[${index}].factKey`,
+    );
+    if (seen.has(factKey)) {
+      throw new TypeError(`Duplicate public Character fact key: ${factKey}`);
+    }
+    seen.add(factKey);
+
+    if (fact.sourceAuthority !== 'CANON' && fact.sourceAuthority !== 'SOFT_CANON') {
+      throw new TypeError(
+        `publicCharacterFacts[${index}].sourceAuthority is not resolved.`,
+      );
+    }
+    if (fact.value === undefined) {
+      throw new TypeError(
+        `publicCharacterFacts[${index}].value is required for a resolved fact.`,
+      );
+    }
+
+    return Object.freeze({
+      factKey,
+      sourceAuthority: fact.sourceAuthority,
+      value: fact.value,
+      sourceReleaseId: requiredPublicFactText(
+        fact.sourceReleaseId,
+        `publicCharacterFacts[${index}].sourceReleaseId`,
+      ),
+      sourceSection: requiredPublicFactText(
+        fact.sourceSection,
+        `publicCharacterFacts[${index}].sourceSection`,
+      ),
+      sourceBibleDocument: requiredPublicFactText(
+        fact.sourceBibleDocument,
+        `publicCharacterFacts[${index}].sourceBibleDocument`,
+      ),
+      sourceBibleRevision: requiredPublicFactText(
+        fact.sourceBibleRevision,
+        `publicCharacterFacts[${index}].sourceBibleRevision`,
+      ),
+    });
+  });
+
+  return Object.freeze({
+    ...context,
+    publicCharacterFacts: Object.freeze(publicCharacterFacts),
+  });
 }
