@@ -570,4 +570,38 @@ describe('Standard Reading production Character turn orchestration', () => {
     expect(renderer.calls).toEqual([]);
   });
 
+
+  it('blocks memory or relationship side-effect proposals until persistence authority is bound', async () => {
+    const renderer = new Renderer({
+      ...validRendererOutput(),
+      relationshipEventProposals: ['RETURN_VISIT'],
+    });
+    const persistence = new Persistence();
+
+    await expect(
+      runCharacterStandardReadingProductionTurnV1({
+        preflight: genuinePreflight(),
+        catalogAuthorityPort: new CatalogPort([]),
+        promotionAuthorityPort: allowPromotion,
+        renderer,
+        persistence,
+        allowedSuggestedActionKeys: [],
+      }),
+    ).rejects.toMatchObject({
+      stage: 'validate',
+    });
+
+    expect(persistence.events).toEqual([
+      'acquire',
+      'context_ready',
+      'failed',
+    ]);
+    expect(persistence.failures).toEqual([
+      expect.objectContaining({
+        stage: 'validate',
+        retryable: false,
+      }),
+    ]);
+  });
+
 });
