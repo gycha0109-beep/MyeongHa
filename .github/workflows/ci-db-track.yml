@@ -3,6 +3,15 @@ name: CI DB Track
 on:
   workflow_call:
     inputs:
+      candidate_pr:
+        type: string
+        default: ''
+      candidate_head:
+        type: string
+        default: ''
+      candidate_base:
+        type: string
+        default: ''
       suite:
         required: true
         type: string
@@ -40,6 +49,17 @@ jobs:
       PGDATABASE: myeongha_test
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.candidate_head || github.sha }}
+          fetch-depth: 0
+      - name: Assemble pinned integration candidate
+        if: inputs.candidate_head != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_PR: ${{ inputs.candidate_pr }}
+          CANDIDATE_HEAD: ${{ inputs.candidate_head }}
+          CANDIDATE_BASE: ${{ inputs.candidate_base }}
+        run: node scripts/ci/integration-candidate.mjs prepare
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '24'
