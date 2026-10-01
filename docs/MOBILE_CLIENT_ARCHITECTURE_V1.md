@@ -1,7 +1,7 @@
 # MyeongHa Mobile Client Architecture v1
 
 > Track: `applizing`  
-> Status: M11-A2 production release origin guard implemented  
+> Status: M11-A3 dual-platform export smoke implemented  
 > Date: 2026-10-01  
 > Server authority: existing MyeongHa API / PostgreSQL  
 > Client principle: Web and Mobile are separate first-class clients of the same server world.
@@ -215,6 +215,7 @@ M9  Push after notification authority unblock             BLOCKED
 M10 native store commerce after rail decision             NOT IN LAUNCH RAIL
 M11-A Android/iOS release-readiness preflight             DONE
 M11-A2 Production API origin release guard                DONE
+M11-A3 Android+iOS Expo export smoke                       DONE
 M11-B production app identity + signed store builds       BLOCKED
 ```
 
@@ -401,3 +402,22 @@ release preflight rejects:
 This guard is release-only and does not remove the existing development runtime
 override behavior. The runtime constant and release-preflight constant are
 cross-tested to prevent silent authority drift.
+
+
+## 17. M11-A3 Android+iOS Expo export smoke
+
+Mobile PR CI now exports both supported client platforms after release preflight:
+
+```text
+Android -> apps/mobile/.expo/export-ci/android
+iOS     -> apps/mobile/.expo/export-ci/ios
+```
+
+M11-A3 invariants:
+
+- Android and iOS export commands are explicit and independently addressable;
+- output directories are isolated so one platform cannot hide or overwrite the other's export result;
+- release-readiness contract verification runs before either export;
+- this is an unsigned Expo export smoke, not an Apple/Google signed store build;
+- no bundle identifier, Android package id, signing credential, provisioning profile, keystore, EAS ownership, or store account is invented;
+- a platform export failure blocks the Mobile PR bundle gate.
