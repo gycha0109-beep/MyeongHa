@@ -5,7 +5,7 @@ MyeongHa Mobile is a first-class React Native client of the existing MyeongHa se
 ## Current state
 
 - Track: `applizing`
-- Phase: **M11-A4 export artifact verification**
+- Phase: **native new-member enrollment + M11-A4 release hardening**
 - Runtime: **Expo SDK 57 / React Native 0.86.x**
 - Navigation: **Expo Router**
 - Secure Guest credential persistence: **Expo SecureStore**
@@ -24,6 +24,7 @@ Mobile now has:
 - native Member sign-in/refresh/sign-out session foundation through the existing server auth proxy, with SecureStore persistence and fail-closed refresh handling;
 - active-subject bearer routing that prefers a recoverable Member session and falls back to Guest only when no Member authority remains;
 - existing-Member sign-in/sign-out from My, using the server auth proxy and ephemeral password input;
+- native new-account creation with same-subject Guest→Member promotion; verification-required sign-up continues through the existing Web confirmation link, then returns to the app for sign-in + promotion;
 - single-flight Guest bootstrap and concurrent 401 replacement recovery;
 - current Birth Profile create/read and current-subject Saju calculation rendering;
 - Records reads for Life Record, Reading History, and Memory with cursor pagination;
@@ -41,7 +42,7 @@ Home does not invent a separate server authority. It does not call unimplemented
 
 Still gated after M11-A4:
 
-- native sign-up / full account management and Guest→existing-Member merge (existing-Member sign-in/sign-out is available from My);
+- full account management and Guest→existing-Member merge; existing-member merge remains blocked by SRC-24;
 - Chat thread discovery / recent-thread listing;
 - Chat send;
 - production Character catalog/recommendation projection;

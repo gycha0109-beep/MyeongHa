@@ -32,9 +32,13 @@ export function MyMemberAuthCard({
   password,
   pending,
   errorMessage,
+  verificationRequired,
   onEmailChange,
   onPasswordChange,
   onSignIn,
+  onSignUp,
+  onCompleteSignUp,
+  onCancelSignUp,
   onSignOut,
 }: {
   subjectKind: 'guest' | 'member';
@@ -42,9 +46,16 @@ export function MyMemberAuthCard({
   password: string;
   pending: boolean;
   errorMessage: string | null;
+  verificationRequired: Readonly<{
+    email: string;
+    message: string;
+  }> | null;
   onEmailChange: (value: string) => void;
   onPasswordChange: (value: string) => void;
   onSignIn: () => void;
+  onSignUp: () => void;
+  onCompleteSignUp: () => void;
+  onCancelSignUp: () => void;
   onSignOut: () => void;
 }) {
   if (subjectKind === 'member') {
@@ -72,54 +83,114 @@ export function MyMemberAuthCard({
 
   return (
     <View style={styles.card}>
-      <Text style={styles.kicker}>MEMBER LOGIN</Text>
-      <Text style={styles.sectionTitle}>기존 계정으로 로그인</Text>
+      <Text style={styles.kicker}>ACCOUNT</Text>
+      <Text style={styles.sectionTitle}>계정으로 이어가기</Text>
       <Text style={styles.body}>
-        로그인하면 회원 계정의 기록과 출생정보를 기준으로 앱을 이어서 사용합니다.
+        기존 계정으로 로그인하거나, 현재 게스트 기록을 그대로 이어받는 새 계정을 만들 수 있습니다.
       </Text>
-      <TextInput
-        accessibilityLabel="이메일"
-        autoCapitalize="none"
-        autoCorrect={false}
-        editable={!pending}
-        keyboardType="email-address"
-        onChangeText={onEmailChange}
-        placeholder="이메일"
-        placeholderTextColor={mobileColors.muted}
-        style={styles.authInput}
-        value={email}
-      />
-      <TextInput
-        accessibilityLabel="비밀번호"
-        autoCapitalize="none"
-        autoCorrect={false}
-        editable={!pending}
-        onChangeText={onPasswordChange}
-        onSubmitEditing={onSignIn}
-        placeholder="비밀번호"
-        placeholderTextColor={mobileColors.muted}
-        secureTextEntry
-        style={styles.authInput}
-        value={password}
-      />
-      {errorMessage !== null ? <Text style={styles.error}>{errorMessage}</Text> : null}
-      <Pressable
-        accessibilityRole="button"
-        disabled={pending || email.trim().length === 0 || password.length === 0}
-        onPress={onSignIn}
-        style={[
-          styles.primaryAction,
-          (pending || email.trim().length === 0 || password.length === 0) &&
-            styles.disabledAction,
-        ]}
-      >
-        <Text style={styles.primaryActionText}>
-          {pending ? '로그인 중…' : '로그인'}
-        </Text>
-      </Pressable>
-      <Text style={styles.caption}>
-        신규 회원가입과 게스트 기록의 기존 계정 병합은 모바일에서 아직 제공하지 않습니다.
-      </Text>
+
+      {verificationRequired === null ? (
+        <>
+          <TextInput
+            accessibilityLabel="이메일"
+            autoCapitalize="none"
+            autoCorrect={false}
+            editable={!pending}
+            keyboardType="email-address"
+            onChangeText={onEmailChange}
+            placeholder="이메일"
+            placeholderTextColor={mobileColors.muted}
+            style={styles.authInput}
+            value={email}
+          />
+          <TextInput
+            accessibilityLabel="비밀번호"
+            autoCapitalize="none"
+            autoCorrect={false}
+            editable={!pending}
+            onChangeText={onPasswordChange}
+            onSubmitEditing={onSignIn}
+            placeholder="비밀번호"
+            placeholderTextColor={mobileColors.muted}
+            secureTextEntry
+            style={styles.authInput}
+            value={password}
+          />
+          {errorMessage !== null ? <Text style={styles.error}>{errorMessage}</Text> : null}
+          <Pressable
+            accessibilityRole="button"
+            disabled={pending || email.trim().length === 0 || password.length === 0}
+            onPress={onSignIn}
+            style={[
+              styles.primaryAction,
+              (pending || email.trim().length === 0 || password.length === 0) &&
+                styles.disabledAction,
+            ]}
+          >
+            <Text style={styles.primaryActionText}>
+              {pending ? '처리 중…' : '기존 계정으로 로그인'}
+            </Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            disabled={pending || email.trim().length === 0 || password.length === 0}
+            onPress={onSignUp}
+            style={[
+              styles.secondaryAction,
+              (pending || email.trim().length === 0 || password.length === 0) &&
+                styles.disabledAction,
+            ]}
+          >
+            <Text style={styles.secondaryActionText}>새 계정 만들기</Text>
+          </Pressable>
+          <Text style={styles.caption}>
+            새 계정은 현재 게스트 주체를 그대로 회원으로 승격합니다. 기존 회원 계정과의 게스트 기록 병합은 아직 지원하지 않습니다.
+          </Text>
+        </>
+      ) : (
+        <>
+          <Text style={styles.body}>{verificationRequired.message}</Text>
+          <Text style={styles.verificationEmail}>{verificationRequired.email}</Text>
+          <Text style={styles.caption}>
+            확인 링크는 현재 Web 확인 화면으로 열립니다. 이메일 확인을 마친 뒤 앱으로 돌아와 비밀번호를 다시 입력해 주세요.
+          </Text>
+          <TextInput
+            accessibilityLabel="비밀번호"
+            autoCapitalize="none"
+            autoCorrect={false}
+            editable={!pending}
+            onChangeText={onPasswordChange}
+            onSubmitEditing={onCompleteSignUp}
+            placeholder="비밀번호 다시 입력"
+            placeholderTextColor={mobileColors.muted}
+            secureTextEntry
+            style={styles.authInput}
+            value={password}
+          />
+          {errorMessage !== null ? <Text style={styles.error}>{errorMessage}</Text> : null}
+          <Pressable
+            accessibilityRole="button"
+            disabled={pending || password.length === 0}
+            onPress={onCompleteSignUp}
+            style={[
+              styles.primaryAction,
+              (pending || password.length === 0) && styles.disabledAction,
+            ]}
+          >
+            <Text style={styles.primaryActionText}>
+              {pending ? '처리 중…' : '가입 완료 후 이어가기'}
+            </Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            disabled={pending}
+            onPress={onCancelSignUp}
+            style={[styles.secondaryAction, pending && styles.disabledAction]}
+          >
+            <Text style={styles.secondaryActionText}>가입 흐름 취소</Text>
+          </Pressable>
+        </>
+      )}
     </View>
   );
 }
@@ -232,7 +303,7 @@ export function MyFlowCards() {
 const pendingSettings = Object.freeze([
   '알림 설정',
   '이용권 · 결제',
-  '회원가입 · 계정 관리',
+  '계정 관리',
   '고객지원',
 ] as const);
 
@@ -252,7 +323,7 @@ export function MyPendingSettings() {
         ))}
       </View>
       <Text style={styles.caption}>
-        연결되지 않은 알림·결제·계정·지원 상태는 임의로 표시하지 않습니다.
+        연결되지 않은 알림·결제·상세 계정관리·지원 상태는 임의로 표시하지 않습니다.
       </Text>
     </View>
   );
@@ -338,6 +409,7 @@ const styles = StyleSheet.create({
   },
   pendingText: { color: mobileColors.muted, fontSize: 13, fontWeight: '700' },
   caption: { color: mobileColors.muted, fontSize: 11, lineHeight: 17 },
+  verificationEmail: { color: mobileColors.ink, fontSize: 14, fontWeight: '800' },
   flowCard: {
     flexDirection: 'row',
     alignItems: 'center',

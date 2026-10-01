@@ -204,6 +204,7 @@ Server idempotency/revision contracts remain mandatory.
 M0  architecture foundation + navigation contract       DONE
 M1  Expo runtime bootstrap + five-tab shell              DONE
 M2  shared API/auth + secure credential adapter          DONE
+M2-B Guest→new Member same-subject enrollment             DONE
 M3  Saju + Birth vertical slice                          DONE
 M4  Records + My                                         DONE
 M5  Home projection composition                          DONE
@@ -447,3 +448,37 @@ missing, empty, or cross-platform-contaminated artifacts.
 
 M11-A4 does not claim signed native binary readiness. APK/AAB/IPA production signing and
 store distribution remain gated by M11-B.
+
+
+## 19. Native new-member enrollment boundary
+
+Mobile may create a new Supabase authentication identity and promote the current
+Guest subject to that new Member identity through the existing Production
+authority:
+
+```text
+POST /api/auth/sign-up
+POST /api/auth/promote-guest
+```
+
+Enrollment invariants:
+
+- generic existing-account sign-in never calls Guest promotion;
+- the Member session returned by sign-up/sign-in is not persisted until Guest
+  promotion succeeds;
+- Guest promotion sends the verified Member bearer plus the current opaque Guest
+  bearer and an empty JSON body;
+- the promotion response subject id must equal the current Guest subject id;
+- only after promotion succeeds is the Member session persisted;
+- the consumed Guest credential is then removed best-effort from device storage;
+- `verification_required` preserves the Guest session and stores no Member
+  session; the app persists only a pending enrollment marker containing the
+  normalized email plus the original Guest subject/session ids, never the
+  password or a duplicate Guest bearer;
+- after app restart, completion may resume only when the current stored Guest
+  still matches that pending subject/session and remains unexpired;
+- the user completes the existing Web confirmation link and returns to the app
+  to sign in and finish promotion;
+- `GUEST_MERGE_REQUIRED` is surfaced as a blocked existing-member merge. Mobile
+  does not invent SRC-24 conflict/resolution semantics;
+- passwords remain ephemeral screen state and are never persisted.

@@ -83,6 +83,14 @@ export {
   serializeMemberSessionV1,
   signInMemberV1,
   signOutMemberV1,
+  signUpMemberV1,
   type MemberSessionUserV1,
   type MemberSessionV1,
+  type MemberSignUpResultV1,
 } from './member-auth.js';
+
+
+export {
+  promoteGuestToNewMemberV1,
+  type GuestPromotionReceiptV1,
+} from './guest-promotion.js';

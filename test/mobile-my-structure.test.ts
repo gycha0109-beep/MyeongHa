@@ -22,7 +22,22 @@ describe('mobile M4-C My structure', () => {
     expect(components).toContain('기존 계정으로 로그인');
     expect(hook).toContain('nativeMobileRuntimeV1.memberSession.signIn');
     expect(hook).toContain('nativeMobileRuntimeV1.memberSession.signOut');
+    expect(hook).toContain('mobileNewMemberEnrollmentServiceV1.start');
+    expect(hook).toContain('mobileNewMemberEnrollmentServiceV1.continueAfterVerification');
     expect(hook).not.toContain('SecureStore');
+  });
+
+  it('exposes new-account enrollment without enabling existing-member Guest merge', async () => {
+    const components = await readRepoFile('apps/mobile/src/features/my/MyComponents.tsx');
+    const service = await readRepoFile(
+      'apps/mobile/src/features/my/mobile-new-member-enrollment.ts',
+    );
+    expect(components).toContain('새 계정 만들기');
+    expect(components).toContain('가입 완료 후 이어가기');
+    expect(components).toContain('가입 흐름 취소');
+    expect(components).toContain('기존 회원 계정과의 게스트 기록 병합은 아직 지원하지 않습니다');
+    expect(service).toContain('promoteGuestToNewMemberV1');
+    expect(service).not.toContain('merge-guest');
   });
 
   it('keeps unavailable settings as non-Pressable information rows', async () => {

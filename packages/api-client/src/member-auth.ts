@@ -16,6 +16,16 @@ export interface MemberSessionV1 {
   readonly user: MemberSessionUserV1;
 }
 
+export type MemberSignUpResultV1 =
+  | Readonly<{
+      status: 'authenticated';
+      session: MemberSessionV1;
+    }>
+  | Readonly<{
+      status: 'verification_required';
+      email: string;
+    }>;
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -79,6 +89,38 @@ function parseAuthenticatedData(value: unknown): MemberSessionV1 {
   return parseMemberSession(value.session);
 }
 
+function parseSignUpData(value: unknown): MemberSignUpResultV1 {
+  if (!isRecord(value)) {
+    return invalid('API_MEMBER_AUTH_RESPONSE_INVALID', 'Member sign-up response is invalid.');
+  }
+  if (value.status === 'authenticated') {
+    return Object.freeze({
+      status: 'authenticated' as const,
+      session: parseMemberSession(value.session),
+    });
+  }
+  if (value.status === 'verification_required') {
+    if (typeof value.email !== 'string') {
+      return invalid(
+        'API_MEMBER_AUTH_RESPONSE_INVALID',
+        'Member sign-up verification email is invalid.',
+      );
+    }
+    const email = value.email.trim().toLowerCase();
+    if (email.length < 3 || email.length > 320 || !email.includes('@')) {
+      return invalid(
+        'API_MEMBER_AUTH_RESPONSE_INVALID',
+        'Member sign-up verification email is invalid.',
+      );
+    }
+    return Object.freeze({
+      status: 'verification_required' as const,
+      email,
+    });
+  }
+  return invalid('API_MEMBER_AUTH_RESPONSE_INVALID', 'Member sign-up response is invalid.');
+}
+
 function normalizeEmail(value: unknown): string {
   if (typeof value !== 'string') {
     return invalid('CLIENT_MEMBER_AUTH_INVALID', 'Member email is invalid.');
@@ -129,6 +171,21 @@ export function isMemberSessionExpiredV1(
   nowEpochMs = Date.now(),
 ): boolean {
   return Date.parse(session.expiresAt) <= nowEpochMs;
+}
+
+export async function signUpMemberV1(
+  client: MyeongHaApiClientV1,
+  email: string,
+  password: string,
+): Promise<MemberSignUpResultV1> {
+  return parseSignUpData(await client.requestData({
+    method: 'POST',
+    path: '/api/auth/sign-up',
+    body: Object.freeze({
+      email: normalizeEmail(email),
+      password: normalizePassword(password),
+    }),
+  }));
 }
 
 export async function signInMemberV1(
