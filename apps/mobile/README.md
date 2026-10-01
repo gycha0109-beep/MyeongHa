@@ -5,7 +5,7 @@ MyeongHa Mobile is a first-class React Native client of the existing MyeongHa se
 ## Current state
 
 - Track: `applizing`
-- Phase: **M7 native Face media staging**
+- Phase: **M8-A Member Chat open/reuse**
 - Runtime: **Expo SDK 57 / React Native 0.86.x**
 - Navigation: **Expo Router**
 - Secure Guest credential persistence: **Expo SecureStore**
@@ -30,15 +30,15 @@ Mobile now has:
 - My projection from current Profile + Birth;
 - Home projection composed from current Profile, Birth, latest Reading History, and calculation-only Saju evidence;
 - known-thread Chat read through `GET /api/chat/:threadId` with forward cursor pagination and redaction-safe rendering;
+- Member-only Chat open/reuse through `POST /api/chat` for the exact approved Launch 9 roster, with server-authoritative publication/availability and thread convergence;
 - Face Reading camera/library photo staging through Expo ImagePicker with image-only selection, 16MB client bound, local preview, and no server analysis.
 
 Home does not invent a separate server authority. It does not call unimplemented `/api/home` or `/api/characters`, does not infer a recent Chat thread, does not auto-run Preview Reading, and does not synthesize daily-fortune claims from calculation-only Saju evidence.
 
-Still gated after M7:
+Still gated after M8-A:
 
 - native sign-up / full account management and Guest→existing-Member merge (existing-Member sign-in/sign-out is available from My);
 - Chat thread discovery / recent-thread listing;
-- Mobile Chat-open activation while native Member auth and Character discovery are unavailable;
 - Chat send;
 - production Character catalog/recommendation projection;
 - Face Reading engine intake / analysis upload. M7 does not treat `exif: false` as proof that selected file bytes are metadata-stripped;

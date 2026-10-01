@@ -6,10 +6,11 @@ async function readRepoFile(path: string) {
 }
 
 describe('mobile M6 acceptance', () => {
-  it('documents known-thread read as complete while discovery/open/send remain gated', async () => {
+  it('documents known-thread read as complete while discovery/send remain gated and later Member open is explicit', async () => {
     const readme = await readRepoFile('apps/mobile/README.md');
     expect(readme).toContain('known-thread Chat read');
     expect(readme).toContain('thread discovery');
+    expect(readme).toContain('Member-only Chat open/reuse');
     expect(readme).toContain('Chat send');
   });
 
