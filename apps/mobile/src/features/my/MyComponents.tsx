@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import type {
   MobileMyBirthViewV1,
@@ -22,6 +22,104 @@ export function MyProfileCard({
         <Text style={styles.profileMeta}>{profile.subjectLabel}</Text>
         <Text style={styles.profileStatus}>{profile.statusLabel}</Text>
       </View>
+    </View>
+  );
+}
+
+export function MyMemberAuthCard({
+  subjectKind,
+  email,
+  password,
+  pending,
+  errorMessage,
+  onEmailChange,
+  onPasswordChange,
+  onSignIn,
+  onSignOut,
+}: {
+  subjectKind: 'guest' | 'member';
+  email: string;
+  password: string;
+  pending: boolean;
+  errorMessage: string | null;
+  onEmailChange: (value: string) => void;
+  onPasswordChange: (value: string) => void;
+  onSignIn: () => void;
+  onSignOut: () => void;
+}) {
+  if (subjectKind === 'member') {
+    return (
+      <View style={styles.card}>
+        <Text style={styles.kicker}>ACCOUNT</Text>
+        <Text style={styles.sectionTitle}>회원으로 이용 중</Text>
+        <Text style={styles.body}>
+          이 기기에서는 회원 세션을 우선 사용합니다.
+        </Text>
+        {errorMessage !== null ? <Text style={styles.error}>{errorMessage}</Text> : null}
+        <Pressable
+          accessibilityRole="button"
+          disabled={pending}
+          onPress={onSignOut}
+          style={[styles.secondaryAction, pending && styles.disabledAction]}
+        >
+          <Text style={styles.secondaryActionText}>
+            {pending ? '처리 중…' : '로그아웃'}
+          </Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.card}>
+      <Text style={styles.kicker}>MEMBER LOGIN</Text>
+      <Text style={styles.sectionTitle}>기존 계정으로 로그인</Text>
+      <Text style={styles.body}>
+        로그인하면 회원 계정의 기록과 출생정보를 기준으로 앱을 이어서 사용합니다.
+      </Text>
+      <TextInput
+        accessibilityLabel="이메일"
+        autoCapitalize="none"
+        autoCorrect={false}
+        editable={!pending}
+        keyboardType="email-address"
+        onChangeText={onEmailChange}
+        placeholder="이메일"
+        placeholderTextColor={mobileColors.muted}
+        style={styles.authInput}
+        value={email}
+      />
+      <TextInput
+        accessibilityLabel="비밀번호"
+        autoCapitalize="none"
+        autoCorrect={false}
+        editable={!pending}
+        onChangeText={onPasswordChange}
+        onSubmitEditing={onSignIn}
+        placeholder="비밀번호"
+        placeholderTextColor={mobileColors.muted}
+        secureTextEntry
+        style={styles.authInput}
+        value={password}
+      />
+      {errorMessage !== null ? <Text style={styles.error}>{errorMessage}</Text> : null}
+      <Pressable
+        accessibilityRole="button"
+        disabled={pending || email.trim().length === 0 || password.length === 0}
+        onPress={onSignIn}
+        style={[
+          styles.primaryAction,
+          (pending || email.trim().length === 0 || password.length === 0) &&
+            styles.disabledAction,
+        ]}
+      >
+        <Text style={styles.primaryActionText}>
+          {pending ? '로그인 중…' : '로그인'}
+        </Text>
+      </Pressable>
+      <Text style={styles.caption}>
+        신규 회원가입과 게스트 기록의 기존 계정 병합은 모바일에서 아직 제공하지 않습니다.
+      </Text>
     </View>
   );
 }
@@ -134,7 +232,7 @@ export function MyFlowCards() {
 const pendingSettings = Object.freeze([
   '알림 설정',
   '이용권 · 결제',
-  '계정 관리',
+  '회원가입 · 계정 관리',
   '고객지원',
 ] as const);
 
@@ -210,6 +308,26 @@ const styles = StyleSheet.create({
     backgroundColor: mobileColors.navy,
   },
   primaryActionText: { color: mobileColors.surface, fontSize: 14, fontWeight: '800' },
+  secondaryAction: {
+    minHeight: 46,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: mobileColors.navy,
+    borderRadius: 12,
+  },
+  secondaryActionText: { color: mobileColors.navy, fontSize: 14, fontWeight: '800' },
+  disabledAction: { opacity: 0.5 },
+  authInput: {
+    minHeight: 48,
+    borderWidth: 1,
+    borderColor: mobileColors.border,
+    borderRadius: 12,
+    backgroundColor: mobileColors.canvas,
+    color: mobileColors.ink,
+    paddingHorizontal: 14,
+    fontSize: 15,
+  },
   pendingAction: {
     minHeight: 42,
     alignItems: 'center',

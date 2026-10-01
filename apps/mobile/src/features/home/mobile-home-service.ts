@@ -21,27 +21,27 @@ export interface MobileHomeServiceV1 {
 
 export function createMobileHomeServiceV1(input: {
   readonly client: MyeongHaApiClientV1;
-  readonly session: Pick<MobileSubjectSessionCoordinatorV1, 'withGuestBearer'>;
+  readonly session: Pick<MobileSubjectSessionCoordinatorV1, 'withActiveBearer'>;
 }): MobileHomeServiceV1 {
   return Object.freeze({
     readProfile() {
-      return input.session.withGuestBearer((bearer) =>
+      return input.session.withActiveBearer((bearer) =>
         readCurrentSubjectProfileV1(input.client, bearer),
       );
     },
     readBirth() {
-      return input.session.withGuestBearer((bearer) =>
+      return input.session.withActiveBearer((bearer) =>
         readCurrentBirthProfileV1(input.client, bearer),
       );
     },
     async readLatestReading() {
-      return input.session.withGuestBearer(async (bearer) => {
+      return input.session.withActiveBearer(async (bearer) => {
         const page = await readReadingHistoryPageV1(input.client, bearer, { pageSize: 1 });
         return page.readings[0] ?? null;
       });
     },
     calculateCurrentSaju() {
-      return input.session.withGuestBearer((bearer) =>
+      return input.session.withActiveBearer((bearer) =>
         calculateCurrentSajuV1(input.client, bearer),
       );
     },

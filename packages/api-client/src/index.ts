@@ -69,3 +69,15 @@ export {
   type ChatSenderTypeV1,
   type ChatThreadPageV1,
 } from './chat.js';
+
+
+export {
+  isMemberSessionExpiredV1,
+  parseStoredMemberSessionV1,
+  refreshMemberSessionV1,
+  serializeMemberSessionV1,
+  signInMemberV1,
+  signOutMemberV1,
+  type MemberSessionUserV1,
+  type MemberSessionV1,
+} from './member-auth.js';

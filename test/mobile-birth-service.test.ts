@@ -35,7 +35,7 @@ describe('mobile Birth service', () => {
     const service = createMobileBirthServiceV1({
       client,
       session: {
-        async withGuestBearer(operation) {
+        async withActiveBearer(operation) {
           sessionCalls += 1;
           return operation('opaque-mobile-token');
         },

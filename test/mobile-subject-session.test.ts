@@ -13,6 +13,7 @@ import {
   MobileSubjectSessionErrorV1,
   createMobileSubjectSessionCoordinatorV1,
 } from '../apps/mobile/src/core/session/mobile-subject-session.js';
+import { MobileMemberSessionErrorV1 } from '../apps/mobile/src/core/session/mobile-member-session.js';
 
 function createMemorySecureStore(): SecureKeyValueStoreV1 {
   const values = new Map<string, string>();
@@ -445,5 +446,147 @@ describe('mobile subject session coordinator', () => {
     await expect(coordinator.acquireGuestCredential()).rejects.toMatchObject({
       code: 'MOBILE_MEMBER_AUTH_NOT_AVAILABLE',
     });
+  });
+});
+
+
+describe('mobile active subject bearer selection', () => {
+  it('prefers a stored Member bearer over the Guest path', async () => {
+    let guestBootstraps = 0;
+    const client = new MyeongHaApiClientV1({
+      origin: 'https://myeongha.test',
+      fetchImpl: async () => {
+        guestBootstraps += 1;
+        return json({
+          subjectId: 'unexpected-guest',
+          kind: 'guest',
+          guestSession: {
+            guestSessionId: 'unexpected-session',
+            expiresAt: '2026-10-10T00:00:00.000Z',
+            bearerToken: 'unexpected-token',
+          },
+        });
+      },
+    });
+    const store = createMobileGuestCredentialStoreV1(createMemorySecureStore());
+    const coordinator = createMobileSubjectSessionCoordinatorV1({
+      client,
+      store,
+      memberSession: {
+        async read() {
+          return {
+            accessToken: 'member-token',
+            refreshToken: 'member-refresh',
+            expiresAt: '2026-10-10T00:00:00.000Z',
+            tokenType: 'bearer',
+            user: { id: null, email: null },
+          };
+        },
+        async withMemberBearer(operation) {
+          return operation('member-token');
+        },
+      },
+    });
+
+    await expect(
+      coordinator.withActiveBearer(async (bearer) => bearer),
+    ).resolves.toBe('member-token');
+    expect(guestBootstraps).toBe(0);
+  });
+
+  it('does not downgrade a recoverable Member to Guest on a transient failure', async () => {
+    let guestBootstraps = 0;
+    const client = new MyeongHaApiClientV1({
+      origin: 'https://myeongha.test',
+      fetchImpl: async () => {
+        guestBootstraps += 1;
+        return json({
+          subjectId: 'unexpected-guest',
+          kind: 'guest',
+          guestSession: {
+            guestSessionId: 'unexpected-session',
+            expiresAt: '2026-10-10T00:00:00.000Z',
+            bearerToken: 'unexpected-token',
+          },
+        });
+      },
+    });
+    const store = createMobileGuestCredentialStoreV1(createMemorySecureStore());
+    const member = {
+      accessToken: 'member-token',
+      refreshToken: 'member-refresh',
+      expiresAt: '2026-10-10T00:00:00.000Z',
+      tokenType: 'bearer' as const,
+      user: { id: null, email: null },
+    };
+    const coordinator = createMobileSubjectSessionCoordinatorV1({
+      client,
+      store,
+      memberSession: {
+        async read() {
+          return member;
+        },
+        async withMemberBearer() {
+          throw new MyeongHaApiClientErrorV1(
+            'http',
+            'AUTH_UPSTREAM_UNAVAILABLE',
+            'temporary',
+            503,
+            true,
+          );
+        },
+      },
+    });
+
+    await expect(
+      coordinator.withActiveBearer(async () => 'unexpected'),
+    ).rejects.toMatchObject({ code: 'AUTH_UPSTREAM_UNAVAILABLE' });
+    expect(guestBootstraps).toBe(0);
+  });
+
+  it('falls back to Guest only after authoritative Member expiry clears the Member', async () => {
+    const client = new MyeongHaApiClientV1({
+      origin: 'https://myeongha.test',
+      fetchImpl: async () =>
+        json({
+          subjectId: 'guest-after-expiry',
+          kind: 'guest',
+          guestSession: {
+            guestSessionId: 'guest-session-after-expiry',
+            expiresAt: '2026-10-10T00:00:00.000Z',
+            bearerToken: 'guest-after-expiry-token',
+          },
+        }),
+    });
+    const store = createMobileGuestCredentialStoreV1(createMemorySecureStore());
+    let memberPresent = true;
+    const coordinator = createMobileSubjectSessionCoordinatorV1({
+      client,
+      store,
+      memberSession: {
+        async read() {
+          return memberPresent
+            ? {
+                accessToken: 'expired-member',
+                refreshToken: 'expired-refresh',
+                expiresAt: '2026-09-30T00:00:00.000Z',
+                tokenType: 'bearer',
+                user: { id: null, email: null },
+              }
+            : null;
+        },
+        async withMemberBearer() {
+          memberPresent = false;
+          throw new MobileMemberSessionErrorV1(
+            'MOBILE_MEMBER_REQUIRED',
+            'expired',
+          );
+        },
+      },
+    });
+
+    await expect(
+      coordinator.withActiveBearer(async (bearer) => bearer),
+    ).resolves.toBe('guest-after-expiry-token');
   });
 });

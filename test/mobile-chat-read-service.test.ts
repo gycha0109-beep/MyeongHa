@@ -38,7 +38,7 @@ describe('mobile Chat read service', () => {
     const service = createMobileChatReadServiceV1({
       client,
       session: {
-        async withGuestBearer(operation) {
+        async withActiveBearer(operation) {
           sessions += 1;
           return operation('guest-token');
         },

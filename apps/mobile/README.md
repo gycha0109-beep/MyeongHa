@@ -9,6 +9,7 @@ MyeongHa Mobile is a first-class React Native client of the existing MyeongHa se
 - Runtime: **Expo SDK 57 / React Native 0.86.x**
 - Navigation: **Expo Router**
 - Secure Guest credential persistence: **Expo SecureStore**
+- Secure Member session foundation: **Expo SecureStore + server auth proxy**
 - WebView wrapper: **not adopted**
 - Web DOM/UI component reuse: **not adopted**
 - Primary navigation: **Home / Saju / Chat / Records / My**
@@ -20,6 +21,9 @@ Mobile now has:
 
 - Expo Router five-tab shell with Saju / Face secondary navigation;
 - portable shared API/auth clients and Expo SecureStore Guest credential persistence;
+- native Member sign-in/refresh/sign-out session foundation through the existing server auth proxy, with SecureStore persistence and fail-closed refresh handling;
+- active-subject bearer routing that prefers a recoverable Member session and falls back to Guest only when no Member authority remains;
+- existing-Member sign-in/sign-out from My, using the server auth proxy and ephemeral password input;
 - single-flight Guest bootstrap and concurrent 401 replacement recovery;
 - current Birth Profile create/read and current-subject Saju calculation rendering;
 - Records reads for Life Record, Reading History, and Memory with cursor pagination;
@@ -32,7 +36,7 @@ Home does not invent a separate server authority. It does not call unimplemented
 
 Still gated after M7:
 
-- native Member auth/account management;
+- native sign-up / full account management and Guest→existing-Member merge (existing-Member sign-in/sign-out is available from My);
 - Chat thread discovery / recent-thread listing;
 - Mobile Chat-open activation while native Member auth and Character discovery are unavailable;
 - Chat send;
