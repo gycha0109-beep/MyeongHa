@@ -52,7 +52,7 @@ export function createMobileNewMemberEnrollmentStoreV1(
       if (raw === null) return null;
       return parse(JSON.parse(raw) as unknown);
     },
-    async write(value) {
+    async write(value: PendingNewMemberEnrollmentV1) {
       const parsed = parse(value);
       await secureStore.setItemAsync(
         MOBILE_NEW_MEMBER_ENROLLMENT_KEY_V1,
