@@ -1,7 +1,7 @@
 # MyeongHa Mobile Client Architecture v1
 
 > Track: `applizing`  
-> Status: M8-A Member Chat open/reuse implemented  
+> Status: M11-A release-readiness preflight implemented  
 > Date: 2026-10-01  
 > Server authority: existing MyeongHa API / PostgreSQL  
 > Client principle: Web and Mobile are separate first-class clients of the same server world.
@@ -210,10 +210,11 @@ M5  Home projection composition                          DONE
 M6  Chat Hub + server-authorized read path               DONE
 M7  Face Reading media path                              DONE
 M8-A Member Chat open/reuse + exact Launch roster         DONE
-M8-B Chat send after authority unblock
-M9  Push after notification authority unblock
-M10 native store commerce after rail decision
-M11 Android/iOS release hardening
+M8-B Chat send after authority unblock                    BLOCKED
+M9  Push after notification authority unblock             BLOCKED
+M10 native store commerce after rail decision             NOT IN LAUNCH RAIL
+M11-A Android/iOS release-readiness preflight             DONE
+M11-B production app identity + signed store builds       BLOCKED
 ```
 
 ## 10. M0 acceptance criteria
@@ -336,3 +337,36 @@ M8-A invariants:
 - successful open/reuse navigates to the existing known-thread read surface.
 - recent-thread discovery remains unavailable.
 - Chat send remains disabled.
+
+
+## 15. M11-A release-readiness preflight
+
+M11-A adds a repository-owned release guard without inventing permanent store identities.
+
+Current release sequencing is explicit:
+
+```text
+Expo app version      = 0.1.0
+iOS buildNumber       = 1
+Android versionCode   = 1
+```
+
+Strict release readiness additionally requires:
+
+```text
+ios.bundleIdentifier
+android.package
+```
+
+Those two values are long-lived platform application identities. The current source/repository does not authorize their exact values, so M11-A deliberately leaves them unset and reports them as blockers instead of deriving them from the GitHub owner, Vercel hostname, Expo slug, or product display name.
+
+M11-A invariants:
+
+- app and package semantic versions must match;
+- iOS buildNumber must be a positive integer string;
+- Android versionCode must be a positive integer;
+- configured platform ids must be valid reverse-DNS identifiers;
+- strict release verification fails while either platform identity is absent;
+- CI contract verification may continue while those exact documented identity blockers remain unresolved;
+- malformed release configuration always fails CI;
+- M11-A does not configure signing credentials, Apple/Google developer accounts, store listing metadata, OTA update authority, or native payment rails.
