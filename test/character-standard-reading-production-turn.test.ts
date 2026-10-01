@@ -137,6 +137,8 @@ class StaticCatalogPort implements CharacterPublicFactCatalogReadAuthorityPortV1
 class CapturingRenderer implements CharacterProductionRendererPortV1 {
   readonly providerKey = 'production-renderer-test';
   readonly modelKey = 'production-model-test';
+  readonly rendererVersion = 'production-renderer-v1';
+  readonly promptVersion = 'production-prompt-v1';
   readonly calls: CharacterProductionRendererInputV1[] = [];
 
   constructor(readonly output: unknown) {}
