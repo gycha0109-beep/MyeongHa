@@ -1,0 +1,90 @@
+name: CI Integration
+run-name: "Integration PR #${{ inputs.pr }} at ${{ inputs.head_sha }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: PR number targeting the default branch
+        required: true
+        type: string
+      head_sha:
+        description: Exact PR head SHA
+        required: true
+        type: string
+      base_sha:
+        description: Exact current default-branch SHA
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: read
+
+# Queue whole regressions without occupying a runner while waiting.
+# This group is repository-scoped, not an account-wide capacity guarantee.
+concurrency:
+  group: ci-integration-admission
+  cancel-in-progress: false
+  queue: max
+
+jobs:
+  admission:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Reject stale or misattributed requests
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_PR: ${{ inputs.pr }}
+          CANDIDATE_HEAD: ${{ inputs.head_sha }}
+          CANDIDATE_BASE: ${{ inputs.base_sha }}
+        run: node scripts/ci/integration-candidate.mjs guard
+
+  full:
+    needs: admission
+    uses: ./.github/workflows/ci.yml
+    with:
+      candidate_pr: ${{ inputs.pr }}
+      candidate_head: ${{ inputs.head_sha }}
+      candidate_base: ${{ inputs.base_sha }}
+
+  verify:
+    name: CI Integration Verify
+    needs: [admission, full]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Require full candidate regression
+        env:
+          ADMISSION_RESULT: ${{ needs.admission.result }}
+          FULL_RESULT: ${{ needs.full.result }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$ADMISSION_RESULT" = "success"
+          test "$FULL_RESULT" = "success"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Recheck head and base before reporting success
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_PR: ${{ inputs.pr }}
+          CANDIDATE_HEAD: ${{ inputs.head_sha }}
+          CANDIDATE_BASE: ${{ inputs.base_sha }}
+        run: node scripts/ci/integration-candidate.mjs guard

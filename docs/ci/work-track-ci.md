@@ -1,5 +1,10 @@
 # Watchtower work-track CI
 
+The proposed read-only pre-merge integration queue, exact candidate checks,
+rollout protection and rollback procedure are documented in
+[pre-merge-integration.md](pre-merge-integration.md). Its rollout is opt-in;
+current required PR checks and production deployment behavior are retained.
+
 PR CI attributes work to the single `Watchtower-Track:` line in the PR body.
 Missing or conflicting metadata is displayed as `unattributed`; workflow names
 and verification domains do not invent a Work Track. Attribution does not grant
