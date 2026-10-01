@@ -803,3 +803,10 @@ export {
   type CharacterStandardReadingProductionTurnStageV1,
   type RunCharacterStandardReadingProductionTurnInputV1,
 } from './character-standard-reading-production-turn.js';
+
+
+export {
+  CHARACTER_PRODUCTION_TURN_POSTGRES_BINDINGS_V1,
+  createPostgresCharacterProductionTurnPersistencePortV1,
+  type CharacterProductionTurnIdFactoryV1,
+} from './postgres-character-production-turn.js';
