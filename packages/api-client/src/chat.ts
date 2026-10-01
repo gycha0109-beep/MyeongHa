@@ -112,6 +112,16 @@ export function parseChatLaunchCharacterIdV1(
   return value as ChatLaunchCharacterIdV1;
 }
 
+function responseLaunchCharacterIdValue(value: unknown): ChatLaunchCharacterIdV1 {
+  if (
+    typeof value !== 'string' ||
+    !CHAT_LAUNCH_CHARACTER_ID_SET_V1.has(value)
+  ) {
+    return invalid('open characterId is invalid.');
+  }
+  return value as ChatLaunchCharacterIdV1;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -365,7 +375,7 @@ function parseChatOpenResultV1(
     return invalid('open threadId is invalid.');
   }
 
-  const characterId = parseChatLaunchCharacterIdV1(data.characterId);
+  const characterId = responseLaunchCharacterIdValue(data.characterId);
   if (characterId !== requestedCharacterId) {
     return invalid('open characterId changed in response.');
   }
