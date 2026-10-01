@@ -162,7 +162,7 @@ describe('shared current-subject Saju Preview client', () => {
 
   it('fails closed on a section type outside the public Product Reading contract', async () => {
     const response = deliveredReading();
-    response.reading.sections[1].sectionType = 'invented_mobile_section';
+    response.reading.sections[1]!.sectionType = 'invented_mobile_section';
     const client = new MyeongHaApiClientV1({
       origin: 'https://myeongha.test',
       fetchImpl: async () => success(response),
