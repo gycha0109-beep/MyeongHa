@@ -17,13 +17,15 @@ describe('mobile M6-B Chat read UI structure', () => {
     expect(detail).not.toContain('sendMessage');
   });
 
-  it('keeps Chat Hub free of fake discovery and static Character roster', async () => {
+  it('keeps recent discovery blocked while consuming the separate source-approved Launch roster', async () => {
     const hub = await readRepoFile('apps/mobile/src/app/(tabs)/chat/index.tsx');
     expect(hub).toContain('최근 대화 목록은 아직 서버에서 제공하지 않아');
+    expect(hub).toContain('MOBILE_CHAT_LAUNCH_ROSTER_V1');
     for (const name of ['백헌', '세연', '여울', '서린', '라현', '미라', '태겸', '윤호', '도윤']) {
-      expect(hub).not.toContain(name);
+      expect(hub).not.toContain(`displayName: '${name}'`);
     }
-    expect(hub).not.toContain('threadId');
+    expect(hub).not.toContain('portrait');
+    expect(hub).not.toContain('recommend');
   });
 
   it('does not expose raw message payloads or redacted body content in UI components', async () => {
