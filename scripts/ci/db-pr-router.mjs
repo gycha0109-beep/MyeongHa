@@ -2,28 +2,7 @@ import { readFileSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const SUITES = Object.freeze({
-  runtime: Object.freeze({
-    workflow: 'db-runtime-authority-suite.yml',
-    postgres: 15,
-  }),
-  content: Object.freeze({
-    workflow: 'db-content-reading-suite.yml',
-    postgres: 15,
-  }),
-  'commerce-payment': Object.freeze({
-    workflow: 'db-commerce-payment-suite.yml',
-    postgres: 15,
-  }),
-  'commerce-entitlement': Object.freeze({
-    workflow: 'db-commerce-entitlement-suite.yml',
-    postgres: 15,
-  }),
-  postgres17: Object.freeze({
-    workflow: 'db-postgres17-authority-suite.yml',
-    postgres: 17,
-  }),
-});
+const SUITES = Object.freeze(JSON.parse(readFileSync(new URL('./db-suites.json', import.meta.url), 'utf8')));
 
 const ALL_SUITES = Object.freeze(Object.keys(SUITES));
 
@@ -59,11 +38,14 @@ const postgres17Patterns = [
 ];
 
 const strongSharedPatterns = [
+  /^scripts\/ci\/(?:db-suites\.json|verification-plan\.mjs)$/u,
   /^test\/db\/bootstrap_supabase_auth_stub\.sql$/u,
   /^test\/db\/verify_no_schema_cardinality_hardcoding\.sh$/u,
   /^test\/db\/catalog_snapshot\.sh$/u,
   /^\.github\/workflows\/ci\.yml$/u,
   /^scripts\/ci\/db-pr-router\.mjs$/u,
+  /^scripts\/ci\/run-db-track\.mjs$/u,
+  /^\.github\/workflows\/ci-db-track\.yml$/u,
 ];
 
 const weakSharedPatterns = [
@@ -112,31 +94,10 @@ function classifyMigration(path, selected) {
   if (!classified) addAll(selected);
 }
 
-function readSuiteCases(workflowFile) {
-  const source = readFileSync(resolve('.github/workflows', workflowFile), 'utf8');
-  const lines = source.replace(/\r\n/gu, '\n').split('\n');
-  const marker = lines.findIndex((line) => /^\s{8}case:\s*$/u.test(line));
-  if (marker < 0) {
-    throw new Error(`No matrix.case list found in ${workflowFile}`);
-  }
-
-  const cases = [];
-  for (let index = marker + 1; index < lines.length; index += 1) {
-    const line = lines[index];
-    if (line.trim() === '') continue;
-    const match = line.match(/^\s{10}-\s+([^#\s][^#]*?)\s*(?:#.*)?$/u);
-    if (match) {
-      cases.push(match[1].trim());
-      continue;
-    }
-    if (!/^\s{10}/u.test(line)) break;
-  }
-
-  if (cases.length === 0) {
-    throw new Error(`Empty matrix.case list in ${workflowFile}`);
-  }
-
-  return cases;
+export function getDbSuite(suiteName) {
+  const suite = SUITES[suiteName];
+  if (!suite) throw new Error(`Unknown DB CI suite: ${suiteName}`);
+  return { ...suite, cases: [...suite.cases] };
 }
 
 export function resolveDbPrRouting(inputPaths) {
@@ -175,7 +136,7 @@ export function resolveDbPrRouting(inputPaths) {
 
   for (const suiteName of suites) {
     const suite = SUITES[suiteName];
-    const cases = readSuiteCases(suite.workflow);
+    const cases = suite.cases;
     if (suite.postgres === 17) pg17Cases.push(...cases);
     else pg15Cases.push(...cases);
   }
