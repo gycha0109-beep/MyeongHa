@@ -357,7 +357,7 @@ begin
       message = 'Official Reading / Reader provenance does not match this Character turn';
   end if;
 
-  select count(*), min(tc.id)
+  select count(*), min(tc.id::text)::uuid
     into v_participant_count, v_thread_character_id
   from public.conversation_thread_characters tc
   where tc.thread_id = v_thread_id
