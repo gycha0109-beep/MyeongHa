@@ -12,11 +12,11 @@ export interface MobileSajuServiceV1 {
 
 export function createMobileSajuServiceV1(input: {
   readonly client: MyeongHaApiClientV1;
-  readonly session: Pick<MobileSubjectSessionCoordinatorV1, 'withGuestBearer'>;
+  readonly session: Pick<MobileSubjectSessionCoordinatorV1, 'withActiveBearer'>;
 }): MobileSajuServiceV1 {
   return Object.freeze({
     calculateCurrent() {
-      return input.session.withGuestBearer((bearer) =>
+      return input.session.withActiveBearer((bearer) =>
         calculateCurrentSajuV1(input.client, bearer),
       );
     },

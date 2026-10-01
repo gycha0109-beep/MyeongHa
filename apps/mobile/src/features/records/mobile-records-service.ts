@@ -19,21 +19,21 @@ export interface MobileRecordsServiceV1 {
 
 export function createMobileRecordsServiceV1(input: {
   readonly client: MyeongHaApiClientV1;
-  readonly session: Pick<MobileSubjectSessionCoordinatorV1, 'withGuestBearer'>;
+  readonly session: Pick<MobileSubjectSessionCoordinatorV1, 'withActiveBearer'>;
 }): MobileRecordsServiceV1 {
   return Object.freeze({
     readLifeRecordPage(options = {}) {
-      return input.session.withGuestBearer((bearer) =>
+      return input.session.withActiveBearer((bearer) =>
         readLifeRecordPageV1(input.client, bearer, options),
       );
     },
     readReadingPage(options = {}) {
-      return input.session.withGuestBearer((bearer) =>
+      return input.session.withActiveBearer((bearer) =>
         readReadingHistoryPageV1(input.client, bearer, options),
       );
     },
     readMemoryPage(options = {}) {
-      return input.session.withGuestBearer((bearer) =>
+      return input.session.withActiveBearer((bearer) =>
         readMemoryPageV1(input.client, bearer, options),
       );
     },

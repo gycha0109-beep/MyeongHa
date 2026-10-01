@@ -12,6 +12,17 @@ describe('mobile M4-C My structure', () => {
     expect(screen).not.toContain('SecureStore');
     expect(screen).not.toContain('Authorization');
     expect(screen).toContain('useMobileMyV1');
+    expect(screen).toContain('useMobileMemberAuthV1');
+  });
+
+  it('exposes Member login without moving credentials into the screen layer', async () => {
+    const components = await readRepoFile('apps/mobile/src/features/my/MyComponents.tsx');
+    const hook = await readRepoFile('apps/mobile/src/features/my/use-mobile-member-auth.tsx');
+    expect(components).toContain('secureTextEntry');
+    expect(components).toContain('기존 계정으로 로그인');
+    expect(hook).toContain('nativeMobileRuntimeV1.memberSession.signIn');
+    expect(hook).toContain('nativeMobileRuntimeV1.memberSession.signOut');
+    expect(hook).not.toContain('SecureStore');
   });
 
   it('keeps unavailable settings as non-Pressable information rows', async () => {

@@ -32,7 +32,7 @@ describe('mobile Records service', () => {
     const service = createMobileRecordsServiceV1({
       client,
       session: {
-        async withGuestBearer(operation) {
+        async withActiveBearer(operation) {
           sessionCalls += 1;
           return operation('guest-token');
         },

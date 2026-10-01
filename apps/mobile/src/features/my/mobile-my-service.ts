@@ -15,16 +15,16 @@ export interface MobileMyServiceV1 {
 
 export function createMobileMyServiceV1(input: {
   readonly client: MyeongHaApiClientV1;
-  readonly session: Pick<MobileSubjectSessionCoordinatorV1, 'withGuestBearer'>;
+  readonly session: Pick<MobileSubjectSessionCoordinatorV1, 'withActiveBearer'>;
 }): MobileMyServiceV1 {
   return Object.freeze({
     readProfile() {
-      return input.session.withGuestBearer((bearer) =>
+      return input.session.withActiveBearer((bearer) =>
         readCurrentSubjectProfileV1(input.client, bearer),
       );
     },
     readBirth() {
-      return input.session.withGuestBearer((bearer) =>
+      return input.session.withActiveBearer((bearer) =>
         readCurrentBirthProfileV1(input.client, bearer),
       );
     },

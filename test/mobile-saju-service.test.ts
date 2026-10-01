@@ -61,7 +61,7 @@ describe('mobile Saju service', () => {
     const service = createMobileSajuServiceV1({
       client,
       session: {
-        async withGuestBearer(operation) {
+        async withActiveBearer(operation) {
           sessionCalls += 1;
           return operation('opaque-mobile-token');
         },

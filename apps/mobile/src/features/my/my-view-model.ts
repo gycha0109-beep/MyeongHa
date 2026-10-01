@@ -41,7 +41,7 @@ export function createMobileMyProfileViewV1(
     subjectLabel:
       profile.subjectKind === 'guest'
         ? '게스트로 이용 중'
-        : '회원 세션 · 네이티브 계정 관리 준비 중',
+        : '회원으로 이용 중',
     statusLabel:
       profile.subjectStatus === 'deletion_pending'
         ? '삭제 요청 진행 중'
