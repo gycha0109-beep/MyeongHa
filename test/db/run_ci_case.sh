@@ -55,6 +55,12 @@ case "$case_name" in
     bash test/db/chat_thread_runtime_binding_query.sh
     catalog_snapshot
     ;;
+  character-production-turn-runtime)
+    apply_standard_migrations
+    psql -v ON_ERROR_STOP=1 -f test/db/official_standard_reading_reader_interpretation.sql >/dev/null
+    bash test/db/character_production_turn_runtime_authority.sh
+    catalog_snapshot
+    ;;
   commerce-entitlement-projection-recompute)
     apply_standard_migrations
     psql -1 -v ON_ERROR_STOP=1 -f test/db/entitlement_projection_recompute.sql
