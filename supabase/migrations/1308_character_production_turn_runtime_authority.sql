@@ -433,7 +433,8 @@ create or replace function public.cmd_character_production_validate_runtime_v1(
   p_turn_id uuid,
   p_attempt_id uuid,
   p_validation_log_id uuid,
-  p_output_guard_version text
+  p_output_guard_version text,
+  p_expected_content_hash text
 )
 returns boolean
 language plpgsql
@@ -450,7 +451,281 @@ declare
 begin
   perform public.assert_myeongha_subject_context_v1(p_subject_id);
 
-  if p_output_guard_version is null or btrim(p_output_guard_version) = '' then
+  if p_output_guard_version is null or btrim(p_output_guard_version) = ''
+     or p_expected_content_hash !~ '^sha256:v1:[0-9a-f]{64}
+    raise exception using
+      errcode = '23514',
+      constraint = 'character_production_guard_version_required',
+      message = 'Character Output Guard version is required';
+  end if;
+
+  select t.resolved_content_release_id,
+         t.resolved_content_bundle_id,
+         a.generation_ai_execution_log_id,
+         a.generated_content_hash,
+         tc.character_id
+    into v_release_id, v_bundle_id, v_generation_log_id,
+         v_generated_hash, v_character_id
+  from public.chat_turns t
+  join public.chat_turn_attempts a
+    on a.turn_id = t.id
+   and a.subject_id = t.subject_id
+   and a.id = p_attempt_id
+  join public.conversation_thread_characters tc
+    on tc.id = a.generated_thread_character_id
+   and tc.thread_id = t.thread_id
+   and tc.content_bundle_id = t.resolved_content_bundle_id
+  where t.id = p_turn_id
+    and t.subject_id = p_subject_id;
+
+  if not found
+     or v_generation_log_id is null
+     or v_generated_hash is null
+     or v_release_id is null
+     or v_bundle_id is null
+     or v_character_id is null
+     or v_generated_hash is distinct from p_expected_content_hash then
+    raise exception using
+      errcode = '23514',
+      constraint = 'character_production_validation_source_missing',
+      message = 'Character production staged generation provenance is unavailable';
+  end if;
+
+  insert into public.ai_execution_logs(
+    id, subject_id, turn_id, turn_attempt_id,
+    stage, provider, model, prompt_version,
+    content_release_id, content_bundle_id, character_id,
+    input_ref_jsonb, output_ref_jsonb,
+    status, created_at
+  ) values (
+    p_validation_log_id, p_subject_id, p_turn_id, p_attempt_id,
+    'output_guard', 'myeongha_internal', p_output_guard_version, p_output_guard_version,
+    v_release_id, v_bundle_id, v_character_id,
+    jsonb_build_object(
+      'generationAiExecutionLogId', v_generation_log_id,
+      'generatedContentHash', v_generated_hash
+    ),
+    jsonb_build_object('generatedContentHash', v_generated_hash),
+    'success', clock_timestamp()
+  );
+
+  insert into public.ai_execution_groundings(
+    ai_execution_log_id, grounding_id, subject_id, role, created_at
+  )
+  select
+    p_validation_log_id,
+    g.grounding_id,
+    p_subject_id,
+    g.role,
+    clock_timestamp()
+  from public.ai_execution_groundings g
+  where g.ai_execution_log_id = v_generation_log_id
+    and g.subject_id = p_subject_id
+  order by g.grounding_id;
+
+  v_replayed := public.cmd_validate_chat_turn_attempt_v1(
+    p_subject_id,
+    p_turn_id,
+    p_attempt_id,
+    p_validation_log_id,
+    p_output_guard_version,
+    jsonb_build_object(
+      'passed', true,
+      'generatedContentHash', v_generated_hash,
+      'outputGuardVersion', p_output_guard_version
+    ),
+    true,
+    null
+  );
+
+  return v_replayed;
+end;
+$$;
+
+create or replace function public.cmd_character_production_commit_runtime_v1(
+  p_subject_id uuid,
+  p_thread_id uuid,
+  p_turn_id uuid,
+  p_attempt_id uuid,
+  p_message_id uuid,
+  p_outbox_event_id uuid,
+  p_character_id text,
+  p_provider text,
+  p_model text,
+  p_expected_content_hash text
+)
+returns table (
+  turn_id uuid,
+  attempt_id uuid,
+  message_id uuid,
+  sequence_no bigint,
+  replayed boolean
+)
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  v_log_provider text;
+  v_log_model text;
+  v_log_character_id text;
+  v_generated_hash text;
+begin
+  perform public.assert_myeongha_subject_context_v1(p_subject_id);
+
+  select l.provider, l.model, l.character_id, a.generated_content_hash
+    into v_log_provider, v_log_model, v_log_character_id, v_generated_hash
+  from public.chat_turn_attempts a
+  join public.ai_execution_logs l
+    on l.id = a.generation_ai_execution_log_id
+   and l.turn_id = a.turn_id
+   and l.turn_attempt_id = a.id
+   and l.subject_id = a.subject_id
+   and l.stage = 'renderer'
+   and l.status = 'success'
+  where a.id = p_attempt_id
+    and a.turn_id = p_turn_id
+    and a.subject_id = p_subject_id;
+
+  if not found
+     or v_log_character_id is distinct from p_character_id
+     or v_log_provider is distinct from p_provider
+     or v_log_model is distinct from p_model
+     or p_expected_content_hash !~ '^sha256:v1:[0-9a-f]{64}
+    raise exception using
+      errcode = '23514',
+      constraint = 'character_production_commit_renderer_provenance_conflict',
+      message = 'Character production commit does not match renderer provenance';
+  end if;
+
+  return query
+  select *
+  from public.cmd_commit_chat_turn_v1(
+    p_subject_id,
+    p_thread_id,
+    p_turn_id,
+    p_attempt_id,
+    p_message_id,
+    p_outbox_event_id,
+    null,
+    null,
+    null
+  );
+end;
+$$;
+
+-- Own the wrappers with the NOLOGIN least-privilege role.
+grant myeongha_character_turn_owner to current_user;
+grant create on schema public to myeongha_character_turn_owner;
+
+alter function public.qry_character_production_committed_turn_runtime_v1(uuid, uuid)
+  owner to myeongha_character_turn_owner;
+alter function public.cmd_character_production_allocate_attempt_runtime_v1(uuid, uuid, uuid, text)
+  owner to myeongha_character_turn_owner;
+alter function public.cmd_character_production_context_ready_runtime_v1(uuid, uuid, uuid)
+  owner to myeongha_character_turn_owner;
+alter function public.cmd_character_production_fail_runtime_v1(uuid, uuid, uuid, text)
+  owner to myeongha_character_turn_owner;
+alter function public.cmd_character_production_stage_generated_runtime_v1(
+  uuid, uuid, uuid, uuid, text, uuid, uuid, text, text, text, text, jsonb, text
+) owner to myeongha_character_turn_owner;
+alter function public.cmd_character_production_validate_runtime_v1(
+  uuid, uuid, uuid, uuid, text, text
+) owner to myeongha_character_turn_owner;
+alter function public.cmd_character_production_commit_runtime_v1(
+  uuid, uuid, uuid, uuid, uuid, uuid, text, text, text, text
+) owner to myeongha_character_turn_owner;
+
+revoke all on function public.qry_character_production_committed_turn_runtime_v1(uuid, uuid)
+  from public, anon, authenticated, service_role;
+revoke all on function public.cmd_character_production_allocate_attempt_runtime_v1(uuid, uuid, uuid, text)
+  from public, anon, authenticated, service_role;
+revoke all on function public.cmd_character_production_context_ready_runtime_v1(uuid, uuid, uuid)
+  from public, anon, authenticated, service_role;
+revoke all on function public.cmd_character_production_fail_runtime_v1(uuid, uuid, uuid, text)
+  from public, anon, authenticated, service_role;
+revoke all on function public.cmd_character_production_stage_generated_runtime_v1(
+  uuid, uuid, uuid, uuid, text, uuid, uuid, text, text, text, text, jsonb, text
+) from public, anon, authenticated, service_role;
+revoke all on function public.cmd_character_production_validate_runtime_v1(
+  uuid, uuid, uuid, uuid, text, text
+) from public, anon, authenticated, service_role;
+revoke all on function public.cmd_character_production_commit_runtime_v1(
+  uuid, uuid, uuid, uuid, uuid, uuid, text, text, text, text
+) from public, anon, authenticated, service_role;
+
+grant execute on function public.qry_character_production_committed_turn_runtime_v1(uuid, uuid)
+  to myeongha_api_executor;
+grant execute on function public.cmd_character_production_allocate_attempt_runtime_v1(uuid, uuid, uuid, text)
+  to myeongha_api_executor;
+grant execute on function public.cmd_character_production_context_ready_runtime_v1(uuid, uuid, uuid)
+  to myeongha_api_executor;
+grant execute on function public.cmd_character_production_fail_runtime_v1(uuid, uuid, uuid, text)
+  to myeongha_api_executor;
+grant execute on function public.cmd_character_production_stage_generated_runtime_v1(
+  uuid, uuid, uuid, uuid, text, uuid, uuid, text, text, text, text, jsonb, text
+) to myeongha_api_executor;
+grant execute on function public.cmd_character_production_validate_runtime_v1(
+  uuid, uuid, uuid, uuid, text, text
+) to myeongha_api_executor;
+grant execute on function public.cmd_character_production_commit_runtime_v1(
+  uuid, uuid, uuid, uuid, uuid, uuid, text, text, text, text
+) to myeongha_api_executor;
+
+revoke create on schema public from myeongha_character_turn_owner;
+revoke myeongha_character_turn_owner from current_user;
+
+DO $$
+DECLARE
+  v_signature text;
+BEGIN
+  FOREACH v_signature IN ARRAY ARRAY[
+    'public.qry_character_production_committed_turn_runtime_v1(uuid,uuid)',
+    'public.cmd_character_production_allocate_attempt_runtime_v1(uuid,uuid,uuid,text)',
+    'public.cmd_character_production_context_ready_runtime_v1(uuid,uuid,uuid)',
+    'public.cmd_character_production_fail_runtime_v1(uuid,uuid,uuid,text)',
+    'public.cmd_character_production_stage_generated_runtime_v1(uuid,uuid,uuid,uuid,text,uuid,uuid,text,text,text,text,jsonb,text)',
+    'public.cmd_character_production_validate_runtime_v1(uuid,uuid,uuid,uuid,text,text)',
+    'public.cmd_character_production_commit_runtime_v1(uuid,uuid,uuid,uuid,uuid,uuid,text,text,text,text)'
+  ]
+  LOOP
+    IF NOT pg_catalog.has_function_privilege(
+      'myeongha_api_executor',
+      v_signature,
+      'EXECUTE'
+    ) THEN
+      RAISE EXCEPTION 'myeongha_api_executor lacks Character production runtime EXECUTE: %',
+        v_signature;
+    END IF;
+  END LOOP;
+
+  IF pg_catalog.has_table_privilege(
+       'myeongha_api_executor', 'public.chat_turns', 'UPDATE'
+     )
+     OR pg_catalog.has_table_privilege(
+       'myeongha_api_executor', 'public.chat_turn_attempts', 'INSERT'
+     )
+     OR pg_catalog.has_table_privilege(
+       'myeongha_api_executor', 'public.ai_execution_logs', 'INSERT'
+     )
+     OR pg_catalog.has_table_privilege(
+       'myeongha_api_executor', 'public.conversation_messages', 'INSERT'
+     ) THEN
+    RAISE EXCEPTION 'myeongha_api_executor unexpectedly has direct Character production DML';
+  END IF;
+END
+$$;
+
+comment on function public.cmd_character_production_stage_generated_runtime_v1(
+  uuid, uuid, uuid, uuid, text, uuid, uuid, text, text, text, text, jsonb, text
+) is
+'Subject-bound Production Character renderer provenance + staged generation wrapper. Reuses the 0220 state machine and links only existing Reading grounding rows.';
+
+comment on function public.cmd_character_production_commit_runtime_v1(
+  uuid, uuid, uuid, uuid, uuid, uuid, text, text, text, text
+) is
+'Subject-bound Production Character commit wrapper. Relationship, World and Memory effects remain NULL until separate governed admission authorities exist.';
+ then
     raise exception using
       errcode = '23514',
       constraint = 'character_production_guard_version_required',
@@ -624,10 +899,10 @@ alter function public.cmd_character_production_stage_generated_runtime_v1(
   uuid, uuid, uuid, uuid, text, uuid, uuid, text, text, text, text, jsonb, text
 ) owner to myeongha_character_turn_owner;
 alter function public.cmd_character_production_validate_runtime_v1(
-  uuid, uuid, uuid, uuid, text
+  uuid, uuid, uuid, uuid, text, text
 ) owner to myeongha_character_turn_owner;
 alter function public.cmd_character_production_commit_runtime_v1(
-  uuid, uuid, uuid, uuid, uuid, uuid, text, text, text
+  uuid, uuid, uuid, uuid, uuid, uuid, text, text, text, text
 ) owner to myeongha_character_turn_owner;
 
 revoke all on function public.qry_character_production_committed_turn_runtime_v1(uuid, uuid)
@@ -642,10 +917,10 @@ revoke all on function public.cmd_character_production_stage_generated_runtime_v
   uuid, uuid, uuid, uuid, text, uuid, uuid, text, text, text, text, jsonb, text
 ) from public, anon, authenticated, service_role;
 revoke all on function public.cmd_character_production_validate_runtime_v1(
-  uuid, uuid, uuid, uuid, text
+  uuid, uuid, uuid, uuid, text, text
 ) from public, anon, authenticated, service_role;
 revoke all on function public.cmd_character_production_commit_runtime_v1(
-  uuid, uuid, uuid, uuid, uuid, uuid, text, text, text
+  uuid, uuid, uuid, uuid, uuid, uuid, text, text, text, text
 ) from public, anon, authenticated, service_role;
 
 grant execute on function public.qry_character_production_committed_turn_runtime_v1(uuid, uuid)
@@ -660,10 +935,10 @@ grant execute on function public.cmd_character_production_stage_generated_runtim
   uuid, uuid, uuid, uuid, text, uuid, uuid, text, text, text, text, jsonb, text
 ) to myeongha_api_executor;
 grant execute on function public.cmd_character_production_validate_runtime_v1(
-  uuid, uuid, uuid, uuid, text
+  uuid, uuid, uuid, uuid, text, text
 ) to myeongha_api_executor;
 grant execute on function public.cmd_character_production_commit_runtime_v1(
-  uuid, uuid, uuid, uuid, uuid, uuid, text, text, text
+  uuid, uuid, uuid, uuid, uuid, uuid, text, text, text, text
 ) to myeongha_api_executor;
 
 revoke create on schema public from myeongha_character_turn_owner;
@@ -716,6 +991,410 @@ comment on function public.cmd_character_production_stage_generated_runtime_v1(
 'Subject-bound Production Character renderer provenance + staged generation wrapper. Reuses the 0220 state machine and links only existing Reading grounding rows.';
 
 comment on function public.cmd_character_production_commit_runtime_v1(
-  uuid, uuid, uuid, uuid, uuid, uuid, text, text, text
+  uuid, uuid, uuid, uuid, uuid, uuid, text, text, text, text
+) is
+'Subject-bound Production Character commit wrapper. Relationship, World and Memory effects remain NULL until separate governed admission authorities exist.';
+
+     or v_generated_hash is distinct from p_expected_content_hash then
+    raise exception using
+      errcode = '23514',
+      constraint = 'character_production_commit_renderer_provenance_conflict',
+      message = 'Character production commit does not match renderer provenance';
+  end if;
+
+  return query
+  select *
+  from public.cmd_commit_chat_turn_v1(
+    p_subject_id,
+    p_thread_id,
+    p_turn_id,
+    p_attempt_id,
+    p_message_id,
+    p_outbox_event_id,
+    null,
+    null,
+    null
+  );
+end;
+$$;
+
+-- Own the wrappers with the NOLOGIN least-privilege role.
+grant myeongha_character_turn_owner to current_user;
+grant create on schema public to myeongha_character_turn_owner;
+
+alter function public.qry_character_production_committed_turn_runtime_v1(uuid, uuid)
+  owner to myeongha_character_turn_owner;
+alter function public.cmd_character_production_allocate_attempt_runtime_v1(uuid, uuid, uuid, text)
+  owner to myeongha_character_turn_owner;
+alter function public.cmd_character_production_context_ready_runtime_v1(uuid, uuid, uuid)
+  owner to myeongha_character_turn_owner;
+alter function public.cmd_character_production_fail_runtime_v1(uuid, uuid, uuid, text)
+  owner to myeongha_character_turn_owner;
+alter function public.cmd_character_production_stage_generated_runtime_v1(
+  uuid, uuid, uuid, uuid, text, uuid, uuid, text, text, text, text, jsonb, text
+) owner to myeongha_character_turn_owner;
+alter function public.cmd_character_production_validate_runtime_v1(
+  uuid, uuid, uuid, uuid, text, text
+) owner to myeongha_character_turn_owner;
+alter function public.cmd_character_production_commit_runtime_v1(
+  uuid, uuid, uuid, uuid, uuid, uuid, text, text, text, text
+) owner to myeongha_character_turn_owner;
+
+revoke all on function public.qry_character_production_committed_turn_runtime_v1(uuid, uuid)
+  from public, anon, authenticated, service_role;
+revoke all on function public.cmd_character_production_allocate_attempt_runtime_v1(uuid, uuid, uuid, text)
+  from public, anon, authenticated, service_role;
+revoke all on function public.cmd_character_production_context_ready_runtime_v1(uuid, uuid, uuid)
+  from public, anon, authenticated, service_role;
+revoke all on function public.cmd_character_production_fail_runtime_v1(uuid, uuid, uuid, text)
+  from public, anon, authenticated, service_role;
+revoke all on function public.cmd_character_production_stage_generated_runtime_v1(
+  uuid, uuid, uuid, uuid, text, uuid, uuid, text, text, text, text, jsonb, text
+) from public, anon, authenticated, service_role;
+revoke all on function public.cmd_character_production_validate_runtime_v1(
+  uuid, uuid, uuid, uuid, text, text
+) from public, anon, authenticated, service_role;
+revoke all on function public.cmd_character_production_commit_runtime_v1(
+  uuid, uuid, uuid, uuid, uuid, uuid, text, text, text, text
+) from public, anon, authenticated, service_role;
+
+grant execute on function public.qry_character_production_committed_turn_runtime_v1(uuid, uuid)
+  to myeongha_api_executor;
+grant execute on function public.cmd_character_production_allocate_attempt_runtime_v1(uuid, uuid, uuid, text)
+  to myeongha_api_executor;
+grant execute on function public.cmd_character_production_context_ready_runtime_v1(uuid, uuid, uuid)
+  to myeongha_api_executor;
+grant execute on function public.cmd_character_production_fail_runtime_v1(uuid, uuid, uuid, text)
+  to myeongha_api_executor;
+grant execute on function public.cmd_character_production_stage_generated_runtime_v1(
+  uuid, uuid, uuid, uuid, text, uuid, uuid, text, text, text, text, jsonb, text
+) to myeongha_api_executor;
+grant execute on function public.cmd_character_production_validate_runtime_v1(
+  uuid, uuid, uuid, uuid, text, text
+) to myeongha_api_executor;
+grant execute on function public.cmd_character_production_commit_runtime_v1(
+  uuid, uuid, uuid, uuid, uuid, uuid, text, text, text, text
+) to myeongha_api_executor;
+
+revoke create on schema public from myeongha_character_turn_owner;
+revoke myeongha_character_turn_owner from current_user;
+
+DO $$
+DECLARE
+  v_signature text;
+BEGIN
+  FOREACH v_signature IN ARRAY ARRAY[
+    'public.qry_character_production_committed_turn_runtime_v1(uuid,uuid)',
+    'public.cmd_character_production_allocate_attempt_runtime_v1(uuid,uuid,uuid,text)',
+    'public.cmd_character_production_context_ready_runtime_v1(uuid,uuid,uuid)',
+    'public.cmd_character_production_fail_runtime_v1(uuid,uuid,uuid,text)',
+    'public.cmd_character_production_stage_generated_runtime_v1(uuid,uuid,uuid,uuid,text,uuid,uuid,text,text,text,text,jsonb,text)',
+    'public.cmd_character_production_validate_runtime_v1(uuid,uuid,uuid,uuid,text)',
+    'public.cmd_character_production_commit_runtime_v1(uuid,uuid,uuid,uuid,uuid,uuid,text,text,text)'
+  ]
+  LOOP
+    IF NOT pg_catalog.has_function_privilege(
+      'myeongha_api_executor',
+      v_signature,
+      'EXECUTE'
+    ) THEN
+      RAISE EXCEPTION 'myeongha_api_executor lacks Character production runtime EXECUTE: %',
+        v_signature;
+    END IF;
+  END LOOP;
+
+  IF pg_catalog.has_table_privilege(
+       'myeongha_api_executor', 'public.chat_turns', 'UPDATE'
+     )
+     OR pg_catalog.has_table_privilege(
+       'myeongha_api_executor', 'public.chat_turn_attempts', 'INSERT'
+     )
+     OR pg_catalog.has_table_privilege(
+       'myeongha_api_executor', 'public.ai_execution_logs', 'INSERT'
+     )
+     OR pg_catalog.has_table_privilege(
+       'myeongha_api_executor', 'public.conversation_messages', 'INSERT'
+     ) THEN
+    RAISE EXCEPTION 'myeongha_api_executor unexpectedly has direct Character production DML';
+  END IF;
+END
+$$;
+
+comment on function public.cmd_character_production_stage_generated_runtime_v1(
+  uuid, uuid, uuid, uuid, text, uuid, uuid, text, text, text, text, jsonb, text
+) is
+'Subject-bound Production Character renderer provenance + staged generation wrapper. Reuses the 0220 state machine and links only existing Reading grounding rows.';
+
+comment on function public.cmd_character_production_commit_runtime_v1(
+  uuid, uuid, uuid, uuid, uuid, uuid, text, text, text, text
+) is
+'Subject-bound Production Character commit wrapper. Relationship, World and Memory effects remain NULL until separate governed admission authorities exist.';
+ then
+    raise exception using
+      errcode = '23514',
+      constraint = 'character_production_guard_version_required',
+      message = 'Character Output Guard version is required';
+  end if;
+
+  select t.resolved_content_release_id,
+         t.resolved_content_bundle_id,
+         a.generation_ai_execution_log_id,
+         a.generated_content_hash,
+         tc.character_id
+    into v_release_id, v_bundle_id, v_generation_log_id,
+         v_generated_hash, v_character_id
+  from public.chat_turns t
+  join public.chat_turn_attempts a
+    on a.turn_id = t.id
+   and a.subject_id = t.subject_id
+   and a.id = p_attempt_id
+  join public.conversation_thread_characters tc
+    on tc.id = a.generated_thread_character_id
+   and tc.thread_id = t.thread_id
+   and tc.content_bundle_id = t.resolved_content_bundle_id
+  where t.id = p_turn_id
+    and t.subject_id = p_subject_id;
+
+  if not found
+     or v_generation_log_id is null
+     or v_generated_hash is null
+     or v_release_id is null
+     or v_bundle_id is null
+     or v_character_id is null then
+    raise exception using
+      errcode = '23514',
+      constraint = 'character_production_validation_source_missing',
+      message = 'Character production staged generation provenance is unavailable';
+  end if;
+
+  insert into public.ai_execution_logs(
+    id, subject_id, turn_id, turn_attempt_id,
+    stage, provider, model, prompt_version,
+    content_release_id, content_bundle_id, character_id,
+    input_ref_jsonb, output_ref_jsonb,
+    status, created_at
+  ) values (
+    p_validation_log_id, p_subject_id, p_turn_id, p_attempt_id,
+    'output_guard', 'myeongha_internal', p_output_guard_version, p_output_guard_version,
+    v_release_id, v_bundle_id, v_character_id,
+    jsonb_build_object(
+      'generationAiExecutionLogId', v_generation_log_id,
+      'generatedContentHash', v_generated_hash
+    ),
+    jsonb_build_object('generatedContentHash', v_generated_hash),
+    'success', clock_timestamp()
+  );
+
+  insert into public.ai_execution_groundings(
+    ai_execution_log_id, grounding_id, subject_id, role, created_at
+  )
+  select
+    p_validation_log_id,
+    g.grounding_id,
+    p_subject_id,
+    g.role,
+    clock_timestamp()
+  from public.ai_execution_groundings g
+  where g.ai_execution_log_id = v_generation_log_id
+    and g.subject_id = p_subject_id
+  order by g.grounding_id;
+
+  v_replayed := public.cmd_validate_chat_turn_attempt_v1(
+    p_subject_id,
+    p_turn_id,
+    p_attempt_id,
+    p_validation_log_id,
+    p_output_guard_version,
+    jsonb_build_object(
+      'passed', true,
+      'generatedContentHash', v_generated_hash,
+      'outputGuardVersion', p_output_guard_version
+    ),
+    true,
+    null
+  );
+
+  return v_replayed;
+end;
+$$;
+
+create or replace function public.cmd_character_production_commit_runtime_v1(
+  p_subject_id uuid,
+  p_thread_id uuid,
+  p_turn_id uuid,
+  p_attempt_id uuid,
+  p_message_id uuid,
+  p_outbox_event_id uuid,
+  p_character_id text,
+  p_provider text,
+  p_model text
+)
+returns table (
+  turn_id uuid,
+  attempt_id uuid,
+  message_id uuid,
+  sequence_no bigint,
+  replayed boolean
+)
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  v_log_provider text;
+  v_log_model text;
+  v_log_character_id text;
+begin
+  perform public.assert_myeongha_subject_context_v1(p_subject_id);
+
+  select l.provider, l.model, l.character_id
+    into v_log_provider, v_log_model, v_log_character_id
+  from public.chat_turn_attempts a
+  join public.ai_execution_logs l
+    on l.id = a.generation_ai_execution_log_id
+   and l.turn_id = a.turn_id
+   and l.turn_attempt_id = a.id
+   and l.subject_id = a.subject_id
+   and l.stage = 'renderer'
+   and l.status = 'success'
+  where a.id = p_attempt_id
+    and a.turn_id = p_turn_id
+    and a.subject_id = p_subject_id;
+
+  if not found
+     or v_log_character_id is distinct from p_character_id
+     or v_log_provider is distinct from p_provider
+     or v_log_model is distinct from p_model then
+    raise exception using
+      errcode = '23514',
+      constraint = 'character_production_commit_renderer_provenance_conflict',
+      message = 'Character production commit does not match renderer provenance';
+  end if;
+
+  return query
+  select *
+  from public.cmd_commit_chat_turn_v1(
+    p_subject_id,
+    p_thread_id,
+    p_turn_id,
+    p_attempt_id,
+    p_message_id,
+    p_outbox_event_id,
+    null,
+    null,
+    null
+  );
+end;
+$$;
+
+-- Own the wrappers with the NOLOGIN least-privilege role.
+grant myeongha_character_turn_owner to current_user;
+grant create on schema public to myeongha_character_turn_owner;
+
+alter function public.qry_character_production_committed_turn_runtime_v1(uuid, uuid)
+  owner to myeongha_character_turn_owner;
+alter function public.cmd_character_production_allocate_attempt_runtime_v1(uuid, uuid, uuid, text)
+  owner to myeongha_character_turn_owner;
+alter function public.cmd_character_production_context_ready_runtime_v1(uuid, uuid, uuid)
+  owner to myeongha_character_turn_owner;
+alter function public.cmd_character_production_fail_runtime_v1(uuid, uuid, uuid, text)
+  owner to myeongha_character_turn_owner;
+alter function public.cmd_character_production_stage_generated_runtime_v1(
+  uuid, uuid, uuid, uuid, text, uuid, uuid, text, text, text, text, jsonb, text
+) owner to myeongha_character_turn_owner;
+alter function public.cmd_character_production_validate_runtime_v1(
+  uuid, uuid, uuid, uuid, text, text
+) owner to myeongha_character_turn_owner;
+alter function public.cmd_character_production_commit_runtime_v1(
+  uuid, uuid, uuid, uuid, uuid, uuid, text, text, text, text
+) owner to myeongha_character_turn_owner;
+
+revoke all on function public.qry_character_production_committed_turn_runtime_v1(uuid, uuid)
+  from public, anon, authenticated, service_role;
+revoke all on function public.cmd_character_production_allocate_attempt_runtime_v1(uuid, uuid, uuid, text)
+  from public, anon, authenticated, service_role;
+revoke all on function public.cmd_character_production_context_ready_runtime_v1(uuid, uuid, uuid)
+  from public, anon, authenticated, service_role;
+revoke all on function public.cmd_character_production_fail_runtime_v1(uuid, uuid, uuid, text)
+  from public, anon, authenticated, service_role;
+revoke all on function public.cmd_character_production_stage_generated_runtime_v1(
+  uuid, uuid, uuid, uuid, text, uuid, uuid, text, text, text, text, jsonb, text
+) from public, anon, authenticated, service_role;
+revoke all on function public.cmd_character_production_validate_runtime_v1(
+  uuid, uuid, uuid, uuid, text, text
+) from public, anon, authenticated, service_role;
+revoke all on function public.cmd_character_production_commit_runtime_v1(
+  uuid, uuid, uuid, uuid, uuid, uuid, text, text, text, text
+) from public, anon, authenticated, service_role;
+
+grant execute on function public.qry_character_production_committed_turn_runtime_v1(uuid, uuid)
+  to myeongha_api_executor;
+grant execute on function public.cmd_character_production_allocate_attempt_runtime_v1(uuid, uuid, uuid, text)
+  to myeongha_api_executor;
+grant execute on function public.cmd_character_production_context_ready_runtime_v1(uuid, uuid, uuid)
+  to myeongha_api_executor;
+grant execute on function public.cmd_character_production_fail_runtime_v1(uuid, uuid, uuid, text)
+  to myeongha_api_executor;
+grant execute on function public.cmd_character_production_stage_generated_runtime_v1(
+  uuid, uuid, uuid, uuid, text, uuid, uuid, text, text, text, text, jsonb, text
+) to myeongha_api_executor;
+grant execute on function public.cmd_character_production_validate_runtime_v1(
+  uuid, uuid, uuid, uuid, text, text
+) to myeongha_api_executor;
+grant execute on function public.cmd_character_production_commit_runtime_v1(
+  uuid, uuid, uuid, uuid, uuid, uuid, text, text, text, text
+) to myeongha_api_executor;
+
+revoke create on schema public from myeongha_character_turn_owner;
+revoke myeongha_character_turn_owner from current_user;
+
+DO $$
+DECLARE
+  v_signature text;
+BEGIN
+  FOREACH v_signature IN ARRAY ARRAY[
+    'public.qry_character_production_committed_turn_runtime_v1(uuid,uuid)',
+    'public.cmd_character_production_allocate_attempt_runtime_v1(uuid,uuid,uuid,text)',
+    'public.cmd_character_production_context_ready_runtime_v1(uuid,uuid,uuid)',
+    'public.cmd_character_production_fail_runtime_v1(uuid,uuid,uuid,text)',
+    'public.cmd_character_production_stage_generated_runtime_v1(uuid,uuid,uuid,uuid,text,uuid,uuid,text,text,text,text,jsonb,text)',
+    'public.cmd_character_production_validate_runtime_v1(uuid,uuid,uuid,uuid,text)',
+    'public.cmd_character_production_commit_runtime_v1(uuid,uuid,uuid,uuid,uuid,uuid,text,text,text)'
+  ]
+  LOOP
+    IF NOT pg_catalog.has_function_privilege(
+      'myeongha_api_executor',
+      v_signature,
+      'EXECUTE'
+    ) THEN
+      RAISE EXCEPTION 'myeongha_api_executor lacks Character production runtime EXECUTE: %',
+        v_signature;
+    END IF;
+  END LOOP;
+
+  IF pg_catalog.has_table_privilege(
+       'myeongha_api_executor', 'public.chat_turns', 'UPDATE'
+     )
+     OR pg_catalog.has_table_privilege(
+       'myeongha_api_executor', 'public.chat_turn_attempts', 'INSERT'
+     )
+     OR pg_catalog.has_table_privilege(
+       'myeongha_api_executor', 'public.ai_execution_logs', 'INSERT'
+     )
+     OR pg_catalog.has_table_privilege(
+       'myeongha_api_executor', 'public.conversation_messages', 'INSERT'
+     ) THEN
+    RAISE EXCEPTION 'myeongha_api_executor unexpectedly has direct Character production DML';
+  END IF;
+END
+$$;
+
+comment on function public.cmd_character_production_stage_generated_runtime_v1(
+  uuid, uuid, uuid, uuid, text, uuid, uuid, text, text, text, text, jsonb, text
+) is
+'Subject-bound Production Character renderer provenance + staged generation wrapper. Reuses the 0220 state machine and links only existing Reading grounding rows.';
+
+comment on function public.cmd_character_production_commit_runtime_v1(
+  uuid, uuid, uuid, uuid, uuid, uuid, text, text, text, text
 ) is
 'Subject-bound Production Character commit wrapper. Relationship, World and Memory effects remain NULL until separate governed admission authorities exist.';
