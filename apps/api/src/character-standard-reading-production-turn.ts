@@ -27,6 +27,8 @@ export interface CharacterProductionRendererInputV1 {
 export interface CharacterProductionRendererPortV1 {
   readonly providerKey: string;
   readonly modelKey: string;
+  readonly rendererVersion: string;
+  readonly promptVersion: string;
   render(input: CharacterProductionRendererInputV1): Awaitable<unknown>;
 }
 
@@ -73,6 +75,8 @@ export interface CharacterProductionTurnPersistencePortV1 {
     readonly contentBundleId: string;
     readonly providerKey: string;
     readonly modelKey: string;
+    readonly rendererVersion: string;
+    readonly promptVersion: string;
     readonly envelope: CharacterDialogueEnvelopeV1;
   }): Awaitable<void>;
 
@@ -252,6 +256,14 @@ export async function runCharacterStandardReadingProductionTurnV1(
   const threadId = requireThreadId(input.preflight);
   const providerKey = requiredIdentifier(input.renderer.providerKey, 'renderer.providerKey');
   const modelKey = requiredIdentifier(input.renderer.modelKey, 'renderer.modelKey');
+  const rendererVersion = requiredIdentifier(
+    input.renderer.rendererVersion,
+    'renderer.rendererVersion',
+  );
+  const promptVersion = requiredIdentifier(
+    input.renderer.promptVersion,
+    'renderer.promptVersion',
+  );
 
   const existing = await input.persistence.readCommitted({
     subjectId,
@@ -378,6 +390,8 @@ export async function runCharacterStandardReadingProductionTurnV1(
       contentBundleId: prepared.serverContext.contentBundleId,
       providerKey,
       modelKey,
+      rendererVersion,
+      promptVersion,
       envelope,
     });
   } catch (error) {

@@ -14,6 +14,8 @@ on:
       - 'test/db/self_birth_profile_current_query.sh'
       - 'test/db/catalog_snapshot.sh'
       - 'test/db/catalog.expected.sha256'
+      - 'test/db/character_production_turn_runtime_authority.sh'
+      - 'test/db/official_standard_reading_reader_interpretation.sql'
       - 'test/ops/supabase-production-migration-repair.sh'
       - '.github/workflows/supabase-production.yml'
       - '.github/workflows/db-runtime-authority-suite.yml'
@@ -32,6 +34,8 @@ on:
       - 'test/db/self_birth_profile_current_query.sh'
       - 'test/db/catalog_snapshot.sh'
       - 'test/db/catalog.expected.sha256'
+      - 'test/db/character_production_turn_runtime_authority.sh'
+      - 'test/db/official_standard_reading_reader_interpretation.sql'
       - 'test/ops/supabase-production-migration-repair.sh'
       - '.github/workflows/supabase-production.yml'
       - '.github/workflows/db-runtime-authority-suite.yml'
@@ -53,6 +57,7 @@ jobs:
       matrix:
         case:
           - birth-profile-production-read-authority
+          - character-production-turn-runtime
           - guest-bootstrap-runtime
           - records-production-read-authority
           - runtime-function-api-role-acl
