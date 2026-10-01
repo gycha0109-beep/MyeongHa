@@ -55,6 +55,9 @@ export {
   type MemoryItemV1,
   type MemoryPageV1,
   type ReadingHistoryItemV1,
+  readOfficialReadingRecordV1,
+  parseOfficialReadingIdV1,
+  type OfficialReadingRecordV1,
   type ReadingHistoryPageV1,
   type RecordsPageOptionsV1,
 } from './records.js';
@@ -107,3 +110,14 @@ export {
   type SajuPreviewReadingTextV1,
   type SajuPreviewRequiredActionV1,
 } from './saju-preview.js';
+
+
+export {
+  PRODUCT_READING_RESPONSE_VERSION_V2,
+  projectProductReadingResponseV2,
+  type ProductReadingDisplayResultV2,
+  type ProductReadingDisplayStepV2,
+  type ProductReadingMessageCodeV2,
+  type ProductReadingRequiredActionV2,
+  type ProductReadingStateV2,
+} from './product-reading-display.js';

@@ -3,6 +3,7 @@ import type {
   MemoryItemV1,
   ReadingHistoryItemV1,
 } from '@myeongha/api-client';
+import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
   FlatList,
@@ -53,14 +54,19 @@ function visibleItems(tab: RecordsTabV1, snapshots: ReturnType<typeof useMobileR
   );
 }
 
-function renderItem(item: VisibleItem) {
+function renderItem(item: VisibleItem, onOpenReading: (readingId: string) => void) {
   switch (item.kind) {
     case 'life_fact':
     case 'life_only':
       return <LifeFactCard item={item.source} />;
     case 'reading':
     case 'reading_only':
-      return <ReadingHistoryCard item={item.source} />;
+      return (
+        <ReadingHistoryCard
+          item={item.source}
+          onOpen={() => onOpenReading(item.source.readingId)}
+        />
+      );
     case 'memory':
     case 'memory_only':
       return <MemoryCard item={item.source} />;
@@ -101,6 +107,10 @@ export default function RecordsScreen() {
   const hasMore = hasMoreForTab(tab, snapshots);
   const loadingMore = loadingMoreForTab(tab, snapshots);
   const initialLoading = initialLoadingForTab(tab, snapshots);
+  const openReading = (readingId: string) => {
+    router.push(`/reading/${readingId}`);
+  };
+
   const loadMoreError = tab === 'all'
     ? [snapshots.life, snapshots.readings, snapshots.memories]
         .some((snapshot) => snapshot.status === 'error' && snapshot.items.length > 0)
@@ -111,7 +121,7 @@ export default function RecordsScreen() {
       <FlatList
         data={items}
         keyExtractor={(item) => `${item.kind}:${item.id}`}
-        renderItem={({ item }) => renderItem(item)}
+        renderItem={({ item }) => renderItem(item, openReading)}
         contentContainerStyle={styles.content}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         onEndReached={() => {

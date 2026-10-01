@@ -17,6 +17,9 @@ function service(overrides: Partial<MobileRecordsServiceV1>): MobileRecordsServi
     async readMemoryPage() {
       return { memories: [], pagination: { pageSize: 2, hasMore: false, nextCursor: null } };
     },
+    async readOfficialReading() {
+      throw new Error('Official Reading detail is not used by pagination tests.');
+    },
     ...overrides,
   };
 }

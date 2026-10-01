@@ -1,10 +1,12 @@
 import {
   readLifeRecordPageV1,
   readMemoryPageV1,
+  readOfficialReadingRecordV1,
   readReadingHistoryPageV1,
   type LifeRecordPageV1,
   type MemoryPageV1,
   type MyeongHaApiClientV1,
+  type OfficialReadingRecordV1,
   type ReadingHistoryPageV1,
   type RecordsPageOptionsV1,
 } from '@myeongha/api-client';
@@ -14,6 +16,7 @@ import type { MobileSubjectSessionCoordinatorV1 } from '@/core/session/mobile-su
 export interface MobileRecordsServiceV1 {
   readLifeRecordPage(options?: RecordsPageOptionsV1): Promise<LifeRecordPageV1>;
   readReadingPage(options?: RecordsPageOptionsV1): Promise<ReadingHistoryPageV1>;
+  readOfficialReading(readingId: string): Promise<OfficialReadingRecordV1>;
   readMemoryPage(options?: RecordsPageOptionsV1): Promise<MemoryPageV1>;
 }
 
@@ -30,6 +33,11 @@ export function createMobileRecordsServiceV1(input: {
     readReadingPage(options = {}) {
       return input.session.withActiveBearer((bearer) =>
         readReadingHistoryPageV1(input.client, bearer, options),
+      );
+    },
+    readOfficialReading(readingId: string) {
+      return input.session.withActiveBearer((bearer) =>
+        readOfficialReadingRecordV1(input.client, bearer, readingId),
       );
     },
     readMemoryPage(options = {}) {

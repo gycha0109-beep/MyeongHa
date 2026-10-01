@@ -18,6 +18,9 @@ function service(counter: { life: number; readings: number; memories: number }):
       counter.memories += 1;
       return { memories: [], pagination: { pageSize: 20, hasMore: false, nextCursor: null } };
     },
+    async readOfficialReading() {
+      throw new Error('Official Reading detail is not used by collection controller tests.');
+    },
   };
 }
 

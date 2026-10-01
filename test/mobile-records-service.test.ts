@@ -47,3 +47,62 @@ describe('mobile Records service', () => {
     expect(requests).toEqual(['/api/life-record', '/api/readings', '/api/memories']);
   });
 });
+
+
+it('routes Official Reading reread through the active subject bearer', async () => {
+  const readingId = '44444444-4444-4444-8444-444444444444';
+  let authorization: string | null = null;
+  let requested = '';
+  const client = new MyeongHaApiClientV1({
+    origin: 'https://myeongha.test',
+    fetchImpl: async (input, init) => {
+      const url = new URL(String(input));
+      requested = `${url.pathname}?${url.searchParams.toString()}`;
+      authorization = new Headers(init?.headers).get('Authorization');
+      return success({
+        readingId,
+        readingSessionId: '55555555-5555-4555-8555-555555555555',
+        sajuDomain: 'career',
+        readingContractVersion: 'myeonghwa-product-reading-response-v2',
+        productResponseState: 'delivered',
+        readerCharacterIds: ['seyeon'],
+        completedAt: '2026-09-23T00:01:00.000Z',
+        reading: {
+          responseId: `reading_response_${'d'.repeat(24)}`,
+          responseVersion: 'myeonghwa-product-reading-response-v2',
+          state: 'delivered',
+          messageCode: 'READING_DELIVERED',
+          requiredAction: 'none',
+          reading: {
+            readingId,
+            sections: [{
+              sectionType: 'overview',
+              title: '핵심',
+              state: 'complete',
+              blocks: [{ type: 'paragraph', text: '저장된 풀이' }],
+            }],
+            disclosures: [],
+          },
+        },
+      });
+    },
+  });
+  let sessionCalls = 0;
+  const service = createMobileRecordsServiceV1({
+    client,
+    session: {
+      async withActiveBearer(operation) {
+        sessionCalls += 1;
+        return operation('active-owner-token');
+      },
+    },
+  });
+
+  await expect(service.readOfficialReading(readingId)).resolves.toMatchObject({
+    readingId,
+    display: { kind: 'delivered' },
+  });
+  expect(sessionCalls).toBe(1);
+  expect(authorization).toBe('Bearer active-owner-token');
+  expect(requested).toBe(`/api/readings?readingId=${readingId}`);
+});

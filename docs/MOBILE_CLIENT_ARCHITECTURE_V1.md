@@ -1,7 +1,7 @@
 # MyeongHa Mobile Client Architecture v1
 
 > Track: `applizing`  
-> Status: M3-B Saju Preview Reading + M11-A4 release hardening implemented  
+> Status: M4-D Official Reading reread + M3-B Preview + M11-A4 hardening implemented  
 > Date: 2026-10-01  
 > Server authority: existing MyeongHa API / PostgreSQL  
 > Client principle: Web and Mobile are separate first-class clients of the same server world.
@@ -208,6 +208,7 @@ M2-B Guest→new Member same-subject enrollment             DONE
 M3  Saju + Birth vertical slice                          DONE
 M3-B source-authorized Saju Preview Reading               DONE
 M4  Records + My                                         DONE
+M4-D Official Reading archive reread                       DONE
 M5  Home projection composition                          DONE
 M6  Chat Hub + server-authorized read path               DONE
 M7  Face Reading media path                              DONE
@@ -533,3 +534,40 @@ M3-B invariants:
   missing interpretation text;
 - Preview execution is explicit user action on the Saju screen; Home remains
   calculation-only and never auto-runs Preview Reading.
+
+
+## 21. M4-D Official Reading archive reread boundary
+
+Mobile Records may reopen an owner-scoped stored Official Reading only through:
+
+```text
+GET /api/readings?readingId=<canonical UUID>
+Authorization: Bearer <active Guest or Member subject>
+```
+
+The server archive authority exposes only execution-successful records whose
+Product response state is:
+
+```text
+delivered
+delivered_with_fallback
+```
+
+M4-D invariants:
+
+- Reading History remains a list authority; only archive-openable states receive
+  a detail navigation action;
+- Mobile validates the requested Reading id as a UUID before network execution;
+- returned Reading id, Reading Session id, Saju domain, response state, contract
+  version, Reader provenance, and completed timestamp are revalidated;
+- the stored ProductReadingResponse snapshot must match the record's Reading id,
+  response contract version, and product response state;
+- the raw stored snapshot never leaves the shared API client result type;
+- the archive uses the same ProductReadingResponse v2 safe display projector as
+  current Preview Reading;
+- response hashes and internal archive provenance are not projected to Mobile;
+- Reader Character ids are not converted into invented names, portraits, or
+  continuation authority;
+- archive reread never starts Chat, mutates Records, or creates a new Reading;
+- a missing/not-owner/non-openable record fails closed instead of falling back
+  to current Preview or another Reading.
