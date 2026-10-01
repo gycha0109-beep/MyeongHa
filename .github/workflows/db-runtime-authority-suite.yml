@@ -34,6 +34,8 @@ on:
       - 'test/db/self_birth_profile_current_query.sh'
       - 'test/db/catalog_snapshot.sh'
       - 'test/db/catalog.expected.sha256'
+      - 'test/db/character_production_turn_runtime_authority.sh'
+      - 'test/db/official_standard_reading_reader_interpretation.sql'
       - 'test/ops/supabase-production-migration-repair.sh'
       - '.github/workflows/supabase-production.yml'
       - '.github/workflows/db-runtime-authority-suite.yml'
