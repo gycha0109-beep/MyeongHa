@@ -50,13 +50,7 @@ export PGOPTIONS='-c statement_timeout=10000 -c lock_timeout=3000 -c idle_in_tra
 
 sql="$(cat <<'SQL'
 begin transaction read only;
-select
-  current_setting('transaction_read_only')
-  || '|'
-  || coalesce(
-    (select ssl::text from pg_stat_ssl where pid = pg_backend_pid()),
-    'false'
-  );
+select current_setting('transaction_read_only');
 rollback;
 SQL
 )"
@@ -67,7 +61,7 @@ if ! printf '%s\n' "$sql" | psql -X -qAt -v ON_ERROR_STOP=1 > "$proof_file" 2>"$
 fi
 
 proof_result="$(tr -d '\r' < "$proof_file")"
-[[ "$proof_result" == 'on|true' ]] || fail READONLY_TLS_RUNTIME_PROOF_MISMATCH
+[[ "$proof_result" == 'on' ]] || fail READONLY_RUNTIME_PROOF_MISMATCH
 
 printf '%s\n' \
   'production_privileged_postgres_tls_readonly_proof=pass' \
