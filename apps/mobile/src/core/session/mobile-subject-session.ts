@@ -8,6 +8,10 @@ import {
 } from '@myeongha/api-client';
 
 import type { MobileGuestCredentialStoreV1 } from '@/core/auth/guest-credential-store';
+import {
+  MobileMemberSessionErrorV1,
+  type MobileMemberSessionCoordinatorV1,
+} from '@/core/session/mobile-member-session';
 
 export type MobileSubjectSessionErrorCodeV1 =
   | 'MOBILE_MEMBER_AUTH_NOT_AVAILABLE'
@@ -29,6 +33,9 @@ export interface MobileSubjectSessionCoordinatorV1 {
   withGuestBearer<T>(
     operation: (bearer: string) => Promise<T>,
   ): Promise<T>;
+  withActiveBearer<T>(
+    operation: (bearer: string) => Promise<T>,
+  ): Promise<T>;
 }
 
 function isUnauthorized(error: unknown): boolean {
@@ -42,6 +49,7 @@ function isUnauthorized(error: unknown): boolean {
 export function createMobileSubjectSessionCoordinatorV1(input: {
   readonly client: MyeongHaApiClientV1;
   readonly store: MobileGuestCredentialStoreV1;
+  readonly memberSession?: Pick<MobileMemberSessionCoordinatorV1, 'read' | 'withMemberBearer'>;
   readonly nowEpochMs?: () => number;
 }): MobileSubjectSessionCoordinatorV1 {
   const nowEpochMs = input.nowEpochMs ?? Date.now;
@@ -211,5 +219,35 @@ export function createMobileSubjectSessionCoordinatorV1(input: {
     }
   }
 
-  return Object.freeze({ acquireGuestCredential, withGuestBearer });
+  async function withActiveBearer<T>(
+    operation: (bearer: string) => Promise<T>,
+  ): Promise<T> {
+    if (input.memberSession === undefined) {
+      return withGuestBearer(operation);
+    }
+
+    const member = await input.memberSession.read();
+    if (member === null) {
+      return withGuestBearer(operation);
+    }
+
+    try {
+      return await input.memberSession.withMemberBearer(operation);
+    } catch (error) {
+      if (
+        error instanceof MobileMemberSessionErrorV1 &&
+        error.code === 'MOBILE_MEMBER_REQUIRED' &&
+        (await input.memberSession.read()) === null
+      ) {
+        return withGuestBearer(operation);
+      }
+      throw error;
+    }
+  }
+
+  return Object.freeze({
+    acquireGuestCredential,
+    withGuestBearer,
+    withActiveBearer,
+  });
 }

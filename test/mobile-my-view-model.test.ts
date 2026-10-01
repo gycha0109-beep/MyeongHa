@@ -31,7 +31,7 @@ describe('mobile My view model', () => {
       },
     })).toMatchObject({
       displayName: '명하',
-      subjectLabel: '회원 세션 · 네이티브 계정 관리 준비 중',
+      subjectLabel: '회원으로 이용 중',
       statusLabel: '삭제 요청 진행 중',
     });
   });

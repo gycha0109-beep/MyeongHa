@@ -16,11 +16,11 @@ export interface MobileChatReadServiceV1 {
 
 export function createMobileChatReadServiceV1(input: {
   readonly client: MyeongHaApiClientV1;
-  readonly session: Pick<MobileSubjectSessionCoordinatorV1, 'withGuestBearer'>;
+  readonly session: Pick<MobileSubjectSessionCoordinatorV1, 'withActiveBearer'>;
 }): MobileChatReadServiceV1 {
   return Object.freeze({
     readThreadPage(threadId: string, options: ChatReadPageOptionsV1 = {}) {
-      return input.session.withGuestBearer((bearer) =>
+      return input.session.withActiveBearer((bearer) =>
         readChatThreadPageV1(input.client, bearer, threadId, options),
       );
     },

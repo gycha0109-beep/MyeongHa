@@ -1,13 +1,16 @@
+import { useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import {
   MyBirthCard,
   MyBirthEmptyCard,
   MyFlowCards,
+  MyMemberAuthCard,
   MyPendingSettings,
   MyProfileCard,
   MySectionError,
 } from '@/features/my/MyComponents';
+import { useMobileMemberAuthV1 } from '@/features/my/use-mobile-member-auth';
 import { useMobileMyV1 } from '@/features/my/use-mobile-my';
 import {
   createMobileMyBirthViewV1,
@@ -18,6 +21,27 @@ import { mobileColors } from '@/ui/mobile-colors';
 
 export default function MyScreen() {
   const { state, retryProfile, retryBirth } = useMobileMyV1();
+  const memberAuth = useMobileMemberAuthV1();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+
+  async function reloadOwnerProjection() {
+    await Promise.all([retryProfile(), retryBirth()]);
+  }
+
+  async function handleSignIn() {
+    const signedIn = await memberAuth.signIn(email, password);
+    if (!signedIn) return;
+    setPassword('');
+    await reloadOwnerProjection();
+  }
+
+  async function handleSignOut() {
+    const signedOut = await memberAuth.signOut();
+    if (!signedOut) return;
+    setPassword('');
+    await reloadOwnerProjection();
+  }
 
   return (
     <MobileScreen
@@ -38,6 +62,22 @@ export default function MyScreen() {
       ) : (
         <MyProfileCard profile={createMobileMyProfileViewV1(state.profile.profile)} />
       )}
+
+      {state.profile.kind === 'ready' ? (
+        <MyMemberAuthCard
+          subjectKind={state.profile.profile.subjectKind}
+          email={email}
+          password={password}
+          pending={memberAuth.state.kind === 'submitting'}
+          errorMessage={
+            memberAuth.state.kind === 'error' ? memberAuth.state.message : null
+          }
+          onEmailChange={setEmail}
+          onPasswordChange={setPassword}
+          onSignIn={() => void handleSignIn()}
+          onSignOut={() => void handleSignOut()}
+        />
+      ) : null}
 
       {state.birth.kind === 'loading' ? (
         <View style={styles.loadingCard}>
