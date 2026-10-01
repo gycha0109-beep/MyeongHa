@@ -6,6 +6,9 @@ import { fileURLToPath } from 'node:url';
 const REVERSE_DNS_PATTERN = /^[a-zA-Z][a-zA-Z0-9]*(?:\.[a-zA-Z][a-zA-Z0-9]*)+$/u;
 const SEMVER_PATTERN = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/u;
 
+export const MOBILE_RELEASE_PRODUCTION_API_ORIGIN_V1 =
+  'https://myeongha.vercel.app';
+
 function isRecord(value) {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -22,7 +25,50 @@ function positiveIntegerString(value) {
   return typeof value === 'string' && /^[1-9][0-9]*$/u.test(value);
 }
 
-export function evaluateMobileReleaseReadinessV1(appJson, mobilePackage) {
+export function resolveMobileReleaseApiOriginV1(configured) {
+  const candidate =
+    typeof configured === 'string' && configured.trim().length > 0
+      ? configured.trim()
+      : MOBILE_RELEASE_PRODUCTION_API_ORIGIN_V1;
+
+  let url;
+  try {
+    url = new URL(candidate);
+  } catch {
+    throw new Error(
+      'EXPO_PUBLIC_MYEONGHA_API_ORIGIN must be an absolute Production URL.',
+    );
+  }
+
+  if (
+    url.username !== '' ||
+    url.password !== '' ||
+    url.search !== '' ||
+    url.hash !== '' ||
+    (url.pathname !== '/' && url.pathname !== '')
+  ) {
+    throw new Error(
+      'EXPO_PUBLIC_MYEONGHA_API_ORIGIN must contain only scheme and host for release.',
+    );
+  }
+
+  if (
+    url.protocol !== 'https:' ||
+    url.origin !== MOBILE_RELEASE_PRODUCTION_API_ORIGIN_V1
+  ) {
+    throw new Error(
+      `EXPO_PUBLIC_MYEONGHA_API_ORIGIN must resolve to canonical Production origin ${MOBILE_RELEASE_PRODUCTION_API_ORIGIN_V1} for release.`,
+    );
+  }
+
+  return url.origin;
+}
+
+export function evaluateMobileReleaseReadinessV1(
+  appJson,
+  mobilePackage,
+  runtimeEnvironment = {},
+) {
   const blockers = [];
   const violations = [];
 
@@ -56,6 +102,18 @@ export function evaluateMobileReleaseReadinessV1(appJson, mobilePackage) {
     violations.push('expo.ios.bundleIdentifier must be a reverse-DNS identifier.');
   }
 
+  try {
+    resolveMobileReleaseApiOriginV1(
+      runtimeEnvironment?.EXPO_PUBLIC_MYEONGHA_API_ORIGIN,
+    );
+  } catch (error) {
+    violations.push(
+      error instanceof Error
+        ? error.message
+        : 'Mobile release API origin is invalid.',
+    );
+  }
+
   const android = isRecord(expo.android) ? expo.android : {};
   if (!positiveInteger(android.versionCode)) {
     violations.push('expo.android.versionCode must be a positive integer.');
@@ -73,14 +131,14 @@ export function evaluateMobileReleaseReadinessV1(appJson, mobilePackage) {
   });
 }
 
-export async function readMobileReleaseReadinessV1(rootDir) {
+export async function readMobileReleaseReadinessV1(rootDir, runtimeEnvironment = process.env) {
   const appJson = JSON.parse(
     await readFile(path.join(rootDir, 'apps/mobile/app.json'), 'utf8'),
   );
   const mobilePackage = JSON.parse(
     await readFile(path.join(rootDir, 'apps/mobile/package.json'), 'utf8'),
   );
-  return evaluateMobileReleaseReadinessV1(appJson, mobilePackage);
+  return evaluateMobileReleaseReadinessV1(appJson, mobilePackage, runtimeEnvironment);
 }
 
 function printReport(report) {

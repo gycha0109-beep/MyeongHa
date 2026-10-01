@@ -1,7 +1,7 @@
 # MyeongHa Mobile Client Architecture v1
 
 > Track: `applizing`  
-> Status: M11-A release-readiness preflight implemented  
+> Status: M11-A2 production release origin guard implemented  
 > Date: 2026-10-01  
 > Server authority: existing MyeongHa API / PostgreSQL  
 > Client principle: Web and Mobile are separate first-class clients of the same server world.
@@ -214,6 +214,7 @@ M8-B Chat send after authority unblock                    BLOCKED
 M9  Push after notification authority unblock             BLOCKED
 M10 native store commerce after rail decision             NOT IN LAUNCH RAIL
 M11-A Android/iOS release-readiness preflight             DONE
+M11-A2 Production API origin release guard                DONE
 M11-B production app identity + signed store builds       BLOCKED
 ```
 
@@ -370,3 +371,33 @@ M11-A invariants:
 - CI contract verification may continue while those exact documented identity blockers remain unresolved;
 - malformed release configuration always fails CI;
 - M11-A does not configure signing credentials, Apple/Google developer accounts, store listing metadata, OTA update authority, or native payment rails.
+
+
+## 16. M11-A2 Production API origin release guard
+
+Development runtime configuration remains intentionally flexible:
+
+- HTTPS API origin overrides are permitted for governed development/staging use.
+- local/private HTTP origins are permitted only for development networks.
+
+Release verification is stricter. The effective build-time value of
+`EXPO_PUBLIC_MYEONGHA_API_ORIGIN` must resolve to the canonical Production
+origin:
+
+```text
+https://myeongha.vercel.app
+```
+
+If the variable is absent, Mobile uses that canonical default. If it is present,
+release preflight rejects:
+
+- any different HTTPS origin;
+- localhost/private HTTP origins;
+- credentials;
+- path components;
+- query strings;
+- fragments.
+
+This guard is release-only and does not remove the existing development runtime
+override behavior. The runtime constant and release-preflight constant are
+cross-tested to prevent silent authority drift.

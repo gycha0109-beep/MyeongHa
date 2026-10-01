@@ -1,8 +1,24 @@
 # Mobile Release Readiness v1
 
 > Track: `applizing`  
-> Status: **M11-A IMPLEMENTED / STORE IDENTITY BLOCKED**  
+> Status: **M11-A2 IMPLEMENTED / STORE IDENTITY BLOCKED**  
 > Date: **2026-10-01**
+
+## Production API origin guard
+
+Release builds are bound to the existing canonical Production API origin:
+
+```text
+https://myeongha.vercel.app
+```
+
+Development may continue to use governed HTTPS overrides and local/private HTTP
+origins. Release preflight is stricter: an explicit
+`EXPO_PUBLIC_MYEONGHA_API_ORIGIN` must normalize to the canonical Production
+origin or verification fails.
+
+This prevents a store build from accidentally shipping against staging,
+localhost, a private LAN address, or another HTTPS host.
 
 ## Current executable baseline
 
@@ -43,7 +59,7 @@ The implementation therefore must not derive them from:
 npm run verify:mobile-release-readiness-contract
 ```
 
-The CI contract mode permits only the two known missing identity blockers. Structural violations still fail.
+The CI contract mode permits only the two known missing identity blockers. Structural violations and non-canonical release API origin overrides still fail.
 
 Once both platform ids are approved, CI can switch from contract mode to strict mode without changing the validator.
 
