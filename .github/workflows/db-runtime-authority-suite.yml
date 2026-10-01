@@ -1,22 +1,7 @@
 name: DB Runtime Authority Suite
 
 on:
-  pull_request:
-    paths:
-      - 'supabase/migrations/**'
-      - 'test/db/bootstrap_supabase_auth_stub.sql'
-      - 'test/db/run_ci_case.sh'
-      - 'test/db/birth_profile_read_runtime_authority.sh'
-      - 'test/db/guest_bootstrap_runtime_authority.sh'
-      - 'test/db/guest_bootstrap_current_query.sh'
-      - 'test/db/records_read_runtime_authority.sh'
-      - 'test/db/runtime_function_api_role_acl.sh'
-      - 'test/db/self_birth_profile_current_query.sh'
-      - 'test/db/catalog_snapshot.sh'
-      - 'test/db/catalog.expected.sha256'
-      - 'test/ops/supabase-production-migration-repair.sh'
-      - '.github/workflows/supabase-production.yml'
-      - '.github/workflows/db-runtime-authority-suite.yml'
+  workflow_dispatch:
   push:
     branches:
       - main

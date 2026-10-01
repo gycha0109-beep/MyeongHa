@@ -1,0 +1,288 @@
+{
+  "schemaVersion": 1,
+  "authority": {
+    "workTrackMeaning": "originating development work track; never a CI verification domain",
+    "workflowNameIsWorkTrackAuthority": false,
+    "canonicalWorkTrackSources": [
+      "workflow_dispatch.watchtower_track",
+      "pull_request.body.Watchtower-Track",
+      "branch track key",
+      "commit footer Watchtower-Track"
+    ],
+    "deprecatedWorkTrackKeys": [
+      "product-commerce"
+    ]
+  },
+  "workflows": {
+    "account-deletion-hosted-auth-canary.yml": {
+      "responsibility": "privacy-operations",
+      "prMode": "none",
+      "mainMode": "manual",
+      "workTrackAttribution": "none"
+    },
+    "ci.yml": {
+      "responsibility": "project-wide-ci",
+      "prMode": "required-router",
+      "mainMode": "required",
+      "workTrackAttribution": "pr-metadata"
+    },
+    "db-commerce-entitlement-suite.yml": {
+      "responsibility": "commerce-entitlement-verification",
+      "prMode": "routed-via-ci",
+      "mainMode": "full-regression",
+      "workTrackAttribution": "none"
+    },
+    "db-commerce-payment-suite.yml": {
+      "responsibility": "commerce-payment-verification",
+      "prMode": "routed-via-ci",
+      "mainMode": "full-regression",
+      "workTrackAttribution": "none"
+    },
+    "db-content-reading-suite.yml": {
+      "responsibility": "content-reading-db-verification",
+      "prMode": "routed-via-ci",
+      "mainMode": "full-regression",
+      "workTrackAttribution": "none"
+    },
+    "db-postgres17-authority-suite.yml": {
+      "responsibility": "postgres17-db-verification",
+      "prMode": "routed-via-ci",
+      "mainMode": "full-regression",
+      "workTrackAttribution": "none"
+    },
+    "db-runtime-authority-suite.yml": {
+      "responsibility": "db-runtime-verification",
+      "prMode": "routed-via-ci",
+      "mainMode": "full-regression",
+      "workTrackAttribution": "none"
+    },
+    "governance.yml": {
+      "responsibility": "project-wide-governance",
+      "prMode": "required",
+      "mainMode": "required",
+      "workTrackAttribution": "pr-metadata"
+    },
+    "mobile-pr.yml": {
+      "responsibility": "mobile-client-verification",
+      "prMode": "narrow",
+      "mainMode": "none",
+      "workTrackAttribution": "pr-metadata"
+    },
+    "postgres-dr-readiness.yml": {
+      "responsibility": "postgres-disaster-recovery",
+      "prMode": "none",
+      "mainMode": "regression",
+      "workTrackAttribution": "none"
+    },
+    "postgres-isolated-restore-drill.yml": {
+      "responsibility": "postgres-disaster-recovery",
+      "prMode": "none",
+      "mainMode": "manual",
+      "workTrackAttribution": "dispatch-input"
+    },
+    "production-authenticated-json-resource-evidence.yml": {
+      "responsibility": "production-security-evidence",
+      "prMode": "none",
+      "mainMode": "manual",
+      "workTrackAttribution": "dispatch-input"
+    },
+    "production-birth-profile-authenticated-create-read-smoke.yml": {
+      "responsibility": "production-birth-smoke",
+      "prMode": "none",
+      "mainMode": "manual",
+      "workTrackAttribution": "none"
+    },
+    "production-birth-profile-create-boundary-smoke.yml": {
+      "responsibility": "production-birth-smoke",
+      "prMode": "none",
+      "mainMode": "manual",
+      "workTrackAttribution": "none"
+    },
+    "production-birth-profile-guest-create-read-smoke.yml": {
+      "responsibility": "production-birth-smoke",
+      "prMode": "none",
+      "mainMode": "manual",
+      "workTrackAttribution": "none"
+    },
+    "production-character-roster-read-audit.yml": {
+      "responsibility": "production-character-audit",
+      "prMode": "none",
+      "mainMode": "triggered-operations",
+      "workTrackAttribution": "none"
+    },
+    "production-chat-current-subject-smoke.yml": {
+      "responsibility": "production-chat-smoke",
+      "prMode": "none",
+      "mainMode": "triggered-operations",
+      "workTrackAttribution": "none"
+    },
+    "production-chat-open-boundary-smoke.yml": {
+      "responsibility": "production-chat-boundary",
+      "prMode": "narrow",
+      "mainMode": "triggered-operations",
+      "workTrackAttribution": "pr-metadata"
+    },
+    "production-data-api-containment.yml": {
+      "responsibility": "production-data-api-operations",
+      "prMode": "none",
+      "mainMode": "manual",
+      "workTrackAttribution": "none"
+    },
+    "production-environment-policy-probe.yml": {
+      "responsibility": "production-environment-operations",
+      "prMode": "none",
+      "mainMode": "manual",
+      "workTrackAttribution": "none"
+    },
+    "production-guest-bootstrap-abuse-policy-evidence.yml": {
+      "responsibility": "production-abuse-policy-evidence",
+      "prMode": "none",
+      "mainMode": "scheduled-manual",
+      "workTrackAttribution": "dispatch-input-or-schedule"
+    },
+    "production-guest-bootstrap-abuse-policy.yml": {
+      "responsibility": "production-abuse-policy-operations",
+      "prMode": "none",
+      "mainMode": "manual",
+      "workTrackAttribution": "dispatch-input"
+    },
+    "production-guest-bootstrap-ttl-binding.yml": {
+      "responsibility": "production-guest-auth-operations",
+      "prMode": "none",
+      "mainMode": "manual",
+      "workTrackAttribution": "none"
+    },
+    "production-member-auth-abuse-policy.yml": {
+      "responsibility": "production-member-auth-operations",
+      "prMode": "none",
+      "mainMode": "manual",
+      "workTrackAttribution": "dispatch-input"
+    },
+    "production-member-auth-rate-limit-canary.yml": {
+      "responsibility": "production-member-auth-evidence",
+      "prMode": "none",
+      "mainMode": "manual",
+      "workTrackAttribution": "dispatch-input"
+    },
+    "production-member-chat-open-reuse-smoke.yml": {
+      "responsibility": "production-chat-smoke",
+      "prMode": "none",
+      "mainMode": "manual",
+      "workTrackAttribution": "none"
+    },
+    "production-member-me-smoke.yml": {
+      "responsibility": "production-member-auth-smoke",
+      "prMode": "none",
+      "mainMode": "manual",
+      "workTrackAttribution": "none"
+    },
+    "production-member-reauth-continuity-smoke.yml": {
+      "responsibility": "production-member-auth-smoke",
+      "prMode": "none",
+      "mainMode": "triggered-operations",
+      "workTrackAttribution": "none"
+    },
+    "production-password-compromise-guard-evidence.yml": {
+      "responsibility": "production-auth-security-evidence",
+      "prMode": "none",
+      "mainMode": "manual",
+      "workTrackAttribution": "dispatch-input"
+    },
+    "production-platform-integrity-read-audit.yml": {
+      "responsibility": "production-platform-audit",
+      "prMode": "none",
+      "mainMode": "manual",
+      "workTrackAttribution": "none"
+    },
+    "production-postgres-backup.yml": {
+      "responsibility": "postgres-backup-operations",
+      "prMode": "none",
+      "mainMode": "scheduled-manual",
+      "workTrackAttribution": "scheduled-operations"
+    },
+    "production-postgres-privacy-delta-audit.yml": {
+      "responsibility": "postgres-privacy-recovery",
+      "prMode": "none",
+      "mainMode": "manual",
+      "workTrackAttribution": "scheduled-operations"
+    },
+    "production-postgres-privacy-recovery-ledger.yml": {
+      "responsibility": "postgres-privacy-recovery",
+      "prMode": "none",
+      "mainMode": "scheduled-manual",
+      "workTrackAttribution": "scheduled-operations"
+    },
+    "production-postgres-tls-peer-canary.yml": {
+      "responsibility": "postgres-transport-security",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
+    "production-postgres-tls-peer-preflight.yml": {
+      "responsibility": "postgres-transport-security",
+      "prMode": "none",
+      "mainMode": "manual",
+      "workTrackAttribution": "dispatch-input"
+    },
+    "production-privacy-recovery-canary.yml": {
+      "responsibility": "privacy-recovery-operations",
+      "prMode": "none",
+      "mainMode": "manual",
+      "workTrackAttribution": "dispatch-input"
+    },
+    "production-records-current-subject-smoke.yml": {
+      "responsibility": "production-records-smoke",
+      "prMode": "none",
+      "mainMode": "triggered-operations",
+      "workTrackAttribution": "none"
+    },
+    "production-saju-current-subject-smoke.yml": {
+      "responsibility": "production-saju-smoke",
+      "prMode": "none",
+      "mainMode": "triggered-operations",
+      "workTrackAttribution": "commit-metadata"
+    },
+    "production-saju-redeploy-recovery.yml": {
+      "responsibility": "production-saju-recovery",
+      "prMode": "none",
+      "mainMode": "triggered-operations",
+      "workTrackAttribution": "commit-metadata"
+    },
+    "production-saju-service-origin-binding.yml": {
+      "responsibility": "production-saju-operations",
+      "prMode": "none",
+      "mainMode": "manual",
+      "workTrackAttribution": "none"
+    },
+    "reader-grounding-cross-service-e2e.yml": {
+      "responsibility": "saju-character-cross-service-verification",
+      "prMode": "narrow",
+      "mainMode": "narrow",
+      "workTrackAttribution": "pr-metadata"
+    },
+    "supabase-production.yml": {
+      "responsibility": "production-db-deployment",
+      "prMode": "none",
+      "mainMode": "deployment-gated",
+      "workTrackAttribution": "commit-metadata"
+    },
+    "web-browser-auth-regression.yml": {
+      "responsibility": "web-auth-verification",
+      "prMode": "narrow",
+      "mainMode": "narrow",
+      "workTrackAttribution": "pr-metadata"
+    },
+    "web-browser-render-smoke.yml": {
+      "responsibility": "web-render-verification",
+      "prMode": "narrow",
+      "mainMode": "narrow",
+      "workTrackAttribution": "pr-metadata"
+    },
+    "web-pr-domain-gates.yml": {
+      "responsibility": "web-pr-verification",
+      "prMode": "required-router",
+      "mainMode": "none",
+      "workTrackAttribution": "pr-metadata"
+    }
+  }
+}
