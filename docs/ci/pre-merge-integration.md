@@ -119,3 +119,4 @@ request path, and one additional required-check contract are introduced here.
 The guarded default retains existing PR regression until activation is verified.
 No extra workflow write permissions, pull_request_target, personal project
 seeding, production deployment change or administrator merge bypass is added.
+Temporary conflicting validation candidate. Never merge this PR.
