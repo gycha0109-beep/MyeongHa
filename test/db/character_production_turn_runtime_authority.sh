@@ -247,7 +247,7 @@ generated_shape="$("${PSQL[@]}" -At -F '|' -c "select
   (select state from public.chat_turn_attempts where id='$ATTEMPT'),
   (select count(*) from public.ai_execution_logs where id='$GEN_LOG' and stage='renderer' and provider='openai' and model='gpt-test'),
   (select count(*) from public.ai_execution_groundings where ai_execution_log_id='$GEN_LOG' and grounding_id='$GROUNDING' and role='context'),
-  (select generated_grounding_refs_jsonb::text from public.chat_turn_attempts where id='$ATTEMPT'),
+  (select grounding_refs_jsonb::text from public.chat_turn_attempts where id='$ATTEMPT'),
   (select count(*) from public.conversation_messages where turn_id='$TURN' and sender_type='character');")"
 expected_generated="generated|generated|1|1|[\"$GROUNDING\"]|0"
 if [[ "$generated_shape" != "$expected_generated" ]]; then
