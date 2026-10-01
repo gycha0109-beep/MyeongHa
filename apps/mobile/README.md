@@ -5,7 +5,7 @@ MyeongHa Mobile is a first-class React Native client of the existing MyeongHa se
 ## Current state
 
 - Track: `applizing`
-- Phase: **M11-A2 production release origin guard**
+- Phase: **M11-A3 dual-platform export smoke**
 - Runtime: **Expo SDK 57 / React Native 0.86.x**
 - Navigation: **Expo Router**
 - Secure Guest credential persistence: **Expo SecureStore**
@@ -33,11 +33,12 @@ Mobile now has:
 - Member-only Chat open/reuse through `POST /api/chat` for the exact approved Launch 9 roster, with server-authoritative publication/availability and thread convergence;
 - Face Reading camera/library photo staging through Expo ImagePicker with image-only selection, 16MB client bound, local preview, and no server analysis;
 - release-readiness preflight with iOS buildNumber / Android versionCode sequencing and fail-closed platform identity checks;
-- release-only API origin guard that requires the canonical Production origin and rejects staging/local overrides while preserving flexible development runtime configuration.
+- release-only API origin guard that requires the canonical Production origin and rejects staging/local overrides while preserving flexible development runtime configuration;
+- CI export smoke for both Android and iOS from the same Expo source, using isolated output directories after release preflight.
 
 Home does not invent a separate server authority. It does not call unimplemented `/api/home` or `/api/characters`, does not infer a recent Chat thread, does not auto-run Preview Reading, and does not synthesize daily-fortune claims from calculation-only Saju evidence.
 
-Still gated after M11-A2:
+Still gated after M11-A3:
 
 - native sign-up / full account management and Guest→existing-Member merge (existing-Member sign-in/sign-out is available from My);
 - Chat thread discovery / recent-thread listing;

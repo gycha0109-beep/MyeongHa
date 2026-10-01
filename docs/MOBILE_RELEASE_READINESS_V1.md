@@ -1,7 +1,7 @@
 # Mobile Release Readiness v1
 
 > Track: `applizing`  
-> Status: **M11-A2 IMPLEMENTED / STORE IDENTITY BLOCKED**  
+> Status: **M11-A3 IMPLEMENTED / STORE IDENTITY BLOCKED**  
 > Date: **2026-10-01**
 
 ## Production API origin guard
@@ -75,3 +75,24 @@ M11-A does not authorize or configure:
 - push credentials;
 - Apple IAP / Google Play Billing;
 - production distribution.
+
+
+## Dual-platform export smoke
+
+Mobile PR CI performs unsigned Expo exports for both supported platforms after the
+release-readiness contract passes:
+
+```bash
+npm run export:ci:android -w @myeongha/mobile
+npm run export:ci:ios -w @myeongha/mobile
+```
+
+The aggregate workspace command runs both in sequence:
+
+```bash
+npm run export:ci -w @myeongha/mobile
+```
+
+This verifies that the shared Expo application can produce both Android and iOS
+bundles without claiming signed-store readiness. Permanent platform identities
+and signing material remain separate blockers.
