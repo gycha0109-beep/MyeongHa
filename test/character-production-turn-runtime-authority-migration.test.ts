@@ -50,7 +50,7 @@ describe('Character Production turn runtime authority migration', () => {
     expect(sql).toContain("'generatedContentHash', p_content_hash");
     expect(sql).toContain("'output_guard', 'myeongha_internal', p_output_guard_version");
     expect(sql).toContain('v_generated_hash is distinct from p_expected_content_hash');
-    expect(sql).toContain('cmd_chat_validate_ai_provenance_conflict');
+    expect(sql).toContain('public.cmd_validate_chat_turn_attempt_v1(');
   });
 
   it('links only existing Reading grounding rows and never synthesizes a grounding', () => {
