@@ -288,6 +288,6 @@ describe('PostgreSQL Character Production turn adapter', () => {
         subjectId: '20000000-0000-4000-8000-000000000001',
         turnId: '30000000-0000-4000-8000-000000000001',
       }),
-    ).rejects.toThrow(/protectedSajuSegments/u);
+    ).rejects.toThrow(/framingBefore/u);
   });
 });
