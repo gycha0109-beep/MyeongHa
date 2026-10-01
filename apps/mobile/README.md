@@ -5,7 +5,7 @@ MyeongHa Mobile is a first-class React Native client of the existing MyeongHa se
 ## Current state
 
 - Track: `applizing`
-- Phase: **M8-A Member Chat open/reuse**
+- Phase: **M11-A release-readiness preflight**
 - Runtime: **Expo SDK 57 / React Native 0.86.x**
 - Navigation: **Expo Router**
 - Secure Guest credential persistence: **Expo SecureStore**
@@ -31,11 +31,12 @@ Mobile now has:
 - Home projection composed from current Profile, Birth, latest Reading History, and calculation-only Saju evidence;
 - known-thread Chat read through `GET /api/chat/:threadId` with forward cursor pagination and redaction-safe rendering;
 - Member-only Chat open/reuse through `POST /api/chat` for the exact approved Launch 9 roster, with server-authoritative publication/availability and thread convergence;
-- Face Reading camera/library photo staging through Expo ImagePicker with image-only selection, 16MB client bound, local preview, and no server analysis.
+- Face Reading camera/library photo staging through Expo ImagePicker with image-only selection, 16MB client bound, local preview, and no server analysis;
+- release-readiness preflight with iOS buildNumber / Android versionCode sequencing and fail-closed platform identity checks.
 
 Home does not invent a separate server authority. It does not call unimplemented `/api/home` or `/api/characters`, does not infer a recent Chat thread, does not auto-run Preview Reading, and does not synthesize daily-fortune claims from calculation-only Saju evidence.
 
-Still gated after M8-A:
+Still gated after M11-A:
 
 - native sign-up / full account management and Guest→existing-Member merge (existing-Member sign-in/sign-out is available from My);
 - Chat thread discovery / recent-thread listing;
@@ -43,7 +44,8 @@ Still gated after M8-A:
 - production Character catalog/recommendation projection;
 - Face Reading engine intake / analysis upload. M7 does not treat `exif: false` as proof that selected file bytes are metadata-stripped;
 - Push;
-- native store commerce.
+- native store commerce;
+- production mobile application identities: `ios.bundleIdentifier` and `android.package`. These remain explicit release blockers until approved rather than being guessed from repository naming.
 
 ## Commands
 
@@ -54,3 +56,20 @@ npm run ios -w @myeongha/mobile
 npm run typecheck -w @myeongha/mobile
 npm run typecheck -w @myeongha/api-client
 ```
+
+
+## Release readiness
+
+```bash
+npm run verify:mobile-release-readiness
+```
+
+The strict command fails until both production platform application identities are explicitly configured.
+
+CI uses:
+
+```bash
+npm run verify:mobile-release-readiness-contract
+```
+
+That mode still fails on malformed release configuration, but allows the two documented source-owned identity blockers to remain unresolved while Mobile implementation work continues.
