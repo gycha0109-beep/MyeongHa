@@ -5,7 +5,7 @@ MyeongHa Mobile is a first-class React Native client of the existing MyeongHa se
 ## Current state
 
 - Track: `applizing`
-- Phase: **M11-A release-readiness preflight**
+- Phase: **M11-A2 production release origin guard**
 - Runtime: **Expo SDK 57 / React Native 0.86.x**
 - Navigation: **Expo Router**
 - Secure Guest credential persistence: **Expo SecureStore**
@@ -32,11 +32,12 @@ Mobile now has:
 - known-thread Chat read through `GET /api/chat/:threadId` with forward cursor pagination and redaction-safe rendering;
 - Member-only Chat open/reuse through `POST /api/chat` for the exact approved Launch 9 roster, with server-authoritative publication/availability and thread convergence;
 - Face Reading camera/library photo staging through Expo ImagePicker with image-only selection, 16MB client bound, local preview, and no server analysis;
-- release-readiness preflight with iOS buildNumber / Android versionCode sequencing and fail-closed platform identity checks.
+- release-readiness preflight with iOS buildNumber / Android versionCode sequencing and fail-closed platform identity checks;
+- release-only API origin guard that requires the canonical Production origin and rejects staging/local overrides while preserving flexible development runtime configuration.
 
 Home does not invent a separate server authority. It does not call unimplemented `/api/home` or `/api/characters`, does not infer a recent Chat thread, does not auto-run Preview Reading, and does not synthesize daily-fortune claims from calculation-only Saju evidence.
 
-Still gated after M11-A:
+Still gated after M11-A2:
 
 - native sign-up / full account management and Guest→existing-Member merge (existing-Member sign-in/sign-out is available from My);
 - Chat thread discovery / recent-thread listing;
@@ -72,4 +73,4 @@ CI uses:
 npm run verify:mobile-release-readiness-contract
 ```
 
-That mode still fails on malformed release configuration, but allows the two documented source-owned identity blockers to remain unresolved while Mobile implementation work continues.
+That mode still fails on malformed release configuration and any non-canonical `EXPO_PUBLIC_MYEONGHA_API_ORIGIN`, but allows the two documented source-owned identity blockers to remain unresolved while Mobile implementation work continues.
