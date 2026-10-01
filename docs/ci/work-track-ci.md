@@ -26,7 +26,8 @@ originating Work Track. The existing `npm run check` command is unchanged.
 
 Each selected DB suite has its own reusable CI job and one runner, replacing
 the shared PG15/PG17 case queues. Each case creates a fresh service-local DB,
-runs the existing `run_ci_case.sh`, and drops that DB. Cases continue after a
+runs the existing `run_ci_case.sh`, drops that DB, and removes the case-created
+cluster roles and their memberships. Cases continue after a
 failure, and the suite fails if any case fails. PostgreSQL images remain 15
 and 17.6. The suite case lists remain owned by the existing main regression
 workflows; there is no duplicate case registry. The shared DB authority core
