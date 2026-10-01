@@ -38,7 +38,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git diff --name-only "$BASE_SHA" "$HEAD_SHA" > "$RUNNER_TEMP/myeongha-pr-changed-files.txt"
+          git diff --name-only "$BASE_SHA...$HEAD_SHA" > "$RUNNER_TEMP/myeongha-pr-changed-files.txt"
           echo "Changed files:"
           cat "$RUNNER_TEMP/myeongha-pr-changed-files.txt"
           node scripts/ci/pr-gate-router.mjs < "$RUNNER_TEMP/myeongha-pr-changed-files.txt" | tee "$RUNNER_TEMP/myeongha-pr-gates.txt"

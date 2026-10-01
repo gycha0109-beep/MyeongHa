@@ -64,6 +64,8 @@ const strongSharedPatterns = [
   /^test\/db\/catalog_snapshot\.sh$/u,
   /^\.github\/workflows\/ci\.yml$/u,
   /^scripts\/ci\/db-pr-router\.mjs$/u,
+  /^scripts\/ci\/run-db-track\.mjs$/u,
+  /^\.github\/workflows\/ci-db-track\.yml$/u,
 ];
 
 const weakSharedPatterns = [
@@ -112,7 +114,7 @@ function classifyMigration(path, selected) {
   if (!classified) addAll(selected);
 }
 
-function readSuiteCases(workflowFile) {
+export function readSuiteCases(workflowFile) {
   const source = readFileSync(resolve('.github/workflows', workflowFile), 'utf8');
   const lines = source.replace(/\r\n/gu, '\n').split('\n');
   const marker = lines.findIndex((line) => /^\s{8}case:\s*$/u.test(line));
@@ -137,6 +139,12 @@ function readSuiteCases(workflowFile) {
   }
 
   return cases;
+}
+
+export function getDbSuite(suiteName) {
+  const suite = SUITES[suiteName];
+  if (!suite) throw new Error(`Unknown DB CI suite: ${suiteName}`);
+  return { ...suite, cases: readSuiteCases(suite.workflow) };
 }
 
 export function resolveDbPrRouting(inputPaths) {
