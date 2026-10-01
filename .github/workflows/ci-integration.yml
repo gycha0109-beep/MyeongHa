@@ -1,7 +1,9 @@
 name: CI Integration
-run-name: "Integration PR #${{ inputs.pr }} at ${{ inputs.head_sha }}"
+run-name: "Integration PR #${{ inputs.pr || github.event.pull_request.number }} at ${{ inputs.head_sha || github.event.pull_request.head.sha }}"
 
 on:
+  pull_request:
+    types: [labeled]
   workflow_dispatch:
     inputs:
       pr:
@@ -44,18 +46,18 @@ jobs:
       - name: Reject stale or misattributed requests
         env:
           GH_TOKEN: ${{ github.token }}
-          CANDIDATE_PR: ${{ inputs.pr }}
-          CANDIDATE_HEAD: ${{ inputs.head_sha }}
-          CANDIDATE_BASE: ${{ inputs.base_sha }}
+          CANDIDATE_PR: ${{ inputs.pr || github.event.pull_request.number }}
+          CANDIDATE_HEAD: ${{ inputs.head_sha || github.event.pull_request.head.sha }}
+          CANDIDATE_BASE: ${{ inputs.base_sha || github.event.pull_request.base.sha }}
         run: node scripts/ci/integration-candidate.mjs guard
 
   full:
     needs: admission
     uses: ./.github/workflows/ci.yml
     with:
-      candidate_pr: ${{ inputs.pr }}
-      candidate_head: ${{ inputs.head_sha }}
-      candidate_base: ${{ inputs.base_sha }}
+      candidate_pr: ${{ inputs.pr || github.event.pull_request.number }}
+      candidate_head: ${{ inputs.head_sha || github.event.pull_request.head.sha }}
+      candidate_base: ${{ inputs.base_sha || github.event.pull_request.base.sha }}
 
   verify:
     name: CI Integration Verify
@@ -84,7 +86,7 @@ jobs:
       - name: Recheck head and base before reporting success
         env:
           GH_TOKEN: ${{ github.token }}
-          CANDIDATE_PR: ${{ inputs.pr }}
-          CANDIDATE_HEAD: ${{ inputs.head_sha }}
-          CANDIDATE_BASE: ${{ inputs.base_sha }}
+          CANDIDATE_PR: ${{ inputs.pr || github.event.pull_request.number }}
+          CANDIDATE_HEAD: ${{ inputs.head_sha || github.event.pull_request.head.sha }}
+          CANDIDATE_BASE: ${{ inputs.base_sha || github.event.pull_request.base.sha }}
         run: node scripts/ci/integration-candidate.mjs guard

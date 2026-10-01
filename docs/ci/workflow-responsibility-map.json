@@ -16,9 +16,9 @@
   "workflows": {
     "ci-integration.yml": {
       "responsibility": "project-wide-ci",
-      "prMode": "none",
+      "prMode": "required",
       "mainMode": "manual",
-      "workTrackAttribution": "none"
+      "workTrackAttribution": "pr-metadata"
     },
     "account-deletion-hosted-auth-canary.yml": {
       "responsibility": "privacy-operations",

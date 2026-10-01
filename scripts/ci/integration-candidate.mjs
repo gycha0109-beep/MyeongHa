@@ -1,9 +1,22 @@
+import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import process from 'node:process';
 
 export const integrationContext = 'CI Integration Verify';
+export const integrationLabel = 'ci-integration-ready';
+
+export function assertSubmissionEvent(event, candidate) {
+  if (event.action !== 'labeled' || event.label?.name !== integrationLabel) {
+    throw new Error('Integration requires the dedicated CI submission label event');
+  }
+  if (String(event.number) !== String(candidate.pr)
+    || event.pull_request?.head.sha !== candidate.head
+    || event.pull_request?.base.sha !== candidate.base) {
+    throw new Error('Candidate must match the immutable PR submission event');
+  }
+}
 
 export function validateCandidate(candidate, current) {
   if (!/^[1-9][0-9]*$/u.test(String(candidate.pr))
@@ -58,13 +71,30 @@ export function currentCandidate(repo, pr) {
   return current;
 }
 
+export function assertRepositoryPrerequisites(repo, current) {
+  const rules = api(`repos/${repo}/rules/branches/${encodeURIComponent(current.defaultBranch)}`);
+  const required = rules.filter(rule => rule.type === 'required_status_checks')
+    .flatMap(rule => rule.parameters.required_status_checks);
+  if (!required.length) throw new Error('No required-check policy found; do not infer a merge policy');
+  const checks = JSON.parse(execFileSync('gh', ['api', '--paginate', '--slurp',
+    `repos/${repo}/commits/${current.head.sha}/check-runs?per_page=100`], { encoding: 'utf8' }))
+    .flatMap(page => page.check_runs);
+  const statuses = JSON.parse(execFileSync('gh', ['api', '--paginate', '--slurp',
+    `repos/${repo}/commits/${current.head.sha}/statuses?per_page=100`], { encoding: 'utf8' })).flat();
+  assertPrerequisites(required, checks, statuses);
+}
+
 export function checkCandidate(candidate, repo) {
   if (process.env.GITHUB_EVENT_NAME === 'workflow_dispatch'
     && process.env.GITHUB_SHA !== candidate.head) {
     throw new Error('Dispatch ref must resolve to the pinned PR head; checks cannot be attributed to another commit');
   }
+  if (process.env.GITHUB_EVENT_NAME === 'pull_request') {
+    assertSubmissionEvent(JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8')), candidate);
+  }
   const current = currentCandidate(repo, candidate.pr);
   validateCandidate(candidate, current);
+  if (process.env.GITHUB_EVENT_NAME === 'pull_request') assertRepositoryPrerequisites(repo, current);
   return current;
 }
 

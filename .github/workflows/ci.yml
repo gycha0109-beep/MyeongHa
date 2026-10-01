@@ -124,7 +124,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [[ "${{ github.event_name }}" != "pull_request" ]]; then
+          if [[ "${{ github.event_name }}" != "pull_request" || -n "${{ inputs.candidate_head }}" ]]; then
             npm test
           else
             git diff --name-only "$BASE_SHA...$HEAD_SHA" > "$RUNNER_TEMP/track-files.txt"
