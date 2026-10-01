@@ -1,4 +1,4 @@
-const DEFAULT_MOBILE_API_ORIGIN_V1 = 'https://myeongha.vercel.app' as const;
+export const MOBILE_PRODUCTION_API_ORIGIN_V1 = 'https://myeongha.vercel.app' as const;
 
 export interface MobileRuntimeConfigV1 {
   readonly apiOrigin: string;
@@ -21,7 +21,7 @@ export function resolveMobileApiOriginV1(
   const candidate =
     typeof configured === 'string' && configured.trim().length > 0
       ? configured.trim()
-      : DEFAULT_MOBILE_API_ORIGIN_V1;
+      : MOBILE_PRODUCTION_API_ORIGIN_V1;
 
   let url: URL;
   try {
