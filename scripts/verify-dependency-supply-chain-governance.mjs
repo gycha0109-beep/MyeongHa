@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { resolveVerificationPlan } from './ci/verification-plan.mjs';
 
 const root = process.cwd();
 const workflowPath = resolve(root, '.github/workflows/governance.yml');
@@ -29,20 +30,21 @@ if (weeklyCount !== 2) {
 
 requireFragment(
   workflow,
-  'dependencies: ${{ steps.scope.outputs.dependencies }}',
+  'node scripts/ci/verification-plan.mjs < "$changed_files" >> "$GITHUB_OUTPUT"',
   'governance',
 );
-requireFragment(workflow, '.github/dependabot\\.yml$', 'governance');
-requireFragment(workflow, 'apps/[^/]+/package\\.json$', 'governance');
-requireFragment(workflow, 'packages/[^/]+/package\\.json$', 'governance');
+for (const path of ['.github/dependabot.yml', '.github/workflows/governance.yml', 'package.json', 'package-lock.json', 'apps/web/package.json', 'packages/contracts/package.json']) {
+  if (!resolveVerificationPlan([path]).dependencies) failures.push(`dependency scope: missing ${path}`);
+}
+if (resolveVerificationPlan(['apps/web/src/chat/ChatPage.tsx']).dependencies) failures.push('dependency scope: unrelated source change selected');
 requireFragment(
   workflow,
-  "if: github.event_name == 'pull_request' && needs.scope.outputs.dependencies == 'true'",
+  "if: github.event_name == 'pull_request' && steps.scope.outputs.dependencies == 'true'",
   'governance',
 );
 requireFragment(
   workflow,
-  'uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0',
+  'uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294',
   'governance',
 );
 requireFragment(workflow, 'fail-on-severity: moderate', 'governance');
@@ -54,22 +56,28 @@ requireFragment(
   'node scripts/verify-dependency-supply-chain-governance.mjs',
   'governance',
 );
-requireFragment(workflow, 'DEPENDENCY_REVIEW_RESULT: ${{ needs.dependency-review.result }}', 'governance');
+requireFragment(workflow, 'DEPENDENCIES_SELECTED: ${{ steps.scope.outputs.dependencies }}', 'governance');
+requireFragment(workflow, 'DEPENDENCY_RESULT: ${{ steps.dependency_review.outcome }}', 'governance');
 requireFragment(
   workflow,
-  'test "$DEPENDENCY_REVIEW_RESULT" = "success" || test "$DEPENDENCY_REVIEW_RESULT" = "skipped"',
+  'if [[ "$EVENT_NAME" == "pull_request" && "$DEPENDENCIES_SELECTED" == "true" ]]; then test "$DEPENDENCY_RESULT" = "success"; fi',
   'governance',
 );
 
 const verifyBlock = workflow.match(/\n  verify:\n[\s\S]*$/u)?.[0] ?? '';
-requireFragment(verifyBlock, '      - dependency-review', 'governance verify');
+requireFragment(verifyBlock, 'name: Governance Verify', 'governance verify');
+requireFragment(verifyBlock, 'if: ${{ always() && !cancelled() }}', 'governance verify');
 
 const dependencyReviewBlock = workflow.match(
-  /\n  dependency-review:\n([\s\S]*?)\n  verify:\n/u,
+  /\n      - name: Review dependency changes\n([\s\S]*?)\n      - name:/u,
 )?.[1] ?? '';
 if (!dependencyReviewBlock) {
-  failures.push('governance: dependency-review job is missing');
+  failures.push('governance: dependency-review step is missing');
 } else {
+  requireFragment(dependencyReviewBlock, 'id: dependency_review', 'governance dependency-review');
+  requireFragment(dependencyReviewBlock, "if: github.event_name == 'pull_request' && steps.scope.outputs.dependencies == 'true'", 'governance dependency-review');
+  requireFragment(dependencyReviewBlock, 'fail-on-severity: moderate', 'governance dependency-review');
+  requireFragment(dependencyReviewBlock, 'fail-on-scopes: runtime, development, unknown', 'governance dependency-review');
   const uses = [...dependencyReviewBlock.matchAll(/uses:\s*([^\s#]+)/gu)].map((match) => match[1]);
   for (const reference of uses) {
     if (reference.startsWith('./')) continue;

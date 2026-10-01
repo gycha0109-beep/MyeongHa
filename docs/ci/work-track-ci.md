@@ -28,6 +28,9 @@ Governance now runs scope resolution, contract verification, dependency review,
 and the required result on one runner. A selected check that failed or was skipped
 fails `Governance Verify`; unselected checks may be skipped. Review severity,
 permissions, and policy verifiers are unchanged.
+The dependency supply-chain verifier now validates the consolidated review step,
+its unchanged severity/scopes/pin, shared path selection, and the required guard
+instead of requiring the removed separate job.
 
 Web PR verification runs scope resolution and the selected browser scripts on
 one runner. Dependencies, Web build, and Chrome are prepared once. The exact
