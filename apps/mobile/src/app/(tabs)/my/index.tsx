@@ -36,6 +36,29 @@ export default function MyScreen() {
     await reloadOwnerProjection();
   }
 
+  async function handleSignUp() {
+    const result = await memberAuth.signUp(email, password);
+    if (result === false) return;
+    setPassword('');
+    if (result === 'authenticated') await reloadOwnerProjection();
+  }
+
+  async function handleCompleteSignUp() {
+    if (memberAuth.state.kind !== 'verification_required') return;
+    const completed = await memberAuth.completeSignUp(
+      memberAuth.state.email,
+      password,
+    );
+    if (!completed) return;
+    setPassword('');
+    await reloadOwnerProjection();
+  }
+
+  async function handleCancelSignUp() {
+    await memberAuth.cancelSignUp();
+    setPassword('');
+  }
+
   async function handleSignOut() {
     const signedOut = await memberAuth.signOut();
     if (!signedOut) return;
@@ -70,11 +93,26 @@ export default function MyScreen() {
           password={password}
           pending={memberAuth.state.kind === 'submitting'}
           errorMessage={
-            memberAuth.state.kind === 'error' ? memberAuth.state.message : null
+            memberAuth.state.kind === 'error'
+              ? memberAuth.state.message
+              : memberAuth.state.kind === 'verification_required'
+                ? memberAuth.state.errorMessage
+                : null
+          }
+          verificationRequired={
+            memberAuth.state.kind === 'verification_required'
+              ? {
+                  email: memberAuth.state.email,
+                  message: memberAuth.state.message,
+                }
+              : null
           }
           onEmailChange={setEmail}
           onPasswordChange={setPassword}
           onSignIn={() => void handleSignIn()}
+          onSignUp={() => void handleSignUp()}
+          onCompleteSignUp={() => void handleCompleteSignUp()}
+          onCancelSignUp={() => void handleCancelSignUp()}
           onSignOut={() => void handleSignOut()}
         />
       ) : null}

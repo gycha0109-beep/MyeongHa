@@ -8,6 +8,7 @@ import {
   serializeMemberSessionV1,
   signInMemberV1,
   signOutMemberV1,
+  signUpMemberV1,
 } from '../packages/api-client/src/index.js';
 
 const session = Object.freeze({
@@ -26,6 +27,37 @@ function success(data: unknown): Response {
 }
 
 describe('shared Member auth client', () => {
+  it('creates a Member account and accepts an immediate authenticated session', async () => {
+    const client = new MyeongHaApiClientV1({
+      origin: 'https://myeongha.test',
+      fetchImpl: async () => success({ status: 'authenticated', session }),
+    });
+
+    await expect(
+      signUpMemberV1(client, ' NEW@example.com ', 'secret-password'),
+    ).resolves.toEqual({
+      status: 'authenticated',
+      session,
+    });
+  });
+
+  it('preserves verification-required sign-up without fabricating a session', async () => {
+    const client = new MyeongHaApiClientV1({
+      origin: 'https://myeongha.test',
+      fetchImpl: async () => success({
+        status: 'verification_required',
+        email: 'NEW@example.com',
+      }),
+    });
+
+    await expect(
+      signUpMemberV1(client, 'new@example.com', 'secret-password'),
+    ).resolves.toEqual({
+      status: 'verification_required',
+      email: 'new@example.com',
+    });
+  });
+
   it('signs in through the server auth proxy without exposing Supabase credentials', async () => {
     let path = '';
     let body = '';

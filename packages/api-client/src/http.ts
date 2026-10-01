@@ -31,6 +31,7 @@ export interface MyeongHaApiRequestV1 {
   readonly method: 'GET' | 'POST' | 'PATCH' | 'DELETE';
   readonly path: string;
   readonly bearer?: string;
+  readonly guestBearer?: string;
   readonly body?: unknown;
 }
 
@@ -158,6 +159,9 @@ export class MyeongHaApiClientV1 {
     const headers = new Headers({ Accept: 'application/json' });
     if (input.bearer !== undefined) {
       headers.set('Authorization', `Bearer ${normalizeBearer(input.bearer)}`);
+    }
+    if (input.guestBearer !== undefined) {
+      headers.set('x-myeongha-guest-bearer', normalizeBearer(input.guestBearer));
     }
     if (input.body !== undefined) {
       headers.set('Content-Type', 'application/json');
