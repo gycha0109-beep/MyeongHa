@@ -2,16 +2,20 @@ import { readFile } from 'node:fs/promises';
 
 const workflowPath = '.github/workflows/production-postgres-backup.yml';
 const runnerPath = 'scripts/operations/export-production-postgres-backup.sh';
+const strictTlsHelperPath = 'scripts/operations/prepare-production-postgres-strict-libpq.mjs';
+const strictDumpHelperPath = 'scripts/operations/run-production-postgres-strict-dump.sh';
 const restoreSourceResolverPath = 'scripts/operations/resolve-postgres-restore-source.sh';
 const runbookPath = 'docs/operations/POSTGRES_BACKUP_RESTORE_RUNBOOK_V1.md';
 
-const [workflow, runner, restoreSourceResolver, runbook] = await Promise.all([
+const [workflow, runner, strictTlsHelper, strictDumpHelper, restoreSourceResolver, runbook] = await Promise.all([
   readFile(workflowPath, 'utf8'),
   readFile(runnerPath, 'utf8'),
+  readFile(strictTlsHelperPath, 'utf8'),
+  readFile(strictDumpHelperPath, 'utf8'),
   readFile(restoreSourceResolverPath, 'utf8'),
   readFile(runbookPath, 'utf8'),
 ]);
-const contract = workflow + '\n' + runner;
+const contract = workflow + '\n' + runner + '\n' + strictTlsHelper + '\n' + strictDumpHelper;
 
 const requiredWorkflowFragments = [
   'name: Production PostgreSQL Logical Backup',
@@ -22,14 +26,17 @@ const requiredWorkflowFragments = [
   'cancel-in-progress: false',
   'SUPABASE_PROJECT_ID: cnsfpcdiyofqvhpcegfc',
   "SUPABASE_CLI_VERSION: '2.117.0'",
+  "SUPABASE_POSTGRES_IMAGE: 'supabase/postgres:17.6.1.167'",
   "BACKUP_RETENTION_DAYS: '30'",
   'SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}',
   'SUPABASE_PRODUCTION_SESSION_POOLER_HOST: ${{ secrets.SUPABASE_PRODUCTION_SESSION_POOLER_HOST }}',
+  'SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM: ${{ secrets.SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM }}',
   'MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE: ${{ secrets.MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE }}',
   'missing=()',
   'missing+=(SUPABASE_DB_PASSWORD)',
   'missing+=(MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE)',
   'missing+=(SUPABASE_PRODUCTION_SESSION_POOLER_HOST)',
+  'missing+=(SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM)',
   'SUPABASE_PRODUCTION_SESSION_POOLER_HOST must be a bare *.pooler.supabase.com hostname.',
   '::error title=Production backup credential missing::Missing Actions secret: $secret_name',
   '::error title=Production backup encryption secret invalid::MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE must be at least 32 characters.',
@@ -40,15 +47,22 @@ const requiredWorkflowFragments = [
   "pool_db='postgres'",
   '[[ "$pool_host" =~ ^[a-z0-9-]+([.][a-z0-9-]+)*[.]pooler[.]supabase[.]com$ ]]',
   "[[ \"$pool_port\" == '5432' ]]",
-  'npx --yes "supabase@$SUPABASE_CLI_VERSION" db dump',
-  '--db-url "$db_url"',
-  '--role-only',
-  '-f "$backup_dir/schema.sql"',
-  '--use-copy',
-  '--data-only',
-  "-x 'storage.buckets_vectors'",
-  "-x 'storage.vector_indexes'",
-  'echo "::add-mask::$db_url"',
+  'prepare-production-postgres-strict-libpq.mjs',
+  'run-production-postgres-strict-dump.sh',
+  "export PGSSLMODE='verify-full'",
+  'export PGSSLROOTCERT="$root_certificate_file"',
+  'export PGHOST="$POOL_HOST"',
+  'export PGUSER="$ADMIN_POOL_USER"',
+  'export PGPASSWORD="$SUPABASE_DB_PASSWORD"',
+  'root_certificate_pem_emitted=false',
+  'bash scripts/operations/run-production-postgres-strict-dump.sh roles "$backup_dir/roles.sql"',
+  'bash scripts/operations/run-production-postgres-strict-dump.sh schema "$backup_dir/schema.sql"',
+  'bash scripts/operations/run-production-postgres-strict-dump.sh data "$backup_dir/data.sql"',
+  '--mount "type=bind,src=$PGSSLROOTCERT,dst=$container_root_certificate,readonly"',
+  '--env PGSSLMODE=verify-full',
+  '--env PGSSLROOTCERT="$container_root_certificate"',
+  '--env PGPASSWORD',
+  '--entrypoint bash',
   'cd "$backup_dir"',
   'sha256sum roles.sql schema.sql data.sql > plaintext-sha256.txt',
   'openssl enc -aes-256-cbc -salt -pbkdf2 -iter 200000',
@@ -73,25 +87,35 @@ const forbiddenWorkflowFragments = [
   'uses: actions/upload-artifact@v7',
   'uses: actions/checkout@v4',
   'uses: actions/upload-artifact@v4',
-  'service_role',
   'sslmode=disable',
+  'sslmode=require',
+  'sslmode=prefer',
   'SUPABASE_DB_PASSWORD: postgres',
   'echo "$SUPABASE_ACCESS_TOKEN"',
   'echo "$SUPABASE_DB_PASSWORD"',
   'echo "$SUPABASE_PRODUCTION_SESSION_POOLER_HOST"',
   'echo "$MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE"',
   'echo "$db_url"',
+  'db_url=',
+  'encoded_password=',
+  'npx --yes "supabase@$SUPABASE_CLI_VERSION" db dump',
+  '--db-url',
   'path: $backup_dir',
   'path: roles.sql',
   'path: schema.sql',
   'path: data.sql',
-  'pg_dump ',
 ];
 
 for (const fragment of forbiddenWorkflowFragments) {
   if (contract.includes(fragment)) {
     throw new Error(`Forbidden production backup workflow fragment: ${fragment}`);
   }
+}
+if ((workflow + '\n' + runner).includes('service_role')) {
+  throw new Error('Production backup workflow/runner must not consume service_role credentials.');
+}
+if (runner.includes('pg_dump ') || runner.includes('pg_dumpall ')) {
+  throw new Error('Production backup runner must route dump execution through the strict Docker helper.');
 }
 
 const encryptIndex = runner.indexOf('openssl enc -aes-256-cbc -salt -pbkdf2 -iter 200000');
