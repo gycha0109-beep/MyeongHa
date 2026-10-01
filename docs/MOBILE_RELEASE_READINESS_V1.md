@@ -1,7 +1,7 @@
 # Mobile Release Readiness v1
 
 > Track: `applizing`  
-> Status: **M11-A3 IMPLEMENTED / STORE IDENTITY BLOCKED**  
+> Status: **M11-A4 IMPLEMENTED / STORE IDENTITY BLOCKED**  
 > Date: **2026-10-01**
 
 ## Production API origin guard
@@ -96,3 +96,26 @@ npm run export:ci -w @myeongha/mobile
 This verifies that the shared Expo application can produce both Android and iOS
 bundles without claiming signed-store readiness. Permanent platform identities
 and signing material remain separate blockers.
+
+
+## Export artifact verification
+
+After the Android and iOS Expo exports complete, CI verifies the generated
+artifacts rather than relying only on the exporter exit code.
+
+For each platform it requires:
+
+```text
+metadata.json
+_expo/static/js/<platform>/*.hbc
+```
+
+`metadata.json` must be non-empty and parse as a JSON object. At least one
+Hermes bundle must exist and have non-zero size. A platform export must not
+contain a Hermes bundle under the opposite platform path.
+
+The command is:
+
+```bash
+npm run verify:mobile-export-artifacts
+```

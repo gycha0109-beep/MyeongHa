@@ -26,3 +26,5 @@ jobs:
         run: npm run verify:mobile-release-readiness-contract
       - name: Export Android and iOS bundles
         run: npm run export:ci -w @myeongha/mobile
+      - name: Verify Android and iOS export artifacts
+        run: npm run verify:mobile-export-artifacts
