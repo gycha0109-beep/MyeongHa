@@ -3,6 +3,31 @@ import {
   type MyeongHaApiClientV1,
 } from './http.js';
 
+export const CHAT_LAUNCH_CHARACTER_IDS_V1 = Object.freeze([
+  'seyeon',
+  'yeoul',
+  'seorin',
+  'rahyeon',
+  'mira',
+  'taegyeom',
+  'yunho',
+  'doyun',
+  'baekheon',
+] as const);
+
+export type ChatLaunchCharacterIdV1 =
+  (typeof CHAT_LAUNCH_CHARACTER_IDS_V1)[number];
+
+const CHAT_LAUNCH_CHARACTER_ID_SET_V1 = new Set<string>(
+  CHAT_LAUNCH_CHARACTER_IDS_V1,
+);
+
+export interface ChatOpenResultV1 {
+  readonly threadId: string;
+  readonly characterId: ChatLaunchCharacterIdV1;
+  readonly created: boolean;
+}
+
 export interface ChatReadPageOptionsV1 {
   readonly afterSequenceNo?: number;
   readonly pageSize?: number;
@@ -64,12 +89,27 @@ function invalid(message: string): never {
   );
 }
 
-function clientInvalid(message: string): never {
+function clientInvalid(message: string, code = 'CLIENT_CHAT_READ_INVALID'): never {
   throw new MyeongHaApiClientErrorV1(
     'malformed_response',
-    'CLIENT_CHAT_READ_INVALID',
+    code,
     message,
   );
+}
+
+export function parseChatLaunchCharacterIdV1(
+  value: unknown,
+): ChatLaunchCharacterIdV1 {
+  if (
+    typeof value !== 'string' ||
+    !CHAT_LAUNCH_CHARACTER_ID_SET_V1.has(value)
+  ) {
+    return clientInvalid(
+      'Chat characterId is not an approved Launch Character.',
+      'CLIENT_CHAT_OPEN_INVALID',
+    );
+  }
+  return value as ChatLaunchCharacterIdV1;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -309,4 +349,48 @@ export async function readChatThreadPageV1(
     normalized.afterSequenceNo,
     normalized.pageSize,
   );
+}
+
+
+function parseChatOpenResultV1(
+  data: unknown,
+  requestedCharacterId: ChatLaunchCharacterIdV1,
+): ChatOpenResultV1 {
+  if (!isRecord(data)) return invalid('open response is invalid.');
+
+  const threadId = stringValue('open threadId', data.threadId);
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(threadId)
+  ) {
+    return invalid('open threadId is invalid.');
+  }
+
+  const characterId = parseChatLaunchCharacterIdV1(data.characterId);
+  if (characterId !== requestedCharacterId) {
+    return invalid('open characterId changed in response.');
+  }
+  if (typeof data.created !== 'boolean') {
+    return invalid('open created flag is invalid.');
+  }
+
+  return Object.freeze({
+    threadId,
+    characterId,
+    created: data.created,
+  });
+}
+
+export async function openMemberCharacterThreadV1(
+  client: MyeongHaApiClientV1,
+  bearer: string,
+  characterIdInput: unknown,
+): Promise<ChatOpenResultV1> {
+  const characterId = parseChatLaunchCharacterIdV1(characterIdInput);
+  const data = await client.requestData({
+    method: 'POST',
+    path: '/api/chat',
+    bearer,
+    body: Object.freeze({ characterId }),
+  });
+  return parseChatOpenResultV1(data, characterId);
 }

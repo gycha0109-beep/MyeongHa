@@ -1,8 +1,8 @@
 # MyeongHa Mobile Client Architecture v1
 
 > Track: `applizing`  
-> Status: M7 native Face media staging implemented  
-> Date: 2026-09-29  
+> Status: M8-A Member Chat open/reuse implemented  
+> Date: 2026-10-01  
 > Server authority: existing MyeongHa API / PostgreSQL  
 > Client principle: Web and Mobile are separate first-class clients of the same server world.
 
@@ -163,9 +163,11 @@ Native media capture can be prepared independently, but the client must not inve
 
 ### Chat
 
-Current Production state permits read-oriented mobile scaffolding only where server authority exists.
+Current Production state permits known-thread read plus Member single-Character open/reuse for the exact approved Launch 9 canonical ids.
 
-Mobile must not locally commit synthetic assistant/user turns when server send/thread-creation authority is blocked.
+Mobile may present only the source-approved Launch membership, canonical ids, and official display names for this selector. Publication/availability and thread creation/reuse remain server-authoritative. Guest open, recent-thread discovery, detailed Character catalog content, and Chat send remain blocked unless separately authorized.
+
+Mobile must not locally commit synthetic assistant/user turns.
 
 ### Records / My
 
@@ -207,7 +209,8 @@ M4  Records + My                                         DONE
 M5  Home projection composition                          DONE
 M6  Chat Hub + server-authorized read path               DONE
 M7  Face Reading media path                              DONE
-M8  Chat send after authority unblock
+M8-A Member Chat open/reuse + exact Launch roster         DONE
+M8-B Chat send after authority unblock
 M9  Push after notification authority unblock
 M10 native store commerce after rail decision
 M11 Android/iOS release hardening
@@ -259,12 +262,12 @@ GET /api/chat/:threadId?afterSequenceNo=<n>&pageSize=<1..50>
 M6 invariants:
 
 - a thread id must already come from a server-authorized link or future discovery projection; Mobile does not invent a thread list.
-- Chat Hub remains an authority-safe blocked surface for recent-thread discovery and Character browsing.
+- M6 itself does not invent recent-thread discovery or Character browsing; later source-authorized phases may add narrower surfaces without changing the M6 read contract.
 - Character names/titles/portraits are not inferred from `characterId`.
 - forward stream pagination is preserved; Mobile does not claim to have the latest message until it has traversed the available forward pages.
 - redacted message body/payload content is never rendered.
 - relationship data stays server-owned; M6 does not locally mutate or score it.
-- no input composer, Chat-open mutation, or Chat-send mutation is activated by M6.
+- no input composer or Chat-send mutation is activated by M6; Member Chat-open is added separately by M8-A.
 
 
 ## 13. M7 Face media staging boundary
@@ -295,3 +298,41 @@ Important privacy boundary:
 `expo-image-picker` with `exif: false` only means EXIF data is not returned in the picker result. M7 does **not** treat that option as evidence that metadata has been stripped from the selected file bytes. The Face Reading engine authority requires EXIF/metadata removal at intake, so engine handoff remains disabled until a source-approved intake adapter explicitly satisfies that requirement.
 
 M7 therefore completes the **native media staging** path without inventing a Production Face Reading upload/API contract or bypassing the separate Face Reading engine authority.
+
+
+## 14. M8-A Member Chat open/reuse boundary
+
+M8-A activates the existing Member-only server command:
+
+```text
+POST /api/chat
+Authorization: Bearer <Member session>
+Content-Type: application/json
+
+{ "characterId": "<approved Launch Character id>" }
+```
+
+The selectable identities are exactly:
+
+```text
+seyeon   세연
+yeoul    여울
+seorin   서린
+rahyeon  라현
+mira     미라
+taegyeom 태겸
+yunho    윤호
+doyun    도윤
+baekheon 백헌
+```
+
+M8-A invariants:
+
+- Guest Chat open remains disabled.
+- Mobile sends exactly one authority-bearing request field: canonical `characterId`.
+- the client does not send subject, release, bundle, presentation key, thread candidate ids, or idempotency keys.
+- the selector exposes only source-approved Launch membership + exact canonical id + official display name; it does not invent detailed Character canon, title, portrait, recommendation, or availability state.
+- the server remains authoritative for active Member eligibility, publication/availability, current default release/bundle, existing-thread reuse, new-thread creation, and concurrency convergence.
+- successful open/reuse navigates to the existing known-thread read surface.
+- recent-thread discovery remains unavailable.
+- Chat send remains disabled.

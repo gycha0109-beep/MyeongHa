@@ -60,9 +60,14 @@ export {
 } from './records.js';
 
 export {
+  CHAT_LAUNCH_CHARACTER_IDS_V1,
+  openMemberCharacterThreadV1,
+  parseChatLaunchCharacterIdV1,
   parseChatThreadIdV1,
   readChatThreadPageV1,
+  type ChatLaunchCharacterIdV1,
   type ChatMessageV1,
+  type ChatOpenResultV1,
   type ChatReadPageOptionsV1,
   type ChatReadPaginationV1,
   type ChatRelationshipV1,
