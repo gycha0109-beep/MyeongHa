@@ -1,7 +1,7 @@
 # MyeongHa Mobile Client Architecture v1
 
 > Track: `applizing`  
-> Status: M11-A4 export artifact verification implemented  
+> Status: M3-B Saju Preview Reading + M11-A4 release hardening implemented  
 > Date: 2026-10-01  
 > Server authority: existing MyeongHa API / PostgreSQL  
 > Client principle: Web and Mobile are separate first-class clients of the same server world.
@@ -151,9 +151,9 @@ Not shared:
 
 ### Saju
 
-Current Birth Profile and Saju calculation runtime can be consumed by Mobile once the shared API client and auth adapters are available.
+Current Birth Profile and Saju calculation runtime are consumed by Mobile through shared API/auth adapters.
 
-Calculation-only facts and authoritative Reading output remain distinct.
+Calculation-only facts and authoritative Reading output remain distinct. Mobile may invoke only the current Production Preview Reading boundary for the exact five server-approved texts and may render only the consumer-safe ProductReadingResponse v2 presentation projection.
 
 ### Face Reading
 
@@ -206,6 +206,7 @@ M1  Expo runtime bootstrap + five-tab shell              DONE
 M2  shared API/auth + secure credential adapter          DONE
 M2-B Guest→new Member same-subject enrollment             DONE
 M3  Saju + Birth vertical slice                          DONE
+M3-B source-authorized Saju Preview Reading               DONE
 M4  Records + My                                         DONE
 M5  Home projection composition                          DONE
 M6  Chat Hub + server-authorized read path               DONE
@@ -482,3 +483,53 @@ Enrollment invariants:
 - `GUEST_MERGE_REQUIRED` is surfaced as a blocked existing-member merge. Mobile
   does not invent SRC-24 conflict/resolution semantics;
 - passwords remain ephemeral screen state and are never persisted.
+
+
+## 20. M3-B Saju Preview Reading boundary
+
+Mobile exposes the existing Production current-subject Preview Reading endpoint:
+
+```text
+POST /api/me/saju/preview-reading
+Authorization: Bearer <active Guest or Member subject>
+Content-Type: application/json
+
+{ "readingText": "<approved Preview text>" }
+```
+
+The selectable request texts are exactly:
+
+```text
+전체 사주
+직업운
+재물운
+연애운
+사업운
+```
+
+The presentation parser is pinned to the Saju public ProductReadingResponse v2
+contract reviewed at Saju source SHA:
+
+```text
+19095a89773d517c2b6d69c45544525b9262459a
+```
+
+M3-B invariants:
+
+- the client never sends Birth input, lifecycle, Saju domain, profile, Character,
+  or other semantic authority fields;
+- current Birth revision binding and governed interpretation execution remain
+  server-owned;
+- only `delivered` and `delivered_with_fallback` responses render Reading text;
+- other ProductReadingResponse states produce neutral availability/clarification
+  UI and are never converted into fortune meaning;
+- the Mobile parser accepts only the public ProductReadingResponse block types
+  already consumed by the current Web Preview surface;
+- unavailable sections are omitted rather than replaced;
+- Preview notice sections and disclosures are preserved;
+- raw response JSON, internal claim ids, methodology state, research authority,
+  or unsupported fields are never shown;
+- Mobile does not add Character voice, advice, fortune scores, daily fortune, or
+  missing interpretation text;
+- Preview execution is explicit user action on the Saju screen; Home remains
+  calculation-only and never auto-runs Preview Reading.
