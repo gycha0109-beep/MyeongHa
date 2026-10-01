@@ -99,6 +99,33 @@ grant insert on public.outbox_events to myeongha_character_turn_owner;
 
 -- Existing Chat read RLS is preserved. Add only the NOLOGIN wrapper owner's exact
 -- current-subject paths; the API executor still receives no direct write DML.
+drop policy if exists subjects_character_turn_select_v1
+  on public.subjects;
+create policy subjects_character_turn_select_v1
+on public.subjects
+for select
+to myeongha_character_turn_owner
+using (id = public.current_myeongha_subject_id());
+
+drop policy if exists outbox_events_character_turn_insert_v1
+  on public.outbox_events;
+create policy outbox_events_character_turn_insert_v1
+on public.outbox_events
+for insert
+to myeongha_character_turn_owner
+with check (
+  aggregate_type = 'chat_turn'
+  and event_type = 'CHAT_TURN_COMMITTED'
+  and event_schema_version = 'v1'
+  and dedupe_key = 'turn-commit-v1'
+  and exists (
+    select 1
+    from public.chat_turns t
+    where t.id::text = outbox_events.payload_jsonb ->> 'turnId'
+      and t.subject_id = public.current_myeongha_subject_id()
+  )
+);
+
 drop policy if exists conversation_threads_character_turn_select_v1
   on public.conversation_threads;
 create policy conversation_threads_character_turn_select_v1
