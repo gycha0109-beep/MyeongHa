@@ -26,11 +26,11 @@ pg_dumpall \
   --no-role-passwords \
   --no-comments \
 | sed -E 's/^\\(un)?restrict .*$/-- &/' \
-| sed -E "s/^CREATE ROLE \\"($reserved_roles)\\"/-- &/" \
-| sed -E "s/^ALTER ROLE \\"($reserved_roles)\\"/-- &/" \
+| sed -E "s/^CREATE ROLE \"($reserved_roles)\"/-- &/" \
+| sed -E "s/^ALTER ROLE \"($reserved_roles)\"/-- &/" \
 | sed -E 's/ (NOSUPERUSER|NOREPLICATION)//g' \
-| sed -E "s/^-- (.* SET \\"($allowed_configs)\\" .*)/\\1/" \
-| sed -E "s/GRANT \\".*\\" TO \\"($reserved_roles)\\"/-- &/" \
+| sed -E "s/^-- (.* SET \"($allowed_configs)\" .*)/\\1/" \
+| sed -E "s/GRANT \".*\" TO \"($reserved_roles)\"/-- &/" \
 | sed -E '/^--/d' \
 | uniq
 echo "RESET ALL;"
@@ -61,8 +61,8 @@ pg_dump \
 | sed -E 's/^ALTER FOREIGN DATA WRAPPER (.+) OWNER TO /-- &/' \
 | sed -E 's/^ALTER DEFAULT PRIVILEGES FOR ROLE "supabase_admin"/-- &/' \
 | sed -E 's/^GRANT ALL ON FOREIGN DATA WRAPPER (.+) TO "postgres" WITH GRANT OPTION/-- &/' \
-| sed -E "s/^GRANT (.+) ON (.+) \\"($excluded_schemas)\\"/-- &/" \
-| sed -E "s/^REVOKE (.+) ON (.+) \\"($excluded_schemas)\\"/-- &/" \
+| sed -E "s/^GRANT (.+) ON (.+) \"($excluded_schemas)\"/-- &/" \
+| sed -E "s/^REVOKE (.+) ON (.+) \"($excluded_schemas)\"/-- &/" \
 | sed -E 's/^(CREATE EXTENSION IF NOT EXISTS "pg_tle").+/\\1;/' \
 | sed -E 's/^(CREATE EXTENSION IF NOT EXISTS "pgsodium").+/\\1;/' \
 | sed -E 's/^(CREATE EXTENSION IF NOT EXISTS "pgmq").+/\\1;/' \
