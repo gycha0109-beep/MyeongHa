@@ -289,6 +289,12 @@
       "prMode": "required-router",
       "mainMode": "none",
       "workTrackAttribution": "pr-metadata"
+    },
+    "ci-db-track.yml": {
+      "responsibility": "db-suite-verification",
+      "prMode": "routed-via-ci",
+      "mainMode": "none",
+      "workTrackAttribution": "caller-pr-metadata"
     }
   }
 }

@@ -41,7 +41,7 @@ jobs:
           changed_files="${RUNNER_TEMP}/myeongha-governance-changed-files.txt"
 
           if [[ "$EVENT_NAME" == "pull_request" ]]; then
-            git diff --name-only "$PR_BASE_SHA" "$PR_HEAD_SHA" > "$changed_files"
+            git diff --name-only "$PR_BASE_SHA...$PR_HEAD_SHA" > "$changed_files"
           elif [[ "$EVENT_NAME" == "push" ]]; then
             if [[ "$PUSH_BASE_SHA" =~ ^0+$ ]]; then
               git show --pretty='' --name-only "$PUSH_HEAD_SHA" > "$changed_files"

@@ -61,6 +61,8 @@ const dbPatterns = [
   /^apps\/api\/src\/(?:account-deletion-worker-|node-postgres-account-deletion-worker-pool\.ts$|postgres-account-deletion-worker\.ts$|production-account-deletion-worker-)/u,
   /^package(?:-lock)?\.json$/u,
   /^\.github\/workflows\/ci\.yml$/u,
+  /^\.github\/workflows\/ci-db-track\.yml$/u,
+  /^scripts\/ci\/run-db-track\.mjs$/u,
   /^scripts\/ci\/pr-gate-router\.mjs$/u,
 ];
 
