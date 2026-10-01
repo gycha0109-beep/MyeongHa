@@ -53,7 +53,6 @@ for (const forbidden of [
 const requiredRunnerFragments = [
   "begin transaction read only;",
   "current_setting('transaction_read_only')",
-  'pg_stat_ssl',
   'rollback;',
   'prepare-production-postgres-strict-libpq.mjs',
   'export PGHOST="$SUPABASE_PRODUCTION_SESSION_POOLER_HOST"',
@@ -99,6 +98,7 @@ for (const forbidden of [
   'service_role',
   'echo "$SUPABASE_DB_PASSWORD"',
   'echo "$SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM"',
+  'pg_stat_ssl',
 ]) {
   if ((workflow + '\n' + runner).includes(forbidden)) {
     throw new Error(`Forbidden privileged PostgreSQL TLS read-only contract fragment: ${forbidden}`);
@@ -123,5 +123,5 @@ for (const fragment of [
 }
 
 console.log(
-  'MyeongHa Production privileged PostgreSQL TLS read-only proof contract verification passed: verify-full, pinned root, explicit READ ONLY transaction, SSL runtime check, and zero write SQL are pinned.',
+  'MyeongHa Production privileged PostgreSQL TLS read-only proof contract verification passed: client-side verify-full with pinned root, explicit READ ONLY transaction, successful connection, and zero write SQL are pinned.',
 );
