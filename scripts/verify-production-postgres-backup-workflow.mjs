@@ -118,6 +118,24 @@ if (runner.includes('pg_dump ') || runner.includes('pg_dumpall ')) {
   throw new Error('Production backup runner must route dump execution through the strict Docker helper.');
 }
 
+if (strictDumpHelper.includes(String.raw`\\\"`)) {
+  throw new Error(
+    'Production strict dump helper must not double-escape embedded double quotes inside bash -c scripts.',
+  );
+}
+for (const fragment of [
+  String.raw`sed -E "s/^CREATE ROLE \"($reserved_roles)\"/-- &/"`,
+  String.raw`sed -E "s/^ALTER ROLE \"($reserved_roles)\"/-- &/"`,
+  String.raw`sed -E "s/^-- (.* SET \"($allowed_configs)\" .*)/\\1/"`,
+  String.raw`sed -E "s/GRANT \".*\" TO \"($reserved_roles)\"/-- &/"`,
+  String.raw`sed -E "s/^GRANT (.+) ON (.+) \"($excluded_schemas)\"/-- &/"`,
+  String.raw`sed -E "s/^REVOKE (.+) ON (.+) \"($excluded_schemas)\"/-- &/"`,
+]) {
+  if (!strictDumpHelper.includes(fragment)) {
+    throw new Error(`Production strict dump helper missing shell-safe sed fragment: ${fragment}`);
+  }
+}
+
 const encryptIndex = runner.indexOf('openssl enc -aes-256-cbc -salt -pbkdf2 -iter 200000');
 const plaintextDeleteIndex = runner.indexOf('rm -f "$plaintext_archive"');
 const runnerStepIndex = workflow.indexOf('run: bash scripts/operations/export-production-postgres-backup.sh');
