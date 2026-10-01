@@ -57,12 +57,7 @@ jobs:
 
           git diff --name-only "$BASE_SHA...$HEAD_SHA" > "$RUNNER_TEMP/myeongha-ci-changed-files.txt"
 
-          node scripts/ci/work-track-plan.mjs < "$RUNNER_TEMP/myeongha-ci-changed-files.txt" >> "$GITHUB_OUTPUT"
-
-          node scripts/ci/pr-gate-router.mjs             < "$RUNNER_TEMP/myeongha-ci-changed-files.txt"             > "$RUNNER_TEMP/myeongha-ci-gates.txt"
-          grep '^db=' "$RUNNER_TEMP/myeongha-ci-gates.txt" >> "$GITHUB_OUTPUT"
-
-          node scripts/ci/db-pr-router.mjs             < "$RUNNER_TEMP/myeongha-ci-changed-files.txt"             | tee "$RUNNER_TEMP/myeongha-db-pr-routing.txt"             >> "$GITHUB_OUTPUT"
+          node scripts/ci/verification-plan.mjs < "$RUNNER_TEMP/myeongha-ci-changed-files.txt" >> "$GITHUB_OUTPUT"
 
   foundation:
     name: Work Track · ${{ needs.scope.outputs.track }}
@@ -224,6 +219,12 @@ jobs:
           SCOPE_RESULT: ${{ needs.scope.result }}
           FOUNDATION_RESULT: ${{ needs.foundation.result }}
           DB_RESULT: ${{ needs.db-authority-core.result }}
+          DB_SELECTED: ${{ needs.scope.outputs.db }}
+          DB_SELECTED_0: ${{ contains(fromJSON(needs.scope.outputs.db_suites || '[]'), 'runtime') }}
+          DB_SELECTED_1: ${{ contains(fromJSON(needs.scope.outputs.db_suites || '[]'), 'content') }}
+          DB_SELECTED_2: ${{ contains(fromJSON(needs.scope.outputs.db_suites || '[]'), 'commerce-payment') }}
+          DB_SELECTED_3: ${{ contains(fromJSON(needs.scope.outputs.db_suites || '[]'), 'commerce-entitlement') }}
+          DB_SELECTED_4: ${{ contains(fromJSON(needs.scope.outputs.db_suites || '[]'), 'postgres17') }}
           DB_TRACK_0: ${{ needs.db-runtime.result }}
           DB_TRACK_1: ${{ needs.db-content.result }}
           DB_TRACK_2: ${{ needs.db-commerce-payment.result }}
@@ -234,7 +235,13 @@ jobs:
           set -euo pipefail
           test "$SCOPE_RESULT" = "success"
           test "$FOUNDATION_RESULT" = "success"
-          test "$DB_RESULT" = "success" || test "$DB_RESULT" = "skipped"
-          for result in "$DB_TRACK_0" "$DB_TRACK_1" "$DB_TRACK_2" "$DB_TRACK_3" "$DB_TRACK_4"; do
-            test "$result" = "success" || test "$result" = "skipped"
+          if [[ "$DB_SELECTED" == "true" ]]; then test "$DB_RESULT" = "success"; else test "$DB_RESULT" = "skipped" || test "$DB_RESULT" = "success"; fi
+          selected=("$DB_SELECTED_0" "$DB_SELECTED_1" "$DB_SELECTED_2" "$DB_SELECTED_3" "$DB_SELECTED_4")
+          results=("$DB_TRACK_0" "$DB_TRACK_1" "$DB_TRACK_2" "$DB_TRACK_3" "$DB_TRACK_4")
+          for index in "${!selected[@]}"; do
+            if [[ "${selected[$index]}" == "true" ]]; then
+              test "${results[$index]}" = "success"
+            else
+              test "${results[$index]}" = "success" || test "${results[$index]}" = "skipped"
+            fi
           done

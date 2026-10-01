@@ -35,6 +35,7 @@ const profilePatterns = [
 ];
 
 const knownFullPatterns = [
+  /^scripts\/ci\/(?:verification-plan\.mjs|run-web-pr-checks\.mjs|web-pr-checks\.json)$/u,
   /^apps\/web\/(?:app\.js|api-envelope\.js|styles\.css|index\.html)$/u,
   /^apps\/web\/product-/u,
   /^apps\/web\/auth(?:[-.]|\.html$)/u,
@@ -55,6 +56,7 @@ const knownFullPatterns = [
 ];
 
 const dbPatterns = [
+  /^scripts\/ci\/(?:db-suites\.json|verification-plan\.mjs)$/u,
   /^supabase\/migrations\//u,
   /^test\/db\//u,
   /^test\/account-deletion-worker-runtime-postgres\.e2e\.test\.ts$/u,
@@ -67,6 +69,8 @@ const dbPatterns = [
 ];
 
 const isWebRelevant = (path) =>
+  /^scripts\/ci\/(?:verification-plan\.mjs|run-web-pr-checks\.mjs|web-pr-checks\.json)$/u.test(path)
+  ||
   path.startsWith('apps/web/')
   || /^scripts\/(?:run|verify)-web-/u.test(path)
   || path === 'scripts/build-web-static.mjs'

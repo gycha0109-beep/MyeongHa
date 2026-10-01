@@ -1,0 +1,59 @@
+{
+  "runtime": {
+    "workflow": "db-runtime-authority-suite.yml",
+    "postgres": 15,
+    "cases": [
+      "birth-profile-production-read-authority",
+      "guest-bootstrap-runtime",
+      "records-production-read-authority",
+      "runtime-function-api-role-acl",
+      "self-birth-profile-current"
+    ]
+  },
+  "content": {
+    "workflow": "db-content-reading-suite.yml",
+    "postgres": 15,
+    "cases": [
+      "active-default-content-release",
+      "character-saju-runtime-components",
+      "chat-thread-runtime-binding",
+      "episode-progress-bundle",
+      "outbox-success-completion",
+      "reading-history",
+      "standard-reading-artifact-reread",
+      "official-standard-reading-reader-interpretation"
+    ]
+  },
+  "commerce-payment": {
+    "workflow": "db-commerce-payment-suite.yml",
+    "postgres": 15,
+    "cases": [
+      "commerce-payment-attempt-authority",
+      "commerce-payment-attempt-handoff-context",
+      "commerce-payment-verification-context",
+      "commerce-provider-payment-verification-context",
+      "commerce-verified-payment-evidence-persistence"
+    ]
+  },
+  "commerce-entitlement": {
+    "workflow": "db-commerce-entitlement-suite.yml",
+    "postgres": 15,
+    "cases": [
+      "commerce-entitlement-projection-recompute",
+      "effective-entitlements-v2",
+      "entitlement-lifecycle-history-v1",
+      "entitlement-restore-v1",
+      "purchase-intent-create",
+      "purchase-intent-history-v2"
+    ]
+  },
+  "postgres17": {
+    "workflow": "db-postgres17-authority-suite.yml",
+    "postgres": 17,
+    "cases": [
+      "birth-profile-create-runtime-authority",
+      "content-release-lifecycle",
+      "member-character-thread-open"
+    ]
+  }
+}
