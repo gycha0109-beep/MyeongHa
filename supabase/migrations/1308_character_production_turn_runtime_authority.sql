@@ -32,6 +32,8 @@ END
 $$;
 
 grant usage on schema public to myeongha_character_turn_owner;
+grant select (id, status)
+  on public.subjects to myeongha_character_turn_owner;
 grant execute on function public.current_myeongha_subject_id()
   to myeongha_character_turn_owner;
 grant execute on function public.assert_myeongha_subject_context_v1(uuid)
