@@ -40,14 +40,18 @@ describe('mobile M3-B Saju Preview Reading structure', () => {
   it('pins the public ProductReadingResponse v2 source and never raw-dumps the response', async () => {
     const architecture = await readRepoFile('docs/MOBILE_CLIENT_ARCHITECTURE_V1.md');
     const client = await readRepoFile('packages/api-client/src/saju-preview.ts');
+    const projector = await readRepoFile(
+      'packages/api-client/src/product-reading-display.ts',
+    );
 
     expect(architecture).toContain(
       '19095a89773d517c2b6d69c45544525b9262459a',
     );
-    expect(client).toContain('myeonghwa-product-reading-response-v2');
-    expect(client).toContain("type === 'source_hint'");
-    expect(client).toContain("type === 'fact_table'");
+    expect(projector).toContain('myeonghwa-product-reading-response-v2');
+    expect(projector).toContain("type === 'source_hint'");
+    expect(projector).toContain("type === 'fact_table'");
     expect(client).not.toContain('JSON.stringify(data');
+    expect(projector).not.toContain('JSON.stringify');
   });
 
   it('keeps Home calculation-only and does not auto-run Preview Reading', async () => {

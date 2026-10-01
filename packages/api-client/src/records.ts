@@ -1,4 +1,8 @@
 import {
+  projectProductReadingResponseV2,
+  type ProductReadingDisplayResultV2,
+} from './product-reading-display.js';
+import {
   MyeongHaApiClientErrorV1,
   type MyeongHaApiClientV1,
 } from './http.js';
@@ -65,6 +69,17 @@ export interface MemoryPageV1 {
   readonly pagination: CollectionPaginationV1;
 }
 
+export interface OfficialReadingRecordV1 {
+  readonly readingId: string;
+  readonly readingSessionId: string;
+  readonly sajuDomain: string;
+  readonly readingContractVersion: string;
+  readonly productResponseState: 'delivered' | 'delivered_with_fallback';
+  readonly readerCharacterIds: readonly string[];
+  readonly completedAt: string;
+  readonly display: Extract<ProductReadingDisplayResultV2, { kind: 'delivered' }>;
+}
+
 function malformed(message: string): never {
   throw new MyeongHaApiClientErrorV1(
     'malformed_response',
@@ -80,6 +95,27 @@ function clientInput(message: string): never {
     message,
   );
 }
+
+function detailClientInput(message: string): never {
+  throw new MyeongHaApiClientErrorV1(
+    'malformed_response',
+    'CLIENT_OFFICIAL_READING_ID_INVALID',
+    message,
+  );
+}
+
+const UUID_V1 = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+const SAJU_DOMAINS_V1 = new Set([
+  'general',
+  'family',
+  'relationship',
+  'compatibility',
+  'career',
+  'business',
+  'wealth',
+  'life_stage',
+  'question_specific',
+]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -329,4 +365,101 @@ export async function readMemoryPageV1(
   const pagination = parsePagination(data.pagination);
   requirePageBound(memories.length, pagination);
   return Object.freeze({ memories, pagination });
+}
+
+
+export function parseOfficialReadingIdV1(value: unknown): string {
+  if (typeof value !== 'string' || !UUID_V1.test(value.trim())) {
+    return detailClientInput('Official Reading id must be a canonical UUID.');
+  }
+  return value.trim();
+}
+
+function parseOfficialReadingRecordV1(
+  value: unknown,
+  expectedReadingId: string,
+): OfficialReadingRecordV1 {
+  if (!isRecord(value)) return malformed('Official Reading response is invalid.');
+
+  const readingId = requireString('Official Reading identity', value.readingId);
+  if (readingId !== expectedReadingId || !UUID_V1.test(readingId)) {
+    return malformed('Official Reading identity does not match the request.');
+  }
+
+  const readingSessionId = requireString(
+    'Official Reading Session identity',
+    value.readingSessionId,
+  );
+  if (!UUID_V1.test(readingSessionId)) {
+    return malformed('Official Reading Session identity is invalid.');
+  }
+
+  const sajuDomain = requireString('Official Reading sajuDomain', value.sajuDomain);
+  if (!SAJU_DOMAINS_V1.has(sajuDomain)) {
+    return malformed('Official Reading sajuDomain is invalid.');
+  }
+
+  const readingContractVersion = requireString(
+    'Official Reading contract version',
+    value.readingContractVersion,
+  );
+  const productResponseState = requireString(
+    'Official Reading product response state',
+    value.productResponseState,
+  );
+  if (
+    productResponseState !== 'delivered' &&
+    productResponseState !== 'delivered_with_fallback'
+  ) {
+    return malformed('Official Reading is not archive-openable.');
+  }
+
+  const display = projectProductReadingResponseV2(
+    value.reading,
+    'API_RECORDS_RESPONSE_INVALID',
+  );
+  if (display.kind !== 'delivered') {
+    return malformed('Official Reading snapshot is not delivered.');
+  }
+  if (
+    display.readingId !== readingId ||
+    display.responseVersion !== readingContractVersion ||
+    display.responseState !== productResponseState
+  ) {
+    return malformed('Official Reading snapshot provenance does not match record metadata.');
+  }
+
+  const readerCharacterIds = parseReaderCharacterIds(value.readerCharacterIds);
+  const sortedIds = [...readerCharacterIds].sort((left, right) =>
+    left.localeCompare(right),
+  );
+  if (sortedIds.some((item, index) => item !== readerCharacterIds[index])) {
+    return malformed('Official Reading reader provenance is not deterministic.');
+  }
+
+  return Object.freeze({
+    readingId,
+    readingSessionId,
+    sajuDomain,
+    readingContractVersion,
+    productResponseState,
+    readerCharacterIds,
+    completedAt: requireTimestamp('Official Reading completedAt', value.completedAt),
+    display,
+  });
+}
+
+export async function readOfficialReadingRecordV1(
+  client: MyeongHaApiClientV1,
+  bearer: string,
+  readingIdInput: unknown,
+): Promise<OfficialReadingRecordV1> {
+  const readingId = parseOfficialReadingIdV1(readingIdInput);
+  const search = new URLSearchParams({ readingId });
+  const data = await client.requestData({
+    method: 'GET',
+    path: `/api/readings?${search.toString()}`,
+    bearer,
+  });
+  return parseOfficialReadingRecordV1(data, readingId);
 }

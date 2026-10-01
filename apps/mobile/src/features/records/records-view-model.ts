@@ -48,6 +48,10 @@ export function formatRecordDateV1(value: string): string {
   return match === null ? '—' : `${match[1]}.${match[2]}.${match[3]}`;
 }
 
+export function readingIsArchiveOpenableV1(value: string): boolean {
+  return value === 'delivered' || value === 'delivered_with_fallback';
+}
+
 export function readingStateLabelV1(value: string): string {
   if (value === 'delivered' || value === 'delivered_with_fallback') return '완료';
   if (value === 'clarification_required') return '추가 확인 필요';

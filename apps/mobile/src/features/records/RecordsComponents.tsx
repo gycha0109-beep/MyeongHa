@@ -7,6 +7,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 
 import {
   formatRecordDateV1,
+  readingIsArchiveOpenableV1,
   readingReaderLabelV1,
   readingStateLabelV1,
   readingTitleV1,
@@ -66,9 +67,16 @@ export function LifeFactCard({ item }: { item: LifeRecordFactV1 }) {
   );
 }
 
-export function ReadingHistoryCard({ item }: { item: ReadingHistoryItemV1 }) {
-  return (
-    <View style={styles.card}>
+export function ReadingHistoryCard({
+  item,
+  onOpen,
+}: {
+  item: ReadingHistoryItemV1;
+  onOpen?: () => void;
+}) {
+  const openable = readingIsArchiveOpenableV1(item.productResponseState);
+  const content = (
+    <>
       <View style={styles.cardTop}>
         <Text style={styles.symbol}>命</Text>
         <Text style={styles.date}>{formatRecordDateV1(item.completedAt)}</Text>
@@ -76,8 +84,24 @@ export function ReadingHistoryCard({ item }: { item: ReadingHistoryItemV1 }) {
       <Text style={styles.cardTitle}>{readingTitleV1(item.sajuDomain)}</Text>
       <Text style={styles.cardBody}>{readingReaderLabelV1(item.readerCharacterIds)}</Text>
       <Text style={styles.state}>{readingStateLabelV1(item.productResponseState)}</Text>
+      {openable && onOpen !== undefined ? (
+        <Text style={styles.openHint}>저장된 풀이 다시 읽기 →</Text>
+      ) : null}
       <Text style={styles.caption}>Reading contract · {item.readingContractVersion}</Text>
-    </View>
+    </>
+  );
+
+  if (!openable || onOpen === undefined) {
+    return <View style={styles.card}>{content}</View>;
+  }
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onOpen}
+      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+    >
+      {content}
+    </Pressable>
   );
 }
 
@@ -176,12 +200,14 @@ const styles = StyleSheet.create({
     gap: 7,
   },
   cardMuted: { opacity: 0.7 },
+  cardPressed: { opacity: 0.82 },
   cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   symbol: { color: mobileColors.gold, fontSize: 20, fontWeight: '800' },
   date: { color: mobileColors.muted, fontSize: 12, fontWeight: '600' },
   cardTitle: { color: mobileColors.ink, fontSize: 18, fontWeight: '800' },
   cardBody: { color: mobileColors.muted, fontSize: 14, lineHeight: 20 },
   state: { color: mobileColors.navy, fontSize: 13, fontWeight: '800' },
+  openHint: { color: mobileColors.navy, fontSize: 12, fontWeight: '800' },
   revoked: { color: mobileColors.seal },
   caption: { color: mobileColors.muted, fontSize: 11, lineHeight: 17 },
   empty: {

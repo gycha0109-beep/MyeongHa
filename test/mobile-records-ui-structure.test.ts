@@ -32,3 +32,33 @@ describe('mobile M4-B Records UI structure', () => {
     expect(components).not.toContain('contentJsonb');
   });
 });
+
+
+describe('mobile M4-D Official Reading reread structure', () => {
+  it('opens only archive-openable Reading cards into the dedicated detail route', async () => {
+    const screen = await readRepoFile('apps/mobile/src/app/(tabs)/records/index.tsx');
+    const components = await readRepoFile('apps/mobile/src/features/records/RecordsComponents.tsx');
+    const viewModel = await readRepoFile('apps/mobile/src/features/records/records-view-model.ts');
+
+    expect(screen).toContain('router.push');
+    expect(screen).toContain('/reading/');
+    expect(components).toContain('저장된 풀이 다시 읽기');
+    expect(components).toContain('readingIsArchiveOpenableV1');
+    expect(viewModel).toContain("value === 'delivered'");
+    expect(viewModel).toContain("value === 'delivered_with_fallback'");
+  });
+
+  it('keeps the detail screen behind the Records service and safe display projection', async () => {
+    const detail = await readRepoFile('apps/mobile/src/app/reading/[readingId].tsx');
+    const service = await readRepoFile('apps/mobile/src/features/records/mobile-records-service.ts');
+    const client = await readRepoFile('packages/api-client/src/records.ts');
+
+    expect(detail).toContain('mobileRecordsServiceV1.readOfficialReading');
+    expect(detail).not.toContain('fetch(');
+    expect(detail).not.toContain('SecureStore');
+    expect(detail).not.toContain('JSON.stringify');
+    expect(service).toContain('readOfficialReadingRecordV1');
+    expect(client).toContain('projectProductReadingResponseV2');
+    expect(client).not.toContain('responseHash:');
+  });
+});

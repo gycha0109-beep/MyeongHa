@@ -5,7 +5,7 @@ MyeongHa Mobile is a first-class React Native client of the existing MyeongHa se
 ## Current state
 
 - Track: `applizing`
-- Phase: **M3-B Saju Preview Reading + native enrollment + M11-A4 release hardening**
+- Phase: **M4-D Official Reading reread + M3-B Preview + native enrollment + M11-A4 hardening**
 - Runtime: **Expo SDK 57 / React Native 0.86.x**
 - Navigation: **Expo Router**
 - Secure Guest credential persistence: **Expo SecureStore**
@@ -28,6 +28,7 @@ Mobile now has:
 - single-flight Guest bootstrap and concurrent 401 replacement recovery;
 - current Birth Profile create/read, current-subject Saju calculation rendering, and source-authorized Preview Reading for the exact five approved topics;
 - Records reads for Life Record, Reading History, and Memory with cursor pagination;
+- owner-scoped Official Reading archive reread for completed stored Readings, using the same Product Reading safe display projection as Preview;
 - My projection from current Profile + Birth;
 - Home projection composed from current Profile, Birth, latest Reading History, and calculation-only Saju evidence;
 - known-thread Chat read through `GET /api/chat/:threadId` with forward cursor pagination and redaction-safe rendering;
