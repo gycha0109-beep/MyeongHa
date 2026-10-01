@@ -1,24 +1,7 @@
 name: DB Content Reading Suite
 
 on:
-  pull_request:
-    paths:
-      - 'supabase/migrations/**'
-      - 'test/db/bootstrap_supabase_auth_stub.sql'
-      - 'test/db/run_ci_case.sh'
-      - 'test/db/active_default_content_release_query.sh'
-      - 'test/db/character_saju_runtime_components_query.sh'
-      - 'test/db/chat_thread_runtime_binding_query.sh'
-      - 'test/db/episode_progress_bundle_query.sh'
-      - 'test/db/outbox_success_completion_concurrency.sh'
-      - 'test/db/reading_history_authority_query.sql'
-      - 'test/db/standard_reading_artifact_reread.sql'
-      - 'test/db/standard_reading_artifact_reread.sh'
-      - 'test/db/official_standard_reading_reader_interpretation.sql'
-      - 'test/db/official_standard_reading_reader_interpretation.sh'
-      - 'test/db/catalog_snapshot.sh'
-      - 'test/db/catalog.expected.sha256'
-      - '.github/workflows/db-content-reading-suite.yml'
+  workflow_dispatch:
   push:
     branches:
       - main
