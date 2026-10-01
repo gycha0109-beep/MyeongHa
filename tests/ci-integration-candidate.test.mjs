@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assertPrerequisites, assertStagedPolicy, validateCandidate } from '../scripts/ci/integration-candidate.mjs';
+import { assertSubmissionEvent, assertPrerequisites, assertStagedPolicy, validateCandidate } from '../scripts/ci/integration-candidate.mjs';
 
 const candidate = { pr: '42', head: 'a'.repeat(40), base: 'b'.repeat(40) };
 const current = () => ({
@@ -63,5 +63,24 @@ describe('pinned integration admission and required evidence', () => {
   it('rejects evidence from another app and spoofed same-name commit statuses', () => {
     expect(() => assertPrerequisites([{ context: 'CI Verify', integration_id: 15368 }],
       [check(1, 'CI Verify', 'success', 7)], [{ context: 'CI Verify', state: 'success' }])).toThrow('missing');
+  });
+});
+
+describe('eligible PR submission evidence', () => {
+  const event = () => ({ action: 'labeled', label: { name: 'ci-integration-ready' }, number: 42,
+    pull_request: { head: { sha: candidate.head }, base: { sha: candidate.base } } });
+  it('accepts the dedicated label with the pinned PR event', () => {
+    expect(() => assertSubmissionEvent(event(), candidate)).not.toThrow();
+  });
+  it.each(['synchronize', 'opened', 'unlabeled'])('rejects unrelated action %s', action => {
+    expect(() => assertSubmissionEvent({ ...event(), action }, candidate)).toThrow('dedicated');
+  });
+  it('rejects an unrelated label instead of a skipped required gate', () => {
+    expect(() => assertSubmissionEvent({ ...event(), label: { name: 'ops' } }, candidate)).toThrow('dedicated');
+  });
+  it('does not borrow a different PR or newer head/base', () => {
+    expect(() => assertSubmissionEvent({ ...event(), number: 43 }, candidate)).toThrow('immutable');
+    expect(() => assertSubmissionEvent(event(), { ...candidate, head: 'c'.repeat(40) })).toThrow('immutable');
+    expect(() => assertSubmissionEvent(event(), { ...candidate, base: 'c'.repeat(40) })).toThrow('immutable');
   });
 });

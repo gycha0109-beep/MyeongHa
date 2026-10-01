@@ -17,7 +17,7 @@
   simultaneous-load timing are not yet verified.
 
 
-Status: implementation proposed in this branch; production activation is not complete.
+Status: implementation merged; staged mode remains disabled during PR-event rollout.
 
 Work Track remains attribution. It never selects test coverage. Existing main
 regressions, deployment workflows, required-check names and GitHub token write
@@ -26,7 +26,8 @@ permissions are unchanged.
 ## Execution
 
 `ci-integration.yml` accepts an open, non-draft PR in this repository targeting
-the default branch. Dispatch it on the exact PR head branch. It pins both the
+the default branch. Submit through the local command below. It adds the dedicated
+ci-integration-ready label to trigger pull_request:labeled. It pins both the
 head and current default-branch SHA, checks attribution before allocating the
 full regression, merges that base into the checked-out head in isolated runners,
 runs the existing CI as a reusable workflow, and rechecks head/base before
@@ -43,6 +44,10 @@ The command first requires every existing required check to succeed for the
 exact head, with its configured GitHub App binding. It ignores only the new
 integration check that it is about to request. Draft, fork, missing, queued,
 failed, skipped, cancelled and newer-failed checks are not borrowed as success.
+The PR event validates its immutable number/head/base and rechecks prerequisites
+before full regression and before success. The local operator can remove and
+re-add the label for a new attempt; workflows have no label write permission.
+Unrelated label events fail admission rather than producing a skipped required gate.
 
 The whole integration workflow queues one regression at a time with
 `queue: max` and `cancel-in-progress: false`. Up to 100 pending runs are supported;
@@ -56,12 +61,13 @@ not repeatedly submit the same candidate.
 ## Activation and rollback
 
 The repository variable `CI_STAGED_VERIFICATION` defaults to disabled. Deploy
-and verify the integration workflow before enabling the staged path. New
-workflow_dispatch files must first exist on the default branch, so their live
-dispatch cannot be certified solely by this implementation PR.
+and verify the integration workflow before enabling the staged path.
+workflow_dispatch is retained for diagnostics, but its job checks do not satisfy
+PR rulesets. Required integration evidence must come from the PR label event.
+See [GitHub required-check event restrictions](https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/troubleshooting-required-status-checks#checks-from-some-workflow-jobs-are-not-evaluated).
 
 1. Merge the reviewed workflow implementation and run an integration request.
-2. Confirm its check is associated with the dispatched PR head, not main or
+2. Confirm its eligible PR-event check appears in PR checks and the ruleset, not main or
    another commit; verify successful, intentionally failed, conflicting and
    stale candidates and multiple queued requests in GitHub.
 3. Add `CI Integration Verify` bound to GitHub Actions (App ID 15368) to main's
@@ -72,7 +78,8 @@ dispatch cannot be certified solely by this implementation PR.
    `CI_STAGED_VERIFICATION=true`. The PR workflow rejects this mode unless both
    the integration requirement and strict policy are visible through GitHub.
 5. Before every merge, verify the exact current head/base, all required checks
-   and mergeability. Existing main and deployment verification remain.
+   and mergeability. Require BLOCKED before integration and CLEAN after a successful
+   integration with all other checks current. Existing main and deployment verification remain.
 
 Rollback: disable the variable first to restore full PR regression where
 applicable, verify that restoration, then remove only the added integration
@@ -119,3 +126,14 @@ request path, and one additional required-check contract are introduced here.
 The guarded default retains existing PR regression until activation is verified.
 No extra workflow write permissions, pull_request_target, personal project
 seeding, production deployment change or administrator merge bypass is added.
+
+## PR-event correction (2026-10-01)
+
+Live rollout showed that a successful workflow_dispatch run on the exact PR head
+did not satisfy GitHub required checks. Staged mode and the added required context
+were rolled back in MyeongHa; Saju was not activated. The corrected path uses an
+eligible pull_request label event with the same read-only permissions and queue.
+The label is CI admission metadata, never a Work Track or CI responsibility.
+Reusable candidate workflows always run the full suite even though their caller
+is a PR event. Admission/Git regressions: 24 tests passed per repository.
+Activation remains contingent on the corrected live PR/ruleset test.
