@@ -5,7 +5,7 @@ MyeongHa Mobile is a first-class React Native client of the existing MyeongHa se
 ## Current state
 
 - Track: `applizing`
-- Phase: **native new-member enrollment + M11-A4 release hardening**
+- Phase: **M3-B Saju Preview Reading + native enrollment + M11-A4 release hardening**
 - Runtime: **Expo SDK 57 / React Native 0.86.x**
 - Navigation: **Expo Router**
 - Secure Guest credential persistence: **Expo SecureStore**
@@ -26,7 +26,7 @@ Mobile now has:
 - existing-Member sign-in/sign-out from My, using the server auth proxy and ephemeral password input;
 - native new-account creation with same-subject Guest→Member promotion; verification-required sign-up continues through the existing Web confirmation link, then returns to the app for sign-in + promotion;
 - single-flight Guest bootstrap and concurrent 401 replacement recovery;
-- current Birth Profile create/read and current-subject Saju calculation rendering;
+- current Birth Profile create/read, current-subject Saju calculation rendering, and source-authorized Preview Reading for the exact five approved topics;
 - Records reads for Life Record, Reading History, and Memory with cursor pagination;
 - My projection from current Profile + Birth;
 - Home projection composed from current Profile, Birth, latest Reading History, and calculation-only Saju evidence;
@@ -38,9 +38,9 @@ Mobile now has:
 - CI export smoke for both Android and iOS from the same Expo source, using isolated output directories after release preflight;
 - post-export artifact verification requiring parseable metadata plus non-empty platform-correct Hermes bundles for both targets.
 
-Home does not invent a separate server authority. It does not call unimplemented `/api/home` or `/api/characters`, does not infer a recent Chat thread, does not auto-run Preview Reading, and does not synthesize daily-fortune claims from calculation-only Saju evidence.
+Home does not invent a separate server authority. It does not call unimplemented `/api/home` or `/api/characters`, does not infer a recent Chat thread, does not auto-run Preview Reading, and does not synthesize daily-fortune claims from calculation-only Saju evidence. Preview Reading is user-triggered only from the Saju surface.
 
-Still gated after M11-A4:
+Still gated after M3-B / M11-A4:
 
 - full account management and Guest→existing-Member merge; existing-member merge remains blocked by SRC-24;
 - Chat thread discovery / recent-thread listing;

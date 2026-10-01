@@ -13,6 +13,7 @@ import {
 } from '@/features/saju/SajuCalculationView';
 import { loadMobileCurrentSajuV1, type MobileSajuLoadStateV1 } from '@/features/saju/mobile-saju-loader';
 import { mobileSajuServiceV1 } from '@/features/saju/native-mobile-saju-service';
+import { SajuPreviewReadingView } from '@/features/saju/SajuPreviewReadingView';
 import { createMobileSajuViewModelV1 } from '@/features/saju/saju-view-model';
 import { MobileScreen } from '@/ui/MobileScreen';
 import { mobileColors } from '@/ui/mobile-colors';
@@ -64,7 +65,7 @@ export default function SajuScreen() {
     <MobileScreen
       eyebrow="READING"
       title="사주"
-      description="현재 자기 Birth revision에 결합된 계산 사실을 표시합니다."
+      description="현재 Birth revision의 계산 사실과 서버에서 검증된 사주 프리뷰를 확인합니다."
     >
       <ReadingSubnav />
 
@@ -98,6 +99,7 @@ export default function SajuScreen() {
           <DayMasterCard dayMaster={viewModel.dayMaster} />
           <ElementBalance elementBalance={viewModel.elementBalance} />
           <CalculationCompleteness completeness={viewModel.completeness} />
+          <SajuPreviewReadingView />
         </>
       ) : null}
 
