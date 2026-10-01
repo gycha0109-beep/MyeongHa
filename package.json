@@ -64,7 +64,8 @@
     "verify:password-compromise-guard": "node scripts/verify-password-compromise-guard.mjs",
     "dev:mobile": "npm run start -w @myeongha/mobile",
     "verify:mobile-release-readiness": "node scripts/verify-mobile-release-readiness.mjs",
-    "verify:mobile-release-readiness-contract": "node scripts/verify-mobile-release-readiness.mjs --allow-blocked"
+    "verify:mobile-release-readiness-contract": "node scripts/verify-mobile-release-readiness.mjs --allow-blocked",
+    "verify:mobile-export-artifacts": "node scripts/verify-mobile-export-artifacts.mjs"
   },
   "dependencies": {
     "pg": "8.23.0"

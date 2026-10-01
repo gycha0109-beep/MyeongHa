@@ -1,7 +1,7 @@
 # MyeongHa Mobile Client Architecture v1
 
 > Track: `applizing`  
-> Status: M11-A3 dual-platform export smoke implemented  
+> Status: M11-A4 export artifact verification implemented  
 > Date: 2026-10-01  
 > Server authority: existing MyeongHa API / PostgreSQL  
 > Client principle: Web and Mobile are separate first-class clients of the same server world.
@@ -216,6 +216,7 @@ M10 native store commerce after rail decision             NOT IN LAUNCH RAIL
 M11-A Android/iOS release-readiness preflight             DONE
 M11-A2 Production API origin release guard                DONE
 M11-A3 Android+iOS Expo export smoke                       DONE
+M11-A4 Export artifact structure verification              DONE
 M11-B production app identity + signed store builds       BLOCKED
 ```
 
@@ -421,3 +422,28 @@ M11-A3 invariants:
 - this is an unsigned Expo export smoke, not an Apple/Google signed store build;
 - no bundle identifier, Android package id, signing credential, provisioning profile, keystore, EAS ownership, or store account is invented;
 - a platform export failure blocks the Mobile PR bundle gate.
+
+
+## 18. M11-A4 export artifact verification
+
+M11-A4 verifies the concrete outputs produced by the M11-A3 Expo export smoke.
+
+Expected per-platform shape:
+
+```text
+apps/mobile/.expo/export-ci/<platform>/
+├─ metadata.json
+└─ _expo/static/js/<platform>/entry-*.hbc
+```
+
+The verifier requires:
+
+- a non-empty, parseable JSON object at `metadata.json`;
+- at least one non-empty Hermes `.hbc` bundle under the matching platform path;
+- no Hermes bundle under the opposite platform path inside that platform's export root.
+
+The checks run after both Expo exports and block the Mobile PR bundle gate on malformed,
+missing, empty, or cross-platform-contaminated artifacts.
+
+M11-A4 does not claim signed native binary readiness. APK/AAB/IPA production signing and
+store distribution remain gated by M11-B.
