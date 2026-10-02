@@ -152,7 +152,6 @@ try {
     const keys = auth.PRODUCT_AUTH_STORAGE_V1;
     const oldMember = {
       accessToken: 'old.header.signature',
-      refreshToken: 'old-refresh-token',
       expiresAt: new Date(Date.now() + 30_000).toISOString(),
       tokenType: 'bearer',
       user: { id: '11111111-1111-4111-8111-111111111111', email: 'member@example.com' },
@@ -160,13 +159,11 @@ try {
     const rotatedMember = {
       ...oldMember,
       accessToken: 'rotated.header.signature',
-      refreshToken: 'rotated-refresh-token',
       expiresAt: '2099-01-02T00:00:00.000Z',
     };
     const staleRefreshResult = {
       ...oldMember,
       accessToken: 'stale.header.signature',
-      refreshToken: 'stale-refresh-token',
       expiresAt: '2099-01-03T00:00:00.000Z',
     };
     const seedMember = (session, pendingGuest = null) => {
@@ -258,7 +255,7 @@ try {
 
   assert(result?.member401Code === 'WEB_MY_SESSION_REQUIRED', `Member stale 401 did not reach My session boundary: ${JSON.stringify(result)}`);
   assert(result?.memberAfterStale401?.accessToken === 'rotated.header.signature', `Stale Member 401 deleted rotated credential: ${JSON.stringify(result)}`);
-  assert(result?.memberAfterStale401?.refreshToken === 'rotated-refresh-token', `Stale Member 401 changed rotated refresh token: ${JSON.stringify(result)}`);
+  assert(result?.memberAfterStale401?.refreshToken == null, `Stale Member 401 exposed a refresh credential: ${JSON.stringify(result)}`);
   assert(result?.guest401Code === 'WEB_BIRTH_SESSION_REQUIRED', `Guest stale 401 did not reach Birth session boundary: ${JSON.stringify(result)}`);
   assert(result?.guestAfterStale401 === 'replacement-opaque-guest', `Stale Guest 401 deleted replacement Guest: ${JSON.stringify(result)}`);
   assert(result?.staleRefresh401Code === 'SESSION_EXPIRED', `Stale refresh rejection did not preserve error authority: ${JSON.stringify(result)}`);
