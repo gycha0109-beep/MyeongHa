@@ -124,8 +124,11 @@ export {
 
 
 export {
+  createTargetPersonV1,
   listTargetPersonsV1,
   parseTargetPersonIdV1,
   readTargetPersonV1,
+  type TargetPersonCreateReceiptV1,
+  type TargetPersonCreateRequestV1,
   type TargetPersonV1,
 } from './target-persons.js';
