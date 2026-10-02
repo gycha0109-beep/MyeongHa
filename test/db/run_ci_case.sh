@@ -112,6 +112,10 @@ case "$case_name" in
     bash test/db/episode_progress_bundle_query.sh
     catalog_snapshot
     ;;
+  device-installation-registration-runtime)
+    apply_standard_migrations
+    bash test/db/device_installation_registration_runtime_authority.sh
+    ;;
   guest-bootstrap-runtime)
     apply_standard_migrations
     bash test/db/guest_bootstrap_runtime_authority.sh

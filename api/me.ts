@@ -3,6 +3,7 @@ import { createNodePostgresSubjectPoolV1 } from '../apps/api/src/node-postgres-s
 import { createProductionChatReadRuntimeV1 } from '../apps/api/src/production-chat-read-runtime.js';
 import { createProductionCurrentSubjectProfileRuntimeV1 } from '../apps/api/src/production-current-subject-profile-runtime.js';
 import { createProductionCurrentSubjectSajuPreviewReadingRuntimeV1 } from '../apps/api/src/production-current-subject-saju-preview-reading-runtime.js';
+import { createProductionDeviceInstallationRuntimeV1 } from '../apps/api/src/production-device-installation-runtime.js';
 import { createProductionTargetPersonCreateRuntimeV1 } from '../apps/api/src/production-target-person-create-runtime.js';
 import { createProductionTargetPersonReadRuntimeV1 } from '../apps/api/src/production-target-person-read-runtime.js';
 import {
@@ -19,6 +20,9 @@ const MEMORIES_ROUTE = '/api/memories' as const;
 const CHAT_OPEN_ROUTE = '/api/chat' as const;
 const CHAT_ROUTE_PREFIX = '/api/chat/' as const;
 const TARGET_PERSONS_ROUTE = '/api/target-persons' as const;
+const DEVICE_INSTALLATION_REGISTER_ROUTE = '/api/device-installations/register' as const;
+const DEVICE_INSTALLATION_REVOKE_PREFIX = '/api/device-installations/' as const;
+const DEVICE_INSTALLATION_REVOKE_SUFFIX = '/revoke' as const;
 const TARGET_PERSON_ROUTE_PREFIX = '/api/target-persons/' as const;
 const SAJU_PREVIEW_READING_ROUTE = '/api/me/saju/preview-reading' as const;
 const RECORDS_ROUTE_PARAM = '__myeongha_records_read' as const;
@@ -29,6 +33,8 @@ const VERCEL_DYNAMIC_CHAT_THREAD_PARAM = 'threadId' as const;
 const CHAT_CURSOR_PARAM = 'afterSequenceNo' as const;
 const TARGET_PERSON_READ_PARAM = '__myeongha_target_person_read' as const;
 const TARGET_PERSON_ID_PARAM = '__myeongha_target_person_id' as const;
+const DEVICE_INSTALLATION_ACTION_PARAM = '__myeongha_device_installation_action' as const;
+const DEVICE_INSTALLATION_ID_PARAM = '__myeongha_device_installation_id' as const;
 const SAJU_PREVIEW_READING_PARAM = '__myeongha_saju_preview_reading' as const;
 const VERCEL_DYNAMIC_TARGET_PERSON_PARAM = 'id' as const;
 const VERCEL_SHARE_PARAM = '_vercel_share' as const;
@@ -55,6 +61,9 @@ let targetPersonRuntime:
   | undefined;
 let targetPersonCreateRuntime:
   | ReturnType<typeof createProductionTargetPersonCreateRuntimeV1>
+  | undefined;
+let deviceInstallationRuntime:
+  | ReturnType<typeof createProductionDeviceInstallationRuntimeV1>
   | undefined;
 let sajuPreviewReadingRuntime:
   | ReturnType<typeof createProductionCurrentSubjectSajuPreviewReadingRuntimeV1>
@@ -123,6 +132,14 @@ function getTargetPersonCreateRuntime(): ReturnType<typeof createProductionTarge
   return targetPersonCreateRuntime;
 }
 
+function getDeviceInstallationRuntime(): ReturnType<typeof createProductionDeviceInstallationRuntimeV1> {
+  deviceInstallationRuntime ??= createProductionDeviceInstallationRuntimeV1({
+    env: process.env,
+    pool: getSharedPostgresPool(),
+  });
+  return deviceInstallationRuntime;
+}
+
 function getSajuPreviewReadingRuntime(): ReturnType<typeof createProductionCurrentSubjectSajuPreviewReadingRuntimeV1> {
   sajuPreviewReadingRuntime ??= createProductionCurrentSubjectSajuPreviewReadingRuntimeV1({
     env: process.env,
@@ -153,6 +170,15 @@ type DispatchTarget =
       readonly kind: 'target-person-detail';
       readonly route: string;
       readonly targetPersonId: string;
+    }
+  | {
+      readonly kind: 'device-installation-register';
+      readonly route: typeof DEVICE_INSTALLATION_REGISTER_ROUTE;
+    }
+  | {
+      readonly kind: 'device-installation-revoke';
+      readonly route: string;
+      readonly installationId: string;
     };
 
 type RecordsDispatchValue = 'life-record' | 'readings' | 'memories';
@@ -238,6 +264,8 @@ function resolveDispatchTarget(request: Request): DispatchTarget | null {
     CHAT_CURSOR_PARAM,
     TARGET_PERSON_READ_PARAM,
     TARGET_PERSON_ID_PARAM,
+    DEVICE_INSTALLATION_ACTION_PARAM,
+    DEVICE_INSTALLATION_ID_PARAM,
     SAJU_PREVIEW_READING_PARAM,
     VERCEL_DYNAMIC_TARGET_PERSON_PARAM,
     VERCEL_SHARE_PARAM,
@@ -302,6 +330,24 @@ function resolveDispatchTarget(request: Request): DispatchTarget | null {
     return null;
   }
 
+  const deviceInstallationAction = getSingleNonEmptyParam(
+    url.searchParams,
+    DEVICE_INSTALLATION_ACTION_PARAM,
+  );
+  if (
+    deviceInstallationAction === null ||
+    (deviceInstallationAction !== undefined &&
+      deviceInstallationAction !== 'register' &&
+      deviceInstallationAction !== 'revoke')
+  ) {
+    return null;
+  }
+  const deviceInstallationId = getSingleNonEmptyParam(
+    url.searchParams,
+    DEVICE_INSTALLATION_ID_PARAM,
+  );
+  if (deviceInstallationId === null) return null;
+
   if (chatOpen !== undefined && chatOpen !== '1') return null;
 
   const isSajuPreviewSourcePath = url.pathname === SAJU_PREVIEW_READING_ROUTE;
@@ -316,6 +362,46 @@ function resolveDispatchTarget(request: Request): DispatchTarget | null {
 
   const hasChatOpen = chatOpen === '1';
   const isChatOpenSourcePath = url.pathname === CHAT_OPEN_ROUTE;
+
+  if (deviceInstallationAction !== undefined) {
+    if (
+      url.pathname !== PROFILE_ROUTE ||
+      recordsRoute !== undefined ||
+      hasChatOpen ||
+      chatThreadId !== undefined ||
+      vercelDynamicThreadId !== undefined ||
+      pathThreadId !== undefined ||
+      afterSequenceNo !== undefined ||
+      sajuPreviewReading !== undefined ||
+      targetPersonRead !== undefined ||
+      targetPersonId !== undefined ||
+      vercelDynamicTargetPersonId !== undefined ||
+      targetPersonPathValue !== undefined
+    ) {
+      return null;
+    }
+
+    if (deviceInstallationAction === 'register') {
+      if (deviceInstallationId !== undefined) return null;
+      return {
+        kind: 'device-installation-register',
+        route: DEVICE_INSTALLATION_REGISTER_ROUTE,
+      };
+    }
+
+    if (
+      deviceInstallationId === undefined ||
+      !isUuid(deviceInstallationId)
+    ) {
+      return null;
+    }
+    return {
+      kind: 'device-installation-revoke',
+      route: `${DEVICE_INSTALLATION_REVOKE_PREFIX}${deviceInstallationId}${DEVICE_INSTALLATION_REVOKE_SUFFIX}`,
+      installationId: deviceInstallationId,
+    };
+  }
+  if (deviceInstallationId !== undefined) return null;
   if (isChatOpenSourcePath && !hasChatOpen) return null;
   if (hasChatOpen && recordsRoute !== undefined) return null;
   if (hasChatOpen && chatThreadId !== undefined) return null;
@@ -530,6 +616,9 @@ function runtimeForTarget(target: DispatchTarget) {
       return getTargetPersonRuntime();
     case 'target-person-create':
       return getTargetPersonCreateRuntime();
+    case 'device-installation-register':
+    case 'device-installation-revoke':
+      return getDeviceInstallationRuntime();
   }
 }
 

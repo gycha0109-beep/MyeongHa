@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { MyeongHaApiClientErrorV1 } from '@myeongha/api-client';
 
+import { nativeMobilePushServiceV1 } from '@/core/push/native-mobile-push-service';
 import { nativeMobileRuntimeV1 } from '@/core/runtime/native-mobile-runtime';
 import {
   MobileNewMemberEnrollmentErrorV1,
@@ -85,11 +86,18 @@ export function useMobileMemberAuthV1() {
 
   const signIn = useCallback(async (email: string, password: string) => {
     setState(Object.freeze({ kind: 'submitting', message: null }));
+    let pushPrepared = false;
     try {
+      await nativeMobilePushServiceV1.prepareForSubjectChange();
+      pushPrepared = true;
       await nativeMobileRuntimeV1.memberSession.signIn(email, password);
+      void nativeMobilePushServiceV1.syncEnabledNoPrompt().catch(() => undefined);
       setState(Object.freeze({ kind: 'idle', message: null }));
       return true;
     } catch (error) {
+      if (pushPrepared) {
+        void nativeMobilePushServiceV1.syncEnabledNoPrompt().catch(() => undefined);
+      }
       setState(Object.freeze({ kind: 'error', message: messageFor(error) }));
       return false;
     }
@@ -108,6 +116,7 @@ export function useMobileMemberAuthV1() {
         }));
         return 'verification_required' as const;
       }
+      void nativeMobilePushServiceV1.syncEnabledNoPrompt().catch(() => undefined);
       setState(Object.freeze({ kind: 'idle', message: null }));
       return 'authenticated' as const;
     } catch (error) {
@@ -147,6 +156,7 @@ export function useMobileMemberAuthV1() {
         email,
         password,
       );
+      void nativeMobilePushServiceV1.syncEnabledNoPrompt().catch(() => undefined);
       setState(Object.freeze({ kind: 'idle', message: null }));
       return true;
     } catch (error) {
@@ -182,13 +192,14 @@ export function useMobileMemberAuthV1() {
   const signOut = useCallback(async () => {
     setState(Object.freeze({ kind: 'submitting', message: null }));
     try {
+      await nativeMobilePushServiceV1.disable();
       await nativeMobileRuntimeV1.memberSession.signOut();
       setState(Object.freeze({ kind: 'idle', message: null }));
       return true;
     } catch {
       setState(Object.freeze({
         kind: 'error',
-        message: '이 기기의 로그인 상태를 정리하지 못했습니다.',
+        message: '기존 계정의 알림 연결 또는 로그인 상태를 안전하게 정리하지 못했습니다.',
       }));
       return false;
     }

@@ -7,7 +7,7 @@ const SUITES = Object.freeze(JSON.parse(readFileSync(new URL('./db-suites.json',
 const ALL_SUITES = Object.freeze(Object.keys(SUITES));
 
 const runtimePatterns = [
-  /^test\/db\/(?:birth_profile_read_runtime_authority|guest_bootstrap_runtime_authority|guest_bootstrap_current_query|records_read_runtime_authority|runtime_function_api_role_acl|self_birth_profile_current_query)\.sh$/u,
+  /^test\/db\/(?:birth_profile_read_runtime_authority|device_installation_registration_runtime_authority|guest_bootstrap_runtime_authority|guest_bootstrap_current_query|records_read_runtime_authority|runtime_function_api_role_acl|self_birth_profile_current_query)\.sh$/u,
   /^test\/ops\/supabase-production-migration-repair\.sh$/u,
   /^\.github\/workflows\/(?:supabase-production|db-runtime-authority-suite)\.yml$/u,
 ];

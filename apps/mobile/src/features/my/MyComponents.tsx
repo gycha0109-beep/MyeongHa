@@ -301,7 +301,6 @@ export function MyFlowCards() {
 }
 
 const pendingSettings = Object.freeze([
-  '알림 설정',
   '이용권 · 결제',
   '계정 관리',
   '고객지원',
@@ -323,7 +322,7 @@ export function MyPendingSettings() {
         ))}
       </View>
       <Text style={styles.caption}>
-        연결되지 않은 알림·결제·상세 계정관리·지원 상태는 임의로 표시하지 않습니다.
+        연결되지 않은 결제·상세 계정관리·지원 상태는 임의로 표시하지 않습니다.
       </Text>
     </View>
   );
