@@ -303,4 +303,25 @@ describe('security observability boundary v1', () => {
     expect(events[0]?.eventCode).toBe('UNEXPECTED_EXCEPTION');
     expect(JSON.stringify(events)).not.toContain('birth payload');
   });
+
+
+  it('sanitizes Node fallback write failures after an application exception', async () => {
+    await expect(
+      executeSecurityObservedNodeRequestV1({
+        method: 'POST',
+        routeId: 'api.birth-profiles',
+        requestIdFactory: () => 'node-fallback-write-failure',
+        now: vi.fn()
+          .mockReturnValueOnce(8_000)
+          .mockReturnValueOnce(8_010),
+        eventWriter: () => undefined,
+        execute: async () => {
+          throw new Error('application secret');
+        },
+        writeResponse: async () => {
+          throw new Error('socket secret');
+        },
+      }),
+    ).rejects.toThrow('Security-observed Node fallback response write failed.');
+  });
 });
