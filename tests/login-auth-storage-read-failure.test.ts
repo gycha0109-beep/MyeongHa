@@ -27,7 +27,6 @@ class FaultingStorage {
 const memberAccessToken = 'member.read.token';
 const memberSession = JSON.stringify({
   accessToken: memberAccessToken,
-  refreshToken: 'refresh-read-authority',
   expiresAt: '2099-01-01T00:00:00.000Z',
   tokenType: 'bearer',
   user: { id: 'auth-user-read', email: 'read@example.com' },
