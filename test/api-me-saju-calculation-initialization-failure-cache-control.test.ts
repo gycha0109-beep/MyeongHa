@@ -39,7 +39,12 @@ describe('GET /api/me/saju/calculation production initialization failure cache b
     expect(response.headers.get('cache-control')).toBe('no-store');
     expect(response.headers.get('content-type')).toBe('text/plain; charset=utf-8');
     expect(await response.text()).toBe('Internal Server Error');
-    expect(consoleError).toHaveBeenCalledWith('MyeongHa Saju calculation route failed.');
-    expect(JSON.stringify(consoleError.mock.calls)).not.toContain(SERVICE_BEARER);
+    expect(consoleError).toHaveBeenCalledTimes(1);
+    const securityEventLine = String(consoleError.mock.calls[0]?.[0] ?? '');
+    expect(securityEventLine).toContain('MYEONGHA_SECURITY_EVENT ');
+    expect(securityEventLine).toContain('"eventCode":"SERVER_FAILURE"');
+    expect(securityEventLine).toContain('"routeId":"api.me.saju.calculation"');
+    expect(securityEventLine).not.toContain(SERVICE_BEARER);
+    expect(securityEventLine).not.toContain('MYEONGHA_DATABASE_URL');
   });
 });
