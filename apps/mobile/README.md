@@ -51,7 +51,7 @@ Still gated after M3-B / M11-A4:
 - Target Person post-create metadata edit, deletion, birth correction, and Compatibility execution;
 - production Character catalog/recommendation projection;
 - Face Reading engine intake / analysis upload. M7 does not treat `exif: false` as proof that selected file bytes are metadata-stripped;
-- notification sending/provider routing and autonomous scheduling remain blocked by SRC-31 / SRC-32; M9-A only registers, refreshes, rebinds, and revokes the current device;
+- Mobile iOS/Android transport is selected as Expo Push Notifications, but notification sending, attempt-provider provenance/resolution, retry/failover, and autonomous scheduling remain blocked by SRC-31 / SRC-32; M9-A only registers, refreshes, rebinds, and revokes the current device;
 - Push activation additionally requires a real EAS project UUID exposed as `EXPO_PUBLIC_EAS_PROJECT_ID`; source does not invent this external project identity;
 - native store commerce;
 - signed store distribution still requires external Apple/Google developer-account and signing authority; production app identity is fixed to `com.myeongha.app` on both platforms.

@@ -410,7 +410,7 @@ PATCH  /api/notification-preferences/preview   # SRC-12 BLOCKED
 
 2026-10-02 Product Owner decision으로 Mobile Expo Push registration lifecycle의 `SRC-19`가 해결되었다. 같은 subject + 같은 active installation key는 기존 row를 refresh하고, token rotation은 해당 row의 보호 token material을 교체한다. 같은 subject의 동일 token이 다른 installation key로 이동하면 기존 row를 revoke하고 새 server-generated row를 만든다. revoked row는 부활시키지 않는다. cross-subject active installation/token은 기존 owner revoke 전까지 fail-closed다.
 
-Client는 stable `installationKey`만 제공하며 canonical `subjectId`나 DB `device_installations.id`를 선택하지 않는다. Raw Expo Push token은 authenticated HTTPS request에서만 수신하고 server-side encryption/fingerprint 경계를 거쳐 저장한다. 이 결정은 `SRC-31` provider routing과 `SRC-32` autonomous scheduling/send authority를 열지 않는다.
+Client는 stable `installationKey`만 제공하며 canonical `subjectId`나 DB `device_installations.id`를 선택하지 않는다. Raw Expo Push token은 authenticated HTTPS request에서만 수신하고 server-side encryption/fingerprint 경계를 거쳐 저장한다. 같은 Product Owner decision은 Mobile iOS/Android MVP transport service를 **Expo Push Notifications**로 선택한다. 다만 `SRC-31`의 notification-attempt provider provenance/resolver와 실제 send/retry/failover authority, `SRC-32` autonomous scheduling authority는 열지 않는다.
 
 ### Notification inbox read boundary — `SRC-13`
 
@@ -450,7 +450,7 @@ new category existing-user default
 
 이 HTTP 목록에 autonomous scheduler create endpoint가 없다는 사실은 scheduler authority가 해결됐다는 뜻이 아니다. Candidate → cadence/frequency/eligibility → logical notification materialization은 `SRC-32`가 계속 막는다.
 
-Likewise provider attempt persistence가 존재해도 installation/platform configuration에서 실제 provider를 resolve하는 production routing authority는 `SRC-31`이 계속 막는다. Public notification API가 이 내부 gap을 우회하지 않는다.
+Mobile iOS/Android의 외부 transport service는 Expo Push Notifications로 선택되었다. 그러나 provider attempt persistence가 존재한다는 사실이나 transport 선택만으로 `notification_delivery_attempts.provider`의 canonical provenance/resolver, retry/failover, 실제 send worker authority가 해결되지는 않는다. 그 남은 내부 경계는 `SRC-31`이 계속 막으며 Public notification API가 이를 우회하지 않는다.
 
 ## 16. Commerce
 
