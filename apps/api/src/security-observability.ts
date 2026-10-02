@@ -25,16 +25,30 @@ export interface SecurityEventV1 {
 
 export type SecurityEventWriterV1 = (event: SecurityEventV1) => void;
 
-export interface ExecuteSecurityObservedRequestInputV1 {
-  readonly request: Request;
+export interface SecurityObservedExecutionContextV1 {
+  readonly requestId: string;
+  readonly serverTime: string;
+}
+
+interface SecurityObservedOperationInputV1 {
+  readonly method?: string;
   readonly routeId: string;
-  readonly execute: (context: {
-    readonly requestId: string;
-    readonly serverTime: string;
-  }) => Response | Promise<Response>;
+  readonly execute: (
+    context: SecurityObservedExecutionContextV1,
+  ) => Response | Promise<Response>;
   readonly requestIdFactory?: () => string;
   readonly now?: () => number;
   readonly eventWriter?: SecurityEventWriterV1;
+}
+
+export interface ExecuteSecurityObservedRequestInputV1
+  extends Omit<SecurityObservedOperationInputV1, 'method'> {
+  readonly request: Request;
+}
+
+export interface ExecuteSecurityObservedNodeRequestInputV1
+  extends SecurityObservedOperationInputV1 {
+  readonly writeResponse: (response: Response) => Promise<void>;
 }
 
 const ROUTE_ID_PATTERN = /^[a-z0-9][a-z0-9._:-]{0,127}$/u;
@@ -56,8 +70,8 @@ function requireRequestId(value: string): string {
   return value;
 }
 
-function requireMethod(value: string): string {
-  if (!METHOD_PATTERN.test(value)) return 'UNKNOWN';
+function requireMethod(value: string | undefined): string {
+  if (value === undefined || !METHOD_PATTERN.test(value)) return 'UNKNOWN';
   return value;
 }
 
@@ -66,7 +80,9 @@ function boundedDurationMs(startedAt: number, completedAt: number): number {
   return Math.max(0, Math.min(3_600_000, Math.round(completedAt - startedAt)));
 }
 
-function classifyStatus(status: number): Pick<SecurityEventV1, 'eventCode' | 'severity' | 'owasp'> | null {
+function classifyStatus(
+  status: number,
+): Pick<SecurityEventV1, 'eventCode' | 'severity' | 'owasp'> | null {
   if (status === 401 || status === 403) {
     return {
       eventCode: 'ACCESS_DENIED',
@@ -97,6 +113,41 @@ function defaultEventWriter(event: SecurityEventV1): void {
   else console.warn(line);
 }
 
+function writeEventBestEffort(
+  writer: SecurityEventWriterV1,
+  event: SecurityEventV1,
+): void {
+  try {
+    writer(event);
+  } catch {
+    // Logging availability must never become request authority.
+  }
+}
+
+function securityEvent(input: {
+  readonly classification: Pick<
+    SecurityEventV1,
+    'eventCode' | 'severity' | 'owasp'
+  >;
+  readonly routeId: string;
+  readonly method: string;
+  readonly status: number;
+  readonly requestId: string;
+  readonly occurredAt: string;
+  readonly durationMs: number;
+}): SecurityEventV1 {
+  return Object.freeze({
+    schemaVersion: SECURITY_EVENT_SCHEMA_VERSION_V1,
+    ...input.classification,
+    routeId: input.routeId,
+    method: input.method,
+    status: input.status,
+    requestId: input.requestId,
+    occurredAt: input.occurredAt,
+    durationMs: input.durationMs,
+  });
+}
+
 function emitStatusEvent(input: {
   readonly status: number;
   readonly routeId: string;
@@ -109,16 +160,44 @@ function emitStatusEvent(input: {
   const classification = classifyStatus(input.status);
   if (classification === null) return;
 
-  input.writer(Object.freeze({
-    schemaVersion: SECURITY_EVENT_SCHEMA_VERSION_V1,
-    ...classification,
-    routeId: input.routeId,
-    method: input.method,
-    status: input.status,
-    requestId: input.requestId,
-    occurredAt: input.occurredAt,
-    durationMs: input.durationMs,
-  }));
+  writeEventBestEffort(
+    input.writer,
+    securityEvent({
+      classification,
+      routeId: input.routeId,
+      method: input.method,
+      status: input.status,
+      requestId: input.requestId,
+      occurredAt: input.occurredAt,
+      durationMs: input.durationMs,
+    }),
+  );
+}
+
+function emitUnexpectedException(input: {
+  readonly routeId: string;
+  readonly method: string;
+  readonly requestId: string;
+  readonly occurredAt: string;
+  readonly durationMs: number;
+  readonly writer: SecurityEventWriterV1;
+}): void {
+  writeEventBestEffort(
+    input.writer,
+    securityEvent({
+      classification: {
+        eventCode: 'UNEXPECTED_EXCEPTION',
+        severity: 'error',
+        owasp: ['A09:2025', 'A10:2025'],
+      },
+      routeId: input.routeId,
+      method: input.method,
+      status: 500,
+      requestId: input.requestId,
+      occurredAt: input.occurredAt,
+      durationMs: input.durationMs,
+    }),
+  );
 }
 
 function genericInternalServerError(): Response {
@@ -130,44 +209,118 @@ function genericInternalServerError(): Response {
   });
 }
 
-export async function executeSecurityObservedRequestV1(
-  input: ExecuteSecurityObservedRequestInputV1,
-): Promise<Response> {
+function createExecutionState(input: SecurityObservedOperationInputV1) {
   const routeId = requireRouteId(input.routeId);
-  const method = requireMethod(input.request.method);
+  const method = requireMethod(input.method);
   const requestId = requireRequestId((input.requestIdFactory ?? randomUUID)());
   const now = input.now ?? Date.now;
   const writer = input.eventWriter ?? defaultEventWriter;
   const startedAt = now();
-  const serverTime = new Date(startedAt).toISOString();
+
+  return Object.freeze({
+    routeId,
+    method,
+    requestId,
+    now,
+    writer,
+    startedAt,
+    context: Object.freeze({
+      requestId,
+      serverTime: new Date(startedAt).toISOString(),
+    }),
+  });
+}
+
+async function executeObservedOperationV1(
+  input: SecurityObservedOperationInputV1,
+): Promise<Response> {
+  const state = createExecutionState(input);
 
   try {
-    const response = await input.execute({ requestId, serverTime });
-    const completedAt = now();
+    const response = await input.execute(state.context);
+    const completedAt = state.now();
     emitStatusEvent({
       status: response.status,
-      routeId,
-      method,
-      requestId,
+      routeId: state.routeId,
+      method: state.method,
+      requestId: state.requestId,
       occurredAt: new Date(completedAt).toISOString(),
-      durationMs: boundedDurationMs(startedAt, completedAt),
-      writer,
+      durationMs: boundedDurationMs(state.startedAt, completedAt),
+      writer: state.writer,
     });
     return response;
   } catch {
-    const completedAt = now();
-    writer(Object.freeze({
-      schemaVersion: SECURITY_EVENT_SCHEMA_VERSION_V1,
-      owasp: ['A09:2025', 'A10:2025'],
-      eventCode: 'UNEXPECTED_EXCEPTION',
-      severity: 'error',
-      routeId,
-      method,
-      status: 500,
-      requestId,
+    const completedAt = state.now();
+    emitUnexpectedException({
+      routeId: state.routeId,
+      method: state.method,
+      requestId: state.requestId,
       occurredAt: new Date(completedAt).toISOString(),
-      durationMs: boundedDurationMs(startedAt, completedAt),
-    }));
+      durationMs: boundedDurationMs(state.startedAt, completedAt),
+      writer: state.writer,
+    });
     return genericInternalServerError();
+  }
+}
+
+export async function executeSecurityObservedRequestV1(
+  input: ExecuteSecurityObservedRequestInputV1,
+): Promise<Response> {
+  return executeObservedOperationV1({
+    method: input.request.method,
+    routeId: input.routeId,
+    execute: input.execute,
+    requestIdFactory: input.requestIdFactory,
+    now: input.now,
+    eventWriter: input.eventWriter,
+  });
+}
+
+export async function executeSecurityObservedNodeRequestV1(
+  input: ExecuteSecurityObservedNodeRequestInputV1,
+): Promise<void> {
+  const state = createExecutionState(input);
+  let response: Response;
+
+  try {
+    response = await input.execute(state.context);
+  } catch {
+    const completedAt = state.now();
+    emitUnexpectedException({
+      routeId: state.routeId,
+      method: state.method,
+      requestId: state.requestId,
+      occurredAt: new Date(completedAt).toISOString(),
+      durationMs: boundedDurationMs(state.startedAt, completedAt),
+      writer: state.writer,
+    });
+    await input.writeResponse(genericInternalServerError());
+    return;
+  }
+
+  const completedAt = state.now();
+  emitStatusEvent({
+    status: response.status,
+    routeId: state.routeId,
+    method: state.method,
+    requestId: state.requestId,
+    occurredAt: new Date(completedAt).toISOString(),
+    durationMs: boundedDurationMs(state.startedAt, completedAt),
+    writer: state.writer,
+  });
+
+  try {
+    await input.writeResponse(response);
+  } catch {
+    const failedAt = state.now();
+    emitUnexpectedException({
+      routeId: state.routeId,
+      method: state.method,
+      requestId: state.requestId,
+      occurredAt: new Date(failedAt).toISOString(),
+      durationMs: boundedDurationMs(state.startedAt, failedAt),
+      writer: state.writer,
+    });
+    throw new Error('Security-observed Node response write failed.');
   }
 }
