@@ -1,3 +1,4 @@
+import { executeSecurityObservedRequestV1 } from '../../../apps/api/src/security-observability.js';
 import { randomUUID } from 'node:crypto';
 import { CURRENT_SUBJECT_SAJU_CALCULATION_HTTP_BINDINGS_V1 } from '../../../apps/api/src/current-subject-saju-calculation-http.js';
 import { IngressRequestBodyCompletionDeadlineExceededV1 } from '../../../apps/api/src/ingress-request-body-deadline.js';
@@ -57,7 +58,6 @@ function internalServerErrorNoStore(): Response {
 }
 
 function reportRouteFailure(): Response {
-  console.error('MyeongHa Saju calculation route failed.');
   return internalServerErrorNoStore();
 }
 
@@ -108,11 +108,11 @@ export function createCurrentSubjectSajuCalculationRouteV1(
 }
 
 export default {
-  async fetch(request: Request): Promise<Response> {
-    try {
-      return await createCurrentSubjectSajuCalculationRouteV1(getRuntime()).fetch(request);
-    } catch {
-      return reportRouteFailure();
-    }
+  fetch(request: Request): Promise<Response> {
+    return executeSecurityObservedRequestV1({
+      request,
+      routeId: 'api.me.saju.calculation',
+      execute: () => createCurrentSubjectSajuCalculationRouteV1(getRuntime()).fetch(request),
+    });
   },
 };

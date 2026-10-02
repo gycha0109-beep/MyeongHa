@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { executeSecurityObservedRequestV1 } from '../../apps/api/src/security-observability.js';
 import { createProductionGuestPromotionRuntimeV1 } from '../../apps/api/src/production-guest-promotion-runtime.js';
 
 let runtime: ReturnType<typeof createProductionGuestPromotionRuntimeV1> | undefined;
@@ -12,10 +12,15 @@ export const maxDuration = 10;
 
 export default {
   fetch(request: Request): Promise<Response> {
-    return getRuntime().handleRequest({
+    return executeSecurityObservedRequestV1({
       request,
-      requestId: randomUUID(),
-      serverTime: new Date().toISOString(),
+      routeId: 'api.auth.promote-guest',
+      execute: ({ requestId, serverTime }) =>
+        getRuntime().handleRequest({
+          request,
+          requestId,
+          serverTime,
+        }),
     });
   },
 };

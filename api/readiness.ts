@@ -1,3 +1,4 @@
+import { executeSecurityObservedRequestV1 } from '../apps/api/src/security-observability.js';
 import { timingSafeEqual } from 'node:crypto';
 import { Client, type ClientConfig } from 'pg';
 
@@ -121,19 +122,25 @@ export function createProductionReadinessResponseV1(
 }
 
 export default {
-  fetch(request: Request): Response | Promise<Response> {
-    if (
-      request.method === POST_METHOD &&
-      isProductionPostgresTlsCanaryRuntimeV1(process.env)
-    ) {
-      return createTlsCanaryResponse(request);
-    }
+  fetch(request: Request): Promise<Response> {
+    return executeSecurityObservedRequestV1({
+      request,
+      routeId: 'api.readiness',
+      execute: () => {
+        if (
+          request.method === POST_METHOD &&
+          isProductionPostgresTlsCanaryRuntimeV1(process.env)
+        ) {
+          return createTlsCanaryResponse(request);
+        }
 
-    if (request.method !== GET_METHOD) {
-      cancelUnusedRequestBodyBestEffort(request);
-      return methodNotAllowed();
-    }
+        if (request.method !== GET_METHOD) {
+          cancelUnusedRequestBodyBestEffort(request);
+          return methodNotAllowed();
+        }
 
-    return createProductionReadinessResponseV1(process.env);
+        return createProductionReadinessResponseV1(process.env);
+      },
+    });
   },
 };

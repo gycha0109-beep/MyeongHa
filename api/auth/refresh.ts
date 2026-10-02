@@ -1,3 +1,4 @@
+import { executeSecurityObservedRequestV1 } from '../../apps/api/src/security-observability.js';
 import { createProductionMemberAuthHttpRuntimeV1 } from '../../apps/api/src/production-member-auth-http-runtime.js';
 
 export const maxDuration = 10;
@@ -13,9 +14,14 @@ function getRuntime(): ReturnType<typeof createProductionMemberAuthHttpRuntimeV1
 
 export default {
   fetch(request: Request): Promise<Response> {
-    return getRuntime().handleRequest({
+    return executeSecurityObservedRequestV1({
       request,
-      action: 'refresh',
+      routeId: 'api.auth.refresh',
+      execute: () =>
+        getRuntime().handleRequest({
+          request,
+          action: 'refresh',
+        }),
     });
   },
 };

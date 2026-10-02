@@ -63,6 +63,7 @@ jobs:
       - name: Verify governance contracts
         run: |
           node scripts/verify-github-actions-trust-boundary.mjs
+          node scripts/verify-security-observability-governance.mjs
           node scripts/verify-ci-responsibility-map.mjs
           node scripts/verify-dependency-supply-chain-governance.mjs
           node scripts/verify-production-environment-governance.mjs
