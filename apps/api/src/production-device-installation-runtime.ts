@@ -26,8 +26,6 @@ export function createProductionDeviceInstallationRuntimeV1(input: {
   readonly memberFetchImpl?: SupabaseMemberVerifierFetchV1;
 }): ProductionDeviceInstallationRuntimeV1 {
   const userDataConfig = parseProductionUserDataRuntimeConfigV1(input.env);
-  const deviceConfig =
-    parseProductionDeviceInstallationRuntimeConfigV1(input.env);
   const poolLease = createProductionPostgresSubjectPoolLeaseV1({
     config: userDataConfig,
     ...(input.pool === undefined ? {} : { pool: input.pool }),
@@ -38,11 +36,23 @@ export function createProductionDeviceInstallationRuntimeV1(input: {
       ? {}
       : { memberFetchImpl: input.memberFetchImpl }),
   });
-  const tokenProtectionPort =
-    createProductionDeviceInstallationTokenProtectionPortV1({
-      encryptionSecret: deviceConfig.pushTokenEncryptionK1Secret,
-      fingerprintSecret: deviceConfig.pushTokenFingerprintK1Secret,
-    });
+  let concreteTokenProtectionPort:
+    | ReturnType<typeof createProductionDeviceInstallationTokenProtectionPortV1>
+    | undefined;
+  const tokenProtectionPort = Object.freeze({
+    protectExpoPushToken(rawToken: string) {
+      if (concreteTokenProtectionPort === undefined) {
+        const deviceConfig =
+          parseProductionDeviceInstallationRuntimeConfigV1(input.env);
+        concreteTokenProtectionPort =
+          createProductionDeviceInstallationTokenProtectionPortV1({
+            encryptionSecret: deviceConfig.pushTokenEncryptionK1Secret,
+            fingerprintSecret: deviceConfig.pushTokenFingerprintK1Secret,
+          });
+      }
+      return concreteTokenProtectionPort.protectExpoPushToken(rawToken);
+    },
+  });
 
   return Object.freeze({
     handleRequest(requestInput: {

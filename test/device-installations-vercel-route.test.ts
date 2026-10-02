@@ -36,6 +36,18 @@ describe('Device Installation Vercel dispatch', () => {
     expect(await canonical.json()).not.toHaveProperty('subjectId');
   });
 
+  it('accepts the Vercel-preserved public register path', () => {
+    const request = new Request(
+      'https://myeongha.example/api/device-installations/register?__myeongha_device_installation_action=register',
+      { method: 'POST' },
+    );
+
+    expect(resolveMeDispatchTargetForTestV1(request)).toEqual({
+      kind: 'device-installation-register',
+      route: '/api/device-installations/register',
+    });
+  });
+
   it('canonicalizes only a valid revoke installation id', () => {
     const request = new Request(
       `https://myeongha.example/api/me?__myeongha_device_installation_action=revoke&__myeongha_device_installation_id=${INSTALLATION_ID}`,
@@ -49,7 +61,20 @@ describe('Device Installation Vercel dispatch', () => {
     });
   });
 
-  it('fails closed on orphan ids and mixed dispatch metadata', () => {
+  it('accepts a Vercel-preserved revoke path only when every id agrees', () => {
+    const request = new Request(
+      `https://myeongha.example/api/device-installations/${INSTALLATION_ID}/revoke?__myeongha_device_installation_action=revoke&__myeongha_device_installation_id=${INSTALLATION_ID}&id=${INSTALLATION_ID}`,
+      { method: 'POST' },
+    );
+
+    expect(resolveMeDispatchTargetForTestV1(request)).toEqual({
+      kind: 'device-installation-revoke',
+      route: `/api/device-installations/${INSTALLATION_ID}/revoke`,
+      installationId: INSTALLATION_ID,
+    });
+  });
+
+  it('fails closed on orphan ids, conflicting source paths, and mixed dispatch metadata', () => {
     expect(resolveMeDispatchTargetForTestV1(new Request(
       `https://myeongha.example/api/me?__myeongha_device_installation_id=${INSTALLATION_ID}`,
       { method: 'POST' },
@@ -57,6 +82,11 @@ describe('Device Installation Vercel dispatch', () => {
 
     expect(resolveMeDispatchTargetForTestV1(new Request(
       'https://myeongha.example/api/me?__myeongha_device_installation_action=register&__myeongha_records_read=readings',
+      { method: 'POST' },
+    ))).toBeNull();
+
+    expect(resolveMeDispatchTargetForTestV1(new Request(
+      `https://myeongha.example/api/device-installations/${INSTALLATION_ID}/revoke?__myeongha_device_installation_action=revoke&__myeongha_device_installation_id=d2000000-0000-4000-8000-00000000b002&id=${INSTALLATION_ID}`,
       { method: 'POST' },
     ))).toBeNull();
   });
