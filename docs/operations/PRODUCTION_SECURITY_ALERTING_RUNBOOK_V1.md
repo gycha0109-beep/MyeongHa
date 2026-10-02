@@ -21,6 +21,8 @@ Vercel's native error anomaly compares current 5xx behavior with its own baselin
 
 The following signals are observable but remain baseline-gated:
 
+Authority state: `BASELINE_REQUIRED`.
+
 - 401 / 403 → `ACCESS_DENIED`
 - 429 → `RATE_LIMITED`
 
