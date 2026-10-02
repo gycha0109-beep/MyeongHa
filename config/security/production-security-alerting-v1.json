@@ -17,7 +17,7 @@
   "detection": {
     "serverFailures": {
       "providerRuleType": "error_anomaly",
-      "filter": "statusGroup eq '5xx'",
+      "filter": "statusGroup:5xx",
       "numericThresholdOwnedBy": "vercel-native-anomaly-model",
       "repositoryNumericThreshold": null
     },
@@ -44,7 +44,10 @@
     "credentialSecret": "VERCEL_SECURITY_ALERTS_TOKEN",
     "ruleConfig": "config/security/vercel-production-5xx-error-anomaly-rule-v1.json",
     "providerRuleId": null,
-    "state": "PENDING_ACTIVATION"
+    "state": "PENDING_ACTIVATION",
+    "providerApi": "/alerts/v3/alert-rules",
+    "providerTransport": "direct-bearer-api",
+    "teamScopedCredentialRequired": true
   },
   "privacy": {
     "permittedIncidentDimensions": [
