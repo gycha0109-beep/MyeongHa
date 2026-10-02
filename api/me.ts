@@ -3,6 +3,7 @@ import { createNodePostgresSubjectPoolV1 } from '../apps/api/src/node-postgres-s
 import { createProductionChatReadRuntimeV1 } from '../apps/api/src/production-chat-read-runtime.js';
 import { createProductionCurrentSubjectProfileRuntimeV1 } from '../apps/api/src/production-current-subject-profile-runtime.js';
 import { createProductionCurrentSubjectSajuPreviewReadingRuntimeV1 } from '../apps/api/src/production-current-subject-saju-preview-reading-runtime.js';
+import { createProductionTargetPersonCreateRuntimeV1 } from '../apps/api/src/production-target-person-create-runtime.js';
 import { createProductionTargetPersonReadRuntimeV1 } from '../apps/api/src/production-target-person-read-runtime.js';
 import {
   createProductionLifeRecordReadRuntimeV1,
@@ -51,6 +52,9 @@ let chatRuntime:
   | undefined;
 let targetPersonRuntime:
   | ReturnType<typeof createProductionTargetPersonReadRuntimeV1>
+  | undefined;
+let targetPersonCreateRuntime:
+  | ReturnType<typeof createProductionTargetPersonCreateRuntimeV1>
   | undefined;
 let sajuPreviewReadingRuntime:
   | ReturnType<typeof createProductionCurrentSubjectSajuPreviewReadingRuntimeV1>
@@ -111,6 +115,14 @@ function getTargetPersonRuntime(): ReturnType<typeof createProductionTargetPerso
   return targetPersonRuntime;
 }
 
+function getTargetPersonCreateRuntime(): ReturnType<typeof createProductionTargetPersonCreateRuntimeV1> {
+  targetPersonCreateRuntime ??= createProductionTargetPersonCreateRuntimeV1({
+    env: process.env,
+    pool: getSharedPostgresPool(),
+  });
+  return targetPersonCreateRuntime;
+}
+
 function getSajuPreviewReadingRuntime(): ReturnType<typeof createProductionCurrentSubjectSajuPreviewReadingRuntimeV1> {
   sajuPreviewReadingRuntime ??= createProductionCurrentSubjectSajuPreviewReadingRuntimeV1({
     env: process.env,
@@ -131,6 +143,10 @@ type DispatchTarget =
   | { readonly kind: 'chat-read'; readonly route: string; readonly afterSequenceNo?: string }
   | {
       readonly kind: 'target-person-list';
+      readonly route: typeof TARGET_PERSONS_ROUTE;
+    }
+  | {
+      readonly kind: 'target-person-create';
       readonly route: typeof TARGET_PERSONS_ROUTE;
     }
   | {
@@ -352,7 +368,12 @@ function resolveDispatchTarget(request: Request): DispatchTarget | null {
       ) {
         return null;
       }
-      return { kind: 'target-person-list', route: TARGET_PERSONS_ROUTE };
+      return {
+        kind: request.method === 'POST'
+          ? 'target-person-create'
+          : 'target-person-list',
+        route: TARGET_PERSONS_ROUTE,
+      };
     }
 
     if (targetPersonId === undefined || !isUuid(targetPersonId)) return null;
@@ -507,6 +528,8 @@ function runtimeForTarget(target: DispatchTarget) {
     case 'target-person-list':
     case 'target-person-detail':
       return getTargetPersonRuntime();
+    case 'target-person-create':
+      return getTargetPersonCreateRuntime();
   }
 }
 

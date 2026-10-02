@@ -11,6 +11,7 @@ import {
   MySectionError,
 } from '@/features/my/MyComponents';
 import {
+  MyTargetPersonCreateCard,
   MyTargetPersonsEmpty,
   MyTargetPersonsSection,
 } from '@/features/my/MyTargetPersons';
@@ -29,6 +30,8 @@ export default function MyScreen() {
     retryProfile,
     retryBirth,
     retryTargetPersons,
+    targetPersonCreate,
+    createTargetPerson,
   } = useMobileMyV1();
   const memberAuth = useMobileMemberAuthV1();
   const [email, setEmail] = useState('');
@@ -161,6 +164,14 @@ export default function MyScreen() {
       ) : (
         <MyTargetPersonsSection items={state.targetPersons.items} />
       )}
+
+      <MyTargetPersonCreateCard
+        submitting={targetPersonCreate.kind === 'submitting'}
+        errorMessage={
+          targetPersonCreate.kind === 'error' ? targetPersonCreate.message : null
+        }
+        onCreate={createTargetPerson}
+      />
 
       <MyFlowCards />
       <MyPendingSettings />

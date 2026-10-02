@@ -8,11 +8,13 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": false,
-      "buildNumber": "1"
+      "buildNumber": "1",
+      "bundleIdentifier": "com.myeongha.app"
     },
     "android": {
       "predictiveBackGestureEnabled": false,
-      "versionCode": 1
+      "versionCode": 1,
+      "package": "com.myeongha.app"
     },
     "plugins": [
       "expo-router",

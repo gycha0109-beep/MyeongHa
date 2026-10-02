@@ -11,7 +11,7 @@ function success(data: unknown): Response {
 }
 
 describe('mobile My service', () => {
-  it('routes Profile, Birth, and Target Person reads through the subject session boundary', async () => {
+  it('routes Profile, Birth, Target Person reads, and create through the subject session boundary', async () => {
     const paths: string[] = [];
     const client = new MyeongHaApiClientV1({
       origin: 'https://myeongha.test',
@@ -31,6 +31,14 @@ describe('mobile My service', () => {
           return success({ birthProfile: null });
         }
         if (path === '/api/target-persons') {
+          if (init?.method === 'POST') {
+            return success({
+              targetPersonId: 'b6300000-0000-4000-8000-000000000001',
+              birthProfileId: 'b6400000-0000-4000-8000-000000000001',
+              revisionId: 'b6500000-0000-4000-8000-000000000001',
+              revisionNo: 1,
+            });
+          }
           return success([]);
         }
         throw new Error(`unexpected path ${path}`);
@@ -50,11 +58,24 @@ describe('mobile My service', () => {
     await service.readProfile();
     await service.readBirth();
     await service.readTargetPersons();
+    await service.createTargetPerson({
+      displayLabel: '상대 A',
+      relationshipLabel: 'friend',
+      input: {
+        calendarType: 'solar',
+        birthDate: '1991-02-03',
+        birthTime: null,
+        timeKnown: false,
+        isLeapMonth: false,
+        sex: 'female',
+      },
+    });
 
-    expect(sessionCalls).toBe(3);
+    expect(sessionCalls).toBe(4);
     expect(paths).toEqual([
       '/api/me',
       '/api/me/birth-profile',
+      '/api/target-persons',
       '/api/target-persons',
     ]);
   });

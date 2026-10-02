@@ -41,7 +41,7 @@ describe('mobile M4-C My structure', () => {
     expect(service).not.toContain('merge-guest');
   });
 
-  it('keeps Target Persons read-only until mutation authority is available', async () => {
+  it('opens Target Person create only while keeping later mutations closed', async () => {
     const screen = await readRepoFile('apps/mobile/src/app/(tabs)/my/index.tsx');
     const component = await readRepoFile(
       'apps/mobile/src/features/my/MyTargetPersons.tsx',
@@ -51,9 +51,13 @@ describe('mobile M4-C My structure', () => {
     );
 
     expect(service).toContain('listTargetPersonsV1');
+    expect(service).toContain('createTargetPersonV1');
     expect(component).toContain('등록된 대상');
-    expect(component).toContain('대상 추가·수정은 아직 모바일에서 지원하지 않습니다');
-    expect(component).not.toContain('<Pressable');
+    expect(component).toContain('새 대상 추가');
+    expect(component).toContain('수정·삭제·궁합 실행은 아직 지원하지 않습니다');
+    expect(component).not.toContain('수정하기');
+    expect(component).not.toContain('삭제하기');
+    expect(component).not.toContain('궁합 보기');
     expect(screen).not.toContain('/api/target-persons');
     expect(screen).not.toContain('fetch(');
   });

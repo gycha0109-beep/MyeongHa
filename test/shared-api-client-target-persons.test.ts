@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   MyeongHaApiClientV1,
+  createTargetPersonV1,
   listTargetPersonsV1,
   readTargetPersonV1,
 } from '../packages/api-client/src/index.js';
@@ -33,7 +34,59 @@ function success(data: unknown): Response {
   return Response.json({ ok: true, data }, { status: 200 });
 }
 
-describe('shared Target Person read client', () => {
+describe('shared Target Person client', () => {
+  it('creates one Target Person through the owner bearer without client-owned ids', async () => {
+    let authorization: string | null = null;
+    let method = '';
+    let body: unknown;
+    const client = new MyeongHaApiClientV1({
+      origin: 'https://myeongha.test',
+      fetchImpl: async (_input, init) => {
+        authorization = new Headers(init?.headers).get('Authorization');
+        method = init?.method ?? '';
+        body = JSON.parse(String(init?.body));
+        return success({
+          targetPersonId: TARGET_ID,
+          birthProfileId: BIRTH_ID,
+          revisionId: REVISION_ID,
+          revisionNo: 1,
+        });
+      },
+    });
+
+    await expect(createTargetPersonV1(client, 'member-token', {
+      displayLabel: '상대 A',
+      relationshipLabel: 'partner',
+      input: {
+        calendarType: 'solar',
+        birthDate: '1991-02-03',
+        birthTime: null,
+        timeKnown: false,
+        isLeapMonth: false,
+        sex: 'female',
+      },
+    })).resolves.toEqual({
+      targetPersonId: TARGET_ID,
+      birthProfileId: BIRTH_ID,
+      revisionId: REVISION_ID,
+      revisionNo: 1,
+    });
+    expect(method).toBe('POST');
+    expect(authorization).toBe('Bearer member-token');
+    expect(body).toEqual({
+      displayLabel: '상대 A',
+      relationshipLabel: 'partner',
+      input: {
+        calendarType: 'solar',
+        birthDate: '1991-02-03',
+        birthTime: null,
+        timeKnown: false,
+        isLeapMonth: false,
+        sex: 'female',
+      },
+    });
+  });
+
   it('lists owner-scoped Target Persons with the active bearer', async () => {
     let authorization: string | null = null;
     let path = '';
