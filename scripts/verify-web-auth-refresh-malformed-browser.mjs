@@ -15,6 +15,7 @@ const member = Object.freeze({
 });
 const stagedGuest = 'malformed-refresh-staged-guest';
 const rotatedToken = 'healthy.rotated.signature';
+const refreshCookieName = 'myeongha_member_refresh_v1';
 const mime = new Map([
   ['.html', 'text/html; charset=utf-8'],
   ['.css', 'text/css; charset=utf-8'],
@@ -71,10 +72,31 @@ async function readJsonBody(req) {
   return raw ? JSON.parse(raw) : {};
 }
 
+function readRefreshCookie(req) {
+  const raw = req.headers.cookie ?? '';
+  for (const segment of raw.split(';')) {
+    const trimmed = segment.trim();
+    const separator = trimmed.indexOf('=');
+    if (separator <= 0 || trimmed.slice(0, separator) !== refreshCookieName) continue;
+    try {
+      return decodeURIComponent(trimmed.slice(separator + 1));
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+function setRefreshCookie(res, token) {
+  res.setHeader(
+    'Set-Cookie',
+    refreshCookieName + '=' + encodeURIComponent(token) + '; Path=/api/auth; HttpOnly; SameSite=Strict',
+  );
+}
+
 function healthySession() {
   return {
     accessToken: rotatedToken,
-    refreshToken: 'healthy-rotated-refresh-token',
     expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
     tokenType: 'bearer',
     user: { id: member.id, email: member.email },
@@ -90,8 +112,18 @@ async function serve() {
 
       if (pathname === '/api/auth/refresh' && req.method === 'POST') {
         const body = await readJsonBody(req);
+        const cookieRefreshToken = readRefreshCookie(req);
+        const authTransport = req.headers['x-myeongha-auth-transport'] ?? null;
         refreshRequests += 1;
-        requests.push({ path: pathname, method: req.method, authorization, refreshToken: body.refreshToken ?? null, mode });
+        requests.push({
+          path: pathname,
+          method: req.method,
+          authorization,
+          cookieRefreshToken,
+          bodyRefreshToken: body.refreshToken ?? null,
+          authTransport,
+          mode,
+        });
 
         if (mode === 'malformed-json') {
           res.statusCode = 200;
@@ -105,7 +137,6 @@ async function serve() {
             status: 'authenticated',
             session: {
               accessToken: '',
-              refreshToken: 'invalid-refresh-token',
               expiresAt: 'not-a-date',
               tokenType: 'bearer',
               user: { id: member.id, email: member.email },
@@ -114,6 +145,7 @@ async function serve() {
           return;
         }
         if (mode === 'success') {
+          setRefreshCookie(res, 'healthy-rotated-refresh-token');
           sendJson(res, 200, successEnvelope({ status: 'authenticated', session: healthySession() }));
           return;
         }
@@ -259,11 +291,18 @@ async function navigate(client, origin, pathname, selector, timeout = 10_000) {
   throw new Error(`Timed out waiting for ${cleanPath} ${selector}`);
 }
 
-async function seedMember(client, { token, refreshToken, expiresAt }) {
+async function seedMember(client, origin, { token, refreshToken, expiresAt }) {
+  const seeded = await client.send('Network.setCookie', {
+    name: refreshCookieName,
+    value: refreshToken,
+    url: `${origin}/api/auth/refresh`,
+    httpOnly: true,
+    sameSite: 'Strict',
+  });
+  assert(seeded?.success !== false, 'Failed to seed malformed-refresh HttpOnly cookie');
   await client.evaluate(`(() => {
     const session = {
       accessToken: ${JSON.stringify(token)},
-      refreshToken: ${JSON.stringify(refreshToken)},
       expiresAt: ${JSON.stringify(expiresAt)},
       tokenType: 'bearer',
       user: { id: ${JSON.stringify(member.id)}, email: ${JSON.stringify(member.email)} },
@@ -326,7 +365,7 @@ async function resolveBearer(client, fn) {
 
 async function assertMalformedScenario(client, origin, { scenarioMode, token, refreshToken, expiresAt, expectedCode, stillValid }) {
   mode = scenarioMode;
-  await seedMember(client, { token, refreshToken, expiresAt });
+  await seedMember(client, origin, { token, refreshToken, expiresAt });
   const refreshBefore = refreshRequests;
   await navigate(client, origin, '/hall.html', '.product-profile');
 
@@ -344,7 +383,7 @@ async function assertMalformedScenario(client, origin, { scenarioMode, token, re
 
   assert(state.authState === 'member' && state.authLabel === '마이 페이지', `${scenarioMode} refresh rendered Guest UI`);
   assert(state.userId === member.id && state.email === member.email, `${scenarioMode} refresh changed Member identity metadata`);
-  assert(state.accessToken === token && state.refreshToken === refreshToken, `${scenarioMode} refresh changed recoverable Member credentials`);
+  assert(state.accessToken === token && state.refreshToken === null, `${scenarioMode} refresh changed recoverable Member credentials or exposed a refresh token`);
   assert(state.activeBearer === token, `${scenarioMode} refresh substituted active Member bearer`);
   assert(state.pendingGuest === stagedGuest, `${scenarioMode} refresh consumed staged Guest authority`);
   assert(refreshRequests > refreshBefore, `${scenarioMode} scenario did not attempt refresh`);
@@ -393,6 +432,16 @@ try {
   const recoveredBearer = await resolveBearer(client, 'getActiveBearer');
   assert(refreshRequests > recoveryRefreshBefore, 'Healthy recovery did not attempt refresh after malformed failures');
   assert(recovered.accessToken === rotatedToken && recovered.activeBearer === rotatedToken, 'Healthy refresh did not rotate Member credentials after malformed failures');
+  assert(recovered.refreshToken === null, 'Healthy refresh recovery exposed a refresh credential');
+  assert(
+    requests.filter((request) => request.path === '/api/auth/refresh').every(
+      (request) =>
+        request.cookieRefreshToken !== null &&
+        request.bodyRefreshToken === null &&
+        request.authTransport === 'web-cookie-v1',
+    ),
+    'Malformed refresh scenarios escaped the governed Web cookie transport',
+  );
   assert(recovered.userId === member.id && recovered.email === member.email, 'Healthy refresh changed Member identity after malformed failures');
   assert(recovered.pendingGuest === stagedGuest, 'Healthy refresh consumed staged Guest after malformed failures');
   assert(recoveredBearer.ok && recoveredBearer.value?.kind === 'member' && recoveredBearer.value?.token === rotatedToken, 'Healthy refresh did not restore active Member authority');
