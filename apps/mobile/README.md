@@ -30,6 +30,7 @@ Mobile now has:
 - Records reads for Life Record, Reading History, and Memory with cursor pagination;
 - owner-scoped Official Reading archive reread for completed stored Readings, using the same Product Reading safe display projection as Preview;
 - My projection from current Profile + Birth;
+- owner-scoped read-only Target Persons list in My, showing only existing server records and current Birth revision data;
 - Home projection composed from current Profile, Birth, latest Reading History, and calculation-only Saju evidence;
 - known-thread Chat read through `GET /api/chat/:threadId` with forward cursor pagination and redaction-safe rendering;
 - Member-only Chat open/reuse through `POST /api/chat` for the exact approved Launch 9 roster, with server-authoritative publication/availability and thread convergence;
@@ -46,6 +47,7 @@ Still gated after M3-B / M11-A4:
 - full account management and Guest→existing-Member merge; existing-member merge remains blocked by SRC-24;
 - Chat thread discovery / recent-thread listing;
 - Chat send;
+- Target Person create/edit and birth-correction mutations;
 - production Character catalog/recommendation projection;
 - Face Reading engine intake / analysis upload. M7 does not treat `exif: false` as proof that selected file bytes are metadata-stripped;
 - Push;

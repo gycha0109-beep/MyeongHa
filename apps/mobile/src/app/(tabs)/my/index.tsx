@@ -10,6 +10,10 @@ import {
   MyProfileCard,
   MySectionError,
 } from '@/features/my/MyComponents';
+import {
+  MyTargetPersonsEmpty,
+  MyTargetPersonsSection,
+} from '@/features/my/MyTargetPersons';
 import { useMobileMemberAuthV1 } from '@/features/my/use-mobile-member-auth';
 import { useMobileMyV1 } from '@/features/my/use-mobile-my';
 import {
@@ -20,13 +24,22 @@ import { MobileScreen } from '@/ui/MobileScreen';
 import { mobileColors } from '@/ui/mobile-colors';
 
 export default function MyScreen() {
-  const { state, retryProfile, retryBirth } = useMobileMyV1();
+  const {
+    state,
+    retryProfile,
+    retryBirth,
+    retryTargetPersons,
+  } = useMobileMyV1();
   const memberAuth = useMobileMemberAuthV1();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
   async function reloadOwnerProjection() {
-    await Promise.all([retryProfile(), retryBirth()]);
+    await Promise.all([
+      retryProfile(),
+      retryBirth(),
+      retryTargetPersons(),
+    ]);
   }
 
   async function handleSignIn() {
@@ -131,6 +144,22 @@ export default function MyScreen() {
         <MyBirthEmptyCard />
       ) : (
         <MyBirthCard birth={createMobileMyBirthViewV1(state.birth.birth)} />
+      )}
+
+      {state.targetPersons.kind === 'loading' ? (
+        <View style={styles.loadingCard}>
+          <ActivityIndicator color={mobileColors.navy} />
+          <Text style={styles.loadingText}>등록된 대상을 확인하는 중입니다…</Text>
+        </View>
+      ) : state.targetPersons.kind === 'error' ? (
+        <MySectionError
+          message="현재 등록된 대상을 불러올 수 없습니다."
+          onRetry={() => void retryTargetPersons()}
+        />
+      ) : state.targetPersons.kind === 'empty' ? (
+        <MyTargetPersonsEmpty />
+      ) : (
+        <MyTargetPersonsSection items={state.targetPersons.items} />
       )}
 
       <MyFlowCards />

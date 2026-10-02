@@ -13,6 +13,7 @@ describe('mobile M4-C My structure', () => {
     expect(screen).not.toContain('Authorization');
     expect(screen).toContain('useMobileMyV1');
     expect(screen).toContain('useMobileMemberAuthV1');
+    expect(screen).toContain('MyTargetPersonsSection');
   });
 
   it('exposes Member login without moving credentials into the screen layer', async () => {
@@ -38,6 +39,23 @@ describe('mobile M4-C My structure', () => {
     expect(components).toContain('기존 회원 계정과의 게스트 기록 병합은 아직 지원하지 않습니다');
     expect(service).toContain('promoteGuestToNewMemberV1');
     expect(service).not.toContain('merge-guest');
+  });
+
+  it('keeps Target Persons read-only until mutation authority is available', async () => {
+    const screen = await readRepoFile('apps/mobile/src/app/(tabs)/my/index.tsx');
+    const component = await readRepoFile(
+      'apps/mobile/src/features/my/MyTargetPersons.tsx',
+    );
+    const service = await readRepoFile(
+      'apps/mobile/src/features/my/mobile-my-service.ts',
+    );
+
+    expect(service).toContain('listTargetPersonsV1');
+    expect(component).toContain('등록된 대상');
+    expect(component).toContain('대상 추가·수정은 아직 모바일에서 지원하지 않습니다');
+    expect(component).not.toContain('<Pressable');
+    expect(screen).not.toContain('/api/target-persons');
+    expect(screen).not.toContain('fetch(');
   });
 
   it('keeps unavailable settings as non-Pressable information rows', async () => {
