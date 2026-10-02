@@ -40,7 +40,6 @@ const stagedGuest = 'guest-before-malformed-member';
 const staleMemberJwt = 'stale.member.signature';
 const replacementSession = {
   accessToken: 'fresh.member.signature',
-  refreshToken: 'fresh-refresh-token',
   expiresAt: '2099-01-01T00:00:00.000Z',
   tokenType: 'bearer',
   user: { id: '22222222-2222-4222-8222-222222222222', email: 'fresh@example.com' },
@@ -86,7 +85,6 @@ describe('Malformed persisted Member reconciliation', () => {
   it('rejects a persisted Member session whose access token cannot satisfy the Member JWT classification invariant', () => {
     seedBrowserAuthority(JSON.stringify({
       accessToken: 'opaque-member-token',
-      refreshToken: 'refresh-token',
       expiresAt: '2099-01-01T00:00:00.000Z',
       tokenType: 'bearer',
       user: { id: '11111111-1111-4111-8111-111111111111', email: 'member@example.com' },
@@ -106,6 +104,7 @@ describe('Malformed persisted Member reconciliation', () => {
     const resolved = readMemberSession();
 
     expect(resolved).toMatchObject(replacementSession);
+    expect(resolved).not.toHaveProperty('refreshToken');
     expect(localStorage.getItem(PRODUCT_AUTH_STORAGE_V1.memberSession)).toBe(replacementRaw);
     expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.guestBearer)).toBe(staleMemberJwt);
     expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.pendingGuestBearer)).toBe(stagedGuest);
@@ -115,7 +114,6 @@ describe('Malformed persisted Member reconciliation', () => {
   it('preserves a newer valid Member that replaces invalid-classification JSON after the stale read', () => {
     const invalidRaw = JSON.stringify({
       accessToken: 'opaque-member-token',
-      refreshToken: 'refresh-token',
       expiresAt: '2099-01-01T00:00:00.000Z',
       tokenType: 'bearer',
       user: { id: '11111111-1111-4111-8111-111111111111', email: 'member@example.com' },
@@ -135,7 +133,6 @@ describe('Malformed persisted Member reconciliation', () => {
   it('propagates a malformed Member cleanup rollback failure without running a second discard', () => {
     seedBrowserAuthority(JSON.stringify({
       accessToken: 'opaque-member-token',
-      refreshToken: 'refresh-token',
       expiresAt: '2099-01-01T00:00:00.000Z',
       tokenType: 'bearer',
       user: { id: '11111111-1111-4111-8111-111111111111', email: 'member@example.com' },
@@ -169,7 +166,6 @@ describe('Malformed persisted Member reconciliation', () => {
         status: 'authenticated',
         session: {
           accessToken: 'opaque-member-token',
-          refreshToken: 'refresh-token',
           expiresAt: '2099-01-01T00:00:00.000Z',
           tokenType: 'bearer',
           user: { id: '11111111-1111-4111-8111-111111111111', email: 'member@example.com' },
