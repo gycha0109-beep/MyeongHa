@@ -5,6 +5,7 @@ const root = process.cwd();
 const rulePath = 'config/security/vercel-production-5xx-error-anomaly-rule-v1.json';
 const authorityPath = 'config/security/production-security-alerting-v1.json';
 const workflowPath = '.github/workflows/production-security-alerting-activate.yml';
+const operationPath = 'scripts/operations/ensure-vercel-security-alert-rule.mjs';
 const runbookPath = 'docs/operations/PRODUCTION_SECURITY_ALERTING_RUNBOOK_V1.md';
 const responsibilityPath = 'docs/ci/workflow-responsibility-map.json';
 const governancePath = '.github/workflows/governance.yml';
@@ -12,6 +13,7 @@ const governancePath = '.github/workflows/governance.yml';
 const rule = JSON.parse(readFileSync(resolve(root, rulePath), 'utf8'));
 const authority = JSON.parse(readFileSync(resolve(root, authorityPath), 'utf8'));
 const workflow = readFileSync(resolve(root, workflowPath), 'utf8');
+const operation = readFileSync(resolve(root, operationPath), 'utf8');
 const runbook = readFileSync(resolve(root, runbookPath), 'utf8');
 const responsibility = JSON.parse(
   readFileSync(resolve(root, responsibilityPath), 'utf8'),
@@ -40,27 +42,42 @@ function forbidFragment(value, fragment, label) {
   }
 }
 
+expectEqual('rule.type', rule.type, 'built-in');
 expectEqual('rule.name', rule.name, 'MyeongHa Production 5xx Error Anomalies');
-expectEqual('rule.alertTypes', rule.alertTypes, [
-  {
-    type: 'error_anomaly',
-    filter: "statusGroup eq '5xx'",
-  },
-]);
 expectEqual(
-  'rule.projectId',
-  rule.projectId,
-  "projectId in ('prj_nXF0b5uv27Lyucz2SEBxzdCRXVsP')",
+  'rule.ruleScope',
+  rule.ruleScope,
+  {
+    type: 'include',
+    projectIds: ['prj_nXF0b5uv27Lyucz2SEBxzdCRXVsP'],
+  },
 );
-expectEqual('rule.autosubscribeOwnersInKnock', rule.autosubscribeOwnersInKnock, true);
+expectEqual(
+  'rule.triggers',
+  rule.triggers,
+  {
+    mode: 'selected',
+    items: [
+      {
+        type: 'error_anomaly',
+        filter: 'statusGroup:5xx',
+      },
+    ],
+  },
+);
+expectEqual('rule.matchMinimumSeverityLevel', rule.matchMinimumSeverityLevel, 'high');
+
 for (const forbiddenKey of [
+  'alertTypes',
+  'projectId',
+  'autosubscribeOwnersInKnock',
   'customAlert',
   'triggerThreshold',
   'minThreshold',
   'triggerOperator',
 ]) {
   if (Object.hasOwn(rule, forbiddenKey)) {
-    failures.push(`rule: forbidden application-owned threshold field ${forbiddenKey}`);
+    failures.push(`rule: forbidden legacy/application-owned field ${forbiddenKey}`);
   }
 }
 
@@ -89,19 +106,29 @@ expectEqual(
   },
 );
 expectEqual(
-  'authority.runtimeSecurityEventSchema',
-  authority.runtimeSecurityEventSchema,
-  'myeongha-security-event-v1',
-);
-expectEqual(
   'authority.serverFailures',
   authority.detection?.serverFailures,
   {
     providerRuleType: 'error_anomaly',
-    filter: "statusGroup eq '5xx'",
+    filter: 'statusGroup:5xx',
     numericThresholdOwnedBy: 'vercel-native-anomaly-model',
     repositoryNumericThreshold: null,
   },
+);
+expectEqual(
+  'authority.activation.providerApi',
+  authority.activation?.providerApi,
+  '/alerts/v3/alert-rules',
+);
+expectEqual(
+  'authority.activation.providerTransport',
+  authority.activation?.providerTransport,
+  'direct-bearer-api',
+);
+expectEqual(
+  'authority.activation.teamScopedCredentialRequired',
+  authority.activation?.teamScopedCredentialRequired,
+  true,
 );
 expectEqual(
   'authority.accessDenied.alertingState',
@@ -142,27 +169,55 @@ for (const fragment of [
   'default: security',
   'environment: production',
   'VERCEL_SECURITY_ALERTS_TOKEN',
-  '--project prj_nXF0b5uv27Lyucz2SEBxzdCRXVsP',
-  'vercel@59.19.1',
-  '--ignore-scripts',
-  'alerts rules ls',
-  'alerts rules add',
+  'Activate and verify governed Vercel v3 alert rule',
   'ensure-vercel-security-alert-rule.mjs',
-  'vercel-production-5xx-error-anomaly-rule-v1.json',
+  'config/security/vercel-production-5xx-error-anomaly-rule-v1.json',
+  'config/security/production-security-alerting-v1.json',
+  'provider_api=/alerts/v3/alert-rules',
+  'provider_transport=direct-bearer-api',
   'credential_material_emitted=false',
   'user_payload_emitted=false',
 ]) {
   requireFragment(workflow, fragment, workflowPath);
 }
+
 for (const fragment of [
   '\npush:',
   '\npull_request:',
   '\nschedule:',
   'echo "$VERCEL_TOKEN"',
   'set -x',
-  '--scope johnny-self',
+  'vercel alerts',
+  'vercel@',
+  '--scope',
 ]) {
   forbidFragment(workflow, fragment, workflowPath);
+}
+
+for (const fragment of [
+  "const API_ORIGIN = 'https://api.vercel.com'",
+  '/alerts/v3/alert-rules?',
+  'Authorization:',
+  'Bearer',
+  'teamId',
+  'projectId',
+  'limit: \'100\'',
+  "method: 'POST'",
+  'rule.notificationSettings?.enableTeamOwnerNotifications !== true',
+  'Vercel Alert API failed:',
+  'provider_api=v3',
+]) {
+  requireFragment(operation, fragment, operationPath);
+}
+
+for (const fragment of [
+  'console.log(token)',
+  'console.error(token)',
+  'JSON.stringify(process.env)',
+  '/v2/user',
+  'vercel alerts',
+]) {
+  forbidFragment(operation, fragment, operationPath);
 }
 
 const workflowResponsibility =
@@ -181,9 +236,11 @@ expectEqual(
 for (const fragment of [
   'A09:2025',
   'error_anomaly',
-  "statusGroup eq '5xx'",
+  'statusGroup:5xx',
   'BASELINE_REQUIRED',
   'VERCEL_SECURITY_ALERTS_TOKEN',
+  '/alerts/v3/alert-rules',
+  'direct bearer API',
   'Do not create numeric alert thresholds',
   'MYEONGHA_SECURITY_EVENT',
 ]) {
@@ -203,5 +260,5 @@ if (failures.length > 0) {
 }
 
 console.log(
-  'Production security alerting governance passed: provider=vercel project=myeongha alert=5xx-error-anomaly numeric-threshold=provider-owned access-denied=baseline-required rate-limit=baseline-required activation=manual-fail-closed.',
+  'Production security alerting governance passed: provider=vercel api=v3 transport=direct-bearer-api project=myeongha alert=5xx-error-anomaly numeric-threshold=provider-owned access-denied=baseline-required rate-limit=baseline-required activation=manual-fail-closed.',
 );
