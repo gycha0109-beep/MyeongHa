@@ -9,6 +9,8 @@ This runbook governs OWASP A09:2025 Production alerting for MyeongHa.
 - Provider: Vercel
 - Provider interface: official Vercel CLI `vercel alerts rules`
 - Provider CLI package: `vercel@59.19.1`
+- Activation state: `ACTIVE`
+- Provider rule ID: `ar_01a0fb72-ee7b-723e-943c-7fd428917c2e`
 - Project: `myeongha`
 - Project ID: `prj_nXF0b5uv27Lyucz2SEBxzdCRXVsP`
 - Team: `johnny-self`
@@ -76,6 +78,21 @@ The workflow:
 
 A same-name rule with different project scope, trigger/filter, type, or severity is drift and must fail instead of being overwritten.
 
+## Activation evidence
+
+Production activation completed successfully on 2026-10-02 in GitHub Actions run `36977096311`.
+
+Verified provider evidence:
+
+- Stable rule ID: `ar_01a0fb72-ee7b-723e-943c-7fd428917c2e`
+- Provider interface: `alerts-rules-cli`
+- Transport: `official-vercel-cli`
+- CLI: `vercel@59.19.1`
+- Exact governed project scope: `myeongha` / `prj_nXF0b5uv27Lyucz2SEBxzdCRXVsP`
+- Trigger/filter: native `error_anomaly` / `statusGroup:5xx`
+- Team-owner notifications: verified enabled by the activation operation
+- Credential material and user payload: not emitted
+
 ## Incident triage
 
 When a 5xx anomaly alert fires:
@@ -115,4 +132,4 @@ Repository governance is implemented by:
 
 `scripts/verify-production-security-alerting-governance.mjs`
 
-Provider activation evidence is not complete until the provider rule has a stable `ar_...` rule ID, team-owner notifications are enabled, and the rule is independently inspected after creation or discovery.
+Provider activation evidence is complete for the governed 5xx anomaly rule recorded above. Any future rule replacement must again produce a stable `ar_...` rule ID, verify team-owner notifications, and independently inspect the provider rule after creation or discovery.
