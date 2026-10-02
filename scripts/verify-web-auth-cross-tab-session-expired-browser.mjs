@@ -16,6 +16,7 @@ const testIdentity = Object.freeze({
 });
 const memberAccessToken = 'sessionexpired.header.signature';
 const memberRefreshToken = 'sessionexpired-refresh-token';
+const refreshCookieName = 'myeongha_member_refresh_v1';
 const tabAGuestBearer = 'cross-tab-session-expired-guest-a';
 const tabBGuestBearer = 'cross-tab-session-expired-guest-b';
 const mime = new Map([
@@ -63,11 +64,39 @@ function errorEnvelope(code, messageKey, retryable = false) {
 function memberSession() {
   return {
     accessToken: memberAccessToken,
-    refreshToken: memberRefreshToken,
     expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
     tokenType: 'bearer',
     user: { id: testIdentity.id, email: testIdentity.email },
   };
+}
+
+function readRefreshCookie(req) {
+  const raw = req.headers.cookie ?? '';
+  for (const segment of raw.split(';')) {
+    const trimmed = segment.trim();
+    const separator = trimmed.indexOf('=');
+    if (separator <= 0 || trimmed.slice(0, separator) !== refreshCookieName) continue;
+    try {
+      return decodeURIComponent(trimmed.slice(separator + 1));
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+function setRefreshCookie(res, token) {
+  res.setHeader(
+    'Set-Cookie',
+    refreshCookieName + '=' + encodeURIComponent(token) + '; Path=/api/auth; HttpOnly; SameSite=Strict',
+  );
+}
+
+function clearRefreshCookie(res) {
+  res.setHeader(
+    'Set-Cookie',
+    refreshCookieName + '=; Path=/api/auth; HttpOnly; SameSite=Strict; Max-Age=0',
+  );
 }
 
 function sendJson(res, status, payload) {
@@ -88,27 +117,37 @@ async function serve() {
       const url = new URL(req.url ?? '/', 'http://127.0.0.1');
       const pathname = decodeURIComponent(url.pathname);
       const authorization = req.headers.authorization ?? null;
+      const authTransport = req.headers['x-myeongha-auth-transport'] ?? null;
 
       if (pathname === '/api/auth/sign-in' && req.method === 'POST') {
         const body = await readJsonBody(req);
-        requests.push({ path: pathname, method: req.method, authorization });
-        if (body.email !== testIdentity.email || body.password !== testIdentity.password) {
+        requests.push({ path: pathname, method: req.method, authorization, authTransport });
+        if (
+          authTransport !== 'web-cookie-v1' ||
+          body.email !== testIdentity.email ||
+          body.password !== testIdentity.password
+        ) {
           sendJson(res, 401, errorEnvelope('INVALID_CREDENTIALS', 'auth.invalid_credentials'));
           return;
         }
+        setRefreshCookie(res, memberRefreshToken);
         sendJson(res, 200, successEnvelope({ status: 'authenticated', session: memberSession() }));
         return;
       }
 
       if (pathname === '/api/auth/refresh' && req.method === 'POST') {
         const body = await readJsonBody(req);
+        const cookieRefreshToken = readRefreshCookie(req);
         refreshRequests += 1;
         requests.push({
           path: pathname,
           method: req.method,
           authorization,
-          refreshToken: body.refreshToken ?? null,
+          authTransport,
+          cookieRefreshToken,
+          bodyRefreshToken: body.refreshToken ?? null,
         });
+        clearRefreshCookie(res);
         sendJson(res, 401, errorEnvelope('SESSION_EXPIRED', 'auth.session_expired', false));
         return;
       }
@@ -406,7 +445,9 @@ try {
   const bootstraps = requests.filter((request) => request.path === '/api/session/bootstrap');
   assert(signIns.length === 1, `Expected one sign-in request, received ${signIns.length}`);
   assert(refreshes.length === 1, `Expected one authoritative refresh rejection, received ${refreshes.length}`);
-  assert(refreshes[0].refreshToken === memberRefreshToken, 'Authoritative refresh expiry did not reject the intended Member refresh credential');
+  assert(refreshes[0].cookieRefreshToken === memberRefreshToken, 'Authoritative refresh expiry did not reject the intended HttpOnly Member refresh credential');
+  assert(refreshes[0].bodyRefreshToken === null, 'Authoritative refresh expiry request leaked the Member refresh credential into JSON');
+  assert(refreshes[0].authTransport === 'web-cookie-v1', 'Authoritative refresh expiry did not use the Web cookie transport');
   assert(guestBootstrapRequests === 0 && bootstraps.length === 0, `Cross-tab SESSION_EXPIRED unexpectedly bootstrapped ${guestBootstrapRequests} Guest session(s)`);
 
   await mkdir(artifactDir, { recursive: true });
