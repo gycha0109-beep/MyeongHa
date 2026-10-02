@@ -1,0 +1,69 @@
+{
+  "schemaVersion": "myeongha-production-security-alerting-v1",
+  "owasp": [
+    "A09:2025"
+  ],
+  "provider": "vercel",
+  "team": {
+    "id": "team_xuYA9OhCWlJETaYFOmeVodgS",
+    "slug": "johnny-self"
+  },
+  "project": {
+    "id": "prj_nXF0b5uv27Lyucz2SEBxzdCRXVsP",
+    "slug": "myeongha",
+    "productionDomain": "myeongha.vercel.app"
+  },
+  "runtimeSecurityEventSchema": "myeongha-security-event-v1",
+  "detection": {
+    "serverFailures": {
+      "providerRuleType": "error_anomaly",
+      "filter": "statusGroup eq '5xx'",
+      "numericThresholdOwnedBy": "vercel-native-anomaly-model",
+      "repositoryNumericThreshold": null
+    },
+    "accessDenied": {
+      "statuses": [
+        401,
+        403
+      ],
+      "eventCode": "ACCESS_DENIED",
+      "alertingState": "BASELINE_REQUIRED"
+    },
+    "rateLimited": {
+      "statuses": [
+        429
+      ],
+      "eventCode": "RATE_LIMITED",
+      "alertingState": "BASELINE_REQUIRED"
+    }
+  },
+  "activation": {
+    "workflow": "production-security-alerting-activate.yml",
+    "requiredConfirmation": "ACTIVATE_PRODUCTION_SECURITY_ALERTING_A09",
+    "requiredTrack": "security",
+    "credentialSecret": "VERCEL_SECURITY_ALERTS_TOKEN",
+    "ruleConfig": "config/security/vercel-production-5xx-error-anomaly-rule-v1.json",
+    "providerRuleId": null,
+    "state": "PENDING_ACTIVATION"
+  },
+  "privacy": {
+    "permittedIncidentDimensions": [
+      "route",
+      "statusGroup",
+      "deployment",
+      "timeWindow",
+      "requestId"
+    ],
+    "forbiddenPayloadClasses": [
+      "authorization",
+      "cookie",
+      "token",
+      "email",
+      "birth-data",
+      "request-body",
+      "database-url",
+      "credential",
+      "raw-error-stack"
+    ]
+  }
+}

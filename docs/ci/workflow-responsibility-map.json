@@ -86,6 +86,12 @@
       "mainMode": "manual",
       "workTrackAttribution": "dispatch-input"
     },
+    "production-security-alerting-activate.yml": {
+      "responsibility": "production-security-alerting",
+      "prMode": "none",
+      "mainMode": "manual",
+      "workTrackAttribution": "dispatch-input"
+    },
     "production-authenticated-json-resource-evidence.yml": {
       "responsibility": "production-security-evidence",
       "prMode": "none",

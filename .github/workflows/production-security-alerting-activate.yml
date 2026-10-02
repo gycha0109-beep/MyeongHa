@@ -1,0 +1,107 @@
+name: Production Security Alerting Activation
+
+run-name: "[WT:security] Production Security Alerting Activation"
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type ACTIVATE_PRODUCTION_SECURITY_ALERTING_A09
+        required: true
+        type: string
+      watchtower_track:
+        description: Watchtower work track attribution
+        required: true
+        default: security
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  activate:
+    name: activate-production-security-alerting
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: production
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_SECURITY_ALERTS_TOKEN }}
+      NO_COLOR: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: "24"
+
+      - name: Fail closed unless explicit security activation is authorized
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+          WATCHTOWER_TRACK: ${{ inputs.watchtower_track }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_EVENT_NAME" = "workflow_dispatch"
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$CONFIRMATION" = "ACTIVATE_PRODUCTION_SECURITY_ALERTING_A09"
+          test "$WATCHTOWER_TRACK" = "security"
+          test -n "${VERCEL_TOKEN:-}"
+
+      - name: Install pinned Vercel CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --global vercel@59.19.1 --ignore-scripts --no-audit --no-fund
+          vercel --version | grep -F "59.19.1"
+
+      - name: Inspect current Vercel alert rules
+        shell: bash
+        run: |
+          set -euo pipefail
+          vercel alerts rules ls             --project myeongha             --scope johnny-self             --format json             > "$RUNNER_TEMP/vercel-alert-rules-before.json"
+
+      - name: Verify existing rule or mark creation required
+        id: preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/operations/ensure-vercel-security-alert-rule.mjs             preflight             "$RUNNER_TEMP/vercel-alert-rules-before.json"             config/security/vercel-production-5xx-error-anomaly-rule-v1.json
+
+      - name: Create governed 5xx error anomaly rule
+        if: steps.preflight.outputs.rule_present != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          vercel alerts rules add             --body config/security/vercel-production-5xx-error-anomaly-rule-v1.json             --project myeongha             --scope johnny-self             --format json             > "$RUNNER_TEMP/vercel-alert-rule-create.json"
+
+      - name: Re-read Vercel alert rules
+        shell: bash
+        run: |
+          set -euo pipefail
+          vercel alerts rules ls             --project myeongha             --scope johnny-self             --format json             > "$RUNNER_TEMP/vercel-alert-rules-after.json"
+
+      - name: Require exact governed rule after activation
+        id: verify
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/operations/ensure-vercel-security-alert-rule.mjs             require             "$RUNNER_TEMP/vercel-alert-rules-after.json"             config/security/vercel-production-5xx-error-anomaly-rule-v1.json
+
+      - name: Record safe activation evidence
+        env:
+          RULE_ID: ${{ steps.verify.outputs.rule_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "production_security_alerting=pass"
+            echo "provider=vercel"
+            echo "project=myeongha"
+            echo "project_id=prj_nXF0b5uv27Lyucz2SEBxzdCRXVsP"
+            echo "alert_type=error_anomaly"
+            echo "status_group=5xx"
+            echo "numeric_threshold_owner=vercel-native-anomaly-model"
+            echo "rule_id=$RULE_ID"
+            echo "credential_material_emitted=false"
+            echo "user_payload_emitted=false"
+          } >> "$GITHUB_STEP_SUMMARY"
