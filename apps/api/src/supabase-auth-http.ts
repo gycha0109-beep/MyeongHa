@@ -9,6 +9,11 @@ import {
 } from './ingress-request-body-deadline.js';
 import { fetchSupabaseAuthWithDeadlineV1 } from './supabase-auth-upstream-deadline.js';
 import {
+  clearMemberRefreshCookieV1,
+  readMemberRefreshCookieV1,
+  setMemberRefreshCookieV1,
+} from './member-refresh-cookie.js';
+import {
   SUPABASE_AUTH_JSON_RESPONSE_MAXIMUM_BYTES_V1,
   UpstreamJsonResponseTooLargeV1,
   readBoundedUpstreamJsonTextV1,
@@ -58,6 +63,32 @@ function response(data: unknown, status = 200): Response {
     status,
     headers: { 'Cache-Control': NO_STORE },
   });
+}
+
+function clientSession(session: AuthSessionV1) {
+  return Object.freeze({
+    accessToken: session.accessToken,
+    expiresAt: session.expiresAt,
+    tokenType: session.tokenType,
+    user: session.user,
+  });
+}
+
+function authenticatedResponse(
+  session: AuthSessionV1,
+  extraData: Readonly<Record<string, unknown>> = {},
+): Response {
+  return setMemberRefreshCookieV1(
+    response({
+      ok: true,
+      data: {
+        status: 'authenticated',
+        session: clientSession(session),
+        ...extraData,
+      },
+    }),
+    session.refreshToken,
+  );
 }
 
 function errorResponse(code: string, status: number): Response {
@@ -325,32 +356,50 @@ export async function handleSupabaseAuthRequestV1(input: {
       cancelUnusedRequestBody(input.request);
       const authorization = input.request.headers.get('authorization');
       if (!authorization || !/^Bearer [^\s,]+$/u.test(authorization)) {
-        return errorResponse('AUTH_REQUIRED', 401);
+        return clearMemberRefreshCookieV1(errorResponse('AUTH_REQUIRED', 401));
       }
       const upstream = await callSupabase(config, '/auth/v1/logout', {
         method: 'POST',
         headers: { Authorization: authorization },
         body: '{}',
       }, 'status-only');
-      if (!upstream.response.ok) return upstreamError(input.action, upstream.response.status);
-      return response({ ok: true, data: { signedOut: true } });
+      if (!upstream.response.ok) {
+        return clearMemberRefreshCookieV1(
+          upstreamError(input.action, upstream.response.status),
+        );
+      }
+      return clearMemberRefreshCookieV1(
+        response({ ok: true, data: { signedOut: true } }),
+      );
     }
 
-    const body = await readObjectBody(input.request);
-    if (body === null) return errorResponse('INVALID_REQUEST', 400);
-
     if (input.action === 'refresh') {
-      const refreshToken = readRequiredString(body, 'refreshToken', 4096);
-      if (refreshToken === null) return errorResponse('INVALID_REQUEST', 400);
+      cancelUnusedRequestBody(input.request);
+      const refreshToken = readMemberRefreshCookieV1(input.request);
+      if (refreshToken === null) {
+        return clearMemberRefreshCookieV1(errorResponse('SESSION_EXPIRED', 401));
+      }
       const upstream = await callSupabase(config, '/auth/v1/token?grant_type=refresh_token', {
         method: 'POST',
         body: JSON.stringify({ refresh_token: refreshToken }),
       });
-      if (!upstream.response.ok) return upstreamError(input.action, upstream.response.status);
+      if (!upstream.response.ok) {
+        const mapped = upstreamError(input.action, upstream.response.status);
+        return (
+          upstream.response.status === 400 ||
+          upstream.response.status === 401 ||
+          upstream.response.status === 422
+        )
+          ? clearMemberRefreshCookieV1(mapped)
+          : mapped;
+      }
       const session = normalizeSession(upstream.payload);
       if (session === null) return errorResponse('AUTH_UPSTREAM_MALFORMED', 502);
-      return response({ ok: true, data: { status: 'authenticated', session } });
+      return authenticatedResponse(session);
     }
+
+    const body = await readObjectBody(input.request);
+    if (body === null) return errorResponse('INVALID_REQUEST', 400);
 
     const rawEmail = readRequiredString(body, 'email', 320);
     const password = readRequiredString(body, 'password', 1024);
@@ -395,16 +444,11 @@ export async function handleSupabaseAuthRequestV1(input: {
           }
           return errorResponse('COMPROMISED_PASSWORD', 403);
         }
-        return response({
-          ok: true,
-          data: {
-            status: 'authenticated',
-            session,
-            passwordCompromiseCheck: compromiseCheck.status,
-          },
+        return authenticatedResponse(session, {
+          passwordCompromiseCheck: compromiseCheck.status,
         });
       }
-      return response({ ok: true, data: { status: 'authenticated', session } });
+      return authenticatedResponse(session);
     }
 
     if (input.action === 'sign-up') {
