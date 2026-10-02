@@ -50,12 +50,15 @@ jobs:
             exit 1
           fi
 
-      - name: Activate and verify governed Vercel v3 alert rule
+      - name: Activate and verify governed Vercel alert rule
         id: activate
         shell: bash
         run: |
           set -euo pipefail
-          node scripts/operations/ensure-vercel-security-alert-rule.mjs             activate             config/security/vercel-production-5xx-error-anomaly-rule-v1.json             config/security/production-security-alerting-v1.json
+          node scripts/operations/ensure-vercel-security-alert-rule.mjs \
+            activate \
+            config/security/vercel-production-5xx-error-anomaly-rule-v1.json \
+            config/security/production-security-alerting-v1.json
 
       - name: Record safe activation evidence
         env:
@@ -68,8 +71,9 @@ jobs:
           {
             echo "production_security_alerting=pass"
             echo "provider=vercel"
-            echo "provider_api=/alerts/v3/alert-rules"
-            echo "provider_transport=direct-bearer-api"
+            echo "provider_interface=alerts-rules-cli"
+            echo "provider_transport=official-vercel-cli"
+            echo "provider_cli=vercel@59.19.1"
             echo "project=myeongha"
             echo "project_id=prj_nXF0b5uv27Lyucz2SEBxzdCRXVsP"
             echo "alert_type=error_anomaly"

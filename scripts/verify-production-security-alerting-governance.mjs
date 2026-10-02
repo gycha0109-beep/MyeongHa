@@ -116,20 +116,30 @@ expectEqual(
   },
 );
 expectEqual(
-  'authority.activation.providerApi',
-  authority.activation?.providerApi,
-  '/alerts/v3/alert-rules',
+  'authority.activation.providerInterface',
+  authority.activation?.providerInterface,
+  'alerts-rules-cli',
 );
 expectEqual(
   'authority.activation.providerTransport',
   authority.activation?.providerTransport,
-  'direct-bearer-api',
+  'official-vercel-cli',
+);
+expectEqual(
+  'authority.activation.providerCliPackage',
+  authority.activation?.providerCliPackage,
+  'vercel@59.19.1',
 );
 expectEqual(
   'authority.activation.teamScopedCredentialRequired',
   authority.activation?.teamScopedCredentialRequired,
   true,
 );
+if (Object.hasOwn(authority.activation ?? {}, 'providerApi')) {
+  failures.push(
+    'authority.activation.providerApi: undocumented Alert Rules REST endpoint must not be pinned',
+  );
+}
 expectEqual(
   'authority.accessDenied.alertingState',
   authority.detection?.accessDenied?.alertingState,
@@ -169,12 +179,13 @@ for (const fragment of [
   'default: security',
   'environment: production',
   'VERCEL_SECURITY_ALERTS_TOKEN',
-  'Activate and verify governed Vercel v3 alert rule',
+  'Activate and verify governed Vercel alert rule',
   'ensure-vercel-security-alert-rule.mjs',
   'config/security/vercel-production-5xx-error-anomaly-rule-v1.json',
   'config/security/production-security-alerting-v1.json',
-  'provider_api=/alerts/v3/alert-rules',
-  'provider_transport=direct-bearer-api',
+  'provider_interface=alerts-rules-cli',
+  'provider_transport=official-vercel-cli',
+  'provider_cli=vercel@59.19.1',
   'credential_material_emitted=false',
   'user_payload_emitted=false',
 ]) {
@@ -187,25 +198,32 @@ for (const fragment of [
   '\nschedule:',
   'echo "$VERCEL_TOKEN"',
   'set -x',
-  'vercel alerts',
-  'vercel@',
-  '--scope',
+  '/alerts/v3/alert-rules',
+  'direct-bearer-api',
 ]) {
   forbidFragment(workflow, fragment, workflowPath);
 }
 
 for (const fragment of [
-  "const API_ORIGIN = 'https://api.vercel.com'",
-  '/alerts/v3/alert-rules?',
-  'Authorization:',
-  'Bearer',
-  'teamId',
-  'projectId',
-  'limit: \'100\'',
-  "method: 'POST'",
-  'rule.notificationSettings?.enableTeamOwnerNotifications !== true',
-  'Vercel Alert API failed:',
-  'provider_api=v3',
+  "spawnSync(",
+  "'npm'",
+  "'exec'",
+  "'vercel'",
+  "'--scope'",
+  "'alerts'",
+  "'rules'",
+  "'ls'",
+  "'add'",
+  "'inspect'",
+  "'--project'",
+  "'--type'",
+  "'built-in'",
+  "'--format'",
+  "'json'",
+  'CREDENTIAL_SCOPE_INCOMPATIBLE',
+  'team/account access token',
+  'provider_interface=alerts-rules-cli',
+  'official-vercel-cli',
 ]) {
   requireFragment(operation, fragment, operationPath);
 }
@@ -214,8 +232,11 @@ for (const fragment of [
   'console.log(token)',
   'console.error(token)',
   'JSON.stringify(process.env)',
-  '/v2/user',
-  'vercel alerts',
+  'https://api.vercel.com',
+  '/alerts/v3/alert-rules',
+  'Authorization:',
+  'Bearer',
+  'fetch(',
 ]) {
   forbidFragment(operation, fragment, operationPath);
 }
@@ -239,12 +260,22 @@ for (const fragment of [
   'statusGroup:5xx',
   'BASELINE_REQUIRED',
   'VERCEL_SECURITY_ALERTS_TOKEN',
-  '/alerts/v3/alert-rules',
-  'direct bearer API',
+  'vercel alerts rules',
+  'official Vercel CLI',
+  'vercel@59.19.1',
+  'project-scoped',
+  'team/account',
   'Do not create numeric alert thresholds',
   'MYEONGHA_SECURITY_EVENT',
 ]) {
   requireFragment(runbook, fragment, runbookPath);
+}
+
+for (const fragment of [
+  '/alerts/v3/alert-rules',
+  'direct bearer API',
+]) {
+  forbidFragment(runbook, fragment, runbookPath);
 }
 
 requireFragment(
@@ -260,5 +291,5 @@ if (failures.length > 0) {
 }
 
 console.log(
-  'Production security alerting governance passed: provider=vercel api=v3 transport=direct-bearer-api project=myeongha alert=5xx-error-anomaly numeric-threshold=provider-owned access-denied=baseline-required rate-limit=baseline-required activation=manual-fail-closed.',
+  'Production security alerting governance passed: provider=vercel interface=alerts-rules-cli transport=official-vercel-cli cli=vercel@59.19.1 project=myeongha alert=5xx-error-anomaly numeric-threshold=provider-owned access-denied=baseline-required rate-limit=baseline-required activation=manual-fail-closed.',
 );
