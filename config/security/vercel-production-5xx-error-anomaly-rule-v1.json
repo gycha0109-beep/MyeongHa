@@ -1,0 +1,11 @@
+{
+  "name": "MyeongHa Production 5xx Error Anomalies",
+  "alertTypes": [
+    {
+      "type": "error_anomaly",
+      "filter": "statusGroup eq '5xx'"
+    }
+  ],
+  "projectId": "projectId in ('prj_nXF0b5uv27Lyucz2SEBxzdCRXVsP')",
+  "autosubscribeOwnersInKnock": true
+}
