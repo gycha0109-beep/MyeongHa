@@ -7,8 +7,8 @@ This runbook governs OWASP A09:2025 Production alerting for MyeongHa.
 ## Current governed alert
 
 - Provider: Vercel
-- Provider API: `/alerts/v3/alert-rules`
-- Provider transport: direct bearer API
+- Provider interface: official Vercel CLI `vercel alerts rules`
+- Provider CLI package: `vercel@59.19.1`
 - Project: `myeongha`
 - Project ID: `prj_nXF0b5uv27Lyucz2SEBxzdCRXVsP`
 - Team: `johnny-self`
@@ -20,6 +20,8 @@ This runbook governs OWASP A09:2025 Production alerting for MyeongHa.
 - Runtime evidence schema: `myeongha-security-event-v1`
 
 Vercel's native error anomaly compares current 5xx behavior with its own baseline. Repository code must not replace this with an arbitrary application-owned numeric threshold.
+
+The repository does not pin or call an undocumented Alert Rules REST endpoint. The supported mutation and inspection contract for this track is the official Vercel CLI: `vercel alerts rules ls/add/inspect`.
 
 ## Not yet activated as alert thresholds
 
@@ -37,11 +39,14 @@ Do not create numeric alert thresholds for these signals until Production baseli
 1. PR containing the alert authority is merged to `main`.
 2. GitHub Production environment is available.
 3. Secret `VERCEL_SECURITY_ALERTS_TOKEN` exists in the GitHub `production` environment.
-4. The token must be scoped to the Vercel team that owns MyeongHa and must be able to manage that team's Alert Rules.
-5. The Vercel team supports the required Alert capability.
-6. Operator uses the canonical workflow on `main`.
+4. The token must be a team/account-capable Vercel access token that can resolve team `johnny-self` and manage its Alert Rules.
+5. A project-scoped token is not accepted for this activation path unless Vercel CLI later documents and demonstrates compatible team-scope resolution. Runs `36968554099` and `36970769733` showed `User not found` with the existing project-scoped credential before Alert Rule access.
+6. The Vercel team must have the required Alert Rules capability. Anomaly alert configuration requires the applicable Vercel observability capability.
+7. Operator uses the canonical workflow on `main`.
 
-The workflow intentionally does not call `vercel whoami`, `/v2/user`, or Vercel CLI scope resolution. Scoped Vercel access tokens can authenticate provider API requests without exposing user identity to the workflow. The activation script calls the governed Alert Rules v3 team endpoint directly.
+The workflow uses the credential only through the `VERCEL_TOKEN` environment variable. It never prints the token or passes it as a command-line argument.
+
+If the credential is still project-scoped, the operation fails closed with `CREDENTIAL_SCOPE_INCOMPATIBLE` rather than falling back to an undocumented provider endpoint.
 
 If the Vercel plan, permission, token, or Alert capability is unavailable, activation must fail closed. Do not weaken the rule or substitute an invented polling threshold.
 
@@ -60,13 +65,14 @@ The workflow:
 
 1. rejects non-main / non-manual / wrong-track execution;
 2. rejects a missing dedicated Vercel secret with a clear message;
-3. calls the Vercel Alert Rules v3 API through the repository operation script;
-4. lists the current governed-project rules before mutation;
+3. uses the pinned official Vercel CLI package;
+4. lists current built-in rules affecting the exact governed project;
 5. verifies an existing same-name rule if present;
-6. creates the v3 built-in 5xx anomaly rule only when absent;
-7. re-reads provider state;
-8. requires an exact provider-side match and team-owner notifications;
-9. emits only safe rule metadata.
+6. creates the built-in 5xx anomaly rule only when absent;
+7. lists provider state again after creation;
+8. independently inspects the exact provider rule ID;
+9. requires exact project scope, trigger/filter, severity, team-owner notifications, and stable `ar_...` ID;
+10. emits only safe rule metadata.
 
 A same-name rule with different project scope, trigger/filter, type, or severity is drift and must fail instead of being overwritten.
 
@@ -109,4 +115,4 @@ Repository governance is implemented by:
 
 `scripts/verify-production-security-alerting-governance.mjs`
 
-Provider activation evidence is not complete until the provider rule has a stable `ar_...` rule ID, team-owner notifications are enabled, and the rule is independently re-read after creation.
+Provider activation evidence is not complete until the provider rule has a stable `ar_...` rule ID, team-owner notifications are enabled, and the rule is independently inspected after creation or discovery.
