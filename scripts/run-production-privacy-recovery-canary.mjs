@@ -31,6 +31,16 @@ function requiredEnv(name) {
   return value;
 }
 
+function privilegedAdminDatabaseUrl() {
+  const url = new URL('postgresql://localhost/postgres');
+  url.hostname = requiredEnv('SUPABASE_PRODUCTION_SESSION_POOLER_HOST');
+  url.port = '5432';
+  url.username = `postgres.${PROJECT_REF}`;
+  url.password = requiredEnv('SUPABASE_DB_PASSWORD');
+  url.searchParams.set('sslmode', 'verify-full');
+  return url.toString();
+}
+
 function requireRunId(value) {
   if (!/^[1-9][0-9]{0,19}$/u.test(value ?? '')) fail('INVALID_RUN_ID');
   return value;
@@ -123,7 +133,7 @@ async function createAdminPool() {
   const { buildProductionPrivilegedPostgresStrictTlsTargetV1 } =
     await runtimeModules();
   const target = buildProductionPrivilegedPostgresStrictTlsTargetV1({
-    databaseUrl: requiredEnv('MYEONGHA_PRIVACY_CANARY_ADMIN_DATABASE_URL'),
+    databaseUrl: privilegedAdminDatabaseUrl(),
     rootCertificatePem: requiredEnv(
       'MYEONGHA_WORKER_DATABASE_SSL_ROOT_CERT_PEM',
     ),
@@ -220,7 +230,7 @@ async function provisionApiCanaryLogin() {
     await pool.end();
   }
 
-  const adminUrl = new URL(requiredEnv('MYEONGHA_PRIVACY_CANARY_ADMIN_DATABASE_URL'));
+  const adminUrl = new URL(privilegedAdminDatabaseUrl());
   adminUrl.username = `${roleName}.${PROJECT_REF}`;
   adminUrl.password = password;
   const databaseUrl = adminUrl.toString();
