@@ -9,18 +9,15 @@ import {
 } from '../scripts/verify-mobile-release-readiness.mjs';
 
 describe('mobile release readiness preflight', () => {
-  it('keeps the current repository blocked only on source-owned platform identifiers', async () => {
+  it('accepts the approved production platform identifiers in the current repository', async () => {
     const report = await readMobileReleaseReadinessV1(
       new URL('..', import.meta.url).pathname,
       {},
     );
 
     expect(report.violations).toEqual([]);
-    expect(report.blockers).toEqual([
-      'ios.bundleIdentifier',
-      'android.package',
-    ]);
-    expect(report.ready).toBe(false);
+    expect(report.blockers).toEqual([]);
+    expect(report.ready).toBe(true);
   });
 
   it('accepts a complete release identity without changing product semantics', () => {

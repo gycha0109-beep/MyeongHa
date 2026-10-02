@@ -4,12 +4,26 @@ import {
 } from './http.js';
 import type {
   BirthCalendarTypeV1,
+  BirthInputV1,
   BirthSexV1,
 } from './birth.js';
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/u;
+
+export interface TargetPersonCreateRequestV1 {
+  readonly displayLabel?: string | null;
+  readonly relationshipLabel?: string | null;
+  readonly input: BirthInputV1;
+}
+
+export interface TargetPersonCreateReceiptV1 {
+  readonly targetPersonId: string;
+  readonly birthProfileId: string;
+  readonly revisionId: string;
+  readonly revisionNo: 1;
+}
 
 export interface TargetPersonV1 {
   readonly targetPersonId: string;
@@ -186,4 +200,106 @@ export async function readTargetPersonV1(
     return malformed('Target Person detail returned a different target id.');
   }
   return item;
+}
+
+
+function normalizeCreateRequest(
+  request: TargetPersonCreateRequestV1,
+): TargetPersonCreateRequestV1 {
+  if (
+    request.input.calendarType !== 'solar' &&
+    request.input.calendarType !== 'lunar'
+  ) {
+    return malformed('Target Person create calendarType is invalid.');
+  }
+  if (
+    typeof request.input.birthDate !== 'string' ||
+    !DATE_PATTERN.test(request.input.birthDate)
+  ) {
+    return malformed('Target Person create birthDate is invalid.');
+  }
+  if (
+    request.input.birthTime !== null &&
+    (typeof request.input.birthTime !== 'string' ||
+      request.input.birthTime.trim().length === 0)
+  ) {
+    return malformed('Target Person create birthTime is invalid.');
+  }
+  if (
+    request.input.timeKnown &&
+    request.input.birthTime === null
+  ) {
+    return malformed('Target Person create known birth time is missing.');
+  }
+  if (
+    !request.input.timeKnown &&
+    request.input.birthTime !== null
+  ) {
+    return malformed('Target Person create unknown birth time must be null.');
+  }
+  if (
+    request.input.isLeapMonth !== null &&
+    typeof request.input.isLeapMonth !== 'boolean'
+  ) {
+    return malformed('Target Person create isLeapMonth is invalid.');
+  }
+  if (
+    request.input.calendarType === 'solar' &&
+    request.input.isLeapMonth === true
+  ) {
+    return malformed('Solar Target Person birth input cannot be a leap month.');
+  }
+  parseSex(request.input.sex);
+
+  for (const [name, value] of [
+    ['displayLabel', request.displayLabel],
+    ['relationshipLabel', request.relationshipLabel],
+  ] as const) {
+    if (value !== undefined && value !== null && typeof value !== 'string') {
+      return malformed(`Target Person create ${name} is invalid.`);
+    }
+  }
+
+  return Object.freeze({
+    ...(request.displayLabel === undefined
+      ? {}
+      : { displayLabel: request.displayLabel }),
+    ...(request.relationshipLabel === undefined
+      ? {}
+      : { relationshipLabel: request.relationshipLabel }),
+    input: Object.freeze({
+      calendarType: request.input.calendarType,
+      birthDate: request.input.birthDate,
+      birthTime: request.input.birthTime,
+      timeKnown: request.input.timeKnown,
+      isLeapMonth: request.input.isLeapMonth,
+      sex: request.input.sex,
+    }),
+  });
+}
+
+export async function createTargetPersonV1(
+  client: MyeongHaApiClientV1,
+  bearer: string,
+  request: TargetPersonCreateRequestV1,
+): Promise<TargetPersonCreateReceiptV1> {
+  const data = await client.requestData({
+    method: 'POST',
+    path: '/api/target-persons',
+    bearer,
+    body: normalizeCreateRequest(request),
+  });
+  if (!isRecord(data)) {
+    return malformed('Target Person create response is invalid.');
+  }
+  const revisionNo = requirePositiveInteger('created revision number', data.revisionNo);
+  if (revisionNo !== 1) {
+    return malformed('Target Person create response did not return revision 1.');
+  }
+  return Object.freeze({
+    targetPersonId: parseTargetPersonIdV1(data.targetPersonId),
+    birthProfileId: parseTargetPersonIdV1(data.birthProfileId),
+    revisionId: parseTargetPersonIdV1(data.revisionId),
+    revisionNo: 1,
+  });
 }

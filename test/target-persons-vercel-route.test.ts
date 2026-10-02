@@ -19,6 +19,8 @@ beforeAll(() => {
     'sb_publishable_test_key_material_for_target_person_route';
   process.env.MYEONGHA_GUEST_FINGERPRINT_SECRET =
     'test-guest-fingerprint-secret-material-at-least-thirty-two-bytes';
+  process.env.MYEONGHA_BIRTH_INPUT_HMAC_K1_SECRET =
+    'test-birth-input-hmac-k1-secret-material-at-least-thirty-two-bytes';
 });
 
 describe('Target Person /api/me Vercel dispatch', () => {
@@ -35,6 +37,35 @@ describe('Target Person /api/me Vercel dispatch', () => {
     expect(toCanonicalMeRequestForTestV1(request, target ?? undefined).url).toBe(
       'https://myeongha.internal/api/target-persons',
     );
+  });
+
+  it('dispatches POST on the collection route to source-authorized Target Person create', () => {
+    const request = new Request(
+      'https://myeongha.example/api/me?__myeongha_target_person_read=list',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          input: {
+            calendarType: 'solar',
+            birthDate: '1991-02-03',
+            birthTime: null,
+            timeKnown: false,
+            isLeapMonth: false,
+            sex: 'female',
+          },
+        }),
+      },
+    );
+
+    const target = resolveMeDispatchTargetForTestV1(request);
+    expect(target).toEqual({
+      kind: 'target-person-create',
+      route: '/api/target-persons',
+    });
+    const canonical = toCanonicalMeRequestForTestV1(request, target ?? undefined);
+    expect(canonical.url).toBe('https://myeongha.internal/api/target-persons');
+    expect(canonical.method).toBe('POST');
   });
 
   it('canonicalizes the private detail rewrite to the exact Target Person id', () => {
@@ -76,10 +107,16 @@ describe('Target Person /api/me Vercel dispatch', () => {
   });
 
   it.each([
-    'https://myeongha.example/api/me?__myeongha_target_person_read=list',
-    `https://myeongha.example/api/me?__myeongha_target_person_read=detail&__myeongha_target_person_id=${TARGET_ID}`,
-  ])('reaches the Target Person runtime but rejects unauthenticated requests: %s', async (url) => {
-    const response = await meEndpoint.fetch(new Request(url, { method: 'GET' }));
+    ['GET', 'https://myeongha.example/api/me?__myeongha_target_person_read=list'],
+    ['GET', `https://myeongha.example/api/me?__myeongha_target_person_read=detail&__myeongha_target_person_id=${TARGET_ID}`],
+    ['POST', 'https://myeongha.example/api/me?__myeongha_target_person_read=list'],
+  ])('reaches the Target Person runtime but rejects unauthenticated %s requests', async (method, url) => {
+    const response = await meEndpoint.fetch(new Request(url, {
+      method,
+      ...(method === 'POST'
+        ? { headers: { 'content-type': 'application/json' }, body: '{}' }
+        : {}),
+    }));
 
     expect(response.status).toBe(401);
     expect(response.headers.get('cache-control')).toBe('no-store');
