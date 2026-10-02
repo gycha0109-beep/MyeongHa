@@ -238,8 +238,9 @@ describe('security observability boundary v1', () => {
     });
   });
 
-  it('records a Node response-write exception and propagates a sanitized transport error', async () => {
+  it('records a Node response-write exception while preserving the established transport error', async () => {
     const events: SecurityEventV1[] = [];
+    const downstreamError = new Error('downstream write failed');
 
     await expect(
       executeSecurityObservedNodeRequestV1({
@@ -253,10 +254,10 @@ describe('security observability boundary v1', () => {
         eventWriter: (event) => events.push(event),
         execute: async () => new Response(null, { status: 200 }),
         writeResponse: async () => {
-          throw new Error('socket secret should not be propagated');
+          throw downstreamError;
         },
       }),
-    ).rejects.toThrow('Security-observed Node response write failed.');
+    ).rejects.toBe(downstreamError);
 
     expect(events).toEqual([
       {
@@ -272,7 +273,7 @@ describe('security observability boundary v1', () => {
         durationMs: 30,
       },
     ]);
-    expect(JSON.stringify(events)).not.toContain('socket secret');
+    expect(JSON.stringify(events)).not.toContain('downstream write failed');
   });
 
   it('writes a generic Node 500 when application execution throws', async () => {
@@ -305,7 +306,9 @@ describe('security observability boundary v1', () => {
   });
 
 
-  it('sanitizes Node fallback write failures after an application exception', async () => {
+  it('preserves a downstream failure when writing the generic Node fallback response', async () => {
+    const downstreamError = new Error('downstream fallback failed');
+
     await expect(
       executeSecurityObservedNodeRequestV1({
         method: 'POST',
@@ -319,9 +322,9 @@ describe('security observability boundary v1', () => {
           throw new Error('application secret');
         },
         writeResponse: async () => {
-          throw new Error('socket secret');
+          throw downstreamError;
         },
       }),
-    ).rejects.toThrow('Security-observed Node fallback response write failed.');
+    ).rejects.toBe(downstreamError);
   });
 });
