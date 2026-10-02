@@ -30,6 +30,8 @@ const JSON_HEADERS = Object.freeze({
   'Content-Type': 'application/json',
 } as const);
 const MYEONGHA_PRODUCTION_WEB_ORIGIN = 'https://myeongha.vercel.app' as const;
+const WEB_AUTH_TRANSPORT_HEADER_V1 = 'x-myeongha-auth-transport' as const;
+const WEB_AUTH_TRANSPORT_VALUE_V1 = 'web-cookie-v1' as const;
 const ALLOWED_AUTH_NEXT_PAGES = new Set([
   'hall.html',
   'reading.html',
@@ -74,21 +76,26 @@ function clientSession(session: AuthSessionV1) {
   });
 }
 
+function usesWebCookieTransport(request: Request): boolean {
+  return request.headers.get(WEB_AUTH_TRANSPORT_HEADER_V1) === WEB_AUTH_TRANSPORT_VALUE_V1;
+}
+
 function authenticatedResponse(
   session: AuthSessionV1,
   extraData: Readonly<Record<string, unknown>> = {},
+  webCookieTransport = false,
 ): Response {
-  return setMemberRefreshCookieV1(
-    response({
-      ok: true,
-      data: {
-        status: 'authenticated',
-        session: clientSession(session),
-        ...extraData,
-      },
-    }),
-    session.refreshToken,
-  );
+  const result = response({
+    ok: true,
+    data: {
+      status: 'authenticated',
+      session: webCookieTransport ? clientSession(session) : session,
+      ...extraData,
+    },
+  });
+  return webCookieTransport
+    ? setMemberRefreshCookieV1(result, session.refreshToken)
+    : result;
 }
 
 function errorResponse(code: string, status: number): Response {
@@ -350,13 +357,15 @@ export async function handleSupabaseAuthRequestV1(input: {
   }
 
   const config = parseConfig(input.env);
+  const webCookieTransport = usesWebCookieTransport(input.request);
 
   try {
     if (input.action === 'sign-out') {
       cancelUnusedRequestBody(input.request);
       const authorization = input.request.headers.get('authorization');
       if (!authorization || !/^Bearer [^\s,]+$/u.test(authorization)) {
-        return clearMemberRefreshCookieV1(errorResponse('AUTH_REQUIRED', 401));
+        const denied = errorResponse('AUTH_REQUIRED', 401);
+        return webCookieTransport ? clearMemberRefreshCookieV1(denied) : denied;
       }
       const upstream = await callSupabase(config, '/auth/v1/logout', {
         method: 'POST',
@@ -364,38 +373,51 @@ export async function handleSupabaseAuthRequestV1(input: {
         body: '{}',
       }, 'status-only');
       if (!upstream.response.ok) {
-        return clearMemberRefreshCookieV1(
-          upstreamError(input.action, upstream.response.status),
-        );
+        const mapped = upstreamError(input.action, upstream.response.status);
+        return webCookieTransport ? clearMemberRefreshCookieV1(mapped) : mapped;
       }
-      return clearMemberRefreshCookieV1(
-        response({ ok: true, data: { signedOut: true } }),
-      );
+      const signedOut = response({ ok: true, data: { signedOut: true } });
+      return webCookieTransport ? clearMemberRefreshCookieV1(signedOut) : signedOut;
     }
 
     if (input.action === 'refresh') {
-      cancelUnusedRequestBody(input.request);
-      const refreshToken = readMemberRefreshCookieV1(input.request);
-      if (refreshToken === null) {
-        return clearMemberRefreshCookieV1(errorResponse('SESSION_EXPIRED', 401));
+      let refreshToken: string | null;
+      if (webCookieTransport) {
+        cancelUnusedRequestBody(input.request);
+        refreshToken = readMemberRefreshCookieV1(input.request);
+      } else {
+        const refreshBody = await readObjectBody(input.request);
+        refreshToken = refreshBody === null
+          ? null
+          : readRequiredString(refreshBody, 'refreshToken', 4096);
       }
+
+      if (refreshToken === null) {
+        const expired = errorResponse('SESSION_EXPIRED', 401);
+        return webCookieTransport ? clearMemberRefreshCookieV1(expired) : expired;
+      }
+
       const upstream = await callSupabase(config, '/auth/v1/token?grant_type=refresh_token', {
         method: 'POST',
         body: JSON.stringify({ refresh_token: refreshToken }),
       });
       if (!upstream.response.ok) {
         const mapped = upstreamError(input.action, upstream.response.status);
-        return (
-          upstream.response.status === 400 ||
-          upstream.response.status === 401 ||
-          upstream.response.status === 422
-        )
-          ? clearMemberRefreshCookieV1(mapped)
-          : mapped;
+        if (
+          webCookieTransport &&
+          (
+            upstream.response.status === 400 ||
+            upstream.response.status === 401 ||
+            upstream.response.status === 422
+          )
+        ) {
+          return clearMemberRefreshCookieV1(mapped);
+        }
+        return mapped;
       }
       const session = normalizeSession(upstream.payload);
       if (session === null) return errorResponse('AUTH_UPSTREAM_MALFORMED', 502);
-      return authenticatedResponse(session);
+      return authenticatedResponse(session, {}, webCookieTransport);
     }
 
     const body = await readObjectBody(input.request);
@@ -444,11 +466,13 @@ export async function handleSupabaseAuthRequestV1(input: {
           }
           return errorResponse('COMPROMISED_PASSWORD', 403);
         }
-        return authenticatedResponse(session, {
-          passwordCompromiseCheck: compromiseCheck.status,
-        });
+        return authenticatedResponse(
+          session,
+          { passwordCompromiseCheck: compromiseCheck.status },
+          webCookieTransport,
+        );
       }
-      return authenticatedResponse(session);
+      return authenticatedResponse(session, {}, webCookieTransport);
     }
 
     if (input.action === 'sign-up') {
