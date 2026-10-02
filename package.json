@@ -64,7 +64,9 @@
     "dev:mobile": "npm run start -w @myeongha/mobile",
     "verify:mobile-release-readiness": "node scripts/verify-mobile-release-readiness.mjs",
     "verify:mobile-release-readiness-contract": "node scripts/verify-mobile-release-readiness.mjs --allow-blocked",
-    "verify:mobile-export-artifacts": "node scripts/verify-mobile-export-artifacts.mjs"
+    "verify:mobile-export-artifacts": "node scripts/verify-mobile-export-artifacts.mjs",
+    "verify:mobile-push-activation-readiness": "node scripts/verify-mobile-push-activation-readiness.mjs",
+    "verify:mobile-push-activation-readiness-contract": "node scripts/verify-mobile-push-activation-readiness.mjs --allow-blocked"
   },
   "dependencies": {
     "pg": "8.23.0"

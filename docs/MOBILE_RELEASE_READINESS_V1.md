@@ -1,8 +1,8 @@
 # Mobile Release Readiness v1
 
 > Track: `applizing`  
-> Status: **M11-A4 IMPLEMENTED / STORE IDENTITY BLOCKED**  
-> Date: **2026-10-01**
+> Status: **M11-A4 IMPLEMENTED / PLATFORM IDENTITY READY / SIGNING EXTERNAL**  
+> Date: **2026-10-02**
 
 ## Production API origin guard
 
@@ -34,24 +34,27 @@ The repository now has an executable preflight:
 npm run verify:mobile-release-readiness
 ```
 
-This strict command must fail until the permanent platform application identities are explicitly approved and configured:
+The permanent platform application identities are now explicitly approved and configured:
 
 ```text
-expo.ios.bundleIdentifier
-expo.android.package
+expo.ios.bundleIdentifier = com.myeongha.app
+expo.android.package      = com.myeongha.app
 ```
 
-## Why these values are not guessed
+The strict release-readiness command therefore passes for repository-owned application
+identity and API-origin checks. Apple/Google signing credentials remain external.
 
-A bundle/package identifier becomes part of the durable Apple/Google application identity. The current repository contains no source-authorized exact values for either platform.
+## Push activation is a separate gate
 
-The implementation therefore must not derive them from:
+General Mobile release identity is no longer blocked by package/bundle identifiers.
+Push activation has its own executable preflight because it additionally depends on
+external Expo/EAS and Production secret configuration:
 
-- GitHub owner/repository names;
-- `myeongha.vercel.app`;
-- Expo slug `myeongha-mobile`;
-- product display name `명하`;
-- an arbitrary reverse-DNS namespace.
+```bash
+npm run verify:mobile-push-activation-readiness
+```
+
+See `docs/MOBILE_PUSH_ACTIVATION_READINESS_V1.md`.
 
 ## CI behavior
 
@@ -59,9 +62,12 @@ The implementation therefore must not derive them from:
 npm run verify:mobile-release-readiness-contract
 ```
 
-The CI contract mode permits only the two known missing identity blockers. Structural violations and non-canonical release API origin overrides still fail.
+The CI contract mode remains available for structural verification. The current repository
+has no platform-identity blockers; structural violations and non-canonical release API
+origin overrides still fail.
 
-Once both platform ids are approved, CI can switch from contract mode to strict mode without changing the validator.
+Mobile PR CI also runs the Push activation contract preflight. That check permits only
+external Push activation blockers while rejecting structural or malformed configuration.
 
 ## Out of scope
 
@@ -70,9 +76,9 @@ M11-A does not authorize or configure:
 - Apple Developer / Google Play account ownership;
 - signing certificate / provisioning profile / keystore material;
 - store listing identifiers or metadata;
-- EAS project ownership;
+- EAS project ownership and the real EAS project UUID;
 - OTA update policy;
-- push credentials;
+- native/platform Push credentials and server Push token-protection secrets;
 - Apple IAP / Google Play Billing;
 - production distribution.
 
