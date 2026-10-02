@@ -129,7 +129,6 @@ const PENDING_GUEST = 'guest-before-member';
 
 const OLD_SESSION = Object.freeze({
   accessToken: OLD_ACCESS,
-  refreshToken: 'old-member-refresh',
   expiresAt: '2099-01-01T00:00:00.000Z',
   tokenType: 'bearer',
   user: Object.freeze({ id: 'auth-user-member-race', email: 'member-race@example.com' }),
@@ -137,13 +136,11 @@ const OLD_SESSION = Object.freeze({
 const NEW_SESSION = Object.freeze({
   ...OLD_SESSION,
   accessToken: NEW_ACCESS,
-  refreshToken: 'new-member-refresh',
   expiresAt: '2099-01-02T00:00:00.000Z',
 });
 const REPLACEMENT_SESSION = Object.freeze({
   ...OLD_SESSION,
   accessToken: REPLACEMENT_ACCESS,
-  refreshToken: 'replacement-member-refresh',
   expiresAt: '2099-01-03T00:00:00.000Z',
 });
 const OLD_RAW = JSON.stringify(OLD_SESSION);
@@ -192,7 +189,6 @@ describe('Member localStorage rollback replacement preservation', () => {
 
     expect(readMemberSession()).toMatchObject({
       accessToken: REPLACEMENT_ACCESS,
-      refreshToken: REPLACEMENT_SESSION.refreshToken,
     });
     expect(session.peek(PRODUCT_AUTH_STORAGE_V1.guestBearer)).toBe(OLD_ACCESS);
     expect(session.peek(PRODUCT_AUTH_STORAGE_V1.pendingGuestBearer)).toBe(PENDING_GUEST);
