@@ -11,7 +11,7 @@ function success(data: unknown): Response {
 }
 
 describe('mobile My service', () => {
-  it('routes Profile and Birth reads through the subject session boundary', async () => {
+  it('routes Profile, Birth, and Target Person reads through the subject session boundary', async () => {
     const paths: string[] = [];
     const client = new MyeongHaApiClientV1({
       origin: 'https://myeongha.test',
@@ -27,7 +27,13 @@ describe('mobile My service', () => {
             profile: null,
           });
         }
-        return success({ birthProfile: null });
+        if (path === '/api/me/birth-profile') {
+          return success({ birthProfile: null });
+        }
+        if (path === '/api/target-persons') {
+          return success([]);
+        }
+        throw new Error(`unexpected path ${path}`);
       },
     });
     let sessionCalls = 0;
@@ -43,8 +49,13 @@ describe('mobile My service', () => {
 
     await service.readProfile();
     await service.readBirth();
+    await service.readTargetPersons();
 
-    expect(sessionCalls).toBe(2);
-    expect(paths).toEqual(['/api/me', '/api/me/birth-profile']);
+    expect(sessionCalls).toBe(3);
+    expect(paths).toEqual([
+      '/api/me',
+      '/api/me/birth-profile',
+      '/api/target-persons',
+    ]);
   });
 });

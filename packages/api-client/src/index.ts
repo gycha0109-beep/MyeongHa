@@ -121,3 +121,11 @@ export {
   type ProductReadingRequiredActionV2,
   type ProductReadingStateV2,
 } from './product-reading-display.js';
+
+
+export {
+  listTargetPersonsV1,
+  parseTargetPersonIdV1,
+  readTargetPersonV1,
+  type TargetPersonV1,
+} from './target-persons.js';

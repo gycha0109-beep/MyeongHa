@@ -1,6 +1,7 @@
 import type {
   CurrentBirthProfileV1,
   CurrentSubjectProfileV1,
+  TargetPersonV1,
 } from '@myeongha/api-client';
 
 import type { MobileMyServiceV1 } from './mobile-my-service.js';
@@ -16,22 +17,34 @@ export type MobileMyBirthStateV1 =
   | Readonly<{ kind: 'ready'; birth: CurrentBirthProfileV1 }>
   | Readonly<{ kind: 'error' }>;
 
+export type MobileMyTargetPersonsStateV1 =
+  | Readonly<{ kind: 'loading' }>
+  | Readonly<{ kind: 'empty' }>
+  | Readonly<{ kind: 'ready'; items: readonly TargetPersonV1[] }>
+  | Readonly<{ kind: 'error' }>;
+
 export interface MobileMyStateV1 {
   readonly profile: MobileMyProfileStateV1;
   readonly birth: MobileMyBirthStateV1;
+  readonly targetPersons: MobileMyTargetPersonsStateV1;
 }
 
 export const MOBILE_MY_LOADING_STATE_V1: MobileMyStateV1 = Object.freeze({
   profile: Object.freeze({ kind: 'loading' }),
   birth: Object.freeze({ kind: 'loading' }),
+  targetPersons: Object.freeze({ kind: 'loading' }),
 });
 
 export async function loadMobileMyV1(
-  service: Pick<MobileMyServiceV1, 'readProfile' | 'readBirth'>,
+  service: Pick<
+    MobileMyServiceV1,
+    'readProfile' | 'readBirth' | 'readTargetPersons'
+  >,
 ): Promise<MobileMyStateV1> {
-  const [profileResult, birthResult] = await Promise.allSettled([
+  const [profileResult, birthResult, targetPersonsResult] = await Promise.allSettled([
     service.readProfile(),
     service.readBirth(),
+    service.readTargetPersons(),
   ]);
 
   const profile: MobileMyProfileStateV1 =
@@ -46,7 +59,17 @@ export async function loadMobileMyV1(
         ? Object.freeze({ kind: 'empty' })
         : Object.freeze({ kind: 'ready', birth: birthResult.value });
 
-  return Object.freeze({ profile, birth });
+  const targetPersons: MobileMyTargetPersonsStateV1 =
+    targetPersonsResult.status === 'rejected'
+      ? Object.freeze({ kind: 'error' })
+      : targetPersonsResult.value.length === 0
+        ? Object.freeze({ kind: 'empty' })
+        : Object.freeze({
+            kind: 'ready',
+            items: targetPersonsResult.value,
+          });
+
+  return Object.freeze({ profile, birth, targetPersons });
 }
 
 export async function reloadMobileMyProfileV1(
@@ -67,6 +90,19 @@ export async function reloadMobileMyBirthV1(
     return birth === null
       ? Object.freeze({ kind: 'empty' })
       : Object.freeze({ kind: 'ready', birth });
+  } catch {
+    return Object.freeze({ kind: 'error' });
+  }
+}
+
+export async function reloadMobileMyTargetPersonsV1(
+  service: Pick<MobileMyServiceV1, 'readTargetPersons'>,
+): Promise<MobileMyTargetPersonsStateV1> {
+  try {
+    const items = await service.readTargetPersons();
+    return items.length === 0
+      ? Object.freeze({ kind: 'empty' })
+      : Object.freeze({ kind: 'ready', items });
   } catch {
     return Object.freeze({ kind: 'error' });
   }

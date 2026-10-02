@@ -6,6 +6,7 @@ import {
   MOBILE_MY_LOADING_STATE_V1,
   reloadMobileMyBirthV1,
   reloadMobileMyProfileV1,
+  reloadMobileMyTargetPersonsV1,
   type MobileMyStateV1,
 } from '@/features/my/mobile-my-loader';
 import { mobileMyServiceV1 } from '@/features/my/native-mobile-my-service';
@@ -44,5 +45,19 @@ export function useMobileMyV1() {
     setState((current) => Object.freeze({ ...current, birth }));
   }, []);
 
-  return Object.freeze({ state, retryProfile, retryBirth });
+  const retryTargetPersons = useCallback(async () => {
+    setState((current) => Object.freeze({
+      ...current,
+      targetPersons: Object.freeze({ kind: 'loading' as const }),
+    }));
+    const targetPersons = await reloadMobileMyTargetPersonsV1(mobileMyServiceV1);
+    setState((current) => Object.freeze({ ...current, targetPersons }));
+  }, []);
+
+  return Object.freeze({
+    state,
+    retryProfile,
+    retryBirth,
+    retryTargetPersons,
+  });
 }

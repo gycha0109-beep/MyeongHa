@@ -208,6 +208,7 @@ M2-B Guest→new Member same-subject enrollment             DONE
 M3  Saju + Birth vertical slice                          DONE
 M3-B source-authorized Saju Preview Reading               DONE
 M4  Records + My                                         DONE
+M4-E Target Persons read-only projection                  DONE
 M4-D Official Reading archive reread                       DONE
 M5  Home projection composition                          DONE
 M6  Chat Hub + server-authorized read path               DONE
@@ -571,3 +572,22 @@ M4-D invariants:
 - archive reread never starts Chat, mutates Records, or creates a new Reading;
 - a missing/not-owner/non-openable record fails closed instead of falling back
   to current Preview or another Reading.
+
+
+## 20. M4-E Target Persons read-only projection
+
+Mobile My may read the current subject's existing Target Persons through:
+
+```text
+GET /api/target-persons
+```
+
+M4-E invariants:
+
+- the active Member/Guest subject bearer is the only client identity evidence;
+- Mobile never sends a subject id in query/body data;
+- Target Person ids, Birth Profile ids, and current revision ids are validated as UUIDs;
+- duplicate Target Person or Birth Profile identities fail closed;
+- only the server-returned display label, relationship label, and current Birth revision input are rendered;
+- Target Person create, edit, deletion, birth correction, comparison, compatibility scoring, or Reading execution are not activated;
+- My Profile and self Birth remain usable when the Target Person read independently fails.

@@ -1,9 +1,11 @@
 import {
   readCurrentBirthProfileV1,
   readCurrentSubjectProfileV1,
+  listTargetPersonsV1,
   type CurrentBirthProfileV1,
   type CurrentSubjectProfileV1,
   type MyeongHaApiClientV1,
+  type TargetPersonV1,
 } from '@myeongha/api-client';
 
 import type { MobileSubjectSessionCoordinatorV1 } from '@/core/session/mobile-subject-session';
@@ -11,6 +13,7 @@ import type { MobileSubjectSessionCoordinatorV1 } from '@/core/session/mobile-su
 export interface MobileMyServiceV1 {
   readProfile(): Promise<CurrentSubjectProfileV1>;
   readBirth(): Promise<CurrentBirthProfileV1 | null>;
+  readTargetPersons(): Promise<readonly TargetPersonV1[]>;
 }
 
 export function createMobileMyServiceV1(input: {
@@ -26,6 +29,11 @@ export function createMobileMyServiceV1(input: {
     readBirth() {
       return input.session.withActiveBearer((bearer) =>
         readCurrentBirthProfileV1(input.client, bearer),
+      );
+    },
+    readTargetPersons() {
+      return input.session.withActiveBearer((bearer) =>
+        listTargetPersonsV1(input.client, bearer),
       );
     },
   });
