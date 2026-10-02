@@ -33,7 +33,6 @@ function sanitizeCliOutput(value) {
   return String(value ?? '')
     .replace(/\u001b\[[0-9;]*m/gu, '')
     .replace(/vcp_[A-Za-z0-9._-]+/gu, '[REDACTED_TOKEN]')
-    .replace(/Authorization:\s*Bearer\s+\S+/giu, 'Authorization: Bearer [REDACTED]')
     .trim()
     .slice(0, 1200);
 }
