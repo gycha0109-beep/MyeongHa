@@ -294,11 +294,7 @@ export async function executeSecurityObservedNodeRequestV1(
       durationMs: boundedDurationMs(state.startedAt, completedAt),
       writer: state.writer,
     });
-    try {
-      await input.writeResponse(genericInternalServerError());
-    } catch {
-      throw new Error('Security-observed Node fallback response write failed.');
-    }
+    await input.writeResponse(genericInternalServerError());
     return;
   }
 
@@ -315,7 +311,7 @@ export async function executeSecurityObservedNodeRequestV1(
 
   try {
     await input.writeResponse(response);
-  } catch {
+  } catch (error) {
     const failedAt = state.now();
     emitUnexpectedException({
       routeId: state.routeId,
@@ -325,6 +321,6 @@ export async function executeSecurityObservedNodeRequestV1(
       durationMs: boundedDurationMs(state.startedAt, failedAt),
       writer: state.writer,
     });
-    throw new Error('Security-observed Node response write failed.');
+    throw error;
   }
 }
