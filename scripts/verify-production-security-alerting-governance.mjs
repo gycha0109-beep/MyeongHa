@@ -168,9 +168,13 @@ expectEqual(
 expectEqual(
   'authority.activation.state',
   authority.activation?.state,
-  'PENDING_ACTIVATION',
+  'ACTIVE',
 );
-expectEqual('authority.activation.providerRuleId', authority.activation?.providerRuleId, null);
+expectEqual(
+  'authority.activation.providerRuleId',
+  authority.activation?.providerRuleId,
+  'ar_01a0fb72-ee7b-723e-943c-7fd428917c2e',
+);
 
 for (const fragment of [
   'workflow_dispatch:',
