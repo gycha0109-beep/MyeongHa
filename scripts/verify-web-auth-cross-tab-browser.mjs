@@ -19,6 +19,7 @@ const memberRefreshToken = 'cross-refresh-token';
 const rotatedMemberAccessToken = 'cross2.header2.signature2';
 const rotatedMemberRefreshToken = 'cross-refresh-token-rotated';
 const tabBGuestBearer = 'cross-tab-guest-b';
+const refreshCookieName = 'myeongha_member_refresh_v1';
 const mime = new Map([
   ['.html', 'text/html; charset=utf-8'],
   ['.css', 'text/css; charset=utf-8'],
@@ -59,14 +60,44 @@ function errorEnvelope(code, messageKey, retryable = false) {
   };
 }
 
-function memberSession({ accessToken = memberAccessToken, refreshToken = memberRefreshToken } = {}) {
+function memberSession({ accessToken = memberAccessToken } = {}) {
   return {
     accessToken,
-    refreshToken,
     expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
     tokenType: 'bearer',
     user: { id: testIdentity.id, email: testIdentity.email },
   };
+}
+
+function readRefreshCookie(req) {
+  const raw = req.headers.cookie ?? '';
+  for (const segment of raw.split(';')) {
+    const trimmed = segment.trim();
+    const separator = trimmed.indexOf('=');
+    if (separator <= 0 || trimmed.slice(0, separator) !== refreshCookieName) continue;
+    try {
+      return decodeURIComponent(trimmed.slice(separator + 1));
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+function setRefreshCookie(res, token) {
+  // Production Secure is pinned by the cookie unit test. This loopback HTTP
+  // harness omits Secure only so Chrome can exercise cookie rotation.
+  res.setHeader(
+    'Set-Cookie',
+    refreshCookieName + '=' + encodeURIComponent(token) + '; Path=/api/auth; HttpOnly; SameSite=Strict',
+  );
+}
+
+function clearRefreshCookie(res) {
+  res.setHeader(
+    'Set-Cookie',
+    refreshCookieName + '=; Path=/api/auth; HttpOnly; SameSite=Strict; Max-Age=0',
+  );
 }
 
 function sendJson(res, status, payload) {
@@ -87,38 +118,60 @@ async function serve() {
       const url = new URL(req.url ?? '/', 'http://127.0.0.1');
       const pathname = decodeURIComponent(url.pathname);
       const authorization = req.headers.authorization ?? null;
+      const authTransport = req.headers['x-myeongha-auth-transport'] ?? null;
 
       if (pathname === '/api/auth/sign-in' && req.method === 'POST') {
         const body = await readJsonBody(req);
-        requests.push({ path: pathname, method: req.method, authorization });
-        if (body.email !== testIdentity.email || body.password !== testIdentity.password) {
+        requests.push({ path: pathname, method: req.method, authorization, authTransport });
+        if (
+          authTransport !== 'web-cookie-v1' ||
+          body.email !== testIdentity.email ||
+          body.password !== testIdentity.password
+        ) {
           sendJson(res, 401, errorEnvelope('INVALID_CREDENTIALS', 'auth.invalid_credentials'));
           return;
         }
+        setRefreshCookie(res, memberRefreshToken);
         sendJson(res, 200, successEnvelope({ status: 'authenticated', session: memberSession() }));
         return;
       }
 
       if (pathname === '/api/auth/refresh' && req.method === 'POST') {
         const body = await readJsonBody(req);
-        requests.push({ path: pathname, method: req.method, authorization, refreshToken: body.refreshToken ?? null });
-        if (body.refreshToken !== memberRefreshToken) {
+        const cookieRefreshToken = readRefreshCookie(req);
+        requests.push({
+          path: pathname,
+          method: req.method,
+          authorization,
+          authTransport,
+          cookieRefreshToken,
+          bodyRefreshToken: body.refreshToken ?? null,
+        });
+        if (
+          authTransport !== 'web-cookie-v1' ||
+          cookieRefreshToken !== memberRefreshToken ||
+          body.refreshToken !== undefined
+        ) {
           sendJson(res, 401, errorEnvelope('SESSION_EXPIRED', 'auth.session_expired'));
           return;
         }
+        setRefreshCookie(res, rotatedMemberRefreshToken);
         sendJson(res, 200, successEnvelope({
           status: 'authenticated',
           session: memberSession({
             accessToken: rotatedMemberAccessToken,
-            refreshToken: rotatedMemberRefreshToken,
           }),
         }));
         return;
       }
 
       if (pathname === '/api/auth/sign-out' && req.method === 'POST') {
-        requests.push({ path: pathname, method: req.method, authorization });
-        if (authorization !== `Bearer ${rotatedMemberAccessToken}`) {
+        requests.push({ path: pathname, method: req.method, authorization, authTransport });
+        clearRefreshCookie(res);
+        if (
+          authTransport !== 'web-cookie-v1' ||
+          authorization !== `Bearer ${rotatedMemberAccessToken}`
+        ) {
           sendJson(res, 401, errorEnvelope('AUTH_REQUIRED', 'auth.required'));
           return;
         }
@@ -411,12 +464,12 @@ try {
     const session = await auth.refreshMemberSession();
     return {
       accessToken: session.accessToken,
-      refreshToken: session.refreshToken,
+      hasRefreshToken: Object.prototype.hasOwnProperty.call(session, 'refreshToken'),
       userId: session.user?.id ?? null,
     };
   })()`);
   assert(refreshedTabA.accessToken === rotatedMemberAccessToken, 'Tab A refresh did not rotate the Member access token');
-  assert(refreshedTabA.refreshToken === rotatedMemberRefreshToken, 'Tab A refresh did not rotate the Member refresh token');
+  assert(refreshedTabA.hasRefreshToken === false, 'Tab A refresh exposed the hidden Member refresh credential');
   assert(refreshedTabA.userId === testIdentity.id, 'Tab A refresh changed the Member identity');
 
   await waitFor(
@@ -425,7 +478,7 @@ try {
       const member = JSON.parse(localStorage.getItem('myeongha.memberSession.v1') ?? 'null');
       return document.querySelector('.product-profile')?.dataset.authState === 'member'
         && member?.accessToken === ${JSON.stringify(rotatedMemberAccessToken)}
-        && member?.refreshToken === ${JSON.stringify(rotatedMemberRefreshToken)}
+        && !Object.prototype.hasOwnProperty.call(member ?? {}, 'refreshToken')
         && sessionStorage.getItem('myeongha.guestBearer.v1') === ${JSON.stringify(rotatedMemberAccessToken)}
         && sessionStorage.getItem('myeongha.pendingGuestBearer.v1') === ${JSON.stringify(tabBGuestBearer)};
     })()`,
@@ -436,7 +489,7 @@ try {
   assert(rotatedTabB.authState === 'member' && rotatedTabB.authLabel === '마이 페이지', 'Tab B lost Member UI during cross-tab refresh rotation');
   assert(rotatedTabB.memberUserId === testIdentity.id, 'Tab B refresh convergence changed the Member identity');
   assert(rotatedTabB.memberAccessToken === rotatedMemberAccessToken, 'Tab B kept the stale Member access token after rotation');
-  assert(rotatedTabB.memberRefreshToken === rotatedMemberRefreshToken, 'Tab B kept the stale Member refresh token after rotation');
+  assert(rotatedTabB.memberRefreshToken === null, 'Tab B exposed a Member refresh token after rotation');
   assert(rotatedTabB.activeBearer === rotatedMemberAccessToken, 'Tab B compatibility bearer did not rotate with the Member session');
   assert(rotatedTabB.pendingGuest === tabBGuestBearer, 'Tab B consumed its staged Guest during Member token rotation');
   assert(rotatedBearer.active?.kind === 'member' && rotatedBearer.active?.token === rotatedMemberAccessToken, 'Tab B active bearer resolver did not expose the rotated Member token');
@@ -485,7 +538,9 @@ try {
   const bootstraps = requests.filter((request) => request.path === '/api/session/bootstrap');
   assert(signIns.length === 1, `Expected one sign-in request, received ${signIns.length}`);
   assert(refreshes.length === 1, `Expected one refresh request, received ${refreshes.length}`);
-  assert(refreshes[0].refreshToken === memberRefreshToken, 'Cross-tab refresh did not use the original Member refresh credential');
+  assert(refreshes[0].cookieRefreshToken === memberRefreshToken, 'Cross-tab refresh did not use the original HttpOnly refresh credential');
+  assert(refreshes[0].bodyRefreshToken === null, 'Cross-tab refresh leaked the Member refresh credential into request JSON');
+  assert(refreshes[0].authTransport === 'web-cookie-v1', 'Cross-tab refresh did not declare the Web cookie transport');
   assert(signOuts.length === 1, `Expected one sign-out request, received ${signOuts.length}`);
   assert(signOuts[0].authorization === `Bearer ${rotatedMemberAccessToken}`, 'Cross-tab sign-out did not use the rotated Member bearer');
   assert(profileReads.some((request) => request.authorization === `Bearer ${rotatedMemberAccessToken}`), 'My page did not use the rotated Member bearer after cross-tab refresh');
