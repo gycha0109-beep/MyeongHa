@@ -45,8 +45,9 @@
     "ruleConfig": "config/security/vercel-production-5xx-error-anomaly-rule-v1.json",
     "providerRuleId": null,
     "state": "PENDING_ACTIVATION",
-    "providerApi": "/alerts/v3/alert-rules",
-    "providerTransport": "direct-bearer-api",
+    "providerInterface": "alerts-rules-cli",
+    "providerTransport": "official-vercel-cli",
+    "providerCliPackage": "vercel@59.19.1",
     "teamScopedCredentialRequired": true
   },
   "privacy": {
