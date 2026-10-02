@@ -301,6 +301,12 @@
       "prMode": "routed-via-ci",
       "mainMode": "none",
       "workTrackAttribution": "caller-pr-metadata"
+    },
+    "mobile-push-production-activate.yml": {
+      "responsibility": "mobile-push-production-activation",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "dispatch-input-or-commit-metadata"
     }
   }
 }

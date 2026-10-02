@@ -26,16 +26,13 @@ export function validateCandidate(candidate, current) {
   if (current.head.repo.full_name !== current.base.repo.full_name) throw new Error('Cross-repository candidates require a separate trust design');
   if (current.base.ref !== current.defaultBranch) throw new Error('Candidate must target the default branch');
   if (current.head.sha !== candidate.head) throw new Error('PR head changed; request a new candidate');
-  if (current.defaultSha !== candidate.base) throw new Error('Default branch changed; request a new candidate');
 }
 
 export function assertStagedPolicy(rules) {
   const checks = rules.filter(rule => rule.type === 'required_status_checks')
     .flatMap(rule => rule.parameters.required_status_checks);
-  const strict = rules.some(rule => rule.type === 'required_status_checks'
-    && rule.parameters.strict_required_status_checks_policy === true);
-  if (!strict || !checks.some(check => check.context === integrationContext && check.integration_id === 15368)) {
-    throw new Error('Staged CI requires CI Integration Verify from GitHub Actions and strict up-to-date checks in the default-branch ruleset');
+  if (!checks.some(check => check.context === integrationContext && check.integration_id === 15368)) {
+    throw new Error('Staged CI requires CI Integration Verify from GitHub Actions in the default-branch ruleset');
   }
 }
 

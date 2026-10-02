@@ -72,11 +72,41 @@ iOS bundleIdentifier = com.myeongha.app
 Android package       = com.myeongha.app
 ```
 
+## Production activation workflow
+
+Repository automation is defined in:
+
+`.github/workflows/mobile-push-production-activate.yml`
+
+It requires two external automation credentials in the GitHub `production` Environment:
+
+```text
+VERCEL_MOBILE_PUSH_ACTIVATION_TOKEN
+EXPO_TOKEN
+```
+
+The Vercel credential is deliberately separate from `VERCEL_SECURITY_ALERTS_TOKEN`; the
+security-alert credential is not reused outside its governed purpose.
+
+When both credentials exist, the activation workflow:
+
+1. creates the two server token-protection values only when absent;
+2. stores them as Vercel **sensitive** Production variables without emitting their values;
+3. creates or links the EAS project non-interactively;
+4. stores the resolved project UUID as `EXPO_PUBLIC_EAS_PROJECT_ID` in the EAS Production environment;
+5. verifies the source activation contract;
+6. redeploys current Vercel Production so the new server secrets are active;
+7. smoke-checks both canonical Device Installation routes.
+
+If either automation credential is absent, preflight records only the missing credential
+name and skips all external mutation.
+
 ## Current boundary
 
-As of 2026-10-02, source and runtime implementation are complete, but activation remains
-externally blocked until the real EAS project UUID and both Production server secrets are
-provisioned.
+As of 2026-10-02, source/runtime implementation and the guarded activation path are
+implemented. External activation remains blocked whenever either dedicated automation
+credential is absent.
 
-A successful preflight means the registration plumbing can be activated. It does **not**
-mean notification sending or scheduler authority is complete.
+A successful activation means registration plumbing is live. It does **not** authorize
+notification creation, sending, retry/failover, or scheduler cadence; those remain under
+`SRC-31` and `SRC-32`.

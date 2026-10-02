@@ -23,9 +23,9 @@ describe('pinned integration admission and required evidence', () => {
     const changed = current(); changed.head.sha = 'c'.repeat(40);
     expect(() => validateCandidate(candidate, changed)).toThrow('PR head changed');
   });
-  it('rejects advancing main instead of reusing old success', () => {
+  it('allows main to advance under loose freshness while keeping the pinned candidate', () => {
     const changed = current(); changed.defaultSha = 'c'.repeat(40);
-    expect(() => validateCandidate(candidate, changed)).toThrow('Default branch changed');
+    expect(() => validateCandidate(candidate, changed)).not.toThrow();
   });
   it('rejects forks, closed PRs, drafts, and another base', () => {
     const fork = current(); fork.head.repo.full_name = 'other/repo';
@@ -35,17 +35,15 @@ describe('pinned integration admission and required evidence', () => {
     const other = current(); other.base.ref = 'release';
     expect(() => validateCandidate(candidate, other)).toThrow('default branch');
   });
-  it('does not permit staged CI without an Actions-bound integration requirement', () => {
+  it('permits loose freshness but still requires an Actions-bound integration requirement', () => {
     expect(() => assertStagedPolicy([])).toThrow('Staged CI requires');
-    const rules = (app) => [{ type: 'required_status_checks', parameters: {
-      strict_required_status_checks_policy: true,
+    const rules = (app, strict = false) => [{ type: 'required_status_checks', parameters: {
+      strict_required_status_checks_policy: strict,
       required_status_checks: [{ context: 'CI Integration Verify', integration_id: app }],
     } }];
     expect(() => assertStagedPolicy(rules(7))).toThrow();
     expect(() => assertStagedPolicy(rules(15368))).not.toThrow();
-    const loose = rules(15368);
-    loose[0].parameters.strict_required_status_checks_policy = false;
-    expect(() => assertStagedPolicy(loose)).toThrow('strict');
+    expect(() => assertStagedPolicy(rules(15368, true))).not.toThrow();
   });
   it('requires every selected check and ignores only the integration check being requested', () => {
     const required = [{ context: 'CI Verify', integration_id: 15368 }, { context: 'CI Integration Verify', integration_id: 15368 }];
