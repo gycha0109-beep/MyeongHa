@@ -236,12 +236,6 @@
       "mainMode": "manual",
       "workTrackAttribution": "dispatch-input"
     },
-    "production-privileged-postgres-tls-readonly-proof.yml": {
-      "responsibility": "postgres-transport-security",
-      "prMode": "none",
-      "mainMode": "manual",
-      "workTrackAttribution": "dispatch-input"
-    },
     "production-records-current-subject-smoke.yml": {
       "responsibility": "production-records-smoke",
       "prMode": "none",
