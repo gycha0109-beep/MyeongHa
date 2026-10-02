@@ -569,6 +569,9 @@ async function postJson(endpoint, body, authorization = null, options = undefine
     Accept: 'application/json',
     'Content-Type': 'application/json',
   });
+  if (endpoint.startsWith('/api/auth/')) {
+    headers.set('X-MyeongHa-Auth-Transport', 'web-cookie-v1');
+  }
   if (authorization) headers.set('Authorization', `Bearer ${authorization}`);
   let response;
   try {
