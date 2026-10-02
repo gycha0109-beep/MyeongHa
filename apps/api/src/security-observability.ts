@@ -38,12 +38,20 @@ export interface ExecuteSecurityObservedRequestInputV1 {
 }
 
 const ROUTE_ID_PATTERN = /^[a-z0-9][a-z0-9._:-]{0,127}$/u;
+const REQUEST_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
 const METHOD_PATTERN = /^[A-Z]{1,16}$/u;
 const NO_STORE = 'no-store' as const;
 
 function requireRouteId(value: string): string {
   if (!ROUTE_ID_PATTERN.test(value)) {
     throw new Error('Security observability routeId must be a bounded static key.');
+  }
+  return value;
+}
+
+function requireRequestId(value: string): string {
+  if (!REQUEST_ID_PATTERN.test(value)) {
+    throw new Error('Security observability requestId must be a bounded opaque key.');
   }
   return value;
 }
@@ -127,7 +135,7 @@ export async function executeSecurityObservedRequestV1(
 ): Promise<Response> {
   const routeId = requireRouteId(input.routeId);
   const method = requireMethod(input.request.method);
-  const requestId = (input.requestIdFactory ?? randomUUID)();
+  const requestId = requireRequestId((input.requestIdFactory ?? randomUUID)());
   const now = input.now ?? Date.now;
   const writer = input.eventWriter ?? defaultEventWriter;
   const startedAt = now();
