@@ -58,7 +58,8 @@ for (const fragment of [
   'MYEONGHA_WORKER_DATABASE_PRINCIPAL: myeongha_worker_runtime',
   '[[ "$MYEONGHA_WORKER_DATABASE_TLS_PEER_MODE" == \'verify-full\' ]]',
   '[[ -n "${MYEONGHA_WORKER_DATABASE_SSL_ROOT_CERT_PEM:-}" ]] || missing+=(MYEONGHA_WORKER_DATABASE_SSL_ROOT_CERT_PEM)',
-  'MYEONGHA_PRIVACY_CANARY_ADMIN_DATABASE_URL',
+  'SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}',
+  'SUPABASE_PRODUCTION_SESSION_POOLER_HOST: ${{ secrets.SUPABASE_PRODUCTION_SESSION_POOLER_HOST }}',
   'node scripts/run-production-privacy-recovery-canary.mjs prepare',
   'gh workflow run production-postgres-backup.yml --ref main',
   'node scripts/run-production-privacy-recovery-canary.mjs execute',
@@ -99,6 +100,10 @@ for (const fragment of [
   'env?decrypt=true',
   'Resolve governed Production API database binding from Vercel',
   'SUPABASE_ACCESS_TOKEN',
+  'MYEONGHA_PRIVACY_CANARY_ADMIN_DATABASE_URL',
+  'sslmode=require',
+  'sslmode=prefer',
+  'sslmode=verify-ca',
 ]) {
   forbidFragment(workflow, fragment, workflowPath);
 }
@@ -111,7 +116,7 @@ if (adminPoolStart < 0 || adminPoolEnd <= adminPoolStart) {
 const adminPoolContract = runtime.slice(adminPoolStart, adminPoolEnd);
 for (const fragment of [
   'buildProductionPrivilegedPostgresStrictTlsTargetV1',
-  "requiredEnv('MYEONGHA_PRIVACY_CANARY_ADMIN_DATABASE_URL')",
+  'privilegedAdminDatabaseUrl()',
   "requiredEnv(\n      'MYEONGHA_WORKER_DATABASE_SSL_ROOT_CERT_PEM'",
   'connectionString: target.connectionString',
   'ssl: target.ssl',
@@ -123,6 +128,32 @@ for (const fragment of [
   'buildNodePostgresPoolConfigV1',
 ]) {
   forbidFragment(adminPoolContract, fragment, runtimePath);
+}
+
+
+const adminUrlStart = runtime.indexOf('function privilegedAdminDatabaseUrl()');
+const adminUrlEnd = runtime.indexOf('function requireRunId', adminUrlStart);
+if (adminUrlStart < 0 || adminUrlEnd <= adminUrlStart) {
+  throw new Error(`${runtimePath} must retain the privileged admin URL builder boundary.`);
+}
+const adminUrlContract = runtime.slice(adminUrlStart, adminUrlEnd);
+for (const fragment of [
+  "new URL('postgresql://localhost/postgres')",
+  "requiredEnv('SUPABASE_PRODUCTION_SESSION_POOLER_HOST')",
+  "url.port = '5432'",
+  "url.username = `postgres.${PROJECT_REF}`",
+  "url.password = requiredEnv('SUPABASE_DB_PASSWORD')",
+  "url.searchParams.set('sslmode', 'verify-full')",
+]) {
+  requireFragment(adminUrlContract, fragment, runtimePath);
+}
+for (const fragment of [
+  "sslmode', 'require",
+  "sslmode', 'prefer",
+  "sslmode', 'verify-ca",
+  'MYEONGHA_PRIVACY_CANARY_ADMIN_DATABASE_URL',
+]) {
+  forbidFragment(adminUrlContract, fragment, runtimePath);
 }
 
 const runtimePathsIndex = workflow.indexOf(
@@ -308,5 +339,5 @@ for (const fragment of [
 }
 
 console.log(
-  'Production privacy recovery canary workflow verification passed: workflow_dispatch-only ops attribution, strict worker TLS binding, explicit one-time worker-password synchronization, pre-mutation worker DB preflight, fresh-or-resume canary recovery, ephemeral least-privilege API login, dedicated worker, hosted Auth cleanup, governed backup binding, non-zero canonical ledger gate, identifier-free evidence, and DR fail-closed semantics are pinned.',
+  'Production privacy recovery canary workflow verification passed: workflow_dispatch-only ops attribution, privileged admin verify-full URL construction without a workflow credential carrier, strict worker TLS binding, explicit one-time worker-password synchronization, pre-mutation worker DB preflight, fresh-or-resume canary recovery, ephemeral least-privilege API login, dedicated worker, hosted Auth cleanup, governed backup binding, non-zero canonical ledger gate, identifier-free evidence, and DR fail-closed semantics are pinned.',
 );
