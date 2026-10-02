@@ -33,7 +33,6 @@ class MemoryStorage {
 
 const memberSession = Object.freeze({
   accessToken: 'header.payload.signature',
-  refreshToken: 'refresh-token',
   expiresAt: '2099-01-01T00:00:00.000Z',
   tokenType: 'bearer',
   user: {
@@ -49,7 +48,6 @@ function seedMemberSession({
   withPendingGuest?: boolean;
   session?: {
     accessToken: string;
-    refreshToken: string;
     expiresAt: string;
     tokenType: string;
     user: { id: string; email: string };
@@ -120,7 +118,6 @@ describe('Member session invalidation at the canonical current-subject boundary'
 
     expect(readMemberSession()).toMatchObject({
       accessToken: memberSession.accessToken,
-      refreshToken: memberSession.refreshToken,
     });
     expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.guestBearer)).toBe(memberSession.accessToken);
     expect(globalThis.dispatchEvent).not.toHaveBeenCalled();
@@ -135,7 +132,6 @@ describe('Member session invalidation at the canonical current-subject boundary'
 
     expect(readMemberSession()).toMatchObject({
       accessToken: memberSession.accessToken,
-      refreshToken: memberSession.refreshToken,
     });
     expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.guestBearer)).toBe(memberSession.accessToken);
     expect(globalThis.dispatchEvent).not.toHaveBeenCalled();
@@ -189,7 +185,6 @@ describe('Member session refresh failure authority', () => {
 
     expect(readMemberSession()).toMatchObject({
       accessToken: memberSession.accessToken,
-      refreshToken: memberSession.refreshToken,
     });
     expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.guestBearer)).toBe(memberSession.accessToken);
     expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.pendingGuestBearer)).toBe('guest-before-member');
@@ -204,7 +199,6 @@ describe('Member session refresh failure authority', () => {
 
     expect(readMemberSession()).toMatchObject({
       accessToken: memberSession.accessToken,
-      refreshToken: memberSession.refreshToken,
     });
     expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.guestBearer)).toBe(memberSession.accessToken);
     expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.pendingGuestBearer)).toBe('guest-before-member');
@@ -223,7 +217,6 @@ describe('Member session refresh failure authority', () => {
 
     expect(readMemberSession()).toMatchObject({
       accessToken: nearExpirySession.accessToken,
-      refreshToken: nearExpirySession.refreshToken,
     });
     expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.guestBearer)).toBe(nearExpirySession.accessToken);
     expect(globalThis.dispatchEvent).not.toHaveBeenCalled();
@@ -241,7 +234,6 @@ describe('Member session refresh failure authority', () => {
 
     expect(readMemberSession()).toMatchObject({
       accessToken: expiredSession.accessToken,
-      refreshToken: expiredSession.refreshToken,
     });
     expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.guestBearer)).toBe(expiredSession.accessToken);
     expect(globalThis.dispatchEvent).not.toHaveBeenCalled();
@@ -252,7 +244,6 @@ describe('Member session refresh failure authority', () => {
     const refreshedSession = {
       ...memberSession,
       accessToken: 'newheader.newpayload.newsignature',
-      refreshToken: 'rotated-refresh-token',
       expiresAt: '2099-01-02T00:00:00.000Z',
     };
     vi.stubGlobal('fetch', vi.fn(async () => Response.json({
@@ -262,12 +253,10 @@ describe('Member session refresh failure authority', () => {
 
     await expect(refreshMemberSession()).resolves.toMatchObject({
       accessToken: refreshedSession.accessToken,
-      refreshToken: refreshedSession.refreshToken,
     });
 
     expect(readMemberSession()).toMatchObject({
       accessToken: refreshedSession.accessToken,
-      refreshToken: refreshedSession.refreshToken,
     });
     expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.guestBearer)).toBe(refreshedSession.accessToken);
     expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.pendingGuestBearer)).toBe('guest-before-member');
@@ -290,7 +279,6 @@ describe('Recoverable Member identity must not downgrade to Guest', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(readMemberSession()).toMatchObject({
       accessToken: expiredSession.accessToken,
-      refreshToken: expiredSession.refreshToken,
     });
     expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.guestBearer)).toBe(expiredSession.accessToken);
     expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.pendingGuestBearer)).toBe('guest-before-member');
