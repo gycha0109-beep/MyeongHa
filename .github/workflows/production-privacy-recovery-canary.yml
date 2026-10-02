@@ -135,16 +135,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          encoded_password="$(python3 - <<'PY'
-          import os
-          import urllib.parse
-          print(urllib.parse.quote(os.environ['SUPABASE_DB_PASSWORD'], safe=''))
-          PY
-          )"
-          admin_url="postgresql://postgres.cnsfpcdiyofqvhpcegfc:${encoded_password}@${SUPABASE_PRODUCTION_SESSION_POOLER_HOST}:5432/postgres?sslmode=require"
-          echo "::add-mask::$admin_url"
           {
-            echo "MYEONGHA_PRIVACY_CANARY_ADMIN_DATABASE_URL=$admin_url"
             echo "MYEONGHA_PRIVACY_CANARY_STATE_PATH=$RUNNER_TEMP/production-privacy-canary-state.json"
             echo "MYEONGHA_PRIVACY_CANARY_EVIDENCE_PATH=$RUNNER_TEMP/production-privacy-canary-evidence.json"
           } >> "$GITHUB_ENV"
