@@ -31,14 +31,14 @@ export interface SecurityObservedExecutionContextV1 {
 }
 
 interface SecurityObservedOperationInputV1 {
-  readonly method?: string;
+  readonly method?: string | undefined;
   readonly routeId: string;
   readonly execute: (
     context: SecurityObservedExecutionContextV1,
   ) => Response | Promise<Response>;
-  readonly requestIdFactory?: () => string;
-  readonly now?: () => number;
-  readonly eventWriter?: SecurityEventWriterV1;
+  readonly requestIdFactory?: (() => string) | undefined;
+  readonly now?: (() => number) | undefined;
+  readonly eventWriter?: SecurityEventWriterV1 | undefined;
 }
 
 export interface ExecuteSecurityObservedRequestInputV1
