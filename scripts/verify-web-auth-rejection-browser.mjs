@@ -65,7 +65,6 @@ async function readJsonBody(req) {
 function memberSession() {
   return {
     accessToken: memberAccessToken,
-    refreshToken: memberRefreshToken,
     expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
     tokenType: 'bearer',
     user: { id: identity.id, email: identity.email },
