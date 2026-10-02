@@ -213,7 +213,8 @@ function getChatPathThreadId(pathname: string): string | null | undefined {
     pathname === MEMORIES_ROUTE ||
     pathname === TARGET_PERSONS_ROUTE ||
     pathname === SAJU_PREVIEW_READING_ROUTE ||
-    pathname.startsWith(TARGET_PERSON_ROUTE_PREFIX)
+    pathname.startsWith(TARGET_PERSON_ROUTE_PREFIX) ||
+    pathname.startsWith(DEVICE_INSTALLATION_REVOKE_PREFIX)
   ) {
     return undefined;
   }
@@ -245,6 +246,27 @@ function getTargetPersonPathValue(pathname: string): 'list' | string | null | un
   }
 }
 
+function getDeviceInstallationPathValue(
+  pathname: string,
+): 'register' | string | null | undefined {
+  if (pathname === DEVICE_INSTALLATION_REGISTER_ROUTE) return 'register';
+  if (!pathname.startsWith(DEVICE_INSTALLATION_REVOKE_PREFIX)) return undefined;
+  if (!pathname.endsWith(DEVICE_INSTALLATION_REVOKE_SUFFIX)) return null;
+
+  const rawSegment = pathname.slice(
+    DEVICE_INSTALLATION_REVOKE_PREFIX.length,
+    -DEVICE_INSTALLATION_REVOKE_SUFFIX.length,
+  );
+  if (rawSegment.length === 0 || rawSegment.includes('/')) return null;
+
+  try {
+    const installationId = decodeURIComponent(rawSegment);
+    return isUuid(installationId) ? installationId : null;
+  } catch {
+    return null;
+  }
+}
+
 function resolveDispatchTarget(request: Request): DispatchTarget | null {
   const url = new URL(request.url);
   if (url.hash !== '') return null;
@@ -253,6 +275,9 @@ function resolveDispatchTarget(request: Request): DispatchTarget | null {
   if (pathThreadId === null) return null;
   const targetPersonPathValue = getTargetPersonPathValue(url.pathname);
   if (targetPersonPathValue === null) return null;
+  const deviceInstallationPathValue =
+    getDeviceInstallationPathValue(url.pathname);
+  if (deviceInstallationPathValue === null) return null;
 
   const keys = [...new Set(url.searchParams.keys())];
   const knownKeys = new Set<string>([
@@ -365,7 +390,6 @@ function resolveDispatchTarget(request: Request): DispatchTarget | null {
 
   if (deviceInstallationAction !== undefined) {
     if (
-      url.pathname !== PROFILE_ROUTE ||
       recordsRoute !== undefined ||
       hasChatOpen ||
       chatThreadId !== undefined ||
@@ -375,14 +399,20 @@ function resolveDispatchTarget(request: Request): DispatchTarget | null {
       sajuPreviewReading !== undefined ||
       targetPersonRead !== undefined ||
       targetPersonId !== undefined ||
-      vercelDynamicTargetPersonId !== undefined ||
       targetPersonPathValue !== undefined
     ) {
       return null;
     }
 
     if (deviceInstallationAction === 'register') {
-      if (deviceInstallationId !== undefined) return null;
+      if (
+        deviceInstallationId !== undefined ||
+        vercelDynamicTargetPersonId !== undefined ||
+        (url.pathname !== PROFILE_ROUTE &&
+          deviceInstallationPathValue !== 'register')
+      ) {
+        return null;
+      }
       return {
         kind: 'device-installation-register',
         route: DEVICE_INSTALLATION_REGISTER_ROUTE,
@@ -391,7 +421,13 @@ function resolveDispatchTarget(request: Request): DispatchTarget | null {
 
     if (
       deviceInstallationId === undefined ||
-      !isUuid(deviceInstallationId)
+      !isUuid(deviceInstallationId) ||
+      (vercelDynamicTargetPersonId !== undefined &&
+        vercelDynamicTargetPersonId !== deviceInstallationId) ||
+      (deviceInstallationPathValue !== undefined &&
+        deviceInstallationPathValue !== deviceInstallationId) ||
+      (url.pathname !== PROFILE_ROUTE &&
+        deviceInstallationPathValue !== deviceInstallationId)
     ) {
       return null;
     }
@@ -401,7 +437,12 @@ function resolveDispatchTarget(request: Request): DispatchTarget | null {
       installationId: deviceInstallationId,
     };
   }
-  if (deviceInstallationId !== undefined) return null;
+  if (
+    deviceInstallationId !== undefined ||
+    deviceInstallationPathValue !== undefined
+  ) {
+    return null;
+  }
   if (isChatOpenSourcePath && !hasChatOpen) return null;
   if (hasChatOpen && recordsRoute !== undefined) return null;
   if (hasChatOpen && chatThreadId !== undefined) return null;
