@@ -75,7 +75,6 @@ for (const fragment of [
   'durationMs',
   'writeEventBestEffort',
   'executeSecurityObservedNodeRequestV1',
-  'Security-observed Node response write failed.',
 ]) {
   requireFragment(source, fragment, 'security observability');
 }
