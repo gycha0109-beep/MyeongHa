@@ -294,7 +294,11 @@ export async function executeSecurityObservedNodeRequestV1(
       durationMs: boundedDurationMs(state.startedAt, completedAt),
       writer: state.writer,
     });
-    await input.writeResponse(genericInternalServerError());
+    try {
+      await input.writeResponse(genericInternalServerError());
+    } catch {
+      throw new Error('Security-observed Node fallback response write failed.');
+    }
     return;
   }
 
