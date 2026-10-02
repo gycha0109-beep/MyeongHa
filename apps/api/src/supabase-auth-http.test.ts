@@ -24,11 +24,20 @@ const unavailablePasswordGuard = Object.freeze({
   },
 });
 
-function request(body: unknown): Request {
+function request(
+  body: unknown,
+  headers: Readonly<Record<string, string>> = {},
+): Request {
   return new Request('https://myeongha.example/api/auth/sign-in', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...headers },
     body: JSON.stringify(body),
+  });
+}
+
+function refreshRequest(refreshToken: string): Request {
+  return request({}, {
+    Cookie: `myeongha_member_refresh_v1=${encodeURIComponent(refreshToken)}`,
   });
 }
 
@@ -88,8 +97,11 @@ describe('Supabase auth HTTP proxy', () => {
     expect(payload.ok).toBe(true);
     expect(payload.data.status).toBe('authenticated');
     expect(payload.data.session.accessToken).toBe('header.payload.signature');
-    expect(payload.data.session.refreshToken).toBe('refresh-token');
+    expect(payload.data.session.refreshToken).toBeUndefined();
     expect(payload.data.session.user.email).toBe('person@example.com');
+    expect(response.headers.get('set-cookie')).toBe(
+      'myeongha_member_refresh_v1=refresh-token; Path=/api/auth; HttpOnly; Secure; SameSite=Strict',
+    );
     expect(JSON.stringify(payload)).not.toContain(env.MYEONGHA_SUPABASE_API_KEY);
     expect(JSON.stringify(payload)).not.toContain('secret-password');
     expect(upstream).toHaveBeenCalledTimes(1);
@@ -399,7 +411,7 @@ describe('Supabase auth HTTP proxy', () => {
     )));
 
     const response = await handleSupabaseAuthRequestV1({
-      request: request({ refreshToken: 'expired-refresh-token' }),
+      request: refreshRequest('expired-refresh-token'),
       env,
       action: 'refresh',
     });
@@ -410,6 +422,9 @@ describe('Supabase auth HTTP proxy', () => {
       code: 'SESSION_EXPIRED',
       retryable: false,
     });
+    expect(response.headers.get('set-cookie')).toBe(
+      'myeongha_member_refresh_v1=; Path=/api/auth; HttpOnly; Secure; SameSite=Strict; Max-Age=0',
+    );
     expect(JSON.stringify(payload)).not.toContain('refresh token rejected upstream');
   });
 
@@ -420,7 +435,7 @@ describe('Supabase auth HTTP proxy', () => {
     )));
 
     const response = await handleSupabaseAuthRequestV1({
-      request: request({ refreshToken: 'still-valid-refresh-token' }),
+      request: refreshRequest('still-valid-refresh-token'),
       env,
       action: 'refresh',
     });
@@ -431,6 +446,7 @@ describe('Supabase auth HTTP proxy', () => {
       code: 'AUTH_UPSTREAM_UNAVAILABLE',
       retryable: true,
     });
+    expect(response.headers.get('set-cookie')).toBeNull();
     expect(JSON.stringify(payload)).not.toContain('upstream unavailable detail');
   });
 
@@ -440,7 +456,7 @@ describe('Supabase auth HTTP proxy', () => {
     })));
 
     const response = await handleSupabaseAuthRequestV1({
-      request: request({ refreshToken: 'still-valid-refresh-token' }),
+      request: refreshRequest('still-valid-refresh-token'),
       env,
       action: 'refresh',
     });
@@ -451,6 +467,7 @@ describe('Supabase auth HTTP proxy', () => {
       code: 'AUTH_UPSTREAM_MALFORMED',
       retryable: true,
     });
+    expect(response.headers.get('set-cookie')).toBeNull();
   });
 
   it('requires bearer authorization for sign-out before calling Supabase', async () => {
@@ -464,6 +481,9 @@ describe('Supabase auth HTTP proxy', () => {
     });
 
     expect(response.status).toBe(401);
+    expect(response.headers.get('set-cookie')).toBe(
+      'myeongha_member_refresh_v1=; Path=/api/auth; HttpOnly; Secure; SameSite=Strict; Max-Age=0',
+    );
     expect(upstream).not.toHaveBeenCalled();
   });
 });
