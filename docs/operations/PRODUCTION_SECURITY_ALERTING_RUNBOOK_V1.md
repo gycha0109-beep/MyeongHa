@@ -33,6 +33,7 @@ Do not create numeric alert thresholds for these signals until Production baseli
 1. PR containing the alert authority is merged to `main`.
 2. GitHub Production environment is available.
 3. Secret `VERCEL_SECURITY_ALERTS_TOKEN` exists and is scoped only as broadly as needed to manage Vercel alert rules.
+   Project-scoped tokens infer the provider account context; the workflow must not force a user/team `--scope` lookup.
 4. The Vercel team supports the required alert-rule capability.
 5. Operator uses the canonical workflow on `main`.
 
