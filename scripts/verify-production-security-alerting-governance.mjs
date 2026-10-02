@@ -142,6 +142,7 @@ for (const fragment of [
   'default: security',
   'environment: production',
   'VERCEL_SECURITY_ALERTS_TOKEN',
+  '--project prj_nXF0b5uv27Lyucz2SEBxzdCRXVsP',
   'vercel@59.19.1',
   '--ignore-scripts',
   'alerts rules ls',
@@ -159,6 +160,7 @@ for (const fragment of [
   '\nschedule:',
   'echo "$VERCEL_TOKEN"',
   'set -x',
+  '--scope johnny-self',
 ]) {
   forbidFragment(workflow, fragment, workflowPath);
 }
