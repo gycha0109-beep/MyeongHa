@@ -132,3 +132,14 @@ export {
   type TargetPersonCreateRequestV1,
   type TargetPersonV1,
 } from './target-persons.js';
+
+export {
+  MOBILE_PUSH_CLIENT_CAPABILITY_V1,
+  registerDeviceInstallationV1,
+  revokeDeviceInstallationV1,
+  type DeviceInstallationPlatformV1,
+  type DeviceInstallationRegisterRequestV1,
+  type DeviceInstallationRegisterResponseV1,
+  type DeviceInstallationRegistrationStateV1,
+  type DeviceInstallationRevokeResponseV1,
+} from './device-installations.js';

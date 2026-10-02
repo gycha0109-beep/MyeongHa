@@ -397,8 +397,8 @@ write는 `idempotencyKey + expectedRevision` 필요.
 Use Case의 공식 API 목록은 notification preference/inbox를 정의하지만 Device Installation register/revoke HTTP route 이름 자체는 명시하지 않는다. 아래 두 device route는 Pack의 supporting surface 후보이며, source-backed DB/lifecycle 의미와 분리해 본다.
 
 ```text
-POST   /api/device-installations/register      # SRC-19 BLOCKED
-POST   /api/device-installations/:id/revoke    # supporting route candidate; revoke behavior source-safe
+POST   /api/device-installations/register      # Mobile Expo Push lifecycle — SRC-19 RESOLVED
+POST   /api/device-installations/:id/revoke    # owner-scoped idempotent revoke
 GET    /api/notifications                      # final inbox projection SRC-13 BLOCKED
 POST   /api/notifications/:id/read             # explicit owned stored notification read command source-safe
 GET    /api/notification-preferences           # stored-row projection only; effective missing-row defaults SRC-12 BLOCKED
@@ -408,9 +408,9 @@ PATCH  /api/notification-preferences/preview   # SRC-12 BLOCKED
 
 ### Device installation lifecycle
 
-`SRC-19` 해결 전 register endpoint를 production-authoritative contract로 승격하지 않는다. Source는 active identity/token uniqueness와 cross-subject revoke-before-rebind는 정의하지만 same-subject retry, token rotation, revoked-row re-registration, row lineage, observation-field refresh, concurrent registration identity를 정의하지 않는다.
+2026-10-02 Product Owner decision으로 Mobile Expo Push registration lifecycle의 `SRC-19`가 해결되었다. 같은 subject + 같은 active installation key는 기존 row를 refresh하고, token rotation은 해당 row의 보호 token material을 교체한다. 같은 subject의 동일 token이 다른 installation key로 이동하면 기존 row를 revoke하고 새 server-generated row를 만든다. revoked row는 부활시키지 않는다. cross-subject active installation/token은 기존 owner revoke 전까지 fail-closed다.
 
-Standalone owner-scoped revoke DB command는 이 gap과 독립적으로 유지할 수 있다. Push token registration이 향후 승격될 때도 subject ownership + installation/token uniqueness는 server가 검증해야 한다.
+Client는 stable `installationKey`만 제공하며 canonical `subjectId`나 DB `device_installations.id`를 선택하지 않는다. Raw Expo Push token은 authenticated HTTPS request에서만 수신하고 server-side encryption/fingerprint 경계를 거쳐 저장한다. 이 결정은 `SRC-31` provider routing과 `SRC-32` autonomous scheduling/send authority를 열지 않는다.
 
 ### Notification inbox read boundary — `SRC-13`
 

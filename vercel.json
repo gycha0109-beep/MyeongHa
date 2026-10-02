@@ -68,6 +68,14 @@
       "destination": "/api/birth-profiles?__myeongha_birth_profile_id=:id"
     },
     {
+      "source": "/api/device-installations/register",
+      "destination": "/api/me?__myeongha_device_installation_action=register"
+    },
+    {
+      "source": "/api/device-installations/:id/revoke",
+      "destination": "/api/me?__myeongha_device_installation_action=revoke&__myeongha_device_installation_id=:id"
+    },
+    {
       "source": "/api/target-persons",
       "destination": "/api/me?__myeongha_target_person_read=list"
     },

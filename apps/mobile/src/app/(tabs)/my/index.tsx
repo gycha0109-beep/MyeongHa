@@ -15,7 +15,9 @@ import {
   MyTargetPersonsEmpty,
   MyTargetPersonsSection,
 } from '@/features/my/MyTargetPersons';
+import { MyPushNotifications } from '@/features/my/MyPushNotifications';
 import { useMobileMemberAuthV1 } from '@/features/my/use-mobile-member-auth';
+import { useMobilePushV1 } from '@/features/my/use-mobile-push';
 import { useMobileMyV1 } from '@/features/my/use-mobile-my';
 import {
   createMobileMyBirthViewV1,
@@ -34,6 +36,7 @@ export default function MyScreen() {
     createTargetPerson,
   } = useMobileMyV1();
   const memberAuth = useMobileMemberAuthV1();
+  const mobilePush = useMobilePushV1();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
@@ -171,6 +174,26 @@ export default function MyScreen() {
           targetPersonCreate.kind === 'error' ? targetPersonCreate.message : null
         }
         onCreate={createTargetPerson}
+      />
+
+      <MyPushNotifications
+        status={
+          mobilePush.state.kind === 'loading'
+            ? null
+            : mobilePush.state.status
+        }
+        pending={
+          mobilePush.state.kind === 'loading' ||
+          mobilePush.state.kind === 'submitting'
+        }
+        errorMessage={
+          mobilePush.state.kind === 'error'
+            ? mobilePush.state.errorMessage
+            : null
+        }
+        onEnable={() => void mobilePush.enable()}
+        onDisable={() => void mobilePush.disable()}
+        onRetry={() => void mobilePush.retry()}
       />
 
       <MyFlowCards />
