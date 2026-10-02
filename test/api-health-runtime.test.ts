@@ -27,7 +27,7 @@ function requestWithCancellation(
 
 describe('GET /api/health', () => {
   it('proves the executable API runtime without depending on user identity or DB state', async () => {
-    const response = healthEndpoint.fetch(
+    const response = await healthEndpoint.fetch(
       new Request('https://myeongha.example/api/health', { method: 'GET' }),
     );
 
@@ -35,10 +35,10 @@ describe('GET /api/health', () => {
     expect(await response.json()).toEqual({ status: 'ok' });
   });
 
-  it('returns 405 without waiting for unused-body cancellation to settle', () => {
+  it('returns 405 without waiting for unused-body cancellation to settle', async () => {
     const source = requestWithCancellation(() => new Promise<void>(() => undefined));
 
-    const response = healthEndpoint.fetch(source.request);
+    const response = await healthEndpoint.fetch(source.request);
 
     expect(response.status).toBe(405);
     expect(response.headers.get('allow')).toBe('GET');
@@ -50,7 +50,7 @@ describe('GET /api/health', () => {
       Promise.reject(new Error('synthetic cancellation failure')),
     );
 
-    const response = healthEndpoint.fetch(source.request);
+    const response = await healthEndpoint.fetch(source.request);
     await Promise.resolve();
 
     expect(response.status).toBe(405);
@@ -58,12 +58,12 @@ describe('GET /api/health', () => {
     expect(source.cancelCalls()).toBe(1);
   });
 
-  it('keeps bodyless method rejection harmless', () => {
+  it('keeps bodyless method rejection harmless', async () => {
     const request = new Request('https://myeongha.example/api/health', {
       method: 'POST',
     });
 
-    const response = healthEndpoint.fetch(request);
+    const response = await healthEndpoint.fetch(request);
 
     expect(response.status).toBe(405);
     expect(response.headers.get('allow')).toBe('GET');
