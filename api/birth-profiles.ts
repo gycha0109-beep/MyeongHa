@@ -1,4 +1,7 @@
-import { randomUUID } from 'node:crypto';
+import {
+  executeSecurityObservedNodeRequestV1,
+  type SecurityEventWriterV1,
+} from '../apps/api/src/security-observability.js';
 import { serializePreparsedJsonBodyBoundedV1 } from '../apps/api/src/authenticated-json-request-resource.js';
 import { createNodePostgresSubjectPoolV1 } from '../apps/api/src/node-postgres-subject-pool.js';
 import { createProductionBirthProfileCreateRuntimeV1 } from '../apps/api/src/production-birth-profile-create-runtime.js';
@@ -52,6 +55,9 @@ interface BirthProfileVercelRuntimePortV1 {
 export interface CreateBirthProfilesVercelHandlerInputV1 {
   readonly getReadRuntime: () => BirthProfileVercelRuntimePortV1;
   readonly getCreateRuntime: () => BirthProfileVercelRuntimePortV1;
+  readonly requestIdFactory?: () => string;
+  readonly now?: () => number;
+  readonly eventWriter?: SecurityEventWriterV1;
 }
 
 let sharedPostgresPool: ReturnType<typeof createNodePostgresSubjectPoolV1> | undefined;
@@ -390,16 +396,11 @@ async function writeWebResponse(
   }
 }
 
-async function writeRouteNotFound(
-  response: VercelNodeResponseLike,
-): Promise<void> {
-  await writeWebResponse(
-    new Response(null, {
-      status: 404,
-      headers: { 'Cache-Control': NO_STORE_CACHE_CONTROL },
-    }),
-    response,
-  );
+function routeNotFound(): Response {
+  return new Response(null, {
+    status: 404,
+    headers: { 'Cache-Control': NO_STORE_CACHE_CONTROL },
+  });
 }
 
 export function createBirthProfilesVercelHandlerV1(
@@ -412,28 +413,34 @@ export function createBirthProfilesVercelHandlerV1(
     request: VercelNodeRequestLike,
     response: VercelNodeResponseLike,
   ): Promise<void> {
-    const birthProfileId = resolveInjectedBirthProfileId(request);
-    if (birthProfileId !== null) {
-      const runtimeResponse = await input.getReadRuntime().handleRequest({
-        request: toCanonicalReadRequest(request, birthProfileId),
-        requestId: randomUUID(),
-        serverTime: new Date().toISOString(),
-      });
-      await writeWebResponse(runtimeResponse, response);
-      return;
-    }
+    await executeSecurityObservedNodeRequestV1({
+      method: request.method,
+      routeId: 'api.birth-profiles',
+      requestIdFactory: input.requestIdFactory,
+      now: input.now,
+      eventWriter: input.eventWriter,
+      execute: async ({ requestId, serverTime }) => {
+        const birthProfileId = resolveInjectedBirthProfileId(request);
+        if (birthProfileId !== null) {
+          return input.getReadRuntime().handleRequest({
+            request: toCanonicalReadRequest(request, birthProfileId),
+            requestId,
+            serverTime,
+          });
+        }
 
-    if (isCanonicalCreateRequest(request)) {
-      const runtimeResponse = await input.getCreateRuntime().handleRequest({
-        request: toCanonicalCreateRequest(request),
-        requestId: randomUUID(),
-        serverTime: new Date().toISOString(),
-      });
-      await writeWebResponse(runtimeResponse, response);
-      return;
-    }
+        if (isCanonicalCreateRequest(request)) {
+          return input.getCreateRuntime().handleRequest({
+            request: toCanonicalCreateRequest(request),
+            requestId,
+            serverTime,
+          });
+        }
 
-    await writeRouteNotFound(response);
+        return routeNotFound();
+      },
+      writeResponse: (runtimeResponse) => writeWebResponse(runtimeResponse, response),
+    });
   };
 }
 
