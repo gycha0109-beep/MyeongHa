@@ -281,6 +281,7 @@ async function seedMember(client, origin, expiresAt) {
     name: refreshCookieName,
     value: refreshToken,
     url: `${origin}/api/auth/refresh`,
+    path: '/api/auth',
     httpOnly: true,
     sameSite: 'Strict',
   });
