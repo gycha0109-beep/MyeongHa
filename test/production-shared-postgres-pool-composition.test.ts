@@ -42,11 +42,11 @@ describe('Production multiplexed PostgreSQL pool composition', () => {
     expect(injectedCloseCalls).toBe(0);
   });
 
-  it('pins one shared pool creation and seven shared injections in /api/me', async () => {
+  it('pins one shared pool creation and eight shared injections in /api/me', async () => {
     const source = await readFile(new URL('../api/me.ts', import.meta.url), 'utf8');
 
     expect(source.match(/createNodePostgresSubjectPoolV1\(/gu)).toHaveLength(1);
-    expect(source.match(/pool: getSharedPostgresPool\(\)/gu)).toHaveLength(7);
+    expect(source.match(/pool: getSharedPostgresPool\(\)/gu)).toHaveLength(8);
   });
 
   it('pins one shared pool creation and two shared injections in /api/birth-profiles', async () => {
