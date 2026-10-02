@@ -35,8 +35,18 @@ function request(
   });
 }
 
-function refreshRequest(refreshToken: string): Request {
-  return request({}, {
+function webRequest(
+  body: unknown,
+  headers: Readonly<Record<string, string>> = {},
+): Request {
+  return request(body, {
+    'X-MyeongHa-Auth-Transport': 'web-cookie-v1',
+    ...headers,
+  });
+}
+
+function webRefreshRequest(refreshToken: string): Request {
+  return webRequest({}, {
     Cookie: `myeongha_member_refresh_v1=${encodeURIComponent(refreshToken)}`,
   });
 }
@@ -85,7 +95,7 @@ describe('Supabase auth HTTP proxy', () => {
     vi.stubGlobal('fetch', upstream);
 
     const response = await handleSupabaseAuthRequestV1({
-      request: request({ email: ' Person@Example.com ', password: 'secret-password' }),
+      request: webRequest({ email: ' Person@Example.com ', password: 'secret-password' }),
       env,
       action: 'sign-in',
       passwordCompromiseGuard: clearPasswordGuard,
@@ -105,6 +115,59 @@ describe('Supabase auth HTTP proxy', () => {
     expect(JSON.stringify(payload)).not.toContain(env.MYEONGHA_SUPABASE_API_KEY);
     expect(JSON.stringify(payload)).not.toContain('secret-password');
     expect(upstream).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves the native JSON session contract when web cookie transport is absent', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({
+      access_token: 'native.header.signature',
+      refresh_token: 'native-refresh-token',
+      expires_in: 3600,
+      user: { id: '11111111-1111-4111-8111-111111111111', email: 'native@example.com' },
+    })));
+
+    const response = await handleSupabaseAuthRequestV1({
+      request: request({ email: 'native@example.com', password: 'secret-password' }),
+      env,
+      action: 'sign-in',
+      passwordCompromiseGuard: clearPasswordGuard,
+    });
+    const payload = await response.json() as any;
+
+    expect(response.status).toBe(200);
+    expect(payload.data.session).toMatchObject({
+      accessToken: 'native.header.signature',
+      refreshToken: 'native-refresh-token',
+    });
+    expect(response.headers.get('set-cookie')).toBeNull();
+  });
+
+  it('preserves native refresh-token body transport when web cookie transport is absent', async () => {
+    const upstream = vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
+      expect(JSON.parse(String(init?.body))).toEqual({
+        refresh_token: 'native-refresh-token',
+      });
+      return Response.json({
+        access_token: 'native.rotated.signature',
+        refresh_token: 'native-rotated-refresh-token',
+        expires_in: 3600,
+        user: { id: '11111111-1111-4111-8111-111111111111', email: 'native@example.com' },
+      });
+    });
+    vi.stubGlobal('fetch', upstream);
+
+    const response = await handleSupabaseAuthRequestV1({
+      request: request({ refreshToken: 'native-refresh-token' }),
+      env,
+      action: 'refresh',
+    });
+    const payload = await response.json() as any;
+
+    expect(response.status).toBe(200);
+    expect(payload.data.session).toMatchObject({
+      accessToken: 'native.rotated.signature',
+      refreshToken: 'native-rotated-refresh-token',
+    });
+    expect(response.headers.get('set-cookie')).toBeNull();
   });
 
   it.each([
@@ -411,7 +474,7 @@ describe('Supabase auth HTTP proxy', () => {
     )));
 
     const response = await handleSupabaseAuthRequestV1({
-      request: refreshRequest('expired-refresh-token'),
+      request: webRefreshRequest('expired-refresh-token'),
       env,
       action: 'refresh',
     });
@@ -435,7 +498,7 @@ describe('Supabase auth HTTP proxy', () => {
     )));
 
     const response = await handleSupabaseAuthRequestV1({
-      request: refreshRequest('still-valid-refresh-token'),
+      request: webRefreshRequest('still-valid-refresh-token'),
       env,
       action: 'refresh',
     });
@@ -456,7 +519,7 @@ describe('Supabase auth HTTP proxy', () => {
     })));
 
     const response = await handleSupabaseAuthRequestV1({
-      request: refreshRequest('still-valid-refresh-token'),
+      request: webRefreshRequest('still-valid-refresh-token'),
       env,
       action: 'refresh',
     });
@@ -475,7 +538,7 @@ describe('Supabase auth HTTP proxy', () => {
     vi.stubGlobal('fetch', upstream);
 
     const response = await handleSupabaseAuthRequestV1({
-      request: request({}),
+      request: webRequest({}),
       env,
       action: 'sign-out',
     });
