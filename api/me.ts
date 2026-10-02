@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { executeSecurityObservedRequestV1 } from '../apps/api/src/security-observability.js';
 import { createNodePostgresSubjectPoolV1 } from '../apps/api/src/node-postgres-subject-pool.js';
 import { createProductionChatReadRuntimeV1 } from '../apps/api/src/production-chat-read-runtime.js';
 import { createProductionCurrentSubjectProfileRuntimeV1 } from '../apps/api/src/production-current-subject-profile-runtime.js';
@@ -511,17 +511,23 @@ function runtimeForTarget(target: DispatchTarget) {
 }
 
 export default {
-  async fetch(request: Request): Promise<Response> {
-    const target = resolveDispatchTarget(request);
-    if (target === null) {
-      cancelUnusedRequestBodyBestEffort(request);
-      return routeNotFound();
-    }
+  fetch(request: Request): Promise<Response> {
+    return executeSecurityObservedRequestV1({
+      request,
+      routeId: 'api.me.dispatch',
+      execute: ({ requestId, serverTime }) => {
+        const target = resolveDispatchTarget(request);
+        if (target === null) {
+          cancelUnusedRequestBodyBestEffort(request);
+          return routeNotFound();
+        }
 
-    return runtimeForTarget(target).handleRequest({
-      request: toCanonicalMeRequestForTestV1(request, target),
-      requestId: randomUUID(),
-      serverTime: new Date().toISOString(),
+        return runtimeForTarget(target).handleRequest({
+          request: toCanonicalMeRequestForTestV1(request, target),
+          requestId,
+          serverTime,
+        });
+      },
     });
   },
 };
