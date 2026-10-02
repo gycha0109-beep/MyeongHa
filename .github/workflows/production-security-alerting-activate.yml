@@ -45,62 +45,37 @@ jobs:
           test "$GITHUB_REF" = "refs/heads/main"
           test "$CONFIRMATION" = "ACTIVATE_PRODUCTION_SECURITY_ALERTING_A09"
           test "$WATCHTOWER_TRACK" = "security"
-          test -n "${VERCEL_TOKEN:-}"
+          if [[ -z "${VERCEL_TOKEN:-}" ]]; then
+            echo "VERCEL_SECURITY_ALERTS_TOKEN is missing from the GitHub production environment." >&2
+            exit 1
+          fi
 
-      - name: Install pinned Vercel CLI
+      - name: Activate and verify governed Vercel v3 alert rule
+        id: activate
         shell: bash
         run: |
           set -euo pipefail
-          npm install --global vercel@59.19.1 --ignore-scripts --no-audit --no-fund
-          vercel --version | grep -F "59.19.1"
-
-      - name: Inspect current Vercel alert rules
-        shell: bash
-        run: |
-          set -euo pipefail
-          vercel alerts rules ls             --project prj_nXF0b5uv27Lyucz2SEBxzdCRXVsP             --format json             > "$RUNNER_TEMP/vercel-alert-rules-before.json"
-
-      - name: Verify existing rule or mark creation required
-        id: preflight
-        shell: bash
-        run: |
-          set -euo pipefail
-          node scripts/operations/ensure-vercel-security-alert-rule.mjs             preflight             "$RUNNER_TEMP/vercel-alert-rules-before.json"             config/security/vercel-production-5xx-error-anomaly-rule-v1.json
-
-      - name: Create governed 5xx error anomaly rule
-        if: steps.preflight.outputs.rule_present != 'true'
-        shell: bash
-        run: |
-          set -euo pipefail
-          vercel alerts rules add             --body config/security/vercel-production-5xx-error-anomaly-rule-v1.json             --project prj_nXF0b5uv27Lyucz2SEBxzdCRXVsP             --format json             > "$RUNNER_TEMP/vercel-alert-rule-create.json"
-
-      - name: Re-read Vercel alert rules
-        shell: bash
-        run: |
-          set -euo pipefail
-          vercel alerts rules ls             --project prj_nXF0b5uv27Lyucz2SEBxzdCRXVsP             --format json             > "$RUNNER_TEMP/vercel-alert-rules-after.json"
-
-      - name: Require exact governed rule after activation
-        id: verify
-        shell: bash
-        run: |
-          set -euo pipefail
-          node scripts/operations/ensure-vercel-security-alert-rule.mjs             require             "$RUNNER_TEMP/vercel-alert-rules-after.json"             config/security/vercel-production-5xx-error-anomaly-rule-v1.json
+          node scripts/operations/ensure-vercel-security-alert-rule.mjs             activate             config/security/vercel-production-5xx-error-anomaly-rule-v1.json             config/security/production-security-alerting-v1.json
 
       - name: Record safe activation evidence
         env:
-          RULE_ID: ${{ steps.verify.outputs.rule_id }}
+          RULE_ID: ${{ steps.activate.outputs.rule_id }}
+          RULE_PRESENT_BEFORE: ${{ steps.activate.outputs.rule_present_before }}
         shell: bash
         run: |
           set -euo pipefail
+          test -n "$RULE_ID"
           {
             echo "production_security_alerting=pass"
             echo "provider=vercel"
+            echo "provider_api=/alerts/v3/alert-rules"
+            echo "provider_transport=direct-bearer-api"
             echo "project=myeongha"
             echo "project_id=prj_nXF0b5uv27Lyucz2SEBxzdCRXVsP"
             echo "alert_type=error_anomaly"
             echo "status_group=5xx"
             echo "numeric_threshold_owner=vercel-native-anomaly-model"
+            echo "rule_present_before=$RULE_PRESENT_BEFORE"
             echo "rule_id=$RULE_ID"
             echo "credential_material_emitted=false"
             echo "user_payload_emitted=false"
