@@ -1,6 +1,5 @@
+import { spawnSync } from 'node:child_process';
 import { appendFileSync, readFileSync } from 'node:fs';
-
-const API_ORIGIN = 'https://api.vercel.com';
 
 function fail(message) {
   console.error(message);
@@ -30,85 +29,114 @@ function same(left, right) {
   return JSON.stringify(stable(left)) === JSON.stringify(stable(right));
 }
 
-function safeProviderCode(value) {
-  return typeof value === 'string' && /^[A-Za-z0-9._:-]{1,128}$/u.test(value)
-    ? value
-    : 'UNKNOWN';
+function sanitizeCliOutput(value) {
+  return String(value ?? '')
+    .replace(/\u001b\[[0-9;]*m/gu, '')
+    .replace(/vcp_[A-Za-z0-9._-]+/gu, '[REDACTED_TOKEN]')
+    .replace(/Authorization:\s*Bearer\s+\S+/giu, 'Authorization: Bearer [REDACTED]')
+    .trim()
+    .slice(0, 1200);
 }
 
-async function providerRequest(token, path, init = {}) {
-  const method = init.method ?? 'GET';
-  const response = await fetch(`${API_ORIGIN}${path}`, {
-    ...init,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: 'application/json',
-      ...(init.body ? { 'Content-Type': 'application/json' } : {}),
-      ...(init.headers ?? {}),
+function classifyCliFailure(detail) {
+  if (/User not found/iu.test(detail)) return 'CREDENTIAL_SCOPE_INCOMPATIBLE';
+  if (/not authorized|unauthorized|forbidden|permission/iu.test(detail)) {
+    return 'PROVIDER_PERMISSION_DENIED';
+  }
+  if (/Observability Plus|not available|unsupported plan|upgrade/iu.test(detail)) {
+    return 'PROVIDER_CAPABILITY_UNAVAILABLE';
+  }
+  return 'PROVIDER_CLI_FAILURE';
+}
+
+function runCli(authority, args) {
+  const cliPackage = authority.activation?.providerCliPackage;
+  const teamSlug = authority.team?.slug;
+
+  if (typeof cliPackage !== 'string' || !/^vercel@\d+\.\d+\.\d+$/u.test(cliPackage)) {
+    fail('Alert authority must pin an exact Vercel CLI package version.');
+  }
+  if (typeof teamSlug !== 'string' || teamSlug.length === 0) {
+    fail('Alert authority is missing the governed Vercel team slug.');
+  }
+
+  const result = spawnSync(
+    'npm',
+    [
+      'exec',
+      '--yes',
+      `--package=${cliPackage}`,
+      '--',
+      'vercel',
+      '--scope',
+      teamSlug,
+      ...args,
+    ],
+    {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        NO_COLOR: '1',
+      },
+      maxBuffer: 4 * 1024 * 1024,
     },
-  });
+  );
 
-  const raw = await response.text();
-  let payload = {};
-  if (raw) {
-    try {
-      payload = JSON.parse(raw);
-    } catch {
-      if (!response.ok) {
-        fail(
-          `Vercel Alert API failed: method=${method} status=${response.status} code=NON_JSON_RESPONSE`,
-        );
-      }
-      fail('Vercel Alert API returned invalid JSON.');
-    }
+  if (result.error) {
+    fail(`Vercel Alert CLI could not start: code=CLI_START_FAILURE`);
   }
 
-  if (!response.ok) {
-    const code =
-      payload && typeof payload === 'object'
-        ? safeProviderCode(payload.error?.code ?? payload.code)
-        : 'UNKNOWN';
+  if (result.status !== 0) {
+    const detail = sanitizeCliOutput(result.stderr || result.stdout);
+    const code = classifyCliFailure(detail);
+    const suffix =
+      code === 'CREDENTIAL_SCOPE_INCOMPATIBLE'
+        ? ' Replace the project-scoped credential with a team/account access token that can resolve the governed team and manage Alert Rules.'
+        : detail
+          ? ` detail=${detail}`
+          : '';
     fail(
-      `Vercel Alert API failed: method=${method} status=${response.status} code=${code}`,
+      `Vercel Alert CLI failed: command=${args.slice(0, 4).join(' ')} exit=${result.status} code=${code}.${suffix}`,
     );
   }
 
-  return payload;
+  return result.stdout;
 }
 
-async function listRules(token, authority) {
-  const teamId = authority.team?.id;
+function runJson(authority, args) {
+  const raw = runCli(authority, args);
+  try {
+    return JSON.parse(raw);
+  } catch {
+    fail(
+      `Vercel Alert CLI returned invalid JSON: command=${args.slice(0, 4).join(' ')}`,
+    );
+  }
+}
+
+async function listRules(authority) {
   const projectId = authority.project?.id;
-  if (typeof teamId !== 'string' || typeof projectId !== 'string') {
-    fail('Alert authority is missing the governed Vercel team or project id.');
+  if (typeof projectId !== 'string') {
+    fail('Alert authority is missing the governed Vercel project id.');
   }
 
-  const rules = [];
-  let cursor = '';
+  const page = runJson(authority, [
+    'alerts',
+    'rules',
+    'ls',
+    '--project',
+    projectId,
+    '--type',
+    'built-in',
+    '--format',
+    'json',
+  ]);
 
-  do {
-    const params = new URLSearchParams({
-      teamId,
-      projectId,
-      limit: '100',
-    });
-    if (cursor) params.set('cursor', cursor);
+  if (!Array.isArray(page.rules)) {
+    fail('Vercel Alert CLI list response is missing rules[].');
+  }
 
-    const page = await providerRequest(
-      token,
-      `/alerts/v3/alert-rules?${params.toString()}`,
-    );
-
-    if (!Array.isArray(page.rules)) {
-      fail('Vercel Alert API list response is missing rules[].');
-    }
-
-    rules.push(...page.rules);
-    cursor =
-      typeof page.pagination?.next === 'string' ? page.pagination.next : '';
-  } while (cursor);
-
-  return rules;
+  return page.rules;
 }
 
 function validateRule(rule, desired) {
@@ -149,21 +177,39 @@ function selectRule(rules, desired) {
   return candidates[0] ?? null;
 }
 
-async function createRule(token, authority, desired) {
-  const teamId = authority.team?.id;
-  if (typeof teamId !== 'string') {
-    fail('Alert authority is missing the governed Vercel team id.');
+function createRule(authority, desiredPath) {
+  const result = runJson(authority, [
+    'alerts',
+    'rules',
+    'add',
+    '--body',
+    desiredPath,
+    '--format',
+    'json',
+  ]);
+
+  if (!result || typeof result !== 'object' || !result.rule) {
+    fail('Vercel Alert CLI create response is missing rule.');
   }
 
-  const params = new URLSearchParams({ teamId });
-  await providerRequest(
-    token,
-    `/alerts/v3/alert-rules?${params.toString()}`,
-    {
-      method: 'POST',
-      body: JSON.stringify(desired),
-    },
-  );
+  return result.rule;
+}
+
+function inspectRule(authority, ruleId) {
+  const result = runJson(authority, [
+    'alerts',
+    'rules',
+    'inspect',
+    ruleId,
+    '--format',
+    'json',
+  ]);
+
+  if (!result || typeof result !== 'object' || !result.rule) {
+    fail('Vercel Alert CLI inspect response is missing rule.');
+  }
+
+  return result.rule;
 }
 
 const [mode, desiredPath, authorityPath] = process.argv.slice(2);
@@ -182,14 +228,20 @@ if (!token) fail('VERCEL_SECURITY_ALERTS_TOKEN is not available to the workflow.
 const desired = JSON.parse(readFileSync(desiredPath, 'utf8'));
 const authority = JSON.parse(readFileSync(authorityPath, 'utf8'));
 
-if (authority.activation?.providerApi !== '/alerts/v3/alert-rules') {
-  fail('Alert authority does not pin the Vercel Alert Rules v3 API.');
+if (authority.activation?.providerInterface !== 'alerts-rules-cli') {
+  fail('Alert authority does not pin the official Vercel Alert Rules CLI interface.');
 }
-if (authority.activation?.providerTransport !== 'direct-bearer-api') {
-  fail('Alert authority does not permit direct bearer API activation.');
+if (authority.activation?.providerTransport !== 'official-vercel-cli') {
+  fail('Alert authority does not permit official Vercel CLI activation.');
+}
+if (authority.activation?.teamScopedCredentialRequired !== true) {
+  fail('Alert authority must require a team/account-capable credential.');
+}
+if (Object.hasOwn(authority.activation ?? {}, 'providerApi')) {
+  fail('Alert authority must not pin an undocumented Alert Rules REST endpoint.');
 }
 
-let rules = await listRules(token, authority);
+let rules = await listRules(authority);
 let rule = selectRule(rules, desired);
 
 if (rule === null) {
@@ -203,8 +255,10 @@ if (rule === null) {
     fail('Required Vercel security alert rule is absent.');
   }
 
-  await createRule(token, authority, desired);
-  rules = await listRules(token, authority);
+  const created = createRule(authority, desiredPath);
+  validateRule(created, desired);
+
+  rules = await listRules(authority);
   rule = selectRule(rules, desired);
 
   if (rule === null) {
@@ -214,9 +268,16 @@ if (rule === null) {
   emit('rule_present_before', 'true');
 }
 
-const ruleId = validateRule(rule, desired);
+const listedRuleId = validateRule(rule, desired);
+const inspectedRule = inspectRule(authority, listedRuleId);
+const ruleId = validateRule(inspectedRule, desired);
+
+if (ruleId !== listedRuleId) {
+  fail('Vercel security alert rule inspection returned an unexpected rule id.');
+}
+
 emit('rule_present_after', 'true');
 emit('rule_id', ruleId);
 console.log(
-  'vercel_security_alert_rule=pass provider_api=v3 transport=direct-bearer-api',
+  `vercel_security_alert_rule=pass provider_interface=alerts-rules-cli transport=official-vercel-cli cli=${authority.activation.providerCliPackage}`,
 );
