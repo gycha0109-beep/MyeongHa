@@ -4,6 +4,7 @@
     "postgres": 15,
     "cases": [
       "birth-profile-production-read-authority",
+      "device-installation-registration-runtime",
       "guest-bootstrap-runtime",
       "records-production-read-authority",
       "runtime-function-api-role-acl",

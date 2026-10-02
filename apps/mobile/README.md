@@ -5,7 +5,7 @@ MyeongHa Mobile is a first-class React Native client of the existing MyeongHa se
 ## Current state
 
 - Track: `applizing`
-- Phase: **M4-E Target Person create + production app identity + M11-A4 hardening**
+- Phase: **M9-A Push registration plumbing + M4-E Target Person create + M11-A4 hardening**
 - Runtime: **Expo SDK 57 / React Native 0.86.x**
 - Navigation: **Expo Router**
 - Secure Guest credential persistence: **Expo SecureStore**
@@ -35,6 +35,7 @@ Mobile now has:
 - known-thread Chat read through `GET /api/chat/:threadId` with forward cursor pagination and redaction-safe rendering;
 - Member-only Chat open/reuse through `POST /api/chat` for the exact approved Launch 9 roster, with server-authoritative publication/availability and thread convergence;
 - Face Reading camera/library photo staging through Expo ImagePicker with image-only selection, 16MB client bound, local preview, and no server analysis;
+- source-authorized Expo Push Device Installation registration/refresh/rebind/revoke plumbing with SecureStore installation identity, user-initiated OS permission request, startup no-prompt sync, and account-switch fail-closed revoke;
 - release-readiness preflight with iOS buildNumber / Android versionCode sequencing and fail-closed platform identity checks;
 - release-only API origin guard that requires the canonical Production origin and rejects staging/local overrides while preserving flexible development runtime configuration;
 - CI export smoke for both Android and iOS from the same Expo source, using isolated output directories after release preflight;
@@ -50,7 +51,8 @@ Still gated after M3-B / M11-A4:
 - Target Person post-create metadata edit, deletion, birth correction, and Compatibility execution;
 - production Character catalog/recommendation projection;
 - Face Reading engine intake / analysis upload. M7 does not treat `exif: false` as proof that selected file bytes are metadata-stripped;
-- Push;
+- notification sending/provider routing and autonomous scheduling remain blocked by SRC-31 / SRC-32; M9-A only registers, refreshes, rebinds, and revokes the current device;
+- Push activation additionally requires a real EAS project UUID exposed as `EXPO_PUBLIC_EAS_PROJECT_ID`; source does not invent this external project identity;
 - native store commerce;
 - signed store distribution still requires external Apple/Google developer-account and signing authority; production app identity is fixed to `com.myeongha.app` on both platforms.
 

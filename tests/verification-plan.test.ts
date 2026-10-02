@@ -33,13 +33,13 @@ describe('shared CI verification plan', () => {
       expect(plan).toMatchObject({ track, browser: false, contracts: false, dependencies: false, db_suites: [] });
     }
   });
-  it('regresses all DB suites when their shared registry changes and preserves all 27 cases', () => {
+  it('regresses all DB suites when their shared registry changes and preserves all 28 cases', () => {
     const plan = resolveVerificationPlan(['scripts/ci/db-suites.json']);
     expect(plan.db).toBe(true);
     expect(plan.db_suites).toHaveLength(5);
-    expect(plan.db_suites.flatMap((suite: string) => getDbSuite(suite).cases)).toHaveLength(27);
+    expect(plan.db_suites.flatMap((suite: string) => getDbSuite(suite).cases)).toHaveLength(28);
     const cases = plan.db_suites.flatMap((suite: string) => getDbSuite(suite).cases);
-    expect(new Set(cases).size).toBe(27);
+    expect(new Set(cases).size).toBe(28);
     const dispatcher = readFileSync('test/db/run_ci_case.sh', 'utf8');
     for (const caseName of cases) expect(dispatcher).toContain(`${caseName})`);
     for (const suiteName of plan.db_suites) {
