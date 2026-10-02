@@ -732,8 +732,6 @@
 
 # J. BACKSTORY
 
-# J. BACKSTORY
-
 ## J1. 성장환경
 
 세연은 명하 중심도시의 일반 생활권에서 태어났다.
@@ -756,7 +754,7 @@
 
 세연을 가정불화 때문에 밝은 척하는 인물로 만들지 않는다.
 
-가족 내부의 세세한 직업과 생활 디테일은 아직 확정하지 않는다.
+부모의 정확한 기관명·직급, 남동생의 이름·학교명과 같은 고유명사 및 세부 생활정보는 아직 확정하지 않는다.
 
 ## J3. 중요한 과거 경험
 
@@ -1023,8 +1021,6 @@ Character 행동 원칙으로 압축하면:
 이 질문들은 Character Bible에 사용자에 대한 고정 정답을 미리 쓰지 않는다. 세연의 일반 성향과 경계는 Bible이 제공하되, 실제 답은 Relationship Projection, Event Ledger, 현재 장면과 이전 disclosure history를 근거로 Runtime이 생성한다.
 
 ---
-
-# CORE SUMMARY
 
 # CORE SUMMARY
 
