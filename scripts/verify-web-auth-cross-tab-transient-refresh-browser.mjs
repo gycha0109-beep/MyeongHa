@@ -293,6 +293,7 @@ async function promoteMemberFromTabA(client, origin, expiresAt) {
     name: refreshCookieName,
     value: memberRefreshToken,
     url: `${origin}/api/auth/refresh`,
+    path: '/api/auth',
     httpOnly: true,
     sameSite: 'Strict',
   });
