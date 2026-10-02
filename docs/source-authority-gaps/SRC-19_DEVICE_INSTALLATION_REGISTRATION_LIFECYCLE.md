@@ -63,14 +63,15 @@ revoke/recreate boundary.
 This resolution does **not** resolve:
 
 ```text
-notification scheduling/cadence/frequency → SRC-32
-delivery provider resolution/sending     → SRC-31
-effective preference defaults            → SRC-12
+notification scheduling/cadence/frequency       → SRC-32
+delivery-attempt provider provenance + sending   → SRC-31
+effective preference defaults                    → SRC-12
 final inbox membership semantics         → SRC-13
 ```
 
-Expo Push is approved here as the Mobile token registration mechanism, not as authority
-to create or send autonomous notifications.
+The 2026-10-02 Product Owner decision separately selects Expo Push Notifications as the
+Mobile iOS/Android MVP transport service. This registration lifecycle still does not
+authorize notification-attempt provider provenance, retry/failover, or autonomous sends.
 
 ## 6. Verification gate
 
