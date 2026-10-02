@@ -265,6 +265,7 @@ async function seed(client, origin, session = original) {
     name: refreshCookieName,
     value: 'refresh-old',
     url: `${origin}/api/auth/refresh`,
+    path: '/api/auth',
     httpOnly: true,
     sameSite: 'Strict',
   });
