@@ -15,7 +15,6 @@ const changedEvent = 'myeongha:auth-changed';
 const memberAccessToken = 'member.read.token';
 const memberRaw = JSON.stringify({
   accessToken: memberAccessToken,
-  refreshToken: 'refresh-browser-read-authority',
   expiresAt: '2099-01-01T00:00:00.000Z',
   tokenType: 'bearer',
   user: { id: 'auth-user-browser-read', email: 'browser-read@example.com' },
