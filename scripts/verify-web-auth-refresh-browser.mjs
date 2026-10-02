@@ -18,6 +18,7 @@ const expiredToken = 'expired.header.signature';
 const rotatedToken = 'rotated.header.signature';
 const terminalExpiredToken = 'terminal.header.signature';
 const stagedGuest = 'refresh-staged-guest';
+const refreshCookieName = 'myeongha_member_refresh_v1';
 const mime = new Map([
   ['.html', 'text/html; charset=utf-8'],
   ['.css', 'text/css; charset=utf-8'],
