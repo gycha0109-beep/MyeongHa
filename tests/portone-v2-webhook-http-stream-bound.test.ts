@@ -1,8 +1,9 @@
 import { createHmac } from 'node:crypto';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   PORTONE_V2_WEBHOOK_MAX_BODY_BYTES_V1,
 } from '../apps/api/src/portone-v2-webhook-payment-completion.js';
+import { INGRESS_REQUEST_BODY_COMPLETION_DEADLINE_MS_V1 } from '../apps/api/src/ingress-request-body-deadline.js';
 import { handlePortOneV2WebhookRequestV1 } from '../apps/api/src/portone-v2-webhook-http.js';
 import type { CommercePaymentVerificationAdapterV1 } from '../apps/api/src/commerce-payment-verification-execution.js';
 import type { PostgresSubjectPoolV1 } from '../apps/api/src/postgres-subject-execution.js';
@@ -107,6 +108,48 @@ describe('PortOne V2 webhook HTTP streaming body bound', () => {
     expect(pullCalls).toBe(2);
     expect(request.bodyUsed).toBe(true);
     expect(request.body?.locked).toBe(false);
+  });
+
+  it('maps an incomplete request body past the governed absolute deadline to retryable 503 without Commerce work', async () => {
+    vi.useFakeTimers();
+    try {
+      let pullCalls = 0;
+      const stream = new ReadableStream<Uint8Array>(
+        {
+          pull() {
+            pullCalls += 1;
+            return new Promise<void>(() => undefined);
+          },
+        },
+        { highWaterMark: 0 },
+      );
+      const request = requestFromStream(stream);
+      const counters = {
+        pool: { calls: 0 },
+        adapter: { calls: 0 },
+      };
+
+      const pending = handle(request, counters);
+      await vi.advanceTimersByTimeAsync(
+        INGRESS_REQUEST_BODY_COMPLETION_DEADLINE_MS_V1,
+      );
+      const response = await pending;
+
+      expect(response.status).toBe(503);
+      expect(response.headers.get('cache-control')).toBe('no-store');
+      expect(await response.json()).toMatchObject({
+        ok: false,
+        error: {
+          code: 'TEMPORARILY_UNAVAILABLE',
+          retryable: true,
+        },
+      });
+      expect(pullCalls).toBe(1);
+      expect(counters.pool.calls).toBe(0);
+      expect(counters.adapter.calls).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('maps stream read failure to the existing safe 400 and releases the reader lock', async () => {
