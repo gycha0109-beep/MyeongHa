@@ -58,7 +58,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          vercel alerts rules ls             --project myeongha             --scope johnny-self             --format json             > "$RUNNER_TEMP/vercel-alert-rules-before.json"
+          vercel alerts rules ls             --project prj_nXF0b5uv27Lyucz2SEBxzdCRXVsP             --format json             > "$RUNNER_TEMP/vercel-alert-rules-before.json"
 
       - name: Verify existing rule or mark creation required
         id: preflight
@@ -72,13 +72,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          vercel alerts rules add             --body config/security/vercel-production-5xx-error-anomaly-rule-v1.json             --project myeongha             --scope johnny-self             --format json             > "$RUNNER_TEMP/vercel-alert-rule-create.json"
+          vercel alerts rules add             --body config/security/vercel-production-5xx-error-anomaly-rule-v1.json             --project prj_nXF0b5uv27Lyucz2SEBxzdCRXVsP             --format json             > "$RUNNER_TEMP/vercel-alert-rule-create.json"
 
       - name: Re-read Vercel alert rules
         shell: bash
         run: |
           set -euo pipefail
-          vercel alerts rules ls             --project myeongha             --scope johnny-self             --format json             > "$RUNNER_TEMP/vercel-alert-rules-after.json"
+          vercel alerts rules ls             --project prj_nXF0b5uv27Lyucz2SEBxzdCRXVsP             --format json             > "$RUNNER_TEMP/vercel-alert-rules-after.json"
 
       - name: Require exact governed rule after activation
         id: verify
