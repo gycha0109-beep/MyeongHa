@@ -36,6 +36,17 @@
         "internalErrorCode": "RESPONSE_TOO_LARGE",
         "publicErrorCode": "SAJU_TEMPORARILY_UNAVAILABLE"
       }
+    },
+    "sajuReading": {
+      "productionExposure": "active",
+      "maximumBodyBytes": 524288,
+      "resourceFailure": {
+        "internalErrorCode": "RESPONSE_TOO_LARGE",
+        "publicErrorCodes": [
+          "SAJU_TEMPORARILY_UNAVAILABLE",
+          "SAJU_PREVIEW_TEMPORARILY_UNAVAILABLE"
+        ]
+      }
     }
   },
   "semanticContractsOtherwiseUnchanged": true

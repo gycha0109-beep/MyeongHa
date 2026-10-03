@@ -9,6 +9,19 @@ import {
   SAJU_READING_LIFECYCLE_HEADER_V1,
   SajuProductionReadingHttpAdapterErrorV1,
 } from './saju-production-reading-http-adapter.js';
+import { SAJU_READING_JSON_RESPONSE_MAXIMUM_BYTES_V1 } from './upstream-json-response-resource.js';
+
+const encoder = new TextEncoder();
+
+function textStream(value: string): ReadableStream<Uint8Array> {
+  const bytes = encoder.encode(value);
+  return new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(bytes);
+      controller.close();
+    },
+  });
+}
 
 const BIRTH_REVISION = Object.freeze({
   birthRevisionRef: 'revision-1',
@@ -29,9 +42,10 @@ function jsonResponse(
 ): {
   status: number;
   headers: { get(name: string): string | null };
-  body: null;
+  body: ReadableStream<Uint8Array>;
   text(): Promise<string>;
 } {
+  const serialized = JSON.stringify(body);
   return {
     status,
     headers: {
@@ -47,9 +61,9 @@ function jsonResponse(
         return null;
       },
     },
-    body: null,
+    body: textStream(serialized),
     async text() {
-      return JSON.stringify(body);
+      return serialized;
     },
   };
 }
@@ -216,6 +230,56 @@ describe('Saju Product Reading HTTP adapter', () => {
     });
   });
 
+  it('rejects an oversized attested response before JSON parsing', async () => {
+    let cancelled = 0;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        controller.enqueue(encoder.encode('{"responseVersion":"myeonghwa-product-reading-response-v2"}'));
+        controller.close();
+      },
+      cancel() {
+        cancelled += 1;
+      },
+    }, { highWaterMark: 0 });
+
+    const adapter = createSajuProductionReadingHttpAdapterV1({
+      baseUrl: 'https://saju.example.test',
+      bearerToken: 'service-credential',
+      fetchImpl: async () => ({
+        status: 200,
+        headers: {
+          get(name: string) {
+            const normalized = name.toLowerCase();
+            if (normalized === 'content-type') return 'application/json';
+            if (normalized === 'content-length') {
+              return String(SAJU_READING_JSON_RESPONSE_MAXIMUM_BYTES_V1 + 1);
+            }
+            if (normalized === SAJU_PRODUCT_READING_RESPONSE_ADMISSION_HEADER_V1) {
+              return SAJU_PRODUCT_READING_RESPONSE_ADMISSION_VERSION_V1;
+            }
+            return null;
+          },
+        },
+        body,
+        async text() {
+          throw new Error('unbounded text() must not be called');
+        },
+      }),
+    });
+
+    const request = buildSajuProductionReadingRequestV1({
+      birthRevision: BIRTH_REVISION,
+      readingText: '재물운',
+    });
+
+    await expect(adapter.requestReading(request)).rejects.toMatchObject({
+      code: 'RESPONSE_TOO_LARGE',
+      httpStatus: 200,
+    });
+    expect(cancelled).toBe(1);
+    expect(body.locked).toBe(false);
+  });
+
   it('rejects malformed JSON after verifying the source admission attestation', async () => {
     const adapter = createSajuProductionReadingHttpAdapterV1({
       baseUrl: 'https://saju.example.test',
@@ -231,7 +295,7 @@ describe('Saju Product Reading HTTP adapter', () => {
             return null;
           },
         },
-        body: null,
+        body: textStream('{not-json'),
         async text() {
           return '{not-json';
         },
@@ -264,7 +328,11 @@ describe('Saju Product Reading HTTP adapter', () => {
             return null;
           },
         },
-        body: null,
+        body: new ReadableStream<Uint8Array>({
+          pull() {
+            return new Promise<void>(() => undefined);
+          },
+        }, { highWaterMark: 0 }),
         text: () => new Promise<string>(() => undefined),
       }),
     });

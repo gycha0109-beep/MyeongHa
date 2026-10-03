@@ -13,6 +13,7 @@ Covered boundaries:
 - Supabase Auth proxy success JSON — Production active
 - Supabase Member identity verifier success JSON — Production active
 - Saju production calculation success JSON — Production active
+- Saju ProductReadingResponse success JSON — Production active
 
 This policy governs response-resource shape only. It does not replace existing upstream deadlines, HTTP status mapping, authentication semantics, session normalization, Member identity semantics, Saju calculation authority, or Saju semantic ingress.
 
@@ -28,6 +29,7 @@ V1 chooses:
 Supabase Auth success JSON maximum       = 128 KiB = 131,072 application-visible octets
 Supabase Member success JSON maximum     =  64 KiB =  65,536 application-visible octets
 Saju calculation success JSON maximum    = 256 KiB = 262,144 application-visible octets
+Saju Reading success JSON maximum        = 512 KiB = 524,288 application-visible octets
 ```
 
 Rationale:
@@ -35,8 +37,10 @@ Rationale:
 1. Supabase Auth success payloads can legitimately include session/token and user metadata, so V1 leaves materially more room than the current canonical fields require while still making allocation finite.
 2. Supabase Member verification consumes only a small identity document and ultimately requires a UUID user id, so 64 KiB is deliberately tighter.
 3. The Saju calculation response carries a canonical snapshot, authority/provenance, pillar states, completeness arrays, and bounded calculation evidence; 256 KiB leaves substantially more headroom for that structured contract without authorizing open-ended upstream output.
-4. These are independent response-side operations limits. They are not derived from the 16 KiB authenticated request-body authority in #699.
-5. Any increase or decrease is a policy change and must update this versioned authority and regression tests before runtime implementation changes.
+4. The Saju Reading response carries the admitted ProductReadingResponse envelope and may additionally contain consumer-facing narrative sections, blocks, calculation summary, disclosures, and display facts. V1 therefore grants twice the calculation ceiling: 512 KiB. This is an explicit repository-owned product/operations transport authority, not a claim that the producer currently emits responses near that size.
+5. The 512 KiB Reading ceiling closes #1535's missing consumer resource authority without changing ProductReadingResponse semantics, source admission, lifecycle attestation, or interpretation authority.
+6. These are independent response-side operations limits. They are not derived from the 16 KiB authenticated request-body authority in #699.
+7. Any increase or decrease is a policy change and must update this versioned authority and regression tests before runtime implementation changes.
 
 ## Response-byte authority
 
@@ -135,6 +139,36 @@ HTTP status
 
 The resource policy does not weaken or reinterpret Saju schema, authority, birth-revision binding, calculation-only semantics, or provenance checks.
 
+### Saju Product Reading — Production active
+
+Affected successful JSON paths:
+
+- `POST /api/readings`
+- `POST /api/preview/readings`
+
+```text
+success JSON ceiling = 524,288 application-visible bytes
+internal resource failure = RESPONSE_TOO_LARGE
+public API collapse       = existing SAJU_TEMPORARILY_UNAVAILABLE / Preview unavailable mapping
+```
+
+The order remains:
+
+```text
+HTTP status
+→ JSON content-type requirement
+→ source ProductReadingResponse admission attestation
+→ lifecycle attestation where applicable
+→ existing deadline + governed response byte ceiling
+→ JSON parse
+→ envelope-version attestation
+→ optional local defense-in-depth admission
+```
+
+The Reading ceiling applies to actual application-visible bytes consumed from the response stream. Unencoded `Content-Length` may reject early but cannot approve a response; compressed/chunked bodies remain subject to incremental decoded-stream counting. Over-limit bodies are cancelled best effort and their content is never reflected into public errors or logs.
+
+This boundary does not change ProductReadingResponse states, message codes, consumer narrative content, source admission authority, Preview lifecycle authority, or downstream interpretation semantics.
+
 ## Failure precedence
 
 V1 uses the first established failure at the governed boundary.
@@ -156,7 +190,8 @@ Production verification instead proves that the exact deployed revision can stil
 
 - fresh Supabase Auth Member session acquisition;
 - Supabase Member identity verification through an authenticated Member surface;
-- Saju current-subject calculation through the Production calculation adapter.
+- Saju current-subject calculation through the Production calculation adapter;
+- Saju current-subject Preview Reading through the Production Reading adapter.
 
 Existing safe Production smoke workflows may be reused when they cover the exact merged/deployed SHA and the governed paths. Credentials, access tokens, refresh tokens, and response bodies must not be logged as evidence.
 
@@ -187,7 +222,7 @@ V1 implementation is complete only when tests prove:
 - cancellation is best-effort/non-blocking and reader locks are released;
 - existing body deadlines remain active through bounded consumption;
 - Auth sign-out and rejected upstream statuses do not materialize unused bodies;
-- Auth, Member, and Saju retain their existing public error/semantic behavior except for the approved finite response-resource narrowing;
+- Auth, Member, Saju calculation, and Saju Reading retain their existing public error/semantic behavior except for the approved finite response-resource narrowing;
 - exact-head CI passes;
 - exact-SHA Production verification passes across the active Auth, Member, and Saju boundaries.
 

@@ -4,6 +4,7 @@ export const UPSTREAM_JSON_RESPONSE_RESOURCE_POLICY_VERSION_V1 =
 export const SUPABASE_AUTH_JSON_RESPONSE_MAXIMUM_BYTES_V1 = 131_072 as const;
 export const SUPABASE_MEMBER_JSON_RESPONSE_MAXIMUM_BYTES_V1 = 65_536 as const;
 export const SAJU_CALCULATION_JSON_RESPONSE_MAXIMUM_BYTES_V1 = 262_144 as const;
+export const SAJU_READING_JSON_RESPONSE_MAXIMUM_BYTES_V1 = 524_288 as const;
 
 export interface UpstreamJsonResponseReadableV1 {
   readonly headers: Readonly<{
