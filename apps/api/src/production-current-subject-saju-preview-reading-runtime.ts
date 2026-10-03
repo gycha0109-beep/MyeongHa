@@ -13,7 +13,9 @@ import type { SupabaseMemberVerifierFetchV1 } from './supabase-member-identity-v
 import type { PostgresSubjectPoolV1 } from './postgres-subject-execution.js';
 import {
   createSajuAbuseObservedIdentityVerifierV1,
+  observeSajuAbuseOutcomeV1,
   type SajuAbuseObservationWriterV1,
+  type SajuAbuseOutcomeObservationWriterV1,
 } from './saju-abuse-observability.js';
 import { createProductionPostgresSubjectPoolLeaseV1 } from './production-postgres-subject-pool-lease.js';
 
@@ -35,6 +37,8 @@ export interface CreateProductionCurrentSubjectSajuPreviewReadingRuntimeInputV1 
   readonly sajuFetchImpl?: SajuProductionCalculationHttpFetchV1;
   /** Observe-only baseline injection. Production defaults to the privacy-safe logger. */
   readonly sajuAbuseObservationWriter?: SajuAbuseObservationWriterV1;
+  /** Observe-only outcome injection. Production defaults to the privacy-safe logger. */
+  readonly sajuAbuseOutcomeWriter?: SajuAbuseOutcomeObservationWriterV1;
   /** Test/runtime clock injection only. */
   readonly now?: () => number;
 }
@@ -61,7 +65,7 @@ export function createProductionCurrentSubjectSajuPreviewReadingRuntimeV1(
   });
 
   return Object.freeze({
-    handleRequest(requestInput: ProductionCurrentSubjectSajuPreviewReadingRequestV1) {
+    async handleRequest(requestInput: ProductionCurrentSubjectSajuPreviewReadingRequestV1) {
       const observedIdentityEvidenceVerifier = createSajuAbuseObservedIdentityVerifierV1({
         delegate: identityEvidenceVerifier,
         routeId: 'api.me.saju.preview-reading',
@@ -72,7 +76,7 @@ export function createProductionCurrentSubjectSajuPreviewReadingRuntimeV1(
           : { eventWriter: input.sajuAbuseObservationWriter }),
         ...(input.now === undefined ? {} : { now: input.now }),
       });
-      return handleCurrentSubjectSajuPreviewReadingRequestV1({
+      const response = await handleCurrentSubjectSajuPreviewReadingRequestV1({
         request: requestInput.request,
         requestId: requestInput.requestId,
         serverTime: requestInput.serverTime,
@@ -80,6 +84,18 @@ export function createProductionCurrentSubjectSajuPreviewReadingRuntimeV1(
         pool: poolLease.pool,
         sajuAdapter,
       });
+
+      observeSajuAbuseOutcomeV1({
+        routeId: 'api.me.saju.preview-reading',
+        requestId: requestInput.requestId,
+        httpStatus: response.status,
+        ...(input.sajuAbuseOutcomeWriter === undefined
+          ? {}
+          : { eventWriter: input.sajuAbuseOutcomeWriter }),
+        ...(input.now === undefined ? {} : { now: input.now }),
+      });
+
+      return response;
     },
     close() {
       return poolLease.close();
