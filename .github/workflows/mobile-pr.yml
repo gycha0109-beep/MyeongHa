@@ -7,6 +7,9 @@ on:
       - 'packages/api-client/**'
       - 'scripts/verify-mobile-release-readiness.mjs'
       - 'scripts/verify-mobile-push-activation-readiness.mjs'
+      - 'scripts/verify-mobile-android-physical-smoke-readiness.mjs'
+      - '.github/workflows/mobile-android-physical-smoke-build.yml'
+      - '.github/mobile-android-physical-smoke-build.trigger'
       - '.github/workflows/mobile-pr.yml'
 
 permissions:
@@ -28,6 +31,8 @@ jobs:
         run: npm run verify:mobile-release-readiness-contract
       - name: Verify Mobile Push activation contract
         run: npm run verify:mobile-push-activation-readiness-contract
+      - name: Verify Android physical-smoke build contract
+        run: npm run verify:mobile-android-physical-smoke-readiness
       - name: Export Android and iOS bundles
         run: npm run export:ci -w @myeongha/mobile
       - name: Verify Android and iOS export artifacts

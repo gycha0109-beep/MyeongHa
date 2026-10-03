@@ -19,16 +19,19 @@ describe('Mobile Push registration structure', () => {
     expect(my).toContain('자동 발송 시점과 빈도는 아직 적용하지 않습니다');
   });
 
-  it('pins Expo Notifications as a native plugin without inventing an EAS project id', async () => {
+  it('pins Expo Notifications and the activated EAS project identity', async () => {
     const packageJson = JSON.parse(await repo('apps/mobile/package.json'));
     const appJson = JSON.parse(await repo('apps/mobile/app.json'));
 
     expect(packageJson.dependencies['expo-notifications']).toBe('~57.0.21');
     expect(packageJson.dependencies['expo-application']).toBe('~57.0.3');
     expect(appJson.expo.plugins).toContain('expo-notifications');
-    expect(appJson.expo.extra?.eas?.projectId).toBeUndefined();
+    expect(appJson.expo.extra?.eas?.projectId).toBe(
+      '5c20243c-60a8-44f3-9d8c-ca06ccc8bebe',
+    );
     const runtimeConfig = await repo('apps/mobile/src/core/config/mobile-runtime-config.ts');
     expect(runtimeConfig).toContain('EXPO_PUBLIC_EAS_PROJECT_ID');
+    expect(runtimeConfig).toContain('5c20243c-60a8-44f3-9d8c-ca06ccc8bebe');
   });
 
   it('revokes on logout and only preserves enabled preference for explicit subject switching', async () => {

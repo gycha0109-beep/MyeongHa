@@ -1,0 +1,14 @@
+{
+  "cli": {
+    "version": ">= 24.10.0"
+  },
+  "build": {
+    "physical-smoke": {
+      "environment": "production",
+      "android": {
+        "withoutCredentials": true,
+        "gradleCommand": ":app:assembleDebug"
+      }
+    }
+  }
+}
