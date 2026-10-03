@@ -3,10 +3,21 @@ import { acquireProductionMemberSmokeSession } from './production-member-smoke-s
 
 const PRODUCTION_ORIGIN = 'https://myeongha.vercel.app';
 const MEMBER_ME_URL = `${PRODUCTION_ORIGIN}/api/me`;
+const BOOTSTRAP_URL = `${PRODUCTION_ORIGIN}/api/session/bootstrap`;
 const BIRTH_PROFILE_URL = `${PRODUCTION_ORIGIN}/api/me/birth-profile`;
+const BIRTH_PROFILES_URL = `${PRODUCTION_ORIGIN}/api/birth-profiles`;
 const SAJU_CALCULATION_URL = `${PRODUCTION_ORIGIN}/api/me/saju/calculation`;
 const SAJU_PREVIEW_READING_URL = `${PRODUCTION_ORIGIN}/api/me/saju/preview-reading`;
 const SAJU_PREVIEW_READING_TEXT = '전체 사주';
+const GUEST_BIRTH_LABEL = 'production-saju-guest-smoke-v1';
+const GUEST_BIRTH_INPUT = Object.freeze({
+  calendarType: 'solar',
+  birthDate: '2000-01-01',
+  birthTime: '00:00:00',
+  timeKnown: true,
+  isLeapMonth: false,
+  sex: 'unspecified',
+});
 const REQUEST_TIMEOUT_MS = 20_000;
 
 function requireSecret(name) {
@@ -218,13 +229,12 @@ function validatePreviewReadingBody(previewBody, label) {
   });
 }
 
-async function requestPreviewReading() {
-  const label = 'Production current-subject Saju Preview Reading';
+async function requestPreviewReading({ label, authorizationHeader }) {
   const startedAt = performance.now();
   const response = await fetchCanonical(SAJU_PREVIEW_READING_URL, {
     method: 'POST',
     headers: {
-      ...authorization,
+      ...authorizationHeader,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ readingText: SAJU_PREVIEW_READING_TEXT }),
@@ -326,7 +336,7 @@ if (matchingCurrentRevisions.length !== 1) {
   throw new Error('Production Saju smoke current Birth Profile revision summary does not match the current revision.');
 }
 
-function validateCalculationBody(calculationBody, label) {
+function validateCalculationBody(calculationBody, label, expectedRevisionId) {
   const meta = requireApiContract(calculationBody, label);
   if (calculationBody.ok !== true) throw new Error(`${label} did not return ok=true.`);
   requireUuid(`${label} requestId`, meta.requestId);
@@ -342,7 +352,7 @@ function validateCalculationBody(calculationBody, label) {
   requireExact('calculation.kind', calculation.kind, 'saju_calculation_evidence');
   requireExact('calculation.semanticAuthority', calculation.semanticAuthority, 'calculation_only');
   requireExact('calculation.interpretationAuthorized', calculation.interpretationAuthorized, false);
-  requireExact('calculation.birthRevisionRef', calculation.birthRevisionRef, currentRevision.revisionId);
+  requireExact('calculation.birthRevisionRef', calculation.birthRevisionRef, expectedRevisionId);
 
   const source = requireRecord('calculation.source', calculation.source);
   requireExact(
@@ -440,11 +450,11 @@ function validateCalculationBody(calculationBody, label) {
   });
 }
 
-async function requestCalculation(label) {
+async function requestCalculation({ label, authorizationHeader, expectedRevisionId }) {
   const startedAt = performance.now();
   const response = await fetchCanonical(SAJU_CALCULATION_URL, {
     method: 'POST',
-    headers: authorization,
+    headers: authorizationHeader,
   });
   requireNoStore(response, label);
   requireJsonContentType(response, label);
@@ -452,21 +462,202 @@ async function requestCalculation(label) {
     throw new Error(`${label} expected HTTP 200, received ${response.status}.`);
   }
   const body = await readJsonWithoutLogging(response, label);
-  const validated = validateCalculationBody(body, label);
+  const validated = validateCalculationBody(body, label, expectedRevisionId);
   return Object.freeze({
     ...validated,
     roundTripMs: elapsedMillisecondsSince(startedAt),
   });
 }
 
-const firstCalculation = await requestCalculation('Production current-subject Saju calculation first');
-const repeatCalculation = await requestCalculation('Production current-subject Saju calculation repeat');
+const firstCalculation = await requestCalculation({
+  label: 'Production current-subject Saju calculation first',
+  authorizationHeader: authorization,
+  expectedRevisionId: currentRevision.revisionId,
+});
+const repeatCalculation = await requestCalculation({
+  label: 'Production current-subject Saju calculation repeat',
+  authorizationHeader: authorization,
+  expectedRevisionId: currentRevision.revisionId,
+});
 
 if (stableSerialize(firstCalculation.stableEvidence) !== stableSerialize(repeatCalculation.stableEvidence)) {
   throw new Error('Production current-subject Saju deterministic repeat evidence changed within the same fresh Member session.');
 }
 
-const previewReading = await requestPreviewReading();
+const previewReading = await requestPreviewReading({
+  label: 'Production current-subject Saju Preview Reading',
+  authorizationHeader: authorization,
+});
+
+async function createGuestSajuFixture() {
+  const bootstrapStartedAt = performance.now();
+  const bootstrapResponse = await fetchCanonical(BOOTSTRAP_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: '{}',
+  });
+  requireNoStore(bootstrapResponse, 'Production Saju smoke Guest bootstrap');
+  requireJsonContentType(bootstrapResponse, 'Production Saju smoke Guest bootstrap');
+  if (bootstrapResponse.status !== 200) {
+    throw new Error(
+      `Production Saju smoke Guest bootstrap expected HTTP 200, received ${bootstrapResponse.status}.`,
+    );
+  }
+  const bootstrapBody = await readJsonWithoutLogging(
+    bootstrapResponse,
+    'Production Saju smoke Guest bootstrap',
+  );
+  requireApiContract(bootstrapBody, 'Production Saju smoke Guest bootstrap');
+  if (bootstrapBody.ok !== true) {
+    throw new Error('Production Saju smoke Guest bootstrap did not return ok=true.');
+  }
+  const bootstrapData = requireRecord(
+    'Production Saju smoke Guest bootstrap data',
+    bootstrapBody.data,
+  );
+  requireExact(
+    'Production Saju smoke Guest bootstrap kind',
+    bootstrapData.kind,
+    'guest',
+  );
+  const guestSubjectId = requireUuid(
+    'Production Saju smoke Guest subjectId',
+    bootstrapData.subjectId,
+  );
+  const guestSession = requireRecord(
+    'Production Saju smoke Guest session',
+    bootstrapData.guestSession,
+  );
+  const guestSessionId = requireUuid(
+    'Production Saju smoke Guest session id',
+    guestSession.guestSessionId,
+  );
+  if (guestSessionId === guestSubjectId) {
+    throw new Error('Production Saju smoke Guest session and subject ids must differ.');
+  }
+  const expiresAt = requireTimestamp(
+    'Production Saju smoke Guest session expiry',
+    guestSession.expiresAt,
+  );
+  if (Date.parse(expiresAt) <= Date.now()) {
+    throw new Error('Production Saju smoke Guest session is already expired.');
+  }
+  const bearerToken = requireNonEmptyString(
+    'Production Saju smoke Guest bearer',
+    guestSession.bearerToken,
+  );
+  const authorizationHeader = { Authorization: `Bearer ${bearerToken}` };
+  const bootstrapRoundTripMs = elapsedMillisecondsSince(bootstrapStartedAt);
+
+  const guestMeStartedAt = performance.now();
+  const guestMeResponse = await fetchCanonical(MEMBER_ME_URL, {
+    method: 'GET',
+    headers: authorizationHeader,
+  });
+  requireNoStore(guestMeResponse, 'Production Saju smoke Guest /api/me');
+  requireJsonContentType(guestMeResponse, 'Production Saju smoke Guest /api/me');
+  if (guestMeResponse.status !== 200) {
+    throw new Error(
+      `Production Saju smoke Guest /api/me expected HTTP 200, received ${guestMeResponse.status}.`,
+    );
+  }
+  const guestMeBody = await readJsonWithoutLogging(
+    guestMeResponse,
+    'Production Saju smoke Guest /api/me',
+  );
+  requireApiContract(guestMeBody, 'Production Saju smoke Guest /api/me');
+  const guestMeData = requireRecord(
+    'Production Saju smoke Guest /api/me data',
+    guestMeBody.data,
+  );
+  if (guestMeBody.ok !== true) {
+    throw new Error('Production Saju smoke Guest /api/me did not return ok=true.');
+  }
+  requireExact(
+    'Production Saju smoke Guest /api/me subject kind',
+    guestMeData.subjectKind,
+    'guest',
+  );
+  requireExact(
+    'Production Saju smoke Guest /api/me subject id',
+    guestMeData.subjectId,
+    guestSubjectId,
+  );
+  requireExact(
+    'Production Saju smoke Guest /api/me subject status',
+    guestMeData.subjectStatus,
+    'active',
+  );
+  const guestMeRoundTripMs = elapsedMillisecondsSince(guestMeStartedAt);
+
+  const birthCreateStartedAt = performance.now();
+  const birthCreateResponse = await fetchCanonical(BIRTH_PROFILES_URL, {
+    method: 'POST',
+    headers: {
+      ...authorizationHeader,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      label: GUEST_BIRTH_LABEL,
+      input: GUEST_BIRTH_INPUT,
+    }),
+  });
+  requireNoStore(birthCreateResponse, 'Production Saju smoke Guest Birth create');
+  requireJsonContentType(birthCreateResponse, 'Production Saju smoke Guest Birth create');
+  if (birthCreateResponse.status !== 201) {
+    throw new Error(
+      `Production Saju smoke Guest Birth create expected HTTP 201, received ${birthCreateResponse.status}.`,
+    );
+  }
+  const birthCreateBody = await readJsonWithoutLogging(
+    birthCreateResponse,
+    'Production Saju smoke Guest Birth create',
+  );
+  requireApiContract(birthCreateBody, 'Production Saju smoke Guest Birth create');
+  if (birthCreateBody.ok !== true) {
+    throw new Error('Production Saju smoke Guest Birth create did not return ok=true.');
+  }
+  const birthCreateData = requireRecord(
+    'Production Saju smoke Guest Birth create data',
+    birthCreateBody.data,
+  );
+  requireUuid(
+    'Production Saju smoke Guest Birth profile id',
+    birthCreateData.birthProfileId,
+  );
+  const revisionId = requireUuid(
+    'Production Saju smoke Guest Birth revision id',
+    birthCreateData.revisionId,
+  );
+  requireExact(
+    'Production Saju smoke Guest Birth revision number',
+    birthCreateData.revisionNo,
+    1,
+  );
+  const birthCreateRoundTripMs = elapsedMillisecondsSince(birthCreateStartedAt);
+
+  return Object.freeze({
+    bearerToken,
+    authorizationHeader,
+    revisionId,
+    guestMeBody,
+    birthCreateBody,
+    bootstrapRoundTripMs,
+    guestMeRoundTripMs,
+    birthCreateRoundTripMs,
+  });
+}
+
+const guest = await createGuestSajuFixture();
+const guestCalculation = await requestCalculation({
+  label: 'Production Guest Saju calculation',
+  authorizationHeader: guest.authorizationHeader,
+  expectedRevisionId: guest.revisionId,
+});
+const guestPreviewReading = await requestPreviewReading({
+  label: 'Production Guest Saju Preview Reading',
+  authorizationHeader: guest.authorizationHeader,
+});
 
 if (
   JSON.stringify(memberBody).includes(accessToken) ||
@@ -478,6 +669,15 @@ if (
   throw new Error('Production current-subject Saju response reflected the fresh Member access token.');
 }
 
+if (
+  JSON.stringify(guest.guestMeBody).includes(guest.bearerToken) ||
+  JSON.stringify(guest.birthCreateBody).includes(guest.bearerToken) ||
+  JSON.stringify(guestCalculation.body).includes(guest.bearerToken) ||
+  JSON.stringify(guestPreviewReading.body).includes(guest.bearerToken)
+) {
+  throw new Error('Production Guest Saju response reflected the Guest bearer token.');
+}
+
 console.log(
-  `MyeongHa production current-subject Saju smoke passed: memberSignIn=200, freshSession=true, memberSubjectMatch=true, birthProfilePresent=true, birthRevisionMatch=true, calculationFirst=200, calculationRepeat=200, deterministicRepeat=true, previewReading=200, previewState=${previewReading.state}, authority=calculation_only, ingressContract=v1, cacheControl=no-store, measurementObservedAtUtc=${measurementObservedAtUtc}, memberRoundTripMs=${memberRoundTripMs}, birthProfileRoundTripMs=${birthProfileRoundTripMs}, calculationFirstRoundTripMs=${firstCalculation.roundTripMs}, calculationRepeatRoundTripMs=${repeatCalculation.roundTripMs}, previewReadingRoundTripMs=${previewReading.roundTripMs}, timingThresholdApplied=false.`,
+  `MyeongHa production current-subject Saju smoke passed: memberSignIn=200, freshSession=true, memberSubjectMatch=true, birthProfilePresent=true, birthRevisionMatch=true, calculationFirst=200, calculationRepeat=200, deterministicRepeat=true, previewReading=200, previewState=${previewReading.state}, guestBootstrap=200, guestSubjectMatch=true, guestBirthCreate=201, guestCalculation=200, guestPreviewReading=200, guestPreviewState=${guestPreviewReading.state}, authority=calculation_only, ingressContract=v1, cacheControl=no-store, measurementObservedAtUtc=${measurementObservedAtUtc}, memberRoundTripMs=${memberRoundTripMs}, birthProfileRoundTripMs=${birthProfileRoundTripMs}, calculationFirstRoundTripMs=${firstCalculation.roundTripMs}, calculationRepeatRoundTripMs=${repeatCalculation.roundTripMs}, previewReadingRoundTripMs=${previewReading.roundTripMs}, guestBootstrapRoundTripMs=${guest.bootstrapRoundTripMs}, guestMeRoundTripMs=${guest.guestMeRoundTripMs}, guestBirthCreateRoundTripMs=${guest.birthCreateRoundTripMs}, guestCalculationRoundTripMs=${guestCalculation.roundTripMs}, guestPreviewReadingRoundTripMs=${guestPreviewReading.roundTripMs}, timingThresholdApplied=false.`,
 );
