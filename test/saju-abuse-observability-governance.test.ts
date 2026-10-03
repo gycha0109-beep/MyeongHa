@@ -17,6 +17,9 @@ describe('Saju abuse baseline observability governance', () => {
     expect(runtime).toContain(
       'identityEvidenceVerifier: observedIdentityEvidenceVerifier',
     );
+    expect(runtime).toContain('observeSajuAbuseOutcomeV1');
+    expect(runtime).toContain("routeId: 'api.me.saju.calculation'");
+    expect(runtime).toContain('httpStatus: response.status');
   });
 
   it('wires the publicly rewritten Preview Reading runtime through the observe-only identity verifier', () => {
@@ -42,6 +45,9 @@ describe('Saju abuse baseline observability governance', () => {
     expect(runtime).toContain(
       'identityEvidenceVerifier: observedIdentityEvidenceVerifier',
     );
+    expect(runtime).toContain('observeSajuAbuseOutcomeV1');
+    expect(runtime).toContain("routeId: 'api.me.saju.preview-reading'");
+    expect(runtime).toContain('httpStatus: response.status');
   });
 
   it('keeps the event schema privacy-scoped and observe-only', () => {
@@ -49,12 +55,15 @@ describe('Saju abuse baseline observability governance', () => {
 
     for (const required of [
       'myeongha-saju-abuse-observation-v1',
+      'myeongha-saju-abuse-outcome-v1',
       'myeongha-saju-abuse-client-hmac-sha256-v1',
       "mode: 'observe_only'",
       'subjectKind',
       'clientKey',
       'requestId',
       'occurredAt',
+      'httpStatus',
+      'completedAt',
       'writeBestEffort',
     ]) {
       expect(observation).toContain(required);
