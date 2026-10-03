@@ -84,7 +84,10 @@ const expected = {
       maximumBodyBytes: 524288,
       resourceFailure: {
         internalErrorCode: 'RESPONSE_TOO_LARGE',
-        publicErrorCode: 'SAJU_TEMPORARILY_UNAVAILABLE',
+        publicErrorCodes: [
+          'SAJU_TEMPORARILY_UNAVAILABLE',
+          'SAJU_PREVIEW_TEMPORARILY_UNAVAILABLE',
+        ],
       },
     },
   },
