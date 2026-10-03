@@ -440,3 +440,12 @@ export {
   resolveCharacterFaceNamedAuthoringSourceV1,
   type CharacterFaceNamedAuthoringSourceV1,
 } from './character-face-named-authoring-source.js';
+
+export {
+  CHARACTER_FACE_NAMED_PROFILE_REGISTRY_VERSION_V1,
+  CharacterFaceNamedProfileCompatibilityErrorV1,
+  SEYEON_FACE_PROFILE_VERSION_V1,
+  assertCharacterFaceNamedProfileCompatibilityV1,
+  resolveCharacterFaceNamedProfileBundleV1,
+  type CharacterFaceNamedProfileBundleV1,
+} from './character-face-named-profile-registry.js';
