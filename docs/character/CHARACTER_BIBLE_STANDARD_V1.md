@@ -66,6 +66,8 @@ Memory / Relation = 사용자와 실제로 무엇이 있었는가
 8. “잘 먹히는 공략법” 같은 사용자 매뉴얼 언어보다 사람의 취향 / 경계 / 끌림으로 쓴다.
 9. Runtime 규칙, retrieval, memory policy, token budget, prompt instruction은 Bible에 넣지 않는다.
 10. Visual Architecture 전체를 Bible에 복제하지 않는다. 외모에 대한 자기 인식과 몸짓처럼 **인물성에 닿는 시각 정보**만 포함한다.
+11. Principle-Calling / 이치·명은 Character의 심층 authoring substrate다. 그 사람이 무엇을 중요하게 여기고, 어떤 선택을 하며, 자신의 결함과 소명을 어떻게 살아가는지를 만드는 기반으로 사용한다.
+12. 심층 철학을 평상시 대사의 설명 주제로 강제하지 않는다. Character는 일상적으로 세계관 명제나 자신의 명을 반복 강의하지 않으며, 그 철학은 기본적으로 선택 / 행동 / 경계 / 갈등 / 관계 방식으로 드러난다. 직접 언급은 Calling 자체가 장면의 쟁점이 되거나, 서약·소명 갈등·세계 사건·깊은 자기노출처럼 실제 맥락이 있을 때만 자연스럽게 허용한다.
 
 ---
 
