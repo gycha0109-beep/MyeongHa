@@ -328,6 +328,67 @@ where turn_id='$turn_id';
   fail "Se-yeon receive replay duplicated messages: $message_counts_after_replay"
 pass "same clientTurnId receive replay does not duplicate committed messages"
 
+failed_turn_id="d1460000-0000-4000-8000-000000000020"
+failed_user_message_id="d1460000-0000-4000-8000-000000000021"
+failed_attempt_id="d1460000-0000-4000-8000-000000000022"
+
+"${psql_base[@]}" -At <<SQL >/dev/null
+begin;
+set local role myeongha_api_executor;
+select pg_catalog.set_config('myeongha.subject_id','$subject_id',true);
+select *
+from public.cmd_receive_seyeon_chat_turn_runtime_v1(
+  '$subject_id','$thread_id',
+  'seyeon-chat-execution-failed-turn',
+  'sha256:v1:seyeon-chat-execution-failed-request',
+  'chat-request-v1',
+  jsonb_build_object(
+    'threadId','$thread_id',
+    'characterId','seyeon',
+    'clientTurnId','seyeon-chat-execution-failed-turn',
+    'text','이 턴은 실행 실패 테스트예요.',
+    'clientCapability','0.0.1-dev'
+  ),
+  '$release_id','$bundle_id',
+  '$failed_turn_id','$failed_user_message_id',
+  '이 턴은 실행 실패 테스트예요.',
+  'sha256:v1:seyeon-chat-execution-failed-user'
+);
+select *
+from public.cmd_allocate_seyeon_chat_attempt_runtime_v1(
+  '$subject_id','$failed_turn_id','$failed_attempt_id',
+  'seyeon-production-chat-planner-v1'
+);
+select public.cmd_mark_seyeon_chat_context_ready_runtime_v1(
+  '$subject_id','$failed_turn_id','$failed_attempt_id'
+);
+select public.cmd_fail_seyeon_chat_attempt_runtime_v1(
+  '$subject_id','$failed_turn_id','$failed_attempt_id',
+  'failed_retryable','SEYEON_PRODUCTION_EXECUTION_FAILED'
+);
+commit;
+SQL
+
+failed_state=$("${psql_base[@]}" -At -F '|' -c "
+select ct.state,a.state,ct.error_code,a.error_code
+from public.chat_turns ct
+join public.chat_turn_attempts a
+  on a.turn_id=ct.id and a.id='$failed_attempt_id'
+where ct.id='$failed_turn_id';
+")
+[[ "$failed_state" == "failed_retryable|failed_retryable|SEYEON_PRODUCTION_EXECUTION_FAILED|SEYEON_PRODUCTION_EXECUTION_FAILED" ]] ||
+  fail "Se-yeon pre-commit failure state mismatch: $failed_state"
+
+failed_assistant_count=$("${psql_base[@]}" -At -c "
+select count(*)
+from public.conversation_messages
+where turn_id='$failed_turn_id'
+  and sender_type='character';
+")
+[[ "$failed_assistant_count" == "0" ]] ||
+  fail "failed Se-yeon turn committed an assistant message"
+pass "pre-commit execution failure becomes retryable without assistant commit"
+
 expect_fail   "authenticated direct Se-yeon chat runtime receive"   "permission denied"   "begin; set local role authenticated; select * from public.cmd_receive_seyeon_chat_turn_runtime_v1('$subject_id','$thread_id','x','h','chat-request-v1','{}'::jsonb,'$release_id','$bundle_id',gen_random_uuid(),gen_random_uuid(),'x','h'); rollback;"
 
 expect_fail   "API executor forged content binding"   "Server-prepared Chat content does not match the pinned thread binding"   "begin; set local role myeongha_api_executor; select pg_catalog.set_config('myeongha.subject_id','$subject_id',true); select * from public.cmd_receive_seyeon_chat_turn_runtime_v1('$subject_id','$thread_id','forged-binding','h','chat-request-v1','{}'::jsonb,'d1460000-0000-4000-8000-000000000099','$bundle_id',gen_random_uuid(),gen_random_uuid(),'x','h'); rollback;"
