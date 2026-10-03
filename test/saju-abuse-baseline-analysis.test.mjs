@@ -77,6 +77,10 @@ describe('Saju abuse baseline analyzer', () => {
       matchedFailureOutcomeCount: 1,
     });
     expect(report.inputQuality.orphanOutcomeCount).toBe(1);
+    expect(report.perRoute['api.me.saju.calculation'].authenticatedAttempts.total).toBe(2);
+    expect(report.perRoute['api.me.saju.calculation'].correlatedOutcomes.matched).toBe(2);
+    expect(report.perRoute['api.me.saju.preview-reading'].authenticatedAttempts.total).toBe(0);
+    expect(report.perRoute['api.me.saju.preview-reading'].correlatedOutcomes.coverageRatio).toBeNull();
     expect(report.policyDecision).toEqual({
       produced: false,
       numericLimit: null,
