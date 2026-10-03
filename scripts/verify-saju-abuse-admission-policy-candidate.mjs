@@ -247,8 +247,8 @@ for (const fragment of [
   'RATE_LIMITED',
   'SAJU_ADMISSION_UNAVAILABLE',
   'no automatic retry',
-  'no numeric threshold',
-  'no Production mutation',
+  'No numeric threshold',
+  'No Production mutation',
 ]) {
   requireFragment(paths.docs, docs, fragment);
 }
