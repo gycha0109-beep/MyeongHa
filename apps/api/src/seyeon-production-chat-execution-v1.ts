@@ -426,7 +426,7 @@ export async function runSeyeonProductionChatExecutionV1(
         });
         runtimeResult = runtime;
 
-        const generatedHash = runtime.envelope.semanticReviewHash;
+        const generatedHash = sha256(runtime.envelope);
         await input.persistencePort.persistGenerated({
           subjectId,
           turnId: receivedTurn.turnId,
