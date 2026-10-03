@@ -112,6 +112,7 @@ describe('Saju abuse baseline analyzer', () => {
       },
     });
 
+    expect(report.inputQuality.configuredSyntheticRequestCount).toBe(1);
     expect(report.inputQuality.syntheticExcludedRequestCount).toBe(1);
     expect(report.inputQuality.syntheticExcludedEventCount).toBe(2);
     expect(report.authenticatedAttempts.total).toBe(1);
@@ -187,6 +188,18 @@ describe('Saju abuse baseline analyzer', () => {
       admission(),
       outcome(),
     ]);
+  });
+
+  it('does not swallow validation failures from structured JSON input', () => {
+    expect(() =>
+      parseSajuAbuseObservationText(
+        JSON.stringify([
+          admission({
+            clientKey: 'not-a-valid-client-key',
+          }),
+        ]),
+      ),
+    ).toThrow(/clientKey is invalid/u);
   });
 
   it('rejects conflicting duplicate evidence for the same schema/request id', () => {
