@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
     inputs:
       confirm:
-        description: 'Type VERIFY_SAJU_CURRENT_SUBJECT to run the production current-subject Saju calculation smoke.'
+        description: 'Type VERIFY_SAJU_CURRENT_SUBJECT to run the production current-subject Saju calculation and Preview Reading smoke.'
         required: true
         type: string
   push:
@@ -50,5 +50,5 @@ jobs:
           node-version: '24'
           package-manager-cache: false
 
-      - name: Verify authenticated production current-subject Saju calculation
+      - name: Verify authenticated production current-subject Saju calculation and Preview Reading
         run: node scripts/verify-production-saju-current-subject.mjs
