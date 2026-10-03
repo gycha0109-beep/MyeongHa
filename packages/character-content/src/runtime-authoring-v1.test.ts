@@ -76,6 +76,25 @@ describe('Character runtime authoring v1 authority', () => {
     }
   });
 
+  it('uses the reviewed Seyeon Runtime projection for the first parallel authority lane', () => {
+    const seyeon = CHARACTER_RUNTIME_AUTHORING_V1.find(
+      (character) => character.characterId === 'seyeon',
+    );
+
+    expect(seyeon).toBeDefined();
+    expect(seyeon?.speech.register).toBe('밝고 행동적인 현실형 동행자');
+    expect(seyeon?.behavior.questionPriorities).toEqual([
+      'activate_next_step',
+      'clarify_boundary',
+    ]);
+    expect(seyeon?.relationshipBehavior.defaultMode.distance).toBe(
+      'warm-proactive',
+    );
+
+    const projection = JSON.stringify(seyeon);
+    expect(projection).not.toContain('차분하고 균형 잡힌 검토자');
+  });
+
   it('keeps publication-only fields outside the runtime authoring registry', () => {
     for (const character of CHARACTER_RUNTIME_AUTHORING_V1) {
       expect('assetRefs' in character).toBe(false);
