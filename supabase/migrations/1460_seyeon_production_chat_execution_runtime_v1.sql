@@ -105,6 +105,9 @@ grant execute on function public.cmd_allocate_chat_turn_attempt_v1(
 grant execute on function public.cmd_mark_chat_turn_context_ready_v1(
   uuid,uuid,uuid
 ) to myeongha_seyeon_chat_runtime_owner;
+grant execute on function public.cmd_mark_chat_turn_failed_v1(
+  uuid,uuid,uuid,text,text
+) to myeongha_seyeon_chat_runtime_owner;
 grant execute on function public.cmd_mark_chat_turn_generated_v1(
   uuid,uuid,uuid,uuid,text,uuid,text,jsonb,text,text,jsonb
 ) to myeongha_seyeon_chat_runtime_owner;
@@ -468,6 +471,57 @@ begin
   );
 end
 $mark_seyeon_chat_context_ready_runtime$;
+
+create or replace function public.cmd_fail_seyeon_chat_attempt_runtime_v1(
+  p_subject_id uuid,
+  p_turn_id uuid,
+  p_attempt_id uuid,
+  p_failure_state text,
+  p_error_code text
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $fail_seyeon_chat_attempt_runtime$
+declare
+  v_thread_id uuid;
+begin
+  perform public.assert_myeongha_subject_context_v1(p_subject_id);
+
+  if p_failure_state is distinct from 'failed_retryable'
+     or p_error_code is distinct from 'SEYEON_PRODUCTION_EXECUTION_FAILED' then
+    raise exception using
+      errcode = '23514',
+      constraint = 'seyeon_chat_runtime_failure_disposition_invalid',
+      message = 'Se-yeon Production execution failure disposition is not authorized';
+  end if;
+
+  select ct.thread_id
+  into v_thread_id
+  from public.chat_turns ct
+  where ct.id = p_turn_id
+    and ct.subject_id = p_subject_id;
+
+  if not found then
+    raise exception using
+      errcode = 'P0001',
+      constraint = 'seyeon_chat_runtime_turn_unavailable',
+      message = 'Se-yeon Chat turn is unavailable';
+  end if;
+
+  perform 1
+  from public.assert_seyeon_chat_thread_runtime_v1(p_subject_id, v_thread_id);
+
+  return public.cmd_mark_chat_turn_failed_v1(
+    p_subject_id,
+    p_turn_id,
+    p_attempt_id,
+    p_failure_state,
+    p_error_code
+  );
+end
+$fail_seyeon_chat_attempt_runtime$;
 
 create or replace function public.cmd_persist_seyeon_chat_generated_runtime_v1(
   p_subject_id uuid,
@@ -858,6 +912,9 @@ alter function public.cmd_allocate_seyeon_chat_attempt_runtime_v1(
 alter function public.cmd_mark_seyeon_chat_context_ready_runtime_v1(
   uuid,uuid,uuid
 ) owner to myeongha_seyeon_chat_runtime_owner;
+alter function public.cmd_fail_seyeon_chat_attempt_runtime_v1(
+  uuid,uuid,uuid,text,text
+) owner to myeongha_seyeon_chat_runtime_owner;
 alter function public.cmd_persist_seyeon_chat_generated_runtime_v1(
   uuid,uuid,uuid,uuid,uuid,text,text,text,text,jsonb,text,text,jsonb
 ) owner to myeongha_seyeon_chat_runtime_owner;
@@ -876,6 +933,9 @@ revoke all on function public.cmd_allocate_seyeon_chat_attempt_runtime_v1(
 ) from public;
 revoke all on function public.cmd_mark_seyeon_chat_context_ready_runtime_v1(
   uuid,uuid,uuid
+) from public;
+revoke all on function public.cmd_fail_seyeon_chat_attempt_runtime_v1(
+  uuid,uuid,uuid,text,text
 ) from public;
 revoke all on function public.cmd_persist_seyeon_chat_generated_runtime_v1(
   uuid,uuid,uuid,uuid,uuid,text,text,text,text,jsonb,text,text,jsonb
@@ -901,6 +961,7 @@ BEGIN
       'public.cmd_receive_seyeon_chat_turn_runtime_v1(uuid,uuid,text,text,text,jsonb,uuid,uuid,uuid,uuid,text,text)',
       'public.cmd_allocate_seyeon_chat_attempt_runtime_v1(uuid,uuid,uuid,text)',
       'public.cmd_mark_seyeon_chat_context_ready_runtime_v1(uuid,uuid,uuid)',
+      'public.cmd_fail_seyeon_chat_attempt_runtime_v1(uuid,uuid,uuid,text,text)',
       'public.cmd_persist_seyeon_chat_generated_runtime_v1(uuid,uuid,uuid,uuid,uuid,text,text,text,text,jsonb,text,text,jsonb)',
       'public.cmd_persist_seyeon_chat_validated_runtime_v1(uuid,uuid,uuid,uuid,text,text,text,text,jsonb,jsonb)',
       'public.cmd_commit_seyeon_chat_turn_runtime_v1(uuid,uuid,uuid,uuid,uuid,uuid)'
@@ -924,6 +985,9 @@ grant execute on function public.cmd_allocate_seyeon_chat_attempt_runtime_v1(
 ) to myeongha_api_executor;
 grant execute on function public.cmd_mark_seyeon_chat_context_ready_runtime_v1(
   uuid,uuid,uuid
+) to myeongha_api_executor;
+grant execute on function public.cmd_fail_seyeon_chat_attempt_runtime_v1(
+  uuid,uuid,uuid,text,text
 ) to myeongha_api_executor;
 grant execute on function public.cmd_persist_seyeon_chat_generated_runtime_v1(
   uuid,uuid,uuid,uuid,uuid,text,text,text,text,jsonb,text,text,jsonb
