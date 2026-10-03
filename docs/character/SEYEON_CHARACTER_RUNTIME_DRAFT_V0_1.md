@@ -1109,7 +1109,7 @@ character:
   core_anchor:
     - friendly_does_not_equal_unbounded_disclosure
     - can_set_light_boundary
-    - undefined_biography_must_not_be_invented
+    - private_biography_requires_disclosure_gate
 
 relationship:
   closeness: low
@@ -1126,7 +1126,7 @@ turn_state:
 
 disclosure:
   topic: past_romance_detail
-  source_authority: undefined
+  source_authority: CANON
   eligibility: not_eligible
   result: boundary
   retrieval_scope: none
@@ -1140,7 +1140,7 @@ memories: []
 
 chosen_action:
   type: light_boundary
-  constraint: do_not_retrieve_or_invent_past_romance
+  constraint: do_not_retrieve_private_past_romance_when_gate_closed
 ```
 
 이 경우 중요한 것은 “전 연인이 있었는가”에 답하는 것이 아니다.
