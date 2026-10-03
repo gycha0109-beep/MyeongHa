@@ -294,6 +294,79 @@ function observationWindow(admissions) {
   };
 }
 
+function buildScopeEvidence(admissions, outcomeByRequest, burstWindowSeconds) {
+  const subjectKindDistribution = new Map();
+  const clientCounts = new Map();
+  for (const admission of admissions) {
+    increment(subjectKindDistribution, admission.subjectKind);
+    increment(clientCounts, admission.clientKey);
+  }
+
+  const matchedPairs = [];
+  const unmatchedAdmissions = [];
+  for (const admission of admissions) {
+    const outcome = outcomeByRequest.get(admission.requestId);
+    if (outcome === undefined) unmatchedAdmissions.push(admission);
+    else matchedPairs.push({ admission, outcome });
+  }
+
+  const statusCodeDistribution = new Map();
+  const statusClassDistribution = new Map();
+  for (const pair of matchedPairs) {
+    increment(statusCodeDistribution, String(pair.outcome.httpStatus));
+    increment(statusClassDistribution, statusClass(pair.outcome.httpStatus));
+  }
+
+  const admissionsByClient = new Map();
+  for (const admission of admissions) {
+    const list = admissionsByClient.get(admission.clientKey) ?? [];
+    list.push(admission);
+    admissionsByClient.set(admission.clientKey, list);
+  }
+  for (const list of admissionsByClient.values()) {
+    list.sort((left, right) => Date.parse(left.occurredAt) - Date.parse(right.occurredAt));
+  }
+
+  const repeatAfterFailureIntervals = [];
+  let matchedFailureOutcomeCount = 0;
+  let failureFollowedByLaterAttemptCount = 0;
+  for (const pair of matchedPairs) {
+    if (pair.outcome.httpStatus < 400) continue;
+    matchedFailureOutcomeCount += 1;
+    const completedAt = Date.parse(pair.outcome.completedAt);
+    const later = (admissionsByClient.get(pair.admission.clientKey) ?? []).find(
+      (candidate) => Date.parse(candidate.occurredAt) > completedAt,
+    );
+    if (later !== undefined) {
+      failureFollowedByLaterAttemptCount += 1;
+      repeatAfterFailureIntervals.push(Date.parse(later.occurredAt) - completedAt);
+    }
+  }
+
+  return {
+    authenticatedAttempts: {
+      total: admissions.length,
+      uniquePseudonymousClients: clientCounts.size,
+      subjectKindDistribution: sortedObject(subjectKindDistribution.entries()),
+      perClientRequestCountHistogram: histogram([...clientCounts.values()]),
+    },
+    correlatedOutcomes: {
+      matched: matchedPairs.length,
+      unmatchedAuthenticatedAdmissions: unmatchedAdmissions.length,
+      coverageRatio:
+        admissions.length === 0
+          ? null
+          : Number((matchedPairs.length / admissions.length).toFixed(6)),
+      statusCodeDistribution: sortedObject(statusCodeDistribution.entries()),
+      statusClassDistribution: sortedObject(statusClassDistribution.entries()),
+      matchedFailureOutcomeCount,
+      failureFollowedByLaterAttemptCount,
+      failureFollowedByLaterAttemptIntervalMs: intervalStats(repeatAfterFailureIntervals),
+    },
+    burstEvidence: buildBurstEvidence(admissions, burstWindowSeconds),
+  };
+}
+
 function parseSyntheticExclusions(value) {
   if (value === null || value === undefined) return new Set();
   if (!isRecord(value)) fail('synthetic exclusions must be an object');
@@ -342,56 +415,26 @@ export function analyzeSajuAbuseBaseline(input) {
     }
   }
 
-  const matchedPairs = [];
-  const unmatchedAdmissions = [];
-  for (const admission of admissions) {
-    const outcome = outcomeByRequest.get(admission.requestId);
-    if (outcome === undefined) unmatchedAdmissions.push(admission);
-    else matchedPairs.push({ admission, outcome });
-  }
   const orphanOutcomes = outcomes.filter((event) => !admissionByRequest.has(event.requestId));
-
-  const subjectKindDistribution = new Map();
+  const burstWindowSeconds = input.burstWindowSeconds ?? null;
+  const aggregateEvidence = buildScopeEvidence(
+    admissions,
+    outcomeByRequest,
+    burstWindowSeconds,
+  );
   const routeDistribution = new Map();
-  const clientCounts = new Map();
-  for (const admission of admissions) {
-    increment(subjectKindDistribution, admission.subjectKind);
-    increment(routeDistribution, admission.routeId);
-    increment(clientCounts, admission.clientKey);
-  }
+  for (const admission of admissions) increment(routeDistribution, admission.routeId);
 
-  const statusCodeDistribution = new Map();
-  const statusClassDistribution = new Map();
-  for (const pair of matchedPairs) {
-    increment(statusCodeDistribution, String(pair.outcome.httpStatus));
-    increment(statusClassDistribution, statusClass(pair.outcome.httpStatus));
-  }
-
-  const admissionsByClient = new Map();
-  for (const admission of admissions) {
-    const list = admissionsByClient.get(admission.clientKey) ?? [];
-    list.push(admission);
-    admissionsByClient.set(admission.clientKey, list);
-  }
-  for (const list of admissionsByClient.values()) {
-    list.sort((left, right) => Date.parse(left.occurredAt) - Date.parse(right.occurredAt));
-  }
-
-  const repeatAfterFailureIntervals = [];
-  let matchedFailureOutcomeCount = 0;
-  let failureFollowedByLaterAttemptCount = 0;
-  for (const pair of matchedPairs) {
-    if (pair.outcome.httpStatus < 400) continue;
-    matchedFailureOutcomeCount += 1;
-    const completedAt = Date.parse(pair.outcome.completedAt);
-    const later = (admissionsByClient.get(pair.admission.clientKey) ?? []).find(
-      (candidate) => Date.parse(candidate.occurredAt) > completedAt,
-    );
-    if (later !== undefined) {
-      failureFollowedByLaterAttemptCount += 1;
-      repeatAfterFailureIntervals.push(Date.parse(later.occurredAt) - completedAt);
-    }
-  }
+  const perRoute = Object.fromEntries(
+    [...ROUTES].map((routeId) => [
+      routeId,
+      buildScopeEvidence(
+        admissions.filter((admission) => admission.routeId === routeId),
+        outcomeByRequest,
+        burstWindowSeconds,
+      ),
+    ]),
+  );
 
   return Object.freeze({
     schemaVersion: SAJU_ABUSE_BASELINE_REPORT_SCHEMA_V1,
@@ -409,29 +452,17 @@ export function analyzeSajuAbuseBaseline(input) {
       configuredSyntheticRequestCount: syntheticRequestIds.size,
       syntheticExcludedRequestCount: observedSyntheticRequestIds.size,
       syntheticExcludedEventCount: excludedEventCount,
-      unmatchedAuthenticatedAdmissionCount: unmatchedAdmissions.length,
+      unmatchedAuthenticatedAdmissionCount:
+        aggregateEvidence.correlatedOutcomes.unmatchedAuthenticatedAdmissions,
       orphanOutcomeCount: orphanOutcomes.length,
     },
     authenticatedAttempts: {
-      total: admissions.length,
-      uniquePseudonymousClients: clientCounts.size,
-      subjectKindDistribution: sortedObject(subjectKindDistribution.entries()),
+      ...aggregateEvidence.authenticatedAttempts,
       routeDistribution: sortedObject(routeDistribution.entries()),
-      perClientRequestCountHistogram: histogram([...clientCounts.values()]),
     },
-    correlatedOutcomes: {
-      matched: matchedPairs.length,
-      coverageRatio:
-        admissions.length === 0
-          ? null
-          : Number((matchedPairs.length / admissions.length).toFixed(6)),
-      statusCodeDistribution: sortedObject(statusCodeDistribution.entries()),
-      statusClassDistribution: sortedObject(statusClassDistribution.entries()),
-      matchedFailureOutcomeCount,
-      failureFollowedByLaterAttemptCount,
-      failureFollowedByLaterAttemptIntervalMs: intervalStats(repeatAfterFailureIntervals),
-    },
-    burstEvidence: buildBurstEvidence(admissions, input.burstWindowSeconds ?? null),
+    correlatedOutcomes: aggregateEvidence.correlatedOutcomes,
+    burstEvidence: aggregateEvidence.burstEvidence,
+    perRoute,
     policyDecision: {
       produced: false,
       numericLimit: null,
