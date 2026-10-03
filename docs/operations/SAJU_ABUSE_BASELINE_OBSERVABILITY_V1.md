@@ -204,6 +204,22 @@ issue closure = NOT ALLOWED
 
 Future snapshots should preserve the same analyzer/report schema so growth in organic evidence can be compared without changing the measurement contract.
 
+A follow-up snapshot after the governed Production Preview Reading smoke is:
+
+```text
+docs/operations/SAJU_ABUSE_BASELINE_SNAPSHOT_2026-10-03_0633Z.json
+```
+
+Its explicit two-hour Vercel Production query window contained exactly the three governed smoke invocations from GitHub Actions run `37101519866`:
+
+- calculation first;
+- calculation repeat;
+- Preview Reading.
+
+All three admission events had matching outcomes with HTTP 200, including direct Production coverage of `api.me.saju.preview-reading`. These requests are synthetic and are excluded from organic baseline metrics. After exclusion, the usable organic authenticated-attempt count in that query window is still zero.
+
+This remains evidence of **INSUFFICIENT baseline**, not evidence that legitimate Production traffic is globally zero.
+
 ## Baseline decision
 
 A later evidence review must separately report, for each mounted route:
