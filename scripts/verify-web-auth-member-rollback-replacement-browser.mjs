@@ -137,7 +137,6 @@ try {
     const PENDING_GUEST = 'browser-guest-before-member';
     const oldMember = {
       accessToken: OLD_ACCESS,
-      refreshToken: 'old-browser-refresh',
       expiresAt: '2099-01-01T00:00:00.000Z',
       tokenType: 'bearer',
       user: { id: '77777777-7777-4777-8777-777777777777', email: 'rollback-browser@example.com' },
@@ -145,13 +144,11 @@ try {
     const newMember = {
       ...oldMember,
       accessToken: NEW_ACCESS,
-      refreshToken: 'new-browser-refresh',
       expiresAt: '2099-01-02T00:00:00.000Z',
     };
     const replacementMember = {
       ...oldMember,
       accessToken: REPLACEMENT_ACCESS,
-      refreshToken: 'replacement-browser-refresh',
       expiresAt: '2099-01-03T00:00:00.000Z',
     };
     const oldRaw = JSON.stringify(oldMember);

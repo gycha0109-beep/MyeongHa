@@ -15,6 +15,7 @@ const member = Object.freeze({
 });
 const memberAccessToken = 'transient.header.signature';
 const memberRefreshToken = 'transient-refresh-token';
+const refreshCookieName = 'myeongha_member_refresh_v1';
 const tabAGuestBearer = 'cross-tab-transient-refresh-guest-a';
 const tabBGuestBearer = 'cross-tab-transient-refresh-guest-b';
 const mime = new Map([
@@ -72,6 +73,21 @@ async function readJsonBody(req) {
   return raw ? JSON.parse(raw) : {};
 }
 
+function readRefreshCookie(req) {
+  const raw = req.headers.cookie ?? '';
+  for (const segment of raw.split(';')) {
+    const trimmed = segment.trim();
+    const separator = trimmed.indexOf('=');
+    if (separator <= 0 || trimmed.slice(0, separator) !== refreshCookieName) continue;
+    try {
+      return decodeURIComponent(trimmed.slice(separator + 1));
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
 async function serve() {
   const server = createServer(async (req, res) => {
     try {
@@ -81,8 +97,17 @@ async function serve() {
 
       if (pathname === '/api/auth/refresh' && req.method === 'POST') {
         const body = await readJsonBody(req);
+        const cookieRefreshToken = readRefreshCookie(req);
+        const authTransport = req.headers['x-myeongha-auth-transport'] ?? null;
         refreshRequests += 1;
-        requests.push({ path: pathname, method: req.method, authorization, refreshToken: body.refreshToken ?? null });
+        requests.push({
+          path: pathname,
+          method: req.method,
+          authorization,
+          authTransport,
+          cookieRefreshToken,
+          bodyRefreshToken: body.refreshToken ?? null,
+        });
         sendJson(res, 503, errorEnvelope('AUTH_UPSTREAM_UNAVAILABLE', 'auth.upstream_unavailable', true));
         return;
       }
@@ -263,11 +288,19 @@ async function seedGuest(client, bearer) {
   })()`);
 }
 
-async function promoteMemberFromTabA(client, expiresAt) {
+async function promoteMemberFromTabA(client, origin, expiresAt) {
+  const seeded = await client.send('Network.setCookie', {
+    name: refreshCookieName,
+    value: memberRefreshToken,
+    url: `${origin}/api/auth/refresh`,
+    path: '/api/auth',
+    httpOnly: true,
+    sameSite: 'Strict',
+  });
+  assert(seeded?.success !== false, 'Failed to seed transient-refresh HttpOnly cookie');
   await client.evaluate(`(() => {
     const session = {
       accessToken: ${JSON.stringify(memberAccessToken)},
-      refreshToken: ${JSON.stringify(memberRefreshToken)},
       expiresAt: ${JSON.stringify(expiresAt)},
       tokenType: 'bearer',
       user: { id: ${JSON.stringify(member.id)}, email: ${JSON.stringify(member.email)} },
@@ -322,7 +355,7 @@ try {
   await seedGuest(tabA, tabAGuestBearer);
   await navigate(tabA, origin, '/hall.html', '.product-profile');
 
-  await promoteMemberFromTabA(tabA, new Date(Date.now() + 10 * 60 * 1000).toISOString());
+  await promoteMemberFromTabA(tabA, origin, new Date(Date.now() + 10 * 60 * 1000).toISOString());
   await navigate(tabA, origin, '/hall.html', '.product-profile');
   await waitFor(
     tabA,
@@ -398,7 +431,15 @@ try {
   assert(expiredTabA.pendingGuest === tabAGuestBearer && expiredTabB.pendingGuest === tabBGuestBearer, 'Expired transient refresh consumed a staged Guest bearer');
   assert(refreshRequests > expiredRefreshBefore, 'Expired cross-tab scenario did not exercise refresh failure');
   assert(guestBootstrapRequests === 0, 'Expired cross-tab scenario bootstrapped a Guest');
-  assert(requests.filter((request) => request.path === '/api/auth/refresh').every((request) => request.refreshToken === memberRefreshToken), 'Transient refresh used an unexpected refresh credential');
+  assert(
+    requests.filter((request) => request.path === '/api/auth/refresh').every(
+      (request) =>
+        request.cookieRefreshToken === memberRefreshToken &&
+        request.bodyRefreshToken === null &&
+        request.authTransport === 'web-cookie-v1',
+    ),
+    'Transient refresh did not use the governed Web cookie credential',
+  );
 
   await mkdir(artifactDir, { recursive: true });
   await writeFile(artifactPath, `${JSON.stringify({

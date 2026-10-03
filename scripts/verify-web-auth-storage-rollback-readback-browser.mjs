@@ -15,7 +15,6 @@ const changedEvent = 'myeongha:auth-changed';
 const guestToken = 'rollback-test-guest-token-not-a-secret';
 const memberSession = Object.freeze({
   accessToken: 'member.rollback.payload',
-  refreshToken: 'member-rollback-refresh',
   expiresAt: '2099-01-01T00:00:00.000Z',
   tokenType: 'bearer',
   user: Object.freeze({ id: 'auth-user-rollback-browser', email: 'rollback-browser@example.com' }),

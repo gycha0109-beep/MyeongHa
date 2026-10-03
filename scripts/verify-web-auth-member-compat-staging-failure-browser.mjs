@@ -14,7 +14,6 @@ const authEvent = 'myeongha:auth-changed';
 const guestBearer = 'guest-before-member-compat-failure';
 const memberSession = Object.freeze({
   accessToken: 'compat.member.signature',
-  refreshToken: 'compat-refresh-token',
   expiresAt: '2099-01-01T00:00:00.000Z',
   tokenType: 'bearer',
   user: {
@@ -25,7 +24,6 @@ const memberSession = Object.freeze({
 const rotatedMemberSession = Object.freeze({
   ...memberSession,
   accessToken: 'compat.rotated.signature',
-  refreshToken: 'compat-refresh-token-rotated',
   expiresAt: '2099-01-02T00:00:00.000Z',
 });
 const mime = new Map([

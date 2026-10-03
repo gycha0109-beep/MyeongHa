@@ -23,6 +23,13 @@ const replacement = Object.freeze({
   }),
 });
 const replacementRaw = JSON.stringify(replacement);
+const replacementSanitized = Object.freeze({
+  accessToken: replacement.accessToken,
+  expiresAt: replacement.expiresAt,
+  tokenType: replacement.tokenType,
+  user: replacement.user,
+});
+const replacementSanitizedRaw = JSON.stringify(replacementSanitized);
 const mime = new Map([
   ['.html', 'text/html; charset=utf-8'],
   ['.css', 'text/css; charset=utf-8'],
@@ -263,7 +270,7 @@ for (const file of ['hall.html', 'product-auth.js', 'product-auth-ui.js']) {
 }
 const productAuthSource = await readFile(join(root, 'product-auth.js'), 'utf8');
 assert(productAuthSource.includes('reconcileMalformedStoredMember(raw)'), 'Malformed stored Member cleanup lacks exact-raw reconciliation');
-assert(productAuthSource.includes('discardMemberSession(null, null, raw)'), 'Malformed stored Member cleanup does not pass the observed raw ownership token');
+assert(productAuthSource.includes('discardMemberSession(null, raw)'), 'Malformed stored Member cleanup does not pass the observed raw ownership token');
 assert(productAuthSource.includes('removeLocal(MEMBER_SESSION_KEY, memberRaw)'), 'Member removal does not re-check the exact raw before deletion');
 
 const { server, origin } = await serve();
@@ -314,9 +321,9 @@ try {
     assert(result.readyState === 'complete', `${label} replacement race browser state not complete: ${result.readyState}`);
     assert(result.replacementInjected === true, `${label} replacement race did not inject newer Member`);
     assert(result.resolvedAccess === replacement.accessToken, `${label} stale cleanup did not resolve newer Member access token: ${result.resolvedAccess}`);
-    assert(result.resolvedRefresh === replacement.refreshToken, `${label} stale cleanup did not resolve newer Member refresh token`);
+    assert(result.resolvedRefresh === null, `${label} stale cleanup exposed a legacy Member refresh token`);
     assert(result.resolvedEmail === replacement.user.email, `${label} stale cleanup did not resolve newer Member identity`);
-    assert(result.stored === replacementRaw, `${label} stale cleanup deleted or altered newer Member authority`);
+    assert(result.stored === replacementSanitizedRaw, `${label} stale cleanup did not sanitize newer Member authority`);
     assert(result.active?.kind === 'member' && result.active?.token === replacement.accessToken, `${label} active bearer downgraded from newer Member`);
     assert(result.compatibilityActive === replacement.accessToken, `${label} compatibility bearer did not converge to newer Member`);
     assert(result.pending === stagedGuest, `${label} stale cleanup mutated pending Guest lineage`);

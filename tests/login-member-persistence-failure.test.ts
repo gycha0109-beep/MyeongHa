@@ -47,14 +47,12 @@ const OLD_ACCESS = 'old.member.payload';
 const NEW_ACCESS = 'new.member.payload';
 const MEMBER_SESSION = Object.freeze({
   accessToken: NEW_ACCESS,
-  refreshToken: 'refresh-new-member',
   expiresAt: '2099-01-01T00:00:00.000Z',
   tokenType: 'bearer',
   user: Object.freeze({ id: 'auth-user-persist', email: 'member@example.com' }),
 });
 const OLD_SESSION = Object.freeze({
   accessToken: OLD_ACCESS,
-  refreshToken: 'refresh-old-member',
   expiresAt: '2099-01-01T00:00:00.000Z',
   tokenType: 'bearer',
   user: Object.freeze({ id: 'auth-user-persist', email: 'member@example.com' }),
@@ -170,7 +168,6 @@ describe('Member session persistence authority', () => {
 
     expect(readMemberSession()).toMatchObject({
       accessToken: OLD_ACCESS,
-      refreshToken: OLD_SESSION.refreshToken,
     });
     expect(session.getItem(PRODUCT_AUTH_STORAGE_V1.guestBearer)).toBe(OLD_ACCESS);
     expect(session.getItem(PRODUCT_AUTH_STORAGE_V1.pendingGuestBearer)).toBeNull();

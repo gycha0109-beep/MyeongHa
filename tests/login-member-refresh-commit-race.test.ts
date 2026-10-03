@@ -48,10 +48,9 @@ const member = Object.freeze({
   email: 'refresh-race@example.com',
 });
 
-function memberSession(accessToken: string, refreshToken: string) {
+function memberSession(accessToken: string) {
   return Object.freeze({
     accessToken,
-    refreshToken,
     expiresAt: '2099-01-01T00:00:00.000Z',
     tokenType: 'bearer',
     user: member,
@@ -79,9 +78,9 @@ afterEach(() => {
 
 describe('Member successful refresh commit authority', () => {
   it('preserves a newer Member generation that appears while the stale refresh commit is waiting for the lock', async () => {
-    const original = memberSession('old.header.signature', 'refresh-old');
-    const staleRefresh = memberSession('stale.header.signature', 'refresh-stale');
-    const newer = memberSession('newer.header.signature', 'refresh-newer');
+    const original = memberSession('old.header.signature');
+    const staleRefresh = memberSession('stale.header.signature');
+    const newer = memberSession('newer.header.signature');
     seed(original);
 
     const locks = new GatedLockManager();
@@ -103,11 +102,9 @@ describe('Member successful refresh commit authority', () => {
 
     await expect(refresh).resolves.toMatchObject({
       accessToken: newer.accessToken,
-      refreshToken: newer.refreshToken,
     });
     expect(readMemberSession()).toMatchObject({
       accessToken: newer.accessToken,
-      refreshToken: newer.refreshToken,
     });
     expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.guestBearer)).toBe(newer.accessToken);
     expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.pendingGuestBearer)).toBe('guest-before-member');

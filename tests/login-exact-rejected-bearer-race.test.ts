@@ -110,8 +110,8 @@ describe('exact rejected bearer invalidation', () => {
 
     expect(readMemberSession()).toMatchObject({
       accessToken: rotatedMember.accessToken,
-      refreshToken: rotatedMember.refreshToken,
     });
+    expect(readMemberSession()).not.toHaveProperty('refreshToken');
     expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.guestBearer)).toBe(rotatedMember.accessToken);
     expect(globalThis.dispatchEvent).not.toHaveBeenCalled();
   });
@@ -169,8 +169,8 @@ describe('refresh generation authority', () => {
     await expect(pending).rejects.toMatchObject({ code: 'SESSION_EXPIRED' });
     expect(readMemberSession()).toMatchObject({
       accessToken: rotatedMember.accessToken,
-      refreshToken: rotatedMember.refreshToken,
     });
+    expect(readMemberSession()).not.toHaveProperty('refreshToken');
     expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.guestBearer)).toBe(rotatedMember.accessToken);
     expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.pendingGuestBearer)).toBe('guest-before-member');
     expect(globalThis.dispatchEvent).not.toHaveBeenCalled();
@@ -192,12 +192,12 @@ describe('refresh generation authority', () => {
 
     await expect(pending).resolves.toMatchObject({
       accessToken: rotatedMember.accessToken,
-      refreshToken: rotatedMember.refreshToken,
     });
+    await expect(pending).resolves.not.toHaveProperty('refreshToken');
     expect(readMemberSession()).toMatchObject({
       accessToken: rotatedMember.accessToken,
-      refreshToken: rotatedMember.refreshToken,
     });
+    expect(readMemberSession()).not.toHaveProperty('refreshToken');
     expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.guestBearer)).toBe(rotatedMember.accessToken);
     expect(globalThis.dispatchEvent).not.toHaveBeenCalled();
   });

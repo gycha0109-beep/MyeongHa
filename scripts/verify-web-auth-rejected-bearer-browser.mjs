@@ -265,7 +265,6 @@ async function seedMember(client) {
   await client.evaluate(`(() => {
     localStorage.setItem(${JSON.stringify(memberKey)}, JSON.stringify({
       accessToken: ${JSON.stringify(memberToken)},
-      refreshToken: 'rejected-refresh-token',
       expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
       tokenType: 'bearer',
       user: { id: '11111111-1111-4111-8111-111111111111', email: 'reject-browser@example.com' },

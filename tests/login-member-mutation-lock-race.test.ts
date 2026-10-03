@@ -80,20 +80,19 @@ const member = Object.freeze({
   email: 'member-mutation-race@example.com',
 });
 
-function memberSession(accessToken: string, refreshToken: string) {
+function memberSession(accessToken: string) {
   return Object.freeze({
     accessToken,
-    refreshToken,
     expiresAt: '2099-01-01T00:00:00.000Z',
     tokenType: 'bearer',
     user: member,
   });
 }
 
-const original = memberSession('old.header.signature', 'refresh-old');
-const staleRefresh = memberSession('stale.header.signature', 'refresh-stale');
-const newerLogin = memberSession('newlogin.header.signature', 'refresh-new-login');
-const signupSession = memberSession('signup.header.signature', 'refresh-signup');
+const original = memberSession('old.header.signature');
+const staleRefresh = memberSession('stale.header.signature');
+const newerLogin = memberSession('newlogin.header.signature');
+const signupSession = memberSession('signup.header.signature');
 const stagedGuest = 'guest-before-member';
 
 function seed(session = original) {
@@ -157,7 +156,6 @@ describe('Member mutation lock authority', () => {
     await expect(refresh).resolves.toMatchObject({ accessToken: newerLogin.accessToken });
     expect(readMemberSession()).toMatchObject({
       accessToken: newerLogin.accessToken,
-      refreshToken: newerLogin.refreshToken,
     });
     expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.guestBearer)).toBe(newerLogin.accessToken);
     expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.pendingGuestBearer)).toBe(stagedGuest);
@@ -214,7 +212,6 @@ describe('Member mutation lock authority', () => {
     await expect(signUp).rejects.toMatchObject({ code: 'WEB_AUTH_MEMBER_MUTATION_SUPERSEDED' });
     expect(readMemberSession()).toMatchObject({
       accessToken: newerLogin.accessToken,
-      refreshToken: newerLogin.refreshToken,
     });
     expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.guestBearer)).toBe(newerLogin.accessToken);
     expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.pendingGuestBearer)).toBe(stagedGuest);
@@ -295,7 +292,6 @@ describe('Member mutation lock authority', () => {
     expect(invalidateMemberSession(original.accessToken)).toBe(false);
     expect(readMemberSession()).toMatchObject({
       accessToken: newerLogin.accessToken,
-      refreshToken: newerLogin.refreshToken,
     });
     expect(globalThis.dispatchEvent).not.toHaveBeenCalled();
   });
