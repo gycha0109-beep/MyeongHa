@@ -6,15 +6,12 @@ Tracking: #1526
 
 ## Current Production scope
 
-Mounted public Production Saju execution:
+Public Production Saju execution paths:
 
-- `POST /api/me/saju/calculation`
+- `POST /api/me/saju/calculation` — direct public route file;
+- `POST /api/me/saju/preview-reading` — public Vercel rewrite to `/api/me?__myeongha_saju_preview_reading=1`, then validated and dispatched by `api/me.ts`.
 
-Source/runtime implementation that is **not currently mounted under `api/`**:
-
-- `/api/me/saju/preview-reading`
-
-Preview Reading is therefore treated as a pre-activation protection target, not a currently exposed Production endpoint.
+Preview Reading has no dedicated route file, but it is currently public through the governed rewrite/dispatcher path.
 
 ## Why observe-only first
 
@@ -134,10 +131,16 @@ The enforcement design must then define:
 - retry/idempotency implications;
 - privacy-safe `RATE_LIMITED` observability.
 
-## Preview activation gate
+## Preview rewrite authority
 
-If Preview Reading is later mounted publicly, its Production runtime already uses the same observe-only identity boundary.
+Preview Reading is already publicly reachable through the governed Vercel rewrite and `api/me.ts` dispatch boundary.
 
-Public activation must still verify the route-level security-observability inventory and must not be interpreted as rate-limit enforcement.
+Its Production runtime uses the same observe-only identity boundary as direct Saju calculation. The public dispatcher is independently covered by the structured security-observability boundary under `api.me.dispatch`.
+
+A future routing change must preserve both:
+- the rewrite/dispatch evidence validation;
+- the Saju abuse observation wrapper.
+
+Observe-only telemetry must not be interpreted as rate-limit enforcement.
 
 Watchtower-Track: security
