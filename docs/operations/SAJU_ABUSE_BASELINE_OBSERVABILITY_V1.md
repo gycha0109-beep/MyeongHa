@@ -154,6 +154,7 @@ The analyzer reports:
 - unique pseudonymous client count;
 - Member/Guest distribution;
 - mounted-route distribution;
+- the same authenticated-attempt, outcome-correlation, and burst evidence separately for each mounted route;
 - per-client request-count histogram without emitting client keys;
 - admission/outcome correlation coverage;
 - matched HTTP status distribution;
