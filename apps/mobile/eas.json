@@ -8,7 +8,7 @@
       "environment": "production",
       "android": {
         "withoutCredentials": true,
-        "gradleCommand": ":app:assembleDebug"
+        "gradleCommand": ":app:assembleRelease"
       }
     }
   }
