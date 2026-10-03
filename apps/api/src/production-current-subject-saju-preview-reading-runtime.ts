@@ -11,6 +11,10 @@ import {
 import type { SajuProductionCalculationHttpFetchV1 } from './saju-production-calculation-http-adapter.js';
 import type { SupabaseMemberVerifierFetchV1 } from './supabase-member-identity-verifier.js';
 import type { PostgresSubjectPoolV1 } from './postgres-subject-execution.js';
+import {
+  createSajuAbuseObservedIdentityVerifierV1,
+  type SajuAbuseObservationWriterV1,
+} from './saju-abuse-observability.js';
 import { createProductionPostgresSubjectPoolLeaseV1 } from './production-postgres-subject-pool-lease.js';
 
 export interface ProductionCurrentSubjectSajuPreviewReadingRequestV1 {
@@ -29,6 +33,10 @@ export interface CreateProductionCurrentSubjectSajuPreviewReadingRuntimeInputV1 
   readonly pool?: PostgresSubjectPoolV1;
   readonly memberFetchImpl?: SupabaseMemberVerifierFetchV1;
   readonly sajuFetchImpl?: SajuProductionCalculationHttpFetchV1;
+  /** Observe-only baseline injection. Production defaults to the privacy-safe logger. */
+  readonly sajuAbuseObservationWriter?: SajuAbuseObservationWriterV1;
+  /** Test/runtime clock injection only. */
+  readonly now?: () => number;
 }
 
 export function createProductionCurrentSubjectSajuPreviewReadingRuntimeV1(
@@ -54,11 +62,21 @@ export function createProductionCurrentSubjectSajuPreviewReadingRuntimeV1(
 
   return Object.freeze({
     handleRequest(requestInput: ProductionCurrentSubjectSajuPreviewReadingRequestV1) {
+      const observedIdentityEvidenceVerifier = createSajuAbuseObservedIdentityVerifierV1({
+        delegate: identityEvidenceVerifier,
+        routeId: 'api.me.saju.preview-reading',
+        requestId: requestInput.requestId,
+        secret: userDataConfig.guestFingerprintSecret,
+        ...(input.sajuAbuseObservationWriter === undefined
+          ? {}
+          : { eventWriter: input.sajuAbuseObservationWriter }),
+        ...(input.now === undefined ? {} : { now: input.now }),
+      });
       return handleCurrentSubjectSajuPreviewReadingRequestV1({
         request: requestInput.request,
         requestId: requestInput.requestId,
         serverTime: requestInput.serverTime,
-        identityEvidenceVerifier,
+        identityEvidenceVerifier: observedIdentityEvidenceVerifier,
         pool: poolLease.pool,
         sajuAdapter,
       });
