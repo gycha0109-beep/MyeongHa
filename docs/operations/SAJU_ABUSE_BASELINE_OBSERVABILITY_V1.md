@@ -183,6 +183,27 @@ policyDecision.enforcementAuthorized = false
 
 The analyzer is evidence tooling only. Product/security authority must separately approve any limit/window/storage/failure semantics before enforcement.
 
+## Latest recorded snapshot
+
+The first repository-recorded Production observation snapshot is:
+
+```text
+docs/operations/SAJU_ABUSE_BASELINE_SNAPSHOT_2026-10-03.json
+```
+
+That snapshot covers an explicit 24-hour Vercel Production runtime-log query window. The query returned only governed synthetic canary traffic. After applying the canonical synthetic exclusion authority, the organic authenticated attempt count is zero.
+
+This does **not** prove the absence of real-world demand outside the queried/log-retained surface. It means only that the captured evidence window contains no usable organic sample. Therefore:
+
+```text
+organic baseline = INSUFFICIENT
+numeric policy = HOLD
+enforcement = HOLD
+issue closure = NOT ALLOWED
+```
+
+Future snapshots should preserve the same analyzer/report schema so growth in organic evidence can be compared without changing the measurement contract.
+
 ## Baseline decision
 
 A later evidence review must separately report, for each mounted route:

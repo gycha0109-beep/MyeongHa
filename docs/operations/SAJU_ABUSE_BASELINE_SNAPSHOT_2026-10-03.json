@@ -1,0 +1,143 @@
+{
+  "schemaVersion": "myeongha-saju-abuse-baseline-snapshot-v1",
+  "capturedAt": "2026-10-03T04:43:13.430Z",
+  "authority": {
+    "issue": "#1526",
+    "analyzerMergeSha": "3e3c22a89af5e88cd8b650f34e423551489b4c47",
+    "telemetryCanaryMergeSha": "08ce15fdaf9504f0fa53ca64c2ce937878b18e35",
+    "source": "vercel-production-runtime-logs",
+    "query": "MYEONGHA_SAJU_ABUSE_OBSERVATION",
+    "requestedWindow": {
+      "from": "2026-10-02T04:43:13.431Z",
+      "to": "2026-10-03T04:43:13.430Z"
+    },
+    "connectorRecordCap": 100,
+    "returnedMatchingInvocationCount": 2,
+    "capReached": false
+  },
+  "evidenceLimitations": [
+    "The snapshot covers only the explicitly queried Production runtime-log window.",
+    "The connector capped the requested limit at 100 records; this query returned two matching invocations, so the cap was not reached.",
+    "Configured synthetic exclusions include four governed canary request ids, but only two of those request ids were present in this queried window.",
+    "No organic authenticated Saju admission was present after synthetic exclusions, so this snapshot cannot authorize a numeric admission policy."
+  ],
+  "analyzerReport": {
+    "schemaVersion": "myeongha-saju-abuse-baseline-report-v1",
+    "mode": "evidence_only",
+    "observationWindow": {
+      "firstAuthenticatedAttemptAt": null,
+      "lastAuthenticatedAttemptAt": null,
+      "retentionNote": "Vercel Production runtime logs queried for the preceding 24 hours; only the explicit query window is asserted."
+    },
+    "inputQuality": {
+      "parsedEventCount": 4,
+      "exactDuplicateEventCount": 0,
+      "configuredSyntheticRequestCount": 4,
+      "syntheticExcludedRequestCount": 2,
+      "syntheticExcludedEventCount": 4,
+      "unmatchedAuthenticatedAdmissionCount": 0,
+      "orphanOutcomeCount": 0
+    },
+    "authenticatedAttempts": {
+      "total": 0,
+      "uniquePseudonymousClients": 0,
+      "subjectKindDistribution": {},
+      "perClientRequestCountHistogram": {},
+      "routeDistribution": {}
+    },
+    "correlatedOutcomes": {
+      "matched": 0,
+      "unmatchedAuthenticatedAdmissions": 0,
+      "coverageRatio": null,
+      "statusCodeDistribution": {},
+      "statusClassDistribution": {},
+      "matchedFailureOutcomeCount": 0,
+      "failureFollowedByLaterAttemptCount": 0,
+      "failureFollowedByLaterAttemptIntervalMs": {
+        "count": 0,
+        "minMs": null,
+        "medianMs": null,
+        "maxMs": null
+      }
+    },
+    "burstEvidence": {
+      "burstWindowSeconds": null,
+      "maxAuthenticatedAttemptsBySingleClient": null,
+      "perClientBurstMaxHistogram": null,
+      "note": "No burst window was supplied; no burst threshold was inferred."
+    },
+    "perRoute": {
+      "api.me.saju.calculation": {
+        "authenticatedAttempts": {
+          "total": 0,
+          "uniquePseudonymousClients": 0,
+          "subjectKindDistribution": {},
+          "perClientRequestCountHistogram": {}
+        },
+        "correlatedOutcomes": {
+          "matched": 0,
+          "unmatchedAuthenticatedAdmissions": 0,
+          "coverageRatio": null,
+          "statusCodeDistribution": {},
+          "statusClassDistribution": {},
+          "matchedFailureOutcomeCount": 0,
+          "failureFollowedByLaterAttemptCount": 0,
+          "failureFollowedByLaterAttemptIntervalMs": {
+            "count": 0,
+            "minMs": null,
+            "medianMs": null,
+            "maxMs": null
+          }
+        },
+        "burstEvidence": {
+          "burstWindowSeconds": null,
+          "maxAuthenticatedAttemptsBySingleClient": null,
+          "perClientBurstMaxHistogram": null,
+          "note": "No burst window was supplied; no burst threshold was inferred."
+        }
+      },
+      "api.me.saju.preview-reading": {
+        "authenticatedAttempts": {
+          "total": 0,
+          "uniquePseudonymousClients": 0,
+          "subjectKindDistribution": {},
+          "perClientRequestCountHistogram": {}
+        },
+        "correlatedOutcomes": {
+          "matched": 0,
+          "unmatchedAuthenticatedAdmissions": 0,
+          "coverageRatio": null,
+          "statusCodeDistribution": {},
+          "statusClassDistribution": {},
+          "matchedFailureOutcomeCount": 0,
+          "failureFollowedByLaterAttemptCount": 0,
+          "failureFollowedByLaterAttemptIntervalMs": {
+            "count": 0,
+            "minMs": null,
+            "medianMs": null,
+            "maxMs": null
+          }
+        },
+        "burstEvidence": {
+          "burstWindowSeconds": null,
+          "maxAuthenticatedAttemptsBySingleClient": null,
+          "perClientBurstMaxHistogram": null,
+          "note": "No burst window was supplied; no burst threshold was inferred."
+        }
+      }
+    },
+    "policyDecision": {
+      "produced": false,
+      "numericLimit": null,
+      "windowSeconds": null,
+      "enforcementAuthorized": false,
+      "note": "Baseline evidence does not automatically choose or authorize an admission policy."
+    }
+  },
+  "disposition": {
+    "organicBaseline": "INSUFFICIENT",
+    "numericAdmissionPolicy": "HOLD",
+    "enforcement": "HOLD",
+    "issueClosureAllowed": false
+  }
+}
