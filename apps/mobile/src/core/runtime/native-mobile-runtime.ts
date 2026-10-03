@@ -1,3 +1,5 @@
+import Constants from 'expo-constants';
+
 import { createMobileApiClientV1 } from '@/core/api/mobile-api-client';
 import { mobileGuestCredentialStoreV1 } from '@/core/auth/native-guest-credential-store';
 import { mobileMemberSessionStoreV1 } from '@/core/auth/native-member-session-store';
@@ -5,7 +7,10 @@ import { readMobileRuntimeConfigV1 } from '@/core/config/mobile-runtime-config';
 import { createMobileMemberSessionCoordinatorV1 } from '@/core/session/mobile-member-session';
 import { createMobileSubjectSessionCoordinatorV1 } from '@/core/session/mobile-subject-session';
 
-const config = readMobileRuntimeConfigV1();
+const config = readMobileRuntimeConfigV1(
+  process.env,
+  Constants.expoConfig?.extra?.eas?.projectId,
+);
 const apiClient = createMobileApiClientV1(config.apiOrigin);
 const memberSession = createMobileMemberSessionCoordinatorV1({
   client: apiClient,

@@ -1,0 +1,132 @@
+name: Mobile Android Physical Smoke Build
+
+run-name: "[WT:applizing] Mobile Android Physical Smoke Build"
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type BUILD_ANDROID_PHYSICAL_SMOKE_V1
+        required: true
+        type: string
+      watchtower_track:
+        description: Watchtower work track attribution
+        required: true
+        default: applizing
+        type: string
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/mobile-android-physical-smoke-build.trigger'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-android-physical-smoke-build
+  cancel-in-progress: false
+
+jobs:
+  build-android-physical-smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    environment: production
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      NO_COLOR: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: "24"
+          package-manager-cache: false
+
+      - name: Verify explicit physical-smoke authority
+        shell: bash
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+          WATCHTOWER_TRACK: ${{ inputs.watchtower_track }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/main"
+
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            test "$CONFIRMATION" = "BUILD_ANDROID_PHYSICAL_SMOKE_V1"
+            test "$WATCHTOWER_TRACK" = "applizing"
+          else
+            test "$GITHUB_EVENT_NAME" = "push"
+            test "$(tr -d '\r\n' < .github/mobile-android-physical-smoke-build.trigger)" = "BUILD_ANDROID_PHYSICAL_SMOKE_V1"
+          fi
+
+          test -n "${EXPO_TOKEN:-}"
+
+      - name: Install workspace dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Verify release identity and Android physical-smoke contract
+        run: |
+          set -euo pipefail
+          npm run verify:mobile-release-readiness
+          npm run verify:mobile-android-physical-smoke-readiness
+
+      - name: Build Android debug APK without EAS signing credentials
+        id: eas_build
+        shell: bash
+        run: |
+          set -euo pipefail
+          pushd apps/mobile >/dev/null
+          npm exec --yes --package=eas-cli@24.10.0 -- \
+            eas build \
+              --platform android \
+              --profile physical-smoke \
+              --non-interactive \
+              --freeze-credentials \
+              --wait \
+              --json \
+              > "$RUNNER_TEMP/myeongha-android-physical-smoke-build.json"
+          popd >/dev/null
+
+          BUILD_JSON="$RUNNER_TEMP/myeongha-android-physical-smoke-build.json" \
+          node --input-type=module <<'NODE' >> "$GITHUB_OUTPUT"
+          import { readFileSync } from 'node:fs';
+
+          const parsed = JSON.parse(readFileSync(process.env.BUILD_JSON, 'utf8'));
+          const build = Array.isArray(parsed) ? parsed[0] : parsed;
+          if (!build || typeof build.id !== 'string') {
+            throw new Error('EAS build output did not contain a build id.');
+          }
+
+          const status = String(build.status ?? '').toUpperCase();
+          if (status !== 'FINISHED') {
+            throw new Error(`EAS Android physical-smoke build did not finish successfully: ${status || 'UNKNOWN'}`);
+          }
+
+          const artifactUrl =
+            build?.artifacts?.buildUrl ??
+            build?.artifacts?.applicationArchiveUrl ??
+            null;
+          if (typeof artifactUrl !== 'string' || !/^https:\/\//u.test(artifactUrl)) {
+            throw new Error('EAS build output did not contain an Android application artifact URL.');
+          }
+
+          process.stdout.write(`build_id=${build.id}\n`);
+          NODE
+
+      - name: Record safe physical-smoke build evidence
+        shell: bash
+        env:
+          EAS_BUILD_ID: ${{ steps.eas_build.outputs.build_id }}
+        run: |
+          set -euo pipefail
+          test -n "$EAS_BUILD_ID"
+          {
+            echo "android_physical_smoke_build=pass"
+            echo "eas_build_id=$EAS_BUILD_ID"
+            echo "eas_profile=physical-smoke"
+            echo "android_gradle_command=:app:assembleDebug"
+            echo "eas_credentials_mutation=false"
+            echo "store_submission=false"
+            echo "eas_build_page=https://expo.dev/accounts/johnny0109/projects/myeongha-mobile/builds/$EAS_BUILD_ID"
+          } >> "$GITHUB_STEP_SUMMARY"
