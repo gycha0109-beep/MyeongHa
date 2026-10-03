@@ -12,7 +12,7 @@ expect_fail() {
   local sql="$3"
   local out rc
   set +e
-  out=$(${"psql_base[@]"} -c "$sql" 2>&1)
+  out=$("${psql_base[@]}" -c "$sql" 2>&1)
   rc=$?
   set -e
   if [[ $rc -eq 0 ]]; then
@@ -39,7 +39,7 @@ guard_log_id="d1460000-0000-4000-8000-000000000010"
 assistant_message_id="d1460000-0000-4000-8000-000000000011"
 chat_outbox_id="d1460000-0000-4000-8000-000000000012"
 
-"${"psql_base[@]"}" <<SQL
+"${psql_base[@]}" <<SQL
 insert into public.subjects(
   id,kind,auth_user_id,status,merged_into_subject_id,created_at,updated_at
 ) values (
@@ -103,7 +103,7 @@ insert into public.conversation_thread_characters(
 );
 SQL
 
-function_shape=$("${"psql_base[@]"}" -At -F '|' -c "
+function_shape=$("${psql_base[@]}" -At -F '|' -c "
 select
   count(*) filter (where p.prosecdef),
   count(*) filter (where owner.rolname='myeongha_seyeon_chat_runtime_owner'),
@@ -125,7 +125,7 @@ where n.nspname='public'
 [[ "$function_shape" == "6|6|6|0" ]] || fail "runtime wrapper ACL/owner mismatch: $function_shape"
 pass "all Se-yeon Production Chat wrappers are narrow SECURITY DEFINER API surfaces"
 
-helper_acl=$("${"psql_base[@]"}" -At -c "
+helper_acl=$("${psql_base[@]}" -At -c "
 select has_function_privilege(
   'myeongha_api_executor',
   'public.assert_seyeon_chat_thread_runtime_v1(uuid,uuid)',
@@ -135,7 +135,7 @@ select has_function_privilege(
 [[ "$helper_acl" == "f" ]] || fail "internal Se-yeon thread helper leaked to API executor"
 pass "thread authority helper is not an API executor surface"
 
-receive_result=$("${"psql_base[@]"}" -At -F '|' <<SQL
+receive_result=$("${psql_base[@]}" -At -F '|' <<SQL
 begin;
 set local role myeongha_api_executor;
 select pg_catalog.set_config('myeongha.subject_id','$subject_id',true);
@@ -165,7 +165,7 @@ SQL
   fail "Se-yeon runtime receive mismatch: $receive_result"
 pass "receive wrapper persists the exact current user message and pinned binding"
 
-attempt_result=$("${"psql_base[@]"}" -At -F '|' <<SQL
+attempt_result=$("${psql_base[@]}" -At -F '|' <<SQL
 begin;
 set local role myeongha_api_executor;
 select pg_catalog.set_config('myeongha.subject_id','$subject_id',true);
@@ -180,7 +180,7 @@ SQL
   fail "Se-yeon runtime attempt allocation mismatch: $attempt_result"
 pass "attempt allocation uses the existing Chat state machine"
 
-context_result=$("${"psql_base[@]"}" -At <<SQL
+context_result=$("${psql_base[@]}" -At <<SQL
 begin;
 set local role myeongha_api_executor;
 select pg_catalog.set_config('myeongha.subject_id','$subject_id',true);
@@ -194,7 +194,7 @@ SQL
   fail "Se-yeon context-ready transition mismatch: $context_result"
 pass "context-ready transition is persisted before provider execution"
 
-generated_result=$("${"psql_base[@]"}" -At <<SQL
+generated_result=$("${psql_base[@]}" -At <<SQL
 begin;
 set local role myeongha_api_executor;
 select pg_catalog.set_config('myeongha.subject_id','$subject_id',true);
@@ -218,7 +218,7 @@ SQL
   fail "Se-yeon generated persistence mismatch: $generated_result"
 pass "renderer provenance and generated payload are staged atomically"
 
-validated_result=$("${"psql_base[@]"}" -At <<SQL
+validated_result=$("${psql_base[@]}" -At <<SQL
 begin;
 set local role myeongha_api_executor;
 select pg_catalog.set_config('myeongha.subject_id','$subject_id',true);
@@ -240,7 +240,7 @@ SQL
   fail "Se-yeon validated persistence mismatch: $validated_result"
 pass "Output Guard provenance validates the exact staged generation"
 
-commit_result=$("${"psql_base[@]"}" -At -F '|' <<SQL
+commit_result=$("${psql_base[@]}" -At -F '|' <<SQL
 begin;
 set local role myeongha_api_executor;
 select pg_catalog.set_config('myeongha.subject_id','$subject_id',true);
@@ -258,7 +258,7 @@ SQL
   fail "Se-yeon runtime commit mismatch: $commit_result"
 pass "validated Se-yeon answer commits one authoritative assistant message"
 
-message_counts=$("${"psql_base[@]"}" -At -F '|' -c "
+message_counts=$("${psql_base[@]}" -At -F '|' -c "
 select
   count(*) filter (where sender_type='user'),
   count(*) filter (where sender_type='character')
@@ -268,7 +268,7 @@ where turn_id='$turn_id';
 [[ "$message_counts" == "1|1" ]] ||
   fail "Se-yeon committed message cardinality mismatch: $message_counts"
 
-provenance=$("${"psql_base[@]"}" -At -F '|' -c "
+provenance=$("${psql_base[@]}" -At -F '|' -c "
 select
   ct.state,
   a.state,
@@ -287,7 +287,7 @@ group by ct.state,a.state;
   fail "Se-yeon committed provenance mismatch: $provenance"
 pass "one user + one assistant message commit with renderer/output-guard provenance"
 
-receive_replay=$("${"psql_base[@]"}" -At -F '|' <<SQL
+receive_replay=$("${psql_base[@]}" -At -F '|' <<SQL
 begin;
 set local role myeongha_api_executor;
 select pg_catalog.set_config('myeongha.subject_id','$subject_id',true);
@@ -316,7 +316,7 @@ SQL
 [[ "$receive_replay" == *"$turn_id|$user_message_id|t"* ]] ||
   fail "Se-yeon receive replay mismatch: $receive_replay"
 
-message_counts_after_replay=$("${"psql_base[@]"}" -At -F '|' -c "
+message_counts_after_replay=$("${psql_base[@]}" -At -F '|' -c "
 select
   count(*) filter (where sender_type='user'),
   count(*) filter (where sender_type='character')
@@ -331,7 +331,7 @@ expect_fail   "authenticated direct Se-yeon chat runtime receive"   "permission 
 
 expect_fail   "API executor forged content binding"   "Server-prepared Chat content does not match the pinned thread binding"   "begin; set local role myeongha_api_executor; select pg_catalog.set_config('myeongha.subject_id','$subject_id',true); select * from public.cmd_receive_seyeon_chat_turn_runtime_v1('$subject_id','$thread_id','forged-binding','h','chat-request-v1','{}'::jsonb,'d1460000-0000-4000-8000-000000000099','$bundle_id',gen_random_uuid(),gen_random_uuid(),'x','h'); rollback;"
 
-owner_shape=$("${"psql_base[@]"}" -At -F '|' -c "
+owner_shape=$("${psql_base[@]}" -At -F '|' -c "
 select
   rolcanlogin,rolsuper,rolcreatedb,rolcreaterole,
   rolinherit,rolreplication,rolbypassrls,
