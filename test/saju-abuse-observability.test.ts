@@ -2,8 +2,10 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   SAJU_ABUSE_CLIENT_KEY_VERSION_V1,
   SAJU_ABUSE_OBSERVATION_SCHEMA_VERSION_V1,
+  SAJU_ABUSE_OUTCOME_SCHEMA_VERSION_V1,
   createSajuAbuseObservedIdentityVerifierV1,
   fingerprintSajuAbuseClientV1,
+  observeSajuAbuseOutcomeV1,
 } from '../apps/api/src/saju-abuse-observability.js';
 
 const SECRET = 'test-saju-abuse-observation-secret-at-least-thirty-two-bytes';
@@ -153,6 +155,58 @@ describe('Saju abuse observe-only telemetry', () => {
         }),
       ),
     ).resolves.toEqual(evidence);
+  });
+
+  it('emits a request-correlatable outcome event without duplicating client identity', () => {
+    const eventWriter = vi.fn();
+
+    expect(() =>
+      observeSajuAbuseOutcomeV1({
+        routeId: 'api.me.saju.calculation',
+        requestId: 'request:saju-abuse:outcome',
+        httpStatus: 503,
+        now: () => Date.parse('2026-10-03T00:31:00.000Z'),
+        eventWriter,
+      }),
+    ).not.toThrow();
+
+    expect(eventWriter).toHaveBeenCalledTimes(1);
+    expect(eventWriter.mock.calls[0]?.[0]).toEqual({
+      schemaVersion: SAJU_ABUSE_OUTCOME_SCHEMA_VERSION_V1,
+      mode: 'observe_only',
+      routeId: 'api.me.saju.calculation',
+      requestId: 'request:saju-abuse:outcome',
+      httpStatus: 503,
+      completedAt: '2026-10-03T00:31:00.000Z',
+    });
+    expect(eventWriter.mock.calls[0]?.[0]).not.toHaveProperty('clientKey');
+    expect(eventWriter.mock.calls[0]?.[0]).not.toHaveProperty('subjectKind');
+  });
+
+  it('keeps invalid clocks and writer failures outside request authority for outcomes', () => {
+    const invalidClockWriter = vi.fn();
+
+    expect(() =>
+      observeSajuAbuseOutcomeV1({
+        routeId: 'api.me.saju.preview-reading',
+        requestId: 'request:saju-abuse:invalid-outcome-clock',
+        httpStatus: 200,
+        now: () => Number.POSITIVE_INFINITY,
+        eventWriter: invalidClockWriter,
+      }),
+    ).not.toThrow();
+    expect(invalidClockWriter).not.toHaveBeenCalled();
+
+    expect(() =>
+      observeSajuAbuseOutcomeV1({
+        routeId: 'api.me.saju.preview-reading',
+        requestId: 'request:saju-abuse:outcome-writer-failure',
+        httpStatus: 200,
+        eventWriter() {
+          throw new Error('synthetic outcome logging failure');
+        },
+      }),
+    ).not.toThrow();
   });
 
   it('domain-separates Member and Guest client keys', () => {
