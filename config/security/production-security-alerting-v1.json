@@ -69,5 +69,18 @@
       "credential",
       "raw-error-stack"
     ]
+  },
+  "baselineEvidence": {
+    "issue": "#1527",
+    "snapshot": "docs/operations/PRODUCTION_SECURITY_ALERTING_BASELINE_2026-10-03.json",
+    "accessDenied": {
+      "alertingState": "BASELINE_REQUIRED",
+      "fixedThreshold": null
+    },
+    "rateLimited": {
+      "alertingState": "BASELINE_REQUIRED",
+      "fixedThreshold": null
+    },
+    "providerMutationAuthorized": false
   }
 }
