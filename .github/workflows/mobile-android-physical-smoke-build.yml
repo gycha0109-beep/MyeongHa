@@ -71,21 +71,138 @@ jobs:
           npm run verify:mobile-release-readiness
           npm run verify:mobile-android-physical-smoke-readiness
 
-      - name: Build Android debug APK without EAS signing credentials
-        id: eas_build
+      - name: Inspect latest failed EAS physical-smoke build
         shell: bash
         run: |
           set -euo pipefail
           pushd apps/mobile >/dev/null
+
+          npm exec --yes --package=eas-cli@24.10.0 -- \
+            eas build:list \
+              --platform android \
+              --profile physical-smoke \
+              --status errored \
+              --limit 1 \
+              --json \
+              --non-interactive \
+              > "$RUNNER_TEMP/myeongha-android-physical-smoke-failed-list.json"
+
+          FAILED_LIST_JSON="$RUNNER_TEMP/myeongha-android-physical-smoke-failed-list.json" \
+          node --input-type=module <<'NODE' > "$RUNNER_TEMP/myeongha-latest-failed-build-id.txt"
+          import { readFileSync } from 'node:fs';
+
+          const parsed = JSON.parse(readFileSync(process.env.FAILED_LIST_JSON, 'utf8'));
+          const build = Array.isArray(parsed) ? parsed[0] : null;
+          if (build && typeof build.id === 'string') {
+            process.stdout.write(build.id);
+          }
+          NODE
+
+          failed_build_id="$(cat "$RUNNER_TEMP/myeongha-latest-failed-build-id.txt")"
+          if [[ -n "$failed_build_id" ]]; then
+            npm exec --yes --package=eas-cli@24.10.0 -- \
+              eas build:view "$failed_build_id" --json \
+              > "$RUNNER_TEMP/myeongha-latest-failed-build-view.json"
+
+            BUILD_VIEW_JSON="$RUNNER_TEMP/myeongha-latest-failed-build-view.json" \
+            node --input-type=module <<'NODE'
+            import { readFileSync } from 'node:fs';
+
+            const build = JSON.parse(readFileSync(process.env.BUILD_VIEW_JSON, 'utf8'));
+            const diagnostic = {
+              id: build?.id ?? null,
+              status: build?.status ?? null,
+              platform: build?.platform ?? null,
+              buildProfile: build?.buildProfile ?? null,
+              createdAt: build?.createdAt ?? null,
+              updatedAt: build?.updatedAt ?? null,
+              error: build?.error
+                ? {
+                    errorCode: build.error.errorCode ?? build.error.code ?? null,
+                    message: build.error.message ?? null,
+                    phase: build.error.phase ?? null,
+                  }
+                : null,
+            };
+            console.log('Latest failed EAS physical-smoke diagnostic:');
+            console.log(JSON.stringify(diagnostic, null, 2));
+            NODE
+          else
+            echo "No previous failed EAS physical-smoke build found."
+          fi
+
+          popd >/dev/null
+
+      - name: Build Android debug APK without EAS signing credentials
+        id: eas_build
+        shell: bash
+        run: |
+          set -uo pipefail
+          pushd apps/mobile >/dev/null
+
+          build_stderr="$RUNNER_TEMP/myeongha-android-physical-smoke-build.stderr.log"
+          set +e
           npm exec --yes --package=eas-cli@24.10.0 -- \
             eas build \
               --platform android \
               --profile physical-smoke \
               --non-interactive \
               --freeze-credentials \
+              --verbose-logs \
+              --build-logger-level debug \
               --wait \
               --json \
-              > "$RUNNER_TEMP/myeongha-android-physical-smoke-build.json"
+              > "$RUNNER_TEMP/myeongha-android-physical-smoke-build.json" \
+              2> >(tee "$build_stderr" >&2)
+          build_rc=$?
+          set -e
+
+          if [[ "$build_rc" -ne 0 ]]; then
+            BUILD_STDERR="$build_stderr" node --input-type=module <<'NODE' > "$RUNNER_TEMP/myeongha-failed-build-id.txt"
+            import { readFileSync } from 'node:fs';
+
+            const text = readFileSync(process.env.BUILD_STDERR, 'utf8');
+            const match = text.match(/\/builds\/([0-9a-f-]{36})/iu);
+            if (match?.[1]) process.stdout.write(match[1]);
+            NODE
+
+            failed_build_id="$(cat "$RUNNER_TEMP/myeongha-failed-build-id.txt")"
+            if [[ -n "$failed_build_id" ]]; then
+              npm exec --yes --package=eas-cli@24.10.0 -- \
+                eas build:view "$failed_build_id" --json \
+                > "$RUNNER_TEMP/myeongha-failed-build-view.json" || true
+
+              if [[ -s "$RUNNER_TEMP/myeongha-failed-build-view.json" ]]; then
+                BUILD_VIEW_JSON="$RUNNER_TEMP/myeongha-failed-build-view.json" \
+                node --input-type=module <<'NODE'
+                import { readFileSync } from 'node:fs';
+
+                const build = JSON.parse(readFileSync(process.env.BUILD_VIEW_JSON, 'utf8'));
+                const diagnostic = {
+                  id: build?.id ?? null,
+                  status: build?.status ?? null,
+                  platform: build?.platform ?? null,
+                  buildProfile: build?.buildProfile ?? null,
+                  createdAt: build?.createdAt ?? null,
+                  updatedAt: build?.updatedAt ?? null,
+                  error: build?.error
+                    ? {
+                        errorCode: build.error.errorCode ?? build.error.code ?? null,
+                        message: build.error.message ?? null,
+                        phase: build.error.phase ?? null,
+                      }
+                    : null,
+                };
+                console.error('Failed EAS physical-smoke diagnostic:');
+                console.error(JSON.stringify(diagnostic, null, 2));
+                NODE
+              fi
+            fi
+
+            popd >/dev/null
+            exit "$build_rc"
+          fi
+
           popd >/dev/null
 
           BUILD_JSON="$RUNNER_TEMP/myeongha-android-physical-smoke-build.json" \
