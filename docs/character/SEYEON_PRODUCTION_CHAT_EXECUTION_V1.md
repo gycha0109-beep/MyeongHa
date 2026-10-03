@@ -175,6 +175,19 @@ assistant commit succeeds
 If assistant commit does not succeed, this execution does not emit a
 post-commit relationship signal.
 
+Before assistant commit, any execution error closes the active attempt through the
+narrow failure wrapper as:
+
+```text
+turn/attempt → failed_retryable
+error_code = SEYEON_PRODUCTION_EXECUTION_FAILED
+assistant message = none
+relationship signal = none
+```
+
+This is an operational retry disposition for the internal execution slice. It does
+not grant the model authority to choose retry/final state or error codes.
+
 ## 7. Transaction boundary
 
 Provider execution must not occur while a PostgreSQL transaction is kept open.
