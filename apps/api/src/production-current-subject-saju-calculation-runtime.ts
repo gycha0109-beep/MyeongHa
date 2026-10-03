@@ -13,7 +13,9 @@ import {
 import type { SupabaseMemberVerifierFetchV1 } from './supabase-member-identity-verifier.js';
 import {
   createSajuAbuseObservedIdentityVerifierV1,
+  observeSajuAbuseOutcomeV1,
   type SajuAbuseObservationWriterV1,
+  type SajuAbuseOutcomeObservationWriterV1,
 } from './saju-abuse-observability.js';
 
 export interface ProductionCurrentSubjectSajuCalculationRequestV1 {
@@ -35,6 +37,8 @@ export interface CreateProductionCurrentSubjectSajuCalculationRuntimeInputV1 {
   readonly sajuFetchImpl?: SajuProductionCalculationHttpFetchV1;
   /** Observe-only baseline injection. Production defaults to the privacy-safe logger. */
   readonly sajuAbuseObservationWriter?: SajuAbuseObservationWriterV1;
+  /** Observe-only outcome injection. Production defaults to the privacy-safe logger. */
+  readonly sajuAbuseOutcomeWriter?: SajuAbuseOutcomeObservationWriterV1;
   /** Test/runtime clock injection only. */
   readonly now?: () => number;
 }
@@ -94,6 +98,16 @@ export function createProductionCurrentSubjectSajuCalculationRuntimeV1(
         identityEvidenceVerifier: observedIdentityEvidenceVerifier,
         pool,
         sajuAdapter,
+      });
+
+      observeSajuAbuseOutcomeV1({
+        routeId: 'api.me.saju.calculation',
+        requestId: requestInput.requestId,
+        httpStatus: response.status,
+        ...(input.sajuAbuseOutcomeWriter === undefined
+          ? {}
+          : { eventWriter: input.sajuAbuseOutcomeWriter }),
+        ...(input.now === undefined ? {} : { now: input.now }),
       });
 
       if (response.status === 405) {
