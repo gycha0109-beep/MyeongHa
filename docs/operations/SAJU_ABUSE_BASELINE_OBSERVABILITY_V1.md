@@ -102,6 +102,26 @@ Fields:
 - `requestId`
 - `occurredAt`
 
+A second request-outcome observation is emitted after the governed HTTP handler returns.
+
+Outcome schema:
+
+```text
+myeongha-saju-abuse-outcome-v1
+```
+
+Outcome fields:
+
+- `mode = observe_only`
+- `routeId`
+- `requestId`
+- `httpStatus`
+- `completedAt`
+
+The outcome event deliberately does not duplicate `clientKey` or `subjectKind`. Baseline analysis joins an outcome to an authenticated admission event by `requestId`. Unmatched outcomes are not counted as authenticated Saju abuse attempts.
+
+The runtime does not read or clone the response body to create this event. HTTP status is the only response-derived field, so observability does not duplicate Reading or calculation payloads.
+
 No application database persistence is introduced. Retention is controlled by the configured runtime-log provider and must be recorded when the baseline is evaluated.
 
 Logging failure and invalid observation clock values do not alter authentication or request execution.
@@ -116,7 +136,9 @@ A later evidence review must separately report, for each mounted route:
 - Member vs Guest distribution;
 - per-client request distribution;
 - peak burst behavior over an explicitly chosen analysis window;
-- retry/error patterns relevant to amplification.
+- retry/error patterns relevant to amplification, correlated by admission/outcome `requestId`.
+
+Synthetic Production smoke events prove telemetry activation but do not by themselves constitute an organic traffic baseline.
 
 Only after that evidence exists may a numeric admission policy be approved.
 
