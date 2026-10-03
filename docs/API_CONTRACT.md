@@ -619,6 +619,7 @@ V1 active upstream boundaries:
 Supabase Auth success JSON maximum = 131,072 application-visible bytes
 Supabase Member success JSON maximum = 65,536 application-visible bytes
 Saju calculation success JSON maximum = 262,144 application-visible bytes
+Saju Reading success JSON maximum = 524,288 application-visible bytes
 ```
 
 Actual application-visible response stream bytes are final authority. `Content-Length` is an early-rejection hint only and cannot approve a response whose consumed stream crosses the governed ceiling; encoded-response metadata likewise cannot substitute for actual application-visible counting.
