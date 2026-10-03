@@ -1,5 +1,8 @@
 export const MOBILE_PRODUCTION_API_ORIGIN_V1 = 'https://myeongha.vercel.app' as const;
 
+export const MOBILE_EAS_PROJECT_ID_V1 =
+  '5c20243c-60a8-44f3-9d8c-ca06ccc8bebe' as const;
+
 export interface MobileRuntimeConfigV1 {
   readonly apiOrigin: string;
   readonly easProjectId: string | null;
@@ -10,13 +13,28 @@ const UUID_PATTERN =
 
 export function resolveMobileEasProjectIdV1(
   configured = process.env.EXPO_PUBLIC_EAS_PROJECT_ID,
+  embeddedProjectId: unknown = MOBILE_EAS_PROJECT_ID_V1,
 ): string | null {
-  if (typeof configured !== 'string' || configured.trim().length === 0) {
-    return null;
-  }
-  const candidate = configured.trim();
+  const configuredCandidate =
+    typeof configured === 'string' && configured.trim().length > 0
+      ? configured.trim()
+      : null;
+  const embeddedCandidate =
+    configuredCandidate === null &&
+    typeof embeddedProjectId === 'string' &&
+    embeddedProjectId.trim().length > 0
+      ? embeddedProjectId.trim()
+      : null;
+
+  const candidate = configuredCandidate ?? embeddedCandidate;
+  if (candidate === null) return null;
+
   if (!UUID_PATTERN.test(candidate)) {
-    throw new Error('EXPO_PUBLIC_EAS_PROJECT_ID must be a UUID when configured.');
+    throw new Error(
+      configuredCandidate !== null
+        ? 'EXPO_PUBLIC_EAS_PROJECT_ID must be a UUID when configured.'
+        : 'expo.extra.eas.projectId must be a UUID when configured.',
+    );
   }
   return candidate;
 }
@@ -73,9 +91,17 @@ export function resolveMobileApiOriginV1(
   return url.origin;
 }
 
-export function readMobileRuntimeConfigV1(): MobileRuntimeConfigV1 {
+export function readMobileRuntimeConfigV1(
+  runtimeEnvironment = process.env,
+  embeddedEasProjectId: unknown = MOBILE_EAS_PROJECT_ID_V1,
+): MobileRuntimeConfigV1 {
   return Object.freeze({
-    apiOrigin: resolveMobileApiOriginV1(),
-    easProjectId: resolveMobileEasProjectIdV1(),
+    apiOrigin: resolveMobileApiOriginV1(
+      runtimeEnvironment.EXPO_PUBLIC_MYEONGHA_API_ORIGIN,
+    ),
+    easProjectId: resolveMobileEasProjectIdV1(
+      runtimeEnvironment.EXPO_PUBLIC_EAS_PROJECT_ID,
+      embeddedEasProjectId,
+    ),
   });
 }

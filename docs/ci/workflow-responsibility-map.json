@@ -14,17 +14,23 @@
     ]
   },
   "workflows": {
-    "ci-integration.yml": {
-      "responsibility": "project-wide-ci",
-      "prMode": "required",
-      "mainMode": "manual",
-      "workTrackAttribution": "pr-metadata"
-    },
     "account-deletion-hosted-auth-canary.yml": {
       "responsibility": "privacy-operations",
       "prMode": "none",
       "mainMode": "manual",
       "workTrackAttribution": "none"
+    },
+    "ci-db-track.yml": {
+      "responsibility": "db-suite-verification",
+      "prMode": "routed-via-ci",
+      "mainMode": "none",
+      "workTrackAttribution": "caller-pr-metadata"
+    },
+    "ci-integration.yml": {
+      "responsibility": "project-wide-ci",
+      "prMode": "required",
+      "mainMode": "manual",
+      "workTrackAttribution": "pr-metadata"
     },
     "ci.yml": {
       "responsibility": "project-wide-ci",
@@ -68,11 +74,23 @@
       "mainMode": "required",
       "workTrackAttribution": "pr-metadata"
     },
+    "mobile-android-physical-smoke-build.yml": {
+      "responsibility": "mobile-android-physical-smoke-build",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "dispatch-input-or-commit-metadata"
+    },
     "mobile-pr.yml": {
       "responsibility": "mobile-client-verification",
       "prMode": "narrow",
       "mainMode": "none",
       "workTrackAttribution": "pr-metadata"
+    },
+    "mobile-push-production-activate.yml": {
+      "responsibility": "mobile-push-production-activation",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "dispatch-input-or-commit-metadata"
     },
     "postgres-dr-readiness.yml": {
       "responsibility": "postgres-disaster-recovery",
@@ -82,12 +100,6 @@
     },
     "postgres-isolated-restore-drill.yml": {
       "responsibility": "postgres-disaster-recovery",
-      "prMode": "none",
-      "mainMode": "manual",
-      "workTrackAttribution": "dispatch-input"
-    },
-    "production-security-alerting-activate.yml": {
-      "responsibility": "production-security-alerting",
       "prMode": "none",
       "mainMode": "manual",
       "workTrackAttribution": "dispatch-input"
@@ -266,6 +278,12 @@
       "mainMode": "manual",
       "workTrackAttribution": "none"
     },
+    "production-security-alerting-activate.yml": {
+      "responsibility": "production-security-alerting",
+      "prMode": "none",
+      "mainMode": "manual",
+      "workTrackAttribution": "dispatch-input"
+    },
     "reader-grounding-cross-service-e2e.yml": {
       "responsibility": "saju-character-cross-service-verification",
       "prMode": "narrow",
@@ -295,18 +313,6 @@
       "prMode": "required-router",
       "mainMode": "none",
       "workTrackAttribution": "pr-metadata"
-    },
-    "ci-db-track.yml": {
-      "responsibility": "db-suite-verification",
-      "prMode": "routed-via-ci",
-      "mainMode": "none",
-      "workTrackAttribution": "caller-pr-metadata"
-    },
-    "mobile-push-production-activate.yml": {
-      "responsibility": "mobile-push-production-activation",
-      "prMode": "none",
-      "mainMode": "one-shot-trigger",
-      "workTrackAttribution": "dispatch-input-or-commit-metadata"
     }
   }
 }
