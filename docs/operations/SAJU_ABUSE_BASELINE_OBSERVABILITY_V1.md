@@ -126,6 +126,63 @@ No application database persistence is introduced. Retention is controlled by th
 
 Logging failure and invalid observation clock values do not alter authentication or request execution.
 
+## Baseline analyzer
+
+Repository-owned evidence analysis is provided by:
+
+```text
+scripts/analyze-saju-abuse-baseline.mjs
+```
+
+The analyzer accepts exported/provider log text or structured event JSON, correlates admission and outcome events by `requestId`, and produces the evidence-only schema:
+
+```text
+myeongha-saju-abuse-baseline-report-v1
+```
+
+Synthetic Production canaries are excluded through the explicit authority file:
+
+```text
+docs/operations/SAJU_ABUSE_SYNTHETIC_EXCLUSIONS_V1.json
+```
+
+Synthetic exclusion entries require the privacy-safe `requestId`, a reason, and an evidence reference. Merely configuring an exclusion does not count it as excluded unless that request id is actually present in the analyzed observation window.
+
+The analyzer reports:
+
+- authenticated attempt count;
+- unique pseudonymous client count;
+- Member/Guest distribution;
+- mounted-route distribution;
+- the same authenticated-attempt, outcome-correlation, and burst evidence separately for each mounted route;
+- per-client request-count histogram without emitting client keys;
+- admission/outcome correlation coverage;
+- matched HTTP status distribution;
+- failure followed by a later authenticated attempt as an observed sequence, without claiming that the later attempt was necessarily a retry;
+- burst evidence only when an operator supplies an explicit positive `--burst-window-seconds` value;
+- input-quality evidence including exact duplicates, unmatched admissions, orphan outcomes, and synthetic exclusions.
+
+No default burst window exists. No numeric admission threshold is inferred.
+
+Example:
+
+```bash
+node scripts/analyze-saju-abuse-baseline.mjs ./saju-runtime-log-export.txt \
+  --synthetic-file docs/operations/SAJU_ABUSE_SYNTHETIC_EXCLUSIONS_V1.json \
+  --burst-window-seconds <explicitly-approved-analysis-window> \
+  --retention-note "<provider retention/window limitation>"
+```
+
+The generated report always records:
+
+```text
+policyDecision.produced = false
+policyDecision.numericLimit = null
+policyDecision.enforcementAuthorized = false
+```
+
+The analyzer is evidence tooling only. Product/security authority must separately approve any limit/window/storage/failure semantics before enforcement.
+
 ## Baseline decision
 
 A later evidence review must separately report, for each mounted route:

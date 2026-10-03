@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "myeongha-saju-abuse-synthetic-exclusions-v1",
+  "requests": [
+    {
+      "requestId": "1c6ad3f4-b3bc-4e98-b759-8164511853ae",
+      "reason": "governed Production current-subject Saju smoke",
+      "evidenceRef": "GitHub Actions run 37092872572 / PR #1548"
+    },
+    {
+      "requestId": "0ba1fb3a-66ec-4d54-abbc-0f7ed1fceab4",
+      "reason": "governed Production current-subject Saju smoke",
+      "evidenceRef": "GitHub Actions run 37092872572 / PR #1548"
+    },
+    {
+      "requestId": "e243ce2d-1ac3-4153-b8ad-0616ca5d5cb4",
+      "reason": "governed Production outcome-correlation Saju smoke",
+      "evidenceRef": "GitHub Actions run 37095057530 / PR #1551"
+    },
+    {
+      "requestId": "c8d091f5-ca24-43d8-b602-dba70830e941",
+      "reason": "governed Production outcome-correlation Saju smoke",
+      "evidenceRef": "GitHub Actions run 37095057530 / PR #1551"
+    }
+  ]
+}
