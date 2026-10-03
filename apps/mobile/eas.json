@@ -4,6 +4,7 @@
   },
   "build": {
     "physical-smoke": {
+      "node": "24.14.0",
       "environment": "production",
       "android": {
         "withoutCredentials": true,
