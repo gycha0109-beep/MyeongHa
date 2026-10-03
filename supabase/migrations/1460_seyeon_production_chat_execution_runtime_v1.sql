@@ -156,6 +156,43 @@ for select
 to myeongha_seyeon_chat_runtime_owner
 using (id = public.current_myeongha_subject_id());
 
+drop policy if exists outbox_events_seyeon_chat_runtime_insert_v1
+  on public.outbox_events;
+create policy outbox_events_seyeon_chat_runtime_insert_v1
+on public.outbox_events
+for insert
+to myeongha_seyeon_chat_runtime_owner
+with check (
+  aggregate_type = 'chat_turn'
+  and event_type = 'CHAT_TURN_COMMITTED'
+  and event_schema_version = 'v1'
+  and dedupe_key = 'turn-commit-v1'
+  and status = 'pending'
+  and attempt_count = 0
+  and payload_jsonb ->> 'turnId' = aggregate_id
+  and coalesce((payload_jsonb ->> 'relationshipEffect')::boolean, true) = false
+  and coalesce((payload_jsonb ->> 'worldEffect')::boolean, true) = false
+  and coalesce((payload_jsonb ->> 'memoryAccepted')::boolean, true) = false
+  and exists (
+    select 1
+    from public.chat_turns ct
+    join public.chat_turn_attempts a
+      on a.turn_id = ct.id
+     and a.subject_id = ct.subject_id
+     and a.id::text = payload_jsonb ->> 'attemptId'
+     and a.state = 'validated'
+    join public.conversation_messages m
+      on m.turn_id = ct.id
+     and m.subject_id = ct.subject_id
+     and m.id::text = payload_jsonb ->> 'messageId'
+     and m.sender_type = 'character'
+     and m.redacted_at is null
+    where ct.id::text = aggregate_id
+      and ct.subject_id = public.current_myeongha_subject_id()
+      and ct.state = 'validated'
+  )
+);
+
 drop policy if exists conversation_threads_seyeon_chat_runtime_select_v1
   on public.conversation_threads;
 create policy conversation_threads_seyeon_chat_runtime_select_v1
