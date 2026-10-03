@@ -117,12 +117,13 @@ where n.nspname='public'
     'cmd_receive_seyeon_chat_turn_runtime_v1',
     'cmd_allocate_seyeon_chat_attempt_runtime_v1',
     'cmd_mark_seyeon_chat_context_ready_runtime_v1',
+    'cmd_fail_seyeon_chat_attempt_runtime_v1',
     'cmd_persist_seyeon_chat_generated_runtime_v1',
     'cmd_persist_seyeon_chat_validated_runtime_v1',
     'cmd_commit_seyeon_chat_turn_runtime_v1'
   );
 ")
-[[ "$function_shape" == "6|6|6|0" ]] || fail "runtime wrapper ACL/owner mismatch: $function_shape"
+[[ "$function_shape" == "7|7|7|0" ]] || fail "runtime wrapper ACL/owner mismatch: $function_shape"
 pass "all Se-yeon Production Chat wrappers are narrow SECURITY DEFINER API surfaces"
 
 helper_acl=$("${psql_base[@]}" -At -c "
