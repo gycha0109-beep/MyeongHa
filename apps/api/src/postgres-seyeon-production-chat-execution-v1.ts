@@ -14,6 +14,8 @@ export const POSTGRES_SEYEON_CHAT_ATTEMPT_RUNTIME_BINDING_V1 =
   'public.cmd_allocate_seyeon_chat_attempt_runtime_v1' as const;
 export const POSTGRES_SEYEON_CHAT_CONTEXT_READY_RUNTIME_BINDING_V1 =
   'public.cmd_mark_seyeon_chat_context_ready_runtime_v1' as const;
+export const POSTGRES_SEYEON_CHAT_FAILURE_RUNTIME_BINDING_V1 =
+  'public.cmd_fail_seyeon_chat_attempt_runtime_v1' as const;
 export const POSTGRES_SEYEON_CHAT_GENERATED_RUNTIME_BINDING_V1 =
   'public.cmd_persist_seyeon_chat_generated_runtime_v1' as const;
 export const POSTGRES_SEYEON_CHAT_VALIDATED_RUNTIME_BINDING_V1 =
@@ -49,6 +51,12 @@ from public.cmd_allocate_seyeon_chat_attempt_runtime_v1(
 const CONTEXT_READY_SQL = `
 select public.cmd_mark_seyeon_chat_context_ready_runtime_v1(
   $1::uuid,$2::uuid,$3::uuid
+) as replayed
+`.trim();
+
+const FAILURE_SQL = `
+select public.cmd_fail_seyeon_chat_attempt_runtime_v1(
+  $1::uuid,$2::uuid,$3::uuid,$4::text,$5::text
 ) as replayed
 `.trim();
 
@@ -182,6 +190,18 @@ implements SeyeonProductionChatPersistencePortV1 {
       input.subjectId,
       input.turnId,
       input.attemptId,
+    ]);
+  }
+
+  async failAttempt(
+    input: Parameters<SeyeonProductionChatPersistencePortV1['failAttempt']>[0],
+  ): Promise<void> {
+    await this.client.query<Row>(FAILURE_SQL, [
+      input.subjectId,
+      input.turnId,
+      input.attemptId,
+      input.failureState,
+      input.errorCode,
     ]);
   }
 
