@@ -109,6 +109,10 @@ jobs:
           node-version: "24"
           package-manager-cache: false
 
+      - name: Install workspace dependencies for Expo config resolution
+        shell: bash
+        run: npm ci --ignore-scripts
+
       - name: Provision Vercel Production Push token-protection secrets
         shell: bash
         run: node scripts/operations/ensure-vercel-mobile-push-env.mjs
