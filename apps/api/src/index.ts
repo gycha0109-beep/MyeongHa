@@ -916,6 +916,7 @@ export {
   SEYEON_PRODUCTION_CHAT_RENDERER_VERSION_V1,
   SEYEON_PRODUCTION_CHAT_REQUEST_CONTRACT_VERSION_V1,
   SeyeonProductionChatExecutionErrorV1,
+  bindSeyeonProductionCurrentUserTurnV1,
   runSeyeonProductionChatExecutionV1,
   type RunSeyeonProductionChatExecutionInputV1,
   type RunSeyeonProductionChatExecutionResultV1,
