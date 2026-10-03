@@ -22,6 +22,7 @@ const validApp = {
 const validEas = {
   build: {
     'physical-smoke': {
+      node: '24.14.0',
       environment: 'production',
       android: {
         withoutCredentials: true,
@@ -47,17 +48,19 @@ describe('Mobile Android physical smoke build readiness', () => {
       easProjectId: '5c20243c-60a8-44f3-9d8c-ca06ccc8bebe',
       androidPackage: 'com.myeongha.app',
       profile: 'physical-smoke',
+      node: '24.14.0',
       environment: 'production',
       gradleCommand: ':app:assembleDebug',
       withoutCredentials: true,
     });
   });
 
-  it('rejects credential-backed or distribution-enabled smoke builds', () => {
+  it('rejects runtime drift, credential-backed builds, or distribution-enabled smoke builds', () => {
     const report = evaluateMobileAndroidPhysicalSmokeReadinessV1(validApp, {
       ...validEas,
       build: {
         'physical-smoke': {
+          node: '22.23.1',
           environment: 'production',
           distribution: 'internal',
           android: {
@@ -69,6 +72,9 @@ describe('Mobile Android physical smoke build readiness', () => {
     });
 
     expect(report.ready).toBe(false);
+    expect(report.violations).toContain(
+      'physical-smoke must pin Node 24.14.0 to match repository runtime authority.',
+    );
     expect(report.violations).toContain(
       'physical-smoke must not configure a distribution channel.',
     );

@@ -7,6 +7,7 @@ export const MOBILE_ANDROID_PHYSICAL_SMOKE_V1: Readonly<{
   easProjectId: '5c20243c-60a8-44f3-9d8c-ca06ccc8bebe';
   androidPackage: 'com.myeongha.app';
   profile: 'physical-smoke';
+  node: '24.14.0';
   environment: 'production';
   gradleCommand: ':app:assembleDebug';
   withoutCredentials: true;

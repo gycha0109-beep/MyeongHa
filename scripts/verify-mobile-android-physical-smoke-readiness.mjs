@@ -7,6 +7,7 @@ export const MOBILE_ANDROID_PHYSICAL_SMOKE_V1 = Object.freeze({
   easProjectId: '5c20243c-60a8-44f3-9d8c-ca06ccc8bebe',
   androidPackage: 'com.myeongha.app',
   profile: 'physical-smoke',
+  node: '24.14.0',
   environment: 'production',
   gradleCommand: ':app:assembleDebug',
   withoutCredentials: true,
@@ -40,6 +41,11 @@ export function evaluateMobileAndroidPhysicalSmokeReadinessV1(
   if (!isRecord(profile)) {
     violations.push('eas.json must define build.physical-smoke.');
   } else {
+    if (profile.node !== MOBILE_ANDROID_PHYSICAL_SMOKE_V1.node) {
+      violations.push(
+        `physical-smoke must pin Node ${MOBILE_ANDROID_PHYSICAL_SMOKE_V1.node} to match repository runtime authority.`,
+      );
+    }
     if (profile.environment !== MOBILE_ANDROID_PHYSICAL_SMOKE_V1.environment) {
       violations.push('physical-smoke must use the EAS production environment.');
     }
