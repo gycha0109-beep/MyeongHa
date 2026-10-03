@@ -20,6 +20,21 @@
       "requestId": "c8d091f5-ca24-43d8-b602-dba70830e941",
       "reason": "governed Production outcome-correlation Saju smoke",
       "evidenceRef": "GitHub Actions run 37095057530 / PR #1551"
+    },
+    {
+      "requestId": "cdf8373d-2863-4110-a983-eee753809c70",
+      "reason": "governed Production current-subject Saju calculation smoke with Preview coverage",
+      "evidenceRef": "GitHub Actions run 37101519866 / PR #1560"
+    },
+    {
+      "requestId": "96a44011-7b8c-4cb8-b1b8-0f35b7ebfc5f",
+      "reason": "governed Production current-subject Saju calculation repeat smoke with Preview coverage",
+      "evidenceRef": "GitHub Actions run 37101519866 / PR #1560"
+    },
+    {
+      "requestId": "e55e7e13-da22-4a30-8f6a-6859dfa9a985",
+      "reason": "governed Production current-subject Saju Preview Reading smoke",
+      "evidenceRef": "GitHub Actions run 37101519866 / PR #1560"
     }
   ]
 }
