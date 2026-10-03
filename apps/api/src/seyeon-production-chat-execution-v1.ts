@@ -259,6 +259,35 @@ function assertReceivePlan(input: {
   });
 }
 
+export function bindSeyeonProductionCurrentUserTurnV1(input: Readonly<{
+  historicalContext: RunSeyeonCharacterTurnV2Input['contextInput'];
+  userMessageId: string;
+  userText: string;
+}>): RunSeyeonCharacterTurnV2Input['contextInput'] {
+  const userMessageId = boundedText(input.userMessageId, 'userMessageId', 256);
+  const userText = boundedText(input.userText, 'userText', 8000);
+  if (
+    input.historicalContext.recentMessages.some(
+      (message) => message.messageId === userMessageId,
+    )
+  ) {
+    throw new SeyeonProductionChatExecutionErrorV1(
+      'Current user message must not already exist in historical Production context.',
+    );
+  }
+  return Object.freeze({
+    ...input.historicalContext,
+    recentMessages: Object.freeze([
+      ...input.historicalContext.recentMessages,
+      Object.freeze({
+        messageId: userMessageId,
+        role: 'user' as const,
+        text: userText,
+      }),
+    ]),
+  });
+}
+
 function relationshipSemanticsPort(
   value: Parameters<typeof runSeyeonCharacterTurnV2>[0]['governance']['relationshipSemantics'],
   applied: unknown,
@@ -359,16 +388,10 @@ export async function runSeyeonProductionChatExecutionV1(
         turnBinding,
         productionContext,
       });
-      const contextInput = Object.freeze({
-        ...historical,
-        recentMessages: Object.freeze([
-          ...historical.recentMessages,
-          Object.freeze({
-            messageId: receivedTurn.userMessageId,
-            role: 'user' as const,
-            text: receivedTurn.userText,
-          }),
-        ]),
+      const contextInput = bindSeyeonProductionCurrentUserTurnV1({
+        historicalContext: historical,
+        userMessageId: receivedTurn.userMessageId,
+        userText: receivedTurn.userText,
       });
 
       const runtime = await runSeyeonCharacterTurnV2({
