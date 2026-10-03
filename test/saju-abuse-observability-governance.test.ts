@@ -19,11 +19,23 @@ describe('Saju abuse baseline observability governance', () => {
     );
   });
 
-  it('pre-wires the Preview Reading runtime before any public route activation', () => {
+  it('wires the publicly rewritten Preview Reading runtime through the observe-only identity verifier', () => {
     const runtime = source(
       'apps/api/src/production-current-subject-saju-preview-reading-runtime.ts',
     );
+    const vercel = source('vercel.json');
+    const dispatcher = source('api/me.ts');
 
+    expect(vercel).toContain('"source": "/api/me/saju/preview-reading"');
+    expect(vercel).toContain(
+      '"destination": "/api/me?__myeongha_saju_preview_reading=1"',
+    );
+    expect(dispatcher).toContain(
+      "const SAJU_PREVIEW_READING_ROUTE = '/api/me/saju/preview-reading'",
+    );
+    expect(dispatcher).toContain(
+      "return { kind: 'saju-preview-reading', route: SAJU_PREVIEW_READING_ROUTE };",
+    );
     expect(runtime).toContain('createSajuAbuseObservedIdentityVerifierV1');
     expect(runtime).toContain("routeId: 'api.me.saju.preview-reading'");
     expect(runtime).toContain('secret: userDataConfig.guestFingerprintSecret');
