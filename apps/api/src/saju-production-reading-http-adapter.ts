@@ -4,6 +4,11 @@ import {
   type SajuProductionCalculationHttpFetchV1,
   type SajuProductionCalculationHttpResponseV1,
 } from './saju-production-calculation-http-adapter.js';
+import {
+  SAJU_READING_JSON_RESPONSE_MAXIMUM_BYTES_V1,
+  UpstreamJsonResponseTooLargeV1,
+  readBoundedUpstreamJsonTextV1,
+} from './upstream-json-response-resource.js';
 
 export const SAJU_PRODUCTION_READING_HTTP_PATH_V1 = '/api/readings' as const;
 export const SAJU_PREVIEW_READING_HTTP_PATH_V1 = '/api/preview/readings' as const;
@@ -26,6 +31,7 @@ export type SajuProductionReadingHttpAdapterFailureCodeV1 =
   | 'HTTP_UNEXPECTED_STATUS'
   | 'INVALID_CONTENT_TYPE'
   | 'INVALID_JSON'
+  | 'RESPONSE_TOO_LARGE'
   | 'RESPONSE_ADMISSION_ATTESTATION_REJECTED'
   | 'RESPONSE_LIFECYCLE_ATTESTATION_REJECTED'
   | 'RESPONSE_ADMISSION_REJECTED';
@@ -68,6 +74,7 @@ export interface SajuProductionReadingHttpAdapterV1<AdmittedResponse = unknown> 
 interface SajuProductionReadingHttpDeadlineLeaseV1 {
   readonly response: SajuProductionCalculationHttpResponseV1;
   readonly deadline: Promise<never>;
+  readonly signal: AbortSignal;
   readonly didTimeout: () => boolean;
   readonly release: () => void;
 }
@@ -242,6 +249,7 @@ async function fetchWithTimeout(input: {
     return Object.freeze({
       response,
       deadline,
+      signal: controller.signal,
       didTimeout: () => timedOut,
       release,
     });
@@ -364,13 +372,23 @@ function assertAttestedEnvelopeVersion(payload: unknown): void {
 
 async function parseJsonResponse(
   response: SajuProductionCalculationHttpResponseV1,
-  deadline: Promise<never>,
+  signal: AbortSignal,
   didTimeout: () => boolean,
 ): Promise<unknown> {
   let text: string;
   try {
-    text = await Promise.race([response.text(), deadline]);
+    text = await readBoundedUpstreamJsonTextV1(response, {
+      maximumBodyBytes: SAJU_READING_JSON_RESPONSE_MAXIMUM_BYTES_V1,
+      signal,
+    });
   } catch (error) {
+    if (error instanceof UpstreamJsonResponseTooLargeV1) {
+      throw new SajuProductionReadingHttpAdapterErrorV1(
+        'RESPONSE_TOO_LARGE',
+        'Saju reading response exceeded the governed resource ceiling.',
+        response.status,
+      );
+    }
     if (
       didTimeout() ||
       (error instanceof SajuProductionReadingHttpAdapterErrorV1 &&
@@ -435,7 +453,7 @@ function createSajuReadingHttpAdapterV1<AdmittedResponse>(
         assertLifecycleAttestation(response, expectedLifecycle);
         const payload = await parseJsonResponse(
           response,
-          lease.deadline,
+          lease.signal,
           lease.didTimeout,
         );
         assertAttestedEnvelopeVersion(payload);
