@@ -140,13 +140,19 @@ export function parseSajuAbuseObservationText(text) {
   const trimmed = text.trim();
   if (trimmed.length === 0) return [];
 
+  let parsedJson;
+  let parsedAsJson = false;
   try {
-    const parsed = JSON.parse(trimmed);
-    const events = [];
-    collectEvents(parsed, events);
-    if (events.length > 0) return events;
+    parsedJson = JSON.parse(trimmed);
+    parsedAsJson = true;
   } catch {
-    // Fall through to provider/log-line parsing.
+    parsedAsJson = false;
+  }
+
+  if (parsedAsJson) {
+    const events = [];
+    collectEvents(parsedJson, events);
+    return events;
   }
 
   return parseMessage(text);
@@ -194,7 +200,7 @@ function increment(map, key, amount = 1) {
 function histogram(values) {
   const counts = new Map();
   for (const value of values) increment(counts, String(value));
-  return sortedObject(
+  return Object.fromEntries(
     [...counts.entries()].sort(([left], [right]) => Number(left) - Number(right)),
   );
 }
@@ -315,6 +321,11 @@ export function analyzeSajuAbuseBaseline(input) {
       ? input.syntheticRequestIds
       : parseSyntheticExclusions(input.syntheticExclusions);
 
+  const observedSyntheticRequestIds = new Set(
+    deduped.events
+      .filter((event) => syntheticRequestIds.has(event.requestId))
+      .map((event) => event.requestId),
+  );
   const included = deduped.events.filter((event) => !syntheticRequestIds.has(event.requestId));
   const excludedEventCount = deduped.events.length - included.length;
 
@@ -395,7 +406,8 @@ export function analyzeSajuAbuseBaseline(input) {
     inputQuality: {
       parsedEventCount: deduped.events.length,
       exactDuplicateEventCount: deduped.exactDuplicateCount,
-      syntheticExcludedRequestCount: syntheticRequestIds.size,
+      configuredSyntheticRequestCount: syntheticRequestIds.size,
+      syntheticExcludedRequestCount: observedSyntheticRequestIds.size,
       syntheticExcludedEventCount: excludedEventCount,
       unmatchedAuthenticatedAdmissionCount: unmatchedAdmissions.length,
       orphanOutcomeCount: orphanOutcomes.length,
