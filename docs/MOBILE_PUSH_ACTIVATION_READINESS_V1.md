@@ -1,8 +1,9 @@
 # Mobile Push Activation Readiness v1
 
 > Track: `applizing`  
-> Status: **IMPLEMENTED / EXTERNAL ACTIVATION BLOCKED**  
-> Product-owner decision: **2026-10-02**
+> Status: **IMPLEMENTED / PRODUCTION ACTIVATED / PHYSICAL DEVICE SMOKE PENDING**  
+> Product-owner decision: **2026-10-02**  
+> Activation evidence: **2026-10-03**
 
 ## Scope
 
@@ -36,33 +37,37 @@ Repository/CI contract check:
 npm run verify:mobile-push-activation-readiness-contract
 ```
 
-Contract mode allows known external blockers to remain absent, but it still fails on
-structural drift or malformed configured values.
+The contract still fails on structural drift or malformed configured values.
 
-## Required external activation values
+## Activated external values
 
 ### Mobile build identity
 
+The real EAS project identity is activated and source-pinned:
+
 ```text
-EXPO_PUBLIC_EAS_PROJECT_ID
+Expo account/project @johnny0109/myeongha-mobile
+EXPO_PUBLIC_EAS_PROJECT_ID=5c20243c-60a8-44f3-9d8c-ca06ccc8bebe
 ```
 
-Must be the real EAS project UUID for the Mobile project. The repository must not invent
-or derive this value from the GitHub repository, Vercel project, app slug, or package id.
+The value came from the EAS project created/linked through the guarded Production
+activation workflow. It is not derived from the GitHub repository, Vercel project,
+app slug, or package id.
 
 ### Production API token protection
+
+The guarded Production activation workflow provisioned and bound:
 
 ```text
 MYEONGHA_PUSH_TOKEN_ENCRYPTION_K1_SECRET
 MYEONGHA_PUSH_TOKEN_FINGERPRINT_K1_SECRET
 ```
 
-Each value must be at least 32 bytes. These are server-side values and must not use the
-`EXPO_PUBLIC_` namespace or be embedded into the Mobile bundle.
+Their values remain secret and are not stored in repository evidence.
 
 ## Source-owned structural invariants
 
-The preflight also verifies:
+The preflight verifies:
 
 ```text
 expo-notifications plugin present
@@ -70,43 +75,72 @@ expo-notifications dependency present
 expo-application dependency present
 iOS bundleIdentifier = com.myeongha.app
 Android package       = com.myeongha.app
+real EAS project UUID pinned
 ```
 
-## Production activation workflow
+## Production activation evidence
 
 Repository automation is defined in:
 
 `.github/workflows/mobile-push-production-activate.yml`
 
-It requires two external automation credentials in the GitHub `production` Environment:
+It uses dedicated credentials from the GitHub `production` Environment:
 
 ```text
 VERCEL_MOBILE_PUSH_ACTIVATION_TOKEN
 EXPO_TOKEN
 ```
 
-The Vercel credential is deliberately separate from `VERCEL_SECURITY_ALERTS_TOKEN`; the
-security-alert credential is not reused outside its governed purpose.
+The activation completed successfully on 2026-10-03.
 
-When both credentials exist, the activation workflow:
+```text
+Activation GitHub run 37091273714
+Vercel redeploy        READY
+Production route smoke PASS
+Runtime errors         0 in immediate post-activation check
+```
 
-1. creates the two server token-protection values only when absent;
-2. stores them as Vercel **sensitive** Production variables without emitting their values;
-3. creates or links the EAS project non-interactively;
-4. stores the resolved project UUID as `EXPO_PUBLIC_EAS_PROJECT_ID` in the EAS Production environment;
-5. verifies the source activation contract;
-6. redeploys current Vercel Production so the new server secrets are active;
-7. smoke-checks both canonical Device Installation routes.
+The activation path:
 
-If either automation credential is absent, preflight records only the missing credential
-name and skips all external mutation.
+1. confirmed dedicated external automation credentials;
+2. provisioned the two server token-protection values only when absent;
+3. stored them as Vercel sensitive Production variables without emitting values;
+4. created/linked the EAS project;
+5. bound `EXPO_PUBLIC_EAS_PROJECT_ID` in the EAS Production environment;
+6. verified the source activation contract;
+7. redeployed current Vercel Production through the Vercel REST API;
+8. smoke-checked both canonical Device Installation routes.
+
+## Android physical-smoke build evidence
+
+A no-production-signing Android build also completed successfully:
+
+```text
+EAS build ID   2e5b3093-5f09-469a-a99d-38cc53e5f117
+GitHub run     37098850829
+Profile        physical-smoke
+Node           24.14.0
+Gradle command :app:assembleDebug
+Credentials    withoutCredentials=true
+```
+
+The build exists only to support physical-device registration lifecycle smoke.
+It does not establish store-signing readiness.
 
 ## Current boundary
 
-As of 2026-10-02, source/runtime implementation and the guarded activation path are
-implemented. External activation remains blocked whenever either dedicated automation
-credential is absent.
+Production registration plumbing is live. The remaining Push activation evidence is
+physical-device lifecycle smoke:
 
-A successful activation means registration plumbing is live. It does **not** authorize
-notification creation, sending, retry/failover, or scheduler cadence; those remain under
-`SRC-31` and `SRC-32`.
+- explicit permission request from My;
+- Expo Push token acquisition;
+- register API success;
+- same-install refresh after relaunch;
+- token rotation if naturally observable;
+- logout revoke;
+- re-login/rebind;
+- no plaintext Push token in application/server logs.
+
+A successful physical-device smoke still does **not** authorize notification creation,
+sending, retry/failover, or scheduler cadence; those remain under `SRC-31` and
+`SRC-32`.

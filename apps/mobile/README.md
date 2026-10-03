@@ -5,7 +5,7 @@ MyeongHa Mobile is a first-class React Native client of the existing MyeongHa se
 ## Current state
 
 - Track: `applizing`
-- Phase: **M9-A Push registration plumbing + M4-E Target Person create + M11-A4 hardening**
+- Phase: **M9-A Push registration plumbing + Push Production activation + Android physical-smoke build + M4-E Target Person create + M11-A4 hardening**
 - Runtime: **Expo SDK 57 / React Native 0.86.x**
 - Navigation: **Expo Router**
 - Secure Guest credential persistence: **Expo SecureStore**
@@ -36,6 +36,8 @@ Mobile now has:
 - Member-only Chat open/reuse through `POST /api/chat` for the exact approved Launch 9 roster, with server-authoritative publication/availability and thread convergence;
 - Face Reading camera/library photo staging through Expo ImagePicker with image-only selection, 16MB client bound, local preview, and no server analysis;
 - source-authorized Expo Push Device Installation registration/refresh/rebind/revoke plumbing with SecureStore installation identity, user-initiated OS permission request, startup no-prompt sync, and account-switch fail-closed revoke;
+- activated EAS project identity `5c20243c-60a8-44f3-9d8c-ca06ccc8bebe` bound to `@johnny0109/myeongha-mobile` and EAS Production;
+- successful no-production-signing Android physical-smoke build (`2e5b3093-5f09-469a-a99d-38cc53e5f117`) using Node 24.14.0 and `:app:assembleDebug`;
 - release-readiness preflight with iOS buildNumber / Android versionCode sequencing and fail-closed platform identity checks;
 - release-only API origin guard that requires the canonical Production origin and rejects staging/local overrides while preserving flexible development runtime configuration;
 - CI export smoke for both Android and iOS from the same Expo source, using isolated output directories after release preflight;
@@ -52,7 +54,7 @@ Still gated after M3-B / M11-A4:
 - production Character catalog/recommendation projection;
 - Face Reading engine intake / analysis upload. M7 does not treat `exif: false` as proof that selected file bytes are metadata-stripped;
 - Mobile iOS/Android transport is selected as Expo Push Notifications, but notification sending, attempt-provider provenance/resolution, retry/failover, and autonomous scheduling remain blocked by SRC-31 / SRC-32; M9-A only registers, refreshes, rebinds, and revokes the current device;
-- Push activation additionally requires a real EAS project UUID exposed as `EXPO_PUBLIC_EAS_PROJECT_ID`; source does not invent this external project identity;
+- Push Production activation and the first Android physical-smoke build are complete; physical-device register/relaunch/logout/rebind evidence is still pending;
 - native store commerce;
 - signed store distribution still requires external Apple/Google developer-account and signing authority; production app identity is fixed to `com.myeongha.app` on both platforms.
 
@@ -81,4 +83,4 @@ CI uses:
 npm run verify:mobile-release-readiness-contract
 ```
 
-That mode still fails on malformed release configuration and any non-canonical `EXPO_PUBLIC_MYEONGHA_API_ORIGIN`, but allows the two documented source-owned identity blockers to remain unresolved while Mobile implementation work continues.
+That mode still fails on malformed release configuration and any non-canonical `EXPO_PUBLIC_MYEONGHA_API_ORIGIN`. The production app identity and activated EAS project identity are now fixed; store signing remains external.
