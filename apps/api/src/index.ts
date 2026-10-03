@@ -871,6 +871,44 @@ export {
   type SeyeonCommittedTurnRelationshipSignalV1,
 } from './seyeon-production-vertical-slice-v1.js';
 export {
+  SEYEON_PRODUCTION_CONTEXT_READ_VERSION_V1,
+  SeyeonProductionContextReadAuthorityPortErrorV1,
+  type SeyeonProductionContextReadAuthorityPortV1,
+  type SeyeonProductionContextReadFailureCodeV1,
+  type SeyeonProductionPersonalRecordAuthorityRowV1,
+  type SeyeonProductionPersonalRecordKindV1,
+  type SeyeonProductionRecentMessageAuthorityRowV1,
+} from './seyeon-production-context-read-v1.js';
+
+export {
+  POSTGRES_PRODUCTION_RELATIONSHIP_HISTORY_RUNTIME_BINDING_V1,
+  POSTGRES_SEYEON_PRODUCTION_PERSONAL_RECORD_CONTEXT_BINDING_V1,
+  POSTGRES_SEYEON_PRODUCTION_RECENT_MESSAGES_BINDING_V1,
+  createPostgresSeyeonProductionContextReadAuthorityPortV1,
+} from './postgres-seyeon-production-context-read-v1.js';
+
+export {
+  SEYEON_PRODUCTION_CONTEXT_VERSION_V1,
+  SEYEON_PRODUCTION_PERSONAL_RECORD_PROJECTORS_V1,
+  SeyeonProductionContextErrorV1,
+  bindSeyeonProductionCharacterContextInputV1,
+  composeSeyeonProductionContextV1,
+  type ComposeSeyeonProductionContextInputV1,
+  type SeyeonProductionBoundCharacterContextInputV1,
+  type SeyeonProductionContextSnapshotV1,
+  type SeyeonProductionPersonalRecordAdmissionV1,
+  type SeyeonProductionPersonalRecordProjectionV1,
+  type SeyeonProductionPersonalRecordProjectorV1,
+} from './seyeon-production-context-v1.js';
+
+export {
+  SEYEON_PRODUCTION_CONTEXT_VERTICAL_SLICE_VERSION_V1,
+  runSeyeonProductionContextVerticalSliceV1,
+  type RunSeyeonProductionContextVerticalSliceInputV1,
+  type RunSeyeonProductionContextVerticalSliceResultV1,
+} from './seyeon-production-context-vertical-slice-v1.js';
+
+export {
   SEYEON_PRODUCTION_RELATIONSHIP_SYNC_OUTBOX_VERSION_V1,
   SeyeonProductionRelationshipSyncOutboxErrorV1,
   processSeyeonProductionRelationshipSyncOutboxV1,
