@@ -4,6 +4,10 @@ import {
   VERCEL_MOBILE_PUSH_SECRET_BINDINGS_V1,
   ensureVercelMobilePushSecretsV1,
 } from '../scripts/operations/ensure-vercel-mobile-push-env.mjs';
+import {
+  VERCEL_MOBILE_PUSH_REDEPLOY_V1,
+  redeployVercelMobilePushProductionV1,
+} from '../scripts/operations/redeploy-vercel-mobile-push-production.mjs';
 
 function response(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -24,6 +28,11 @@ describe('Mobile Push Production activation authority', () => {
     expect(workflow).not.toContain('VERCEL_SECURITY_ALERTS_TOKEN');
     expect(workflow).toContain('ACTIVATE_MOBILE_PUSH_V1');
     expect(workflow).toContain('credential_values_emitted=false');
+    expect(workflow).toContain(
+      'redeploy-vercel-mobile-push-production.mjs',
+    );
+    expect(workflow).not.toContain('vercel redeploy');
+    expect(workflow).not.toContain('VERCEL_TOKEN:');
   });
 
   it('pins the exact two sensitive server-side token-protection keys', () => {
@@ -90,6 +99,66 @@ describe('Mobile Push Production activation authority', () => {
     expect(payload.type).toBe('sensitive');
     expect(payload.target).toEqual(['production']);
     expect(Buffer.byteLength(payload.value, 'utf8')).toBeGreaterThanOrEqual(32);
+  });
+
+  it('redeploys Production through the direct Vercel API and waits for READY', async () => {
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    const responses = [
+      response({
+        id: 'dpl_Source123',
+        readyState: 'READY',
+        target: 'production',
+        projectId: VERCEL_MOBILE_PUSH_REDEPLOY_V1.projectId,
+      }),
+      response({
+        id: 'dpl_Redeploy456',
+        readyState: 'BUILDING',
+        target: 'production',
+      }),
+      response({
+        id: 'dpl_Redeploy456',
+        readyState: 'READY',
+        target: 'production',
+        projectId: VERCEL_MOBILE_PUSH_REDEPLOY_V1.projectId,
+      }),
+    ];
+    let cursor = 0;
+    const fetchImpl: typeof fetch = async (url, init) => {
+      calls.push({ url: String(url), ...(init === undefined ? {} : { init }) });
+      const next = responses[cursor];
+      cursor += 1;
+      if (next === undefined) throw new Error('Unexpected provider request.');
+      return next;
+    };
+
+    const result = await redeployVercelMobilePushProductionV1({
+      token: 'test-token',
+      projectId: VERCEL_MOBILE_PUSH_REDEPLOY_V1.projectId,
+      teamId: VERCEL_MOBILE_PUSH_REDEPLOY_V1.teamId,
+      productionHost: VERCEL_MOBILE_PUSH_REDEPLOY_V1.productionHost,
+      fetchImpl,
+      sleepImpl: async () => {},
+      pollAttempts: 3,
+      pollIntervalMs: 0,
+    });
+
+    expect(result).toEqual({
+      ready: true,
+      deploymentId: 'dpl_Redeploy456',
+      sourceDeploymentId: 'dpl_Source123',
+      state: 'READY',
+    });
+    expect(calls).toHaveLength(3);
+    expect(calls[0]?.url).toContain(
+      '/v13/deployments/myeongha.vercel.app?teamId=',
+    );
+    expect(calls[1]?.init?.method).toBe('POST');
+    expect(calls[1]?.url).toContain('/v13/deployments?forceNew=1&teamId=');
+    expect(JSON.parse(String(calls[1]?.init?.body))).toEqual({
+      deploymentId: 'dpl_Source123',
+      target: 'production',
+    });
+    expect(calls[2]?.url).toContain('/v13/deployments/dpl_Redeploy456?teamId=');
   });
 
   it('fails closed instead of accepting a readable Production secret', async () => {
