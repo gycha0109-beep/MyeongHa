@@ -2,7 +2,6 @@ import { createHash } from 'node:crypto';
 
 import {
   canonicalJson,
-  type SeyeonRelationshipEventV2,
 } from '../../../packages/domain/src/index.js';
 import {
   assertServerPreparedChatReceivePlanV1,
@@ -263,7 +262,7 @@ function assertReceivePlan(input: {
 function relationshipSemanticsPort(
   value: Parameters<typeof runSeyeonCharacterTurnV2>[0]['governance']['relationshipSemantics'],
   applied: unknown,
-) {
+): Parameters<typeof runSeyeonCharacterTurnV2>[0]['governance']['relationshipSemantics'] {
   if (applied === null) return value;
   return Object.freeze({ resolve: () => applied });
 }
@@ -376,13 +375,18 @@ export async function runSeyeonProductionChatExecutionV1(
         userMessageRef: receivedTurn.userMessageId,
         userText: receivedTurn.userText,
         contextInput,
-        governance: Object.freeze({
-          ...input.governance,
-          relationshipSemantics: relationshipSemanticsPort(
+        governance: (() => {
+          const semantics = relationshipSemanticsPort(
             input.governance.relationshipSemantics,
             activation.appliedRelationshipSemantics,
-          ),
-        }),
+          );
+          return Object.freeze({
+            ...input.governance,
+            ...(semantics === undefined
+              ? {}
+              : { relationshipSemantics: semantics }),
+          });
+        })(),
         interpreterProvider: input.interpreterProvider,
         rendererProvider: input.rendererProvider,
         semanticReviewerProvider: input.semanticReviewerProvider,
