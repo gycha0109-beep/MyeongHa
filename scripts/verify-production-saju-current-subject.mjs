@@ -5,6 +5,8 @@ const PRODUCTION_ORIGIN = 'https://myeongha.vercel.app';
 const MEMBER_ME_URL = `${PRODUCTION_ORIGIN}/api/me`;
 const BIRTH_PROFILE_URL = `${PRODUCTION_ORIGIN}/api/me/birth-profile`;
 const SAJU_CALCULATION_URL = `${PRODUCTION_ORIGIN}/api/me/saju/calculation`;
+const SAJU_PREVIEW_READING_URL = `${PRODUCTION_ORIGIN}/api/me/saju/preview-reading`;
+const SAJU_PREVIEW_READING_TEXT = '전체 사주';
 const REQUEST_TIMEOUT_MS = 20_000;
 
 function requireSecret(name) {
@@ -161,6 +163,83 @@ function canonicalize(value) {
 
 function stableSerialize(value) {
   return JSON.stringify(canonicalize(value));
+}
+
+function validatePreviewReadingBody(previewBody, label) {
+  const meta = requireApiContract(previewBody, label);
+  if (previewBody.ok !== true) throw new Error(`${label} did not return ok=true.`);
+  requireUuid(`${label} requestId`, meta.requestId);
+  requireTimestamp(`${label} serverTime`, meta.serverTime);
+
+  const data = requireRecord(`${label} data`, previewBody.data);
+  requireExact(`${label} lifecycle`, data.lifecycle, 'preview');
+  const reading = requireRecord(`${label} reading`, data.reading);
+  requireExact(
+    `${label} responseVersion`,
+    reading.responseVersion,
+    'myeonghwa-product-reading-response-v2',
+  );
+  if (
+    typeof reading.responseId !== 'string' ||
+    !/^reading_response_[0-9a-f]{24}$/u.test(reading.responseId)
+  ) {
+    throw new Error(`${label} responseId is invalid.`);
+  }
+
+  const acceptedStates = new Map([
+    ['delivered', ['READING_DELIVERED', 'none']],
+    ['delivered_with_fallback', ['READING_DELIVERED_WITH_GROUNDED_FALLBACK', 'none']],
+    ['partial_evidence', ['READING_EVIDENCE_PARTIAL', 'none']],
+    ['insufficient_evidence', ['READING_EVIDENCE_INSUFFICIENT', 'none']],
+  ]);
+  const expected = acceptedStates.get(reading.state);
+  if (expected === undefined) {
+    throw new Error(`${label} returned an unexpected Product Reading state.`);
+  }
+  requireExact(`${label} messageCode`, reading.messageCode, expected[0]);
+  requireExact(`${label} requiredAction`, reading.requiredAction, expected[1]);
+
+  if (
+    (reading.state === 'delivered' || reading.state === 'delivered_with_fallback') &&
+    !isRecord(reading.reading)
+  ) {
+    throw new Error(`${label} delivered state omitted reading.`);
+  }
+  if (
+    (reading.state === 'partial_evidence' || reading.state === 'insufficient_evidence') &&
+    reading.reading !== undefined
+  ) {
+    throw new Error(`${label} non-delivered evidence state unexpectedly included reading.`);
+  }
+
+  return Object.freeze({
+    body: previewBody,
+    state: reading.state,
+  });
+}
+
+async function requestPreviewReading() {
+  const label = 'Production current-subject Saju Preview Reading';
+  const startedAt = performance.now();
+  const response = await fetchCanonical(SAJU_PREVIEW_READING_URL, {
+    method: 'POST',
+    headers: {
+      ...authorization,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ readingText: SAJU_PREVIEW_READING_TEXT }),
+  });
+  requireNoStore(response, label);
+  requireJsonContentType(response, label);
+  if (response.status !== 200) {
+    throw new Error(`${label} expected HTTP 200, received ${response.status}.`);
+  }
+  const body = await readJsonWithoutLogging(response, label);
+  const validated = validatePreviewReadingBody(body, label);
+  return Object.freeze({
+    ...validated,
+    roundTripMs: elapsedMillisecondsSince(startedAt),
+  });
 }
 
 const expectedSubjectId = requireUuid(
@@ -387,15 +466,18 @@ if (stableSerialize(firstCalculation.stableEvidence) !== stableSerialize(repeatC
   throw new Error('Production current-subject Saju deterministic repeat evidence changed within the same fresh Member session.');
 }
 
+const previewReading = await requestPreviewReading();
+
 if (
   JSON.stringify(memberBody).includes(accessToken) ||
   JSON.stringify(birthProfileBody).includes(accessToken) ||
   JSON.stringify(firstCalculation.body).includes(accessToken) ||
-  JSON.stringify(repeatCalculation.body).includes(accessToken)
+  JSON.stringify(repeatCalculation.body).includes(accessToken) ||
+  JSON.stringify(previewReading.body).includes(accessToken)
 ) {
   throw new Error('Production current-subject Saju response reflected the fresh Member access token.');
 }
 
 console.log(
-  `MyeongHa production current-subject Saju smoke passed: memberSignIn=200, freshSession=true, memberSubjectMatch=true, birthProfilePresent=true, birthRevisionMatch=true, calculationFirst=200, calculationRepeat=200, deterministicRepeat=true, authority=calculation_only, ingressContract=v1, cacheControl=no-store, measurementObservedAtUtc=${measurementObservedAtUtc}, memberRoundTripMs=${memberRoundTripMs}, birthProfileRoundTripMs=${birthProfileRoundTripMs}, calculationFirstRoundTripMs=${firstCalculation.roundTripMs}, calculationRepeatRoundTripMs=${repeatCalculation.roundTripMs}, timingThresholdApplied=false.`,
+  `MyeongHa production current-subject Saju smoke passed: memberSignIn=200, freshSession=true, memberSubjectMatch=true, birthProfilePresent=true, birthRevisionMatch=true, calculationFirst=200, calculationRepeat=200, deterministicRepeat=true, previewReading=200, previewState=${previewReading.state}, authority=calculation_only, ingressContract=v1, cacheControl=no-store, measurementObservedAtUtc=${measurementObservedAtUtc}, memberRoundTripMs=${memberRoundTripMs}, birthProfileRoundTripMs=${birthProfileRoundTripMs}, calculationFirstRoundTripMs=${firstCalculation.roundTripMs}, calculationRepeatRoundTripMs=${repeatCalculation.roundTripMs}, previewReadingRoundTripMs=${previewReading.roundTripMs}, timingThresholdApplied=false.`,
 );
