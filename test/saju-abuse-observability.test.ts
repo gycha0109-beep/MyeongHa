@@ -102,6 +102,33 @@ describe('Saju abuse observe-only telemetry', () => {
     expect(eventWriter).not.toHaveBeenCalled();
   });
 
+  it('skips an observation when the baseline clock is invalid without changing auth authority', async () => {
+    const evidence = {
+      kind: 'member',
+      verifiedAuthUserId: '22222222-2222-4222-8222-222222222222',
+    } as const;
+    const eventWriter = vi.fn();
+    const verifier = createSajuAbuseObservedIdentityVerifierV1({
+      delegate: {
+        verifyRequestIdentity: vi.fn(async () => evidence),
+      },
+      routeId: 'api.me.saju.calculation',
+      requestId: 'request:saju-abuse:invalid-clock',
+      secret: SECRET,
+      now: () => Number.NaN,
+      eventWriter,
+    });
+
+    await expect(
+      verifier.verifyRequestIdentity(
+        new Request('https://myeongha.example/api/me/saju/calculation', {
+          method: 'POST',
+        }),
+      ),
+    ).resolves.toEqual(evidence);
+    expect(eventWriter).not.toHaveBeenCalled();
+  });
+
   it('isolates observation-writer failure from authentication authority', async () => {
     const evidence = {
       kind: 'member',
