@@ -10,7 +10,10 @@ describe('Production current-subject Saju smoke governance', () => {
 
     expect(source).toContain('/api/me/saju/calculation');
     expect(source).toContain('/api/me/saju/preview-reading');
+    expect(source).toContain('/api/session/bootstrap');
+    expect(source).toContain('/api/birth-profiles');
     expect(source).toContain("const SAJU_PREVIEW_READING_TEXT = '전체 사주';");
+    expect(source).toContain("const GUEST_BIRTH_LABEL = 'production-saju-guest-smoke-v1';");
     expect(source).toContain("body: JSON.stringify({ readingText: SAJU_PREVIEW_READING_TEXT })");
     expect(source).toContain("requireExact(`${label} lifecycle`, data.lifecycle, 'preview')");
     expect(source).toContain("'myeonghwa-product-reading-response-v2'");
@@ -19,17 +22,26 @@ describe('Production current-subject Saju smoke governance', () => {
     expect(source).toContain("['partial_evidence', ['READING_EVIDENCE_PARTIAL', 'none']]");
     expect(source).toContain("['insufficient_evidence', ['READING_EVIDENCE_INSUFFICIENT', 'none']]");
     expect(source).toContain('JSON.stringify(previewReading.body).includes(accessToken)');
+    expect(source).toContain("bootstrapData.kind");
+    expect(source).toContain("'guest'");
+    expect(source).toContain("guestMeData.subjectKind");
+    expect(source).toContain("guestCalculation = await requestCalculation");
+    expect(source).toContain("guestPreviewReading = await requestPreviewReading");
+    expect(source).toContain('JSON.stringify(guestCalculation.body).includes(guest.bearerToken)');
+    expect(source).toContain('JSON.stringify(guestPreviewReading.body).includes(guest.bearerToken)');
     expect(source).not.toContain('console.log(previewReading.body)');
+    expect(source).not.toContain('console.log(guestPreviewReading.body)');
     expect(source).not.toContain('console.log(accessToken)');
+    expect(source).not.toContain('console.log(guest.bearerToken)');
   });
 
-  it('keeps Preview Reading inside the existing governed Production smoke workflow', () => {
+  it('keeps Member and Guest Saju coverage inside the existing governed Production smoke workflow', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
 
     expect(workflow).toContain('VERIFY_SAJU_CURRENT_SUBJECT');
     expect(workflow).toContain('environment: production');
     expect(workflow).toContain('node scripts/verify-production-saju-current-subject.mjs');
-    expect(workflow).toContain('Saju calculation and Preview Reading');
+    expect(workflow).toContain('Member and Guest Saju calculation and Preview Reading');
     expect(workflow).not.toContain('schedule:');
   });
 });
