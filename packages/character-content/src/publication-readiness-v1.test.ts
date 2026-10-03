@@ -8,7 +8,10 @@ import type {
   CharacterContentBundleCandidateMetadataV1,
   CharacterPublicationMaterialInputV1,
 } from './content-candidate-assembler-v1.js';
-import { inspectCharacterPublicationReadinessV1 } from './publication-readiness-v1.js';
+import {
+  inspectCharacterPublicationLaneReadinessV1,
+  inspectCharacterPublicationReadinessV1,
+} from './publication-readiness-v1.js';
 
 const metadata: CharacterContentBundleCandidateMetadataV1 = {
   bundleId: 'fixture-character-candidate-v1',
@@ -197,5 +200,80 @@ describe('Character publication readiness preflight v1', () => {
           entry.missingPublicationMaterialFields.length === 0,
       ),
     ).toBe(true);
+  });
+});
+
+
+describe('parallel Character publication lane readiness v1', () => {
+  it('allows Seyeon to become lane-ready without declaring the other eight ready', () => {
+    const seyeonCanon = canonCompletions.find(
+      (entry) => entry.characterId === 'seyeon',
+    );
+    const seyeonMaterial = publicationMaterials.find(
+      (entry) => entry.characterId === 'seyeon',
+    );
+    expect(seyeonCanon).toBeDefined();
+    expect(seyeonMaterial).toBeDefined();
+    if (seyeonCanon === undefined || seyeonMaterial === undefined) {
+      throw new Error('Seyeon fixture is required');
+    }
+
+    const lane = inspectCharacterPublicationLaneReadinessV1({
+      characterId: 'seyeon',
+      metadata: {
+        ...metadata,
+        bundleId: 'fixture-seyeon-independent-lane-v1',
+        contentVersion: 'fixture-seyeon-content-v1',
+      },
+      canonCompletion: seyeonCanon,
+      publicationMaterial: seyeonMaterial,
+    });
+
+    expect(lane.ready).toBe(true);
+    expect(lane.characterId).toBe('seyeon');
+    expect(lane.missingMetadataFields).toEqual([]);
+    expect(lane.missingCanonFields).toEqual([]);
+    expect(lane.missingPublicationMaterialFields).toEqual([]);
+
+    const aggregate = inspectCharacterPublicationReadinessV1({
+      metadata,
+      canonCompletions: [seyeonCanon],
+      publicationMaterials: [seyeonMaterial],
+    });
+    expect(aggregate.ready).toBe(false);
+    expect(
+      aggregate.characters
+        .filter((entry) => entry.characterId !== 'seyeon')
+        .every(
+          (entry) =>
+            entry.missingCanonFields.length > 0 &&
+            entry.missingPublicationMaterialFields.length > 0,
+        ),
+    ).toBe(true);
+  });
+
+  it('fails one lane closed when supplied canon belongs to another Character', () => {
+    const seyeonMaterial = publicationMaterials.find(
+      (entry) => entry.characterId === 'seyeon',
+    );
+    const yeoulCanon = canonCompletions.find(
+      (entry) => entry.characterId === 'yeoul',
+    );
+    expect(seyeonMaterial).toBeDefined();
+    expect(yeoulCanon).toBeDefined();
+    if (seyeonMaterial === undefined || yeoulCanon === undefined) {
+      throw new Error('lane fixtures are required');
+    }
+
+    const lane = inspectCharacterPublicationLaneReadinessV1({
+      characterId: 'seyeon',
+      metadata,
+      canonCompletion: yeoulCanon,
+      publicationMaterial: seyeonMaterial,
+    });
+
+    expect(lane.ready).toBe(false);
+    expect(lane.canonCharacterIdMatches).toBe(false);
+    expect(lane.missingCanonFields.length).toBeGreaterThan(0);
   });
 });
