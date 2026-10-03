@@ -106,6 +106,30 @@ describe('Se-yeon Production Chat PostgreSQL adapter', () => {
     });
   });
 
+  it('uses the narrow failure runtime function for pre-commit execution errors', async () => {
+    const queryClient = client([{ replayed: false }]);
+    const port = createPostgresSeyeonProductionChatPersistencePortV1(queryClient);
+
+    await port.failAttempt({
+      subjectId: SUBJECT_ID,
+      turnId: TURN_ID,
+      attemptId: ATTEMPT_ID,
+      failureState: 'failed_retryable',
+      errorCode: 'SEYEON_PRODUCTION_EXECUTION_FAILED',
+    });
+
+    expect(queryClient.query).toHaveBeenCalledWith(
+      expect.stringContaining('cmd_fail_seyeon_chat_attempt_runtime_v1'),
+      [
+        SUBJECT_ID,
+        TURN_ID,
+        ATTEMPT_ID,
+        'failed_retryable',
+        'SEYEON_PRODUCTION_EXECUTION_FAILED',
+      ],
+    );
+  });
+
   it('uses the narrow generated and validated runtime functions', async () => {
     const queryClient = client([{ replayed: false }]);
     const port = createPostgresSeyeonProductionChatPersistencePortV1(queryClient);
