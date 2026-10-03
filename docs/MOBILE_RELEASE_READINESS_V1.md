@@ -1,8 +1,8 @@
 # Mobile Release Readiness v1
 
 > Track: `applizing`  
-> Status: **M11-A4 IMPLEMENTED / PLATFORM IDENTITY READY / SIGNING EXTERNAL**  
-> Date: **2026-10-02**
+> Status: **M11-A4 IMPLEMENTED / ANDROID PHYSICAL-SMOKE BUILD VERIFIED / SIGNING EXTERNAL**  
+> Date: **2026-10-03**
 
 ## Production API origin guard
 
@@ -28,13 +28,13 @@ iOS buildNumber     1
 Android versionCode 1
 ```
 
-The repository now has an executable preflight:
+The repository has an executable preflight:
 
 ```bash
 npm run verify:mobile-release-readiness
 ```
 
-The permanent platform application identities are now explicitly approved and configured:
+The permanent platform application identities are explicitly approved and configured:
 
 ```text
 expo.ios.bundleIdentifier = com.myeongha.app
@@ -42,13 +42,15 @@ expo.android.package      = com.myeongha.app
 ```
 
 The strict release-readiness command therefore passes for repository-owned application
-identity and API-origin checks. Apple/Google signing credentials remain external.
+identity and API-origin checks. Apple/Google store signing credentials remain external.
 
 ## Push activation is a separate gate
 
-General Mobile release identity is no longer blocked by package/bundle identifiers.
-Push activation has its own executable preflight because it additionally depends on
-external Expo/EAS and Production secret configuration:
+General Mobile release identity is not blocked by package/bundle identifiers.
+Push Production activation has completed through the guarded activation workflow,
+and the activated EAS project identity is now source-pinned and EAS-bound.
+
+The executable preflight remains:
 
 ```bash
 npm run verify:mobile-push-activation-readiness
@@ -62,26 +64,57 @@ See `docs/MOBILE_PUSH_ACTIVATION_READINESS_V1.md`.
 npm run verify:mobile-release-readiness-contract
 ```
 
-The CI contract mode remains available for structural verification. The current repository
-has no platform-identity blockers; structural violations and non-canonical release API
-origin overrides still fail.
+The CI contract mode remains available for structural verification. Structural
+violations and non-canonical release API origin overrides still fail.
 
-Mobile PR CI also runs the Push activation contract preflight. That check permits only
-external Push activation blockers while rejecting structural or malformed configuration.
+Mobile PR CI also runs the Push activation contract and the Android physical-smoke
+build contract.
+
+## Android physical-smoke build evidence
+
+The first successful no-store-signing Android physical-smoke build completed on
+2026-10-03.
+
+```text
+EAS project      @johnny0109/myeongha-mobile
+EAS project UUID 5c20243c-60a8-44f3-9d8c-ca06ccc8bebe
+EAS build ID     2e5b3093-5f09-469a-a99d-38cc53e5f117
+GitHub run       37098850829
+Build profile    physical-smoke
+Node             24.14.0
+Gradle command   :app:assembleDebug
+Credentials      withoutCredentials=true
+Store submit     false
+```
+
+The build completed successfully and produced an installable Android application
+archive. This proves the repository can reach a native Android artifact without
+opening production keystore or store-submission authority.
+
+The remaining release-readiness evidence is physical-device smoke:
+
+1. install the successful Android artifact on a physical device;
+2. launch the app with its debug runtime requirements satisfied;
+3. explicitly enable Push from My;
+4. verify Device Installation registration;
+5. relaunch and verify no-prompt refresh;
+6. verify logout revokes the binding;
+7. verify re-login/rebind behavior.
+
+Physical-device smoke is evidence work only. It does not authorize notification
+sending, retry/failover, or scheduling.
 
 ## Out of scope
 
 M11-A does not authorize or configure:
 
 - Apple Developer / Google Play account ownership;
-- signing certificate / provisioning profile / keystore material;
+- production signing certificate / provisioning profile / keystore material;
 - store listing identifiers or metadata;
-- EAS project ownership and the real EAS project UUID;
 - OTA update policy;
-- native/platform Push credentials and server Push token-protection secrets;
 - Apple IAP / Google Play Billing;
-- production distribution.
-
+- production store distribution;
+- notification sending, retry/failover, or autonomous scheduling.
 
 ## Dual-platform export smoke
 
@@ -100,9 +133,7 @@ npm run export:ci -w @myeongha/mobile
 ```
 
 This verifies that the shared Expo application can produce both Android and iOS
-bundles without claiming signed-store readiness. Permanent platform identities
-and signing material remain separate blockers.
-
+bundles without claiming signed-store readiness.
 
 ## Export artifact verification
 
