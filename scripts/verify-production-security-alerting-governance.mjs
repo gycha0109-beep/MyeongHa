@@ -7,6 +7,7 @@ const authorityPath = 'config/security/production-security-alerting-v1.json';
 const workflowPath = '.github/workflows/production-security-alerting-activate.yml';
 const operationPath = 'scripts/operations/ensure-vercel-security-alert-rule.mjs';
 const runbookPath = 'docs/operations/PRODUCTION_SECURITY_ALERTING_RUNBOOK_V1.md';
+const baselinePath = 'docs/operations/PRODUCTION_SECURITY_ALERTING_BASELINE_2026-10-03.json';
 const responsibilityPath = 'docs/ci/workflow-responsibility-map.json';
 const governancePath = '.github/workflows/governance.yml';
 
@@ -15,6 +16,7 @@ const authority = JSON.parse(readFileSync(resolve(root, authorityPath), 'utf8'))
 const workflow = readFileSync(resolve(root, workflowPath), 'utf8');
 const operation = readFileSync(resolve(root, operationPath), 'utf8');
 const runbook = readFileSync(resolve(root, runbookPath), 'utf8');
+const baseline = JSON.parse(readFileSync(resolve(root, baselinePath), 'utf8'));
 const responsibility = JSON.parse(
   readFileSync(resolve(root, responsibilityPath), 'utf8'),
 );
@@ -175,6 +177,86 @@ expectEqual(
   authority.activation?.providerRuleId,
   'ar_01a0fb72-ee7b-723e-943c-7fd428917c2e',
 );
+expectEqual(
+  'authority.baselineEvidence',
+  authority.baselineEvidence,
+  {
+    issue: '#1527',
+    snapshot: baselinePath,
+    accessDenied: {
+      alertingState: 'BASELINE_REQUIRED',
+      fixedThreshold: null,
+    },
+    rateLimited: {
+      alertingState: 'BASELINE_REQUIRED',
+      fixedThreshold: null,
+    },
+    providerMutationAuthorized: false,
+  },
+);
+
+expectEqual(
+  'baseline.schemaVersion',
+  baseline.schemaVersion,
+  'myeongha-production-security-alerting-baseline-v1',
+);
+expectEqual('baseline.issue', baseline.issue, '#1527');
+expectEqual(
+  'baseline.runtimeSecurityEventSchema',
+  baseline.runtimeSecurityEventSchema,
+  'myeongha-security-event-v1',
+);
+expectEqual(
+  'baseline.historicalCheckpoint.accessDenied',
+  baseline.historicalCheckpoint?.accessDenied,
+  {
+    total: 7,
+    statusDistribution: { '401': 7, '403': 0 },
+    routeDistribution: { 'api.me.dispatch': 7 },
+  },
+);
+expectEqual(
+  'baseline.historicalCheckpoint.rateLimited',
+  baseline.historicalCheckpoint?.rateLimited,
+  {
+    total: 0,
+    statusDistribution: { '429': 0 },
+  },
+);
+expectEqual(
+  'baseline.currentCheckpoint.accessDeniedQuery.result',
+  baseline.currentCheckpoint?.accessDeniedQuery?.result,
+  'NO_MATCHES_RETURNED',
+);
+expectEqual(
+  'baseline.currentCheckpoint.rateLimitedQuery.result',
+  baseline.currentCheckpoint?.rateLimitedQuery?.result,
+  'NO_MATCHES_RETURNED',
+);
+expectEqual(
+  'baseline.currentCheckpoint.retentionProbe.result',
+  baseline.currentCheckpoint?.retentionProbe?.result,
+  'RETENTION_WINDOW_UNSUPPORTED_OR_EXCEEDED',
+);
+expectEqual(
+  'baseline.decision',
+  baseline.decision,
+  {
+    accessDenied: {
+      alertingState: 'BASELINE_REQUIRED',
+      activation: 'HOLD',
+      fixedThreshold: null,
+    },
+    rateLimited: {
+      alertingState: 'BASELINE_REQUIRED',
+      activation: 'HOLD',
+      fixedThreshold: null,
+    },
+    providerMutationAuthorized: false,
+    fiveXxAnomalyRuleRemainsActive: true,
+    note: 'Collect later bounded checkpoints with preserved provider bounds and route/status distributions before any 401/403/429 alert activation decision.',
+  },
+);
 
 for (const fragment of [
   'workflow_dispatch:',
@@ -271,6 +353,9 @@ for (const fragment of [
   'team/account',
   'Do not create numeric alert thresholds',
   'MYEONGHA_SECURITY_EVENT',
+  'PRODUCTION_SECURITY_ALERTING_BASELINE_2026-10-03.json',
+  'ACCESS_DENIED alert activation = HOLD / BASELINE_REQUIRED',
+  'RATE_LIMITED alert activation  = HOLD / BASELINE_REQUIRED',
 ]) {
   requireFragment(runbook, fragment, runbookPath);
 }

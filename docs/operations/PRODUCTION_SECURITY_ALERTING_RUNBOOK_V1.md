@@ -36,6 +36,30 @@ Authority state: `BASELINE_REQUIRED`.
 
 Do not create numeric alert thresholds for these signals until Production baseline evidence supports them.
 
+Repository baseline authority:
+
+```text
+docs/operations/PRODUCTION_SECURITY_ALERTING_BASELINE_2026-10-03.json
+```
+
+The recorded evidence currently contains two non-equivalent checkpoints:
+
+- an earlier 24-hour checkpoint recorded in issue #1527 with 7 `ACCESS_DENIED` events, all HTTP 401 on `api.me.dispatch`, and no 403/429 population;
+- a later exact 24-hour query in which the provider returned no `ACCESS_DENIED` or `RATE_LIMITED` matches.
+
+A seven-day comparison query could not be used because it exceeded the available runtime-log retention surface.
+
+Therefore:
+
+```text
+ACCESS_DENIED alert activation = HOLD / BASELINE_REQUIRED
+RATE_LIMITED alert activation  = HOLD / BASELINE_REQUIRED
+fixed numeric threshold        = null
+provider mutation authorized   = false
+```
+
+A no-match query is not interpreted as proof that these events never occur outside the queried or retained provider surface. Future checkpoints must persist the exact provider time bounds and route/status distributions before an alerting decision is reconsidered.
+
 ## Activation prerequisites
 
 1. PR containing the alert authority is merged to `main`.

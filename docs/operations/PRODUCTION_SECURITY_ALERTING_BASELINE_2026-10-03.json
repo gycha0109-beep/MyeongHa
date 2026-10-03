@@ -1,0 +1,84 @@
+{
+  "schemaVersion": "myeongha-production-security-alerting-baseline-v1",
+  "issue": "#1527",
+  "capturedAt": "2026-10-03T08:38:38.578Z",
+  "provider": "vercel",
+  "project": {
+    "id": "prj_nXF0b5uv27Lyucz2SEBxzdCRXVsP",
+    "slug": "myeongha"
+  },
+  "runtimeSecurityEventSchema": "myeongha-security-event-v1",
+  "historicalCheckpoint": {
+    "evidenceRef": "GitHub issue #1527 comment 5963965280",
+    "observationWindow": {
+      "requested": "24h",
+      "exactProviderBoundsPersisted": false
+    },
+    "accessDenied": {
+      "total": 7,
+      "statusDistribution": {
+        "401": 7,
+        "403": 0
+      },
+      "routeDistribution": {
+        "api.me.dispatch": 7
+      }
+    },
+    "rateLimited": {
+      "total": 0,
+      "statusDistribution": {
+        "429": 0
+      }
+    },
+    "limitations": [
+      "The exact provider query bounds for the historical checkpoint were not persisted in the issue comment.",
+      "The seven ACCESS_DENIED events were clustered in a short interval and were insufficient to classify a stable expected or anomalous pattern.",
+      "No 403 or 429 population was observed in that checkpoint."
+    ]
+  },
+  "currentCheckpoint": {
+    "accessDeniedQuery": {
+      "requestedWindow": {
+        "from": "2026-10-02T08:37:56.874Z",
+        "to": "2026-10-03T08:37:56.874Z"
+      },
+      "query": "ACCESS_DENIED",
+      "connectorRecordCap": 100,
+      "result": "NO_MATCHES_RETURNED"
+    },
+    "rateLimitedQuery": {
+      "requestedWindow": {
+        "from": "2026-10-02T08:38:01.017Z",
+        "to": "2026-10-03T08:38:01.017Z"
+      },
+      "query": "RATE_LIMITED",
+      "connectorRecordCap": 100,
+      "result": "NO_MATCHES_RETURNED"
+    },
+    "retentionProbe": {
+      "requestedWindow": "7d",
+      "result": "RETENTION_WINDOW_UNSUPPORTED_OR_EXCEEDED",
+      "providerMessage": "Requested window likely exceeds available runtime-log retention; use a more recent window."
+    },
+    "limitations": [
+      "No matches returned in the current 24-hour queries does not prove that ACCESS_DENIED or RATE_LIMITED never occurs outside the queried or retained provider surface.",
+      "The seven-day probe could not provide a comparable longer history because the requested window exceeded the available runtime-log retention surface.",
+      "The historical and current checkpoints are not sufficient to derive a fixed numeric alert threshold."
+    ]
+  },
+  "decision": {
+    "accessDenied": {
+      "alertingState": "BASELINE_REQUIRED",
+      "activation": "HOLD",
+      "fixedThreshold": null
+    },
+    "rateLimited": {
+      "alertingState": "BASELINE_REQUIRED",
+      "activation": "HOLD",
+      "fixedThreshold": null
+    },
+    "providerMutationAuthorized": false,
+    "fiveXxAnomalyRuleRemainsActive": true,
+    "note": "Collect later bounded checkpoints with preserved provider bounds and route/status distributions before any 401/403/429 alert activation decision."
+  }
+}
