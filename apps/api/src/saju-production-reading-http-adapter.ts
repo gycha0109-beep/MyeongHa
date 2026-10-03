@@ -372,15 +372,19 @@ function assertAttestedEnvelopeVersion(payload: unknown): void {
 
 async function parseJsonResponse(
   response: SajuProductionCalculationHttpResponseV1,
+  deadline: Promise<never>,
   signal: AbortSignal,
   didTimeout: () => boolean,
 ): Promise<unknown> {
   let text: string;
   try {
-    text = await readBoundedUpstreamJsonTextV1(response, {
-      maximumBodyBytes: SAJU_READING_JSON_RESPONSE_MAXIMUM_BYTES_V1,
-      signal,
-    });
+    text = await Promise.race([
+      readBoundedUpstreamJsonTextV1(response, {
+        maximumBodyBytes: SAJU_READING_JSON_RESPONSE_MAXIMUM_BYTES_V1,
+        signal,
+      }),
+      deadline,
+    ]);
   } catch (error) {
     if (error instanceof UpstreamJsonResponseTooLargeV1) {
       throw new SajuProductionReadingHttpAdapterErrorV1(
@@ -453,6 +457,7 @@ function createSajuReadingHttpAdapterV1<AdmittedResponse>(
         assertLifecycleAttestation(response, expectedLifecycle);
         const payload = await parseJsonResponse(
           response,
+          lease.deadline,
           lease.signal,
           lease.didTimeout,
         );
