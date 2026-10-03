@@ -5,9 +5,11 @@ import { resolveVerificationPlan } from './ci/verification-plan.mjs';
 const root = process.cwd();
 const workflowPath = resolve(root, '.github/workflows/governance.yml');
 const dependabotPath = resolve(root, '.github/dependabot.yml');
+const restoreDrillPath = resolve(root, '.github/workflows/postgres-isolated-restore-drill.yml');
 
 const workflow = readFileSync(workflowPath, 'utf8').replace(/\r\n/g, '\n');
 const dependabot = readFileSync(dependabotPath, 'utf8').replace(/\r\n/g, '\n');
+const restoreDrill = readFileSync(restoreDrillPath, 'utf8').replace(/\r\n/g, '\n');
 
 const failures = [];
 
@@ -18,6 +20,17 @@ function requireFragment(source, fragment, label) {
 function forbidFragment(source, fragment, label) {
   if (source.includes(fragment)) failures.push(`${label}: forbidden ${JSON.stringify(fragment)}`);
 }
+
+requireFragment(
+  restoreDrill,
+  'image: ghcr.io/supabase/postgres@sha256:b3bfedb107413abb3b8cb0d0874b0414a1dceb3d55bc0c778de6ad22d1f7dc86 # release 17.6.1.166',
+  'production restore container',
+);
+forbidFragment(
+  restoreDrill,
+  'image: ghcr.io/supabase/postgres:17.6.1.166',
+  'production restore container',
+);
 
 requireFragment(dependabot, 'version: 2', 'dependabot');
 requireFragment(dependabot, 'package-ecosystem: npm', 'dependabot');
@@ -94,5 +107,5 @@ if (failures.length > 0) {
 }
 
 console.log(
-  'Dependency supply-chain governance passed: dependabot_ecosystems=2 schedules=weekly dependency_review=required-via-governance severity=moderate scopes=runtime,development,unknown immutable_action=true warn_only=false',
+  'Dependency supply-chain governance passed: dependabot_ecosystems=2 schedules=weekly dependency_review=required-via-governance severity=moderate scopes=runtime,development,unknown immutable_action=true production_restore_image_digest_pinned=true warn_only=false',
 );

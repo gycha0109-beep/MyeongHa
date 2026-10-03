@@ -84,7 +84,7 @@ for (const fragment of [
   'Require operations Watchtower attribution',
   '[[ "$MYEONGHA_WATCHTOWER_TRACK" == \'ops\' ]]',
   'environment: production',
-  'image: ghcr.io/supabase/postgres:17.6.1.166',
+  'image: ghcr.io/supabase/postgres@sha256:b3bfedb107413abb3b8cb0d0874b0414a1dceb3d55bc0c778de6ad22d1f7dc86 # release 17.6.1.166',
   'POSTGRES_PASSWORD: restore-drill',
   'EXPECTED_PROJECT_REF: cnsfpcdiyofqvhpcegfc',
   'MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE: ${{ secrets.MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE }}',
