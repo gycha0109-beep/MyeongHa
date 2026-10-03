@@ -7,10 +7,12 @@ const runtimePath = 'apps/api/src/upstream-json-response-resource.ts';
 const authPath = 'apps/api/src/supabase-auth-http.ts';
 const memberPath = 'apps/api/src/supabase-member-identity-verifier.ts';
 const sajuPath = 'apps/api/src/saju-production-calculation-http-adapter.ts';
+const sajuReadingPath = 'apps/api/src/saju-production-reading-http-adapter.ts';
 const runtimeTestPath = 'apps/api/src/upstream-json-response-resource.test.ts';
 const authResourceTestPath = 'apps/api/src/supabase-auth-response-resource.test.ts';
 const memberTestPath = 'apps/api/src/supabase-member-identity-verifier.test.ts';
 const sajuResourceTestPath = 'test/saju-production-calculation-response-resource.test.ts';
+const sajuReadingTestPath = 'apps/api/src/saju-production-reading-http-adapter.test.ts';
 
 const [
   policyRaw,
@@ -20,10 +22,12 @@ const [
   auth,
   member,
   saju,
+  sajuReading,
   runtimeTest,
   authResourceTest,
   memberTest,
   sajuResourceTest,
+  sajuReadingTest,
 ] = await Promise.all([
   readFile(policyPath, 'utf8'),
   readFile(docsPath, 'utf8'),
@@ -32,10 +36,12 @@ const [
   readFile(authPath, 'utf8'),
   readFile(memberPath, 'utf8'),
   readFile(sajuPath, 'utf8'),
+  readFile(sajuReadingPath, 'utf8'),
   readFile(runtimeTestPath, 'utf8'),
   readFile(authResourceTestPath, 'utf8'),
   readFile(memberTestPath, 'utf8'),
   readFile(sajuResourceTestPath, 'utf8'),
+  readFile(sajuReadingTestPath, 'utf8'),
 ]);
 
 const policy = JSON.parse(policyRaw);
@@ -73,6 +79,14 @@ const expected = {
         publicErrorCode: 'SAJU_TEMPORARILY_UNAVAILABLE',
       },
     },
+    sajuReading: {
+      productionExposure: 'active',
+      maximumBodyBytes: 524288,
+      resourceFailure: {
+        internalErrorCode: 'RESPONSE_TOO_LARGE',
+        publicErrorCode: 'SAJU_TEMPORARILY_UNAVAILABLE',
+      },
+    },
   },
   semanticContractsOtherwiseUnchanged: true,
 };
@@ -92,6 +106,7 @@ for (const fragment of [
   '128 KiB = 131,072 application-visible octets',
   '64 KiB =  65,536 application-visible octets',
   '256 KiB = 262,144 application-visible octets',
+  '512 KiB = 524,288 application-visible octets',
   'Content-Length',
   'Content-Encoding',
   'Actual application-visible stream bytes are final authority.',
@@ -112,6 +127,7 @@ for (const fragment of [
   'Supabase Auth success JSON maximum = 131,072 application-visible bytes',
   'Supabase Member success JSON maximum = 65,536 application-visible bytes',
   'Saju calculation success JSON maximum = 262,144 application-visible bytes',
+  'Saju Reading success JSON maximum = 524,288 application-visible bytes',
   'Content-Length is an early-rejection hint only',
   'existing upstream deadlines remain independently authoritative',
 ]) {
@@ -123,6 +139,7 @@ for (const fragment of [
   'SUPABASE_AUTH_JSON_RESPONSE_MAXIMUM_BYTES_V1 = 131_072',
   'SUPABASE_MEMBER_JSON_RESPONSE_MAXIMUM_BYTES_V1 = 65_536',
   'SAJU_CALCULATION_JSON_RESPONSE_MAXIMUM_BYTES_V1 = 262_144',
+  'SAJU_READING_JSON_RESPONSE_MAXIMUM_BYTES_V1 = 524_288',
   'UpstreamJsonResponseTooLargeV1',
   'readBoundedUpstreamJsonTextV1',
   "response.headers.get('content-length')",
@@ -172,6 +189,22 @@ if (saju.includes('response.text()')) {
   throw new Error(`${sajuPath} regressed to unbounded successful Response.text() consumption.`);
 }
 
+
+for (const fragment of [
+  'SAJU_READING_JSON_RESPONSE_MAXIMUM_BYTES_V1',
+  'readBoundedUpstreamJsonTextV1(response',
+  "'RESPONSE_TOO_LARGE'",
+  'lease.deadline',
+  'lease.signal',
+  'SAJU_PRODUCT_READING_RESPONSE_ADMISSION_HEADER_V1',
+  'SAJU_READING_LIFECYCLE_HEADER_V1',
+]) {
+  requireFragment(sajuReadingPath, sajuReading, fragment);
+}
+if (sajuReading.includes('response.text()')) {
+  throw new Error(`${sajuReadingPath} regressed to unbounded successful Response.text() consumption.`);
+}
+
 for (const [name, source, fragments] of [
   [runtimeTestPath, runtimeTest, [
     'accepts an exact-limit application-visible response',
@@ -193,10 +226,16 @@ for (const [name, source, fragments] of [
     'RESPONSE_TOO_LARGE',
     'SAJU_TEMPORARILY_UNAVAILABLE',
   ]],
+  [sajuReadingTestPath, sajuReadingTest, [
+    'SAJU_READING_JSON_RESPONSE_MAXIMUM_BYTES_V1 + 1',
+    'rejects an oversized attested response before JSON parsing',
+    'RESPONSE_TOO_LARGE',
+    'body.locked',
+  ]],
 ]) {
   for (const fragment of fragments) requireFragment(name, source, fragment);
 }
 
 console.log(
-  'MyeongHa upstream JSON response resource policy v1 verification passed: Auth 128 KiB, Member 64 KiB, Saju 256 KiB, bounded streaming readers, non-blocking cleanup, and existing deadlines are pinned.',
+  'MyeongHa upstream JSON response resource policy v1 verification passed: Auth 128 KiB, Member 64 KiB, Saju calculation 256 KiB, Saju Reading 512 KiB, bounded streaming readers, non-blocking cleanup, and existing deadlines are pinned.',
 );
