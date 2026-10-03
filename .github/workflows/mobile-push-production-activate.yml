@@ -98,7 +98,6 @@ jobs:
     environment: production
     env:
       VERCEL_MOBILE_PUSH_ACTIVATION_TOKEN: ${{ secrets.VERCEL_MOBILE_PUSH_ACTIVATION_TOKEN }}
-      VERCEL_TOKEN: ${{ secrets.VERCEL_MOBILE_PUSH_ACTIVATION_TOKEN }}
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
       NO_COLOR: "1"
     steps:
@@ -166,9 +165,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          npm exec --yes --package=vercel@59.19.1 --             vercel redeploy https://myeongha.vercel.app             --target=production             --scope "$VERCEL_TEAM_SLUG"             > "$RUNNER_TEMP/myeongha-mobile-push-redeploy-url.txt"
+          node scripts/operations/redeploy-vercel-mobile-push-production.mjs             > "$RUNNER_TEMP/myeongha-mobile-push-redeploy-evidence.txt"
 
-          test -s "$RUNNER_TEMP/myeongha-mobile-push-redeploy-url.txt"
+          grep -F "vercel_mobile_push_redeploy=pass"             "$RUNNER_TEMP/myeongha-mobile-push-redeploy-evidence.txt" >/dev/null
 
       - name: Smoke canonical Device Installation routes
         shell: bash
