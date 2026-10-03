@@ -1,0 +1,88 @@
+{
+  "contractVersion": "myeongha-saju-abuse-admission-policy-candidate-v1",
+  "issue": "#1526",
+  "policyAuthority": "NOT_APPROVED",
+  "activationState": "hold-baseline-insufficient",
+  "enforcementAuthorized": false,
+  "productionMutationAuthorized": false,
+  "strategy": "postgres-application-admission",
+  "algorithm": "anchored-fixed-window",
+  "windowSeconds": null,
+  "requestLimit": null,
+  "blockedCountSaturation": null,
+  "routes": [
+    {
+      "routeId": "api.me.saju.calculation",
+      "publicPath": "/api/me/saju/calculation",
+      "method": "POST",
+      "bucketScope": "route+clientKey"
+    },
+    {
+      "routeId": "api.me.saju.preview-reading",
+      "publicPath": "/api/me/saju/preview-reading",
+      "method": "POST",
+      "bucketScope": "route+clientKey"
+    }
+  ],
+  "clientKey": {
+    "version": "myeongha-saju-abuse-client-hmac-sha256-v1",
+    "derivationAuthority": "apps/api/src/saju-abuse-observability.ts#fingerprintSajuAbuseClientV1",
+    "source": "verified-member-or-guest-evidence",
+    "rawIdentityPersistence": false,
+    "rawNetworkIdentifierPersistence": false,
+    "admissionBucketComponents": [
+      "routeId",
+      "clientKey"
+    ]
+  },
+  "counterStoreCandidate": {
+    "kind": "postgres",
+    "persistence": "unlogged-ephemeral",
+    "directTableAuthorityForApiExecutor": false,
+    "commandAuthority": "dedicated-security-definer-command",
+    "failureMode": "fail-closed",
+    "unavailableHttpStatus": 503,
+    "unavailableCode": "SAJU_ADMISSION_UNAVAILABLE",
+    "cleanupRetention": "UNDECIDED_UNTIL_WINDOW_APPROVAL",
+    "rationale": "Reuse the already runtime-proven Member Auth PostgreSQL application-admission pattern without adding a new external store dependency."
+  },
+  "blockedResponseCandidate": {
+    "httpStatus": 429,
+    "code": "RATE_LIMITED",
+    "retryAfterSource": "admission-reset-at",
+    "retryAfterMaximumSeconds": null,
+    "cacheControl": "no-store"
+  },
+  "retryBoundary": {
+    "sharedApiClientAutomaticRetry": false,
+    "upstreamCalculationAutomaticRetry": false,
+    "upstreamPreviewReadingAutomaticRetry": false,
+    "deniedRequestReachesSubjectResolution": false,
+    "deniedRequestReachesBirthProfileRead": false,
+    "deniedRequestReachesUpstreamSaju": false,
+    "allowedRepeatedRequestsConsumeAdmission": true
+  },
+  "observability": {
+    "rateLimitedEventRequired": true,
+    "eventCode": "RATE_LIMITED",
+    "rawClientKeyInRateLimitedEvent": false,
+    "rawIdentityInRateLimitedEvent": false,
+    "requestBodyInRateLimitedEvent": false,
+    "birthDataInRateLimitedEvent": false,
+    "sajuPayloadInRateLimitedEvent": false
+  },
+  "baselineAuthority": {
+    "analyzer": "scripts/analyze-saju-abuse-baseline.mjs",
+    "latestSnapshot": "docs/operations/SAJU_ABUSE_BASELINE_SNAPSHOT_2026-10-03.json",
+    "organicBaseline": "INSUFFICIENT",
+    "numericPolicyDecision": "HOLD"
+  },
+  "approvalRequirements": [
+    "usable-organic-baseline-or-explicit-product-authority",
+    "windowSeconds-approved",
+    "requestLimit-approved",
+    "retryAfterMaximumSeconds-approved",
+    "counter-cleanup-retention-approved",
+    "production-canary-plan-approved"
+  ]
+}
