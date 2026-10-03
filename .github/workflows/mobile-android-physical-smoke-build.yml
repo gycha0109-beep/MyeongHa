@@ -119,7 +119,7 @@ jobs:
 
           popd >/dev/null
 
-      - name: Build Android debug APK without EAS signing credentials
+      - name: Build Android standalone smoke APK without EAS signing credentials
         id: eas_build
         shell: bash
         run: |
@@ -186,6 +186,70 @@ jobs:
           [[ "$artifact_url" =~ ^https:// ]]
 
           echo "build_id=$build_id" >> "$GITHUB_OUTPUT"
+          echo "artifact_url=$artifact_url" >> "$GITHUB_OUTPUT"
+
+      - name: Download and verify standalone physical-smoke APK
+        id: verify_apk
+        shell: bash
+        env:
+          EAS_ARTIFACT_URL: ${{ steps.eas_build.outputs.artifact_url }}
+          EAS_BUILD_ID: ${{ steps.eas_build.outputs.build_id }}
+        run: |
+          set -euo pipefail
+
+          apk="$RUNNER_TEMP/myeongha-android-physical-smoke.apk"
+          evidence="$RUNNER_TEMP/myeongha-android-physical-smoke-evidence.txt"
+
+          test -n "$EAS_ARTIFACT_URL"
+          test -n "$EAS_BUILD_ID"
+
+          curl --fail --location --retry 3 --retry-all-errors \
+            "$EAS_ARTIFACT_URL" \
+            --output "$apk"
+          test -s "$apk"
+
+          sdk_root="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          test -n "$sdk_root"
+
+          apksigner="$(find "$sdk_root/build-tools" -mindepth 2 -maxdepth 2 -type f -name apksigner | sort -V | tail -1)"
+          aapt="$(find "$sdk_root/build-tools" -mindepth 2 -maxdepth 2 -type f -name aapt | sort -V | tail -1)"
+          test -x "$apksigner"
+          test -x "$aapt"
+
+          "$apksigner" verify --verbose --print-certs "$apk" | tee "$RUNNER_TEMP/apksigner.txt"
+          grep -F "CN=Android Debug" "$RUNNER_TEMP/apksigner.txt"
+
+          "$aapt" dump badging "$apk" | tee "$RUNNER_TEMP/aapt-badging.txt"
+          grep -F "package: name='com.myeongha.app'" "$RUNNER_TEMP/aapt-badging.txt"
+
+          unzip -l "$apk" | tee "$RUNNER_TEMP/apk-contents.txt"
+          grep -F "assets/index.android.bundle" "$RUNNER_TEMP/apk-contents.txt"
+
+          apk_sha256="$(sha256sum "$apk" | awk '{print $1}')"
+          {
+            echo "eas_build_id=$EAS_BUILD_ID"
+            echo "android_package=com.myeongha.app"
+            echo "gradle_command=:app:assembleRelease"
+            echo "certificate_boundary=android_debug"
+            echo "embedded_js_bundle=true"
+            echo "production_signing_used=false"
+            echo "store_submission=false"
+            echo "apk_sha256=$apk_sha256"
+          } > "$evidence"
+
+          echo "apk_path=$apk" >> "$GITHUB_OUTPUT"
+          echo "evidence_path=$evidence" >> "$GITHUB_OUTPUT"
+
+      - name: Upload verified physical-smoke APK
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: myeongha-android-physical-smoke-${{ steps.eas_build.outputs.build_id }}
+          path: |
+            ${{ steps.verify_apk.outputs.apk_path }}
+            ${{ steps.verify_apk.outputs.evidence_path }}
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
 
       - name: Record safe physical-smoke build evidence
         shell: bash
@@ -198,8 +262,11 @@ jobs:
             echo "android_physical_smoke_build=pass"
             echo "eas_build_id=$EAS_BUILD_ID"
             echo "eas_profile=physical-smoke"
-            echo "android_gradle_command=:app:assembleDebug"
+            echo "android_gradle_command=:app:assembleRelease"
             echo "eas_credentials_mutation=false"
+            echo "certificate_boundary=android_debug"
+            echo "embedded_js_bundle=true"
+            echo "github_artifact=myeongha-android-physical-smoke-$EAS_BUILD_ID"
             echo "store_submission=false"
             echo "eas_build_page=https://expo.dev/accounts/johnny0109/projects/myeongha-mobile/builds/$EAS_BUILD_ID"
           } >> "$GITHUB_STEP_SUMMARY"

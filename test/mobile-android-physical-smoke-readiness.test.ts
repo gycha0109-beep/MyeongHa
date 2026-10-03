@@ -26,14 +26,14 @@ const validEas = {
       environment: 'production',
       android: {
         withoutCredentials: true,
-        gradleCommand: ':app:assembleDebug',
+        gradleCommand: ':app:assembleRelease',
       },
     },
   },
 };
 
 describe('Mobile Android physical smoke build readiness', () => {
-  it('reports the current repository as ready for a no-credential debug APK build', async () => {
+  it('reports the current repository as ready for a standalone no-EAS-credential APK build', async () => {
     const report = await readMobileAndroidPhysicalSmokeReadinessV1(
       new URL('..', import.meta.url).pathname,
     );
@@ -43,14 +43,14 @@ describe('Mobile Android physical smoke build readiness', () => {
     });
   });
 
-  it('pins the activated EAS project and no-credential debug build boundary', () => {
+  it('pins the activated EAS project and standalone no-EAS-credential build boundary', () => {
     expect(MOBILE_ANDROID_PHYSICAL_SMOKE_V1).toEqual({
       easProjectId: '5c20243c-60a8-44f3-9d8c-ca06ccc8bebe',
       androidPackage: 'com.myeongha.app',
       profile: 'physical-smoke',
       node: '24.14.0',
       environment: 'production',
-      gradleCommand: ':app:assembleDebug',
+      gradleCommand: ':app:assembleRelease',
       withoutCredentials: true,
     });
   });
@@ -82,7 +82,7 @@ describe('Mobile Android physical smoke build readiness', () => {
       'physical-smoke Android build must set withoutCredentials=true.',
     );
     expect(report.violations).toContain(
-      'physical-smoke Android build must use :app:assembleDebug.',
+      'physical-smoke Android build must use :app:assembleRelease.',
     );
   });
 

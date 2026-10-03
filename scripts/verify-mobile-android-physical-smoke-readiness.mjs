@@ -9,7 +9,7 @@ export const MOBILE_ANDROID_PHYSICAL_SMOKE_V1 = Object.freeze({
   profile: 'physical-smoke',
   node: '24.14.0',
   environment: 'production',
-  gradleCommand: ':app:assembleDebug',
+  gradleCommand: ':app:assembleRelease',
   withoutCredentials: true,
 });
 
