@@ -225,6 +225,7 @@ jobs:
             {
               method: 'POST',
               body: JSON.stringify({
+                name: current.name,
                 deploymentId: current.id,
                 target: 'production',
               }),
