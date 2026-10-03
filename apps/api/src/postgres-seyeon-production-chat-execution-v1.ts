@@ -138,7 +138,7 @@ implements SeyeonProductionChatPersistencePortV1 {
       input.clientTurnId,
       input.requestHash,
       input.requestContractVersion,
-      input.requestSnapshot,
+      JSON.stringify(input.requestSnapshot),
       input.resolvedContentReleaseId,
       input.resolvedContentBundleId,
       input.turnId,
@@ -198,10 +198,10 @@ implements SeyeonProductionChatPersistencePortV1 {
       input.modelKey,
       input.rendererVersion,
       input.bodyText,
-      input.messagePayload,
+      JSON.stringify(input.messagePayload),
       input.messageSchemaVersion,
       input.contentHash,
-      input.groundingRefs,
+      JSON.stringify(input.groundingRefs),
     ]);
   }
 
@@ -217,8 +217,8 @@ implements SeyeonProductionChatPersistencePortV1 {
       input.modelKey,
       input.outputGuardVersion,
       input.generatedContentHash,
-      input.validationResult,
-      input.groundingRefs,
+      JSON.stringify(input.validationResult),
+      JSON.stringify(input.groundingRefs),
     ]);
   }
 
