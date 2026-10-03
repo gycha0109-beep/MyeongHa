@@ -908,6 +908,25 @@ export {
   type RunSeyeonProductionContextVerticalSliceResultV1,
 } from './seyeon-production-context-vertical-slice-v1.js';
 
+
+export {
+  SEYEON_PRODUCTION_CHAT_EXECUTION_VERSION_V1,
+  SEYEON_PRODUCTION_CHAT_OUTPUT_GUARD_VERSION_V1,
+  SEYEON_PRODUCTION_CHAT_PLANNER_VERSION_V1,
+  SEYEON_PRODUCTION_CHAT_RENDERER_VERSION_V1,
+  SEYEON_PRODUCTION_CHAT_REQUEST_CONTRACT_VERSION_V1,
+  SeyeonProductionChatExecutionErrorV1,
+  runSeyeonProductionChatExecutionV1,
+  type RunSeyeonProductionChatExecutionInputV1,
+  type RunSeyeonProductionChatExecutionResultV1,
+  type SeyeonProductionChatAttemptV1,
+  type SeyeonProductionChatCommitReceiptV1,
+  type SeyeonProductionChatExecutionIdPortV1,
+  type SeyeonProductionChatPersistencePortV1,
+  type SeyeonProductionChatPostTurnInputV1,
+  type SeyeonProductionChatReceivedTurnV1,
+} from './seyeon-production-chat-execution-v1.js';
+
 export {
   SEYEON_PRODUCTION_RELATIONSHIP_SYNC_OUTBOX_VERSION_V1,
   SeyeonProductionRelationshipSyncOutboxErrorV1,
