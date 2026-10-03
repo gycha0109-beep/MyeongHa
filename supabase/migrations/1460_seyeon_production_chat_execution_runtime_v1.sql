@@ -140,8 +140,22 @@ grant select on public.ai_execution_groundings
 grant insert on public.outbox_events
   to myeongha_seyeon_chat_runtime_owner;
 
+-- Existing capability/ownership triggers read the canonical Subject while the
+-- SECURITY INVOKER Chat core commands persist turn/message rows.
+grant select (id, status, merged_into_subject_id)
+on public.subjects
+to myeongha_seyeon_chat_runtime_owner;
+
 -- conversation_threads/messages/participants already have RLS enabled by the
 -- Production Chat read authority. Add only this owner-specific Subject slice.
+drop policy if exists subjects_seyeon_chat_runtime_select_v1
+  on public.subjects;
+create policy subjects_seyeon_chat_runtime_select_v1
+on public.subjects
+for select
+to myeongha_seyeon_chat_runtime_owner
+using (id = public.current_myeongha_subject_id());
+
 drop policy if exists conversation_threads_seyeon_chat_runtime_select_v1
   on public.conversation_threads;
 create policy conversation_threads_seyeon_chat_runtime_select_v1
