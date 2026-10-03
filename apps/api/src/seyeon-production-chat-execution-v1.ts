@@ -111,6 +111,14 @@ export interface SeyeonProductionChatPersistencePortV1 {
     attemptId: string;
   }>): Awaitable<void>;
 
+  failAttempt(input: Readonly<{
+    subjectId: string;
+    turnId: string;
+    attemptId: string;
+    failureState: 'failed_retryable';
+    errorCode: 'SEYEON_PRODUCTION_EXECUTION_FAILED';
+  }>): Awaitable<void>;
+
   persistGenerated(input: Readonly<{
     subjectId: string;
     turnId: string;
@@ -344,203 +352,219 @@ export async function runSeyeonProductionChatExecutionV1(
   let committedTurn: SeyeonProductionChatCommitReceiptV1 | null = null;
   let runtimeResult: RunSeyeonCharacterTurnV2Result | null = null;
 
-  const relationshipResult = await runSeyeonProductionContextVerticalSliceV1({
-    mode: input.mode,
-    resolvedSubjectId: subjectId,
-    threadId,
-    currentUserMessageRef: receivedTurn.userMessageId,
-    bandProjection: input.bandProjection,
-    relationshipReadPort: input.relationshipReadPort,
-    contextReadPort: input.contextReadPort,
-    productionHistoryRecords: input.productionHistoryRecords,
-    productionAuthorityRef: input.productionAuthorityRef,
-    idPort: input.idPort,
-    contextPort: input.contextPort,
-    commitPort: input.commitPort,
-    ...(input.serverOwnedPersonalRecordProjectors === undefined
-      ? {}
-      : {
-          serverOwnedPersonalRecordProjectors:
-            input.serverOwnedPersonalRecordProjectors,
-        }),
-    ...(input.maxRecentMessages === undefined
-      ? {}
-      : { maxRecentMessages: input.maxRecentMessages }),
-    ...(input.maxRelationshipEvents === undefined
-      ? {}
-      : { maxRelationshipEvents: input.maxRelationshipEvents }),
-    ...(input.maxPersonalRecords === undefined
-      ? {}
-      : { maxPersonalRecords: input.maxPersonalRecords }),
-    runCommittedTurn: async ({
-      turnBinding,
-      activation,
-      productionContext,
-    }) => {
-      await input.persistencePort.markContextReady({
-        subjectId,
-        turnId: receivedTurn.turnId,
-        attemptId: attempt.attemptId,
-      });
-
-      const historical = bindSeyeonProductionCharacterContextInputV1({
-        base: input.baseContext,
+  let relationshipResult: RunSeyeonProductionContextVerticalSliceResultV1<RunSeyeonCharacterTurnV2Result>;
+  try {
+    relationshipResult = await runSeyeonProductionContextVerticalSliceV1({
+      mode: input.mode,
+      resolvedSubjectId: subjectId,
+      threadId,
+      currentUserMessageRef: receivedTurn.userMessageId,
+      bandProjection: input.bandProjection,
+      relationshipReadPort: input.relationshipReadPort,
+      contextReadPort: input.contextReadPort,
+      productionHistoryRecords: input.productionHistoryRecords,
+      productionAuthorityRef: input.productionAuthorityRef,
+      idPort: input.idPort,
+      contextPort: input.contextPort,
+      commitPort: input.commitPort,
+      ...(input.serverOwnedPersonalRecordProjectors === undefined
+        ? {}
+        : {
+            serverOwnedPersonalRecordProjectors:
+              input.serverOwnedPersonalRecordProjectors,
+          }),
+      ...(input.maxRecentMessages === undefined
+        ? {}
+        : { maxRecentMessages: input.maxRecentMessages }),
+      ...(input.maxRelationshipEvents === undefined
+        ? {}
+        : { maxRelationshipEvents: input.maxRelationshipEvents }),
+      ...(input.maxPersonalRecords === undefined
+        ? {}
+        : { maxPersonalRecords: input.maxPersonalRecords }),
+      runCommittedTurn: async ({
         turnBinding,
+        activation,
         productionContext,
-      });
-      const contextInput = bindSeyeonProductionCurrentUserTurnV1({
-        historicalContext: historical,
-        userMessageId: receivedTurn.userMessageId,
-        userText: receivedTurn.userText,
-      });
+      }) => {
+        await input.persistencePort.markContextReady({
+          subjectId,
+          turnId: receivedTurn.turnId,
+          attemptId: attempt.attemptId,
+        });
 
-      const runtime = await runSeyeonCharacterTurnV2({
-        userMessageRef: receivedTurn.userMessageId,
-        userText: receivedTurn.userText,
-        contextInput,
-        governance: (() => {
-          const semantics = relationshipSemanticsPort(
-            input.governance.relationshipSemantics,
-            activation.appliedRelationshipSemantics,
-          );
-          return Object.freeze({
-            ...input.governance,
-            ...(semantics === undefined
-              ? {}
-              : { relationshipSemantics: semantics }),
-          });
-        })(),
-        interpreterProvider: input.interpreterProvider,
-        rendererProvider: input.rendererProvider,
-        semanticReviewerProvider: input.semanticReviewerProvider,
-      });
-      runtimeResult = runtime;
+        const historical = bindSeyeonProductionCharacterContextInputV1({
+          base: input.baseContext,
+          turnBinding,
+          productionContext,
+        });
+        const contextInput = bindSeyeonProductionCurrentUserTurnV1({
+          historicalContext: historical,
+          userMessageId: receivedTurn.userMessageId,
+          userText: receivedTurn.userText,
+        });
 
-      const generatedHash = runtime.envelope.semanticReviewHash;
-      await input.persistencePort.persistGenerated({
-        subjectId,
-        turnId: receivedTurn.turnId,
-        attemptId: attempt.attemptId,
-        threadCharacterId: receivedTurn.threadCharacterId,
-        aiExecutionLogId:
-          input.executionIdPort.nextAiExecutionLogId('renderer'),
-        providerKey: runtime.providers.renderer.providerKey,
-        modelKey: runtime.providers.renderer.modelKey,
-        rendererVersion: SEYEON_PRODUCTION_CHAT_RENDERER_VERSION_V1,
-        bodyText: runtime.envelope.utterance,
-        messagePayload: runtime.envelope,
-        messageSchemaVersion: runtime.envelope.schemaVersion,
-        contentHash: generatedHash,
-        groundingRefs: Object.freeze([]),
-      });
+        const runtime = await runSeyeonCharacterTurnV2({
+          userMessageRef: receivedTurn.userMessageId,
+          userText: receivedTurn.userText,
+          contextInput,
+          governance: (() => {
+            const semantics = relationshipSemanticsPort(
+              input.governance.relationshipSemantics,
+              activation.appliedRelationshipSemantics,
+            );
+            return Object.freeze({
+              ...input.governance,
+              ...(semantics === undefined
+                ? {}
+                : { relationshipSemantics: semantics }),
+            });
+          })(),
+          interpreterProvider: input.interpreterProvider,
+          rendererProvider: input.rendererProvider,
+          semanticReviewerProvider: input.semanticReviewerProvider,
+        });
+        runtimeResult = runtime;
 
-      await input.persistencePort.persistValidated({
-        subjectId,
-        turnId: receivedTurn.turnId,
-        attemptId: attempt.attemptId,
-        aiExecutionLogId:
-          input.executionIdPort.nextAiExecutionLogId('output_guard'),
-        providerKey: runtime.providers.semanticReviewer.providerKey,
-        modelKey: runtime.providers.semanticReviewer.modelKey,
-        outputGuardVersion: SEYEON_PRODUCTION_CHAT_OUTPUT_GUARD_VERSION_V1,
-        generatedContentHash: generatedHash,
-        validationResult: Object.freeze({
-          schemaVersion: 'seyeon-production-chat-validation-v1',
-          passed: true,
+        const generatedHash = runtime.envelope.semanticReviewHash;
+        await input.persistencePort.persistGenerated({
+          subjectId,
+          turnId: receivedTurn.turnId,
+          attemptId: attempt.attemptId,
+          threadCharacterId: receivedTurn.threadCharacterId,
+          aiExecutionLogId:
+            input.executionIdPort.nextAiExecutionLogId('renderer'),
+          providerKey: runtime.providers.renderer.providerKey,
+          modelKey: runtime.providers.renderer.modelKey,
+          rendererVersion: SEYEON_PRODUCTION_CHAT_RENDERER_VERSION_V1,
+          bodyText: runtime.envelope.utterance,
+          messagePayload: runtime.envelope,
+          messageSchemaVersion: runtime.envelope.schemaVersion,
+          contentHash: generatedHash,
+          groundingRefs: Object.freeze([]),
+        });
+
+        await input.persistencePort.persistValidated({
+          subjectId,
+          turnId: receivedTurn.turnId,
+          attemptId: attempt.attemptId,
+          aiExecutionLogId:
+            input.executionIdPort.nextAiExecutionLogId('output_guard'),
+          providerKey: runtime.providers.semanticReviewer.providerKey,
+          modelKey: runtime.providers.semanticReviewer.modelKey,
+          outputGuardVersion: SEYEON_PRODUCTION_CHAT_OUTPUT_GUARD_VERSION_V1,
           generatedContentHash: generatedHash,
-          semanticReviewHash: runtime.envelope.semanticReviewHash,
-        }),
-        groundingRefs: Object.freeze([]),
-      });
-
-      const committed = await input.persistencePort.commitTurn({
-        subjectId,
-        threadId,
-        turnId: receivedTurn.turnId,
-        attemptId: attempt.attemptId,
-        assistantMessageId: input.executionIdPort.nextAssistantMessageId(),
-        outboxEventId: input.executionIdPort.nextCommitOutboxEventId(),
-      });
-      committedTurn = committed;
-
-      const postTurnIdentityInput = Object.freeze({
-        subjectId,
-        turnId: committed.turnId,
-        userMessageId: receivedTurn.userMessageId,
-        assistantMessageId: committed.assistantMessageId,
-      });
-      const postTurn = await runSeyeonPostTurnRelationshipV2({
-        turnId: committed.turnId,
-        messages: Object.freeze([
-          Object.freeze({
-            messageId: receivedTurn.userMessageId,
-            role: 'user' as const,
-            text: receivedTurn.userText,
+          validationResult: Object.freeze({
+            schemaVersion: 'seyeon-production-chat-validation-v1',
+            passed: true,
+            generatedContentHash: generatedHash,
+            semanticReviewHash: runtime.envelope.semanticReviewHash,
           }),
-          Object.freeze({
-            messageId: committed.assistantMessageId,
-            role: 'assistant' as const,
-            text: runtime.envelope.utterance,
+          groundingRefs: Object.freeze([]),
+        });
+
+        const committed = await input.persistencePort.commitTurn({
+          subjectId,
+          threadId,
+          turnId: receivedTurn.turnId,
+          attemptId: attempt.attemptId,
+          assistantMessageId: input.executionIdPort.nextAssistantMessageId(),
+          outboxEventId: input.executionIdPort.nextCommitOutboxEventId(),
+        });
+        committedTurn = committed;
+
+        const postTurnIdentityInput = Object.freeze({
+          subjectId,
+          turnId: committed.turnId,
+          userMessageId: receivedTurn.userMessageId,
+          assistantMessageId: committed.assistantMessageId,
+        });
+        const postTurn = await runSeyeonPostTurnRelationshipV2({
+          turnId: committed.turnId,
+          messages: Object.freeze([
+            Object.freeze({
+              messageId: receivedTurn.userMessageId,
+              role: 'user' as const,
+              text: receivedTurn.userText,
+            }),
+            Object.freeze({
+              messageId: committed.assistantMessageId,
+              role: 'assistant' as const,
+              text: runtime.envelope.utterance,
+            }),
+          ]),
+          interpretation: runtime.interpretation,
+          envelope: runtime.envelope,
+          ledger: input.postTurn.ledger,
+          extractorProvider: input.postTurn.extractorProvider,
+          eventAuthorityEvidence: Object.freeze({
+            integrityDecisions: runtime.governedPreflight.integrity.decisions,
+            riskCausality: runtime.riskCausality,
+            ...(input.postTurn.serverObservationRefs === undefined
+              ? {}
+              : {
+                  serverObservationRefs:
+                    input.postTurn.serverObservationRefs,
+                }),
           }),
-        ]),
-        interpretation: runtime.interpretation,
-        envelope: runtime.envelope,
-        ledger: input.postTurn.ledger,
-        extractorProvider: input.postTurn.extractorProvider,
-        eventAuthorityEvidence: Object.freeze({
-          integrityDecisions: runtime.governedPreflight.integrity.decisions,
-          riskCausality: runtime.riskCausality,
-          ...(input.postTurn.serverObservationRefs === undefined
+          semanticRelevanceByEventId:
+            input.postTurn.semanticRelevanceByEventId,
+          ...(input.postTurn.recentlyMentionedEventIds === undefined
             ? {}
             : {
-                serverObservationRefs:
-                  input.postTurn.serverObservationRefs,
+                recentlyMentionedEventIds:
+                  input.postTurn.recentlyMentionedEventIds,
               }),
-        }),
-        semanticRelevanceByEventId:
-          input.postTurn.semanticRelevanceByEventId,
-        ...(input.postTurn.recentlyMentionedEventIds === undefined
-          ? {}
-          : {
-              recentlyMentionedEventIds:
-                input.postTurn.recentlyMentionedEventIds,
-            }),
-        identity: Object.freeze({
-          eventId: input.executionIdPort.nextExperimentalEventId(),
-          eventDedupeKey:
-            input.executionIdPort.nextExperimentalEventDedupeKey(
-              postTurnIdentityInput,
-            ),
-          ledgerEntryId:
-            input.executionIdPort.nextExperimentalLedgerEntryId(),
-          occurredAt: committed.committedAt,
-          recordedAt: committed.committedAt,
-        }),
-      });
-
-      const relationshipEvent =
-        postTurn.decision === 'event'
-          ? Object.freeze({
-              experimentalEvent: postTurn.event,
-              authorityDecision: postTurn.authorityDecision,
-              activeExperimentalEvents:
-                input.postTurn.ledger.activeEvents(),
-            })
-          : null;
-
-      return Object.freeze({
-        turnResult: runtime,
-        signal: Object.freeze({
-          committedTurn: Object.freeze({
-            turnId: committed.turnId,
-            assistantMessageRef: committed.assistantMessageId,
+          identity: Object.freeze({
+            eventId: input.executionIdPort.nextExperimentalEventId(),
+            eventDedupeKey:
+              input.executionIdPort.nextExperimentalEventDedupeKey(
+                postTurnIdentityInput,
+              ),
+            ledgerEntryId:
+              input.executionIdPort.nextExperimentalLedgerEntryId(),
             occurredAt: committed.committedAt,
+            recordedAt: committed.committedAt,
           }),
-          relationshipEvent,
-        }),
+        });
+
+        const relationshipEvent =
+          postTurn.decision === 'event'
+            ? Object.freeze({
+                experimentalEvent: postTurn.event,
+                authorityDecision: postTurn.authorityDecision,
+                activeExperimentalEvents:
+                  input.postTurn.ledger.activeEvents(),
+              })
+            : null;
+
+        return Object.freeze({
+          turnResult: runtime,
+          signal: Object.freeze({
+            committedTurn: Object.freeze({
+              turnId: committed.turnId,
+              assistantMessageRef: committed.assistantMessageId,
+              occurredAt: committed.committedAt,
+            }),
+            relationshipEvent,
+          }),
+        });
+      },
+    });
+
+
+  } catch (error) {
+    if (committedTurn === null) {
+      await input.persistencePort.failAttempt({
+        subjectId,
+        turnId: receivedTurn.turnId,
+        attemptId: attempt.attemptId,
+        failureState: 'failed_retryable',
+        errorCode: 'SEYEON_PRODUCTION_EXECUTION_FAILED',
       });
-    },
-  });
+    }
+    throw error;
+  }
 
   if (committedTurn === null || runtimeResult === null) {
     throw new SeyeonProductionChatExecutionErrorV1(
