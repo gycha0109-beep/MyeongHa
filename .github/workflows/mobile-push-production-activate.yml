@@ -149,6 +149,8 @@ jobs:
           npm exec --yes --package=eas-cli@24.8.0 --             eas env:set production             --name EXPO_PUBLIC_EAS_PROJECT_ID             --value "$EAS_PROJECT_ID"             --visibility plaintext             --scope project             --non-interactive             >/dev/null
 
           observed="$(npm exec --yes --package=eas-cli@24.8.0 --             eas env:get production             --variable-name EXPO_PUBLIC_EAS_PROJECT_ID             --format short             --scope project             --non-interactive)"
+          [[ "$observed" == EXPO_PUBLIC_EAS_PROJECT_ID=* ]]
+          observed="${observed#EXPO_PUBLIC_EAS_PROJECT_ID=}"
           test "$observed" = "$EAS_PROJECT_ID"
           popd >/dev/null
 
