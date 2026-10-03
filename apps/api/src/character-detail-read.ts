@@ -17,7 +17,7 @@ export interface CharacterDetailContentRowV1 {
   readonly contentBundleId: string;
   readonly characterId: string;
   readonly displayName: string;
-  readonly deityProxyLabel: string;
+  readonly representativeTitle: string;
   readonly shortDescriptor: string;
 }
 
@@ -51,7 +51,7 @@ export interface CharacterDetailContentAuthorityPortV1 {
 export interface CharacterDetailReadItemV1 {
   readonly characterId: string;
   readonly displayName: string;
-  readonly deityProxyLabel: string;
+  readonly representativeTitle: string;
   readonly shortDescriptor: string;
   readonly catalogAvailability: CharacterCatalogAvailabilityV1;
   readonly catalogEnabled: boolean;
@@ -164,9 +164,9 @@ function projectContentTarget(
   );
   const rowCharacterId = requireStoredString('character identity', row.characterId);
   const displayName = requireStoredString('display name', row.displayName);
-  const deityProxyLabel = requireStoredString(
-    'deity proxy label',
-    row.deityProxyLabel,
+  const representativeTitle = requireStoredString(
+    'representative title',
+    row.representativeTitle,
   );
   const shortDescriptor = requireStoredString(
     'short descriptor',
@@ -188,7 +188,7 @@ function projectContentTarget(
     contentBundleId: rowBundleId,
     characterId: rowCharacterId,
     displayName,
-    deityProxyLabel,
+    representativeTitle,
     shortDescriptor,
   });
 }
@@ -268,7 +268,7 @@ export async function readCharacterDetailForResolvedBundle(
       character: Object.freeze({
         characterId,
         displayName: content.displayName,
-        deityProxyLabel: content.deityProxyLabel,
+        representativeTitle: content.representativeTitle,
         shortDescriptor: content.shortDescriptor,
         catalogAvailability: catalog.catalogAvailability,
         catalogEnabled: catalog.catalogEnabled,

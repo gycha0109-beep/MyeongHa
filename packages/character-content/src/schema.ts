@@ -26,17 +26,42 @@ export interface CharacterSpeechProfile {
   )[];
 }
 
+export type CharacterCallingAuthorityState =
+  | 'resolved'
+  | 'world_dependent'
+  | 'author_undefined'
+  | 'intentionally_open';
+
+export interface CharacterResolvedCallingBond {
+  readonly authorityState: 'resolved';
+  readonly principleId: string;
+  readonly callingDefinition: string;
+  readonly oath: string;
+  readonly acceptedInterpretations?: readonly string[];
+  readonly resistedExtremes?: readonly string[];
+}
+
+export interface CharacterUnresolvedCallingBond {
+  readonly authorityState:
+    | 'world_dependent'
+    | 'author_undefined'
+    | 'intentionally_open';
+  readonly note?: string;
+}
+
+export type CharacterCallingBond =
+  | CharacterResolvedCallingBond
+  | CharacterUnresolvedCallingBond;
+
 export interface CharacterCanonProfile {
   readonly worldRole: string;
   readonly origin: string;
   readonly apparentAgeBand: string;
-  readonly deityBond: {
-    readonly deityId: string;
-    readonly representationRole: string;
-    readonly oath: string;
-    readonly acceptedDoctrine: readonly string[];
-    readonly resistedDoctrine: readonly string[];
-  };
+  readonly callingBond: CharacterCallingBond;
+  /** Character-level direction that emerges after accepting the calling. */
+  readonly vocation?: string;
+  /** Concrete MyeongHa social duties; never inferred from calling alone. */
+  readonly duties?: readonly string[];
   readonly worldview: {
     readonly coreValues: readonly string[];
     readonly humanTheory: string;
@@ -200,7 +225,11 @@ export interface CharacterContentDefinition {
    * required by the Production publication boundary for real roster content.
    */
   readonly gender?: string;
-  readonly deityProxyLabel: string;
+  /**
+   * Optional presentation title for an authored human representative.
+   * Absence is valid while the Principle/Calling layer remains unresolved.
+   */
+  readonly representativeTitle?: string;
   readonly shortDescriptor: string;
   readonly personalityTraits: readonly string[];
   readonly flaws: readonly string[];

@@ -42,6 +42,8 @@ export type ProductionCharacterContentValidationCode =
   | 'ASSET_MANIFEST_HASH_REQUIRED'
   | 'CHARACTER_GENDER_CANON_REQUIRED'
   | 'CHARACTER_VISUAL_CANON_REQUIRED'
+  | 'CHARACTER_REPRESENTATIVE_TITLE_REQUIRED'
+  | 'CHARACTER_CALLING_AUTHORITY_REQUIRED'
   | 'CHARACTER_ASSET_REFS_REQUIRED'
   | 'CHARACTER_EMOTION_IDS_REQUIRED'
   | 'CHARACTER_ANIMATION_CUE_IDS_REQUIRED';
@@ -115,6 +117,17 @@ function hasVersionedAssetManifestHash(bundle: CharacterContentBundle): boolean 
 
 function hasAuthoredGender(character: CharacterContentDefinition): boolean {
   return character.gender !== undefined && character.gender.trim().length > 0;
+}
+
+function hasAuthoredRepresentativeTitle(character: CharacterContentDefinition): boolean {
+  return (
+    character.representativeTitle !== undefined &&
+    character.representativeTitle.trim().length > 0
+  );
+}
+
+function hasResolvedCalling(character: CharacterContentDefinition): boolean {
+  return character.canon?.callingBond.authorityState === 'resolved';
 }
 
 function hasAuthoredVisual(character: CharacterContentDefinition): boolean {
@@ -222,6 +235,26 @@ export function validateProductionCharacterContentBundle(
     throw new ProductionCharacterContentValidationError(
       'CHARACTER_VISUAL_CANON_REQUIRED',
       `Production character content requires source-authored visual canon: ${missingVisual.characterId}`,
+    );
+  }
+
+  const missingRepresentativeTitle = bundle.characters.find(
+    (character) => !hasAuthoredRepresentativeTitle(character),
+  );
+  if (missingRepresentativeTitle !== undefined) {
+    throw new ProductionCharacterContentValidationError(
+      'CHARACTER_REPRESENTATIVE_TITLE_REQUIRED',
+      `Production character content requires a source-authored representative title: ${missingRepresentativeTitle.characterId}`,
+    );
+  }
+
+  const unresolvedCalling = bundle.characters.find(
+    (character) => !hasResolvedCalling(character),
+  );
+  if (unresolvedCalling !== undefined) {
+    throw new ProductionCharacterContentValidationError(
+      'CHARACTER_CALLING_AUTHORITY_REQUIRED',
+      `Production character content requires a resolved Principle/Calling authority binding: ${unresolvedCalling.characterId}`,
     );
   }
 

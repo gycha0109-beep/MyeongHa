@@ -65,11 +65,33 @@ function validateCanon(characterId: string, canon: CharacterCanonProfile): void 
   nonEmpty(canon.worldRole, `${path}.worldRole`);
   nonEmpty(canon.origin, `${path}.origin`);
   nonEmpty(canon.apparentAgeBand, `${path}.apparentAgeBand`);
-  stableKey(canon.deityBond.deityId, `${path}.deityBond.deityId`);
-  nonEmpty(canon.deityBond.representationRole, `${path}.deityBond.representationRole`);
-  nonEmpty(canon.deityBond.oath, `${path}.deityBond.oath`);
-  validateStringList(canon.deityBond.acceptedDoctrine, `${path}.deityBond.acceptedDoctrine`);
-  validateStringList(canon.deityBond.resistedDoctrine, `${path}.deityBond.resistedDoctrine`);
+
+  const callingPath = `${path}.callingBond`;
+  if (canon.callingBond.authorityState === 'resolved') {
+    stableKey(canon.callingBond.principleId, `${callingPath}.principleId`);
+    nonEmpty(canon.callingBond.callingDefinition, `${callingPath}.callingDefinition`);
+    nonEmpty(canon.callingBond.oath, `${callingPath}.oath`);
+    if (canon.callingBond.acceptedInterpretations !== undefined) {
+      validateStringList(
+        canon.callingBond.acceptedInterpretations,
+        `${callingPath}.acceptedInterpretations`,
+      );
+    }
+    if (canon.callingBond.resistedExtremes !== undefined) {
+      validateStringList(
+        canon.callingBond.resistedExtremes,
+        `${callingPath}.resistedExtremes`,
+      );
+    }
+  } else if (canon.callingBond.note !== undefined) {
+    nonEmpty(canon.callingBond.note, `${callingPath}.note`);
+  }
+
+  if (canon.vocation !== undefined) nonEmpty(canon.vocation, `${path}.vocation`);
+  if (canon.duties !== undefined) {
+    validateStringList(canon.duties, `${path}.duties`, { required: true });
+  }
+
   validateStringList(canon.worldview.coreValues, `${path}.worldview.coreValues`, { required: true });
   nonEmpty(canon.worldview.humanTheory, `${path}.worldview.humanTheory`);
   nonEmpty(canon.worldview.agencyTheory, `${path}.worldview.agencyTheory`);
@@ -224,7 +246,8 @@ function validateAuthoredCharacter(character: CharacterContentDefinition): void 
   if (character.personalityTraits.length === 0) throw new CharacterContentValidationError(`${id}.personalityTraits must not be empty`);
   if (character.flaws.length === 0) throw new CharacterContentValidationError(`${id}.flaws must not be empty`);
   if (character.values.length === 0) throw new CharacterContentValidationError(`${id}.values must not be empty`);
-  if (character.deityProxyLabel === 'placeholder') throw new CharacterContentValidationError(`${id}.deityProxyLabel must be authored`);
+  if (character.representativeTitle === 'placeholder') throw new CharacterContentValidationError(`${id}.representativeTitle must be authored`);
+  if (character.representativeTitle !== undefined) nonEmpty(character.representativeTitle, `${id}.representativeTitle`);
   if (character.emotionIds === undefined || character.emotionIds.length === 0) throw new CharacterContentValidationError(`${id}.emotionIds must not be empty`);
   if (!character.canon) throw new CharacterContentValidationError(`${id}.canon is required`);
   if (!character.persona) throw new CharacterContentValidationError(`${id}.persona is required`);
@@ -251,7 +274,9 @@ export function validateCharacterContentBundle(bundle: CharacterContentBundle): 
     nonEmpty(character.contentVersion, `${character.characterId}.contentVersion`);
     if (character.contentVersion !== bundle.contentVersion) throw new CharacterContentValidationError(`${character.characterId}.contentVersion must match bundle contentVersion`);
     nonEmpty(character.displayName, `${character.characterId}.displayName`);
-    nonEmpty(character.deityProxyLabel, `${character.characterId}.deityProxyLabel`);
+    if (character.representativeTitle !== undefined) {
+      nonEmpty(character.representativeTitle, `${character.characterId}.representativeTitle`);
+    }
     nonEmpty(character.shortDescriptor, `${character.characterId}.shortDescriptor`);
     if (character.capabilities.length === 0) throw new CharacterContentValidationError(`${character.characterId}.capabilities must not be empty`);
     unique(character.capabilities.map((capability) => capability.domain), `${character.characterId}.capabilities.domain`);

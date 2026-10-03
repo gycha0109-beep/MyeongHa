@@ -88,7 +88,7 @@ function authoredCharacter(characterId = 'baekheon'): CharacterContentDefinition
     ...base,
     characterId,
     displayName: 'Official Reading Runtime Test Reader',
-    deityProxyLabel: 'official_reading_runtime_test',
+    representativeTitle: 'official_reading_runtime_test',
     shortDescriptor: 'official reading runtime test only',
     personalityTraits: ['observant'],
     flaws: ['overchecks continuity'],
@@ -99,12 +99,13 @@ function authoredCharacter(characterId = 'baekheon'): CharacterContentDefinition
       worldRole: 'record witness',
       origin: 'record hall',
       apparentAgeBand: 'adult',
-      deityBond: {
-        deityId: 'deity-official-reading-runtime-test',
-        representationRole: 'witness',
+      callingBond: {
+        authorityState: 'resolved',
+        principleId: 'principle-official-reading-runtime-test',
+        callingDefinition: 'test-only witness calling',
         oath: 'Keep the record intact.',
-        acceptedDoctrine: ['Records matter.'],
-        resistedDoctrine: ['Records do not own people.'],
+        acceptedInterpretations: ['Records matter.'],
+        resistedExtremes: ['Records do not own people.'],
       },
       worldview: {
         coreValues: ['truth'],

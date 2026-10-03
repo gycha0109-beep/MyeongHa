@@ -79,7 +79,7 @@ describe('immutable content bundle validation', () => {
     const { developmentPlaceholder: _episodePlaceholder, ...authoredEpisode } = DEV_WORLD_CONTENT_BUNDLE.episodes[0]!;
 
     expect(() => validateCharacterContentBundle({ ...DEV_CHARACTER_CONTENT_BUNDLE, characters: [{ ...authoredCharacter, personalityTraits: [] }] })).toThrow(/personalityTraits must not be empty/u);
-    expect(() => validateCharacterContentBundle({ ...DEV_CHARACTER_CONTENT_BUNDLE, characters: [{ ...authoredCharacter, deityProxyLabel: 'placeholder' }] })).toThrow(/deityProxyLabel must be authored/u);
+    expect(() => validateCharacterContentBundle({ ...DEV_CHARACTER_CONTENT_BUNDLE, characters: [{ ...authoredCharacter, representativeTitle: 'placeholder' }] })).toThrow(/representativeTitle must be authored/u);
     expect(() => validateWorldContentBundle({ ...DEV_WORLD_CONTENT_BUNDLE, episodes: [{ ...authoredEpisode, title: 'Placeholder Episode' }] }, DEV_CHARACTER_CONTENT_BUNDLE)).toThrow(/title must be authored/u);
   });
 

@@ -26,7 +26,7 @@ function authoredCharacter(): CharacterContentDefinition {
   return {
     ...base,
     displayName: 'Orchestration Test Representative',
-    deityProxyLabel: 'orchestration_witness',
+    representativeTitle: 'orchestration_witness',
     shortDescriptor: 'test-only authored character',
     personalityTraits: ['observant'],
     flaws: ['overchecks continuity'],
@@ -45,12 +45,13 @@ function authoredCharacter(): CharacterContentDefinition {
       worldRole: 'record witness',
       origin: 'record hall',
       apparentAgeBand: 'adult',
-      deityBond: {
-        deityId: 'deity-orchestration-test',
-        representationRole: 'witness',
+      callingBond: {
+        authorityState: 'resolved',
+        principleId: 'principle-orchestration-test',
+        callingDefinition: 'test-only witness calling',
         oath: 'Keep governed records intact.',
-        acceptedDoctrine: ['Records require provenance.'],
-        resistedDoctrine: ['Records do not replace the person.'],
+        acceptedInterpretations: ['Records require provenance.'],
+        resistedExtremes: ['Records do not replace the person.'],
       },
       worldview: {
         coreValues: ['truth'],

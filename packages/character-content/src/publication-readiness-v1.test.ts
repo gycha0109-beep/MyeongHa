@@ -6,6 +6,7 @@ import {
 import type {
   CharacterCanonCompletionV1,
   CharacterContentBundleCandidateMetadataV1,
+  CharacterPrincipleCallingCompletionV1,
   CharacterPublicationMaterialInputV1,
 } from './content-candidate-assembler-v1.js';
 import { inspectCharacterPublicationReadinessV1 } from './publication-readiness-v1.js';
@@ -34,6 +35,18 @@ const canonCompletions: readonly CharacterCanonCompletionV1[] =
       flaw: `fixture flaw for ${characterId}`,
       contradiction: `fixture contradiction for ${characterId}`,
       hiddenMotivation: `fixture hidden motivation for ${characterId}`,
+    },
+  }));
+
+const principleCallingCompletions: readonly CharacterPrincipleCallingCompletionV1[] =
+  CHARACTER_IMMUTABLE_AUTHORING_V1_CHARACTER_IDS.map((characterId) => ({
+    characterId,
+    representativeTitle: `fixture representative ${characterId}`,
+    callingBond: {
+      authorityState: 'resolved',
+      principleId: `principle-${characterId}`,
+      callingDefinition: `fixture calling for ${characterId}`,
+      oath: `fixture oath for ${characterId}`,
     },
   }));
 
@@ -73,6 +86,10 @@ describe('Character publication readiness preflight v1', () => {
         'psychology.contradiction',
         'psychology.hiddenMotivation',
       ]);
+      expect(character.missingPrincipleCallingFields).toEqual([
+        'representativeTitle',
+        'callingBond.resolved',
+      ]);
       expect(character.missingPublicationMaterialFields).toEqual([
         'assetRefs',
         'emotionIds',
@@ -89,6 +106,7 @@ describe('Character publication readiness preflight v1', () => {
     const report = inspectCharacterPublicationReadinessV1({
       metadata,
       canonCompletions,
+      principleCallingCompletions,
       publicationMaterials: [
         {
           characterId: firstId,
@@ -103,6 +121,7 @@ describe('Character publication readiness preflight v1', () => {
       (entry) => entry.characterId === firstId,
     );
     expect(first?.missingCanonFields).toEqual([]);
+    expect(first?.missingPrincipleCallingFields).toEqual([]);
     expect(first?.missingPublicationMaterialFields).toEqual([
       'emotionIds',
       'animationCueIds',
@@ -117,6 +136,35 @@ describe('Character publication readiness preflight v1', () => {
         'animationCueIds',
       ]);
     }
+  });
+
+  it('reports unresolved Principle/Calling authority separately from Character canon', () => {
+    const first = principleCallingCompletions[0];
+    if (first === undefined) throw new Error('fixture roster is empty');
+
+    const report = inspectCharacterPublicationReadinessV1({
+      metadata,
+      canonCompletions,
+      principleCallingCompletions: [
+        {
+          ...first,
+          representativeTitle: '   ',
+          callingBond: {
+            authorityState: 'world_dependent',
+            note: 'test-only unresolved authority',
+          },
+        },
+        ...principleCallingCompletions.slice(1),
+      ],
+      publicationMaterials,
+    });
+
+    expect(report.ready).toBe(false);
+    expect(report.characters[0]?.missingCanonFields).toEqual([]);
+    expect(report.characters[0]?.missingPrincipleCallingFields).toEqual([
+      'representativeTitle',
+      'callingBond.resolved',
+    ]);
   });
 
   it('rejects blank canon text as not ready even when the roster entry exists', () => {
@@ -166,6 +214,7 @@ describe('Character publication readiness preflight v1', () => {
           characterId: 'unexpected' as typeof firstCanon.characterId,
         },
       ],
+      principleCallingCompletions,
       publicationMaterials: [...publicationMaterials, firstMaterial],
     });
 
@@ -181,6 +230,7 @@ describe('Character publication readiness preflight v1', () => {
     const report = inspectCharacterPublicationReadinessV1({
       metadata,
       canonCompletions,
+      principleCallingCompletions,
       publicationMaterials,
     });
 
@@ -188,12 +238,15 @@ describe('Character publication readiness preflight v1', () => {
     expect(report.missingMetadataFields).toEqual([]);
     expect(report.duplicateCanonCharacterIds).toEqual([]);
     expect(report.unexpectedCanonCharacterIds).toEqual([]);
+    expect(report.duplicatePrincipleCallingCharacterIds).toEqual([]);
+    expect(report.unexpectedPrincipleCallingCharacterIds).toEqual([]);
     expect(report.duplicatePublicationMaterialCharacterIds).toEqual([]);
     expect(report.unexpectedPublicationMaterialCharacterIds).toEqual([]);
     expect(
       report.characters.every(
         (entry) =>
           entry.missingCanonFields.length === 0 &&
+          entry.missingPrincipleCallingFields.length === 0 &&
           entry.missingPublicationMaterialFields.length === 0,
       ),
     ).toBe(true);

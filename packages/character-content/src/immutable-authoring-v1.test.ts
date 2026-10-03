@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 
 import {
   CHARACTER_CONCEPT_V1_WORKING_ROSTER,
-  CHARACTER_DEITY_MANDATE_CIRCLE_V1,
   CHARACTER_IMMUTABLE_AUTHORING_V1,
   CHARACTER_IMMUTABLE_AUTHORING_V1_CHARACTER_IDS,
   CHARACTER_IMMUTABLE_AUTHORING_V1_SOURCE,
@@ -40,22 +39,23 @@ describe('Character immutable authoring v1 authority', () => {
     );
   });
 
-  it('materializes the approved five-Deity peer Mandate Circle', () => {
-    expect(CHARACTER_DEITY_MANDATE_CIRCLE_V1.map((entry) => entry.deityId)).toEqual([
-      'deity_gyeol',
-      'deity_jeung',
-      'deity_gyeon',
-      'deity_on',
-      'deity_teum',
+  it('keeps Principle/Calling authority out of immutable identity and visual authoring', () => {
+    const forbiddenKeys = new Set([
+      'deityId',
+      'deityProxyLabel',
+      'deityBond',
+      'principleId',
+      'callingBond',
+      'representativeTitle',
+      'vocation',
+      'duties',
     ]);
-    expect(new Set(CHARACTER_DEITY_MANDATE_CIRCLE_V1.map((entry) => entry.deityId)).size).toBe(5);
-  });
-
-  it('keeps every character bound to an approved Deity and complete authored visual profile', () => {
-    const deityIds = new Set(CHARACTER_DEITY_MANDATE_CIRCLE_V1.map((entry) => entry.deityId));
 
     for (const entry of CHARACTER_IMMUTABLE_AUTHORING_V1) {
-      expect(deityIds.has(entry.deityId)).toBe(true);
+      for (const key of Object.keys(entry)) {
+        expect(forbiddenKeys.has(key)).toBe(false);
+      }
+
       expect(entry.visual.visualVersion).toBe('visual-v1');
       expect(entry.visual.visualDirection.length).toBeGreaterThan(0);
       expect(entry.visual.silhouette.length).toBeGreaterThan(0);

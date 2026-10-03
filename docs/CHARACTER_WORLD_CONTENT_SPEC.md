@@ -43,20 +43,40 @@ World Root Canon은 기존 Deity ontology를 이치(理) → 명(命) → 대리
 
 따라서 이 문서에서 새로 정의하는 authoring 의미는 principle/calling 기준을 따른다.
 
-현재 일부 런타임 TypeScript schema에는 deityId, deityBond, deityProxyLabel 같은 레거시 필드명이 남아 있을 수 있다. 이는 아직 수행하지 않은 typed migration의 호환 명칭이며, 별도의 인간형 신격 NPC가 Canon으로 존재한다는 뜻으로 해석하지 않는다.
+typed Character content contract는 Principle/Calling 기준으로 정렬한다. Character별 binding이 아직 승인되지 않은 경우에는 unresolved authority state를 보존하며, 기존 Deity mapping을 Principle로 기계적으로 승격하지 않는다.
 
-이 문서 변경은 ontology와 authoring contract의 방향을 먼저 고정하며, 런타임 필드명 마이그레이션은 별도 구현 작업으로 수행한다.
+과거 immutable content bundle은 역사적 artifact로 재현 가능해야 하므로 기존 artifact를 rewrite하지 않는다. 신규 writer와 Production publication boundary만 현재 Principle/Calling contract를 따른다.
 
 ---
 
 ## 3. Character Definition
 
 ```ts
+type CharacterCallingBinding =
+  | {
+      authorityState: 'resolved';
+      principleId: string;
+      callingDefinition: string;
+      oath: string;
+      acceptedInterpretations?: string[];
+      resistedExtremes?: string[];
+    }
+  | {
+      authorityState: 'world_dependent' | 'author_undefined' | 'intentionally_open';
+      note?: string;
+    };
+
 interface CharacterDefinition {
   characterId: string;
   schemaVersion: string;
-  display: { name: string; shortDescription: string };
-  calling: { principleId: string; callingDefinition: string; representationRole: string; oath: string };
+  display: {
+    name: string;
+    shortDescription: string;
+    representativeTitle?: string;
+  };
+  callingBond: CharacterCallingBinding;
+  vocation?: string;
+  duties?: string[];
   persona: CharacterPersona;
   voice: CharacterVoice;
   specialties: string[];
@@ -327,7 +347,8 @@ Publish 전에 source-complete 범위의 자동 검증:
 - Production Launch display-name set이 승인된 9개와 정확히 일치하는지 확인;
 - development placeholder가 Production boundary를 통과하지 않는지 확인;
 - stable IDs unique;
-- referenced principle/calling/character/episode 존재;
+- resolved Principle/Calling binding은 source-backed authority를 가져야 하며, unresolved state를 가짜 ID로 채우지 않음;
+- referenced character/episode 존재;
 - relation target 존재;
 - capability domain stable key 존재;
 - asset references manifest 안에 존재;
