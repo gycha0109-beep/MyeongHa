@@ -10,3 +10,4 @@ export * from './character-voice-continuity-v1.js';
 export * from './immutable-authoring-v1.js';
 export * from './content-candidate-assembler-v1.js';
 export * from './publication-readiness-v1.js';
+export * from './production-character-lane-v1.js';
