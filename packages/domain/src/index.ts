@@ -433,3 +433,10 @@ export {
   type SajuProductionCalculationIngressArtifactV1,
   type SajuProductionCalculationIngressErrorCodeV1,
 } from './saju-production-calculation-ingress.js';
+
+export {
+  CHARACTER_FACE_NAMED_AUTHORING_AUTHORITY_SOURCE_V1,
+  CHARACTER_FACE_NAMED_AUTHORING_SOURCE_SCHEMA_VERSION_V1,
+  resolveCharacterFaceNamedAuthoringSourceV1,
+  type CharacterFaceNamedAuthoringSourceV1,
+} from './character-face-named-authoring-source.js';
