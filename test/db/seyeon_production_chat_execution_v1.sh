@@ -259,6 +259,23 @@ SQL
   fail "Se-yeon runtime commit mismatch: $commit_result"
 pass "validated Se-yeon answer commits one authoritative assistant message"
 
+chat_outbox_shape=$("${psql_base[@]}" -At -F '|' -c "
+select
+  aggregate_type,
+  aggregate_id,
+  event_type,
+  event_schema_version,
+  dedupe_key,
+  payload_jsonb ->> 'relationshipEffect',
+  payload_jsonb ->> 'worldEffect',
+  payload_jsonb ->> 'memoryAccepted'
+from public.outbox_events
+where id='$chat_outbox_id';
+")
+[[ "$chat_outbox_shape" == "chat_turn|$turn_id|CHAT_TURN_COMMITTED|v1|turn-commit-v1|false|false|false" ]] ||
+  fail "Se-yeon Chat commit outbox shape mismatch: $chat_outbox_shape"
+pass "Chat commit outbox carries no legacy relationship/world/memory side effect"
+
 message_counts=$("${psql_base[@]}" -At -F '|' -c "
 select
   count(*) filter (where sender_type='user'),
