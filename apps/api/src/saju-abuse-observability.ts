@@ -107,9 +107,8 @@ export function createSajuAbuseObservedIdentityVerifierV1(
       if (evidence === null) return null;
 
       const occurredAtMs = now();
-      const occurredAt = Number.isFinite(occurredAtMs)
-        ? new Date(occurredAtMs).toISOString()
-        : new Date(0).toISOString();
+      if (!Number.isFinite(occurredAtMs)) return evidence;
+      const occurredAt = new Date(occurredAtMs).toISOString();
 
       writeBestEffort(
         writer,
