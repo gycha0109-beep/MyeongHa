@@ -35,6 +35,31 @@
       "requestId": "e55e7e13-da22-4a30-8f6a-6859dfa9a985",
       "reason": "governed Production current-subject Saju Preview Reading smoke",
       "evidenceRef": "GitHub Actions run 37101519866 / PR #1560"
+    },
+    {
+      "requestId": "5165dd14-b5ed-441f-81e6-1e350fef323d",
+      "reason": "governed Production Member Saju calculation smoke with Guest coverage",
+      "evidenceRef": "GitHub Actions run 37106609427 / PR #1564"
+    },
+    {
+      "requestId": "c9666aa2-50ca-4c71-9b5a-2ad4eeaa4c8c",
+      "reason": "governed Production Member Saju calculation repeat smoke with Guest coverage",
+      "evidenceRef": "GitHub Actions run 37106609427 / PR #1564"
+    },
+    {
+      "requestId": "fbb0a4e9-10ad-4056-8835-c373b0f4d404",
+      "reason": "governed Production Member Saju Preview Reading smoke with Guest coverage",
+      "evidenceRef": "GitHub Actions run 37106609427 / PR #1564"
+    },
+    {
+      "requestId": "d4c9cd0f-1752-4d36-8509-3c7ac4c233e6",
+      "reason": "governed Production Guest Saju calculation smoke",
+      "evidenceRef": "GitHub Actions run 37106609427 / PR #1564"
+    },
+    {
+      "requestId": "970c6358-7dea-41bd-9e1a-7c2b77af15d8",
+      "reason": "governed Production Guest Saju Preview Reading smoke",
+      "evidenceRef": "GitHub Actions run 37106609427 / PR #1564"
     }
   ]
 }

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 const initialPath = 'docs/operations/SAJU_ABUSE_BASELINE_SNAPSHOT_2026-10-03.json';
 const followUpPath = 'docs/operations/SAJU_ABUSE_BASELINE_SNAPSHOT_2026-10-03_0633Z.json';
+const guestFollowUpPath = 'docs/operations/SAJU_ABUSE_BASELINE_SNAPSHOT_2026-10-03_0817Z.json';
 const exclusionsPath = 'docs/operations/SAJU_ABUSE_SYNTHETIC_EXCLUSIONS_V1.json';
 
 function readJson(path) {
@@ -101,16 +102,82 @@ describe('follow-up Saju abuse baseline snapshot after Preview smoke', () => {
     expect(serialized).not.toMatch(/[a-f0-9]{64}/u);
   });
 
-  it('pins all seven governed synthetic Saju request ids exactly once', () => {
+  it('keeps the Preview smoke exclusions in the canonical authority', () => {
     const exclusions = readJson(exclusionsPath);
-    const ids = exclusions.requests.map((request) => request.requestId);
 
-    expect(ids).toHaveLength(7);
-    expect(new Set(ids).size).toBe(7);
     expect(
       exclusions.requests.filter(
         (request) => request.evidenceRef === 'GitHub Actions run 37101519866 / PR #1560',
       ),
     ).toHaveLength(3);
+  });
+});
+
+
+describe('follow-up Saju abuse baseline snapshot after Member and Guest smoke', () => {
+  it('proves normal Member and Guest Production flows without authorizing enforcement', () => {
+    const value = readJson(guestFollowUpPath);
+
+    expect(value.authority.guestSmokeRunId).toBe(37106609427);
+    expect(value.authority.productionDeploymentSha).toBe(
+      '88efcac5ab59025fda73b686abf72b29bfcd5ec3',
+    );
+    expect(value.authority.governedSyntheticCoverage).toEqual({
+      member: {
+        'api.me.saju.calculation': 2,
+        'api.me.saju.preview-reading': 1,
+      },
+      guest: {
+        'api.me.saju.calculation': 1,
+        'api.me.saju.preview-reading': 1,
+      },
+    });
+    expect(value.authority.returnedMatchingInvocationCount).toBe(5);
+    expect(value.authority.capReached).toBe(false);
+    expect(value.analyzerReport.inputQuality).toMatchObject({
+      parsedEventCount: 10,
+      configuredSyntheticRequestCount: 12,
+      syntheticExcludedRequestCount: 5,
+      syntheticExcludedEventCount: 10,
+      unmatchedAuthenticatedAdmissionCount: 0,
+      orphanOutcomeCount: 0,
+    });
+    expect(value.analyzerReport.authenticatedAttempts.total).toBe(0);
+    expect(value.analyzerReport.policyDecision).toEqual({
+      produced: false,
+      numericLimit: null,
+      windowSeconds: null,
+      enforcementAuthorized: false,
+      note: 'Baseline evidence does not automatically choose or authorize an admission policy.',
+    });
+    expect(value.disposition).toEqual({
+      normalMemberProductionFlow: 'PROVEN',
+      normalGuestProductionFlow: 'PROVEN',
+      organicBaseline: 'INSUFFICIENT',
+      numericAdmissionPolicy: 'HOLD',
+      enforcement: 'HOLD',
+      issueClosureAllowed: false,
+    });
+  });
+
+  it('does not persist synthetic request ids or pseudonymous client keys in the Guest follow-up snapshot', () => {
+    const serialized = JSON.stringify(readJson(guestFollowUpPath));
+
+    expect(serialized).not.toContain('requestId');
+    expect(serialized).not.toContain('clientKey');
+    expect(serialized).not.toMatch(/[a-f0-9]{64}/u);
+  });
+
+  it('pins all twelve governed synthetic Saju request ids exactly once', () => {
+    const exclusions = readJson(exclusionsPath);
+    const ids = exclusions.requests.map((request) => request.requestId);
+
+    expect(ids).toHaveLength(12);
+    expect(new Set(ids).size).toBe(12);
+    expect(
+      exclusions.requests.filter(
+        (request) => request.evidenceRef === 'GitHub Actions run 37106609427 / PR #1564',
+      ),
+    ).toHaveLength(5);
   });
 });

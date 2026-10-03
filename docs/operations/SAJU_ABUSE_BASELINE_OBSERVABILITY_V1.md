@@ -220,6 +220,34 @@ All three admission events had matching outcomes with HTTP 200, including direct
 
 This remains evidence of **INSUFFICIENT baseline**, not evidence that legitimate Production traffic is globally zero.
 
+A second follow-up snapshot after the governed Member + Guest Production Saju smoke is:
+
+```text
+docs/operations/SAJU_ABUSE_BASELINE_SNAPSHOT_2026-10-03_0817Z.json
+```
+
+Its explicit two-hour Production query window contained exactly five governed smoke invocations from GitHub Actions run `37106609427`:
+
+- Member calculation first;
+- Member calculation repeat;
+- Member Preview Reading;
+- Guest calculation;
+- Guest Preview Reading.
+
+The Guest admission events were emitted with `subjectKind=guest`, used the Guest-specific pseudonymous client key domain, and each had a matching HTTP 200 outcome. The Member and Guest pseudonymous keys were distinct. This proves normal Production execution for both supported identity kinds without persisting raw identity material.
+
+All five requests are synthetic and are excluded from organic baseline metrics. After exclusion, the usable organic authenticated-attempt count in that query window is still zero.
+
+Therefore:
+
+```text
+normal Member Production flow = PROVEN
+normal Guest Production flow  = PROVEN
+organic baseline               = INSUFFICIENT
+numeric policy                 = HOLD
+enforcement                    = HOLD
+```
+
 ## Baseline decision
 
 A later evidence review must separately report, for each mounted route:
