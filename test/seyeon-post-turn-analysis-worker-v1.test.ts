@@ -210,6 +210,18 @@ function baseInput(
 }
 
 describe('Se-yeon durable post-turn analysis worker V1', () => {
+  it('survives a JSON/JSONB-compatible round trip with the same canonical hash', () => {
+    const value = snapshot();
+    const roundTripped = JSON.parse(JSON.stringify(value)) as unknown;
+
+    expect(
+      validateSeyeonPostTurnAnalysisSnapshotV1(
+        roundTripped,
+        hash(value),
+      ),
+    ).toEqual(value);
+  });
+
   it('rejects a tampered immutable snapshot hash', () => {
     const value = snapshot();
     expect(() =>
