@@ -81,6 +81,22 @@ PHASE P historical recentMessages
 If the current message id already appears in historical context, execution fails
 closed instead of duplicating it.
 
+Receive idempotency is also execution idempotency:
+
+```text
+same clientTurnId + same request hash
+→ committed/delivered turn
+→ return the persisted assistant message
+→ do not allocate another attempt
+→ do not call the model again
+→ do not emit another relationship candidate
+```
+
+If receive replays a nonterminal turn that already owns an active attempt,
+attempt allocation returns `replayed=true` and this execution fails closed as
+in-flight before any provider is called. A second executor never reuses another
+executor's running/generated/validated attempt.
+
 ## 4. Chat persistence authority
 
 The implementation reuses the existing Chat core commands:
@@ -169,8 +185,16 @@ assistant commit succeeds
 → post-turn extraction
 → Event Authority
 → Production relationship admission
-→ governed relationship apply/sync
+→ durable PHASE O relationship-sync outbox enqueue
+→ immediate governed relationship apply/sync
 ```
+
+For `WRITE_DARK`, `BEHAVIOR_SHADOW`, and `LIVE`, the durable PHASE O
+outbox port is mandatory. The already-admitted generic Production Relationship
+Event is enqueued before direct apply. If direct apply later fails, the existing
+outbox worker can claim the persisted Event and apply it against the latest
+serialized relationship revision. Successful immediate apply remains safe
+because the worker path uses the existing dedupe/replay authority.
 
 If assistant commit does not succeed, this execution does not emit a
 post-commit relationship signal.
@@ -253,6 +277,9 @@ Required regressions include:
 - only validated output can commit;
 - one user + one assistant message after commit;
 - same receive idempotency key does not duplicate committed messages;
+- committed receive replay returns the persisted assistant answer without model re-execution;
+- a replayed active attempt is treated as in-flight and never becomes a second model execution;
+- write-capable relationship modes enqueue the admitted Production Event before direct apply;
 - direct authenticated runtime wrapper calls fail;
 - the narrow runtime owner stays NOLOGIN/NOBYPASSRLS;
 - legacy relationship/world/memory commit payloads remain NULL;
@@ -270,3 +297,26 @@ stop calling the new Se-yeon Production Chat execution core
 ```
 
 No durable relationship or Chat history needs to be rewritten.
+
+## 12. Residual internal-dark-runtime limitation
+
+This slice makes an **already admitted** Production Relationship Event durable
+before direct apply. It does not yet turn post-commit extraction itself into a
+durable worker job.
+
+Therefore a failure in the narrow interval:
+
+```text
+Chat committed
+→ post-turn extractor / Event Authority
+→ before relationship Event admission + outbox enqueue
+```
+
+can leave a committed Chat turn without a derived relationship Event. The
+authoritative `CHAT_TURN_COMMITTED` outbox Event still exists, but replaying
+post-turn analysis from that Chat event is a separate downstream-runtime slice
+and is not invented here.
+
+Because this PR remains an internal dark runtime and public Chat send activation
+is still HOLD behind SRC-15, this residual is explicit rather than silently
+claiming lossless relationship extraction.
