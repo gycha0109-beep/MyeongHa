@@ -1,4 +1,7 @@
 import {
+  findReadingPublicTrustLanguageViolationV1,
+} from '../../character-content/src/index.js';
+import {
   CHARACTER_OUTPUT_GUARD_VERSION_V1,
   CharacterOutputGuardError,
   guardCharacterRendererOutput,
@@ -222,6 +225,20 @@ function parseFaceRendererDraftV1(
   });
 }
 
+function assertFacePublicTrustLanguage(
+  utterance: CharacterFaceUtteranceV1,
+): void {
+  for (const [index, segment] of utterance.segments.entries()) {
+    const violation =
+      findReadingPublicTrustLanguageViolationV1(segment.text);
+    if (violation !== null) {
+      throw new CharacterOutputGuardError(
+        `face.utterance.segments[${index}].text violates reading public trust language policy: ${violation.ruleKey}.`,
+      );
+    }
+  }
+}
+
 function buildDialogueEnvelope(
   input: Readonly<{
     draft:
@@ -308,6 +325,15 @@ export function finalizeCharacterFaceOutputV1(
       deliveryProfile:
         input.deliveryProfile,
     });
+
+  if (
+    semanticDecision.mode ===
+    'accepted'
+  ) {
+    assertFacePublicTrustLanguage(
+      semanticDecision.utterance,
+    );
+  }
 
   const dialogue =
     buildDialogueEnvelope({
