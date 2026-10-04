@@ -26,11 +26,19 @@ server-minted existing-thread Chat receive plan
 → runSeyeonCharacterTurnV2
 → renderer provenance + generated staging
 → Output Guard provenance + validated staging
-→ cmd_commit_seyeon_chat_turn_runtime_v1
-→ authoritative committed assistant message
+→ cmd_commit_seyeon_chat_turn_runtime_v2
+   ├─ authoritative committed assistant message
+   ├─ generic CHAT_TURN_COMMITTED outbox
+   └─ dedicated SEYEON_POST_TURN_ANALYSIS_REQUESTED outbox
+→ dedicated post-turn worker claim
+→ immutable snapshot/hash verification
 → post-turn extractor candidate
 → Event Authority
-→ PHASE O Production admission / relationship sync
+→ Production relationship admission
+→ immutable analysis checkpoint
+→ durable PHASE O relationship-sync outbox enqueue
+→ dedicated post-turn job complete
+→ PHASE O relationship worker apply
 → R+n
 → next turn reads R+n
 ```
@@ -181,20 +189,26 @@ Relationship mutation is separate:
 
 ```text
 assistant commit succeeds
-→ exact committed message id exists
-→ post-turn extraction
++ dedicated post-turn analysis job commits atomically
+→ exact committed user/assistant material is recoverable
+→ post-turn worker claim
+→ immutable snapshot/hash verification
+→ Event Candidate Extraction
 → Event Authority
 → Production relationship admission
+→ immutable analysis checkpoint
 → durable PHASE O relationship-sync outbox enqueue
-→ immediate governed relationship apply/sync
+→ post-turn job complete
+→ existing PHASE O relationship worker apply/sync
 ```
 
-For `WRITE_DARK`, `BEHAVIOR_SHADOW`, and `LIVE`, the durable PHASE O
-outbox port is mandatory. The already-admitted generic Production Relationship
-Event is enqueued before direct apply. If direct apply later fails, the existing
-outbox worker can claim the persisted Event and apply it against the latest
-serialized relationship revision. Successful immediate apply remains safe
-because the worker path uses the existing dedupe/replay authority.
+The generic `CHAT_TURN_COMMITTED` row remains independent and is not consumed
+by the Se-yeon post-turn worker.
+
+For `WRITE_DARK`, `BEHAVIOR_SHADOW`, and `LIVE`, the PHASE O relationship
+outbox port remains mandatory. A post-turn job may reach `processed` only after
+the admitted Production Relationship Event has been durably enqueued. The
+post-turn worker never mutates the Production relationship projection directly.
 
 If assistant commit does not succeed, this execution does not emit a
 post-commit relationship signal.
@@ -227,8 +241,13 @@ Tx D context-ready
 --- no DB transaction while model execution is awaited ---
 Tx E generated provenance/staging
 Tx F validated provenance/staging
-Tx G assistant commit
-Tx H relationship sync
+Tx G assistant commit + generic Chat outbox + dedicated post-turn outbox
+Tx H post-turn job claim
+--- no DB transaction while post-turn extractor is awaited ---
+Tx I immutable Event Authority/Production admission checkpoint
+Tx J Production relationship-sync outbox enqueue
+Tx K post-turn job successful completion
+Tx L PHASE O relationship worker claim/apply/complete
 ```
 
 A caller must not wrap the complete model execution in one
@@ -279,8 +298,18 @@ Required regressions include:
 - same receive idempotency key does not duplicate committed messages;
 - committed receive replay returns the persisted assistant answer without model re-execution;
 - a replayed active attempt is treated as in-flight and never becomes a second model execution;
-- write-capable relationship modes enqueue the admitted Production Event before direct apply;
-- direct authenticated runtime wrapper calls fail;
+- Chat commit and dedicated post-turn handoff commit atomically;
+- dedicated worker restores the exact committed user/assistant material;
+- generic CHAT_TURN_COMMITTED remains independently pending/processable;
+- snapshot hash tampering fails closed;
+- extractor none/reject completes only the dedicated analysis job;
+- write-capable relationship modes enqueue the admitted Production Event before the post-turn job completes;
+- Event Authority/Production admission result is checkpointed before downstream relationship enqueue;
+- identical checkpoint replay is idempotent while conflicting checkpoint material fails closed;
+- after checkpoint persistence, reclaim/retry does not call the extractor again;
+- relationship enqueue failure leaves the post-turn job uncompleted/reclaimable;
+- completion response-loss replay is idempotent;
+- direct authenticated runtime/worker wrapper calls fail;
 - the narrow runtime owner stays NOLOGIN/NOBYPASSRLS;
 - legacy relationship/world/memory commit payloads remain NULL;
 - all existing Watchtower/DB/Web/Governance gates remain green.
@@ -298,25 +327,54 @@ stop calling the new Se-yeon Production Chat execution core
 
 No durable relationship or Chat history needs to be rewritten.
 
-## 12. Residual internal-dark-runtime limitation
+## 12. PHASE Q durable post-turn boundary
 
-This slice makes an **already admitted** Production Relationship Event durable
-before direct apply. It does not yet turn post-commit extraction itself into a
-durable worker job.
+PHASE Q closes the previous crash window by inserting a dedicated
+`SEYEON_POST_TURN_ANALYSIS_REQUESTED` outbox row in the same database
+transaction that commits the assistant message.
 
-Therefore a failure in the narrow interval:
+The durable job carries a hash-bound bounded snapshot of the already-governed
+turn evidence needed for post-turn analysis. It is an operational execution
+snapshot, not a Life Fact, Character Memory, or new truth authority, and it is
+never exposed through Character memory retrieval.
+
+The worker owns only:
 
 ```text
-Chat committed
-→ post-turn extractor / Event Authority
-→ before relationship Event admission + outbox enqueue
+claim
+→ restore exact committed Chat material
+→ verify snapshot/hash
+→ extractor
+→ Event Authority
+→ Production admission
+→ relationship-sync enqueue
+→ successful completion
 ```
 
-can leave a committed Chat turn without a derived relationship Event. The
-authoritative `CHAT_TURN_COMMITTED` outbox Event still exists, but replaying
-post-turn analysis from that Chat event is a separate downstream-runtime slice
-and is not invented here.
+Lease expiry/reclaim uses the existing generic outbox authority. PHASE Q does
+not invent `failed`, backoff, attempt-count, dead-letter, or manual-requeue
+semantics; those remain blocked by SRC-30.
 
-Because this PR remains an internal dark runtime and public Chat send activation
-is still HOLD behind SRC-15, this residual is explicit rather than silently
-claiming lossless relationship extraction.
+The worker checkpoints the authoritative post-turn decision before any
+relationship-sync side effect. The checkpoint is immutable:
+
+```text
+none / rejected
+OR
+shadow + validated Production Relationship Event
+OR
+relationship_event + validated Production Relationship Event
+```
+
+The Production Event checkpoint must bind the canonical Subject, Se-yeon, and
+the exact server-owned Production Event id already fixed in the committed
+snapshot. An identical checkpoint write is an idempotent replay; a different
+checkpoint for the same job fails closed.
+
+If the process fails after checkpoint persistence, reclaim/retry resumes from
+that checkpoint and does **not** call the extractor again. This removes external
+model nondeterminism from downstream retry. A crash before the first checkpoint
+may rerun extraction against the same immutable turn snapshot, but no
+relationship side effect has been durably emitted at that point.
+
+Public browser Chat activation remains independently HOLD behind SRC-15.

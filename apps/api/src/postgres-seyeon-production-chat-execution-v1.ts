@@ -21,7 +21,7 @@ export const POSTGRES_SEYEON_CHAT_GENERATED_RUNTIME_BINDING_V1 =
 export const POSTGRES_SEYEON_CHAT_VALIDATED_RUNTIME_BINDING_V1 =
   'public.cmd_persist_seyeon_chat_validated_runtime_v1' as const;
 export const POSTGRES_SEYEON_CHAT_COMMIT_RUNTIME_BINDING_V1 =
-  'public.cmd_commit_seyeon_chat_turn_runtime_v1' as const;
+  'public.cmd_commit_seyeon_chat_turn_runtime_v2' as const;
 
 const RECEIVE_SQL = `
 select
@@ -88,9 +88,11 @@ select
   assistant_message_id::text as "assistantMessageId",
   sequence_no as "sequenceNo",
   committed_at::text as "committedAt",
+  post_turn_outbox_event_id::text as "postTurnOutboxEventId",
   replayed
-from public.cmd_commit_seyeon_chat_turn_runtime_v1(
-  $1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::uuid
+from public.cmd_commit_seyeon_chat_turn_runtime_v2(
+  $1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::uuid,
+  $7::uuid,$8::jsonb,$9::text
 )
 `.trim();
 
@@ -318,6 +320,9 @@ implements SeyeonProductionChatPersistencePortV1 {
       input.attemptId,
       input.assistantMessageId,
       input.outboxEventId,
+      input.postTurnOutboxEventId,
+      JSON.stringify(input.postTurnSnapshot),
+      input.postTurnSnapshotHash,
     ]);
     const row = one(result.rows, 'commit');
     return Object.freeze({
@@ -329,6 +334,10 @@ implements SeyeonProductionChatPersistencePortV1 {
       ),
       sequenceNo: integer('assistant message sequence', row.sequenceNo),
       committedAt: timestamp('commit timestamp', row.committedAt),
+      postTurnOutboxEventId: text(
+        'post-turn outbox event id',
+        row.postTurnOutboxEventId,
+      ),
       replayed: bool('commit replay flag', row.replayed),
     });
   }
