@@ -43,7 +43,7 @@ jobs:
     environment: production
     services:
       postgres:
-        image: ghcr.io/supabase/postgres:17.6.1.166
+        image: ghcr.io/supabase/postgres@sha256:b3bfedb107413abb3b8cb0d0874b0414a1dceb3d55bc0c778de6ad22d1f7dc86 # release 17.6.1.166
         env:
           POSTGRES_PASSWORD: restore-drill
           POSTGRES_DB: postgres
@@ -176,6 +176,21 @@ jobs:
           SOURCE_ARTIFACT_NAME: ${{ steps.source.outputs.artifact_name }}
           SOURCE_ARTIFACT_EXPIRES_AT: ${{ steps.source.outputs.artifact_expires_at }}
         run: bash scripts/operations/build-postgres-restore-evidence.sh
+
+      - name: Record current-frontier restore evidence
+        shell: bash
+        env:
+          RESTORE_EVIDENCE_PATH: ${{ runner.temp }}/restore-evidence/restore-evidence.json
+        run: |
+          set -euo pipefail
+          jq -er '"backup_migration_frontier=\(.backup_migration_frontier)"' "$RESTORE_EVIDENCE_PATH"
+          jq -er '"member_auth_rate_limit_schema_restore=\(.member_auth_rate_limit_schema_restore)"' "$RESTORE_EVIDENCE_PATH"
+          jq -er '"member_auth_rate_limit_unlogged=\(.member_auth_rate_limit_unlogged)"' "$RESTORE_EVIDENCE_PATH"
+          jq -er '"member_auth_rate_limit_ephemeral_data_restore=\(.member_auth_rate_limit_ephemeral_data_restore)"' "$RESTORE_EVIDENCE_PATH"
+          jq -er '"member_auth_rate_limit_owner_restore=\(.member_auth_rate_limit_owner_restore)"' "$RESTORE_EVIDENCE_PATH"
+          jq -er '"member_auth_rate_limit_acl_restore=\(.member_auth_rate_limit_acl_restore)"' "$RESTORE_EVIDENCE_PATH"
+          jq -er '"member_auth_rate_limit_synthetic_admission=\(.member_auth_rate_limit_synthetic_admission)"' "$RESTORE_EVIDENCE_PATH"
+
       - name: Upload restore drill evidence only
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:

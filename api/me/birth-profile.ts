@@ -1,3 +1,4 @@
+import { executeSecurityObservedRequestV1 } from '../../apps/api/src/security-observability.js';
 import { randomUUID } from 'node:crypto';
 import { createProductionCurrentSubjectBirthProfileRuntimeV1 } from '../../apps/api/src/production-current-subject-birth-profile-runtime.js';
 
@@ -55,16 +56,6 @@ function routeNotFoundNoStore(): Response {
   });
 }
 
-function internalServerErrorNoStore(): Response {
-  return new Response('Internal Server Error', {
-    status: 500,
-    headers: {
-      'Cache-Control': NO_STORE_CACHE_CONTROL,
-      'Content-Type': 'text/plain; charset=utf-8',
-    },
-  });
-}
-
 function toCanonicalRuntimeRequest(request: Request): Request | null {
   let url: URL;
   try {
@@ -99,22 +90,24 @@ export function createCurrentSubjectBirthProfileVercelHandlerV1(
   const serverTimeFactory = input.serverTimeFactory ?? (() => new Date().toISOString());
 
   return Object.freeze({
-    async fetch(request: Request): Promise<Response> {
-      const canonicalRequest = toCanonicalRuntimeRequest(request);
-      cancelUnusedRequestBodyBestEffort(request);
-      if (canonicalRequest === null) return routeNotFoundNoStore();
+    fetch(request: Request): Promise<Response> {
+      return executeSecurityObservedRequestV1({
+        request,
+        routeId: 'api.me.birth-profile',
+        requestIdFactory,
+        execute: async ({ requestId }) => {
+          const canonicalRequest = toCanonicalRuntimeRequest(request);
+          cancelUnusedRequestBodyBestEffort(request);
+          if (canonicalRequest === null) return routeNotFoundNoStore();
 
-      try {
-        const response = await input.getRuntime().handleRequest({
-          request: canonicalRequest,
-          requestId: requestIdFactory(),
-          serverTime: serverTimeFactory(),
-        });
-        return withNoStore(response);
-      } catch {
-        console.error('MyeongHa current Birth Profile route failed.');
-        return internalServerErrorNoStore();
-      }
+          const response = await input.getRuntime().handleRequest({
+            request: canonicalRequest,
+            requestId,
+            serverTime: serverTimeFactory(),
+          });
+          return withNoStore(response);
+        },
+      });
     },
   });
 }

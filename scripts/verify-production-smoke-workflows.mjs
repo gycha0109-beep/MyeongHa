@@ -18,6 +18,20 @@ const contracts = [
     forbidSecrets: true,
   },
   {
+    file: 'production-authenticated-json-resource-evidence.yml',
+    confirm: 'VERIFY_AUTHENTICATED_JSON_RESOURCE_BOUND',
+    commands: ['node scripts/operations/verify-production-authenticated-json-resource-live.mjs'],
+    required: [
+      'watchtower_track:',
+      'default: ops',
+      'MYEONGHA_WATCHTOWER_TRACK: ${{ inputs.watchtower_track }}',
+      'MYEONGHA_AUTHENTICATED_JSON_RESOURCE_CONFIRM: ${{ inputs.confirmation }}',
+      '[[ "$GITHUB_REF" == \'refs/heads/main\' ]]',
+      'MYEONGHA_PRODUCTION_MEMBER_EMAIL: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_EMAIL }}',
+      'MYEONGHA_PRODUCTION_MEMBER_PASSWORD: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_PASSWORD }}',
+    ],
+  },
+  {
     file: 'production-member-me-smoke.yml',
     confirm: 'VERIFY_MEMBER_ME',
     commands: ['node scripts/verify-production-member-me.mjs'],
@@ -97,7 +111,7 @@ const contracts = [
     pushPath: '.github/production-chat-current-subject-smoke.trigger',
     commands: ['bash scripts/run-production-member-chat-read-smoke.sh'],
     required: [
-      'SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}',
+      'SUPABASE_PRODUCTION_SESSION_POOLER_HOST: ${{ secrets.SUPABASE_PRODUCTION_SESSION_POOLER_HOST }}',
       'SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}',
       'MYEONGHA_PRODUCTION_MEMBER_EMAIL: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_EMAIL }}',
       'MYEONGHA_PRODUCTION_MEMBER_PASSWORD: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_PASSWORD }}',

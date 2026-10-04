@@ -5,7 +5,8 @@
 > Date: **2026-08-29**  
 > Source Authority: `Usecase_re_reviewed_v2(1).md`, `Myeongha_DB_ERD_v0.6_AUTHORITY_FIRST(2).md`  
 > Shared Contracts: `SHARED_DOMAIN_CONTRACTS_SPEC.md`  
-> Source Gaps: `SRC-12`, `SRC-13`, `SRC-19`, `SRC-31`, `SRC-32`
+> Source Gaps: `SRC-12`, `SRC-13`, `SRC-31` (attempt provenance/send only), `SRC-32`  
+> Resolved Mobile boundary: `SRC-19`; Expo Push Notifications selected for Mobile iOS/Android MVP transport on 2026-10-02
 
 ---
 
@@ -38,7 +39,9 @@ installation/platform configuration
 
 Push payload 자체는 캐릭터 메시지나 world event의 authority가 아니다.
 
-`notification_delivery_attempt`의 row-locked attempt allocator와 terminal provenance는 source-backed persistence boundary다. 다만 Primary Source가 요구하는 **installation/platform configuration → provider** resolver의 canonical input/mapping/registry는 아직 정의되지 않았다. 따라서 caller-supplied provider 문자열을 production routing authority로 취급하지 않으며 이 경계는 `SRC-31`을 따른다.
+`notification_delivery_attempt`의 row-locked attempt allocator와 terminal provenance는 source-backed persistence boundary다. 2026-10-02 Product Owner decision으로 Mobile iOS/Android MVP의 외부 transport service는 **Expo Push Notifications**로 선택되었다.
+
+다만 이 결정은 `notification_delivery_attempts.provider`에 저장할 canonical provider identity, installation → attempt-provider provenance resolver, retry/failover 규칙을 정하지 않는다. 따라서 caller-supplied provider 문자열을 production routing authority로 취급하지 않으며 이 남은 경계는 `SRC-31`을 따른다.
 
 자동 notification candidate가 실제 logical notification으로 materialize될지, 언제 materialize될지, frequency cap에 의해 막힐지는 별도 `SRC-32` scheduler decision authority다.
 
@@ -94,21 +97,21 @@ Source-backed invariants:
 - revoked installation은 새 delivery 대상에서 제외
 - client가 `subject_id`를 직접 지정해 다른 사용자 installation을 등록하지 못한다
 
-다만 source는 **same-subject register retry / re-registration / push-token rotation lifecycle**을 정의하지 않는다. 특히 active row를 in-place update할지, revoke+new generation으로 만들지, revoked row를 재활성화할지, app/client capability/last_seen을 어떤 transition에서 갱신할지가 없다.
-
-따라서:
+2026-10-02 Product Owner decision으로 `SRC-19` Mobile lifecycle은 해결되었다.
 
 ```text
-POST /api/device-installations/:id/revoke
-→ source-complete
-
 POST /api/device-installations/register
-→ SRC-19 OPEN
+→ same-subject active installation refresh
+→ token rotation in place
+→ same-subject token rebind revokes old generation + creates new server row
+→ revoked generation never resurrects
+→ cross-subject active identity claim fails closed
+
+POST /api/device-installations/:id/revoke
+→ owner-scoped idempotent revoke
 ```
 
-`SRC-19` 해결 전 단순 UPSERT나 token-steal/rebind를 production registration authority로 승격하지 않는다.
-
-또한 이미 저장된 eligible installation에서 실제 push attempt를 만들 때의 provider 선택은 별도 `SRC-31` 경계다. `platform IN ('ios','android','web')`와 provider column의 `e.g. apns | fcm | web_push`만으로 `ios→apns`, `android→fcm`, `web→web_push`를 normative mapping으로 만들지 않는다. Registration lifecycle과 provider routing lifecycle은 서로 자동 해결되지 않는다.
+Mobile iOS/Android MVP transport service는 **Expo Push Notifications**로 선택되며, registration에는 Expo Push token을 사용한다. 그러나 이미 저장된 eligible installation에서 실제 delivery attempt를 만들 때 `notification_delivery_attempts.provider`를 어떤 canonical identity로 기록할지, retry 때 재해석할지, failover를 허용할지는 별도 `SRC-31` 경계다. `platform IN ('ios','android','web')`와 기존 provider 예시만으로 `ios→apns`, `android→fcm`, `web→web_push`를 normative attempt-provider mapping으로 만들지 않는다.
 
 ## 6. Preference Model
 

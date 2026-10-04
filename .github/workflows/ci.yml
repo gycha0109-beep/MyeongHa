@@ -1,6 +1,17 @@
 name: CI
 
 on:
+  workflow_call:
+    inputs:
+      candidate_pr:
+        required: true
+        type: string
+      candidate_head:
+        required: true
+        type: string
+      candidate_base:
+        required: true
+        type: string
   pull_request:
   push:
     branches:
@@ -19,48 +30,116 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     outputs:
+      track: ${{ steps.scope.outputs.track }}
+      web: ${{ steps.scope.outputs.web }}
+      mobile: ${{ steps.scope.outputs.mobile }}
       db: ${{ steps.scope.outputs.db }}
+      db_suites: ${{ steps.scope.outputs.db_suites }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' || inputs.candidate_head != ''
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ inputs.candidate_head || github.event.pull_request.head.sha }}
           fetch-depth: 0
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' || inputs.candidate_head != ''
         with:
           node-version: '24'
           package-manager-cache: false
+      - name: Assemble pinned integration candidate
+        if: inputs.candidate_head != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_PR: ${{ inputs.candidate_pr }}
+          CANDIDATE_HEAD: ${{ inputs.candidate_head }}
+          CANDIDATE_BASE: ${{ inputs.candidate_base }}
+        run: node scripts/ci/integration-candidate.mjs prepare
+      - name: Require integration protection before staged CI
+        if: github.event_name == 'pull_request' && vars.CI_STAGED_VERIFICATION == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CI_STAGED_VERIFICATION: ${{ vars.CI_STAGED_VERIFICATION }}
+        run: node scripts/ci/integration-candidate.mjs policy
       - name: Resolve CI scope
         id: scope
         env:
           EVENT_NAME: ${{ github.event_name }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          CANDIDATE_HEAD: ${{ inputs.candidate_head }}
         shell: bash
         run: |
           set -euo pipefail
-          if [[ "$EVENT_NAME" == "push" ]]; then
-            echo "db=true" >> "$GITHUB_OUTPUT"
+          if [[ "$EVENT_NAME" == "push" || -n "$CANDIDATE_HEAD" ]]; then
+            {
+              echo "track=main-regression"
+              echo "web=true"
+              echo "mobile=true"
+              echo "db=true"
+              if [[ -n "$CANDIDATE_HEAD" ]]; then
+                echo 'db_suites=["runtime","content","commerce-payment","commerce-entitlement","postgres17"]'
+              else
+                echo 'db_suites=[]'
+              fi
+            } >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          git diff --name-only "$BASE_SHA" "$HEAD_SHA" > "$RUNNER_TEMP/myeongha-ci-changed-files.txt"
-          node scripts/ci/pr-gate-router.mjs < "$RUNNER_TEMP/myeongha-ci-changed-files.txt" > "$RUNNER_TEMP/myeongha-ci-gates.txt"
-          grep '^db=' "$RUNNER_TEMP/myeongha-ci-gates.txt" >> "$GITHUB_OUTPUT"
+
+          git diff --name-only "$BASE_SHA...$HEAD_SHA" > "$RUNNER_TEMP/myeongha-ci-changed-files.txt"
+
+          node scripts/ci/verification-plan.mjs < "$RUNNER_TEMP/myeongha-ci-changed-files.txt" >> "$GITHUB_OUTPUT"
 
   foundation:
+    name: Work Track · ${{ needs.scope.outputs.track }}
+    needs: scope
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.candidate_head || github.sha }}
+          fetch-depth: 0
+      - name: Assemble pinned integration candidate
+        if: inputs.candidate_head != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_PR: ${{ inputs.candidate_pr }}
+          CANDIDATE_HEAD: ${{ inputs.candidate_head }}
+          CANDIDATE_BASE: ${{ inputs.candidate_base }}
+        run: node scripts/ci/integration-candidate.mjs prepare
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '24'
           cache: npm
       - name: Install dependencies
         run: npm ci --ignore-scripts --no-audit --no-fund
-      - name: Check
-        run: npm run check
+      - name: Check shared TypeScript consumers
+        run: npx tsc -p tsconfig.json --noEmit
+      - name: Check API client
+        run: npm run typecheck -w @myeongha/api-client
+      - name: Check affected tests
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" != "pull_request" || -n "${{ inputs.candidate_head }}" ]]; then
+            npm test
+          else
+            git diff --name-only "$BASE_SHA...$HEAD_SHA" > "$RUNNER_TEMP/track-files.txt"
+            node scripts/ci/run-track-tests.mjs "$RUNNER_TEMP/track-files.txt"
+          fi
+      - name: Build shared TypeScript
+        run: npm run build
+      - name: Check and build Web dependency
+        if: needs.scope.outputs.web == 'true'
+        run: npm run typecheck -w @myeongha/web && npm run build:web && npm run verify:deployment-config
+      - name: Check Mobile dependency
+        if: needs.scope.outputs.mobile == 'true'
+        run: npm run typecheck -w @myeongha/mobile
+      - name: Verify Supabase deployment configuration
+        run: npm run verify:supabase-deployment-config
 
   db-authority-core:
     needs: scope
@@ -89,6 +168,17 @@ jobs:
       PGDATABASE: myeongha_test
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.candidate_head || github.sha }}
+          fetch-depth: 0
+      - name: Assemble pinned integration candidate
+        if: inputs.candidate_head != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_PR: ${{ inputs.candidate_pr }}
+          CANDIDATE_HEAD: ${{ inputs.candidate_head }}
+          CANDIDATE_BASE: ${{ inputs.candidate_base }}
+        run: node scripts/ci/integration-candidate.mjs prepare
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '24'
@@ -114,6 +204,66 @@ jobs:
           MYEONGHA_RUN_ACCOUNT_DELETION_DB_E2E: '1'
         run: npx vitest run test/account-deletion-worker-runtime-postgres.e2e.test.ts
 
+  db-runtime:
+    name: DB dependency · runtime
+    needs: scope
+    if: (github.event_name == 'pull_request' || inputs.candidate_head != '') && contains(fromJSON(needs.scope.outputs.db_suites), 'runtime')
+    uses: ./.github/workflows/ci-db-track.yml
+    with:
+      suite: runtime
+      postgres: '15'
+      candidate_pr: ${{ inputs.candidate_pr }}
+      candidate_head: ${{ inputs.candidate_head }}
+      candidate_base: ${{ inputs.candidate_base }}
+
+  db-content:
+    name: DB dependency · content
+    needs: scope
+    if: (github.event_name == 'pull_request' || inputs.candidate_head != '') && contains(fromJSON(needs.scope.outputs.db_suites), 'content')
+    uses: ./.github/workflows/ci-db-track.yml
+    with:
+      suite: content
+      postgres: '15'
+      candidate_pr: ${{ inputs.candidate_pr }}
+      candidate_head: ${{ inputs.candidate_head }}
+      candidate_base: ${{ inputs.candidate_base }}
+
+  db-commerce-payment:
+    name: DB dependency · commerce-payment
+    needs: scope
+    if: (github.event_name == 'pull_request' || inputs.candidate_head != '') && contains(fromJSON(needs.scope.outputs.db_suites), 'commerce-payment')
+    uses: ./.github/workflows/ci-db-track.yml
+    with:
+      suite: commerce-payment
+      postgres: '15'
+      candidate_pr: ${{ inputs.candidate_pr }}
+      candidate_head: ${{ inputs.candidate_head }}
+      candidate_base: ${{ inputs.candidate_base }}
+
+  db-commerce-entitlement:
+    name: DB dependency · commerce-entitlement
+    needs: scope
+    if: (github.event_name == 'pull_request' || inputs.candidate_head != '') && contains(fromJSON(needs.scope.outputs.db_suites), 'commerce-entitlement')
+    uses: ./.github/workflows/ci-db-track.yml
+    with:
+      suite: commerce-entitlement
+      postgres: '15'
+      candidate_pr: ${{ inputs.candidate_pr }}
+      candidate_head: ${{ inputs.candidate_head }}
+      candidate_base: ${{ inputs.candidate_base }}
+
+  db-postgres17:
+    name: DB dependency · postgres17
+    needs: scope
+    if: (github.event_name == 'pull_request' || inputs.candidate_head != '') && contains(fromJSON(needs.scope.outputs.db_suites), 'postgres17')
+    uses: ./.github/workflows/ci-db-track.yml
+    with:
+      suite: postgres17
+      postgres: '17.6'
+      candidate_pr: ${{ inputs.candidate_pr }}
+      candidate_head: ${{ inputs.candidate_head }}
+      candidate_base: ${{ inputs.candidate_base }}
+
   verify:
     name: CI Verify
     runs-on: ubuntu-latest
@@ -123,15 +273,40 @@ jobs:
       - scope
       - foundation
       - db-authority-core
+      - db-runtime
+      - db-content
+      - db-commerce-payment
+      - db-commerce-entitlement
+      - db-postgres17
     steps:
       - name: Require selected CI gates
         env:
           SCOPE_RESULT: ${{ needs.scope.result }}
           FOUNDATION_RESULT: ${{ needs.foundation.result }}
           DB_RESULT: ${{ needs.db-authority-core.result }}
+          DB_SELECTED: ${{ needs.scope.outputs.db }}
+          DB_SELECTED_0: ${{ contains(fromJSON(needs.scope.outputs.db_suites || '[]'), 'runtime') }}
+          DB_SELECTED_1: ${{ contains(fromJSON(needs.scope.outputs.db_suites || '[]'), 'content') }}
+          DB_SELECTED_2: ${{ contains(fromJSON(needs.scope.outputs.db_suites || '[]'), 'commerce-payment') }}
+          DB_SELECTED_3: ${{ contains(fromJSON(needs.scope.outputs.db_suites || '[]'), 'commerce-entitlement') }}
+          DB_SELECTED_4: ${{ contains(fromJSON(needs.scope.outputs.db_suites || '[]'), 'postgres17') }}
+          DB_TRACK_0: ${{ needs.db-runtime.result }}
+          DB_TRACK_1: ${{ needs.db-content.result }}
+          DB_TRACK_2: ${{ needs.db-commerce-payment.result }}
+          DB_TRACK_3: ${{ needs.db-commerce-entitlement.result }}
+          DB_TRACK_4: ${{ needs.db-postgres17.result }}
         shell: bash
         run: |
           set -euo pipefail
           test "$SCOPE_RESULT" = "success"
           test "$FOUNDATION_RESULT" = "success"
-          test "$DB_RESULT" = "success" || test "$DB_RESULT" = "skipped"
+          if [[ "$DB_SELECTED" == "true" ]]; then test "$DB_RESULT" = "success"; else test "$DB_RESULT" = "skipped" || test "$DB_RESULT" = "success"; fi
+          selected=("$DB_SELECTED_0" "$DB_SELECTED_1" "$DB_SELECTED_2" "$DB_SELECTED_3" "$DB_SELECTED_4")
+          results=("$DB_TRACK_0" "$DB_TRACK_1" "$DB_TRACK_2" "$DB_TRACK_3" "$DB_TRACK_4")
+          for index in "${!selected[@]}"; do
+            if [[ "${selected[$index]}" == "true" ]]; then
+              test "${results[$index]}" = "success"
+            else
+              test "${results[$index]}" = "success" || test "${results[$index]}" = "skipped"
+            fi
+          done

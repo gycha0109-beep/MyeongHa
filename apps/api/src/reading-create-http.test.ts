@@ -266,4 +266,52 @@ describe('Reading create HTTP adapter', () => {
     expect(queriedSql.some((sql) => /insert\s+into\s+public\.(readings|reading_sessions)/iu.test(sql))).toBe(false);
     expect(queriedSql.some((sql) => sql.includes('cmd_create_reading_session_runtime_v1'))).toBe(true);
   });
+
+  it('rejects an authenticated body above 16 KiB before PostgreSQL work', async () => {
+    const connect = vi.fn(async () => {
+      throw new Error('must not connect');
+    });
+    const response = await invoke({
+      request: post({
+        idempotencyKey: IDEMPOTENCY_KEY,
+        domain: 'general',
+        sourceBirthProfileId: SOURCE_PROFILE_ID,
+        padding: 'x'.repeat(17_000),
+      }),
+      pool: { connect },
+    });
+    const payload = await response.json() as any;
+
+    expect(response.status).toBe(413);
+    expect(payload.error.code).toBe('REQUEST_TOO_LARGE');
+    expect(payload.error.messageKey).toBe('request.too_large');
+    expect(connect).not.toHaveBeenCalled();
+  });
+
+  it('rejects dormant Reading strings above their governed 128 UTF-8 byte limits', async () => {
+    for (const body of [
+      {
+        idempotencyKey: 'x'.repeat(129),
+        domain: 'general',
+        sourceBirthProfileId: SOURCE_PROFILE_ID,
+      },
+      {
+        idempotencyKey: IDEMPOTENCY_KEY,
+        domain: 'general',
+        sourceBirthProfileId: 'x'.repeat(129),
+      },
+    ]) {
+      const onCommand = vi.fn();
+      const response = await invoke({
+        request: post(body),
+        pool: fakePool({ onCommand }),
+      });
+      const payload = await response.json() as any;
+
+      expect(response.status).toBe(400);
+      expect(payload.error.code).toBe('INVALID_REQUEST');
+      expect(onCommand).not.toHaveBeenCalled();
+    }
+  });
+
 });

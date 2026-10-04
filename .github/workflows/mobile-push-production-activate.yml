@@ -1,0 +1,315 @@
+name: Mobile Push Production Activation
+
+run-name: "[WT:applizing] Mobile Push Production Activation"
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type ACTIVATE_MOBILE_PUSH_V1
+        required: true
+        type: string
+      watchtower_track:
+        description: Watchtower work track attribution
+        required: true
+        default: applizing
+        type: string
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/mobile-push-production-activate.trigger'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-push-production-activation
+  cancel-in-progress: false
+
+env:
+  VERCEL_PROJECT_ID: prj_nXF0b5uv27Lyucz2SEBxzdCRXVsP
+  VERCEL_TEAM_ID: team_xuYA9OhCWlJETaYFOmeVodgS
+  VERCEL_TEAM_SLUG: johnny-self
+
+jobs:
+  preflight:
+    name: external-credential-preflight
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    environment: production
+    outputs:
+      ready: ${{ steps.credentials.outputs.ready }}
+      missing: ${{ steps.credentials.outputs.missing }}
+    env:
+      VERCEL_MOBILE_PUSH_ACTIVATION_TOKEN: ${{ secrets.VERCEL_MOBILE_PUSH_ACTIVATION_TOKEN }}
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - name: Verify explicit activation authority
+        shell: bash
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+          WATCHTOWER_TRACK: ${{ inputs.watchtower_track }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/main"
+
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            test "$CONFIRMATION" = "ACTIVATE_MOBILE_PUSH_V1"
+            test "$WATCHTOWER_TRACK" = "applizing"
+          else
+            test "$GITHUB_EVENT_NAME" = "push"
+            test "$(tr -d '\r\n' < .github/mobile-push-production-activate.trigger)" = "ACTIVATE_MOBILE_PUSH_V1"
+          fi
+
+      - name: Check external credentials without exposing values
+        id: credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=()
+          [[ -n "${VERCEL_MOBILE_PUSH_ACTIVATION_TOKEN:-}" ]] || missing+=("VERCEL_MOBILE_PUSH_ACTIVATION_TOKEN")
+          [[ -n "${EXPO_TOKEN:-}" ]] || missing+=("EXPO_TOKEN")
+
+          if (( ${#missing[@]} == 0 )); then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+            echo "missing=none" >> "$GITHUB_OUTPUT"
+            echo "Mobile Push external credential preflight: READY" >> "$GITHUB_STEP_SUMMARY"
+          else
+            joined="$(IFS=,; echo "${missing[*]}")"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "missing=$joined" >> "$GITHUB_OUTPUT"
+            {
+              echo "Mobile Push external credential preflight: BLOCKED"
+              echo
+              echo "Missing credential names: $joined"
+              echo "Credential values were not emitted."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  activate:
+    name: activate-mobile-push-production
+    needs: preflight
+    if: ${{ needs.preflight.outputs.ready == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: production
+    env:
+      VERCEL_MOBILE_PUSH_ACTIVATION_TOKEN: ${{ secrets.VERCEL_MOBILE_PUSH_ACTIVATION_TOKEN }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_MOBILE_PUSH_ACTIVATION_TOKEN }}
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      NO_COLOR: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: "24"
+          package-manager-cache: false
+
+      - name: Install workspace dependencies for Expo config resolution
+        shell: bash
+        run: npm ci --ignore-scripts
+
+      - name: Provision Vercel Production Push token-protection secrets
+        shell: bash
+        run: node scripts/operations/ensure-vercel-mobile-push-env.mjs
+
+      - name: Create or link the EAS project without prompts
+        id: eas
+        shell: bash
+        run: |
+          set -euo pipefail
+          pushd apps/mobile >/dev/null
+          npm exec --yes --package=eas-cli@24.8.0 --             eas project:init --force --json --non-interactive             > "$RUNNER_TEMP/myeongha-eas-init.json"
+
+          node --input-type=module <<'NODE' >> "$GITHUB_OUTPUT"
+          import { readFileSync } from 'node:fs';
+          const app = JSON.parse(readFileSync('app.json', 'utf8'));
+          const projectId = app?.expo?.extra?.eas?.projectId;
+          if (
+            typeof projectId !== 'string' ||
+            !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(projectId)
+          ) {
+            throw new Error('EAS project init did not produce a valid project UUID.');
+          }
+          process.stdout.write(`eas_project_id=${projectId}\n`);
+          NODE
+          popd >/dev/null
+
+      - name: Bind public EAS project identity to EAS Production environment
+        shell: bash
+        env:
+          EAS_PROJECT_ID: ${{ steps.eas.outputs.eas_project_id }}
+        run: |
+          set -euo pipefail
+          pushd apps/mobile >/dev/null
+          npm exec --yes --package=eas-cli@24.8.0 --             eas env:set production             --name EXPO_PUBLIC_EAS_PROJECT_ID             --value "$EAS_PROJECT_ID"             --visibility plaintext             --scope project             --non-interactive             >/dev/null
+
+          observed="$(npm exec --yes --package=eas-cli@24.8.0 --             eas env:get production             --variable-name EXPO_PUBLIC_EAS_PROJECT_ID             --format short             --scope project             --non-interactive)"
+          [[ "$observed" == EXPO_PUBLIC_EAS_PROJECT_ID=* ]]
+          observed="${observed#EXPO_PUBLIC_EAS_PROJECT_ID=}"
+          test "$observed" = "$EAS_PROJECT_ID"
+          popd >/dev/null
+
+      - name: Verify source Push activation contract against resolved identity
+        shell: bash
+        env:
+          EXPO_PUBLIC_EAS_PROJECT_ID: ${{ steps.eas.outputs.eas_project_id }}
+          MYEONGHA_PUSH_TOKEN_ENCRYPTION_K1_SECRET: "contract-only-independent-encryption-secret-0000000001"
+          MYEONGHA_PUSH_TOKEN_FINGERPRINT_K1_SECRET: "contract-only-independent-fingerprint-secret-0000000002"
+        run: npm run verify:mobile-push-activation-readiness
+
+      - name: Redeploy current Vercel Production with the new server secrets
+        id: vercel_redeploy
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { appendFileSync } from 'node:fs';
+
+          const token = process.env.VERCEL_TOKEN;
+          const teamId = process.env.VERCEL_TEAM_ID;
+          const projectId = process.env.VERCEL_PROJECT_ID;
+          if (!token || !teamId || !projectId) {
+            throw new Error('Vercel redeploy requires token, team, and project identity.');
+          }
+
+          const headers = {
+            authorization: `Bearer ${token}`,
+            'content-type': 'application/json',
+          };
+
+          async function api(url, init = {}) {
+            const response = await fetch(url, {
+              ...init,
+              headers: {
+                ...headers,
+                ...(init.headers ?? {}),
+              },
+            });
+            const raw = await response.text();
+            let body = {};
+            if (raw) {
+              try {
+                body = JSON.parse(raw);
+              } catch {
+                body = { raw };
+              }
+            }
+            if (!response.ok) {
+              const detail = typeof body === 'object' ? JSON.stringify(body).slice(0, 800) : String(body).slice(0, 800);
+              throw new Error(`Vercel API ${response.status}: ${detail}`);
+            }
+            return body;
+          }
+
+          const teamQuery = new URLSearchParams({ teamId }).toString();
+          const current = await api(
+            `https://api.vercel.com/v13/deployments/myeongha.vercel.app?${teamQuery}`,
+          );
+
+          if (
+            current?.project?.id !== projectId ||
+            current?.target !== 'production' ||
+            current?.readyState !== 'READY' ||
+            typeof current?.id !== 'string'
+          ) {
+            throw new Error('Canonical Vercel Production deployment did not match the pinned project contract.');
+          }
+
+          const created = await api(
+            `https://api.vercel.com/v13/deployments?forceNew=1&${teamQuery}`,
+            {
+              method: 'POST',
+              body: JSON.stringify({
+                name: current.name,
+                deploymentId: current.id,
+                target: 'production',
+              }),
+            },
+          );
+
+          if (typeof created?.id !== 'string') {
+            throw new Error('Vercel redeploy API did not return a deployment id.');
+          }
+
+          let deployment = null;
+          for (let attempt = 1; attempt <= 60; attempt += 1) {
+            deployment = await api(
+              `https://api.vercel.com/v13/deployments/${encodeURIComponent(created.id)}?${teamQuery}`,
+            );
+            if (deployment?.readyState === 'READY') break;
+            if (['ERROR', 'CANCELED'].includes(deployment?.readyState)) {
+              throw new Error(`Vercel redeploy terminated with state ${deployment.readyState}.`);
+            }
+            await new Promise((resolve) => setTimeout(resolve, 5000));
+          }
+
+          if (
+            deployment?.readyState !== 'READY' ||
+            deployment?.project?.id !== projectId ||
+            deployment?.target !== 'production'
+          ) {
+            throw new Error('Vercel redeploy did not reach READY Production state.');
+          }
+
+          let aliased = false;
+          for (let attempt = 1; attempt <= 30; attempt += 1) {
+            const canonical = await api(
+              `https://api.vercel.com/v13/deployments/myeongha.vercel.app?${teamQuery}`,
+            );
+            if (canonical?.id === created.id && canonical?.readyState === 'READY') {
+              aliased = true;
+              break;
+            }
+            await new Promise((resolve) => setTimeout(resolve, 2000));
+          }
+          if (!aliased) {
+            throw new Error('Canonical Production alias did not move to the new redeployment.');
+          }
+
+          appendFileSync(process.env.GITHUB_OUTPUT, `deployment_id=${created.id}\n`);
+          console.log(`Vercel Production redeploy READY: ${created.id}`);
+          NODE
+
+      - name: Smoke canonical Device Installation routes
+        shell: bash
+        run: |
+          set -euo pipefail
+          for path in             /api/device-installations/register             /api/device-installations/d2000000-0000-4000-8000-00000000b001/revoke
+          do
+            ok=false
+            for attempt in {1..12}; do
+              status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}'                 "https://myeongha.vercel.app$path")"
+              if [[ "$status" == "405" ]]; then
+                ok=true
+                break
+              fi
+              sleep 5
+            done
+            [[ "$ok" == "true" ]] || {
+              echo "Production Device Installation route smoke failed: path=$path expected=405" >&2
+              exit 1
+            }
+          done
+
+      - name: Record safe activation evidence
+        shell: bash
+        env:
+          EAS_PROJECT_ID: ${{ steps.eas.outputs.eas_project_id }}
+        run: |
+          set -euo pipefail
+          {
+            echo "mobile_push_activation=pass"
+            echo "provider=expo-push-notifications"
+            echo "eas_project_id=$EAS_PROJECT_ID"
+            echo "vercel_project_id=$VERCEL_PROJECT_ID"
+            echo "server_token_protection_secrets=present-sensitive"
+            echo "production_routes=register,revoke"
+            echo "credential_values_emitted=false"
+            echo "notification_sending_authority=closed"
+            echo "scheduler_authority=closed"
+          } >> "$GITHUB_STEP_SUMMARY"

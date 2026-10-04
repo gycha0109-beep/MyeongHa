@@ -1,3 +1,13 @@
+import { executeSecurityObservedRequestV1 } from '../apps/api/src/security-observability.js';
+import { timingSafeEqual } from 'node:crypto';
+import { Client, type ClientConfig } from 'pg';
+
+import {
+  PRODUCTION_POSTGRES_TLS_CANARY_ENV_V1,
+  ProductionPostgresTlsCanaryErrorV1,
+  isProductionPostgresTlsCanaryRuntimeV1,
+  runProductionPostgresTlsPeerCanaryV1,
+} from '../apps/api/src/production-postgres-tls-peer-canary.js';
 import {
   evaluateProductionReadinessV1,
   type ProductionReadinessReportV1,
@@ -5,6 +15,7 @@ import {
 import type { ProductionSajuRuntimeEnvV1 } from '../apps/api/src/production-saju-runtime-config.js';
 
 const GET_METHOD = 'GET' as const;
+const POST_METHOD = 'POST' as const;
 const NO_STORE_CACHE_CONTROL = 'no-store' as const;
 
 function cancelUnusedRequestBodyBestEffort(request: Request): void {
@@ -28,6 +39,76 @@ function methodNotAllowed(): Response {
   });
 }
 
+function safeEqual(left: string, right: string): boolean {
+  const a = Buffer.from(left);
+  const b = Buffer.from(right);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
+function authorizeBearerToken(request: Request, token: unknown): boolean {
+  if (typeof token !== 'string' || token.length < 32) return false;
+
+  const header = request.headers.get('authorization');
+  if (header === null || !header.startsWith('Bearer ')) return false;
+
+  return safeEqual(header.slice('Bearer '.length), token);
+}
+
+function authorizeTlsCanary(request: Request): boolean {
+  return authorizeBearerToken(
+    request,
+    process.env[PRODUCTION_POSTGRES_TLS_CANARY_ENV_V1.token],
+  );
+}
+
+async function createTlsCanaryResponse(request: Request): Promise<Response> {
+  if (!authorizeTlsCanary(request)) {
+    return Response.json(
+      { status: 'not_found' },
+      { status: 404, headers: { 'Cache-Control': NO_STORE_CACHE_CONTROL } },
+    );
+  }
+
+  try {
+    const evidence = await runProductionPostgresTlsPeerCanaryV1({
+      env: process.env,
+      createClient(config: ClientConfig) {
+        const client = new Client(config);
+        return {
+          connect: async () => {
+            await client.connect();
+          },
+          query: async (text: string) => {
+            const result = await client.query(text);
+            return { rows: result.rows as readonly Record<string, unknown>[] };
+          },
+          end: () => client.end(),
+        };
+      },
+    });
+
+    return Response.json(
+      { status: 'pass', evidence },
+      {
+        status: 200,
+        headers: { 'Cache-Control': NO_STORE_CACHE_CONTROL },
+      },
+    );
+  } catch (error) {
+    const code =
+      error instanceof ProductionPostgresTlsCanaryErrorV1
+        ? error.code
+        : 'CANARY_UNEXPECTED_FAILURE';
+    return Response.json(
+      { status: 'fail', code },
+      {
+        status: 503,
+        headers: { 'Cache-Control': NO_STORE_CACHE_CONTROL },
+      },
+    );
+  }
+}
+
 export function createProductionReadinessResponseV1(
   env: ProductionSajuRuntimeEnvV1,
 ): Response {
@@ -41,12 +122,25 @@ export function createProductionReadinessResponseV1(
 }
 
 export default {
-  fetch(request: Request): Response {
-    if (request.method !== GET_METHOD) {
-      cancelUnusedRequestBodyBestEffort(request);
-      return methodNotAllowed();
-    }
+  fetch(request: Request): Promise<Response> {
+    return executeSecurityObservedRequestV1({
+      request,
+      routeId: 'api.readiness',
+      execute: () => {
+        if (
+          request.method === POST_METHOD &&
+          isProductionPostgresTlsCanaryRuntimeV1(process.env)
+        ) {
+          return createTlsCanaryResponse(request);
+        }
 
-    return createProductionReadinessResponseV1(process.env);
+        if (request.method !== GET_METHOD) {
+          cancelUnusedRequestBodyBestEffort(request);
+          return methodNotAllowed();
+        }
+
+        return createProductionReadinessResponseV1(process.env);
+      },
+    });
   },
 };

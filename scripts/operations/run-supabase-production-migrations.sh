@@ -6,28 +6,23 @@ set -euo pipefail
 
 [[ "$SUPABASE_PROJECT_ID" == 'cnsfpcdiyofqvhpcegfc' ]]
 
-db_args=()
+: "${SUPABASE_PRODUCTION_SESSION_POOLER_HOST:?SUPABASE_PRODUCTION_SESSION_POOLER_HOST is required}"
 
-if [[ -n "${SUPABASE_PRODUCTION_SESSION_POOLER_HOST:-}" ]]; then
-  host="$SUPABASE_PRODUCTION_SESSION_POOLER_HOST"
-  if [[ ! "$host" =~ ^[a-z0-9-]+([.][a-z0-9-]+)*[.]pooler[.]supabase[.]com$ ]]; then
-    echo 'SUPABASE_PRODUCTION_SESSION_POOLER_HOST must be a bare *.pooler.supabase.com hostname.' >&2
-    exit 1
-  fi
+host="$SUPABASE_PRODUCTION_SESSION_POOLER_HOST"
+if [[ ! "$host" =~ ^[a-z0-9-]+([.][a-z0-9-]+)*[.]pooler[.]supabase[.]com$ ]]; then
+  echo 'SUPABASE_PRODUCTION_SESSION_POOLER_HOST must be a bare *.pooler.supabase.com hostname.' >&2
+  exit 1
+fi
 
-  encoded_password="$(python3 - <<'PY'
+encoded_password="$(python3 - <<'PY'
 import os
 import urllib.parse
 print(urllib.parse.quote(os.environ['SUPABASE_DB_PASSWORD'], safe=''))
 PY
 )"
-  db_url="postgresql://postgres.${SUPABASE_PROJECT_ID}:${encoded_password}@${host}:5432/postgres?sslmode=require"
-  echo "::add-mask::$db_url"
-  db_args+=(--db-url "$db_url")
-else
-  : "${SUPABASE_ACCESS_TOKEN:?SUPABASE_ACCESS_TOKEN is not configured and no explicit Session Pooler host is available}"
-  supabase link --project-ref "$SUPABASE_PROJECT_ID"
-fi
+db_url="postgresql://postgres.${SUPABASE_PROJECT_ID}:${encoded_password}@${host}:5432/postgres?sslmode=require"
+echo "::add-mask::$db_url"
+db_args=(--db-url "$db_url")
 
 state_file="$(mktemp)"
 trap 'rm -f "$state_file"' EXIT

@@ -1,4 +1,8 @@
 import { ApiCommandError } from './api-error.js';
+import {
+  BIRTH_PROFILE_LABEL_MAXIMUM_UTF8_BYTES_V1,
+  utf8ByteLengthV1,
+} from './authenticated-json-request-resource.js';
 
 export const BIRTH_PROFILE_CREATE_AUTHORITY_BINDING_V1 =
   'public.cmd_create_birth_profile_v1' as const;
@@ -191,6 +195,15 @@ function parseRequest(value: unknown): BirthProfileCreateRequestV1 {
   const label = request.label ?? null;
   if (label !== null && typeof label !== 'string') {
     throw new ApiCommandError('INVALID_REQUEST', 'label must be a string or null.');
+  }
+  if (
+    typeof label === 'string' &&
+    utf8ByteLengthV1(label) > BIRTH_PROFILE_LABEL_MAXIMUM_UTF8_BYTES_V1
+  ) {
+    throw new ApiCommandError(
+      'INVALID_REQUEST',
+      'label exceeds the governed UTF-8 byte limit.',
+    );
   }
 
   return Object.freeze({

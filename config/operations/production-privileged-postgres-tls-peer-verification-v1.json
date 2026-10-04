@@ -1,0 +1,126 @@
+{
+  "contractVersion": "myeongha-production-privileged-postgres-tls-peer-verification-v1",
+  "issue": 1454,
+  "watchtowerTrack": "security",
+  "phase": "COMPLETE",
+  "activationState": "production-privileged-verify-full-active-legacy-carrier-removed",
+  "productionActivation": true,
+  "productionCredentialBindingMutated": false,
+  "governedProjectRef": "cnsfpcdiyofqvhpcegfc",
+  "privilegedPrincipal": "postgres.cnsfpcdiyofqvhpcegfc",
+  "databaseName": "postgres",
+  "databasePort": 5432,
+  "endpointKind": "supavisor",
+  "endpointAuthorityPinned": true,
+  "requiredTlsMode": "verify-full",
+  "peerVerification": "full",
+  "rejectUnauthorized": true,
+  "defaultHostnameVerification": true,
+  "rootCertificateFingerprint256": "80:70:25:AD:50:D4:ED:21:9D:2C:9C:7D:29:9C:00:4F:82:4E:B0:0C:F7:F6:5A:FE:F6:07:D0:7B:72:E6:CA:FA",
+  "rootCertificatePinned": true,
+  "strictToWeakFallback": false,
+  "readOnlyProductionProof": {
+    "status": "passed",
+    "workflowRunId": 36828515574,
+    "sourceMainSha": "ddd9d0eba47a04afb3815c72ebd82be3f2611893",
+    "connectionSucceeded": true,
+    "transactionReadOnly": true,
+    "writeExecuted": false,
+    "tlsMode": "verify-full",
+    "peerVerification": "full",
+    "defaultHostnameVerification": true,
+    "databaseUrlEmitted": false,
+    "credentialMaterialEmitted": false,
+    "rootCertificatePemEmitted": false
+  },
+  "productionActivationEvidence": {
+    "privacyRecoveryLedger": {
+      "status": "passed",
+      "workflowRunId": 36832365748,
+      "sourceMainSha": "ddd9d0eba47a04afb3815c72ebd82be3f2611893",
+      "strictLibpqAuthorityPassed": true,
+      "tlsMode": "verify-full",
+      "peerVerification": "full",
+      "encryptedArtifactUploaded": true
+    },
+    "logicalBackup": {
+      "status": "passed",
+      "workflowRunId": 36856447227,
+      "sourceMainSha": "26ffb7bf4f73bc771763c0768bb79b5c52b5dbdc",
+      "strictLibpqAuthorityPassed": true,
+      "rolesDumpStrictTransportPassed": true,
+      "schemaDumpStrictTransportPassed": true,
+      "dataDumpStrictTransportPassed": true,
+      "encryptedArtifactUploaded": true,
+      "migrationFrontier": 1310
+    },
+    "privacyRecoveryCanary": {
+      "status": "passed",
+      "workflowRunId": 36863674453,
+      "sourceMainSha": "f5a4196b4b2d0c7b1b5e08e0c335f89499e30ec2",
+      "freshSyntheticDeletionPassed": true,
+      "governedPreDeletionBackupRunId": 36863733668,
+      "canonicalPrivacyRecoveryLedgerRunId": 36864105567,
+      "nonZeroAccountDeletionStartedLedgerEvidence": true,
+      "identifierFreeEvidenceUploaded": true,
+      "workerCredentialMutationPerformed": false
+    }
+  },
+  "legacyCleanup": {
+    "status": "passed",
+    "pullRequest": 1502,
+    "mergeMainSha": "903f74eb0c9fce5aba801c25f84b248658305759",
+    "workflowPrivilegedAdminDatabaseUrlCarrierRemoved": true,
+    "workflowPrivilegedSslmodeRequirePresent": false,
+    "runtimePrivilegedSourceTlsMode": "verify-full",
+    "privilegedRequireFallbackPresent": false,
+    "privilegedPreferFallbackPresent": false,
+    "privilegedVerifyCaFallbackPresent": false,
+    "sec03WorkerSourceCanonicalizationExcludedFromSec04": true,
+    "exactHead": {
+      "ciRunId": 36951907166,
+      "ciPassed": true,
+      "governanceRunId": 36951906859,
+      "governancePassed": true,
+      "webPrRunId": 36951906839,
+      "webPrPassed": true,
+      "integrationRunId": 36952117592,
+      "integrationPassed": true
+    },
+    "mergedMain": {
+      "ciRunId": 36952866695,
+      "ciPassed": true,
+      "webBrowserSmokeRunId": 36952866434,
+      "webBrowserSmokePassed": true,
+      "governanceRunId": 36952866374,
+      "governancePassed": true,
+      "supabaseProductionRunId": 36952866410,
+      "supabaseProductionPassed": true
+    }
+  },
+  "oneShotCleanup": {
+    "productionPrivilegedPostgresTlsReadonlyProofWorkflowRemoved": true,
+    "productionPrivilegedPostgresTlsReadonlyProofRunnerRemoved": true,
+    "productionPrivilegedPostgresTlsReadonlyProofVerifierRemoved": true,
+    "workflowResponsibilityRegistrationRemoved": true,
+    "packageVerifierRegistrationRemoved": true
+  },
+  "sensitiveMaterialEvidence": {
+    "databaseUrlEmitted": false,
+    "credentialMaterialEmitted": false,
+    "rootCertificatePemEmitted": false
+  },
+  "scopeExclusions": [
+    {
+      "authority": "SEC-03",
+      "path": "account-deletion worker source credential carrier canonicalization",
+      "reason": "The concrete worker pool is separately governed by the completed verify-full worker TLS contract and is not a privileged SEC-04 path."
+    },
+    {
+      "authority": "PI-P0-04 / issue 425",
+      "path": "supabase_admin future default-ACL provider provenance",
+      "reason": "Provider-authority/default-ACL work is intentionally separate from privileged PostgreSQL transport security."
+    }
+  ],
+  "activationBlockers": []
+}

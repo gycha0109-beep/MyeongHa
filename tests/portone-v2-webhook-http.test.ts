@@ -1,5 +1,6 @@
 import { createHmac } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
+import { INGRESS_REQUEST_BODY_COMPLETION_DEADLINE_MS_V1 } from '../apps/api/src/ingress-request-body-deadline.js';
 import {
   PORTONE_V2_WEBHOOK_MAX_BODY_BYTES_V1,
 } from '../apps/api/src/portone-v2-webhook-payment-completion.js';
@@ -187,6 +188,7 @@ describe('PortOne V2 webhook HTTP transport', () => {
       route: '/api/commerce/webhooks/portone-v2',
       apiContractVersion: 'v0.9',
       maxBodyBytes: PORTONE_V2_WEBHOOK_MAX_BODY_BYTES_V1,
+      bodyCompletionDeadlineMs: INGRESS_REQUEST_BODY_COMPLETION_DEADLINE_MS_V1,
     });
   });
 

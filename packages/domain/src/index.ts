@@ -71,6 +71,171 @@ export {
 } from './character-saju-grounding-admission.js';
 
 export {
+  CHARACTER_FACE_CONTEXT_SCHEMA_VERSION_V1,
+  CHARACTER_FACE_REALIZATION_MODE_V1,
+  CHARACTER_FACE_SOURCE_BINDING_SCHEMA_VERSION_V1,
+  FACE_CHARACTER_GROUNDING_PROJECTION_VERSION_V1,
+  FACE_CHARACTER_GROUNDING_REF_SCHEMA_VERSION_V1,
+  CharacterFaceGroundingAdmissionErrorV1,
+  admitCharacterFaceGroundingRefV1,
+  admitCharacterRuntimeFaceGroundingV1,
+  type CharacterFaceGroundingRefV1,
+  type CharacterFaceRuntimeContextV1,
+  type CharacterFaceSourceBindingV1,
+  type CharacterRuntimeContextWithFaceGroundingV1,
+} from './character-face-grounding-admission.js';
+
+export {
+  FACE_CHARACTER_GROUNDING_SCHEMA_VERSION_V1,
+  FACE_CHARACTER_NEUTRAL_REALIZATION_POLICY_V1,
+  FACE_CHARACTER_REALIZATION_POLICY_REGISTRY_VERSION_V1,
+  CharacterFaceGroundingBundleAdmissionErrorV1,
+  admitCharacterFaceGroundingBundleViewV1,
+  hashCharacterFaceGroundingBundleMaterialV1,
+  type CharacterFaceAxesDisplayValueV1,
+  type CharacterFaceDisplayAxisV1,
+  type CharacterFaceDisplayUnitV1,
+  type CharacterFaceDisplayValueV1,
+  type CharacterFaceGroundingBundleProviderV1,
+  type CharacterFaceGroundingBundleViewV1,
+  type CharacterFaceObservationUnitViewV1,
+  type CharacterFaceScalarDisplayValueV1,
+} from './character-face-grounding-bundle.js';
+
+export {
+  CHARACTER_FACE_CAPABILITY_SCHEMA_VERSION_V1,
+  CHARACTER_FACE_CAPABILITY_SOURCE_SCHEMA_VERSION_V1,
+  CHARACTER_FACE_SUPPORTED_REALIZATION_MODES_V1,
+  CHARACTER_FACE_SUPPORTED_TOPIC_KEYS_V1,
+  CharacterFaceCapabilityAdmissionErrorV1,
+  admitCharacterFaceCapabilityProfileV1,
+  admitCharacterFaceCapabilitySourceV1,
+  evaluateCharacterFaceCapabilityV1,
+  type CharacterFaceCapabilityDecisionV1,
+  type CharacterFaceCapabilityProfileV1,
+  type CharacterFaceCapabilitySourceV1,
+  type CharacterFaceSupportedRealizationModeV1,
+  type CharacterFaceSupportedTopicKeyV1,
+} from './character-face-capability.js';
+
+export {
+  CHARACTER_FACE_ATTENTION_KEYS_V1,
+  CHARACTER_FACE_ATTENTION_REGISTRY_VERSION_V1,
+  CHARACTER_FACE_PERSPECTIVE_SCHEMA_VERSION_V1,
+  CHARACTER_FACE_PERSPECTIVE_SOURCE_SCHEMA_VERSION_V1,
+  CHARACTER_FACE_UNCERTAINTY_HANDLING_V1,
+  CharacterFacePerspectiveAdmissionErrorV1,
+  admitCharacterFacePerspectiveProfileV1,
+  admitCharacterFacePerspectiveSourceV1,
+  assertCharacterFacePerspectiveCapabilityCompatibilityV1,
+  type CharacterFaceAttentionKeyV1,
+  type CharacterFacePerspectiveDeliveryAuthorityV1,
+  type CharacterFacePerspectiveProfileV1,
+  type CharacterFacePerspectiveSelectionV1,
+  type CharacterFacePerspectiveSourceV1,
+  type CharacterFaceUncertaintyHandlingV1,
+} from './character-face-perspective.js';
+
+export {
+  CHARACTER_FACE_INSIGHT_SELECTION_SCHEMA_VERSION_V1,
+  CharacterFaceInsightSelectionErrorV1,
+  selectCharacterFaceInsightsV1,
+  type CharacterFaceAttentionResolutionStatusV1,
+  type CharacterFaceAttentionResolutionV1,
+  type CharacterFaceInsightSelectionV1,
+  type CharacterFaceSelectionReasonCodeV1,
+  type CharacterFaceSelectionReasonV1,
+} from './character-face-insight-selector.js';
+
+export {
+  CHARACTER_FACE_READING_PLAN_DECISION_SCHEMA_VERSION_V1,
+  CHARACTER_FACE_READING_PLAN_SCHEMA_VERSION_V1,
+  CharacterFaceReadingPlanErrorV1,
+  buildCharacterFaceReadingPlanDecisionV1,
+  type CharacterFaceReadingBeatV1,
+  type CharacterFaceReadingCapabilityRefV1,
+  type CharacterFaceReadingPerspectiveRefV1,
+  type CharacterFaceReadingPlanDecisionV1,
+  type CharacterFaceReadingPlanV1,
+  type CharacterFaceReadingRelationshipProjectionRefV1,
+  type CharacterFaceReadingSemanticPurposeV1,
+} from './character-face-reading-plan.js';
+
+export {
+  CHARACTER_FACE_DELIVERY_LOCALE_V1,
+  CHARACTER_FACE_DELIVERY_PROFILE_SCHEMA_VERSION_V1,
+  CHARACTER_FACE_DELIVERY_SOURCE_SCHEMA_VERSION_V1,
+  CHARACTER_FACE_NEUTRAL_FACT_STYLES_V1,
+  CHARACTER_FACE_SAFE_FOLLOW_UP_FRAMING_V1,
+  CHARACTER_FACE_SAFE_REACTION_FRAMING_V1,
+  CHARACTER_FACE_UNAVAILABLE_STYLES_V1,
+  CharacterFaceDeliveryProfileAdmissionErrorV1,
+  admitCharacterFaceDeliveryProfileV1,
+  admitCharacterFaceDeliverySourceV1,
+  resolveCharacterFaceFollowUpFramingV1,
+  resolveCharacterFaceReactionFramingV1,
+  type CharacterFaceDeliveryProfileV1,
+  type CharacterFaceDeliverySourceV1,
+  type CharacterFaceFollowUpFramingBindingV1,
+  type CharacterFaceNeutralFactStyleV1,
+  type CharacterFaceSafeFollowUpFramingKeyV1,
+  type CharacterFaceSafeReactionFramingKeyV1,
+  type CharacterFaceUnavailableStyleV1,
+} from './character-face-delivery-profile.js';
+
+export {
+  CHARACTER_FACE_VOICE_RUNTIME_INVARIANT_VERSION_V1,
+  CharacterFaceVoiceRuntimeInvariantErrorV1,
+  assertCharacterFaceVoiceRuntimeInvariantV1,
+} from './character-face-voice-authority.js';
+
+export {
+  CHARACTER_FACE_BOUNDED_RENDERER_VERSION_V1,
+  CHARACTER_FACE_NEUTRAL_CAPABILITY_LABELS_V1,
+  CHARACTER_FACE_UTTERANCE_SCHEMA_VERSION_V1,
+  CharacterFaceBoundedRendererErrorV1,
+  formatCharacterFaceDisplayValueV1,
+  renderCharacterFaceBoundedNeutralV1,
+  type CharacterFaceBoundedRenderDecisionV1,
+  type CharacterFaceDeliveryProfileRefV1,
+  type CharacterFaceProtectedFallbackReasonV1,
+  type CharacterFaceUtteranceSegmentV1,
+  type CharacterFaceUtteranceV1,
+} from './character-face-bounded-renderer.js';
+
+export {
+  CHARACTER_FACE_SEMANTIC_GUARD_FAILURE_CODES_V1,
+  CHARACTER_FACE_SEMANTIC_GUARD_VERSION_V1,
+  guardCharacterFaceSemanticPreservationV1,
+  type CharacterFaceSemanticGuardDecisionV1,
+  type CharacterFaceSemanticGuardEvidenceV1,
+  type CharacterFaceSemanticGuardFailureCodeV1,
+  type CharacterFaceSemanticGuardFailureV1,
+} from './character-face-semantic-guard.js';
+
+export {
+  CHARACTER_FACE_FINAL_OUTPUT_SCHEMA_VERSION_V1,
+  CHARACTER_FACE_FINALIZER_VERSION_V1,
+  CHARACTER_FACE_PUBLIC_FALLBACK_REASON_V1,
+  finalizeCharacterFaceOutputV1,
+  type CharacterFaceFinalOutputEnvelopeV1,
+  type CharacterFaceFinalRendererDraftV1,
+  type CharacterFaceProtectedFinalMaterialV1,
+} from './character-face-final-output.js';
+
+export {
+  CHARACTER_FACE_ARTIFACT_BUILDER_VERSION_V1,
+  CHARACTER_FACE_READING_ARTIFACT_SCHEMA_VERSION_V1,
+  assertCharacterFaceReadingArtifactCandidateIntegrityV1,
+  buildCharacterFaceReadingArtifactCandidateV1,
+  computeCharacterFaceReadingArtifactIdV1,
+  hashCharacterFaceFinalOutputV1,
+  hashCharacterFaceReadingArtifactV1,
+  type CharacterFaceReadingArtifactBuildDecisionV1,
+  type CharacterFaceReadingArtifactCandidateV1,
+} from './character-face-reading-artifact.js';
+
+export {
   CHARACTER_PERSPECTIVE_NARRATIVE_ROLES_V1,
   CHARACTER_PERSPECTIVE_SCHEMA_VERSION_V1,
   SAJU_GROUNDING_AXIS_KEYS_V1,
@@ -268,3 +433,19 @@ export {
   type SajuProductionCalculationIngressArtifactV1,
   type SajuProductionCalculationIngressErrorCodeV1,
 } from './saju-production-calculation-ingress.js';
+
+export {
+  CHARACTER_FACE_NAMED_AUTHORING_AUTHORITY_SOURCE_V1,
+  CHARACTER_FACE_NAMED_AUTHORING_SOURCE_SCHEMA_VERSION_V1,
+  resolveCharacterFaceNamedAuthoringSourceV1,
+  type CharacterFaceNamedAuthoringSourceV1,
+} from './character-face-named-authoring-source.js';
+
+export {
+  CHARACTER_FACE_NAMED_PROFILE_REGISTRY_VERSION_V1,
+  CharacterFaceNamedProfileCompatibilityErrorV1,
+  SEYEON_FACE_PROFILE_VERSION_V1,
+  assertCharacterFaceNamedProfileCompatibilityV1,
+  resolveCharacterFaceNamedProfileBundleV1,
+  type CharacterFaceNamedProfileBundleV1,
+} from './character-face-named-profile-registry.js';

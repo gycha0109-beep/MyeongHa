@@ -30,7 +30,6 @@ const member = Object.freeze({
 function session(expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString()) {
   return {
     accessToken: 'malformed.member.signature',
-    refreshToken: 'malformed-refresh-token',
     expiresAt,
     tokenType: 'bearer',
     user: member,
@@ -57,7 +56,6 @@ function malformedSessionResponse() {
       status: 'authenticated',
       session: {
         accessToken: '',
-        refreshToken: 'invalid-refresh-token',
         expiresAt: 'not-a-date',
         tokenType: 'bearer',
         user: member,
@@ -69,9 +67,9 @@ function malformedSessionResponse() {
 function expectMemberAuthorityPreserved(expectedAccessToken: string) {
   expect(readMemberSession()).toMatchObject({
     accessToken: expectedAccessToken,
-    refreshToken: 'malformed-refresh-token',
     user: member,
   });
+  expect(readMemberSession()).not.toHaveProperty('refreshToken');
   expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.guestBearer)).toBe(expectedAccessToken);
   expect(sessionStorage.getItem(PRODUCT_AUTH_STORAGE_V1.pendingGuestBearer)).toBe('staged-guest-before-malformed-refresh');
   expect(globalThis.dispatchEvent).not.toHaveBeenCalled();

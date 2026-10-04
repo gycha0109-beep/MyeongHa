@@ -5,8 +5,17 @@ import type {
   PostgresSubjectPoolV1,
 } from './postgres-subject-execution.js';
 import {
+  buildProductionPostgresStrictTlsTargetV1,
+  PRODUCTION_POSTGRES_TLS_PEER_VERIFICATION_CONTRACT_VERSION_V1,
+  PRODUCTION_POSTGRES_TLS_REQUIRED_MODE_V1,
+  PRODUCTION_POSTGRES_TLS_ROOT_FINGERPRINT256_V1,
+  type ProductionPostgresStrictTlsTargetV1,
+} from './production-postgres-tls-peer-verification.js';
+import {
+  inspectProductionDatabaseTlsPostureV1,
   MYEONGHA_API_EXECUTION_ROLE,
-  type ProductionUserDataRuntimeConfigV1,
+  MYEONGHA_PRODUCTION_SUPABASE_PROJECT_REF,
+  type ProductionPostgresRuntimeConfigV1,
 } from './production-user-data-runtime-config.js';
 
 export const NODE_POSTGRES_SUBJECT_POOL_DEFAULTS_V1 = Object.freeze({
@@ -15,6 +24,50 @@ export const NODE_POSTGRES_SUBJECT_POOL_DEFAULTS_V1 = Object.freeze({
   idleTimeoutMs: 10_000,
   statementTimeoutMs: 5_000,
 } as const);
+
+export interface NodePostgresSubjectPoolOptionsV1 {
+  readonly maxConnectionsPerRuntime?: number;
+  readonly connectionTimeoutMs?: number;
+  readonly idleTimeoutMs?: number;
+  readonly statementTimeoutMs?: number;
+}
+
+function requirePositivePoolInteger(name: string, value: number): number {
+  if (!Number.isInteger(value) || value < 1 || value > 60_000) {
+    throw new NodePostgresSubjectPoolErrorV1(
+      'INVALID_POOL_OPTIONS',
+      `PostgreSQL subject pool ${name} must be an integer from 1 to 60000.`,
+    );
+  }
+  return value;
+}
+
+function resolvePoolOptions(
+  options: NodePostgresSubjectPoolOptionsV1 = {},
+): Required<NodePostgresSubjectPoolOptionsV1> {
+  return Object.freeze({
+    maxConnectionsPerRuntime: requirePositivePoolInteger(
+      'maxConnectionsPerRuntime',
+      options.maxConnectionsPerRuntime
+        ?? NODE_POSTGRES_SUBJECT_POOL_DEFAULTS_V1.maxConnectionsPerRuntime,
+    ),
+    connectionTimeoutMs: requirePositivePoolInteger(
+      'connectionTimeoutMs',
+      options.connectionTimeoutMs
+        ?? NODE_POSTGRES_SUBJECT_POOL_DEFAULTS_V1.connectionTimeoutMs,
+    ),
+    idleTimeoutMs: requirePositivePoolInteger(
+      'idleTimeoutMs',
+      options.idleTimeoutMs
+        ?? NODE_POSTGRES_SUBJECT_POOL_DEFAULTS_V1.idleTimeoutMs,
+    ),
+    statementTimeoutMs: requirePositivePoolInteger(
+      'statementTimeoutMs',
+      options.statementTimeoutMs
+        ?? NODE_POSTGRES_SUBJECT_POOL_DEFAULTS_V1.statementTimeoutMs,
+    ),
+  });
+}
 
 const VERIFY_LOGIN_PRINCIPAL_SQL = `
 select
@@ -45,7 +98,8 @@ export class NodePostgresSubjectPoolErrorV1 extends Error {
       | 'PRINCIPAL_MISMATCH'
       | 'EXECUTION_ROLE_UNAVAILABLE'
       | 'INVALID_PREFLIGHT_RESULT'
-      | 'TLS_MODE_UNSUPPORTED',
+      | 'TLS_MODE_UNSUPPORTED'
+      | 'INVALID_POOL_OPTIONS',
     message: string,
   ) {
     super(message);
@@ -54,16 +108,12 @@ export class NodePostgresSubjectPoolErrorV1 extends Error {
 }
 
 /**
- * node-postgres 8.x currently interprets sslmode=require without libpq
- * compatibility as certificate/hostname verification. The production Supabase
- * connection authority is explicitly bound as libpq sslmode=require, whose
- * contract is encrypted transport without CA/hostname verification. Pin that
- * interpretation explicitly so a pg-connection-string compatibility change
- * cannot silently change the deployed meaning of the governed URL.
+ * Legacy/libpq-compatible connection-string normalization retained only for
+ * non-ordinary-runtime callers that still own a separate database authority.
  *
- * Stronger modes such as verify-ca / verify-full are deliberately untouched.
- * They require their corresponding CA material and must never be downgraded by
- * this adapter.
+ * The ordinary Production subject pool MUST NOT use this helper after SEC-01 B4.
+ * Its only admissible path is buildProductionNodePostgresPoolConfigV1(), which
+ * requires the governed verify-full activation binding and explicit CA object.
  */
 export function normalizeNodePostgresConnectionStringV1(
   connectionString: string,
@@ -97,18 +147,120 @@ export function normalizeNodePostgresConnectionStringV1(
   return url.toString();
 }
 
-export function buildNodePostgresPoolConfigV1(
-  connectionString: string,
+function withResolvedPoolOptions(
+  connection: Pick<PoolConfig, 'connectionString' | 'ssl'>,
+  options: NodePostgresSubjectPoolOptionsV1,
 ): PoolConfig {
+  const resolved = resolvePoolOptions(options);
   return Object.freeze({
-    connectionString: normalizeNodePostgresConnectionStringV1(connectionString),
-    max: NODE_POSTGRES_SUBJECT_POOL_DEFAULTS_V1.maxConnectionsPerRuntime,
-    connectionTimeoutMillis:
-      NODE_POSTGRES_SUBJECT_POOL_DEFAULTS_V1.connectionTimeoutMs,
-    idleTimeoutMillis: NODE_POSTGRES_SUBJECT_POOL_DEFAULTS_V1.idleTimeoutMs,
-    statement_timeout: NODE_POSTGRES_SUBJECT_POOL_DEFAULTS_V1.statementTimeoutMs,
+    ...connection,
+    max: resolved.maxConnectionsPerRuntime,
+    connectionTimeoutMillis: resolved.connectionTimeoutMs,
+    idleTimeoutMillis: resolved.idleTimeoutMs,
+    statement_timeout: resolved.statementTimeoutMs,
     allowExitOnIdle: true,
   });
+}
+
+export function buildNodePostgresPoolConfigV1(
+  connectionString: string,
+  options: NodePostgresSubjectPoolOptionsV1 = {},
+): PoolConfig {
+  return withResolvedPoolOptions(
+    {
+      connectionString: normalizeNodePostgresConnectionStringV1(connectionString),
+    },
+    options,
+  );
+}
+
+type StrictTargetBuilderV1 = (
+  input: Parameters<typeof buildProductionPostgresStrictTlsTargetV1>[0],
+) => Pick<ProductionPostgresStrictTlsTargetV1, 'connectionString' | 'ssl'>;
+
+export function buildProductionNodePostgresPoolConfigV1(
+  config: ProductionPostgresRuntimeConfigV1,
+  options: NodePostgresSubjectPoolOptionsV1 = {},
+  dependencies: Readonly<{
+    buildStrictTarget?: StrictTargetBuilderV1;
+  }> = {},
+): PoolConfig {
+  if (config.databaseTlsPeerMode !== 'verify-full') {
+    throw new NodePostgresSubjectPoolErrorV1(
+      'TLS_MODE_UNSUPPORTED',
+      'Production PostgreSQL runtime requires governed verify-full peer verification.',
+    );
+  }
+
+  if (
+    typeof config.databaseSslRootCertificatePem !== 'string' ||
+    config.databaseSslRootCertificatePem.trim().length === 0
+  ) {
+    throw new NodePostgresSubjectPoolErrorV1(
+      'TLS_MODE_UNSUPPORTED',
+      'PostgreSQL verify-full runtime requires the governed root certificate binding.',
+    );
+  }
+
+  const sourcePosture = inspectProductionDatabaseTlsPostureV1(config.databaseUrl);
+  if (sourcePosture.mode !== 'require' && sourcePosture.mode !== 'verify-full') {
+    throw new NodePostgresSubjectPoolErrorV1(
+      'TLS_MODE_UNSUPPORTED',
+      'PostgreSQL B3 verify-full activation only accepts the governed require migration source or verify-full source.',
+    );
+  }
+
+  let candidate: URL;
+  try {
+    candidate = new URL(config.databaseUrl);
+  } catch {
+    throw new NodePostgresSubjectPoolErrorV1(
+      'TLS_MODE_UNSUPPORTED',
+      'PostgreSQL runtime connection URL could not be prepared for verify-full.',
+    );
+  }
+
+  for (const key of [...candidate.searchParams.keys()]) {
+    const normalized = key.trim().toLowerCase();
+    if (normalized.startsWith('ssl') || normalized === 'uselibpqcompat') {
+      candidate.searchParams.delete(key);
+    }
+  }
+  candidate.searchParams.set('sslmode', PRODUCTION_POSTGRES_TLS_REQUIRED_MODE_V1);
+
+  let strictTarget: Pick<
+    ProductionPostgresStrictTlsTargetV1,
+    'connectionString' | 'ssl'
+  >;
+  try {
+    strictTarget = (
+      dependencies.buildStrictTarget ?? buildProductionPostgresStrictTlsTargetV1
+    )({
+      databaseUrl: candidate.toString(),
+      rootCertificatePem: config.databaseSslRootCertificatePem,
+      authority: {
+        contractVersion:
+          PRODUCTION_POSTGRES_TLS_PEER_VERIFICATION_CONTRACT_VERSION_V1,
+        projectRef: MYEONGHA_PRODUCTION_SUPABASE_PROJECT_REF,
+        requiredTlsMode: PRODUCTION_POSTGRES_TLS_REQUIRED_MODE_V1,
+        rootCertificateFingerprint256:
+          PRODUCTION_POSTGRES_TLS_ROOT_FINGERPRINT256_V1,
+      },
+    });
+  } catch {
+    throw new NodePostgresSubjectPoolErrorV1(
+      'TLS_MODE_UNSUPPORTED',
+      'PostgreSQL verify-full runtime authority validation failed.',
+    );
+  }
+
+  return withResolvedPoolOptions(
+    {
+      connectionString: strictTarget.connectionString,
+      ssl: strictTarget.ssl,
+    },
+    options,
+  );
 }
 
 class PgDriverClientV1 implements NodePostgresDriverClientV1 {
@@ -134,26 +286,39 @@ class PgDriverClientV1 implements NodePostgresDriverClientV1 {
 }
 
 class PgDriverPoolV1 implements NodePostgresDriverPoolV1 {
-  private readonly pool: Pool;
+  private pool: Pool | undefined;
 
-  constructor(connectionString: string) {
-    this.pool = new Pool(buildNodePostgresPoolConfigV1(connectionString));
+  constructor(
+    private readonly config: ProductionPostgresRuntimeConfigV1,
+    private readonly options: NodePostgresSubjectPoolOptionsV1 = {},
+  ) {}
 
-    this.pool.on('error', (error) => {
+  private getOrCreatePool(): Pool {
+    if (this.pool !== undefined) return this.pool;
+
+    const pool = new Pool(
+      buildProductionNodePostgresPoolConfigV1(this.config, this.options),
+    );
+    pool.on('error', (error) => {
       const code = (error as Error & { code?: unknown }).code;
       console.error('MyeongHa PostgreSQL idle-pool error.', {
         name: error.name,
         code: typeof code === 'string' ? code : null,
       });
     });
+    this.pool = pool;
+    return pool;
   }
 
   async connect(): Promise<NodePostgresDriverClientV1> {
-    return new PgDriverClientV1(await this.pool.connect());
+    return new PgDriverClientV1(await this.getOrCreatePool().connect());
   }
 
   async end(): Promise<void> {
-    await this.pool.end();
+    if (this.pool === undefined) return;
+    const pool = this.pool;
+    this.pool = undefined;
+    await pool.end();
   }
 }
 
@@ -270,7 +435,8 @@ export function createNodePostgresSubjectPoolFromDriverV1(input: {
 }
 
 export function createNodePostgresSubjectPoolV1(
-  config: ProductionUserDataRuntimeConfigV1,
+  config: ProductionPostgresRuntimeConfigV1,
+  options: NodePostgresSubjectPoolOptionsV1 = {},
 ): NodePostgresSubjectPoolV1 {
   if (config.databaseExecutionRole !== MYEONGHA_API_EXECUTION_ROLE) {
     throw new NodePostgresSubjectPoolErrorV1(
@@ -280,7 +446,7 @@ export function createNodePostgresSubjectPoolV1(
   }
 
   return new NodePostgresSubjectPoolV1(
-    new PgDriverPoolV1(config.databaseUrl),
+    new PgDriverPoolV1(config, options),
     config.databasePrincipal,
   );
 }

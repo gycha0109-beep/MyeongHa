@@ -81,7 +81,6 @@ class FaultingStorage {
 const MEMBER_ACCESS = 'rollback.member.payload';
 const MEMBER_SESSION = Object.freeze({
   accessToken: MEMBER_ACCESS,
-  refreshToken: 'rollback-member-refresh',
   expiresAt: '2099-01-01T00:00:00.000Z',
   tokenType: 'bearer',
   user: Object.freeze({ id: 'auth-user-rollback', email: 'rollback@example.com' }),

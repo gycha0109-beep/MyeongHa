@@ -10,6 +10,7 @@ import { validatePrivacyRecoveryLedgerCoverage } from './validate-postgres-priva
 const paths = {
   workflow: '.github/workflows/production-postgres-privacy-recovery-ledger.yml',
   runner: 'scripts/operations/export-production-postgres-privacy-recovery-ledger.sh',
+  strictTlsHelper: 'scripts/operations/prepare-production-postgres-strict-libpq.mjs',
   builder: 'scripts/build-postgres-privacy-recovery-ledger-manifest.mjs',
   coverage: 'scripts/validate-postgres-privacy-recovery-ledger-coverage.mjs',
   decisions: 'docs/P0_DECISION_REGISTER.md',
@@ -22,7 +23,7 @@ const entries = await Promise.all(
   Object.entries(paths).map(async ([key, path]) => [key, await readFile(path, 'utf8')]),
 );
 const files = Object.fromEntries(entries);
-const contract = files.workflow + '\n' + files.runner;
+const contract = files.workflow + '\n' + files.runner + '\n' + files.strictTlsHelper;
 
 function requireFragment(key, fragment) {
   if (!files[key].includes(fragment)) {
@@ -40,9 +41,18 @@ for (const fragment of [
   'environment: production',
   'SUPABASE_DB_PASSWORD: ' + '$' + '{{ secrets.SUPABASE_DB_PASSWORD }}',
   'SUPABASE_PRODUCTION_SESSION_POOLER_HOST: ' + '$' + '{{ secrets.SUPABASE_PRODUCTION_SESSION_POOLER_HOST }}',
+  'SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM: ' + '$' + '{{ secrets.SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM }}',
   'MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE: ' + '$' + '{{ secrets.MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE }}',
-  '.name == "Production PostgreSQL Logical Backup"',
   '.path == ".github/workflows/production-postgres-backup.yml"',
+  'INPUT_BACKUP_RUN_ID: ${{ inputs.backup_run_id }}',
+  'missing+=(SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM)',
+  'prepare-production-postgres-strict-libpq.mjs',
+  'export PGHOST="$SUPABASE_PRODUCTION_SESSION_POOLER_HOST"',
+  'export PGUSER="$admin_pool_user"',
+  'export PGPASSWORD="$SUPABASE_DB_PASSWORD"',
+  "export PGSSLMODE='verify-full'",
+  'export PGSSLROOTCERT="$root_certificate_file"',
+  'root_certificate_pem_emitted=false',
   'begin transaction read only;',
   "where current_setting('transaction_read_only') = 'on';",
   'rollback;',
@@ -71,9 +81,24 @@ for (const fragment of [
   }
 }
 
+if (files.workflow.includes('.name == "Production PostgreSQL Logical Backup"')) {
+  throw new Error(
+    'Privacy recovery ledger must bind backup authority to canonical workflow path, not mutable workflow/run display name.',
+  );
+}
+
 for (const fragment of [
+  '\n  push:',
+  'github.event_name == \'push\'',
+  'config/operations/run-once/production-postgres-privacy-ledger-sec03-b3.marker',
+  'Validate SEC-03 one-shot ledger replay authority',
+  'Require SEC-03 non-zero account-deletion evidence',
   'SUPABASE_SERVICE_ROLE_KEY',
   'sslmode=disable',
+  'sslmode=require',
+  'sslmode=prefer',
+  'db_url=',
+  'encoded_password=',
   'pg_dump',
   'supabase db dump',
   'authoritativePrivacyReconciliation: true',

@@ -1,3 +1,6 @@
+import {
+  findReadingPublicTrustLanguageViolationV1,
+} from '../../character-content/src/index.js';
 import type { SajuDomain } from '../../contracts/src/index.js';
 import {
   assertCharacterSajuVoiceRuntimeInvariantV1,
@@ -81,6 +84,20 @@ export class CharacterSajuBoundedRendererErrorV1 extends TypeError {
   }
 }
 
+function assertPublicTrustLanguage(
+  text: string,
+  path: string,
+): string {
+  const violation =
+    findReadingPublicTrustLanguageViolationV1(text);
+  if (violation !== null) {
+    throw new CharacterSajuBoundedRendererErrorV1(
+      `${path} violates reading public trust language policy: ${violation.ruleKey}.`,
+    );
+  }
+  return text;
+}
+
 function sha256Json(value: unknown): string {
   return createHash('sha256').update(canonicalJson(value)).digest('hex');
 }
@@ -107,7 +124,13 @@ function resolveSafeFramingByPurpose(input: {
     );
   }
   const match = matches[0]!;
-  return Object.freeze({ key: match.key, text: match.text });
+  return Object.freeze({
+    key: match.key,
+    text: assertPublicTrustLanguage(
+      match.text,
+      `saju.safeFraming.${input.collection}.${match.key}`,
+    ),
+  });
 }
 
 function requireSelectedUnit(input: {
@@ -155,7 +178,10 @@ function realizationText(unit: CharacterGroundingUnitViewV1): string {
   // CSR-07 bootstrap is deliberately exact-core. Until the Saju source publishes
   // approved realization templates, Character runtime may organize the meaning but
   // may not freely paraphrase it.
-  return unit.canonicalMeaning;
+  return assertPublicTrustLanguage(
+    unit.canonicalMeaning,
+    `saju.semantic.${unit.unitId}`,
+  );
 }
 
 function reactionFraming(input: {
@@ -320,7 +346,10 @@ export function renderCharacterSajuBoundedExactCoreV1(input: {
         segments.push(
           Object.freeze({
             kind: 'protected_disclosure' as const,
-            text: disclosure.text,
+            text: assertPublicTrustLanguage(
+              disclosure.text,
+              `saju.disclosure.${disclosure.disclosureRef}`,
+            ),
             disclosureRef: disclosure.disclosureRef,
           }),
         );

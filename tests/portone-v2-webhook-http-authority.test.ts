@@ -17,7 +17,7 @@ describe('PortOne V2 webhook HTTP static authority', () => {
   it('reads raw bytes incrementally without parsing or reserializing provider JSON', () => {
     expect(source).toContain('const body = request.body;');
     expect(source).toContain('reader = body.getReader();');
-    expect(source).toContain('const chunk = await reader.read();');
+    expect(source).toContain('const chunk = await deadline.waitFor(reader.read());');
     expect(source).toContain('reader.releaseLock();');
     expect(source).not.toContain('request.arrayBuffer()');
     expect(source).not.toContain('request.json()');
@@ -48,14 +48,19 @@ describe('PortOne V2 webhook HTTP static authority', () => {
     expect(source).not.toContain('transactionId');
   });
 
-  it('adds no deployment, secret binding, entitlement, refund, persistence, or stream-disposal authority', () => {
+  it('adds no deployment, secret binding, entitlement, refund, persistence, or non-timeout stream-disposal authority', () => {
     expect(source).not.toContain('process.env');
     expect(source).not.toContain('PORTONE_WEBHOOK_SECRET');
     expect(source).not.toContain('createServer');
     expect(source).not.toContain('listen(');
     expect(source).not.toContain('Entitlement');
     expect(source).not.toContain('refund');
-    expect(source).not.toContain('cancel');
+    expect(source.match(/reader\.cancel\(\)/gu)).toHaveLength(1);
+    const timeoutBoundary = source.match(
+      /if \(error instanceof IngressRequestBodyCompletionDeadlineExceededV1\) \{[\s\S]*?throw error;\n    \}/u,
+    )?.[0];
+    expect(timeoutBoundary).toContain('void reader.cancel().catch(() => undefined);');
+    expect(source).not.toContain('body.cancel()');
     expect(source).not.toContain('insert into');
   });
 });

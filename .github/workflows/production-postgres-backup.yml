@@ -17,6 +17,7 @@ concurrency:
 env:
   SUPABASE_PROJECT_ID: cnsfpcdiyofqvhpcegfc
   SUPABASE_CLI_VERSION: '2.117.0'
+  SUPABASE_POSTGRES_IMAGE: 'supabase/postgres:17.6.1.167'
   BACKUP_RETENTION_DAYS: '30'
 
 jobs:
@@ -26,9 +27,9 @@ jobs:
     timeout-minutes: 30
     environment: production
     env:
-      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
       SUPABASE_PRODUCTION_SESSION_POOLER_HOST: ${{ secrets.SUPABASE_PRODUCTION_SESSION_POOLER_HOST }}
+      SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM: ${{ secrets.SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM }}
       MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE: ${{ secrets.MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE }}
     steps:
       - name: Checkout exact repository state
@@ -42,13 +43,11 @@ jobs:
           [[ -n "${SUPABASE_DB_PASSWORD:-}" ]] || missing+=(SUPABASE_DB_PASSWORD)
           [[ -n "${MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE:-}" ]] || missing+=(MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE)
 
-          if [[ -n "${SUPABASE_PRODUCTION_SESSION_POOLER_HOST:-}" ]]; then
-            if [[ ! "$SUPABASE_PRODUCTION_SESSION_POOLER_HOST" =~ ^[a-z0-9-]+([.][a-z0-9-]+)*[.]pooler[.]supabase[.]com$ ]]; then
-              echo '::error title=Production backup pooler host invalid::SUPABASE_PRODUCTION_SESSION_POOLER_HOST must be a bare *.pooler.supabase.com hostname.'
-              exit 1
-            fi
-          else
-            [[ -n "${SUPABASE_ACCESS_TOKEN:-}" ]] || missing+=(SUPABASE_ACCESS_TOKEN)
+          [[ -n "${SUPABASE_PRODUCTION_SESSION_POOLER_HOST:-}" ]] || missing+=(SUPABASE_PRODUCTION_SESSION_POOLER_HOST)
+          [[ -n "${SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM:-}" ]] || missing+=(SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM)
+          if [[ -n "${SUPABASE_PRODUCTION_SESSION_POOLER_HOST:-}" && ! "$SUPABASE_PRODUCTION_SESSION_POOLER_HOST" =~ ^[a-z0-9-]+([.][a-z0-9-]+)*[.]pooler[.]supabase[.]com$ ]]; then
+            echo '::error title=Production backup pooler host invalid::SUPABASE_PRODUCTION_SESSION_POOLER_HOST must be a bare *.pooler.supabase.com hostname.'
+            exit 1
           fi
 
           if (( ${#missing[@]} > 0 )); then
@@ -68,60 +67,25 @@ jobs:
           echo "::add-mask::$SUPABASE_DB_PASSWORD"
           echo "::add-mask::$MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE"
 
-      - name: Verify Docker and pinned Supabase CLI
+      - name: Verify Docker, PostgreSQL client, and pinned backup image
         shell: bash
         run: |
           set -euo pipefail
           docker info >/dev/null
-          cli_version="$(npx --yes "supabase@$SUPABASE_CLI_VERSION" --version)"
-          [[ "$cli_version" == "$SUPABASE_CLI_VERSION" ]]
+          docker pull "$SUPABASE_POSTGRES_IMAGE" >/dev/null
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+          psql --version
 
-      - name: Resolve governed production session-pooler endpoint
+      - name: Bind governed production Session Pooler endpoint
         id: database
         shell: bash
         run: |
           set -euo pipefail
-          umask 077
-
-          if [[ -n "${SUPABASE_PRODUCTION_SESSION_POOLER_HOST:-}" ]]; then
-            admin_pool_user="postgres.$SUPABASE_PROJECT_ID"
-            pool_host="$SUPABASE_PRODUCTION_SESSION_POOLER_HOST"
-            pool_port='5432'
-            pool_db='postgres'
-          else
-            pooler_file="$RUNNER_TEMP/supabase-pooler.json"
-            trap 'rm -f "$pooler_file"' EXIT
-
-            curl -fsS \
-              -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
-              "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_ID/config/database/pooler" \
-              -o "$pooler_file"
-
-            pooler_record="$({
-              jq -ce '
-                (if type == "array" then . elif (.data? | type) == "array" then .data else [.] end)
-                | map(
-                    select((.database_type // "") == "PRIMARY")
-                    | . + { resolved_connection_string: (.connection_string // .connectionString // "") }
-                  )
-                | map(
-                    select(
-                      (.resolved_connection_string | type) == "string"
-                      and (.resolved_connection_string | length) > 0
-                      and (.resolved_connection_string | test("\\.pooler\\.supabase\\.com:5432/postgres(?:\\?|$)"))
-                    )
-                  )
-                | first // empty
-              ' "$pooler_file"
-            })"
-            test -n "$pooler_record"
-
-            connection_string="$(jq -r '.resolved_connection_string // empty' <<<"$pooler_record")"
-            admin_pool_user="$(sed -E 's#^[a-zA-Z0-9+.-]+://([^:]+):.*#\1#' <<<"$connection_string")"
-            pool_host="$(sed -E 's#^[^@]+@([^:/]+):([0-9]+)/.*#\1#' <<<"$connection_string")"
-            pool_port="$(sed -E 's#^[^@]+@([^:/]+):([0-9]+)/.*#\2#' <<<"$connection_string")"
-            pool_db="$(sed -E 's#^[^@]+@[^/]+/([^?]+).*$#\1#' <<<"$connection_string")"
-          fi
+          admin_pool_user="postgres.$SUPABASE_PROJECT_ID"
+          pool_host="$SUPABASE_PRODUCTION_SESSION_POOLER_HOST"
+          pool_port='5432'
+          pool_db='postgres'
 
           [[ "$admin_pool_user" == "postgres.$SUPABASE_PROJECT_ID" ]]
           [[ "$pool_host" =~ ^[a-z0-9-]+([.][a-z0-9-]+)*[.]pooler[.]supabase[.]com$ ]]
@@ -162,3 +126,4 @@ jobs:
           echo "project_ref=$SUPABASE_PROJECT_ID"
           echo "retention_days=$BACKUP_RETENTION_DAYS"
           echo "source_sha=$GITHUB_SHA"
+          echo "migration_frontier=${{ steps.dump.outputs.migration_frontier }}"

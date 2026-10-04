@@ -11,6 +11,12 @@ import {
   type SajuProductionCalculationHttpFetchV1,
 } from './saju-production-calculation-http-adapter.js';
 import type { SupabaseMemberVerifierFetchV1 } from './supabase-member-identity-verifier.js';
+import {
+  createSajuAbuseObservedIdentityVerifierV1,
+  observeSajuAbuseOutcomeV1,
+  type SajuAbuseObservationWriterV1,
+  type SajuAbuseOutcomeObservationWriterV1,
+} from './saju-abuse-observability.js';
 
 export interface ProductionCurrentSubjectSajuCalculationRequestV1 {
   readonly request: Request;
@@ -29,6 +35,12 @@ export interface CreateProductionCurrentSubjectSajuCalculationRuntimeInputV1 {
   readonly memberFetchImpl?: SupabaseMemberVerifierFetchV1;
   /** Server-side test/runtime injection only. Never derived from the client request. */
   readonly sajuFetchImpl?: SajuProductionCalculationHttpFetchV1;
+  /** Observe-only baseline injection. Production defaults to the privacy-safe logger. */
+  readonly sajuAbuseObservationWriter?: SajuAbuseObservationWriterV1;
+  /** Observe-only outcome injection. Production defaults to the privacy-safe logger. */
+  readonly sajuAbuseOutcomeWriter?: SajuAbuseOutcomeObservationWriterV1;
+  /** Test/runtime clock injection only. */
+  readonly now?: () => number;
 }
 
 function cancelUnusedRequestBodyBestEffort(request: Request): void {
@@ -69,13 +81,33 @@ export function createProductionCurrentSubjectSajuCalculationRuntimeV1(
 
   return Object.freeze({
     async handleRequest(requestInput: ProductionCurrentSubjectSajuCalculationRequestV1) {
+      const observedIdentityEvidenceVerifier = createSajuAbuseObservedIdentityVerifierV1({
+        delegate: identityEvidenceVerifier,
+        routeId: 'api.me.saju.calculation',
+        requestId: requestInput.requestId,
+        secret: userDataConfig.guestFingerprintSecret,
+        ...(input.sajuAbuseObservationWriter === undefined
+          ? {}
+          : { eventWriter: input.sajuAbuseObservationWriter }),
+        ...(input.now === undefined ? {} : { now: input.now }),
+      });
       const response = await handleCurrentSubjectSajuCalculationRequestV1({
         request: requestInput.request,
         requestId: requestInput.requestId,
         serverTime: requestInput.serverTime,
-        identityEvidenceVerifier,
+        identityEvidenceVerifier: observedIdentityEvidenceVerifier,
         pool,
         sajuAdapter,
+      });
+
+      observeSajuAbuseOutcomeV1({
+        routeId: 'api.me.saju.calculation',
+        requestId: requestInput.requestId,
+        httpStatus: response.status,
+        ...(input.sajuAbuseOutcomeWriter === undefined
+          ? {}
+          : { eventWriter: input.sajuAbuseOutcomeWriter }),
+        ...(input.now === undefined ? {} : { now: input.now }),
       });
 
       if (response.status === 405) {

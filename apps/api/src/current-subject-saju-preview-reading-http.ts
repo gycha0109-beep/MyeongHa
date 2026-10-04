@@ -1,8 +1,16 @@
 import { ApiCommandError } from './api-error.js';
 import {
+  AuthenticatedJsonRequestBodyTooLargeV1,
+  readAuthenticatedJsonRequestBodyV1,
+} from './authenticated-json-request-resource.js';
+import {
   readBoundCurrentBirthProfileV1,
 } from './current-subject-saju-calculation-http.js';
 import type { IdentityEvidenceVerificationPortV1 } from './current-subject-profile-http.js';
+import {
+  createIngressRequestBodyCompletionDeadlineLeaseV1,
+  IngressRequestBodyCompletionDeadlineExceededV1,
+} from './ingress-request-body-deadline.js';
 import type { PostgresSubjectPoolV1 } from './postgres-subject-execution.js';
 import { executeCurrentBirthProfileSajuReadingV1 } from './saju-production-reading-execution.js';
 import {
@@ -164,10 +172,31 @@ export async function handleCurrentSubjectSajuPreviewReadingRequestV1<AdmittedRe
     });
   }
 
+  const bodyDeadline = createIngressRequestBodyCompletionDeadlineLeaseV1();
   let requestBody: unknown;
   try {
-    requestBody = await input.request.json();
-  } catch {
+    requestBody = await readAuthenticatedJsonRequestBodyV1(input.request, {
+      waitForRead: (pending) => bodyDeadline.waitFor(pending),
+    });
+  } catch (error) {
+    if (error instanceof AuthenticatedJsonRequestBodyTooLargeV1) {
+      return errorResponse({
+        status: 413,
+        code: 'REQUEST_TOO_LARGE',
+        messageKey: 'request.too_large',
+        retryable: false,
+        requestId,
+      });
+    }
+    if (error instanceof IngressRequestBodyCompletionDeadlineExceededV1) {
+      return errorResponse({
+        status: 408,
+        code: 'REQUEST_BODY_TIMEOUT',
+        messageKey: 'auth.request_body_timeout',
+        retryable: false,
+        requestId,
+      });
+    }
     return errorResponse({
       status: 400,
       code: 'INVALID_REQUEST',
@@ -175,6 +204,8 @@ export async function handleCurrentSubjectSajuPreviewReadingRequestV1<AdmittedRe
       retryable: false,
       requestId,
     });
+  } finally {
+    bodyDeadline.release();
   }
 
   const readingText = parseRequestBody(requestBody);

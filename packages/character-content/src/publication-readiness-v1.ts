@@ -52,6 +52,24 @@ export interface CharacterPublicationReadinessReportV1 {
   readonly characters: readonly CharacterPublicationReadinessEntryV1[];
 }
 
+export interface CharacterPublicationLaneReadinessInputV1 {
+  readonly characterId: CharacterPublicationReadinessCharacterId;
+  readonly metadata?: Partial<CharacterContentBundleCandidateMetadataV1>;
+  readonly canonCompletion?: CharacterCanonCompletionV1;
+  readonly publicationMaterial?: CharacterPublicationMaterialInputV1;
+}
+
+export interface CharacterPublicationLaneReadinessReportV1 {
+  readonly ready: boolean;
+  readonly characterId: CharacterPublicationReadinessCharacterId;
+  readonly missingMetadataFields: readonly CharacterPublicationMetadataField[];
+  readonly canonCharacterIdMatches: boolean;
+  readonly publicationMaterialCharacterIdMatches: boolean;
+  readonly missingCanonFields: readonly CharacterCanonReadinessField[];
+  readonly missingPublicationMaterialFields:
+    readonly CharacterPublicationMaterialField[];
+}
+
 const METADATA_FIELDS: readonly CharacterPublicationMetadataField[] = [
   'bundleId',
   'contentVersion',
@@ -232,5 +250,56 @@ export function inspectCharacterPublicationReadinessV1(
     duplicatePublicationMaterialCharacterIds: publicationDiagnostics.duplicate,
     unexpectedPublicationMaterialCharacterIds: publicationDiagnostics.unexpected,
     characters,
+  };
+}
+
+
+/**
+ * Inspect one Character publication lane independently from the exact-nine
+ * aggregate Launch gate.
+ *
+ * A ready result means only that this Character's supplied lane inputs are
+ * structurally complete enough to proceed to assembly/Production validation.
+ * It never implies that the full MVP Character launch roster is ready.
+ */
+export function inspectCharacterPublicationLaneReadinessV1(
+  input: CharacterPublicationLaneReadinessInputV1,
+): CharacterPublicationLaneReadinessReportV1 {
+  const metadata = input.metadata ?? {};
+  const missingMetadataFields = METADATA_FIELDS.filter(
+    (field) => !hasText(metadata[field]),
+  );
+
+  const canonCharacterIdMatches =
+    input.canonCompletion === undefined ||
+    input.canonCompletion.characterId === input.characterId;
+  const publicationMaterialCharacterIdMatches =
+    input.publicationMaterial === undefined ||
+    input.publicationMaterial.characterId === input.characterId;
+
+  const laneMissingCanonFields = canonCharacterIdMatches
+    ? missingCanonFields(input.canonCompletion)
+    : [...ALL_CANON_FIELDS];
+  const laneMissingPublicationMaterialFields =
+    publicationMaterialCharacterIdMatches
+      ? missingPublicationMaterialFields(input.publicationMaterial)
+      : [...ALL_PUBLICATION_MATERIAL_FIELDS];
+
+  return {
+    ready:
+      missingMetadataFields.length === 0 &&
+      input.canonCompletion !== undefined &&
+      input.publicationMaterial !== undefined &&
+      canonCharacterIdMatches &&
+      publicationMaterialCharacterIdMatches &&
+      laneMissingCanonFields.length === 0 &&
+      laneMissingPublicationMaterialFields.length === 0,
+    characterId: input.characterId,
+    missingMetadataFields,
+    canonCharacterIdMatches,
+    publicationMaterialCharacterIdMatches,
+    missingCanonFields: laneMissingCanonFields,
+    missingPublicationMaterialFields:
+      laneMissingPublicationMaterialFields,
   };
 }

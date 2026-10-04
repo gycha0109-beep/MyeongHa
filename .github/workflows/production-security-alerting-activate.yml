@@ -1,0 +1,86 @@
+name: Production Security Alerting Activation
+
+run-name: "[WT:security] Production Security Alerting Activation"
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type ACTIVATE_PRODUCTION_SECURITY_ALERTING_A09
+        required: true
+        type: string
+      watchtower_track:
+        description: Watchtower work track attribution
+        required: true
+        default: security
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  activate:
+    name: activate-production-security-alerting
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: production
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_SECURITY_ALERTS_TOKEN }}
+      NO_COLOR: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: "24"
+
+      - name: Fail closed unless explicit security activation is authorized
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+          WATCHTOWER_TRACK: ${{ inputs.watchtower_track }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_EVENT_NAME" = "workflow_dispatch"
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$CONFIRMATION" = "ACTIVATE_PRODUCTION_SECURITY_ALERTING_A09"
+          test "$WATCHTOWER_TRACK" = "security"
+          if [[ -z "${VERCEL_TOKEN:-}" ]]; then
+            echo "VERCEL_SECURITY_ALERTS_TOKEN is missing from the GitHub production environment." >&2
+            exit 1
+          fi
+
+      - name: Activate and verify governed Vercel alert rule
+        id: activate
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/operations/ensure-vercel-security-alert-rule.mjs \
+            activate \
+            config/security/vercel-production-5xx-error-anomaly-rule-v1.json \
+            config/security/production-security-alerting-v1.json
+
+      - name: Record safe activation evidence
+        env:
+          RULE_ID: ${{ steps.activate.outputs.rule_id }}
+          RULE_PRESENT_BEFORE: ${{ steps.activate.outputs.rule_present_before }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$RULE_ID"
+          {
+            echo "production_security_alerting=pass"
+            echo "provider=vercel"
+            echo "provider_interface=alerts-rules-cli"
+            echo "provider_transport=official-vercel-cli"
+            echo "provider_cli=vercel@59.19.1"
+            echo "project=myeongha"
+            echo "project_id=prj_nXF0b5uv27Lyucz2SEBxzdCRXVsP"
+            echo "alert_type=error_anomaly"
+            echo "status_group=5xx"
+            echo "numeric_threshold_owner=vercel-native-anomaly-model"
+            echo "rule_present_before=$RULE_PRESENT_BEFORE"
+            echo "rule_id=$RULE_ID"
+            echo "credential_material_emitted=false"
+            echo "user_payload_emitted=false"
+          } >> "$GITHUB_STEP_SUMMARY"

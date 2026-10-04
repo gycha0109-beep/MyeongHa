@@ -55,6 +55,25 @@ export {
 } from './character-saju-sp2-rollout-orchestration.js';
 
 export {
+  CHARACTER_FACE_READING_COMMIT_SCHEMA_VERSION_V1,
+  CharacterFaceReadingCommitErrorV1,
+  InMemoryCharacterFaceReadingCommitPortV1,
+  commitCharacterFaceReadingArtifactV1,
+  type CharacterFaceCommittedArtifactV1,
+  type CharacterFaceReadingCommitPortV1,
+  type CharacterFaceReadingCommitReceiptV1,
+  type CharacterFaceReadingCommitResultV1,
+} from './character-face-reading-artifact-commit.js';
+
+export {
+  CHARACTER_FACE_CONTROLLED_REVEAL_VERSION_V1,
+  CharacterFaceControlledRevealErrorV1,
+  commitAndRevealCharacterFaceReadingV1,
+  type CharacterFaceControlledRevealResultV1,
+  type CharacterFaceControlledRevealStateV1,
+} from './character-face-reading-artifact-orchestration.js';
+
+export {
   PRODUCTION_CHARACTER_SAJU_SP2_OFF_POLICY_VERSION_V1,
   PRODUCTION_CHARACTER_SAJU_SP2_ROLLOUT_ENV_V1,
   ProductionCharacterSajuSp2RolloutConfigErrorV1,

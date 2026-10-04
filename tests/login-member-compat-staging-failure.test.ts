@@ -31,7 +31,6 @@ class FailingStorage {
 
 const currentSession = Object.freeze({
   accessToken: 'current.member.signature',
-  refreshToken: 'refresh-current',
   expiresAt: '2099-01-01T00:00:00.000Z',
   tokenType: 'bearer',
   user: {
@@ -43,7 +42,6 @@ const currentSession = Object.freeze({
 const rotatedSession = Object.freeze({
   ...currentSession,
   accessToken: 'rotated.member.signature',
-  refreshToken: 'refresh-rotated',
   expiresAt: '2099-01-02T00:00:00.000Z',
 });
 
@@ -106,7 +104,6 @@ describe('Member compatibility sessionStorage staging persistence', () => {
 
     expect(readMemberSession()).toMatchObject({
       accessToken: currentSession.accessToken,
-      refreshToken: currentSession.refreshToken,
     });
     expect(session.getItem(PRODUCT_AUTH_STORAGE_V1.guestBearer)).toBe('stale.member.signature');
     expect(session.getItem(PRODUCT_AUTH_STORAGE_V1.pendingGuestBearer)).toBe('guest-before-member');
@@ -127,7 +124,6 @@ describe('Member compatibility sessionStorage staging persistence', () => {
 
     expect(readMemberSession()).toMatchObject({
       accessToken: currentSession.accessToken,
-      refreshToken: currentSession.refreshToken,
     });
     expect(session.getItem(PRODUCT_AUTH_STORAGE_V1.guestBearer)).toBe(currentSession.accessToken);
     expect(session.getItem(PRODUCT_AUTH_STORAGE_V1.pendingGuestBearer)).toBe('guest-before-member');

@@ -18,6 +18,7 @@ const expiredToken = 'expired.header.signature';
 const rotatedToken = 'rotated.header.signature';
 const terminalExpiredToken = 'terminal.header.signature';
 const stagedGuest = 'refresh-staged-guest';
+const refreshCookieName = 'myeongha_member_refresh_v1';
 const mime = new Map([
   ['.html', 'text/html; charset=utf-8'],
   ['.css', 'text/css; charset=utf-8'],
@@ -73,10 +74,38 @@ async function readJsonBody(req) {
   return raw ? JSON.parse(raw) : {};
 }
 
+function readRefreshCookie(req) {
+  const raw = req.headers.cookie ?? '';
+  for (const segment of raw.split(';')) {
+    const trimmed = segment.trim();
+    const separator = trimmed.indexOf('=');
+    if (separator <= 0 || trimmed.slice(0, separator) !== refreshCookieName) continue;
+    try {
+      return decodeURIComponent(trimmed.slice(separator + 1));
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+function setRefreshCookie(res, token) {
+  res.setHeader(
+    'Set-Cookie',
+    refreshCookieName + '=' + encodeURIComponent(token) + '; Path=/api/auth; HttpOnly; SameSite=Strict',
+  );
+}
+
+function clearRefreshCookie(res) {
+  res.setHeader(
+    'Set-Cookie',
+    refreshCookieName + '=; Path=/api/auth; HttpOnly; SameSite=Strict; Max-Age=0',
+  );
+}
+
 function rotatedSession() {
   return {
     accessToken: rotatedToken,
-    refreshToken: 'refresh-token-rotated',
     expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
     tokenType: 'bearer',
     user: { id: member.id, email: member.email },
@@ -92,13 +121,25 @@ async function serve() {
 
       if (pathname === '/api/auth/refresh' && req.method === 'POST') {
         const body = await readJsonBody(req);
+        const cookieRefreshToken = readRefreshCookie(req);
+        const authTransport = req.headers['x-myeongha-auth-transport'] ?? null;
         refreshRequests += 1;
-        requests.push({ path: pathname, method: req.method, authorization, refreshToken: body.refreshToken ?? null, mode: refreshMode });
+        requests.push({
+          path: pathname,
+          method: req.method,
+          authorization,
+          cookieRefreshToken,
+          bodyRefreshToken: body.refreshToken ?? null,
+          authTransport,
+          mode: refreshMode,
+        });
         if (refreshMode === 'success') {
+          setRefreshCookie(res, 'refresh-token-rotated');
           sendJson(res, 200, successEnvelope({ status: 'authenticated', session: rotatedSession() }));
           return;
         }
         if (refreshMode === 'expired') {
+          clearRefreshCookie(res);
           sendJson(res, 401, errorEnvelope('SESSION_EXPIRED', 'auth.session_expired', false));
           return;
         }
@@ -241,11 +282,19 @@ async function waitFor(client, expression, message, timeout = 8_000) {
   throw new Error(`${message}; diagnostics=${JSON.stringify(diagnostics)}; requests=${JSON.stringify(requests)}`);
 }
 
-async function seedMember(client, { token, refreshToken, expiresAt }) {
+async function seedMember(client, origin, { token, refreshToken, expiresAt }) {
+  const seeded = await client.send('Network.setCookie', {
+    name: refreshCookieName,
+    value: refreshToken,
+    url: `${origin}/api/auth/refresh`,
+    path: '/api/auth',
+    httpOnly: true,
+    sameSite: 'Strict',
+  });
+  assert(seeded?.success !== false, 'Failed to seed refresh HttpOnly cookie');
   await client.evaluate(`(() => {
     const session = {
       accessToken: ${JSON.stringify(token)},
-      refreshToken: ${JSON.stringify(refreshToken)},
       expiresAt: ${JSON.stringify(expiresAt)},
       tokenType: 'bearer',
       user: { id: ${JSON.stringify(member.id)}, email: ${JSON.stringify(member.email)} },
@@ -306,7 +355,7 @@ try {
   await navigate(client, origin, '/hall.html', '.product-profile');
 
   refreshMode = 'unavailable';
-  await seedMember(client, {
+  await seedMember(client, origin, {
     token: nearExpiryToken,
     refreshToken: 'refresh-token-near',
     expiresAt: new Date(Date.now() + 30_000).toISOString(),
@@ -327,7 +376,7 @@ try {
   assert(refreshRequests > nearRefreshBefore, 'Near-expiry scenario did not attempt Member refresh');
   assert(guestBootstrapRequests === 0, 'Near-expiry transient refresh bootstrapped a Guest');
 
-  await seedMember(client, {
+  await seedMember(client, origin, {
     token: expiredToken,
     refreshToken: 'refresh-token-expired',
     expiresAt: new Date(Date.now() - 5_000).toISOString(),
@@ -370,7 +419,7 @@ try {
   assert(guestBootstrapRequests === 0, 'Refresh recovery unexpectedly bootstrapped a Guest');
 
   refreshMode = 'expired';
-  await seedMember(client, {
+  await seedMember(client, origin, {
     token: terminalExpiredToken,
     refreshToken: 'refresh-token-terminal',
     expiresAt: new Date(Date.now() - 5_000).toISOString(),
@@ -396,7 +445,17 @@ try {
   assert(authoritativeState.userId === null && authoritativeState.email === null, 'Authoritative SESSION_EXPIRED retained Member identity metadata');
   assert(authoritativeState.activeBearer === stagedGuest && authoritativeState.pendingGuest === null, 'Authoritative SESSION_EXPIRED did not restore pending Guest authority exactly once');
   assert(refreshRequests > authoritativeRefreshBefore, 'Authoritative expiry scenario did not attempt Member refresh');
-  assert(requests.some((request) => request.path === '/api/auth/refresh' && request.refreshToken === 'refresh-token-terminal' && request.mode === 'expired'), 'Authoritative expiry scenario did not reject the intended Member refresh credential');
+  assert(
+    requests.some(
+      (request) =>
+        request.path === '/api/auth/refresh' &&
+        request.cookieRefreshToken === 'refresh-token-terminal' &&
+        request.bodyRefreshToken === null &&
+        request.authTransport === 'web-cookie-v1' &&
+        request.mode === 'expired',
+    ),
+    'Authoritative expiry scenario did not reject the intended HttpOnly Member refresh credential',
+  );
   assert(guestBootstrapRequests === 0, 'Authoritative SESSION_EXPIRED bootstrapped a new Guest instead of restoring the staged Guest');
 
   const report = {

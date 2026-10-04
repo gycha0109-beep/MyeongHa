@@ -397,8 +397,8 @@ write는 `idempotencyKey + expectedRevision` 필요.
 Use Case의 공식 API 목록은 notification preference/inbox를 정의하지만 Device Installation register/revoke HTTP route 이름 자체는 명시하지 않는다. 아래 두 device route는 Pack의 supporting surface 후보이며, source-backed DB/lifecycle 의미와 분리해 본다.
 
 ```text
-POST   /api/device-installations/register      # SRC-19 BLOCKED
-POST   /api/device-installations/:id/revoke    # supporting route candidate; revoke behavior source-safe
+POST   /api/device-installations/register      # Mobile Expo Push lifecycle — SRC-19 RESOLVED
+POST   /api/device-installations/:id/revoke    # owner-scoped idempotent revoke
 GET    /api/notifications                      # final inbox projection SRC-13 BLOCKED
 POST   /api/notifications/:id/read             # explicit owned stored notification read command source-safe
 GET    /api/notification-preferences           # stored-row projection only; effective missing-row defaults SRC-12 BLOCKED
@@ -408,9 +408,9 @@ PATCH  /api/notification-preferences/preview   # SRC-12 BLOCKED
 
 ### Device installation lifecycle
 
-`SRC-19` 해결 전 register endpoint를 production-authoritative contract로 승격하지 않는다. Source는 active identity/token uniqueness와 cross-subject revoke-before-rebind는 정의하지만 same-subject retry, token rotation, revoked-row re-registration, row lineage, observation-field refresh, concurrent registration identity를 정의하지 않는다.
+2026-10-02 Product Owner decision으로 Mobile Expo Push registration lifecycle의 `SRC-19`가 해결되었다. 같은 subject + 같은 active installation key는 기존 row를 refresh하고, token rotation은 해당 row의 보호 token material을 교체한다. 같은 subject의 동일 token이 다른 installation key로 이동하면 기존 row를 revoke하고 새 server-generated row를 만든다. revoked row는 부활시키지 않는다. cross-subject active installation/token은 기존 owner revoke 전까지 fail-closed다.
 
-Standalone owner-scoped revoke DB command는 이 gap과 독립적으로 유지할 수 있다. Push token registration이 향후 승격될 때도 subject ownership + installation/token uniqueness는 server가 검증해야 한다.
+Client는 stable `installationKey`만 제공하며 canonical `subjectId`나 DB `device_installations.id`를 선택하지 않는다. Raw Expo Push token은 authenticated HTTPS request에서만 수신하고 server-side encryption/fingerprint 경계를 거쳐 저장한다. 같은 Product Owner decision은 Mobile iOS/Android MVP transport service를 **Expo Push Notifications**로 선택한다. 다만 `SRC-31`의 notification-attempt provider provenance/resolver와 실제 send/retry/failover authority, `SRC-32` autonomous scheduling authority는 열지 않는다.
 
 ### Notification inbox read boundary — `SRC-13`
 
@@ -450,7 +450,7 @@ new category existing-user default
 
 이 HTTP 목록에 autonomous scheduler create endpoint가 없다는 사실은 scheduler authority가 해결됐다는 뜻이 아니다. Candidate → cadence/frequency/eligibility → logical notification materialization은 `SRC-32`가 계속 막는다.
 
-Likewise provider attempt persistence가 존재해도 installation/platform configuration에서 실제 provider를 resolve하는 production routing authority는 `SRC-31`이 계속 막는다. Public notification API가 이 내부 gap을 우회하지 않는다.
+Mobile iOS/Android의 외부 transport service는 Expo Push Notifications로 선택되었다. 그러나 provider attempt persistence가 존재한다는 사실이나 transport 선택만으로 `notification_delivery_attempts.provider`의 canonical provenance/resolver, retry/failover, 실제 send worker authority가 해결되지는 않는다. 그 남은 내부 경계는 `SRC-31`이 계속 막으며 Public notification API가 이를 우회하지 않는다.
 
 ## 16. Commerce
 
@@ -577,7 +577,60 @@ The numeric ceiling is an explicit operations/resource authority introduced for 
 - final notification inbox membership/order/cursor: `SRC-13` 해결 전 normative contract로 확정하지 않는다. Raw stored notification ledger의 deterministic internal/read projection은 public inbox ordering authority가 아니다.
 - offset pagination은 append-heavy stream 기본값으로 사용하지 않는다.
 
-## 21. Contract Test Gate
+## 21. Authenticated JSON Request Resource Bounds
+
+Repository-owned request-resource authority: `docs/operations/AUTHENTICATED_JSON_REQUEST_RESOURCE_POLICY_V1.md`.
+
+V1 common body authority:
+
+```text
+maximum body = 16,384 UTF-8 bytes
+over-limit   = 413 REQUEST_TOO_LARGE
+measurement  = actual consumed UTF-8 octets
+Content-Length is an early-rejection hint only
+```
+
+Covered boundaries:
+
+- Production-active `POST /api/birth-profiles`
+  - Birth label = maximum 512 UTF-8 bytes
+  - identity verification remains before MyeongHa body consumption
+  - the pre-parsed Vercel adapter must not perform unbounded secondary serialization after authentication
+- Production-active Chat-open `POST /api/chat`
+  - existing finite character allowlist remains the characterId authority
+  - existing body-completion deadline remains independently enforced
+- `POST /api/readings`
+  - Reading create remains dormant at the current Production routing baseline
+  - Reading idempotencyKey = maximum 128 UTF-8 bytes
+  - Reading sourceBirthProfileId = maximum 128 UTF-8 bytes
+  - these limits are activation prerequisites, not a claim of current Production create exposure
+
+Streaming-capable runtimes count bytes while consuming the request and reject as soon as the ceiling is crossed; they must not first materialize the complete over-limit body. A resource rejection occurs before semantic validation/persistence. Within-limit malformed JSON and semantic-invalid requests retain their existing governed error behavior.
+
+The 16 KiB ceiling and field ceilings are explicit operations/resource authority introduced for #699 because the product/source pack does not provide those numeric limits. They are not inferred from Vercel's platform payload ceiling. Changing them requires a reviewed authority update and regression tests.
+
+## 22. Upstream JSON Response Resource Bounds
+
+Repository-owned response-resource authority: `docs/operations/UPSTREAM_JSON_RESPONSE_RESOURCE_POLICY_V1.md`.
+
+V1 active upstream boundaries:
+
+```text
+Supabase Auth success JSON maximum = 131,072 application-visible bytes
+Supabase Member success JSON maximum = 65,536 application-visible bytes
+Saju calculation success JSON maximum = 262,144 application-visible bytes
+Saju Reading success JSON maximum = 524,288 application-visible bytes
+```
+
+Actual application-visible response stream bytes are final authority. `Content-Length` is an early-rejection hint only and cannot approve a response whose consumed stream crosses the governed ceiling; encoded-response metadata likewise cannot substitute for actual application-visible counting.
+
+The existing upstream deadlines remain independently authoritative. Resource enforcement adds a finite space bound without weakening timeout behavior, status-first rejection, Auth/Member semantics, or Saju semantic ingress.
+
+Successful governed JSON bodies must be bounded before whole-body decode/JSON parsing. Unused rejected/status-only bodies are cancelled on a best-effort non-blocking basis. Supabase Auth sign-out remains status-only and does not require success-body materialization.
+
+The Auth 128 KiB, Member 64 KiB, and Saju 256 KiB ceilings are explicit operations/resource authority introduced for #700 because the product/source pack and upstream contracts do not provide application-owned response byte limits. They are independent of the #699 authenticated request-body ceiling. Changing them requires a reviewed authority update and regression tests.
+
+## 23. Contract Test Gate
 
 - 모든 endpoint unknown field policy
 - Web/Mobile same fixture same schema

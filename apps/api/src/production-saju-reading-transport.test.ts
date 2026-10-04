@@ -9,6 +9,18 @@ import {
   SAJU_PRODUCT_READING_RESPONSE_ADMISSION_VERSION_V1,
 } from './saju-production-reading-http-adapter.js';
 
+const encoder = new TextEncoder();
+
+function textStream(value: string): ReadableStream<Uint8Array> {
+  const bytes = encoder.encode(value);
+  return new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(bytes);
+      controller.close();
+    },
+  });
+}
+
 const ENV = Object.freeze({
   MYEONGHA_SAJU_SERVICE_ORIGIN: 'https://saju.example.test',
   MYEONGHA_SAJU_SERVICE_BEARER: 'server-owned-reading-credential',
@@ -25,6 +37,7 @@ const BIRTH_REVISION = Object.freeze({
 });
 
 function attestedResponse(body: unknown) {
+  const serialized = JSON.stringify(body);
   return {
     status: 200,
     headers: {
@@ -37,9 +50,9 @@ function attestedResponse(body: unknown) {
         return null;
       },
     },
-    body: null,
+    body: textStream(serialized),
     async text() {
-      return JSON.stringify(body);
+      return serialized;
     },
   };
 }

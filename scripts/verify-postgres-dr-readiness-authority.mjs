@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { readdir, readFile } from 'node:fs/promises';
 
 const paths = {
@@ -5,7 +6,11 @@ const paths = {
   decisions: 'docs/P0_DECISION_REGISTER.md',
   privacy: 'docs/AUTH_RLS_PRIVACY_SPEC.md',
   sourceGaps: 'docs/SOURCE_AUTHORITY_GAPS.md',
+  backupExport: 'scripts/operations/export-production-postgres-backup.sh',
+  strictDump: 'scripts/operations/run-production-postgres-strict-dump.sh',
+  backupWorkflow: '.github/workflows/production-postgres-backup.yml',
   restoreHarness: 'scripts/run-postgres-isolated-restore-drill.sh',
+  restoreEnvelope: 'scripts/build-postgres-restore-evidence-envelope.mjs',
   restoreRunbook: 'docs/operations/POSTGRES_BACKUP_RESTORE_RUNBOOK_V1.md',
   readinessStatus: 'docs/operations/POSTGRES_DR_READINESS_STATUS_V1.md',
 };
@@ -14,6 +19,11 @@ const entries = await Promise.all(
   Object.entries(paths).map(async ([key, path]) => [key, await readFile(path, 'utf8')]),
 );
 const files = Object.fromEntries(entries);
+
+execFileSync('bash', ['-n', paths.backupExport], { stdio: 'inherit' });
+execFileSync('bash', ['-n', paths.strictDump], { stdio: 'inherit' });
+execFileSync('bash', ['-n', paths.restoreHarness], { stdio: 'inherit' });
+
 const migrationFiles = await readdir('supabase/migrations');
 const migrationNumbers = migrationFiles
   .map((name) => name.match(/^(\d+)_.*\.sql$/))
@@ -89,14 +99,32 @@ requireRegex(
   /SRC-06[\s\S]{0,2000}BLOCKING BEFORE FINAL DELETION DDL BASELINE/,
   'SRC-06 must remain blocking before final deletion DDL authority is resolved',
 );
+requireFragment('backupExport', "select max(version::bigint)");
+requireFragment('backupExport', "public.member_auth_rate_limit_buckets");
+requireFragment('strictDump', '--exclude-table "public.member_auth_rate_limit_buckets"');
+requireFragment('strictDump', '--env PGSSLMODE=verify-full');
+requireFragment('strictDump', '--env PGSSLROOTCERT="$container_root_certificate"');
+requireFragment('backupExport', 'migration_frontier');
+requireFragment('backupExport', 'ephemeral_data_exclusions');
+requireFragment('backupWorkflow', 'postgresql-client');
+requireFragment('restoreHarness', 'backup_migration_frontier');
+requireFragment('restoreHarness', 'member_auth_rate_limit_schema_restore');
+requireFragment('restoreHarness', 'member_auth_rate_limit_unlogged');
+requireFragment('restoreHarness', 'member_auth_rate_limit_ephemeral_data_restore');
+requireFragment('restoreHarness', 'member_auth_rate_limit_owner_restore');
+requireFragment('restoreHarness', 'member_auth_rate_limit_acl_restore');
+requireFragment('restoreHarness', 'member_auth_rate_limit_synthetic_admission');
 requireFragment('restoreHarness', 'privacy_reconciliation: "not_exercised_by_this_workflow"');
 requireFragment('restoreHarness', 'dr_ready: false');
+requireFragment('restoreEnvelope', 'backupManifest.migration_frontier');
+requireFragment('restoreEnvelope', "public.member_auth_rate_limit_buckets");
+requireFragment('restoreEnvelope', "member_auth_rate_limit_synthetic_admission: 'pass'");
 requireFragment('restoreRunbook', 'Production state: CURRENT-FRONTIER BACKUP+RESTORE PROVEN / DR NOT READY');
-requireFragment('restoreRunbook', 'backup schema freshness             = CURRENT — backup frontier 1305 / deployed frontier 1305');
-requireFragment('restoreRunbook', 'current-schema restore              = EVIDENCED — run 35947730074 / frontier 1305');
+requireFragment('restoreRunbook', 'backup schema freshness             = CURRENT — backup frontier 1310 / deployed frontier 1310');
+requireFragment('restoreRunbook', 'current-schema restore              = EVIDENCED — run 36295215761 / frontier 1310');
 requireFragment('restoreRunbook', 'bounded privacy source authority    = RUNTIME-PROVEN — run 35653303484 / AUTHORITATIVE_CAPTURED_WINDOW_V1');
 requireFragment('restoreRunbook', 'recovered finalization mechanics    = IMPLEMENTED / POST-MERGE CI GREEN');
-requireFragment('restoreRunbook', 'recovered finalization on current-frontier synthetic restore = PROVEN — run 35947730074 / synthetic captured-window mechanics');
+requireFragment('restoreRunbook', 'recovered finalization on current-frontier synthetic restore = PROVEN — run 36295215761 / synthetic captured-window mechanics');
 requireFragment('restoreRunbook', 'authoritative privacy reconciliation= PROVEN — run 35659483080 / bounded captured window only');
 requireFragment('restoreRunbook', 'future-safe privacy reconciliation  = false');
 requireFragment('restoreRunbook', 'full authoritative achieved evidence comparison **PASS** — `5536s`');
@@ -109,9 +137,9 @@ requireFragment('restoreRunbook', 'Production PostgreSQL Privacy Recovery Ledger
 requireFragment('restoreRunbook', '35539838537');
 requireFragment('restoreRunbook', '- [x] bounded captured-window privacy source authority runtime-proven — run `35539838537`');
 requireFragment('restoreRunbook', '- [x] account-deletion finalizer and recovered-state finalization mechanics implemented / post-merge CI green');
-requireFragment('restoreRunbook', '- [x] fresh governed backup captured after deployed migration `1305` — run `35944326928` / artifact `10786441202`');
-requireFragment('restoreRunbook', '- [x] isolated restore completed from that current-frontier backup — run `35947730074`');
-requireFragment('restoreRunbook', '- [x] recovered-state synthetic finalization drill executed on that fresh governed restore — run `35947730074`');
+requireFragment('restoreRunbook', '- [x] fresh governed backup captured after deployed migration `1310` — run `36294430134` / artifact `10923756192`');
+requireFragment('restoreRunbook', '- [x] isolated restore completed from that current-frontier backup — run `36295215761`');
+requireFragment('restoreRunbook', '- [x] recovered-state synthetic finalization drill executed on that fresh governed restore — run `36295215761`');
 requireFragment('restoreRunbook', '- [x] authoritative privacy/deletion/legal-retention reconciliation exercised for the applicable captured window — run `35659483080`');
 requireFragment('restoreRunbook', '- [x] achieved recovery duration measured across the full authoritative recovery procedure — `67s`');
 requireFragment('restoreRunbook', '- [x] full authoritative data-loss window measured — `5536s`');
@@ -125,25 +153,31 @@ for (const staleFragment of [
   'isolated restore                = NOT YET EVIDENCED',
 ]) {
   if (files.restoreRunbook.includes(staleFragment)) {
-    throw new Error(`${paths.restoreRunbook} contains stale restore-state evidence after latest successful runtime-proof run 35947730074: ${staleFragment}`);
+    throw new Error(`${paths.restoreRunbook} contains stale restore-state evidence after latest successful runtime-proof run 36295215761: ${staleFragment}`);
   }
 }
 
 const requiredStatusFragments = [
-  'latest_governed_backup_run_id: 35944326928',
-  'latest_governed_backup_source_sha: fcab2c63d3f682bd7e89bf048cff9d4d62c404dd',
-  'latest_governed_backup_artifact_id: 10786441202',
-  'latest_proven_backup_migration_frontier: 1305',
-  'production_schema_latest_deployed_migration: 1305',
-  'current_repository_migration_frontier: 1305',
-  'latest_isolated_restore_run_id: 35947730074',
-  'latest_isolated_restore_runtime_head_sha: fcab2c63d3f682bd7e89bf048cff9d4d62c404dd',
-  'latest_isolated_restore_backup_run_id: 35944326928',
-  'latest_isolated_restore_evidence_artifact_id: 10787108939',
-  'latest_isolated_restore_backup_migration_frontier: 1305',
-  'restore_evidence_envelope_runtime: PROVEN_ON_RUN_35947730074',
+  'latest_governed_backup_run_id: 36294430134',
+  'latest_governed_backup_source_sha: 1d67dda2c17d35b7bf089d733981bd2425a0a0c5',
+  'latest_governed_backup_artifact_id: 10923756192',
+  'latest_proven_backup_migration_frontier: 1310',
+  'production_schema_latest_deployed_migration: 1310',
+  'current_repository_migration_frontier: 1310',
+  'latest_isolated_restore_run_id: 36295215761',
+  'latest_isolated_restore_runtime_head_sha: 195fe1fb0af5c3d2f2ef1556085710d669bec50e',
+  'latest_isolated_restore_backup_run_id: 36294430134',
+  'latest_isolated_restore_evidence_artifact_id: 10923587751',
+  'latest_isolated_restore_backup_migration_frontier: 1310',
+  'restore_evidence_envelope_runtime: PROVEN_ON_RUN_36295215761',
   'latest_isolated_restore_result: SUCCESS',
   'provider_managed_data_full_restore: false',
+  'member_auth_rate_limit_schema_restore: PASS',
+  'member_auth_rate_limit_unlogged: true',
+  'member_auth_rate_limit_ephemeral_data_restore: EXCLUDED',
+  'member_auth_rate_limit_owner_restore: PASS',
+  'member_auth_rate_limit_acl_restore: PASS',
+  'member_auth_rate_limit_synthetic_admission: PASS',
   'privacy_recovery_ledger_authority_class: AUTHORITATIVE_CAPTURED_WINDOW_V1',
   'authoritative_post_backup_source: true_bounded_captured_window_only',
   'account_deletion_finalizer_runtime: IMPLEMENTED_AND_PROVIDER_MECHANICS_SEPARATELY_PROVEN',

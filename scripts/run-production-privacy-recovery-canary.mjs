@@ -1,10 +1,6 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import { appendFile, readFile, writeFile } from 'node:fs/promises';
 import { Pool } from 'pg';
-import {
-  HostedAuthCanaryKeySelectionError,
-  selectHostedAuthCanaryAdminKey,
-} from './account-deletion-hosted-auth-canary-key-selection.mjs';
 
 const PROJECT_REF = 'cnsfpcdiyofqvhpcegfc';
 const ORIGIN = `https://${PROJECT_REF}.supabase.co`;
@@ -33,6 +29,16 @@ function requiredEnv(name) {
   const value = process.env[name];
   if (typeof value !== 'string' || value.length === 0) fail(`MISSING_${name}`);
   return value;
+}
+
+function privilegedAdminDatabaseUrl() {
+  const url = new URL('postgresql://localhost/postgres');
+  url.hostname = requiredEnv('SUPABASE_PRODUCTION_SESSION_POOLER_HOST');
+  url.port = '5432';
+  url.username = `postgres.${PROJECT_REF}`;
+  url.password = requiredEnv('SUPABASE_DB_PASSWORD');
+  url.searchParams.set('sslmode', 'verify-full');
+  return url.toString();
 }
 
 function requireRunId(value) {
@@ -81,39 +87,17 @@ async function fetchWithTimeout(url, init, timeoutMs = 10_000) {
   }
 }
 
-async function resolveAdminSecret() {
-  const explicit = process.env.MYEONGHA_SUPABASE_AUTH_ADMIN_SECRET;
-  if (typeof explicit === 'string' && explicit.length > 0) return explicit;
-
-  const token = requiredEnv('SUPABASE_ACCESS_TOKEN');
+function resolveAdminSecret() {
+  const secret = requiredEnv('MYEONGHA_SUPABASE_AUTH_ADMIN_SECRET');
   if (
-    token.trim() !== token ||
-    token.length < 20 ||
-    token.length > 4096 ||
-    /\s/u.test(token)
+    secret.trim() !== secret ||
+    secret.length < 16 ||
+    secret.length > 4_096 ||
+    /\s/u.test(secret)
   ) {
-    fail('MANAGEMENT_ACCESS_TOKEN_INVALID');
+    fail('AUTH_ADMIN_SECRET_INVALID');
   }
-
-  const response = await fetchWithTimeout(
-    `https://api.supabase.com/v1/projects/${PROJECT_REF}/api-keys`,
-    {
-      method: 'GET',
-      headers: {
-        accept: 'application/json',
-        authorization: `Bearer ${token}`,
-      },
-    },
-  );
-  if (!response.ok) fail(`MANAGEMENT_API_REJECTED_${response.status}`);
-
-  const payload = await readBoundedJson(response);
-  try {
-    return selectHostedAuthCanaryAdminKey(payload);
-  } catch (error) {
-    if (error instanceof HostedAuthCanaryKeySelectionError) fail(error.code);
-    throw error;
-  }
+  return secret;
 }
 
 async function runtimeModules() {
@@ -124,6 +108,7 @@ async function runtimeModules() {
     workerRuntimeModule,
     workerPoolModule,
     postgresPoolModule,
+    privilegedPostgresTlsModule,
   ] = await Promise.all([
     import('../dist/apps/api/src/production-account-deletion-auth-admin-config.js'),
     import('../dist/apps/api/src/supabase-auth-admin-user-deletion.js'),
@@ -131,6 +116,7 @@ async function runtimeModules() {
     import('../dist/apps/api/src/production-account-deletion-worker-runtime.js'),
     import('../dist/apps/api/src/node-postgres-account-deletion-worker-pool.js'),
     import('../dist/apps/api/src/node-postgres-subject-pool.js'),
+    import('../dist/apps/api/src/production-privileged-postgres-tls-peer-verification.js'),
   ]);
   return {
     ...authConfigModule,
@@ -139,16 +125,22 @@ async function runtimeModules() {
     ...workerRuntimeModule,
     ...workerPoolModule,
     ...postgresPoolModule,
+    ...privilegedPostgresTlsModule,
   };
 }
 
 async function createAdminPool() {
-  const { normalizeNodePostgresConnectionStringV1 } = await runtimeModules();
-  const connectionString = normalizeNodePostgresConnectionStringV1(
-    requiredEnv('MYEONGHA_PRIVACY_CANARY_ADMIN_DATABASE_URL'),
-  );
+  const { buildProductionPrivilegedPostgresStrictTlsTargetV1 } =
+    await runtimeModules();
+  const target = buildProductionPrivilegedPostgresStrictTlsTargetV1({
+    databaseUrl: privilegedAdminDatabaseUrl(),
+    rootCertificatePem: requiredEnv(
+      'MYEONGHA_WORKER_DATABASE_SSL_ROOT_CERT_PEM',
+    ),
+  });
   return new Pool({
-    connectionString,
+    connectionString: target.connectionString,
+    ssl: target.ssl,
     max: 1,
     connectionTimeoutMillis: 5_000,
     idleTimeoutMillis: 10_000,
@@ -238,7 +230,7 @@ async function provisionApiCanaryLogin() {
     await pool.end();
   }
 
-  const adminUrl = new URL(requiredEnv('MYEONGHA_PRIVACY_CANARY_ADMIN_DATABASE_URL'));
+  const adminUrl = new URL(privilegedAdminDatabaseUrl());
   adminUrl.username = `${roleName}.${PROJECT_REF}`;
   adminUrl.password = password;
   const databaseUrl = adminUrl.toString();
@@ -798,7 +790,7 @@ async function prepare() {
     fail('CONFIRMATION_REQUIRED');
   }
   const runId = requireRunId(process.env.GITHUB_RUN_ID);
-  const secret = await resolveAdminSecret();
+  const secret = resolveAdminSecret();
   const authUserId = await createHostedUser(secret, runId);
   const state = {
     schema: 'myeongha-production-privacy-canary-state-v1',
@@ -1065,7 +1057,7 @@ async function execute() {
   state.phase = 'deletion_started';
   await writeState(state);
 
-  const secret = await resolveAdminSecret();
+  const secret = resolveAdminSecret();
   const worker = await runWorker(state, secret);
   await verifyFinalState(state, secret, worker);
 
@@ -1089,7 +1081,7 @@ async function resumeDeletion() {
     fail('RESUME_SOURCE_RUN_MISMATCH');
   }
 
-  const secret = await resolveAdminSecret();
+  const secret = resolveAdminSecret();
   const worker = await runWorker(state, secret);
   await verifyFinalState(state, secret, worker);
 
@@ -1155,7 +1147,7 @@ async function cleanupPrestart() {
     await pool.end();
   }
 
-  const secret = await resolveAdminSecret();
+  const secret = resolveAdminSecret();
   await deleteHostedUserBestEffort(secret, state.authUserId);
   state.phase = 'cleaned';
   await writeState(state);

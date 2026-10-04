@@ -1,0 +1,20 @@
+{
+  "type": "built-in",
+  "name": "MyeongHa Production 5xx Error Anomalies",
+  "ruleScope": {
+    "type": "include",
+    "projectIds": [
+      "prj_nXF0b5uv27Lyucz2SEBxzdCRXVsP"
+    ]
+  },
+  "triggers": {
+    "mode": "selected",
+    "items": [
+      {
+        "type": "error_anomaly",
+        "filter": "statusGroup:5xx"
+      }
+    ]
+  },
+  "matchMinimumSeverityLevel": "high"
+}

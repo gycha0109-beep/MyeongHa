@@ -34,6 +34,7 @@ jobs:
     env:
       SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
       SUPABASE_PRODUCTION_SESSION_POOLER_HOST: ${{ secrets.SUPABASE_PRODUCTION_SESSION_POOLER_HOST }}
+      SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM: ${{ secrets.SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM }}
       MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE: ${{ secrets.MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE }}
 
     steps:
@@ -47,6 +48,7 @@ jobs:
           missing=()
           [[ -n "${SUPABASE_DB_PASSWORD:-}" ]] || missing+=(SUPABASE_DB_PASSWORD)
           [[ -n "${SUPABASE_PRODUCTION_SESSION_POOLER_HOST:-}" ]] || missing+=(SUPABASE_PRODUCTION_SESSION_POOLER_HOST)
+          [[ -n "${SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM:-}" ]] || missing+=(SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM)
           [[ -n "${MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE:-}" ]] || missing+=(MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE)
 
           if (( ${#missing[@]} > 0 )); then
@@ -90,8 +92,7 @@ jobs:
               [
                 .workflow_runs[]
                 | select(
-                    .name == "Production PostgreSQL Logical Backup"
-                    and .path == ".github/workflows/production-postgres-backup.yml"
+                    .path == ".github/workflows/production-postgres-backup.yml"
                     and .conclusion == "success"
                     and .head_branch == "main"
                     and (.event == "schedule" or .event == "workflow_dispatch")
@@ -112,8 +113,7 @@ jobs:
             -o "$run_json"
 
           jq -e '
-            .name == "Production PostgreSQL Logical Backup"
-            and .path == ".github/workflows/production-postgres-backup.yml"
+            .path == ".github/workflows/production-postgres-backup.yml"
             and .conclusion == "success"
             and .head_branch == "main"
             and (.event == "schedule" or .event == "workflow_dispatch")

@@ -14,17 +14,18 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  scope:
-    name: route-governance-scope
+  verify:
+    name: Governance Verify
     runs-on: ubuntu-latest
-    timeout-minutes: 3
-    outputs:
-      contracts: ${{ steps.scope.outputs.contracts }}
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: "24"
+          cache: npm
       - name: Resolve governance scope
         id: scope
         env:
@@ -40,7 +41,7 @@ jobs:
           changed_files="${RUNNER_TEMP}/myeongha-governance-changed-files.txt"
 
           if [[ "$EVENT_NAME" == "pull_request" ]]; then
-            git diff --name-only "$PR_BASE_SHA" "$PR_HEAD_SHA" > "$changed_files"
+            git diff --name-only "$PR_BASE_SHA...$PR_HEAD_SHA" > "$changed_files"
           elif [[ "$EVENT_NAME" == "push" ]]; then
             if [[ "$PUSH_BASE_SHA" =~ ^0+$ ]]; then
               git show --pretty='' --name-only "$PUSH_HEAD_SHA" > "$changed_files"
@@ -55,43 +56,42 @@ jobs:
           echo "Changed files:"
           cat "$changed_files"
 
-          if grep -Eq '^(\.github/workflows/|\.github/[^/]+\.trigger$|scripts/|docs/|supabase/migrations/|test/db/|package\.json$|package-lock\.json$)' "$changed_files"; then
-            echo "contracts=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "contracts=false" >> "$GITHUB_OUTPUT"
-          fi
-
-  contracts:
-    needs: scope
-    if: needs.scope.outputs.contracts == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: '24'
-          cache: npm
+          node scripts/ci/verification-plan.mjs < "$changed_files" >> "$GITHUB_OUTPUT"
       - name: Install dependencies
         run: npm ci --ignore-scripts --no-audit --no-fund
+        if: steps.scope.outputs.contracts == 'true'
       - name: Verify governance contracts
-        run: npm run check:governance
-
-  verify:
-    name: Governance Verify
-    runs-on: ubuntu-latest
-    timeout-minutes: 2
-    if: ${{ always() && !cancelled() }}
-    needs:
-      - scope
-      - contracts
-    steps:
-      - name: Require selected governance gates
+        run: |
+          node scripts/verify-github-actions-trust-boundary.mjs
+          node scripts/verify-security-observability-governance.mjs
+          node scripts/verify-production-security-alerting-governance.mjs
+          node scripts/verify-ci-responsibility-map.mjs
+          node scripts/verify-dependency-supply-chain-governance.mjs
+          node scripts/verify-production-environment-governance.mjs
+          npm run check:governance
+          node scripts/verify-upstream-json-response-resource-policy.mjs
+        if: steps.scope.outputs.contracts == 'true'
+        id: contracts
+      - name: Review dependency changes
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294
+        with:
+          fail-on-severity: moderate
+          fail-on-scopes: runtime, development, unknown
+          comment-summary-in-pr: never
+        id: dependency_review
+        if: github.event_name == 'pull_request' && steps.scope.outputs.dependencies == 'true'
+      - name: Require every selected governance check
+        if: ${{ always() && !cancelled() }}
         env:
-          SCOPE_RESULT: ${{ needs.scope.result }}
-          CONTRACTS_RESULT: ${{ needs.contracts.result }}
+          SCOPE_RESULT: ${{ steps.scope.outcome }}
+          CONTRACTS_SELECTED: ${{ steps.scope.outputs.contracts }}
+          CONTRACTS_RESULT: ${{ steps.contracts.outcome }}
+          DEPENDENCIES_SELECTED: ${{ steps.scope.outputs.dependencies }}
+          DEPENDENCY_RESULT: ${{ steps.dependency_review.outcome }}
+          EVENT_NAME: ${{ github.event_name }}
         shell: bash
         run: |
           set -euo pipefail
           test "$SCOPE_RESULT" = "success"
-          test "$CONTRACTS_RESULT" = "success" || test "$CONTRACTS_RESULT" = "skipped"
+          if [[ "$CONTRACTS_SELECTED" == "true" ]]; then test "$CONTRACTS_RESULT" = "success"; fi
+          if [[ "$EVENT_NAME" == "pull_request" && "$DEPENDENCIES_SELECTED" == "true" ]]; then test "$DEPENDENCY_RESULT" = "success"; fi

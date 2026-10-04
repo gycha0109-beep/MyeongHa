@@ -9,6 +9,16 @@ import {
 } from './ingress-request-body-deadline.js';
 import { fetchSupabaseAuthWithDeadlineV1 } from './supabase-auth-upstream-deadline.js';
 import {
+  clearMemberRefreshCookieV1,
+  readMemberRefreshCookieV1,
+  setMemberRefreshCookieV1,
+} from './member-refresh-cookie.js';
+import {
+  SUPABASE_AUTH_JSON_RESPONSE_MAXIMUM_BYTES_V1,
+  UpstreamJsonResponseTooLargeV1,
+  readBoundedUpstreamJsonTextV1,
+} from './upstream-json-response-resource.js';
+import {
   createPwnedPasswordCompromiseGuardV1,
   type PasswordCompromiseGuardPortV1,
 } from './breached-password-guard.js';
@@ -20,6 +30,8 @@ const JSON_HEADERS = Object.freeze({
   'Content-Type': 'application/json',
 } as const);
 const MYEONGHA_PRODUCTION_WEB_ORIGIN = 'https://myeongha.vercel.app' as const;
+const WEB_AUTH_TRANSPORT_HEADER_V1 = 'x-myeongha-auth-transport' as const;
+const WEB_AUTH_TRANSPORT_VALUE_V1 = 'web-cookie-v1' as const;
 const ALLOWED_AUTH_NEXT_PAGES = new Set([
   'hall.html',
   'reading.html',
@@ -53,6 +65,37 @@ function response(data: unknown, status = 200): Response {
     status,
     headers: { 'Cache-Control': NO_STORE },
   });
+}
+
+function clientSession(session: AuthSessionV1) {
+  return Object.freeze({
+    accessToken: session.accessToken,
+    expiresAt: session.expiresAt,
+    tokenType: session.tokenType,
+    user: session.user,
+  });
+}
+
+function usesWebCookieTransport(request: Request): boolean {
+  return request.headers.get(WEB_AUTH_TRANSPORT_HEADER_V1) === WEB_AUTH_TRANSPORT_VALUE_V1;
+}
+
+function authenticatedResponse(
+  session: AuthSessionV1,
+  extraData: Readonly<Record<string, unknown>> = {},
+  webCookieTransport = false,
+): Response {
+  const result = response({
+    ok: true,
+    data: {
+      status: 'authenticated',
+      session: webCookieTransport ? clientSession(session) : session,
+      ...extraData,
+    },
+  });
+  return webCookieTransport
+    ? setMemberRefreshCookieV1(result, session.refreshToken)
+    : result;
 }
 
 function errorResponse(code: string, status: number): Response {
@@ -221,11 +264,6 @@ function normalizeSession(payload: unknown): AuthSessionV1 | null {
   });
 }
 
-function cancelUnusedRequestBody(request: Request): void {
-  if (request.body === null) return;
-  void request.body.cancel().catch(() => undefined);
-}
-
 function cancelUnusedResponseBody(response: Response): void {
   if (response.body === null) return;
   void response.body.cancel().catch(() => undefined);
@@ -235,6 +273,7 @@ async function callSupabase(
   config: AuthProxyConfigV1,
   path: string,
   init: Omit<RequestInit, 'signal'>,
+  responseMode: 'json' | 'status-only' = 'json',
 ): Promise<{ response: Response; payload: unknown }> {
   const deadline = await fetchSupabaseAuthWithDeadlineV1(
     globalThis.fetch,
@@ -256,10 +295,20 @@ async function callSupabase(
       return { response: deadline.response, payload: null };
     }
 
+    if (responseMode === 'status-only') {
+      cancelUnusedResponseBody(deadline.response);
+      return { response: deadline.response, payload: null };
+    }
+
     let payload: unknown = null;
     try {
-      payload = await deadline.response.json();
+      const text = await readBoundedUpstreamJsonTextV1(deadline.response, {
+        maximumBodyBytes: SUPABASE_AUTH_JSON_RESPONSE_MAXIMUM_BYTES_V1,
+        signal: deadline.signal,
+      });
+      payload = JSON.parse(text) as unknown;
     } catch (error) {
+      if (error instanceof UpstreamJsonResponseTooLargeV1) throw error;
       if (deadline.signal.aborted) throw error;
       payload = null;
     }
@@ -293,9 +342,6 @@ export async function handleSupabaseAuthRequestV1(input: {
   readonly passwordCompromiseGuard?: PasswordCompromiseGuardPortV1;
 }): Promise<Response> {
   if (input.request.method !== 'POST') {
-    try {
-      cancelUnusedRequestBody(input.request);
-    } catch {}
     return new Response(null, {
       status: 405,
       headers: { Allow: 'POST', 'Cache-Control': NO_STORE },
@@ -303,38 +349,69 @@ export async function handleSupabaseAuthRequestV1(input: {
   }
 
   const config = parseConfig(input.env);
+  const webCookieTransport = usesWebCookieTransport(input.request);
 
   try {
     if (input.action === 'sign-out') {
-      cancelUnusedRequestBody(input.request);
       const authorization = input.request.headers.get('authorization');
       if (!authorization || !/^Bearer [^\s,]+$/u.test(authorization)) {
-        return errorResponse('AUTH_REQUIRED', 401);
+        const denied = errorResponse('AUTH_REQUIRED', 401);
+        return webCookieTransport ? clearMemberRefreshCookieV1(denied) : denied;
       }
       const upstream = await callSupabase(config, '/auth/v1/logout', {
         method: 'POST',
         headers: { Authorization: authorization },
         body: '{}',
-      });
-      if (!upstream.response.ok) return upstreamError(input.action, upstream.response.status);
-      return response({ ok: true, data: { signedOut: true } });
+      }, 'status-only');
+      if (!upstream.response.ok) {
+        const mapped = upstreamError(input.action, upstream.response.status);
+        return webCookieTransport ? clearMemberRefreshCookieV1(mapped) : mapped;
+      }
+      const signedOut = response({ ok: true, data: { signedOut: true } });
+      return webCookieTransport ? clearMemberRefreshCookieV1(signedOut) : signedOut;
     }
 
-    const body = await readObjectBody(input.request);
-    if (body === null) return errorResponse('INVALID_REQUEST', 400);
-
     if (input.action === 'refresh') {
-      const refreshToken = readRequiredString(body, 'refreshToken', 4096);
-      if (refreshToken === null) return errorResponse('INVALID_REQUEST', 400);
+      let refreshToken: string | null;
+      if (webCookieTransport) {
+        refreshToken = readMemberRefreshCookieV1(input.request);
+      } else {
+        const refreshBody = await readObjectBody(input.request);
+        refreshToken = refreshBody === null
+          ? null
+          : readRequiredString(refreshBody, 'refreshToken', 4096);
+      }
+
+      if (refreshToken === null) {
+        const expired = errorResponse('SESSION_EXPIRED', 401);
+        return webCookieTransport ? clearMemberRefreshCookieV1(expired) : expired;
+      }
+
       const upstream = await callSupabase(config, '/auth/v1/token?grant_type=refresh_token', {
         method: 'POST',
         body: JSON.stringify({ refresh_token: refreshToken }),
       });
-      if (!upstream.response.ok) return upstreamError(input.action, upstream.response.status);
+      if (!upstream.response.ok) {
+        const mapped = upstreamError(input.action, upstream.response.status);
+        if (
+          webCookieTransport &&
+          (
+            upstream.response.status === 400 ||
+            upstream.response.status === 401 ||
+            upstream.response.status === 422
+          )
+        ) {
+          return clearMemberRefreshCookieV1(mapped);
+        }
+        return mapped;
+      }
       const session = normalizeSession(upstream.payload);
       if (session === null) return errorResponse('AUTH_UPSTREAM_MALFORMED', 502);
-      return response({ ok: true, data: { status: 'authenticated', session } });
+      return authenticatedResponse(session, {}, webCookieTransport);
     }
+
+    const body = await readObjectBody(input.request);
+    if (body === null) return errorResponse('INVALID_REQUEST', 400);
 
     const rawEmail = readRequiredString(body, 'email', 320);
     const password = readRequiredString(body, 'password', 1024);
@@ -373,22 +450,19 @@ export async function handleSupabaseAuthRequestV1(input: {
               method: 'POST',
               headers: { Authorization: `Bearer ${session.accessToken}` },
               body: '{}',
-            });
+            }, 'status-only');
           } catch {
             // The compromised credential never receives the newly-created session tokens.
           }
           return errorResponse('COMPROMISED_PASSWORD', 403);
         }
-        return response({
-          ok: true,
-          data: {
-            status: 'authenticated',
-            session,
-            passwordCompromiseCheck: compromiseCheck.status,
-          },
-        });
+        return authenticatedResponse(
+          session,
+          { passwordCompromiseCheck: compromiseCheck.status },
+          webCookieTransport,
+        );
       }
-      return response({ ok: true, data: { status: 'authenticated', session } });
+      return authenticatedResponse(session, {}, webCookieTransport);
     }
 
     if (input.action === 'sign-up') {
@@ -410,6 +484,9 @@ export async function handleSupabaseAuthRequestV1(input: {
   } catch (error) {
     if (error instanceof IngressRequestBodyCompletionDeadlineExceededV1) {
       return errorResponse('REQUEST_BODY_TIMEOUT', 408);
+    }
+    if (error instanceof UpstreamJsonResponseTooLargeV1) {
+      return errorResponse('AUTH_UPSTREAM_MALFORMED', 502);
     }
     return errorResponse('AUTH_UPSTREAM_UNAVAILABLE', 503);
   }

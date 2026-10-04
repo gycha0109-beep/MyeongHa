@@ -107,7 +107,7 @@ This run is the authority for the Production enforce baseline. The scheduled evi
 - no Guest TTL change;
 - no Supabase Auth rate-limit change;
 - no automatic client retry after a 429;
-- a pre-existing different Vercel rate-limit rule causes the mutation workflow to fail closed instead of overwriting it.
+- MyeongHa-owned rate-limit rules may coexist only when they are registered in the governed WAF registry and satisfy their declared policy contract; foreign, duplicate, drifted, or activation-hold rate-limit rules keep mutation fail-closed.
 
 ## Production canary after enforce
 

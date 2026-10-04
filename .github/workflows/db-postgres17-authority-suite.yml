@@ -1,16 +1,7 @@
 name: DB PostgreSQL 17 Authority Suite
 
 on:
-  pull_request:
-    paths:
-      - 'supabase/migrations/**'
-      - 'test/db/bootstrap_supabase_auth_stub.sql'
-      - 'test/db/run_ci_case.sh'
-      - 'test/db/birth_profile_create_runtime_authority.sh'
-      - 'test/db/content_release_lifecycle_authority.sh'
-      - 'test/db/member_character_thread_open_concurrency.sh'
-      - 'docs/CHARACTER_GATE_B_PUBLICATION_BLOCKER_EVIDENCE.md'
-      - '.github/workflows/db-postgres17-authority-suite.yml'
+  workflow_dispatch:
   push:
     branches:
       - main
@@ -18,6 +9,10 @@ on:
       - 'supabase/migrations/**'
       - 'test/db/bootstrap_supabase_auth_stub.sql'
       - 'test/db/run_ci_case.sh'
+      - 'scripts/ci/db-suites.json'
+      - 'scripts/ci/db-pr-router.mjs'
+      - 'scripts/ci/run-db-track.mjs'
+      - '.github/workflows/ci-db-track.yml'
       - 'test/db/birth_profile_create_runtime_authority.sh'
       - 'test/db/content_release_lifecycle_authority.sh'
       - 'test/db/member_character_thread_open_concurrency.sh'
@@ -32,40 +27,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  db-case:
-    name: ${{ matrix.case }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        case:
-          - birth-profile-create-runtime-authority
-          - content-release-lifecycle
-          - member-character-thread-open
-    services:
-      postgres:
-        image: postgres:17.6
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: myeongha_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd="pg_isready -U postgres -d myeongha_test"
-          --health-interval=5s
-          --health-timeout=5s
-          --health-retries=10
-    env:
-      PGHOST: localhost
-      PGPORT: 5432
-      PGUSER: postgres
-      PGPASSWORD: postgres
-      PGDATABASE: myeongha_test
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Verify PostgreSQL client
-        run: psql --version
-      - name: Run DB regression case
-        run: bash test/db/run_ci_case.sh "${{ matrix.case }}"
+  db-suite:
+    name: DB suite · postgres17
+    uses: ./.github/workflows/ci-db-track.yml
+    with:
+      suite: postgres17
+      postgres: "17.6"

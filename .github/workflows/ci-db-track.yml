@@ -1,0 +1,70 @@
+name: CI DB Track
+
+on:
+  workflow_call:
+    inputs:
+      candidate_pr:
+        type: string
+        default: ''
+      candidate_head:
+        type: string
+        default: ''
+      candidate_base:
+        type: string
+        default: ''
+      suite:
+        required: true
+        type: string
+      postgres:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  db-track:
+    name: ${{ inputs.suite }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:${{ inputs.postgres }}
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ${{ github.run_id }}-${{ github.run_attempt }}
+          POSTGRES_DB: myeongha_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d myeongha_test"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: ${{ github.run_id }}-${{ github.run_attempt }}
+      PGDATABASE: myeongha_test
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.candidate_head || github.sha }}
+          fetch-depth: 0
+      - name: Assemble pinned integration candidate
+        if: inputs.candidate_head != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_PR: ${{ inputs.candidate_pr }}
+          CANDIDATE_HEAD: ${{ inputs.candidate_head }}
+          CANDIDATE_BASE: ${{ inputs.candidate_base }}
+        run: node scripts/ci/integration-candidate.mjs prepare
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Run isolated cases on one runner per DB suite
+        env:
+          DB_SUITE: ${{ inputs.suite }}
+        run: node scripts/ci/run-db-track.mjs "$DB_SUITE"

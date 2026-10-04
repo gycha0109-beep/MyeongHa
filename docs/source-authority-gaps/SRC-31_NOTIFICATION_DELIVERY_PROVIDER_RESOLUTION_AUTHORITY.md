@@ -1,6 +1,7 @@
 # SRC-31 — Notification Delivery Provider Resolution Authority
 
-> Status: **OPEN / BLOCKING for production-authoritative push-provider selection at notification attempt creation**  
+> Status: **PARTIALLY RESOLVED — Mobile MVP transport provider = Expo Push Notifications; OPEN / BLOCKING for notification-attempt provider provenance/resolver and actual send authority**  
+> Product-owner decision: **2026-10-02**  
 > Domain: Notification Delivery / Provider Routing / Attempt Provenance  
 > Source authority reviewed:
 > - `Usecase_re_reviewed_v2(1).md`
@@ -11,6 +12,8 @@
 > - existing notification delivery attempt concurrency tests
 >
 > This gap does **not** invalidate the source-backed logical-delivery row, attempt-number allocator, attempt terminalization mechanics, revoked-installation checks, or stored delivery/attempt read projections. It specifically blocks treating a caller-supplied provider string as authoritative routing/provenance.
+>
+> Repository Product Owner decision on 2026-10-02 additionally selects **Expo Push Notifications** as the Mobile MVP transport/provider service for iOS/Android. That decision resolves the external Mobile transport choice, but it does **not** by itself define the canonical `notification_delivery_attempts.provider` value, attempt resolver/provenance contract, retry/failover behavior, or autonomous send policy.
 
 ---
 
@@ -54,7 +57,18 @@ A. trust caller p_provider and store it
 B. hard-code a CASE expression from platform to provider by convention
 ```
 
-The missing resolver authority is recorded as `SRC-31`.
+The remaining attempt-creation resolver/provenance authority is recorded as `SRC-31`.
+
+The Mobile MVP operational transport choice is no longer open:
+
+```text
+Mobile iOS/Android transport provider service = Expo Push Notifications
+device registration token form               = Expo Push token
+direct client/provider choice                 = DENY
+web transport                                 = outside this Mobile MVP decision
+```
+
+This decision intentionally does **not** invent a canonical persisted attempt-provider string such as `expo_push`, nor does it reinterpret the Primary Source examples `apns | fcm | web_push`. The attempt ledger vocabulary and resolver contract remain separately blocked until explicitly selected.
 
 ## 2. Source-complete stored boundaries
 
@@ -358,9 +372,9 @@ Standalone installation revoke remains source-complete and unrelated to provider
 
 ## 13. Relationship to P0 / provider operational choices
 
-Choosing actual provider credentials, SDKs, service accounts, environment endpoints, or deployment runbooks may be an operational/P0 matter.
+The Mobile MVP operational provider choice is now explicit: **Expo Push Notifications** for iOS/Android. Actual Expo/EAS project identity, native credentials, and deployment secrets remain external operational configuration.
 
-That does not authorize the application data contract to persist an arbitrary provider value as if it were source-derived.
+That choice does not authorize the application data contract to persist an arbitrary `notification_delivery_attempts.provider` value as if it were source-derived.
 
 The Source must still define enough logical routing authority to answer:
 
@@ -401,7 +415,7 @@ owner-scoped B75 delivery/attempt read projections
 
 ## 15. Pack / implementation must NOT invent
 
-Until `SRC-31` is resolved, do not:
+Until the remaining attempt-provider provenance/send portion of `SRC-31` is resolved, do not:
 
 - treat `ios -> apns`, `android -> fcm`, `web -> web_push` as normative merely because it is conventional;
 - treat the ERD `e.g.` provider strings as a closed registry;
@@ -456,14 +470,26 @@ At minimum tests should prove:
 
 ## 18. Current fail-closed interpretation
 
-Until `SRC-31` is resolved:
+Current boundary:
 
 ```text
+Mobile MVP transport service
+= Expo Push Notifications (product-owner selected)
+
+Device registration / token lifecycle
+= source-authorized under resolved SRC-19
+
 Attempt allocation/finalization mechanics
 = source-backed persistence/concurrency primitive
 
+Canonical notification_delivery_attempts.provider derivation
+= STILL OPEN
+
 Provider selection supplied via p_provider
 = NOT sufficient production routing authority
+
+Actual send worker / retry / failover
+= NOT AUTHORIZED
 ```
 
-A production notification worker must not be declared source-complete solely because the DB can allocate, record, and finalize attempts. The missing provider resolver is part of the send authority boundary mandated by Primary Source.
+A production notification worker must not be declared source-complete solely because the Mobile transport service has been selected or because the DB can allocate, record, and finalize attempts. The remaining attempt-provider provenance/resolver contract is part of the send authority boundary mandated by Primary Source.

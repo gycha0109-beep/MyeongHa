@@ -1,0 +1,55 @@
+{
+  "contractVersion": "myeongha-member-auth-abuse-policy-v1",
+  "vercelProjectId": "prj_nXF0b5uv27Lyucz2SEBxzdCRXVsP",
+  "vercelTeamId": "team_xuYA9OhCWlJETaYFOmeVodgS",
+  "vercelProjectName": "myeongha",
+  "activationState": "hold",
+  "rules": [
+    {
+      "policyId": "member-auth-sign-in-v1",
+      "ruleName": "myeongha-auth-sign-in-rate-limit-v1",
+      "route": "/api/auth/sign-in",
+      "method": "POST",
+      "algorithm": "fixed_window",
+      "windowSeconds": 60,
+      "requestLimit": 30,
+      "keys": [
+        "ip"
+      ],
+      "observeRateLimitAction": "log",
+      "enforceRateLimitAction": "rate_limit"
+    },
+    {
+      "policyId": "member-auth-sign-up-v1",
+      "ruleName": "myeongha-auth-sign-up-rate-limit-v1",
+      "route": "/api/auth/sign-up",
+      "method": "POST",
+      "algorithm": "fixed_window",
+      "windowSeconds": 60,
+      "requestLimit": 30,
+      "keys": [
+        "ip"
+      ],
+      "observeRateLimitAction": "log",
+      "enforceRateLimitAction": "rate_limit"
+    },
+    {
+      "policyId": "member-auth-refresh-v1",
+      "ruleName": "myeongha-auth-refresh-rate-limit-v1",
+      "route": "/api/auth/refresh",
+      "method": "POST",
+      "algorithm": "fixed_window",
+      "windowSeconds": 60,
+      "requestLimit": 30,
+      "keys": [
+        "ip"
+      ],
+      "observeRateLimitAction": "log",
+      "enforceRateLimitAction": "rate_limit"
+    }
+  ],
+  "durableNetworkIdentifierPersistence": false,
+  "applicationRetryOnRateLimit": false,
+  "supabaseSecretKeyRequired": false,
+  "draftAuthority": "preview-capability-probe"
+}

@@ -9,6 +9,9 @@ function configuredEnv(): Record<string, string> {
     MYEONGHA_DATABASE_URL:
       'postgresql://myeongha_login:database-password@db.example.com:5432/postgres?sslmode=require',
     MYEONGHA_DATABASE_PRINCIPAL: 'myeongha_login',
+    MYEONGHA_DATABASE_TLS_PEER_MODE: 'verify-full',
+    MYEONGHA_DATABASE_SSL_ROOT_CERT_PEM:
+      '-----BEGIN CERTIFICATE-----\\ntest-only\\n-----END CERTIFICATE-----',
     MYEONGHA_SUPABASE_URL: MYEONGHA_PRODUCTION_SUPABASE_ORIGIN,
     MYEONGHA_SUPABASE_API_KEY: 'supabase-api-key-value-1234567890',
     MYEONGHA_GUEST_FINGERPRINT_SECRET:
@@ -157,10 +160,10 @@ describe('GET /api/readiness', () => {
     expect(body).not.toContain(env.MYEONGHA_SAJU_SERVICE_BEARER);
   });
 
-  it('returns 405 without waiting for unused-body cancellation to settle', () => {
+  it('returns 405 without waiting for unused-body cancellation to settle', async () => {
     const source = requestWithCancellation(() => new Promise<void>(() => undefined));
 
-    const response = readinessEndpoint.fetch(source.request);
+    const response = await readinessEndpoint.fetch(source.request);
 
     expect(response.status).toBe(405);
     expect(response.headers.get('allow')).toBe('GET');
@@ -173,7 +176,7 @@ describe('GET /api/readiness', () => {
       Promise.reject(new Error('synthetic cancellation failure')),
     );
 
-    const response = readinessEndpoint.fetch(source.request);
+    const response = await readinessEndpoint.fetch(source.request);
     await Promise.resolve();
 
     expect(response.status).toBe(405);
@@ -182,12 +185,12 @@ describe('GET /api/readiness', () => {
     expect(source.cancelCalls()).toBe(1);
   });
 
-  it('keeps bodyless method rejection harmless without evaluating production configuration', () => {
+  it('keeps bodyless method rejection harmless without evaluating production configuration', async () => {
     const request = new Request('https://myeongha.example/api/readiness', {
       method: 'POST',
     });
 
-    const response = readinessEndpoint.fetch(request);
+    const response = await readinessEndpoint.fetch(request);
 
     expect(response.status).toBe(405);
     expect(response.headers.get('allow')).toBe('GET');

@@ -1,4 +1,9 @@
 import type { CommercePaymentVerificationAdapterV1 } from './commerce-payment-verification-execution.js';
+import {
+  INGRESS_REQUEST_BODY_COMPLETION_DEADLINE_MS_V1,
+  IngressRequestBodyCompletionDeadlineExceededV1,
+  createIngressRequestBodyCompletionDeadlineLeaseV1,
+} from './ingress-request-body-deadline.js';
 import type { PostgresSubjectPoolV1 } from './postgres-subject-execution.js';
 import {
   PORTONE_V2_WEBHOOK_MAX_BODY_BYTES_V1,
@@ -18,6 +23,7 @@ export const PORTONE_V2_WEBHOOK_HTTP_BINDINGS_V1 = Object.freeze({
   route: ROUTE,
   apiContractVersion: API_CONTRACT_VERSION,
   maxBodyBytes: PORTONE_V2_WEBHOOK_MAX_BODY_BYTES_V1,
+  bodyCompletionDeadlineMs: INGRESS_REQUEST_BODY_COMPLETION_DEADLINE_MS_V1,
 } as const);
 
 export interface HandlePortOneV2WebhookRequestInputV1 {
@@ -106,12 +112,13 @@ async function readBoundedRawBody(request: Request): Promise<Uint8Array | null> 
     return null;
   }
 
+  const deadline = createIngressRequestBodyCompletionDeadlineLeaseV1();
   const chunks: Uint8Array[] = [];
   let receivedBytes = 0;
 
   try {
     while (true) {
-      const chunk = await reader.read();
+      const chunk = await deadline.waitFor(reader.read());
       if (typeof chunk.done !== 'boolean') return null;
       if (chunk.done) break;
       if (!(chunk.value instanceof Uint8Array)) return null;
@@ -122,9 +129,17 @@ async function readBoundedRawBody(request: Request): Promise<Uint8Array | null> 
       if (receivedBytes > PORTONE_V2_WEBHOOK_MAX_BODY_BYTES_V1) return null;
       chunks.push(chunk.value);
     }
-  } catch {
+  } catch (error) {
+    if (error instanceof IngressRequestBodyCompletionDeadlineExceededV1) {
+      try {
+        void reader.cancel().catch(() => undefined);
+      } catch {
+      }
+      throw error;
+    }
     return null;
   } finally {
+    deadline.release();
     try {
       reader.releaseLock();
     } catch {
@@ -151,7 +166,15 @@ export async function handlePortOneV2WebhookRequestV1(
     return noStoreResponse(405, { Allow: POST_METHOD });
   }
 
-  const rawBody = await readBoundedRawBody(input.request);
+  let rawBody: Uint8Array | null;
+  try {
+    rawBody = await readBoundedRawBody(input.request);
+  } catch (error) {
+    if (error instanceof IngressRequestBodyCompletionDeadlineExceededV1) {
+      return temporarilyUnavailableResponse();
+    }
+    return temporarilyUnavailableResponse();
+  }
   if (rawBody === null) return invalidWebhookResponse();
 
   try {

@@ -1,20 +1,7 @@
 name: PostgreSQL DR Readiness Authority
-run-name: "[WT:ops] PostgreSQL DR Readiness Authority"
 
 on:
   workflow_dispatch:
-  pull_request:
-    paths:
-      - 'supabase/migrations/**'
-      - 'docs/architecture/PRODUCTION_OPERATIONS_ARCHITECTURE_V1.md'
-      - 'docs/P0_DECISION_REGISTER.md'
-      - 'docs/AUTH_RLS_PRIVACY_SPEC.md'
-      - 'docs/SOURCE_AUTHORITY_GAPS.md'
-      - 'docs/operations/POSTGRES_BACKUP_RESTORE_RUNBOOK_V1.md'
-      - 'docs/operations/POSTGRES_DR_READINESS_STATUS_V1.md'
-      - 'scripts/run-postgres-isolated-restore-drill.sh'
-      - 'scripts/verify-postgres-dr-readiness-authority.mjs'
-      - '.github/workflows/postgres-dr-readiness.yml'
   push:
     branches:
       - main
@@ -27,7 +14,12 @@ on:
       - 'docs/operations/POSTGRES_BACKUP_RESTORE_RUNBOOK_V1.md'
       - 'docs/operations/POSTGRES_DR_READINESS_STATUS_V1.md'
       - 'scripts/run-postgres-isolated-restore-drill.sh'
+      - 'scripts/operations/export-production-postgres-backup.sh'
+      - 'scripts/build-postgres-restore-evidence-envelope.mjs'
+      - 'scripts/operations/build-postgres-restore-evidence.sh'
       - 'scripts/verify-postgres-dr-readiness-authority.mjs'
+      - '.github/workflows/production-postgres-backup.yml'
+      - '.github/workflows/postgres-isolated-restore-drill.yml'
       - '.github/workflows/postgres-dr-readiness.yml'
 
 permissions:

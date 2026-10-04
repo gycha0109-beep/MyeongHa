@@ -1,5 +1,5 @@
 .records-page{--records-paper:rgba(250,245,238,.90);--records-paper-soft:rgba(248,242,234,.62);--records-line:rgba(128,92,55,.20);--records-line-strong:rgba(128,92,55,.38);--records-shadow:0 18px 48px rgba(65,45,29,.07);--records-night:#0b151d;--records-night-soft:#111d24;--records-gold:#c79a5b;--records-cream:#efe4d4}
-.records-main{position:relative;z-index:1;padding:30px 0 46px}
+.records-main{position:relative;z-index:1;overflow-x:clip;padding:30px 0 46px}
 .records-shell{position:relative}
 .records-shell::before{content:"";position:absolute;z-index:-1;left:-8vw;right:-8vw;top:-32px;height:220px;pointer-events:none;background:radial-gradient(circle at 86% 22%,rgba(182,137,77,.10),transparent 17rem),linear-gradient(165deg,transparent 0 54%,rgba(81,105,116,.035) 54.4% 55%,transparent 55.5%);opacity:.9}
 .records-head{display:grid;grid-template-columns:minmax(210px,.68fr) minmax(360px,1fr);align-items:end;gap:48px;margin-bottom:22px;padding:6px 4px 0}

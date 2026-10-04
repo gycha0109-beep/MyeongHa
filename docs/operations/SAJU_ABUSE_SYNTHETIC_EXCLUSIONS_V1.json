@@ -1,0 +1,90 @@
+{
+  "schemaVersion": "myeongha-saju-abuse-synthetic-exclusions-v1",
+  "requests": [
+    {
+      "requestId": "1c6ad3f4-b3bc-4e98-b759-8164511853ae",
+      "reason": "governed Production current-subject Saju smoke",
+      "evidenceRef": "GitHub Actions run 37092872572 / PR #1548"
+    },
+    {
+      "requestId": "0ba1fb3a-66ec-4d54-abbc-0f7ed1fceab4",
+      "reason": "governed Production current-subject Saju smoke",
+      "evidenceRef": "GitHub Actions run 37092872572 / PR #1548"
+    },
+    {
+      "requestId": "e243ce2d-1ac3-4153-b8ad-0616ca5d5cb4",
+      "reason": "governed Production outcome-correlation Saju smoke",
+      "evidenceRef": "GitHub Actions run 37095057530 / PR #1551"
+    },
+    {
+      "requestId": "c8d091f5-ca24-43d8-b602-dba70830e941",
+      "reason": "governed Production outcome-correlation Saju smoke",
+      "evidenceRef": "GitHub Actions run 37095057530 / PR #1551"
+    },
+    {
+      "requestId": "cdf8373d-2863-4110-a983-eee753809c70",
+      "reason": "governed Production current-subject Saju calculation smoke with Preview coverage",
+      "evidenceRef": "GitHub Actions run 37101519866 / PR #1560"
+    },
+    {
+      "requestId": "96a44011-7b8c-4cb8-b1b8-0f35b7ebfc5f",
+      "reason": "governed Production current-subject Saju calculation repeat smoke with Preview coverage",
+      "evidenceRef": "GitHub Actions run 37101519866 / PR #1560"
+    },
+    {
+      "requestId": "e55e7e13-da22-4a30-8f6a-6859dfa9a985",
+      "reason": "governed Production current-subject Saju Preview Reading smoke",
+      "evidenceRef": "GitHub Actions run 37101519866 / PR #1560"
+    },
+    {
+      "requestId": "5165dd14-b5ed-441f-81e6-1e350fef323d",
+      "reason": "governed Production Member Saju calculation smoke with Guest coverage",
+      "evidenceRef": "GitHub Actions run 37106609427 / PR #1564"
+    },
+    {
+      "requestId": "c9666aa2-50ca-4c71-9b5a-2ad4eeaa4c8c",
+      "reason": "governed Production Member Saju calculation repeat smoke with Guest coverage",
+      "evidenceRef": "GitHub Actions run 37106609427 / PR #1564"
+    },
+    {
+      "requestId": "fbb0a4e9-10ad-4056-8835-c373b0f4d404",
+      "reason": "governed Production Member Saju Preview Reading smoke with Guest coverage",
+      "evidenceRef": "GitHub Actions run 37106609427 / PR #1564"
+    },
+    {
+      "requestId": "d4c9cd0f-1752-4d36-8509-3c7ac4c233e6",
+      "reason": "governed Production Guest Saju calculation smoke",
+      "evidenceRef": "GitHub Actions run 37106609427 / PR #1564"
+    },
+    {
+      "requestId": "970c6358-7dea-41bd-9e1a-7c2b77af15d8",
+      "reason": "governed Production Guest Saju Preview Reading smoke",
+      "evidenceRef": "GitHub Actions run 37106609427 / PR #1564"
+    },
+    {
+      "requestId": "84e856f2-0a0a-4a75-83a9-120a35b9b681",
+      "reason": "governed Production Member Saju calculation smoke after bounded Reading rollout",
+      "evidenceRef": "GitHub Actions run 37166344665 / PR #1580"
+    },
+    {
+      "requestId": "99d698f2-6917-4d92-8c05-407f931e16de",
+      "reason": "governed Production Member Saju calculation repeat smoke after bounded Reading rollout",
+      "evidenceRef": "GitHub Actions run 37166344665 / PR #1580"
+    },
+    {
+      "requestId": "60893525-d056-426d-b668-ed60095eb917",
+      "reason": "governed Production Member Saju Preview Reading smoke after bounded Reading rollout",
+      "evidenceRef": "GitHub Actions run 37166344665 / PR #1580"
+    },
+    {
+      "requestId": "de167f52-5c10-495b-87bc-550795d6e953",
+      "reason": "governed Production Guest Saju calculation smoke after bounded Reading rollout",
+      "evidenceRef": "GitHub Actions run 37166344665 / PR #1580"
+    },
+    {
+      "requestId": "d884d5ce-5991-497e-a0a3-d46250531644",
+      "reason": "governed Production Guest Saju Preview Reading smoke after bounded Reading rollout",
+      "evidenceRef": "GitHub Actions run 37166344665 / PR #1580"
+    }
+  ]
+}

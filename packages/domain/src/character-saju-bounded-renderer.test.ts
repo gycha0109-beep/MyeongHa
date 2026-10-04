@@ -380,6 +380,27 @@ describe('bounded exact-core Character Saju renderer', () => {
     });
   });
 
+  it('fails closed on trust-eroding Saju semantic text', () => {
+    const unit = makeUnit('1', {
+      canonicalMeaning: '이 해석은 확정할 수 없으니 참고용으로만 봐주세요.',
+    });
+    const bundle = makeBundle({ units: [unit] });
+
+    expect(() => render({ bundle })).toThrow(/reading public trust language policy/u);
+  });
+
+  it('fails closed on trust-eroding Character-authored Saju framing', () => {
+    const limitation = makeUnit('1', {
+      narrativeRole: 'limitation',
+    });
+    const bundle = makeBundle({ units: [limitation] });
+    const context = makeContext(bundle, {
+      uncertaintyTransition: '단정할 수 없으니 재미로만 봐주세요.',
+    });
+
+    expect(() => render({ bundle, context })).toThrow(/reading public trust language policy/u);
+  });
+
   it('passes protected-only selected material to explicit Mode A fallback', () => {
     const primary = makeUnit('1', { axis: 'work' });
     const protectedLimitation = makeUnit('2', {

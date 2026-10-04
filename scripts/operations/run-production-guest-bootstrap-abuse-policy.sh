@@ -3,6 +3,7 @@ set -euo pipefail
 umask 077
 
 source scripts/operations/vercel-production-common.sh
+source scripts/operations/vercel-waf-managed-rule-common.sh
 
 : "${RUNNER_TEMP:?}"
 : "${VERCEL_TOKEN:?}"
@@ -88,18 +89,9 @@ if (( same_name_count > 1 )); then
   exit 1
 fi
 
-conflicting_rate_limit_count="$(jq --arg name "$rule_name" '
-  [(.active.rules // [])[]
-    | select(
-        .name != $name
-        and ((.action.mitigate.action // "") == "rate_limit" or (.action.mitigate.rateLimit // null) != null)
-      )]
-  | length
-' "$before_file")"
-if (( conflicting_rate_limit_count > 0 )); then
-  echo "::error title=Guest bootstrap firewall rate-limit slot conflict::A different active rate-limit rule already exists; no mutation was attempted."
-  exit 1
-fi
+assert_managed_rate_limit_registry_live_safety "$before_file" "$rule_name"
+echo "managed_rate_limit_registry_safety=verified"
+
 
 managed_rule_id="$(jq -r --arg name "$rule_name" '
   ([((.draft.rules // []) + (.active.rules // []))[] | select(.name == $name) | .id][0] // "")

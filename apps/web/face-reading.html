@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="명하 관상 — 정면 사진을 준비하고 얼굴 구조 확인과 관상 풀이로 이어갑니다." />
+  <title>관상 · 명하</title>
+  <link rel="stylesheet" href="product.css" vite-ignore />
+  <link rel="stylesheet" href="product-theme.css" data-product-theme="true" vite-ignore />
+  <link rel="stylesheet" href="reading-reader-picker.css" vite-ignore />
+  <link rel="stylesheet" href="face-reading.css" vite-ignore />
+  <script src="product-theme.js"></script>
+</head>
+<body class="product-page face-reading-page" data-page="physiognomy">
+  <header class="product-header">
+    <div class="product-shell product-header-inner">
+      <a class="product-brand" href="hall.html" aria-label="명하 홈">
+        <span class="product-brand-name">명하</span>
+        <span class="product-brand-seal" aria-hidden="true">明河</span>
+        <span class="product-brand-sub">MyeongHa</span>
+      </a>
+      <nav class="product-nav" aria-label="주요 메뉴">
+        <a class="product-nav-link" href="hall.html">홈</a>
+        <a class="product-nav-link" href="reading.html">사주</a>
+        <a class="product-nav-link" href="face-reading.html" aria-current="page">관상</a>
+        <a class="product-nav-link" href="chat-hub.html">대화</a>
+        <a class="product-nav-link" href="records.html">기록</a>
+        <a class="product-nav-link" href="my.html">마이</a>
+      </nav>
+      <div class="product-utilities">
+        <button class="product-icon-button" type="button" aria-label="알림"></button>
+        <a class="product-profile" href="my.html" aria-label="내 프로필">
+          <span class="product-profile-mark" aria-hidden="true">之</span>
+          <span>마이</span>
+          <span aria-hidden="true">⌄</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main class="face-main">
+    <div class="face-shell">
+      <section class="face-hero">
+        <div class="face-hero-copy">
+          <span class="face-kicker">FACE READING</span>
+          <h1>관상</h1>
+          <strong>얼굴에 드러난 구조를 읽습니다.</strong>
+          <p>한 장의 사진으로 얼굴의 형태와 균형을 살펴보고, 명하의 Reader와 함께 관상 풀이로 이어갑니다.</p>
+        </div>
+        <div class="face-orbit" aria-hidden="true"><i></i><i></i><i></i><b>相</b></div>
+      </section>
+
+      <section class="face-reader-bar" aria-label="선택한 Reader">
+        <div class="face-reader-current">
+          <img data-face-reader-portrait src="assets/characters/seyeon-portrait-v2.webp" alt="" />
+          <div class="face-reader-copy">
+            <span class="face-reader-eyebrow">SELECTED READER</span>
+            <div class="face-reader-heading">
+              <strong><span data-face-reader-name>세연</span>과 함께 관상을 봅니다.</strong>
+              <small data-face-reader-title>무녀</small>
+            </div>
+            <p data-face-reader-tone>부드럽게 흐름을 풀어 설명합니다.</p>
+          </div>
+        </div>
+        <button class="face-reader-change" type="button" data-face-reader-change>
+          Reader 변경 <span aria-hidden="true">→</span>
+        </button>
+      </section>
+
+      <section class="face-workspace" aria-labelledby="face-capture-title">
+        <div class="face-preview-panel">
+          <div class="face-preview" data-face-preview>
+            <img data-face-image alt="선택한 얼굴 사진 미리보기" hidden />
+            <div class="face-placeholder" data-face-placeholder aria-hidden="true">
+              <span class="face-guide"></span>
+              <b>相</b>
+              <small>정면 사진을 이 안에 맞춰주세요</small>
+            </div>
+            <div class="face-photo-corners" data-face-corners hidden aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+          </div>
+          <div class="face-preview-meta">
+            <span><b aria-hidden="true">◇</b> 선택한 사진은 브라우저 미리보기에만 사용합니다.</span>
+            <span>JPEG · PNG · WebP · 최대 16MB</span>
+          </div>
+        </div>
+
+        <div class="face-control">
+          <span class="face-step">01 · 사진 준비</span>
+          <h2 id="face-capture-title"><span data-face-reader-name>세연</span>에게 관상 보기</h2>
+          <p class="face-description" data-face-description>정면에서 얼굴이 잘 보이는 사진을 준비해주세요. 선택한 Reader와 함께 얼굴 구조 확인부터 시작합니다.</p>
+
+          <ul class="face-guide-list">
+            <li><span>✓</span> 얼굴 전체가 프레임 안에 들어온 사진</li>
+            <li><span>✓</span> 정면에 가깝고 흔들림이 적은 사진</li>
+            <li><span>✓</span> 과도한 필터나 얼굴을 가리는 요소가 적은 사진</li>
+            <li><span>✓</span> 밝기가 충분하고 얼굴 윤곽이 보이는 사진</li>
+          </ul>
+
+          <input data-face-camera class="face-file-input" type="file" accept="image/jpeg,image/png,image/webp" capture="user" />
+          <input data-face-gallery class="face-file-input" type="file" accept="image/jpeg,image/png,image/webp" />
+
+          <div class="face-file-card" data-face-file-card hidden>
+            <span class="face-file-mark" aria-hidden="true">▧</span>
+            <div><strong data-face-file-name>선택한 사진</strong><small data-face-file-meta>미리보기 준비됨</small></div>
+            <span>준비됨</span>
+          </div>
+
+          <div class="face-actions">
+            <button class="face-secondary" type="button" data-face-camera-button><span aria-hidden="true">▣</span> 사진 촬영</button>
+            <button class="face-secondary" type="button" data-face-gallery-button><span aria-hidden="true">▧</span> 사진 선택</button>
+            <button class="face-primary" type="button" data-face-analyze disabled><span data-face-analyze-label>사진을 먼저 준비해주세요</span> <span aria-hidden="true">→</span></button>
+          </div>
+
+          <div class="face-status" data-face-status>
+            <span aria-hidden="true">◇</span>
+            <div>
+              <strong data-face-status-title>관상 보기 준비</strong>
+              <p data-face-status-copy>사진을 준비하면 선택한 Reader와 얼굴 구조 확인 단계로 이어집니다.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="face-flow" aria-labelledby="face-flow-title">
+        <div class="face-flow-head">
+          <span class="face-kicker">HOW IT WORKS</span>
+          <h2 id="face-flow-title"><span data-face-reader-name>세연</span>과 함께하는 관상, 이렇게 진행됩니다.</h2>
+          <p>사진을 건네고 얼굴 구조를 확인한 뒤, 확인된 결과를 선택한 Reader의 방식으로 듣습니다.</p>
+        </div>
+        <div class="face-flow-grid">
+          <article><span>01</span><b aria-hidden="true">▣</b><strong>사진을 건넵니다</strong><p>정면 사진을 촬영하거나 선택하고 브라우저에서 안전하게 준비합니다.</p></article>
+          <article><span>02</span><b aria-hidden="true">◎</b><strong>얼굴을 살펴봅니다</strong><p>얼굴의 관측 가능한 구조와 균형을 확인합니다.</p></article>
+          <article><span>03</span><b aria-hidden="true">▤</b><strong>Reader가 풀어드립니다</strong><p>확인된 관상 결과를 선택한 Reader의 관점과 말투로 전달합니다.</p></article>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <nav class="mobile-bottom-nav" aria-label="모바일 주요 메뉴">
+    <a class="mobile-nav-link" href="hall.html"><span class="mobile-nav-icon" aria-hidden="true">⌂</span><span>홈</span></a>
+    <a class="mobile-nav-link" href="reading.html"><span class="mobile-nav-icon" aria-hidden="true">✦</span><span>사주</span></a>
+    <a class="mobile-nav-link" href="face-reading.html" aria-current="page"><span class="mobile-nav-icon" aria-hidden="true">相</span><span>관상</span></a>
+    <a class="mobile-nav-link" href="chat-hub.html"><span class="mobile-nav-icon" aria-hidden="true">◌</span><span>대화</span></a>
+    <a class="mobile-nav-link" href="records.html"><span class="mobile-nav-icon" aria-hidden="true">▤</span><span>기록</span></a>
+    <a class="mobile-nav-link" href="my.html"><span class="mobile-nav-icon" aria-hidden="true">♙</span><span>마이</span></a>
+  </nav>
+
+  <script type="module" src="face-reading-shell.js"></script>
+</body>
+</html>

@@ -1,0 +1,73 @@
+{
+  "contractVersion": "myeongha-member-auth-abuse-policy-v2",
+  "strategy": "postgres-application-admission",
+  "activationState": "production-active",
+  "algorithm": "anchored-fixed-window",
+  "windowSeconds": 60,
+  "requestLimit": 30,
+  "blockedCountSaturation": 31,
+  "actions": [
+    "sign-in",
+    "sign-up",
+    "refresh"
+  ],
+  "excludedActions": [
+    "sign-out"
+  ],
+  "clientKey": {
+    "source": "trusted-vercel-x-forwarded-for",
+    "derivation": "hmac-sha256",
+    "domainVersion": "myeongha-member-auth-rate-limit-hmac-sha256-v1",
+    "rawNetworkIdentifierPersistence": false,
+    "crossEndpointLinkability": false
+  },
+  "counterStore": {
+    "kind": "postgres",
+    "table": "public.member_auth_rate_limit_buckets",
+    "persistence": "unlogged-ephemeral",
+    "staleCleanupAfterSeconds": 300,
+    "maximumCleanupRowsPerAdmission": 8
+  },
+  "authority": {
+    "executionRole": "myeongha_api_executor",
+    "command": "public.cmd_admit_member_auth_request_v1",
+    "dedicatedOwner": "myeongha_member_auth_rate_limit_owner",
+    "directTableAuthorityForApiExecutor": false
+  },
+  "failureMode": "fail-closed",
+  "applicationRetryOnRateLimit": false,
+  "supabaseSecretKeyRequired": false,
+  "productionHttpActivation": true,
+  "runtime": {
+    "routeComposition": "production-member-auth-http-runtime-v1",
+    "admissionBeforeRequestBody": true,
+    "postgresConnectionTimeoutMs": 1500,
+    "postgresStatementTimeoutMs": 1500,
+    "failureStatus": 503,
+    "failureCode": "AUTH_RATE_LIMIT_UNAVAILABLE",
+    "blockedStatus": 429,
+    "blockedCode": "RATE_LIMITED",
+    "retryAfterSecondsRange": [
+      1,
+      60
+    ]
+  },
+  "productionCanary": {
+    "status": "pass",
+    "runId": 36346090857,
+    "exactProductionDeploymentId": "dpl_8sA237CXZ4vN65N9Nq4uSPYf9p4h",
+    "sideEffectFree": true,
+    "expectedAllowedInvalidRequests": 30,
+    "expectedFirstRateLimitedAttempt": 31,
+    "observedRetryAfterSeconds": {
+      "sign-in": 52,
+      "sign-up": 53,
+      "refresh": 52
+    },
+    "endpointBucketIndependence": true,
+    "signOutExcluded": true,
+    "probePayloads": "local-invalid-only",
+    "rawNetworkIdentifiersEmitted": false,
+    "credentialMaterialEmitted": false
+  }
+}

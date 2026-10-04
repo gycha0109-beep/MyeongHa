@@ -74,6 +74,7 @@ bash test/db/reading_clarification_concurrency.sh
 bash test/db/notification_delivery_attempt_concurrency.sh
 bash test/db/account_deletion_start_concurrency.sh
 bash test/db/account_deletion_start_runtime_authority.sh
+bash test/db/member_auth_rate_limit_authority.sh
 bash test/db/account_deletion_start_rls_catalog_guard.sh
 bash test/db/public_trigger_function_security_catalog_guard.sh
 bash test/db/account_deletion_finalization_preflight.sh

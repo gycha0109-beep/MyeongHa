@@ -360,7 +360,7 @@ function sameMemberSessionGeneration(left, right) {
     left &&
     right &&
     left.accessToken === right.accessToken &&
-    left.refreshToken === right.refreshToken
+    left.expiresAt === right.expiresAt
   );
 }
 
@@ -439,16 +439,12 @@ function discardMemberCompatibilityState() {
   return Object.freeze({ ok: true, rolledBack: true });
 }
 
-function discardMemberSession(expectedAccessToken = null, expectedRefreshToken = null, expectedMemberRaw = undefined) {
+function discardMemberSession(expectedAccessToken = null, expectedMemberRaw = undefined) {
   const memberRaw = expectedMemberRaw === undefined ? readLocal(MEMBER_SESSION_KEY) : expectedMemberRaw;
   const storedMember = normalizedStoredMemberSession(memberRaw);
   if (
     expectedAccessToken !== null &&
-    (
-      !storedMember ||
-      storedMember.accessToken !== expectedAccessToken ||
-      (expectedRefreshToken !== null && storedMember.refreshToken !== expectedRefreshToken)
-    )
+    (!storedMember || storedMember.accessToken !== expectedAccessToken)
   ) {
     return false;
   }
@@ -511,7 +507,6 @@ function normalizeSession(value) {
   if (!isRecord(value)) return null;
   if (
     !isJwtLike(value.accessToken) ||
-    typeof value.refreshToken !== 'string' || value.refreshToken.length === 0 ||
     typeof value.expiresAt !== 'string' || Number.isNaN(Date.parse(value.expiresAt))
   ) {
     return null;
@@ -519,7 +514,6 @@ function normalizeSession(value) {
   const user = isRecord(value.user) ? value.user : {};
   return Object.freeze({
     accessToken: value.accessToken,
-    refreshToken: value.refreshToken,
     expiresAt: value.expiresAt,
     tokenType: 'bearer',
     user: Object.freeze({
@@ -575,6 +569,9 @@ async function postJson(endpoint, body, authorization = null, options = undefine
     Accept: 'application/json',
     'Content-Type': 'application/json',
   });
+  if (endpoint.startsWith('/api/auth/')) {
+    headers.set('X-MyeongHa-Auth-Transport', 'web-cookie-v1');
+  }
   if (authorization) headers.set('Authorization', `Bearer ${authorization}`);
   let response;
   try {
@@ -599,7 +596,7 @@ async function postJson(endpoint, body, authorization = null, options = undefine
 }
 
 function reconcileMalformedStoredMember(raw) {
-  if (discardMemberSession(null, null, raw)) return null;
+  if (discardMemberSession(null, raw)) return null;
 
   const latestRaw = readLocal(MEMBER_SESSION_KEY);
   if (latestRaw === null || latestRaw === raw) return null;
@@ -621,6 +618,22 @@ export function readMemberSession() {
   if (!normalized) {
     return reconcileMalformedStoredMember(raw);
   }
+
+  if (isRecord(parsed) && Object.prototype.hasOwnProperty.call(parsed, 'refreshToken')) {
+    const latestRaw = readLocal(MEMBER_SESSION_KEY);
+    if (latestRaw !== raw) return readMemberSession();
+
+    const sanitized = JSON.stringify(normalized);
+    if (!writeLocal(MEMBER_SESSION_KEY, sanitized)) {
+      const observed = readLocal(MEMBER_SESSION_KEY);
+      if (observed !== raw) return readMemberSession();
+      throw new ProductAuthError(
+        'WEB_AUTH_MEMBER_PERSIST_FAILED',
+        '로그인 세션의 장기 갱신 자격 증명을 브라우저 저장소에서 제거하지 못했습니다.',
+      );
+    }
+  }
+
   return normalized;
 }
 
@@ -696,7 +709,7 @@ export async function refreshMemberSession() {
   const current = readMemberSession();
   if (!current) return null;
   try {
-    const data = await postJson('/api/auth/refresh', { refreshToken: current.refreshToken });
+    const data = await postJson('/api/auth/refresh', {});
     if (!isRecord(data) || data.status !== 'authenticated') {
       throw new ProductAuthError('WEB_AUTH_MALFORMED_SESSION', '갱신된 세션 응답이 올바르지 않습니다.');
     }
@@ -704,7 +717,7 @@ export async function refreshMemberSession() {
     return await commitRefreshedMemberSession(current, data.session);
   } catch (error) {
     if (isAuthoritativeRefreshRejection(error)) {
-      discardMemberSession(current.accessToken, current.refreshToken);
+      discardMemberSession(current.accessToken);
     }
     throw error;
   }
@@ -823,7 +836,7 @@ export async function signOutMember() {
         // Local sign-out is still authoritative for this browser session when local authority can be cleared.
       }
     }
-    if (!discardMemberSession(current?.accessToken ?? null, current?.refreshToken ?? null)) {
+    if (!discardMemberSession(current?.accessToken ?? null)) {
       throw new ProductAuthError('WEB_AUTH_MEMBER_CLEAR_FAILED', '로그인 세션을 브라우저에서 안전하게 제거하지 못했습니다.');
     }
   });

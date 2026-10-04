@@ -6,6 +6,9 @@ import {
 } from '../../contracts/src/index.js';
 import type { CharacterRelationshipBehaviorContent } from './schema.js';
 import {
+  findReadingPublicTrustLanguageViolationV1,
+} from './reading-public-trust-language-policy-v1.js';
+import {
   CHARACTER_RUNTIME_AUTHORING_V1,
   CHARACTER_RUNTIME_AUTHORING_V1_CHARACTER_IDS,
   CHARACTER_RUNTIME_AVOIDED_STRATEGY_KEYS_V1,
@@ -74,6 +77,40 @@ describe('Character runtime authoring v1 authority', () => {
       expect(character.sajuProfile.safeFraming.after).toHaveLength(2);
       expect(character.relationshipBehavior).toBeDefined();
     }
+  });
+
+  it('keeps every authored Saju safe-framing line free of trust-eroding meta disclaimers', () => {
+    for (const character of CHARACTER_RUNTIME_AUTHORING_V1) {
+      const entries = [
+        ...character.sajuProfile.safeFraming.before,
+        ...character.sajuProfile.safeFraming.after,
+      ];
+      for (const entry of entries) {
+        expect(
+          findReadingPublicTrustLanguageViolationV1(entry.text),
+          `${character.characterId}:${entry.key}`,
+        ).toBeNull();
+      }
+    }
+  });
+
+  it('uses the reviewed Seyeon Runtime projection for the first parallel authority lane', () => {
+    const seyeon = CHARACTER_RUNTIME_AUTHORING_V1.find(
+      (character) => character.characterId === 'seyeon',
+    );
+
+    expect(seyeon).toBeDefined();
+    expect(seyeon?.speech.register).toBe('밝고 행동적인 현실형 동행자');
+    expect(seyeon?.behavior.questionPriorities).toEqual([
+      'activate_next_step',
+      'clarify_boundary',
+    ]);
+    expect(seyeon?.relationshipBehavior.defaultMode.distance).toBe(
+      'warm-proactive',
+    );
+
+    const projection = JSON.stringify(seyeon);
+    expect(projection).not.toContain('차분하고 균형 잡힌 검토자');
   });
 
   it('keeps publication-only fields outside the runtime authoring registry', () => {

@@ -24,14 +24,12 @@ const signUpIdentity = Object.freeze({
 });
 const newerLogin = Object.freeze({
   accessToken: 'newer.member.signature',
-  refreshToken: 'refresh-newer-member',
   expiresAt: '2099-01-03T00:00:00.000Z',
   tokenType: 'bearer',
   user: signInIdentity,
 });
 const staleSignup = Object.freeze({
   accessToken: 'stale.signup.signature',
-  refreshToken: 'refresh-stale-signup',
   expiresAt: '2099-01-04T00:00:00.000Z',
   tokenType: 'bearer',
   user: signUpIdentity,
@@ -330,8 +328,8 @@ try {
 
   assert(signupResult.value === null, 'stale authenticated signup unexpectedly returned a session');
   assert(signupResult.error?.code === 'WEB_AUTH_MEMBER_MUTATION_SUPERSEDED', `unexpected stale signup result ${JSON.stringify(signupResult)}`);
-  assert(finalSignupTab.accessToken === newerLogin.accessToken && finalSignupTab.refreshToken === newerLogin.refreshToken, 'stale authenticated signup overwrote the newer shared Member authority');
-  assert(finalSignInTab.accessToken === newerLogin.accessToken && finalSignInTab.refreshToken === newerLogin.refreshToken, 'newer Member authority diverged across tabs');
+  assert(finalSignupTab.accessToken === newerLogin.accessToken && finalSignupTab.refreshToken === null, 'stale authenticated signup overwrote or exposed the newer shared Member authority');
+  assert(finalSignInTab.accessToken === newerLogin.accessToken && finalSignInTab.refreshToken === null, 'newer Member authority diverged across tabs or exposed a refresh credential');
   assert(finalSignupTab.activeGuest === guestBearer && finalSignupTab.pendingGuest === null, 'stale signup mutated the originating Guest lineage');
 
   const report = {

@@ -18,26 +18,24 @@ const identity = Object.freeze({
 const member = Object.freeze({ id: identity.id, email: identity.email });
 const original = Object.freeze({
   accessToken: 'old.header.signature',
-  refreshToken: 'refresh-old',
   expiresAt: '2099-01-01T00:00:00.000Z',
   tokenType: 'bearer',
   user: member,
 });
 const staleRefresh = Object.freeze({
   accessToken: 'stale.header.signature',
-  refreshToken: 'refresh-stale',
   expiresAt: '2099-01-02T00:00:00.000Z',
   tokenType: 'bearer',
   user: member,
 });
 const newerLogin = Object.freeze({
   accessToken: 'newlogin.header.signature',
-  refreshToken: 'refresh-new-login',
   expiresAt: '2099-01-03T00:00:00.000Z',
   tokenType: 'bearer',
   user: member,
 });
 const stagedGuest = 'member-mutation-lock-staged-guest';
+const refreshCookieName = 'myeongha_member_refresh_v1';
 const mime = new Map([
   ['.html', 'text/html; charset=utf-8'],
   ['.js', 'text/javascript; charset=utf-8'],
@@ -63,6 +61,35 @@ async function readJsonBody(req) {
   return raw ? JSON.parse(raw) : {};
 }
 
+function readRefreshCookie(req) {
+  const raw = req.headers.cookie ?? '';
+  for (const segment of raw.split(';')) {
+    const trimmed = segment.trim();
+    const separator = trimmed.indexOf('=');
+    if (separator <= 0 || trimmed.slice(0, separator) !== refreshCookieName) continue;
+    try {
+      return decodeURIComponent(trimmed.slice(separator + 1));
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+function setRefreshCookie(res, token) {
+  res.setHeader(
+    'Set-Cookie',
+    refreshCookieName + '=' + encodeURIComponent(token) + '; Path=/api/auth; HttpOnly; SameSite=Strict',
+  );
+}
+
+function clearRefreshCookie(res) {
+  res.setHeader(
+    'Set-Cookie',
+    refreshCookieName + '=; Path=/api/auth; HttpOnly; SameSite=Strict; Max-Age=0',
+  );
+}
+
 async function serve() {
   const server = createServer(async (req, res) => {
     try {
@@ -71,7 +98,13 @@ async function serve() {
       if (pathname === '/api/auth/refresh' && req.method === 'POST') {
         const body = await readJsonBody(req);
         refreshRequests += 1;
-        requests.push({ path: pathname, refreshToken: body.refreshToken ?? null });
+        requests.push({
+          path: pathname,
+          cookieRefreshToken: readRefreshCookie(req),
+          bodyRefreshToken: body.refreshToken ?? null,
+          authTransport: req.headers['x-myeongha-auth-transport'] ?? null,
+        });
+        setRefreshCookie(res, 'refresh-stale');
         sendJson(res, 200, {
           ok: true,
           data: { status: 'authenticated', session: staleRefresh },
@@ -82,8 +115,13 @@ async function serve() {
       if (pathname === '/api/auth/sign-in' && req.method === 'POST') {
         const body = await readJsonBody(req);
         signInRequests += 1;
-        requests.push({ path: pathname, email: body.email ?? null });
+        requests.push({
+          path: pathname,
+          email: body.email ?? null,
+          authTransport: req.headers['x-myeongha-auth-transport'] ?? null,
+        });
         assert(body.email === identity.email && body.password === identity.password, 'unexpected sign-in credentials');
+        setRefreshCookie(res, 'refresh-new-login');
         sendJson(res, 200, {
           ok: true,
           data: { status: 'authenticated', session: newerLogin },
@@ -93,7 +131,12 @@ async function serve() {
       }
       if (pathname === '/api/auth/sign-out' && req.method === 'POST') {
         signOutRequests += 1;
-        requests.push({ path: pathname, authorization: req.headers.authorization ?? null });
+        requests.push({
+          path: pathname,
+          authorization: req.headers.authorization ?? null,
+          authTransport: req.headers['x-myeongha-auth-transport'] ?? null,
+        });
+        clearRefreshCookie(res);
         sendJson(res, 200, {
           ok: true,
           data: { status: 'signed_out' },
@@ -217,7 +260,16 @@ async function waitFor(client, expression, message, timeout = 8_000) {
   throw new Error(message);
 }
 
-async function seed(client, session = original) {
+async function seed(client, origin, session = original) {
+  const seeded = await client.send('Network.setCookie', {
+    name: refreshCookieName,
+    value: 'refresh-old',
+    url: `${origin}/api/auth/refresh`,
+    path: '/api/auth',
+    httpOnly: true,
+    sameSite: 'Strict',
+  });
+  assert(seeded?.success !== false, 'Failed to seed mutation-lock HttpOnly refresh cookie');
   await client.evaluate(`(() => {
     localStorage.setItem('myeongha.memberSession.v1', ${JSON.stringify(JSON.stringify(session))});
     sessionStorage.setItem('myeongha.guestBearer.v1', ${JSON.stringify(session.accessToken)});
@@ -279,7 +331,7 @@ try {
   const supportsLocks = await client.evaluate(`Boolean(navigator.locks && typeof navigator.locks.request === 'function')`);
   assert(supportsLocks, 'Chrome Web Locks API unavailable');
 
-  await seed(client);
+  await seed(client, origin);
   const releaseDirect = await holdLock(client, 'direct');
   await client.evaluate(`(() => {
     window.__directRefresh = { done: false, value: null, error: null };
@@ -309,7 +361,7 @@ try {
   assert(directState.storedAccessToken === newerLogin.accessToken, 'stale refresh overwrote direct newer Member replacement');
   console.log('MyeongHa_WEB_AUTH_REFRESH_COMMIT_LOCK_BROWSER_PASS blocked=true preserved_newer=true refresh_requests=1');
 
-  await seed(client);
+  await seed(client, origin);
   const releaseSignIn = await holdLock(client, 'signin');
   await client.evaluate(`(() => {
     window.__signInRace = { done: false, value: null, error: null };
@@ -345,11 +397,11 @@ try {
   assert(signInRequests === 1, `expected one serialized sign-in request, received ${signInRequests}`);
   assert(signInRace.signIn.error === null && signInRace.signIn.value?.accessToken === newerLogin.accessToken, 'serialized sign-in failed');
   assert(signInRace.refresh.error === null && signInRace.refresh.value?.accessToken === newerLogin.accessToken, 'stale refresh did not converge after serialized sign-in');
-  assert(signInState.storedAccessToken === newerLogin.accessToken && signInState.storedRefreshToken === newerLogin.refreshToken, 'stale refresh overwrote the newer sign-in generation');
+  assert(signInState.storedAccessToken === newerLogin.accessToken && signInState.storedRefreshToken === null, 'stale refresh overwrote or exposed the newer sign-in generation');
   assert(signInState.activeBearer === newerLogin.accessToken && signInState.pendingGuest === stagedGuest, 'serialized sign-in compatibility authority mismatch');
   console.log('Member mutation lock sign-in request-start precedence: PASS');
 
-  await seed(client);
+  await seed(client, origin);
   const releaseSignOut = await holdLock(client, 'signout');
   await client.evaluate(`(() => {
     window.__signOutRace = { done: false, error: null };
@@ -383,7 +435,28 @@ try {
   assert(signOutState.activeBearer === stagedGuest && signOutState.pendingGuest === null, 'sign-out did not restore staged Guest authority');
   assert(signOutRequests === 1, `expected one serialized sign-out request, received ${signOutRequests}`);
   assert(requests.find((request) => request.path === '/api/auth/sign-out')?.authorization === `Bearer ${original.accessToken}`, 'sign-out did not use the locked canonical Member bearer');
-  console.log('Member mutation lock sign-out request-start precedence: PASS');
+  assert(
+    requests.filter((request) => request.path === '/api/auth/refresh').every(
+      (request) =>
+        request.cookieRefreshToken === 'refresh-old' &&
+        request.bodyRefreshToken === null &&
+        request.authTransport === 'web-cookie-v1',
+    ),
+    'Member mutation refresh escaped the governed Web cookie transport',
+  );
+  assert(
+    requests.filter((request) => request.path === '/api/auth/sign-in').every(
+      (request) => request.authTransport === 'web-cookie-v1',
+    ),
+    'Serialized sign-in did not use the Web cookie transport',
+  );
+  assert(
+    requests.filter((request) => request.path === '/api/auth/sign-out').every(
+      (request) => request.authTransport === 'web-cookie-v1',
+    ),
+    'Serialized sign-out did not use the Web cookie transport',
+  );
+    console.log('Member mutation lock sign-out request-start precedence: PASS');
 
   const report = {
     status: 'MyeongHa_WEB_AUTH_MEMBER_MUTATION_LOCK_BROWSER_PASS',

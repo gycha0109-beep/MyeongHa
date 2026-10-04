@@ -17,6 +17,7 @@ const accessToken = 'network.header.signature';
 const rotatedToken = 'networkrotated.header.signature';
 const refreshToken = 'network-refresh-token';
 const rotatedRefreshToken = 'network-refresh-token-rotated';
+const refreshCookieName = 'myeongha_member_refresh_v1';
 const stagedGuest = 'refresh-network-staged-guest';
 const mime = new Map([
   ['.html', 'text/html; charset=utf-8'],
@@ -74,10 +75,31 @@ async function readJsonBody(req) {
   return raw ? JSON.parse(raw) : {};
 }
 
+function readRefreshCookie(req) {
+  const raw = req.headers.cookie ?? '';
+  for (const segment of raw.split(';')) {
+    const trimmed = segment.trim();
+    const separator = trimmed.indexOf('=');
+    if (separator <= 0 || trimmed.slice(0, separator) !== refreshCookieName) continue;
+    try {
+      return decodeURIComponent(trimmed.slice(separator + 1));
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+function setRefreshCookie(res, token) {
+  res.setHeader(
+    'Set-Cookie',
+    refreshCookieName + '=' + encodeURIComponent(token) + '; Path=/api/auth; HttpOnly; SameSite=Strict',
+  );
+}
+
 function rotatedSession() {
   return {
     accessToken: rotatedToken,
-    refreshToken: rotatedRefreshToken,
     expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
     tokenType: 'bearer',
     user: { id: member.id, email: member.email },
@@ -98,13 +120,16 @@ async function serve() {
           path: pathname,
           method: req.method,
           authorization,
-          refreshToken: body.refreshToken ?? null,
+          cookieRefreshToken: readRefreshCookie(req),
+          bodyRefreshToken: body.refreshToken ?? null,
+          authTransport: req.headers['x-myeongha-auth-transport'] ?? null,
           mode: refreshMode,
         });
         if (refreshMode === 'network') {
           req.socket.destroy();
           return;
         }
+        setRefreshCookie(res, rotatedRefreshToken);
         sendJson(res, 200, successEnvelope({ status: 'authenticated', session: rotatedSession() }));
         return;
       }
@@ -251,11 +276,19 @@ async function waitFor(client, expression, message, timeout = 8_000) {
   throw new Error(`${message}; diagnostics=${JSON.stringify(diagnostics)}; requests=${JSON.stringify(requests)}`);
 }
 
-async function seedMember(client, expiresAt) {
+async function seedMember(client, origin, expiresAt) {
+  const seeded = await client.send('Network.setCookie', {
+    name: refreshCookieName,
+    value: refreshToken,
+    url: `${origin}/api/auth/refresh`,
+    path: '/api/auth',
+    httpOnly: true,
+    sameSite: 'Strict',
+  });
+  assert(seeded?.success !== false, 'Failed to seed network-refresh HttpOnly cookie');
   await client.evaluate(`(() => {
     const session = {
       accessToken: ${JSON.stringify(accessToken)},
-      refreshToken: ${JSON.stringify(refreshToken)},
       expiresAt: ${JSON.stringify(expiresAt)},
       tokenType: 'bearer',
       user: { id: ${JSON.stringify(member.id)}, email: ${JSON.stringify(member.email)} },
@@ -323,7 +356,7 @@ try {
   await navigate(client, origin, '/hall.html', '.product-profile');
 
   refreshMode = 'network';
-  await seedMember(client, new Date(Date.now() + 30_000).toISOString());
+  await seedMember(client, origin, new Date(Date.now() + 30_000).toISOString());
   const nearBefore = refreshRequests;
   await navigate(client, origin, '/hall.html', '.product-profile');
   await waitFor(
@@ -342,7 +375,7 @@ try {
   assert(refreshRequests > nearBefore, 'Near-expiry network scenario did not exercise refresh transport failure');
   assert(guestBootstrapRequests === 0, 'Near-expiry network failure bootstrapped a Guest');
 
-  await seedMember(client, new Date(Date.now() - 5_000).toISOString());
+  await seedMember(client, origin, new Date(Date.now() - 5_000).toISOString());
   const expiredBefore = refreshRequests;
   await navigate(client, origin, '/hall.html', '.product-profile');
   await waitFor(
@@ -357,7 +390,7 @@ try {
   assert(!expiredEnsure.ok && expiredEnsure.error?.code === 'WEB_AUTH_NETWORK_FAILED', 'Expired network failure allowed Guest fallback from ensureActiveBearer');
   assert(expiredState.authState === 'member' && expiredState.authLabel === '마이 페이지', 'Expired network failure rendered Guest UI');
   assert(expiredState.userId === member.id && expiredState.email === member.email, 'Expired network failure deleted Member identity');
-  assert(expiredState.accessToken === accessToken && expiredState.refreshToken === refreshToken, 'Expired network failure deleted recoverable Member credentials');
+  assert(expiredState.accessToken === accessToken && expiredState.refreshToken === null, 'Expired network failure deleted recoverable Member credentials or exposed refresh authority');
   assert(expiredState.activeBearer === accessToken && expiredState.pendingGuest === stagedGuest, 'Expired network failure substituted Guest authority');
   assert(refreshRequests > expiredBefore, 'Expired network scenario did not exercise refresh transport failure');
   assert(guestBootstrapRequests === 0, 'Expired network failure bootstrapped a Guest');
@@ -377,12 +410,17 @@ try {
   const recoveredBearer = await resolveBearer(client, 'getActiveBearer');
   assert(recoveredBearer.ok && recoveredBearer.value?.kind === 'member' && recoveredBearer.value?.token === rotatedToken, 'Recovered network refresh did not expose rotated Member bearer');
   assert(recovered.userId === member.id && recovered.email === member.email, 'Network recovery changed Member identity');
-  assert(recovered.accessToken === rotatedToken && recovered.refreshToken === rotatedRefreshToken, 'Network recovery did not persist rotated credentials');
+  assert(recovered.accessToken === rotatedToken && recovered.refreshToken === null, 'Network recovery did not persist rotated access authority or exposed refresh authority');
   assert(recovered.activeBearer === rotatedToken && recovered.pendingGuest === stagedGuest, 'Network recovery consumed or substituted staged Guest authority');
   assert(guestBootstrapRequests === 0, 'Network recovery unexpectedly bootstrapped a Guest');
   assert(
-    requests.filter((request) => request.path === '/api/auth/refresh').every((request) => request.refreshToken === refreshToken),
-    'Network refresh scenario used an unexpected refresh credential',
+    requests.filter((request) => request.path === '/api/auth/refresh').every(
+      (request) =>
+        request.cookieRefreshToken === refreshToken &&
+        request.bodyRefreshToken === null &&
+        request.authTransport === 'web-cookie-v1',
+    ),
+    'Network refresh scenario escaped the governed Web cookie credential',
   );
 
   await mkdir(artifactDir, { recursive: true });

@@ -1,0 +1,41 @@
+{
+  "expo": {
+    "name": "명하",
+    "slug": "myeongha-mobile",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "myeongha",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": false,
+      "buildNumber": "1",
+      "bundleIdentifier": "com.myeongha.app"
+    },
+    "android": {
+      "predictiveBackGestureEnabled": false,
+      "versionCode": 1,
+      "package": "com.myeongha.app"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-notifications",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "관상에 사용할 사진을 선택할 수 있도록 사진 접근을 허용해 주세요.",
+          "cameraPermission": "관상 사진을 촬영할 수 있도록 카메라 접근을 허용해 주세요.",
+          "microphonePermission": false
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "5c20243c-60a8-44f3-9d8c-ca06ccc8bebe"
+      }
+    },
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

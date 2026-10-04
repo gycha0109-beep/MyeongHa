@@ -35,8 +35,13 @@ describe('Production character roster read audit contract', () => {
   it('uses the governed Production database credentials without mutation permissions', () => {
     expect(workflow).toContain('environment: production');
     expect(workflow).toContain('SUPABASE_PROJECT_ID: cnsfpcdiyofqvhpcegfc');
-    expect(workflow).toContain('SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}');
+    expect(workflow).toContain(
+      'SUPABASE_PRODUCTION_SESSION_POOLER_HOST: ${{ secrets.SUPABASE_PRODUCTION_SESSION_POOLER_HOST }}',
+    );
     expect(workflow).toContain('SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}');
+    expect(workflow).not.toContain('SUPABASE_ACCESS_TOKEN');
+    expect(workflow).not.toContain('api.supabase.com');
+    expect(workflow).not.toContain('/config/database/pooler');
     expect(workflow).toContain('permissions:\n  contents: read');
     expect(workflow).not.toContain('actions: write');
     expect(workflow).not.toContain('id-token: write');

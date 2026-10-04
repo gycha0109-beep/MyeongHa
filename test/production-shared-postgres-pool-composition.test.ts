@@ -9,6 +9,9 @@ function productionLikeEnv(): Record<string, string> {
     MYEONGHA_DATABASE_URL:
       'postgresql://myeongha_runtime.cnsfpcdiyofqvhpcegfc:test-password@aws-0-test.pooler.supabase.com:5432/postgres?sslmode=require',
     MYEONGHA_DATABASE_PRINCIPAL: 'myeongha_runtime',
+    MYEONGHA_DATABASE_TLS_PEER_MODE: 'verify-full',
+    MYEONGHA_DATABASE_SSL_ROOT_CERT_PEM:
+      '-----BEGIN CERTIFICATE-----\\ntest-only\\n-----END CERTIFICATE-----',
     MYEONGHA_SUPABASE_URL: 'https://cnsfpcdiyofqvhpcegfc.supabase.co',
     MYEONGHA_SUPABASE_API_KEY:
       'sb_publishable_test_key_material_for_shared_postgres_pool',
@@ -39,11 +42,11 @@ describe('Production multiplexed PostgreSQL pool composition', () => {
     expect(injectedCloseCalls).toBe(0);
   });
 
-  it('pins one shared pool creation and seven shared injections in /api/me', async () => {
+  it('pins one shared pool creation and nine shared injections in /api/me', async () => {
     const source = await readFile(new URL('../api/me.ts', import.meta.url), 'utf8');
 
     expect(source.match(/createNodePostgresSubjectPoolV1\(/gu)).toHaveLength(1);
-    expect(source.match(/pool: getSharedPostgresPool\(\)/gu)).toHaveLength(7);
+    expect(source.match(/pool: getSharedPostgresPool\(\)/gu)).toHaveLength(9);
   });
 
   it('pins one shared pool creation and two shared injections in /api/birth-profiles', async () => {

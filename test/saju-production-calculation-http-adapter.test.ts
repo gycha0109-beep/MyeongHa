@@ -101,13 +101,13 @@ function jsonResponse(
   status = 200,
   contentType = 'application/json; charset=utf-8',
 ): SajuProductionCalculationHttpResponseV1 {
-  return {
-    status,
-    headers: { get: (name) => (name.toLowerCase() === 'content-type' ? contentType : null) },
-    async text() {
-      return typeof body === 'string' ? body : JSON.stringify(body);
+  return new Response(
+    typeof body === 'string' ? body : JSON.stringify(body),
+    {
+      status,
+      headers: { 'Content-Type': contentType },
     },
-  };
+  );
 }
 
 async function expectAdapterError(

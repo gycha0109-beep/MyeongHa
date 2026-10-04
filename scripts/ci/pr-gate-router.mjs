@@ -35,6 +35,7 @@ const profilePatterns = [
 ];
 
 const knownFullPatterns = [
+  /^scripts\/ci\/(?:verification-plan\.mjs|run-web-pr-checks\.mjs|web-pr-checks\.json)$/u,
   /^apps\/web\/(?:app\.js|api-envelope\.js|styles\.css|index\.html)$/u,
   /^apps\/web\/product-/u,
   /^apps\/web\/auth(?:[-.]|\.html$)/u,
@@ -55,16 +56,21 @@ const knownFullPatterns = [
 ];
 
 const dbPatterns = [
+  /^scripts\/ci\/(?:db-suites\.json|verification-plan\.mjs)$/u,
   /^supabase\/migrations\//u,
   /^test\/db\//u,
   /^test\/account-deletion-worker-runtime-postgres\.e2e\.test\.ts$/u,
   /^apps\/api\/src\/(?:account-deletion-worker-|node-postgres-account-deletion-worker-pool\.ts$|postgres-account-deletion-worker\.ts$|production-account-deletion-worker-)/u,
   /^package(?:-lock)?\.json$/u,
   /^\.github\/workflows\/ci\.yml$/u,
+  /^\.github\/workflows\/ci-db-track\.yml$/u,
+  /^scripts\/ci\/run-db-track\.mjs$/u,
   /^scripts\/ci\/pr-gate-router\.mjs$/u,
 ];
 
 const isWebRelevant = (path) =>
+  /^scripts\/ci\/(?:verification-plan\.mjs|run-web-pr-checks\.mjs|web-pr-checks\.json)$/u.test(path)
+  ||
   path.startsWith('apps/web/')
   || /^scripts\/(?:run|verify)-web-/u.test(path)
   || path === 'scripts/build-web-static.mjs'

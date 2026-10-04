@@ -11,7 +11,17 @@
     "verbatimModuleSyntax": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "types": ["node"]
+    "types": [
+      "node"
+    ],
+    "paths": {
+      "@/*": [
+        "apps/mobile/src/*.ts",
+        "apps/mobile/src/*.tsx"
+      ]
+    },
+    "baseUrl": ".",
+    "ignoreDeprecations": "6.0"
   },
   "include": [
     "api/**/*.ts",

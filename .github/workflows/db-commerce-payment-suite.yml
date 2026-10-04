@@ -1,30 +1,7 @@
 name: DB Commerce Payment Suite
-run-name: "[WT:product-commerce] DB Commerce Payment Suite"
 
 on:
-  pull_request:
-    paths:
-      - 'supabase/migrations/**'
-      - 'test/db/bootstrap_supabase_auth_stub.sql'
-      - 'test/db/run_ci_case.sh'
-      - 'test/db/commerce_payment_attempt_authority.sh'
-      - 'test/db/commerce_payment_attempt_handoff_context.sh'
-      - 'test/db/commerce_payment_verification_context.sh'
-      - 'test/db/commerce_provider_payment_verification_context.sh'
-      - 'test/db/commerce_verified_payment_evidence_persistence.sh'
-      - 'test/db/commerce_verified_payment_replay_timestamp.sh'
-      - 'test/db/catalog_snapshot.sh'
-      - 'test/db/catalog.expected.sha256'
-      - 'apps/api/src/postgres-commerce-internal-execution.ts'
-      - 'apps/api/src/commerce-provider-payment-verification-context-read.ts'
-      - 'apps/api/src/commerce-verified-payment-evidence-persistence.ts'
-      - 'apps/api/src/verified-commerce-evidence.ts'
-      - 'tests/postgres-commerce-internal-execution.test.ts'
-      - 'tests/commerce-provider-payment-verification-context-read.test.ts'
-      - 'tests/commerce-provider-payment-verification-context-authority.test.ts'
-      - 'tests/commerce-verified-payment-evidence-persistence.test.ts'
-      - 'tests/commerce-verified-payment-evidence-persistence-authority.test.ts'
-      - '.github/workflows/db-commerce-payment-suite.yml'
+  workflow_dispatch:
   push:
     branches:
       - main
@@ -32,6 +9,10 @@ on:
       - 'supabase/migrations/**'
       - 'test/db/bootstrap_supabase_auth_stub.sql'
       - 'test/db/run_ci_case.sh'
+      - 'scripts/ci/db-suites.json'
+      - 'scripts/ci/db-pr-router.mjs'
+      - 'scripts/ci/run-db-track.mjs'
+      - '.github/workflows/ci-db-track.yml'
       - 'test/db/commerce_payment_attempt_authority.sh'
       - 'test/db/commerce_payment_attempt_handoff_context.sh'
       - 'test/db/commerce_payment_verification_context.sh'
@@ -59,41 +40,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  db-case:
-    name: ${{ matrix.case }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        case:
-          - commerce-payment-attempt-authority
-          - commerce-payment-attempt-handoff-context
-          - commerce-payment-verification-context
-          - commerce-provider-payment-verification-context
-          - commerce-verified-payment-evidence-persistence
-    services:
-      postgres:
-        image: postgres:15
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_HOST_AUTH_METHOD: trust
-          POSTGRES_DB: myeongha_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd="pg_isready -U postgres -d myeongha_test"
-          --health-interval=5s
-          --health-timeout=5s
-          --health-retries=10
-    env:
-      PGHOST: localhost
-      PGPORT: 5432
-      PGUSER: postgres
-      PGDATABASE: myeongha_test
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Verify PostgreSQL client
-        run: psql --version
-      - name: Run DB regression case
-        run: bash test/db/run_ci_case.sh "${{ matrix.case }}"
+  db-suite:
+    name: DB suite · commerce-payment
+    uses: ./.github/workflows/ci-db-track.yml
+    with:
+      suite: commerce-payment
+      postgres: "15"

@@ -1,3 +1,4 @@
+import { executeSecurityObservedRequestV1 } from '../apps/api/src/security-observability.js';
 const GET_METHOD = 'GET' as const;
 
 function cancelUnusedRequestBodyBestEffort(request: Request): void {
@@ -21,12 +22,18 @@ function methodNotAllowed(): Response {
 }
 
 export default {
-  fetch(request: Request): Response {
-    if (request.method !== GET_METHOD) {
-      cancelUnusedRequestBodyBestEffort(request);
-      return methodNotAllowed();
-    }
+  fetch(request: Request): Promise<Response> {
+    return executeSecurityObservedRequestV1({
+      request,
+      routeId: 'api.health',
+      execute: () => {
+        if (request.method !== GET_METHOD) {
+          cancelUnusedRequestBodyBestEffort(request);
+          return methodNotAllowed();
+        }
 
-    return Response.json({ status: 'ok' });
+        return Response.json({ status: 'ok' });
+      },
+    });
   },
 };

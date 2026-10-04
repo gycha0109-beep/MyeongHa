@@ -1,8 +1,10 @@
-import { randomUUID } from 'node:crypto';
+import { executeSecurityObservedRequestV1 } from '../apps/api/src/security-observability.js';
 import { createNodePostgresSubjectPoolV1 } from '../apps/api/src/node-postgres-subject-pool.js';
 import { createProductionChatReadRuntimeV1 } from '../apps/api/src/production-chat-read-runtime.js';
 import { createProductionCurrentSubjectProfileRuntimeV1 } from '../apps/api/src/production-current-subject-profile-runtime.js';
 import { createProductionCurrentSubjectSajuPreviewReadingRuntimeV1 } from '../apps/api/src/production-current-subject-saju-preview-reading-runtime.js';
+import { createProductionDeviceInstallationRuntimeV1 } from '../apps/api/src/production-device-installation-runtime.js';
+import { createProductionTargetPersonCreateRuntimeV1 } from '../apps/api/src/production-target-person-create-runtime.js';
 import { createProductionTargetPersonReadRuntimeV1 } from '../apps/api/src/production-target-person-read-runtime.js';
 import {
   createProductionLifeRecordReadRuntimeV1,
@@ -18,6 +20,9 @@ const MEMORIES_ROUTE = '/api/memories' as const;
 const CHAT_OPEN_ROUTE = '/api/chat' as const;
 const CHAT_ROUTE_PREFIX = '/api/chat/' as const;
 const TARGET_PERSONS_ROUTE = '/api/target-persons' as const;
+const DEVICE_INSTALLATION_REGISTER_ROUTE = '/api/device-installations/register' as const;
+const DEVICE_INSTALLATION_REVOKE_PREFIX = '/api/device-installations/' as const;
+const DEVICE_INSTALLATION_REVOKE_SUFFIX = '/revoke' as const;
 const TARGET_PERSON_ROUTE_PREFIX = '/api/target-persons/' as const;
 const SAJU_PREVIEW_READING_ROUTE = '/api/me/saju/preview-reading' as const;
 const RECORDS_ROUTE_PARAM = '__myeongha_records_read' as const;
@@ -28,6 +33,8 @@ const VERCEL_DYNAMIC_CHAT_THREAD_PARAM = 'threadId' as const;
 const CHAT_CURSOR_PARAM = 'afterSequenceNo' as const;
 const TARGET_PERSON_READ_PARAM = '__myeongha_target_person_read' as const;
 const TARGET_PERSON_ID_PARAM = '__myeongha_target_person_id' as const;
+const DEVICE_INSTALLATION_ACTION_PARAM = '__myeongha_device_installation_action' as const;
+const DEVICE_INSTALLATION_ID_PARAM = '__myeongha_device_installation_id' as const;
 const SAJU_PREVIEW_READING_PARAM = '__myeongha_saju_preview_reading' as const;
 const VERCEL_DYNAMIC_TARGET_PERSON_PARAM = 'id' as const;
 const VERCEL_SHARE_PARAM = '_vercel_share' as const;
@@ -51,6 +58,12 @@ let chatRuntime:
   | undefined;
 let targetPersonRuntime:
   | ReturnType<typeof createProductionTargetPersonReadRuntimeV1>
+  | undefined;
+let targetPersonCreateRuntime:
+  | ReturnType<typeof createProductionTargetPersonCreateRuntimeV1>
+  | undefined;
+let deviceInstallationRuntime:
+  | ReturnType<typeof createProductionDeviceInstallationRuntimeV1>
   | undefined;
 let sajuPreviewReadingRuntime:
   | ReturnType<typeof createProductionCurrentSubjectSajuPreviewReadingRuntimeV1>
@@ -111,6 +124,22 @@ function getTargetPersonRuntime(): ReturnType<typeof createProductionTargetPerso
   return targetPersonRuntime;
 }
 
+function getTargetPersonCreateRuntime(): ReturnType<typeof createProductionTargetPersonCreateRuntimeV1> {
+  targetPersonCreateRuntime ??= createProductionTargetPersonCreateRuntimeV1({
+    env: process.env,
+    pool: getSharedPostgresPool(),
+  });
+  return targetPersonCreateRuntime;
+}
+
+function getDeviceInstallationRuntime(): ReturnType<typeof createProductionDeviceInstallationRuntimeV1> {
+  deviceInstallationRuntime ??= createProductionDeviceInstallationRuntimeV1({
+    env: process.env,
+    pool: getSharedPostgresPool(),
+  });
+  return deviceInstallationRuntime;
+}
+
 function getSajuPreviewReadingRuntime(): ReturnType<typeof createProductionCurrentSubjectSajuPreviewReadingRuntimeV1> {
   sajuPreviewReadingRuntime ??= createProductionCurrentSubjectSajuPreviewReadingRuntimeV1({
     env: process.env,
@@ -134,9 +163,22 @@ type DispatchTarget =
       readonly route: typeof TARGET_PERSONS_ROUTE;
     }
   | {
+      readonly kind: 'target-person-create';
+      readonly route: typeof TARGET_PERSONS_ROUTE;
+    }
+  | {
       readonly kind: 'target-person-detail';
       readonly route: string;
       readonly targetPersonId: string;
+    }
+  | {
+      readonly kind: 'device-installation-register';
+      readonly route: typeof DEVICE_INSTALLATION_REGISTER_ROUTE;
+    }
+  | {
+      readonly kind: 'device-installation-revoke';
+      readonly route: string;
+      readonly installationId: string;
     };
 
 type RecordsDispatchValue = 'life-record' | 'readings' | 'memories';
@@ -171,7 +213,8 @@ function getChatPathThreadId(pathname: string): string | null | undefined {
     pathname === MEMORIES_ROUTE ||
     pathname === TARGET_PERSONS_ROUTE ||
     pathname === SAJU_PREVIEW_READING_ROUTE ||
-    pathname.startsWith(TARGET_PERSON_ROUTE_PREFIX)
+    pathname.startsWith(TARGET_PERSON_ROUTE_PREFIX) ||
+    pathname.startsWith(DEVICE_INSTALLATION_REVOKE_PREFIX)
   ) {
     return undefined;
   }
@@ -203,6 +246,27 @@ function getTargetPersonPathValue(pathname: string): 'list' | string | null | un
   }
 }
 
+function getDeviceInstallationPathValue(
+  pathname: string,
+): 'register' | string | null | undefined {
+  if (pathname === DEVICE_INSTALLATION_REGISTER_ROUTE) return 'register';
+  if (!pathname.startsWith(DEVICE_INSTALLATION_REVOKE_PREFIX)) return undefined;
+  if (!pathname.endsWith(DEVICE_INSTALLATION_REVOKE_SUFFIX)) return null;
+
+  const rawSegment = pathname.slice(
+    DEVICE_INSTALLATION_REVOKE_PREFIX.length,
+    -DEVICE_INSTALLATION_REVOKE_SUFFIX.length,
+  );
+  if (rawSegment.length === 0 || rawSegment.includes('/')) return null;
+
+  try {
+    const installationId = decodeURIComponent(rawSegment);
+    return isUuid(installationId) ? installationId : null;
+  } catch {
+    return null;
+  }
+}
+
 function resolveDispatchTarget(request: Request): DispatchTarget | null {
   const url = new URL(request.url);
   if (url.hash !== '') return null;
@@ -211,6 +275,9 @@ function resolveDispatchTarget(request: Request): DispatchTarget | null {
   if (pathThreadId === null) return null;
   const targetPersonPathValue = getTargetPersonPathValue(url.pathname);
   if (targetPersonPathValue === null) return null;
+  const deviceInstallationPathValue =
+    getDeviceInstallationPathValue(url.pathname);
+  if (deviceInstallationPathValue === null) return null;
 
   const keys = [...new Set(url.searchParams.keys())];
   const knownKeys = new Set<string>([
@@ -222,6 +289,8 @@ function resolveDispatchTarget(request: Request): DispatchTarget | null {
     CHAT_CURSOR_PARAM,
     TARGET_PERSON_READ_PARAM,
     TARGET_PERSON_ID_PARAM,
+    DEVICE_INSTALLATION_ACTION_PARAM,
+    DEVICE_INSTALLATION_ID_PARAM,
     SAJU_PREVIEW_READING_PARAM,
     VERCEL_DYNAMIC_TARGET_PERSON_PARAM,
     VERCEL_SHARE_PARAM,
@@ -286,6 +355,24 @@ function resolveDispatchTarget(request: Request): DispatchTarget | null {
     return null;
   }
 
+  const deviceInstallationAction = getSingleNonEmptyParam(
+    url.searchParams,
+    DEVICE_INSTALLATION_ACTION_PARAM,
+  );
+  if (
+    deviceInstallationAction === null ||
+    (deviceInstallationAction !== undefined &&
+      deviceInstallationAction !== 'register' &&
+      deviceInstallationAction !== 'revoke')
+  ) {
+    return null;
+  }
+  const deviceInstallationId = getSingleNonEmptyParam(
+    url.searchParams,
+    DEVICE_INSTALLATION_ID_PARAM,
+  );
+  if (deviceInstallationId === null) return null;
+
   if (chatOpen !== undefined && chatOpen !== '1') return null;
 
   const isSajuPreviewSourcePath = url.pathname === SAJU_PREVIEW_READING_ROUTE;
@@ -300,6 +387,62 @@ function resolveDispatchTarget(request: Request): DispatchTarget | null {
 
   const hasChatOpen = chatOpen === '1';
   const isChatOpenSourcePath = url.pathname === CHAT_OPEN_ROUTE;
+
+  if (deviceInstallationAction !== undefined) {
+    if (
+      recordsRoute !== undefined ||
+      hasChatOpen ||
+      chatThreadId !== undefined ||
+      vercelDynamicThreadId !== undefined ||
+      pathThreadId !== undefined ||
+      afterSequenceNo !== undefined ||
+      sajuPreviewReading !== undefined ||
+      targetPersonRead !== undefined ||
+      targetPersonId !== undefined ||
+      targetPersonPathValue !== undefined
+    ) {
+      return null;
+    }
+
+    if (deviceInstallationAction === 'register') {
+      if (
+        deviceInstallationId !== undefined ||
+        vercelDynamicTargetPersonId !== undefined ||
+        (url.pathname !== PROFILE_ROUTE &&
+          deviceInstallationPathValue !== 'register')
+      ) {
+        return null;
+      }
+      return {
+        kind: 'device-installation-register',
+        route: DEVICE_INSTALLATION_REGISTER_ROUTE,
+      };
+    }
+
+    if (
+      deviceInstallationId === undefined ||
+      !isUuid(deviceInstallationId) ||
+      (vercelDynamicTargetPersonId !== undefined &&
+        vercelDynamicTargetPersonId !== deviceInstallationId) ||
+      (deviceInstallationPathValue !== undefined &&
+        deviceInstallationPathValue !== deviceInstallationId) ||
+      (url.pathname !== PROFILE_ROUTE &&
+        deviceInstallationPathValue !== deviceInstallationId)
+    ) {
+      return null;
+    }
+    return {
+      kind: 'device-installation-revoke',
+      route: `${DEVICE_INSTALLATION_REVOKE_PREFIX}${deviceInstallationId}${DEVICE_INSTALLATION_REVOKE_SUFFIX}`,
+      installationId: deviceInstallationId,
+    };
+  }
+  if (
+    deviceInstallationId !== undefined ||
+    deviceInstallationPathValue !== undefined
+  ) {
+    return null;
+  }
   if (isChatOpenSourcePath && !hasChatOpen) return null;
   if (hasChatOpen && recordsRoute !== undefined) return null;
   if (hasChatOpen && chatThreadId !== undefined) return null;
@@ -352,7 +495,12 @@ function resolveDispatchTarget(request: Request): DispatchTarget | null {
       ) {
         return null;
       }
-      return { kind: 'target-person-list', route: TARGET_PERSONS_ROUTE };
+      return {
+        kind: request.method === 'POST'
+          ? 'target-person-create'
+          : 'target-person-list',
+        route: TARGET_PERSONS_ROUTE,
+      };
     }
 
     if (targetPersonId === undefined || !isUuid(targetPersonId)) return null;
@@ -507,21 +655,32 @@ function runtimeForTarget(target: DispatchTarget) {
     case 'target-person-list':
     case 'target-person-detail':
       return getTargetPersonRuntime();
+    case 'target-person-create':
+      return getTargetPersonCreateRuntime();
+    case 'device-installation-register':
+    case 'device-installation-revoke':
+      return getDeviceInstallationRuntime();
   }
 }
 
 export default {
-  async fetch(request: Request): Promise<Response> {
-    const target = resolveDispatchTarget(request);
-    if (target === null) {
-      cancelUnusedRequestBodyBestEffort(request);
-      return routeNotFound();
-    }
+  fetch(request: Request): Promise<Response> {
+    return executeSecurityObservedRequestV1({
+      request,
+      routeId: 'api.me.dispatch',
+      execute: ({ requestId, serverTime }) => {
+        const target = resolveDispatchTarget(request);
+        if (target === null) {
+          cancelUnusedRequestBodyBestEffort(request);
+          return routeNotFound();
+        }
 
-    return runtimeForTarget(target).handleRequest({
-      request: toCanonicalMeRequestForTestV1(request, target),
-      requestId: randomUUID(),
-      serverTime: new Date().toISOString(),
+        return runtimeForTarget(target).handleRequest({
+          request: toCanonicalMeRequestForTestV1(request, target),
+          requestId,
+          serverTime,
+        });
+      },
     });
   },
 };

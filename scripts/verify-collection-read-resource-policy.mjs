@@ -105,3 +105,5 @@ for (const fragment of [
 console.log(
   'MyeongHa collection read resource policy v1 verification passed: default/max 50, keyset/sequence cursors, DB pageSize+1 derivation, canonical-subject ownership independence, and no offset pagination are pinned.',
 );
+
+await import('./verify-authenticated-json-request-resource-policy.mjs');

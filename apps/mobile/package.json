@@ -1,6 +1,36 @@
 {
   "name": "@myeongha/mobile",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "main": "expo-router/entry",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "export:ci": "npm run export:ci:android && npm run export:ci:ios",
+    "export:ci:android": "expo export --platform android --output-dir .expo/export-ci/android",
+    "export:ci:ios": "expo export --platform ios --output-dir .expo/export-ci/ios"
+  },
+  "dependencies": {
+    "@myeongha/api-client": "0.1.0",
+    "expo": "~57.0.25",
+    "expo-application": "~57.0.3",
+    "expo-constants": "~57.0.19",
+    "expo-image-picker": "~57.0.20",
+    "expo-linking": "~57.0.11",
+    "expo-notifications": "~57.0.21",
+    "expo-router": "~57.0.23",
+    "expo-secure-store": "~57.0.4",
+    "expo-status-bar": "~57.0.1",
+    "react": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-screens": "~4.26.0"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "typescript": "6.0.2"
+  }
 }
