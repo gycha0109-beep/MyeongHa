@@ -43,7 +43,8 @@ After setting the existing Production user-data runtime environment and provider
 environment:
 
 ```bash
-npm run dogfood:seyeon -- \
+npm run build
+node dist/apps/api/src/seyeon-internal-live-dogfood-cli-v1.js \
   --member-auth-user-id <verified-auth-user-id> \
   --thread <existing-seyeon-thread-id> \
   --client-turn <fresh-client-turn-id> \
