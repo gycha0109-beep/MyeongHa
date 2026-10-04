@@ -106,6 +106,8 @@ grant select on public.conversation_messages
   to myeongha_seyeon_post_turn_owner;
 grant select on public.conversation_thread_characters
   to myeongha_seyeon_post_turn_owner;
+grant select on public.conversation_threads
+  to myeongha_seyeon_post_turn_owner;
 
 drop policy if exists outbox_events_seyeon_post_turn_select_v1
   on public.outbox_events;
@@ -183,6 +185,14 @@ drop policy if exists conversation_messages_seyeon_post_turn_select_v1
   on public.conversation_messages;
 create policy conversation_messages_seyeon_post_turn_select_v1
 on public.conversation_messages
+for select
+to myeongha_seyeon_post_turn_owner
+using (subject_id = public.current_myeongha_subject_id());
+
+drop policy if exists conversation_threads_seyeon_post_turn_select_v1
+  on public.conversation_threads;
+create policy conversation_threads_seyeon_post_turn_select_v1
+on public.conversation_threads
 for select
 to myeongha_seyeon_post_turn_owner
 using (subject_id = public.current_myeongha_subject_id());
@@ -655,11 +665,14 @@ revoke myeongha_seyeon_post_turn_owner from current_user;
 
 DO $postcheck$
 DECLARE
-  v_owner oid;
-  v_member_count integer;
+  v_owner_oid oid;
+  v_server_version_num integer := current_setting('server_version_num')::integer;
+  v_membership_count integer;
+  v_expected_admin_count integer;
+  v_current_user_superuser boolean;
 BEGIN
   SELECT oid
-  INTO STRICT v_owner
+  INTO STRICT v_owner_oid
   FROM pg_catalog.pg_roles
   WHERE rolname = 'myeongha_seyeon_post_turn_owner'
     AND NOT rolcanlogin
@@ -671,13 +684,41 @@ BEGIN
     AND NOT rolbypassrls;
 
   SELECT count(*)
-  INTO v_member_count
+  INTO v_membership_count
   FROM pg_catalog.pg_auth_members
-  WHERE roleid = v_owner;
+  WHERE roleid = v_owner_oid;
 
-  IF current_setting('server_version_num')::integer < 160000
-     AND v_member_count <> 0 THEN
-    RAISE EXCEPTION 'myeongha_seyeon_post_turn_owner retained unexpected membership';
+  SELECT r.rolsuper
+  INTO STRICT v_current_user_superuser
+  FROM pg_catalog.pg_roles r
+  WHERE r.rolname = CURRENT_USER;
+
+  IF v_server_version_num >= 160000 THEN
+    IF v_current_user_superuser THEN
+      IF v_membership_count <> 0 THEN
+        RAISE EXCEPTION 'myeongha_seyeon_post_turn_owner retained unexpected PostgreSQL 16+ superuser membership';
+      END IF;
+    ELSE
+      SELECT count(*)
+      INTO v_expected_admin_count
+      FROM pg_catalog.pg_auth_members m
+      JOIN pg_catalog.pg_roles member_role
+        ON member_role.oid = m.member
+      JOIN pg_catalog.pg_roles grantor_role
+        ON grantor_role.oid = m.grantor
+      WHERE m.roleid = v_owner_oid
+        AND member_role.rolname = CURRENT_USER
+        AND m.admin_option
+        AND NOT m.inherit_option
+        AND NOT m.set_option
+        AND grantor_role.rolsuper;
+
+      IF v_membership_count <> 1 OR v_expected_admin_count <> 1 THEN
+        RAISE EXCEPTION 'myeongha_seyeon_post_turn_owner did not return to the PostgreSQL 16+ admin-only creator membership contract';
+      END IF;
+    END IF;
+  ELSIF v_membership_count <> 0 THEN
+    RAISE EXCEPTION 'myeongha_seyeon_post_turn_owner retained unexpected pre-PostgreSQL-16 membership';
   END IF;
 
   IF NOT has_schema_privilege(
