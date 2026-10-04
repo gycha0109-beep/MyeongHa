@@ -142,7 +142,9 @@ export function createProductionSeyeonInternalDogfoodRelationshipInspectorV1(
   },
 ): SeyeonInternalDogfoodRelationshipInspectorV1 {
   return Object.freeze({
-    async inspect(request) {
+    async inspect(request: {
+      readonly verifiedEvidence: VerifiedSubjectIdentityEvidenceV1;
+    }) {
       const runner =
         createSeyeonProductionSubjectTransactionRunnerV1({
           pool: input.pool,
