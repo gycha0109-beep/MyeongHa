@@ -6,10 +6,22 @@ import type {
 
 type Row = Readonly<Record<string, unknown>>;
 
+export const POSTGRES_SEYEON_POST_TURN_ANALYSIS_LOOKUP_BINDING_V1 =
+  'public.qry_seyeon_post_turn_analysis_job_v1' as const;
 export const POSTGRES_SEYEON_POST_TURN_ANALYSIS_CLAIM_BINDING_V1 =
   'public.cmd_claim_seyeon_post_turn_analysis_v1' as const;
 export const POSTGRES_SEYEON_POST_TURN_ANALYSIS_COMPLETE_BINDING_V1 =
   'public.cmd_complete_seyeon_post_turn_analysis_v1' as const;
+
+const FIND_SQL = `
+select
+  outbox_event_id::text as "outboxEventId",
+  status,
+  lease_expires_at::text as "leaseExpiresAt"
+from public.qry_seyeon_post_turn_analysis_job_v1(
+  $1::uuid,$2::uuid
+)
+`.trim();
 
 const CLAIM_SQL = `
 select
@@ -50,6 +62,10 @@ function text(name:string,value:unknown):string {
   return value.trim();
 }
 
+function nullableInstant(name:string,value:unknown):string|null {
+  return value===null ? null : instant(name,value);
+}
+
 function instant(name:string,value:unknown):string {
   const raw=text(name,value);
   const parsed=Date.parse(raw);
@@ -69,6 +85,20 @@ function bool(name:string,value:unknown):boolean {
 class PostgresSeyeonPostTurnAnalysisOutboxPortV1
 implements SeyeonPostTurnAnalysisOutboxPortV1 {
   constructor(private readonly client:PostgresTransactionQueryV1){}
+
+  async findByTurn(
+    input:Parameters<SeyeonPostTurnAnalysisOutboxPortV1['findByTurn']>[0],
+  ){
+    const result=await this.client.query<Row>(FIND_SQL,[
+      input.subjectId,
+      input.turnId,
+    ]);
+    return Object.freeze(result.rows.map(row=>Object.freeze({
+      outboxEventId:text('outbox event id',row.outboxEventId),
+      status:text('status',row.status),
+      leaseExpiresAt:nullableInstant('lease expiry',row.leaseExpiresAt),
+    })));
+  }
 
   async claim(
     input:Parameters<SeyeonPostTurnAnalysisOutboxPortV1['claim']>[0],
