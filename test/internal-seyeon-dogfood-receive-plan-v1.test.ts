@@ -81,6 +81,7 @@ describe('internal pinned Se-yeon dogfood receive plan V1', () => {
         clientTurnId: 'dogfood-turn-2',
         structuredAction: {
           type: 'SELECT_SAJU_DOMAIN',
+          version: 'v1',
           domain: 'general',
         },
         clientCapability: 'internal-dogfood-v1',
