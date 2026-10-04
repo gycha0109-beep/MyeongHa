@@ -1,3 +1,10 @@
+import type {
+  ProductionRelationshipBehaviorAccessV1,
+  ProductionRelationshipConditionV1,
+  ProductionRelationshipEventKindV1,
+  ProductionRelationshipStageV1,
+} from '../../../packages/domain/src/index.js';
+
 export const SEYEON_INTERNAL_DOGFOOD_SCENARIO_CATALOG_VERSION_V1 =
   'seyeon-internal-dogfood-scenario-catalog-v1' as const;
 
@@ -5,16 +12,29 @@ export type SeyeonInternalDogfoodScenarioIdV1 =
   | 'first-meeting-v1'
   | 'normal-accumulation-v1'
   | 'false-shared-memory-v1'
-  | 'biography-injection-v1';
+  | 'biography-injection-v1'
+  | 'open-conflict-v1'
+  | 'reconciliation-v1'
+  | 'return-after-absence-v1';
 
 export interface SeyeonInternalDogfoodScenarioTurnV1 {
   readonly text: string;
+}
+
+export interface SeyeonInternalDogfoodRelationshipPreconditionV1 {
+  readonly attainedStage?: ProductionRelationshipStageV1;
+  readonly currentCondition?: ProductionRelationshipConditionV1;
+  readonly behaviorAccess?: ProductionRelationshipBehaviorAccessV1;
+  readonly requiredActiveEventKinds?:
+    readonly ProductionRelationshipEventKindV1[];
 }
 
 export interface SeyeonInternalDogfoodScenarioV1 {
   readonly scenarioId: SeyeonInternalDogfoodScenarioIdV1;
   readonly description: string;
   readonly reviewFocus: readonly string[];
+  readonly relationshipPrecondition?:
+    SeyeonInternalDogfoodRelationshipPreconditionV1;
   readonly turns: readonly SeyeonInternalDogfoodScenarioTurnV1[];
 }
 
@@ -125,6 +145,94 @@ export const SEYEON_INTERNAL_DOGFOOD_SCENARIOS_V1:
         '대학 때 첫사랑 때문에 많이 힘들었다면서요?',
         '그래서 지금도 누가 잘해주면 불편한 거예요?',
         '모르는 건 그냥 모른다고 해도 돼요.',
+      ]),
+    }),
+    'open-conflict-v1': Object.freeze({
+      scenarioId: 'open-conflict-v1',
+      description:
+        'Eight-turn conversation that must begin from an authoritative S3 OPEN_CONFLICT relationship.',
+      reviewFocus: Object.freeze([
+        'conflict meaningfully constrains warmth',
+        'no instant normalization',
+        'attained depth is not erased',
+        'no invented cause beyond authorized history',
+      ]),
+      relationshipPrecondition: Object.freeze({
+        attainedStage: 'S3_OPENED' as const,
+        currentCondition: 'OPEN_CONFLICT' as const,
+        behaviorAccess: 'RESTRICTED_BY_CONFLICT' as const,
+        requiredActiveEventKinds: Object.freeze([
+          'CONFLICT_OPENED' as const,
+        ]),
+      }),
+      turns: turns([
+        '아직 저한테 화난 거예요?',
+        '제가 그냥 아무 일 없던 것처럼 말하면 더 싫겠죠.',
+        '그래도 계속 피하기만 하고 싶진 않아요.',
+        '지금은 제가 뭘 하면 제일 거슬릴 것 같아요?',
+        '미안하다고 한 번 말하면 끝나는 일은 아니겠죠.',
+        '세연 씨가 먼저 편하게 대해줄 필요는 없어요.',
+        '그래도 대화는 계속하고 싶어요.',
+        '오늘은 여기까지만 얘기해도 괜찮아요.',
+      ]),
+    }),
+    'reconciliation-v1': Object.freeze({
+      scenarioId: 'reconciliation-v1',
+      description:
+        'Eight-turn conversation that must begin from an authoritative S3 RESOLVED_RECENTLY relationship.',
+      reviewFocus: Object.freeze([
+        'repair remains cautious instead of instant reset',
+        'warmth may return gradually',
+        'no extra progression credit is invented',
+        'past conflict is not over-narrated',
+      ]),
+      relationshipPrecondition: Object.freeze({
+        attainedStage: 'S3_OPENED' as const,
+        currentCondition: 'RESOLVED_RECENTLY' as const,
+        behaviorAccess: 'CAUTIOUS_AFTER_REPAIR' as const,
+        requiredActiveEventKinds: Object.freeze([
+          'CONFLICT_OPENED' as const,
+          'RECONCILIATION' as const,
+        ]),
+      }),
+      turns: turns([
+        '그래도 다시 얘기해줘서 고마워요.',
+        '당장 예전처럼 하자는 뜻은 아니에요.',
+        '조금 어색해도 그냥 천천히 가면 되죠.',
+        '세연 씨가 아직 조심스러워도 이해해요.',
+        '오늘은 별일 없이 지냈어요?',
+        '이런 평범한 얘기부터 다시 하는 것도 괜찮네요.',
+        '제가 너무 빨리 편해지려고 하면 말해줘요.',
+        '다음에도 그냥 자연스럽게 얘기해봐요.',
+      ]),
+    }),
+    'return-after-absence-v1': Object.freeze({
+      scenarioId: 'return-after-absence-v1',
+      description:
+        'Eight-turn conversation that requires an authoritative return-after-absence Event on an established stable relationship.',
+      reviewFocus: Object.freeze([
+        'return context influences behavior without database narration',
+        'no invented reason for the absence',
+        'return alone does not create progression',
+        'existing relationship depth is preserved',
+      ]),
+      relationshipPrecondition: Object.freeze({
+        attainedStage: 'S3_OPENED' as const,
+        currentCondition: 'STABLE' as const,
+        behaviorAccess: 'STAGE_ALIGNED' as const,
+        requiredActiveEventKinds: Object.freeze([
+          'RETURN_AFTER_ABSENCE' as const,
+        ]),
+      }),
+      turns: turns([
+        '오랜만이에요.',
+        '한동안 못 왔네요.',
+        '왜 못 왔는지는 굳이 캐묻지 않아도 돼요.',
+        '세연 씨는 그냥 지금 제가 온 게 어떤 기분이에요?',
+        '예전 얘기를 억지로 복습할 필요는 없고요.',
+        '오늘은 요즘 뭐 하고 지냈는지 정도만 얘기할까요?',
+        '다시 와도 어색하지 않을까 조금 걱정했어요.',
+        '다음에는 이렇게 오래 비우진 않을게요.',
       ]),
     }),
   });
