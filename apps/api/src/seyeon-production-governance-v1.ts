@@ -172,7 +172,9 @@ function createIntegrityClassifier(
   provider: SeyeonStructuredProviderPortV2,
 ): CharacterIntegrityClaimClassifierPortV1 {
   return Object.freeze({
-    async classify(input) {
+    async classify(
+      input: Parameters<CharacterIntegrityClaimClassifierPortV1['classify']>[0],
+    ) {
       const raw = await provider.generate({
         contractVersion: 'seyeon-structured-provider-v2',
         purpose: 'integrity_classification',
@@ -201,7 +203,9 @@ function createIntegrityClassifier(
 function createConservativeIntegrityResolver():
   CharacterIntegrityAuthorityResolverPortV1 {
   return Object.freeze({
-    resolve(input) {
+    resolve(
+      input: Parameters<CharacterIntegrityAuthorityResolverPortV1['resolve']>[0],
+    ) {
       return Object.freeze({
         state: 'MISSING' as const,
         authorityRefs: Object.freeze([]),
@@ -217,7 +221,9 @@ function createDisclosureClassifier(
   provider: SeyeonStructuredProviderPortV2,
 ): CharacterDisclosureTopicClassifierPortV2 {
   return Object.freeze({
-    async classify(input) {
+    async classify(
+      input: Parameters<CharacterDisclosureTopicClassifierPortV2['classify']>[0],
+    ) {
       const raw = await provider.generate({
         contractVersion: 'seyeon-structured-provider-v2',
         purpose: 'disclosure_classification',
@@ -242,7 +248,9 @@ function createDisclosureClassifier(
 function disclosureSourceDescriptor():
   CharacterDisclosureSourceDescriptorPortV2 {
   return Object.freeze({
-    readDescriptor(input) {
+    readDescriptor(
+      input: Parameters<CharacterDisclosureSourceDescriptorPortV2['readDescriptor']>[0],
+    ) {
       return DISCLOSURE_SOURCES_V1[input.topicKey];
     },
   });
@@ -251,7 +259,9 @@ function disclosureSourceDescriptor():
 function disclosureFactAuthorityResolver():
   CharacterDisclosureFactAuthorityResolverPortV2 {
   return Object.freeze({
-    resolve(input) {
+    resolve(
+      input: Parameters<CharacterDisclosureFactAuthorityResolverPortV2['resolve']>[0],
+    ) {
       if (input.characterId !== 'seyeon') return null;
       return resolveCharacterFactAuthorityEntryV1(
         SEYEON_FACT_AUTHORITY_REGISTRY_V1,
