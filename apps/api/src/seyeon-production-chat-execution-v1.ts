@@ -21,10 +21,15 @@ import {
   type RunSeyeonCharacterTurnV2Input,
   type RunSeyeonCharacterTurnV2Result,
 } from './seyeon-character-runtime-v2.js';
-import {
-  runSeyeonPostTurnRelationshipV2,
-  type SeyeonEventLedgerPortV2,
+import type {
+  SeyeonEventLedgerPortV2,
 } from './seyeon-post-turn-relationship-v2.js';
+import {
+  prepareSeyeonPostTurnAnalysisSnapshotV1,
+  processSeyeonPostTurnAnalysisV1,
+  type ProcessSeyeonPostTurnAnalysisResultV1,
+  type SeyeonPostTurnAnalysisOutboxPortV1,
+} from './seyeon-post-turn-analysis-worker-v1.js';
 import type {
   SeyeonProductionRelationshipSyncOutboxPortV1,
 } from './seyeon-production-relationship-outbox-v1.js';
@@ -48,6 +53,7 @@ export interface SeyeonProductionChatExecutionIdPortV1 {
   nextAttemptId(): string;
   nextAssistantMessageId(): string;
   nextCommitOutboxEventId(): string;
+  nextPostTurnAnalysisOutboxEventId(): string;
   nextRelationshipSyncOutboxEventId(): string;
   nextAiExecutionLogId(stage: 'renderer' | 'output_guard'): string;
   nextExperimentalEventId(): string;
@@ -90,6 +96,7 @@ export interface SeyeonProductionChatCommitReceiptV1 {
   readonly assistantMessageId: string;
   readonly sequenceNo: number;
   readonly committedAt: string;
+  readonly postTurnOutboxEventId: string | null;
   readonly replayed: boolean;
 }
 
@@ -168,6 +175,9 @@ export interface SeyeonProductionChatPersistencePortV1 {
     attemptId: string;
     assistantMessageId: string;
     outboxEventId: string;
+    postTurnOutboxEventId: string;
+    postTurnSnapshot: unknown;
+    postTurnSnapshotHash: string;
   }>): Awaitable<SeyeonProductionChatCommitReceiptV1>;
 }
 
@@ -175,6 +185,9 @@ export interface SeyeonProductionChatPostTurnInputV1 {
   readonly ledger: SeyeonEventLedgerPortV2;
   readonly extractorProvider:
     RunSeyeonCharacterTurnV2Input['interpreterProvider'];
+  readonly analysisOutboxPort: SeyeonPostTurnAnalysisOutboxPortV1;
+  readonly lockOwner: string;
+  readonly leaseExpiresAt: string;
   readonly semanticRelevanceByEventId: Readonly<Record<string, number>>;
   readonly recentlyMentionedEventIds?: readonly string[];
   readonly serverObservationRefs?: readonly string[];
@@ -216,6 +229,15 @@ export interface RunSeyeonProductionChatExecutedResultV1 {
   readonly runtimeResult: RunSeyeonCharacterTurnV2Result;
   readonly relationshipResult:
     RunSeyeonProductionContextVerticalSliceResultV1<RunSeyeonCharacterTurnV2Result>;
+  readonly postTurnAnalysis:
+    | Readonly<{
+        readonly status: 'processed';
+        readonly result: ProcessSeyeonPostTurnAnalysisResultV1;
+      }>
+    | Readonly<{
+        readonly status: 'deferred';
+        readonly outboxEventId: string;
+      }>;
 }
 
 export interface RunSeyeonProductionChatCommittedReplayResultV1 {
@@ -320,6 +342,7 @@ export function resolveSeyeonProductionCommittedReplayV1(
         assistantMessageId: committed.assistantMessageId,
         sequenceNo: committed.sequenceNo,
         committedAt: committed.committedAt,
+        postTurnOutboxEventId: null,
         replayed: true,
       }),
       assistantText: committed.assistantText,
@@ -467,18 +490,6 @@ export async function runSeyeonProductionChatExecutionV1(
       idPort: input.idPort,
       contextPort: input.contextPort,
       commitPort: input.commitPort,
-      ...(
-        durableRelationshipRequired &&
-        input.relationshipSyncOutboxPort !== undefined
-          ? {
-              durableSync: Object.freeze({
-                outboxEventId:
-                  input.executionIdPort.nextRelationshipSyncOutboxEventId(),
-                outboxPort: input.relationshipSyncOutboxPort,
-              }),
-            }
-          : {}
-      ),
       ...(input.serverOwnedPersonalRecordProjectors === undefined
         ? {}
         : {
@@ -556,6 +567,54 @@ export async function runSeyeonProductionChatExecutionV1(
           groundingRefs: Object.freeze([]),
         });
 
+        const assistantMessageId =
+          input.executionIdPort.nextAssistantMessageId();
+        const postTurnIdentityInput = Object.freeze({
+          subjectId,
+          turnId: receivedTurn.turnId,
+          userMessageId: receivedTurn.userMessageId,
+          assistantMessageId,
+        });
+        const postTurnOutboxEventId =
+          input.executionIdPort.nextPostTurnAnalysisOutboxEventId();
+        const postTurnSnapshot = prepareSeyeonPostTurnAnalysisSnapshotV1({
+          subjectId,
+          mode: input.mode,
+          turnId: receivedTurn.turnId,
+          userMessageId: receivedTurn.userMessageId,
+          assistantMessageId,
+          preparedAt: new Date().toISOString(),
+          productionAuthorityRef: input.productionAuthorityRef,
+          runtimeResult: runtime,
+          ledger: input.postTurn.ledger,
+          semanticRelevanceByEventId:
+            input.postTurn.semanticRelevanceByEventId,
+          ...(input.postTurn.recentlyMentionedEventIds === undefined
+            ? {}
+            : {
+                recentlyMentionedEventIds:
+                  input.postTurn.recentlyMentionedEventIds,
+              }),
+          ...(input.postTurn.serverObservationRefs === undefined
+            ? {}
+            : {
+                serverObservationRefs:
+                  input.postTurn.serverObservationRefs,
+              }),
+          productionHistoryRecords: input.productionHistoryRecords,
+          identity: Object.freeze({
+            experimentalEventId:
+              input.executionIdPort.nextExperimentalEventId(),
+            experimentalEventDedupeKey:
+              input.executionIdPort.nextExperimentalEventDedupeKey(
+                postTurnIdentityInput,
+              ),
+            productionEventId: await input.idPort.nextProductionEventId(),
+            relationshipSyncOutboxEventId:
+              input.executionIdPort.nextRelationshipSyncOutboxEventId(),
+          }),
+        });
+
         await input.persistencePort.persistValidated({
           subjectId,
           turnId: receivedTurn.turnId,
@@ -580,75 +639,13 @@ export async function runSeyeonProductionChatExecutionV1(
           threadId,
           turnId: receivedTurn.turnId,
           attemptId: attempt.attemptId,
-          assistantMessageId: input.executionIdPort.nextAssistantMessageId(),
+          assistantMessageId,
           outboxEventId: input.executionIdPort.nextCommitOutboxEventId(),
+          postTurnOutboxEventId,
+          postTurnSnapshot: postTurnSnapshot.snapshot,
+          postTurnSnapshotHash: postTurnSnapshot.snapshotHash,
         });
         committedTurn = committed;
-
-        const postTurnIdentityInput = Object.freeze({
-          subjectId,
-          turnId: committed.turnId,
-          userMessageId: receivedTurn.userMessageId,
-          assistantMessageId: committed.assistantMessageId,
-        });
-        const postTurn = await runSeyeonPostTurnRelationshipV2({
-          turnId: committed.turnId,
-          messages: Object.freeze([
-            Object.freeze({
-              messageId: receivedTurn.userMessageId,
-              role: 'user' as const,
-              text: receivedTurn.userText,
-            }),
-            Object.freeze({
-              messageId: committed.assistantMessageId,
-              role: 'assistant' as const,
-              text: runtime.envelope.utterance,
-            }),
-          ]),
-          interpretation: runtime.interpretation,
-          envelope: runtime.envelope,
-          ledger: input.postTurn.ledger,
-          extractorProvider: input.postTurn.extractorProvider,
-          eventAuthorityEvidence: Object.freeze({
-            integrityDecisions: runtime.governedPreflight.integrity.decisions,
-            riskCausality: runtime.riskCausality,
-            ...(input.postTurn.serverObservationRefs === undefined
-              ? {}
-              : {
-                  serverObservationRefs:
-                    input.postTurn.serverObservationRefs,
-                }),
-          }),
-          semanticRelevanceByEventId:
-            input.postTurn.semanticRelevanceByEventId,
-          ...(input.postTurn.recentlyMentionedEventIds === undefined
-            ? {}
-            : {
-                recentlyMentionedEventIds:
-                  input.postTurn.recentlyMentionedEventIds,
-              }),
-          identity: Object.freeze({
-            eventId: input.executionIdPort.nextExperimentalEventId(),
-            eventDedupeKey:
-              input.executionIdPort.nextExperimentalEventDedupeKey(
-                postTurnIdentityInput,
-              ),
-            ledgerEntryId:
-              input.executionIdPort.nextExperimentalLedgerEntryId(),
-            occurredAt: committed.committedAt,
-            recordedAt: committed.committedAt,
-          }),
-        });
-
-        const relationshipEvent =
-          postTurn.decision === 'event'
-            ? Object.freeze({
-                experimentalEvent: postTurn.event,
-                authorityDecision: postTurn.authorityDecision,
-                activeExperimentalEvents:
-                  input.postTurn.ledger.activeEvents(),
-              })
-            : null;
 
         return Object.freeze({
           turnResult: runtime,
@@ -658,7 +655,7 @@ export async function runSeyeonProductionChatExecutionV1(
               assistantMessageRef: committed.assistantMessageId,
               occurredAt: committed.committedAt,
             }),
-            relationshipEvent,
+            relationshipEvent: null,
           }),
         });
       },
@@ -683,6 +680,39 @@ export async function runSeyeonProductionChatExecutionV1(
       'Production Chat execution returned without a committed assistant turn.',
     );
   }
+  if (committedTurn.postTurnOutboxEventId === null) {
+    throw new SeyeonProductionChatExecutionErrorV1(
+      'Committed Production Chat turn is missing its durable post-turn outbox identity.',
+    );
+  }
+
+  let postTurnAnalysis:
+    RunSeyeonProductionChatExecutedResultV1['postTurnAnalysis'];
+  try {
+    const result = await processSeyeonPostTurnAnalysisV1({
+      subjectId,
+      outboxEventId: committedTurn.postTurnOutboxEventId,
+      lockOwner: input.postTurn.lockOwner,
+      leaseExpiresAt: input.postTurn.leaseExpiresAt,
+      outboxPort: input.postTurn.analysisOutboxPort,
+      extractorProvider: input.postTurn.extractorProvider,
+      ...(input.relationshipSyncOutboxPort === undefined
+        ? {}
+        : {
+            relationshipSyncOutboxPort:
+              input.relationshipSyncOutboxPort,
+          }),
+    });
+    postTurnAnalysis = Object.freeze({
+      status: 'processed' as const,
+      result,
+    });
+  } catch {
+    postTurnAnalysis = Object.freeze({
+      status: 'deferred' as const,
+      outboxEventId: committedTurn.postTurnOutboxEventId,
+    });
+  }
 
   return Object.freeze({
     version: SEYEON_PRODUCTION_CHAT_EXECUTION_VERSION_V1,
@@ -692,5 +722,6 @@ export async function runSeyeonProductionChatExecutionV1(
     committedTurn,
     runtimeResult,
     relationshipResult,
+    postTurnAnalysis,
   });
 }
