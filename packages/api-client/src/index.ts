@@ -143,3 +143,13 @@ export {
   type DeviceInstallationRegistrationStateV1,
   type DeviceInstallationRevokeResponseV1,
 } from './device-installations.js';
+
+export {
+  SOCIAL_AUTH_PROVIDERS_V1,
+  parseSocialAuthCallbackV1,
+  parseSocialAuthProviderV1,
+  startSocialAuthV1,
+  type SocialAuthCallbackResultV1,
+  type SocialAuthProviderV1,
+  type SocialAuthStartResultV1,
+} from './social-auth.js';

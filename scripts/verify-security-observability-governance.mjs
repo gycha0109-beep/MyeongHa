@@ -12,6 +12,7 @@ const fetchBoundaryRoutes = new Map([
   ['api/auth/sign-in.ts', 'api.auth.sign-in'],
   ['api/auth/sign-out.ts', 'api.auth.sign-out'],
   ['api/auth/sign-up.ts', 'api.auth.sign-up'],
+  ['api/auth/social/start.ts', 'api.auth.social.start'],
   ['api/health.ts', 'api.health'],
   ['api/me.ts', 'api.me.dispatch'],
   ['api/me/birth-profile.ts', 'api.me.birth-profile'],

@@ -16,6 +16,7 @@ const FUNCTION_POLICY = Object.freeze({
   'api/auth/sign-in.ts': 'continue_to_terminal_outcome',
   'api/auth/sign-out.ts': 'continue_to_terminal_outcome',
   'api/auth/sign-up.ts': 'continue_to_terminal_outcome',
+  'api/auth/social/start.ts': 'continue_to_terminal_outcome',
   'api/birth-profiles.ts': 'continue_to_terminal_outcome',
   'api/health.ts': 'cancel_on_disconnect',
   'api/me.ts': 'continue_to_terminal_outcome',
@@ -73,6 +74,7 @@ describe('Production request cancellation policy V1', () => {
 
   it('keeps durable and mixed dispatchers fail-closed at Function cancellation level', () => {
     expect(FUNCTION_POLICY['api/auth/promote-guest.ts']).toBe('continue_to_terminal_outcome');
+    expect(FUNCTION_POLICY['api/auth/social/start.ts']).toBe('continue_to_terminal_outcome');
     expect(FUNCTION_POLICY['api/session/bootstrap.ts']).toBe('continue_to_terminal_outcome');
     expect(FUNCTION_POLICY['api/birth-profiles.ts']).toBe('continue_to_terminal_outcome');
     expect(FUNCTION_POLICY['api/me.ts']).toBe('continue_to_terminal_outcome');
