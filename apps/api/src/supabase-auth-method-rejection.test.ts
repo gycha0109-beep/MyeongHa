@@ -43,7 +43,7 @@ afterEach(() => {
 
 describe('Supabase Auth terminal method rejection', () => {
   it.each(actions)(
-    'returns %s 405 without waiting for unused-body cancellation to settle',
+    'returns %s 405 without cancelling the runtime-owned request body',
     async (action) => {
       const source = requestWithCancellation(() => new Promise<void>(() => undefined));
       const upstream = vi.fn();
@@ -59,12 +59,12 @@ describe('Supabase Auth terminal method rejection', () => {
       expect(response.headers.get('allow')).toBe('POST');
       expect(response.headers.get('cache-control')).toBe('no-store');
       expect(await response.text()).toBe('');
-      expect(source.cancelCalls()).toBe(1);
+      expect(source.cancelCalls()).toBe(0);
       expect(upstream).not.toHaveBeenCalled();
     },
   );
 
-  it('keeps 405 authoritative when unused-body cancellation rejects', async () => {
+  it('does not invoke an unused-body cancellation hook that would reject', async () => {
     const source = requestWithCancellation(() =>
       Promise.reject(new Error('synthetic cancellation rejection')),
     );
@@ -79,10 +79,10 @@ describe('Supabase Auth terminal method rejection', () => {
     expect(response.status).toBe(405);
     expect(response.headers.get('allow')).toBe('POST');
     expect(response.headers.get('cache-control')).toBe('no-store');
-    expect(source.cancelCalls()).toBe(1);
+    expect(source.cancelCalls()).toBe(0);
   });
 
-  it('keeps 405 authoritative when cancellation throws synchronously', async () => {
+  it('does not invoke an unused-body cancellation hook that would throw synchronously', async () => {
     const request = new Request('https://myeongha.example/api/auth/refresh', {
       method: 'PUT',
       body: new ReadableStream<Uint8Array>(),
@@ -101,7 +101,7 @@ describe('Supabase Auth terminal method rejection', () => {
     expect(response.status).toBe(405);
     expect(response.headers.get('allow')).toBe('POST');
     expect(response.headers.get('cache-control')).toBe('no-store');
-    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(cancel).not.toHaveBeenCalled();
   });
 
   it('keeps bodyless method rejection harmless', async () => {
