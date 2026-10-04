@@ -91,3 +91,29 @@ The harness regression suite now also verifies:
 
 These tests complement the existing lower-level post-turn checkpoint/retry and
 relationship-event idempotency tests. They do not invent an SRC-30 retry policy.
+
+
+## Controlled DB chain validation
+
+The controlled PostgreSQL authority suite now includes one end-to-end durable
+relationship path using only existing Production commands:
+
+```text
+committed Se-yeon Chat turn
+→ SEYEON_POST_TURN_ANALYSIS_REQUESTED
+→ immutable relationship_event checkpoint
+→ SEYEON_PRODUCTION_RELATIONSHIP_SYNC_REQUESTED
+→ relationship worker lease
+→ PHASE M relationship context lock
+→ frozen relationship-policy-v1 apply
+→ relationship sync completion
+→ next-turn Production relationship read
+```
+
+The fixture uses the existing `CARE_ACCEPTED_BY_CHARACTER` policy rule and
+asserts the frozen V1 result from an empty relationship projection:
+`closeness=3`, `trust=4`, `friction=0`, revision `0 → 1`, stage
+`S0_FIRST_MEETING`, condition `STABLE`.
+
+It also verifies response-loss relationship-sync enqueue replay reuses the
+already-processed request. No new retry/backoff/dead-letter policy is defined.
