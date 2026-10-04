@@ -28,6 +28,7 @@ describe('Se-yeon post-turn PostgreSQL adapter V1', () => {
         schemaVersion: 'seyeon-post-turn-analysis-snapshot-v1',
       },
       snapshotHash: 'sha256:v1:snapshot',
+      checkpointJsonb: null,
       status: 'processing',
       lockOwner: 'worker-1',
       leaseExpiresAt: '2026-10-04T02:10:00.000Z',
@@ -59,6 +60,48 @@ describe('Se-yeon post-turn PostgreSQL adapter V1', () => {
         '11111111-1111-4111-8111-111111111111',
         'worker-1',
         '2026-10-04T02:10:00.000Z',
+      ],
+    );
+  });
+
+  it('binds the immutable post-turn checkpoint command', async () => {
+    const queryClient = client([{
+      outboxEventId: '11111111-1111-4111-8111-111111111111',
+      status: 'processing',
+      replayed: false,
+    }]);
+    const port = createPostgresSeyeonPostTurnAnalysisOutboxPortV1(
+      queryClient,
+    );
+
+    await expect(port.checkpoint({
+      subjectId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      outboxEventId: '11111111-1111-4111-8111-111111111111',
+      lockOwner: 'worker-1',
+      checkpoint: {
+        schemaVersion: 'seyeon-post-turn-analysis-checkpoint-v1',
+        decision: 'none',
+      },
+    })).resolves.toEqual([
+      {
+        outboxEventId: '11111111-1111-4111-8111-111111111111',
+        status: 'processing',
+        replayed: false,
+      },
+    ]);
+
+    expect(queryClient.query).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'cmd_checkpoint_seyeon_post_turn_analysis_v1',
+      ),
+      [
+        'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        '11111111-1111-4111-8111-111111111111',
+        'worker-1',
+        JSON.stringify({
+          schemaVersion: 'seyeon-post-turn-analysis-checkpoint-v1',
+          decision: 'none',
+        }),
       ],
     );
   });
