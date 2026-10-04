@@ -364,6 +364,8 @@ pass "response-loss checkpoint replay is idempotent"
 
 expect_fail   "post-turn checkpoint immutable conflict"   "checkpoint is immutable once written"   "begin; set local role myeongha_api_executor; select pg_catalog.set_config('myeongha.subject_id','$subject_id',true); select * from public.cmd_checkpoint_seyeon_post_turn_analysis_v1('$subject_id','$post_turn_outbox_id','worker-e147',jsonb_build_object('schemaVersion','seyeon-post-turn-analysis-checkpoint-v1','decision','rejected')); rollback;"
 
+expect_fail   "post-turn checkpoint Production Event identity mismatch"   "outside committed snapshot authority"   "begin; set local role myeongha_api_executor; select pg_catalog.set_config('myeongha.subject_id','$subject_id',true); select * from public.cmd_checkpoint_seyeon_post_turn_analysis_v1('$subject_id','$post_turn_outbox_id','worker-e147',jsonb_build_object('schemaVersion','seyeon-post-turn-analysis-checkpoint-v1','decision','relationship_event','productionEvent',jsonb_build_object('schemaVersion','relationship-event-v1','authority','authorized_relationship_event_v1','subjectId','$subject_id','characterId','seyeon','eventId','e1470000-0000-4000-8000-000000000099'))); rollback;"
+
 checkpoint_shape=$("${psql_base[@]}" -At -c "
 select payload_jsonb#>>'{analysisCheckpoint,decision}'
 from public.outbox_events
