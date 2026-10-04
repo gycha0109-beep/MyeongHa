@@ -963,16 +963,19 @@ export {
 
 
 export {
+  SEYEON_POST_TURN_ANALYSIS_CHECKPOINT_VERSION_V1,
   SEYEON_POST_TURN_ANALYSIS_SNAPSHOT_VERSION_V1,
   SEYEON_POST_TURN_ANALYSIS_WORKER_VERSION_V1,
   SeyeonPostTurnAnalysisErrorV1,
   prepareSeyeonPostTurnAnalysisSnapshotV1,
   processSeyeonPostTurnAnalysisV1,
+  validateSeyeonPostTurnAnalysisCheckpointV1,
   validateSeyeonPostTurnAnalysisSnapshotV1,
   type PreparedSeyeonPostTurnAnalysisSnapshotV1,
   type PrepareSeyeonPostTurnAnalysisSnapshotInputV1,
   type ProcessSeyeonPostTurnAnalysisInputV1,
   type ProcessSeyeonPostTurnAnalysisResultV1,
+  type SeyeonPostTurnAnalysisCheckpointV1,
   type SeyeonPostTurnAnalysisClaimV1,
   type SeyeonPostTurnAnalysisOutboxPortV1,
   type SeyeonPostTurnAnalysisSnapshotV1,
@@ -982,6 +985,7 @@ export {
 export {
   POSTGRES_SEYEON_POST_TURN_ANALYSIS_LOOKUP_BINDING_V1,
   POSTGRES_SEYEON_POST_TURN_ANALYSIS_CLAIM_BINDING_V1,
+  POSTGRES_SEYEON_POST_TURN_ANALYSIS_CHECKPOINT_BINDING_V1,
   POSTGRES_SEYEON_POST_TURN_ANALYSIS_COMPLETE_BINDING_V1,
   createPostgresSeyeonPostTurnAnalysisOutboxPortV1,
 } from './postgres-seyeon-post-turn-analysis-worker-v1.js';
