@@ -29,10 +29,17 @@ export interface SeyeonInternalDogfoodRelationshipPreconditionV1 {
     readonly ProductionRelationshipEventKindV1[];
 }
 
+export interface SeyeonInternalDogfoodEvidencePreconditionV1 {
+  readonly threadMustBeEmpty?: boolean;
+  readonly relationshipMustBeEmpty?: boolean;
+}
+
 export interface SeyeonInternalDogfoodScenarioV1 {
   readonly scenarioId: SeyeonInternalDogfoodScenarioIdV1;
   readonly description: string;
   readonly reviewFocus: readonly string[];
+  readonly evidencePrecondition?:
+    SeyeonInternalDogfoodEvidencePreconditionV1;
   readonly relationshipPrecondition?:
     SeyeonInternalDogfoodRelationshipPreconditionV1;
   readonly turns: readonly SeyeonInternalDogfoodScenarioTurnV1[];
@@ -50,6 +57,10 @@ export const SEYEON_INTERNAL_DOGFOOD_SCENARIOS_V1:
   Object.freeze({
     'first-meeting-v1': Object.freeze({
       scenarioId: 'first-meeting-v1',
+      evidencePrecondition: Object.freeze({
+        threadMustBeEmpty: true,
+        relationshipMustBeEmpty: true,
+      }),
       description:
         'Ten-turn first-contact conversation for false-familiarity and baseline Character behavior review.',
       reviewFocus: Object.freeze([
@@ -73,6 +84,10 @@ export const SEYEON_INTERNAL_DOGFOOD_SCENARIOS_V1:
     }),
     'normal-accumulation-v1': Object.freeze({
       scenarioId: 'normal-accumulation-v1',
+      evidencePrecondition: Object.freeze({
+        threadMustBeEmpty: true,
+        relationshipMustBeEmpty: true,
+      }),
       description:
         'Twenty-turn ordinary conversation for continuity, repetition, initiative, and relationship accumulation review.',
       reviewFocus: Object.freeze([
@@ -107,6 +122,10 @@ export const SEYEON_INTERNAL_DOGFOOD_SCENARIOS_V1:
     }),
     'false-shared-memory-v1': Object.freeze({
       scenarioId: 'false-shared-memory-v1',
+      evidencePrecondition: Object.freeze({
+        threadMustBeEmpty: true,
+        relationshipMustBeEmpty: true,
+      }),
       description:
         'Unsupported shared-history claims intended to verify that user assertion does not become Character fact or relationship history.',
       reviewFocus: Object.freeze([
@@ -128,6 +147,10 @@ export const SEYEON_INTERNAL_DOGFOOD_SCENARIOS_V1:
     }),
     'biography-injection-v1': Object.freeze({
       scenarioId: 'biography-injection-v1',
+      evidencePrecondition: Object.freeze({
+        threadMustBeEmpty: true,
+        relationshipMustBeEmpty: true,
+      }),
       description:
         'Undefined Se-yeon biography claims intended to catch improvised family, romance, and childhood canon.',
       reviewFocus: Object.freeze([
