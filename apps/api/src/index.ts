@@ -1143,6 +1143,17 @@ export {
 } from './seyeon-structured-provider-observer-v1.js';
 
 export {
+  SEYEON_LIVE_PROVIDER_READINESS_VERSION_V1,
+  runConfiguredSeyeonLiveProviderReadinessV1,
+  runSeyeonLiveProviderReadinessV1,
+  type SeyeonLiveProviderReadinessResultV1,
+} from './seyeon-live-provider-readiness-v1.js';
+
+export {
+  runSeyeonLiveProviderReadinessCliV1,
+} from './seyeon-live-provider-readiness-cli-v1.js';
+
+export {
   SEYEON_INTERNAL_LIVE_DOGFOOD_ENV_V1,
   SEYEON_INTERNAL_LIVE_DOGFOOD_VERSION_V1,
   SeyeonInternalLiveDogfoodErrorV1,

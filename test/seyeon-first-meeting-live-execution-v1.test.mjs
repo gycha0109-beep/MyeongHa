@@ -150,9 +150,14 @@ describe('Se-yeon first-meeting live execution surface', () => {
     expect(workflow).toContain(
       `[[ "\${MYEONGHA_DATABASE_PRINCIPAL:-}" == 'myeongha_runtime' ]]`,
     );
-    expect(workflow).toContain(
+    const readinessIndex = workflow.indexOf(
+      'node dist/apps/api/src/seyeon-live-provider-readiness-cli-v1.js',
+    );
+    const campaignIndex = workflow.indexOf(
       'node scripts/run-seyeon-first-meeting-live-dogfood.mjs',
     );
+    expect(readinessIndex).toBeGreaterThan(-1);
+    expect(campaignIndex).toBeGreaterThan(readinessIndex);
     expect(workflow).toContain('retention-days: 7');
     expect(workflow).toContain(
       `[[ "$TECHNICAL_VERDICT" == 'PASS' ]]`,
