@@ -78,3 +78,16 @@ After this harness is green, PHASE S continues with:
    memory, undefined biography, progression, conflict, reconciliation, and
    return-after-absence;
 7. separate technical-integrity and Character-quality verdicts.
+
+
+## Fault-boundary regression coverage
+
+The harness regression suite now also verifies:
+
+- every non-`enqueued` post-turn decision skips relationship apply;
+- an unexpected non-deferred Chat result fails closed;
+- canonical Subject drift between Chat, post-turn, and relationship workers fails closed;
+- a post-turn worker crash propagates without attempting relationship apply.
+
+These tests complement the existing lower-level post-turn checkpoint/retry and
+relationship-event idempotency tests. They do not invent an SRC-30 retry policy.
