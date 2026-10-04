@@ -82,5 +82,17 @@ export async function acquireProductionMemberSmokeSession() {
     throw new Error('Production Member smoke sign-in returned an invalid access token.');
   }
 
-  return Object.freeze({ accessToken });
+  const user = session.user;
+  if (!isRecord(user)) {
+    throw new Error('Production Member smoke sign-in did not return an authenticated user object.');
+  }
+  const verifiedAuthUserId = user.id;
+  if (
+    typeof verifiedAuthUserId !== 'string' ||
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(verifiedAuthUserId)
+  ) {
+    throw new Error('Production Member smoke sign-in returned an invalid authenticated user id.');
+  }
+
+  return Object.freeze({ accessToken, verifiedAuthUserId });
 }
