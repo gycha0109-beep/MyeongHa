@@ -115,6 +115,36 @@ function activeExperimentalById(
   return result;
 }
 
+export function snapshotSeyeonProductionCausalBindingsV1(input: Readonly<{
+  subjectId: string;
+  experimentalEvents: readonly SeyeonRelationshipEventV2[];
+  productionHistoryRecords: readonly ProductionRelationshipHistoryRecordV1[];
+}>): readonly SeyeonProductionRelationshipCausalBindingV1[] {
+  const experimental = activeExperimentalById(input.experimentalEvents);
+  const replay = replayProductionRelationshipHistoryV1(
+    input.productionHistoryRecords,
+  );
+  const byDedupe = new Map(
+    replay.activeEvents.map((event) => [event.dedupeKey, event] as const),
+  );
+
+  return Object.freeze(
+    [...experimental.values()].flatMap((event) => {
+      const dedupeKey = deriveSeyeonProductionRelationshipDedupeKeyV1({
+        subjectId: input.subjectId,
+        experimentalEvent: event,
+      });
+      const productionEvent = byDedupe.get(dedupeKey);
+      return productionEvent === undefined
+        ? []
+        : [Object.freeze({
+            experimentalEventId: event.eventId,
+            productionEvent,
+          })];
+    }),
+  );
+}
+
 function resolveCausalBindings(input: {
   readonly subjectId: string;
   readonly event: SeyeonRelationshipEventV2;
@@ -125,34 +155,34 @@ function resolveCausalBindings(input: {
     return Object.freeze([]);
   }
 
-  const experimental = activeExperimentalById(input.activeExperimentalEvents);
-  const replay = replayProductionRelationshipHistoryV1(
-    input.productionHistoryRecords,
+  const activeExperimental = activeExperimentalById(
+    input.activeExperimentalEvents,
   );
-  const byDedupe = new Map(
-    replay.activeEvents.map((event) => [event.dedupeKey, event] as const),
+  const snapshot = snapshotSeyeonProductionCausalBindingsV1({
+    subjectId: input.subjectId,
+    experimentalEvents: input.activeExperimentalEvents,
+    productionHistoryRecords: input.productionHistoryRecords,
+  });
+  const byExperimentalId = new Map(
+    snapshot.map((binding) => [
+      binding.experimentalEventId,
+      binding.productionEvent,
+    ] as const),
   );
 
   return Object.freeze(
     input.event.causalPredecessorEventIds.map((experimentalEventId) => {
-      const predecessor = experimental.get(experimentalEventId);
-      if (predecessor === undefined) {
+      if (!activeExperimental.has(experimentalEventId)) {
         throw new SeyeonProductionRelationshipSyncErrorV1(
           'Experimental causal predecessor is not active in the Se-yeon ledger.',
         );
       }
-
-      const dedupeKey = deriveSeyeonProductionRelationshipDedupeKeyV1({
-        subjectId: input.subjectId,
-        experimentalEvent: predecessor,
-      });
-      const productionEvent = byDedupe.get(dedupeKey);
+      const productionEvent = byExperimentalId.get(experimentalEventId);
       if (productionEvent === undefined) {
         throw new SeyeonProductionRelationshipSyncErrorV1(
           'Experimental causal predecessor has no active Production relationship Event binding.',
         );
       }
-
       return Object.freeze({
         experimentalEventId,
         productionEvent,
