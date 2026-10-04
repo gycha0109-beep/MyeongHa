@@ -109,6 +109,10 @@ grant select on public.conversation_thread_characters
 grant select on public.conversation_threads
   to myeongha_seyeon_post_turn_owner;
 
+-- Commit V2 needs read access only to its own dedicated post-turn idempotency row.
+grant select on public.outbox_events
+  to myeongha_seyeon_chat_runtime_owner;
+
 drop policy if exists outbox_events_seyeon_post_turn_select_v1
   on public.outbox_events;
 create policy outbox_events_seyeon_post_turn_select_v1
@@ -210,6 +214,25 @@ using (
     where ct.id = conversation_thread_characters.thread_id
       and ct.subject_id = public.current_myeongha_subject_id()
   )
+);
+
+drop policy if exists outbox_events_seyeon_post_turn_commit_select_v1
+  on public.outbox_events;
+create policy outbox_events_seyeon_post_turn_commit_select_v1
+on public.outbox_events
+for select
+to myeongha_seyeon_chat_runtime_owner
+using (
+  aggregate_type = 'chat_turn'
+  and event_type = 'SEYEON_POST_TURN_ANALYSIS_REQUESTED'
+  and event_schema_version = 'v1'
+  and dedupe_key = 'seyeon-post-turn-v1'
+  and payload_jsonb ->> 'schemaVersion'
+        = 'seyeon-post-turn-analysis-request-v1'
+  and payload_jsonb ->> 'subjectId'
+        = public.current_myeongha_subject_id()::text
+  and payload_jsonb ->> 'characterId' = 'seyeon'
+  and payload_jsonb ->> 'turnId' = aggregate_id
 );
 
 -- The Chat runtime owner already owns the validated Chat commit boundary. This
