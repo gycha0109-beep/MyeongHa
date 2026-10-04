@@ -42,7 +42,9 @@ export function createSeyeonProductionRuntimeIdPortV1(
     nextCommitOutboxEventId: next,
     nextPostTurnAnalysisOutboxEventId: next,
     nextRelationshipSyncOutboxEventId: next,
-    nextAiExecutionLogId: (_stage) => next(),
+    nextAiExecutionLogId: (
+      _stage: 'renderer' | 'output_guard',
+    ) => next(),
     nextExperimentalEventId: next,
     nextExperimentalEventDedupeKey: semanticDedupe,
     nextExperimentalLedgerEntryId: next,
