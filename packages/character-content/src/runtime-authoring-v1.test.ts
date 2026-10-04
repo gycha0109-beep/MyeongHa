@@ -6,6 +6,9 @@ import {
 } from '../../contracts/src/index.js';
 import type { CharacterRelationshipBehaviorContent } from './schema.js';
 import {
+  findReadingPublicTrustLanguageViolationV1,
+} from './reading-public-trust-language-policy-v1.js';
+import {
   CHARACTER_RUNTIME_AUTHORING_V1,
   CHARACTER_RUNTIME_AUTHORING_V1_CHARACTER_IDS,
   CHARACTER_RUNTIME_AVOIDED_STRATEGY_KEYS_V1,
@@ -73,6 +76,21 @@ describe('Character runtime authoring v1 authority', () => {
       expect(character.sajuProfile.safeFraming.before).toHaveLength(2);
       expect(character.sajuProfile.safeFraming.after).toHaveLength(2);
       expect(character.relationshipBehavior).toBeDefined();
+    }
+  });
+
+  it('keeps every authored Saju safe-framing line free of trust-eroding meta disclaimers', () => {
+    for (const character of CHARACTER_RUNTIME_AUTHORING_V1) {
+      const entries = [
+        ...character.sajuProfile.safeFraming.before,
+        ...character.sajuProfile.safeFraming.after,
+      ];
+      for (const entry of entries) {
+        expect(
+          findReadingPublicTrustLanguageViolationV1(entry.text),
+          `${character.characterId}:${entry.key}`,
+        ).toBeNull();
+      }
     }
   });
 
