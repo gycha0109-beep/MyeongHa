@@ -35,6 +35,7 @@ server-minted existing-thread Chat receive plan
 → post-turn extractor candidate
 → Event Authority
 → Production relationship admission
+→ immutable analysis checkpoint
 → durable PHASE O relationship-sync outbox enqueue
 → dedicated post-turn job complete
 → PHASE O relationship worker apply
@@ -195,6 +196,7 @@ assistant commit succeeds
 → Event Candidate Extraction
 → Event Authority
 → Production relationship admission
+→ immutable analysis checkpoint
 → durable PHASE O relationship-sync outbox enqueue
 → post-turn job complete
 → existing PHASE O relationship worker apply/sync
@@ -242,9 +244,10 @@ Tx F validated provenance/staging
 Tx G assistant commit + generic Chat outbox + dedicated post-turn outbox
 Tx H post-turn job claim
 --- no DB transaction while post-turn extractor is awaited ---
-Tx I Production relationship-sync outbox enqueue
-Tx J post-turn job successful completion
-Tx K PHASE O relationship worker claim/apply/complete
+Tx I immutable Event Authority/Production admission checkpoint
+Tx J Production relationship-sync outbox enqueue
+Tx K post-turn job successful completion
+Tx L PHASE O relationship worker claim/apply/complete
 ```
 
 A caller must not wrap the complete model execution in one
@@ -301,6 +304,9 @@ Required regressions include:
 - snapshot hash tampering fails closed;
 - extractor none/reject completes only the dedicated analysis job;
 - write-capable relationship modes enqueue the admitted Production Event before the post-turn job completes;
+- Event Authority/Production admission result is checkpointed before downstream relationship enqueue;
+- identical checkpoint replay is idempotent while conflicting checkpoint material fails closed;
+- after checkpoint persistence, reclaim/retry does not call the extractor again;
 - relationship enqueue failure leaves the post-turn job uncompleted/reclaimable;
 - completion response-loss replay is idempotent;
 - direct authenticated runtime/worker wrapper calls fail;
@@ -349,8 +355,26 @@ Lease expiry/reclaim uses the existing generic outbox authority. PHASE Q does
 not invent `failed`, backoff, attempt-count, dead-letter, or manual-requeue
 semantics; those remain blocked by SRC-30.
 
-Extractor retry re-evaluates the same immutable snapshot. Stable server-owned
-Event/outbox identities and downstream dedupe keep side effects fail-closed. The
-worker does not claim that an external model call itself is byte-deterministic.
+The worker checkpoints the authoritative post-turn decision before any
+relationship-sync side effect. The checkpoint is immutable:
+
+```text
+none / rejected
+OR
+shadow + validated Production Relationship Event
+OR
+relationship_event + validated Production Relationship Event
+```
+
+The Production Event checkpoint must bind the canonical Subject, Se-yeon, and
+the exact server-owned Production Event id already fixed in the committed
+snapshot. An identical checkpoint write is an idempotent replay; a different
+checkpoint for the same job fails closed.
+
+If the process fails after checkpoint persistence, reclaim/retry resumes from
+that checkpoint and does **not** call the extractor again. This removes external
+model nondeterminism from downstream retry. A crash before the first checkpoint
+may rerun extraction against the same immutable turn snapshot, but no
+relationship side effect has been durably emitted at that point.
 
 Public browser Chat activation remains independently HOLD behind SRC-15.
