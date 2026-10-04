@@ -1,6 +1,6 @@
 import type {
   SeyeonStructuredProviderPortV2,
-  SeyeonStructuredProviderPurposeV2,
+  SeyeonStructuredPurposeV2,
   SeyeonStructuredProviderRequestV2,
 } from './seyeon-character-runtime-v2.js';
 
@@ -14,14 +14,14 @@ export const SEYEON_STRUCTURED_PROVIDER_PURPOSES_V1 = Object.freeze([
   'dialogue_render',
   'semantic_review',
   'event_extraction',
-] as const satisfies readonly SeyeonStructuredProviderPurposeV2[]);
+] as const satisfies readonly SeyeonStructuredPurposeV2[]);
 
 export interface SeyeonStructuredProviderInvocationSnapshotV1 {
   readonly version: typeof SEYEON_STRUCTURED_PROVIDER_OBSERVER_VERSION_V1;
   readonly providerKey: string;
   readonly modelKey: string;
   readonly total: number;
-  readonly byPurpose: Readonly<Record<SeyeonStructuredProviderPurposeV2, number>>;
+  readonly byPurpose: Readonly<Record<SeyeonStructuredPurposeV2, number>>;
 }
 
 export interface ObservedSeyeonStructuredProviderV1 {
@@ -30,7 +30,7 @@ export interface ObservedSeyeonStructuredProviderV1 {
 }
 
 function zeroPurposeCounts():
-  Record<SeyeonStructuredProviderPurposeV2, number> {
+  Record<SeyeonStructuredPurposeV2, number> {
   return {
     integrity_classification: 0,
     disclosure_classification: 0,
