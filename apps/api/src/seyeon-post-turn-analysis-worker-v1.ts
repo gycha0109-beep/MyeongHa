@@ -89,6 +89,15 @@ export interface SeyeonPostTurnAnalysisClaimV1 {
 }
 
 export interface SeyeonPostTurnAnalysisOutboxPortV1 {
+  findByTurn(input: Readonly<{
+    subjectId: string;
+    turnId: string;
+  }>): Awaitable<readonly Readonly<{
+    outboxEventId: string;
+    status: string;
+    leaseExpiresAt: string | null;
+  }>[]>;
+  
   claim(input: Readonly<{
     subjectId: string;
     outboxEventId: string;
