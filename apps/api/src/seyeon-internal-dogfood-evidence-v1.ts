@@ -122,6 +122,7 @@ export interface SeyeonInternalDogfoodEvidenceInspectorV1 {
 }
 
 export interface ConfiguredSeyeonInternalDogfoodEvidenceRuntimeV1 {
+  readonly pool: PostgresSubjectPoolV1;
   readonly harness: ProductionSeyeonInternalDogfoodHarnessV1;
   readonly observer: ObservedSeyeonStructuredProviderV1;
   readonly relationshipInspector:
@@ -158,6 +159,7 @@ export function createConfiguredSeyeonInternalDogfoodEvidenceRuntimeV1(
     });
 
   return Object.freeze({
+    pool: poolLease.pool,
     harness,
     observer,
     relationshipInspector,

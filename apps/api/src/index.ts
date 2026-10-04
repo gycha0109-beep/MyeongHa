@@ -1090,6 +1090,28 @@ export {
 
 
 export {
+  SEYEON_INTERNAL_DOGFOOD_THREAD_PREPARATION_VERSION_V1,
+  prepareSeyeonInternalDogfoodThreadV1,
+  type PrepareSeyeonInternalDogfoodThreadInputV1,
+  type SeyeonInternalDogfoodThreadPreparationResultV1,
+  type SeyeonInternalDogfoodThreadPreparationStatusV1,
+} from './seyeon-internal-dogfood-thread-preparation-v1.js';
+
+export {
+  SEYEON_FIRST_MEETING_LIVE_CAMPAIGN_VERSION_V1,
+  runConfiguredSeyeonFirstMeetingLiveCampaignV1,
+  runSeyeonFirstMeetingLiveCampaignV1,
+  type RunSeyeonFirstMeetingLiveCampaignInputV1,
+  type RunSeyeonFirstMeetingLiveCampaignResultV1,
+} from './seyeon-internal-first-meeting-campaign-v1.js';
+
+export {
+  parseSeyeonInternalFirstMeetingCampaignCommandV1,
+  runSeyeonInternalFirstMeetingCampaignCliV1,
+  type SeyeonInternalFirstMeetingCampaignCommandV1,
+} from './seyeon-internal-first-meeting-campaign-cli-v1.js';
+
+export {
   SEYEON_INTERNAL_DOGFOOD_EVIDENCE_VERSION_V1,
   createConfiguredSeyeonInternalDogfoodEvidenceRuntimeV1,
   createProductionSeyeonInternalDogfoodEvidenceInspectorV1,
