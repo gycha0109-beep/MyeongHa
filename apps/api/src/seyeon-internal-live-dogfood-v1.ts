@@ -65,6 +65,16 @@ export interface SeyeonInternalLiveDogfoodTurnSummaryV1 {
     readonly replayed: boolean;
   }>;
   readonly postTurnDecision: string | null;
+  readonly relationshipUsedForTurn:
+    | Readonly<{
+        readonly revision: number;
+        readonly stageKey: string;
+        readonly closenessBand: string;
+        readonly trustBand: string;
+        readonly frictionBand: string;
+      }>
+    | null;
+  readonly relationshipRevisionUsedForTurn: number | null;
   readonly relationshipRevision:
     RunSeyeonInternalDogfoodTurnResultV1['relationshipRevision'];
 }
@@ -230,6 +240,13 @@ function summarizeTurn(
       ? execution.assistantText
       : execution.runtimeResult.envelope.utterance;
 
+  const relationshipResult =
+    execution.disposition === 'executed'
+      ? execution.relationshipResult
+      : null;
+  const relationship =
+    relationshipResult?.turnBinding.relationship ?? null;
+
   return Object.freeze({
     disposition: result.disposition,
     subjectId: result.subjectId,
@@ -244,6 +261,18 @@ function summarizeTurn(
     }),
     postTurnDecision:
       result.postTurn === null ? null : result.postTurn.result.decision,
+    relationshipUsedForTurn:
+      relationship === null
+        ? null
+        : Object.freeze({
+            revision: relationship.revision,
+            stageKey: relationship.stageKey,
+            closenessBand: relationship.closenessBand,
+            trustBand: relationship.trustBand,
+            frictionBand: relationship.frictionBand,
+          }),
+    relationshipRevisionUsedForTurn:
+      relationshipResult?.relationshipRevisionUsedForTurn ?? null,
     relationshipRevision: result.relationshipRevision,
   });
 }
