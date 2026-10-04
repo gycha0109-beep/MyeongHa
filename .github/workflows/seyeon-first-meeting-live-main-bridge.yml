@@ -48,7 +48,7 @@ jobs:
           [[ "${{ github.event_name }}" == 'push' ]]
           [[ "${{ github.ref }}" == 'refs/heads/main' ]]
           trigger_value="$(tr -d '\r\n' < .github/seyeon-first-meeting-live-main.trigger)"
-          [[ "$trigger_value" == 'fire-2026-10-04-v1' ]]
+          [[ "$trigger_value" == 'fire-2026-10-04-v2' ]]
 
           test -n "${MYEONGHA_PRODUCTION_MEMBER_EMAIL:-}"
           test -n "${MYEONGHA_PRODUCTION_MEMBER_PASSWORD:-}"
