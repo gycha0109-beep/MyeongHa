@@ -1,0 +1,117 @@
+name: "[WT:character-memory] Se-yeon First Meeting Live Dogfood"
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type RUN_SEYEON_FIRST_MEETING_LIVE to execute the governed Production first-meeting dogfood.'
+        required: true
+        type: string
+      run_id:
+        description: 'Optional 1-64 character dogfood run id. Leave empty to use the GitHub run identity.'
+        required: false
+        type: string
+  push:
+    branches:
+      - feat/character-memory/seyeon-production-context-v1
+    paths:
+      - '.github/seyeon-first-meeting-live-dogfood.trigger'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: seyeon-first-meeting-live-dogfood
+  cancel-in-progress: false
+
+jobs:
+  live:
+    name: run-seyeon-first-meeting-live-dogfood
+    runs-on: ubuntu-24.04
+    environment: production
+    env:
+      DISPATCH_CONFIRM: ${{ inputs.confirm }}
+      INPUT_RUN_ID: ${{ inputs.run_id }}
+      MYEONGHA_PRODUCTION_MEMBER_EMAIL: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_EMAIL }}
+      MYEONGHA_PRODUCTION_MEMBER_PASSWORD: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_PASSWORD }}
+      MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID }}
+      MYEONGHA_DATABASE_URL: ${{ secrets.MYEONGHA_DATABASE_URL }}
+      MYEONGHA_DATABASE_PRINCIPAL: ${{ secrets.MYEONGHA_DATABASE_PRINCIPAL }}
+      MYEONGHA_SUPABASE_URL: https://cnsfpcdiyofqvhpcegfc.supabase.co
+      MYEONGHA_SUPABASE_API_KEY: ${{ secrets.MYEONGHA_SUPABASE_API_KEY }}
+      MYEONGHA_GUEST_FINGERPRINT_SECRET: ${{ secrets.MYEONGHA_GUEST_FINGERPRINT_SECRET }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      MYEONGHA_SEYEON_OPENAI_MODEL: ${{ vars.MYEONGHA_SEYEON_OPENAI_MODEL || secrets.MYEONGHA_SEYEON_OPENAI_MODEL }}
+      MYEONGHA_SEYEON_OPENAI_TIMEOUT_MS: ${{ vars.MYEONGHA_SEYEON_OPENAI_TIMEOUT_MS }}
+
+    steps:
+      - name: Check out exact repository runner
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Verify explicit live invocation and server configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${{ github.event_name }}" == 'workflow_dispatch' ]]; then
+            [[ "$DISPATCH_CONFIRM" == 'RUN_SEYEON_FIRST_MEETING_LIVE' ]]
+          else
+            [[ "${{ github.event_name }}" == 'push' ]]
+            [[ "${{ github.ref }}" == 'refs/heads/feat/character-memory/seyeon-production-context-v1' ]]
+            trigger_value="$(tr -d '\r' < .github/seyeon-first-meeting-live-dogfood.trigger)"
+            [[ "$trigger_value" =~ ^fire-[0-9]{4}-[0-9]{2}-[0-9]{2}-v[0-9]+$ ]]
+          fi
+
+          test -n "${MYEONGHA_PRODUCTION_MEMBER_EMAIL:-}"
+          test -n "${MYEONGHA_PRODUCTION_MEMBER_PASSWORD:-}"
+          test -n "${MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID:-}"
+          test -n "${MYEONGHA_DATABASE_URL:-}"
+          [[ "${MYEONGHA_DATABASE_PRINCIPAL:-}" == 'myeongha_runtime' ]]
+          [[ "${MYEONGHA_SUPABASE_URL:-}" == 'https://cnsfpcdiyofqvhpcegfc.supabase.co' ]]
+          test -n "${MYEONGHA_SUPABASE_API_KEY:-}"
+          test -n "${MYEONGHA_GUEST_FINGERPRINT_SECRET:-}"
+          test -n "${OPENAI_API_KEY:-}"
+          test -n "${MYEONGHA_SEYEON_OPENAI_MODEL:-}"
+
+          if [[ -n "${INPUT_RUN_ID:-}" ]]; then
+            [[ "$INPUT_RUN_ID" =~ ^[A-Za-z0-9._-]{1,64}$ ]]
+            echo "SEYEON_LIVE_RUN_ID=$INPUT_RUN_ID" >> "$GITHUB_ENV"
+          else
+            echo "SEYEON_LIVE_RUN_ID=gha-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_ENV"
+          fi
+
+      - name: Set up Node 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Build internal dogfood runtime
+        run: npm run build
+
+      - name: Execute first-meeting live dogfood
+        id: live
+        run: node scripts/run-seyeon-first-meeting-live-dogfood.mjs
+
+      - name: Upload redacted live evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: seyeon-first-meeting-live-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/seyeon-first-meeting-live-dogfood/evidence.json
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Enforce technical live verdict
+        if: always()
+        shell: bash
+        env:
+          CAMPAIGN_STATUS: ${{ steps.live.outputs.campaign_status }}
+          TECHNICAL_VERDICT: ${{ steps.live.outputs.technical_verdict }}
+        run: |
+          set -euo pipefail
+          [[ "$CAMPAIGN_STATUS" == 'READY_CREATED' || "$CAMPAIGN_STATUS" == 'READY_REUSED_EMPTY' ]]
+          [[ "$TECHNICAL_VERDICT" == 'PASS' ]]
