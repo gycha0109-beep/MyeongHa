@@ -84,7 +84,9 @@ function postgresConstraint(error: unknown): string | null {
 
 function mapPostgresError(error: unknown): never {
   switch (postgresConstraint(error)) {
-    case 'qry_chat_thread_stream_input_required':
+    case 'qry_chat_thread_stream_subject_required':
+    case 'qry_chat_thread_stream_thread_required':
+    case 'qry_chat_thread_stream_cursor_valid':
       throw new ChatThreadStreamReadAuthorityPortErrorV1(
         'INVALID_INPUT',
         'Chat thread stream input was rejected.',
@@ -129,10 +131,14 @@ export function createPostgresChatThreadStreamReadAuthorityPortV1(
                 row.characterId,
               ),
               bodyText: nullableText('body text', row.bodyText),
-              messagePayloadJsonb:
-                row.messagePayloadJsonb === undefined
-                  ? null
-                  : row.messagePayloadJsonb,
+              messagePayloadJsonb: (() => {
+                if (row.messagePayloadJsonb === undefined) {
+                  throw new Error(
+                    'Chat thread stream PostgreSQL message payload is invalid.',
+                  );
+                }
+                return row.messagePayloadJsonb;
+              })(),
               messageSchemaVersion: nullableText(
                 'message schema version',
                 row.messageSchemaVersion,
