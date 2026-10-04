@@ -3,8 +3,10 @@ import { createHash } from 'node:crypto';
 import {
   canonicalJson,
   admitSeyeonProductionRelationshipEventV1,
+  validateProductionRelationshipEventV1,
   materializeSeyeonAuthorizedExperimentalEventV1,
   validateSeyeonEventAuthorityV1,
+  type ProductionRelationshipEventV1,
   type ProductionRelationshipHistoryRecordV1,
   type SeyeonDialogueEnvelopeV2,
   type SeyeonEventAuthorityEvidenceV1,
@@ -37,6 +39,22 @@ export const SEYEON_POST_TURN_ANALYSIS_SNAPSHOT_VERSION_V1 =
   'seyeon-post-turn-analysis-snapshot-v1' as const;
 export const SEYEON_POST_TURN_ANALYSIS_WORKER_VERSION_V1 =
   'seyeon-post-turn-analysis-worker-v1' as const;
+
+export const SEYEON_POST_TURN_ANALYSIS_CHECKPOINT_VERSION_V1 =
+  'seyeon-post-turn-analysis-checkpoint-v1' as const;
+
+export type SeyeonPostTurnAnalysisCheckpointV1 =
+  | Readonly<{
+      readonly schemaVersion:
+        typeof SEYEON_POST_TURN_ANALYSIS_CHECKPOINT_VERSION_V1;
+      readonly decision: 'none' | 'rejected';
+    }>
+  | Readonly<{
+      readonly schemaVersion:
+        typeof SEYEON_POST_TURN_ANALYSIS_CHECKPOINT_VERSION_V1;
+      readonly decision: 'shadow' | 'relationship_event';
+      readonly productionEvent: ProductionRelationshipEventV1;
+    }>;
 
 type Awaitable<T> = T | Promise<T>;
 
@@ -82,6 +100,7 @@ export interface SeyeonPostTurnAnalysisClaimV1 {
   readonly committedAt: string;
   readonly snapshotJsonb: unknown;
   readonly snapshotHash: string;
+  readonly checkpointJsonb: unknown | null;
   readonly status: string;
   readonly lockOwner: string;
   readonly leaseExpiresAt: string;
@@ -105,6 +124,17 @@ export interface SeyeonPostTurnAnalysisOutboxPortV1 {
     leaseExpiresAt: string;
   }>): Awaitable<readonly SeyeonPostTurnAnalysisClaimV1[]>;
 
+  checkpoint(input: Readonly<{
+    subjectId: string;
+    outboxEventId: string;
+    lockOwner: string;
+    checkpoint: SeyeonPostTurnAnalysisCheckpointV1;
+  }>): Awaitable<readonly Readonly<{
+    outboxEventId: string;
+    status: string;
+    replayed: boolean;
+  }>[]>;
+  
   complete(input: Readonly<{
     subjectId: string;
     outboxEventId: string;
@@ -222,6 +252,76 @@ function one<T>(rows: readonly T[], label: string): T {
 
 function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+export function validateSeyeonPostTurnAnalysisCheckpointV1(
+  raw: unknown,
+): SeyeonPostTurnAnalysisCheckpointV1 {
+  if (
+    !isRecord(raw) ||
+    raw.schemaVersion !== SEYEON_POST_TURN_ANALYSIS_CHECKPOINT_VERSION_V1 ||
+    typeof raw.decision !== 'string'
+  ) {
+    throw new SeyeonPostTurnAnalysisErrorV1(
+      'Post-turn analysis checkpoint shape is invalid.',
+    );
+  }
+
+  if (raw.decision === 'none' || raw.decision === 'rejected') {
+    return Object.freeze({
+      schemaVersion: SEYEON_POST_TURN_ANALYSIS_CHECKPOINT_VERSION_V1,
+      decision: raw.decision,
+    });
+  }
+
+  if (
+    raw.decision === 'shadow' ||
+    raw.decision === 'relationship_event'
+  ) {
+    if (!isRecord(raw.productionEvent)) {
+      throw new SeyeonPostTurnAnalysisErrorV1(
+        'Post-turn analysis checkpoint Production Event is missing.',
+      );
+    }
+    return Object.freeze({
+      schemaVersion: SEYEON_POST_TURN_ANALYSIS_CHECKPOINT_VERSION_V1,
+      decision: raw.decision,
+      productionEvent: validateProductionRelationshipEventV1(
+        raw.productionEvent as unknown as ProductionRelationshipEventV1,
+      ),
+    });
+  }
+
+  throw new SeyeonPostTurnAnalysisErrorV1(
+    'Post-turn analysis checkpoint decision is unsupported.',
+  );
+}
+
+async function checkpoint(input: {
+  subjectId: string;
+  outboxEventId: string;
+  lockOwner: string;
+  checkpoint: SeyeonPostTurnAnalysisCheckpointV1;
+  outboxPort: SeyeonPostTurnAnalysisOutboxPortV1;
+}): Promise<SeyeonPostTurnAnalysisCheckpointV1> {
+  const row = one(
+    await input.outboxPort.checkpoint({
+      subjectId: input.subjectId,
+      outboxEventId: input.outboxEventId,
+      lockOwner: input.lockOwner,
+      checkpoint: input.checkpoint,
+    }),
+    'Se-yeon post-turn analysis checkpoint',
+  );
+  if (
+    row.outboxEventId !== input.outboxEventId ||
+    row.status !== 'processing'
+  ) {
+    throw new SeyeonPostTurnAnalysisErrorV1(
+      'Post-turn analysis checkpoint did not remain in processing state.',
+    );
+  }
+  return input.checkpoint;
 }
 
 export function validateSeyeonPostTurnAnalysisSnapshotV1(
@@ -420,6 +520,92 @@ async function complete(input: {
   return row;
 }
 
+async function finishFromCheckpoint(input: {
+  subjectId: string;
+  claimed: SeyeonPostTurnAnalysisClaimV1;
+  lockOwner: string;
+  outboxPort: SeyeonPostTurnAnalysisOutboxPortV1;
+  relationshipSyncOutboxPort?:
+    SeyeonProductionRelationshipSyncOutboxPortV1;
+  checkpoint: SeyeonPostTurnAnalysisCheckpointV1;
+}): Promise<ProcessSeyeonPostTurnAnalysisResultV1> {
+  const checkpointValue = input.checkpoint;
+
+  if (
+    checkpointValue.decision === 'none' ||
+    checkpointValue.decision === 'rejected'
+  ) {
+    const done = await complete({
+      subjectId: input.subjectId,
+      outboxEventId: input.claimed.outboxEventId,
+      lockOwner: input.lockOwner,
+      outboxPort: input.outboxPort,
+    });
+    return Object.freeze({
+      version: SEYEON_POST_TURN_ANALYSIS_WORKER_VERSION_V1,
+      decision: checkpointValue.decision,
+      outboxEventId: input.claimed.outboxEventId,
+      reclaimed: input.claimed.reclaimed,
+      processedAt: done.processedAt,
+    });
+  }
+
+  if (checkpointValue.decision === 'shadow') {
+    const done = await complete({
+      subjectId: input.subjectId,
+      outboxEventId: input.claimed.outboxEventId,
+      lockOwner: input.lockOwner,
+      outboxPort: input.outboxPort,
+    });
+    return Object.freeze({
+      version: SEYEON_POST_TURN_ANALYSIS_WORKER_VERSION_V1,
+      decision: 'shadow' as const,
+      outboxEventId: input.claimed.outboxEventId,
+      reclaimed: input.claimed.reclaimed,
+      productionEventId: checkpointValue.productionEvent.eventId,
+      processedAt: done.processedAt,
+    });
+  }
+
+  if (input.relationshipSyncOutboxPort === undefined) {
+    throw new SeyeonPostTurnAnalysisErrorV1(
+      'Write-capable post-turn analysis requires relationship sync outbox authority.',
+    );
+  }
+
+  const syncRow = one(
+    await input.relationshipSyncOutboxPort.enqueue({
+      subjectId: input.subjectId,
+      outboxEventId:
+        validateSeyeonPostTurnAnalysisSnapshotV1(
+          input.claimed.snapshotJsonb,
+          input.claimed.snapshotHash,
+        ).identity.relationshipSyncOutboxEventId,
+      turnId: input.claimed.turnId,
+      productionEvent: checkpointValue.productionEvent,
+    }),
+    'Se-yeon relationship sync enqueue',
+  );
+
+  const done = await complete({
+    subjectId: input.subjectId,
+    outboxEventId: input.claimed.outboxEventId,
+    lockOwner: input.lockOwner,
+    outboxPort: input.outboxPort,
+  });
+
+  return Object.freeze({
+    version: SEYEON_POST_TURN_ANALYSIS_WORKER_VERSION_V1,
+    decision: 'enqueued' as const,
+    outboxEventId: input.claimed.outboxEventId,
+    reclaimed: input.claimed.reclaimed,
+    productionEventId: checkpointValue.productionEvent.eventId,
+    relationshipSyncOutboxEventId: syncRow.outboxEventId,
+    relationshipSyncReplayed: syncRow.replayed,
+    processedAt: done.processedAt,
+  });
+}
+
 export async function processSeyeonPostTurnAnalysisV1(
   input: ProcessSeyeonPostTurnAnalysisInputV1,
 ): Promise<ProcessSeyeonPostTurnAnalysisResultV1> {
@@ -446,6 +632,24 @@ export async function processSeyeonPostTurnAnalysisV1(
     throw new SeyeonPostTurnAnalysisErrorV1(
       'Committed Chat material does not match the post-turn analysis snapshot.',
     );
+  }
+
+  if (claimed.checkpointJsonb !== null) {
+    return finishFromCheckpoint({
+      subjectId: input.subjectId,
+      claimed,
+      lockOwner: input.lockOwner,
+      outboxPort: input.outboxPort,
+      ...(input.relationshipSyncOutboxPort === undefined
+        ? {}
+        : {
+            relationshipSyncOutboxPort:
+              input.relationshipSyncOutboxPort,
+          }),
+      checkpoint: validateSeyeonPostTurnAnalysisCheckpointV1(
+        claimed.checkpointJsonb,
+      ),
+    });
   }
 
   if (snapshot.mode === 'OFF') {
@@ -490,18 +694,23 @@ export async function processSeyeonPostTurnAnalysisV1(
   });
 
   if (candidate.decision === 'none') {
-    const done = await complete({
+    const saved = await checkpoint({
       subjectId: input.subjectId,
       outboxEventId: claimed.outboxEventId,
       lockOwner: input.lockOwner,
       outboxPort: input.outboxPort,
+      checkpoint: Object.freeze({
+        schemaVersion:
+          SEYEON_POST_TURN_ANALYSIS_CHECKPOINT_VERSION_V1,
+        decision: 'none' as const,
+      }),
     });
-    return Object.freeze({
-      version: SEYEON_POST_TURN_ANALYSIS_WORKER_VERSION_V1,
-      decision: 'none' as const,
-      outboxEventId: claimed.outboxEventId,
-      reclaimed: claimed.reclaimed,
-      processedAt: done.processedAt,
+    return finishFromCheckpoint({
+      subjectId: input.subjectId,
+      claimed,
+      lockOwner: input.lockOwner,
+      outboxPort: input.outboxPort,
+      checkpoint: saved,
     });
   }
 
@@ -511,18 +720,23 @@ export async function processSeyeonPostTurnAnalysisV1(
     evidence: snapshot.eventAuthorityEvidence,
   });
   if (authorityDecision.decision === 'REJECT') {
-    const done = await complete({
+    const saved = await checkpoint({
       subjectId: input.subjectId,
       outboxEventId: claimed.outboxEventId,
       lockOwner: input.lockOwner,
       outboxPort: input.outboxPort,
+      checkpoint: Object.freeze({
+        schemaVersion:
+          SEYEON_POST_TURN_ANALYSIS_CHECKPOINT_VERSION_V1,
+        decision: 'rejected' as const,
+      }),
     });
-    return Object.freeze({
-      version: SEYEON_POST_TURN_ANALYSIS_WORKER_VERSION_V1,
-      decision: 'rejected' as const,
-      outboxEventId: claimed.outboxEventId,
-      reclaimed: claimed.reclaimed,
-      processedAt: done.processedAt,
+    return finishFromCheckpoint({
+      subjectId: input.subjectId,
+      claimed,
+      lockOwner: input.lockOwner,
+      outboxPort: input.outboxPort,
+      checkpoint: saved,
     });
   }
 
@@ -546,54 +760,33 @@ export async function processSeyeonPostTurnAnalysisV1(
     causalBindings: snapshot.productionCausalBindings,
   });
 
-  if (snapshot.mode === 'SHADOW') {
-    const done = await complete({
-      subjectId: input.subjectId,
-      outboxEventId: claimed.outboxEventId,
-      lockOwner: input.lockOwner,
-      outboxPort: input.outboxPort,
-    });
-    return Object.freeze({
-      version: SEYEON_POST_TURN_ANALYSIS_WORKER_VERSION_V1,
-      decision: 'shadow' as const,
-      outboxEventId: claimed.outboxEventId,
-      reclaimed: claimed.reclaimed,
-      productionEventId: admission.event.eventId,
-      processedAt: done.processedAt,
-    });
-  }
-
-  if (input.relationshipSyncOutboxPort === undefined) {
-    throw new SeyeonPostTurnAnalysisErrorV1(
-      'Write-capable post-turn analysis requires relationship sync outbox authority.',
-    );
-  }
-
-  const syncRow = one(
-    await input.relationshipSyncOutboxPort.enqueue({
-      subjectId: input.subjectId,
-      outboxEventId: snapshot.identity.relationshipSyncOutboxEventId,
-      turnId: claimed.turnId,
-      productionEvent: admission.event,
-    }),
-    'Se-yeon relationship sync enqueue',
-  );
-
-  const done = await complete({
+  const saved = await checkpoint({
     subjectId: input.subjectId,
     outboxEventId: claimed.outboxEventId,
     lockOwner: input.lockOwner,
     outboxPort: input.outboxPort,
+    checkpoint: Object.freeze({
+      schemaVersion:
+        SEYEON_POST_TURN_ANALYSIS_CHECKPOINT_VERSION_V1,
+      decision:
+        snapshot.mode === 'SHADOW'
+          ? ('shadow' as const)
+          : ('relationship_event' as const),
+      productionEvent: admission.event,
+    }),
   });
 
-  return Object.freeze({
-    version: SEYEON_POST_TURN_ANALYSIS_WORKER_VERSION_V1,
-    decision: 'enqueued' as const,
-    outboxEventId: claimed.outboxEventId,
-    reclaimed: claimed.reclaimed,
-    productionEventId: admission.event.eventId,
-    relationshipSyncOutboxEventId: syncRow.outboxEventId,
-    relationshipSyncReplayed: syncRow.replayed,
-    processedAt: done.processedAt,
+  return finishFromCheckpoint({
+    subjectId: input.subjectId,
+    claimed,
+    lockOwner: input.lockOwner,
+    outboxPort: input.outboxPort,
+    ...(input.relationshipSyncOutboxPort === undefined
+      ? {}
+      : {
+          relationshipSyncOutboxPort:
+            input.relationshipSyncOutboxPort,
+        }),
+    checkpoint: saved,
   });
 }
