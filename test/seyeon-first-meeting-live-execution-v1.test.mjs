@@ -155,7 +155,7 @@ describe('Se-yeon first-meeting live execution surface', () => {
     );
     expect(workflow).toContain('retention-days: 7');
     expect(workflow).toContain(
-      "[[ "$TECHNICAL_VERDICT" == 'PASS' ]]",
+      `[[ "$TECHNICAL_VERDICT" == 'PASS' ]]`,
     );
   });
 });
