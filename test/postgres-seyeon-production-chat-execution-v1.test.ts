@@ -135,6 +135,7 @@ describe('Se-yeon Production Chat PostgreSQL adapter', () => {
       assistantMessageId: '99999999-9999-4999-8999-999999999999',
       sequenceNo: '8',
       committedAt: '2026-10-03T08:00:00.000Z',
+      postTurnOutboxEventId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
       replayed: false,
     }]);
     const commitPort =
@@ -147,14 +148,28 @@ describe('Se-yeon Production Chat PostgreSQL adapter', () => {
       attemptId: ATTEMPT_ID,
       assistantMessageId: '99999999-9999-4999-8999-999999999999',
       outboxEventId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      postTurnOutboxEventId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+      postTurnSnapshot: {
+        schemaVersion: 'seyeon-post-turn-analysis-snapshot-v1',
+      },
+      postTurnSnapshotHash: 'sha256:v1:post-turn',
     })).resolves.toEqual({
       turnId: TURN_ID,
       attemptId: ATTEMPT_ID,
       assistantMessageId: '99999999-9999-4999-8999-999999999999',
       sequenceNo: 8,
       committedAt: '2026-10-03T08:00:00.000Z',
+      postTurnOutboxEventId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
       replayed: false,
     });
+
+    expect(commitClient.query).toHaveBeenCalledWith(
+      expect.stringContaining('cmd_commit_seyeon_chat_turn_runtime_v2'),
+      expect.arrayContaining([
+        'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+        'sha256:v1:post-turn',
+      ]),
+    );
   });
 
   it('uses the narrow failure runtime function for pre-commit execution errors', async () => {
