@@ -34,24 +34,24 @@ const COMMITTED_AT = '2026-10-04T02:00:00.000Z';
 
 const interpretation: SeyeonTurnInterpretationV2 = Object.freeze({
   schemaVersion: 'seyeon-turn-interpretation-v2',
-  userMove: 'care_offer',
+  userMove: 'offered_help',
   notice: Object.freeze({
     summary: '사용자가 세연에게 도움을 제안했다.',
     evidenceRefs: Object.freeze([USER_ID]),
   }),
   immediateWant: Object.freeze({
-    key: 'accept_help',
+    key: 'care_without_credit',
     summary: '도움을 자연스럽게 받아들인다.',
   }),
   tension: Object.freeze({
-    key: 'receiving_help_discomfort',
+    key: 'none_material',
     summary: '도움을 받는 데 익숙하지 않다.',
   }),
   chosenAction: Object.freeze({
-    key: 'accept_help',
+    key: 'accept_care',
     rationale: '관계 맥락상 도움을 받아들이기로 한다.',
   }),
-  expressionState: 'softened',
+  expressionState: 'caring',
   reveal: Object.freeze({
     level: 'familiar',
     triggerRef: USER_ID,
@@ -63,7 +63,7 @@ const interpretation: SeyeonTurnInterpretationV2 = Object.freeze({
 const envelope: SeyeonDialogueEnvelopeV2 = Object.freeze({
   schemaVersion: 'seyeon-dialogue-envelope-v2',
   utterance: '그럼 이번에는 조금 도움받아 볼게요.',
-  expressionState: 'softened',
+  expressionState: 'caring'
   revealLevel: 'familiar',
   memoryRefsMentioned: Object.freeze([]),
   privateSourceRefsMentioned: Object.freeze([]),
