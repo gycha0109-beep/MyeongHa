@@ -482,6 +482,7 @@ returns table (
   committed_at timestamptz,
   snapshot_jsonb jsonb,
   snapshot_hash text,
+  checkpoint_jsonb jsonb,
   status text,
   lock_owner text,
   lease_expires_at timestamptz,
@@ -603,12 +604,135 @@ begin
     v_committed_at,
     v_row.payload_jsonb -> 'snapshot',
     v_row.payload_jsonb ->> 'snapshotHash',
+    v_row.payload_jsonb -> 'analysisCheckpoint',
     v_claim.status,
     v_claim.lock_owner,
     v_claim.lease_expires_at,
     v_claim.reclaimed;
 end
 $claim_seyeon_post_turn_analysis$;
+
+create or replace function public.cmd_checkpoint_seyeon_post_turn_analysis_v1(
+  p_subject_id uuid,
+  p_outbox_event_id uuid,
+  p_lock_owner text,
+  p_checkpoint_jsonb jsonb
+)
+returns table (
+  outbox_event_id uuid,
+  status text,
+  replayed boolean
+)
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $checkpoint_seyeon_post_turn_analysis$
+declare
+  v_row public.outbox_events%rowtype;
+  v_existing jsonb;
+  v_decision text;
+begin
+  perform public.assert_myeongha_subject_context_v1(p_subject_id);
+
+  if jsonb_typeof(p_checkpoint_jsonb) is distinct from 'object'
+     or p_checkpoint_jsonb ->> 'schemaVersion'
+          is distinct from 'seyeon-post-turn-analysis-checkpoint-v1' then
+    raise exception using
+      errcode = '23514',
+      constraint = 'seyeon_post_turn_checkpoint_shape_invalid',
+      message = 'Se-yeon post-turn analysis checkpoint shape is invalid';
+  end if;
+
+  v_decision := p_checkpoint_jsonb ->> 'decision';
+  if v_decision not in ('none','rejected','shadow','relationship_event') then
+    raise exception using
+      errcode = '23514',
+      constraint = 'seyeon_post_turn_checkpoint_decision_invalid',
+      message = 'Se-yeon post-turn analysis checkpoint decision is invalid';
+  end if;
+
+  if v_decision in ('shadow','relationship_event')
+     and jsonb_typeof(p_checkpoint_jsonb -> 'productionEvent')
+          is distinct from 'object' then
+    raise exception using
+      errcode = '23514',
+      constraint = 'seyeon_post_turn_checkpoint_event_required',
+      message = 'Se-yeon post-turn analysis checkpoint requires a Production relationship Event';
+  end if;
+
+  if v_decision in ('none','rejected')
+     and p_checkpoint_jsonb ? 'productionEvent' then
+    raise exception using
+      errcode = '23514',
+      constraint = 'seyeon_post_turn_checkpoint_event_forbidden',
+      message = 'Terminal non-Event checkpoint must not contain a Production relationship Event';
+  end if;
+
+  select oe.*
+  into v_row
+  from public.outbox_events oe
+  where oe.id = p_outbox_event_id
+  for update;
+
+  if not found
+     or v_row.aggregate_type is distinct from 'chat_turn'
+     or v_row.event_type is distinct from 'SEYEON_POST_TURN_ANALYSIS_REQUESTED'
+     or v_row.event_schema_version is distinct from 'v1'
+     or v_row.dedupe_key is distinct from 'seyeon-post-turn-v1'
+     or v_row.payload_jsonb ->> 'schemaVersion'
+          is distinct from 'seyeon-post-turn-analysis-request-v1'
+     or v_row.payload_jsonb ->> 'subjectId'
+          is distinct from p_subject_id::text
+     or v_row.payload_jsonb ->> 'characterId' is distinct from 'seyeon' then
+    raise exception using
+      errcode = 'P0001',
+      constraint = 'cmd_seyeon_post_turn_checkpoint_ineligible',
+      message = 'outbox event is not an eligible Se-yeon post-turn analysis request';
+  end if;
+
+  if v_row.status is distinct from 'processing'
+     or v_row.lock_owner is distinct from p_lock_owner
+     or v_row.lease_expires_at is null
+     or v_row.lease_expires_at <= clock_timestamp() then
+    raise exception using
+      errcode = '55000',
+      constraint = 'cmd_seyeon_post_turn_checkpoint_lease_invalid',
+      message = 'Se-yeon post-turn analysis checkpoint requires the active worker lease';
+  end if;
+
+  v_existing := v_row.payload_jsonb -> 'analysisCheckpoint';
+  if v_existing is not null then
+    if v_existing is distinct from p_checkpoint_jsonb then
+      raise exception using
+        errcode = '23514',
+        constraint = 'seyeon_post_turn_checkpoint_immutable_conflict',
+        message = 'Se-yeon post-turn analysis checkpoint is immutable once written';
+    end if;
+
+    return query
+    select
+      p_outbox_event_id,
+      v_row.status,
+      true;
+    return;
+  end if;
+
+  update public.outbox_events oe
+  set payload_jsonb = jsonb_set(
+    oe.payload_jsonb,
+    '{analysisCheckpoint}',
+    p_checkpoint_jsonb,
+    true
+  )
+  where oe.id = p_outbox_event_id;
+
+  return query
+  select
+    p_outbox_event_id,
+    'processing'::text,
+    false;
+end
+$checkpoint_seyeon_post_turn_analysis$;
 
 create or replace function public.cmd_complete_seyeon_post_turn_analysis_v1(
   p_subject_id uuid,
@@ -687,11 +811,17 @@ revoke all on function public.qry_seyeon_post_turn_analysis_job_v1(
 alter function public.cmd_claim_seyeon_post_turn_analysis_v1(
   uuid,uuid,text,timestamptz
 ) owner to myeongha_seyeon_post_turn_owner;
+alter function public.cmd_checkpoint_seyeon_post_turn_analysis_v1(
+  uuid,uuid,text,jsonb
+) owner to myeongha_seyeon_post_turn_owner;
 alter function public.cmd_complete_seyeon_post_turn_analysis_v1(
   uuid,uuid,text
 ) owner to myeongha_seyeon_post_turn_owner;
 revoke all on function public.cmd_claim_seyeon_post_turn_analysis_v1(
   uuid,uuid,text,timestamptz
+) from public;
+revoke all on function public.cmd_checkpoint_seyeon_post_turn_analysis_v1(
+  uuid,uuid,text,jsonb
 ) from public;
 revoke all on function public.cmd_complete_seyeon_post_turn_analysis_v1(
   uuid,uuid,text
@@ -719,6 +849,10 @@ BEGIN
       v_role
     );
     execute pg_catalog.format(
+      'revoke all on function public.cmd_checkpoint_seyeon_post_turn_analysis_v1(uuid,uuid,text,jsonb) from %I',
+      v_role
+    );
+    execute pg_catalog.format(
       'revoke all on function public.cmd_complete_seyeon_post_turn_analysis_v1(uuid,uuid,text) from %I',
       v_role
     );
@@ -734,6 +868,9 @@ grant execute on function public.qry_seyeon_post_turn_analysis_job_v1(
 ) to myeongha_api_executor;
 grant execute on function public.cmd_claim_seyeon_post_turn_analysis_v1(
   uuid,uuid,text,timestamptz
+) to myeongha_api_executor;
+grant execute on function public.cmd_checkpoint_seyeon_post_turn_analysis_v1(
+  uuid,uuid,text,jsonb
 ) to myeongha_api_executor;
 grant execute on function public.cmd_complete_seyeon_post_turn_analysis_v1(
   uuid,uuid,text
