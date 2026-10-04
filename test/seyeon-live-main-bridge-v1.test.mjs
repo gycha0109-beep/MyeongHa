@@ -15,6 +15,8 @@ describe('Se-yeon live main bridge V1', () => {
       ".github/seyeon-first-meeting-live-main.trigger",
     );
     expect(workflow).toContain('environment: production');
+    expect(workflow).toContain("fire-2026-10-04-v2");
+    expect(workflow).not.toContain("fire-2026-10-04-v1");
     expect(workflow).toContain(
       'DOGFOOD_SOURCE_SHA: 92173206c4a500556915dfb75d3a2492619234a6',
     );
