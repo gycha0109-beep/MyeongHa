@@ -1,4 +1,7 @@
 import { RELATIONSHIP_EVENT_CANDIDATES } from '../../contracts/src/index.js';
+import {
+  findReadingPublicTrustLanguageViolationV1,
+} from './reading-public-trust-language-policy-v1.js';
 import type {
   CharacterBehaviorPolicyContent,
   CharacterCanonProfile,
@@ -153,6 +156,13 @@ function validateSafeFraming(
       if (/[{}]/u.test(entry.text)) {
         throw new CharacterContentValidationError(
           `${entryPath}.text must not contain dynamic interpolation tokens`,
+        );
+      }
+      const publicTrustViolation =
+        findReadingPublicTrustLanguageViolationV1(entry.text);
+      if (publicTrustViolation !== null) {
+        throw new CharacterContentValidationError(
+          `${entryPath}.text violates reading public trust language policy: ${publicTrustViolation.ruleKey}`,
         );
       }
       if (!SAFE_FRAMING_PURPOSES.has(entry.purpose)) {
