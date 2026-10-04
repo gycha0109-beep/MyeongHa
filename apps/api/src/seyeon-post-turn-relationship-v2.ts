@@ -80,6 +80,11 @@ export type RunSeyeonPostTurnRelationshipV2Result =
       readonly relationshipAfter: SeyeonRelationshipProjectionV2;
     }>;
 
+export interface SeyeonPreparedPostTurnRelationshipContextV2 {
+  readonly priorEvents: readonly SeyeonRelationshipEventV2[];
+  readonly relationshipBefore: SeyeonRelationshipProjectionV2;
+}
+
 function resolveUnresolvedConflictEventIds(
   relationship: SeyeonRelationshipProjectionV2,
 ): readonly string[] {
@@ -123,6 +128,34 @@ function selectPriorCausalEvents(input: {
   );
 }
 
+export function prepareSeyeonPostTurnRelationshipContextV2(input: Readonly<{
+  ledger: SeyeonEventLedgerPortV2;
+  semanticRelevanceByEventId: Readonly<Record<string, number>>;
+  recentlyMentionedEventIds?: readonly string[];
+  now: string;
+}>): SeyeonPreparedPostTurnRelationshipContextV2 {
+  if (input.ledger.authority !== 'experimental_non_production') {
+    throw new TypeError(
+      'Se-yeon V2 relationship preparation requires the experimental ledger boundary.',
+    );
+  }
+  const relationshipBefore = input.ledger.projectRelationship();
+  const priorEvents = selectPriorCausalEvents({
+    events: input.ledger.activeEvents(),
+    semanticRelevanceByEventId: input.semanticRelevanceByEventId,
+    unresolvedConflictEventIds:
+      resolveUnresolvedConflictEventIds(relationshipBefore),
+    ...(input.recentlyMentionedEventIds === undefined
+      ? {}
+      : { recentlyMentionedEventIds: input.recentlyMentionedEventIds }),
+    now: input.now,
+  });
+  return Object.freeze({
+    priorEvents,
+    relationshipBefore,
+  });
+}
+
 export async function runSeyeonPostTurnRelationshipV2(
   input: RunSeyeonPostTurnRelationshipV2Input,
 ): Promise<RunSeyeonPostTurnRelationshipV2Result> {
@@ -132,18 +165,16 @@ export async function runSeyeonPostTurnRelationshipV2(
     );
   }
 
-  const relationshipBefore = input.ledger.projectRelationship();
-  const activeEvents = input.ledger.activeEvents();
-  const priorEvents = selectPriorCausalEvents({
-    events: activeEvents,
+  const prepared = prepareSeyeonPostTurnRelationshipContextV2({
+    ledger: input.ledger,
     semanticRelevanceByEventId: input.semanticRelevanceByEventId,
-    unresolvedConflictEventIds:
-      resolveUnresolvedConflictEventIds(relationshipBefore),
     ...(input.recentlyMentionedEventIds === undefined
       ? {}
       : { recentlyMentionedEventIds: input.recentlyMentionedEventIds }),
     now: input.identity.occurredAt,
   });
+  const relationshipBefore = prepared.relationshipBefore;
+  const priorEvents = prepared.priorEvents;
   const priorCausalEventIds = Object.freeze(
     priorEvents.map((event) => event.eventId),
   );
