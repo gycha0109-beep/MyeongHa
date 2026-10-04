@@ -116,6 +116,11 @@ function analysisPort(
   },
 ): SeyeonPostTurnAnalysisOutboxPortV1 {
   return {
+    findByTurn(request) {
+      expect(request.subjectId).toBe(SUBJECT_ID);
+      expect(request.turnId).toBe(TURN_ID);
+      return Object.freeze([]);
+    },
     claim(request) {
       input.order?.push('claim');
       expect(request.outboxEventId).toBe(ANALYSIS_OUTBOX_ID);
