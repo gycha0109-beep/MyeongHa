@@ -133,3 +133,11 @@ The utterance excludes:
 ## Next
 
 TOPIC-FACE-005F-C recomputes this renderer output and compares an external/candidate utterance against it in the Face Semantic Preservation Guard.
+
+## 사용자 출력 신뢰 언어 규칙
+
+관상 공개 문장은 `docs/READING_PUBLIC_TRUST_LANGUAGE_POLICY_V1.md`를 따라야 한다.
+
+- “사진 한 장만으로”, “확정할 수 없다”, “참고용”, “재미로만”, “과학적으로” 같은 일반 면책 문구는 공개하지 않는다.
+- 관측 불가나 데이터 부족은 숨기지 않고, “수염에 가려 턱선은 이번 해석에서 제외”처럼 해당 근거를 직접 말한다.
+- 향후 AI 렌더러가 추가되어도 최종 공개 경계의 코드 검사를 우회할 수 없다.
