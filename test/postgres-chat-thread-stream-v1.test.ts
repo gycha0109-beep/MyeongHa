@@ -9,7 +9,10 @@ import type {
 
 describe('PostgreSQL Chat thread stream evidence adapter V1', () => {
   it('binds the governed stream query and maps rows without adding content authority', async () => {
-    const calls: Array<{ text: string; values?: readonly unknown[] }> = [];
+    const calls: Array<{
+      text: string;
+      values: readonly unknown[] | undefined;
+    }> = [];
     const client: PostgresTransactionQueryV1 = {
       async query<Row>(text: string, values?: readonly unknown[]) {
         calls.push({ text, values });
