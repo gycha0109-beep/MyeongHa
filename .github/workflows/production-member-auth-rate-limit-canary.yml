@@ -13,6 +13,11 @@ on:
         required: true
         default: ops
         type: string
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/production-member-auth-rate-limit-canary.trigger'
 
 permissions:
   contents: read
@@ -33,8 +38,8 @@ jobs:
     timeout-minutes: 15
     environment: production
     env:
-      MYEONGHA_WATCHTOWER_TRACK: ${{ inputs.watchtower_track }}
-      MYEONGHA_MEMBER_AUTH_RATE_LIMIT_CANARY_CONFIRM: ${{ inputs.confirm }}
+      MYEONGHA_WATCHTOWER_TRACK: ${{ github.event_name == 'push' && 'ops' || inputs.watchtower_track }}
+      MYEONGHA_MEMBER_AUTH_RATE_LIMIT_CANARY_CONFIRM: ${{ github.event_name == 'push' && 'VERIFY_MEMBER_AUTH_RATE_LIMIT_CANARY_V2' || inputs.confirm }}
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
     steps:
       - name: Checkout exact repository state
@@ -44,7 +49,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          [[ "$GITHUB_EVENT_NAME" == 'workflow_dispatch' ]]
+          case "$GITHUB_EVENT_NAME" in
+            workflow_dispatch|push) ;;
+            *) echo "Unsupported Member Auth rate-limit canary event: $GITHUB_EVENT_NAME" >&2; exit 1 ;;
+          esac
           [[ "$GITHUB_REF" == 'refs/heads/main' ]]
           [[ "$MYEONGHA_WATCHTOWER_TRACK" == 'ops' ]]
           [[ "$MYEONGHA_MEMBER_AUTH_RATE_LIMIT_CANARY_CONFIRM" == 'VERIFY_MEMBER_AUTH_RATE_LIMIT_CANARY_V2' ]]
