@@ -711,15 +711,23 @@ set local role myeongha_api_executor;
 select pg_catalog.set_config('myeongha.subject_id','$subject_id',true);
 select
   r.revision,r.closeness,r.trust,r.friction,
-  r.attained_stage,r.current_condition,
-  (select status from public.outbox_events where id='$chain_post_turn_outbox_id'),
-  (select status from public.outbox_events where id='$chain_relationship_outbox_id')
+  r.attained_stage,r.current_condition
 from public.qry_production_relationship_runtime_v1('$subject_id','seyeon') r;
 commit;
 SQL
 )
-[[ "$chain_final_shape" == *"1|3|4|0|S0_FIRST_MEETING|STABLE|processed|processed"* ]] ||
+[[ "$chain_final_shape" == *"1|3|4|0|S0_FIRST_MEETING|STABLE"* ]] ||
   fail "PHASE S next-turn relationship projection mismatch: $chain_final_shape"
+
+chain_outbox_shape=$("${psql_base[@]}" -At -F '|' -c "
+select
+  max(case when id='$chain_post_turn_outbox_id' then status end),
+  max(case when id='$chain_relationship_outbox_id' then status end)
+from public.outbox_events
+where id in ('$chain_post_turn_outbox_id','$chain_relationship_outbox_id');
+")
+[[ "$chain_outbox_shape" == "processed|processed" ]] ||
+  fail "PHASE S durable worker outbox status mismatch: $chain_outbox_shape"
 pass "PHASE S next-turn read observes the committed relationship revision after durable workers"
 
 chain_sync_replay=$("${psql_base[@]}" -At -F '|' <<SQL
