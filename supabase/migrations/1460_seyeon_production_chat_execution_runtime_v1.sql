@@ -365,6 +365,12 @@ returns table (
   thread_character_id uuid,
   content_release_id uuid,
   content_bundle_id uuid,
+  turn_state text,
+  committed_attempt_id uuid,
+  committed_assistant_message_id uuid,
+  committed_assistant_text text,
+  committed_assistant_sequence_no bigint,
+  committed_at timestamptz,
   replayed boolean
 )
 language plpgsql
@@ -375,6 +381,12 @@ declare
   v_binding record;
   v_receive record;
   v_body text;
+  v_turn_state text;
+  v_committed_attempt_id uuid;
+  v_committed_message_id uuid;
+  v_committed_message_text text;
+  v_committed_message_sequence bigint;
+  v_committed_at timestamptz;
 begin
   perform public.assert_myeongha_subject_context_v1(p_subject_id);
 
@@ -425,6 +437,56 @@ begin
       message = 'Current authoritative user message is unavailable';
   end if;
 
+  select
+    ct.state,
+    ct.committed_attempt_id,
+    ct.committed_at,
+    a.committed_message_id,
+    m.body_text,
+    m.sequence_no
+  into
+    v_turn_state,
+    v_committed_attempt_id,
+    v_committed_at,
+    v_committed_message_id,
+    v_committed_message_text,
+    v_committed_message_sequence
+  from public.chat_turns ct
+  left join public.chat_turn_attempts a
+    on a.id = ct.committed_attempt_id
+   and a.turn_id = ct.id
+   and a.subject_id = ct.subject_id
+  left join public.conversation_messages m
+    on m.id = a.committed_message_id
+   and m.turn_id = ct.id
+   and m.subject_id = ct.subject_id
+   and m.sender_type = 'character'
+   and m.redacted_at is null
+  where ct.id = v_receive.turn_id
+    and ct.thread_id = p_thread_id
+    and ct.subject_id = p_subject_id;
+
+  if not found or v_turn_state is null then
+    raise exception using
+      errcode = '23514',
+      constraint = 'seyeon_chat_runtime_turn_state_unavailable',
+      message = 'Authoritative Se-yeon Chat turn state is unavailable';
+  end if;
+
+  if v_turn_state in ('committed','delivered')
+     and (
+       v_committed_attempt_id is null
+       or v_committed_message_id is null
+       or v_committed_message_text is null
+       or v_committed_message_sequence is null
+       or v_committed_at is null
+     ) then
+    raise exception using
+      errcode = '23514',
+      constraint = 'seyeon_chat_runtime_committed_replay_incomplete',
+      message = 'Committed Se-yeon Chat replay material is incomplete';
+  end if;
+
   return query
   select
     v_receive.turn_id,
@@ -433,6 +495,12 @@ begin
     v_binding.thread_character_id,
     v_binding.content_release_id,
     v_binding.content_bundle_id,
+    v_turn_state,
+    v_committed_attempt_id,
+    v_committed_message_id,
+    v_committed_message_text,
+    v_committed_message_sequence,
+    v_committed_at,
     v_receive.replayed;
 end
 $receive_seyeon_chat_turn_runtime$;
