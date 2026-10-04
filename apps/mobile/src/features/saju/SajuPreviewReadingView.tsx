@@ -1,34 +1,45 @@
 import {
   MyeongHaApiClientErrorV1,
-  SAJU_PREVIEW_READING_TEXTS_V1,
   type SajuPreviewReadingResultV1,
-  type SajuPreviewReadingTextV1,
 } from '@myeongha/api-client';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import {
+  MOBILE_SAJU_TOPIC_SECTIONS_V1,
+  type MobileSajuTopicV1,
+} from './mobile-saju-topic-catalog';
 import { mobileSajuPreviewServiceV1 } from './native-mobile-saju-preview-service';
 import { mobileColors } from '@/ui/mobile-colors';
 
+type PreviewTopicV1 = MobileSajuTopicV1 & Readonly<{
+  availability: Extract<MobileSajuTopicV1['availability'], { kind: 'preview' }>;
+}>;
+
 type PreviewStateV1 =
   | Readonly<{ kind: 'idle' }>
-  | Readonly<{ kind: 'loading'; readingText: SajuPreviewReadingTextV1 }>
+  | Readonly<{ kind: 'blocked'; topic: MobileSajuTopicV1; message: string }>
+  | Readonly<{ kind: 'loading'; topic: PreviewTopicV1 }>
   | Readonly<{
       kind: 'ready';
-      readingText: SajuPreviewReadingTextV1;
+      topic: PreviewTopicV1;
       result: Extract<SajuPreviewReadingResultV1, { kind: 'delivered' }>;
     }>
   | Readonly<{
       kind: 'not_delivered';
-      readingText: SajuPreviewReadingTextV1;
+      topic: PreviewTopicV1;
       result: Extract<SajuPreviewReadingResultV1, { kind: 'not_delivered' }>;
     }>
   | Readonly<{
       kind: 'error';
-      readingText: SajuPreviewReadingTextV1;
+      topic: PreviewTopicV1;
       message: string;
       retryable: boolean;
     }>;
+
+function isPreviewTopic(topic: MobileSajuTopicV1): topic is PreviewTopicV1 {
+  return topic.availability.kind === 'preview';
+}
 
 function notDeliveredCopy(
   state: Extract<SajuPreviewReadingResultV1, { kind: 'not_delivered' }>['responseState'],
@@ -81,20 +92,22 @@ function errorCopy(error: unknown): Readonly<{ message: string; retryable: boole
 export function SajuPreviewReadingView() {
   const [state, setState] = useState<PreviewStateV1>({ kind: 'idle' });
 
-  async function load(readingText: SajuPreviewReadingTextV1) {
-    setState(Object.freeze({ kind: 'loading', readingText }));
+  async function load(topic: PreviewTopicV1) {
+    setState(Object.freeze({ kind: 'loading', topic }));
     try {
-      const result = await mobileSajuPreviewServiceV1.read(readingText);
+      const result = await mobileSajuPreviewServiceV1.read(
+        topic.availability.readingText,
+      );
       if (result.kind === 'delivered') {
         setState(Object.freeze({
           kind: 'ready',
-          readingText,
+          topic,
           result,
         }));
       } else {
         setState(Object.freeze({
           kind: 'not_delivered',
-          readingText,
+          topic,
           result,
         }));
       }
@@ -102,70 +115,133 @@ export function SajuPreviewReadingView() {
       const mapped = errorCopy(error);
       setState(Object.freeze({
         kind: 'error',
-        readingText,
+        topic,
         message: mapped.message,
         retryable: mapped.retryable,
       }));
     }
   }
 
-  const selected = state.kind === 'idle' ? null : state.readingText;
+  function selectTopic(topic: MobileSajuTopicV1) {
+    if (isPreviewTopic(topic)) {
+      void load(topic);
+      return;
+    }
+    setState(Object.freeze({
+      kind: 'blocked',
+      topic,
+      message: topic.availability.message,
+    }));
+  }
+
+  const selectedKey = state.kind === 'idle' ? null : state.topic.key;
   const pending = state.kind === 'loading';
 
   return (
     <View style={styles.section}>
       <View style={styles.headerCard}>
-        <Text style={styles.eyebrow}>PREVIEW READING</Text>
-        <Text style={styles.title}>사주 프리뷰</Text>
+        <Text style={styles.eyebrow}>SAJU READING</Text>
+        <Text style={styles.title}>사주 읽기</Text>
         <Text style={styles.body}>
-          현재 출생정보를 기준으로 서버에서 검증된 Product Reading을 불러옵니다.
-          모바일은 결과를 새로 만들거나 보강하지 않습니다.
+          웹 사주 화면과 같은 주제 구성을 보여줍니다. 현재 서버 Preview 권한이 열린
+          주제만 바로 실행하고, 나머지는 필요한 입력이나 준비 상태를 그대로 표시합니다.
         </Text>
-        <View style={styles.topicWrap}>
-          {SAJU_PREVIEW_READING_TEXTS_V1.map((readingText) => {
-            const active = selected === readingText;
-            return (
-              <Pressable
-                key={readingText}
-                accessibilityRole="button"
-                disabled={pending}
-                onPress={() => void load(readingText)}
-                style={[
-                  styles.topicButton,
-                  active && styles.topicButtonActive,
-                  pending && styles.disabled,
-                ]}
-              >
-                <Text style={[
-                  styles.topicButtonText,
-                  active && styles.topicButtonTextActive,
-                ]}>
-                  {readingText}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
         <Text style={styles.authorityNote}>
-          Preview · 연구 검증 중인 원국 해석이며 확정적 미래 예측은 포함하지 않습니다.
+          다른 주제의 풀이로 자동 대체하지 않습니다.
         </Text>
       </View>
+
+      {MOBILE_SAJU_TOPIC_SECTIONS_V1.map((section) => (
+        <View key={section.key} style={styles.topicSection}>
+          <View style={styles.sectionHeading}>
+            <Text style={styles.sectionTitle}>{section.title}</Text>
+            {section.support ? (
+              <Text style={styles.sectionSupport}>{section.support}</Text>
+            ) : null}
+          </View>
+
+          <View style={styles.topicList}>
+            {section.topics.map((topic) => {
+              const active = selectedKey === topic.key;
+              return (
+                <Pressable
+                  key={topic.key}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: active, disabled: pending }}
+                  disabled={pending}
+                  onPress={() => selectTopic(topic)}
+                  style={[
+                    styles.topicCard,
+                    active && styles.topicCardActive,
+                    pending && styles.disabled,
+                  ]}
+                >
+                  <View style={[styles.topicIcon, active && styles.topicIconActive]}>
+                    <Text style={[styles.topicIconText, active && styles.topicIconTextActive]}>
+                      {topic.icon}
+                    </Text>
+                  </View>
+
+                  <View style={styles.topicCopy}>
+                    <View style={styles.topicTitleRow}>
+                      <Text style={styles.topicTitle}>{topic.label}</Text>
+                      <View
+                        style={[
+                          styles.statusBadge,
+                          topic.availability.kind === 'preview'
+                            ? styles.statusBadgeReady
+                            : styles.statusBadgeBlocked,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.statusBadgeText,
+                            topic.availability.kind === 'preview'
+                              ? styles.statusBadgeTextReady
+                              : styles.statusBadgeTextBlocked,
+                          ]}
+                        >
+                          {topic.availability.statusLabel}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={styles.topicDescription}>{topic.description}</Text>
+                  </View>
+
+                  <Text style={styles.chevron}>›</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      ))}
+
+      {state.kind === 'blocked' ? (
+        <View style={styles.stateCard}>
+          <Text style={styles.stateKicker}>현재 실행 범위</Text>
+          <Text style={styles.stateTitle}>{state.topic.label}</Text>
+          <Text style={styles.muted}>{state.message}</Text>
+          <Text style={styles.authorityNote}>
+            웹과 동일하게 권한이 열리기 전에는 다른 풀이를 대신 실행하지 않습니다.
+          </Text>
+        </View>
+      ) : null}
 
       {state.kind === 'loading' ? (
         <View style={styles.stateCard}>
           <ActivityIndicator color={mobileColors.navy} />
-          <Text style={styles.muted}>{state.readingText} 프리뷰를 준비하고 있습니다…</Text>
+          <Text style={styles.muted}>{state.topic.label} 프리뷰를 준비하고 있습니다…</Text>
         </View>
       ) : null}
 
       {state.kind === 'not_delivered' ? (
         <View style={styles.stateCard}>
-          <Text style={styles.stateTitle}>{state.readingText}</Text>
+          <Text style={styles.stateTitle}>{state.topic.label}</Text>
           <Text style={styles.muted}>{notDeliveredCopy(state.result.responseState)}</Text>
           {state.result.responseState === 'temporarily_unavailable' ? (
             <Pressable
               accessibilityRole="button"
-              onPress={() => void load(state.readingText)}
+              onPress={() => void load(state.topic)}
               style={styles.retryButton}
             >
               <Text style={styles.retryButtonText}>다시 시도</Text>
@@ -176,11 +252,12 @@ export function SajuPreviewReadingView() {
 
       {state.kind === 'error' ? (
         <View style={styles.stateCard}>
+          <Text style={styles.stateTitle}>{state.topic.label}</Text>
           <Text style={styles.error}>{state.message}</Text>
           {state.retryable ? (
             <Pressable
               accessibilityRole="button"
-              onPress={() => void load(state.readingText)}
+              onPress={() => void load(state.topic)}
               style={styles.retryButton}
             >
               <Text style={styles.retryButtonText}>다시 시도</Text>
@@ -191,6 +268,13 @@ export function SajuPreviewReadingView() {
 
       {state.kind === 'ready' ? (
         <>
+          <View style={styles.resultHeading}>
+            <Text style={styles.resultTitle}>{state.topic.label}</Text>
+            <Text style={styles.authorityNote}>
+              Preview · 연구 검증 중인 원국 해석이며 확정적 미래 예측은 포함하지 않습니다.
+            </Text>
+          </View>
+
           {state.result.notices.length > 0 ? (
             <View style={styles.noticeCard}>
               <Text style={styles.noticeTitle}>읽기 범위 안내</Text>
@@ -238,7 +322,7 @@ export function SajuPreviewReadingView() {
 }
 
 const styles = StyleSheet.create({
-  section: { gap: 12 },
+  section: { gap: 16 },
   headerCard: {
     borderWidth: 1,
     borderColor: mobileColors.border,
@@ -247,27 +331,69 @@ const styles = StyleSheet.create({
     padding: 20,
     gap: 10,
   },
-  eyebrow: { color: mobileColors.gold, fontSize: 11, fontWeight: '800', letterSpacing: 1.1 },
-  title: { color: mobileColors.ink, fontSize: 20, fontWeight: '800' },
+  eyebrow: {
+    color: mobileColors.gold,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.1,
+  },
+  title: { color: mobileColors.ink, fontSize: 22, fontWeight: '800' },
   body: { color: mobileColors.muted, fontSize: 14, lineHeight: 21 },
-  topicWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingTop: 2 },
-  topicButton: {
-    minHeight: 38,
-    justifyContent: 'center',
+  authorityNote: { color: mobileColors.muted, fontSize: 11, lineHeight: 17 },
+  topicSection: { gap: 10 },
+  sectionHeading: { gap: 3, paddingHorizontal: 2 },
+  sectionTitle: { color: mobileColors.ink, fontSize: 19, fontWeight: '800' },
+  sectionSupport: { color: mobileColors.muted, fontSize: 12, lineHeight: 18 },
+  topicList: { gap: 8 },
+  topicCard: {
+    minHeight: 78,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
     borderWidth: 1,
     borderColor: mobileColors.border,
-    borderRadius: 999,
-    paddingHorizontal: 13,
+    borderRadius: 16,
+    backgroundColor: mobileColors.surface,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  topicCardActive: {
+    borderColor: mobileColors.navy,
+  },
+  topicIcon: {
+    width: 42,
+    height: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 21,
     backgroundColor: mobileColors.canvas,
   },
-  topicButtonActive: {
+  topicIconActive: { backgroundColor: mobileColors.navy },
+  topicIconText: { color: mobileColors.gold, fontSize: 18, fontWeight: '800' },
+  topicIconTextActive: { color: mobileColors.surface },
+  topicCopy: { flex: 1, gap: 5 },
+  topicTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  topicTitle: { color: mobileColors.ink, fontSize: 16, fontWeight: '800' },
+  topicDescription: { color: mobileColors.muted, fontSize: 12, lineHeight: 18 },
+  statusBadge: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+  },
+  statusBadgeReady: {
     borderColor: mobileColors.navy,
     backgroundColor: mobileColors.navy,
   },
-  topicButtonText: { color: mobileColors.navy, fontSize: 13, fontWeight: '800' },
-  topicButtonTextActive: { color: mobileColors.surface },
+  statusBadgeBlocked: {
+    borderColor: mobileColors.border,
+    backgroundColor: mobileColors.canvas,
+  },
+  statusBadgeText: { fontSize: 10, fontWeight: '800' },
+  statusBadgeTextReady: { color: mobileColors.surface },
+  statusBadgeTextBlocked: { color: mobileColors.muted },
+  chevron: { color: mobileColors.gold, fontSize: 24, fontWeight: '500' },
   disabled: { opacity: 0.55 },
-  authorityNote: { color: mobileColors.muted, fontSize: 11, lineHeight: 17 },
   stateCard: {
     borderWidth: 1,
     borderColor: mobileColors.border,
@@ -276,7 +402,13 @@ const styles = StyleSheet.create({
     padding: 18,
     gap: 10,
   },
-  stateTitle: { color: mobileColors.ink, fontSize: 17, fontWeight: '800' },
+  stateKicker: {
+    color: mobileColors.gold,
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+  },
+  stateTitle: { color: mobileColors.ink, fontSize: 18, fontWeight: '800' },
   muted: { color: mobileColors.muted, fontSize: 14, lineHeight: 21 },
   error: { color: mobileColors.seal, fontSize: 14, lineHeight: 20 },
   retryButton: {
@@ -288,6 +420,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   retryButtonText: { color: mobileColors.navy, fontSize: 14, fontWeight: '800' },
+  resultHeading: { gap: 5, paddingHorizontal: 2 },
+  resultTitle: { color: mobileColors.ink, fontSize: 20, fontWeight: '800' },
   noticeCard: {
     borderWidth: 1,
     borderColor: mobileColors.gold,
@@ -306,7 +440,12 @@ const styles = StyleSheet.create({
     padding: 20,
     gap: 10,
   },
-  stepIndex: { color: mobileColors.gold, fontSize: 11, fontWeight: '900', letterSpacing: 0.8 },
+  stepIndex: {
+    color: mobileColors.gold,
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+  },
   stepTitle: { color: mobileColors.ink, fontSize: 19, fontWeight: '800' },
   primaryText: { color: mobileColors.navy, fontSize: 16, lineHeight: 24, fontWeight: '700' },
   supportBlock: {
