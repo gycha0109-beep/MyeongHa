@@ -348,6 +348,7 @@ export {
   type SeyeonEventExtractionCandidateV2,
   type SeyeonEventExtractionContextV2,
   type SeyeonEventExtractionMessageV2,
+  type SeyeonEventExtractionPriorEventV2,
   type SeyeonEventRetrievalCandidateV2,
 } from './seyeon-event-extraction-v2.js';
 
@@ -543,6 +544,7 @@ export {
   SEYEON_PRODUCTION_RELATIONSHIP_EVENT_BINDINGS_V1,
   SEYEON_PRODUCTION_RELATIONSHIP_EVENT_BINDING_VERSION_V1,
   SEYEON_PRODUCTION_RELATIONSHIP_RUNTIME_BINDING_AUTHORIZED_V1,
+  resolveSeyeonExperimentalEvidenceKindForProductionEventV1,
   resolveSeyeonProductionRelationshipEventBindingV1,
   type SeyeonProductionRelationshipEventBindingV1,
 } from './seyeon-relationship-event-bindings-v1.js';

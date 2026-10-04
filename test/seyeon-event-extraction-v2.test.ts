@@ -235,6 +235,89 @@ describe('Se-yeon event extraction and retrieval v2', () => {
     ).toThrow(/minimum salience/);
   });
 
+  it('accepts an authorized Production relationship Event as a causal predecessor view', () => {
+    const productionPrior = Object.freeze({
+      authority:
+        'authorized_production_relationship_event_v1' as const,
+      eventId: '44444444-4444-4444-8444-444444444451',
+      characterId: 'seyeon' as const,
+      eventKind: 'PROMISE_MADE' as const,
+      occurredAt: '2026-09-20T00:00:00.000Z',
+      causalPredecessorEventIds: Object.freeze([]),
+      facts: Object.freeze([
+        Object.freeze({
+          factKey: 'commitment',
+          statement: 'Production authority recorded the prior commitment.',
+          sourceRefs: Object.freeze(['server:relationship-history']),
+        }),
+      ]),
+    });
+    const context = {
+      ...extractionContext(),
+      priorEvents: [productionPrior],
+    };
+
+    const candidate = guardSeyeonEventExtractionCandidateV2({
+      context,
+      rawOutput: {
+        schemaVersion:
+          SEYEON_EVENT_EXTRACTION_CANDIDATE_SCHEMA_VERSION_V2,
+        decision: 'event',
+        reason: '현재 발화가 기존 Production 약속의 이행을 확인한다.',
+        eventKind: 'PROMISE_KEPT',
+        sourceMessageRefs: ['user-current'],
+        causalPredecessorEventIds: [productionPrior.eventId],
+        facts: [
+          {
+            factKey: 'promise_kept',
+            statement: '사용자가 현재 약속 이행을 언급했다.',
+            sourceRefs: ['user-current'],
+          },
+        ],
+        characterInterpretation: null,
+        salience: 0.9,
+        confidence: 0.95,
+        dedupeBasis: 'production-prior:promise-kept',
+      },
+    });
+
+    expect(candidate.decision).toBe('event');
+    if (candidate.decision !== 'event') {
+      throw new Error('Expected event candidate.');
+    }
+    expect(candidate.causalPredecessorEventIds).toEqual([
+      productionPrior.eventId,
+    ]);
+
+    expect(() =>
+      guardSeyeonEventExtractionCandidateV2({
+        context,
+        rawOutput: {
+          schemaVersion:
+            SEYEON_EVENT_EXTRACTION_CANDIDATE_SCHEMA_VERSION_V2,
+          decision: 'event',
+          reason: 'unknown predecessor',
+          eventKind: 'PROMISE_KEPT',
+          sourceMessageRefs: ['user-current'],
+          causalPredecessorEventIds: [
+            '44444444-4444-4444-8444-444444444499',
+          ],
+          facts: [
+            {
+              factKey: 'promise_kept',
+              statement: '근거 없는 선행자',
+              sourceRefs: ['user-current'],
+            },
+          ],
+          characterInterpretation: null,
+          salience: 0.9,
+          confidence: 0.95,
+          dedupeBasis: 'unknown-production-prior',
+        },
+      }),
+    ).toThrow(/absent from prior Event context/i);
+  });
+
   it('requires PROMISE_KEPT to point at a prior PROMISE_MADE event', () => {
     const promise = retrievalEvent({
       id: 'promise-made-prior',

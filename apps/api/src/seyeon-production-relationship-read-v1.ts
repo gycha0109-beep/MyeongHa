@@ -25,6 +25,12 @@ export interface SeyeonRelationshipBandProjectionV1 {
   readonly frictionBand: RelationshipStateBand;
 }
 
+export interface SeyeonRelationshipBandProjectorV1 {
+  project(
+    state: SeyeonProductionRelationshipRuntimeStateV1,
+  ): SeyeonRelationshipBandProjectionV1;
+}
+
 export interface SeyeonProductionRelationshipTurnBindingV1 {
   readonly version: typeof SEYEON_PRODUCTION_RELATIONSHIP_READ_VERSION_V1;
   readonly relationshipRevisionUsedForTurn: number | null;
@@ -56,7 +62,8 @@ function validateBand(
 
 export async function readSeyeonProductionRelationshipTurnBindingV1(input: {
   readonly resolvedSubjectId: string;
-  readonly bandProjection: SeyeonRelationshipBandProjectionV1 | null;
+  readonly bandProjection?: SeyeonRelationshipBandProjectionV1 | null;
+  readonly bandProjector?: SeyeonRelationshipBandProjectorV1;
   readonly authorityPort: SeyeonProductionRelationshipReadAuthorityPortV1;
 }): Promise<SeyeonProductionRelationshipTurnBindingV1> {
   const subjectId = input.resolvedSubjectId.trim();
@@ -93,7 +100,11 @@ export async function readSeyeonProductionRelationshipTurnBindingV1(input: {
       'Production relationship read returned a different Subject identity.',
     );
   }
-  if (input.bandProjection === null) {
+  const bandProjection =
+    input.bandProjection ??
+    input.bandProjector?.project(state) ??
+    null;
+  if (bandProjection === null) {
     throw new SeyeonProductionRelationshipReadErrorV1(
       'Production relationship exists but governed relationship band projection is unavailable.',
     );
@@ -102,12 +113,12 @@ export async function readSeyeonProductionRelationshipTurnBindingV1(input: {
   const relationship = Object.freeze({
     stageKey: state.attainedStage,
     closenessBand: validateBand(
-      input.bandProjection.closenessBand,
+      bandProjection.closenessBand,
       'closenessBand',
     ),
-    trustBand: validateBand(input.bandProjection.trustBand, 'trustBand'),
+    trustBand: validateBand(bandProjection.trustBand, 'trustBand'),
     frictionBand: validateBand(
-      input.bandProjection.frictionBand,
+      bandProjection.frictionBand,
       'frictionBand',
     ),
     revision: state.revision,

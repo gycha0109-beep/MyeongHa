@@ -1,5 +1,6 @@
 import {
   replayProductionRelationshipHistoryV1,
+  type ProductionRelationshipHistoryRecordV1,
 } from '../../../packages/domain/src/relationship-policy-reference-replay-v1.js';
 import type {
   ProductionRelationshipEventV1,
@@ -67,6 +68,8 @@ export interface SeyeonProductionContextSnapshotV1 {
   readonly personalRecordAdmissions:
     readonly SeyeonProductionPersonalRecordAdmissionV1[];
   readonly activeRelationshipEventCount: number;
+  readonly relationshipHistoryRecords:
+    readonly ProductionRelationshipHistoryRecordV1[];
 }
 
 export class SeyeonProductionContextErrorV1 extends Error {
@@ -361,6 +364,7 @@ export async function composeSeyeonProductionContextV1(
     ]),
     personalRecordAdmissions: personal.admissions,
     activeRelationshipEventCount: replay.activeEvents.length,
+    relationshipHistoryRecords: Object.freeze([...history]),
   });
 }
 

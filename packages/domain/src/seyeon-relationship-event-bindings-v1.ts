@@ -74,6 +74,21 @@ export const SEYEON_PRODUCTION_RELATIONSHIP_EVENT_BINDINGS_V1: readonly SeyeonPr
     }),
   ]);
 
+export function resolveSeyeonExperimentalEvidenceKindForProductionEventV1(
+  productionEventKind: ProductionRelationshipEventKindV1,
+): SeyeonExperimentalEventKindV2 {
+  const matches = SEYEON_PRODUCTION_RELATIONSHIP_EVENT_BINDINGS_V1.filter(
+    (candidate) =>
+      candidate.productionEventKind === productionEventKind,
+  );
+  if (matches.length !== 1 || matches[0] === undefined) {
+    throw new TypeError(
+      'Production relationship Event is not uniquely bound to Se-yeon experimental evidence V1.',
+    );
+  }
+  return matches[0].experimentalEvidenceKind;
+}
+
 export function resolveSeyeonProductionRelationshipEventBindingV1(
   experimentalEvidenceKind: SeyeonExperimentalEventKindV2,
 ): SeyeonProductionRelationshipEventBindingV1 {

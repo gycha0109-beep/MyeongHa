@@ -304,6 +304,7 @@ describe('Se-yeon Production context V1', () => {
       retrievedMemories: [],
       personalRecordAdmissions: [],
       activeRelationshipEventCount: 0,
+      relationshipHistoryRecords: [],
     };
 
     const forged = {

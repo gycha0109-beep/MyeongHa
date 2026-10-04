@@ -10,6 +10,7 @@ import {
 import {
   bindSeyeonProductionCharacterContextInputV1,
   type SeyeonProductionBoundCharacterContextInputV1,
+  type SeyeonProductionContextSnapshotV1,
 } from './seyeon-production-context-v1.js';
 import {
   runSeyeonProductionContextVerticalSliceV1,
@@ -33,6 +34,15 @@ import {
 import type {
   SeyeonProductionRelationshipSyncOutboxPortV1,
 } from './seyeon-production-relationship-outbox-v1.js';
+import type {
+  SeyeonProductionRelationshipActivationV1,
+} from './seyeon-production-relationship-activation-v1.js';
+import type {
+  SeyeonProductionRelationshipTurnBindingV1,
+} from './seyeon-production-relationship-read-v1.js';
+import {
+  projectSeyeonProductionRelationshipBandsV1,
+} from './seyeon-production-relationship-band-v1.js';
 
 export const SEYEON_PRODUCTION_CHAT_EXECUTION_VERSION_V1 =
   'seyeon-production-chat-execution-v1' as const;
@@ -181,22 +191,46 @@ export interface SeyeonProductionChatPersistencePortV1 {
   }>): Awaitable<SeyeonProductionChatCommitReceiptV1>;
 }
 
+export type SeyeonProductionChatPostTurnExecutionModeV1 =
+  | 'DEFERRED'
+  | 'INLINE_BEST_EFFORT';
+
 export interface SeyeonProductionChatPostTurnInputV1 {
   readonly ledger: SeyeonEventLedgerPortV2;
-  readonly extractorProvider:
-    RunSeyeonCharacterTurnV2Input['interpreterProvider'];
   readonly analysisOutboxPort: SeyeonPostTurnAnalysisOutboxPortV1;
-  readonly lockOwner: string;
-  readonly leaseExpiresAt: string;
+  readonly executionMode?: SeyeonProductionChatPostTurnExecutionModeV1;
+  readonly extractorProvider?:
+    RunSeyeonCharacterTurnV2Input['interpreterProvider'];
+  readonly lockOwner?: string;
+  readonly leaseExpiresAt?: string;
   readonly semanticRelevanceByEventId: Readonly<Record<string, number>>;
   readonly recentlyMentionedEventIds?: readonly string[];
   readonly serverObservationRefs?: readonly string[];
 }
 
+export interface SeyeonProductionGovernanceResolutionInputV1 {
+  readonly subjectId: string;
+  readonly threadId: string;
+  readonly userMessageRef: string;
+  readonly userText: string;
+  readonly turnBinding: SeyeonProductionRelationshipTurnBindingV1;
+  readonly activation: SeyeonProductionRelationshipActivationV1;
+  readonly productionContext: SeyeonProductionContextSnapshotV1;
+}
+
+export type SeyeonProductionGovernanceResolverV1 = (
+  input: SeyeonProductionGovernanceResolutionInputV1,
+) => Awaitable<RunSeyeonCharacterTurnV2Input['governance']>;
+
 type BaseProductionSliceInputV1 = Omit<
   RunSeyeonProductionContextVerticalSliceInputV1<RunSeyeonCharacterTurnV2Result>,
   | 'threadId'
   | 'currentUserMessageRef'
+  | 'bandProjection'
+  | 'bandProjector'
+  | 'productionHistoryRecords'
+  | 'contextPort'
+  | 'commitPort'
   | 'durableSync'
   | 'runCommittedTurn'
 >;
@@ -206,7 +240,8 @@ extends BaseProductionSliceInputV1 {
   readonly threadId: string;
   readonly receivePlan: ChatReceivePlan;
   readonly baseContext: SeyeonProductionBoundCharacterContextInputV1;
-  readonly governance: RunSeyeonCharacterTurnV2Input['governance'];
+  readonly governance?: RunSeyeonCharacterTurnV2Input['governance'];
+  readonly resolveGovernance?: SeyeonProductionGovernanceResolverV1;
   readonly interpreterProvider:
     RunSeyeonCharacterTurnV2Input['interpreterProvider'];
   readonly rendererProvider:
@@ -408,22 +443,103 @@ function relationshipSemanticsPort(
   return Object.freeze({ resolve: () => applied });
 }
 
+function postTurnInlineConfig(
+  postTurn: SeyeonProductionChatPostTurnInputV1,
+): Readonly<{
+  extractorProvider: RunSeyeonCharacterTurnV2Input['interpreterProvider'];
+  lockOwner: string;
+  leaseExpiresAt: string;
+}> | null {
+  const mode = postTurn.executionMode ?? 'INLINE_BEST_EFFORT';
+  if (mode === 'DEFERRED') return null;
+
+  if (
+    postTurn.extractorProvider === undefined ||
+    postTurn.lockOwner === undefined ||
+    postTurn.leaseExpiresAt === undefined
+  ) {
+    throw new SeyeonProductionChatExecutionErrorV1(
+      'Inline post-turn execution requires extractor, lock owner, and lease expiry.',
+    );
+  }
+  const leaseExpiresAt = boundedText(
+    postTurn.leaseExpiresAt,
+    'postTurn.leaseExpiresAt',
+    64,
+  );
+  if (!Number.isFinite(Date.parse(leaseExpiresAt))) {
+    throw new SeyeonProductionChatExecutionErrorV1(
+      'postTurn.leaseExpiresAt must be an ISO-compatible instant.',
+    );
+  }
+
+  return Object.freeze({
+    extractorProvider: postTurn.extractorProvider,
+    lockOwner: boundedText(postTurn.lockOwner, 'postTurn.lockOwner', 256),
+    leaseExpiresAt: new Date(leaseExpiresAt).toISOString(),
+  });
+}
+
+async function resolveTurnGovernance(input: {
+  readonly execution: RunSeyeonProductionChatExecutionInputV1;
+  readonly subjectId: string;
+  readonly threadId: string;
+  readonly userMessageRef: string;
+  readonly userText: string;
+  readonly turnBinding: SeyeonProductionRelationshipTurnBindingV1;
+  readonly activation: SeyeonProductionRelationshipActivationV1;
+  readonly productionContext: SeyeonProductionContextSnapshotV1;
+}): Promise<RunSeyeonCharacterTurnV2Input['governance']> {
+  const base =
+    input.execution.resolveGovernance === undefined
+      ? input.execution.governance
+      : await input.execution.resolveGovernance({
+          subjectId: input.subjectId,
+          threadId: input.threadId,
+          userMessageRef: input.userMessageRef,
+          userText: input.userText,
+          turnBinding: input.turnBinding,
+          activation: input.activation,
+          productionContext: input.productionContext,
+        });
+  if (base === undefined) {
+    throw new SeyeonProductionChatExecutionErrorV1(
+      'Se-yeon Production execution requires server governance authority.',
+    );
+  }
+
+  const semantics = relationshipSemanticsPort(
+    base.relationshipSemantics,
+    input.activation.appliedRelationshipSemantics,
+  );
+  return Object.freeze({
+    ...base,
+    ...(semantics === undefined
+      ? {}
+      : { relationshipSemantics: semantics }),
+  });
+}
+
 export async function runSeyeonProductionChatExecutionV1(
   input: RunSeyeonProductionChatExecutionInputV1,
 ): Promise<RunSeyeonProductionChatExecutionResultV1> {
   const subjectId = boundedText(input.resolvedSubjectId, 'resolvedSubjectId', 256);
   const threadId = boundedText(input.threadId, 'threadId', 256);
   const receive = assertReceivePlan({ threadId, plan: input.receivePlan });
-  const durableRelationshipRequired =
-    input.mode === 'WRITE_DARK' ||
-    input.mode === 'BEHAVIOR_SHADOW' ||
-    input.mode === 'LIVE';
+  const inlinePostTurn = postTurnInlineConfig(input.postTurn);
+  const inlineDurableRelationshipRequired =
+    inlinePostTurn !== null &&
+    (
+      input.mode === 'WRITE_DARK' ||
+      input.mode === 'BEHAVIOR_SHADOW' ||
+      input.mode === 'LIVE'
+    );
   if (
-    durableRelationshipRequired &&
+    inlineDurableRelationshipRequired &&
     input.relationshipSyncOutboxPort === undefined
   ) {
     throw new SeyeonProductionChatExecutionErrorV1(
-      'Write-capable Se-yeon Production execution requires durable relationship sync outbox authority.',
+      'Inline write-capable post-turn execution requires durable relationship sync outbox authority.',
     );
   }
 
@@ -472,6 +588,7 @@ export async function runSeyeonProductionChatExecutionV1(
     }
     const recoveryJob = recoveryRows[0];
     if (
+      inlinePostTurn !== null &&
       recoveryJob !== undefined &&
       (recoveryJob.status === 'pending' ||
         recoveryJob.status === 'processing')
@@ -480,10 +597,10 @@ export async function runSeyeonProductionChatExecutionV1(
         await processSeyeonPostTurnAnalysisV1({
           subjectId,
           outboxEventId: recoveryJob.outboxEventId,
-          lockOwner: input.postTurn.lockOwner,
-          leaseExpiresAt: input.postTurn.leaseExpiresAt,
+          lockOwner: inlinePostTurn.lockOwner,
+          leaseExpiresAt: inlinePostTurn.leaseExpiresAt,
           outboxPort: input.postTurn.analysisOutboxPort,
-          extractorProvider: input.postTurn.extractorProvider,
+          extractorProvider: inlinePostTurn.extractorProvider,
           ...(input.relationshipSyncOutboxPort === undefined
             ? {}
             : {
@@ -492,8 +609,8 @@ export async function runSeyeonProductionChatExecutionV1(
               }),
         });
       } catch {
-        // Chat replay remains available even while durable post-turn work waits
-        // for lease expiry/reclaim or downstream relationship recovery.
+        // Chat replay remains available while durable post-turn work is deferred
+        // or waits for lease expiry/reclaim/downstream relationship recovery.
       }
     }
     return Object.freeze({
@@ -525,14 +642,13 @@ export async function runSeyeonProductionChatExecutionV1(
       resolvedSubjectId: subjectId,
       threadId,
       currentUserMessageRef: receivedTurn.userMessageId,
-      bandProjection: input.bandProjection,
+      bandProjector: Object.freeze({
+        project: projectSeyeonProductionRelationshipBandsV1,
+      }),
       relationshipReadPort: input.relationshipReadPort,
       contextReadPort: input.contextReadPort,
-      productionHistoryRecords: input.productionHistoryRecords,
       productionAuthorityRef: input.productionAuthorityRef,
       idPort: input.idPort,
-      contextPort: input.contextPort,
-      commitPort: input.commitPort,
       ...(input.serverOwnedPersonalRecordProjectors === undefined
         ? {}
         : {
@@ -570,22 +686,22 @@ export async function runSeyeonProductionChatExecutionV1(
           userText: receivedTurn.userText,
         });
 
+        const governance = await resolveTurnGovernance({
+          execution: input,
+          subjectId,
+          threadId,
+          userMessageRef: receivedTurn.userMessageId,
+          userText: receivedTurn.userText,
+          turnBinding,
+          activation,
+          productionContext,
+        });
+
         const runtime = await runSeyeonCharacterTurnV2({
           userMessageRef: receivedTurn.userMessageId,
           userText: receivedTurn.userText,
           contextInput,
-          governance: (() => {
-            const semantics = relationshipSemanticsPort(
-              input.governance.relationshipSemantics,
-              activation.appliedRelationshipSemantics,
-            );
-            return Object.freeze({
-              ...input.governance,
-              ...(semantics === undefined
-                ? {}
-                : { relationshipSemantics: semantics }),
-            });
-          })(),
+          governance,
           interpreterProvider: input.interpreterProvider,
           rendererProvider: input.rendererProvider,
           semanticReviewerProvider: input.semanticReviewerProvider,
@@ -642,7 +758,8 @@ export async function runSeyeonProductionChatExecutionV1(
                 serverObservationRefs:
                   input.postTurn.serverObservationRefs,
               }),
-          productionHistoryRecords: input.productionHistoryRecords,
+          productionHistoryRecords:
+            productionContext.relationshipHistoryRecords,
           identity: Object.freeze({
             experimentalEventId:
               input.executionIdPort.nextExperimentalEventId(),
@@ -731,30 +848,37 @@ export async function runSeyeonProductionChatExecutionV1(
 
   let postTurnAnalysis:
     RunSeyeonProductionChatExecutedResultV1['postTurnAnalysis'];
-  try {
-    const result = await processSeyeonPostTurnAnalysisV1({
-      subjectId,
-      outboxEventId: committedTurn.postTurnOutboxEventId,
-      lockOwner: input.postTurn.lockOwner,
-      leaseExpiresAt: input.postTurn.leaseExpiresAt,
-      outboxPort: input.postTurn.analysisOutboxPort,
-      extractorProvider: input.postTurn.extractorProvider,
-      ...(input.relationshipSyncOutboxPort === undefined
-        ? {}
-        : {
-            relationshipSyncOutboxPort:
-              input.relationshipSyncOutboxPort,
-          }),
-    });
-    postTurnAnalysis = Object.freeze({
-      status: 'processed' as const,
-      result,
-    });
-  } catch {
+  if (inlinePostTurn === null) {
     postTurnAnalysis = Object.freeze({
       status: 'deferred' as const,
       outboxEventId: committedTurn.postTurnOutboxEventId,
     });
+  } else {
+    try {
+      const result = await processSeyeonPostTurnAnalysisV1({
+        subjectId,
+        outboxEventId: committedTurn.postTurnOutboxEventId,
+        lockOwner: inlinePostTurn.lockOwner,
+        leaseExpiresAt: inlinePostTurn.leaseExpiresAt,
+        outboxPort: input.postTurn.analysisOutboxPort,
+        extractorProvider: inlinePostTurn.extractorProvider,
+        ...(input.relationshipSyncOutboxPort === undefined
+          ? {}
+          : {
+              relationshipSyncOutboxPort:
+                input.relationshipSyncOutboxPort,
+            }),
+      });
+      postTurnAnalysis = Object.freeze({
+        status: 'processed' as const,
+        result,
+      });
+    } catch {
+      postTurnAnalysis = Object.freeze({
+        status: 'deferred' as const,
+        outboxEventId: committedTurn.postTurnOutboxEventId,
+      });
+    }
   }
 
   return Object.freeze({

@@ -51,6 +51,8 @@ export const SEYEON_STRUCTURED_PROVIDER_CONTRACT_VERSION_V2 =
   'seyeon-structured-provider-v2' as const;
 
 export type SeyeonStructuredPurposeV2 =
+  | 'integrity_classification'
+  | 'disclosure_classification'
   | 'turn_interpretation'
   | 'dialogue_render'
   | 'semantic_review'
