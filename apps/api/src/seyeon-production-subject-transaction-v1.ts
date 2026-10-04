@@ -68,8 +68,14 @@ export function createSeyeonProductionSubjectTransactionRunnerV1(input: {
     resolveSubject() {
       return run(null, (_client, resolvedSubject) => resolvedSubject);
     },
-    run(expectedSubjectId, execute) {
-      return run(subjectId(expectedSubjectId), execute);
+    run<T>(
+      expectedSubjectId: string,
+      execute: (
+        client: PostgresTransactionQueryV1,
+        resolvedSubject: ResolvedSubjectContextV1,
+      ) => Awaitable<T>,
+    ): Promise<T> {
+      return run<T>(subjectId(expectedSubjectId), execute);
     },
   });
 }
