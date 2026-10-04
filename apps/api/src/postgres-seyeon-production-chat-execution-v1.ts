@@ -31,6 +31,12 @@ select
   thread_character_id::text as "threadCharacterId",
   content_release_id::text as "contentReleaseId",
   content_bundle_id::text as "contentBundleId",
+  turn_state as "turnState",
+  committed_attempt_id::text as "committedAttemptId",
+  committed_assistant_message_id::text as "committedAssistantMessageId",
+  committed_assistant_text as "committedAssistantText",
+  committed_assistant_sequence_no as "committedAssistantSequenceNo",
+  committed_at::text as "committedAt",
   replayed
 from public.cmd_receive_seyeon_chat_turn_runtime_v1(
   $1::uuid,$2::uuid,$3::text,$4::text,$5::text,$6::jsonb,
@@ -95,6 +101,18 @@ function text(name: string, value: unknown): string {
   return value.trim();
 }
 
+function nullableText(name: string, value: unknown): string | null {
+  return value === null ? null : text(name, value);
+}
+
+function nullableInteger(name: string, value: unknown): number | null {
+  return value === null ? null : integer(name, value);
+}
+
+function nullableTimestamp(name: string, value: unknown): string | null {
+  return value === null ? null : timestamp(name, value);
+}
+
 function integer(name: string, value: unknown): number {
   const parsed =
     typeof value === 'number'
@@ -155,6 +173,52 @@ implements SeyeonProductionChatPersistencePortV1 {
       input.userContentHash,
     ]);
     const row = one(result.rows, 'receive');
+    const turnState = text('turn state', row.turnState);
+    const committedAttemptId = nullableText(
+      'committed attempt id',
+      row.committedAttemptId,
+    );
+    const committedAssistantMessageId = nullableText(
+      'committed assistant message id',
+      row.committedAssistantMessageId,
+    );
+    const committedAssistantText = nullableText(
+      'committed assistant text',
+      row.committedAssistantText,
+    );
+    const committedAssistantSequenceNo = nullableInteger(
+      'committed assistant sequence',
+      row.committedAssistantSequenceNo,
+    );
+    const committedAt = nullableTimestamp(
+      'committed timestamp',
+      row.committedAt,
+    );
+
+    const committedTurn =
+      turnState === 'committed' || turnState === 'delivered'
+        ? (() => {
+            if (
+              committedAttemptId === null ||
+              committedAssistantMessageId === null ||
+              committedAssistantText === null ||
+              committedAssistantSequenceNo === null ||
+              committedAt === null
+            ) {
+              throw new Error(
+                'Se-yeon Production Chat PostgreSQL committed replay material is incomplete.',
+              );
+            }
+            return Object.freeze({
+              attemptId: committedAttemptId,
+              assistantMessageId: committedAssistantMessageId,
+              assistantText: committedAssistantText,
+              sequenceNo: committedAssistantSequenceNo,
+              committedAt,
+            });
+          })()
+        : null;
+
     return Object.freeze({
       turnId: text('turn id', row.turnId),
       userMessageId: text('user message id', row.userMessageId),
@@ -162,6 +226,8 @@ implements SeyeonProductionChatPersistencePortV1 {
       threadCharacterId: text('thread Character id', row.threadCharacterId),
       contentReleaseId: text('content release id', row.contentReleaseId),
       contentBundleId: text('content bundle id', row.contentBundleId),
+      turnState,
+      committedTurn,
       replayed: bool('receive replay flag', row.replayed),
     });
   }
