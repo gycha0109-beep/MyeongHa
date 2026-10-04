@@ -11,6 +11,9 @@ import {
   getMemoryItems,
 } from './memory-items-read.js';
 import {
+  createOpenAiSeyeonStructuredProviderV1,
+} from './openai-seyeon-structured-provider-v1.js';
+import {
   createPostgresChatThreadRuntimeBindingAuthorityPortV1,
 } from './postgres-chat-thread-runtime-binding.js';
 import {
@@ -30,13 +33,24 @@ import type {
   PostgresSubjectPoolV1,
 } from './postgres-subject-execution.js';
 import {
+  createProductionPostgresSubjectPoolLeaseV1,
+} from './production-postgres-subject-pool-lease.js';
+import {
+  parseProductionUserDataRuntimeConfigV1,
+  type ProductionUserDataRuntimeEnvV1,
+} from './production-user-data-runtime-config.js';
+import {
+  createProductionSeyeonInternalDogfoodRelationshipInspectorV1,
   inspectSeyeonInternalDogfoodRelationshipV1,
   type SeyeonInternalDogfoodRelationshipInspectionV1,
+  type SeyeonInternalDogfoodRelationshipInspectorV1,
 } from './seyeon-internal-dogfood-relationship-inspector-v1.js';
-import type {
-  ProductionSeyeonInternalDogfoodHarnessV1,
+import {
+  createProductionSeyeonInternalDogfoodHarnessV1,
+  type ProductionSeyeonInternalDogfoodHarnessV1,
 } from './seyeon-internal-dogfood-harness-v1.js';
 import {
+  parseSeyeonInternalLiveProviderConfigV1,
   runSeyeonInternalLiveDogfoodSessionV1,
 } from './seyeon-internal-live-dogfood-v1.js';
 import {
@@ -52,6 +66,7 @@ import {
   createSeyeonProductionSubjectTransactionRunnerV1,
 } from './seyeon-production-subject-transaction-v1.js';
 import {
+  createObservedSeyeonStructuredProviderV1,
   diffSeyeonStructuredProviderInvocationsV1,
   type ObservedSeyeonStructuredProviderV1,
   type SeyeonStructuredProviderInvocationSnapshotV1,
@@ -106,15 +121,60 @@ export interface SeyeonInternalDogfoodEvidenceInspectorV1 {
   }): Promise<SeyeonInternalDogfoodEvidenceSnapshotV1>;
 }
 
+export interface ConfiguredSeyeonInternalDogfoodEvidenceRuntimeV1 {
+  readonly harness: ProductionSeyeonInternalDogfoodHarnessV1;
+  readonly observer: ObservedSeyeonStructuredProviderV1;
+  readonly relationshipInspector:
+    SeyeonInternalDogfoodRelationshipInspectorV1;
+  readonly evidenceInspector:
+    SeyeonInternalDogfoodEvidenceInspectorV1;
+  close(): Promise<void>;
+}
+
+export function createConfiguredSeyeonInternalDogfoodEvidenceRuntimeV1(
+  env: ProductionUserDataRuntimeEnvV1,
+): ConfiguredSeyeonInternalDogfoodEvidenceRuntimeV1 {
+  const databaseConfig = parseProductionUserDataRuntimeConfigV1(env);
+  const providerConfig =
+    parseSeyeonInternalLiveProviderConfigV1(env);
+  const poolLease = createProductionPostgresSubjectPoolLeaseV1({
+    config: databaseConfig,
+  });
+  const observer = createObservedSeyeonStructuredProviderV1(
+    createOpenAiSeyeonStructuredProviderV1(providerConfig),
+  );
+  const harness = createProductionSeyeonInternalDogfoodHarnessV1({
+    databaseConfig,
+    provider: observer.provider,
+    pool: poolLease.pool,
+  });
+  const relationshipInspector =
+    createProductionSeyeonInternalDogfoodRelationshipInspectorV1({
+      pool: poolLease.pool,
+    });
+  const evidenceInspector =
+    createProductionSeyeonInternalDogfoodEvidenceInspectorV1({
+      pool: poolLease.pool,
+    });
+
+  return Object.freeze({
+    harness,
+    observer,
+    relationshipInspector,
+    evidenceInspector,
+    async close() {
+      await harness.close();
+      await poolLease.close();
+    },
+  });
+}
+
 export interface RunSeyeonInternalDogfoodEvidenceInputV1 {
   readonly harness: ProductionSeyeonInternalDogfoodHarnessV1;
   readonly observer: ObservedSeyeonStructuredProviderV1;
   readonly evidenceInspector: SeyeonInternalDogfoodEvidenceInspectorV1;
-  readonly relationshipInspector?: {
-    inspect(input: {
-      readonly verifiedEvidence: VerifiedSubjectIdentityEvidenceV1;
-    }): Promise<SeyeonInternalDogfoodRelationshipInspectionV1>;
-  };
+  readonly relationshipInspector?:
+    SeyeonInternalDogfoodRelationshipInspectorV1;
   readonly scenario: SeyeonInternalDogfoodScenarioV1;
   readonly verifiedEvidence: VerifiedSubjectIdentityEvidenceV1;
   readonly threadId: string;
