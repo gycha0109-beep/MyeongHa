@@ -32,7 +32,6 @@ jobs:
       MYEONGHA_PRODUCTION_MEMBER_EMAIL: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_EMAIL }}
       MYEONGHA_PRODUCTION_MEMBER_PASSWORD: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_PASSWORD }}
       MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID }}
-      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
       SUPABASE_PRODUCTION_SESSION_POOLER_HOST: ${{ secrets.SUPABASE_PRODUCTION_SESSION_POOLER_HOST }}
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -55,7 +54,6 @@ jobs:
           test -n "${MYEONGHA_PRODUCTION_MEMBER_PASSWORD:-}"
           test -n "${MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID:-}"
 
-          test -n "${SUPABASE_ACCESS_TOKEN:-}"
           test -n "${SUPABASE_DB_PASSWORD:-}"
           test -n "${SUPABASE_PRODUCTION_SESSION_POOLER_HOST:-}"
           [[ "$SUPABASE_PRODUCTION_SESSION_POOLER_HOST" =~ ^[a-z0-9-]+([.][a-z0-9-]+)*[.]pooler[.]supabase[.]com$ ]]
@@ -115,31 +113,7 @@ jobs:
           pool_host="$SUPABASE_PRODUCTION_SESSION_POOLER_HOST"
           pool_port='5432'
           pool_db='postgres'
-          api_keys_file="$RUNNER_TEMP/seyeon-live-supabase-api-keys.json"
-
-          cleanup_local() {
-            exit_code=$?
-            trap - EXIT
-            rm -f "$api_keys_file"
-            exit "$exit_code"
-          }
-          trap cleanup_local EXIT
-
-          [[ "$role_name" =~ ^[a-z_][a-z0-9_]{0,62}$ ]]
-          [[ "$runtime_password" =~ ^[0-9a-f]{64}$ ]]
-          [[ "$guest_fingerprint_secret" =~ ^[0-9a-f]{64}$ ]]
-
-          curl -fsS \
-            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
-            "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_ID/api-keys?reveal=true" \
-            -o "$api_keys_file"
-
-          supabase_publishable_key="$(jq -er '
-            [ .[] | select(.type == "publishable" and (.disabled != true)) ]
-            | sort_by(if .name == "default" then 0 else 1 end)
-            | .[0].api_key
-          ' "$api_keys_file")"
-          [[ "$supabase_publishable_key" == sb_publishable_* ]]
+          supabase_publishable_key='internal-member-dogfood-unused-v1'
 
           echo "::add-mask::$runtime_password"
           echo "::add-mask::$guest_fingerprint_secret"
