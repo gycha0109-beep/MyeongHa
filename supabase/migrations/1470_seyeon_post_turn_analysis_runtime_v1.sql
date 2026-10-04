@@ -399,6 +399,49 @@ begin
 end
 $commit_seyeon_chat_turn_runtime_v2$;
 
+create or replace function public.qry_seyeon_post_turn_analysis_job_v1(
+  p_subject_id uuid,
+  p_turn_id uuid
+)
+returns table (
+  outbox_event_id uuid,
+  status text,
+  lease_expires_at timestamptz
+)
+language plpgsql
+stable
+security definer
+set search_path = pg_catalog, public
+as $qry_seyeon_post_turn_analysis_job$
+begin
+  if p_subject_id is null or p_turn_id is null then
+    raise exception using
+      errcode = '23514',
+      constraint = 'seyeon_post_turn_lookup_identity_required',
+      message = 'Se-yeon post-turn lookup requires canonical Subject and turn identities';
+  end if;
+
+  perform public.assert_myeongha_subject_context_v1(p_subject_id);
+
+  return query
+  select
+    oe.id,
+    oe.status,
+    oe.lease_expires_at
+  from public.outbox_events oe
+  where oe.aggregate_type = 'chat_turn'
+    and oe.aggregate_id = p_turn_id::text
+    and oe.event_type = 'SEYEON_POST_TURN_ANALYSIS_REQUESTED'
+    and oe.event_schema_version = 'v1'
+    and oe.dedupe_key = 'seyeon-post-turn-v1'
+    and oe.payload_jsonb ->> 'schemaVersion'
+          = 'seyeon-post-turn-analysis-request-v1'
+    and oe.payload_jsonb ->> 'subjectId' = p_subject_id::text
+    and oe.payload_jsonb ->> 'characterId' = 'seyeon'
+    and oe.payload_jsonb ->> 'turnId' = p_turn_id::text;
+end
+$qry_seyeon_post_turn_analysis_job$;
+
 create or replace function public.cmd_claim_seyeon_post_turn_analysis_v1(
   p_subject_id uuid,
   p_outbox_event_id uuid,
@@ -612,6 +655,12 @@ revoke myeongha_seyeon_chat_runtime_owner from current_user;
 
 grant myeongha_seyeon_post_turn_owner to current_user;
 grant create on schema public to myeongha_seyeon_post_turn_owner;
+alter function public.qry_seyeon_post_turn_analysis_job_v1(
+  uuid,uuid
+) owner to myeongha_seyeon_post_turn_owner;
+revoke all on function public.qry_seyeon_post_turn_analysis_job_v1(
+  uuid,uuid
+) from public;
 alter function public.cmd_claim_seyeon_post_turn_analysis_v1(
   uuid,uuid,text,timestamptz
 ) owner to myeongha_seyeon_post_turn_owner;
@@ -639,6 +688,10 @@ BEGIN
       v_role
     );
     execute pg_catalog.format(
+      'revoke all on function public.qry_seyeon_post_turn_analysis_job_v1(uuid,uuid) from %I',
+      v_role
+    );
+    execute pg_catalog.format(
       'revoke all on function public.cmd_claim_seyeon_post_turn_analysis_v1(uuid,uuid,text,timestamptz) from %I',
       v_role
     );
@@ -652,6 +705,9 @@ $acl$;
 
 grant execute on function public.cmd_commit_seyeon_chat_turn_runtime_v2(
   uuid,uuid,uuid,uuid,uuid,uuid,uuid,jsonb,text
+) to myeongha_api_executor;
+grant execute on function public.qry_seyeon_post_turn_analysis_job_v1(
+  uuid,uuid
 ) to myeongha_api_executor;
 grant execute on function public.cmd_claim_seyeon_post_turn_analysis_v1(
   uuid,uuid,text,timestamptz
