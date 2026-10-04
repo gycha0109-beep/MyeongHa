@@ -10,6 +10,7 @@ import {
 import {
   bindSeyeonProductionCharacterContextInputV1,
   type SeyeonProductionBoundCharacterContextInputV1,
+  type SeyeonProductionContextSnapshotV1,
 } from './seyeon-production-context-v1.js';
 import {
   runSeyeonProductionContextVerticalSliceV1,
@@ -33,6 +34,15 @@ import {
 import type {
   SeyeonProductionRelationshipSyncOutboxPortV1,
 } from './seyeon-production-relationship-outbox-v1.js';
+import type {
+  SeyeonProductionRelationshipActivationV1,
+} from './seyeon-production-relationship-activation-v1.js';
+import type {
+  SeyeonProductionRelationshipTurnBindingV1,
+} from './seyeon-production-relationship-read-v1.js';
+import {
+  projectSeyeonProductionRelationshipBandsV1,
+} from './seyeon-production-relationship-band-v1.js';
 
 export const SEYEON_PRODUCTION_CHAT_EXECUTION_VERSION_V1 =
   'seyeon-production-chat-execution-v1' as const;
@@ -181,22 +191,46 @@ export interface SeyeonProductionChatPersistencePortV1 {
   }>): Awaitable<SeyeonProductionChatCommitReceiptV1>;
 }
 
+export type SeyeonProductionChatPostTurnExecutionModeV1 =
+  | 'DEFERRED'
+  | 'INLINE_BEST_EFFORT';
+
 export interface SeyeonProductionChatPostTurnInputV1 {
   readonly ledger: SeyeonEventLedgerPortV2;
-  readonly extractorProvider:
-    RunSeyeonCharacterTurnV2Input['interpreterProvider'];
   readonly analysisOutboxPort: SeyeonPostTurnAnalysisOutboxPortV1;
-  readonly lockOwner: string;
-  readonly leaseExpiresAt: string;
+  readonly executionMode?: SeyeonProductionChatPostTurnExecutionModeV1;
+  readonly extractorProvider?:
+    RunSeyeonCharacterTurnV2Input['interpreterProvider'];
+  readonly lockOwner?: string;
+  readonly leaseExpiresAt?: string;
   readonly semanticRelevanceByEventId: Readonly<Record<string, number>>;
   readonly recentlyMentionedEventIds?: readonly string[];
   readonly serverObservationRefs?: readonly string[];
 }
 
+export interface SeyeonProductionGovernanceResolutionInputV1 {
+  readonly subjectId: string;
+  readonly threadId: string;
+  readonly userMessageRef: string;
+  readonly userText: string;
+  readonly turnBinding: SeyeonProductionRelationshipTurnBindingV1;
+  readonly activation: SeyeonProductionRelationshipActivationV1;
+  readonly productionContext: SeyeonProductionContextSnapshotV1;
+}
+
+export type SeyeonProductionGovernanceResolverV1 = (
+  input: SeyeonProductionGovernanceResolutionInputV1,
+) => Awaitable<RunSeyeonCharacterTurnV2Input['governance']>;
+
 type BaseProductionSliceInputV1 = Omit<
   RunSeyeonProductionContextVerticalSliceInputV1<RunSeyeonCharacterTurnV2Result>,
   | 'threadId'
   | 'currentUserMessageRef'
+  | 'bandProjection'
+  | 'bandProjector'
+  | 'productionHistoryRecords'
+  | 'contextPort'
+  | 'commitPort'
   | 'durableSync'
   | 'runCommittedTurn'
 >;
@@ -206,7 +240,8 @@ extends BaseProductionSliceInputV1 {
   readonly threadId: string;
   readonly receivePlan: ChatReceivePlan;
   readonly baseContext: SeyeonProductionBoundCharacterContextInputV1;
-  readonly governance: RunSeyeonCharacterTurnV2Input['governance'];
+  readonly governance?: RunSeyeonCharacterTurnV2Input['governance'];
+  readonly resolveGovernance?: SeyeonProductionGovernanceResolverV1;
   readonly interpreterProvider:
     RunSeyeonCharacterTurnV2Input['interpreterProvider'];
   readonly rendererProvider:
