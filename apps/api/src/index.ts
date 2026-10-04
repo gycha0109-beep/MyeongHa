@@ -1083,3 +1083,27 @@ export {
   type SeyeonInternalDogfoodRuntimeSetV1,
   type SeyeonInternalDogfoodWorkerLeaseV1,
 } from './seyeon-internal-dogfood-harness-v1.js';
+
+
+export {
+  SEYEON_STRUCTURED_PROVIDER_OBSERVER_VERSION_V1,
+  SEYEON_STRUCTURED_PROVIDER_PURPOSES_V1,
+  createObservedSeyeonStructuredProviderV1,
+  diffSeyeonStructuredProviderInvocationsV1,
+  type ObservedSeyeonStructuredProviderV1,
+  type SeyeonStructuredProviderInvocationSnapshotV1,
+} from './seyeon-structured-provider-observer-v1.js';
+
+export {
+  SEYEON_INTERNAL_LIVE_DOGFOOD_ENV_V1,
+  SEYEON_INTERNAL_LIVE_DOGFOOD_VERSION_V1,
+  SeyeonInternalLiveDogfoodErrorV1,
+  parseSeyeonInternalLiveDogfoodCommandV1,
+  parseSeyeonInternalLiveProviderConfigV1,
+  runConfiguredSeyeonInternalLiveDogfoodV1,
+  runSeyeonInternalLiveDogfoodSessionV1,
+  type RunSeyeonInternalLiveDogfoodSessionInputV1,
+  type RunSeyeonInternalLiveDogfoodSessionResultV1,
+  type SeyeonInternalLiveDogfoodCommandV1,
+  type SeyeonInternalLiveDogfoodTurnSummaryV1,
+} from './seyeon-internal-live-dogfood-v1.js';
