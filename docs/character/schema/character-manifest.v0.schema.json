@@ -1,0 +1,166 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://myeongha.local/schema/character-manifest.v0.schema.json",
+  "title": "MyeongHa Character Manifest v0 Foundation",
+  "description": "Experimental machine-readable projection compiled or extracted from a Character Bible. It is not an independent authoring authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "manifest_version",
+    "status",
+    "derivation",
+    "character",
+    "facts"
+  ],
+  "properties": {
+    "manifest_version": {
+      "const": "0.1-foundation"
+    },
+    "status": {
+      "const": "EXPERIMENTAL_NOT_RUNTIME_BOUND"
+    },
+    "derivation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_of_truth",
+        "editable_authority",
+        "mode",
+        "source_bible_document",
+        "source_bible_standard"
+      ],
+      "properties": {
+        "source_of_truth": {
+          "const": "Character Bible"
+        },
+        "editable_authority": {
+          "const": false
+        },
+        "mode": {
+          "enum": [
+            "compiled",
+            "extracted"
+          ]
+        },
+        "source_bible_document": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_bible_version": {
+          "type": "string"
+        },
+        "source_bible_standard": {
+          "const": "Character Bible Standard v1"
+        },
+        "source_revision": {
+          "type": "string",
+          "description": "Optional commit SHA or document revision used for derivation."
+        }
+      }
+    },
+    "character": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "display_name"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "display_name": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "facts": {
+      "type": "object",
+      "description": "Fact registry keyed by stable fact_key. Values must be derived from the Bible or represent explicit Bible authoring gaps.",
+      "additionalProperties": {
+        "$ref": "#/$defs/fact"
+      }
+    }
+  },
+  "$defs": {
+    "fact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_authority",
+        "character_knowledge",
+        "disclosure_default",
+        "source_section"
+      ],
+      "properties": {
+        "value": {
+          "description": "Bible-derived value or null when no authoritative value exists."
+        },
+        "policy": {
+          "type": "string",
+          "description": "Optional policy/range for SOFT_CANON, INTENTIONALLY_OPEN, or WORLD_DEPENDENT facts."
+        },
+        "source_authority": {
+          "enum": [
+            "CANON",
+            "SOFT_CANON",
+            "AUTHOR_UNDEFINED",
+            "INTENTIONALLY_OPEN",
+            "WORLD_DEPENDENT"
+          ]
+        },
+        "character_knowledge": {
+          "enum": [
+            "KNOWN",
+            "PARTIAL",
+            "UNKNOWN_TO_CHARACTER",
+            "NOT_APPLICABLE"
+          ]
+        },
+        "disclosure_default": {
+          "enum": [
+            "PUBLIC",
+            "FAMILIAR",
+            "ATTACHED",
+            "DEEP_TRUST",
+            "CONTEXTUAL",
+            "NEVER",
+            "NOT_APPLICABLE"
+          ]
+        },
+        "source_section": {
+          "type": "string",
+          "minLength": 1
+        },
+        "closure_note": {
+          "type": "string"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "source_authority": {
+                "enum": [
+                  "CANON",
+                  "SOFT_CANON"
+                ]
+              }
+            },
+            "required": [
+              "source_authority"
+            ]
+          },
+          "then": {
+            "required": [
+              "value"
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "$comment": "Foundation only. Do not hand-author this as a second Canon. If adopted, generate it from the Character Bible and regenerate after Bible changes. Runtime implementation is intentionally not bound to this schema yet."
+}

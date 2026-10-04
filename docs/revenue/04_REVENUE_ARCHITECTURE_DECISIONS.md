@@ -2,7 +2,8 @@
 
 > Product: **명하 / MyeongHa**  
 > Status: **Working decision register**  
-> Date: **2026-08-30 KST**
+> Date: **2026-08-30 KST**  
+> Updated: **2026-10-03 KST**
 
 ---
 
@@ -367,6 +368,70 @@ known P90/P99 AI COGS
 
 ---
 
+# D-R13 — Broad Reading과 Premium Question Reading을 분리
+
+**Status: WORKING_DECISION**
+
+기본 상품과 프리미엄 상품의 역할을 분리한다.
+
+```text
+Broad Reading
+→ 한 영역을 넓게 읽는 기본 상품
+→ General / Relationship / Career / Wealth / Annual 등
+
+Premium Question Reading
+→ 사용자가 지금 실제로 답을 원하는 구체 고민을 깊게 다루는 상품
+→ 재회 / 관계 진전 / 결혼·배우자 / 이직 결정·시기 / 재물·사업 시기 / 선택 비교 등
+```
+
+Premium Question Reading의 사용자 가치 기준:
+
+1. 사용자의 구체 질문에 먼저 직접 답한다.
+2. 단순히 기본 Reading을 더 길게 재서술하지 않는다.
+3. 필요한 경우 기존 natal/domain 구조에 더해 시간·궁합·질문별 종합 범위를 사용한다.
+4. 결론 뒤에 시기 / 조건 / 위험요소 / 근거 / 불확실성을 구조화해 제공할 수 있어야 한다.
+5. 동일 공식 결과를 Character가 임의로 바꾸지 않으며, Character는 허용된 결과에 자기 관점과 후속 대화를 더한다.
+
+Semantic / Product boundary:
+
+```text
+상품 욕구
+≠ semantic authority
+
+SKU 존재
+≠ capability ready
+
+research asset 존재
+≠ Production-ready claim
+```
+
+따라서 Premium Question Reading은 해당 요청에 필요한 Saju capability가 실제로:
+
+- methodology / rule authority를 가지고 있고
+- runtime에서 도달 가능하며
+- 필요한 input contract가 닫혀 있고
+- evidence-grounded narrative를 만들 수 있고
+- 해당 product/profile에서 authorized 되어 있을 때만
+
+판매 surface로 올린다.
+
+예를 들어 구체적인 시기 질문은 필요한 T9/Daewoon 범위가, 특정 두 사람 관계 질문은 필요한 T10 Compatibility 범위가, 재회·선택형 질문은 필요한 T11 Question-specific synthesis와 관련 domain scope가 실제로 준비된 범위 안에서만 제공한다.
+
+근거가 부족한 영역을 다음 방식으로 메우지 않는다.
+
+```text
+LLM 추측으로 missing semantic claim 생성
+정확 사건/날짜를 근거 없이 확정
+상대방의 실제 현재 속마음을 사주로 단정
+마케팅 문구를 위해 capability보다 강한 약속 생성
+```
+
+필요 capability가 닫히지 않았다면 상품 범위를 축소하거나 출시를 보류한다.
+
+정확한 Premium SKU 이름 / 가격 / bundle 구성 / 출시 순서는 별도 Product + Saju readiness 결정으로 남긴다.
+
+---
+
 # Open Decisions
 
 아직 결정하지 않음:
@@ -382,6 +447,7 @@ O-R07 premium compute unit (credit / allowance / session)
 O-R08 first paid Saju SKU
 O-R09 B2B timing
 O-R10 self-host crossover
+O-R11 Premium Question Reading exact SKU / pricing / capability gate matrix
 ```
 
 ---

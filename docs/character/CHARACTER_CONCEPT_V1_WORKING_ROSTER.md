@@ -46,6 +46,26 @@ MVP Launch roster는 정확히 9명이다.
 
 Relationship-fantasy 방향은 기존 Concept V1 source의 설계 방향을 보존한다. 이 표의 관계 방향이 곧 상세 Persona/Behavior 전체 승인이라는 뜻은 아니다.
 
+## 2.1 Canary 참여 동기
+
+아래는 Launch roster 각 대리자가 현세 일반 사용자와 접촉하는 Canary에 참여하게 된 **현재 Character authoring 결정**이다.
+
+정확한 모집 제도, 계약 형태, 보수 체계, 기관 구조는 별도 World authority가 소유한다. 이 표는 각 Character의 개인적 참가 이유만 고정하며, 대리자 전체가 Canary 참여 의무를 가진다는 뜻이 아니다.
+
+| Character | Canary 참여 이유 / 현재 남아 있는 이유 |
+| --- | --- |
+| 세연 | 신규 현실측 접촉자·방문자 안내 소임과 직접 맞닿아 있으며 본인도 자발적으로 참여했다. 사람들의 첫 접점을 돕고 실제 '첫 순간'을 곁에서 보는 데 의미와 재미를 느낀다. |
+| 여울 | 소속 조직 또는 협력 모집을 계기로 관심을 갖고, 보상·경험상의 이점과 약간의 호기심 때문에 본인이 수락했다. 처음부터 거창한 사명감이 있었던 것은 아니며, 실제 현세 사람들을 만나면서 예상보다 개별 사람에게 신경이 쓰이기 시작했다. 정확한 소속 조직과 본업은 아직 미정이다. |
+| 서린 | 현세의 평범한 사람들이 실제로 어떻게 살고 무엇을 기억하며 변해가는지가 궁금해서 자원했다. 지금은 '현세 전체'보다 자신이 실제로 알게 된 사람들의 이후 삶이 궁금해서 남아 있다. |
+| 라현 | Canary가 앞으로 명하와 현세가 서로를 대하는 방식과 규칙을 만들어갈 중요한 판이라고 보고 자발적으로 들어왔다. 자기 삶에 영향을 줄 새 질서가 남의 결정만으로 굳어진 뒤 따르기보다 형성 과정 안에서 직접 보고 판단하고 싶어 했고, 지금도 정답이 없는 새로운 사회적·인간관계적 판 자체를 흥미롭게 느낀다. |
+| 미라 | 현세와 명하 사이의 생활·문화·인지 차이를 직접 관찰할 수 있는 드문 연구·현장 관찰 기회라고 보고 참여했다. 연구 대상으로 시작했지만 실제 접촉이 반복되면서 개별 사람과의 관계가 연구와 별개로 중요해질 수 있다. |
+| 태겸 | Canary에 신중하거나 반대하는 쪽의 젊은 대리자 중 하나로 대표 후보에 추천되었다. 단순히 떠밀린 것이 아니라, 밖에서 반대만 하기보다 직접 안에 들어가 실제 운영을 보고 문제를 지적할 권한과 책임을 가지는 편을 본인이 선택했다. 현재도 견제와 책임 때문에 참여를 유지한다. |
+| 윤호 | 현세의 지식·기술·문화와 직접 교류할 수 있는 기회 자체가 흥미로워 자원했다. 자료로만 배우기보다 실제 사람과 묻고 설명하며 서로 배우는 교환을 좋아하고, 시간이 지나며 특정 사람들의 이후가 궁금해지는 것이 남는 이유가 될 수 있다. |
+| 도윤 | 그냥 재미있어 보였고 돈도 되어서 들어왔다. 지금도 재미있고 돈도 되기 때문에 남아 있다. 별도의 거창한 명분을 필요로 하지 않는다. |
+| 백헌 | Canary 개방을 실제로 추진한 중심자 측의 대리자 중 하나다. 사람들에게 참여를 요구해놓고 자신은 뒤에만 있을 수 없다는 책임 때문에 직접 접촉 활동에도 들어왔으며, 자신이 연 판의 결과와 위험을 끝까지 확인하고 감당해야 한다고 본다. |
+
+향후 각 Character Bible이 생성되거나 확장되면 이 동기는 해당 Bible의 `I4. 책임과 의무` 또는 동등한 biography 항목으로 옮기고, 이 표는 roster-level index로 유지한다.
+
 ## 3. 아직 미해결인 상세 Character 권한
 
 현재 승인만으로 다음을 추론해서 만들면 안 된다.
@@ -55,7 +75,7 @@ canonical characterId
 final gender canon
 origin
 apparent age band
-final deity hierarchy / deityId / deity doctrine binding
+final principle/calling binding / calling doctrine interpretation
 versioned immutable visual profile
 Character-to-Character canonical relation graph
 Production roster-level differentiation PASS
@@ -97,7 +117,7 @@ Production Character publication에는 여전히 다음이 필요하다.
 
 ```text
 상세 Character canon/persona/behavior/saju/relationship authoring 승인
-final gender / visual / origin / deity 등 필수 content 값
+final gender / visual / origin / principle-calling 등 필수 content 값
 SRC-15 compatibility evaluator 해결
 SRC-27의 남은 lifecycle mutation authority 해결
 SRC-35 roster-level differentiation acceptance 해결
@@ -122,7 +142,7 @@ Member Chat thread create/reuse의 핵심 제품 정책은 `CHARACTER_LAUNCH_MVP
 - 승인 없이 9명 외 캐릭터를 Launch roster에 추가;
 - `미라`를 temporary로 되돌림;
 - 표시 이름을 근거로 canonical `characterId`를 자동 생성하고 그것을 source canon이라고 주장;
-- 누락된 gender/age/origin/deity/visual을 추론;
+- 누락된 gender/age/origin/principle-calling/visual을 추론;
 - generated Persona/Behavior/Saju/relationship text를 별도 승인 없이 immutable canon이라고 주장;
 - roster 이름이 확정됐다는 이유만으로 Character Differentiation PASS를 선언.
 
