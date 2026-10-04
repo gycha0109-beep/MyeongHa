@@ -108,6 +108,11 @@ export async function runSeyeonInternalDogfoodScenarioCliV1(
   const command = parseSeyeonInternalDogfoodScenarioCommandV1(argv);
   const scenario =
     getSeyeonInternalDogfoodScenarioV1(command.scenarioId);
+  if (!command.verifyFinalReplay) {
+    throw new Error(
+      'Evidence-mode scenario execution requires --verify-final-replay.',
+    );
+  }
   const runtime =
     createConfiguredSeyeonInternalDogfoodEvidenceRuntimeV1(
       process.env,
