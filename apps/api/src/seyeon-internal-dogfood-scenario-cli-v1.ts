@@ -1,14 +1,12 @@
 import { pathToFileURL } from 'node:url';
 
 import {
-  createConfiguredSeyeonInternalLiveDogfoodRuntimeV1,
-} from './seyeon-internal-live-dogfood-v1.js';
+  createConfiguredSeyeonInternalDogfoodEvidenceRuntimeV1,
+  runSeyeonInternalDogfoodEvidenceV1,
+} from './seyeon-internal-dogfood-evidence-v1.js';
 import {
   getSeyeonInternalDogfoodScenarioV1,
 } from './seyeon-internal-dogfood-scenarios-v1.js';
-import {
-  runSeyeonInternalDogfoodScenarioV1,
-} from './seyeon-internal-dogfood-scenario-runner-v1.js';
 import type {
   VerifiedSubjectIdentityEvidenceV1,
 } from './subject-identity-resolver.js';
@@ -111,18 +109,20 @@ export async function runSeyeonInternalDogfoodScenarioCliV1(
   const scenario =
     getSeyeonInternalDogfoodScenarioV1(command.scenarioId);
   const runtime =
-    createConfiguredSeyeonInternalLiveDogfoodRuntimeV1(process.env);
+    createConfiguredSeyeonInternalDogfoodEvidenceRuntimeV1(
+      process.env,
+    );
 
   try {
-    const result = await runSeyeonInternalDogfoodScenarioV1({
+    const result = await runSeyeonInternalDogfoodEvidenceV1({
       harness: runtime.harness,
       observer: runtime.observer,
       relationshipInspector: runtime.relationshipInspector,
+      evidenceInspector: runtime.evidenceInspector,
       scenario,
       verifiedEvidence: command.verifiedEvidence,
       threadId: command.threadId,
       runId: command.runId,
-      verifyFinalReplay: command.verifyFinalReplay,
     });
     process.stdout.write(JSON.stringify(result, null, 2) + '\n');
   } finally {
