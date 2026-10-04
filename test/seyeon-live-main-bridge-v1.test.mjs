@@ -16,9 +16,17 @@ describe('Se-yeon live main bridge V1', () => {
     );
     expect(workflow).toContain('environment: production');
     expect(workflow).toContain(
-      'DOGFOOD_SOURCE_SHA: 8ec713a3d810aac159e8bb97c6cc82f6111c08f4',
+      'DOGFOOD_SOURCE_SHA: 92173206c4a500556915dfb75d3a2492619234a6',
     );
-    expect(workflow).toContain('decrypt=true');
+    expect(workflow).not.toContain('decrypt=true');
+    expect(workflow).not.toContain('VERCEL_TOKEN');
+    expect(workflow).toContain('SUPABASE_DB_PASSWORD');
+    expect(workflow).toContain('SUPABASE_PRODUCTION_SESSION_POOLER_HOST');
+    expect(workflow).toContain('create role');
+    expect(workflow).toContain('myeongha_dogfood_');
+    expect(workflow).toContain('grant $API_EXECUTION_ROLE');
+    expect(workflow).toContain('drop role');
+    expect(workflow).toContain('if: always()');
     expect(workflow).toContain(
       'node dist/apps/api/src/seyeon-live-provider-readiness-cli-v1.js',
     );
@@ -30,10 +38,18 @@ describe('Se-yeon live main bridge V1', () => {
     const readiness = workflow.indexOf(
       'node dist/apps/api/src/seyeon-live-provider-readiness-cli-v1.js',
     );
+    const createRole = workflow.indexOf(
+      'Create ephemeral least-privilege dogfood DB login',
+    );
     const campaign = workflow.indexOf(
       'node scripts/run-seyeon-first-meeting-live-dogfood.mjs',
     );
+    const cleanup = workflow.indexOf(
+      'Drop ephemeral dogfood DB login',
+    );
     expect(readiness).toBeGreaterThan(-1);
-    expect(campaign).toBeGreaterThan(readiness);
+    expect(createRole).toBeGreaterThan(readiness);
+    expect(campaign).toBeGreaterThan(createRole);
+    expect(cleanup).toBeGreaterThan(campaign);
   });
 });
