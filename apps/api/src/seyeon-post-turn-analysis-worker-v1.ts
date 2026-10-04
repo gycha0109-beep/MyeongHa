@@ -562,7 +562,7 @@ async function finishFromCheckpoint(input: {
       decision: 'shadow' as const,
       outboxEventId: input.claimed.outboxEventId,
       reclaimed: input.claimed.reclaimed,
-      productionEventId: productionEvent.eventId,
+      productionEventId: checkpointValue.productionEvent.eventId,
       processedAt: done.processedAt,
     });
   }
@@ -606,7 +606,7 @@ async function finishFromCheckpoint(input: {
     decision: 'enqueued' as const,
     outboxEventId: input.claimed.outboxEventId,
     reclaimed: input.claimed.reclaimed,
-    productionEventId: checkpointValue.productionEvent.eventId,
+    productionEventId: productionEvent.eventId,
     relationshipSyncOutboxEventId: syncRow.outboxEventId,
     relationshipSyncReplayed: syncRow.replayed,
     processedAt: done.processedAt,
