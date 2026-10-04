@@ -30,7 +30,7 @@ class Connection implements PostgresSubjectConnectionV1 {
             subjectId: this.subjectId,
             subjectKind: 'member',
           },
-        ] as readonly Row[],
+        ] as unknown as readonly Row[],
       };
     }
     return { rows: [] };
