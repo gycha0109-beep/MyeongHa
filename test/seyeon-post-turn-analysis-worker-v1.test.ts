@@ -63,7 +63,7 @@ const interpretation: SeyeonTurnInterpretationV2 = Object.freeze({
 const envelope: SeyeonDialogueEnvelopeV2 = Object.freeze({
   schemaVersion: 'seyeon-dialogue-envelope-v2',
   utterance: '그럼 이번에는 조금 도움받아 볼게요.',
-  expressionState: 'caring'
+  expressionState: 'caring',
   revealLevel: 'familiar',
   memoryRefsMentioned: Object.freeze([]),
   privateSourceRefsMentioned: Object.freeze([]),
