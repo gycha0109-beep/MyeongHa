@@ -129,6 +129,7 @@ select
   count(*) filter (
     where p.proname in (
       'cmd_claim_seyeon_post_turn_analysis_v1',
+      'cmd_checkpoint_seyeon_post_turn_analysis_v1',
       'cmd_complete_seyeon_post_turn_analysis_v1'
     )
       and p.prosecdef
@@ -143,10 +144,11 @@ where n.nspname='public'
   and p.proname in (
     'cmd_commit_seyeon_chat_turn_runtime_v2',
     'cmd_claim_seyeon_post_turn_analysis_v1',
+    'cmd_checkpoint_seyeon_post_turn_analysis_v1',
     'cmd_complete_seyeon_post_turn_analysis_v1'
   );
 ")
-[[ "$function_shape" == "1|2" ]] ||
+[[ "$function_shape" == "1|3" ]] ||
   fail "post-turn wrapper ownership/ACL mismatch: $function_shape"
 pass "post-turn commit/worker wrappers are narrow SECURITY DEFINER surfaces"
 
@@ -301,6 +303,7 @@ select
   assistant_text,
   committed_at is not null,
   snapshot_hash,
+  checkpoint_jsonb is null,
   status,
   lock_owner,
   reclaimed
@@ -313,9 +316,62 @@ from public.cmd_claim_seyeon_post_turn_analysis_v1(
 commit;
 SQL
 )
-[[ "$claim_result" == *"$post_turn_outbox_id|$turn_id|$attempt_id|$user_message_id|이번에는 제가 좀 도와드릴게요.|$assistant_message_id|그럼 이번에는 조금 도움받아 볼게요.|t|$snapshot_hash|processing|worker-e147|f"* ]] ||
+[[ "$claim_result" == *"$post_turn_outbox_id|$turn_id|$attempt_id|$user_message_id|이번에는 제가 좀 도와드릴게요.|$assistant_message_id|그럼 이번에는 조금 도움받아 볼게요.|t|$snapshot_hash|t|processing|worker-e147|f"* ]] ||
   fail "post-turn claim material mismatch: $claim_result"
 pass "dedicated worker claim restores the exact committed Chat material"
+
+checkpoint_result=$("${psql_base[@]}" -At -F '|' <<SQL
+begin;
+set local role myeongha_api_executor;
+select pg_catalog.set_config('myeongha.subject_id','$subject_id',true);
+select outbox_event_id,status,replayed
+from public.cmd_checkpoint_seyeon_post_turn_analysis_v1(
+  '$subject_id',
+  '$post_turn_outbox_id',
+  'worker-e147',
+  jsonb_build_object(
+    'schemaVersion','seyeon-post-turn-analysis-checkpoint-v1',
+    'decision','none'
+  )
+);
+commit;
+SQL
+)
+[[ "$checkpoint_result" == *"$post_turn_outbox_id|processing|f"* ]] ||
+  fail "post-turn checkpoint mismatch: $checkpoint_result"
+pass "worker persists one immutable post-turn authority checkpoint"
+
+checkpoint_replay=$("${psql_base[@]}" -At -F '|' <<SQL
+begin;
+set local role myeongha_api_executor;
+select pg_catalog.set_config('myeongha.subject_id','$subject_id',true);
+select outbox_event_id,status,replayed
+from public.cmd_checkpoint_seyeon_post_turn_analysis_v1(
+  '$subject_id',
+  '$post_turn_outbox_id',
+  'worker-e147',
+  jsonb_build_object(
+    'schemaVersion','seyeon-post-turn-analysis-checkpoint-v1',
+    'decision','none'
+  )
+);
+commit;
+SQL
+)
+[[ "$checkpoint_replay" == *"$post_turn_outbox_id|processing|t"* ]] ||
+  fail "post-turn checkpoint replay mismatch: $checkpoint_replay"
+pass "response-loss checkpoint replay is idempotent"
+
+expect_fail   "post-turn checkpoint immutable conflict"   "checkpoint is immutable once written"   "begin; set local role myeongha_api_executor; select pg_catalog.set_config('myeongha.subject_id','$subject_id',true); select * from public.cmd_checkpoint_seyeon_post_turn_analysis_v1('$subject_id','$post_turn_outbox_id','worker-e147',jsonb_build_object('schemaVersion','seyeon-post-turn-analysis-checkpoint-v1','decision','rejected')); rollback;"
+
+checkpoint_shape=$("${psql_base[@]}" -At -c "
+select payload_jsonb#>>'{analysisCheckpoint,decision}'
+from public.outbox_events
+where id='$post_turn_outbox_id';
+")
+[[ "$checkpoint_shape" == "none" ]] ||
+  fail "post-turn checkpoint was not persisted immutably: $checkpoint_shape"
+pass "checkpoint survives independently from generic Chat outbox state"
 
 generic_status=$("${psql_base[@]}" -At -c "
 select status
@@ -444,6 +500,8 @@ where id in ('$rollback_chat_outbox_id','$rollback_post_turn_outbox_id');
 [[ "$rollback_outbox_count" == "0" ]] ||
   fail "failed post-turn handoff leaked an outbox row"
 pass "post-turn handoff failure rolls back assistant commit and both outbox writes atomically"
+
+expect_fail   "authenticated direct post-turn checkpoint"   "permission denied"   "begin; set local role authenticated; select * from public.cmd_checkpoint_seyeon_post_turn_analysis_v1('$subject_id','$post_turn_outbox_id','worker-e147',jsonb_build_object('schemaVersion','seyeon-post-turn-analysis-checkpoint-v1','decision','none')); rollback;"
 
 expect_fail   "authenticated direct post-turn claim"   "permission denied"   "begin; set local role authenticated; select * from public.cmd_claim_seyeon_post_turn_analysis_v1('$subject_id','$post_turn_outbox_id','x',clock_timestamp()+interval '1 minute'); rollback;"
 
