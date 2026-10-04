@@ -1098,12 +1098,39 @@ export {
   SEYEON_INTERNAL_LIVE_DOGFOOD_ENV_V1,
   SEYEON_INTERNAL_LIVE_DOGFOOD_VERSION_V1,
   SeyeonInternalLiveDogfoodErrorV1,
+  createConfiguredSeyeonInternalLiveDogfoodRuntimeV1,
   parseSeyeonInternalLiveDogfoodCommandV1,
   parseSeyeonInternalLiveProviderConfigV1,
   runConfiguredSeyeonInternalLiveDogfoodV1,
   runSeyeonInternalLiveDogfoodSessionV1,
+  type ConfiguredSeyeonInternalLiveDogfoodRuntimeV1,
   type RunSeyeonInternalLiveDogfoodSessionInputV1,
   type RunSeyeonInternalLiveDogfoodSessionResultV1,
   type SeyeonInternalLiveDogfoodCommandV1,
   type SeyeonInternalLiveDogfoodTurnSummaryV1,
 } from './seyeon-internal-live-dogfood-v1.js';
+
+
+export {
+  SEYEON_INTERNAL_DOGFOOD_SCENARIO_CATALOG_VERSION_V1,
+  SEYEON_INTERNAL_DOGFOOD_SCENARIOS_V1,
+  getSeyeonInternalDogfoodScenarioV1,
+  type SeyeonInternalDogfoodScenarioIdV1,
+  type SeyeonInternalDogfoodScenarioTurnV1,
+  type SeyeonInternalDogfoodScenarioV1,
+} from './seyeon-internal-dogfood-scenarios-v1.js';
+
+export {
+  SEYEON_INTERNAL_DOGFOOD_SCENARIO_RUNNER_VERSION_V1,
+  SeyeonInternalDogfoodScenarioRunnerErrorV1,
+  runSeyeonInternalDogfoodScenarioV1,
+  type RunSeyeonInternalDogfoodScenarioInputV1,
+  type RunSeyeonInternalDogfoodScenarioResultV1,
+  type SeyeonInternalDogfoodScenarioTurnResultV1,
+} from './seyeon-internal-dogfood-scenario-runner-v1.js';
+
+export {
+  parseSeyeonInternalDogfoodScenarioCommandV1,
+  runSeyeonInternalDogfoodScenarioCliV1,
+  type SeyeonInternalDogfoodScenarioCommandV1,
+} from './seyeon-internal-dogfood-scenario-cli-v1.js';
