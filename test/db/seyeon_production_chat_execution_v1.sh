@@ -309,7 +309,16 @@ receive_replay=$("${psql_base[@]}" -At -F '|' <<SQL
 begin;
 set local role myeongha_api_executor;
 select pg_catalog.set_config('myeongha.subject_id','$subject_id',true);
-select turn_id,user_message_id,replayed
+select
+  turn_id,
+  user_message_id,
+  turn_state,
+  committed_attempt_id,
+  committed_assistant_message_id,
+  committed_assistant_text,
+  committed_assistant_sequence_no,
+  committed_at is not null,
+  replayed
 from public.cmd_receive_seyeon_chat_turn_runtime_v1(
   '$subject_id','$thread_id',
   'seyeon-chat-execution-turn-1',
@@ -331,7 +340,7 @@ from public.cmd_receive_seyeon_chat_turn_runtime_v1(
 commit;
 SQL
 )
-[[ "$receive_replay" == *"$turn_id|$user_message_id|t"* ]] ||
+[[ "$receive_replay" == *"$turn_id|$user_message_id|committed|$attempt_id|$assistant_message_id|저는 오늘 여기저기 좀 돌아다녔어요.|2|t|t"* ]] ||
   fail "Se-yeon receive replay mismatch: $receive_replay"
 
 message_counts_after_replay=$("${psql_base[@]}" -At -F '|' -c "
