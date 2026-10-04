@@ -223,6 +223,51 @@ describe('Se-yeon Production relationship admission bridge V1', () => {
     expect(keptAdmission.event.payload.commitmentKey).toBe(
       madeAdmission.event.payload.commitmentKey,
     );
+
+    const keptFromProductionHistory = experimentalEvent({
+      id: 'experimental-promise-kept-direct-production',
+      dedupe: 'promise:kept:meet-saturday:direct-production',
+      kind: 'PROMISE_KEPT',
+      turnId: TURN_2,
+      messageRefs: [USER_2],
+      occurredAt: keptAt,
+      predecessors: [madeAdmission.event.eventId],
+    });
+    const directAdmission =
+      admitSeyeonProductionRelationshipEventV1({
+        subjectId: SUBJECT_ID,
+        productionEventId:
+          '44444444-4444-4444-8444-444444444453',
+        productionAuthorityRef:
+          'seyeon-prod-authority:promise-kept-direct',
+        committedTurnId: TURN_2,
+        committedAssistantMessageRef: ASSISTANT_2,
+        authoritativeOccurredAt: keptAt,
+        experimentalEvent: keptFromProductionHistory,
+        authorityDecision: authority({
+          kind: 'PROMISE_KEPT',
+          turnId: TURN_2,
+          messageRefs: [USER_2],
+          authorityRefs: ['world:event:promise-kept'],
+          factRefs: [USER_2, 'world:event:promise-kept'],
+          predecessors: [madeAdmission.event.eventId],
+        }),
+        causalBindings: [
+          {
+            causalEventRef: madeAdmission.event.eventId,
+            bindingAuthority:
+              'authorized_production_history',
+            productionEvent: madeAdmission.event,
+          },
+        ],
+      });
+
+    expect(
+      directAdmission.event.causalPredecessorEventIds,
+    ).toEqual([madeAdmission.event.eventId]);
+    expect(directAdmission.event.payload.commitmentKey).toBe(
+      madeAdmission.event.payload.commitmentKey,
+    );
   });
 
   it('fails closed when a character-output Event is not bound to the committed guarded assistant message', () => {
