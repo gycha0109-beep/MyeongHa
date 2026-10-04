@@ -562,10 +562,17 @@ async function finishFromCheckpoint(input: {
       decision: 'shadow' as const,
       outboxEventId: input.claimed.outboxEventId,
       reclaimed: input.claimed.reclaimed,
-      productionEventId: checkpointValue.productionEvent.eventId,
+      productionEventId: productionEvent.eventId,
       processedAt: done.processedAt,
     });
   }
+
+  if (checkpointValue.decision !== 'relationship_event') {
+    throw new SeyeonPostTurnAnalysisErrorV1(
+      'Post-turn analysis checkpoint decision is inconsistent with write recovery.',
+    );
+  }
+  const productionEvent = checkpointValue.productionEvent;
 
   if (input.relationshipSyncOutboxPort === undefined) {
     throw new SeyeonPostTurnAnalysisErrorV1(
@@ -582,7 +589,7 @@ async function finishFromCheckpoint(input: {
           input.claimed.snapshotHash,
         ).identity.relationshipSyncOutboxEventId,
       turnId: input.claimed.turnId,
-      productionEvent: checkpointValue.productionEvent,
+      productionEvent,
     }),
     'Se-yeon relationship sync enqueue',
   );
