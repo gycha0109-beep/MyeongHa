@@ -44,7 +44,7 @@ describe('Production Member Auth rate-limit canary protected-main trigger', () =
     const trigger = readFileSync(TRIGGER, 'utf8').trim();
 
     expect(trigger).toBe(
-      'fire-2026-10-04-a09-rate-limited-observability-v3',
+      'fire-2026-10-04-a09-rate-limited-observability-v4',
     );
   });
 
