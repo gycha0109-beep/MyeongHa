@@ -25,6 +25,9 @@ import {
   runSeyeonPostTurnRelationshipV2,
   type SeyeonEventLedgerPortV2,
 } from './seyeon-post-turn-relationship-v2.js';
+import type {
+  SeyeonProductionRelationshipSyncOutboxPortV1,
+} from './seyeon-production-relationship-outbox-v1.js';
 
 export const SEYEON_PRODUCTION_CHAT_EXECUTION_VERSION_V1 =
   'seyeon-production-chat-execution-v1' as const;
@@ -45,6 +48,7 @@ export interface SeyeonProductionChatExecutionIdPortV1 {
   nextAttemptId(): string;
   nextAssistantMessageId(): string;
   nextCommitOutboxEventId(): string;
+  nextRelationshipSyncOutboxEventId(): string;
   nextAiExecutionLogId(stage: 'renderer' | 'output_guard'): string;
   nextExperimentalEventId(): string;
   nextExperimentalEventDedupeKey(input: {
@@ -180,6 +184,7 @@ type BaseProductionSliceInputV1 = Omit<
   RunSeyeonProductionContextVerticalSliceInputV1<RunSeyeonCharacterTurnV2Result>,
   | 'threadId'
   | 'currentUserMessageRef'
+  | 'durableSync'
   | 'runCommittedTurn'
 >;
 
@@ -197,6 +202,8 @@ extends BaseProductionSliceInputV1 {
     RunSeyeonCharacterTurnV2Input['semanticReviewerProvider'];
   readonly persistencePort: SeyeonProductionChatPersistencePortV1;
   readonly executionIdPort: SeyeonProductionChatExecutionIdPortV1;
+  readonly relationshipSyncOutboxPort?:
+    SeyeonProductionRelationshipSyncOutboxPortV1;
   readonly postTurn: SeyeonProductionChatPostTurnInputV1;
 }
 
@@ -384,6 +391,18 @@ export async function runSeyeonProductionChatExecutionV1(
   const subjectId = boundedText(input.resolvedSubjectId, 'resolvedSubjectId', 256);
   const threadId = boundedText(input.threadId, 'threadId', 256);
   const receive = assertReceivePlan({ threadId, plan: input.receivePlan });
+  const durableRelationshipRequired =
+    input.mode === 'WRITE_DARK' ||
+    input.mode === 'BEHAVIOR_SHADOW' ||
+    input.mode === 'LIVE';
+  if (
+    durableRelationshipRequired &&
+    input.relationshipSyncOutboxPort === undefined
+  ) {
+    throw new SeyeonProductionChatExecutionErrorV1(
+      'Write-capable Se-yeon Production execution requires durable relationship sync outbox authority.',
+    );
+  }
 
   const turnId = input.executionIdPort.nextTurnId();
   const userMessageId = input.executionIdPort.nextUserMessageId();
@@ -448,6 +467,18 @@ export async function runSeyeonProductionChatExecutionV1(
       idPort: input.idPort,
       contextPort: input.contextPort,
       commitPort: input.commitPort,
+      ...(
+        durableRelationshipRequired &&
+        input.relationshipSyncOutboxPort !== undefined
+          ? {
+              durableSync: Object.freeze({
+                outboxEventId:
+                  input.executionIdPort.nextRelationshipSyncOutboxEventId(),
+                outboxPort: input.relationshipSyncOutboxPort,
+              }),
+            }
+          : {}
+      ),
       ...(input.serverOwnedPersonalRecordProjectors === undefined
         ? {}
         : {
