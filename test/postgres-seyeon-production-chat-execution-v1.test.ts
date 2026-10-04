@@ -28,6 +28,12 @@ describe('Se-yeon Production Chat PostgreSQL adapter', () => {
       threadCharacterId: '66666666-6666-4666-8666-666666666666',
       contentReleaseId: '77777777-7777-4777-8777-777777777777',
       contentBundleId: '88888888-8888-4888-8888-888888888888',
+      turnState: 'received',
+      committedAttemptId: null,
+      committedAssistantMessageId: null,
+      committedAssistantText: null,
+      committedAssistantSequenceNo: null,
+      committedAt: null,
       replayed: false,
     }]);
     const port = createPostgresSeyeonProductionChatPersistencePortV1(queryClient);
@@ -56,6 +62,51 @@ describe('Se-yeon Production Chat PostgreSQL adapter', () => {
       expect.stringContaining('cmd_receive_seyeon_chat_turn_runtime_v1'),
       expect.arrayContaining([SUBJECT_ID, THREAD_ID, 'client-1']),
     );
+  });
+
+  it('maps authoritative committed replay material from receive', async () => {
+    const queryClient = client([{
+      turnId: TURN_ID,
+      userMessageId: USER_MESSAGE_ID,
+      userText: '같은 요청',
+      threadCharacterId: '66666666-6666-4666-8666-666666666666',
+      contentReleaseId: '77777777-7777-4777-8777-777777777777',
+      contentBundleId: '88888888-8888-4888-8888-888888888888',
+      turnState: 'committed',
+      committedAttemptId: ATTEMPT_ID,
+      committedAssistantMessageId: '99999999-9999-4999-8999-999999999999',
+      committedAssistantText: '이미 저장된 답변',
+      committedAssistantSequenceNo: '8',
+      committedAt: '2026-10-04T00:00:00.000Z',
+      replayed: true,
+    }]);
+    const port = createPostgresSeyeonProductionChatPersistencePortV1(queryClient);
+
+    await expect(port.receiveTurn({
+      subjectId: SUBJECT_ID,
+      threadId: THREAD_ID,
+      turnId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      userMessageId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      clientTurnId: 'client-replay',
+      requestHash: 'sha256:v1:replay',
+      requestContractVersion: 'chat-request-v1',
+      requestSnapshot: { text: '같은 요청' },
+      resolvedContentReleaseId: '77777777-7777-4777-8777-777777777777',
+      resolvedContentBundleId: '88888888-8888-4888-8888-888888888888',
+      userText: '같은 요청',
+      userContentHash: 'sha256:v1:user-replay',
+    })).resolves.toEqual(expect.objectContaining({
+      turnId: TURN_ID,
+      turnState: 'committed',
+      replayed: true,
+      committedTurn: {
+        attemptId: ATTEMPT_ID,
+        assistantMessageId: '99999999-9999-4999-8999-999999999999',
+        assistantText: '이미 저장된 답변',
+        sequenceNo: 8,
+        committedAt: '2026-10-04T00:00:00.000Z',
+      },
+    }));
   });
 
   it('maps attempt allocation and commit provenance', async () => {
