@@ -59,7 +59,12 @@ export async function runSeyeonProductionContextVerticalSliceV1<TTurnResult>(
   const result = await runSeyeonProductionVerticalSliceV1({
     mode: input.mode,
     resolvedSubjectId: input.resolvedSubjectId,
-    bandProjection: input.bandProjection,
+    ...(input.bandProjection === undefined
+      ? {}
+      : { bandProjection: input.bandProjection }),
+    ...(input.bandProjector === undefined
+      ? {}
+      : { bandProjector: input.bandProjector }),
     relationshipReadPort: input.relationshipReadPort,
     productionHistoryRecords: input.productionHistoryRecords,
     productionAuthorityRef: input.productionAuthorityRef,
