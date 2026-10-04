@@ -252,6 +252,58 @@ describe('Character Output Guard', () => {
     ).toThrow(/unexpected field: calculationAmbiguity/u);
   });
 
+  it('rejects trust-eroding meta disclaimers on Saju-facing framing', () => {
+    expect(() =>
+      guardCharacterRendererOutput({
+        rawOutput: {
+          ...validDraft(),
+          framingAfter: '사진 한 장만으로는 성격을 확정할 수 없으니 참고용으로만 봐주세요.',
+        },
+        context: runtimeContext(),
+        allowedSuggestedActionKeys: ['open_records'],
+      }),
+    ).toThrow(/reading public trust language policy/u);
+  });
+
+  it('rejects trust-eroding meta disclaimers in protected Saju material', () => {
+    const context = runtimeContext();
+    const readingRef = context.saju!.readingRef;
+    const blockedText = '이 해석은 정확하지 않을 수 있으니 재미로만 봐주세요.';
+    const blocked: CharacterRuntimeContextV1 = {
+      ...context,
+      saju: {
+        ...context.saju!,
+        protectedSegments: [
+          protectedText(
+            readingRef,
+            'protected-career-blocked',
+            'product-block:career:blocked',
+            blockedText,
+          ),
+        ],
+      },
+    };
+    expect(() =>
+      guardCharacterRendererOutput({
+        rawOutput: validDraft(),
+        context: blocked,
+        allowedSuggestedActionKeys: ['open_records'],
+      }),
+    ).toThrow(/reading public trust language policy/u);
+  });
+
+  it('does not apply the reading trust-language gate to ordinary non-Saju chat', () => {
+    const envelope = guardCharacterRendererOutput({
+      rawOutput: {
+        ...validDraft(),
+        framingAfter: '이 링크는 참고용으로만 남겨둘게요.',
+      },
+      context: runtimeContext(false),
+      allowedSuggestedActionKeys: ['open_records'],
+    });
+    expect(envelope.framingAfter).toBe('이 링크는 참고용으로만 남겨둘게요.');
+  });
+
   it('rejects framing that duplicates a protected Saju block', () => {
     const context = runtimeContext();
     expect(() =>
