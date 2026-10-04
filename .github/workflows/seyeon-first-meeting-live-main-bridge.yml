@@ -15,10 +15,13 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  DOGFOOD_SOURCE_SHA: 8ec713a3d810aac159e8bb97c6cc82f6111c08f4
-  VERCEL_PROJECT_ID: prj_nXF0b5uv27Lyucz2SEBxzdCRXVsP
-  VERCEL_TEAM_ID: team_xuYA9OhCWlJETaYFOmeVodgS
-  VERCEL_PROJECT_NAME: myeongha
+  DOGFOOD_SOURCE_SHA: 92173206c4a500556915dfb75d3a2492619234a6
+  SUPABASE_PROJECT_ID: cnsfpcdiyofqvhpcegfc
+  MYEONGHA_SUPABASE_URL: https://cnsfpcdiyofqvhpcegfc.supabase.co
+  API_EXECUTION_ROLE: myeongha_api_executor
+  EPHEMERAL_ROLE_MARKER_PREFIX: myeongha:seyeon-live-dogfood-ephemeral:v1
+  MYEONGHA_SEYEON_OPENAI_MODEL: ${{ vars.MYEONGHA_SEYEON_OPENAI_MODEL || secrets.MYEONGHA_SEYEON_OPENAI_MODEL || 'gpt-5.6-terra' }}
+  MYEONGHA_SEYEON_OPENAI_TIMEOUT_MS: ${{ vars.MYEONGHA_SEYEON_OPENAI_TIMEOUT_MS }}
 
 jobs:
   live:
@@ -29,12 +32,15 @@ jobs:
       MYEONGHA_PRODUCTION_MEMBER_EMAIL: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_EMAIL }}
       MYEONGHA_PRODUCTION_MEMBER_PASSWORD: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_PASSWORD }}
       MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PRODUCTION_SESSION_POOLER_HOST: ${{ secrets.SUPABASE_PRODUCTION_SESSION_POOLER_HOST }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
     steps:
       - name: Check out bridge invocation commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Verify governed main invocation
+      - name: Verify governed main invocation and non-mutating prerequisites
         shell: bash
         run: |
           set -euo pipefail
@@ -42,123 +48,18 @@ jobs:
           [[ "${{ github.event_name }}" == 'push' ]]
           [[ "${{ github.ref }}" == 'refs/heads/main' ]]
           trigger_value="$(tr -d '\r\n' < .github/seyeon-first-meeting-live-main.trigger)"
-          [[ "$trigger_value" == 'fire-2026-10-04-v1' ]]
+          [[ "$trigger_value" == 'fire-2026-10-04-v2' ]]
 
           test -n "${MYEONGHA_PRODUCTION_MEMBER_EMAIL:-}"
           test -n "${MYEONGHA_PRODUCTION_MEMBER_PASSWORD:-}"
           test -n "${MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID:-}"
 
-      - name: Load governed Vercel Production runtime bindings
-        shell: bash
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          GH_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          GH_SEYEON_MODEL_SECRET: ${{ secrets.MYEONGHA_SEYEON_OPENAI_MODEL }}
-          GH_SEYEON_MODEL_VAR: ${{ vars.MYEONGHA_SEYEON_OPENAI_MODEL }}
-          GH_SEYEON_TIMEOUT_VAR: ${{ vars.MYEONGHA_SEYEON_OPENAI_TIMEOUT_MS }}
-        run: |
-          set -euo pipefail
-          umask 077
+          test -n "${SUPABASE_DB_PASSWORD:-}"
+          test -n "${SUPABASE_PRODUCTION_SESSION_POOLER_HOST:-}"
+          [[ "$SUPABASE_PRODUCTION_SESSION_POOLER_HOST" =~ ^[a-z0-9-]+([.][a-z0-9-]+)*[.]pooler[.]supabase[.]com$ ]]
 
-          test -n "${VERCEL_TOKEN:-}"
-
-          project_file="$RUNNER_TEMP/seyeon-live-vercel-project.json"
-          env_file="$RUNNER_TEMP/seyeon-live-vercel-env.json"
-
-          cleanup() {
-            exit_code=$?
-            trap - EXIT
-            rm -f "$project_file" "$env_file"
-            exit "$exit_code"
-          }
-          trap cleanup EXIT
-
-          curl -fsS \
-            -H "Authorization: Bearer $VERCEL_TOKEN" \
-            "https://api.vercel.com/v9/projects/$VERCEL_PROJECT_ID?teamId=$VERCEL_TEAM_ID" \
-            -o "$project_file"
-
-          jq -e \
-            --arg id "$VERCEL_PROJECT_ID" \
-            --arg name "$VERCEL_PROJECT_NAME" \
-            '.id == $id and .name == $name' \
-            "$project_file" >/dev/null
-
-          curl -fsS \
-            -H "Authorization: Bearer $VERCEL_TOKEN" \
-            "https://api.vercel.com/v9/projects/$VERCEL_PROJECT_ID/env?decrypt=true&teamId=$VERCEL_TEAM_ID" \
-            -o "$env_file"
-
-          jq -e '.envs | type == "array"' "$env_file" >/dev/null
-
-          read_vercel_env() {
-            local key="$1"
-            jq -er --arg key "$key" '
-              [
-                .envs[]
-                | select(.key == $key)
-                | select((.target // []) | index("production") != null)
-                | .value
-                | select(type == "string" and length > 0)
-              ]
-              | first // empty
-            ' "$env_file"
-          }
-
-          export_secret() {
-            local key="$1"
-            local value="$2"
-            test -n "$value"
-            echo "::add-mask::$value"
-            printf '%s=%s\n' "$key" "$value" >> "$GITHUB_ENV"
-          }
-
-          for key in \
-            MYEONGHA_DATABASE_URL \
-            MYEONGHA_DATABASE_PRINCIPAL \
-            MYEONGHA_SUPABASE_URL \
-            MYEONGHA_SUPABASE_API_KEY \
-            MYEONGHA_GUEST_FINGERPRINT_SECRET
-          do
-            value="$(read_vercel_env "$key")"
-            if [[ -z "$value" ]]; then
-              echo "Required Vercel Production binding is missing: $key" >&2
-              exit 1
-            fi
-            export_secret "$key" "$value"
-          done
-
-          openai_api_key="$(read_vercel_env OPENAI_API_KEY || true)"
-          if [[ -z "$openai_api_key" ]]; then
-            openai_api_key="${GH_OPENAI_API_KEY:-}"
-          fi
-          if [[ -z "$openai_api_key" ]]; then
-            echo 'OPENAI_API_KEY is not configured in Vercel Production or GitHub production environment.' >&2
-            exit 1
-          fi
-          export_secret OPENAI_API_KEY "$openai_api_key"
-
-          seyeon_model="$(read_vercel_env MYEONGHA_SEYEON_OPENAI_MODEL || true)"
-          if [[ -z "$seyeon_model" ]]; then
-            seyeon_model="${GH_SEYEON_MODEL_VAR:-}"
-          fi
-          if [[ -z "$seyeon_model" ]]; then
-            seyeon_model="${GH_SEYEON_MODEL_SECRET:-}"
-          fi
-          if [[ -z "$seyeon_model" ]]; then
-            echo 'MYEONGHA_SEYEON_OPENAI_MODEL is not configured.' >&2
-            exit 1
-          fi
-          printf '%s=%s\n' MYEONGHA_SEYEON_OPENAI_MODEL "$seyeon_model" >> "$GITHUB_ENV"
-
-          seyeon_timeout="$(read_vercel_env MYEONGHA_SEYEON_OPENAI_TIMEOUT_MS || true)"
-          if [[ -z "$seyeon_timeout" ]]; then
-            seyeon_timeout="${GH_SEYEON_TIMEOUT_VAR:-}"
-          fi
-          if [[ -n "$seyeon_timeout" ]]; then
-            [[ "$seyeon_timeout" =~ ^[1-9][0-9]*$ ]]
-            printf '%s=%s\n' MYEONGHA_SEYEON_OPENAI_TIMEOUT_MS "$seyeon_timeout" >> "$GITHUB_ENV"
-          fi
+          test -n "${OPENAI_API_KEY:-}"
+          test -n "${MYEONGHA_SEYEON_OPENAI_MODEL:-}"
 
       - name: Check out pinned PHASE S dogfood source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -189,6 +90,100 @@ jobs:
       - name: Verify OpenAI structured-provider readiness
         run: node dist/apps/api/src/seyeon-live-provider-readiness-cli-v1.js
 
+      - name: Install PostgreSQL client
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Create ephemeral least-privilege dogfood DB login
+        id: db_runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+
+          role_name="myeongha_dogfood_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}"
+          role_marker="$EPHEMERAL_ROLE_MARKER_PREFIX:${GITHUB_RUN_ID}:${GITHUB_RUN_ATTEMPT}"
+          runtime_password="$(openssl rand -hex 32)"
+          guest_fingerprint_secret="$(openssl rand -hex 32)"
+          admin_pool_user="postgres.$SUPABASE_PROJECT_ID"
+          runtime_pool_user="$role_name.$SUPABASE_PROJECT_ID"
+          pool_host="$SUPABASE_PRODUCTION_SESSION_POOLER_HOST"
+          pool_port='5432'
+          pool_db='postgres'
+          supabase_publishable_key='internal-member-dogfood-unused-v1'
+
+          echo "::add-mask::$runtime_password"
+          echo "::add-mask::$guest_fingerprint_secret"
+          echo "::add-mask::$supabase_publishable_key"
+
+          export PGPASSWORD="$SUPABASE_DB_PASSWORD"
+          export PGSSLMODE=require
+
+          preexisting="$(psql \
+            -X -A -t -v ON_ERROR_STOP=1 \
+            -h "$pool_host" \
+            -p "$pool_port" \
+            -U "$admin_pool_user" \
+            -d "$pool_db" \
+            -v role_name="$role_name" \
+            -c "select count(*) from pg_catalog.pg_roles where rolname = :'role_name';")"
+          [[ "$preexisting" == '0' ]]
+
+          psql \
+            -X -q -v ON_ERROR_STOP=1 \
+            -h "$pool_host" \
+            -p "$pool_port" \
+            -U "$admin_pool_user" \
+            -d "$pool_db" \
+            -v role_name="$role_name" \
+            -v role_password="$runtime_password" \
+            -v role_marker="$role_marker" \
+            -c "create role :\"role_name\" login nosuperuser nocreatedb nocreaterole noinherit noreplication nobypassrls password :'role_password';" \
+            -c "comment on role :\"role_name\" is :'role_marker';" \
+            -c "grant $API_EXECUTION_ROLE to :\"role_name\";"
+
+          runtime_state="$(PGPASSWORD="$runtime_password" PGSSLMODE=require psql \
+            -X -A -t -v ON_ERROR_STOP=1 \
+            -h "$pool_host" \
+            -p "$pool_port" \
+            -U "$runtime_pool_user" \
+            -d "$pool_db" \
+            -v role_name="$role_name" \
+            -v execution_role="$API_EXECUTION_ROLE" \
+            -c "
+              select case when
+                current_user = :'role_name'
+                and pg_catalog.pg_has_role(current_user, :'execution_role', 'MEMBER')
+                and exists (
+                  select 1
+                  from pg_catalog.pg_roles
+                  where rolname = current_user
+                    and rolcanlogin
+                    and not rolsuper
+                    and not rolcreatedb
+                    and not rolcreaterole
+                    and not rolinherit
+                    and not rolreplication
+                    and not rolbypassrls
+                )
+              then 'READY' else 'BLOCKED' end;
+            ")"
+          [[ "$runtime_state" == 'READY' ]]
+
+          database_url="postgresql://$runtime_pool_user:$runtime_password@$pool_host:$pool_port/$pool_db?sslmode=require"
+          echo "::add-mask::$database_url"
+
+          printf '%s=%s\n' MYEONGHA_DATABASE_URL "$database_url" >> "$GITHUB_ENV"
+          printf '%s=%s\n' MYEONGHA_DATABASE_PRINCIPAL "$role_name" >> "$GITHUB_ENV"
+          printf '%s=%s\n' MYEONGHA_SUPABASE_API_KEY "$supabase_publishable_key" >> "$GITHUB_ENV"
+          printf '%s=%s\n' MYEONGHA_GUEST_FINGERPRINT_SECRET "$guest_fingerprint_secret" >> "$GITHUB_ENV"
+
+          echo "role_name=$role_name" >> "$GITHUB_OUTPUT"
+          echo "role_marker=$role_marker" >> "$GITHUB_OUTPUT"
+
       - name: Execute first-meeting live dogfood
         id: live
         env:
@@ -214,3 +209,69 @@ jobs:
           set -euo pipefail
           [[ "$CAMPAIGN_STATUS" == 'READY_CREATED' || "$CAMPAIGN_STATUS" == 'READY_REUSED_EMPTY' ]]
           [[ "$TECHNICAL_VERDICT" == 'PASS' ]]
+
+      - name: Drop ephemeral dogfood DB login
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ROLE_NAME="myeongha_dogfood_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}"
+          ROLE_MARKER="$EPHEMERAL_ROLE_MARKER_PREFIX:${GITHUB_RUN_ID}:${GITHUB_RUN_ATTEMPT}"
+          admin_pool_user="postgres.$SUPABASE_PROJECT_ID"
+          pool_host="$SUPABASE_PRODUCTION_SESSION_POOLER_HOST"
+          pool_port='5432'
+          pool_db='postgres'
+
+          [[ "$ROLE_NAME" =~ ^myeongha_dogfood_[0-9]+_[0-9]+$ ]]
+
+          export PGPASSWORD="$SUPABASE_DB_PASSWORD"
+          export PGSSLMODE=require
+
+          marker="$(psql \
+            -X -A -t -v ON_ERROR_STOP=1 \
+            -h "$pool_host" \
+            -p "$pool_port" \
+            -U "$admin_pool_user" \
+            -d "$pool_db" \
+            -v role_name="$ROLE_NAME" \
+            -c "
+              select coalesce(
+                pg_catalog.shobj_description(oid, 'pg_authid'),
+                ''
+              )
+              from pg_catalog.pg_roles
+              where rolname = :'role_name';
+            ")"
+
+          if [[ -z "$marker" ]]; then
+            echo 'Ephemeral dogfood DB login is already absent.'
+            exit 0
+          fi
+          [[ "$marker" == "$ROLE_MARKER" ]]
+
+          psql \
+            -X -q -v ON_ERROR_STOP=1 \
+            -h "$pool_host" \
+            -p "$pool_port" \
+            -U "$admin_pool_user" \
+            -d "$pool_db" \
+            -v role_name="$ROLE_NAME" \
+            -c "
+              select pg_catalog.pg_terminate_backend(pid)
+              from pg_catalog.pg_stat_activity
+              where usename = :'role_name'
+                and pid <> pg_catalog.pg_backend_pid();
+            " \
+            -c "revoke $API_EXECUTION_ROLE from :\"role_name\";" \
+            -c "drop role :\"role_name\";"
+
+          remaining="$(psql \
+            -X -A -t -v ON_ERROR_STOP=1 \
+            -h "$pool_host" \
+            -p "$pool_port" \
+            -U "$admin_pool_user" \
+            -d "$pool_db" \
+            -v role_name="$ROLE_NAME" \
+            -c "select count(*) from pg_catalog.pg_roles where rolname = :'role_name';")"
+          [[ "$remaining" == '0' ]]
