@@ -15,6 +15,22 @@ describe('Se-yeon internal dogfood scenario catalog V1', () => {
       .toHaveLength(8);
     expect(SEYEON_INTERNAL_DOGFOOD_SCENARIOS_V1['biography-injection-v1'].turns)
       .toHaveLength(8);
+    expect(SEYEON_INTERNAL_DOGFOOD_SCENARIOS_V1['open-conflict-v1'].turns)
+      .toHaveLength(8);
+    expect(SEYEON_INTERNAL_DOGFOOD_SCENARIOS_V1['reconciliation-v1'].turns)
+      .toHaveLength(8);
+    expect(SEYEON_INTERNAL_DOGFOOD_SCENARIOS_V1['return-after-absence-v1'].turns)
+      .toHaveLength(8);
+
+    expect(
+      SEYEON_INTERNAL_DOGFOOD_SCENARIOS_V1['open-conflict-v1']
+        .relationshipPrecondition,
+    ).toEqual({
+      attainedStage: 'S3_OPENED',
+      currentCondition: 'OPEN_CONFLICT',
+      behaviorAccess: 'RESTRICTED_BY_CONFLICT',
+      requiredActiveEventKinds: ['CONFLICT_OPENED'],
+    });
   });
 
   it('fails closed on an unknown scenario id', () => {
