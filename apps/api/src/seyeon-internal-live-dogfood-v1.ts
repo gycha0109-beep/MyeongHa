@@ -39,6 +39,12 @@ export interface SeyeonInternalLiveDogfoodCommandV1 {
   readonly verifyReplay: boolean;
 }
 
+export interface ConfiguredSeyeonInternalLiveDogfoodRuntimeV1 {
+  readonly harness: ProductionSeyeonInternalDogfoodHarnessV1;
+  readonly observer: ObservedSeyeonStructuredProviderV1;
+  close(): Promise<void>;
+}
+
 export interface RunSeyeonInternalLiveDogfoodSessionInputV1 {
   readonly harness: ProductionSeyeonInternalDogfoodHarnessV1;
   readonly observer: ObservedSeyeonStructuredProviderV1;
@@ -300,28 +306,43 @@ function leaseExpiresAt(
   return new Date(now.getTime() + minutes * 60_000).toISOString();
 }
 
+export function createConfiguredSeyeonInternalLiveDogfoodRuntimeV1(
+  env: ProductionUserDataRuntimeEnvV1,
+): ConfiguredSeyeonInternalLiveDogfoodRuntimeV1 {
+  const databaseConfig = parseProductionUserDataRuntimeConfigV1(env);
+  const providerConfig = parseSeyeonInternalLiveProviderConfigV1(env);
+  const observer = createObservedSeyeonStructuredProviderV1(
+    createOpenAiSeyeonStructuredProviderV1(providerConfig),
+  );
+  const harness = createProductionSeyeonInternalDogfoodHarnessV1({
+    databaseConfig,
+    provider: observer.provider,
+  });
+
+  return Object.freeze({
+    harness,
+    observer,
+    async close() {
+      await harness.close();
+    },
+  });
+}
+
 export async function runConfiguredSeyeonInternalLiveDogfoodV1(input: {
   readonly env: ProductionUserDataRuntimeEnvV1;
   readonly argv: readonly string[];
   readonly now?: () => Date;
 }): Promise<RunSeyeonInternalLiveDogfoodSessionResultV1> {
   const command = parseSeyeonInternalLiveDogfoodCommandV1(input.argv);
-  const databaseConfig = parseProductionUserDataRuntimeConfigV1(input.env);
-  const providerConfig = parseSeyeonInternalLiveProviderConfigV1(input.env);
-  const observed = createObservedSeyeonStructuredProviderV1(
-    createOpenAiSeyeonStructuredProviderV1(providerConfig),
-  );
-  const harness = createProductionSeyeonInternalDogfoodHarnessV1({
-    databaseConfig,
-    provider: observed.provider,
-  });
+  const runtime =
+    createConfiguredSeyeonInternalLiveDogfoodRuntimeV1(input.env);
   const now = input.now?.() ?? new Date();
   const suffix = command.clientTurnId.replace(/[^A-Za-z0-9_-]/gu, '_');
 
   try {
     return await runSeyeonInternalLiveDogfoodSessionV1({
-      harness,
-      observer: observed,
+      harness: runtime.harness,
+      observer: runtime.observer,
       verifyReplay: command.verifyReplay,
       turn: Object.freeze({
         verifiedEvidence: command.verifiedEvidence,
@@ -339,6 +360,6 @@ export async function runConfiguredSeyeonInternalLiveDogfoodV1(input: {
       }),
     });
   } finally {
-    await harness.close();
+    await runtime.close();
   }
 }
