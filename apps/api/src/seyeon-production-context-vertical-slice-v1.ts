@@ -66,6 +66,9 @@ export async function runSeyeonProductionContextVerticalSliceV1<TTurnResult>(
     idPort: input.idPort,
     contextPort: input.contextPort,
     commitPort: input.commitPort,
+    ...(input.durableSync === undefined
+      ? {}
+      : { durableSync: input.durableSync }),
     runCommittedTurn: async ({ turnBinding, activation }) => {
       const productionContext = await composeSeyeonProductionContextV1({
         resolvedSubjectId: input.resolvedSubjectId,

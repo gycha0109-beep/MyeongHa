@@ -17,6 +17,9 @@ import {
   type ProductionRelationshipApplyContextPortV1,
   type ProductionRelationshipApplyIdPortV1,
 } from './production-relationship-event-apply-command-v1.js';
+import type {
+  SeyeonProductionRelationshipSyncOutboxPortV1,
+} from './seyeon-production-relationship-outbox-v1.js';
 
 type Awaitable<T> = T | Promise<T>;
 
@@ -56,6 +59,10 @@ export interface SyncSeyeonProductionRelationshipEventV1Input {
   readonly idPort: SeyeonProductionRelationshipSyncIdPortV1;
   readonly contextPort: ProductionRelationshipApplyContextPortV1;
   readonly commitPort: ProductionRelationshipApplyCommitPortV1;
+  readonly durableSync?: Readonly<{
+    readonly outboxEventId: string;
+    readonly outboxPort: SeyeonProductionRelationshipSyncOutboxPortV1;
+  }>;
 }
 
 export type SyncSeyeonProductionRelationshipEventV1Result =
@@ -78,6 +85,11 @@ export type SyncSeyeonProductionRelationshipEventV1Result =
       readonly mode: 'WRITE_DARK' | 'BEHAVIOR_SHADOW' | 'LIVE';
       readonly status: 'committed';
       readonly admission: SeyeonProductionRelationshipAdmissionV1;
+      readonly durableOutboxEnqueue: null | Readonly<{
+        readonly outboxEventId: string;
+        readonly status: string;
+        readonly replayed: boolean;
+      }>;
       readonly applyResult: ApplyProductionRelationshipEventResultV1;
     }>;
 
@@ -211,6 +223,45 @@ export async function syncSeyeonProductionRelationshipEventV1(
     });
   }
 
+  const durableOutboxEnqueue =
+    input.durableSync === undefined
+      ? null
+      : (() => input.durableSync)();
+
+  let durableReceipt: null | Readonly<{
+    outboxEventId: string;
+    status: string;
+    replayed: boolean;
+  }> = null;
+
+  if (durableOutboxEnqueue !== null) {
+    const rows = await durableOutboxEnqueue.outboxPort.enqueue({
+      subjectId: input.resolvedSubjectId,
+      outboxEventId: durableOutboxEnqueue.outboxEventId,
+      turnId: input.committedTurn.turnId,
+      productionEvent: admission.event,
+    });
+    if (rows.length !== 1 || rows[0] === undefined) {
+      throw new SeyeonProductionRelationshipSyncErrorV1(
+        'Durable Se-yeon relationship sync enqueue must return exactly one row.',
+      );
+    }
+    const row = rows[0];
+    if (
+      row.outboxEventId.trim().length === 0 ||
+      row.status.trim().length === 0
+    ) {
+      throw new SeyeonProductionRelationshipSyncErrorV1(
+        'Durable Se-yeon relationship sync enqueue returned invalid authority material.',
+      );
+    }
+    durableReceipt = Object.freeze({
+      outboxEventId: row.outboxEventId,
+      status: row.status,
+      replayed: row.replayed,
+    });
+  }
+
   const applyResult = await applyProductionRelationshipEventV1({
     resolvedSubjectId: input.resolvedSubjectId,
     expectedRevision: input.expectedRevision,
@@ -225,6 +276,7 @@ export async function syncSeyeonProductionRelationshipEventV1(
     mode: input.mode,
     status: 'committed' as const,
     admission,
+    durableOutboxEnqueue: durableReceipt,
     applyResult,
   });
 }

@@ -908,6 +908,42 @@ export {
   type RunSeyeonProductionContextVerticalSliceResultV1,
 } from './seyeon-production-context-vertical-slice-v1.js';
 
+
+export {
+  SEYEON_PRODUCTION_CHAT_EXECUTION_VERSION_V1,
+  SEYEON_PRODUCTION_CHAT_OUTPUT_GUARD_VERSION_V1,
+  SEYEON_PRODUCTION_CHAT_PLANNER_VERSION_V1,
+  SEYEON_PRODUCTION_CHAT_RENDERER_VERSION_V1,
+  SEYEON_PRODUCTION_CHAT_REQUEST_CONTRACT_VERSION_V1,
+  SeyeonProductionChatExecutionErrorV1,
+  assertSeyeonProductionAttemptOwnershipV1,
+  bindSeyeonProductionCurrentUserTurnV1,
+  resolveSeyeonProductionCommittedReplayV1,
+  runSeyeonProductionChatExecutionV1,
+  type RunSeyeonProductionChatCommittedReplayResultV1,
+  type RunSeyeonProductionChatExecutedResultV1,
+  type RunSeyeonProductionChatExecutionInputV1,
+  type RunSeyeonProductionChatExecutionResultV1,
+  type SeyeonProductionChatAttemptV1,
+  type SeyeonProductionChatCommitReceiptV1,
+  type SeyeonProductionChatExecutionIdPortV1,
+  type SeyeonProductionChatPersistencePortV1,
+  type SeyeonProductionChatPostTurnInputV1,
+  type SeyeonProductionChatReceivedTurnV1,
+} from './seyeon-production-chat-execution-v1.js';
+
+
+export {
+  POSTGRES_SEYEON_CHAT_ATTEMPT_RUNTIME_BINDING_V1,
+  POSTGRES_SEYEON_CHAT_COMMIT_RUNTIME_BINDING_V1,
+  POSTGRES_SEYEON_CHAT_CONTEXT_READY_RUNTIME_BINDING_V1,
+  POSTGRES_SEYEON_CHAT_FAILURE_RUNTIME_BINDING_V1,
+  POSTGRES_SEYEON_CHAT_GENERATED_RUNTIME_BINDING_V1,
+  POSTGRES_SEYEON_CHAT_RECEIVE_RUNTIME_BINDING_V1,
+  POSTGRES_SEYEON_CHAT_VALIDATED_RUNTIME_BINDING_V1,
+  createPostgresSeyeonProductionChatPersistencePortV1,
+} from './postgres-seyeon-production-chat-execution-v1.js';
+
 export {
   SEYEON_PRODUCTION_RELATIONSHIP_SYNC_OUTBOX_VERSION_V1,
   SeyeonProductionRelationshipSyncOutboxErrorV1,
