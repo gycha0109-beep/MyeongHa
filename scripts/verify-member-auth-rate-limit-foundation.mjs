@@ -310,10 +310,15 @@ for (const fragment of [
   'const WINDOW_SECONDS = 60;',
   '{"email":"","password":""}',
   '{"refreshToken":""}',
-  "body.error.code !== 'INVALID_REQUEST'",
+  "expectedPreLimitStatus: 400",
+  "expectedPreLimitCode: 'INVALID_REQUEST'",
+  "expectedPreLimitStatus: 401",
+  "expectedPreLimitCode: 'SESSION_EXPIRED'",
+  'body.error.code !== endpoint.expectedPreLimitCode',
   "body.error.code !== 'RATE_LIMITED'",
   'sign_out_rate_limit_excluded=pass',
   'endpoint_bucket_independence=pass',
+  'probe_payloads=local_non_mutating_only',
   'raw_network_identifiers_emitted=false',
   'credential_material_emitted=false',
 ]) requireFragment(paths.canaryScript, canaryScript, fragment);
@@ -322,6 +327,13 @@ for (const fragment of [
   'name: Production Member Auth Rate Limit Canary',
   'run-name: "[WT:ops] Production Member Auth Rate Limit Canary"',
   'workflow_dispatch:',
+  'push:',
+  'branches:',
+  '- main',
+  "- '.github/production-member-auth-rate-limit-canary.trigger'",
+  'workflow_dispatch|push',
+  "github.event_name == 'push' && 'ops' || inputs.watchtower_track",
+  "github.event_name == 'push' && 'VERIFY_MEMBER_AUTH_RATE_LIMIT_CANARY_V2' || inputs.confirm",
   'VERIFY_MEMBER_AUTH_RATE_LIMIT_CANARY_V2',
   'default: ops',
   'environment: production',
@@ -331,7 +343,7 @@ for (const fragment of [
   'group: production-member-auth-rate-limit-canary',
   'cancel-in-progress: false',
 ]) requireFragment(paths.canaryWorkflow, canaryWorkflow, fragment);
-for (const forbidden of ['\npush:', '\npull_request:', '\nschedule:']) {
+for (const forbidden of ['\npull_request:', '\nschedule:']) {
   forbidFragment(paths.canaryWorkflow, canaryWorkflow, forbidden);
 }
 
