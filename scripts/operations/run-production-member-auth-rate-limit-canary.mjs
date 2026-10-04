@@ -9,16 +9,22 @@ const endpoints = Object.freeze([
     action: 'sign-in',
     url: `${PRODUCTION_ORIGIN}/api/auth/sign-in`,
     body: '{"email":"","password":""}',
+    expectedPreLimitStatus: 400,
+    expectedPreLimitCode: 'INVALID_REQUEST',
   }),
   Object.freeze({
     action: 'sign-up',
     url: `${PRODUCTION_ORIGIN}/api/auth/sign-up`,
     body: '{"email":"","password":""}',
+    expectedPreLimitStatus: 400,
+    expectedPreLimitCode: 'INVALID_REQUEST',
   }),
   Object.freeze({
     action: 'refresh',
     url: `${PRODUCTION_ORIGIN}/api/auth/refresh`,
     body: '{"refreshToken":""}',
+    expectedPreLimitStatus: 401,
+    expectedPreLimitCode: 'SESSION_EXPIRED',
   }),
 ]);
 
@@ -72,10 +78,10 @@ async function send(endpoint) {
   });
 }
 
-async function assertInvalidRequest(response, endpoint, attempt) {
-  if (response.status !== 400) {
+async function assertPreLimitResponse(response, endpoint, attempt) {
+  if (response.status !== endpoint.expectedPreLimitStatus) {
     throw new Error(
-      `${endpoint.action} attempt ${attempt} expected local HTTP 400 before the governed limit, received ${response.status}.`,
+      `${endpoint.action} attempt ${attempt} expected local HTTP ${endpoint.expectedPreLimitStatus} before the governed limit, received ${response.status}.`,
     );
   }
   requireNoStore(response, `${endpoint.action} attempt ${attempt}`);
@@ -83,10 +89,12 @@ async function assertInvalidRequest(response, endpoint, attempt) {
   if (
     body.ok !== false ||
     !isRecord(body.error) ||
-    body.error.code !== 'INVALID_REQUEST' ||
+    body.error.code !== endpoint.expectedPreLimitCode ||
     body.error.retryable !== false
   ) {
-    throw new Error(`${endpoint.action} attempt ${attempt} did not return INVALID_REQUEST.`);
+    throw new Error(
+      `${endpoint.action} attempt ${attempt} did not return ${endpoint.expectedPreLimitCode}.`,
+    );
   }
 }
 
@@ -115,7 +123,7 @@ async function readRateLimit(response, label) {
   return retryAfter;
 }
 
-async function firstCleanInvalidRequest(endpoint) {
+async function firstCleanPreLimitResponse(endpoint) {
   let startedAt = Date.now();
   let response = await send(endpoint);
   if (response.status === 429) {
@@ -124,16 +132,16 @@ async function firstCleanInvalidRequest(endpoint) {
     startedAt = Date.now();
     response = await send(endpoint);
   }
-  await assertInvalidRequest(response, endpoint, 1);
+  await assertPreLimitResponse(response, endpoint, 1);
   return startedAt;
 }
 
 async function runEndpointCanary(endpoint) {
-  const startedAt = await firstCleanInvalidRequest(endpoint);
+  const startedAt = await firstCleanPreLimitResponse(endpoint);
 
   for (let attempt = 2; attempt <= REQUEST_LIMIT; attempt += 1) {
     const response = await send(endpoint);
-    await assertInvalidRequest(response, endpoint, attempt);
+    await assertPreLimitResponse(response, endpoint, attempt);
   }
 
   const allowedElapsedMs = Date.now() - startedAt;
@@ -193,12 +201,12 @@ if (
 
 console.log('member_auth_rate_limit_canary=pass');
 for (const result of results) {
-  console.log(`${result.action}_allowed_invalid_requests=${REQUEST_LIMIT}`);
+  console.log(`${result.action}_allowed_pre_limit_requests=${REQUEST_LIMIT}`);
   console.log(`${result.action}_first_rate_limited_attempt=${REQUEST_LIMIT + 1}`);
   console.log(`${result.action}_retry_after_seconds=${result.retryAfter}`);
 }
 console.log('endpoint_bucket_independence=pass');
 console.log('sign_out_rate_limit_excluded=pass');
-console.log('probe_payloads=local_invalid_only');
+console.log('probe_payloads=local_non_mutating_only');
 console.log('raw_network_identifiers_emitted=false');
 console.log('credential_material_emitted=false');
