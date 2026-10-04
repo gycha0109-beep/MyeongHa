@@ -356,6 +356,95 @@ SQL
   fail "post-turn completion replay mismatch: $complete_replay"
 pass "response-loss completion replay is read-only and idempotent"
 
+rollback_turn_id="e1470000-0000-4000-8000-000000000020"
+rollback_user_message_id="e1470000-0000-4000-8000-000000000021"
+rollback_attempt_id="e1470000-0000-4000-8000-000000000022"
+rollback_renderer_log_id="e1470000-0000-4000-8000-000000000023"
+rollback_guard_log_id="e1470000-0000-4000-8000-000000000024"
+rollback_assistant_message_id="e1470000-0000-4000-8000-000000000025"
+rollback_chat_outbox_id="e1470000-0000-4000-8000-000000000026"
+rollback_post_turn_outbox_id="e1470000-0000-4000-8000-000000000027"
+
+"${psql_base[@]}" -At <<SQL >/dev/null
+begin;
+set local role myeongha_api_executor;
+select pg_catalog.set_config('myeongha.subject_id','$subject_id',true);
+select * from public.cmd_receive_seyeon_chat_turn_runtime_v1(
+  '$subject_id','$thread_id',
+  'seyeon-post-turn-worker-rollback-turn',
+  'sha256:v1:e147-rollback-request',
+  'chat-request-v1',
+  jsonb_build_object(
+    'threadId','$thread_id',
+    'characterId','seyeon',
+    'clientTurnId','seyeon-post-turn-worker-rollback-turn',
+    'text','원자성 롤백 테스트예요.',
+    'clientCapability','0.0.1-dev'
+  ),
+  '$release_id','$bundle_id',
+  '$rollback_turn_id','$rollback_user_message_id',
+  '원자성 롤백 테스트예요.',
+  'sha256:v1:e147-rollback-user'
+);
+select * from public.cmd_allocate_seyeon_chat_attempt_runtime_v1(
+  '$subject_id','$rollback_turn_id','$rollback_attempt_id',
+  'seyeon-production-chat-planner-v1'
+);
+select public.cmd_mark_seyeon_chat_context_ready_runtime_v1(
+  '$subject_id','$rollback_turn_id','$rollback_attempt_id'
+);
+select public.cmd_persist_seyeon_chat_generated_runtime_v1(
+  '$subject_id','$rollback_turn_id','$rollback_attempt_id','$thread_character_id',
+  '$rollback_renderer_log_id',
+  'test-provider','test-renderer-model','seyeon-character-runtime-v2',
+  '롤백될 답변입니다.',
+  jsonb_build_object(
+    'schemaVersion','seyeon-dialogue-envelope-v2',
+    'utterance','롤백될 답변입니다.'
+  ),
+  'seyeon-dialogue-envelope-v2',
+  'sha256:v1:e147-rollback-answer',
+  '[]'::jsonb
+);
+select public.cmd_persist_seyeon_chat_validated_runtime_v1(
+  '$subject_id','$rollback_turn_id','$rollback_attempt_id','$rollback_guard_log_id',
+  'test-provider','test-review-model','seyeon-semantic-review-v2',
+  'sha256:v1:e147-rollback-answer',
+  jsonb_build_object(
+    'schemaVersion','seyeon-production-chat-validation-v1',
+    'passed',true,
+    'generatedContentHash','sha256:v1:e147-rollback-answer'
+  ),
+  '[]'::jsonb
+);
+commit;
+SQL
+
+expect_fail \
+  "post-turn handoff mismatch rolls back Chat commit" \
+  "Se-yeon post-turn snapshot does not bind the authoritative user message" \
+  "begin; set local role myeongha_api_executor; select pg_catalog.set_config('myeongha.subject_id','$subject_id',true); select * from public.cmd_commit_seyeon_chat_turn_runtime_v2('$subject_id','$thread_id','$rollback_turn_id','$rollback_attempt_id','$rollback_assistant_message_id','$rollback_chat_outbox_id','$rollback_post_turn_outbox_id',jsonb_build_object('schemaVersion','seyeon-post-turn-analysis-snapshot-v1','turnId','$rollback_turn_id','userMessageId','e1470000-0000-4000-8000-000000000099','assistantMessageId','$rollback_assistant_message_id'),'sha256:v1:e147-rollback-snapshot'); rollback;"
+
+rollback_state=$("${psql_base[@]}" -At -F '|' -c "
+select
+  state,
+  committed_attempt_id is null,
+  committed_at is null
+from public.chat_turns
+where id='$rollback_turn_id';
+")
+[[ "$rollback_state" == "validated|t|t" ]] ||
+  fail "failed post-turn handoff did not rollback Chat commit: $rollback_state"
+
+rollback_outbox_count=$("${psql_base[@]}" -At -c "
+select count(*)
+from public.outbox_events
+where id in ('$rollback_chat_outbox_id','$rollback_post_turn_outbox_id');
+")
+[[ "$rollback_outbox_count" == "0" ]] ||
+  fail "failed post-turn handoff leaked an outbox row"
+pass "post-turn handoff failure rolls back assistant commit and both outbox writes atomically"
+
 expect_fail   "authenticated direct post-turn claim"   "permission denied"   "begin; set local role authenticated; select * from public.cmd_claim_seyeon_post_turn_analysis_v1('$subject_id','$post_turn_outbox_id','x',clock_timestamp()+interval '1 minute'); rollback;"
 
 expect_fail   "foreign Subject post-turn claim"   "outbox event is not an eligible Se-yeon post-turn analysis request"   "begin; set local role myeongha_api_executor; select pg_catalog.set_config('myeongha.subject_id','e1470000-0000-4000-8000-000000000099',true); select * from public.cmd_claim_seyeon_post_turn_analysis_v1('e1470000-0000-4000-8000-000000000099','$post_turn_outbox_id','x',clock_timestamp()+interval '1 minute'); rollback;"
