@@ -1,3 +1,4 @@
+import type { SocialAuthProviderV1 } from '@myeongha/api-client';
 import { router } from 'expo-router';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
@@ -33,6 +34,7 @@ export function MyMemberAuthCard({
   pending,
   errorMessage,
   verificationRequired,
+  socialPendingProvider,
   onEmailChange,
   onPasswordChange,
   onSignIn,
@@ -40,6 +42,8 @@ export function MyMemberAuthCard({
   onCompleteSignUp,
   onCancelSignUp,
   onSignOut,
+  onSocialSignIn,
+  onCancelSocialSignIn,
 }: {
   subjectKind: 'guest' | 'member';
   email: string;
@@ -50,6 +54,7 @@ export function MyMemberAuthCard({
     email: string;
     message: string;
   }> | null;
+  socialPendingProvider: SocialAuthProviderV1 | null;
   onEmailChange: (value: string) => void;
   onPasswordChange: (value: string) => void;
   onSignIn: () => void;
@@ -57,6 +62,8 @@ export function MyMemberAuthCard({
   onCompleteSignUp: () => void;
   onCancelSignUp: () => void;
   onSignOut: () => void;
+  onSocialSignIn: (provider: SocialAuthProviderV1) => void;
+  onCancelSocialSignIn: () => void;
 }) {
   if (subjectKind === 'member') {
     return (
@@ -91,6 +98,45 @@ export function MyMemberAuthCard({
 
       {verificationRequired === null ? (
         <>
+
+          <View style={styles.socialActions}>
+            {([
+              ['google', 'Google로 계속'],
+              ['kakao', '카카오로 계속'],
+              ['naver', '네이버로 계속'],
+            ] as const).map(([provider, label]) => (
+              <Pressable
+                key={provider}
+                accessibilityRole="button"
+                disabled={pending}
+                onPress={() => onSocialSignIn(provider)}
+                style={[styles.socialAction, pending && styles.disabledAction]}
+              >
+                <Text style={styles.socialActionText}>
+                  {socialPendingProvider === provider ? '확인 중…' : label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+          {socialPendingProvider !== null ? (
+            <>
+              <Text style={styles.caption}>
+                외부 로그인 화면에서 확인을 마치면 자동으로 돌아옵니다.
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={onCancelSocialSignIn}
+                style={styles.pendingAction}
+              >
+                <Text style={styles.pendingText}>소셜 로그인 취소</Text>
+              </Pressable>
+            </>
+          ) : null}
+          <View style={styles.authDivider}>
+            <View style={styles.authDividerLine} />
+            <Text style={styles.authDividerText}>또는 이메일로 계속</Text>
+            <View style={styles.authDividerLine} />
+          </View>
           <TextInput
             accessibilityLabel="이메일"
             autoCapitalize="none"
@@ -387,6 +433,24 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   secondaryActionText: { color: mobileColors.navy, fontSize: 14, fontWeight: '800' },
+  socialActions: { gap: 8 },
+  socialAction: {
+    minHeight: 46,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: mobileColors.border,
+    borderRadius: 12,
+    backgroundColor: mobileColors.canvas,
+  },
+  socialActionText: { color: mobileColors.ink, fontSize: 14, fontWeight: '800' },
+  authDivider: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  authDividerLine: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: mobileColors.border,
+  },
+  authDividerText: { color: mobileColors.muted, fontSize: 11, fontWeight: '700' },
   disabledAction: { opacity: 0.5 },
   authInput: {
     minHeight: 48,

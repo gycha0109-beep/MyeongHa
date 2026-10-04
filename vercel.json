@@ -40,6 +40,10 @@
   ],
   "rewrites": [
     {
+      "source": "/api/auth/social/start",
+      "destination": "/api/auth/sign-in?__myeongha_social_auth_start=1"
+    },
+    {
       "source": "/api/me/saju/preview-reading",
       "destination": "/api/me?__myeongha_saju_preview_reading=1"
     },

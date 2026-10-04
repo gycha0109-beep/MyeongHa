@@ -106,6 +106,13 @@ for (const [path, routeId] of fetchBoundaryRoutes) {
   forbidFragment(route, 'console.warn(', `Fetch security boundary ${path}`);
 }
 
+const signInDispatcher = readFileSync(resolve(root, 'api/auth/sign-in.ts'), 'utf8');
+requireFragment(
+  signInDispatcher,
+  "routeId: 'api.auth.social.start'",
+  'Fetch security boundary api/auth/sign-in.ts social auth dispatch',
+);
+
 for (const [path, routeId] of nodeBoundaryRoutes) {
   const route = readFileSync(resolve(root, path), 'utf8');
   requireFragment(route, 'executeSecurityObservedNodeRequestV1', `Node security boundary ${path}`);

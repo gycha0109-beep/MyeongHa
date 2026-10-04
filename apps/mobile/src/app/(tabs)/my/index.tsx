@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import {
@@ -47,6 +47,20 @@ export default function MyScreen() {
       retryTargetPersons(),
     ]);
   }
+
+  useEffect(() => {
+    if (memberAuth.authRevision === 0) return;
+    void Promise.all([
+      retryProfile(),
+      retryBirth(),
+      retryTargetPersons(),
+    ]);
+  }, [
+    memberAuth.authRevision,
+    retryProfile,
+    retryBirth,
+    retryTargetPersons,
+  ]);
 
   async function handleSignIn() {
     const signedIn = await memberAuth.signIn(email, password);
@@ -110,7 +124,15 @@ export default function MyScreen() {
           subjectKind={state.profile.profile.subjectKind}
           email={email}
           password={password}
-          pending={memberAuth.state.kind === 'submitting'}
+          pending={
+            memberAuth.state.kind === 'submitting' ||
+            memberAuth.state.kind === 'social_pending'
+          }
+          socialPendingProvider={
+            memberAuth.state.kind === 'social_pending'
+              ? memberAuth.state.provider
+              : null
+          }
           errorMessage={
             memberAuth.state.kind === 'error'
               ? memberAuth.state.message
@@ -133,6 +155,8 @@ export default function MyScreen() {
           onCompleteSignUp={() => void handleCompleteSignUp()}
           onCancelSignUp={() => void handleCancelSignUp()}
           onSignOut={() => void handleSignOut()}
+          onSocialSignIn={(provider) => void memberAuth.signInWithSocial(provider)}
+          onCancelSocialSignIn={() => void memberAuth.cancelSocialSignIn()}
         />
       ) : null}
 
