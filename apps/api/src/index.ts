@@ -980,6 +980,7 @@ export {
 } from './seyeon-post-turn-analysis-worker-v1.js';
 
 export {
+  POSTGRES_SEYEON_POST_TURN_ANALYSIS_LOOKUP_BINDING_V1,
   POSTGRES_SEYEON_POST_TURN_ANALYSIS_CLAIM_BINDING_V1,
   POSTGRES_SEYEON_POST_TURN_ANALYSIS_COMPLETE_BINDING_V1,
   createPostgresSeyeonPostTurnAnalysisOutboxPortV1,
