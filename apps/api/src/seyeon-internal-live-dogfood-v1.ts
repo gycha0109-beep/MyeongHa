@@ -39,6 +39,12 @@ export interface SeyeonInternalLiveDogfoodCommandV1 {
   readonly verifyReplay: boolean;
 }
 
+export interface ConfiguredSeyeonInternalLiveDogfoodRuntimeV1 {
+  readonly harness: ProductionSeyeonInternalDogfoodHarnessV1;
+  readonly observer: ObservedSeyeonStructuredProviderV1;
+  close(): Promise<void>;
+}
+
 export interface RunSeyeonInternalLiveDogfoodSessionInputV1 {
   readonly harness: ProductionSeyeonInternalDogfoodHarnessV1;
   readonly observer: ObservedSeyeonStructuredProviderV1;
@@ -59,6 +65,16 @@ export interface SeyeonInternalLiveDogfoodTurnSummaryV1 {
     readonly replayed: boolean;
   }>;
   readonly postTurnDecision: string | null;
+  readonly relationshipUsedForTurn:
+    | Readonly<{
+        readonly revision: number;
+        readonly stageKey: string;
+        readonly closenessBand: string;
+        readonly trustBand: string;
+        readonly frictionBand: string;
+      }>
+    | null;
+  readonly relationshipRevisionUsedForTurn: number | null;
   readonly relationshipRevision:
     RunSeyeonInternalDogfoodTurnResultV1['relationshipRevision'];
 }
@@ -224,6 +240,13 @@ function summarizeTurn(
       ? execution.assistantText
       : execution.runtimeResult.envelope.utterance;
 
+  const relationshipResult =
+    execution.disposition === 'executed'
+      ? execution.relationshipResult
+      : null;
+  const relationship =
+    relationshipResult?.turnBinding?.relationship ?? null;
+
   return Object.freeze({
     disposition: result.disposition,
     subjectId: result.subjectId,
@@ -238,6 +261,18 @@ function summarizeTurn(
     }),
     postTurnDecision:
       result.postTurn === null ? null : result.postTurn.result.decision,
+    relationshipUsedForTurn:
+      relationship === null
+        ? null
+        : Object.freeze({
+            revision: relationship.revision,
+            stageKey: relationship.stageKey,
+            closenessBand: relationship.closenessBand,
+            trustBand: relationship.trustBand,
+            frictionBand: relationship.frictionBand,
+          }),
+    relationshipRevisionUsedForTurn:
+      relationshipResult?.relationshipRevisionUsedForTurn ?? null,
     relationshipRevision: result.relationshipRevision,
   });
 }
@@ -300,28 +335,43 @@ function leaseExpiresAt(
   return new Date(now.getTime() + minutes * 60_000).toISOString();
 }
 
+export function createConfiguredSeyeonInternalLiveDogfoodRuntimeV1(
+  env: ProductionUserDataRuntimeEnvV1,
+): ConfiguredSeyeonInternalLiveDogfoodRuntimeV1 {
+  const databaseConfig = parseProductionUserDataRuntimeConfigV1(env);
+  const providerConfig = parseSeyeonInternalLiveProviderConfigV1(env);
+  const observer = createObservedSeyeonStructuredProviderV1(
+    createOpenAiSeyeonStructuredProviderV1(providerConfig),
+  );
+  const harness = createProductionSeyeonInternalDogfoodHarnessV1({
+    databaseConfig,
+    provider: observer.provider,
+  });
+
+  return Object.freeze({
+    harness,
+    observer,
+    async close() {
+      await harness.close();
+    },
+  });
+}
+
 export async function runConfiguredSeyeonInternalLiveDogfoodV1(input: {
   readonly env: ProductionUserDataRuntimeEnvV1;
   readonly argv: readonly string[];
   readonly now?: () => Date;
 }): Promise<RunSeyeonInternalLiveDogfoodSessionResultV1> {
   const command = parseSeyeonInternalLiveDogfoodCommandV1(input.argv);
-  const databaseConfig = parseProductionUserDataRuntimeConfigV1(input.env);
-  const providerConfig = parseSeyeonInternalLiveProviderConfigV1(input.env);
-  const observed = createObservedSeyeonStructuredProviderV1(
-    createOpenAiSeyeonStructuredProviderV1(providerConfig),
-  );
-  const harness = createProductionSeyeonInternalDogfoodHarnessV1({
-    databaseConfig,
-    provider: observed.provider,
-  });
+  const runtime =
+    createConfiguredSeyeonInternalLiveDogfoodRuntimeV1(input.env);
   const now = input.now?.() ?? new Date();
   const suffix = command.clientTurnId.replace(/[^A-Za-z0-9_-]/gu, '_');
 
   try {
     return await runSeyeonInternalLiveDogfoodSessionV1({
-      harness,
-      observer: observed,
+      harness: runtime.harness,
+      observer: runtime.observer,
       verifyReplay: command.verifyReplay,
       turn: Object.freeze({
         verifiedEvidence: command.verifiedEvidence,
@@ -339,6 +389,6 @@ export async function runConfiguredSeyeonInternalLiveDogfoodV1(input: {
       }),
     });
   } finally {
-    await harness.close();
+    await runtime.close();
   }
 }
