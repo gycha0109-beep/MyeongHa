@@ -1068,3 +1068,18 @@ export {
   type RunProductionSeyeonRelationshipWorkerInputV1,
   type RunProductionSeyeonRelationshipWorkerResultV1,
 } from './production-seyeon-relationship-worker-runtime-v1.js';
+
+
+export {
+  SEYEON_INTERNAL_DOGFOOD_HARNESS_BINDINGS_V1,
+  SEYEON_INTERNAL_DOGFOOD_HARNESS_VERSION_V1,
+  SeyeonInternalDogfoodHarnessErrorV1,
+  createProductionSeyeonInternalDogfoodHarnessV1,
+  runSeyeonInternalDogfoodTurnV1,
+  type CreateProductionSeyeonInternalDogfoodHarnessInputV1,
+  type ProductionSeyeonInternalDogfoodHarnessV1,
+  type RunSeyeonInternalDogfoodTurnInputV1,
+  type RunSeyeonInternalDogfoodTurnResultV1,
+  type SeyeonInternalDogfoodRuntimeSetV1,
+  type SeyeonInternalDogfoodWorkerLeaseV1,
+} from './seyeon-internal-dogfood-harness-v1.js';
