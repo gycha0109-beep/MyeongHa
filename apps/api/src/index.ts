@@ -1086,6 +1086,15 @@ export {
 
 
 export {
+  SEYEON_INTERNAL_DOGFOOD_RELATIONSHIP_INSPECTOR_VERSION_V1,
+  createProductionSeyeonInternalDogfoodRelationshipInspectorV1,
+  inspectSeyeonInternalDogfoodRelationshipV1,
+  type SeyeonInternalDogfoodRelationshipInspectionV1,
+  type SeyeonInternalDogfoodRelationshipInspectorV1,
+} from './seyeon-internal-dogfood-relationship-inspector-v1.js';
+
+
+export {
   SEYEON_STRUCTURED_PROVIDER_OBSERVER_VERSION_V1,
   SEYEON_STRUCTURED_PROVIDER_PURPOSES_V1,
   createObservedSeyeonStructuredProviderV1,
@@ -1115,6 +1124,7 @@ export {
   SEYEON_INTERNAL_DOGFOOD_SCENARIO_CATALOG_VERSION_V1,
   SEYEON_INTERNAL_DOGFOOD_SCENARIOS_V1,
   getSeyeonInternalDogfoodScenarioV1,
+  type SeyeonInternalDogfoodRelationshipPreconditionV1,
   type SeyeonInternalDogfoodScenarioIdV1,
   type SeyeonInternalDogfoodScenarioTurnV1,
   type SeyeonInternalDogfoodScenarioV1,

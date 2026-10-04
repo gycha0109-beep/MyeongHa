@@ -6,6 +6,10 @@ import {
   type SeyeonInternalLiveDogfoodTurnSummaryV1,
 } from './seyeon-internal-live-dogfood-v1.js';
 import type {
+  SeyeonInternalDogfoodRelationshipInspectionV1,
+  SeyeonInternalDogfoodRelationshipInspectorV1,
+} from './seyeon-internal-dogfood-relationship-inspector-v1.js';
+import type {
   SeyeonInternalDogfoodScenarioV1,
 } from './seyeon-internal-dogfood-scenarios-v1.js';
 import {
@@ -23,6 +27,8 @@ export const SEYEON_INTERNAL_DOGFOOD_SCENARIO_RUNNER_VERSION_V1 =
 export interface RunSeyeonInternalDogfoodScenarioInputV1 {
   readonly harness: ProductionSeyeonInternalDogfoodHarnessV1;
   readonly observer: ObservedSeyeonStructuredProviderV1;
+  readonly relationshipInspector?:
+    SeyeonInternalDogfoodRelationshipInspectorV1;
   readonly scenario: SeyeonInternalDogfoodScenarioV1;
   readonly verifiedEvidence: VerifiedSubjectIdentityEvidenceV1;
   readonly threadId: string;
@@ -55,6 +61,8 @@ export interface RunSeyeonInternalDogfoodScenarioResultV1 {
   readonly threadId: string;
   readonly subjectId: string;
   readonly turnCount: number;
+  readonly relationshipPreflight:
+    SeyeonInternalDogfoodRelationshipInspectionV1 | null;
   readonly turns: readonly SeyeonInternalDogfoodScenarioTurnResultV1[];
   readonly providerDelta: SeyeonStructuredProviderInvocationSnapshotV1;
 }
@@ -63,6 +71,53 @@ export class SeyeonInternalDogfoodScenarioRunnerErrorV1 extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'SeyeonInternalDogfoodScenarioRunnerErrorV1';
+  }
+}
+
+function assertRelationshipPrecondition(
+  scenario: SeyeonInternalDogfoodScenarioV1,
+  inspection: SeyeonInternalDogfoodRelationshipInspectionV1,
+): void {
+  const expected = scenario.relationshipPrecondition;
+  if (expected === undefined) return;
+
+  const relationship = inspection.relationship;
+  if (relationship === null) {
+    throw new SeyeonInternalDogfoodScenarioRunnerErrorV1(
+      'Scenario requires an existing authoritative Production relationship.',
+    );
+  }
+  if (
+    expected.attainedStage !== undefined &&
+    relationship.attainedStage !== expected.attainedStage
+  ) {
+    throw new SeyeonInternalDogfoodScenarioRunnerErrorV1(
+      'Scenario relationship attained stage precondition is not satisfied.',
+    );
+  }
+  if (
+    expected.currentCondition !== undefined &&
+    relationship.currentCondition !== expected.currentCondition
+  ) {
+    throw new SeyeonInternalDogfoodScenarioRunnerErrorV1(
+      'Scenario relationship condition precondition is not satisfied.',
+    );
+  }
+  if (
+    expected.behaviorAccess !== undefined &&
+    relationship.behaviorAccess !== expected.behaviorAccess
+  ) {
+    throw new SeyeonInternalDogfoodScenarioRunnerErrorV1(
+      'Scenario relationship behavior-access precondition is not satisfied.',
+    );
+  }
+  for (const kind of expected.requiredActiveEventKinds ?? []) {
+    if (!inspection.activeEventKinds.includes(kind)) {
+      throw new SeyeonInternalDogfoodScenarioRunnerErrorV1(
+        'Scenario requires authoritative active relationship Event kind ' +
+          kind + '.',
+      );
+    }
   }
 }
 
@@ -114,9 +169,28 @@ export async function runSeyeonInternalDogfoodScenarioV1(
     );
   }
 
+  let relationshipPreflight:
+    SeyeonInternalDogfoodRelationshipInspectionV1 | null = null;
+  if (input.scenario.relationshipPrecondition !== undefined) {
+    if (input.relationshipInspector === undefined) {
+      throw new SeyeonInternalDogfoodScenarioRunnerErrorV1(
+        'Governed relationship scenario requires a server-owned relationship inspector.',
+      );
+    }
+    relationshipPreflight =
+      await input.relationshipInspector.inspect({
+        verifiedEvidence: input.verifiedEvidence,
+      });
+    assertRelationshipPrecondition(
+      input.scenario,
+      relationshipPreflight,
+    );
+  }
+
   const scenarioProviderBefore = input.observer.snapshot();
   const results: SeyeonInternalDogfoodScenarioTurnResultV1[] = [];
-  let subjectId: string | null = null;
+  let subjectId: string | null =
+    relationshipPreflight?.subjectId ?? null;
 
   for (
     let zeroIndex = 0;
@@ -200,6 +274,7 @@ export async function runSeyeonInternalDogfoodScenarioV1(
     threadId: input.threadId,
     subjectId,
     turnCount: results.length,
+    relationshipPreflight,
     turns: Object.freeze(results),
     providerDelta: diffSeyeonStructuredProviderInvocationsV1(
       scenarioProviderBefore,

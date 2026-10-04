@@ -231,4 +231,143 @@ describe('Se-yeon internal dogfood scenario runner V1', () => {
       }),
     ).rejects.toThrow(/runId/i);
   });
+  it('requires authoritative relationship preconditions before the first model call', async () => {
+    const observer = createObservedSeyeonStructuredProviderV1({
+      providerKey: 'test-provider',
+      modelKey: 'test-model',
+      async generate() {
+        return {};
+      },
+    });
+    let harnessCalls = 0;
+    const harness: ProductionSeyeonInternalDogfoodHarnessV1 = {
+      async run(turn) {
+        harnessCalls += 1;
+        return executed({
+          clientTurnId: turn.clientTurnId,
+          index: harnessCalls,
+        });
+      },
+      async close() {},
+    };
+
+    const result = await runSeyeonInternalDogfoodScenarioV1({
+      harness,
+      observer,
+      relationshipInspector: {
+        async inspect() {
+          return {
+            version: 'seyeon-internal-dogfood-relationship-inspector-v1',
+            subjectId: 'subject-1',
+            relationship: {
+              revision: 41,
+              attainedStage: 'S3_OPENED',
+              currentCandidateStage: 'S3_OPENED',
+              currentCondition: 'OPEN_CONFLICT',
+              behaviorAccess: 'RESTRICTED_BY_CONFLICT',
+              closenessBand: 'high',
+              trustBand: 'high',
+              frictionBand: 'high',
+            },
+            activeEventKinds: ['CONFLICT_OPENED'],
+            activeEventIds: ['conflict-1'],
+          };
+        },
+      },
+      scenario: {
+        scenarioId: 'open-conflict-v1',
+        description: 'conflict',
+        reviewFocus: [],
+        relationshipPrecondition: {
+          attainedStage: 'S3_OPENED',
+          currentCondition: 'OPEN_CONFLICT',
+          behaviorAccess: 'RESTRICTED_BY_CONFLICT',
+          requiredActiveEventKinds: ['CONFLICT_OPENED'],
+        },
+        turns: [{ text: 'one' }],
+      },
+      verifiedEvidence: {
+        kind: 'member',
+        verifiedAuthUserId: 'auth-user-1',
+      },
+      threadId: 'thread-1',
+      runId: 'conflict-001',
+      verifyFinalReplay: false,
+    });
+
+    expect(harnessCalls).toBe(1);
+    expect(result.relationshipPreflight?.relationship).toMatchObject({
+      attainedStage: 'S3_OPENED',
+      currentCondition: 'OPEN_CONFLICT',
+      behaviorAccess: 'RESTRICTED_BY_CONFLICT',
+    });
+  });
+
+  it('fails before Chat execution when authoritative relationship state does not satisfy the scenario', async () => {
+    const observer = createObservedSeyeonStructuredProviderV1({
+      providerKey: 'test-provider',
+      modelKey: 'test-model',
+      async generate() {
+        return {};
+      },
+    });
+    let harnessCalls = 0;
+    const harness: ProductionSeyeonInternalDogfoodHarnessV1 = {
+      async run() {
+        harnessCalls += 1;
+        throw new Error('must not run');
+      },
+      async close() {},
+    };
+
+    await expect(
+      runSeyeonInternalDogfoodScenarioV1({
+        harness,
+        observer,
+        relationshipInspector: {
+          async inspect() {
+            return {
+              version: 'seyeon-internal-dogfood-relationship-inspector-v1',
+              subjectId: 'subject-1',
+              relationship: {
+                revision: 40,
+                attainedStage: 'S3_OPENED',
+                currentCandidateStage: 'S3_OPENED',
+                currentCondition: 'STABLE',
+                behaviorAccess: 'STAGE_ALIGNED',
+                closenessBand: 'high',
+                trustBand: 'high',
+                frictionBand: 'low',
+              },
+              activeEventKinds: [],
+              activeEventIds: [],
+            };
+          },
+        },
+        scenario: {
+          scenarioId: 'open-conflict-v1',
+          description: 'conflict',
+          reviewFocus: [],
+          relationshipPrecondition: {
+            attainedStage: 'S3_OPENED',
+            currentCondition: 'OPEN_CONFLICT',
+            behaviorAccess: 'RESTRICTED_BY_CONFLICT',
+            requiredActiveEventKinds: ['CONFLICT_OPENED'],
+          },
+          turns: [{ text: 'one' }],
+        },
+        verifiedEvidence: {
+          kind: 'member',
+          verifiedAuthUserId: 'auth-user-1',
+        },
+        threadId: 'thread-1',
+        runId: 'conflict-002',
+        verifyFinalReplay: false,
+      }),
+    ).rejects.toThrow(/condition precondition/i);
+
+    expect(harnessCalls).toBe(0);
+    expect(observer.snapshot().total).toBe(0);
+  });
+
 });

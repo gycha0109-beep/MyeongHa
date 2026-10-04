@@ -117,6 +117,7 @@ export async function runSeyeonInternalDogfoodScenarioCliV1(
     const result = await runSeyeonInternalDogfoodScenarioV1({
       harness: runtime.harness,
       observer: runtime.observer,
+      relationshipInspector: runtime.relationshipInspector,
       scenario,
       verifiedEvidence: command.verifiedEvidence,
       threadId: command.threadId,

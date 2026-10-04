@@ -7,6 +7,13 @@ import {
   type ProductionUserDataRuntimeEnvV1,
 } from './production-user-data-runtime-config.js';
 import {
+  createProductionPostgresSubjectPoolLeaseV1,
+} from './production-postgres-subject-pool-lease.js';
+import {
+  createProductionSeyeonInternalDogfoodRelationshipInspectorV1,
+  type SeyeonInternalDogfoodRelationshipInspectorV1,
+} from './seyeon-internal-dogfood-relationship-inspector-v1.js';
+import {
   createProductionSeyeonInternalDogfoodHarnessV1,
   type ProductionSeyeonInternalDogfoodHarnessV1,
   type RunSeyeonInternalDogfoodTurnInputV1,
@@ -42,6 +49,8 @@ export interface SeyeonInternalLiveDogfoodCommandV1 {
 export interface ConfiguredSeyeonInternalLiveDogfoodRuntimeV1 {
   readonly harness: ProductionSeyeonInternalDogfoodHarnessV1;
   readonly observer: ObservedSeyeonStructuredProviderV1;
+  readonly relationshipInspector:
+    SeyeonInternalDogfoodRelationshipInspectorV1;
   close(): Promise<void>;
 }
 
@@ -75,6 +84,12 @@ export interface SeyeonInternalLiveDogfoodTurnSummaryV1 {
       }>
     | null;
   readonly relationshipRevisionUsedForTurn: number | null;
+  readonly relationshipBehavior:
+    | Readonly<{
+        readonly currentCondition: string;
+        readonly behaviorAccess: string;
+      }>
+    | null;
   readonly relationshipRevision:
     RunSeyeonInternalDogfoodTurnResultV1['relationshipRevision'];
 }
@@ -246,6 +261,8 @@ function summarizeTurn(
       : null;
   const relationship =
     relationshipResult?.turnBinding?.relationship ?? null;
+  const relationshipSemantics =
+    relationshipResult?.turnBinding?.relationshipSemantics ?? null;
 
   return Object.freeze({
     disposition: result.disposition,
@@ -273,6 +290,15 @@ function summarizeTurn(
           }),
     relationshipRevisionUsedForTurn:
       relationshipResult?.relationshipRevisionUsedForTurn ?? null,
+    relationshipBehavior:
+      relationshipSemantics === null
+        ? null
+        : Object.freeze({
+            currentCondition:
+              relationshipSemantics.currentCondition,
+            behaviorAccess:
+              relationshipSemantics.behaviorAccess,
+          }),
     relationshipRevision: result.relationshipRevision,
   });
 }
@@ -340,19 +366,29 @@ export function createConfiguredSeyeonInternalLiveDogfoodRuntimeV1(
 ): ConfiguredSeyeonInternalLiveDogfoodRuntimeV1 {
   const databaseConfig = parseProductionUserDataRuntimeConfigV1(env);
   const providerConfig = parseSeyeonInternalLiveProviderConfigV1(env);
+  const poolLease = createProductionPostgresSubjectPoolLeaseV1({
+    config: databaseConfig,
+  });
   const observer = createObservedSeyeonStructuredProviderV1(
     createOpenAiSeyeonStructuredProviderV1(providerConfig),
   );
   const harness = createProductionSeyeonInternalDogfoodHarnessV1({
     databaseConfig,
     provider: observer.provider,
+    pool: poolLease.pool,
   });
+  const relationshipInspector =
+    createProductionSeyeonInternalDogfoodRelationshipInspectorV1({
+      pool: poolLease.pool,
+    });
 
   return Object.freeze({
     harness,
     observer,
+    relationshipInspector,
     async close() {
       await harness.close();
+      await poolLease.close();
     },
   });
 }
