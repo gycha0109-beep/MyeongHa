@@ -237,21 +237,19 @@ jobs:
           [[ "$TECHNICAL_VERDICT" == 'PASS' ]]
 
       - name: Drop ephemeral dogfood DB login
-        if: always() && steps.db_runtime.outputs.role_name != ''
+        if: always()
         shell: bash
-        env:
-          ROLE_NAME: ${{ steps.db_runtime.outputs.role_name }}
-          ROLE_MARKER: ${{ steps.db_runtime.outputs.role_marker }}
         run: |
           set -euo pipefail
 
+          ROLE_NAME="myeongha_dogfood_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}"
+          ROLE_MARKER="$EPHEMERAL_ROLE_MARKER_PREFIX:${GITHUB_RUN_ID}:${GITHUB_RUN_ATTEMPT}"
           admin_pool_user="postgres.$SUPABASE_PROJECT_ID"
           pool_host="$SUPABASE_PRODUCTION_SESSION_POOLER_HOST"
           pool_port='5432'
           pool_db='postgres'
 
           [[ "$ROLE_NAME" =~ ^myeongha_dogfood_[0-9]+_[0-9]+$ ]]
-          [[ "$ROLE_MARKER" == "$EPHEMERAL_ROLE_MARKER_PREFIX:${GITHUB_RUN_ID}:${GITHUB_RUN_ATTEMPT}" ]]
 
           export PGPASSWORD="$SUPABASE_DB_PASSWORD"
           export PGSSLMODE=require
