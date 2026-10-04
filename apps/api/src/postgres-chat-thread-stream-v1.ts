@@ -110,7 +110,9 @@ export function createPostgresChatThreadStreamReadAuthorityPortV1(
   client: PostgresTransactionQueryV1,
 ): ChatThreadStreamReadAuthorityPortV1 {
   return Object.freeze({
-    async readStream(input) {
+    async readStream(
+      input: Parameters<ChatThreadStreamReadAuthorityPortV1['readStream']>[0],
+    ) {
       try {
         const result = await client.query<RowV1>(
           READ_CHAT_THREAD_STREAM_SQL_V1,
