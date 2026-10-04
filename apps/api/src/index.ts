@@ -686,6 +686,10 @@ export {
 } from './postgres-chat-thread-runtime-binding.js';
 
 export {
+  createPostgresChatThreadStreamReadAuthorityPortV1,
+} from './postgres-chat-thread-stream-v1.js';
+
+export {
   READER_INTERPRETATION_PREVIEW_CONTRACT_VERSION_V1,
   READER_INTERPRETATION_PREVIEW_SCHEMA_VERSION_V1,
   ReaderInterpretationPreviewRuntimeErrorV1,
@@ -1086,6 +1090,19 @@ export {
 
 
 export {
+  SEYEON_INTERNAL_DOGFOOD_EVIDENCE_VERSION_V1,
+  createConfiguredSeyeonInternalDogfoodEvidenceRuntimeV1,
+  createProductionSeyeonInternalDogfoodEvidenceInspectorV1,
+  runSeyeonInternalDogfoodEvidenceV1,
+  type ConfiguredSeyeonInternalDogfoodEvidenceRuntimeV1,
+  type RunSeyeonInternalDogfoodEvidenceInputV1,
+  type RunSeyeonInternalDogfoodEvidenceResultV1,
+  type SeyeonInternalDogfoodEvidenceInspectorV1,
+  type SeyeonInternalDogfoodEvidenceSnapshotV1,
+  type SeyeonInternalDogfoodTechnicalVerdictV1,
+} from './seyeon-internal-dogfood-evidence-v1.js';
+
+export {
   SEYEON_INTERNAL_DOGFOOD_RELATIONSHIP_INSPECTOR_VERSION_V1,
   createProductionSeyeonInternalDogfoodRelationshipInspectorV1,
   inspectSeyeonInternalDogfoodRelationshipV1,
@@ -1124,6 +1141,7 @@ export {
   SEYEON_INTERNAL_DOGFOOD_SCENARIO_CATALOG_VERSION_V1,
   SEYEON_INTERNAL_DOGFOOD_SCENARIOS_V1,
   getSeyeonInternalDogfoodScenarioV1,
+  type SeyeonInternalDogfoodEvidencePreconditionV1,
   type SeyeonInternalDogfoodRelationshipPreconditionV1,
   type SeyeonInternalDogfoodScenarioIdV1,
   type SeyeonInternalDogfoodScenarioTurnV1,
@@ -1133,6 +1151,8 @@ export {
 export {
   SEYEON_INTERNAL_DOGFOOD_SCENARIO_RUNNER_VERSION_V1,
   SeyeonInternalDogfoodScenarioRunnerErrorV1,
+  assertSeyeonInternalDogfoodRelationshipPreconditionV1,
+  buildSeyeonInternalDogfoodClientTurnIdV1,
   runSeyeonInternalDogfoodScenarioV1,
   type RunSeyeonInternalDogfoodScenarioInputV1,
   type RunSeyeonInternalDogfoodScenarioResultV1,

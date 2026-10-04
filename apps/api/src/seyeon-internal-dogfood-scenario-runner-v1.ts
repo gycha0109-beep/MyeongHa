@@ -74,7 +74,7 @@ export class SeyeonInternalDogfoodScenarioRunnerErrorV1 extends Error {
   }
 }
 
-function assertRelationshipPrecondition(
+export function assertSeyeonInternalDogfoodRelationshipPreconditionV1(
   scenario: SeyeonInternalDogfoodScenarioV1,
   inspection: SeyeonInternalDogfoodRelationshipInspectionV1,
 ): void {
@@ -135,7 +135,7 @@ function boundedRunId(value: string): string {
   return normalized;
 }
 
-function clientTurnId(
+export function buildSeyeonInternalDogfoodClientTurnIdV1(
   scenarioId: string,
   runId: string,
   turnIndex: number,
@@ -181,7 +181,7 @@ export async function runSeyeonInternalDogfoodScenarioV1(
       await input.relationshipInspector.inspect({
         verifiedEvidence: input.verifiedEvidence,
       });
-    assertRelationshipPrecondition(
+    assertSeyeonInternalDogfoodRelationshipPreconditionV1(
       input.scenario,
       relationshipPreflight,
     );
@@ -199,11 +199,12 @@ export async function runSeyeonInternalDogfoodScenarioV1(
   ) {
     const fixture = input.scenario.turns[zeroIndex]!;
     const turnIndex = zeroIndex + 1;
-    const turnClientId = clientTurnId(
-      input.scenario.scenarioId,
-      runId,
-      turnIndex,
-    );
+    const turnClientId =
+      buildSeyeonInternalDogfoodClientTurnIdV1(
+        input.scenario.scenarioId,
+        runId,
+        turnIndex,
+      );
     const now = input.now?.() ?? new Date();
     const expiresAt = leaseExpiresAt(now);
     const before = input.observer.snapshot();
