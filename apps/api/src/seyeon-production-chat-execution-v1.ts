@@ -472,8 +472,9 @@ export async function runSeyeonProductionChatExecutionV1(
   });
   assertSeyeonProductionAttemptOwnershipV1(attempt);
 
-  let committedTurn: SeyeonProductionChatCommitReceiptV1 | null = null;
-  let runtimeResult: RunSeyeonCharacterTurnV2Result | null = null;
+  const commitState: {
+    value: SeyeonProductionChatCommitReceiptV1 | null;
+  } = { value: null };
 
   let relationshipResult: RunSeyeonProductionContextVerticalSliceResultV1<RunSeyeonCharacterTurnV2Result>;
   try {
@@ -547,8 +548,6 @@ export async function runSeyeonProductionChatExecutionV1(
           rendererProvider: input.rendererProvider,
           semanticReviewerProvider: input.semanticReviewerProvider,
         });
-        runtimeResult = runtime;
-
         const generatedHash = sha256(runtime.envelope);
         await input.persistencePort.persistGenerated({
           subjectId,
@@ -645,7 +644,7 @@ export async function runSeyeonProductionChatExecutionV1(
           postTurnSnapshot: postTurnSnapshot.snapshot,
           postTurnSnapshotHash: postTurnSnapshot.snapshotHash,
         });
-        committedTurn = committed;
+        commitState.value = committed;
 
         return Object.freeze({
           turnResult: runtime,
@@ -663,7 +662,7 @@ export async function runSeyeonProductionChatExecutionV1(
 
 
   } catch (error) {
-    if (committedTurn === null) {
+    if (commitState.value === null) {
       await input.persistencePort.failAttempt({
         subjectId,
         turnId: receivedTurn.turnId,
@@ -675,7 +674,8 @@ export async function runSeyeonProductionChatExecutionV1(
     throw error;
   }
 
-  if (committedTurn === null || runtimeResult === null) {
+  const committedTurn = commitState.value;
+  if (committedTurn === null) {
     throw new SeyeonProductionChatExecutionErrorV1(
       'Production Chat execution returned without a committed assistant turn.',
     );
@@ -685,6 +685,7 @@ export async function runSeyeonProductionChatExecutionV1(
       'Committed Production Chat turn is missing its durable post-turn outbox identity.',
     );
   }
+  const runtimeResult = relationshipResult.turnResult;
 
   let postTurnAnalysis:
     RunSeyeonProductionChatExecutedResultV1['postTurnAnalysis'];
