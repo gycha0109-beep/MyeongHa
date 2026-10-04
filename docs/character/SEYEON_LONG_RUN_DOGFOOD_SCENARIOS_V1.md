@@ -83,5 +83,6 @@ Those remain server-owned Production reads.
 - public Chat activation;
 - personal Memory writes;
 - relationship policy changes;
-- conflict/reconciliation/return fixtures, which belong to the next controlled
-  relationship-state scenario slice.
+- relationship-state mutation or seeding. Governed conflict, reconciliation,
+  and return scenarios are provided by the companion relationship dogfood
+  slice and require pre-existing authoritative Production history.
