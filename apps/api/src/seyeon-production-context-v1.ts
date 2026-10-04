@@ -1,5 +1,6 @@
 import {
   replayProductionRelationshipHistoryV1,
+  type ProductionRelationshipHistoryRecordV1,
 } from '../../../packages/domain/src/relationship-policy-reference-replay-v1.js';
 import type {
   ProductionRelationshipEventV1,
