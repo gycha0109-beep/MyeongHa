@@ -148,7 +148,7 @@ describe('Se-yeon first-meeting live execution surface', () => {
       "MYEONGHA_DATABASE_PRINCIPAL: ${{ secrets.MYEONGHA_DATABASE_PRINCIPAL }}",
     );
     expect(workflow).toContain(
-      "[[ "${MYEONGHA_DATABASE_PRINCIPAL:-}" == 'myeongha_runtime' ]]",
+      `[[ "\${MYEONGHA_DATABASE_PRINCIPAL:-}" == 'myeongha_runtime' ]]`,
     );
     expect(workflow).toContain(
       'node scripts/run-seyeon-first-meeting-live-dogfood.mjs',
