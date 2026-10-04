@@ -63,6 +63,14 @@ export interface SeyeonProductionChatReceivedTurnV1 {
   readonly threadCharacterId: string;
   readonly contentReleaseId: string;
   readonly contentBundleId: string;
+  readonly turnState: string;
+  readonly committedTurn: null | Readonly<{
+    readonly attemptId: string;
+    readonly assistantMessageId: string;
+    readonly assistantText: string;
+    readonly sequenceNo: number;
+    readonly committedAt: string;
+  }>;
   readonly replayed: boolean;
 }
 
@@ -192,8 +200,9 @@ extends BaseProductionSliceInputV1 {
   readonly postTurn: SeyeonProductionChatPostTurnInputV1;
 }
 
-export interface RunSeyeonProductionChatExecutionResultV1 {
+export interface RunSeyeonProductionChatExecutedResultV1 {
   readonly version: typeof SEYEON_PRODUCTION_CHAT_EXECUTION_VERSION_V1;
+  readonly disposition: 'executed';
   readonly receivedTurn: SeyeonProductionChatReceivedTurnV1;
   readonly attempt: SeyeonProductionChatAttemptV1;
   readonly committedTurn: SeyeonProductionChatCommitReceiptV1;
@@ -201,6 +210,18 @@ export interface RunSeyeonProductionChatExecutionResultV1 {
   readonly relationshipResult:
     RunSeyeonProductionContextVerticalSliceResultV1<RunSeyeonCharacterTurnV2Result>;
 }
+
+export interface RunSeyeonProductionChatCommittedReplayResultV1 {
+  readonly version: typeof SEYEON_PRODUCTION_CHAT_EXECUTION_VERSION_V1;
+  readonly disposition: 'committed_replay';
+  readonly receivedTurn: SeyeonProductionChatReceivedTurnV1;
+  readonly committedTurn: SeyeonProductionChatCommitReceiptV1;
+  readonly assistantText: string;
+}
+
+export type RunSeyeonProductionChatExecutionResultV1 =
+  | RunSeyeonProductionChatExecutedResultV1
+  | RunSeyeonProductionChatCommittedReplayResultV1;
 
 export class SeyeonProductionChatExecutionErrorV1 extends Error {
   constructor(message: string) {
@@ -265,6 +286,59 @@ function assertReceivePlan(input: {
     ),
     userText: boundedText(userText, 'userText', 8000),
   });
+}
+
+export function resolveSeyeonProductionCommittedReplayV1(
+  receivedTurn: SeyeonProductionChatReceivedTurnV1,
+): RunSeyeonProductionChatCommittedReplayResultV1 | null {
+  if (!receivedTurn.replayed) return null;
+
+  if (
+    receivedTurn.turnState === 'committed' ||
+    receivedTurn.turnState === 'delivered'
+  ) {
+    const committed = receivedTurn.committedTurn;
+    if (committed === null) {
+      throw new SeyeonProductionChatExecutionErrorV1(
+        'Committed Chat replay is missing authoritative assistant material.',
+      );
+    }
+    return Object.freeze({
+      version: SEYEON_PRODUCTION_CHAT_EXECUTION_VERSION_V1,
+      disposition: 'committed_replay' as const,
+      receivedTurn,
+      committedTurn: Object.freeze({
+        turnId: receivedTurn.turnId,
+        attemptId: committed.attemptId,
+        assistantMessageId: committed.assistantMessageId,
+        sequenceNo: committed.sequenceNo,
+        committedAt: committed.committedAt,
+        replayed: true,
+      }),
+      assistantText: committed.assistantText,
+    });
+  }
+
+  if (
+    receivedTurn.turnState === 'failed_final' ||
+    receivedTurn.turnState === 'abandoned'
+  ) {
+    throw new SeyeonProductionChatExecutionErrorV1(
+      'Terminal Chat replay cannot start another Production execution.',
+    );
+  }
+
+  return null;
+}
+
+export function assertSeyeonProductionAttemptOwnershipV1(
+  attempt: SeyeonProductionChatAttemptV1,
+): void {
+  if (attempt.replayed) {
+    throw new SeyeonProductionChatExecutionErrorV1(
+      'A Se-yeon Production execution attempt is already in flight.',
+    );
+  }
 }
 
 export function bindSeyeonProductionCurrentUserTurnV1(input: Readonly<{
@@ -342,12 +416,19 @@ export async function runSeyeonProductionChatExecutionV1(
     );
   }
 
+  const committedReplay =
+    resolveSeyeonProductionCommittedReplayV1(receivedTurn);
+  if (committedReplay !== null) {
+    return committedReplay;
+  }
+
   const attempt = await input.persistencePort.allocateAttempt({
     subjectId,
     turnId: receivedTurn.turnId,
     attemptId: input.executionIdPort.nextAttemptId(),
     plannerVersion: SEYEON_PRODUCTION_CHAT_PLANNER_VERSION_V1,
   });
+  assertSeyeonProductionAttemptOwnershipV1(attempt);
 
   let committedTurn: SeyeonProductionChatCommitReceiptV1 | null = null;
   let runtimeResult: RunSeyeonCharacterTurnV2Result | null = null;
@@ -574,6 +655,7 @@ export async function runSeyeonProductionChatExecutionV1(
 
   return Object.freeze({
     version: SEYEON_PRODUCTION_CHAT_EXECUTION_VERSION_V1,
+    disposition: 'executed' as const,
     receivedTurn,
     attempt,
     committedTurn,
