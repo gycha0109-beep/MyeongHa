@@ -7,7 +7,6 @@ import { acquireProductionMemberSmokeSession } from './production-member-smoke-s
 const PRODUCTION_ORIGIN = 'https://myeongha.vercel.app';
 const MEMBER_ME_URL = PRODUCTION_ORIGIN + '/api/me';
 const PRODUCTION_SUPABASE_ORIGIN = 'https://cnsfpcdiyofqvhpcegfc.supabase.co';
-const AUTH_USER_URL = PRODUCTION_SUPABASE_ORIGIN + '/auth/v1/user';
 const REQUEST_TIMEOUT_MS = 20_000;
 const EVIDENCE_DIR_NAME = 'seyeon-first-meeting-live-dogfood';
 
@@ -69,38 +68,6 @@ async function readJson(response, label) {
   }
 }
 
-async function resolveVerifiedAuthUserId(accessToken) {
-  const apiKey = requireEnv('MYEONGHA_SUPABASE_API_KEY', 4096);
-  const response = await fetch(AUTH_USER_URL, {
-    method: 'GET',
-    headers: {
-      accept: 'application/json',
-      apikey: apiKey,
-      authorization: 'Bearer ' + accessToken,
-    },
-    cache: 'no-store',
-    redirect: 'error',
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-  });
-  if (!response.ok) {
-    try {
-      void response.body?.cancel();
-    } catch {
-      // best-effort only
-    }
-    throw new Error(
-      'Supabase Auth user verification failed with HTTP ' +
-        String(response.status) +
-        '.',
-    );
-  }
-  const payload = await readJson(response, 'Supabase Auth user verification');
-  if (!isRecord(payload)) {
-    throw new Error('Supabase Auth user verification returned an invalid payload.');
-  }
-  return requireUuid('Supabase Auth user id', payload.id);
-}
-
 async function verifyCanonicalMember(accessToken) {
   const expectedSubjectId = requireUuid(
     'MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID',
@@ -153,9 +120,13 @@ function requireRuntimeConfiguration() {
   ];
   for (const name of required) requireEnv(name);
 
-  if (requireEnv('MYEONGHA_DATABASE_PRINCIPAL', 128) !== 'myeongha_runtime') {
+  const principal = requireEnv('MYEONGHA_DATABASE_PRINCIPAL', 128);
+  if (
+    !/^[a-z_][a-z0-9_]{0,62}$/u.test(principal) ||
+    ['postgres', 'supabase_admin', 'service_role', 'myeongha_api_executor'].includes(principal)
+  ) {
     throw new Error(
-      'MYEONGHA_DATABASE_PRINCIPAL must be the governed myeongha_runtime login principal.',
+      'MYEONGHA_DATABASE_PRINCIPAL must be a dedicated non-privileged PostgreSQL login principal.',
     );
   }
   if (requireEnv('MYEONGHA_SUPABASE_URL', 256) !== PRODUCTION_SUPABASE_ORIGIN) {
@@ -323,8 +294,10 @@ async function run() {
   requireRuntimeConfiguration();
   const session = await acquireProductionMemberSmokeSession();
   await verifyCanonicalMember(session.accessToken);
-  const verifiedAuthUserId =
-    await resolveVerifiedAuthUserId(session.accessToken);
+  const verifiedAuthUserId = requireUuid(
+    'Production Member authenticated user id',
+    session.verifiedAuthUserId,
+  );
   const runId = boundedRunId();
 
   const module = await import(
