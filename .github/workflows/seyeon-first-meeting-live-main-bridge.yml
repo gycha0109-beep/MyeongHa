@@ -1,0 +1,216 @@
+name: "[WT:character-memory] Se-yeon First Meeting Live Main Bridge"
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/seyeon-first-meeting-live-main.trigger'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: seyeon-first-meeting-live-main-bridge
+  cancel-in-progress: false
+
+env:
+  DOGFOOD_SOURCE_SHA: 8ec713a3d810aac159e8bb97c6cc82f6111c08f4
+  VERCEL_PROJECT_ID: prj_nXF0b5uv27Lyucz2SEBxzdCRXVsP
+  VERCEL_TEAM_ID: team_xuYA9OhCWlJETaYFOmeVodgS
+  VERCEL_PROJECT_NAME: myeongha
+
+jobs:
+  live:
+    name: run-seyeon-first-meeting-live-main-bridge
+    runs-on: ubuntu-24.04
+    environment: production
+    env:
+      MYEONGHA_PRODUCTION_MEMBER_EMAIL: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_EMAIL }}
+      MYEONGHA_PRODUCTION_MEMBER_PASSWORD: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_PASSWORD }}
+      MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID }}
+
+    steps:
+      - name: Check out bridge invocation commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Verify governed main invocation
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          [[ "${{ github.event_name }}" == 'push' ]]
+          [[ "${{ github.ref }}" == 'refs/heads/main' ]]
+          trigger_value="$(tr -d '\r\n' < .github/seyeon-first-meeting-live-main.trigger)"
+          [[ "$trigger_value" == 'fire-2026-10-04-v1' ]]
+
+          test -n "${MYEONGHA_PRODUCTION_MEMBER_EMAIL:-}"
+          test -n "${MYEONGHA_PRODUCTION_MEMBER_PASSWORD:-}"
+          test -n "${MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID:-}"
+
+      - name: Load governed Vercel Production runtime bindings
+        shell: bash
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          GH_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GH_SEYEON_MODEL_SECRET: ${{ secrets.MYEONGHA_SEYEON_OPENAI_MODEL }}
+          GH_SEYEON_MODEL_VAR: ${{ vars.MYEONGHA_SEYEON_OPENAI_MODEL }}
+          GH_SEYEON_TIMEOUT_VAR: ${{ vars.MYEONGHA_SEYEON_OPENAI_TIMEOUT_MS }}
+        run: |
+          set -euo pipefail
+          umask 077
+
+          test -n "${VERCEL_TOKEN:-}"
+
+          project_file="$RUNNER_TEMP/seyeon-live-vercel-project.json"
+          env_file="$RUNNER_TEMP/seyeon-live-vercel-env.json"
+
+          cleanup() {
+            exit_code=$?
+            trap - EXIT
+            rm -f "$project_file" "$env_file"
+            exit "$exit_code"
+          }
+          trap cleanup EXIT
+
+          curl -fsS \
+            -H "Authorization: Bearer $VERCEL_TOKEN" \
+            "https://api.vercel.com/v9/projects/$VERCEL_PROJECT_ID?teamId=$VERCEL_TEAM_ID" \
+            -o "$project_file"
+
+          jq -e \
+            --arg id "$VERCEL_PROJECT_ID" \
+            --arg name "$VERCEL_PROJECT_NAME" \
+            '.id == $id and .name == $name' \
+            "$project_file" >/dev/null
+
+          curl -fsS \
+            -H "Authorization: Bearer $VERCEL_TOKEN" \
+            "https://api.vercel.com/v9/projects/$VERCEL_PROJECT_ID/env?decrypt=true&teamId=$VERCEL_TEAM_ID" \
+            -o "$env_file"
+
+          jq -e '.envs | type == "array"' "$env_file" >/dev/null
+
+          read_vercel_env() {
+            local key="$1"
+            jq -er --arg key "$key" '
+              [
+                .envs[]
+                | select(.key == $key)
+                | select((.target // []) | index("production") != null)
+                | .value
+                | select(type == "string" and length > 0)
+              ]
+              | first // empty
+            ' "$env_file"
+          }
+
+          export_secret() {
+            local key="$1"
+            local value="$2"
+            test -n "$value"
+            echo "::add-mask::$value"
+            printf '%s=%s\n' "$key" "$value" >> "$GITHUB_ENV"
+          }
+
+          for key in \
+            MYEONGHA_DATABASE_URL \
+            MYEONGHA_DATABASE_PRINCIPAL \
+            MYEONGHA_SUPABASE_URL \
+            MYEONGHA_SUPABASE_API_KEY \
+            MYEONGHA_GUEST_FINGERPRINT_SECRET
+          do
+            value="$(read_vercel_env "$key")"
+            if [[ -z "$value" ]]; then
+              echo "Required Vercel Production binding is missing: $key" >&2
+              exit 1
+            fi
+            export_secret "$key" "$value"
+          done
+
+          openai_api_key="$(read_vercel_env OPENAI_API_KEY || true)"
+          if [[ -z "$openai_api_key" ]]; then
+            openai_api_key="${GH_OPENAI_API_KEY:-}"
+          fi
+          if [[ -z "$openai_api_key" ]]; then
+            echo 'OPENAI_API_KEY is not configured in Vercel Production or GitHub production environment.' >&2
+            exit 1
+          fi
+          export_secret OPENAI_API_KEY "$openai_api_key"
+
+          seyeon_model="$(read_vercel_env MYEONGHA_SEYEON_OPENAI_MODEL || true)"
+          if [[ -z "$seyeon_model" ]]; then
+            seyeon_model="${GH_SEYEON_MODEL_VAR:-}"
+          fi
+          if [[ -z "$seyeon_model" ]]; then
+            seyeon_model="${GH_SEYEON_MODEL_SECRET:-}"
+          fi
+          if [[ -z "$seyeon_model" ]]; then
+            echo 'MYEONGHA_SEYEON_OPENAI_MODEL is not configured.' >&2
+            exit 1
+          fi
+          printf '%s=%s\n' MYEONGHA_SEYEON_OPENAI_MODEL "$seyeon_model" >> "$GITHUB_ENV"
+
+          seyeon_timeout="$(read_vercel_env MYEONGHA_SEYEON_OPENAI_TIMEOUT_MS || true)"
+          if [[ -z "$seyeon_timeout" ]]; then
+            seyeon_timeout="${GH_SEYEON_TIMEOUT_VAR:-}"
+          fi
+          if [[ -n "$seyeon_timeout" ]]; then
+            [[ "$seyeon_timeout" =~ ^[1-9][0-9]*$ ]]
+            printf '%s=%s\n' MYEONGHA_SEYEON_OPENAI_TIMEOUT_MS "$seyeon_timeout" >> "$GITHUB_ENV"
+          fi
+
+      - name: Check out pinned PHASE S dogfood source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.DOGFOOD_SOURCE_SHA }}
+          clean: true
+
+      - name: Verify pinned source
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD)" == "$DOGFOOD_SOURCE_SHA" ]]
+          test -f scripts/run-seyeon-first-meeting-live-dogfood.mjs
+          test -f apps/api/src/seyeon-live-provider-readiness-v1.ts
+
+      - name: Set up Node 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Build internal dogfood runtime
+        run: npm run build
+
+      - name: Verify OpenAI structured-provider readiness
+        run: node dist/apps/api/src/seyeon-live-provider-readiness-cli-v1.js
+
+      - name: Execute first-meeting live dogfood
+        id: live
+        env:
+          SEYEON_LIVE_RUN_ID: gha-main-${{ github.run_id }}-${{ github.run_attempt }}
+        run: node scripts/run-seyeon-first-meeting-live-dogfood.mjs
+
+      - name: Upload redacted live evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: seyeon-first-meeting-live-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/seyeon-first-meeting-live-dogfood/evidence.json
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Enforce technical live verdict
+        if: always()
+        shell: bash
+        env:
+          CAMPAIGN_STATUS: ${{ steps.live.outputs.campaign_status }}
+          TECHNICAL_VERDICT: ${{ steps.live.outputs.technical_verdict }}
+        run: |
+          set -euo pipefail
+          [[ "$CAMPAIGN_STATUS" == 'READY_CREATED' || "$CAMPAIGN_STATUS" == 'READY_REUSED_EMPTY' ]]
+          [[ "$TECHNICAL_VERDICT" == 'PASS' ]]
