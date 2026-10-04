@@ -6,6 +6,9 @@ import {
   executePostgresSubjectTransactionV1,
   type PostgresSubjectPoolV1,
 } from './postgres-subject-execution.js';
+import type {
+  VerifiedSubjectIdentityEvidenceV1,
+} from './subject-identity-resolver.js';
 
 const POST_METHOD = 'POST' as const;
 const ROUTE = '/api/chat' as const;
@@ -54,7 +57,7 @@ type ChatOpenCommandRowV1 = Readonly<{
   characterId: unknown;
 }>;
 
-type ChatOpenDataV1 = Readonly<{
+export type ChatOpenDataV1 = Readonly<{
   threadId: string;
   characterId: string;
   created: boolean;
@@ -208,6 +211,59 @@ function mapCommandRow(
   });
 }
 
+export interface OpenMemberSingleCharacterThreadInputV1 {
+  readonly verifiedEvidence: VerifiedSubjectIdentityEvidenceV1;
+  readonly characterId: string;
+  readonly pool: PostgresSubjectPoolV1;
+  readonly createUuid: () => string;
+}
+
+export type OpenMemberSingleCharacterThreadResultV1 =
+  | ChatOpenDataV1
+  | Readonly<{ forbiddenGuest: true }>;
+
+export async function openMemberSingleCharacterThreadV1(
+  input: OpenMemberSingleCharacterThreadInputV1,
+): Promise<OpenMemberSingleCharacterThreadResultV1> {
+  const characterId = input.characterId.trim();
+  if (!CHAT_LAUNCH_CHARACTER_ID_SET_V1.has(characterId)) {
+    throw new ApiCommandError(
+      'NOT_FOUND',
+      'Selected Character is not in the Launch roster.',
+    );
+  }
+
+  const candidateThreadId = requireUuid(
+    'candidate thread id',
+    input.createUuid(),
+  );
+  const candidateThreadCharacterId = requireUuid(
+    'candidate thread character id',
+    input.createUuid(),
+  );
+
+  return executePostgresSubjectTransactionV1({
+    pool: input.pool,
+    verifiedEvidence: input.verifiedEvidence,
+    execute: async ({ resolvedSubject, client }) => {
+      if (resolvedSubject.subjectKind !== 'member') {
+        return Object.freeze({ forbiddenGuest: true as const });
+      }
+
+      const result = await client.query<ChatOpenCommandRowV1>(
+        OPEN_MEMBER_THREAD_SQL,
+        [
+          resolvedSubject.subjectId,
+          characterId,
+          candidateThreadId,
+          candidateThreadCharacterId,
+        ],
+      );
+      return mapCommandRow(result.rows, characterId);
+    },
+  });
+}
+
 function mapCommandError(error: unknown, requestId: string): Response | null {
   if (error instanceof ApiCommandError && error.code === 'AUTH_REQUIRED') {
     return jsonError({
@@ -340,29 +396,12 @@ export async function handleChatOpenRequestV1(
     });
   }
 
-  const candidateThreadId = requireUuid('candidate thread id', input.createUuid());
-  const candidateThreadCharacterId = requireUuid(
-    'candidate thread character id',
-    input.createUuid(),
-  );
-
   try {
-    const data = await executePostgresSubjectTransactionV1({
-      pool: input.pool,
+    const data = await openMemberSingleCharacterThreadV1({
       verifiedEvidence,
-      execute: async ({ resolvedSubject, client }) => {
-        if (resolvedSubject.subjectKind !== 'member') {
-          return { forbiddenGuest: true } as const;
-        }
-
-        const result = await client.query<ChatOpenCommandRowV1>(OPEN_MEMBER_THREAD_SQL, [
-          resolvedSubject.subjectId,
-          characterId,
-          candidateThreadId,
-          candidateThreadCharacterId,
-        ]);
-        return mapCommandRow(result.rows, characterId);
-      },
+      characterId,
+      pool: input.pool,
+      createUuid: input.createUuid,
     });
 
     if ('forbiddenGuest' in data) {
