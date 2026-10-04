@@ -525,7 +525,7 @@ chain_provenance_id="e1471000-0000-4000-8000-000000000014"
 chain_authority_provenance_id="e1471000-0000-4000-8000-000000000015"
 chain_snapshot_hash="sha256:v1:e147-phase-s-db-chain"
 
-"\${psql_base[@]}" -At <<SQL >/dev/null
+"${psql_base[@]}" -At <<SQL >/dev/null
 begin;
 set local role myeongha_api_executor;
 select pg_catalog.set_config('myeongha.subject_id','$subject_id',true);
@@ -619,13 +619,13 @@ select * from public.cmd_commit_seyeon_chat_turn_runtime_v2(
 commit;
 SQL
 
-chain_assistant_occurred_at=$("\${psql_base[@]}" -Atc "
+chain_assistant_occurred_at=$("${psql_base[@]}" -Atc "
 select date_trunc('milliseconds',created_at)
 from public.conversation_messages
 where id='$chain_assistant_message_id';
 ")
 
-chain_production_event_json=$("\${psql_base[@]}" -Atc "
+chain_production_event_json=$("${psql_base[@]}" -Atc "
 select jsonb_build_object(
   'schemaVersion','relationship-event-v1',
   'authority','authorized_relationship_event_v1',
@@ -658,7 +658,7 @@ select jsonb_build_object(
 );
 ")
 
-chain_post_turn_result=$("\${psql_base[@]}" -At -F '|' <<SQL
+chain_post_turn_result=$("${psql_base[@]}" -At -F '|' <<SQL
 begin;
 set local role myeongha_api_executor;
 select pg_catalog.set_config('myeongha.subject_id','$subject_id',true);
@@ -698,7 +698,7 @@ SQL
   fail "PHASE S post-turn completion mismatch: $chain_post_turn_result"
 pass "PHASE S DB chain checkpoints one admitted Event, enqueues sync, then completes post-turn"
 
-chain_worker_result=$("\${psql_base[@]}" -At -F '|' <<SQL
+chain_worker_result=$("${psql_base[@]}" -At -F '|' <<SQL
 begin;
 set local role myeongha_api_executor;
 select pg_catalog.set_config('myeongha.subject_id','$subject_id',true);
@@ -795,7 +795,7 @@ SQL
   fail "PHASE S relationship sync completion mismatch: $chain_worker_result"
 pass "PHASE S DB chain applies the checkpointed Event exactly once through relationship authority"
 
-chain_final_shape=$("\${psql_base[@]}" -At -F '|' <<SQL
+chain_final_shape=$("${psql_base[@]}" -At -F '|' <<SQL
 begin;
 set local role myeongha_api_executor;
 select pg_catalog.set_config('myeongha.subject_id','$subject_id',true);
@@ -812,7 +812,7 @@ SQL
   fail "PHASE S next-turn relationship projection mismatch: $chain_final_shape"
 pass "PHASE S next-turn read observes the committed relationship revision after durable workers"
 
-chain_sync_replay=$("\${psql_base[@]}" -At -F '|' <<SQL
+chain_sync_replay=$("${psql_base[@]}" -At -F '|' <<SQL
 begin;
 set local role myeongha_api_executor;
 select pg_catalog.set_config('myeongha.subject_id','$subject_id',true);
