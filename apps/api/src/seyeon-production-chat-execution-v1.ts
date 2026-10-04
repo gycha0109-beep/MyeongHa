@@ -461,7 +461,49 @@ export async function runSeyeonProductionChatExecutionV1(
   const committedReplay =
     resolveSeyeonProductionCommittedReplayV1(receivedTurn);
   if (committedReplay !== null) {
-    return committedReplay;
+    const recoveryRows = await input.postTurn.analysisOutboxPort.findByTurn({
+      subjectId,
+      turnId: receivedTurn.turnId,
+    });
+    if (recoveryRows.length > 1) {
+      throw new SeyeonProductionChatExecutionErrorV1(
+        'Committed Chat replay resolved more than one post-turn analysis job.',
+      );
+    }
+    const recoveryJob = recoveryRows[0];
+    if (
+      recoveryJob !== undefined &&
+      (recoveryJob.status === 'pending' ||
+        recoveryJob.status === 'processing')
+    ) {
+      try {
+        await processSeyeonPostTurnAnalysisV1({
+          subjectId,
+          outboxEventId: recoveryJob.outboxEventId,
+          lockOwner: input.postTurn.lockOwner,
+          leaseExpiresAt: input.postTurn.leaseExpiresAt,
+          outboxPort: input.postTurn.analysisOutboxPort,
+          extractorProvider: input.postTurn.extractorProvider,
+          ...(input.relationshipSyncOutboxPort === undefined
+            ? {}
+            : {
+                relationshipSyncOutboxPort:
+                  input.relationshipSyncOutboxPort,
+              }),
+        });
+      } catch {
+        // Chat replay remains available even while durable post-turn work waits
+        // for lease expiry/reclaim or downstream relationship recovery.
+      }
+    }
+    return Object.freeze({
+      ...committedReplay,
+      committedTurn: Object.freeze({
+        ...committedReplay.committedTurn,
+        postTurnOutboxEventId:
+          recoveryJob?.outboxEventId ?? null,
+      }),
+    });
   }
 
   const attempt = await input.persistencePort.allocateAttempt({
