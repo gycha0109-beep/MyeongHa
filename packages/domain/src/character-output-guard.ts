@@ -1,4 +1,7 @@
 import {
+  findReadingPublicTrustLanguageViolationV1,
+} from '../../character-content/src/index.js';
+import {
   RELATIONSHIP_EVENT_CANDIDATES,
   type RelationshipEventCandidate,
 } from '../../contracts/src/index.js';
@@ -221,6 +224,20 @@ function assertNoProtectedEcho(
   }
 }
 
+function assertReadingPublicTrustLanguage(
+  text: string | null,
+  path: string,
+): void {
+  if (text === null) return;
+  const violation =
+    findReadingPublicTrustLanguageViolationV1(text);
+  if (violation !== null) {
+    throw new CharacterOutputGuardError(
+      `${path} violates reading public trust language policy: ${violation.ruleKey}.`,
+    );
+  }
+}
+
 export function guardCharacterRendererOutput(input: {
   readonly rawOutput: unknown;
   readonly context: CharacterRuntimeContextV1;
@@ -251,6 +268,11 @@ export function guardCharacterRendererOutput(input: {
 
   const framingBefore = optionalBoundedText(input.rawOutput.framingBefore, 'framingBefore');
   const framingAfter = optionalBoundedText(input.rawOutput.framingAfter, 'framingAfter');
+
+  if (input.context.saju !== null) {
+    assertReadingPublicTrustLanguage(framingBefore, 'framingBefore');
+    assertReadingPublicTrustLanguage(framingAfter, 'framingAfter');
+  }
 
   const emotion = boundedIdentifier(input.rawOutput.emotion, 'emotion');
   if (!input.context.rendererPolicy.allowedEmotionIds.includes(emotion)) {
@@ -306,6 +328,10 @@ export function guardCharacterRendererOutput(input: {
     (input.context.saju?.protectedSegments ?? []).map((segment, index) => {
       if (readingRef === null) throw new CharacterOutputGuardError('Protected Saju segment without readingRef.');
       verifyProtectedTextRef(segment, readingRef, `protectedSajuSegments[${index}]`);
+      assertReadingPublicTrustLanguage(
+        segment.text,
+        `protectedSajuSegments[${index}].text`,
+      );
       return Object.freeze({ ...segment });
     }),
   );
@@ -313,6 +339,10 @@ export function guardCharacterRendererOutput(input: {
     (input.context.saju?.disclosures ?? []).map((disclosure, index) => {
       if (readingRef === null) throw new CharacterOutputGuardError('Protected Saju disclosure without readingRef.');
       verifyProtectedTextRef(disclosure, readingRef, `protectedSajuDisclosures[${index}]`);
+      assertReadingPublicTrustLanguage(
+        disclosure.text,
+        `protectedSajuDisclosures[${index}].text`,
+      );
       return Object.freeze({ ...disclosure });
     }),
   );
