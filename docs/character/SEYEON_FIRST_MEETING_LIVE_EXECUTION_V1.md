@@ -106,6 +106,28 @@ already implemented by the campaign.
 It does not connect through the Supabase administrative database principal and
 does not create an alternate elevated dogfood DB path.
 
+## Provider readiness gate
+
+Before the campaign runner can open or reuse the Member's Se-yeon thread, the
+workflow performs one non-conversational OpenAI Responses request through the
+same configured structured-provider adapter.
+
+The probe:
+
+- uses the configured `OPENAI_API_KEY`, model, origin, and timeout path;
+- uses `store: false`;
+- requires strict JSON Schema output `{"ready": true}`;
+- contains no Member, Subject, thread, Character-memory, or conversation data;
+- performs no PostgreSQL operation;
+- performs exactly one provider request and has no implicit retry.
+
+Any provider configuration, network, timeout, HTTP, refusal, or structured
+output failure stops the workflow before the live campaign runner starts.
+
+This gate reduces the risk of partially committing a ten-turn campaign because
+of a bad provider key/model/configuration. It does not create a retry policy for
+mid-campaign failures.
+
 ## Live execution
 
 The runner builds the TypeScript runtime and executes:
