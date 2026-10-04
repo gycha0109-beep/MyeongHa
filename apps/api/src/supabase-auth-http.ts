@@ -264,11 +264,6 @@ function normalizeSession(payload: unknown): AuthSessionV1 | null {
   });
 }
 
-function cancelUnusedRequestBody(request: Request): void {
-  if (request.body === null) return;
-  void request.body.cancel().catch(() => undefined);
-}
-
 function cancelUnusedResponseBody(response: Response): void {
   if (response.body === null) return;
   void response.body.cancel().catch(() => undefined);
@@ -347,9 +342,6 @@ export async function handleSupabaseAuthRequestV1(input: {
   readonly passwordCompromiseGuard?: PasswordCompromiseGuardPortV1;
 }): Promise<Response> {
   if (input.request.method !== 'POST') {
-    try {
-      cancelUnusedRequestBody(input.request);
-    } catch {}
     return new Response(null, {
       status: 405,
       headers: { Allow: 'POST', 'Cache-Control': NO_STORE },
@@ -361,7 +353,6 @@ export async function handleSupabaseAuthRequestV1(input: {
 
   try {
     if (input.action === 'sign-out') {
-      cancelUnusedRequestBody(input.request);
       const authorization = input.request.headers.get('authorization');
       if (!authorization || !/^Bearer [^\s,]+$/u.test(authorization)) {
         const denied = errorResponse('AUTH_REQUIRED', 401);
@@ -383,7 +374,6 @@ export async function handleSupabaseAuthRequestV1(input: {
     if (input.action === 'refresh') {
       let refreshToken: string | null;
       if (webCookieTransport) {
-        cancelUnusedRequestBody(input.request);
         refreshToken = readMemberRefreshCookieV1(input.request);
       } else {
         const refreshBody = await readObjectBody(input.request);
