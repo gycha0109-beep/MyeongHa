@@ -10,6 +10,7 @@ import {
   type ProductionRelationshipHistoryRecordV1,
   type SeyeonDialogueEnvelopeV2,
   type SeyeonEventAuthorityEvidenceV1,
+  type SeyeonEventExtractionPriorEventV2,
   type SeyeonProductionRelationshipCausalBindingV1,
   type SeyeonRelationshipEventV2,
   type SeyeonRelationshipProjectionV2,
@@ -34,6 +35,9 @@ import {
   snapshotSeyeonProductionCausalBindingsV1,
   type SeyeonProductionRelationshipModeV1,
 } from './seyeon-production-relationship-sync-v1.js';
+import {
+  snapshotSeyeonProductionHistoryCausalContextV1,
+} from './seyeon-production-causal-context-v1.js';
 
 export const SEYEON_POST_TURN_ANALYSIS_SNAPSHOT_VERSION_V1 =
   'seyeon-post-turn-analysis-snapshot-v1' as const;
@@ -77,7 +81,7 @@ export interface SeyeonPostTurnAnalysisSnapshotV1 {
   readonly interpretation: SeyeonTurnInterpretationV2;
   readonly envelope: SeyeonDialogueEnvelopeV2;
   readonly eventAuthorityEvidence: SeyeonEventAuthorityEvidenceV1;
-  readonly priorEvents: readonly SeyeonRelationshipEventV2[];
+  readonly priorEvents: readonly SeyeonEventExtractionPriorEventV2[];
   readonly relationshipBefore: SeyeonRelationshipProjectionV2;
   readonly productionCausalBindings:
     readonly SeyeonProductionRelationshipCausalBindingV1[];
@@ -379,7 +383,8 @@ export function validateSeyeonPostTurnAnalysisSnapshotV1(
     eventAuthorityEvidence:
       raw.eventAuthorityEvidence as unknown as SeyeonEventAuthorityEvidenceV1,
     priorEvents:
-      raw.priorEvents as unknown as readonly SeyeonRelationshipEventV2[],
+      raw.priorEvents as unknown as
+        readonly SeyeonEventExtractionPriorEventV2[],
     relationshipBefore:
       raw.relationshipBefore as unknown as SeyeonRelationshipProjectionV2,
     productionCausalBindings:
@@ -429,12 +434,49 @@ export function prepareSeyeonPostTurnAnalysisSnapshotV1(
     now: instant(input.preparedAt, 'preparedAt'),
   });
 
-  const productionCausalBindings =
+  const productionCausal =
+    snapshotSeyeonProductionHistoryCausalContextV1(
+      input.productionHistoryRecords,
+    );
+  const experimentalBindings =
     snapshotSeyeonProductionCausalBindingsV1({
       subjectId: input.subjectId,
       experimentalEvents: prepared.priorEvents,
       productionHistoryRecords: input.productionHistoryRecords,
     });
+
+  const priorEvents: SeyeonEventExtractionPriorEventV2[] = [
+    ...productionCausal.priorEvents,
+  ];
+  const priorIds = new Set(priorEvents.map((event) => event.eventId));
+  for (const event of prepared.priorEvents) {
+    if (priorEvents.length >= 8) break;
+    if (priorIds.has(event.eventId)) continue;
+    priorEvents.push(event);
+    priorIds.add(event.eventId);
+  }
+
+  const productionCausalBindings:
+    SeyeonProductionRelationshipCausalBindingV1[] = [
+      ...productionCausal.causalBindings,
+    ];
+  const bindingRefs = new Set(
+    productionCausalBindings.map(
+      (binding) =>
+        binding.causalEventRef ??
+        binding.experimentalEventId ??
+        '',
+    ),
+  );
+  for (const binding of experimentalBindings) {
+    const ref =
+      binding.causalEventRef ??
+      binding.experimentalEventId ??
+      '';
+    if (ref.length === 0 || bindingRefs.has(ref)) continue;
+    productionCausalBindings.push(binding);
+    bindingRefs.add(ref);
+  }
 
   const snapshot: SeyeonPostTurnAnalysisSnapshotV1 = Object.freeze({
     schemaVersion: SEYEON_POST_TURN_ANALYSIS_SNAPSHOT_VERSION_V1,
@@ -462,9 +504,10 @@ export function prepareSeyeonPostTurnAnalysisSnapshotV1(
         ? {}
         : { serverObservationRefs: input.serverObservationRefs }),
     }),
-    priorEvents: prepared.priorEvents,
+    priorEvents: Object.freeze(priorEvents),
     relationshipBefore: prepared.relationshipBefore,
-    productionCausalBindings,
+    productionCausalBindings:
+      Object.freeze(productionCausalBindings),
     identity: Object.freeze({
       experimentalEventId: boundedText(
         input.identity.experimentalEventId,
