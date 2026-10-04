@@ -1,1 +1,1 @@
-fire-2026-10-03-saju-guest-production-smoke-v1
+fire-2026-10-04-saju-reading-bound-production-smoke-v1
