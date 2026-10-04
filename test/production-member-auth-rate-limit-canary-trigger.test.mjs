@@ -5,6 +5,8 @@ const WORKFLOW =
   '.github/workflows/production-member-auth-rate-limit-canary.yml';
 const TRIGGER =
   '.github/production-member-auth-rate-limit-canary.trigger';
+const SCRIPT =
+  'scripts/operations/run-production-member-auth-rate-limit-canary.mjs';
 
 describe('Production Member Auth rate-limit canary protected-main trigger', () => {
   it('allows only workflow dispatch or the dedicated main push trigger path', () => {
@@ -42,7 +44,21 @@ describe('Production Member Auth rate-limit canary protected-main trigger', () =
     const trigger = readFileSync(TRIGGER, 'utf8').trim();
 
     expect(trigger).toBe(
-      'fire-2026-10-04-a09-rate-limited-observability-v2',
+      'fire-2026-10-04-a09-rate-limited-observability-v3',
     );
+  });
+
+  it('pins endpoint-specific local pre-limit responses before the shared 429 boundary', () => {
+    const script = readFileSync(SCRIPT, 'utf8');
+
+    expect(script).toContain("action: 'sign-in'");
+    expect(script).toContain("action: 'sign-up'");
+    expect(script).toContain("action: 'refresh'");
+    expect(script).toContain("expectedPreLimitStatus: 400");
+    expect(script).toContain("expectedPreLimitCode: 'INVALID_REQUEST'");
+    expect(script).toContain("expectedPreLimitStatus: 401");
+    expect(script).toContain("expectedPreLimitCode: 'SESSION_EXPIRED'");
+    expect(script).toContain("body.error.code !== endpoint.expectedPreLimitCode");
+    expect(script).toContain("first_rate_limited_attempt");
   });
 });
