@@ -24,7 +24,19 @@ export const SEYEON_PRODUCTION_RELATIONSHIP_MAX_EVENTS_PER_TURN_V1 =
   4 as const;
 
 export interface SeyeonProductionRelationshipCausalBindingV1 {
-  readonly experimentalEventId: string;
+  /**
+   * Compatibility field for bindings originating from an active experimental
+   * ledger Event. Production-history causal views do not fabricate one.
+   */
+  readonly experimentalEventId?: string;
+  /**
+   * Server-owned causal reference presented to the extractor. For direct
+   * Production-history context this is the Production Event id itself.
+   */
+  readonly causalEventRef?: string;
+  readonly bindingAuthority?:
+    | 'experimental_event_binding'
+    | 'authorized_production_history';
   readonly productionEvent: ProductionRelationshipEventV1;
 }
 
@@ -153,13 +165,24 @@ function causalProductionEvents(input: {
   const ids = input.experimentalEvent.causalPredecessorEventIds;
   if (ids.length === 0) return Object.freeze([]);
 
-  const resolved = ids.map((experimentalId) => {
-    const matches = input.bindings.filter(
-      (binding) => binding.experimentalEventId === experimentalId,
-    );
+  const resolved = ids.map((causalEventRef) => {
+    const matches = input.bindings.filter((binding) => {
+      const boundRef =
+        binding.causalEventRef ?? binding.experimentalEventId ?? null;
+      if (
+        binding.causalEventRef !== undefined &&
+        binding.experimentalEventId !== undefined &&
+        binding.causalEventRef !== binding.experimentalEventId
+      ) {
+        throw new SeyeonProductionRelationshipAdmissionErrorV1(
+          'Causal binding aliases must identify the same predecessor.',
+        );
+      }
+      return boundRef === causalEventRef;
+    });
     if (matches.length !== 1) {
       throw new SeyeonProductionRelationshipAdmissionErrorV1(
-        'Every experimental causal predecessor must resolve to exactly one Production Event.',
+        'Every causal predecessor must resolve to exactly one authorized Production Event.',
       );
     }
     return validateProductionRelationshipEventV1(matches[0]!.productionEvent);
