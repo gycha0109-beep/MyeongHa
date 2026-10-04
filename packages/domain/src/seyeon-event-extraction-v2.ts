@@ -20,10 +20,22 @@ export interface SeyeonEventExtractionMessageV2 {
   readonly text: string;
 }
 
+export interface SeyeonEventExtractionPriorEventV2 {
+  readonly authority:
+    | 'experimental_non_canonical_event'
+    | 'authorized_production_relationship_event_v1';
+  readonly eventId: string;
+  readonly characterId: 'seyeon';
+  readonly eventKind: SeyeonExperimentalEventKindV2;
+  readonly occurredAt: string;
+  readonly causalPredecessorEventIds: readonly string[];
+  readonly facts: readonly SeyeonEventFactV2[];
+}
+
 export interface SeyeonEventExtractionContextV2 {
   readonly turnId: string;
   readonly messages: readonly SeyeonEventExtractionMessageV2[];
-  readonly priorEvents: readonly SeyeonRelationshipEventV2[];
+  readonly priorEvents: readonly SeyeonEventExtractionPriorEventV2[];
   readonly interpretation: SeyeonTurnInterpretationV2;
   readonly envelope: SeyeonDialogueEnvelopeV2;
   readonly relationshipBefore: SeyeonRelationshipProjectionV2;
@@ -161,7 +173,7 @@ function parseOptionalRefs(
 function validateCausalRequirements(input: {
   readonly eventKind: SeyeonExperimentalEventKindV2;
   readonly causalPredecessorEventIds: readonly string[];
-  readonly priorEvents: readonly SeyeonRelationshipEventV2[];
+  readonly priorEvents: readonly SeyeonEventExtractionPriorEventV2[];
 }): void {
   const priorById = new Map(
     input.priorEvents.map((event) => [event.eventId, event] as const),
@@ -222,6 +234,17 @@ export function validateSeyeonEventExtractionContextV2(
   if (context.priorEvents.some((event) => event.characterId !== 'seyeon')) {
     throw new SeyeonEventExtractionErrorV2(
       'event extraction context cannot contain another Character private Event.',
+    );
+  }
+  if (
+    context.priorEvents.some(
+      (event) =>
+        event.authority !== 'experimental_non_canonical_event' &&
+        event.authority !== 'authorized_production_relationship_event_v1',
+    )
+  ) {
+    throw new SeyeonEventExtractionErrorV2(
+      'event extraction context prior Event authority is unsupported.',
     );
   }
 }
