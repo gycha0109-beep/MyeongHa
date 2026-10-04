@@ -248,6 +248,26 @@ numeric policy                 = HOLD
 enforcement                    = HOLD
 ```
 
+A third follow-up snapshot after the bounded ProductReadingResponse rollout is:
+
+```text
+docs/operations/SAJU_ABUSE_BASELINE_SNAPSHOT_2026-10-04_0126Z.json
+```
+
+Its explicit two-hour Production query window contained exactly five governed smoke invocations from GitHub Actions run `37166344665`:
+
+- Member calculation first;
+- Member calculation repeat;
+- Member Preview Reading;
+- Guest calculation;
+- Guest Preview Reading.
+
+Member Preview Reading was served by exact #1579 deployment `dpl_AcvLyvadX8XTLWanQMyMm35Gn6Rb` at SHA `5728a4a00872feb73d293e2b0c00247eb40e26bf`. Guest Preview Reading was served by the immediate #1580 trigger deployment, which includes the same bounded Reading implementation. Both returned HTTP 200 and `delivered`.
+
+All five requests are synthetic and are excluded from organic baseline metrics. After exclusion, the usable organic authenticated-attempt count in that query window is still zero.
+
+Therefore the bounded Reading Production path is **PROVEN**, while A06 remains **INSUFFICIENT / HOLD** for numeric admission policy and enforcement.
+
 ## Baseline decision
 
 A later evidence review must separately report, for each mounted route:
