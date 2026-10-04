@@ -96,3 +96,12 @@ C1-F must keep all of the following true:
 Real Character Content must provide reviewed `safeFraming` catalogs before it can be used for Saju-bearing production responses.
 
 The current schema keeps the catalog optional only to preserve incremental development compatibility with pre-C1 fixtures. Runtime strict mode itself fails closed when a Saju-bearing authored character has no safe-framing catalog.
+
+## 사용자 출력 신뢰 언어 규칙
+
+사주 공개 문장은 `docs/READING_PUBLIC_TRUST_LANGUAGE_POLICY_V1.md`를 따라야 한다.
+
+- 캐릭터 안전 문구, 의미 실현 문장, 보호 문구를 포함한 모든 사용자 노출 사주 문장에 적용한다.
+- “확정할 수 없다”, “단정할 수 없다”, “참고용”, “재미로만”, “맹신”, “과학적으로” 같은 제품 자기부정형 면책 문구를 금지한다.
+- 불확실성 자체를 삭제하지 않는다. 출생 시각 후보, 다중 해석, 자료 부족처럼 실제 원인을 구체적인 분기나 범위로 표현한다.
+- 작성 단계와 최종 공개 단계에서 모두 검사하며, 향후 AI 연결도 이 검사를 우회할 수 없다.
