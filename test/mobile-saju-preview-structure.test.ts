@@ -21,16 +21,45 @@ describe('mobile M3-B Saju Preview Reading structure', () => {
     expect(view).not.toContain('JSON.stringify');
   });
 
-  it('exposes only the exact five approved Preview topics and preserves neutral authority copy', async () => {
+  it('keeps exactly five executable Preview topics while exposing the full web topic surface', async () => {
     const client = await readRepoFile('packages/api-client/src/saju-preview.ts');
     const view = await readRepoFile(
       'apps/mobile/src/features/saju/SajuPreviewReadingView.tsx',
+    );
+    const catalog = await readRepoFile(
+      'apps/mobile/src/features/saju/mobile-saju-topic-catalog.ts',
     );
 
     for (const readingText of ['전체 사주', '직업운', '재물운', '연애운', '사업운']) {
       expect(client).toContain(`'${readingText}'`);
     }
     expect(client).not.toContain("'올해 운세'");
+    expect(view).toContain('MOBILE_SAJU_TOPIC_SECTIONS_V1');
+    expect(view).toContain('다른 주제의 풀이로 자동 대체하지 않습니다');
+
+    for (const label of [
+      '전체 사주',
+      '직업 · 커리어',
+      '재물',
+      '연애 · 관계',
+      '사업',
+      '가족',
+      '삶의 단계',
+      '올해',
+      '이번 달',
+      '배우자 · 관계',
+      '궁합',
+      '지금 고민으로 보기',
+    ]) {
+      expect(catalog).toContain(`label: '${label}'`);
+    }
+  });
+
+  it('preserves neutral Preview authority copy', async () => {
+    const view = await readRepoFile(
+      'apps/mobile/src/features/saju/SajuPreviewReadingView.tsx',
+    );
+
     expect(view).toContain('확정적 미래 예측은 포함하지 않습니다');
     expect(view).not.toContain('오늘 운세');
     expect(view).not.toContain('행운');
