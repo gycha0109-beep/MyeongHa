@@ -134,6 +134,12 @@
       "mainMode": "triggered-operations",
       "workTrackAttribution": "none"
     },
+    "seyeon-first-meeting-live-main-bridge.yml": {
+      "responsibility": "production-character-dogfood",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
     "production-chat-current-subject-smoke.yml": {
       "responsibility": "production-chat-smoke",
       "prMode": "none",
