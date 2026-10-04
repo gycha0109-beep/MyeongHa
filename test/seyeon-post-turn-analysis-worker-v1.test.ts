@@ -115,6 +115,7 @@ function analysisPort(
     order?: string[];
   },
 ): SeyeonPostTurnAnalysisOutboxPortV1 {
+  let checkpointJsonb: unknown | null = null;
   return {
     findByTurn(request) {
       expect(request.subjectId).toBe(SUBJECT_ID);
@@ -136,10 +137,33 @@ function analysisPort(
           committedAt: COMMITTED_AT,
           snapshotJsonb: input.snapshot,
           snapshotHash: hash(input.snapshot),
+          checkpointJsonb,
           status: 'processing',
           lockOwner: 'post-turn-worker-1',
           leaseExpiresAt: '2026-10-04T02:10:00.000Z',
           reclaimed: false,
+        }),
+      ]);
+    },
+    checkpoint(request) {
+      input.order?.push('checkpoint');
+      expect(request.outboxEventId).toBe(ANALYSIS_OUTBOX_ID);
+      if (checkpointJsonb === null) {
+        checkpointJsonb = request.checkpoint;
+        return Object.freeze([
+          Object.freeze({
+            outboxEventId: ANALYSIS_OUTBOX_ID,
+            status: 'processing',
+            replayed: false,
+          }),
+        ]);
+      }
+      expect(request.checkpoint).toEqual(checkpointJsonb);
+      return Object.freeze([
+        Object.freeze({
+          outboxEventId: ANALYSIS_OUTBOX_ID,
+          status: 'processing',
+          replayed: true,
         }),
       ]);
     },
@@ -248,7 +272,7 @@ describe('Se-yeon durable post-turn analysis worker V1', () => {
     );
 
     expect(result.decision).toBe('none');
-    expect(order).toEqual(['claim', 'complete']);
+    expect(order).toEqual(['claim', 'checkpoint', 'complete']);
   });
 
   it('enqueues the admitted Production relationship Event before completing the analysis job', async () => {
@@ -303,6 +327,73 @@ describe('Se-yeon durable post-turn analysis worker V1', () => {
     );
     expect(order).toEqual([
       'claim',
+      'checkpoint',
+      'relationship-enqueue',
+      'complete',
+    ]);
+  });
+
+  it('reuses the immutable authority checkpoint after a failed downstream enqueue without rerunning the extractor', async () => {
+    const order: string[] = [];
+    const value = snapshot();
+    const port = analysisPort({ snapshot: value, order });
+    let relationshipAttempts = 0;
+    const relationshipPort: SeyeonProductionRelationshipSyncOutboxPortV1 = {
+      enqueue(input) {
+        relationshipAttempts += 1;
+        order.push('relationship-enqueue');
+        if (relationshipAttempts === 1) {
+          throw new Error('temporary relationship outbox failure');
+        }
+        return Object.freeze([
+          Object.freeze({
+            outboxEventId: input.outboxEventId,
+            status: 'pending',
+            replayed: false,
+          }),
+        ]);
+      },
+      claim() {
+        throw new Error('not used');
+      },
+      complete() {
+        throw new Error('not used');
+      },
+    };
+
+    await expect(
+      processSeyeonPostTurnAnalysisV1({
+        ...baseInput(port, acceptedHelpProvider()),
+        relationshipSyncOutboxPort: relationshipPort,
+      }),
+    ).rejects.toThrow(/temporary relationship outbox failure/);
+
+    const extractorMustNotRunAgain: SeyeonStructuredProviderPortV2 = {
+      providerKey: 'must-not-run',
+      modelKey: 'must-not-run',
+      generate() {
+        throw new Error('extractor was rerun after checkpoint');
+      },
+    };
+
+    const retried = await processSeyeonPostTurnAnalysisV1({
+      ...baseInput(port, extractorMustNotRunAgain),
+      relationshipSyncOutboxPort: relationshipPort,
+    });
+
+    expect(retried).toEqual(
+      expect.objectContaining({
+        decision: 'enqueued',
+        productionEventId: PRODUCTION_EVENT_ID,
+        relationshipSyncOutboxEventId: RELATIONSHIP_OUTBOX_ID,
+      }),
+    );
+    expect(relationshipAttempts).toBe(2);
+    expect(order).toEqual([
+      'claim',
+      'checkpoint',
+      'relationship-enqueue',
+      'claim',
       'relationship-enqueue',
       'complete',
     ]);
@@ -334,6 +425,10 @@ describe('Se-yeon durable post-turn analysis worker V1', () => {
       }),
     ).rejects.toThrow(/temporary relationship outbox failure/);
 
-    expect(order).toEqual(['claim', 'relationship-enqueue']);
+    expect(order).toEqual([
+      'claim',
+      'checkpoint',
+      'relationship-enqueue',
+    ]);
   });
 });
