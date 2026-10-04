@@ -81,7 +81,7 @@ export function createSeyeonProductionTransactionalPortsV1(input: {
         requireSubject(subjectId, request.subjectId);
         return runner.run(subjectId, (client) =>
           createPostgresChatThreadRuntimeBindingAuthorityPortV1(client)
-            .readRuntimeBinding(request: Parameters<ChatThreadRuntimeBindingReadAuthorityPortV1['readRuntimeBinding']>[0]),
+            .readRuntimeBinding(request),
         );
       },
     });
@@ -91,7 +91,7 @@ export function createSeyeonProductionTransactionalPortsV1(input: {
       readBundleManifest(request: Parameters<ContentBundleManifestReadAuthorityPortV1['readBundleManifest']>[0]) {
         return runner.run(subjectId, (client) =>
           createPostgresContentBundleManifestReadAuthorityPortV1(client)
-            .readBundleManifest(request: Parameters<ContentBundleManifestReadAuthorityPortV1['readBundleManifest']>[0]),
+            .readBundleManifest(request),
         );
       },
     });
@@ -102,49 +102,49 @@ export function createSeyeonProductionTransactionalPortsV1(input: {
         requireSubject(subjectId, request.subjectId);
         return runner.run(subjectId, (client) =>
           createPostgresSeyeonProductionChatPersistencePortV1(client)
-            .receiveTurn(request: Parameters<SeyeonProductionChatPersistencePortV1['receiveTurn']>[0]),
+            .receiveTurn(request),
         );
       },
       allocateAttempt(request: Parameters<SeyeonProductionChatPersistencePortV1['allocateAttempt']>[0]) {
         requireSubject(subjectId, request.subjectId);
         return runner.run(subjectId, (client) =>
           createPostgresSeyeonProductionChatPersistencePortV1(client)
-            .allocateAttempt(request: Parameters<SeyeonProductionChatPersistencePortV1['allocateAttempt']>[0]),
+            .allocateAttempt(request),
         );
       },
       markContextReady(request: Parameters<SeyeonProductionChatPersistencePortV1['markContextReady']>[0]) {
         requireSubject(subjectId, request.subjectId);
         return runner.run(subjectId, (client) =>
           createPostgresSeyeonProductionChatPersistencePortV1(client)
-            .markContextReady(request: Parameters<SeyeonProductionChatPersistencePortV1['markContextReady']>[0]),
+            .markContextReady(request),
         );
       },
       failAttempt(request: Parameters<SeyeonProductionChatPersistencePortV1['failAttempt']>[0]) {
         requireSubject(subjectId, request.subjectId);
         return runner.run(subjectId, (client) =>
           createPostgresSeyeonProductionChatPersistencePortV1(client)
-            .failAttempt(request: Parameters<SeyeonProductionChatPersistencePortV1['failAttempt']>[0]),
+            .failAttempt(request),
         );
       },
       persistGenerated(request: Parameters<SeyeonProductionChatPersistencePortV1['persistGenerated']>[0]) {
         requireSubject(subjectId, request.subjectId);
         return runner.run(subjectId, (client) =>
           createPostgresSeyeonProductionChatPersistencePortV1(client)
-            .persistGenerated(request: Parameters<SeyeonProductionChatPersistencePortV1['persistGenerated']>[0]),
+            .persistGenerated(request),
         );
       },
       persistValidated(request: Parameters<SeyeonProductionChatPersistencePortV1['persistValidated']>[0]) {
         requireSubject(subjectId, request.subjectId);
         return runner.run(subjectId, (client) =>
           createPostgresSeyeonProductionChatPersistencePortV1(client)
-            .persistValidated(request: Parameters<SeyeonProductionChatPersistencePortV1['persistValidated']>[0]),
+            .persistValidated(request),
         );
       },
       commitTurn(request: Parameters<SeyeonProductionChatPersistencePortV1['commitTurn']>[0]) {
         requireSubject(subjectId, request.subjectId);
         return runner.run(subjectId, (client) =>
           createPostgresSeyeonProductionChatPersistencePortV1(client)
-            .commitTurn(request: Parameters<SeyeonProductionChatPersistencePortV1['commitTurn']>[0]),
+            .commitTurn(request),
         );
       },
     });
@@ -155,7 +155,7 @@ export function createSeyeonProductionTransactionalPortsV1(input: {
         requireSubject(subjectId, request.subjectId);
         return runner.run(subjectId, (client) =>
           createPostgresSeyeonProductionRelationshipReadAuthorityPortV1(client)
-            .readCurrent(request: Parameters<SeyeonProductionRelationshipReadAuthorityPortV1['readCurrent']>[0]),
+            .readCurrent(request),
         );
       },
     });
@@ -166,21 +166,21 @@ export function createSeyeonProductionTransactionalPortsV1(input: {
         requireSubject(subjectId, request.subjectId);
         return runner.run(subjectId, (client) =>
           createPostgresSeyeonProductionContextReadAuthorityPortV1(client)
-            .readPersonalRecords(request: Parameters<SeyeonProductionContextReadAuthorityPortV1['readPersonalRecords']>[0]),
+            .readPersonalRecords(request),
         );
       },
       readRelationshipHistory(request: Parameters<SeyeonProductionContextReadAuthorityPortV1['readRelationshipHistory']>[0]) {
         requireSubject(subjectId, request.subjectId);
         return runner.run(subjectId, (client) =>
           createPostgresSeyeonProductionContextReadAuthorityPortV1(client)
-            .readRelationshipHistory(request: Parameters<SeyeonProductionContextReadAuthorityPortV1['readRelationshipHistory']>[0]),
+            .readRelationshipHistory(request),
         );
       },
       readRecentMessages(request: Parameters<SeyeonProductionContextReadAuthorityPortV1['readRecentMessages']>[0]) {
         requireSubject(subjectId, request.subjectId);
         return runner.run(subjectId, (client) =>
           createPostgresSeyeonProductionContextReadAuthorityPortV1(client)
-            .readRecentMessages(request: Parameters<SeyeonProductionContextReadAuthorityPortV1['readRecentMessages']>[0]),
+            .readRecentMessages(request),
         );
       },
     });
@@ -191,7 +191,7 @@ export function createSeyeonProductionTransactionalPortsV1(input: {
         requireSubject(subjectId, request.subjectId);
         return runner.run(subjectId, (client) =>
           createPostgresSeyeonPostTurnAnalysisOutboxPortV1(client)
-            .findByTurn(request: Parameters<SeyeonPostTurnAnalysisOutboxPortV1['findByTurn']>[0]),
+            .findByTurn(request),
         );
       },
       claim(request: Parameters<SeyeonPostTurnAnalysisOutboxPortV1['claim']>[0]) {
@@ -205,7 +205,7 @@ export function createSeyeonProductionTransactionalPortsV1(input: {
         requireSubject(subjectId, request.subjectId);
         return runner.run(subjectId, (client) =>
           createPostgresSeyeonPostTurnAnalysisOutboxPortV1(client)
-            .checkpoint(request: Parameters<SeyeonPostTurnAnalysisOutboxPortV1['checkpoint']>[0]),
+            .checkpoint(request),
         );
       },
       complete(request: Parameters<SeyeonPostTurnAnalysisOutboxPortV1['complete']>[0]) {
