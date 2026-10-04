@@ -50,11 +50,11 @@ export interface RunSeyeonProductionVerticalSliceInputV1<TTurnResult> {
   readonly bandProjection?: SeyeonRelationshipBandProjectionV1 | null;
   readonly bandProjector?: SeyeonRelationshipBandProjectorV1;
   readonly relationshipReadPort: SeyeonProductionRelationshipReadAuthorityPortV1;
-  readonly productionHistoryRecords: readonly ProductionRelationshipHistoryRecordV1[];
+  readonly productionHistoryRecords?: readonly ProductionRelationshipHistoryRecordV1[];
   readonly productionAuthorityRef: string;
   readonly idPort: SeyeonProductionRelationshipSyncIdPortV1;
-  readonly contextPort: ProductionRelationshipApplyContextPortV1;
-  readonly commitPort: ProductionRelationshipApplyCommitPortV1;
+  readonly contextPort?: ProductionRelationshipApplyContextPortV1;
+  readonly commitPort?: ProductionRelationshipApplyCommitPortV1;
   readonly durableSync?: SyncSeyeonProductionRelationshipEventV1Input['durableSync'];
   readonly runCommittedTurn: (input: Readonly<{
     readonly turnBinding: SeyeonProductionRelationshipTurnBindingV1;
@@ -130,6 +130,16 @@ export async function runSeyeonProductionVerticalSliceV1<TTurnResult>(
       turnResult: committed.turnResult,
       syncResult: null,
     });
+  }
+
+  if (
+    input.productionHistoryRecords === undefined ||
+    input.contextPort === undefined ||
+    input.commitPort === undefined
+  ) {
+    throw new SeyeonProductionVerticalSliceErrorV1(
+      'Immediate relationship sync requires history and atomic apply authority.',
+    );
   }
 
   const beforeRevision = expectedRevision(turnBinding);
