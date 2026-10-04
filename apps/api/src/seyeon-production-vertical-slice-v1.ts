@@ -21,6 +21,7 @@ import {
   syncSeyeonProductionRelationshipEventV1,
   type SeyeonProductionRelationshipModeV1,
   type SeyeonProductionRelationshipSyncIdPortV1,
+  type SyncSeyeonProductionRelationshipEventV1Input,
   type SyncSeyeonProductionRelationshipEventV1Result,
 } from './seyeon-production-relationship-sync-v1.js';
 
@@ -52,6 +53,7 @@ export interface RunSeyeonProductionVerticalSliceInputV1<TTurnResult> {
   readonly idPort: SeyeonProductionRelationshipSyncIdPortV1;
   readonly contextPort: ProductionRelationshipApplyContextPortV1;
   readonly commitPort: ProductionRelationshipApplyCommitPortV1;
+  readonly durableSync?: SyncSeyeonProductionRelationshipEventV1Input['durableSync'];
   readonly runCommittedTurn: (input: Readonly<{
     readonly turnBinding: SeyeonProductionRelationshipTurnBindingV1;
     readonly activation: SeyeonProductionRelationshipActivationV1;
@@ -137,6 +139,9 @@ export async function runSeyeonProductionVerticalSliceV1<TTurnResult>(
     idPort: input.idPort,
     contextPort: input.contextPort,
     commitPort: input.commitPort,
+    ...(input.durableSync === undefined
+      ? {}
+      : { durableSync: input.durableSync }),
   });
 
   const afterRevision =
