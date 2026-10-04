@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 const initialPath = 'docs/operations/SAJU_ABUSE_BASELINE_SNAPSHOT_2026-10-03.json';
 const followUpPath = 'docs/operations/SAJU_ABUSE_BASELINE_SNAPSHOT_2026-10-03_0633Z.json';
 const guestFollowUpPath = 'docs/operations/SAJU_ABUSE_BASELINE_SNAPSHOT_2026-10-03_0817Z.json';
+const boundedReadingFollowUpPath = 'docs/operations/SAJU_ABUSE_BASELINE_SNAPSHOT_2026-10-04_0126Z.json';
 const exclusionsPath = 'docs/operations/SAJU_ABUSE_SYNTHETIC_EXCLUSIONS_V1.json';
 
 function readJson(path) {
@@ -168,15 +169,72 @@ describe('follow-up Saju abuse baseline snapshot after Member and Guest smoke', 
     expect(serialized).not.toMatch(/[a-f0-9]{64}/u);
   });
 
-  it('pins all twelve governed synthetic Saju request ids exactly once', () => {
+  it('keeps the Member and Guest smoke exclusions in the canonical authority', () => {
     const exclusions = readJson(exclusionsPath);
-    const ids = exclusions.requests.map((request) => request.requestId);
 
-    expect(ids).toHaveLength(12);
-    expect(new Set(ids).size).toBe(12);
     expect(
       exclusions.requests.filter(
         (request) => request.evidenceRef === 'GitHub Actions run 37106609427 / PR #1564',
+      ),
+    ).toHaveLength(5);
+  });
+});
+
+
+describe('follow-up Saju abuse baseline snapshot after bounded Reading rollout', () => {
+  it('proves the bounded Reading Production flow without authorizing A06 enforcement', () => {
+    const value = readJson(boundedReadingFollowUpPath);
+
+    expect(value.authority.boundedReadingSmokeRunId).toBe(37166344665);
+    expect(value.authority.returnedMatchingInvocationCount).toBe(5);
+    expect(value.authority.capReached).toBe(false);
+    expect(value.authority.governedSyntheticCoverage).toEqual({
+      member: {
+        'api.me.saju.calculation': 2,
+        'api.me.saju.preview-reading': 1,
+      },
+      guest: {
+        'api.me.saju.calculation': 1,
+        'api.me.saju.preview-reading': 1,
+      },
+    });
+    expect(value.analyzerReport.inputQuality).toMatchObject({
+      parsedEventCount: 10,
+      configuredSyntheticRequestCount: 17,
+      syntheticExcludedRequestCount: 5,
+      syntheticExcludedEventCount: 10,
+      unmatchedAuthenticatedAdmissionCount: 0,
+      orphanOutcomeCount: 0,
+    });
+    expect(value.analyzerReport.authenticatedAttempts.total).toBe(0);
+    expect(value.disposition).toEqual({
+      normalMemberProductionFlow: 'PROVEN',
+      normalGuestProductionFlow: 'PROVEN',
+      boundedReadingProductionFlow: 'PROVEN',
+      organicBaseline: 'INSUFFICIENT',
+      numericAdmissionPolicy: 'HOLD',
+      enforcement: 'HOLD',
+      issueClosureAllowed: false,
+    });
+  });
+
+  it('keeps synthetic identifiers and pseudonymous client keys out of the bounded Reading snapshot', () => {
+    const serialized = JSON.stringify(readJson(boundedReadingFollowUpPath));
+
+    expect(serialized).not.toContain('requestId');
+    expect(serialized).not.toContain('clientKey');
+    expect(serialized).not.toMatch(/[a-f0-9]{64}/u);
+  });
+
+  it('pins all seventeen governed synthetic Saju request ids exactly once', () => {
+    const exclusions = readJson(exclusionsPath);
+    const ids = exclusions.requests.map((request) => request.requestId);
+
+    expect(ids).toHaveLength(17);
+    expect(new Set(ids).size).toBe(17);
+    expect(
+      exclusions.requests.filter(
+        (request) => request.evidenceRef === 'GitHub Actions run 37166344665 / PR #1580',
       ),
     ).toHaveLength(5);
   });
