@@ -8,6 +8,9 @@ import {
   type SeyeonExperimentalEventKindV2,
   type SeyeonRelationshipEventV2,
 } from '../packages/domain/src/index.js';
+import {
+  snapshotSeyeonProductionHistoryCausalContextV1,
+} from '../apps/api/src/seyeon-production-causal-context-v1.js';
 
 const SUBJECT_ID = '11111111-1111-4111-8111-111111111111';
 const TURN_1 = '22222222-2222-4222-8222-222222222221';
@@ -223,6 +226,55 @@ describe('Se-yeon Production relationship admission bridge V1', () => {
     expect(keptAdmission.event.payload.commitmentKey).toBe(
       madeAdmission.event.payload.commitmentKey,
     );
+
+    const openCausal =
+      snapshotSeyeonProductionHistoryCausalContextV1([
+        Object.freeze({
+          action: 'record' as const,
+          ledgerEntryId:
+            '55555555-5555-4555-8555-555555555551',
+          dedupeKey: 'history:promise-made',
+          recordedAt: madeAt,
+          event: madeAdmission.event,
+        }),
+      ]);
+    expect(openCausal.priorEvents).toEqual([
+      expect.objectContaining({
+        authority:
+          'authorized_production_relationship_event_v1',
+        eventId: madeAdmission.event.eventId,
+        eventKind: 'PROMISE_MADE',
+      }),
+    ]);
+    expect(openCausal.causalBindings).toEqual([
+      expect.objectContaining({
+        causalEventRef: madeAdmission.event.eventId,
+        bindingAuthority: 'authorized_production_history',
+        productionEvent: madeAdmission.event,
+      }),
+    ]);
+
+    const closedCausal =
+      snapshotSeyeonProductionHistoryCausalContextV1([
+        Object.freeze({
+          action: 'record' as const,
+          ledgerEntryId:
+            '55555555-5555-4555-8555-555555555551',
+          dedupeKey: 'history:promise-made',
+          recordedAt: madeAt,
+          event: madeAdmission.event,
+        }),
+        Object.freeze({
+          action: 'record' as const,
+          ledgerEntryId:
+            '55555555-5555-4555-8555-555555555552',
+          dedupeKey: 'history:promise-kept',
+          recordedAt: keptAt,
+          event: keptAdmission.event,
+        }),
+      ]);
+    expect(closedCausal.priorEvents).toEqual([]);
+    expect(closedCausal.causalBindings).toEqual([]);
 
     const keptFromProductionHistory = experimentalEvent({
       id: 'experimental-promise-kept-direct-production',
