@@ -20,6 +20,9 @@ import {
   syncSeyeonProductionRelationshipEventV1,
   type SeyeonProductionRelationshipSyncIdPortV1,
 } from '../apps/api/src/seyeon-production-relationship-sync-v1.js';
+import type {
+  SeyeonProductionRelationshipSyncOutboxPortV1,
+} from '../apps/api/src/seyeon-production-relationship-outbox-v1.js';
 
 const SUBJECT_ID = '11111111-1111-4111-8111-111111111111';
 const STATE_ID = '22222222-2222-4222-8222-222222222222';
@@ -156,10 +159,14 @@ function contextPort(
   };
 }
 
-function commitPort(counter: { calls: number }): ProductionRelationshipApplyCommitPortV1 {
+function commitPort(
+  counter: { calls: number },
+  order?: string[],
+): ProductionRelationshipApplyCommitPortV1 {
   return {
     commitEvent(input) {
       counter.calls += 1;
+      order?.push('apply');
       return Object.freeze([
         Object.freeze({
           stateId: input.stateId,
@@ -233,6 +240,27 @@ describe('Se-yeon Production relationship sync V1', () => {
       occurredAt: '2026-09-28T02:00:00.000Z',
     });
     const counter = { calls: 0 };
+    const order: string[] = [];
+    const outboxPort: SeyeonProductionRelationshipSyncOutboxPortV1 = {
+      enqueue(input) {
+        order.push('enqueue');
+        expect(input.turnId).toBe(TURN_1);
+        expect(input.productionEvent.authority).toBe(
+          'authorized_relationship_event_v1',
+        );
+        return [Object.freeze({
+          outboxEventId: input.outboxEventId,
+          status: 'pending',
+          replayed: false,
+        })];
+      },
+      claim() {
+        throw new Error('claim must not run in synchronous admission');
+      },
+      complete() {
+        throw new Error('complete must not run in synchronous admission');
+      },
+    };
 
     const result = await syncSeyeonProductionRelationshipEventV1({
       mode: 'WRITE_DARK',
@@ -250,16 +278,26 @@ describe('Se-yeon Production relationship sync V1', () => {
       productionAuthorityRef: 'seyeon-prod:write:1',
       idPort: ids(),
       contextPort: contextPort([]),
-      commitPort: commitPort(counter),
+      commitPort: commitPort(counter, order),
+      durableSync: {
+        outboxEventId: '99999999-9999-4999-8999-999999999999',
+        outboxPort,
+      },
     });
 
     expect(result.status).toBe('committed');
     if (result.status !== 'committed') {
       throw new Error('Expected committed result.');
     }
+    expect(result.durableOutboxEnqueue).toEqual({
+      outboxEventId: '99999999-9999-4999-8999-999999999999',
+      status: 'pending',
+      replayed: false,
+    });
     expect(result.applyResult.revisionBefore).toBe(0);
     expect(result.applyResult.revisionAfter).toBe(1);
     expect(counter.calls).toBe(1);
+    expect(order).toEqual(['enqueue', 'apply']);
   });
 
   it('resolves a kept promise through the active Production predecessor rather than the experimental id', async () => {
