@@ -467,6 +467,26 @@ describe('Supabase auth HTTP proxy', () => {
     expect(JSON.stringify(payload)).not.toContain('upstream secret detail');
   });
 
+  it('leaves the runtime-owned web refresh request body untouched', async () => {
+    const authRequest = webRefreshRequest('still-valid-refresh-token');
+    const cancel = vi.spyOn(authRequest.body!, 'cancel');
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({
+      access_token: 'header.payload.signature',
+      refresh_token: 'refresh-token',
+      expires_in: 3600,
+      user: { id: '11111111-1111-4111-8111-111111111111', email: 'person@example.com' },
+    })));
+
+    const response = await handleSupabaseAuthRequestV1({
+      request: authRequest,
+      env,
+      action: 'refresh',
+    });
+
+    expect(response.status).toBe(200);
+    expect(cancel).not.toHaveBeenCalled();
+  });
+
   it('maps a rejected refresh token to authoritative SESSION_EXPIRED 401', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => Response.json(
       { msg: 'refresh token rejected upstream' },
