@@ -644,7 +644,8 @@ begin
   end if;
 
   v_decision := p_checkpoint_jsonb ->> 'decision';
-  if v_decision not in ('none','rejected','shadow','relationship_event') then
+  if v_decision is null
+     or v_decision not in ('none','rejected','shadow','relationship_event') then
     raise exception using
       errcode = '23514',
       constraint = 'seyeon_post_turn_checkpoint_decision_invalid',
@@ -688,6 +689,26 @@ begin
       errcode = 'P0001',
       constraint = 'cmd_seyeon_post_turn_checkpoint_ineligible',
       message = 'outbox event is not an eligible Se-yeon post-turn analysis request';
+  end if;
+
+  if v_decision in ('shadow','relationship_event')
+     and (
+       p_checkpoint_jsonb #>> '{productionEvent,schemaVersion}'
+          is distinct from 'relationship-event-v1'
+       or p_checkpoint_jsonb #>> '{productionEvent,authority}'
+          is distinct from 'authorized_relationship_event_v1'
+       or p_checkpoint_jsonb #>> '{productionEvent,subjectId}'
+          is distinct from p_subject_id::text
+       or p_checkpoint_jsonb #>> '{productionEvent,characterId}'
+          is distinct from 'seyeon'
+       or p_checkpoint_jsonb #>> '{productionEvent,eventId}'
+          is distinct from
+             v_row.payload_jsonb #>> '{snapshot,identity,productionEventId}'
+     ) then
+    raise exception using
+      errcode = '23514',
+      constraint = 'seyeon_post_turn_checkpoint_event_identity_invalid',
+      message = 'Se-yeon post-turn checkpoint Production Event is outside committed snapshot authority';
   end if;
 
   if v_row.status is distinct from 'processing'
