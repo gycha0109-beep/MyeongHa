@@ -48,8 +48,8 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('Supabase Auth sign-out unused request-body cleanup', () => {
-  it('cancels a non-closing unauthorized sign-out body without calling upstream', async () => {
+describe('Supabase Auth sign-out unused request-body handling', () => {
+  it('returns unauthorized sign-out without cancelling the runtime-owned request body', async () => {
     const upstream = vi.fn();
     vi.stubGlobal('fetch', upstream);
     const input = signOutRequest({});
@@ -63,17 +63,17 @@ describe('Supabase Auth sign-out unused request-body cleanup', () => {
 
     expect(response.status).toBe(401);
     expect(payload.error.code).toBe('AUTH_REQUIRED');
-    expect(input.wasCancelled()).toBe(true);
+    expect(input.wasCancelled()).toBe(false);
     expect(upstream).not.toHaveBeenCalled();
   });
 
-  it('cancels before authorized logout and ignores cancellation failure', async () => {
+  it('keeps an authorized sign-out request body untouched before upstream logout', async () => {
     const input = signOutRequest({
       authorization: 'Bearer test-access-token',
       cancelError: new Error('cancel failed'),
     });
     const upstream = vi.fn(async (_request: string | URL | Request, init?: RequestInit) => {
-      expect(input.wasCancelled()).toBe(true);
+      expect(input.wasCancelled()).toBe(false);
       expect(init?.headers).toMatchObject({ Authorization: 'Bearer test-access-token' });
       expect(init?.body).toBe('{}');
       return Response.json({});
@@ -89,7 +89,7 @@ describe('Supabase Auth sign-out unused request-body cleanup', () => {
 
     expect(response.status).toBe(200);
     expect(payload).toEqual({ ok: true, data: { signedOut: true } });
-    expect(input.wasCancelled()).toBe(true);
+    expect(input.wasCancelled()).toBe(false);
     expect(upstream).toHaveBeenCalledTimes(1);
   });
 });
