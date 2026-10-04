@@ -245,7 +245,7 @@ function summarizeTurn(
       ? execution.relationshipResult
       : null;
   const relationship =
-    relationshipResult?.turnBinding.relationship ?? null;
+    relationshipResult?.turnBinding?.relationship ?? null;
 
   return Object.freeze({
     disposition: result.disposition,
