@@ -58,13 +58,14 @@ function fakeChatRuntime(
 function fakePostTurnRuntime(
   result: unknown,
   calls: string[],
+  subjectId = '92000000-0000-0000-0000-000000000001',
 ): ProductionSeyeonPostTurnWorkerRuntimeV1 {
   return {
     async run(input) {
       calls.push('post:' + input.outboxEventId);
       return {
         runtimeVersion: 'production-seyeon-post-turn-worker-runtime-v1',
-        subjectId: '92000000-0000-0000-0000-000000000001',
+        subjectId,
         result,
       } as unknown as Awaited<
         ReturnType<ProductionSeyeonPostTurnWorkerRuntimeV1['run']>
@@ -76,13 +77,14 @@ function fakePostTurnRuntime(
 
 function fakeRelationshipRuntime(
   calls: string[],
+  subjectId = '92000000-0000-0000-0000-000000000001',
 ): ProductionSeyeonRelationshipWorkerRuntimeV1 {
   return {
     async run(input) {
       calls.push('relationship:' + input.outboxEventId);
       return {
         runtimeVersion: 'production-seyeon-relationship-worker-runtime-v1',
-        subjectId: '92000000-0000-0000-0000-000000000001',
+        subjectId,
         result: {
           version: 'seyeon-production-relationship-sync-outbox-v1',
           outboxEventId: input.outboxEventId,
@@ -208,4 +210,164 @@ describe('Se-yeon internal dogfood harness V1', () => {
     expect(result.postTurn).toBeNull();
     expect(result.relationship).toBeNull();
   });
+  it.each(['disabled', 'none', 'rejected', 'shadow'] as const)(
+    'does not invoke relationship apply for post-turn decision %s',
+    async (decision) => {
+      const calls: string[] = [];
+      const postTurnResult =
+        decision === 'shadow'
+          ? {
+              decision,
+              outboxEventId: 'post-turn-no-apply',
+              reclaimed: false,
+              productionEventId: 'shadow-event-1',
+              processedAt: '2026-10-04T05:00:00.000Z',
+            }
+          : {
+              decision,
+              outboxEventId: 'post-turn-no-apply',
+              reclaimed: false,
+              processedAt: '2026-10-04T05:00:00.000Z',
+            };
+
+      const result = await runSeyeonInternalDogfoodTurnV1({
+        runtimes: {
+          chat: fakeChatRuntime({
+            disposition: 'executed',
+            postTurnAnalysis: {
+              status: 'deferred',
+              outboxEventId: 'post-turn-no-apply',
+            },
+          }, calls),
+          postTurn: fakePostTurnRuntime(postTurnResult, calls),
+          relationship: fakeRelationshipRuntime(calls),
+        },
+        turn: TURN,
+      });
+
+      expect(calls).toEqual(['chat', 'post:post-turn-no-apply']);
+      expect(result.relationship).toBeNull();
+      expect(result.relationshipRevision).toBeNull();
+    },
+  );
+
+  it('fails closed if Production Chat unexpectedly stops being deferred', async () => {
+    const calls: string[] = [];
+    await expect(
+      runSeyeonInternalDogfoodTurnV1({
+        runtimes: {
+          chat: fakeChatRuntime({
+            disposition: 'executed',
+            postTurnAnalysis: {
+              status: 'processed',
+            },
+          }, calls),
+          postTurn: fakePostTurnRuntime({ decision: 'none' }, calls),
+          relationship: fakeRelationshipRuntime(calls),
+        },
+        turn: TURN,
+      }),
+    ).rejects.toThrow(/requires deferred post-turn execution/i);
+
+    expect(calls).toEqual(['chat']);
+  });
+
+  it('fails closed when the post-turn worker resolves a different Subject', async () => {
+    const calls: string[] = [];
+    await expect(
+      runSeyeonInternalDogfoodTurnV1({
+        runtimes: {
+          chat: fakeChatRuntime({
+            disposition: 'executed',
+            postTurnAnalysis: {
+              status: 'deferred',
+              outboxEventId: 'post-turn-subject-drift',
+            },
+          }, calls),
+          postTurn: fakePostTurnRuntime(
+            {
+              decision: 'none',
+              outboxEventId: 'post-turn-subject-drift',
+              reclaimed: false,
+              processedAt: '2026-10-04T05:00:00.000Z',
+            },
+            calls,
+            '92000000-0000-0000-0000-000000000099',
+          ),
+          relationship: fakeRelationshipRuntime(calls),
+        },
+        turn: TURN,
+      }),
+    ).rejects.toThrow(/different canonical Subject/i);
+
+    expect(calls).toEqual(['chat', 'post:post-turn-subject-drift']);
+  });
+
+  it('fails closed when the relationship worker resolves a different Subject', async () => {
+    const calls: string[] = [];
+    await expect(
+      runSeyeonInternalDogfoodTurnV1({
+        runtimes: {
+          chat: fakeChatRuntime({
+            disposition: 'executed',
+            postTurnAnalysis: {
+              status: 'deferred',
+              outboxEventId: 'post-turn-relationship-drift',
+            },
+          }, calls),
+          postTurn: fakePostTurnRuntime({
+            decision: 'enqueued',
+            outboxEventId: 'post-turn-relationship-drift',
+            reclaimed: false,
+            productionEventId: 'production-event-drift',
+            relationshipSyncOutboxEventId: 'relationship-sync-drift',
+            relationshipSyncReplayed: false,
+            processedAt: '2026-10-04T05:00:00.000Z',
+          }, calls),
+          relationship: fakeRelationshipRuntime(
+            calls,
+            '92000000-0000-0000-0000-000000000099',
+          ),
+        },
+        turn: TURN,
+      }),
+    ).rejects.toThrow(/different canonical Subject/i);
+
+    expect(calls).toEqual([
+      'chat',
+      'post:post-turn-relationship-drift',
+      'relationship:relationship-sync-drift',
+    ]);
+  });
+
+  it('propagates post-turn failure without attempting relationship apply', async () => {
+    const calls: string[] = [];
+    const failingPostTurn = {
+      async run(input: { outboxEventId: string }) {
+        calls.push('post:' + input.outboxEventId);
+        throw new Error('simulated post-turn crash');
+      },
+      async close() {},
+    } as unknown as ProductionSeyeonPostTurnWorkerRuntimeV1;
+
+    await expect(
+      runSeyeonInternalDogfoodTurnV1({
+        runtimes: {
+          chat: fakeChatRuntime({
+            disposition: 'executed',
+            postTurnAnalysis: {
+              status: 'deferred',
+              outboxEventId: 'post-turn-crash',
+            },
+          }, calls),
+          postTurn: failingPostTurn,
+          relationship: fakeRelationshipRuntime(calls),
+        },
+        turn: TURN,
+      }),
+    ).rejects.toThrow(/simulated post-turn crash/);
+
+    expect(calls).toEqual(['chat', 'post:post-turn-crash']);
+  });
+
 });
