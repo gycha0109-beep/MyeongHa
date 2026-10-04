@@ -92,6 +92,9 @@ jobs:
       - name: Build internal dogfood runtime
         run: npm run build
 
+      - name: Verify OpenAI structured-provider readiness
+        run: node dist/apps/api/src/seyeon-live-provider-readiness-cli-v1.js
+
       - name: Execute first-meeting live dogfood
         id: live
         run: node scripts/run-seyeon-first-meeting-live-dogfood.mjs
