@@ -469,7 +469,15 @@ export function buildSeyeonSemanticReviewRequestV2(input: {
       rendererDraft: input.rendererDraft,
       expectedUtteranceHash: input.utteranceHash,
     }),
-    responseSchema: SEMANTIC_REVIEW_RESPONSE_SCHEMA_V2,
+    responseSchema: Object.freeze({
+      ...SEMANTIC_REVIEW_RESPONSE_SCHEMA_V2,
+      properties: Object.freeze({
+        ...SEMANTIC_REVIEW_RESPONSE_SCHEMA_V2.properties,
+        reviewedUtteranceHash: Object.freeze({
+          enum: [input.utteranceHash],
+        }),
+      }),
+    }),
   });
 }
 
