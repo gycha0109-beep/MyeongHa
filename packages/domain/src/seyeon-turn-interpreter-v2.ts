@@ -20,6 +20,7 @@ export const SEYEON_USER_MOVE_KEYS_V2 = Object.freeze([
   'public_humiliation',
   'harm_minimized_as_joke',
   'direct_importance_expression',
+  'low_intensity_state_share',
   'neutral_or_other',
 ] as const);
 
@@ -285,6 +286,11 @@ export function guardSeyeonTurnInterpretationV2(input: {
     );
   }
 
+  const userMove = parseEnum(
+    input.rawOutput.userMove,
+    SEYEON_USER_MOVE_KEYS_V2,
+    'userMove',
+  );
   const chosenAction = parseEnum(
     input.rawOutput.chosenAction.key,
     SEYEON_ACTION_KEYS_V2,
@@ -335,6 +341,33 @@ export function guardSeyeonTurnInterpretationV2(input: {
     );
   }
 
+  if (
+    input.context.behaviorPolicy.interactionDepth === 'public_first_contact' &&
+    userMove === 'low_intensity_state_share'
+  ) {
+    const allowedFirstContactStateShareActions = new Set([
+      'approach',
+      'activate',
+      'tease',
+      'invite',
+    ] as const);
+    if (!allowedFirstContactStateShareActions.has(chosenAction as never)) {
+      throw new SeyeonTurnInterpretationErrorV2(
+        'A low-intensity state share at first contact must keep Se-yeon active instead of defaulting to care, permission handoff, or distance.',
+      );
+    }
+    if (expressionState !== 'baseline' && expressionState !== 'playful') {
+      throw new SeyeonTurnInterpretationErrorV2(
+        'A low-intensity state share at first contact must remain baseline or playful unless stronger evidence exists.',
+      );
+    }
+    if (revealLevel !== 'public') {
+      throw new SeyeonTurnInterpretationErrorV2(
+        'A low-intensity state share at first contact must remain public.',
+      );
+    }
+  }
+
   const disclosureResult = input.context.disclosure.decision?.result ?? null;
   if (
     disclosureResult !== null &&
@@ -354,11 +387,7 @@ export function guardSeyeonTurnInterpretationV2(input: {
 
   return Object.freeze({
     schemaVersion: SEYEON_TURN_INTERPRETATION_SCHEMA_VERSION_V2,
-    userMove: parseEnum(
-      input.rawOutput.userMove,
-      SEYEON_USER_MOVE_KEYS_V2,
-      'userMove',
-    ),
+    userMove,
     notice: Object.freeze({
       summary: boundedText(input.rawOutput.notice.summary, 'notice.summary'),
       evidenceRefs,
