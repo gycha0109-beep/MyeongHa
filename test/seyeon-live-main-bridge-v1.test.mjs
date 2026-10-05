@@ -26,7 +26,7 @@ describe('Se-yeon live main bridge V1', () => {
     expect(workflow).toContain('SUPABASE_PRODUCTION_SESSION_POOLER_HOST');
     expect(workflow).toContain('create role');
     expect(workflow).toContain('myeongha_dogfood_');
-    expect(workflow).toContain('grant $API_EXECUTION_ROLE');
+    expect(workflow).toContain('grant :"execution_role" to :"role_name";');
     expect(workflow).toContain('drop role');
     expect(workflow).toContain("<<'SQL'");
     expect(workflow).toContain("command -v psql");
