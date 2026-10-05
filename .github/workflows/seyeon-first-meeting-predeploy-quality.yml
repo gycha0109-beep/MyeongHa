@@ -25,6 +25,9 @@ jobs:
       MYEONGHA_SEYEON_OPENAI_TIMEOUT_MS: ${{ vars.MYEONGHA_SEYEON_OPENAI_TIMEOUT_MS }}
 
     steps:
+      - name: 저장소 받기
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
       - name: 시험 브랜치 확인
         shell: bash
         run: |
@@ -34,9 +37,6 @@ jobs:
           [[ "$trigger_value" =~ ^fire-[0-9]{4}-[0-9]{2}-[0-9]{2}-v[0-9]+$ ]]
           test -n "${OPENAI_API_KEY:-}"
           test -n "${MYEONGHA_SEYEON_OPENAI_MODEL:-}"
-
-      - name: 저장소 받기
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Node 24 준비
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
