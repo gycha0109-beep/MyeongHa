@@ -87,8 +87,18 @@ function productionContext(recentMessages) {
   });
 }
 
+function maxTurns() {
+  const raw = process.env.SEYEON_PREDEPLOY_MAX_TURNS?.trim() ?? '1';
+  const value = Number(raw);
+  if (!Number.isSafeInteger(value) || value < 1 || value > 10) {
+    throw new Error('SEYEON_PREDEPLOY_MAX_TURNS must be an integer between 1 and 10.');
+  }
+  return value;
+}
+
 async function main() {
   const runnerTemp = requiredEnv('RUNNER_TEMP');
+  const turnLimit = maxTurns();
   const providerConfig = parseSeyeonInternalLiveProviderConfigV1(process.env);
   const observed = createObservedSeyeonStructuredProviderV1(
     createOpenAiSeyeonStructuredProviderV1(providerConfig),
@@ -111,7 +121,11 @@ async function main() {
   const turns = [];
   const providerBefore = observed.snapshot();
 
-  for (let index = 0; index < scenario.turns.length; index += 1) {
+  for (
+    let index = 0;
+    index < Math.min(turnLimit, scenario.turns.length);
+    index += 1
+  ) {
     const fixture = scenario.turns[index];
     const turnIndex = index + 1;
     const userMessageRef =
@@ -225,6 +239,7 @@ async function main() {
       realStructuredProviderUsed: true,
     }),
     scenarioId: scenario.scenarioId,
+    requestedTurnLimit: turnLimit,
     turnCount: turns.length,
     reviewFocus: scenario.reviewFocus,
     providerDelta: diffSeyeonStructuredProviderInvocationsV1(
