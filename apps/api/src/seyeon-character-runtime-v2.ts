@@ -424,7 +424,18 @@ export function buildSeyeonRendererRequestV2(
         disclosureSliceIds: allowedDisclosureSliceIds,
       }),
     }),
-    responseSchema: RENDERER_RESPONSE_SCHEMA_V2,
+    responseSchema: Object.freeze({
+      ...RENDERER_RESPONSE_SCHEMA_V2,
+      properties: Object.freeze({
+        ...RENDERER_RESPONSE_SCHEMA_V2.properties,
+        expressionState: Object.freeze({
+          enum: [packet.interpretation.expressionState],
+        }),
+        revealLevel: Object.freeze({
+          enum: [packet.interpretation.reveal.level],
+        }),
+      }),
+    }),
   });
 }
 
