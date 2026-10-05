@@ -21,6 +21,7 @@ export const SEYEON_USER_MOVE_KEYS_V2 = Object.freeze([
   'harm_minimized_as_joke',
   'direct_importance_expression',
   'low_intensity_state_share',
+  'asked_seyeon_current_want',
   'neutral_or_other',
 ] as const);
 
@@ -291,6 +292,11 @@ export function guardSeyeonTurnInterpretationV2(input: {
     SEYEON_USER_MOVE_KEYS_V2,
     'userMove',
   );
+  const immediateWantKey = parseEnum(
+    input.rawOutput.immediateWant.key,
+    SEYEON_IMMEDIATE_WANT_KEYS_V2,
+    'immediateWant.key',
+  );
   const chosenAction = parseEnum(
     input.rawOutput.chosenAction.key,
     SEYEON_ACTION_KEYS_V2,
@@ -368,6 +374,36 @@ export function guardSeyeonTurnInterpretationV2(input: {
     }
   }
 
+  if (
+    input.context.behaviorPolicy.interactionDepth === 'public_first_contact' &&
+    userMove === 'asked_seyeon_current_want'
+  ) {
+    if (immediateWantKey !== 'disclose_desire') {
+      throw new SeyeonTurnInterpretationErrorV2(
+        'A direct question about Se-yeon current want must activate disclose_desire at first contact.',
+      );
+    }
+    if (chosenAction !== 'invite') {
+      throw new SeyeonTurnInterpretationErrorV2(
+        'A direct question about Se-yeon current want must answer through an invite grounded in her own present preference.',
+      );
+    }
+    if (
+      expressionState !== 'baseline' &&
+      expressionState !== 'playful' &&
+      expressionState !== 'energized'
+    ) {
+      throw new SeyeonTurnInterpretationErrorV2(
+        'A direct current-want answer at first contact must remain baseline, playful, or energized.',
+      );
+    }
+    if (revealLevel !== 'public') {
+      throw new SeyeonTurnInterpretationErrorV2(
+        'A direct current-want answer at first contact must remain public.',
+      );
+    }
+  }
+
   const disclosureResult = input.context.disclosure.decision?.result ?? null;
   if (
     disclosureResult !== null &&
@@ -393,11 +429,7 @@ export function guardSeyeonTurnInterpretationV2(input: {
       evidenceRefs,
     }),
     immediateWant: Object.freeze({
-      key: parseEnum(
-        input.rawOutput.immediateWant.key,
-        SEYEON_IMMEDIATE_WANT_KEYS_V2,
-        'immediateWant.key',
-      ),
+      key: immediateWantKey,
       summary: boundedText(
         input.rawOutput.immediateWant.summary,
         'immediateWant.summary',
