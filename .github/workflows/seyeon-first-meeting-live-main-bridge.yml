@@ -48,7 +48,7 @@ jobs:
           [[ "${{ github.event_name }}" == 'push' ]]
           [[ "${{ github.ref }}" == 'refs/heads/main' ]]
           trigger_value="$(tr -d '\r\n' < .github/seyeon-first-meeting-live-main.trigger)"
-          [[ "$trigger_value" == 'fire-2026-10-04-v2' ]]
+          [[ "$trigger_value" == 'fire-2026-10-05-v3' ]]
 
           test -n "${MYEONGHA_PRODUCTION_MEMBER_EMAIL:-}"
           test -n "${MYEONGHA_PRODUCTION_MEMBER_PASSWORD:-}"
@@ -122,14 +122,19 @@ jobs:
           export PGPASSWORD="$SUPABASE_DB_PASSWORD"
           export PGSSLMODE=require
 
-          preexisting="$(psql \
-            -X -A -t -v ON_ERROR_STOP=1 \
-            -h "$pool_host" \
-            -p "$pool_port" \
-            -U "$admin_pool_user" \
-            -d "$pool_db" \
-            -v role_name="$role_name" \
-            -c "select count(*) from pg_catalog.pg_roles where rolname = :'role_name';")"
+          preexisting="$(
+            psql \
+              -X -A -t -v ON_ERROR_STOP=1 \
+              -h "$pool_host" \
+              -p "$pool_port" \
+              -U "$admin_pool_user" \
+              -d "$pool_db" \
+              -v role_name="$role_name" <<'SQL'
+          select count(*)
+          from pg_catalog.pg_roles
+          where rolname = :'role_name';
+          SQL
+          )"
           [[ "$preexisting" == '0' ]]
 
           psql \
@@ -141,36 +146,47 @@ jobs:
             -v role_name="$role_name" \
             -v role_password="$runtime_password" \
             -v role_marker="$role_marker" \
-            -c "create role :\"role_name\" login nosuperuser nocreatedb nocreaterole noinherit noreplication nobypassrls password :'role_password';" \
-            -c "comment on role :\"role_name\" is :'role_marker';" \
-            -c "grant $API_EXECUTION_ROLE to :\"role_name\";"
+            -v execution_role="$API_EXECUTION_ROLE" <<'SQL'
+          create role :"role_name"
+            login
+            nosuperuser
+            nocreatedb
+            nocreaterole
+            noinherit
+            noreplication
+            nobypassrls
+            password :'role_password';
+          comment on role :"role_name" is :'role_marker';
+          grant :"execution_role" to :"role_name";
+          SQL
 
-          runtime_state="$(PGPASSWORD="$runtime_password" PGSSLMODE=require psql \
-            -X -A -t -v ON_ERROR_STOP=1 \
-            -h "$pool_host" \
-            -p "$pool_port" \
-            -U "$runtime_pool_user" \
-            -d "$pool_db" \
-            -v role_name="$role_name" \
-            -v execution_role="$API_EXECUTION_ROLE" \
-            -c "
-              select case when
-                current_user = :'role_name'
-                and pg_catalog.pg_has_role(current_user, :'execution_role', 'MEMBER')
-                and exists (
-                  select 1
-                  from pg_catalog.pg_roles
-                  where rolname = current_user
-                    and rolcanlogin
-                    and not rolsuper
-                    and not rolcreatedb
-                    and not rolcreaterole
-                    and not rolinherit
-                    and not rolreplication
-                    and not rolbypassrls
-                )
-              then 'READY' else 'BLOCKED' end;
-            ")"
+          runtime_state="$(
+            PGPASSWORD="$runtime_password" PGSSLMODE=require psql \
+              -X -A -t -v ON_ERROR_STOP=1 \
+              -h "$pool_host" \
+              -p "$pool_port" \
+              -U "$runtime_pool_user" \
+              -d "$pool_db" \
+              -v role_name="$role_name" \
+              -v execution_role="$API_EXECUTION_ROLE" <<'SQL'
+          select case when
+            current_user = :'role_name'
+            and pg_catalog.pg_has_role(current_user, :'execution_role', 'MEMBER')
+            and exists (
+              select 1
+              from pg_catalog.pg_roles
+              where rolname = current_user
+                and rolcanlogin
+                and not rolsuper
+                and not rolcreatedb
+                and not rolcreaterole
+                and not rolinherit
+                and not rolreplication
+                and not rolbypassrls
+            )
+          then 'READY' else 'BLOCKED' end;
+          SQL
+          )"
           [[ "$runtime_state" == 'READY' ]]
 
           database_url="postgresql://$runtime_pool_user:$runtime_password@$pool_host:$pool_port/$pool_db?sslmode=require"
@@ -225,24 +241,30 @@ jobs:
 
           [[ "$ROLE_NAME" =~ ^myeongha_dogfood_[0-9]+_[0-9]+$ ]]
 
+          if ! command -v psql >/dev/null 2>&1; then
+            echo 'PostgreSQL client was never installed; ephemeral role creation could not have started.'
+            exit 0
+          fi
+
           export PGPASSWORD="$SUPABASE_DB_PASSWORD"
           export PGSSLMODE=require
 
-          marker="$(psql \
-            -X -A -t -v ON_ERROR_STOP=1 \
-            -h "$pool_host" \
-            -p "$pool_port" \
-            -U "$admin_pool_user" \
-            -d "$pool_db" \
-            -v role_name="$ROLE_NAME" \
-            -c "
-              select coalesce(
-                pg_catalog.shobj_description(oid, 'pg_authid'),
-                ''
-              )
-              from pg_catalog.pg_roles
-              where rolname = :'role_name';
-            ")"
+          marker="$(
+            psql \
+              -X -A -t -v ON_ERROR_STOP=1 \
+              -h "$pool_host" \
+              -p "$pool_port" \
+              -U "$admin_pool_user" \
+              -d "$pool_db" \
+              -v role_name="$ROLE_NAME" <<'SQL'
+          select coalesce(
+            pg_catalog.shobj_description(oid, 'pg_authid'),
+            ''
+          )
+          from pg_catalog.pg_roles
+          where rolname = :'role_name';
+          SQL
+          )"
 
           if [[ -z "$marker" ]]; then
             echo 'Ephemeral dogfood DB login is already absent.'
@@ -257,21 +279,26 @@ jobs:
             -U "$admin_pool_user" \
             -d "$pool_db" \
             -v role_name="$ROLE_NAME" \
-            -c "
-              select pg_catalog.pg_terminate_backend(pid)
-              from pg_catalog.pg_stat_activity
-              where usename = :'role_name'
-                and pid <> pg_catalog.pg_backend_pid();
-            " \
-            -c "revoke $API_EXECUTION_ROLE from :\"role_name\";" \
-            -c "drop role :\"role_name\";"
+            -v execution_role="$API_EXECUTION_ROLE" <<'SQL'
+          select pg_catalog.pg_terminate_backend(pid)
+          from pg_catalog.pg_stat_activity
+          where usename = :'role_name'
+            and pid <> pg_catalog.pg_backend_pid();
+          revoke :"execution_role" from :"role_name";
+          drop role :"role_name";
+          SQL
 
-          remaining="$(psql \
-            -X -A -t -v ON_ERROR_STOP=1 \
-            -h "$pool_host" \
-            -p "$pool_port" \
-            -U "$admin_pool_user" \
-            -d "$pool_db" \
-            -v role_name="$ROLE_NAME" \
-            -c "select count(*) from pg_catalog.pg_roles where rolname = :'role_name';")"
+          remaining="$(
+            psql \
+              -X -A -t -v ON_ERROR_STOP=1 \
+              -h "$pool_host" \
+              -p "$pool_port" \
+              -U "$admin_pool_user" \
+              -d "$pool_db" \
+              -v role_name="$ROLE_NAME" <<'SQL'
+          select count(*)
+          from pg_catalog.pg_roles
+          where rolname = :'role_name';
+          SQL
+          )"
           [[ "$remaining" == '0' ]]
