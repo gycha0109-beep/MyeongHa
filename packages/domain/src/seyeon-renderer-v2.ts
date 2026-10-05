@@ -50,6 +50,7 @@ export interface SeyeonRendererPacketV2 {
   readonly integrity: SeyeonRuntimeContextV2['integrity'];
   readonly relationship: SeyeonRuntimeContextV2['relationship'];
   readonly relationshipSemantics: SeyeonRuntimeContextV2['relationshipSemantics'];
+  readonly behaviorPolicy: SeyeonRuntimeContextV2['behaviorPolicy'];
   readonly riskCausality: SeyeonRiskActionCausalityDecisionV1;
   readonly bibleSlices: SeyeonRuntimeContextV2['bibleSlices'];
   readonly recentConversation: SeyeonRuntimeContextV2['recentConversation'];
@@ -240,6 +241,7 @@ export function buildSeyeonRendererPacketV2(input: {
     integrity: input.context.integrity,
     relationship: input.context.relationship,
     relationshipSemantics: input.context.relationshipSemantics,
+    behaviorPolicy: input.context.behaviorPolicy,
     riskCausality: input.riskCausality,
     bibleSlices: input.context.bibleSlices,
     recentConversation: input.context.recentConversation,
