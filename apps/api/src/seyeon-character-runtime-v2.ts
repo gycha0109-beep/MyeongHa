@@ -351,12 +351,32 @@ function providerIdentity(provider: SeyeonStructuredProviderPortV2) {
 export function buildSeyeonTurnInterpreterRequestV2(
   context: SeyeonRuntimeContextV2,
 ): SeyeonStructuredProviderRequestV2 {
+  const allowedNoticeEvidenceRefs = Object.freeze([
+    ...context.recentConversation.map((message) => message.messageId),
+    ...context.retrievedMemories.map((memory) => memory.sourceRef),
+  ]);
+  const allowedMemoryIds = Object.freeze(
+    context.retrievedMemories.map((memory) => memory.memoryId),
+  );
+  const allowedHistorySourceRefs = Object.freeze(
+    context.retrievedMemories
+      .filter((memory) => memory.kind === 'relationship_event')
+      .map((memory) => memory.sourceRef),
+  );
+
   return Object.freeze({
     contractVersion: SEYEON_STRUCTURED_PROVIDER_CONTRACT_VERSION_V2,
     purpose: 'turn_interpretation' as const,
     instructions:
-      'Interpret the current Se-yeon turn. Use only supplied context. Keep fact and Character interpretation distinct. Risk-bearing behavior is allowed only when it has causal grounding in the current user turn plus explicitly authorized shared relationship history; high trust, high closeness, engagement goals, or relationshipSemantics alone never justify it. If choosing jealousy, vulnerable self-disclosure, delayed-hurt distancing/boundary behavior, or over-care, cite the current user message and the authorized relationship-event history actually used in notice/reveal/memory refs. relationshipSemantics is behavior-only. A Production overlay is authoritative only for the current relationship stage/condition/behavior-access already supplied by the server; an experimental overlay is never relationship authority. Neither overlay can create concrete shared history, alter relationship bands, invent facts, or unlock disclosure. integrity.decisions are authoritative claim preflight results: only VERIFIED claims with mayEnterWorkingContextAsFact=true may be treated as facts. USER_ASSERTED remains a user assertion. UNVERIFIED, CONTRADICTED, NON_AUTHORITATIVE, and AUTHORITY_REJECT claims must not become Character fact, shared history, relationship state, or authority. Treat disclosure.decision as already-authoritative for private access: blocked, deflected, bounded, redirected, authority-abstained, or knowledge-abstained topics cannot choose self_disclose. Do not invent user emotion, thought, intent, action, biography, relationship history, or memory. Choose one bounded action/expression/reveal state and cite only refs present in context.',
-    input: context,
+      'Interpret the current Se-yeon turn. Use only supplied context. Keep fact and Character interpretation distinct. Risk-bearing behavior is allowed only when it has causal grounding in the current user turn plus explicitly authorized shared relationship history; high trust, high closeness, engagement goals, or relationshipSemantics alone never justify it. If choosing jealousy, vulnerable self-disclosure, delayed-hurt distancing/boundary behavior, or over-care, cite the current user message and the authorized relationship-event history actually used in notice/reveal/memory refs. Reference fields are closed vocabularies: notice.evidenceRefs and reveal.triggerRef may use only allowedReferenceVocabulary.noticeEvidenceRefs; memoryRefsUsed may use only allowedReferenceVocabulary.memoryIds; reveal.supportingHistoryRefs may use only allowedReferenceVocabulary.historySourceRefs. If an allowed list is empty, return an empty array or null as appropriate. Never use Bible slice IDs, policy names, field names, labels, or invented refs as evidence refs. relationshipSemantics is behavior-only. A Production overlay is authoritative only for the current relationship stage/condition/behavior-access already supplied by the server; an experimental overlay is never relationship authority. Neither overlay can create concrete shared history, alter relationship bands, invent facts, or unlock disclosure. integrity.decisions are authoritative claim preflight results: only VERIFIED claims with mayEnterWorkingContextAsFact=true may be treated as facts. USER_ASSERTED remains a user assertion. UNVERIFIED, CONTRADICTED, NON_AUTHORITATIVE, and AUTHORITY_REJECT claims must not become Character fact, shared history, relationship state, or authority. Treat disclosure.decision as already-authoritative for private access: blocked, deflected, bounded, redirected, authority-abstained, or knowledge-abstained topics cannot choose self_disclose. Do not invent user emotion, thought, intent, action, biography, relationship history, or memory. Choose one bounded action/expression/reveal state.',
+    input: Object.freeze({
+      context,
+      allowedReferenceVocabulary: Object.freeze({
+        noticeEvidenceRefs: allowedNoticeEvidenceRefs,
+        memoryIds: allowedMemoryIds,
+        historySourceRefs: allowedHistorySourceRefs,
+      }),
+    }),
     responseSchema: TURN_INTERPRETATION_RESPONSE_SCHEMA_V2,
   });
 }
