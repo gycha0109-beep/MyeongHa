@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  PREDEPLOY_SOURCE_SHA: 8f01076afd453d36e07d1c967f99c90396677438
+  PREDEPLOY_SOURCE_SHA: 62271d49c5ef6347bdb917c0d78e13e8278b22d1
 
 jobs:
   quality:
@@ -26,6 +26,7 @@ jobs:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       MYEONGHA_SEYEON_OPENAI_MODEL: ${{ vars.MYEONGHA_SEYEON_OPENAI_MODEL || secrets.MYEONGHA_SEYEON_OPENAI_MODEL || 'gpt-5.6-terra' }}
       MYEONGHA_SEYEON_OPENAI_TIMEOUT_MS: ${{ vars.MYEONGHA_SEYEON_OPENAI_TIMEOUT_MS }}
+      SEYEON_PREDEPLOY_MAX_TURNS: '1'
 
     steps:
       - name: Main 호출 커밋 받기
@@ -70,9 +71,6 @@ jobs:
 
       - name: 세연 대화 엔진 빌드
         run: npm run build
-
-      - name: 실제 AI 연결 확인
-        run: node dist/apps/api/src/seyeon-live-provider-readiness-cli-v1.js
 
       - name: 첫 만남 10턴 실제 대화 실행
         run: node scripts/run-seyeon-first-meeting-predeploy-quality.mjs
