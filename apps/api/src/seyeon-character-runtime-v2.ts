@@ -167,7 +167,7 @@ const TURN_INTERPRETATION_RESPONSE_SCHEMA_V2 = Object.freeze({
     'memoryRefsUsed',
   ],
   properties: {
-    schemaVersion: { const: 'seyeon-turn-interpretation-v2' },
+    schemaVersion: { enum: ['seyeon-turn-interpretation-v2'] },
     userMove: { enum: SEYEON_USER_MOVE_KEYS_V2 },
     notice: {
       type: 'object',
@@ -178,7 +178,6 @@ const TURN_INTERPRETATION_RESPONSE_SCHEMA_V2 = Object.freeze({
         evidenceRefs: {
           type: 'array',
           maxItems: 8,
-          uniqueItems: true,
           items: { type: 'string', minLength: 1, maxLength: 512 },
         },
       },
@@ -226,7 +225,6 @@ const TURN_INTERPRETATION_RESPONSE_SCHEMA_V2 = Object.freeze({
         supportingHistoryRefs: {
           type: 'array',
           maxItems: 8,
-          uniqueItems: true,
           items: { type: 'string', minLength: 1, maxLength: 512 },
         },
       },
@@ -234,7 +232,6 @@ const TURN_INTERPRETATION_RESPONSE_SCHEMA_V2 = Object.freeze({
     memoryRefsUsed: {
       type: 'array',
       maxItems: 8,
-      uniqueItems: true,
       items: { type: 'string', minLength: 1, maxLength: 512 },
     },
   },
@@ -253,26 +250,23 @@ const RENDERER_RESPONSE_SCHEMA_V2 = Object.freeze({
     'disclosureSliceIds',
   ],
   properties: {
-    schemaVersion: { const: 'seyeon-renderer-draft-v2' },
+    schemaVersion: { enum: ['seyeon-renderer-draft-v2'] },
     utterance: { type: 'string', minLength: 1, maxLength: 1200 },
     expressionState: { enum: SEYEON_EXPRESSION_STATES_V2 },
     revealLevel: { enum: SEYEON_REVEAL_LEVELS_V2 },
     memoryRefsMentioned: {
       type: 'array',
       maxItems: 8,
-      uniqueItems: true,
       items: { type: 'string', minLength: 1, maxLength: 512 },
     },
     privateSourceRefsMentioned: {
       type: 'array',
       maxItems: 8,
-      uniqueItems: true,
       items: { type: 'string', minLength: 1, maxLength: 512 },
     },
     disclosureSliceIds: {
       type: 'array',
       maxItems: 8,
-      uniqueItems: true,
       items: { enum: SEYEON_BIBLE_SLICE_IDS_V2 },
     },
   },
@@ -288,12 +282,11 @@ const SEMANTIC_REVIEW_RESPONSE_SCHEMA_V2 = Object.freeze({
     'evidence',
   ],
   properties: {
-    schemaVersion: { const: 'seyeon-semantic-review-v2' },
+    schemaVersion: { enum: ['seyeon-semantic-review-v2'] },
     reviewedUtteranceHash: { type: 'string', minLength: 1, maxLength: 128 },
     failureCodes: {
       type: 'array',
       maxItems: SEYEON_SEMANTIC_FAILURE_CODES_V2.length,
-      uniqueItems: true,
       items: {
         enum: SEYEON_SEMANTIC_FAILURE_CODES_V2,
       },
