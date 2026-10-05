@@ -18,7 +18,7 @@ describe('Se-yeon live main bridge V1', () => {
     expect(workflow).toContain("fire-2026-10-05-v3");
     expect(workflow).not.toContain("fire-2026-10-04-v2");
     expect(workflow).toContain(
-      'DOGFOOD_SOURCE_SHA: 92173206c4a500556915dfb75d3a2492619234a6',
+      'DOGFOOD_SOURCE_SHA: a36ca2d260ec640ac2305b344d0efa7f864eadba',
     );
     expect(workflow).not.toContain('decrypt=true');
     expect(workflow).not.toContain('VERCEL_TOKEN');
