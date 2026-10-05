@@ -141,6 +141,40 @@ describe('Se-yeon runtime context v2', () => {
     );
   });
 
+  it('derives a first-contact behavior policy that keeps Se-yeon active without over-care', () => {
+    const context = assembleSeyeonRuntimeContextV2({
+      relationship: null,
+      recentMessages: [
+        {
+          messageId: 'message-current',
+          role: 'user',
+          text: '오늘은 별일 없었는데 조금 피곤하네요.',
+        },
+      ],
+      disclosure: { decision: null, retrievedSources: [] },
+      retrievedMemories: [],
+      focuses: ['care', 'expression'],
+    });
+
+    expect(context.actionPolicy.allowedActionKeys).not.toContain('care_practically');
+    expect(context.actionPolicy.allowedActionKeys).not.toContain('narrow_choices');
+    expect(context.actionPolicy.allowedActionKeys).not.toContain('remember_naturally');
+    expect(context.behaviorPolicy).toMatchObject({
+      interactionDepth: 'public_first_contact',
+      initiativeMode: 'character_leads',
+      careMode: 'light_unless_explicit_need',
+      questionMode: 'movement_first',
+      maxQuestionsPerUtterance: 1,
+      requireCharacterOwnedMove: true,
+      permissionHandoffAsDefaultForbidden: true,
+      therapyFramingAsDefaultForbidden: true,
+      lowIntensityUserStatePolicy: 'acknowledge_then_character_move',
+    });
+    expect(context.behaviorPolicy.preferredActionKeys).toEqual(
+      expect.arrayContaining(['approach', 'activate', 'tease', 'invite']),
+    );
+  });
+
   it('fails closed when a retrieved memory has no provenance', () => {
     expect(() =>
       assembleSeyeonRuntimeContextV2({
