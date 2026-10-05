@@ -26,7 +26,7 @@ jobs:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       MYEONGHA_SEYEON_OPENAI_MODEL: 'gpt-5.6-luna'
       MYEONGHA_SEYEON_OPENAI_TIMEOUT_MS: ${{ vars.MYEONGHA_SEYEON_OPENAI_TIMEOUT_MS }}
-      SEYEON_PREDEPLOY_MAX_TURNS: '3'
+      SEYEON_PREDEPLOY_MAX_TURNS: '5'
 
     steps:
       - name: Main 호출 커밋 받기
