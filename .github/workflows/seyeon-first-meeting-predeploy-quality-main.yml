@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  PREDEPLOY_SOURCE_SHA: ee332194c0edb000c60d091bc066f3e2fe98ab2d
+  PREDEPLOY_SOURCE_SHA: 92c0cd4bdd3bf108ec67d70a9bc1bfd089d84568
 
 jobs:
   quality:
