@@ -263,6 +263,15 @@ describe('Se-yeon structured Character runtime v2', () => {
     expect(rendererInput.packet.behaviorPolicy).toEqual(
       interpreterInput.context.behaviorPolicy,
     );
+
+    const rendererSchema = renderer.requests[0]?.responseSchema as {
+      properties: {
+        expressionState: { enum: readonly string[] };
+        revealLevel: { enum: readonly string[] };
+      };
+    };
+    expect(rendererSchema.properties.expressionState.enum).toEqual(['baseline']);
+    expect(rendererSchema.properties.revealLevel.enum).toEqual(['familiar']);
   });
 
   it('rejects fake interpreter provenance before renderer invocation', async () => {
