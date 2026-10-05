@@ -229,6 +229,40 @@ describe('Se-yeon structured Character runtime v2', () => {
     expect(interpreter.requests[0]?.purpose).toBe('turn_interpretation');
     expect(renderer.requests[0]?.purpose).toBe('dialogue_render');
     expect(reviewer.requests[0]?.purpose).toBe('semantic_review');
+
+    const interpreterInput = interpreter.requests[0]?.input as {
+      context: {
+        behaviorPolicy: {
+          interactionDepth: string;
+          initiativeMode: string;
+        };
+        actionPolicy: {
+          allowedActionKeys: readonly string[];
+        };
+      };
+      allowedInterpretationVocabulary: {
+        actionKeys: readonly string[];
+      };
+    };
+    expect(interpreterInput.context.behaviorPolicy).toMatchObject({
+      interactionDepth: 'established_relationship',
+      initiativeMode: 'balanced',
+    });
+    expect(interpreterInput.allowedInterpretationVocabulary.actionKeys).toEqual(
+      interpreterInput.context.actionPolicy.allowedActionKeys,
+    );
+
+    const rendererInput = renderer.requests[0]?.input as {
+      packet: {
+        behaviorPolicy: {
+          interactionDepth: string;
+          initiativeMode: string;
+        };
+      };
+    };
+    expect(rendererInput.packet.behaviorPolicy).toEqual(
+      interpreterInput.context.behaviorPolicy,
+    );
   });
 
   it('rejects fake interpreter provenance before renderer invocation', async () => {
