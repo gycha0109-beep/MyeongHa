@@ -15,8 +15,8 @@ describe('Se-yeon live main bridge V1', () => {
       ".github/seyeon-first-meeting-live-main.trigger",
     );
     expect(workflow).toContain('environment: production');
-    expect(workflow).toContain("fire-2026-10-04-v2");
-    expect(workflow).not.toContain("fire-2026-10-04-v1");
+    expect(workflow).toContain("fire-2026-10-05-v3");
+    expect(workflow).not.toContain("fire-2026-10-04-v2");
     expect(workflow).toContain(
       'DOGFOOD_SOURCE_SHA: 92173206c4a500556915dfb75d3a2492619234a6',
     );
@@ -28,6 +28,8 @@ describe('Se-yeon live main bridge V1', () => {
     expect(workflow).toContain('myeongha_dogfood_');
     expect(workflow).toContain('grant $API_EXECUTION_ROLE');
     expect(workflow).toContain('drop role');
+    expect(workflow).toContain("<<'SQL'");
+    expect(workflow).toContain("command -v psql");
     expect(workflow).toContain('if: always()');
     expect(workflow).toContain(
       'node dist/apps/api/src/seyeon-live-provider-readiness-cli-v1.js',
