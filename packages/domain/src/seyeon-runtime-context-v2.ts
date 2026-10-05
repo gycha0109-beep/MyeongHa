@@ -19,7 +19,9 @@ import { SEYEON_FACT_AUTHORITY_REGISTRY_V1 } from '../../character-content/src/s
 import {
   SEYEON_AUTHORED_PROJECTION_V2,
   SEYEON_BIBLE_SLICE_IDS_V2,
+  type SeyeonActionKeyV2,
   type SeyeonBibleSliceIdV2,
+  type SeyeonExpressionStateV2,
 } from '../../character-content/src/seyeon-authored-projection-v2.js';
 
 export const SEYEON_RUNTIME_CONTEXT_SCHEMA_VERSION_V2 =
@@ -77,6 +79,37 @@ export interface SeyeonRetrievedMemoryV2 {
   readonly salience: number;
 }
 
+export type SeyeonRuntimeInteractionDepthV2 =
+  | 'public_first_contact'
+  | 'established_relationship';
+
+export type SeyeonRuntimeInitiativeModeV2 =
+  | 'character_leads'
+  | 'balanced';
+
+export type SeyeonRuntimeCareModeV2 =
+  | 'light_unless_explicit_need'
+  | 'relationship_calibrated';
+
+export type SeyeonRuntimeQuestionModeV2 =
+  | 'movement_first'
+  | 'relationship_calibrated';
+
+export interface SeyeonRuntimeBehaviorPolicyV2 {
+  readonly interactionDepth: SeyeonRuntimeInteractionDepthV2;
+  readonly initiativeMode: SeyeonRuntimeInitiativeModeV2;
+  readonly careMode: SeyeonRuntimeCareModeV2;
+  readonly questionMode: SeyeonRuntimeQuestionModeV2;
+  readonly maxQuestionsPerUtterance: number;
+  readonly requireCharacterOwnedMove: boolean;
+  readonly permissionHandoffAsDefaultForbidden: true;
+  readonly therapyFramingAsDefaultForbidden: true;
+  readonly lowIntensityUserStatePolicy:
+    | 'acknowledge_then_character_move'
+    | 'relationship_calibrated';
+  readonly preferredActionKeys: readonly SeyeonActionKeyV2[];
+}
+
 export interface SeyeonRuntimeContextV2 {
   readonly schemaVersion: typeof SEYEON_RUNTIME_CONTEXT_SCHEMA_VERSION_V2;
   readonly character: Readonly<{
@@ -125,9 +158,10 @@ export interface SeyeonRuntimeContextV2 {
     readonly legacyUndefinedAndHypothesisFieldsNeverTruthAuthority: true;
   }>;
   readonly actionPolicy: Readonly<{
-    readonly allowedActionKeys: readonly string[];
-    readonly allowedExpressionStates: readonly string[];
+    readonly allowedActionKeys: readonly SeyeonActionKeyV2[];
+    readonly allowedExpressionStates: readonly SeyeonExpressionStateV2[];
   }>;
+  readonly behaviorPolicy: SeyeonRuntimeBehaviorPolicyV2;
 }
 
 export interface AssembleSeyeonRuntimeContextV2Input {
@@ -502,6 +536,47 @@ export function resolveSeyeonBibleSliceSelectionV2(input: {
   return Object.freeze([...selected]);
 }
 
+export function resolveSeyeonRuntimeBehaviorPolicyV2(input: {
+  readonly relationship: SeyeonRelationshipContextV2 | null;
+}): SeyeonRuntimeBehaviorPolicyV2 {
+  if (input.relationship === null) {
+    return Object.freeze({
+      interactionDepth: 'public_first_contact' as const,
+      initiativeMode: 'character_leads' as const,
+      careMode: 'light_unless_explicit_need' as const,
+      questionMode: 'movement_first' as const,
+      maxQuestionsPerUtterance: 1,
+      requireCharacterOwnedMove: true,
+      permissionHandoffAsDefaultForbidden: true as const,
+      therapyFramingAsDefaultForbidden: true as const,
+      lowIntensityUserStatePolicy: 'acknowledge_then_character_move' as const,
+      preferredActionKeys: Object.freeze([
+        'approach',
+        'activate',
+        'tease',
+        'invite',
+        'admit_boundary',
+        'accept_care',
+      ] as const),
+    });
+  }
+
+  return Object.freeze({
+    interactionDepth: 'established_relationship' as const,
+    initiativeMode: 'balanced' as const,
+    careMode: 'relationship_calibrated' as const,
+    questionMode: 'relationship_calibrated' as const,
+    maxQuestionsPerUtterance: 2,
+    requireCharacterOwnedMove: false,
+    permissionHandoffAsDefaultForbidden: true as const,
+    therapyFramingAsDefaultForbidden: true as const,
+    lowIntensityUserStatePolicy: 'relationship_calibrated' as const,
+    preferredActionKeys: Object.freeze([
+      ...SEYEON_AUTHORED_PROJECTION_V2.actionKeys,
+    ]),
+  });
+}
+
 export function assembleSeyeonRuntimeContextV2(
   input: AssembleSeyeonRuntimeContextV2Input,
 ): SeyeonRuntimeContextV2 {
@@ -579,6 +654,33 @@ export function assembleSeyeonRuntimeContextV2(
     sliceIds.map((id) => SEYEON_AUTHORED_PROJECTION_V2.bibleSlices[id]),
   );
 
+  const allowedActionKeys = Object.freeze(
+    SEYEON_AUTHORED_PROJECTION_V2.actionKeys.filter((key) => {
+      if (retrievedMemories.length === 0 && key === 'remember_naturally') {
+        return false;
+      }
+      if (
+        relationship === null &&
+        (key === 'narrow_choices' || key === 'care_practically')
+      ) {
+        return false;
+      }
+      return true;
+    }),
+  );
+  const allowedExpressionStates = Object.freeze(
+    relationship === null
+      ? SEYEON_AUTHORED_PROJECTION_V2.expressionStates.filter((state) =>
+          ['baseline', 'energized', 'playful', 'embarrassed', 'caring'].includes(
+            state,
+          ),
+        )
+      : [...SEYEON_AUTHORED_PROJECTION_V2.expressionStates],
+  );
+  const behaviorPolicy = resolveSeyeonRuntimeBehaviorPolicyV2({
+    relationship,
+  });
+
   return Object.freeze({
     schemaVersion: SEYEON_RUNTIME_CONTEXT_SCHEMA_VERSION_V2,
     character: Object.freeze({
@@ -623,8 +725,9 @@ export function assembleSeyeonRuntimeContextV2(
       legacyUndefinedAndHypothesisFieldsNeverTruthAuthority: true as const,
     }),
     actionPolicy: Object.freeze({
-      allowedActionKeys: SEYEON_AUTHORED_PROJECTION_V2.actionKeys,
-      allowedExpressionStates: SEYEON_AUTHORED_PROJECTION_V2.expressionStates,
+      allowedActionKeys,
+      allowedExpressionStates,
     }),
+    behaviorPolicy,
   });
 }
