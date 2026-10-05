@@ -240,6 +240,39 @@ describe('Se-yeon renderer packet and guard v2', () => {
     ).toThrow(SeyeonRendererGuardErrorV2);
   });
 
+  it('rejects a repeated conversation mechanic reported by semantic review', () => {
+    const prepared = interpretation();
+    const packet = buildSeyeonRendererPacketV2(prepared);
+    const utterance = '그럼 또 색 하나만 골라보세요.';
+
+    expect(() =>
+      guardSeyeonRendererOutputV2({
+        packet,
+        rawOutput: {
+          schemaVersion: 'seyeon-renderer-draft-v2',
+          utterance,
+          expressionState: 'baseline',
+          revealLevel: 'familiar',
+          memoryRefsMentioned: [],
+          privateSourceRefsMentioned: [],
+          disclosureSliceIds: [],
+        },
+        semanticReview: {
+          schemaVersion: 'seyeon-semantic-review-v2',
+          reviewedUtteranceHash: hashSeyeonRendererUtteranceV2(utterance),
+          failureCodes: ['REPETITIVE_CHARACTER_MOVE'],
+          evidence: [
+            {
+              code: 'REPETITIVE_CHARACTER_MOVE',
+              excerpt: '또 색 하나만 골라보세요',
+              reason: '최근 세연 응답에서 사용한 동일한 대화 장치를 사용자 요청 없이 반복했다.',
+            },
+          ],
+        },
+      }),
+    ).toThrow(SeyeonRendererGuardErrorV2);
+  });
+
   it('does not allow renderer-authored disclosure without a guarded self_disclose action', () => {
     const prepared = interpretation();
     const packet = buildSeyeonRendererPacketV2(prepared);
