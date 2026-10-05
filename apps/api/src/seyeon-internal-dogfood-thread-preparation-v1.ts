@@ -60,6 +60,29 @@ function notRun(
   });
 }
 
+function postgresConstraint(error: unknown): string | null {
+  if (typeof error !== 'object' || error === null) return null;
+  const constraint = (error as { constraint?: unknown }).constraint;
+  return typeof constraint === 'string' ? constraint : null;
+}
+
+function contentPrerequisiteReason(error: unknown): string | null {
+  const constraint = postgresConstraint(error);
+  if (constraint === 'member_character_thread_active_default_required') {
+    return 'Production active default Character content release is unavailable.';
+  }
+  if (constraint === 'member_character_thread_active_bundle_required') {
+    return 'Production active default Character content bundle is unavailable.';
+  }
+  if (constraint === 'member_character_thread_character_published') {
+    return 'Se-yeon is not published in the active Production Character content bundle.';
+  }
+  if (constraint === 'member_character_thread_character_available') {
+    return 'Se-yeon is not currently available in the active Production Character content bundle.';
+  }
+  return null;
+}
+
 export async function prepareSeyeonInternalDogfoodThreadV1(
   input: PrepareSeyeonInternalDogfoodThreadInputV1,
 ): Promise<SeyeonInternalDogfoodThreadPreparationResultV1> {
@@ -71,12 +94,22 @@ export async function prepareSeyeonInternalDogfoodThreadV1(
 
   const openThread =
     input.openThread ?? openMemberSingleCharacterThreadV1;
-  const opened = await openThread({
-    verifiedEvidence: input.verifiedEvidence,
-    characterId: 'seyeon',
-    pool: input.pool,
-    createUuid: input.createUuid,
-  });
+
+  let opened: OpenMemberSingleCharacterThreadResultV1;
+  try {
+    opened = await openThread({
+      verifiedEvidence: input.verifiedEvidence,
+      characterId: 'seyeon',
+      pool: input.pool,
+      createUuid: input.createUuid,
+    });
+  } catch (error) {
+    const reason = contentPrerequisiteReason(error);
+    if (reason !== null) {
+      return notRun([reason]);
+    }
+    throw error;
+  }
 
   if ('forbiddenGuest' in opened) {
     return notRun([
