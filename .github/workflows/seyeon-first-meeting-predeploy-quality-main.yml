@@ -24,7 +24,7 @@ jobs:
     environment: production
     env:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      MYEONGHA_SEYEON_OPENAI_MODEL: 'gpt-5.6-luna'
+      MYEONGHA_SEYEON_OPENAI_MODEL: 'gpt-5.6-terra'
       MYEONGHA_SEYEON_OPENAI_TIMEOUT_MS: ${{ vars.MYEONGHA_SEYEON_OPENAI_TIMEOUT_MS }}
       SEYEON_PREDEPLOY_MAX_TURNS: '1'
 
