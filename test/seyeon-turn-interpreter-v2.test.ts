@@ -155,6 +155,80 @@ describe('Se-yeon turn interpreter v2 guard', () => {
     ).toThrow(/deep_trust/);
   });
 
+  it('keeps a mild first-contact state share active instead of defaulting to caretaker behavior', () => {
+    const firstContact = assembleSeyeonRuntimeContextV2({
+      relationship: null,
+      recentMessages: [
+        {
+          messageId: 'message-current',
+          role: 'user',
+          text: '오늘은 별일 없었는데 조금 피곤하네요.',
+        },
+      ],
+      disclosure: { decision: null, retrievedSources: [] },
+      retrievedMemories: [],
+      focuses: ['care', 'expression'],
+    });
+
+    const accepted = guardSeyeonTurnInterpretationV2({
+      context: firstContact,
+      rawOutput: {
+        schemaVersion: 'seyeon-turn-interpretation-v2',
+        userMove: 'low_intensity_state_share',
+        notice: {
+          summary: '도움 요청 없이 가벼운 피로를 공유했다.',
+          evidenceRefs: ['message-current'],
+        },
+        immediateWant: {
+          key: 'stay_without_interrogation',
+          summary: '피로를 키우지 않고 가볍게 대화를 이어가고 싶다.',
+        },
+        tension: {
+          key: 'help_vs_user_agency',
+          summary: '챙김으로 과장하지 않고 현재 상태를 그대로 받아들인다.',
+        },
+        chosenAction: {
+          key: 'approach',
+          rationale: '짧게 받아들이고 세연 쪽에서 다음 대화의 움직임을 만든다.',
+        },
+        expressionState: 'baseline',
+        reveal: {
+          level: 'public',
+          triggerRef: 'message-current',
+          supportingHistoryRefs: [],
+        },
+        memoryRefsUsed: [],
+      },
+    });
+
+    expect(accepted.userMove).toBe('low_intensity_state_share');
+    expect(accepted.chosenAction.key).toBe('approach');
+    expect(accepted.expressionState).toBe('baseline');
+
+    expect(() =>
+      guardSeyeonTurnInterpretationV2({
+        context: firstContact,
+        rawOutput: {
+          ...accepted,
+          chosenAction: {
+            key: 'give_space',
+            rationale: '쉬도록 권하고 대화를 사용자의 선택에 맡긴다.',
+          },
+        },
+      }),
+    ).toThrow(/low-intensity state share/);
+
+    expect(() =>
+      guardSeyeonTurnInterpretationV2({
+        context: firstContact,
+        rawOutput: {
+          ...accepted,
+          expressionState: 'caring',
+        },
+      }),
+    ).toThrow(/baseline or playful/);
+  });
+
   it('does not permit jealousy as a public/familiar default expression', () => {
     const draft = validDraft();
     draft.expressionState = 'jealous';
