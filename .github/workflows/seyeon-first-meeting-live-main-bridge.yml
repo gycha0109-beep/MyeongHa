@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  DOGFOOD_SOURCE_SHA: 92173206c4a500556915dfb75d3a2492619234a6
+  DOGFOOD_SOURCE_SHA: a36ca2d260ec640ac2305b344d0efa7f864eadba
   SUPABASE_PROJECT_ID: cnsfpcdiyofqvhpcegfc
   MYEONGHA_SUPABASE_URL: https://cnsfpcdiyofqvhpcegfc.supabase.co
   API_EXECUTION_ROLE: myeongha_api_executor
