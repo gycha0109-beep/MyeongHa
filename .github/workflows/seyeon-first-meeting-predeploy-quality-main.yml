@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  PREDEPLOY_SOURCE_SHA: 62271d49c5ef6347bdb917c0d78e13e8278b22d1
+  PREDEPLOY_SOURCE_SHA: a3d01ca3736c51cf718e0f459a7ab4c7ea0e8a05
 
 jobs:
   quality:
@@ -24,7 +24,7 @@ jobs:
     environment: production
     env:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      MYEONGHA_SEYEON_OPENAI_MODEL: ${{ vars.MYEONGHA_SEYEON_OPENAI_MODEL || secrets.MYEONGHA_SEYEON_OPENAI_MODEL || 'gpt-5.6-terra' }}
+      MYEONGHA_SEYEON_OPENAI_MODEL: 'gpt-5.6-luna'
       MYEONGHA_SEYEON_OPENAI_TIMEOUT_MS: ${{ vars.MYEONGHA_SEYEON_OPENAI_TIMEOUT_MS }}
       SEYEON_PREDEPLOY_MAX_TURNS: '1'
 
