@@ -126,6 +126,60 @@ describe('Se-yeon internal dogfood thread preparation V1', () => {
     expect(result.reasons.join(' ')).toMatch(/already contains/i);
   });
 
+  it('classifies missing Production active-default content as a prerequisite instead of throwing', async () => {
+    const openThread = vi.fn(async () => {
+      const error = new Error(
+        'exactly one active default content release is required',
+      ) as Error & { constraint?: string };
+      error.constraint = 'member_character_thread_active_default_required';
+      throw error;
+    });
+    const inspect = vi.fn();
+
+    const result = await prepareSeyeonInternalDogfoodThreadV1({
+      verifiedEvidence: {
+        kind: 'member',
+        verifiedAuthUserId: 'auth-user-1',
+      },
+      pool: unusedPool,
+      evidenceInspector: { inspect },
+      createUuid: () => '77777777-7777-4777-8777-777777777777',
+      openThread,
+    });
+
+    expect(result.status).toBe('NOT_RUN_PREREQUISITE');
+    expect(result.threadId).toBeNull();
+    expect(result.created).toBeNull();
+    expect(result.preflight).toBeNull();
+    expect(result.reasons).toEqual([
+      'Production active default Character content release is unavailable.',
+    ]);
+    expect(inspect).not.toHaveBeenCalled();
+  });
+
+  it('does not swallow unrelated thread-open failures', async () => {
+    const failure = new Error('unexpected database failure');
+
+    await expect(
+      prepareSeyeonInternalDogfoodThreadV1({
+        verifiedEvidence: {
+          kind: 'member',
+          verifiedAuthUserId: 'auth-user-1',
+        },
+        pool: unusedPool,
+        evidenceInspector: {
+          async inspect() {
+            throw new Error('must not inspect');
+          },
+        },
+        createUuid: () => '77777777-7777-4777-8777-777777777777',
+        openThread: async () => {
+          throw failure;
+        },
+      }),
+    ).rejects.toBe(failure);
+  });
+
   it('does not call Member thread-open authority for Guest evidence', async () => {
     const openThread = vi.fn();
     const result = await prepareSeyeonInternalDogfoodThreadV1({
