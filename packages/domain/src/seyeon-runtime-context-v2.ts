@@ -107,6 +107,12 @@ export interface SeyeonRuntimeBehaviorPolicyV2 {
   readonly lowIntensityUserStatePolicy:
     | 'acknowledge_then_character_move'
     | 'relationship_calibrated';
+  readonly recentMoveNoveltyPolicy:
+    | 'avoid_repeating_unprompted_assistant_mechanic'
+    | 'relationship_calibrated';
+  readonly directCurrentDesirePolicy:
+    | 'state_seyeon_want_before_inviting'
+    | 'relationship_calibrated';
   readonly preferredActionKeys: readonly SeyeonActionKeyV2[];
 }
 
@@ -550,6 +556,9 @@ export function resolveSeyeonRuntimeBehaviorPolicyV2(input: {
       permissionHandoffAsDefaultForbidden: true as const,
       therapyFramingAsDefaultForbidden: true as const,
       lowIntensityUserStatePolicy: 'acknowledge_then_character_move' as const,
+      recentMoveNoveltyPolicy:
+        'avoid_repeating_unprompted_assistant_mechanic' as const,
+      directCurrentDesirePolicy: 'state_seyeon_want_before_inviting' as const,
       preferredActionKeys: Object.freeze([
         'approach',
         'activate',
@@ -571,6 +580,8 @@ export function resolveSeyeonRuntimeBehaviorPolicyV2(input: {
     permissionHandoffAsDefaultForbidden: true as const,
     therapyFramingAsDefaultForbidden: true as const,
     lowIntensityUserStatePolicy: 'relationship_calibrated' as const,
+    recentMoveNoveltyPolicy: 'relationship_calibrated' as const,
+    directCurrentDesirePolicy: 'relationship_calibrated' as const,
     preferredActionKeys: Object.freeze([
       ...SEYEON_AUTHORED_PROJECTION_V2.actionKeys,
     ]),
