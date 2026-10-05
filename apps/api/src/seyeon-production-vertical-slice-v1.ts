@@ -11,6 +11,7 @@ import {
   readSeyeonProductionRelationshipTurnBindingV1,
   type SeyeonProductionRelationshipReadAuthorityPortV1,
   type SeyeonRelationshipBandProjectionV1,
+  type SeyeonRelationshipBandProjectorV1,
   type SeyeonProductionRelationshipTurnBindingV1,
 } from './seyeon-production-relationship-read-v1.js';
 import {
@@ -21,6 +22,7 @@ import {
   syncSeyeonProductionRelationshipEventV1,
   type SeyeonProductionRelationshipModeV1,
   type SeyeonProductionRelationshipSyncIdPortV1,
+  type SyncSeyeonProductionRelationshipEventV1Input,
   type SyncSeyeonProductionRelationshipEventV1Result,
 } from './seyeon-production-relationship-sync-v1.js';
 
@@ -45,13 +47,15 @@ export interface SeyeonCommittedTurnRelationshipSignalV1 {
 export interface RunSeyeonProductionVerticalSliceInputV1<TTurnResult> {
   readonly mode: SeyeonProductionRelationshipModeV1;
   readonly resolvedSubjectId: string;
-  readonly bandProjection: SeyeonRelationshipBandProjectionV1 | null;
+  readonly bandProjection?: SeyeonRelationshipBandProjectionV1 | null;
+  readonly bandProjector?: SeyeonRelationshipBandProjectorV1;
   readonly relationshipReadPort: SeyeonProductionRelationshipReadAuthorityPortV1;
-  readonly productionHistoryRecords: readonly ProductionRelationshipHistoryRecordV1[];
+  readonly productionHistoryRecords?: readonly ProductionRelationshipHistoryRecordV1[];
   readonly productionAuthorityRef: string;
   readonly idPort: SeyeonProductionRelationshipSyncIdPortV1;
-  readonly contextPort: ProductionRelationshipApplyContextPortV1;
-  readonly commitPort: ProductionRelationshipApplyCommitPortV1;
+  readonly contextPort?: ProductionRelationshipApplyContextPortV1;
+  readonly commitPort?: ProductionRelationshipApplyCommitPortV1;
+  readonly durableSync?: SyncSeyeonProductionRelationshipEventV1Input['durableSync'];
   readonly runCommittedTurn: (input: Readonly<{
     readonly turnBinding: SeyeonProductionRelationshipTurnBindingV1;
     readonly activation: SeyeonProductionRelationshipActivationV1;
@@ -92,7 +96,12 @@ export async function runSeyeonProductionVerticalSliceV1<TTurnResult>(
 ): Promise<RunSeyeonProductionVerticalSliceResultV1<TTurnResult>> {
   const turnBinding = await readSeyeonProductionRelationshipTurnBindingV1({
     resolvedSubjectId: input.resolvedSubjectId,
-    bandProjection: input.bandProjection,
+    ...(input.bandProjection === undefined
+      ? {}
+      : { bandProjection: input.bandProjection }),
+    ...(input.bandProjector === undefined
+      ? {}
+      : { bandProjector: input.bandProjector }),
     authorityPort: input.relationshipReadPort,
   });
   const activation = resolveSeyeonProductionRelationshipActivationV1({
@@ -123,6 +132,16 @@ export async function runSeyeonProductionVerticalSliceV1<TTurnResult>(
     });
   }
 
+  if (
+    input.productionHistoryRecords === undefined ||
+    input.contextPort === undefined ||
+    input.commitPort === undefined
+  ) {
+    throw new SeyeonProductionVerticalSliceErrorV1(
+      'Immediate relationship sync requires history and atomic apply authority.',
+    );
+  }
+
   const beforeRevision = expectedRevision(turnBinding);
   const syncResult = await syncSeyeonProductionRelationshipEventV1({
     mode: input.mode,
@@ -137,6 +156,9 @@ export async function runSeyeonProductionVerticalSliceV1<TTurnResult>(
     idPort: input.idPort,
     contextPort: input.contextPort,
     commitPort: input.commitPort,
+    ...(input.durableSync === undefined
+      ? {}
+      : { durableSync: input.durableSync }),
   });
 
   const afterRevision =

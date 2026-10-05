@@ -40,13 +40,17 @@ export interface ChatReceivePlan {
 }
 
 const serverPreparedChatReceivePlansV1 = new WeakSet<object>();
+const internalPinnedSeyeonDogfoodPlansV1 = new WeakSet<object>();
 const serverPreparedChatReceiveContentEntriesV1 =
   new WeakMap<object, ContentReleaseRuntimeEntry>();
 
 export function assertServerPreparedChatReceivePlanV1(
   plan: ChatReceivePlan,
 ): void {
-  if (!serverPreparedChatReceivePlansV1.has(plan)) {
+  if (
+    !serverPreparedChatReceivePlansV1.has(plan) &&
+    !internalPinnedSeyeonDogfoodPlansV1.has(plan)
+  ) {
     throw new ApiCommandError(
       'INVALID_REQUEST',
       'Chat receive plan was not minted by server receive authority.',
@@ -60,6 +64,11 @@ export function getServerPreparedChatReceiveContentEntryV1(
   assertServerPreparedChatReceivePlanV1(plan);
   const entry = serverPreparedChatReceiveContentEntriesV1.get(plan);
   if (entry === undefined) {
+    if (internalPinnedSeyeonDogfoodPlansV1.has(plan)) {
+      throw new Error(
+        'Internal pinned Se-yeon dogfood plan intentionally has no public client-compatibility content entry.',
+      );
+    }
     throw new Error(
       'Server-minted Chat receive plan lost its immutable content authority binding.',
     );
@@ -80,6 +89,96 @@ function hashRequest(request: ChatRequestV1): string {
   return `sha256:v1:${createHash('sha256')
     .update(canonicalJson(request))
     .digest('hex')}`;
+}
+
+export interface PrepareInternalPinnedSeyeonDogfoodReceiveInputV1 {
+  readonly request: unknown;
+  readonly trustedThread: TrustedThreadBinding;
+  readonly pinnedBundleId: string;
+  readonly contentVersion: string;
+}
+
+/**
+ * Internal dark-run authority only.
+ *
+ * This does not decide SRC-15 client/content compatibility and must never be
+ * mounted as a browser/public Chat send boundary. It only reproduces one
+ * already-owned active thread's server-pinned release/bundle for Se-yeon
+ * dogfood execution.
+ */
+export function prepareInternalPinnedSeyeonDogfoodReceivePlanV1(
+  input: PrepareInternalPinnedSeyeonDogfoodReceiveInputV1,
+): ChatReceivePlan {
+  let request: ChatRequestV1;
+  try {
+    request = parseChatRequestV1(input.request);
+  } catch (error) {
+    throw new ApiCommandError(
+      'INVALID_REQUEST',
+      error instanceof Error ? error.message : 'Invalid chat request.',
+    );
+  }
+
+  const threadId = input.trustedThread.threadId.trim();
+  const releaseId = input.trustedThread.pinnedReleaseId.trim();
+  const bundleId = input.pinnedBundleId.trim();
+  const contentVersion = input.contentVersion.trim();
+
+  if (
+    threadId.length === 0 ||
+    releaseId.length === 0 ||
+    bundleId.length === 0 ||
+    contentVersion.length === 0
+  ) {
+    throw new ApiCommandError(
+      'CAPABILITY_UNAVAILABLE',
+      'Internal pinned Se-yeon dogfood content binding is incomplete.',
+    );
+  }
+  if (request.threadId !== threadId) {
+    throw new ApiCommandError(
+      'NOT_FOUND',
+      'Internal dogfood request does not match the owned pinned thread.',
+    );
+  }
+  if (request.text === undefined || request.structuredAction !== undefined) {
+    throw new ApiCommandError(
+      'INVALID_REQUEST',
+      'Internal Se-yeon dogfood currently accepts text turns only.',
+    );
+  }
+  if (
+    input.trustedThread.participantCharacterIds.length !== 1 ||
+    input.trustedThread.participantCharacterIds[0] !== 'seyeon'
+  ) {
+    throw new ApiCommandError(
+      'FORBIDDEN',
+      'Internal Se-yeon dogfood requires an existing single-character Se-yeon thread.',
+    );
+  }
+  if (
+    request.characterId !== undefined &&
+    request.characterId !== 'seyeon'
+  ) {
+    throw new ApiCommandError(
+      'FORBIDDEN',
+      'Internal Se-yeon dogfood cannot target another Character.',
+    );
+  }
+
+  const plan = Object.freeze({
+    normalizedRequest: request,
+    requestHash: hashRequest(request),
+    isNewThread: false,
+    resolvedContent: Object.freeze({
+      releaseId,
+      bundleId,
+      contentVersion,
+    }),
+    requestedCharacterId: 'seyeon',
+  });
+  internalPinnedSeyeonDogfoodPlansV1.add(plan);
+  return plan;
 }
 
 function mapReleaseError(error: unknown): never {

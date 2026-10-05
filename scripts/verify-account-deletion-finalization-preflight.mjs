@@ -33,6 +33,7 @@ const expectedProducerFiles = [
   '0290_account_deletion_start_command.sql',
   '1080_entitlement_effect_apply_v1.sql',
   '1440_seyeon_relationship_sync_outbox_v1.sql',
+  '1470_seyeon_post_turn_analysis_runtime_v1.sql',
 ];
 
 if (JSON.stringify(producerFiles) !== JSON.stringify(expectedProducerFiles)) {
@@ -50,6 +51,7 @@ for (const [path, aggregateType] of [
   ['supabase/migrations/0290_account_deletion_start_command.sql', 'data_deletion_job'],
   ['supabase/migrations/1080_entitlement_effect_apply_v1.sql', 'entitlement'],
   ['supabase/migrations/1440_seyeon_relationship_sync_outbox_v1.sql', 'character_relationship'],
+  ['supabase/migrations/1470_seyeon_post_turn_analysis_runtime_v1.sql', 'chat_turn'],
 ]) {
   const text = await readFile(path, 'utf8');
   const outboxInsertCount = (text.match(/insert\s+into\s+public\.outbox_events\b/gi) || []).length;

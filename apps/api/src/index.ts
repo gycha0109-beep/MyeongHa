@@ -686,6 +686,10 @@ export {
 } from './postgres-chat-thread-runtime-binding.js';
 
 export {
+  createPostgresChatThreadStreamReadAuthorityPortV1,
+} from './postgres-chat-thread-stream-v1.js';
+
+export {
   READER_INTERPRETATION_PREVIEW_CONTRACT_VERSION_V1,
   READER_INTERPRETATION_PREVIEW_SCHEMA_VERSION_V1,
   ReaderInterpretationPreviewRuntimeErrorV1,
@@ -839,6 +843,7 @@ export {
   type SeyeonProductionRelationshipReadAuthorityPortV1,
   type SeyeonProductionRelationshipTurnBindingV1,
   type SeyeonRelationshipBandProjectionV1,
+  type SeyeonRelationshipBandProjectorV1,
 } from './seyeon-production-relationship-read-v1.js';
 
 export {
@@ -850,6 +855,7 @@ export {
   SEYEON_PRODUCTION_RELATIONSHIP_MODES_V1,
   SEYEON_PRODUCTION_RELATIONSHIP_SYNC_VERSION_V1,
   SeyeonProductionRelationshipSyncErrorV1,
+  snapshotSeyeonProductionCausalBindingsV1,
   syncSeyeonProductionRelationshipEventV1,
   type SeyeonProductionRelationshipModeV1,
   type SeyeonProductionRelationshipSyncIdPortV1,
@@ -871,6 +877,80 @@ export {
   type SeyeonCommittedTurnRelationshipSignalV1,
 } from './seyeon-production-vertical-slice-v1.js';
 export {
+  SEYEON_PRODUCTION_CONTEXT_READ_VERSION_V1,
+  SeyeonProductionContextReadAuthorityPortErrorV1,
+  type SeyeonProductionContextReadAuthorityPortV1,
+  type SeyeonProductionContextReadFailureCodeV1,
+  type SeyeonProductionPersonalRecordAuthorityRowV1,
+  type SeyeonProductionPersonalRecordKindV1,
+  type SeyeonProductionRecentMessageAuthorityRowV1,
+} from './seyeon-production-context-read-v1.js';
+
+export {
+  POSTGRES_PRODUCTION_RELATIONSHIP_HISTORY_RUNTIME_BINDING_V1,
+  POSTGRES_SEYEON_PRODUCTION_PERSONAL_RECORD_CONTEXT_BINDING_V1,
+  POSTGRES_SEYEON_PRODUCTION_RECENT_MESSAGES_BINDING_V1,
+  createPostgresSeyeonProductionContextReadAuthorityPortV1,
+} from './postgres-seyeon-production-context-read-v1.js';
+
+export {
+  SEYEON_PRODUCTION_CONTEXT_VERSION_V1,
+  SEYEON_PRODUCTION_PERSONAL_RECORD_PROJECTORS_V1,
+  SeyeonProductionContextErrorV1,
+  bindSeyeonProductionCharacterContextInputV1,
+  composeSeyeonProductionContextV1,
+  type ComposeSeyeonProductionContextInputV1,
+  type SeyeonProductionBoundCharacterContextInputV1,
+  type SeyeonProductionContextSnapshotV1,
+  type SeyeonProductionPersonalRecordAdmissionV1,
+  type SeyeonProductionPersonalRecordProjectionV1,
+  type SeyeonProductionPersonalRecordProjectorV1,
+} from './seyeon-production-context-v1.js';
+
+export {
+  SEYEON_PRODUCTION_CONTEXT_VERTICAL_SLICE_VERSION_V1,
+  runSeyeonProductionContextVerticalSliceV1,
+  type RunSeyeonProductionContextVerticalSliceInputV1,
+  type RunSeyeonProductionContextVerticalSliceResultV1,
+} from './seyeon-production-context-vertical-slice-v1.js';
+
+
+export {
+  SEYEON_PRODUCTION_CHAT_EXECUTION_VERSION_V1,
+  SEYEON_PRODUCTION_CHAT_OUTPUT_GUARD_VERSION_V1,
+  SEYEON_PRODUCTION_CHAT_PLANNER_VERSION_V1,
+  SEYEON_PRODUCTION_CHAT_RENDERER_VERSION_V1,
+  SEYEON_PRODUCTION_CHAT_REQUEST_CONTRACT_VERSION_V1,
+  SeyeonProductionChatExecutionErrorV1,
+  assertSeyeonProductionAttemptOwnershipV1,
+  bindSeyeonProductionCurrentUserTurnV1,
+  resolveSeyeonProductionCommittedReplayV1,
+  runSeyeonProductionChatExecutionV1,
+  type RunSeyeonProductionChatCommittedReplayResultV1,
+  type RunSeyeonProductionChatExecutedResultV1,
+  type RunSeyeonProductionChatExecutionInputV1,
+  type RunSeyeonProductionChatExecutionResultV1,
+  type SeyeonProductionChatAttemptV1,
+  type SeyeonProductionChatCommitReceiptV1,
+  type SeyeonProductionChatExecutionIdPortV1,
+  type SeyeonProductionChatPersistencePortV1,
+  type SeyeonProductionChatPostTurnInputV1,
+  type SeyeonProductionChatReceivedTurnV1,
+} from './seyeon-production-chat-execution-v1.js';
+
+
+export {
+  POSTGRES_SEYEON_CHAT_ATTEMPT_RUNTIME_BINDING_V1,
+  POSTGRES_SEYEON_CHAT_COMMIT_RUNTIME_BINDING_V1,
+  POSTGRES_SEYEON_CHAT_CONTEXT_READY_RUNTIME_BINDING_V1,
+  POSTGRES_SEYEON_CHAT_FAILURE_RUNTIME_BINDING_V1,
+  POSTGRES_SEYEON_CHAT_GENERATED_RUNTIME_BINDING_V1,
+  POSTGRES_SEYEON_CHAT_RECEIVE_RUNTIME_BINDING_V1,
+  POSTGRES_SEYEON_CHAT_VALIDATED_RUNTIME_BINDING_V1,
+  createPostgresSeyeonProductionChatPersistencePortV1,
+} from './postgres-seyeon-production-chat-execution-v1.js';
+
+export {
   SEYEON_PRODUCTION_RELATIONSHIP_SYNC_OUTBOX_VERSION_V1,
   SeyeonProductionRelationshipSyncOutboxErrorV1,
   processSeyeonProductionRelationshipSyncOutboxV1,
@@ -885,3 +965,235 @@ export {
   POSTGRES_SEYEON_RELATIONSHIP_SYNC_ENQUEUE_BINDING_V1,
   createPostgresSeyeonProductionRelationshipSyncOutboxPortV1,
 } from './postgres-seyeon-production-relationship-outbox-v1.js';
+
+
+export {
+  SEYEON_POST_TURN_ANALYSIS_CHECKPOINT_VERSION_V1,
+  SEYEON_POST_TURN_ANALYSIS_SNAPSHOT_VERSION_V1,
+  SEYEON_POST_TURN_ANALYSIS_WORKER_VERSION_V1,
+  SeyeonPostTurnAnalysisErrorV1,
+  prepareSeyeonPostTurnAnalysisSnapshotV1,
+  processSeyeonPostTurnAnalysisV1,
+  validateSeyeonPostTurnAnalysisCheckpointV1,
+  validateSeyeonPostTurnAnalysisSnapshotV1,
+  type PreparedSeyeonPostTurnAnalysisSnapshotV1,
+  type PrepareSeyeonPostTurnAnalysisSnapshotInputV1,
+  type ProcessSeyeonPostTurnAnalysisInputV1,
+  type ProcessSeyeonPostTurnAnalysisResultV1,
+  type SeyeonPostTurnAnalysisCheckpointV1,
+  type SeyeonPostTurnAnalysisClaimV1,
+  type SeyeonPostTurnAnalysisOutboxPortV1,
+  type SeyeonPostTurnAnalysisSnapshotV1,
+  type SeyeonPostTurnAnalysisStableIdentityV1,
+} from './seyeon-post-turn-analysis-worker-v1.js';
+
+export {
+  POSTGRES_SEYEON_POST_TURN_ANALYSIS_LOOKUP_BINDING_V1,
+  POSTGRES_SEYEON_POST_TURN_ANALYSIS_CLAIM_BINDING_V1,
+  POSTGRES_SEYEON_POST_TURN_ANALYSIS_CHECKPOINT_BINDING_V1,
+  POSTGRES_SEYEON_POST_TURN_ANALYSIS_COMPLETE_BINDING_V1,
+  createPostgresSeyeonPostTurnAnalysisOutboxPortV1,
+} from './postgres-seyeon-post-turn-analysis-worker-v1.js';
+
+export {
+  SEYEON_PRODUCTION_RELATIONSHIP_BAND_PROJECTION_AUTHORITY_V1,
+  SEYEON_PRODUCTION_RELATIONSHIP_BAND_PROJECTION_VERSION_V1,
+  projectSeyeonProductionRelationshipBandsV1,
+} from './seyeon-production-relationship-band-v1.js';
+
+export {
+  OPENAI_RESPONSES_DEFAULT_ORIGIN_V1,
+  OPENAI_SEYEON_STRUCTURED_PROVIDER_DEFAULT_TIMEOUT_MS_V1,
+  OPENAI_SEYEON_STRUCTURED_PROVIDER_KEY_V1,
+  OPENAI_SEYEON_STRUCTURED_PROVIDER_MAX_TIMEOUT_MS_V1,
+  OPENAI_SEYEON_STRUCTURED_PROVIDER_VERSION_V1,
+  OpenAiSeyeonStructuredProviderErrorV1,
+  createOpenAiSeyeonStructuredProviderV1,
+  type OpenAiSeyeonStructuredProviderConfigV1,
+  type OpenAiSeyeonStructuredProviderFailureCodeV1,
+  type OpenAiSeyeonStructuredProviderFetchV1,
+} from './openai-seyeon-structured-provider-v1.js';
+
+export {
+  SEYEON_PRODUCTION_GOVERNANCE_VERSION_V1,
+  createSeyeonProductionGovernanceV1,
+  projectSeyeonProductionDisclosureRelationshipV1,
+} from './seyeon-production-governance-v1.js';
+
+export {
+  prepareInternalPinnedSeyeonDogfoodReceivePlanV1,
+  type PrepareInternalPinnedSeyeonDogfoodReceiveInputV1,
+} from './chat-receive.js';
+
+export {
+  POSTGRES_CONTENT_BUNDLE_MANIFEST_READ_BINDING_V1,
+  createPostgresContentBundleManifestReadAuthorityPortV1,
+} from './postgres-content-bundle-manifest-read-v1.js';
+
+export {
+  createSeyeonProductionSubjectTransactionRunnerV1,
+  type SeyeonProductionSubjectTransactionRunnerV1,
+} from './seyeon-production-subject-transaction-v1.js';
+
+export {
+  createSeyeonProductionTransactionalPortsV1,
+  type SeyeonProductionTransactionalPortsV1,
+} from './seyeon-production-transactional-ports-v1.js';
+
+export {
+  createSeyeonProductionRuntimeIdPortV1,
+  type SeyeonProductionRuntimeIdPortV1,
+} from './seyeon-production-runtime-ids-v1.js';
+
+export {
+  PRODUCTION_SEYEON_CHAT_RUNTIME_BINDINGS_V1,
+  PRODUCTION_SEYEON_CHAT_RUNTIME_VERSION_V1,
+  createProductionSeyeonChatRuntimeV1,
+  type CreateProductionSeyeonChatRuntimeInputV1,
+  type ProductionSeyeonChatRuntimeV1,
+  type RunProductionSeyeonChatInputV1,
+  type RunProductionSeyeonChatResultV1,
+} from './production-seyeon-chat-runtime-v1.js';
+
+export {
+  PRODUCTION_SEYEON_POST_TURN_WORKER_RUNTIME_VERSION_V1,
+  createProductionSeyeonPostTurnWorkerRuntimeV1,
+  type CreateProductionSeyeonPostTurnWorkerRuntimeInputV1,
+  type ProductionSeyeonPostTurnWorkerRuntimeV1,
+  type RunProductionSeyeonPostTurnWorkerInputV1,
+  type RunProductionSeyeonPostTurnWorkerResultV1,
+} from './production-seyeon-post-turn-worker-runtime-v1.js';
+
+export {
+  PRODUCTION_SEYEON_RELATIONSHIP_WORKER_RUNTIME_VERSION_V1,
+  createProductionSeyeonRelationshipWorkerRuntimeV1,
+  type CreateProductionSeyeonRelationshipWorkerRuntimeInputV1,
+  type ProductionSeyeonRelationshipWorkerRuntimeV1,
+  type RunProductionSeyeonRelationshipWorkerInputV1,
+  type RunProductionSeyeonRelationshipWorkerResultV1,
+} from './production-seyeon-relationship-worker-runtime-v1.js';
+
+
+export {
+  SEYEON_INTERNAL_DOGFOOD_HARNESS_BINDINGS_V1,
+  SEYEON_INTERNAL_DOGFOOD_HARNESS_VERSION_V1,
+  SeyeonInternalDogfoodHarnessErrorV1,
+  createProductionSeyeonInternalDogfoodHarnessV1,
+  runSeyeonInternalDogfoodTurnV1,
+  type CreateProductionSeyeonInternalDogfoodHarnessInputV1,
+  type ProductionSeyeonInternalDogfoodHarnessV1,
+  type RunSeyeonInternalDogfoodTurnInputV1,
+  type RunSeyeonInternalDogfoodTurnResultV1,
+  type SeyeonInternalDogfoodRuntimeSetV1,
+  type SeyeonInternalDogfoodWorkerLeaseV1,
+} from './seyeon-internal-dogfood-harness-v1.js';
+
+
+export {
+  SEYEON_INTERNAL_DOGFOOD_THREAD_PREPARATION_VERSION_V1,
+  prepareSeyeonInternalDogfoodThreadV1,
+  type PrepareSeyeonInternalDogfoodThreadInputV1,
+  type SeyeonInternalDogfoodThreadPreparationResultV1,
+  type SeyeonInternalDogfoodThreadPreparationStatusV1,
+} from './seyeon-internal-dogfood-thread-preparation-v1.js';
+
+export {
+  SEYEON_FIRST_MEETING_LIVE_CAMPAIGN_VERSION_V1,
+  runConfiguredSeyeonFirstMeetingLiveCampaignV1,
+  runSeyeonFirstMeetingLiveCampaignV1,
+  type RunSeyeonFirstMeetingLiveCampaignInputV1,
+  type RunSeyeonFirstMeetingLiveCampaignResultV1,
+} from './seyeon-internal-first-meeting-campaign-v1.js';
+
+export {
+  parseSeyeonInternalFirstMeetingCampaignCommandV1,
+  runSeyeonInternalFirstMeetingCampaignCliV1,
+  type SeyeonInternalFirstMeetingCampaignCommandV1,
+} from './seyeon-internal-first-meeting-campaign-cli-v1.js';
+
+export {
+  SEYEON_INTERNAL_DOGFOOD_EVIDENCE_VERSION_V1,
+  createConfiguredSeyeonInternalDogfoodEvidenceRuntimeV1,
+  createProductionSeyeonInternalDogfoodEvidenceInspectorV1,
+  runSeyeonInternalDogfoodEvidenceV1,
+  type ConfiguredSeyeonInternalDogfoodEvidenceRuntimeV1,
+  type RunSeyeonInternalDogfoodEvidenceInputV1,
+  type RunSeyeonInternalDogfoodEvidenceResultV1,
+  type SeyeonInternalDogfoodEvidenceInspectorV1,
+  type SeyeonInternalDogfoodEvidenceSnapshotV1,
+  type SeyeonInternalDogfoodTechnicalVerdictV1,
+} from './seyeon-internal-dogfood-evidence-v1.js';
+
+export {
+  SEYEON_INTERNAL_DOGFOOD_RELATIONSHIP_INSPECTOR_VERSION_V1,
+  createProductionSeyeonInternalDogfoodRelationshipInspectorV1,
+  inspectSeyeonInternalDogfoodRelationshipV1,
+  type SeyeonInternalDogfoodRelationshipInspectionV1,
+  type SeyeonInternalDogfoodRelationshipInspectorV1,
+} from './seyeon-internal-dogfood-relationship-inspector-v1.js';
+
+
+export {
+  SEYEON_STRUCTURED_PROVIDER_OBSERVER_VERSION_V1,
+  SEYEON_STRUCTURED_PROVIDER_PURPOSES_V1,
+  createObservedSeyeonStructuredProviderV1,
+  diffSeyeonStructuredProviderInvocationsV1,
+  type ObservedSeyeonStructuredProviderV1,
+  type SeyeonStructuredProviderInvocationSnapshotV1,
+} from './seyeon-structured-provider-observer-v1.js';
+
+export {
+  SEYEON_LIVE_PROVIDER_READINESS_VERSION_V1,
+  runConfiguredSeyeonLiveProviderReadinessV1,
+  runSeyeonLiveProviderReadinessV1,
+  type SeyeonLiveProviderReadinessResultV1,
+} from './seyeon-live-provider-readiness-v1.js';
+
+export {
+  runSeyeonLiveProviderReadinessCliV1,
+} from './seyeon-live-provider-readiness-cli-v1.js';
+
+export {
+  SEYEON_INTERNAL_LIVE_DOGFOOD_ENV_V1,
+  SEYEON_INTERNAL_LIVE_DOGFOOD_VERSION_V1,
+  SeyeonInternalLiveDogfoodErrorV1,
+  createConfiguredSeyeonInternalLiveDogfoodRuntimeV1,
+  parseSeyeonInternalLiveDogfoodCommandV1,
+  parseSeyeonInternalLiveProviderConfigV1,
+  runConfiguredSeyeonInternalLiveDogfoodV1,
+  runSeyeonInternalLiveDogfoodSessionV1,
+  type ConfiguredSeyeonInternalLiveDogfoodRuntimeV1,
+  type RunSeyeonInternalLiveDogfoodSessionInputV1,
+  type RunSeyeonInternalLiveDogfoodSessionResultV1,
+  type SeyeonInternalLiveDogfoodCommandV1,
+  type SeyeonInternalLiveDogfoodTurnSummaryV1,
+} from './seyeon-internal-live-dogfood-v1.js';
+
+
+export {
+  SEYEON_INTERNAL_DOGFOOD_SCENARIO_CATALOG_VERSION_V1,
+  SEYEON_INTERNAL_DOGFOOD_SCENARIOS_V1,
+  getSeyeonInternalDogfoodScenarioV1,
+  type SeyeonInternalDogfoodEvidencePreconditionV1,
+  type SeyeonInternalDogfoodRelationshipPreconditionV1,
+  type SeyeonInternalDogfoodScenarioIdV1,
+  type SeyeonInternalDogfoodScenarioTurnV1,
+  type SeyeonInternalDogfoodScenarioV1,
+} from './seyeon-internal-dogfood-scenarios-v1.js';
+
+export {
+  SEYEON_INTERNAL_DOGFOOD_SCENARIO_RUNNER_VERSION_V1,
+  SeyeonInternalDogfoodScenarioRunnerErrorV1,
+  assertSeyeonInternalDogfoodRelationshipPreconditionV1,
+  buildSeyeonInternalDogfoodClientTurnIdV1,
+  runSeyeonInternalDogfoodScenarioV1,
+  type RunSeyeonInternalDogfoodScenarioInputV1,
+  type RunSeyeonInternalDogfoodScenarioResultV1,
+  type SeyeonInternalDogfoodScenarioTurnResultV1,
+} from './seyeon-internal-dogfood-scenario-runner-v1.js';
+
+export {
+  parseSeyeonInternalDogfoodScenarioCommandV1,
+  runSeyeonInternalDogfoodScenarioCliV1,
+  type SeyeonInternalDogfoodScenarioCommandV1,
+} from './seyeon-internal-dogfood-scenario-cli-v1.js';
