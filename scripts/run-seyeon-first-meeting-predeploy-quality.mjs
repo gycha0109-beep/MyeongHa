@@ -11,6 +11,9 @@ import {
   runSeyeonCharacterTurnV2,
 } from '../dist/apps/api/src/seyeon-character-runtime-v2.js';
 import {
+  bindSeyeonProductionCurrentUserTurnV1,
+} from '../dist/apps/api/src/seyeon-production-chat-execution-v1.js';
+import {
   createSeyeonProductionGovernanceV1,
 } from '../dist/apps/api/src/seyeon-production-governance-v1.js';
 import {
@@ -80,14 +83,21 @@ async function main() {
     });
     const before = observed.snapshot();
 
+    const historicalContext = Object.freeze({
+      relationship: null,
+      recentMessages: context.recentMessages,
+      retrievedMemories: Object.freeze([]),
+    });
+    const contextInput = bindSeyeonProductionCurrentUserTurnV1({
+      historicalContext,
+      userMessageId: userMessageRef,
+      userText: fixture.text,
+    });
+
     const result = await runSeyeonCharacterTurnV2({
       userMessageRef,
       userText: fixture.text,
-      contextInput: Object.freeze({
-        relationship: null,
-        recentMessages: context.recentMessages,
-        retrievedMemories: Object.freeze([]),
-      }),
+      contextInput,
       governance,
       interpreterProvider: observed.provider,
       rendererProvider: observed.provider,
