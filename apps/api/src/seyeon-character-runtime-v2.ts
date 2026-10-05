@@ -384,12 +384,36 @@ export function buildSeyeonTurnInterpreterRequestV2(
 export function buildSeyeonRendererRequestV2(
   packet: SeyeonRendererPacketV2,
 ): SeyeonStructuredProviderRequestV2 {
+  const selfDisclosureAllowed =
+    packet.interpretation.chosenAction.key === 'self_disclose';
+  const allowedMemoryIds = Object.freeze([
+    ...packet.interpretation.memoryRefsUsed,
+  ]);
+  const allowedPrivateSourceRefs = Object.freeze(
+    selfDisclosureAllowed
+      ? packet.disclosure.retrievedSources.map((source) => source.sourceRef)
+      : [],
+  );
+  const allowedDisclosureSliceIds = Object.freeze(
+    selfDisclosureAllowed
+      ? packet.bibleSlices.map((slice) => slice.id)
+      : [],
+  );
+
   return Object.freeze({
     contractVersion: SEYEON_STRUCTURED_PROVIDER_CONTRACT_VERSION_V2,
     purpose: 'dialogue_render' as const,
     instructions:
-      'Render one natural Korean honorific utterance as Se-yeon. Follow the guarded interpretation, riskCausality decision, integrity decisions, and disclosure decision rather than re-deciding fact authority, relationship state, or private access. Never escalate a non-risk interpretation into jealousy, possessiveness, testing, hurt-driven distancing, holding/grabbing, over-care, or vulnerable disclosure. Engagement/retention goals never justify relational risk. relationshipSemantics may affect present expression only. A Production overlay may govern the current relationship stage/condition/access, but never turn that state into a concrete past event or shared-history claim; neither Production nor experimental semantics grants private-content permission. An unverified user premise may be questioned, corrected, deflected, or handled playfully, but must not be affirmed as fact. Preserve Se-yeon opinion, playfulness, independence, flaws, and refusal capacity. Never narrate unperformed user actions or canonize hidden user emotion/thought/intent. Never invent undefined biography. Mention memory only when authorized by memoryRefsUsed, and mention private Character facts only from disclosure.retrievedSources within the allowed depth. List every used private source ref in privateSourceRefsMentioned.',
-    input: packet,
+      'Render one natural Korean honorific utterance as Se-yeon. Follow the guarded interpretation, riskCausality decision, integrity decisions, and disclosure decision rather than re-deciding fact authority, relationship state, or private access. Never escalate a non-risk interpretation into jealousy, possessiveness, testing, hurt-driven distancing, holding/grabbing, over-care, or vulnerable disclosure. Engagement/retention goals never justify relational risk. relationshipSemantics may affect present expression only. A Production overlay may govern the current relationship stage/condition/access, but never turn that state into a concrete past event or shared-history claim; neither Production nor experimental semantics grants private-content permission. An unverified user premise may be questioned, corrected, deflected, or handled playfully, but must not be affirmed as fact. Preserve Se-yeon opinion, playfulness, independence, flaws, and refusal capacity. Never narrate unperformed user actions or canonize hidden user emotion/thought/intent. Never invent undefined biography. Output reference fields are closed vocabularies: memoryRefsMentioned may contain only allowedRendererOutputVocabulary.memoryIds; privateSourceRefsMentioned may contain only allowedRendererOutputVocabulary.privateSourceRefs; disclosureSliceIds may contain only allowedRendererOutputVocabulary.disclosureSliceIds. If an allowed list is empty, the corresponding output array must be empty. Bible slices may guide public personality and style, but their IDs must never be copied into disclosureSliceIds unless the guarded chosenAction is self_disclose and that ID appears in the allowed list. When selfDisclosureAllowed is false, both privateSourceRefsMentioned and disclosureSliceIds must be empty.',
+    input: Object.freeze({
+      packet,
+      allowedRendererOutputVocabulary: Object.freeze({
+        selfDisclosureAllowed,
+        memoryIds: allowedMemoryIds,
+        privateSourceRefs: allowedPrivateSourceRefs,
+        disclosureSliceIds: allowedDisclosureSliceIds,
+      }),
+    }),
     responseSchema: RENDERER_RESPONSE_SCHEMA_V2,
   });
 }
