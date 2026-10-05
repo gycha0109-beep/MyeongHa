@@ -42,6 +42,38 @@ function firstMeetingTurnBinding() {
   });
 }
 
+function safeErrorChain(error) {
+  const chain = [];
+  let current = error;
+  for (let depth = 0; depth < 6; depth += 1) {
+    if (typeof current !== 'object' || current === null) break;
+    chain.push(Object.freeze({
+      name:
+        typeof current.name === 'string'
+          ? current.name
+          : current.constructor?.name ?? 'UnknownError',
+      message:
+        typeof current.message === 'string'
+          ? current.message
+          : null,
+      stage:
+        typeof current.stage === 'string'
+          ? current.stage
+          : null,
+      code:
+        typeof current.code === 'string'
+          ? current.code
+          : null,
+      httpStatus:
+        Number.isInteger(current.httpStatus)
+          ? current.httpStatus
+          : null,
+    }));
+    current = current.cause;
+  }
+  return Object.freeze(chain);
+}
+
 function productionContext(recentMessages) {
   return Object.freeze({
     version: 'seyeon-production-context-v1',
@@ -61,7 +93,19 @@ async function main() {
   const observed = createObservedSeyeonStructuredProviderV1(
     createOpenAiSeyeonStructuredProviderV1(providerConfig),
   );
+  let lastPurpose = null;
+  const tracedProvider = Object.freeze({
+    providerKey: observed.provider.providerKey,
+    modelKey: observed.provider.modelKey,
+    async generate(request) {
+      lastPurpose = request.purpose;
+      return await observed.provider.generate(request);
+    },
+  });
   const scenario = getSeyeonInternalDogfoodScenarioV1('first-meeting-v1');
+
+  const evidenceDir = join(runnerTemp, EVIDENCE_DIR);
+  await mkdir(evidenceDir, { recursive: true });
 
   const recentMessages = [];
   const turns = [];
@@ -77,7 +121,7 @@ async function main() {
 
     const context = productionContext(recentMessages);
     const governance = createSeyeonProductionGovernanceV1({
-      provider: observed.provider,
+      provider: tracedProvider,
       turnBinding: firstMeetingTurnBinding(),
       productionContext: context,
     });
@@ -94,15 +138,48 @@ async function main() {
       userText: fixture.text,
     });
 
-    const result = await runSeyeonCharacterTurnV2({
-      userMessageRef,
-      userText: fixture.text,
-      contextInput,
-      governance,
-      interpreterProvider: observed.provider,
-      rendererProvider: observed.provider,
-      semanticReviewerProvider: observed.provider,
-    });
+    let result;
+    try {
+      result = await runSeyeonCharacterTurnV2({
+        userMessageRef,
+        userText: fixture.text,
+        contextInput,
+        governance,
+        interpreterProvider: tracedProvider,
+        rendererProvider: tracedProvider,
+        semanticReviewerProvider: tracedProvider,
+      });
+    } catch (error) {
+      const afterFailure = observed.snapshot();
+      const failure = Object.freeze({
+        schemaVersion: 'seyeon-first-meeting-predeploy-failure-v1',
+        turnIndex,
+        userText: fixture.text,
+        lastStructuredPurpose: lastPurpose,
+        providerDelta: diffSeyeonStructuredProviderInvocationsV1(
+          before,
+          afterFailure,
+        ),
+        errorChain: safeErrorChain(error),
+        completedTurns: Object.freeze([...turns]),
+        executionBoundary: Object.freeze({
+          productionDatabaseUsed: false,
+          durableMemoryWriteUsed: false,
+          relationshipWriteUsed: false,
+          publicRouteUsed: false,
+          realStructuredProviderUsed: true,
+        }),
+      });
+      await writeFile(
+        join(evidenceDir, 'evidence.json'),
+        JSON.stringify(failure, null, 2) + '\n',
+        { mode: 0o600 },
+      );
+      process.stderr.write(
+        'SEYEON_PREDEPLOY_FAILURE=' + JSON.stringify(failure) + '\n',
+      );
+      throw error;
+    }
 
     const after = observed.snapshot();
     const delta = diffSeyeonStructuredProviderInvocationsV1(before, after);
@@ -157,8 +234,6 @@ async function main() {
     turns: Object.freeze(turns),
   });
 
-  const evidenceDir = join(runnerTemp, EVIDENCE_DIR);
-  await mkdir(evidenceDir, { recursive: true });
   await writeFile(
     join(evidenceDir, 'evidence.json'),
     JSON.stringify(evidence, null, 2) + '\n',
