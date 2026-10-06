@@ -229,6 +229,70 @@ describe('Se-yeon turn interpreter v2 guard', () => {
     ).toThrow(/baseline or playful/);
   });
 
+  it('routes a first-contact conversation-boundary question through Se-yeon owned boundary behavior', () => {
+    const firstContact = assembleSeyeonRuntimeContextV2({
+      relationship: null,
+      recentMessages: [
+        {
+          messageId: 'message-current',
+          role: 'user',
+          text: '여기서는 어떤 얘기까지 해도 돼요?',
+        },
+      ],
+      disclosure: { decision: null, retrievedSources: [] },
+      retrievedMemories: [],
+      focuses: ['expression'],
+    });
+
+    const accepted = guardSeyeonTurnInterpretationV2({
+      context: firstContact,
+      rawOutput: {
+        schemaVersion: 'seyeon-turn-interpretation-v2',
+        userMove: 'asked_conversation_boundary',
+        notice: {
+          summary: '사용자가 첫 만남 대화의 범위를 직접 물었다.',
+          evidenceRefs: ['message-current'],
+        },
+        immediateWant: {
+          key: 'create_next_step',
+          summary: '세연의 편안한 범위를 밝히고 대화를 계속하고 싶다.',
+        },
+        tension: {
+          key: 'approach_vs_self_disclosure',
+          summary: '친근하게 답하되 첫 만남의 공개 범위를 넘지 않는다.',
+        },
+        chosenAction: {
+          key: 'admit_boundary',
+          rationale: '세연의 현재 대화 경계를 짧게 밝힌다.',
+        },
+        expressionState: 'baseline',
+        reveal: {
+          level: 'public',
+          triggerRef: 'message-current',
+          supportingHistoryRefs: [],
+        },
+        memoryRefsUsed: [],
+      },
+    });
+
+    expect(accepted.userMove).toBe('asked_conversation_boundary');
+    expect(accepted.chosenAction.key).toBe('admit_boundary');
+    expect(accepted.reveal.level).toBe('public');
+
+    expect(() =>
+      guardSeyeonTurnInterpretationV2({
+        context: firstContact,
+        rawOutput: {
+          ...accepted,
+          chosenAction: {
+            key: 'activate',
+            rationale: '범위를 답하지 않고 다음 주제로 넘긴다.',
+          },
+        },
+      }),
+    ).toThrow(/conversation-boundary/);
+  });
+
   it('requires a Se-yeon-owned present desire when the user directly asks what she wants', () => {
     const firstContact = assembleSeyeonRuntimeContextV2({
       relationship: null,
