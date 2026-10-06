@@ -170,6 +170,9 @@ describe('Se-yeon runtime context v2', () => {
       therapyFramingAsDefaultForbidden: true,
       lowIntensityUserStatePolicy: 'acknowledge_then_character_move',
       recentMoveNoveltyPolicy: 'avoid_repeating_unprompted_assistant_mechanic',
+      recentMoveNoveltyUnit: 'concrete_mechanic_or_activity',
+      initiativePatternMayRepeat: true,
+      conversationPacePolicy: 'state_owned_pacing_stance_without_new_prompt',
       directCurrentDesirePolicy:
         'state_turn_local_seyeon_want_without_forced_invite',
       turnLocalPresentDesireNeverDurableAuthority: true,
