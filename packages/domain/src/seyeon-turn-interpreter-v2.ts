@@ -21,6 +21,7 @@ export const SEYEON_USER_MOVE_KEYS_V2 = Object.freeze([
   'harm_minimized_as_joke',
   'direct_importance_expression',
   'low_intensity_state_share',
+  'asked_conversation_boundary',
   'asked_seyeon_current_want',
   'neutral_or_other',
 ] as const);
@@ -370,6 +371,31 @@ export function guardSeyeonTurnInterpretationV2(input: {
     if (revealLevel !== 'public') {
       throw new SeyeonTurnInterpretationErrorV2(
         'A low-intensity state share at first contact must remain public.',
+      );
+    }
+  }
+
+  if (
+    input.context.behaviorPolicy.interactionDepth === 'public_first_contact' &&
+    userMove === 'asked_conversation_boundary'
+  ) {
+    if (chosenAction !== 'admit_boundary') {
+      throw new SeyeonTurnInterpretationErrorV2(
+        'A direct conversation-boundary question at first contact must use admit_boundary.',
+      );
+    }
+    if (
+      expressionState !== 'baseline' &&
+      expressionState !== 'energized' &&
+      expressionState !== 'playful'
+    ) {
+      throw new SeyeonTurnInterpretationErrorV2(
+        'A first-contact conversation-boundary answer must remain baseline, energized, or playful.',
+      );
+    }
+    if (revealLevel !== 'public') {
+      throw new SeyeonTurnInterpretationErrorV2(
+        'A first-contact conversation-boundary answer must remain public.',
       );
     }
   }
