@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  PREDEPLOY_SOURCE_SHA: 92c0cd4bdd3bf108ec67d70a9bc1bfd089d84568
+  PREDEPLOY_SOURCE_SHA: 6f5346b78bfa173d1d5c0f376f7ea7ac8d3c9410
 
 jobs:
   luna:
