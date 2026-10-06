@@ -103,7 +103,9 @@ Production-only server configuration:
 - `MYEONGHA_NAVER_OAUTH_BRIDGE_ENABLED=true`: transport gate, enabled only after
   source deployment and provider setup are ready for the registered tester.
 - `MYEONGHA_SOCIAL_AUTH_NAVER_ENABLED`: keep false/absent until real provider
-  roundtrip and Member-session verification succeed.
+  roundtrip succeeds and the matching provider configuration is verified.
+  Native Member-session verification is separately required after the single
+  final APK build; provider activation alone is not proof of mobile readiness.
 
 The bridge encrypts and authenticates the Supabase state/PKCE binding, preserves
 Naver's state through token exchange, and accepts only fixed provider endpoints,
@@ -126,7 +128,9 @@ routes; use the existing security observer's bounded status events.
 
 Activation remains **IMPLEMENTED_UNVERIFIED** until this exact source is deployed,
 Naver callback and Supabase custom provider are saved, and a registered developer
-account completes the real flow. Naver's development app permits registered
+account completes the real provider flow. Native Member-session verification
+remains pending until the separately authorized final APK build and device test.
+Naver's development app permits registered
 members only; review approval is separately required for general-user availability.
 No APK build is part of this change.
 
