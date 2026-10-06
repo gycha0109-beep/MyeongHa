@@ -296,6 +296,12 @@
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "commit-metadata"
     },
+    "seyeon-first-meeting-predeploy-final-validation.yml": {
+      "responsibility": "production-character-dogfood",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
     "seyeon-first-meeting-predeploy-quality-main.yml": {
       "responsibility": "production-character-dogfood",
       "prMode": "none",
