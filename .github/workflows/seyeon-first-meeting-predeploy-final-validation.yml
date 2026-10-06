@@ -15,11 +15,42 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  PREDEPLOY_SOURCE_SHA: 6f5346b78bfa173d1d5c0f376f7ea7ac8d3c9410
+  PREDEPLOY_SOURCE_SHA: 93c06c3531d2e4853c4616f0fd48350ee4331435
 
 jobs:
+  source-build:
+    name: 세연-최종검증-소스빌드
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: 고정된 세연 시험 소스 받기
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ env.PREDEPLOY_SOURCE_SHA }}
+          fetch-depth: 1
+
+      - name: 시험 소스 고정 확인
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD)" == "$PREDEPLOY_SOURCE_SHA" ]]
+          test -f scripts/run-seyeon-first-meeting-predeploy-quality.mjs
+
+      - name: Node 24 준비
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: 의존성 설치
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: 세연 시험 소스 빌드
+        run: npm run build
+
   luna:
     name: 세연-최종검증-Luna-5턴
+    needs: source-build
     runs-on: ubuntu-24.04
     environment: production
     env:
