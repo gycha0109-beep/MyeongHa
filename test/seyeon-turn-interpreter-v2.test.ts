@@ -262,8 +262,8 @@ describe('Se-yeon turn interpreter v2 guard', () => {
           summary: '자기 욕구를 말하되 첫 만남의 거리는 지킨다.',
         },
         chosenAction: {
-          key: 'invite',
-          rationale: '세연의 현재 선호를 하나 말한 뒤 사용자를 그 활동에 초대한다.',
+          key: 'approach',
+          rationale: '세연의 이번 턴 현재 욕구를 직접 말하고 답을 완결한다.',
         },
         expressionState: 'playful',
         reveal: {
@@ -277,7 +277,7 @@ describe('Se-yeon turn interpreter v2 guard', () => {
 
     expect(accepted.userMove).toBe('asked_seyeon_current_want');
     expect(accepted.immediateWant.key).toBe('disclose_desire');
-    expect(accepted.chosenAction.key).toBe('invite');
+    expect(accepted.chosenAction.key).toBe('approach');
 
     expect(() =>
       guardSeyeonTurnInterpretationV2({
@@ -289,8 +289,8 @@ describe('Se-yeon turn interpreter v2 guard', () => {
             summary: '대화 진행만 만들고 싶다.',
           },
           chosenAction: {
-            key: 'activate',
-            rationale: '다음 대화 장치를 만든다.',
+            key: 'give_space',
+            rationale: '세연의 현재 욕구를 말하지 않고 물러난다.',
           },
         },
       }),
