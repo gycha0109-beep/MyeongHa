@@ -218,15 +218,23 @@ describe('Se-yeon turn interpreter v2 guard', () => {
       }),
     ).toThrow(/low-intensity state share/);
 
-    expect(() =>
-      guardSeyeonTurnInterpretationV2({
-        context: firstContact,
-        rawOutput: {
-          ...accepted,
-          expressionState: 'caring',
-        },
-      }),
-    ).toThrow(/baseline or playful/);
+    const clampedCaring = guardSeyeonTurnInterpretationV2({
+      context: firstContact,
+      rawOutput: {
+        ...accepted,
+        expressionState: 'caring',
+      },
+    });
+    expect(clampedCaring.expressionState).toBe('baseline');
+
+    const preservedPlayful = guardSeyeonTurnInterpretationV2({
+      context: firstContact,
+      rawOutput: {
+        ...accepted,
+        expressionState: 'playful',
+      },
+    });
+    expect(preservedPlayful.expressionState).toBe('playful');
   });
 
   it('routes a first-contact conversation-boundary question through Se-yeon owned boundary behavior', () => {
