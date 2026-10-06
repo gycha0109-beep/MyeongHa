@@ -40,6 +40,22 @@
   ],
   "rewrites": [
     {
+      "source": "/api/auth/social/naver/authorize",
+      "destination": "/api/auth/sign-in?__myeongha_naver_oauth_bridge=authorize"
+    },
+    {
+      "source": "/api/auth/social/naver/callback",
+      "destination": "/api/auth/sign-in?__myeongha_naver_oauth_bridge=callback"
+    },
+    {
+      "source": "/api/auth/social/naver/token",
+      "destination": "/api/auth/sign-in?__myeongha_naver_oauth_bridge=token"
+    },
+    {
+      "source": "/api/auth/social/naver/userinfo",
+      "destination": "/api/auth/sign-in?__myeongha_naver_oauth_bridge=userinfo"
+    },
+    {
       "source": "/api/auth/social/start",
       "destination": "/api/auth/sign-in?__myeongha_social_auth_start=1"
     },
