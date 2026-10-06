@@ -104,12 +104,26 @@ async function main() {
     createOpenAiSeyeonStructuredProviderV1(providerConfig),
   );
   let lastPurpose = null;
+  let lastRendererCandidate = null;
   const tracedProvider = Object.freeze({
     providerKey: observed.provider.providerKey,
     modelKey: observed.provider.modelKey,
     async generate(request) {
       lastPurpose = request.purpose;
-      return await observed.provider.generate(request);
+      const output = await observed.provider.generate(request);
+      if (
+        request.purpose === 'dialogue_render' &&
+        typeof output === 'object' &&
+        output !== null &&
+        typeof output.utterance === 'string'
+      ) {
+        const utterance = output.utterance.trim();
+        lastRendererCandidate =
+          utterance.length > 0 && utterance.length <= 1200
+            ? utterance
+            : null;
+      }
+      return output;
     },
   });
   const scenario = getSeyeonInternalDogfoodScenarioV1('first-meeting-v1');
@@ -140,6 +154,7 @@ async function main() {
       productionContext: context,
     });
     const before = observed.snapshot();
+    lastRendererCandidate = null;
 
     const historicalContext = Object.freeze({
       relationship: null,
@@ -175,6 +190,10 @@ async function main() {
           afterFailure,
         ),
         errorChain: safeErrorChain(error),
+        rejectedRendererCandidate:
+          lastPurpose === 'semantic_review'
+            ? lastRendererCandidate
+            : null,
         completedTurns: Object.freeze([...turns]),
         executionBoundary: Object.freeze({
           productionDatabaseUsed: false,
