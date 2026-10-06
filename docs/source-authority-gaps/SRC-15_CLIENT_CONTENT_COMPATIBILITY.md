@@ -1,6 +1,6 @@
 # SRC-15 — Client Capability / Asset Manifest Compatibility Decision Authority
 
-**Status: BLOCKING BEFORE REMOTE CONTENT COMPATIBILITY VERDICT / ACTIVATION GATE FINALIZATION**
+**Status: RESOLVED FOR MVP EVALUATOR CONTRACT / PRODUCTION ACTIVATION STILL BLOCKED BY CONCRETE ASSET AUTHORITY**
 
 ## Source-backed requirement
 
@@ -16,17 +16,9 @@ interface ContentManifest {
 }
 ```
 
-The same section requires an insufficient client capability to be handled by hiding unsupported content, using a compatible fallback asset/cue, or prompting an update, and states that remote content must not crash the app.
+The same section requires unsupported remote content to be hidden, replaced by an authorized fallback, or handled as update-required without crashing the app.
 
-Use Case 12.1 additionally requires:
-
-```text
-apiContractVersion
-minimumSupportedClientCapability
-contentCapabilityVersion
-```
-
-and fixes the rule that remote content activates only when `minClientCapability` is satisfied. The final checklist separately requires remote content to pass both client capability and asset manifest compatibility before activation.
+Use Case 12.1 additionally requires remote content to activate only when the minimum client capability is satisfied. The final checklist separately requires client capability and asset-manifest compatibility before activation.
 
 ERD v0.6 stores the relevant immutable bundle metadata as opaque fields:
 
@@ -36,76 +28,70 @@ content_bundles.asset_manifest_hash text
 content_bundles.cue_schema_version text
 ```
 
-`artifact_ref` remains a private immutable artifact resolver key and is not part of the client-facing manifest contract.
+`artifact_ref` remains a private immutable artifact resolver key and is not part of the client-facing compatibility contract.
 
-## Missing authority
+## Historical authority gap
 
-The source requires a compatibility decision but does not define the decision algorithm or the complete evaluator input. In particular, it does not specify:
+The original source did not define:
 
-```text
-1. capability identifier grammar and ordering/comparison semantics
-   - whether capability is semver, ordinal registry key, feature set, or another representation
+1. capability identifier comparison semantics;
+2. client-supported capability evidence shape;
+3. asset-manifest comparison semantics;
+4. cue-schema compatibility semantics;
+5. fallback/update precedence;
+6. final evaluator ownership and deterministic result shape.
 
-2. client-supported capability input shape
-   - one scalar version, a capability set, per-platform registry, or negotiated contract
+Therefore lexical comparison, numeric suffix parsing, semantic-version coercion, direct hash comparison, or hard-coded fallback order were previously prohibited as implementation inventions.
 
-3. asset compatibility comparison contract
-   - whether assetManifestHash represents the required remote manifest, installed client inventory,
-     a signed manifest identity, or another compatibility proof
+## Resolution
 
-4. cue compatibility semantics
-   - how cueSchemaVersion relates to client capability and fallback cue support
+The MVP decision is now fixed by:
 
-5. fallback selection authority
-   - which compatible fallback bundle/asset/cue is chosen and how that choice remains deterministic
+`docs/source-authority-decisions/CHARACTER_CLIENT_CONTENT_COMPATIBILITY_V1.md`
 
-6. final evaluator ownership
-   - server, client, or a split protocol; including what evidence is persisted for an activation decision
-```
+The resolved contract is:
 
-The presence of two opaque strings such as `client-cap-v3` and `client-cap-v2` is not sufficient authority to infer lexical, numeric, semver, or ad-hoc ordering. Likewise, equality or inequality of two asset hashes is not by itself a defined asset-compatibility algorithm.
+- MVP target = current Production Web Client only;
+- all compatibility identifiers are opaque and unordered;
+- the server owns the final compatibility evaluator;
+- client self-asserted compatibility booleans are not authority;
+- the server-owned client profile provides explicit supported identifier sets;
+- capability, asset-manifest hash, and cue-schema checks use exact set membership only;
+- no lexical, numeric, semantic-version, prefix, or suffix inference is allowed;
+- malformed compatibility evidence fails closed by hiding the remote content;
+- asset-manifest mismatch hides the remote content;
+- capability-only or cue-schema-only mismatch returns update-required;
+- all three checks must pass before activation;
+- automatic fallback bundle/asset/cue selection is not part of MVP authority;
+- no new compatibility DB state is introduced.
 
-## Allowed implementation before resolution
+The executable domain evaluator is:
 
-The following bounded projection is source-backed and may remain active:
+`packages/domain/src/character-content-compatibility.ts`
 
-```text
-qry_content_bundle_manifest_v1(content_bundle_id)
-→ contentVersion
-→ minClientCapability
-→ characterIds
-→ assetManifestHash
-→ cueSchemaVersion
-```
+## Remaining production blockers
 
-It provides the published compatibility inputs without making a compatibility verdict and does not expose `artifact_ref`, raw `manifest_jsonb`, release rollout internals, or other private authority.
+Resolving this comparison protocol does **not** approve concrete Production asset values.
 
-## Forbidden claims before resolution
+The following remain independently blocked until their own authority and evidence are complete:
 
-Until source authority defines the missing comparison/evaluator contract, implementation must not claim that it has completed any of the following:
+- concrete Production `assetRefs`;
+- concrete emotion and animation cue identifiers;
+- concrete cue schema value;
+- concrete asset-manifest hash and source provenance;
+- asset ownership/licensing evidence;
+- Production ContentBundle/ContentRelease publication;
+- positive Member Chat Production activation;
+- public Chat route activation.
 
-```text
-client capability satisfied / insufficient
-asset manifest compatible / incompatible
-cue schema compatible / incompatible
-remote content safe to activate
-fallback bundle/asset/cue selected authoritatively
-forced-update decision derived authoritatively
-```
+The existing Gate B/C boundaries in
+`docs/source-authority-decisions/CHARACTER_RUNTIME_ASSET_AUTHORITY_REQUEST_V1.md`
+remain unchanged.
 
-A lexical comparison, numeric suffix parsing, semver coercion, direct hash equality rule, or hard-coded fallback order would be an implementation invention and is therefore prohibited.
+## Activation consequence
 
-## Source decision required
+SRC-15 no longer blocks implementation because of an undefined comparator/evaluator protocol.
 
-Source authority must define either a complete compatibility protocol or an equivalent governed contract covering at minimum:
+Production remote Character content must still fail closed until a separately approved concrete client profile and concrete asset package exist. A passing synthetic/unit-test profile is not Production activation evidence.
 
-```text
-capability representation + comparator
-client capability evidence/input
-asset compatibility evidence/input + comparison rule
-cue compatibility rule
-fallback/update decision precedence
-final evaluator ownership and deterministic result shape
-```
-
-Only after that decision may the compatibility verdict become production activation authority.
+Watchtower-Track: character-memory
