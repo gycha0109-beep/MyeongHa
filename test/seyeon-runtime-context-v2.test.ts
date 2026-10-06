@@ -170,7 +170,9 @@ describe('Se-yeon runtime context v2', () => {
       therapyFramingAsDefaultForbidden: true,
       lowIntensityUserStatePolicy: 'acknowledge_then_character_move',
       recentMoveNoveltyPolicy: 'avoid_repeating_unprompted_assistant_mechanic',
-      directCurrentDesirePolicy: 'state_seyeon_want_before_inviting',
+      directCurrentDesirePolicy:
+        'state_turn_local_seyeon_want_without_forced_invite',
+      turnLocalPresentDesireNeverDurableAuthority: true,
     });
     expect(context.behaviorPolicy.preferredActionKeys).toEqual(
       expect.arrayContaining(['approach', 'activate', 'tease', 'invite']),
