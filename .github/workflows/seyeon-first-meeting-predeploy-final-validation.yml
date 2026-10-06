@@ -1,0 +1,152 @@
+name: "[WT:character-memory] 세연 배포 전 최종 실대화 검증"
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/seyeon-first-meeting-predeploy-final-validation.trigger'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: seyeon-first-meeting-predeploy-final-validation-main
+  cancel-in-progress: false
+
+env:
+  PREDEPLOY_SOURCE_SHA: 92c0cd4bdd3bf108ec67d70a9bc1bfd089d84568
+
+jobs:
+  luna:
+    name: 세연-최종검증-Luna-5턴
+    runs-on: ubuntu-24.04
+    environment: production
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      MYEONGHA_SEYEON_OPENAI_MODEL: 'gpt-5.6-luna'
+      MYEONGHA_SEYEON_OPENAI_TIMEOUT_MS: ${{ vars.MYEONGHA_SEYEON_OPENAI_TIMEOUT_MS }}
+      SEYEON_PREDEPLOY_MAX_TURNS: '5'
+
+    steps:
+      - name: Main 호출 커밋 받기
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+
+      - name: 보호된 호출 조건 확인
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "${{ github.event_name }}" == 'push' ]]
+          [[ "${{ github.ref }}" == 'refs/heads/main' ]]
+          trigger_value="$(tr -d '\r' < .github/seyeon-first-meeting-predeploy-final-validation.trigger)"
+          [[ "$trigger_value" =~ ^fire-[0-9]{4}-[0-9]{2}-[0-9]{2}-v[0-9]+$ ]]
+          [[ "$PREDEPLOY_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test -n "${OPENAI_API_KEY:-}"
+          test -n "${MYEONGHA_SEYEON_OPENAI_MODEL:-}"
+
+      - name: 고정된 세연 시험 소스 받기
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ env.PREDEPLOY_SOURCE_SHA }}
+          fetch-depth: 1
+
+      - name: 시험 소스 고정 확인
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD)" == "$PREDEPLOY_SOURCE_SHA" ]]
+          test -f scripts/run-seyeon-first-meeting-predeploy-quality.mjs
+
+      - name: Node 24 준비
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: 의존성 설치
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: 세연 대화 엔진 빌드
+        run: npm run build
+
+      - name: Luna 5턴 실제 대화 실행
+        run: node scripts/run-seyeon-first-meeting-predeploy-quality.mjs
+
+      - name: Luna 시험 결과 보관
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: seyeon-final-validation-luna-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/seyeon-first-meeting-predeploy-quality/evidence.json
+          if-no-files-found: warn
+          retention-days: 7
+
+  terra:
+    name: 세연-최종검증-Terra-5턴
+    needs: luna
+    runs-on: ubuntu-24.04
+    environment: production
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      MYEONGHA_SEYEON_OPENAI_MODEL: 'gpt-5.6-terra'
+      MYEONGHA_SEYEON_OPENAI_TIMEOUT_MS: ${{ vars.MYEONGHA_SEYEON_OPENAI_TIMEOUT_MS }}
+      SEYEON_PREDEPLOY_MAX_TURNS: '5'
+
+    steps:
+      - name: Main 호출 커밋 받기
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+
+      - name: 보호된 호출 조건 확인
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "${{ github.event_name }}" == 'push' ]]
+          [[ "${{ github.ref }}" == 'refs/heads/main' ]]
+          trigger_value="$(tr -d '\r' < .github/seyeon-first-meeting-predeploy-final-validation.trigger)"
+          [[ "$trigger_value" =~ ^fire-[0-9]{4}-[0-9]{2}-[0-9]{2}-v[0-9]+$ ]]
+          [[ "$PREDEPLOY_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test -n "${OPENAI_API_KEY:-}"
+          test -n "${MYEONGHA_SEYEON_OPENAI_MODEL:-}"
+
+      - name: 고정된 세연 시험 소스 받기
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ env.PREDEPLOY_SOURCE_SHA }}
+          fetch-depth: 1
+
+      - name: 시험 소스 고정 확인
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD)" == "$PREDEPLOY_SOURCE_SHA" ]]
+          test -f scripts/run-seyeon-first-meeting-predeploy-quality.mjs
+
+      - name: Node 24 준비
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: 의존성 설치
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: 세연 대화 엔진 빌드
+        run: npm run build
+
+      - name: Terra 5턴 실제 대화 실행
+        run: node scripts/run-seyeon-first-meeting-predeploy-quality.mjs
+
+      - name: Terra 시험 결과 보관
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: seyeon-final-validation-terra-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/seyeon-first-meeting-predeploy-quality/evidence.json
+          if-no-files-found: warn
+          retention-days: 7
