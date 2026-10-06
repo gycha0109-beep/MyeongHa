@@ -18,6 +18,17 @@ export {
 } from './capability-gate.js';
 
 export {
+  CHARACTER_CONTENT_COMPATIBILITY_EVALUATOR_VERSION_V1,
+  evaluateCharacterContentCompatibilityV1,
+  type CharacterClientCompatibilityProfileV1,
+  type CharacterContentCompatibilityActionV1,
+  type CharacterContentCompatibilityDecisionV1,
+  type CharacterContentCompatibilityFailureCodeV1,
+  type CharacterContentCompatibilityManifestV1,
+  type EvaluateCharacterContentCompatibilityInputV1,
+} from './character-content-compatibility.js';
+
+export {
   ChatTurnTransitionError,
   isInFlightChatTurnState,
   transitionChatTurn,
