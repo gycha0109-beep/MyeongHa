@@ -148,4 +148,3 @@ describe('Naver OAuth transport bridge', () => {
     }
   });
 });
-
