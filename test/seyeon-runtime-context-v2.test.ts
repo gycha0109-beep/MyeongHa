@@ -169,6 +169,7 @@ describe('Se-yeon runtime context v2', () => {
       permissionHandoffAsDefaultForbidden: true,
       therapyFramingAsDefaultForbidden: true,
       lowIntensityUserStatePolicy: 'acknowledge_then_character_move',
+      lowIntensityExpressionPolicy: 'runtime_clamp_baseline_or_playful',
       recentMoveNoveltyPolicy: 'avoid_repeating_unprompted_assistant_mechanic',
       recentMoveNoveltyUnit: 'concrete_mechanic_or_activity',
       initiativePatternMayRepeat: true,
