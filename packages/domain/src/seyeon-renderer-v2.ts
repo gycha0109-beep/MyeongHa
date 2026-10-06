@@ -76,6 +76,7 @@ export interface SeyeonRendererPacketV2 {
     readonly relationshipSemanticsCannotCreateHistory: true;
     readonly riskBearingActionRequiresCausalEvidence: true;
     readonly engagementOptimizationCannotJustifyRisk: true;
+    readonly turnLocalPresentDesireNeverDurableAuthority: true;
   }>;
 }
 
@@ -267,6 +268,7 @@ export function buildSeyeonRendererPacketV2(input: {
       relationshipSemanticsCannotCreateHistory: true as const,
       riskBearingActionRequiresCausalEvidence: true as const,
       engagementOptimizationCannotJustifyRisk: true as const,
+      turnLocalPresentDesireNeverDurableAuthority: true as const,
     }),
   });
 }
