@@ -111,8 +111,9 @@ export interface SeyeonRuntimeBehaviorPolicyV2 {
     | 'avoid_repeating_unprompted_assistant_mechanic'
     | 'relationship_calibrated';
   readonly directCurrentDesirePolicy:
-    | 'state_seyeon_want_before_inviting'
+    | 'state_turn_local_seyeon_want_without_forced_invite'
     | 'relationship_calibrated';
+  readonly turnLocalPresentDesireNeverDurableAuthority: true;
   readonly preferredActionKeys: readonly SeyeonActionKeyV2[];
 }
 
@@ -558,7 +559,9 @@ export function resolveSeyeonRuntimeBehaviorPolicyV2(input: {
       lowIntensityUserStatePolicy: 'acknowledge_then_character_move' as const,
       recentMoveNoveltyPolicy:
         'avoid_repeating_unprompted_assistant_mechanic' as const,
-      directCurrentDesirePolicy: 'state_seyeon_want_before_inviting' as const,
+      directCurrentDesirePolicy:
+        'state_turn_local_seyeon_want_without_forced_invite' as const,
+      turnLocalPresentDesireNeverDurableAuthority: true as const,
       preferredActionKeys: Object.freeze([
         'approach',
         'activate',
@@ -582,6 +585,7 @@ export function resolveSeyeonRuntimeBehaviorPolicyV2(input: {
     lowIntensityUserStatePolicy: 'relationship_calibrated' as const,
     recentMoveNoveltyPolicy: 'relationship_calibrated' as const,
     directCurrentDesirePolicy: 'relationship_calibrated' as const,
+    turnLocalPresentDesireNeverDurableAuthority: true as const,
     preferredActionKeys: Object.freeze([
       ...SEYEON_AUTHORED_PROJECTION_V2.actionKeys,
     ]),
