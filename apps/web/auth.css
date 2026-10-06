@@ -86,6 +86,73 @@
   box-shadow: 0 2px 9px rgba(20, 29, 33, .08);
 }
 
+.auth-social {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 22px;
+}
+
+.auth-social-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.auth-social-button {
+  min-height: 48px;
+  border: 1px solid color-mix(in srgb, var(--mh-ink-faint, #aaa) 35%, transparent);
+  border-radius: 11px;
+  background: var(--mh-paper-raised, #fff);
+  color: var(--mh-ink-strong, #1d2730);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform .14s ease, box-shadow .14s ease, opacity .14s ease;
+}
+
+.auth-social-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 5px 16px rgba(20, 29, 33, .08);
+}
+
+.auth-social-button:disabled {
+  opacity: .58;
+  cursor: wait;
+}
+
+.auth-social-button[data-provider="kakao"] {
+  border-color: #fee500;
+  background: #fee500;
+  color: #191919;
+}
+
+.auth-social-button[data-provider="naver"] {
+  border-color: #03c75a;
+  background: #03c75a;
+  color: #fff;
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--mh-ink-faint, #8d877f);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: color-mix(in srgb, var(--mh-ink-faint, #aaa) 25%, transparent);
+}
+
+.auth-divider span {
+  white-space: nowrap;
+}
+
 .auth-form {
   display: grid;
   gap: 18px;
