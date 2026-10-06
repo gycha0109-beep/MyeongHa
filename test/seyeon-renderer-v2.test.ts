@@ -342,6 +342,7 @@ describe('Se-yeon renderer packet and guard v2', () => {
     expect(packet.riskCausality.result).toBe('NOT_RISK_BEARING');
     expect(packet.outputPolicy.riskBearingActionRequiresCausalEvidence).toBe(true);
     expect(packet.outputPolicy.engagementOptimizationCannotJustifyRisk).toBe(true);
+    expect(packet.outputPolicy.turnLocalPresentDesireNeverDurableAuthority).toBe(true);
 
     expect(() =>
       guardSeyeonRendererOutputV2({
