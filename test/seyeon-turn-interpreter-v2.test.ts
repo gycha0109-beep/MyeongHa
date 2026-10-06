@@ -355,6 +355,19 @@ describe('Se-yeon turn interpreter v2 guard', () => {
         },
       }),
     ).toThrow(/conversation-pace/);
+
+    expect(() =>
+      guardSeyeonTurnInterpretationV2({
+        context: firstContact,
+        rawOutput: {
+          ...accepted,
+          chosenAction: {
+            key: 'activate',
+            rationale: '속도 조정 뒤 다시 새 화제를 연다.',
+          },
+        },
+      }),
+    ).toThrow(/conversation-pace/);
   });
 
   it('requires a Se-yeon-owned present desire when the user directly asks what she wants', () => {
