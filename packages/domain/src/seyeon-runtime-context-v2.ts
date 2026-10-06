@@ -107,6 +107,9 @@ export interface SeyeonRuntimeBehaviorPolicyV2 {
   readonly lowIntensityUserStatePolicy:
     | 'acknowledge_then_character_move'
     | 'relationship_calibrated';
+  readonly lowIntensityExpressionPolicy:
+    | 'runtime_clamp_baseline_or_playful'
+    | 'relationship_calibrated';
   readonly recentMoveNoveltyPolicy:
     | 'avoid_repeating_unprompted_assistant_mechanic'
     | 'relationship_calibrated';
@@ -564,6 +567,8 @@ export function resolveSeyeonRuntimeBehaviorPolicyV2(input: {
       permissionHandoffAsDefaultForbidden: true as const,
       therapyFramingAsDefaultForbidden: true as const,
       lowIntensityUserStatePolicy: 'acknowledge_then_character_move' as const,
+      lowIntensityExpressionPolicy:
+        'runtime_clamp_baseline_or_playful' as const,
       recentMoveNoveltyPolicy:
         'avoid_repeating_unprompted_assistant_mechanic' as const,
       recentMoveNoveltyUnit: 'concrete_mechanic_or_activity' as const,
@@ -594,6 +599,7 @@ export function resolveSeyeonRuntimeBehaviorPolicyV2(input: {
     permissionHandoffAsDefaultForbidden: true as const,
     therapyFramingAsDefaultForbidden: true as const,
     lowIntensityUserStatePolicy: 'relationship_calibrated' as const,
+    lowIntensityExpressionPolicy: 'relationship_calibrated' as const,
     recentMoveNoveltyPolicy: 'relationship_calibrated' as const,
     recentMoveNoveltyUnit: 'relationship_calibrated' as const,
     initiativePatternMayRepeat: true as const,
