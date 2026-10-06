@@ -304,11 +304,21 @@ export function guardSeyeonTurnInterpretationV2(input: {
     SEYEON_ACTION_KEYS_V2,
     'chosenAction.key',
   );
-  const expressionState = parseEnum(
+  const rawExpressionState = parseEnum(
     input.rawOutput.expressionState,
     SEYEON_EXPRESSION_STATES_V2,
     'expressionState',
   );
+  let expressionState = rawExpressionState;
+  if (
+    input.context.behaviorPolicy.interactionDepth === 'public_first_contact' &&
+    userMove === 'low_intensity_state_share' &&
+    input.context.behaviorPolicy.lowIntensityExpressionPolicy ===
+      'runtime_clamp_baseline_or_playful'
+  ) {
+    expressionState =
+      rawExpressionState === 'playful' ? 'playful' : 'baseline';
+  }
   const revealLevel = parseEnum(
     input.rawOutput.reveal.level,
     SEYEON_REVEAL_LEVELS_V2,
@@ -362,11 +372,6 @@ export function guardSeyeonTurnInterpretationV2(input: {
     if (!allowedFirstContactStateShareActions.has(chosenAction as never)) {
       throw new SeyeonTurnInterpretationErrorV2(
         'A low-intensity state share at first contact must keep Se-yeon active instead of defaulting to care, permission handoff, or distance.',
-      );
-    }
-    if (expressionState !== 'baseline' && expressionState !== 'playful') {
-      throw new SeyeonTurnInterpretationErrorV2(
-        'A low-intensity state share at first contact must remain baseline or playful unless stronger evidence exists.',
       );
     }
     if (revealLevel !== 'public') {
