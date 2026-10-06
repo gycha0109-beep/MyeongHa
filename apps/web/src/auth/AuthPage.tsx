@@ -3,6 +3,13 @@ import { createAuthPageController } from '../../auth-page.js';
 
 type AuthMode = 'sign-in' | 'sign-up';
 type StatusKind = '' | 'error' | 'success';
+type SocialProvider = 'google' | 'kakao' | 'naver';
+
+const SOCIAL_LOGIN_OPTIONS = Object.freeze([
+  { provider: 'google', label: 'Google로 계속' },
+  { provider: 'kakao', label: '카카오로 계속' },
+  { provider: 'naver', label: '네이버로 계속' },
+] as const satisfies readonly { provider: SocialProvider; label: string }[]);
 type AuthController = {
   selectMode(mode: AuthMode): void;
   submit(input: { email: string; password: string; confirmation: string }): Promise<void>;
@@ -23,6 +30,16 @@ export function AuthPage() {
     }) as AuthController;
     return () => controller.current?.dispose();
   }, []);
+
+  function handleSocialSignIn(provider: SocialProvider) {
+    const label = SOCIAL_LOGIN_OPTIONS.find((option) => option.provider === provider)?.label ?? '소셜';
+    setStatus({
+      message: provider === 'naver'
+        ? '네이버 로그인은 제공사 검수 승인 후 사용할 수 있습니다.'
+        : `${label.replace('로 계속', '')} 로그인은 최종 연동 확인 후 사용할 수 있습니다.`,
+      kind: '',
+    });
+  }
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -50,6 +67,26 @@ export function AuthPage() {
         <div className="auth-tabs" role="tablist" aria-label="인증 방식">
           <button className="auth-tab" id="auth-tab-signin" type="button" role="tab" aria-selected={!signingUp} aria-controls="auth-form" onClick={() => controller.current?.selectMode('sign-in')}>로그인</button>
           <button className="auth-tab" id="auth-tab-signup" type="button" role="tab" aria-selected={signingUp} aria-controls="auth-form" onClick={() => controller.current?.selectMode('sign-up')}>회원가입</button>
+        </div>
+
+        <div className="auth-social" aria-label="소셜 로그인">
+          <div className="auth-social-actions">
+            {SOCIAL_LOGIN_OPTIONS.map(({ provider, label }) => (
+              <button
+                key={provider}
+                className="auth-social-button"
+                data-provider={provider}
+                type="button"
+                disabled={busy}
+                onClick={() => handleSocialSignIn(provider)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <div className="auth-divider" aria-hidden="true">
+            <span>또는 이메일로 계속</span>
+          </div>
         </div>
 
         <form className="auth-form" id="auth-form" noValidate onSubmit={handleSubmit}>
