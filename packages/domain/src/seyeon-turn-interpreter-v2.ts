@@ -383,9 +383,14 @@ export function guardSeyeonTurnInterpretationV2(input: {
         'A direct question about Se-yeon current want must activate disclose_desire at first contact.',
       );
     }
-    if (chosenAction !== 'invite') {
+    const allowedDirectWantActions = new Set([
+      'approach',
+      'activate',
+      'invite',
+    ] as const);
+    if (!allowedDirectWantActions.has(chosenAction as never)) {
       throw new SeyeonTurnInterpretationErrorV2(
-        'A direct question about Se-yeon current want must answer through an invite grounded in her own present preference.',
+        'A direct question about Se-yeon current want must answer through a turn-local Se-yeon preference without forcing an invitation.',
       );
     }
     if (
