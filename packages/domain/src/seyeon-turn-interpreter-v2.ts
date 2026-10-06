@@ -405,13 +405,9 @@ export function guardSeyeonTurnInterpretationV2(input: {
     input.context.behaviorPolicy.interactionDepth === 'public_first_contact' &&
     userMove === 'stated_conversation_pace'
   ) {
-    const allowedPaceActions = new Set([
-      'approach',
-      'activate',
-    ] as const);
-    if (!allowedPaceActions.has(chosenAction as never)) {
+    if (chosenAction !== 'approach') {
       throw new SeyeonTurnInterpretationErrorV2(
-        'A first-contact conversation-pace statement must reduce pressure while keeping Se-yeon active.',
+        'A first-contact conversation-pace statement must reduce pressure through an owned stance without opening another topic device.',
       );
     }
     if (
