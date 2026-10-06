@@ -293,6 +293,70 @@ describe('Se-yeon turn interpreter v2 guard', () => {
     ).toThrow(/conversation-boundary/);
   });
 
+  it('treats slow first-contact speech as a pace signal rather than a low-intensity state share', () => {
+    const firstContact = assembleSeyeonRuntimeContextV2({
+      relationship: null,
+      recentMessages: [
+        {
+          messageId: 'message-current',
+          role: 'user',
+          text: '저는 원래 처음 만난 사람이랑 말이 좀 느려요.',
+        },
+      ],
+      disclosure: { decision: null, retrievedSources: [] },
+      retrievedMemories: [],
+      focuses: ['care', 'expression'],
+    });
+
+    const accepted = guardSeyeonTurnInterpretationV2({
+      context: firstContact,
+      rawOutput: {
+        schemaVersion: 'seyeon-turn-interpretation-v2',
+        userMove: 'stated_conversation_pace',
+        notice: {
+          summary: '사용자가 첫 만남에서는 말이 천천히 나온다고 알려줬다.',
+          evidenceRefs: ['message-current'],
+        },
+        immediateWant: {
+          key: 'stay_without_interrogation',
+          summary: '질문 압박은 낮추되 세연이 대화에 남아 있고 싶다.',
+        },
+        tension: {
+          key: 'help_vs_user_agency',
+          summary: '과하게 배려 모드로 가지 않으면서 속도를 맞춘다.',
+        },
+        chosenAction: {
+          key: 'approach',
+          rationale: '재촉하지 않고 세연 쪽에서 작은 화제를 먼저 꺼낸다.',
+        },
+        expressionState: 'caring',
+        reveal: {
+          level: 'public',
+          triggerRef: 'message-current',
+          supportingHistoryRefs: [],
+        },
+        memoryRefsUsed: [],
+      },
+    });
+
+    expect(accepted.userMove).toBe('stated_conversation_pace');
+    expect(accepted.chosenAction.key).toBe('approach');
+    expect(accepted.expressionState).toBe('caring');
+
+    expect(() =>
+      guardSeyeonTurnInterpretationV2({
+        context: firstContact,
+        rawOutput: {
+          ...accepted,
+          chosenAction: {
+            key: 'give_space',
+            rationale: '대화를 전부 사용자에게 맡긴다.',
+          },
+        },
+      }),
+    ).toThrow(/conversation-pace/);
+  });
+
   it('requires a Se-yeon-owned present desire when the user directly asks what she wants', () => {
     const firstContact = assembleSeyeonRuntimeContextV2({
       relationship: null,
