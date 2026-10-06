@@ -22,6 +22,7 @@ export const SEYEON_USER_MOVE_KEYS_V2 = Object.freeze([
   'direct_importance_expression',
   'low_intensity_state_share',
   'asked_conversation_boundary',
+  'stated_conversation_pace',
   'asked_seyeon_current_want',
   'neutral_or_other',
 ] as const);
@@ -396,6 +397,35 @@ export function guardSeyeonTurnInterpretationV2(input: {
     if (revealLevel !== 'public') {
       throw new SeyeonTurnInterpretationErrorV2(
         'A first-contact conversation-boundary answer must remain public.',
+      );
+    }
+  }
+
+  if (
+    input.context.behaviorPolicy.interactionDepth === 'public_first_contact' &&
+    userMove === 'stated_conversation_pace'
+  ) {
+    const allowedPaceActions = new Set([
+      'approach',
+      'activate',
+    ] as const);
+    if (!allowedPaceActions.has(chosenAction as never)) {
+      throw new SeyeonTurnInterpretationErrorV2(
+        'A first-contact conversation-pace statement must reduce pressure while keeping Se-yeon active.',
+      );
+    }
+    if (
+      expressionState !== 'baseline' &&
+      expressionState !== 'caring' &&
+      expressionState !== 'playful'
+    ) {
+      throw new SeyeonTurnInterpretationErrorV2(
+        'A first-contact conversation-pace statement must remain baseline, caring, or playful.',
+      );
+    }
+    if (revealLevel !== 'public') {
+      throw new SeyeonTurnInterpretationErrorV2(
+        'A first-contact conversation-pace statement must remain public.',
       );
     }
   }
