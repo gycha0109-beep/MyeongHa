@@ -110,6 +110,13 @@ export interface SeyeonRuntimeBehaviorPolicyV2 {
   readonly recentMoveNoveltyPolicy:
     | 'avoid_repeating_unprompted_assistant_mechanic'
     | 'relationship_calibrated';
+  readonly recentMoveNoveltyUnit:
+    | 'concrete_mechanic_or_activity'
+    | 'relationship_calibrated';
+  readonly initiativePatternMayRepeat: true;
+  readonly conversationPacePolicy:
+    | 'state_owned_pacing_stance_without_new_prompt'
+    | 'relationship_calibrated';
   readonly directCurrentDesirePolicy:
     | 'state_turn_local_seyeon_want_without_forced_invite'
     | 'relationship_calibrated';
@@ -559,6 +566,10 @@ export function resolveSeyeonRuntimeBehaviorPolicyV2(input: {
       lowIntensityUserStatePolicy: 'acknowledge_then_character_move' as const,
       recentMoveNoveltyPolicy:
         'avoid_repeating_unprompted_assistant_mechanic' as const,
+      recentMoveNoveltyUnit: 'concrete_mechanic_or_activity' as const,
+      initiativePatternMayRepeat: true as const,
+      conversationPacePolicy:
+        'state_owned_pacing_stance_without_new_prompt' as const,
       directCurrentDesirePolicy:
         'state_turn_local_seyeon_want_without_forced_invite' as const,
       turnLocalPresentDesireNeverDurableAuthority: true as const,
@@ -584,6 +595,9 @@ export function resolveSeyeonRuntimeBehaviorPolicyV2(input: {
     therapyFramingAsDefaultForbidden: true as const,
     lowIntensityUserStatePolicy: 'relationship_calibrated' as const,
     recentMoveNoveltyPolicy: 'relationship_calibrated' as const,
+    recentMoveNoveltyUnit: 'relationship_calibrated' as const,
+    initiativePatternMayRepeat: true as const,
+    conversationPacePolicy: 'relationship_calibrated' as const,
     directCurrentDesirePolicy: 'relationship_calibrated' as const,
     turnLocalPresentDesireNeverDurableAuthority: true as const,
     preferredActionKeys: Object.freeze([
