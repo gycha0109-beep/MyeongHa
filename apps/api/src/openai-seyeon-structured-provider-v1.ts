@@ -72,7 +72,7 @@ function modelKey(value: string): string {
   if (
     normalized.length === 0 ||
     normalized.length > 128 ||
-    !/^[A-Za-z0-9._:-]+$/u.test(normalized)
+    !/^[A-Za-z0-9._:-]+(?:\/[A-Za-z0-9._:-]+)?$/u.test(normalized)
   ) {
     return failConfiguration('OpenAI model identifier is invalid.');
   }
