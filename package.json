@@ -71,6 +71,7 @@
     "verify:mobile-android-physical-smoke-readiness": "node scripts/verify-mobile-android-physical-smoke-readiness.mjs"
   },
   "dependencies": {
+    "@vercel/oidc": "3.2.0",
     "pg": "8.23.0"
   },
   "devDependencies": {
