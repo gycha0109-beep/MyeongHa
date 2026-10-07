@@ -284,6 +284,12 @@
       "mainMode": "manual",
       "workTrackAttribution": "dispatch-input"
     },
+    "production-seyeon-turn-send-smoke.yml": {
+      "responsibility": "production-chat-smoke",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
     "reader-grounding-cross-service-e2e.yml": {
       "responsibility": "saju-character-cross-service-verification",
       "prMode": "narrow",
