@@ -11,8 +11,8 @@
     "depthCounts": {
       "1": 30,
       "2": 47,
-      "3": 58,
-      "4": 5
+      "3": 59,
+      "4": 4
     },
     "directDepthOneEdgeCount": 30
   },
@@ -2017,7 +2017,7 @@
       "disposition": "UNDECIDED"
     },
     {
-      "minDepth": 4,
+      "minDepth": 3,
       "parentTable": "chat_turn_attempts",
       "childTable": "character_reading_artifacts",
       "constraintName": "character_reading_artifacts_attempt_turn_subject_fk",
