@@ -1186,9 +1186,9 @@
 }
 
 
-/* Canonical character-room art.
- * These web-optimized derivatives preserve the uploaded representative image composition.
- * The room owns the crop via background-size: cover; no generated/recomposed art is used.
+/* Character-room presentation art.
+ * Each Character keeps its own presentation authority. Seyeon Chat Theme v1 is
+ * presentation-only and must not be interpreted as residence canon.
  */
 .character-room-v2[data-character="seyeon"] {
   --conversation-room-art: url("assets/characters/chat-themes/seyeon-chat-theme-web-v1.webp");
