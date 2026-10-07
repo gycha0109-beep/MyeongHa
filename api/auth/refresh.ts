@@ -24,19 +24,28 @@ function isSocialCompleteRequest(request: Request): boolean {
 export default {
   fetch(request: Request): Promise<Response> {
     const socialComplete = isSocialCompleteRequest(request);
-    return executeSecurityObservedRequestV1({
-      request,
-      routeId: socialComplete ? 'api.auth.social.complete' : 'api.auth.refresh',
-      execute: () => socialComplete
-        ? handleSupabaseAuthRequestV1({
+
+    if (socialComplete) {
+      return executeSecurityObservedRequestV1({
+        request,
+        routeId: 'api.auth.social.complete',
+        execute: () =>
+          handleSupabaseAuthRequestV1({
             request,
             env: process.env,
             action: 'social-complete',
-          })
-        : getRuntime().handleRequest({
-            request,
-            action: 'refresh',
           }),
+      });
+    }
+
+    return executeSecurityObservedRequestV1({
+      request,
+      routeId: 'api.auth.refresh',
+      execute: () =>
+        getRuntime().handleRequest({
+          request,
+          action: 'refresh',
+        }),
     });
   },
 };
