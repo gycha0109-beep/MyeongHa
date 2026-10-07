@@ -1,6 +1,6 @@
 import { parseChatThreadIdV1 } from '@myeongha/api-client';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ImageBackground, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import {
   ChatReadHeader,
@@ -10,6 +10,8 @@ import {
 } from '@/features/chat/ChatReadComponents';
 import { useMobileChatThreadV1 } from '@/features/chat/use-mobile-chat-thread';
 import { mobileColors } from '@/ui/mobile-colors';
+
+const SEYEON_CHAT_THEME_BACKGROUND = require('../../../../assets/characters/chat-themes/seyeon-chat-theme-mobile-v1.webp');
 
 function resolveThreadId(value: string | string[] | undefined): string | null {
   const candidate = Array.isArray(value) ? value[0] : value;
@@ -22,18 +24,31 @@ function resolveThreadId(value: string | string[] | undefined): string | null {
 
 function ValidChatThread({ threadId }: { threadId: string }) {
   const { snapshot, loadMore } = useMobileChatThreadV1(threadId);
+  const isSeyeonTheme = snapshot.characterId === 'seyeon';
+  const threadContent = (
+    <ScrollView contentContainerStyle={styles.content}>
+      <Pressable accessibilityRole="button" onPress={() => router.back()} style={styles.back}>
+        <Text style={styles.backText}>‹ 대화로 돌아가기</Text>
+      </Pressable>
+      <ChatReadHeader snapshot={snapshot} />
+      <ChatReadMessages snapshot={snapshot} />
+      <ChatReadMore snapshot={snapshot} onLoadMore={() => void loadMore()} />
+      <ChatSendPending themed={isSeyeonTheme} />
+    </ScrollView>
+  );
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <Pressable accessibilityRole="button" onPress={() => router.back()} style={styles.back}>
-          <Text style={styles.backText}>‹ 대화로 돌아가기</Text>
-        </Pressable>
-        <ChatReadHeader snapshot={snapshot} />
-        <ChatReadMessages snapshot={snapshot} />
-        <ChatReadMore snapshot={snapshot} onLoadMore={() => void loadMore()} />
-        <ChatSendPending />
-      </ScrollView>
+      {isSeyeonTheme ? (
+        <ImageBackground
+          source={SEYEON_CHAT_THEME_BACKGROUND}
+          resizeMode="cover"
+          style={styles.seyeonThemeBackground}
+          imageStyle={styles.seyeonThemeImage}
+        >
+          <View style={styles.seyeonThemeWash}>{threadContent}</View>
+        </ImageBackground>
+      ) : threadContent}
     </SafeAreaView>
   );
 }
@@ -63,6 +78,9 @@ export default function ChatThreadScreen() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: mobileColors.canvas },
+  seyeonThemeBackground: { flex: 1 },
+  seyeonThemeImage: { opacity: 0.98 },
+  seyeonThemeWash: { flex: 1, backgroundColor: 'rgba(255, 249, 240, 0.18)' },
   content: { paddingHorizontal: 20, paddingTop: 18, paddingBottom: 38, gap: 18 },
   back: { alignSelf: 'flex-start', paddingVertical: 6 },
   backText: { color: mobileColors.navy, fontSize: 14, fontWeight: '800' },
