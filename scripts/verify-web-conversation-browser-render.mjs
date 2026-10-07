@@ -325,6 +325,7 @@ async function verifyRoom(page, origin, suffix, width, height, mobile) {
       stream: Boolean(stream),
       composer: Boolean(composer),
       sceneBg: scene ? getComputedStyle(scene).backgroundImage : '',
+      panelBg: panel ? getComputedStyle(panel).backgroundImage : '',
       contextHidden: document.querySelector('[data-context-pill]')?.hidden === true,
       threadHidden: document.querySelector('[data-thread-bar]')?.hidden === true,
       globalHeaderDisplay: globalHeader ? getComputedStyle(globalHeader).display : '',
@@ -338,8 +339,12 @@ async function verifyRoom(page, origin, suffix, width, height, mobile) {
     ? 'assets/characters/chat-themes/seyeon-chat-theme-mobile-v1.webp'
     : 'assets/characters/chat-themes/seyeon-chat-theme-web-v1.webp';
   assert(
-    state.sceneBg.includes(approvedThemeAsset),
-    `${suffix}: approved Se-yeon chat theme asset is not rendered`,
+    state.sceneBg.includes('assets/characters/seyeon-portrait-v2.webp'),
+    `${suffix}: approved Se-yeon portrait is not rendered in the character scene`,
+  );
+  assert(
+    state.panelBg.includes(approvedThemeAsset),
+    `${suffix}: approved Se-yeon chat theme asset is not rendered in the chat panel`,
   );
   assert(state.contextHidden && state.threadHidden, `${suffix}: unverified continuation context became visible`);
   assert(['auto', 'scroll'].includes(state.streamOverflow), `${suffix}: conversation stream is not scrollable`);
