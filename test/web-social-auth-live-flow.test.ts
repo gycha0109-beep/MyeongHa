@@ -27,7 +27,8 @@ describe('web social auth live flow', () => {
 
   it('moves the provider refresh token into the existing HttpOnly-cookie web session rail', () => {
     expect(productAuth).toContain('__myeongha_social_complete=1');
-    expect(refreshRoute).toContain("routeId: socialComplete ? 'api.auth.social.complete'");
+    expect(refreshRoute).toContain("routeId: 'api.auth.social.complete'");
+    expect(refreshRoute).toContain("routeId: 'api.auth.refresh'");
     expect(refreshRoute).toContain("action: 'social-complete'");
   });
 });
