@@ -5,7 +5,7 @@ import {
 } from '../apps/api/src/chat-receive.js';
 import {
   assertSeyeonPublicContentCompatibilityV1,
-} from '../apps/api/src/production-seyeon-chat-runtime-v1.js';
+} from '../apps/api/src/seyeon-public-content-compatibility-v1.js';
 import { ApiCommandError } from '../apps/api/src/api-error.js';
 
 const THREAD_ID = '123e4567-e89b-42d3-a456-426614174000';

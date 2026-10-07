@@ -1,6 +1,5 @@
 import {
   InMemorySeyeonEventLedgerV2,
-  evaluateCharacterContentCompatibilityV1,
   type CharacterClientCompatibilityProfileV1,
 } from '../../../packages/domain/src/index.js';
 import {
@@ -15,7 +14,9 @@ import {
   prepareInternalPinnedSeyeonDogfoodReceivePlanV1,
   prepareServerCompatiblePinnedSeyeonReceivePlanV1,
 } from './chat-receive.js';
-import { ApiCommandError } from './api-error.js';
+import {
+  assertSeyeonPublicContentCompatibilityV1,
+} from './seyeon-public-content-compatibility-v1.js';
 import {
   createOpenAiSeyeonStructuredProviderV1,
   type OpenAiSeyeonStructuredProviderConfigV1,
@@ -143,28 +144,6 @@ function assertBundleContainsSeyeon(
 }
 
 
-export function assertSeyeonPublicContentCompatibilityV1(input: {
-  readonly bundleManifest: ContentBundleManifestReadResponseV1;
-  readonly clientProfile: CharacterClientCompatibilityProfileV1;
-}): void {
-  const decision = evaluateCharacterContentCompatibilityV1({
-    manifest: {
-      minClientCapability: input.bundleManifest.manifest.minClientCapability,
-      assetManifestHash: input.bundleManifest.manifest.assetManifestHash,
-      cueSchemaVersion: input.bundleManifest.manifest.cueSchemaVersion,
-    },
-    clientProfile: input.clientProfile,
-  });
-
-  if (!decision.compatible || decision.action !== 'activate') {
-    throw new ApiCommandError(
-      decision.failures.includes('INVALID_COMPATIBILITY_INPUT')
-        ? 'CAPABILITY_UNAVAILABLE'
-        : 'CONTENT_INCOMPATIBLE',
-      'Pinned Se-yeon content is not compatible with the governed Web client profile.',
-    );
-  }
-}
 
 export function createProductionSeyeonChatRuntimeV1(
   input: CreateProductionSeyeonChatRuntimeInputV1,
