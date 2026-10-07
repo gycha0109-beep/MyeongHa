@@ -152,7 +152,7 @@ describe('MyeongHa immersive long-form Character Room', () => {
     expect(presentation).toContain("'thread_identity_pending'");
   });
 
-  it('opens a canonical thread for a new Character room while keeping public turn mutation fail-closed', async () => {
+  it('opens a canonical thread and exposes the governed Seyeon Member turn-send path', async () => {
     const [transport, requestContract, apiContract] = await Promise.all([
       readFile(transportPath, 'utf8'),
       readFile(chatRequestContractPath, 'utf8'),
@@ -169,8 +169,11 @@ describe('MyeongHa immersive long-form Character Room', () => {
     expect(transport).toContain('openForCanonicalCharacter');
     expect(transport).toContain('buildChatThreadUrlV1');
     expect(transport).toContain('sessionStorage.setItem(pendingDraftKey(result.threadId), message)');
-    expect(transport).toContain('웹 메시지 전송은 아직 운영 연결 전입니다. 입력한 내용은 그대로 남아 있습니다.');
-    expect(transport).not.toContain("fetch('/api/chat/turn'");
+    expect(transport).toContain('/turns');
+    expect(transport).toContain('clientTurnId: crypto.randomUUID()');
+    expect(transport).toContain("authoritativeCharacterId !== 'seyeon'");
+    expect(transport).toContain("activeBearer.kind !== 'member'");
+    expect(transport).toContain('await loadRoomState()');
     expect(transport).not.toContain('clientCapability:');
   });
 
@@ -191,9 +194,10 @@ describe('MyeongHa immersive long-form Character Room', () => {
 
     expect(transport).toContain('event.preventDefault()');
     expect(transport).toContain('void openThreadAndPreserveDraft(message.trim())');
-    expect(transport).toContain('대화방은 연결됐지만 웹 메시지 전송은 아직 운영 연결 전입니다. 입력한 내용은 그대로 남아 있습니다.');
+    expect(transport).toContain('입력한 내용은 그대로 남아 있습니다.');
     expect(transport).toContain('restorePendingDraft()');
-    expect(transport).not.toContain("messageInput.value = ''");
+    expect(transport).toContain("messageInput.value = ''");
+    expect(transport).toContain('await loadRoomState()');
   });
 
   it('keeps unverified continuation context hidden until an authority supplies it', async () => {

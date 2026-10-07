@@ -59,18 +59,20 @@ Pending, processed-before-finalization, failed, dead-lettered, foreign-owner pro
 
 ## Current outbox association coverage
 
-The repository currently creates outbox rows from exactly four governed producer migrations:
+The repository currently creates outbox rows from six governed producer migrations:
 
 ```text
-0220_chat_attempt_commit_commands.sql       -> aggregate_type = chat_turn
-0260_reading_transport_commands.sql         -> aggregate_type = reading
-0290_account_deletion_start_command.sql      -> aggregate_type = data_deletion_job
-1080_entitlement_effect_apply_v1.sql         -> aggregate_type = entitlement
+0220_chat_attempt_commit_commands.sql             -> aggregate_type = chat_turn
+0260_reading_transport_commands.sql               -> aggregate_type = reading
+0290_account_deletion_start_command.sql            -> aggregate_type = data_deletion_job
+1080_entitlement_effect_apply_v1.sql               -> aggregate_type = entitlement
+1470_seyeon_relationship_sync_outbox_v1.sql        -> aggregate_type = character_relationship
+1500_seyeon_post_turn_analysis_runtime_v1.sql      -> aggregate_type = chat_turn
 ```
 
-The preflight associates those aggregate types back to the canonical Subject through their authoritative tables.
+The preflight associates the established aggregate types back to the canonical Subject through their authoritative tables.
 
-It also treats top-level `payload_jsonb.subjectId` as a fail-closed fallback so a Subject-linked event remains visible even when its aggregate type is not in the current mapping.
+The two Se-yeon producers additionally bind top-level `payload_jsonb.subjectId` to the canonical Subject. The preflight's existing top-level `payload_jsonb.subjectId` fallback therefore covers both Se-yeon queues without inventing a second ownership mapping.
 
 `scripts/verify-account-deletion-finalization-preflight.mjs` scans every migration for `INSERT INTO public.outbox_events`. Any producer-set drift fails CI until this association coverage is reviewed.
 

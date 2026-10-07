@@ -68,6 +68,7 @@ export {
   parseChatLaunchCharacterIdV1,
   parseChatThreadIdV1,
   readChatThreadPageV1,
+  sendSeyeonChatTurnV1,
   type ChatLaunchCharacterIdV1,
   type ChatMessageV1,
   type ChatOpenResultV1,
@@ -76,6 +77,8 @@ export {
   type ChatRelationshipV1,
   type ChatSenderTypeV1,
   type ChatThreadPageV1,
+  type SeyeonChatTurnSendRequestV1,
+  type SeyeonChatTurnSendResultV1,
 } from './chat.js';
 
 

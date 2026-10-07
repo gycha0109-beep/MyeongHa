@@ -40,13 +40,19 @@ export interface ChatReceivePlan {
 }
 
 const serverPreparedChatReceivePlansV1 = new WeakSet<object>();
+const internalPinnedSeyeonDogfoodPlansV1 = new WeakSet<object>();
+const serverCompatiblePinnedSeyeonPlansV1 = new WeakSet<object>();
 const serverPreparedChatReceiveContentEntriesV1 =
   new WeakMap<object, ContentReleaseRuntimeEntry>();
 
 export function assertServerPreparedChatReceivePlanV1(
   plan: ChatReceivePlan,
 ): void {
-  if (!serverPreparedChatReceivePlansV1.has(plan)) {
+  if (
+    !serverPreparedChatReceivePlansV1.has(plan) &&
+    !internalPinnedSeyeonDogfoodPlansV1.has(plan) &&
+    !serverCompatiblePinnedSeyeonPlansV1.has(plan)
+  ) {
     throw new ApiCommandError(
       'INVALID_REQUEST',
       'Chat receive plan was not minted by server receive authority.',
@@ -60,6 +66,16 @@ export function getServerPreparedChatReceiveContentEntryV1(
   assertServerPreparedChatReceivePlanV1(plan);
   const entry = serverPreparedChatReceiveContentEntriesV1.get(plan);
   if (entry === undefined) {
+    if (internalPinnedSeyeonDogfoodPlansV1.has(plan)) {
+      throw new Error(
+        'Internal pinned Se-yeon plan intentionally has no public client-compatibility content entry.',
+      );
+    }
+    if (serverCompatiblePinnedSeyeonPlansV1.has(plan)) {
+      throw new Error(
+        'Server-compatible pinned Se-yeon plan carries compatibility authority outside ContentReleaseRuntime.',
+      );
+    }
     throw new Error(
       'Server-minted Chat receive plan lost its immutable content authority binding.',
     );
@@ -80,6 +96,129 @@ function hashRequest(request: ChatRequestV1): string {
   return `sha256:v1:${createHash('sha256')
     .update(canonicalJson(request))
     .digest('hex')}`;
+}
+
+export interface PrepareInternalPinnedSeyeonDogfoodReceiveInputV1 {
+  readonly request: unknown;
+  readonly trustedThread: TrustedThreadBinding;
+  readonly pinnedBundleId: string;
+  readonly contentVersion: string;
+}
+
+/**
+ * Server-internal pinned Se-yeon receive authority.
+ *
+ * This helper does not grant browser compatibility authority. A public HTTP
+ * adapter must first establish server-trusted client/content compatibility.
+ */
+export function prepareInternalPinnedSeyeonDogfoodReceivePlanV1(
+  input: PrepareInternalPinnedSeyeonDogfoodReceiveInputV1,
+): ChatReceivePlan {
+  let request: ChatRequestV1;
+  try {
+    request = parseChatRequestV1(input.request);
+  } catch (error) {
+    throw new ApiCommandError(
+      'INVALID_REQUEST',
+      error instanceof Error ? error.message : 'Invalid chat request.',
+    );
+  }
+
+  const threadId = input.trustedThread.threadId.trim();
+  const releaseId = input.trustedThread.pinnedReleaseId.trim();
+  const bundleId = input.pinnedBundleId.trim();
+  const contentVersion = input.contentVersion.trim();
+
+  if (
+    threadId.length === 0 ||
+    releaseId.length === 0 ||
+    bundleId.length === 0 ||
+    contentVersion.length === 0
+  ) {
+    throw new ApiCommandError(
+      'CAPABILITY_UNAVAILABLE',
+      'Pinned Se-yeon content binding is incomplete.',
+    );
+  }
+  if (request.threadId !== threadId) {
+    throw new ApiCommandError(
+      'NOT_FOUND',
+      'Chat request does not match the owned pinned thread.',
+    );
+  }
+  if (request.text === undefined || request.structuredAction !== undefined) {
+    throw new ApiCommandError(
+      'INVALID_REQUEST',
+      'Se-yeon Production runtime currently accepts text turns only.',
+    );
+  }
+  if (
+    input.trustedThread.participantCharacterIds.length !== 1 ||
+    input.trustedThread.participantCharacterIds[0] !== 'seyeon'
+  ) {
+    throw new ApiCommandError(
+      'FORBIDDEN',
+      'Se-yeon Production runtime requires an existing single-character Se-yeon thread.',
+    );
+  }
+  if (request.characterId !== undefined && request.characterId !== 'seyeon') {
+    throw new ApiCommandError(
+      'FORBIDDEN',
+      'Se-yeon Production runtime cannot target another Character.',
+    );
+  }
+
+  const plan = Object.freeze({
+    normalizedRequest: request,
+    requestHash: hashRequest(request),
+    isNewThread: false,
+    resolvedContent: Object.freeze({
+      releaseId,
+      bundleId,
+      contentVersion,
+    }),
+    requestedCharacterId: 'seyeon',
+  });
+  internalPinnedSeyeonDogfoodPlansV1.add(plan);
+  return plan;
+}
+
+
+export interface PrepareServerCompatiblePinnedSeyeonReceiveInputV1 {
+  readonly clientTurnId: string;
+  readonly text: string;
+  readonly trustedThread: TrustedThreadBinding;
+  readonly pinnedBundleId: string;
+  readonly contentVersion: string;
+  readonly clientCapability: string;
+}
+
+/**
+ * Public-boundary server-minted pinned Se-yeon receive plan.
+ *
+ * The caller must already have established client/content compatibility from
+ * server-owned authority. Browser input never supplies release, bundle,
+ * character, or compatibility identity to this helper.
+ */
+export function prepareServerCompatiblePinnedSeyeonReceivePlanV1(
+  input: PrepareServerCompatiblePinnedSeyeonReceiveInputV1,
+): ChatReceivePlan {
+  const plan = prepareInternalPinnedSeyeonDogfoodReceivePlanV1({
+    request: Object.freeze({
+      threadId: input.trustedThread.threadId,
+      characterId: 'seyeon',
+      clientTurnId: input.clientTurnId,
+      text: input.text,
+      clientCapability: input.clientCapability,
+    }),
+    trustedThread: input.trustedThread,
+    pinnedBundleId: input.pinnedBundleId,
+    contentVersion: input.contentVersion,
+  });
+
+  internalPinnedSeyeonDogfoodPlansV1.delete(plan);
+  serverCompatiblePinnedSeyeonPlansV1.add(plan);
+  return plan;
 }
 
 function mapReleaseError(error: unknown): never {

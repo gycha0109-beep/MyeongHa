@@ -192,6 +192,28 @@ turn RECEIVED + authoritative user message
 
 Planner/LLM이 `requiredLifeFactTypes`, record type, schema version 또는 proposed JSON을 출력해도 source-approved personal-record registry가 없으면 durable Life Fact/Memory authority로 승격하지 않는다. `SRC-25` 해결 전 example key나 free-form key를 저장 authority로 사용하지 않는다.
 
+### `POST /api/chat/:threadId/turns`
+
+세연 Member 전용 기존 thread 텍스트 turn 전송 경로다.
+
+Request body:
+
+```json
+{
+  "clientTurnId": "uuid",
+  "text": "사용자 메시지"
+}
+```
+
+경계:
+
+- browser는 `subjectId`, Character id, release/bundle id, 관계/기억 mutation, client compatibility authority를 보내지 않는다.
+- server가 인증된 Member Subject와 owned active single-character `seyeon` thread를 다시 확인한다.
+- pinned bundle은 승인된 Production Web compatibility profile과 exact-match 검증을 통과해야 한다.
+- 기존 Chat state machine의 receive → attempt → context → generated → validated → commit을 재사용한다.
+- 응답 성공 후 Web은 thread를 authoritative read route로 다시 읽어 화면을 갱신한다.
+- Guest / 다른 Character / multi-character는 이 V1 경로에서 지원하지 않는다.
+
 ### `GET /api/chat/:threadId`
 sequence cursor authoritative stream.
 

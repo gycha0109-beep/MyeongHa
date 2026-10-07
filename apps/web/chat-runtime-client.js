@@ -33,6 +33,7 @@ const chatIntro = document.querySelector('[data-chat-intro]');
 const messageInput = document.querySelector('[data-message-input]');
 const composer = document.querySelector('[data-composer]');
 let openingThread = false;
+let authoritativeCharacterId = null;
 
 function setComposeStatus(message) {
   if (composeStatus) composeStatus.textContent = message;
@@ -342,6 +343,7 @@ async function loadRoomState() {
     if (characterId === null) {
       throw new Error('Character Room read omitted character authority.');
     }
+    authoritativeCharacterId = characterId;
     renderRoomState(Object.freeze({
       characterId,
       messages: Object.freeze(messages),
@@ -352,6 +354,94 @@ async function loadRoomState() {
       historyEmpty.textContent = '현재 지난 대화를 불러올 수 없습니다.';
     }
     setComposeStatus('현재 대화 기록 연결을 사용할 수 없습니다.');
+  }
+}
+
+async function sendTurn(message) {
+  if (authoritativeCharacterId !== 'seyeon') {
+    setComposeStatus('현재 운영 메시지 전송은 세연 대화에서만 사용할 수 있습니다.');
+    return;
+  }
+
+  const activeBearer = await getActiveBearer();
+  if (!activeBearer || activeBearer.kind !== 'member') {
+    setComposeStatus('세연과 실제 대화를 하려면 회원 로그인이 필요합니다.');
+    return;
+  }
+
+  setComposerBusy(true);
+  setComposeStatus('세연이 답하고 있습니다…');
+
+  try {
+    const response = await fetch(
+      `/api/chat/${encodeURIComponent(threadId)}/turns`,
+      {
+        method: 'POST',
+        credentials: 'same-origin',
+        cache: 'no-store',
+        headers: {
+          Accept: 'application/json',
+          Authorization: `Bearer ${activeBearer.token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          clientTurnId: crypto.randomUUID(),
+          text: message,
+        }),
+      },
+    );
+
+    if (response.status === 401) {
+      invalidateRejectedBearer(activeBearer);
+      throw new Error('AUTH_REQUIRED');
+    }
+
+    let envelope = null;
+    try {
+      envelope = await response.json();
+    } catch {
+      throw new Error('INVALID_RESPONSE');
+    }
+
+    if (!response.ok) {
+      const code = envelope?.error?.code;
+      if (code === 'CONTENT_INCOMPATIBLE') throw new Error('CONTENT_INCOMPATIBLE');
+      if (code === 'CAPABILITY_UNAVAILABLE') throw new Error('CAPABILITY_UNAVAILABLE');
+      if (code === 'TURN_IN_FLIGHT') throw new Error('TURN_IN_FLIGHT');
+      if (code === 'IDEMPOTENCY_CONFLICT') throw new Error('IDEMPOTENCY_CONFLICT');
+      if (code === 'AI_TEMPORARILY_UNAVAILABLE') throw new Error('AI_TEMPORARILY_UNAVAILABLE');
+      if (response.status === 403) throw new Error('MEMBER_REQUIRED');
+      throw new Error('TURN_SEND_FAILED');
+    }
+
+    const { unwrapApiSuccessEnvelope } = await apiEnvelopePromise;
+    unwrapApiSuccessEnvelope(envelope);
+    await loadRoomState();
+
+    if (messageInput instanceof HTMLTextAreaElement) {
+      messageInput.value = '';
+      messageInput.style.height = 'auto';
+    }
+    setComposeStatus('세연의 답변이 도착했습니다.');
+  } catch (error) {
+    const code = error instanceof Error ? error.message : '';
+    const messageByCode = {
+      AUTH_REQUIRED: '로그인 상태가 만료되었습니다. 다시 로그인해 주세요.',
+      MEMBER_REQUIRED: '현재 웹 실대화는 회원 계정에서만 사용할 수 있습니다.',
+      CONTENT_INCOMPATIBLE: '현재 웹 버전과 세연 대화 콘텐츠가 맞지 않습니다.',
+      CAPABILITY_UNAVAILABLE: '세연 실대화 운영 연결을 지금 사용할 수 없습니다.',
+      TURN_IN_FLIGHT: '이전 메시지를 처리 중입니다. 잠시 후 다시 보내 주세요.',
+      IDEMPOTENCY_CONFLICT: '같은 전송 식별자가 다른 내용과 충돌했습니다.',
+      AI_TEMPORARILY_UNAVAILABLE: '세연의 답변 생성이 잠시 지연되고 있습니다. 다시 시도해 주세요.',
+      INVALID_RESPONSE: '대화 서버 응답을 확인할 수 없습니다.',
+      TURN_SEND_FAILED: '메시지를 보내지 못했습니다. 입력한 내용은 그대로 남아 있습니다.',
+    };
+    setComposeStatus(
+      messageByCode[code] ??
+      '메시지를 보내지 못했습니다. 입력한 내용은 그대로 남아 있습니다.',
+    );
+  } finally {
+    setComposerBusy(false);
   }
 }
 
@@ -372,10 +462,7 @@ function submitTurn(event) {
     return;
   }
 
-  // Public browser turn execution is not yet an authorized Production HTTP
-  // surface on main. Do not fabricate a successful send or invent client
-  // compatibility authority. The thread is valid and the draft stays intact.
-  setComposeStatus('대화방은 연결됐지만 웹 메시지 전송은 아직 운영 연결 전입니다. 입력한 내용은 그대로 남아 있습니다.');
+  void sendTurn(message.trim());
 }
 
 restorePendingDraft();

@@ -514,3 +514,26 @@ export {
   type CharacterFaceGovernedReadingArtifactBuildDecisionV1,
   type CharacterFaceGovernedReadingArtifactCandidateV1,
 } from './character-face-governed-reading-artifact.js';
+
+
+// Se-yeon validated Production runtime dependencies.
+export * from './character-disclosure-gate-v1.js';
+export * from './character-disclosure-gate-v2.js';
+export * from './character-integrity-gate-v1.js';
+export * from './relationship-event-registry-v1.js';
+export * from './relationship-policy-artifact-v1.js';
+export * from './relationship-policy-evaluator-v1.js';
+export * from './relationship-policy-reference-replay-v1.js';
+export * from './seyeon-event-authority-v1.js';
+export * from './seyeon-event-extraction-v2.js';
+export * from './seyeon-event-ledger-v2.js';
+export * from './seyeon-production-relationship-bridge-v1.js';
+export * from './seyeon-production-relationship-runtime-v1.js';
+export * from './seyeon-relationship-event-bindings-v1.js';
+export * from './seyeon-relationship-policy-shadow-v3.js';
+export * from './seyeon-relationship-runtime-overlay-v2.js';
+export * from './seyeon-relationship-semantics-v2.js';
+export * from './seyeon-renderer-v2.js';
+export * from './seyeon-risk-action-causality-v1.js';
+export * from './seyeon-runtime-context-v2.js';
+export * from './seyeon-turn-interpreter-v2.js';
