@@ -657,6 +657,97 @@ describe(
     );
 
     it(
+      'requires the authored governed Face capability before Seyeon can plan the traditional reading',
+      () => {
+        const {
+          profiles,
+          context,
+        } =
+          seyeonRuntime();
+
+        expect(
+          profiles.governedCapability.allowedTopicKeys,
+        ).toEqual([
+          'face.reading.three_divisions',
+        ]);
+        expect(
+          profiles.governedCapability.canInitiate,
+        ).toBe(false);
+
+        const deniedProfiles = {
+          ...profiles,
+          governedCapability: {
+            ...profiles.governedCapability,
+            allowedTopicKeys:
+              Object.freeze([]),
+          },
+        } as typeof profiles;
+
+        expect(() =>
+          buildCharacterFaceGovernedReadingArtifactCandidateV1({
+            candidateHandoff:
+              governedCandidate(),
+            expectedSource,
+            rawRendererOutput: {
+              schemaVersion:
+                'v1',
+              emotion:
+                'neutral',
+              animationCue:
+                'idle',
+              suggestedActions: [],
+            },
+            context,
+            profiles:
+              deniedProfiles,
+            allowedSuggestedActionKeys: [],
+          }),
+        ).toThrow(
+          /Governed Face capability denied the reading plan: TOPIC_NOT_ALLOWED/u,
+        );
+      },
+    );
+
+    it(
+      'rejects a neutral-only runtime from the governed traditional reading plan path',
+      () => {
+        const {
+          profiles,
+          context,
+        } =
+          seyeonRuntime();
+
+        const missingGovernedContext = {
+          ...context,
+          governedFace: null,
+        } as typeof context;
+
+        expect(() =>
+          buildCharacterFaceGovernedReadingArtifactCandidateV1({
+            candidateHandoff:
+              governedCandidate(),
+            expectedSource,
+            rawRendererOutput: {
+              schemaVersion:
+                'v1',
+              emotion:
+                'neutral',
+              animationCue:
+                'idle',
+              suggestedActions: [],
+            },
+            context:
+              missingGovernedContext,
+            profiles,
+            allowedSuggestedActionKeys: [],
+          }),
+        ).toThrow(
+          /requires an admitted governed Face runtime context/u,
+        );
+      },
+    );
+
+    it(
       'reuses the same receipt for the same artifact and rejects replacement on the same turn',
       () => {
         const port =
