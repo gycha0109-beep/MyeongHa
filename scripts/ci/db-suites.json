@@ -3,6 +3,7 @@
     "workflow": "db-runtime-authority-suite.yml",
     "postgres": 15,
     "cases": [
+      "guest-promotion-auth-fk",
       "birth-profile-production-read-authority",
       "device-installation-registration-runtime",
       "guest-bootstrap-runtime",
@@ -52,6 +53,7 @@
     "workflow": "db-postgres17-authority-suite.yml",
     "postgres": 17,
     "cases": [
+      "guest-promotion-auth-fk",
       "birth-profile-create-runtime-authority",
       "content-release-lifecycle",
       "member-character-thread-open"
