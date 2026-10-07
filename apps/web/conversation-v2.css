@@ -1180,9 +1180,12 @@
  * presentation-only and must not be interpreted as residence canon.
  */
 .character-room-v2[data-character="seyeon"] {
-  --conversation-room-art: url("assets/characters/seyeon-portrait-v2.webp");
-  --conversation-room-position: center 24%;
-  --conversation-room-mobile-position: center 20%;
+  /* Legacy filename only: this asset is Seyeon's approved full-body presentation scene,
+   * not residence/background canon.
+   */
+  --conversation-room-art: url("assets/characters/rooms/seyeon-room.webp");
+  --conversation-room-position: center center;
+  --conversation-room-mobile-position: center 34%;
 }
 .character-room-v2[data-character="yeoul"] {
   --conversation-room-art: url("assets/characters/rooms/yeoul-room-uploaded.svg");
@@ -1256,7 +1259,7 @@
 /* Seyeon Chat Theme v1 — presentation-only, not Seyeon's residence canon. */
 .character-room-v2[data-character="seyeon"] .conversation-chat-panel {
   background-image:
-    linear-gradient(rgba(255,250,242,.68), rgba(250,240,225,.76)),
+    linear-gradient(rgba(255,250,242,.50), rgba(250,240,225,.58)),
     url("assets/characters/chat-themes/seyeon-chat-theme-web-v1.webp");
   background-size: cover;
   background-position: center center;
@@ -1281,7 +1284,81 @@
 @media (max-width: 900px) {
   .character-room-v2[data-character="seyeon"] .conversation-chat-panel {
     background-image:
-      linear-gradient(rgba(255,250,242,.66), rgba(250,240,225,.78)),
+      linear-gradient(rgba(255,250,242,.48), rgba(250,240,225,.62)),
+      url("assets/characters/chat-themes/seyeon-chat-theme-mobile-v1.webp");
+    background-size: cover;
+    background-position: center 42%;
+    background-repeat: no-repeat;
+  }
+}
+
+
+/* Seyeon owns the room skin even when the global product chrome is dark.
+ * Keep the outer shell dark, but render the approved warm conversation theme
+ * inside the chat panel instead of letting product-theme.css replace it.
+ */
+html[data-theme="dark"] body.character-room-v2[data-character="seyeon"] .conversation-chat-panel {
+  color: #453b33;
+  border-color: rgba(151,113,67,.28);
+  background-image:
+    linear-gradient(rgba(255,250,242,.50), rgba(250,240,225,.58)),
+    url("assets/characters/chat-themes/seyeon-chat-theme-web-v1.webp");
+  background-size: cover;
+  background-position: center center;
+  background-repeat: no-repeat;
+  box-shadow: 0 12px 34px rgba(54,43,30,.14);
+}
+
+html[data-theme="dark"] body.character-room-v2[data-character="seyeon"] .conversation-chat-head,
+html[data-theme="dark"] body.character-room-v2[data-character="seyeon"] .conversation-thread-bar {
+  border-color: rgba(151,113,67,.18);
+}
+
+html[data-theme="dark"] body.character-room-v2[data-character="seyeon"] .conversation-chat-head .character-dialogue-name-row h1,
+html[data-theme="dark"] body.character-room-v2[data-character="seyeon"] .conversation-message-heading strong,
+html[data-theme="dark"] body.character-room-v2[data-character="seyeon"] .conversation-message-body > strong {
+  color: #342d28;
+}
+
+html[data-theme="dark"] body.character-room-v2[data-character="seyeon"] .conversation-chat-head .character-dialogue-name-row span,
+html[data-theme="dark"] body.character-room-v2[data-character="seyeon"] .conversation-message-heading time {
+  color: #7f7165;
+}
+
+html[data-theme="dark"] body.character-room-v2[data-character="seyeon"] .conversation-message-body p {
+  color: #413b35;
+  border-color: rgba(183,134,96,.20);
+  background: rgba(255,252,246,.90);
+}
+
+html[data-theme="dark"] body.character-room-v2[data-character="seyeon"] .conversation-message[data-sender="user"] .conversation-message-body p {
+  color: #45372d;
+  border-color: rgba(144,112,72,.20);
+  background: rgba(239,224,204,.94);
+}
+
+html[data-theme="dark"] body.character-room-v2[data-character="seyeon"] .conversation-composer {
+  border-color: rgba(151,113,67,.26);
+  background: rgba(255,252,247,.88);
+  box-shadow: 0 8px 20px rgba(63,49,33,.08);
+}
+
+html[data-theme="dark"] body.character-room-v2[data-character="seyeon"] .conversation-composer textarea {
+  color: #37322d;
+}
+
+html[data-theme="dark"] body.character-room-v2[data-character="seyeon"] .conversation-composer textarea::placeholder {
+  color: #8f8377;
+}
+
+html[data-theme="dark"] body.character-room-v2[data-character="seyeon"] .conversation-chat-panel .character-compose-status {
+  color: #8f6554;
+}
+
+@media (max-width: 900px) {
+  html[data-theme="dark"] body.character-room-v2[data-character="seyeon"] .conversation-chat-panel {
+    background-image:
+      linear-gradient(rgba(255,250,242,.48), rgba(250,240,225,.62)),
       url("assets/characters/chat-themes/seyeon-chat-theme-mobile-v1.webp");
     background-size: cover;
     background-position: center 42%;
