@@ -175,26 +175,49 @@ export function admitCharacterFaceGovernedGroundingV1(input: Readonly<{
     hashCharacterFaceGovernedInterpretationMaterialV1(material);
   if (bundleHash !== expectedHash) fail('Governed Face grounding bundleHash mismatch.');
 
-  const grounding = Object.freeze({ ...material, bundleHash })
-    satisfies CharacterFaceGovernedGroundingBundleV1;
+  const grounding:
+    CharacterFaceGovernedGroundingBundleV1 =
+      Object.freeze({
+        ...material,
+        bundleHash,
+      });
 
   const rawRef = rec(input.candidateGroundingRef, 'governedGroundingRef');
   exact(rawRef, REF_KEYS, 'governedGroundingRef');
-  const expectedRef = Object.freeze({
-    schemaVersion: CHARACTER_FACE_GOVERNED_GROUNDING_REF_SCHEMA_VERSION_V1,
-    projectionVersion: grounding.projectionVersion,
-    mode: grounding.mode,
-    topicKey: grounding.topicKey,
-    sourceContractVersion: grounding.sourceContractVersion,
-    sourceAuthorityRef: grounding.sourceAuthorityRef,
-    sourceResultHash: grounding.sourceResultHash,
-    authorizationReceiptRef: grounding.authorizationReceiptRef,
-    handoffHash: grounding.handoffHash,
-    faceEngineVersion: grounding.faceEngineVersion,
-    ...(grounding.faceReadingRef === undefined ? {} : { faceReadingRef: grounding.faceReadingRef }),
-    methodologyPackRefs: grounding.methodologyPackRefs,
-    bundleHash: grounding.bundleHash,
-  }) satisfies CharacterFaceGovernedGroundingRefV1;
+  const expectedRef:
+    CharacterFaceGovernedGroundingRefV1 =
+      Object.freeze({
+        schemaVersion:
+          CHARACTER_FACE_GOVERNED_GROUNDING_REF_SCHEMA_VERSION_V1,
+        projectionVersion:
+          grounding.projectionVersion,
+        mode:
+          grounding.mode,
+        topicKey:
+          grounding.topicKey,
+        sourceContractVersion:
+          grounding.sourceContractVersion,
+        sourceAuthorityRef:
+          grounding.sourceAuthorityRef,
+        sourceResultHash:
+          grounding.sourceResultHash,
+        authorizationReceiptRef:
+          grounding.authorizationReceiptRef,
+        handoffHash:
+          grounding.handoffHash,
+        faceEngineVersion:
+          grounding.faceEngineVersion,
+        ...(grounding.faceReadingRef === undefined
+          ? {}
+          : {
+              faceReadingRef:
+                grounding.faceReadingRef,
+            }),
+        methodologyPackRefs:
+          grounding.methodologyPackRefs,
+        bundleHash:
+          grounding.bundleHash,
+      });
   if (!same(rawRef, expectedRef)) fail('Governed Face grounding ref mismatch.');
 
   return Object.freeze({ handoff, grounding, groundingRef: expectedRef });
