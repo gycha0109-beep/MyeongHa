@@ -455,10 +455,35 @@ describe(
       () => {
         const { profiles, context } =
           seyeonRuntime();
-        const candidate = {
-          ...governedCandidate(),
+        const base =
+          governedCandidate();
+        const foreignSourceResultHash =
+          `face-topic-source-result:${'f'.repeat(64)}`;
+        const withoutHash = {
+          schemaVersion:
+            base.schemaVersion,
+          sourceContractVersion:
+            base.sourceContractVersion,
+          sourceAuthorityRef:
+            base.sourceAuthorityRef,
           sourceResultHash:
-            `face-topic-source-result:${'f'.repeat(64)}`,
+            foreignSourceResultHash,
+          topicKey: base.topicKey,
+          authorizationState:
+            base.authorizationState,
+          authorizationScope:
+            base.authorizationScope,
+          authorizationReceiptRef:
+            base.authorizationReceiptRef,
+          units: base.units,
+        };
+        const candidate = {
+          ...withoutHash,
+          handoffHash:
+            CHARACTER_FACE_GOVERNED_INTERPRETATION_HASH_PREFIX_V1 +
+            hashCharacterFaceGovernedInterpretationMaterialV1(
+              withoutHash,
+            ),
         };
 
         expect(() =>
@@ -468,7 +493,7 @@ describe(
             expectedSource: {
               ...expectedSource,
               sourceResultHash:
-                candidate.sourceResultHash,
+                foreignSourceResultHash,
             },
             rawRendererOutput: {
               schemaVersion: 'v1',
