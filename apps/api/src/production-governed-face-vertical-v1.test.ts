@@ -663,7 +663,7 @@ describe(
                   eligibleEnvelope(),
                 ),
             databaseClient: {
-              async query(
+              async query<Row = Record<string, unknown>>(
                 _sql: string,
                 values?: readonly unknown[],
               ) {
@@ -676,41 +676,43 @@ describe(
                     'expected governed durable commit parameters',
                   );
                 }
+                const row = {
+                  receiptId:
+                    values[3],
+                  turnId:
+                    values[1],
+                  attemptId:
+                    values[2],
+                  artifactId:
+                    values[5],
+                  artifactHash:
+                    values[6],
+                  characterId:
+                    values[7],
+                  sourceResultHash:
+                    values[8],
+                  authorizationReceiptRef:
+                    values[9],
+                  faceBundleHash:
+                    values[10],
+                  handoffHash:
+                    values[11],
+                  readingPlanRef:
+                    values[12],
+                  finalOutputHash:
+                    values[13],
+                  artifactJsonb:
+                    values[14],
+                  createdAt:
+                    '2026-10-08T00:00:00.000Z',
+                  replayed:
+                    false,
+                } as unknown as Row;
                 return {
-                  rows: [
-                    {
-                      receiptId:
-                        values[3],
-                      turnId:
-                        values[1],
-                      attemptId:
-                        values[2],
-                      artifactId:
-                        values[5],
-                      artifactHash:
-                        values[6],
-                      characterId:
-                        values[7],
-                      sourceResultHash:
-                        values[8],
-                      authorizationReceiptRef:
-                        values[9],
-                      faceBundleHash:
-                        values[10],
-                      handoffHash:
-                        values[11],
-                      readingPlanRef:
-                        values[12],
-                      finalOutputHash:
-                        values[13],
-                      artifactJsonb:
-                        values[14],
-                      createdAt:
-                        '2026-10-08T00:00:00.000Z',
-                      replayed:
-                        false,
-                    },
-                  ],
+                  rows:
+                    Object.freeze([
+                      row,
+                    ]),
                 };
               },
             },
