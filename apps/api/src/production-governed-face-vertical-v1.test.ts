@@ -8,17 +8,21 @@ import {
   CHARACTER_FACE_GOVERNED_MODE_V1,
   CHARACTER_FACE_GOVERNED_REALIZATION_POLICY_REGISTRY_VERSION_V1,
   CHARACTER_FACE_GOVERNED_REALIZATION_POLICY_V1,
-  CHARACTER_FACE_GOVERNED_READING_COMMIT_SCHEMA_VERSION_V1,
-  CharacterFaceGovernedReadingCommitErrorV1,
   hashCharacterFaceGovernedInterpretationMaterialV1,
   hashCharacterFaceGovernedReadingArtifactV1,
-  resolveCharacterRuntimeAuthorityLaneV1,
   resolveCharacterFaceNamedProfileBundleV1,
   type CharacterRuntimeContextV1,
 } from '../../../packages/domain/src/index.js';
+import {
+  CHARACTER_FACE_GOVERNED_READING_COMMIT_SCHEMA_VERSION_V1,
+  CharacterFaceGovernedReadingCommitErrorV1,
+} from './character-face-governed-reading-artifact-commit.js';
 import type {
   CharacterFaceGovernedReadingDurableCommitPortV1,
 } from './character-face-governed-reading-artifact-durable-commit.js';
+import {
+  resolveCharacterRuntimeAuthorityLaneV1,
+} from '../../../packages/character-content/src/runtime-authority-lane-v1.js';
 import {
   createProductionGovernedFaceVerticalV1,
   PRODUCTION_GOVERNED_FACE_TOPIC_KEY_V1,
