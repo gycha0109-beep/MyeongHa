@@ -1,4 +1,9 @@
 import { resolveCanonicalCharacterPresentationV1 } from './character-presentation-identity.js';
+import {
+  ChatOpenClientErrorV1,
+  buildChatThreadUrlV1,
+  createChatOpenClientV1,
+} from './chat-open-client.js';
 import { applyCanonicalCharacterPresentationV1 } from './chat-character.js';
 import { parseChatRoomReadPayloadV1, parseChatThreadRouteV1 } from './chat-room-read-contract.js';
 import { getActiveBearer, invalidateGuestSession, invalidateMemberSession } from './product-auth.js';
@@ -9,7 +14,14 @@ const params = new URLSearchParams(window.location.search);
 const threadRoute = parseChatThreadRouteV1(params);
 const threadId = threadRoute.threadId;
 const invalidThreadRoute = threadRoute.state === 'invalid';
+const requestedCharacterId = (() => {
+  const raw = params.get('character');
+  if (typeof raw !== 'string') return null;
+  const normalized = raw.trim().toLowerCase();
+  return resolveCanonicalCharacterPresentationV1(normalized) ? normalized : null;
+})();
 const apiEnvelopePromise = import('./api-envelope.js');
+const chatOpenClient = createChatOpenClientV1();
 
 const historyList = document.querySelector('[data-history-list]');
 const historyEmpty = document.querySelector('[data-history-empty]');
@@ -18,9 +30,81 @@ const contextTitle = document.querySelector('[data-context-title]');
 const composeStatus = document.querySelector('[data-compose-status]');
 const chatStream = document.querySelector('[data-chat-stream]');
 const chatIntro = document.querySelector('[data-chat-intro]');
+const messageInput = document.querySelector('[data-message-input]');
+const composer = document.querySelector('[data-composer]');
+let openingThread = false;
 
 function setComposeStatus(message) {
   if (composeStatus) composeStatus.textContent = message;
+}
+
+function setComposerBusy(busy) {
+  if (composer) composer.dataset.runtimeBusy = String(Boolean(busy));
+  if (messageInput instanceof HTMLTextAreaElement) messageInput.readOnly = Boolean(busy);
+  const sendButton = composer?.querySelector('button[type="submit"]');
+  if (sendButton instanceof HTMLButtonElement) sendButton.disabled = Boolean(busy);
+}
+
+function pendingDraftKey(targetThreadId) {
+  return `myeongha:chat:pending-draft:${targetThreadId}`;
+}
+
+function restorePendingDraft() {
+  if (!threadId || !(messageInput instanceof HTMLTextAreaElement)) return;
+  const key = pendingDraftKey(threadId);
+  const draft = sessionStorage.getItem(key);
+  if (typeof draft !== 'string' || draft.trim().length === 0) return;
+  messageInput.value = draft;
+  sessionStorage.removeItem(key);
+  messageInput.style.height = 'auto';
+  messageInput.style.height = `${Math.min(messageInput.scrollHeight, 120)}px`;
+  setComposeStatus('대화방 연결은 완료되었습니다. 입력한 문장은 보존했습니다.');
+}
+
+function chatOpenFailureMessage(error) {
+  if (!(error instanceof ChatOpenClientErrorV1)) {
+    return '대화방을 준비하지 못했습니다. 잠시 후 다시 시도해 주세요.';
+  }
+  if (error.code === 'CHAT_OPEN_SESSION_REQUIRED') {
+    return '대화를 시작하려면 로그인이 필요합니다.';
+  }
+  if (error.code === 'CHAT_OPEN_MEMBER_REQUIRED') {
+    return '현재 웹 대화는 회원 계정에서 시작할 수 있습니다.';
+  }
+  if (error.code === 'CHAT_OPEN_CHARACTER_UNAVAILABLE') {
+    return '현재 세연 대화방을 열 수 없습니다.';
+  }
+  if (error.code === 'CHAT_OPEN_CONTENT_INCOMPATIBLE') {
+    return '현재 웹 버전과 세연 대화 콘텐츠가 맞지 않습니다.';
+  }
+  if (error.code === 'CHAT_OPEN_CONTENT_UNAVAILABLE') {
+    return '세연 대화 콘텐츠를 지금 불러올 수 없습니다.';
+  }
+  return '대화방을 준비하지 못했습니다. 잠시 후 다시 시도해 주세요.';
+}
+
+async function openThreadAndPreserveDraft(message) {
+  if (openingThread) return;
+  if (!requestedCharacterId) {
+    setComposeStatus('대화 상대를 확인할 수 없습니다.');
+    return;
+  }
+
+  openingThread = true;
+  setComposerBusy(true);
+  setComposeStatus('대화방을 준비하고 있습니다…');
+
+  try {
+    const result = await chatOpenClient.openForCanonicalCharacter({
+      characterId: requestedCharacterId,
+    });
+    sessionStorage.setItem(pendingDraftKey(result.threadId), message);
+    window.location.assign(buildChatThreadUrlV1(result.threadId));
+  } catch (error) {
+    setComposeStatus(chatOpenFailureMessage(error));
+    setComposerBusy(false);
+    openingThread = false;
+  }
 }
 
 function formatTimestamp(value) {
@@ -209,7 +293,7 @@ async function loadRoomState() {
   if (!threadId) {
     if (historyEmpty) {
       historyEmpty.hidden = false;
-      historyEmpty.textContent = '이어갈 대화를 선택하면 지난 대화가 여기에 표시됩니다.';
+      historyEmpty.textContent = '아직 시작된 대화가 없습니다.';
     }
     return;
   }
@@ -284,17 +368,17 @@ function submitTurn(event) {
   }
 
   if (!threadId) {
-    setComposeStatus('먼저 이어갈 대화를 선택해야 합니다. 입력한 내용은 보내지지 않았습니다.');
+    void openThreadAndPreserveDraft(message.trim());
     return;
   }
 
-  // ChatRequestV1 requires clientCapability. The current web surface has no
-  // source-backed capability acquisition contract or live HTTP adapter, so a
-  // valid command cannot be formed without inventing client authority. Keep
-  // the user's draft and fail closed before any mutation request is sent.
-  setComposeStatus('현재 메시지를 보낼 수 없습니다. 입력한 내용은 그대로 남아 있습니다.');
+  // Public browser turn execution is not yet an authorized Production HTTP
+  // surface on main. Do not fabricate a successful send or invent client
+  // compatibility authority. The thread is valid and the draft stays intact.
+  setComposeStatus('대화방은 연결됐지만 웹 메시지 전송은 아직 운영 연결 전입니다. 입력한 내용은 그대로 남아 있습니다.');
 }
 
+restorePendingDraft();
 document.addEventListener('myeongha:chat-submit', submitTurn);
 window.addEventListener('storage', (event) => {
   if (event.key !== PRODUCT_AUTH_STORAGE_V1.memberSession) return;
