@@ -67,6 +67,12 @@ This decision does not:
 - make relationship or memory writes an LLM authority;
 - authorize later default replacement without a separate decision.
 
+## First execution evidence
+
+The first governed publication run reached the empty-Production and operator-role preflight before any publication command executed. It confirmed that the Production `postgres` deployment principal already holds membership in `myeongha_content_operator`.
+
+That existing membership is deployment authority established outside this bootstrap. The bootstrap therefore uses `SET LOCAL ROLE myeongha_content_operator` and does not grant or revoke role membership. The failed first attempt performed no Character content mutation.
+
 After bootstrap, the existing Production Member Seyeon one-turn smoke is the acceptance gate.
 
 Watchtower-Track: character-memory

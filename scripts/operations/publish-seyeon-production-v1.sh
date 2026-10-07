@@ -66,13 +66,12 @@ begin
     raise exception 'myeongha_content_operator role is unavailable';
   end if;
 
-  if pg_has_role('postgres', 'myeongha_content_operator', 'MEMBER') then
-    raise exception 'postgres unexpectedly already holds myeongha_content_operator';
+  if not pg_has_role('postgres', 'myeongha_content_operator', 'MEMBER') then
+    raise exception 'postgres must hold the governed myeongha_content_operator membership';
   end if;
 end
 $bootstrap_preflight$;
 
-grant myeongha_content_operator to postgres;
 set local role myeongha_content_operator;
 
 select public.cmd_publish_character_content_bundle_v1(
@@ -105,7 +104,6 @@ select public.cmd_activate_content_release_v1(
 );
 
 reset role;
-revoke myeongha_content_operator from postgres;
 commit;
 SQL
 
