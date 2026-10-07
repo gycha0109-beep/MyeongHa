@@ -580,6 +580,13 @@ describe(
             .authorizationReceiptRef,
         );
         expect(
+          result.commitReceipt
+            .finalOutputHash,
+        ).toBe(
+          artifact
+            .finalOutputHash,
+        );
+        expect(
           port.committedCount,
         ).toBe(1);
       },
