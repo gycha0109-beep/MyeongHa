@@ -4,8 +4,10 @@ import {
 import {
   buildCharacterFaceGovernedReadingArtifactCandidateV1,
   type CharacterFaceGovernedReadingArtifactBuildDecisionV1,
-  type CharacterRuntimeContextV1,
-} from '../../packages/domain/src/index.js';
+} from '../../packages/domain/src/character-face-governed-reading-artifact.js';
+import type {
+  CharacterRuntimeContextV1,
+} from '../../packages/domain/src/character-runtime-context.js';
 import {
   CHARACTER_FACE_REALIZATION_MODE_V1,
   CHARACTER_FACE_SOURCE_BINDING_SCHEMA_VERSION_V1,
