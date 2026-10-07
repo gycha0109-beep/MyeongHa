@@ -6,7 +6,7 @@ const chatPagePath = new URL('../apps/web/src/chat/ChatPage.tsx', import.meta.ur
 const chatCssPath = new URL('../apps/web/chat-room.css', import.meta.url);
 const chatRuntimeCssPath = new URL('../apps/web/chat-runtime.css', import.meta.url);
 const conversationCssPath = new URL('../apps/web/conversation-v2.css', import.meta.url);
-const seyeonAssetPath = new URL('../apps/web/seyeon-chat.webp', import.meta.url);
+const seyeonThemeAssetPath = new URL('../apps/web/assets/characters/chat-themes/seyeon-chat-theme-web-v1.webp', import.meta.url);
 const characterPresentationPath = new URL('../apps/web/chat-character.js', import.meta.url);
 const transportPath = new URL('../apps/web/chat-runtime-client.js', import.meta.url);
 const chatRequestContractPath = new URL('../packages/contracts/src/chat-request.ts', import.meta.url);
@@ -65,12 +65,12 @@ describe('MyeongHa immersive long-form Character Room', () => {
     expect(presentation).not.toContain('가족 이야기를 나눈 날');
   });
 
-  it('supports every current character through shared geometry while giving only Se-yeon the approved uploaded asset', async () => {
+  it('supports every current character through shared geometry while applying Se-yeon approved chat-theme presentation', async () => {
     const [presentation, baseCss, conversationCss, asset] = await Promise.all([
       readFile(characterPresentationPath, 'utf8'),
       readFile(chatCssPath, 'utf8'),
       readFile(conversationCssPath, 'utf8'),
-      stat(seyeonAssetPath),
+      stat(seyeonThemeAssetPath),
     ]);
 
     for (const key of ['baekheon', 'seyeon', 'yeoul', 'seorin', 'rahyeon', 'mira', 'taegyeom', 'yunho', 'doyun']) {
@@ -92,9 +92,10 @@ describe('MyeongHa immersive long-form Character Room', () => {
     expect(presentation).toContain("'thread_identity_invalid'");
     expect(presentation).toContain("root.dataset.characterAuthority = 'presentation_hint_only'");
     expect(presentation).toContain('root.dataset.character = characterKey');
-    expect(presentation).toContain("sceneLabel: '세연의 봄날 산책 공간'");
+    expect(presentation).toContain("sceneLabel: '세연의 따뜻한 오후빛 대화 공간'");
     expect(conversationCss).toContain('.character-room-v2[data-character="seyeon"] .conversation-room-scene');
-    expect(conversationCss).toContain('url("seyeon-chat.webp")');
+    expect(conversationCss).toContain('url("assets/characters/chat-themes/seyeon-chat-theme-web-v1.webp")');
+    expect(conversationCss).toContain('url("assets/characters/seyeon-portrait-v2.webp")');
     expect(asset.size).toBeGreaterThan(10_000);
 
     for (const key of ['baekheon', 'yeoul', 'seorin', 'rahyeon', 'mira', 'taegyeom', 'yunho', 'doyun']) {
