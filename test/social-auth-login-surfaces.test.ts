@@ -25,6 +25,8 @@ describe('social login button surfaces', () => {
 
     expect(web).toContain("data-provider={provider}");
     expect(web).toContain("handleSocialSignIn(provider)");
+    expect(web).toContain("controller.current?.startSocial(provider)");
+    expect(web).not.toContain('최종 연동 확인 후 사용할 수 있습니다.');
     expect(web).not.toContain('myeongha://auth/callback');
   });
 });

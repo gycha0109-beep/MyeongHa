@@ -8,6 +8,7 @@ import {
   readGuestBearer,
   readMemberSession,
   signInWithPassword,
+  signInWithSocialRefreshToken,
   signUpWithPassword,
 } from './product-auth.js';
 
@@ -20,6 +21,9 @@ const CONFIRMATION_GUEST_HANDOFF_ENTRY_PREFIX = 'myeongha.pendingGuestConfirmati
 const CONFIRMATION_GUEST_HANDOFF_TTL_MS = 24 * 60 * 60 * 1000;
 // Keep the same mixed-version namespace used by product-auth.js so promotion cannot cross a newer Member mutation.
 const MEMBER_MUTATION_LOCK_NAME = 'myeongha.memberSession.v1.refresh.lock';
+const WEB_SOCIAL_AUTH_PENDING_KEY = 'myeongha.webSocialAuthPending.v1';
+const WEB_SOCIAL_AUTH_CALLBACK_URI = 'https://myeongha.vercel.app/auth.html?social=callback';
+const WEB_SOCIAL_AUTH_PROVIDERS = new Set(['google', 'kakao', 'naver']);
 const ALLOWED_NEXT = new Set([
   'hall.html',
   'reading.html',
@@ -62,6 +66,254 @@ function selectMode(nextMode) {
   ui?.setMode(mode);
   setStatus('');
   setBusy(false);
+}
+
+function readSocialAuthPending() {
+  let raw;
+  try {
+    raw = sessionStorage.getItem(WEB_SOCIAL_AUTH_PENDING_KEY);
+  } catch (error) {
+    throw new ProductAuthError(
+      'WEB_SOCIAL_AUTH_PENDING_READ_FAILED',
+      '소셜 로그인 진행 상태를 브라우저에서 읽지 못했습니다.',
+      error,
+    );
+  }
+  if (!raw) return null;
+
+  let stored;
+  try {
+    stored = JSON.parse(raw);
+  } catch {
+    clearSocialAuthPending();
+    return null;
+  }
+
+  const provider = typeof stored?.provider === 'string' && WEB_SOCIAL_AUTH_PROVIDERS.has(stored.provider)
+    ? stored.provider
+    : null;
+  const state = typeof stored?.state === 'string' && /^[A-Za-z0-9_-]{16,128}$/u.test(stored.state)
+    ? stored.state
+    : null;
+  const expiresAtMs = typeof stored?.expiresAt === 'string'
+    ? Date.parse(stored.expiresAt)
+    : Number.NaN;
+  const guestBearer = stored?.guestBearer === null
+    ? null
+    : normalizeGuestBearer(stored?.guestBearer);
+  const next = typeof stored?.next === 'string' ? stored.next : 'hall.html';
+
+  if (
+    provider === null ||
+    state === null ||
+    Number.isNaN(expiresAtMs) ||
+    expiresAtMs <= Date.now() ||
+    (stored?.guestBearer !== null && guestBearer === null)
+  ) {
+    clearSocialAuthPending();
+    return null;
+  }
+
+  return Object.freeze({
+    provider,
+    state,
+    expiresAt: new Date(expiresAtMs).toISOString(),
+    guestBearer,
+    next,
+  });
+}
+
+function writeSocialAuthPending(value) {
+  const serialized = JSON.stringify(value);
+  try {
+    sessionStorage.setItem(WEB_SOCIAL_AUTH_PENDING_KEY, serialized);
+    return sessionStorage.getItem(WEB_SOCIAL_AUTH_PENDING_KEY) === serialized;
+  } catch {
+    return false;
+  }
+}
+
+function clearSocialAuthPending() {
+  try {
+    sessionStorage.removeItem(WEB_SOCIAL_AUTH_PENDING_KEY);
+  } catch {}
+}
+
+function cleanSocialCallbackUrl(next = 'hall.html') {
+  const url = new URL('/auth.html', location.origin);
+  if (next !== 'hall.html') url.searchParams.set('next', next);
+  history.replaceState(null, '', `${url.pathname}${url.search}`);
+}
+
+function mergedSocialCallbackParams(url) {
+  const merged = new URLSearchParams(url.search);
+  const fragment = new URLSearchParams(url.hash.startsWith('#') ? url.hash.slice(1) : url.hash);
+  for (const [key, value] of fragment) {
+    if (!merged.has(key)) merged.set(key, value);
+  }
+  return merged;
+}
+
+async function startSocialAuth(provider) {
+  if (busy) return;
+  if (!WEB_SOCIAL_AUTH_PROVIDERS.has(provider)) {
+    setStatus('지원하지 않는 로그인 방식입니다.', 'error');
+    return;
+  }
+
+  setBusy(true);
+  setStatus('');
+  try {
+    await ensureGuestBearer();
+    const guestBearer = readGuestBearer();
+
+    let response;
+    try {
+      response = await fetch('/api/auth/social/start', {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        credentials: 'same-origin',
+        cache: 'no-store',
+        body: JSON.stringify({
+          provider,
+          redirectUri: WEB_SOCIAL_AUTH_CALLBACK_URI,
+        }),
+      });
+    } catch (error) {
+      throw new ProductAuthError(
+        'WEB_AUTH_NETWORK_FAILED',
+        '인증 서버에 연결할 수 없습니다.',
+        error,
+      );
+    }
+
+    let payload = null;
+    try {
+      payload = await response.json();
+    } catch {
+      payload = null;
+    }
+
+    if (!response.ok || payload?.ok !== true) {
+      const code = readPublicErrorCode(payload) ?? 'AUTH_REQUEST_FAILED';
+      throw new ProductAuthError(code, '소셜 로그인을 시작하지 못했습니다.');
+    }
+
+    const data = payload.data;
+    if (
+      !data ||
+      data.provider !== provider ||
+      typeof data.authorizationUrl !== 'string' ||
+      typeof data.state !== 'string' ||
+      !/^[A-Za-z0-9_-]{16,128}$/u.test(data.state) ||
+      typeof data.expiresAt !== 'string' ||
+      !Number.isFinite(Date.parse(data.expiresAt)) ||
+      Date.parse(data.expiresAt) <= Date.now()
+    ) {
+      throw new ProductAuthError(
+        'WEB_SOCIAL_AUTH_START_INVALID',
+        '소셜 로그인 시작 응답이 올바르지 않습니다.',
+      );
+    }
+
+    const authorizationUrl = new URL(data.authorizationUrl);
+    if (
+      authorizationUrl.protocol !== 'https:' ||
+      authorizationUrl.origin !== 'https://cnsfpcdiyofqvhpcegfc.supabase.co' ||
+      authorizationUrl.pathname !== '/auth/v1/authorize'
+    ) {
+      throw new ProductAuthError(
+        'WEB_SOCIAL_AUTH_START_INVALID',
+        '소셜 로그인 주소가 허용된 인증 경계를 벗어났습니다.',
+      );
+    }
+
+    const pending = Object.freeze({
+      provider,
+      state: data.state,
+      expiresAt: data.expiresAt,
+      guestBearer,
+      next: nextHref(),
+    });
+    if (!writeSocialAuthPending(pending)) {
+      throw new ProductAuthError(
+        'WEB_SOCIAL_AUTH_PENDING_WRITE_FAILED',
+        '소셜 로그인 진행 상태를 브라우저에 저장하지 못했습니다.',
+      );
+    }
+
+    location.assign(authorizationUrl.toString());
+  } catch (error) {
+    clearSocialAuthPending();
+    setStatus(authErrorMessage(error), 'error');
+    setBusy(false);
+  }
+}
+
+async function consumeSocialReturn() {
+  const url = new URL(location.href);
+  if (url.searchParams.get('social') !== 'callback') return false;
+
+  mode = 'sign-in';
+  ui?.setMode(mode);
+  setBusy(true);
+
+  const params = mergedSocialCallbackParams(url);
+  const pending = readSocialAuthPending();
+  const next = pending?.next ?? 'hall.html';
+  const returnedState = params.get('state');
+  const providerError = params.get('error') ?? params.get('error_code');
+  const refreshToken = params.get('refresh_token');
+
+  cleanSocialCallbackUrl(next);
+
+  if (pending === null || returnedState !== pending.state) {
+    clearSocialAuthPending();
+    setStatus('소셜 로그인 요청을 확인할 수 없습니다. 다시 시도해 주세요.', 'error');
+    setBusy(false);
+    return true;
+  }
+
+  if (pending.guestBearer !== null && readGuestBearer() !== pending.guestBearer) {
+    clearSocialAuthPending();
+    setStatus('로그인 중 게스트 세션이 변경되어 소셜 로그인을 적용하지 않았습니다.', 'error');
+    setBusy(false);
+    return true;
+  }
+
+  if (providerError !== null) {
+    clearSocialAuthPending();
+    setStatus('소셜 로그인이 취소되었거나 실패했습니다.', 'error');
+    setBusy(false);
+    return true;
+  }
+
+  if (
+    refreshToken === null ||
+    refreshToken.length === 0 ||
+    refreshToken.length > 4096 ||
+    /\s/u.test(refreshToken)
+  ) {
+    clearSocialAuthPending();
+    setStatus('소셜 로그인 세션을 확인하지 못했습니다. 다시 시도해 주세요.', 'error');
+    setBusy(false);
+    return true;
+  }
+
+  try {
+    const session = await signInWithSocialRefreshToken(refreshToken);
+    clearSocialAuthPending();
+    await finishAuthenticated(session);
+  } catch (error) {
+    clearSocialAuthPending();
+    setStatus(authErrorMessage(error), 'error');
+  } finally {
+    setBusy(false);
+  }
+  return true;
 }
 
 function consumeConfirmationReturn() {
@@ -464,7 +716,10 @@ async function promoteGuestIfPresent(accessToken, memberEmail) {
 
   if (response.ok && payload?.ok === true) {
     clearPromotedGuestBearer();
-    if (!await clearConfirmationGuestHandoffIfMatches(memberEmail, guestBearer)) {
+    if (
+      normalizeEmail(memberEmail) &&
+      !await clearConfirmationGuestHandoffIfMatches(memberEmail, guestBearer)
+    ) {
       throw confirmationGuestHandoffClearFailure();
     }
     return { status: 'promoted' };
@@ -478,7 +733,10 @@ async function promoteGuestIfPresent(accessToken, memberEmail) {
     }
     if (code === 'GUEST_AUTH_REQUIRED') {
       invalidateGuestSession(guestBearer);
-      if (!await clearConfirmationGuestHandoffIfMatches(memberEmail, guestBearer)) {
+      if (
+        normalizeEmail(memberEmail) &&
+        !await clearConfirmationGuestHandoffIfMatches(memberEmail, guestBearer)
+      ) {
         throw confirmationGuestHandoffClearFailure();
       }
       return { status: 'guest-rejected' };
@@ -513,6 +771,14 @@ function authErrorMessage(error) {
       return '저장된 게스트 계정 연결 기록을 확인하지 못했습니다. 브라우저 저장소 접근을 복구한 뒤 다시 로그인해 주세요.';
     case 'WEB_AUTH_CONFIRMATION_HANDOFF_CLEAR_FAILED':
       return '게스트 계정 연결 기록을 정리하지 못했습니다. 브라우저 저장소 접근을 복구한 뒤 다시 로그인해 주세요.';
+    case 'SOCIAL_AUTH_PROVIDER_DISABLED':
+      return '현재 이 소셜 로그인 제공자는 아직 활성화되지 않았습니다.';
+    case 'WEB_SOCIAL_AUTH_PENDING_READ_FAILED':
+    case 'WEB_SOCIAL_AUTH_PENDING_WRITE_FAILED':
+      return '소셜 로그인 진행 상태를 브라우저에 안전하게 보존하지 못했습니다. 다시 시도해 주세요.';
+    case 'WEB_SOCIAL_AUTH_START_INVALID':
+    case 'WEB_SOCIAL_AUTH_CALLBACK_INVALID':
+      return '소셜 로그인 응답을 확인하지 못했습니다. 다시 시도해 주세요.';
     default:
       return '인증을 완료하지 못했습니다. 입력을 확인하고 다시 시도해 주세요.';
   }
@@ -596,13 +862,19 @@ export function createAuthPageController(adapter) {
   ui.setMode(mode);
   ui.setBusy(false, mode);
 
-  const confirmationReturn = consumeConfirmationReturn();
-  if (readMemberSession() && !confirmationReturn) {
-    setStatus('현재 브라우저에 이전 로그인 세션이 있습니다. 계정 상태가 맞지 않으면 아래에서 다시 로그인해 세션을 갱신할 수 있습니다.');
+  const socialReturn = new URL(location.href).searchParams.get('social') === 'callback';
+  if (socialReturn) {
+    void consumeSocialReturn();
+  } else {
+    const confirmationReturn = consumeConfirmationReturn();
+    if (readMemberSession() && !confirmationReturn) {
+      setStatus('현재 브라우저에 이전 로그인 세션이 있습니다. 계정 상태가 맞지 않으면 아래에서 다시 로그인해 세션을 갱신할 수 있습니다.');
+    }
   }
 
   return Object.freeze({
     selectMode,
+    startSocial: startSocialAuth,
     submit: submitAuth,
     dispose() {
       if (ui === adapter) ui = null;

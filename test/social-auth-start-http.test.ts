@@ -82,6 +82,27 @@ describe('social auth start HTTP boundary', () => {
       .toBe(expectedProvider);
   });
 
+  it('creates the exact governed production web callback when requested', async () => {
+    const response = await handleSocialAuthStartRequestV1({
+      request: request({
+        provider: 'google',
+        redirectUri: 'https://myeongha.vercel.app/auth.html?social=callback',
+      }),
+      env: { MYEONGHA_SOCIAL_AUTH_GOOGLE_ENABLED: 'true' },
+    });
+
+    expect(response.status).toBe(200);
+    const payload = await response.json() as {
+      data: { authorizationUrl: string; state: string };
+    };
+    const authorize = new URL(payload.data.authorizationUrl);
+    const redirect = new URL(authorize.searchParams.get('redirect_to') ?? '');
+    expect(redirect.origin).toBe('https://myeongha.vercel.app');
+    expect(redirect.pathname).toBe('/auth.html');
+    expect(redirect.searchParams.get('social')).toBe('callback');
+    expect(redirect.searchParams.get('state')).toBe(payload.data.state);
+  });
+
   it('rejects arbitrary redirect URIs', async () => {
     const response = await handleSocialAuthStartRequestV1({
       request: request({

@@ -11,6 +11,9 @@ const NO_STORE = 'no-store' as const;
 const MOBILE_SOCIAL_REDIRECT_SCHEME = 'myeongha:' as const;
 const MOBILE_SOCIAL_REDIRECT_HOST = 'auth' as const;
 const MOBILE_SOCIAL_REDIRECT_PATH = '/callback' as const;
+const WEB_SOCIAL_REDIRECT_ORIGIN = 'https://myeongha.vercel.app' as const;
+const WEB_SOCIAL_REDIRECT_PATH = '/auth.html' as const;
+const WEB_SOCIAL_REDIRECT_MARKER = 'callback' as const;
 const SOCIAL_AUTH_STATE_TTL_MS = 10 * 60 * 1000;
 
 export const SOCIAL_AUTH_PROVIDER_ENV_V1 = Object.freeze({
@@ -74,17 +77,25 @@ function parseRedirectUri(value: unknown): URL | null {
     return null;
   }
 
-  if (
-    url.protocol !== MOBILE_SOCIAL_REDIRECT_SCHEME ||
-    url.hostname !== MOBILE_SOCIAL_REDIRECT_HOST ||
-    url.pathname !== MOBILE_SOCIAL_REDIRECT_PATH ||
-    url.username !== '' ||
-    url.password !== '' ||
-    url.search !== '' ||
-    url.hash !== ''
-  ) {
-    return null;
-  }
+  const commonSafe =
+    url.username === '' &&
+    url.password === '' &&
+    url.hash === '';
+  const mobile =
+    commonSafe &&
+    url.protocol === MOBILE_SOCIAL_REDIRECT_SCHEME &&
+    url.hostname === MOBILE_SOCIAL_REDIRECT_HOST &&
+    url.pathname === MOBILE_SOCIAL_REDIRECT_PATH &&
+    url.search === '';
+  const web =
+    commonSafe &&
+    url.origin === WEB_SOCIAL_REDIRECT_ORIGIN &&
+    url.pathname === WEB_SOCIAL_REDIRECT_PATH &&
+    url.searchParams.getAll('social').length === 1 &&
+    url.searchParams.get('social') === WEB_SOCIAL_REDIRECT_MARKER &&
+    [...url.searchParams.keys()].every((key) => key === 'social');
+
+  if (!mobile && !web) return null;
   return url;
 }
 

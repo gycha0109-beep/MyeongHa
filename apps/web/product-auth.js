@@ -772,6 +772,34 @@ export async function ensureActiveBearer() {
   return ensureActiveBearer();
 }
 
+export async function signInWithSocialRefreshToken(refreshToken) {
+  if (
+    typeof refreshToken !== 'string' ||
+    refreshToken.length === 0 ||
+    refreshToken.length > 4096 ||
+    /\s/u.test(refreshToken)
+  ) {
+    throw new ProductAuthError(
+      'WEB_SOCIAL_AUTH_CALLBACK_INVALID',
+      '소셜 로그인 세션 응답이 올바르지 않습니다.',
+    );
+  }
+
+  return withMemberMutationLock(async () => {
+    const data = await postJson(
+      '/api/auth/refresh?__myeongha_social_complete=1',
+      { refreshToken },
+    );
+    if (!isRecord(data) || data.status !== 'authenticated') {
+      throw new ProductAuthError(
+        'WEB_AUTH_MALFORMED_SESSION',
+        '소셜 로그인 응답이 올바르지 않습니다.',
+      );
+    }
+    return saveSession(data.session);
+  });
+}
+
 export async function signInWithPassword(email, password) {
   return withMemberMutationLock(async () => {
     const data = await postJson('/api/auth/sign-in', { email, password });
