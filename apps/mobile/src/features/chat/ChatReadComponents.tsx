@@ -1,5 +1,7 @@
 import type { MobileChatThreadSnapshotV1 } from '@/features/chat/mobile-chat-read-repository';
 import { createMobileChatMessageViewV1 } from '@/features/chat/chat-view-model';
+import { resolveMobileChatCharacterPresentationV1 } from '@/features/chat/chat-character-presentation';
+import { MOBILE_CHAT_LAUNCH_ROSTER_V1 } from '@/features/chat/chat-launch-roster';
 import { mobileColors } from '@/ui/mobile-colors';
 import {
   ActivityIndicator,
@@ -9,15 +11,34 @@ import {
   View,
 } from 'react-native';
 
-export function ChatReadHeader() {
+export function ChatReadHeader({
+  snapshot,
+}: {
+  snapshot: MobileChatThreadSnapshotV1;
+}) {
+  const character = snapshot.characterId === null
+    ? null
+    : MOBILE_CHAT_LAUNCH_ROSTER_V1.find(
+        (entry) => entry.characterId === snapshot.characterId,
+      ) ?? null;
+  const presentation = character === null
+    ? null
+    : resolveMobileChatCharacterPresentationV1(character.characterId);
+  const displayName = character?.displayName ?? '대화 상대';
+  const meta = presentation === null
+    ? '서버가 확인한 기존 대화 · 읽기 전용'
+    : `${presentation.title} · 서버가 확인한 기존 대화 · 읽기 전용`;
+
   return (
     <View style={styles.headerCard}>
       <View style={styles.avatar}>
-        <Text style={styles.avatarText}>明</Text>
+        <Text style={styles.avatarText}>
+          {character === null ? '明' : displayName.slice(0, 1)}
+        </Text>
       </View>
       <View style={styles.headerCopy}>
-        <Text style={styles.headerTitle}>대화 상대</Text>
-        <Text style={styles.headerMeta}>서버가 확인한 기존 대화 · 읽기 전용</Text>
+        <Text style={styles.headerTitle}>{displayName}</Text>
+        <Text style={styles.headerMeta}>{meta}</Text>
       </View>
     </View>
   );
