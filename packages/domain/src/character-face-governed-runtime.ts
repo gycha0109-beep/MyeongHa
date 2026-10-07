@@ -47,6 +47,27 @@ export function admitCharacterRuntimeGovernedFaceGroundingV1(input: Readonly<{
   if (input.context.saju !== null) {
     throw new TypeError('Governed Face runtime cannot be mixed with Saju runtime context.');
   }
+
+  const existingFace =
+    (input.context as CharacterRuntimeContextV1 & {
+      readonly face?: unknown;
+    }).face;
+  if (existingFace !== undefined && existingFace !== null) {
+    throw new TypeError(
+      'Governed Face runtime cannot be mixed with neutral Face runtime context.',
+    );
+  }
+
+  const existingGovernedFace =
+    (input.context as CharacterRuntimeContextV1 & {
+      readonly governedFace?: unknown;
+    }).governedFace;
+  if (existingGovernedFace !== undefined && existingGovernedFace !== null) {
+    throw new TypeError(
+      'Governed Face runtime context must be admitted exactly once.',
+    );
+  }
+
   const admitted = admitCharacterFaceGovernedGroundingV1(input);
   const governedFace = Object.freeze({
     schemaVersion: CHARACTER_FACE_GOVERNED_CONTEXT_SCHEMA_VERSION_V1,
