@@ -1,0 +1,100 @@
+{
+  "schemaVersion": "seyeon-production-publication-artifact-v1",
+  "characterId": "seyeon",
+  "contentVersion": "seyeon-production-publication-v1",
+  "sourceAuthority": {
+    "runtimeDecision": "docs/source-authority-decisions/SEYEON_BIBLE_RUNTIME_V0_2_V0_1_APPROVAL.md",
+    "runtimeReviewedCommit": "a0afd9bda57ae0a3f48396d9b55a651403bbcc41",
+    "presentationPackage": "docs/character/seyeon-publication-package-v1.proposal.json",
+    "presentationApprovalDate": "2026-10-07"
+  },
+  "bundleMetadata": {
+    "minClientCapability": "character-chat-theme-v1",
+    "assetManifestHash": "sha256:v1:ca769bd9b211e5d04f64128fea1fb2e3d1eca3f91d2d34c6fe14f39b62591a4d",
+    "cueSchemaVersion": "character-static-presentation-v1"
+  },
+  "characterCatalog": [
+    {
+      "character_id": "seyeon",
+      "availability": "available",
+      "enabled": true,
+      "release_at": null,
+      "retire_at": null
+    }
+  ],
+  "characterCapabilities": [
+    {
+      "id": "1f3ac91c-306f-4b0b-bece-badab7532902",
+      "character_id": "seyeon",
+      "saju_domain": "general",
+      "role": "primary",
+      "can_initiate": true,
+      "capability_version": "character-saju-capability-v1"
+    },
+    {
+      "id": "455ec870-22ca-4ddb-9a41-2e40b6c9574a",
+      "character_id": "seyeon",
+      "saju_domain": "life_stage",
+      "role": "primary",
+      "can_initiate": true,
+      "capability_version": "character-saju-capability-v1"
+    },
+    {
+      "id": "da59db6e-38fb-40ef-8d80-91351138c953",
+      "character_id": "seyeon",
+      "saju_domain": "family",
+      "role": "secondary",
+      "can_initiate": false,
+      "capability_version": "character-saju-capability-v1"
+    },
+    {
+      "id": "fff11fa9-de00-4636-8dd0-99cd7e624b76",
+      "character_id": "seyeon",
+      "saju_domain": "relationship",
+      "role": "secondary",
+      "can_initiate": false,
+      "capability_version": "character-saju-capability-v1"
+    },
+    {
+      "id": "5bf07196-5913-4fa8-93ea-80e46485b37a",
+      "character_id": "seyeon",
+      "saju_domain": "career",
+      "role": "secondary",
+      "can_initiate": false,
+      "capability_version": "character-saju-capability-v1"
+    },
+    {
+      "id": "b32c4405-a68c-4d53-93a6-fa9f15d8982a",
+      "character_id": "seyeon",
+      "saju_domain": "wealth",
+      "role": "secondary",
+      "can_initiate": false,
+      "capability_version": "character-saju-capability-v1"
+    },
+    {
+      "id": "2e609f2f-5d09-43f8-ace2-74d8048dcd84",
+      "character_id": "seyeon",
+      "saju_domain": "compatibility",
+      "role": "commentary",
+      "can_initiate": false,
+      "capability_version": "character-saju-capability-v1"
+    },
+    {
+      "id": "f9f34b69-58d0-4002-86f5-a42935a18b88",
+      "character_id": "seyeon",
+      "saju_domain": "business",
+      "role": "commentary",
+      "can_initiate": false,
+      "capability_version": "character-saju-capability-v1"
+    },
+    {
+      "id": "3fbadd2f-3ac2-44db-9d60-edac5bca3045",
+      "character_id": "seyeon",
+      "saju_domain": "question_specific",
+      "role": "commentary",
+      "can_initiate": false,
+      "capability_version": "character-saju-capability-v1"
+    }
+  ],
+  "characterRelations": []
+}
