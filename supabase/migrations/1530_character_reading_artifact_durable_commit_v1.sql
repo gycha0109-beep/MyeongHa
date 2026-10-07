@@ -220,6 +220,12 @@ declare
 begin
   perform public.assert_myeongha_subject_context_v1(p_subject_id);
 
+  -- Serialize all first-commit/replay decisions for one logical turn without
+  -- granting UPDATE authority merely to obtain row locks.
+  perform pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended(p_turn_id::text, 0)
+  );
+
   if p_subject_id is null
      or p_turn_id is null
      or p_attempt_id is null
@@ -318,8 +324,7 @@ begin
   into v_turn_state
   from public.chat_turns ct
   where ct.id = p_turn_id
-    and ct.subject_id = p_subject_id
-  for update;
+    and ct.subject_id = p_subject_id;
 
   if not found then
     raise exception using
@@ -342,8 +347,7 @@ begin
   into v_existing
   from public.character_reading_artifacts cra
   where cra.turn_id = p_turn_id
-    and cra.artifact_kind = 'face_governed_reading'
-  for update;
+    and cra.artifact_kind = 'face_governed_reading';
 
   if found then
     if v_existing.subject_id is distinct from p_subject_id
@@ -391,8 +395,7 @@ begin
   from public.chat_turn_attempts a
   where a.id = p_attempt_id
     and a.turn_id = p_turn_id
-    and a.subject_id = p_subject_id
-  for update;
+    and a.subject_id = p_subject_id;
 
   if not found then
     raise exception using
