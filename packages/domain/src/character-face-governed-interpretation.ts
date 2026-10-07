@@ -494,18 +494,17 @@ export function selectCharacterFaceGovernedInterpretationsV1(
     fail('Governed Face interpretation selection maxUnits must remain within 1..4.');
   }
 
-  const preferredLensOrder = requireSortedUniqueStrings(
-    [...input.preferredLensOrder].sort(),
-    'preferredLensOrder',
+  const preferredLensOrder = input.preferredLensOrder.map(
+    (lensKey, index) =>
+      requireString(
+        lensKey,
+        `preferredLensOrder[${index}]`,
+        256,
+      ),
   );
 
-  if (
-    preferredLensOrder.length !== input.preferredLensOrder.length ||
-    preferredLensOrder.some(
-      (value, index) => value !== [...input.preferredLensOrder].sort()[index],
-    )
-  ) {
-    fail('preferredLensOrder must be unique and preserve its authored order.');
+  if (new Set(preferredLensOrder).size !== preferredLensOrder.length) {
+    fail('preferredLensOrder must not contain duplicate lens keys.');
   }
 
   const byLens = new Map(
