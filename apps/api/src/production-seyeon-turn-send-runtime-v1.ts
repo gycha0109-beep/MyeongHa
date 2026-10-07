@@ -81,13 +81,39 @@ export async function resolveProductionSeyeonProviderConfigAtRequestV1(
         team: SEYEON_PRODUCTION_PROVIDER_ROUTING_V1.vercelTeam,
       })
     ).trim();
-  } catch {
+  } catch (error) {
+    console.error(
+      'MYEONGHA_SEYEON_PROVIDER_DIAGNOSTIC ' +
+      JSON.stringify({
+        schemaVersion: 'myeongha-seyeon-provider-diagnostic-v1',
+        stage: 'oidc_resolution',
+        outcome: 'failure',
+        errorName: error instanceof Error ? error.name : 'UnknownError',
+      }),
+    );
     return failClosedProviderConfig();
   }
 
   if (vercelOidcToken.length === 0) {
+    console.error(
+      'MYEONGHA_SEYEON_PROVIDER_DIAGNOSTIC ' +
+      JSON.stringify({
+        schemaVersion: 'myeongha-seyeon-provider-diagnostic-v1',
+        stage: 'oidc_resolution',
+        outcome: 'empty',
+      }),
+    );
     return failClosedProviderConfig();
   }
+
+  console.error(
+    'MYEONGHA_SEYEON_PROVIDER_DIAGNOSTIC ' +
+    JSON.stringify({
+      schemaVersion: 'myeongha-seyeon-provider-diagnostic-v1',
+      stage: 'oidc_resolution',
+      outcome: 'success',
+    }),
+  );
 
   return Object.freeze({
     apiKey: vercelOidcToken,
