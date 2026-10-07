@@ -54,7 +54,7 @@ expect_failure() {
   echo "PASS ${label}"
 }
 
-replacement='${PAYLOAD/character_face_governed_reading_artifact_dbtest/character_face_governed_reading_artifact_replacement}'
+replacement="${PAYLOAD/character_face_governed_reading_artifact_dbtest/character_face_governed_reading_artifact_replacement}"
 expect_failure "same-turn replacement" "character_face_governed_artifact_replay_conflict" "
 begin; set local role myeongha_api_executor;
 select * from public.begin_member_subject_context_v1('${AUTH}');
