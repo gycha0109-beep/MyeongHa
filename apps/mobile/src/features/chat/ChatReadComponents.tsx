@@ -25,12 +25,13 @@ export function ChatReadHeader({
     ? null
     : resolveMobileChatCharacterPresentationV1(character.characterId);
   const displayName = character?.displayName ?? '대화 상대';
+  const isSeyeonTheme = snapshot.characterId === 'seyeon';
   const meta = presentation === null
     ? '서버가 확인한 기존 대화 · 읽기 전용'
     : `${presentation.title} · 서버가 확인한 기존 대화 · 읽기 전용`;
 
   return (
-    <View style={styles.headerCard}>
+    <View style={[styles.headerCard, isSeyeonTheme && styles.seyeonSurface]}>
       <View style={styles.avatar}>
         <Text style={styles.avatarText}>
           {character === null ? '明' : displayName.slice(0, 1)}
@@ -49,9 +50,10 @@ export function ChatReadMessages({
 }: {
   snapshot: MobileChatThreadSnapshotV1;
 }) {
+  const isSeyeonTheme = snapshot.characterId === 'seyeon';
   if (snapshot.status === 'loading_initial' || snapshot.status === 'idle') {
     return (
-      <View style={styles.stateCard}>
+      <View style={[styles.stateCard, isSeyeonTheme && styles.seyeonSurface]}>
         <ActivityIndicator color={mobileColors.navy} />
         <Text style={styles.stateText}>대화 기록을 불러오는 중입니다…</Text>
       </View>
@@ -60,7 +62,7 @@ export function ChatReadMessages({
 
   if (snapshot.status === 'error' && snapshot.messages.length === 0) {
     return (
-      <View style={styles.stateCard}>
+      <View style={[styles.stateCard, isSeyeonTheme && styles.seyeonSurface]}>
         <Text style={styles.errorTitle}>대화를 불러오지 못했습니다</Text>
         <Text style={styles.stateText}>
           이 대화가 현재 계정에 속하지 않거나 더 이상 사용할 수 없을 수 있습니다.
@@ -71,7 +73,7 @@ export function ChatReadMessages({
 
   if (snapshot.messages.length === 0) {
     return (
-      <View style={styles.stateCard}>
+      <View style={[styles.stateCard, isSeyeonTheme && styles.seyeonSurface]}>
         <Text style={styles.emptyMark}>◇</Text>
         <Text style={styles.errorTitle}>아직 표시할 메시지가 없습니다</Text>
       </View>
@@ -130,7 +132,7 @@ export function ChatReadMore({
       accessibilityRole="button"
       disabled={snapshot.status === 'loading_more'}
       onPress={onLoadMore}
-      style={styles.loadMore}
+      style={[styles.loadMore, snapshot.characterId === 'seyeon' && styles.seyeonSurface]}
     >
       {snapshot.status === 'loading_more' ? (
         <ActivityIndicator color={mobileColors.navy} />
@@ -141,9 +143,9 @@ export function ChatReadMore({
   );
 }
 
-export function ChatSendPending() {
+export function ChatSendPending({ themed = false }: { themed?: boolean }) {
   return (
-    <View style={styles.pendingCard}>
+    <View style={[styles.pendingCard, themed && styles.seyeonSurface]}>
       <Text style={styles.pendingTitle}>메시지 보내기는 아직 열리지 않았습니다</Text>
       <Text style={styles.stateText}>
         현재 모바일에서는 서버가 확인한 기존 대화 기록만 읽을 수 있습니다.
@@ -174,6 +176,14 @@ const styles = StyleSheet.create({
     borderColor: mobileColors.gold,
   },
   avatarText: { color: mobileColors.navy, fontSize: 20, fontWeight: '900' },
+  seyeonSurface: {
+    backgroundColor: 'rgba(255, 250, 242, 0.90)',
+    borderColor: 'rgba(181, 132, 94, 0.24)',
+  },
+  seyeonBubble: {
+    backgroundColor: 'rgba(255, 252, 246, 0.92)',
+    borderColor: 'rgba(181, 132, 94, 0.20)',
+  },
   headerCopy: { flex: 1, gap: 3 },
   headerTitle: { color: mobileColors.ink, fontSize: 18, fontWeight: '800' },
   headerMeta: { color: mobileColors.muted, fontSize: 12, lineHeight: 18 },
