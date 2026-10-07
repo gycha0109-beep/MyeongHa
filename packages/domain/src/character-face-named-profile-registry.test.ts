@@ -155,6 +155,7 @@ describe('TOPIC-FACE-005I-B named Character Face profiles', () => {
         authoringSource: bundle.authoringSource,
         faceProfileVersion: SEYEON_FACE_PROFILE_VERSION_V1,
         capability: bundle.capability,
+        governedCapability: bundle.governedCapability,
         perspective: bundle.perspective,
         delivery: {
           ...bundle.delivery,
