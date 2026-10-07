@@ -151,7 +151,7 @@ for (const entry of disposition.tableDispositions) {
   }
 }
 if (!sameJson(counts, { DELETE: 45, ANONYMIZE: 4, RETAIN: 9 })) {
-  fail('approved 39/4/9 disposition split drifted: ' + JSON.stringify(counts));
+  fail('approved 45/4/9 disposition split drifted: ' + JSON.stringify(counts));
 }
 
 for (const resolution of disposition.edgeConflictResolutions) {

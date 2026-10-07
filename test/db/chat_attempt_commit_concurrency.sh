@@ -305,20 +305,7 @@ commit_result="$("${PSQL[@]}" -At -F '|' -c "select turn_id,attempt_id,message_i
   'a6000000-0000-0000-0000-000000000001',
   'a8000000-0000-0000-0000-000000000001',
   'a9000000-0000-0000-0000-000000000001',
-  jsonb_build_object(
-    'id','ab000000-0000-0000-0000-000000000001',
-    'characterId','chat-commit-char',
-    'eventType','RETURN_VISIT',
-    'eventSchemaVersion','v1',
-    'eventDedupeKey','happy-relationship',
-    'expectedRevision',0,
-    'deltaCloseness',1,
-    'deltaTrust',2,
-    'deltaFriction',0,
-    'relationshipStage','familiar',
-    'policyVersion','relationship-policy-v1',
-    'payload',jsonb_build_object('source','test-policy')
-  ),
+  null,
   jsonb_build_object(
     'id','ac000000-0000-0000-0000-000000000001',
     'eventType','CHAT_SCENE_COMPLETED',
@@ -355,12 +342,12 @@ happy_shape="$("${PSQL[@]}" -At -F '|' -c "select
   (select count(*) from public.record_access_grants where memory_item_id='ad000000-0000-0000-0000-000000000001' and revoked_at is null),
   (select status from public.memory_proposals where id='aa000000-0000-0000-0000-000000000001'),
   (select count(*) from public.outbox_events where id='a9000000-0000-0000-0000-000000000001');")"
-expected_happy='committed|committed|a8000000-0000-0000-0000-000000000001|1|1|11|22|1|1|1|1|accepted|1'
+expected_happy='committed|committed|a8000000-0000-0000-0000-000000000001|1|0|10|20|0|1|1|1|accepted|1'
 if [[ "${happy_shape}" != "${expected_happy}" ]]; then
   echo "FAIL happy atomic side-effect shape: ${happy_shape}" >&2
   exit 23
 fi
-echo "PASS assistant message + relationship + world + accepted memory + explicit grant + outbox committed atomically"
+echo "PASS assistant message + world + accepted memory + explicit grant + outbox commit while legacy relationship mutation stays absent"
 
 replay_result="$("${PSQL[@]}" -At -F '|' -c "select turn_id,attempt_id,message_id,sequence_no,replayed from public.cmd_commit_chat_turn_v1(
   'a0000000-0000-0000-0000-000000000001',
@@ -382,7 +369,7 @@ replay_counts="$("${PSQL[@]}" -At -F '|' -c "select
   (select count(*) from public.world_events where source_turn_id='a4000000-0000-0000-0000-000000000001'),
   (select count(*) from public.memory_items where id='ad000000-0000-0000-0000-000000000001'),
   (select count(*) from public.outbox_events where aggregate_type='chat_turn' and aggregate_id='a4000000-0000-0000-0000-000000000001');")"
-if [[ "${replay_counts}" != '1|1|1|1|1' ]]; then
+if [[ "${replay_counts}" != '1|0|1|1|1' ]]; then
   echo "FAIL committed replay duplicated side effects: ${replay_counts}" >&2
   exit 25
 fi
