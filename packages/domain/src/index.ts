@@ -501,3 +501,16 @@ export {
   type CharacterFaceGovernedFinalRendererDraftV1,
   type CharacterFaceGovernedFollowUpV1,
 } from './character-face-governed-final-output.js';
+
+
+export {
+  CHARACTER_FACE_GOVERNED_ARTIFACT_BUILDER_VERSION_V1,
+  CHARACTER_FACE_GOVERNED_READING_ARTIFACT_SCHEMA_VERSION_V1,
+  assertCharacterFaceGovernedReadingArtifactCandidateIntegrityV1,
+  buildCharacterFaceGovernedReadingArtifactCandidateV1,
+  computeCharacterFaceGovernedReadingArtifactIdV1,
+  hashCharacterFaceGovernedFinalOutputV1,
+  hashCharacterFaceGovernedReadingArtifactV1,
+  type CharacterFaceGovernedReadingArtifactBuildDecisionV1,
+  type CharacterFaceGovernedReadingArtifactCandidateV1,
+} from './character-face-governed-reading-artifact.js';
