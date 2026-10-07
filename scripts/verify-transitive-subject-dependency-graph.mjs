@@ -42,7 +42,7 @@ if (!Array.isArray(graph.edges) || graph.edges.length !== 140) {
   fail('expected exactly 140 reachable FK edges');
 }
 
-const expectedDepthCounts = { '1': 30, '2': 47, '3': 58, '4': 5 };
+const expectedDepthCounts = { '1': 30, '2': 47, '3': 59, '4': 4 };
 if (
   graph.discovery?.edgeCount !== 140 ||
   graph.discovery?.distinctReachableTableCount !== 59 ||
@@ -135,8 +135,8 @@ for (const fragment of [
   'maximum minimum depth      = 4',
   'depth 1 = 30',
   'depth 2 = 47',
-  'depth 3 = 58',
-  'depth 4 = 5',
+  'depth 3 = 59',
+  'depth 4 = 4',
   'disposition = UNDECIDED',
 ]) {
   if (!doc.includes(fragment)) fail('documentation boundary missing: ' + fragment);
@@ -162,5 +162,5 @@ for (const fragment of [
 }
 
 console.log(
-  'Transitive Subject dependency graph historical coverage PASS: 140 reachable FK edges across 59 tables, depths 30/47/58/5, exact depth-1 parity with #1063; schema graph stays policy-neutral while approved dispositions live separately.',
+  'Transitive Subject dependency graph historical coverage PASS: 140 reachable FK edges across 59 tables, depths 30/47/59/4, exact depth-1 parity with #1063; schema graph stays policy-neutral while approved dispositions live separately.',
 );
