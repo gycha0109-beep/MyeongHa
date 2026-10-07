@@ -31,6 +31,9 @@ import {
   createProductionSajuGovernedFaceHandoffTransportV1,
 } from './production-saju-governed-face-handoff-transport.js';
 import {
+  createProductionGovernedFaceVerticalRuntimeV1,
+} from './production-governed-face-vertical-runtime-v1.js';
+import {
   SAJU_GOVERNED_FACE_HANDOFF_ADMISSION_HEADER_V1,
   SAJU_GOVERNED_FACE_HANDOFF_RUNTIME_SCHEMA_VERSION_V1,
 } from './saju-governed-face-handoff-http-adapter.js';
@@ -638,6 +641,115 @@ describe(
         expect(
           commitPort.commits,
         ).toBe(1);
+      },
+    );
+
+    it(
+      'runs the production composition root through the PostgreSQL durable adapter',
+      async () => {
+        let databaseCalls = 0;
+
+        const runtime =
+          createProductionGovernedFaceVerticalRuntimeV1({
+            sajuEnv: {
+              MYEONGHA_SAJU_SERVICE_ORIGIN:
+                'https://saju.example.test',
+              MYEONGHA_SAJU_SERVICE_BEARER:
+                'service-secret',
+            },
+            sajuFetchImpl:
+              async () =>
+                response(
+                  eligibleEnvelope(),
+                ),
+            databaseClient: {
+              async query(
+                _sql: string,
+                values?: readonly unknown[],
+              ) {
+                databaseCalls += 1;
+                if (
+                  values === undefined ||
+                  values.length < 15
+                ) {
+                  throw new Error(
+                    'expected governed durable commit parameters',
+                  );
+                }
+                return {
+                  rows: [
+                    {
+                      receiptId:
+                        values[3],
+                      turnId:
+                        values[1],
+                      attemptId:
+                        values[2],
+                      artifactId:
+                        values[5],
+                      artifactHash:
+                        values[6],
+                      characterId:
+                        values[7],
+                      sourceResultHash:
+                        values[8],
+                      authorizationReceiptRef:
+                        values[9],
+                      faceBundleHash:
+                        values[10],
+                      handoffHash:
+                        values[11],
+                      readingPlanRef:
+                        values[12],
+                      finalOutputHash:
+                        values[13],
+                      artifactJsonb:
+                        values[14],
+                      createdAt:
+                        '2026-10-08T00:00:00.000Z',
+                      replayed:
+                        false,
+                    },
+                  ],
+                };
+              },
+            },
+            baseRuntimeProvider: {
+              async resolve() {
+                return baseContext();
+              },
+            },
+            presentationProvider: {
+              async render() {
+                return {
+                  schemaVersion:
+                    'v1',
+                  emotion:
+                    'neutral',
+                  animationCue:
+                    'idle',
+                  suggestedActions: [],
+                };
+              },
+            },
+          });
+
+        const result =
+          await runtime.run({
+            subjectId:
+              '00000000-0000-4000-8000-000000000051',
+            turnId:
+              '00000000-0000-4000-8000-000000000052',
+            attemptId:
+              '00000000-0000-4000-8000-000000000053',
+            sourceRequest:
+              SOURCE_REQUEST,
+          });
+
+        expect(result.status).toBe(
+          'delivered',
+        );
+        expect(databaseCalls).toBe(1);
       },
     );
 
