@@ -13,3 +13,8 @@ export * from './immutable-authoring-v1.js';
 export * from './content-candidate-assembler-v1.js';
 export * from './publication-readiness-v1.js';
 export * from './production-character-lane-v1.js';
+
+export * from './character-disclosure-policy-v1.js';
+export * from './character-fact-authority-v1.js';
+export * from './seyeon-authored-projection-v2.js';
+export * from './seyeon-fact-authority-v1.js';
