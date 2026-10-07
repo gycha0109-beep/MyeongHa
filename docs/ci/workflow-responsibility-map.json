@@ -314,6 +314,12 @@
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "commit-metadata"
     },
+    "seyeon-production-publication-v1.yml": {
+      "responsibility": "production-character-publication",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
     "supabase-production.yml": {
       "responsibility": "production-db-deployment",
       "prMode": "none",
