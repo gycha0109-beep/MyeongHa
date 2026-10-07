@@ -1,6 +1,6 @@
 {
   "schemaVersion": "seyeon-publication-package-proposal-v1",
-  "authorityState": "proposal_not_approved",
+  "authorityState": "approved_by_product_owner",
   "characterId": "seyeon",
   "sourceAuthority": {
     "runtimeDecision": "docs/source-authority-decisions/SEYEON_BIBLE_RUNTIME_V0_2_V0_1_APPROVAL.md",
@@ -61,5 +61,6 @@
     "default_release_replacement",
     "public_member_exposure",
     "residence_canon"
-  ]
+  ],
+  "productOwnerApprovalDate": "2026-10-07"
 }
