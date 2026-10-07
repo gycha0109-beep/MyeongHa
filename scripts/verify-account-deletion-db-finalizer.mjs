@@ -120,7 +120,11 @@ if (!/create\s+or\s+replace\s+function\s+public\.internal_finalize_account_delet
   fail('DB finalizer must be SECURITY DEFINER so trigger exceptions are owner-bound');
 }
 const ownerBoundGuardCount = migration.split('pg_catalog.pg_get_userbyid(p.proowner)').length - 1;
-const finalizerSubjectGuardCount = migration.split("pg_catalog.current_setting('myeongha.account_deletion_finalizer_subject_id', true)").length - 1;
+const finalizerSubjectGuardCount = (
+  migration.match(
+    /pg_catalog\.current_setting\(\s*'myeongha\.account_deletion_finalizer_subject_id',\s*true\s*\)/g,
+  ) ?? []
+).length;
 if (ownerBoundGuardCount !== 9 || finalizerSubjectGuardCount !== 9) {
   fail(
     'expected 9 inline owner-bound immutable-trigger guards, found owner=' +
