@@ -19,10 +19,6 @@
     },
     "api/readiness.ts": {
       "supportsCancellation": true
-    },
-    "api/me.ts": {
-      "supportsCancellation": true,
-      "maxDuration": 60
     }
   },
   "redirects": [

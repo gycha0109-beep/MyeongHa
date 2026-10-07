@@ -14,6 +14,8 @@ import {
 } from '../apps/api/src/production-records-read-runtime.js';
 import { parseProductionUserDataRuntimeConfigV1 } from '../apps/api/src/production-user-data-runtime-config.js';
 
+export const config = Object.freeze({ maxDuration: 60 });
+
 const PROFILE_ROUTE = '/api/me' as const;
 const LIFE_RECORD_ROUTE = '/api/life-record' as const;
 const READINGS_ROUTE = '/api/readings' as const;
