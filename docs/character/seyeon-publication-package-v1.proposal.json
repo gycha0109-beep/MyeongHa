@@ -1,0 +1,65 @@
+{
+  "schemaVersion": "seyeon-publication-package-proposal-v1",
+  "authorityState": "proposal_not_approved",
+  "characterId": "seyeon",
+  "sourceAuthority": {
+    "runtimeDecision": "docs/source-authority-decisions/SEYEON_BIBLE_RUNTIME_V0_2_V0_1_APPROVAL.md",
+    "themeDecision": "docs/source-authority-decisions/SEYEON_CHAT_THEME_V1_APPROVAL.md",
+    "themeManifest": "docs/character/seyeon-chat-theme-v1.manifest.json"
+  },
+  "publicationMaterialProposal": {
+    "assetRefs": [
+      "apps/web/assets/characters/seyeon-portrait-v2.webp",
+      "apps/web/assets/characters/chat-themes/seyeon-chat-theme-web-v1.webp",
+      "apps/mobile/assets/characters/chat-themes/seyeon-chat-theme-mobile-v1.webp"
+    ],
+    "emotionIds": [
+      "neutral"
+    ],
+    "animationCueIds": [
+      "static"
+    ]
+  },
+  "bundleMetadataProposal": {
+    "cueSchemaVersion": "character-static-presentation-v1",
+    "minClientCapability": "character-chat-theme-v1",
+    "assetManifestHash": "sha256:v1:ca769bd9b211e5d04f64128fea1fb2e3d1eca3f91d2d34c6fe14f39b62591a4d"
+  },
+  "assetManifest": {
+    "schemaVersion": "seyeon-static-presentation-manifest-v1",
+    "characterId": "seyeon",
+    "assets": [
+      {
+        "role": "portrait",
+        "assetRef": "apps/web/assets/characters/seyeon-portrait-v2.webp",
+        "sha256": "d26c12da27f22c9877ea077b31810ed84ec1c14ece7778b410ff02fb5e4ee6c9"
+      },
+      {
+        "role": "chat_theme_web",
+        "assetRef": "apps/web/assets/characters/chat-themes/seyeon-chat-theme-web-v1.webp",
+        "sha256": "a48c2e7cd2df1b63c9c81fd097cb65ef304af653b8a68f027bfec438470fab52"
+      },
+      {
+        "role": "chat_theme_mobile",
+        "assetRef": "apps/mobile/assets/characters/chat-themes/seyeon-chat-theme-mobile-v1.webp",
+        "sha256": "ba545f917394884502c5bc435df544296ea36a5c35319f52e01b7c2131906f4a"
+      }
+    ],
+    "emotionIds": [
+      "neutral"
+    ],
+    "animationCueIds": [
+      "static"
+    ],
+    "cueSchemaVersion": "character-static-presentation-v1",
+    "minClientCapability": "character-chat-theme-v1"
+  },
+  "explicitNonAuthority": [
+    "production_publication",
+    "content_bundle_id",
+    "content_release_id",
+    "default_release_replacement",
+    "public_member_exposure",
+    "residence_canon"
+  ]
+}
