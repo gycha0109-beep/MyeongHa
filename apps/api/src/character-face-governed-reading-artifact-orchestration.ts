@@ -116,7 +116,9 @@ function assertCommittedRevealBinding(
     input.receipt.handoffHash !==
       input.artifact.handoffHash ||
     input.receipt.readingPlanRef !==
-      input.artifact.readingPlanRef
+      input.artifact.readingPlanRef ||
+    input.receipt.finalOutputHash !==
+      input.artifact.finalOutputHash
   ) {
     throw new CharacterFaceGovernedControlledRevealErrorV1(
       'deliver',
