@@ -37,7 +37,7 @@ export default function ChatHubScreen() {
         <Text style={styles.kicker}>MEET</Text>
         <Text style={styles.title}>대화 상대 선택</Text>
         <Text style={styles.body}>
-          승인된 출시 9명의 ID와 공식 이름만 표시합니다. 실제 사용 가능 여부와 대화방 생성·재사용은 서버가 결정합니다.
+          승인된 출시 9명을 한눈에 보고 대화 상대를 고를 수 있습니다. 실제 사용 가능 여부와 대화방 생성·재사용은 서버가 결정합니다.
         </Text>
 
         {state.access === 'checking' ? (
@@ -74,9 +74,24 @@ export default function ChatHubScreen() {
                   style={[styles.characterRow, disabled && styles.disabled]}
                 >
                   <View style={styles.characterMark}>
-                    <Text style={styles.characterMarkText}>明</Text>
+                    <Text style={styles.characterMarkText}>
+                      {character.displayName.slice(0, 1)}
+                    </Text>
                   </View>
-                  <Text style={styles.characterName}>{character.displayName}</Text>
+                  <View style={styles.characterCopy}>
+                    <View style={styles.characterTitleRow}>
+                      <Text style={styles.characterName}>{character.displayName}</Text>
+                      <Text style={styles.characterTitle}>{character.title}</Text>
+                    </View>
+                    <Text style={styles.characterLine}>{character.openingLine}</Text>
+                    <View style={styles.characterTags}>
+                      {character.tags.map((tag) => (
+                        <View key={tag} style={styles.characterTag}>
+                          <Text style={styles.characterTagText}>{tag}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
                   <Text style={styles.characterAction}>
                     {opening ? '여는 중…' : '대화 열기'}
                   </Text>
@@ -124,31 +139,46 @@ const styles = StyleSheet.create({
     backgroundColor: mobileColors.navy,
   },
   loginActionText: { color: mobileColors.surface, fontSize: 13, fontWeight: '800' },
-  roster: { gap: 8, paddingTop: 2 },
+  roster: { gap: 10, paddingTop: 2 },
   characterRow: {
-    minHeight: 54,
+    minHeight: 116,
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 11,
+    alignItems: 'flex-start',
+    gap: 12,
     borderWidth: 1,
     borderColor: mobileColors.border,
-    borderRadius: 14,
-    paddingHorizontal: 12,
+    borderRadius: 16,
+    padding: 14,
     backgroundColor: mobileColors.canvas,
   },
   disabled: { opacity: 0.55 },
   characterMark: {
-    width: 32,
-    height: 32,
+    width: 40,
+    height: 40,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: mobileColors.gold,
-    borderRadius: 16,
+    borderRadius: 20,
+    backgroundColor: mobileColors.surface,
   },
-  characterMarkText: { color: mobileColors.navy, fontSize: 13, fontWeight: '900' },
-  characterName: { flex: 1, color: mobileColors.ink, fontSize: 15, fontWeight: '800' },
-  characterAction: { color: mobileColors.navy, fontSize: 12, fontWeight: '800' },
+  characterMarkText: { color: mobileColors.navy, fontSize: 16, fontWeight: '900' },
+  characterCopy: { flex: 1, gap: 6 },
+  characterTitleRow: { flexDirection: 'row', alignItems: 'baseline', gap: 8 },
+  characterName: { color: mobileColors.ink, fontSize: 16, fontWeight: '900' },
+  characterTitle: { color: mobileColors.muted, fontSize: 11, fontWeight: '700' },
+  characterLine: { color: mobileColors.ink, fontSize: 13, lineHeight: 19 },
+  characterTags: { flexDirection: 'row', flexWrap: 'wrap', gap: 5 },
+  characterTag: {
+    borderWidth: 1,
+    borderColor: mobileColors.border,
+    borderRadius: 999,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    backgroundColor: mobileColors.surface,
+  },
+  characterTagText: { color: mobileColors.muted, fontSize: 10, fontWeight: '700' },
+  characterAction: { color: mobileColors.navy, fontSize: 11, fontWeight: '800', paddingTop: 3 },
   errorText: { color: mobileColors.seal, fontSize: 12, lineHeight: 18 },
   memoryNote: {
     flexDirection: 'row',
