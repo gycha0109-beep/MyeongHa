@@ -47,7 +47,7 @@ jobs:
           else
             [[ "${{ github.ref }}" == 'refs/heads/main' ]]
             trigger_value="$(tr -d '\r\n' < .github/seyeon-production-publication-v1.trigger)"
-            [[ "$trigger_value" == 'fire-2026-10-07-v1' ]]
+            [[ "$trigger_value" == 'fire-2026-10-07-v2' ]]
           fi
           test -n "${SUPABASE_PRODUCTION_SESSION_POOLER_HOST:-}"
           test -n "${SUPABASE_DB_PASSWORD:-}"

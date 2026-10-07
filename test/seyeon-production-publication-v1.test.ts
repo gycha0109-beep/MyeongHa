@@ -30,8 +30,10 @@ describe('Seyeon Production publication v1', () => {
     expect(source).toContain('cmd_create_content_release_v1');
     expect(source).toContain('cmd_activate_content_release_v1');
     expect(source).toContain('is distinct from row(0::bigint, 0::bigint, 0::bigint, 0::bigint)');
-    expect(source).toContain('grant myeongha_content_operator to postgres');
-    expect(source).toContain('revoke myeongha_content_operator from postgres');
+    expect(source).toContain('grant myeongha_content_operator to postgres with set true');
+    expect(source).toContain('grant myeongha_content_operator to postgres with set false');
+    expect(source).toContain("pg_has_role('postgres', 'myeongha_content_operator', 'SET')");
+    expect(source).not.toContain('revoke myeongha_content_operator from postgres');
     expect(source).toContain("'seyeon' and enabled = true and availability = 'available'");
   });
 
