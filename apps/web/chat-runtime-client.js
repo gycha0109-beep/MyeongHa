@@ -33,6 +33,7 @@ const chatIntro = document.querySelector('[data-chat-intro]');
 const messageInput = document.querySelector('[data-message-input]');
 const composer = document.querySelector('[data-composer]');
 let openingThread = false;
+let sendingTurn = false;
 let authoritativeCharacterId = null;
 
 function setComposeStatus(message) {
@@ -50,16 +51,78 @@ function pendingDraftKey(targetThreadId) {
   return `myeongha:chat:pending-draft:${targetThreadId}`;
 }
 
+function pendingTurnKey(targetThreadId) {
+  return `myeongha:chat:pending-turn:v1:${targetThreadId}`;
+}
+
+function readPendingTurn(targetThreadId) {
+  if (!targetThreadId) return null;
+  const raw = sessionStorage.getItem(pendingTurnKey(targetThreadId));
+  if (typeof raw !== 'string' || raw.length === 0) return null;
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (
+      !parsed ||
+      typeof parsed !== 'object' ||
+      typeof parsed.clientTurnId !== 'string' ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(parsed.clientTurnId) ||
+      typeof parsed.text !== 'string' ||
+      parsed.text.trim().length === 0 ||
+      parsed.text.length > 8000
+    ) {
+      sessionStorage.removeItem(pendingTurnKey(targetThreadId));
+      return null;
+    }
+    return Object.freeze({
+      clientTurnId: parsed.clientTurnId,
+      text: parsed.text,
+    });
+  } catch {
+    sessionStorage.removeItem(pendingTurnKey(targetThreadId));
+    return null;
+  }
+}
+
+function getOrCreatePendingTurn(message) {
+  const existing = readPendingTurn(threadId);
+  if (existing?.text === message) return existing;
+
+  const pendingTurn = Object.freeze({
+    clientTurnId: crypto.randomUUID(),
+    text: message,
+  });
+  sessionStorage.setItem(pendingTurnKey(threadId), JSON.stringify(pendingTurn));
+  return pendingTurn;
+}
+
+function clearPendingTurn(clientTurnId) {
+  const existing = readPendingTurn(threadId);
+  if (existing?.clientTurnId !== clientTurnId) return;
+  sessionStorage.removeItem(pendingTurnKey(threadId));
+}
+
 function restorePendingDraft() {
   if (!threadId || !(messageInput instanceof HTMLTextAreaElement)) return;
-  const key = pendingDraftKey(threadId);
-  const draft = sessionStorage.getItem(key);
+
+  const draftKey = pendingDraftKey(threadId);
+  const openDraft = sessionStorage.getItem(draftKey);
+  const pendingTurn = readPendingTurn(threadId);
+  const draft = typeof openDraft === 'string' && openDraft.trim().length > 0
+    ? openDraft
+    : pendingTurn?.text ?? null;
+
   if (typeof draft !== 'string' || draft.trim().length === 0) return;
+
   messageInput.value = draft;
-  sessionStorage.removeItem(key);
+  if (openDraft === draft) sessionStorage.removeItem(draftKey);
   messageInput.style.height = 'auto';
   messageInput.style.height = `${Math.min(messageInput.scrollHeight, 120)}px`;
-  setComposeStatus('대화방 연결은 완료되었습니다. 입력한 문장은 보존했습니다.');
+  setComposeStatus(
+    pendingTurn?.text === draft
+      ? '완료되지 않은 전송 문장을 복원했습니다. 다시 보내면 같은 요청으로 이어집니다.'
+      : '대화방 연결은 완료되었습니다. 입력한 문장은 보존했습니다.',
+  );
 }
 
 function chatOpenFailureMessage(error) {
@@ -348,12 +411,14 @@ async function loadRoomState() {
       characterId,
       messages: Object.freeze(messages),
     }));
+    return true;
   } catch {
     if (historyEmpty) {
       historyEmpty.hidden = false;
       historyEmpty.textContent = '현재 지난 대화를 불러올 수 없습니다.';
     }
     setComposeStatus('현재 대화 기록 연결을 사용할 수 없습니다.');
+    return false;
   }
 }
 
@@ -363,16 +428,18 @@ async function sendTurn(message) {
     return;
   }
 
-  const activeBearer = await getActiveBearer();
-  if (!activeBearer || activeBearer.kind !== 'member') {
-    setComposeStatus('세연과 실제 대화를 하려면 회원 로그인이 필요합니다.');
-    return;
-  }
+  if (sendingTurn) return;
 
+  sendingTurn = true;
   setComposerBusy(true);
   setComposeStatus('세연이 답하고 있습니다…');
+  const pendingTurn = getOrCreatePendingTurn(message);
 
   try {
+    const activeBearer = await getActiveBearer();
+    if (!activeBearer || activeBearer.kind !== 'member') {
+      throw new Error('MEMBER_REQUIRED');
+    }
     const response = await fetch(
       `/api/chat/${encodeURIComponent(threadId)}/turns`,
       {
@@ -385,8 +452,8 @@ async function sendTurn(message) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          clientTurnId: crypto.randomUUID(),
-          text: message,
+          clientTurnId: pendingTurn.clientTurnId,
+          text: pendingTurn.text,
         }),
       },
     );
@@ -408,7 +475,10 @@ async function sendTurn(message) {
       if (code === 'CONTENT_INCOMPATIBLE') throw new Error('CONTENT_INCOMPATIBLE');
       if (code === 'CAPABILITY_UNAVAILABLE') throw new Error('CAPABILITY_UNAVAILABLE');
       if (code === 'TURN_IN_FLIGHT') throw new Error('TURN_IN_FLIGHT');
-      if (code === 'IDEMPOTENCY_CONFLICT') throw new Error('IDEMPOTENCY_CONFLICT');
+      if (code === 'IDEMPOTENCY_CONFLICT') {
+        clearPendingTurn(pendingTurn.clientTurnId);
+        throw new Error('IDEMPOTENCY_CONFLICT');
+      }
       if (code === 'AI_TEMPORARILY_UNAVAILABLE') throw new Error('AI_TEMPORARILY_UNAVAILABLE');
       if (response.status === 403) throw new Error('MEMBER_REQUIRED');
       throw new Error('TURN_SEND_FAILED');
@@ -416,8 +486,10 @@ async function sendTurn(message) {
 
     const { unwrapApiSuccessEnvelope } = await apiEnvelopePromise;
     unwrapApiSuccessEnvelope(envelope);
-    await loadRoomState();
+    const rereadSucceeded = await loadRoomState();
+    if (!rereadSucceeded) throw new Error('AUTHORITATIVE_REREAD_FAILED');
 
+    clearPendingTurn(pendingTurn.clientTurnId);
     if (messageInput instanceof HTMLTextAreaElement) {
       messageInput.value = '';
       messageInput.style.height = 'auto';
@@ -435,12 +507,14 @@ async function sendTurn(message) {
       AI_TEMPORARILY_UNAVAILABLE: '세연의 답변 생성이 잠시 지연되고 있습니다. 다시 시도해 주세요.',
       INVALID_RESPONSE: '대화 서버 응답을 확인할 수 없습니다.',
       TURN_SEND_FAILED: '메시지를 보내지 못했습니다. 입력한 내용은 그대로 남아 있습니다.',
+      AUTHORITATIVE_REREAD_FAILED: '전송 결과를 다시 확인하지 못했습니다. 같은 문장으로 다시 보내면 중복 생성 없이 확인을 이어갑니다.',
     };
     setComposeStatus(
       messageByCode[code] ??
       '메시지를 보내지 못했습니다. 입력한 내용은 그대로 남아 있습니다.',
     );
   } finally {
+    sendingTurn = false;
     setComposerBusy(false);
   }
 }
