@@ -6,13 +6,14 @@ function fail(message) {
   throw new Error('Account deletion DB finalizer verifier rejected: ' + message);
 }
 
-const [baseMigration, readerAccessSyncMigration, policyText, finalPolicyText] = await Promise.all([
+const [baseMigration, readerAccessSyncMigration, relationshipRuntimeSyncMigration, policyText, finalPolicyText] = await Promise.all([
   readFile('supabase/migrations/1171_account_deletion_db_finalizer.sql', 'utf8'),
   readFile('supabase/migrations/1230_account_deletion_finalizer_reader_access_sync.sql', 'utf8'),
+  readFile('supabase/migrations/1520_account_deletion_finalizer_relationship_runtime_sync.sql', 'utf8'),
   readFile('docs/operations/ACCOUNT_DELETION_DISPOSITION_POLICY_V1.json', 'utf8'),
   readFile('docs/operations/ACCOUNT_DELETION_FINALIZATION_POLICY_V1.json', 'utf8'),
 ]);
-const migration = baseMigration + '\n' + readerAccessSyncMigration;
+const migration = baseMigration + '\n' + readerAccessSyncMigration + '\n' + relationshipRuntimeSyncMigration;
 
 const policy = JSON.parse(policyText);
 const finalPolicy = JSON.parse(finalPolicyText);
@@ -30,7 +31,7 @@ const expectedRetain = policy.tableDispositions
   .map((entry) => entry.table)
   .sort();
 
-if (expectedDelete.length !== 39 || expectedAnonymize.length !== 4 || expectedRetain.length !== 9) {
+if (expectedDelete.length !== 45 || expectedAnonymize.length !== 4 || expectedRetain.length !== 9) {
   fail('approved disposition cardinality drifted');
 }
 

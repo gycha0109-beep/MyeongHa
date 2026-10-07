@@ -6,8 +6,8 @@
   "executionAuthorized": false,
   "graphRef": {
     "schema": "myeongha-transitive-subject-dependency-graph-v1",
-    "edgeCount": 125,
-    "distinctReachableTableCount": 52,
+    "edgeCount": 138,
+    "distinctReachableTableCount": 58,
     "maxDepth": 4
   },
   "tableDispositions": [
@@ -246,7 +246,43 @@
       "retentionDurationDays": null
     },
     {
+      "table": "relationship_event_adjustments",
+      "disposition": "UNDECIDED",
+      "authorityReference": null,
+      "retentionDurationDays": null
+    },
+    {
+      "table": "relationship_event_links",
+      "disposition": "UNDECIDED",
+      "authorityReference": null,
+      "retentionDurationDays": null
+    },
+    {
+      "table": "relationship_event_provenance_refs",
+      "disposition": "UNDECIDED",
+      "authorityReference": null,
+      "retentionDurationDays": null
+    },
+    {
+      "table": "relationship_event_records",
+      "disposition": "UNDECIDED",
+      "authorityReference": null,
+      "retentionDurationDays": null
+    },
+    {
       "table": "relationship_events",
+      "disposition": "UNDECIDED",
+      "authorityReference": null,
+      "retentionDurationDays": null
+    },
+    {
+      "table": "relationship_history_entries",
+      "disposition": "UNDECIDED",
+      "authorityReference": null,
+      "retentionDurationDays": null
+    },
+    {
+      "table": "relationship_state_snapshots",
       "disposition": "UNDECIDED",
       "authorityReference": null,
       "retentionDurationDays": null
