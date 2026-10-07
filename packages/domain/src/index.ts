@@ -480,3 +480,24 @@ export {
   type CharacterFaceGovernedInterpretationUnitV1,
   type CharacterFaceProtectedInterpretationSegmentV1,
 } from './character-face-governed-interpretation.js';
+
+export {
+  CHARACTER_FACE_GOVERNED_READING_PLAN_DECISION_SCHEMA_VERSION_V1,
+  CHARACTER_FACE_GOVERNED_READING_PLAN_SCHEMA_VERSION_V1,
+  CHARACTER_FACE_GOVERNED_SELECTION_POLICY_V1,
+  CharacterFaceGovernedReadingPlanErrorV1,
+  buildCharacterFaceGovernedReadingPlanV1,
+  type CharacterFaceGovernedReadingBeatV1,
+  type CharacterFaceGovernedReadingPlanDecisionV1,
+  type CharacterFaceGovernedReadingPlanV1,
+} from './character-face-governed-reading-plan.js';
+
+export {
+  CHARACTER_FACE_GOVERNED_FINAL_OUTPUT_SCHEMA_VERSION_V1,
+  CHARACTER_FACE_GOVERNED_FINALIZER_VERSION_V1,
+  CHARACTER_FACE_GOVERNED_OUTPUT_GUARD_VERSION_V1,
+  finalizeCharacterFaceGovernedInterpretationOutputV1,
+  type CharacterFaceGovernedFinalOutputEnvelopeV1,
+  type CharacterFaceGovernedFinalRendererDraftV1,
+  type CharacterFaceGovernedFollowUpV1,
+} from './character-face-governed-final-output.js';
