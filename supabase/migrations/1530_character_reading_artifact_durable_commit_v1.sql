@@ -474,6 +474,9 @@ alter function public.cmd_commit_character_face_governed_reading_artifact_v1(
   uuid,uuid,uuid,uuid,text,text,text,text,text,text,text,text,text,text,jsonb
 ) owner to myeongha_character_reading_artifact_runtime_owner;
 
+revoke create on schema public
+  from myeongha_character_reading_artifact_runtime_owner;
+
 revoke all on function public.cmd_commit_character_face_governed_reading_artifact_v1(
   uuid,uuid,uuid,uuid,text,text,text,text,text,text,text,text,text,text,jsonb
 ) from public;
