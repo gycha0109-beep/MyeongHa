@@ -15,6 +15,15 @@ import type {
   SajuGovernedFaceHandoffHttpAdapterV1,
   SajuGovernedFaceHandoffNotEligibleReasonV1,
 } from './saju-governed-face-handoff-http-adapter.js';
+import {
+  createProductionSajuGovernedFaceHandoffTransportV1,
+} from './production-saju-governed-face-handoff-transport.js';
+import type {
+  ProductionSajuRuntimeEnvV1,
+} from './production-saju-runtime-config.js';
+import type {
+  SajuProductionCalculationHttpFetchV1,
+} from './saju-production-calculation-http-adapter.js';
 
 export const PRODUCTION_GOVERNED_FACE_VERTICAL_VERSION_V1 =
   'production-governed-face-vertical-v1' as const;
@@ -422,5 +431,77 @@ export async function runProductionGovernedFaceVerticalV1(
     topicKey:
       normalized.topicKey,
     reveal,
+  });
+}
+
+
+export interface ProductionGovernedFaceVerticalRuntimeV1 {
+  run(
+    request:
+      ProductionGovernedFaceVerticalRequestV1,
+  ): Promise<
+    ProductionGovernedFaceVerticalResultV1
+  >;
+}
+
+export interface CreateProductionGovernedFaceVerticalInputV1 {
+  readonly env:
+    ProductionSajuRuntimeEnvV1;
+  readonly baseContext:
+    ProductionGovernedFaceBaseContextAuthorityPortV1;
+  readonly renderer:
+    ProductionGovernedFaceRendererPortV1;
+  readonly commitPort:
+    CharacterFaceGovernedReadingDurableCommitPortV1;
+  readonly allowedSuggestedActionKeys:
+    readonly string[];
+  /** Server-owned test/runtime injection only. Never derived from client input. */
+  readonly sajuFetchImpl?:
+    SajuProductionCalculationHttpFetchV1;
+}
+
+export function createProductionGovernedFaceVerticalV1(
+  input:
+    CreateProductionGovernedFaceVerticalInputV1,
+): ProductionGovernedFaceVerticalRuntimeV1 {
+  const transport =
+    createProductionSajuGovernedFaceHandoffTransportV1({
+      env:
+        input.env,
+      ...(input.sajuFetchImpl === undefined
+        ? {}
+        : {
+            sajuFetchImpl:
+              input.sajuFetchImpl,
+          }),
+    });
+
+  const dependencies =
+    Object.freeze({
+      transport,
+      baseContext:
+        input.baseContext,
+      renderer:
+        input.renderer,
+      commitPort:
+        input.commitPort,
+      allowedSuggestedActionKeys:
+        Object.freeze([
+          ...input.allowedSuggestedActionKeys,
+        ]),
+    }) satisfies
+      ProductionGovernedFaceVerticalDependenciesV1;
+
+  return Object.freeze({
+    run(
+      runInput:
+        ProductionGovernedFaceVerticalRequestV1,
+    ) {
+      return runProductionGovernedFaceVerticalV1({
+        request:
+          runInput,
+        dependencies,
+      });
+    },
   });
 }
