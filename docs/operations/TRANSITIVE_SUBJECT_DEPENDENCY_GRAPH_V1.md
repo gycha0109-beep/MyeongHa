@@ -44,8 +44,8 @@ maximum minimum depth      = 4
 
 depth 1 = 30
 depth 2 = 47
-depth 3 = 58
-depth 4 = 5
+depth 3 = 59
+depth 4 = 4
 ```
 
 Depth 1 is required to exactly match #1063's direct `subjects(id)` FK inventory.
