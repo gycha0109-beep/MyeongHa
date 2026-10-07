@@ -95,6 +95,7 @@ describe('MyeongHa immersive long-form Character Room', () => {
     expect(presentation).toContain("sceneLabel: '세연의 따뜻한 오후빛 대화 공간'");
     expect(conversationCss).toContain('.character-room-v2[data-character="seyeon"] .conversation-room-scene');
     expect(conversationCss).toContain('url("assets/characters/chat-themes/seyeon-chat-theme-web-v1.webp")');
+    expect(conversationCss).toContain('--conversation-room-art: url("assets/characters/rooms/seyeon-room.webp")');
     expect(conversationCss).toContain('url("assets/characters/seyeon-portrait-v2.webp")');
     expect(asset.size).toBeGreaterThan(10_000);
 
@@ -151,7 +152,7 @@ describe('MyeongHa immersive long-form Character Room', () => {
     expect(presentation).toContain("'thread_identity_pending'");
   });
 
-  it('fails chat mutation closed instead of inventing a client capability or canonical character authority', async () => {
+  it('opens a canonical thread for a new Character room while keeping public turn mutation fail-closed', async () => {
     const [transport, requestContract, apiContract] = await Promise.all([
       readFile(transportPath, 'utf8'),
       readFile(chatRequestContractPath, 'utf8'),
@@ -164,12 +165,12 @@ describe('MyeongHa immersive long-form Character Room', () => {
     expect(requestContract).toContain('readonly clientCapability: string;');
     expect(requestContract).toContain('readonly characterId?: string;');
 
-    expect(transport).toContain('ChatRequestV1 requires clientCapability');
-    expect(transport).toContain('현재 메시지를 보낼 수 없습니다. 입력한 내용은 그대로 남아 있습니다.');
+    expect(transport).toContain('createChatOpenClientV1');
+    expect(transport).toContain('openForCanonicalCharacter');
+    expect(transport).toContain('buildChatThreadUrlV1');
+    expect(transport).toContain('sessionStorage.setItem(pendingDraftKey(result.threadId), message)');
+    expect(transport).toContain('웹 메시지 전송은 아직 운영 연결 전입니다. 입력한 내용은 그대로 남아 있습니다.');
     expect(transport).not.toContain("fetch('/api/chat/turn'");
-    expect(transport).not.toContain("method: 'POST'");
-    expect(transport).not.toContain('presentationKey: characterKey');
-    expect(transport).not.toContain('characterId: characterKey');
     expect(transport).not.toContain('clientCapability:');
   });
 
@@ -189,7 +190,9 @@ describe('MyeongHa immersive long-form Character Room', () => {
     expect(transport).not.toContain('window.MyeongHaCharacterRoom');
 
     expect(transport).toContain('event.preventDefault()');
-    expect(transport).toContain('현재 메시지를 보낼 수 없습니다. 입력한 내용은 그대로 남아 있습니다.');
+    expect(transport).toContain('void openThreadAndPreserveDraft(message.trim())');
+    expect(transport).toContain('대화방은 연결됐지만 웹 메시지 전송은 아직 운영 연결 전입니다. 입력한 내용은 그대로 남아 있습니다.');
+    expect(transport).toContain('restorePendingDraft()');
     expect(transport).not.toContain("messageInput.value = ''");
   });
 

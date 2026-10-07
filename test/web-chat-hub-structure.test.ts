@@ -147,7 +147,8 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
     }
     expect(v2Css).toContain('assets/characters/chat-themes/seyeon-chat-theme-web-v1.webp');
     expect(v2Css).toContain('assets/characters/chat-themes/seyeon-chat-theme-mobile-v1.webp');
-    expect(v2Css).not.toContain('--conversation-room-art: url("assets/characters/rooms/seyeon-room.webp")');
+    expect(v2Css).toContain('--conversation-room-art: url("assets/characters/rooms/seyeon-room.webp")');
+    expect(v2Css).toContain("not residence/background canon");
     for (const key of ['baekheon', 'seorin', 'rahyeon', 'taegyeom', 'yunho']) {
       expect(v2Css).toContain(`assets/characters/rooms/${key}-room.webp`);
     }
