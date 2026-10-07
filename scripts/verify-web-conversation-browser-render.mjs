@@ -310,6 +310,7 @@ async function verifyHub(page, origin, suffix, width, height, mobile) {
 async function verifyRoom(page, origin, suffix, width, height, mobile) {
   await page.viewport(width, height, mobile);
   await page.navigate(`${origin}/chat.html?character=seyeon`);
+  await page.evaluate(`document.documentElement.dataset.theme = 'dark'`);
 
   const state = await page.evaluate(`(() => {
     const scene = document.querySelector('.conversation-room-scene');
@@ -325,7 +326,9 @@ async function verifyRoom(page, origin, suffix, width, height, mobile) {
       stream: Boolean(stream),
       composer: Boolean(composer),
       sceneBg: scene ? getComputedStyle(scene).backgroundImage : '',
+      sceneSize: scene ? getComputedStyle(scene).backgroundSize : '',
       panelBg: panel ? getComputedStyle(panel).backgroundImage : '',
+      panelColor: panel ? getComputedStyle(panel).color : '',
       contextHidden: document.querySelector('[data-context-pill]')?.hidden === true,
       threadHidden: document.querySelector('[data-thread-bar]')?.hidden === true,
       globalHeaderDisplay: globalHeader ? getComputedStyle(globalHeader).display : '',
@@ -339,12 +342,20 @@ async function verifyRoom(page, origin, suffix, width, height, mobile) {
     ? 'assets/characters/chat-themes/seyeon-chat-theme-mobile-v1.webp'
     : 'assets/characters/chat-themes/seyeon-chat-theme-web-v1.webp';
   assert(
-    state.sceneBg.includes('assets/characters/seyeon-portrait-v2.webp'),
-    `${suffix}: approved Se-yeon portrait is not rendered in the character scene`,
+    state.sceneBg.includes('assets/characters/rooms/seyeon-room.webp'),
+    `${suffix}: approved Se-yeon full-body presentation scene is not rendered`,
+  );
+  assert(
+    state.sceneSize === 'cover',
+    `${suffix}: Se-yeon full-body presentation scene must fill the scene rail`,
   );
   assert(
     state.panelBg.includes(approvedThemeAsset),
-    `${suffix}: approved Se-yeon chat theme asset is not rendered in the chat panel`,
+    `${suffix}: approved Se-yeon chat theme asset is not rendered in the chat panel under dark product chrome`,
+  );
+  assert(
+    state.panelColor === 'rgb(69, 59, 51)',
+    `${suffix}: dark product chrome replaced Se-yeon's warm chat-panel text palette`,
   );
   assert(state.contextHidden && state.threadHidden, `${suffix}: unverified continuation context became visible`);
   assert(['auto', 'scroll'].includes(state.streamOverflow), `${suffix}: conversation stream is not scrollable`);
