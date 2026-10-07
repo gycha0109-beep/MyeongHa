@@ -44,12 +44,12 @@ function expectThrow(label, fn, pattern) {
 
 const report = evaluateAccountDeletionDispositionContract(contract, graph);
 for (const [field, expected] of [
-  ['graphEdgeCount', 138],
-  ['graphReachableTableCount', 58],
-  ['coveredEdgeCount', 138],
-  ['coveredTableCount', 58],
-  ['unresolvedTableCount', 58],
-  ['unresolvedEdgeCount', 138],
+  ['graphEdgeCount', 140],
+  ['graphReachableTableCount', 59],
+  ['coveredEdgeCount', 140],
+  ['coveredTableCount', 59],
+  ['unresolvedTableCount', 59],
+  ['unresolvedEdgeCount', 140],
   ['dependencyConflictCount', 0],
   ['explicitConflictResolutionCount', 0],
   ['policyReady', false],
@@ -73,8 +73,8 @@ if (!/^\|\s*`P0-PR-01`\s*\|[^|\n]*\|\s*\*\*DECIDED\*\*\s*\|/m.test(decisions)) {
 }
 
 for (const fragment of [
-  'reachable FK edges          = 138',
-  'reachable tables            = 58',
+  'reachable FK edges          = 140',
+  'reachable tables            = 59',
   'all table dispositions      = UNDECIDED',
   'executionPlanAllowed = false',
   'destructiveSqlAllowed = false',
@@ -133,7 +133,7 @@ if (!testOnlyReport.policyReady || !testOnlyReport.executionPlanAllowed) {
   fail('test-only complete approved fixture should prove the positive plan gate path');
 }
 const testOnlyPlan = buildAccountDeletionExecutionPlan(testOnlyApproved, graph);
-if (testOnlyPlan.stepCount !== 58) fail('test-only plan must cover all 58 reachable tables');
+if (testOnlyPlan.stepCount !== 59) fail('test-only plan must cover all 59 reachable tables');
 if (testOnlyPlan.destructiveSqlGenerated !== false || testOnlyPlan.sql !== null) {
   fail('v1 execution plan must remain structured and non-SQL');
 }
@@ -159,5 +159,5 @@ expectThrow(
 );
 
 console.log(
-  'Account deletion disposition historical gate PASS: 58/58 tables and 138/138 edges remain covered by the immutable pre-approval candidate, conflict drift fails closed, and SQL generation remains absent.',
+  'Account deletion disposition historical gate PASS: 59/59 tables and 140/140 edges remain covered by the immutable pre-approval candidate, conflict drift fails closed, and SQL generation remains absent.',
 );

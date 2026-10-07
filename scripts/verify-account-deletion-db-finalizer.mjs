@@ -6,14 +6,27 @@ function fail(message) {
   throw new Error('Account deletion DB finalizer verifier rejected: ' + message);
 }
 
-const [baseMigration, readerAccessSyncMigration, relationshipRuntimeSyncMigration, policyText, finalPolicyText] = await Promise.all([
+const [
+  baseMigration,
+  readerAccessSyncMigration,
+  relationshipRuntimeSyncMigration,
+  characterReadingArtifactMigration,
+  policyText,
+  finalPolicyText,
+] = await Promise.all([
   readFile('supabase/migrations/1171_account_deletion_db_finalizer.sql', 'utf8'),
   readFile('supabase/migrations/1230_account_deletion_finalizer_reader_access_sync.sql', 'utf8'),
   readFile('supabase/migrations/1520_account_deletion_finalizer_relationship_runtime_sync.sql', 'utf8'),
+  readFile('supabase/migrations/1530_character_reading_artifact_durable_commit_v1.sql', 'utf8'),
   readFile('docs/operations/ACCOUNT_DELETION_DISPOSITION_POLICY_V1.json', 'utf8'),
   readFile('docs/operations/ACCOUNT_DELETION_FINALIZATION_POLICY_V1.json', 'utf8'),
 ]);
-const migration = baseMigration + '\n' + readerAccessSyncMigration + '\n' + relationshipRuntimeSyncMigration;
+const migration = [
+  baseMigration,
+  readerAccessSyncMigration,
+  relationshipRuntimeSyncMigration,
+  characterReadingArtifactMigration,
+].join('\n');
 
 const policy = JSON.parse(policyText);
 const finalPolicy = JSON.parse(finalPolicyText);
@@ -31,7 +44,7 @@ const expectedRetain = policy.tableDispositions
   .map((entry) => entry.table)
   .sort();
 
-if (expectedDelete.length !== 45 || expectedAnonymize.length !== 4 || expectedRetain.length !== 9) {
+if (expectedDelete.length !== 46 || expectedAnonymize.length !== 4 || expectedRetain.length !== 9) {
   fail('approved disposition cardinality drifted');
 }
 
@@ -40,10 +53,27 @@ const deleteMatches = [...migration.matchAll(/delete\s+from\s+public\.([a-z0-9_]
   .sort();
 
 const uniqueDeletes = [...new Set(deleteMatches)].sort();
-if (JSON.stringify(uniqueDeletes) !== JSON.stringify(expectedDelete)) {
+
+const characterArtifactCascadeContract =
+  /foreign\s+key\s*\(turn_id,\s*subject_id\)[\s\S]*?references\s+public\.chat_turns\s*\(id,\s*subject_id\)[\s\S]*?on\s+delete\s+cascade/i
+    .test(characterReadingArtifactMigration) &&
+  /foreign\s+key\s*\(attempt_id,\s*turn_id,\s*subject_id\)[\s\S]*?references\s+public\.chat_turn_attempts\s*\(id,\s*turn_id,\s*subject_id\)[\s\S]*?on\s+delete\s+cascade/i
+    .test(characterReadingArtifactMigration);
+
+if (!characterArtifactCascadeContract) {
+  fail('character_reading_artifacts must remain cascade-bound to authoritative turn/attempt deletion');
+}
+
+const cascadeDeletes = ['character_reading_artifacts'];
+const effectiveDeletes = [...new Set([
+  ...uniqueDeletes,
+  ...cascadeDeletes,
+])].sort();
+
+if (JSON.stringify(effectiveDeletes) !== JSON.stringify(expectedDelete)) {
   fail(
     'DELETE target set mismatch expected=' + expectedDelete.join(',') +
-    ' actual=' + uniqueDeletes.join(',')
+    ' actual=' + effectiveDeletes.join(',')
   );
 }
 
@@ -90,10 +120,14 @@ if (!/create\s+or\s+replace\s+function\s+public\.internal_finalize_account_delet
   fail('DB finalizer must be SECURITY DEFINER so trigger exceptions are owner-bound');
 }
 const ownerBoundGuardCount = migration.split('pg_catalog.pg_get_userbyid(p.proowner)').length - 1;
-const finalizerSubjectGuardCount = migration.split("pg_catalog.current_setting('myeongha.account_deletion_finalizer_subject_id', true)").length - 1;
-if (ownerBoundGuardCount !== 8 || finalizerSubjectGuardCount !== 8) {
+const finalizerSubjectGuardCount = (
+  migration.match(
+    /pg_catalog\.current_setting\(\s*'myeongha\.account_deletion_finalizer_subject_id',\s*true\s*\)/g,
+  ) ?? []
+).length;
+if (ownerBoundGuardCount !== 9 || finalizerSubjectGuardCount !== 9) {
   fail(
-    'expected 8 inline owner-bound immutable-trigger guards, found owner=' +
+    'expected 9 inline owner-bound immutable-trigger guards, found owner=' +
     ownerBoundGuardCount + ' subject=' + finalizerSubjectGuardCount
   );
 }
