@@ -346,7 +346,7 @@ async function verifyRoom(page, origin, suffix, width, height, mobile) {
     `${suffix}: approved Se-yeon full-body presentation scene is not rendered`,
   );
   assert(
-    state.sceneSize === 'cover',
+    state.sceneSize.split(',').every((value) => value.trim() === 'cover'),
     `${suffix}: Se-yeon full-body presentation scene must fill the scene rail`,
   );
   assert(
