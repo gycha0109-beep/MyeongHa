@@ -460,3 +460,23 @@ export {
   resolveCharacterFaceNamedProfileBundleV1,
   type CharacterFaceNamedProfileBundleV1,
 } from './character-face-named-profile-registry.js';
+
+export {
+  CHARACTER_FACE_GOVERNED_INTERPRETATION_AUTHORIZATION_SCOPE_V1,
+  CHARACTER_FACE_GOVERNED_INTERPRETATION_AUTHORIZATION_STATE_V1,
+  CHARACTER_FACE_GOVERNED_INTERPRETATION_HASH_PREFIX_V1,
+  CHARACTER_FACE_GOVERNED_INTERPRETATION_REQUIRED_PROHIBITIONS_V1,
+  CHARACTER_FACE_GOVERNED_INTERPRETATION_SCHEMA_VERSION_V1,
+  CharacterFaceGovernedInterpretationAdmissionErrorV1,
+  admitCharacterFaceGovernedInterpretationHandoffV1,
+  buildCharacterFaceProtectedInterpretationSegmentsV1,
+  hashCharacterFaceGovernedInterpretationMaterialV1,
+  selectCharacterFaceGovernedInterpretationsV1,
+  type CharacterFaceGovernedInterpretationDirectionV1,
+  type CharacterFaceGovernedInterpretationEvidenceStatusV1,
+  type CharacterFaceGovernedInterpretationHandoffV1,
+  type CharacterFaceGovernedInterpretationSelectionV1,
+  type CharacterFaceGovernedInterpretationSourceBindingV1,
+  type CharacterFaceGovernedInterpretationUnitV1,
+  type CharacterFaceProtectedInterpretationSegmentV1,
+} from './character-face-governed-interpretation.js';
