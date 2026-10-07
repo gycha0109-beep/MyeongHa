@@ -1,6 +1,6 @@
 # Seyeon one-Character publication package v1 — Technical proposal
 
-> 상태: **PROPOSED / NOT APPROVED / NOT PRODUCTION AUTHORITY**
+> 상태: **APPROVED TECHNICAL PACKAGE / NOT YET PRODUCTION-PUBLISHED**
 >
 > 범위: 세연 1명 독립 운영 게시 패키지를 만들기 위해 필요한 기술 식별자 제안
 >
@@ -34,7 +34,7 @@ minClientCapability
 ```
 
 승인된 정적 세연 표현을 이 필드에 어떤 exact value로 옮길지 아직 source authority가 없으므로,
-이번 문서는 그 값을 **승인 후보**로만 고정한다.
+이번 문서는 Product Owner 승인에 따라 아래 exact 값을 **세연 1인 게시 패키지 기술 authority**로 고정한다.
 
 ## 3. assetRefs 제안
 
@@ -62,7 +62,7 @@ animationCueIds = ["static"]
 - `neutral`: 별도 authored emotional expression variant를 선택하지 않는 기본 정적 상태
 - `static`: renderer motion을 실행하지 않는 정적 표시 상태
 
-이 두 문자열은 현재 **제안값**이며 승인 전 Production authority가 아니다.
+이 두 문자열은 2026-10-07 Product Owner 승인으로 세연 정적 표현의 기술 식별자로 확정한다.
 
 ## 5. 호환성 식별자 제안
 
@@ -95,11 +95,11 @@ stable-key JSON 직렬화 후 SHA-256 후보:
 sha256:v1:ca769bd9b211e5d04f64128fea1fb2e3d1eca3f91d2d34c6fe14f39b62591a4d
 ```
 
-이 hash 역시 제안 기술값의 일부이므로, 제안값이 변경되면 다시 계산해야 한다.
+이 hash는 승인된 기술 패키지의 일부다. 패키지 값이 변경되면 새 승인과 함께 다시 계산해야 한다.
 
-## 7. 승인 표면
+## 7. Product Owner 승인
 
-Product Owner가 다음 exact package를 승인하면 이후 Production package 입력으로 승격할 수 있다.
+2026-10-07 Product Owner가 다음 exact package를 승인했다. 이후 Production package 입력으로 사용할 수 있으나, 실제 DB 게시/릴리스 활성화는 별도 게이트다.
 
 ```text
 assetRefs:
