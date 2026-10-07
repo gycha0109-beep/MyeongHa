@@ -118,7 +118,8 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
     expect(v2Css).not.toContain('.chat-person-art[data-character="seyeon"]');
     expect(v2Css).toContain('.chat-incoming-art[data-character="seyeon"]');
     expect(v2Css).toContain('.chat-recent-avatar[data-character="seyeon"]');
-    expect(v2Css).toContain('url("seyeon-chat.webp")');
+    expect(v2Css).toContain('url("assets/characters/seyeon-portrait-v2.webp")');
+    expect(v2Css).toContain('assets/characters/chat-themes/seyeon-chat-theme-web-v1.webp');
 
     for (const key of ['seyeon', 'baekheon', 'seorin', 'rahyeon', 'taegyeom', 'yunho']) {
       expect(js).toContain(`${key}: Object.freeze({ src: 'assets/characters/${key}-portrait-v2.webp'`);
