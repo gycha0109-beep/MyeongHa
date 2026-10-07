@@ -1,0 +1,365 @@
+{
+  "classification": "synthetic_contract_only",
+  "source": {
+    "authorityReceipt": {
+      "schemaVersion": "face-topic-authority-source-receipt-v1",
+      "observation": {
+        "authorityRef": "test-only:neutral-authority",
+        "materializedCapabilities": [
+          "face.vertical_reference.visible_hairline",
+          "face.vertical_reference.brow",
+          "face.vertical_reference.interbrow_surface",
+          "face.vertical_reference.nose_root_bridge",
+          "face.vertical_reference.visible_nose_tip",
+          "face.vertical_reference.visible_central_groove",
+          "face.vertical_reference.inferior_lower_face"
+        ],
+        "unavailableOrHardGapCapabilities": [],
+        "provenanceRefs": [
+          "test-only:observation-evidence"
+        ]
+      },
+      "bridge": {
+        "authorityRef": "test-only:bridge-authority",
+        "bindingGroups": [
+          {
+            "bindingGroupRef": "face-bridge.frb005.three_divisions",
+            "requiredBindingCount": 16,
+            "admittedBindingCount": 16,
+            "bindingReady": true,
+            "provenanceRefs": [
+              "test-only:binding-evidence"
+            ]
+          }
+        ],
+        "provenanceRefs": [
+          "test-only:bridge-evidence"
+        ]
+      },
+      "traditional": {
+        "authorityRef": "test-only:traditional-authority",
+        "methodologyRefs": [
+          "method.mayi.face_three_divisions.fr261@0.2.0"
+        ],
+        "semanticClaimFamilies": [
+          "face.claim.three_divisions"
+        ],
+        "provenanceRefs": [
+          "test-only:source-scan"
+        ],
+        "characterPublicationDecision": {
+          "state": "product_authorized",
+          "scope": "character_public_reading",
+          "decisionRef": "test-only:synthetic-publication-decision",
+          "topicKeys": [
+            "face.reading.three_divisions"
+          ]
+        }
+      }
+    },
+    "plan": {
+      "schemaVersion": "face-topic-execution-plan-v1",
+      "authorized": true,
+      "topicKey": "face.reading.three_divisions",
+      "topicDefinitionRef": {
+        "id": "face.reading.three_divisions",
+        "version": "0.1.0",
+        "contentHash": "751f8d62532d25c3e71d150cf3e3d4f18fe54b17983334c9fa6ab1d83224faea"
+      },
+      "authoritySnapshotId": "face-authority-coverage:0749cee9ca525ed2cdc0b27e6c6d7327d7988d84d1ed5279f5de432e0080fe67",
+      "observationArtifactRef": "test-only:observation-artifact",
+      "executionKind": "traditional_face_reading",
+      "readinessState": "available",
+      "requiredObservationCapabilities": [
+        "face.vertical_reference.visible_hairline",
+        "face.vertical_reference.brow",
+        "face.vertical_reference.interbrow_surface",
+        "face.vertical_reference.nose_root_bridge",
+        "face.vertical_reference.visible_nose_tip",
+        "face.vertical_reference.visible_central_groove",
+        "face.vertical_reference.inferior_lower_face"
+      ],
+      "optionalObservationCapabilities": [],
+      "requiredMethodologyRefs": [
+        "method.mayi.face_three_divisions.fr261@0.2.0"
+      ],
+      "optionalMethodologyRefs": [],
+      "methodologyRefs": [
+        "method.mayi.face_three_divisions.fr261@0.2.0"
+      ],
+      "requiredSemanticClaimFamilies": [
+        "face.claim.three_divisions"
+      ],
+      "optionalSemanticClaimFamilies": [],
+      "semanticClaimFamilies": [
+        "face.claim.three_divisions"
+      ],
+      "bindingGroupRefs": [
+        "face-bridge.frb005.three_divisions"
+      ],
+      "requestedInferenceKeys": [],
+      "prohibitedInferenceKeys": [
+        "exact_marriage_age_without_authority",
+        "exact_wealth_amount_without_authority",
+        "guaranteed_future_outcome",
+        "intelligence_inference",
+        "morality_inference",
+        "objective_personality_diagnosis"
+      ],
+      "unavailableOptionalRequirements": [],
+      "provenanceRefs": [
+        "test-only:bridge-evidence",
+        "test-only:observation-evidence",
+        "test-only:source-scan"
+      ],
+      "requestId": "test-only:governed-request",
+      "executionPlanHash": "face-topic-execution-plan:01e5384f0dc170680920e62a52007c253e0cfa656f2dc96a91e9b1fae336d0d9"
+    },
+    "receipt": {
+      "schemaVersion": "face-topic-execution-result-receipt-v1",
+      "executionPlanHash": "face-topic-execution-plan:01e5384f0dc170680920e62a52007c253e0cfa656f2dc96a91e9b1fae336d0d9",
+      "requestId": "test-only:governed-request",
+      "authoritySnapshotId": "face-authority-coverage:0749cee9ca525ed2cdc0b27e6c6d7327d7988d84d1ed5279f5de432e0080fe67",
+      "observationArtifactRef": "test-only:observation-artifact",
+      "executionKind": "traditional_face_reading",
+      "faceEngineVersion": "test-only:face-engine",
+      "methodologyPackRefs": [
+        "method.mayi.face_three_divisions.fr261@0.2.0"
+      ],
+      "bindingGroupRefs": [
+        "face-bridge.frb005.three_divisions"
+      ],
+      "observations": [
+        {
+          "kind": "neutral_observation",
+          "capabilityKey": "face.vertical_reference.visible_hairline",
+          "observationRef": "test-only:observation:0",
+          "qualifiers": [
+            "test-only:observation-qualifier"
+          ],
+          "provenanceRefs": [
+            "test-only:observation-evidence"
+          ]
+        },
+        {
+          "kind": "neutral_observation",
+          "capabilityKey": "face.vertical_reference.brow",
+          "observationRef": "test-only:observation:1",
+          "qualifiers": [
+            "test-only:observation-qualifier"
+          ],
+          "provenanceRefs": [
+            "test-only:observation-evidence"
+          ]
+        },
+        {
+          "kind": "neutral_observation",
+          "capabilityKey": "face.vertical_reference.interbrow_surface",
+          "observationRef": "test-only:observation:2",
+          "qualifiers": [
+            "test-only:observation-qualifier"
+          ],
+          "provenanceRefs": [
+            "test-only:observation-evidence"
+          ]
+        },
+        {
+          "kind": "neutral_observation",
+          "capabilityKey": "face.vertical_reference.nose_root_bridge",
+          "observationRef": "test-only:observation:3",
+          "qualifiers": [
+            "test-only:observation-qualifier"
+          ],
+          "provenanceRefs": [
+            "test-only:observation-evidence"
+          ]
+        },
+        {
+          "kind": "neutral_observation",
+          "capabilityKey": "face.vertical_reference.visible_nose_tip",
+          "observationRef": "test-only:observation:4",
+          "qualifiers": [
+            "test-only:observation-qualifier"
+          ],
+          "provenanceRefs": [
+            "test-only:observation-evidence"
+          ]
+        },
+        {
+          "kind": "neutral_observation",
+          "capabilityKey": "face.vertical_reference.visible_central_groove",
+          "observationRef": "test-only:observation:5",
+          "qualifiers": [
+            "test-only:observation-qualifier"
+          ],
+          "provenanceRefs": [
+            "test-only:observation-evidence"
+          ]
+        },
+        {
+          "kind": "neutral_observation",
+          "capabilityKey": "face.vertical_reference.inferior_lower_face",
+          "observationRef": "test-only:observation:6",
+          "qualifiers": [
+            "test-only:observation-qualifier"
+          ],
+          "provenanceRefs": [
+            "test-only:observation-evidence"
+          ]
+        }
+      ],
+      "semanticClaims": [
+        {
+          "kind": "traditional_claim",
+          "claimFamily": "face.claim.three_divisions",
+          "claimRef": "test-only:semantic-claim",
+          "methodologyRef": "method.mayi.face_three_divisions.fr261@0.2.0",
+          "inferenceKeys": [],
+          "qualifiers": [
+            "test-only:source-qualifier"
+          ],
+          "provenanceRefs": [
+            "test-only:semantic-evidence",
+            "test-only:source-scan"
+          ],
+          "governedInterpretation": {
+            "interpretationId": "test-only:source-interpretation:1",
+            "lensKey": "test-only:source-lens",
+            "direction": "mixed_or_conditional",
+            "evidenceStatus": "direct_evidence",
+            "protectedMeaningText": "시험 자료: 승인된 조건이 충족되는 경우에 한해 읽습니다.",
+            "observationRefs": [
+              "test-only:observation:0",
+              "test-only:observation:1",
+              "test-only:observation:2",
+              "test-only:observation:3",
+              "test-only:observation:4",
+              "test-only:observation:5",
+              "test-only:observation:6"
+            ],
+            "bindingRefs": [
+              "face-bridge.frb005.three_divisions"
+            ],
+            "evidenceRefs": [
+              "test-only:semantic-evidence"
+            ],
+            "sourceRefs": [
+              "test-only:source-scan"
+            ],
+            "conditions": [
+              "test-only:source-condition"
+            ],
+            "qualifiers": [
+              "test-only:source-qualifier"
+            ],
+            "prohibitedExtensions": [
+              "exact_marriage_age_without_authority",
+              "exact_wealth_amount_without_authority",
+              "guaranteed_future_outcome",
+              "intelligence_inference",
+              "morality_inference",
+              "no_condition_removal",
+              "no_conflict_resolution_without_upstream_authority",
+              "no_direction_mutation",
+              "no_new_face_claims",
+              "no_topic_remapping",
+              "objective_personality_diagnosis"
+            ]
+          }
+        }
+      ],
+      "approvedNarrativeBlocks": [
+        {
+          "blockRef": "test-only:approved-narrative",
+          "sourceRefs": [
+            "test-only:semantic-claim"
+          ],
+          "text": "시험 자료: 승인된 조건이 충족되는 경우에 한해 읽습니다.",
+          "realizationPolicy": "protected_verbatim",
+          "prohibitedExtensions": [
+            "exact_marriage_age_without_authority",
+            "exact_wealth_amount_without_authority",
+            "guaranteed_future_outcome",
+            "intelligence_inference",
+            "morality_inference",
+            "no_condition_removal",
+            "no_conflict_resolution_without_upstream_authority",
+            "no_direction_mutation",
+            "no_new_face_claims",
+            "no_topic_remapping",
+            "objective_personality_diagnosis"
+          ]
+        }
+      ],
+      "unavailableSections": [],
+      "prohibitedInferences": [
+        "exact_marriage_age_without_authority",
+        "exact_wealth_amount_without_authority",
+        "guaranteed_future_outcome",
+        "intelligence_inference",
+        "morality_inference",
+        "objective_personality_diagnosis"
+      ],
+      "provenanceRefs": [
+        "test-only:source-evidence"
+      ]
+    }
+  },
+  "handoff": {
+    "schemaVersion": "character-face-governed-interpretation-v1",
+    "sourceContractVersion": "saju-face-governed-interpretation-source-v1",
+    "sourceAuthorityRef": "test-only:traditional-authority",
+    "sourceResultHash": "face-topic-source-result:4d834b072dd9e8f9a52f271fd3409d03df7032063e98f9d79b5c0567924dd31b",
+    "topicKey": "face.reading.three_divisions",
+    "authorizationState": "product_authorized",
+    "authorizationScope": "character_public_reading",
+    "units": [
+      {
+        "interpretationId": "test-only:source-interpretation:1",
+        "lensKey": "test-only:source-lens",
+        "direction": "mixed_or_conditional",
+        "evidenceStatus": "direct_evidence",
+        "protectedMeaningText": "시험 자료: 승인된 조건이 충족되는 경우에 한해 읽습니다.",
+        "observationRefs": [
+          "test-only:observation:0",
+          "test-only:observation:1",
+          "test-only:observation:2",
+          "test-only:observation:3",
+          "test-only:observation:4",
+          "test-only:observation:5",
+          "test-only:observation:6"
+        ],
+        "bindingRefs": [
+          "face-bridge.frb005.three_divisions"
+        ],
+        "evidenceRefs": [
+          "test-only:semantic-evidence"
+        ],
+        "sourceRefs": [
+          "test-only:source-scan"
+        ],
+        "conditions": [
+          "test-only:source-condition"
+        ],
+        "qualifiers": [
+          "test-only:source-qualifier"
+        ],
+        "prohibitedExtensions": [
+          "exact_marriage_age_without_authority",
+          "exact_wealth_amount_without_authority",
+          "guaranteed_future_outcome",
+          "intelligence_inference",
+          "morality_inference",
+          "no_condition_removal",
+          "no_conflict_resolution_without_upstream_authority",
+          "no_direction_mutation",
+          "no_new_face_claims",
+          "no_topic_remapping",
+          "objective_personality_diagnosis"
+        ]
+      }
+    ],
+    "authorizationReceiptRef": "face-governed-authorization:3914b3f2d3cc9025c21729b46987822ce3ec1802af092212ab7eb4f5ace6a6ab",
+    "handoffHash": "face-governed-interpretation:f8681c24ba46d4429ee0ce8985cf3cd353fa91dcc424574a9241af112bca0488"
+  }
+}
