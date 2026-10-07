@@ -32,10 +32,12 @@ create table public.character_reading_artifacts (
     unique (id, subject_id),
   constraint character_reading_artifacts_turn_subject_fk
     foreign key (turn_id, subject_id)
-    references public.chat_turns(id, subject_id),
+    references public.chat_turns(id, subject_id)
+    on delete cascade,
   constraint character_reading_artifacts_attempt_turn_subject_fk
     foreign key (attempt_id, turn_id, subject_id)
-    references public.chat_turn_attempts(id, turn_id, subject_id),
+    references public.chat_turn_attempts(id, turn_id, subject_id)
+    on delete cascade,
   constraint character_reading_artifacts_kind_nonempty
     check (btrim(artifact_kind) <> ''),
   constraint character_reading_artifacts_schema_nonempty
@@ -67,6 +69,27 @@ language plpgsql
 set search_path = pg_catalog, public
 as $$
 begin
+  if tg_op = 'DELETE'
+     and current_user = (
+       select pg_catalog.pg_get_userbyid(p.proowner)
+       from pg_catalog.pg_proc p
+       where p.oid = pg_catalog.to_regprocedure(
+         'public.internal_finalize_account_deletion_db_v1(uuid,uuid,text)'
+       )
+     )
+     and coalesce(
+       nullif(
+         pg_catalog.current_setting(
+           'myeongha.account_deletion_finalizer_subject_id',
+           true
+         ),
+         ''
+       )::uuid = old.subject_id,
+       false
+     ) then
+    return old;
+  end if;
+
   raise exception using
     errcode = '23514',
     constraint = 'tr_character_reading_artifact_immutable_v1',
