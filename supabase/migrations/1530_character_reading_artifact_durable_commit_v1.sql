@@ -218,6 +218,49 @@ begin
       message = 'Governed Character Face artifact commit input is incomplete';
   end if;
 
+  if p_artifact_jsonb - array[
+       'schemaVersion',
+       'artifactId',
+       'artifactBuilderVersion',
+       'characterId',
+       'characterContentVersion',
+       'topicKey',
+       'sourceContractVersion',
+       'sourceAuthorityRef',
+       'sourceResultHash',
+       'authorizationState',
+       'authorizationScope',
+       'authorizationReceiptRef',
+       'faceBundleHash',
+       'handoffHash',
+       'readingPlanRef',
+       'selectionPolicy',
+       'selectedInterpretationIds',
+       'selectedLensKeys',
+       'protectedInterpretations',
+       'followUp',
+       'outputGuardVersion',
+       'governedOutputGuardVersion',
+       'finalizerVersion',
+       'finalOutputHash',
+       'finalOutput',
+       'validationState',
+       'commitState',
+       'revealState'
+     ]::text[] is distinct from '{}'::jsonb then
+    raise exception using
+      errcode = '23514',
+      constraint = 'character_face_governed_artifact_payload_scope_invalid',
+      message = 'Governed Character Face artifact payload contains unsupported top-level material';
+  end if;
+
+  if p_artifact_jsonb::text ~* '"(rawImage|rawPhoto|rawOriginalPhoto|rawLandmarks|landmarkIndices|faceEmbedding|identityTemplate|highResolutionCrop)"[[:space:]]*:' then
+    raise exception using
+      errcode = '23514',
+      constraint = 'character_face_governed_artifact_biometric_payload_forbidden',
+      message = 'Governed Character Face artifact cannot persist raw biometric material';
+  end if;
+
   if p_artifact_jsonb ->> 'schemaVersion'
        is distinct from btrim(p_artifact_schema_version)
      or p_artifact_jsonb ->> 'artifactId'
