@@ -481,6 +481,42 @@ export {
   type CharacterFaceProtectedInterpretationSegmentV1,
 } from './character-face-governed-interpretation.js';
 
+
+export {
+  CHARACTER_FACE_GOVERNED_GROUNDING_SCHEMA_VERSION_V1,
+  CHARACTER_FACE_GOVERNED_GROUNDING_REF_SCHEMA_VERSION_V1,
+  CHARACTER_FACE_GOVERNED_GROUNDING_PROJECTION_VERSION_V1,
+  CHARACTER_FACE_GOVERNED_REALIZATION_POLICY_REGISTRY_VERSION_V1,
+  CHARACTER_FACE_GOVERNED_REALIZATION_POLICY_V1,
+  CHARACTER_FACE_GOVERNED_MODE_V1,
+  type CharacterFaceGovernedGroundingUnitV1,
+  type CharacterFaceGovernedGroundingBundleV1,
+  type CharacterFaceGovernedGroundingRefV1,
+  type CharacterFaceGovernedGroundingAdmissionV1,
+} from './character-face-governed-grounding.js';
+
+export {
+  CharacterFaceGovernedGroundingAdmissionErrorV1,
+  admitCharacterFaceGovernedGroundingV1,
+} from './character-face-governed-grounding-admission.js';
+
+export {
+  CHARACTER_FACE_GOVERNED_CONTEXT_SCHEMA_VERSION_V1,
+  admitCharacterRuntimeGovernedFaceGroundingV1,
+  type CharacterGovernedFaceRuntimeContextV1,
+  type CharacterRuntimeContextWithGovernedFaceGroundingV1,
+} from './character-face-governed-runtime.js';
+
+export {
+  CHARACTER_FACE_GOVERNED_CAPABILITY_SCHEMA_VERSION_V1,
+  CHARACTER_FACE_GOVERNED_CAPABILITY_SOURCE_SCHEMA_VERSION_V1,
+  CHARACTER_FACE_GOVERNED_SUPPORTED_TOPIC_KEYS_V1,
+  admitCharacterFaceGovernedCapabilityProfileV1,
+  evaluateCharacterFaceGovernedCapabilityV1,
+  type CharacterFaceGovernedCapabilitySourceV1,
+  type CharacterFaceGovernedCapabilityProfileV1,
+} from './character-face-governed-capability.js';
+
 export {
   CHARACTER_FACE_GOVERNED_READING_PLAN_DECISION_SCHEMA_VERSION_V1,
   CHARACTER_FACE_GOVERNED_READING_PLAN_SCHEMA_VERSION_V1,
