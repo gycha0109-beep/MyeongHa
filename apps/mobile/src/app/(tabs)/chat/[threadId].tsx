@@ -29,7 +29,7 @@ function ValidChatThread({ threadId }: { threadId: string }) {
         <Pressable accessibilityRole="button" onPress={() => router.back()} style={styles.back}>
           <Text style={styles.backText}>‹ 대화로 돌아가기</Text>
         </Pressable>
-        <ChatReadHeader />
+        <ChatReadHeader snapshot={snapshot} />
         <ChatReadMessages snapshot={snapshot} />
         <ChatReadMore snapshot={snapshot} onLoadMore={() => void loadMore()} />
         <ChatSendPending />
