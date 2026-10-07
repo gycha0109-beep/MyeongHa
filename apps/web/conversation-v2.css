@@ -1191,9 +1191,9 @@
  * presentation-only and must not be interpreted as residence canon.
  */
 .character-room-v2[data-character="seyeon"] {
-  --conversation-room-art: url("assets/characters/chat-themes/seyeon-chat-theme-web-v1.webp");
-  --conversation-room-position: center center;
-  --conversation-room-mobile-position: center center;
+  --conversation-room-art: url("assets/characters/seyeon-portrait-v2.webp");
+  --conversation-room-position: center 24%;
+  --conversation-room-mobile-position: center 20%;
 }
 .character-room-v2[data-character="yeoul"] {
   --conversation-room-art: url("assets/characters/rooms/yeoul-room-uploaded.svg");
@@ -1287,13 +1287,6 @@
 }
 
 @media (max-width: 900px) {
-  .character-room-v2[data-character="seyeon"] .conversation-room-scene {
-    background-image:
-      linear-gradient(180deg, rgba(255,250,240,.02) 54%, rgba(98,69,46,.14) 100%),
-      url("assets/characters/chat-themes/seyeon-chat-theme-mobile-v1.webp") !important;
-    background-position: center center !important;
-  }
-
   .character-room-v2[data-character="seyeon"] .conversation-chat-panel {
     background:
       linear-gradient(rgba(255,250,242,.82), rgba(250,240,225,.88)),
