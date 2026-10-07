@@ -8,7 +8,7 @@ import {
 const authorityReference =
   'https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582';
 const expectedGraphFingerprint =
-  'ee707fb6f61be5898f509ae0fc778c3b469ba1a330e79238dc7407b90ffdba9d';
+  'c745bacb0e9b2d13013c1048fc4273203af68b9c4816eef7b6c9fe37e4db167b';
 
 const [policyText, dispositionText, graphText, decisions, drStatus] = await Promise.all([
   readFile('docs/operations/ACCOUNT_DELETION_FINALIZATION_POLICY_V1.json', 'utf8'),
@@ -117,10 +117,10 @@ if (disposition.graphRef.fingerprintSha256 !== expectedGraphFingerprint) {
 
 const report = evaluateAccountDeletionDispositionContract(disposition, graph);
 for (const [field, expected] of [
-  ['graphEdgeCount', 138],
-  ['graphReachableTableCount', 58],
-  ['coveredEdgeCount', 138],
-  ['coveredTableCount', 58],
+  ['graphEdgeCount', 140],
+  ['graphReachableTableCount', 59],
+  ['coveredEdgeCount', 140],
+  ['coveredTableCount', 59],
   ['unresolvedTableCount', 0],
   ['unresolvedEdgeCount', 0],
   ['dependencyConflictCount', 0],
@@ -150,8 +150,8 @@ for (const entry of disposition.tableDispositions) {
     fail('non-retained table must not carry retention duration: ' + entry.table);
   }
 }
-if (!sameJson(counts, { DELETE: 45, ANONYMIZE: 4, RETAIN: 9 })) {
-  fail('approved 45/4/9 disposition split drifted: ' + JSON.stringify(counts));
+if (!sameJson(counts, { DELETE: 46, ANONYMIZE: 4, RETAIN: 9 })) {
+  fail('approved 46/4/9 disposition split drifted: ' + JSON.stringify(counts));
 }
 
 for (const resolution of disposition.edgeConflictResolutions) {
@@ -169,7 +169,7 @@ for (const resolution of disposition.edgeConflictResolutions) {
 }
 
 const plan = buildAccountDeletionExecutionPlan(disposition, graph);
-if (plan.stepCount !== 58 || plan.destructiveSqlGenerated !== false || plan.sql !== null) {
+if (plan.stepCount !== 59 || plan.destructiveSqlGenerated !== false || plan.sql !== null) {
   fail('approved structured plan must cover 58 tables and remain non-SQL');
 }
 if (plan.graphFingerprintSha256 !== expectedGraphFingerprint) {
@@ -211,5 +211,5 @@ for (const fragment of [
 }
 
 console.log(
-  'Approved account deletion policy PASS: P0-PR-01 is DECIDED, 58/58 tables map to DELETE 45 / ANONYMIZE 4 / RETAIN 9, 37 mixed FK edges are explicitly planned, retained Commerce uses calendar P5Y, component policy artifacts remain non-promoting, current bounded Production reconciliation evidence is tracked separately, and DR Ready remains false.',
+  'Approved account deletion policy PASS: P0-PR-01 is DECIDED, 59/59 tables map to DELETE 46 / ANONYMIZE 4 / RETAIN 9, 37 mixed FK edges are explicitly planned, retained Commerce uses calendar P5Y, component policy artifacts remain non-promoting, current bounded Production reconciliation evidence is tracked separately, and DR Ready remains false.',
 );

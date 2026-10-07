@@ -59,3 +59,10 @@
 - 저장 전 공개 금지와 저장 후 통제 공개
 
 합성 fixture의 관상 의미 자체를 실제 제품 규칙으로 승인하거나 운영 데이터로 승격하지 않는다.
+
+
+## Durable persistence implementation
+
+The original contract remains unchanged, but Production persistence is now specified separately in `FACE_GOVERNED_READING_ARTIFACT_PERSISTENCE_V1.md`.
+
+The in-memory commit port remains a contract-test boundary. It must not be described as durable DB storage. Production reveal must use the async durable commit boundary and a PostgreSQL receipt that additionally pins `finalOutputHash`.

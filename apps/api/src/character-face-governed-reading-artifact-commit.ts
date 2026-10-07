@@ -21,6 +21,7 @@ export interface CharacterFaceGovernedReadingCommitReceiptV1 {
   readonly faceBundleHash: string;
   readonly handoffHash: string;
   readonly readingPlanRef: string;
+  readonly finalOutputHash: string;
 }
 
 export interface CharacterFaceGovernedCommittedArtifactV1 {
@@ -153,7 +154,9 @@ function assertReceiptBindsArtifact(
     input.receipt.handoffHash !==
       input.artifact.handoffHash ||
     input.receipt.readingPlanRef !==
-      input.artifact.readingPlanRef
+      input.artifact.readingPlanRef ||
+    input.receipt.finalOutputHash !==
+      input.artifact.finalOutputHash
   ) {
     throw new CharacterFaceGovernedReadingCommitErrorV1(
       'commit',
@@ -253,6 +256,8 @@ export class InMemoryCharacterFaceGovernedReadingCommitPortV1
               input.artifact.handoffHash,
             readingPlanRef:
               input.artifact.readingPlanRef,
+            finalOutputHash:
+              input.artifact.finalOutputHash,
           }),
         artifact:
           input.artifact,

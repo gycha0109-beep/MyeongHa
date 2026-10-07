@@ -38,13 +38,13 @@ The initial #1066 discovery run intentionally used an empty inventory and emitte
 ## Current graph
 
 ```text
-reachable FK edges         = 138
-distinct reachable tables  = 58
+reachable FK edges         = 140
+distinct reachable tables  = 59
 maximum minimum depth      = 4
 
 depth 1 = 30
 depth 2 = 47
-depth 3 = 57
+depth 3 = 59
 depth 4 = 4
 ```
 
@@ -57,6 +57,7 @@ Depth greater than 1 represents relational dependencies reachable through direct
 The discovered graph includes, among others:
 
 - `subjects → conversation_threads → chat_turns / conversation_messages`;
+- `subjects → conversation_threads → chat_turns → character_reading_artifacts` (governed Character reading artifact sidecar);
 - `subjects → purchase_intents → commerce_payment_attempts / purchase_intent_reader_selections`;
 - `subjects → commerce_receipts → commerce_provider_events / entitlement_events / entitlement_grants`;
 - `subjects → reading_sessions → readings → reading_execution_attempts / reading_groundings / reading_refs`;
@@ -78,7 +79,7 @@ The guard reconstructs the same recursive graph against the fully migrated CI da
 It also requires:
 
 ```text
-edge count       = 138
+edge count       = 140
 depth-1 count    = 30
 max depth        = 4
 recursion bound  = 20 (must never be reached)
