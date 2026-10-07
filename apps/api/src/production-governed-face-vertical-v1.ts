@@ -8,8 +8,10 @@ import {
 } from '../../../packages/domain/src/index.js';
 import {
   commitAndRevealCharacterFaceGovernedReadingDurablyV1,
-  type CharacterFaceGovernedControlledRevealResultV1,
 } from './character-face-governed-reading-artifact-durable-orchestration.js';
+import type {
+  CharacterFaceGovernedControlledRevealResultV1,
+} from './character-face-governed-reading-artifact-orchestration.js';
 import type {
   CharacterFaceGovernedReadingDurableCommitPortV1,
 } from './character-face-governed-reading-artifact-durable-commit.js';
