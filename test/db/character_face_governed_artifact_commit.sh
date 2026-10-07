@@ -62,8 +62,8 @@ select * from public.cmd_commit_character_face_governed_reading_artifact_v1(
 '${SUBJECT}','${TURN}','af200000-0000-0000-0000-000000000099','af100000-0000-0000-0000-000000000098',
 '${SCHEMA}','character_face_governed_reading_artifact_replacement','sha256:v1:replacement','${CHAR}','${SOURCE}','${AUTHREF}','${BUNDLE}','${HANDOFF}','${PLAN}','${FINAL}','${replacement}'::jsonb);"
 
-biometric='${PAYLOAD%?},"rawImage":"forbidden"}'
-expect_failure "raw biometric payload" "character_face_governed_artifact_payload_scope_invalid" "
+biometric="${PAYLOAD%?},\"followUp\":{\"rawImage\":\"forbidden\"}}"
+expect_failure "raw biometric payload" "character_face_governed_artifact_biometric_payload_forbidden" "
 begin; set local role myeongha_api_executor;
 select * from public.begin_member_subject_context_v1('${AUTH}');
 select * from public.cmd_commit_character_face_governed_reading_artifact_v1(
