@@ -160,6 +160,15 @@ function mapExecutionError(error: unknown, requestId: string): Response | null {
   }
 
   if (error instanceof OpenAiSeyeonStructuredProviderErrorV1) {
+    console.error(
+      'MYEONGHA_SEYEON_PROVIDER_DIAGNOSTIC ' +
+      JSON.stringify({
+        schemaVersion: 'myeongha-seyeon-provider-diagnostic-v1',
+        stage: 'provider',
+        code: error.code,
+        httpStatus: error.httpStatus,
+      }),
+    );
     return jsonError({
       status: 503,
       code: 'AI_TEMPORARILY_UNAVAILABLE',
