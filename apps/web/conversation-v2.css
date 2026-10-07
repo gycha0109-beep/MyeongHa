@@ -263,7 +263,7 @@
 .conversation-featured-active .chat-continuation-scene[data-character="seyeon"],
 .chat-incoming-art[data-character="seyeon"],
 .chat-recent-avatar[data-character="seyeon"] {
-  background-image: url("seyeon-chat.webp");
+  background-image: url("assets/characters/seyeon-portrait-v2.webp");
   background-repeat: no-repeat;
   background-color: #ead9cc;
 }
@@ -614,10 +614,10 @@
 
 .character-room-v2[data-character="seyeon"] .conversation-room-scene {
   background-image:
-    linear-gradient(180deg, rgba(18,15,13,.02) 55%, rgba(18,15,13,.24) 100%),
-    url("seyeon-chat.webp");
+    linear-gradient(180deg, rgba(255,250,240,.02) 55%, rgba(98,69,46,.16) 100%),
+    url("assets/characters/chat-themes/seyeon-chat-theme-web-v1.webp");
   background-size: cover;
-  background-position: center 37%;
+  background-position: center center;
 }
 
 .character-room-v2[data-character="seyeon"] .conversation-room-scene .character-room-scene-decoration {
@@ -783,7 +783,7 @@
 
 .character-room-v2[data-character="seyeon"] .conversation-message-avatar[data-character="seyeon"],
 .character-room-v2[data-character="seyeon"] [data-character-avatar] {
-  background-image: url("seyeon-chat.webp");
+  background-image: url("assets/characters/seyeon-portrait-v2.webp");
   color: transparent;
 }
 
@@ -1186,14 +1186,14 @@
 }
 
 
-/* Canonical character-room art.
- * These web-optimized derivatives preserve the uploaded representative image composition.
- * The room owns the crop via background-size: cover; no generated/recomposed art is used.
+/* Character-room presentation art.
+ * Each Character keeps its own presentation authority. Seyeon Chat Theme v1 is
+ * presentation-only and must not be interpreted as residence canon.
  */
 .character-room-v2[data-character="seyeon"] {
-  --conversation-room-art: url("assets/characters/rooms/seyeon-room.webp");
-  --conversation-room-position: center 38%;
-  --conversation-room-mobile-position: center 24%;
+  --conversation-room-art: url("assets/characters/chat-themes/seyeon-chat-theme-web-v1.webp");
+  --conversation-room-position: center center;
+  --conversation-room-mobile-position: center center;
 }
 .character-room-v2[data-character="yeoul"] {
   --conversation-room-art: url("assets/characters/rooms/yeoul-room-uploaded.svg");
@@ -1260,5 +1260,43 @@
 @media (max-width: 900px) {
   body.character-room.character-room-v2[data-character] .conversation-room-scene {
     background-position: var(--conversation-room-mobile-position, center 22%) !important;
+  }
+}
+
+
+/* Seyeon Chat Theme v1 — presentation-only, not Seyeon's residence canon. */
+.character-room-v2[data-character="seyeon"] .conversation-chat-panel {
+  background:
+    linear-gradient(rgba(255,250,242,.84), rgba(250,240,225,.88)),
+    url("assets/characters/chat-themes/seyeon-chat-theme-web-v1.webp") center center / cover no-repeat;
+}
+
+.character-room-v2[data-character="seyeon"] .conversation-message-body p {
+  background: rgba(255,252,246,.90);
+  border-color: rgba(183,134,96,.20);
+}
+
+.character-room-v2[data-character="seyeon"] .conversation-message[data-sender="user"] .conversation-message-body p {
+  background: rgba(239,224,204,.94);
+}
+
+.character-room-v2[data-character="seyeon"] [data-character-avatar],
+.character-room-v2[data-character="seyeon"] .conversation-message-avatar[data-character="seyeon"] {
+  background-image: url("assets/characters/seyeon-portrait-v2.webp");
+  background-position: center 22%;
+}
+
+@media (max-width: 900px) {
+  .character-room-v2[data-character="seyeon"] .conversation-room-scene {
+    background-image:
+      linear-gradient(180deg, rgba(255,250,240,.02) 54%, rgba(98,69,46,.14) 100%),
+      url("assets/characters/chat-themes/seyeon-chat-theme-mobile-v1.webp") !important;
+    background-position: center center !important;
+  }
+
+  .character-room-v2[data-character="seyeon"] .conversation-chat-panel {
+    background:
+      linear-gradient(rgba(255,250,242,.82), rgba(250,240,225,.88)),
+      url("assets/characters/chat-themes/seyeon-chat-theme-mobile-v1.webp") center 42% / cover no-repeat;
   }
 }

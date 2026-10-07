@@ -334,7 +334,13 @@ async function verifyRoom(page, origin, suffix, width, height, mobile) {
 
   assert(state.character === 'seyeon', `${suffix}: character identity did not bind to Se-yeon`);
   assert(state.scene && state.panel && state.stream && state.composer, `${suffix}: room surfaces missing`);
-  assert(state.sceneBg.includes('assets/characters/rooms/seyeon-room.webp'), `${suffix}: approved Se-yeon room scene asset is not rendered`);
+  const approvedThemeAsset = mobile
+    ? 'assets/characters/chat-themes/seyeon-chat-theme-mobile-v1.webp'
+    : 'assets/characters/chat-themes/seyeon-chat-theme-web-v1.webp';
+  assert(
+    state.sceneBg.includes(approvedThemeAsset),
+    `${suffix}: approved Se-yeon chat theme asset is not rendered`,
+  );
   assert(state.contextHidden && state.threadHidden, `${suffix}: unverified continuation context became visible`);
   assert(['auto', 'scroll'].includes(state.streamOverflow), `${suffix}: conversation stream is not scrollable`);
   if (mobile) assert(state.globalHeaderDisplay === 'none', `${suffix}: desktop product header should be hidden in mobile room`);
@@ -342,7 +348,10 @@ async function verifyRoom(page, origin, suffix, width, height, mobile) {
 
   await page.navigate(`${origin}/chat.html?character=baekheon`);
   const baekheonScene = await page.evaluate(`getComputedStyle(document.querySelector('.conversation-room-scene')).backgroundImage`);
-  assert(!baekheonScene.includes('assets/characters/rooms/seyeon-room.webp'), `${suffix}: Se-yeon room scene leaked onto Baekheon room`);
+  assert(
+    !baekheonScene.includes('assets/characters/chat-themes/seyeon-chat-theme-'),
+    `${suffix}: Se-yeon chat theme leaked onto Baekheon room`,
+  );
   return state;
 }
 
@@ -355,8 +364,8 @@ try {
   const results = {
     desktopHub: await verifyHub(page, server.origin, 'hub-desktop', 1440, 1000, false),
     mobileHub: await verifyHub(page, server.origin, 'hub-mobile', 390, 844, true),
-    desktopRoom: await verifyRoom(page, server.origin, 'seyeon-room-desktop', 1440, 1000, false),
-    mobileRoom: await verifyRoom(page, server.origin, 'seyeon-room-mobile', 390, 844, true),
+    desktopRoom: await verifyRoom(page, server.origin, 'seyeon-chat-theme-desktop', 1440, 1000, false),
+    mobileRoom: await verifyRoom(page, server.origin, 'seyeon-chat-theme-mobile', 390, 844, true),
   };
   await writeFile(new URL(`../artifacts/${artifactPrefix}.json`, import.meta.url), `${JSON.stringify(results, null, 2)}\n`);
   console.log('MyeongHa conversation browser smoke: PASS');

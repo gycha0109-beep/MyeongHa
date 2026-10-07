@@ -15,6 +15,9 @@ describe('mobile M6-B Chat read UI structure', () => {
     expect(detail).not.toContain('fetch(');
     expect(detail).not.toContain('SecureStore');
     expect(detail).not.toContain('sendMessage');
+    expect(detail).toContain('ImageBackground');
+    expect(detail).toContain('seyeon-chat-theme-mobile-v1.webp');
+    expect(detail).toContain("snapshot.characterId === 'seyeon'");
   });
 
   it('keeps recent discovery blocked while consuming the separate source-approved Launch roster', async () => {

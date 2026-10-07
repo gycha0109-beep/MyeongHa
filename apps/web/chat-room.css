@@ -556,56 +556,26 @@ body[data-character="baekheon"] .scene-branch {
 }
 
 body[data-character="seyeon"] {
-  --room-accent: #b57d67;
-  --room-night: #7f4d46;
+  --room-accent: #b88669;
+  --room-night: #9b6b52;
 }
 
 body[data-character="seyeon"] .character-room-scene {
   background:
-    linear-gradient(180deg, rgba(255,245,231,.10), rgba(75,44,32,.12)),
-    radial-gradient(circle at 50% 25%, rgba(255,236,200,.92), transparent 29%),
-    linear-gradient(135deg, #f3d8c6 0%, #eab9a3 34%, #bc856f 100%);
+    linear-gradient(180deg, rgba(255,250,240,.04), rgba(97,67,43,.10)),
+    url("assets/characters/chat-themes/seyeon-chat-theme-web-v1.webp") center center / cover no-repeat;
 }
 
-body[data-character="seyeon"] .scene-window {
-  right: auto !important;
-  left: 0 !important;
-  width: 34%;
-  background:
-    linear-gradient(90deg, transparent 49%, rgba(112,78,54,.18) 50%, transparent 51%),
-    linear-gradient(180deg, transparent 49%, rgba(112,78,54,.18) 50%, transparent 51%),
-    linear-gradient(155deg, #fff4dd, #f2c8b0 78%);
-  box-shadow: inset -35px 0 70px rgba(172,99,73,.12);
-}
-
-body[data-character="seyeon"] .scene-lamp {
-  left: 25% !important;
-  top: 38% !important;
-  background:
-    radial-gradient(circle at 50% 50%, rgba(255,235,184,.92), rgba(234,172,91,.18) 35%, transparent 65%),
-    linear-gradient(90deg, rgba(183,126,73,.28), rgba(120,72,41,.28));
-}
-
+body[data-character="seyeon"] .scene-character-placeholder,
+body[data-character="seyeon"] .scene-window,
+body[data-character="seyeon"] .scene-lamp,
 body[data-character="seyeon"] .scene-branch {
-  inset: auto auto 28% 2% !important;
-  width: 42%;
-  opacity: .72;
-}
-
-body[data-character="seyeon"] .scene-character-placeholder {
-  left: 38% !important;
-  top: 8% !important;
-  bottom: 21% !important;
-  width: 30%;
-  opacity: .40;
-  background:
-    radial-gradient(circle at 50% 17%, #d79678 0 12%, transparent 13%),
-    linear-gradient(180deg, transparent 0 24%, #d89d8c 24% 100%);
+  opacity: 0;
 }
 
 body[data-character="seyeon"] .character-dialogue-panel {
   background:
-    linear-gradient(rgba(251,244,235,.96), rgba(251,244,235,.96)),
+    linear-gradient(rgba(252,247,239,.94), rgba(252,247,239,.94)),
     url("home-plum-branch.svg") right -82px bottom -22px / 400px auto no-repeat,
     url("home-paper-mountains.svg") center bottom -32px / 470px auto no-repeat;
 }
@@ -812,5 +782,16 @@ body[data-character="doyun"] .character-room-scene {
   .character-room-menu {
     top: 64px;
     right: 12px;
+  }
+}
+
+
+@media (max-width: 767px) {
+  body[data-character="seyeon"] .character-room-scene {
+    background-image:
+      linear-gradient(180deg, rgba(255,250,240,.02), rgba(97,67,43,.08)),
+      url("assets/characters/chat-themes/seyeon-chat-theme-mobile-v1.webp");
+    background-position: center center !important;
+    background-size: cover;
   }
 }

@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "seyeon-chat-theme-v1",
+  "characterId": "seyeon",
+  "canonBoundary": "presentation_only_not_residence_canon",
+  "mode": "static",
+  "palette": {
+    "base": [
+      "cream",
+      "ivory",
+      "light_beige"
+    ],
+    "accent": "light_apricot",
+    "lighting": "warm_afternoon"
+  },
+  "assets": {
+    "portrait": {
+      "path": "apps/web/assets/characters/seyeon-portrait-v2.webp",
+      "sha256": "d26c12da27f22c9877ea077b31810ed84ec1c14ece7778b410ff02fb5e4ee6c9"
+    },
+    "webBackground": {
+      "path": "apps/web/assets/characters/chat-themes/seyeon-chat-theme-web-v1.webp",
+      "width": 1440,
+      "height": 810,
+      "sha256": "a48c2e7cd2df1b63c9c81fd097cb65ef304af653b8a68f027bfec438470fab52"
+    },
+    "mobileBackground": {
+      "path": "apps/mobile/assets/characters/chat-themes/seyeon-chat-theme-mobile-v1.webp",
+      "webMirrorPath": "apps/web/assets/characters/chat-themes/seyeon-chat-theme-mobile-v1.webp",
+      "width": 720,
+      "height": 1280,
+      "sha256": "ba545f917394884502c5bc435df544296ea36a5c35319f52e01b7c2131906f4a"
+    }
+  }
+}
