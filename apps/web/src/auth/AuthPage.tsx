@@ -12,6 +12,7 @@ const SOCIAL_LOGIN_OPTIONS = Object.freeze([
 ] as const satisfies readonly { provider: SocialProvider; label: string }[]);
 type AuthController = {
   selectMode(mode: AuthMode): void;
+  startSocial(provider: SocialProvider): Promise<void>;
   submit(input: { email: string; password: string; confirmation: string }): Promise<void>;
   dispose(): void;
 };
@@ -32,13 +33,7 @@ export function AuthPage() {
   }, []);
 
   function handleSocialSignIn(provider: SocialProvider) {
-    const label = SOCIAL_LOGIN_OPTIONS.find((option) => option.provider === provider)?.label ?? '소셜';
-    setStatus({
-      message: provider === 'naver'
-        ? '네이버 로그인은 제공사 검수 승인 후 사용할 수 있습니다.'
-        : `${label.replace('로 계속', '')} 로그인은 최종 연동 확인 후 사용할 수 있습니다.`,
-      kind: '',
-    });
+    void controller.current?.startSocial(provider);
   }
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {

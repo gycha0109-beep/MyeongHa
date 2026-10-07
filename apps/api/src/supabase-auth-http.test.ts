@@ -141,6 +141,53 @@ describe('Supabase auth HTTP proxy', () => {
     expect(response.headers.get('set-cookie')).toBeNull();
   });
 
+  it('adopts a social refresh token into the governed web cookie session', async () => {
+    const upstream = vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
+      expect(JSON.parse(String(init?.body))).toEqual({
+        refresh_token: 'social-refresh-token',
+      });
+      return Response.json({
+        access_token: 'social.header.signature',
+        refresh_token: 'social-rotated-refresh-token',
+        expires_in: 3600,
+        user: { id: '11111111-1111-4111-8111-111111111111', email: 'social@example.com' },
+      });
+    });
+    vi.stubGlobal('fetch', upstream);
+
+    const response = await handleSupabaseAuthRequestV1({
+      request: webRequest({ refreshToken: 'social-refresh-token' }),
+      env,
+      action: 'social-complete',
+    });
+    const payload = await response.json() as any;
+
+    expect(response.status).toBe(200);
+    expect(payload.data.session).toMatchObject({
+      accessToken: 'social.header.signature',
+      user: { email: 'social@example.com' },
+    });
+    expect(payload.data.session.refreshToken).toBeUndefined();
+    expect(response.headers.get('set-cookie')).toBe(
+      'myeongha_member_refresh_v1=social-rotated-refresh-token; Path=/api/auth; HttpOnly; Secure; SameSite=Strict',
+    );
+    expect(JSON.stringify(payload)).not.toContain('social-refresh-token');
+  });
+
+  it('rejects social session adoption outside the web-cookie transport', async () => {
+    const upstream = vi.fn();
+    vi.stubGlobal('fetch', upstream);
+
+    const response = await handleSupabaseAuthRequestV1({
+      request: request({ refreshToken: 'social-refresh-token' }),
+      env,
+      action: 'social-complete',
+    });
+
+    expect(response.status).toBe(400);
+    expect(upstream).not.toHaveBeenCalled();
+  });
+
   it('preserves native refresh-token body transport when web cookie transport is absent', async () => {
     const upstream = vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
       expect(JSON.parse(String(init?.body))).toEqual({
