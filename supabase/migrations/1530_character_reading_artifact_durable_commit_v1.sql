@@ -262,29 +262,16 @@ begin
       message = 'Governed Character Face artifact turn is unavailable';
   end if;
 
-  select a.state
-  into v_attempt_state
-  from public.chat_turn_attempts a
-  where a.id = p_attempt_id
-    and a.turn_id = p_turn_id
-    and a.subject_id = p_subject_id
-  for update;
-
-  if not found then
-    raise exception using
-      errcode = 'P0001',
-      constraint = 'character_face_governed_artifact_attempt_unavailable',
-      message = 'Governed Character Face artifact attempt is unavailable';
-  end if;
-
-  if v_turn_state not in ('validated','committed','delivered')
-     or v_attempt_state not in ('validated','committed') then
+  if v_turn_state not in ('validated','committed','delivered') then
     raise exception using
       errcode = '23514',
-      constraint = 'character_face_governed_artifact_turn_attempt_not_validated',
-      message = 'Governed Character Face artifact requires a validated or committed turn attempt';
+      constraint = 'character_face_governed_artifact_turn_not_validated',
+      message = 'Governed Character Face artifact requires a validated or committed turn';
   end if;
 
+  -- Replay is keyed by logical turn + immutable artifact, not by a newly supplied
+  -- retry attempt id. This preserves the existing governed artifact contract:
+  -- same turn + same artifact returns the original durable receipt.
   select cra.*
   into v_existing
   from public.character_reading_artifacts cra
@@ -294,7 +281,6 @@ begin
 
   if found then
     if v_existing.subject_id is distinct from p_subject_id
-       or v_existing.attempt_id is distinct from p_attempt_id
        or v_existing.artifact_schema_version is distinct from btrim(p_artifact_schema_version)
        or v_existing.artifact_id is distinct from btrim(p_artifact_id)
        or v_existing.artifact_hash is distinct from btrim(p_artifact_hash)
@@ -330,6 +316,30 @@ begin
       v_existing.created_at,
       true;
     return;
+  end if;
+
+  -- Only a first commit needs to prove that the supplied attempt is the exact
+  -- validated attempt for this turn. Replays above return the original attempt.
+  select a.state
+  into v_attempt_state
+  from public.chat_turn_attempts a
+  where a.id = p_attempt_id
+    and a.turn_id = p_turn_id
+    and a.subject_id = p_subject_id
+  for update;
+
+  if not found then
+    raise exception using
+      errcode = 'P0001',
+      constraint = 'character_face_governed_artifact_attempt_unavailable',
+      message = 'Governed Character Face artifact attempt is unavailable';
+  end if;
+
+  if v_attempt_state not in ('validated','committed') then
+    raise exception using
+      errcode = '23514',
+      constraint = 'character_face_governed_artifact_attempt_not_validated',
+      message = 'Governed Character Face artifact requires a validated or committed attempt';
   end if;
 
   insert into public.character_reading_artifacts (
