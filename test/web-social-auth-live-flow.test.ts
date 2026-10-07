@@ -29,6 +29,7 @@ describe('web social auth live flow', () => {
     expect(productAuth).toContain('__myeongha_social_complete=1');
     expect(refreshRoute).toContain("routeId: 'api.auth.social.complete'");
     expect(refreshRoute).toContain("routeId: 'api.auth.refresh'");
-    expect(refreshRoute).toContain("action: 'social-complete'");
+    expect(refreshRoute).toContain("action: 'refresh'");
+    expect(refreshRoute).toContain("authAction: 'social-complete'");
   });
 });

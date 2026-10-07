@@ -16,6 +16,7 @@ import {
 } from './production-member-auth-rate-limit-config.js';
 import {
   handleSupabaseAuthRequestV1,
+  type SupabaseAuthActionV1,
 } from './supabase-auth-http.js';
 import type {
   ProductionUserDataRuntimeEnvV1,
@@ -32,14 +33,25 @@ export const MEMBER_AUTH_RATE_LIMIT_POSTGRES_POOL_OPTIONS_V1 =
 type MemberAuthUpstreamHandlerV1 = (input: {
   readonly request: Request;
   readonly env: ProductionUserDataRuntimeEnvV1;
-  readonly action: MemberAuthRateLimitActionV1;
+  readonly action: SupabaseAuthActionV1;
 }) => Promise<Response>;
 
+type ProductionMemberAuthHttpRequestV1 =
+  | Readonly<{
+      request: Request;
+      action: Exclude<MemberAuthRateLimitActionV1, 'refresh'>;
+      authAction?: never;
+    }>
+  | Readonly<{
+      request: Request;
+      action: 'refresh';
+      authAction?: 'social-complete';
+    }>;
+
 export interface ProductionMemberAuthHttpRuntimeV1 {
-  handleRequest(input: {
-    readonly request: Request;
-    readonly action: MemberAuthRateLimitActionV1;
-  }): Promise<Response>;
+  handleRequest(
+    input: ProductionMemberAuthHttpRequestV1,
+  ): Promise<Response>;
   close(): Promise<void>;
 }
 
@@ -90,15 +102,19 @@ export function createProductionMemberAuthHttpRuntimeV1(
   }
 
   return Object.freeze({
-    async handleRequest(requestInput: {
-      readonly request: Request;
-      readonly action: MemberAuthRateLimitActionV1;
-    }) {
+    async handleRequest(
+      requestInput:
+        ProductionMemberAuthHttpRequestV1,
+    ) {
+      const authAction =
+        requestInput.authAction ??
+        requestInput.action;
+
       if (requestInput.request.method !== 'POST') {
         return authHandler({
           request: requestInput.request,
           env: input.env,
-          action: requestInput.action,
+          action: authAction,
         });
       }
 
@@ -119,7 +135,7 @@ export function createProductionMemberAuthHttpRuntimeV1(
         next: () => authHandler({
           request: requestInput.request,
           env: input.env,
-          action: requestInput.action,
+          action: authAction,
         }),
       });
     },

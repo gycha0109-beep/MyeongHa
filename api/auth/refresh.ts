@@ -1,6 +1,5 @@
 import { executeSecurityObservedRequestV1 } from '../../apps/api/src/security-observability.js';
 import { createProductionMemberAuthHttpRuntimeV1 } from '../../apps/api/src/production-member-auth-http-runtime.js';
-import { handleSupabaseAuthRequestV1 } from '../../apps/api/src/supabase-auth-http.js';
 
 export const maxDuration = 10;
 
@@ -30,10 +29,10 @@ export default {
         request,
         routeId: 'api.auth.social.complete',
         execute: () =>
-          handleSupabaseAuthRequestV1({
+          getRuntime().handleRequest({
             request,
-            env: process.env,
-            action: 'social-complete',
+            action: 'refresh',
+            authAction: 'social-complete',
           }),
       });
     }

@@ -60,6 +60,38 @@ describe('Production Member Auth HTTP runtime', () => {
     expect(authHandler).toHaveBeenCalledTimes(1);
   });
 
+  it('uses the refresh admission bucket before delegating social completion upstream', async () => {
+    const admit = vi.fn(async () => ({
+      allowed: true,
+      requestCount: 1,
+      resetAt: '2026-09-28T03:01:00.000Z',
+    }));
+    const authHandler = vi.fn(async () => Response.json({ ok: true }));
+    const runtime = createProductionMemberAuthHttpRuntimeV1({
+      env: env(),
+      admissionPort: { admit },
+      authHandler,
+    });
+
+    const response = await runtime.handleRequest({
+      request: request(),
+      action: 'refresh',
+      authAction: 'social-complete',
+    });
+
+    expect(response.status).toBe(200);
+    expect(admit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'refresh',
+      }),
+    );
+    expect(authHandler).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'social-complete',
+      }),
+    );
+  });
+
   it('maps missing activation config to fail-closed 503 without Auth work', async () => {
     const authHandler = vi.fn();
     const runtime = createProductionMemberAuthHttpRuntimeV1({
