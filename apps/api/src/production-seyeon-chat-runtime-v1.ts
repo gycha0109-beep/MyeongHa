@@ -1,5 +1,7 @@
 import {
   InMemorySeyeonEventLedgerV2,
+  evaluateCharacterContentCompatibilityV1,
+  type CharacterClientCompatibilityProfileV1,
 } from '../../../packages/domain/src/index.js';
 import {
   getChatThreadRuntimeBinding,
@@ -11,7 +13,9 @@ import {
 } from './content-bundle-manifest-read.js';
 import {
   prepareInternalPinnedSeyeonDogfoodReceivePlanV1,
+  prepareServerCompatiblePinnedSeyeonReceivePlanV1,
 } from './chat-receive.js';
+import { ApiCommandError } from './api-error.js';
 import {
   createOpenAiSeyeonStructuredProviderV1,
   type OpenAiSeyeonStructuredProviderConfigV1,
@@ -88,6 +92,8 @@ export interface CreateProductionSeyeonChatRuntimeInputV1 {
   readonly provider?: SeyeonStructuredProviderPortV2;
   readonly pool?: PostgresSubjectPoolV1;
   readonly createUuid?: () => string;
+  /** Server-owned public Web compatibility authority. Never derived from a request. */
+  readonly clientCompatibilityProfile?: CharacterClientCompatibilityProfileV1;
 }
 
 function text(value: string, path: string, max: number): string {
@@ -132,6 +138,30 @@ function assertBundleContainsSeyeon(
   if (!manifest.manifest.characterIds.includes('seyeon')) {
     throw new Error(
       'Pinned content bundle does not contain Se-yeon.',
+    );
+  }
+}
+
+
+export function assertSeyeonPublicContentCompatibilityV1(input: {
+  readonly bundleManifest: ContentBundleManifestReadResponseV1;
+  readonly clientProfile: CharacterClientCompatibilityProfileV1;
+}): void {
+  const decision = evaluateCharacterContentCompatibilityV1({
+    manifest: {
+      minClientCapability: input.bundleManifest.manifest.minClientCapability,
+      assetManifestHash: input.bundleManifest.manifest.assetManifestHash,
+      cueSchemaVersion: input.bundleManifest.manifest.cueSchemaVersion,
+    },
+    clientProfile: input.clientProfile,
+  });
+
+  if (!decision.compatible || decision.action !== 'activate') {
+    throw new ApiCommandError(
+      decision.failures.includes('INVALID_COMPATIBILITY_INPUT')
+        ? 'CAPABILITY_UNAVAILABLE'
+        : 'CONTENT_INCOMPATIBLE',
+      'Pinned Se-yeon content is not compatible with the governed Web client profile.',
     );
   }
 }
@@ -184,27 +214,40 @@ export function createProductionSeyeonChatRuntimeV1(
       });
       assertBundleContainsSeyeon(bundleManifest);
 
+      const trustedThread = Object.freeze({
+        threadId,
+        pinnedReleaseId: threadBinding.activeContentReleaseId,
+        participantCharacterIds: threadBinding.participantCharacterIds,
+      });
+
       const receivePlan =
-        prepareInternalPinnedSeyeonDogfoodReceivePlanV1({
-          request: Object.freeze({
-            threadId,
-            characterId: 'seyeon',
-            clientTurnId,
-            text: userText,
-            clientCapability: 'internal-seyeon-dogfood-v1',
-          }),
-          trustedThread: Object.freeze({
-            threadId,
-            pinnedReleaseId:
-              threadBinding.activeContentReleaseId,
-            participantCharacterIds:
-              threadBinding.participantCharacterIds,
-          }),
-          pinnedBundleId:
-            threadBinding.activeContentBundleId,
-          contentVersion:
-            bundleManifest.manifest.contentVersion,
-        });
+        input.clientCompatibilityProfile === undefined
+          ? prepareInternalPinnedSeyeonDogfoodReceivePlanV1({
+              request: Object.freeze({
+                threadId,
+                characterId: 'seyeon',
+                clientTurnId,
+                text: userText,
+                clientCapability: 'internal-seyeon-dogfood-v1',
+              }),
+              trustedThread,
+              pinnedBundleId: threadBinding.activeContentBundleId,
+              contentVersion: bundleManifest.manifest.contentVersion,
+            })
+          : (() => {
+              assertSeyeonPublicContentCompatibilityV1({
+                bundleManifest,
+                clientProfile: input.clientCompatibilityProfile,
+              });
+              return prepareServerCompatiblePinnedSeyeonReceivePlanV1({
+                clientTurnId,
+                text: userText,
+                trustedThread,
+                pinnedBundleId: threadBinding.activeContentBundleId,
+                contentVersion: bundleManifest.manifest.contentVersion,
+                clientCapability: bundleManifest.manifest.minClientCapability,
+              });
+            })();
 
       const ledger = new InMemorySeyeonEventLedgerV2();
 

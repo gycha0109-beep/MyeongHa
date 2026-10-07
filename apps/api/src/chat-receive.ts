@@ -41,6 +41,7 @@ export interface ChatReceivePlan {
 
 const serverPreparedChatReceivePlansV1 = new WeakSet<object>();
 const internalPinnedSeyeonDogfoodPlansV1 = new WeakSet<object>();
+const serverCompatiblePinnedSeyeonPlansV1 = new WeakSet<object>();
 const serverPreparedChatReceiveContentEntriesV1 =
   new WeakMap<object, ContentReleaseRuntimeEntry>();
 
@@ -49,7 +50,8 @@ export function assertServerPreparedChatReceivePlanV1(
 ): void {
   if (
     !serverPreparedChatReceivePlansV1.has(plan) &&
-    !internalPinnedSeyeonDogfoodPlansV1.has(plan)
+    !internalPinnedSeyeonDogfoodPlansV1.has(plan) &&
+    !serverCompatiblePinnedSeyeonPlansV1.has(plan)
   ) {
     throw new ApiCommandError(
       'INVALID_REQUEST',
@@ -67,6 +69,11 @@ export function getServerPreparedChatReceiveContentEntryV1(
     if (internalPinnedSeyeonDogfoodPlansV1.has(plan)) {
       throw new Error(
         'Internal pinned Se-yeon plan intentionally has no public client-compatibility content entry.',
+      );
+    }
+    if (serverCompatiblePinnedSeyeonPlansV1.has(plan)) {
+      throw new Error(
+        'Server-compatible pinned Se-yeon plan carries compatibility authority outside ContentReleaseRuntime.',
       );
     }
     throw new Error(
@@ -173,6 +180,44 @@ export function prepareInternalPinnedSeyeonDogfoodReceivePlanV1(
     requestedCharacterId: 'seyeon',
   });
   internalPinnedSeyeonDogfoodPlansV1.add(plan);
+  return plan;
+}
+
+
+export interface PrepareServerCompatiblePinnedSeyeonReceiveInputV1 {
+  readonly clientTurnId: string;
+  readonly text: string;
+  readonly trustedThread: TrustedThreadBinding;
+  readonly pinnedBundleId: string;
+  readonly contentVersion: string;
+  readonly clientCapability: string;
+}
+
+/**
+ * Public-boundary server-minted pinned Se-yeon receive plan.
+ *
+ * The caller must already have established client/content compatibility from
+ * server-owned authority. Browser input never supplies release, bundle,
+ * character, or compatibility identity to this helper.
+ */
+export function prepareServerCompatiblePinnedSeyeonReceivePlanV1(
+  input: PrepareServerCompatiblePinnedSeyeonReceiveInputV1,
+): ChatReceivePlan {
+  const plan = prepareInternalPinnedSeyeonDogfoodReceivePlanV1({
+    request: Object.freeze({
+      threadId: input.trustedThread.threadId,
+      characterId: 'seyeon',
+      clientTurnId: input.clientTurnId,
+      text: input.text,
+      clientCapability: input.clientCapability,
+    }),
+    trustedThread: input.trustedThread,
+    pinnedBundleId: input.pinnedBundleId,
+    contentVersion: input.contentVersion,
+  });
+
+  internalPinnedSeyeonDogfoodPlansV1.delete(plan);
+  serverCompatiblePinnedSeyeonPlansV1.add(plan);
   return plan;
 }
 

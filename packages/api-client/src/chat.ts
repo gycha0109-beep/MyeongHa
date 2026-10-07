@@ -362,6 +362,95 @@ export async function readChatThreadPageV1(
 }
 
 
+
+export interface SeyeonChatTurnSendRequestV1 {
+  readonly clientTurnId: string;
+  readonly text: string;
+}
+
+export interface SeyeonChatTurnSendResultV1 {
+  readonly turnId: string;
+  readonly assistantMessageId: string;
+  readonly assistantText: string;
+  readonly sequenceNo: number;
+  readonly replayed: boolean;
+}
+
+function parseTurnSendInputV1(value: unknown): SeyeonChatTurnSendRequestV1 {
+  if (!isRecord(value)) {
+    return clientInvalid('Chat turn request must be an object.', 'CLIENT_CHAT_TURN_INVALID');
+  }
+  const keys = Object.keys(value).sort();
+  if (keys.length !== 2 || keys[0] !== 'clientTurnId' || keys[1] !== 'text') {
+    return clientInvalid(
+      'Chat turn request accepts only clientTurnId and text.',
+      'CLIENT_CHAT_TURN_INVALID',
+    );
+  }
+  if (
+    typeof value.clientTurnId !== 'string' ||
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(value.clientTurnId)
+  ) {
+    return clientInvalid('Chat clientTurnId must be a UUID.', 'CLIENT_CHAT_TURN_INVALID');
+  }
+  if (
+    typeof value.text !== 'string' ||
+    value.text.trim().length === 0 ||
+    value.text.trim().length > 8000
+  ) {
+    return clientInvalid(
+      'Chat text must be non-empty and at most 8000 characters.',
+      'CLIENT_CHAT_TURN_INVALID',
+    );
+  }
+  return Object.freeze({
+    clientTurnId: value.clientTurnId,
+    text: value.text.trim(),
+  });
+}
+
+function parseSeyeonTurnSendResultV1(data: unknown): SeyeonChatTurnSendResultV1 {
+  if (!isRecord(data)) return invalid('turn response is invalid.');
+  const turnId = stringValue('turn turnId', data.turnId);
+  const assistantMessageId = stringValue(
+    'turn assistantMessageId',
+    data.assistantMessageId,
+  );
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(turnId)) {
+    return invalid('turn turnId is invalid.');
+  }
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(assistantMessageId)) {
+    return invalid('turn assistantMessageId is invalid.');
+  }
+  if (typeof data.replayed !== 'boolean') {
+    return invalid('turn replayed flag is invalid.');
+  }
+  return Object.freeze({
+    turnId,
+    assistantMessageId,
+    assistantText: stringValue('turn assistantText', data.assistantText),
+    sequenceNo: integerValue('turn sequenceNo', data.sequenceNo),
+    replayed: data.replayed,
+  });
+}
+
+export async function sendSeyeonChatTurnV1(
+  client: MyeongHaApiClientV1,
+  bearer: string,
+  threadIdInput: unknown,
+  requestInput: unknown,
+): Promise<SeyeonChatTurnSendResultV1> {
+  const threadId = parseChatThreadIdV1(threadIdInput);
+  const request = parseTurnSendInputV1(requestInput);
+  const data = await client.requestData({
+    method: 'POST',
+    path: `/api/chat/${encodeURIComponent(threadId)}/turns`,
+    bearer,
+    body: request,
+  });
+  return parseSeyeonTurnSendResultV1(data);
+}
+
 function parseChatOpenResultV1(
   data: unknown,
   requestedCharacterId: ChatLaunchCharacterIdV1,
