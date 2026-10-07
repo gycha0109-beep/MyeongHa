@@ -2,6 +2,10 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  hashCharacterFaceGovernedInterpretationMaterialV1,
+} from '../../../packages/domain/src/index.js';
+
+import {
   buildSajuGovernedFaceHandoffRequestV1,
   createSajuGovernedFaceHandoffHttpAdapterV1,
   SAJU_GOVERNED_FACE_HANDOFF_ADMISSION_HEADER_V1,
@@ -37,7 +41,7 @@ const fixture = JSON.parse(
     topicKey: string;
     authorizationReceiptRef: string;
     handoffHash: string;
-    units: readonly unknown[];
+    units: readonly Record<string, unknown>[];
   };
 };
 
@@ -101,7 +105,98 @@ const REQUEST =
       fixture.source.plan.requestId,
   });
 
+
+function governedGroundingFixture() {
+  const units = Object.freeze(
+    fixture.handoff.units.map((unit) =>
+      Object.freeze({
+        ...unit,
+        realizationPolicyRef:
+          'protected_meaning_exact_v1',
+      }),
+    ),
+  );
+
+  const material = Object.freeze({
+    schemaVersion:
+      'face-governed-character-grounding-v1',
+    projectionVersion:
+      'face-governed-character-grounding-projection-v1',
+    realizationPolicyRegistryVersion:
+      'face-governed-character-realization-policy-v1',
+    mode:
+      'governed_traditional_interpretation',
+    topicKey:
+      fixture.handoff.topicKey,
+    sourceContractVersion:
+      fixture.handoff.sourceContractVersion,
+    sourceAuthorityRef:
+      fixture.handoff.sourceAuthorityRef,
+    sourceResultHash:
+      fixture.handoff.sourceResultHash,
+    authorizationReceiptRef:
+      fixture.handoff.authorizationReceiptRef,
+    handoffHash:
+      fixture.handoff.handoffHash,
+    faceEngineVersion:
+      'test-only:face-engine-v1',
+    faceReadingRef:
+      'test-only:face-reading-ref-v1',
+    methodologyPackRefs:
+      Object.freeze(['test-only:methodology-pack-v1']),
+    bindingGroupRefs:
+      Object.freeze(['test-only:binding-group-v1']),
+    units,
+    unavailableSections:
+      Object.freeze([]),
+    prohibitedInferences:
+      Object.freeze(['guaranteed_future_outcome']),
+    provenanceRefs:
+      Object.freeze(['test-only:governed-face-grounding']),
+  });
+
+  const grounding = Object.freeze({
+    ...material,
+    bundleHash:
+      'face-governed-character-grounding:' +
+      hashCharacterFaceGovernedInterpretationMaterialV1(material),
+  });
+
+  const groundingRef = Object.freeze({
+    schemaVersion:
+      'face-governed-character-grounding-ref-v1',
+    projectionVersion:
+      grounding.projectionVersion,
+    mode:
+      grounding.mode,
+    topicKey:
+      grounding.topicKey,
+    sourceContractVersion:
+      grounding.sourceContractVersion,
+    sourceAuthorityRef:
+      grounding.sourceAuthorityRef,
+    sourceResultHash:
+      grounding.sourceResultHash,
+    authorizationReceiptRef:
+      grounding.authorizationReceiptRef,
+    handoffHash:
+      grounding.handoffHash,
+    faceEngineVersion:
+      grounding.faceEngineVersion,
+    faceReadingRef:
+      grounding.faceReadingRef,
+    methodologyPackRefs:
+      grounding.methodologyPackRefs,
+    bundleHash:
+      grounding.bundleHash,
+  });
+
+  return { grounding, groundingRef };
+}
+
 function eligibleEnvelope() {
+  const { grounding, groundingRef } =
+    governedGroundingFixture();
   return {
     schemaVersion:
       SAJU_GOVERNED_FACE_HANDOFF_RUNTIME_SCHEMA_VERSION_V1,
@@ -128,6 +223,8 @@ function eligibleEnvelope() {
     },
     handoff:
       fixture.handoff,
+    grounding,
+    groundingRef,
   };
 }
 
@@ -184,6 +281,10 @@ describe('TOPIC-FACE-005M-B Saju governed Face handoff HTTP adapter', () => {
           .sourceBinding,
       handoff:
         fixture.handoff,
+      grounding:
+        eligibleEnvelope().grounding,
+      groundingRef:
+        eligibleEnvelope().groundingRef,
     });
 
     expect(calls).toHaveLength(1);
@@ -385,6 +486,71 @@ describe('TOPIC-FACE-005M-B Saju governed Face handoff HTTP adapter', () => {
 
     await expect(
       adapter.requestHandoff(
+        REQUEST,
+      ),
+    ).rejects.toMatchObject({
+      code:
+        'HANDOFF_ADMISSION_REJECTED',
+    });
+  });
+
+
+  it('rejects governed grounding or groundingRef tampering rather than reconstructing source authority', async () => {
+    const groundingTamper =
+      eligibleEnvelope();
+    groundingTamper.grounding = {
+      ...groundingTamper.grounding,
+      bundleHash:
+        'face-governed-character-grounding:tampered',
+    };
+
+    const adapter =
+      createSajuGovernedFaceHandoffHttpAdapterV1({
+        baseUrl:
+          'https://saju.example.test',
+        bearerToken:
+          'service-secret',
+        fetchImpl:
+          async () =>
+            jsonResponse(
+              200,
+              groundingTamper,
+            ),
+      });
+
+    await expect(
+      adapter.requestHandoff(
+        REQUEST,
+      ),
+    ).rejects.toMatchObject({
+      code:
+        'HANDOFF_ADMISSION_REJECTED',
+    });
+
+    const refTamper =
+      eligibleEnvelope();
+    refTamper.groundingRef = {
+      ...refTamper.groundingRef,
+      bundleHash:
+        'face-governed-character-grounding:other',
+    };
+
+    const second =
+      createSajuGovernedFaceHandoffHttpAdapterV1({
+        baseUrl:
+          'https://saju.example.test',
+        bearerToken:
+          'service-secret',
+        fetchImpl:
+          async () =>
+            jsonResponse(
+              200,
+              refTamper,
+            ),
+      });
+
+    await expect(
+      second.requestHandoff(
         REQUEST,
       ),
     ).rejects.toMatchObject({
