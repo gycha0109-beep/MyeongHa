@@ -10,7 +10,7 @@ const characters = {
   seyeon: {
     name: '세연',
     title: '무녀',
-    sceneLabel: '세연의 봄날 산책 공간',
+    sceneLabel: '세연의 따뜻한 오후빛 대화 공간',
     intro: ['왔네요.', '오늘은 어떤 이야기부터 해볼까요?'],
   },
   yeoul: {
