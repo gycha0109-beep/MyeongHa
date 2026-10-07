@@ -5,14 +5,14 @@
   "graphAuthority": "SCHEMA_DISCOVERED_POLICY_NEUTRAL",
   "executionAuthorized": false,
   "discovery": {
-    "edgeCount": 138,
-    "distinctReachableTableCount": 58,
+    "edgeCount": 140,
+    "distinctReachableTableCount": 59,
     "maxDepth": 4,
     "depthCounts": {
       "1": 30,
       "2": 47,
-      "3": 57,
-      "4": 4
+      "3": 58,
+      "4": 5
     },
     "directDepthOneEdgeCount": 30
   },
@@ -1264,6 +1264,21 @@
     {
       "minDepth": 3,
       "parentTable": "chat_turns",
+      "childTable": "character_reading_artifacts",
+      "constraintName": "character_reading_artifacts_turn_subject_fk",
+      "childColumns": [
+        "turn_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "chat_turns",
       "childTable": "chat_turn_attempts",
       "constraintName": "chat_turn_attempts_generated_turn_bundle_fk",
       "childColumns": [
@@ -1998,6 +2013,23 @@
       ],
       "parentColumns": [
         "id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 4,
+      "parentTable": "chat_turn_attempts",
+      "childTable": "character_reading_artifacts",
+      "constraintName": "character_reading_artifacts_attempt_turn_subject_fk",
+      "childColumns": [
+        "attempt_id",
+        "turn_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "turn_id",
+        "subject_id"
       ],
       "disposition": "UNDECIDED"
     },
