@@ -7,6 +7,17 @@ import type {
   ContentBundleManifestReadResponseV1,
 } from './content-bundle-manifest-read.js';
 
+export const SEYEON_PRODUCTION_WEB_COMPATIBILITY_PROFILE_V1 = Object.freeze({
+  profileKey: 'production-web-seyeon-static-v1',
+  supportedClientCapabilities: Object.freeze(['character-chat-theme-v1']),
+  supportedAssetManifestHashes: Object.freeze([
+    'sha256:v1:ca769bd9b211e5d04f64128fea1fb2e3d1eca3f91d2d34c6fe14f39b62591a4d',
+  ]),
+  supportedCueSchemaVersions: Object.freeze([
+    'character-static-presentation-v1',
+  ]),
+}) satisfies CharacterClientCompatibilityProfileV1;
+
 /**
  * Positive admission boundary for public Se-yeon Chat content.
  *

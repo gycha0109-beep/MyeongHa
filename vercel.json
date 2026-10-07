@@ -19,6 +19,10 @@
     },
     "api/readiness.ts": {
       "supportsCancellation": true
+    },
+    "api/me.ts": {
+      "supportsCancellation": true,
+      "maxDuration": 60
     }
   },
   "redirects": [
@@ -66,6 +70,10 @@
     {
       "source": "/api/chat",
       "destination": "/api/me?__myeongha_chat_open=1"
+    },
+    {
+      "source": "/api/chat/:threadId/turns",
+      "destination": "/api/me?__myeongha_chat_turn_send=1&__myeongha_chat_thread_id=:threadId"
     },
     {
       "source": "/api/chat/:threadId",

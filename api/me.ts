@@ -1,6 +1,7 @@
 import { executeSecurityObservedRequestV1 } from '../apps/api/src/security-observability.js';
 import { createNodePostgresSubjectPoolV1 } from '../apps/api/src/node-postgres-subject-pool.js';
 import { createProductionChatReadRuntimeV1 } from '../apps/api/src/production-chat-read-runtime.js';
+import { createProductionSeyeonTurnSendRuntimeV1 } from '../apps/api/src/production-seyeon-turn-send-runtime-v1.js';
 import { createProductionCurrentSubjectProfileRuntimeV1 } from '../apps/api/src/production-current-subject-profile-runtime.js';
 import { createProductionCurrentSubjectSajuPreviewReadingRuntimeV1 } from '../apps/api/src/production-current-subject-saju-preview-reading-runtime.js';
 import { createProductionDeviceInstallationRuntimeV1 } from '../apps/api/src/production-device-installation-runtime.js';
@@ -19,6 +20,7 @@ const READINGS_ROUTE = '/api/readings' as const;
 const MEMORIES_ROUTE = '/api/memories' as const;
 const CHAT_OPEN_ROUTE = '/api/chat' as const;
 const CHAT_ROUTE_PREFIX = '/api/chat/' as const;
+const CHAT_TURN_SEND_SUFFIX = '/turns' as const;
 const TARGET_PERSONS_ROUTE = '/api/target-persons' as const;
 const DEVICE_INSTALLATION_REGISTER_ROUTE = '/api/device-installations/register' as const;
 const DEVICE_INSTALLATION_REVOKE_PREFIX = '/api/device-installations/' as const;
@@ -29,6 +31,7 @@ const RECORDS_ROUTE_PARAM = '__myeongha_records_read' as const;
 const READING_RECORD_ID_PARAM = 'readingId' as const;
 const CHAT_OPEN_PARAM = '__myeongha_chat_open' as const;
 const CHAT_THREAD_PARAM = '__myeongha_chat_thread_id' as const;
+const CHAT_TURN_SEND_PARAM = '__myeongha_chat_turn_send' as const;
 const VERCEL_DYNAMIC_CHAT_THREAD_PARAM = 'threadId' as const;
 const CHAT_CURSOR_PARAM = 'afterSequenceNo' as const;
 const TARGET_PERSON_READ_PARAM = '__myeongha_target_person_read' as const;
@@ -55,6 +58,9 @@ let memoriesRuntime:
   | undefined;
 let chatRuntime:
   | ReturnType<typeof createProductionChatReadRuntimeV1>
+  | undefined;
+let seyeonTurnSendRuntime:
+  | ReturnType<typeof createProductionSeyeonTurnSendRuntimeV1>
   | undefined;
 let targetPersonRuntime:
   | ReturnType<typeof createProductionTargetPersonReadRuntimeV1>
@@ -116,6 +122,14 @@ function getChatRuntime(): ReturnType<typeof createProductionChatReadRuntimeV1> 
   return chatRuntime;
 }
 
+function getSeyeonTurnSendRuntime(): ReturnType<typeof createProductionSeyeonTurnSendRuntimeV1> {
+  seyeonTurnSendRuntime ??= createProductionSeyeonTurnSendRuntimeV1({
+    env: process.env,
+    pool: getSharedPostgresPool(),
+  });
+  return seyeonTurnSendRuntime;
+}
+
 function getTargetPersonRuntime(): ReturnType<typeof createProductionTargetPersonReadRuntimeV1> {
   targetPersonRuntime ??= createProductionTargetPersonReadRuntimeV1({
     env: process.env,
@@ -158,6 +172,7 @@ type DispatchTarget =
     }
   | { readonly kind: 'chat-open'; readonly route: typeof CHAT_OPEN_ROUTE }
   | { readonly kind: 'chat-read'; readonly route: string; readonly afterSequenceNo?: string }
+  | { readonly kind: 'chat-turn-send'; readonly route: string; readonly threadId: string }
   | {
       readonly kind: 'target-person-list';
       readonly route: typeof TARGET_PERSONS_ROUTE;
@@ -204,7 +219,27 @@ function getRecordsDispatchValueForSourcePath(pathname: string): RecordsDispatch
   return undefined;
 }
 
+function getChatTurnPathThreadId(pathname: string): string | null | undefined {
+  if (!pathname.startsWith(CHAT_ROUTE_PREFIX) || !pathname.endsWith(CHAT_TURN_SEND_SUFFIX)) {
+    return undefined;
+  }
+
+  const rawSegment = pathname.slice(
+    CHAT_ROUTE_PREFIX.length,
+    -CHAT_TURN_SEND_SUFFIX.length,
+  );
+  if (rawSegment.length === 0 || rawSegment.includes('/')) return null;
+
+  try {
+    const threadId = decodeURIComponent(rawSegment);
+    return isUuid(threadId) ? threadId : null;
+  } catch {
+    return null;
+  }
+}
+
 function getChatPathThreadId(pathname: string): string | null | undefined {
+  if (getChatTurnPathThreadId(pathname) !== undefined) return undefined;
   if (
     pathname === PROFILE_ROUTE ||
     pathname === CHAT_OPEN_ROUTE ||
@@ -271,6 +306,8 @@ function resolveDispatchTarget(request: Request): DispatchTarget | null {
   const url = new URL(request.url);
   if (url.hash !== '') return null;
 
+  const turnPathThreadId = getChatTurnPathThreadId(url.pathname);
+  if (turnPathThreadId === null) return null;
   const pathThreadId = getChatPathThreadId(url.pathname);
   if (pathThreadId === null) return null;
   const targetPersonPathValue = getTargetPersonPathValue(url.pathname);
@@ -285,6 +322,7 @@ function resolveDispatchTarget(request: Request): DispatchTarget | null {
     READING_RECORD_ID_PARAM,
     CHAT_OPEN_PARAM,
     CHAT_THREAD_PARAM,
+    CHAT_TURN_SEND_PARAM,
     VERCEL_DYNAMIC_CHAT_THREAD_PARAM,
     CHAT_CURSOR_PARAM,
     TARGET_PERSON_READ_PARAM,
@@ -319,6 +357,10 @@ function resolveDispatchTarget(request: Request): DispatchTarget | null {
   if (chatOpen === null) return null;
   const chatThreadId = getSingleNonEmptyParam(url.searchParams, CHAT_THREAD_PARAM);
   if (chatThreadId === null) return null;
+  const chatTurnSend = getSingleNonEmptyParam(url.searchParams, CHAT_TURN_SEND_PARAM);
+  if (chatTurnSend === null || (chatTurnSend !== undefined && chatTurnSend !== '1')) {
+    return null;
+  }
   const vercelDynamicThreadId = getSingleNonEmptyParam(
     url.searchParams,
     VERCEL_DYNAMIC_CHAT_THREAD_PARAM,
@@ -372,6 +414,44 @@ function resolveDispatchTarget(request: Request): DispatchTarget | null {
     DEVICE_INSTALLATION_ID_PARAM,
   );
   if (deviceInstallationId === null) return null;
+
+  if (chatTurnSend === '1' || turnPathThreadId !== undefined) {
+    if (chatTurnSend !== '1') return null;
+    if (
+      recordsRoute !== undefined ||
+      readingRecordId !== undefined ||
+      chatOpen !== undefined ||
+      afterSequenceNo !== undefined ||
+      sajuPreviewReading !== undefined ||
+      targetPersonRead !== undefined ||
+      targetPersonId !== undefined ||
+      vercelDynamicTargetPersonId !== undefined ||
+      targetPersonPathValue !== undefined ||
+      deviceInstallationAction !== undefined ||
+      deviceInstallationId !== undefined ||
+      deviceInstallationPathValue !== undefined
+    ) {
+      return null;
+    }
+    if (chatThreadId === undefined || !isUuid(chatThreadId)) return null;
+    if (
+      turnPathThreadId !== undefined &&
+      turnPathThreadId !== chatThreadId
+    ) {
+      return null;
+    }
+    if (
+      vercelDynamicThreadId !== undefined &&
+      vercelDynamicThreadId !== chatThreadId
+    ) {
+      return null;
+    }
+    return {
+      kind: 'chat-turn-send',
+      route: `${CHAT_ROUTE_PREFIX}${chatThreadId}${CHAT_TURN_SEND_SUFFIX}`,
+      threadId: chatThreadId,
+    };
+  }
 
   if (chatOpen !== undefined && chatOpen !== '1') return null;
 
@@ -652,6 +732,8 @@ function runtimeForTarget(target: DispatchTarget) {
     case 'chat-open':
     case 'chat-read':
       return getChatRuntime();
+    case 'chat-turn-send':
+      return getSeyeonTurnSendRuntime();
     case 'target-person-list':
     case 'target-person-detail':
       return getTargetPersonRuntime();

@@ -14,7 +14,11 @@ import {
 } from './production-request-identity-verifier.js';
 import {
   createProductionSeyeonChatRuntimeV1,
+  type ProductionSeyeonChatRuntimeV1,
 } from './production-seyeon-chat-runtime-v1.js';
+import {
+  SEYEON_PRODUCTION_WEB_COMPATIBILITY_PROFILE_V1,
+} from './seyeon-public-content-compatibility-v1.js';
 import {
   parseProductionUserDataRuntimeConfigV1,
   type ProductionUserDataRuntimeEnvV1,
@@ -36,8 +40,10 @@ export interface ProductionSeyeonTurnSendRuntimeV1 {
 
 export interface CreateProductionSeyeonTurnSendRuntimeInputV1 {
   readonly env: ProductionUserDataRuntimeEnvV1;
-  readonly providerConfig: OpenAiSeyeonStructuredProviderConfigV1;
-  readonly clientCompatibilityProfile: CharacterClientCompatibilityProfileV1;
+  /** Server-owned test override only. Production defaults to the approved Seyeon Web profile. */
+  readonly providerConfig?: OpenAiSeyeonStructuredProviderConfigV1;
+  /** Server-owned test override only. Browser input can never supply this profile. */
+  readonly clientCompatibilityProfile?: CharacterClientCompatibilityProfileV1;
   readonly pool?: PostgresSubjectPoolV1;
   readonly memberFetchImpl?: SupabaseMemberVerifierFetchV1;
   readonly identityEvidenceVerifier?: IdentityEvidenceVerificationPortV1;
@@ -57,13 +63,23 @@ export function createProductionSeyeonTurnSendRuntimeV1(
       config,
       ...(input.memberFetchImpl === undefined ? {} : { memberFetchImpl: input.memberFetchImpl }),
     });
-  const runtime = createProductionSeyeonChatRuntimeV1({
-    databaseConfig: config,
-    providerConfig: input.providerConfig,
-    clientCompatibilityProfile: input.clientCompatibilityProfile,
-    ...(input.pool === undefined ? {} : { pool: input.pool }),
-    ...(input.createUuid === undefined ? {} : { createUuid: input.createUuid }),
-  });
+
+  let runtime: ProductionSeyeonChatRuntimeV1 | undefined;
+  const getRuntime = () => {
+    runtime ??= createProductionSeyeonChatRuntimeV1({
+      databaseConfig: config,
+      providerConfig: input.providerConfig ?? {
+        apiKey: input.env.OPENAI_API_KEY ?? '',
+        model: input.env.MYEONGHA_SEYEON_OPENAI_MODEL?.trim() || 'gpt-5.6-terra',
+      },
+      clientCompatibilityProfile:
+        input.clientCompatibilityProfile ??
+        SEYEON_PRODUCTION_WEB_COMPATIBILITY_PROFILE_V1,
+      ...(input.pool === undefined ? {} : { pool: input.pool }),
+      ...(input.createUuid === undefined ? {} : { createUuid: input.createUuid }),
+    });
+    return runtime;
+  };
 
   return Object.freeze({
     handleRequest(requestInput: ProductionSeyeonTurnSendRequestV1) {
@@ -72,11 +88,13 @@ export function createProductionSeyeonTurnSendRuntimeV1(
         requestId: requestInput.requestId,
         serverTime: requestInput.serverTime,
         identityEvidenceVerifier,
-        runtime,
+        runtime: Object.freeze({
+          run: (runInput) => getRuntime().run(runInput),
+        }),
       });
     },
     close() {
-      return runtime.close();
+      return runtime?.close() ?? Promise.resolve();
     },
   });
 }

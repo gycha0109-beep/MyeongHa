@@ -5,12 +5,24 @@ import {
 } from '../apps/api/src/chat-receive.js';
 import {
   assertSeyeonPublicContentCompatibilityV1,
+  SEYEON_PRODUCTION_WEB_COMPATIBILITY_PROFILE_V1,
 } from '../apps/api/src/seyeon-public-content-compatibility-v1.js';
 import { ApiCommandError } from '../apps/api/src/api-error.js';
 
 const THREAD_ID = '123e4567-e89b-42d3-a456-426614174000';
 
 describe('Seyeon public turn authority', () => {
+  it('pins the Product Owner-approved static Web compatibility identifiers', () => {
+    expect(SEYEON_PRODUCTION_WEB_COMPATIBILITY_PROFILE_V1).toEqual({
+      profileKey: 'production-web-seyeon-static-v1',
+      supportedClientCapabilities: ['character-chat-theme-v1'],
+      supportedAssetManifestHashes: [
+        'sha256:v1:ca769bd9b211e5d04f64128fea1fb2e3d1eca3f91d2d34c6fe14f39b62591a4d',
+      ],
+      supportedCueSchemaVersions: ['character-static-presentation-v1'],
+    });
+  });
+
   it('mints browser-independent request authority only from server inputs', () => {
     const plan = prepareServerCompatiblePinnedSeyeonReceivePlanV1({
       clientTurnId: '223e4567-e89b-42d3-a456-426614174000',
