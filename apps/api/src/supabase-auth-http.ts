@@ -42,7 +42,12 @@ const ALLOWED_AUTH_NEXT_PAGES = new Set([
   'my.html',
 ]);
 
-export type SupabaseAuthActionV1 = 'sign-in' | 'sign-up' | 'refresh' | 'sign-out';
+export type SupabaseAuthActionV1 =
+  | 'sign-in'
+  | 'sign-up'
+  | 'refresh'
+  | 'social-complete'
+  | 'sign-out';
 
 interface AuthProxyConfigV1 {
   readonly supabaseOrigin: typeof MYEONGHA_PRODUCTION_SUPABASE_ORIGIN;
@@ -369,6 +374,29 @@ export async function handleSupabaseAuthRequestV1(input: {
       }
       const signedOut = response({ ok: true, data: { signedOut: true } });
       return webCookieTransport ? clearMemberRefreshCookieV1(signedOut) : signedOut;
+    }
+
+    if (input.action === 'social-complete') {
+      if (!webCookieTransport) return errorResponse('INVALID_REQUEST', 400);
+
+      const completeBody = await readObjectBody(input.request);
+      const refreshToken = completeBody === null
+        ? null
+        : readRequiredString(completeBody, 'refreshToken', 4096);
+      if (refreshToken === null || /\s/u.test(refreshToken)) {
+        return errorResponse('INVALID_REQUEST', 400);
+      }
+
+      const upstream = await callSupabase(config, '/auth/v1/token?grant_type=refresh_token', {
+        method: 'POST',
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
+      if (!upstream.response.ok) {
+        return upstreamError('refresh', upstream.response.status);
+      }
+      const session = normalizeSession(upstream.payload);
+      if (session === null) return errorResponse('AUTH_UPSTREAM_MALFORMED', 502);
+      return authenticatedResponse(session, {}, true);
     }
 
     if (input.action === 'refresh') {

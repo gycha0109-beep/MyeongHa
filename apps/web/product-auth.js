@@ -1,6 +1,8 @@
 const MEMBER_SESSION_KEY = 'myeongha.memberSession.v1';
 const GUEST_TOKEN_KEY = 'myeongha.guestBearer.v1';
 const PENDING_GUEST_TOKEN_KEY = 'myeongha.pendingGuestBearer.v1';
+const WEB_SOCIAL_AUTH_PENDING_KEY = 'myeongha.webSocialAuthPending.v1';
+const WEB_SOCIAL_AUTH_PROVIDERS = new Set(['google', 'kakao', 'naver']);
 const AUTH_CHANGED_EVENT = 'myeongha:auth-changed';
 const REFRESH_SKEW_MS = 60_000;
 // Keep the existing lock namespace so already-open older tabs still serialize with the expanded authority.
@@ -34,6 +36,86 @@ export function normalizeGuestBearer(value) {
     return null;
   }
   return value;
+}
+
+export function readWebSocialAuthPending(now = Date.now()) {
+  const raw = readSession(WEB_SOCIAL_AUTH_PENDING_KEY);
+  if (!raw) return null;
+
+  let stored;
+  try {
+    stored = JSON.parse(raw);
+  } catch {
+    removeSession(WEB_SOCIAL_AUTH_PENDING_KEY, raw);
+    return null;
+  }
+
+  const provider = typeof stored?.provider === 'string' && WEB_SOCIAL_AUTH_PROVIDERS.has(stored.provider)
+    ? stored.provider
+    : null;
+  const state = typeof stored?.state === 'string' && /^[A-Za-z0-9_-]{16,128}$/u.test(stored.state)
+    ? stored.state
+    : null;
+  const expiresAtMs = typeof stored?.expiresAt === 'string'
+    ? Date.parse(stored.expiresAt)
+    : Number.NaN;
+  const guestBearer = stored?.guestBearer === null
+    ? null
+    : normalizeGuestBearer(stored?.guestBearer);
+  const next = typeof stored?.next === 'string' ? stored.next : 'hall.html';
+
+  if (
+    provider === null ||
+    state === null ||
+    Number.isNaN(expiresAtMs) ||
+    expiresAtMs <= now ||
+    (stored?.guestBearer !== null && guestBearer === null)
+  ) {
+    removeSession(WEB_SOCIAL_AUTH_PENDING_KEY, raw);
+    return null;
+  }
+
+  return Object.freeze({
+    provider,
+    state,
+    expiresAt: new Date(expiresAtMs).toISOString(),
+    guestBearer,
+    next,
+  });
+}
+
+export function writeWebSocialAuthPending(value) {
+  const guestBearer = value?.guestBearer === null
+    ? null
+    : normalizeGuestBearer(value?.guestBearer);
+  if (
+    !WEB_SOCIAL_AUTH_PROVIDERS.has(value?.provider) ||
+    typeof value?.state !== 'string' ||
+    !/^[A-Za-z0-9_-]{16,128}$/u.test(value.state) ||
+    typeof value?.expiresAt !== 'string' ||
+    !Number.isFinite(Date.parse(value.expiresAt)) ||
+    Date.parse(value.expiresAt) <= Date.now() ||
+    (value?.guestBearer !== null && guestBearer === null) ||
+    typeof value?.next !== 'string'
+  ) {
+    return false;
+  }
+
+  return writeSession(
+    WEB_SOCIAL_AUTH_PENDING_KEY,
+    JSON.stringify({
+      provider: value.provider,
+      state: value.state,
+      expiresAt: value.expiresAt,
+      guestBearer,
+      next: value.next,
+    }),
+  );
+}
+
+export function clearWebSocialAuthPending() {
+  const raw = readSession(WEB_SOCIAL_AUTH_PENDING_KEY);
+  return raw === null || removeSession(WEB_SOCIAL_AUTH_PENDING_KEY, raw);
 }
 
 function readLocal(key) {
@@ -770,6 +852,34 @@ export async function ensureActiveBearer() {
   if (token) return Object.freeze({ kind: 'guest', token });
 
   return ensureActiveBearer();
+}
+
+export async function signInWithSocialRefreshToken(refreshToken) {
+  if (
+    typeof refreshToken !== 'string' ||
+    refreshToken.length === 0 ||
+    refreshToken.length > 4096 ||
+    /\s/u.test(refreshToken)
+  ) {
+    throw new ProductAuthError(
+      'WEB_SOCIAL_AUTH_CALLBACK_INVALID',
+      '소셜 로그인 세션 응답이 올바르지 않습니다.',
+    );
+  }
+
+  return withMemberMutationLock(async () => {
+    const data = await postJson(
+      '/api/auth/refresh?__myeongha_social_complete=1',
+      { refreshToken },
+    );
+    if (!isRecord(data) || data.status !== 'authenticated') {
+      throw new ProductAuthError(
+        'WEB_AUTH_MALFORMED_SESSION',
+        '소셜 로그인 응답이 올바르지 않습니다.',
+      );
+    }
+    return saveSession(data.session);
+  });
 }
 
 export async function signInWithPassword(email, password) {
