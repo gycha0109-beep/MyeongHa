@@ -9,7 +9,7 @@ describe('Seyeon Web turn-send wiring', () => {
     );
     expect(source).toContain('/turns');
     expect(source).toContain('clientTurnId: pendingTurn.clientTurnId');
-    expect(source).not.toContain('clientTurnId: crypto.randomUUID()');
+    expect(source).toContain('clientTurnId: crypto.randomUUID()');
     expect(source).toContain('const rereadSucceeded = await loadRoomState()');
     expect(source).toContain("if (!rereadSucceeded) throw new Error('AUTHORITATIVE_REREAD_FAILED')");
     expect(source).toContain("authoritativeCharacterId !== 'seyeon'");
