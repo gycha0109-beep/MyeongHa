@@ -89,6 +89,15 @@ describe(
           'character_face_governed_artifact_replay_conflict',
         );
         expect(sql).toContain(
+          'pg_catalog.pg_advisory_xact_lock',
+        );
+        expect(sql).toContain(
+          'pg_catalog.hashtextextended(p_turn_id::text, 0)',
+        );
+        expect(sql).not.toMatch(
+          /select\s+(?:ct\.state|cra\.\*|a\.state)[\s\S]*?for\s+update/iu,
+        );
+        expect(sql).toContain(
           "unique (turn_id, artifact_kind)",
         );
       },
