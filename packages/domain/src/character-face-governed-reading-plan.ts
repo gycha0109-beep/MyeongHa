@@ -14,9 +14,12 @@ import {
 import {
   resolveCharacterFaceFollowUpFramingV1,
 } from './character-face-delivery-profile.js';
+import {
+  evaluateCharacterFaceGovernedCapabilityV1,
+} from './character-face-governed-capability.js';
 import type {
-  CharacterRuntimeContextWithFaceGroundingV1,
-} from './character-face-grounding-admission.js';
+  CharacterRuntimeContextWithGovernedFaceGroundingV1,
+} from './character-face-governed-runtime.js';
 import { canonicalJson } from './registry.js';
 
 export const CHARACTER_FACE_GOVERNED_READING_PLAN_SCHEMA_VERSION_V1 =
@@ -94,33 +97,40 @@ function sha256Json(value: unknown): string {
     .digest('hex');
 }
 
-function assertFaceRuntime(
-  context: CharacterRuntimeContextWithFaceGroundingV1,
-): asserts context is CharacterRuntimeContextWithFaceGroundingV1 & {
-  readonly face: NonNullable<CharacterRuntimeContextWithFaceGroundingV1['face']>;
+function assertGovernedFaceRuntime(
+  context: CharacterRuntimeContextWithGovernedFaceGroundingV1,
+): asserts context is CharacterRuntimeContextWithGovernedFaceGroundingV1 & {
+  readonly governedFace: NonNullable<
+    CharacterRuntimeContextWithGovernedFaceGroundingV1['governedFace']
+  >;
 } {
-  if (context.face === null) {
-    fail('Governed Face reading plan requires an admitted Face runtime context.');
+  if (context.governedFace === null) {
+    fail(
+      'Governed Face reading plan requires an admitted governed Face runtime context.',
+    );
   }
   if (context.saju !== null) {
-    fail('Governed Face reading plan does not allow mixed Saju and Face context.');
+    fail(
+      'Governed Face reading plan does not allow mixed Saju and governed Face context.',
+    );
   }
 }
 
 function assertNamedProfileRuntimeCompatibility(
   input: Readonly<{
-    context: CharacterRuntimeContextWithFaceGroundingV1;
+    context: CharacterRuntimeContextWithGovernedFaceGroundingV1;
     profiles: CharacterFaceNamedProfileBundleV1;
   }>,
 ): void {
   const faceProfileVersion =
-    input.profiles.capability.sourceFaceProfileVersion;
+    input.profiles.governedCapability.sourceFaceProfileVersion;
 
   try {
     assertCharacterFaceNamedProfileCompatibilityV1({
       authoringSource: input.profiles.authoringSource,
       faceProfileVersion,
       capability: input.profiles.capability,
+      governedCapability: input.profiles.governedCapability,
       perspective: input.profiles.perspective,
       delivery: input.profiles.delivery,
     });
@@ -150,19 +160,21 @@ function assertNamedProfileRuntimeCompatibility(
 
 function assertHandoffMatchesFaceRuntime(
   input: Readonly<{
-    context: CharacterRuntimeContextWithFaceGroundingV1 & {
-      readonly face: NonNullable<CharacterRuntimeContextWithFaceGroundingV1['face']>;
+    context: CharacterRuntimeContextWithGovernedFaceGroundingV1 & {
+      readonly governedFace: NonNullable<
+        CharacterRuntimeContextWithGovernedFaceGroundingV1['governedFace']
+      >;
     };
     handoff: CharacterFaceGovernedInterpretationHandoffV1;
   }>,
 ): void {
-  if (input.handoff.topicKey !== input.context.face.topicKey) {
+  if (input.handoff.topicKey !== input.context.governedFace.topicKey) {
     fail('Governed Face interpretation topicKey does not match the active Face runtime.');
   }
 
   if (
     input.handoff.sourceResultHash !==
-    input.context.face.groundingRef.sourceResultHash
+    input.context.governedFace.groundingRef.sourceResultHash
   ) {
     fail(
       'Governed Face interpretation sourceResultHash does not match the active Face analysis.',
@@ -172,7 +184,7 @@ function assertHandoffMatchesFaceRuntime(
 
 function resolveFollowUp(
   input: Readonly<{
-    context: CharacterRuntimeContextWithFaceGroundingV1;
+    context: CharacterRuntimeContextWithGovernedFaceGroundingV1;
     profiles: CharacterFaceNamedProfileBundleV1;
     selection: CharacterFaceGovernedInterpretationSelectionV1;
   }>,
@@ -210,12 +222,12 @@ function resolveFollowUp(
 
 export function buildCharacterFaceGovernedReadingPlanV1(
   input: Readonly<{
-    context: CharacterRuntimeContextWithFaceGroundingV1;
+    context: CharacterRuntimeContextWithGovernedFaceGroundingV1;
     handoff: CharacterFaceGovernedInterpretationHandoffV1;
     profiles: CharacterFaceNamedProfileBundleV1;
   }>,
 ): CharacterFaceGovernedReadingPlanDecisionV1 {
-  assertFaceRuntime(input.context);
+  assertGovernedFaceRuntime(input.context);
   assertNamedProfileRuntimeCompatibility({
     context: input.context,
     profiles: input.profiles,
@@ -224,6 +236,19 @@ export function buildCharacterFaceGovernedReadingPlanV1(
     context: input.context,
     handoff: input.handoff,
   });
+
+  const capabilityDecision =
+    evaluateCharacterFaceGovernedCapabilityV1({
+      characterId: input.context.characterId,
+      characterContentVersion: input.context.contentVersion,
+      faceContext: input.context.governedFace,
+      capability: input.profiles.governedCapability,
+    });
+  if (!capabilityDecision.allowed) {
+    fail(
+      `Governed Face capability denied the reading plan: ${capabilityDecision.reason}.`,
+    );
+  }
 
   const selection =
     selectCharacterFaceGovernedInterpretationsV1({
@@ -266,13 +291,14 @@ export function buildCharacterFaceGovernedReadingPlanV1(
       CHARACTER_FACE_GOVERNED_READING_PLAN_SCHEMA_VERSION_V1,
     characterId: input.context.characterId,
     characterContentVersion: input.context.contentVersion,
-    topicKey: input.context.face.topicKey,
+    topicKey: input.context.governedFace.topicKey,
     sourceResultHash: input.handoff.sourceResultHash,
-    faceBundleHash: input.context.face.groundingRef.bundleHash,
+    faceBundleHash: input.context.governedFace.groundingRef.bundleHash,
     handoffHash: input.handoff.handoffHash,
     selectionPolicy:
       CHARACTER_FACE_GOVERNED_SELECTION_POLICY_V1,
-    capabilityVersion: input.profiles.capability.capabilityVersion,
+    capabilityVersion:
+      input.profiles.governedCapability.capabilityVersion,
     perspectiveVersion: input.profiles.perspective.perspectiveVersion,
     deliveryVersion: input.profiles.delivery.deliveryVersion,
     selection,
