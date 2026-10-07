@@ -144,7 +144,10 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
     for (const key of ['seyeon', 'baekheon', 'yeoul', 'seorin', 'rahyeon', 'mira', 'taegyeom', 'yunho', 'doyun']) {
       expect(v2Css).toContain(`.character-room-v2[data-character="${key}"]`);
     }
-    for (const key of ['seyeon', 'baekheon', 'seorin', 'rahyeon', 'taegyeom', 'yunho']) {
+    expect(v2Css).toContain('assets/characters/chat-themes/seyeon-chat-theme-web-v1.webp');
+    expect(v2Css).toContain('assets/characters/chat-themes/seyeon-chat-theme-mobile-v1.webp');
+    expect(v2Css).not.toContain('--conversation-room-art: url("assets/characters/rooms/seyeon-room.webp")');
+    for (const key of ['baekheon', 'seorin', 'rahyeon', 'taegyeom', 'yunho']) {
       expect(v2Css).toContain(`assets/characters/rooms/${key}-room.webp`);
     }
     expect(v2Css).toContain('assets/characters/rooms/yeoul-room-uploaded.svg');
