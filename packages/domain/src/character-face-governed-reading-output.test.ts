@@ -6,7 +6,7 @@ import {
 
 import {
   resolveCharacterRuntimeAuthorityLaneV1,
-} from '../character-content/src/runtime-authority-lane-v1.js';
+} from '../../character-content/src/runtime-authority-lane-v1.js';
 import type {
   CharacterRuntimeContextV1,
 } from './character-runtime-context.js';
