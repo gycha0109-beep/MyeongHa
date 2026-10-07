@@ -32,6 +32,8 @@ const expectedProducerFiles = [
   '0260_reading_transport_commands.sql',
   '0290_account_deletion_start_command.sql',
   '1080_entitlement_effect_apply_v1.sql',
+  '1470_seyeon_relationship_sync_outbox_v1.sql',
+  '1500_seyeon_post_turn_analysis_runtime_v1.sql',
 ];
 
 if (JSON.stringify(producerFiles) !== JSON.stringify(expectedProducerFiles)) {
@@ -60,6 +62,26 @@ for (const [path, aggregateType] of [
   if (!migration.includes("oe.aggregate_type = '" + aggregateType + "'")) {
     fail('preflight does not associate current outbox aggregate type ' + aggregateType);
   }
+}
+
+for (const [path, aggregateType] of [
+  ['supabase/migrations/1470_seyeon_relationship_sync_outbox_v1.sql', 'character_relationship'],
+  ['supabase/migrations/1500_seyeon_post_turn_analysis_runtime_v1.sql', 'chat_turn'],
+]) {
+  const text = await readFile(path, 'utf8');
+  const outboxInsertCount = (text.match(/insert\s+into\s+public\.outbox_events\b/gi) || []).length;
+  if (outboxInsertCount !== 1) {
+    fail(path + ' expected exactly one governed outbox insert, found ' + outboxInsertCount);
+  }
+  if (!text.includes("'" + aggregateType + "'")) {
+    fail(path + ' lost expected aggregate type ' + aggregateType);
+  }
+  if (!text.includes("'subjectId'") || !text.includes('p_subject_id::text')) {
+    fail(path + ' must bind top-level payload_jsonb.subjectId to canonical Subject');
+  }
+}
+if (!migration.includes("oe.payload_jsonb ->> 'subjectId' = p_subject_id::text")) {
+  fail('preflight lost canonical payload_jsonb.subjectId fallback for governed outbox producers');
 }
 
 for (const fragment of [
