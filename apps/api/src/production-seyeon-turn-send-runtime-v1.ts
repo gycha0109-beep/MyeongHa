@@ -27,6 +27,52 @@ import type {
   SupabaseMemberVerifierFetchV1,
 } from './supabase-member-identity-verifier.js';
 
+export const SEYEON_PRODUCTION_PROVIDER_ROUTING_V1 = Object.freeze({
+  directDefaultModel: 'gpt-5.6-terra',
+  gatewayOrigin: 'https://ai-gateway.vercel.sh',
+  gatewayDefaultModel: 'openai/gpt-5.6-sol',
+} as const);
+
+function optionalEnv(
+  env: ProductionUserDataRuntimeEnvV1,
+  name: string,
+): string | null {
+  const value = env[name];
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim();
+  return normalized.length === 0 ? null : normalized;
+}
+
+export function resolveProductionSeyeonProviderConfigV1(
+  env: ProductionUserDataRuntimeEnvV1,
+): OpenAiSeyeonStructuredProviderConfigV1 {
+  const directApiKey = optionalEnv(env, 'OPENAI_API_KEY');
+  if (directApiKey !== null) {
+    return Object.freeze({
+      apiKey: directApiKey,
+      model:
+        optionalEnv(env, 'MYEONGHA_SEYEON_OPENAI_MODEL') ??
+        SEYEON_PRODUCTION_PROVIDER_ROUTING_V1.directDefaultModel,
+    });
+  }
+
+  const vercelOidcToken = optionalEnv(env, 'VERCEL_OIDC_TOKEN');
+  if (vercelOidcToken !== null) {
+    return Object.freeze({
+      apiKey: vercelOidcToken,
+      model:
+        optionalEnv(env, 'MYEONGHA_SEYEON_AI_GATEWAY_MODEL') ??
+        SEYEON_PRODUCTION_PROVIDER_ROUTING_V1.gatewayDefaultModel,
+      origin: SEYEON_PRODUCTION_PROVIDER_ROUTING_V1.gatewayOrigin,
+    });
+  }
+
+  return Object.freeze({
+    apiKey: '',
+    model: SEYEON_PRODUCTION_PROVIDER_ROUTING_V1.directDefaultModel,
+  });
+}
+
 export interface ProductionSeyeonTurnSendRequestV1 {
   readonly request: Request;
   readonly requestId: string;
@@ -68,10 +114,9 @@ export function createProductionSeyeonTurnSendRuntimeV1(
   const getRuntime = () => {
     runtime ??= createProductionSeyeonChatRuntimeV1({
       databaseConfig: config,
-      providerConfig: input.providerConfig ?? {
-        apiKey: input.env.OPENAI_API_KEY ?? '',
-        model: input.env.MYEONGHA_SEYEON_OPENAI_MODEL?.trim() || 'gpt-5.6-terra',
-      },
+      providerConfig:
+        input.providerConfig ??
+        resolveProductionSeyeonProviderConfigV1(input.env),
       clientCompatibilityProfile:
         input.clientCompatibilityProfile ??
         SEYEON_PRODUCTION_WEB_COMPATIBILITY_PROFILE_V1,
