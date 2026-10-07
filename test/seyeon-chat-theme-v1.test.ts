@@ -24,7 +24,7 @@ describe('Seyeon chat theme v1', () => {
     ).resolves.toBe('ba545f917394884502c5bc435df544296ea36a5c35319f52e01b7c2131906f4a');
   });
 
-  it('uses the approved chat theme instead of the unapproved legacy Seyeon room image', async () => {
+  it('keeps the approved chat theme separate from Seyeon full-body presentation art', async () => {
     const [roomCss, conversationCss] = await Promise.all([
       readFile(repoFile('apps/web/chat-room.css'), 'utf8'),
       readFile(repoFile('apps/web/conversation-v2.css'), 'utf8'),
@@ -34,9 +34,10 @@ describe('Seyeon chat theme v1', () => {
     expect(roomCss).toContain('seyeon-chat-theme-mobile-v1.webp');
     expect(conversationCss).toContain('seyeon-chat-theme-web-v1.webp');
     expect(conversationCss).toContain('seyeon-chat-theme-mobile-v1.webp');
-    expect(conversationCss).not.toContain(
+    expect(conversationCss).toContain(
       '--conversation-room-art: url("assets/characters/rooms/seyeon-room.webp")',
     );
+    expect(conversationCss).toContain("Legacy filename only: this asset is Seyeon's approved full-body presentation scene");
     expect(conversationCss).toContain('url("assets/characters/seyeon-portrait-v2.webp")');
   });
 
