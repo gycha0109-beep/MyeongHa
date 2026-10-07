@@ -54,6 +54,7 @@ bash test/db/transitive_subject_dependency_graph_catalog_guard.sh
 bash test/db/outbox_claim_concurrency.sh
 bash test/db/chat_receive_concurrency.sh
 bash test/db/chat_attempt_commit_concurrency.sh
+bash test/db/character_face_governed_artifact_commit.sh
 bash test/db/chat_retry_abandon_concurrency.sh
 bash test/db/birth_profile_create_concurrency.sh
 
