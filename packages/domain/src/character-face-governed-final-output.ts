@@ -21,8 +21,8 @@ import type {
   CharacterFaceNamedProfileBundleV1,
 } from './character-face-named-profile-registry.js';
 import type {
-  CharacterRuntimeContextWithFaceGroundingV1,
-} from './character-face-grounding-admission.js';
+  CharacterRuntimeContextWithGovernedFaceGroundingV1,
+} from './character-face-governed-runtime.js';
 
 export const CHARACTER_FACE_GOVERNED_FINAL_OUTPUT_SCHEMA_VERSION_V1 =
   'character-face-governed-final-output-v1' as const;
@@ -159,7 +159,7 @@ function assertPublicTrustLanguage(text: string, path: string): void {
 function buildDialogue(
   input: Readonly<{
     draft: CharacterFaceGovernedFinalRendererDraftV1;
-    context: CharacterRuntimeContextWithFaceGroundingV1;
+    context: CharacterRuntimeContextWithGovernedFaceGroundingV1;
     allowedSuggestedActionKeys: readonly string[];
   }>,
 ): CharacterDialogueEnvelopeV1 {
@@ -227,7 +227,7 @@ export function finalizeCharacterFaceGovernedInterpretationOutputV1(
       CharacterFaceGovernedInterpretationSourceBindingV1;
     rawRendererOutput: unknown;
     context:
-      CharacterRuntimeContextWithFaceGroundingV1;
+      CharacterRuntimeContextWithGovernedFaceGroundingV1;
     profiles: CharacterFaceNamedProfileBundleV1;
     allowedSuggestedActionKeys: readonly string[];
   }>,
@@ -274,9 +274,9 @@ export function finalizeCharacterFaceGovernedInterpretationOutputV1(
     allowedSuggestedActionKeys: input.allowedSuggestedActionKeys,
   });
 
-  if (input.context.face === null) {
+  if (input.context.governedFace === null) {
     throw new CharacterOutputGuardError(
-      'Governed Face finalization requires an admitted Face context.',
+      'Governed Face finalization requires an admitted governed Face context.',
     );
   }
 
@@ -291,9 +291,9 @@ export function finalizeCharacterFaceGovernedInterpretationOutputV1(
       CHARACTER_FACE_GOVERNED_OUTPUT_GUARD_VERSION_V1,
     characterId: input.context.characterId,
     characterContentVersion: input.context.contentVersion,
-    topicKey: input.context.face.topicKey,
+    topicKey: input.context.governedFace.topicKey,
     sourceResultHash: handoff.sourceResultHash,
-    faceBundleHash: input.context.face.groundingRef.bundleHash,
+    faceBundleHash: input.context.governedFace.groundingRef.bundleHash,
     handoffHash: handoff.handoffHash,
     readingPlanRef: planDecision.plan.planId,
     dialogue,

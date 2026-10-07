@@ -20,8 +20,8 @@ import type {
   CharacterFaceNamedProfileBundleV1,
 } from './character-face-named-profile-registry.js';
 import type {
-  CharacterRuntimeContextWithFaceGroundingV1,
-} from './character-face-grounding-admission.js';
+  CharacterRuntimeContextWithGovernedFaceGroundingV1,
+} from './character-face-governed-runtime.js';
 import { canonicalJson } from './registry.js';
 
 export const CHARACTER_FACE_GOVERNED_READING_ARTIFACT_SCHEMA_VERSION_V1 =
@@ -264,7 +264,7 @@ export function buildCharacterFaceGovernedReadingArtifactCandidateV1(
       CharacterFaceGovernedInterpretationSourceBindingV1;
     rawRendererOutput: unknown;
     context:
-      CharacterRuntimeContextWithFaceGroundingV1;
+      CharacterRuntimeContextWithGovernedFaceGroundingV1;
     profiles:
       CharacterFaceNamedProfileBundleV1;
     allowedSuggestedActionKeys:

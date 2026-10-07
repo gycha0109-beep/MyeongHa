@@ -1,5 +1,7 @@
 import {
-  admitCharacterFaceGovernedInterpretationHandoffV1,
+  admitCharacterFaceGovernedGroundingV1,
+  type CharacterFaceGovernedGroundingBundleV1,
+  type CharacterFaceGovernedGroundingRefV1,
   type CharacterFaceGovernedInterpretationHandoffV1,
   type CharacterFaceGovernedInterpretationSourceBindingV1,
 } from '../../../packages/domain/src/index.js';
@@ -52,6 +54,8 @@ export type SajuGovernedFaceHandoffTransportDecisionV1 =
       executionPlanHash: string;
       sourceBinding: SajuGovernedFaceTrustedSourceBindingV1;
       handoff: CharacterFaceGovernedInterpretationHandoffV1;
+      grounding: CharacterFaceGovernedGroundingBundleV1;
+      groundingRef: CharacterFaceGovernedGroundingRefV1;
     }>
   | Readonly<{
       state: 'not_eligible';
@@ -126,6 +130,8 @@ const ELIGIBLE_KEYS = Object.freeze([
   'executionPlanHash',
   'sourceBinding',
   'handoff',
+  'grounding',
+  'groundingRef',
 ] as const);
 
 const NOT_ELIGIBLE_KEYS = Object.freeze([
@@ -854,12 +860,15 @@ function admitEnvelope(
     );
   }
 
-  let handoff:
-    CharacterFaceGovernedInterpretationHandoffV1;
+  let admitted;
   try {
-    handoff =
-      admitCharacterFaceGovernedInterpretationHandoffV1({
-        candidate:
+    admitted =
+      admitCharacterFaceGovernedGroundingV1({
+        candidateGrounding:
+          envelope.grounding,
+        candidateGroundingRef:
+          envelope.groundingRef,
+        candidateHandoff:
           envelope.handoff,
         expectedSource:
           Object.freeze({
@@ -876,13 +885,17 @@ function admitEnvelope(
   } catch {
     throw new SajuGovernedFaceHandoffHttpAdapterErrorV1(
       'HANDOFF_ADMISSION_REJECTED',
-      'Saju governed Face handoff failed MyeongHa defense-in-depth admission.',
+      'Saju governed Face handoff/grounding failed MyeongHa defense-in-depth admission.',
       200,
     );
   }
 
   if (
-    handoff.authorizationReceiptRef !==
+    admitted.handoff.authorizationReceiptRef !==
+      sourceBinding.authorizationReceiptRef ||
+    admitted.grounding.authorizationReceiptRef !==
+      sourceBinding.authorizationReceiptRef ||
+    admitted.groundingRef.authorizationReceiptRef !==
       sourceBinding.authorizationReceiptRef
   ) {
     fail(
@@ -902,7 +915,12 @@ function admitEnvelope(
     authoritySnapshotId,
     executionPlanHash,
     sourceBinding,
-    handoff,
+    handoff:
+      admitted.handoff,
+    grounding:
+      admitted.grounding,
+    groundingRef:
+      admitted.groundingRef,
   });
 }
 

@@ -11,12 +11,16 @@ import type {
   CharacterRuntimeContextV1,
 } from '../packages/domain/src/character-runtime-context.js';
 import {
-  CHARACTER_FACE_REALIZATION_MODE_V1,
-  CHARACTER_FACE_SOURCE_BINDING_SCHEMA_VERSION_V1,
-  FACE_CHARACTER_GROUNDING_PROJECTION_VERSION_V1,
-  FACE_CHARACTER_GROUNDING_REF_SCHEMA_VERSION_V1,
-  admitCharacterRuntimeFaceGroundingV1,
-} from '../packages/domain/src/character-face-grounding-admission.js';
+  CHARACTER_FACE_GOVERNED_GROUNDING_PROJECTION_VERSION_V1,
+  CHARACTER_FACE_GOVERNED_GROUNDING_REF_SCHEMA_VERSION_V1,
+  CHARACTER_FACE_GOVERNED_GROUNDING_SCHEMA_VERSION_V1,
+  CHARACTER_FACE_GOVERNED_MODE_V1,
+  CHARACTER_FACE_GOVERNED_REALIZATION_POLICY_REGISTRY_VERSION_V1,
+  CHARACTER_FACE_GOVERNED_REALIZATION_POLICY_V1,
+} from '../packages/domain/src/character-face-governed-grounding.js';
+import {
+  admitCharacterRuntimeGovernedFaceGroundingV1,
+} from '../packages/domain/src/character-face-governed-runtime.js';
 import {
   resolveCharacterFaceNamedProfileBundleV1,
 } from '../packages/domain/src/character-face-named-profile-registry.js';
@@ -42,14 +46,10 @@ import {
 
 const SOURCE_RESULT_HASH =
   'face-topic-source-result:' + 'a'.repeat(64);
-const PROJECTION_HASH =
-  'face-product-projection:' + 'b'.repeat(64);
-const GROUNDING_HASH =
-  'face-grounding:' + 'c'.repeat(64);
-const DISPLAY_FACTS_HASH =
-  'face-display-facts:' + 'd'.repeat(64);
-const BUNDLE_HASH =
-  'face-character-grounding:' + 'e'.repeat(64);
+const FACE_ENGINE_VERSION =
+  'test-only:face-engine-v1';
+const FACE_READING_REF =
+  'test-only:face-reading-ref-v1';
 
 const expectedSource:
   CharacterFaceGovernedInterpretationSourceBindingV1 =
@@ -61,7 +61,7 @@ const expectedSource:
       sourceResultHash:
         SOURCE_RESULT_HASH,
       topicKey:
-        'face.discover.extended',
+        'face.reading.three_divisions',
     });
 
 const requiredProhibitions =
@@ -326,51 +326,115 @@ function seyeonRuntime() {
     saju: null,
   } as unknown as CharacterRuntimeContextV1;
 
+  const handoff =
+    governedCandidate();
+  const groundingUnits =
+    Object.freeze(
+      handoff.units.map((entry) =>
+        Object.freeze({
+          ...entry,
+          realizationPolicyRef:
+            CHARACTER_FACE_GOVERNED_REALIZATION_POLICY_V1,
+        }),
+      ),
+    );
+  const groundingMaterial =
+    Object.freeze({
+      schemaVersion:
+        CHARACTER_FACE_GOVERNED_GROUNDING_SCHEMA_VERSION_V1,
+      projectionVersion:
+        CHARACTER_FACE_GOVERNED_GROUNDING_PROJECTION_VERSION_V1,
+      realizationPolicyRegistryVersion:
+        CHARACTER_FACE_GOVERNED_REALIZATION_POLICY_REGISTRY_VERSION_V1,
+      mode:
+        CHARACTER_FACE_GOVERNED_MODE_V1,
+      topicKey:
+        handoff.topicKey,
+      sourceContractVersion:
+        handoff.sourceContractVersion,
+      sourceAuthorityRef:
+        handoff.sourceAuthorityRef,
+      sourceResultHash:
+        handoff.sourceResultHash,
+      authorizationReceiptRef:
+        handoff.authorizationReceiptRef,
+      handoffHash:
+        handoff.handoffHash,
+      faceEngineVersion:
+        FACE_ENGINE_VERSION,
+      faceReadingRef:
+        FACE_READING_REF,
+      methodologyPackRefs:
+        Object.freeze([
+          'test-only:methodology-pack-v1',
+        ]),
+      bindingGroupRefs:
+        Object.freeze([
+          'test-only:binding-group-v1',
+        ]),
+      units:
+        groundingUnits,
+      unavailableSections:
+        Object.freeze([]),
+      prohibitedInferences:
+        Object.freeze([
+          'guaranteed_future_outcome',
+        ]),
+      provenanceRefs:
+        Object.freeze([
+          'test-only:governed-face-grounding',
+        ]),
+    });
+  const grounding =
+    Object.freeze({
+      ...groundingMaterial,
+      bundleHash:
+        'face-governed-character-grounding:' +
+        hashCharacterFaceGovernedInterpretationMaterialV1(
+          groundingMaterial,
+        ),
+    });
+  const groundingRef =
+    Object.freeze({
+      schemaVersion:
+        CHARACTER_FACE_GOVERNED_GROUNDING_REF_SCHEMA_VERSION_V1,
+      projectionVersion:
+        grounding.projectionVersion,
+      mode:
+        grounding.mode,
+      topicKey:
+        grounding.topicKey,
+      sourceContractVersion:
+        grounding.sourceContractVersion,
+      sourceAuthorityRef:
+        grounding.sourceAuthorityRef,
+      sourceResultHash:
+        grounding.sourceResultHash,
+      authorizationReceiptRef:
+        grounding.authorizationReceiptRef,
+      handoffHash:
+        grounding.handoffHash,
+      faceEngineVersion:
+        grounding.faceEngineVersion,
+      faceReadingRef:
+        grounding.faceReadingRef,
+      methodologyPackRefs:
+        grounding.methodologyPackRefs,
+      bundleHash:
+        grounding.bundleHash,
+    });
+
   const context =
-    admitCharacterRuntimeFaceGroundingV1({
+    admitCharacterRuntimeGovernedFaceGroundingV1({
       context:
         base,
-      source: {
-        schemaVersion:
-          CHARACTER_FACE_SOURCE_BINDING_SCHEMA_VERSION_V1,
-        topicKey:
-          expectedSource.topicKey,
-        readinessState:
-          'available',
-        mode:
-          CHARACTER_FACE_REALIZATION_MODE_V1,
-        sourceResultHash:
-          SOURCE_RESULT_HASH,
-        projectionHash:
-          PROJECTION_HASH,
-        groundingHash:
-          GROUNDING_HASH,
-        displayFactsHash:
-          DISPLAY_FACTS_HASH,
-        bundleHash:
-          BUNDLE_HASH,
-        projectionVersion:
-          FACE_CHARACTER_GROUNDING_PROJECTION_VERSION_V1,
-        unavailableSections: [],
-      },
-      groundingRef: {
-        schemaVersion:
-          FACE_CHARACTER_GROUNDING_REF_SCHEMA_VERSION_V1,
-        topicKey:
-          expectedSource.topicKey,
-        sourceResultHash:
-          SOURCE_RESULT_HASH,
-        projectionHash:
-          PROJECTION_HASH,
-        groundingHash:
-          GROUNDING_HASH,
-        displayFactsHash:
-          DISPLAY_FACTS_HASH,
-        bundleHash:
-          BUNDLE_HASH,
-        projectionVersion:
-          FACE_CHARACTER_GROUNDING_PROJECTION_VERSION_V1,
-      },
+      candidateGrounding:
+        grounding,
+      candidateGroundingRef:
+        groundingRef,
+      candidateHandoff:
+        handoff,
+      expectedSource,
     });
 
   return {
@@ -441,7 +505,7 @@ describe(
           lane.authorityVersion,
         );
         expect(
-          profiles.capability
+          profiles.governedCapability
             .sourceContentVersion,
         ).toBe(
           source.contentVersion,
@@ -589,6 +653,97 @@ describe(
         expect(
           port.committedCount,
         ).toBe(1);
+      },
+    );
+
+    it(
+      'requires the authored governed Face capability before Seyeon can plan the traditional reading',
+      () => {
+        const {
+          profiles,
+          context,
+        } =
+          seyeonRuntime();
+
+        expect(
+          profiles.governedCapability.allowedTopicKeys,
+        ).toEqual([
+          'face.reading.three_divisions',
+        ]);
+        expect(
+          profiles.governedCapability.canInitiate,
+        ).toBe(false);
+
+        const deniedProfiles = {
+          ...profiles,
+          governedCapability: {
+            ...profiles.governedCapability,
+            allowedTopicKeys:
+              Object.freeze([]),
+          },
+        } as typeof profiles;
+
+        expect(() =>
+          buildCharacterFaceGovernedReadingArtifactCandidateV1({
+            candidateHandoff:
+              governedCandidate(),
+            expectedSource,
+            rawRendererOutput: {
+              schemaVersion:
+                'v1',
+              emotion:
+                'neutral',
+              animationCue:
+                'idle',
+              suggestedActions: [],
+            },
+            context,
+            profiles:
+              deniedProfiles,
+            allowedSuggestedActionKeys: [],
+          }),
+        ).toThrow(
+          /Governed Face capability denied the reading plan: TOPIC_NOT_ALLOWED/u,
+        );
+      },
+    );
+
+    it(
+      'rejects a neutral-only runtime from the governed traditional reading plan path',
+      () => {
+        const {
+          profiles,
+          context,
+        } =
+          seyeonRuntime();
+
+        const missingGovernedContext = {
+          ...context,
+          governedFace: null,
+        } as typeof context;
+
+        expect(() =>
+          buildCharacterFaceGovernedReadingArtifactCandidateV1({
+            candidateHandoff:
+              governedCandidate(),
+            expectedSource,
+            rawRendererOutput: {
+              schemaVersion:
+                'v1',
+              emotion:
+                'neutral',
+              animationCue:
+                'idle',
+              suggestedActions: [],
+            },
+            context:
+              missingGovernedContext,
+            profiles,
+            allowedSuggestedActionKeys: [],
+          }),
+        ).toThrow(
+          /requires an admitted governed Face runtime context/u,
+        );
       },
     );
 

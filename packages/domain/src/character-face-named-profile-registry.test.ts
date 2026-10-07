@@ -37,14 +37,19 @@ describe('TOPIC-FACE-005I-B named Character Face profiles', () => {
 
     const source = bundle.authoringSource;
     expect(bundle.capability.characterId).toBe(source.characterId);
+    expect(bundle.governedCapability.characterId).toBe(source.characterId);
     expect(bundle.perspective.characterId).toBe(source.characterId);
     expect(bundle.delivery.characterId).toBe(source.characterId);
 
     expect(bundle.capability.sourceContentVersion).toBe(source.contentVersion);
+    expect(bundle.governedCapability.sourceContentVersion).toBe(source.contentVersion);
     expect(bundle.perspective.sourceContentVersion).toBe(source.contentVersion);
     expect(bundle.delivery.sourceContentVersion).toBe(source.contentVersion);
 
     expect(bundle.capability.sourceFaceProfileVersion).toBe(
+      SEYEON_FACE_PROFILE_VERSION_V1,
+    );
+    expect(bundle.governedCapability.sourceFaceProfileVersion).toBe(
       SEYEON_FACE_PROFILE_VERSION_V1,
     );
     expect(bundle.perspective.sourceFaceProfileVersion).toBe(
@@ -136,6 +141,7 @@ describe('TOPIC-FACE-005I-B named Character Face profiles', () => {
         authoringSource: bundle.authoringSource,
         faceProfileVersion: SEYEON_FACE_PROFILE_VERSION_V1,
         capability: bundle.capability,
+        governedCapability: bundle.governedCapability,
         perspective: bundle.perspective,
         delivery: {
           ...bundle.delivery,
@@ -149,6 +155,7 @@ describe('TOPIC-FACE-005I-B named Character Face profiles', () => {
         authoringSource: bundle.authoringSource,
         faceProfileVersion: SEYEON_FACE_PROFILE_VERSION_V1,
         capability: bundle.capability,
+        governedCapability: bundle.governedCapability,
         perspective: bundle.perspective,
         delivery: {
           ...bundle.delivery,
