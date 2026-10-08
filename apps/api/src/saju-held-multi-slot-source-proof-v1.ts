@@ -62,9 +62,9 @@ function result(
   return Object.freeze({
     version: SAJU_HELD_MULTI_SLOT_SOURCE_PROOF_VERSION_V1,
     state, reason, checkedSlots: Object.freeze([...checkedSlots]),
-    sourceAuthority: 'NOT_EVALUATED',
-    releaseAuthorization: 'NOT_EVALUATED',
-    canExecute: false, canPublish: false, canSell: false,
+    sourceAuthority: 'NOT_EVALUATED' as const,
+    releaseAuthorization: 'NOT_EVALUATED' as const,
+    canExecute: false as const, canPublish: false as const, canSell: false as const,
   });
 }
 
