@@ -29,7 +29,9 @@ function fixture(input: {
       if (input.unavailable === 'commit' && sql === 'COMMIT') throw Error('commit failed');
       if (input.unavailable === 'rollback' && sql === 'ROLLBACK') throw Error('rollback failed');
       if (sql.includes('insert into public.saju_source_proof_nonce_claims')) {
-        if (input.unavailable === 'insert') throw Error('relation missing');
+        if (input.unavailable === 'insert' || input.unavailable === 'rollback') {
+          throw Error('nonce registry insert failed');
+        }
         const key = args?.[0] as string;
         if (input.duplicateRows) {
           return { rows: [{ replay_key_digest: key }, { replay_key_digest: key }] as Row[] };
