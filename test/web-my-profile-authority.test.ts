@@ -73,7 +73,8 @@ describe('web My profile authority boundary', () => {
   });
 
   it('does not fabricate plan, entitlement, or notification values', () => {
-    expect(page).toContain('알림과 이용 권한 설정은 준비 중입니다.');
+    expect(page).toContain('이용권·결제 내역 및 알림 설정은 실제 서버 조회·동의 기능이 연결될 때만 메뉴에 표시합니다.');
+    expect(page).not.toContain('my-setting-row is-pending');
     expect(page).not.toContain('프리미엄');
     expect(page).not.toContain('구독 중');
     expect(page).not.toContain('알림 켜짐');
