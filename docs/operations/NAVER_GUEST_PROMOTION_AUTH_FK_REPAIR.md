@@ -51,8 +51,15 @@ and incident evidence; local checks alone do not establish Production success.
 ## Deployment and rollback
 
 Deploy through the existing Supabase Production migration workflow after merge.
-This applies `20261007150457_guest_promotion_auth_fk_validation.sql`; check the dry run
-to ensure no unapproved pending migration is included. The DB-only repair needs no
+Production history currently has unrelated pending versions, so this PR adds an exact
+single-migration mode selected only when the push changes this sole migration. It runs
+only `20261007150457_guest_promotion_auth_fk_validation.sql` in a transaction and records
+only that version through the CLI's migration-history repair, then checks the exact
+record. It does not run bulk db push or repair unrelated history in this mode.
+Other pushes and workflow dispatch retain the existing governed deployment behavior.
+Tests reject SQL failure, missing history, invalid scope and mixed-migration selection.
+This is a directly required deployment dependency of the incident repair; it prevents
+unapproved rollout of the unrelated migration backlog. The DB-only repair needs no
 additional Vercel configuration change. The already-enabled Naver flag remains true
 for review capture; general Naver approval and resubmission remain external steps.
 

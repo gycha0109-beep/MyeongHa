@@ -24,6 +24,27 @@ db_url="postgresql://postgres.${SUPABASE_PROJECT_ID}:${encoded_password}@${host}
 echo "::add-mask::$db_url"
 db_args=(--db-url "$db_url")
 
+# This approved incident repair must not deploy unrelated historical backlog.
+# The workflow selects this mode only when this is the sole changed migration.
+if [[ "${SUPABASE_PROMOTION_REPAIR_ONLY:-false}" == 'true' ]]; then
+  repair_version='20261007150457'
+  repair_file="supabase/migrations/${repair_version}_guest_promotion_auth_fk_validation.sql"
+  [[ -f "$repair_file" ]]
+  export PGHOST="$host" PGPORT='5432' PGDATABASE='postgres'
+  export PGUSER="postgres.$SUPABASE_PROJECT_ID" PGPASSWORD="$SUPABASE_DB_PASSWORD" PGSSLMODE='require'
+  psql -X -v ON_ERROR_STOP=1 -1 -f "$repair_file"
+  # Record only the SQL just applied; never mark unrelated pending versions applied.
+  supabase migration repair "$repair_version" --status applied "${db_args[@]}"
+  applied_version="$(psql -X -v ON_ERROR_STOP=1 -Atqc "select version from supabase_migrations.schema_migrations where version='$repair_version'")"
+  [[ "$applied_version" == "$repair_version" ]]
+  echo 'Guest promotion function-only repair applied; unrelated migration backlog untouched.'
+  exit 0
+fi
+if [[ "${SUPABASE_PROMOTION_REPAIR_ONLY:-false}" != 'false' ]]; then
+  echo 'Invalid promotion repair deployment scope.' >&2
+  exit 1
+fi
+
 state_file="$(mktemp)"
 trap 'rm -f "$state_file"' EXIT
 

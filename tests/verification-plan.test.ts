@@ -33,13 +33,15 @@ describe('shared CI verification plan', () => {
       expect(plan).toMatchObject({ track, browser: false, contracts: false, dependencies: false, db_suites: [] });
     }
   });
-  it('regresses all DB suites when their shared registry changes and preserves all 28 cases', () => {
+  it('regresses all DB suites and includes Guest promotion on both PostgreSQL versions', () => {
     const plan = resolveVerificationPlan(['scripts/ci/db-suites.json']);
     expect(plan.db).toBe(true);
     expect(plan.db_suites).toHaveLength(5);
-    expect(plan.db_suites.flatMap((suite: string) => getDbSuite(suite).cases)).toHaveLength(28);
+    expect(plan.db_suites.flatMap((suite: string) => getDbSuite(suite).cases)).toHaveLength(30);
     const cases = plan.db_suites.flatMap((suite: string) => getDbSuite(suite).cases);
-    expect(new Set(cases).size).toBe(28);
+    expect(new Set(cases).size).toBe(29);
+    expect(getDbSuite('runtime').cases).toContain('guest-promotion-auth-fk');
+    expect(getDbSuite('postgres17').cases).toContain('guest-promotion-auth-fk');
     const dispatcher = readFileSync('test/db/run_ci_case.sh', 'utf8');
     for (const caseName of cases) expect(dispatcher).toContain(`${caseName})`);
     for (const suiteName of plan.db_suites) {
