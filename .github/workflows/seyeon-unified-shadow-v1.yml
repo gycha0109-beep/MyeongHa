@@ -31,12 +31,12 @@ jobs:
           set -euo pipefail
           if [ "${{ github.event_name }}" = "push" ]; then
             [ "${{ github.ref }}" = "refs/heads/main" ]
-            [ "$(tr -d '\r\n' < .github/seyeon-unified-shadow-v1.trigger)" = "fire-2026-10-08-shadow-v1" ]
+            [ "$(tr -d '\r\n' < .github/seyeon-unified-shadow-v1.trigger)" = "fire-2026-10-08-shadow-v2" ]
           else
             [ "${{ github.event_name }}" = "workflow_dispatch" ]
             [ "${{ github.ref }}" = "refs/heads/main" ]
           fi
-          test -f scripts/run-seyeon-unified-shadow-v1.mjs
+          test -f scripts/run-seyeon-unified-shadow-eval-v1.mjs
 
       - name: Setup Node 24
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
