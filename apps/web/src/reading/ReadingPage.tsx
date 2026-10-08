@@ -1,3 +1,4 @@
+import { resolveReadingAvailabilityV1 } from './reading-availability.js';
 import { useEffect } from 'react';
 
 const readingTopics = [
@@ -25,6 +26,7 @@ export function ReadingPage() {
       <header className="gm-saju-head">
         <h1 className="gm-page-title">사주</h1>
         <p className="gm-lede">내 명식과 사주 읽기 주제를 한곳에 모아봤어요.</p>
+        <p className="reading-availability-intro">프리뷰 확인은 현재 제공 가능한 검증용 읽기이며, 정식 Reader 해석과는 다릅니다. 준비 중인 주제는 상세 화면에서 제공 상태를 확인할 수 있습니다.</p>
       </header>
 
       <div className="saju-status" id="saju-status" role="status">내 사주를 확인하는 중입니다…</div>
@@ -126,7 +128,7 @@ export function ReadingPage() {
             {readingTopics.map(([icon, title, description, href, modifier]) => (
               <a className={`gm-card gm-saju-reading-card${modifier === 'is-wide' ? ' is-wide' : ''}`} href={href} key={href}>
                 <span className={`gm-icon${modifier === 'is-rose' ? ' is-rose' : ''}`} aria-hidden="true">{icon}</span>
-                <span><strong>{title}</strong><small>{description}</small></span>
+                <span><strong>{title}</strong><small>{description}</small><small className={`reading-topic-availability is-${resolveReadingAvailabilityV1(href).kind}`}>{resolveReadingAvailabilityV1(href).label}</small></span>
                 <span className="gm-chevron" aria-hidden="true">›</span>
               </a>
             ))}
@@ -141,12 +143,12 @@ export function ReadingPage() {
           <div className="gm-saju-flow-grid">
             <a className="gm-card gm-flow-card" href="reading-detail.html?scope=year">
               <span className="gm-flow-thumb" aria-hidden="true" />
-              <span className="gm-flow-copy"><strong>올해</strong><p id="saju-flow-year">올해의 흐름</p><p>지금의 흐름을 한눈에, 주요 키워드와 변화의 시기를 읽어보세요.</p></span>
+              <span className="gm-flow-copy"><strong>올해</strong><p id="saju-flow-year">올해의 흐름</p><p>지금의 흐름을 한눈에, 주요 키워드와 변화의 시기를 읽어보세요.</p><small className="reading-topic-availability is-unavailable">정식 읽기 준비 중</small></span>
               <span className="gm-chevron" aria-hidden="true">›</span>
             </a>
             <a className="gm-card gm-flow-card" href="reading-detail.html?scope=month">
               <span className="gm-flow-thumb" aria-hidden="true" />
-              <span className="gm-flow-copy"><strong>이번 달</strong><p>이번 달의 기운과 흐름, 놓치지 말아야 할 순간을 짚어봅니다.</p></span>
+              <span className="gm-flow-copy"><strong>이번 달</strong><p>이번 달의 기운과 흐름, 놓치지 말아야 할 순간을 짚어봅니다.</p><small className="reading-topic-availability is-unavailable">정식 읽기 준비 중</small></span>
               <span className="gm-chevron" aria-hidden="true">›</span>
             </a>
           </div>
@@ -158,7 +160,7 @@ export function ReadingPage() {
             {relationshipTopics.map(([icon, title, description, href, modifier]) => (
               <a className="gm-card gm-relation-card" href={href} key={href}>
                 <span className={`gm-icon${modifier ? ` ${modifier}` : ''}`} aria-hidden="true">{icon}</span>
-                <span><strong>{title}</strong><small>{description}</small></span>
+                <span><strong>{title}</strong><small>{description}</small><small className={`reading-topic-availability is-${resolveReadingAvailabilityV1(href).kind}`}>{resolveReadingAvailabilityV1(href).label}</small></span>
                 <span className="gm-chevron" aria-hidden="true">›</span>
               </a>
             ))}
@@ -169,7 +171,7 @@ export function ReadingPage() {
           <div className="gm-section-head"><h2 className="gm-section-title" id="gm-question-title">고민이 있다면</h2></div>
           <a className="gm-card gm-question-card" href="reading-detail.html?topic=question-specific">
             <span className="gm-icon" aria-hidden="true">…</span>
-            <span className="gm-question-copy"><strong>지금 고민으로 보기</strong><small>지금 마음에 있는 질문을 바탕으로, 사주가 전하는 범위 안에서 읽어보세요.</small></span>
+            <span className="gm-question-copy"><strong>지금 고민으로 보기</strong><small>지금 마음에 있는 질문을 바탕으로, 사주가 전하는 범위 안에서 읽어보세요.</small><small className="reading-topic-availability is-input_pending">추가 입력 준비 중</small></span>
             <span className="gm-chevron" aria-hidden="true">›</span>
           </a>
         </section>

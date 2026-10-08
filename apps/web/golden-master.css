@@ -600,3 +600,20 @@ body.gm-page .mobile-bottom-nav { display: none; }
   .gm-flow-card .gm-chevron { display: none; }
   .gm-chart-panel { left: 12px; width: calc(100vw - 48px); }
 }
+
+/* Availability labels are informational, not entitlement or delivery claims. */
+body.gm-page .reading-availability-intro { color: #756971; font-size: 13px; line-height: 1.55; margin: 0 0 10px; }
+body.gm-page .reading-topic-availability,
+body.gm-page .gm-product-card small.reading-topic-availability,
+body.gm-page .gm-saju-reading-card small.reading-topic-availability {
+  display: inline-flex; width: fit-content; margin-top: 8px;
+  border: 1px solid currentColor; border-radius: 999px; padding: 3px 9px;
+  color: #65545a; font-family: inherit; font-size: 10px; font-weight: 750;
+  line-height: 1.5; letter-spacing: 0;
+}
+body.gm-page .reading-topic-availability.is-preview { color: #415c51; }
+body.gm-page .reading-topic-availability.is-input_pending { color: #845f3c; }
+html[data-theme="dark"] body.gm-page .reading-availability-intro { color: #c4b5bc; }
+html[data-theme="dark"] body.gm-page .reading-topic-availability,
+html[data-theme="dark"] body.gm-page .reading-topic-availability.is-preview,
+html[data-theme="dark"] body.gm-page .reading-topic-availability.is-input_pending { color: #e7d2b3; }

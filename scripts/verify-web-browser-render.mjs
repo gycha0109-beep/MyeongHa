@@ -245,6 +245,7 @@ try {
       bodyText: document.body.innerText,
       styles: [...document.styleSheets].map((sheet) => sheet.href ? new URL(sheet.href).pathname : 'inline'),
       heroHref: document.querySelector('.gm-home-hero .gm-primary-button')?.getAttribute('href') ?? '',
+      monthHref: document.querySelector('.gm-month-card')?.getAttribute('href') ?? '',
       shellWidth: shell ? Math.round(shell.width) : 0,
       productCount: products.length,
       productTopBands: productRects.map((rect) => Math.round(rect.top)),
@@ -274,7 +275,8 @@ try {
   assert(hallState.bodyText.includes('오늘 이야기할 사람') && hallState.bodyText.includes('캐릭터 선택'), 'Home Character chooser missing');
   assert(hallState.heroHref === 'chat-hub.html', `Home global conversation entry must route through the hub: ${hallState.heroHref}`);
   assert(!hallState.bodyText.includes('세연') && !hallState.bodyText.includes('연화'), 'Home must not infer a named Character mapping');
-  assert(hallState.bodyText.includes('이번 달 사주 읽기') && hallState.bodyText.includes('검증된 Reading이 제공 가능한지 상세 화면에서 확인할 수 있습니다.'), 'Home monthly Reading readiness entry missing');
+  assert(hallState.bodyText.includes('이번 달 사주 읽기') && hallState.bodyText.includes('현재 월간 해석은 준비 중입니다.') && hallState.bodyText.includes('전체 사주 프리뷰'), 'Home must distinguish monthly unavailable from admitted Preview');
+  assert(hallState.monthHref === 'reading-detail.html?topic=temperament&scope=original', `Home feature must link to admitted General Natal Preview, got ${hallState.monthHref}`);
   assert(!hallState.bodyText.includes('이달의 운세 전체보기') && !hallState.bodyText.includes('오늘의 흐름은 사주 화면에서 직접 펼쳐볼 수 있습니다.'), 'Home must not claim blocked monthly Reading availability');
   assert(hallState.bodyText.includes('사주 읽기 주제') && hallState.bodyText.includes('전체 사주') && hallState.bodyText.includes('직업 · 커리어') && hallState.bodyText.includes('재물') && hallState.bodyText.includes('연애 · 관계'), 'Home four-card Saju row missing');
   assert(hallState.bodyText.includes('최근 이야기') && hallState.bodyText.includes('지금은 저장된 사실을 이야기로 추측해 이어 붙이지 않습니다.'), 'Home recent-story fail-closed state missing');
