@@ -37,6 +37,8 @@ type AccountState =
   | { kind: 'ready'; payload: ProfilePayload }
   | { kind: 'unavailable'; message: string; login: boolean; hasStoredMemberSession: boolean };
 
+type SettingsPanel = 'account' | 'help' | null;
+
 type BirthState =
   | { kind: 'loading' }
   | { kind: 'ready'; payload: BirthPayload }
@@ -96,7 +98,7 @@ function AuthActions({ subjectKind, hasStoredMemberSession }: {
   );
 }
 
-function ProfileHome({ state }: { state: AccountState }) {
+function ProfileHome({ state, onOpenAccount }: { state: AccountState; onOpenAccount: () => void }) {
   const payload = state.kind === 'ready' ? state.payload : null;
   const profile = payload?.profile;
   const memberSession = payload ? readMemberSession() : null;
@@ -137,7 +139,7 @@ function ProfileHome({ state }: { state: AccountState }) {
             <strong className="my-profile-name" id="my-display-name">{displayName}</strong>
             <span className="my-profile-email" id="my-account-email">{email}</span>
           </div>
-          <a className="my-profile-manage" href="#my-settings-title">내 정보 관리 <span aria-hidden="true">→</span></a>
+          <button className="my-profile-manage" type="button" onClick={onOpenAccount}>내 정보 관리 <span aria-hidden="true">→</span></button>
 
           <div className="my-runtime-meta" aria-hidden="true">
             <span id="my-subject-kind">{payload?.subjectKind === 'member' ? '회원' : payload?.subjectKind === 'guest' ? '게스트' : ''}</span>
@@ -288,25 +290,104 @@ function RecentSection() {
   );
 }
 
-function SettingsSection({ account }: { account: AccountState }) {
+
+function SettingsSection({ account, openPanel, setOpenPanel }: {
+  account: AccountState;
+  openPanel: SettingsPanel;
+  setOpenPanel: (panel: SettingsPanel) => void;
+}) {
   const payload = account.kind === 'ready' ? account.payload : null;
+  const profile = payload?.profile;
+  const session = readMemberSession();
   const hasStoredMemberSession = account.kind === 'unavailable'
     ? account.hasStoredMemberSession
-    : Boolean(payload && readMemberSession());
+    : Boolean(payload && session);
+
+  function toggle(panel: Exclude<SettingsPanel, null>) {
+    setOpenPanel(openPanel === panel ? null : panel);
+  }
 
   return (
     <section className="my-settings-section" aria-labelledby="my-settings-title">
       <div className="my-section-intro">
         <span className="my-section-kicker">SETTINGS</span>
         <h2 id="my-settings-title">설정</h2>
-        <p>계정과 이용 환경에 필요한 항목을 한곳에 모았습니다.</p>
+        <p>내 계정 정보를 확인하고 명하 이용 안내를 찾아볼 수 있습니다.</p>
       </div>
 
       <div className="my-settings-list">
-        <div className="my-setting-row is-pending"><span className="my-setting-icon" aria-hidden="true">♧</span><strong>알림 설정</strong><span>준비 중</span></div>
-        <div className="my-setting-row is-pending"><span className="my-setting-icon" aria-hidden="true">◇</span><strong>이용권 · 결제</strong><span>준비 중</span></div>
-        <div className="my-setting-row is-pending"><span className="my-setting-icon" aria-hidden="true">⚙</span><strong>계정 관리</strong><span>준비 중</span></div>
-        <div className="my-setting-row is-pending"><span className="my-setting-icon" aria-hidden="true">?</span><strong>고객지원</strong><span>준비 중</span></div>
+        <button
+          className="my-setting-row my-setting-trigger"
+          type="button"
+          id="my-account-panel-trigger"
+          aria-expanded={openPanel === 'account'}
+          aria-controls="my-account-panel"
+          onClick={() => toggle('account')}
+        >
+          <span className="my-setting-icon" aria-hidden="true">⚙</span>
+          <strong>계정 관리</strong>
+          <span className="my-setting-chevron" aria-hidden="true">{openPanel === 'account' ? '⌃' : '⌄'}</span>
+        </button>
+        <div className="my-setting-detail" id="my-account-panel" role="region" aria-labelledby="my-account-panel-trigger" hidden={openPanel !== 'account'}>
+          {account.kind === 'loading' ? <p>계정 정보를 확인하는 중입니다…</p> : null}
+          {account.kind === 'unavailable' ? (
+            <>
+              <p>{account.message}</p>
+              {account.login ? <a href="auth.html?next=my.html">로그인하기 →</a> : null}
+            </>
+          ) : null}
+          {payload ? (
+            <>
+              <dl className="my-account-facts">
+                <div><dt>계정 유형</dt><dd>{payload.subjectKind === 'member' ? '회원' : '게스트'}</dd></div>
+                <div><dt>계정 상태</dt><dd>{payload.subjectStatus === 'deletion_pending' ? '삭제 요청 진행 중' : '사용 중'}</dd></div>
+                <div><dt>호칭</dt><dd>{profile?.displayName?.trim() || '설정되지 않음'}</dd></div>
+                {payload.subjectKind === 'member' ? (
+                  <div><dt>로그인 이메일</dt><dd>{session?.user?.email ?? '현재 세션에서 확인할 수 없음'}</dd></div>
+                ) : null}
+              </dl>
+              {payload.subjectKind === 'guest' ? (
+                <a className="my-setting-inline-link" href="auth.html?next=my.html">회원 계정 연결하기 →</a>
+              ) : null}
+              <p className="my-setting-caveat">현재 저장된 계정 정보를 조회하는 화면입니다. 프로필 변경 및 회원 탈퇴 요청은 검증된 서버 절차가 연결되기 전까지 이 화면에서 실행하지 않습니다.</p>
+            </>
+          ) : null}
+        </div>
+
+        <button
+          className="my-setting-row my-setting-trigger"
+          type="button"
+          id="my-help-panel-trigger"
+          aria-expanded={openPanel === 'help'}
+          aria-controls="my-help-panel"
+          onClick={() => toggle('help')}
+        >
+          <span className="my-setting-icon" aria-hidden="true">?</span>
+          <strong>도움말 · 고객지원</strong>
+          <span className="my-setting-chevron" aria-hidden="true">{openPanel === 'help' ? '⌃' : '⌄'}</span>
+        </button>
+        <div className="my-setting-detail" id="my-help-panel" role="region" aria-labelledby="my-help-panel-trigger" hidden={openPanel !== 'help'}>
+          <h3>자주 묻는 질문</h3>
+          <div className="my-help-faq">
+            <div>
+              <strong>저장한 사주 해석은 어디서 확인하나요?</strong>
+              <p>기록 화면에서 저장된 공식 풀이를 다시 볼 수 있습니다. 저장되지 않은 결과는 기록에 나타나지 않습니다.</p>
+              <a href="records.html">기록 보러 가기 →</a>
+            </div>
+            <div>
+              <strong>관상에 선택한 사진은 어디에 사용되나요?</strong>
+              <p>현재 관상 화면은 브라우저에서 사진을 미리 확인하는 단계이며, 사진 분석 기능은 아직 연결되지 않았습니다.</p>
+              <a href="face-reading.html">관상 화면 보기 →</a>
+            </div>
+            <div>
+              <strong>회원 계정은 어디서 연결하나요?</strong>
+              <p>마이페이지에서 계정 연결 또는 로그인을 통해 현재 이용 흐름을 이어갈 수 있습니다.</p>
+              <a href="auth.html?next=my.html">계정 연결 화면 →</a>
+            </div>
+          </div>
+          <p className="my-setting-caveat">현재는 이용 안내만 제공합니다. 공식 문의 접수처와 약관 링크는 확인된 공개 경로가 준비되면 이곳에 연결됩니다.</p>
+        </div>
+
         <div className="my-setting-row my-setting-auth">
           <span className="my-setting-icon" aria-hidden="true">{payload?.subjectKind === 'member' ? '↪' : '之'}</span>
           <strong>{payload?.subjectKind === 'member' ? '로그아웃' : '계정 연결'}</strong>
@@ -314,12 +395,13 @@ function SettingsSection({ account }: { account: AccountState }) {
         </div>
       </div>
 
-      <p className="my-settings-note">알림과 이용 권한 설정은 준비 중입니다. 연결되지 않은 설정 상태를 임의로 표시하지 않습니다.</p>
+      <p className="my-settings-note">이용권·결제 내역 및 알림 설정은 실제 서버 조회·동의 기능이 연결될 때만 메뉴에 표시합니다. 잔여 이용권이나 알림 상태를 임의로 생성하지 않습니다.</p>
     </section>
   );
 }
 
 export function MyPage() {
+  const [openSettingsPanel, setOpenSettingsPanel] = useState<SettingsPanel>(null);
   const [account, setAccount] = useState<AccountState>({ kind: 'loading' });
   const [birth, setBirth] = useState<BirthState>({ kind: 'loading' });
 
@@ -382,13 +464,18 @@ export function MyPage() {
     return () => window.removeEventListener('storage', handleStorage);
   }, []);
 
+  function openAccountSettings() {
+    setOpenSettingsPanel('account');
+    document.getElementById('my-settings-title')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
   return (
     <div className="product-shell my-page-shell">
-      <ProfileHome state={account} />
+      <ProfileHome state={account} onOpenAccount={openAccountSettings} />
       <BirthSection state={birth} />
       <FlowSection />
       <RecentSection />
-      <SettingsSection account={account} />
+      <SettingsSection account={account} openPanel={openSettingsPanel} setOpenPanel={setOpenSettingsPanel} />
     </div>
   );
 }

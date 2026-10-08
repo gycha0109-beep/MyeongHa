@@ -175,7 +175,8 @@ describe('web Birth session guard', () => {
     expect(myPage).toContain('hidden={Boolean(birthProfile)}');
     expect(myPage).toContain('hidden={!birthProfile}');
     expect(myPage).toContain('출생 정보 수정 준비 중');
-    expect(myPage).toContain('알림과 이용 권한 설정은 준비 중입니다.');
+    expect(myPage).toContain('이용권·결제 내역 및 알림 설정은 실제 서버 조회·동의 기능이 연결될 때만 메뉴에 표시합니다.');
+    expect(myPage).not.toContain('my-setting-row is-pending');
     expect(myPage).toContain('내 정보를 보려면 현재 세션이 필요합니다.');
     expect(myPage).toContain('확인되지 않은 계정 정보를 대신 표시하지 않습니다.');
   });
