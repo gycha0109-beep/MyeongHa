@@ -23,6 +23,7 @@ jobs:
     outputs:
       requires_deploy: ${{ steps.relevance.outputs.requires_deploy }}
       promotion_repair_only: ${{ steps.relevance.outputs.promotion_repair_only }}
+      seyeon_manifest_repair_only: ${{ steps.relevance.outputs.seyeon_manifest_repair_only }}
     steps:
       - name: Checkout deployment surface
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -68,8 +69,16 @@ jobs:
               promotion_repair_only=true
             fi
           fi
+          seyeon_manifest_repair_only=false
+          if [[ "$EVENT_NAME" == 'push' && "$requires_deploy" == 'true' ]]; then
+            migration_changes="$(printf '%s\n' "${changed_files:-}" | grep '^supabase/migrations/' || true)"
+            if [[ "$migration_changes" == 'supabase/migrations/20261008043000_seyeon_manifest_acl_restore.sql' ]]; then
+              seyeon_manifest_repair_only=true
+            fi
+          fi
           echo "requires_deploy=$requires_deploy" >> "$GITHUB_OUTPUT"
           echo "promotion_repair_only=$promotion_repair_only" >> "$GITHUB_OUTPUT"
+          echo "seyeon_manifest_repair_only=$seyeon_manifest_repair_only" >> "$GITHUB_OUTPUT"
           {
             echo '### Supabase Production change gate'
             echo
@@ -78,6 +87,7 @@ jobs:
             echo "- before_sha: ${BEFORE_SHA:-absent}"
             echo "- requires_deploy: $requires_deploy"
             echo "- promotion_repair_only: $promotion_repair_only"
+            echo "- seyeon_manifest_repair_only: $seyeon_manifest_repair_only"
             echo "- reason: $reason"
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -91,6 +101,7 @@ jobs:
       SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
       SUPABASE_PRODUCTION_SESSION_POOLER_HOST: ${{ secrets.SUPABASE_PRODUCTION_SESSION_POOLER_HOST }}
       SUPABASE_PROMOTION_REPAIR_ONLY: ${{ needs.change-gate.outputs.promotion_repair_only }}
+      SUPABASE_SEYEON_MANIFEST_ACL_REPAIR_ONLY: ${{ needs.change-gate.outputs.seyeon_manifest_repair_only }}
 
     steps:
       - name: Checkout
