@@ -538,7 +538,7 @@ try {
 
   const darkSaju = await verifyDarkPage(client, origin, '/reading.html', '#saju-empty', { artifactSuffix: '-dark-saju' });
   const darkReading = await verifyDarkPage(client, origin, '/reading-detail.html?scope=year', '.reading-route-state', { artifactSuffix: '-dark-reading-detail' });
-  const darkChatHub = await verifyDarkPage(client, origin, '/chat-hub.html', '.conversation-primary', { artifactSuffix: '-dark-chat-hub' });
+  const darkChatHub = await verifyDarkPage(client, origin, '/chat-hub.html', '.conversation-people .chat-person-card', { artifactSuffix: '-dark-chat-hub' });
   const darkChatRoom = await verifyDarkPage(client, origin, '/chat.html', '.conversation-chat-panel', { artifactSuffix: '-dark-chat-room' });
   const darkRecords = await verifyDarkPage(client, origin, '/records.html', '.records-main');
   const darkMy = await verifyDarkPage(client, origin, '/my.html', '.my-main');
