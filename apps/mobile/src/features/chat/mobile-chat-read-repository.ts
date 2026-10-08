@@ -142,9 +142,19 @@ export function createMobileChatReadRepositoryV1(input: {
 
   async function loadInitial(): Promise<MobileChatThreadSnapshotV1> {
     if (inFlight !== null) return inFlight;
+    // Clear previously displayed owner data before the next Member/Guest read.
+    // On account changes, an old owner's messages must not remain on screen.
     publish({
       ...snapshot,
       status: 'loading_initial',
+      characterId: null,
+      messages: Object.freeze([]),
+      relationship: null,
+      hasMore: true,
+      nextAfterSequenceNo: 0,
+      contentReleaseId: null,
+      contentBundleId: null,
+      contentRevision: null,
       errorCode: null,
     });
     const pending = (async () => {

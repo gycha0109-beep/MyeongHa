@@ -6,6 +6,7 @@ import { mobileColors } from '@/ui/mobile-colors';
 import {
   ActivityIndicator,
   Pressable,
+  TextInput,
   StyleSheet,
   Text,
   View,
@@ -27,8 +28,8 @@ export function ChatReadHeader({
   const displayName = character?.displayName ?? '대화 상대';
   const isSeyeonTheme = snapshot.characterId === 'seyeon';
   const meta = presentation === null
-    ? '서버가 확인한 기존 대화 · 읽기 전용'
-    : `${presentation.title} · 서버가 확인한 기존 대화 · 읽기 전용`;
+    ? '서버가 확인한 대화방'
+    : `${presentation.title} · ${isSeyeonTheme ? '실시간 대화' : '대화 기록'}`;
 
   return (
     <View style={[styles.headerCard, isSeyeonTheme && styles.seyeonSurface]}>
@@ -143,14 +144,64 @@ export function ChatReadMore({
   );
 }
 
-export function ChatSendPending({ themed = false }: { themed?: boolean }) {
+export function ChatComposer({
+  snapshot, draft, onChangeDraft, onSend, sending, status,
+}: {
+  snapshot: MobileChatThreadSnapshotV1;
+  draft: string;
+  onChangeDraft: (text: string) => void;
+  onSend: () => void;
+  sending: boolean;
+  status: string | null;
+}) {
+  const ready = snapshot.status === 'ready' || snapshot.status === 'loading_more';
+  const seyeon = snapshot.characterId === 'seyeon';
+  const allowed = ready && seyeon;
+  if (!allowed) {
+    return (
+      <View style={styles.pendingCard}>
+        <Text style={styles.pendingTitle}>
+          {snapshot.characterId === null
+            ? '대화 상대를 확인하고 있습니다'
+            : seyeon
+              ? '대화 기록을 확인한 뒤 메시지를 보낼 수 있습니다'
+              : '이 캐릭터의 AI 대화는 준비 중입니다'}
+        </Text>
+        <Text style={styles.stateText}>
+          {seyeon
+            ? '대화방 기록을 불러오지 못한 경우 다시 입장해 주세요.'
+            : '캐릭터 대화방과 기록은 이용할 수 있으며, AI 답변 기능은 추후 열립니다.'}
+        </Text>
+      </View>
+    );
+  }
   return (
-    <View style={[styles.pendingCard, themed && styles.seyeonSurface]}>
-      <Text style={styles.pendingTitle}>메시지 보내기는 아직 열리지 않았습니다</Text>
-      <Text style={styles.stateText}>
-        현재 모바일에서는 서버가 확인한 기존 대화 기록만 읽을 수 있습니다.
-      </Text>
-      <Text style={styles.pendingBadge}>읽기 전용</Text>
+    <View style={[styles.composerCard, styles.seyeonSurface]}>
+      <View style={styles.composerRow}>
+        <TextInput
+          accessibilityLabel="세연에게 보낼 메시지"
+          multiline
+          maxLength={8000}
+          value={draft}
+          onChangeText={onChangeDraft}
+          editable={!sending}
+          placeholder="세연에게 하고 싶은 말을 적어주세요"
+          placeholderTextColor={mobileColors.muted}
+          style={styles.composerInput}
+        />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="메시지 보내기"
+          disabled={sending || draft.trim().length === 0}
+          onPress={onSend}
+          style={[styles.sendAction, (sending || draft.trim().length === 0) && styles.sendDisabled]}
+        >
+          {sending
+            ? <ActivityIndicator color={mobileColors.surface} />
+            : <Text style={styles.sendActionText}>전송</Text>}
+        </Pressable>
+      </View>
+      <Text style={styles.composerHelp}>{status ?? '회원 전용 · 세연과의 대화는 서버에 보관됩니다.'}</Text>
     </View>
   );
 }
@@ -243,5 +294,11 @@ const styles = StyleSheet.create({
     gap: 7,
   },
   pendingTitle: { color: mobileColors.ink, fontSize: 15, fontWeight: '800' },
-  pendingBadge: { alignSelf: 'flex-start', color: mobileColors.muted, fontSize: 11, fontWeight: '800' },
+  composerCard: { paddingHorizontal: 14, paddingVertical: 12, gap: 7, borderTopWidth: 1, borderColor: mobileColors.border },
+  composerRow: { flexDirection: 'row', gap: 8, alignItems: 'flex-end' },
+  composerInput: { flex: 1, maxHeight: 130, minHeight: 44, color: mobileColors.ink, fontSize: 14, lineHeight: 20, borderRadius: 13, borderWidth: 1, borderColor: mobileColors.border, backgroundColor: mobileColors.surface, paddingHorizontal: 12, paddingVertical: 10, textAlignVertical: 'top' },
+  sendAction: { minWidth: 58, minHeight: 44, paddingHorizontal: 12, borderRadius: 12, justifyContent: 'center', alignItems: 'center', backgroundColor: mobileColors.navy },
+  sendDisabled: { opacity: 0.48 },
+  sendActionText: { color: mobileColors.surface, fontSize: 13, fontWeight: '800' },
+  composerHelp: { fontSize: 11, color: mobileColors.muted, lineHeight: 16 },
 });
