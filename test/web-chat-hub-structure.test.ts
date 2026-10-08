@@ -97,6 +97,12 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
     expect(css).toContain('.conversation-hub-status');
   });
 
+  it('keeps the main dark-theme browser smoke on the visible discovery state', async () => {
+    const smoke = await readFile(new URL('../scripts/verify-web-browser-render.mjs', import.meta.url), 'utf8');
+    expect(smoke).toContain("verifyDarkPage(client, origin, '/chat-hub.html', '.conversation-people .chat-person-card'");
+    expect(smoke).not.toContain("verifyDarkPage(client, origin, '/chat-hub.html', '.conversation-primary'");
+  });
+
   it('keeps thread-backed relationship surfaces presentation-neutral until an owner-scoped server projection supplies canonical Character authority', async () => {
     const js = await readFile(hubJsPath, 'utf8');
 
