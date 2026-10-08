@@ -168,7 +168,7 @@ export function projectSeyeonProductionDisclosureRelationshipV1(input: {
   });
 }
 
-function createIntegrityClassifier(
+export function createIntegrityClassifier(
   provider: SeyeonStructuredProviderPortV2,
 ): CharacterIntegrityClaimClassifierPortV1 {
   return Object.freeze({
@@ -217,7 +217,7 @@ function createConservativeIntegrityResolver():
   });
 }
 
-function createDisclosureClassifier(
+export function createDisclosureClassifier(
   provider: SeyeonStructuredProviderPortV2,
 ): CharacterDisclosureTopicClassifierPortV2 {
   return Object.freeze({
