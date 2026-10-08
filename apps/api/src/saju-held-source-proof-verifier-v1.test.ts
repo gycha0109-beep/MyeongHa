@@ -176,3 +176,41 @@ describe('2B-3C-3 MyeongHa source proof verification, Preview HOLD only', () => 
     }
   });
 });
+
+
+describe('2B-3C-5 independent signed Saju slot transport vectors', () => {
+  it('verifies Natal and Relationship separately, but rejects crossed signed intent or nonce', async () => {
+    const natal = envelope();
+    const relationship = structuredClone(envelope());
+    const relationshipRequest = { ...expectedRequest, reading: { text: '연애운' } };
+    relationship.response.responseId = 'reading_response_' + 'd'.repeat(24);
+    relationship.response.reading.readingId = 'synthetic-reading-relationship';
+    relationship.proof.payload.nonce = 'R'.repeat(24);
+    relationship.proof.payload.requestBodyHash = hash(relationshipRequest);
+    relationship.proof.payload.material.responseId = relationship.response.responseId;
+    relationship.proof.payload.material.readingId = relationship.response.reading.readingId;
+    relationship.proof.payload.material.responseBodyHash = hash(relationship.response);
+    relationship.proof.payload.responseBodyHash = hash(relationship.response);
+    relationship.proof.signatureHex = createHmac('sha256', keyBytes)
+      .update(DOMAIN).update(hash(relationship.proof.payload)).digest('hex');
+
+    const store = trust();
+    expect(await verifySajuHeldSourceProofV1(natal, store, context()))
+      .toMatchObject({ state: 'held', transportIntegrity: 'VERIFIED', canSell: false });
+    expect(await verifySajuHeldSourceProofV1(relationship, store, {
+      ...context(), expectedNonce: 'R'.repeat(24), expectedRequestBody: relationshipRequest,
+    })).toMatchObject({ state: 'held', transportIntegrity: 'VERIFIED', canSell: false });
+
+    expect(await verifySajuHeldSourceProofV1(natal, trust(), {
+      ...context(), expectedNonce: 'R'.repeat(24), expectedRequestBody: relationshipRequest,
+    })).toMatchObject({ state: 'blocked', transportIntegrity: 'NOT_VERIFIED' });
+
+    expect(await verifySajuHeldSourceProofV1(relationship, trust(), {
+      ...context(), expectedNonce: 'R'.repeat(24), expectedRequestBody: expectedRequest,
+    })).toMatchObject({ state: 'blocked', transportIntegrity: 'NOT_VERIFIED' });
+
+    expect(await verifySajuHeldSourceProofV1(relationship, store, {
+      ...context(), expectedNonce: 'R'.repeat(24), expectedRequestBody: relationshipRequest,
+    })).toMatchObject({ state: 'blocked', transportIntegrity: 'NOT_VERIFIED' });
+  });
+});
