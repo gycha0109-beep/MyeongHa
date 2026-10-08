@@ -29,6 +29,11 @@ describe('Seyeon provider diagnostic logging', () => {
       expect(chatRuntime).toContain(stage);
     }
     expect(chatRuntime).toContain('sqlState');
+    expect(chatRuntime).toContain('runtimeStage');
+    expect(chatRuntime).toContain('providerFailureCode');
+    expect(chatRuntime).toContain('providerHttpStatus');
+    expect(chatRuntime).toContain('error.cause instanceof OpenAiSeyeonStructuredProviderErrorV1');
+    expect(chatRuntime).not.toContain('console.error(error)');
     expect(chatRuntime).not.toContain('JSON.stringify(error)');
     expect(chatRuntime).not.toContain('error.message');
   });
