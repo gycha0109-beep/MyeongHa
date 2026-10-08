@@ -22,6 +22,7 @@ jobs:
     runs-on: ubuntu-24.04
     outputs:
       requires_deploy: ${{ steps.relevance.outputs.requires_deploy }}
+      promotion_repair_only: ${{ steps.relevance.outputs.promotion_repair_only }}
     steps:
       - name: Checkout deployment surface
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -60,7 +61,15 @@ jobs:
             fi
           fi
 
+          promotion_repair_only=false
+          if [[ "$EVENT_NAME" == 'push' && "$requires_deploy" == 'true' ]]; then
+            migration_changes="$(printf '%s\n' "${changed_files:-}" | grep '^supabase/migrations/' || true)"
+            if [[ "$migration_changes" == 'supabase/migrations/20261007150457_guest_promotion_auth_fk_validation.sql' ]]; then
+              promotion_repair_only=true
+            fi
+          fi
           echo "requires_deploy=$requires_deploy" >> "$GITHUB_OUTPUT"
+          echo "promotion_repair_only=$promotion_repair_only" >> "$GITHUB_OUTPUT"
           {
             echo '### Supabase Production change gate'
             echo
@@ -68,6 +77,7 @@ jobs:
             echo "- current_sha: $CURRENT_SHA"
             echo "- before_sha: ${BEFORE_SHA:-absent}"
             echo "- requires_deploy: $requires_deploy"
+            echo "- promotion_repair_only: $promotion_repair_only"
             echo "- reason: $reason"
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -80,6 +90,7 @@ jobs:
     env:
       SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
       SUPABASE_PRODUCTION_SESSION_POOLER_HOST: ${{ secrets.SUPABASE_PRODUCTION_SESSION_POOLER_HOST }}
+      SUPABASE_PROMOTION_REPAIR_ONLY: ${{ needs.change-gate.outputs.promotion_repair_only }}
 
     steps:
       - name: Checkout
@@ -90,16 +101,16 @@ jobs:
         with:
           version: 2.116.0
 
-      - name: Deploy governed production migrations
-        shell: bash
-        run: bash scripts/operations/run-supabase-production-migrations.sh
-
       - name: Install PostgreSQL client for read-only post-deploy verification
         shell: bash
         run: |
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y postgresql-client
+
+      - name: Deploy governed production migrations
+        shell: bash
+        run: bash scripts/operations/run-supabase-production-migrations.sh
 
       - name: Verify production platform integrity after deploy
         shell: bash

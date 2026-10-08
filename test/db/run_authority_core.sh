@@ -87,6 +87,7 @@ bash test/db/account_deletion_finalizer_catalog_guard.sh
 run_isolated_case myeongha_privacy_reconciliation_replay_test bash test/db/privacy_reconciliation_replay.sh
 
 bash test/db/guest_promotion_concurrency.sh
+psql -v ON_ERROR_STOP=1 -f test/db/guest_promotion_auth_fk_authority.sql
 bash test/db/user_resource_revocation_concurrency.sh
 bash test/db/character_forget_concurrency.sh
 bash test/db/memory_grant_revoke_concurrency.sh

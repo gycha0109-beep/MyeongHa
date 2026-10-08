@@ -36,6 +36,19 @@ catalog_snapshot() {
 }
 
 case "$case_name" in
+  guest-promotion-auth-fk)
+    version_num="$(psql -Atqc "show server_version_num")"
+    if [[ "$version_num" -ge 160000 ]]; then
+      # Match the existing PG17 fixture: birth owner transfer has its own
+      # managed-principal case and is unrelated to Guest promotion.
+      apply_pg17_migrations_without_birth_authority
+    else
+      apply_standard_migrations
+    fi
+    psql -v ON_ERROR_STOP=1 -f test/db/guest_promotion_auth_fk_authority.sql
+    bash test/db/guest_promotion_concurrency.sh
+    if [[ "$version_num" -lt 160000 ]]; then catalog_snapshot; fi
+    ;;
   active-default-content-release)
     apply_standard_migrations
     bash test/db/active_default_content_release_query.sh
