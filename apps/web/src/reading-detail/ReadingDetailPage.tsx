@@ -17,7 +17,7 @@ export function ReadingDetailPage() {
       </section>
 
       <section className="reading-stage" data-reading-stage hidden aria-label="캐릭터와 함께 읽는 사주">
-        <div className="reader-scene" data-reader-portrait role="img" aria-label="백헌 사주 읽기 장면">
+        <div className="reader-scene" data-reader-portrait role="img" aria-label="세연 사주 읽기 장면">
           <div className="reader-scene-art" aria-hidden="true">
             <span className="reader-orbit" />
             <span className="reader-lamp" />
@@ -26,17 +26,17 @@ export function ReadingDetailPage() {
 
           <div className="reader-reading-intro" data-reading-scene-intro aria-hidden="true">
             <span className="reader-reading-intro-kicker">READING SESSION</span>
-            <strong><span data-reader-name>백헌</span>이 명식을 살펴보고 있습니다.</strong>
+            <strong><span data-reader-name>세연</span>이 명식을 살펴보고 있습니다.</strong>
             <span className="reader-reading-intro-line" />
           </div>
 
           <div className="reader-identity">
-            <span className="reader-title-badge" data-reader-title>충추원의 장</span>
+            <span className="reader-title-badge" data-reader-title>무녀</span>
             <div className="reader-name-line">
-              <h1 data-reader-name>백헌</h1>
-              <span className="reader-name-hanja" data-reader-hanja aria-hidden="true">白憲</span>
+              <h1 data-reader-name>세연</h1>
+              <span className="reader-name-hanja" data-reader-hanja aria-hidden="true"></span>
             </div>
-            <p data-reader-intro>당신의 사주를 바탕으로 지금의 흐름부터 하나씩 살펴보겠습니다.</p>
+            <p data-reader-intro>복잡하게 시작하지 않을게요. 지금 가장 크게 읽히는 흐름부터 같이 봐요.</p>
           </div>
 
           <div className="reader-dialogue" aria-label="함께 읽는 사람의 말">
@@ -79,7 +79,7 @@ export function ReadingDetailPage() {
             <section className="reading-block reading-character-block">
               <span className="reading-block-icon" aria-hidden="true">✿</span>
               <div>
-                <h2><span data-reader-name>백헌</span>의 한 마디</h2>
+                <h2><span data-reader-name>세연</span>의 한 마디</h2>
                 <p data-reader-comment>이 해석에서 실제로 확인해 볼 지점을 함께 짚겠습니다.</p>
                 <span className="reading-authority-note" data-reading-authority-note>Preview · 현재 검증 중인 원국 해석입니다.</span>
               </div>
@@ -96,7 +96,7 @@ export function ReadingDetailPage() {
 
           <section className="reading-completion" data-reading-completion hidden aria-live="polite">
             <span className="reading-completion-kicker">READING COMPLETE</span>
-            <h2 data-reading-completion-title><span data-reader-name>백헌</span>이 이번 사주 읽기를 마쳤습니다.</h2>
+            <h2 data-reading-completion-title><span data-reader-name>세연</span>이 이번 사주 읽기를 마쳤습니다.</h2>
             <p data-reading-completion-copy>읽은 내용은 기록에서 다시 확인할 수 있습니다. 대화를 시작하려면 대화 상대를 새로 선택해 주세요.</p>
             <div className="reading-completion-actions">
               <a className="reading-completion-primary" data-reading-chat-link href="chat-hub.html">

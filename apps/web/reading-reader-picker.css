@@ -238,3 +238,21 @@
     min-height: 118px;
   }
 }
+
+/* Reader concept rollout: presentation candidates and server-paid access are distinct. */
+.reading-reader-option:disabled,
+.reading-reader-option.is-unavailable {
+  cursor: not-allowed;
+  opacity: .62;
+  border-color: rgba(184, 145, 88, .14);
+  background: rgba(13, 23, 29, .64);
+}
+.reading-reader-option:disabled:hover,
+.reading-reader-option:disabled:focus-visible {
+  transform: none;
+  border-color: rgba(184, 145, 88, .14);
+  background: rgba(13, 23, 29, .64);
+}
+.reading-reader-option:disabled .reading-reader-option-action {
+  color: rgba(238, 229, 215, .6);
+}

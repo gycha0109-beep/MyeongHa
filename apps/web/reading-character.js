@@ -4,6 +4,7 @@ import { isBrowserSajuPreviewDeliveryV1 } from './saju-preview-response-admissio
 import { getActiveBearer, invalidateGuestSession, invalidateMemberSession } from './product-auth.js';
 import { parsePersistedReadingHandoffV1 } from './reading-history-handoff.js';
 import { parseOfficialReadingRecordPayloadV1 } from './official-reading-record-contract.js';
+import { resolveReaderPresentationCandidateV1 } from './reader-rollout-policy.js';
 
 const readerCatalog = {
   baekheon: {
@@ -69,11 +70,11 @@ const aliases = new Map([
 
 const params = new URLSearchParams(window.location.search);
 const persistedReadingHandoff = parsePersistedReadingHandoffV1(params);
-const requestedReader = params.get('character') || params.get('reader') || 'baekheon';
+const requestedReader = params.get('character') || params.get('reader') || 'seyeon';
 const normalizedReader = aliases.get(requestedReader) || requestedReader.toLowerCase();
 // Frontend integration authority: URL-selected Reader identity is presentation-only.
 // When Reader Interpretation is activated, the server-returned readerCharacterId wins.
-const presentationReaderHint = readerCatalog[normalizedReader] ? normalizedReader : 'baekheon';
+const presentationReaderHint = resolveReaderPresentationCandidateV1(normalizedReader);
 const readerKey = presentationReaderHint;
 const reader = readerCatalog[presentationReaderHint];
 const route = resolveReadingDetailRoute(params);
@@ -98,6 +99,7 @@ const routeAction = document.querySelector('[data-reading-route-action]');
 root.dataset.reader = presentationReaderHint;
 root.dataset.readerSelection = params.has('reader') || params.has('character') ? 'explicit' : 'default';
 root.dataset.readerAuthority = 'presentation_hint_only';
+root.dataset.readerSelectionState = normalizedReader === presentationReaderHint ? 'preview_presentation' : 'withheld';
 root.dataset.readerPresentation = 'reading-scene-v1';
 root.dataset.readingRouteState = persistedReadingHandoff.state === 'ready'
   ? 'persisted_record_loading'

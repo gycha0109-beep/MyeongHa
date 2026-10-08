@@ -26,6 +26,8 @@ describe('MyeongHa Saju Reader picker', () => {
     expect(runtime).toContain("window.location.assign(next.href);");
     expect(runtime).toContain("dialog.showModal()");
     expect(runtime).toContain('현재 프리뷰에서는 사주 근거와 해석 문장은 그대로 유지하고');
+    expect(runtime).toContain('button.disabled = !rollout.previewSelectable');
+    expect(runtime).toContain('현재 세연만 프리뷰 장면을 선택할 수 있습니다.');
     expect(runtime).toContain('선택한 Reader의 장면과 이름만 화면 연출에 적용합니다.');
     expect(css).toContain('.reading-reader-picker-grid');
   });
