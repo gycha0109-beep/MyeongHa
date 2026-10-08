@@ -165,6 +165,7 @@ async function runSeyeonTurnRuntimePhaseV1<T>(
   stage: SeyeonTurnRuntimePhaseV1,
   action: () => Promise<T>,
 ): Promise<T> {
+  const startedAt = performance.now();
   try {
     return await action();
   } catch (error) {
@@ -195,6 +196,12 @@ async function runSeyeonTurnRuntimePhaseV1<T>(
       }),
     );
     throw error;
+  } finally {
+    console.info('MYEONGHA_SEYEON_RUNTIME_METRIC ' + JSON.stringify({
+      schemaVersion: 'myeongha-seyeon-runtime-metric-v1',
+      stage,
+      elapsedMs: Math.max(0, Math.round(performance.now() - startedAt)),
+    }));
   }
 }
 
