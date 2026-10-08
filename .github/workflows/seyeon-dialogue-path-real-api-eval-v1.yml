@@ -1,0 +1,70 @@
+name: "[WT:character-memory] 세연 실제 API 기존5회 신규3회 Shadow 비교"
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/seyeon-dialogue-path-eval-v1.trigger'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: seyeon-dialogue-path-real-api-eval-v1
+  cancel-in-progress: false
+
+jobs:
+  compare:
+    name: 세연 실제 API 5회·3회 합성 격리 비교
+    runs-on: ubuntu-24.04
+    environment: production
+    timeout-minutes: 18
+    steps:
+      - name: Checkout evaluated revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Enforce main-only bounded experiment
+        shell: bash
+        run: |
+          set -euo pipefail
+          [ "${{ github.ref }}" = "refs/heads/main" ]
+          if [ "${{ github.event_name }}" = "push" ]; then
+            [ "$(tr -d '\r\n' < .github/seyeon-dialogue-path-eval-v1.trigger)" = "fire-2026-10-09-real-path-v1" ]
+          else
+            [ "${{ github.event_name }}" = "workflow_dispatch" ]
+          fi
+          test -f scripts/run-seyeon-dialogue-path-real-api-eval-v1.mjs
+
+      - name: Setup Node 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Verify deterministic budget and quality accounting
+        run: npx vitest run test/seyeon-dialogue-path-eval-core-v1.test.mjs test/seyeon-fast-dialogue-shadow-v1.test.ts test/seyeon-unified-governance-candidate-v1.test.ts
+
+      - name: Build pinned runtime evaluator
+        run: npm run build
+
+      - name: Compare the actual five-call and three-call paths
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          SEYEON_DIALOGUE_PATH_EVIDENCE_PATH: ${{ runner.temp }}/seyeon-dialogue-path-real-api-v1/evidence.json
+        run: |
+          test -n "${OPENAI_API_KEY:-}"
+          node scripts/run-seyeon-dialogue-path-real-api-eval-v1.mjs
+
+      - name: Retain synthetic IDs and numeric metrics only
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: seyeon-dialogue-path-real-api-v1-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/seyeon-dialogue-path-real-api-v1/evidence.json
+          if-no-files-found: warn
+          retention-days: 14

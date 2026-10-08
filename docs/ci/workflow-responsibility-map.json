@@ -361,6 +361,12 @@
       "prMode": "none",
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "commit-metadata"
+    },
+    "seyeon-dialogue-path-real-api-eval-v1.yml": {
+      "responsibility": "production-character-model-evaluation",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
     }
   }
 }
