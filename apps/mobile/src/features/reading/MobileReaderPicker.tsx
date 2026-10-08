@@ -5,6 +5,7 @@ import {
   findMobileReaderPresentationV1,
   MOBILE_READER_PRESENTATIONS_V1,
   type MobileReaderPresentationIdV1,
+  isMobileReaderPreviewSelectableV1,
 } from '@/features/reading/mobile-reader-presentation';
 import { mobileColors } from '@/ui/mobile-colors';
 
@@ -20,12 +21,13 @@ interface MobileReaderPickerPropsV1 {
  */
 export function MobileReaderPicker({ selected, onChange, vertical }: MobileReaderPickerPropsV1) {
   const [expanded, setExpanded] = useState(false);
-  const reader = findMobileReaderPresentationV1(selected);
+  const effectiveSelected = isMobileReaderPreviewSelectableV1(selected) ? selected : 'seyeon';
+  const reader = findMobileReaderPresentationV1(effectiveSelected);
   return (
     <View style={styles.panel}>
       <View style={styles.heading}>
         <View style={styles.headingCopy}>
-          <Text style={styles.kicker}>READER · 화면 연출 선택</Text>
+          <Text style={styles.kicker}>READER · 세연 프리뷰 장면</Text>
           <Text style={styles.title}>{reader.name} <Text style={styles.subtitle}>· {reader.title}</Text></Text>
           <Text style={styles.tone}>{reader.tone}</Text>
         </View>
@@ -41,25 +43,34 @@ export function MobileReaderPicker({ selected, onChange, vertical }: MobileReade
       </View>
       {expanded ? (
         <View style={styles.grid}>
-          {MOBILE_READER_PRESENTATIONS_V1.map((option) => (
+          {MOBILE_READER_PRESENTATIONS_V1.map((option) => {
+            const available = isMobileReaderPreviewSelectableV1(option.key);
+            return (
             <Pressable
               key={option.key}
               accessibilityRole="button"
               accessibilityLabel={`${option.name} Reader 선택`}
-              accessibilityState={{ selected: selected === option.key }}
-              onPress={() => { onChange(option.key); setExpanded(false); }}
-              style={[styles.option, selected === option.key && styles.selected]}
+              accessibilityState={{ selected: effectiveSelected === option.key, disabled: !available }}
+              disabled={!available}
+              onPress={() => {
+                if (!available) return;
+                onChange(option.key);
+                setExpanded(false);
+              }}
+              style={[styles.option, effectiveSelected === option.key && styles.selected, !available && styles.unavailable]}
             >
-              <Text style={[styles.optionName, selected === option.key && styles.selectedText]}>
+              <Text style={[styles.optionName, effectiveSelected === option.key && styles.selectedText]}>
                 {option.name}
               </Text>
-              <Text style={[styles.optionTitle, selected === option.key && styles.selectedText]}>
-                {option.title}
+              <Text style={[styles.optionTitle, effectiveSelected === option.key && styles.selectedText]}>
+                {available ? option.title : '컨셉 준비 중'}
               </Text>
             </Pressable>
-          ))}
+            );
+          })}
         </View>
       ) : null}
+      <Text style={styles.notice}>현재 세연만 프리뷰 장면을 선택할 수 있으며, 유료 Reader 해석은 아직 공개되지 않았습니다.</Text>
       <Text style={styles.notice}>
         {vertical === 'saju'
           ? '선택한 Reader는 현재 사주 프리뷰 화면의 표시만 바꿉니다. 해석 근거와 내용은 변경되지 않습니다.'
@@ -82,6 +93,7 @@ const styles = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   option: { width: '31%', minHeight: 65, borderWidth: 1, borderColor: mobileColors.border, borderRadius: 12, alignItems: 'center', justifyContent: 'center', gap: 3, backgroundColor: mobileColors.canvas, padding: 5 },
   selected: { backgroundColor: mobileColors.navy, borderColor: mobileColors.navy },
+  unavailable: { opacity: 0.5 },
   optionName: { color: mobileColors.ink, fontSize: 14, fontWeight: '800' },
   optionTitle: { color: mobileColors.muted, fontSize: 10, textAlign: 'center' },
   selectedText: { color: mobileColors.surface },

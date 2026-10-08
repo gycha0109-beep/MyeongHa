@@ -27,6 +27,7 @@ describe('mobile Saju and Face Reader presentation parity', () => {
     expect(MOBILE_READER_PRESENTATIONS_V1).toHaveLength(9);
     expect(findMobileReaderPresentationV1('seyeon').name).toBe('세연');
     expect(findMobileReaderPresentationV1('baekheon').name).toBe('백헌');
+    expect(MOBILE_READER_PRESENTATIONS_V1.map((x) => x.key)).toHaveLength(9);
   });
 
   it('only changes presentation in the Saju calculation/preview and Face photo-stage screens', async () => {
@@ -43,6 +44,8 @@ describe('mobile Saju and Face Reader presentation parity', () => {
     expect(face).toContain('disabled\n        style={styles.primaryDisabled}');
     expect(picker).toContain('해석 근거와 내용은 변경되지 않습니다.');
     expect(picker).toContain('사진 분석과 Reader 풀이는 아직 열리지 않았습니다.');
+    expect(picker).toContain('disabled={!available}');
+    expect(picker).toContain('현재 세연만 프리뷰 장면을 선택할 수 있으며');
   });
 
   it('does not promote a Reader pick into an artificial server identity', async () => {
