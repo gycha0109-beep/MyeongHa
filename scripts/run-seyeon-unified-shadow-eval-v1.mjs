@@ -7,6 +7,7 @@ import {
   SEYEON_MODEL_EVAL_CASES_V1,
   scoreSeyeonClassifierCaseV1,
   aggregateSeyeonEvalV1,
+  assessSeyeonShadowEvalQualityV1,
 } from './seyeon-model-eval-cases-v1.mjs';
 
 const PRICES = Object.freeze({
@@ -92,8 +93,10 @@ async function main() {
   const models = Object.fromEntries(MODELS.map((m) => {
     const valid = rows[m].filter((row) => row.status === 'ok');
     const failing = rows[m].filter((row) => row.status !== 'ok');
+    const scores = aggregateSeyeonEvalV1(valid);
     return [m, {
-      scores: aggregateSeyeonEvalV1(valid),
+      scores,
+      qualityGate: assessSeyeonShadowEvalQualityV1(scores, failing.length),
       errorCount: failing.length,
       p50Ms: percentile(valid.map((row) => row.elapsedMs), 0.5),
       p95Ms: percentile(valid.map((row) => row.elapsedMs), 0.95),
@@ -129,12 +132,13 @@ async function main() {
       ordinaryFalsePositives: r.scores.ordinaryFalsePositives,
       p50Ms: r.p50Ms, p95Ms: r.p95Ms,
       errorCount: r.errorCount,
+      qualityGate: r.qualityGate,
       estimatedCostUsd: r.usage.estimatedCostUsd,
       mismatchIds: r.mismatches.map((row) => row.id),
     }));
   }
-  if (MODELS.some((m) => models[m].errorCount > 0)) {
-    throw new Error('Unified classifier candidate has runtime errors; no promotion.');
+  if (MODELS.some((m) => models[m].qualityGate.status !== 'PASS')) {
+    throw new Error('Synthetic Shadow classifier quality gate HOLD; no promotion.');
   }
 }
 await main();

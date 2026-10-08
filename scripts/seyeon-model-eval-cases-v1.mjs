@@ -151,3 +151,19 @@ export function aggregateSeyeonEvalV1(rows) {
     strictOrdinary, ordinaryClaimFalsePositives,
   });
 }
+
+/** Synthetic test gate only. No Production model promotion authority. */
+export function assessSeyeonShadowEvalQualityV1(scores, errors, expectedCount = 100) {
+  const reasons = [];
+  if (scores.count !== expectedCount) reasons.push('INCOMPLETE_EVALUATION');
+  if (errors !== 0) reasons.push('MODEL_EXECUTION_ERROR');
+  if (scores.sensitiveCount === 0 || scores.sensitiveMisses !== 0) reasons.push('SENSITIVE_TOPIC_MISS');
+  if (scores.ordinaryFalsePositives !== 0) reasons.push('ORDINARY_TOPIC_FALSE_POSITIVE');
+  if (scores.expectedClaims === 0 || scores.detectedClaims !== scores.expectedClaims) reasons.push('REQUIRED_CLAIM_MISS');
+  if (scores.ordinaryClaimFalsePositives !== 0) reasons.push('UNSUPPORTED_ORDINARY_CLAIM');
+  return Object.freeze({
+    status: reasons.length === 0 ? 'PASS' : 'HOLD',
+    reasons: Object.freeze(reasons),
+    scope: 'SYNTHETIC_CLASSIFIER_ONLY_NOT_PRODUCTION_AUTHORITY',
+  });
+}

@@ -3,6 +3,7 @@ import {
   SEYEON_MODEL_EVAL_CASES_V1,
   scoreSeyeonClassifierCaseV1,
   aggregateSeyeonEvalV1,
+  assessSeyeonShadowEvalQualityV1,
 } from '../scripts/seyeon-model-eval-cases-v1.mjs';
 
 describe('Seyeon role model comparison harness', () => {
@@ -22,6 +23,24 @@ describe('Seyeon role model comparison harness', () => {
       expect(item.text.length).toBeLessThan(300);
       expect(Object.isFrozen(item)).toBe(true);
     }
+  });
+
+  it('HOLDs misses, unsupported claims, and model errors even when output parses', () => {
+    const base = {
+      count: 100, sensitiveCount: 56, sensitiveMisses: 0,
+      ordinaryFalsePositives: 0, expectedClaims: 22, detectedClaims: 22,
+      ordinaryClaimFalsePositives: 0,
+    };
+    expect(assessSeyeonShadowEvalQualityV1(base, 0).status).toBe('PASS');
+    expect(assessSeyeonShadowEvalQualityV1({ ...base, sensitiveMisses: 1 }, 0))
+      .toMatchObject({ status: 'HOLD', reasons: ['SENSITIVE_TOPIC_MISS'] });
+    expect(assessSeyeonShadowEvalQualityV1({ ...base, count: 99 }, 1).reasons)
+      .toEqual(expect.arrayContaining(['INCOMPLETE_EVALUATION', 'MODEL_EXECUTION_ERROR']));
+    expect(assessSeyeonShadowEvalQualityV1({
+      ...base, ordinaryFalsePositives: 1, ordinaryClaimFalsePositives: 1,
+    }, 0).reasons).toEqual(expect.arrayContaining([
+      'ORDINARY_TOPIC_FALSE_POSITIVE', 'UNSUPPORTED_ORDINARY_CLAIM',
+    ]));
   });
 
   it('never mistakes omission of a sensitive topic for a passing verdict', () => {
