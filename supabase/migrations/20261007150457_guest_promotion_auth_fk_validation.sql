@@ -174,4 +174,3 @@ begin
     select p_subject_id, p_guest_session_id, 'member'::text, 'active'::text, false;
 end;
 $$;
-
