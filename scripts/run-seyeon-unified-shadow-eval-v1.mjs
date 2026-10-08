@@ -14,7 +14,7 @@ const PRICES = Object.freeze({
   'gpt-5.6-terra': Object.freeze({ input: 2.00, cached: 0.20, output: 12.00 }),
 });
 const MODELS = Object.freeze(Object.keys(PRICES));
-const MAX_CALLS = 96;
+const MAX_CALLS = 200;
 const MAX_ESTIMATED_COST_USD = 0.75;
 function safeToken(value) {
   return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : 0;
@@ -72,7 +72,7 @@ function percentile(values, share) {
 async function main() {
   const apiKey = process.env.OPENAI_API_KEY?.trim();
   if (!apiKey) throw new Error('Missing protected model evaluation credential.');
-  if (SEYEON_MODEL_EVAL_CASES_V1.length !== 48) throw new Error('Unexpected benchmark size.');
+  if (SEYEON_MODEL_EVAL_CASES_V1.length !== 100) throw new Error('Unexpected benchmark size.');
   const total = {
     calls: 0, estimatedCostUsd: 0,
     byModel: Object.fromEntries(MODELS.map((model) => [model, {
