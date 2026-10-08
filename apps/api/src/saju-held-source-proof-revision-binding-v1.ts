@@ -8,7 +8,11 @@ import {
   type SajuHeldSourceProofVerificationV1,
 } from './saju-held-source-proof-verifier-v1.js';
 import type { SajuProductionReadingRequestV1 } from './saju-production-reading-http-adapter.js';
-import { buildCurrentBirthGeneralNatalSourceProofRequestV1 } from './saju-source-proof-request-normalization-v1.js';
+import {
+  SAJU_SOURCE_PROOF_GENERAL_NATAL_TEXT_V1,
+  buildCurrentBirthSourceProofRehearsalRequestV1,
+  type SajuHeldProofRehearsalReadingTextV1,
+} from './saju-source-proof-request-normalization-v1.js';
 import type { VerifiedSubjectIdentityEvidenceV1, ResolvedSubjectContextV1 } from './subject-identity-resolver.js';
 
 export const SAJU_HELD_REVISION_BINDING_VERSION_V1 =
@@ -32,6 +36,8 @@ export interface BindCurrentSubjectSajuHeldProofInputV1 {
   readonly pool: PostgresSubjectPoolV1;
   readonly issuePort: SajuHeldSourceProofIssuePortV1;
   readonly verifierTrust: SajuHeldSourceProofVerifierTrustV1;
+  /** Defaults to General Natal. Only fixed internal rehearsal slots may differ. */
+  readonly readingText?: SajuHeldProofRehearsalReadingTextV1;
   /** Server-only deterministic test seam; never derived from a browser request. */
   readonly nonceFactory?: () => string;
   /** Server clock seam for tests. */
@@ -113,7 +119,7 @@ function sameCurrentContext(
 }
 
 /**
- * One General Natal proof rehearsal, with a fresh authorized Subject+Revision
+ * One fixed, server-selected Preview reading proof rehearsal, with a fresh Subject+Revision
  * snapshot both before and after Saju's protected proof issuance.
  *
  * The DB transaction is fully committed before any external I/O. A valid HMAC
@@ -136,7 +142,10 @@ export async function bindCurrentSubjectSajuHeldProofV1(
   let request: SajuProductionReadingRequestV1;
   let nonce: string;
   try {
-    request = buildCurrentBirthGeneralNatalSourceProofRequestV1(before.profile);
+    request = buildCurrentBirthSourceProofRehearsalRequestV1(
+      before.profile,
+      input.readingText ?? SAJU_SOURCE_PROOF_GENERAL_NATAL_TEXT_V1,
+    );
     nonce = (input.nonceFactory ?? (() => randomBytes(32).toString('base64url')))();
     if (typeof nonce !== 'string' || !NONCE.test(nonce)) {
       return verdict('blocked', 'invalid_current_birth_request');

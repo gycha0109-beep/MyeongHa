@@ -93,6 +93,11 @@ function canonicalize(value: unknown): unknown {
 function digest(value: unknown): string {
   return createHash('sha256').update(JSON.stringify(canonicalize(value))).digest('hex');
 }
+/** Server-only hash parity with Saju deterministicContentHash v1. */
+export function hashSajuHeldSourceProofRequestV1(input: unknown): string {
+  return digest(input);
+}
+
 function blocked(): SajuHeldSourceProofVerificationV1 {
   return Object.freeze({
     state: 'blocked', reason: 'invalid_or_replayed_transport_proof',
