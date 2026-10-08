@@ -14,7 +14,7 @@ describe('mobile Saju and Face Reader presentation parity', () => {
     const projection = (v: { key: string; name: string; title: string; tone: string }) =>
       ({ key: v.key, name: v.name, title: v.title, tone: v.tone });
     const webCatalog = await source('apps/web/reader-presentation-catalog.js');
-    const regex = /key: '([^']+)',\\s*name: '([^']+)',\\s*title: '([^']+)',\\s*tone: '([^']+)'/gu;
+    const regex = /key: '([^']+)',\s*name: '([^']+)',\s*title: '([^']+)',\s*tone: '([^']+)'/gu;
     const webReaders = [...webCatalog.matchAll(regex)].map((match) => ({
       key: match[1] ?? '',
       name: match[2] ?? '',
