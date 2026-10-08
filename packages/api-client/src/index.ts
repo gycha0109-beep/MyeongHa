@@ -156,3 +156,17 @@ export {
   type SocialAuthProviderV1,
   type SocialAuthStartResultV1,
 } from './social-auth.js';
+
+export {
+  readReaderInterpretationPreviewV1,
+  parseReaderInterpretationPreviewV1,
+  READER_INTERPRETATION_PREVIEW_PATH_V1,
+  READER_INTERPRETATION_PREVIEW_SCHEMA_V1,
+  READER_INTERPRETATION_SAJU_DOMAINS_V1,
+  type ReaderInterpretationPreviewRequestV1,
+  type ReaderInterpretationPreviewResultV1,
+  type ReaderInterpretationSegmentV1,
+  type ReaderInterpretationSajuDomainV1,
+  type ReaderInterpretationSegmentKindV1,
+} from './reader-interpretation.js';
+
