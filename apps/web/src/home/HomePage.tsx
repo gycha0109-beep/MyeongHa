@@ -38,7 +38,7 @@ export function HomePage() {
             <span className="gm-month-eyebrow" id="home-current-date">{currentMonthLabel(new Date())}</span>
             <strong className="gm-card-title">이달에는 전체 사주 프리뷰부터 시작해 보세요.</strong>
             <span className="gm-month-support">현재 월간 해석은 준비 중입니다. 검증된 전체 사주 프리뷰의 제공 상태를 상세 화면에서 확인할 수 있습니다.</span>
-            <span className="gm-inline-link">전체 사주 프리뷰 확인 <span aria-hidden="true">›</span></span>
+            <span className="gm-inline-link">읽기 확인 <span aria-hidden="true">›</span></span>
           </span>
         </a>
       </section>
