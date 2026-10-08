@@ -2,6 +2,7 @@ import { createHash, createHmac } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
 import {
   createSajuHeldSourceProofServerTrustV1,
+  type SajuHeldSourceProofServerTrustOptionsV1,
 } from '../apps/api/src/saju-held-source-proof-server-trust-v1.js';
 import {
   verifySajuHeldSourceProofV1,
@@ -220,9 +221,9 @@ describe('2B-3C-8A server-only Saju transport + proof trust composition', () => 
       { serviceOrigin: 'http://saju-proof.example' }, { serviceBearer: '' },
       { noncePool: {} }, { timeoutMs: 40_000 },
     ]) {
-      expect(() => createSajuHeldSourceProofServerTrustV1({
-        ...f.input, ...overrides,
-      })).toThrow();
+      const invalid = { ...f.input, ...overrides } as unknown
+        as SajuHeldSourceProofServerTrustOptionsV1;
+      expect(() => createSajuHeldSourceProofServerTrustV1(invalid)).toThrow();
     }
     expect(f.queries).toHaveLength(0);
     expect(f.fetchImpl).not.toHaveBeenCalled();
