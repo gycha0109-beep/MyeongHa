@@ -15,6 +15,7 @@ import {
 } from './postgres-subject-execution.js';
 import { executeCurrentBirthProfileSajuCalculationV1 } from './saju-production-calculation-execution.js';
 import type { SajuProductionCalculationHttpAdapterV1 } from './saju-production-calculation-http-adapter.js';
+import type { ResolvedSubjectContextV1, VerifiedSubjectIdentityEvidenceV1 } from './subject-identity-resolver.js';
 import {
   getCurrentSelfBirthProfileLocator,
   SelfBirthProfileLocatorAuthorityPortErrorV1,
@@ -340,12 +341,20 @@ function unavailableResponse(requestId: string): Response {
   });
 }
 
-export async function readBoundCurrentBirthProfileV1(input: {
+export interface ReadBoundCurrentBirthContextInputV1 {
   readonly pool: PostgresSubjectPoolV1;
-  readonly verifiedEvidence: NonNullable<
-    Awaited<ReturnType<IdentityEvidenceVerificationPortV1['verifyRequestIdentity']>>
-  >;
-}): Promise<BirthProfileReadResponseV1> {
+  readonly verifiedEvidence: VerifiedSubjectIdentityEvidenceV1;
+}
+
+export interface BoundCurrentBirthContextV1 {
+  readonly resolvedSubject: ResolvedSubjectContextV1;
+  readonly profile: BirthProfileReadResponseV1;
+}
+
+/** Capture the transaction-resolved owner and its current Birth revision together. */
+export async function readBoundCurrentBirthContextV1(
+  input: ReadBoundCurrentBirthContextInputV1,
+): Promise<BoundCurrentBirthContextV1> {
   return executePostgresSubjectTransactionV1({
     pool: input.pool,
     verifiedEvidence: input.verifiedEvidence,
@@ -375,9 +384,17 @@ export async function readBoundCurrentBirthProfileV1(input: {
         );
       }
 
-      return profile;
+      return Object.freeze({ resolvedSubject, profile });
     },
   });
+}
+
+/** Existing public internal read stays source-compatible for all current callers. */
+export async function readBoundCurrentBirthProfileV1(
+  input: ReadBoundCurrentBirthContextInputV1,
+): Promise<BirthProfileReadResponseV1> {
+  const context = await readBoundCurrentBirthContextV1(input);
+  return context.profile;
 }
 
 /**
