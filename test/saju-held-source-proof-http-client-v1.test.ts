@@ -3,6 +3,7 @@ import {
   createSajuHeldSourceProofHttpIssuePortV1,
   SajuHeldSourceProofHttpErrorV1,
   SAJU_HELD_SOURCE_PROOF_HTTP_PATH_V1,
+  type SajuHeldSourceProofHttpFetchInitV1,
 } from '../apps/api/src/saju-held-source-proof-http-client-v1.js';
 
 const origin = 'https://saju-proof.example';
@@ -42,7 +43,7 @@ function client(fetchImpl: (url: string, init: {
 
 describe('2B-3C-6 protected Saju Preview source proof HTTP connector', () => {
   it('sends only the fixed protected route and passes unknown envelope to verifier', async () => {
-    const fetchImpl = vi.fn(async () => jsonResponse(envelope));
+    const fetchImpl = vi.fn(async (_url: string, _init: SajuHeldSourceProofHttpFetchInitV1) => jsonResponse(envelope));
     const port = client(fetchImpl);
     expect(await port.issuePreviewProof({ nonce, request })).toEqual(envelope);
     expect(fetchImpl).toHaveBeenCalledTimes(1);
