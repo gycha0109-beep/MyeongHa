@@ -5,6 +5,12 @@ import {
   type CharacterFaceCapabilityProfileV1,
 } from './character-face-capability.js';
 import {
+  CHARACTER_FACE_GOVERNED_CAPABILITY_SCHEMA_VERSION_V1,
+  CHARACTER_FACE_GOVERNED_CAPABILITY_SOURCE_SCHEMA_VERSION_V1,
+  admitCharacterFaceGovernedCapabilityProfileV1,
+  type CharacterFaceGovernedCapabilityProfileV1,
+} from './character-face-governed-capability.js';
+import {
   CHARACTER_FACE_DELIVERY_LOCALE_V1,
   CHARACTER_FACE_DELIVERY_PROFILE_SCHEMA_VERSION_V1,
   CHARACTER_FACE_DELIVERY_SOURCE_SCHEMA_VERSION_V1,
@@ -40,6 +46,7 @@ export interface CharacterFaceNamedProfileBundleV1 {
     typeof CHARACTER_FACE_NAMED_PROFILE_REGISTRY_VERSION_V1;
   readonly authoringSource: CharacterFaceNamedAuthoringSourceV1;
   readonly capability: CharacterFaceCapabilityProfileV1;
+  readonly governedCapability: CharacterFaceGovernedCapabilityProfileV1;
   readonly perspective: CharacterFacePerspectiveProfileV1;
   readonly delivery: CharacterFaceDeliveryProfileV1;
 }
@@ -80,6 +87,7 @@ export function assertCharacterFaceNamedProfileCompatibilityV1(
     authoringSource: CharacterFaceNamedAuthoringSourceV1;
     faceProfileVersion: string;
     capability: CharacterFaceCapabilityProfileV1;
+    governedCapability: CharacterFaceGovernedCapabilityProfileV1;
     perspective: CharacterFacePerspectiveProfileV1;
     delivery: CharacterFaceDeliveryProfileV1;
   }>,
@@ -94,6 +102,14 @@ export function assertCharacterFaceNamedProfileCompatibilityV1(
     input.capability.characterId,
     input.capability.sourceContentVersion,
     input.capability.sourceFaceProfileVersion,
+    input.authoringSource,
+    input.faceProfileVersion,
+  );
+  assertIdentity(
+    'GovernedCapability',
+    input.governedCapability.characterId,
+    input.governedCapability.sourceContentVersion,
+    input.governedCapability.sourceFaceProfileVersion,
     input.authoringSource,
     input.faceProfileVersion,
   );
@@ -174,6 +190,40 @@ function buildSeyeonBundle(): CharacterFaceNamedProfileBundleV1 | null {
           capabilitySource.allowPartial,
         canInitiate:
           capabilitySource.canInitiate,
+      },
+    });
+
+  const governedCapabilitySource = Object.freeze({
+    schemaVersion:
+      CHARACTER_FACE_GOVERNED_CAPABILITY_SOURCE_SCHEMA_VERSION_V1,
+    capabilityVersion:
+      'seyeon-face-governed-capability-v1',
+    characterId: authoringSource.characterId,
+    contentVersion: authoringSource.contentVersion,
+    faceProfileVersion,
+    allowedTopicKeys: Object.freeze([
+      'face.reading.three_divisions',
+    ] as const),
+    canInitiate: false as const,
+  });
+
+  const governedCapability =
+    admitCharacterFaceGovernedCapabilityProfileV1({
+      source: governedCapabilitySource,
+      candidate: {
+        schemaVersion:
+          CHARACTER_FACE_GOVERNED_CAPABILITY_SCHEMA_VERSION_V1,
+        capabilityVersion:
+          governedCapabilitySource.capabilityVersion,
+        characterId:
+          governedCapabilitySource.characterId,
+        sourceContentVersion:
+          governedCapabilitySource.contentVersion,
+        sourceFaceProfileVersion:
+          governedCapabilitySource.faceProfileVersion,
+        allowedTopicKeys:
+          governedCapabilitySource.allowedTopicKeys,
+        canInitiate: false,
       },
     });
 
@@ -294,6 +344,7 @@ function buildSeyeonBundle(): CharacterFaceNamedProfileBundleV1 | null {
     authoringSource,
     faceProfileVersion,
     capability,
+    governedCapability,
     perspective,
     delivery,
   });
@@ -303,6 +354,7 @@ function buildSeyeonBundle(): CharacterFaceNamedProfileBundleV1 | null {
       CHARACTER_FACE_NAMED_PROFILE_REGISTRY_VERSION_V1,
     authoringSource,
     capability,
+    governedCapability,
     perspective,
     delivery,
   });

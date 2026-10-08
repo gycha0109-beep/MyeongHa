@@ -1,3 +1,5 @@
+import { getVercelOidcToken } from '@vercel/oidc';
+
 import type {
   CharacterClientCompatibilityProfileV1,
 } from '../../../packages/domain/src/index.js';
@@ -14,7 +16,6 @@ import {
 } from './production-request-identity-verifier.js';
 import {
   createProductionSeyeonChatRuntimeV1,
-  type ProductionSeyeonChatRuntimeV1,
 } from './production-seyeon-chat-runtime-v1.js';
 import {
   SEYEON_PRODUCTION_WEB_COMPATIBILITY_PROFILE_V1,
@@ -26,6 +27,102 @@ import {
 import type {
   SupabaseMemberVerifierFetchV1,
 } from './supabase-member-identity-verifier.js';
+
+export const SEYEON_PRODUCTION_PROVIDER_ROUTING_V1 = Object.freeze({
+  directDefaultModel: 'gpt-5.6-terra',
+  gatewayOrigin: 'https://ai-gateway.vercel.sh',
+  gatewayDefaultModel: 'openai/gpt-5.6-sol',
+  vercelProject: 'prj_nXF0b5uv27Lyucz2SEBxzdCRXVsP',
+  vercelTeam: 'team_xuYA9OhCWlJETaYFOmeVodgS',
+} as const);
+
+export type ProductionSeyeonOidcTokenProviderV1 = (input: {
+  readonly project: string;
+  readonly team: string;
+}) => Promise<string>;
+
+function optionalEnv(
+  env: ProductionUserDataRuntimeEnvV1,
+  name: string,
+): string | null {
+  const value = env[name];
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim();
+  return normalized.length === 0 ? null : normalized;
+}
+
+function failClosedProviderConfig(): OpenAiSeyeonStructuredProviderConfigV1 {
+  return Object.freeze({
+    apiKey: '',
+    model: SEYEON_PRODUCTION_PROVIDER_ROUTING_V1.directDefaultModel,
+  });
+}
+
+export async function resolveProductionSeyeonProviderConfigAtRequestV1(
+  env: ProductionUserDataRuntimeEnvV1,
+  oidcTokenProvider: ProductionSeyeonOidcTokenProviderV1 =
+    getVercelOidcToken,
+): Promise<OpenAiSeyeonStructuredProviderConfigV1> {
+  const directApiKey = optionalEnv(env, 'OPENAI_API_KEY');
+  if (directApiKey !== null) {
+    return Object.freeze({
+      apiKey: directApiKey,
+      model:
+        optionalEnv(env, 'MYEONGHA_SEYEON_OPENAI_MODEL') ??
+        SEYEON_PRODUCTION_PROVIDER_ROUTING_V1.directDefaultModel,
+    });
+  }
+
+  let vercelOidcToken: string;
+  try {
+    vercelOidcToken = (
+      await oidcTokenProvider({
+        project: SEYEON_PRODUCTION_PROVIDER_ROUTING_V1.vercelProject,
+        team: SEYEON_PRODUCTION_PROVIDER_ROUTING_V1.vercelTeam,
+      })
+    ).trim();
+  } catch (error) {
+    console.error(
+      'MYEONGHA_SEYEON_PROVIDER_DIAGNOSTIC ' +
+      JSON.stringify({
+        schemaVersion: 'myeongha-seyeon-provider-diagnostic-v1',
+        stage: 'oidc_resolution',
+        outcome: 'failure',
+        errorName: error instanceof Error ? error.name : 'UnknownError',
+      }),
+    );
+    return failClosedProviderConfig();
+  }
+
+  if (vercelOidcToken.length === 0) {
+    console.error(
+      'MYEONGHA_SEYEON_PROVIDER_DIAGNOSTIC ' +
+      JSON.stringify({
+        schemaVersion: 'myeongha-seyeon-provider-diagnostic-v1',
+        stage: 'oidc_resolution',
+        outcome: 'empty',
+      }),
+    );
+    return failClosedProviderConfig();
+  }
+
+  console.error(
+    'MYEONGHA_SEYEON_PROVIDER_DIAGNOSTIC ' +
+    JSON.stringify({
+      schemaVersion: 'myeongha-seyeon-provider-diagnostic-v1',
+      stage: 'oidc_resolution',
+      outcome: 'success',
+    }),
+  );
+
+  return Object.freeze({
+    apiKey: vercelOidcToken,
+    model:
+      optionalEnv(env, 'MYEONGHA_SEYEON_AI_GATEWAY_MODEL') ??
+      SEYEON_PRODUCTION_PROVIDER_ROUTING_V1.gatewayDefaultModel,
+    origin: SEYEON_PRODUCTION_PROVIDER_ROUTING_V1.gatewayOrigin,
+  });
+}
 
 export interface ProductionSeyeonTurnSendRequestV1 {
   readonly request: Request;
@@ -40,7 +137,7 @@ export interface ProductionSeyeonTurnSendRuntimeV1 {
 
 export interface CreateProductionSeyeonTurnSendRuntimeInputV1 {
   readonly env: ProductionUserDataRuntimeEnvV1;
-  /** Server-owned test override only. Production defaults to the approved Seyeon Web profile. */
+  /** Server-owned test override only. Production resolves credentials per turn. */
   readonly providerConfig?: OpenAiSeyeonStructuredProviderConfigV1;
   /** Server-owned test override only. Browser input can never supply this profile. */
   readonly clientCompatibilityProfile?: CharacterClientCompatibilityProfileV1;
@@ -48,11 +145,13 @@ export interface CreateProductionSeyeonTurnSendRuntimeInputV1 {
   readonly memberFetchImpl?: SupabaseMemberVerifierFetchV1;
   readonly identityEvidenceVerifier?: IdentityEvidenceVerificationPortV1;
   readonly createUuid?: () => string;
+  /** Test seam for request-context OIDC only. */
+  readonly oidcTokenProvider?: ProductionSeyeonOidcTokenProviderV1;
 }
 
 /**
- * Public-boundary composition root. Callers must supply the approved, server-owned
- * Web compatibility profile explicitly; there is deliberately no fallback/default.
+ * Public-boundary composition root. Provider credentials are resolved inside the
+ * request lifecycle so Vercel request-context OIDC is never cached across turns.
  */
 export function createProductionSeyeonTurnSendRuntimeV1(
   input: CreateProductionSeyeonTurnSendRuntimeInputV1,
@@ -64,23 +163,6 @@ export function createProductionSeyeonTurnSendRuntimeV1(
       ...(input.memberFetchImpl === undefined ? {} : { memberFetchImpl: input.memberFetchImpl }),
     });
 
-  let runtime: ProductionSeyeonChatRuntimeV1 | undefined;
-  const getRuntime = () => {
-    runtime ??= createProductionSeyeonChatRuntimeV1({
-      databaseConfig: config,
-      providerConfig: input.providerConfig ?? {
-        apiKey: input.env.OPENAI_API_KEY ?? '',
-        model: input.env.MYEONGHA_SEYEON_OPENAI_MODEL?.trim() || 'gpt-5.6-terra',
-      },
-      clientCompatibilityProfile:
-        input.clientCompatibilityProfile ??
-        SEYEON_PRODUCTION_WEB_COMPATIBILITY_PROFILE_V1,
-      ...(input.pool === undefined ? {} : { pool: input.pool }),
-      ...(input.createUuid === undefined ? {} : { createUuid: input.createUuid }),
-    });
-    return runtime;
-  };
-
   return Object.freeze({
     handleRequest(requestInput: ProductionSeyeonTurnSendRequestV1) {
       return handleSeyeonChatTurnSendRequestV1({
@@ -89,12 +171,33 @@ export function createProductionSeyeonTurnSendRuntimeV1(
         serverTime: requestInput.serverTime,
         identityEvidenceVerifier,
         runtime: Object.freeze({
-          run: (runInput) => getRuntime().run(runInput),
+          run: async (runInput) => {
+            const providerConfig =
+              input.providerConfig ??
+              await resolveProductionSeyeonProviderConfigAtRequestV1(
+                input.env,
+                input.oidcTokenProvider ?? getVercelOidcToken,
+              );
+            const runtime = createProductionSeyeonChatRuntimeV1({
+              databaseConfig: config,
+              providerConfig,
+              clientCompatibilityProfile:
+                input.clientCompatibilityProfile ??
+                SEYEON_PRODUCTION_WEB_COMPATIBILITY_PROFILE_V1,
+              ...(input.pool === undefined ? {} : { pool: input.pool }),
+              ...(input.createUuid === undefined ? {} : { createUuid: input.createUuid }),
+            });
+            try {
+              return await runtime.run(runInput);
+            } finally {
+              await runtime.close();
+            }
+          },
         }),
       });
     },
     close() {
-      return runtime?.close() ?? Promise.resolve();
+      return Promise.resolve();
     },
   });
 }
