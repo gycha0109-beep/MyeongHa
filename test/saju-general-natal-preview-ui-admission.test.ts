@@ -94,7 +94,9 @@ describe('General Natal 2A: existing route → browser guarded Preview integrati
       new URL('../apps/web/reading-character.js', import.meta.url), 'utf8',
     );
     expect(runtime).toContain("import { isBrowserSajuPreviewDeliveryV1 } from './saju-preview-response-admission.js'");
-    expect(runtime).toContain('if (!isBrowserSajuPreviewDeliveryV1(payload)) return null;');
+    expect(runtime).toContain('if (requireBrowserAdmission && !isBrowserSajuPreviewDeliveryV1(payload)) return null;');
+    expect(runtime).toContain('const preview = previewStepsFromPayload(payload, { requireBrowserAdmission: true });');
+    expect(runtime).toContain('const readingView = previewStepsFromPayload({');
     expect(runtime).toContain('activatePreviewReading(preview);');
     expect(runtime).toContain('if (stage) stage.hidden = false;');
   });
