@@ -51,7 +51,7 @@ function createPicker() {
 function openPicker(anchor) {
   const current = createPicker();
   pendingReadingUrl = new URL(anchor.href, window.location.href);
-  const targetText = anchor.textContent?.replace(/\\s+/gu, ' ').trim() || '선택한 사주 읽기';
+  const targetText = anchor.textContent?.replace(/\s+/gu, ' ').trim() || '선택한 사주 읽기';
 
   if (typeof current.dialog.showModal !== 'function') {
     // No explicit choice was made. Keep the existing route without a Reader hint.
