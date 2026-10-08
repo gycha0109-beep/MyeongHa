@@ -73,7 +73,7 @@ function renderReader() {
     if (analyzeLabel) analyzeLabel.textContent = '사진을 먼저 준비해주세요';
     if (statusTitle) statusTitle.textContent = `${selectedReader.name}과 관상 보기`;
     if (statusCopy) {
-      statusCopy.textContent = '사진을 준비하면 얼굴 구조를 확인한 뒤 선택한 Reader의 풀이로 이어집니다.';
+      statusCopy.textContent = '사진을 준비하면 얼굴 구조를 확인한 뒤 선택한 대리자의 풀이로 이어집니다.';
     }
   }
 }
