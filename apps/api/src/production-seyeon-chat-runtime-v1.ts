@@ -183,6 +183,7 @@ async function runSeyeonTurnRuntimePhaseV1<T>(
         runtimeStage,
         providerFailureCode: providerCause?.code ?? null,
         providerHttpStatus: providerCause?.httpStatus ?? null,
+        providerDiagnostic: providerCause?.diagnostic ?? null,
       }),
     );
     throw error;

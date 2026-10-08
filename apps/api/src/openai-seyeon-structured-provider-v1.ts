@@ -44,10 +44,65 @@ export class OpenAiSeyeonStructuredProviderErrorV1 extends Error {
     readonly code: OpenAiSeyeonStructuredProviderFailureCodeV1,
     message: string,
     readonly httpStatus: number | null = null,
+    readonly diagnostic: Readonly<{ reason: string; errorCode: string | null; errorType: string | null }> | null = null,
   ) {
     super(message);
     this.name = 'OpenAiSeyeonStructuredProviderErrorV1';
   }
+}
+
+/** Error bodies can reflect credentials or prompts. Emit only fixed vocabulary. */
+export async function readSeyeonProviderFailureDiagnosticV1(response: Response) {
+  const reader = response.body?.getReader();
+  let timer: ReturnType<typeof setTimeout>;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error('diagnostic timeout')), 2_000);
+  });
+  let raw = '';
+  try {
+    if (reader) {
+      const chunks: Uint8Array[] = [];
+      let size = 0;
+      while (true) {
+        const result = await Promise.race([reader.read(), deadline]);
+        if (result.done) break;
+        size += result.value.byteLength;
+        if (size > 16_384) break;
+        chunks.push(result.value);
+      }
+      raw = new TextDecoder().decode(Buffer.concat(chunks));
+    }
+  } catch {
+    // Missing, oversized, or unreadable error bodies never replace HTTP_FAILURE.
+  } finally {
+    clearTimeout(timer!);
+    void reader?.cancel().catch(() => undefined);
+  }
+  let error: Record<string, unknown> = {};
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (isRecord(parsed) && isRecord(parsed.error)) error = parsed.error;
+  } catch { /* No raw response is retained or emitted. */ }
+  const allowed = new Set([
+    'forbidden', 'permission_denied', 'access_denied', 'model_not_found',
+    'model_not_allowed', 'model_not_available', 'model_access_denied',
+    'customer_verification_required', 'insufficient_funds', 'quota_for_entity_exceeded',
+    'invalid_request_error', 'permission_error', 'authentication_error',
+    'unsupported_country_region_territory', 'free_tier_model_not_supported',
+  ]);
+  const safeValue = (value: unknown) => typeof value === 'string' && allowed.has(value) ? value : null;
+  const message = typeof error.message === 'string' ? error.message : '';
+  const reason = /free.{0,30}(?:tier|credit).{0,160}(?:model|support|available|access)|model.{0,160}free/iu.test(message)
+    ? 'MODEL_FREE_TIER_RESTRICTED'
+    : /customer_verification_required|payment method|verify.{0,40}(?:customer|account)|organization must be verified/iu.test(message + ' ' + String(error.code))
+      ? 'CUSTOMER_VERIFICATION_REQUIRED'
+      : /country|region.{0,30}(?:unsupported|not supported)/iu.test(message)
+        ? 'UNSUPPORTED_COUNTRY_REGION'
+        : /insufficient_funds|quota_for_entity_exceeded/iu.test(String(error.code))
+          ? 'CREDIT_OR_BUDGET_EXHAUSTED'
+          : /(?:access|permission).{0,80}model|model.{0,80}(?:access|permission|not allowed)/iu.test(message)
+            ? 'MODEL_ACCESS_DENIED' : 'UNKNOWN';
+  return Object.freeze({ reason, errorCode: safeValue(error.code), errorType: safeValue(error.type) });
 }
 
 function failConfiguration(message: string): never {
@@ -274,15 +329,12 @@ export function createOpenAiSeyeonStructuredProviderV1(
       }
 
       if (!response.ok) {
-        try {
-          void response.body?.cancel();
-        } catch {
-          // best-effort body cancellation only
-        }
+        const diagnostic = await readSeyeonProviderFailureDiagnosticV1(response);
         throw new OpenAiSeyeonStructuredProviderErrorV1(
           'HTTP_FAILURE',
           'OpenAI structured request returned a non-success status.',
           response.status,
+          diagnostic,
         );
       }
 
