@@ -147,7 +147,7 @@ export function createSajuHeldSourceProofHttpIssuePortV1(
   if (typeof fetchImpl !== 'function') return fail('INVALID_CONFIGURATION');
 
   return Object.freeze({
-    async issuePreviewProof(input) {
+    async issuePreviewProof(input: Parameters<SajuHeldSourceProofIssuePortV1['issuePreviewProof']>[0]) {
       const body = outboundBody(input);
       const controller = new AbortController();
       let timedOut = false;
