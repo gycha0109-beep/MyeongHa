@@ -209,7 +209,7 @@ describe('2B-3C-8A server-only Saju transport + proof trust composition', () => 
     const key = Buffer.from(keyBytes);
     const ports = createSajuHeldSourceProofServerTrustV1({ ...f.input, keyBytes: key });
     key.fill(0);
-    expect(ports.verifierTrust.keyBytes).toEqual(keyBytes);
+    expect(Buffer.from(ports.verifierTrust.keyBytes)).toEqual(keyBytes);
     expect(ports.verifierTrust.keyBytes).not.toBe(key);
   });
 
