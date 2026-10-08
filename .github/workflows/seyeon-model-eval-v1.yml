@@ -21,8 +21,6 @@ jobs:
     runs-on: ubuntu-24.04
     environment: production
     timeout-minutes: 15
-    env:
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
     steps:
       - name: Checkout evaluated revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -38,7 +36,6 @@ jobs:
             [ "${{ github.event_name }}" = "workflow_dispatch" ]
             [ "${{ github.ref }}" = "refs/heads/main" ]
           fi
-          test -n "${OPENAI_API_KEY:-}"
           test -f scripts/run-seyeon-model-eval-v1.mjs
 
       - name: Setup Node 24
@@ -58,8 +55,11 @@ jobs:
 
       - name: Compare Luna and Terra on synthetic governed classification
         env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           SEYEON_EVAL_EVIDENCE_PATH: ${{ runner.temp }}/seyeon-model-eval-v1/evidence.json
-        run: node scripts/run-seyeon-model-eval-v1.mjs
+        run: |
+          test -n "${OPENAI_API_KEY:-}"
+          node scripts/run-seyeon-model-eval-v1.mjs
 
       - name: Retain bounded evidence
         if: always()
