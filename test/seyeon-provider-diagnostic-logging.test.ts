@@ -20,5 +20,16 @@ describe('Seyeon provider diagnostic logging', () => {
     expect(source).not.toContain('apiKey: error');
     expect(source).not.toContain('text: error');
     expect(source).not.toContain('responseBody');
+    const chatRuntime = await readFile(
+      new URL('../apps/api/src/production-seyeon-chat-runtime-v1.ts', import.meta.url),
+      'utf8',
+    );
+    expect(chatRuntime).toContain('MYEONGHA_SEYEON_TURN_RUNTIME_DIAGNOSTIC');
+    for (const stage of ['subject_resolution', 'thread_binding', 'content_manifest', 'chat_execution']) {
+      expect(chatRuntime).toContain(stage);
+    }
+    expect(chatRuntime).toContain('sqlState');
+    expect(chatRuntime).not.toContain('JSON.stringify(error)');
+    expect(chatRuntime).not.toContain('error.message');
   });
 });
