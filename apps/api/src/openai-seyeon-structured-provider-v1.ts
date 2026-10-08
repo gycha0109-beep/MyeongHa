@@ -230,6 +230,9 @@ export function createOpenAiSeyeonStructuredProviderV1(
           },
           body: JSON.stringify({
             model,
+            ...(endpoint === 'https://ai-gateway.vercel.sh/v1/responses' && model.startsWith('openai/')
+              ? { providerOptions: { gateway: { only: ['openai'] } } }
+              : {}),
             store: false,
             instructions: request.instructions,
             input: [
