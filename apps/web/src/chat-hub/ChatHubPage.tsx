@@ -6,26 +6,19 @@ export function ChatHubPage() {
   }, []);
 
   return (
-    <div className="product-shell">
+    <div className="product-shell chat-hub-shell" data-chat-hub-state="unavailable">
       <section className="chat-hub-intro conversation-hub-intro" aria-labelledby="chat-hub-title">
         <div>
           <span className="chat-hub-eyebrow">CONVERSATION</span>
           <h1 id="chat-hub-title">대화</h1>
-          <p>누구와 이야기를 이어갈까요?</p>
+          <p>이곳에서 마음이 가는 대리자를 만나보세요.</p>
         </div>
-        <a className="conversation-meet-button" href="#people"><span>다른 사람 만나기</span><span aria-hidden="true">›</span></a>
+        <a className="conversation-meet-button" href="#people" data-meet-shortcut hidden><span>다른 대리자 만나기</span><span aria-hidden="true">›</span></a>
       </section>
 
-      <section className="chat-hub-primary conversation-primary" aria-label="이어갈 대화와 내 대화">
+      <section className="chat-hub-primary conversation-primary" data-relationship-section hidden aria-label="이어갈 대화와 내 대화">
         <article className="chat-continuation-card conversation-featured" data-continuation-card>
-          <div className="chat-continuation-empty conversation-featured-empty" data-continuation-empty>
-            <span className="chat-continuation-kicker">지금 이어갈 사람</span>
-            <div className="chat-continuation-mark" aria-hidden="true">明</div>
-            <h2>아직 이어지고 있는 대화가 없습니다.</h2>
-            <p>누군가와 이야기를 시작하면, 다시 이어가기 좋은 관계가 이곳에 먼저 나타납니다.</p>
-            <a className="chat-continuation-action" href="#people"><span>다른 사람 만나기</span><span aria-hidden="true">→</span></a>
-          </div>
-
+          {/* A recent conversation is displayed only after an owner-scoped server projection. */}
           <div className="chat-continuation-active conversation-featured-active" data-continuation-active hidden>
             <div className="chat-continuation-scene" data-continuation-scene aria-hidden="true"><span data-continuation-initial>明</span></div>
             <div className="chat-continuation-copy conversation-featured-copy">
@@ -46,11 +39,7 @@ export function ChatHubPage() {
             <button className="chat-text-button" type="button" data-recent-all hidden>전체 보기 →</button>
           </div>
           <div className="chat-recent-list" data-recent-list hidden />
-          <div className="chat-recent-empty conversation-thread-empty" data-recent-empty>
-            <span className="chat-recent-empty-mark" aria-hidden="true">◇</span>
-            <strong>아직 이어지고 있는 관계가 없습니다.</strong>
-            <p>대화를 시작하면 그 사람과의 이야기가 여기에 남습니다.</p>
-          </div>
+
         </aside>
       </section>
 
@@ -63,8 +52,8 @@ export function ChatHubPage() {
         <div className="chat-people-heading">
           <div>
             <span className="chat-hub-section-kicker">MEET</span>
-            <h2 id="people-title">다른 사람 만나기<span aria-hidden="true">✦</span></h2>
-            <p>새로운 이야기를 시작하고 싶을 때만 열어보세요. 사람마다 말하는 방식과 거리감이 다릅니다.</p>
+            <h2 id="people-title"><span data-discovery-heading>누구와 이야기를 시작해볼까요?</span><span data-returning-heading hidden>다른 대리자 만나기</span><span className="chat-people-star" aria-hidden="true">✦</span></h2>
+            <p>말하는 방식도, 분위기도 조금씩 다른 명하의 대리자들. 마음이 가는 사람을 선택해보세요.</p>
           </div>
           <label className="chat-search">
             <span className="sr-only">사람 찾기</span><span className="chat-search-icon" aria-hidden="true" />
@@ -79,10 +68,11 @@ export function ChatHubPage() {
         </div>
       </section>
 
-      <aside className="conversation-memory-note" aria-label="대화 안내">
+      <aside className="conversation-memory-note conversation-hub-status" data-hub-availability role="status" aria-label="대화 목록 연결 상태">
         <span className="conversation-memory-mark" aria-hidden="true">◇</span>
-        <p><strong>이야기는 언제든 이어집니다.</strong><br />당신이 남긴 말은, 그 사람과의 다음 대화로 이어집니다.</p>
+        <p>이전 대화 목록은 아직 이 화면에 연결되지 않았습니다. 대리자 탐색은 이용할 수 있으며, 실제 대화 시작과 접근 가능 여부는 서버에서 확인합니다.</p>
       </aside>
+      <p className="conversation-hub-verified-empty" data-hub-verified-empty hidden role="status">아직 이어지는 대화가 없습니다. 마음에 드는 대리자와 이야기를 시작해보세요.</p>
     </div>
   );
 }

@@ -82,7 +82,6 @@ const peopleGrid = document.querySelector('[data-people-grid]');
 const peopleSearch = document.querySelector('[data-people-search]');
 const peopleMore = document.querySelector('[data-people-more]');
 const searchEmpty = document.querySelector('[data-search-empty]');
-const continuationEmpty = document.querySelector('[data-continuation-empty]');
 const continuationActive = document.querySelector('[data-continuation-active]');
 const continuationName = document.querySelector('[data-continuation-name]');
 const continuationTitle = document.querySelector('[data-continuation-title]');
@@ -93,7 +92,6 @@ const continuationScene = document.querySelector('[data-continuation-scene]');
 const continuationThreadNote = document.querySelector('[data-continuation-thread-note]');
 const continuationThreadTitle = document.querySelector('[data-continuation-thread-title]');
 const recentList = document.querySelector('[data-recent-list]');
-const recentEmpty = document.querySelector('[data-recent-empty]');
 const recentAll = document.querySelector('[data-recent-all]');
 const incomingSection = document.querySelector('[data-incoming-section]');
 const incomingList = document.querySelector('[data-incoming-list]');
@@ -227,16 +225,14 @@ peopleMore?.addEventListener('click', () => {
 });
 
 function setContinuation(state) {
-  if (!continuationEmpty || !continuationActive) return;
+  if (!continuationActive) return;
   if (!state || typeof state !== 'object') {
-    continuationEmpty.hidden = false;
     continuationActive.hidden = true;
     return;
   }
 
   const threadId = parseChatThreadIdV1(state.threadId);
   if (!threadId || typeof state.context !== 'string' || !state.context.trim()) {
-    continuationEmpty.hidden = false;
     continuationActive.hidden = true;
     return;
   }
@@ -247,7 +243,6 @@ function setContinuation(state) {
   // from the opaque thread id or browser state.
   const name = '대화 상대';
 
-  continuationEmpty.hidden = true;
   continuationActive.hidden = false;
 
   if (continuationName) continuationName.textContent = name;
@@ -311,7 +306,7 @@ function createRecentItem(item) {
 }
 
 function setRecent(items) {
-  if (!recentList || !recentEmpty) return;
+  if (!recentList) return;
   const safeItems = Array.isArray(items)
     ? items.map(createRecentItem).filter(Boolean).slice(0, 5)
     : [];
@@ -319,14 +314,12 @@ function setRecent(items) {
   if (safeItems.length === 0) {
     recentList.replaceChildren();
     recentList.hidden = true;
-    recentEmpty.hidden = false;
     if (recentAll) recentAll.hidden = true;
     return;
   }
 
   recentList.replaceChildren(...safeItems);
   recentList.hidden = false;
-  recentEmpty.hidden = true;
   if (recentAll) recentAll.hidden = safeItems.length < 5;
 }
 
@@ -381,6 +374,29 @@ function setIncoming(items) {
   incomingSection.hidden = false;
 }
 
+
+// Layout depends on an *authoritative* owner-scoped conversation list, not
+// on an empty local array. No browser-controlled setter or synthetic threads
+// are exposed while that production projection is unavailable.
+const hubShell = document.querySelector('[data-chat-hub-state]');
+const relationshipSection = document.querySelector('[data-relationship-section]');
+const availabilityNote = document.querySelector('[data-hub-availability]');
+const verifiedEmptyNote = document.querySelector('[data-hub-verified-empty]');
+const discoveryHeading = document.querySelector('[data-discovery-heading]');
+const returningHeading = document.querySelector('[data-returning-heading]');
+const meetShortcut = document.querySelector('[data-meet-shortcut]');
+
+function setHubPresentationState(state) {
+  if (!['unavailable', 'verified_empty', 'active'].includes(state)) return;
+  if (hubShell) hubShell.dataset.chatHubState = state;
+  if (relationshipSection) relationshipSection.hidden = state !== 'active';
+  if (availabilityNote) availabilityNote.hidden = state !== 'unavailable';
+  if (verifiedEmptyNote) verifiedEmptyNote.hidden = state !== 'verified_empty';
+  if (discoveryHeading) discoveryHeading.hidden = state === 'active';
+  if (returningHeading) returningHeading.hidden = state !== 'active';
+  if (meetShortcut) meetShortcut.hidden = state !== 'active';
+}
+
 // No browser relationship hydration mutator is exposed while the repository has
 // no validated server relationship-thread projection contract. Discovery remains
 // presentation-only; relationship surfaces stay empty until such a contract exists.
@@ -390,3 +406,4 @@ renderPeople();
 setContinuation(null);
 setRecent([]);
 setIncoming([]);
+setHubPresentationState('unavailable');

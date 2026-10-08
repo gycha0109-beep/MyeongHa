@@ -279,6 +279,12 @@ async function verifyHub(page, origin, suffix, width, height, mobile) {
       featured: Boolean(document.querySelector('.conversation-featured')),
       threads: Boolean(document.querySelector('.conversation-thread-panel')),
       discovery: Boolean(document.querySelector('.conversation-people')),
+      hubState: document.querySelector('[data-chat-hub-state]')?.dataset.chatHubState,
+      relationshipHidden: document.querySelector('[data-relationship-section]')?.hidden === true,
+      availabilityVisible: document.querySelector('[data-hub-availability]')?.hidden === false,
+      verifiedEmptyHidden: document.querySelector('[data-hub-verified-empty]')?.hidden === true,
+      discoveryTop: document.querySelector('.conversation-people')?.getBoundingClientRect().top ?? -1,
+      introBottom: document.querySelector('.conversation-hub-intro')?.getBoundingClientRect().bottom ?? -1,
       portraits,
       darkTag,
       incomingHidden: document.querySelector('[data-incoming-section]')?.hidden === true,
@@ -286,9 +292,13 @@ async function verifyHub(page, origin, suffix, width, height, mobile) {
   })()`);
 
   assert(state.intro && state.primary && state.featured && state.threads && state.discovery, `${suffix}: conversation hub surfaces missing`);
-  assert(state.text.includes('누구와 이야기를 이어갈까요?'), `${suffix}: relationship-first subtitle missing`);
-  assert(state.text.includes('내 대화'), `${suffix}: 내 대화 heading missing`);
-  assert(state.text.includes('다른 사람 만나기'), `${suffix}: discovery entry missing`);
+  assert(state.hubState === 'unavailable', `${suffix}: chat history availability was invented`);
+  assert(state.relationshipHidden && state.availabilityVisible && state.verifiedEmptyHidden, `${suffix}: unknown history must not render an empty or active relationship`);
+  assert(state.text.includes('누구와 이야기를 시작해볼까요?'), `${suffix}: discovery-first introduction missing`);
+  assert(state.text.includes('이전 대화 목록은 아직 이 화면에 연결되지 않았습니다.'), `${suffix}: unavailable history notice missing`);
+  assert(!state.text.includes('아직 이어지고 있는 대화가 없습니다.'), `${suffix}: fabricated empty history resurfaced`);
+  assert(!state.text.includes('아직 이어지고 있는 관계가 없습니다.'), `${suffix}: duplicate fabricated relationship placeholder resurfaced`);
+  assert(state.discoveryTop > state.introBottom && state.discoveryTop - state.introBottom < 55, `${suffix}: discovery cards were pushed below an empty stage`);
   assert(state.incomingHidden, `${suffix}: incoming stories must stay hidden without runtime authority`);
   assert(state.portraits.length === 9, `${suffix}: expected nine finalized portrait cards`);
   for (const portrait of state.portraits) {
