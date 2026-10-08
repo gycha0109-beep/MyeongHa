@@ -187,16 +187,21 @@ describe('2B-2: server-only held composite Preview rehearsal', () => {
     expect(JSON.stringify(result)).not.toContain('원전 해석');
   });
 
-  it.each(['revision', 'input', 'archive'] as const)(
+  it.each([
+    ['revision', 'current_birth_revision_changed'],
+    ['input', 'current_birth_revision_changed'],
+    // The existing Birth authority refuses archived data before snapshot comparison.
+    ['archive', 'birth_profile_unavailable'],
+  ] as const)(
     'discards all responses when the current Birth snapshot changes during Preview: %s',
-    async (mutation) => {
+    async (mutation, expectedReason) => {
       const f = makeFixture({ mutation });
       const result = await rehearseCurrentSubjectHeldCompositePreviewV1({
         verifiedEvidence: evidence, pool: f.pool, adapterConfig: f.adapterConfig,
       });
       expect(result).toMatchObject({
         status: 'blocked',
-        reason: 'current_birth_revision_changed',
+        reason: expectedReason,
         checkedSlots: [],
         canPublish: false,
       });
