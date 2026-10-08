@@ -20,7 +20,7 @@ function publicContext(): SeyeonRuntimeContextV2 {
 
 describe('Seyeon low-risk combined dialogue Shadow', () => {
   it('builds one combined structured candidate and never allows unreviewed output', async () => {
-    const generate = vi.fn(async () => ({ interpretation: {}, draft: {} }));
+    const generate = vi.fn(async (_request: unknown) => ({ interpretation: {}, draft: {} }));
     const review = vi.fn(async () => ({ failureCodes: [] }));
     const shadow = createSeyeonFastDialogueShadowV1({
       candidateProvider: { providerKey: 'test', modelKey: 'test', generate },
