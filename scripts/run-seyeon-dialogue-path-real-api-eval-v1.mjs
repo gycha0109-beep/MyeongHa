@@ -24,7 +24,7 @@ import {
 const cases = selectSeyeonDialoguePathCasesV1(SEYEON_MODEL_EVAL_CASES_V1);
 const key = process.env.OPENAI_API_KEY?.trim();
 if (!key) throw new Error('Missing protected model evaluation credential.');
-if (cases.length !== 8 || SEYEON_DIALOGUE_PATH_CASE_IDS_V1.length !== 8) {
+if (cases.length !== 16 || SEYEON_DIALOGUE_PATH_CASE_IDS_V1.length !== 16) {
   throw new Error('Synthetic case cap changed unexpectedly.');
 }
 

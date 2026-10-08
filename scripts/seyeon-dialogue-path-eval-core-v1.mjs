@@ -5,12 +5,22 @@
  */
 export const SEYEON_DIALOGUE_PATH_CASE_IDS_V1 = Object.freeze([
   'N01', 'N02', 'N03', 'N04', 'N05', 'N06', 'N09', 'N10',
+  'N19', 'N22', 'X01', 'X02', 'X03', 'X04', 'X05', 'X06',
+]);
+/** These are fictional, no-claim, first-contact prompts. They do not join the 100-case classifier gold set. */
+export const SEYEON_DIALOGUE_PATH_ADDITIONAL_CASES_V1 = Object.freeze([
+  Object.freeze({ id: 'X01', text: '처음 인사니까 짧게 인사해 줘.', topic: null, noClaims: true }),
+  Object.freeze({ id: 'X02', text: '가벼운 말장난 하나 해줄래?', topic: null, noClaims: true }),
+  Object.freeze({ id: 'X03', text: '오늘 어떤 주제가 재미있을까?', topic: null, noClaims: true }),
+  Object.freeze({ id: 'X04', text: '이번에는 네가 대화 주제를 골라줘.', topic: null, noClaims: true }),
+  Object.freeze({ id: 'X05', text: '지금 가장 끌리는 책 장르 하나만 골라줘.', topic: null, noClaims: true }),
+  Object.freeze({ id: 'X06', text: '질문 대신 네 생각부터 말해줘.', topic: null, noClaims: true }),
 ]);
 export const SEYEON_DIALOGUE_PATH_ROUTES_V1 = Object.freeze([
   'legacy_5_terra',
   'fast_3_luna_terra',
 ]);
-export const SEYEON_DIALOGUE_PATH_MAX_CALLS_V1 = 64;
+export const SEYEON_DIALOGUE_PATH_MAX_CALLS_V1 = 128;
 export const SEYEON_DIALOGUE_PATH_MAX_ESTIMATED_COST_USD_V1 = 3;
 export const SEYEON_DIALOGUE_PATH_PRICES_V1 = Object.freeze({
   'gpt-5.6-luna': Object.freeze({ input: 0.20, cached: 0.02, output: 1.20 }),
@@ -19,8 +29,9 @@ export const SEYEON_DIALOGUE_PATH_PRICES_V1 = Object.freeze({
 
 export function selectSeyeonDialoguePathCasesV1(allCases) {
   if (!Array.isArray(allCases)) throw new TypeError('Missing synthetic fixtures.');
+  const available = [...allCases, ...SEYEON_DIALOGUE_PATH_ADDITIONAL_CASES_V1];
   const result = SEYEON_DIALOGUE_PATH_CASE_IDS_V1.map((id) => {
-    const matches = allCases.filter((value) => value.id === id);
+    const matches = available.filter((value) => value.id === id);
     if (matches.length !== 1 ||
       matches[0].topic !== null || matches[0].noClaims !== true ||
       typeof matches[0].text !== 'string' || matches[0].text.length > 160) {
@@ -61,7 +72,11 @@ export function summarizeSeyeonDialoguePathV1(rows, totalCases) {
       id: row.id,
       code: row.errorCode,
     }));
+    const expectedCalls = route === 'legacy_5_terra' ? 5 : 3;
+    const gateVerdict = items.length === totalCases && success.length === totalCases &&
+      items.every(row => row.calls === expectedCalls) ? 'GUARD_SAMPLE_PASS' : 'HOLD';
     return [route, {
+      gateVerdict,
       samples: items.length,
       admitted: success.length,
       rejected: errorIds.length,
@@ -73,9 +88,7 @@ export function summarizeSeyeonDialoguePathV1(rows, totalCases) {
     }];
   }));
   const complete = SEYEON_DIALOGUE_PATH_ROUTES_V1.every(route =>
-    routes[route].samples === totalCases && routes[route].admitted === totalCases &&
-    rows.filter(row => row.route === route).every(row =>
-      row.calls === (route === 'legacy_5_terra' ? 5 : 3)));
+    routes[route].gateVerdict === 'GUARD_SAMPLE_PASS');
   return Object.freeze({
     scope: 'SYNTHETIC_PUBLIC_FIRST_CONTACT_GUARD_ACCEPTANCE_ONLY',
     automaticPromotion: false,
