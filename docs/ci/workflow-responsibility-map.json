@@ -284,6 +284,12 @@
       "mainMode": "manual",
       "workTrackAttribution": "dispatch-input"
     },
+    "production-seyeon-db-authority-audit.yml": {
+      "responsibility": "production-character-db-authority-audit",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
     "production-seyeon-turn-send-smoke.yml": {
       "responsibility": "production-chat-smoke",
       "prMode": "none",

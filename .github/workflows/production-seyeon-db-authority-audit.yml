@@ -1,0 +1,80 @@
+name: "[WT:character-memory] 세연 Production DB 실행 권한 읽기 전용 점검"
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/production-seyeon-db-authority-audit.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-production-migrations
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    name: audit-production-seyeon-authority
+    runs-on: ubuntu-24.04
+    environment: production
+    timeout-minutes: 6
+    env:
+      SUPABASE_PROJECT_ID: cnsfpcdiyofqvhpcegfc
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PRODUCTION_SESSION_POOLER_HOST: ${{ secrets.SUPABASE_PRODUCTION_SESSION_POOLER_HOST }}
+    steps:
+      - name: Install PostgreSQL client
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+      - name: Inspect exact Se-yeon server function and migration presence without row access
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$SUPABASE_PROJECT_ID" == 'cnsfpcdiyofqvhpcegfc' ]]
+          test -n "$SUPABASE_DB_PASSWORD"
+          [[ "$SUPABASE_PRODUCTION_SESSION_POOLER_HOST" =~ ^[a-z0-9-]+([.][a-z0-9-]+)*[.]pooler[.]supabase[.]com$ ]]
+          export PGHOST="$SUPABASE_PRODUCTION_SESSION_POOLER_HOST"
+          export PGPORT='5432' PGDATABASE='postgres' PGUSER="postgres.$SUPABASE_PROJECT_ID"
+          export PGPASSWORD="$SUPABASE_DB_PASSWORD" PGSSLMODE='require'
+          psql -X -v ON_ERROR_STOP=1 -At <<'SQL'
+          BEGIN READ ONLY;
+          select 'role|' || rolname || '|true'
+          from pg_catalog.pg_roles
+          where rolname in ('myeongha_api_executor',
+                            'myeongha_relationship_apply_owner',
+                            'myeongha_seyeon_chat_runtime_owner',
+                            'myeongha_seyeon_post_turn_owner')
+          order by rolname;
+          with required(label, signature) as (
+            values
+              ('relationship_read','public.qry_production_relationship_runtime_v1(uuid,text)'),
+              ('relationship_sync','public.cmd_enqueue_seyeon_relationship_sync_v1(uuid,uuid,uuid,jsonb)'),
+              ('personal_context','public.qry_seyeon_production_personal_record_context_v1(uuid,text)'),
+              ('history_context','public.qry_production_relationship_history_runtime_v1(uuid,text,bigint)'),
+              ('receive','public.cmd_receive_seyeon_chat_turn_runtime_v1(uuid,uuid,text,text,text,jsonb,uuid,uuid,uuid,uuid,text,text)'),
+              ('allocate','public.cmd_allocate_seyeon_chat_attempt_runtime_v1(uuid,uuid,uuid,text)'),
+              ('context_ready','public.cmd_mark_seyeon_chat_context_ready_runtime_v1(uuid,uuid,uuid)'),
+              ('fail_attempt','public.cmd_fail_seyeon_chat_attempt_runtime_v1(uuid,uuid,uuid,text,text)'),
+              ('generated','public.cmd_persist_seyeon_chat_generated_runtime_v1(uuid,uuid,uuid,uuid,uuid,text,text,text,text,jsonb,text,text,jsonb)'),
+              ('validated','public.cmd_persist_seyeon_chat_validated_runtime_v1(uuid,uuid,uuid,uuid,text,text,text,text,jsonb,jsonb)'),
+              ('commit','public.cmd_commit_seyeon_chat_turn_runtime_v2(uuid,uuid,uuid,uuid,uuid,uuid,uuid,jsonb,text)'),
+              ('post_turn_job','public.qry_seyeon_post_turn_analysis_job_v1(uuid,uuid)'),
+              ('bundle_manifest','public.qry_content_bundle_manifest_v1(uuid)')
+          )
+          select 'function|' || label || '|' ||
+                 (pg_catalog.to_regprocedure(signature) is not null)::text
+          from required order by label;
+          select 'migration|' || expected.version || '|' ||
+                 (actual.version is not null)::text
+          from (values ('1460'),('1470'),('1480'),('1490'),('1500'),('1510'),
+                       ('20261008043000')) expected(version)
+          left join supabase_migrations.schema_migrations actual
+            on actual.version = expected.version
+          order by expected.version;
+          COMMIT;
+          SQL
