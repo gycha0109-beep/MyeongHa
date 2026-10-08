@@ -26,7 +26,7 @@ describe('Records v2 product surface', () => {
       expect(markup).toContain(`id="${id}"`);
     }
     expect(js).toContain('createRecordsRuntimeClient().readRecords()');
-    expect(js).toContain('renderBirthProfileUnavailable()');
+    expect(js).toContain('renderCurrentBirthProfile(records.birth)');
     expect(js).toContain('function setupTabs()');
     expect(js).toContain("'ArrowLeft', 'ArrowRight'");
   });

@@ -57,7 +57,7 @@ export function RecordsPage() {
         <section id="saju-records" className="records-tab-panel" role="tabpanel" aria-labelledby="saju-records-tab" hidden>
           <div className="records-panel-head records-panel records-saju-head">
             <div><span className="records-kicker">SAJU</span><h2>사주 기록</h2></div>
-            <p>완료되어 저장된 사주 풀이 이력을 삶의 사실과 분리해 확인합니다. 실제 Reading이 없을 때만 개발 샘플이 fallback으로 표시됩니다.</p>
+            <p>완료되어 저장된 사주 풀이 이력을 삶의 사실과 분리해 확인합니다.</p>
           </div>
           <div id="saju-records-list" className="records-reading-grid" />
         </section>
@@ -65,7 +65,7 @@ export function RecordsPage() {
         <section id="birth-records" className="records-tab-panel" role="tabpanel" aria-labelledby="birth-records-tab" hidden>
           <div className="records-panel-head records-panel records-birth-head">
             <div><span className="records-kicker">BIRTH</span><h2>명식록</h2></div>
-            <p>태어난 순간의 원본 입력과 연결된 기록을 확인합니다.</p>
+            <p>서버에 저장된 현재 출생 정보와 입력 차수를 확인합니다. 과거 수정 이력은 표시하지 않습니다.</p>
           </div>
           <div id="birth-records-list" className="records-grid" />
         </section>

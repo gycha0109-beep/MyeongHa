@@ -73,11 +73,26 @@ function recordsFetch(calls: Array<{ endpoint: string; authorization: string | n
     if (endpoint === '/api/life-record') return successEnvelope({ facts: [], pagination: { pageSize: 50, hasMore: false, nextCursor: null } });
     if (endpoint === '/api/readings') return successEnvelope({ readings: [], pagination: { pageSize: 50, hasMore: false, nextCursor: null } });
     if (endpoint === '/api/memories') return successEnvelope({ memories: [], pagination: { pageSize: 50, hasMore: false, nextCursor: null } });
+    if (endpoint === '/api/me/birth-profile') return successEnvelope({ birthProfile: null });
     return Response.json({ ok: false }, { status: 404 });
   });
 }
 
 function snapshotFor(label: string, endpoint: string) {
+  if (endpoint === '/api/me/birth-profile') return {
+    birthProfile: {
+      profileKind: 'self', archivedAt: null,
+      currentRevision: {
+        revisionId: '33333333-3333-4333-8333-333333333333',
+        revisionNo: 1,
+        input: {
+          calendarType: 'solar',
+          birthDate: label === 'member-a' ? '1991-01-01' : '1992-02-02',
+          birthTime: null, timeKnown: false, isLeapMonth: false, sex: null,
+        },
+      },
+    },
+  };
   if (endpoint === '/api/me') {
     return {
       subjectKind: 'member',
@@ -144,18 +159,21 @@ describe('Records active bearer binding', () => {
       lifeFacts: { facts: [] },
       readings: { readings: [] },
       memories: { memories: [] },
+      birth: { status: 'ready', payload: { birthProfile: null } },
     });
 
     expect(resolveBearer).toHaveBeenCalledTimes(2);
-    expect(calls).toHaveLength(4);
+    expect(calls).toHaveLength(5);
     expect(calls.map((call) => call.endpoint)).toEqual([
       '/api/me',
       '/api/life-record',
       '/api/readings',
       '/api/memories',
+      '/api/me/birth-profile',
     ]);
     expect(calls[0]).toEqual({ endpoint: '/api/me', authorization: `Bearer ${memberSession.accessToken}` });
     expect(calls.slice(1).map((call) => call.authorization)).toEqual([
+      `Bearer ${memberSession.accessToken}`,
       `Bearer ${memberSession.accessToken}`,
       `Bearer ${memberSession.accessToken}`,
       `Bearer ${memberSession.accessToken}`,
@@ -171,7 +189,7 @@ describe('Records active bearer binding', () => {
 
     await client.readRecords();
 
-    expect(calls).toHaveLength(4);
+    expect(calls).toHaveLength(5);
     expect(calls.every((call) => call.authorization === 'Bearer opaque-guest-session')).toBe(true);
   });
 
@@ -197,11 +215,12 @@ describe('Records active bearer binding', () => {
       lifeFacts: { facts: [{ factType: 'member-b-fact' }] },
       readings: { readings: [{ readingId: '44444444-4444-4444-8444-444444444402' }] },
       memories: { memories: [{ memoryId: 'member-b-memory' }] },
+      birth: { status: 'ready', payload: { birthProfile: { currentRevision: { input: { birthDate: '1992-02-02' } } } } },
     });
 
-    expect(calls).toHaveLength(8);
-    expect(calls.slice(0, 4).every((call) => call.authorization === `Bearer ${memberA.token}`)).toBe(true);
-    expect(calls.slice(4).every((call) => call.authorization === `Bearer ${memberB.token}`)).toBe(true);
+    expect(calls).toHaveLength(10);
+    expect(calls.slice(0, 5).every((call) => call.authorization === `Bearer ${memberA.token}`)).toBe(true);
+    expect(calls.slice(5).every((call) => call.authorization === `Bearer ${memberB.token}`)).toBe(true);
   });
 
   it('fails closed instead of returning either stale snapshot when authority changes twice', async () => {
@@ -225,7 +244,7 @@ describe('Records active bearer binding', () => {
     });
 
     await expect(client.readRecords()).rejects.toMatchObject({ code: 'WEB_RECORDS_SESSION_CHANGED' });
-    expect(calls).toHaveLength(8);
+    expect(calls).toHaveLength(10);
   });
 
   it('fails closed without making an API request when no active bearer can be resolved', async () => {

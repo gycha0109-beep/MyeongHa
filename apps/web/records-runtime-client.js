@@ -1,5 +1,6 @@
 import { parseReadingHistoryPayloadV1, ReadingHistoryContractErrorV1 } from './reading-history-contract.js';
 import { unwrapApiSuccessEnvelope, WebApiEnvelopeError } from './api-envelope.js';
+import { assertBirthProfile } from './my-runtime-client.js';
 import {
   PRODUCT_AUTH_STORAGE_V1,
   ensureActiveBearer,
@@ -9,6 +10,7 @@ import {
 
 const DEFAULT_ENDPOINTS = Object.freeze({
   profile: '/api/me',
+  birthProfile: '/api/me/birth-profile',
   lifeFacts: '/api/life-record',
   readings: '/api/readings',
   memories: '/api/memories',
@@ -125,6 +127,19 @@ async function readJson(fetchImpl, endpoint, bearer) {
     throw error;
   }
 }
+async function readOptionalCurrentBirthProfile(fetchImpl, endpoint, bearer) {
+  try {
+    const payload = await readJson(fetchImpl, endpoint, bearer);
+    // Share the validated current-self Birth contract with My.
+    return Object.freeze({ status: 'ready', payload: assertBirthProfile(payload) });
+  } catch (error) {
+    // Revoked credentials cannot be downgraded into an optional-data error.
+    if (error instanceof RecordsRuntimeError && error.code === 'WEB_RECORDS_SESSION_REQUIRED') throw error;
+    // Other failures do not hide Life Facts, Official Readings or Memories.
+    return Object.freeze({ status: 'unavailable' });
+  }
+}
+
 function projectReadingHistory(payload) {
   try {
     return parseReadingHistoryPayloadV1(payload);
@@ -266,13 +281,14 @@ export function createRecordsRuntimeClient(options = {}) {
     readRecords() {
       return readStable(async (bearer) => {
         const profile = await readJson(fetchImpl, endpoints.profile, bearer);
-        const [lifeFacts, readingsPayload, memories] = await Promise.all([
+        const [lifeFacts, readingsPayload, memories, birth] = await Promise.all([
           readPagedCollection(fetchImpl, endpoints.lifeFacts, bearer, 'facts'),
           readPagedCollection(fetchImpl, endpoints.readings, bearer, 'readings'),
           readPagedCollection(fetchImpl, endpoints.memories, bearer, 'memories'),
+          readOptionalCurrentBirthProfile(fetchImpl, endpoints.birthProfile, bearer),
         ]);
         const readings = projectReadingHistory(readingsPayload);
-        return Object.freeze({ profile, lifeFacts, readings, memories });
+        return Object.freeze({ profile, lifeFacts, readings, memories, birth });
       });
     },
   });
