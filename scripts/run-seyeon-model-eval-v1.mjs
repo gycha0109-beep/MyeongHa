@@ -36,6 +36,7 @@ function createModelRunner(model, apiKey, totals) {
       throw new Error('EVALUATION_BUDGET_EXHAUSTED');
     }
     totals.calls += 1;
+    totals.byModel[model].calls += 1;
     const response = await fetch(url, init);
     if (response.ok) {
       const body = await response.clone().json();
@@ -43,13 +44,19 @@ function createModelRunner(model, apiKey, totals) {
       const cached = token(usage.input_tokens_details?.cached_tokens);
       const input = token(usage.input_tokens);
       const output = token(usage.output_tokens);
-      totals.inputTokens += input;
-      totals.outputTokens += output;
-      totals.cachedTokens += cached;
-      totals.estimatedCostUsd += (
+      const modelTotals = totals.byModel[model];
+      const cost = (
         Math.max(0, input - cached) * rates.input +
         cached * rates.cached + output * rates.output
       ) / 1_000_000;
+      modelTotals.inputTokens += input;
+      modelTotals.outputTokens += output;
+      modelTotals.cachedTokens += cached;
+      modelTotals.estimatedCostUsd += cost;
+      totals.inputTokens += input;
+      totals.outputTokens += output;
+      totals.cachedTokens += cached;
+      totals.estimatedCostUsd += cost;
     }
     return response;
   };
@@ -92,7 +99,12 @@ async function main() {
   if (SEYEON_MODEL_EVAL_CASES_V1.length !== MAX_CASES) {
     throw new Error('Unexpected benchmark size; fail closed.');
   }
-  const totals = { calls: 0, inputTokens: 0, outputTokens: 0, cachedTokens: 0, estimatedCostUsd: 0 };
+  const totals = {
+    calls: 0, inputTokens: 0, outputTokens: 0, cachedTokens: 0, estimatedCostUsd: 0,
+    byModel: Object.fromEntries(MODELS.map((model) => [model, {
+      calls: 0, inputTokens: 0, outputTokens: 0, cachedTokens: 0, estimatedCostUsd: 0,
+    }])),
+  };
   const runners = new Map(MODELS.map((model) => [
     model, createModelRunner(model, apiKey, totals),
   ]));
@@ -118,6 +130,10 @@ async function main() {
     return [model, {
       errorCount: countErrors,
       scores: aggregateSeyeonEvalV1(passed),
+      usage: {
+        ...totals.byModel[model],
+        estimatedCostUsd: Number(totals.byModel[model].estimatedCostUsd.toFixed(6)),
+      },
       p50Ms: percentile(0.5),
       p95Ms: percentile(0.95),
       rows, // ID, gold and model output enum only; no utterance or personal data.
@@ -152,6 +168,8 @@ async function main() {
       claimRecall: report.scores.claimRecall,
       ordinaryFalsePositives: report.scores.ordinaryFalsePositives,
       p50Ms: report.p50Ms, p95Ms: report.p95Ms,
+      inputTokens: report.usage.inputTokens, outputTokens: report.usage.outputTokens,
+      estimatedCostUsd: report.usage.estimatedCostUsd,
     }));
   }
   console.log(JSON.stringify({ calls: totals.calls, estimatedCostUsd: artifact.estimatedUsage.estimatedCostUsd, automaticPromotion: false }));
