@@ -1,10 +1,11 @@
+import { resolveReadingAvailabilityV1 } from '../reading/reading-availability.js';
 function currentMonthLabel(now: Date): string {
   const formatted = new Intl.DateTimeFormat('ko-KR', {
     year: 'numeric',
     month: 'long',
   }).format(now);
 
-  return `${formatted}의 흐름`;
+  return `${formatted} · 사주 시작하기`;
 }
 
 export function HomePage() {
@@ -28,16 +29,16 @@ export function HomePage() {
       <section className="gm-section" aria-labelledby="home-month-title">
         <div className="gm-section-head">
           <h2 className="gm-section-title" id="home-month-title">이번 달 사주 읽기</h2>
-          <a className="gm-inline-link" href="reading-detail.html?scope=month">제공 상태 확인 <span aria-hidden="true">›</span></a>
+          <a className="gm-inline-link" href="reading-detail.html?topic=temperament&scope=original">프리뷰 확인 <span aria-hidden="true">›</span></a>
         </div>
 
-        <a className="gm-card gm-month-card" href="reading-detail.html?scope=month">
+        <a className="gm-card gm-month-card" href="reading-detail.html?topic=temperament&scope=original">
           <span className="gm-month-art" aria-hidden="true"></span>
           <span className="gm-month-copy">
             <span className="gm-month-eyebrow" id="home-current-date">{currentMonthLabel(new Date())}</span>
-            <strong className="gm-card-title">이번 달 읽기 주제와 제공 상태를 확인해보세요.</strong>
-            <span className="gm-month-support">검증된 Reading이 제공 가능한지 상세 화면에서 확인할 수 있습니다.</span>
-            <span className="gm-inline-link">읽기 확인 <span aria-hidden="true">›</span></span>
+            <strong className="gm-card-title">이달에는 전체 사주 프리뷰부터 시작해 보세요.</strong>
+            <span className="gm-month-support">현재 월간 해석은 준비 중입니다. 검증된 전체 사주 프리뷰의 제공 상태를 상세 화면에서 확인할 수 있습니다.</span>
+            <span className="gm-inline-link">전체 사주 프리뷰 확인 <span aria-hidden="true">›</span></span>
           </span>
         </a>
       </section>
@@ -51,22 +52,22 @@ export function HomePage() {
         <div className="gm-home-products">
           <a className="gm-card gm-product-card" href="reading-detail.html?topic=temperament&scope=original">
             <span className="gm-icon" aria-hidden="true">✦</span>
-            <span><strong>전체 사주</strong><small>나라는 사람을 더 깊이</small></span>
+            <span><strong>전체 사주</strong><small>나라는 사람을 더 깊이</small><small className="reading-topic-availability is-preview">{resolveReadingAvailabilityV1('reading-detail.html?topic=temperament&scope=original').label}</small></span>
             <span className="gm-chevron" aria-hidden="true">›</span>
           </a>
           <a className="gm-card gm-product-card" href="reading-detail.html?topic=career">
             <span className="gm-icon" aria-hidden="true">⌁</span>
-            <span><strong>직업 · 커리어</strong><small>일과 선택을 더 깊이</small></span>
+            <span><strong>직업 · 커리어</strong><small>일과 선택을 더 깊이</small><small className="reading-topic-availability is-preview">{resolveReadingAvailabilityV1('reading-detail.html?topic=career').label}</small></span>
             <span className="gm-chevron" aria-hidden="true">›</span>
           </a>
           <a className="gm-card gm-product-card" href="reading-detail.html?topic=money">
             <span className="gm-icon" aria-hidden="true">財</span>
-            <span><strong>재물</strong><small>재물과 자원의 흐름</small></span>
+            <span><strong>재물</strong><small>재물과 자원의 흐름</small><small className="reading-topic-availability is-preview">{resolveReadingAvailabilityV1('reading-detail.html?topic=money').label}</small></span>
             <span className="gm-chevron" aria-hidden="true">›</span>
           </a>
           <a className="gm-card gm-product-card" href="reading-detail.html?topic=love">
             <span className="gm-icon is-rose" aria-hidden="true">緣</span>
-            <span><strong>연애 · 관계</strong><small>관계에서 반복되는 방식</small></span>
+            <span><strong>연애 · 관계</strong><small>관계에서 반복되는 방식</small><small className="reading-topic-availability is-preview">{resolveReadingAvailabilityV1('reading-detail.html?topic=love').label}</small></span>
             <span className="gm-chevron" aria-hidden="true">›</span>
           </a>
         </div>
