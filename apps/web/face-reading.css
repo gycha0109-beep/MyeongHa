@@ -115,62 +115,6 @@
 }
 .face-reader-change:hover { border-color:rgba(194,155,88,.56); background:rgba(194,155,88,.055); }
 
-.face-reading-page .reading-reader-picker-intro p { max-width:760px; }
-.face-reader-picker-tools {
-  margin:18px 0 -4px;
-  display:flex;
-  align-items:center;
-  gap:10px;
-}
-.face-reader-picker-search {
-  width:100%;
-  min-height:42px;
-  padding:0 14px 0 38px;
-  border:1px solid rgba(184,145,88,.24);
-  border-radius:10px;
-  color:#f0e6d8;
-  background:
-    linear-gradient(90deg, transparent 0 36px, rgba(184,145,88,.12) 36px 37px, transparent 37px),
-    rgba(9,20,26,.78);
-  background-image:
-    radial-gradient(circle at 20px 50%, transparent 0 5px, rgba(205,159,91,.72) 5.5px 6.5px, transparent 7px),
-    linear-gradient(45deg, transparent 0 48%, rgba(205,159,91,.72) 49% 52%, transparent 53%);
-  background-size:100% 100%,9px 9px;
-  background-position:0 0,25px 24px;
-  background-repeat:no-repeat;
-  font-size:11px;
-}
-.face-reader-picker-search::placeholder { color:rgba(238,229,215,.4); }
-.face-reader-picker-search:focus { border-color:rgba(205,159,91,.62); outline:none; }
-.face-reader-picker .reading-reader-option[hidden] { display:none; }
-.face-reader-picker-empty {
-  margin:24px 0 4px;
-  padding:22px;
-  border:1px dashed rgba(184,145,88,.2);
-  border-radius:10px;
-  color:rgba(238,229,215,.5);
-  text-align:center;
-  font-size:11px;
-}
-.face-reader-picker-empty[hidden] { display:none; }
-.face-reading-page .reading-reader-option.is-selected {
-  border-color:rgba(224,182,109,.9);
-  background:rgba(27,43,49,.98);
-  box-shadow:inset 0 0 0 1px rgba(224,182,109,.2),0 10px 28px rgba(0,0,0,.14);
-}
-.face-reading-page .reading-reader-option.is-selected .reading-reader-option-action { color:#f1c77f; }
-.face-reading-page .reading-reader-option.is-selected .reading-reader-option-heading::after {
-  content:"선택됨";
-  margin-left:auto;
-  padding:3px 6px;
-  border:1px solid rgba(224,182,109,.48);
-  border-radius:999px;
-  color:#e7bd7a;
-  font-size:8px;
-  font-family:var(--mh-sans);
-  font-weight:800;
-}
-
 .face-workspace { display:grid; grid-template-columns:minmax(0,1.05fr) minmax(390px,.95fr); overflow:hidden; border:1px solid var(--face-line); border-radius:18px; background:rgba(8,24,30,.88); box-shadow:0 24px 60px rgba(0,0,0,.2); }
 .face-preview-panel { padding:22px; border-right:1px solid var(--face-line-soft); background:radial-gradient(circle at 50% 34%,rgba(194,155,88,.07),transparent 36%),linear-gradient(145deg,#09181e,#0a2027); }
 .face-preview { min-height:530px; position:relative; overflow:hidden; display:grid; place-items:center; border:1px solid rgba(194,155,88,.31); border-radius:14px; background:radial-gradient(circle at 50% 40%,rgba(198,159,93,.055),transparent 31%),linear-gradient(180deg,#07151b,#071116); }
@@ -457,62 +401,6 @@ html[data-theme="light"] body.face-reading-page .face-flow-grid article {
 }
 html[data-theme="light"] body.face-reading-page .face-flow-grid article > strong {
   color: #2f3739;
-}
-
-/* Reader picker belongs to this page; the Saju picker keeps its own theme. */
-html[data-theme="light"] body.face-reading-page .reading-reader-picker {
-  color: #283136;
-  background: linear-gradient(145deg, #fffaf3, #f4e9da);
-  box-shadow: 0 30px 75px rgba(37, 31, 24, .22);
-}
-html[data-theme="light"] body.face-reading-page .reading-reader-picker::backdrop {
-  background: rgba(17, 24, 27, .42);
-}
-html[data-theme="light"] body.face-reading-page .reading-reader-picker-close {
-  color: #534735;
-  background: #f4e8d8;
-}
-html[data-theme="light"] body.face-reading-page .reading-reader-picker-intro h2,
-html[data-theme="light"] body.face-reading-page .reading-reader-option-heading strong {
-  color: #273136;
-}
-html[data-theme="light"] body.face-reading-page .reading-reader-picker-intro p,
-html[data-theme="light"] body.face-reading-page .reading-reader-option-tone,
-html[data-theme="light"] body.face-reading-page .reading-reader-picker-note {
-  color: #58646a;
-}
-html[data-theme="light"] body.face-reading-page .reading-reader-picker-target,
-html[data-theme="light"] body.face-reading-page .reading-reader-option-heading small {
-  color: #5e6870;
-}
-html[data-theme="light"] body.face-reading-page .reading-reader-option {
-  border-color: rgba(130, 101, 65, .26);
-  background: #fffaf3;
-}
-html[data-theme="light"] body.face-reading-page .reading-reader-option:hover,
-html[data-theme="light"] body.face-reading-page .reading-reader-option:focus-visible {
-  border-color: #a27d49;
-  background: #f9eddb;
-}
-html[data-theme="light"] body.face-reading-page .reading-reader-option.is-selected {
-  border-color: #96703d;
-  background: #f4e5cf;
-  box-shadow: inset 0 0 0 1px rgba(150,112,61,.18);
-}
-html[data-theme="light"] body.face-reading-page .reading-reader-option.is-selected .reading-reader-option-action,
-html[data-theme="light"] body.face-reading-page .reading-reader-option.is-selected .reading-reader-option-heading::after {
-  color: #70471c;
-}
-html[data-theme="light"] body.face-reading-page .face-reader-picker-search {
-  border-color: rgba(130, 101, 65, .36);
-  color: #283136;
-  background-color: #fffaf3;
-}
-html[data-theme="light"] body.face-reading-page .face-reader-picker-search::placeholder {
-  color: #687076;
-}
-html[data-theme="light"] body.face-reading-page .face-reader-picker-empty {
-  color: #58646a;
 }
 
 @media (max-width: 767px) {

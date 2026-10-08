@@ -1,13 +1,9 @@
-import { READER_PRESENTATIONS } from './reader-presentation-catalog.js';
 import { readerRolloutPresentationV1 } from './reader-rollout-policy.js';
+import { createDelegatePicker } from './reader-picker-dialog.js';
 
-const READER_PICKER_SELECTOR = '[data-reading-reader-picker]';
 const READING_DETAIL_PATH = '/reading-detail.html';
-
-const readers = READER_PRESENTATIONS;
-
 let pendingReadingUrl = null;
-let pendingLabel = '';
+let picker = null;
 
 function isReadingDetailAnchor(anchor) {
   if (!(anchor instanceof HTMLAnchorElement)) return false;
@@ -19,167 +15,56 @@ function isReadingDetailAnchor(anchor) {
 }
 
 function createPicker() {
-  const existing = document.querySelector(READER_PICKER_SELECTOR);
-  if (existing instanceof HTMLDialogElement) return existing;
-
-  const dialog = document.createElement('dialog');
-  dialog.className = 'reading-reader-picker';
-  dialog.dataset.readingReaderPicker = '';
-
-  const panel = document.createElement('div');
-  panel.className = 'reading-reader-picker-panel';
-
-  const close = document.createElement('button');
-  close.className = 'reading-reader-picker-close';
-  close.type = 'button';
-  close.dataset.readerPickerClose = '';
-  close.setAttribute('aria-label', 'Reader 선택 닫기');
-  close.textContent = '×';
-
-  const intro = document.createElement('div');
-  intro.className = 'reading-reader-picker-intro';
-
-  const kicker = document.createElement('span');
-  kicker.className = 'reading-reader-picker-kicker';
-  kicker.textContent = 'READER';
-
-  const title = document.createElement('h2');
-  title.id = 'reading-reader-picker-title';
-  title.textContent = '어떤 Reader 장면으로 볼까요?';
-
-  const copy = document.createElement('p');
-  copy.textContent = '현재 프리뷰에서는 사주 근거와 해석 문장은 그대로 유지하고, 선택한 Reader의 장면과 이름만 화면 연출에 적용합니다.';
-
-  const target = document.createElement('span');
-  target.className = 'reading-reader-picker-target';
-  target.dataset.readerPickerTarget = '';
-  target.textContent = '선택한 사주 읽기';
-
-  intro.append(kicker, title, copy, target);
-
-  const grid = document.createElement('div');
-  grid.className = 'reading-reader-picker-grid';
-  grid.setAttribute('role', 'list');
-
-  for (const reader of readers) {
-    const rollout = readerRolloutPresentationV1(reader.key);
-    const button = document.createElement('button');
-    button.className = 'reading-reader-option';
-    button.type = 'button';
-    button.dataset.readerKey = reader.key;
-    button.dataset.readerRolloutState = rollout.stage;
-    button.disabled = !rollout.previewSelectable;
-    if (button.disabled) button.classList.add('is-unavailable');
-    button.setAttribute('role', 'listitem');
-    button.setAttribute('aria-label', rollout.previewSelectable
-      ? `${reader.name} 프리뷰 장면 선택`
-      : `${reader.name} Reader 준비 중`);
-
-    const art = document.createElement('span');
-    art.className = 'reading-reader-option-art';
-
-    const image = document.createElement('img');
-    image.src = reader.portrait;
-    image.alt = '';
-    image.loading = 'lazy';
-    image.decoding = 'async';
-    art.append(image);
-
-    const body = document.createElement('span');
-    body.className = 'reading-reader-option-copy';
-
-    const heading = document.createElement('span');
-    heading.className = 'reading-reader-option-heading';
-
-    const name = document.createElement('strong');
-    name.textContent = reader.name;
-
-    const readerTitle = document.createElement('small');
-    readerTitle.textContent = rollout.previewSelectable ? reader.title : '컨셉 정리 중';
-
-    heading.append(name, readerTitle);
-
-
-    const tone = document.createElement('span');
-    tone.className = 'reading-reader-option-tone';
-    tone.textContent = rollout.previewSelectable
-      ? reader.tone : '설정 확정 후 순차적으로 공개합니다.';
-
-    const action = document.createElement('span');
-    action.className = 'reading-reader-option-action';
-    action.textContent = rollout.previewSelectable ? '프리뷰 장면 보기 →' : '준비 중';
-
-    body.append(heading, tone, action);
-    button.append(art, body);
-    grid.append(button);
-  }
-
-  const note = document.createElement('p');
-  note.className = 'reading-reader-picker-note';
-  note.textContent = '현재 세연만 프리뷰 장면을 선택할 수 있습니다. 이 선택은 프리뷰 화면 연출에만 적용됩니다. 저장된 풀이를 다시 읽거나 대화를 이어가는 Reader는 서버에서 연결 가능한 상태가 확인된 뒤 별도로 표시됩니다. 유료 Reader 해석은 아직 공개되지 않았습니다.';
-
-  panel.append(close, intro, grid, note);
-  dialog.append(panel);
-  dialog.setAttribute('aria-labelledby', title.id);
-  document.body.append(dialog);
-
-  dialog.addEventListener('click', (event) => {
-    if (event.target === dialog) dialog.close('backdrop');
+  if (picker) return picker;
+  picker = createDelegatePicker({
+    titleId: 'reading-reader-picker-title',
+    description: '현재 프리뷰에서는 사주 근거와 해석 문장은 그대로 유지하고, 선택한 대리자의 장면과 이름만 화면 연출에 적용합니다.',
+    targetLabel: '선택한 사주 읽기',
+    note: '현재 세연만 프리뷰 장면을 선택할 수 있습니다. 이 선택은 프리뷰 화면 연출에만 적용됩니다. 저장된 풀이를 다시 읽거나 대화를 이어가는 대리자는 서버에서 연결 가능한 상태가 확인된 뒤 별도로 표시됩니다. 유료 대리자 해석은 아직 공개되지 않았습니다.',
+    resolveOption(reader) {
+      const rollout = readerRolloutPresentationV1(reader.key);
+      return {
+        stage: rollout.stage,
+        selectable: rollout.previewSelectable,
+        title: rollout.previewSelectable ? reader.title : '컨셉 정리 중',
+        tone: rollout.previewSelectable ? reader.tone : '설정 확정 후 순차적으로 공개합니다.',
+        action: rollout.previewSelectable ? '프리뷰 장면 보기 →' : '준비 중',
+        ariaLabel: rollout.previewSelectable
+          ? reader.name + ' 프리뷰 장면 선택'
+          : reader.name + ' 대리자 준비 중',
+      };
+    },
+    onSelect(reader) {
+      if (!pendingReadingUrl || !readerRolloutPresentationV1(reader.key).previewSelectable) return;
+      const next = new URL(pendingReadingUrl.href);
+      next.searchParams.set('reader', reader.key);
+      window.location.assign(next.href);
+    },
   });
-
-  close.addEventListener('click', () => dialog.close('close'));
-
-  dialog.addEventListener('close', () => {
-    if (dialog.returnValue !== 'reader-selected') {
-      pendingReadingUrl = null;
-      pendingLabel = '';
-    }
+  picker.dialog.dataset.readingReaderPicker = '';
+  picker.dialog.addEventListener('close', () => {
+    if (picker.dialog.returnValue !== 'reader-selected') pendingReadingUrl = null;
   });
-
-  dialog.addEventListener('click', (event) => {
-    const button = event.target instanceof Element
-      ? event.target.closest('[data-reader-key]')
-      : null;
-    if (!(button instanceof HTMLButtonElement) || !pendingReadingUrl || button.disabled) return;
-
-    const readerKey = button.dataset.readerKey;
-    if (!readerKey || !readerRolloutPresentationV1(readerKey).previewSelectable) return;
-
-    const next = new URL(pendingReadingUrl.href);
-    next.searchParams.set('reader', readerKey);
-    dialog.close('reader-selected');
-    window.location.assign(next.href);
-  });
-
-  return dialog;
+  return picker;
 }
 
 function openPicker(anchor) {
-  const dialog = createPicker();
+  const current = createPicker();
   pendingReadingUrl = new URL(anchor.href, window.location.href);
-  pendingLabel = anchor.textContent?.replace(/\s+/gu, ' ').trim() || '선택한 사주 읽기';
+  const targetText = anchor.textContent?.replace(/\s+/gu, ' ').trim() || '선택한 사주 읽기';
 
-  const target = dialog.querySelector('[data-reader-picker-target]');
-  if (target) target.textContent = pendingLabel;
-
-  if (typeof dialog.showModal === 'function') {
-    dialog.showModal();
-  } else {
-    // No modal means no explicit Reader presentation choice was made.
-    // Continue without manufacturing a browser Reader hint.
+  if (typeof current.dialog.showModal !== 'function') {
+    // No explicit choice was made. Keep the existing route without a Reader hint.
     window.location.assign(pendingReadingUrl.href);
     return;
   }
-
-  const firstReader = dialog.querySelector('[data-reader-key]:not(:disabled)');
-  if (firstReader instanceof HTMLButtonElement) firstReader.focus();
+  current.open({ targetText });
 }
 
 document.addEventListener('click', (event) => {
   if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
   const anchor = event.target instanceof Element ? event.target.closest('a[href]') : null;
   if (!isReadingDetailAnchor(anchor)) return;
-
   event.preventDefault();
   openPicker(anchor);
 });

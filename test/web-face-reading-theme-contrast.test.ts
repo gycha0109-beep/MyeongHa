@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 const pagePath = new URL('../apps/web/face-reading.html', import.meta.url);
 const faceCssPath = new URL('../apps/web/face-reading.css', import.meta.url);
+const pickerCssPath = new URL('../apps/web/reading-reader-picker.css', import.meta.url);
 const themeJsPath = new URL('../apps/web/product-theme.js', import.meta.url);
 
 describe('Face Reading light/dark theme contrast', () => {
@@ -16,33 +17,31 @@ describe('Face Reading light/dark theme contrast', () => {
     expect(themeRuntime).toContain('root.dataset.theme = theme');
   });
 
-  it('gives each light-mode surface its own readable foreground and background', async () => {
-    const css = await readFile(faceCssPath, 'utf8');
+  it('keeps page-specific light surfaces and centralizes the shared picker skin', async () => {
+    const [css, picker] = await Promise.all([
+      readFile(faceCssPath, 'utf8'), readFile(pickerCssPath, 'utf8'),
+    ]);
     expect(css).toContain('html[data-theme="light"] body.face-reading-page {');
     expect(css).toContain('--face-ivory: #252c30;');
     expect(css).toContain('--face-muted: #536067;');
+    for (const selector of [
+      '.face-hero', '.face-hero h1', '.face-hero-copy > strong',
+      '.face-reader-bar', '.face-reader-heading strong', '.face-workspace',
+      '.face-control h2', '.face-guide-list', '.face-secondary',
+      '.face-status strong', '.face-flow-grid article', '.face-flow-grid article > strong',
+      '.mobile-bottom-nav',
+    ]) expect(css).toContain(`html[data-theme="light"] body.face-reading-page ${selector}`);
 
     for (const selector of [
-      '.face-hero',
-      '.face-hero h1',
-      '.face-hero-copy > strong',
-      '.face-reader-bar',
-      '.face-reader-heading strong',
-      '.face-workspace',
-      '.face-control h2',
-      '.face-guide-list',
-      '.face-secondary',
-      '.face-status strong',
-      '.face-flow-grid article',
-      '.face-flow-grid article > strong',
       '.reading-reader-picker',
       '.reading-reader-picker-intro h2',
       '.reading-reader-option.is-selected',
-      '.face-reader-picker-search',
-      '.mobile-bottom-nav',
-    ]) {
-      expect(css).toContain(`html[data-theme="light"] body.face-reading-page ${selector}`);
-    }
+      '.reading-reader-picker-search',
+      '.reading-reader-picker-empty',
+      '.reading-reader-option:disabled',
+    ]) expect(picker).toContain(`html[data-theme="light"] body.product-page ${selector}`);
+    expect(picker).toContain('.reading-reader-picker .reading-reader-option[hidden]');
+    expect(picker).toContain('.reading-reader-picker .reading-reader-option.is-selected');
   });
 
   it('uses a light photo stage without changing the dark stage or upload behavior', async () => {
@@ -51,22 +50,13 @@ describe('Face Reading light/dark theme contrast', () => {
 
     expect(css).toContain('linear-gradient(145deg,#09181e,#0a2027)');
     for (const selector of [
-      '.face-preview-panel',
-      '.face-preview',
-      '.face-preview img',
-      '.face-placeholder > b',
-      '.face-placeholder small',
-      '.face-guide',
-      '.face-guide::before',
-      '.face-preview-meta',
-    ]) {
-      expect(css).toContain(`html[data-theme="light"] body.face-reading-page ${selector}`);
-    }
+      '.face-preview-panel', '.face-preview', '.face-preview img',
+      '.face-placeholder > b', '.face-placeholder small',
+      '.face-guide', '.face-guide::before', '.face-preview-meta',
+    ]) expect(css).toContain(`html[data-theme="light"] body.face-reading-page ${selector}`);
     expect(css).toContain('linear-gradient(180deg, #f8f5ee, #ede8de)');
     expect(page).toContain('data-face-preview');
     expect(page).toContain('data-face-image');
-    expect(css).toContain('.face-reader-picker .reading-reader-option[hidden]');
-    expect(css).toContain('.face-reading-page .reading-reader-option.is-selected');
     expect(css).toContain('.face-primary { border:1px solid #d8aa61');
   });
 });
