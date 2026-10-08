@@ -117,3 +117,69 @@ describe('2B-3C-5 independent signed slot crossing, synthetic boundary tests', (
     },
   );
 });
+
+
+describe('2B-3C-5 adversarial final authority and replay conditions', () => {
+  it('blocks a missing required source proof without leaking the first slot', async () => {
+    bind.mockReset();
+    bind.mockResolvedValueOnce(bound('natal')).mockResolvedValueOnce({
+      version: 'myeongha-held-source-proof-revision-binding-v1',
+      state: 'blocked', reason: 'source_proof_invalid',
+      sourceAuthority: 'NOT_EVALUATED', releaseAuthorization: 'NOT_EVALUATED',
+      canExecute: false, canPublish: false, canSell: false,
+    });
+    expect(await rehearseCurrentSubjectSajuMultiSlotSourceProofV1(input())).toMatchObject({
+      state: 'blocked', reason: 'required_slot_blocked', checkedSlots: [],
+    });
+    expect(read).not.toHaveBeenCalled();
+  });
+
+  it('refuses a replayed nonce even if a slot attempts to return held', async () => {
+    const request = input();
+    request.nonceFactory = () => 'Q'.repeat(24);
+    bind.mockReset();
+    bind.mockImplementation(async (one) => {
+      try { one.nonceFactory?.(); } catch {
+        return {
+          version: 'myeongha-held-source-proof-revision-binding-v1',
+          state: 'blocked', reason: 'invalid_current_birth_request',
+          sourceAuthority: 'NOT_EVALUATED', releaseAuthorization: 'NOT_EVALUATED',
+          canExecute: false, canPublish: false, canSell: false,
+        };
+      }
+      return bound(one.readingText === '전체 사주' ? 'natal' : 'relationship');
+    });
+    expect(await rehearseCurrentSubjectSajuMultiSlotSourceProofV1(request)).toMatchObject({
+      state: 'blocked', reason: 'reused_slot_nonce', checkedSlots: [],
+    });
+  });
+
+  it.each([
+    ['subject', 'other'], ['profile', 'other'], ['revision', 'different'],
+  ] as const)('rejects stale final %s identity', async (what, next) => {
+    const latest = snapshot();
+    if (what === 'subject') latest.resolvedSubject.subjectId = next;
+    if (what === 'profile') latest.profile.birthProfileId = next;
+    if (what === 'revision') latest.profile.currentRevision.revisionId = next;
+    read.mockResolvedValue(latest);
+    expect(await rehearseCurrentSubjectSajuMultiSlotSourceProofV1(input())).toMatchObject({
+      state: 'blocked', reason: 'final_birth_revision_changed', checkedSlots: [],
+    });
+  });
+
+  it('detects changed Birth input even if the Revision ID was not updated', async () => {
+    const latest = snapshot();
+    latest.profile.currentRevision.input.birthDate = '2001-07-15';
+    read.mockResolvedValue(latest);
+    expect(await rehearseCurrentSubjectSajuMultiSlotSourceProofV1(input())).toMatchObject({
+      state: 'blocked', reason: 'final_birth_revision_changed', checkedSlots: [],
+    });
+  });
+
+  it('fails closed when the final owner-authority read errors', async () => {
+    read.mockRejectedValue(new Error('DB unavailable'));
+    expect(await rehearseCurrentSubjectSajuMultiSlotSourceProofV1(input())).toMatchObject({
+      state: 'blocked', reason: 'final_birth_profile_unavailable', checkedSlots: [],
+    });
+  });
+});
