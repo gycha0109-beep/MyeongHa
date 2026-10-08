@@ -5,7 +5,8 @@
   ],
   "saju": [
     "scripts/verify-web-saju-auth-browser.mjs",
-    "scripts/verify-golden-master-header-browser.mjs"
+    "scripts/verify-golden-master-header-browser.mjs",
+    "scripts/verify-web-general-natal-preview-browser.mjs"
   ],
   "records": [
     "scripts/verify-web-records-auth-browser.mjs"
@@ -28,6 +29,7 @@
     "scripts/verify-web-my-birth-browser.mjs",
     "scripts/run-web-birth-session-browser-smoke-v2.mjs",
     "scripts/verify-web-birth-member-replacement-browser.mjs",
-    "scripts/run-web-conversation-browser-smoke.mjs"
+    "scripts/run-web-conversation-browser-smoke.mjs",
+    "scripts/verify-web-general-natal-preview-browser.mjs"
   ]
 }
