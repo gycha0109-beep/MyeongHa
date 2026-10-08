@@ -221,8 +221,7 @@ describe('2B-3C-8A server-only Saju transport + proof trust composition', () => 
       { serviceOrigin: 'http://saju-proof.example' }, { serviceBearer: '' },
       { noncePool: {} }, { timeoutMs: 40_000 },
     ]) {
-      const invalid = { ...f.input, ...overrides } as unknown
-        as SajuHeldSourceProofServerTrustOptionsV1;
+      const invalid = { ...f.input, ...overrides } as unknown as SajuHeldSourceProofServerTrustOptionsV1;
       expect(() => createSajuHeldSourceProofServerTrustV1(invalid)).toThrow();
     }
     expect(f.queries).toHaveLength(0);
