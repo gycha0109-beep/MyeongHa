@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { SajuHeldSourceProofHttpErrorV1 } from '../apps/api/src/saju-held-source-proof-http-client-v1.js';
 import {
   createSajuHeldCurrentBirthServerRehearsalV1,
 } from '../apps/api/src/saju-held-current-birth-server-rehearsal-v1.js';
@@ -136,7 +137,7 @@ describe('2B-3C-8B current Birth server-only Preview proof rehearsal', () => {
     expect(() => createSajuHeldCurrentBirthServerRehearsalV1({
       ...f.options,
       proofTrust: { ...f.options.proofTrust, serviceOrigin: 'http://saju-proof.example' },
-    })).toThrow(TypeError);
+    })).toThrow(SajuHeldSourceProofHttpErrorV1);
     expect(bind).not.toHaveBeenCalled();
     expect(f.subjectConnect).not.toHaveBeenCalled();
     expect(f.nonceConnect).not.toHaveBeenCalled();
