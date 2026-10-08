@@ -302,7 +302,7 @@
  * Face Reading has its own dark visual language, but the shared product theme
  * uses a light foreground by default. Keep its surfaces and text in the same
  * scheme so light mode never pairs dark-on-dark labels with a navy panel.
- * The preview itself remains a dark image stage in both themes.
+ * The preview stage follows the selected theme, while the image fit and capture logic stay unchanged.
  */
 html[data-theme="light"] body.face-reading-page {
   --face-bg: #f5ede3;
@@ -387,11 +387,35 @@ html[data-theme="light"] body.face-reading-page .face-workspace {
 }
 html[data-theme="light"] body.face-reading-page .face-preview-panel {
   background:
-    radial-gradient(circle at 50% 34%, rgba(194,155,88,.07), transparent 36%),
-    linear-gradient(145deg, #09181e, #0a2027);
+    radial-gradient(circle at 48% 30%, rgba(255,255,255,.42), transparent 45%),
+    linear-gradient(145deg, #f0eae0, #e9e2d7);
+}
+html[data-theme="light"] body.face-reading-page .face-preview {
+  border-color: rgba(142,113,76,.4);
+  background:
+    radial-gradient(circle at 50% 40%, rgba(255,255,255,.55), transparent 42%),
+    linear-gradient(180deg, #f8f5ee, #ede8de);
+}
+html[data-theme="light"] body.face-reading-page .face-preview img {
+  background: #f8f5ee;
+}
+html[data-theme="light"] body.face-reading-page .face-placeholder > b {
+  color: #96703d;
+}
+html[data-theme="light"] body.face-reading-page .face-placeholder small {
+  color: #555e61;
+}
+html[data-theme="light"] body.face-reading-page .face-guide {
+  border-color: rgba(149,112,65,.65);
+}
+html[data-theme="light"] body.face-reading-page .face-guide::before,
+html[data-theme="light"] body.face-reading-page .face-guide::after,
+html[data-theme="light"] body.face-reading-page .face-photo-corners i {
+  color: #987344;
+  border-color: #987344;
 }
 html[data-theme="light"] body.face-reading-page .face-preview-meta {
-  color: #c7d0cd;
+  color: #4e5c62;
 }
 html[data-theme="light"] body.face-reading-page .face-control h2,
 html[data-theme="light"] body.face-reading-page .face-status strong,
