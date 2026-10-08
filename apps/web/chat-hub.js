@@ -406,3 +406,4 @@ renderPeople();
 setContinuation(null);
 setRecent([]);
 setIncoming([]);
+setHubPresentationState('unavailable');
