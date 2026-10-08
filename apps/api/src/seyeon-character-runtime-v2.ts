@@ -52,6 +52,7 @@ export const SEYEON_STRUCTURED_PROVIDER_CONTRACT_VERSION_V2 =
 
 export type SeyeonStructuredPurposeV2 =
   | 'integrity_classification'
+  | 'unified_preflight_shadow'
   | 'disclosure_classification'
   | 'turn_interpretation'
   | 'dialogue_render'
