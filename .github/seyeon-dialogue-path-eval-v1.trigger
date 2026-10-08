@@ -1,1 +1,1 @@
-fire-2026-10-09-real-path-v1
+fire-2026-10-09-real-path-v2

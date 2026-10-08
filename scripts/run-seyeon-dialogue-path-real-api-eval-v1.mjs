@@ -118,6 +118,11 @@ function governance(preflight) {
 function reason(error) {
   const kind = error?.code;
   if (typeof kind === 'string' && [
+    'FAST_INTERPRETATION_GUARD_REJECTED',
+    'FAST_RISK_CAUSALITY_REJECTED',
+    'FAST_RENDERER_PACKET_REJECTED',
+    'FAST_RENDERER_GUARD_REJECTED',
+    'FAST_SEMANTIC_OUTPUT_REJECTED',
     'TIMEOUT', 'NETWORK_FAILURE', 'HTTP_FAILURE', 'INVALID_CONFIGURATION',
     'INVALID_CONTENT_TYPE', 'INVALID_RESPONSE', 'MODEL_REFUSAL', 'INVALID_STRUCTURED_OUTPUT',
   ].includes(kind)) return kind;

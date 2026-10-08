@@ -78,7 +78,9 @@ describe('Seyeon low-risk combined dialogue Shadow', () => {
       candidateProvider: { providerKey: 'test', modelKey: 'test', generate },
       reviewerProvider: { providerKey: 'test', modelKey: 'test', generate: review },
     });
-    await expect(shadow.evaluate(publicContext())).rejects.toThrow();
+    await expect(shadow.evaluate(publicContext())).rejects.toMatchObject({
+      code: 'FAST_INTERPRETATION_GUARD_REJECTED',
+    });
     expect(generate).toHaveBeenCalledOnce();
     const request = generate.mock.calls[0]?.[0] as unknown as Record<string, unknown>;
     expect(request).toMatchObject({
