@@ -16,6 +16,7 @@ import {
 } from './production-request-identity-verifier.js';
 import {
   createProductionSeyeonChatRuntimeV1,
+  type SeyeonProductionRoleProviderConfigsV1,
 } from './production-seyeon-chat-runtime-v1.js';
 import {
   SEYEON_PRODUCTION_WEB_COMPATIBILITY_PROFILE_V1,
@@ -124,6 +125,26 @@ export async function resolveProductionSeyeonProviderConfigAtRequestV1(
   });
 }
 
+/** Optional server-only role routing. Missing overrides retain the proven legacy provider. */
+export function resolveProductionSeyeonRoleProviderConfigsV1(
+  env: ProductionUserDataRuntimeEnvV1,
+  base: OpenAiSeyeonStructuredProviderConfigV1,
+): SeyeonProductionRoleProviderConfigsV1 | undefined {
+  const preflight = optionalEnv(env, 'SEYEON_MODEL_PREFLIGHT');
+  const interpreter = optionalEnv(env, 'SEYEON_MODEL_INTERPRETER');
+  const renderer = optionalEnv(env, 'SEYEON_MODEL_RENDERER');
+  const reviewer = optionalEnv(env, 'SEYEON_MODEL_REVIEWER');
+  if (preflight === null && interpreter === null &&
+      renderer === null && reviewer === null) return undefined;
+  const role = (model: string) => Object.freeze({ ...base, model });
+  return Object.freeze({
+    ...(preflight === null ? {} : { preflight: role(preflight) }),
+    ...(interpreter === null ? {} : { interpreter: role(interpreter) }),
+    ...(renderer === null ? {} : { renderer: role(renderer) }),
+    ...(reviewer === null ? {} : { reviewer: role(reviewer) }),
+  });
+}
+
 export interface ProductionSeyeonTurnSendRequestV1 {
   readonly request: Request;
   readonly requestId: string;
@@ -178,9 +199,13 @@ export function createProductionSeyeonTurnSendRuntimeV1(
                 input.env,
                 input.oidcTokenProvider ?? getVercelOidcToken,
               );
+            const roleProviderConfigs = input.providerConfig === undefined
+              ? resolveProductionSeyeonRoleProviderConfigsV1(input.env, providerConfig)
+              : undefined;
             const runtime = createProductionSeyeonChatRuntimeV1({
               databaseConfig: config,
               providerConfig,
+              ...(roleProviderConfigs === undefined ? {} : { roleProviderConfigs }),
               clientCompatibilityProfile:
                 input.clientCompatibilityProfile ??
                 SEYEON_PRODUCTION_WEB_COMPATIBILITY_PROFILE_V1,

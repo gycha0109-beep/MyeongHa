@@ -45,22 +45,25 @@ export async function runCharacterGovernedPreflightV1(input: {
     readonly retriever: CharacterPrivateSourceRetrieverPortV2;
   }>;
 }): Promise<CharacterGovernedPreflightResultV1> {
-  const integrity = await runCharacterIntegrityPreflightV1({
+  // Independent classifiers run concurrently; neither may authorize disclosure.
+  // Promise.all still fails closed on either rejection before retrieval/response.
+  const [integrity, disclosure] = await Promise.all([
+    runCharacterIntegrityPreflightV1({
     characterId: input.characterId,
     userMessageRef: input.userMessageRef,
     userText: input.userText,
     classifier: input.integrity.classifier,
     authorityResolver: input.integrity.authorityResolver,
-  });
-
-  const disclosure = await runCharacterDisclosurePreflightV2({
+  }),
+    runCharacterDisclosurePreflightV2({
     characterId: input.characterId,
     userQuestion: input.userText,
     relationship: input.relationship,
     classifier: input.disclosure.classifier,
     sourceDescriptor: input.disclosure.sourceDescriptor,
     factAuthorityResolver: input.disclosure.factAuthorityResolver,
-  });
+  }),
+  ]);
 
   const retrievedPrivateSources = await retrieveAllowedCharacterDisclosureSourcesV2({
     preflight: disclosure,

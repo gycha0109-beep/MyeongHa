@@ -89,9 +89,17 @@ export interface ProductionSeyeonChatRuntimeV1 {
   close(): Promise<void>;
 }
 
+export interface SeyeonProductionRoleProviderConfigsV1 {
+  readonly preflight?: OpenAiSeyeonStructuredProviderConfigV1;
+  readonly interpreter?: OpenAiSeyeonStructuredProviderConfigV1;
+  readonly renderer?: OpenAiSeyeonStructuredProviderConfigV1;
+  readonly reviewer?: OpenAiSeyeonStructuredProviderConfigV1;
+}
+
 export interface CreateProductionSeyeonChatRuntimeInputV1 {
   readonly databaseConfig: ProductionUserDataRuntimeConfigV1;
   readonly providerConfig?: OpenAiSeyeonStructuredProviderConfigV1;
+  readonly roleProviderConfigs?: SeyeonProductionRoleProviderConfigsV1;
   readonly provider?: SeyeonStructuredProviderPortV2;
   readonly pool?: PostgresSubjectPoolV1;
   readonly createUuid?: () => string;
@@ -157,6 +165,7 @@ async function runSeyeonTurnRuntimePhaseV1<T>(
   stage: SeyeonTurnRuntimePhaseV1,
   action: () => Promise<T>,
 ): Promise<T> {
+  const startedAt = performance.now();
   try {
     return await action();
   } catch (error) {
@@ -187,6 +196,12 @@ async function runSeyeonTurnRuntimePhaseV1<T>(
       }),
     );
     throw error;
+  } finally {
+    console.info('MYEONGHA_SEYEON_RUNTIME_METRIC ' + JSON.stringify({
+      schemaVersion: 'myeongha-seyeon-runtime-metric-v1',
+      stage,
+      elapsedMs: Math.max(0, Math.round(performance.now() - startedAt)),
+    }));
   }
 }
 
@@ -198,6 +213,16 @@ export function createProductionSeyeonChatRuntimeV1(
     ...(input.pool === undefined ? {} : { pool: input.pool }),
   });
   const provider = resolveProvider(input);
+  const roleProvider = (role: keyof SeyeonProductionRoleProviderConfigsV1) => {
+    const roleConfig = input.roleProviderConfigs?.[role];
+    return roleConfig === undefined
+      ? provider
+      : createOpenAiSeyeonStructuredProviderV1(roleConfig);
+  };
+  const preflightProvider = roleProvider('preflight');
+  const interpreterProvider = roleProvider('interpreter');
+  const rendererProvider = roleProvider('renderer');
+  const reviewerProvider = roleProvider('reviewer');
   const idPort = createSeyeonProductionRuntimeIdPortV1(
     input.createUuid,
   );
@@ -302,13 +327,13 @@ export function createProductionSeyeonChatRuntimeV1(
             productionContext,
           }) =>
             createSeyeonProductionGovernanceV1({
-              provider,
+              provider: preflightProvider,
               turnBinding,
               productionContext,
             }),
-          interpreterProvider: provider,
-          rendererProvider: provider,
-          semanticReviewerProvider: provider,
+          interpreterProvider,
+          rendererProvider,
+          semanticReviewerProvider: reviewerProvider,
           persistencePort: ports.chatPersistence,
           executionIdPort: idPort,
           postTurn: Object.freeze({

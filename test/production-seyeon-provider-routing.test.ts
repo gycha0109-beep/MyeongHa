@@ -3,6 +3,7 @@ import { createOpenAiSeyeonStructuredProviderV1 } from '../apps/api/src/openai-s
 
 import {
   resolveProductionSeyeonProviderConfigAtRequestV1,
+  resolveProductionSeyeonRoleProviderConfigsV1,
   SEYEON_PRODUCTION_PROVIDER_ROUTING_V1,
 } from '../apps/api/src/production-seyeon-turn-send-runtime-v1.js';
 
@@ -69,4 +70,36 @@ describe('Production Seyeon provider routing', () => {
       model: 'gpt-5.6-terra',
     });
   });
+  it('leaves all role models unchanged unless server-owned overrides are set', () => {
+    const base = { apiKey: 'sk-test-direct-key-1234567890', model: 'gpt-5.6-terra' };
+    expect(resolveProductionSeyeonRoleProviderConfigsV1({}, base)).toBeUndefined();
+    const roles = resolveProductionSeyeonRoleProviderConfigsV1({
+      SEYEON_MODEL_PREFLIGHT: 'gpt-5.6-luna',
+      SEYEON_MODEL_REVIEWER: 'gpt-5.6-luna',
+    }, base);
+    expect(roles?.preflight).toEqual({ ...base, model: 'gpt-5.6-luna' });
+    expect(roles?.reviewer).toEqual({ ...base, model: 'gpt-5.6-luna' });
+    expect(roles?.renderer).toBeUndefined();
+    expect(roles?.interpreter).toBeUndefined();
+    expect(base.model).toBe('gpt-5.6-terra');
+  });
+
+  it('keeps direct and gateway provider identities isolated during role overrides', async () => {
+    const token = 'oidc-token-for-test-only-123456789';
+    const gateway = await resolveProductionSeyeonProviderConfigAtRequestV1(
+      { MYEONGHA_SEYEON_AI_GATEWAY_MODEL: 'openai/gpt-5.6-sol' },
+      async () => token,
+    );
+    const roles = resolveProductionSeyeonRoleProviderConfigsV1(
+      { SEYEON_MODEL_RENDERER: 'openai/gpt-5.6-terra' },
+      gateway,
+    );
+    expect(roles?.renderer).toEqual({
+      apiKey: token,
+      origin: 'https://ai-gateway.vercel.sh',
+      model: 'openai/gpt-5.6-terra',
+    });
+    expect(gateway.model).toBe('openai/gpt-5.6-sol');
+  });
+
 });
