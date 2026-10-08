@@ -95,8 +95,10 @@ function validatedSlots(manifest) {
     !hasExactKeys(manifest, MANIFEST_FIELDS) ||
     manifest.schemaVersion !== 'v1' ||
     manifest.mode !== 'inspection_only' ||
-    !TOKEN_PATTERN.test(manifest.productId ?? '') ||
-    !TOKEN_PATTERN.test(manifest.productVersion ?? '') ||
+    typeof manifest.productId !== 'string' ||
+    !TOKEN_PATTERN.test(manifest.productId) ||
+    typeof manifest.productVersion !== 'string' ||
+    !TOKEN_PATTERN.test(manifest.productVersion) ||
     !Array.isArray(manifest.slots) ||
     manifest.slots.length < 1 ||
     manifest.slots.length > 8
@@ -110,7 +112,8 @@ function validatedSlots(manifest) {
     if (
       !isRecord(slot) ||
       !hasExactKeys(slot, SLOT_FIELDS) ||
-      !TOKEN_PATTERN.test(slot.slotId ?? '') ||
+      typeof slot.slotId !== 'string' ||
+      !TOKEN_PATTERN.test(slot.slotId) ||
       (slot.requirement !== 'required' && slot.requirement !== 'optional') ||
       !isSupportedRouteSearch(slot.routeSearch)
     ) {
