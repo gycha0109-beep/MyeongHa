@@ -17,6 +17,29 @@ import {
 
 export const SEYEON_FAST_DIALOGUE_SHADOW_VERSION_V1 =
   'seyeon-fast-dialogue-shadow-v1' as const;
+export type SeyeonFastDialogueShadowStageFailureCodeV1 =
+  | 'FAST_INTERPRETATION_GUARD_REJECTED'
+  | 'FAST_RISK_CAUSALITY_REJECTED'
+  | 'FAST_RENDERER_PACKET_REJECTED'
+  | 'FAST_RENDERER_GUARD_REJECTED'
+  | 'FAST_SEMANTIC_OUTPUT_REJECTED';
+
+/** Fixed stage codes only: never copy generated text or private context into logs. */
+export class SeyeonFastDialogueShadowStageErrorV1 extends Error {
+  constructor(readonly code: SeyeonFastDialogueShadowStageFailureCodeV1) {
+    super('Fast-dialogue Shadow server guard rejected stage: ' + code);
+    this.name = 'SeyeonFastDialogueShadowStageErrorV1';
+  }
+}
+
+function admitStage<T>(code: SeyeonFastDialogueShadowStageFailureCodeV1, run: () => T): T {
+  try {
+    return run();
+  } catch {
+    throw new SeyeonFastDialogueShadowStageErrorV1(code);
+  }
+}
+
 
 export const SEYEON_FAST_DIALOGUE_SHADOW_RESPONSE_SCHEMA_V1 = Object.freeze({
   type: 'object',
@@ -58,6 +81,14 @@ export function createSeyeonFastDialogueShadowV1(input: {
           request.instructions,
           'Produce interpretation and draft in one structured response. The server validates interpretation and causal eligibility AFTER your response.',
           'The draft is a proposed Korean polite utterance, NOT a verified conversation response.',
+          'Public first contact only: interpretation.reveal.level MUST be public; reveal.triggerRef MUST be null; reveal.supportingHistoryRefs and memoryRefsUsed MUST be empty. Never choose self_disclose, remember_naturally, jealousy, over-care, or relationship escalation.',
+          'Choose action and expression only from allowedInterpretationVocabulary in the input. Notice evidenceRefs may cite only recent user message IDs provided; never invent references.',
+          'For low_intensity_state_share, choose action approach, activate, tease, or invite. Choose baseline or playful expression so the server first-contact emotion clamp cannot make the draft inconsistent.',
+          'For asked_seyeon_current_want, immediateWant.key MUST equal disclose_desire and action must be approach, activate, or invite. State Se-yeon present moment want directly; do not imply stable personal history.',
+          'For stated_conversation_pace, choose approach with a concise self-contained Se-yeon stance. For asked_conversation_boundary, choose admit_boundary with one character-owned boundary, not a permission menu.',
+          'Draft MUST use polite natural Korean, must satisfy the selected guarded action without inventing Canon, shared user experiences, relationship closeness, or facts about the user. No generic therapy, rest advice, or pointless option lists.',
+          'Keep interpretation.expressionState baseline or playful and draft.expressionState exactly the same. Draft.revealLevel MUST be public. Draft memoryRefsMentioned, privateSourceRefsMentioned, and disclosureSliceIds MUST be empty.',
+
           'Keep expressionState and revealLevel of draft equal to interpretation.expressionState and interpretation.reveal.level.',
           'Do not disclose private source content, use memory refs, invent biographical history, assert user actions, or escalate jealousy, vulnerability or intimacy.',
           'The independent semantic reviewer and all server guards may reject this candidate. No output is authoritative.',
@@ -71,23 +102,27 @@ export function createSeyeonFastDialogueShadowV1(input: {
         throw new TypeError('Fast-dialogue Shadow returned an invalid outer response.');
       }
       const obj = raw as Record<string, unknown>;
-      const interpretation = guardSeyeonTurnInterpretationV2({
-        rawOutput: obj.interpretation,
-        context,
-      });
-      const riskCausality = guardSeyeonRiskBearingActionCausalityV1({
-        context,
-        interpretation,
-      });
-      const packet = buildSeyeonRendererPacketV2({
-        context,
-        interpretation,
-        riskCausality,
-      });
-      const draft = admitSeyeonRendererDraftV2({
-        rawOutput: obj.draft,
-        packet,
-      });
+      const interpretation = admitStage('FAST_INTERPRETATION_GUARD_REJECTED', () =>
+        guardSeyeonTurnInterpretationV2({
+          rawOutput: obj.interpretation,
+          context,
+        }));
+      const riskCausality = admitStage('FAST_RISK_CAUSALITY_REJECTED', () =>
+        guardSeyeonRiskBearingActionCausalityV1({
+          context,
+          interpretation,
+        }));
+      const packet = admitStage('FAST_RENDERER_PACKET_REJECTED', () =>
+        buildSeyeonRendererPacketV2({
+          context,
+          interpretation,
+          riskCausality,
+        }));
+      const draft = admitStage('FAST_RENDERER_GUARD_REJECTED', () =>
+        admitSeyeonRendererDraftV2({
+          rawOutput: obj.draft,
+          packet,
+        }));
       const review: unknown = await input.reviewerProvider.generate(
         buildSeyeonSemanticReviewRequestV2({
           packet,
@@ -95,11 +130,12 @@ export function createSeyeonFastDialogueShadowV1(input: {
           utteranceHash: hashSeyeonRendererUtteranceV2(draft.utterance),
         }),
       );
-      const envelope = guardSeyeonRendererOutputV2({
-        rawOutput: draft,
-        packet,
-        semanticReview: review,
-      });
+      const envelope = admitStage('FAST_SEMANTIC_OUTPUT_REJECTED', () =>
+        guardSeyeonRendererOutputV2({
+          rawOutput: draft,
+          packet,
+          semanticReview: review,
+        }));
       return Object.freeze({
         version: SEYEON_FAST_DIALOGUE_SHADOW_VERSION_V1,
         scope: 'SHADOW_ONLY_NOT_PRODUCTION' as const,

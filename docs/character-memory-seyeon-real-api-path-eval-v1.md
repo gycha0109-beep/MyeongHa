@@ -13,3 +13,8 @@ Watchtower-Track: character-memory
 - PASS는 8/8 양쪽 경로의 자동 검증 통과를 뜻할 뿐 라이브 전환 승인으로 취급하지 않는다. 하나라도 거부 시 평가 HOLD 및 Production 경로 변경 금지.
 - 보호된 production `OPENAI_API_KEY`는 `main` push sentinel 경로에서만 사용한다. 불신 PR 코드에서 키를 실행하지 않는다.
 - 기존 Production turn-send/model routing/Canon/Memory/Commerce/Saju/DB/migration은 수정하지 않는다.
+
+## 실측 v1 HOLD와 후보 v2 진단
+- 1차 실측: 기준 6/8 승인(P50 11256ms), 후보 4/8 승인(P50 8809ms), 총 60호출, 추정 $0.289025. 기준 N03/N09 의미 검증 거부; 후보 N03/N05/N06/N09 최종 의미 검증 전 거부(당시 오류 범주 미분화).
+- v2 Shadow에는 고정 단계 코드만 추가하여 Interpretation/Causality/Renderer/Semantic 거부를 구분한다. 프롬프트에 공개 첫 만남의 필수 턴별 행동과 출력 어휘·공개 심도를 명확히 고정한다.
+- 합성 평가 수 8, 모델 배치, 예산·토큰·속도 측정 방식은 이전과 동일. 운영 상태는 변경하지 않음.
