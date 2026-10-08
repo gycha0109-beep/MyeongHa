@@ -21,7 +21,7 @@ function fixture(input: {
     async query<Row = Record<string, unknown>>(
       sql: string, args?: readonly unknown[],
     ): Promise<PostgresQueryResultV1<Row>> {
-      log.push({ sql, args });
+      log.push(args === undefined ? { sql } : { sql, args });
       if (input.unavailable === 'begin' && sql === 'BEGIN') throw Error('begin failed');
       if (input.unavailable === 'role' && sql.startsWith('SET LOCAL ROLE')) {
         throw Error('no role membership');
