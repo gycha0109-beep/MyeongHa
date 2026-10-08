@@ -59,6 +59,10 @@ describe('Se-yeon real API dialogue-path benchmark accounting', () => {
       ...rows.slice(0,3),
       { ...rows[3], outcome: 'rejected', errorCode: 'SEMANTIC_GUARD_REJECTED' },
     ], 2);
+    const missingCalls = summarizeSeyeonDialoguePathV1([
+      { ...rows[0], calls: 4 }, ...rows.slice(1),
+    ], 2);
+    expect(missingCalls.verdict).toBe('HOLD');
     expect(held.verdict).toBe('HOLD');
     expect(held.routes.fast_3_luna_terra.failureCases).toEqual([
       { id: 'N02', code: 'SEMANTIC_GUARD_REJECTED' },

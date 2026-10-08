@@ -73,7 +73,9 @@ export function summarizeSeyeonDialoguePathV1(rows, totalCases) {
     }];
   }));
   const complete = SEYEON_DIALOGUE_PATH_ROUTES_V1.every(route =>
-    routes[route].samples === totalCases && routes[route].admitted === totalCases);
+    routes[route].samples === totalCases && routes[route].admitted === totalCases &&
+    rows.filter(row => row.route === route).every(row =>
+      row.calls === (route === 'legacy_5_terra' ? 5 : 3)));
   return Object.freeze({
     scope: 'SYNTHETIC_PUBLIC_FIRST_CONTACT_GUARD_ACCEPTANCE_ONLY',
     automaticPromotion: false,
