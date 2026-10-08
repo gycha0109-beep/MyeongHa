@@ -18,3 +18,14 @@ export function findMobileReaderPresentationV1(id: MobileReaderPresentationIdV1)
   return MOBILE_READER_PRESENTATIONS_V1.find((reader) => reader.key === id)
     ?? MOBILE_READER_PRESENTATIONS_V1[0];
 }
+
+/**
+ * Mobile mirrors Web's first Reader Preview candidate.
+ * This is not a server Reader grant or paid interpretation activation.
+ */
+export const MOBILE_READER_PREVIEW_CANDIDATE_IDS_V1 = Object.freeze(['seyeon'] as const);
+export const MOBILE_READER_INTERPRETATION_PUBLIC_V1 = false;
+
+export function isMobileReaderPreviewSelectableV1(id: MobileReaderPresentationIdV1): boolean {
+  return MOBILE_READER_PREVIEW_CANDIDATE_IDS_V1.some((candidate) => candidate === id);
+}
