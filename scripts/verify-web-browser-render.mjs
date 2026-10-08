@@ -325,18 +325,22 @@ try {
       triggerFound: true,
       open: dialog instanceof HTMLDialogElement && dialog.open,
       optionCount: dialog?.querySelectorAll('[data-reader-key]').length ?? 0,
+      enabledCount: dialog?.querySelectorAll('[data-reader-key]:not(:disabled)').length ?? 0,
+      seyeonEnabled: !(dialog?.querySelector('[data-reader-key="seyeon"]')?.disabled ?? true),
+      othersDisabled: [...(dialog?.querySelectorAll('[data-reader-key]:not([data-reader-key="seyeon"])') ?? [])].every((item) => item.disabled),
       note: dialog?.querySelector('.reading-reader-picker-note')?.textContent?.trim() ?? '',
       target: dialog?.querySelector('[data-reader-picker-target]')?.textContent?.trim() ?? '',
     };
   })()`);
   assert(pickerOpen.triggerFound && pickerOpen.open, 'Saju Reading entry did not open the Reader picker');
-  assert(pickerOpen.optionCount === 9, `Saju Reader picker must expose nine Readers, got ${pickerOpen.optionCount}`);
+  assert(pickerOpen.optionCount === 9, `Saju Reader catalog must retain nine Readers, got ${pickerOpen.optionCount}`);
+  assert(pickerOpen.enabledCount === 1 && pickerOpen.seyeonEnabled && pickerOpen.othersDisabled, `Only Seyeon Preview must be selectable: ${JSON.stringify(pickerOpen)}`);
   assert(pickerOpen.note.includes('이 선택은 프리뷰 화면 연출에만 적용됩니다.'), `Reader presentation-only note missing: ${pickerOpen.note}`);
   await artifact(client, '-saju-reader-picker');
 
   await client.evaluate(`(() => {
-    const button = document.querySelector('[data-reader-key="baekheon"]');
-    if (!(button instanceof HTMLButtonElement)) throw new Error('Baekheon Reader option missing');
+    const button = document.querySelector('[data-reader-key="seyeon"]');
+    if (!(button instanceof HTMLButtonElement)) throw new Error('Seyeon Reader option missing');
     button.click();
     return true;
   })()`);
@@ -355,9 +359,9 @@ try {
     };
   })()`);
   assert(selectedReaderRoute.topic === 'temperament' && selectedReaderRoute.scope === 'original', `Reader picker lost Reading route identity: ${JSON.stringify(selectedReaderRoute)}`);
-  assert(selectedReaderRoute.reader === 'baekheon', `Reader picker did not bind Baekheon into the URL: ${JSON.stringify(selectedReaderRoute)}`);
-  assert(selectedReaderRoute.readerDataset === 'baekheon' && selectedReaderRoute.selectionDataset === 'explicit', `Reading runtime did not consume explicit Reader selection: ${JSON.stringify(selectedReaderRoute)}`);
-  assert(selectedReaderRoute.presentationDataset === 'reading-scene-v1' && selectedReaderRoute.readerName === '백헌', `Reader Reading Scene v1 did not activate: ${JSON.stringify(selectedReaderRoute)}`);
+  assert(selectedReaderRoute.reader === 'seyeon', `Reader picker did not bind Seyeon into the URL: ${JSON.stringify(selectedReaderRoute)}`);
+  assert(selectedReaderRoute.readerDataset === 'seyeon' && selectedReaderRoute.selectionDataset === 'explicit', `Reading runtime did not consume explicit Reader selection: ${JSON.stringify(selectedReaderRoute)}`);
+  assert(selectedReaderRoute.presentationDataset === 'reading-scene-v1' && selectedReaderRoute.readerName === '세연', `Reader Reading Scene v1 did not activate: ${JSON.stringify(selectedReaderRoute)}`);
 
   await client.evaluate(`(() => {
     sessionStorage.setItem('myeongha.readingHandoff.v1', JSON.stringify({
