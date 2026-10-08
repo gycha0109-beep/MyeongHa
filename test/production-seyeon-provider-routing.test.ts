@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { createOpenAiSeyeonStructuredProviderV1 } from '../apps/api/src/openai-seyeon-structured-provider-v1.js';
 
 import {
   resolveProductionSeyeonProviderConfigAtRequestV1,
@@ -6,6 +7,23 @@ import {
 } from '../apps/api/src/production-seyeon-turn-send-runtime-v1.js';
 
 describe('Production Seyeon provider routing', () => {
+  it('accepts scoped AI Gateway models without allowing malformed model paths', () => {
+    const config = {
+      apiKey: 'vercel-oidc-token-12345678901234567890',
+      model: 'openai/gpt-5.6-sol',
+      origin: SEYEON_PRODUCTION_PROVIDER_ROUTING_V1.gatewayOrigin,
+    };
+    expect(createOpenAiSeyeonStructuredProviderV1(config).modelKey).toBe('openai/gpt-5.6-sol');
+    expect(() => createOpenAiSeyeonStructuredProviderV1({
+      ...config,
+      model: 'openai//gpt-5.6-sol',
+    })).toThrow('OpenAI model identifier is invalid.');
+    expect(() => createOpenAiSeyeonStructuredProviderV1({
+      ...config,
+      model: '/gpt-5.6-sol',
+    })).toThrow('OpenAI model identifier is invalid.');
+  });
+
   it('prefers an explicit direct OpenAI key without consulting Vercel OIDC', async () => {
     const oidc = vi.fn(async () => 'oidc-token-that-must-not-win-1234567890');
     await expect(resolveProductionSeyeonProviderConfigAtRequestV1({
