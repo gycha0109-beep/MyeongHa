@@ -53,6 +53,7 @@ export const SEYEON_STRUCTURED_PROVIDER_CONTRACT_VERSION_V2 =
 export type SeyeonStructuredPurposeV2 =
   | 'integrity_classification'
   | 'unified_preflight_shadow'
+  | 'turn_interpret_render_shadow'
   | 'disclosure_classification'
   | 'turn_interpretation'
   | 'dialogue_render'
@@ -153,7 +154,7 @@ export interface RunSeyeonCharacterTurnV2Result {
   }>;
 }
 
-const TURN_INTERPRETATION_RESPONSE_SCHEMA_V2 = Object.freeze({
+export const TURN_INTERPRETATION_RESPONSE_SCHEMA_V2 = Object.freeze({
   type: 'object',
   additionalProperties: false,
   required: [
@@ -238,7 +239,7 @@ const TURN_INTERPRETATION_RESPONSE_SCHEMA_V2 = Object.freeze({
   },
 } as const);
 
-const RENDERER_RESPONSE_SCHEMA_V2 = Object.freeze({
+export const RENDERER_RESPONSE_SCHEMA_V2 = Object.freeze({
   type: 'object',
   additionalProperties: false,
   required: [
