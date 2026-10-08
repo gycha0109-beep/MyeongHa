@@ -42,10 +42,12 @@ describe('MyeongHa Saju Reader picker', () => {
 
     expect(runtime).toContain("import { READER_PRESENTATIONS } from './reader-presentation-catalog.js';");
     for (const key of keys) expect(catalog).toContain(`key: '${key}'`);
-    for (const key of keys.filter((key) => key !== 'doyun')) {
+    for (const key of keys.filter((key) => !['doyun', 'yeoul', 'mira'].includes(key))) {
       expect(catalog).toContain(`assets/characters/${key}-portrait-v2.webp`);
     }
     expect(catalog).toContain('assets/characters/doyoon-portrait-v2.webp');
+    expect(catalog).toContain('assets/characters/yeoul-portrait-uploaded.svg');
+    expect(catalog).toContain('assets/characters/mira-portrait-uploaded.svg');
     for (const name of names) expect(catalog).toContain(`name: '${name}'`);
 
     expect(catalog).not.toContain('representativeDemo: true');
