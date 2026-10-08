@@ -15,7 +15,9 @@ describe('mobile Chat mirrors web nine-character entry with server-owned send', 
       .toEqual([...CHAT_LAUNCH_CHARACTER_IDS_V1]);
     const hub = await source('apps/mobile/src/app/(tabs)/chat/index.tsx');
     expect(hub).toContain('MOBILE_CHAT_LAUNCH_ROSTER_V1.map');
-    expect(hub).toContain('openCharacter(character.characterId)');
+    expect(hub).toContain('handleOpen(character.characterId)');
+    const hook = await source('apps/mobile/src/features/chat/use-mobile-chat-open.tsx');
+    expect(hook).toContain('mobileChatOpenServiceV1.open(characterId)');
     expect(hub).toContain('세연은 실제 AI 대화가 가능');
   });
 
