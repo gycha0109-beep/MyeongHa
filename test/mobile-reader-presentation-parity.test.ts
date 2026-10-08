@@ -10,7 +10,7 @@ const source = (p: string) =>
   readFile(new URL('../' + p, import.meta.url), 'utf8');
 
 describe('mobile Saju and Face Reader presentation parity', () => {
-  it('uses the same nine presentation names, titles, tones, and canonical ids as Web', () => {
+  it('uses the same nine presentation names, titles, tones, and canonical ids as Web', async () => {
     const projection = (v: { key: string; name: string; title: string; tone: string }) =>
       ({ key: v.key, name: v.name, title: v.title, tone: v.tone });
     const webCatalog = await source('apps/web/reader-presentation-catalog.js');
