@@ -34,6 +34,16 @@ describe('Seyeon role model comparison harness', () => {
     expect(aggregateSeyeonEvalV1([report]).sensitiveRecall).toBe(0);
   });
 
+  it('counts a wrong sensitive category as a missed sensitive disclosure', () => {
+    const spec = SEYEON_MODEL_EVAL_CASES_V1.find((x) => x.id === 'D07');
+    const report = scoreSeyeonClassifierCaseV1(spec, { claims: [] }, {
+      topicKey: 'past_romance_surface', questionContext: 'casual_curiosity',
+    });
+    expect(report.topicMatch).toBe(false);
+    expect(report.sensitiveMiss).toBe(true);
+    expect(aggregateSeyeonEvalV1([report]).sensitiveRecall).toBe(0);
+  });
+
   it('counts missing authority / shared-history claims as failures', () => {
     const spec = SEYEON_MODEL_EVAL_CASES_V1.find((x) => x.id === 'H01');
     const report = scoreSeyeonClassifierCaseV1(spec, { claims: [] }, {
