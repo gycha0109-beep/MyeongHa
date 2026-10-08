@@ -136,8 +136,7 @@ export function resolveProductionSeyeonRoleProviderConfigsV1(
   const reviewer = optionalEnv(env, 'SEYEON_MODEL_REVIEWER');
   if (preflight === null && interpreter === null &&
       renderer === null && reviewer === null) return undefined;
-  const role = (model: string | null) =>
-    model === null ? undefined : Object.freeze({ ...base, model });
+  const role = (model: string) => Object.freeze({ ...base, model });
   return Object.freeze({
     ...(preflight === null ? {} : { preflight: role(preflight) }),
     ...(interpreter === null ? {} : { interpreter: role(interpreter) }),
