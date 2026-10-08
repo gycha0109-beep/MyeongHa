@@ -52,6 +52,7 @@ bash test/db/account_deletion_policy_catalog_guard.sh
 bash test/db/subject_owned_data_graph_catalog_guard.sh
 bash test/db/transitive_subject_dependency_graph_catalog_guard.sh
 bash test/db/outbox_claim_concurrency.sh
+bash test/db/saju_source_proof_nonce_claim_concurrency.sh
 bash test/db/chat_receive_concurrency.sh
 bash test/db/chat_attempt_commit_concurrency.sh
 bash test/db/character_face_governed_artifact_commit.sh
