@@ -47,7 +47,7 @@ function poolFactory(events: string[], mutation?: Mutation, absent = false) {
         events.push('CURRENT_BIRTH_READ');
         if (absent) return { rows: [] };
         return { rows: [{
-          subjectId: SUBJECT_ID,
+          subjectId: mutation === 'subject' && currentRead > 1 ? OTHER_SUBJECT_ID : SUBJECT_ID,
           birthProfileId: mutation === 'profile' && currentRead > 1 ? OTHER_PROFILE_ID : PROFILE_ID,
           currentRevisionId: (mutation === 'revision' || mutation === 'same_input_revision') && currentRead > 1
             ? '55555555-5555-4555-8555-555555555555' : REVISION_ID,
