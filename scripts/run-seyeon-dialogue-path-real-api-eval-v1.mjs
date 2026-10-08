@@ -122,6 +122,22 @@ function reason(error) {
     'INVALID_CONTENT_TYPE', 'INVALID_RESPONSE', 'MODEL_REFUSAL', 'INVALID_STRUCTURED_OUTPUT',
   ].includes(kind)) return kind;
   const message = String(error?.message ?? '');
+  // Enumerate only fixed guard classes. Never include a user/model message in evidence.
+  if (error?.name === 'SeyeonTurnInterpretationErrorV2' ||
+      error?.name === 'SeyeonRiskActionCausalityErrorV1') {
+    return 'INTERPRETATION_GUARD_REJECTED';
+  }
+  if (error?.name === 'SeyeonRendererGuardErrorV2') {
+    return message.includes('semantic review rejected')
+      ? 'SEMANTIC_GUARD_REJECTED' : 'RENDERER_GUARD_REJECTED';
+  }
+  if (error?.name === 'SeyeonCharacterRuntimeErrorV2') {
+    if (error.stage === 'interpret' || error.stage === 'risk_causality')
+      return 'INTERPRETATION_GUARD_REJECTED';
+    if (error.stage === 'render' || error.stage === 'validate')
+      return 'RENDERER_GUARD_REJECTED';
+    if (error.stage === 'semantic_review') return 'SEMANTIC_PROVIDER_REJECTED';
+  }
   if (message.includes('semantic review rejected')) return 'SEMANTIC_GUARD_REJECTED';
   if (message.includes('Fast-dialogue Shadow requires')) return 'FAST_SHADOW_INELIGIBLE';
   if (message.includes('SYNTHETIC_PRIVATE_')) return 'PRIVATE_TOPIC_EXCLUDED';
