@@ -45,10 +45,26 @@ describe('Face Reading light/dark theme contrast', () => {
     }
   });
 
-  it('preserves the original dark image stage and the Reader picker contract', async () => {
+  it('uses a light photo stage without changing the dark stage or upload behavior', async () => {
     const css = await readFile(faceCssPath, 'utf8');
+    const page = await readFile(pagePath, 'utf8');
+
     expect(css).toContain('linear-gradient(145deg,#09181e,#0a2027)');
-    expect(css).toContain('.face-preview img');
+    for (const selector of [
+      '.face-preview-panel',
+      '.face-preview',
+      '.face-preview img',
+      '.face-placeholder > b',
+      '.face-placeholder small',
+      '.face-guide',
+      '.face-guide::before',
+      '.face-preview-meta',
+    ]) {
+      expect(css).toContain(`html[data-theme="light"] body.face-reading-page ${selector}`);
+    }
+    expect(css).toContain('linear-gradient(180deg, #f8f5ee, #ede8de)');
+    expect(page).toContain('data-face-preview');
+    expect(page).toContain('data-face-image');
     expect(css).toContain('.face-reader-picker .reading-reader-option[hidden]');
     expect(css).toContain('.face-reading-page .reading-reader-option.is-selected');
     expect(css).toContain('.face-primary { border:1px solid #d8aa61');
