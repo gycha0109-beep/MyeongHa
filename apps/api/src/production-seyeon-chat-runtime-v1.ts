@@ -19,6 +19,7 @@ import {
 } from './seyeon-public-content-compatibility-v1.js';
 import {
   createOpenAiSeyeonStructuredProviderV1,
+  OpenAiSeyeonStructuredProviderErrorV1,
   type OpenAiSeyeonStructuredProviderConfigV1,
 } from './openai-seyeon-structured-provider-v1.js';
 import type {
@@ -46,8 +47,9 @@ import {
 import {
   createSeyeonProductionTransactionalPortsV1,
 } from './seyeon-production-transactional-ports-v1.js';
-import type {
-  SeyeonStructuredProviderPortV2,
+import {
+  SeyeonCharacterRuntimeErrorV2,
+  type SeyeonStructuredProviderPortV2,
 } from './seyeon-character-runtime-v2.js';
 import type {
   VerifiedSubjectIdentityEvidenceV1,
@@ -164,6 +166,13 @@ async function runSeyeonTurnRuntimePhaseV1<T>(
     const sqlState = typeof rawCode === 'string' && /^[A-Z0-9]{5}$/u.test(rawCode)
       ? rawCode
       : null;
+    const runtimeStage =
+      error instanceof SeyeonCharacterRuntimeErrorV2 ? error.stage : null;
+    const providerCause =
+      error instanceof SeyeonCharacterRuntimeErrorV2 &&
+      error.cause instanceof OpenAiSeyeonStructuredProviderErrorV1
+        ? error.cause
+        : null;
     console.error(
       'MYEONGHA_SEYEON_TURN_RUNTIME_DIAGNOSTIC ' +
       JSON.stringify({
@@ -171,6 +180,9 @@ async function runSeyeonTurnRuntimePhaseV1<T>(
         stage,
         errorName: error instanceof Error ? error.name : 'UnknownError',
         sqlState,
+        runtimeStage,
+        providerFailureCode: providerCause?.code ?? null,
+        providerHttpStatus: providerCause?.httpStatus ?? null,
       }),
     );
     throw error;
