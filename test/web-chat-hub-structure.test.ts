@@ -28,7 +28,10 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
     expect(myConversations).toBeGreaterThan(primary);
     expect(incoming).toBeGreaterThan(myConversations);
     expect(discoverySection).toBeGreaterThan(incoming);
-    expect(source).toContain('누구와 이야기를 이어갈까요?');
+    expect(source).toContain('이곳에서 마음이 가는 대리자를 만나보세요.');
+    expect(source).toContain('누구와 이야기를 시작해볼까요?');
+    expect(source).toContain('data-chat-hub-state="unavailable"');
+    expect(source).toContain('data-relationship-section hidden');
     expect(source).toContain('지금 이어갈 사람');
     expect(source).toContain('data-incoming-section hidden');
     expect(source).not.toContain('<h2 id="recent-title">최근 대화</h2>');
@@ -42,8 +45,19 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
     ]);
     const source = `${html}\n${page}`;
 
-    expect(source).toContain('아직 이어지고 있는 대화가 없습니다.');
-    expect(source).toContain('아직 이어지고 있는 관계가 없습니다.');
+    expect(source).not.toContain('아직 이어지고 있는 대화가 없습니다.');
+    expect(source).not.toContain('아직 이어지고 있는 관계가 없습니다.');
+    expect(source).toContain('이전 대화 목록은 아직 이 화면에 연결되지 않았습니다.');
+    expect(source).toContain('data-hub-availability role="status"');
+    expect(source).toContain('data-hub-verified-empty hidden role="status"');
+    expect(source).toContain('아직 이어지는 대화가 없습니다.');
+    expect(source).toContain('data-relationship-section hidden');
+    expect(js).toContain("setHubPresentationState('unavailable')");
+    expect(js).toContain("relationshipSection.hidden = state !== 'active'");
+    expect(js).toContain("verifiedEmptyNote.hidden = state !== 'verified_empty'");
+    expect(js).toContain("availabilityNote.hidden = state !== 'unavailable'");
+    expect(js).not.toContain("setHubPresentationState('verified_empty')");
+    expect(js).not.toContain("setHubPresentationState('active')");
     expect(source).not.toContain('퇴사를 고민했던 이야기');
     expect(source).not.toContain('지난번 당신');
     expect(js).toContain('setContinuation(null)');
@@ -56,6 +70,31 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
     expect(js).toContain('item.hasIncoming === true');
     expect(js).not.toContain('threadTitle:');
     expect(js).not.toContain('hasIncoming: true');
+  });
+
+  it('keeps discovery first on unavailable/verified-empty but respects actual thread authorization for active', async () => {
+    const [page, runtime, css] = await Promise.all([
+      readFile(hubPagePath, 'utf8'),
+      readFile(hubJsPath, 'utf8'),
+      readFile(hubV2CssPath, 'utf8'),
+    ]);
+    expect(page).toContain('data-relationship-section hidden');
+    expect(page).toContain('data-people-grid');
+    expect(page).toContain('data-meet-shortcut hidden');
+    expect(page).toContain('data-incoming-section hidden');
+    expect(page).toContain('data-discovery-heading');
+    expect(page).toContain('data-returning-heading hidden');
+    expect(runtime).toContain('function setHubPresentationState(state)');
+    expect(runtime).toContain("['unavailable', 'verified_empty', 'active']");
+    expect(runtime).toContain('meetShortcut.hidden = state !== \'active\'');
+    expect(runtime).toContain('returningHeading.hidden = state !== \'active\'');
+    expect(runtime).toContain('setContinuation(null)');
+    expect(runtime).toContain('setRecent([])');
+    expect(runtime).not.toContain('setRelationshipState(state = {})');
+    expect(css).toContain('.chat-hub-shell[data-chat-hub-state="unavailable"] .conversation-people');
+    expect(css).toContain('.chat-hub-shell[data-chat-hub-state="active"] .conversation-people');
+    expect(css).toContain('html[data-theme="dark"] body.chat-hub-page .conversation-people');
+    expect(css).toContain('.conversation-hub-status');
   });
 
   it('keeps thread-backed relationship surfaces presentation-neutral until an owner-scoped server projection supplies canonical Character authority', async () => {
