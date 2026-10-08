@@ -25,6 +25,17 @@ import {
   type CharacterStandardReadingChatBaseContextInputV1,
   type CharacterStandardReadingChatTurnServerContextInputV1,
 } from '../apps/api/src/index.js';
+import {
+  runReaderInterpretationPreviewHttpV1,
+} from '../apps/api/src/reader-interpretation-preview-http.js';
+import {
+  SAJU_CHARACTER_GROUNDING_ADMISSION_HEADER_V1,
+  SAJU_CHARACTER_GROUNDING_ADMISSION_VERSION_V1,
+  createSajuCharacterGroundingHttpAdapterV1,
+} from '../apps/api/src/saju-character-grounding-http-adapter.js';
+import type {
+  SajuProductionCalculationHttpRequestInitV1,
+} from '../apps/api/src/saju-production-calculation-http-adapter.js';
 import type { ChatThreadRuntimeBindingReadAuthorityPortV1 } from '../apps/api/src/chat-thread-runtime-binding-read.js';
 import type { CharacterRelationshipReadAuthorityPortV1 } from '../apps/api/src/character-relationship-read.js';
 import type { MemoryItemsReadAuthorityPortV1 } from '../apps/api/src/memory-items-read.js';
@@ -538,6 +549,91 @@ describe('thread-bound Official Reading Reader runtime', () => {
     expect(result.officialReadingId).toBe(READING_ID);
     expect(result.sourceResponseHash).toBe(bundle.sourceResponseHash);
     expect(groundingProjectionPort.projectGrounding).toHaveBeenCalledTimes(1);
+  });
+
+  it('joins owner-authorized Official Reading to a real bounded Saju HTTP transport and Reader HTTP scene', async () => {
+    const authority = authorities();
+    const bundle = previewGrounding();
+    const httpFetch = vi.fn(async (
+      _url: string,
+      _init: SajuProductionCalculationHttpRequestInitV1,
+    ) => ({
+      status: 200,
+      headers: new Headers({
+        'content-type': 'application/json',
+        [SAJU_CHARACTER_GROUNDING_ADMISSION_HEADER_V1]:
+          SAJU_CHARACTER_GROUNDING_ADMISSION_VERSION_V1,
+      }),
+      body: null,
+      text: async () => JSON.stringify(bundle),
+    }));
+    const resolveContext = vi.fn(async () => ({
+      relationshipProjectionPolicy: serverContextInput().relationshipProjectionPolicy,
+    }));
+
+    const response = await runReaderInterpretationPreviewHttpV1({
+      resolvedSubjectId: SUBJECT_ID,
+      effectiveAt: '2026-09-21T00:01:00.000Z',
+      body: { threadId: THREAD_ID, officialReadingId: READING_ID },
+      contextAuthorityPort: { resolveContext },
+      contentReleaseRuntime: compatibleReceiveRuntime(),
+      ...authority,
+      groundingProjectionPort: createSajuCharacterGroundingHttpAdapterV1({
+        baseUrl: 'https://saju.example',
+        bearerToken: 'synthetic-test-only-bearer',
+        fetchImpl: httpFetch,
+      }),
+    });
+
+    expect(response.lifecycle).toBe('preview');
+    expect(response.readerCharacterId).toBe('baekheon');
+    expect(response.officialReadingId).toBe(READING_ID);
+    expect(response.interpretationHash).toBeTruthy();
+    expect(httpFetch).toHaveBeenCalledTimes(1);
+    expect(httpFetch.mock.calls[0]?.[0]).toBe('https://saju.example/api/character-grounding');
+    const outbound = httpFetch.mock.calls[0]![1];
+    expect(outbound.method).toBe('POST');
+    expect(outbound.redirect).toBe('manual');
+    expect(outbound.headers.authorization).toBe('Bearer synthetic-test-only-bearer');
+    expect(JSON.parse(outbound.body)).toEqual({
+      response: expect.objectContaining({
+        responseVersion: 'myeonghwa-product-reading-response-v2',
+        state: 'delivered',
+      }),
+      engineVersion: 'saju-engine-v1',
+      readingDomain: 'career',
+    });
+    expect(outbound.body).not.toContain(SUBJECT_ID);
+    expect(outbound.body).not.toContain('baekheon');
+    expect(response).not.toHaveProperty('groundingHash');
+    expect(response).not.toHaveProperty('sourceResponseHash');
+    expect(response).not.toHaveProperty('responseSnapshotJsonb');
+  });
+
+  it('blocks revoked Reader access before dispatching a Saju grounding HTTP request', async () => {
+    const authority = authorities();
+    authority.accessAuthorityPort.readAccessibleReadings = vi.fn(async () => []);
+    const httpFetch = vi.fn();
+    await expect(runReaderInterpretationPreviewHttpV1({
+      resolvedSubjectId: SUBJECT_ID,
+      effectiveAt: '2026-09-21T00:01:00.000Z',
+      body: { threadId: THREAD_ID, officialReadingId: READING_ID },
+      contextAuthorityPort: {
+        resolveContext: vi.fn(async () => ({
+          relationshipProjectionPolicy: serverContextInput().relationshipProjectionPolicy,
+        })),
+      },
+      contentReleaseRuntime: compatibleReceiveRuntime(),
+      ...authority,
+      groundingProjectionPort: createSajuCharacterGroundingHttpAdapterV1({
+        baseUrl: 'https://saju.example',
+        bearerToken: 'synthetic-test-only-bearer',
+        fetchImpl: httpFetch,
+      }),
+    })).rejects.toThrow();
+
+    expect(httpFetch).not.toHaveBeenCalled();
+    expect(authority.artifactAuthorityPort.readArtifactSource).not.toHaveBeenCalled();
   });
 
   it('rejects caller-supplied same-id Character profile authority before Preview grounding', async () => {
