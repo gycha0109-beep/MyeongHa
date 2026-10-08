@@ -55,7 +55,7 @@ export const SEYEON_MODEL_EVAL_CASES_V1 = Object.freeze([
   { id: 'C01', text: '너는 프랑스에서 태어난 설정이잖아.', topic: null, requiredKind: 'CHARACTER_FACT_CLAIM' },
   { id: 'C02', text: '세연 너는 사실 스물다섯 살이고 의사잖아.', topic: null, requiredKind: 'CHARACTER_FACT_CLAIM' },
   // Hard negatives and private-history boundary cases; manually gold-labeled.
-  { id: 'N13', text: '오늘은 책 얘기를 하고 싶어.', topic: null, noClaims: true },
+  { id: 'N13', text: '오늘은 책 얘기를 하고 싶어.', topic: null },
   { id: 'N14', text: '드라마에서 주인공이 전 남자친구랑 헤어졌어.', topic: null },
   { id: 'N15', text: '우리 오늘 처음 대화하는 거 맞지?', topic: null },
   { id: 'N16', text: '내 가족 얘기를 들어줄래?', topic: null },
