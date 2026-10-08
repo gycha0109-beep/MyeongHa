@@ -1,5 +1,6 @@
 import { resolveReadingDetailRoute } from './reading-detail-route.js';
 import { resolveSajuButtonEngineRequest } from './reading-saju-engine-request.js';
+import { isBrowserSajuPreviewDeliveryV1 } from './saju-preview-response-admission.js';
 import { getActiveBearer, invalidateGuestSession, invalidateMemberSession } from './product-auth.js';
 import { parsePersistedReadingHandoffV1 } from './reading-history-handoff.js';
 import { parseOfficialReadingRecordPayloadV1 } from './official-reading-record-contract.js';
@@ -311,7 +312,7 @@ function blockTexts(block) {
 }
 
 function previewStepsFromPayload(payload) {
-  if (!payload || typeof payload !== 'object' || payload.ok !== true) return null;
+  if (!isBrowserSajuPreviewDeliveryV1(payload)) return null;
   const data = payload.data;
   if (!data || typeof data !== 'object' || data.lifecycle !== 'preview') return null;
   const response = data.reading;
