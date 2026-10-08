@@ -29,7 +29,7 @@ export function HomePage() {
       <section className="gm-section" aria-labelledby="home-month-title">
         <div className="gm-section-head">
           <h2 className="gm-section-title" id="home-month-title">이번 달 사주 읽기</h2>
-          <a className="gm-inline-link" href="reading-detail.html?topic=temperament&scope=original">프리뷰 확인 <span aria-hidden="true">›</span></a>
+          <a className="gm-inline-link" href="reading-detail.html?topic=temperament&scope=original">제공 상태 확인 <span aria-hidden="true">›</span></a>
         </div>
 
         <a className="gm-card gm-month-card" href="reading-detail.html?topic=temperament&scope=original">
