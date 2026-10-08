@@ -31,7 +31,7 @@ jobs:
           set -euo pipefail
           if [ "${{ github.event_name }}" = "push" ]; then
             [ "${{ github.ref }}" = "refs/heads/main" ]
-            [ "$(tr -d '\r\n' < .github/seyeon-model-eval-v1.trigger)" = "fire-2026-10-08-v1" ]
+            [ "$(tr -d '\r\n' < .github/seyeon-model-eval-v1.trigger)" = "fire-2026-10-08-v2" ]
           else
             [ "${{ github.event_name }}" = "workflow_dispatch" ]
             [ "${{ github.ref }}" = "refs/heads/main" ]

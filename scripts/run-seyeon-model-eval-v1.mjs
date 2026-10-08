@@ -19,10 +19,10 @@ const RATE_PER_MILLION = Object.freeze({
   'gpt-5.6-terra': Object.freeze({ input: 2.00, cached: 0.20, output: 12.00 }),
 });
 const MODELS = Object.freeze(Object.keys(RATE_PER_MILLION));
-const MAX_CALLS = 192;
+const MAX_CALLS = 400;
 const MAX_ESTIMATED_COST_USD = 1.50;
 const DEFAULT_OUTPUT = './.evidence/seyeon-model-eval-v1.json';
-const MAX_CASES = 48;
+const MAX_CASES = 100;
 
 function token(value) {
   return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0

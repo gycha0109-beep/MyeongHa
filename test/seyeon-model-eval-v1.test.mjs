@@ -7,16 +7,16 @@ import {
 
 describe('Seyeon role model comparison harness', () => {
   it('uses a bounded, synthetic and manually gold-labeled set of cases', () => {
-    expect(SEYEON_MODEL_EVAL_CASES_V1).toHaveLength(48);
-    expect(new Set(SEYEON_MODEL_EVAL_CASES_V1.map((item) => item.id)).size).toBe(48);
+    expect(SEYEON_MODEL_EVAL_CASES_V1).toHaveLength(100);
+    expect(new Set(SEYEON_MODEL_EVAL_CASES_V1.map((item) => item.id)).size).toBe(100);
     const sensitive = SEYEON_MODEL_EVAL_CASES_V1.filter((item) => item.topic !== null);
-    expect(sensitive).toHaveLength(24);
+    expect(sensitive).toHaveLength(56);
     expect(new Set(sensitive.map((item) => item.topic))).toEqual(new Set([
       'family_emotional_history', 'past_romance_surface',
       'past_romance_detail', 'deep_vulnerability',
     ]));
     const protectedClaims = SEYEON_MODEL_EVAL_CASES_V1.filter((item) => item.requiredKind !== undefined);
-    expect(protectedClaims).toHaveLength(12);
+    expect(protectedClaims).toHaveLength(22);
     for (const item of SEYEON_MODEL_EVAL_CASES_V1) {
       expect(item.text.length).toBeGreaterThan(0);
       expect(item.text.length).toBeLessThan(300);
@@ -28,6 +28,16 @@ describe('Seyeon role model comparison harness', () => {
     const spec = SEYEON_MODEL_EVAL_CASES_V1.find((x) => x.id === 'D01');
     const report = scoreSeyeonClassifierCaseV1(spec, { claims: [] }, {
       topicKey: null, questionContext: 'casual_curiosity',
+    });
+    expect(report.topicMatch).toBe(false);
+    expect(report.sensitiveMiss).toBe(true);
+    expect(aggregateSeyeonEvalV1([report]).sensitiveRecall).toBe(0);
+  });
+
+  it('counts a wrong sensitive category as a missed sensitive disclosure', () => {
+    const spec = SEYEON_MODEL_EVAL_CASES_V1.find((x) => x.id === 'D07');
+    const report = scoreSeyeonClassifierCaseV1(spec, { claims: [] }, {
+      topicKey: 'past_romance_surface', questionContext: 'casual_curiosity',
     });
     expect(report.topicMatch).toBe(false);
     expect(report.sensitiveMiss).toBe(true);
