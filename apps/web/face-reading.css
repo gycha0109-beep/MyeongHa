@@ -296,3 +296,211 @@
   .face-main{padding-top:22px}.face-shell{width:calc(100% - 24px)}.face-hero{min-height:210px;grid-template-columns:1fr;padding:28px 26px}.face-orbit{width:150px;height:150px;position:absolute;right:-20px;top:30px;opacity:.34}.face-hero-copy{max-width:calc(100% - 35px)}.face-preview-panel{padding:12px}.face-preview{min-height:440px}.face-control{padding:28px 20px}.face-actions{grid-template-columns:1fr 1fr}.face-primary{grid-column:1/-1}.face-reader-bar{padding:12px;gap:12px}.face-reader-current>img{width:56px;height:56px}.face-reader-heading strong{font-size:15px}.face-reader-change{padding:0 12px}.face-flow{padding-top:40px}.face-flow-head{margin-bottom:24px}.face-flow-grid{grid-template-columns:1fr;gap:10px}.face-flow-grid article{min-height:0;padding:20px}.face-flow-grid article>p{margin-top:14px}
 }
 @media(max-width:520px){.face-reader-bar{display:grid;grid-template-columns:1fr}.face-reader-change{width:100%;justify-self:stretch}.face-reader-current{align-items:flex-start}.face-hero h1{font-size:42px}.face-hero-copy>strong{max-width:300px;font-size:23px}.face-hero-copy>p{font-size:11px}.face-preview{min-height:390px}.face-placeholder{transform:scale(.86)}.face-preview-meta{display:grid;gap:4px}.face-control h2{font-size:23px}.face-file-card{grid-template-columns:30px minmax(0,1fr)}.face-file-card>span:last-child{display:none}.face-actions{grid-template-columns:1fr}.face-primary{grid-column:auto}}
+
+
+/*
+ * Face Reading has its own dark visual language, but the shared product theme
+ * uses a light foreground by default. Keep its surfaces and text in the same
+ * scheme so light mode never pairs dark-on-dark labels with a navy panel.
+ * The preview itself remains a dark image stage in both themes.
+ */
+html[data-theme="light"] body.face-reading-page {
+  --face-bg: #f5ede3;
+  --face-panel: #fffaf4;
+  --face-line: rgba(130, 101, 65, .30);
+  --face-line-soft: rgba(130, 101, 65, .20);
+  --face-gold: #88612f;
+  --face-gold-strong: #a77635;
+  --face-ivory: #252c30;
+  --face-muted: #536067;
+  --face-muted-2: #637078;
+  color: var(--face-ivory);
+  background:
+    radial-gradient(circle at 85% 7%, rgba(189, 154, 99, .12), transparent 29rem),
+    linear-gradient(180deg, #faf5ed 0%, #f5ece1 62%, #f1e6d9 100%);
+}
+html[data-theme="light"] body.face-reading-page .product-header {
+  border-bottom-color: var(--face-line-soft);
+  background: rgba(250, 245, 237, .95);
+}
+html[data-theme="light"] body.face-reading-page .product-header::after,
+html[data-theme="light"] body.face-reading-page .product-nav-link[aria-current="page"]::before {
+  background: #faf5ed;
+}
+html[data-theme="light"] body.face-reading-page .product-brand-name,
+html[data-theme="light"] body.face-reading-page .product-nav-link,
+html[data-theme="light"] body.face-reading-page .product-icon-button,
+html[data-theme="light"] body.face-reading-page .product-profile {
+  color: #354046;
+}
+html[data-theme="light"] body.face-reading-page .product-nav-link:hover,
+html[data-theme="light"] body.face-reading-page .product-nav-link[aria-current="page"] {
+  color: #1c262b;
+}
+html[data-theme="light"] body.face-reading-page .product-icon-button,
+html[data-theme="light"] body.face-reading-page .product-profile {
+  border-color: var(--face-line);
+  background: rgba(255,255,255,.38);
+}
+html[data-theme="light"] body.face-reading-page .product-profile-mark {
+  border-color: var(--face-line);
+  color: #4e514b;
+  background: rgba(168,126,75,.09);
+}
+
+html[data-theme="light"] body.face-reading-page .face-hero {
+  color: var(--face-ivory);
+  background: linear-gradient(115deg, #fcf6ed, #f5e9d9 70%, #f1e4d2);
+  box-shadow: 0 18px 45px rgba(83, 62, 39, .09);
+}
+html[data-theme="light"] body.face-reading-page .face-hero h1,
+html[data-theme="light"] body.face-reading-page .face-hero-copy > strong {
+  color: #263035;
+}
+html[data-theme="light"] body.face-reading-page .face-orbit {
+  color: rgba(137, 98, 44, .72);
+}
+html[data-theme="light"] body.face-reading-page .face-reader-bar {
+  color: var(--face-ivory);
+  background:
+    radial-gradient(circle at 100% 0%, rgba(189,151,93,.14), transparent 38%),
+    linear-gradient(135deg, #fffaf3, #f4eadc);
+  box-shadow: 0 9px 26px rgba(84,65,39,.07);
+}
+html[data-theme="light"] body.face-reading-page .face-reader-heading strong {
+  color: #263035;
+}
+html[data-theme="light"] body.face-reading-page .face-reader-change {
+  border-color: rgba(130, 101, 65, .42);
+  color: #66491e;
+  background: rgba(255,255,255,.65);
+}
+html[data-theme="light"] body.face-reading-page .face-reader-change:hover {
+  border-color: #997141;
+  background: #fffdf8;
+}
+
+html[data-theme="light"] body.face-reading-page .face-workspace {
+  color: var(--face-ivory);
+  background: #fffaf4;
+  box-shadow: 0 18px 48px rgba(83,62,39,.09);
+}
+html[data-theme="light"] body.face-reading-page .face-preview-panel {
+  background:
+    radial-gradient(circle at 50% 34%, rgba(194,155,88,.07), transparent 36%),
+    linear-gradient(145deg, #09181e, #0a2027);
+}
+html[data-theme="light"] body.face-reading-page .face-preview-meta {
+  color: #c7d0cd;
+}
+html[data-theme="light"] body.face-reading-page .face-control h2,
+html[data-theme="light"] body.face-reading-page .face-status strong,
+html[data-theme="light"] body.face-reading-page .face-flow-head h2 {
+  color: #263035;
+}
+html[data-theme="light"] body.face-reading-page .face-guide-list {
+  color: #48575d;
+}
+html[data-theme="light"] body.face-reading-page .face-file-card {
+  background: #f7efe4;
+}
+html[data-theme="light"] body.face-reading-page .face-file-card strong {
+  color: #313c40;
+}
+html[data-theme="light"] body.face-reading-page .face-secondary {
+  border-color: rgba(130,101,65,.44);
+  color: #423e36;
+  background: #fffaf2;
+}
+html[data-theme="light"] body.face-reading-page .face-secondary:hover {
+  border-color: #997141;
+  background: #f6ead7;
+}
+html[data-theme="light"] body.face-reading-page .face-primary {
+  color: #202a2d;
+}
+html[data-theme="light"] body.face-reading-page .face-primary:disabled {
+  opacity: .67;
+}
+html[data-theme="light"] body.face-reading-page .face-status {
+  background: rgba(186, 149, 92, .09);
+}
+html[data-theme="light"] body.face-reading-page .face-flow-grid article {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(194,155,88,.08), transparent 42%),
+    linear-gradient(155deg, #fffaf3, #f6ebdc);
+  box-shadow: 0 8px 22px rgba(79, 61, 37, .06);
+}
+html[data-theme="light"] body.face-reading-page .face-flow-grid article > strong {
+  color: #2f3739;
+}
+
+/* Reader picker belongs to this page; the Saju picker keeps its own theme. */
+html[data-theme="light"] body.face-reading-page .reading-reader-picker {
+  color: #283136;
+  background: linear-gradient(145deg, #fffaf3, #f4e9da);
+  box-shadow: 0 30px 75px rgba(37, 31, 24, .22);
+}
+html[data-theme="light"] body.face-reading-page .reading-reader-picker::backdrop {
+  background: rgba(17, 24, 27, .42);
+}
+html[data-theme="light"] body.face-reading-page .reading-reader-picker-close {
+  color: #534735;
+  background: #f4e8d8;
+}
+html[data-theme="light"] body.face-reading-page .reading-reader-picker-intro h2,
+html[data-theme="light"] body.face-reading-page .reading-reader-option-heading strong {
+  color: #273136;
+}
+html[data-theme="light"] body.face-reading-page .reading-reader-picker-intro p,
+html[data-theme="light"] body.face-reading-page .reading-reader-option-tone,
+html[data-theme="light"] body.face-reading-page .reading-reader-picker-note {
+  color: #58646a;
+}
+html[data-theme="light"] body.face-reading-page .reading-reader-picker-target,
+html[data-theme="light"] body.face-reading-page .reading-reader-option-heading small {
+  color: #5e6870;
+}
+html[data-theme="light"] body.face-reading-page .reading-reader-option {
+  border-color: rgba(130, 101, 65, .26);
+  background: #fffaf3;
+}
+html[data-theme="light"] body.face-reading-page .reading-reader-option:hover,
+html[data-theme="light"] body.face-reading-page .reading-reader-option:focus-visible {
+  border-color: #a27d49;
+  background: #f9eddb;
+}
+html[data-theme="light"] body.face-reading-page .reading-reader-option.is-selected {
+  border-color: #96703d;
+  background: #f4e5cf;
+  box-shadow: inset 0 0 0 1px rgba(150,112,61,.18);
+}
+html[data-theme="light"] body.face-reading-page .reading-reader-option.is-selected .reading-reader-option-action,
+html[data-theme="light"] body.face-reading-page .reading-reader-option.is-selected .reading-reader-option-heading::after {
+  color: #70471c;
+}
+html[data-theme="light"] body.face-reading-page .face-reader-picker-search {
+  border-color: rgba(130, 101, 65, .36);
+  color: #283136;
+  background-color: #fffaf3;
+}
+html[data-theme="light"] body.face-reading-page .face-reader-picker-search::placeholder {
+  color: #687076;
+}
+html[data-theme="light"] body.face-reading-page .face-reader-picker-empty {
+  color: #58646a;
+}
+
+@media (max-width: 767px) {
+  html[data-theme="light"] body.face-reading-page .mobile-bottom-nav {
+    border-color: var(--face-line);
+    background: rgba(250,245,237,.98);
+  }
+  html[data-theme="light"] body.face-reading-page .mobile-nav-link {
+    color: #5d6467;
+  }
+  html[data-theme="light"] body.face-reading-page .mobile-nav-link[aria-current="page"] {
+    color: #4b351b;
+    background: #f0e3d0;
+  }
+}
