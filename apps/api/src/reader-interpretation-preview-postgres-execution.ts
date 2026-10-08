@@ -7,6 +7,7 @@ import {
   type ReaderInterpretationPreviewContextAuthorityPortV1,
   type ReaderInterpretationPreviewHttpResponseV1,
 } from './reader-interpretation-preview-http.js';
+import { assertReaderRuntimeInternalPreviewCandidateV1 } from './reader-production-rollout-policy-v1.js';
 import { createPostgresCharacterRelationshipReadAuthorityPortV1 } from './postgres-character-relationship-read.js';
 import { createPostgresCharacterStandardReadingKnowledgePortsV1 } from './postgres-character-standard-reading-knowledge.js';
 import { createPostgresChatThreadRuntimeBindingAuthorityPortV1 } from './postgres-chat-thread-runtime-binding.js';
@@ -90,6 +91,11 @@ export function executeReaderInterpretationPreviewPostgresV1(
         nonMemoryContextAuthorityPort:
           createPostgresReaderContextNonMemoryReadAuthorityPortV1(client),
         groundingProjectionPort: input.groundingProjectionPort,
+        // This entry point must apply the same server-resolved Reader tranche
+        // admission as the standalone hosted Preview wrapper. This callback is
+        // invoked only after the authoritative Thread + Reading source resolves;
+        // it is never driven by a browser Reader hint.
+        admitServerReader: assertReaderRuntimeInternalPreviewCandidateV1,
       });
     },
   });
