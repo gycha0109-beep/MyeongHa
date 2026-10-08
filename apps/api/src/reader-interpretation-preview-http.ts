@@ -240,6 +240,7 @@ export async function runReaderInterpretationPreviewHttpV1(input: {
   readonly memoryGrantsAuthorityPort: MemoryGrantsReadAuthorityPortV1;
   readonly nonMemoryContextAuthorityPort: ReaderContextLifeFactsReadAuthorityPortV1;
   readonly groundingProjectionPort: OfficialReadingCharacterGroundingProjectionPortV1;
+  readonly admitServerReader?: (serverReaderCharacterId: string) => void;
 }): Promise<ReaderInterpretationPreviewHttpResponseV1> {
   const subjectId = requireSubject(input.resolvedSubjectId);
   const effectiveAt = requireEffectiveAt(input.effectiveAt);
@@ -269,6 +270,7 @@ export async function runReaderInterpretationPreviewHttpV1(input: {
     memoryGrantsAuthorityPort: input.memoryGrantsAuthorityPort,
     nonMemoryContextAuthorityPort: input.nonMemoryContextAuthorityPort,
     groundingProjectionPort: input.groundingProjectionPort,
+    ...(input.admitServerReader ? { admitServerReader: input.admitServerReader } : {}),
   });
 
   return projectReaderInterpretationPreviewHttpResponseV1(envelope);

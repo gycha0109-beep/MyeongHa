@@ -3,7 +3,10 @@ import { createHash } from 'node:crypto';
 import {
   runReaderInterpretationPreviewHttpV1,
   type ReaderInterpretationPreviewHttpResponseV1,
-} from './reader-interpretation-preview-http.js';
+ } from './reader-interpretation-preview-http.js';
+import {
+  assertReaderRuntimeInternalPreviewCandidateV1,
+} from './reader-production-rollout-policy-v1.js';
 
 export const PRODUCTION_READER_INTERPRETATION_ACTIVATION_ENV_V1 = Object.freeze({
   mode: 'MYEONGHA_READER_INTERPRETATION_MODE',
@@ -260,5 +263,10 @@ export async function runProductionReaderInterpretationPreviewHttpV1(
   });
 
   const { activationEnv: _activationEnv, ...previewInput } = input;
-  return runReaderInterpretationPreviewHttpV1(previewInput);
+  return runReaderInterpretationPreviewHttpV1({
+    ...previewInput,
+    // Server-owned admission overrides any caller-supplied hook.
+    // Public paid Reader and non-Seyeon runtime remain held.
+    admitServerReader: assertReaderRuntimeInternalPreviewCandidateV1,
+  });
 }
