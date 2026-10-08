@@ -12,13 +12,14 @@ describe('shared CI verification plan', () => {
   });
   it('keeps multiple selected surfaces and runs their union without duplicates', () => {
     const plan = resolveVerificationPlan(['apps/web/reading-reader-picker.js', 'apps/web/records-page.js']);
-    expect(selectWebChecks(plan)).toEqual(['scripts/verify-web-saju-auth-browser.mjs', 'scripts/verify-golden-master-header-browser.mjs', 'scripts/verify-web-records-auth-browser.mjs']);
+    expect(selectWebChecks(plan)).toEqual(['scripts/verify-web-saju-auth-browser.mjs', 'scripts/verify-golden-master-header-browser.mjs', 'scripts/verify-web-general-natal-preview-browser.mjs', 'scripts/verify-web-records-auth-browser.mjs']);
   });
   it('retains every previous full browser check, including auth and birth rejection boundaries', () => {
     const plan = resolveVerificationPlan(['package-lock.json']);
     expect(plan).toMatchObject({ full: true, browser: true, contracts: true, dependencies: true, unit_full: true });
     const scripts = selectWebChecks(plan);
-    expect(scripts).toHaveLength(12);
+    expect(scripts).toHaveLength(13);
+    expect(scripts).toContain('scripts/verify-web-general-natal-preview-browser.mjs');
     expect(scripts).toContain('scripts/run-web-auth-browser-smoke.mjs');
     expect(scripts).toContain('scripts/run-web-auth-confirmation-browser-smoke.mjs');
     expect(scripts).toContain('scripts/run-web-birth-session-browser-smoke-v2.mjs');
