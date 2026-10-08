@@ -145,6 +145,38 @@ function assertBundleContainsSeyeon(
 
 
 
+type SeyeonTurnRuntimePhaseV1 =
+  | 'subject_resolution'
+  | 'thread_binding'
+  | 'content_manifest'
+  | 'chat_execution';
+
+async function runSeyeonTurnRuntimePhaseV1<T>(
+  stage: SeyeonTurnRuntimePhaseV1,
+  action: () => Promise<T>,
+): Promise<T> {
+  try {
+    return await action();
+  } catch (error) {
+    const rawCode = typeof error === 'object' && error !== null && 'code' in error
+      ? (error as { code?: unknown }).code
+      : null;
+    const sqlState = typeof rawCode === 'string' && /^[A-Z0-9]{5}$/u.test(rawCode)
+      ? rawCode
+      : null;
+    console.error(
+      'MYEONGHA_SEYEON_TURN_RUNTIME_DIAGNOSTIC ' +
+      JSON.stringify({
+        schemaVersion: 'myeongha-seyeon-turn-runtime-diagnostic-v1',
+        stage,
+        errorName: error instanceof Error ? error.name : 'UnknownError',
+        sqlState,
+      }),
+    );
+    throw error;
+  }
+}
+
 export function createProductionSeyeonChatRuntimeV1(
   input: CreateProductionSeyeonChatRuntimeInputV1,
 ): ProductionSeyeonChatRuntimeV1 {
@@ -174,23 +206,32 @@ export function createProductionSeyeonChatRuntimeV1(
           pool: poolLease.pool,
           verifiedEvidence: runInput.verifiedEvidence,
         });
-      const resolvedSubject = await runner.resolveSubject();
+      const resolvedSubject = await runSeyeonTurnRuntimePhaseV1(
+        'subject_resolution',
+        () => runner.resolveSubject(),
+      );
       const ports = createSeyeonProductionTransactionalPortsV1({
         subjectId: resolvedSubject.subjectId,
         runner,
       });
 
-      const threadBinding = await getChatThreadRuntimeBinding({
-        resolvedSubjectId: resolvedSubject.subjectId,
-        threadId,
-        authorityPort: ports.threadBinding,
-      });
+      const threadBinding = await runSeyeonTurnRuntimePhaseV1(
+        'thread_binding',
+        () => getChatThreadRuntimeBinding({
+          resolvedSubjectId: resolvedSubject.subjectId,
+          threadId,
+          authorityPort: ports.threadBinding,
+        }),
+      );
       assertDogfoodThread(threadBinding);
 
-      const bundleManifest = await getContentBundleManifest({
-        contentBundleId: threadBinding.activeContentBundleId,
-        authorityPort: ports.bundleManifest,
-      });
+      const bundleManifest = await runSeyeonTurnRuntimePhaseV1(
+        'content_manifest',
+        () => getContentBundleManifest({
+          contentBundleId: threadBinding.activeContentBundleId,
+          authorityPort: ports.bundleManifest,
+        }),
+      );
       assertBundleContainsSeyeon(bundleManifest);
 
       const trustedThread = Object.freeze({
@@ -230,8 +271,9 @@ export function createProductionSeyeonChatRuntimeV1(
 
       const ledger = new InMemorySeyeonEventLedgerV2();
 
-      const execution =
-        await runSeyeonProductionChatExecutionV1({
+      const execution = await runSeyeonTurnRuntimePhaseV1(
+        'chat_execution',
+        () => runSeyeonProductionChatExecutionV1({
           mode: 'WRITE_DARK',
           resolvedSubjectId: resolvedSubject.subjectId,
           threadId,
@@ -262,7 +304,8 @@ export function createProductionSeyeonChatRuntimeV1(
             executionMode: 'DEFERRED',
             semanticRelevanceByEventId: Object.freeze({}),
           }),
-        });
+        }),
+      );
 
       return Object.freeze({
         runtimeVersion: PRODUCTION_SEYEON_CHAT_RUNTIME_VERSION_V1,
