@@ -35,7 +35,7 @@ import type {
 export const SEYEON_PRODUCTION_GOVERNANCE_VERSION_V1 =
   'seyeon-production-governance-v1' as const;
 
-const INTEGRITY_CLASSIFICATION_RESPONSE_SCHEMA_V1 = Object.freeze({
+export const INTEGRITY_CLASSIFICATION_RESPONSE_SCHEMA_V1 = Object.freeze({
   type: 'object',
   additionalProperties: false,
   required: ['claims'],
@@ -57,7 +57,7 @@ const INTEGRITY_CLASSIFICATION_RESPONSE_SCHEMA_V1 = Object.freeze({
   },
 } as const);
 
-const DISCLOSURE_CLASSIFICATION_RESPONSE_SCHEMA_V1 = Object.freeze({
+export const DISCLOSURE_CLASSIFICATION_RESPONSE_SCHEMA_V1 = Object.freeze({
   type: 'object',
   additionalProperties: false,
   required: ['topicKey', 'questionContext'],
