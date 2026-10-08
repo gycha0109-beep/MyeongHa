@@ -302,6 +302,12 @@
       "mainMode": "narrow",
       "workTrackAttribution": "pr-metadata"
     },
+    "seyeon-dialogue-path-real-api-eval-v1.yml": {
+      "responsibility": "production-character-model-evaluation",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
     "seyeon-first-meeting-live-main-bridge.yml": {
       "responsibility": "production-character-dogfood",
       "prMode": "none",
@@ -320,8 +326,20 @@
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "commit-metadata"
     },
+    "seyeon-model-eval-v1.yml": {
+      "responsibility": "production-character-model-evaluation",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
     "seyeon-production-publication-v1.yml": {
       "responsibility": "production-character-publication",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
+    "seyeon-unified-shadow-v1.yml": {
+      "responsibility": "production-character-model-evaluation",
       "prMode": "none",
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "commit-metadata"
@@ -349,18 +367,6 @@
       "prMode": "required-router",
       "mainMode": "none",
       "workTrackAttribution": "pr-metadata"
-    },
-    "seyeon-model-eval-v1.yml": {
-      "responsibility": "production-character-model-evaluation",
-      "prMode": "none",
-      "mainMode": "one-shot-trigger",
-      "workTrackAttribution": "commit-metadata"
-    },
-    "seyeon-unified-shadow-v1.yml": {
-      "responsibility": "production-character-model-evaluation",
-      "prMode": "none",
-      "mainMode": "one-shot-trigger",
-      "workTrackAttribution": "commit-metadata"
     }
   }
 }
