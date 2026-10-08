@@ -209,6 +209,21 @@ messageInput?.addEventListener('input', () => {
   messageInput.style.height = `${Math.min(messageInput.scrollHeight, 120)}px`;
 });
 
+let messageCompositionActive = false;
+messageInput?.addEventListener('compositionstart', () => { messageCompositionActive = true; });
+messageInput?.addEventListener('compositionend', () => { messageCompositionActive = false; });
+
+messageInput?.addEventListener('keydown', (event) => {
+  if (event.key !== 'Enter' || event.shiftKey || event.ctrlKey || event.altKey || event.metaKey) return;
+  // The Enter key can commit an active Korean/other IME composition.
+  // It must never submit a partially composed message.
+  if (event.isComposing || messageCompositionActive || event.keyCode === 229) return;
+
+  event.preventDefault();
+  if (!messageInput.value.trim()) return;
+  composer?.requestSubmit();
+});
+
 composer?.addEventListener('submit', (event) => {
   event.preventDefault();
   const value = messageInput?.value.trim() ?? '';
