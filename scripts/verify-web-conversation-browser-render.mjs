@@ -369,6 +369,69 @@ async function verifyRoom(page, origin, suffix, width, height, mobile) {
   );
   assert(state.contextHidden && state.threadHidden, `${suffix}: unverified continuation context became visible`);
   assert(['auto', 'scroll'].includes(state.streamOverflow), `${suffix}: conversation stream is not scrollable`);
+  await waitFor(page, 'Boolean(window.MyeongHaCharacterRoom && document.querySelector("[data-message-input]"))',
+    `${suffix}: message composer runtime did not mount`);
+  const keyboard = await page.evaluate(`(() => {
+    const textarea = document.querySelector('[data-message-input]');
+    const composer = document.querySelector('[data-composer]');
+    const submitButton = composer?.querySelector('button[type="submit"]');
+    const sent = [];
+    composer.addEventListener('myeongha:chat-submit', (event) => {
+      // Capture the normal form submit contract without sending a network request.
+      event.preventDefault();
+      event.stopPropagation();
+      sent.push(event.detail?.message);
+    });
+    const key = (init) => {
+      const event = new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Enter', ...init });
+      textarea.dispatchEvent(event);
+      return event.defaultPrevented;
+    };
+
+    textarea.value = '엔터 전송';
+    const plainPrevented = key({});
+    const plainSent = [...sent];
+
+    textarea.value = '첫 줄\\n둘째 줄';
+    const shiftPrevented = key({ shiftKey: true });
+    const shiftSentCount = sent.length;
+
+    textarea.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+    const composingPrevented = key({});
+    textarea.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true }));
+    const nativeComposingPrevented = key({ isComposing: true });
+    const composingSentCount = sent.length;
+
+    textarea.value = '다중 줄\\n전송';
+    const finalPrevented = key({});
+    const finalSent = [...sent];
+
+    textarea.value = '버튼 전송';
+    submitButton?.click();
+    const buttonSent = [...sent];
+
+    textarea.value = '   ';
+    const emptyPrevented = key({});
+    return {
+      plainPrevented, plainSent, shiftPrevented, shiftSentCount,
+      composingPrevented, nativeComposingPrevented, composingSentCount,
+      finalPrevented, finalSent, buttonSent, emptyPrevented, sent,
+      hasSubmitButton: Boolean(submitButton),
+    };
+  })()`);
+  assert(keyboard.plainPrevented && keyboard.plainSent.length === 1 && keyboard.plainSent[0] === '엔터 전송',
+    `${suffix}: Enter must submit exactly one message`);
+  assert(!keyboard.shiftPrevented && keyboard.shiftSentCount === 1,
+    `${suffix}: Shift+Enter must retain native newline behavior without submit`);
+  assert(!keyboard.composingPrevented && !keyboard.nativeComposingPrevented && keyboard.composingSentCount === 1,
+    `${suffix}: Enter during IME composition must not submit`);
+  assert(keyboard.finalPrevented && keyboard.finalSent.length === 2 && keyboard.finalSent[1] === '다중 줄\\n전송',
+    `${suffix}: plain Enter must send multiline text unchanged`);
+  assert(keyboard.hasSubmitButton && keyboard.buttonSent.length === 3 && keyboard.buttonSent[2] === '버튼 전송',
+    `${suffix}: send button must retain native submit behavior`);
+  assert(keyboard.emptyPrevented && keyboard.sent.length === 3,
+    `${suffix}: blank Enter must not submit`);
+
   if (mobile) assert(state.globalHeaderDisplay === 'none', `${suffix}: desktop product header should be hidden in mobile room`);
   await page.screenshot(fileURLToPath(new URL(`../artifacts/${artifactPrefix}-${suffix}.png`, import.meta.url)));
 
