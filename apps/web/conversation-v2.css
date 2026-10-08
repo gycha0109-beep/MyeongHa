@@ -1365,3 +1365,146 @@ html[data-theme="dark"] body.character-room-v2[data-character="seyeon"] .convers
     background-repeat: no-repeat;
   }
 }
+
+/* Conversation hub: discovery leads when no owner-scoped thread projection
+ * exists. A missing server connection must never masquerade as zero threads. */
+body.chat-hub-page .chat-hub-shell[data-chat-hub-state="unavailable"] .conversation-people,
+body.chat-hub-page .chat-hub-shell[data-chat-hub-state="verified_empty"] .conversation-people {
+  margin-top: 0;
+}
+
+body.chat-hub-page .conversation-people {
+  scroll-margin-top: 96px;
+  padding: clamp(20px, 3vw, 32px);
+}
+
+body.chat-hub-page .conversation-people .chat-people-heading {
+  align-items: center;
+  gap: 24px;
+  padding-bottom: 24px;
+}
+
+body.chat-hub-page .conversation-people .chat-people-heading h2 {
+  font-size: clamp(25px, 2.5vw, 34px);
+  line-height: 1.25;
+}
+body.chat-hub-page .conversation-people .chat-people-heading h2 > span[hidden] {
+  display: none !important;
+}
+body.chat-hub-page .conversation-people .chat-people-star {
+  margin-left: 9px;
+  color: var(--conversation-brass);
+  font-size: .5em;
+  vertical-align: 15%;
+}
+body.chat-hub-page .conversation-people .chat-people-heading p {
+  max-width: 610px;
+  line-height: 1.7;
+}
+body.chat-hub-page .conversation-people .chat-person-card {
+  min-height: 205px;
+  background: color-mix(in srgb, var(--mh-paper-raised) 78%, transparent);
+}
+body.chat-hub-page .conversation-people .chat-person-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+body.chat-hub-page .conversation-people .chat-person-action {
+  margin-top: auto;
+  padding-top: 3px;
+}
+
+body.chat-hub-page .conversation-hub-status {
+  padding: 12px 18px;
+  gap: 10px;
+  margin-top: 14px;
+  border-color: color-mix(in srgb, var(--mh-brass) 22%, transparent);
+  background: color-mix(in srgb, var(--mh-paper-raised) 66%, transparent);
+  box-shadow: none;
+}
+body.chat-hub-page .conversation-hub-status .conversation-memory-mark {
+  width: 28px;
+  height: 28px;
+  font-size: 12px;
+  flex: 0 0 28px;
+}
+body.chat-hub-page .conversation-hub-status p,
+body.chat-hub-page .conversation-hub-verified-empty {
+  color: var(--mh-ink-muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
+body.chat-hub-page .conversation-hub-verified-empty {
+  margin: 14px 0 0;
+  padding: 14px 18px;
+  border: 1px solid var(--mh-line);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--mh-paper-raised) 66%, transparent);
+}
+body.chat-hub-page .chat-hub-shell[data-chat-hub-state="active"] .conversation-primary {
+  margin-bottom: 0;
+}
+body.chat-hub-page .chat-hub-shell[data-chat-hub-state="active"] .conversation-people {
+  margin-top: 26px;
+}
+
+/* The whole discovery card adapts to the selected global theme instead of
+ * keeping a pale sheet on a dark product shell. Character portraits are unchanged. */
+html[data-theme="dark"] body.chat-hub-page .conversation-people {
+  border-color: rgba(191, 154, 100, .22);
+  background: rgba(17, 28, 34, .84);
+}
+html[data-theme="dark"] body.chat-hub-page .conversation-people .chat-people-heading h2,
+html[data-theme="dark"] body.chat-hub-page .conversation-people .chat-person-title-row h3 {
+  color: #f2e8d9;
+}
+html[data-theme="dark"] body.chat-hub-page .conversation-people .chat-people-heading p,
+html[data-theme="dark"] body.chat-hub-page .conversation-people .chat-person-line {
+  color: #c5bbb0;
+}
+html[data-theme="dark"] body.chat-hub-page .conversation-people .chat-person-card {
+  border-color: rgba(191, 154, 100, .24);
+  background: rgba(29, 40, 46, .9);
+}
+html[data-theme="dark"] body.chat-hub-page .conversation-people .chat-person-action {
+  color: #d5ab6c;
+}
+html[data-theme="dark"] body.chat-hub-page .conversation-people .chat-search {
+  border-color: rgba(191, 154, 100, .35);
+  background: rgba(11, 21, 26, .45);
+}
+html[data-theme="dark"] body.chat-hub-page .conversation-people .chat-search input {
+  color: #f1e8dc;
+}
+html[data-theme="dark"] body.chat-hub-page .conversation-hub-status,
+html[data-theme="dark"] body.chat-hub-page .conversation-hub-verified-empty {
+  border-color: rgba(191, 154, 100, .25);
+  background: rgba(17, 28, 34, .75);
+}
+html[data-theme="dark"] body.chat-hub-page .conversation-hub-status p,
+html[data-theme="dark"] body.chat-hub-page .conversation-hub-verified-empty {
+  color: #b8b4ad;
+}
+
+@media (max-width: 900px) {
+  body.chat-hub-page .conversation-people .chat-people-heading {
+    align-items: stretch;
+  }
+}
+@media (max-width: 640px) {
+  body.chat-hub-page .conversation-people { padding: 18px 14px; }
+  body.chat-hub-page .conversation-people .chat-people-heading {
+    gap: 14px;
+    padding-bottom: 17px;
+  }
+  body.chat-hub-page .conversation-people .chat-people-heading h2 {
+    font-size: 24px;
+  }
+  body.chat-hub-page .conversation-people .chat-person-card {
+    min-height: 182px;
+  }
+  body.chat-hub-page .conversation-hub-status {
+    padding: 11px 13px;
+  }
+}
