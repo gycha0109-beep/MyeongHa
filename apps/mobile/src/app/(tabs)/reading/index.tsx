@@ -4,6 +4,8 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 
 import { mobileBirthServiceV1 } from '@/features/birth/native-mobile-birth-service';
 import { ReadingSubnav } from '@/features/reading/ReadingSubnav';
+import { MobileReaderPicker } from '@/features/reading/MobileReaderPicker';
+import type { MobileReaderPresentationIdV1 } from '@/features/reading/mobile-reader-presentation';
 import {
   BirthSummaryCard,
   CalculationCompleteness,
@@ -37,6 +39,7 @@ function errorCopy(state: Exclude<MobileSajuLoadStateV1, { kind: 'birth_required
 
 export default function SajuScreen() {
   const [state, setState] = useState<ScreenState>({ kind: 'loading' });
+  const [presentationReader, setPresentationReader] = useState<MobileReaderPresentationIdV1>('seyeon');
 
   const load = useCallback(async () => {
     setState({ kind: 'loading' });
@@ -99,6 +102,7 @@ export default function SajuScreen() {
           <DayMasterCard dayMaster={viewModel.dayMaster} />
           <ElementBalance elementBalance={viewModel.elementBalance} />
           <CalculationCompleteness completeness={viewModel.completeness} />
+          <MobileReaderPicker selected={presentationReader} onChange={setPresentationReader} vertical="saju" />
           <SajuPreviewReadingView />
         </>
       ) : null}

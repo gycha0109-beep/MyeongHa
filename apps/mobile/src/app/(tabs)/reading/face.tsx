@@ -17,6 +17,8 @@ import {
   pickMobileFaceMediaFromLibraryV1,
 } from '@/platform/media/expo-face-media-picker';
 import { ReadingSubnav } from '@/features/reading/ReadingSubnav';
+import { MobileReaderPicker } from '@/features/reading/MobileReaderPicker';
+import { findMobileReaderPresentationV1, type MobileReaderPresentationIdV1 } from '@/features/reading/mobile-reader-presentation';
 import { MobileScreen } from '@/ui/MobileScreen';
 import { mobileColors } from '@/ui/mobile-colors';
 
@@ -34,6 +36,8 @@ function sizeLabel(bytes: number | null): string {
 
 export default function FaceScreen() {
   const [state, setState] = useState<FaceMediaStateV1>({ kind: 'idle' });
+  const [presentationReader, setPresentationReader] = useState<MobileReaderPresentationIdV1>('seyeon');
+  const readerPresentation = findMobileReaderPresentationV1(presentationReader);
 
   async function choose(
     source: 'camera' | 'library',
@@ -76,11 +80,12 @@ export default function FaceScreen() {
       description="정면 사진을 준비하고, 얼굴 구조 확인 단계까지 안전하게 이어갑니다."
     >
       <ReadingSubnav />
+      <MobileReaderPicker selected={presentationReader} onChange={setPresentationReader} vertical="face" />
 
       <View style={styles.hero}>
         <View>
           <Text style={styles.kicker}>01 · 사진 준비</Text>
-          <Text style={styles.heroTitle}>얼굴이 잘 보이는 사진을 준비해 주세요.</Text>
+          <Text style={styles.heroTitle}>{readerPresentation.name}에게 보여줄 정면 사진을 준비해 주세요.</Text>
         </View>
         <Text style={styles.body}>
           얼굴 전체가 프레임 안에 들어오고, 정면에 가깝고, 흔들림과 과도한 필터가 적은 사진이 좋습니다.
@@ -154,7 +159,7 @@ export default function FaceScreen() {
         <Text style={styles.statusMark}>◇</Text>
         <View style={styles.statusCopy}>
           <Text style={styles.statusTitle}>
-            {ready === null ? '관상 보기 준비' : '사진 준비 완료'}
+            {ready === null ? `${readerPresentation.name}과 관상 보기 준비` : '사진 준비 완료'}
           </Text>
           <Text style={styles.body}>
             현재 모바일에서는 사진 촬영·선택과 기기 내 미리보기까지만 제공합니다. 서버 분석은 시작하지 않습니다.
