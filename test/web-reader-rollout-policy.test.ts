@@ -38,15 +38,18 @@ describe('Reader staged rollout: one Preview presentation candidate, shared nine
   });
 
   it('keeps the web UI and deep links aligned on release candidates', async () => {
-    const [picker, scene, html, css] = await Promise.all([
+    const [picker, shared, scene, html, css] = await Promise.all([
       read('apps/web/reading-reader-picker.js'),
+      read('apps/web/reader-picker-dialog.js'),
       read('apps/web/reading-character.js'),
       read('apps/web/reading-detail.html'),
       read('apps/web/reading-reader-picker.css'),
     ]);
     expect(picker).toContain('readerRolloutPresentationV1(reader.key)');
-    expect(picker).toContain('button.disabled = !rollout.previewSelectable');
-    expect(picker).toContain('readerRolloutPresentationV1(readerKey).previewSelectable');
+    expect(picker).toContain('selectable: rollout.previewSelectable');
+    expect(shared).toContain('button.disabled = optionState.selectable === false;');
+    expect(shared).toContain('if (!(button instanceof HTMLButtonElement) || button.disabled) return;');
+    expect(picker).toContain('readerRolloutPresentationV1(reader.key).previewSelectable');
     expect(picker).toContain('현재 세연만 프리뷰 장면을 선택할 수 있습니다.');
     expect(scene).toContain('resolveReaderPresentationCandidateV1(normalizedReader)');
     expect(scene).toContain("const requestedReader = params.get('character') || params.get('reader') || 'seyeon'");
