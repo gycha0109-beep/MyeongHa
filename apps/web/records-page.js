@@ -122,12 +122,70 @@ function renderProfile(payload) {
   byId('records-subject-kind').textContent = kind;
 }
 
-function renderBirthProfileUnavailable() {
+function renderBirthProfileUnavailable(message = '현재 출생 정보를 불러오지 못했습니다. 확인되지 않은 정보는 대신 보여드리지 않습니다.') {
   const target = byId('birth-records-list');
   clear(target);
   const card = textElement('article', 'panel side-card', '');
-  card.append(textElement('h3', '', '아직 표시할 명식록이 없습니다.'));
-  card.append(textElement('p', 'muted', '저장된 명식을 이 화면에서 확인할 수 있게 되면 이곳에 표시됩니다. 확인되지 않은 정보는 대신 보여드리지 않습니다.'));
+  card.append(textElement('h3', '', '출생 정보 확인'));
+  card.append(textElement('p', 'muted', message));
+  target.append(card);
+}
+
+function renderCurrentBirthProfile(birth) {
+  if (birth?.status !== 'ready') {
+    renderBirthProfileUnavailable();
+    return;
+  }
+
+  const target = byId('birth-records-list');
+  const profile = birth.payload?.birthProfile;
+  if (profile === null) {
+    clear(target);
+    const card = textElement('article', 'panel side-card', '');
+    card.append(textElement('h3', '', '아직 등록된 출생 정보가 없습니다.'));
+    card.append(textElement('p', 'muted', '현재 계정의 본인 출생 정보가 저장되면 이곳에 표시됩니다.'));
+    const link = textElement('a', 'records-birth-link', '출생 정보 입력하기 →');
+    link.href = 'birth.html';
+    card.append(link);
+    target.append(card);
+    return;
+  }
+  if (!profile || !profile.currentRevision?.input) {
+    renderBirthProfileUnavailable();
+    return;
+  }
+
+  const { revisionNo, input } = profile.currentRevision;
+  const calendar = input.calendarType === 'solar'
+    ? '양력'
+    : input.isLeapMonth ? '음력 · 윤달' : '음력';
+  const birthTime = input.timeKnown ? input.birthTime.slice(0, 5) : '시간 모름';
+  const sex = {
+    male: '남성',
+    female: '여성',
+    unspecified: '미지정',
+  }[input.sex] ?? '미입력';
+
+  clear(target);
+  const card = textElement('article', 'panel side-card records-birth-card', '');
+  card.append(textElement('h3', '', '현재 등록된 출생 정보'));
+  card.append(textElement('p', 'records-birth-description',
+    '서버가 확인한 현재 본인 출생 정보입니다. 과거 수정 이력이나 사주 풀이 결과가 아닙니다.'));
+
+  const facts = document.createElement('dl');
+  facts.className = 'records-birth-facts';
+  for (const [title, value] of [
+    ['생년월일', input.birthDate.replaceAll('-', '.')],
+    ['태어난 시간', birthTime],
+    ['달력 기준', calendar],
+    ['성별 정보', sex],
+  ]) {
+    const row = document.createElement('div');
+    row.append(textElement('dt', '', title), textElement('dd', '', value));
+    facts.append(row);
+  }
+  card.append(facts);
+  card.append(textElement('span', 'records-birth-revision', `현재 입력 · revision ${revisionNo}`));
   target.append(card);
 }
 
@@ -385,7 +443,7 @@ async function boot() {
   try {
     const records = await createRecordsRuntimeClient().readRecords();
     renderProfile(records.profile);
-    renderBirthProfileUnavailable();
+    renderCurrentBirthProfile(records.birth);
     renderLifeFacts(records.lifeFacts);
     renderSajuReadings(records.readings, records.lifeFacts);
     renderMemories(records.memories);

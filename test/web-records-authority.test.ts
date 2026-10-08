@@ -32,7 +32,7 @@ describe('web records authority boundary', () => {
     expect(client).toContain("lifeFacts: '/api/life-record'");
     expect(client).toContain("memories: '/api/memories'");
     expect(client).not.toContain('/v1/');
-    expect(client).not.toContain('birthProfile:');
+    expect(client).toContain("birthProfile: '/api/me/birth-profile'");
     expect(client).not.toContain('subjectId=');
     expect(client).not.toContain('authUserId');
     expect(client).toContain("credentials: 'same-origin'");
@@ -45,11 +45,15 @@ describe('web records authority boundary', () => {
     expect(client).toContain('WebApiEnvelopeError');
   });
 
-  it('does not invent a current Birth Profile locator route', () => {
-    expect(client).not.toContain('birth-profile');
-    expect(client).not.toContain('readBirthProfile');
-    expect(page).toContain('function renderBirthProfileUnavailable()');
+  it('uses the verified current-self Birth Profile endpoint without inventing prior revisions', () => {
+    expect(client).toContain("birthProfile: '/api/me/birth-profile'");
+    expect(client).toContain("import { assertBirthProfile } from './my-runtime-client.js'");
+    expect(client).toContain("readOptionalCurrentBirthProfile(fetchImpl, endpoints.birthProfile, bearer)");
+    expect(page).toContain('function renderCurrentBirthProfile(birth)');
+    expect(page).toContain('renderCurrentBirthProfile(records.birth)');
+    expect(page).toContain('function renderBirthProfileUnavailable(');
     expect(page).toContain('확인되지 않은 정보는 대신 보여드리지 않습니다.');
+    expect(page).toContain('과거 수정 이력이나 사주 풀이 결과가 아닙니다.');
   });
 
   it('fails closed for missing session, failed transport, malformed JSON, and malformed envelopes', () => {

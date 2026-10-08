@@ -61,7 +61,7 @@ function assertProfile(payload) {
   return payload;
 }
 
-function assertBirthProfile(payload) {
+export function assertBirthProfile(payload) {
   if (!isRecord(payload) || !Object.prototype.hasOwnProperty.call(payload, 'birthProfile')) {
     malformed('WEB_MY_MALFORMED_BIRTH_PROFILE', 'Birth Profile API returned a malformed payload.');
   }
