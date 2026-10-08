@@ -31,6 +31,24 @@ describe('Seyeon unified preflight shadow-only contract', () => {
     expect(result.disclosure.topicKey).toBeNull();
   });
 
+  it('preserves Korean omitted-subject breakup boundary as a prompt contract (not a model-quality PASS)', async () => {
+    const { classifier, generate } = shadow({
+      claims: [], topicKey: null, questionContext: 'casual_curiosity',
+    });
+    await classifier.classify({ characterId: 'seyeon', userText: '헤어질 때 무슨 대화를 나눴어?' });
+    const request = generate.mock.calls[0]?.[0] as {
+      readonly instructions: string;
+      readonly input: { readonly userText: string };
+    };
+    expect(request.input.userText).toBe('헤어질 때 무슨 대화를 나눴어?');
+    expect(request.instructions).toContain('Korean may omit an explicit subject');
+    expect(request.instructions).toContain('classify past_romance_detail');
+    expect(request.instructions).toContain('the user own breakup');
+    expect(request.instructions).toContain('a movie or fictional character');
+    expect(request.instructions).toContain('unverified SHARED_EVENT_CLAIM');
+    expect(request.instructions).toContain('existing server disclosure and integrity authorities remain final');
+  });
+
   it('fails closed on unknown sensitive topics or claim kinds', async () => {
     const badTopic = shadow({ claims: [], topicKey: 'injected-secret', questionContext: 'casual_curiosity' });
     await expect(badTopic.classifier.classify({ characterId: 'seyeon', userText: '가족?' }))
