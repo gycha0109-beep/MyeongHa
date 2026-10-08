@@ -5,7 +5,7 @@ import {
 } from '../apps/api/src/seyeon-unified-preflight-shadow-v1.js';
 
 function shadow(raw: unknown) {
-  const generate = vi.fn(async () => raw);
+  const generate = vi.fn(async (_request: unknown) => raw);
   return {
     classifier: createSeyeonUnifiedPreflightShadowV1({
       providerKey: 'test-only', modelKey: 'test-only', generate,
