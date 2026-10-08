@@ -1,7 +1,14 @@
 import { resolveReadingDetailRoute } from './reading-detail-route.js';
 import { resolveSajuButtonEngineRequest } from './reading-saju-engine-request.js';
 import { isBrowserSajuPreviewDeliveryV1 } from './saju-preview-response-admission.js';
-import { getActiveBearer, invalidateGuestSession, invalidateMemberSession } from './product-auth.js';
+import {
+  getActiveBearer, invalidateGuestSession, invalidateMemberSession,
+  readMemberSession, readGuestBearer, PRODUCT_AUTH_STORAGE_V1,
+} from './product-auth.js';
+import {
+  captureReadingResponseOwnerV1,
+  isReadingResponseOwnerCurrentV1,
+} from './reading-response-owner-guard.js';
 import { parsePersistedReadingHandoffV1 } from './reading-history-handoff.js';
 import { parseOfficialReadingRecordPayloadV1 } from './official-reading-record-contract.js';
 import { resolveReaderPresentationCandidateV1 } from './reader-rollout-policy.js';
@@ -137,6 +144,70 @@ document.querySelectorAll('[data-reader-hanja]').forEach((element) => {
 
 const portrait = document.querySelector('[data-reader-portrait]');
 if (portrait) portrait.setAttribute('aria-label', `${reader.name} 사주 읽기 장면`);
+
+let activeReadingOwner = null;
+
+function currentReadingOwnerEvidence() {
+  return { memberSession: readMemberSession(), guestCredential: readGuestBearer() };
+}
+
+function captureActiveReadingOwner(credential) {
+  const evidence = currentReadingOwnerEvidence();
+  return captureReadingResponseOwnerV1(
+    credential, evidence.memberSession, evidence.guestCredential,
+  );
+}
+
+function isCurrentReadingOwner(owner) {
+  const evidence = currentReadingOwnerEvidence();
+  return isReadingResponseOwnerCurrentV1(
+    owner, evidence.memberSession, evidence.guestCredential,
+  );
+}
+
+function renderReadingAccountChanged() {
+  activeReadingOwner = null;
+  if (persistedReadingHandoff.state === 'ready') {
+    renderPersistedReadingFailure(
+      '계정 또는 세션이 변경되었습니다.',
+      '이전 계정의 공식 풀이를 표시하지 않습니다. 현재 계정의 기록에서 다시 열어 주세요.',
+      'persisted_record_session_changed',
+    );
+  } else if (previewEligible) {
+    renderPreviewFailure(
+      '계정 또는 세션이 변경되었습니다.',
+      '이전 세션의 사주 프리뷰를 표시하지 않습니다. 사주 페이지에서 다시 시작해 주세요.',
+      'preview_session_changed',
+    );
+  }
+}
+
+function ensureResponseOwnerCurrent(owner) {
+  try {
+    if (isCurrentReadingOwner(owner)) return true;
+  } catch {
+    // If browser session evidence is unreadable, do not show the old result.
+  }
+  renderReadingAccountChanged();
+  return false;
+}
+
+function onReadingAuthChanged() {
+  if (activeReadingOwner === null) return;
+  try {
+    if (isCurrentReadingOwner(activeReadingOwner)) return;
+  } catch {
+    // Unreadable browser session evidence is treated as a changed session.
+  }
+  renderReadingAccountChanged();
+}
+
+window.addEventListener(PRODUCT_AUTH_STORAGE_V1.changedEvent, onReadingAuthChanged);
+window.addEventListener('storage', (event) => {
+  if (event.key === null || event.key === PRODUCT_AUTH_STORAGE_V1.memberSession) {
+    onReadingAuthChanged();
+  }
+});
 
 function scopeDisplay(scope) {
   if (scope === 'year') return `${currentYear}년 · 올해`;
@@ -598,6 +669,13 @@ async function loadPersistedReading() {
     return;
   }
 
+  const owner = captureActiveReadingOwner(activeBearer);
+  if (owner === null) {
+    renderReadingAccountChanged();
+    return;
+  }
+  activeReadingOwner = owner;
+
   try {
     const endpoint = new URL(OFFICIAL_READING_RECORD_ENDPOINT, window.location.origin);
     endpoint.searchParams.set('readingId', persistedReadingHandoff.readingId);
@@ -611,6 +689,7 @@ async function loadPersistedReading() {
       cache: 'no-store',
     });
     const payload = await readJson(response);
+    if (!ensureResponseOwnerCurrent(owner)) return;
 
     if (response.status === 401) {
       invalidateActiveBearer(activeBearer);
@@ -693,6 +772,13 @@ async function loadPreviewReading() {
     return;
   }
 
+  const owner = captureActiveReadingOwner(activeBearer);
+  if (owner === null) {
+    renderReadingAccountChanged();
+    return;
+  }
+  activeReadingOwner = owner;
+
   try {
     const response = await fetch(SAJU_PREVIEW_READING_ENDPOINT, {
       method: 'POST',
@@ -706,6 +792,7 @@ async function loadPreviewReading() {
       body: JSON.stringify({ readingText: engineRequest.readingText }),
     });
     const payload = await readJson(response);
+    if (!ensureResponseOwnerCurrent(owner)) return;
 
     if (response.status === 401) {
       invalidateActiveBearer(activeBearer);
