@@ -25,9 +25,9 @@ export default function ChatHubScreen() {
     >
       <View style={styles.card}>
         <Text style={styles.kicker}>CONTINUE</Text>
-        <Text style={styles.title}>기존 대화 읽기</Text>
+        <Text style={styles.title}>이어지는 대화</Text>
         <Text style={styles.body}>
-          기존 대화로 연결되는 링크가 있으면 해당 대화의 메시지 기록을 읽기 전용으로 엽니다.
+          웹과 앱에서 같은 회원 계정으로 대화방을 열면 서버에 보관된 대화를 이어서 볼 수 있습니다.
         </Text>
         <Text style={styles.note}>
           최근 대화 목록은 아직 서버에서 제공하지 않아 이 화면에서 임의로 만들지 않습니다.
@@ -111,7 +111,7 @@ export default function ChatHubScreen() {
       <View style={styles.memoryNote}>
         <Text style={styles.memoryMark}>◇</Text>
         <Text style={styles.memoryCopy}>
-          메시지 보내기는 아직 열지 않습니다. 새 대화를 열어도 현재 모바일 화면은 서버 기록을 읽는 범위만 제공합니다.
+          9명 모두 캐릭터를 선택해 대화방을 열 수 있습니다. 세연은 실제 AI 대화가 가능하며, 다른 8명의 답변 기능은 준비 중입니다.
         </Text>
       </View>
     </MobileScreen>

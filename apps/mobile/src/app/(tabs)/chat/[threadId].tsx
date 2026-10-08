@@ -1,12 +1,16 @@
 import { parseChatThreadIdV1 } from '@myeongha/api-client';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ImageBackground, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useRef } from 'react';
+import {
+  ImageBackground, KeyboardAvoidingView, Platform, Pressable,
+  SafeAreaView, ScrollView, StyleSheet, Text, View,
+} from 'react-native';
 
 import {
+  ChatComposer,
   ChatReadHeader,
   ChatReadMessages,
   ChatReadMore,
-  ChatSendPending,
 } from '@/features/chat/ChatReadComponents';
 import { useMobileChatThreadV1 } from '@/features/chat/use-mobile-chat-thread';
 import { mobileColors } from '@/ui/mobile-colors';
@@ -23,18 +27,41 @@ function resolveThreadId(value: string | string[] | undefined): string | null {
 }
 
 function ValidChatThread({ threadId }: { threadId: string }) {
-  const { snapshot, loadMore } = useMobileChatThreadV1(threadId);
+  const { snapshot, loadMore, draft, setDraft, sending, sendStatus, send } =
+    useMobileChatThreadV1(threadId);
+  const scrollRef = useRef<ScrollView>(null);
   const isSeyeonTheme = snapshot.characterId === 'seyeon';
+
   const threadContent = (
-    <ScrollView contentContainerStyle={styles.content}>
-      <Pressable accessibilityRole="button" onPress={() => router.back()} style={styles.back}>
-        <Text style={styles.backText}>‹ 대화로 돌아가기</Text>
-      </Pressable>
-      <ChatReadHeader snapshot={snapshot} />
-      <ChatReadMessages snapshot={snapshot} />
-      <ChatReadMore snapshot={snapshot} onLoadMore={() => void loadMore()} />
-      <ChatSendPending themed={isSeyeonTheme} />
-    </ScrollView>
+    <KeyboardAvoidingView
+      style={styles.room}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <ScrollView
+        ref={scrollRef}
+        style={styles.stream}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        onContentSizeChange={() => {
+          if (!snapshot.hasMore) scrollRef.current?.scrollToEnd({ animated: true });
+        }}
+      >
+        <Pressable accessibilityRole="button" onPress={() => router.back()} style={styles.back}>
+          <Text style={styles.backText}>‹ 대화로 돌아가기</Text>
+        </Pressable>
+        <ChatReadHeader snapshot={snapshot} />
+        <ChatReadMessages snapshot={snapshot} />
+        <ChatReadMore snapshot={snapshot} onLoadMore={() => void loadMore()} />
+      </ScrollView>
+      <ChatComposer
+        snapshot={snapshot}
+        draft={draft}
+        onChangeDraft={setDraft}
+        onSend={() => void send()}
+        sending={sending}
+        status={sendStatus}
+      />
+    </KeyboardAvoidingView>
   );
 
   return (
@@ -78,10 +105,12 @@ export default function ChatThreadScreen() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: mobileColors.canvas },
+  room: { flex: 1 },
+  stream: { flex: 1 },
   seyeonThemeBackground: { flex: 1 },
   seyeonThemeImage: { opacity: 0.98 },
   seyeonThemeWash: { flex: 1, backgroundColor: 'rgba(255, 249, 240, 0.18)' },
-  content: { paddingHorizontal: 20, paddingTop: 18, paddingBottom: 38, gap: 18 },
+  content: { paddingHorizontal: 20, paddingTop: 18, paddingBottom: 18, gap: 18 },
   back: { alignSelf: 'flex-start', paddingVertical: 6 },
   backText: { color: mobileColors.navy, fontSize: 14, fontWeight: '800' },
   invalidContent: {
