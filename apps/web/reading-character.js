@@ -311,8 +311,11 @@ function blockTexts(block) {
   return [];
 }
 
-function previewStepsFromPayload(payload) {
-  if (!isBrowserSajuPreviewDeliveryV1(payload)) return null;
+function previewStepsFromPayload(payload, { requireBrowserAdmission = false } = {}) {
+  // Official archive reread already has its own persisted-record admission boundary.
+  // This narrow browser guard applies only to the live Preview HTTP path.
+  if (requireBrowserAdmission && !isBrowserSajuPreviewDeliveryV1(payload)) return null;
+  if (!payload || typeof payload !== 'object' || payload.ok !== true) return null;
   const data = payload.data;
   if (!data || typeof data !== 'object' || data.lifecycle !== 'preview') return null;
   const response = data.reading;
@@ -731,7 +734,7 @@ async function loadPreviewReading() {
       return;
     }
 
-    const preview = previewStepsFromPayload(payload);
+    const preview = previewStepsFromPayload(payload, { requireBrowserAdmission: true });
     if (!preview) {
       renderPreviewFailure(
         '현재 이 사주 프리뷰를 표시할 수 없습니다.',
