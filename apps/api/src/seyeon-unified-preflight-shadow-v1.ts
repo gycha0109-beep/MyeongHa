@@ -66,6 +66,10 @@ export function createSeyeonUnifiedPreflightShadowV1(
         throw new TypeError('Unified shadow classifier result must be a plain object.');
       }
       const record = raw as Record<string, unknown>;
+      if (Object.keys(record).some((key) =>
+        !SEYEON_UNIFIED_PREFLIGHT_SHADOW_RESPONSE_SCHEMA_V1.required.includes(key))) {
+        throw new TypeError('Unified shadow classifier returned an unknown field.');
+      }
       const integrity = guardCharacterIntegrityClassificationV1({ claims: record.claims });
       const disclosure = guardCharacterDisclosureTopicClassificationV2({
         topicKey: record.topicKey, questionContext: record.questionContext,
