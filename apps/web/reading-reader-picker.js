@@ -1,4 +1,5 @@
 import { READER_PRESENTATIONS } from './reader-presentation-catalog.js';
+import { readerRolloutPresentationV1 } from './reader-rollout-policy.js';
 
 const READER_PICKER_SELECTOR = '[data-reading-reader-picker]';
 const READING_DETAIL_PATH = '/reading-detail.html';
@@ -61,12 +62,18 @@ function createPicker() {
   grid.setAttribute('role', 'list');
 
   for (const reader of readers) {
+    const rollout = readerRolloutPresentationV1(reader.key);
     const button = document.createElement('button');
     button.className = 'reading-reader-option';
     button.type = 'button';
     button.dataset.readerKey = reader.key;
+    button.dataset.readerRolloutState = rollout.stage;
+    button.disabled = !rollout.previewSelectable;
+    if (button.disabled) button.classList.add('is-unavailable');
     button.setAttribute('role', 'listitem');
-    button.setAttribute('aria-label', `${reader.name}에게 읽기 맡기기`);
+    button.setAttribute('aria-label', rollout.previewSelectable
+      ? `${reader.name} 프리뷰 장면 선택`
+      : `${reader.name} Reader 준비 중`);
 
     const art = document.createElement('span');
     art.className = 'reading-reader-option-art';
@@ -88,18 +95,19 @@ function createPicker() {
     name.textContent = reader.name;
 
     const readerTitle = document.createElement('small');
-    readerTitle.textContent = reader.title;
+    readerTitle.textContent = rollout.previewSelectable ? reader.title : '컨셉 정리 중';
 
     heading.append(name, readerTitle);
 
 
     const tone = document.createElement('span');
     tone.className = 'reading-reader-option-tone';
-    tone.textContent = reader.tone;
+    tone.textContent = rollout.previewSelectable
+      ? reader.tone : '설정 확정 후 순차적으로 공개합니다.';
 
     const action = document.createElement('span');
     action.className = 'reading-reader-option-action';
-    action.textContent = '이 장면으로 보기 →';
+    action.textContent = rollout.previewSelectable ? '프리뷰 장면 보기 →' : '준비 중';
 
     body.append(heading, tone, action);
     button.append(art, body);
@@ -108,7 +116,7 @@ function createPicker() {
 
   const note = document.createElement('p');
   note.className = 'reading-reader-picker-note';
-  note.textContent = '이 선택은 프리뷰 화면 연출에만 적용됩니다. 저장된 풀이를 다시 읽거나 대화를 이어가는 Reader는 서버에서 연결 가능한 상태가 확인된 뒤 별도로 표시됩니다.';
+  note.textContent = '현재 세연만 프리뷰 장면을 선택할 수 있습니다. 이 선택은 프리뷰 화면 연출에만 적용됩니다. 저장된 풀이를 다시 읽거나 대화를 이어가는 Reader는 서버에서 연결 가능한 상태가 확인된 뒤 별도로 표시됩니다. 유료 Reader 해석은 아직 공개되지 않았습니다.';
 
   panel.append(close, intro, grid, note);
   dialog.append(panel);
@@ -132,10 +140,10 @@ function createPicker() {
     const button = event.target instanceof Element
       ? event.target.closest('[data-reader-key]')
       : null;
-    if (!(button instanceof HTMLButtonElement) || !pendingReadingUrl) return;
+    if (!(button instanceof HTMLButtonElement) || !pendingReadingUrl || button.disabled) return;
 
     const readerKey = button.dataset.readerKey;
-    if (!readerKey || !readers.some((reader) => reader.key === readerKey)) return;
+    if (!readerKey || !readerRolloutPresentationV1(readerKey).previewSelectable) return;
 
     const next = new URL(pendingReadingUrl.href);
     next.searchParams.set('reader', readerKey);
@@ -163,7 +171,7 @@ function openPicker(anchor) {
     return;
   }
 
-  const firstReader = dialog.querySelector('[data-reader-key]');
+  const firstReader = dialog.querySelector('[data-reader-key]:not(:disabled)');
   if (firstReader instanceof HTMLButtonElement) firstReader.focus();
 }
 
