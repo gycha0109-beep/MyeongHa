@@ -132,6 +132,11 @@ export interface RunThreadBoundReaderInterpretationPreviewInputV1 {
   readonly memoryGrantsAuthorityPort: MemoryGrantsReadAuthorityPortV1;
   readonly nonMemoryContextAuthorityPort: ReaderContextLifeFactsReadAuthorityPortV1;
   readonly groundingProjectionPort: OfficialReadingCharacterGroundingProjectionPortV1;
+  /**
+   * Optional production-only release admission after authoritative Thread
+   * and Official Reading have been re-resolved. This is NOT a grant.
+   */
+  readonly admitServerReader?: (serverReaderCharacterId: string) => void;
 }
 
 export class ReaderInterpretationPreviewRuntimeErrorV1 extends Error {
@@ -573,6 +578,8 @@ export async function runThreadBoundReaderInterpretationPreviewV1(
     }
     throw error;
   }
+
+  input.admitServerReader?.(prepared.source.readerCharacterId);
 
   return renderResolvedReaderInterpretationPreviewV1({
     source: prepared.source,

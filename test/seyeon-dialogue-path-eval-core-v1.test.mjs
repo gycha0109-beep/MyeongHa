@@ -13,15 +13,18 @@ import {
 } from '../scripts/seyeon-dialogue-path-eval-core-v1.mjs';
 
 describe('Se-yeon real API dialogue-path benchmark accounting', () => {
-  it('pins eight public non-claim fixtures with no private questions or real user data', () => {
+  it('pins 16 public first-contact synthetic prompts without changing the 100-case classifier gold set', () => {
     const cases = selectSeyeonDialoguePathCasesV1(SEYEON_MODEL_EVAL_CASES_V1);
     expect(cases.map(x => x.id)).toEqual(SEYEON_DIALOGUE_PATH_CASE_IDS_V1);
-    expect(cases).toHaveLength(8);
+    expect(cases).toHaveLength(16);
+    expect(cases.filter(x => x.id.startsWith('X')).map(x => x.id))
+      .toEqual(['X01', 'X02', 'X03', 'X04', 'X05', 'X06']);
+    expect(cases.every(x => x.topic === undefined && x.text.length <= 160)).toBe(true);
     expect(() => selectSeyeonDialoguePathCasesV1([
       ...SEYEON_MODEL_EVAL_CASES_V1.filter(x => x.id !== 'N01'),
       { id: 'N01', text: 'Sensitive synthetic', topic: 'past_romance_detail', noClaims: true },
     ])).toThrow('Fixture not eligible');
-    expect(SEYEON_DIALOGUE_PATH_MAX_CALLS_V1).toBe(8 * (5 + 3));
+    expect(SEYEON_DIALOGUE_PATH_MAX_CALLS_V1).toBe(16 * (5 + 3));
     expect(SEYEON_DIALOGUE_PATH_MAX_ESTIMATED_COST_USD_V1).toBeLessThanOrEqual(3);
   });
 
@@ -63,6 +66,15 @@ describe('Se-yeon real API dialogue-path benchmark accounting', () => {
       { ...rows[0], calls: 4 }, ...rows.slice(1),
     ], 2);
     expect(missingCalls.verdict).toBe('HOLD');
+    const baselineRejected = summarizeSeyeonDialoguePathV1([
+      { ...rows[0], outcome: 'rejected', errorCode: 'SEMANTIC_GUARD_REJECTED' },
+      ...rows.slice(1),
+    ], 2);
+    expect(baselineRejected.verdict).toBe('HOLD');
+    expect(baselineRejected.routes.legacy_5_terra.gateVerdict).toBe('HOLD');
+    expect(baselineRejected.routes.fast_3_luna_terra.gateVerdict).toBe('GUARD_SAMPLE_PASS');
+    expect(summary.routes.legacy_5_terra.gateVerdict).toBe('GUARD_SAMPLE_PASS');
+    expect(summary.routes.fast_3_luna_terra.gateVerdict).toBe('GUARD_SAMPLE_PASS');
     expect(held.verdict).toBe('HOLD');
     expect(held.routes.fast_3_luna_terra.failureCases).toEqual([
       { id: 'N02', code: 'SEMANTIC_GUARD_REJECTED' },

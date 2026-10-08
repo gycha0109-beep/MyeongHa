@@ -64,7 +64,7 @@ function renderReader() {
     if (analyzeLabel) analyzeLabel.textContent = `${selectedReader.name}에게 보여주기 준비 중`;
     if (statusTitle) statusTitle.textContent = `${selectedReader.name}과 관상 보기 준비됨`;
     if (statusCopy) {
-      statusCopy.textContent = '사진 준비를 마쳤습니다. 얼굴 구조 확인 기능이 연결되면 선택한 Reader의 풀이로 이어집니다.';
+      statusCopy.textContent = '사진 준비를 마쳤습니다. 얼굴 구조 확인 기능이 연결되면 선택한 대리자의 풀이로 이어집니다.';
     }
   } else {
     if (description) {
@@ -73,7 +73,7 @@ function renderReader() {
     if (analyzeLabel) analyzeLabel.textContent = '사진을 먼저 준비해주세요';
     if (statusTitle) statusTitle.textContent = `${selectedReader.name}과 관상 보기`;
     if (statusCopy) {
-      statusCopy.textContent = '사진을 준비하면 얼굴 구조를 확인한 뒤 선택한 Reader의 풀이로 이어집니다.';
+      statusCopy.textContent = '사진을 준비하면 얼굴 구조를 확인한 뒤 선택한 대리자의 풀이로 이어집니다.';
     }
   }
 }
@@ -182,7 +182,7 @@ function createReaderPicker() {
   const close = document.createElement('button');
   close.className = 'reading-reader-picker-close';
   close.type = 'button';
-  close.setAttribute('aria-label', 'Reader 선택 닫기');
+  close.setAttribute('aria-label', '대리자 선택 닫기');
   close.textContent = '×';
 
   const intro = document.createElement('div');
@@ -190,18 +190,18 @@ function createReaderPicker() {
 
   const kicker = document.createElement('span');
   kicker.className = 'reading-reader-picker-kicker';
-  kicker.textContent = 'READER';
+  kicker.textContent = '대리자';
 
   const title = document.createElement('h2');
   title.id = 'face-reader-picker-title';
-  title.textContent = '어떤 Reader와 함께 볼까요?';
+  title.textContent = '어떤 대리자와 함께 볼까요?';
 
   const copy = document.createElement('p');
-  copy.textContent = '관상 결과 자체는 Reader에 따라 바뀌지 않습니다. 확인된 결과를 무엇부터 보고 어떤 말투로 풀어주는지가 달라집니다.';
+  copy.textContent = '관상 결과 자체는 대리자에 따라 바뀌지 않습니다. 확인된 결과를 무엇부터 보고 어떤 말투로 풀어주는지가 달라집니다.';
 
   const target = document.createElement('span');
   target.className = 'reading-reader-picker-target';
-  target.textContent = '관상 · Reader 선택';
+  target.textContent = '관상 · 대리자 선택';
 
   intro.append(kicker, title, copy, target);
 
@@ -211,8 +211,8 @@ function createReaderPicker() {
   const search = document.createElement('input');
   search.className = 'face-reader-picker-search';
   search.type = 'search';
-  search.placeholder = '이름이나 설명으로 Reader 찾기';
-  search.setAttribute('aria-label', 'Reader 검색');
+  search.placeholder = '이름이나 설명으로 대리자 찾기';
+  search.setAttribute('aria-label', '대리자 검색');
   tools.append(search);
 
   const grid = document.createElement('div');
@@ -257,7 +257,7 @@ function createReaderPicker() {
 
     const action = document.createElement('span');
     action.className = 'reading-reader-option-action';
-    action.textContent = '이 Reader와 보기 →';
+    action.textContent = '이 대리자와 보기 →';
 
     body.append(heading, tone, action);
     button.append(art, body);
@@ -267,11 +267,11 @@ function createReaderPicker() {
   const empty = document.createElement('p');
   empty.className = 'face-reader-picker-empty';
   empty.hidden = true;
-  empty.textContent = '검색과 일치하는 Reader가 없습니다.';
+  empty.textContent = '검색과 일치하는 대리자가 없습니다.';
 
   const note = document.createElement('p');
   note.className = 'reading-reader-picker-note';
-  note.textContent = 'Reader는 확인된 관상 결과의 전달 방식과 대화 경험을 맡습니다. Reader 선택이 관상 의미 자체를 새로 만들거나 바꾸지는 않습니다.';
+  note.textContent = '대리자는 확인된 관상 결과의 전달 방식과 대화 경험을 맡습니다. 대리자 선택이 관상 의미 자체를 새로 만들거나 바꾸지는 않습니다.';
 
   panel.append(close, intro, tools, grid, empty, note);
   dialog.append(panel);

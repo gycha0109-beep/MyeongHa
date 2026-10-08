@@ -24,7 +24,7 @@ import {
 const cases = selectSeyeonDialoguePathCasesV1(SEYEON_MODEL_EVAL_CASES_V1);
 const key = process.env.OPENAI_API_KEY?.trim();
 if (!key) throw new Error('Missing protected model evaluation credential.');
-if (cases.length !== 8 || SEYEON_DIALOGUE_PATH_CASE_IDS_V1.length !== 8) {
+if (cases.length !== 16 || SEYEON_DIALOGUE_PATH_CASE_IDS_V1.length !== 16) {
   throw new Error('Synthetic case cap changed unexpectedly.');
 }
 
@@ -118,6 +118,11 @@ function governance(preflight) {
 function reason(error) {
   const kind = error?.code;
   if (typeof kind === 'string' && [
+    'FAST_INTERPRETATION_GUARD_REJECTED',
+    'FAST_RISK_CAUSALITY_REJECTED',
+    'FAST_RENDERER_PACKET_REJECTED',
+    'FAST_RENDERER_GUARD_REJECTED',
+    'FAST_SEMANTIC_OUTPUT_REJECTED',
     'TIMEOUT', 'NETWORK_FAILURE', 'HTTP_FAILURE', 'INVALID_CONFIGURATION',
     'INVALID_CONTENT_TYPE', 'INVALID_RESPONSE', 'MODEL_REFUSAL', 'INVALID_STRUCTURED_OUTPUT',
   ].includes(kind)) return kind;

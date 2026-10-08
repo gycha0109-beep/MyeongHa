@@ -21,7 +21,7 @@ export const READER_PRESENTATIONS = Object.freeze([
     name: '여울',
     title: '설계관 기록관',
     tone: '돌려 말하지 않고 필요한 지점부터 봅니다.',
-    portrait: 'assets/characters/yeoul-portrait-v2.webp',
+    portrait: 'assets/characters/yeoul-portrait-uploaded.svg',
   }),
   Object.freeze({
     key: 'seorin',
@@ -42,7 +42,7 @@ export const READER_PRESENTATIONS = Object.freeze([
     name: '미라',
     title: '대리자',
     tone: '과장 없이 지금 쓸 수 있는 정보부터 봅니다.',
-    portrait: 'assets/characters/mira-portrait-v2.webp',
+    portrait: 'assets/characters/mira-portrait-uploaded.svg',
   }),
   Object.freeze({
     key: 'taegyeom',
