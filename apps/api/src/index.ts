@@ -736,6 +736,11 @@ export {
 } from './saju-character-grounding-http-adapter.js';
 
 export {
+  executeProductionReaderInterpretationPreviewPostgresV1,
+  type ExecuteProductionReaderInterpretationPostgresInputV1,
+} from './reader-interpretation-preview-production-saju-postgres.js';
+
+export {
   READER_INTERPRETATION_PREVIEW_HTTP_PATH_V1,
   READER_INTERPRETATION_PREVIEW_HTTP_SCHEMA_VERSION_V1,
   ReaderInterpretationPreviewHttpErrorV1,
