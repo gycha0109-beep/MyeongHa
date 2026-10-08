@@ -425,7 +425,7 @@ async function verifyRoom(page, origin, suffix, width, height, mobile) {
     `${suffix}: Shift+Enter must retain native newline behavior without submit`);
   assert(!keyboard.composingPrevented && !keyboard.nativeComposingPrevented && keyboard.composingSentCount === 1,
     `${suffix}: Enter during IME composition must not submit`);
-  assert(keyboard.finalPrevented && keyboard.finalSent.length === 2 && keyboard.finalSent[1] === '다중 줄\\n전송',
+  assert(keyboard.finalPrevented && keyboard.finalSent.length === 2 && keyboard.finalSent[1] === '다중 줄\n전송',
     `${suffix}: plain Enter must send multiline text unchanged`);
   assert(keyboard.hasSubmitButton && keyboard.buttonSent.length === 3 && keyboard.buttonSent[2] === '버튼 전송',
     `${suffix}: send button must retain native submit behavior`);
