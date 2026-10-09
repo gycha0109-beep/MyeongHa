@@ -68,7 +68,7 @@ function fixture(settings: {fail?: string; returned?: 'wrong' | 'two' | 'empty'}
         sql.push({ text, values });
         if (settings.fail === 'begin' && text === 'BEGIN') throw Error('SECRET_BEGIN');
         if (settings.fail === 'role' && text.startsWith('SET LOCAL')) throw Error('SECRET_ROLE');
-        if (settings.fail === 'update' && text.startsWith('update public.')) throw Error('SECRET_UPDATE');
+        if (['update', 'rollback'].includes(settings.fail ?? '') && text.startsWith('update public.')) throw Error('SECRET_UPDATE');
         if (settings.fail === 'commit' && text === 'COMMIT') throw Error('SECRET_COMMIT');
         if (settings.fail === 'rollback' && text === 'ROLLBACK') throw Error('SECRET_ROLLBACK');
         if (text.startsWith('update public.')) {
@@ -193,7 +193,7 @@ describe('8C-2B-2D-3-02 dormant V2 PostgreSQL atomic consumer', () => {
       const port = createSajuHeldStagingPostgresAdmissionPortV2(f.options);
       expect(await port.consumeAuthorizedAttemptOnce()).toBe(false);
       expect(await port.consumeAuthorizedAttemptOnce()).toBe(false);
-      expect(f.connect).toHaveBeenCalledTimes(fail === 'connect' ? 1 : 1);
+      expect(f.connect).toHaveBeenCalledOnce();
       expect(JSON.stringify(await port.consumeAuthorizedAttemptOnce())).not.toContain('SECRET_');
       if (fail !== 'connect') expect(f.release).toHaveBeenCalledOnce();
       if (['role', 'update', 'commit'].includes(fail)) {
