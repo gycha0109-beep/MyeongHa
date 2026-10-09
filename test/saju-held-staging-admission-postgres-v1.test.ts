@@ -54,7 +54,9 @@ function fixture(overrides: { issue?: Record<string, unknown>, manifest?: Record
           if (overrides.unavailable === 'commit' && text === 'COMMIT') throw Error('SECRET_COMMIT');
           if (overrides.unavailable === 'rollback' && text === 'ROLLBACK') throw Error('SECRET_ROLLBACK');
           if (text.startsWith('update public.saju_staging_operator_admission_permits')) {
-            if (overrides.unavailable === 'update') throw Error('SECRET_UPDATE');
+            if (overrides.unavailable === 'update' || overrides.unavailable === 'rollback') {
+              throw Error('SECRET_UPDATE');
+            }
             if (overrides.returns === 'two') return { rows: [
               { permitId: args?.[0] }, { permitId: args?.[0] },
             ] as Row[] };
@@ -151,16 +153,9 @@ describe('8C-2B-2C independent operator signed Postgres one-shot admission (synt
     ['missing pool', { pool: undefined }],
   ])('rejects invalid admission config %s', (_name, bad) => {
     const f = fixture();
-    if ('approvalSignature' in bad && bad.approvalSignature) {
-      const port = createSajuHeldStagingPostgresAdmissionPortV1({
-        ...f.options, ...bad,
-      } as typeof f.options);
-      expect(port.consumeAuthorizedAttemptOnce()).resolves.toBe(false);
-    } else {
-      expect(() => createSajuHeldStagingPostgresAdmissionPortV1({
-        ...f.options, ...bad,
-      } as typeof f.options)).toThrow(TypeError);
-    }
+    expect(() => createSajuHeldStagingPostgresAdmissionPortV1({
+      ...f.options, ...bad,
+    } as typeof f.options)).toThrow(TypeError);
   });
 
   it('blocks target drift between manifest and independently approved target', () => {
