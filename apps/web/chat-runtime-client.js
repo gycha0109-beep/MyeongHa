@@ -377,8 +377,8 @@ function ensureRoomReady() {
       if (!loaded) return false;
       roomReady = true;
       if (retryButton) retryButton.hidden = true;
-      restorePendingDraft();
       setComposeStatus('');
+      restorePendingDraft();
       return true;
     } catch (error) {
       setComposeStatus(chatOpenFailureMessage(error));
