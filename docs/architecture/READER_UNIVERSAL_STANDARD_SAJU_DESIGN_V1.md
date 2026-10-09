@@ -95,7 +95,7 @@ verified canonical Subject
 - 기존 path: legacy_character_capability (다른 경로/기존 Character 특화 기능 보호).
 - 새 경로: official_standard_product_rule (서버 발급된 ticket만 인정하며 granted productId/domain/readingRef 결속).
 - domain selector의 일치 조건은 **source.domain == requestedDomain == official product admission.domain**.
-- 기존 Character voice, s aj u profile, content bundle, relationship, required disclosure·ambiguity·grounding hash 검증 유지.
+- 기존 Character voice, Saju profile, content bundle, relationship, required disclosure·ambiguity·grounding hash 검증 유지.
 - 새로운 API를 통하지 않는 direct Saju context 주입은 계속 차단.
 - V1 consumer를 일괄 수정하지 않고 V2 전용 path에서 단계적으로 전환한다.
 
