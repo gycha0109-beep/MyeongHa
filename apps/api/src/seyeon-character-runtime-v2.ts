@@ -274,7 +274,7 @@ export const RENDERER_RESPONSE_SCHEMA_V2 = Object.freeze({
   },
 } as const);
 
-const SEMANTIC_REVIEW_RESPONSE_SCHEMA_V2 = Object.freeze({
+export const SEMANTIC_REVIEW_RESPONSE_SCHEMA_V2 = Object.freeze({
   type: 'object',
   additionalProperties: false,
   required: [
