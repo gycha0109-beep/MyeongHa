@@ -34,6 +34,41 @@ const summarize = (calls: readonly ReturnType<typeof inline>[]) =>
   });
 
 describe('Se-yeon attributed cost v1 (offline)', () => {
+  it('accepts every actual structured provider purpose only in its authoritative stage', () => {
+    const valid = [
+      ['preflight', 'integrity_classification'],
+      ['preflight', 'disclosure_classification'],
+      ['preflight', 'unified_preflight_shadow'],
+      ['interpretation', 'turn_interpretation'],
+      ['interpretation', 'turn_interpret_render_shadow'],
+      ['dialogue_render', 'dialogue_render'],
+      ['semantic_review', 'semantic_review'],
+      ['event_extraction', 'event_extraction'],
+    ] as const;
+    for (const [stage, purpose] of valid) {
+      const ids = stage === 'event_extraction'
+        ? { postTurnOutboxEventId: 'outbox-1' }
+        : { attemptId: 'attempt-1' };
+      expect(attributeSeyeonAiCostCallV1({
+        subjectId: 'subject-1', threadId: 'thread-1', turnId: 'turn-1',
+        ...ids, stage, event: event('call-' + purpose, purpose),
+      }).stage).toBe(stage);
+    }
+  });
+  it('rejects invented preflight aliases and cross-stage shadow requests', () => {
+    for (const [stage, purpose] of [
+      ['preflight', 'preflight'],
+      ['interpretation', 'interpretation'],
+      ['preflight', 'turn_interpretation'],
+      ['dialogue_render', 'turn_interpret_render_shadow'],
+      ['semantic_review', 'disclosure_classification'],
+    ] as const) {
+      expect(() => attributeSeyeonAiCostCallV1({
+        subjectId: 'subject-1', threadId: 'thread-1', turnId: 'turn-1',
+        attemptId: 'attempt-1', stage, event: event('bad-' + purpose, purpose),
+      })).toThrow('stage/purpose mismatch');
+    }
+  });
   it('attributes retries and post-turn extraction without double-charging a replay', () => {
     const first = inline('call-1');
     const retry = inline('call-2', 'attempt-2');
