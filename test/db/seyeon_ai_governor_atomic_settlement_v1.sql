@@ -156,12 +156,16 @@ begin
   end;
   if not v_denied then raise exception 'Complete usage was marked unknown'; end if;
 
-  -- None of the failed transactions may turn started into settled.
-  if not exists (
-    select 1 from public.seyeon_ai_call_cost_events e
-    where e.call_id=v_first and e.lifecycle_state='started'
-      and e.governor_effective_micro_usd=3700
-  ) then raise exception 'Rejected cost events mutated the reservation'; end if;
+  -- No direct executor SELECT grants on the protected cost ledger.
+  -- Use its narrow, Subject-scoped summary to prove rejection left the
+  -- record started, without bypassing RLS in the test.
+  select * into strict v_sum from public.qry_seyeon_ai_turn_cost_v1(
+    v_subject,v_turn
+  );
+  if v_sum.call_count<>1 or v_sum.unknown_cost_calls<>1
+    or v_sum.total_estimated_cost_micro_usd is not null then
+    raise exception 'Rejected price manipulation settled the reservation';
+  end if;
 
   select * into strict v_reply from public.cmd_governed_settle_seyeon_ai_call_v1(
     v_subject,v_turn,v_attempt,'post_turn',v_event
