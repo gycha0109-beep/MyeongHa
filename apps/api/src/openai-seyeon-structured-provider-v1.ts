@@ -296,7 +296,12 @@ function emitSeyeonProviderMetricV1(input: {
     },
     ...(input.priceQuote === undefined ? {} : { price: input.priceQuote }),
   });
-  console.info('MYEONGHA_SEYEON_PROVIDER_METRIC ' + JSON.stringify(event));
+  const { schemaVersion: costContractVersion, ...fields } = event;
+  console.info('MYEONGHA_SEYEON_PROVIDER_METRIC ' + JSON.stringify({
+    schemaVersion: 'myeongha-seyeon-provider-metric-v1',
+    costContractVersion,
+    ...fields,
+  }));
   try {
     input.observeMetric?.(event);
   } catch {
