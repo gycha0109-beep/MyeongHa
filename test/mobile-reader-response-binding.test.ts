@@ -33,14 +33,17 @@ const response = {
 
 function testService(serverResponse: unknown) {
   const fetchImpl = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => Response.json({ ok: true, data: serverResponse }));
-  const withActiveBearer = vi.fn(async <T>(operation: (token: string) => Promise<T>) =>
-    operation('server-authenticated-subject-token'));
+  let bearerCalls = 0;
+  const withActiveBearer = async <T>(operation: (token: string) => Promise<T>): Promise<T> => {
+    bearerCalls += 1;
+    return operation('server-authenticated-subject-token');
+  };
   const service = createMobileReaderInterpretationServiceV1({
     client: new MyeongHaApiClientV1({ origin: 'https://myeongha.test', fetchImpl }),
     session: { withActiveBearer },
     publicRouteActivated: true,
   });
-  return { service, fetchImpl, withActiveBearer };
+  return { service, fetchImpl, bearerCalls: () => bearerCalls };
 }
 
 describe('mobile M3-beta-1 Reader response authority matching', () => {
@@ -59,7 +62,7 @@ describe('mobile M3-beta-1 Reader response authority matching', () => {
   });
 
   it('matches server response to exact Official Reading, Reader and Saju domain', async () => {
-    const { service, fetchImpl, withActiveBearer } = testService(response);
+    const { service, fetchImpl, bearerCalls } = testService(response);
     await expect(service.readForOfficialReading(request)).resolves.toMatchObject({
       mode: 'reader_interpretation',
       readerCharacterId: 'seyeon',
@@ -67,7 +70,7 @@ describe('mobile M3-beta-1 Reader response authority matching', () => {
       domain: 'general',
     });
     expect(fetchImpl).toHaveBeenCalledTimes(1);
-    expect(withActiveBearer).toHaveBeenCalledTimes(1);
+    expect(bearerCalls()).toBe(1);
     const init = fetchImpl.mock.calls[0]?.[1];
     expect(init).toBeDefined();
     expect(JSON.parse(String(init?.body))).toEqual({
