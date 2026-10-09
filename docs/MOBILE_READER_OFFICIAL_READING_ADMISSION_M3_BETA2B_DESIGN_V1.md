@@ -1,7 +1,8 @@
 # 명하 앱화 M3-β-2b — Reader 공식 Reading 서버 승인 연동 설계 v1
 
 > 상태: DESIGN CANDIDATE / NOT APPROVED / PUBLIC OFF
-> 점검 기준: main 459e9c93d3881f1d3e41e88e3df876e739676041 (2026-10-09)
+> 최초 점검 기준: main 459e9c93d3881f1d3e41e88e3df876e739676041 (2026-10-09)
+> 후속 재검토: main 0b82b3f157b052c7110c9b4c7f5d5a1874918929 · #1824 포함. 리뷰·승인 증거 0건. 각 계약 승인 상태는 별도 핸드오프 문서 참조.
 > 소유: frontend-integration(모바일 UX/클라이언트), reader-runtime(실행/공개), applizing(A1/A2/상품 능력), commerce-payment/entitlement(구매·Grant), DB(증거·동시성), saju-bridge(공식 의미)
 > 범위: 기존 M3-α(#1809), M3-β-1(#1813), M3-β-2a(#1818) 다음 단계. 이 문서는 제안이며 새로운 API, 판매 상품, 가격, 결제 권한, SQL, 출시를 승인하거나 구현하지 않는다.
 
@@ -27,8 +28,10 @@
 | Reader 공개 | `reader-production-rollout-policy-v1.ts` | `READER_RUNTIME_PUBLIC_ACTIVATED_V1=false`, 내부 세연 후보만 |
 | Production 실행 | `reader-interpretation-preview-postgres-execution.ts` | canonical subject transaction·activation·A2 검증 seam. 실제 approved Product port는 명시적 주입 필요 |
 | Public 경로 | `vercel.json` 및 `api/me.ts` | Reader Interpretation 공개 rewrite/dispatch 없음 |
-| Character A3 | #1815 V2 plan/renderer/semantic guard 병합 | bounded 기능 구현 ≠ public Reader/Chat V2 운영 연결 |
-| Commerce | P0-CM-03/실판매 SKU·실결제/fulfillment 승인 | 현 기준 완료 증거 없음. 문서·합성 테스트로 대신할 수 없음 |
+| Character A3 | #1815 V2 plan/renderer/semantic guard, #1821 server non-Saju base, #1824 Thread-bound V2 Preview 내부 경로 병합 | 내부 V2 실행 경로 연결 진전. 공개 HTTP·유료 Chat·Commerce 연동은 별도 HOLD |
+| Commerce | `docs/P0_DECISION_REGISTER.md` P0-CM-01~04, `#1068` | 첫 후보 `standard.love_relationship`/도메인 `relationship`/기간 `natal`/변형 `general`/Product Owner 정가 8,900원은 기록됨. 하지만 P0-CM-03 OPEN-P0, Offer·Charge Terms·실판매·fulfillment 비활성. Web one-off 출시 결정이므로 모바일 직접 결제 허가가 아님 |
+
+과거 운영 이슈 `#680`은 2026-09-17 종료됨. 이를 현재 'OPEN' 블로커로 재사용하지 않는다. 다만 이슈 종료가 Reader Production 상품/결제/해설 운영 승인을 뜻하지 않는다. 제품 관련 문서는 예전 상태를 포함하므로 `docs/P0_DECISION_REGISTER.md`의 더 최신 결정과 구분한다.
 
 최종 출시 결정은 GitHub PR 병합/CI 성공만으로 내려선 안 된다. 운영 정책 row, Grant 발급, 배포·회수 및 사용자의 실제 E2E 증거가 따로 필요하다.
 
@@ -52,7 +55,7 @@
 4. 목표: 서버가 그 실행 시점에 canonical Subject, exact Thread Reader, pinned release/bundle, exact active Grant, Product rule, official artifact version/hash를 **다시 검증**하고 내부 proof 발급·일회성 소비. 클라이언트 preflight는 방어층이지 이 검증의 대체물이 아님.
 5. 목표: 검증 후에만 A3 renderer/semantic guard가 보호된 응답을 생성. 서버 응답은 기존 Schema와 source identity가 일치하는지 모바일에서 재검증.
 6. 목표: Reader별 해설 재열람/후속 대화는 **별도 서버 권한·기록 계약**이 승인되었을 때만 열림. 성공 응답 하나로 기록·대화 접근권을 자동 발급하지 않음.
-7. 목표: 추가 Reader 구매는 동일 공식 Reading을 재사용하는 별도 Offer/Grant 흐름. 할인 여부·금액·SKU·환불 조건은 Commerce 승인 전까지 미정이며 버튼/가격 생성 금지.
+7. 목표: 추가 Reader 구매는 동일 공식 Reading을 재사용하는 별도 Offer/Grant 흐름. `standard.love_relationship`의 Product Owner 정가 8,900원은 기록되어 있지만 **활성 Offer/Charge Terms가 없어 실행 가격으로 사용할 수 없다.** 할인·추가 Reader 과금 조건은 별도 미결정. P0-CM-01에 따라 출시 결제 표면은 Web one-off이며 모바일 native checkout이나 자동 외부 결제 이동은 승인되지 않았다. 모바일 결제 버튼/실판매 표시 생성 금지.
 
 ## 5. 모바일 상태 머신 설계
 
@@ -72,20 +75,22 @@
 
 | 결정 ID | Owner | 반드시 합의할 질문 |
 | --- | --- | --- |
-| D-01 | Product + Commerce | 승인된 live Product SKU/spec/domain, Reader rule source, 상품별 적용 Reader, Offer/환불/추가 Reader 가격 |
+| D-01 | Product + Commerce | `standard.love_relationship` 비활성 후보 및 KRW 8,900 Product Owner 가격은 기존 결정. 다만 Saju Production 권한, Reader rule 승인본, 실행 Offer/Charge Terms, 할인/추가 Reader 단가, Web-only handoff와 Sale activation은 여전히 OPEN |
 | D-02 | Commerce + DB | exact Subject×Official Reading×Reader 구매 Grant의 DB evidence, 소멸·환불 시점, revoke race/reveal 직전 검증 |
 | D-03 | Reader + API | 운영 Reader 공개와 cohort/release 정책, public route 생성 여부 및 Read/POST 권한 경계 |
 | D-04 | API + frontend | UI용 **안전한 Reader별 표시 상태 조회 계약** 필요 여부와 개인정보 비노출 응답 분류. 조회는 Grant 발급이 아님 |
 | D-05 | API + DB | 클라이언트에 신뢰 가능한 `threadId`를 어떻게 제공·재조회할지. 일반 `POST /api/chat`은 구매 승인 수단이 아님 |
-| D-06 | Reader + Saju | V2 renderer/semantic guard의 실제 Preview 경로 연결·응답 계약 및 protected fallback |
+| D-06 | Reader + Saju | #1824로 A2 기반 **내부 Thread-bound V2 Preview** 실행 경로는 병합됨. 공개 HTTP/유료 Reader 응답 버전·실제 공개 허가·Chat V2 연결·protected fallback 전달은 별도 OPEN |
 | D-07 | API + UX | 결과 persist/re-read, 재진입, 후속 Chat 해금의 서버 계약. 기존 채팅 메시지 내용과 분리 |
 | D-08 | Release + QA | 단계적 세연 cohort, 확대 전 9 Reader 검증, live smoke, 즉시 OFF/rollback owner |
+
+D-03/D-06: 현재 `myeongha-reader-interpretation-preview-http-v1`은 `lifecycle='preview'` 전용이다. 'preview'를 유료 구매한 공식 해설 결과/영구 기록과 동일시해서는 안 되며, 승인된 **유료 출력 계약 또는 명시적으로 승인된 Preview 재사용 정책**이 필요하다. 두 필드 Body를 유지하는 안도 최종 유료 HTTP 표준으로 이미 승인된 것은 아니다.
 
 D-04/D-05는 새 endpoint가 필요하다는 확정이 아니다. 현 API의 서버 증거로 충분한지 owner가 결정해야 한다. 제안하는 any JSON shape/path는 전부 미승인으로 취급한다.
 
 ## 7. 구현 순서
 
-P0: D-01~D-05 Product/Commerce/DB/Reader/API 승인; 출시 전 필수 증거 정리.
+P0: P0-CM-03 + Saju Production Interpretation Authority + Web 결제/Grant 우선 판정. D-01~D-05 Product/Commerce/DB/Reader/API 승인 및 소유자별 증거 수집. `#680`은 종료 이력으로 관리.
 P1: 서버의 exact Reader Grant+Policy+Release 게이트를 HTTP 진입점 앞에 결속하고 OFF 상태 부정 테스트. Server-owned Thread 바인딩/권한 투영 계약 합의.
 P2: 해당 서버 계약만 대상으로 `@myeongha/api-client`에 엄격 응답 검증 및 모바일 native service 주입; Reader 소개→권한 표시→실행 상태 머신 연결. OFF 기본값은 별도 승인 때까지 보존.
 P3: 서버 result와 출처를 유지하여 화면 표시; 해설 기록·후속 Chat은 승인된 재열람/Chat 계약에 한해 별도 트랙.
@@ -95,4 +100,4 @@ P4: synthetic+staging+production cohort E2E, revoke race/identity isolation/roll
 
 현재 PR은 모바일 UI/API 구현이 아니라 **검토 가능한 상세 설계 문서**다. 신규 Product catalog, Price, Offer, Entitlement grant, SQL migration, Reader Runtime public activation, Vercel rewrite, 결제 활성화, Character canon, Saju 해석 생성, 후속 Chat 공개를 포함하지 않는다.
 
-참조: #1777 범용화 설계, #1789 A2 설계, #1815 A3-γ, #1809 M3-α, #1813 M3-β-1, #1818 M3-β-2a, docs/architecture/COMMERCE_ENTITLEMENT_ARCHITECTURE_V1.md, MyeongHa_UX_Reading_Reader_Knowledge_Spec_v1.1.
+참조: #1777 범용화 설계, #1789 A2 설계, #1815/#1821/#1824 A3-γ, #1809 M3-α, #1813 M3-β-1, #1818 M3-β-2a, `docs/P0_DECISION_REGISTER.md`, `docs/STANDARD_LOVE_RELATIONSHIP_PRODUCT_V1.md`, `docs/architecture/COMMERCE_ENTITLEMENT_ARCHITECTURE_V1.md`, `MyeongHa_UX_Reading_Reader_Knowledge_Spec_v1.1`. 상세 검토 및 owner 전달: `MOBILE_READER_OFFICIAL_READING_ADMISSION_M3_BETA2B_OWNER_HANDOFF_V1.md`.
