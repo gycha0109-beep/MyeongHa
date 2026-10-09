@@ -22,13 +22,15 @@
 | ID | 담당 트랙 | 현재 확인된 사실 | 미확정/블로커 | 수용할 owner 산출물 | 상태 |
 | --- | --- | --- | --- | --- | --- |
 | D-01 | Product / commerce-payment / commerce-entitlement | P0-CM-01 Web one-off, P0-CM-02 PortOne V2, P0-CM-03 비활성 `standard.love_relationship`+가격 결정 | Live Saju authority, 승인 Reader Product rule revision, enabled Offer/Charge Terms, 추가 Reader 가격/환불, 실판매 승인 없음 | 승인 SKU/spec/domain/rule/revision 연결 표, Offer/Grant 키, Web handoff, 판매 OPEN 조건과 실행 증거 | PARTIAL/HOLD |
-| D-02 | commerce-entitlement / DB | A2 exact access metadata 및 1회성 proof; Commerce independent Grant 원칙 | DB exact purchase source/Reader-specific Grant와 현재 reading_access가 물린 production evidence, revoke 중 생성된 응답 최종 공개 시점 경합 | Source→Grant→Access SQL 경로·effectiveAt, revoke/expire/refund, 2 Grant 공존·동시성 테스트 | HOLD |
+| D-02 | commerce-entitlement / DB | migrations 1220/1240/1270: Reader별 exact access_grants↔entitlement_grant↔official Reading 관계, v2 bind 및 runtime Query 이미 존재; A2 one-use proof | LIVE verified receipt→Grant→v2 bind 호출자/EXECUTE 활성, v2 replay 후 revoke의 의미, 다중 bundle, 기존 DB can_initiate와 A3 V2 일반 Reader 정책 차이, 최종 reveal revoke 경합 | 새 계약서의 GRANT-01~16 실행·SQL 소유자 검증과 안전한 activation 승인 | PARTIAL/HOLD |
 | D-03 | reader-runtime / API / Release | `READER_RUNTIME_PUBLIC_ACTIVATED_V1=false`; activation `off/internal_preview`, 내부 세연 only | 유료 public 게이트·공개 endpoint·cohort·rollback 오너 없음 | approved rollout/release policy, public HTTP ingress+error/limits+kill switch, 서버 deny trace | HOLD |
 | D-04 | API / frontend-integration / Privacy | 현재 UI 4축 모두 `not_checked`로 보존 | 안전한 상태 조회 UX 계약 존재 여부, scope·status·session expiry·가시성/거부 분류 미정 | 기존 API 재사용 여부 결정 + 엄격 response schema 혹은 API 불필요 결정, PII 비노출 테스트 | HOLD |
 | D-05 | API / DB / Reader Runtime | 기존 `GET /api/chat/:threadId`는 인증된 Thread Character를 검증 가능. M3-β-2a 사용 | 공식 Reading+Reader에 결합된 owned Thread를 최초 획득/복구하는 서버 계약 없음 | exact authorized Thread binding/lookup, client discoverability, replay/revoke/cross-user denial tests | PARTIAL/HOLD |
 | D-06 | reader-runtime / saju-bridge / API | #1815 bounded renderer, #1821 non-Saju base, #1824 A2 Thread-bound V2 내부 Preview 연결 | Public/paid V2 응답 승인, live Saju Product interpretation, Preview→paid 버전 호환·fallback 계약 없음 | A2→A3 one-use proof 실행 증거 및 response lifecycle/version/bounded fallback contract, official semantics parity | PARTIAL/HOLD |
 | D-07 | Reader / Records / Chat / DB | archived Official Reading 상세, Chat read/send와 A2 후속 Chat preflight 구현 | Reader별 해설 결과 저장/재열람·Chat V2 연결·source 범위·재접속 후 권한검증 운영 계약 미정 | per-Reader interpretation persistence/read/source version/revocation policy, follow-up chat admission and separation | HOLD |
 | D-08 | Release / QA / Security / Ops | 세연 internal Preview tranche와 off 스위치 존재; base CI와 문서 PR 검사 성공 | Public cohort 실측, live Web checkout/Grant→Reader E2E, kill-switch drill, multi-device/refund/rollback 증거 없음 | exact production deploy SHA, cohort evidence, kill-switch rollback runbook, audit-safe signals | HOLD |
+
+세부 D-01/D-02 근거: **MOBILE_READER_PRODUCT_COMMERCE_DB_EXACT_GRANT_M3_BETA2B_CONTRACT_V1.md**. 이미 구현된 v2 DB authority를 신규 스키마 요구로 잘못 분류하지 않으며, 운영 활성화는 별개 HOLD.
 
 **D-01~D-08 최종 owner 승인: 0/8 확인.** 이 문서는 기술적 사실의 정리일 뿐, 승인 요청이 실제로 수락됐거나 각 트랙의 최종 계약이 확정되었다는 뜻이 아니다.
 
