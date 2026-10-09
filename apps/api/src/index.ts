@@ -742,6 +742,12 @@ export {
 } from './character-standard-reading-chat-followup-evidence-v1.js';
 
 export {
+  POSTGRES_STANDARD_FOLLOWUP_ANCHOR_BINDING_V1,
+  PostgresStandardFollowupAnchorErrorV1,
+  createPostgresStandardFollowupAnchorAuthorityPortV1,
+} from './postgres-standard-followup-anchor-v1.js';
+
+export {
   createPostgresChatThreadRuntimeBindingAuthorityPortV1,
 } from './postgres-chat-thread-runtime-binding.js';
 
