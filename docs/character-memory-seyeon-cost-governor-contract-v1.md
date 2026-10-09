@@ -31,6 +31,12 @@ Watchtower-Track: character-memory
 - `HELD_UNKNOWN_USAGE`의 추정 금액은 실제 청구액이 아니다. 별도의 청구 대조·감사 기록으로만 해제한다.
 - 상한 초과는 막아야 하는 운영 사고다. 단순 상태 머신이 공급자 출력량을 제한하지 않으므로 **Provider 자체 max_output_tokens, 입력 토큰 상한, 재시도 제한을 반드시 추가**해야 한다.
 
+## 2.1 옵트인 모델 출력 제한 (이 PR에 포함)
+- `openai-seyeon-structured-provider-v1`에 `maxOutputTokens` 선택 설정을 추가한다. 유효 범위는 1~32,768 정수다.
+- 명시적으로 설정한 경우에만 Responses payload에 `max_output_tokens`가 들어간다. 설정되지 않은 기존 Production 요청은 그대로 유지된다.
+- `max_output_tokens`는 추론 토큰을 포함한 전체 출력 상한이다. 작은 값을 강제로 주면 기존 JSON 생성이 실패할 수 있어 기본 활성화하지 않는다.
+- **입력 토큰 상한과 전체 예약의 원자적 실행은 아직 구현되지 않았다.** 출력 제한만으로 총 예산을 보장하지 못하므로 Governor 운영 활성화는 계속 보류한다.
+
 ## 3. 향후 DB 어댑터 선행 조건
 1. DB authority/역할 소유자가 예약·정산 테이블 및 좁은 EXECUTE 전용 SECURITY DEFINER 계약을 승인한다. 임의 테이블 DML·RLS 권한 확대 금지.
 2. 원자적 `admit` 트랜잭션 내 Subject·전역 예산을 함께 잠그거나 충돌 안전한 행/키로 예약한다. 두 요청이 동시에 잔여 한도를 통과하는 문제를 DB 경합 시험에서 재현·차단한다.
