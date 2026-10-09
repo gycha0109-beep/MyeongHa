@@ -157,7 +157,7 @@ export async function startGovernedSeyeonAiCallV1(
       !/^[0-9]+$/u.test(row.ceilingMicroUsd) ||
       BigInt(row.ceilingMicroUsd) !== BigInt(call.quote.ceilingMicroUsd) ||
       typeof row.bucketUtcDate !== 'string' ||
-      !/^\\d{4}-\\d{2}-\\d{2}$/u.test(row.bucketUtcDate)) {
+      !/^\d{4}-\d{2}-\d{2}$/u.test(row.bucketUtcDate)) {
     throw new Error('Se-yeon governed start DB receipt disagrees with quote.');
   }
   return Object.freeze({
