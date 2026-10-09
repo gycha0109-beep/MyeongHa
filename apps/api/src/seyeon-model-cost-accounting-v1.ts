@@ -212,9 +212,18 @@ export function quoteSeyeonModelCallCeilingV1(input: {
       maxInputTokens === 0 || maxOutputTokens === 0) {
     throw new TypeError('Se-yeon reservation requires enforceable positive token ceilings.');
   }
+  // A rate card may define cached input at a higher price than uncached.
+  // Quote with the more expensive input rate rather than under-reserving.
+  const conservativeRates = {
+    ...rates,
+    inputMicroUsdPerMillionTokens: Math.max(
+      rates.inputMicroUsdPerMillionTokens,
+      rates.cachedInputMicroUsdPerMillionTokens,
+    ),
+  };
   const microUsd = ceilCostMicroUsd({
     inputTokens: maxInputTokens, cachedInputTokens: 0, outputTokens: maxOutputTokens,
-  }, rates);
+  }, conservativeRates);
   if (microUsd === null) throw new RangeError('Se-yeon cost reservation would overflow.');
   return Object.freeze({ microUsd, modelKey, rateCardVersion });
 }
