@@ -15,6 +15,49 @@ insert into public.seyeon_ai_governor_daily_budgets_v1(
   bucket_utc_date,global_limit_micro_usd,subject_limit_micro_usd
 ) values ((clock_timestamp() at time zone 'UTC')::date,10000,4200);
 
+-- D1: A settled rate card cannot be repriced in place or deleted. Operators
+-- may disable/restore admission without altering previously priced calls.
+do $test_rate_card_immutable$
+declare v_denied boolean;
+begin
+  v_denied:=false;
+  begin
+    update public.seyeon_ai_governor_model_policies_v1
+    set input_micro_usd_per_million=2_000_000
+    where policy_version='offline-policy-v1';
+  exception when check_violation then
+    v_denied:=true;
+  end;
+  if not v_denied then raise exception 'Model rate changed without version rollover'; end if;
+
+  v_denied:=false;
+  begin
+    update public.seyeon_ai_governor_model_policies_v1
+    set allowed_purposes=array['dialogue_render']::text[]
+    where policy_version='offline-policy-v1';
+  exception when check_violation then
+    v_denied:=true;
+  end;
+  if not v_denied then raise exception 'Model purpose changed without new policy'; end if;
+
+  v_denied:=false;
+  begin
+    delete from public.seyeon_ai_governor_model_policies_v1
+    where policy_version='offline-policy-v1';
+  exception when check_violation then
+    v_denied:=true;
+  end;
+  if not v_denied then raise exception 'Governed immutable policy deleted'; end if;
+
+  update public.seyeon_ai_governor_model_policies_v1
+  set is_active=false
+  where policy_version='offline-policy-v1';
+  update public.seyeon_ai_governor_model_policies_v1
+  set is_active=true
+  where policy_version='offline-policy-v1';
+end
+$test_rate_card_immutable$;
+
 set local role myeongha_api_executor;
 set local myeongha.subject_id = 'a0000000-0000-0000-0000-000000000001';
 do $test$
@@ -51,6 +94,75 @@ begin
     'costStatus','estimated',
     'invoiceReconciled',false
   );
+  -- D1: Recalculate expected cost from the DB rate card, not the caller's
+  -- untrusted estimatedCostMicroUsd, even when the quoted rate version matches.
+  v_denied:=false;
+  begin
+    perform * from public.cmd_governed_settle_seyeon_ai_call_v1(
+      v_subject,v_turn,v_attempt,'post_turn',
+      pg_catalog.jsonb_set(v_event,'{estimatedCostMicroUsd}','1'::jsonb)
+    );
+  exception when check_violation then v_denied:=true;
+  end;
+  if not v_denied then raise exception 'Forged underpriced cost passed settlement'; end if;
+
+  -- Same forged total, but cache allocation differs from original pricing.
+  v_denied:=false;
+  begin
+    perform * from public.cmd_governed_settle_seyeon_ai_call_v1(
+      v_subject,v_turn,v_attempt,'post_turn',
+      pg_catalog.jsonb_set(v_event,'{cachedInputTokens}','10'::jsonb)
+    );
+  exception when check_violation then v_denied:=true;
+  end;
+  if not v_denied then raise exception 'Forged cache split passed settlement'; end if;
+
+  -- An estimated settlement MUST expose the input, output, cached usage.
+  v_denied:=false;
+  begin
+    perform * from public.cmd_governed_settle_seyeon_ai_call_v1(
+      v_subject,v_turn,v_attempt,'post_turn',
+      pg_catalog.jsonb_set(v_event,'{inputTokens}','null'::jsonb)
+    );
+  exception when check_violation then v_denied:=true;
+  end;
+  if not v_denied then raise exception 'Estimated price admitted absent token usage'; end if;
+
+  -- Governed pricing exists, so price_unknown cannot silently settle.
+  v_denied:=false;
+  begin
+    perform * from public.cmd_governed_settle_seyeon_ai_call_v1(
+      v_subject,v_turn,v_attempt,'post_turn',
+      pg_catalog.jsonb_set(
+        pg_catalog.jsonb_set(v_event,'{costStatus}','"price_unknown"'::jsonb),
+        '{estimatedCostMicroUsd}','null'::jsonb
+      )
+    );
+  exception when check_violation then v_denied:=true;
+  end;
+  if not v_denied then raise exception 'Governed call lost configured pricing'; end if;
+
+  -- Complete usage cannot be used to hide a charge under usage_unknown.
+  v_denied:=false;
+  begin
+    perform * from public.cmd_governed_settle_seyeon_ai_call_v1(
+      v_subject,v_turn,v_attempt,'post_turn',
+      pg_catalog.jsonb_set(
+        pg_catalog.jsonb_set(v_event,'{costStatus}','"usage_unknown"'::jsonb),
+        '{estimatedCostMicroUsd}','null'::jsonb
+      )
+    );
+  exception when check_violation then v_denied:=true;
+  end;
+  if not v_denied then raise exception 'Complete usage was marked unknown'; end if;
+
+  -- None of the failed transactions may turn started into settled.
+  if not exists (
+    select 1 from public.seyeon_ai_call_cost_events e
+    where e.call_id=v_first and e.lifecycle_state='started'
+      and e.governor_effective_micro_usd=3700
+  ) then raise exception 'Rejected cost events mutated the reservation'; end if;
+
   select * into strict v_reply from public.cmd_governed_settle_seyeon_ai_call_v1(
     v_subject,v_turn,v_attempt,'post_turn',v_event
   );
