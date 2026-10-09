@@ -47,10 +47,6 @@ export function ChatPage() {
                 <span data-character-title>서버 확인 중</span>
               </div>
             </div>
-            <div className="conversation-chat-head-actions">
-              <button type="button" data-history-open>지난 대화</button>
-              <a href="records.html">기록 보기</a>
-            </div>
           </header>
 
           <div className="conversation-thread-bar" data-thread-bar hidden>
@@ -60,7 +56,7 @@ export function ChatPage() {
           </div>
 
           <div className="conversation-message-stream" data-chat-stream aria-live="polite">
-            <article className="conversation-message" data-sender="character" data-chat-intro>
+            <article className="conversation-message" data-sender="character" data-chat-intro hidden>
               <span className="conversation-message-avatar" data-character-avatar aria-hidden="true">明</span>
               <div className="conversation-message-body">
                 <strong data-character-name>대화 상대</strong>
@@ -78,30 +74,10 @@ export function ChatPage() {
           </form>
 
           <p className="character-compose-status" data-compose-status aria-live="polite" />
+          <button className="character-room-retry" data-room-retry type="button" hidden>대화 다시 연결하기 →</button>
         </section>
       </main>
 
-      <aside className="character-history-drawer" data-history-drawer aria-hidden="true" aria-label="지난 대화">
-        <div className="character-history-head">
-          <div>
-            <span className="character-history-kicker">지난 대화</span>
-            <h2 data-history-character-name>대화 상대와 나눈 이야기</h2>
-          </div>
-          <button type="button" data-history-close aria-label="지난 대화 닫기">×</button>
-        </div>
-
-        <div className="character-history-list" data-history-list />
-        <p className="history-runtime-empty" data-history-empty>이어갈 대화를 선택하면 지난 대화가 여기에 표시됩니다.</p>
-      </aside>
-
-      <div className="character-room-scrim" data-room-scrim hidden />
-
-      <div className="character-room-menu" data-room-menu hidden>
-        <a href="#" aria-disabled="true">캐릭터 정보</a>
-        <a href="records.html">이어진 기록 보기</a>
-        <a href="#" aria-disabled="true">기억 관리</a>
-        <a href="#" aria-disabled="true">대화에서 찾기</a>
-      </div>
     </>
   );
 }
