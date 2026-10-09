@@ -98,6 +98,14 @@
 
 최소 검증: Vitest 정책·selector, PostgreSQL migration 1130/1150/1220, scoped DB case, A2/A3 증거, staging current approved version 교차 검증. 실데이터 출판/결제 검증은 별도 Release gate.
 
+## 5.1 실제 PostgreSQL 부분 검증 — PR #1838 병합
+
+- **PR #1838**: merged SHA `2ec39bc55a08b38b625bbc2ec10382b2341a9d58`; isolated scoped DB + Integration CI PASS.
+- verified synthetic purchase/Reader selection과 구매 기반 Grant가 있어도, 정확한 Reader×bundle×relationship `character_capabilities` 행이 **존재하지 않으면** `cmd_bind_standard_reading_access_v2`가 `reader_capability_unavailable`로 거부함을 검증. 거부 시 official Reading/interpretation/access 신규 row 0. 출판된 Capability row를 갱신하지 않고 fixture의 정상 행을 새로 INSERT하면 기존 positive test 정상.
+- 출판된 Character Capability row는 immutable trigger가 UPDATE/DELETE를 차단하므로 직접 값 변조 Fixture 사용 금지.
+- **검증 범위 주의:** 이번 DB 테스트는 **missing Capability row** DENY. 이미 출판된 `can_initiate=false` 행의 별도 SQL 사례 및 Product-approved 9×9 정책 일치는 미검증. CAP-01~12 전체 PASS가 아니며 #1828은 OPEN.
+- **권한 미변경:** SQL migration·Product/Reader 정책·출판 콘텐츠·실구매 Grant·Public Reader OFF에 변화 없음.
+
 ## 6. 구현 순서와 종료 조건
 
 - CAP-A (Product/Character): Standard vs Specialist 용어·권한·프리미엄 정책과 실제 Rule version/source 결정. Product/DB/Reader owner 승인 필요.
