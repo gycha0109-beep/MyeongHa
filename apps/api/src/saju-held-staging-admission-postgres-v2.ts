@@ -118,7 +118,7 @@ export function createSajuHeldStagingPostgresAdmissionPortV2(
       let inTransaction = false;
       let discardConnection: unknown;
       try {
-        await connection.query('BEGIN');
+        await connection.query('BEGIN ISOLATION LEVEL READ COMMITTED');
         inTransaction = true;
         await connection.query('SET LOCAL ROLE myeongha_saju_staging_admission_runtime');
         // PostgreSQL may evaluate a volatile WHERE predicate BEFORE a
