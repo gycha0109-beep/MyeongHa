@@ -25,7 +25,7 @@ export interface SeyeonAtomicPinnedPersonalRecordV1 {
 export interface SeyeonAtomicGrantReadV1 extends SeyeonAtomicPinnedPersonalRecordV1 {}
 
 export class SeyeonAtomicPublicationHoldV1 extends Error {
-  readonly name = 'SeyeonAtomicPublicationHoldV1';
+  override readonly name = 'SeyeonAtomicPublicationHoldV1';
   constructor(readonly code:
     | 'PINNED_PROOF_MISSING'
     | 'PINNED_PROOF_INVALID'
