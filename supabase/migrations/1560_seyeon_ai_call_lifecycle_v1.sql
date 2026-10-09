@@ -138,7 +138,7 @@ begin
      )
      or (p_event->>'priceVersion' is not null
        and (pg_catalog.length(p_event->>'priceVersion')>256
-         or p_event->>'priceVersion' !~ '^[a-zA-Z0-9._:/-]+
+         or p_event->>'priceVersion' !~ '^[a-zA-Z0-9._:/-]+$'))
   then
     raise exception using errcode='23514',
       constraint='seyeon_ai_call_settlement_identity_invalid',
