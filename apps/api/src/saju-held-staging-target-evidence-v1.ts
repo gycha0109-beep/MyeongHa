@@ -84,8 +84,7 @@ function dbObserve(x: unknown): Readonly<SajuStagingDbObservationV1> {
     || !bool(x.tlsPeerVerified) || !bool(x.roleMembershipObserved)
     || !bool(x.nonPrivilegedLoginObserved) || !bool(x.rlsObserved)
     || !bool(x.crossDomainDeniedObserved)) throw new TypeError();
-  return Object.freeze(Object.fromEntries(DB.map(k => [k, x[k]]))
-    as unknown as SajuStagingDbObservationV1);
+  return Object.freeze(Object.fromEntries(DB.map(k => [k, x[k]])) as unknown as SajuStagingDbObservationV1);
 }
 function observations(input: unknown): Readonly<SajuStagingTargetObservationsV1> {
   if (!exact(input, OBS_FIELDS)) throw new TypeError();
@@ -97,13 +96,11 @@ function observations(input: unknown): Readonly<SajuStagingTargetObservationsV1>
     || !bool(p.bearerIsolatedObserved) || !bool(p.hmacIsolatedObserved)
     || !bool(p.productionSeparatedObserved)) throw new TypeError();
   return Object.freeze({
-    auth: Object.freeze(Object.fromEntries(AUTH.map(k => [k, a[k]]))
-      as unknown as SajuStagingTargetObservationsV1['auth']),
+    auth: Object.freeze(Object.fromEntries(AUTH.map(k => [k, a[k]])) as unknown as SajuStagingTargetObservationsV1['auth']),
     subjectDb: dbObserve(input.subjectDb),
     nonceDb: dbObserve(input.nonceDb),
     admissionDb: dbObserve(input.admissionDb),
-    proof: Object.freeze(Object.fromEntries(PROOF.map(k => [k, p[k]]))
-      as unknown as SajuStagingTargetObservationsV1['proof']),
+    proof: Object.freeze(Object.fromEntries(PROOF.map(k => [k, p[k]])) as unknown as SajuStagingTargetObservationsV1['proof']),
   });
 }
 function ordered(obs: Readonly<SajuStagingTargetObservationsV1>): unknown[] {
