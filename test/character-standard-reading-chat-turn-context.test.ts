@@ -335,10 +335,26 @@ function authorities(
     readRelationshipEvents: vi.fn(async () => []),
     readRecentMessages: vi.fn(async () => []),
   };
+  // Synthetic Product/Commerce approval for legacy Reader Preview integration
+  // fixtures only; production has no implicit approved Product policy.
+  const productReaderEligibilityAuthorityPort = {
+    readApprovedRule: vi.fn(async () => ({
+      status: 'approved' as const,
+      rule: {
+        kind: 'standard_all_readers' as const,
+        productId: PRODUCT_ID,
+        productSpecVersion: 'standard-reading-v1',
+        sajuDomain: 'career' as const,
+        ruleVersion: 'synthetic-test-reader-policy-v1',
+        approvedPolicyRevision: 'synthetic-test-revision-v1',
+      },
+    })),
+  };
   return {
     threadBindingAuthorityPort,
     accessAuthorityPort,
     artifactAuthorityPort,
+    productReaderEligibilityAuthorityPort,
     relationshipAuthorityPort,
     memoryItemsAuthorityPort,
     memoryGrantsAuthorityPort,
@@ -709,9 +725,10 @@ describe('thread-bound Official Reading Reader runtime', () => {
         contextInput: serverContextInput(),
         groundingProjectionPort,
       }),
-    ).rejects.toThrow(/content bundle does not match/u);
+    ).rejects.toMatchObject({ code: 'ACCESS_DENIED' });
 
     expect(groundingProjectionPort.projectGrounding).not.toHaveBeenCalled();
+    expect(authority.artifactAuthorityPort.readArtifactSource).not.toHaveBeenCalled();
   });
 
   it('rejects revoked Reader access on the hardened Preview path before grounding', async () => {

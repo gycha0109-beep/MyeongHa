@@ -12,6 +12,7 @@ import type {
 import type {
   CharacterStandardReadingServerContextInputV1,
 } from './character-standard-reading-server-runtime-authority.js';
+import type { ProductReaderEligibilityAuthorityPortV1 } from './product-reader-eligibility-policy-v1.js';
 import type {
   CharacterRelationshipReadAuthorityPortV1,
 } from './character-relationship-read.js';
@@ -240,6 +241,7 @@ export async function runReaderInterpretationPreviewHttpV1(input: {
   readonly memoryGrantsAuthorityPort: MemoryGrantsReadAuthorityPortV1;
   readonly nonMemoryContextAuthorityPort: ReaderContextLifeFactsReadAuthorityPortV1;
   readonly groundingProjectionPort: OfficialReadingCharacterGroundingProjectionPortV1;
+  readonly productReaderEligibilityAuthorityPort?: ProductReaderEligibilityAuthorityPortV1;
   readonly admitServerReader?: (serverReaderCharacterId: string) => void;
 }): Promise<ReaderInterpretationPreviewHttpResponseV1> {
   const subjectId = requireSubject(input.resolvedSubjectId);
@@ -270,6 +272,9 @@ export async function runReaderInterpretationPreviewHttpV1(input: {
     memoryGrantsAuthorityPort: input.memoryGrantsAuthorityPort,
     nonMemoryContextAuthorityPort: input.nonMemoryContextAuthorityPort,
     groundingProjectionPort: input.groundingProjectionPort,
+    ...(input.productReaderEligibilityAuthorityPort
+      ? { productReaderEligibilityAuthorityPort: input.productReaderEligibilityAuthorityPort }
+      : {}),
     ...(input.admitServerReader ? { admitServerReader: input.admitServerReader } : {}),
   });
 
