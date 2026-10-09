@@ -1,7 +1,8 @@
 # M3-β-2b — 서버 소유자 계약 검토·구현 핸드오프 v1
 
 > 상태: SELF-REVIEWED DESIGN HANDOFF / OWNER APPROVAL NOT RECEIVED / PUBLIC OFF
-> 확인 기준: 2026-10-09 main 0b82b3f157b052c7110c9b4c7f5d5a1874918929
+> 기존 확인 기준: 2026-10-09 main 0b82b3f157b052c7110c9b4c7f5d5a1874918929
+> 후속 동기화: main 34ba01d470b29fbd4827db2692b65146d252553c (PR #1825/#1826 병합). Owner 교차 승인 리뷰 0건, tracked issues #1827/#1828.
 > 출처 우선순위: 실제 main 코드·docs/P0_DECISION_REGISTER.md 및 최근 병합 PR > 더 이전 역사 문서.
 > 확인 범위: GitHub PR #1823 리뷰/일반 코멘트 0건. 아래 OWNER는 담당 **트랙**이지 실제 담당자의 승인·리뷰 참여를 의미하지 않는다.
 
@@ -90,6 +91,15 @@ Authenticated canonical Subject
 5. 모바일 로그인 전환/Guest→Member continuity 중 늦게 돌아온 이전 Subject의 결과를 어떻게 폐기하는가?
 6. 연애·관계라는 **첫 Product 후보**가 일반 9 Reader×9 Saju domain 합성 검증과 다름을 상품·UI에 어떻게 반영하는가?
 7. 앱의 Reader 구매 추가 흐름이 승인된 Web-only checkout 정책을 어떤 공식 handoff/복원 계약으로 만족하는가? 현재는 미승인이다.
+
+## 5.1 최신 Reader 검증 반영 및 담당 이슈
+
+- **PR #1825 병합:** A3 V2 Preview의 `interpretationHash`를 `sha256:v1:<hex>`에 맞추고 guarded `protected_fallback`, 재조회 철회/미승인 premium 규칙 음성 테스트 보강. 이는 public paid HTTP·실운영 동시성 실측이 아니다.
+- **PR #1826 병합:** 9 Reader × 9 Saju domain = 81개 synthetic A2/A3 eligible 조합에 대해 각 one-use proof 발급·소비·재사용 거부 PASS. 운영 DB 구매 바인딩, 실제 발행 Character 콘텐츠, Product saleability, 실사용 E2E를 증명하지 않는다.
+- **Issue #1827 (DB):** `cmd_bind_standard_reading_access_v2`의 historical replay와 current active Grant 분리, 복수 exact Grant·bundle ambiguity, revoke 중 공개 판단. DB owner 리뷰·격리 Postgres 테스트 및 필요시 forward-only 수정을 요구.
+- **Issue #1828 (Product/DB/Reader):** 기존 DB `character_capabilities.can_initiate`/domain 검증과 A3 Product-approved `standard_all_readers`의 운영 계약 충돌 검토. 정확한 Reader unlock/출판/premium 정책을 승인받기 전 임의 DB 조건 완화 금지.
+
+이슈 등록은 **승인이 아니라 트랙별 작업 요청**이다. 담당자들의 owner decision과 검증 증거가 확인되기 전 D-01/D-02와 A 설계 승인은 HOLD다. 앱화 트랙이 과거 readonly binder 결과나 A3 synthetic PASS를 미래 paid 권한으로 사용해서는 안 된다.
 
 ## 6. A/B/C 판정
 
