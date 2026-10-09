@@ -13,7 +13,7 @@ insert into public.seyeon_ai_governor_model_policies_v1(
 );
 insert into public.seyeon_ai_governor_daily_budgets_v1(
   bucket_utc_date,global_limit_micro_usd,subject_limit_micro_usd
-) values ((clock_timestamp() at time zone 'UTC')::date,6000,4200);
+) values ((clock_timestamp() at time zone 'UTC')::date,10000,4200);
 
 set local role myeongha_api_executor;
 set local myeongha.subject_id = 'a0000000-0000-0000-0000-000000000001';
