@@ -31,6 +31,9 @@ import {
   type ProcessSeyeonPostTurnAnalysisResultV1,
   type SeyeonPostTurnAnalysisOutboxPortV1,
 } from './seyeon-post-turn-analysis-worker-v1.js';
+import {
+  assertSeyeonPersonalRecordsNotUsedBeforeUnprotectedCommitV1,
+} from './seyeon-personal-record-precommit-hold-v1.js';
 import type {
   SeyeonProductionRelationshipSyncOutboxPortV1,
 } from './seyeon-production-relationship-outbox-v1.js';
@@ -669,6 +672,11 @@ export async function runSeyeonProductionChatExecutionV1(
         activation,
         productionContext,
       }) => {
+        // Until exact-Grant atomic Commit is wired, do not invoke a model with
+        // any positively admitted personal Memory/Life Fact in its context.
+        assertSeyeonPersonalRecordsNotUsedBeforeUnprotectedCommitV1(
+          productionContext,
+        );
         await input.persistencePort.markContextReady({
           subjectId,
           turnId: receivedTurn.turnId,
