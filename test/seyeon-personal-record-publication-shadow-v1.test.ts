@@ -30,9 +30,9 @@ const projector: SeyeonProductionPersonalRecordProjectorV1 = Object.freeze({
   recordKind: 'memory',
   recordType: 'consultation_detail',
   schemaVersion: 'memory-v1',
-  project: ({ payload }) => ({
+  project: ({ payload }: { readonly recordId: string; readonly payload: unknown }) => ({
     summary: (payload as { summary: string }).summary,
-    claimKind: 'fact',
+    claimKind: 'fact' as const,
     relevance: 0.5,
     salience: 0.5,
   }),
