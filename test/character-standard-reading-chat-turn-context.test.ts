@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { prepareCharacterStandardReadingChatTurnPreflightV2 } from '../apps/api/src/character-standard-reading-chat-turn-preflight-v2.js';
+import { prepareCharacterStandardChatGroundingV2 } from '../apps/api/src/character-standard-reading-chat-grounding-v2.js';
 import { runThreadBoundReaderInterpretationPreviewV2 } from '../apps/api/src/reader-interpretation-preview-runtime-v2.js';
 import type { CharacterContentDefinition } from '../packages/character-content/src/index.js';
 import {
@@ -1395,5 +1396,164 @@ describe('A3-epsilon server-only Official Standard Reader Chat V2 preflight (pub
     await expect(prepareCharacterStandardReadingChatTurnPreflightV2(args))
       .rejects.toMatchObject({ code: 'SOURCE_MISMATCH' });
     expect(reads).toBeGreaterThanOrEqual(4);
+  });
+});
+
+
+describe('A3-zeta / PR 2-A server-only Chat Grounding V2 admission (public OFF)', () => {
+  async function setup() {
+    const authority = authorities();
+    const receivePlan = existingThreadReceivePlan();
+    const preflight = await prepareCharacterStandardReadingChatTurnPreflightV2({
+      resolvedSubjectId: SUBJECT_ID,
+      receivePlan,
+      readingId: READING_ID,
+      effectiveAt: '2026-09-21T00:02:00.000Z',
+      ...authority,
+      contextInput: serverContextInput(),
+    });
+    const projectGrounding = vi.fn(async () => previewGrounding());
+    return { authority, preflight, projectGrounding };
+  }
+
+  function input(f: Awaited<ReturnType<typeof setup>>) {
+    return {
+      preflight: f.preflight,
+      threadBindingAuthorityPort: f.authority.threadBindingAuthorityPort,
+      accessAuthorityPort: f.authority.accessAuthorityPort,
+      artifactAuthorityPort: f.authority.artifactAuthorityPort,
+      productReaderEligibilityAuthorityPort: f.authority.productReaderEligibilityAuthorityPort,
+      groundingProjectionPort: { projectGrounding: f.projectGrounding },
+    };
+  }
+
+  it('adopts Saju-owned source-attested grounding only after fresh A2/A3 checks on both sides', async () => {
+    const f = await setup();
+    const result = await prepareCharacterStandardChatGroundingV2(input(f));
+    expect(result.scope.subjectId).toBe(SUBJECT_ID);
+    expect(result.scope.readingId).toBe(READING_ID);
+    expect(result.context.schemaVersion).toBe('v2');
+    expect(result.context.characterId).toBe('baekheon');
+    expect(result.context.saju).not.toHaveProperty('capability');
+    expect(result.context.saju.groundingRef.readingRef).toBe(READING_ID);
+    expect(result.context.saju.groundingRef.groundingHash).toBe(result.grounding.groundingHash);
+    expect(result.grounding.readingDomain).toBe('career');
+    expect(f.projectGrounding).toHaveBeenCalledTimes(1);
+    expect(f.authority.accessAuthorityPort.readAccessibleReadings).toHaveBeenCalledTimes(4);
+    expect(f.authority.artifactAuthorityPort.readArtifactSource).toHaveBeenCalledTimes(4);
+    expect(f.authority.productReaderEligibilityAuthorityPort.readApprovedRule).toHaveBeenCalledTimes(7);
+  });
+
+  it('refuses a structural clone of the server-issued preflight before querying the raw source', async () => {
+    const f = await setup();
+    const port = f.authority.artifactAuthorityPort.readArtifactSource as ReturnType<typeof vi.fn>;
+    port.mockClear();
+    await expect(prepareCharacterStandardChatGroundingV2({
+      ...input(f), preflight: { ...f.preflight },
+    })).rejects.toMatchObject({ code: 'ACCESS_DENIED' });
+    expect(port).not.toHaveBeenCalled();
+    expect(f.projectGrounding).not.toHaveBeenCalled();
+  });
+
+  it('blocks a revoked Reader Grant before dispatching Saju Grounding projection', async () => {
+    const f = await setup();
+    f.authority.accessAuthorityPort.readAccessibleReadings = vi.fn(async () => []);
+    await expect(prepareCharacterStandardChatGroundingV2(input(f)))
+      .rejects.toMatchObject({ code: 'ACCESS_DENIED' });
+    expect(f.projectGrounding).not.toHaveBeenCalled();
+  });
+
+  it('blocks a revoked Reader Grant after projection and never admits a grounded context', async () => {
+    const f = await setup();
+    f.projectGrounding.mockImplementationOnce(async () => {
+      f.authority.accessAuthorityPort.readAccessibleReadings = vi.fn(async () => []);
+      return previewGrounding();
+    });
+    await expect(prepareCharacterStandardChatGroundingV2(input(f)))
+      .rejects.toMatchObject({ code: 'SOURCE_MISMATCH' });
+    expect(f.projectGrounding).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects a premium-reclassified Product before Saju projection', async () => {
+    const f = await setup();
+    f.authority.productReaderEligibilityAuthorityPort.readApprovedRule.mockResolvedValue({
+      status: 'approved',
+      rule: {
+        kind: 'premium_restricted',
+        allowedReaderIds: ['baekheon'],
+        productId: PRODUCT_ID,
+        productSpecVersion: 'standard-reading-v1',
+        sajuDomain: 'career',
+        ruleVersion: 'synthetic-test-reader-policy-v1',
+        approvedPolicyRevision: 'synthetic-test-revision-v1',
+      },
+    } as never);
+    await expect(prepareCharacterStandardChatGroundingV2(input(f)))
+      .rejects.toMatchObject({ code: 'ACCESS_DENIED' });
+    expect(f.projectGrounding).not.toHaveBeenCalled();
+  });
+
+  it('rejects a Product reclassified while Saju service is executing', async () => {
+    const f = await setup();
+    f.projectGrounding.mockImplementationOnce(async () => {
+      f.authority.productReaderEligibilityAuthorityPort.readApprovedRule.mockResolvedValue({
+        status: 'approved',
+        rule: {
+          kind: 'premium_restricted',
+          allowedReaderIds: ['baekheon'],
+          productId: PRODUCT_ID,
+          productSpecVersion: 'standard-reading-v1',
+          sajuDomain: 'career',
+          ruleVersion: 'synthetic-test-reader-policy-v1',
+          approvedPolicyRevision: 'synthetic-test-revision-v1',
+        },
+      } as never);
+      return previewGrounding();
+    });
+    await expect(prepareCharacterStandardChatGroundingV2(input(f)))
+      .rejects.toMatchObject({ code: 'SOURCE_MISMATCH' });
+    expect(f.projectGrounding).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects forged grounding hash and never accepts the service response as authority', async () => {
+    const f = await setup();
+    f.projectGrounding.mockResolvedValueOnce({
+      ...previewGrounding(), groundingHash: '0'.repeat(64),
+    });
+    await expect(prepareCharacterStandardChatGroundingV2(input(f)))
+      .rejects.toMatchObject({ code: 'SOURCE_MISMATCH' });
+    expect(f.projectGrounding).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects a different Reading/domain source from the Saju service', async () => {
+    const f = await setup();
+    f.projectGrounding.mockResolvedValueOnce({
+      ...previewGrounding(), readingRef: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+    });
+    await expect(prepareCharacterStandardChatGroundingV2(input(f)))
+      .rejects.toMatchObject({ code: 'SOURCE_MISMATCH' });
+  });
+
+  it('rejects the official source snapshot drifting while the Saju service runs', async () => {
+    const f = await setup();
+    let n = 0;
+    const read = f.authority.artifactAuthorityPort.readArtifactSource;
+    f.authority.artifactAuthorityPort.readArtifactSource = vi.fn(async (args) => {
+      n++;
+      const rows = await read(args);
+      return n > 1
+        ? rows.map(row => ({ ...row, completedAt: '2026-10-10T01:00:00.000Z' }))
+        : rows;
+    });
+    await expect(prepareCharacterStandardChatGroundingV2(input(f)))
+      .rejects.toMatchObject({ code: 'SOURCE_MISMATCH' });
+    expect(f.projectGrounding).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails closed when Saju projection cannot respond', async () => {
+    const f = await setup();
+    f.projectGrounding.mockRejectedValueOnce(new Error('synthetic transport failure'));
+    await expect(prepareCharacterStandardChatGroundingV2(input(f)))
+      .rejects.toMatchObject({ code: 'GROUNDING_UNAVAILABLE' });
   });
 });
