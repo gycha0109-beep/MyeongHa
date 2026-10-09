@@ -129,6 +129,19 @@ export default function OfficialReadingDetailScreen() {
               </Text>
             </View>
 
+            <View style={styles.readerCard}>
+              <Text style={styles.readerCardTitle}>이 공식 Reading과 Reader</Text>
+              <Text style={styles.readerCardText}>
+                {state.record.readerCharacterIds.length > 0
+                  ? `공식 기록에 연결된 Reader 정보: ${state.record.readerCharacterIds.length}명`
+                  : '이 공식 기록에 연결된 Reader 정보가 없습니다.'}
+              </Text>
+              <Text style={styles.readerCardText}>
+                Reader 연결 정보는 해설 구매·열람 권한 또는 해설 완료의 증명이 아닙니다.
+                Reader별 해설 다시 보기와 후속 대화는 별도의 서버 권한·기록 계약이 승인된 뒤 제공됩니다.
+              </Text>
+            </View>
+
             {state.record.display.notices.length > 0 ? (
               <View style={styles.noticeCard}>
                 <Text style={styles.noticeTitle}>읽기 범위 안내</Text>
@@ -212,6 +225,16 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   retryText: { color: mobileColors.navy, fontSize: 13, fontWeight: '800' },
+  readerCard: {
+    borderWidth: 1,
+    borderColor: mobileColors.border,
+    borderRadius: 16,
+    backgroundColor: mobileColors.surface,
+    padding: 16,
+    gap: 8,
+  },
+  readerCardTitle: { color: mobileColors.navy, fontSize: 15, fontWeight: '800' },
+  readerCardText: { color: mobileColors.muted, fontSize: 13, lineHeight: 19 },
   noticeCard: {
     borderWidth: 1,
     borderColor: mobileColors.gold,
