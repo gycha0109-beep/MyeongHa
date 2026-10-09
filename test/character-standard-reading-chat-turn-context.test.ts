@@ -4,6 +4,7 @@ import {
   prepareCharacterStandardChatGroundingV2,
   assertServerPreparedStandardChatGroundingV2,
 } from '../apps/api/src/character-standard-reading-chat-grounding-v2.js';
+import { selectCharacterStandardFollowupEvidenceV1 } from '../apps/api/src/character-standard-reading-chat-followup-evidence-v1.js';
 import { runThreadBoundReaderInterpretationPreviewV2 } from '../apps/api/src/reader-interpretation-preview-runtime-v2.js';
 import type { CharacterContentDefinition } from '../packages/character-content/src/index.js';
 import {
@@ -1561,5 +1562,138 @@ describe('A3-zeta / PR 2-A server-only Chat Grounding V2 admission (public OFF)'
     f.projectGrounding.mockRejectedValueOnce(new Error('synthetic transport failure'));
     await expect(prepareCharacterStandardChatGroundingV2(input(f)))
       .rejects.toMatchObject({ code: 'GROUNDING_UNAVAILABLE' });
+  });
+});
+
+
+describe('A3-eta server-anchored follow-up evidence selection (public OFF)', () => {
+  async function setup(bundle = previewGrounding()) {
+    const authority = authorities();
+    const preflight = await prepareCharacterStandardReadingChatTurnPreflightV2({
+      resolvedSubjectId: SUBJECT_ID, receivePlan: existingThreadReceivePlan(),
+      readingId: READING_ID, effectiveAt: '2026-09-21T00:02:00.000Z',
+      ...authority, contextInput: serverContextInput(),
+    });
+    const grounded = await prepareCharacterStandardChatGroundingV2({
+      preflight, threadBindingAuthorityPort: authority.threadBindingAuthorityPort,
+      accessAuthorityPort: authority.accessAuthorityPort,
+      artifactAuthorityPort: authority.artifactAuthorityPort,
+      productReaderEligibilityAuthorityPort: authority.productReaderEligibilityAuthorityPort,
+      groundingProjectionPort: { projectGrounding: vi.fn(async () => bundle) },
+    });
+    const ids = grounded.grounding.units.map(unit => unit.unitId);
+    const anchor = {
+      status: 'committed_semantic_guard_pass' as const,
+      subjectId: SUBJECT_ID, threadId: THREAD_ID,
+      readerCharacterId: 'baekheon', readingRef: READING_ID,
+      officialArtifactResponseHash: grounded.scope.officialArtifactResponseHash,
+      groundingHash: grounded.grounding.groundingHash,
+      assistantMessageId: 'synthetic-validated-assistant-turn',
+      sourceUnitRefs: [ids[0]!],
+    };
+    const readLatestValidatedAnchor = vi.fn(async () => anchor);
+    return { ids, anchor, readLatestValidatedAnchor, input: {
+      preflight, grounded, anchorAuthorityPort: { readLatestValidatedAnchor },
+    } };
+  }
+
+  it('uses exactly a persisted validated Unit, never arbitrary user text or all Reading units', async () => {
+    const f = await setup();
+    const result = await selectCharacterStandardFollowupEvidenceV1(f.input);
+    expect(result.mode).toBe('grounded_selection');
+    if (result.mode !== 'grounded_selection') throw new Error('no validated unit');
+    expect(result.selectedUnitIds).toEqual([f.ids[0]]);
+    expect(result.selectionHash).toMatch(/^sha256:v1:[0-9a-f]{64}$/u);
+    expect(f.readLatestValidatedAnchor).toHaveBeenCalledWith({
+      subjectId: SUBJECT_ID, threadId: THREAD_ID,
+      readerCharacterId: 'baekheon', readingRef: READING_ID,
+    });
+  });
+
+  it('requires clarification when no validated prior answer is present', async () => {
+    const f = await setup();
+    f.readLatestValidatedAnchor.mockResolvedValueOnce(null as never);
+    await expect(selectCharacterStandardFollowupEvidenceV1(f.input))
+      .resolves.toMatchObject({ mode: 'hold', reason: 'clarification_required' });
+  });
+
+  it('requires explicit server-verified focus for a multi-unit prior answer', async () => {
+    const f = await setup();
+    f.readLatestValidatedAnchor.mockResolvedValueOnce({
+      ...f.anchor, sourceUnitRefs: [f.ids[0]!, f.ids[1]!],
+    } as never);
+    await expect(selectCharacterStandardFollowupEvidenceV1(f.input))
+      .resolves.toMatchObject({ mode: 'hold', reason: 'clarification_required' });
+    f.readLatestValidatedAnchor.mockResolvedValueOnce({
+      ...f.anchor, sourceUnitRefs: [f.ids[0]!, f.ids[1]!],
+      focusedUnitRef: f.ids[1]!,
+    } as never);
+    const selected = await selectCharacterStandardFollowupEvidenceV1(f.input);
+    expect(selected.mode).toBe('grounded_selection');
+    if (selected.mode !== 'grounded_selection') throw new Error('no focus');
+    expect(selected.selectedUnitIds).toEqual([f.ids[1]]);
+  });
+
+  it('blocks cross-Subject / cross-Reading evidence and hallucinated Unit identifiers', async () => {
+    const f = await setup();
+    f.readLatestValidatedAnchor.mockResolvedValueOnce({
+      ...f.anchor, subjectId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    } as never);
+    await expect(selectCharacterStandardFollowupEvidenceV1(f.input))
+      .rejects.toMatchObject({ code: 'SOURCE_MISMATCH' });
+    f.readLatestValidatedAnchor.mockResolvedValueOnce({
+      ...f.anchor, sourceUnitRefs: ['unknown-source-unit'],
+    });
+    await expect(selectCharacterStandardFollowupEvidenceV1(f.input))
+      .rejects.toMatchObject({ code: 'SOURCE_MISMATCH' });
+  });
+
+  it('refuses forged grounded results before reading the validated assistant anchor', async () => {
+    const f = await setup();
+    await expect(selectCharacterStandardFollowupEvidenceV1({
+      ...f.input, grounded: { ...f.input.grounded },
+    })).rejects.toMatchObject({ code: 'ACCESS_DENIED' });
+    expect(f.readLatestValidatedAnchor).not.toHaveBeenCalled();
+  });
+
+  it('retains recursively required companions, disclosures and ambiguities', async () => {
+    const original = previewGrounding();
+    const ids = original.units.map(unit => unit.unitId);
+    const { groundingHash: _hash, ...materialWithoutHash } = original;
+    const material = {
+      ...materialWithoutHash,
+      units: original.units.map((unit, i) => i === 0 ? {
+        ...unit, requiredCompanionUnitRefs: [ids[1]!],
+        requiredDisclosureRefs: ['disclosure-followup-1'],
+        ambiguityRef: 'ambiguity-followup-1',
+      } : unit),
+      disclosures: [{
+        disclosureRef: 'disclosure-followup-1', type: 'scope_limitation' as const,
+        text: '현재 공식 Reading 범위의 설명입니다.', sourceDisclosureIndex: 0,
+      }],
+      ambiguities: [{
+        ambiguityRef: 'ambiguity-followup-1', kind: 'reading_block' as const,
+        sourceRef: 'sections.0.blocks.0',
+        summary: '특정 시기를 확정할 수 없습니다.',
+      }],
+    };
+    const f = await setup({
+      ...material, groundingHash: hashCharacterSajuGroundingBundleMaterialV1(material),
+    });
+    const result = await selectCharacterStandardFollowupEvidenceV1(f.input);
+    expect(result.mode).toBe('protected_only');
+    if (result.mode !== 'protected_only') throw new Error('missing protected evidence');
+    expect(result.selectedUnitIds).toEqual([ids[0], ids[1]]);
+    expect(result.requiredDisclosureRefs).toEqual(['disclosure-followup-1']);
+    expect(result.requiredAmbiguityRefs).toEqual(['ambiguity-followup-1']);
+  });
+
+  it('rejects a focus outside prior committed source refs', async () => {
+    const f = await setup();
+    f.readLatestValidatedAnchor.mockResolvedValueOnce({
+      ...f.anchor, focusedUnitRef: f.ids[2]!,
+    } as never);
+    await expect(selectCharacterStandardFollowupEvidenceV1(f.input))
+      .rejects.toMatchObject({ code: 'SOURCE_MISMATCH' });
   });
 });
