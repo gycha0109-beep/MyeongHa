@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
+import { SAJU_DOMAINS, type SajuDomain } from '../packages/contracts/src/index.js';
+import { OFFICIAL_READER_RUNTIME_IDS_V1 } from '../apps/api/src/reader-production-rollout-policy-v1.js';
 import {
   issueCharacterSajuOfficialStandardEligibilityV2,
   consumeCharacterSajuOfficialStandardEligibilityV2,
@@ -18,26 +20,26 @@ const BUNDLE = '55555555-5555-4555-8555-555555555555';
 const RELEASE = 'release-synthetic-reader';
 const EFFECTIVE = '2026-10-09T08:00:00.000Z';
 
-function standardPolicy(): ProductReaderRuleLookupV1 {
+function standardPolicy(domain: SajuDomain = 'general'): ProductReaderRuleLookupV1 {
   return { status: 'approved', rule: {
     kind: 'standard_all_readers', productId: PRODUCT,
-    productSpecVersion: 'standard-reading-v1', sajuDomain: 'general',
+    productSpecVersion: 'standard-reading-v1', sajuDomain: domain,
     ruleVersion: 'fixture-standard-rule', approvedPolicyRevision: 'fixture-approved-r1',
   }};
 }
 
-function fixture(reader = 'seyeon') {
-  const readApprovedRule = vi.fn(async (): Promise<ProductReaderRuleLookupV1> => standardPolicy());
+function fixture(reader = 'seyeon', domain: SajuDomain = 'general') {
+  const readApprovedRule = vi.fn(async (): Promise<ProductReaderRuleLookupV1> => standardPolicy(domain));
   const productAuthorityPort = { readApprovedRule };
   const access = {
     subjectId: SUBJECT, readingId: READING, readerCharacterId: reader,
     readerContentBundleId: BUNDLE,
     readingSessionId: '22222222-2222-4222-8222-222222222222',
     productId: PRODUCT, productSpecVersion: 'standard-reading-v1',
-    topicKey: 'general', sajuDomain: 'general', readingPeriod: 'original',
+    topicKey: domain, sajuDomain: domain, readingPeriod: 'original',
     readingVariant: 'standard',
     sourceBirthRevisionId: '44444444-4444-4444-8444-444444444444',
-    domainCapabilityVersion: 'general-v1',
+    domainCapabilityVersion: `${domain}-v1`,
     readingContractVersion: 'myeonghwa-product-reading-response-v2',
     sajuEngineVersion: 'saju-engine-v1',
     responseHash: 'sha256:v1:fixture-response-hash',
@@ -82,17 +84,21 @@ function fixture(reader = 'seyeon') {
 }
 
 describe('A3-alpha — official standard Character Saju eligibility V2', () => {
-  it.each(['seyeon', 'baekheon', 'yeoul', 'seorin', 'rahyeon', 'mira', 'taegyeom', 'yunho', 'doyun'])(
-    'mints only after a real A2 ticket for the exact %s Reader and standard policy',
-    async (reader) => {
-      const f = fixture(reader);
+  it.each(
+    OFFICIAL_READER_RUNTIME_IDS_V1.flatMap((reader) =>
+      SAJU_DOMAINS.map((domain) => ({ reader, domain })),
+    ),
+  )(
+    'mints and consumes only the exact A2 standard proof for $reader × $domain',
+    async ({ reader, domain }) => {
+      const f = fixture(reader, domain);
       const prepared = await prepareOfficialReadingReaderAdmissionV1(f.input);
       const proof = await issueCharacterSajuOfficialStandardEligibilityV2({
         prepared, currentScope: prepared.scope, productAuthorityPort: f.productAuthorityPort,
       });
       expect(proof).toMatchObject({
         source: 'official_standard_product_rule',
-        admittedDomain: 'general', productId: PRODUCT, readingRef: READING,
+        admittedDomain: domain, productId: PRODUCT, readingRef: READING,
         subjectId: SUBJECT, readerCharacterId: reader,
         policyRevision: 'fixture-approved-r1',
       });
