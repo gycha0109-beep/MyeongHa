@@ -25,11 +25,13 @@ const pinned: SeyeonAtomicPinnedPersonalRecordV1 = Object.freeze({
 function setup(current: readonly SeyeonAtomicPinnedPersonalRecordV1[] = [pinned]) {
   const transactionClient = Object.freeze({ txId: 'server-same-tx' });
   const sequence: string[] = [];
+  const runCalls: string[] = [];
   const subjectTransaction = {
-    run: vi.fn(async <T>(
+    run: async <T>(
       resolvedSubjectId: string,
       callback: (client: typeof transactionClient) => Promise<T>,
     ) => {
+      runCalls.push(resolvedSubjectId);
       if (resolvedSubjectId !== subjectId) throw new Error('subject mismatch');
       sequence.push('BEGIN');
       try {
@@ -40,7 +42,7 @@ function setup(current: readonly SeyeonAtomicPinnedPersonalRecordV1[] = [pinned]
         sequence.push('ROLLBACK');
         throw error;
       }
-    }),
+    },
   };
   const lockCurrentRecordsInSameTransaction = vi.fn(async (
     client: typeof transactionClient,
@@ -79,7 +81,7 @@ function setup(current: readonly SeyeonAtomicPinnedPersonalRecordV1[] = [pinned]
     commitTurnInSameTransaction,
     ...overrides,
   });
-  return { call, sequence, subjectTransaction, lockCurrentRecordsInSameTransaction, commitTurnInSameTransaction };
+  return { call, sequence, runCalls, subjectTransaction, lockCurrentRecordsInSameTransaction, commitTurnInSameTransaction };
 }
 
 describe('Se-yeon same-transaction Commit candidate, never Production activation', () => {
@@ -89,7 +91,7 @@ describe('Se-yeon same-transaction Commit candidate, never Production activation
     expect(x.sequence).toEqual([
       'BEGIN', 'LOCK_EXACT_CURRENT_GRANTS', 'WRITE_COMMIT', 'COMMIT',
     ]);
-    expect(x.subjectTransaction.run).toHaveBeenCalledTimes(1);
+    expect(x.runCalls).toEqual([subjectId]);
     expect(x.lockCurrentRecordsInSameTransaction).toHaveBeenCalledTimes(1);
     expect(x.commitTurnInSameTransaction).toHaveBeenCalledTimes(1);
     expect(result).toMatchObject({
@@ -128,7 +130,7 @@ describe('Se-yeon same-transaction Commit candidate, never Production activation
     await expect(invalid.call({
       serverPinnedRecords: [{ ...pinned, grantId: 'ATTACKER_GRANT_ROLE_SYSTEM' }],
     })).rejects.toMatchObject({ code: 'PINNED_PROOF_INVALID' });
-    expect(invalid.subjectTransaction.run).not.toHaveBeenCalled();
+    expect(invalid.runCalls).toEqual([]);
 
     const unavailable = setup();
     unavailable.lockCurrentRecordsInSameTransaction.mockRejectedValueOnce(
@@ -145,7 +147,7 @@ describe('Se-yeon same-transaction Commit candidate, never Production activation
     await expect(x.call({ serverPinnedRecords: [] })).rejects.toMatchObject({
       code: 'PINNED_PROOF_MISSING',
     });
-    expect(x.subjectTransaction.run).not.toHaveBeenCalled();
+    expect(x.runCalls).toEqual([]);
     expect(SeyeonAtomicPublicationHoldV1.name).toBe('SeyeonAtomicPublicationHoldV1');
   });
 
@@ -162,6 +164,6 @@ describe('Se-yeon same-transaction Commit candidate, never Production activation
     const x = setup([pinned, pinned]);
     await expect(x.call({ serverPinnedRecords: [pinned, pinned] })).rejects
       .toMatchObject({ code: 'PINNED_PROOF_INVALID' });
-    expect(x.subjectTransaction.run).not.toHaveBeenCalled();
+    expect(x.runCalls).toEqual([]);
   });
 });
