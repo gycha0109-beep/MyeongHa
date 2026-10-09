@@ -50,6 +50,15 @@ from public.cmd_governed_start_seyeon_ai_call_v1(
 )
 `.trim();
 
+const GOVERNED_SETTLE_SQL = `
+select call_id::text as "callId", replayed,
+       occupied_micro_usd::text as "occupiedMicroUsd",
+       over_ceiling as "overCeiling"
+from public.cmd_governed_settle_seyeon_ai_call_v1(
+  $1::uuid,$2::uuid,$3::uuid,$4::text,$5::jsonb
+)
+`.trim();
+
 const TURN_TOTAL_SQL = `
 select call_count as "callCount",
  known_cost_micro_usd::text as "knownCostMicroUsd",
@@ -201,6 +210,42 @@ export async function settleSeyeonAiCallV1(
     throw new Error('Se-yeon cost ledger settlement receipt is invalid.');
   }
   return Object.freeze({callId,replayed:row.replayed});
+}
+
+/** The governed reservation and global budget are settled atomically in DB. */
+export async function settleGovernedSeyeonAiCallV1(
+  client: PostgresTransactionQueryV1,
+  binding: SeyeonAiCostLedgerBindingV1,
+  event: SeyeonAiCostEventV1,
+): Promise<{
+  callId: string; replayed: boolean;
+  occupiedMicroUsd: bigint; overCeiling: boolean;
+}> {
+  const args = bindingParams(binding);
+  const callId = uuid(event.callId,'callId');
+  if (event.schemaVersion !== 'seyeon-ai-cost-v1' ||
+      event.invoiceReconciled !== false) {
+    throw new Error('Se-yeon governed settlement contract is invalid.');
+  }
+  const result = await client.query<{
+    callId: string; replayed: boolean;
+    occupiedMicroUsd: string; overCeiling: boolean;
+  }>(GOVERNED_SETTLE_SQL,[...args,JSON.stringify(event)]);
+  const row = result.rows[0];
+  if (result.rows.length !== 1 || row === undefined ||
+      uuid(row.callId,'response callId') !== callId ||
+      typeof row.replayed !== 'boolean' ||
+      typeof row.occupiedMicroUsd !== 'string' ||
+      !/^[0-9]+$/u.test(row.occupiedMicroUsd) ||
+      BigInt(row.occupiedMicroUsd) > BigInt(Number.MAX_SAFE_INTEGER) ||
+      typeof row.overCeiling !== 'boolean') {
+    throw new Error('Se-yeon governed settlement receipt is invalid.');
+  }
+  return Object.freeze({
+    callId,replayed:row.replayed,
+    occupiedMicroUsd:BigInt(row.occupiedMicroUsd),
+    overCeiling:row.overCeiling,
+  });
 }
 
 export async function insertSeyeonAiCallCostV1(
@@ -368,7 +413,9 @@ export function createPersistingSeyeonAiProviderV1(input: {
           }
           try {
             await input.runner.run(state.binding.subjectId, client =>
-              settleSeyeonAiCallV1(client,state.binding!,event),
+              input.governor === undefined
+                ? settleSeyeonAiCallV1(client,state.binding!,event)
+                : settleGovernedSeyeonAiCallV1(client,state.binding!,event),
             );
           } catch {
             // Keep the started row for reconciliation. Never retry inference.
