@@ -1116,11 +1116,11 @@ describe('A3-gamma server-only Thread-bound official standard V2 Preview (public
     authority.productReaderEligibilityAuthorityPort.readApprovedRule.mockResolvedValue({
       status: 'approved',
       rule: {
-        kind: 'premium_named_readers',
+        kind: 'premium_restricted',
         productId: PRODUCT_ID,
         productSpecVersion: 'standard-reading-v1',
         sajuDomain: 'career',
-        readerCharacterIds: ['baekheon'],
+        allowedReaderIds: ['baekheon'],
         ruleVersion: 'synthetic-premium-policy-v1',
         approvedPolicyRevision: 'synthetic-premium-revision-v1',
       },
