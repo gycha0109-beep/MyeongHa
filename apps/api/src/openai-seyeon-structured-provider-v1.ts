@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { readBoundedUpstreamJsonTextV1 } from './upstream-json-response-resource.js';
 import {
   createSeyeonAiCostEventV1,
   estimateSeyeonAiCallCostV1,
@@ -22,6 +23,8 @@ export const OPENAI_SEYEON_STRUCTURED_PROVIDER_DEFAULT_TIMEOUT_MS_V1 =
   30_000 as const;
 export const OPENAI_SEYEON_STRUCTURED_PROVIDER_MAX_TIMEOUT_MS_V1 =
   120_000 as const;
+export const OPENAI_SEYEON_STRUCTURED_PROVIDER_MAX_RESPONSE_BYTES_V1 =
+  524_288 as const;
 
 /** Defense-in-depth only; deterministic authorization/Output Guards remain mandatory. */
 const SEYEON_PROVIDER_UNTRUSTED_DATA_BOUNDARY_V1 =
@@ -404,6 +407,7 @@ export function createOpenAiSeyeonStructuredProviderV1(
           signal: controller.signal,
         });
       } catch {
+        clearTimeout(timer);
         meter(timedOut ? 'timeout' : 'network_failure', null);
         if (timedOut) {
           throw new OpenAiSeyeonStructuredProviderErrorV1(
@@ -415,10 +419,9 @@ export function createOpenAiSeyeonStructuredProviderV1(
           'NETWORK_FAILURE',
           'OpenAI structured request failed before a response was accepted.',
         );
-      } finally {
-        clearTimeout(timer);
       }
 
+      try {
       if (!response.ok) {
         const diagnostic = await readSeyeonProviderFailureDiagnosticV1(response);
         meter('http_failure', response.status);
@@ -450,12 +453,24 @@ export function createOpenAiSeyeonStructuredProviderV1(
 
       let raw: unknown;
       try {
-        raw = await response.json();
+        const boundedText = await readBoundedUpstreamJsonTextV1(response, {
+          maximumBodyBytes: OPENAI_SEYEON_STRUCTURED_PROVIDER_MAX_RESPONSE_BYTES_V1,
+          signal: controller.signal,
+        });
+        raw = JSON.parse(boundedText) as unknown;
       } catch {
+        if (timedOut || controller.signal.aborted) {
+          meter('timeout', response.status);
+          throw new OpenAiSeyeonStructuredProviderErrorV1(
+            'TIMEOUT',
+            'OpenAI structured response body exceeded the request deadline.',
+            response.status,
+          );
+        }
         meter('invalid_response', response.status);
         throw new OpenAiSeyeonStructuredProviderErrorV1(
           'INVALID_RESPONSE',
-          'OpenAI structured response body is not valid JSON.',
+          'OpenAI structured response body failed bounded JSON admission.',
           response.status,
         );
       }
@@ -470,6 +485,9 @@ export function createOpenAiSeyeonStructuredProviderV1(
           'OpenAI structured output text is not valid JSON.',
           response.status,
         );
+      }
+      } finally {
+        clearTimeout(timer);
       }
     },
   });
