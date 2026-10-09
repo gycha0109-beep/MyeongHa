@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   createSajuHeldStagingPostgresAdmissionPortV2,
   SAJU_HELD_STAGING_CONSUME_SQL_V2,
+  SAJU_HELD_STAGING_LOCK_SQL_V2,
 } from '../apps/api/src/saju-held-staging-admission-postgres-v2.js';
 import {
   canonicalSajuHeldStagingPermitApprovalBytesV2,
@@ -71,6 +72,9 @@ function fixture(settings: {fail?: string; returned?: 'wrong' | 'two' | 'empty'}
         if (['update', 'rollback'].includes(settings.fail ?? '') && text.startsWith('update public.')) throw Error('SECRET_UPDATE');
         if (settings.fail === 'commit' && text === 'COMMIT') throw Error('SECRET_COMMIT');
         if (settings.fail === 'rollback' && text === 'ROLLBACK') throw Error('SECRET_ROLLBACK');
+        if (text === SAJU_HELD_STAGING_LOCK_SQL_V2) {
+          return { rows: [{ permitId: values?.[0] }] as Row[] };
+        }
         if (text.startsWith('update public.')) {
           if (settings.returned === 'two') return {rows: [
             {permitId: values?.[0]}, {permitId: values?.[0]},
@@ -111,9 +115,10 @@ describe('8C-2B-2D-3-02 dormant V2 PostgreSQL atomic consumer', () => {
     expect(await port.consumeAuthorizedAttemptOnce()).toBe(false);
     expect(f.connect).toHaveBeenCalledOnce();
     expect(f.sql.map(x => x.text === SAJU_HELD_STAGING_CONSUME_SQL_V2
-      ? 'UPDATE' : x.text)).toEqual([
+      ? 'UPDATE' : x.text === SAJU_HELD_STAGING_LOCK_SQL_V2
+        ? 'LOCK' : x.text)).toEqual([
         'BEGIN', 'SET LOCAL ROLE myeongha_saju_staging_admission_runtime',
-        'UPDATE', 'COMMIT',
+        'LOCK', 'UPDATE', 'COMMIT',
       ]);
     expect(SAJU_HELD_STAGING_CONSUME_SQL_V2).toContain('connection_plan_digest = $3::text');
     expect(SAJU_HELD_STAGING_CONSUME_SQL_V2).toContain('clock_timestamp()');
