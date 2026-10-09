@@ -1,0 +1,29 @@
+name: Dispatch Latest Main Production Privacy Canary
+
+on:
+  push:
+    branches:
+      - ops/dispatch-production-privacy-canary-main-20260922
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  dispatch:
+    name: dispatch-production-privacy-recovery-canary
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Dispatch latest main canary
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          main_sha="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq '.sha')"
+          echo "Dispatching Production Privacy Recovery Canary from main@$main_sha"
+          gh workflow run production-privacy-recovery-canary.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref main \
+            -f confirmation=RUN_SYNTHETIC_PRODUCTION_PRIVACY_CANARY \
+            -f watchtower_track=privacy-recovery
