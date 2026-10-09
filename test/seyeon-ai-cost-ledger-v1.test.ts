@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   createPersistingSeyeonAiProviderV1,
   insertSeyeonAiCallCostV1,
+  startSeyeonAiCallV1,
+  settleSeyeonAiCallV1,
   readSeyeonAiTurnCostV1,
   type SeyeonAiCostLedgerBindingV1,
 } from '../apps/api/src/postgres-seyeon-ai-cost-ledger-v1.js';
@@ -86,39 +88,137 @@ describe('Se-yeon durable AI cost ledger (offline)',()=>{
     });
   });
 
-  it('awaits the Subject-scoped insert after mocked provider response',async()=>{
-    const query = vi.fn().mockImplementation(async (_sql:string,values:unknown[])=>({
-      rows:[{callId:JSON.parse(String(values[4])).callId,replayed:false}],
-    }));
-    const client = {query} as unknown as PostgresTransactionQueryV1;
-    const runner: SeyeonProductionSubjectTransactionRunnerV1 = {
+  it('writes a strict start receipt before calling the provider', async()=>{
+    const query=vi.fn().mockResolvedValue({rows:[{callId}]});
+    const client={query} as unknown as PostgresTransactionQueryV1;
+    expect(await startSeyeonAiCallV1(client,binding,{
+      callId,purpose:'dialogue_render',providerKey:'openai-responses',modelKey:'test-model',
+    })).toBe(callId);
+    expect(query.mock.calls[0]![0]).toContain('cmd_start_seyeon_ai_call_v1');
+    expect(query.mock.calls[0]![1]).toEqual([
+      subjectId,turnId,attemptId,'chat',callId,'dialogue_render','openai-responses','test-model',
+    ]);
+    expect(JSON.stringify(query.mock.calls)).not.toContain('offline fixture');
+  });
+
+  it('checks settlement receipt and cost payload separately from dispatch',async()=>{
+    const query=vi.fn().mockResolvedValue({rows:[{callId,replayed:false}]});
+    const client={query} as unknown as PostgresTransactionQueryV1;
+    expect(await settleSeyeonAiCallV1(client,binding,event))
+      .toEqual({callId,replayed:false});
+    expect(query.mock.calls[0]![0]).toContain('cmd_settle_seyeon_ai_call_v1');
+    expect(JSON.parse(query.mock.calls[0]![1][4])).toMatchObject({
+      callId,costStatus:'price_unknown',estimatedCostMicroUsd:null,
+    });
+  });
+
+  it('commits a start before mocked inference and settles the identical provider call',async()=>{
+    const order:string[]=[];
+    let startId='';
+    const query=vi.fn().mockImplementation(async (sql:string,values:unknown[])=>{
+      if(sql.includes('cmd_start_seyeon_ai_call_v1')) {
+        order.push('start');
+        startId=String(values[4]);
+        return {rows:[{callId:startId}]};
+      }
+      if(sql.includes('cmd_settle_seyeon_ai_call_v1')) {
+        order.push('settle');
+        expect(JSON.parse(String(values[4])).callId).toBe(startId);
+        return {rows:[{callId:startId,replayed:false}]};
+      }
+      throw new Error('Unexpected cost ledger SQL');
+    });
+    const client={query} as unknown as PostgresTransactionQueryV1;
+    const runner:SeyeonProductionSubjectTransactionRunnerV1={
       resolveSubject:async()=>({subjectId,subjectKind:'member'}),
       run:async (_subject,execute)=>execute(client,{subjectId,subjectKind:'member'}),
     };
-    const fetchImpl = vi.fn(async()=>response());
+    const fetchImpl=vi.fn(async (_url:string,init:RequestInit)=>{
+      order.push('fetch');
+      expect(new Headers(init.headers).get('x-client-request-id')).toBe(startId);
+      return response();
+    });
     vi.spyOn(console,'info').mockImplementation(()=>undefined);
-    const provider = createPersistingSeyeonAiProviderV1({
+    const provider=createPersistingSeyeonAiProviderV1({
       config:{apiKey:key,model:'test-model',fetchImpl},
       runner,getBinding:()=>binding,
     });
     expect(await provider.generate(request)).toEqual({ok:true});
     expect(fetchImpl).toHaveBeenCalledTimes(1);
-    expect(query).toHaveBeenCalledTimes(1);
+    expect(query).toHaveBeenCalledTimes(2);
+    expect(order).toEqual(['start','fetch','settle']);
     expect(JSON.stringify(query.mock.calls)).not.toContain('offline fixture');
   });
 
-  it('records rejected HTTP calls and never repeats inference because the DB is down',async()=>{
-    const query=vi.fn().mockRejectedValue(new Error('database credentials'));
+  it('blocks external inference if the pre-dispatch ledger is unavailable',async()=>{
+    const query=vi.fn().mockRejectedValue(new Error('database credential canary'));
     const client={query} as unknown as PostgresTransactionQueryV1;
-    const runner: SeyeonProductionSubjectTransactionRunnerV1={
+    const runner:SeyeonProductionSubjectTransactionRunnerV1={
+      resolveSubject:async()=>({subjectId,subjectKind:'member'}),
+      run:async (_subject,execute)=>execute(client,{subjectId,subjectKind:'member'}),
+    };
+    const fetchImpl=vi.fn(async()=>response());
+    const errors=vi.spyOn(console,'error').mockImplementation(()=>undefined);
+    const provider=createPersistingSeyeonAiProviderV1({
+      config:{apiKey:key,model:'test-model',fetchImpl},
+      runner,getBinding:()=>binding,
+    });
+    await expect(provider.generate(request)).rejects.toMatchObject({
+      code:'PRE_DISPATCH_REJECTED',
+    });
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(errors.mock.calls)).not.toContain('database credential canary');
+  });
+
+  it('does not repeat paid inference when settlement fails after a successful response',async()=>{
+    let startedCallId='';
+    const query=vi.fn().mockImplementation(async (sql:string,values:unknown[])=>{
+      if(sql.includes('cmd_start_seyeon_ai_call_v1')) {
+        startedCallId=String(values[4]);
+        return {rows:[{callId:startedCallId}]};
+      }
+      throw new Error('database credential canary');
+    });
+    const client={query} as unknown as PostgresTransactionQueryV1;
+    const runner:SeyeonProductionSubjectTransactionRunnerV1={
+      resolveSubject:async()=>({subjectId,subjectKind:'member'}),
+      run:async (_subject,execute)=>execute(client,{subjectId,subjectKind:'member'}),
+    };
+    const fetchImpl=vi.fn(async()=>response());
+    const errors=vi.spyOn(console,'error').mockImplementation(()=>undefined);
+    const provider=createPersistingSeyeonAiProviderV1({
+      config:{apiKey:key,model:'test-model',fetchImpl},
+      runner,getBinding:()=>binding,
+    });
+    await expect(provider.generate(request)).resolves.toEqual({ok:true});
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(query).toHaveBeenCalledTimes(2);
+    expect(startedCallId).not.toBe('');
+    expect(errors.mock.calls.map(c=>c[0]))
+      .toContain('MYEONGHA_SEYEON_COST_SETTLEMENT_FAILED');
+    expect(JSON.stringify(errors.mock.calls)).not.toContain('database credential canary');
+  });
+
+  it('settles rejected HTTP calls without a retry or a second paid request',async()=>{
+    let call='';
+    const query=vi.fn().mockImplementation(async (sql:string,values:unknown[])=>{
+      if(sql.includes('cmd_start_seyeon_ai_call_v1')) {
+        call=String(values[4]);
+        return {rows:[{callId:call}]};
+      }
+      const event=JSON.parse(String(values[4]));
+      expect(event).toMatchObject({callId:call,outcome:'http_failure'});
+      return {rows:[{callId:call,replayed:false}]};
+    });
+    const client={query} as unknown as PostgresTransactionQueryV1;
+    const runner:SeyeonProductionSubjectTransactionRunnerV1={
       resolveSubject:async()=>({subjectId,subjectKind:'member'}),
       run:async (_subject,execute)=>execute(client,{subjectId,subjectKind:'member'}),
     };
     const fetchImpl=vi.fn(async()=>new Response(JSON.stringify({error:{code:'invalid_request_error'}}),{
       status:429,headers:{'content-type':'application/json'},
     }));
-    vi.spyOn(console,'info').mockImplementation(()=>undefined);
-    const errors=vi.spyOn(console,'error').mockImplementation(()=>undefined);
     const provider=createPersistingSeyeonAiProviderV1({
       config:{apiKey:key,model:'test-model',fetchImpl},
       runner,getBinding:()=>({...binding,phase:'post_turn'}),
@@ -126,10 +226,7 @@ describe('Se-yeon durable AI cost ledger (offline)',()=>{
     await expect(provider.generate({...request,purpose:'event_extraction'}))
       .rejects.toMatchObject({code:'HTTP_FAILURE'});
     expect(fetchImpl).toHaveBeenCalledTimes(1);
-    expect(query).toHaveBeenCalledTimes(1);
+    expect(query).toHaveBeenCalledTimes(2);
     expect(query.mock.calls[0]![1][3]).toBe('post_turn');
-    expect(errors.mock.calls.map(x=>x[0]))
-      .toContain('MYEONGHA_SEYEON_COST_PERSIST_FAILED');
-    expect(JSON.stringify(errors.mock.calls)).not.toContain('database credentials');
   });
 });
