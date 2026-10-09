@@ -56,6 +56,7 @@ export function ChatPage() {
           </div>
 
           <div className="conversation-message-stream" data-chat-stream aria-live="polite">
+            <p className="character-room-loading" data-room-loading role="status">대화를 불러오는 중입니다…</p>
             <article className="conversation-message" data-sender="character" data-chat-intro hidden>
               <span className="conversation-message-avatar" data-character-avatar aria-hidden="true">明</span>
               <div className="conversation-message-body">
