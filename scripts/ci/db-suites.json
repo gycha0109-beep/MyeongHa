@@ -8,6 +8,7 @@
       "device-installation-registration-runtime",
       "guest-bootstrap-runtime",
       "records-production-read-authority",
+      "reader-memory-tenant-boundary",
       "runtime-function-api-role-acl",
       "self-birth-profile-current",
       "saju-staging-operator-admission"
