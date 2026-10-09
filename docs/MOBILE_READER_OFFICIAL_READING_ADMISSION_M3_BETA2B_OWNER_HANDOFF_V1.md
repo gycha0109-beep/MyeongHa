@@ -116,7 +116,7 @@ Authenticated canonical Subject
 - 현재 Preview 서버 실행은 Subject DB transaction 내에서 runtime 함수를 await하고, A3 내부의 재검증은 동일 effectiveAt을 사용한다. **현재 A3 V2는 공개 HTTP가 아니며**, 원격 Saju 처리 이후 fresh Grant 재검증·response 공개 선형화 계약은 확인되지 않았다.
 - **조건부 권고 후보:** 짧은 T1 prepare → DB 밖 protected renderer → fresh DB clock/Subject/Grant/Rule/Thread/Source로 T2 final authorization → 승인된 결과만 공개.
 - RACE-01~16은 **설계된 테스트**이지 실행 PASS가 아니다. Commit 이후 HTTP 전송 사이 revoke의 의미와 provider 원가/idempotency·lock policy를 DB/Commerce/Reader/API가 승인해야 한다.
-- **D-02 실행 설계 강화:** MOBILE_READER_FINAL_AUTHORIZATION_LOCKING_D02_V1.md에서 기존 Commerce FOR UPDATE·revision CAS와 Reader v2 bind의 Grant-first 잠금, runtime stable query의 무잠금 차이를 검증. L1 T2 commit 선형화와 R2 공유 scope 잠금은 **조건부 후보**, 실제 owner 채택 전 HOLD. 새 bundle/Grant phantom은 기존 Grant FOR SHARE만으로 차단되지 않음. DB-C1/C2(오프라인) 우선, DB-C3/C4(공통 writer protocol) owner 승인 후 분할.
+- **D-02 실행 설계 강화:** MOBILE_READER_FINAL_AUTHORIZATION_LOCKING_D02_V1.md에서 기존 Commerce FOR UPDATE·revision CAS와 Reader v2 bind의 Grant-first 잠금, runtime stable query의 무잠금 차이를 검증. L1 T2 commit 선형화와 R2 공유 scope 잠금은 **조건부 후보**, 실제 owner 채택 전 HOLD. 새 bundle/Grant phantom은 기존 Grant FOR SHARE만으로 차단되지 않음. **#1854 병합:** DB-C1 same Reader/same Bundle 두 독립 Purchase Grants 중 한쪽 revoke 후 나머지 유지·전부 revoke시 원본 접근 차단 PASS. DB-C2는 다른 Bundle active 두 행이 DB에 그대로 보여 **기존 A2 exact-one 로직으로 거부할 수 있는 모호성**을 확인하고 한 Bundle revoke 뒤 단일 행 복구 PASS. DB-C2 SQL 자체가 접근을 DENY하는 것은 아님. DB-C3/C4(공통 writer protocol) owner 승인 후 분할.
 
 ## 6. A/B/C 판정
 
