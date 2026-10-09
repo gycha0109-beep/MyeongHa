@@ -175,6 +175,10 @@ case "$case_name" in
     apply_standard_migrations
     bash test/db/records_read_runtime_authority.sh
     ;;
+  reader-memory-tenant-boundary)
+    apply_standard_migrations
+    psql -v ON_ERROR_STOP=1 -f test/db/reader_memory_tenant_boundary_v1.sql
+    ;;
   runtime-function-api-role-acl)
     apply_standard_migrations
     bash test/db/runtime_function_api_role_acl.sh
