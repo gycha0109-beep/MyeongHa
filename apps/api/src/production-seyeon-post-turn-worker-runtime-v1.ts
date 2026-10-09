@@ -1,6 +1,7 @@
 import {
   createPersistingSeyeonAiProviderV1,
   type SeyeonAiCostLedgerBindingV1,
+  type SeyeonAiGovernorAdmissionV1,
 } from './postgres-seyeon-ai-cost-ledger-v1.js';
 import {
   createOpenAiSeyeonStructuredProviderV1,
@@ -60,6 +61,8 @@ export interface CreateProductionSeyeonPostTurnWorkerRuntimeInputV1 {
   readonly databaseConfig: ProductionUserDataRuntimeConfigV1;
   readonly providerConfig?: OpenAiSeyeonStructuredProviderConfigV1;
   readonly provider?: SeyeonStructuredProviderPortV2;
+  /** Explicit server-only, absent by default. */
+  readonly costGovernor?: SeyeonAiGovernorAdmissionV1;
   readonly pool?: PostgresSubjectPoolV1;
 }
 
@@ -78,6 +81,10 @@ function resolveProvider(
 export function createProductionSeyeonPostTurnWorkerRuntimeV1(
   input: CreateProductionSeyeonPostTurnWorkerRuntimeInputV1,
 ): ProductionSeyeonPostTurnWorkerRuntimeV1 {
+  if (input.costGovernor !== undefined &&
+      (input.provider !== undefined || input.providerConfig === undefined)) {
+    throw new Error('Governed post-turn requires native metered Provider config.');
+  }
   const poolLease = createProductionPostgresSubjectPoolLeaseV1({
     config: input.databaseConfig,
     ...(input.pool === undefined ? {} : { pool: input.pool }),
@@ -124,6 +131,9 @@ export function createProductionSeyeonPostTurnWorkerRuntimeV1(
               config: input.providerConfig,
               runner,
               getBinding: () => activeCostBinding,
+              ...(input.costGovernor === undefined ? {} : {
+                governor: input.costGovernor,
+              }),
             })
           : provider;
 
