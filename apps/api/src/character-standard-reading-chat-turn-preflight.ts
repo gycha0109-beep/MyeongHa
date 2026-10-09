@@ -29,6 +29,7 @@ import type {
 import {
   CharacterStandardReadingServerRuntimeAuthorityErrorV1,
   prepareCharacterStandardReadingServerRuntimeV1,
+  assertNoCallerContentAuthorityFields,
   type CharacterStandardReadingServerContextInputV1,
 } from './character-standard-reading-server-runtime-authority.js';
 import type {
@@ -84,6 +85,7 @@ export async function prepareCharacterStandardReadingChatTurnPreflightV1(
     );
   }
   const contentEntry = getServerPreparedChatReceiveContentEntryV1(input.receivePlan);
+  assertNoCallerContentAuthorityFields(input.contextInput);
   const request = input.receivePlan.normalizedRequest;
 
   if (input.receivePlan.isNewThread || request.threadId === undefined) {
@@ -96,7 +98,9 @@ export async function prepareCharacterStandardReadingChatTurnPreflightV1(
   // eligibility before the downstream legacy Character source/assembly seam.
   // The A2 ticket is one-use and is consumed only after the source and
   // current thread revision have been independently checked again.
-  const admission = await prepareOfficialReadingReaderAdmissionV1({
+  let admission;
+  try {
+    admission = await prepareOfficialReadingReaderAdmissionV1({
     ...(input.resolvedSubjectId === undefined
       ? {} : { resolvedSubjectId: input.resolvedSubjectId }),
     threadId: request.threadId,
@@ -107,7 +111,12 @@ export async function prepareCharacterStandardReadingChatTurnPreflightV1(
     accessAuthorityPort: input.accessAuthorityPort,
     artifactAuthorityPort: input.artifactAuthorityPort,
     productReaderEligibilityAuthorityPort: input.productReaderEligibilityAuthorityPort,
-  });
+    });
+  } catch {
+    throw new CharacterStandardReadingChatTurnPreflightErrorV1(
+      'Official Reading Reader A2 authorization is unavailable.',
+    );
+  }
 
   let runtime: CharacterStandardReadingThreadRuntimeV1;
   try {
