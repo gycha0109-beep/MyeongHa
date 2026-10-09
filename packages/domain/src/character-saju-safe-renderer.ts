@@ -8,6 +8,7 @@ import {
   type CharacterDialogueEnvelopeV1,
 } from './character-output-guard.js';
 import type { CharacterRuntimeContextV1 } from './character-runtime-context.js';
+import type { CharacterRuntimeContextV2 } from './character-saju-runtime-v2.js';
 
 /**
  * Strict provider contract for Saju-bearing turns.
@@ -68,7 +69,7 @@ function resolveFraming(
  * fails closed before provider output is accepted.
  */
 export function assertCharacterSajuVoiceRuntimeInvariantV1(
-  context: CharacterRuntimeContextV1,
+  context: CharacterRuntimeContextV1 | CharacterRuntimeContextV2,
 ): void {
   if (context.saju === null) {
     throw new CharacterOutputGuardError(

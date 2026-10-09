@@ -6,6 +6,8 @@ import {
   assertCharacterSajuVoiceRuntimeInvariantV1,
 } from './character-saju-safe-renderer.js';
 import type { CharacterRuntimeContextWithGroundingV1 } from './character-saju-grounding-admission.js';
+import type { CharacterRuntimeContextWithGroundingV2 } from './character-saju-runtime-v2.js';
+type CharacterReadingRuntimeContext = CharacterRuntimeContextWithGroundingV1 | CharacterRuntimeContextWithGroundingV2;
 import type { CharacterPerspectiveProfileV1 } from './character-saju-perspective.js';
 import {
   admitCharacterSajuGroundingBundleViewV1,
@@ -103,7 +105,7 @@ function sha256Json(value: unknown): string {
 }
 
 function resolveSafeFramingByPurpose(input: {
-  readonly context: CharacterRuntimeContextWithGroundingV1;
+  readonly context: CharacterReadingRuntimeContext;
   readonly collection: 'before' | 'after';
   readonly purpose:
     | 'record_transition'
@@ -185,7 +187,7 @@ function realizationText(unit: CharacterGroundingUnitViewV1): string {
 }
 
 function reactionFraming(input: {
-  readonly context: CharacterRuntimeContextWithGroundingV1;
+  readonly context: CharacterReadingRuntimeContext;
   readonly units: readonly CharacterGroundingUnitViewV1[];
   readonly requestedDomain: SajuDomain;
 }): { readonly key: string; readonly text: string } {
@@ -233,7 +235,7 @@ function assertRenderedUnitCoverage(input: {
 }
 
 export function renderCharacterSajuBoundedExactCoreV1(input: {
-  readonly context: CharacterRuntimeContextWithGroundingV1;
+  readonly context: CharacterReadingRuntimeContext;
   readonly grounding: unknown;
   readonly perspective: CharacterPerspectiveProfileV1;
   readonly requestedDomain: SajuDomain;
@@ -386,3 +388,10 @@ export function renderCharacterSajuBoundedExactCoreV1(input: {
     utterance,
   });
 }
+
+export function renderCharacterSajuBoundedExactCoreV2(input: {
+  readonly context: CharacterRuntimeContextWithGroundingV2;
+  readonly grounding: unknown;
+  readonly perspective: CharacterPerspectiveProfileV1;
+  readonly requestedDomain: SajuDomain;
+}): CharacterSajuBoundedRenderDecisionV1 { return renderCharacterSajuBoundedExactCoreV1(input); }

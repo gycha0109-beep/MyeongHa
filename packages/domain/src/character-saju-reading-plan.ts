@@ -2,11 +2,14 @@ import { createHash } from 'node:crypto';
 
 import type { SajuDomain } from '../../contracts/src/index.js';
 import type { CharacterRuntimeContextWithGroundingV1 } from './character-saju-grounding-admission.js';
+import type { CharacterRuntimeContextWithGroundingV2 } from './character-saju-runtime-v2.js';
+type CharacterReadingRuntimeContext = CharacterRuntimeContextWithGroundingV1 | CharacterRuntimeContextWithGroundingV2;
 import type { CharacterPerspectiveProfileV1 } from './character-saju-perspective.js';
 import {
   CHARACTER_INSIGHT_SELECTION_SCHEMA_VERSION_V1,
   admitCharacterSajuGroundingBundleViewV1,
   selectCharacterInsightsV1,
+  selectCharacterInsightsV2,
   type CharacterGroundingUnitViewV1,
   type CharacterInsightSelectionV1,
 } from './character-saju-insight-selector.js';
@@ -124,7 +127,7 @@ function perspectiveRef(
 }
 
 function relationshipRef(
-  context: CharacterRuntimeContextWithGroundingV1,
+  context: CharacterReadingRuntimeContext,
 ): CharacterReadingRelationshipProjectionRefV1 {
   return Object.freeze({
     schemaVersion: 'v1',
@@ -153,7 +156,7 @@ function purposeForUnit(
 }
 
 function firstAuthoredQuestionStrategy(
-  context: CharacterRuntimeContextWithGroundingV1,
+  context: CharacterReadingRuntimeContext,
 ): string | null {
   for (const raw of context.sajuProfile.followUpQuestionStrategies) {
     const strategy = raw.trim();
@@ -163,7 +166,7 @@ function firstAuthoredQuestionStrategy(
 }
 
 function hasSafeFramingPurpose(
-  context: CharacterRuntimeContextWithGroundingV1,
+  context: CharacterReadingRuntimeContext,
   collection: 'before' | 'after',
   purpose:
     | 'record_transition'
@@ -217,7 +220,7 @@ function protectedDisclosureRefs(input: {
 }
 
 function shouldScheduleReaction(input: {
-  readonly context: CharacterRuntimeContextWithGroundingV1;
+  readonly context: CharacterReadingRuntimeContext;
   readonly selectedUnits: readonly CharacterGroundingUnitViewV1[];
 }): boolean {
   const hasUncertainty = input.selectedUnits.some(
@@ -237,7 +240,7 @@ function shouldScheduleReaction(input: {
 }
 
 function planBeats(input: {
-  readonly context: CharacterRuntimeContextWithGroundingV1;
+  readonly context: CharacterReadingRuntimeContext;
   readonly selectedUnits: readonly CharacterGroundingUnitViewV1[];
   readonly disclosureRefs: readonly string[];
 }): readonly CharacterReadingBeatV1[] {
@@ -315,12 +318,14 @@ function assertLimitationPreservation(input: {
 }
 
 export function buildCharacterReadingPlanDecisionV1(input: {
-  readonly context: CharacterRuntimeContextWithGroundingV1;
+  readonly context: CharacterReadingRuntimeContext;
   readonly grounding: unknown;
   readonly perspective: CharacterPerspectiveProfileV1;
   readonly requestedDomain: SajuDomain;
 }): CharacterReadingPlanDecisionV1 {
-  const selection = selectCharacterInsightsV1(input);
+  const selection = input.context.schemaVersion === 'v2'
+    ? selectCharacterInsightsV2({ ...input, context: input.context })
+    : selectCharacterInsightsV1({ ...input, context: input.context });
   const groundingRef = input.context.saju?.groundingRef ?? null;
   if (groundingRef === null) {
     throw new CharacterReadingPlanErrorV1(
@@ -399,3 +404,11 @@ export function buildCharacterReadingPlanDecisionV1(input: {
     plan,
   });
 }
+
+/** V2 standard Product admission runs in the separate selector. */
+export function buildCharacterReadingPlanDecisionV2(input: {
+  readonly context: CharacterRuntimeContextWithGroundingV2;
+  readonly grounding: unknown;
+  readonly perspective: CharacterPerspectiveProfileV1;
+  readonly requestedDomain: SajuDomain;
+}): CharacterReadingPlanDecisionV1 { return buildCharacterReadingPlanDecisionV1(input); }

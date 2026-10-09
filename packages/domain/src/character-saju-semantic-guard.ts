@@ -1,5 +1,7 @@
 import type { SajuDomain } from '../../contracts/src/index.js';
 import type { CharacterRuntimeContextWithGroundingV1 } from './character-saju-grounding-admission.js';
+import type { CharacterRuntimeContextWithGroundingV2 } from './character-saju-runtime-v2.js';
+type CharacterReadingRuntimeContext = CharacterRuntimeContextWithGroundingV1 | CharacterRuntimeContextWithGroundingV2;
 import type { CharacterPerspectiveProfileV1 } from './character-saju-perspective.js';
 import {
   admitCharacterSajuGroundingBundleViewV1,
@@ -271,7 +273,7 @@ function compareIdentity(
 
 export function guardCharacterSajuSemanticPreservationV1(input: {
   readonly candidate: unknown;
-  readonly context: CharacterRuntimeContextWithGroundingV1;
+  readonly context: CharacterReadingRuntimeContext;
   readonly grounding: unknown;
   readonly perspective: CharacterPerspectiveProfileV1;
   readonly requestedDomain: SajuDomain;
@@ -356,3 +358,11 @@ export function guardCharacterSajuSemanticPreservationV1(input: {
     }),
   });
 }
+
+export function guardCharacterSajuSemanticPreservationV2(input: {
+  readonly candidate: unknown;
+  readonly context: CharacterRuntimeContextWithGroundingV2;
+  readonly grounding: unknown;
+  readonly perspective: CharacterPerspectiveProfileV1;
+  readonly requestedDomain: SajuDomain;
+}): CharacterSajuSemanticGuardDecisionV1 { return guardCharacterSajuSemanticPreservationV1(input); }

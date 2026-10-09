@@ -16,6 +16,13 @@ import {
   type CharacterSajuGroundingBundleViewV1,
 } from './character-saju-insight-selector.js';
 import { renderCharacterSajuBoundedExactCoreV1 } from './character-saju-bounded-renderer.js';
+import { renderCharacterSajuBoundedExactCoreV2 } from './character-saju-bounded-renderer.js';
+import { guardCharacterSajuSemanticPreservationV2 } from './character-saju-semantic-guard.js';
+import { buildCharacterReadingPlanDecisionV2 } from './character-saju-reading-plan.js';
+import {
+  assembleCharacterRuntimeContextFromOfficialStandardV2,
+  admitCharacterRuntimeSajuGroundingV2,
+} from './character-saju-runtime-v2.js';
 
 const SOURCE_HASH = 'a'.repeat(64);
 
@@ -442,5 +449,55 @@ describe('bounded exact-core Character Saju renderer', () => {
     expect(render({ bundle, context, perspective })).toEqual(
       render({ bundle, context, perspective }),
     );
+  });
+});
+
+describe('A3-gamma official standard V2 interpretation pipeline', () => {
+  it('preserves exact source semantics and refuses forged V2 grounded contexts', () => {
+    const unit = makeUnit('1', { axis: 'work' });
+    const source = makeBundle({ units: [unit] });
+    const legacy = makeContext(source);
+    const { capability, groundingRef, ...saju } = legacy.saju!;
+    expect(capability.domain).toBe('general');
+    const v2 = assembleCharacterRuntimeContextFromOfficialStandardV2({
+      baseContext: { ...legacy, saju: null },
+      saju,
+      eligibility: {
+        source: 'official_standard_product_rule',
+        admittedDomain: 'general',
+        productId: 'fixture-official-standard',
+        policyRevision: 'fixture-approved-policy',
+        readingRef: source.readingRef,
+        subjectId: 'fixture-subject',
+        readerCharacterId: legacy.characterId,
+        threadId: 'fixture-thread',
+        readerContentBundleId: legacy.contentBundleId,
+        contentReleaseId: 'fixture-release',
+        officialArtifactResponseHash: 'fixture-artifact-hash',
+      },
+    });
+    expect('capability' in v2.saju).toBe(false);
+    const context = admitCharacterRuntimeSajuGroundingV2({ context: v2, groundingRef });
+    const perspective = makePerspective({ characterId: legacy.characterId });
+    const input = { context, grounding: source, perspective, requestedDomain: 'general' as const };
+    expect(buildCharacterReadingPlanDecisionV2(input).mode).toBe('character_plan');
+    const rendered = renderCharacterSajuBoundedExactCoreV2(input);
+    expect(rendered.mode).toBe('bounded_exact_core');
+    if (rendered.mode !== 'bounded_exact_core') throw new Error('expected bounded V2');
+    expect(rendered.utterance.segments
+      .filter((segment) => segment.kind === 'semantic_realization')
+      .map((segment) => segment.text)).toEqual([unit.canonicalMeaning]);
+    expect(guardCharacterSajuSemanticPreservationV2({
+      ...input, candidate: rendered.utterance,
+    }).mode).toBe('accepted');
+    expect(() => renderCharacterSajuBoundedExactCoreV2({
+      ...input, context: { ...context },
+    })).toThrow();
+    expect(guardCharacterSajuSemanticPreservationV2({
+      ...input, candidate: { ...rendered.utterance, segments: [] },
+    }).mode).not.toBe('accepted');
+    expect(() => renderCharacterSajuBoundedExactCoreV2({
+      ...input, grounding: { ...source, groundingHash: 'b'.repeat(64) },
+    })).toThrow();
   });
 });
