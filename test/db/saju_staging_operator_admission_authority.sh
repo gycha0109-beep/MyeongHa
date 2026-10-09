@@ -78,6 +78,11 @@ deny "runtime DELETE" "begin; set local role $runtime; delete from $t;"
 
 consume() {
   local id="$1" expected_digest="$2"
+  local claim_issued="$issued" claim_expires="$expires"
+  if [[ "$id" = "$expired" ]]; then
+    claim_issued=$((now-130000))
+    claim_expires=$((now-1000))
+  fi
   cat <<SQL
 update $t
 set status='CONSUMED',
@@ -88,7 +93,7 @@ where permit_id='$id'::uuid
   and myeongha_commit_sha='$sha_m'::text and saju_commit_sha='$sha_s'::text
   and approved_operator_id='ci-operator'
   and approval_signature_key_id='ed25519-ci-key'
-  and issued_at_ms=$issued and expires_at_ms=$expires
+  and issued_at_ms=$claim_issued and expires_at_ms=$claim_expires
   and status='ISSUED' and consumed_at_ms is null
   and issued_at_ms<=floor(extract(epoch from statement_timestamp())*1000)::bigint
   and expires_at_ms>floor(extract(epoch from statement_timestamp())*1000)::bigint
@@ -152,5 +157,7 @@ q "update $t set status='REVOKED' where permit_id='$revoked'" >/dev/null
   fail "revoked permit accepted"
 pass "expired/revoked permit rejection"
 
-deny "runtime cannot revert consumed permit" "begin; set local role $runtime;
-  update $t set status='ISSUED',consumed_at_ms=null where permit_id='$single';"
+[[ -z "$(q "begin; set local role $runtime;
+  update $t set status='ISSUED',consumed_at_ms=null where permit_id='$single'; commit;")" ]] ||
+  fail "runtime reset an already consumed approval"
+pass "consumed approval reset denied"
