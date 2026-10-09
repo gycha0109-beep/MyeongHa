@@ -54,8 +54,12 @@ describe('MyeongHa immersive long-form Character Room', () => {
 
     expect(source).toContain('data-context-pill hidden');
     expect(source).toContain('data-thread-bar hidden');
-    expect(source).toContain('data-history-list />');
-    expect(source).toContain('data-history-empty');
+    expect(source).toContain('data-chat-intro hidden');
+    expect(source).toContain('data-room-loading role="status"');
+    expect(source).toContain('data-room-retry type="button" hidden');
+    expect(source).not.toContain('data-history-open');
+    expect(source).not.toContain('data-history-drawer');
+    expect(source).not.toContain('>기록 보기</a>');
     expect(source).not.toContain('퇴사를 고민했던 이야기');
     expect(source).not.toContain('남기로 결정했다고 이야기했습니다');
 
@@ -104,7 +108,7 @@ describe('MyeongHa immersive long-form Character Room', () => {
     }
   });
 
-  it('hydrates both history and the visible chat stream from the canonical authoritative read route', async () => {
+  it('hydrates the visible chat stream from the canonical authoritative read route', async () => {
     const [transport, apiContract] = await Promise.all([
       readFile(transportPath, 'utf8'),
       readFile(apiContractPath, 'utf8'),
@@ -126,7 +130,6 @@ describe('MyeongHa immersive long-form Character Room', () => {
     expect(transport).not.toContain('payload.presentationKey');
     expect(transport).toContain("import('./api-envelope.js')");
     expect(transport).toContain('unwrapApiSuccessEnvelope(envelope)');
-    expect(transport).toContain('renderHistory(state.messages, state.characterId)');
     expect(transport).toContain('renderConversation(state.messages, state.characterId)');
     expect(transport).toContain("article.className = 'conversation-message'");
     expect(transport).not.toContain("new URL('/api/chat/thread', window.location.origin)");
@@ -144,7 +147,6 @@ describe('MyeongHa immersive long-form Character Room', () => {
 
     expect(transport).toContain('applyCanonicalCharacterPresentationV1(state.characterId)');
     expect(transport).toContain('resolveCanonicalCharacterPresentationV1(message.characterId)');
-    expect(transport).toContain('renderHistory(state.messages, state.characterId)');
     expect(transport).toContain('renderConversation(state.messages, state.characterId)');
     expect(transport).not.toContain('presentationKey: state.characterId');
     expect(presentation).toContain("root.dataset.characterAuthority = 'canonical_character_id'");
@@ -168,7 +170,11 @@ describe('MyeongHa immersive long-form Character Room', () => {
     expect(transport).toContain('createChatOpenClientV1');
     expect(transport).toContain('openForCanonicalCharacter');
     expect(transport).toContain('buildChatThreadUrlV1');
-    expect(transport).toContain('sessionStorage.setItem(pendingDraftKey(result.threadId), message)');
+    expect(transport).toContain("window.history.replaceState(window.history.state, '', buildChatThreadUrlV1(threadId))");
+    expect(transport).toContain('threadId = opened.threadId');
+    expect(transport).toContain('const loaded = await loadRoomState()');
+    expect(transport).toContain('roomReady = true');
+    expect(transport).not.toContain('window.location.assign(');
     expect(transport).toContain('/turns');
     expect(transport).toContain('clientTurnId: crypto.randomUUID()');
     expect(transport).toContain("authoritativeCharacterId !== 'seyeon'");
@@ -193,9 +199,14 @@ describe('MyeongHa immersive long-form Character Room', () => {
     expect(transport).not.toContain('window.MyeongHaCharacterRoom');
 
     expect(transport).toContain('event.preventDefault()');
-    expect(transport).toContain('void openThreadAndPreserveDraft(message.trim())');
+    expect(transport).toContain('void ensureRoomReady().then((ready) => {');
+    expect(transport).toContain('if (ready) return sendTurn(message.trim())');
+    expect(transport).toContain('void ensureRoomReady();');
     expect(transport).toContain('입력한 내용은 그대로 남아 있습니다.');
     expect(transport).toContain('restorePendingDraft()');
+    expect(transport).toContain('if (chatIntro) {');
+    expect(transport).toContain('chatStream.replaceChildren(chatIntro)');
+    expect(transport).toContain("retryButton?.addEventListener('click'");
     expect(transport).toContain("messageInput.value = ''");
     expect(transport).toContain('await loadRoomState()');
   });
