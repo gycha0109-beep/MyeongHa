@@ -726,6 +726,7 @@ export {
 
 export {
   CharacterStandardChatGroundingErrorV2,
+  assertServerPreparedStandardChatGroundingV2,
   prepareCharacterStandardChatGroundingV2,
   type PrepareCharacterStandardChatGroundingInputV2,
   type CharacterStandardChatGroundingV2,
