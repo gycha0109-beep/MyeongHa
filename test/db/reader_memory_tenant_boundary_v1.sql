@@ -125,7 +125,7 @@ SET revoked_at = clock_timestamp()
 WHERE id = 'a7400000-0000-4000-8000-000000000001'::uuid;
 SET LOCAL ROLE myeongha_api_executor;
 
-DO $
+DO $$
 DECLARE v_count bigint;
 BEGIN
   SELECT count(*) INTO v_count FROM public.qry_memory_active_grants_v1(
@@ -141,7 +141,7 @@ BEGIN
   IF v_count <> 1 THEN
     RAISE EXCEPTION 'Revoking a grant improperly deleted the owner Memory item';
   END IF;
-END $;
+END $$;
 
 RESET ROLE;
 UPDATE public.memory_items
@@ -149,7 +149,7 @@ SET revoked_at = clock_timestamp()
 WHERE id = 'a7300000-0000-4000-8000-000000000001'::uuid;
 SET LOCAL ROLE myeongha_api_executor;
 
-DO $
+DO $$
 DECLARE
   v_count bigint;
   v_constraint text;
@@ -172,7 +172,7 @@ BEGIN
       RAISE EXCEPTION 'Unexpected revoked Memory grant failure: %', v_constraint;
     END IF;
   END;
-END $;
+END $$;
 
 -- Switch only trusted transaction-local Subject binding: A's memory disappears.
 SELECT pg_catalog.set_config('myeongha.subject_id', 'a7200000-0000-4000-8000-000000000002', true);
