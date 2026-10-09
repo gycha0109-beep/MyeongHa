@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { ContentReleaseRuntimeEntry } from '../packages/world-content/src/index.js';
 import {
   prepareCharacterStandardReadingServerRuntimeV1,
+  prepareCharacterStandardReadingServerBaseContextV2,
   type CharacterStandardReadingServerContextInputV1,
 } from '../apps/api/src/character-standard-reading-server-runtime-authority.js';
 
@@ -62,5 +63,62 @@ describe('Character Standard Reading server runtime authority', () => {
     })).rejects.toThrow(
       `Server Reader runtime does not accept non-empty caller-supplied ${field} authority.`,
     );
+  });
+});
+
+describe('A3-gamma V2 non-Saju server authority composition', () => {
+  const SUBJECT = '11111111-1111-4111-8111-111111111111';
+  const THREAD = '22222222-2222-4222-8222-222222222222';
+  const RELEASE = 'pinned-release';
+  const BUNDLE = 'pinned-bundle';
+
+  function ports() {
+    return {
+      resolvedSubjectId: SUBJECT,
+      threadId: THREAD,
+      contentEntry: {
+        release: { releaseId: RELEASE, bundleId: BUNDLE },
+        characters: { characters: [{ characterId: 'seyeon', capabilities: [] }] },
+        world: { characterRelations: [] },
+      } as unknown as ContentReleaseRuntimeEntry,
+      threadBindingAuthorityPort: { readRuntimeBinding: async () => [{
+        threadId: THREAD, status: 'active', contentRevision: 2,
+        activeContentReleaseId: RELEASE, activeContentBundleId: BUNDLE,
+        participantCharacterIds: ['seyeon'],
+      }] },
+      relationshipAuthorityPort: { readCurrentRelationship: async () => [{
+        stateId: '33333333-3333-4333-8333-333333333333',
+        characterId: 'seyeon', closeness: 10, trust: 15, friction: 5,
+        relationshipStage: 'initial', revision: 1, policyVersion: 'v1',
+        lastInteractionAt: null, updatedAt: '2026-10-09T00:00:00Z',
+      }] },
+      memoryItemsAuthorityPort: { readCurrentItems: async () => [] },
+      memoryGrantsAuthorityPort: { readActiveGrants: async () => [] },
+      nonMemoryContextAuthorityPort: { readGrantedLifeFacts: async () => [] },
+      contextInput: ({ relationshipProjectionPolicy: { version: 'v1' } } as unknown as CharacterStandardReadingServerContextInputV1),
+    };
+  }
+
+  it('builds pinned non-Saju context for a Reader with zero specialist capabilities', async () => {
+    const input = ports();
+    const base = await prepareCharacterStandardReadingServerBaseContextV2(input);
+    expect(base.threadBinding.activeContentReleaseId).toBe(RELEASE);
+    expect(base.contextInput.character.characterId).toBe('seyeon');
+    expect(base.contextInput.character.capabilities).toEqual([]);
+    expect(base.contextInput.contentBundleId).toBe(BUNDLE);
+    expect(base.contextInput.recentMessages).toEqual([]);
+    expect(base.contextInput.grantedMemories).toEqual([]);
+    expect('saju' in base.contextInput).toBe(false);
+  });
+
+  it('rejects a forged Saju context before reading server authority', async () => {
+    const input = ports();
+    await expect(prepareCharacterStandardReadingServerBaseContextV2({
+      ...input,
+      contextInput: ({ ...input.contextInput, saju: { readingRef: 'forged' } } as CharacterStandardReadingServerContextInputV1),
+      threadBindingAuthorityPort: {
+        readRuntimeBinding: async () => { throw new Error('must not query'); },
+      },
+    })).rejects.toThrow('caller-supplied saju authority');
   });
 });

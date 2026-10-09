@@ -1,4 +1,5 @@
 import type { ContentReleaseRuntimeEntry } from '../../../packages/world-content/src/index.js';
+import type { ChatThreadRuntimeBindingV1 } from './chat-thread-runtime-binding-read.js';
 import {
   prepareCharacterStandardReadingThreadRuntimeV1,
   type CharacterStandardReadingThreadRuntimeV1,
@@ -116,9 +117,21 @@ function findExactReaderCharacter(
  * authority. Exact Reader access + Official Reading source are then re-resolved by
  * the existing thread runtime. Caller-supplied content authority fails closed.
  */
-export async function prepareCharacterStandardReadingServerRuntimeV1(
-  input: PrepareCharacterStandardReadingServerRuntimeInputV1,
-): Promise<CharacterStandardReadingThreadRuntimeV1> {
+export interface CharacterStandardReadingServerBaseContextV2 {
+  readonly threadBinding: ChatThreadRuntimeBindingV1;
+  /** Server-constructed non-Saju input. No Character specialist capability needed. */
+  readonly contextInput: CharacterStandardReadingChatBaseContextInputV1;
+}
+
+/**
+ * A3-gamma: compose only pinned Character/relationship/Memory authority.
+ * Do not retrieve an Official Reading or inject Saju; downstream must first
+ * mint and consume exact A2/A3 one-use Product eligibility proof.
+ */
+export async function prepareCharacterStandardReadingServerBaseContextV2(
+  input: Omit<PrepareCharacterStandardReadingServerRuntimeInputV1,
+    'readingId' | 'effectiveAt' | 'accessAuthorityPort' | 'artifactAuthorityPort'>,
+): Promise<CharacterStandardReadingServerBaseContextV2> {
   assertNoCallerContentAuthorityFields(input.contextInput);
 
   const subjectBinding =
@@ -228,15 +241,7 @@ export async function prepareCharacterStandardReadingServerRuntimeV1(
     }));
   }
 
-  const runtime = await prepareCharacterStandardReadingThreadRuntimeV1({
-    ...subjectBinding,
-    threadId: input.threadId,
-    readingId: input.readingId,
-    effectiveAt: input.effectiveAt,
-    threadBindingAuthorityPort: input.threadBindingAuthorityPort,
-    accessAuthorityPort: input.accessAuthorityPort,
-    artifactAuthorityPort: input.artifactAuthorityPort,
-    contextInput: {
+  const contextInput: CharacterStandardReadingChatBaseContextInputV1 = {
       ...input.contextInput,
       character,
       contentBundleId: input.contentEntry.release.bundleId,
@@ -249,7 +254,26 @@ export async function prepareCharacterStandardReadingServerRuntimeV1(
       grantedLifeFacts: Object.freeze(grantedLifeFacts.map((fact) => Object.freeze({ ...fact }))),
       grantedMemories: Object.freeze(grantedMemories),
       recentMessages: Object.freeze([]),
-    },
+    };
+  return Object.freeze({ threadBinding: initialThreadBinding, contextInput });
+}
+
+/** Legacy specialist V1 behavior is unchanged; V2 does not fabricate Capability. */
+export async function prepareCharacterStandardReadingServerRuntimeV1(
+  input: PrepareCharacterStandardReadingServerRuntimeInputV1,
+): Promise<CharacterStandardReadingThreadRuntimeV1> {
+  const base = await prepareCharacterStandardReadingServerBaseContextV2(input);
+  const subjectBinding = input.resolvedSubjectId === undefined
+    ? {} : { resolvedSubjectId: input.resolvedSubjectId };
+  const runtime = await prepareCharacterStandardReadingThreadRuntimeV1({
+    ...subjectBinding,
+    threadId: input.threadId,
+    readingId: input.readingId,
+    effectiveAt: input.effectiveAt,
+    threadBindingAuthorityPort: input.threadBindingAuthorityPort,
+    accessAuthorityPort: input.accessAuthorityPort,
+    artifactAuthorityPort: input.artifactAuthorityPort,
+    contextInput: base.contextInput,
   });
 
   if (runtime.threadBinding.activeContentReleaseId !== input.contentEntry.release.releaseId) {
