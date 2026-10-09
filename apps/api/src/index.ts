@@ -705,6 +705,17 @@ export {
 } from './postgres-chat-thread-runtime-binding.js';
 
 export {
+  assessProductReaderEligibilityV1,
+  resolveProductReaderEligibilityV1,
+  type ProductReaderEligibilitySourceV1,
+  type ProductReaderRuleV1,
+  type ProductReaderRuleLookupV1,
+  type ProductReaderEligibilityAuthorityPortV1,
+  type ProductReaderEligibilityWithheldReasonV1,
+  type ProductReaderEligibilityDecisionV1,
+} from './product-reader-eligibility-policy-v1.js';
+
+export {
   READER_INTERPRETATION_PREVIEW_CONTRACT_VERSION_V1,
   READER_INTERPRETATION_PREVIEW_SCHEMA_VERSION_V1,
   ReaderInterpretationPreviewRuntimeErrorV1,
