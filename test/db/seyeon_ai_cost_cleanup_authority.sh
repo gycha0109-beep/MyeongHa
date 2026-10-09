@@ -14,8 +14,8 @@ begin
   where p.oid='public.cleanup_seyeon_ai_cost_on_attempt_delete_v1()'::pg_catalog.regprocedure;
 
   if v_owner is distinct from 'myeongha_seyeon_cost_meter_owner'
-     or v_security_definer is distinct from true then
-    raise exception 'Se-yeon cost ledger cleanup must run under narrow SECURITY DEFINER owner';
+     or v_security_definer is distinct from false then
+    raise exception 'Se-yeon cost ledger cleanup must remain SECURITY INVOKER with a narrow owner';
   end if;
 
   if not exists (
