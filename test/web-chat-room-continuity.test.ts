@@ -56,6 +56,15 @@ describe('Web Character Room continuous open and resume', () => {
     expect(runtime).toContain('메시지를 보내지 못했습니다. 입력한 내용은 그대로 남아 있습니다.');
   });
 
+  it('smoke-checks the visible error and retry state without requiring the removed history drawer', async () => {
+    const browser = await readFile(new URL('../scripts/verify-web-browser-render.mjs', import.meta.url), 'utf8');
+    expect(browser).toContain("document.querySelector('[data-room-loading]')");
+    expect(browser).toContain("document.querySelector('[data-chat-intro]')?.hidden === true");
+    expect(browser).toContain("document.querySelector('[data-room-retry]')?.hidden === true");
+    expect(browser).toContain('invalidThreadChat.loading === invalidThreadChat.status');
+    expect(browser).not.toContain("document.querySelector('[data-history-empty]')");
+  });
+
   it('has only the message stream and account-independent official Records tab, not a duplicate past-chat drawer', async () => {
     const [page, transport, presentation] = await Promise.all([
       web('src/chat/ChatPage.tsx'), web('chat-runtime-client.js'), web('chat-character.js'),
