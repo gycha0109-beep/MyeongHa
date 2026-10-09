@@ -1,6 +1,9 @@
 import {
   MyeongHaApiClientErrorV1,
   readReaderInterpretationPreviewV1,
+  readChatThreadPageV1,
+  parseChatThreadIdV1,
+  parseOfficialReadingIdV1,
   type ReaderInterpretationPreviewRequestV1,
   type ReaderInterpretationPreviewResultV1,
   type MyeongHaApiClientV1,
@@ -46,14 +49,41 @@ export function createMobileReaderInterpretationServiceV1(input: {
     async readForOfficialReading(request: MobileReaderResponseBindingV1 & {
       readonly threadId: string;
     }) {
-      // The Thread must come from a server-owned, approved context.
-      // Never infer its identity from a Reader picker or archive provenance.
-      const result = await read(Object.freeze({
-        threadId: request.threadId,
-        officialReadingId: request.officialReading.readingId,
-      }));
-      assertMobileReaderResponseBindingV1(request, result);
-      return result;
+      // Public OFF rejects before resolving the active Subject or doing I/O.
+      if (input.publicRouteActivated !== true) {
+        return read({
+          threadId: request.threadId,
+          officialReadingId: request.officialReading.readingId,
+        });
+      }
+
+      const threadId = parseChatThreadIdV1(request.threadId);
+      const officialReadingId = parseOfficialReadingIdV1(request.officialReading.readingId);
+      return input.session.withActiveBearer(async (bearer) => {
+        // Fresh authenticated server read: verify the Thread's pinned Reader
+        // before requesting any paid/privileged interpretation. The server
+        // still owns exact Reading/Thread/Grant/Product/release admission.
+        const thread = await readChatThreadPageV1(input.client, bearer, threadId, {
+          pageSize: 1,
+        });
+        if (thread.threadId !== threadId ||
+          thread.characterId !== request.expectedReaderId) {
+          throw new MyeongHaApiClientErrorV1(
+            'malformed_response',
+            'CLIENT_READER_THREAD_BINDING_MISMATCH',
+            'Reader thread identity does not match the requested Reader.',
+          );
+        }
+
+        const result = await readReaderInterpretationPreviewV1(
+          input.client,
+          bearer,
+          Object.freeze({ threadId, officialReadingId }),
+          { publicRouteActivated: true },
+        );
+        assertMobileReaderResponseBindingV1(request, result);
+        return result;
+      });
     },
   });
 }
