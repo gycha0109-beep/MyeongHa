@@ -135,17 +135,17 @@ export async function classifyCharacterStandardFollowupQuestionScopeV1(input: Re
   assertServerPreparedStandardChatPreflightV2(input.preflight);
   assertServerPreparedStandardChatGroundingV2(input.grounded);
 
-  const kind = classify(
-    input.preflight.receivePlan.normalizedRequest.text,
-    input.grounded.scope.sajuDomain,
-  );
+  const questionText = input.preflight.receivePlan.normalizedRequest.text;
+  if (typeof questionText !== 'string') return hold('unsupported_question');
+
+  const kind = classify(questionText, input.grounded.scope.sajuDomain);
   if (kind !== 'admitted') return hold(kind);
 
   const evidence = await selectCharacterStandardFollowupEvidenceV1(input);
   if (evidence.mode === 'hold') return hold(evidence.reason);
 
   const questionHash = `sha256:v1:${createHash('sha256')
-    .update(input.preflight.receivePlan.normalizedRequest.text)
+    .update(questionText)
     .digest('hex')}`;
   const withoutHash = {
     schemaVersion: STANDARD_FOLLOWUP_QUESTION_SCOPE_VERSION_V1,
