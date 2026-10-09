@@ -2,7 +2,7 @@
 set -euo pipefail
 
 psql_base=(psql -X -Atq -v ON_ERROR_STOP=1)
-q() { "${psql_base[@]} -c "$1"; }
+q() { "${psql_base[@]}" -c "$1"; }
 fail() { echo "FAIL saju admission DB: $*" >&2; exit 1; }
 pass() { echo "PASS saju admission DB: $*"; }
 deny() {
@@ -111,7 +111,7 @@ first_output="$(mktemp)"; second_output="$(mktemp)"
 first_error="$(mktemp)"; second_error="$(mktemp)"
 trap 'rm -f "$first_output" "$second_output" "$first_error" "$second_error"' EXIT
 (
-  "${psql_base[@]} >"$first_output" 2>"$first_error" <<SQL
+  "${psql_base[@]}" >"$first_output" 2>"$first_error" <<SQL
 begin;
 set local role $runtime;
 $(consume "$parallel" "$digest")
@@ -122,7 +122,7 @@ SQL
 pid1=$!
 sleep 0.5
 (
-  "${psql_base[@]} >"$second_output" 2>"$second_error" <<SQL
+  "${psql_base[@]}" >"$second_output" 2>"$second_error" <<SQL
 begin;
 set local role $runtime;
 $(consume "$parallel" "$digest")
