@@ -10,7 +10,7 @@ Watchtower-Track: saju-bridge
 
 ## 변경 범위
 
-- `apps/api/src/saju-held-staging-admission-postgres-v2.ts`: V2 구분된 테이블, V2 서명 사전검증, 별도 승인 DB pool, `BEGIN → SET LOCAL ROLE → UPDATE ... RETURNING → COMMIT`. 커넥션은 소비 시점까지 요청하지 않는다. COMMIT 실패/응답 불명확/ROLLBACK 실패는 거부하고 재시도하지 않는다.
+- `apps/api/src/saju-held-staging-admission-postgres-v2.ts`: V2 구분된 테이블, V2 서명 사전검증, 별도 승인 DB pool, `BEGIN READ COMMITTED → SET LOCAL ROLE → SELECT FOR UPDATE → 별도 UPDATE ... RETURNING → COMMIT`. 커넥션은 소비 시점까지 요청하지 않는다. COMMIT 실패/응답 불명확/ROLLBACK 실패는 거부하고 재시도하지 않는다.
 - `test/db/fixtures/saju_staging_operator_admission_schema_8c2b2d302.sql`: 독립 V2 CI 테이블, FORCE RLS, issuer/runtime/revoker NOLOGIN·NOINHERIT, 열별 최소 ACL, TTL≤15분·상태 CHECK. **운영 DB migration 아님**.
 - `test/db/saju_staging_operator_admission_v2_authority.sh`: 실제 PG15/17에서 RLS·ACL, Manifest/Connection Plan Digest 변경, 재사용, 동시성, 철회, 만료 및 잠금 대기 후 만료를 검증한다.
 - `test/saju-held-staging-admission-postgres-v2.test.ts`: 합성 public-key Ed25519 검증, 범위 고정, 회피·변조·DB 장애·SQL 조건부 일치 시험.
@@ -23,7 +23,7 @@ Watchtower-Track: saju-bridge
 2. Runtime의 PostgreSQL `SET LOCAL ROLE`은 자체적으로 실제 로그인 권한을 증명하지 않는다. 합성·CI PostgreSQL에서 superuser가 역할을 전환하는 것은 운영 최소 권한 로그인 증빙이 아니다. **어떤 role membership도 이 단계에서 GRANT하지 않는다.**
 3. Issuer는 ISSUED 행 INSERT만, Runtime은 승인 비교에 필요한 SELECT와 `status`/`consumed_at_ms` UPDATE만, Revoker는 미소비 ISSUED → REVOKED만 가능. 일반 API/nonce/Auth/commerce는 접근 불가.
 4. 서명 검증을 통과해도 **공개키의 출처와 운영자 권한은 여기서 보증하지 않는다.** 독립적으로 보관된 승인자 키 레지스트리와 승인 원본의 출처/변경 불가성은 3-03에서 별도 검증 필요.
-5. PostgreSQL의 `clock_timestamp()`를 소비 조건·행 상태 검사에 이용해 잠금 대기 후 이미 만료된 승인 사용을 거부한다. COMMIT 결과 불명확 시 자동 재시도가 없고 운영 감사 경로에서만 확인.
+5. PostgreSQL의 `clock_timestamp()`를 소비 조건·행 상태 검사에 이용해 단일 UPDATE 내부의 clock_timestamp()만으로는 잠금 대기 후 만료 재검사를 보장하지 못함이 PG17 CI에서 확인됐다. 먼저 SELECT FOR UPDATE로 행 잠금을 획득한 뒤, READ COMMITTED 별도 UPDATE 문장의 clock_timestamp()로 만료를 새로 평가하여 거부한다. COMMIT 결과 불명확 시 자동 재시도가 없고 운영 감사 경로에서만 확인.
 6. 새 테이블 SQL·테스트 이외의 Supabase migrations, staging grants, Secret provider, 실제 Auth/Proof 요청, 로그인/배포/판매 권한, HTTP route, CLI 실행 경로를 생성하지 않는다.
 7. 서명·승인 메타데이터·Subject/Birth·DB URL/Secrets 원문은 로그로 반환하지 않는다. 테스트 fixture의 값은 합성이다.
 
