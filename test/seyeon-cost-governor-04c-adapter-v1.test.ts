@@ -85,13 +85,16 @@ describe('Se-yeon 04C governed provider adapter (fake HTTP and fake DB)', () => 
           callId:admittedId,ceilingMicroUsd:'3700',bucketUtcDate:'2026-10-10',
         }]};
       }
-      if (sql.includes('cmd_settle_seyeon_ai_call_v1')) {
+      if (sql.includes('cmd_governed_settle_seyeon_ai_call_v1')) {
         order.push('settle');
         const event = JSON.parse(String(values[4]));
         expect(event).toMatchObject({
           callId:admittedId,priceVersion:'offline-rate-v1',
         });
-        return {rows:[{callId:admittedId,replayed:false}]};
+        return {rows:[{
+          callId:admittedId,replayed:false,
+          occupiedMicroUsd:'130',overCeiling:false,
+        }]};
       }
       throw new Error('unexpected SQL');
     });
