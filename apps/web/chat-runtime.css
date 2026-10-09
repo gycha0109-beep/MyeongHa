@@ -37,3 +37,38 @@
   opacity: .62;
   font-style: italic;
 }
+
+/* The static greeting is not a conversation fact until the owner-scoped read
+ * confirms an empty thread. Avoid a false welcome flash on return visits. */
+.conversation-message[data-chat-intro][hidden],
+.character-room-loading[hidden],
+.character-room-retry[hidden] {
+  display: none !important;
+}
+.character-room-loading {
+  margin: 18px 16px;
+  color: var(--mh-ink-muted, #756c64);
+  font-size: 13px;
+  line-height: 1.7;
+}
+.character-room-retry {
+  align-self: flex-start;
+  margin: 4px 14px 12px;
+  padding: 8px 13px;
+  border: 1px solid var(--mh-line, rgba(145,112,75,.4));
+  border-radius: 8px;
+  background: var(--mh-paper-raised, #fffaf2);
+  color: var(--mh-ink-strong, #263035);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.character-room-retry:focus-visible {
+  outline: 2px solid var(--mh-brass-strong, #ae8550);
+  outline-offset: 2px;
+}
+html[data-theme="dark"] .character-room-retry {
+  background: #15232b;
+  color: #f1e6d7;
+  border-color: rgba(193,158,109,.45);
+}
