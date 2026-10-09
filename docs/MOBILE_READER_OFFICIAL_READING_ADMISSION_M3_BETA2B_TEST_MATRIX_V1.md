@@ -88,6 +88,15 @@ migration 1220/1270/1240의 기존 관계와 Reader 접근을 재사용할 때�
 - **기존 DB 회귀 완료 부분**: #1831 revoked Reader A binding replay ≠ current Reader metadata/raw source access 및 hash drift conflict 검증. RACE-01~16의 PASS 증거로 치환하지 않는다.
 - **운영 구분**: C안의 Product 정책 적격성은 **owner 미승인 후보**. T1/T2 splitting은 현재 서버 동작이 아니라 **조건부 설계**. DB/Commerce/Product/Reader/Saju/Release 승인 없이 코드/런타임/Offer 공개 금지.
 
+## 2.3 최종 결과 공개(Commit)와 실제 환불 경합 검증
+
+- 권한회수 상세 실행 설계: MOBILE_READER_FINAL_AUTHORIZATION_LOCKING_D02_V1.md (설계 후보, 미실행).
+- **DB-C1/C2:** 같은 Reader·bundle에 두 독립 Grant가 있을 때 한쪽 revoke 후 다른 Grant의 정확한 접근 유지; 서로 다른 active bundle 둘 이상은 모호성 거부. fixture 및 Postgres 실제 SQL 선행 검증.
+- **DB-C3:** refund/revoke의 FOR UPDATE·revision CAS와 T2 접근 승인 잠금이 두 PostgreSQL connection에서 양 방향 순서로 직렬화되는지 검증. 만료 시점은 잠금 후 fresh DB clock 사용.
+- **DB-C4:** 새로운 Reader bundle/Grant가 끼어드는 phantom은 기존 Grant row lock만으로 막을 수 없으므로, 모든 writer가 준수하는 reader/reading scope anchor 프로토콜이 필요. Owner 승인 전 구현·PASS 없음.
+- **API-C1/C2:** Saju/provider await 시 DB connection 해제, T2의 fresh identity/Grant/source/policy/rollout 확인 후에만 응답 본문 전달. T1/A2 proof 자체는 현재 권한이 아님.
+- 관련 테스트는 **아직 실행되지 않았다**. #1831 및 #1838 기존 DB 회귀 PASS와 혼동 금지.
+
 ## 3. 특히 중요한 경계 테스트
 
 1. **미구매 Reader**: DB access metadata 단에서 deny. Product rule lookup 이전 raw artifact 0, Saju 0. 시뮬레이션 테스트에서 이 원칙과 실제 DB query trace가 일치해야 한다.
