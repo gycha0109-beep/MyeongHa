@@ -78,16 +78,16 @@ create policy seyeon_ai_cost_ledger_owner_insert
   on public.seyeon_ai_call_cost_events for insert to myeongha_seyeon_cost_meter_owner
   with check (subject_id=public.current_myeongha_subject_id());
 
--- This DELETE permission belongs only to a non-login trigger function owner.
--- It intentionally does not depend on a current Subject session during the
--- approved account-deletion finalizer's own SECURITY DEFINER transaction.
+-- The non-login SECURITY DEFINER cleanup function owns the DELETE privilege.
+-- Deletion is driven only by an authoritative attempt-row DELETE, not by a
+-- caller-controlled Subject GUC; the function contains no dynamic SQL.
 create policy seyeon_ai_cost_ledger_owner_cleanup
   on public.seyeon_ai_call_cost_events for delete to myeongha_seyeon_cost_meter_owner
   using (true);
 
 create function public.cleanup_seyeon_ai_cost_on_attempt_delete_v1()
 returns trigger
-language plpgsql security invoker
+language plpgsql security definer
 set search_path = pg_catalog, public
 as $cleanup$
 begin
