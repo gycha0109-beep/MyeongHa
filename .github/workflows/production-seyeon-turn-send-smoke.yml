@@ -22,6 +22,8 @@ concurrency:
 
 jobs:
   verify:
+    # Paid live-model hold: re-enable only after explicit approval and review.
+    if: ${{ false }}
     name: verify-production-seyeon-member-turn
     runs-on: ubuntu-24.04
     environment: production
