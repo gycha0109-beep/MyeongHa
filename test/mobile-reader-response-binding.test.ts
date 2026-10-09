@@ -32,7 +32,7 @@ const response = {
 };
 
 function testService(serverResponse: unknown) {
-  const fetchImpl = vi.fn(async () => Response.json({ ok: true, data: serverResponse }));
+  const fetchImpl = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => Response.json({ ok: true, data: serverResponse }));
   const withActiveBearer = vi.fn(async <T>(operation: (token: string) => Promise<T>) =>
     operation('server-authenticated-subject-token'));
   const service = createMobileReaderInterpretationServiceV1({
@@ -102,7 +102,7 @@ describe('mobile M3-beta-1 Reader response authority matching', () => {
       ...response,
       mode: 'protected_fallback',
       fallbackReason: 'semantic_guard_failed',
-      utterance: undefined,
+      utterance: response.utterance,
     });
     await expect(fallback.service.readForOfficialReading(request)).rejects.toMatchObject({
       code: 'API_READER_SCENE_RESPONSE_INVALID',
