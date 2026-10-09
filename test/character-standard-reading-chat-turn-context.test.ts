@@ -796,10 +796,14 @@ describe('thread-bound Official Reading Reader runtime', () => {
 
 describe('Official Reading Reader Chat turn preflight', () => {
   it('denies Product HOLD before reading the raw Official artifact or Saju', async () => {
-    const authority = authorities();
-    authority.productReaderEligibilityAuthorityPort.readApprovedRule = vi.fn(async () => ({
-      status: 'withheld' as const, reason: 'unclassified' as const,
-    }));
+    const authority = {
+      ...authorities(),
+      productReaderEligibilityAuthorityPort: {
+        readApprovedRule: vi.fn(async () => ({
+          status: 'withheld' as const, reason: 'unclassified' as const,
+        })),
+      },
+    };
     await expect(prepareCharacterStandardReadingChatTurnPreflightV1({
       resolvedSubjectId: SUBJECT_ID,
       receivePlan: existingThreadReceivePlan(),
