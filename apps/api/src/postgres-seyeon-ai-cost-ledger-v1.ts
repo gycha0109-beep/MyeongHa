@@ -355,9 +355,9 @@ export function createPersistingSeyeonAiProviderV1(input: {
       };
       const provider = createOpenAiSeyeonStructuredProviderV1({
         ...input.config,
-        async beforeDispatch(call, serializedRequestBody) {
-          // The external hook still receives metadata only; no prompt body.
-          await input.config.beforeDispatch?.(call);
+        async meteredBeforeDispatch(call, serializedRequestBody) {
+          // Metadata-only external hook runs separately in the raw Provider.
+          // Only this server-owned metering hook accesses the full request.
           const binding = input.getBinding();
           if (binding === null) {
             console.error('MYEONGHA_SEYEON_COST_BINDING_MISSING');
