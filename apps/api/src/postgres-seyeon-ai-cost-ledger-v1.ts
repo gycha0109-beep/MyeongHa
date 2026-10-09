@@ -202,8 +202,9 @@ export function createPersistingSeyeonAiProviderV1(input: {
     async generate(request: Parameters<SeyeonStructuredProviderPortV2['generate']>[0]) {
       const events: SeyeonAiCostEventV1[] = [];
       const observer = input.config.observeMetric;
-      let startedBinding: SeyeonAiCostLedgerBindingV1 | null = null;
-      let startedCallId: string | null = null;
+      const state: { binding: SeyeonAiCostLedgerBindingV1 | null; callId: string | null } = {
+        binding: null, callId: null,
+      };
       const provider = createOpenAiSeyeonStructuredProviderV1({
         ...input.config,
         async beforeDispatch(call) {
@@ -218,11 +219,11 @@ export function createPersistingSeyeonAiProviderV1(input: {
           await input.runner.run(binding.subjectId, client =>
             startSeyeonAiCallV1(client,binding,call),
           );
-          startedBinding = binding;
-          startedCallId = call.callId;
+          state.binding = binding;
+          state.callId = call.callId;
         },
         observeMetric(event) {
-          if (event.callId !== startedCallId) {
+          if (event.callId !== state.callId) {
             console.error('MYEONGHA_SEYEON_COST_CALL_ID_MISMATCH');
             return;
           }
@@ -238,20 +239,20 @@ export function createPersistingSeyeonAiProviderV1(input: {
         return await provider.generate(request);
       } finally {
         for (const event of events) {
-          if (startedBinding === null || startedCallId !== event.callId) {
+          if (state.binding === null || state.callId !== event.callId) {
             console.error('MYEONGHA_SEYEON_COST_BINDING_MISSING');
             continue;
           }
           try {
-            await input.runner.run(startedBinding.subjectId, client =>
-              settleSeyeonAiCallV1(client,startedBinding!,event),
+            await input.runner.run(state.binding.subjectId, client =>
+              settleSeyeonAiCallV1(client,state.binding!,event),
             );
           } catch {
             // Keep the started row for reconciliation. Never retry inference.
             console.error('MYEONGHA_SEYEON_COST_SETTLEMENT_FAILED');
           }
         }
-        if (startedCallId !== null && events.length === 0) {
+        if (state.callId !== null && events.length === 0) {
           console.error('MYEONGHA_SEYEON_COST_PROVIDER_EVENT_MISSING');
         }
       }
