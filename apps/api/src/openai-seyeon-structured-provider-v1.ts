@@ -53,7 +53,18 @@ export interface OpenAiSeyeonStructuredProviderConfigV1 {
     modelKey: string;
     /** Exact UTF-8 byte length of the final JSON body passed to fetch. */
     requestBodyBytes: number;
-  }>, serializedRequestBody?: string) => void | Promise<void>;
+  }>) => void | Promise<void>;
+  /** Privileged internal metering hook; never publish to user-facing callbacks. */
+  readonly meteredBeforeDispatch?: (
+    call: Readonly<{
+      callId: string;
+      purpose: SeyeonStructuredProviderRequestV2['purpose'];
+      providerKey: typeof OPENAI_SEYEON_STRUCTURED_PROVIDER_KEY_V1;
+      modelKey: string;
+      requestBodyBytes: number;
+    }>,
+    serializedRequestBody: string,
+  ) => void | Promise<void>;
 }
 
 export type OpenAiSeyeonStructuredProviderFailureCodeV1 =
@@ -393,15 +404,18 @@ export function createOpenAiSeyeonStructuredProviderV1(
             },
           });
       const requestBodyBytes = new TextEncoder().encode(requestBody).byteLength;
-      if (config.beforeDispatch !== undefined) {
+      if (config.beforeDispatch !== undefined ||
+          config.meteredBeforeDispatch !== undefined) {
         try {
-          await config.beforeDispatch(Object.freeze({
+          const metadata = Object.freeze({
             callId,
             purpose: request.purpose,
             providerKey: OPENAI_SEYEON_STRUCTURED_PROVIDER_KEY_V1,
             modelKey: model,
             requestBodyBytes,
-          }), requestBody);
+          });
+          await config.beforeDispatch?.(metadata);
+          await config.meteredBeforeDispatch?.(metadata, requestBody);
         } catch {
           // Never dispatch if admission fails. Do not disclose secrets/DB details.
           throw new OpenAiSeyeonStructuredProviderErrorV1(
