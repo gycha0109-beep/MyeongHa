@@ -53,7 +53,7 @@ export interface OpenAiSeyeonStructuredProviderConfigV1 {
     modelKey: string;
     /** Exact UTF-8 byte length of the final JSON body passed to fetch. */
     requestBodyBytes: number;
-  }>) => void | Promise<void>;
+  }>, serializedRequestBody?: string) => void | Promise<void>;
 }
 
 export type OpenAiSeyeonStructuredProviderFailureCodeV1 =
@@ -401,7 +401,7 @@ export function createOpenAiSeyeonStructuredProviderV1(
             providerKey: OPENAI_SEYEON_STRUCTURED_PROVIDER_KEY_V1,
             modelKey: model,
             requestBodyBytes,
-          }));
+          }), requestBody);
         } catch {
           // Never dispatch if admission fails. Do not disclose secrets/DB details.
           throw new OpenAiSeyeonStructuredProviderErrorV1(
