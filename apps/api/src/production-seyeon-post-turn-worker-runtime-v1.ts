@@ -1,4 +1,8 @@
 import {
+  createPersistingSeyeonAiProviderV1,
+  type SeyeonAiCostLedgerBindingV1,
+} from './postgres-seyeon-ai-cost-ledger-v1.js';
+import {
   createOpenAiSeyeonStructuredProviderV1,
   type OpenAiSeyeonStructuredProviderConfigV1,
 } from './openai-seyeon-structured-provider-v1.js';
@@ -95,13 +99,41 @@ export function createProductionSeyeonPostTurnWorkerRuntimeV1(
         runner,
       });
 
+      let activeCostBinding: SeyeonAiCostLedgerBindingV1 | null = null;
+      const meteredOutbox = Object.freeze({
+        ...ports.postTurnAnalysis,
+        async claim(
+          request: Parameters<typeof ports.postTurnAnalysis.claim>[0],
+        ) {
+          const rows = await ports.postTurnAnalysis.claim(request);
+          const claim = rows[0];
+          if (claim !== undefined) {
+            activeCostBinding = Object.freeze({
+              subjectId: resolvedSubject.subjectId,
+              turnId: claim.turnId,
+              attemptId: claim.attemptId,
+              phase: 'post_turn' as const,
+            });
+          }
+          return rows;
+        },
+      });
+      const meteredProvider =
+        input.provider === undefined && input.providerConfig !== undefined
+          ? createPersistingSeyeonAiProviderV1({
+              config: input.providerConfig,
+              runner,
+              getBinding: () => activeCostBinding,
+            })
+          : provider;
+
       const result = await processSeyeonPostTurnAnalysisV1({
         subjectId: resolvedSubject.subjectId,
         outboxEventId: runInput.outboxEventId,
         lockOwner: runInput.lockOwner,
         leaseExpiresAt: runInput.leaseExpiresAt,
-        outboxPort: ports.postTurnAnalysis,
-        extractorProvider: provider,
+        outboxPort: meteredOutbox,
+        extractorProvider: meteredProvider,
         relationshipSyncOutboxPort:
           ports.relationshipSyncOutbox,
       });
