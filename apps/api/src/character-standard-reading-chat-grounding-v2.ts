@@ -4,6 +4,7 @@ import {
   SAJU_GROUNDING_AXIS_REGISTRY_VERSION_V1,
   admitCharacterRuntimeSajuGroundingV2,
   admitCharacterSajuGroundingBundleViewV1,
+  canonicalJson,
   type CharacterRuntimeContextWithGroundingV2,
   type CharacterSajuGroundingBundleViewV1,
   type CharacterSajuGroundingRefV1,
@@ -205,9 +206,7 @@ export async function prepareCharacterStandardChatGroundingV2(
     const current = await prepareOfficialReadingReaderAdmissionV1(admissionInput);
     assertFresh(preflight, current);
     if (!sameScope(initial.scope, current.scope) ||
-        current.source.responseHash !== initial.source.responseHash ||
-        current.source.sajuEngineVersion !== initial.source.sajuEngineVersion ||
-        current.source.productResponseState !== initial.source.productResponseState) {
+        canonicalJson(initial.source) !== canonicalJson(current.source)) {
       deny('SOURCE_MISMATCH');
     }
     const finalProof = await issueCharacterSajuOfficialStandardEligibilityV2({
