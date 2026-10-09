@@ -24,6 +24,7 @@ import {
 } from './character-saju-official-eligibility-v2.js';
 import {
   prepareCharacterStandardReadingServerBaseContextV2,
+  assertNoCallerContentAuthorityFields,
 } from './character-standard-reading-server-runtime-authority.js';
 import {
   assembleOfficialStandardReaderRuntimeV2,
@@ -68,6 +69,9 @@ function hashEnvelope(value: unknown): string {
 export async function runThreadBoundReaderInterpretationPreviewV2(
   input: RunThreadBoundReaderInterpretationPreviewInputV1,
 ): Promise<ReaderInterpretationPreviewEnvelopeV1> {
+  // Caller-provided Character, Memory, Saju and Release authority are rejected
+  // before consulting access, Product policy or the raw Official artifact.
+  assertNoCallerContentAuthorityFields(input.contextInput);
   const subjectId = requiredId(input.resolvedSubjectId);
   const readingId = requiredId(input.officialReadingId);
   if (!input.productReaderEligibilityAuthorityPort) deny('ACCESS_DENIED');
