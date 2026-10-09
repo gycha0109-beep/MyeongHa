@@ -12,13 +12,13 @@ export type SeyeonGovernorChatRoleV1 =
  * pools or dispatching a model request; D3B must close legacy SQL privileges.
  */
 export function assertSeyeonProductionGovernorBoundaryV1(input: {
-  readonly mode?: SeyeonProductionGovernorModeV1;
+  readonly mode?: SeyeonProductionGovernorModeV1 | undefined;
   readonly target: 'chat' | 'post_turn';
   readonly provider?: unknown;
-  readonly providerConfig?: OpenAiSeyeonStructuredProviderConfigV1;
+  readonly providerConfig?: OpenAiSeyeonStructuredProviderConfigV1 | undefined;
   readonly roleProviderConfigs?: Readonly<Partial<Record<
     SeyeonGovernorChatRoleV1, OpenAiSeyeonStructuredProviderConfigV1
-  >>>;
+  >>> | undefined;
   readonly governorConfigured: boolean;
 }): void {
   if (input.mode === undefined || input.mode === 'OFF') return;

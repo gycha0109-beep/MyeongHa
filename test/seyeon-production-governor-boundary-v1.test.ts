@@ -47,7 +47,7 @@ describe('PR-04D3A Production Governor pre-activation gates (offline)', () => {
       })).toThrow('four explicit');
     }
     expect(() => assertSeyeonProductionGovernorBoundaryV1({
-      ...common, roleProviderConfigs: { ...roles, injected: base },
+      ...common, roleProviderConfigs: ({ ...roles, injected: base } as typeof roles),
     })).toThrow('four explicit');
   });
   it('rejects custom network and pre-dispatch hooks in every role', () => {
