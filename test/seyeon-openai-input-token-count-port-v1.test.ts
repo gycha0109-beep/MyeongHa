@@ -107,15 +107,22 @@ describe('PR-04D2 OpenAI exact input-token counter (offline, no API calls)',()=>
     const governor=createSeyeonOpenAiInputTokenCountAdmissionV1(
       makeConfig(countFetch),
     );
+    const metadataHook=vi.fn((_metadata: unknown)=>{
+      expect(JSON.stringify(_metadata)).not.toContain('Synthetic 한글');
+      expect(JSON.stringify(_metadata)).not.toContain(serverKey);
+    });
     const provider=createPersistingSeyeonAiProviderV1({
       config:{apiKey:serverKey,model:policy.modelKey,maxOutputTokens:800,
-        priceQuote:policy.priceQuote,fetchImpl:generator},
+        priceQuote:policy.priceQuote,fetchImpl:generator,
+        beforeDispatch:metadataHook},
       runner:runner(query),getBinding:()=>binding,governor,
     });
     const logger=vi.spyOn(console,'info').mockImplementation(()=>undefined);
     try{
       await expect(provider.generate(request)).resolves.toEqual({ok:true});
       expect(steps).toEqual(['count','admit','generate','settle']);
+      expect(metadataHook).toHaveBeenCalledOnce();
+      expect(metadataHook.mock.calls[0]).toHaveLength(1);
       expect(JSON.stringify(query.mock.calls)).not.toContain('Synthetic 한글');
     }finally{logger.mockRestore();}
   });
