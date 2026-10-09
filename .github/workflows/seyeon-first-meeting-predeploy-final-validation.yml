@@ -49,6 +49,8 @@ jobs:
         run: npm run build
 
   luna:
+    # Paid live-model hold: re-enable only after explicit approval and review.
+    if: ${{ false }}
     name: 세연-최종검증-Luna-5턴
     needs: source-build
     runs-on: ubuntu-24.04
@@ -116,6 +118,8 @@ jobs:
           retention-days: 7
 
   terra:
+    # Paid live-model hold: re-enable only after explicit approval and review.
+    if: ${{ false }}
     name: 세연-최종검증-Terra-5턴
     needs: luna
     runs-on: ubuntu-24.04
