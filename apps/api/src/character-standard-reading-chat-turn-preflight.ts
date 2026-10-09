@@ -1,4 +1,9 @@
 import {
+  prepareOfficialReadingReaderAdmissionV1,
+  consumeOfficialReadingReaderAdmissionV1,
+} from './official-reading-reader-admission-v1.js';
+import type { ProductReaderEligibilityAuthorityPortV1 } from './product-reader-eligibility-policy-v1.js';
+import {
   getServerPreparedChatReceiveContentEntryV1,
   type ChatReceivePlan,
 } from './chat-receive.js';
@@ -41,6 +46,8 @@ export interface PrepareCharacterStandardReadingChatTurnPreflightInputV1 {
   readonly threadBindingAuthorityPort: ChatThreadRuntimeBindingReadAuthorityPortV1;
   readonly accessAuthorityPort: CharacterStandardReadingAccessAuthorityPortV1;
   readonly artifactAuthorityPort: CharacterStandardReadingArtifactAuthorityPortV1;
+  /** Mandatory A2 Product/Commerce policy authority: absence fails closed. */
+  readonly productReaderEligibilityAuthorityPort?: ProductReaderEligibilityAuthorityPortV1;
   readonly relationshipAuthorityPort: CharacterRelationshipReadAuthorityPortV1;
   readonly memoryItemsAuthorityPort: MemoryItemsReadAuthorityPortV1;
   readonly memoryGrantsAuthorityPort: MemoryGrantsReadAuthorityPortV1;
@@ -71,6 +78,11 @@ export class CharacterStandardReadingChatTurnPreflightErrorV1 extends Error {
 export async function prepareCharacterStandardReadingChatTurnPreflightV1(
   input: PrepareCharacterStandardReadingChatTurnPreflightInputV1,
 ): Promise<CharacterStandardReadingChatTurnPreflightV1> {
+  if (!input.productReaderEligibilityAuthorityPort) {
+    throw new CharacterStandardReadingChatTurnPreflightErrorV1(
+      'Approved Product Reader policy authority is required for Official Reading Chat.',
+    );
+  }
   const contentEntry = getServerPreparedChatReceiveContentEntryV1(input.receivePlan);
   const request = input.receivePlan.normalizedRequest;
 
@@ -79,6 +91,23 @@ export async function prepareCharacterStandardReadingChatTurnPreflightV1(
       'Official Reading Reader follow-up preflight requires an existing server-bound thread.',
     );
   }
+
+  // Re-validate exact Subject × Thread × Reader × Reading Grant and Product
+  // eligibility before the downstream legacy Character source/assembly seam.
+  // The A2 ticket is one-use and is consumed only after the source and
+  // current thread revision have been independently checked again.
+  const admission = await prepareOfficialReadingReaderAdmissionV1({
+    ...(input.resolvedSubjectId === undefined
+      ? {} : { resolvedSubjectId: input.resolvedSubjectId }),
+    threadId: request.threadId,
+    readingId: input.readingId,
+    effectiveAt: input.effectiveAt,
+    contentEntry,
+    threadBindingAuthorityPort: input.threadBindingAuthorityPort,
+    accessAuthorityPort: input.accessAuthorityPort,
+    artifactAuthorityPort: input.artifactAuthorityPort,
+    productReaderEligibilityAuthorityPort: input.productReaderEligibilityAuthorityPort,
+  });
 
   let runtime: CharacterStandardReadingThreadRuntimeV1;
   try {
@@ -119,6 +148,50 @@ export async function prepareCharacterStandardReadingChatTurnPreflightV1(
       'Chat receive bundle no longer matches the current owned thread binding.',
     );
   }
+
+  const scope = admission.scope;
+  const current = runtime.source;
+  const thread = runtime.threadBinding;
+  if (thread.threadId !== scope.threadId ||
+      thread.contentRevision !== scope.contentRevision ||
+      thread.activeContentReleaseId !== scope.contentReleaseId ||
+      thread.activeContentBundleId !== scope.readerContentBundleId ||
+      thread.participantCharacterIds.length !== 1 ||
+      thread.participantCharacterIds[0] !== scope.readerCharacterId ||
+      runtime.context.characterId !== scope.readerCharacterId ||
+      runtime.context.contentBundleId !== scope.readerContentBundleId ||
+      current.subjectId !== scope.subjectId ||
+      current.readingId !== scope.readingId ||
+      current.readerCharacterId !== scope.readerCharacterId ||
+      current.readerContentBundleId !== scope.readerContentBundleId ||
+      current.productId !== scope.productId ||
+      current.productSpecVersion !== scope.productSpecVersion ||
+      current.sajuDomain !== scope.sajuDomain ||
+      current.readingContractVersion !== scope.readingContractVersion ||
+      current.responseHash !== scope.officialArtifactResponseHash) {
+    throw new CharacterStandardReadingChatTurnPreflightErrorV1(
+      'Official Reading Chat source or owned Reader thread changed after A2 admission.',
+    );
+  }
+
+  consumeOfficialReadingReaderAdmissionV1({
+    ticket: admission.ticket,
+    expectedScope: Object.freeze({
+      ...scope,
+      subjectId: current.subjectId,
+      threadId: thread.threadId,
+      contentRevision: thread.contentRevision,
+      readingId: current.readingId,
+      readerCharacterId: current.readerCharacterId,
+      readerContentBundleId: current.readerContentBundleId,
+      contentReleaseId: thread.activeContentReleaseId,
+      productId: current.productId,
+      productSpecVersion: current.productSpecVersion,
+      sajuDomain: current.sajuDomain,
+      readingContractVersion: current.readingContractVersion,
+      officialArtifactResponseHash: current.responseHash,
+    }),
+  });
 
   return Object.freeze({
     receivePlan: input.receivePlan,

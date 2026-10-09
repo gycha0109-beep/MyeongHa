@@ -491,6 +491,15 @@ async function renderResolvedReaderInterpretationPreviewV1(input: {
 export async function runReaderInterpretationPreviewV1(
   input: RunReaderInterpretationPreviewInputV1,
 ): Promise<ReaderInterpretationPreviewEnvelopeV1> {
+  // The standalone API has no server-owned Thread/Release/Product policy
+  // admission. It is retained only for isolated historical unit fixtures.
+  // Never execute it in a hosted or developer runtime.
+  if (process.env.NODE_ENV !== 'test') {
+    throw new ReaderInterpretationPreviewRuntimeErrorV1(
+      'ACCESS_DENIED',
+      'Standalone Reader Preview is disabled without A2 thread-bound admission.',
+    );
+  }
   const subjectId = requiredString(input.resolvedSubjectId, 'resolvedSubjectId');
   const officialReadingId = requiredString(input.officialReadingId, 'officialReadingId');
   const readerCharacterId = requiredString(input.readerCharacterId, 'readerCharacterId');
