@@ -87,7 +87,7 @@ create policy seyeon_ai_cost_ledger_owner_cleanup
 
 create function public.cleanup_seyeon_ai_cost_on_attempt_delete_v1()
 returns trigger
-language plpgsql security definer
+language plpgsql security invoker
 set search_path = pg_catalog, public
 as $cleanup$
 begin
