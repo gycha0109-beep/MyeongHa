@@ -43,10 +43,18 @@ export interface OpenAiSeyeonStructuredProviderConfigV1 {
   readonly fetchImpl?: OpenAiSeyeonStructuredProviderFetchV1;
   readonly priceQuote?: SeyeonAiPriceV1;
   readonly observeMetric?: (event: SeyeonAiCostEventV1) => void;
+  /** Server-owned admission hook; must finish before network dispatch. */
+  readonly beforeDispatch?: (call: Readonly<{
+    callId: string;
+    purpose: SeyeonStructuredProviderRequestV2['purpose'];
+    providerKey: typeof OPENAI_SEYEON_STRUCTURED_PROVIDER_KEY_V1;
+    modelKey: string;
+  }>) => void | Promise<void>;
 }
 
 export type OpenAiSeyeonStructuredProviderFailureCodeV1 =
   | 'INVALID_CONFIGURATION'
+  | 'PRE_DISPATCH_REJECTED'
   | 'TIMEOUT'
   | 'NETWORK_FAILURE'
   | 'HTTP_FAILURE'
@@ -342,6 +350,23 @@ export function createOpenAiSeyeonStructuredProviderV1(
     ): Promise<unknown> {
       const startedAt = performance.now();
       const callId = randomUUID();
+      if (config.beforeDispatch !== undefined) {
+        try {
+          await config.beforeDispatch(Object.freeze({
+            callId,
+            purpose: request.purpose,
+            providerKey: OPENAI_SEYEON_STRUCTURED_PROVIDER_KEY_V1,
+            modelKey: model,
+          }));
+        } catch {
+          // No external call has been made, so no provider cost event is emitted.
+          // Never surface DB diagnostics, caller identities, prompts, or credentials.
+          throw new OpenAiSeyeonStructuredProviderErrorV1(
+            'PRE_DISPATCH_REJECTED',
+            'OpenAI structured request was rejected before provider dispatch.',
+          );
+        }
+      }
       const meter = (
         outcome: SeyeonAiCallOutcomeV1,
         httpStatus: number | null,
