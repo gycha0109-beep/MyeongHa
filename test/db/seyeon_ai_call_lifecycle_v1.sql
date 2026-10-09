@@ -14,6 +14,8 @@ declare
   v_start record;
   v_settle record;
   v_summary record;
+  v_model record;
+  v_unsettled_count bigint;
   v_event jsonb;
   v_failed boolean;
 begin
@@ -49,6 +51,17 @@ begin
      or v_summary.unknown_cost_calls<>1
      or v_summary.total_estimated_cost_micro_usd is not null then
     raise exception 'Unsettled AI cost silently disappeared from turn summary';
+  end if;
+
+  select * into strict v_model from public.qry_seyeon_ai_model_cost_v1(v_subject,v_turn);
+  select count(*) into v_unsettled_count
+    from public.qry_seyeon_ai_unsettled_calls_v1(v_subject,v_turn);
+  if v_model.model_key is distinct from 'test-model'
+     or v_model.unsettled_calls<>1
+     or v_model.unknown_cost_calls<>1
+     or v_model.total_estimated_cost_micro_usd is not null
+     or v_unsettled_count<>1 then
+    raise exception 'Pending per-model cost did not remain unresolved';
   end if;
 
   -- Even identical duplicate start must reject: never authorize a second dispatch.
@@ -118,6 +131,16 @@ begin
   exception when insufficient_privilege then v_failed:=true;
   end;
   if not v_failed then raise exception 'Cross-Subject call start was admitted'; end if;
+
+  select * into strict v_model from public.qry_seyeon_ai_model_cost_v1(v_subject,v_turn);
+  select count(*) into v_unsettled_count
+    from public.qry_seyeon_ai_unsettled_calls_v1(v_subject,v_turn);
+  if v_model.call_count<>1 or v_model.unsettled_calls<>0
+     or v_model.unknown_cost_calls<>0
+     or v_model.total_estimated_cost_micro_usd<>27
+     or v_unsettled_count<>0 then
+    raise exception 'Settled per-model cost or pending list is inconsistent';
+  end if;
 
   select * into strict v_summary from public.qry_seyeon_ai_turn_cost_v1(
     v_subject,v_turn);
