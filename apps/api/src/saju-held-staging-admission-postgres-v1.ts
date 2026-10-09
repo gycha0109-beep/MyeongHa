@@ -1,4 +1,4 @@
-import { createPublicKey, verify, type KeyObject } from 'node:crypto';
+import { verify, type KeyObject } from 'node:crypto';
 import type { PostgresSubjectPoolV1 } from './postgres-subject-execution.js';
 import {
   assessSajuHeldStagingAdmissionContractV1,
@@ -118,7 +118,7 @@ export function createSajuHeldStagingPostgresAdmissionPortV1(
       || signature.toString('base64url') !== options.approvalSignature) {
       throw new TypeError();
     }
-    key = createPublicKey(options.approvalPublicKey);
+    key = options.approvalPublicKey;
   } catch {
     throw new TypeError('Invalid isolated staging operator admission configuration.');
   }
