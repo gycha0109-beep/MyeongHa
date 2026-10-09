@@ -357,6 +357,7 @@ async function run(
   const context = input.context ?? makeContext(bundle, reader);
   const ports = input.ports ?? authorityPorts({ activeReaders: [reader.characterId] });
   return runReaderInterpretationPreviewV1({
+    legacyOfflineFixtureOnly: true,
     resolvedSubjectId: input.resolvedSubjectId ?? SUBJECT_ID,
     officialReadingId: READING_ID,
     readerCharacterId: reader.characterId,
@@ -587,5 +588,23 @@ describe('Reader Interpretation Preview Runtime v1', () => {
     await expect(
       run(readers.baekheon, { resolvedSubjectId: ' ' }),
     ).rejects.toMatchObject({ code: 'AUTH_REQUIRED' });
+  });
+});
+
+describe('A3-gamma standalone fail-closed boundary', () => {
+  it('rejects an unflagged standalone invocation before contacting source authority', async () => {
+    const port = authorityPorts({ activeReaders: ['seyeon'] });
+    await expect(runReaderInterpretationPreviewV1({
+      resolvedSubjectId: SUBJECT_ID,
+      officialReadingId: READING_ID,
+      readerCharacterId: 'seyeon',
+      effectiveAt: '2026-09-21T00:00:00.000Z',
+      requestedDomain: 'general',
+      context: makeContext(baseBundle, readers.seyeon),
+      groundingProjectionPort: groundingProjectionPort(baseBundle),
+      ...port,
+    })).rejects.toMatchObject({ code: 'ACCESS_DENIED' });
+    expect(port.accessAuthorityPort.readAccessibleReadings).not.toHaveBeenCalled();
+    expect(port.artifactAuthorityPort.readArtifactSource).not.toHaveBeenCalled();
   });
 });

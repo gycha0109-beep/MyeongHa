@@ -113,6 +113,8 @@ export interface OfficialReadingCharacterGroundingProjectionPortV1 {
 
 export interface RunReaderInterpretationPreviewInputV1 {
   readonly resolvedSubjectId?: string;
+  /** @internal Test fixture only; NEVER a public request or server activation knob. */
+  readonly legacyOfflineFixtureOnly?: true;
   readonly officialReadingId: string;
   readonly readerCharacterId: string;
   readonly effectiveAt: string;
@@ -488,9 +490,20 @@ async function renderResolvedReaderInterpretationPreviewV1(input: {
   });
 }
 
+/**
+ * A3-gamma: legacy standalone path has no A2 Product rule or Thread-bound
+ * one-use grant. Fail closed for every runtime except explicit offline tests.
+ * Public/production consumers must use runThreadBoundReaderInterpretationPreviewV1.
+ */
 export async function runReaderInterpretationPreviewV1(
   input: RunReaderInterpretationPreviewInputV1,
 ): Promise<ReaderInterpretationPreviewEnvelopeV1> {
+  if (process.env.NODE_ENV !== 'test' || input.legacyOfflineFixtureOnly !== true) {
+    throw new ReaderInterpretationPreviewRuntimeErrorV1(
+      'ACCESS_DENIED',
+      'Legacy standalone Reader Preview is not authorized. Use A2 Thread admission.',
+    );
+  }
   const subjectId = requiredString(input.resolvedSubjectId, 'resolvedSubjectId');
   const officialReadingId = requiredString(input.officialReadingId, 'officialReadingId');
   const readerCharacterId = requiredString(input.readerCharacterId, 'readerCharacterId');
