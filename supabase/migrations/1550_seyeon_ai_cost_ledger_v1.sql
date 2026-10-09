@@ -17,10 +17,9 @@ create table public.seyeon_ai_call_cost_events (
   cost_status text not null,
   estimated_cost_micro_usd bigint null,
   created_at timestamptz not null default clock_timestamp(),
-  constraint seyeon_ai_cost_turn_fk foreign key (turn_id,thread_id,subject_id)
-    references public.chat_turns(id,thread_id,subject_id) on delete cascade,
-  constraint seyeon_ai_cost_attempt_fk foreign key (attempt_id,turn_id,subject_id)
-    references public.chat_turn_attempts(id,turn_id,subject_id) on delete cascade,
+  -- Provenance is verified under one Subject transaction by the insert RPC.
+  -- Intentionally avoid extending the frozen P0-PR-01 FK discovery graph.
+  -- A dedicated attempt-delete trigger supplies mandatory privacy cleanup.
   constraint seyeon_ai_cost_phase_check check (phase in ('chat','post_turn')),
   constraint seyeon_ai_cost_outcome_check check (outcome in
     ('response_received','http_failure','network_failure','timeout','invalid_content_type','invalid_response')),
@@ -63,7 +62,7 @@ grant execute on function public.current_myeongha_subject_id()
   to myeongha_seyeon_cost_meter_owner;
 grant select on public.chat_turns,public.chat_turn_attempts
   to myeongha_seyeon_cost_meter_owner;
-grant select,insert on public.seyeon_ai_call_cost_events
+grant select,insert,delete on public.seyeon_ai_call_cost_events
   to myeongha_seyeon_cost_meter_owner;
 
 create policy seyeon_ai_cost_turn_owner_read
@@ -78,6 +77,31 @@ create policy seyeon_ai_cost_ledger_owner_read
 create policy seyeon_ai_cost_ledger_owner_insert
   on public.seyeon_ai_call_cost_events for insert to myeongha_seyeon_cost_meter_owner
   with check (subject_id=public.current_myeongha_subject_id());
+
+-- This DELETE permission belongs only to a non-login trigger function owner.
+-- It intentionally does not depend on a current Subject session during the
+-- approved account-deletion finalizer's own SECURITY DEFINER transaction.
+create policy seyeon_ai_cost_ledger_owner_cleanup
+  on public.seyeon_ai_call_cost_events for delete to myeongha_seyeon_cost_meter_owner
+  using (true);
+
+create function public.cleanup_seyeon_ai_cost_on_attempt_delete_v1()
+returns trigger
+language plpgsql security definer
+set search_path = pg_catalog, public
+as $cleanup$
+begin
+  delete from public.seyeon_ai_call_cost_events e
+  where e.subject_id=old.subject_id
+    and e.turn_id=old.turn_id
+    and e.attempt_id=old.id;
+  return old;
+end
+$cleanup$;
+
+create trigger cleanup_seyeon_ai_cost_on_attempt_delete_v1
+after delete on public.chat_turn_attempts
+for each row execute function public.cleanup_seyeon_ai_cost_on_attempt_delete_v1();
 
 create function public.cmd_record_seyeon_ai_call_cost_v1(
   p_subject_id uuid,p_turn_id uuid,p_attempt_id uuid,p_phase text,p_event jsonb
@@ -237,6 +261,9 @@ alter function public.cmd_record_seyeon_ai_call_cost_v1(uuid,uuid,uuid,text,json
   owner to myeongha_seyeon_cost_meter_owner;
 alter function public.qry_seyeon_ai_turn_cost_v1(uuid,uuid)
   owner to myeongha_seyeon_cost_meter_owner;
+alter function public.cleanup_seyeon_ai_cost_on_attempt_delete_v1()
+  owner to myeongha_seyeon_cost_meter_owner;
+revoke all on function public.cleanup_seyeon_ai_cost_on_attempt_delete_v1() from public;
 revoke all on function public.cmd_record_seyeon_ai_call_cost_v1(uuid,uuid,uuid,text,jsonb) from public;
 revoke all on function public.qry_seyeon_ai_turn_cost_v1(uuid,uuid) from public;
 do $acl$
@@ -247,6 +274,7 @@ begin
   loop
     execute format('revoke all on function public.cmd_record_seyeon_ai_call_cost_v1(uuid,uuid,uuid,text,jsonb) from %I',v_role);
     execute format('revoke all on function public.qry_seyeon_ai_turn_cost_v1(uuid,uuid) from %I',v_role);
+    execute format('revoke all on function public.cleanup_seyeon_ai_cost_on_attempt_delete_v1() from %I',v_role);
   end loop;
 end $acl$;
 grant execute on function public.cmd_record_seyeon_ai_call_cost_v1(uuid,uuid,uuid,text,jsonb)
