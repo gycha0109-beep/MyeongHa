@@ -212,7 +212,9 @@ order by section, k1, k2, line;
 SQL
 
 actual="$(sha256sum "$catalog_file" | awk '{print $1}')"
-expected="1414f1a8764d7d3f48127b3282594cbd78c43f3cd9f96d2a44b35daf3e7ffe97"
+# Cost ledger cleanup adds one narrowly scoped AFTER DELETE trigger on chat attempts.
+# Preserve the established six historical blockers and pin the seventh exactly.
+expected="b40987083749d70f5b8a70b55701ea5eb68a3f7b10cc2479d6c055cbaf69a7eb"
 
 echo "Account deletion finalizer catalog digest: $actual"
 
@@ -229,8 +231,12 @@ delete_trigger_count="$(grep -c '^DELETE_TRIGGER|' "$catalog_file" || true)"
 delete_cycle_count="$(grep -c '^DELETE_CYCLE|' "$catalog_file" || true)"
 detach_shape_count="$(grep -c '^DETACH_SHAPE|' "$catalog_file" || true)"
 
-if [[ "$delete_trigger_count" != "6" ]]; then
-  echo "FAIL expected 6 DELETE-trigger catalog rows, found $delete_trigger_count" >&2
+if [[ "$delete_trigger_count" != "7" ]]; then
+  echo "FAIL expected 7 DELETE-trigger catalog rows, found $delete_trigger_count" >&2
+  exit 1
+fi
+if ! grep -Fq 'DELETE_TRIGGER|chat_turn_attempts|cleanup_seyeon_ai_cost_on_attempt_delete_v1|CREATE TRIGGER cleanup_seyeon_ai_cost_on_attempt_delete_v1 AFTER DELETE ON chat_turn_attempts FOR EACH ROW EXECUTE FUNCTION cleanup_seyeon_ai_cost_on_attempt_delete_v1()' "$catalog_file"; then
+  echo "FAIL Se-yeon cost ledger privacy cleanup trigger missing or changed" >&2
   exit 1
 fi
 if [[ "$delete_cycle_count" != "19" ]]; then
