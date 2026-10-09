@@ -7,35 +7,47 @@
 
 ## Current research state
 
-**Latest research pass:** Pass 4 — WTP / Cost / Launch Pricing  
+**Latest research pass:** Pass 5A — World Economics + Free/Paid Boundary Benchmark  
 **Snapshot:** 2026-08-30 KST  
 **Current leading revenue meta-hypothesis:** **H-R18 — Layered Value Monetization**  
 **Current leading launch hypothesis:** **H-R19 — Explicit Value Artifact Launch**  
+**New longitudinal hypothesis:** **H-R20 — Longitudinal Value Accumulation**  
 **Authority status:** **NOT PRODUCT AUTHORITY / requires experiment**
 
-Current launch candidate:
+Current candidate:
 
 ```text
 open / low-friction relationship core
 + free grounded first value
 + explicit paid structured artifacts
++ longitudinal value accumulation from real life-state history
 + optional membership after repeat-use proof
 + premium compute as cost guard
 ```
 
-Pass 4 keeps H-R17's architecture boundary:
+Pass 5/5A keeps H-R19 but sharpens the boundary:
+
+> Long-term Character / Memory value must raise retention **and** create differentiated paid Artifact value. If it only raises free usage and COGS, the business model gets worse.
+
+Current Memory boundary:
 
 ```text
-ordinary relationship chat
-!=
-new governed Saju semantic execution
+preservation / natural callback
+= relationship infrastructure
+
+cross-history synthesis / formal compilation
+= monetizable artifact candidate
 ```
 
-but changes the monetization interpretation:
+Cross-platform boundary benchmark currently points toward:
 
-> A clean technical execution boundary does **not** automatically need to become a visible consumer billing unit.
+```text
+FREE
+relationship / natural continuity / lightweight recurring value
 
-`Grounded Analysis Right` remains an experiment/control primitive, but visible replenishing currency is no longer the default launch preference.
+PAID
+explicit synthesis / deeper time horizon / durable artifact / costly modality
+```
 
 ---
 
@@ -45,6 +57,9 @@ For **current research interpretation**, read in this order:
 
 ```text
 README.md
+→ 19_FREE_PAID_BOUNDARY_BENCHMARK.md
+→ 18_PASS5_WORLD_INTEGRATION_DELTA.md
+→ 17_WORLD_CHARACTER_SERVICE_REVENUE_IMPACT.md
 → 16_PASS4_PRICING_DECISION_DELTA.md
 → 15_WTP_COST_AND_LAUNCH_PRICE_LADDER.md
 → 13_PASS3_BROAD_SCAN_DELTA.md
@@ -59,7 +74,7 @@ README.md
 → Pass 1 documents 01~05 for historical baseline
 ```
 
-Later research passes may supersede Pass 4 explicitly. Old research files remain as historical evidence unless factually wrong.
+Later research passes may supersede Pass 5A explicitly. Old research files remain as historical evidence unless factually wrong.
 
 ---
 
@@ -120,16 +135,7 @@ Public-company anchor for free core + subscription + higher-cost AI tier + ads/I
 ## Pass 4 — launch pricing and cost correction
 
 ### `15_WTP_COST_AND_LAUNCH_PRICE_LADDER.md`
-Combines:
-
-```text
-current Korean digital-Saju price ladder
-human consultation upper anchors
-current API model pricing
-C_chat / C_read illustrative workloads
-web / app payment economics
-launch SKU price hypotheses
-```
+Combines Korean digital-Saju price ladders, consultation anchors, API pricing, illustrative C_chat/C_read workloads, payment economics, and launch SKU hypotheses.
 
 Major finding:
 
@@ -138,25 +144,69 @@ Major finding:
 This makes repeated relationship chat a more plausible marginal-cost risk than a single structured Reading.
 
 ### `16_PASS4_PRICING_DECISION_DELTA.md`
+Introduces H-R19 `Explicit Value Artifact Launch` and demotes visible replenishing analysis currency from default launch preference to experiment/control.
 
-Introduces H-R19:
+Current price bands remain hypotheses only.
+
+---
+
+## Pass 5 — World / Character Service economics
+
+### `17_WORLD_CHARACTER_SERVICE_REVENUE_IMPACT.md`
+Evaluates the latest World architecture:
 
 ```text
-Explicit Value Artifact Launch
+bounded context
+per-character relationship / knowledge / narrative state
+long-term Life State
+finite authored arcs + state-based variation
 ```
 
-and demotes visible replenishing analysis currency from default launch preference to experiment/control.
+Main findings:
 
-Current price bands are hypotheses only:
+- bounded context can prevent tenure from causing linear per-turn token growth;
+- per-character history can strengthen retention but also multiply free chat COGS;
+- memory economics must include extraction/reconciliation/evaluation/privacy overhead, not storage alone;
+- free Relationship Core can cannibalize paid Artifact demand if Artifact is only a longer answer;
+- dynamic narrative should be treated as an asset-reuse multiplier, not free content generation;
+- long-term value is more likely tied to closed `problem → choice → outcome` loops than tenure alone.
+
+### `18_PASS5_WORLD_INTEGRATION_DELTA.md`
+Keeps H-R19 and introduces H-R20 `Longitudinal Value Accumulation`.
+
+It also elevates `Free-Core Cannibalization` as a first-class revenue risk and records Revenue requirements back to World:
 
 ```text
-entry artifact       ~₩4,900
-core artifact        ~₩7,900 / ₩9,900
-high-value artifact  ~₩12,900 / ₩14,900
-membership test      ~₩9,900~12,900
+bounded state cardinality
+observable memory COGS
+character marginal economics
+outcome closure
+artifact role separation
+data minimization
 ```
 
-They must be validated on **net contribution per eligible exposure**, not purchase conversion alone.
+---
+
+## Pass 5A — free / paid boundary benchmark
+
+### `19_FREE_PAID_BOUNDARY_BENCHMARK.md`
+Compares the current free/paid boundary across Character.AI, Replika, Kindroid, Nomi, Tinder, Duolingo, Finch, The Pattern, Co-Star, Nebula, Sajuping, Jamo, DoSa and Patreon.
+
+Extracted boundary patterns:
+
+```text
+A. core action free / efficiency paid
+B. relationship free / depth & modality paid
+C. recurring free value / deep analysis paid
+D. allowance free / heavy usage paid
+E. free relationship / paid artifact or ownership
+```
+
+Current MyeongHa interpretation:
+
+> Preserve the emotional/relationship loop without payment; monetize explicit synthesis, deeper temporal scope, durable artifacts, and high-cost modalities when required.
+
+This strengthens H-R19 but does not make it product authority.
 
 ---
 
@@ -177,9 +227,10 @@ Examples:
 
 - `₩2~3 / turn` remains a research/all-in cost target candidate, not runtime quota.
 - `Grounded Analysis Right` is a monetization hypothesis, not an existing entitlement key.
-- H-R18/H-R19 are business hypotheses, not existing SKUs.
+- H-R18/H-R19/H-R20 are business hypotheses, not existing SKUs.
 - competitor prices are evidence, not launch prices.
 - experiment event names are not analytics schema until governed through the analytics contract.
+- `closed decision loop` is a research construct, not an existing DB object.
 
 ---
 
@@ -196,25 +247,28 @@ Examples:
 9. **No unlimited lifetime AI-compute promise.**
 10. **No commerce incentive contaminating Saju semantic recommendations.**
 11. **Technical execution boundary != mandatory consumer billing unit.**
+12. **Basic relationship continuity is not a memory tax.**
+13. **Long-term data that does not improve continuity or paid value is liability, not moat.**
 
 ---
 
 ## Current core question
 
-Desk research is now close to saturation.
-
 The next answer must come from MyeongHa itself:
 
-> **Which explicit result will users pay for, at what price, after receiving enough free grounded trust — and can relationship retention produce that paid moment without chat COGS overwhelming contribution?**
+> **Does long-term Character relationship history create enough incremental Artifact value and repeat purchase to justify the free chat/memory COGS it generates?**
 
-Required next evidence:
+Required evidence now includes:
 
 ```text
 actual C_chat
-actual C_read
-first-purchase conversion by price
-free micro-analysis retention lift vs cannibalization
-30/90-day repeat purchase
-membership demand after repeat use
-P95/P99 chat COGS
+memory-related COGS / turn
+P95/P99 free-user chat COGS
+D30/D90/6M retention by active-character count
+artifact attach rate by tenure
+artifact ARPPU by tenure
+repeat purchase by closed-decision-loop count
+Life Chronicle eligibility → purchase conversion
+content authoring cost / activated user
+meaningful exposures / authored event
 ```
