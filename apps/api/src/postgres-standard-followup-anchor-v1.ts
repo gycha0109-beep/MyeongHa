@@ -100,10 +100,10 @@ function assertAnchor(
       !Array.isArray(row.sourceUnitRefs) ||
       row.sourceUnitRefs.length === 0 ||
       row.sourceUnitRefs.length > 12 ||
-      row.sourceUnitRefs.some(v => !validText(v, 38) || !UNIT_ID.test(v)) ||
+      row.sourceUnitRefs.some(v => !validText(v, 39) || !UNIT_ID.test(v)) ||
       new Set(row.sourceUnitRefs).size !== row.sourceUnitRefs.length ||
       (row.focusedUnitRef !== null && row.focusedUnitRef !== undefined &&
-        (!validText(row.focusedUnitRef, 38) ||
+        (!validText(row.focusedUnitRef, 39) ||
           !row.sourceUnitRefs.includes(row.focusedUnitRef)))) {
     deny('INVALID_PROVENANCE');
   }
