@@ -210,20 +210,9 @@ begin
       message='AI Subject daily budget exhausted';
   end if;
 
-  -- Keep the source attempt stable while admitting a cost record. No new FK.
-  perform 1 from public.chat_turns t
-    join public.chat_turn_attempts a
-      on a.turn_id=t.id and a.subject_id=t.subject_id
-  where t.id=p_turn_id and t.subject_id=p_subject_id and a.id=p_attempt_id
-    and ((p_phase='chat' and a.state in ('running','generated'))
-      or (p_phase='post_turn' and a.state='committed'))
-  for key share of t,a;
-  if not found then
-    raise exception using errcode='23514',
-      constraint='seyeon_ai_governor_attempt_ineligible',
-      message='AI governed admission requires an eligible canonical attempt';
-  end if;
-
+  -- No direct row-lock privilege is granted on chat_attempts/chat_turns.
+  -- The existing authoritative cmd_start rechecks Subject/turn/attempt state.
+  -- Finalizer vs admission concurrency remains an ENFORCE blocker for 04D.
   -- No ON CONFLICT replay: a duplicate ID must not authorize a second send.
   perform 1 from public.cmd_start_seyeon_ai_call_v1(
     p_subject_id,p_turn_id,p_attempt_id,p_phase,p_call_id,
