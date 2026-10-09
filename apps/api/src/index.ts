@@ -742,6 +742,13 @@ export {
 } from './character-standard-reading-chat-followup-evidence-v1.js';
 
 export {
+  STANDARD_FOLLOWUP_QUESTION_SCOPE_VERSION_V1,
+  assertServerPreparedStandardFollowupQuestionScopeV1,
+  classifyCharacterStandardFollowupQuestionScopeV1,
+  type CharacterStandardFollowupQuestionScopeDecisionV1,
+} from './character-standard-reading-chat-question-scope-v1.js';
+
+export {
   POSTGRES_STANDARD_FOLLOWUP_ANCHOR_BINDING_V1,
   PostgresStandardFollowupAnchorErrorV1,
   createPostgresStandardFollowupAnchorAuthorityPortV1,
