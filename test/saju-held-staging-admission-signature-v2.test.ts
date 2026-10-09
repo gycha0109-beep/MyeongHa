@@ -198,41 +198,29 @@ describe('8C-2B-2D-3-01 V2 cryptographic target binding, zero I/O', () => {
       ...f, permit: { ...f.permit, connectionPlanDigest: 'f'.repeat(64) },
     })],
     ['wrong operator', (f: ReturnType<typeof fixture>) => ({
-      ...f, expectedOperatorId: 'other-operator' },
-    )],
+      ...f, expectedOperatorId: 'other-operator' })],
     ['wrong key id', (f: ReturnType<typeof fixture>) => ({
-      ...f, expectedApprovalKeyId: 'other-signing-key' },
-    )],
+      ...f, expectedApprovalKeyId: 'other-signing-key' })],
     ['wrong verification key', (f: ReturnType<typeof fixture>) => ({
-      ...f, approvalPublicKey: generateKeyPairSync('ed25519').publicKey },
-    )],
+      ...f, approvalPublicKey: generateKeyPairSync('ed25519').publicKey })],
     ['forged signature', (f: ReturnType<typeof fixture>) => ({
-      ...f, approvalSignature: sign(null, Buffer.from('forged'), keys.privateKey).toString('base64url') },
-    )],
+      ...f, approvalSignature: sign(null, Buffer.from('forged'), keys.privateKey).toString('base64url') })],
     ['malformed signature', (f: ReturnType<typeof fixture>) => ({
-      ...f, approvalSignature: 'SECRET_IMPOSTOR_SIGNATURE' },
-    )],
+      ...f, approvalSignature: 'SECRET_IMPOSTOR_SIGNATURE' })],
     ['non Ed25519 key', (f: ReturnType<typeof fixture>) => ({
-      ...f, approvalPublicKey: generateKeyPairSync('rsa', { modulusLength: 2048 }).publicKey },
-    )],
+      ...f, approvalPublicKey: generateKeyPairSync('rsa', { modulusLength: 2048 }).publicKey })],
     ['unsigned key object', (f: ReturnType<typeof fixture>) => ({
-      ...f, approvalPublicKey: { type: 'public', asymmetricKeyType: 'ed25519' } },
-    )],
+      ...f, approvalPublicKey: { type: 'public', asymmetricKeyType: 'ed25519' } })],
     ['expired', (f: ReturnType<typeof fixture>) => ({
-      ...f, nowMs: f.permit.expiresAtMs },
-    )],
+      ...f, nowMs: f.permit.expiresAtMs })],
     ['not yet issued', (f: ReturnType<typeof fixture>) => ({
-      ...f, nowMs: f.permit.issuedAtMs - 1 },
-    )],
+      ...f, nowMs: f.permit.issuedAtMs - 1 })],
     ['consumed permit', (f: ReturnType<typeof fixture>) => ({
-      ...f, permit: { ...f.permit, status: 'CONSUMED', consumedAtMs: NOW - 10_000 } },
-    )],
+      ...f, permit: { ...f.permit, status: 'CONSUMED', consumedAtMs: NOW - 10_000 } })],
     ['revoked permit', (f: ReturnType<typeof fixture>) => ({
-      ...f, permit: { ...f.permit, status: 'REVOKED' } },
-    )],
+      ...f, permit: { ...f.permit, status: 'REVOKED' } })],
     ['untrusted time', (f: ReturnType<typeof fixture>) => ({
-      ...f, nowMs: Number.NaN },
-    )],
+      ...f, nowMs: Number.NaN })],
   ])('fails closed on %s', (_label, change) => {
     const result = assessSajuHeldStagingAdmissionSignatureV2(change(fixture()));
     expect(result.contract).toBe('BLOCKED');
