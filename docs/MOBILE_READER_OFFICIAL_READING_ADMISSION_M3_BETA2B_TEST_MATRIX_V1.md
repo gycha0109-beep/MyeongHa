@@ -79,6 +79,15 @@ migration 1220/1270/1240의 기존 관계와 Reader 접근을 재사용할 때�
 | DBGR-07 | Guest→Member promotion 또는 direct Guest merge 후 재열람 | canonical lineage만 허용, 기존 purchase/Grant/Reading owner rewrite 없음 |
 | DBGR-08 | historical `standard_reading_unit_bindings`와 신규 official v2 authority 공존 | 과거 provenance 자동 승격 금지, 신규 Reader-independent official Reading identity 유지 |
 
+## 2.2 Product Capability·회수 동시성 설계 검증 게이트
+
+정확한 수용 조건은 다음 문서가 소유한다. **현재 미실행.** 기존 9×9 합성 A3 PASS와 #1831 Postgres replay PASS를 과장하지 않는다.
+
+- **CAP-01~12**: MOBILE_READER_PRODUCT_CAPABILITY_CONSISTENCY_M3_BETA2B_DESIGN_V1.md — Product-approved Standard 9×9 eligibility와 DB v2 can_initiate 조건의 책임 분리, Premium Specialist Capability·Unlock·Published Release·정책 revision 동기화.
+- **RACE-01~16**: MOBILE_READER_GRANT_REVOKE_REVEAL_CONCURRENCY_M3_BETA2B_DESIGN_V1.md — T1 approved→revoke→T2 deny, grant/revoke interleaving, same-bundle remaining Grant, cross-bundle ambiguity, fresh effectiveAt, Subject/session 전환, provider await 중 DB connection lease, 결과 공개 선형화 정책.
+- **기존 DB 회귀 완료 부분**: #1831 revoked Reader A binding replay ≠ current Reader metadata/raw source access 및 hash drift conflict 검증. RACE-01~16의 PASS 증거로 치환하지 않는다.
+- **운영 구분**: C안의 Product 정책 적격성은 **owner 미승인 후보**. T1/T2 splitting은 현재 서버 동작이 아니라 **조건부 설계**. DB/Commerce/Product/Reader/Saju/Release 승인 없이 코드/런타임/Offer 공개 금지.
+
 ## 3. 특히 중요한 경계 테스트
 
 1. **미구매 Reader**: DB access metadata 단에서 deny. Product rule lookup 이전 raw artifact 0, Saju 0. 시뮬레이션 테스트에서 이 원칙과 실제 DB query trace가 일치해야 한다.
