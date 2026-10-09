@@ -41,6 +41,18 @@ export interface CharacterStandardReadingChatTurnPreflightV2 {
   readonly runtime: CharacterRuntimeContextV2;
 }
 
+const mintedStandardChatPreflightsV2 = new WeakSet<object>();
+
+/** Downstream must reject structural clones before resolving an Official source. */
+export function assertServerPreparedStandardChatPreflightV2(
+  candidate: unknown,
+): asserts candidate is CharacterStandardReadingChatTurnPreflightV2 {
+  if (typeof candidate !== 'object' || candidate === null ||
+      !mintedStandardChatPreflightsV2.has(candidate)) {
+    throw new CharacterStandardReadingChatTurnPreflightErrorV2('ACCESS_DENIED');
+  }
+}
+
 export class CharacterStandardReadingChatTurnPreflightErrorV2 extends Error {
   constructor(
     readonly code: 'INVALID_REQUEST' | 'ACCESS_DENIED' | 'SOURCE_MISMATCH',
@@ -199,10 +211,12 @@ export async function prepareCharacterStandardReadingChatTurnPreflightV2(
     return deny('ACCESS_DENIED');
   }
 
-  return Object.freeze({
+  const result = Object.freeze({
     receivePlan: input.receivePlan,
     threadBinding: thread,
     scope,
     runtime,
   });
+  mintedStandardChatPreflightsV2.add(result);
+  return result;
 }
