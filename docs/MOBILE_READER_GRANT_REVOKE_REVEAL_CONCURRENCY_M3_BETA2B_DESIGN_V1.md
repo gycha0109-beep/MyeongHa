@@ -5,6 +5,7 @@
 > 책임: DB Authority, Commerce Entitlement, Reader Runtime, API/Security, Saju/QA
 > Issues: #1827 (DB refund/revoke), #1823 (umbrella), #1831 (replay/current-access regression merged)
 > 코드/DB migration 변경, LIVE 정책 승인, 운영 배포는 이 문서 범위 밖
+> 세부 잠금·선형화 실행 계획: MOBILE_READER_FINAL_AUTHORIZATION_LOCKING_D02_V1.md (T2 commit 정책 L1, R0~R3 대안, 신규 Grant phantom, DB-C1~C4 실제 Postgres 검증)
 
 ## 1. 확인된 동작과 미보장 성질
 
