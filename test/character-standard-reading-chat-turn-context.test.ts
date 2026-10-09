@@ -565,6 +565,7 @@ describe('thread-bound Official Reading Reader runtime', () => {
     expect(result.readerContentBundleId).toBe(BUNDLE_ID);
     expect(result.officialReadingId).toBe(READING_ID);
     expect(result.sourceResponseHash).toBe(bundle.sourceResponseHash);
+    expect(result.interpretationHash).toMatch(/^sha256:v1:[0-9a-f]{64}$/u);
     expect(groundingProjectionPort.projectGrounding).toHaveBeenCalledTimes(1);
   });
 
@@ -1108,6 +1109,51 @@ describe('A3-gamma server-only Thread-bound official standard V2 Preview (public
     expect(result.sourceResponseHash).toBe(bundle.sourceResponseHash);
     expect(projectGrounding).toHaveBeenCalledTimes(1);
     expect(authority.productReaderEligibilityAuthorityPort.readApprovedRule).toHaveBeenCalled();
+  });
+
+  it('refuses a premium Product rule before Saju grounding, even for a known Reader', async () => {
+    const authority = authorities();
+    authority.productReaderEligibilityAuthorityPort.readApprovedRule.mockResolvedValue({
+      status: 'approved',
+      rule: {
+        kind: 'premium_named_readers',
+        productId: PRODUCT_ID,
+        productSpecVersion: 'standard-reading-v1',
+        sajuDomain: 'career',
+        readerCharacterIds: ['baekheon'],
+        ruleVersion: 'synthetic-premium-policy-v1',
+        approvedPolicyRevision: 'synthetic-premium-revision-v1',
+      },
+    } as never);
+    const projectGrounding = vi.fn(async () => previewGrounding());
+    await expect(runThreadBoundReaderInterpretationPreviewV2({
+      resolvedSubjectId: SUBJECT_ID, threadId: THREAD_ID, officialReadingId: READING_ID,
+      effectiveAt: '2026-09-21T00:01:00.000Z', ...authority,
+      contentReleaseRuntime: nonspecialistReleaseRuntime(),
+      contextInput: serverContextInput(), groundingProjectionPort: { projectGrounding },
+    })).rejects.toMatchObject({ code: 'ACCESS_DENIED' });
+    expect(projectGrounding).not.toHaveBeenCalled();
+  });
+
+  it('blocks revoked Reader access on A2 recheck before Saju grounding', async () => {
+    const authority = authorities();
+    const initialAccess = await authority.accessAuthorityPort.readAccessibleReadings({
+      subjectId: SUBJECT_ID, readingId: READING_ID, readerCharacterId: 'baekheon',
+    } as never);
+    let accessReads = 0;
+    authority.accessAuthorityPort.readAccessibleReadings = vi.fn(async () => {
+      accessReads += 1;
+      return accessReads === 1 ? initialAccess : [];
+    });
+    const projectGrounding = vi.fn(async () => previewGrounding());
+    await expect(runThreadBoundReaderInterpretationPreviewV2({
+      resolvedSubjectId: SUBJECT_ID, threadId: THREAD_ID, officialReadingId: READING_ID,
+      effectiveAt: '2026-09-21T00:01:00.000Z', ...authority,
+      contentReleaseRuntime: nonspecialistReleaseRuntime(),
+      contextInput: serverContextInput(), groundingProjectionPort: { projectGrounding },
+    })).rejects.toMatchObject({ code: 'ACCESS_DENIED' });
+    expect(accessReads).toBeGreaterThanOrEqual(2);
+    expect(projectGrounding).not.toHaveBeenCalled();
   });
 
   it('blocks a withheld Product rule before Saju grounding', async () => {
