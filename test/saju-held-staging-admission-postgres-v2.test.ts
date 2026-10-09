@@ -65,7 +65,7 @@ function fixture(settings: {fail?: string; returned?: 'wrong' | 'two' | 'empty'}
     if (settings.fail === 'connect') throw Error('SECRET_CONNECT');
     return {
       async query<Row = Record<string, unknown>>(text: string, values?: readonly unknown[]) {
-        sql.push({ text, values });
+        sql.push(values === undefined ? { text } : { text, values });
         if (settings.fail === 'begin' && text === 'BEGIN') throw Error('SECRET_BEGIN');
         if (settings.fail === 'role' && text.startsWith('SET LOCAL')) throw Error('SECRET_ROLE');
         if (['update', 'rollback'].includes(settings.fail ?? '') && text.startsWith('update public.')) throw Error('SECRET_UPDATE');
