@@ -2,6 +2,7 @@ import {
   summarizeSeyeonAiCostsV1,
   type SeyeonAiCostEventV1,
 } from './seyeon-ai-usage-cost-v1.js';
+import type { SeyeonStructuredPurposeV2 } from './seyeon-character-runtime-v2.js';
 
 export const SEYEON_AI_COST_ATTRIBUTION_VERSION_V1 =
   'seyeon-ai-cost-attribution-v1' as const;
@@ -30,14 +31,22 @@ export interface SeyeonAiAttributedCallV1 {
   readonly event: SeyeonAiCostEventV1;
 }
 
-const allowedPurpose: Readonly<Record<SeyeonAiAttributionStageV1, string>> =
-  Object.freeze({
-    preflight: 'preflight',
-    interpretation: 'interpretation',
-    dialogue_render: 'dialogue_render',
-    semantic_review: 'semantic_review',
-    event_extraction: 'event_extraction',
-  });
+const allowedPurposes: Readonly<Record<
+  SeyeonAiAttributionStageV1, readonly SeyeonStructuredPurposeV2[]
+>> = Object.freeze({
+  preflight: [
+    'integrity_classification',
+    'disclosure_classification',
+    'unified_preflight_shadow',
+  ],
+  interpretation: [
+    'turn_interpretation',
+    'turn_interpret_render_shadow',
+  ],
+  dialogue_render: ['dialogue_render'],
+  semantic_review: ['semantic_review'],
+  event_extraction: ['event_extraction'],
+});
 
 function serverId(value: string, field: string): string {
   if (typeof value !== 'string' || value.length < 1 ||
@@ -58,8 +67,7 @@ export function attributeSeyeonAiCostCallV1(input: {
 }): SeyeonAiAttributedCallV1 {
   const { event, stage } = input;
   if (event.schemaVersion !== 'seyeon-ai-cost-v1' ||
-      allowedPurpose[stage] === undefined ||
-      event.purpose !== allowedPurpose[stage]) {
+      !allowedPurposes[stage]?.some((purpose) => purpose === event.purpose)) {
     throw new Error('Se-yeon cost attribution stage/purpose mismatch.');
   }
   if (stage === 'event_extraction' &&
