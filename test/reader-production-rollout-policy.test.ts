@@ -73,11 +73,20 @@ describe('server-side first tranche for the shared Character Reader runtime', ()
     ]);
     expect(production).toContain('admitServerReader: assertReaderRuntimeInternalPreviewCandidateV1');
     expect(http).toContain('admitServerReader: input.admitServerReader');
-    expect(runtime).toContain('input.admitServerReader?.(prepared.source.readerCharacterId);');
-    expect(runtime.indexOf('input.admitServerReader?.(prepared.source.readerCharacterId);'))
-      .toBeGreaterThan(runtime.indexOf('prepared = await prepareCharacterStandardReadingServerRuntimeV1('));
-    expect(runtime.indexOf('input.admitServerReader?.(prepared.source.readerCharacterId);'))
-      .toBeLessThan(runtime.indexOf('return renderResolvedReaderInterpretationPreviewV1({\n    source: prepared.source'));
+    const rolloutGate = 'input.admitServerReader?.(initialThreadBinding.participantCharacterIds[0]);';
+    const productGate = 'if (!input.productReaderEligibilityAuthorityPort) {';
+    const admissionGate = 'admission = await prepareOfficialReadingReaderAdmissionV1({';
+    const legacyAssembly = 'prepared = await prepareCharacterStandardReadingServerRuntimeV1({';
+    const consumeProof = 'consumeOfficialReadingReaderAdmissionV1({';
+    const render = 'return renderResolvedReaderInterpretationPreviewV1({\n    source: prepared.source';
+    for (const gate of [rolloutGate, productGate, admissionGate, legacyAssembly, consumeProof, render]) {
+      expect(runtime).toContain(gate);
+    }
+    expect(runtime.indexOf(productGate)).toBeLessThan(runtime.indexOf(rolloutGate));
+    expect(runtime.indexOf(rolloutGate)).toBeLessThan(runtime.indexOf(admissionGate));
+    expect(runtime.indexOf(admissionGate)).toBeLessThan(runtime.indexOf(legacyAssembly));
+    expect(runtime.indexOf(legacyAssembly)).toBeLessThan(runtime.indexOf(consumeProof));
+    expect(runtime.indexOf(consumeProof)).toBeLessThan(runtime.indexOf(render));
     expect(web).toContain("READER_PREVIEW_CANDIDATE_IDS_V1 = Object.freeze(['seyeon'])");
     expect(web).toContain('READER_PUBLIC_INTERPRETATION_ENABLED_V1 = false');
     expect(parseProductionReaderInterpretationActivationConfigV1({}).mode).toBe('off');
