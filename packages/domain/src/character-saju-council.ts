@@ -322,6 +322,7 @@ export function guardCharacterSajuCouncilConsistencyV1(input: {
   input.transcript.turns.forEach((turn, turnIndex) => {
     if (
       turn.turnIndex !== turnIndex ||
+      turn.characterId !== input.transcript.participantCharacterIds[turnIndex] ||
       turn.readingRef !== input.grounding.readingRef ||
       turn.groundingHash !== input.grounding.groundingHash ||
       turn.utterance.readingRef !== input.grounding.readingRef ||
