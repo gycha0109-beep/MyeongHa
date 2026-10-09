@@ -155,7 +155,7 @@ describe('Se-yeon same-transaction Commit candidate, never Production activation
       'subject mismatch',
     );
     expect(x.commitTurnInSameTransaction).not.toHaveBeenCalled();
-    expect(x.sequence).toEqual(['ROLLBACK']);
+    expect(x.sequence).toEqual([]); // Mock runner refuses mismatched Subject before BEGIN.
   });
 
   it('rejects duplicate pinned grant references before any DB work', async () => {
