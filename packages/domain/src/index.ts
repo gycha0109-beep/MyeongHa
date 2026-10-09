@@ -266,11 +266,9 @@ export {
 } from './character-saju-perspective.js';
 
 export {
-  CHARACTER_SAJU_FIRST_SLICE_CHARACTER_IDS_V1,
-  CHARACTER_SAJU_FIRST_SLICE_PERSPECTIVE_VERSION_V1,
-  resolveCharacterSajuFirstSlicePerspectiveV1,
-  type CharacterSajuFirstSliceCharacterIdV1,
-} from './character-saju-perspective-registry.js';
+  CHARACTER_SAJU_COMMON_PERSPECTIVE_VERSION_V1,
+  resolveCharacterSajuCommonPerspectiveV1,
+} from './character-saju-common-perspective.js';
 
 export {
   CHARACTER_GROUNDING_REALIZATION_POLICIES_V1,

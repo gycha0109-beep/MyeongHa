@@ -72,24 +72,15 @@ Consequences:
 - Historical relationship events and raw messages are deliberately absent, so Reader v1 has no product-defined history/message window and no arbitrary retrieval limit. Legacy empty arrays may cross older internal seams, but non-empty history is rejected and the server normalizes both fields to empty.
 - Current relationship projection remains available for Character delivery, but its numeric band projection policy is not invented here; SRC-22 remains the policy-authority blocker for Production thresholds.
 
-## 3. Current executable slice
+## 3. Common bounded Reader Interpretation (all Character identities)
 
-The runtime is intentionally perspective-agnostic: it receives an already-admitted `CharacterPerspectiveProfileV1` and does not invent Character-to-grounding mappings.
+The historical first-slice Baekheon/Taegyeom authored-axis-to-grounding mappings were **removed**. They were test scaffolding, not an authorized policy limiting which Character can read a standard Saju Reading.
 
-Current repository authority already admits explicit mappings for:
+All server-authorized Readers now use a source-neutral `common_bounded` perspective, bound to their own pinned Character content identity and safe framing catalog. The common selection uses Saju-owned narrative roles/source-unit order without inventing an authored axis mapping. The existing typed `admitCharacterPerspectiveProfileV1` remains strict for future, separately reviewed authored specializations; no such specialized profile is registered or automatically selected here.
 
-- Baekheon
-- Taegyeom
+This is a **runtime selection change only**. Existing exact Reader entitlement, Official Reading ownership, server Thread/content release, restricted internal Preview rollout (currently Se-yeon only), public Paid Reader OFF, and product/Commerce activation gates all remain unchanged. All Readers capable of standard Saju interpretation does not automatically grant every Character access to a user's paid Reading.
 
-The Preview E2E regression therefore proves multi-Reader Source Truth reuse with those existing admitted mappings. It verifies that both Readers consume the same `officialReadingId`, `sourceResponseHash`, and `groundingHash`, while selecting different authorized source units.
-
-## 4. Se-yeon / Yeo-ul boundary
-
-Se-yeon and Yeo-ul have published Character Saju authoring, but this repository does **not** yet contain an approved explicit mapping from their authored `attentionAxes` to the shared Saju grounding-axis registry.
-
-This runtime must not guess that mapping.
-
-Before Se-yeon or Yeo-ul can enter this semantic Reader Interpretation path, a separate reviewed authority change must explicitly bind every published attention axis to a grounding axis and pin the interpretation behavior. Until then, their existing Reading Scene remains presentation-only and must not be treated as semantic Reader Interpretation authority.
+The Character-specific difference at this stage comes from each approved pinned Character safe-framing/voice authority, while source Saju `canonicalMeaning` and semantic hashes stay invariant. The common baseline does **not** authorize free-form Character paraphrasing, missing safe-framing fabrication, unapproved Product eligibility, or public rollout. If authored framing/Source Truth is unavailable, preserve guarded fallback.
 
 ## 5. Preview envelope
 

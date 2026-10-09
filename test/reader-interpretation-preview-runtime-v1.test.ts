@@ -84,13 +84,13 @@ const baseBundle = makeBundle([
 ]);
 
 type ReaderFixture = {
-  readonly characterId: 'baekheon' | 'taegyeom';
+  readonly characterId: 'baekheon' | 'taegyeom' | 'seyeon';
   readonly contentBundleId: string;
   readonly attentionAxes: readonly string[];
   readonly currentLifeQuestion: string;
 };
 
-const readers: Record<'baekheon' | 'taegyeom', ReaderFixture> = {
+const readers: Record<'baekheon' | 'taegyeom' | 'seyeon', ReaderFixture> = {
   baekheon: {
     characterId: 'baekheon',
     contentBundleId: 'bundle-baekheon-v1',
@@ -102,6 +102,12 @@ const readers: Record<'baekheon' | 'taegyeom', ReaderFixture> = {
     contentBundleId: 'bundle-taegyeom-v1',
     attentionAxes: ['responsibility', 'boundary', 'consequence'],
     currentLifeQuestion: '지금 선택에서 감당할 책임과 경계를 먼저 확인하십시오.',
+  },
+  seyeon: {
+    characterId: 'seyeon',
+    contentBundleId: 'bundle-seyeon-v1',
+    attentionAxes: ['whole_pattern', 'competing_signals', 'long_horizon_balance'],
+    currentLifeQuestion: '한 번에 정하지 말고 지금 할 수 있는 것부터 볼까요?',
   },
 };
 
@@ -363,7 +369,7 @@ async function run(
 }
 
 describe('Reader Interpretation Preview Runtime v1', () => {
-  it('reuses one official Source Truth while different admitted Readers select different source units', async () => {
+  it('reuses one official Source Truth with character-neutral selection for different Readers', async () => {
     const ports = authorityPorts({ activeReaders: ['baekheon', 'taegyeom'] });
     const baekheon = await run(readers.baekheon, { ports });
     const taegyeom = await run(readers.taegyeom, { ports });
@@ -381,7 +387,8 @@ describe('Reader Interpretation Preview Runtime v1', () => {
     expect(taegyeom.sourceResponseHash).toBe(SOURCE_HASH);
     expect(baekheon.groundingHash).toBe(taegyeom.groundingHash);
     expect(baekheon.readerCharacterId).not.toBe(taegyeom.readerCharacterId);
-    expect(baekheon.utterance.renderedUnitIds).not.toEqual(taegyeom.utterance.renderedUnitIds);
+    expect(baekheon.utterance.renderedUnitIds).toEqual(taegyeom.utterance.renderedUnitIds);
+    expect(baekheon.utterance.segments).not.toEqual(taegyeom.utterance.segments);
 
     const officialMeanings = new Set(baseBundle.units.map((unit) => unit.canonicalMeaning));
     for (const envelope of [baekheon, taegyeom]) {
@@ -464,59 +471,27 @@ describe('Reader Interpretation Preview Runtime v1', () => {
     expect(result.groundingHash).toBe(baseBundle.groundingHash);
   });
 
-  it('fails closed when the active Reader has no reviewed grounding-axis perspective', async () => {
-    const unsupportedContext = {
-      ...makeContext(baseBundle, readers.baekheon),
-      characterId: 'seyeon',
-      contentBundleId: 'bundle-seyeon-v1',
-      sajuProfile: {
-        ...makeContext(baseBundle, readers.baekheon).sajuProfile,
-        profileVersion: 'seyeon-saju-profile-v1',
-        attentionAxes: ['whole_pattern', 'competing_signals', 'long_horizon_balance'],
-      },
-    } as unknown as CharacterRuntimeContextWithGroundingV1;
+  it('admits Seyeon with the same safe common perspective and no single-character axis mapping', async () => {
+    const ports = authorityPorts({ activeReaders: ['seyeon'] });
+    const projected = groundingProjectionPort(baseBundle);
+    const result = await run(readers.seyeon, { ports, projectionPort: projected });
+    expect(result.mode).toBe('reader_interpretation');
+    expect(result.readerCharacterId).toBe('seyeon');
+    expect(result.sourceResponseHash).toBe(SOURCE_HASH);
+    expect(projected.projectGrounding).toHaveBeenCalledOnce();
+    if (result.mode !== 'reader_interpretation') throw new Error('expected Reader interpretation');
+    const meanings = new Set(baseBundle.units.map((unit) => unit.canonicalMeaning));
+    for (const segment of result.utterance.segments) {
+      if (segment.kind === 'semantic_realization') expect(meanings.has(segment.text)).toBe(true);
+    }
+  });
 
-    const accessAuthorityPort: CharacterStandardReadingAccessAuthorityPortV1 = {
-      readAccessibleReadings: vi.fn(async () => [{
-        subjectId: SUBJECT_ID,
-        readingId: READING_ID,
-        readingSessionId: 'official-reading-session-1',
-        productId: 'standard-reading-product-1',
-        readerCharacterId: 'seyeon',
-        readerContentBundleId: 'bundle-seyeon-v1',
-        topicKey: 'general',
-        sajuDomain: 'general',
-        readingPeriod: 'original',
-        readingVariant: 'standard',
-        sourceBirthRevisionId: 'birth-revision-1',
-        productSpecVersion: 'standard-reading-v1',
-        domainCapabilityVersion: 'general-v1',
-        readingContractVersion: RESPONSE_VERSION,
-        sajuEngineVersion: ENGINE_VERSION,
-        responseHash: OFFICIAL_ARTIFACT_HASH,
-      }]),
-    };
-    const artifactAuthorityPort: CharacterStandardReadingArtifactAuthorityPortV1 = {
-      readArtifactSource: vi.fn(async () => [artifactRow('seyeon')]),
-    };
-
-    const projectionPort = groundingProjectionPort(baseBundle);
-
-    await expect(
-      runReaderInterpretationPreviewV1({
-        resolvedSubjectId: SUBJECT_ID,
-        officialReadingId: READING_ID,
-        readerCharacterId: 'seyeon',
-        effectiveAt: '2026-09-21T00:00:00.000Z',
-        requestedDomain: 'general',
-        context: unsupportedContext,
-        groundingProjectionPort: projectionPort,
-        accessAuthorityPort,
-        artifactAuthorityPort,
-      }),
-    ).rejects.toMatchObject({ code: 'PERSPECTIVE_UNAVAILABLE' });
-
-    expect(projectionPort.projectGrounding).not.toHaveBeenCalled();
+  it('keeps Seyeon per-Reading grant protection before any grounding call', async () => {
+    const ports = authorityPorts({ activeReaders: [] });
+    const projected = groundingProjectionPort(baseBundle);
+    await expect(run(readers.seyeon, { ports, projectionPort: projected }))
+      .rejects.toMatchObject({ code: 'ACCESS_DENIED' });
+    expect(projected.projectGrounding).not.toHaveBeenCalled();
   });
 
   it('does not let one Reader borrow another Reader runtime context', async () => {
