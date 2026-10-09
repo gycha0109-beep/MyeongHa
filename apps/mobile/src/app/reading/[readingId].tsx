@@ -14,6 +14,7 @@ import {
   View,
 } from 'react-native';
 
+import { MobileOfficialReadingReaderEntry } from '@/features/reading/MobileOfficialReadingReaderEntry';
 import { mobileRecordsServiceV1 } from '@/features/records/native-mobile-records-service';
 import {
   formatRecordDateV1,
@@ -182,6 +183,8 @@ export default function OfficialReadingDetailScreen() {
                 ) : null}
               </View>
             ))}
+
+            <MobileOfficialReadingReaderEntry record={state.record} />
           </>
         ) : null}
       </ScrollView>
