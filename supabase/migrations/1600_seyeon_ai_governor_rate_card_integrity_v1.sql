@@ -117,10 +117,8 @@ begin
       message='Governed usage estimate must use the reservation price version';
   end if;
 
-  -- D1: The DB rate card is authoritative, not the event's quoted amount.
-  -- Rate identity and numeric fields must match the immutable policy version
-  -- that was selected at admission. Do NOT require is_active: an operator may
-  -- disable a model while an already-reserved request is in-flight.
+  -- Recompute against the immutable DB rate card used for this admission.
+  -- Deactivated versions must remain usable to settle in-flight calls.
   select m.* into v_rate
   from public.seyeon_ai_governor_model_policies_v1 m
   where m.provider_key=v_row.provider_key
@@ -130,7 +128,7 @@ begin
   if not found then
     raise exception using errcode='23514',
       constraint='seyeon_ai_governor_rate_card_missing',
-      message='Governed settlement cannot verify the original immutable rate card';
+      message='Governed settlement rate card missing';
   end if;
 
   if p_event->>'costStatus'='estimated' then
@@ -142,166 +140,10 @@ begin
       or jsonb_typeof(p_event->'outputTokens') is distinct from 'number'
       or jsonb_typeof(p_event->'cachedInputTokens') is distinct from 'number'
       or jsonb_typeof(p_event->'estimatedCostMicroUsd') is distinct from 'number'
-      or p_event->>'inputTokens' !~ '^[0-9]{1,16}
-    p_subject_id,p_turn_id,p_attempt_id,p_phase,p_event
-  ) x;
-  if v_settled.call_id is distinct from v_call then
-    raise exception using errcode='23514',
-      constraint='seyeon_ai_governor_settlement_receipt_drift',
-      message='Governed settlement received a different provider call id';
-  end if;
-  if v_settled.replayed then
-    -- Already settled. No second debit/refund, including after a day rollover.
-    return query select v_call,true,v_row.governor_effective_micro_usd,
-      v_row.governor_effective_micro_usd>v_row.governor_ceiling_micro_usd;
-    return;
-  end if;
-
-  -- All event fields have been validated by the old ledger command above.
-  v_actual:=case when p_event->>'costStatus'='estimated'
-    then (p_event->>'estimatedCostMicroUsd')::numeric
-    else v_row.governor_ceiling_micro_usd::numeric end;
-  v_delta:=v_actual-v_row.governor_ceiling_micro_usd::numeric;
-  v_next:=v_budget.occupied_micro_usd::numeric+v_delta;
-  if v_next<0 or v_next>9223372036854775807::numeric then
-    raise exception using errcode='23514',
-      constraint='seyeon_ai_governor_settlement_counter_range',
-      message='Governed settlement daily accounting exceeded integer range';
-  end if;
-  update public.seyeon_ai_governor_daily_budgets_v1 d
-  set occupied_micro_usd=v_next::bigint
-  where d.bucket_utc_date=v_day;
-  if not found then
-    raise exception using errcode='23514',
-      constraint='seyeon_ai_governor_settlement_update_failed',
-      message='Governed settlement cannot update reserved day balance';
-  end if;
-  -- Actual cost above ceiling is recorded and marked as an incident. Do not
-  -- falsify invoice/usage to satisfy a configured budget.
-  return query select v_call,false,v_actual::bigint,
-    v_actual>v_row.governor_ceiling_micro_usd::numeric;
-end
-$settle_governed$;
-      or p_event->>'outputTokens' !~ '^[0-9]{1,16}
-    p_subject_id,p_turn_id,p_attempt_id,p_phase,p_event
-  ) x;
-  if v_settled.call_id is distinct from v_call then
-    raise exception using errcode='23514',
-      constraint='seyeon_ai_governor_settlement_receipt_drift',
-      message='Governed settlement received a different provider call id';
-  end if;
-  if v_settled.replayed then
-    -- Already settled. No second debit/refund, including after a day rollover.
-    return query select v_call,true,v_row.governor_effective_micro_usd,
-      v_row.governor_effective_micro_usd>v_row.governor_ceiling_micro_usd;
-    return;
-  end if;
-
-  -- All event fields have been validated by the old ledger command above.
-  v_actual:=case when p_event->>'costStatus'='estimated'
-    then (p_event->>'estimatedCostMicroUsd')::numeric
-    else v_row.governor_ceiling_micro_usd::numeric end;
-  v_delta:=v_actual-v_row.governor_ceiling_micro_usd::numeric;
-  v_next:=v_budget.occupied_micro_usd::numeric+v_delta;
-  if v_next<0 or v_next>9223372036854775807::numeric then
-    raise exception using errcode='23514',
-      constraint='seyeon_ai_governor_settlement_counter_range',
-      message='Governed settlement daily accounting exceeded integer range';
-  end if;
-  update public.seyeon_ai_governor_daily_budgets_v1 d
-  set occupied_micro_usd=v_next::bigint
-  where d.bucket_utc_date=v_day;
-  if not found then
-    raise exception using errcode='23514',
-      constraint='seyeon_ai_governor_settlement_update_failed',
-      message='Governed settlement cannot update reserved day balance';
-  end if;
-  -- Actual cost above ceiling is recorded and marked as an incident. Do not
-  -- falsify invoice/usage to satisfy a configured budget.
-  return query select v_call,false,v_actual::bigint,
-    v_actual>v_row.governor_ceiling_micro_usd::numeric;
-end
-$settle_governed$;
-      or p_event->>'cachedInputTokens' !~ '^[0-9]{1,16}
-    p_subject_id,p_turn_id,p_attempt_id,p_phase,p_event
-  ) x;
-  if v_settled.call_id is distinct from v_call then
-    raise exception using errcode='23514',
-      constraint='seyeon_ai_governor_settlement_receipt_drift',
-      message='Governed settlement received a different provider call id';
-  end if;
-  if v_settled.replayed then
-    -- Already settled. No second debit/refund, including after a day rollover.
-    return query select v_call,true,v_row.governor_effective_micro_usd,
-      v_row.governor_effective_micro_usd>v_row.governor_ceiling_micro_usd;
-    return;
-  end if;
-
-  -- All event fields have been validated by the old ledger command above.
-  v_actual:=case when p_event->>'costStatus'='estimated'
-    then (p_event->>'estimatedCostMicroUsd')::numeric
-    else v_row.governor_ceiling_micro_usd::numeric end;
-  v_delta:=v_actual-v_row.governor_ceiling_micro_usd::numeric;
-  v_next:=v_budget.occupied_micro_usd::numeric+v_delta;
-  if v_next<0 or v_next>9223372036854775807::numeric then
-    raise exception using errcode='23514',
-      constraint='seyeon_ai_governor_settlement_counter_range',
-      message='Governed settlement daily accounting exceeded integer range';
-  end if;
-  update public.seyeon_ai_governor_daily_budgets_v1 d
-  set occupied_micro_usd=v_next::bigint
-  where d.bucket_utc_date=v_day;
-  if not found then
-    raise exception using errcode='23514',
-      constraint='seyeon_ai_governor_settlement_update_failed',
-      message='Governed settlement cannot update reserved day balance';
-  end if;
-  -- Actual cost above ceiling is recorded and marked as an incident. Do not
-  -- falsify invoice/usage to satisfy a configured budget.
-  return query select v_call,false,v_actual::bigint,
-    v_actual>v_row.governor_ceiling_micro_usd::numeric;
-end
-$settle_governed$;
-      or p_event->>'estimatedCostMicroUsd' !~ '^[0-9]{1,16}
-    p_subject_id,p_turn_id,p_attempt_id,p_phase,p_event
-  ) x;
-  if v_settled.call_id is distinct from v_call then
-    raise exception using errcode='23514',
-      constraint='seyeon_ai_governor_settlement_receipt_drift',
-      message='Governed settlement received a different provider call id';
-  end if;
-  if v_settled.replayed then
-    -- Already settled. No second debit/refund, including after a day rollover.
-    return query select v_call,true,v_row.governor_effective_micro_usd,
-      v_row.governor_effective_micro_usd>v_row.governor_ceiling_micro_usd;
-    return;
-  end if;
-
-  -- All event fields have been validated by the old ledger command above.
-  v_actual:=case when p_event->>'costStatus'='estimated'
-    then (p_event->>'estimatedCostMicroUsd')::numeric
-    else v_row.governor_ceiling_micro_usd::numeric end;
-  v_delta:=v_actual-v_row.governor_ceiling_micro_usd::numeric;
-  v_next:=v_budget.occupied_micro_usd::numeric+v_delta;
-  if v_next<0 or v_next>9223372036854775807::numeric then
-    raise exception using errcode='23514',
-      constraint='seyeon_ai_governor_settlement_counter_range',
-      message='Governed settlement daily accounting exceeded integer range';
-  end if;
-  update public.seyeon_ai_governor_daily_budgets_v1 d
-  set occupied_micro_usd=v_next::bigint
-  where d.bucket_utc_date=v_day;
-  if not found then
-    raise exception using errcode='23514',
-      constraint='seyeon_ai_governor_settlement_update_failed',
-      message='Governed settlement cannot update reserved day balance';
-  end if;
-  -- Actual cost above ceiling is recorded and marked as an incident. Do not
-  -- falsify invoice/usage to satisfy a configured budget.
-  return query select v_call,false,v_actual::bigint,
-    v_actual>v_row.governor_ceiling_micro_usd::numeric;
-end
-$settle_governed$;
+      or p_event->>'inputTokens' !~ '^[0-9]{1,16}$'
+      or p_event->>'outputTokens' !~ '^[0-9]{1,16}$'
+      or p_event->>'cachedInputTokens' !~ '^[0-9]{1,16}$'
+      or p_event->>'estimatedCostMicroUsd' !~ '^[0-9]{1,16}$'
     then
       raise exception using errcode='23514',
         constraint='seyeon_ai_governor_usage_incomplete',
@@ -325,22 +167,19 @@ $settle_governed$;
         (p_event->>'estimatedCostMicroUsd')::numeric then
       raise exception using errcode='23514',
         constraint='seyeon_ai_governor_cost_disagrees_with_rate',
-        message='Governed estimated cost does not match immutable DB prices';
+        message='Governed estimated cost disagrees with immutable DB rate';
     end if;
   elsif p_event->>'costStatus'='price_unknown' then
-    -- Governed calls have an approved price card. A price_unknown event
-    -- indicates a broken metering contract, not an eligible settlement.
     raise exception using errcode='23514',
       constraint='seyeon_ai_governor_price_unknown_invalid',
-      message='Governed calls cannot settle with an unknown price';
+      message='Governed call cannot settle with unknown price';
   elsif p_event->>'costStatus'='usage_unknown' then
-    -- Unknown usage must really be incomplete; keep full reservation.
     if p_event->>'inputTokens' is not null
       and p_event->>'outputTokens' is not null
       and p_event->>'cachedInputTokens' is not null then
       raise exception using errcode='23514',
         constraint='seyeon_ai_governor_unknown_usage_conflict',
-        message='Complete governed usage cannot be labelled unknown';
+        message='Complete governed usage cannot be marked unknown';
     end if;
   end if;
 
