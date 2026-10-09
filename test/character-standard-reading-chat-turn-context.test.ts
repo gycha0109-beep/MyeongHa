@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { prepareCharacterStandardReadingChatTurnPreflightV2 } from '../apps/api/src/character-standard-reading-chat-turn-preflight-v2.js';
 import { runThreadBoundReaderInterpretationPreviewV2 } from '../apps/api/src/reader-interpretation-preview-runtime-v2.js';
 import type { CharacterContentDefinition } from '../packages/character-content/src/index.js';
 import {
@@ -1210,5 +1211,190 @@ describe('A3-gamma server-only Thread-bound official standard V2 Preview (public
       groundingProjectionPort: { projectGrounding },
     })).rejects.toMatchObject({ code: 'SOURCE_MISMATCH' });
     expect(projectGrounding).not.toHaveBeenCalled();
+  });
+});
+
+
+describe('A3-epsilon server-only Official Standard Reader Chat V2 preflight (public OFF)', () => {
+  function nonspecialistReceivePlan() {
+    const runtime = compatibleReceiveRuntime();
+    const original = runtime.resolvePinned(RELEASE_ID);
+    const noSpecialistCapabilities = {
+      ...original,
+      characters: {
+        ...original.characters,
+        characters: [{
+          ...authoredCharacter('baekheon'),
+          capabilities: [],
+        }],
+      },
+    } as ContentReleaseRuntimeEntry;
+    const nonSpecialist = {
+      ...runtime,
+      assertPinnedClientCompatible: vi.fn(() => noSpecialistCapabilities),
+    } as unknown as ContentReleaseRuntime;
+    return prepareChatReceiveCommand({
+      request: {
+        threadId: THREAD_ID,
+        clientTurnId: 'turn-standard-v2-follow-up',
+        text: '방금 공식 직업 사주에 관해 더 설명해주세요.',
+        clientCapability: 'source-authorized-test-capability',
+      },
+      releaseRuntime: nonSpecialist,
+      trustedThread: {
+        threadId: THREAD_ID,
+        pinnedReleaseId: RELEASE_ID,
+        participantCharacterIds: ['baekheon'],
+      },
+    });
+  }
+
+  function input() {
+    const authority = authorities();
+    return {
+      ...authority,
+      resolvedSubjectId: SUBJECT_ID,
+      readingId: READING_ID,
+      effectiveAt: '2026-09-21T00:02:00.000Z',
+      receivePlan: nonspecialistReceivePlan(),
+      contextInput: serverContextInput(),
+    };
+  }
+
+  it('assembles a source-bound V2 standard context with zero specialist capabilities', async () => {
+    const args = input();
+    const result = await prepareCharacterStandardReadingChatTurnPreflightV2(args);
+    expect(result.receivePlan).toBe(args.receivePlan);
+    expect(result.threadBinding.contentRevision).toBe(4);
+    expect(result.scope.subjectId).toBe(SUBJECT_ID);
+    expect(result.scope.threadId).toBe(THREAD_ID);
+    expect(result.scope.readingId).toBe(READING_ID);
+    expect(result.runtime.schemaVersion).toBe('v2');
+    expect(result.runtime.characterId).toBe('baekheon');
+    expect(result.runtime.saju.readingRef).toBe(READING_ID);
+    expect(result.runtime.saju.domain).toBe('career');
+    expect(result.runtime.saju.eligibility.source).toBe('official_standard_product_rule');
+    expect(result.runtime.saju.eligibility.readerCharacterId).toBe('baekheon');
+    expect(result.runtime.saju).not.toHaveProperty('capability');
+    expect(result.runtime.saju.protectedSegments.map((segment) => segment.text)).toEqual([
+      '서버가 다시 읽은 공식 직업 Reading입니다.',
+    ]);
+    expect(result.runtime.memories.map((memory) => memory.granteeCharacterId)).toEqual(['baekheon']);
+    expect(args.accessAuthorityPort.readAccessibleReadings).toHaveBeenCalledTimes(2);
+    expect(args.artifactAuthorityPort.readArtifactSource).toHaveBeenCalledTimes(2);
+    expect(args.productReaderEligibilityAuthorityPort.readApprovedRule).toHaveBeenCalledTimes(3);
+  });
+
+  it('rejects missing approved Product authority before raw Official Reading access', async () => {
+    const args = input();
+    await expect(prepareCharacterStandardReadingChatTurnPreflightV2({
+      ...args,
+      productReaderEligibilityAuthorityPort: undefined,
+    })).rejects.toMatchObject({ code: 'ACCESS_DENIED' });
+    expect(args.accessAuthorityPort.readAccessibleReadings).not.toHaveBeenCalled();
+    expect(args.artifactAuthorityPort.readArtifactSource).not.toHaveBeenCalled();
+  });
+
+  it('rejects a cloned receive plan before accessing a Reading', async () => {
+    const args = input();
+    await expect(prepareCharacterStandardReadingChatTurnPreflightV2({
+      ...args,
+      receivePlan: Object.freeze({ ...args.receivePlan }),
+    })).rejects.toThrow(/not minted by server receive authority/u);
+    expect(args.accessAuthorityPort.readAccessibleReadings).not.toHaveBeenCalled();
+    expect(args.artifactAuthorityPort.readArtifactSource).not.toHaveBeenCalled();
+  });
+
+  it('rejects caller Saju or Memory authority before any Reader access lookup', async () => {
+    const args = input();
+    await expect(prepareCharacterStandardReadingChatTurnPreflightV2({
+      ...args,
+      contextInput: {
+        ...serverContextInput(),
+        saju: { readingRef: READING_ID },
+      } as CharacterStandardReadingChatTurnServerContextInputV1,
+    })).rejects.toThrow(/caller-supplied saju authority/u);
+    expect(args.accessAuthorityPort.readAccessibleReadings).not.toHaveBeenCalled();
+    expect(args.artifactAuthorityPort.readArtifactSource).not.toHaveBeenCalled();
+  });
+
+  it('fails closed on a different Reading or Subject, without releasing V2 context', async () => {
+    const differentReading = input();
+    await expect(prepareCharacterStandardReadingChatTurnPreflightV2({
+      ...differentReading,
+      readingId: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+    })).rejects.toMatchObject({ code: 'ACCESS_DENIED' });
+    const differentSubject = input();
+    await expect(prepareCharacterStandardReadingChatTurnPreflightV2({
+      ...differentSubject,
+      resolvedSubjectId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    })).rejects.toMatchObject({ code: 'ACCESS_DENIED' });
+  });
+
+  it('rejects Reader access revoked between A2 reads', async () => {
+    const args = input();
+    const accessible = await args.accessAuthorityPort.readAccessibleReadings({
+      subjectId: SUBJECT_ID, readingId: READING_ID, readerCharacterId: 'baekheon',
+    } as never);
+    let reads = 0;
+    args.accessAuthorityPort.readAccessibleReadings = vi.fn(async () => {
+      reads += 1;
+      return reads === 1 ? accessible : [];
+    });
+    await expect(prepareCharacterStandardReadingChatTurnPreflightV2(args))
+      .rejects.toMatchObject({ code: 'ACCESS_DENIED' });
+    expect(reads).toBeGreaterThanOrEqual(2);
+    expect(args.artifactAuthorityPort.readArtifactSource).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects a Product rule reclassified as premium immediately before A3 issuance', async () => {
+    const args = input();
+    let reads = 0;
+    args.productReaderEligibilityAuthorityPort.readApprovedRule = vi.fn(async () => {
+      reads += 1;
+      return {
+        status: 'approved' as const,
+        rule: {
+          kind: reads < 3 ? 'standard_all_readers' as const : 'premium_restricted' as const,
+          productId: PRODUCT_ID,
+          productSpecVersion: 'standard-reading-v1',
+          sajuDomain: 'career' as const,
+          ruleVersion: 'synthetic-test-reader-policy-v1',
+          approvedPolicyRevision: 'synthetic-test-revision-v1',
+          ...(reads < 3 ? {} : { allowedReaderIds: ['baekheon'] }),
+        },
+      };
+    });
+    await expect(prepareCharacterStandardReadingChatTurnPreflightV2(args))
+      .rejects.toMatchObject({ code: 'ACCESS_DENIED' });
+    expect(reads).toBe(3);
+  });
+
+  it('fails closed on Release mismatch before access or Content composition', async () => {
+    const args = input();
+    const mismatch = existingThreadReceivePlan(
+      '99999999-9999-4999-8999-999999999999', BUNDLE_ID,
+    );
+    await expect(prepareCharacterStandardReadingChatTurnPreflightV2({
+      ...args, receivePlan: mismatch,
+    })).rejects.toMatchObject({ code: 'ACCESS_DENIED' });
+    expect(args.artifactAuthorityPort.readArtifactSource).not.toHaveBeenCalled();
+  });
+
+  it('rejects Thread revision drift during non-Saju context assembly', async () => {
+    const args = input();
+    let reads = 0;
+    args.threadBindingAuthorityPort.readRuntimeBinding = vi.fn(async () => {
+      reads += 1;
+      return [{
+        threadId: THREAD_ID, status: 'active',
+        activeContentReleaseId: RELEASE_ID, activeContentBundleId: BUNDLE_ID,
+        contentRevision: reads <= 3 ? 4 : 5,
+        participantCharacterIds: ['baekheon'],
+      }];
+    });
+    await expect(prepareCharacterStandardReadingChatTurnPreflightV2(args))
+      .rejects.toMatchObject({ code: 'SOURCE_MISMATCH' });
+    expect(reads).toBeGreaterThanOrEqual(4);
   });
 });
