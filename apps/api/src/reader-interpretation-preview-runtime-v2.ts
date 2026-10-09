@@ -54,7 +54,7 @@ function requiredId(value: unknown): string {
 }
 
 function hashEnvelope(value: unknown): string {
-  return createHash('sha256').update(canonicalJson(value), 'utf8').digest('hex');
+  return `sha256:v1:${createHash('sha256').update(canonicalJson(value), 'utf8').digest('hex')}`;
 }
 
 /**
@@ -195,9 +195,6 @@ export async function runThreadBoundReaderInterpretationPreviewV2(
       grounding.engineVersion !== current.source.sajuEngineVersion ||
       grounding.productResponseVersion !== current.source.readingContractVersion) deny('SOURCE_MISMATCH');
 
-  const rendered = renderCharacterSajuBoundedExactCoreV2({
-    context: grounded, grounding, perspective, requestedDomain: current.scope.sajuDomain,
-  });
   const common = {
     schemaVersion: READER_INTERPRETATION_PREVIEW_SCHEMA_VERSION_V1,
     contractVersion: READER_INTERPRETATION_PREVIEW_CONTRACT_VERSION_V1,
@@ -210,15 +207,34 @@ export async function runThreadBoundReaderInterpretationPreviewV2(
     sourceResponseHash: grounding.sourceResponseHash,
     groundingHash: grounding.groundingHash,
   };
+  // Rendering is a fallible content/policy boundary. Never surface a raw
+  // exception or an unvalidated partial utterance as a Reader interpretation.
+  let rendered: ReturnType<typeof renderCharacterSajuBoundedExactCoreV2>;
+  try {
+    rendered = renderCharacterSajuBoundedExactCoreV2({
+      context: grounded, grounding, perspective, requestedDomain: current.scope.sajuDomain,
+    });
+  } catch {
+    const envelope = { ...common, mode: 'protected_fallback' as const,
+      fallbackReason: 'renderer_protected_fallback' as const };
+    return Object.freeze({ ...envelope, interpretationHash: hashEnvelope(envelope) });
+  }
   if (rendered.mode === 'protected_fallback') {
     const envelope = { ...common, mode: 'protected_fallback' as const,
       fallbackReason: 'renderer_protected_fallback' as const };
     return Object.freeze({ ...envelope, interpretationHash: hashEnvelope(envelope) });
   }
-  const guarded = guardCharacterSajuSemanticPreservationV2({
-    candidate: rendered.utterance,
-    context: grounded, grounding, perspective, requestedDomain: current.scope.sajuDomain,
-  });
+  let guarded: ReturnType<typeof guardCharacterSajuSemanticPreservationV2>;
+  try {
+    guarded = guardCharacterSajuSemanticPreservationV2({
+      candidate: rendered.utterance,
+      context: grounded, grounding, perspective, requestedDomain: current.scope.sajuDomain,
+    });
+  } catch {
+    const envelope = { ...common, mode: 'protected_fallback' as const,
+      fallbackReason: 'semantic_guard_failed' as const };
+    return Object.freeze({ ...envelope, interpretationHash: hashEnvelope(envelope) });
+  }
   if (guarded.mode !== 'accepted') {
     const envelope = { ...common, mode: 'protected_fallback' as const,
       fallbackReason: 'semantic_guard_failed' as const };
