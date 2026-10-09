@@ -1,4 +1,8 @@
 import {
+  createPersistingSeyeonAiProviderV1,
+  type SeyeonAiCostLedgerBindingV1,
+} from './postgres-seyeon-ai-cost-ledger-v1.js';
+import {
   InMemorySeyeonEventLedgerV2,
   type CharacterClientCompatibilityProfileV1,
 } from '../../../packages/domain/src/index.js';
@@ -253,6 +257,39 @@ export function createProductionSeyeonChatRuntimeV1(
         runner,
       });
 
+      // The authoritative attempt is allocated before every native model call.
+      // Never derive cost ownership from browser/client-supplied identities.
+      let activeCostBinding: SeyeonAiCostLedgerBindingV1 | null = null;
+      const meteredChatPersistence = Object.freeze({
+        ...ports.chatPersistence,
+        async allocateAttempt(
+          request: Parameters<typeof ports.chatPersistence.allocateAttempt>[0],
+        ) {
+          const attempt = await ports.chatPersistence.allocateAttempt(request);
+          activeCostBinding = Object.freeze({
+            subjectId: resolvedSubject.subjectId,
+            turnId: request.turnId,
+            attemptId: attempt.attemptId,
+            phase: 'chat' as const,
+          });
+          return attempt;
+        },
+      });
+      const meterRole = (role: keyof SeyeonProductionRoleProviderConfigsV1) => {
+        const roleConfig = input.roleProviderConfigs?.[role];
+        const config = roleConfig ??
+          (input.provider === undefined ? input.providerConfig : undefined);
+        return config === undefined
+          ? roleProvider(role)
+          : createPersistingSeyeonAiProviderV1({
+              config, runner, getBinding: () => activeCostBinding,
+            });
+      };
+      const meteredPreflight = meterRole('preflight');
+      const meteredInterpreter = meterRole('interpreter');
+      const meteredRenderer = meterRole('renderer');
+      const meteredReviewer = meterRole('reviewer');
+
       const threadBinding = await runSeyeonTurnRuntimePhaseV1(
         'thread_binding',
         () => getChatThreadRuntimeBinding({
@@ -327,14 +364,14 @@ export function createProductionSeyeonChatRuntimeV1(
             productionContext,
           }) =>
             createSeyeonProductionGovernanceV1({
-              provider: preflightProvider,
+              provider: meteredPreflight,
               turnBinding,
               productionContext,
             }),
-          interpreterProvider,
-          rendererProvider,
-          semanticReviewerProvider: reviewerProvider,
-          persistencePort: ports.chatPersistence,
+          interpreterProvider: meteredInterpreter,
+          rendererProvider: meteredRenderer,
+          semanticReviewerProvider: meteredReviewer,
+          persistencePort: meteredChatPersistence,
           executionIdPort: idPort,
           postTurn: Object.freeze({
             ledger,
