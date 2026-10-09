@@ -138,6 +138,20 @@ function bundle(domain: SajuDomain) {
   return { ...material, groundingHash: hashCharacterSajuGroundingBundleMaterialV1(material) };
 }
 
+function refOf(value: ReturnType<typeof bundle>) {
+  return {
+    schemaVersion: value.schemaVersion,
+    groundingProjectionVersion: value.groundingProjectionVersion,
+    axisRegistryVersion: value.axisRegistryVersion,
+    readingRef: value.readingRef,
+    productResponseVersion: value.productResponseVersion,
+    engineVersion: value.engineVersion,
+    readingDomain: value.readingDomain,
+    sourceResponseHash: value.sourceResponseHash,
+    groundingHash: value.groundingHash,
+  };
+}
+
 async function authorize(reader: string, domain: SajuDomain) {
   const f = fixture(reader, domain);
   const prepared = await prepareOfficialReadingReaderAdmissionV1(f.input);
@@ -166,7 +180,7 @@ describe('A3-beta: verified official standard Saju runtime, no fake Capability',
       expect(a.context.saju.disclosures[0]?.text).toBe('불확실성을 고려해야 합니다.');
       const grounding = bundle(domain);
       const admitted = admitCharacterRuntimeSajuGroundingV2({
-        context: a.context, groundingRef: grounding,
+        context: a.context, groundingRef: refOf(grounding),
       });
       const selected = selectCharacterInsightsV2({
         context: admitted, grounding, perspective: a.perspective,
@@ -202,10 +216,10 @@ describe('A3-beta: verified official standard Saju runtime, no fake Capability',
     const a = await authorize('baekheon', 'wealth');
     const grounding = bundle('wealth');
     expect(() => admitCharacterRuntimeSajuGroundingV2({
-      context: a.context, groundingRef: { ...grounding, readingDomain: 'general' },
+      context: a.context, groundingRef: { ...refOf(grounding), readingDomain: 'general' },
     })).toThrow();
     const admitted = admitCharacterRuntimeSajuGroundingV2({
-      context: a.context, groundingRef: grounding,
+      context: a.context, groundingRef: refOf(grounding),
     });
     expect(() => selectCharacterInsightsV2({
       context: { ...admitted }, grounding,
