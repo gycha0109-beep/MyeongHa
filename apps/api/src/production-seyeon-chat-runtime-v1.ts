@@ -223,10 +223,6 @@ export function createProductionSeyeonChatRuntimeV1(
       ? provider
       : createOpenAiSeyeonStructuredProviderV1(roleConfig);
   };
-  const preflightProvider = roleProvider('preflight');
-  const interpreterProvider = roleProvider('interpreter');
-  const rendererProvider = roleProvider('renderer');
-  const reviewerProvider = roleProvider('reviewer');
   const idPort = createSeyeonProductionRuntimeIdPortV1(
     input.createUuid,
   );
