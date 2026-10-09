@@ -100,10 +100,6 @@ document.querySelectorAll('[data-character-avatar]').forEach((node) => {
   node.textContent = character.name.slice(0, 1);
 });
 
-document.querySelectorAll('[data-history-character-name]').forEach((node) => {
-  node.textContent = `${character.name}과 나눈 이야기`;
-});
-
 const scene = document.querySelector('[data-character-scene]');
 if (scene) {
   scene.setAttribute('aria-label', character.sceneLabel);
@@ -141,9 +137,7 @@ export function applyCanonicalCharacterPresentationV1(characterId) {
     node.dataset.character = identity.presentationKey;
     node.textContent = next.name.slice(0, 1);
   });
-  document.querySelectorAll('[data-history-character-name]').forEach((node) => {
-    node.textContent = `${next.name}과 나눈 이야기`;
-  });
+  setDialogueLines(next.intro);
   if (scene) scene.setAttribute('aria-label', next.sceneLabel);
   return true;
 }
@@ -153,51 +147,6 @@ window.MyeongHaCharacterRoom = Object.freeze({
   characterKey,
   characterName: character.name,
   characterAuthority: root.dataset.characterAuthority,
-});
-
-const historyDrawer = document.querySelector('[data-history-drawer]');
-const historyOpenButtons = document.querySelectorAll('[data-history-open]');
-const historyClose = document.querySelector('[data-history-close]');
-const scrim = document.querySelector('[data-room-scrim]');
-const roomMenu = document.querySelector('[data-room-menu]');
-const menuToggle = document.querySelector('[data-menu-toggle]');
-
-function openHistory() {
-  historyDrawer?.classList.add('is-open');
-  historyDrawer?.setAttribute('aria-hidden', 'false');
-  if (scrim) scrim.hidden = false;
-}
-
-function closeHistory() {
-  historyDrawer?.classList.remove('is-open');
-  historyDrawer?.setAttribute('aria-hidden', 'true');
-  if (scrim && (!roomMenu || roomMenu.hidden)) scrim.hidden = true;
-}
-
-function closeMenu() {
-  if (roomMenu) roomMenu.hidden = true;
-  if (scrim && !historyDrawer?.classList.contains('is-open')) scrim.hidden = true;
-}
-
-historyOpenButtons.forEach((button) => button.addEventListener('click', openHistory));
-historyClose?.addEventListener('click', closeHistory);
-
-menuToggle?.addEventListener('click', () => {
-  if (!roomMenu) return;
-  roomMenu.hidden = !roomMenu.hidden;
-  if (scrim) scrim.hidden = roomMenu.hidden && !historyDrawer?.classList.contains('is-open');
-});
-
-scrim?.addEventListener('click', () => {
-  closeHistory();
-  closeMenu();
-});
-
-document.addEventListener('keydown', (event) => {
-  if (event.key === 'Escape') {
-    closeHistory();
-    closeMenu();
-  }
 });
 
 const composer = document.querySelector('[data-composer]');
