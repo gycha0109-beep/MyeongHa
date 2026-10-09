@@ -57,6 +57,7 @@ bash test/db/chat_receive_concurrency.sh
 bash test/db/chat_attempt_commit_concurrency.sh
 psql -v ON_ERROR_STOP=1 -f test/db/seyeon_ai_call_lifecycle_v1.sql
 psql -v ON_ERROR_STOP=1 -f test/db/seyeon_ai_governor_atomic_admission_v1.sql
+psql -v ON_ERROR_STOP=1 -f test/db/seyeon_ai_governor_atomic_settlement_v1.sql
 bash test/db/character_face_governed_artifact_commit.sh
 bash test/db/chat_retry_abandon_concurrency.sh
 bash test/db/birth_profile_create_concurrency.sh
