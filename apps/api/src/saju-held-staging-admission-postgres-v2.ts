@@ -23,6 +23,16 @@ export interface SajuHeldStagingPostgresAdmissionOptionsV2
   readonly nowMsFactory?: () => number;
 }
 
+/** Acquire the row lock in its OWN statement before evaluating expiry. */
+export const SAJU_HELD_STAGING_LOCK_SQL_V2 = [
+  'select permit_id::text as "permitId"',
+  'from public.saju_staging_operator_admission_permits_v2',
+  'where permit_id = $1::uuid',
+  '  and manifest_digest = $2::text',
+  '  and connection_plan_digest = $3::text',
+  'for update',
+].join('\n');
+
 /** Independently signed Permit V2 bound to both immutable digests. */
 export const SAJU_HELD_STAGING_CONSUME_SQL_V2 = [
   'update public.saju_staging_operator_admission_permits_v2',
@@ -111,6 +121,15 @@ export function createSajuHeldStagingPostgresAdmissionPortV2(
         await connection.query('BEGIN');
         inTransaction = true;
         await connection.query('SET LOCAL ROLE myeongha_saju_staging_admission_runtime');
+        // PostgreSQL may evaluate a volatile WHERE predicate BEFORE a
+        // blocking row-lock wait. A separate subsequent UPDATE statement
+        // is required to re-check expiry at the actual consumption time.
+        const locked = await connection.query<{ permitId: unknown }>(
+          SAJU_HELD_STAGING_LOCK_SQL_V2,
+          [permit.permitId, permit.manifestDigest, permit.connectionPlanDigest],
+        );
+        if (locked.rows.length !== 1
+          || locked.rows[0]?.permitId !== permit.permitId) throw new Error();
         const result = await connection.query<{ permitId: unknown }>(
           SAJU_HELD_STAGING_CONSUME_SQL_V2,
           [
