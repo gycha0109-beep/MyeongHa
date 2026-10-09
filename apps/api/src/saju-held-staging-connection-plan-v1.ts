@@ -26,6 +26,7 @@ const HEX64 = /^[a-f0-9]{64}$/u;
 const SHA = /^[a-f0-9]{40}$/u;
 const TARGET = /^[a-z][a-z0-9._:-]{2,100}$/u;
 const ROLE = /^[a-z_][a-z0-9_]{2,62}$/u;
+const FORBIDDEN_ROLE = new Set(['postgres', 'supabase_admin', 'service_role', 'authenticated', 'anon', 'public', 'pg_signal_backend']);
 const HOST = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?$/u;
 const DIGEST_DOMAIN = 'myeongha/saju/staging-connection-plan/v1\0';
 
@@ -118,6 +119,8 @@ export function parseSajuHeldStagingConnectionPlanV1(
   if (new Set([subjectDb.targetId, nonceDb.targetId, admissionDb.targetId]).size !== 3
     || new Set([subjectDb.loginRole, nonceDb.loginRole, admissionDb.loginRole]).size !== 3
     || new Set([subjectDb.runtimeRole, nonceDb.runtimeRole, admissionDb.runtimeRole]).size !== 3
+    || [subjectDb, nonceDb, admissionDb].some(db =>
+      FORBIDDEN_ROLE.has(db.loginRole) || FORBIDDEN_ROLE.has(db.runtimeRole))
     || subjectDb.loginRole === subjectDb.runtimeRole
     || nonceDb.loginRole === nonceDb.runtimeRole
     || admissionDb.loginRole === admissionDb.runtimeRole
@@ -149,7 +152,7 @@ export function digestSajuHeldStagingConnectionPlanV1(value: unknown): string {
   const p = parseSajuHeldStagingConnectionPlanV1(value);
   const normalized = PLAN_KEYS.map(key => {
     const entry = p[key];
-    return typeof entry === 'object' ? DB_KEYS.map(field => entry[field]) : entry;
+    return typeof entry === 'object' ? DB_KEYS.map(field => entry[field as keyof SajuHeldStagingDbConnectionBindingV1]) : entry;
   });
   return createHash('sha256').update(DIGEST_DOMAIN, 'utf8')
     .update(JSON.stringify(normalized), 'utf8').digest('hex');
