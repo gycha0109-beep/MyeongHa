@@ -334,12 +334,19 @@ export function createOpenAiSeyeonStructuredProviderV1(
         outcome: SeyeonAiCallOutcomeV1,
         httpStatus: number | null,
         payload?: unknown,
-      ) => emitSeyeonProviderMetricV1({
-        callId, purpose: request.purpose, model, startedAt,
-        outcome, httpStatus, payload,
-        ...(config.priceQuote === undefined ? {} : { priceQuote: config.priceQuote }),
-        ...(config.observeMetric === undefined ? {} : { observeMetric: config.observeMetric }),
-      });
+      ) => {
+        try {
+          emitSeyeonProviderMetricV1({
+            callId, purpose: request.purpose, model, startedAt,
+            outcome, httpStatus, payload,
+            ...(config.priceQuote === undefined ? {} : { priceQuote: config.priceQuote }),
+            ...(config.observeMetric === undefined ? {} : { observeMetric: config.observeMetric }),
+          });
+        } catch {
+          // Malformed provider usage must not change an otherwise valid answer.
+          console.error('MYEONGHA_SEYEON_PROVIDER_METRIC_CAPTURE_FAILED');
+        }
+      };
       const controller = new AbortController();
       let timedOut = false;
       const timer = setTimeout(() => {
