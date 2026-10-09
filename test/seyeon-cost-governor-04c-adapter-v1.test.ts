@@ -75,11 +75,12 @@ describe('Se-yeon 04C governed provider adapter (fake HTTP and fake DB)', () => 
       if (sql.includes('cmd_governed_start_seyeon_ai_call_v1')) {
         order.push('admit');
         admittedId = String(values[4]);
-        expect(values).toMatchObject([
+        expect(values.slice(0,12)).toEqual([
           subjectId,turnId,attemptId,'chat',admittedId,
           'dialogue_render','openai-responses','test-model',
           'offline-policy-v1','offline-rate-v1',500,800,
         ]);
+        expect(Number(values[12])).toBeGreaterThan(100);
         return {rows:[{
           callId:admittedId,ceilingMicroUsd:'3700',bucketUtcDate:'2026-10-10',
         }]};
