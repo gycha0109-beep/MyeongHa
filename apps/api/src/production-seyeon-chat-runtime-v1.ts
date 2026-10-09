@@ -1,4 +1,8 @@
 import {
+  assertSeyeonProductionGovernorBoundaryV1,
+  type SeyeonProductionGovernorModeV1,
+} from './seyeon-production-governor-boundary-v1.js';
+import {
   createPersistingSeyeonAiProviderV1,
   type SeyeonAiCostLedgerBindingV1,
   type SeyeonAiGovernorAdmissionV1,
@@ -105,6 +109,8 @@ export interface CreateProductionSeyeonChatRuntimeInputV1 {
   readonly databaseConfig: ProductionUserDataRuntimeConfigV1;
   readonly providerConfig?: OpenAiSeyeonStructuredProviderConfigV1;
   readonly roleProviderConfigs?: SeyeonProductionRoleProviderConfigsV1;
+  /** Default OFF: no Production Governor activation in D3A. */
+  readonly governorMode?: SeyeonProductionGovernorModeV1;
   /** Explicit server-only opt-in: each native role must receive a certified cap. */
   readonly costGovernorForRole?: (
     role: keyof SeyeonProductionRoleProviderConfigsV1,
@@ -228,12 +234,23 @@ export function createProductionSeyeonChatRuntimeV1(
       Object.values(input.roleProviderConfigs ?? {}).some(v => v === undefined)) {
     throw new Error('Governed chat requires configuration for every active role.');
   }
+  assertSeyeonProductionGovernorBoundaryV1({
+    mode: input.governorMode,
+    target: 'chat',
+    provider: input.provider,
+    providerConfig: input.providerConfig,
+    roleProviderConfigs: input.roleProviderConfigs,
+    governorConfigured: input.costGovernorForRole !== undefined,
+  });
   const poolLease = createProductionPostgresSubjectPoolLeaseV1({
     config: input.databaseConfig,
     ...(input.pool === undefined ? {} : { pool: input.pool }),
   });
-  const provider = resolveProvider(input);
+  const provider = input.governorMode === 'ENFORCE' ? null : resolveProvider(input);
   const roleProvider = (role: keyof SeyeonProductionRoleProviderConfigsV1) => {
+    if (input.governorMode === 'ENFORCE' || provider === null) {
+      throw new Error('ENFORCE rejects raw role Provider fallback.');
+    }
     const roleConfig = input.roleProviderConfigs?.[role];
     return roleConfig === undefined
       ? provider
@@ -291,14 +308,15 @@ export function createProductionSeyeonChatRuntimeV1(
         const roleConfig = input.roleProviderConfigs?.[role];
         const config = roleConfig ??
           (input.provider === undefined ? input.providerConfig : undefined);
-        return config === undefined
-          ? roleProvider(role)
-          : createPersistingSeyeonAiProviderV1({
-              config, runner, getBinding: () => activeCostBinding,
-              ...(input.costGovernorForRole === undefined ? {} : {
-                governor: input.costGovernorForRole(role,config),
-              }),
-            });
+        if (config === undefined) return roleProvider(role);
+        const governor = input.costGovernorForRole?.(role, config);
+        if (input.governorMode === 'ENFORCE' && governor === undefined) {
+          throw new Error('ENFORCE refuses a missing role Governor.');
+        }
+        return createPersistingSeyeonAiProviderV1({
+          config, runner, getBinding: () => activeCostBinding,
+          ...(governor === undefined ? {} : { governor }),
+        });
       };
       const meteredPreflight = meterRole('preflight');
       const meteredInterpreter = meterRole('interpreter');

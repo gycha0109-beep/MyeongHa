@@ -1,4 +1,8 @@
 import {
+  assertSeyeonProductionGovernorBoundaryV1,
+  type SeyeonProductionGovernorModeV1,
+} from './seyeon-production-governor-boundary-v1.js';
+import {
   createPersistingSeyeonAiProviderV1,
   type SeyeonAiCostLedgerBindingV1,
   type SeyeonAiGovernorAdmissionV1,
@@ -61,6 +65,8 @@ export interface CreateProductionSeyeonPostTurnWorkerRuntimeInputV1 {
   readonly databaseConfig: ProductionUserDataRuntimeConfigV1;
   readonly providerConfig?: OpenAiSeyeonStructuredProviderConfigV1;
   readonly provider?: SeyeonStructuredProviderPortV2;
+  /** Default OFF: explicitly prepared, never automatically activated. */
+  readonly governorMode?: SeyeonProductionGovernorModeV1;
   /** Explicit server-only, absent by default. */
   readonly costGovernor?: SeyeonAiGovernorAdmissionV1;
   readonly pool?: PostgresSubjectPoolV1;
@@ -85,11 +91,18 @@ export function createProductionSeyeonPostTurnWorkerRuntimeV1(
       (input.provider !== undefined || input.providerConfig === undefined)) {
     throw new Error('Governed post-turn requires native metered Provider config.');
   }
+  assertSeyeonProductionGovernorBoundaryV1({
+    mode: input.governorMode,
+    target: 'post_turn',
+    provider: input.provider,
+    providerConfig: input.providerConfig,
+    governorConfigured: input.costGovernor !== undefined,
+  });
   const poolLease = createProductionPostgresSubjectPoolLeaseV1({
     config: input.databaseConfig,
     ...(input.pool === undefined ? {} : { pool: input.pool }),
   });
-  const provider = resolveProvider(input);
+  const provider = input.governorMode === 'ENFORCE' ? null : resolveProvider(input);
 
   return Object.freeze({
     async run(
@@ -136,6 +149,9 @@ export function createProductionSeyeonPostTurnWorkerRuntimeV1(
               }),
             })
           : provider;
+      if (meteredProvider === null) {
+        throw new Error('ENFORCE refuses an unmetered Post-turn Provider.');
+      }
 
       const result = await processSeyeonPostTurnAnalysisV1({
         subjectId: resolvedSubject.subjectId,

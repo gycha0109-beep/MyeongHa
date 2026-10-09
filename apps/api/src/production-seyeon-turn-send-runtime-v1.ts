@@ -10,6 +10,8 @@ import {
 import type {
   OpenAiSeyeonStructuredProviderConfigV1,
 } from './openai-seyeon-structured-provider-v1.js';
+import type { SeyeonAiGovernorAdmissionV1 } from './postgres-seyeon-ai-cost-ledger-v1.js';
+import type { SeyeonProductionGovernorModeV1 } from './seyeon-production-governor-boundary-v1.js';
 import type { PostgresSubjectPoolV1 } from './postgres-subject-execution.js';
 import {
   createProductionRequestIdentityVerifierV1,
@@ -168,6 +170,12 @@ export interface CreateProductionSeyeonTurnSendRuntimeInputV1 {
   readonly createUuid?: () => string;
   /** Test seam for request-context OIDC only. */
   readonly oidcTokenProvider?: ProductionSeyeonOidcTokenProviderV1;
+  /** Server-only explicit mode; default OFF. D5 owns activation approval. */
+  readonly governorMode?: SeyeonProductionGovernorModeV1;
+  readonly costGovernorForRole?: (
+    role: keyof SeyeonProductionRoleProviderConfigsV1,
+    config: OpenAiSeyeonStructuredProviderConfigV1,
+  ) => SeyeonAiGovernorAdmissionV1;
 }
 
 /**
@@ -205,6 +213,10 @@ export function createProductionSeyeonTurnSendRuntimeV1(
             const runtime = createProductionSeyeonChatRuntimeV1({
               databaseConfig: config,
               providerConfig,
+              ...(input.governorMode === undefined ? {} : { governorMode: input.governorMode }),
+              ...(input.costGovernorForRole === undefined ? {} : {
+                costGovernorForRole: input.costGovernorForRole,
+              }),
               ...(roleProviderConfigs === undefined ? {} : { roleProviderConfigs }),
               clientCompatibilityProfile:
                 input.clientCompatibilityProfile ??
