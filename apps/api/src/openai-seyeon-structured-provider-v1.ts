@@ -26,6 +26,8 @@ export interface OpenAiSeyeonStructuredProviderConfigV1 {
   readonly model: string;
   readonly origin?: string;
   readonly timeoutMs?: number;
+  /** Opt-in: the provider must enforce this on the total output, including reasoning. */
+  readonly maxOutputTokens?: number;
   readonly fetchImpl?: OpenAiSeyeonStructuredProviderFetchV1;
 }
 
@@ -172,6 +174,15 @@ function timeoutMs(value: number | undefined): number {
   return resolved;
 }
 
+/** No Production default: existing provider requests remain byte-for-byte unchanged. */
+function maxOutputTokens(value: number | undefined): number | undefined {
+  if (value === undefined) return undefined;
+  if (!Number.isSafeInteger(value) || value < 1 || value > 32_768) {
+    return failConfiguration('OpenAI structured provider output token ceiling is invalid.');
+  }
+  return value;
+}
+
 function responseFormatName(
   request: SeyeonStructuredProviderRequestV2,
 ): string {
@@ -289,6 +300,7 @@ export function createOpenAiSeyeonStructuredProviderV1(
   const model = modelKey(config.model);
   const endpoint = responsesEndpoint(config.origin);
   const requestTimeoutMs = timeoutMs(config.timeoutMs);
+  const requestOutputCeiling = maxOutputTokens(config.maxOutputTokens);
   const fetchImpl = config.fetchImpl ?? fetch;
 
   return Object.freeze({
@@ -322,6 +334,7 @@ export function createOpenAiSeyeonStructuredProviderV1(
               ? { providerOptions: { gateway: { only: ['openai'] } } }
               : {}),
             store: false,
+            ...(requestOutputCeiling === undefined ? {} : { max_output_tokens: requestOutputCeiling }),
             instructions: request.instructions,
             input: [
               {
