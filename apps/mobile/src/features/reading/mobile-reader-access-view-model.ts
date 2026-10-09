@@ -2,7 +2,7 @@ import {
   MOBILE_READER_INTERPRETATION_PUBLIC_V1,
   type MobileReaderPresentationIdV1,
   isMobileReaderPreviewSelectableV1,
-} from './mobile-reader-presentation';
+} from './mobile-reader-presentation.js';
 
 /**
  * UI projection only. These names are not API response statuses or permission grants.
