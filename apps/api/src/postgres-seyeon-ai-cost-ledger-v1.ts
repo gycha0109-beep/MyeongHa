@@ -186,6 +186,8 @@ export interface SeyeonAiGovernorAdmissionV1 {
   readonly certifiedInputTokenUpperBound: (
     request: SeyeonStructuredProviderRequestV2,
     exactRequestBodyBytes: number,
+    /** The immutable JSON body that will be supplied unchanged to fetch. */
+    serializedRequestBody: string,
   ) => number | null | Promise<number | null>;
 }
 
@@ -353,10 +355,9 @@ export function createPersistingSeyeonAiProviderV1(input: {
       };
       const provider = createOpenAiSeyeonStructuredProviderV1({
         ...input.config,
-        async beforeDispatch(call) {
-          // Any caller-provided admission gate must approve before a DB start
-          // so a refused network call does not leave a false paid-call record.
-          await input.config.beforeDispatch?.(call);
+        async meteredBeforeDispatch(call, serializedRequestBody) {
+          // Metadata-only external hook runs separately in the raw Provider.
+          // Only this server-owned metering hook accesses the full request.
           const binding = input.getBinding();
           if (binding === null) {
             console.error('MYEONGHA_SEYEON_COST_BINDING_MISSING');
@@ -367,8 +368,13 @@ export function createPersistingSeyeonAiProviderV1(input: {
               startSeyeonAiCallV1(client,binding,call),
             );
           } else {
+            if (typeof serializedRequestBody !== 'string' ||
+                new TextEncoder().encode(serializedRequestBody).byteLength !==
+                  call.requestBodyBytes) {
+              throw new Error('Governed token count requires the final immutable body.');
+            }
             const bound = await input.governor.certifiedInputTokenUpperBound(
-              request, call.requestBodyBytes,
+              request, call.requestBodyBytes, serializedRequestBody,
             );
             const quote = quoteSeyeonCostGovernorMaximumV1({
               policy: input.governor.policy,
