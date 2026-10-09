@@ -717,6 +717,13 @@ export {
 } from './character-standard-reading-chat-turn-preflight.js';
 
 export {
+  CharacterStandardReadingChatTurnPreflightErrorV2,
+  prepareCharacterStandardReadingChatTurnPreflightV2,
+  type CharacterStandardReadingChatTurnPreflightV2,
+  type PrepareCharacterStandardReadingChatTurnPreflightInputV2,
+} from './character-standard-reading-chat-turn-preflight-v2.js';
+
+export {
   createPostgresChatThreadRuntimeBindingAuthorityPortV1,
 } from './postgres-chat-thread-runtime-binding.js';
 
