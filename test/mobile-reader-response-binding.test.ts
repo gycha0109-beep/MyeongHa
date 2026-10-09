@@ -32,7 +32,25 @@ const response = {
 };
 
 function testService(serverResponse: unknown) {
-  const fetchImpl = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => Response.json({ ok: true, data: serverResponse }));
+  const fetchImpl = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
+    const url = new URL(String(input));
+    if (url.pathname === '/api/chat/' + threadId) {
+      return Response.json({ ok: true, data: {
+        threadId,
+        characterId: 'seyeon',
+        contentReleaseId: 'server-pinned-release',
+        contentBundleId: 'server-pinned-bundle',
+        contentRevision: 1,
+        afterSequenceNo: 0,
+        lastSequenceNo: 0,
+        messages: [],
+        pagination: { pageSize: 1, hasMore: false, nextAfterSequenceNo: null },
+        latestCharacterMessage: null,
+        relationship: null,
+      } });
+    }
+    return Response.json({ ok: true, data: serverResponse });
+  });
   let bearerCalls = 0;
   const withActiveBearer = async <T>(operation: (token: string) => Promise<T>): Promise<T> => {
     bearerCalls += 1;
@@ -69,11 +87,21 @@ describe('mobile M3-beta-1 Reader response authority matching', () => {
       officialReadingId: readingId,
       domain: 'general',
     });
-    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
     expect(bearerCalls()).toBe(1);
-    const init = fetchImpl.mock.calls[0]?.[1];
-    expect(init).toBeDefined();
-    expect(JSON.parse(String(init?.body))).toEqual({
+    const preflight = fetchImpl.mock.calls[0];
+    expect(new URL(String(preflight?.[0])).pathname).toBe('/api/chat/' + threadId);
+    expect(new Headers(preflight?.[1]?.headers).get('Authorization')).toBe(
+      'Bearer server-authenticated-subject-token',
+    );
+    const post = fetchImpl.mock.calls[1];
+    expect(new URL(String(post?.[0])).pathname).toBe(
+      '/api/me/readings/reader-interpretation/preview',
+    );
+    expect(new Headers(post?.[1]?.headers).get('Authorization')).toBe(
+      'Bearer server-authenticated-subject-token',
+    );
+    expect(JSON.parse(String(post?.[1]?.body))).toEqual({
       threadId,
       officialReadingId: readingId,
     });
