@@ -109,6 +109,8 @@ Authenticated canonical Subject
 - **조건부 권고 후보(C):** server/DB-authoritative, versioned approved Product eligibility를 v2 bind에 정확히 결속하고 specialist Capability와 의미를 분리. 미승인 Product policy source이면 현행 HOLD(D).
 - Product/DB/Reader가 정책 source와 revision/실제 DB function/출판·unlock 규칙을 승인해야 하며 **이 문서가 C를 확정하지 않는다**.
 
+- **#1838 추가 검증 완료:** 이미 선택된 Reader라도 출판된 *정확한 도메인 Capability 행이 없는 경우* v2 DB bind가 정확히 DENY한다는 실제 PostgreSQL 회귀 PASS, merged `2ec39bc5`. 출판 행 불변 규칙 보존. 이것은 `can_initiate=false` 출판 행, Product-approved 9 Reader DB 통합 성공을 증명하지 않음. #1828 owner decision HOLD.
+
 **#1827 revoke race:** 상세 문서 **MOBILE_READER_GRANT_REVOKE_REVEAL_CONCURRENCY_M3_BETA2B_DESIGN_V1.md**.
 - #1831 완료: revoked bind replay와 current runtime access 분리의 실제 PostgreSQL 회귀 PASS.
 - 현재 Preview 서버 실행은 Subject DB transaction 내에서 runtime 함수를 await하고, A3 내부의 재검증은 동일 effectiveAt을 사용한다. **현재 A3 V2는 공개 HTTP가 아니며**, 원격 Saju 처리 이후 fresh Grant 재검증·response 공개 선형화 계약은 확인되지 않았다.
