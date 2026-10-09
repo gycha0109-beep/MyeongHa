@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { readBoundedUpstreamJsonTextV1 } from './upstream-json-response-resource.js';
 import {
   createSeyeonAiCostEventV1,
   estimateSeyeonAiCallCostV1,
@@ -22,6 +23,8 @@ export const OPENAI_SEYEON_STRUCTURED_PROVIDER_DEFAULT_TIMEOUT_MS_V1 =
   30_000 as const;
 export const OPENAI_SEYEON_STRUCTURED_PROVIDER_MAX_TIMEOUT_MS_V1 =
   120_000 as const;
+export const OPENAI_SEYEON_STRUCTURED_PROVIDER_MAX_RESPONSE_BYTES_V1 =
+  524_288 as const;
 
 /** Defense-in-depth only; deterministic authorization/Output Guards remain mandatory. */
 const SEYEON_PROVIDER_UNTRUSTED_DATA_BOUNDARY_V1 =
@@ -404,6 +407,7 @@ export function createOpenAiSeyeonStructuredProviderV1(
           signal: controller.signal,
         });
       } catch {
+        clearTimeout(timer);
         meter(timedOut ? 'timeout' : 'network_failure', null);
         if (timedOut) {
           throw new OpenAiSeyeonStructuredProviderErrorV1(
@@ -415,61 +419,75 @@ export function createOpenAiSeyeonStructuredProviderV1(
           'NETWORK_FAILURE',
           'OpenAI structured request failed before a response was accepted.',
         );
+      }
+
+      try {
+        if (!response.ok) {
+          const diagnostic = await readSeyeonProviderFailureDiagnosticV1(response);
+          meter('http_failure', response.status);
+          throw new OpenAiSeyeonStructuredProviderErrorV1(
+            'HTTP_FAILURE',
+            'OpenAI structured request returned a non-success status.',
+            response.status,
+            diagnostic,
+          );
+        }
+
+        const contentType = response.headers.get('content-type');
+        if (
+          contentType === null ||
+          !/^application\/json(?:\s*;|$)/iu.test(contentType.trim())
+        ) {
+          meter('invalid_content_type', response.status);
+          try {
+            void response.body?.cancel();
+          } catch {
+            // best-effort body cancellation only
+          }
+          throw new OpenAiSeyeonStructuredProviderErrorV1(
+            'INVALID_CONTENT_TYPE',
+            'OpenAI structured request returned a non-JSON success response.',
+            response.status,
+          );
+        }
+
+        let raw: unknown;
+        try {
+          const boundedText = await readBoundedUpstreamJsonTextV1(response, {
+            maximumBodyBytes: OPENAI_SEYEON_STRUCTURED_PROVIDER_MAX_RESPONSE_BYTES_V1,
+            signal: controller.signal,
+          });
+          raw = JSON.parse(boundedText) as unknown;
+        } catch {
+          if (timedOut || controller.signal.aborted) {
+            meter('timeout', response.status);
+            throw new OpenAiSeyeonStructuredProviderErrorV1(
+              'TIMEOUT',
+              'OpenAI structured response body exceeded the request deadline.',
+              response.status,
+            );
+          }
+          meter('invalid_response', response.status);
+          throw new OpenAiSeyeonStructuredProviderErrorV1(
+            'INVALID_RESPONSE',
+            'OpenAI structured response body failed bounded JSON admission.',
+            response.status,
+          );
+        }
+
+        meter('response_received', response.status, raw);
+        const text = extractStructuredText(raw);
+        try {
+          return JSON.parse(text) as unknown;
+        } catch {
+          throw new OpenAiSeyeonStructuredProviderErrorV1(
+            'INVALID_STRUCTURED_OUTPUT',
+            'OpenAI structured output text is not valid JSON.',
+            response.status,
+          );
+        }
       } finally {
         clearTimeout(timer);
-      }
-
-      if (!response.ok) {
-        const diagnostic = await readSeyeonProviderFailureDiagnosticV1(response);
-        meter('http_failure', response.status);
-        throw new OpenAiSeyeonStructuredProviderErrorV1(
-          'HTTP_FAILURE',
-          'OpenAI structured request returned a non-success status.',
-          response.status,
-          diagnostic,
-        );
-      }
-
-      const contentType = response.headers.get('content-type');
-      if (
-        contentType === null ||
-        !/^application\/json(?:\s*;|$)/iu.test(contentType.trim())
-      ) {
-        meter('invalid_content_type', response.status);
-        try {
-          void response.body?.cancel();
-        } catch {
-          // best-effort body cancellation only
-        }
-        throw new OpenAiSeyeonStructuredProviderErrorV1(
-          'INVALID_CONTENT_TYPE',
-          'OpenAI structured request returned a non-JSON success response.',
-          response.status,
-        );
-      }
-
-      let raw: unknown;
-      try {
-        raw = await response.json();
-      } catch {
-        meter('invalid_response', response.status);
-        throw new OpenAiSeyeonStructuredProviderErrorV1(
-          'INVALID_RESPONSE',
-          'OpenAI structured response body is not valid JSON.',
-          response.status,
-        );
-      }
-
-      meter('response_received', response.status, raw);
-      const text = extractStructuredText(raw);
-      try {
-        return JSON.parse(text) as unknown;
-      } catch {
-        throw new OpenAiSeyeonStructuredProviderErrorV1(
-          'INVALID_STRUCTURED_OUTPUT',
-          'OpenAI structured output text is not valid JSON.',
-          response.status,
-        );
       }
     },
   });
