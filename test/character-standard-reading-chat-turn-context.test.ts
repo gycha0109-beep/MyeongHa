@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import { prepareCharacterStandardReadingChatTurnPreflightV2 } from '../apps/api/src/character-standard-reading-chat-turn-preflight-v2.js';
-import { prepareCharacterStandardChatGroundingV2 } from '../apps/api/src/character-standard-reading-chat-grounding-v2.js';
+import {
+  prepareCharacterStandardChatGroundingV2,
+  assertServerPreparedStandardChatGroundingV2,
+} from '../apps/api/src/character-standard-reading-chat-grounding-v2.js';
 import { runThreadBoundReaderInterpretationPreviewV2 } from '../apps/api/src/reader-interpretation-preview-runtime-v2.js';
 import type { CharacterContentDefinition } from '../packages/character-content/src/index.js';
 import {
@@ -1438,6 +1441,9 @@ describe('A3-zeta / PR 2-A server-only Chat Grounding V2 admission (public OFF)'
     expect(result.context.saju.groundingRef.readingRef).toBe(READING_ID);
     expect(result.context.saju.groundingRef.groundingHash).toBe(result.grounding.groundingHash);
     expect(result.grounding.readingDomain).toBe('career');
+    expect(() => assertServerPreparedStandardChatGroundingV2(result)).not.toThrow();
+    expect(() => assertServerPreparedStandardChatGroundingV2({ ...result }))
+      .toThrow(/grounding is unavailable/u);
     expect(f.projectGrounding).toHaveBeenCalledTimes(1);
     expect(f.authority.accessAuthorityPort.readAccessibleReadings).toHaveBeenCalledTimes(4);
     expect(f.authority.artifactAuthorityPort.readArtifactSource).toHaveBeenCalledTimes(4);
