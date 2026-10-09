@@ -142,19 +142,11 @@ insert into public.standard_reading_offer_roles(
   'standard-reading-offer-role-v1'
 );
 
+-- Publish the unlockable Reader's existing Capability first. The
+-- standard Reader's Capability is inserted only after its fail-closed case.
 insert into public.character_capabilities(
   id, content_bundle_id, character_id, saju_domain, role, can_initiate, capability_version
-) values
-(
-  '12100000-0000-0000-0000-000000000001',
-  '11391000-0000-0000-0000-000000000001',
-  'test-standard-reader',
-  'relationship',
-  'primary',
-  true,
-  'relationship-test-v2'
-),
-(
+) values (
   '12100000-0000-0000-0000-000000000002',
   '11391000-0000-0000-0000-000000000001',
   'test-unlockable-reader',
@@ -282,6 +274,82 @@ select pg_temp.assert_v2_true(
   (select count(*) = 0 from public.standard_reading_official_bindings)
   and (select count(*) = 0 from public.standard_reading_reader_interpretations)
   and (select count(*) = 0 from public.standard_reading_reader_access_grants)
+);
+
+-- The v4 purchase selection is already pinned for this available Reader,
+-- despite the deliberate absence of its published domain Capability row.
+-- Current v2 bind requires an exact can_initiate=true row and must fail
+-- closed. Published Character capabilities are immutable; this fixture never
+-- updates or deletes one to simulate eligibility.
+select pg_temp.assert_v2_true(
+  'Reader selection exists before the legacy domain capability gate',
+  exists (
+    select 1
+    from public.purchase_intent_reader_selections pirs
+    where pirs.purchase_intent_id = '11392300-0000-0000-0000-000000000001'
+      and pirs.reader_character_id = 'test-standard-reader'
+      and pirs.reader_content_bundle_id = '11391000-0000-0000-0000-000000000001'
+  )
+);
+
+select pg_temp.assert_v2_true(
+  'selected Reader has no published relationship Capability row yet',
+  not exists (
+    select 1 from public.character_capabilities
+    where content_bundle_id = '11391000-0000-0000-0000-000000000001'
+      and character_id = 'test-standard-reader'
+      and saju_domain = 'relationship'
+  )
+);
+
+select pg_temp.assert_v2_fails(
+  'v2 binding refuses selected Reader lacking an exact can_initiate Capability despite verified purchase Grant',
+  $sql$
+    select * from public.cmd_bind_standard_reading_access_v2(
+      '11390000-0000-0000-0000-000000000001',
+      '11392300-0000-0000-0000-000000000001',
+      '12103000-0000-0000-0000-000000000091',
+      '12103100-0000-0000-0000-000000000091',
+      'sha256:v1:1111111111111111111111111111111111111111111111111111111111111111',
+      'standard-reading-access-bind-v2',
+      '{"schemaVersion":"standard-reading-access-bind-v2","purchaseIntentId":"11392300-0000-0000-0000-000000000001"}'::jsonb
+    )
+  $sql$,
+  'cmd_standard_reading_access_v2_reader_capability_unavailable'
+);
+
+select pg_temp.assert_v2_true(
+  'capability rejection creates no official Reading or Reader access provenance',
+  (select count(*) = 0 from public.standard_reading_official_bindings)
+  and (select count(*) = 0 from public.standard_reading_reader_interpretations)
+  and (select count(*) = 0 from public.standard_reading_reader_access_grants)
+  and (select count(*) = 0 from public.readings
+       where id = '12103100-0000-0000-0000-000000000091')
+);
+
+-- Append the test Reader's domain Capability as immutable published content.
+-- Later positive binds now exercise the original can_initiate=true fixture.
+insert into public.character_capabilities(
+  id, content_bundle_id, character_id, saju_domain, role, can_initiate, capability_version
+) values (
+  '12100000-0000-0000-0000-000000000001',
+  '11391000-0000-0000-0000-000000000001',
+  'test-standard-reader',
+  'relationship',
+  'primary',
+  true,
+  'relationship-test-v2'
+);
+
+select pg_temp.assert_v2_true(
+  'published test capability exists before positive official Reader binding',
+  exists (
+    select 1 from public.character_capabilities
+    where content_bundle_id = '11391000-0000-0000-0000-000000000001'
+      and character_id = 'test-standard-reader'
+      and saju_domain = 'relationship'
+      and can_initiate = true
+  )
 );
 
 select pg_temp.assert_v2_true(
