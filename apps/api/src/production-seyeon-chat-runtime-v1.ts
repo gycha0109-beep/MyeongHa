@@ -1,6 +1,7 @@
 import {
   createPersistingSeyeonAiProviderV1,
   type SeyeonAiCostLedgerBindingV1,
+  type SeyeonAiGovernorAdmissionV1,
 } from './postgres-seyeon-ai-cost-ledger-v1.js';
 import {
   InMemorySeyeonEventLedgerV2,
@@ -104,6 +105,11 @@ export interface CreateProductionSeyeonChatRuntimeInputV1 {
   readonly databaseConfig: ProductionUserDataRuntimeConfigV1;
   readonly providerConfig?: OpenAiSeyeonStructuredProviderConfigV1;
   readonly roleProviderConfigs?: SeyeonProductionRoleProviderConfigsV1;
+  /** Explicit server-only opt-in: each native role must receive a certified cap. */
+  readonly costGovernorForRole?: (
+    role: keyof SeyeonProductionRoleProviderConfigsV1,
+    config: OpenAiSeyeonStructuredProviderConfigV1,
+  ) => SeyeonAiGovernorAdmissionV1;
   readonly provider?: SeyeonStructuredProviderPortV2;
   readonly pool?: PostgresSubjectPoolV1;
   readonly createUuid?: () => string;
@@ -212,6 +218,16 @@ async function runSeyeonTurnRuntimePhaseV1<T>(
 export function createProductionSeyeonChatRuntimeV1(
   input: CreateProductionSeyeonChatRuntimeInputV1,
 ): ProductionSeyeonChatRuntimeV1 {
+  if (input.costGovernorForRole !== undefined &&
+      input.provider !== undefined) {
+    throw new Error('Governed chat requires native, fully metered Provider config.');
+  }
+  if (input.costGovernorForRole !== undefined &&
+      input.provider === undefined &&
+      input.providerConfig === undefined &&
+      Object.values(input.roleProviderConfigs ?? {}).some(v => v === undefined)) {
+    throw new Error('Governed chat requires configuration for every active role.');
+  }
   const poolLease = createProductionPostgresSubjectPoolLeaseV1({
     config: input.databaseConfig,
     ...(input.pool === undefined ? {} : { pool: input.pool }),
@@ -279,6 +295,9 @@ export function createProductionSeyeonChatRuntimeV1(
           ? roleProvider(role)
           : createPersistingSeyeonAiProviderV1({
               config, runner, getBinding: () => activeCostBinding,
+              ...(input.costGovernorForRole === undefined ? {} : {
+                governor: input.costGovernorForRole(role,config),
+              }),
             });
       };
       const meteredPreflight = meterRole('preflight');
