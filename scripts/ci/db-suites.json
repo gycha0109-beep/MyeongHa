@@ -11,7 +11,8 @@
       "reader-memory-tenant-boundary",
       "runtime-function-api-role-acl",
       "self-birth-profile-current",
-      "saju-staging-operator-admission"
+      "saju-staging-operator-admission",
+      "saju-staging-operator-admission-v2"
     ]
   },
   "content": {
@@ -59,7 +60,8 @@
       "birth-profile-create-runtime-authority",
       "content-release-lifecycle",
       "member-character-thread-open",
-      "saju-staging-operator-admission"
+      "saju-staging-operator-admission",
+      "saju-staging-operator-admission-v2"
     ]
   }
 }
