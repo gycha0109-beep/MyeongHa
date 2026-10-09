@@ -718,10 +718,18 @@ export {
 
 export {
   CharacterStandardReadingChatTurnPreflightErrorV2,
+  assertServerPreparedStandardChatPreflightV2,
   prepareCharacterStandardReadingChatTurnPreflightV2,
   type CharacterStandardReadingChatTurnPreflightV2,
   type PrepareCharacterStandardReadingChatTurnPreflightInputV2,
 } from './character-standard-reading-chat-turn-preflight-v2.js';
+
+export {
+  CharacterStandardChatGroundingErrorV2,
+  prepareCharacterStandardChatGroundingV2,
+  type PrepareCharacterStandardChatGroundingInputV2,
+  type CharacterStandardChatGroundingV2,
+} from './character-standard-reading-chat-grounding-v2.js';
 
 export {
   createPostgresChatThreadRuntimeBindingAuthorityPortV1,
