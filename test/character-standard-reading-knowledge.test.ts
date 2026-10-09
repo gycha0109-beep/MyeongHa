@@ -2,6 +2,9 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   ApiCommandError,
   resolveCharacterStandardReadingKnowledgeV1,
+  resolveCharacterStandardReadingAccessMetadataV1,
+  resolveCharacterStandardReadingArtifactAfterAccessV1,
+  type CharacterStandardReadingAccessMetadataV1,
   type CharacterStandardReadingAccessAuthorityPortV1,
   type CharacterStandardReadingArtifactAuthorityPortV1,
 } from '../apps/api/src/index.js';
@@ -136,7 +139,7 @@ describe('Character Standard Reading Reader Knowledge source', () => {
   it('fails closed when metadata authority returns a different Reader or subject', async () => {
     await expect(
       resolveWith(ports({ accessRows: [accessRow({ readerCharacterId: 'seyeon' })] })),
-    ).rejects.toThrow(/metadata and artifact authorities disagree/u);
+    ).rejects.toThrow(/access authority returned inconsistent metadata identity/u);
 
     await expect(
       resolveWith(
@@ -146,7 +149,7 @@ describe('Character Standard Reading Reader Knowledge source', () => {
           ],
         }),
       ),
-    ).rejects.toThrow(/metadata and artifact authorities disagree/u);
+    ).rejects.toThrow(/access authority returned inconsistent metadata identity/u);
   });
 
   it('fails closed when a different Reader is returned by raw source authority', async () => {
@@ -209,5 +212,149 @@ describe('Character Standard Reading Reader Knowledge source', () => {
     await expect(
       resolveWith(authorityPorts, { effectiveAt: 'not-a-time' }),
     ).rejects.toMatchObject({ code: 'INVALID_REQUEST' } satisfies Partial<ApiCommandError>);
+  });
+});
+
+describe('A2-alpha exact Reader access metadata-first source boundary', () => {
+  const subjectId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const readingId = '11111111-1111-4111-8111-111111111111';
+  const bundleId = '55555555-5555-4555-8555-555555555555';
+
+  function metadataOnly(authorityPorts: ReturnType<typeof ports>, expectedBundle = bundleId) {
+    return resolveCharacterStandardReadingAccessMetadataV1({
+      resolvedSubjectId: subjectId,
+      readerCharacterId: 'baekheon',
+      readingId,
+      effectiveAt: EFFECTIVE_AT,
+      expectedReaderContentBundleId: expectedBundle,
+      accessAuthorityPort: authorityPorts.accessAuthorityPort,
+    });
+  }
+
+  it('returns provenance-only metadata before touching raw Saju source', async () => {
+    const authorityPorts = ports();
+    const admitted = await metadataOnly(authorityPorts);
+    expect(admitted).toMatchObject({
+      subjectId, readingId, readerCharacterId: 'baekheon',
+      readerContentBundleId: bundleId,
+      productId: accessRow().productId,
+      productSpecVersion: 'standard-reading-v1',
+      sajuDomain: 'general',
+      responseHash: accessRow().responseHash,
+      effectiveAt: EFFECTIVE_AT,
+    });
+    expect(Object.isFrozen(admitted)).toBe(true);
+    expect(admitted).not.toHaveProperty('responseSnapshotJsonb');
+    expect(admitted).not.toHaveProperty('productResponseState');
+    expect(admitted).not.toHaveProperty('completedAt');
+    expect(authorityPorts.artifactAuthorityPort.readArtifactSource).not.toHaveBeenCalled();
+
+    const resolved = await resolveCharacterStandardReadingArtifactAfterAccessV1({
+      admittedAccess: admitted, artifactAuthorityPort: authorityPorts.artifactAuthorityPort,
+    });
+    expect(resolved.responseSnapshotJsonb).toEqual(artifactRow().responseSnapshotJsonb);
+    expect(resolved).not.toHaveProperty('effectiveAt');
+    expect(Object.isFrozen(resolved)).toBe(true);
+    expect(authorityPorts.artifactAuthorityPort.readArtifactSource).toHaveBeenCalledOnce();
+  });
+
+  it('rejects caller-crafted, cloned or reused metadata before raw read', async () => {
+    const authorityPorts = ports();
+    const access = await metadataOnly(authorityPorts);
+    const fake = { ...access } as CharacterStandardReadingAccessMetadataV1;
+    await expect(resolveCharacterStandardReadingArtifactAfterAccessV1({
+      admittedAccess: fake, artifactAuthorityPort: authorityPorts.artifactAuthorityPort,
+    })).rejects.toThrow(/unused server-admitted access metadata/u);
+    expect(authorityPorts.artifactAuthorityPort.readArtifactSource).not.toHaveBeenCalled();
+
+    await resolveCharacterStandardReadingArtifactAfterAccessV1({
+      admittedAccess: access, artifactAuthorityPort: authorityPorts.artifactAuthorityPort,
+    });
+    await expect(resolveCharacterStandardReadingArtifactAfterAccessV1({
+      admittedAccess: access, artifactAuthorityPort: authorityPorts.artifactAuthorityPort,
+    })).rejects.toThrow(/unused server-admitted access metadata/u);
+    expect(authorityPorts.artifactAuthorityPort.readArtifactSource).toHaveBeenCalledOnce();
+  });
+
+  it('refuses different Subject/Reader/bundle before raw artifact or policy lookup', async () => {
+    const cases = [
+      { accessRows: [accessRow({ subjectId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' })] },
+      { accessRows: [accessRow({ readerCharacterId: 'seyeon' })] },
+    ];
+    for (const input of cases) {
+      const authorityPorts = ports(input);
+      await expect(metadataOnly(authorityPorts)).rejects.toThrow(
+        /access authority returned inconsistent metadata identity/u,
+      );
+      expect(authorityPorts.artifactAuthorityPort.readArtifactSource).not.toHaveBeenCalled();
+    }
+    const authorityPorts = ports();
+    await expect(metadataOnly(authorityPorts, 'different-bundle-id')).rejects.toThrow(
+      /different pinned Reader content bundle/u,
+    );
+    expect(authorityPorts.artifactAuthorityPort.readArtifactSource).not.toHaveBeenCalled();
+  });
+
+  it('does not mint metadata when duplicate or missing access is returned', async () => {
+    for (const accessRows of [[], [accessRow(), accessRow()]]) {
+      const authorityPorts = ports({ accessRows });
+      await expect(metadataOnly(authorityPorts)).rejects.toThrow();
+      expect(authorityPorts.artifactAuthorityPort.readArtifactSource).not.toHaveBeenCalled();
+    }
+  });
+
+  it('rejects malformed Product provenance before the artifact phase', async () => {
+    for (const { invalid, expected } of [
+      { invalid: { productSpecVersion: '' }, expected: /Product spec version/u },
+      { invalid: { sajuDomain: 'unknown' }, expected: /unsupported Saju domain/u },
+    ]) {
+      const authorityPorts = ports({
+        accessRows: [{ ...accessRow(), ...invalid }],
+      });
+      await expect(metadataOnly(authorityPorts)).rejects.toThrow(expected);
+      expect(authorityPorts.artifactAuthorityPort.readArtifactSource).not.toHaveBeenCalled();
+    }
+  });
+
+  it('consumes access once even if artifact authority returns a conflicting provenance', async () => {
+    const authorityPorts = ports({
+      artifactRows: [artifactRow({ responseHash: 'sha256:v1:forged' })],
+    });
+    const access = await metadataOnly(authorityPorts);
+    await expect(resolveCharacterStandardReadingArtifactAfterAccessV1({
+      admittedAccess: access,
+      artifactAuthorityPort: authorityPorts.artifactAuthorityPort,
+    })).rejects.toThrow(/metadata and artifact authorities disagree/u);
+    await expect(resolveCharacterStandardReadingArtifactAfterAccessV1({
+      admittedAccess: access,
+      artifactAuthorityPort: authorityPorts.artifactAuthorityPort,
+    })).rejects.toThrow(/unused server-admitted access metadata/u);
+    expect(authorityPorts.artifactAuthorityPort.readArtifactSource).toHaveBeenCalledOnce();
+  });
+
+  it('uses the old compatibility wrapper with access-first and unchanged source shape', async () => {
+    const sequence: string[] = [];
+    const authorityPorts = {
+      accessAuthorityPort: {
+        readAccessibleReadings: vi.fn(async () => {
+          sequence.push('access'); return [accessRow()];
+        }),
+      },
+      artifactAuthorityPort: {
+        readArtifactSource: vi.fn(async () => {
+          sequence.push('artifact'); return [artifactRow()];
+        }),
+      },
+    };
+    const result = await resolveWith(authorityPorts);
+    expect(sequence).toEqual(['access', 'artifact']);
+    expect(Object.keys(result).sort()).toEqual([
+      'subjectId', 'readingId', 'readingSessionId', 'productId',
+      'readerCharacterId', 'readerContentBundleId', 'topicKey', 'sajuDomain',
+      'readingPeriod', 'readingVariant', 'sourceBirthRevisionId',
+      'productSpecVersion', 'domainCapabilityVersion', 'readingContractVersion',
+      'sajuEngineVersion', 'responseHash', 'productResponseState',
+      'responseSnapshotJsonb', 'completedAt',
+    ].sort());
   });
 });

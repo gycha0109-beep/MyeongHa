@@ -100,6 +100,35 @@ export interface CharacterStandardReadingKnowledgeSourceV1 {
   readonly completedAt: string;
 }
 
+/**
+ * Metadata-only phase for an exact DB-authorized Subject × Reading × Reader.
+ * This is NOT a Product policy approval, payment instruction or permanent Grant.
+ * The private admission set prevents caller-created metadata from reaching the
+ * raw artifact phase. A2-beta adds Product eligibility between these phases.
+ */
+export type CharacterStandardReadingAccessMetadataV1 = Readonly<
+  Omit<CharacterStandardReadingKnowledgeSourceV1,
+    'productResponseState' | 'responseSnapshotJsonb' | 'completedAt'> & {
+    readonly effectiveAt: string;
+  }
+>;
+
+export interface ResolveCharacterStandardReadingAccessMetadataInputV1 {
+  readonly resolvedSubjectId?: string;
+  readonly readerCharacterId: unknown;
+  readonly readingId: unknown;
+  readonly effectiveAt: unknown;
+  readonly expectedReaderContentBundleId?: unknown;
+  readonly accessAuthorityPort: CharacterStandardReadingAccessAuthorityPortV1;
+}
+
+export interface ResolveCharacterStandardReadingArtifactAfterAccessInputV1 {
+  readonly admittedAccess: CharacterStandardReadingAccessMetadataV1;
+  readonly artifactAuthorityPort: CharacterStandardReadingArtifactAuthorityPortV1;
+}
+
+const admittedAccessMetadataV1 = new WeakSet<object>();
+
 const SAJU_DOMAINS = Object.freeze([
   'general',
   'family',
@@ -222,111 +251,125 @@ function selectExactArtifact(
 }
 
 /**
- * Server-only Reader Knowledge source admission.
- *
- * The caller supplies only an already server-resolved subject plus the requested
- * Character/Reading identities. Effective Reader access and the raw official Reading
- * source are re-resolved independently from DB authority. Client sessionStorage,
- * query-string topic/scope labels, and client-carried Reading prose are not accepted
- * as Source Truth.
- *
- * This boundary does not itself authorize public Chat injection. The underlying DB
- * functions remain INTERNAL/HOLD until the separate Production Saju/Character
- * authority gates are promoted. Access metadata also carries the exact server-owned
- * Reader content-bundle id so semantic runtimes cannot swap Character content.
+ * DB-authoritative access metadata only. The raw official artifact is NOT read
+ * here. A2-beta may consult the separately approved Product policy after this
+ * phase, before calling the artifact phase.
  */
-export async function resolveCharacterStandardReadingKnowledgeV1(
-  input: ResolveCharacterStandardReadingKnowledgeInputV1,
-): Promise<CharacterStandardReadingKnowledgeSourceV1> {
+export async function resolveCharacterStandardReadingAccessMetadataV1(
+  input: ResolveCharacterStandardReadingAccessMetadataInputV1,
+): Promise<CharacterStandardReadingAccessMetadataV1> {
   const subjectId = requireResolvedSubjectId(input.resolvedSubjectId);
-  const readerCharacterId = requireRequestIdentifier(
-    'readerCharacterId',
-    input.readerCharacterId,
-  );
+  const readerCharacterId = requireRequestIdentifier('readerCharacterId', input.readerCharacterId);
   const readingId = requireRequestIdentifier('readingId', input.readingId);
   const effectiveAt = requireEffectiveAt(input.effectiveAt);
 
   try {
     const accessRows = await input.accessAuthorityPort.readAccessibleReadings({
-      subjectId,
-      readerCharacterId,
-      effectiveAt,
+      subjectId, readerCharacterId, effectiveAt,
     });
     const access = selectExactAccess(accessRows, readingId);
-
-    const artifactRows = await input.artifactAuthorityPort.readArtifactSource({
-      subjectId,
-      readingId,
-      readerCharacterId,
-      effectiveAt,
-    });
-    const artifact = selectExactArtifact(artifactRows);
-
     const accessSubjectId = requireStoredString('subject id', access.subjectId);
     const accessReadingId = requireStoredString('Reading id', access.readingId);
-    const accessProductId = requireStoredString('Product id', access.productId);
     const accessReaderCharacterId = requireStoredString(
-      'Reader Character id',
-      access.readerCharacterId,
+      'Reader Character id', access.readerCharacterId,
     );
-    const accessReaderContentBundleId = requireStoredString(
-      'Reader content bundle id',
-      access.readerContentBundleId,
+    const readerContentBundleId = requireStoredString(
+      'Reader content bundle id', access.readerContentBundleId,
     );
-    const accessContractVersion = requireStoredString(
-      'Reading contract version',
-      access.readingContractVersion,
-    );
-    const accessResponseHash = requireStoredString('response hash', access.responseHash);
 
-    if (
-      accessSubjectId !== subjectId ||
-      accessReadingId !== readingId ||
-      accessReaderCharacterId !== readerCharacterId ||
-      requireStoredString('artifact Reading id', artifact.readingId) !== readingId ||
-      requireStoredString('artifact Reader Character id', artifact.readerCharacterId) !==
-        readerCharacterId ||
-      requireStoredString('artifact Product id', artifact.productId) !== accessProductId ||
-      requireStoredString(
-        'artifact Reading contract version',
-        artifact.readingContractVersion,
-      ) !== accessContractVersion ||
-      requireStoredString('artifact response hash', artifact.responseHash) !== accessResponseHash
-    ) {
+    // Authenticate the exact row BEFORE any raw source lookup or policy evaluation.
+    if (accessSubjectId !== subjectId ||
+        accessReadingId !== readingId ||
+        accessReaderCharacterId !== readerCharacterId) {
       throw new Error(
-        'Character Standard Reading metadata and artifact authorities disagree on source provenance.',
+        'Character Standard Reading access authority returned inconsistent metadata identity.',
+      );
+    }
+    if (input.expectedReaderContentBundleId !== undefined &&
+        readerContentBundleId !== requireRequestIdentifier(
+          'expectedReaderContentBundleId', input.expectedReaderContentBundleId,
+        )) {
+      throw new Error(
+        'Character Standard Reading access authority returned a different pinned Reader content bundle.',
       );
     }
 
-    return Object.freeze({
+    const metadata = Object.freeze({
       subjectId,
       readingId,
-      readingSessionId: requireStoredString('Reading Session id', access.readingSessionId),
-      productId: accessProductId,
       readerCharacterId,
-      readerContentBundleId: accessReaderContentBundleId,
+      readerContentBundleId,
+      effectiveAt,
+      readingSessionId: requireStoredString('Reading Session id', access.readingSessionId),
+      productId: requireStoredString('Product id', access.productId),
       topicKey: requireStoredString('topic key', access.topicKey),
       sajuDomain: requireSajuDomain(access.sajuDomain),
       readingPeriod: requireStoredString('reading period', access.readingPeriod),
       readingVariant: requireStoredString('reading variant', access.readingVariant),
       sourceBirthRevisionId: requireStoredString(
-        'source Birth revision id',
-        access.sourceBirthRevisionId,
+        'source Birth revision id', access.sourceBirthRevisionId,
       ),
-      productSpecVersion: requireStoredString(
-        'Product spec version',
-        access.productSpecVersion,
-      ),
+      productSpecVersion: requireStoredString('Product spec version', access.productSpecVersion),
       domainCapabilityVersion: requireStoredString(
-        'domain capability version',
-        access.domainCapabilityVersion,
+        'domain capability version', access.domainCapabilityVersion,
       ),
-      readingContractVersion: accessContractVersion,
+      readingContractVersion: requireStoredString(
+        'Reading contract version', access.readingContractVersion,
+      ),
       sajuEngineVersion: requireStoredString('Saju engine version', access.sajuEngineVersion),
-      responseHash: accessResponseHash,
+      responseHash: requireStoredString('response hash', access.responseHash),
+    }) satisfies CharacterStandardReadingAccessMetadataV1;
+
+    admittedAccessMetadataV1.add(metadata);
+    return metadata;
+  } catch (error) {
+    return mapAuthorityError(error);
+  }
+}
+
+/**
+ * Raw artifact phase. Accept ONLY a metadata object admitted from the exact
+ * server access query above, once per invocation. Product eligibility is not
+ * verified here; future A2-beta must check it BEFORE calling this phase.
+ */
+export async function resolveCharacterStandardReadingArtifactAfterAccessV1(
+  input: ResolveCharacterStandardReadingArtifactAfterAccessInputV1,
+): Promise<CharacterStandardReadingKnowledgeSourceV1> {
+  const access = input.admittedAccess;
+  if (typeof access !== 'object' || access === null ||
+      !admittedAccessMetadataV1.delete(access)) {
+    throw new Error(
+      'Official Reading raw artifact requires one unused server-admitted access metadata object.',
+    );
+  }
+  try {
+    const artifactRows = await input.artifactAuthorityPort.readArtifactSource({
+      subjectId: access.subjectId,
+      readingId: access.readingId,
+      readerCharacterId: access.readerCharacterId,
+      effectiveAt: access.effectiveAt,
+    });
+    const artifact = selectExactArtifact(artifactRows);
+
+    if (requireStoredString('artifact Reading id', artifact.readingId) !== access.readingId ||
+        requireStoredString('artifact Reader Character id', artifact.readerCharacterId) !==
+          access.readerCharacterId ||
+        requireStoredString('artifact Product id', artifact.productId) !== access.productId ||
+        requireStoredString(
+          'artifact Reading contract version', artifact.readingContractVersion,
+        ) !== access.readingContractVersion ||
+        requireStoredString('artifact response hash', artifact.responseHash) !==
+          access.responseHash) {
+      throw new Error(
+        'Character Standard Reading metadata and artifact authorities disagree on source provenance.',
+      );
+    }
+
+    const { effectiveAt: _effectiveAt, ...sourceMetadata } = access;
+    return Object.freeze({
+      ...sourceMetadata,
       productResponseState: requireStoredString(
-        'Product response state',
-        artifact.productResponseState,
+        'Product response state', artifact.productResponseState,
       ),
       responseSnapshotJsonb: requireArtifactSnapshot(artifact.responseSnapshotJsonb),
       completedAt: requireTimestamp('completedAt', artifact.completedAt),
@@ -334,4 +377,27 @@ export async function resolveCharacterStandardReadingKnowledgeV1(
   } catch (error) {
     return mapAuthorityError(error);
   }
+}
+
+/**
+ * Compatibility wrapper. Callers retain the original Reading Knowledge shape,
+ * authority ports, and fail-closed ordering. This does not by itself apply
+ * Product policy, mint a grant, enable Reader interpretation or bypass A3.
+ */
+export async function resolveCharacterStandardReadingKnowledgeV1(
+  input: ResolveCharacterStandardReadingKnowledgeInputV1,
+): Promise<CharacterStandardReadingKnowledgeSourceV1> {
+  const admittedAccess = await resolveCharacterStandardReadingAccessMetadataV1({
+    ...(input.resolvedSubjectId === undefined
+      ? {}
+      : { resolvedSubjectId: input.resolvedSubjectId }),
+    readerCharacterId: input.readerCharacterId,
+    readingId: input.readingId,
+    effectiveAt: input.effectiveAt,
+    accessAuthorityPort: input.accessAuthorityPort,
+  });
+  return resolveCharacterStandardReadingArtifactAfterAccessV1({
+    admittedAccess,
+    artifactAuthorityPort: input.artifactAuthorityPort,
+  });
 }
