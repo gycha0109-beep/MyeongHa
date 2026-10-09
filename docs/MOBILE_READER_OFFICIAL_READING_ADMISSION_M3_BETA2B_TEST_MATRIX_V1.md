@@ -64,6 +64,21 @@
 | OPS-05 | 과거 #680 배포 문제 상태 확인 | #680 CLOSED는 repo 배포 권한 이슈의 이력이며 Product/Reader/결제 출시 승인 근거로 사용하지 않음 |
 | OPS-06 | 신규 Native checkout 호출 또는 미승인 외부 결제 이동 | P0-CM-01 Web one-off 정책에 반하는 앱 내 결제/IAP/자동 redirect 금지 |
 
+## 2.1 기존 DB v2 계약에 대한 신규 회귀 요구
+
+migration 1220/1270/1240의 기존 관계와 Reader 접근을 재사용할 때에는 아래 음성 검증을 **별도 DB·Commerce owner 테스트**로 수행한다. 이는 테스트 실행 결과가 아니다. 상세 논거는 `MOBILE_READER_PRODUCT_COMMERCE_DB_EXACT_GRANT_M3_BETA2B_CONTRACT_V1.md`.
+
+| ID | 조건 | 기대 |
+| --- | --- | --- |
+| DBGR-01 | `cmd_bind_standard_reading_access_v2` 과거 성공 replay 뒤 해당 Grant revoke | 바인딩 replay는 현재 Reader permission이나 새 receipt/Grant 발급으로 해석되지 않음 |
+| DBGR-02 | 한 Reader의 동일 bundle에 독립 active Grant 2개, 하나 revoke | 여전히 유효한 exact Grant가 존재하면 해당 Reader metadata 허용; 불필요한 source rewrite 없음 |
+| DBGR-03 | 한 Reader의 두 active Grant가 서로 다른 content bundle에 귀속 | `qry_character_standard_reading_access_runtime_v2`의 distinct bundle 행을 상위 exact-one A2가 차단 |
+| DBGR-04 | migration 1220 v2 bind의 `character_capabilities.can_initiate`와 A3 공통 Reader V2 capability의 차이 | Product/DB/Reader가 승인한 정책을 증명하기 전 capability 위조·gate 제거 금지 |
+| DBGR-05 | 추가 Reader Offer인데 official Reading Source Truth 미완료 | v2 bind 신규 Reading 생성 불가; 공식 Reading identity/응답 해시 불변 |
+| DBGR-06 | Saju/LLM 대기 중 환불/권한 회수 | 현재 transaction/isolation/reveal 정책에 따른 차단; A2 proof 단독으로 회수 경쟁 해결 주장 금지 |
+| DBGR-07 | Guest→Member promotion 또는 direct Guest merge 후 재열람 | canonical lineage만 허용, 기존 purchase/Grant/Reading owner rewrite 없음 |
+| DBGR-08 | historical `standard_reading_unit_bindings`와 신규 official v2 authority 공존 | 과거 provenance 자동 승격 금지, 신규 Reader-independent official Reading identity 유지 |
+
 ## 3. 특히 중요한 경계 테스트
 
 1. **미구매 Reader**: DB access metadata 단에서 deny. Product rule lookup 이전 raw artifact 0, Saju 0. 시뮬레이션 테스트에서 이 원칙과 실제 DB query trace가 일치해야 한다.
