@@ -39,7 +39,15 @@ const timestamp = (x: unknown): x is number =>
   typeof x === 'number' && Number.isSafeInteger(x) && x >= 0;
 const id = (x: unknown): x is string => typeof x === 'string' && ID.test(x);
 const digest = (x: unknown): x is string => typeof x === 'string' && HEX64.test(x);
-const bool = (x: unknown): x is boolean => x === true;
+const bool = (x: unknown): x is true => x === true;
+const origin = (x: unknown): x is string => {
+  if (typeof x !== 'string') return false;
+  try {
+    const u = new URL(x);
+    return u.protocol === 'https:' && u.origin === x && u.hostname !== 'localhost'
+      && !u.username && !u.password && !u.search && !u.hash && u.pathname === '/';
+  } catch { return false; }
+};
 
 export interface SajuStagingDbObservationV1 {
   readonly targetId: string; readonly loginRole: string; readonly runtimeRole: string;
@@ -82,20 +90,20 @@ function dbObserve(x: unknown): Readonly<SajuStagingDbObservationV1> {
 function observations(input: unknown): Readonly<SajuStagingTargetObservationsV1> {
   if (!exact(input, OBS_FIELDS)) throw new TypeError();
   const a = input.auth, p = input.proof;
-  if (!exact(a, AUTH) || !id(a.projectRef) || !id(a.origin)
+  if (!exact(a, AUTH) || !id(a.projectRef) || !origin(a.origin)
     || !bool(a.memberOnlyObserved) || !bool(a.productionSeparatedObserved)
-    || !exact(p, PROOF) || !id(p.origin) || !id(p.issuer) || !id(p.audience)
+    || !exact(p, PROOF) || !origin(p.origin) || !id(p.issuer) || !id(p.audience)
     || !id(p.keyId) || !bool(p.httpsPeerVerified)
     || !bool(p.bearerIsolatedObserved) || !bool(p.hmacIsolatedObserved)
     || !bool(p.productionSeparatedObserved)) throw new TypeError();
   return Object.freeze({
     auth: Object.freeze(Object.fromEntries(AUTH.map(k => [k, a[k]]))
-      as SajuStagingTargetObservationsV1['auth']),
+      as unknown as SajuStagingTargetObservationsV1['auth']),
     subjectDb: dbObserve(input.subjectDb),
     nonceDb: dbObserve(input.nonceDb),
     admissionDb: dbObserve(input.admissionDb),
     proof: Object.freeze(Object.fromEntries(PROOF.map(k => [k, p[k]]))
-      as SajuStagingTargetObservationsV1['proof']),
+      as unknown as SajuStagingTargetObservationsV1['proof']),
   });
 }
 function ordered(obs: Readonly<SajuStagingTargetObservationsV1>): unknown[] {
