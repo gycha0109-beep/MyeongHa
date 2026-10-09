@@ -415,11 +415,16 @@ try {
     authority: document.body.dataset.characterAuthority ?? '',
     name: document.querySelector('[data-dialogue-name]')?.textContent?.trim() ?? '',
     status: document.querySelector('[data-compose-status]')?.textContent?.trim() ?? '',
-    history: document.querySelector('[data-history-empty]')?.textContent?.trim() ?? '',
+    loading: document.querySelector('[data-room-loading]')?.textContent?.trim() ?? '',
+    introHidden: document.querySelector('[data-chat-intro]')?.hidden === true,
+    retryHidden: document.querySelector('[data-room-retry]')?.hidden === true,
   }))()`);
   assert(invalidThreadChat.character === '' && invalidThreadChat.authority === 'thread_identity_invalid', `Invalid thread route fell back to presentation Character authority: ${JSON.stringify(invalidThreadChat)}`);
   assert(invalidThreadChat.name === '대화 상대', `Invalid thread route leaked a presentation Character: ${JSON.stringify(invalidThreadChat)}`);
-  assert(invalidThreadChat.status === '유효한 대화를 다시 선택해 주세요.' && invalidThreadChat.history === '대화 주소가 올바르지 않습니다.', `Invalid thread route did not fail closed visibly: ${JSON.stringify(invalidThreadChat)}`);
+  assert(invalidThreadChat.status === '대화 주소가 올바르지 않습니다. 대리자를 다시 선택해 주세요.'
+    && invalidThreadChat.loading === invalidThreadChat.status
+    && invalidThreadChat.introHidden && invalidThreadChat.retryHidden,
+    `Invalid thread route did not fail closed visibly: ${JSON.stringify(invalidThreadChat)}`);
 
   await navigate(client, origin, '/records.html?tab=saju&from=reading&reader=baekheon&topic=temperament&scope=original', '#saju-records');
   const readingRecordsHandoff = await client.evaluate(`(() => {
