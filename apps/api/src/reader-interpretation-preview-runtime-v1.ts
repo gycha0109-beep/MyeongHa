@@ -9,7 +9,7 @@ import {
   canonicalJson,
   guardCharacterSajuSemanticPreservationV1,
   renderCharacterSajuBoundedExactCoreV1,
-  resolveCharacterSajuFirstSlicePerspectiveV1,
+  resolveCharacterSajuCommonPerspectiveV1,
   type CharacterPerspectiveProfileV1,
   type CharacterRuntimeContextV1,
   type CharacterRuntimeContextWithGroundingV1,
@@ -395,18 +395,11 @@ function withHash<T extends object>(value: T): T & { readonly interpretationHash
 function resolveRuntimePerspective(
   context: CharacterRuntimeContextV1,
 ): CharacterPerspectiveProfileV1 {
-  const perspective = resolveCharacterSajuFirstSlicePerspectiveV1({
+  return resolveCharacterSajuCommonPerspectiveV1({
     characterId: context.characterId,
     contentVersion: context.contentVersion,
     sajuProfile: context.sajuProfile,
   });
-  if (perspective === null) {
-    throw new ReaderInterpretationPreviewRuntimeErrorV1(
-      'PERSPECTIVE_UNAVAILABLE',
-      'Reader Interpretation has no reviewed Character grounding-axis perspective for this Reader.',
-    );
-  }
-  return perspective;
 }
 
 async function renderResolvedReaderInterpretationPreviewV1(input: {
@@ -415,9 +408,9 @@ async function renderResolvedReaderInterpretationPreviewV1(input: {
   readonly requestedDomain: SajuDomain;
   readonly groundingProjectionPort: OfficialReadingCharacterGroundingProjectionPortV1;
 }): Promise<ReaderInterpretationPreviewEnvelopeV1> {
-  // Perspective admission is content-only and must happen before the cross-service
-  // Saju call. Unsupported Readers fail closed without spending grounding transport
-  // or exposing an unreviewed Character interpretation path.
+  // Character-neutral bounded selection is resolved before the Saju call.
+  // Reader grants, pinned Character content and rollout admission remain
+  // independent mandatory gates; no Character-to-Saju axis guess is made.
   const perspective = resolveRuntimePerspective(input.context);
   const { grounding, runtimeContext } = await projectAndAdmitGrounding({
     source: input.source,
