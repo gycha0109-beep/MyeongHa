@@ -91,11 +91,11 @@ migration 1220/1270/1240의 기존 관계와 Reader 접근을 재사용할 때�
 ## 2.3 최종 결과 공개(Commit)와 실제 환불 경합 검증
 
 - 권한회수 상세 실행 설계: MOBILE_READER_FINAL_AUTHORIZATION_LOCKING_D02_V1.md (설계 후보, 미실행).
-- **DB-C1/C2:** 같은 Reader·bundle에 두 독립 Grant가 있을 때 한쪽 revoke 후 다른 Grant의 정확한 접근 유지; 서로 다른 active bundle 둘 이상은 모호성 거부. fixture 및 Postgres 실제 SQL 선행 검증.
+- **DB-C1/C2 실제 Postgres PASS (#1854, merged b18e6c15):** 같은 Reader·bundle에 두 독립 verified synthetic receipt-backed purchase Grants가 있고 한쪽 revoke 후 다른 Grant로 원본 접근 유지, 전부 revoke 후 raw source 접근 0. 다른 active Bundle 둘 이상은 bundle-aware metadata가 별도 2행으로 노출, 하나 회수 후 1행 복귀. **SQL에서 직접 모호성을 DENY한 것이 아니라 기존 서버 A2 exact-one 계약의 거부 입력을 확인한 것**임.
 - **DB-C3:** refund/revoke의 FOR UPDATE·revision CAS와 T2 접근 승인 잠금이 두 PostgreSQL connection에서 양 방향 순서로 직렬화되는지 검증. 만료 시점은 잠금 후 fresh DB clock 사용.
 - **DB-C4:** 새로운 Reader bundle/Grant가 끼어드는 phantom은 기존 Grant row lock만으로 막을 수 없으므로, 모든 writer가 준수하는 reader/reading scope anchor 프로토콜이 필요. Owner 승인 전 구현·PASS 없음.
 - **API-C1/C2:** Saju/provider await 시 DB connection 해제, T2의 fresh identity/Grant/source/policy/rollout 확인 후에만 응답 본문 전달. T1/A2 proof 자체는 현재 권한이 아님.
-- 관련 테스트는 **아직 실행되지 않았다**. #1831 및 #1838 기존 DB 회귀 PASS와 혼동 금지.
+- **DB-C1/C2 테스트 실행·병합 완료.** DB-C3/C4 및 final reveal RACE-01~16 실제 잠금 경합은 **아직 실행되지 않았다**. #1831·#1838·#1854 범위의 DB PASS를 운영 환불/최종 공개 승인으로 혼동 금지.
 
 ## 3. 특히 중요한 경계 테스트
 
