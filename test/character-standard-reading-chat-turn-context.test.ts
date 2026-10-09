@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { runThreadBoundReaderInterpretationPreviewV2 } from '../apps/api/src/reader-interpretation-preview-runtime-v2.js';
 import type { CharacterContentDefinition } from '../packages/character-content/src/index.js';
 import {
   SAJU_CHARACTER_GROUNDING_PROJECTION_VERSION_V1,
@@ -1066,3 +1067,102 @@ describe('Official Reading Reader Chat turn preflight', () => {
   });
 });
 
+
+describe('A3-gamma server-only Thread-bound official standard V2 Preview (public OFF)', () => {
+  function nonspecialistReleaseRuntime(): ContentReleaseRuntime {
+    const original = compatibleReceiveRuntime();
+    const pinned = original.resolvePinned(RELEASE_ID);
+    const released = {
+      ...pinned,
+      characters: {
+        ...pinned.characters,
+        characters: [{
+          ...authoredCharacter('baekheon'),
+          capabilities: [],
+        }],
+      },
+    } as ContentReleaseRuntimeEntry;
+    return {
+      ...original,
+      resolvePinned: vi.fn(() => released),
+    } as unknown as ContentReleaseRuntime;
+  }
+
+  it('uses exact A2/A3 standard rule with zero Character specialist capabilities', async () => {
+    const authority = authorities();
+    const bundle = previewGrounding();
+    const projectGrounding = vi.fn(async () => bundle);
+    const result = await runThreadBoundReaderInterpretationPreviewV2({
+      resolvedSubjectId: SUBJECT_ID,
+      threadId: THREAD_ID,
+      officialReadingId: READING_ID,
+      effectiveAt: '2026-09-21T00:01:00.000Z',
+      ...authority,
+      contentReleaseRuntime: nonspecialistReleaseRuntime(),
+      contextInput: serverContextInput(),
+      groundingProjectionPort: { projectGrounding },
+    });
+    expect(result.readerCharacterId).toBe('baekheon');
+    expect(result.readerContentBundleId).toBe(BUNDLE_ID);
+    expect(result.officialReadingId).toBe(READING_ID);
+    expect(result.sourceResponseHash).toBe(bundle.sourceResponseHash);
+    expect(projectGrounding).toHaveBeenCalledTimes(1);
+    expect(authority.productReaderEligibilityAuthorityPort.readApprovedRule).toHaveBeenCalled();
+  });
+
+  it('blocks a withheld Product rule before Saju grounding', async () => {
+    const authority = authorities();
+    authority.productReaderEligibilityAuthorityPort.readApprovedRule.mockResolvedValue({
+      status: 'withheld', reason: 'unclassified',
+    } as never);
+    const projectGrounding = vi.fn(async () => previewGrounding());
+    await expect(runThreadBoundReaderInterpretationPreviewV2({
+      resolvedSubjectId: SUBJECT_ID, threadId: THREAD_ID, officialReadingId: READING_ID,
+      effectiveAt: '2026-09-21T00:01:00.000Z', ...authority,
+      contentReleaseRuntime: nonspecialistReleaseRuntime(),
+      contextInput: serverContextInput(),
+      groundingProjectionPort: { projectGrounding },
+    })).rejects.toMatchObject({ code: 'ACCESS_DENIED' });
+    expect(projectGrounding).not.toHaveBeenCalled();
+    expect(authority.artifactAuthorityPort.readArtifactSource).not.toHaveBeenCalled();
+  });
+
+  it('rejects forged caller Saju and content authority before requesting grounding', async () => {
+    const authority = authorities();
+    const projectGrounding = vi.fn(async () => previewGrounding());
+    await expect(runThreadBoundReaderInterpretationPreviewV2({
+      resolvedSubjectId: SUBJECT_ID, threadId: THREAD_ID, officialReadingId: READING_ID,
+      effectiveAt: '2026-09-21T00:01:00.000Z', ...authority,
+      contentReleaseRuntime: nonspecialistReleaseRuntime(),
+      contextInput: {
+        ...serverContextInput(),
+        saju: { readingRef: READING_ID },
+      } as CharacterStandardReadingChatTurnServerContextInputV1,
+      groundingProjectionPort: { projectGrounding },
+    })).rejects.toThrow(/caller-supplied saju authority/u);
+    expect(projectGrounding).not.toHaveBeenCalled();
+  });
+
+  it('rejects revision drift between A2 proof and freshly re-read Thread before Saju', async () => {
+    const authority = authorities();
+    let reads = 0;
+    authority.threadBindingAuthorityPort.readRuntimeBinding = vi.fn(async () => {
+      reads += 1;
+      return [{
+        threadId: THREAD_ID, status: 'active',
+        activeContentReleaseId: RELEASE_ID, activeContentBundleId: BUNDLE_ID,
+        contentRevision: reads < 5 ? 4 : 5,
+        participantCharacterIds: ['baekheon'],
+      }];
+    });
+    const projectGrounding = vi.fn(async () => previewGrounding());
+    await expect(runThreadBoundReaderInterpretationPreviewV2({
+      resolvedSubjectId: SUBJECT_ID, threadId: THREAD_ID, officialReadingId: READING_ID,
+      effectiveAt: '2026-09-21T00:01:00.000Z', ...authority,
+      contentReleaseRuntime: nonspecialistReleaseRuntime(),
+      contextInput: serverContextInput(),
+      groundingProjectionPort: { projectGrounding },
+    })).rejects.toMatchObject({ code: 'SOURCE_MISMATCH' });
+    expect(projectGrounding).not.toHaveBeenCalled();
+  });
+});
