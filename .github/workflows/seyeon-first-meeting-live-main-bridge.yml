@@ -25,6 +25,8 @@ env:
 
 jobs:
   live:
+    # Paid live-model hold: re-enable only after explicit approval and review.
+    if: ${{ false }}
     name: run-seyeon-first-meeting-live-main-bridge
     runs-on: ubuntu-24.04
     environment: production

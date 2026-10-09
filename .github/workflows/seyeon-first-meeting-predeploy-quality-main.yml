@@ -19,6 +19,8 @@ env:
 
 jobs:
   quality:
+    # Paid live-model hold: re-enable only after explicit approval and review.
+    if: ${{ false }}
     name: 세연-배포전-10턴-실대화
     runs-on: ubuntu-24.04
     environment: production

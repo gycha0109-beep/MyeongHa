@@ -17,6 +17,9 @@ concurrency:
 
 jobs:
   compare:
+    # Cost incident hold: no paid model requests until a separately reviewed approval PR.
+    # This blocks push-triggered AND workflow_dispatch runs; do not remove for optimization tests.
+    if: ${{ false }}
     name: 세연 통합 분류 Shadow 격리 평가
     runs-on: ubuntu-24.04
     environment: production
