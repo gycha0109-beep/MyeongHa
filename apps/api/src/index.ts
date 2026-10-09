@@ -662,6 +662,17 @@ export {
 } from './character-standard-reading-knowledge.js';
 
 export {
+  OFFICIAL_READER_ADMISSION_VERSION_V1,
+  OfficialReadingReaderAdmissionErrorV1,
+  prepareOfficialReadingReaderAdmissionV1,
+  consumeOfficialReadingReaderAdmissionV1,
+  type OfficialReadingReaderAdmissionScopeV1,
+  type OfficialReadingReaderAdmissionTicketV1,
+  type PrepareOfficialReadingReaderAdmissionInputV1,
+  type PreparedOfficialReadingReaderAdmissionV1,
+} from './official-reading-reader-admission-v1.js';
+
+export {
   createPostgresCharacterStandardReadingKnowledgePortsV1,
 } from './postgres-character-standard-reading-knowledge.js';
 
