@@ -244,6 +244,7 @@ async function runPreview(
   active = true,
 ) {
   return runReaderInterpretationPreviewV1({
+    legacyOfflineFixtureOnly: true,
     resolvedSubjectId: SUBJECT_ID,
     officialReadingId: READING_ID,
     readerCharacterId: READER_ID,

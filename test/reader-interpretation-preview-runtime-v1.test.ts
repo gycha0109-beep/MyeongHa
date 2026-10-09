@@ -357,6 +357,7 @@ async function run(
   const context = input.context ?? makeContext(bundle, reader);
   const ports = input.ports ?? authorityPorts({ activeReaders: [reader.characterId] });
   return runReaderInterpretationPreviewV1({
+    legacyOfflineFixtureOnly: true,
     resolvedSubjectId: input.resolvedSubjectId ?? SUBJECT_ID,
     officialReadingId: READING_ID,
     readerCharacterId: reader.characterId,
@@ -369,6 +370,22 @@ async function run(
 }
 
 describe('Reader Interpretation Preview Runtime v1', () => {
+  it('rejects standalone preview in Production before Reader access or Saju', async () => {
+    const reader = readers.baekheon;
+    const ports = authorityPorts({ activeReaders: [reader.characterId] });
+    const projectionPort = groundingProjectionPort(baseBundle);
+    vi.stubEnv('NODE_ENV', 'production');
+    try {
+      await expect(run(reader, { ports, projectionPort })).rejects.toMatchObject({
+        code: 'ACCESS_DENIED',
+      });
+      expect(ports.accessAuthorityPort.readAccessibleReadings).not.toHaveBeenCalled();
+      expect(projectionPort.projectGrounding).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it('reuses one official Source Truth with character-neutral selection for different Readers', async () => {
     const ports = authorityPorts({ activeReaders: ['baekheon', 'taegyeom'] });
     const baekheon = await run(readers.baekheon, { ports });
@@ -587,5 +604,25 @@ describe('Reader Interpretation Preview Runtime v1', () => {
     await expect(
       run(readers.baekheon, { resolvedSubjectId: ' ' }),
     ).rejects.toMatchObject({ code: 'AUTH_REQUIRED' });
+  });
+});
+
+describe('A3-gamma standalone explicit offline-fixture boundary', () => {
+  it('rejects test-mode standalone calls without explicit offline-fixture opt-in before authorities are read', async () => {
+    const ports = authorityPorts({ activeReaders: ['seyeon'] });
+    const grounding = groundingProjectionPort(baseBundle);
+    await expect(runReaderInterpretationPreviewV1({
+      resolvedSubjectId: SUBJECT_ID,
+      officialReadingId: READING_ID,
+      readerCharacterId: 'seyeon',
+      effectiveAt: '2026-09-21T00:00:00.000Z',
+      requestedDomain: 'general',
+      context: makeContext(baseBundle, readers.seyeon),
+      groundingProjectionPort: grounding,
+      ...ports,
+    })).rejects.toMatchObject({ code: 'ACCESS_DENIED' });
+    expect(ports.accessAuthorityPort.readAccessibleReadings).not.toHaveBeenCalled();
+    expect(ports.artifactAuthorityPort.readArtifactSource).not.toHaveBeenCalled();
+    expect(grounding.projectGrounding).not.toHaveBeenCalled();
   });
 });

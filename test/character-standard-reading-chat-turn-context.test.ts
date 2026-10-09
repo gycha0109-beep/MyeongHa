@@ -795,6 +795,29 @@ describe('thread-bound Official Reading Reader runtime', () => {
 });
 
 describe('Official Reading Reader Chat turn preflight', () => {
+  it('denies Product HOLD before reading the raw Official artifact or Saju', async () => {
+    const authority = {
+      ...authorities(),
+      productReaderEligibilityAuthorityPort: {
+        readApprovedRule: vi.fn(async () => ({
+          status: 'withheld' as const, reason: 'unclassified' as const,
+        })),
+      },
+    };
+    await expect(prepareCharacterStandardReadingChatTurnPreflightV1({
+      resolvedSubjectId: SUBJECT_ID,
+      receivePlan: existingThreadReceivePlan(),
+      readingId: READING_ID,
+      effectiveAt: '2026-09-21T00:02:00.000Z',
+      ...authority,
+      contextInput: serverContextInput(),
+    })).rejects.toBeInstanceOf(CharacterStandardReadingChatTurnPreflightErrorV1);
+    expect(authority.accessAuthorityPort.readAccessibleReadings).toHaveBeenCalledTimes(1);
+    expect(authority.artifactAuthorityPort.readArtifactSource).not.toHaveBeenCalled();
+    expect(authority.relationshipAuthorityPort.readCurrentRelationship).not.toHaveBeenCalled();
+  });
+
+
   it('joins a server-minted receive plan to a fresh thread-bound Official Reading runtime without generation or commit', async () => {
     const authority = authorities();
     const receivePlan = existingThreadReceivePlan();
@@ -926,8 +949,10 @@ describe('Official Reading Reader Chat turn preflight', () => {
       }),
     ).rejects.toThrow(/requires a stored current relationship projection/u);
 
-    expect(authority.accessAuthorityPort.readAccessibleReadings).not.toHaveBeenCalled();
-    expect(authority.artifactAuthorityPort.readArtifactSource).not.toHaveBeenCalled();
+    // A2 verifies the exact Reader Grant and Product rule before the
+    // downstream relationship/memory authority is resolved.
+    expect(authority.accessAuthorityPort.readAccessibleReadings).toHaveBeenCalledTimes(1);
+    expect(authority.artifactAuthorityPort.readArtifactSource).toHaveBeenCalledTimes(1);
   });
 
   it('rejects caller-supplied granted Memory context before authority lookup', async () => {
@@ -989,8 +1014,10 @@ describe('Official Reading Reader Chat turn preflight', () => {
       }),
     ).rejects.toThrow(/multiple active grants for the current Reader/u);
 
-    expect(authority.accessAuthorityPort.readAccessibleReadings).not.toHaveBeenCalled();
-    expect(authority.artifactAuthorityPort.readArtifactSource).not.toHaveBeenCalled();
+    // A2 verifies the exact Reader Grant and Product rule before the
+    // downstream relationship/memory authority is resolved.
+    expect(authority.accessAuthorityPort.readAccessibleReadings).toHaveBeenCalledTimes(1);
+    expect(authority.artifactAuthorityPort.readArtifactSource).toHaveBeenCalledTimes(1);
   });
 
   it('rejects a receive plan whose release no longer matches the freshly reread owned thread', async () => {

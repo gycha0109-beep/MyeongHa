@@ -64,7 +64,7 @@ export class CharacterStandardReadingServerRuntimeAuthorityErrorV1 extends Error
   }
 }
 
-function assertNoCallerContentAuthorityFields(
+export function assertNoCallerContentAuthorityFields(
   input: CharacterStandardReadingServerContextInputV1,
 ): void {
   for (const field of [
@@ -74,6 +74,7 @@ function assertNoCallerContentAuthorityFields(
     'relationshipState',
     'grantedLifeFacts',
     'grantedMemories',
+    'saju',
   ] as const) {
     if (Object.prototype.hasOwnProperty.call(input, field)) {
       throw new CharacterStandardReadingServerRuntimeAuthorityErrorV1(
