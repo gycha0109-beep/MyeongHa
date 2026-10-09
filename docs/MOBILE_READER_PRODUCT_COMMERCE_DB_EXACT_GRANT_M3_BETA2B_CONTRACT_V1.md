@@ -2,6 +2,7 @@
 
 > Status: SOURCE-REVIEWED DESIGN / OWNER APPROVAL HOLD / PUBLIC OFF
 > Baseline: MyeongHa main 0b82b3f157b052c7110c9b4c7f5d5a1874918929 (2026-10-09)
+> Latest reconciled main: 34ba01d470b29fbd4827db2692b65146d252553c (#1825, #1826). Owner issues: #1827 (DB replay/revoke), #1828 (Product/DB/Reader capability).
 > No API, catalog, sale, database migration, product approval or activation change.
 
 ## 1. 결론 — 신규 Grant 테이블을 만들지 않는다
@@ -108,6 +109,13 @@ canonical transaction-local Subject
 **R5. 동시 최초·추가 Reader 구매:** Official identity UNIQUE 및 locked Intent/Grant/Source mutation 경계를 기준으로 Race 테스트. 하나의 공식 Reading identity로 두 생성이 가능해져서는 안 된다. 다른 request_hash는 immutable conflict, 동일 hash는 replay 시 신규 발생 행 0.
 
 **R6. Reader artifact 저장:** standard_reading_reader_interpretations는 logical identity일 뿐 유료 Reader 발화 원문 저장소가 아니다. migration 1530 character_reading_artifacts는 face_governed_reading을 대상으로 한다. Reader 결과의 persist/re-read와 Chat 권한은 Records/Reader owner의 별도 검토가 필요하다.
+
+### R7. 최신 A3 증거와 DB 운영 경계
+
+- #1825: Reader V2 Preview `interpretationHash` 및 guarded fallback, grant 재조회 철회 synthetic 음성 테스트.
+- #1826: 9 Reader×9 official Saju domain 조합에 대해 합성 A2→A3 proof 생성·소비·replay-deny 회귀 81개.
+- 이 두 PASS는 **DB v2 `cmd_bind_standard_reading_access_v2`의 구매 실행 경로**를 호출하거나 Product Owner의 unactivated `standard.love_relationship` Offer를 활성화한 것이 아니다.
+- SQL/DB owner 이슈 **#1827**에서 bind replay/current grant/revoke-race를, **#1828**에서 `can_initiate` vs A3 approved standard policy를 검증하기 전, app/mobile은 Public Reader OFF.
 
 ## 7. 테스트 요구사항 (미실행)
 
