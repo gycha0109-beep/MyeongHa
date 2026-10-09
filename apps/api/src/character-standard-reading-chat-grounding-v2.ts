@@ -54,6 +54,18 @@ export interface CharacterStandardChatGroundingV2 {
   readonly grounding: CharacterSajuGroundingBundleViewV1;
 }
 
+const mintedStandardChatGroundingsV2 = new WeakSet<object>();
+
+/** Downstream question-focus and rendering consumers require this exact server artifact. */
+export function assertServerPreparedStandardChatGroundingV2(
+  candidate: unknown,
+): asserts candidate is CharacterStandardChatGroundingV2 {
+  if (typeof candidate !== 'object' || candidate === null ||
+      !mintedStandardChatGroundingsV2.has(candidate)) {
+    throw new CharacterStandardChatGroundingErrorV2('ACCESS_DENIED');
+  }
+}
+
 export class CharacterStandardChatGroundingErrorV2 extends Error {
   constructor(readonly code: 'ACCESS_DENIED' | 'SOURCE_MISMATCH' | 'GROUNDING_UNAVAILABLE') {
     super('Official standard Chat grounding is unavailable.');
@@ -223,11 +235,13 @@ export async function prepareCharacterStandardChatGroundingV2(
       context: preflight.runtime,
       groundingRef: ref,
     });
-    return Object.freeze({
+    const result = Object.freeze({
       scope: current.scope,
       context,
       grounding,
     });
+    mintedStandardChatGroundingsV2.add(result);
+    return result;
   } catch {
     deny('SOURCE_MISMATCH');
   }
