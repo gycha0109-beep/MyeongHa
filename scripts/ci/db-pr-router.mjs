@@ -7,6 +7,7 @@ const SUITES = Object.freeze(JSON.parse(readFileSync(new URL('./db-suites.json',
 const ALL_SUITES = Object.freeze(Object.keys(SUITES));
 
 const runtimePatterns = [
+  /^test\/db\/(?:saju_staging_operator_admission_v2_authority\.sh|fixtures\/saju_staging_operator_admission_schema_8c2b2d302\.sql)$/u,
   /^test\/db\/(?:saju_staging_operator_admission_authority\.sh|fixtures\/saju_staging_operator_admission_schema_8c2b2d1\.sql)$/u,
   /^test\/db\/(?:birth_profile_read_runtime_authority|device_installation_registration_runtime_authority|guest_bootstrap_runtime_authority|guest_bootstrap_current_query|records_read_runtime_authority|runtime_function_api_role_acl|self_birth_profile_current_query)\.sh$/u,
   /^test\/ops\/supabase-production-migration-repair\.sh$/u,
@@ -33,6 +34,7 @@ const commerceEntitlementPatterns = [
 ];
 
 const postgres17Patterns = [
+  /^test\/db\/(?:saju_staging_operator_admission_v2_authority\.sh|fixtures\/saju_staging_operator_admission_schema_8c2b2d302\.sql)$/u,
   /^test\/db\/(?:birth_profile_create_runtime_authority|content_release_lifecycle_authority|member_character_thread_open_concurrency)\.sh$/u,
   /^docs\/CHARACTER_GATE_B_PUBLICATION_BLOCKER_EVIDENCE\.md$/u,
   /^\.github\/workflows\/db-postgres17-authority-suite\.yml$/u,
