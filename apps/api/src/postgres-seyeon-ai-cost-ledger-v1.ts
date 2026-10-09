@@ -8,6 +8,15 @@ import {
 import type {
   SeyeonStructuredProviderPortV2,
 } from './seyeon-character-runtime-v2.js';
+import type {
+  SeyeonStructuredProviderRequestV2,
+} from './seyeon-character-runtime-v2.js';
+import {
+  quoteSeyeonCostGovernorMaximumV1,
+  validateSeyeonCostGovernorModelPolicyV1,
+  type SeyeonCostGovernorModelPolicyV1,
+  type SeyeonCostGovernorQuoteV1,
+} from './seyeon-cost-governor-server-policy-v1.js';
 
 export const SEYEON_AI_COST_LEDGER_VERSION_V1 = 'seyeon-ai-cost-ledger-v1' as const;
 
@@ -27,6 +36,17 @@ const SETTLE_SQL = `
 select call_id::text as "callId", replayed
 from public.cmd_settle_seyeon_ai_call_v1(
   $1::uuid,$2::uuid,$3::uuid,$4::text,$5::jsonb
+)
+`.trim();
+
+const GOVERNED_START_SQL = `
+select call_id::text as "callId",
+       ceiling_micro_usd::text as "ceilingMicroUsd",
+       bucket_utc_date::text as "bucketUtcDate"
+from public.cmd_governed_start_seyeon_ai_call_v1(
+  $1::uuid,$2::uuid,$3::uuid,$4::text,$5::uuid,
+  $6::text,$7::text,$8::text,$9::text,$10::text,
+  $11::bigint,$12::bigint,$13::bigint
 )
 `.trim();
 
@@ -94,6 +114,70 @@ export async function startSeyeonAiCallV1(
     throw new Error('Se-yeon cost ledger start receipt is invalid.');
   }
   return callId;
+}
+
+export interface SeyeonGovernedStartCallV1 extends SeyeonAiCallStartV1 {
+  readonly quote: SeyeonCostGovernorQuoteV1;
+  readonly requestBodyBytes: number;
+}
+
+/** Exact call/subject binding; no identity, costs, or policy from client input. */
+export async function startGovernedSeyeonAiCallV1(
+  client: PostgresTransactionQueryV1,
+  binding: SeyeonAiCostLedgerBindingV1,
+  call: SeyeonGovernedStartCallV1,
+): Promise<{ callId: string; ceilingMicroUsd: bigint; bucketUtcDate: string }> {
+  const args = bindingParams(binding);
+  const callId = uuid(call.callId, 'callId');
+  if (call.purpose !== call.quote.purpose ||
+      call.providerKey !== call.quote.providerKey ||
+      call.modelKey !== call.quote.modelKey ||
+      !Number.isSafeInteger(call.requestBodyBytes) ||
+      call.requestBodyBytes < 1 ||
+      !Number.isSafeInteger(call.quote.inputCeilingTokens) ||
+      call.quote.inputCeilingTokens < 1 ||
+      !Number.isSafeInteger(call.quote.outputCeilingTokens) ||
+      call.quote.outputCeilingTokens < 1 ||
+      !Number.isSafeInteger(call.quote.ceilingMicroUsd) ||
+      call.quote.ceilingMicroUsd < 1) {
+    throw new Error('Se-yeon governed start requires an authoritative bounded quote.');
+  }
+  const result = await client.query<{
+    callId: string; ceilingMicroUsd: string; bucketUtcDate: string;
+  }>(GOVERNED_START_SQL,[
+    ...args,callId,call.purpose,call.providerKey,call.modelKey,
+    call.quote.policyVersion,call.quote.rateCardVersion,
+    call.quote.inputCeilingTokens,call.quote.outputCeilingTokens,
+    call.requestBodyBytes,
+  ]);
+  const row = result.rows[0];
+  if (result.rows.length !== 1 || row === undefined ||
+      uuid(row.callId,'response callId') !== callId ||
+      typeof row.ceilingMicroUsd !== 'string' ||
+      !/^[0-9]+$/u.test(row.ceilingMicroUsd) ||
+      BigInt(row.ceilingMicroUsd) !== BigInt(call.quote.ceilingMicroUsd) ||
+      typeof row.bucketUtcDate !== 'string' ||
+      !/^\d{4}-\d{2}-\d{2}$/u.test(row.bucketUtcDate)) {
+    throw new Error('Se-yeon governed start DB receipt disagrees with quote.');
+  }
+  return Object.freeze({
+    callId,
+    ceilingMicroUsd: BigInt(row.ceilingMicroUsd),
+    bucketUtcDate: row.bucketUtcDate,
+  });
+}
+
+/**
+ * Caller MUST supply an independently certified model input upper-bound port.
+ * Missing certification aborts before network dispatch; neither a browser
+ * count nor a crude bytes-to-tokens heuristic is acceptable.
+ */
+export interface SeyeonAiGovernorAdmissionV1 {
+  readonly policy: SeyeonCostGovernorModelPolicyV1;
+  readonly certifiedInputTokenUpperBound: (
+    request: SeyeonStructuredProviderRequestV2,
+    exactRequestBodyBytes: number,
+  ) => number | null | Promise<number | null>;
 }
 
 export async function settleSeyeonAiCallV1(
@@ -194,7 +278,24 @@ export function createPersistingSeyeonAiProviderV1(input: {
   readonly config: OpenAiSeyeonStructuredProviderConfigV1;
   readonly runner: SeyeonProductionSubjectTransactionRunnerV1;
   readonly getBinding: () => SeyeonAiCostLedgerBindingV1 | null;
+  /** Explicit opt-in, server-only. Undefined retains legacy ledger behavior. */
+  readonly governor?: SeyeonAiGovernorAdmissionV1;
 }): SeyeonStructuredProviderPortV2 {
+  if (input.governor !== undefined) {
+    const p = validateSeyeonCostGovernorModelPolicyV1(input.governor.policy);
+    const price = input.config.priceQuote;
+    if (input.config.model !== p.modelKey ||
+        input.config.maxOutputTokens !== p.maximumOutputTokens ||
+        price === undefined ||
+        price.providerKey !== p.providerKey ||
+        price.modelKey !== p.modelKey ||
+        price.priceVersion !== p.priceQuote.priceVersion ||
+        price.inputMicroUsdPerMillion !== p.priceQuote.inputMicroUsdPerMillion ||
+        price.cachedInputMicroUsdPerMillion !== p.priceQuote.cachedInputMicroUsdPerMillion ||
+        price.outputMicroUsdPerMillion !== p.priceQuote.outputMicroUsdPerMillion) {
+      throw new Error('Se-yeon governed provider is missing exact server price/output policy.');
+    }
+  }
   const descriptor = createOpenAiSeyeonStructuredProviderV1(input.config);
   return Object.freeze({
     providerKey: descriptor.providerKey,
@@ -216,9 +317,31 @@ export function createPersistingSeyeonAiProviderV1(input: {
             console.error('MYEONGHA_SEYEON_COST_BINDING_MISSING');
             throw new Error('AI cost binding is unavailable before dispatch.');
           }
-          await input.runner.run(binding.subjectId, client =>
-            startSeyeonAiCallV1(client,binding,call),
-          );
+          if (input.governor === undefined) {
+            await input.runner.run(binding.subjectId, client =>
+              startSeyeonAiCallV1(client,binding,call),
+            );
+          } else {
+            const bound = await input.governor.certifiedInputTokenUpperBound(
+              request, call.requestBodyBytes,
+            );
+            const quote = quoteSeyeonCostGovernorMaximumV1({
+              policy: input.governor.policy,
+              request: {
+                purpose: call.purpose,
+                providerKey: call.providerKey,
+                modelKey: call.modelKey,
+                verifiedInputTokenUpperBound: bound,
+                serializedRequestBytes: call.requestBodyBytes,
+                enforcedOutputTokenLimit: input.config.maxOutputTokens ?? null,
+              },
+            });
+            await input.runner.run(binding.subjectId, client =>
+              startGovernedSeyeonAiCallV1(client,binding,{
+                ...call, quote, requestBodyBytes: call.requestBodyBytes,
+              }),
+            );
+          }
           state.binding = binding;
           state.callId = call.callId;
         },
