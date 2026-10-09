@@ -3,6 +3,8 @@ import { createSeyeonOpenAiInputTokenCountAdmissionV1 } from
   '../apps/api/src/seyeon-openai-input-token-count-port-v1.js';
 import { createPersistingSeyeonAiProviderV1 } from
   '../apps/api/src/postgres-seyeon-ai-cost-ledger-v1.js';
+import type { OpenAiSeyeonStructuredProviderFetchV1 } from
+  '../apps/api/src/openai-seyeon-structured-provider-v1.js';
 import type { SeyeonCostGovernorModelPolicyV1 } from
   '../apps/api/src/seyeon-cost-governor-server-policy-v1.js';
 import type { PostgresTransactionQueryV1 } from
@@ -45,7 +47,7 @@ const modelReply=()=>Response.json({
   },
 });
 const serverKey='sk-synthetic-count-only-no-network';
-const makeConfig=(countFetch:typeof fetch)=>({
+const makeConfig=(countFetch:OpenAiSeyeonStructuredProviderFetchV1)=>({
   apiKey:serverKey,model:policy.modelKey,policy,
   reservedHeadroomTokens:64,fetchImpl:countFetch,
 });
