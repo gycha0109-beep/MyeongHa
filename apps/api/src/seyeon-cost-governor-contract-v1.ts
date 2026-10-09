@@ -93,8 +93,10 @@ function validateAmount(value: number, name: string, allowZero = false): void {
   }
 }
 function validateDate(value: string): void {
-  if (typeof value !== 'string' || !DATE_RE.test(value) ||
-      new Date(value + 'T00:00:00Z').toISOString().slice(0, 10) !== value) {
+  const parsed = typeof value === 'string' && DATE_RE.test(value)
+    ? new Date(value + 'T00:00:00Z') : null;
+  if (parsed === null || !Number.isFinite(parsed.getTime()) ||
+      parsed.toISOString().slice(0, 10) !== value) {
     throw new TypeError('Invalid Cost Governor UTC budget bucket.');
   }
 }
