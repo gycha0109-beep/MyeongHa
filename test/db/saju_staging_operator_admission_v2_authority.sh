@@ -60,6 +60,12 @@ consume() {
  if [[ $# -ge 4 ]]; then start="$4"; fi
  if [[ $# -ge 5 ]]; then expiry="$5"; fi
  cat <<SQL
+do \$permit_v2_lock\$ begin
+  perform permit_id from $t
+  where permit_id='$1'::uuid
+  and manifest_digest='$md' and connection_plan_digest='$pd'
+  for update;
+end \$permit_v2_lock\$;
 update $t
 set status='CONSUMED',consumed_at_ms=floor(extract(epoch from clock_timestamp())*1000)::bigint
 where permit_id='$1'::uuid and manifest_digest='$md' and connection_plan_digest='$pd'
