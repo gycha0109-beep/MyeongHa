@@ -277,6 +277,7 @@ export {
   admitCharacterSajuGroundingBundleViewV1,
   hashCharacterSajuGroundingBundleMaterialV1,
   selectCharacterInsightsV1,
+  selectCharacterInsightsV2,
   type CharacterGroundingAmbiguityViewV1,
   type CharacterGroundingDisclosureViewV1,
   type CharacterGroundingRealizationPolicyRefV1,
@@ -571,3 +572,13 @@ export * from './seyeon-renderer-v2.js';
 export * from './seyeon-risk-action-causality-v1.js';
 export * from './seyeon-runtime-context-v2.js';
 export * from './seyeon-turn-interpreter-v2.js';
+
+export {
+  admitCharacterRuntimeSajuGroundingV2,
+  assertCharacterRuntimeSajuGroundingV2,
+  CharacterSajuRuntimeAdmissionErrorV2,
+  type CharacterRuntimeContextV2,
+  type CharacterRuntimeContextWithGroundingV2,
+  type CharacterSajuRuntimeContextV2,
+  type CharacterSajuRuntimeContextWithGroundingV2,
+} from './character-saju-runtime-v2.js';

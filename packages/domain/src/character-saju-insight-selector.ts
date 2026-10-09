@@ -9,6 +9,10 @@ import {
   type CharacterSajuGroundingRefV1,
 } from './character-saju-grounding-admission.js';
 import {
+  assertCharacterRuntimeSajuGroundingV2,
+  type CharacterRuntimeContextWithGroundingV2,
+} from './character-saju-runtime-v2.js';
+import {
   CHARACTER_PERSPECTIVE_NARRATIVE_ROLES_V1,
   SAJU_GROUNDING_AXIS_KEYS_V1,
   type CharacterPerspectiveGroundingAxisKeyV1,
@@ -709,13 +713,44 @@ function assertSelectorContext(input: {
   return saju.groundingRef;
 }
 
+type CharacterSajuSelectionAdmittedInput = {
+  readonly context: Pick<CharacterRuntimeContextWithGroundingV1, 'characterId'>;
+  readonly grounding: unknown;
+  readonly perspective: CharacterPerspectiveProfileV1;
+  readonly requestedDomain: SajuDomain;
+};
+
 export function selectCharacterInsightsV1(input: {
   readonly context: CharacterRuntimeContextWithGroundingV1;
   readonly grounding: unknown;
   readonly perspective: CharacterPerspectiveProfileV1;
   readonly requestedDomain: SajuDomain;
 }): CharacterInsightSelectionV1 {
-  const groundingRef = assertSelectorContext(input);
+  return selectCharacterInsightsFromAdmittedContextV2(input, assertSelectorContext(input));
+}
+
+/** V2 accepts only a WeakSet-admitted official standard Reader runtime. */
+export function selectCharacterInsightsV2(input: {
+  readonly context: CharacterRuntimeContextWithGroundingV2;
+  readonly grounding: unknown;
+  readonly perspective: CharacterPerspectiveProfileV1;
+  readonly requestedDomain: SajuDomain;
+}): CharacterInsightSelectionV1 {
+  const groundingRef = assertCharacterRuntimeSajuGroundingV2(input);
+  if (input.perspective.characterId !== input.context.characterId ||
+      input.perspective.sourceContentVersion !== input.context.contentVersion ||
+      input.perspective.sourceSajuProfileVersion !== input.context.sajuProfile.profileVersion) {
+    throw new CharacterInsightSelectionErrorV1(
+      'V2 Character perspective is stale or belongs to another Reader.',
+    );
+  }
+  return selectCharacterInsightsFromAdmittedContextV2(input, groundingRef);
+}
+
+function selectCharacterInsightsFromAdmittedContextV2(
+  input: CharacterSajuSelectionAdmittedInput,
+  groundingRef: CharacterSajuGroundingRefV1,
+): CharacterInsightSelectionV1 {
   const grounding = admitCharacterSajuGroundingBundleViewV1({
     candidate: input.grounding,
     expectedRef: groundingRef,
