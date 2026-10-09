@@ -18,6 +18,12 @@ import {
   type CharacterSajuUtteranceV1,
 } from '../../../packages/domain/src/index.js';
 import { ApiCommandError } from './api-error.js';
+import type { ProductReaderEligibilityAuthorityPortV1 } from './product-reader-eligibility-policy-v1.js';
+import {
+  prepareOfficialReadingReaderAdmissionV1,
+  consumeOfficialReadingReaderAdmissionV1,
+  OfficialReadingReaderAdmissionErrorV1,
+} from './official-reading-reader-admission-v1.js';
 import {
   projectOfficialStandardReadingToProtectedCharacterSajuContextV1,
 } from './character-standard-reading-protected-context.js';
@@ -132,6 +138,11 @@ export interface RunThreadBoundReaderInterpretationPreviewInputV1 {
   readonly memoryGrantsAuthorityPort: MemoryGrantsReadAuthorityPortV1;
   readonly nonMemoryContextAuthorityPort: ReaderContextLifeFactsReadAuthorityPortV1;
   readonly groundingProjectionPort: OfficialReadingCharacterGroundingProjectionPortV1;
+  /**
+   * Product/Commerce server-only authority. Missing authority fails closed:
+   * it cannot be substituted with a hard-coded standard Product or Reader role.
+   */
+  readonly productReaderEligibilityAuthorityPort?: ProductReaderEligibilityAuthorityPortV1;
   /**
    * Optional production-only release admission after authoritative Thread
    * and Official Reading have been re-resolved. This is NOT a grant.
@@ -545,6 +556,49 @@ export async function runThreadBoundReaderInterpretationPreviewV1(
     );
   }
 
+  // A2-gamma: no Product-owned policy authority means NO raw Official
+  // Reading, no optional fallback, and no Saju grounding request.
+  if (!input.productReaderEligibilityAuthorityPort) {
+    throw new ReaderInterpretationPreviewRuntimeErrorV1(
+      'ACCESS_DENIED',
+      'Approved Reader Product policy authority is unavailable.',
+    );
+  }
+
+  // The candidate restriction is independent of product eligibility. Check
+  // it against the owned Thread Reader BEFORE querying the raw artifact.
+  if (initialThreadBinding.participantCharacterIds.length !== 1 ||
+      !initialThreadBinding.participantCharacterIds[0]) {
+    throw new ReaderInterpretationPreviewRuntimeErrorV1(
+      'ACCESS_DENIED',
+      'Reader interpretation requires one server-owned Reader.',
+    );
+  }
+  input.admitServerReader?.(initialThreadBinding.participantCharacterIds[0]);
+
+  let admission;
+  try {
+    admission = await prepareOfficialReadingReaderAdmissionV1({
+      resolvedSubjectId: subjectId,
+      threadId: input.threadId,
+      readingId: officialReadingId,
+      effectiveAt,
+      contentEntry,
+      threadBindingAuthorityPort: input.threadBindingAuthorityPort,
+      accessAuthorityPort: input.accessAuthorityPort,
+      artifactAuthorityPort: input.artifactAuthorityPort,
+      productReaderEligibilityAuthorityPort: input.productReaderEligibilityAuthorityPort,
+    });
+  } catch (error) {
+    if (error instanceof OfficialReadingReaderAdmissionErrorV1) {
+      throw new ReaderInterpretationPreviewRuntimeErrorV1(
+        'ACCESS_DENIED',
+        'Official Reading Reader admission is unavailable.',
+      );
+    }
+    throw error;
+  }
+
   let prepared;
   try {
     prepared = await prepareCharacterStandardReadingServerRuntimeV1({
@@ -572,7 +626,58 @@ export async function runThreadBoundReaderInterpretationPreviewV1(
     throw error;
   }
 
-  input.admitServerReader?.(prepared.source.readerCharacterId);
+  // The existing Character V1 assembler re-reads current DB authorities.
+  // Any drift between its source and the A2-beta admission proof denies
+  // before Saju transport. A3 replaces the legacy capability gate separately.
+  const verified = admission.scope;
+  const current = prepared.source;
+  if (
+    prepared.threadBinding.threadId !== verified.threadId ||
+    prepared.threadBinding.contentRevision !== verified.contentRevision ||
+    prepared.threadBinding.activeContentReleaseId !== verified.contentReleaseId ||
+    prepared.threadBinding.activeContentBundleId !== verified.readerContentBundleId ||
+    prepared.threadBinding.participantCharacterIds.length !== 1 ||
+    prepared.threadBinding.participantCharacterIds[0] !== verified.readerCharacterId ||
+    prepared.context.characterId !== verified.readerCharacterId ||
+    current.subjectId !== verified.subjectId ||
+    current.readingId !== verified.readingId ||
+    current.readerCharacterId !== verified.readerCharacterId ||
+    current.readerContentBundleId !== verified.readerContentBundleId ||
+    current.productId !== verified.productId ||
+    current.productSpecVersion !== verified.productSpecVersion ||
+    current.sajuDomain !== verified.sajuDomain ||
+    current.readingContractVersion !== verified.readingContractVersion ||
+    current.responseHash !== verified.officialArtifactResponseHash
+  ) {
+    throw new ReaderInterpretationPreviewRuntimeErrorV1(
+      'SOURCE_MISMATCH',
+      'Official Reading source or Reader identity changed after server admission.',
+    );
+  }
+  try {
+    consumeOfficialReadingReaderAdmissionV1({
+      ticket: admission.ticket,
+      expectedScope: Object.freeze({
+        ...verified,
+        subjectId: current.subjectId,
+        readingId: current.readingId,
+        readerCharacterId: current.readerCharacterId,
+        readerContentBundleId: current.readerContentBundleId,
+        contentReleaseId: prepared.threadBinding.activeContentReleaseId,
+        contentRevision: prepared.threadBinding.contentRevision,
+        productId: current.productId,
+        productSpecVersion: current.productSpecVersion,
+        sajuDomain: current.sajuDomain,
+        readingContractVersion: current.readingContractVersion,
+        officialArtifactResponseHash: current.responseHash,
+      }),
+    });
+  } catch {
+    throw new ReaderInterpretationPreviewRuntimeErrorV1(
+      'ACCESS_DENIED',
+      'Reader admission proof is no longer valid.',
+    );
+  }
 
   return renderResolvedReaderInterpretationPreviewV1({
     source: prepared.source,
