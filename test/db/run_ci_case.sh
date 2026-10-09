@@ -245,6 +245,10 @@ SQL
     apply_pg17_migrations_without_birth_authority
     bash test/db/member_character_thread_open_concurrency.sh
     ;;
+  saju-staging-operator-admission)
+    psql -v ON_ERROR_STOP=1 -f test/db/fixtures/saju_staging_operator_admission_schema_8c2b2d1.sql >/dev/null
+    bash test/db/saju_staging_operator_admission_authority.sh
+    ;;
   *)
     echo "Unknown DB CI case: $case_name" >&2
     exit 2
