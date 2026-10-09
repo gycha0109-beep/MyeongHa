@@ -51,6 +51,8 @@ export interface OpenAiSeyeonStructuredProviderConfigV1 {
     purpose: SeyeonStructuredProviderRequestV2['purpose'];
     providerKey: typeof OPENAI_SEYEON_STRUCTURED_PROVIDER_KEY_V1;
     modelKey: string;
+    /** Exact UTF-8 byte length of the final JSON body passed to fetch. */
+    requestBodyBytes: number;
   }>) => void | Promise<void>;
 }
 
@@ -362,6 +364,35 @@ export function createOpenAiSeyeonStructuredProviderV1(
     ): Promise<unknown> {
       const startedAt = performance.now();
       const callId = randomUUID();
+      const requestBody = JSON.stringify({
+            model,
+            ...(endpoint === 'https://ai-gateway.vercel.sh/v1/responses' && model.startsWith('openai/')
+              ? { providerOptions: { gateway: { only: ['openai'] } } }
+              : {}),
+            store: false,
+            ...(requestOutputCeiling === undefined ? {} : { max_output_tokens: requestOutputCeiling }),
+            instructions: request.instructions + '\n\n' + SEYEON_PROVIDER_UNTRUSTED_DATA_BOUNDARY_V1,
+            input: [
+              {
+                role: 'user',
+                content: [
+                  {
+                    type: 'input_text',
+                    text: JSON.stringify(request.input),
+                  },
+                ],
+              },
+            ],
+            text: {
+              format: {
+                type: 'json_schema',
+                name: responseFormatName(request),
+                strict: true,
+                schema: request.responseSchema,
+              },
+            },
+          });
+      const requestBodyBytes = new TextEncoder().encode(requestBody).byteLength;
       if (config.beforeDispatch !== undefined) {
         try {
           await config.beforeDispatch(Object.freeze({
@@ -369,10 +400,10 @@ export function createOpenAiSeyeonStructuredProviderV1(
             purpose: request.purpose,
             providerKey: OPENAI_SEYEON_STRUCTURED_PROVIDER_KEY_V1,
             modelKey: model,
+            requestBodyBytes,
           }));
         } catch {
-          // No external call has been made, so no provider cost event is emitted.
-          // Never surface DB diagnostics, caller identities, prompts, or credentials.
+          // Never dispatch if admission fails. Do not disclose secrets/DB details.
           throw new OpenAiSeyeonStructuredProviderErrorV1(
             'PRE_DISPATCH_REJECTED',
             'OpenAI structured request was rejected before provider dispatch.',
@@ -413,34 +444,7 @@ export function createOpenAiSeyeonStructuredProviderV1(
             'content-type': 'application/json',
             'x-client-request-id': callId,
           },
-          body: JSON.stringify({
-            model,
-            ...(endpoint === 'https://ai-gateway.vercel.sh/v1/responses' && model.startsWith('openai/')
-              ? { providerOptions: { gateway: { only: ['openai'] } } }
-              : {}),
-            store: false,
-            ...(requestOutputCeiling === undefined ? {} : { max_output_tokens: requestOutputCeiling }),
-            instructions: request.instructions + '\n\n' + SEYEON_PROVIDER_UNTRUSTED_DATA_BOUNDARY_V1,
-            input: [
-              {
-                role: 'user',
-                content: [
-                  {
-                    type: 'input_text',
-                    text: JSON.stringify(request.input),
-                  },
-                ],
-              },
-            ],
-            text: {
-              format: {
-                type: 'json_schema',
-                name: responseFormatName(request),
-                strict: true,
-                schema: request.responseSchema,
-              },
-            },
-          }),
+          body: requestBody,
           redirect: 'error',
           signal: controller.signal,
         });
