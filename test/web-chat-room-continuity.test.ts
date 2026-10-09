@@ -13,7 +13,7 @@ describe('Web Character Room continuous open and resume', () => {
     ]);
     expect(command).toContain('reuse it when present, otherwise create it atomically');
     expect(command).toContain('if v_existing_count = 1 then');
-    expect(client).toContain("endpoint = CHAT_OPEN_ENDPOINT_V1");
+    expect(client).toContain("const endpoint = options.endpoint ?? CHAT_OPEN_ENDPOINT_V1;");
     expect(runtime).toContain('openForCanonicalCharacter({');
     expect(runtime).toContain('threadId = opened.threadId');
     expect(runtime).toContain("window.history.replaceState(window.history.state, '', buildChatThreadUrlV1(threadId))");
