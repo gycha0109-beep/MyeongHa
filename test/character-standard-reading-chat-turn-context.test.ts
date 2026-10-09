@@ -1287,10 +1287,9 @@ describe('A3-epsilon server-only Official Standard Reader Chat V2 preflight (pub
 
   it('rejects missing approved Product authority before raw Official Reading access', async () => {
     const args = input();
-    await expect(prepareCharacterStandardReadingChatTurnPreflightV2({
-      ...args,
-      productReaderEligibilityAuthorityPort: undefined,
-    })).rejects.toMatchObject({ code: 'ACCESS_DENIED' });
+    const { productReaderEligibilityAuthorityPort: _missing, ...withoutPolicy } = args;
+    await expect(prepareCharacterStandardReadingChatTurnPreflightV2(withoutPolicy))
+      .rejects.toMatchObject({ code: 'ACCESS_DENIED' });
     expect(args.accessAuthorityPort.readAccessibleReadings).not.toHaveBeenCalled();
     expect(args.artifactAuthorityPort.readArtifactSource).not.toHaveBeenCalled();
   });
@@ -1364,7 +1363,7 @@ describe('A3-epsilon server-only Official Standard Reader Chat V2 preflight (pub
           ...(reads < 3 ? {} : { allowedReaderIds: ['baekheon'] }),
         },
       };
-    });
+    }) as never;
     await expect(prepareCharacterStandardReadingChatTurnPreflightV2(args))
       .rejects.toMatchObject({ code: 'ACCESS_DENIED' });
     expect(reads).toBe(3);
