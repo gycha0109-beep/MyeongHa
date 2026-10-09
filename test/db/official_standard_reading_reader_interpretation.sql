@@ -552,6 +552,70 @@ select pg_temp.assert_v2_true(
   )
 );
 
+-- A v2 bind replay returns immutable purchase provenance even after the
+-- underlying purchase-backed Reader A Grant was revoked. It must NEVER be
+-- mistaken for fresh interpretation/Reading access: the separate runtime
+-- metadata and raw artifact queries are the current authorization gates.
+select pg_temp.assert_v2_true(
+  'revoked Reader v2 binding replay is provenance, not current access',
+  (
+    select result.replayed = true
+       and result.official_reading_created = false
+       and result.interpretation_created = false
+       and result.reader_character_id = 'test-standard-reader'
+       and result.reading_id = '12103100-0000-0000-0000-000000000001'::uuid
+    from public.cmd_bind_standard_reading_access_v2(
+      '11390000-0000-0000-0000-000000000001',
+      '11392300-0000-0000-0000-000000000001',
+      '12103000-0000-0000-0000-000000000097',
+      '12103100-0000-0000-0000-000000000097',
+      'sha256:v1:1111111111111111111111111111111111111111111111111111111111111111',
+      'standard-reading-access-bind-v2',
+      '{"schemaVersion":"standard-reading-access-bind-v2","purchaseIntentId":"11392300-0000-0000-0000-000000000001"}'::jsonb
+    ) result
+  )
+  and not exists (
+    select 1 from public.qry_character_standard_reading_access_runtime_v2(
+      '11390000-0000-0000-0000-000000000001',
+      'test-standard-reader',
+      clock_timestamp()
+    )
+  )
+  and not exists (
+    select 1 from public.internal_qry_standard_reading_artifact_source_v2(
+      '11390000-0000-0000-0000-000000000001',
+      '12103100-0000-0000-0000-000000000001',
+      'test-standard-reader',
+      clock_timestamp()
+    )
+  )
+  and exists (
+    select 1 from public.qry_character_standard_reading_access_runtime_v2(
+      '11390000-0000-0000-0000-000000000001',
+      'test-unlockable-reader',
+      clock_timestamp()
+    )
+  )
+  and (select count(*) = 1 from public.standard_reading_official_bindings)
+  and (select count(*) = 2 from public.standard_reading_reader_access_grants)
+);
+
+select pg_temp.assert_v2_fails(
+  'revoked Reader binding replay still rejects different request hash',
+  $sql$
+    select 1 from public.cmd_bind_standard_reading_access_v2(
+      '11390000-0000-0000-0000-000000000001',
+      '11392300-0000-0000-0000-000000000001',
+      '12103000-0000-0000-0000-000000000096',
+      '12103100-0000-0000-0000-000000000096',
+      'sha256:v1:3333333333333333333333333333333333333333333333333333333333333333',
+      'standard-reading-access-bind-v2',
+      '{"schemaVersion":"standard-reading-access-bind-v2","purchaseIntentId":"11392300-0000-0000-0000-000000000001"}'::jsonb
+    )
+  $sql$,
+  'cmd_standard_reading_access_v2_binding_conflict'
+);
+
 select pg_temp.assert_v2_true(
   'Reader-scoped raw source denies revoked Reader A and permits active Reader B',
   not exists (
