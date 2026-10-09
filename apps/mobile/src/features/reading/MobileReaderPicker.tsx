@@ -7,6 +7,7 @@ import {
   type MobileReaderPresentationIdV1,
   isMobileReaderPreviewSelectableV1,
 } from '@/features/reading/mobile-reader-presentation';
+import { createMobileReaderAccessViewStateV1 } from '@/features/reading/mobile-reader-access-view-model';
 import { mobileColors } from '@/ui/mobile-colors';
 
 interface MobileReaderPickerPropsV1 {
@@ -45,6 +46,7 @@ export function MobileReaderPicker({ selected, onChange, vertical }: MobileReade
         <View style={styles.grid}>
           {MOBILE_READER_PRESENTATIONS_V1.map((option) => {
             const available = isMobileReaderPreviewSelectableV1(option.key);
+            const accessView = createMobileReaderAccessViewStateV1(option.key);
             return (
             <Pressable
               key={option.key}
@@ -63,7 +65,11 @@ export function MobileReaderPicker({ selected, onChange, vertical }: MobileReade
                 {option.name}
               </Text>
               <Text style={[styles.optionTitle, effectiveSelected === option.key && styles.selectedText]}>
-                {available ? option.title : '컨셉 준비 중'}
+                {option.title}
+              </Text>
+              <Text style={styles.optionTone}>{option.tone}</Text>
+              <Text style={styles.optionStatus}>
+                {accessView.previewPresentation === 'preview_available' ? '프리뷰만' : '컨셉 준비 중'}
               </Text>
             </Pressable>
             );
@@ -71,6 +77,7 @@ export function MobileReaderPicker({ selected, onChange, vertical }: MobileReade
         </View>
       ) : null}
       <Text style={styles.notice}>현재 세연만 프리뷰 장면을 선택할 수 있으며, 유료 Reader 해석은 아직 공개되지 않았습니다.</Text>
+      <Text style={styles.notice}>Reader 표시와 프리뷰 선택은 상품 지원, 구매 접근권, 공개 승인 또는 공식 Reading 열람 권한을 뜻하지 않습니다. 이 권한들은 서버가 각각 확인해야 합니다.</Text>
       <Text style={styles.notice}>
         {vertical === 'saju'
           ? '선택한 Reader는 현재 사주 프리뷰 화면의 표시만 바꿉니다. 해석 근거와 내용은 변경되지 않습니다.'
@@ -91,11 +98,13 @@ const styles = StyleSheet.create({
   action: { minHeight: 42, paddingHorizontal: 16, borderRadius: 12, borderWidth: 1, borderColor: mobileColors.border, justifyContent: 'center' },
   actionText: { color: mobileColors.navy, fontSize: 13, fontWeight: '800' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  option: { width: '31%', minHeight: 65, borderWidth: 1, borderColor: mobileColors.border, borderRadius: 12, alignItems: 'center', justifyContent: 'center', gap: 3, backgroundColor: mobileColors.canvas, padding: 5 },
+  option: { width: '31%', minHeight: 116, borderWidth: 1, borderColor: mobileColors.border, borderRadius: 12, alignItems: 'center', justifyContent: 'center', gap: 3, backgroundColor: mobileColors.canvas, padding: 5 },
   selected: { backgroundColor: mobileColors.navy, borderColor: mobileColors.navy },
   unavailable: { opacity: 0.5 },
   optionName: { color: mobileColors.ink, fontSize: 14, fontWeight: '800' },
   optionTitle: { color: mobileColors.muted, fontSize: 10, textAlign: 'center' },
+  optionTone: { color: mobileColors.muted, fontSize: 10, lineHeight: 14, textAlign: 'center' },
+  optionStatus: { color: mobileColors.gold, fontSize: 10, fontWeight: '800', textAlign: 'center' },
   selectedText: { color: mobileColors.surface },
   notice: { color: mobileColors.muted, fontSize: 11, lineHeight: 17 },
 });
