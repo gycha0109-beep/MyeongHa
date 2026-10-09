@@ -111,44 +111,54 @@ export function createSeyeonOpenAiInputTokenCountAdmissionV1(
       const timeout = setTimeout(() => controller.abort(),limitMs);
       let result: Response;
       try {
-        result = await send(SEYEON_OPENAI_INPUT_TOKEN_COUNT_ENDPOINT_V1,{
-          method:'POST',
-          headers:{
-            authorization:'Bearer '+config.apiKey,
-            accept:'application/json',
-            'content-type':'application/json',
-          },
-          body:countBody,
-          signal:controller.signal,
-          redirect:'error',
-        });
+        try {
+          result = await send(SEYEON_OPENAI_INPUT_TOKEN_COUNT_ENDPOINT_V1,{
+            method:'POST',
+            headers:{
+              authorization:'Bearer '+config.apiKey,
+              accept:'application/json',
+              'content-type':'application/json',
+            },
+            body:countBody,
+            signal:controller.signal,
+            redirect:'error',
+          });
+        } catch {
+          throw new Error('Input token count request failed or exceeded its deadline.');
+        }
+        if (!result.ok ||
+            !(result.headers.get('content-type') ?? '').toLowerCase()
+              .includes('application/json')) {
+          throw new Error('Input token count provider declined or returned unknown format.');
+        }
+        let bytes: string;
+        try {
+          bytes = await result.text();
+        } catch {
+          throw new Error('Input token count response body failed or timed out.');
+        }
+        if (new TextEncoder().encode(bytes).byteLength>8192) {
+          throw new Error('Input token count response was oversized.');
+        }
+        let payload: unknown;
+        try { payload=JSON.parse(bytes); }
+        catch { throw new Error('Input token count response is invalid JSON.'); }
+        if (!isRecord(payload) ||
+            payload.object !== 'response.input_tokens' ||
+            !Number.isSafeInteger(payload.input_tokens) ||
+            (payload.input_tokens as number)<1) {
+          throw new Error('Input token count receipt is malformed.');
+        }
+        const resultUpperBound=(payload.input_tokens as number)+config.reservedHeadroomTokens;
+        if (!Number.isSafeInteger(resultUpperBound) ||
+            resultUpperBound>policy.maximumInputTokens) {
+          throw new Error('Input token count exceeds approved model budget.');
+        }
+        return resultUpperBound;
+
       } finally {
         clearTimeout(timeout);
       }
-      if (!result.ok ||
-          !(result.headers.get('content-type') ?? '').toLowerCase()
-            .includes('application/json')) {
-        throw new Error('Input token count provider declined or returned unknown format.');
-      }
-      const bytes = await result.text();
-      if (new TextEncoder().encode(bytes).byteLength>8192) {
-        throw new Error('Input token count response was oversized.');
-      }
-      let payload: unknown;
-      try { payload=JSON.parse(bytes); }
-      catch { throw new Error('Input token count response is invalid JSON.'); }
-      if (!isRecord(payload) ||
-          payload.object !== 'response.input_tokens' ||
-          !Number.isSafeInteger(payload.input_tokens) ||
-          (payload.input_tokens as number)<1) {
-        throw new Error('Input token count receipt is malformed.');
-      }
-      const resultUpperBound=(payload.input_tokens as number)+config.reservedHeadroomTokens;
-      if (!Number.isSafeInteger(resultUpperBound) ||
-          resultUpperBound>policy.maximumInputTokens) {
-        throw new Error('Input token count exceeds approved model budget.');
-      }
-      return resultUpperBound;
     },
   });
 }
