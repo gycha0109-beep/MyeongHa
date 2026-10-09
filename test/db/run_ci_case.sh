@@ -178,6 +178,7 @@ case "$case_name" in
   reader-memory-tenant-boundary)
     apply_standard_migrations
     psql -v ON_ERROR_STOP=1 -f test/db/reader_memory_tenant_boundary_v1.sql
+    bash test/db/seyeon_atomic_memory_grant_race_v1.sh
     ;;
   runtime-function-api-role-acl)
     apply_standard_migrations
