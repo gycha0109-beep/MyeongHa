@@ -9,7 +9,8 @@
       "guest-bootstrap-runtime",
       "records-production-read-authority",
       "runtime-function-api-role-acl",
-      "self-birth-profile-current"
+      "self-birth-profile-current",
+      "saju-staging-operator-admission"
     ]
   },
   "content": {
@@ -56,7 +57,8 @@
       "guest-promotion-auth-fk",
       "birth-profile-create-runtime-authority",
       "content-release-lifecycle",
-      "member-character-thread-open"
+      "member-character-thread-open",
+      "saju-staging-operator-admission"
     ]
   }
 }
