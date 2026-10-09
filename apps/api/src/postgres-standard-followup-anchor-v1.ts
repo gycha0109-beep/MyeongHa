@@ -134,7 +134,9 @@ export function createPostgresStandardFollowupAnchorAuthorityPortV1(
   client: PostgresTransactionQueryV1,
 ): ValidatedStandardFollowupAnchorAuthorityPortV1 {
   return Object.freeze({
-    async readLatestValidatedAnchor(scope) {
+    async readLatestValidatedAnchor(
+      scope: Parameters<ValidatedStandardFollowupAnchorAuthorityPortV1['readLatestValidatedAnchor']>[0],
+    ): Promise<ValidatedStandardFollowupAnchorV1 | null> {
       validateInput(scope);
       let rows: readonly AnchorRowV1[];
       try {
