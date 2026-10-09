@@ -34,18 +34,18 @@ export interface SeyeonAiAttributedCallV1 {
 const allowedPurposes: Readonly<Record<
   SeyeonAiAttributionStageV1, readonly SeyeonStructuredPurposeV2[]
 >> = Object.freeze({
-  preflight: Object.freeze([
+  preflight: [
     'integrity_classification',
     'disclosure_classification',
     'unified_preflight_shadow',
-  ]),
-  interpretation: Object.freeze([
+  ],
+  interpretation: [
     'turn_interpretation',
     'turn_interpret_render_shadow',
-  ]),
-  dialogue_render: Object.freeze(['dialogue_render']),
-  semantic_review: Object.freeze(['semantic_review']),
-  event_extraction: Object.freeze(['event_extraction']),
+  ],
+  dialogue_render: ['dialogue_render'],
+  semantic_review: ['semantic_review'],
+  event_extraction: ['event_extraction'],
 });
 
 function serverId(value: string, field: string): string {
