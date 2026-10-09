@@ -23,7 +23,7 @@ begin
   v_denied:=false;
   begin
     update public.seyeon_ai_governor_model_policies_v1
-    set input_micro_usd_per_million=2_000_000
+    set input_micro_usd_per_million=2000000
     where policy_version='offline-policy-v1';
   exception when check_violation then
     v_denied:=true;
