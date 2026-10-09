@@ -134,8 +134,11 @@ describe('A1 Product × Reader eligibility (no grants, checkout or public activa
   });
 
   it.each([
-    [], ['seyeon', 'seyeon'], ['unknown'], ['seyeon', 'unknown'],
-  ])('denies malformed premium allowlists %j', (allowedReaderIds) => {
+    { allowedReaderIds: [] },
+    { allowedReaderIds: ['seyeon', 'seyeon'] },
+    { allowedReaderIds: ['unknown'] },
+    { allowedReaderIds: ['seyeon', 'unknown'] },
+  ])('denies malformed premium allowlists $allowedReaderIds', ({ allowedReaderIds }) => {
     const rule = {
       ...((approvedPremium(['seyeon']) as Extract<ProductReaderRuleLookupV1, { status: 'approved' }>).rule),
       allowedReaderIds,
