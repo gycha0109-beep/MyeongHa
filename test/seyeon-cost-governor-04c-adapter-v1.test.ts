@@ -8,6 +8,7 @@ import type {
   SeyeonProductionSubjectTransactionRunnerV1,
 } from '../apps/api/src/seyeon-production-subject-transaction-v1.js';
 import type { PostgresTransactionQueryV1 } from '../apps/api/src/postgres-subject-execution.js';
+import type { SeyeonStructuredProviderRequestV2 } from '../apps/api/src/seyeon-character-runtime-v2.js';
 import type { SeyeonCostGovernorModelPolicyV1 } from '../apps/api/src/seyeon-cost-governor-server-policy-v1.js';
 
 const subjectId = '11111111-1111-4111-8111-111111111111';
@@ -93,7 +94,7 @@ describe('Se-yeon 04C governed provider adapter (fake HTTP and fake DB)', () => 
       }
       throw new Error('unexpected SQL');
     });
-    const bound = vi.fn(async (_request: typeof request, bytes:number) => {
+    const bound = vi.fn(async (_request: SeyeonStructuredProviderRequestV2, bytes:number) => {
       order.push('certify');
       expect(bytes).toBeGreaterThan(100);
       return 500;
@@ -157,7 +158,7 @@ describe('Se-yeon 04C governed provider adapter (fake HTTP and fake DB)', () => 
     const input={runner:runner(query),getBinding:()=>binding,
       governor:{policy,certifiedInputTokenUpperBound:()=>500}};
     expect(()=>createPersistingSeyeonAiProviderV1({
-      ...input,config:{...config,maxOutputTokens:undefined},
+      ...input,config:{apiKey:config.apiKey,model:config.model,priceQuote:config.priceQuote},
     })).toThrow('server price/output policy');
     expect(()=>createPersistingSeyeonAiProviderV1({
       ...input,config:{...config,priceQuote:{...config.priceQuote,
