@@ -733,6 +733,15 @@ export {
 } from './character-standard-reading-chat-grounding-v2.js';
 
 export {
+  STANDARD_FOLLOWUP_EVIDENCE_VERSION_V1,
+  CharacterStandardFollowupEvidenceErrorV1,
+  selectCharacterStandardFollowupEvidenceV1,
+  type ValidatedStandardFollowupAnchorV1,
+  type ValidatedStandardFollowupAnchorAuthorityPortV1,
+  type CharacterStandardFollowupEvidenceDecisionV1,
+} from './character-standard-reading-chat-followup-evidence-v1.js';
+
+export {
   createPostgresChatThreadRuntimeBindingAuthorityPortV1,
 } from './postgres-chat-thread-runtime-binding.js';
 
