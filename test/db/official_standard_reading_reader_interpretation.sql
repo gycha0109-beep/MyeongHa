@@ -790,4 +790,276 @@ select pg_temp.assert_v2_true(
   )
 );
 
+-- DB-C1/C2: Purchase-backed independent Grants and Reader bundle ambiguity.
+-- Extend the isolated synthetic Reader B fixture only. Never overwrite historical
+-- interpretation/access provenance or modify live Product, grants or catalog.
+insert into public.content_bundles(
+  id, content_version, content_hash, artifact_ref, artifact_schema_version,
+  min_client_capability, asset_manifest_hash, cue_schema_version,
+  manifest_jsonb, published_at
+) values (
+  '12191000-0000-0000-0000-000000000002',
+  'test-commerce-v2-reader-bundle-2',
+  'sha256:test:commerce-v2-reader-bundle-2',
+  'test://commerce-v2-reader-bundle-2',
+  'test-v1', 'test-client-v1', 'sha256:test:assets-bundle-2',
+  'test-cue-v1', '{}'::jsonb, clock_timestamp() - interval '1 day'
+);
+
+insert into public.character_runtime_catalog(
+  character_id, content_bundle_id, availability, enabled,
+  release_at, retire_at, published_at
+) values (
+  'test-unlockable-reader',
+  '12191000-0000-0000-0000-000000000002',
+  'unlockable', true, clock_timestamp() - interval '1 day', null,
+  clock_timestamp() - interval '1 day'
+);
+
+insert into public.character_capabilities(
+  id, content_bundle_id, character_id, saju_domain, role,
+  can_initiate, capability_version
+) values (
+  '12191010-0000-0000-0000-000000000002',
+  '12191000-0000-0000-0000-000000000002',
+  'test-unlockable-reader', 'relationship', 'secondary',
+  true, 'relationship-test-v2'
+);
+
+-- B2 purchases exactly the same Reader and pinned bundle as the original B1.
+-- B3 purchases the same logical Reader but a separately published bundle.
+insert into public.purchase_intents(
+  id, subject_id, product_offer_id, provider_account_link_id,
+  idempotency_key, request_hash, offer_snapshot_jsonb, offer_snapshot_hash,
+  status, created_at, updated_at,
+  expected_amount_minor, expected_currency, charge_terms_version,
+  capability_set_id, capability_snapshot_jsonb, capability_snapshot_hash
+)
+select x.intent_id::uuid, pi.subject_id, pi.product_offer_id,
+       pi.provider_account_link_id, x.idempotency_key, x.request_hash,
+       pi.offer_snapshot_jsonb, pi.offer_snapshot_hash,
+       'created', clock_timestamp(), clock_timestamp(),
+       pi.expected_amount_minor, pi.expected_currency, pi.charge_terms_version,
+       pi.capability_set_id, pi.capability_snapshot_jsonb,
+       pi.capability_snapshot_hash
+from public.purchase_intents pi
+cross join (values
+  ('12192300-0000-0000-0000-000000000002', 'reader-b2-independent-purchase', 'sha256:test:reader-b2-independent-purchase'),
+  ('12192300-0000-0000-0000-000000000003', 'reader-b3-other-bundle-purchase', 'sha256:test:reader-b3-other-bundle-purchase')
+) as x(intent_id, idempotency_key, request_hash)
+where pi.id = '12102300-0000-0000-0000-000000000001';
+
+insert into public.purchase_intent_reader_selections(
+  purchase_intent_id, product_id, reader_character_id,
+  reader_content_bundle_id, selection_contract_version,
+  selection_snapshot_jsonb, selection_hash, created_at
+)
+select x.intent_id::uuid, sel.product_id, sel.reader_character_id,
+       x.bundle_id::uuid, sel.selection_contract_version,
+       pg_catalog.jsonb_set(sel.selection_snapshot_jsonb, '{readerContentBundleId}',
+         to_jsonb(x.bundle_id)),
+       x.selection_hash, clock_timestamp()
+from public.purchase_intent_reader_selections sel
+cross join (values
+  ('12192300-0000-0000-0000-000000000002', '11391000-0000-0000-0000-000000000001', 'sha256:test:reader-b2-selection'),
+  ('12192300-0000-0000-0000-000000000003', '12191000-0000-0000-0000-000000000002', 'sha256:test:reader-b3-selection')
+) as x(intent_id, bundle_id, selection_hash)
+where sel.purchase_intent_id = '12102300-0000-0000-0000-000000000001';
+
+update public.purchase_intents
+set status = 'verified', updated_at = clock_timestamp()
+where id in (
+  '12192300-0000-0000-0000-000000000002',
+  '12192300-0000-0000-0000-000000000003'
+);
+
+insert into public.commerce_receipts(
+  id, subject_id, purchase_intent_id, product_offer_id,
+  platform, provider, external_transaction_id,
+  receipt_fingerprint, verification_status, verified_payload_jsonb,
+  verified_at, created_at, environment, verifier_revision,
+  verified_amount_minor, verified_currency
+)
+select x.receipt_id::uuid, cr.subject_id, x.intent_id::uuid,
+       cr.product_offer_id, cr.platform, cr.provider, x.transaction_id,
+       x.fingerprint, cr.verification_status, cr.verified_payload_jsonb,
+       clock_timestamp(), clock_timestamp(), cr.environment,
+       cr.verifier_revision, cr.verified_amount_minor, cr.verified_currency
+from public.commerce_receipts cr
+cross join (values
+  ('12192000-0000-0000-0000-000000000002', '12192300-0000-0000-0000-000000000002',
+   'tx-official-reader-b2', 'hmac-sha256:k1:3333333333333333333333333333333333333333333333333333333333333333'),
+  ('12192000-0000-0000-0000-000000000003', '12192300-0000-0000-0000-000000000003',
+   'tx-official-reader-b3', 'hmac-sha256:k1:4444444444444444444444444444444444444444444444444444444444444444')
+) as x(receipt_id, intent_id, transaction_id, fingerprint)
+where cr.id = '12102000-0000-0000-0000-000000000002';
+
+select * from public.internal_apply_verified_receipt_capability_effects_v1(
+  '12192000-0000-0000-0000-000000000002',
+  array['test-reader-unit'], array[transaction_timestamp()],
+  array[transaction_timestamp()], array[null]::timestamptz[],
+  array[null]::text[]
+);
+
+select pg_temp.assert_v2_true(
+  'DB-C1 B2 has a distinct verified receipt-backed active purchase Grant',
+  exists (
+    select 1
+    from public.entitlement_grants g
+    join public.commerce_receipts cr on cr.id = g.source_receipt_id
+    where cr.purchase_intent_id = '12192300-0000-0000-0000-000000000002'
+      and g.subject_id = '11390000-0000-0000-0000-000000000001'
+      and g.grant_source_type = 'purchase'
+      and g.status = 'active'
+  )
+);
+
+select pg_temp.assert_v2_true(
+  'DB-C1 independent B2 bind reuses one committed official Reading',
+  (
+    select result.reading_id = '12103100-0000-0000-0000-000000000001'::uuid
+       and result.reader_character_id = 'test-unlockable-reader'
+       and result.reader_content_bundle_id = '11391000-0000-0000-0000-000000000001'::uuid
+       and result.official_reading_created = false
+       and result.interpretation_created = false
+       and result.replayed = false
+    from public.cmd_bind_standard_reading_access_v2(
+      '11390000-0000-0000-0000-000000000001',
+      '12192300-0000-0000-0000-000000000002',
+      '12193000-0000-0000-0000-000000000002',
+      '12193100-0000-0000-0000-000000000002',
+      'sha256:v1:5555555555555555555555555555555555555555555555555555555555555555',
+      'standard-reading-access-bind-v2',
+      '{"schemaVersion":"standard-reading-access-bind-v2","purchaseIntentId":"12192300-0000-0000-0000-000000000002"}'::jsonb
+    ) result
+  )
+);
+
+select pg_temp.assert_v2_true(
+  'DB-C1 same-Reader same-bundle independent Grants collapse to one metadata row',
+  (select count(*) = 1
+   from public.qry_character_standard_reading_access_runtime_v2(
+     '11390000-0000-0000-0000-000000000001',
+     'test-unlockable-reader', clock_timestamp()
+   ))
+  and (select count(*) = 2
+       from public.standard_reading_reader_access_grants
+       where reader_character_id = 'test-unlockable-reader')
+  and (select count(*) = 1 from public.standard_reading_official_bindings)
+);
+
+-- Revoke original B1 alone. B2 must preserve access without rewriting B1.
+update public.entitlement_grants g
+set status = 'revoked', revision = revision + 1,
+    last_effective_at = clock_timestamp(), updated_at = clock_timestamp()
+from public.standard_reading_reader_access_grants a
+where a.purchase_intent_id = '12102300-0000-0000-0000-000000000001'
+  and a.entitlement_grant_id = g.id;
+
+select pg_temp.assert_v2_true(
+  'DB-C1 revoking B1 retains B2 exact Reader access and official source',
+  (select count(*) = 1
+   from public.qry_character_standard_reading_access_runtime_v2(
+     '11390000-0000-0000-0000-000000000001',
+     'test-unlockable-reader', clock_timestamp()
+   ))
+  and exists (
+    select 1 from public.internal_qry_standard_reading_artifact_source_v2(
+      '11390000-0000-0000-0000-000000000001',
+      '12103100-0000-0000-0000-000000000001',
+      'test-unlockable-reader', clock_timestamp()
+    )
+  )
+  and (select count(*) = 1 from public.standard_reading_official_bindings)
+);
+
+-- DB-C2 creates another independently verified purchase of the same Reader
+-- against a DIFFERENT published content bundle. The exact-one A2 chooser must
+-- reject the two distinct metadata candidates rather than select one.
+select * from public.internal_apply_verified_receipt_capability_effects_v1(
+  '12192000-0000-0000-0000-000000000003',
+  array['test-reader-unit'], array[transaction_timestamp()],
+  array[transaction_timestamp()], array[null]::timestamptz[],
+  array[null]::text[]
+);
+
+select pg_temp.assert_v2_true(
+  'DB-C2 other-bundle B3 binds same official Reading but distinct bundle provenance',
+  (
+    select result.reading_id = '12103100-0000-0000-0000-000000000001'::uuid
+       and result.reader_character_id = 'test-unlockable-reader'
+       and result.reader_content_bundle_id = '12191000-0000-0000-0000-000000000002'::uuid
+       and result.official_reading_created = false
+       and result.interpretation_created = false
+    from public.cmd_bind_standard_reading_access_v2(
+      '11390000-0000-0000-0000-000000000001',
+      '12192300-0000-0000-0000-000000000003',
+      '12193000-0000-0000-0000-000000000003',
+      '12193100-0000-0000-0000-000000000003',
+      'sha256:v1:6666666666666666666666666666666666666666666666666666666666666666',
+      'standard-reading-access-bind-v2',
+      '{"schemaVersion":"standard-reading-access-bind-v2","purchaseIntentId":"12192300-0000-0000-0000-000000000003"}'::jsonb
+    ) result
+  )
+);
+
+select pg_temp.assert_v2_true(
+  'DB-C2 active different bundles remain as TWO rows for exact-one A2 denial',
+  (select count(*) = 2 from public.qry_character_standard_reading_access_runtime_v2(
+    '11390000-0000-0000-0000-000000000001',
+    'test-unlockable-reader', clock_timestamp()
+  ))
+  and (select count(distinct reader_content_bundle_id) = 2
+       from public.qry_character_standard_reading_access_runtime_v2(
+         '11390000-0000-0000-0000-000000000001',
+         'test-unlockable-reader', clock_timestamp()
+       ))
+  and (select count(*) = 1 from public.standard_reading_official_bindings)
+  and (select count(*) = 2 from public.standard_reading_reader_interpretations)
+);
+
+-- Restore unambiguous B2 without modifying the immutable Reader access ledger.
+update public.entitlement_grants g
+set status = 'revoked', revision = revision + 1,
+    last_effective_at = clock_timestamp(), updated_at = clock_timestamp()
+from public.standard_reading_reader_access_grants a
+where a.purchase_intent_id = '12192300-0000-0000-0000-000000000003'
+  and a.entitlement_grant_id = g.id;
+
+select pg_temp.assert_v2_true(
+  'DB-C2 revoking only different-bundle B3 returns B2 single exact bundle',
+  (select count(*) = 1 from public.qry_character_standard_reading_access_runtime_v2(
+    '11390000-0000-0000-0000-000000000001',
+    'test-unlockable-reader', clock_timestamp()
+  ))
+  and (select count(*) = 4 from public.standard_reading_reader_access_grants)
+  and (select count(*) = 1 from public.standard_reading_official_bindings)
+);
+
+update public.entitlement_grants g
+set status = 'revoked', revision = revision + 1,
+    last_effective_at = clock_timestamp(), updated_at = clock_timestamp()
+from public.standard_reading_reader_access_grants a
+where a.purchase_intent_id = '12192300-0000-0000-0000-000000000002'
+  and a.entitlement_grant_id = g.id;
+
+select pg_temp.assert_v2_true(
+  'DB-C1 all B Grants revoked block Reader source without deleting provenance',
+  not exists (
+    select 1 from public.qry_character_standard_reading_access_runtime_v2(
+      '11390000-0000-0000-0000-000000000001',
+      'test-unlockable-reader', clock_timestamp()
+    )
+  )
+  and not exists (
+    select 1 from public.internal_qry_standard_reading_artifact_source_v2(
+      '11390000-0000-0000-0000-000000000001',
+      '12103100-0000-0000-0000-000000000001',
+      'test-unlockable-reader', clock_timestamp()
+    )
+  )
+  and (select count(*) = 4 from public.standard_reading_reader_access_grants)
+  and (select count(*) = 1 from public.standard_reading_official_bindings)
+);
+
 \echo 'Official Standard Reading + Reader Interpretation authority tests passed'
