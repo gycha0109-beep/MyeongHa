@@ -67,7 +67,7 @@ function fixture(settings: {fail?: string; returned?: 'wrong' | 'two' | 'empty'}
     return {
       async query<Row = Record<string, unknown>>(text: string, values?: readonly unknown[]) {
         sql.push(values === undefined ? { text } : { text, values });
-        if (settings.fail === 'begin' && text === 'BEGIN') throw Error('SECRET_BEGIN');
+        if (settings.fail === 'begin' && text === 'BEGIN ISOLATION LEVEL READ COMMITTED') throw Error('SECRET_BEGIN');
         if (settings.fail === 'role' && text.startsWith('SET LOCAL')) throw Error('SECRET_ROLE');
         if (['update', 'rollback'].includes(settings.fail ?? '') && text.startsWith('update public.')) throw Error('SECRET_UPDATE');
         if (settings.fail === 'commit' && text === 'COMMIT') throw Error('SECRET_COMMIT');
@@ -117,7 +117,7 @@ describe('8C-2B-2D-3-02 dormant V2 PostgreSQL atomic consumer', () => {
     expect(f.sql.map(x => x.text === SAJU_HELD_STAGING_CONSUME_SQL_V2
       ? 'UPDATE' : x.text === SAJU_HELD_STAGING_LOCK_SQL_V2
         ? 'LOCK' : x.text)).toEqual([
-        'BEGIN', 'SET LOCAL ROLE myeongha_saju_staging_admission_runtime',
+        'BEGIN ISOLATION LEVEL READ COMMITTED', 'SET LOCAL ROLE myeongha_saju_staging_admission_runtime',
         'LOCK', 'UPDATE', 'COMMIT',
       ]);
     expect(SAJU_HELD_STAGING_CONSUME_SQL_V2).toContain('connection_plan_digest = $3::text');
