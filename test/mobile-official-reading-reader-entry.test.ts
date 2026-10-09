@@ -30,7 +30,7 @@ describe('mobile M3-alpha Official Reading Reader entry', () => {
       interpretationRoute: 'server_admission_required',
     };
     const project = (access: Access, verificationFailure?: 'retryable_failure' | 'protected_failure') =>
-      projectMobileOfficialReadingReaderEntryV1(official, 'seyeon', { access, verificationFailure });
+      projectMobileOfficialReadingReaderEntryV1(official, 'seyeon', verificationFailure ? { access, verificationFailure } : { access });
 
     expect(project(base).status).toBe('server_verification_required');
     expect(project({ ...base, releaseApproval: { kind: 'server_verified', value: 'approval_pending' } }).status).toBe('release_approval_pending');
