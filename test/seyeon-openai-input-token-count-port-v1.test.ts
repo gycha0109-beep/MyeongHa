@@ -182,6 +182,6 @@ describe('PR-04D2 OpenAI exact input-token counter (offline, no API calls)',()=>
     );
     await expect(networkDown.certifiedInputTokenUpperBound(
       request,byteLen,body,
-    )).rejects.toThrow('private network error');
+    )).rejects.toThrow('Input token count request failed or exceeded its deadline.');
   });
 });
