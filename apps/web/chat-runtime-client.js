@@ -12,7 +12,7 @@ import { shouldReloadChatForMemberSessionStorageChange } from './product-auth-su
 
 const params = new URLSearchParams(window.location.search);
 const threadRoute = parseChatThreadRouteV1(params);
-const threadId = threadRoute.threadId;
+let threadId = threadRoute.threadId;
 const invalidThreadRoute = threadRoute.state === 'invalid';
 const requestedCharacterId = (() => {
   const raw = params.get('character');
@@ -23,16 +23,18 @@ const requestedCharacterId = (() => {
 const apiEnvelopePromise = import('./api-envelope.js');
 const chatOpenClient = createChatOpenClientV1();
 
-const historyList = document.querySelector('[data-history-list]');
-const historyEmpty = document.querySelector('[data-history-empty]');
 const contextPill = document.querySelector('[data-context-pill]');
 const contextTitle = document.querySelector('[data-context-title]');
 const composeStatus = document.querySelector('[data-compose-status]');
 const chatStream = document.querySelector('[data-chat-stream]');
 const chatIntro = document.querySelector('[data-chat-intro]');
+const roomLoading = document.querySelector('[data-room-loading]');
+const retryButton = document.querySelector('[data-room-retry]');
 const messageInput = document.querySelector('[data-message-input]');
 const composer = document.querySelector('[data-composer]');
-let openingThread = false;
+let roomBootPromise = null;
+let roomReady = false;
+let queuedSubmission = false;
 let sendingTurn = false;
 let authoritativeCharacterId = null;
 
@@ -103,7 +105,7 @@ function clearPendingTurn(clientTurnId) {
 }
 
 function restorePendingDraft() {
-  if (!threadId || !(messageInput instanceof HTMLTextAreaElement)) return;
+  if (!threadId || !(messageInput instanceof HTMLTextAreaElement) || messageInput.value.trim()) return;
 
   const draftKey = pendingDraftKey(threadId);
   const openDraft = sessionStorage.getItem(draftKey);
@@ -147,30 +149,6 @@ function chatOpenFailureMessage(error) {
   return '대화방을 준비하지 못했습니다. 잠시 후 다시 시도해 주세요.';
 }
 
-async function openThreadAndPreserveDraft(message) {
-  if (openingThread) return;
-  if (!requestedCharacterId) {
-    setComposeStatus('대화 상대를 확인할 수 없습니다.');
-    return;
-  }
-
-  openingThread = true;
-  setComposerBusy(true);
-  setComposeStatus('대화방을 준비하고 있습니다…');
-
-  try {
-    const result = await chatOpenClient.openForCanonicalCharacter({
-      characterId: requestedCharacterId,
-    });
-    sessionStorage.setItem(pendingDraftKey(result.threadId), message);
-    window.location.assign(buildChatThreadUrlV1(result.threadId));
-  } catch (error) {
-    setComposeStatus(chatOpenFailureMessage(error));
-    setComposerBusy(false);
-    openingThread = false;
-  }
-}
-
 function formatTimestamp(value) {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return '시간 정보 없음';
@@ -196,42 +174,6 @@ function safeMessageText(message) {
   if (message.redacted === true) return '삭제된 메시지입니다.';
   if (typeof message.bodyText === 'string' && message.bodyText.trim().length > 0) return message.bodyText;
   return '표시할 수 있는 텍스트가 없습니다.';
-}
-
-function renderHistory(messages, authoritativeCharacterId) {
-  if (!historyList) return;
-  historyList.replaceChildren();
-
-  if (messages.length === 0) {
-    if (historyEmpty) historyEmpty.hidden = false;
-    return;
-  }
-
-  if (historyEmpty) historyEmpty.hidden = true;
-
-  messages.forEach((message) => {
-    if (!message || typeof message !== 'object') return;
-    if (!Number.isSafeInteger(message.sequenceNo)) return;
-    if (typeof message.senderType !== 'string') return;
-
-    const article = document.createElement('article');
-    article.className = 'history-entry';
-    article.dataset.sender = message.senderType;
-    article.dataset.redacted = String(message.redacted === true);
-
-    const time = document.createElement('time');
-    time.textContent = formatTimestamp(message.createdAt);
-    if (typeof message.createdAt === 'string') time.dateTime = message.createdAt;
-
-    const strong = document.createElement('strong');
-    strong.textContent = senderLabel(message, authoritativeCharacterId);
-
-    const paragraph = document.createElement('p');
-    paragraph.textContent = safeMessageText(message);
-
-    article.append(time, strong, paragraph);
-    historyList.append(article);
-  });
 }
 
 function createStreamMessage(message, authoritativeCharacterId) {
@@ -272,7 +214,12 @@ function renderConversation(messages, authoritativeCharacterId) {
   if (!chatStream) return;
   const nodes = messages.map((message) => createStreamMessage(message, authoritativeCharacterId)).filter(Boolean);
   if (nodes.length === 0) {
-    if (chatIntro) chatIntro.hidden = false;
+    if (chatIntro) {
+      chatIntro.hidden = false;
+      chatStream.replaceChildren(chatIntro);
+    } else {
+      chatStream.replaceChildren();
+    }
     return;
   }
   chatStream.replaceChildren(...nodes);
@@ -280,7 +227,6 @@ function renderConversation(messages, authoritativeCharacterId) {
 }
 
 function renderRoomState(state) {
-  renderHistory(state.messages, state.characterId);
   renderConversation(state.messages, state.characterId);
 
   // Exact-nine product authority maps canonical Character id to the same
@@ -295,12 +241,8 @@ function renderRoomState(state) {
 }
 
 function clearOwnerScopedRoomStateForAuthorityChange() {
-  historyList?.replaceChildren();
-  if (historyEmpty) {
-    historyEmpty.hidden = false;
-    historyEmpty.textContent = '현재 계정의 대화 권한을 다시 확인하는 중입니다.';
-  }
   chatStream?.replaceChildren();
+  roomReady = false;
   if (contextPill) contextPill.hidden = true;
   if (contextTitle) contextTitle.textContent = '';
   setComposeStatus('현재 계정의 대화 권한을 다시 확인하는 중입니다.');
@@ -345,21 +287,9 @@ async function readChatPage(activeBearer, afterSequenceNo) {
 }
 
 async function loadRoomState() {
-  if (invalidThreadRoute) {
-    if (historyEmpty) {
-      historyEmpty.hidden = false;
-      historyEmpty.textContent = '대화 주소가 올바르지 않습니다.';
-    }
+  if (!threadId || invalidThreadRoute) {
     setComposeStatus('유효한 대화를 다시 선택해 주세요.');
-    return;
-  }
-
-  if (!threadId) {
-    if (historyEmpty) {
-      historyEmpty.hidden = false;
-      historyEmpty.textContent = '아직 시작된 대화가 없습니다.';
-    }
-    return;
+    return false;
   }
 
   try {
@@ -413,13 +343,64 @@ async function loadRoomState() {
     }));
     return true;
   } catch {
-    if (historyEmpty) {
-      historyEmpty.hidden = false;
-      historyEmpty.textContent = '현재 지난 대화를 불러올 수 없습니다.';
-    }
     setComposeStatus('현재 대화 기록 연결을 사용할 수 없습니다.');
     return false;
   }
+}
+
+// Resolve or reuse an owner-scoped thread in the current document. Never
+// navigate away on the first message: the server decides thread identity,
+// while this UI updates only the URL after the canonical response.
+function ensureRoomReady() {
+  if (roomReady) return Promise.resolve(true);
+  if (roomBootPromise) return roomBootPromise;
+
+  roomBootPromise = (async () => {
+    if (invalidThreadRoute) {
+      setComposeStatus('대화 주소가 올바르지 않습니다. 대리자를 다시 선택해 주세요.');
+      return false;
+    }
+    try {
+      if (!threadId) {
+        if (!requestedCharacterId) {
+          setComposeStatus('대화 상대를 확인할 수 없습니다.');
+          return false;
+        }
+        const opened = await chatOpenClient.openForCanonicalCharacter({
+          characterId: requestedCharacterId,
+        });
+        threadId = opened.threadId;
+        window.history.replaceState(window.history.state, '', buildChatThreadUrlV1(threadId));
+      }
+
+      const loaded = await loadRoomState();
+      if (!loaded) return false;
+      roomReady = true;
+      if (retryButton) retryButton.hidden = true;
+      restorePendingDraft();
+      setComposeStatus('');
+      return true;
+    } catch (error) {
+      setComposeStatus(chatOpenFailureMessage(error));
+      return false;
+    }
+  })().then((ready) => {
+    if (!ready) {
+      const message = composeStatus?.textContent || '대화를 불러오지 못했습니다.';
+      if (roomLoading) {
+        roomLoading.hidden = false;
+        roomLoading.textContent = message;
+      }
+      if (retryButton && !invalidThreadRoute) retryButton.hidden = false;
+    } else if (roomLoading) {
+      roomLoading.hidden = true;
+    }
+    return ready;
+  }).finally(() => {
+    roomBootPromise = null;
+  });
+
+  return roomBootPromise;
 }
 
 async function sendTurn(message) {
@@ -531,16 +512,28 @@ function submitTurn(event) {
     return;
   }
 
-  if (!threadId) {
-    void openThreadAndPreserveDraft(message.trim());
+  if (!roomReady) {
+    if (queuedSubmission) return;
+    queuedSubmission = true;
+    setComposerBusy(true);
+    void ensureRoomReady().then((ready) => {
+      if (ready) return sendTurn(message.trim());
+    }).finally(() => {
+      queuedSubmission = false;
+      if (!sendingTurn) setComposerBusy(false);
+    });
     return;
   }
 
   void sendTurn(message.trim());
 }
 
-restorePendingDraft();
 document.addEventListener('myeongha:chat-submit', submitTurn);
+retryButton?.addEventListener('click', () => {
+  if (roomLoading) roomLoading.textContent = '대화 연결을 다시 확인하고 있습니다…';
+  if (retryButton) retryButton.hidden = true;
+  void ensureRoomReady();
+});
 window.addEventListener('storage', (event) => {
   if (event.key !== PRODUCT_AUTH_STORAGE_V1.memberSession) return;
   if (!shouldReloadChatForMemberSessionStorageChange({
@@ -551,4 +544,4 @@ window.addEventListener('storage', (event) => {
   clearOwnerScopedRoomStateForAuthorityChange();
   window.location.reload();
 });
-void loadRoomState();
+void ensureRoomReady();
