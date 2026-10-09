@@ -95,8 +95,7 @@ describe('A3-gamma V2 non-Saju server authority composition', () => {
       memoryItemsAuthorityPort: { readCurrentItems: async () => [] },
       memoryGrantsAuthorityPort: { readActiveGrants: async () => [] },
       nonMemoryContextAuthorityPort: { readGrantedLifeFacts: async () => [] },
-      contextInput: { relationshipProjectionPolicy: { version: 'v1' } }
-        as unknown as CharacterStandardReadingServerContextInputV1,
+      contextInput: ({ relationshipProjectionPolicy: { version: 'v1' } } as unknown as CharacterStandardReadingServerContextInputV1),
     };
   }
 
@@ -116,8 +115,7 @@ describe('A3-gamma V2 non-Saju server authority composition', () => {
     const input = ports();
     await expect(prepareCharacterStandardReadingServerBaseContextV2({
       ...input,
-      contextInput: { ...input.contextInput, saju: { readingRef: 'forged' } }
-        as CharacterStandardReadingServerContextInputV1,
+      contextInput: ({ ...input.contextInput, saju: { readingRef: 'forged' } } as CharacterStandardReadingServerContextInputV1),
       threadBindingAuthorityPort: {
         readRuntimeBinding: async () => { throw new Error('must not query'); },
       },
