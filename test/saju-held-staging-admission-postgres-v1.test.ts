@@ -48,7 +48,7 @@ function fixture(overrides: { issue?: Record<string, unknown>, manifest?: Record
       if (overrides.unavailable === 'connect') throw Error('SECRET_CONNECT_FAILURE');
       return {
         async query<Row = Record<string, unknown>>(text: string, args?: readonly unknown[]) {
-          sql.push({ text, args });
+          sql.push(args === undefined ? { text } : { text, args });
           if (overrides.unavailable === 'begin' && text === 'BEGIN') throw Error('SECRET_BEGIN');
           if (overrides.unavailable === 'role' && text.startsWith('SET LOCAL')) throw Error('SECRET_ROLE');
           if (overrides.unavailable === 'commit' && text === 'COMMIT') throw Error('SECRET_COMMIT');
@@ -134,8 +134,7 @@ describe('8C-2B-2C independent operator signed Postgres one-shot admission (synt
     ['already consumed', { status: 'CONSUMED', consumedAtMs: NOW - 1 }],
   ])('blocks invalid signed permit %s', async (_label, change) => {
     const f = fixture({ issue: change });
-    if (change.approvedOperatorId || change.status === 'REVOKED'
-      || change.status === 'CONSUMED') {
+    if (['wrong operator', 'revoked', 'already consumed'].includes(_label)) {
       expect(() => createSajuHeldStagingPostgresAdmissionPortV1(f.options))
         .toThrow('Invalid isolated staging operator admission configuration.');
     } else {
@@ -152,7 +151,7 @@ describe('8C-2B-2C independent operator signed Postgres one-shot admission (synt
     ['missing pool', { pool: undefined }],
   ])('rejects invalid admission config %s', (_name, bad) => {
     const f = fixture();
-    if (bad.approvalSignature) {
+    if ('approvalSignature' in bad && bad.approvalSignature) {
       const port = createSajuHeldStagingPostgresAdmissionPortV1({
         ...f.options, ...bad,
       } as typeof f.options);
