@@ -24,7 +24,7 @@ const validRow = Object.freeze({
 });
 
 function mock(rows: unknown[] = [validRow]) {
-  const query = vi.fn(async () => ({ rows }));
+  const query = vi.fn(async (_text: string, _values?: readonly unknown[]) => ({ rows }));
   const client = { query } as unknown as PostgresTransactionQueryV1;
   return { query, port: createPostgresStandardFollowupAnchorAuthorityPortV1(client) };
 }
