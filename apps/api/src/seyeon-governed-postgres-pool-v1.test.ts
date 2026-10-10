@@ -25,7 +25,7 @@ function safeRow() {
     currentUser:SEYEON_GOVERNED_DB_LOGIN_V1,
     canLogin:true,isSuper:false,canBypassRls:false,canInherit:false,
     canCreateDb:false,canCreateRole:false,
-    canSetGovernedRole:true,isLegacyMember:false,canSetLegacyRole:false,
+    hasGovernedRoleMembership:true,isLegacyMember:false,
     isCostOwnerMember:false,otherMemberships:0,
     canLegacyStart:false,canLegacySettle:false,canLegacyRecord:false,
     canDirectLedger:false,canDirectBudget:false,canDirectRateCard:false,
@@ -42,6 +42,8 @@ function driver(input: {preflight?:Readonly<Record<string,unknown>>; failSql?:st
         throw new Error('database command rejected');
       if(text===GOVERNED_LOGIN_PREFLIGHT_SQL_V1)
         return {rows:[input.preflight??safeRow()]};
+      if(text==='select current_user::text as "currentUser"')
+        return {rows:[{currentUser:'myeongha_seyeon_governed_executor'}]};
       if(text.startsWith('select subject_id::text'))
         return {rows:[{subjectId:MEMBER_ID,subjectKind:'member'}]};
       return {rows:[]};
@@ -92,8 +94,8 @@ describe('Se-yeon D3B2B-3B2 isolated governed credential boundary',()=>{
       ['sessionUser','myeongha_login'],['currentUser','postgres'],
       ['canLogin',false],['isSuper',true],['canBypassRls',true],
       ['canInherit',true],['canCreateDb',true],['canCreateRole',true],
-      ['otherMemberships',1],['canSetGovernedRole',false],
-      ['isLegacyMember',true],['canSetLegacyRole',true],
+      ['otherMemberships',1],['hasGovernedRoleMembership',false],
+      ['isLegacyMember',true],
       ['isCostOwnerMember',true],['canLegacyStart',true],
       ['canLegacySettle',true],['canLegacyRecord',true],
       ['canDirectLedger',true],['canDirectBudget',true],
@@ -121,8 +123,14 @@ describe('Se-yeon D3B2B-3B2 isolated governed credential boundary',()=>{
     });
     const a=await p.connect();a.release();
     const b=await p.connect();b.release();
-    expect(safe.calls).toHaveLength(2);
-    expect(safe.calls.every(c=>c.text===GOVERNED_LOGIN_PREFLIGHT_SQL_V1)).toBe(true);
+    expect(safe.calls).toHaveLength(10);
+    expect(safe.calls.map(c=>c.text).slice(0,5)).toEqual([
+      GOVERNED_LOGIN_PREFLIGHT_SQL_V1,
+      'BEGIN','SET LOCAL ROLE myeongha_seyeon_governed_executor',
+      'select current_user::text as "currentUser"','ROLLBACK',
+    ]);
+    expect(safe.calls.filter(c=>c.text===GOVERNED_LOGIN_PREFLIGHT_SQL_V1))
+      .toHaveLength(2);
     expect(safe.calls[0]?.values).toEqual([
       'myeongha_seyeon_governed_executor','myeongha_api_executor',
     ]);
@@ -154,6 +162,8 @@ describe('Se-yeon D3B2B-3B2 isolated governed credential boundary',()=>{
     expect(d.calls.map(c=>c.text)).toEqual([
       GOVERNED_LOGIN_PREFLIGHT_SQL_V1,
       'BEGIN','SET LOCAL ROLE myeongha_seyeon_governed_executor',
+      'select current_user::text as "currentUser"','ROLLBACK',
+      'BEGIN','SET LOCAL ROLE myeongha_seyeon_governed_executor',
       expect.stringContaining('public.begin_member_subject_context_v1'),
       'select public.assert_myeongha_subject_context_v1($1::uuid)',
       'COMMIT',
@@ -163,7 +173,7 @@ describe('Se-yeon D3B2B-3B2 isolated governed credential boundary',()=>{
   });
 
   it('never dispatches an operation after preflight failure or Subject mismatch',async()=>{
-    const bad=driver({preflight:{...safeRow(),canSetLegacyRole:true}});
+    const bad=driver({preflight:{...safeRow(),isLegacyMember:true}});
     const badPool=createSeyeonGovernedPostgresPoolFromDriverV1({
       driverPool:bad.pool,expectedPrincipal:SEYEON_GOVERNED_DB_LOGIN_V1,
     });
@@ -206,5 +216,19 @@ describe('Se-yeon D3B2B-3B2 isolated governed credential boundary',()=>{
     expect(count).toBe(0);
     expect(d.calls.map(c=>c.text).filter(t=>t==='ROLLBACK')).toHaveLength(1);
     expect(d.released).toEqual([undefined]);
+  });
+
+  it('rejects missing actual SET ROLE authority and rolls back before any caller SQL',async()=>{
+    const d=driver({failSql:'SET LOCAL ROLE'});
+    const pool=createSeyeonGovernedPostgresPoolFromDriverV1({
+      driverPool:d.pool,expectedPrincipal:SEYEON_GOVERNED_DB_LOGIN_V1,
+    });
+    await expect(pool.connect()).rejects.toThrow('database command rejected');
+    expect(d.calls.map(c=>c.text)).toEqual([
+      GOVERNED_LOGIN_PREFLIGHT_SQL_V1,
+      'BEGIN','SET LOCAL ROLE myeongha_seyeon_governed_executor',
+      'ROLLBACK',
+    ]);
+    expect(d.released[0]).toBeInstanceOf(Error);
   });
 });
