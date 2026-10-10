@@ -86,7 +86,7 @@ AI 경량 보안 정책 평가: [#1816](https://github.com/gycha0109-beep/Myeong
 
 ## G1-B2 / 0건 경로 선행 DB Pin (구현, 양수 HOLD)
 
-- `supabase/migrations/1630_seyeon_zero_personal_source_pre_model_pin_v1.sql`은 `chat_turn_attempts`에 `seyeon_personal_source_pin_jsonb` 및 저장시각을 추가하며, 사후 불변 Trigger 및 세연 검증 결과의 원본 Pin 일치 Commit Trigger를 둡니다.
+- `supabase/migrations/1640_seyeon_zero_personal_source_pre_model_pin_v1.sql`은 `chat_turn_attempts`에 `seyeon_personal_source_pin_jsonb` 및 저장시각을 추가하며, 사후 불변 Trigger 및 세연 검증 결과의 원본 Pin 일치 Commit Trigger를 둡니다.
 - `cmd_mark_seyeon_chat_context_ready_pinned_v1(subject,turn,attempt,sourceProof)`가 **서버 생성 0건 Proof**와 **최종 선택된 Memory/Life Fact가 0건임을 보여주는 Selection**을 엄격히 검증한 뒤, 하나의 DB 트랜잭션에서 Pin 영속 저장과 `context_ready`로 전이합니다.
 - 이전 3인자 `cmd_mark_seyeon_chat_context_ready_runtime_v1`에서 `myeongha_api_executor`의 EXECUTE를 회수했습니다. 신규 함수는 NOLOGIN runtime owner가 실행하고 공개 DB 역할은 호출할 수 없습니다. 새 함수의 API 직접 DML 권한 부여는 없습니다.
 - 실행 경로에서 positive 개인기록 사전 HOLD + 정확한 final 모델 선택 검증 후 **선행 Pin 저장 성공**이 확인돼야 `resolveTurnGovernance` 및 유료 Provider 경로로 진입할 수 있습니다. 실패 시 모델/AI 호출 이전 종료.
