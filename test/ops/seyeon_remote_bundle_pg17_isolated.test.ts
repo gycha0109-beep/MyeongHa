@@ -28,7 +28,7 @@ describe('Se-yeon exact remote historical bundle PostgreSQL 17 rehearsal', () =>
     expect(body).toContain('SUPABASE_DB_PASSWORD');
   });
 
-  it('rejects fake remote SQL before any PostgreSQL operation', () => {
+  it('rejects an exact-length but wrong-SHA remote SQL before any PostgreSQL operation', () => {
     const dir = mkdtempSync(join(tmpdir(), 'seyeon-pg17-negative-'));
     try {
       const bad = join(dir, 'wrong.sql');
@@ -38,7 +38,7 @@ describe('Se-yeon exact remote historical bundle PostgreSQL 17 rehearsal', () =>
       const mockPsql = join(bin, 'psql');
       writeFileSync(mockPsql, '#!/usr/bin/env bash\nprintf reached > "' + marker + '"\n');
       chmodSync(mockPsql, 0o755);
-      writeFileSync(bad, 'SELECT 1;\n');
+      writeFileSync(bad, Buffer.alloc(104021, 0x58));
       // A database operation would invoke the mock psql and leave its marker.
       const env = {
         ...process.env,
