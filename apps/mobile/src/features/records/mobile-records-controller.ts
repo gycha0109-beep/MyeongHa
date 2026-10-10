@@ -19,6 +19,7 @@ export interface MobileRecordsSnapshotsV1 {
 
 export interface MobileRecordsControllerV1 {
   getSnapshots(): MobileRecordsSnapshotsV1;
+  reset(): MobileRecordsSnapshotsV1;
   loadInitial(
     key: MobileRecordsCollectionKeyV1,
     options?: Readonly<{ force?: boolean }>,
@@ -43,6 +44,18 @@ export function createMobileRecordsControllerV1(input: {
   }
   const nowEpochMs = input.nowEpochMs ?? Date.now;
   const loadedAt: Partial<Record<MobileRecordsCollectionKeyV1, number>> = {};
+  let generation = 0;
+
+  function reset(): MobileRecordsSnapshotsV1 {
+    generation += 1;
+    delete loadedAt.life;
+    delete loadedAt.readings;
+    delete loadedAt.memories;
+    input.repositories.life.reset();
+    input.repositories.readings.reset();
+    input.repositories.memories.reset();
+    return getSnapshots();
+  }
 
   function getSnapshots(): MobileRecordsSnapshotsV1 {
     return Object.freeze({
@@ -78,9 +91,10 @@ export function createMobileRecordsControllerV1(input: {
     options: Readonly<{ force?: boolean }> = {},
   ): Promise<MobileRecordsSnapshotsV1> {
     if (!options.force && cacheFresh(key)) return getSnapshots();
+    const requestGeneration = generation;
     try {
       await repository(key).loadInitial();
-      loadedAt[key] = nowEpochMs();
+      if (requestGeneration === generation) loadedAt[key] = nowEpochMs();
     } catch {
       // Repository snapshot owns the section-level failure state.
     }
@@ -88,9 +102,10 @@ export function createMobileRecordsControllerV1(input: {
   }
 
   async function loadMore(key: MobileRecordsCollectionKeyV1): Promise<MobileRecordsSnapshotsV1> {
+    const requestGeneration = generation;
     try {
       await repository(key).loadMore();
-      loadedAt[key] = nowEpochMs();
+      if (requestGeneration === generation) loadedAt[key] = nowEpochMs();
     } catch {
       // Repository snapshot owns the section-level failure state.
     }
@@ -120,6 +135,7 @@ export function createMobileRecordsControllerV1(input: {
 
   return Object.freeze({
     getSnapshots,
+    reset,
     loadInitial,
     loadMore,
     loadInitialAll,

@@ -2,8 +2,8 @@ import {
   MyeongHaApiClientErrorV1,
   type OfficialReadingRecordV1,
 } from '@myeongha/api-client';
-import { router, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useCallback, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -30,6 +30,13 @@ type DetailStateV1 =
 
 function errorState(error: unknown): Extract<DetailStateV1, { kind: 'error' }> {
   if (error instanceof MyeongHaApiClientErrorV1) {
+    if (error.code === 'CLIENT_RECORDS_SESSION_CHANGED') {
+      return Object.freeze({
+        kind: 'error' as const,
+        message: '로그인 상태가 변경되어 이전 계정의 공식 풀이를 표시하지 않았습니다.',
+        retryable: false,
+      });
+    }
     if (
       error.code === 'CLIENT_OFFICIAL_READING_ID_INVALID' ||
       error.code === 'NOT_FOUND'
@@ -69,20 +76,34 @@ export default function OfficialReadingDetailScreen() {
   const params = useLocalSearchParams<{ readingId?: string | string[] }>();
   const readingId = typeof params.readingId === 'string' ? params.readingId : '';
   const [state, setState] = useState<DetailStateV1>({ kind: 'loading' });
+  const focused = useRef(false);
+  const requestEpoch = useRef(0);
 
   const load = useCallback(async () => {
+    const epoch = ++requestEpoch.current;
     setState(Object.freeze({ kind: 'loading' as const }));
     try {
       const record = await mobileRecordsServiceV1.readOfficialReading(readingId);
-      setState(Object.freeze({ kind: 'ready' as const, record }));
+      if (focused.current && epoch === requestEpoch.current) {
+        setState(Object.freeze({ kind: 'ready' as const, record }));
+      }
     } catch (error) {
-      setState(errorState(error));
+      if (focused.current && epoch === requestEpoch.current) {
+        setState(errorState(error));
+      }
     }
   }, [readingId]);
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
+    focused.current = true;
     void load();
-  }, [load]);
+    return () => {
+      focused.current = false;
+      requestEpoch.current += 1;
+      // Archive content must not remain on a blurred or replaced route.
+      setState(Object.freeze({ kind: 'loading' as const }));
+    };
+  }, [load]));
 
   return (
     <SafeAreaView style={styles.safeArea}>
