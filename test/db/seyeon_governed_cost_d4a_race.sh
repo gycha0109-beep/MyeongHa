@@ -95,4 +95,63 @@ grep -Fq "$a|f|300|f" "$tmp/settled.log" || { cat "$tmp/settled.log" >&2; exit 1
 db -f "$tmp/settle.sql" >"$tmp/replay.log"
 grep -Fq "$a|t|300|f" "$tmp/replay.log" || { cat "$tmp/replay.log" >&2; exit 13; }
 [[ "$(state)" == '1|300|300' ]] || { echo 'FAIL replay double-refunded' >&2; exit 14; }
-echo 'D4A independent sessions: row lock, budget ceiling, settlement replay PASS'
+# C: real PostgreSQL backend termination AFTER bounded admission, BEFORE
+# COMMIT. This must rollback both the ledger row and global budget atomically.
+db -c "update public.seyeon_ai_governor_daily_budgets_v1
+  set global_limit_micro_usd=5000,subject_limit_micro_usd=5000
+  where bucket_utc_date=(clock_timestamp() at time zone 'UTC')::date" >/dev/null
+c='d4a00000-0000-4000-8000-000000000003'
+d='d4a00000-0000-4000-8000-000000000004'
+{
+  printf "set application_name='seyeon_d4a_crash_ci';\n"
+  admit "$c"
+  printf '\\! touch "%s/crash-ready"\nselect pg_sleep(25);\ncommit;\n' "$tmp"
+} >"$tmp/crash.sql"
+db -f "$tmp/crash.sql" >"$tmp/crash.log" 2>&1 &
+pid=$!
+ready=false
+for i in $(seq 1 100); do
+  if [[ -f "$tmp/crash-ready" ]]; then ready=true; break; fi
+  if ! kill -0 "$pid" 2>/dev/null; then break; fi
+  sleep 0.05
+done
+if [[ "$ready" != true ]]; then cat "$tmp/crash.log" >&2; exit 15; fi
+terminated="$(db -c "select count(*) from pg_catalog.pg_stat_activity
+  where application_name='seyeon_d4a_crash_ci' and pid<>pg_backend_pid()
+    and pg_catalog.pg_terminate_backend(pid)")"
+[[ "$terminated" == '1' ]] || {
+  echo "FAIL did not terminate exactly one uncommitted backend: $terminated" >&2
+  exit 16
+}
+if wait "$pid" 2>/dev/null; then
+  echo 'FAIL terminated transaction unexpectedly committed' >&2; exit 17
+fi
+pid=''
+[[ "$(state)" == '1|300|300' ]] || {
+  echo "FAIL backend termination left a phantom reservation: $(state)" >&2
+  exit 18
+}
+sed "s/$a/$c/g" "$tmp/settle.sql" >"$tmp/ghost-settle.sql"
+if db -f "$tmp/ghost-settle.sql" >"$tmp/ghost.log" 2>&1; then
+  echo 'FAIL uncommitted terminated call was settled' >&2; exit 19
+fi
+grep -q 'Governed settlement requires an authoritative reserved call' "$tmp/ghost.log" || {
+  cat "$tmp/ghost.log" >&2; exit 20
+}
+{ admit "$d"; printf 'commit;\n'; } >"$tmp/recovered.sql"
+db -f "$tmp/recovered.sql" >"$tmp/recovered.log"
+grep -Fq "$d|3700" "$tmp/recovered.log" || {
+  cat "$tmp/recovered.log" >&2; exit 21
+}
+[[ "$(state)" == '2|4000|4000' ]] || {
+  echo "FAIL new backend cannot recover budget: $(state)" >&2; exit 22
+}
+# Independent synthetic login remains prohibited from the legacy API role.
+if db -c "set session authorization myeongha_seyeon_d4_login_ci;
+  set role myeongha_api_executor;" >"$tmp/cross-role.log" 2>&1; then
+  echo 'FAIL governed login entered common role' >&2; exit 23
+fi
+grep -Eiq '(permission denied|not a member)' "$tmp/cross-role.log" || {
+  cat "$tmp/cross-role.log" >&2; exit 24
+}
+echo 'D4A independent sessions: row lock, budget ceiling, replay, crash rollback PASS'
