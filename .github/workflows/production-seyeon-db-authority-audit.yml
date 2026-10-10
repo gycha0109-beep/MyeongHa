@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - '.github/workflows/production-seyeon-db-authority-audit.yml'
+      - 'test/db/seyeon_remote_bundle_pg17_isolated.sh'
   workflow_dispatch:
     inputs:
       exact_remote_bundle_pg17:
