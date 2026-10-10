@@ -138,7 +138,7 @@ export function createPostgresStandardFollowupAnchorAuthorityPortV1(
       scope: Parameters<ValidatedStandardFollowupAnchorAuthorityPortV1['readLatestValidatedAnchor']>[0],
     ): Promise<ValidatedStandardFollowupAnchorV1 | null> {
       validateInput(scope);
-      let rows: readonly AnchorRowV1[];
+      let rows: unknown;
       try {
         const result = await client.query<AnchorRowV1>(READ_SQL, [
           scope.subjectId, scope.threadId, scope.readerCharacterId, scope.readingRef,
@@ -147,9 +147,15 @@ export function createPostgresStandardFollowupAnchorAuthorityPortV1(
       } catch {
         return deny('ACCESS_DENIED');
       }
-      if (rows.length > 1) return deny('INVALID_PROVENANCE');
+      // Zero rows is the only benign absence. A malformed DB/protocol response
+      // must not escape as a TypeError or be treated as "no eligible anchor".
+      if (!Array.isArray(rows) || rows.length > 1) return deny('INVALID_PROVENANCE');
       if (rows.length === 0) return null;
-      return assertAnchor(rows[0]!, scope);
+      const row: unknown = rows[0];
+      if (row === null || typeof row !== 'object' || Array.isArray(row)) {
+        return deny('INVALID_PROVENANCE');
+      }
+      return assertAnchor(row as AnchorRowV1, scope);
     },
   });
 }
