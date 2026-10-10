@@ -94,6 +94,26 @@ describe('PostgreSQL Official Standard Reading access bind v2 adapter', () => {
     expect(rows).toEqual([client.row]);
   });
 
+  it('keeps database replay as historical metadata, not as an asserted current Grant', async () => {
+    const client = new FakeClient();
+    client.row = {
+      ...client.row,
+      officialReadingCreated: false,
+      interpretationCreated: false,
+      replayed: true,
+    };
+    const port = createPostgresStandardReadingAccessBindAuthorityPortV2(client);
+    const rows = await port.bindAccess(INPUT);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      replayed: true,
+      officialReadingCreated: false,
+      interpretationCreated: false,
+    });
+    expect(rows[0]).not.toHaveProperty('accessCurrentlyGranted');
+    expect(rows[0]).not.toHaveProperty('refundable');
+  });
+
   it('maps official-reuse and exact-Grant failures to bounded authority errors', async () => {
     for (const [constraint, code] of [
       ['cmd_standard_reading_access_v2_entitlement_unavailable', 'ENTITLEMENT_UNAVAILABLE'],

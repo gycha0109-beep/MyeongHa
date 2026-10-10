@@ -182,7 +182,7 @@ describe('Official Standard Reading + Reader access bind command v2', () => {
     expect(result.officialReadingCreated).toBe(false);
   });
 
-  it('accepts exact replay without duplicating Reader Interpretation identity', async () => {
+  it('holds historical Reader bind replay until current exact Grant is independently verified', async () => {
     const p = ports();
     p.authorityPort.result = [authorityRow({
       subjectId: SUBJECT_ID,
@@ -201,13 +201,43 @@ describe('Official Standard Reading + Reader access bind command v2', () => {
       replayed: true,
     })];
 
-    const result = await bindStandardReadingAccessV2({
+    const error = await expectApiCode(bindStandardReadingAccessV2({
       resolvedSubjectId: SUBJECT_ID,
       request: request(),
       ...p,
-    });
-    expect(result.readingId).toBe(EXISTING_READING_ID);
-    expect(result.interpretationCreated).toBe(false);
+    }), 'CAPABILITY_UNAVAILABLE');
+    expect(error.message).not.toContain(EXISTING_READING_ID);
+    expect(error.message).not.toContain(GRANT_ID);
+    expect(p.authorityPort.calls).toHaveLength(1);
+  });
+
+  it('never treats any historical Reader replay as an active grant, including initial Reader history', async () => {
+    for (const accessRole of ['initial_reader', 'additional_reader'] as const) {
+      const p = ports();
+      p.authorityPort.result = [authorityRow({
+        subjectId: SUBJECT_ID,
+        purchaseIntentId: PURCHASE_INTENT_ID,
+        proposedReadingSessionId: SESSION_ID,
+        proposedReadingId: READING_ID,
+        requestHash: 'unused',
+        requestContractVersion: STANDARD_READING_ACCESS_REQUEST_CONTRACT_VERSION_V2,
+        requestSnapshotJsonb: expectedSnapshot(),
+      }, {
+        readingSessionId: EXISTING_SESSION_ID,
+        readingId: EXISTING_READING_ID,
+        accessRole,
+        officialReadingCreated: false,
+        interpretationCreated: false,
+        replayed: true,
+      })];
+      const error = await expectApiCode(bindStandardReadingAccessV2({
+        resolvedSubjectId: SUBJECT_ID,
+        request: request(),
+        ...p,
+      }), 'CAPABILITY_UNAVAILABLE');
+      expect(error.message).not.toContain(EXISTING_READING_ID);
+      expect(p.authorityPort.calls).toHaveLength(1);
+    }
   });
 
   it('rejects client authority injection before trusted ids or DB authority run', async () => {

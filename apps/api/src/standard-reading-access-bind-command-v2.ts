@@ -261,6 +261,19 @@ function assembleResponse(
     throw new Error('Additional Reader access must not create a new official Reading.');
   }
 
+  // A DB bind replay is immutable purchase-binding HISTORY, not a current
+  // entitlement. Migration 1220 intentionally returns replayed=true even
+  // after refund/revocation. Until the DB owner supplies an exact, transaction-
+  // bound current Grant check, this application command must not return a
+  // replay as the same successful access-opening response as a new bind.
+  // Reader Knowledge requires its own fresh exact Grant admission separately.
+  if (replayed) {
+    throw new ApiCommandError(
+      'CAPABILITY_UNAVAILABLE',
+      'Standard Reading Reader access must be verified against a current Grant.',
+    );
+  }
+
   void entitlementGrantId;
 
   return Object.freeze({
