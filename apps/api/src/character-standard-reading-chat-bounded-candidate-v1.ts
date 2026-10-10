@@ -147,7 +147,7 @@ export function prepareCharacterStandardReaderBoundedCandidateV1(input: Readonly
   if (guard.mode !== 'accepted' ||
       !exactMembers(guard.evidence.validatedUnitIds, closure.selectedUnitIds) ||
       !exactMembers(guard.evidence.validatedDisclosureRefs, closure.requiredDisclosureRefs) ||
-      guard.utterance !== rendered.utterance) {
+      guard.utterance.utteranceId !== rendered.utterance.utteranceId) {
     return hold('semantic_guard_failed');
   }
 
