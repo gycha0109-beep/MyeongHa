@@ -36,6 +36,22 @@ begin
   if v_late <> 6 or v_early <> 0 then
     raise exception 'HOLD_SEYEON_BACKFILL: migration history has changed';
   end if;
+  if (select count(*) from supabase_migrations.schema_migrations
+      where version >= '1520' and version <= '1640') <> 0 then
+    raise exception 'HOLD_SEYEON_BACKFILL: later dependent migrations already present';
+  end if;
+  if (select count(*) from (
+      values
+      ('1460','seyeon_production_relationship_runtime_read_v1'),
+      ('1470','seyeon_relationship_sync_outbox_v1'),
+      ('1480','seyeon_production_context_runtime_v1'),
+      ('1490','seyeon_production_chat_execution_runtime_v1'),
+      ('1500','seyeon_post_turn_analysis_runtime_v1'),
+      ('1510','seyeon_production_runtime_composition_v1')
+    ) as expected(version,name)
+    join supabase_migrations.schema_migrations actual using (version,name)) <> 6 then
+    raise exception 'HOLD_SEYEON_BACKFILL: later history marker names have changed';
+  end if;
   select count(*) into v_bundle from supabase_migrations.schema_migrations
     where version='20261008090417'
       and name='seyeon_runtime_1460_1510_acl_before_owner_recovery'
