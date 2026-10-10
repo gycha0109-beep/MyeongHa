@@ -108,7 +108,7 @@
 | DB-C1 | 같은 Reader/Reading/bundle의 독립 active Grants 둘, B1 revoke 후 B2 유지, 전부 revoke 시 deny | #1854 / db-authority-core | **실제 Postgres PASS / merged b18e6c15** |
 | DB-C2 | 서로 다른 active bundle 둘은 DB 메타데이터 2행으로 유지, 한 bundle revoke 뒤 단일 행 복구 | #1854 / db-authority-core | **DB SQL 2행 PASS**. 애플리케이션 exact-one reject의 새 E2E는 별도 |
 | DB-C3 | 기존 구매 Grant UPDATE vs 가상 최종 조회 FOR SHARE의 양방향 잠금 대기 | #1857 / isolated PostgreSQL 두 연결 | **기초 행 잠금 사전 검증 PASS**. 실제 T2 권한 함수·환불 Provider effect/최종 공개는 HOLD |
-| DB-C4 | B2 행 잠금 중 다른 bundle B3의 **기존 독립 Grant** 활성화 | #1857 / preflight | **단일 행 잠금의 한계 재현 PASS**. 신규 Grant INSERT/공통 scope anchor·실제 T2 경합은 HOLD |
+| DB-C4 | B2 행 잠금 중 기존 B3 활성화(#1857) **및 신규 B4 verified receipt→Grant 발급→Reader access INSERT(#1864)** | #1857·#1864 / 격리 PostgreSQL | **기존 B2 행 잠금의 한계, 신규 INSERT phantom PASS**. 공동 anchor를 적용한 T2/환불 경합·운영 승인 여전히 HOLD |
 | API-C1 | T1→원격 fake Saju wait→T2, provider await 중 DB pool lease 0 | Reader/API Runtime 별도 PR | 구현 HOLD |
 | API-C2 | Fresh clock/Subject/Source/policy/release 검증 및 client stale response 폐기 | Reader/API + 모바일 계약 검증 | 구현 HOLD |
 | RELEASE | Web checkout→receipt→Grant→Reader result→refund→re-read, kill switch | Product/Commerce/Saju/QA | 운영 HOLD |
@@ -121,6 +121,34 @@ DB-C1/C2는 #1854로 격리 PostgreSQL 범위에서 검증·병합 완료. 별�
 - DB-C4 사전 검증은 **기존 다른 번들 B3 Grant의 상태 활성화**가 B2 행 `FOR SHARE`만으로 차단되지 않는다는 음성 증거다. **새 Purchase Intent/binding/Grant INSERT phantom은 시험하지 않았다.**
 - #1857 병합 `510945f0b0d9e7c969dd2c60d520922c3ef8b01f`, scoped DB 및 full integration PASS. 기능 정책/SQL migration/공개 설정 변경 없음. L1·R2 잠금 protocol은 DB/Commerce/Reader owner HOLD 유지.
 
+## 6.2 PR #1864 — 신규 구매 바인딩 INSERT 경합 증거와 차기 설계
+
+- 병합 PR **#1864**, commit `db55677ea20210ec7b6ba7c2c04b5222ef7ac458`: 새로운 synthetic verified receipt B4를 생성하되 아직 B4 purchase-backed Grant/Reader access는 없는 상태에서 시작.
+- T2 유사 PostgreSQL 연결 A가 기존 Reader B2 `entitlement_grants` row를 `FOR SHARE` 보유하는 동안, 연결 B가 **기존 `internal_apply_verified_receipt_capability_effects_v1` + `cmd_bind_standard_reading_access_v2`**로 B4의 신규 Grant **및** Reader access provenance를 원자적 트랜잭션에 발급·삽입한다.
+- B2의 행 잠금이 유지되는 동안 **B4 신규 Grant 1개·Reader access 1개·서로 다른 활성 bundle 2개·동일 공식 Reading 1건** 관측. 이는 #1857의 '이미 존재하는 B3 Grant 활성화'보다 강한 **실제 신규 INSERT phantom** 음성 검증이다.
+- 전체 DB/Core/Commerce/Runtime 통합 CI PASS. **단일 기존 Grant 행 잠금은 신규 다른 bundle 접근권의 출현을 직렬화하지 못한다.**
+- 이 증거는 아직 **승인된 공통 scope-anchor T2**, Provider refund event, L1 HTTP reveal linearization, source drift, staging live purchase 등을 구현·검증하지 않았다. Public Reader OFF와 D-02 Owner HOLD 유지.
+
+### 실행 가능한 R2 범위 잠금 후보 — 기존 self Birth Profile 재사용 (미승인)
+
+1. migration 1220 `cmd_bind_standard_reading_access_v2`는 **exact purchase Grant를 `FOR UPDATE`한 다음**, 해당 canonical Subject의 `birth_profiles` 현재 self 행을 **`FOR UPDATE`**해 Official Reading identity를 직렬화한다(기존 코드 확인).
+2. **후보 R2-BP:** 운영 T2는 최신 정확한 Reader access 후보 Grant들을 UUID 정렬 등 DB Owner가 정한 일관된 순서로 잠근 후, 동일 Subject의 해당 self Birth Profile을 공유/업데이트 충돌 잠금으로 확보하고, **잠금 후 새 DB clock**에서 Grant·bundle·Reading·Rule·Thread·Release 전부를 다시 읽는다. T2가 Birth Profile 잠금을 선점하면 새 B4 `cmd_bind...`가 같은 행 `FOR UPDATE`를 기다려, 최종 판정 직전 phantom 결속을 방어할 수 있는 후보이다.
+3. **필수 조건:** checkout/Receipt-effect가 B4 Grant를 먼저 발급할 수 있어도, 실제 Reader access가 DB bind되기 전에는 paid Reader access가 아님을 유지한다. Refunder는 Grant UPDATE와 직렬화. T2가 새 B4의 선행 발급만 보고 '접근 허용'을 만들지 않아야 한다.
+4. **미결정 위험:** self Birth Profile은 Reader·Product를 넘어 공유되므로 lock contention 증가. Birth revision mutation, 다른 Reading 생성/기록, Subject merge와 Commerce effect의 **모든 잠금 순서**를 재검토해야 한다. 유효한 access Grant 집합의 잠금 대상 결정 시점과 Birth Profile 잠금 사이 신규 binding을 반드시 잠금 이후 fresh query로 포착해야 한다.
+5. **대안 R2-NEW:** 별도 canonical Subject×official Reading×Reader scope anchor/DB 함수로 더 작은 잠금 범위를 정의할 수 있으나, 새 권위 객체 및 모든 writer 마이그레이션 비용이 발생한다. 신규 table/함수·public 권한을 이 문서에서 승인하지 않는다.
+
+### 차기 구현 승인 게이트
+
+| 승인 항목 | 필요한 근거 |
+| --- | --- |
+| DB Owner | R2-BP 또는 R2-NEW 선택; 정확한 row lock mode, 모든 mutation 경로의 공통 잠금 순서, deadlock/timeout 및 RLS·SECURITY DEFINER 검증 |
+| Commerce Owner | revoke/refund event가 T2 Grant 잠금과 직렬화되는지, 독립 구매 Grant와 환불 이벤트 순서 정책 |
+| Reader/API Owner | 짧은 T1→DB 밖 LLM→새 T2 승인/커밋, 응답 노출 시점 L1 의미, timeout·fallback·비스트리밍 |
+| QA | 실제 **두 PostgreSQL 연결**에서 B4 INSERT 먼저/T2 먼저 양방향, 빠른 연속 2 Grant, 취소/만료/Subject merge, 교착 반복/lock wait/latency 계측 |
+| Release Owner | owner 합의·CI·스테이징 E2E 전까지 `READER_RUNTIME_PUBLIC_ACTIVATED_V1=false` 유지 |
+
+**판정:** DB-C4 신규 INSERT phantom *재현* PASS. R2 잠금 방어 구현·검증 및 실제 공개 선형화는 별도 Owner approval/PR가 필요한 HOLD.
+
 ## 7. 부정 테스트·출시 금지
 
 - 기존 Product standard.love_relationship 활성화·Offer/Charge Terms·PortOne 결제·Grant 발급 운영 승인은 아직 확인되지 않음.
@@ -132,7 +160,7 @@ DB-C1/C2는 #1854로 격리 PostgreSQL 범위에서 검증·병합 완료. 별�
 ## 8. A/B/C 종료
 
 A. 실행 가능한 lock/linearization 후보·DB-C1~C4 테스트 설계 작성: **SELF REVIEW PASS**. DB/Commerce/Reader/API/Legal 합의: **HOLD**.
-B. #1831·#1838·#1854(DB-C1/C2), #1857(기존 Grant 행 잠금 **사전 검증만**) 실제 PostgreSQL PASS. 승인된 DB-C3/C4 완결, 짧은 T1-T2/Final reveal 운영 구현·환불 interleaving은 **HOLD**.
+B. #1831·#1838·#1854(DB-C1/C2), #1857(기존 Grant 행 잠금), **#1864(새 검증 Receipt→Grant 발급→Reader access INSERT phantom)** 실제 격리 PostgreSQL PASS. 승인된 공통 잠금, T1-T2 Final reveal, 운영 환불 interleaving은 **HOLD**.
 C. 실판매·환불/권한회수·Saju Production·Reader 공개/rollback 실제 E2E: **HOLD**.
 
 본 문서는 코드가 아니라 owner 검토용 설계이며, 어떤 실제 동시성 테스트 실행도 주장하지 않는다.
