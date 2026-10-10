@@ -95,6 +95,23 @@ describe('A3-theta PostgreSQL Standard Reading follow-up anchor contract (dorman
       .rejects.toMatchObject({ code: 'INVALID_PROVENANCE' });
   });
 
+  it('rejects malformed single-row DB results without leaking TypeError or returning null', async () => {
+    for (const badRow of [null, undefined, 42, 'untrusted', [], true]) {
+      const { port } = mock([badRow]);
+      await expect(port.readLatestValidatedAnchor(scope))
+        .rejects.toMatchObject({ code: 'INVALID_PROVENANCE' });
+    }
+  });
+
+  it('rejects broken database response shapes as invalid provenance, not absent evidence', async () => {
+    for (const badRows of [null, undefined, {}, 'invalid']) {
+      const { port, query } = mock();
+      query.mockResolvedValueOnce({ rows: badRows } as never);
+      await expect(port.readLatestValidatedAnchor(scope))
+        .rejects.toMatchObject({ code: 'INVALID_PROVENANCE' });
+    }
+  });
+
   it('returns no arbitrary focus when the DB supplies no focused Unit', async () => {
     const { port } = mock([{ ...validRow, focusedUnitRef: null }]);
     const result = await port.readLatestValidatedAnchor(scope);
