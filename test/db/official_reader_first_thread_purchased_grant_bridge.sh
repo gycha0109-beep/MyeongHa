@@ -38,6 +38,9 @@ purchase_state() {
       and a.purchase_intent_id='$1'::uuid;" >/dev/null
 }
 
+# The preceding general Chat fixture may already have a default Release.
+# Clear its default flag only inside the same disposable PostgreSQL database.
+p -c "update public.content_releases set is_default=false where is_default;" >/dev/null
 # Publish a disposable default A in this isolated test DB only.
 p <<SQL >/dev/null
 insert into public.content_releases(
