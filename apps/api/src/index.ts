@@ -764,6 +764,13 @@ export {
 } from './character-standard-reading-chat-scene-handoff-v1.js';
 
 export {
+  STANDARD_READER_SOURCE_CLOSURE_VERSION_V1,
+  CharacterStandardReaderSourceClosureErrorV1,
+  closeCharacterStandardReaderSourceFocusV1,
+  type CharacterStandardReaderSourceClosureDecisionV1,
+} from './character-standard-reading-chat-source-closure-v1.js';
+
+export {
   POSTGRES_STANDARD_FOLLOWUP_ANCHOR_BINDING_V1,
   PostgresStandardFollowupAnchorErrorV1,
   createPostgresStandardFollowupAnchorAuthorityPortV1,
