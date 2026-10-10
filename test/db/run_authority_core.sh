@@ -75,6 +75,7 @@ run_isolated_case myeongha_seyeon_d4a_test bash test/db/seyeon_governed_cost_d4a
 run_isolated_case myeongha_seyeon_d4b_test bash test/db/seyeon_governed_cost_d4b_deletion_race.sh
 run_isolated_case myeongha_seyeon_d4b2_test bash test/db/seyeon_governed_cost_d4b2_settle_delete_race.sh
 run_isolated_case myeongha_seyeon_d4b3_test bash test/db/seyeon_governed_cost_d4b3_cross_subject_race.sh
+run_isolated_case myeongha_seyeon_d4b4_test bash test/db/seyeon_governed_cost_d4b4_settlement_crash_replay.sh
 psql -v ON_ERROR_STOP=1 -f test/db/seyeon_ai_legacy_cutover_revoke_simulation_v1.sql
 bash test/db/seyeon_legacy_cutover_readonly_preflight_v1.sh
 bash test/db/character_face_governed_artifact_commit.sh
