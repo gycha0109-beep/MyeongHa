@@ -72,7 +72,7 @@ for name in quote rate id; do
   }
 done
 # PUBLIC cannot execute trigger function, detached worker cannot SELECT ledger.
-test "$(db -c "select has_function_privilege('public','public.pin_seyeon_governed_reservation_receipt_v1()','EXECUTE')")" = f || exit 12
+test "$(db -c "select has_function_privilege('myeongha_seyeon_settlement_worker','public.pin_seyeon_governed_reservation_receipt_v1()','EXECUTE')")" = f || exit 12
 test "$(db -c "select has_table_privilege('myeongha_seyeon_settlement_worker','public.seyeon_ai_call_cost_events','SELECT')")" = f || exit 13
 # Deactivation cannot retrospectively mutate the admitted price.
 db -c "update public.seyeon_ai_governor_model_policies_v1
