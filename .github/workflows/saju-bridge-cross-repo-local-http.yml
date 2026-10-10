@@ -12,6 +12,9 @@ on:
       - test/saju-held-cross-repo-local-gotrue-auth.test.ts
       - test/saju-held-cross-repo-local-restricted-login.test.ts
       - test/saju-held-cross-repo-local-tls-nonce.test.ts
+      - test/saju-held-cross-repo-local-tls-subject.test.ts
+      - test/db/fixtures/saju_local_tls_subject_login.sql
+      - scripts/local/setup-saju-bridge-tls-subject-ci.sh
       - test/db/fixtures/saju_local_tls_nonce_login.sql
       - scripts/local/setup-saju-bridge-tls-nonce-ci.sh
       - test/db/fixtures/saju_local_restricted_logins.sql
@@ -32,7 +35,7 @@ concurrency:
 jobs:
   real-local-http:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 16
     services:
       postgres:
         image: postgres:15
@@ -128,6 +131,10 @@ jobs:
         working-directory: myeongha
         shell: bash
         run: bash scripts/local/setup-saju-bridge-tls-nonce-ci.sh
+      - name: Start independent disposable Subject PostgreSQL with verified TLS and restricted login
+        working-directory: myeongha
+        shell: bash
+        run: bash scripts/local/setup-saju-bridge-tls-subject-ci.sh
       - name: Start disposable real Supabase GoTrue with independent Auth database
         shell: bash
         env:
@@ -173,6 +180,7 @@ jobs:
           MYEONGHA_LOCAL_GOTRUE_ENABLED: '1'
           MYEONGHA_LOCAL_RESTRICTED_LOGINS_ENABLED: '1'
           MYEONGHA_LOCAL_TLS_NONCE_ENABLED: '1'
+          MYEONGHA_LOCAL_TLS_SUBJECT_ENABLED: '1'
         run: node scripts/local/verify-saju-bridge-http.mjs ../saju
       - name: Collect disposable GoTrue Auth failure diagnostics
         if: failure()
@@ -186,3 +194,9 @@ jobs:
         run: |
           docker rm -f myeongha-saju-tls-nonce-ci >/dev/null 2>&1 || true
           rm -rf "$RUNNER_TEMP/saju-bridge-nonce-tls"
+      - name: Tear down isolated TLS Subject cluster and ephemeral CA material
+        if: always()
+        shell: bash
+        run: |
+          docker rm -f myeongha-saju-tls-subject-ci >/dev/null 2>&1 || true
+          rm -rf "$RUNNER_TEMP/saju-bridge-subject-tls"

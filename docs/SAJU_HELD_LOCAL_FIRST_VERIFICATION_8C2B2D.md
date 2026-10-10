@@ -176,6 +176,20 @@ node scripts/local/verify-saju-bridge-http.mjs ../Saju
 
 **한계:** 이 테스트의 CA는 CI가 생성한 일회용 자체 CA이다. `saju-held-staging-db-tls-target-v1.ts`의 독립 운영 승인 Plan을 실제로 수령하거나 운영 Root fingerprint를 검증하지 않는다. Subject DB는 이 단계에서도 **평문 로컬 연결**이며, Admission DB의 독립 TLS 실소켓 경계 역시 미검증이다. 운영 Auth/Root/Attestor/Runner/Permit custody, 실제 TLS 대상·DNS·R01–R14 운영 신뢰 증빙은 계속 `NOT_VERIFIED`/`HOLD` 상태로 유지한다.
 
+## 2H. 독립 Subject PostgreSQL TLS·제한 로그인 및 실제 GoTrue 경로 — 3단계
+
+2G의 별도 TLS Nonce 클러스터 외에, CI 한정 **별도 Subject PostgreSQL 15 클러스터**(127.0.0.1:5444, `subject.saju-bridge-ci.invalid`, `myeongha_saju_subject_tls_verify`)를 추가했다. 기존 Subject/Nonce 실행 구현과 Saju HTTP 발급기는 변경하지 않는다. 기존 동일 [교차 저장소 Workflow](../.github/workflows/saju-bridge-cross-repo-local-http.yml)만 확장했다.
+
+- `scripts/local/setup-saju-bridge-tls-subject-ci.sh`: 매 실행 독립 Subject CA/오답 CA/서버 SAN·암호 생성, TLS 1.2+, `hostnossl reject`, 호스트에 바인딩된 5444 포트, 모든 migrations 및 **합성** Subject/Birth fixture를 폐기형 DB에만 적용. 독립 Nonce CA/계정/DB와 혼동 금지.
+- `test/db/fixtures/saju_local_tls_subject_login.sql`: 정확한 CI DB와 관리자 세션에서 기존 `myeongha_runtime`의 비슈퍼유저·NOINHERIT·NOBYPASSRLS 및 정확한 `myeongha_api_executor` 멤버십을 확인한 후에만 일회 암호 설정. 새 Production GRANT나 운영 migration 아님.
+- `test/saju-held-cross-repo-local-tls-subject.test.ts`: 실제 `pg_stat_ssl` TLS peer·`session_user` 확인, 오답 CA·호스트명·평문·타 DB 로그인 차단, 직접 Birth/Nonce 조회·타 실행 역할 승격 거부, 같은 Subject TLS 풀 세션 재사용 뒤 서로 다른 Member 접근 및 원래 Member 재진입 검증, 실제 Saju HTTP/HMAC→독립 TLS Nonce 원자 소비·Current Birth Revision 재확인.
+- 기존 `test/saju-held-cross-repo-local-gotrue-auth.test.ts`의 **실제 폐기형 GoTrue 회원가입/JWT** 3건을 새 Subject TLS의 제한된 로그인 및 별도 TLS Nonce 클러스터로 다시 연결했다. Synthetic GoTrue → Subject 임시 매핑에만 CI 관리자를 사용하고, 실제 읽기/소비는 비슈퍼유저 네트워크 로그인으로 수행한다.
+- 수정된 CI와 HTTP runner 외에 Production Route/Runner/Secret/Key 발급/운영 DB/실회원 접근은 없다. 테스트 자체 CA는 운영 독립 Root/승인 증빙이 아니다.
+
+**검증 근거:** [Scope CI #38060001813](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38060001813) — 코드 HEAD `9706788819badebb8a808846b1bd865f6c3985b9`에서 15+5+4+4+3 = **31건 PASS**. 첫 검증은 별도 Nonce 클러스터에 없는 Subject role을 `pg_has_role`로 직접 질의하는 테스트 전제 오류로 실패했다. `pg_roles` 존재성 검사로 수정한 뒤 **동일 격리 경로 재검증 PASS**. GitHub PR #1911에서 HEAD의 추가 문서 커밋/전체 고정 SHA CI·병합 상태를 별도로 검증한다.
+
+**한계:** 이는 CI runner 내부의 자체 CA·임시 GoTrue/Subject/Nonce와 실제 네트워크 소켓 검증일 뿐, 운영 Root 키 custody, 독립 클라우드 Auth, R01–R14 운영 관찰, 실제 Approval/Runner를 증명하지 않는다. **Admission의 독립 로그인/실제 TLS/Permit V2 소비 경계는 후속 2I**, 세 DB 동시 교차 검증은 2J에서 확인한다. `stagingConnection=NOT_VERIFIED`, `stagingAdmission=HOLD`, `canRunOnce/canExecute/canPublish/canSell=false`.
+
 ## 3. 통과 기준 / 아직 증명하지 않은 것
 
 | 시험 | 로컬/기존 CI에서 검사 가능 | 남는 실제 환경 확인 |

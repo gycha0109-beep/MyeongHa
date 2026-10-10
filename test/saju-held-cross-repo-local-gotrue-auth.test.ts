@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto';
-import { Pool } from 'pg';
+import { readFileSync } from 'node:fs';
+import { Pool, type PoolConfig } from 'pg';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { bindAuthenticatedMemberSajuHeldProofV1 } from '../apps/api/src/saju-held-authenticated-member-proof-v1.js';
 import { createProductionRequestIdentityVerifierV1 } from '../apps/api/src/production-request-identity-verifier.js';
@@ -46,12 +47,51 @@ const pgConfig = {
   max: 3,
   connectionTimeoutMillis: 5000,
 };
-const ownerPool = enabled ? new Pool(pgConfig) : undefined;
-const noncePool = enabled ? new Pool(pgConfig) : undefined;
+const isolatedSubjectTls = enabled && process.env.MYEONGHA_LOCAL_TLS_SUBJECT_ENABLED === '1';
+const isolatedNonceTls = enabled && process.env.MYEONGHA_LOCAL_TLS_NONCE_ENABLED === '1';
+const readCiCa = (file: string | undefined) => file ? readFileSync(file, 'utf8') : '';
+const subjectAdminConfig: PoolConfig = isolatedSubjectTls ? {
+  host: 'subject.saju-bridge-ci.invalid', port: 5444,
+  user: 'postgres', database: 'myeongha_saju_subject_tls_verify',
+  password: process.env.MYEONGHA_LOCAL_TLS_SUBJECT_ADMIN_PASSWORD,
+  ssl: {
+    ca: readCiCa(process.env.MYEONGHA_LOCAL_TLS_SUBJECT_CA_FILE),
+    rejectUnauthorized: true,
+  },
+  max: 3, connectionTimeoutMillis: 5000,
+} : pgConfig;
+const subjectRuntimeConfig: PoolConfig = {
+  ...subjectAdminConfig,
+  user: 'myeongha_runtime',
+  password: process.env.MYEONGHA_LOCAL_TLS_SUBJECT_PASSWORD,
+  max: 1,
+};
+const nonceRuntimeConfig: PoolConfig = isolatedNonceTls ? {
+  host: 'nonce.saju-bridge-ci.invalid', port: 5443,
+  user: 'myeongha_tls_nonce_ci_login',
+  database: 'myeongha_saju_nonce_tls_verify',
+  password: process.env.MYEONGHA_LOCAL_TLS_NONCE_PASSWORD,
+  ssl: {
+    ca: readCiCa(process.env.MYEONGHA_LOCAL_TLS_NONCE_CA_FILE),
+    rejectUnauthorized: true,
+  },
+  max: 2, connectionTimeoutMillis: 5000,
+} : pgConfig;
+const ownerPool = enabled ? new Pool(subjectAdminConfig) : undefined;
+const subjectRuntimePool = isolatedSubjectTls ? new Pool(subjectRuntimeConfig) : ownerPool;
+const noncePool = enabled ? new Pool(nonceRuntimeConfig) : undefined;
 let owner: CreatedUser;
 let other: CreatedUser;
 
 function guard(): void {
+  if (isolatedSubjectTls && (!isolatedNonceTls
+    || !process.env.MYEONGHA_LOCAL_TLS_SUBJECT_ADMIN_PASSWORD
+    || !process.env.MYEONGHA_LOCAL_TLS_SUBJECT_PASSWORD
+    || !process.env.MYEONGHA_LOCAL_TLS_SUBJECT_CA_FILE
+    || !process.env.MYEONGHA_LOCAL_TLS_NONCE_PASSWORD
+    || !process.env.MYEONGHA_LOCAL_TLS_NONCE_CA_FILE)) {
+    throw new Error('GoTrue dual TLS suites require disposable isolated TLS credentials.');
+  }
   if (process.env.PGHOST !== '127.0.0.1'
     || process.env.PGPORT !== '5432'
     || process.env.PGDATABASE !== 'myeongha_saju_local_verify'
@@ -185,7 +225,7 @@ function input(token?: string) {
     identityEvidenceVerifier: createProductionRequestIdentityVerifierV1({
       config: userDataConfig, memberFetchImpl: authFetch,
     }),
-    pool: poolPort(ownerPool!),
+    pool: poolPort(subjectRuntimePool!),
     issuePort: createSajuHeldSourceProofHttpIssuePortV1({
       serviceOrigin: SAJU_ORIGIN,
       serviceBearer: process.env.MYEONGHA_LOCAL_SAJU_BEARER!,
@@ -209,7 +249,30 @@ describe.skipIf(!enabled)('real local GoTrue /user -> MyeongHa member verifier -
     const database = await ownerPool!.query<{ name: string }>(
       'select current_database() as name',
     );
-    expect(database.rows[0]?.name).toBe('myeongha_saju_local_verify');
+    expect(database.rows[0]?.name).toBe(
+      isolatedSubjectTls ? 'myeongha_saju_subject_tls_verify' : 'myeongha_saju_local_verify',
+    );
+    if (isolatedSubjectTls) {
+      const [subjectStatus, nonceStatus] = await Promise.all([
+        subjectRuntimePool!.query(`select session_user::text as login,
+          current_user::text as principal, ssl.ssl,
+          pg_has_role(current_user,'myeongha_api_executor','MEMBER') as can_exec,
+          pg_has_role(current_user,'myeongha_saju_proof_nonce_runtime','MEMBER') as can_nonce
+          from pg_stat_ssl ssl where ssl.pid=pg_backend_pid()`),
+        noncePool!.query(`select session_user::text as login,
+          current_user::text as principal, ssl.ssl,
+          exists(select 1 from pg_roles where rolname='myeongha_api_executor') as can_exec
+          from pg_stat_ssl ssl where ssl.pid=pg_backend_pid()`),
+      ]);
+      expect(subjectStatus.rows[0]).toMatchObject({
+        login: 'myeongha_runtime', principal: 'myeongha_runtime',
+        ssl: true, can_exec: true, can_nonce: false,
+      });
+      expect(nonceStatus.rows[0]).toMatchObject({
+        login: 'myeongha_tls_nonce_ci_login', principal: 'myeongha_tls_nonce_ci_login',
+        ssl: true, can_exec: false,
+      });
+    }
     const health = await fetch(AUTH + '/health', { redirect: 'manual' });
     expect(health.ok).toBe(true);
     await health.body?.cancel();
@@ -221,7 +284,8 @@ describe.skipIf(!enabled)('real local GoTrue /user -> MyeongHa member verifier -
   }, 30000);
 
   afterAll(async () => {
-    await Promise.all([ownerPool?.end(), noncePool?.end()]);
+    await Promise.all([ownerPool?.end(), noncePool?.end(),
+      isolatedSubjectTls ? subjectRuntimePool?.end() : undefined]);
   });
 
   it('accepts real GoTrue member JWT through existing verifier, binding owned Birth to Saju Proof', async () => {

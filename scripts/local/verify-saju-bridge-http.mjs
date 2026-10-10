@@ -45,6 +45,15 @@ async function run() {
   const realGoTrueEnabled = process.env.MYEONGHA_LOCAL_GOTRUE_ENABLED === '1';
   const restrictedLoginEnabled = process.env.MYEONGHA_LOCAL_RESTRICTED_LOGINS_ENABLED === '1';
   const tlsNonceEnabled = process.env.MYEONGHA_LOCAL_TLS_NONCE_ENABLED === '1';
+  const tlsSubjectEnabled = process.env.MYEONGHA_LOCAL_TLS_SUBJECT_ENABLED === '1';
+  if (tlsSubjectEnabled && (!tlsNonceEnabled || !restrictedLoginEnabled
+    || !process.env.MYEONGHA_LOCAL_TLS_SUBJECT_PASSWORD
+    || !process.env.MYEONGHA_LOCAL_TLS_SUBJECT_ADMIN_PASSWORD
+    || !process.env.MYEONGHA_LOCAL_TLS_SUBJECT_CA_FILE
+    || !process.env.MYEONGHA_LOCAL_TLS_SUBJECT_WRONG_CA_FILE
+    || !process.env.MYEONGHA_LOCAL_TLS_SUBJECT_CA_FINGERPRINT)) {
+    throw new Error('Independent Subject TLS requires disposable dual-DB TLS, GoTrue and limited roles.');
+  }
   if (tlsNonceEnabled && (!restrictedLoginEnabled
     || !process.env.MYEONGHA_LOCAL_TLS_NONCE_PASSWORD
     || !process.env.MYEONGHA_LOCAL_TLS_NONCE_CA_FILE
@@ -195,6 +204,30 @@ async function run() {
       if (tlsCode !== 0) throw new Error('Actual separate PostgreSQL TLS peer/nonce verification failed.');
       console.log('[saju-bridge] Physically separate nonce PG with verified TLS and restricted login: PASS (not staging).');
     }
+    if (tlsSubjectEnabled) {
+      const verifySubject = spawn(process.execPath, [
+        vitest, 'run', 'test/saju-held-cross-repo-local-tls-subject.test.ts',
+      ], {
+        cwd: root,
+        env: {
+          ...testEnv,
+          MYEONGHA_LOCAL_TLS_SUBJECT_ENABLED: '1',
+          MYEONGHA_LOCAL_TLS_SUBJECT_PASSWORD: process.env.MYEONGHA_LOCAL_TLS_SUBJECT_PASSWORD,
+          MYEONGHA_LOCAL_TLS_SUBJECT_CA_FILE: process.env.MYEONGHA_LOCAL_TLS_SUBJECT_CA_FILE,
+          MYEONGHA_LOCAL_TLS_SUBJECT_WRONG_CA_FILE: process.env.MYEONGHA_LOCAL_TLS_SUBJECT_WRONG_CA_FILE,
+          MYEONGHA_LOCAL_TLS_SUBJECT_CA_FINGERPRINT: process.env.MYEONGHA_LOCAL_TLS_SUBJECT_CA_FINGERPRINT,
+          MYEONGHA_LOCAL_TLS_NONCE_PASSWORD: process.env.MYEONGHA_LOCAL_TLS_NONCE_PASSWORD,
+          MYEONGHA_LOCAL_TLS_NONCE_CA_FILE: process.env.MYEONGHA_LOCAL_TLS_NONCE_CA_FILE,
+        },
+        stdio: 'inherit',
+      });
+      const tlsSubjectCode = await new Promise((ok, bad) => {
+        verifySubject.once('error', bad);
+        verifySubject.once('exit', (exitCode, signal) => ok(exitCode ?? (signal ? 1 : 1)));
+      });
+      if (tlsSubjectCode !== 0) throw new Error('Isolated Subject PostgreSQL TLS verification failed.');
+      console.log('[saju-bridge] Separate Subject/Nonce TLS PostgreSQL proof PASSED (not staging).');
+    }
     if (realGoTrueEnabled) {
       // A distinct Vitest process prevents the GoTrue→Subject fixture remapping
       // from racing with baseline Birth owner/revision tests.
@@ -202,7 +235,18 @@ async function run() {
         vitest, 'run', 'test/saju-held-cross-repo-local-gotrue-auth.test.ts',
       ], {
         cwd: root,
-        env: { ...testEnv, MYEONGHA_LOCAL_GOTRUE_AUTH_DB: '1' },
+        env: {
+          ...testEnv, MYEONGHA_LOCAL_GOTRUE_AUTH_DB: '1',
+          ...(tlsSubjectEnabled ? {
+            MYEONGHA_LOCAL_TLS_SUBJECT_ENABLED: '1',
+            MYEONGHA_LOCAL_TLS_SUBJECT_PASSWORD: process.env.MYEONGHA_LOCAL_TLS_SUBJECT_PASSWORD,
+            MYEONGHA_LOCAL_TLS_SUBJECT_ADMIN_PASSWORD: process.env.MYEONGHA_LOCAL_TLS_SUBJECT_ADMIN_PASSWORD,
+            MYEONGHA_LOCAL_TLS_SUBJECT_CA_FILE: process.env.MYEONGHA_LOCAL_TLS_SUBJECT_CA_FILE,
+            MYEONGHA_LOCAL_TLS_NONCE_ENABLED: '1',
+            MYEONGHA_LOCAL_TLS_NONCE_PASSWORD: process.env.MYEONGHA_LOCAL_TLS_NONCE_PASSWORD,
+            MYEONGHA_LOCAL_TLS_NONCE_CA_FILE: process.env.MYEONGHA_LOCAL_TLS_NONCE_CA_FILE,
+          } : {}),
+        },
         stdio: 'inherit',
       });
       const gotrueCode = await new Promise((ok, bad) => {
