@@ -71,6 +71,7 @@ export function createMobileGuestCredentialStoreV1(
 
   async function write(credential: GuestCredentialV1): Promise<GuestCredentialV1> {
     const serialized = serializeGuestCredentialV1(credential);
+    const previousRaw = await readRaw().catch(() => null);
     try {
       await secureStore.setItemAsync(MOBILE_GUEST_CREDENTIAL_KEY_V1, serialized);
     } catch (error) {
@@ -90,7 +91,18 @@ export function createMobileGuestCredentialStoreV1(
     }
 
     const persisted = parseStoredGuestCredentialV1(observed);
-    emitMobileSubjectCredentialChangedV1();
+    let sameSubject = false;
+    if (previousRaw !== null) {
+      try {
+        const previous = parseStoredGuestCredentialV1(previousRaw);
+        sameSubject =
+          previous.subjectId === persisted.subjectId &&
+          previous.guestSessionId === persisted.guestSessionId;
+      } catch {
+        // Old malformed credentials do not justify reusing old archive data.
+      }
+    }
+    if (!sameSubject) emitMobileSubjectCredentialChangedV1();
     return persisted;
   }
 
