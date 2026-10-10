@@ -10,6 +10,7 @@ import {
   assertServerGuardedStandardReaderBoundedCandidateV1,
   guardCharacterStandardReaderFinalOutputV1,
   assertServerGuardedStandardReaderOutputHoldV1,
+  recheckCharacterStandardReaderFinalHoldV1,
 } from '../apps/api/src/character-standard-reading-chat-bounded-candidate-v1.js';
 import {
   selectCharacterStandardFirstQuestionSourceEntryV1,
@@ -1753,7 +1754,7 @@ describe('A3-eta server-anchored follow-up evidence selection (public OFF)', () 
       sourceUnitRefs: [ids[0]!],
     };
     const readLatestValidatedAnchor = vi.fn(async () => anchor);
-    return { ids, anchor, readLatestValidatedAnchor, input: {
+    return { ids, anchor, readLatestValidatedAnchor, authority, input: {
       preflight, grounded, anchorAuthorityPort: { readLatestValidatedAnchor },
     } };
   }
@@ -1837,6 +1838,8 @@ describe('A3-eta server-anchored follow-up evidence selection (public OFF)', () 
       productSpecVersion: f.input.grounded.scope.productSpecVersion,
       productRuleVersion: f.input.grounded.scope.productRuleVersion,
       approvedPolicyRevision: f.input.grounded.scope.approvedPolicyRevision,
+      sajuDomain: f.input.grounded.scope.sajuDomain,
+      readingContractVersion: f.input.grounded.scope.readingContractVersion,
       focusedUnitRef: f.ids[0],
       requiredDisclosureRefs: questionScope.evidence.requiredDisclosureRefs,
       requiredAmbiguityRefs: [],
@@ -1862,6 +1865,92 @@ describe('A3-eta server-anchored follow-up evidence selection (public OFF)', () 
     expect(guarded).not.toHaveProperty('publicReply');
     expect(guarded).not.toHaveProperty('entitlementGrantId');
     expect(guarded).not.toHaveProperty('canCommit');
+  });
+
+  async function verifiedOutputHold() {
+    const { f, questionScope, candidate } = await oneUnitSemanticCandidate();
+    const outputHold = guardCharacterStandardReaderFinalOutputV1({
+      grounded: f.input.grounded, questionScope,
+      candidate, rendererDraft: cosmetics(),
+    });
+    const args = {
+      preflight: f.input.preflight,
+      outputHold,
+      threadBindingAuthorityPort: f.authority.threadBindingAuthorityPort,
+      accessAuthorityPort: f.authority.accessAuthorityPort,
+      artifactAuthorityPort: f.authority.artifactAuthorityPort,
+      productReaderEligibilityAuthorityPort: f.authority.productReaderEligibilityAuthorityPort,
+    };
+    return { f, outputHold, args };
+  }
+
+  it('RR-09 rechecks exact current A2 source/Grant/Product after output but only returns metadata HOLD', async () => {
+    const { outputHold, args } = await verifiedOutputHold();
+    const result = await recheckCharacterStandardReaderFinalHoldV1(args);
+    expect(result).toMatchObject({
+      mode: 'fresh_revalidated_hold',
+      publicDisclosureAuthorized: false,
+      atomicCommitAuthorized: false,
+      reason: 'DB_ATOMIC_PROVENANCE_AND_DISCLOSURE_PENDING',
+      sourceIdentityHash: outputHold.sourceIdentityHash,
+      utteranceHash: outputHold.utteranceHash,
+    });
+    expect(Date.parse(result.recheckedAt)).toBeGreaterThan(Date.parse(outputHold.effectiveAt));
+    expect(Object.isFrozen(result)).toBe(true);
+    expect(result).not.toHaveProperty('committedMessageId');
+    expect(result).not.toHaveProperty('dbWriter');
+    expect(result).not.toHaveProperty('admissionTicket');
+    expect(result).not.toHaveProperty('publicReply');
+    expect(result).not.toHaveProperty('entitlementGrantId');
+  });
+
+  it('RR-09 denies current Reader access revoked after the earlier output hold', async () => {
+    const { f, args } = await verifiedOutputHold();
+    f.authority.accessAuthorityPort.readAccessibleReadings = vi.fn(async () => []);
+    await expect(recheckCharacterStandardReaderFinalHoldV1(args))
+      .rejects.toMatchObject({ code: 'ACCESS_DENIED' });
+  });
+
+  it('RR-09 denies policy reclassification after semantic and output guards', async () => {
+    const { f, args } = await verifiedOutputHold();
+    f.authority.productReaderEligibilityAuthorityPort.readApprovedRule.mockResolvedValue({
+      status: 'approved',
+      rule: {
+        kind: 'premium_restricted', allowedReaderIds: ['baekheon'],
+        productId: PRODUCT_ID, productSpecVersion: 'standard-reading-v1',
+        sajuDomain: 'career', ruleVersion: 'synthetic-test-reader-policy-v1',
+        approvedPolicyRevision: 'synthetic-test-revision-v1',
+      },
+    } as never);
+    await expect(recheckCharacterStandardReaderFinalHoldV1(args))
+      .rejects.toMatchObject({ code: 'ACCESS_DENIED' });
+  });
+
+  it('RR-09 denies release/bundle revision drift or official source disappearance', async () => {
+    const { f, args } = await verifiedOutputHold();
+    const read = f.authority.threadBindingAuthorityPort.readRuntimeBinding;
+    f.authority.threadBindingAuthorityPort.readRuntimeBinding = vi.fn(async (params) =>
+      (await read(params)).map(row => ({ ...row, contentRevision: row.contentRevision + 1 })));
+    await expect(recheckCharacterStandardReaderFinalHoldV1(args))
+      .rejects.toMatchObject({ code: 'SOURCE_MISMATCH' });
+
+    const valid = await verifiedOutputHold();
+    valid.f.authority.artifactAuthorityPort.readArtifactSource = vi.fn(async () => []);
+    await expect(recheckCharacterStandardReaderFinalHoldV1(valid.args))
+      .rejects.toMatchObject({ code: 'ACCESS_DENIED' });
+  });
+
+  it('RR-09 refuses cloned HOLD/preflight before any new DB Grant read', async () => {
+    const { f, args, outputHold } = await verifiedOutputHold();
+    const port = f.authority.accessAuthorityPort.readAccessibleReadings;
+    (port as ReturnType<typeof vi.fn>).mockClear();
+    await expect(recheckCharacterStandardReaderFinalHoldV1({
+      ...args, outputHold: { ...outputHold },
+    })).rejects.toThrow(/output hold is unavailable/u);
+    await expect(recheckCharacterStandardReaderFinalHoldV1({
+      ...args, preflight: { ...args.preflight },
+    })).rejects.toThrow();
+    expect(port).not.toHaveBeenCalled();
   });
 
   it('RR-06 Output Guard rejects unminted candidate, cloned source, and a different question focus', async () => {
