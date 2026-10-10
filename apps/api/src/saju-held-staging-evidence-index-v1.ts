@@ -116,7 +116,21 @@ export function assessSajuHeldStagingEvidenceIndexV1(
       const digests = new Map<string, SajuStagingEvidenceIdV1>();
       const auditRefs = new Map<string, SajuStagingEvidenceIdV1>();
       for (const raw of input.entries as unknown[]) {
-        if (!exactData(raw)) { invalidExtra = true; continue; }
+        if (!exactData(raw)) {
+          invalidExtra = true;
+          // Extract only a plain own data ID; never inspect arbitrary fields/getters.
+          try {
+            if (raw !== null && typeof raw === 'object' && !Array.isArray(raw)) {
+              const d = Object.getOwnPropertyDescriptor(raw, 'evidenceId');
+              if (d && Object.hasOwn(d, 'value')) {
+                const identified = SAJU_HELD_STAGING_REQUIRED_EVIDENCE_V1
+                  .find(s => s.id === d.value);
+                if (identified) blocked.add(identified.id);
+              }
+            }
+          } catch { /* malicious proxy is still blocked */ }
+          continue;
+        }
         const spec = SAJU_HELD_STAGING_REQUIRED_EVIDENCE_V1.find(s => s.id === raw.evidenceId);
         if (!spec) { invalidExtra = true; continue; }
         const evidenceId = spec.id;
