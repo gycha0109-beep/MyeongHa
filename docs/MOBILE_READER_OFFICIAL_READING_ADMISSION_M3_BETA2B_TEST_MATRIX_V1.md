@@ -93,9 +93,9 @@ migration 1220/1270/1240의 기존 관계와 Reader 접근을 재사용할 때�
 - 권한회수 상세 실행 설계: MOBILE_READER_FINAL_AUTHORIZATION_LOCKING_D02_V1.md (설계 후보, 미실행).
 - **DB-C1/C2 실제 Postgres PASS (#1854, merged b18e6c15):** 같은 Reader·bundle에 두 독립 verified synthetic receipt-backed purchase Grants가 있고 한쪽 revoke 후 다른 Grant로 원본 접근 유지, 전부 revoke 후 raw source 접근 0. 다른 active Bundle 둘 이상은 bundle-aware metadata가 별도 2행으로 노출, 하나 회수 후 1행 복귀. **SQL에서 직접 모호성을 DENY한 것이 아니라 기존 서버 A2 exact-one 계약의 거부 입력을 확인한 것**임.
 - **DB-C3:** refund/revoke의 FOR UPDATE·revision CAS와 T2 접근 승인 잠금이 두 PostgreSQL connection에서 양 방향 순서로 직렬화되는지 검증. 만료 시점은 잠금 후 fresh DB clock 사용.
-- **DB-C4:** 새로운 Reader bundle/Grant가 끼어드는 phantom은 기존 Grant row lock만으로 막을 수 없으므로, 모든 writer가 준수하는 reader/reading scope anchor 프로토콜이 필요. Owner 승인 전 구현·PASS 없음.
+- **DB-C4 (#1864 격리 PostgreSQL 재현 PASS):** B2 Grant를 FOR SHARE로 유지한 상태에서 B4 **신규 synthetic verified receipt→purchase Entitlement Grant 발급→Reader access INSERT**가 커밋되고 서로 다른 active Bundle 2개가 나타나는 phantom 경합을 확인. **공통 writer scope anchor를 통한 차단은 미구현·Owner HOLD**.
 - **API-C1/C2:** Saju/provider await 시 DB connection 해제, T2의 fresh identity/Grant/source/policy/rollout 확인 후에만 응답 본문 전달. T1/A2 proof 자체는 현재 권한이 아님.
-- **#1857 두 PostgreSQL 연결 DB 잠금 사전 검증 PASS:** 기존 purchase Grant UPDATE 선점 → FOR SHARE가 기다린 후 회수 상태 DENY; 반대 순서에서는 UPDATE가 FOR SHARE를 기다린다. B2 행만 잠근 동안 B3 **기존 독립 Grant**가 활성화되는 한계 확인. **실제 T2/Provider refund RACE-01~16과 신규 Grant INSERT phantom 경합은 미구현·미실행**, Owner 승인 HOLD. #1831·#1838·#1854·#1857 범위의 DB PASS를 실서비스 공개 승인으로 혼동 금지.
+- **#1857 두 PostgreSQL 연결 DB 잠금 사전 검증 PASS:** purchase Grant UPDATE 선점 → FOR SHARE wait 후 revoked DENY, 반대 순서는 UPDATE wait. **#1864**에서는 B4 **신규 INSERT**까지 확장해 단일 Grant 행 잠금의 결함 범위를 확인. **운영 T2/Provider refund 실제 선형화, R2-BP 또는 R2-NEW 공동 scope-anchor 잠금 구현 및 해당 경합 테스트는 미실행**. #1831·#1838·#1854·#1857·#1864 PASS를 실서비스 공개 승인으로 혼동 금지.
 
 ## 3. 특히 중요한 경계 테스트
 
