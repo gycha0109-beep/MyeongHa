@@ -2,9 +2,10 @@
 """Stage six immutable history SQL files with managed-owner COMMENT reordered.
 
 The original SQL under supabase/migrations/ remains byte-for-byte untouched.
-Only one closing REVOKE ROLE statement per file moves after the existing
-COMMENT ON FUNCTION blocks, preventing Supabase's non-superuser postgres role
-from losing function-owner membership before COMMENT ON FUNCTION executes.
+Only existing trailing COMMENT ON FUNCTION statements move immediately BEFORE
+GRANT OWNER ROLE / ALTER FUNCTION OWNER, so Supabase's non-superuser postgres
+can comment while still the function creator. GRANT / REVOKE ROLE membership
+statements remain untouched and in their original order.
 """
 import argparse
 import os
@@ -56,11 +57,19 @@ def main():
         before, trailing_comments = sql.split(MARKER, 1)
         if not COMMENT_TAIL.fullmatch(trailing_comments):
             raise ValueError(f"HOLD_MANAGED_OWNER_STAGING: non-comment SQL after REVOKE: {file_name}")
-        if "grant myeongha_relationship_apply_owner to current_user;" not in before.lower():
-            raise ValueError(f"HOLD_MANAGED_OWNER_STAGING: missing scoped role grant: {file_name}")
-        patched = before.rstrip() + "\n\n" + trailing_comments.strip() + "\n\n" + MARKER + "\n"
-        if patched.count(MARKER) != 1:
-            raise ValueError("staged SQL must contain exactly one closing role revoke")
+        grant_marker = "grant myeongha_relationship_apply_owner to current_user;"
+        if before.lower().count(grant_marker) != 1:
+            raise ValueError(f"HOLD_MANAGED_OWNER_STAGING: unexpected scoped owner grant: {file_name}")
+        prefix, owned_operations = before.split(grant_marker, 1)
+        # The source's closing REVOKE (and its grant/owner/ACL statements)
+        # remain in the ORIGINAL order. Only metadata COMMENT moves to a point
+        # where current_user is still creator and owner of the new function.
+        patched = (
+            prefix.rstrip() + "\\n\\n" + trailing_comments.strip() + "\\n\\n" +
+            grant_marker + owned_operations + MARKER + "\\n"
+        )
+        if patched.count(MARKER) != 1 or patched.count(grant_marker) != 1:
+            raise ValueError("staged SQL changed owner membership statement multiplicity")
         target = output / file_name
         fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         with os.fdopen(fd, "wb") as file_out:
