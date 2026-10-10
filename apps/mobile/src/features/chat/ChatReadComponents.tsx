@@ -1,6 +1,7 @@
 import type { MobileChatThreadSnapshotV1 } from '@/features/chat/mobile-chat-read-repository';
 import { createMobileChatMessageViewV1 } from '@/features/chat/chat-view-model';
 import { resolveMobileChatCharacterPresentationV1 } from '@/features/chat/chat-character-presentation';
+import { projectMobileChatEmptyGreetingV1 } from '@/features/chat/mobile-chat-empty-greeting';
 import { MOBILE_CHAT_LAUNCH_ROSTER_V1 } from '@/features/chat/chat-launch-roster';
 import { mobileColors } from '@/ui/mobile-colors';
 import {
@@ -73,6 +74,22 @@ export function ChatReadMessages({
   }
 
   if (snapshot.messages.length === 0) {
+    // The server already opened/reused and verified this Thread. The web
+    // room shows the Character's introduction only for confirmed empty history.
+    // This line is presentation, not an invented stored Chat message.
+    const greeting = projectMobileChatEmptyGreetingV1(snapshot);
+    if (greeting !== null) {
+      return (
+        <View style={styles.messages}>
+          <View style={styles.messageRow}>
+            <View style={[styles.bubble, isSeyeonTheme && styles.seyeonSurface]}>
+              <Text style={styles.messageLabel}>{greeting.displayName}</Text>
+              <Text style={styles.messageBody}>{greeting.openingLine}</Text>
+            </View>
+          </View>
+        </View>
+      );
+    }
     return (
       <View style={[styles.stateCard, isSeyeonTheme && styles.seyeonSurface]}>
         <Text style={styles.emptyMark}>◇</Text>
