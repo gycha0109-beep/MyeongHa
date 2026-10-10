@@ -64,6 +64,8 @@ psql -v ON_ERROR_STOP=1 -f test/db/seyeon_ai_governor_internal_start_v1.sql
 psql -v ON_ERROR_STOP=1 -f test/db/seyeon_ai_governor_role_cutover_preflight_v1.sql
 psql -v ON_ERROR_STOP=1 -f test/db/seyeon_governed_execution_role_v1.sql
 bash test/db/seyeon_governed_login_boundary_v1.sh
+psql -v ON_ERROR_STOP=1 -f test/db/seyeon_ai_legacy_cutover_revoke_simulation_v1.sql
+bash test/db/seyeon_legacy_cutover_readonly_preflight_v1.sh
 bash test/db/character_face_governed_artifact_commit.sh
 bash test/db/chat_retry_abandon_concurrency.sh
 bash test/db/birth_profile_create_concurrency.sh
