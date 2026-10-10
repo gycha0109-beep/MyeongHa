@@ -54,20 +54,19 @@ describe('M3-beta-2b device-local archive invalidation on confirmed auth changes
   it('signals only after a verified Member sign-in write and exposes no identity in event', async () => {
     const { storage } = fixture();
     const store = createMobileMemberSessionStoreV1(storage);
-    const observations: Array<{ arguments: number; member: MemberSessionV1 | null }> = [];
-    let observed: MemberSessionV1 | null = null;
+    const observations: number[] = [];
+    let snapshotAtEvent: Promise<MemberSessionV1 | null> | null = null;
     const unsubscribe = subscribeMobileSubjectCredentialChangesV1(function () {
-      observations.push({ arguments: arguments.length, member: observed });
+      observations.push(arguments.length);
+      snapshotAtEvent = store.read();
     });
     // The store verifies its durable readback before publishing.
-    const p = store.write(member);
-    await p;
-    observed = await store.read();
-    // A subscriber sees a committed write even when called synchronously;
-    // no bearer or Subject fields were given to the callback.
-    expect(observations).toHaveLength(1);
-    expect(observations[0]?.arguments).toBe(0);
-    expect(observed).toEqual(member);
+    await store.write(member);
+    // The listener receives no token / Subject payload and can read the
+    // freshly committed session, not a speculative write.
+    expect(observations).toEqual([0]);
+    expect(snapshotAtEvent).not.toBeNull();
+    await expect(snapshotAtEvent).resolves.toEqual(member);
     unsubscribe();
   });
 
@@ -94,12 +93,43 @@ describe('M3-beta-2b device-local archive invalidation on confirmed auth changes
       expect(calls).toBe(1);
       expect(await store.clear('other-guest')).toBe(false);
       expect(calls).toBe(1);
+      // Pure token rotation must not recursively reload the SAME Subject.
       expect(await store.write({ ...guest, bearerToken: 'next-guest' })).toMatchObject({
         bearerToken: 'next-guest',
       });
+      expect(calls).toBe(1);
+      expect(await store.write({
+        ...guest,
+        subjectId: 'subject-guest-two',
+        guestSessionId: 'guest-session-two',
+        bearerToken: 'different-guest',
+      })).toMatchObject({ subjectId: 'subject-guest-two' });
       expect(calls).toBe(2);
-      expect(await store.clear('next-guest')).toBe(true);
+      expect(await store.clear('different-guest')).toBe(true);
       expect(calls).toBe(3);
+    } finally {
+      unsubscribe();
+    }
+  });
+
+  it('does not re-invalidate Records for a token refresh of the same Member identity', async () => {
+    const store = createMobileMemberSessionStoreV1(fixture().storage);
+    let calls = 0;
+    const unsubscribe = subscribeMobileSubjectCredentialChangesV1(() => { calls += 1; });
+    try {
+      await store.write(member);
+      expect(calls).toBe(1);
+      await store.write({
+        ...member,
+        accessToken: 'refreshed.access.token',
+        refreshToken: 'refreshed-token',
+      });
+      expect(calls).toBe(1);
+      await store.write({
+        ...member,
+        user: { id: '22222222-2222-4222-8222-222222222222', email: 'another@example.com' },
+      });
+      expect(calls).toBe(2);
     } finally {
       unsubscribe();
     }
