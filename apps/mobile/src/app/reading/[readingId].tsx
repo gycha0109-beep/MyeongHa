@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 
 import { MobileOfficialReadingReaderEntry } from '@/features/reading/MobileOfficialReadingReaderEntry';
+import { subscribeMobileSubjectCredentialChangesV1 } from '@/core/session/mobile-subject-credential-changes';
 import { mobileRecordsServiceV1 } from '@/features/records/native-mobile-records-service';
 import {
   formatRecordDateV1,
@@ -96,8 +97,16 @@ export default function OfficialReadingDetailScreen() {
 
   useFocusEffect(useCallback(() => {
     focused.current = true;
+    const unsubscribe = subscribeMobileSubjectCredentialChangesV1(() => {
+      // A verified credential mutation immediately hides the old archived
+      // Reading, including while this route remains focused.
+      requestEpoch.current += 1;
+      setState(Object.freeze({ kind: 'loading' as const }));
+      void load();
+    });
     void load();
     return () => {
+      unsubscribe();
       focused.current = false;
       requestEpoch.current += 1;
       // Archive content must not remain on a blurred or replaced route.
