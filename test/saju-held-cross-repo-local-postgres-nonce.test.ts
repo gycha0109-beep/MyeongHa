@@ -9,6 +9,7 @@ import {
 } from '../apps/api/src/saju-held-source-proof-http-client-v1.js';
 import { createSajuSourceProofPostgresNonceClaimV1 } from '../apps/api/src/saju-source-proof-nonce-postgres-claim-v1.js';
 import { verifySajuHeldSourceProofV1 } from '../apps/api/src/saju-held-source-proof-verifier-v1.js';
+import type { PostgresQueryResultV1, PostgresSubjectPoolV1 } from '../apps/api/src/postgres-subject-execution.js';
 
 const enabled = process.env.MYEONGHA_LOCAL_SAJU_NONCE_DB === '1';
 const port = Number(process.env.MYEONGHA_LOCAL_SAJU_PORT);
@@ -102,13 +103,36 @@ function context(sample: Issued) {
   };
 }
 
+function noncePool(pool: Pool): PostgresSubjectPoolV1 {
+  return {
+    async connect() {
+      const connection = await pool.connect();
+      return {
+        async query<Row = Record<string, unknown>>(
+          sql: string, values?: readonly unknown[],
+        ): Promise<PostgresQueryResultV1<Row>> {
+          const result = values === undefined
+            ? await connection.query(sql)
+            : await connection.query(sql, [...values]);
+          return { rows: result.rows as readonly Row[] };
+        },
+        release(error?: unknown) {
+          connection.release(error === undefined
+            ? undefined
+            : error instanceof Error ? error : new Error('Local nonce test connection discard'));
+        },
+      };
+    },
+  };
+}
+
 function verifier(pool: Pool) {
   return {
     trustedIssuer: process.env.MYEONGHA_LOCAL_SAJU_ISSUER!,
     expectedAudience: process.env.MYEONGHA_LOCAL_SAJU_AUDIENCE!,
     trustedKeyId: process.env.MYEONGHA_LOCAL_SAJU_KEY_ID!,
     keyBytes: Buffer.from(process.env.MYEONGHA_LOCAL_SAJU_HMAC_KEY!, 'base64'),
-    claimNonceOnce: createSajuSourceProofPostgresNonceClaimV1({ pool }),
+    claimNonceOnce: createSajuSourceProofPostgresNonceClaimV1({ pool: noncePool(pool) }),
   };
 }
 
