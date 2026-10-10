@@ -34,6 +34,9 @@ import {
 import {
   assertSeyeonPersonalRecordsNotUsedBeforeUnprotectedCommitV1,
 } from './seyeon-personal-record-precommit-hold-v1.js';
+import {
+  createSeyeonAttemptZeroPersonalProofV1,
+} from './seyeon-attempt-zero-personal-proof-v1.js';
 import type {
   SeyeonProductionRelationshipSyncOutboxPortV1,
 } from './seyeon-production-relationship-outbox-v1.js';
@@ -677,6 +680,15 @@ export async function runSeyeonProductionChatExecutionV1(
         assertSeyeonPersonalRecordsNotUsedBeforeUnprotectedCommitV1(
           productionContext,
         );
+        // Pin the server-observed EMPTY personal-record set to this exact
+        // attempt before model execution; persist it with Output Guard below.
+        const personalRecordProof = createSeyeonAttemptZeroPersonalProofV1({
+          subjectId,
+          threadId,
+          turnId: receivedTurn.turnId,
+          attemptId: attempt.attemptId,
+          context: productionContext,
+        });
         await input.persistencePort.markContextReady({
           subjectId,
           turnId: receivedTurn.turnId,
@@ -796,6 +808,7 @@ export async function runSeyeonProductionChatExecutionV1(
             passed: true,
             generatedContentHash: generatedHash,
             semanticReviewHash: runtime.envelope.semanticReviewHash,
+            personalRecordProvenance: personalRecordProof,
           }),
           groundingRefs: Object.freeze([]),
         });
