@@ -127,16 +127,36 @@ for (const forbidden of ['pull_request:', 'schedule:']) {
   }
 }
 if (onSection.includes('push:')) {
-  for (const fragment of [
-    'branches:',
-    '- main',
+  // Exceptional one-shot restore is never a general scheduled/push job.
+  // Both version-specific marker contracts preserve the manual interface.
+  const legacy1310 = onSection.includes(
     "'.github/ops/postgres-restore-frontier-1310.once'",
-  ]) {
+  );
+  const seyeonIncident = onSection.includes(
+    "'.github/ops/postgres-restore-seyeon-20261008090417.once'",
+  );
+  if (legacy1310 === seyeonIncident) {
+    throw new Error('Restore one-shot push must have exactly one governed source marker.');
+  }
+  for (const fragment of ['branches:', '- main']) {
     requireFragment(onSection, fragment, workflowPath);
   }
-  for (const fragment of [
+  const legacyRequired = [
     'Gate one-shot frontier-1310 restore marker',
     'POSTGRES-RESTORE-FRONTIER-1310-V1',
+  ];
+  const seyeonRequired = [
+    'Gate one-shot Se-yeon current-frontier restore marker',
+    'POSTGRES-RESTORE-SEYEON-20261008090417-V1',
+    "ops(dr): one-shot restore backup 38088591661 (#1947)",
+    'now - point <= 14400',
+    'backup_run_id=38088591661',
+    'incident_reference_utc=2026-10-10T21:44:36Z',
+    "refs/heads/main",
+    'SCOPED_RESTORE_PROOF_ONLY',
+  ];
+  for (const fragment of [
+    ...(legacy1310 ? legacyRequired : seyeonRequired),
     "github.event_name == 'push'",
     "github.event_name == 'workflow_dispatch' && inputs.backup_run_id || steps.one_shot.outputs.backup_run_id",
     "github.event_name == 'workflow_dispatch' && inputs.incident_reference_utc || steps.one_shot.outputs.incident_reference_utc",
@@ -144,6 +164,7 @@ if (onSection.includes('push:')) {
     requireFragment(workflow, fragment, workflowPath);
   }
 }
+
 if (!permissionsSection.includes('actions: read') || !permissionsSection.includes('contents: read')) {
   throw new Error('Restore drill requires read-only Actions and repository permissions.');
 }
