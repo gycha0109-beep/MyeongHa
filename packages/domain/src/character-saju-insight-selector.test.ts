@@ -435,8 +435,8 @@ describe('Representative perspective generalization contract (synthetic / public
       characterId: 'rahyeon',
     };
     expect(() => selectCharacterInsightsV1({
-      context: { ...makeContext(bundle), characterId: 'seyeon' }
-        as CharacterRuntimeContextWithGroundingV1,
+      context: ({ ...makeContext(bundle), characterId: 'seyeon' }
+        as CharacterRuntimeContextWithGroundingV1),
       grounding: bundle,
       perspective,
       requestedDomain: 'general',
