@@ -28,6 +28,10 @@ Watchtower-Track: saju-bridge
 3-04-03A 비권한 증빙 인덱스: [SAJU_HELD_STAGING_EVIDENCE_INDEX_8C2B2D30403A.md](./SAJU_HELD_STAGING_EVIDENCE_INDEX_8C2B2D30403A.md).
 실환경 R01–R14: [3-04-01 운영 런북](./SAJU_HELD_STAGING_OPERATIONAL_EVIDENCE_RUNBOOK_8C2B2D30401.md).
 
+## 2A. 무료 로컬 통합 검증 우선
+
+실제 클라우드 검증을 진행하기 전에는 비용이 없는 로컬 환경에서 기존 합성·DB 통합 검증을 먼저 반복한다. [8C-2B-2D 로컬 우선 실행 경로](./SAJU_HELD_LOCAL_FIRST_VERIFICATION_8C2B2D.md)는 PG15/17의 실제 로컬 Permit V2 소비·RLS/경합 테스트를 Docker 내부 격리 환경으로 재현하는 절차다. 이 검증은 **운영 Root·독립 Auth·DB 3종·HTTPS/TLS/관리 평면 승인 증빙을 대체하지 않는다**. 별도 유료 인프라는 필요한 근거를 밝히기 전까지 생성하지 않는다.
+
 ## 3. 코드·운영 병렬화와 범위 제한
 
 - 3-04-02의 **명세/테스트 포트**는 실환경 운영 권한 없이 미리 검토 가능하다. Root/KMS/저장소 생성·권한 부여는 별도 운영 결정 후 진행.
