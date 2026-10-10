@@ -32,7 +32,7 @@ describe('G1-B2 zero-only DB durability boundary', () => {
     expect(pg).toContain('exactModelSourceSelection: input.exactModelSourceSelection');
 
     const sql = await readFile(new URL(
-      '../supabase/migrations/1630_seyeon_zero_personal_source_pre_model_pin_v1.sql',
+      '../supabase/migrations/1640_seyeon_zero_personal_source_pre_model_pin_v1.sql',
       import.meta.url,
     ), 'utf8');
     expect(sql).toContain('seyeon_personal_source_pin_jsonb');
