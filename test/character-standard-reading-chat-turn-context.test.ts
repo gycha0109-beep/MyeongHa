@@ -1442,7 +1442,7 @@ describe('A3-epsilon server-only Official Standard Reader Chat V2 preflight (pub
     expect(result.runtime.memories.map((memory) => memory.granteeCharacterId)).toEqual(['baekheon']);
     expect(args.accessAuthorityPort.readAccessibleReadings).toHaveBeenCalledTimes(2);
     expect(args.artifactAuthorityPort.readArtifactSource).toHaveBeenCalledTimes(2);
-    expect(args.productReaderEligibilityAuthorityPort.readApprovedRule).toHaveBeenCalledTimes(3);
+    expect(args.productReaderEligibilityAuthorityPort.readApprovedRule).toHaveBeenCalledTimes(5);
   });
 
   it('rejects missing approved Product authority before raw Official Reading access', async () => {
@@ -1526,7 +1526,7 @@ describe('A3-epsilon server-only Official Standard Reader Chat V2 preflight (pub
     }) as never;
     await expect(prepareCharacterStandardReadingChatTurnPreflightV2(args))
       .rejects.toMatchObject({ code: 'ACCESS_DENIED' });
-    expect(reads).toBe(3);
+    expect(reads).toBe(5);
   });
 
   it('fails closed on Release mismatch before access or Content composition', async () => {
@@ -1603,7 +1603,7 @@ describe('A3-zeta / PR 2-A server-only Chat Grounding V2 admission (public OFF)'
     expect(f.projectGrounding).toHaveBeenCalledTimes(1);
     expect(f.authority.accessAuthorityPort.readAccessibleReadings).toHaveBeenCalledTimes(4);
     expect(f.authority.artifactAuthorityPort.readArtifactSource).toHaveBeenCalledTimes(4);
-    expect(f.authority.productReaderEligibilityAuthorityPort.readApprovedRule).toHaveBeenCalledTimes(7);
+    expect(f.authority.productReaderEligibilityAuthorityPort.readApprovedRule).toHaveBeenCalledTimes(11);
   });
 
   it('refuses a structural clone of the server-issued preflight before querying the raw source', async () => {
