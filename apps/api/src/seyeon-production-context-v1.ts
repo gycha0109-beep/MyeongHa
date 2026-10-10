@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+import { canonicalJson } from '../../../packages/domain/src/index.js';
 import {
   replayProductionRelationshipHistoryV1,
   type ProductionRelationshipHistoryRecordV1,
@@ -59,6 +61,29 @@ export interface SeyeonProductionPersonalRecordAdmissionV1 {
   readonly reason: 'ADMITTED' | 'UNSUPPORTED_SCHEMA';
 }
 
+/**
+ * Source-side candidate only: produced by a server-owned Projector next to
+ * DB-authoritative Record/Grant rows, before the final model-context selection.
+ * NEVER treat as a committed Pin, active Grant, or Reveal permission.
+ */
+export interface SeyeonPersonalRecordProjectionCandidateV1 {
+  readonly recordKind: SeyeonProductionPersonalRecordKindV1;
+  readonly recordId: string;
+  readonly grantId: string;
+  readonly recordType: string;
+  readonly schemaVersion: string;
+  readonly projectedMemoryId: string;
+  readonly rawRecordDigest: string;
+  readonly projectedMemoryDigest: string;
+  readonly permitsAtomicCommit: false;
+  readonly permitsHttpReveal: false;
+}
+
+function candidateDigest(value: unknown): string {
+  return 'sha256:v1:' +
+    createHash('sha256').update(canonicalJson(value)).digest('hex');
+}
+
 export interface SeyeonProductionContextSnapshotV1 {
   readonly version: typeof SEYEON_PRODUCTION_CONTEXT_VERSION_V1;
   readonly relationshipRevisionUsedForTurn: number | null;
@@ -67,6 +92,9 @@ export interface SeyeonProductionContextSnapshotV1 {
   readonly retrievedMemories: readonly SeyeonRetrievedMemoryV2[];
   readonly personalRecordAdmissions:
     readonly SeyeonProductionPersonalRecordAdmissionV1[];
+  /** Server-internal preselection evidence; NOT an exact model-input Pin. */
+  readonly personalRecordProjectionCandidates?:
+    readonly SeyeonPersonalRecordProjectionCandidateV1[];
   readonly activeRelationshipEventCount: number;
   readonly relationshipHistoryRecords:
     readonly ProductionRelationshipHistoryRecordV1[];
@@ -140,6 +168,7 @@ function personalMemories(input: {
 }): Readonly<{
   memories: readonly SeyeonRetrievedMemoryV2[];
   admissions: readonly SeyeonProductionPersonalRecordAdmissionV1[];
+  sourceCandidates: readonly SeyeonPersonalRecordProjectionCandidateV1[];
 }> {
   const registry = new Map<string, SeyeonProductionPersonalRecordProjectorV1>();
   for (const projector of input.projectors) {
@@ -154,6 +183,7 @@ function personalMemories(input: {
 
   const memories: SeyeonRetrievedMemoryV2[] = [];
   const admissions: SeyeonProductionPersonalRecordAdmissionV1[] = [];
+  const sourceCandidates: SeyeonPersonalRecordProjectionCandidateV1[] = [];
   const seen = new Set<string>();
 
   for (const row of input.rows) {
@@ -190,7 +220,7 @@ function personalMemories(input: {
     }));
 
     if (memories.length < input.max) {
-      memories.push(Object.freeze({
+      const selected = Object.freeze({
         memoryId: row.recordKind + ':' + row.recordId,
         kind: row.recordKind,
         claimKind: projected.claimKind,
@@ -199,13 +229,37 @@ function personalMemories(input: {
           row.recordKind + ':' + row.recordId + ':grant:' + row.grantId,
         relevance: score(projected.relevance, 'personalRecord.relevance'),
         salience: score(projected.salience, 'personalRecord.salience'),
+      });
+      // Capture origin and projection together. IDs come from the authority
+      // row, NEVER from user payload, model text, or a parsed sourceRef.
+      // These candidates are not yet the final sorted/truncated model inputs.
+      sourceCandidates.push(Object.freeze({
+        recordKind: row.recordKind,
+        recordId: row.recordId,
+        grantId: row.grantId,
+        recordType: row.recordType,
+        schemaVersion: row.schemaVersion,
+        projectedMemoryId: selected.memoryId,
+        rawRecordDigest: candidateDigest(Object.freeze({
+          kind: row.recordKind,
+          recordId: row.recordId,
+          grantId: row.grantId,
+          recordType: row.recordType,
+          schemaVersion: row.schemaVersion,
+          payload: row.payload,
+        })),
+        projectedMemoryDigest: candidateDigest(selected),
+        permitsAtomicCommit: false as const,
+        permitsHttpReveal: false as const,
       }));
+      memories.push(selected);
     }
   }
 
   return Object.freeze({
     memories: Object.freeze(memories),
     admissions: Object.freeze(admissions),
+    sourceCandidates: Object.freeze(sourceCandidates),
   });
 }
 
@@ -363,6 +417,7 @@ export async function composeSeyeonProductionContextV1(
       ...personal.memories,
     ]),
     personalRecordAdmissions: personal.admissions,
+    personalRecordProjectionCandidates: personal.sourceCandidates,
     activeRelationshipEventCount: replay.activeEvents.length,
     relationshipHistoryRecords: Object.freeze([...history]),
   });
