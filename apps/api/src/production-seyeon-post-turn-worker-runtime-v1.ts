@@ -1,4 +1,8 @@
 import {
+  createSeyeonProductionPostTurnGovernorV1,
+} from './seyeon-production-governor-factory-v1.js';
+import type { SeyeonCostGovernorModelPolicyV1 } from './seyeon-cost-governor-server-policy-v1.js';
+import {
   assertSeyeonProductionGovernorBoundaryV1,
   type SeyeonProductionGovernorModeV1,
 } from './seyeon-production-governor-boundary-v1.js';
@@ -69,6 +73,12 @@ export interface CreateProductionSeyeonPostTurnWorkerRuntimeInputV1 {
   readonly governorMode?: SeyeonProductionGovernorModeV1;
   /** Explicit server-only, absent by default. */
   readonly costGovernor?: SeyeonAiGovernorAdmissionV1;
+  /** Trusted server-owned policy; required with ENFORCE. */
+  readonly governorApproval?: Readonly<{
+    policy: SeyeonCostGovernorModelPolicyV1;
+    reservedHeadroomTokens: number;
+    timeoutMs?: number;
+  }>;
   readonly pool?: PostgresSubjectPoolV1;
 }
 
@@ -91,12 +101,31 @@ export function createProductionSeyeonPostTurnWorkerRuntimeV1(
       (input.provider !== undefined || input.providerConfig === undefined)) {
     throw new Error('Governed post-turn requires native metered Provider config.');
   }
+  if (input.governorMode === 'ENFORCE' && input.costGovernor !== undefined) {
+    throw new Error('ENFORCE cannot use an externally supplied Governor.');
+  }
+  if (input.governorMode !== 'ENFORCE' && input.governorApproval !== undefined) {
+    throw new Error('Governor approval requires explicit ENFORCE mode.');
+  }
+  const approved = input.governorMode === 'ENFORCE' &&
+      input.governorApproval !== undefined && input.providerConfig !== undefined
+    ? createSeyeonProductionPostTurnGovernorV1({
+        providerConfig: input.providerConfig,
+        policy: input.governorApproval.policy,
+        reservedHeadroomTokens: input.governorApproval.reservedHeadroomTokens,
+        ...(input.governorApproval.timeoutMs === undefined ? {} : {
+          timeoutMs: input.governorApproval.timeoutMs,
+        }),
+      })
+    : null;
+  const nativeConfig = approved?.providerConfig ?? input.providerConfig;
+  const governor = approved?.costGovernor ?? input.costGovernor;
   assertSeyeonProductionGovernorBoundaryV1({
     mode: input.governorMode,
     target: 'post_turn',
     provider: input.provider,
-    providerConfig: input.providerConfig,
-    governorConfigured: input.costGovernor !== undefined,
+    providerConfig: nativeConfig,
+    governorConfigured: governor !== undefined,
   });
   const poolLease = createProductionPostgresSubjectPoolLeaseV1({
     config: input.databaseConfig,
@@ -139,14 +168,12 @@ export function createProductionSeyeonPostTurnWorkerRuntimeV1(
         },
       });
       const meteredProvider =
-        input.provider === undefined && input.providerConfig !== undefined
+        input.provider === undefined && nativeConfig !== undefined
           ? createPersistingSeyeonAiProviderV1({
-              config: input.providerConfig,
+              config: nativeConfig,
               runner,
               getBinding: () => activeCostBinding,
-              ...(input.costGovernor === undefined ? {} : {
-                governor: input.costGovernor,
-              }),
+              ...(governor === undefined ? {} : { governor }),
             })
           : provider;
       if (meteredProvider === null) {
