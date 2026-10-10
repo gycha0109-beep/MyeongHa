@@ -160,6 +160,26 @@ python3 scripts/operations/stage-seyeon-managed-owner-comment-order.py \
   --source-dir "$root/supabase/migrations" \
   --output-dir "$tempdir/managed-owner-migrations" >/dev/null ||
   hold 'Managed-owner SQL staging failed against exact approved source.'
+# Match the Production managed-owner membership *options* (admin true,
+# INHERIT false, SET false) before dropping the disposable service superuser.
+# The fixture's grantor may differ from Supabase's "supabase_admin"; both the
+# pre/post Production and isolated tests still require exact membership
+# fingerprint preservation across the six scoped migrations.
+psql -X -q -v ON_ERROR_STOP=1 \
+  -c 'grant myeongha_relationship_apply_owner to postgres with admin true, inherit false, set false;' \
+  >/dev/null 2>"$tempdir/membership-fixture.err" ||
+  hold 'Unable to install restricted managed-owner membership fixture.'
+membership="$(psql -X -qAt -v ON_ERROR_STOP=1 -c "
+  select count(*) from pg_auth_members m
+    join pg_roles owner on owner.oid=m.roleid
+    join pg_roles member on member.oid=m.member
+  where owner.rolname='myeongha_relationship_apply_owner'
+    and member.rolname='postgres'
+    and m.admin_option=true and m.inherit_option=false and m.set_option=false")" ||
+  hold 'Unable to inspect non-superuser owner membership fixture.'
+[[ "$membership" == 1 ]] ||
+  hold 'Expected one restricted direct managed-owner grant.'
+
 # Supabase Production's postgres role is non-superuser. The earlier rehearsal
 # was a false positive because stock postgres:17.6 ships a superuser postgres.
 # Demote ONLY this disposable test service after the historical bundle is
