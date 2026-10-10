@@ -4,6 +4,8 @@ import {
   type GuestCredentialV1,
 } from '@myeongha/api-client';
 
+import { emitMobileSubjectCredentialChangedV1 } from '@/core/session/mobile-subject-credential-changes';
+
 export const MOBILE_GUEST_CREDENTIAL_KEY_V1 =
   'myeongha.mobile.guestCredential.v1' as const;
 
@@ -69,6 +71,7 @@ export function createMobileGuestCredentialStoreV1(
 
   async function write(credential: GuestCredentialV1): Promise<GuestCredentialV1> {
     const serialized = serializeGuestCredentialV1(credential);
+    const previousRaw = await readRaw().catch(() => null);
     try {
       await secureStore.setItemAsync(MOBILE_GUEST_CREDENTIAL_KEY_V1, serialized);
     } catch (error) {
@@ -87,7 +90,20 @@ export function createMobileGuestCredentialStoreV1(
       );
     }
 
-    return parseStoredGuestCredentialV1(observed);
+    const persisted = parseStoredGuestCredentialV1(observed);
+    let sameSubject = false;
+    if (previousRaw !== null) {
+      try {
+        const previous = parseStoredGuestCredentialV1(previousRaw);
+        sameSubject =
+          previous.subjectId === persisted.subjectId &&
+          previous.guestSessionId === persisted.guestSessionId;
+      } catch {
+        // Old malformed credentials do not justify reusing old archive data.
+      }
+    }
+    if (!sameSubject) emitMobileSubjectCredentialChangedV1();
+    return persisted;
   }
 
   async function clear(expectedBearerToken?: string): Promise<boolean> {
@@ -110,7 +126,9 @@ export function createMobileGuestCredentialStoreV1(
       );
     }
 
-    return (await readRaw()) === null;
+    const cleared = (await readRaw()) === null;
+    if (cleared) emitMobileSubjectCredentialChangedV1();
+    return cleared;
   }
 
   return Object.freeze({ read, write, clear });
