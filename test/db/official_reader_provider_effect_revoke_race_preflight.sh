@@ -121,6 +121,23 @@ assert_committed_revoke() {
     where a.subject_id='$subject'::uuid and a.reader_character_id='$reader'
       and a.official_reading_id='$reading'::uuid and g.status='active';")" == 0 ]] ||
     fail "revoked Reader B still has active synthetic access"
+
+  # The actual Reader metadata and raw-Reading production query wrappers must
+  # both deny this Reader immediately after the provider-effect COMMIT. The
+  # immutable Reader purchase binding remains, but is not access authority.
+  local visibility
+  visibility="$(p -c "begin;
+    select pg_catalog.set_config('myeongha.subject_id', '$subject', true);
+    select
+      (select count(*) from public.qry_character_standard_reading_access_runtime_v2(
+        '$subject'::uuid, '$reader', clock_timestamp()
+      ))::text || ':' ||
+      (select count(*) from public.qry_standard_reading_artifact_source_runtime_v1(
+        '$subject'::uuid, '$reading'::uuid, '$reader', clock_timestamp()
+      ))::text;
+    commit;")" || fail "revoked Reader runtime queries failed"
+  printf '%s\n' "$visibility" | grep -qx '0:0' ||
+    fail "revoked Reader remained visible to production metadata or raw artifact query"
 }
 
 # CASE 1: Commerce effect owns the Grant row before Reader reads.

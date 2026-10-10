@@ -171,6 +171,10 @@ case "$case_name" in
     bash test/db/official_standard_reading_reader_interpretation.sh
     catalog_snapshot
     ;;
+  official-reader-provider-revoke-race)
+    apply_standard_migrations
+    bash test/db/official_reader_provider_effect_revoke_race_preflight.sh
+    ;;
   records-production-read-authority)
     apply_standard_migrations
     bash test/db/records_read_runtime_authority.sh

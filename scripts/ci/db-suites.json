@@ -26,7 +26,8 @@
       "outbox-success-completion",
       "reading-history",
       "standard-reading-artifact-reread",
-      "official-standard-reading-reader-interpretation"
+      "official-standard-reading-reader-interpretation",
+      "official-reader-provider-revoke-race"
     ]
   },
   "commerce-payment": {
