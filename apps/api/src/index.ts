@@ -745,8 +745,17 @@ export {
   STANDARD_FOLLOWUP_QUESTION_SCOPE_VERSION_V1,
   assertServerPreparedStandardFollowupQuestionScopeV1,
   classifyCharacterStandardFollowupQuestionScopeV1,
+  classifyCharacterStandardFollowupLexicalIntentV1,
+  type CharacterStandardFollowupLexicalIntentV1,
   type CharacterStandardFollowupQuestionScopeDecisionV1,
 } from './character-standard-reading-chat-question-scope-v1.js';
+
+export {
+  STANDARD_READER_BOUNDED_CANDIDATE_VERSION_V1,
+  prepareCharacterStandardReaderBoundedCandidateV1,
+  assertServerGuardedStandardReaderBoundedCandidateV1,
+  type CharacterStandardReaderBoundedCandidateV1,
+} from './character-standard-reading-chat-bounded-candidate-v1.js';
 
 export {
   STANDARD_FIRST_QUESTION_SOURCE_ENTRY_VERSION_V1,
