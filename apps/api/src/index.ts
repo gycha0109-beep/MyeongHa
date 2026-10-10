@@ -745,6 +745,8 @@ export {
   STANDARD_FOLLOWUP_QUESTION_SCOPE_VERSION_V1,
   assertServerPreparedStandardFollowupQuestionScopeV1,
   classifyCharacterStandardFollowupQuestionScopeV1,
+  classifyCharacterStandardFollowupLexicalIntentV1,
+  type CharacterStandardFollowupLexicalIntentV1,
   type CharacterStandardFollowupQuestionScopeDecisionV1,
 } from './character-standard-reading-chat-question-scope-v1.js';
 

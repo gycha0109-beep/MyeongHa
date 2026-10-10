@@ -35,7 +35,7 @@ export type CharacterStandardFollowupQuestionScopeDecisionV1 =
       schemaVersion: typeof STANDARD_FOLLOWUP_QUESTION_SCOPE_VERSION_V1;
       mode: 'hold';
       reason: 'unsupported_question' | 'new_authority_required' |
-        'clarification_required' | 'insufficient_evidence';
+        'clarification_required' | 'multiple_intents' | 'insufficient_evidence';
     }>;
 
 const serverMintedQuestionScopes = new WeakSet<object>();
@@ -83,6 +83,10 @@ const REFERENCES_TO_PRIOR_ANSWER = Object.freeze([
   /^방금 (?:말씀하신|설명하신) 내용을 (?:조금 )?더 (?:쉽게 )?설명해 ?주세요[.!?]?$/u,
   /^방금 (?:말씀하신|설명하신) 내용이 무슨 뜻인가요[.!?]?$/u,
   /^그건 무슨 뜻인가요[.!?]?$/u,
+  /^그 부분을 (?:다시|한 번 더|쉽게|좀 더 쉽게) 설명해 ?주세요[.!?]?$/u,
+  /^아까 (?:말씀하신|설명하신) (?:그 )?부분을 (?:조금 )?더 (?:쉽게 )?설명해 ?주세요[.!?]?$/u,
+  /^그 부분을 (?:쉽게 )?풀어서 (?:말씀해|설명해) ?주세요[.!?]?$/u,
+  /^지금 설명하신 게 무슨 뜻인가요[.!?]?$/u,
 ] as const);
 
 const EXACT_READING_REFERENCE =
@@ -117,8 +121,38 @@ export function classifyExactOfficialReadingReferenceV1(
 const SOURCE_CHANGE_REQUEST =
   /(?:[0-9]{4}\s*년|내년|내후년|작년|올해|이번\s*달|다음\s*달|다음\s*해|언제|몇\s*월|월운|세운|대운|새로\s*계산|다시\s*계산|다른\s*사람|새로운\s*사주|궁합\s*봐|실시간|미래\s*예측)/u;
 
-function classify(text: unknown, admittedDomain: string):
-  'admitted' | 'unsupported_question' | 'new_authority_required' {
+/**
+ * RR-05 lexical triage only. This is NOT semantic intent recognition and
+ * never authorizes new Saju meaning, a Unit focus, generation or Commit.
+ *
+ * Split requests remain distinct from new period/domain requests so the
+ * eventual UX can ask for one question at a time, rather than pretending
+ * that an extra paid Reading was already authorized.
+ */
+export type CharacterStandardFollowupLexicalIntentV1 =
+  | 'admitted'
+  | 'clarification_required'
+  | 'new_authority_required'
+  | 'multiple_intents'
+  | 'unsupported_question';
+
+const CLARIFICATION_REFERENCES = Object.freeze([
+  /^어느 부분을 (?:말씀하시는|설명하시는) 건가요[.!?]?$/u,
+  /^어떤 부분을 (?:말씀하시는|설명하시는) 건가요[.!?]?$/u,
+  /^그게 어느 부분인가요[.!?]?$/u,
+  /^그거요[.!?]?$/u,
+] as const);
+
+// Two distinct requested actions plus an explicit conjunction: no guessing
+// which explanation or which extra product scope should win.
+const MULTI_INTENT_CONNECTOR =
+  /(?:그리고|추가로|또한|뿐만 아니라|동시에|함께|설명해 ?주고)/u;
+const REQUEST_ACTIONS = /(?:설명|해석|추천|계산|알려|비교|보여)/gu;
+
+export function classifyCharacterStandardFollowupLexicalIntentV1(
+  text: unknown,
+  admittedDomain: string,
+): CharacterStandardFollowupLexicalIntentV1 {
   if (typeof text !== 'string' || text.length > 240 ||
       /[\u0000-\u001f\u007f\u200b-\u200f\u202a-\u202e\u2060-\u206f]/u.test(text)) {
     return 'unsupported_question';
@@ -126,10 +160,18 @@ function classify(text: unknown, admittedDomain: string):
   const normalized = text.normalize('NFKC').trim().replace(/ +/gu, ' ');
   if (normalized.length === 0 || normalized.length > 160) return 'unsupported_question';
 
+  const actions = normalized.match(REQUEST_ACTIONS) ?? [];
+  if (MULTI_INTENT_CONNECTOR.test(normalized) && actions.length > 1) {
+    return 'multiple_intents';
+  }
+  if (SOURCE_CHANGE_REQUEST.test(normalized)) return 'new_authority_required';
+  if (CLARIFICATION_REFERENCES.some(pattern => pattern.test(normalized))) {
+    return 'clarification_required';
+  }
   if (REFERENCES_TO_PRIOR_ANSWER.some(pattern => pattern.test(normalized))) {
     return 'admitted';
   }
-  return classifyExactOfficialReadingReferenceV1(text, admittedDomain);
+  return classifyExactOfficialReadingReferenceV1(normalized, admittedDomain);
 }
 
 /**
@@ -155,7 +197,9 @@ export async function classifyCharacterStandardFollowupQuestionScopeV1(input: Re
   const questionText = input.preflight.receivePlan.normalizedRequest.text;
   if (typeof questionText !== 'string') return hold('unsupported_question');
 
-  const kind = classify(questionText, input.grounded.scope.sajuDomain);
+  const kind = classifyCharacterStandardFollowupLexicalIntentV1(
+    questionText, input.grounded.scope.sajuDomain,
+  );
   if (kind !== 'admitted') return hold(kind);
 
   const evidence = await selectCharacterStandardFollowupEvidenceV1(input);
