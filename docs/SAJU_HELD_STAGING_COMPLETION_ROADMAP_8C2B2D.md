@@ -47,10 +47,11 @@ Watchtower-Track: saju-bridge
 | 2F | Subject/Nonce 실제 비슈퍼유저 네트워크 로그인 | #1904 · `7ff94cccda07` | Subject TLS/클러스터 분리 |
 | 2G | 별도 PostgreSQL Nonce 클러스터 TLS 1.2+/CA/DNS SAN·제한 로그인 | #1905 · `c187ba6c64dd` | Subject/Admission 독립 TLS |
 | 2H | Subject 별도 PostgreSQL TLS/CA/SAN·제한 로그인·Member RLS·실제 GoTrue JWT → Saju HTTP → Nonce TLS | #1911 · [CI #38060001813](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38060001813), 31 PASS | Admission 독립 DB/TLS·운영 R01–R14 |
+| 2I | 3번째 독립 Admission PostgreSQL TLS/제한 LOGIN, Permit V2 서명·원자 소비·경합·장애 부정 테스트 | #1913 · [초기 CI #38061098116](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38061098116), 총 38 PASS | 동일 요청의 세 DB 통합·독립 운영 Authority/R01–R14 |
 
 - #1904 범위 검증: 실제 제한 로그인 포함 23건 PASS, 병합 및 main 기록 확인.
 - #1905 범위 검증: 기존 23건과 독립 TLS Nonce 4건을 포함한 27건 PASS. [범위 CI #38057794070](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38057794070)와 [고정 HEAD 통합 CI #38058002001](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38058002001)는 `d740773e863eb6d4071edae58cbbda6faebe7aa5`에서 SUCCESS.
-- 2H의 Subject/Nonce 별도 TLS와 실제 격리 GoTrue 연결은 PR #1911의 scoped CI에서 검증했다. 다음은 **2I 독립 Admission TLS/Permit** 및 **2J Subject·Nonce·Admission 3개 DB 교차** 순서다. 2H 테스트 성공은 PR 최종 통합 CI/병합이나 운영 검증을 대신하지 않는다. 기존 코드/동일 scoped CI 재사용 우선.
+- 2H의 Subject/Nonce 별도 TLS와 실제 격리 GoTrue 연결은 PR #1911의 scoped CI에서 검증했다. 2I의 세 번째 독립 Admission TLS 및 Permit V2 원자 소비는 PR #1913 초기 scoped CI에서 통과했지만 고정 SHA 전체 CI·병합은 별도 확인한다. 다음은 **2J Subject·Nonce·Admission 동일 요청 교차 검증**이다. 2H 테스트 성공은 PR 최종 통합 CI/병합이나 운영 검증을 대신하지 않는다. 기존 코드/동일 scoped CI 재사용 우선.
 - 로컬에서 생성한 GoTrue 계정·자체 CA·DB/암호·서명 Proof는 운영 Root/Attestor/회원 데이터 또는 R01–R14 독립 운영 증빙이 아니다. 실제 운영 Root/Key/증빙/연결/Runner는 그대로 미검증/HOLD.
 - 상세 수행 파일·성공/실패 테스트는 로컬 기록의 해당 절에 보존하며 이후 각 하위 단계의 PR, 병합 SHA, CI 링크 및 한계를 여기에 추가한다.
 
@@ -70,7 +71,7 @@ Watchtower-Track: saju-bridge
 | 운영 증빙 목록 및 중단 절차 | #1856, R01–R14 | 문서 완료 / 운영 미검증 |
 | 개별 부정 시험 T01–T40 | 기존 합성 테스트 분산 | **개별 대응표 미완료** |
 | 독립 Root 및 durable revision/challenge | 3-04-02 | 설계/운영 미완료 |
-| 실환경 Auth·DB 3종·Saju Proof | 로컬 2A–2H 합성/실소켓 검증, 2H scoped 31 PASS; 3-04-03A 인덱스 계약 / 03B 실제 probe | Admission 독립 TLS·Permit/3 DB 교차·R05–R14 운영 확인 미완료 |
+| 실환경 Auth·DB 3종·Saju Proof | 로컬 2A–2I 합성/실소켓 검증, Admission scoped 38 PASS; 3-04-03A 인덱스 계약 / 03B 실제 probe | 3 DB 동일 요청 교차 및 R05–R14 독립 운영 관찰 미완료 |
 | Target Authority V2 + Runner | 3-04-04 | 미연결 |
 | 실제 격리 스테이징 1회 | 2D-4 | 미실행 |
 | Production/Commerce | 별도 authority | 미승인 |

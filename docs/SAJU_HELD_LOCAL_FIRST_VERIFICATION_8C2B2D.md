@@ -190,6 +190,20 @@ node scripts/local/verify-saju-bridge-http.mjs ../Saju
 
 **한계:** 이는 CI runner 내부의 자체 CA·임시 GoTrue/Subject/Nonce와 실제 네트워크 소켓 검증일 뿐, 운영 Root 키 custody, 독립 클라우드 Auth, R01–R14 운영 관찰, 실제 Approval/Runner를 증명하지 않는다. **Admission의 독립 로그인/실제 TLS/Permit V2 소비 경계는 후속 2I**, 세 DB 동시 교차 검증은 2J에서 확인한다. `stagingConnection=NOT_VERIFIED`, `stagingAdmission=HOLD`, `canRunOnce/canExecute/canPublish/canSell=false`.
 
+## 2I. 독립 Admission TLS PostgreSQL·서명 Permit V2·최소권한 원자 소비 — 4단계
+
+2H의 Subject TLS, 2G의 Nonce TLS와 **서로 다른 세 번째 폐기형 PostgreSQL 15 클러스터**를 Admission 전용으로 구성한다. 이 단계는 **DB 원자성/역할 격리 검증**이며 애플리케이션 Rehearsal Runner 실행 승인이 아니다.
+
+- `scripts/local/setup-saju-bridge-tls-admission-ci.sh`: GitHub CI와 정확한 로컬 기본 DB 환경만 허용. `127.0.0.1:5445`, `admission.saju-bridge-ci.invalid`, `myeongha_saju_admission_tls_verify`라는 고정된 별도 Docker DB를 생성하고 자체 CA·오답 CA·DNS SAN 서버 인증서를 실행마다 새로 생성해 종료 시 폐기. TLS 1.2+, PostgreSQL 서버의 `hostnossl reject`, 실제 `psql sslmode=verify-full` 확인.
+- 기존 `test/db/fixtures/saju_staging_operator_admission_schema_8c2b2d302.sql`의 Permit V2/Issuer/Runtime/Revoker FORCE RLS/ACL 구조를 **이 DB에만** 재사용. `test/db/fixtures/saju_local_tls_admission_login.sql`은 유일한 Admission 소비 계정 `myeongha_tls_admission_ci_login`에 일회용 암호를 부여하고 **오직** `myeongha_saju_staging_admission_runtime`에만 회원 자격을 준다. 비슈퍼유저·NOINHERIT·NOBYPASSRLS·NOLOGIN 역할 경계를 실제 확인한다.
+- `test/saju-held-cross-repo-local-tls-admission.test.ts`: 실제 `pg_stat_ssl`, 세 DB의 서로 다른 CA/계정, 틀린 CA·SAN·평문·다른 DB 계정 실패, 직접 SELECT/INSERT 및 Issuer/Revoker/Subject 역할 승격 거부. 기존 Ed25519 V2 Permit/Manifest/Connection Plan 서명과 DB `SELECT FOR UPDATE` + 조건부 UPDATE 구현으로 정확히 한 번 소비, 두 독립 TLS 연결 경합, 취소/만료·Signature 변조 차단, 임의 트랜잭션 ROLLBACK 후 재확인, 연결 불능 Fail-Closed를 검증한다.
+- `scripts/local/verify-saju-bridge-http.mjs`와 기존 [교차 저장소 Workflow](../.github/workflows/saju-bridge-cross-repo-local-http.yml)에 **선택적 Admission 검사 단계만 추가**. 2A–2H의 GoTrue→Subject TLS→Saju HTTP/HMAC→Nonce TLS 경로는 보존한다.
+- 2I용 Permit과 키는 테스트가 생성한 합성 데이터이며 실제 Operator의 승인/Key custody/Attestor/Challenge 증빙이 아니다. Signed Permit DB consume이 성공해도 **Runner를 호출하지 않고** `stagingAdmission=HOLD`, 모든 실행·공개·판매 권한 false 유지.
+
+**초기 검증:** [Scope CI #38061098116](https://github.com/gycha0109-beep/MyeongHa/actions/runs/38061098116) — 기존 31건 + 신규 Admission 7건 = **38건 PASS**. 첫 실행의 미대기 assertion 경고 1건은 `await expect(...).resolves`로 수정했으며, 최종 HEAD·필수 통합 CI·Squash Merge는 PR #1913에서 다시 검증·기록한다.
+
+**여전히 미검증:** 세 DB가 모두 CI 내에서 별도 TLS 클러스터라는 사실이 실제 운영 DB 자격증명·R06–R09 독립 증빙을 입증하지 않는다. 세 DB의 동일 요청 흐름에서의 통합 불변성·부분 장애는 **2J**의 책임이다. 3-04-02 Root/Key custody, 3-04-03B 독립 R01–R14, 3-04-04 Target Authority V2, 2D-4 Runner Rehearsal은 별도 운영 승인 전 HOLD.
+
 ## 3. 통과 기준 / 아직 증명하지 않은 것
 
 | 시험 | 로컬/기존 CI에서 검사 가능 | 남는 실제 환경 확인 |
