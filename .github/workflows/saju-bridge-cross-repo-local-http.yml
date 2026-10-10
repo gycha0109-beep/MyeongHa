@@ -8,6 +8,8 @@ on:
       - test/saju-held-cross-repo-local-http.test.ts
       - test/saju-held-cross-repo-local-postgres-nonce.test.ts
       - test/saju-held-cross-repo-local-postgres-current-birth.test.ts
+      - test/saju-held-cross-repo-local-auth-user.test.ts
+      - apps/api/src/saju-held-authenticated-member-proof-v1.ts
       - test/db/fixtures/saju_local_subject_birth_proof_e2e.sql
       - apps/api/src/saju-held-source-proof-revision-binding-v1.ts
       - apps/api/src/current-subject-saju-calculation-http.ts
