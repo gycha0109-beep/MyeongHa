@@ -1,0 +1,50 @@
+name: Saju Bridge Cross-Repo Loopback
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/saju-bridge-cross-repo-local-http.yml
+      - scripts/local/verify-saju-bridge-http.mjs
+      - test/saju-held-cross-repo-local-http.test.ts
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: saju-bridge-loopback-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  real-local-http:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout MyeongHa candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          path: myeongha
+          persist-credentials: false
+      - name: Checkout pinned Saju source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: gycha0109-beep/Saju
+          ref: cd0acf9abd447826ccaefba56112d046e560ee04
+          path: saju
+          persist-credentials: false
+      - name: Set up Node 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Install isolated toolchain
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund --prefix myeongha
+          npm ci --ignore-scripts --no-audit --no-fund --prefix saju
+      - name: Build actual Saju proof issuer
+        working-directory: saju
+        run: npm run build
+      - name: Verify real HTTP loopback and MyeongHa signature checks
+        working-directory: myeongha
+        run: node scripts/local/verify-saju-bridge-http.mjs ../saju
