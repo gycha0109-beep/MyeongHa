@@ -37,6 +37,10 @@ import {
 import {
   createSeyeonAttemptZeroPersonalProofV1,
 } from './seyeon-attempt-zero-personal-proof-v1.js';
+import type { SeyeonAttemptZeroPersonalProofV1 } from './seyeon-attempt-zero-personal-proof-v1.js';
+import type {
+  SeyeonExactModelPersonalSourceSelectionV1,
+} from './seyeon-exact-model-personal-source-selection-v1.js';
 import {
   selectSeyeonExactModelPersonalSourcesV1,
 } from './seyeon-exact-model-personal-source-selection-v1.js';
@@ -147,6 +151,9 @@ export interface SeyeonProductionChatPersistencePortV1 {
     subjectId: string;
     turnId: string;
     attemptId: string;
+    /** DB command atomically pins zero-proof with context_ready BEFORE models. */
+    zeroPersonalProof: SeyeonAttemptZeroPersonalProofV1;
+    exactModelSourceSelection: SeyeonExactModelPersonalSourceSelectionV1;
   }>): Awaitable<void>;
 
   failAttempt(input: Readonly<{
@@ -692,12 +699,6 @@ export async function runSeyeonProductionChatExecutionV1(
           attemptId: attempt.attemptId,
           context: productionContext,
         });
-        await input.persistencePort.markContextReady({
-          subjectId,
-          turnId: receivedTurn.turnId,
-          attemptId: attempt.attemptId,
-        });
-
         const historical = bindSeyeonProductionCharacterContextInputV1({
           base: input.baseContext,
           turnBinding,
@@ -725,6 +726,17 @@ export async function runSeyeonProductionChatExecutionV1(
             'Se-yeon positive personal records require durable DB Pin and atomic Commit.',
           );
         }
+
+        // This is a DB durability boundary, not a Grant/Reveal approval.
+        // The owner RPC writes both exact zero markers and moves context_ready
+        // in ONE PostgreSQL transaction; a failure prevents all Providers.
+        await input.persistencePort.markContextReady({
+          subjectId,
+          turnId: receivedTurn.turnId,
+          attemptId: attempt.attemptId,
+          zeroPersonalProof: personalRecordProof,
+          exactModelSourceSelection: exactModelPersonalSources,
+        });
 
         const governance = await resolveTurnGovernance({
           execution: input,

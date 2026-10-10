@@ -13,7 +13,7 @@ export const POSTGRES_SEYEON_CHAT_RECEIVE_RUNTIME_BINDING_V1 =
 export const POSTGRES_SEYEON_CHAT_ATTEMPT_RUNTIME_BINDING_V1 =
   'public.cmd_allocate_seyeon_chat_attempt_runtime_v1' as const;
 export const POSTGRES_SEYEON_CHAT_CONTEXT_READY_RUNTIME_BINDING_V1 =
-  'public.cmd_mark_seyeon_chat_context_ready_runtime_v1' as const;
+  'public.cmd_mark_seyeon_chat_context_ready_pinned_v1' as const;
 export const POSTGRES_SEYEON_CHAT_FAILURE_RUNTIME_BINDING_V1 =
   'public.cmd_fail_seyeon_chat_attempt_runtime_v1' as const;
 export const POSTGRES_SEYEON_CHAT_GENERATED_RUNTIME_BINDING_V1 =
@@ -55,8 +55,8 @@ from public.cmd_allocate_seyeon_chat_attempt_runtime_v1(
 `.trim();
 
 const CONTEXT_READY_SQL = `
-select public.cmd_mark_seyeon_chat_context_ready_runtime_v1(
-  $1::uuid,$2::uuid,$3::uuid
+select public.cmd_mark_seyeon_chat_context_ready_pinned_v1(
+  $1::uuid,$2::uuid,$3::uuid,$4::jsonb
 ) as replayed
 `.trim();
 
@@ -258,6 +258,10 @@ implements SeyeonProductionChatPersistencePortV1 {
       input.subjectId,
       input.turnId,
       input.attemptId,
+      JSON.stringify({
+        zeroProof: input.zeroPersonalProof,
+        exactModelSourceSelection: input.exactModelSourceSelection,
+      }),
     ]);
   }
 
