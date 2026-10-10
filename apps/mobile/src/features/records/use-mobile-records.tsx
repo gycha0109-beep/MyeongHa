@@ -6,6 +6,8 @@ import type {
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 
+import { subscribeMobileSubjectCredentialChangesV1 } from '@/core/session/mobile-subject-credential-changes';
+
 import {
   mobileRecordsControllerV1,
 } from '@/features/records/native-mobile-records-controller';
@@ -54,15 +56,24 @@ export function useMobileRecordsV1() {
   useFocusEffect(
     useCallback(() => {
       focused.current = true;
-      const epoch = ++focusEpoch.current;
+      const restartForCurrentSubject = () => {
+        // Credential writes are delivered after durable persistence.
+        // Never paint prior Subject records while the next read is pending.
+        const epoch = ++focusEpoch.current;
+        setSnapshots(mobileRecordsControllerV1.reset());
+        const pending = mobileRecordsControllerV1.loadInitialAll({ force: true });
+        setSnapshots(sync());
+        void pending.then((result) => {
+          if (focused.current && epoch === focusEpoch.current) setSnapshots(result);
+        });
+      };
+      const unsubscribe = subscribeMobileSubjectCredentialChangesV1(
+        restartForCurrentSubject,
+      );
       // Re-entry after login/logout must not reuse an unscoped 60s cache.
-      setSnapshots(mobileRecordsControllerV1.reset());
-      const pending = mobileRecordsControllerV1.loadInitialAll({ force: true });
-      setSnapshots(sync());
-      void pending.then((result) => {
-        if (focused.current && epoch === focusEpoch.current) setSnapshots(result);
-      });
+      restartForCurrentSubject();
       return () => {
+        unsubscribe();
         focused.current = false;
         focusEpoch.current += 1;
         // Suppress both cached rows and in-flight pages after tab blur.
