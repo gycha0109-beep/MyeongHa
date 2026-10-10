@@ -32,6 +32,16 @@ import {
   createSeyeonProductionSubjectTransactionRunnerV1,
 } from './seyeon-production-subject-transaction-v1.js';
 import {
+  createSeyeonGovernedCostTransactionRunnerV1,
+} from './seyeon-governed-cost-transaction-v1.js';
+import type {
+  SeyeonGovernedDbConfigV1,
+  SeyeonGovernedPostgresSubjectPoolV1,
+} from './seyeon-governed-postgres-pool-v1.js';
+import {
+  createSeyeonProductionCostPoolLeaseV1,
+} from './seyeon-production-cost-pool-lease-v1.js';
+import {
   createSeyeonProductionTransactionalPortsV1,
 } from './seyeon-production-transactional-ports-v1.js';
 import type {
@@ -80,6 +90,10 @@ export interface CreateProductionSeyeonPostTurnWorkerRuntimeInputV1 {
     timeoutMs?: number;
   }>;
   readonly pool?: PostgresSubjectPoolV1;
+  /** ENFORCE-only segregated DB credentials, never the ordinary Subject Pool. */
+  readonly governedDbConfig?: SeyeonGovernedDbConfigV1;
+  /** Server-owned test seam; not accepted from HTTP request input. */
+  readonly governedCostPool?: SeyeonGovernedPostgresSubjectPoolV1;
 }
 
 function resolveProvider(
@@ -127,6 +141,11 @@ export function createProductionSeyeonPostTurnWorkerRuntimeV1(
     providerConfig: nativeConfig,
     governorConfigured: governor !== undefined,
   });
+  const costPoolLease = createSeyeonProductionCostPoolLeaseV1({
+    mode: input.governorMode,
+    ...(input.governedDbConfig === undefined ? {} : { governedDbConfig: input.governedDbConfig }),
+    ...(input.governedCostPool === undefined ? {} : { governedPool: input.governedCostPool }),
+  });
   const poolLease = createProductionPostgresSubjectPoolLeaseV1({
     config: input.databaseConfig,
     ...(input.pool === undefined ? {} : { pool: input.pool }),
@@ -142,7 +161,25 @@ export function createProductionSeyeonPostTurnWorkerRuntimeV1(
           pool: poolLease.pool,
           verifiedEvidence: runInput.verifiedEvidence,
         });
-      const resolvedSubject = await runner.resolveSubject();
+      const resolvedSubject = await runner.resolveSubject();;
+      // The main Subject Runner remains responsible for Chat/Outbox writes.
+      // Governed Start and Settle use a different DB LOGIN + role only.
+      const costRunner = costPoolLease === null
+        ? runner
+        : createSeyeonGovernedCostTransactionRunnerV1({
+            pool: costPoolLease.pool,
+            verifiedEvidence: runInput.verifiedEvidence,
+          });
+      if (costPoolLease !== null) {
+        // Prove independent credential + the same canonical Subject before
+        // any model provider can be invoked. Never fallback to legacy.
+        const governedSubject = await costRunner.resolveSubject();
+        if (governedSubject.subjectId.toLowerCase() !==
+            resolvedSubject.subjectId.toLowerCase() ||
+            governedSubject.subjectKind !== resolvedSubject.subjectKind) {
+          throw new Error('ENFORCE cost DB canonical Subject does not match the application Subject.');
+        }
+      }
       const ports = createSeyeonProductionTransactionalPortsV1({
         subjectId: resolvedSubject.subjectId,
         runner,
@@ -171,7 +208,7 @@ export function createProductionSeyeonPostTurnWorkerRuntimeV1(
         input.provider === undefined && nativeConfig !== undefined
           ? createPersistingSeyeonAiProviderV1({
               config: nativeConfig,
-              runner,
+              runner: costRunner,
               getBinding: () => activeCostBinding,
               ...(governor === undefined ? {} : { governor }),
             })
@@ -199,8 +236,12 @@ export function createProductionSeyeonPostTurnWorkerRuntimeV1(
       });
     },
 
-    close() {
-      return poolLease.close();
+    async close() {
+      try {
+        await poolLease.close();
+      } finally {
+        await costPoolLease?.close();
+      }
     },
   });
 }
