@@ -6,6 +6,7 @@ on:
       - .github/workflows/saju-bridge-cross-repo-local-http.yml
       - scripts/local/verify-saju-bridge-http.mjs
       - test/saju-held-cross-repo-local-http.test.ts
+      - test/saju-held-cross-repo-local-postgres-nonce.test.ts
   workflow_dispatch:
 
 permissions:
@@ -19,6 +20,27 @@ jobs:
   real-local-http:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ${{ github.run_id }}-${{ github.run_attempt }}
+          POSTGRES_DB: myeongha_saju_local_verify
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d myeongha_saju_local_verify"
+          --health-interval=3s
+          --health-timeout=3s
+          --health-retries=15
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: '5432'
+      PGDATABASE: myeongha_saju_local_verify
+      PGUSER: postgres
+      PGPASSWORD: ${{ github.run_id }}-${{ github.run_attempt }}
+      MYEONGHA_LOCAL_NONCE_PG_ENABLED: '1'
     steps:
       - name: Checkout MyeongHa candidate
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -45,6 +67,11 @@ jobs:
       - name: Build actual Saju proof issuer
         working-directory: saju
         run: npm run build
-      - name: Verify real HTTP loopback and MyeongHa signature checks
+      - name: Bootstrap one-use local-only nonce registry and client-denial roles
+        working-directory: myeongha
+        run: |
+          psql -X -v ON_ERROR_STOP=1 -f test/db/bootstrap_supabase_auth_stub.sql
+          psql -X -v ON_ERROR_STOP=1 -f supabase/migrations/1540_saju_source_proof_nonce_claim_authority_v1.sql
+      - name: Verify real HTTP loopback, signature, and PostgreSQL atomic claims
         working-directory: myeongha
         run: node scripts/local/verify-saju-bridge-http.mjs ../saju

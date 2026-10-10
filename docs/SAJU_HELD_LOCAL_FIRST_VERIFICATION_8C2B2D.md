@@ -71,6 +71,33 @@ node scripts/local/verify-saju-bridge-http.mjs ../Saju
 
 GitHub의 범위 제한된 [교차 저장소 루프백 CI](../.github/workflows/saju-bridge-cross-repo-local-http.yml)는 Saju 소스의 정확한 SHA를 고정하고, 실제 HTTP 경로를 **서버/클라이언트 양쪽의 현재 구현으로** 실행한다. Saju 코드가 변경되면 고정 SHA를 다시 선택하고 계약 테스트를 재실행한다.
 
+## 2B. 사주 엔진 실 HTTP + PostgreSQL Nonce 영속 재사용 차단
+
+앞선 2A의 인메모리 `Set` 검증에서 한 단계 나아가, 기존 명하 Nonce DB 어댑터(`createSajuSourceProofPostgresNonceClaimV1`)를 **실제 휘발성 PostgreSQL 15**에서 실행합니다. GitHub의 [대상 범위 한정 교차 저장소 CI](../.github/workflows/saju-bridge-cross-repo-local-http.yml)가 다음을 수행합니다.
+
+1. CI 실행마다 독립된 `postgres:15` 서비스와 `myeongha_saju_local_verify` 데이터베이스 생성.
+2. 기존 테스트 전용 Supabase Auth 역할 fixture와 **운영 스키마 변경 없이 재사용한** `1540_saju_source_proof_nonce_claim_authority_v1.sql`을 임시 DB에만 적용.
+3. 별도 Node 프로세스로 실제 Saju Proof 발급 서버를 `127.0.0.1`에 기동하고, 명하의 **기존** HTTP 클라이언트·HMAC 검증기·PostgreSQL nonce 소비 어댑터 연결.
+4. 올바른 서명/Nonce 조합을 원자적으로 한 번만 소비하고, 별도 DB 연결에서 동일 Proof 재사용을 거부하는지 확인.
+5. DB 연결 둘에서 같은 서명 Proof를 병렬 검증하여 정확히 하나만 `held`가 되고 nonce digest 행도 하나만 저장되는지 확인.
+6. HMAC 응답 변조는 nonce claim 전에 차단하며, `authenticated` 역할은 직접 INSERT할 수 없는지 검증. 원본 nonce/출생정보는 Nonce 테이블에 저장하지 않음.
+
+로컬에서 동일 검증을 수행하려면 **명하·사주 저장소, Node 24, 로컬 전용 PostgreSQL 15**가 있어야 합니다. 운영 DB 또는 운영 PostgreSQL 포트 포워딩을 사용하지 마십시오.
+
+```powershell
+# 아래 명령은 MyeongHa 저장소 루트에서 실행하며,
+# 환경변수 PGHOST=127.0.0.1, PGPORT=5432, PGDATABASE=myeongha_saju_local_verify,
+# PGUSER=postgres, PGPASSWORD=<로컬 임시 DB 비밀번호>를 미리 설정합니다.
+# 데이터베이스는 실 운영과 무관한 폐기용 로컬 인스턴스만 허용됩니다.
+
+psql -v ON_ERROR_STOP=1 -f test/db/bootstrap_supabase_auth_stub.sql
+psql -v ON_ERROR_STOP=1 -f supabase/migrations/1540_saju_source_proof_nonce_claim_authority_v1.sql
+$env:MYEONGHA_LOCAL_NONCE_PG_ENABLED = '1'
+node scripts/local/verify-saju-bridge-http.mjs ../Saju
+```
+
+**증명 범위 제한:** GitHub 테스트 DB는 임시 컨테이너의 superuser로 `SET LOCAL ROLE`을 실행합니다. 로컬 PostgreSQL의 실제 유니크 인덱스·RLS/ACL·원자성은 확인하지만, 독립 운영 로그인·접근 제어자·서버 간 DB 물리 분리/커스텀 TLS/실제 Supabase 회원 인증을 증명하지 않습니다. Saju Preview HMAC 결과는 여전히 `sourceAuthority=NOT_EVALUATED`, `stagingAdmission=HOLD` 및 제품 권한 모두 `false`입니다.
+
 ## 3. 통과 기준 / 아직 증명하지 않은 것
 
 | 시험 | 로컬/기존 CI에서 검사 가능 | 남는 실제 환경 확인 |
