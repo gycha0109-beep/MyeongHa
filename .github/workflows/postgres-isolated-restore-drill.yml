@@ -5,9 +5,10 @@ on:
   # Explicit, one-shot guarded source: this workflow file is changed only
   # through an exact-head reviewed main merge. No Production SQL is written.
   push:
-    branches: [main]
+    branches:
+      - main
     paths:
-      - '.github/workflows/postgres-isolated-restore-drill.yml'
+      - '.github/ops/postgres-restore-seyeon-20261008090417.once'
   workflow_dispatch:
     inputs:
       backup_run_id:
@@ -63,9 +64,7 @@ jobs:
           --health-retries 12
           --health-start-period 30s
     env:
-      MYEONGHA_WATCHTOWER_TRACK: ${{ github.event_name == 'push' && 'ops' || inputs.watchtower_track }}
-      RESTORE_BACKUP_RUN_ID: ${{ github.event_name == 'push' && '38088591661' || inputs.backup_run_id }}
-      RESTORE_INCIDENT_REFERENCE_UTC: ${{ github.event_name == 'push' && '2026-10-10T21:44:36Z' || inputs.incident_reference_utc }}
+      MYEONGHA_WATCHTOWER_TRACK: ${{ github.event_name == 'workflow_dispatch' && inputs.watchtower_track || 'ops' }}
       EXPECTED_PROJECT_REF: cnsfpcdiyofqvhpcegfc
       MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE: ${{ secrets.MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE }}
 
@@ -76,37 +75,41 @@ jobs:
           set -euo pipefail
           [[ "$MYEONGHA_WATCHTOWER_TRACK" == 'ops' ]]
 
-      - name: Require one-time fresh backfill-source restore for push
+      - name: Checkout exact repository state
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Gate one-shot Se-yeon current-frontier restore marker
         if: ${{ github.event_name == 'push' }}
+        id: one_shot
         shell: bash
         run: |
           set -euo pipefail
           [[ "$GITHUB_REF" == 'refs/heads/main' ]]
-          [[ "$RESTORE_BACKUP_RUN_ID" == '38088591661' ]]
-          [[ "$RESTORE_INCIDENT_REFERENCE_UTC" == '2026-10-10T21:44:36Z' ]]
-          # Fail closed if this one-shot source becomes stale.
-          point="$(date -u -d "$RESTORE_INCIDENT_REFERENCE_UTC" +%s)"
+          [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]]
+          [[ -z "$(git status --porcelain)" ]]
+          [[ "$(git show -s --format=%s HEAD)" == 'ops(dr): one-shot restore backup 38088591661 (#1947)' ]]
+          [[ "$(cat .github/ops/postgres-restore-seyeon-20261008090417.once)" == 'POSTGRES-RESTORE-SEYEON-20261008090417-V1' ]]
+          point="$(date -u -d '2026-10-10T21:44:36Z' +%s)"
           now="$(date -u +%s)"
           (( now >= point && now - point <= 14400 ))
-          echo 'SCOPED_RESTORE_PROOF_ONLY: 38088591661, never Production SQL'
-
-      - name: Checkout exact repository state
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+          echo 'backup_run_id=38088591661' >> "$GITHUB_OUTPUT"
+          echo 'incident_reference_utc=2026-10-10T21:44:36Z' >> "$GITHUB_OUTPUT"
+          echo 'SCOPED_RESTORE_PROOF_ONLY: backup 38088591661; never Production SQL'
 
       - name: Validate drill input and source backup authority
         id: source
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          BACKUP_RUN_ID: ${{ env.RESTORE_BACKUP_RUN_ID }}
-          INCIDENT_REFERENCE_UTC: ${{ env.RESTORE_INCIDENT_REFERENCE_UTC }}
+          BACKUP_RUN_ID: ${{ github.event_name == 'workflow_dispatch' && inputs.backup_run_id || steps.one_shot.outputs.backup_run_id }}
+          INCIDENT_REFERENCE_UTC: ${{ github.event_name == 'workflow_dispatch' && inputs.incident_reference_utc || steps.one_shot.outputs.incident_reference_utc }}
         run: bash scripts/operations/resolve-postgres-restore-source.sh
       - name: Download exact governed backup artifact
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
           github-token: ${{ github.token }}
           repository: ${{ github.repository }}
-          run-id: ${{ env.RESTORE_BACKUP_RUN_ID }}
+          run-id: ${{ github.event_name == 'workflow_dispatch' && inputs.backup_run_id || steps.one_shot.outputs.backup_run_id }}
           artifact-ids: ${{ steps.source.outputs.artifact_id }}
           merge-multiple: true
           path: ${{ runner.temp }}/backup-artifact
@@ -117,7 +120,7 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          BACKUP_RUN_ID: ${{ env.RESTORE_BACKUP_RUN_ID }}
+          BACKUP_RUN_ID: ${{ github.event_name == 'workflow_dispatch' && inputs.backup_run_id || steps.one_shot.outputs.backup_run_id }}
           PRIVACY_LEDGER_RUN_ID: ${{ inputs.privacy_ledger_run_id }}
           PRODUCTION_PRIVACY_CANARY_RUN_ID: ${{ inputs.production_privacy_canary_run_id }}
         run: bash scripts/operations/resolve-postgres-authoritative-privacy-replay-source.sh
@@ -163,7 +166,7 @@ jobs:
         shell: bash
         env:
           BACKUP_ARTIFACT_DIR: ${{ runner.temp }}/backup-artifact
-          PRIVACY_RECONCILIATION_BACKUP_RUN_ID: ${{ env.RESTORE_BACKUP_RUN_ID }}
+          PRIVACY_RECONCILIATION_BACKUP_RUN_ID: ${{ github.event_name == 'workflow_dispatch' && inputs.backup_run_id || steps.one_shot.outputs.backup_run_id }}
           PRIVACY_RECONCILIATION_EVIDENCE_PATH: ${{ runner.temp }}/restore-evidence/privacy-reconciliation-evidence.json
           PGHOST: 127.0.0.1
           PGPORT: 5432
@@ -177,10 +180,10 @@ jobs:
         env:
           LEDGER_ARTIFACT_DIR: ${{ runner.temp }}/privacy-ledger-artifact
           CANARY_EVIDENCE_DIR: ${{ runner.temp }}/privacy-canary-evidence
-          PRIVACY_RECONCILIATION_BACKUP_RUN_ID: ${{ env.RESTORE_BACKUP_RUN_ID }}
+          PRIVACY_RECONCILIATION_BACKUP_RUN_ID: ${{ github.event_name == 'workflow_dispatch' && inputs.backup_run_id || steps.one_shot.outputs.backup_run_id }}
           PRIVACY_RECONCILIATION_LEDGER_RUN_ID: ${{ inputs.privacy_ledger_run_id }}
           PRODUCTION_PRIVACY_CANARY_RUN_ID: ${{ inputs.production_privacy_canary_run_id }}
-          PRIVACY_RECONCILIATION_INCIDENT_REFERENCE_UTC: ${{ env.RESTORE_INCIDENT_REFERENCE_UTC }}
+          PRIVACY_RECONCILIATION_INCIDENT_REFERENCE_UTC: ${{ github.event_name == 'workflow_dispatch' && inputs.incident_reference_utc || steps.one_shot.outputs.incident_reference_utc }}
           PRIVACY_RECONCILIATION_EVIDENCE_PATH: ${{ runner.temp }}/restore-evidence/authoritative-privacy-reconciliation-evidence.json
           PGHOST: 127.0.0.1
           PGPORT: 5432
@@ -194,8 +197,8 @@ jobs:
         env:
           BACKUP_ARTIFACT_DIR: ${{ runner.temp }}/backup-artifact
           RESTORE_EVIDENCE_PATH: ${{ runner.temp }}/restore-evidence/restore-evidence.json
-          BACKUP_RUN_ID: ${{ env.RESTORE_BACKUP_RUN_ID }}
-          INCIDENT_REFERENCE_UTC: ${{ env.RESTORE_INCIDENT_REFERENCE_UTC }}
+          BACKUP_RUN_ID: ${{ github.event_name == 'workflow_dispatch' && inputs.backup_run_id || steps.one_shot.outputs.backup_run_id }}
+          INCIDENT_REFERENCE_UTC: ${{ github.event_name == 'workflow_dispatch' && inputs.incident_reference_utc || steps.one_shot.outputs.incident_reference_utc }}
           SOURCE_ARTIFACT_NAME: ${{ steps.source.outputs.artifact_name }}
           SOURCE_ARTIFACT_EXPIRES_AT: ${{ steps.source.outputs.artifact_expires_at }}
         run: bash scripts/operations/build-postgres-restore-evidence.sh
