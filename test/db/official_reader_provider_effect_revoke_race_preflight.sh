@@ -40,8 +40,7 @@ receipt="$(p -c "select source_receipt_id from public.entitlement_grants where i
 
 # Synthetic provider events are confined to this disposable isolated database;
 # production receipts, customer records, and operational Grants are untouched.
-p >"$tmpdir/events.out" 2>&1 <<SQL ||
-  { cat "$tmpdir/events.out" >&2; fail "synthetic provider event seed failed"; }
+p >"$tmpdir/events.out" 2>&1 <<SQL || { cat "$tmpdir/events.out" >&2; fail "synthetic provider event seed failed"; }
 insert into public.commerce_provider_events(
   id,provider,external_event_id,event_type,external_transaction_id,
   resolved_subject_id,resolution_source_type,resolved_receipt_id,
