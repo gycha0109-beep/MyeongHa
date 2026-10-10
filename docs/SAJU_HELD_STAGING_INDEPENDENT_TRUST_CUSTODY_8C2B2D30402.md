@@ -95,6 +95,14 @@ Watchtower-Track: saju-bridge
 
 기존 `test/saju-held-staging-target-trust-v1.test.ts`의 합성 Permit 교차재사용/Root 변경 검증은 재사용한다. 후속 저장소 CI 테스트는 기존 scoped PG15/PG17 CI suite를 **확장**하고 별도 Actions workflow를 만들지 않는다.
 
+## 6A. 폐기형 DB 검증 — 운영 인가와 분리
+
+- `test/db/fixtures/saju_custody_challenge_ci.sql`: 오직 CI 격리 PostgreSQL에 설치하는 Root fingerprint/최저 revision 보관과 일회성 Permit Challenge 저장소. 운영 migration 또는 실제 Root/Key custody가 아니다.
+- `test/db/saju_staging_custody_challenge_authority.sh`: 최소권한 역할의 직접 테이블 접근 거부, Root ID·fingerprint 교체 거부, 낮은 revision/동시 상향/ROLLBACK, 다른 Permit·Manifest·Plan·digest 재사용 차단, 만료·철회 및 동시 소비에서 성공 최대 한 번을 확인한다.
+- Challenge 난수는 DB가 암호학적 UUID를 세 번 생성하여 결합하고 도메인 분리 SHA-256 digest로 저장한다. 소비는 정확한 환경·Permit ID·대상 digest·양 SHA가 일치할 때만 조건부 원자 UPDATE한다. 같은 환경·Permit에는 자동 재발급하지 않는다.
+- 기존 `test/db/run_authority_core.sh`의 격리 DB 경로를 재사용하며 별도 워크플로, 운영 GRANT/로그인, 외부 DB/KMS·Runner/Commerce 자원은 생성하지 않는다.
+- **미증명:** 실제 Root 및 서명키의 독립 custody, 서명 검증과 floor 갱신의 신뢰된 선행 결속, 재해복구 시 durable floor, 운영 R01–R14, Permit/Challenge 별도 DB 간 원자성, 불명확 COMMIT의 독립 감사. 현재 상태는 `NOT_VERIFIED/HOLD`; 실행·발행·판매 권한은 모두 false.
+
 ## 7. 3-04-02 단계 종료 판정
 
 - **A — 설계:** 신뢰 입력·주체·스토리지 계약·접근 권한·레이스/사고 정책·테스트 매트릭스 문서화.
