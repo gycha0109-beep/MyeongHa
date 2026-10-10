@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   SEYEON_GOVERNED_DB_LOGIN_V1,
-  GOVERNED_LOGIN_PREFLIGHT_SQL_V1,
   SeyeonGovernedDbBoundaryErrorV1,
   createSeyeonGovernedPostgresPoolFromDriverV1,
   parseSeyeonGovernedDbConfigV1,
   verifySeyeonGovernedLoginPreflightV1,
 } from './seyeon-governed-postgres-pool-v1.js';
+import { GOVERNED_LOGIN_PREFLIGHT_SQL_V1 } from './postgres-seyeon-ai-cost-ledger-v1.js';
 import {
   createSeyeonGovernedCostTransactionRunnerV1,
 } from './seyeon-governed-cost-transaction-v1.js';
