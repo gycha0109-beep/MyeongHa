@@ -186,7 +186,7 @@ if (!migrationFiles.includes('0010_auth_owner.sql')) {
 
 const migrationVersionOwner = new Map();
 for (const name of migrationFiles.filter((file) => file.endsWith('.sql'))) {
-  const match = /^(\\d+)_[^/]+\\.sql$/.exec(name);
+  const match = /^(\d+)_[^/]+\.sql$/.exec(name);
   if (!match) throw new Error(`Invalid Supabase migration filename: ${name}`);
   const version = match[1];
   const existing = migrationVersionOwner.get(version);
